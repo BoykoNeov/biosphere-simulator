@@ -1,10 +1,12 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — steps 1–3 complete (repo/tooling skeleton; core state
+**Status:** In progress — steps 1–4 complete (repo/tooling skeleton; core state
 primitives: quantities, Stock, State, RNG, units-at-boundary core seam; flows:
-`Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`).
-Step 3 was built test-first against the "Step 3 design" below (advisor-reviewed).
-Step 4 (Boundary domain reservoir stocks) is next.
+`Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`;
+Boundary domain: `source`/`sink`/`loss_sink` reservoir constructors + the
+per-quantity numerical-loss-sink identity). Steps 3–4 were built test-first
+against their design sections below (advisor-reviewed).
+Step 5 (`Environment` source resolver) is next.
 (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
@@ -378,6 +380,83 @@ mis-stated as "every state change is a flow."
 
 ---
 
+## Step 4 design — Boundary domain reservoir stocks
+
+*Design pass (settled with advisor); implemented test-first.* This realizes
+decision #13 (and hosts #6's loss-sink). **Key framing:** the `Stock` *data
+shape* needed here already exists — step 2 gave `Stock` its `BOUNDARY` kind and
+`unclamped` flag. So step 4 is **not** a `Stock` change; it is the boundary
+*module* — the canonical identities + safe constructors that later steps
+reference **by name**.
+
+### New module — `simcore/boundary.py` (not `domain.py`)
+`domain.py`'s original "rich Domain class" role was dissolved into the registry's
+domain index in step 3 ("This index *is* Phase-0's Domain primitive … not a rich
+class"). Reviving it for unrelated content would mislead, so the boundary content
+lives in `boundary.py`; the repo-layout block above is updated to match.
+
+Three reservoir roles, all `BOUNDARY`-kind, each built by a constructor so call
+sites cannot misconfigure `kind` / `unit` / `unclamped` (the `unit` is always
+derived from `quantity` via the canonical-unit table — single source of truth,
+#9):
+- `source(stock_id, quantity, amount, *, unclamped=True)` — an "outside" supply
+  (solar; outside atmosphere as a source). **`unclamped` defaults True** — the
+  decision-#13 default that is easy to get wrong, encoded here so min-scaling
+  never throttles a supply. Overridable for a finite/throttleable supply.
+- `sink(stock_id, quantity, amount=0.0)` — an "outside" disposal reservoir
+  (receives outputs, never withdrawn from, so min-scaling — withdrawals only —
+  never applies; stays clamped). `amount` is a cumulative-output accumulator.
+- `loss_sink(quantity, amount=0.0)` + `loss_sinks(quantities=ASSERTED_QUANTITIES)`
+  — the numerical-loss reservoir extinction routes a snapped POPULATION residual
+  into (#6). **One per conserved (mass) quantity**, because a `Stock` holds
+  exactly one `Quantity` and conservation is per-quantity — a single multi-quantity
+  sink is impossible by the data model. ENERGY gets none (balance-exempt, #8;
+  POPULATION biomass is carbon anyway). Identity is canonical/deterministic:
+  `loss_sink_id(q) == "boundary.loss.<q.value>"`, with `is_loss_sink(id)` so the
+  step-8 ledger / diagnostics can separate routed numerical-loss deltas from
+  legitimate boundary exchange.
+
+`BOUNDARY_DOMAIN = DomainId("boundary")` is the canonical namespace (already used
+by existing fixtures, e.g. `boundary.outside_c`).
+
+### Decisions pinned here
+- **Guard `unclamped ⇒ kind == BOUNDARY` in `Stock.__post_init__`** (a step-2
+  primitive tightened mid-step-4, called out in the commit). This is a
+  *conservation* guard, not tidiness: if step 7's arbitration skip is later
+  written as the natural `if stock.unclamped: skip` (dropping the kind check), an
+  unclamped POOL would never be throttled and could go negative — a silent
+  conservation break. Rejecting `unclamped=True` on a non-BOUNDARY at construction
+  closes that single-point hazard and loses nothing (it is meaningless per #13).
+- **Unclamped sources may go negative *by design*.** The non-negativity invariant
+  guards POOL (via arbitration) and POPULATION (via extinction), **not** unclamped
+  sources, whose magnitude is pure ledger bookkeeping. (Documented in the module so
+  a future reader does not "fix" it.)
+- **Constructor is necessary but not sufficient.** Loss-sinks (and any boundary
+  reservoir) must actually be placed into the initial `State` by step 10's init,
+  or step 7's extinction deposit / step 8's ledger hit a referential-integrity
+  `KeyError` at the first step (referential integrity is the apply path's job,
+  step 5/6 — not a build-time check).
+
+### Step-4 test plan (construction-level; later machinery not pulled forward)
+- Loss-sink identity: `loss_sink_id` deterministic + quantity-specific;
+  `is_loss_sink` true for a loss-sink id, false for a normal boundary/biosphere id.
+- `loss_sink(q)` is a zeroed `BOUNDARY` reservoir (right quantity/unit/domain,
+  `unclamped=False`); `loss_sinks()` covers exactly `ASSERTED_QUANTITIES`, keyed by
+  id (ready to merge into `State.stocks`), with no ENERGY sink; explicit-set arg
+  honoured.
+- `source` is `BOUNDARY` + `unclamped=True` by default and overridable; `sink` is a
+  clamped `BOUNDARY` accumulator.
+- **Boundary-exchange (conservation half):** a synthetic Harvest (plant carbon →
+  boundary sink) **balances under `assert_flow_balanced` once the boundary reservoir
+  is counted** (#13) — reusing the step-3 helper. *(The "unclamped source is not
+  throttled" half of that exit-gate needs the arbitrator, step 7.)*
+- **Loss-sink routing conserves:** a withdrawal + matching loss-sink deposit
+  balances per-quantity — pinning that step 7's routing will conserve, without
+  dragging step 7's mechanism forward.
+- Guard: `unclamped=True` on POOL/POPULATION raises; on BOUNDARY it is allowed.
+
+---
+
 ## Test suite (exit gates)
 
 | Test | Asserts |
@@ -433,9 +512,12 @@ valid configuration: conservation, non-negativity, order-independence.
 space-station/
   pyproject.toml
   src/simcore/            # PURE engine — stdlib only, ZERO third-party deps
-    quantities.py  state.py  flow.py  domain.py  registry.py
+    quantities.py  state.py  flow.py  boundary.py  registry.py
     integrator.py  arbitration.py  conservation.py
     environment.py observation.py  determinism.py  events.py  rng.py
+    # (no domain.py: the Phase-0 "Domain" primitive is the registry's domain
+    #  index, not a rich class — see Step 3 design. boundary.py holds the
+    #  Boundary-domain reservoir constructors — see Step 4 design.)
   src/sim_io/             # OUTSIDE the core: JSON checkpoints, hex-float golden
   src/config/             # OUTSIDE: YAML loader + pydantic schemas + pint units
   src/domains/biosphere/  # Phase-0 minimal demo
@@ -511,7 +593,16 @@ space-station/
    are constants in `quantities.py`, shared with step 8. Tests: flow / registry /
    environment incl. a Hypothesis registration-order-independence property; all
    gates green (ruff, pyright, pytest).
-4. Boundary domain: reservoir stocks (`unclamped` sources + loss-sink).
+4. ✅ Boundary domain: reservoir stocks (`unclamped` sources + loss-sink).
+   *Done* (built test-first against "Step 4 design" above): `simcore/boundary.py`
+   — `BOUNDARY_DOMAIN`; `source`/`sink`/`loss_sink`/`loss_sinks` constructors
+   (unit derived from quantity; `source` defaults `unclamped=True`); per-quantity
+   loss-sink identity `loss_sink_id`/`is_loss_sink` over `ASSERTED_QUANTITIES`.
+   Hardened the step-2 `Stock` with an `unclamped ⇒ BOUNDARY` guard (a
+   conservation single-point fix, not tidiness). Tests: boundary constructors +
+   loss-sink identity + the conservation half of the Boundary-exchange gate
+   (reusing step-3 `assert_flow_balanced`) + loss-sink routing conserves + the
+   guard. All gates green (ruff, ruff format, pyright, pytest — 78 passed).
 5. `Environment` source resolver (forcing-at-`n·dt` + snapshot-reading shared-stock
    backends).
 6. Integrator strategy: Euler (with backstop), then RK4 (backstop→hard error);

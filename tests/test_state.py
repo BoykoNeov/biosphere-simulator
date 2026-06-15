@@ -61,6 +61,36 @@ def test_stock_rejects_non_finite_threshold() -> None:
         )
 
 
+@pytest.mark.parametrize("kind", [StockKind.POOL, StockKind.POPULATION])
+def test_stock_rejects_unclamped_on_non_boundary(kind: StockKind) -> None:
+    # `unclamped` is only meaningful for BOUNDARY sources (decision #13). An
+    # unclamped POOL/POPULATION would silently escape arbitration throttling and
+    # could go negative — reject it at construction.
+    with pytest.raises(ValueError, match="unclamped"):
+        Stock(
+            id=StockId("p"),
+            domain=DomainId("bio"),
+            quantity=Quantity.CARBON,
+            unit=UnitLabel("mol"),
+            amount=1.0,
+            kind=kind,
+            unclamped=True,
+        )
+
+
+def test_stock_allows_unclamped_on_boundary() -> None:
+    stock = Stock(
+        id=StockId("boundary.solar"),
+        domain=DomainId("boundary"),
+        quantity=Quantity.ENERGY,
+        unit=UnitLabel("J"),
+        amount=1.0,
+        kind=StockKind.BOUNDARY,
+        unclamped=True,
+    )
+    assert stock.unclamped is True
+
+
 # --- State -----------------------------------------------------------------
 def test_state_is_frozen() -> None:
     state = State(n=0, stocks={}, rng_seed=0)

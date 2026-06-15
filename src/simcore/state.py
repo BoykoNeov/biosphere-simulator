@@ -52,6 +52,17 @@ class Stock:
                 f"Stock {self.id!r} extinction_threshold is not finite: "
                 f"{self.extinction_threshold!r}"
             )
+        # `unclamped` is meaningful only for BOUNDARY sources (decision #13): it
+        # tells arbitration's min-scaling never to throttle this stock. An
+        # unclamped POOL/POPULATION would silently escape throttling and could go
+        # negative — a conservation break — so reject it at construction. (Guard
+        # added in step 4 alongside the Boundary domain module; it tightens this
+        # step-2 primitive to match its own documented contract.)
+        if self.unclamped and self.kind is not StockKind.BOUNDARY:
+            raise ValueError(
+                f"Stock {self.id!r} is unclamped but kind={self.kind.name}; "
+                "unclamped is only valid on BOUNDARY stocks (decision #13)"
+            )
 
 
 @dataclass(frozen=True)
