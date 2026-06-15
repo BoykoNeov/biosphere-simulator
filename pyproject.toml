@@ -1,0 +1,55 @@
+[project]
+name = "biosphere-sim"
+version = "0.0.0"
+description = "Deterministic stock-and-flow station/biosphere simulation engine (Phase 0 skeleton)."
+readme = "README.md"
+requires-python = ">=3.12"
+# Runtime deps live ONLY in the outer layers (config/, sim_io/).
+# simcore/ is stdlib-only (zero third-party deps) — enforced by a purity test
+# in a later step, not by packaging. See docs/plans/phase-0-engine-skeleton.md.
+dependencies = [
+    "pydantic>=2",   # config/: param schema validation
+    "pint>=0.24",    # config/: unit validation at the boundary
+    "pyyaml>=6",     # config/: YAML param loading (safe_load)
+]
+
+[dependency-groups]
+# PEP 735 dev group; `uv sync` installs it by default.
+dev = [
+    "ruff>=0.6",
+    "pytest>=8",
+    "hypothesis>=6",
+    "pyright>=1.1",
+]
+# PCSE (EUPL) is an OFFLINE validation oracle only, needed once real biology
+# lands (Phase 1). Deferred here to keep the skeleton lean and numpy-free.
+# See docs/reuse-and-licenses.md — oracle use only, never imported by the core.
+# oracle = ["pcse"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Multi-package src-layout: each path maps to a top-level import package.
+packages = ["src/simcore", "src/sim_io", "src/config", "src/domains"]
+
+[tool.ruff]
+# Lint against the minimum supported version (the floor), not the dev version.
+target-version = "py312"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.13"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
