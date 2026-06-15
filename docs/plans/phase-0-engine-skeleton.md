@@ -1,9 +1,10 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — steps 1–2 complete (repo/tooling skeleton; core state
-primitives: quantities, Stock, State, RNG, units-at-boundary core seam). Step 3
-(`Flow`/`Leg`/`FlowResult` + registry + cross-domain flows) — **design pass done**
-(see "Step 3 design" below, settled with advisor); implementation next.
+**Status:** In progress — steps 1–3 complete (repo/tooling skeleton; core state
+primitives: quantities, Stock, State, RNG, units-at-boundary core seam; flows:
+`Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`).
+Step 3 was built test-first against the "Step 3 design" below (advisor-reviewed).
+Step 4 (Boundary domain reservoir stocks) is next.
 (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
@@ -496,14 +497,20 @@ space-station/
    the `config/` boundary is deferred to the param-loader step** — there is
    nothing to validate until params exist, and the "Units" exit gate lives in
    the step-11 suite.
-3. `Flow`/`Leg`/`FlowResult` + registry + cross-domain flows.
-   *Design done* (see "Step 3 design" above): frozen `Leg`/`FlowResult`
-   (one-leg-per-stock), `Flow` Protocol, minimal `Environment` Protocol (interface
-   only — backends are step 5). Balance + referential integrity are *evaluation-
-   time* (helpers over an evaluated `FlowResult`; registry does structure only:
-   dup-id reject + canonical id-sorted iteration + a `Stock.domain` index = the
-   Phase-0 "Domain" primitive). ENERGY-exempt asserted-set is one constant in
-   `quantities.py`, shared with step 8. Implementation next.
+3. ✅ `Flow`/`Leg`/`FlowResult` + registry + cross-domain flows.
+   *Done* (built test-first against "Step 3 design" above): frozen `Leg`/
+   `FlowResult` (one-leg-per-stock, NaN/Inf-rejecting, list→tuple coercion),
+   `Flow` Protocol (read-only `id`/`priority` so frozen flows satisfy it),
+   minimal `Environment` Protocol (interface only — backends are step 5).
+   Balance + referential integrity are *evaluation-time*: helpers
+   `per_quantity_residual` / `assert_flow_balanced` (raises `ConservationError`;
+   `abs(residual) <= atol + rtol*scale`; canonical leg-sort #15) / `domains_touched`
+   over an evaluated `FlowResult`. Registry does structure only: dup-id reject +
+   canonical id-sorted iteration + a `Stock.domain` index = the Phase-0 "Domain"
+   primitive. ENERGY-exempt `ASSERTED_QUANTITIES` + `BALANCE_ATOL`/`BALANCE_RTOL`
+   are constants in `quantities.py`, shared with step 8. Tests: flow / registry /
+   environment incl. a Hypothesis registration-order-independence property; all
+   gates green (ruff, pyright, pytest).
 4. Boundary domain: reservoir stocks (`unclamped` sources + loss-sink).
 5. `Environment` source resolver (forcing-at-`n·dt` + snapshot-reading shared-stock
    backends).
