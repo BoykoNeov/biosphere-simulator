@@ -1,12 +1,14 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — steps 1–4 complete (repo/tooling skeleton; core state
+**Status:** In progress — steps 1–5 complete (repo/tooling skeleton; core state
 primitives: quantities, Stock, State, RNG, units-at-boundary core seam; flows:
 `Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`;
 Boundary domain: `source`/`sink`/`loss_sink` reservoir constructors + the
-per-quantity numerical-loss-sink identity). Steps 3–4 were built test-first
-against their design sections below (advisor-reviewed).
-Step 5 (`Environment` source resolver) is next.
+per-quantity numerical-loss-sink identity; Environment source resolver:
+`SourceResolver`/`BoundEnvironment` + `Schedule`/`constant`, forcing-at-`n·dt`
+and snapshot-reading shared-stock backends behind the frozen `get`). Steps 3–5
+were built test-first against their design sections below (advisor-reviewed).
+Step 6 (integrator strategy: Euler then RK4) is next.
 (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
@@ -457,6 +459,101 @@ by existing fixtures, e.g. `boundary.outside_c`).
 
 ---
 
+## Step 5 design — Environment source resolver
+
+*Design pass (settle with advisor); implement test-first.* Realizes the scope
+item "Environment as source resolver" plus decisions #14 (forcing at integer
+`t = n·dt`) and #16 (internal branch reads the immutable snapshot). Step 3 built
+the `Environment` **Protocol** (`get(var) -> float`); step 5 builds the concrete
+**backends** behind it without touching the frozen interface.
+
+### The binding model (the crux)
+`Environment.get(var)` takes only `var` (frozen API) — so all per-step context
+(*which* snapshot, *which* `dt`) must be **bound into** the object before it
+reaches a flow. Step 5 therefore splits into:
+- **`SourceResolver`** — immutable, build-once *wiring* (mirrors `Registry`): two
+  **disjoint** var maps, `forcings: var -> Schedule` and `shared: var -> StockId`.
+- **a bound view** — `resolver.bind(snapshot, dt)` returns a lightweight object
+  satisfying `Environment`; the integrator (step 6) rebinds it **per derivative
+  evaluation** (Euler: once; RK4: per stage) and hands it to `flow.evaluate`.
+
+`get(var)` dispatches: a forcing var → `schedule(snapshot.n, dt)`; a shared var →
+`snapshot.stocks[stock_id].amount`. The caller cannot tell which — the
+indistinguishability that lets *identical* domain code run standalone (forcing)
+and coupled (shared stock).
+
+**Step-6 seam contract (pin now, enforce there):** the integrator must `bind`
+the env to the **same snapshot object** it passes positionally to
+`flow.evaluate(snapshot, env, dt)`. This is the mechanism that *makes* #16 hold —
+if step 6 ever binds to a different state than it passes, a flow's direct snapshot
+reads and its `env.get` shared-stock reads silently diverge, and **no step-5 test
+can catch it** (it is integrator behaviour, not resolver behaviour). The natural
+step-6 code gets this right; the contract is written down so it stays right.
+
+### Why `n` comes from the bound snapshot (#14 + #16 unified)
+Both branches read the *one* bound snapshot: the internal branch reads its stock
+amounts (#16 — the same snapshot flows read), and the forcing branch reads its
+integer `n` (`n = snapshot.n`) to evaluate `schedule(n, dt)` at `t = n·dt`, never
+an accumulated `t` (#14). Tying forcing-time to the bound snapshot also settles
+RK4 for free: RK4's intermediate stage-states keep the step's `n` (only amounts
+are perturbed; `n` increments only at apply), so **forcing is piecewise-constant
+within a step**. This is *exact* (zero error), not a tolerated approximation,
+because **time-varying-forcing × RK4 simply does not occur in Phase 0**: the demo
+forcing is constant, and the convergence/drift oscillator (Lotka–Volterra +
+harmonic) is **autonomous** — its oscillation emerges from 2-stock coupling, with
+no explicit `t` in any `env.get`. Time-varying forcing under RK4 would want
+sub-stage evaluation at `(n + c_i)·dt`; that refinement is **deferred** and noted
+so step 6 isn't boxed in.
+
+### Schedule shape
+`Schedule = Callable[[int, float], float]` — a pure function of `(n, dt)`. Passing
+the integer `n` *and* `dt` (not a precomputed float `t`) keeps the integer visible,
+so step-index schedules ("every k steps") and wall-time schedules (`t = n·dt`) are
+both expressible drift-free (#14). A `constant(value)` helper covers the Phase-0
+demo (validates `value` finite at construction). `get` guards the forcing result
+with `math.isfinite` — stock amounts are already finite (`Stock.__post_init__`), so
+only forcing can introduce NaN/Inf; a bad schedule fails loudly instead of
+poisoning a downstream leg.
+
+### Referential integrity = resolve-time (with eyes open)
+A `shared` var pointing at an unknown `StockId`, or an unknown `var`, surfaces as a
+`KeyError` at the first `get` — **not** a construction check. Note the analogy to
+flow legs is *imperfect* and we own that: flow legs genuinely *cannot* be checked
+at build (they don't exist until `evaluate`), whereas the `shared: var -> StockId`
+map **is** fully known at construction. So the honest justification is not "can't
+check it" but "**the cost of deferring is ~nil**": a missing target fails at the
+*first* `get` (n = 0), loud and immediate, never a 100k-step time bomb — so a
+build-time check buys almost nothing while coupling the resolver to the initial
+stock set. (If step 10 later wants belt-and-suspenders, passing the stock-id set
+and rejecting unknown targets is one set-difference — cheap to add then.) Overlap
+*within* the wiring (a var in both maps) **is** rejected at construction — a
+structural property of the wiring itself, knowable at build and independent of any
+stock set (analogous to the registry's dup-id reject).
+
+### Step-5 test plan
+- `constant`: returns its value for any `(n, dt)`; rejects non-finite.
+- Forcing branch: the `schedule` receives the integer `snapshot.n` and `dt`; the
+  value changes with `n` for a time-varying schedule, is fixed for a constant.
+- Shared branch: returns the bound snapshot's stock amount; **rebinding to a
+  snapshot with a different amount changes the result** (proves it reads the bound
+  snapshot, #16 — no caching of a stale value).
+- Indistinguishability gate: a synthetic flow that withdraws `env.get("x")`
+  produces an **equal `FlowResult`** whether `"x"` is a constant forcing `V` or a
+  stock holding `V` — compared **across several `n`** (a one-binding comparison
+  could pass even if the forcing branch accidentally ignored `n`; spanning `n`
+  proves constant-forcing and static-stock stay equivalent as steps advance, the
+  shape the step-10/11 full-run gate needs).
+- Branch isolation (Hypothesis): the forcing value depends only on `(n, dt)`, not
+  on the snapshot's stock contents.
+- Construction: an overlapping var is rejected (`ValueError`); empty wiring is a
+  valid resolver.
+- Resolve-time errors: an unknown var → `KeyError`; a shared var → missing stock →
+  `KeyError`.
+- `bind(...)` satisfies the `Environment` Protocol (`isinstance`), tying the
+  backend to the interface.
+
+---
+
 ## Test suite (exit gates)
 
 | Test | Asserts |
@@ -603,8 +700,23 @@ space-station/
    loss-sink identity + the conservation half of the Boundary-exchange gate
    (reusing step-3 `assert_flow_balanced`) + loss-sink routing conserves + the
    guard. All gates green (ruff, ruff format, pyright, pytest — 78 passed).
-5. `Environment` source resolver (forcing-at-`n·dt` + snapshot-reading shared-stock
-   backends).
+5. ✅ `Environment` source resolver (forcing-at-`n·dt` + snapshot-reading
+   shared-stock backends).
+   *Done* (built test-first against "Step 5 design" above): `simcore/environment.py`
+   — `SourceResolver` (build-once, MappingProxyType-wrapped disjoint var maps;
+   rejects a var wired as both forcing and shared) + `BoundEnvironment` (frozen,
+   lightweight per-evaluation view satisfying the `Environment` Protocol) +
+   `Schedule = Callable[[int, float], float]` and a `constant` helper. Forcing
+   branch evaluates `schedule(snapshot.n, dt)` at integer `n` (#14, finiteness-
+   guarded — only forcing can leak NaN/Inf); shared branch reads the bound
+   snapshot's stock amount (#16). Referential integrity is resolve-time (`KeyError`
+   at first `get`). Step-6 seam contract pinned in the design: the integrator binds
+   env to the *same* snapshot it passes to `flow.evaluate`. Tests: constant
+   schedule, forcing-at-`n·dt`, shared-snapshot rebinding, the indistinguishability
+   gate across several `n`, a Hypothesis branch-isolation property, wiring/overlap
+   rejection, resolve-time errors, Protocol satisfaction, plus a mixed-wiring
+   dispatch test (one resolver routing both branches — the step-10 demo shape).
+   All gates green (ruff, ruff format, pyright, pytest — 95 passed).
 6. Integrator strategy: Euler (with backstop), then RK4 (backstop→hard error);
    atomic apply + canonical reduce everywhere.
 7. Arbitration backstop + counter; extinction-with-loss-sink; events.
