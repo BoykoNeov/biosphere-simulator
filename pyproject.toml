@@ -49,7 +49,9 @@ addopts = "-ra"
 
 [tool.pyright]
 include = ["src", "tests"]
-pythonVersion = "3.13"
+# Check against the supported floor (matches requires-python and ruff target),
+# even though the dev interpreter is pinned to 3.13 via .python-version.
+pythonVersion = "3.12"
 typeCheckingMode = "basic"
 venvPath = "."
 venv = ".venv"

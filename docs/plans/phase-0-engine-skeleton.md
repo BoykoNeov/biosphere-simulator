@@ -1,6 +1,7 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** Reviewed (advisor pass folded in) — ready to build on your go.
+**Status:** In progress — step 1 (repo + tooling skeleton) complete; step 2 next.
+(Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -369,7 +370,9 @@ space-station/
 
 ## Sequencing
 
-1. Repo + tooling skeleton (`pyproject`, `uv`, `ruff`, `pytest`, CI-less local).
+1. ✅ Repo + tooling skeleton (`pyproject`, `uv`, `ruff`, `pytest`, CI-less local).
+   *Done:* uv-managed Python 3.13, committed `uv.lock`, multi-package src-layout,
+   all gates green (ruff/pytest+hypothesis/pyright), smoke test resolves packages.
 2. `quantities`, `Stock` (+ `kind`/`unclamped`), `State` (integer `n`),
    counter-based `rng`, units-at-boundary.
 3. `Flow`/`Leg`/`FlowResult` + registry + cross-domain flows.
