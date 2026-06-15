@@ -73,9 +73,15 @@ def keyed_hash(seed: int, key: tuple[int, ...], step: int) -> int:
 
 @runtime_checkable
 class Rng(Protocol):
-    """Frozen-API RNG surface: a seed plus order-independent keyed draws."""
+    """Frozen-API RNG surface: a seed plus order-independent keyed draws.
 
-    seed: int
+    ``seed`` is **read-only** (declared as a property) so a frozen implementation
+    like ``CounterRng`` satisfies the protocol — a writable-attribute protocol
+    member would reject a frozen dataclass field. (Same fix applied to ``Flow``.)
+    """
+
+    @property
+    def seed(self) -> int: ...
 
     def draw(self, key: tuple[int, ...], step: int) -> float: ...
 
