@@ -1,0 +1,76 @@
+"""Conserved quantities, stock kinds, and the canonical-unit table.
+
+This is part of the frozen Phase-0 API (see ``docs/plans/phase-0-engine-skeleton``).
+Everything here is plain stdlib data — no third-party imports.
+"""
+
+from enum import Enum
+
+from simcore.ids import UnitLabel
+
+
+class Quantity(Enum):
+    """A conserved quantity tracked by the ledger.
+
+    The conservation gate balances each member independently every step. Add a
+    member only when a real stock and the matching flow stoichiometry exist for
+    it — every per-quantity loop and the canonical-unit table below must cover
+    each member, so an unused quantity is dead weight.
+
+    ``PHOSPHORUS`` is intentionally *reserved as a comment*, not a member: the
+    design anticipates it, but it has no Phase-0 stock or unit. (Matches the
+    frozen API, which lists it as ``# PHOSPHORUS reserved``.)
+    """
+
+    CARBON = "carbon"
+    WATER = "water"
+    NITROGEN = "nitrogen"
+    OXYGEN = "oxygen"
+    ENERGY = "energy"
+    # PHOSPHORUS reserved — add when a phosphorus stock + flow actually exist.
+
+
+class StockKind(Enum):
+    """How a stock behaves under arbitration and extinction.
+
+    - ``POOL``: a resource pool (e.g. atmospheric carbon, water). Never
+      zeroed-with-loss; arbitration may throttle draws against it.
+    - ``POPULATION``: absorbing-eligible biomass/population. May go extinct —
+      below its ``extinction_threshold`` it snaps to 0 and the residual is routed
+      to the numerical-loss boundary sink (decision #6).
+    - ``BOUNDARY``: an "outside" reservoir. Its per-step delta *is* a ledger
+      Input/Output (decision #13). May be flagged ``unclamped`` (e.g. solar) so
+      arbitration's min-scaling never throttles it.
+    """
+
+    POOL = "pool"
+    POPULATION = "population"
+    BOUNDARY = "boundary"
+
+
+# Canonical-unit table — the single shared source of truth (decision #9). The
+# core carries only these *labels*; the outer ``config`` loader validates and
+# converts incoming params against them with pint.
+#
+# PROVISIONAL (step-2 note): the specific unit chosen per quantity does NOT
+# affect any Phase-0 invariant — conservation arithmetic only requires that every
+# stock of a given quantity shares one consistent canonical unit, regardless of
+# which. Picking the science-correct units (mol vs kg, dry-mass basis, ...) is a
+# Phase-1 decision. Until then these are placeholders; do not read significance
+# into mol-vs-kg here.
+CANONICAL_UNIT: dict[Quantity, UnitLabel] = {
+    Quantity.CARBON: UnitLabel("mol"),
+    Quantity.WATER: UnitLabel("mol"),
+    Quantity.NITROGEN: UnitLabel("mol"),
+    Quantity.OXYGEN: UnitLabel("mol"),
+    Quantity.ENERGY: UnitLabel("J"),
+}
+
+
+def canonical_unit(quantity: Quantity) -> UnitLabel:
+    """Return the canonical-unit label for ``quantity``.
+
+    Raises ``KeyError`` if a quantity has no table entry — which would be a bug,
+    since every ``Quantity`` member must be covered (a test asserts totality).
+    """
+    return CANONICAL_UNIT[quantity]

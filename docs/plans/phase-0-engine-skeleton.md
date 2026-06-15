@@ -1,6 +1,7 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — step 1 (repo + tooling skeleton) complete; step 2 next.
+**Status:** In progress — step 1 (repo + tooling skeleton) complete; step 2 (core
+state primitives: quantities, Stock, State, RNG, units-at-boundary) under way.
 (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
@@ -159,13 +160,23 @@ class StockKind(Enum):
     BOUNDARY     # "outside" reservoir — its delta is a ledger Input/Output
 
 # --- stocks ---------------------------------------------------------------
-@dataclass
+@dataclass(frozen=True)   # step-2 decision: Stock is FROZEN, matching the
+                          # immutable-snapshot/determinism model — a step writes
+                          # a new State via dataclasses.replace, never mutates a
+                          # Stock in place. (Perf is explicitly deferred.)
 class Stock:
     id: StockId                 # stable, canonical-sortable
     domain: DomainId
     quantity: Quantity
     unit: UnitLabel             # canonical-unit *label* (str/enum); pint
-                                # validation lives in the loader, not the core
+                                # validation lives in the loader, not the core.
+                                # The Quantity->UnitLabel canonical table lives in
+                                # simcore.quantities (the shared source of truth,
+                                # #9). Step-2 note: the *specific* labels (mol vs
+                                # kg ...) are PROVISIONAL — they don't affect any
+                                # Phase-0 invariant (conservation only needs one
+                                # consistent unit per quantity); the science pick
+                                # is a Phase-1 decision.
     amount: float               # in canonical unit
     kind: StockKind             # POOL | POPULATION | BOUNDARY
     extinction_threshold: float = 0.0   # POPULATION only: below -> 0 + loss-sink
@@ -214,7 +225,13 @@ class Integrator(Protocol):
 # --- RNG: counter-based, keyed, pure-Python, seed carried in State -------
 class Rng(Protocol):
     seed: int
-    def draw(self, key: tuple, step: int) -> float: ...   # order-independent
+    def draw(self, key: tuple[int, ...], step: int) -> float: ...  # order-independent
+    # Cross-port contract (step 2): keyed splitmix64 *finalizer* used as a
+    # stateless hash of (seed, *key, step); all ops masked to 64 bits; float via
+    # (x >> 11) / 2**53 in [0,1) (no 1.0, no NaN/Inf). `key` is a tuple of ints
+    # for Phase 0 — string-folding (which would need a pinned byte-hash like
+    # FNV-1a + its own vectors) is deferred until a scenario needs it. Golden
+    # hex vectors in the tests are the Rust port's conformance target.
 
 # --- global state (immutable snapshot per step) --------------------------
 @dataclass(frozen=True)
