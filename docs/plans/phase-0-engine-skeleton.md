@@ -1,7 +1,9 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — step 1 (repo + tooling skeleton) complete; step 2 (core
-state primitives: quantities, Stock, State, RNG, units-at-boundary) under way.
+**Status:** In progress — steps 1–2 complete (repo/tooling skeleton; core state
+primitives: quantities, Stock, State, RNG, units-at-boundary core seam). Step 3
+(`Flow`/`Leg`/`FlowResult` + registry + cross-domain flows) — **design pass done**
+(see "Step 3 design" below, settled with advisor); implementation next.
 (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
@@ -282,6 +284,99 @@ from the kinetics, not the guard.
 
 ---
 
+## Step 3 design — flows, balance helper, registry
+
+*Design pass (settled with advisor); implementation next.* This realizes the
+Frozen API's flow/registry portion. The shapes here are the irreversible
+"structured per-stock legs" commitment (#1/#2), so they are pinned before coding.
+
+### New modules
+- `simcore/flow.py` — `Leg`, `FlowResult`, the `Flow` Protocol, and pure
+  *result-level* helpers (`per_quantity_residual`, `assert_flow_balanced`,
+  `domains_touched`).
+- `simcore/environment.py` — the **`Environment` Protocol only** (`get(var) -> float`).
+  The interface is needed for `Flow.evaluate`'s signature; the forcing /
+  shared-stock *backends* are step 5. Building just the Protocol now keeps step 3
+  from pulling step 5 forward.
+- `simcore/registry.py` — `Registry`.
+
+### Data shapes (frozen, stdlib, NaN/Inf-rejecting like `Stock`)
+- `Leg(stock: StockId, amount: float)` — `amount` per dt; `>0` deposit, `<0`
+  withdrawal. `__post_init__` rejects non-finite `amount`.
+- `FlowResult(legs: tuple[Leg, ...])` — **at most one leg per `StockId`** (reject
+  duplicates in `__post_init__`: a flow nets its own touches on a stock). Empty
+  `legs` is a valid no-op step. One-leg-per-stock also keeps arbitration's
+  `demand_s` / `scale_f` (#15, step 7) a clean per-(stock, flow) quantity.
+- `Flow(Protocol)` — `id: FlowId`, `priority: int`,
+  `evaluate(snapshot: State, env: Environment, dt: float) -> FlowResult`. PURE.
+  `priority` is carried for declared-controller policies (#5) but **unused under
+  the proportional default**; canonical reduction order is always id-sorted (#15),
+  never priority.
+
+### Balance is evaluation-time, not registration-time (key correction)
+A `Flow` exposes only `evaluate`; **legs exist only after evaluation against a
+snapshot.** So nothing leg-shaped is knowable at registration. Therefore both the
+balance check and referential integrity are *evaluation-time*:
+- **Balance** is a property of an *evaluated* `FlowResult`: per `Quantity`,
+  `Σ legs == 0` within tolerance (every mole withdrawn from one carbon stock lands
+  in another carbon stock, incl. boundary reservoirs). Resolving each leg's
+  quantity needs a stock lookup, so the check is a pure helper over
+  `(result, stocks)` — used in step-3 tests and **reused by the step-8 every-step
+  conservation assertion**.
+- **`ENERGY` is exempt** (#8 — energy closure is Phase 5/6; here it is diagnostic).
+  `per_quantity_residual` returns *all* residuals incl. ENERGY (the diagnostic);
+  `assert_flow_balanced` checks only the **asserted set**. That asserted set
+  (all mass quantities = every `Quantity` except `ENERGY` for Phase 0) lives as
+  **one constant in `simcore/quantities.py`** so step 3 and the step-8 ledger
+  cannot drift apart.
+- **Referential integrity** (every produced `Leg.stock` is a real stock) is also
+  evaluation-time: an assertion in the **apply path** (step 5/6), not a
+  registration check. Cost: a typo'd stock id surfaces at first step, not at build
+  — acceptable for Phase 0; static-wiring validation is a noted future enhancement.
+
+### Registry (frozen, build-once config)
+Because referential integrity and "which domains a flow touches" are
+evaluation-time, the registry's real job shrinks to **structure only**:
+- holds the flow set; **rejects duplicate `FlowId`**;
+- exposes **canonical id-sorted** flow iteration — this is the registration-order-
+  independence guarantee (#7/#15): shuffling registration yields bit-identical
+  iteration;
+- a **domain index** `Mapping[DomainId, frozenset[StockId]]` derived from
+  `Stock.domain` over the initial stocks. This *is* Phase-0's "Domain" primitive
+  (scope list): a `DomainId` namespace + its stock membership, **not** a rich class.
+- The registry is **injected into the integrator at construction** (the frozen
+  `Integrator.step(state, env, dt)` has no registry param) — built here, consumed
+  in step 6.
+
+"Cross-domain flow" is then a property of an *evaluated* result:
+`domains_touched(result, stocks) -> frozenset[DomainId]` maps legs → `Stock.domain`;
+a flow is cross-domain iff it touches >1 domain. Step-3 tests exercise this with a
+**synthetic** Harvest flow — the real Photosynthesis/Respiration/Harvest demo is
+step 10; the cross-domain test must not drag the biosphere demo forward.
+
+### Why per-flow balance ⟹ global conservation (forward note)
+Arbitration scales a whole flow by one factor (#2/#4), and `scale_f · Σlegs = 0`,
+so scaling preserves per-flow balance *exactly*; summed over flows this yields the
+global ledger balance (#13). **Caveat:** extinction's loss-sink routing (step 7)
+is a *balanced non-flow* state change — so "every flow is balanced" must **not** be
+mis-stated as "every state change is a flow."
+
+### Step-3 test plan
+- `Leg`/`FlowResult`: frozen; non-finite `amount` rejected; duplicate-`StockId`
+  `FlowResult` rejected; empty legs allowed.
+- Balance helper: a balanced synthetic flow passes; a carbon-imbalanced flow fails;
+  an energy-only imbalance is **tolerated** (ENERGY exempt); near-zero residual
+  within `tol` passes (tolerance is actually applied).
+- `Flow` purity: evaluating a synthetic flow twice on the same snapshot returns an
+  equal `FlowResult`.
+- Registry: rejects duplicate `FlowId`; **registration-order independence** —
+  shuffling the flow list yields bit-identical canonical iteration (Hypothesis
+  property test); domain index matches `Stock.domain`.
+- Cross-domain: a synthetic Harvest (plant-carbon → outside-carbon across two
+  domains) is balanced and `domains_touched == {biosphere, boundary}`.
+
+---
+
 ## Test suite (exit gates)
 
 | Test | Asserts |
@@ -402,6 +497,13 @@ space-station/
    nothing to validate until params exist, and the "Units" exit gate lives in
    the step-11 suite.
 3. `Flow`/`Leg`/`FlowResult` + registry + cross-domain flows.
+   *Design done* (see "Step 3 design" above): frozen `Leg`/`FlowResult`
+   (one-leg-per-stock), `Flow` Protocol, minimal `Environment` Protocol (interface
+   only — backends are step 5). Balance + referential integrity are *evaluation-
+   time* (helpers over an evaluated `FlowResult`; registry does structure only:
+   dup-id reject + canonical id-sorted iteration + a `Stock.domain` index = the
+   Phase-0 "Domain" primitive). ENERGY-exempt asserted-set is one constant in
+   `quantities.py`, shared with step 8. Implementation next.
 4. Boundary domain: reservoir stocks (`unclamped` sources + loss-sink).
 5. `Environment` source resolver (forcing-at-`n·dt` + snapshot-reading shared-stock
    backends).
