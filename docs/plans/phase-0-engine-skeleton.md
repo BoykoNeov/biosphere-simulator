@@ -392,6 +392,15 @@ space-station/
    all gates green (ruff/pytest+hypothesis/pyright), smoke test resolves packages.
 2. `quantities`, `Stock` (+ `kind`/`unclamped`), `State` (integer `n`),
    counter-based `rng`, units-at-boundary.
+   *Done:* `simcore.{ids,quantities,state,rng}` — frozen `Stock`/`State`
+   (MappingProxyType snapshot, integer `n`, finiteness + key/id guards),
+   counter-based keyed splitmix64-finalizer `rng` (order-independent, 64-bit
+   masked, `key:tuple[int]`) with cross-port golden hex vectors. *units-at-
+   boundary:* the **core-side** seam is built (the `Quantity→UnitLabel`
+   canonical table is the single source of truth, #9); the **pint validation at
+   the `config/` boundary is deferred to the param-loader step** — there is
+   nothing to validate until params exist, and the "Units" exit gate lives in
+   the step-11 suite.
 3. `Flow`/`Leg`/`FlowResult` + registry + cross-domain flows.
 4. Boundary domain: reservoir stocks (`unclamped` sources + loss-sink).
 5. `Environment` source resolver (forcing-at-`n·dt` + snapshot-reading shared-stock

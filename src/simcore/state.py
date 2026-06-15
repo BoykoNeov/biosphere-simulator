@@ -61,6 +61,11 @@ class State:
     Time is the integer step count ``n`` (decision #14): wall time is ``n * dt``,
     evaluated, never accumulated. ``rng_seed`` is carried in state so draws are
     keyed by ``(seed, key, n)`` and stay order-independent (decision #12).
+
+    Note: a ``State`` is **not hashable** — the ``MappingProxyType`` stocks field
+    is unhashable, so ``hash(state)`` raises. Equality (by contents) works. If a
+    later test needs states in a ``set``/dict-key, give ``State`` a custom
+    ``__hash__`` then (e.g. over ``n`` + sorted stock ids); don't rely on it now.
     """
 
     n: int
