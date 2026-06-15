@@ -74,3 +74,20 @@ def canonical_unit(quantity: Quantity) -> UnitLabel:
     since every ``Quantity`` member must be covered (a test asserts totality).
     """
     return CANONICAL_UNIT[quantity]
+
+
+# --- balance contract (shared by the step-3 flow check + step-8 ledger) ------
+# The quantities whose per-flow / per-step balance is ASSERTED. ENERGY is exempt
+# (decision #8: energy *closure* is Phase 5/6; here energy is a diagnostic only).
+# This is the single source of truth for "what we assert" — co-located with the
+# tolerances below ("how tightly") so the step-3 flow-balance helper and the
+# step-8 conservation gate cannot drift apart.
+ASSERTED_QUANTITIES: frozenset[Quantity] = frozenset(Quantity) - {Quantity.ENERGY}
+
+# The balance test is ``abs(residual) <= BALANCE_ATOL + BALANCE_RTOL * scale``,
+# where ``scale`` is the transfer magnitude (max ``|leg.amount|`` for the
+# quantity). The relative term keeps the check meaningful over the varied
+# magnitudes the step-8 every-step gate sees. Phase-0 defaults; step 8 may revisit
+# against real numbers (the *form* is what matters, not these exact values).
+BALANCE_ATOL: float = 1e-9
+BALANCE_RTOL: float = 1e-9
