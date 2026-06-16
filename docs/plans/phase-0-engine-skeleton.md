@@ -1,6 +1,6 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — steps 1–6 complete (repo/tooling skeleton; core state
+**Status:** In progress — steps 1–7 complete (repo/tooling skeleton; core state
 primitives: quantities, Stock, State, RNG, units-at-boundary core seam; flows:
 `Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`;
 Boundary domain: `source`/`sink`/`loss_sink` reservoir constructors + the
@@ -9,9 +9,13 @@ per-quantity numerical-loss-sink identity; Environment source resolver:
 and snapshot-reading shared-stock backends behind the frozen `get`; integrator
 strategy: `Integrator` protocol + `EulerIntegrator`/`Rk4Integrator`,
 increment-form RK4, canonical reduce + apply-once, referential integrity in the
-apply path). Steps 3–6 were built test-first against their design sections below
-(advisor-reviewed). Step 7 (arbitration backstop + counter; extinction-with-
-loss-sink; events) is next. (Earlier: Reviewed, advisor pass folded in.)
+apply path; arbitration backstop: `simcore.arbitration` min-scaling (Euler-only,
+`unclamped`-skip, whole-flow scaling) with the RK4 `check_no_overdraw` hard-error
+asymmetry; extinction-with-loss-sink + `ExtinctionEvent`; functional `StepReport`
+`(state, events, rationed)` keeping the core mutation-free). Steps 3–7 were built
+test-first against their design sections below (advisor-reviewed). Step 8
+(conservation ledger: Inputs/Outputs = boundary deltas + per-step assertion) is
+next. (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -853,7 +857,35 @@ space-station/
    combine; forcing piecewise-constant under RK4; referential-integrity raise;
    determinism + a Hypothesis registration-order-independence property; Protocol
    satisfaction. All gates green (ruff, ruff format, pyright, pytest — 108 passed).
-7. Arbitration backstop + counter; extinction-with-loss-sink; events.
+7. ✅ Arbitration backstop + counter; extinction-with-loss-sink; events.
+   *Done* (built test-first against the Frozen-API step algorithm #3/#6 + decisions
+   #4/#6/#13/#15): `simcore/arbitration.py` — single-pass min-scaling
+   (`min_scaling` → scaled whole flows + firing count; `check_no_overdraw` →
+   `ArbitrationError`). Demand `Σ|withdrawals|` summed in canonical flow-id order
+   (#15), `unclamped` BOUNDARY sources skipped (never throttled, impose no
+   constraint, #13), `scale_s = min(1, available/demand)` on start-of-step levels,
+   `scale_f = min` over the clamped stocks a flow withdraws from; whole-flow scaling
+   keeps every quantity balanced (the conservation-safety proof). **Euler-only**:
+   `EulerIntegrator` scales + reports firings; `Rk4Integrator` makes a needed
+   `scale_f < 1` a hard error per stage (positivity under RK4 is the kinetics' job).
+   `simcore/events.py` — frozen `ExtinctionEvent(n, stock, quantity, residual)`.
+   Integrator extinction pass (post-apply, scheme-independent): POPULATION stocks
+   with `amount < threshold and amount != 0` snap to 0, residual routed to
+   `loss_sink_id(quantity)` (KeyError if the loss-sink is absent — referential
+   integrity), event emitted in canonical id-order. The `amount != 0` guard makes
+   extinction absorbing without event-spam (no re-fire at 0; sub-threshold "noise"
+   re-snapped, not revived; supra-threshold scenario inflow survives). Diagnostics
+   are **functional, not mutable**: `step_report(...) -> StepReport(state, events,
+   rationed)`; the frozen `step(...) -> State` is `step_report(...).state` — the core
+   keeps no mutable event log/counter (advisor: preserves purity, dodges the
+   integrator-reuse re-accumulation footgun). Existing well-fed/POOL tests stay
+   bit-identical (scale_f==1 reuses the result object; extinction is POPULATION-only).
+   Tests: proportional sag + non-negativity + conservation; `unclamped` skip;
+   multi-quantity whole-flow balance; RK4 hard-error vs well-fed; registration-order
+   independence under arbitration (Hypothesis); extinction snap/route/event
+   (Euler+RK4), POOL-never-zeroed, absorbing (no re-fire / re-snap / survive),
+   missing-loss-sink KeyError; event data shape. All gates green (ruff, ruff format,
+   pyright, pytest — 129 passed).
 8. Conservation ledger (Inputs/Outputs = boundary deltas) + per-step assertion.
 9. Outer `sim_io` snapshot round-trip (JSON; hex-float goldens).
 10. Two-domain demo (Biosphere + Boundary; `Harvest` cross-domain flow; internal
