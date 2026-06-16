@@ -132,14 +132,17 @@ def test_well_fed_rk4_run_never_over_draws() -> None:
     assert total_rationed == 0
 
 
-def test_well_fed_run_emits_no_extinction_events() -> None:
+@pytest.mark.parametrize("integrator_cls", INTEGRATORS)
+def test_well_fed_run_emits_no_extinction_events(integrator_cls: type) -> None:
     params = DemoParams()
     state, reg = build_demo(params)
 
     _final, _rationed, events = run(
-        EulerIntegrator(reg), state, coupled_resolver(), params.dt, 200
+        integrator_cls(reg), state, coupled_resolver(), params.dt, 200
     )
 
+    # Asserted for both schemes: extinction conserves silently via the loss-sink, so
+    # an RK4 regression that snapped plant_c would slip past every other step-10 gate.
     assert events == ()
 
 
@@ -154,7 +157,8 @@ def test_demo_run_conserves_carbon_via_boundary_exchange(integrator_cls: type) -
     ledger = {leg.quantity: leg for leg in compute_ledger(state, final)}
     carbon = ledger[Quantity.CARBON]
     # Total carbon unchanged: the boundary's Output exactly offsets ΔStored (#13).
-    assert carbon.boundary_delta + carbon.stored_delta == pytest.approx(carbon.residual)
+    # (boundary_delta == -stored_delta is the design's "outside_c gain == carbon
+    # drained from atm+plant", since the loss-sink stays 0 on the well-fed run.)
     assert carbon.residual == pytest.approx(0.0, abs=1e-9)
     assert carbon.boundary_delta == pytest.approx(-carbon.stored_delta, abs=1e-9)
     # The harvest actually drained carbon into the boundary reservoir.
