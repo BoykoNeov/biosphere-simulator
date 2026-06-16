@@ -221,7 +221,11 @@ class Environment(Protocol):
 
 # --- integrator: strategy, implicit-ready --------------------------------
 class Integrator(Protocol):
-    def step(self, state: State, env: Environment, dt: float) -> State: ...
+    def step(self, state: State, env: SourceResolver, dt: float) -> State: ...
+    # env reconciled to the SourceResolver binding source in step 6 (was
+    # `env: Environment`): a BoundEnvironment is pinned to one snapshot, but RK4
+    # must rebind per stage, which only the resolver can do. Registry is injected
+    # at construction. See "Step 6 design" below for the full rationale.
     # owns stepping; calls the (arbitrated) flow-evaluation function as many
     # times as the scheme needs (Euler:1, RK4:4, implicit-future:N).
     # CONTRACT: the min-scaling backstop is Euler-only. Under any higher-order

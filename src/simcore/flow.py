@@ -104,6 +104,13 @@ class Flow(Protocol):
     policies (decision #5) but is **unused** under the proportional default;
     canonical reduction order is always id-sorted (#15), never priority-sorted.
 
+    **Increment-form contract (step 6).** ``evaluate`` returns the *per-step
+    increment* — each leg amount is ``dt·rate(snapshot)``, not a bare rate — and
+    ``rate`` must be **independent of ``dt``** (linear in ``dt``). This is what
+    lets RK4's ⅙-combine reproduce classical RK4 exactly (see
+    ``simcore.integrator``). A flow that uses ``dt`` non-linearly (an analytic
+    sub-step, dt-gated logic) still conserves mass but silently forfeits RK4 order.
+
     ``id``/``priority`` are **read-only** (declared as properties) so that frozen
     flow implementations — the expected shape, matching the immutable-state model
     — satisfy the protocol; a mutable attribute satisfies a read-only member too.
