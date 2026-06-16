@@ -1,15 +1,17 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — steps 1–5 complete (repo/tooling skeleton; core state
+**Status:** In progress — steps 1–6 complete (repo/tooling skeleton; core state
 primitives: quantities, Stock, State, RNG, units-at-boundary core seam; flows:
 `Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`;
 Boundary domain: `source`/`sink`/`loss_sink` reservoir constructors + the
 per-quantity numerical-loss-sink identity; Environment source resolver:
 `SourceResolver`/`BoundEnvironment` + `Schedule`/`constant`, forcing-at-`n·dt`
-and snapshot-reading shared-stock backends behind the frozen `get`). Steps 3–5
-were built test-first against their design sections below (advisor-reviewed).
-Step 6 (integrator strategy: Euler then RK4) is next.
-(Earlier: Reviewed, advisor pass folded in.)
+and snapshot-reading shared-stock backends behind the frozen `get`; integrator
+strategy: `Integrator` protocol + `EulerIntegrator`/`Rk4Integrator`,
+increment-form RK4, canonical reduce + apply-once, referential integrity in the
+apply path). Steps 3–6 were built test-first against their design sections below
+(advisor-reviewed). Step 7 (arbitration backstop + counter; extinction-with-
+loss-sink; events) is next. (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -554,6 +556,117 @@ stock set (analogous to the registry's dup-id reject).
 
 ---
 
+## Step 6 design — integrator strategy (Euler, RK4)
+
+*Design pass (settled with advisor); implement test-first.* Realizes the scope
+item "Integrator interface (strategy) + Euler and RK4" and the Frozen-API
+`Integrator` Protocol + step-algorithm steps 1–2, 4–5. The arbitration backstop
+(step-alg #3) and extinction/conservation (steps #6–7) are **deferred to steps
+7–8**; step 6 builds the stepping spine with a clean seam for them.
+
+### New module — `simcore/integrator.py`
+The `Integrator` Protocol realization plus two concrete strategies
+(`EulerIntegrator`, `Rk4Integrator`). Pure stdlib.
+
+### The increment-form insight (why RK4 falls out cleanly)
+`Flow.evaluate(snapshot, env, dt)` returns legs that are the **per-step
+increment** `dt·rate(snapshot)`, not a bare rate (the "amount per dt" contract).
+With `f(y) := reduce(evaluate-all-flows(y), dt)` the per-stock delta map:
+- **Euler:** `y_{n+1} = y_n + f(y_n)` — one evaluation.
+- **RK4 (increment form):** `k1=f(y_n)`, `k2=f(y_n+½k1)`, `k3=f(y_n+½k2)`,
+  `k4=f(y_n+k3)`, `y_{n+1}=y_n+(k1+2k2+2k3+k4)/6`.
+
+Because each `k_i` already carries `dt`, the ⅙-combine reproduces classical
+`y+dt/6(k1'+2k2'+2k3'+k4')` exactly (advisor-verified). Arbitration stays
+compatible: it compares per-step withdrawal deltas to snapshot levels (step 7).
+
+### Load-bearing contract (the easy-to-rot one) — pin it
+The increment-form identity holds **only if** `evaluate(y, dt) = dt·rate(y)` with
+`rate` **independent of `dt`**. A flow that uses `dt` non-linearly (analytic
+sub-step, dt-gated logic) still runs and still conserves mass, but **silently
+drops RK4 to lower order** — and a single autonomous-oscillator convergence check
+won't catch it (the demo flows are dt-linear). So:
+- Document on `Flow.evaluate`: "returns `dt·rate`; `rate` must be `dt`-independent
+  (linear in `dt`). Non-linear `dt` use still conserves mass but forfeits RK4
+  order."
+- Step-6 test: evaluate a demo flow at `dt` and `2·dt`; assert every leg scales
+  ×2 (the dt-linearity guard).
+
+### Derivative helper + stage states
+`_derivative(stage_state, resolver, dt) -> dict[StockId, float]`: bind `resolver`
+to `stage_state` (the **same** object the flows read — the step-5 seam contract
+#16), `evaluate` every registry flow in canonical id-order, reduce legs per-stock
+by summing in that canonical order (#15). Called 1× (Euler) / 4× (RK4).
+
+RK4 **stage states keep `n`** (only amounts perturbed, via `dataclasses.replace`)
+→ forcing is piecewise-constant within a step — *exact* here (the Phase-0
+oscillator is autonomous; step-5 note). Intermediate stages may hold **negative**
+amounts (allowed — `Stock` forbids only NaN/Inf); positivity under RK4 comes from
+kinetics, not a guard (the integrator contract).
+
+### Combine over the **union** of stage keys (missing ⇒ 0)
+A state-gated flow can emit a leg at one stage but not another (a rate crossing a
+threshold at a perturbed stage). Combining must iterate
+`keys(k1)∪…∪keys(k4)` with `k_i.get(s, 0.0)`, never one map's keys — else a stock
+silently drops. (Won't bite the structurally-fixed demo flows, but a state-gated
+test pins it.)
+
+### Apply-once + referential integrity
+`step` builds the next `State` (n→n+1) by adding the combined delta to each named
+stock (via `dataclasses.replace`). This is the **apply path** the plan assigns
+referential integrity to (step 5/6): a leg naming a stock absent from
+`State.stocks` raises a clear error at the first step (not a silent drop). Stocks
+with no delta pass through unchanged.
+
+### `env` is the binding source (`SourceResolver`) — a conscious reconciliation
+The frozen `Integrator.step(state, env, dt)` annotated `env: Environment`, written
+**before** the step-5 resolver existed. A `BoundEnvironment` is pinned to one
+snapshot — RK4 must *rebind* per stage, which only `SourceResolver.bind` does. We
+reconcile the slot to `env: SourceResolver` (the binding source; the integrator
+produces `Environment` views internally), keeping `env` a **per-step argument**
+while `Registry` is a **construction** dependency. This honors the frozen API's
+*deliberate* split — registry = model *structure* → construction (per
+`registry.py`'s "the frozen `Integrator.step` has no registry param" note); env =
+per-run *scenario* wiring (same model, different forcing/coupling) → step arg —
+rather than collapsing both to construction. The parameter is named honestly as a
+binding source, not a pre-bound `Environment`. (Symmetry with `SourceResolver`'s
+"mirrors Registry" docstring would instead argue for construction + `step(state,
+dt)`; we chose the per-run-input reading deliberately, not by default.)
+
+### Arbitration seam — deferred, not pre-built
+Step 6 ships `_derivative` as pure evaluate→reduce with **no** arbitration
+parameter (a guessed no-op signature is speculative interface step 7 would
+rework). The two integrator classes are the place step 7 attaches the asymmetry
+(Euler min-scaling vs RK4 hard-error); step 7 extends `_derivative`/the classes
+then.
+
+### Step-6 test plan
+- **Euler correctness:** one step of a balanced flow equals `y_n + dt·rate`
+  exactly.
+- **RK4 correctness + order:** on analytic exponential decay (`dy/dt=-λy`, a POOL
+  stock → boundary sink, so balanced and clear of extinction/over-draw), RK4's
+  error vs `y0·e^{-λt}` is far below Euler's, and halving `dt` shrinks RK4 error
+  ~16× vs Euler ~2× (4th vs 1st order).
+- **dt-linearity contract:** legs scale ×2 from `dt` to `2·dt` (guards the
+  load-bearing contract above).
+- **Conservation of the new arithmetic (test-level, *not* the step-8 gate):** the
+  realized per-step delta map, wrapped as a `FlowResult`, passes step-3
+  `assert_flow_balanced` — for **both** Euler and RK4 (each `k_i` is a sum of
+  balanced legs; the linear ⅙-combine preserves balance).
+- **Union-of-keys combine:** a state-gated flow emitting a leg only at some stages
+  still contributes (no dropped stock).
+- **Stage states keep `n`:** RK4 reads a time-varying schedule at the step's `n`
+  for all four stages (forcing piecewise-constant within a step).
+- **Referential integrity:** a flow emitting a leg on an unknown stock id raises
+  at apply.
+- **Determinism + registration-order:** a step is bit-identical across runs and
+  under flow/stock registration shuffle (Hypothesis), validating canonical reduce
+  in the apply path.
+- **Protocol satisfaction:** `EulerIntegrator`/`Rk4Integrator` satisfy the
+  `Integrator` Protocol (`isinstance`).
+
+---
+
 ## Test suite (exit gates)
 
 | Test | Asserts |
@@ -717,8 +830,25 @@ space-station/
    rejection, resolve-time errors, Protocol satisfaction, plus a mixed-wiring
    dispatch test (one resolver routing both branches — the step-10 demo shape).
    All gates green (ruff, ruff format, pyright, pytest — 95 passed).
-6. Integrator strategy: Euler (with backstop), then RK4 (backstop→hard error);
+6. ✅ Integrator strategy: Euler (with backstop), then RK4 (backstop→hard error);
    atomic apply + canonical reduce everywhere.
+   *Done* (built test-first against "Step 6 design" above): `simcore/integrator.py`
+   — `Integrator` Protocol (`env` reconciled to the `SourceResolver` binding source;
+   `Registry` injected at construction) + `EulerIntegrator`/`Rk4Integrator`. Shared
+   `_derivative` binds the resolver to the same stage-state it passes to
+   `flow.evaluate` (#16 seam), evaluates flows in canonical id-order, reduces legs
+   per-stock in that order (#15). RK4 in **increment form** (legs are `dt·rate`, so
+   the ⅙-combine reproduces classical RK4 exactly — advisor-verified); stage states
+   keep `n` (forcing piecewise-constant within a step); the combine folds over the
+   **union** of stage keys; intermediate stages may go negative (positivity is the
+   kinetics' job). Apply-once writes `n→n+1` and owns **referential integrity**
+   (unknown leg stock → `KeyError`). Arbitration/extinction are the *deferred*
+   step-7 seam (no speculative no-op param). Tests: Euler exactness; RK4 4th-order
+   vs Euler 1st-order on analytic exp-decay; the dt-linearity contract; conservation
+   of the applied delta (Euler+RK4, via step-3 `assert_flow_balanced`); union-of-keys
+   combine; forcing piecewise-constant under RK4; referential-integrity raise;
+   determinism + a Hypothesis registration-order-independence property; Protocol
+   satisfaction. All gates green (ruff, ruff format, pyright, pytest — 108 passed).
 7. Arbitration backstop + counter; extinction-with-loss-sink; events.
 8. Conservation ledger (Inputs/Outputs = boundary deltas) + per-step assertion.
 9. Outer `sim_io` snapshot round-trip (JSON; hex-float goldens).
