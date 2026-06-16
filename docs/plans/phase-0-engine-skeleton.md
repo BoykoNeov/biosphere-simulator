@@ -1,6 +1,6 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — steps 1–7 complete (repo/tooling skeleton; core state
+**Status:** In progress — steps 1–8 complete (repo/tooling skeleton; core state
 primitives: quantities, Stock, State, RNG, units-at-boundary core seam; flows:
 `Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`;
 Boundary domain: `source`/`sink`/`loss_sink` reservoir constructors + the
@@ -12,10 +12,12 @@ increment-form RK4, canonical reduce + apply-once, referential integrity in the
 apply path; arbitration backstop: `simcore.arbitration` min-scaling (Euler-only,
 `unclamped`-skip, whole-flow scaling) with the RK4 `check_no_overdraw` hard-error
 asymmetry; extinction-with-loss-sink + `ExtinctionEvent`; functional `StepReport`
-`(state, events, rationed)` keeping the core mutation-free). Steps 3–7 were built
-test-first against their design sections below (advisor-reviewed). Step 8
-(conservation ledger: Inputs/Outputs = boundary deltas + per-step assertion) is
-next. (Earlier: Reviewed, advisor pass folded in.)
+`(state, events, rationed)` keeping the core mutation-free; conservation ledger:
+`simcore.conservation` `QuantityLedger`/`compute_ledger`/`assert_conserved`, the
+always-on every-step gate wired into the integrator's shared `_finalize` tail).
+Steps 3–8 were built test-first against their design sections below
+(advisor-reviewed). Step 9 (outer `sim_io` snapshot round-trip: JSON, hex-float
+goldens) is next. (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -675,6 +677,110 @@ then.
 
 ---
 
+## Step 8 design — conservation ledger + per-step assertion
+
+*Design pass (settled with advisor); implement test-first.* Realizes step-algorithm
+#7 ("per quantity, `|inputs − outputs − ΔStored| < tol`, failure raises"), the
+"Conservation" exit gate, and the `conservation.py` module in the repo layout.
+
+### The invariant — the augmented system is closed (#13)
+Every Phase-0 state change is **balanced**: a flow has `Σ legs == 0` per quantity
+(arbitration scales *whole* flows, preserving that), and extinction's loss-sink
+routing is a balanced *non-flow* change (withdraw from the POPULATION, deposit the
+residual into the loss-sink). So over the augmented (modeled + boundary) closed
+system, **per asserted quantity the total mass across all stocks is unchanged
+step-to-step**, within tolerance:
+
+  `residual_q = Σ_{stocks s of quantity q} (after[s].amount − before[s].amount) ≈ 0`.
+
+This is the **bug-resistant form** of the plan's `inputs − outputs − ΔStored = 0`:
+they are equal up to sign (`inputs − outputs = −boundary_delta`, so
+`inputs − outputs − ΔStored = −(boundary_delta + stored_delta) = −residual`), but
+the total-mass residual needs only the hard `StockKind` partition for the
+*diagnostic* decomposition — never for the pass/fail — so there is no sign/
+classification surface in the gate itself.
+
+### Why this is **not** "every state change is a flow"
+Tempting shortcut: wrap the whole-step per-stock delta as one `FlowResult` and reuse
+`assert_flow_balanced`. **Rejected** — it mis-states the step-3 caveat that
+extinction's loss-sink routing is a *balanced non-flow* change. The gate reasons
+about **state deltas**, not flows. So `conservation.py` computes the residual itself
+and shares with `flow.py` only the contract constants (`ASSERTED_QUANTITIES`,
+`BALANCE_ATOL`/`BALANCE_RTOL`, `ConservationError`) — which *is* the real drift risk,
+and is covered.
+
+### New module — `simcore/conservation.py` (pure stdlib)
+- `QuantityLedger` (frozen, clean accounting): `(quantity, boundary_delta,
+  stored_delta, residual)`.
+  - `boundary_delta = Σ Δ over BOUNDARY stocks` of the quantity — this *is* the
+    ledger's net Input/Output (#13); the net flux *into* the modeled system is
+    `−boundary_delta`.
+  - `stored_delta = Σ Δ over POOL + POPULATION stocks` — the modeled ΔStored.
+  - `residual = boundary_delta + stored_delta` (≡ total-mass Δ; should be ~0).
+  - No `scale` field — the relative-tolerance basis is a tolerance detail, computed
+    inside `assert_conserved`, not stored in the diagnostic record.
+- `compute_ledger(before, after) -> tuple[QuantityLedger, ...]` — pure; covers every
+  quantity **present** in the stocks (incl. `ENERGY` as a diagnostic, mirroring
+  `per_quantity_residual`), in canonical quantity-name order. Per-stock deltas are
+  summed in **sorted stock-id order** (#15 — "every reduction"; float sums are
+  non-associative, so this is required for bit-identical-under-shuffle, not a
+  nicety). Asserts `before`/`after` share the same stock-id key set (an engine-bug
+  guard: Phase-0 never adds/removes stocks mid-run).
+- `assert_conserved(before, after, *, atol=BALANCE_ATOL, rtol=BALANCE_RTOL) -> None`
+  — raises `ConservationError` (imported from `flow.py`; no cycle) for any
+  **`ASSERTED_QUANTITIES`** member whose `|residual| > atol + rtol * scale`, where
+  `scale = max |per-stock Δ|` for that quantity (transfer-scaled, matching
+  `assert_flow_balanced`'s scale notion — see below). Thresholds the residual
+  `compute_ledger` already computed (one residual computation; DRY within the
+  module). ENERGY is skipped (balance-exempt, #8).
+
+### Tolerance: transfer-scaled, with a flagged future revisit
+`scale = max |per-stock Δ|` matches the flow helper. For Phase-0 magnitudes
+(O(1)–O(1e3)) `rtol·max|Δ|` sits comfortably above the stored-rounding floor
+(~`eps·|amount|` ≈ 1e-13 here), so the gate stays tight. **Watch-item:** the
+*stored*-state residual's rounding error scales with `|amount|`, not transfer — so at
+~1e6+ amounts with tiny transfers, an `amount`-scaled basis (`Σ|amount|`) would be
+the principled choice. Not Phase 0; noted so a future reader doesn't read
+significance into the transfer-scaling.
+
+### Wiring — always-on, inside the integrator (#7 / CLAUDE.md)
+`step_report` calls `conservation.assert_conserved(state, nxt)` **after the
+extinction pass** (`nxt` is the post-extinction state). Always-on, every step — "a
+failure is a bug", not an opt-in harness check; this matches arbitration /
+extinction / referential-integrity already living in the integrator. **No `ledger`
+field is added to `StepReport`**: there is no consumer until the step-10/11 demo, and
+adding one now repeats the speculative-param smell step 6 correctly avoided. The
+decomposition *exists and is tested* now; surfacing it waits for observation.
+
+### Step-8 test plan
+- **Conserves on a balanced step** (Euler + RK4): a multi-flow scenario steps without
+  raising; `compute_ledger` residual ~0; `boundary_delta + stored_delta == residual`.
+- **Gate catches a bug (isolated):** an unbalanced `−5/+3` transfer between two
+  **ample POOLs of the same quantity** — no over-draw (arbitration can't pre-empt),
+  no POPULATION (extinction can't), real stocks (referential integrity can't) — so
+  `step` raises `ConservationError`. Also a function-level `assert_conserved` case on
+  hand-built before/after states.
+- **ENERGY exempt:** an energy-only imbalance does **not** raise (mirrors the flow
+  test); `compute_ledger` still reports the ENERGY residual (diagnostic).
+- **Conserves under arbitration:** the throttled-Euler over-draw scenario passes the
+  gate (min-scaling preserves whole-flow balance) — the suite table names
+  "incl. arbitration & extinction events".
+- **Conserves across extinction:** a snap-to-zero step passes the gate (residual ~0
+  once the loss-sink deposit is counted).
+- **Ledger decomposition:** a Harvest-like flow (modeled POOL → boundary sink) yields
+  `boundary_delta` = the sink's gain, `stored_delta` = the pool's loss, `residual` ~0.
+- **Tolerance applied:** a residual just within `atol + rtol·scale` passes; just
+  outside raises (the relative term is exercised, not just `atol`).
+- **Registration-order independence:** `compute_ledger`/`assert_conserved` are
+  bit-identical under flow/stock registration shuffle (Hypothesis), validating the
+  sorted-stock-id reduction (#15).
+- **Key-set guard:** `compute_ledger` on before/after with differing stock-id keys
+  raises (engine-bug guard).
+- After wiring, the **full suite stays green** — the verification that no existing
+  scenario silently violated conservation.
+
+---
+
 ## Test suite (exit gates)
 
 | Test | Asserts |
@@ -886,9 +992,35 @@ space-station/
    (Euler+RK4), POOL-never-zeroed, absorbing (no re-fire / re-snap / survive),
    missing-loss-sink KeyError; event data shape. All gates green (ruff, ruff format,
    pyright, pytest — 129 passed).
-8. Conservation ledger (Inputs/Outputs = boundary deltas) + per-step assertion.
+8. ✅ Conservation ledger (Inputs/Outputs = boundary deltas) + per-step assertion.
+   *Done* (built test-first against "Step 8 design" above): `simcore/conservation.py`
+   — `QuantityLedger` `(quantity, boundary_delta, stored_delta, residual)`;
+   `compute_ledger(before, after)` decomposes the per-step change per quantity
+   (BOUNDARY deltas = the ledger's Inputs/Outputs #13, POOL+POPULATION = ΔStored),
+   summing per-stock deltas in **sorted stock-id order** (#15); `assert_conserved`
+   thresholds the total-mass residual (`= boundary+stored`) at
+   `atol + rtol·max|Δ|` over `ASSERTED_QUANTITIES` (ENERGY exempt #8), raising the
+   shared `ConservationError`. The residual is the bug-resistant form of
+   `inputs − outputs − ΔStored` (equal up to sign by #13, no sign/classification
+   surface in the pass/fail). The gate is **always-on**: the integrator's new shared
+   `_finalize` tail runs extinction → `assert_conserved(state, nxt)` → `StepReport`,
+   so neither scheme can skip it ("conservation is asserted every step — a failure is
+   a bug"). Deliberately **not** reusing `assert_flow_balanced` over a whole-step
+   delta (that mis-states extinction's balanced *non-flow* routing as a flow); shares
+   only the contract constants with `flow.py`. No `ledger` field on `StepReport` yet
+   (no consumer until step 10/11). Tests: balanced-step conservation (Euler+RK4),
+   isolated gate-catches-bug raise, ENERGY-exempt-but-reported, conserves under
+   arbitration + across extinction, boundary/stored decomposition, the relative-tol
+   term, a Hypothesis insertion-order-independence property, key-set guard. All gates
+   green (ruff, ruff format, pyright, pytest — 142 passed).
 9. Outer `sim_io` snapshot round-trip (JSON; hex-float goldens).
 10. Two-domain demo (Biosphere + Boundary; `Harvest` cross-domain flow; internal
     resolver case).
 11. Full test suite + golden snapshot; freeze API.
+    *Carry-forward from step 8:* the conservation gate is **transfer-scaled**
+    (`tol = atol + rtol·max|Δ|`). The golden run is where `BALANCE_RTOL` first meets
+    real demo magnitudes — confirm the per-step residual stays comfortably under tol
+    at the demo's actual amounts; if the goldens are large amounts with small
+    transfers, switch the scale basis to amount-scaled (`Σ|amount|`). Flagged, not
+    changed now.
 ```

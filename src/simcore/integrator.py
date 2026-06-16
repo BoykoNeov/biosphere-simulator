@@ -3,8 +3,9 @@
 Realizes the Frozen-API ``Integrator`` Protocol and the full step algorithm:
 take an immutable snapshot, evaluate every flow against it, **arbitrate**, reduce
 legs per-stock in canonical order, combine the scheme's evaluations, **apply once**
-(``n -> n+1``), then run the **extinction pass**. (The every-step conservation gate
-is the step-8 ledger.)
+(``n -> n+1``), run the **extinction pass**, then assert the **every-step
+conservation gate** (``simcore.conservation`` — total mass per asserted quantity
+unchanged across the step, decision #13 / step-alg #7).
 
 **Increment-form contract (load-bearing).** ``Flow.evaluate(snapshot, env, dt)``
 returns legs that are the *per-step increment* ``dt·rate(snapshot)`` — not a bare
@@ -53,7 +54,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Protocol, runtime_checkable
 
-from simcore import arbitration
+from simcore import arbitration, conservation
 from simcore.boundary import loss_sink_id
 from simcore.environment import SourceResolver
 from simcore.events import Event, ExtinctionEvent
@@ -253,6 +254,21 @@ def _extinction_pass(state: State) -> tuple[State, tuple[ExtinctionEvent, ...]]:
     return replace(state, stocks=new_stocks), tuple(events)
 
 
+def _finalize(before: State, applied: State, rationed: int) -> StepReport:
+    """Shared post-apply tail: extinction pass → conservation gate → ``StepReport``.
+
+    The every-step conservation gate (step 8) lives here, in **one** place, so
+    neither scheme can skip it: per asserted quantity the total mass across all
+    stocks must be unchanged from ``before`` to the post-extinction state (decision
+    #13 / step-alg #7). A violation raises ``ConservationError`` — it is an engine
+    bug, not a recoverable condition. ``before`` is the snapshot the flows evaluated
+    against; ``applied`` is the post-apply (pre-extinction) state.
+    """
+    nxt, events = _extinction_pass(applied)
+    conservation.assert_conserved(before, nxt)
+    return StepReport(state=nxt, events=events, rationed=rationed)
+
+
 class _BaseIntegrator:
     """Shared spine: registry injection + the ``step``→``step_report`` delegation.
 
@@ -288,9 +304,7 @@ class EulerIntegrator(_BaseIntegrator):
     def step_report(self, state: State, env: SourceResolver, dt: float) -> StepReport:
         results = _evaluate_all(self._registry, state, env, dt)
         scaled, rationed = arbitration.min_scaling(results, state.stocks)
-        nxt = _apply(state, _reduce(scaled))
-        nxt, events = _extinction_pass(nxt)
-        return StepReport(state=nxt, events=events, rationed=rationed)
+        return _finalize(state, _apply(state, _reduce(scaled)), rationed)
 
 
 class Rk4Integrator(_BaseIntegrator):
@@ -308,6 +322,4 @@ class Rk4Integrator(_BaseIntegrator):
         k2 = _rk4_stage(reg, _perturb(state, k1, 0.5), env, dt)
         k3 = _rk4_stage(reg, _perturb(state, k2, 0.5), env, dt)
         k4 = _rk4_stage(reg, _perturb(state, k3, 1.0), env, dt)
-        nxt = _apply(state, _combine(k1, k2, k3, k4))
-        nxt, events = _extinction_pass(nxt)
-        return StepReport(state=nxt, events=events, rationed=0)
+        return _finalize(state, _apply(state, _combine(k1, k2, k3, k4)), 0)
