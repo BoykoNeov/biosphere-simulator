@@ -1,0 +1,27 @@
+# Phase-0 biosphere demo parameters — the single source of truth for the demo
+# coefficients (no hardcoded coefficients in code; "parameters are data").
+#
+# Conserved-quantity AMOUNTS carry explicit units, validated at the config
+# boundary against the canonical-unit table (decision #9) and converted to the
+# canonical unit. They are declared *in* the canonical unit here, so the conversion
+# is identity and the loaded floats are bit-identical to the step-10 inline
+# defaults — determinism / the well-fed bound stay unchanged. Units are PROVISIONAL
+# (decision #9 / Phase 1); do not read science significance into mol vs J.
+#
+# RATES and dt are dimensionless model coefficients (Scope A — not unit-validated;
+# see the Step-11 design). Their values satisfy the well-fed structural bound:
+#   k_photo * light * dt < 1   (atmospheric_c)
+#   (k_resp + k_harv) * dt < 1 (plant_c)
+
+dt: 0.5
+
+amounts:
+  atmospheric_c0: "1000.0 mol"
+  plant_c0: "100.0 mol"
+  outside_c0: "0.0 mol"
+  light: "1.0 J"
+
+rates:
+  k_photo: 0.2
+  k_resp: 0.1
+  k_harv: 0.05

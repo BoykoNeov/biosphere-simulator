@@ -22,8 +22,15 @@ were built test-first against their design sections below (advisor-reviewed). St
 10 added the demo: Photosynthesis/Respiration/`Harvest` (cross-domain) flows, the
 internal source-resolver case proven as a **bit-identical forcing≡shared run**
 (#16), and the **well-fed backstop gate** (`rationed == 0` / no RK4 over-draw).
-Step 11 (full test suite + golden snapshot; freeze API) is next. (Earlier:
-Reviewed, advisor pass folded in.)
+Step 11 (full test suite + golden snapshot; freeze API) is a bundle, now **in
+progress**: **cluster 1 — the `config/` loader + `params/demo.yaml` + the param-load
+half of the Units gate (Scope A)** is done (pydantic/pint/yaml confined to
+`config/` + `domains/biosphere/loader.py`; `DemoParams`' inline defaults removed,
+the YAML is now the single source of truth; amounts declared in canonical units so
+the demo run stays bit-identical). Remaining clusters: convergence/drift oscillator,
+`simcore`-purity test, golden demo regression snapshot, `observe`/`Observation`,
+conservation-tol carry-forward, API freeze. (Earlier: Reviewed, advisor pass folded
+in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -888,7 +895,9 @@ param-loader step". This is called out as a *conscious* deviation from the CLAUD
 land `config/` + the `params/*.yaml` + the Units gate so it does not fall through a
 crack. (`observe`/`Observation` is likewise a step-11 concern — step-10 tests read
 `state.stocks[id].amount` directly and the golden round-trips full `State` via the
-step-9 `sim_io`.)
+step-9 `sim_io`.) **Landed in step 11, cluster 1** — see *Step 11 design — config
+loader + Units gate (Scope A)* below; `DemoParams`' inline defaults are gone and
+`params/demo.yaml` is now the single source of truth.
 
 ### Step-10 test plan
 - **Cross-domain Harvest:** evaluating `Harvest` against the demo state is
@@ -912,6 +921,62 @@ step-9 `sim_io`.)
 
 ---
 
+## Step 11 design — config loader + Units gate (Scope A — cluster 1)
+
+Step 11 is a *bundle*; this is its first cluster — the outer **`config/` loader**, the
+demo **params YAML**, and the **Units** exit gate carried forward from step 10. The
+remaining clusters (convergence/drift oscillator, `simcore`-purity test, golden demo
+regression snapshot, `observe`/`Observation`, the conservation-tol carry-forward, and
+the API freeze) are tracked in sequencing item 11 and land after.
+
+### Layering — the spine stays headless
+The pure core (`simcore`) and the simulation spine (`domains/biosphere/{flows,demo}`)
+stay **stdlib-only**. pydantic / pint / yaml are confined to:
+- `config/` — `errors` (`ConfigError`/`UnitValidationError`), `loader.load_yaml` (safe
+  `safe_load` read + shape guard), `units.to_canonical` (pint dimensional check +
+  conversion to the canonical unit).
+- `domains/biosphere/loader.py` — the **only** biosphere module importing the config
+  stack; holds the pydantic schema and the field→`Quantity` map, returning a plain
+  `DemoParams` in canonical units. `demo.py` no longer carries inline defaults —
+  `params/demo.yaml` is the single source of truth (the "parameters are data"
+  invariant, now in letter, not just spirit — this closes the step-10 deviation).
+
+### Scope A — what the Units gate validates now (advisor-confirmed)
+Only conserved-quantity **amounts** are unit-validated against the canonical-unit table
+(decision #9): each amount is a unit-bearing string (`"1000.0 mol"`), parsed by pint
+and converted to its quantity's canonical unit, or rejected as a `UnitValidationError`.
+**Rate coefficients are dimensionless** schema-validated floats (`gt=0`); full rate-law
+dimensional closure is deferred to Phase 1 — it would require new per-leg dimensional
+signatures on the **about-to-be-frozen `Flow` protocol**, and adding API right before
+the freeze is backwards.
+
+The Units exit gate therefore has two halves now: **param-load** (this cluster) and the
+**eval-time** `assert_flow_balanced`, which already resolves each leg's quantity via
+stock lookup and so catches a carbon-leg-into-an-oxygen-stock mismatch. Rate-law closure
+is the Phase-1 third half.
+
+### Determinism is unchanged
+The demo amounts are declared **in** their canonical unit, so conversion is identity and
+the loaded floats are **bit-identical** to the step-10 inline defaults — the golden run,
+the well-fed bound, and every determinism gate are unaffected. (A pydantic gotcha pinned
+here: amount fields are typed `str`, not `float`, or the unit-bearing string would be
+rejected before pint ever runs.)
+
+### Cluster-1 test plan (`tests/test_config.py`)
+- `to_canonical` accepts identity + compatible conversions (kmol→mol, kJ→J, exact);
+  rejects wrong dimension (kg / J as carbon, mol / kg as energy), bare dimensionless,
+  and unparseable units — all as `UnitValidationError` (a `ConfigError` subclass).
+- `load_yaml` reads a mapping; wraps missing-file / non-mapping / invalid-YAML as
+  `ConfigError`.
+- `load_demo_params()` yields the exact canonical floats and `DEMO_PARAMS_PATH` exists;
+  the full schema + unit gate fires end-to-end through the real loader (kg amount →
+  `UnitValidationError`; kmol amount → converted; non-positive rate/`dt`, unknown /
+  missing field → pydantic `ValidationError`).
+- `test_biosphere_demo.py` now sources params via `load_demo_params()` (a `DEMO_PARAMS`
+  module constant), proving the YAML drives the existing step-10 gates unchanged.
+
+---
+
 ## Test suite (exit gates)
 
 | Test | Asserts |
@@ -926,7 +991,7 @@ step-9 `sim_io`.)
 | **Convergence / drift** | a **non-arbitrating** oscillator (toy 2-stock predator–prey + harmonic) converges as dt→0 under RK4; Euler's spurious amplitude growth is *detected* (guards the L-V/Euler trap). |
 | **Serialization round-trip** | state → plain data → state reproduces bit-identical continuation (JSON; **hex-float** in golden files for exact cross-run/cross-port comparison). |
 | **Regression snapshot** | golden demo run; any bit change is surfaced. |
-| **Units** | param load / flow registration reject dimensional mismatch. |
+| **Units** | param load rejects a dimensional mismatch on conserved-quantity *amounts* (Scope A, step-11 cluster 1); eval-time `assert_flow_balanced` rejects a leg landing in a wrong-quantity stock. Full rate-law dimensional closure → Phase 1. |
 
 Property-based tests (Hypothesis) for the invariants that should hold over *any*
 valid configuration: conservation, non-negativity, order-independence.
@@ -1035,7 +1100,8 @@ space-station/
    canonical table is the single source of truth, #9); the **pint validation at
    the `config/` boundary is deferred to the param-loader step** — there is
    nothing to validate until params exist, and the "Units" exit gate lives in
-   the step-11 suite.
+   the step-11 suite. *(Landed in step 11, cluster 1: the param-load half — pint
+   validation of conserved-quantity amounts at the `config/` boundary, Scope A.)*
 3. ✅ `Flow`/`Leg`/`FlowResult` + registry + cross-domain flows.
    *Done* (built test-first against "Step 3 design" above): frozen `Leg`/
    `FlowResult` (one-leg-per-stock, NaN/Inf-rejecting, list→tuple coercion),
@@ -1198,10 +1264,13 @@ space-station/
     transfers, switch the scale basis to amount-scaled (`Σ|amount|`). Flagged, not
     changed now.
     *Carry-forward from step 10 (owns these — do not let them fall through a crack):*
-    build the outer **`config/` loader** (YAML `safe_load` + pydantic schema + pint
-    dimensional validation) and `domains/biosphere/params/*.yaml`, replacing
-    `DemoParams`' inline defaults with loaded params, and land the **Units** exit gate
-    ("param load / flow registration reject dimensional mismatch"). Also still owed:
-    the **convergence/drift** oscillator gate, the `simcore`-purity test, the golden
-    demo regression snapshot, `observe`/`Observation`, and the API freeze.
+    ✅ **cluster 1 done** — built the outer **`config/` loader** (YAML `safe_load` +
+    pydantic schema + pint dimensional validation) and `domains/biosphere/params/demo.yaml`,
+    replaced `DemoParams`' inline defaults with loaded params, and landed the
+    **param-load half of the Units exit gate** (amounts unit-validated against the
+    canonical table; rates dimensionless — **Scope A**, rate-law closure → Phase 1; the
+    eval-time half is the existing `assert_flow_balanced`). See *Step 11 design* above.
+    Still owed (later clusters): the **convergence/drift** oscillator gate, the
+    `simcore`-purity test, the golden demo regression snapshot, `observe`/`Observation`,
+    and the API freeze.
 ```

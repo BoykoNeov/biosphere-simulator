@@ -25,12 +25,12 @@ from domains.biosphere.demo import (
     LIGHT_VAR,
     OUTSIDE_C,
     PLANT_C,
-    DemoParams,
     build_demo,
     coupled_resolver,
     forcing_resolver,
     run,
 )
+from domains.biosphere.loader import load_demo_params
 from simcore.boundary import BOUNDARY_DOMAIN, loss_sink_id
 from simcore.conservation import compute_ledger
 from simcore.environment import Environment
@@ -42,13 +42,17 @@ from simcore.state import State
 
 INTEGRATORS = [EulerIntegrator, Rk4Integrator]
 
+# The committed canonical demo params, loaded + unit-validated from params/demo.yaml
+# (DemoParams has no inline defaults — the YAML is the single source of truth).
+DEMO_PARAMS = load_demo_params()
+
 
 class _FixedLightEnv:
     """An Environment that resolves only ``light`` (for evaluating flows directly)."""
 
     def get(self, var: str) -> float:
         if var == LIGHT_VAR:
-            return DemoParams().light
+            return DEMO_PARAMS.light
         raise KeyError(var)
 
 
@@ -58,7 +62,7 @@ def _amounts(state: State) -> dict[str, float]:
 
 # --- assembly sanity --------------------------------------------------------
 def test_build_demo_assembly_is_referentially_complete() -> None:
-    state, reg = build_demo()
+    state, reg = build_demo(DEMO_PARAMS)
     # Two domains present in the index, with the expected membership.
     assert reg.domain_index[BIOSPHERE] == frozenset({ATMOSPHERIC_C, PLANT_C})
     assert BOUNDARY_DOMAIN in reg.domain_index
@@ -73,14 +77,14 @@ def test_build_demo_assembly_is_referentially_complete() -> None:
 
 
 def test_demo_flows_satisfy_the_integrator_protocol() -> None:
-    _state, reg = build_demo()
+    _state, reg = build_demo(DEMO_PARAMS)
     assert isinstance(EulerIntegrator(reg), Integrator)
     assert isinstance(Rk4Integrator(reg), Integrator)
 
 
 # --- cross-domain Harvest ---------------------------------------------------
 def test_harvest_is_cross_domain_and_carbon_balanced() -> None:
-    params = DemoParams()
+    params = DEMO_PARAMS
     state, reg = build_demo(params)
     harvest = next(f for f in reg.flows if f.id == HARVEST)
 
@@ -95,7 +99,7 @@ def test_harvest_is_cross_domain_and_carbon_balanced() -> None:
 def test_forcing_and_coupled_resolvers_run_bit_identically(
     integrator_cls: type,
 ) -> None:
-    params = DemoParams()
+    params = DEMO_PARAMS
     state, reg = build_demo(params)
     integ = integrator_cls(reg)
 
@@ -108,7 +112,7 @@ def test_forcing_and_coupled_resolvers_run_bit_identically(
 
 # --- well-fed backstop gate (rationing counter == 0 / no over-draw) ---------
 def test_well_fed_euler_run_never_rations() -> None:
-    params = DemoParams()
+    params = DEMO_PARAMS
     state, reg = build_demo(params)
 
     _final, total_rationed, _events = run(
@@ -120,7 +124,7 @@ def test_well_fed_euler_run_never_rations() -> None:
 
 
 def test_well_fed_rk4_run_never_over_draws() -> None:
-    params = DemoParams()
+    params = DEMO_PARAMS
     state, reg = build_demo(params)
 
     # RK4 makes a needed scale_f < 1 an ArbitrationError; completing the run *is* the
@@ -134,7 +138,7 @@ def test_well_fed_rk4_run_never_over_draws() -> None:
 
 @pytest.mark.parametrize("integrator_cls", INTEGRATORS)
 def test_well_fed_run_emits_no_extinction_events(integrator_cls: type) -> None:
-    params = DemoParams()
+    params = DEMO_PARAMS
     state, reg = build_demo(params)
 
     _final, _rationed, events = run(
@@ -149,7 +153,7 @@ def test_well_fed_run_emits_no_extinction_events(integrator_cls: type) -> None:
 # --- conservation + boundary exchange (#13) ---------------------------------
 @pytest.mark.parametrize("integrator_cls", INTEGRATORS)
 def test_demo_run_conserves_carbon_via_boundary_exchange(integrator_cls: type) -> None:
-    params = DemoParams()
+    params = DEMO_PARAMS
     state, reg = build_demo(params)
 
     final, _, _ = run(integrator_cls(reg), state, coupled_resolver(), params.dt, 100)
@@ -171,7 +175,7 @@ def test_demo_run_conserves_carbon_via_boundary_exchange(integrator_cls: type) -
 
 # --- dt-linearity of the demo flows (guards RK4 order; step-6 contract) -----
 def test_demo_flow_legs_scale_linearly_with_dt() -> None:
-    params = DemoParams()
+    params = DEMO_PARAMS
     state, reg = build_demo(params)
     env: Environment = _FixedLightEnv()
     dt = params.dt
@@ -188,7 +192,7 @@ def test_demo_flow_legs_scale_linearly_with_dt() -> None:
 
 # --- determinism + registration-order independence --------------------------
 def test_demo_run_is_deterministic_across_runs() -> None:
-    params = DemoParams()
+    params = DEMO_PARAMS
     state, reg = build_demo(params)
     first, _, _ = run(Rk4Integrator(reg), state, coupled_resolver(), params.dt, 50)
     second, _, _ = run(Rk4Integrator(reg), state, coupled_resolver(), params.dt, 50)
@@ -200,7 +204,7 @@ def test_demo_run_is_deterministic_across_runs() -> None:
 def test_demo_run_is_registration_order_independent(
     integrator_cls: type, perm: list[int]
 ) -> None:
-    params = DemoParams()
+    params = DEMO_PARAMS
     state, reg = build_demo(params)
     stocks = dict(state.stocks)
     flows = list(reg.flows)

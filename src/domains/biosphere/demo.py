@@ -9,12 +9,12 @@ demo's boundary exchange (#13) and internal resolver (#16) need them.
 
 **Parameters are declared data.** ``DemoParams`` holds the coefficients / initial
 amounts / light level / ``dt`` and is injected into the flows — no magic numbers in
-flow logic. The full **YAML + pydantic + pint** ``config/`` loader (and
-``params/*.yaml``) is **deliberately deferred to step 11**, which owns the Units exit
-gate; see the step-10 design section in ``docs/plans/phase-0-engine-skeleton.md`` for
-that conscious deviation from the "parameters are data (YAML + pydantic)" invariant.
+flow logic. It carries **no inline defaults**: ``params/demo.yaml`` is the single
+source of truth, loaded + unit-validated by ``domains.biosphere.loader`` (step 11).
+``build_demo`` / ``forcing_resolver`` therefore take ``params`` as a required arg.
 
-Pure stdlib only.
+Pure stdlib only — the YAML + pydantic + pint loading lives in ``loader.py`` so this
+assembly (and ``flows``) stays importable headless.
 """
 
 from dataclasses import dataclass
@@ -69,22 +69,17 @@ class DemoParams:
     floor. Units are PROVISIONAL (decision #9 / Phase 1).
     """
 
-    atmospheric_c0: float = 1000.0
-    plant_c0: float = 100.0
-    outside_c0: float = 0.0
-    light: float = 1.0
-    k_photo: float = 0.2
-    k_resp: float = 0.1
-    k_harv: float = 0.05
-    dt: float = 0.5
+    atmospheric_c0: float
+    plant_c0: float
+    outside_c0: float
+    light: float
+    k_photo: float
+    k_resp: float
+    k_harv: float
+    dt: float
 
 
-# Module-level default so the build/resolver helpers can default to it without a
-# call-in-default (ruff B008). DemoParams is frozen, so sharing one instance is safe.
-DEFAULT_PARAMS: DemoParams = DemoParams()
-
-
-def build_demo(params: DemoParams = DEFAULT_PARAMS) -> tuple[State, Registry]:
+def build_demo(params: DemoParams) -> tuple[State, Registry]:
     """Build the demo's initial ``State`` and flow ``Registry``.
 
     The state **always** includes ``boundary.light`` (the inert energy driver) and
@@ -133,7 +128,7 @@ def build_demo(params: DemoParams = DEFAULT_PARAMS) -> tuple[State, Registry]:
     return state, Registry(flows, stocks)
 
 
-def forcing_resolver(params: DemoParams = DEFAULT_PARAMS) -> SourceResolver:
+def forcing_resolver(params: DemoParams) -> SourceResolver:
     """``light`` wired as a constant forcing schedule (the standalone-biosphere view).
 
     Produces a run **bit-identical** to ``coupled_resolver``'s (decision #16) because
