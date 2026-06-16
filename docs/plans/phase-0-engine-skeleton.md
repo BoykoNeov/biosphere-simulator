@@ -1,6 +1,6 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — steps 1–9 complete (repo/tooling skeleton; core state
+**Status:** In progress — steps 1–10 complete (repo/tooling skeleton; core state
 primitives: quantities, Stock, State, RNG, units-at-boundary core seam; flows:
 `Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`;
 Boundary domain: `source`/`sink`/`loss_sink` reservoir constructors + the
@@ -16,10 +16,14 @@ asymmetry; extinction-with-loss-sink + `ExtinctionEvent`; functional `StepReport
 `simcore.conservation` `QuantityLedger`/`compute_ledger`/`assert_conserved`, the
 always-on every-step gate wired into the integrator's shared `_finalize` tail;
 outer `sim_io` snapshot round-trip: `State ⇄ JSON` with hex-float amounts +
-hex-string seed, byte-exact committed golden). Steps 3–9 were built test-first
-against their design sections below (advisor-reviewed). Step 10 (two-domain
-Biosphere+Boundary demo: `Harvest` cross-domain flow, internal resolver case) is
-next. (Earlier: Reviewed, advisor pass folded in.)
+hex-string seed, byte-exact committed golden; two-domain Biosphere+Boundary demo
+wiring the spine end-to-end via `domains/biosphere/{flows,demo}.py`). Steps 3–10
+were built test-first against their design sections below (advisor-reviewed). Step
+10 added the demo: Photosynthesis/Respiration/`Harvest` (cross-domain) flows, the
+internal source-resolver case proven as a **bit-identical forcing≡shared run**
+(#16), and the **well-fed backstop gate** (`rationed == 0` / no RK4 over-draw).
+Step 11 (full test suite + golden snapshot; freeze API) is next. (Earlier:
+Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -783,6 +787,131 @@ decomposition *exists and is tested* now; surfacing it waits for observation.
 
 ---
 
+## Step 10 design — two-domain demo (Biosphere + Boundary)
+
+*Design pass (settled with advisor); implement test-first.* Realizes the scope's
+"Minimal two-domain demo" and the cross-domain + internal-resolver exit gates. This
+is the first assembly that wires *all* the prior steps together: stocks across two
+domains, three flows (one cross-domain), a `SourceResolver`, both integrators, the
+arbitration/extinction/conservation tail. It builds **no new core machinery** — it
+is the integration that proves the spine. Trivial laws only: **no FvCB, no
+saturating kinetics** (Phase 1).
+
+### New modules
+- `src/domains/biosphere/flows.py` — three frozen-dataclass `Flow`s. All are
+  **strictly proportional (first-order) and dt-linear** (`leg = dt·rate`, `rate`
+  `dt`-independent — the step-6 increment-form contract), so RK4 stays 4th order:
+  - **`Photosynthesis`** `atmospheric_c → plant_c`, flux `= k_photo·light·atm_c·dt`.
+    `light = env.get(light_var)` is read as a **scalar rate multiplier**, *not* a
+    consumed leg (energy is structure-only in Phase 0 — decision #8). This is the
+    flow that carries the **internal-resolver** case.
+  - **`Respiration`** `plant_c → atmospheric_c`, flux `= k_resp·plant_c·dt`.
+    Autonomous (no `env`).
+  - **`Harvest`** (cross-domain) `plant_c → boundary.outside_c`, flux
+    `= k_harv·plant_c·dt`. Exercises the registry cross-domain path + balanced
+    boundary exchange (#13): harvested carbon leaves the modeled system *into* a
+    boundary reservoir, so the flow stays internally balanced.
+- `src/domains/biosphere/demo.py` — the **scenario assembly** (lives under the
+  biosphere domain — it is the biosphere's showcase — even though it wires in
+  boundary reservoirs). Stock-id constants, a frozen `DemoParams` (coefficients +
+  initial amounts + `light` level + `dt`), `build_demo(params) -> (State, Registry)`,
+  and the two resolver builders (`forcing_resolver` / `coupled_resolver`). A thin
+  `run(integrator, state, resolver, dt, steps) -> (State, total_rationed, events)`
+  helper folds the per-step `step_report` loop (summing `rationed`, collecting
+  events) so the well-fed gate and golden run share one driver.
+
+### Stocks (carbon-only dynamics; one inert energy driver)
+`DomainId("biosphere")` (the *real* namespace — `test_integrator`'s `"bio"` is
+test-local) and `BOUNDARY_DOMAIN`:
+- `biosphere.atmospheric_c` — **POOL**, carbon, ~`1000`.
+- `biosphere.plant_c` — **POPULATION**, carbon, ~`100`, `extinction_threshold=0.0`.
+  POPULATION is the honest biomass label (#6); dynamically cosmetic here (POOL and
+  POPULATION are both "stored", and the snap condition `amount < 0 and amount != 0`
+  never fires while plant_c stays positive), but it makes this a **loss-sink-bearing
+  assembly** — the plan wanted the boundary machinery built "even though the closed
+  demo barely exercises it".
+- `boundary.outside_c` — BOUNDARY `sink` (Harvest's destination; its per-step delta
+  *is* the carbon ledger's Output, #13).
+- `boundary.light` — BOUNDARY **ENERGY `source`** (`unclamped`), constant level `L`,
+  **never touched by any leg** — it exists purely to be *read* (the scalar driver).
+  Its delta is always 0; ENERGY is balance-exempt (#8), so it appears in
+  `compute_ledger` only as a 0 diagnostic.
+- `loss_sink(CARBON)` — the documented "step-10 init **must** include the boundary
+  loss-sinks" requirement (step-4 design); inert here (no extinction), present so the
+  assembly is referentially complete.
+
+Initial **amounts are kept O(1)–O(1e3)** deliberately: the always-on conservation
+gate (`tol = atol + rtol·max|Δ|`) runs *every step of this run*, and at these
+magnitudes the float residual (~1e-13) sits far under tol — we avoid the step-11
+"large amounts / tiny transfers" watch-item by construction, not by luck.
+
+### Well-fed is a structural bound, not "gentle constants" (the backstop gate)
+The plan treats a nonzero rationing counter as a **hard gate failure**. Because every
+withdrawal is first-order in the stock it draws from, the demand/available ratio on
+any clamped stock is exactly `(Σ rates on that stock)·dt` — **independent of
+trajectory and level**. So the entire well-fed guarantee reduces to two inequalities:
+- `k_photo·light·dt < 1`            (atmospheric_c — only Photosynthesis withdraws)
+- `(k_resp + k_harv)·dt < 1`        (plant_c — Respiration + Harvest withdraw)
+
+Pick constants with margin (`rate·dt ≈ 0.1`, e.g. `dt=0.5`, `k_photo=0.2`, `L=1.0`,
+`k_resp=0.1`, `k_harv=0.05`). This also clears RK4: a perturbed stage that drove a
+stock negative would *flip* its first-order term to a deposit (no withdrawal → no
+demand), and with `rate·dt < 1` the stages stay positive anyway — so RK4 never hits
+its hard-error path. **The proof says it is safe; the gate is still asserted
+empirically** over the full run (`Σ rationed == 0` for Euler; no `ArbitrationError`
+for RK4). Keeping all three flows strictly proportional is load-bearing — a
+constant/zeroth-order withdrawal would break the trajectory-independent bound.
+
+### The internal-resolver case = bit-identical forcing ≡ shared (decision #16)
+The demo state **always** includes `boundary.light`; the *only* difference between
+the two runs is how `"light"` is wired:
+- `forcing_resolver`: `SourceResolver(forcings={"light": constant(L)})`.
+- `coupled_resolver`: `SourceResolver(shared={"light": boundary.light})`.
+
+Because no flow touches `boundary.light`, it stays `L` at every step **and every RK4
+stage** (perturbation only shifts stocks with deltas), so `env.get("light")` returns
+`L` identically in both wirings → the two full runs are **bit-identical**. That is
+the integrated form of decision #16 (the reader cannot tell forcing from shared
+stock), and it makes the golden **wiring-independent** — so the **canonical golden
+uses `coupled_resolver`**, the wiring that actually exercises the #16 read path each
+step.
+
+### Deliberate deviation: config loader deferred to step 11
+`DemoParams` is a frozen dataclass — coefficients are **declared data injected into
+the flows**, not magic numbers buried in flow logic, so "parameters are data" holds
+in spirit. The full **YAML + pydantic + pint** `config/` loader (and
+`domains/biosphere/params/*.yaml`) is **deliberately deferred to step 11**, which
+owns the **Units** exit gate ("param load / flow registration reject dimensional
+mismatch") — consistent with the plan's repeated deferral of pint validation to "the
+param-loader step". This is called out as a *conscious* deviation from the CLAUDE.md
+"parameters are data (YAML + pydantic)" invariant, **not** a silent one; step 11 must
+land `config/` + the `params/*.yaml` + the Units gate so it does not fall through a
+crack. (`observe`/`Observation` is likewise a step-11 concern — step-10 tests read
+`state.stocks[id].amount` directly and the golden round-trips full `State` via the
+step-9 `sim_io`.)
+
+### Step-10 test plan
+- **Cross-domain Harvest:** evaluating `Harvest` against the demo state is
+  `assert_flow_balanced` (carbon) and `domains_touched == {biosphere, boundary}`
+  (reuses the step-3 helpers).
+- **Internal-resolver indistinguishability (headline):** a multi-step run under
+  `forcing_resolver` vs `coupled_resolver` is **bit-identical** (exact `==` on all
+  amounts), for **both** Euler and RK4.
+- **Well-fed backstop gate:** an Euler run sums `rationed == 0`; an RK4 run completes
+  with **no** `ArbitrationError` (over the full run length, not one step).
+- **Conservation / boundary exchange:** the always-on gate not raising over the run
+  *is* the per-step assertion; plus an explicit `compute_ledger` check at a step that
+  `boundary_delta + stored_delta == residual ≈ 0` and outside_c's gain equals the
+  carbon drained from atm+plant (Inputs/Outputs = boundary delta, #13).
+- **No spurious extinction:** the well-fed run emits **no** events (plant_c
+  POPULATION never snaps).
+- **dt-linearity:** each demo flow's legs scale ×2 from `dt` to `2·dt` (the step-6
+  contract, applied to the real demo flows — incl. Photosynthesis reading `env`).
+- **Registration-order independence + determinism:** the run is bit-identical under
+  flow-registration shuffle (Hypothesis) and across repeat runs.
+
+---
+
 ## Test suite (exit gates)
 
 | Test | Asserts |
@@ -860,12 +989,14 @@ space-station/
 - [ ] Registration-order independence (bit-identical under shuffle).
 - [x] State serialization round-trips exactly.
 - [ ] Conservation passes every step for all quantities.
-- [ ] Arbitration backstop: non-negative + conserved under over-draw; counter == 0
-      on the well-fed demo.
+- [x] Arbitration backstop: non-negative + conserved under over-draw (step 7);
+      counter == 0 on the well-fed demo (step 10).
 - [ ] Extinction absorbing state works, conserves mass via the loss-sink, never
       revives; POOL stocks never zeroed.
-- [ ] Cross-domain flow + internal source-resolver exercised and shuffle-stable.
-- [ ] Boundary exchange balances; `unclamped` sources not throttled.
+- [x] Cross-domain flow + internal source-resolver exercised and shuffle-stable
+      (step 10: `Harvest`; bit-identical forcing≡shared run).
+- [x] Boundary exchange balances (step 10); `unclamped` sources not throttled
+      (step 7).
 - [ ] Convergence/drift test green; Euler oscillator-growth trap demonstrably
       caught.
 - [ ] Engine + domain API frozen (this document's Frozen API section).
@@ -1041,8 +1172,24 @@ space-station/
    (NaN/Inf, unclamped-non-boundary), version guard. (Layering — `simcore` never
    imports `sim_io` — holds; the dedicated purity test is step 11.) All gates green
    (ruff, ruff format, pyright, pytest — 169 passed).
-10. Two-domain demo (Biosphere + Boundary; `Harvest` cross-domain flow; internal
+10. ✅ Two-domain demo (Biosphere + Boundary; `Harvest` cross-domain flow; internal
     resolver case).
+    *Done* (built test-first against "Step 10 design" above): `domains/biosphere/`
+    — `flows.py` (`Photosynthesis` reading `env.get("light")` as a scalar driver,
+    `Respiration`, cross-domain `Harvest`; all first-order/dt-linear) + `demo.py`
+    (`DemoParams` declared-data coefficients, `build_demo` → two-domain `State` with
+    `boundary.{outside_c,light}` + a carbon loss-sink + the flow `Registry`,
+    `forcing_resolver`/`coupled_resolver`, a `run` driver folding `step_report`).
+    The internal-resolver case is proven as a **bit-identical forcing≡shared run**
+    (#16, both integrators); the **well-fed backstop gate** holds as a
+    trajectory-independent first-order bound, asserted empirically (`rationed == 0`
+    over 200 Euler steps / no RK4 `ArbitrationError`); Harvest is cross-domain +
+    carbon-balanced; the run conserves carbon via boundary exchange (#13) and emits
+    no events; dt-linearity, determinism, and registration-order independence all
+    green. No new core machinery. **Deliberate deviation** (advisor-flagged): the
+    YAML + pydantic + pint `config/` loader is deferred to step 11 (see below) —
+    `DemoParams` keeps coefficients as injected data in the meantime. All gates green
+    (ruff, ruff format, pyright, pytest — 183 passed).
 11. Full test suite + golden snapshot; freeze API.
     *Carry-forward from step 8:* the conservation gate is **transfer-scaled**
     (`tol = atol + rtol·max|Δ|`). The golden run is where `BALANCE_RTOL` first meets
@@ -1050,4 +1197,11 @@ space-station/
     at the demo's actual amounts; if the goldens are large amounts with small
     transfers, switch the scale basis to amount-scaled (`Σ|amount|`). Flagged, not
     changed now.
+    *Carry-forward from step 10 (owns these — do not let them fall through a crack):*
+    build the outer **`config/` loader** (YAML `safe_load` + pydantic schema + pint
+    dimensional validation) and `domains/biosphere/params/*.yaml`, replacing
+    `DemoParams`' inline defaults with loaded params, and land the **Units** exit gate
+    ("param load / flow registration reject dimensional mismatch"). Also still owed:
+    the **convergence/drift** oscillator gate, the `simcore`-purity test, the golden
+    demo regression snapshot, `observe`/`Observation`, and the API freeze.
 ```
