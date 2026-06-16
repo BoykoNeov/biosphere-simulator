@@ -1,0 +1,57 @@
+{
+  "n": 42,
+  "rng_seed": "0x123456789abcdef",
+  "stocks": [
+    {
+      "amount": "0x1.921fb54442d18p+1",
+      "domain": "bio",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "bio.atmo_c",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.999999999999ap-4",
+      "domain": "bio",
+      "extinction_threshold": "0x1.0c6f7a0b5ed8dp-20",
+      "id": "bio.plant_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x0.0000000000001p-1022",
+      "domain": "bio",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "bio.water",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "-0x0.0p+0",
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.loss.carbon",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.7e43c8800759cp+996",
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.solar",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": true,
+      "unit": "J"
+    }
+  ],
+  "version": 1
+}

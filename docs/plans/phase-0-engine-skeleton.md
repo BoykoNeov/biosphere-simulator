@@ -1,6 +1,6 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — steps 1–8 complete (repo/tooling skeleton; core state
+**Status:** In progress — steps 1–9 complete (repo/tooling skeleton; core state
 primitives: quantities, Stock, State, RNG, units-at-boundary core seam; flows:
 `Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`;
 Boundary domain: `source`/`sink`/`loss_sink` reservoir constructors + the
@@ -14,10 +14,12 @@ apply path; arbitration backstop: `simcore.arbitration` min-scaling (Euler-only,
 asymmetry; extinction-with-loss-sink + `ExtinctionEvent`; functional `StepReport`
 `(state, events, rationed)` keeping the core mutation-free; conservation ledger:
 `simcore.conservation` `QuantityLedger`/`compute_ledger`/`assert_conserved`, the
-always-on every-step gate wired into the integrator's shared `_finalize` tail).
-Steps 3–8 were built test-first against their design sections below
-(advisor-reviewed). Step 9 (outer `sim_io` snapshot round-trip: JSON, hex-float
-goldens) is next. (Earlier: Reviewed, advisor pass folded in.)
+always-on every-step gate wired into the integrator's shared `_finalize` tail;
+outer `sim_io` snapshot round-trip: `State ⇄ JSON` with hex-float amounts +
+hex-string seed, byte-exact committed golden). Steps 3–9 were built test-first
+against their design sections below (advisor-reviewed). Step 10 (two-domain
+Biosphere+Boundary demo: `Harvest` cross-domain flow, internal resolver case) is
+next. (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -856,7 +858,7 @@ space-station/
 
 - [ ] Deterministic replay (bit-identical re-run).
 - [ ] Registration-order independence (bit-identical under shuffle).
-- [ ] State serialization round-trips exactly.
+- [x] State serialization round-trips exactly.
 - [ ] Conservation passes every step for all quantities.
 - [ ] Arbitration backstop: non-negative + conserved under over-draw; counter == 0
       on the well-fed demo.
@@ -1013,7 +1015,32 @@ space-station/
    arbitration + across extinction, boundary/stored decomposition, the relative-tol
    term, a Hypothesis insertion-order-independence property, key-set guard. All gates
    green (ruff, ruff format, pyright, pytest — 142 passed).
-9. Outer `sim_io` snapshot round-trip (JSON; hex-float goldens).
+9. ✅ Outer `sim_io` snapshot round-trip (JSON; hex-float goldens).
+   *Done* (built test-first against the "Serialization round-trip" exit gate):
+   `src/sim_io/snapshot.py` — `State ⇄ JSON` via `state_to_dict`/`state_from_dict`
+   + `dumps`/`loads` (re-exported from `sim_io`). Floats (`amount`,
+   `extinction_threshold`) serialize as **hex-float strings** (`float.hex()`/
+   `fromhex`) — bit-exact for every finite double incl. `-0.0`/subnormals, C99
+   cross-port, and keeps the JSON free of native NaN/Inf tokens. **`rng_seed` is a
+   `0x`-hex string, not a JSON number** (advisor catch): a full 64-bit seed loses
+   precision above 2**53 in an f64 reader (Rust/JS), which a Python-only round-trip
+   would hide — same exactness discipline as decision #12. `n` stays a native int.
+   Stocks serialize as a **list sorted by id** (canonical #15; each carries its own
+   id, so no key/id divergence); `unit` is stored verbatim (no silent re-derive).
+   Reconstruction routes through `Stock(...)`/`State(...)`, so every core invariant
+   re-fires (NaN/Inf reject, `unclamped⇒BOUNDARY`, key/id, `n>=0`) — a tampered
+   golden fails loudly at load. A `version` marker + reject-unknown-version guard is
+   the one narrow exception to the project's anti-speculation norm (a format is the
+   rare place forward-compat can't be retrofitted), with **no** migration machinery.
+   Committed golden `tests/regression/golden/state_snapshot.json`, compared
+   **byte-exact** (`dumps(...).encode() == read_bytes()` — not text-mode, dodging
+   the Windows CRLF desync). Tests: round-trip equality + per-amount hex-exactness
+   (nasty doubles), >2**53 seed survival, byte-exact golden + golden-loads-back,
+   bit-identical continuation (Euler step on round-tripped == on original),
+   insertion-order independence, canonical id-order output, fail-loud tampering
+   (NaN/Inf, unclamped-non-boundary), version guard. (Layering — `simcore` never
+   imports `sim_io` — holds; the dedicated purity test is step 11.) All gates green
+   (ruff, ruff format, pyright, pytest — 169 passed).
 10. Two-domain demo (Biosphere + Boundary; `Harvest` cross-domain flow; internal
     resolver case).
 11. Full test suite + golden snapshot; freeze API.
