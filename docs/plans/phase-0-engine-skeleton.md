@@ -27,8 +27,12 @@ progress**: **cluster 1 — the `config/` loader + `params/demo.yaml` + the para
 half of the Units gate (Scope A)** is done (pydantic/pint/yaml confined to
 `config/` + `domains/biosphere/loader.py`; `DemoParams`' inline defaults removed,
 the YAML is now the single source of truth; amounts declared in canonical units so
-the demo run stays bit-identical). Remaining clusters: convergence/drift oscillator,
-`simcore`-purity test, golden demo regression snapshot, `observe`/`Observation`,
+the demo run stays bit-identical). **Cluster 2 — the `simcore`-purity test** is now
+done: a static AST guard (`tests/test_simcore_purity.py`) asserting every core file
+imports stdlib or `simcore` only — tight enough to also catch a core→outer-layer
+leak — with discrimination controls (a pure `_third_party_imports` helper proven to
+flag `numpy`/`pint`) and a vacuous-pass guard. Remaining clusters: convergence/drift
+oscillator, golden demo regression snapshot, `observe`/`Observation`,
 conservation-tol carry-forward, API freeze. (Earlier: Reviewed, advisor pass folded
 in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
@@ -1270,7 +1274,12 @@ space-station/
     **param-load half of the Units exit gate** (amounts unit-validated against the
     canonical table; rates dimensionless — **Scope A**, rate-law closure → Phase 1; the
     eval-time half is the existing `assert_flow_balanced`). See *Step 11 design* above.
-    Still owed (later clusters): the **convergence/drift** oscillator gate, the
-    `simcore`-purity test, the golden demo regression snapshot, `observe`/`Observation`,
-    and the API freeze.
+    ✅ **cluster 2 done** — the `simcore`-**purity test** (`tests/test_simcore_purity.py`):
+    a static AST scan asserting every core file imports stdlib or `simcore` only (allow-set
+    deliberately tight, so it also catches a core→`sim_io`/`config`/`domains` leak), via a
+    pure `_third_party_imports` helper with discrimination controls (flags `numpy`/`pint`)
+    and a non-vacuous-discovery guard. The spine (`domains/biosphere`) purity check is a
+    cheap extension of the same helper, deferred to a later cluster. Still owed: the
+    **convergence/drift** oscillator gate, the golden demo regression snapshot,
+    `observe`/`Observation`, and the API freeze.
 ```
