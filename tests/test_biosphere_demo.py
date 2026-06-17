@@ -36,7 +36,13 @@ from simcore.conservation import compute_ledger
 from simcore.environment import Environment
 from simcore.flow import assert_flow_balanced, domains_touched
 from simcore.integrator import EulerIntegrator, Integrator, Rk4Integrator
-from simcore.quantities import Quantity, StockKind
+from simcore.quantities import (
+    ASSERTED_QUANTITIES,
+    BALANCE_ATOL,
+    BALANCE_RTOL,
+    Quantity,
+    StockKind,
+)
 from simcore.registry import Registry
 from simcore.state import State
 
@@ -171,6 +177,59 @@ def test_demo_run_conserves_carbon_via_boundary_exchange(integrator_cls: type) -
     energy = ledger[Quantity.ENERGY]
     assert energy.boundary_delta == 0.0
     assert energy.residual == 0.0
+
+
+# --- conservation-tol carry-forward (step-11): per-step residual vs tol ------
+@pytest.mark.parametrize("integrator_cls", INTEGRATORS)
+def test_per_step_conservation_residual_stays_well_under_tol(
+    integrator_cls: type,
+) -> None:
+    """The transfer-scaled conservation gate has wide, length-independent headroom.
+
+    The step-8 carry-forward: confirm the per-step residual stays *comfortably* under
+    ``tol = atol + rtol·max|Δ|`` at the demo's real magnitudes before trusting
+    transfer-scaling for the golden run. It does — and the reason is precise. As
+    ``Harvest`` drains carbon into ``outside_c`` (→ ~1e3 mol) with shrinking deposits,
+    that stock becomes a large-accumulated-stock / small-transfer case — the very
+    regime the watch-item flags — so ``rtol·max|Δ|`` collapses toward the
+    stored-rounding floor ``~eps·|outside_c|`` (~2e-13). What keeps the gate safe is
+    **atol** (1e-9), which floors ``tol`` ~3–4 orders above that residual. Hence the
+    ratio is bounded by ``eps·Σ|amount| / atol`` (~2e-4) for *any* run length — the
+    total mass is capped by conservation, so a longer golden run cannot exceed it. An
+    ``amount``-scaled basis (``Σ|amount|``) stays a Phase-1 revisit, unnecessary until
+    accumulated amounts approach ``atol/eps`` (~4.5e6). (Observed worst ≈ 1.1e-4·tol is
+    below the analytic ceiling ``eps·Σ|amount|/atol`` ≈ 2.4e-4·tol — the residual is a
+    signed sum, so it cancels below the bound.)
+
+    Run length (1200) is past the ratio plateau (~650/880 steps for Euler/RK4); since
+    the bound is length-independent, the plateau value is the true worst case.
+    """
+    params = DEMO_PARAMS
+    state, reg = build_demo(params)
+    integ = integrator_cls(reg)
+    resolver = coupled_resolver()
+
+    worst_ratio = 0.0
+    for _ in range(1200):
+        nxt = integ.step(state, resolver, params.dt)
+        ledger = {ql.quantity: ql for ql in compute_ledger(state, nxt)}
+        scale: dict[Quantity, float] = {}
+        for sid, b in state.stocks.items():
+            d = abs(nxt.stocks[sid].amount - b.amount)
+            scale[b.quantity] = max(scale.get(b.quantity, 0.0), d)
+        for q in ASSERTED_QUANTITIES:
+            ql = ledger.get(q)
+            if ql is None:
+                continue  # quantity absent from the state — trivially conserved
+            tol = BALANCE_ATOL + BALANCE_RTOL * scale.get(q, 0.0)
+            worst_ratio = max(worst_ratio, abs(ql.residual) / tol)
+        state = nxt
+
+    # Observed plateau ~1.1e-4; analytic ceiling eps·Σ|amount|/atol ~2.4e-4. The 1e-3
+    # tripwire fires once accumulated amounts grow ~4-8x: an early warning, well before
+    # atol ceases to dominate the rounding floor (~atol/eps ≈ 4.5e6, where the
+    # amount-scaled basis is actually motivated).
+    assert worst_ratio < 1e-3
 
 
 # --- dt-linearity of the demo flows (guards RK4 order; step-6 contract) -----

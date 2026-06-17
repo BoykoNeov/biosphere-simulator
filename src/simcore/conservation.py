@@ -119,10 +119,18 @@ def assert_conserved(
     magnitude — ``max |per-stock Δ|`` for that quantity — matching
     ``flow.assert_flow_balanced``'s scale notion.
 
-    Transfer-scaling is correct for Phase-0 magnitudes (O(1)–O(1e3)), where
-    ``rtol·max|Δ|`` sits well above the stored-rounding floor (~``eps·|amount|``). At
-    ~1e6+ amounts with tiny transfers an ``amount``-scaled basis (``Σ|amount|``) would
-    be the principled choice — a flagged future revisit, not Phase 0.
+    What keeps this safe is **atol**, not the transfer magnitude. The Phase-0 demo
+    *does* enter the watch-item's regime — ``Harvest`` fills the ``outside_c`` boundary
+    reservoir to a large accumulated stock (~1e3) with shrinking deposits, so
+    ``rtol·max|Δ|`` collapses toward the stored-rounding floor ``~eps·|amount|``. But
+    ``tol >= atol`` (1e-9) sits ~3–4 orders above that floor, so the per-step ratio
+    ``|residual|/tol`` is tiny: observed worst ≈ ``1.1e-4`` (a signed sum, so below the
+    ceiling), analytic ceiling ``eps·Σ|amount| / atol`` ≈ ``2.4e-4`` —
+    length-independent because conservation caps the total mass. An ``amount``-scaled
+    basis (``Σ|amount|``) becomes the principled choice only once accumulated amounts
+    approach ``atol/eps`` (~4.5e6), where ``eps·Σ|amount|`` overtakes ``atol`` — a
+    flagged Phase-1 revisit, verified unnecessary for the Phase-0 demo (the step-11
+    carry-forward gate in ``tests/test_biosphere_demo.py``).
 
     Thresholds the residual ``compute_ledger`` already computes (one residual
     computation; the ``ValueError`` key-set guard there also covers this entry point).

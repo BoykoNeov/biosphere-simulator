@@ -87,7 +87,9 @@ ASSERTED_QUANTITIES: frozenset[Quantity] = frozenset(Quantity) - {Quantity.ENERG
 # The balance test is ``abs(residual) <= BALANCE_ATOL + BALANCE_RTOL * scale``,
 # where ``scale`` is the transfer magnitude (max ``|leg.amount|`` for the
 # quantity). The relative term keeps the check meaningful over the varied
-# magnitudes the step-8 every-step gate sees. Phase-0 defaults; step 8 may revisit
-# against real numbers (the *form* is what matters, not these exact values).
+# magnitudes the step-8 every-step gate sees. Phase-0 defaults, verified adequate
+# against the demo's real magnitudes (step-11 conservation-tol carry-forward:
+# ``BALANCE_ATOL`` floors ``tol`` above the stored-rounding floor — see
+# ``conservation.assert_conserved``). The *form* matters, not these exact values.
 BALANCE_ATOL: float = 1e-9
 BALANCE_RTOL: float = 1e-9

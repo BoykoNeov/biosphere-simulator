@@ -40,9 +40,17 @@ one unclamped BOUNDARY reservoir, proving RK4's invariant drift is **4th-order**
 grow run-over-run) — the L-V/Euler trap *detected*, not tolerated. The run is
 non-arbitrating (`rationed == 0`, which for the POOL stocks also guarantees they stay
 ≥ 0) and total carbon is conserved to the float floor (the always-on gate, made
-explicit). Remaining clusters: golden demo regression snapshot, `observe`/`Observation`,
-conservation-tol carry-forward, API freeze. (Earlier: Reviewed, advisor pass folded
-in.)
+explicit). **Cluster 4 — the conservation-tol carry-forward** is now done: confirmed
+the transfer-scaled gate (`tol = atol + rtol·max|Δ|`) has wide, **length-independent**
+headroom at demo magnitudes — `outside_c` filling to ~1.1e3 mol with shrinking deposits
+*does* enter the watch-item's large-stock/small-transfer regime, but **`BALANCE_ATOL`**
+(1e-9) floors `tol` ~3–4 orders above the stored-rounding floor `~eps·|outside_c|`, so
+`|residual|/tol` is bounded by `eps·Σ|amount|/atol` (≈2.4e-4 ceiling; observed worst
+≈1.1e-4, a signed sum below it) for any run length. **No
+scale-basis change** (amount-scaled `Σ|amount|` stays a Phase-1 revisit, biting only
+near `atol/eps` ≈ 4.5e6); pinned by a per-step headroom gate (both integrators, worst
+ratio ≈ 1.1e-4 < a 1e-3 tripwire). Remaining clusters: golden demo regression snapshot,
+`observe`/`Observation`, API freeze. (Earlier: Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -1270,12 +1278,23 @@ space-station/
     `DemoParams` keeps coefficients as injected data in the meantime. All gates green
     (ruff, ruff format, pyright, pytest — 183 passed).
 11. Full test suite + golden snapshot; freeze API.
-    *Carry-forward from step 8:* the conservation gate is **transfer-scaled**
-    (`tol = atol + rtol·max|Δ|`). The golden run is where `BALANCE_RTOL` first meets
-    real demo magnitudes — confirm the per-step residual stays comfortably under tol
-    at the demo's actual amounts; if the goldens are large amounts with small
-    transfers, switch the scale basis to amount-scaled (`Σ|amount|`). Flagged, not
-    changed now.
+    ✅ **conservation-tol carry-forward (from step 8) resolved** — the conservation
+    gate is **transfer-scaled** (`tol = atol + rtol·max|Δ|`); confirmed it has wide,
+    **length-independent** headroom at the demo's real magnitudes, so **no scale-basis
+    change** (transfer-scaling kept; amount-scaled `Σ|amount|` stays a Phase-1 revisit).
+    The sharp finding (advisor pass): the demo *does* enter the watch-item's regime —
+    `Harvest` fills `outside_c` to a large accumulated stock (~1.1e3 mol) with shrinking
+    deposits, so `rtol·max|Δ|` collapses toward the stored-rounding floor `~eps·|outside_c|`
+    (~2e-13). What keeps the gate safe is **`BALANCE_ATOL`** (1e-9), which floors `tol`
+    ~3–4 orders above that residual — *not* the smallness of the amounts. Hence the
+    per-step ratio `|residual|/tol` is bounded by `eps·Σ|amount| / atol` (≈2.4e-4
+    ceiling; observed worst ≈1.1e-4, a signed sum below it) for *any* run length
+    (conservation caps total mass), so a longer golden run cannot breach it; the
+    amount-scaled basis bites only once accumulated amounts approach
+    `atol/eps` ≈ 4.5e6. Pinned by a per-step headroom gate
+    (`test_per_step_conservation_residual_stays_well_under_tol`, both integrators,
+    measured worst ratio ≈ 1.1e-4 < a 1e-3 tripwire); `conservation.assert_conserved`
+    and `quantities.BALANCE_*` docstrings updated to record the verified rationale.
     *Carry-forward from step 10 (owns these — do not let them fall through a crack):*
     ✅ **cluster 1 done** — built the outer **`config/` loader** (YAML `safe_load` +
     pydantic schema + pint dimensional validation) and `domains/biosphere/params/demo.yaml`,
