@@ -49,8 +49,14 @@ headroom at demo magnitudes — `outside_c` filling to ~1.1e3 mol with shrinking
 ≈1.1e-4, a signed sum below it) for any run length. **No
 scale-basis change** (amount-scaled `Σ|amount|` stays a Phase-1 revisit, biting only
 near `atol/eps` ≈ 4.5e6); pinned by a per-step headroom gate (both integrators, worst
-ratio ≈ 1.1e-4 < a 1e-3 tripwire). Remaining clusters: golden demo regression snapshot,
-`observe`/`Observation`, API freeze. (Earlier: Reviewed, advisor pass folded in.)
+ratio ≈ 1.1e-4 < a 1e-3 tripwire). **Cluster 5 — `observe`/`Observation`** is now done:
+`simcore/observation.py` — the plain-data consumer read surface (the last of the frozen
+`init`/`step`/`observe` trio), a **projection** that re-exposes only the observable subset
+of each stock (`id`/`domain`/`quantity`/`unit`/`amount`/`kind`) and drops the engine
+internals (`rng_seed`, `extinction_threshold`, `unclamped`); no aggregates/`totals`
+(advisor-confirmed anti-speculation — no Phase-0 consumer), canonical id-sorted, frozen +
+hashable. Remaining clusters: golden demo regression snapshot, API freeze. (Earlier:
+Reviewed, advisor pass folded in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -997,6 +1003,63 @@ rejected before pint ever runs.)
 
 ---
 
+## Step 11 design — `observe`/`Observation` (cluster — the read surface)
+
+*Design pass (settled with advisor); implemented test-first.* Realizes the last of the
+three frozen core-surface functions (`init`/`step`/`observe`) and the `Observation`
+core primitive. `simcore/observation.py` is pure stdlib.
+
+### `observe` is a **projection**, not an aggregate (the crux)
+`State` is the engine's *working* representation (a `MappingProxyType` of stocks, the
+`rng_seed`, and per-stock engine controls). `observe(state) -> Observation` is the
+**consumer-facing read** — "what is in the tanks at step `n`" — decoupled from that
+internal shape so a UI / telemetry / Godot front-end never reaches into `State.stocks`
+and knows about the RNG seed, arbitration flags, or extinction thresholds. Its
+legitimate job is *hiding engine internals*, an API-boundary decision — **not** adding
+features. (Note `init(config) -> State` from the frozen-API sketch was never built
+literally — `build_demo` subsumed it — so the project already treats that sketch as
+illustrative and builds these surfaces minimally-for-need; `observe` follows suit.)
+
+`Observation(n: int, stocks: tuple[StockObservation, ...])`, with
+`StockObservation(id, domain, quantity, unit, amount, kind)` — the observable subset of
+`Stock`. The field rule (the contract a reader holds the type to): **if you cannot say
+what a consumer observes with a field, it is an engine internal and is dropped.** So
+`rng_seed` (internal RNG state), `extinction_threshold` (an engine control: *when* a
+population snaps), and `unclamped` (an arbitration control, #13) are **dropped**; `kind`
+is **kept** as descriptive *classification* (POOL/POPULATION/BOUNDARY lets a consumer
+tell a modeled stock from an "outside" reservoir) — classification, not a tunable
+control, which is the line between it and `threshold`/`unclamped`.
+
+### No aggregates yet (anti-speculation, advisor-confirmed)
+Deliberately **no** per-quantity `totals` / per-domain rollup: nothing in Phase 0
+consumes it — the golden snapshot round-trips a full `State` via `sim_io`, and the API
+freeze reads neither — so it is the `StepReport.ledger` refusal again ("no field without
+a named consumer"). A canonical-order total is not load-bearing here (a display total
+feeds back into no pass/fail, so needs no bit-identical summing) and the reduction it
+would need already lives in `conservation.compute_ledger`. Additive and cheap to add
+when a real consumer appears.
+
+### Plain-data, hashable; canonical order
+Carrying no `Mapping` field, `Observation` is fully `==`-comparable **and hashable**
+(unlike `State`, which trades hashability for its `MappingProxyType`) — what
+snapshot/equality assertions want. Stocks are emitted in **canonical id-sorted order**
+(#15), so two observations of equal states compare equal regardless of `State.stocks`
+insertion order.
+
+### Cluster test plan (`tests/test_observation.py`)
+- Projection faithfully copies each stock's observable fields (`amount` bit-exact incl.
+  `-0.0`/subnormals) and `n`; empty state → empty observation.
+- **Projection boundary (load-bearing):** `dataclasses.fields` of `StockObservation` ==
+  the observable set (no `extinction_threshold`/`unclamped`); of `Observation` ==
+  `{n, stocks}` (no `rng_seed`).
+- Canonical id-order; insertion-order independence (explicit + a Hypothesis permutation
+  property) with equal hashes.
+- Frozen; deterministic; hashable + set-usable; `n` participates in equality.
+- Integration: `observe(build_demo(...).state)` covers every demo stock with matching
+  fields.
+
+---
+
 ## Test suite (exit gates)
 
 | Test | Asserts |
@@ -1315,6 +1378,15 @@ space-station/
     proves RK4's LV-invariant drift is 4th-order (halving-dt ratio ≈ 16) while forward
     Euler exhibits the textbook spiral — one-signed invariant growth ~10⁶× RK4's, with
     prey amplitude growing run-over-run. `rationed == 0` is both the non-arbitrating gate
-    and (for POOL stocks) the proof they stay ≥ 0. Still owed: the golden demo regression
-    snapshot, `observe`/`Observation`, and the API freeze.
+    and (for POOL stocks) the proof they stay ≥ 0.
+    ✅ **cluster 5 done** — `observe`/`Observation` (`simcore/observation.py` +
+    `tests/test_observation.py`): the plain-data consumer read surface (last of the frozen
+    `init`/`step`/`observe` trio), a **projection** that re-exposes the observable subset of
+    each stock and drops engine internals (`rng_seed`/`extinction_threshold`/`unclamped`);
+    `kind` kept as descriptive classification. **No `totals`/aggregate** (advisor-confirmed:
+    no Phase-0 consumer — the `StepReport.ledger` refusal again; additive later). Canonical
+    id-sorted (#15); frozen + `==`/hashable (unlike `State`). Tests pin the projection
+    boundary via `dataclasses.fields`, plus order-independence (Hypothesis) and the demo
+    integration. See *Step 11 design — `observe`/`Observation`* above. Still owed: the golden
+    demo regression snapshot and the API freeze.
 ```
