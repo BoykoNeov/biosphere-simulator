@@ -1,6 +1,6 @@
 # Phase 0.5 — Numerical Foundations
 
-**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Steps 1–3 done**.
+**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Steps 1–4 done**.
 This is the living plan for Phase 0.5, written design-first before any code, mirroring
 how Phase 0 was run. The multi-rate sub-stepping **contract is locked here** (Step 3)
 before it is written, as the working style requires. Steps are test-first.
@@ -382,7 +382,7 @@ as a count. **Scoped honestly:** disjointness of the slow/fast flow sets is the
 every flow single-domain so the partition is unambiguous (automatic cross-domain-flow
 inference stays out of scope).
 
-## Step 4 design — 100k-step stability gate
+## Step 4 design — 100k-step stability gate ✅ done
 
 *Realizes "100k+ steps, no drift" per N6.* `tests/test_stability.py`. Scenario: a
 **dissipative relaxation to a stable fixed point** (a balanced two-stock exchange
@@ -393,11 +393,44 @@ RK4 (and one multi-rate config) and assert what is **new**: every amount stays
 finite (no `NaN`/`Inf`/overflow), state stays **bounded** (relaxes, does not blow
 up), `rationed == 0` over the whole run, and the always-on conservation gate (running
 every step) completes — making the length-independence of the conservation tolerance
-**empirical**, not just analytic. (Marked slow; opt-in or a reduced count in the
-default suite if runtime warrants.)
+**empirical**, not just analytic.
 
-**Test plan:** 100k steps complete without `ConservationError`; `max|amount|`
-bounded; no non-finite amount; `rationed == 0`; results are reproducible run-to-run.
+**Realized scenario — a closed reversible exchange A ⇌ B** (the "balanced two-stock
+exchange that settles"). Two CARBON `POOL` stocks; forward `A→B` at `k_f·A`, backward
+`B→A` at `k_b·B`. Closed (`A+B=T`), so it conserves with no boundary reservoir, and
+linear with the single real-negative eigenvalue `−(k_f+k_b)` — a monotone, non-
+oscillating decay to `A*=k_b·T/(k_f+k_b)`. Params `k_f=0.7, k_b=0.3, dt=0.1` give
+Euler factor `0.9` (stable), `A*=0.3, B*=0.7`. (The demo was *rejected*: per
+`conservation.assert_conserved`'s docstring it fills `outside_c` to ~1e3 with
+shrinking deposits — an *accumulation*, not relaxation to a stable fixed point, so it
+would violate N6.) **Finiteness is not re-instrumented** — `Stock.__post_init__`
+already rejects non-finite amounts at the producing step; the new assertion is the
+upper **bound** (finite-but-diverging), tracked as running `max|amount| ≤ T`, plus a
+*settled* probe (final-step `|Δ| ≤ ε`, no secular drift). Determinism was *not* added
+here — it is decision #7 with its own golden-run gate.
+
+**What the 100k actually demonstrates (scoped honestly).** That sitting at the fixed
+point for ~99k steps (the system settles by ~step 600 at `λ=−1`) accumulates no FP
+error that trips the conservation gate or pushes an amount out of bounds — i.e.
+length-independence in the **bounded small-amplitude** regime N6 asks for. It does
+*not* stress the large-accumulation regime (amounts approaching `atol/eps ≈ 4.5e6`)
+that `assert_conserved`'s docstring flags; that would require exactly the demo-style
+accumulation N6 rejected, and stays a deferred Phase-1 revisit. Side-effect: the
+`|Δ| ≤ ε` settled-probe would *fail* on an oscillator (persistent per-step motion),
+so it actively validates N6's "no oscillator" reasoning rather than passing vacuously.
+
+**Gating.** Step count is an env-overridable module constant (`STATION_STABILITY_STEPS`,
+default `100_000`); the `slow` marker is registered and the module marked, as an
+opt-*out* handle only — a bare `uv run pytest` runs the real gate (not deselected by
+default, which would be theater), `-m "not slow"` skips it for a fast loop. The multi-
+rate config uses `n_sub=2` (split order is pinned by Step 3, so `n_sub` only trims
+runtime). Observed runtime at 100k: Euler ≈1.6 s, RK4 ≈6.3 s, multi-rate ≈21 s.
+
+**Test plan (done):** for Euler, RK4, and Strang+RK4 multi-rate — 100k steps complete
+without `ConservationError` (the every-step gate); `max|amount| ≤ T` (bounded, no
+divergence); final-step `|Δ| ≤ 1e-9` (settled, no drift); `A` within `1e-2` of `A*`
+(relaxed to the fixed-point neighborhood — loose for the multi-rate split's shifted
+fixed point); `rationed == 0` (non-arbitrating); `|total − T| ≤ 1e-9`.
 
 ## Step 5 design — edge-case suite
 
@@ -446,8 +479,10 @@ and peak memory across the sweep, on the dev machine, with the machine/commit no
       registration-order-independent, with the asserted split order *(Step 3 done —
       Strang+RK4→2.00, Strang+Euler→1.02, Lie→1.01; all-fast `n_sub=1` bit-identical
       to single-rate)*.
-- [ ] 100k+ step run: bounded, no `NaN`/`Inf`/overflow, conservation holds
-      (length-independence now empirical), non-arbitrating.
+- [x] 100k+ step run: bounded, no `NaN`/`Inf`/overflow, conservation holds
+      (length-independence now empirical), non-arbitrating *(Step 4 done — closed
+      A⇌B exchange relaxes to A*=0.3; Euler/RK4/Strang+RK4 multi-rate all bounded by
+      T, settled, `rationed==0`, conserving over 100k steps)*.
 - [ ] Edge cases pinned (empty/zero, depletion, over-draw asymmetry, overflow).
 - [ ] Performance baseline committed (`docs/perf-baseline.md`).
 - [ ] Core purity, determinism, and the frozen Phase-0 API all still hold (the
