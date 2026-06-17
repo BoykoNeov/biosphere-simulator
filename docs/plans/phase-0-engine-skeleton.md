@@ -31,8 +31,16 @@ the demo run stays bit-identical). **Cluster 2 — the `simcore`-purity test** i
 done: a static AST guard (`tests/test_simcore_purity.py`) asserting every core file
 imports stdlib or `simcore` only — tight enough to also catch a core→outer-layer
 leak — with discrimination controls (a pure `_third_party_imports` helper proven to
-flag `numpy`/`pint`) and a vacuous-pass guard. Remaining clusters: convergence/drift
-oscillator, golden demo regression snapshot, `observe`/`Observation`,
+flag `numpy`/`pint`) and a vacuous-pass guard. **Cluster 3 — the convergence/drift
+oscillator gate** is now done: a mass-conserving **Lotka–Volterra** oscillator
+(`tests/test_oscillator.py`), prey/predator as CARBON `POOL` stocks balanced against
+one unclamped BOUNDARY reservoir, proving RK4's invariant drift is **4th-order**
+(measured halving-dt ratios 16.3–18.1 → 16) while forward Euler shows the textbook
+**spurious amplitude growth** (one-signed invariant drift ~10⁶× RK4's; prey peaks
+grow run-over-run) — the L-V/Euler trap *detected*, not tolerated. The run is
+non-arbitrating (`rationed == 0`, which for the POOL stocks also guarantees they stay
+≥ 0) and total carbon is conserved to the float floor (the always-on gate, made
+explicit). Remaining clusters: golden demo regression snapshot, `observe`/`Observation`,
 conservation-tol carry-forward, API freeze. (Earlier: Reviewed, advisor pass folded
 in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
@@ -1066,8 +1074,9 @@ space-station/
       (step 10: `Harvest`; bit-identical forcing≡shared run).
 - [x] Boundary exchange balances (step 10); `unclamped` sources not throttled
       (step 7).
-- [ ] Convergence/drift test green; Euler oscillator-growth trap demonstrably
-      caught.
+- [x] Convergence/drift test green; Euler oscillator-growth trap demonstrably
+      caught (step 11 cluster 3: mass-conserving Lotka–Volterra, RK4 4th-order
+      invariant drift vs Euler's one-signed amplitude growth).
 - [ ] Engine + domain API frozen (this document's Frozen API section).
 
 ---
@@ -1279,7 +1288,14 @@ space-station/
     deliberately tight, so it also catches a core→`sim_io`/`config`/`domains` leak), via a
     pure `_third_party_imports` helper with discrimination controls (flags `numpy`/`pint`)
     and a non-vacuous-discovery guard. The spine (`domains/biosphere`) purity check is a
-    cheap extension of the same helper, deferred to a later cluster. Still owed: the
-    **convergence/drift** oscillator gate, the golden demo regression snapshot,
-    `observe`/`Observation`, and the API freeze.
+    cheap extension of the same helper, deferred to a later cluster.
+    ✅ **cluster 3 done** — the **convergence/drift** oscillator gate
+    (`tests/test_oscillator.py`): a mass-conserving **Lotka–Volterra** oscillator
+    (prey/predator CARBON `POOL`s balanced against one unclamped BOUNDARY reservoir, so
+    every flow is carbon-balanced and the always-on conservation gate passes for free)
+    proves RK4's LV-invariant drift is 4th-order (halving-dt ratio ≈ 16) while forward
+    Euler exhibits the textbook spiral — one-signed invariant growth ~10⁶× RK4's, with
+    prey amplitude growing run-over-run. `rationed == 0` is both the non-arbitrating gate
+    and (for POOL stocks) the proof they stay ≥ 0. Still owed: the golden demo regression
+    snapshot, `observe`/`Observation`, and the API freeze.
 ```
