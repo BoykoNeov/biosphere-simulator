@@ -89,10 +89,14 @@ def test_unit_validation_error_is_a_config_error() -> None:
 # [mass] — dimensionally incompatible without a molar mass), so it is explicit
 # arithmetic, not a `to_canonical` conversion.
 def test_dry_matter_to_carbon_mol_known_value() -> None:
-    # 1 kg DM at 45% carbon = 0.45 kg C; / 12.011 g/mol = 37.4656... mol C.
-    # Exact (==): the helper computes precisely this expression.
+    # Pin the molar mass directly (IUPAC carbon: 12.011 g/mol = 0.012011 kg/mol) so a
+    # typo in the constant is caught.
+    assert MOLAR_MASS_CARBON_KG_PER_MOL == 0.012011
+    # And an INDEPENDENT hand-computed conversion that does NOT reference the module
+    # constant (so a wrong formula/fraction is caught, not just restated against
+    # itself): 1 kg DM x 0.45 kg C/kg DM / 12.011 g/mol = 37.4657 mol C.
     mol_c = dry_matter_kg_to_carbon_mol(1.0, carbon_fraction=0.45)
-    assert mol_c == 0.45 / MOLAR_MASS_CARBON_KG_PER_MOL
+    assert math.isclose(mol_c, 37.4657, rel_tol=1e-4)
 
 
 def test_dry_matter_carbon_round_trips() -> None:
