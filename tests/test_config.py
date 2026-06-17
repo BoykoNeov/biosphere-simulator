@@ -13,6 +13,7 @@ stdlib-pure. These gates cover the three responsibilities of that boundary:
     schema + unit gate fires end-to-end through the real loader.
 """
 
+import math
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,13 @@ import yaml
 from pydantic import ValidationError
 
 from config import ConfigError, UnitValidationError, load_yaml, to_canonical
-from domains.biosphere.loader import DEMO_PARAMS_PATH, load_demo_params
+from domains.biosphere.loader import (
+    DEMO_PARAMS_PATH,
+    MOLAR_MASS_CARBON_KG_PER_MOL,
+    carbon_mol_to_dry_matter_kg,
+    dry_matter_kg_to_carbon_mol,
+    load_demo_params,
+)
 from simcore.quantities import Quantity
 
 
@@ -34,6 +41,10 @@ from simcore.quantities import Quantity
         (Quantity.CARBON, "1.0 kmol", 1000.0),  # kmol -> mol, exact
         (Quantity.ENERGY, "1.0 J", 1.0),  # identity
         (Quantity.ENERGY, "1.0 kJ", 1000.0),  # kJ -> J, exact
+        (Quantity.WATER, "5.0 kg", 5.0),  # WATER canonical is kg (Step 1, mass)
+        (Quantity.WATER, "5000.0 g", 5.0),  # g -> kg, exact
+        (Quantity.NITROGEN, "0.5 kg", 0.5),  # NITROGEN canonical is kg (element mass)
+        (Quantity.NITROGEN, "250.0 g", 0.25),  # g -> kg, exact
     ],
 )
 def test_to_canonical_converts_compatible_units(
@@ -51,6 +62,9 @@ def test_to_canonical_converts_compatible_units(
         (Quantity.CARBON, "1000.0"),  # dimensionless: no unit at all
         (Quantity.ENERGY, "1.0 mol"),  # amount is not energy
         (Quantity.ENERGY, "1.0 kg"),  # mass is not energy
+        (Quantity.WATER, "5.0 mol"),  # substance is not mass (WATER is kg)
+        (Quantity.WATER, "5.0 L"),  # volume is not mass (no density at the boundary)
+        (Quantity.NITROGEN, "1.0 mol"),  # substance is not mass (NITROGEN is kg)
         (Quantity.CARBON, "1.0 wibblewobble"),  # undefined unit
         (Quantity.CARBON, "not a quantity"),  # unparseable
     ],
@@ -66,6 +80,34 @@ def test_unit_validation_error_is_a_config_error() -> None:
     # The loader's callers catch ConfigError broadly; the unit error must be caught
     # by that same handler.
     assert issubclass(UnitValidationError, ConfigError)
+
+
+# --- kg-DM <-> mol-C boundary conversion (Step 1) ---------------------------
+# Biomass is conventionally kg dry matter, but our CARBON currency is mol C
+# (golden-locked). The carbon fraction of dry matter (kg C / kg DM) bridges them at
+# the config boundary. pint cannot do this generically (mol is [substance], kg is
+# [mass] — dimensionally incompatible without a molar mass), so it is explicit
+# arithmetic, not a `to_canonical` conversion.
+def test_dry_matter_to_carbon_mol_known_value() -> None:
+    # 1 kg DM at 45% carbon = 0.45 kg C; / 12.011 g/mol = 37.4656... mol C.
+    # Exact (==): the helper computes precisely this expression.
+    mol_c = dry_matter_kg_to_carbon_mol(1.0, carbon_fraction=0.45)
+    assert mol_c == 0.45 / MOLAR_MASS_CARBON_KG_PER_MOL
+
+
+def test_dry_matter_carbon_round_trips() -> None:
+    # kg DM -> mol C -> kg DM recovers the original mass for a given carbon fraction.
+    for mass_kg, f_c in [(1.0, 0.45), (0.001, 0.40), (12.34, 0.48)]:
+        mol_c = dry_matter_kg_to_carbon_mol(mass_kg, carbon_fraction=f_c)
+        back = carbon_mol_to_dry_matter_kg(mol_c, carbon_fraction=f_c)
+        assert math.isclose(back, mass_kg, rel_tol=1e-12)
+
+
+@pytest.mark.parametrize("bad_fraction", [0.0, -0.1, 1.5])
+def test_carbon_fraction_must_be_a_valid_fraction(bad_fraction: float) -> None:
+    # The carbon fraction is kg C per kg DM: it must lie in (0, 1].
+    with pytest.raises(ValueError, match="carbon_fraction"):
+        dry_matter_kg_to_carbon_mol(1.0, carbon_fraction=bad_fraction)
 
 
 # --- load_yaml: safe read + shape guard -------------------------------------

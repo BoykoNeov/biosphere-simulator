@@ -33,16 +33,20 @@ derivative work*:
   are peer-reviewed algorithms. Reimplementing from the primary literature yields
   code we own outright. PCSE then only ever serves as the verification oracle.
 
-## Project license status (decided 2026-06-15)
+## Project license status (chosen 2026-06-17 — Apache-2.0)
 
-**Deferred on purpose.** No `LICENSE` file yet; we will choose one later (before
-Phase 1, when real crop code lands). The **repo is public**, so the interim legal
-status is **"all rights reserved"** — others may view it but have no right to use,
-copy, modify, or contribute until a license is added. This is reversible at any
-time and does not affect anything we build.
+**Apache License 2.0** (see `/LICENSE`), chosen at the Phase-1 Step-1 precondition
+(real crop code is landing). Permissive, so it keeps the core free of copyleft — the
+whole point of the clean-room discipline below was to leave that door open, and a
+permissive license keeps it open for the eventual Godot product. Apache-2.0 over MIT
+for its explicit patent grant. Copyright holder: Boyko Neov.
 
-**Clean-room is mandatory regardless of the eventual license** — we never port
-EUPL (or any copyleft) code into our core; PCSE stays an offline oracle only.
+*(History: the license was deliberately deferred from 2026-06-15 until Phase-1; the
+interim status was "all rights reserved" on a public repo.)*
+
+**Clean-room is mandatory regardless of our license** — we never port EUPL (or any
+copyleft) code into our core; PCSE stays an offline oracle only. A permissive
+outbound license does **not** permit pulling copyleft source inbound.
 
 ## Practical rule for contributors (and Claude sessions)
 

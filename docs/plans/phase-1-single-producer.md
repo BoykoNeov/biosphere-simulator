@@ -386,6 +386,48 @@ litter sink, plus the carbon loss-sink already in the demo (extinction routing).
 *Realizes P4. Tightest constraint first: every later param file and flow depends on
 the canonical units and the per-area↔absolute convention.*
 
+### RESOLVED (2026-06-17) — the locks
+
+- **Canonical units** (`simcore.quantities.CANONICAL_UNIT`):
+  `CARBON = mol`, `ENERGY = J` (golden-locked, untouched); **`WATER = kg`**,
+  **`NITROGEN = kg`** (mass basis — kg H₂O matches Penman–Monteith mm/day =
+  kg m⁻² day⁻¹; kg N is unambiguous element mass, unlike species-ambiguous "mol N");
+  `OXYGEN = mol` (untracked in P1; molar keeps gas species consistent for deferred
+  Phase-2 stoichiometry). *WATER is a genuine kg-vs-mol toss-up (Phase-2 molar gas
+  stoichiometry was the only real counter-argument); user chose kg with the cost
+  understood.*
+- **Plan-claim correction.** The earlier "WATER/NITROGEN appear in no committed
+  golden" is true only for NITROGEN. **WATER appears in
+  `tests/regression/golden/state_snapshot.json`** (a `bio.water` POOL stock), which
+  is byte-pinned. The WATER→kg flip **regenerated that one golden** (mechanical —
+  `_golden_state()` reads `canonical_unit(WATER)` dynamically; the demo goldens are
+  carbon/energy-only and untouched). No `sim_io` schema-version bump: the unit is a
+  label *value*, not a schema-structure change (the version bump is Step 2's aux
+  field).
+- **Ground-area basis — the absolute-vs-per-area split (written down, the real
+  substance of the lock).** Per-area params (mm day⁻¹, µmol CO₂ m⁻² s⁻¹, kg N ha⁻¹)
+  are *dimensionally incompatible* with the absolute canonical unit in pint (length
+  vs mass; even kg m⁻² ≠ kg), so `to_canonical` neither can nor should touch them:
+  - **Absolute amounts** (initial stock values, e.g. soil-water content in kg) →
+    validated/converted by `to_canonical` against the quantity's canonical unit.
+    This is what Step 1's unit-validation tests exercise (WATER/NITROGEN kg ↔ g
+    convert; mol/L/etc. are rejected).
+  - **Per-area rate-law params** (mm day⁻¹, µmol m⁻² s⁻¹) → the per-leg dimensional
+    closure that P4 **defers**: schema-validated floats carrying a *declared unit in
+    the param-file header*, multiplied by the scenario **`ground_area`** (m²) inside
+    `evaluate` to yield an absolute leg in the canonical unit. `ground_area` is
+    scenario data, not core state. A typed per-leg dimensional check stays a future
+    enhancement (P4).
+- **kg-DM ⇄ mol-C conversion** lives in the **biosphere loader**
+  (`domains/biosphere/loader.py`), not `config/units.py`: it is crop-specific data
+  (carbon fraction kg C / kg DM), not generic pint. Explicit cited arithmetic —
+  `mol_C = mass_kg · f_C / M_C`, `M_C = 12.011 g/mol` (IUPAC) — with a round-trip
+  test and an `f_C ∈ (0, 1]` guard. Build-ahead infra; first used at allocation
+  (Step 9).
+- **LICENSE precondition — resolved.** **Apache-2.0** added at repo root (`/LICENSE`);
+  `docs/reuse-and-licenses.md` updated. Permissive keeps the core copyleft-free per
+  the reuse rationale; Apache over MIT for the patent grant.
+
 **Tasks.**
 - **Resolve `CANONICAL_UNIT` for WATER and NITROGEN** to science-correct labels
   (CARBON/ENERGY stay `mol`/`J` — golden-locked). Add a totality test (already

@@ -52,16 +52,26 @@ class StockKind(Enum):
 # core carries only these *labels*; the outer ``config`` loader validates and
 # converts incoming params against them with pint.
 #
-# PROVISIONAL (step-2 note): the specific unit chosen per quantity does NOT
-# affect any Phase-0 invariant — conservation arithmetic only requires that every
-# stock of a given quantity shares one consistent canonical unit, regardless of
-# which. Picking the science-correct units (mol vs kg, dry-mass basis, ...) is a
-# Phase-1 decision. Until then these are placeholders; do not read significance
-# into mol-vs-kg here.
+# RESOLVED (Phase-1 Step 1; was Phase-0 PROVISIONAL). Conservation arithmetic only
+# requires one consistent canonical unit per quantity, but the science picks are
+# now fixed:
+#   - CARBON = mol, ENERGY = J  → GOLDEN-LOCKED: the committed demo regression
+#     goldens (``tests/regression/golden/demo_*``) carry these labels, so changing
+#     either forces regenerating those goldens. ``mol C`` / ``J`` are adequate.
+#   - WATER = kg, NITROGEN = kg → mass basis. kg H2O is the Penman-Monteith
+#     convention (transpiration mm/day = kg m^-2 day^-1); kg N is unambiguous
+#     element mass (WOFOST-native, unlike species-ambiguous "mol N"). (Flipping
+#     WATER from the Phase-0 ``mol`` placeholder regenerated the one golden that
+#     carries a water stock, ``tests/regression/golden/state_snapshot.json``.)
+#   - OXYGEN = mol → untracked in Phase 1 (no O2 stock/flow); molar keeps the
+#     gas-phase species consistent for the deferred Phase-2 stoichiometry.
+# Per-organ *biomass* is conventionally kg dry matter; our currency is CARBON in
+# mol, so kg-DM <-> mol-C is a boundary conversion in the biosphere loader (carbon
+# fraction + molar mass), NOT a second canonical unit for carbon.
 CANONICAL_UNIT: dict[Quantity, UnitLabel] = {
     Quantity.CARBON: UnitLabel("mol"),
-    Quantity.WATER: UnitLabel("mol"),
-    Quantity.NITROGEN: UnitLabel("mol"),
+    Quantity.WATER: UnitLabel("kg"),
+    Quantity.NITROGEN: UnitLabel("kg"),
     Quantity.OXYGEN: UnitLabel("mol"),
     Quantity.ENERGY: UnitLabel("J"),
 }

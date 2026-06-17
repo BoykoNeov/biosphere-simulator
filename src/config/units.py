@@ -10,6 +10,13 @@ only conserved-quantity *amounts* are unit-validated here. Rate coefficients are
 dimensionless model parameters validated by the schema; full rate-law dimensional
 closure is a Phase-1 concern (it would require per-leg dimensional signatures on the
 about-to-be-frozen ``Flow`` protocol).
+
+This validates **absolute** amounts only (e.g. a soil-water stock in ``kg``).
+**Per-area** physiological rate params (mm day⁻¹, µmol m⁻² s⁻¹) are NOT routed here
+— they are dimensionally incompatible with the absolute canonical unit (length/area
+vs mass) and are instead schema-validated floats multiplied by a scenario
+``ground_area`` (m²) inside the flow's ``evaluate``. See the Phase-1 Step-1 design
+(``docs/plans/phase-1-single-producer.md``) for that absolute-vs-per-area split.
 """
 
 from __future__ import annotations

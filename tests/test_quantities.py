@@ -35,3 +35,19 @@ def test_canonical_unit_accessor_matches_table() -> None:
 
 def test_canonical_units_are_nonempty_labels() -> None:
     assert all(isinstance(u, str) and u for u in CANONICAL_UNIT.values())
+
+
+def test_canonical_units_are_science_correct() -> None:
+    # Phase-1 Step-1 resolves the Phase-0 PROVISIONAL table to science-correct labels.
+    #   CARBON=mol, ENERGY=J are GOLDEN-LOCKED (the committed demo goldens carry them;
+    #   changing either forces regenerating those goldens).
+    #   WATER=kg, NITROGEN=kg are mass-basis: kg H2O matches Penman-Monteith
+    #   (mm/day = kg m^-2 day^-1); kg N is unambiguous element mass (WOFOST-native,
+    #   unlike species-ambiguous "mol N").
+    #   OXYGEN stays mol (untracked in Phase 1; molar keeps gas species consistent
+    #   for the deferred Phase-2 stoichiometry).
+    assert CANONICAL_UNIT[Quantity.CARBON] == "mol"
+    assert CANONICAL_UNIT[Quantity.ENERGY] == "J"
+    assert CANONICAL_UNIT[Quantity.WATER] == "kg"
+    assert CANONICAL_UNIT[Quantity.NITROGEN] == "kg"
+    assert CANONICAL_UNIT[Quantity.OXYGEN] == "mol"

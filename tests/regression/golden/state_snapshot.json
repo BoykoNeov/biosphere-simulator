@@ -30,7 +30,7 @@
       "kind": "pool",
       "quantity": "water",
       "unclamped": false,
-      "unit": "mol"
+      "unit": "kg"
     },
     {
       "amount": "-0x0.0p+0",

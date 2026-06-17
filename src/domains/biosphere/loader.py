@@ -24,6 +24,40 @@ from simcore.quantities import Quantity
 # The committed canonical demo params.
 DEMO_PARAMS_PATH: Path = Path(__file__).parent / "params" / "demo.yaml"
 
+# --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
+# Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
+# is mol C (golden-locked; see ``simcore.quantities.CANONICAL_UNIT``). The carbon
+# fraction of dry matter (kg C per kg DM, crop-specific data, typically ~0.40-0.48)
+# bridges the two. This is *crop data*, not generic dimensional analysis: pint
+# treats mol ([substance]) and kg ([mass]) as incompatible without a molar mass, so
+# this lives here as explicit cited arithmetic rather than a ``to_canonical``
+# conversion. Build-ahead infra — no Phase-1 param uses it until allocation (Step 9).
+#
+# M_C = 12.011 g/mol = 0.012011 kg/mol (IUPAC conventional standard atomic weight of
+# carbon, [12.0096, 12.0116]).
+MOLAR_MASS_CARBON_KG_PER_MOL: float = 0.012011
+
+
+def _check_carbon_fraction(carbon_fraction: float) -> None:
+    """The carbon fraction is kg C per kg DM; it must lie in ``(0, 1]``."""
+    if not (0.0 < carbon_fraction <= 1.0):
+        raise ValueError(
+            f"carbon_fraction must be in (0, 1] (kg C per kg DM), got {carbon_fraction}"
+        )
+
+
+def dry_matter_kg_to_carbon_mol(mass_kg: float, *, carbon_fraction: float) -> float:
+    """Convert kg dry matter to mol carbon: ``mass_kg * f_C / M_C``."""
+    _check_carbon_fraction(carbon_fraction)
+    return mass_kg * carbon_fraction / MOLAR_MASS_CARBON_KG_PER_MOL
+
+
+def carbon_mol_to_dry_matter_kg(mol_c: float, *, carbon_fraction: float) -> float:
+    """Inverse of :func:`dry_matter_kg_to_carbon_mol`: ``mol_c * M_C / f_C``."""
+    _check_carbon_fraction(carbon_fraction)
+    return mol_c * MOLAR_MASS_CARBON_KG_PER_MOL / carbon_fraction
+
+
 # Explicit field -> conserved Quantity map (explicit, not inferred): each amount's
 # declared unit is validated against *this* quantity's canonical unit.
 _AMOUNT_QUANTITIES: dict[str, Quantity] = {
