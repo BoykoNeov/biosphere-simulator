@@ -1222,14 +1222,22 @@ space-station/
 
 ## Exit criteria (all must hold)
 
-- [ ] Deterministic replay (bit-identical re-run).
-- [ ] Registration-order independence (bit-identical under shuffle).
+- [x] Deterministic replay (bit-identical re-run) —
+      `test_integrator.test_step_is_deterministic_across_runs` +
+      `test_biosphere_demo.test_demo_run_is_deterministic_across_runs`.
+- [x] Registration-order independence (bit-identical under shuffle) — Hypothesis
+      properties across `test_integrator` / `test_registry` / `test_biosphere_demo` /
+      `test_arbitration` / `test_conservation`.
 - [x] State serialization round-trips exactly.
-- [ ] Conservation passes every step for all quantities.
+- [x] Conservation passes every step for all quantities — the always-on integrator
+      gate (step 8) + `test_conservation` (balanced step Euler+RK4; gate-catches-bug;
+      under arbitration; across extinction).
 - [x] Arbitration backstop: non-negative + conserved under over-draw (step 7);
       counter == 0 on the well-fed demo (step 10).
-- [ ] Extinction absorbing state works, conserves mass via the loss-sink, never
-      revives; POOL stocks never zeroed.
+- [x] Extinction absorbing state works, conserves mass via the loss-sink, never
+      revives; POOL stocks never zeroed — `test_extinction` (snap/route,
+      POOL-never-zeroed, no-refire / re-snap / survive) +
+      `test_conservation.test_conserves_across_extinction`.
 - [x] Cross-domain flow + internal source-resolver exercised and shuffle-stable
       (step 10: `Harvest`; bit-identical forcing≡shared run).
 - [x] Boundary exchange balances (step 10); `unclamped` sources not throttled
