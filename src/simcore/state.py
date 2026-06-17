@@ -20,6 +20,12 @@ from types import MappingProxyType
 from simcore.ids import DomainId, StockId, UnitLabel
 from simcore.quantities import Quantity, StockKind
 
+# Shared immutable empty default for ``State.aux`` (the non-conserved channel,
+# Phase-1 P2). A ``MappingProxyType`` is not in dataclass's mutable-default
+# blacklist (list/dict/set) and is effectively immutable, so one shared instance
+# is a safe default — every ``State`` re-wraps its own copy in ``__post_init__``.
+_EMPTY_AUX: Mapping[str, float] = MappingProxyType({})
+
 
 @dataclass(frozen=True)
 class Stock:
@@ -77,11 +83,21 @@ class State:
     is unhashable, so ``hash(state)`` raises. Equality (by contents) works. If a
     later test needs states in a ``set``/dict-key, give ``State`` a custom
     ``__hash__`` then (e.g. over ``n`` + sorted stock ids); don't rely on it now.
+
+    ``aux`` is the **non-conserved auxiliary channel** (Phase-1 P2): scalar
+    accumulators (thermal time, …) advanced by the integrator in parallel to
+    ``stocks`` but **outside** the conservation gate — they have no balanced
+    counterparty, so they are not flows and are invisible to
+    ``conservation.compute_ledger`` (which reasons only over ``stocks``). The
+    empty default keeps every pre-P2 call site (and the Phase-0/0.5 goldens, modulo
+    the schema bump) unchanged. Keys are stable, canonical-sortable names; values
+    are advanced by ``simcore.auxiliary`` processes (see the integrator).
     """
 
     n: int
     stocks: Mapping[StockId, Stock]
     rng_seed: int
+    aux: Mapping[str, float] = _EMPTY_AUX
 
     def __post_init__(self) -> None:
         if self.n < 0:
@@ -92,5 +108,12 @@ class State:
         for key, stock in self.stocks.items():
             if key != stock.id:
                 raise ValueError(f"State.stocks key {key!r} != stock.id {stock.id!r}")
-        # Detach from the caller's dict and forbid post-construction mutation.
+        # NaN/Inf are forbidden anywhere in state (determinism/serialization) — the
+        # same isfinite-only discipline as ``Stock.amount``; aux values are plain
+        # accumulators, so no further coercion.
+        for name, value in self.aux.items():
+            if not math.isfinite(value):
+                raise ValueError(f"State.aux[{name!r}] is not finite: {value!r}")
+        # Detach from the caller's dicts and forbid post-construction mutation.
         object.__setattr__(self, "stocks", MappingProxyType(dict(self.stocks)))
+        object.__setattr__(self, "aux", MappingProxyType(dict(self.aux)))

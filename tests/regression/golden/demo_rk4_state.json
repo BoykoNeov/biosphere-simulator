@@ -1,4 +1,5 @@
 {
+  "aux": {},
   "n": 200,
   "rng_seed": "0x0",
   "stocks": [
@@ -53,5 +54,5 @@
       "unit": "mol"
     }
   ],
-  "version": 1
+  "version": 2
 }

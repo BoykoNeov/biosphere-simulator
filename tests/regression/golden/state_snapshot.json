@@ -1,4 +1,9 @@
 {
+  "aux": {
+    "neg_zero": "-0x0.0p+0",
+    "subnormal": "0x0.0000000000001p-1022",
+    "thermal_time": "0x1.921fb54442d18p+1"
+  },
   "n": 42,
   "rng_seed": "0x123456789abcdef",
   "stocks": [
@@ -53,5 +58,5 @@
       "unit": "J"
     }
   ],
-  "version": 1
+  "version": 2
 }

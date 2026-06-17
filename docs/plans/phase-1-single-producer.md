@@ -1,13 +1,15 @@
 # Phase 1 — Single Producer
 
-**Status:** PLANNING (design-first, advisor-reviewed). No code yet. This first
-revision **locks the three foundation decisions** (the non-conserved aux channel,
-single-currency-flow coupling, and units/area + the Euler-daily/gate split) and
-**enumerates** the seven biological process steps as forward-pointers. Per the
-working-style rule and the advisor's "tightest-constraint-first" sequencing, the
-foundation (Steps 1–3) is designed in full and is reviewed/built **before** any of
-the seven process sections are written in detail — seven FvCB/PM/allocation designs
-on top of an architecture that might shift in review is wasted writing.
+**Status:** IN PROGRESS. **Steps 1 (units + area basis) and 2 (the non-conserved aux
+channel) are implemented, tested, and committed** — see their per-step `RESOLVED`
+blocks below. **Step 3 (PCSE oracle harness) is next.** This plan **locks the three
+foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
+and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
+process steps as forward-pointers. Per the working-style rule and the advisor's
+"tightest-constraint-first" sequencing, the foundation (Steps 1–3) is designed in full
+and is reviewed/built **before** any of the seven process sections are written in
+detail — seven FvCB/PM/allocation designs on top of an architecture that might shift
+in review is wasted writing.
 
 **Goal (roadmap exit, lines 220–246):** *"Build a research-grade crop physiology
 model."* A single producer (one crop, well-mixed 0-D) driven by external forcing
@@ -279,7 +281,7 @@ class State:
                                          # default ⇒ existing call sites unchanged.
 
 # --- simcore aux process: parallel to Flow, but UN-balanced + single-valued ---
-class AuxProcess(Protocol):              # (module: simcore/aux.py — PURE core)
+class AuxProcess(Protocol):              # (module: simcore/auxiliary.py — PURE core)
     id: AuxId
     def evaluate(self, snapshot: State, env: Environment, dt: float
                  ) -> Mapping[str, float]: ...
@@ -452,10 +454,58 @@ value; the Phase-0 demo goldens are **unchanged** (CARBON/ENERGY labels untouche
 
 *Realizes P2 — the load-bearing step; reviewed before any process step.*
 
+### RESOLVED (2026-06-17) — the locks (implemented + advisor-reviewed)
+
+- **`State.aux: Mapping[str, float]`** — additive 4th field, default a shared empty
+  `MappingProxyType` (re-wrapped per instance in `__post_init__`), so positional
+  `State(n, stocks, rng_seed)` and every pre-P2 call site are unchanged. Values are
+  **finiteness-validated** (NaN/Inf rejected) with the *isfinite-only* discipline of
+  `Stock.amount` — no further coercion. The mapping is detached from the caller dict
+  and read-only, exactly like `stocks`.
+- **`simcore/auxiliary.py` (pure core)** — `AuxId = NewType(str)` and the `AuxProcess`
+  Protocol (read-only `id` property + `evaluate(snapshot, env, dt) -> Mapping[str,
+  float]` returning per-name **increments**, increment-form like `Flow`). No balance
+  check (non-conserved by definition). `AuxProcess.id` is the *process* id (dedup +
+  canonical order), distinct from the accumulator *names* it writes — several
+  processes may write one shared name (summed).
+  - **Module-name deviation (forced):** the plan's `aux.py` is **unusable** — `AUX`
+    is a reserved Windows device name, so git's Win32 APIs can't commit/clone
+    `aux.py` (and an eventual Rust `aux.rs` would hit the same wall). The file is
+    **`auxiliary.py`**; the Python identifiers (`AuxProcess`, `AuxId`, `State.aux`,
+    `aux_processes`) are unaffected — only the filename was reserved.
+- **`Registry`** gained an optional `aux_processes` (default `None`), sorted by
+  `AuxId` and duplicate-id-rejected — the *same* discipline as flows — so
+  `Registry(flows, stocks)` and `Integrator(registry)` are unchanged.
+- **Integrator** — aux advances in **`_apply`** (reached **only** by `step_report`):
+  one explicit-Euler `_aux_increments` evaluation at the **step-entry** snapshot,
+  summed per name across processes in canonical `AuxId` order (#15), folded into the
+  single `n→n+1` commit. **RK4 carries aux for free** — `_perturb` only `replace`s
+  `stocks`, so stage states keep aux like they keep `n`; a flow reading aux sees a
+  within-step constant and aux advances exactly once per step regardless of scheme.
+  `substep`/`_deltas` never touch aux.
+- **aux × multirate — documented + placement-test guarded, NO runtime raise**
+  (advisor-endorsed). `multirate_step` is typed against `Substepper`, which exposes
+  no registry; a runtime guard would need `isinstance(_BaseIntegrator)` + reach into
+  `.registry`, breaking the abstraction multirate is deliberately decoupled from, to
+  defend a case Phase 1 explicitly defers — against the repo's anti-speculation norm.
+  `substep` leaving aux untouched is the structural guard; `test_aux.py` pins it.
+- **`sim_io.snapshot` — `SCHEMA_VERSION` 1→2**; `aux` serialized as a **key-sorted
+  object of hex-float strings** (same exactness/canonical order as amounts). **The
+  bump is NOT golden-only** (an earlier plan claim was wrong): two version-hardcoding
+  tests were updated (`test_schema_version_constant_exposed` → 2;
+  `test_unknown_schema_version_rejected` now asserts **v1 is rejected**). All **3
+  goldens regenerated** via their explicit `_regenerate`/`__main__` actions (a
+  `_regenerate()` block was added to `test_sim_io_snapshot.py`); the diff is clean —
+  only `version` + an `aux` block changed, no stock amount drifted.
+- **`conservation` untouched** — `compute_ledger` and its key-set guard reason over
+  `stocks` only, so aux is invisible by construction (pinned: an aux-only change
+  conserves trivially; an unbalanced *stock* change still trips the gate).
+- **`Observation` NOT extended** — deferred, no named Phase-1 consumer (P2).
+
 **Tasks.**
 - `State.aux: Mapping[str, float]` (additive field, empty `MappingProxyType`
   default; `__post_init__` wraps/validates finiteness like amounts).
-- `simcore/aux.py` (PURE core): the `AuxProcess` protocol (`evaluate → per-name
+- `simcore/auxiliary.py` (PURE core): the `AuxProcess` protocol (`evaluate → per-name
   increments`, increment-form like `Flow`) + an `AuxId` type. No balance check
   (non-conserved by definition).
 - **Integrator:** advance aux by **explicit Euler at the step-entry snapshot**

@@ -50,7 +50,10 @@ def _golden_state() -> State:
     The single source of truth for both the committed golden file and the tests
     that pin it. Stocks intentionally cover POOL / POPULATION / BOUNDARY, an
     ``unclamped`` source, a loss-sink, and the awkward doubles ``pi``, ``0.1``,
-    ``-0.0`` (signed zero), and the smallest positive subnormal.
+    ``-0.0`` (signed zero), and the smallest positive subnormal. ``aux`` (the
+    non-conserved channel, P2) carries its own nasty floats — a representative
+    ``thermal_time`` plus ``-0.0`` and the smallest subnormal — to pin aux
+    hex-float exactness (incl. the sign bit) in the committed golden.
     """
     stocks = [
         Stock(
@@ -83,7 +86,8 @@ def _golden_state() -> State:
         dataclasses.replace(boundary.loss_sink(Quantity.CARBON), amount=-0.0),
         boundary.source(StockId("boundary.solar"), Quantity.ENERGY, 1e300),
     ]
-    return State(n=42, stocks={s.id: s for s in stocks}, rng_seed=_BIG_SEED)
+    aux = {"thermal_time": math.pi, "neg_zero": -0.0, "subnormal": 5e-324}
+    return State(n=42, stocks={s.id: s for s in stocks}, rng_seed=_BIG_SEED, aux=aux)
 
 
 # --- round-trip ------------------------------------------------------------
@@ -103,6 +107,17 @@ def test_round_trip_is_bit_exact_per_amount() -> None:
             back.stocks[sid].extinction_threshold.hex()
             == stock.extinction_threshold.hex()
         )
+
+
+def test_aux_round_trip_is_bit_exact() -> None:
+    # Aux values round-trip bit-for-bit via hex-float. Asserted via .hex() (not ==)
+    # so the ``-0.0`` sign bit and the subnormal survive — the same reason the
+    # per-amount bit-exact test exists.
+    state = _golden_state()
+    back = sim_io.loads(sim_io.dumps(state))
+    assert back.aux.keys() == state.aux.keys()
+    for name, value in state.aux.items():
+        assert back.aux[name].hex() == value.hex()
 
 
 def test_dumps_is_idempotent() -> None:
@@ -200,9 +215,15 @@ def test_golden_loads_to_state() -> None:
 
 # --- canonical order / insertion-order independence ------------------------
 def test_serialization_is_insertion_order_independent() -> None:
+    # Shuffling BOTH the stock and the aux insertion order must not change the bytes
+    # (canonical id/key sort, #15) — stocks are pre-sorted as a list, aux keys by
+    # json.dumps(sort_keys=True) + the explicit pre-sort.
     state = _golden_state()
-    shuffled_items = list(state.stocks.items())[::-1]
-    shuffled = State(n=state.n, stocks=dict(shuffled_items), rng_seed=state.rng_seed)
+    shuffled_stocks = dict(list(state.stocks.items())[::-1])
+    shuffled_aux = dict(list(state.aux.items())[::-1])
+    shuffled = State(
+        n=state.n, stocks=shuffled_stocks, rng_seed=state.rng_seed, aux=shuffled_aux
+    )
     assert sim_io.dumps(shuffled) == sim_io.dumps(state)
 
 
@@ -211,6 +232,13 @@ def test_stocks_emitted_in_canonical_id_order() -> None:
     assert isinstance(stocks, list)
     ids = [s["id"] for s in stocks]
     assert ids == sorted(ids)
+
+
+def test_aux_emitted_in_canonical_key_order() -> None:
+    aux = sim_io.state_to_dict(_golden_state())["aux"]
+    assert isinstance(aux, dict)
+    keys = list(aux)
+    assert keys == sorted(keys)
 
 
 # --- fail-loud reconstruction ----------------------------------------------
@@ -237,8 +265,10 @@ def test_tampered_unclamped_non_boundary_rejected() -> None:
         sim_io.state_from_dict(data)
 
 
-@pytest.mark.parametrize("version", [0, 2, "1", None])
+@pytest.mark.parametrize("version", [0, 1, 3, "2", None])
 def test_unknown_schema_version_rejected(version: object) -> None:
+    # Includes the now-superseded v1: a v1 golden is rejected outright (no migration
+    # machinery; the v1->v2 aux bump regenerated all goldens).
     data = sim_io.state_to_dict(_golden_state())
     data["version"] = version
     with pytest.raises(ValueError, match="schema version"):
@@ -253,4 +283,24 @@ def test_missing_version_rejected() -> None:
 
 
 def test_schema_version_constant_exposed() -> None:
-    assert sim_io.SCHEMA_VERSION == snapshot.SCHEMA_VERSION == 1
+    assert sim_io.SCHEMA_VERSION == snapshot.SCHEMA_VERSION == 2
+
+
+def _regenerate() -> None:
+    """Rewrite the committed ``state_snapshot.json`` golden from the current serializer.
+
+    A deliberately separate, explicit action — NOT reachable from a test run — so a
+    verify run can never overwrite the golden it is meant to check (mirrors
+    ``test_regression_demo._regenerate``). Run via::
+
+        uv run python tests/test_sim_io_snapshot.py
+
+    Review the diff before committing: a change here means the on-disk format moved
+    (e.g. a schema bump like the v1→v2 aux addition).
+    """
+    GOLDEN.write_bytes(sim_io.dumps(_golden_state()).encode("utf-8"))
+    print(f"wrote {GOLDEN}")
+
+
+if __name__ == "__main__":
+    _regenerate()

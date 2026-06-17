@@ -31,6 +31,9 @@ Design (settled with advisor):
 * **``unit`` is serialized verbatim**, not re-derived from ``quantity`` on load —
   re-deriving would be a silent "fix" that breaks a faithful round-trip if the
   stored label ever diverged from the canonical table.
+* **``aux`` (the non-conserved channel, P2) serializes as a key-sorted object of
+  hex-float strings** — same exactness/canonical-order discipline as stock amounts
+  (added at the v1→v2 bump; empty for any pre-aux run).
 * **Reconstruction routes through ``Stock(...)`` / ``State(...)``**, so every core
   invariant re-fires for free: NaN/Inf rejection, the ``unclamped ⇒ BOUNDARY``
   guard, the key/id match, ``n >= 0``. A tampered golden therefore fails loudly at
@@ -56,8 +59,9 @@ from simcore.state import State, Stock
 
 # Snapshot schema version. Bump only when the on-disk shape changes; see the
 # module docstring for why a marker exists at all (and why no migration machinery
-# does yet).
-SCHEMA_VERSION = 1
+# does yet). v2 adds the non-conserved ``aux`` channel (Phase-1 P2); v1 goldens are
+# rejected outright (no migration) and were regenerated at the bump.
+SCHEMA_VERSION = 2
 
 
 def _stock_to_dict(stock: Stock) -> dict[str, object]:
@@ -92,13 +96,18 @@ def state_to_dict(state: State) -> dict[str, object]:
     """``State`` → plain JSON-able data.
 
     Stocks are emitted as a list sorted by id (canonical order, #15); the seed is a
-    ``0x``-hex string (cross-port precision, see module docstring).
+    ``0x``-hex string (cross-port precision, see module docstring). The non-conserved
+    ``aux`` channel (P2) is a key-sorted object of hex-float strings — the same
+    exactness/canonical-order discipline as stock amounts (``-0.0`` and subnormals
+    survive bit-for-bit; ``json.dumps(sort_keys=True)`` also sorts the keys, the
+    pre-sort here makes the canonical order explicit at the source).
     """
     return {
         "version": SCHEMA_VERSION,
         "n": state.n,
         "rng_seed": hex(state.rng_seed),
         "stocks": [_stock_to_dict(state.stocks[sid]) for sid in sorted(state.stocks)],
+        "aux": {name: state.aux[name].hex() for name in sorted(state.aux)},
     }
 
 
@@ -117,10 +126,12 @@ def state_from_dict(data: Mapping[str, Any]) -> State:
             f"and reads version {SCHEMA_VERSION} only"
         )
     stocks = [_stock_from_dict(s) for s in data["stocks"]]
+    aux = {name: float.fromhex(h) for name, h in data["aux"].items()}
     return State(
         n=data["n"],
         stocks={s.id: s for s in stocks},
         rng_seed=int(data["rng_seed"], 0),
+        aux=aux,
     )
 
 

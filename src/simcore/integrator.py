@@ -47,6 +47,17 @@ autonomous Phase-0 oscillator (step-5 note). Intermediate RK4 stage amounts may 
 negative — allowed (``Stock`` forbids only NaN/Inf); positivity under RK4 is the
 kinetics' job, not a guard.
 
+**Aux channel (Phase-1 P2).** Alongside the conserved stocks the integrator advances
+``State.aux`` — non-conserved scalar accumulators (thermal time, …) with no balanced
+counterparty (``simcore.auxiliary``). Aux is advanced by **one explicit-Euler
+evaluation at the step-entry snapshot** in ``step_report`` (``_aux_increments`` →
+``_apply``),
+*independent of the stock scheme*: RK4 stage states carry aux unchanged (only amounts
+perturb, exactly like ``n``), so a flow reading aux sees a within-step constant, and
+aux advances exactly once per full step. It is **outside** the conservation gate by
+construction (``conservation.compute_ledger`` reasons only over ``stocks``). ``substep``
+(the multi-rate primitive) leaves aux untouched — see its docstring.
+
 Pure stdlib only.
 """
 
@@ -145,6 +156,47 @@ def _reduce(results: Sequence[FlowResult]) -> dict[StockId, float]:
     return deltas
 
 
+def _aux_increments(
+    registry: Registry, snapshot: State, env: SourceResolver, dt: float
+) -> dict[str, float]:
+    """Per-name aux increment: one Euler evaluation at ``snapshot`` (P2/P3).
+
+    Binds ``env`` to ``snapshot`` (the #16 seam — the *same* snapshot aux reads) and
+    evaluates every aux process in canonical ``AuxId`` order (the registry guarantees
+    it), summing increments per accumulator name (sorted within a process). The
+    cross-process per-name sum runs in AuxId order, so the result is bit-identical
+    under aux-process registration shuffle (#15). One evaluation, at the step-entry
+    snapshot, regardless of the stock scheme — aux is never sub-staged through RK4.
+    Returns ``{}`` when there are no aux processes (the empty-default fast path).
+    """
+    increments: dict[str, float] = {}
+    if not registry.aux_processes:
+        return increments
+    bound = env.bind(snapshot, dt)
+    for proc in registry.aux_processes:
+        result = proc.evaluate(snapshot, bound, dt)
+        for name in sorted(result):
+            increments[name] = increments.get(name, 0.0) + result[name]
+    return increments
+
+
+def _advanced_aux(state: State, increments: Mapping[str, float]) -> Mapping[str, float]:
+    """``state.aux`` with each named accumulator advanced by its increment (P2).
+
+    Increment-form, like stocks: ``new[name] = old.get(name, 0) + increment[name]``.
+    Empty increments ⇒ ``state.aux`` is returned unchanged (the no-aux fast path that
+    keeps the Phase-0/0.5 empty default and goldens intact). Sorted iteration is for
+    deterministic ordering only — each name is one independent addition. The returned
+    mapping is re-wrapped immutably by ``State.__post_init__`` on ``replace``.
+    """
+    if not increments:
+        return state.aux
+    merged = dict(state.aux)
+    for name in sorted(increments):
+        merged[name] = merged.get(name, 0.0) + increments[name]
+    return merged
+
+
 def _rk4_stage(
     registry: Registry, stage_state: State, env: SourceResolver, dt: float
 ) -> dict[StockId, float]:
@@ -192,9 +244,25 @@ def _perturb(state: State, deltas: Mapping[StockId, float], factor: float) -> St
     return replace(state, stocks=_shifted_stocks(state, deltas, factor))
 
 
-def _apply(state: State, deltas: Mapping[StockId, float]) -> State:
-    """Write the step result: amounts shifted by ``deltas`` and ``n -> n+1``."""
-    return replace(state, n=state.n + 1, stocks=_shifted_stocks(state, deltas, 1.0))
+def _apply(
+    state: State,
+    deltas: Mapping[StockId, float],
+    aux_increments: Mapping[str, float],
+) -> State:
+    """Write the step result: amounts shifted by ``deltas``, aux advanced, ``n -> n+1``.
+
+    Aux is advanced **here**, in the single ``n -> n+1`` commit reached only by
+    ``step_report`` — never in ``_perturb`` (RK4 stages keep aux, like ``n``) and
+    never in ``substep`` (the multi-rate primitive leaves aux untouched, P2). So aux
+    advances exactly once per full step, by one Euler increment, independent of the
+    stock scheme.
+    """
+    return replace(
+        state,
+        n=state.n + 1,
+        stocks=_shifted_stocks(state, deltas, 1.0),
+        aux=_advanced_aux(state, aux_increments),
+    )
 
 
 def _combine(
@@ -330,9 +398,17 @@ class _BaseIntegrator:
 
     def step_report(self, state: State, env: SourceResolver, dt: float) -> StepReport:
         """One full step: ``_deltas`` → apply with ``n -> n+1`` → extinction +
-        the every-step conservation gate."""
+        the every-step conservation gate.
+
+        Aux (the non-conserved channel, P2) is advanced **only here**: one Euler
+        evaluation of every aux process at the step-entry ``state``
+        (``_aux_increments``) is folded into the single ``n -> n+1`` commit by
+        ``_apply``. ``substep`` shares the ``_deltas`` spine but deliberately does
+        **not** advance aux (see ``substep``).
+        """
         deltas, rationed = self._deltas(state, env, dt)
-        return _finalize(state, _apply(state, deltas), rationed)
+        aux_increments = _aux_increments(self._registry, state, env, dt)
+        return _finalize(state, _apply(state, deltas, aux_increments), rationed)
 
     def substep(self, state: State, env: SourceResolver, dt: float) -> StepReport:
         """Amounts-only advance (keeps ``n``); the ``simcore.multirate`` primitive.
@@ -344,6 +420,13 @@ class _BaseIntegrator:
         the single ``n -> n+1``, and asserts conservation once at the composite
         boundary (decisions N2/N4/N5). Arbitration/extinction behave exactly as in
         single-rate (Euler scales + counts; RK4 hard-errors on over-draw).
+
+        **Aux is deliberately untouched here** (P2). ``substep`` keeps ``n`` and only
+        perturbs stock amounts, so ``State.aux`` passes through unchanged — advancing
+        it in the shared sub-step path would advance it ``n_sub``× per master step
+        (wrong). Aux × multi-rate is out of scope in Phase 1 (single-rate); the
+        ``multirate_step`` driver therefore does not advance aux across a master step.
+        Pinned by the placement test in ``tests/test_aux.py``.
         """
         deltas, rationed = self._deltas(state, env, dt)
         return _finalize_substep(_perturb(state, deltas, 1.0), rationed)
