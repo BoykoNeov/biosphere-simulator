@@ -5,14 +5,23 @@ Exercises ``lab.rk45`` per the Step-2 test plan (N1): the oracle honors its requ
 used as a reference — fixed-step RK4 converges *toward the RK45 trajectory* on a
 non-analytic (Lotka–Volterra) scenario, enriching Step 1 beyond the analytic cases.
 
-Two **discriminating controls** guard the thing most likely to be wrong — a transcribed
-Butcher-tableau coefficient — because tolerance-honoring alone would not catch it (a
-subtly-wrong method can still honor a tolerance by taking more steps), mirroring how
-Step 1 pinned ``fit_order`` on synthetic data:
+Two controls guard the thing most likely to be wrong — a transcribed Butcher-tableau
+coefficient — because tolerance-honoring alone would not catch it (a subtly-wrong method
+can still honor a tolerance by taking more steps), mirroring how Step 1 pinned
+``fit_order`` on synthetic data:
   * a *static* consistency check (each ``A`` row sums to its node ``c``; ``ΣB == 1``;
-    ``ΣB_STAR == 1``), and
+    ``ΣB_STAR == 1`` — necessary order conditions), and
   * an *empirical* one — the embedded error estimate is **5th-order** in ``dt``, fit
     via the Step-1 ``fit_order`` harness over a single-step ``dt`` ladder.
+
+What these *actually* pin (stated honestly): the empirical test confirms the **error
+estimator's** order (``b*`` is order 4, so the controller is driven correctly), not the
+propagated solution ``b``'s own nonlinear 5th order — if ``b`` were secretly 4th-order,
+``e = y5 − y4`` would still be ~``dt⁵``. RK45's nonlinear accuracy therefore rests on
+"it is the standard DOPRI5 tableau, correctly entered + consistency-checked", reinforced
+by the *linear*-scalar decay accuracy test and (tableau-independent) mass conservation —
+the standard pragmatic way to validate an oracle. A *direct* nonlinear-accuracy pin
+(RK45's drift in the nonlinear LV invariant ``V``) is filed-not-built — beyond Step 2.
 
 Per N1 the oracle breaks the integer clock (#14) by design and is **not** added to the
 determinism / bit-identical-across-ports gates. Flows are defined test-locally (the
@@ -176,13 +185,17 @@ def test_dopri5_tableau_is_consistent() -> None:
 
 # === discriminating control #2: the embedded error estimate is 5th-order =======
 def test_embedded_error_estimate_is_fifth_order() -> None:
-    """A single RK45 step's error estimate scales as ``dt⁵`` (pins the tableau order).
+    """One RK45 step's error estimate scales as ``dt⁵`` (pins the *estimator* order).
 
     Mirrors Step-1's synthetic ``fit_order`` pin: take *one* DOPRI step on decay from a
     fixed state over a geometric ``dt`` ladder and fit the slope of ``|error|`` vs
     ``dt``. The embedded 4(5) estimate is O(dt⁵), so the slope must be ≈5 — independent
     of the adaptive driver. (The ladder stays above the round-off floor: the finest
     estimate is ~1e-11 ≫ 1e-16.)
+
+    Scope (see the module docstring): this confirms the embedded estimate / ``b*``'s
+    order — i.e. that step control is driven correctly — *not* the propagated solution's
+    nonlinear 5th order, which rests on the known, consistency-checked tableau.
     """
     reg, state, env = _decay_scenario(a0=2.0, lam=1.0)
     y = {sid: state.stocks[sid].amount for sid in state.stocks}

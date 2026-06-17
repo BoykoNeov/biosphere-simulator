@@ -272,11 +272,16 @@ oracle) and **no arbitration/extinction** (positivity is the kinetics' job, scen
 well-fed); conservation is verified at the call site via `assert_conserved` over rebuilt
 states (dt-independent), not inside the oracle.
 
-The tableau is guarded by **two discriminating controls** (the Step-1 `fit_order`
-analogue, because tolerance-honoring alone can't catch a transcribed coefficient): a
-*static* consistency check (each `A`-row sums to its node `c`; `ΣB=ΣB*=1`) and an
-*empirical* one — the embedded error estimate is **5th-order** in `dt` (measured 5.03 via
-`fit_order` over a single-step ladder). Measured: tolerance-honoring on analytic decay
+The tableau is guarded by **two controls** (the Step-1 `fit_order` analogue, because
+tolerance-honoring alone can't catch a transcribed coefficient): a *static* consistency
+check (each `A`-row sums to its node `c`; `ΣB=ΣB*=1`) and an *empirical* one — the
+embedded error estimate is **5th-order** in `dt` (measured 5.03 via `fit_order` over a
+single-step ladder). Stated honestly about scope: these pin the **error estimator's**
+order (that step control is driven correctly) and the tableau's consistency, *not* the
+propagated solution's own nonlinear 5th order — that rests on "it is the standard,
+consistency-checked DOPRI5 tableau", reinforced by the linear-scalar decay accuracy and
+(tableau-independent) conservation. A direct nonlinear-accuracy pin (RK45's drift in the
+nonlinear LV invariant `V`) is **filed-not-built** — beyond Step 2. Measured: tolerance-honoring on analytic decay
 (tol 1e-6→err 2.9e-7, 1e-9→3.2e-10, tighter strictly better); step size adapts (LV orbit,
 max/min ≈ 27.6 over 67 accepted / 3 rejected steps); mass conserved (LV total-carbon drift
 2.3e-13); and **fixed-step RK4 converges toward the RK45 reference at 4th order on the
