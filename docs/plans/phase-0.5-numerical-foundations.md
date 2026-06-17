@@ -1,9 +1,17 @@
 # Phase 0.5 — Numerical Foundations
 
-**Status:** DESIGN PASS — not started. This is the living plan for Phase 0.5,
-written design-first (advisor-reviewed) before any code, mirroring how Phase 0 was
-run. The multi-rate sub-stepping **contract is locked here** (Step 3) before it is
-written, as the working style requires. Steps are test-first.
+**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Step 1 done**.
+This is the living plan for Phase 0.5, written design-first before any code, mirroring
+how Phase 0 was run. The multi-rate sub-stepping **contract is locked here** (Step 3)
+before it is written, as the working style requires. Steps are test-first.
+
+Step 1 (convergence/timestep-sensitivity harness) is complete: `lab/convergence.py`
+(`fit_order`/`convergence_order` — the reusable log-log least-squares order estimator,
+the first `lab/` module) + `tests/test_convergence.py` gate the observed order on
+analytic decay (measured Euler 1.018 ∈ [0.8,1.3]; RK4 4.035 ∈ [3.6,4.3], finest RK4
+error 7.6e-11 ≫ the round-off floor), with the fitter pinned independently on synthetic
+power-law data. The `lab` package is registered in `pyproject.toml` (out-of-core; outside
+the simcore purity gate).
 
 **Goal (roadmap exit):** *"You trust the math before trusting the science."* Add the
 numerical machinery and the trust-gates that must exist before any Phase-1 biology:
@@ -226,6 +234,16 @@ stay; Step 1 factors out the measurement, it does not duplicate the scenarios.)
 reference; fitted order within band ([0.8,1.3] Euler, [3.6,4.3] RK4); the harness
 is reused unchanged by Steps 2–3.
 
+✅ **done** — `lab/convergence.py` (`fit_order`: log-log least-squares slope over the
+whole `dt` ladder, NaN/round-off-floor guards; `convergence_order`: the
+`error_of_dt`→order convenience) + `tests/test_convergence.py`. The decay scenario is
+test-local (repo convention). Measured: Euler 1.018, RK4 4.035 (both comfortably
+centered in band); RK4 errors 3.3e-7→7.6e-11 strictly decreasing, well above the f64
+floor. The fitter is pinned independently on synthetic `C·dt^p` data (the
+discriminating control) and rejects bad input (length mismatch, <2 rungs, non-positive
+dt/error). The decision to home the fitter in `lab/` (created now, not deferred to
+Step 2) keeps the engine free of analysis tooling and gives Steps 2–3 a clean import.
+
 ## Step 2 design — adaptive RK45 oracle (out-of-core)
 
 *Realizes "Adaptive RK45 (lab only)" per N1.* New package `lab/` (sibling of
@@ -347,8 +365,8 @@ and peak memory across the sweep, on the dev machine, with the machine/commit no
 
 ## Exit criteria (Phase 0.5 — "trust the math")
 
-- [ ] Convergence/timestep-sensitivity: observed order matches each scheme (Euler→1,
-      RK4→4) across a `dt` ladder; multi-rate (Strang)→2.
+- [x] Convergence/timestep-sensitivity: observed order matches each scheme (Euler→1,
+      RK4→4) across a `dt` ladder *(Step 1 done)*; multi-rate (Strang)→2 *(Step 3)*.
 - [ ] Adaptive RK45 oracle exists (out-of-core), tolerance-honoring, conserving; used
       as a convergence reference for a non-analytic case.
 - [ ] Multi-rate sub-stepping: deterministic, conserving, `n`-preserving (#14),

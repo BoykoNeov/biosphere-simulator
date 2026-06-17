@@ -32,7 +32,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 # Multi-package src-layout: each path maps to a top-level import package.
-packages = ["src/simcore", "src/sim_io", "src/config", "src/domains"]
+# `lab` is out-of-core validation/analysis tooling (convergence fitter, RK45
+# oracle) — outside simcore, exempt from the core purity/determinism invariants.
+packages = ["src/simcore", "src/sim_io", "src/config", "src/domains", "src/lab"]
 
 [tool.ruff]
 # Lint against the minimum supported version (the floor), not the dev version.
