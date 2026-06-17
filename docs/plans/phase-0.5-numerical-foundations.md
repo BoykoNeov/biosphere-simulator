@@ -1,6 +1,7 @@
 # Phase 0.5 — Numerical Foundations
 
-**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Steps 1–4 done**.
+**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Steps 1–5 done**
+(Step 6, the perf baseline, is the only remaining deliverable).
 This is the living plan for Phase 0.5, written design-first before any code, mirroring
 how Phase 0 was run. The multi-rate sub-stepping **contract is locked here** (Step 3)
 before it is written, as the working style requires. Steps are test-first.
@@ -432,7 +433,7 @@ divergence); final-step `|Δ| ≤ 1e-9` (settled, no drift); `A` within `1e-2` o
 (relaxed to the fixed-point neighborhood — loose for the multi-rate split's shifted
 fixed point); `rationed == 0` (non-arbitrating); `|total − T| ≤ 1e-9`.
 
-## Step 5 design — edge-case suite
+## Step 5 design — edge-case suite ✅ done
 
 *Realizes "zero stocks, depleted resources, negative-flow attempts, overflow
 protection."* `tests/test_edge_cases.py`. Much machinery exists (arbitration handles
@@ -451,6 +452,41 @@ explicitly and adds any missing guard.
   which `Stock.__post_init__` rejects → a clear error rather than a silent `Inf`
   poisoning the ledger. (If a gap surfaces — e.g. overflow inside a reduction before
   `Stock` construction — add the guard and note it here.)
+
+✅ **done** — `tests/test_edge_cases.py` (11 cases). **A test-only change: no new
+guard was needed**, and nothing in `simcore/` moved — so the purity / frozen-API /
+determinism gates stay green *by construction*, not by re-verification. The suite is
+scoped to the **degenerate boundary values** the existing mechanisms must survive; the
+*proportional multi-flow sag*, the `unclamped` skip, and registration-order
+independence stay in `tests/test_arbitration.py` and are not re-tested.
+
+- **Empty/zero (no-op):** an empty registry over empty *or* unchanged stocks steps
+  `n→n+1`, `rationed==0`, `events==()`, conserving trivially — pinned under **both**
+  Euler and RK4 (RK4's union-of-stage-keys combine over four empty maps is a no-op).
+- **Zero availability (`scale_f == 0`):** a POOL at exactly 0 with a withdrawal gives
+  `scale_s = min(1, 0/x) = 0` — pinned at the pure `min_scaling` level (every scaled
+  leg exactly 0, the only place `scale_f` is directly observable), then at the
+  integrator: Euler stays at 0 / `rationed==1` / conserves, **RK4 hard-errors**
+  (`ArbitrationError`). This is the `available_s == 0` edge `test_arbitration` (which
+  uses nonzero availability) does not cover.
+- **Depletion / strict over-draw (the asymmetry):** a single constant drain of 16/dt
+  from a POOL at 10 → Euler scales by `10/16 = 0.625` (binary-exact), lands at exactly
+  0 (never negative), `rationed==1`, conserves; the same draw under **RK4 raises
+  `ArbitrationError`** — the Euler-scale / RK4-hard-error contract re-pinned at the
+  boundary with a single flow.
+- **Exact-fit seam:** withdrawing *exactly* the available 10 gives `scale_s = 1.0`, so
+  the backstop does **not** fire (`rationed==0`) yet the pool still lands at exactly 0
+  — the throttle/no-throttle boundary. Deliberately **Euler-only**: under RK4 a
+  constant exact-fit flow hard-errors (stage 2 perturbs the pool to 5 while demand
+  stays 10 → `scale_f = 0.5 < 1`), and the strict-over-draw test carries the RK4 side.
+- **Overflow protection:** an `unclamped` boundary source (min-scaling skips it, so the
+  withdrawal isn't throttled) feeds a POOL at `sys.float_info.max`; depositing another
+  `float_info.max` overflows to `+inf`, which `Stock.__post_init__`'s `math.isfinite`
+  guard rejects with `ValueError` (assertion pinned to `match="not finite"`, not a bare
+  `ValueError`). **No gap:** every reduction (`_reduce`/`_combine`/`_scale_factors`)
+  feeds `Stock` construction *before* the conservation gate runs, and `math.isfinite`
+  rejects `inf` **and** `nan` there — so a non-finite from any reduction is caught at
+  the producing step regardless of which reduction overflowed.
 
 ## Step 6 design — performance baseline
 
@@ -483,7 +519,10 @@ and peak memory across the sweep, on the dev machine, with the machine/commit no
       (length-independence now empirical), non-arbitrating *(Step 4 done — closed
       A⇌B exchange relaxes to A*=0.3; Euler/RK4/Strang+RK4 multi-rate all bounded by
       T, settled, `rationed==0`, conserving over 100k steps)*.
-- [ ] Edge cases pinned (empty/zero, depletion, over-draw asymmetry, overflow).
+- [x] Edge cases pinned (empty/zero, depletion, over-draw asymmetry, overflow)
+      *(Step 5 done — `tests/test_edge_cases.py`, 11 cases; test-only, no new guard:
+      Euler scale-to-0 / RK4 hard-error asymmetry, exact-fit seam, `math.isfinite`
+      overflow rejection)*.
 - [ ] Performance baseline committed (`docs/perf-baseline.md`).
 - [ ] Core purity, determinism, and the frozen Phase-0 API all still hold (the
       Phase-0 gates stay green).
