@@ -1,6 +1,6 @@
 # Phase 0.5 — Numerical Foundations
 
-**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Steps 1–2 done**.
+**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Steps 1–3 done**.
 This is the living plan for Phase 0.5, written design-first before any code, mirroring
 how Phase 0 was run. The multi-rate sub-stepping **contract is locked here** (Step 3)
 before it is written, as the working style requires. Steps are test-first.
@@ -349,6 +349,39 @@ comparison/cost; **Strang is the default** and the gated path.
   evaluations than single-rate at the fast `dt` (the efficiency the feature exists
   for) — a count assertion, not a wall-clock one.
 
+✅ **done** — `simcore/multirate.py` (`Split` enum; `multirate_step` driver) + the
+`Substepper` protocol and `substep` primitive on `_BaseIntegrator`
+(`tests/test_multirate.py`, 15 cases). `substep` was added by **extracting a
+per-scheme `_deltas` hook** so `step_report` (full step) and `substep` (amounts-only,
+keeps `n`, extinction-but-no-conservation) consume the *identical* delta computation —
+which makes the equivalence below hold **by construction**, not by luck. The driver
+folds a flat op-list (Strang: half-slow / `n_sub`×fast / half-slow; Lie: full-slow /
+`n_sub`×fast), commits the single `n → n+1`, then asserts conservation **once** at the
+composite boundary. Sub-steps deliberately *skip* the per-operation conservation
+assert (per N5), so the composite gate is the load-bearing tripwire; extinction events
+are re-stamped to the produced `n` (the `ExtinctionEvent.n` convention).
+
+The order check (N4, the load-bearing one) runs on a **non-commuting linear cascade**
+`x →(fast) y →(slow) z` (all CARBON POOL, closed so it conserves with no boundary,
+closed-form `y(t)` reference). Sharing stock `y` makes `[L_fast, L_slow] ≠ 0` — the
+asymmetry that exposes the split's true order; commuting operators would have hidden it
+behind RK4's 4th. Measured (fitting `|y − y_exact|` via the Step-1 `fit_order` harness,
+ladder 0.1→0.0125, errors ~1e-4→1e-6 well above the f64 floor): **Strang+RK4-on-both →
+2.00** (not 4 — the split caps it), **Strang+Euler → 1.02** (the silent collapse to Lie
+this phase exists to catch), **Lie+RK4 → 1.01**. Equivalence: all-fast `n_sub=1`
+reproduces single-rate `step` **bit-for-bit** (Euler and RK4); the *all-slow* Strang
+case differs by ~O(`dt²`) (two `dt/2` halves ≠ one `dt` step — the noted asymmetry).
+Conservation: the coupled cascade holds total carbon to <1e-12 over 40 master steps,
+and an injected unbalanced sub-delta trips `ConservationError` at the composite gate.
+`n` accounting: `state.n == k` after `k` master steps for `n_sub ∈ {1,2,5}`.
+Determinism: bit-identical across runs and under a Hypothesis flow-shuffle within each
+registry. Speedup: with `n_sub=4`, the slow flow is evaluated **8** times (2 Strang
+halves × 4 RK4 stages) vs **16** single-rate at the fast `dt` — the efficiency claim,
+as a count. **Scoped honestly:** disjointness of the slow/fast flow sets is the
+*assembler's* responsibility (N3), not enforced by the driver; the test scenarios keep
+every flow single-domain so the partition is unambiguous (automatic cross-domain-flow
+inference stays out of scope).
+
 ## Step 4 design — 100k-step stability gate
 
 *Realizes "100k+ steps, no drift" per N6.* `tests/test_stability.py`. Scenario: a
@@ -409,8 +442,10 @@ and peak memory across the sweep, on the dev machine, with the machine/commit no
 - [x] Adaptive RK45 oracle exists (out-of-core), tolerance-honoring, conserving; used
       as a convergence reference for a non-analytic case *(Step 2 done — RK4→RK45
       observed order 3.97 on LV; embedded estimate order 5.03)*.
-- [ ] Multi-rate sub-stepping: deterministic, conserving, `n`-preserving (#14),
-      registration-order-independent, with the asserted split order.
+- [x] Multi-rate sub-stepping: deterministic, conserving, `n`-preserving (#14),
+      registration-order-independent, with the asserted split order *(Step 3 done —
+      Strang+RK4→2.00, Strang+Euler→1.02, Lie→1.01; all-fast `n_sub=1` bit-identical
+      to single-rate)*.
 - [ ] 100k+ step run: bounded, no `NaN`/`Inf`/overflow, conservation holds
       (length-independence now empirical), non-arbitrating.
 - [ ] Edge cases pinned (empty/zero, depletion, over-draw asymmetry, overflow).

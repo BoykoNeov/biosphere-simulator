@@ -103,6 +103,25 @@ class StepReport:
     rationed: int
 
 
+@runtime_checkable
+class Substepper(Protocol):
+    """A concrete integrator's *amounts-only* advance (the multi-rate building block).
+
+    ``substep`` is like ``step_report`` but **keeps** ``State.n`` (it advances
+    amounts and runs arbitration + extinction, but does **not** bump the integer
+    clock and does **not** assert conservation). It is the primitive
+    ``simcore.multirate`` composes — the driver owns the single ``n -> n+1`` commit
+    and the composite conservation gate (decisions N2/N4/N5).
+
+    This is deliberately **separate** from the frozen ``Integrator`` Protocol
+    (Phase-0 surface): ``substep`` is an *additive* capability on the concrete
+    strategies, not part of the frozen ``step`` contract. The concrete
+    ``EulerIntegrator`` / ``Rk4Integrator`` satisfy **both** protocols.
+    """
+
+    def substep(self, state: State, env: SourceResolver, dt: float) -> StepReport: ...
+
+
 def _evaluate_all(
     registry: Registry, stage_state: State, env: SourceResolver, dt: float
 ) -> list[FlowResult]:
@@ -269,11 +288,33 @@ def _finalize(before: State, applied: State, rationed: int) -> StepReport:
     return StepReport(state=nxt, events=events, rationed=rationed)
 
 
-class _BaseIntegrator:
-    """Shared spine: registry injection + the ``step``→``step_report`` delegation.
+def _finalize_substep(advanced: State, rationed: int) -> StepReport:
+    """Multi-rate sub-step tail: extinction pass only — **no** conservation gate.
 
-    Subclasses implement ``step_report`` (the scheme); ``step`` is the frozen-API
-    surface returning just the produced ``State``.
+    Mirrors ``_finalize`` but deliberately omits the conservation assert: under
+    operator splitting (``simcore.multirate``) conservation is asserted **once**, at
+    the composite master-step boundary, not per sub-operation (decisions N4/N5). The
+    sub-step keeps ``State.n`` (``advanced`` is an amounts-only advance produced by
+    ``_perturb(..., 1.0)``); the multi-rate driver owns the single ``n -> n+1``
+    commit. Extinction still runs per sub-operation (as in single-rate), so a routed
+    residual lands in the loss-sink within the sub-step and the composite gate then
+    sees a balanced whole.
+    """
+    nxt, events = _extinction_pass(advanced)
+    return StepReport(state=nxt, events=events, rationed=rationed)
+
+
+class _BaseIntegrator:
+    """Shared spine: registry injection, the ``step``→``step_report`` delegation, and
+    the ``substep`` primitive (the multi-rate building block).
+
+    Subclasses implement ``_deltas`` — the scheme's per-step combined delta map plus
+    its rationing-firing count. Everything else is shared: ``step_report`` applies the
+    deltas with ``n -> n+1`` and the full conservation gate; ``substep`` applies the
+    **same** deltas amounts-only (keeping ``n``, no conservation gate) for
+    ``simcore.multirate`` to compose. Because both consume the identical ``_deltas``,
+    an all-fast ``n_sub == 1`` multi-rate step reproduces the single-rate ``step``
+    exactly. ``step`` is the frozen-API surface returning just the produced ``State``.
     """
 
     def __init__(self, registry: Registry) -> None:
@@ -288,6 +329,35 @@ class _BaseIntegrator:
         return self.step_report(state, env, dt).state
 
     def step_report(self, state: State, env: SourceResolver, dt: float) -> StepReport:
+        """One full step: ``_deltas`` → apply with ``n -> n+1`` → extinction +
+        the every-step conservation gate."""
+        deltas, rationed = self._deltas(state, env, dt)
+        return _finalize(state, _apply(state, deltas), rationed)
+
+    def substep(self, state: State, env: SourceResolver, dt: float) -> StepReport:
+        """Amounts-only advance (keeps ``n``); the ``simcore.multirate`` primitive.
+
+        Computes the **same** per-step deltas as ``step_report`` (via ``_deltas``)
+        but applies them with ``_perturb(..., 1.0)`` — amounts shift, ``n`` is kept —
+        and runs only the extinction pass (``_finalize_substep``), **not** the
+        conservation gate. The multi-rate driver composes several sub-steps, commits
+        the single ``n -> n+1``, and asserts conservation once at the composite
+        boundary (decisions N2/N4/N5). Arbitration/extinction behave exactly as in
+        single-rate (Euler scales + counts; RK4 hard-errors on over-draw).
+        """
+        deltas, rationed = self._deltas(state, env, dt)
+        return _finalize_substep(_perturb(state, deltas, 1.0), rationed)
+
+    def _deltas(
+        self, state: State, env: SourceResolver, dt: float
+    ) -> tuple[dict[StockId, float], int]:
+        """The scheme's combined per-step delta map and its rationing-firing count.
+
+        The one piece that differs between schemes; ``step_report``/``substep`` share
+        everything else. Returns ``(deltas, rationed)`` where ``deltas`` is the
+        canonical-order-reduced per-stock increment for this ``dt`` and ``rationed``
+        is the Euler-backstop firing count (always 0 for RK4).
+        """
         raise NotImplementedError
 
 
@@ -301,10 +371,12 @@ class EulerIntegrator(_BaseIntegrator):
     reported in the ``StepReport``.
     """
 
-    def step_report(self, state: State, env: SourceResolver, dt: float) -> StepReport:
+    def _deltas(
+        self, state: State, env: SourceResolver, dt: float
+    ) -> tuple[dict[StockId, float], int]:
         results = _evaluate_all(self._registry, state, env, dt)
         scaled, rationed = arbitration.min_scaling(results, state.stocks)
-        return _finalize(state, _apply(state, _reduce(scaled)), rationed)
+        return _reduce(scaled), rationed
 
 
 class Rk4Integrator(_BaseIntegrator):
@@ -316,10 +388,12 @@ class Rk4Integrator(_BaseIntegrator):
     ``StepReport.rationed`` is always 0 here.
     """
 
-    def step_report(self, state: State, env: SourceResolver, dt: float) -> StepReport:
+    def _deltas(
+        self, state: State, env: SourceResolver, dt: float
+    ) -> tuple[dict[StockId, float], int]:
         reg = self._registry
         k1 = _rk4_stage(reg, state, env, dt)
         k2 = _rk4_stage(reg, _perturb(state, k1, 0.5), env, dt)
         k3 = _rk4_stage(reg, _perturb(state, k2, 0.5), env, dt)
         k4 = _rk4_stage(reg, _perturb(state, k3, 1.0), env, dt)
-        return _finalize(state, _apply(state, _combine(k1, k2, k3, k4)), 0)
+        return _combine(k1, k2, k3, k4), 0
