@@ -1,0 +1,57 @@
+{
+  "n": 200,
+  "rng_seed": "0x0",
+  "stocks": [
+    {
+      "amount": "0x1.36886f7980b35p+4",
+      "domain": "biosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.atmospheric_c",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.05cd160cb9941p+5",
+      "domain": "biosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.plant_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.0000000000000p+0",
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.light",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": true,
+      "unit": "J"
+    },
+    {
+      "amount": "0x0.0p+0",
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.loss.carbon",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.05f77591b430cp+10",
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.outside_c",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    }
+  ],
+  "version": 1
+}

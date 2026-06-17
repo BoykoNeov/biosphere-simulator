@@ -55,8 +55,17 @@ ratio ≈ 1.1e-4 < a 1e-3 tripwire). **Cluster 5 — `observe`/`Observation`** i
 of each stock (`id`/`domain`/`quantity`/`unit`/`amount`/`kind`) and drops the engine
 internals (`rng_seed`, `extinction_threshold`, `unclamped`); no aggregates/`totals`
 (advisor-confirmed anti-speculation — no Phase-0 consumer), canonical id-sorted, frozen +
-hashable. Remaining clusters: golden demo regression snapshot, API freeze. (Earlier:
-Reviewed, advisor pass folded in.)
+hashable. **Cluster 6 — the golden demo regression snapshot** is now done:
+`tests/test_regression_demo.py` runs the full two-domain demo for a fixed 200 coupled
+steps (the #16 read path) under **each** integrator and **byte-compares** the final
+`State` — serialized via the step-9 `sim_io` hex-float serializer (DRY; no new format) —
+to committed goldens (`tests/regression/golden/demo_{euler,rk4}_state.json`). 200 steps is
+the length the step-10 well-fed gates already validate (`rationed == 0` / `events == ()`),
+so the golden only *adds* the bit-pin (re-asserted inline). Regeneration is a **separate,
+explicit** script action (run the module as `__main__`), never an env-gated test
+side-effect, so a verify run is strictly read-only and cannot silently overwrite the
+golden it checks. Remaining cluster: API freeze. (Earlier: Reviewed, advisor pass folded
+in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
 first registered domain. We are building a deterministic stock-and-flow core and
@@ -1387,8 +1396,16 @@ space-station/
     no Phase-0 consumer — the `StepReport.ledger` refusal again; additive later). Canonical
     id-sorted (#15); frozen + `==`/hashable (unlike `State`). Tests pin the projection
     boundary via `dataclasses.fields`, plus order-independence (Hypothesis) and the demo
-    integration. See *Step 11 design — `observe`/`Observation`* above. Still owed: the golden
-    demo regression snapshot and the API freeze.
+    integration. See *Step 11 design — `observe`/`Observation`* above.
+    ✅ **golden demo regression snapshot done** — `tests/test_regression_demo.py`: the
+    full demo run (200 coupled steps, the #16 path) under **both** integrators, final
+    `State` **byte-compared** to committed goldens via the step-9 `sim_io` hex-float
+    serializer (DRY — no new format). 200 steps reuses the step-10 well-fed gates'
+    validated length (`rationed == 0` / `events == ()`, re-asserted inline). Regeneration
+    is a **separate explicit script action** (module `__main__`), not an env-gated test
+    side-effect — a verify run stays read-only and can't overwrite the golden it checks
+    (the advisor-flagged footgun). Goldens are platform-stable: the flows touch only
+    `+ − × ÷` (no transcendentals), canonical-order reduced. Still owed: the API freeze.
     **Freeze-review carry-forward (advisor):** the freeze *locks* these field choices, and
     add-a-field is non-breaking while remove-after-freeze is breaking — so two items get a
     deliberate pass at the API-freeze cluster (do **not** pre-empt them now): (a)
