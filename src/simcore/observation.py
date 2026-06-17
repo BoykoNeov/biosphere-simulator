@@ -25,11 +25,20 @@ engine internal and does not belong.** Each kept field passes that test:
   * ``.quantity`` — *what substance* (carbon/water/…); needed to group or colour by
     conserved quantity;
   * ``.unit`` — an amount is uninterpretable without its canonical-unit label;
-  * ``.amount`` — the measurement itself;
-  * ``.kind`` — descriptive *classification* (POOL / POPULATION / BOUNDARY): lets a
-    consumer tell a modeled stock from an "outside" boundary reservoir. This is
-    classification, not a tunable control — hence kept while ``threshold`` /
-    ``unclamped`` are dropped.
+  * ``.amount`` — the measurement itself.
+
+**``kind`` is dropped — an API-freeze decision.** ``StockKind`` mixes two axes, and
+neither survives the field rule cleanly. BOUNDARY-vs-modeled *is* observable, but in
+this model it is fully derivable from ``domain`` (every BOUNDARY stock is built into
+the ``boundary`` namespace — see ``simcore.boundary`` — and ``domain`` is already the
+blessed grouping axis above), so that half is **redundant**. The only information
+``kind`` carries that ``domain`` does not — POOL-vs-POPULATION — is engine-behavioral
+(extinction *eligibility*), the same control axis as ``extinction_threshold``. With
+no Phase-0 consumer of ``observe`` and the freeze asymmetry (adding a field back is
+non-breaking; removing one after the freeze is breaking), ``kind`` is **cut
+conservatively** at the freeze. Re-add a purpose-built observable flag (e.g. a coarse
+modeled/boundary boolean, decoupled from the engine ``StockKind`` enum) when a real
+consumer needs one — additive and cheap.
 
 **No aggregates (yet).** There is intentionally no per-quantity ``totals`` /
 per-domain rollup field: nothing in Phase 0 consumes it (the golden snapshot
@@ -54,7 +63,7 @@ Pure stdlib only.
 from dataclasses import dataclass
 
 from simcore.ids import DomainId, StockId, UnitLabel
-from simcore.quantities import Quantity, StockKind
+from simcore.quantities import Quantity
 from simcore.state import State
 
 
@@ -63,7 +72,7 @@ class StockObservation:
     """The observable subset of one ``Stock`` (engine-internal fields dropped).
 
     See the module docstring for why each field is observable and why
-    ``extinction_threshold`` / ``unclamped`` are not.
+    ``extinction_threshold`` / ``unclamped`` / ``kind`` are not.
     """
 
     id: StockId
@@ -71,7 +80,6 @@ class StockObservation:
     quantity: Quantity
     unit: UnitLabel
     amount: float
-    kind: StockKind
 
 
 @dataclass(frozen=True)
@@ -90,10 +98,10 @@ class Observation:
 def observe(state: State) -> Observation:
     """Project ``state`` to a plain-data ``Observation`` (the consumer read surface).
 
-    Re-exposes only the observable subset of each stock (dropping the RNG seed and the
-    extinction/arbitration controls — see the module docstring) with stocks in
-    **canonical id-sorted order** (#15), so equal states observe equal regardless of
-    ``State.stocks`` insertion order.
+    Re-exposes only the observable subset of each stock (dropping the RNG seed, the
+    extinction/arbitration controls, and ``kind`` — see the module docstring) with
+    stocks in **canonical id-sorted order** (#15), so equal states observe equal
+    regardless of ``State.stocks`` insertion order.
     """
     stocks = tuple(
         StockObservation(
@@ -102,7 +110,6 @@ def observe(state: State) -> Observation:
             quantity=stock.quantity,
             unit=stock.unit,
             amount=stock.amount,
-            kind=stock.kind,
         )
         for stock in (state.stocks[sid] for sid in sorted(state.stocks))
     )

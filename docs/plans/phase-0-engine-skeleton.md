@@ -1,6 +1,6 @@
 # Phase 0 — Engine Skeleton
 
-**Status:** In progress — steps 1–10 complete (repo/tooling skeleton; core state
+**Status:** Phase 0 COMPLETE — steps 1–11 done (repo/tooling skeleton; core state
 primitives: quantities, Stock, State, RNG, units-at-boundary core seam; flows:
 `Leg`/`FlowResult`/`Flow` + balance helpers, `Environment` protocol, `Registry`;
 Boundary domain: `source`/`sink`/`loss_sink` reservoir constructors + the
@@ -22,8 +22,7 @@ were built test-first against their design sections below (advisor-reviewed). St
 10 added the demo: Photosynthesis/Respiration/`Harvest` (cross-domain) flows, the
 internal source-resolver case proven as a **bit-identical forcing≡shared run**
 (#16), and the **well-fed backstop gate** (`rationed == 0` / no RK4 over-draw).
-Step 11 (full test suite + golden snapshot; freeze API) is a bundle, now **in
-progress**: **cluster 1 — the `config/` loader + `params/demo.yaml` + the param-load
+Step 11 (full test suite + golden snapshot; freeze API) is a bundle, now **complete**: **cluster 1 — the `config/` loader + `params/demo.yaml` + the param-load
 half of the Units gate (Scope A)** is done (pydantic/pint/yaml confined to
 `config/` + `domains/biosphere/loader.py`; `DemoParams`' inline defaults removed,
 the YAML is now the single source of truth; amounts declared in canonical units so
@@ -52,7 +51,8 @@ near `atol/eps` ≈ 4.5e6); pinned by a per-step headroom gate (both integrators
 ratio ≈ 1.1e-4 < a 1e-3 tripwire). **Cluster 5 — `observe`/`Observation`** is now done:
 `simcore/observation.py` — the plain-data consumer read surface (the last of the frozen
 `init`/`step`/`observe` trio), a **projection** that re-exposes only the observable subset
-of each stock (`id`/`domain`/`quantity`/`unit`/`amount`/`kind`) and drops the engine
+of each stock (`id`/`domain`/`quantity`/`unit`/`amount`; `kind` later cut at the API
+freeze) and drops the engine
 internals (`rng_seed`, `extinction_threshold`, `unclamped`); no aggregates/`totals`
 (advisor-confirmed anti-speculation — no Phase-0 consumer), canonical id-sorted, frozen +
 hashable. **Cluster 6 — the golden demo regression snapshot** is now done:
@@ -64,7 +64,8 @@ the length the step-10 well-fed gates already validate (`rationed == 0` / `event
 so the golden only *adds* the bit-pin (re-asserted inline). Regeneration is a **separate,
 explicit** script action (run the module as `__main__`), never an env-gated test
 side-effect, so a verify run is strictly read-only and cannot silently overwrite the
-golden it checks. Remaining cluster: API freeze. (Earlier: Reviewed, advisor pass folded
+golden it checks. API freeze done (review items (a) `Observation.kind` cut, (b)
+`init`/`step` reconciled) — **Phase 0 complete.** (Earlier: Reviewed, advisor pass folded
 in.)
 **Goal:** Freeze the engine architecture before any scientific complexity appears.
 The architecture is multi-domain from the first commit; biosphere is simply the
@@ -313,6 +314,27 @@ def init(config) -> State: ...
 def step(state, env, dt) -> State: ...
 def observe(state) -> Observation: ...   # plain data
 ```
+
+### Freeze reconciliation — the core surface as actually built
+
+The sketch above is the **early illustrative shape** (it predates the step-3 registry
+and step-6 integrator-strategy designs). The freeze locks the *real* surface, so the
+three diverged slots are reconciled here (full rationale in *Step 11 — API freeze*):
+
+- `observe(state) -> Observation` — **built literally.** Its `Observation` drops the
+  sketch's implied `kind` (cut at the freeze — redundant with `domain`; review item (a)).
+- `step(state, env, dt) -> State` — realized as the **`Integrator.step(...)` strategy
+  method** (the `Registry` is injected at construction, not passed per step). The
+  concrete `EulerIntegrator`/`Rk4Integrator` add `step_report(...) -> StepReport` for
+  diagnostics — **additive, outside the frozen `Integrator` Protocol** (which carries
+  only `step`). The `env: Environment → SourceResolver` slot was reconciled in step 6
+  (see the `Integrator` Protocol comment above).
+- `init(config) -> State` — **never built; there is no general `init` in Phase 0.** The
+  demo-specific `build_demo(params) -> (State, Registry)` stands in — note it returns
+  the `Registry` too (the integrator needs it at construction; the single-`State` sketch
+  predated that). `build_demo` is a **domain assembly** (`domains/biosphere/demo.py`),
+  *not* a frozen engine entry point; a general `init(config) -> (State, Registry)` (a
+  real config/scenario loader) is a Phase-1 concern.
 
 ### Step algorithm (one derivative evaluation = steps 1–4)
 1. Take immutable `snapshot`.
@@ -1030,14 +1052,14 @@ literally — `build_demo` subsumed it — so the project already treats that sk
 illustrative and builds these surfaces minimally-for-need; `observe` follows suit.)
 
 `Observation(n: int, stocks: tuple[StockObservation, ...])`, with
-`StockObservation(id, domain, quantity, unit, amount, kind)` — the observable subset of
+`StockObservation(id, domain, quantity, unit, amount)` — the observable subset of
 `Stock`. The field rule (the contract a reader holds the type to): **if you cannot say
 what a consumer observes with a field, it is an engine internal and is dropped.** So
 `rng_seed` (internal RNG state), `extinction_threshold` (an engine control: *when* a
-population snaps), and `unclamped` (an arbitration control, #13) are **dropped**; `kind`
-is **kept** as descriptive *classification* (POOL/POPULATION/BOUNDARY lets a consumer
-tell a modeled stock from an "outside" reservoir) — classification, not a tunable
-control, which is the line between it and `threshold`/`unclamped`.
+population snaps), and `unclamped` (an arbitration control, #13) are **dropped**. The
+cluster-5 draft also carried `kind`, but the **API freeze cut it** (review item (a)):
+its BOUNDARY-vs-modeled axis is redundant with `domain`, and its only unique content —
+POOL-vs-POPULATION — is engine-behavioral. See *Step 11 — API freeze*.
 
 ### No aggregates yet (anti-speculation, advisor-confirmed)
 Deliberately **no** per-quantity `totals` / per-domain rollup: nothing in Phase 0
@@ -1066,6 +1088,64 @@ insertion order.
 - Frozen; deterministic; hashable + set-usable; `n` participates in equality.
 - Integration: `observe(build_demo(...).state)` covers every demo stock with matching
   fields.
+
+---
+
+## Step 11 design — API freeze (locks the surface)
+
+*The last Phase-0 cluster.* The freeze is a **decision act**, not new machinery: there
+is no codegen'd lock — the *Frozen API* section above **is** the locked surface, so
+"freezing" means (1) resolving the two review items the freeze-note reserved for this
+cluster, (2) reconciling the sketch with what was actually built (the *Freeze
+reconciliation* block under the Frozen API), and (3) flipping the exit criterion. The
+freeze **asymmetry** frames every call: **adding** a field/function later is
+non-breaking; **removing** one after the freeze is breaking — so an undecided field is
+cut, not kept.
+
+### Review item (a) — `Observation.kind`: **cut** (cluster 5 had kept it)
+The freeze-note flagged `kind` as the borderline `Observation` field. Resolved by a
+redundancy check (advisor): `StockKind` carries two axes —
+- **BOUNDARY-vs-modeled** *is* observable, **but** every BOUNDARY stock is built into
+  the `boundary` domain (all three `simcore.boundary` constructors pin
+  `domain=BOUNDARY_DOMAIN` + `kind=BOUNDARY` together), and `domain` is already the
+  projection's blessed grouping axis — so this half is **redundant** with a field the
+  observation already exposes.
+- **POOL-vs-POPULATION** is the *only* content `kind` adds over `domain`, and it is
+  engine-**behavioral** (extinction *eligibility*) — the same control axis as the
+  already-dropped `extinction_threshold`.
+
+So `kind`'s non-redundant content is exactly its leaky (behavioral) half. With **no
+Phase-0 consumer of `observe` at all** and the freeze asymmetry, `kind` is **cut
+conservatively**; re-add a purpose-built observable flag (a coarse modeled/boundary
+boolean, decoupled from the engine `StockKind` enum) when a real consumer appears.
+`StockObservation` is now `(id, domain, quantity, unit, amount)`;
+`tests/test_observation.py` pins the new field set. (The redundancy is a constructor
+*convention*, not an enforced `Stock` invariant — there is no `kind==BOUNDARY ⟺
+boundary-domain` guard — but it holds across the whole Phase-0 model, which is what the
+cut relies on; a future invariant could harden it.)
+
+### Review item (b) — reconcile `init(config) -> State` with reality
+Recorded as the **Freeze reconciliation** block under the Frozen API so the *locked*
+surface is the real one, not the sketch:
+- **`init`** was never built, and **there is no general `init` in Phase 0.** The
+  demo-specific `build_demo(params) -> (State, Registry)` stands in — it returns the
+  `Registry` too (the integrator takes the registry at construction; the single-`State`
+  sketch predated the step-6 strategy design). `build_demo` is a *domain assembly*, not
+  a frozen engine entry point; a general `init(config) -> (State, Registry)` is deferred
+  to Phase 1.
+- **`step`** is the `Integrator.step(...)` strategy method, not a free function; the
+  concrete classes add `step_report(...)` (additive, outside the frozen Protocol). The
+  `env` type was already reconciled to `SourceResolver` in step 6.
+- **`observe`** was built literally (minus `kind`, per (a)).
+
+### The complete divergence set (nothing else silently drifted)
+A freeze must not bless a surface that quietly diverged elsewhere. The full set of
+Frozen-API ↔ implementation divergences is **exactly three**, all now documented: (a)
+`Observation.kind` (cut here), (b) `init`/`step` (reconciled here), and the
+`Integrator.step` `env: Environment → SourceResolver` slot (reconciled in step 6, noted
+inline). The remaining dataclasses (`Stock`, `State`, `Leg`, `FlowResult`) and the
+`Flow` / `Environment` / `Rng` Protocols match their implementations, each built
+test-first against its step design above. **Phase 0 is complete.**
 
 ---
 
@@ -1157,7 +1237,9 @@ space-station/
 - [x] Convergence/drift test green; Euler oscillator-growth trap demonstrably
       caught (step 11 cluster 3: mass-conserving Lotka–Volterra, RK4 4th-order
       invariant drift vs Euler's one-signed amplitude growth).
-- [ ] Engine + domain API frozen (this document's Frozen API section).
+- [x] Engine + domain API frozen — the Frozen API section + its **Freeze
+      reconciliation** block; both reserved review items resolved (`Observation.kind`
+      cut; `init`/`step` reconciled) in *Step 11 — API freeze*.
 
 ---
 
@@ -1416,4 +1498,11 @@ space-station/
     reconcile the frozen-API sketch's `init(config) -> State` with reality — it was never
     built literally; `build_demo` subsumes it but returns `(State, Registry)`, so make the
     divergence explicit rather than silent.
-```
+    ✅ **API freeze done** — both reserved review items resolved: (a) `Observation.kind`
+    **cut** (its BOUNDARY-vs-modeled axis is redundant with `domain`; its unique
+    POOL-vs-POPULATION axis is engine-behavioral — a conservative freeze cut, no Phase-0
+    consumer); (b) `init`/`step` reconciled — there is no general `init` in Phase 0
+    (`build_demo → (State, Registry)` stands in), `step` is the `Integrator.step` strategy
+    method (+ additive `step_report`). Documented in *Step 11 — API freeze* + the
+    Frozen-API *Freeze reconciliation* block; the `[ ] Engine + domain API frozen` exit
+    criterion is now ✅. **Phase 0 complete.**

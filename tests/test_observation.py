@@ -1,9 +1,10 @@
 """Step-11 tests: the ``observe`` / ``Observation`` plain-data read surface.
 
 ``observe`` is a **projection**: it re-exposes only the observable subset of a
-``State`` (per-stock id/domain/quantity/unit/amount/kind) and drops the engine
-internals (``rng_seed``, ``extinction_threshold``, ``unclamped``). The headline
-gates here pin exactly that boundary, plus the canonical id-ordering (#15) /
+``State`` (per-stock id/domain/quantity/unit/amount) and drops the engine internals
+(``rng_seed``, ``extinction_threshold``, ``unclamped``) plus ``kind`` (cut at the API
+freeze — its observable half is redundant with ``domain``; see ``observation``). The
+headline gates here pin exactly that boundary, plus the canonical id-ordering (#15) /
 insertion-order independence and the hashable-plain-data property the design buys.
 """
 
@@ -47,8 +48,8 @@ def _pop(sid: str = "bio.plant_c", amount: float = 100.0) -> Stock:
 
 
 def _boundary(sid: str = "boundary.light", amount: float = 1.0) -> Stock:
-    # An unclamped BOUNDARY source: proves `unclamped` is dropped while `kind` (the
-    # descriptive classification) is kept.
+    # An unclamped BOUNDARY source: proves `unclamped` is dropped (and that a boundary
+    # reservoir projects like any modeled stock now that `kind` is dropped too).
     return Stock(
         id=StockId(sid),
         domain=DomainId("boundary"),
@@ -78,7 +79,6 @@ def test_observe_copies_observable_fields_faithfully() -> None:
         assert so.quantity == src.quantity
         assert so.unit == src.unit
         assert so.amount == src.amount  # exact: a plain copy
-        assert so.kind == src.kind
 
 
 def test_observe_empty_state() -> None:
@@ -97,11 +97,14 @@ def test_observe_preserves_exact_amount(amount: float) -> None:
 
 # --- the projection boundary (the load-bearing design assertion) -----------
 def test_stock_observation_drops_engine_control_fields() -> None:
-    # The contract: observable identity/classification only — no engine *controls*.
+    # The contract: observable identity/measurement only — no engine controls, and no
+    # `kind` (observable half redundant with `domain`; unique POOL/POPULATION half is
+    # engine-behavioral — cut at the API freeze).
     names = {f.name for f in dataclasses.fields(StockObservation)}
-    assert names == {"id", "domain", "quantity", "unit", "amount", "kind"}
+    assert names == {"id", "domain", "quantity", "unit", "amount"}
     assert "extinction_threshold" not in names  # an engine control, not a measurement
     assert "unclamped" not in names  # an arbitration control (#13), not a measurement
+    assert "kind" not in names  # cut at the freeze (redundant with `domain`)
 
 
 def test_observation_drops_rng_seed() -> None:
@@ -169,9 +172,8 @@ def test_observe_demo_state_covers_all_stocks() -> None:
     for so in obs.stocks:
         src = state.stocks[so.id]
         assert so.amount == src.amount
-        assert (so.domain, so.quantity, so.unit, so.kind) == (
+        assert (so.domain, so.quantity, so.unit) == (
             src.domain,
             src.quantity,
             src.unit,
-            src.kind,
         )
