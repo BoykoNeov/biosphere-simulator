@@ -1,7 +1,8 @@
 # Phase 0.5 — Numerical Foundations
 
-**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Steps 1–5 done**
-(Step 6, the perf baseline, is the only remaining deliverable).
+**Status:** COMPLETE — all steps 1–6 done (advisor-reviewed). Step 6 (the perf
+baseline) delivered the last piece: `bench/perf.py` + the committed
+`docs/perf-baseline.md` regression reference (non-gating).
 This is the living plan for Phase 0.5, written design-first before any code, mirroring
 how Phase 0 was run. The multi-rate sub-stepping **contract is locked here** (Step 3)
 before it is written, as the working style requires. Steps are test-first.
@@ -502,6 +503,40 @@ check; Phase 0.5 only establishes the baseline.
 **Deliverable:** `bench/` script + committed `docs/perf-baseline.md` with steps/sec
 and peak memory across the sweep, on the dev machine, with the machine/commit noted.
 
+✅ **done** — `bench/perf.py` (stdlib-only: `time.perf_counter` + `tracemalloc`, repo
+root, **outside `simcore`** so the purity gate is untouched and no runtime dep is
+added) + the committed `docs/perf-baseline.md`. **Scenario:** a *closed ring of `N`
+CARBON `POOL` stocks* — one first-order transfer flow per stock (`s_i → s_{i+1 mod N}`,
+`k·dt = 0.05`) — generalizing the Step-4 closed A⇌B exchange to arbitrary `N`. The ring
+is the load-bearing choice (advisor): **exactly one outgoing flow per pool caps
+per-stock demand at `k·dt·s_i` for any `N`**, so it stays well-fed (no Euler rationing,
+no RK4 over-draw hard-error) at every size — a hub/star would pile `N−1` draws on the
+centre and over-draw it. Closed (conserves with no boundary reservoir); uniform start
+keeps every RK4 stage amount positive. Each cell is sanity-checked `rationed == 0` / no
+events, so a mis-scaled scenario fails loudly rather than producing junk numbers.
+
+**Methodology (the honesty points):** steps/sec counts **master steps** (`n → n+1`) for
+all three schemes so they are directly comparable; each cell is calibrated to a target
+wall-time then measured **best-of-N** (min time), `gc` disabled across the timed
+interval. Peak memory is a **separate** run (never time a `tracemalloc`-instrumented
+loop), reported as the **peak traced Python heap** — *not* RSS — with the scenario built
+inside the traced region. **Multi-rate is pure overhead in this scenario** (the
+fast/slow split is nominal — no stiffness separation, the only thing Step 3 established
+makes it pay), stated in the doc so its slower number does not read as "multi-rate is
+bad." **Domain count is reported flat** with the mechanism: the step path never iterates
+distinct domains — the conservation ledger partitions by `StockKind`/`Quantity`, and
+`Registry.domain_index` is O(stocks) regardless of `D` — so it is genuinely orthogonal
+to per-step cost (verified by reading `simcore/conservation.py`, not assumed).
+**Non-gating** (absolute numbers are machine-dependent — a regression *reference*, not a
+pass/fail), regenerated explicitly via `uv run python bench/perf.py --out
+docs/perf-baseline.md` (a `--quick` subset exists for iteration). Sweeps committed:
+stock count `N ∈ {2,8,32,128,512}` (×3 schemes), domain count `D ∈ {1,2,4,8,32,128}` at
+`N=128` (RK4). Observed on the dev machine (CPython 3.13, 16-core AMD): throughput falls
+~O(`N`) (Euler 62.3k→287 steps/s across `N`), RK4 ≈3–4× Euler's cost (ratio grows toward
+4× as fixed overhead amortizes), multi-rate ≈3× RK4's; peak heap rises ~O(`N`) (24→650
+KiB Euler; sub-1 MiB at `N=512`) and is step-count-independent; domain throughput flat
+(~306–310 steps/s across all `D`).
+
 ---
 
 ## Exit criteria (Phase 0.5 — "trust the math")
@@ -523,7 +558,11 @@ and peak memory across the sweep, on the dev machine, with the machine/commit no
       *(Step 5 done — `tests/test_edge_cases.py`, 11 cases; test-only, no new guard:
       Euler scale-to-0 / RK4 hard-error asymmetry, exact-fit seam, `math.isfinite`
       overflow rejection)*.
-- [ ] Performance baseline committed (`docs/perf-baseline.md`).
-- [ ] Core purity, determinism, and the frozen Phase-0 API all still hold (the
-      Phase-0 gates stay green).
+- [x] Performance baseline committed (`docs/perf-baseline.md`) *(Step 6 done —
+      `bench/perf.py` stdlib-only harness; stock/domain/scheme sweeps of steps/sec +
+      peak traced heap; non-gating reference, machine/commit noted)*.
+- [x] Core purity, determinism, and the frozen Phase-0 API all still hold (the
+      Phase-0 gates stay green) *(`bench/` is out-of-core and adds no test — the
+      purity/determinism/frozen-API gates are untouched; `ruff check .` + the full
+      `pytest` suite stay green)*.
 ```
