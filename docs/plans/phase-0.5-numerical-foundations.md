@@ -1,6 +1,6 @@
 # Phase 0.5 — Numerical Foundations
 
-**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Step 1 done**.
+**Status:** IN PROGRESS — design pass complete (advisor-reviewed); **Steps 1–2 done**.
 This is the living plan for Phase 0.5, written design-first before any code, mirroring
 how Phase 0 was run. The multi-rate sub-stepping **contract is locked here** (Step 3)
 before it is written, as the working style requires. Steps are test-first.
@@ -260,6 +260,40 @@ converges *toward the RK45 trajectory* on a non-analytic scenario (enriches Step
 beyond the analytic cases). RK45 is **not** added to the determinism/bit-identical
 gates (it is lab-only).
 
+✅ **done** — `lab/rk45.py` (Dormand–Prince embedded 4(5); carries its own float
+`t`/adaptive `dt`, N1) + `tests/test_rk45.py`. The derivative is recovered as
+`rate = leg / dt` evaluated at `dt = 1.0` (legs *are* rates there, no round-off) —
+load-bearing on the same dt-linearity contract RK4 leans on, documented in the module.
+The per-step advance is factored into `_rk45_step(...) -> (y_new, error)` so the embedded
+estimate's order is pinnable independently; the controller is the scipy-default RMS norm
+with `safety=0.9`, factor∈[0.2,10], exponent −0.2; the final step is clipped to land on
+`t_end`. **No FSAL** (the one-eval saving isn't worth the accept/reject bug surface in an
+oracle) and **no arbitration/extinction** (positivity is the kinetics' job, scenarios are
+well-fed); conservation is verified at the call site via `assert_conserved` over rebuilt
+states (dt-independent), not inside the oracle.
+
+The tableau is guarded by **two discriminating controls** (the Step-1 `fit_order`
+analogue, because tolerance-honoring alone can't catch a transcribed coefficient): a
+*static* consistency check (each `A`-row sums to its node `c`; `ΣB=ΣB*=1`) and an
+*empirical* one — the embedded error estimate is **5th-order** in `dt` (measured 5.03 via
+`fit_order` over a single-step ladder). Measured: tolerance-honoring on analytic decay
+(tol 1e-6→err 2.9e-7, 1e-9→3.2e-10, tighter strictly better); step size adapts (LV orbit,
+max/min ≈ 27.6 over 67 accepted / 3 rejected steps); mass conserved (LV total-carbon drift
+2.3e-13); and **fixed-step RK4 converges toward the RK45 reference at 4th order on the
+non-analytic LV scenario** (measured 3.97 — the enrichment beyond Step 1's analytic
+cases). For that last gate the finest RK4 rung (err 3.6e-9) is kept ~3800× above the
+reference's self-consistency floor (9.3e-13, from a 10× tighter reference) so the fit
+measures truncation error, not reference noise — the "stay above the floor" discipline
+from Step 1, with the floor being the reference's accuracy rather than machine eps.
+
+**Note — adaptation is demonstrated on LV, not decay.** The Step-2 test plan groups
+step-size adaptation under the *decay* case; decay *does* adapt (a few ×) under mixed
+atol/rtol, but an LV orbit drives an order-of-magnitude swing in the admissible step, a
+sharper, less brittle demonstrator. Same property, regrouped onto the scenario that shows
+it best (the LV scenario already had to exist for the convergence-reference gate). The
+oracle is **autonomous-only** for Phase 0.5 (forcing read at the template's fixed `n`);
+sub-stage time-varying forcing stays deferred.
+
 ## Step 3 design — multi-rate sub-stepping driver (THE locked contract)
 
 *Realizes multi-rate per N2–N5 — the load-bearing section.* New pure-core module
@@ -367,8 +401,9 @@ and peak memory across the sweep, on the dev machine, with the machine/commit no
 
 - [x] Convergence/timestep-sensitivity: observed order matches each scheme (Euler→1,
       RK4→4) across a `dt` ladder *(Step 1 done)*; multi-rate (Strang)→2 *(Step 3)*.
-- [ ] Adaptive RK45 oracle exists (out-of-core), tolerance-honoring, conserving; used
-      as a convergence reference for a non-analytic case.
+- [x] Adaptive RK45 oracle exists (out-of-core), tolerance-honoring, conserving; used
+      as a convergence reference for a non-analytic case *(Step 2 done — RK4→RK45
+      observed order 3.97 on LV; embedded estimate order 5.03)*.
 - [ ] Multi-rate sub-stepping: deterministic, conserving, `n`-preserving (#14),
       registration-order-independent, with the asserted split order.
 - [ ] 100k+ step run: bounded, no `NaN`/`Inf`/overflow, conservation holds
