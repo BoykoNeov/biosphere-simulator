@@ -1389,4 +1389,14 @@ space-station/
     boundary via `dataclasses.fields`, plus order-independence (Hypothesis) and the demo
     integration. See *Step 11 design — `observe`/`Observation`* above. Still owed: the golden
     demo regression snapshot and the API freeze.
+    **Freeze-review carry-forward (advisor):** the freeze *locks* these field choices, and
+    add-a-field is non-breaking while remove-after-freeze is breaking — so two items get a
+    deliberate pass at the API-freeze cluster (do **not** pre-empt them now): (a)
+    `Observation`'s `kind` is the borderline field — BOUNDARY-vs-modeled is observable but
+    POOL-vs-POPULATION is engine-behavioral; the "no Phase-0 consumer" rule that cut `totals`
+    technically also catches `kind` (it stays under the *different* "minimal observable
+    representation" rule), so confirm it earns its place or cut it conservatively; (b)
+    reconcile the frozen-API sketch's `init(config) -> State` with reality — it was never
+    built literally; `build_demo` subsumes it but returns `(State, Registry)`, so make the
+    divergence explicit rather than silent.
 ```
