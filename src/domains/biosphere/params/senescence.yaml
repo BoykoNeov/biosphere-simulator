@@ -1,0 +1,41 @@
+# winter_wheat — biomass senescence (relative organ death rates) crop params
+# Currency/units: CARBON (mol). Senescence sheds standing organ carbon to the litter
+#   BOUNDARY sink (distinct from the numerical extinction loss-sink): a relative death
+#   rate (1/day) per organ, loss = rate · organ_c (mol C/day). Self-limiting (→ 0 as the
+#   organ → 0), so positivity is structural.
+#
+# Units discipline (P4 / config/units.py): the relative death rates (1/day) are NOT a
+#   conserved-Quantity canonical unit, so they are schema-validated, bound-checked floats
+#   carrying a declared unit (exact-string guarded at the loader, like respiration's
+#   maintenance_coef). A zero rate is valid (no turnover of that organ).
+#
+# Deferred Step-11 seam (documented in allocation.py): DVS / leaf-age / self-shading
+#   keying of the death rate (the Step-6 maturity-seam shape). Standalone Step 9 is a
+#   plain per-organ constant relative rate.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   Step-11 validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
+#       Simulation Monographs, PUDOC, Wageningen (relative death-rate senescence).
+
+name: winter_wheat
+process: senescence
+
+parameters:
+  rdr_leaf:
+    value: 0.02
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical leaf relative death rate [A]; primary citation pending Step 11"
+  rdr_stem:
+    value: 0.005
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical stem relative death rate [A]; primary citation pending Step 11"
+  rdr_root:
+    value: 0.01
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical root relative death rate [A]; primary citation pending Step 11"

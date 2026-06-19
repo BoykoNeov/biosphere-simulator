@@ -1,0 +1,44 @@
+# winter_wheat — leaf/stem/root biomass allocation (DVS-keyed partitioning) crop params
+# Currency/units: CARBON (mol). Allocation is an INTERNAL redistribution of the daily
+#   structural increment DMI = Yg·max(0, GASS − MRES) (mol C/day) among the plant organs;
+#   it adds no new currency. The fractions are dimensionless and DVS-keyed.
+#
+# Schema shape (NEW — a list of rows, not the flat value/unit/source scalars used by the
+#   other process files): a single DVS-keyed partition table of (dvs, fl, fs, fr) rows.
+#   ONE shared-breakpoint table, NOT three independent FL/FS/FR tables — independent tables
+#   would interpolate to sums ≠ 1 between mismatched knots; a single table is sum-1
+#   everywhere by linearity (lerp(1,1)=1). The loader enforces, per row, fl+fs+fr == 1
+#   (within tol) and each fraction ∈ [0,1], and that the dvs knots strictly increase.
+#   Stage points: DVS 0 emergence, 1 anthesis, 2 maturity (see phenology.yaml). Fractions
+#   are flat-extrapolated outside the table.
+#
+# Model (DVS-keyed dry-matter partitioning; the WOFOST FLTB/FSTB/FRTB idiom):
+#   (FL, FS, FR) = piecewise-linear interp of the table at the current DVS;
+#   (leaf, stem, root) increment = DMI · (FL, FS, FR).
+#
+# Deferred Step-11 seams (documented in allocation.py): a grain/storage organ (a 4th
+#   fraction FO + a storage_c pool — REQUIRED at Step 11, the oracle fixture has
+#   TWSO ≈ 11.5 of TAGP ≈ 20.4 t/ha) and DVS-keyed senescence (see senescence.yaml).
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   Step-11 validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
+#       Simulation Monographs, PUDOC, Wageningen (DVS-keyed dry-matter partitioning).
+#   [B] van Keulen, H. & Wolf, J., eds. (1986), "Modelling of Agricultural Production:
+#       Weather, Soils and Crops", Simulation Monographs, PUDOC, Wageningen.
+
+name: winter_wheat
+process: allocation
+
+parameters:
+  partition_table:
+    source: "TODO(cite) — provisional, literature-typical winter-wheat leaf/stem/root partition fractions [A][B]; primary citation pending Step 11 (and a storage-organ FO column)"
+    rows:
+      - {dvs: 0.0, fl: 0.55, fs: 0.10, fr: 0.35}
+      - {dvs: 1.0, fl: 0.30, fs: 0.50, fr: 0.20}
+      - {dvs: 2.0, fl: 0.00, fs: 0.50, fr: 0.50}

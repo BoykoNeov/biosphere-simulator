@@ -6,9 +6,11 @@ channel), 3 (the PCSE oracle harness + clean-room param discipline), 4
 photosynthesis — the first carbon-source flow), 6 (maintenance + growth
 respiration — the carbon-sink flows), 7 (Penman–Monteith transpiration + root
 uptake — the first WATER-currency flows), and 8 (thermal-time phenology — the aux
-accumulator's rate function, the first consumer of the Step-2 channel) are implemented,
-tested, and committed** — see their per-step `RESOLVED` blocks below. **The foundation
-(Steps 1–3) is complete; Step 9 (leaf/stem/root biomass allocation) is next.** This
+accumulator's rate function, the first consumer of the Step-2 channel), and 9
+(leaf/stem/root biomass allocation + senescence — the first internal-redistribution
+carbon process and multi-organ stock structure) are implemented, tested, and
+committed** — see their per-step `RESOLVED` blocks below. **The foundation
+(Steps 1–3) is complete; Step 10 (nitrogen uptake + limitation) is next.** This
 plan **locks the three
 foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
 and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
@@ -1191,6 +1193,146 @@ season accumulates to ``daily_thermal_time(T)·n·dt`` (the ``test_aux`` precede
 committed ``phenology.yaml`` loads to the expected ``PhenologyParams``; the loader
 rejects an out-of-range value (``t_base ≥ t_cap``, non-positive ``tsum``), a bad unit
 string, and a missing ``source`` tag (clean-room discipline at the boundary).
+
+## Step 9 design — leaf/stem/root biomass allocation + senescence (DVS-keyed)
+
+*The first **internal-redistribution** CARBON process and the first **multi-organ**
+stock structure, designed just-in-time. Consumes the Step-8 derived ``DVS`` (allocation
+fractions) and the Step-5/6 carbon budget (the net structural increment). Establishes
+the leaf/stem/root organ pools the Step-11 season grows and the litter boundary sink
+the season sheds into.*
+
+### RESOLVED (2026-06-19) — the locks (advisor-reviewed)
+
+- **Two new pure flows in one module ``domains/biosphere/allocation.py`` (stdlib only):
+  ``Allocation`` (the multi-leg redistribution) and ``Senescence`` (the litter loss) —
+  the respiration.py idiom (two related flows, one module).** Roadmap line 232: flow +
+  unit test + param file + doc, **standalone before integration**. Per the Step-7/8
+  precedent, **no committed flow is modified** here — except one *non-behavioral*
+  extraction (below) — and the Step-5/6 rewiring is **deferred to Step 11 with an
+  explicit checklist written down now** (the load-bearing mandate; see "the transition").
+- **``Allocation`` is ONE multi-leg CARBON flow, recompute-DMI (the ``GrowthRespiration``
+  pattern).** Source ``plant_c``, sinks ``leaf_c``/``stem_c``/``root_c``; it **recomputes**
+  the daily structural increment ``DMI = Yg · max(0, GASS − MRES)`` from the step-entry
+  snapshot (flows cannot read each other's results pre-arbitration), exactly as
+  ``GrowthRespiration`` recomputes GASS/MRES. One flow, not three: a 3-organ multi-leg
+  flow balances trivially (Σ legs = 0) and recomputes DMI **once**; three flows would
+  triple the recompute and the field list. The long field list (photosynthesis + canopy +
+  respiration + phenology params, ``ground_area``, the forcing-var names, the aux name,
+  and the four organ/buffer stock ids) is the **inherent cost** of a flux-and-state-coupled
+  quantity in an independent-flow engine — precedented by ``GrowthRespiration``.
+- **Shared ``available_for_growth = max(0, GASS − MRES)`` helper — the one extraction
+  (a non-behavioral refactor of ``respiration.py``).** ``growth_respiration_flux`` owns
+  that expression today; if ``Allocation`` recomputed it independently the two would be a
+  **3-way budget-drift hazard** (assimilation/growth-resp/allocation must agree on the same
+  carbon budget — the ``ASRC = GPHOT − MRES`` invariant the Step-11 oracle budgets to).
+  Extract ``available_for_growth(gross, maintenance) -> float`` in ``respiration.py``;
+  ``growth_respiration_flux`` becomes ``(1 − Yg)·available_for_growth(...)`` (identical
+  behavior — Step-6 tests stay green) and ``Allocation`` computes
+  ``DMI = Yg·available_for_growth(...)`` — agreement by construction. Then net
+  ``plant_c`` across the four carbon flows is ``GASS − MRES − GRES − DMI = 0`` when
+  ``GASS ≥ MRES`` (the buffer passes growth through), confirming the budget closes.
+- **Pure split functions, hand-checkable with a *given* DMI.** ``partition_fractions(dvs,
+  table) -> (FL, FS, FR)`` (the DVS-keyed interpolation) and ``partition(dmi, dvs, table)
+  -> (leaf, stem, root)`` are tested against independent literals with a supplied ``dmi``;
+  the flow recomputes ``dmi`` and calls them (a ``Flow`` cannot take ``dmi`` as an arg —
+  which is *why* the pure fn is tested standalone and the flow recomputes).
+- **DISCRIMINATING CONSTRAINT — fractions must sum to 1 *under interpolation*, or the
+  every-step conservation gate HARD-FAILS every step (a crash, not a silent drift).** If
+  ``FL + FS + FR ≠ 1`` at the evaluated DVS, the organ legs don't sum to ``DMI`` and the
+  flow doesn't balance. Designed out:
+  - **A single DVS-keyed table of ``(dvs, fl, fs, fr)`` rows — NOT three independent
+    FL/FS/FR tables.** Independent tables with different breakpoints interpolate to sums
+    ≠ 1 *between* knots even when each knot sums to 1; a single shared-breakpoint table is
+    sum-1 **everywhere** by linearity (``lerp(1, 1) = 1``).
+  - **Loader enforces** (the one genuinely new schema shape — a *list of rows*, not the
+    flat scalar ``value/unit/source`` entries): each row sums to 1 within tol, DVS knots
+    strictly increasing, every fraction ∈ [0, 1], ``source`` present. ``dvs`` clamps to
+    ``[rows[0].dvs, rows[-1].dvs]`` (a flat extrapolation outside the table).
+  - **Belt-and-suspenders:** the flow sets the ``plant_c`` leg = ``−Σ(organ legs)`` so it
+    **balances by construction** regardless; the loader sum-check enforces the *semantics*
+    (drain exactly ``DMI``, not more or less).
+- **THE TRANSITION — the Step-11 rewiring checklist (written down now; the gate will NOT
+  catch these — they are physics, not balance, errors).** Once ``Allocation`` drains
+  ``DMI`` from ``plant_c``, in the *integrated* model ``plant_c`` reframes from "the
+  biomass" to a near-zero **labile carbohydrate buffer** (``+GASS −MRES −GRES −DMI = 0``
+  per step). The checklist is **per-read, NOT per-flow** — every flow that *recomputes* a
+  shared quantity must read the *same* stock, or the agreement-by-construction breaks
+  silently (the budget stops telescoping; ``plant_c`` stops netting to 0):
+  1. **Every GASS/LAI recompute reads ``leaf_c`` for leaf carbon** — ``GrossAssimilation``,
+     ``GrowthRespiration``, **and** ``Allocation`` — else LAI ≈ 0 (the buffer is ~empty).
+  2. **Every MRES recompute reads ``Σ(leaf_c + stem_c + root_c)`` for biomass** —
+     ``MaintenanceRespiration``, ``GrowthRespiration``, **and** ``Allocation`` — else
+     maintenance ≈ 0.
+  - **The trap (why per-read):** ``GrowthRespiration.evaluate`` reads ``plant_c`` *once*
+    into ``leaf_carbon`` and feeds it to **both** its LAI **and** its MRES recompute. A
+    per-flow checklist tempts "fix the LAI read, done" — but its MRES read must switch to
+    ``Σ`` organs too, or ``GrowthRespiration`` (GRES on the buffer's ~0 maintenance) and
+    ``Allocation`` (DMI on ``Σ``-organ maintenance) no longer share
+    ``available_for_growth``, GRES/DMI stop telescoping, and the shared-helper property
+    (pinned by ``test_allocation_dmi_agrees_with_step6_growth_resp_budget``) dies.
+  3. **When ``f_water``/``f_N`` land (Steps 7/10 → wired at 11), the ``limitation=``
+     factor must be applied identically across all three GASS recomputes** — same
+     divergence hazard if one flow limits and another does not.
+  (Optional ``plant_c`` → ``labile_c`` rename is a Step-11 nicety, not now.) **Standalone
+  ``Allocation`` already reads the post-transition-correct stocks** — ``leaf_c`` for its
+  GASS/LAI recompute and ``Σ`` organs for its MRES recompute — so Step 11 only re-points
+  the *other* flows to agree with it; allocation needs no change at integration.
+- **``Senescence`` — a separate multi-leg flow ``{leaf_c, stem_c, root_c} → litter_sink``,
+  relative death rate ∝ organ carbon.** ``senescence_flux(organ_c, rdr) = rdr · organ_c``
+  (mol C day⁻¹) per organ; → 0 as the organ → 0, so positivity is **structural** (the
+  Step-5/6/7 self-limiting pattern). ``litter_sink`` is a **BOUNDARY** sink **distinct
+  from the numerical extinction loss-sink** (decision #6) — real shed biomass, not a
+  rounding residual; Phase-2 litter/decomposition dynamics consume it later. DVS / leaf-age
+  / self-shading keying of the death rate is a documented **Step-11 seam** (standalone is a
+  plain per-organ constant relative rate), so Step 11 is a coefficient/keying change, not a
+  structural one — the Step-6 ``maturity``-seam precedent.
+- **Organ stocks: POPULATION, CARBON.** ``leaf_c``/``stem_c``/``root_c`` are absorbing-
+  eligible biomass (extinction-eligible, decision #6); ``plant_c`` stays the
+  (POPULATION) buffer; ``litter_sink`` is BOUNDARY. Standalone tests construct them
+  ad hoc (the scenario wiring — initial organ amounts, the season's stock set — is
+  Step 11). Each flow is internally balanced in CARBON (P1): ``Allocation`` is an
+  internal redistribution (Σ legs = 0), ``Senescence`` is organ → boundary (Σ = 0).
+- **Grain / storage organ deferred — flagged, NOT built (it blocks Step 11, not Step 9).**
+  The title is leaf/stem/root; the table is structured so a **4th fraction ``FO``**
+  (storage organ, the reproductive-phase sink at DVS > 1) is an **additive** column.
+  **But this is not free at validation:** the committed oracle fixture has
+  ``TWSO ≈ 11.5`` of ``TAGP ≈ 20.4 t/ha`` — over half the above-ground biomass is grain —
+  so a 3-organ model **cannot** match the biomass curve at the Step-11 behavioral gate.
+  Adding ``FO`` + a ``storage_c`` pool is therefore a **Step-11 precondition**, surfaced
+  here so it is not a surprise.
+- **Clean-room (P5).** The DVS-keyed partitioning concept is cited to crop-model
+  literature (Penning de Vries et al. 1989; van Keulen & Wolf 1986; the WOFOST
+  ``FLTB``/``FSTB``/``FRTB`` idiom); the relative-death-rate senescence concept likewise.
+  All numeric VALUES (the partition fractions, the per-organ death rates) are honest
+  **provisional literature-typical placeholders** (``TODO(cite)``), pending the Step-11
+  validation gate — never fabricated to a recalled citation, never backfilled from the
+  unlicensed WOFOST YAML.
+
+**Tasks.**
+- ``domains/biosphere/allocation.py`` (PURE stdlib): ``PartitionRow`` + ``AllocationParams``
+  (the table) and ``SenescenceParams`` (per-organ rates) dataclasses; ``partition_fractions``
+  + ``partition`` (the DVS-keyed split); ``senescence_flux``; the ``Allocation`` (recompute-DMI,
+  multi-leg) and ``Senescence`` (multi-leg) flows.
+- Extract ``available_for_growth`` in ``respiration.py`` (non-behavioral; ``growth_respiration_flux``
+  delegates to it) and import it in ``allocation.py``.
+- ``params/allocation.yaml`` (the row-table shape) + ``params/senescence.yaml`` (per-organ
+  ``1/day`` rates) + ``load_allocation_params`` / ``load_senescence_params`` in ``loader.py``
+  (the new row-table schema with the sum-1 / increasing-DVS / bound checks; the exact-string
+  ``1/day`` guard for senescence, like ``_RespSchema``).
+
+**Test plan (`tests/test_allocation.py`).** ``partition_fractions`` at the table knots and a
+midpoint against **independent literals**, the sum-to-1 invariant across a DVS sweep, and the
+out-of-range clamp; ``partition`` splits a given DMI exactly; ``senescence_flux`` ∝ organ
+carbon and → 0 at zero; the assembled ``Allocation`` flow produces a **carbon-balanced** 4-leg
+``FlowResult`` (``assert_flow_balanced``) whose organ legs equal the hand-computed
+``DMI·fractions`` (DMI recomposed via the Step-4/5/6 stack + ``available_for_growth``) and whose
+``plant_c`` leg is ``−ΣDMI``, the dark-day ``GASS < MRES`` → ``DMI = 0`` clamp, DVS read from
+``snapshot.aux["thermal_time"]``, and ``dt``-linear scaling; the assembled ``Senescence`` flow
+produces a carbon-balanced ``{organs → litter}`` ``FlowResult`` with the hand-computed legs and
+``dt``-linear scaling; the committed ``allocation.yaml``/``senescence.yaml`` load to the expected
+params; the loaders reject a non-sum-1 row, non-increasing DVS, an out-of-range fraction / death
+rate, a bad unit, and a missing ``source`` tag (clean-room discipline at the boundary).
 
 ---
 

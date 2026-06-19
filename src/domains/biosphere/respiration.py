@@ -119,17 +119,33 @@ def maintenance_respiration_flux(
     )
 
 
+def available_for_growth(gross: float, maintenance: float) -> float:
+    """Assimilate available for growth after maintenance: ``max(0, GASS − MRES)``.
+
+    The maintenance-first carbon budget (McCree–de Vries–Thornley; the WOFOST
+    ``ASRC = GPHOT − MRES`` invariant): the assimilate left once maintenance is paid,
+    clamped at 0 (no negative growth). This single expression is **shared** by
+    :func:`growth_respiration_flux` (``GRES = (1−Yg)·available``) and Step-9 allocation
+    (``DMI = Yg·available``) so the growth-respiration and allocation flows agree on the
+    same budget *by construction* — recomputing it independently would risk a 3-way
+    budget drift (assimilation/growth-resp/allocation), the one genuine cross-flow
+    hazard.
+    """
+    return max(0.0, gross - maintenance)
+
+
 def growth_respiration_flux(
     gross: float, maintenance: float, *, growth_efficiency: float
 ) -> float:
     """Daily growth respiration ``(1 − Yg) · max(0, GASS − MRES)`` (mol C day⁻¹).
 
     The maintenance-first conversion loss (McCree–de Vries–Thornley): growth
-    respiration acts on the assimilate left **after** maintenance. The ``max(0, …)``
-    clamp keeps the *sink* flow a sink — when ``MRES ≥ GASS`` there is no growth, so
-    growth respiration is 0 rather than a (carbon-creating) negative withdrawal.
+    respiration acts on the assimilate left **after** maintenance
+    (:func:`available_for_growth`). The ``max(0, …)`` clamp keeps the *sink* flow a sink
+    — when ``MRES ≥ GASS`` there is no growth, so growth respiration is 0 rather than a
+    (carbon-creating) negative withdrawal.
     """
-    return (1.0 - growth_efficiency) * max(0.0, gross - maintenance)
+    return (1.0 - growth_efficiency) * available_for_growth(gross, maintenance)
 
 
 @dataclass(frozen=True)

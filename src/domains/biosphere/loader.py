@@ -18,6 +18,11 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from config import convert, load_yaml, to_canonical
+from domains.biosphere.allocation import (
+    AllocationParams,
+    PartitionRow,
+    SenescenceParams,
+)
 from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.demo import DemoParams
 from domains.biosphere.phenology import PhenologyParams
@@ -42,6 +47,10 @@ TRANSPIRATION_PARAMS_PATH: Path = (
 )
 # The committed winter-wheat thermal-time phenology params (Phase-1 Step 8).
 PHENOLOGY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "phenology.yaml"
+# The committed winter-wheat allocation (DVS-keyed partition table) params (Step 9).
+ALLOCATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "allocation.yaml"
+# The committed winter-wheat senescence (relative death rate) params (Phase-1 Step 9).
+SENESCENCE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "senescence.yaml"
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -621,4 +630,165 @@ def load_phenology_params(
         t_cap=values["t_cap"],
         tsum_anthesis=values["tsum_anthesis"],
         tsum_maturity=values["tsum_maturity"],
+    )
+
+
+# --- leaf/stem/root allocation (Phase-1 Step 9) -----------------------------
+# A NEW schema shape: a DVS-keyed partition TABLE (a list of {dvs, fl, fs, fr} rows),
+# not the flat value/unit/source scalars the other process files use. The fractions are
+# dimensionless (no pint), so the loader's job is the structural discipline that keeps
+# the every-step conservation gate from hard-failing: each row's fl+fs+fr == 1 (within
+# tol — else the organ legs would not sum to the structural increment), the DVS knots
+# strictly increase (so interpolation has a well-defined bracket), and every fraction
+# lies in [0, 1]. The single shared-breakpoint table is sum-1 *everywhere* by linearity.
+
+# Tolerance for the per-row fl+fs+fr == 1 check (the fractions are authored decimals;
+# this is a typo guard, not a floating-point-accumulation bound).
+_PARTITION_SUM_ATOL: float = 1e-9
+
+
+class _PartitionRowSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dvs: float
+    fl: float
+    fs: float
+    fr: float
+
+
+class _PartitionTable(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str  # the clean-room provenance tag for the partition curve (recorded)
+    rows: list[_PartitionRowSchema]
+
+
+class _AllocationParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    partition_table: _PartitionTable
+
+
+class _AllocationSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _AllocationParameters
+
+
+def load_allocation_params(
+    path: str | Path = ALLOCATION_PARAMS_PATH,
+) -> AllocationParams:
+    """Load, schema- and structurally-check the DVS-keyed partition table.
+
+    Requires at least two rows (interpolation needs a bracket), strictly increasing
+    ``dvs`` knots, every fraction in ``[0, 1]``, and each row's ``fl + fs + fr == 1``
+    within tol — the last is load-bearing: a row that does not sum to 1 would make the
+    allocation flow's organ legs miss the structural increment and trip the every-step
+    conservation gate. ``source`` is required (clean-room discipline). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a structural
+    violation.
+    """
+    schema = _AllocationSchema.model_validate(load_yaml(path))
+    rows = schema.parameters.partition_table.rows
+    if len(rows) < 2:
+        raise ValueError(f"partition table needs >= 2 rows, got {len(rows)}")
+    for prev, row in zip(rows, rows[1:], strict=False):
+        if not prev.dvs < row.dvs:
+            raise ValueError(
+                f"partition table dvs knots must strictly increase, got "
+                f"{prev.dvs} then {row.dvs}"
+            )
+    for row in rows:
+        for name, frac in (("fl", row.fl), ("fs", row.fs), ("fr", row.fr)):
+            if not (0.0 <= frac <= 1.0):
+                raise ValueError(
+                    f"partition fraction {name} must be in [0, 1] at dvs={row.dvs}, "
+                    f"got {frac}"
+                )
+        total = row.fl + row.fs + row.fr
+        if abs(total - 1.0) > _PARTITION_SUM_ATOL:
+            raise ValueError(
+                f"partition fractions must sum to 1 at dvs={row.dvs}, got {total}"
+            )
+    return AllocationParams(
+        table=tuple(PartitionRow(dvs=r.dvs, fl=r.fl, fs=r.fs, fr=r.fr) for r in rows)
+    )
+
+
+# --- biomass senescence (Phase-1 Step 9) ------------------------------------
+# Same structured value/unit/source format as respiration. The per-organ relative death
+# rates (1/day) are NOT a conserved-Quantity canonical unit, so they are schema-
+# validated, bound-checked floats whose declared ``unit`` is exact-string guarded (the
+# respiration discipline). A zero rate is valid (no turnover); a negative is rejected.
+
+# Expected canonical unit string per senescence param (exact-match guard).
+_SENESCENCE_UNITS: dict[str, str] = {
+    "rdr_leaf": "1/day",
+    "rdr_stem": "1/day",
+    "rdr_root": "1/day",
+}
+
+
+class _SenescenceValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _SenescenceParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rdr_leaf: _SenescenceValueUnit
+    rdr_stem: _SenescenceValueUnit
+    rdr_root: _SenescenceValueUnit
+
+
+class _SenescenceSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _SenescenceParameters
+
+
+def _senescence_value(params: _SenescenceParameters, field: str) -> float:
+    """Read a senescence param's value, exact-string guarding its declared unit."""
+    entry: _SenescenceValueUnit = getattr(params, field)
+    expected = _SENESCENCE_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_senescence_params(
+    path: str | Path = SENESCENCE_PARAMS_PATH,
+) -> SenescenceParams:
+    """Load, schema- and bound-check the senescence params into ``SenescenceParams``.
+
+    Each param carries a declared unit (exact-string guarded) and a required ``source``
+    tag (clean-room discipline). The relative death rates must be non-negative (0 = no
+    turnover of that organ; negative would create carbon). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    negative value.
+    """
+    schema = _SenescenceSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _senescence_value(params, field) for field in _SENESCENCE_UNITS}
+
+    for field in _SENESCENCE_UNITS:
+        if values[field] < 0.0:
+            raise ValueError(f"{field} must be >= 0, got {values[field]}")
+
+    return SenescenceParams(
+        rdr_leaf=values["rdr_leaf"],
+        rdr_stem=values["rdr_stem"],
+        rdr_root=values["rdr_root"],
     )
