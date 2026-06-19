@@ -288,9 +288,12 @@ def test_load_nitrogen_params_applies_carbon_fraction_fold() -> None:
     p = load_nitrogen_params()
     assert isinstance(p, NitrogenParams)
     assert p.max_uptake_capacity == _MAX_UPTAKE
-    fold = MOLAR_MASS_CARBON_KG_PER_MOL / _CARBON_FRACTION
-    assert math.isclose(p.n_residual_per_mol_c, _N_RESIDUAL_KG_KG * fold, rel_tol=1e-12)
-    assert math.isclose(p.n_critical_per_mol_c, _N_CRITICAL_KG_KG * fold, rel_tol=1e-12)
+    # Independent hand-computed literals (NOT a restatement of the loader's M_C/cf
+    # formula): at cf=0.45, kg DM per mol C = 0.012011/0.45 = 0.0266911...; so
+    # 0.005 kg N/kg DM → 1.33456e-4 and 0.015 → 4.00367e-4 kg N/mol C. This pins the
+    # fold *direction/magnitude*, not just "loader matches its own arithmetic".
+    assert math.isclose(p.n_residual_per_mol_c, 1.3345556e-4, rel_tol=1e-6)
+    assert math.isclose(p.n_critical_per_mol_c, 4.0036667e-4, rel_tol=1e-6)
 
 
 def test_committed_nitrogen_carbon_fraction_matches_canopy() -> None:

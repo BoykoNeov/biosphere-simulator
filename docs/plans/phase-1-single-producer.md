@@ -1473,9 +1473,12 @@ capacity, and a missing ``source`` tag (clean-room discipline at the boundary).
       channel (P2) — additive to frozen State, serialized, observed, outside the
       conservation gate; PCSE oracle harness behind a marker, clean-room param
       discipline (P5). *(Steps 1–3 — complete.)*
-- [ ] **Seven processes**, each shipped as **flow/aux-rate + unit test + param file
+- [x] **Seven processes**, each shipped as **flow/aux-rate + unit test + param file
       + documentation** before integration (roadmap line 232): Beer–Lambert, FvCB,
-      respiration, Penman–Monteith, phenology, allocation, nitrogen. *(Steps 4–10.)*
+      respiration, Penman–Monteith, phenology, allocation, nitrogen — all complete and
+      committed. *(Steps 4–10.)* The Step-11 season **re-exercises** them assembled
+      (the rewiring per the transition checklists); shipping each standalone is what
+      this criterion gates.
 - [ ] **Single-currency + multiplicative coupling (P1)** throughout; **OXYGEN not
       tracked**; every flow internally balanced in its one currency; the every-step
       conservation gate holds over a full season with `rationed == 0` (self-limiting
