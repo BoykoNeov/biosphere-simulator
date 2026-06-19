@@ -2,10 +2,9 @@
 
 The **NITROGEN**-currency process (P1, single-currency) and the structural mirror of
 Step 7 (water): a depletable soil-N pool drained by a self-limiting uptake flow and
-refilled by a supply flow, plus the ``f_N`` stress factor that Step 11 wires into the
-photosynthesis ``Π fᵢ`` limiter (delivered + unit-tested standalone here, **not yet a
-flow input** — exactly as Step 7 delivered :func:`water_stress_factor` without wiring
-``f_water`` into :class:`GrossAssimilation`).
+refilled by a supply flow, plus the ``f_N`` stress factor wired into the photosynthesis
+``Π fᵢ`` limiter at Step 11 (via ``CarbonContext.limitation`` in
+``domains.biosphere.carbon_budget``; delivered + unit-tested standalone here).
 
 * **N uptake** — ``soil_n -> plant_n``, balanced in NITROGEN:
 

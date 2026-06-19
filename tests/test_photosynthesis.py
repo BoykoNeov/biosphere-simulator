@@ -8,10 +8,9 @@ The first carbon source process. Three layers:
   literals (not restatements of the implementation), the ``Ci ≤ Γ*`` → 0 clamp, the
   PAR → 0 limit, and monotonicity.
 * **The provisional big-leaf canopy aggregator**: the LAI → 0 finiteness limit, the
-  LAI = 0 zero, and a composed daily-flux literal.
-* **The assembled ``GrossAssimilation`` flow**: a carbon-balanced ``FlowResult`` with
-  the hand-computed daily mol-C leg, and the rate set by the ``Ci`` forcing (not the
-  CO₂ boundary amount).
+  LAI = 0 zero, and a composed daily-flux literal. (The gross daily mol-C flux these
+  functions compute is what the dissolved ``GrossAssimilation`` flow used to deposit and
+  what the Step-11 carbon-budget flows recompute — the numbers stay pinned here.)
 * **Config boundary** (``load_photosynthesis_params``): the committed file loads to the
   expected params; bad units / out-of-range values / a missing source are rejected.
 """
@@ -30,7 +29,6 @@ from domains.biosphere.loader import (
     load_photosynthesis_params,
 )
 from domains.biosphere.photosynthesis import (
-    GrossAssimilation,
     PhotosynthesisParams,
     daily_canopy_assimilation,
     electron_transport_rate,
@@ -39,11 +37,6 @@ from domains.biosphere.photosynthesis import (
     rubisco_limited_rate,
     temperature_factor,
 )
-from simcore.environment import SourceResolver, constant
-from simcore.flow import assert_flow_balanced
-from simcore.ids import DomainId, FlowId, StockId
-from simcore.quantities import Quantity, StockKind, canonical_unit
-from simcore.state import State, Stock
 
 # The committed winter-wheat provisional placeholders (mirror photosynthesis.yaml).
 # Held as a literal so the physics literals below are independent of the loader.
@@ -248,113 +241,6 @@ def test_daily_canopy_assimilation_rejects_non_positive_daylength(
             canopy=_canopy(),
             ground_area=1.0,
         )
-
-
-# --- the assembled GrossAssimilation flow -----------------------------------
-_BIO = DomainId("biosphere")
-_PLANT_C = StockId("biosphere.plant_c")
-_CO2 = StockId("boundary.co2")
-
-
-def _state(plant_c0: float, co2_0: float) -> State:
-    carbon = canonical_unit(Quantity.CARBON)
-    plant = Stock(
-        id=_PLANT_C,
-        domain=_BIO,
-        quantity=Quantity.CARBON,
-        unit=carbon,
-        amount=plant_c0,
-        kind=StockKind.POPULATION,
-        extinction_threshold=0.0,
-    )
-    co2 = Stock(
-        id=_CO2,
-        domain=DomainId("boundary"),
-        quantity=Quantity.CARBON,
-        unit=carbon,
-        amount=co2_0,
-        kind=StockKind.BOUNDARY,
-        unclamped=True,
-    )
-    return State(n=0, stocks={_PLANT_C: plant, _CO2: co2}, rng_seed=0)
-
-
-def _flow() -> GrossAssimilation:
-    return GrossAssimilation(
-        id=FlowId("biosphere.gross_assimilation"),
-        priority=0,
-        co2_source=_CO2,
-        plant_c=_PLANT_C,
-        par_var="par",
-        ci_var="ci",
-        temp_var="temp",
-        daylength_var="daylength_s",
-        params=_params(),
-        canopy=_canopy(),
-        ground_area=1.0,
-    )
-
-
-def _env(snapshot: State, dt: float):  # noqa: ANN202 - BoundEnvironment is internal
-    resolver = SourceResolver(
-        forcings={
-            "par": constant(800.0),
-            "ci": constant(400.0),
-            "temp": constant(20.0),
-            "daylength_s": constant(43200.0),
-        }
-    )
-    return resolver.bind(snapshot, dt)
-
-
-def test_gross_assimilation_leg_is_the_hand_computed_daily_flux() -> None:
-    state = _state(plant_c0=5.0, co2_0=1.0e9)
-    flow = _flow()
-    result = flow.evaluate(state, _env(state, 1.0), 1.0)
-    legs = {leg.stock: leg.amount for leg in result.legs}
-    # plant_c gains the gross daily flux (dt=1 day); the CO₂ boundary loses it.
-    assert math.isclose(legs[_PLANT_C], 1.3778614691309006, rel_tol=1e-12)
-    assert math.isclose(legs[_CO2], -1.3778614691309006, rel_tol=1e-12)
-
-
-def test_gross_assimilation_is_carbon_balanced() -> None:
-    state = _state(plant_c0=5.0, co2_0=1.0e9)
-    flow = _flow()
-    result = flow.evaluate(state, _env(state, 1.0), 1.0)
-    # One withdrawal, one equal deposit, both CARBON ⇒ the gate passes (P1).
-    assert_flow_balanced(result, state.stocks)
-
-
-def test_gross_assimilation_rate_is_set_by_ci_not_co2_boundary_amount() -> None:
-    # Unlike the demo's Photosynthesis (rate ∝ withdrawn amount), the FvCB rate is the
-    # Ci forcing — doubling the CO₂ boundary reservoir leaves the flux unchanged.
-    flow = _flow()
-    small = flow.evaluate(s := _state(5.0, 1.0e6), _env(s, 1.0), 1.0)
-    large = flow.evaluate(s2 := _state(5.0, 2.0e6), _env(s2, 1.0), 1.0)
-    small_plant = next(leg.amount for leg in small.legs if leg.stock == _PLANT_C)
-    large_plant = next(leg.amount for leg in large.legs if leg.stock == _PLANT_C)
-    assert small_plant == large_plant
-
-
-def test_gross_assimilation_scales_linearly_with_dt() -> None:
-    # Increment form: the leg is dt · (daily rate), and the daily rate is dt-INDEPENDENT
-    # — daily_canopy_assimilation reads the photoperiod from forcing (daylength_s), not
-    # dt — so the flow is genuinely dt-linear (the RK4 increment-form contract holds).
-    # This corrects P3's "not dt-refinable" premise; see the Step-5 RESOLVED note. The
-    # crop scenario still selects Euler-daily to match the oracle's daily numerics.
-    state = _state(5.0, 1.0e9)
-    flow = _flow()
-    one = next(
-        leg.amount
-        for leg in flow.evaluate(state, _env(state, 1.0), 1.0).legs
-        if leg.stock == _PLANT_C
-    )
-    half = next(
-        leg.amount
-        for leg in flow.evaluate(state, _env(state, 0.5), 0.5).legs
-        if leg.stock == _PLANT_C
-    )
-    assert math.isclose(half, one * 0.5, rel_tol=1e-12)
 
 
 # --- config boundary: load_photosynthesis_params ----------------------------

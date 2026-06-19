@@ -47,15 +47,7 @@ Planta 149:78–90.
 import math
 from dataclasses import dataclass
 
-from domains.biosphere.canopy import (
-    CanopyParams,
-    intercepted_fraction,
-    leaf_area_index,
-)
-from simcore.environment import Environment
-from simcore.flow import FlowResult, Leg
-from simcore.ids import FlowId, StockId
-from simcore.state import State
+from domains.biosphere.canopy import CanopyParams, intercepted_fraction
 
 # µmol → mol (the leaf-level FvCB convention is µmol CO₂; the canonical CARBON unit is
 # mol). 1 mol CO₂ assimilated == 1 mol C fixed.
@@ -226,59 +218,3 @@ def daily_canopy_assimilation(
     return (
         canopy_rate * daylength_s * ground_area * MICROMOL_TO_MOL * f_temp * limitation
     )
-
-
-@dataclass(frozen=True)
-class GrossAssimilation:
-    """CARBON source flow ``co2_source -> plant_c`` (FvCB; balanced in carbon, P1).
-
-    Reads the intercellular CO₂ ``Ci``, incident PAR, air temperature, and photoperiod
-    as **scalar drivers** through ``env.get`` (forcing or shared stock — the flow
-    cannot tell, #16). Unlike the demo's ``Photosynthesis`` (rate ∝ the withdrawn
-    stock's amount), the rate is set by the ``Ci`` *forcing*, **independent of**
-    ``co2_source``'s amount — correct because CO₂ is an unclamped, non-limiting
-    boundary source in the open Phase-1 system (no rationing).
-
-    Deposits **gross** assimilated carbon: the WOFOST conversion-efficiency / growth-
-    respiration loss is an explicit balanced leg in Step 6, never a silent factor. The
-    plant pool is read as ``leaf_carbon`` for the canopy diagnostic (the single
-    provisional ``plant_c`` pool; the leaf/stem/root split is Step 9).
-    """
-
-    id: FlowId
-    priority: int
-    co2_source: StockId
-    plant_c: StockId
-    par_var: str
-    ci_var: str
-    temp_var: str
-    daylength_var: str
-    params: PhotosynthesisParams
-    canopy: CanopyParams
-    ground_area: float
-
-    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
-        incident_par = env.get(self.par_var)
-        ci = env.get(self.ci_var)
-        temp_c = env.get(self.temp_var)
-        daylength_s = env.get(self.daylength_var)
-        leaf_carbon = snapshot.stocks[self.plant_c].amount
-        lai = leaf_area_index(
-            leaf_carbon,
-            sla_per_mol_c=self.canopy.sla_per_mol_c,
-            ground_area=self.ground_area,
-        )
-        # f_water·f_N seam: 1.0 in Step 5; populated via env reads at Steps 7/10.
-        daily_mol_c = daily_canopy_assimilation(
-            incident_par,
-            lai,
-            ci,
-            temp_c,
-            daylength_s,
-            params=self.params,
-            canopy=self.canopy,
-            ground_area=self.ground_area,
-            limitation=1.0,
-        )
-        flux = daily_mol_c * dt
-        return FlowResult(legs=(Leg(self.co2_source, -flux), Leg(self.plant_c, flux)))

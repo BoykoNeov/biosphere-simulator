@@ -1629,15 +1629,30 @@ already landed at Step 2).*
   notes and the exit-criteria checkboxes below are updated; ``MEMORY.md`` + a memory file
   record the buffer-dissolution deviation so it is not re-litigated.
 
-- **CO₂ is ONE stock (advisor-flagged).** A single **unclamped ``boundary.co2``** is *both*
-  the assimilation source and the respiration sink (CO₂ is non-limiting in the open
-  Phase-1 system — P1; the FvCB rate reads the ``ci_var`` *forcing*, never the stock
-  amount). So ``Allocation`` draws ``DMI`` from ``boundary.co2``, both respiration flows
-  deposit to ``boundary.co2``, and ``GrowthRespiration``'s two legs (``−GRES`` source,
-  ``+GRES`` sink) land on that one stock and net to 0 (a withdrawal skipped as unclamped).
-  Matches the ``respiration.py`` docstring ("the **same** ``boundary.co2`` reservoir") and
-  the demo's single ``atmospheric_c``. Settled before commit 4 (it sets the golden's stock
-  set). The litter and vapor sinks stay distinct BOUNDARY stocks.
+- **CO₂ is TWO stocks: ``co2_atmos`` (unclamped BOUNDARY source) + ``co2_resp`` (BOUNDARY
+  sink) — supersedes the Step-6 "same reservoir" note (advisor-reconciled).** The Step-6
+  ``respiration.py`` docstring chose a *single* ``boundary.co2`` reservoir — but that was
+  correct only **because respiration's source was then ``plant_c``** (``plant_c → co2``
+  moved real carbon). The buffer dissolution makes the source ``co2`` itself, so a single
+  stock would make ``GrowthRespiration`` (``co2 → co2``) a **permanent no-op** and the
+  covered-maintenance a wash — i.e. respiration would become a *silent* ``Yg`` factor, the
+  very thing plan line 348 forbids ("a balanced carbon flow to atmosphere/boundary, not a
+  silent factor"). The premise that justified one reservoir is exactly what dissolution
+  removed, so it does not carry forward. Two stocks keep every flow real and balanced:
+  - ``Allocation``: ``co2_atmos -> organs`` (DMI). ``GrowthRespiration``:
+    ``co2_atmos -> co2_resp`` (GRES). ``MaintenanceRespiration``:
+    ``{co2_atmos(covered), organs(shortfall)} -> co2_resp`` (MRES).
+  - ``co2_atmos`` is the unclamped atmosphere (CO₂ non-limiting, P1 — the FvCB rate reads
+    the ``ci_var`` *forcing*, never the stock amount). ``co2_resp`` is the carbon **mirror
+    of the already-committed ``vapor_sink`` (transpiration) and ``litter_sink``
+    (senescence)** — BOUNDARY sinks that accumulate and are read only in Phase 2; an
+    unread-in-Phase-1 boundary sink is the **established discipline**, not anti-speculation
+    debt. ``co2_resp`` strictly increasing is also a cheap liveness signal ("respiration
+    happened"), complementing the organ-biomass liveness assertion.
+  - **One-way door:** no Phase-1 deliverable distinguishes one stock from two (biomass /
+    conservation / ``rationed == 0`` / golden / the biomass+water oracle match are
+    bit-identical); the only difference is whether respiration is a visible flux or a wash.
+    Decided here, sets the golden's stock set, not revisited in Phase 1.
 
 - **Seedling bootstrap + the no-extinction guard (advisor-flagged; same root as liveness).**
   The season starts with **nonzero** ``leaf_c``/``stem_c``/``root_c`` (the oracle's day-0

@@ -6,12 +6,12 @@ The counterpart to Step 5's gross assimilation. Layers:
   temperature multiplier, maintenance respiration (∝ biomass × Q10), and the
   maintenance-first growth-respiration loss ``(1 − Yg)·max(0, GASS − MRES)``, checked
   against **independent hand-computed** literals and the ``MRES ≥ GASS`` → 0 clamp.
-* **The assembled flows**: ``MaintenanceRespiration`` (carbon-balanced, dt-linear,
-  rate set by the temperature forcing) and ``GrowthRespiration`` (a composed,
-  carbon-balanced ``FlowResult`` recomputing GASS via the Step-4/5 canopy/FvCB stack
-  and MRES via the shared maintenance helper; the dark-day → 0 clamp).
 * **Config boundary** (``load_respiration_params``): the committed file loads to the
   expected params; bad units / out-of-range values / a missing source are rejected.
+
+The assembled flows (``MaintenanceRespiration``, ``GrowthRespiration``) moved to
+``domains.biosphere.carbon_budget`` at Step 11 (the buffer dissolution); they are tested
+in ``test_carbon_budget.py``. The maintenance / growth-respiration rate laws are here.
 """
 
 import math
@@ -22,62 +22,22 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.loader import RESPIRATION_PARAMS_PATH, load_respiration_params
-from domains.biosphere.photosynthesis import (
-    PhotosynthesisParams,
-    daily_canopy_assimilation,
-)
 from domains.biosphere.respiration import (
-    GrowthRespiration,
-    MaintenanceRespiration,
     RespirationParams,
     growth_respiration_flux,
     maintenance_respiration_flux,
     q10_factor,
 )
-from simcore.environment import SourceResolver, constant
-from simcore.flow import assert_flow_balanced
-from simcore.ids import DomainId, FlowId, StockId
-from simcore.quantities import Quantity, StockKind, canonical_unit
-from simcore.state import State, Stock
 
 # The committed winter-wheat provisional placeholders (mirror respiration.yaml).
 _M_REF, _Q10, _T_REF, _YG = 0.02, 2.0, 25.0, 0.75
-
-# FvCB + canopy placeholders (mirror photosynthesis.yaml / canopy.yaml; see those tests)
-# — needed to drive the composed GrowthRespiration flow at a known operating point.
-_VCMAX, _JMAX, _ALPHA, _THETA = 100.0, 180.0, 0.3, 0.7
-_GAMMA_STAR, _KC, _KO, _O2 = 42.75, 404.9, 278.4, 210.0
-_TMIN, _TOPT_LO, _TOPT_HI, _TMAX = 0.0, 15.0, 25.0, 35.0
-_SLA_PER_MOL_C, _K = 0.5872044444444445, 0.6
 
 
 def _resp() -> RespirationParams:
     return RespirationParams(
         maintenance_coef=_M_REF, q10=_Q10, t_ref=_T_REF, growth_efficiency=_YG
     )
-
-
-def _photo() -> PhotosynthesisParams:
-    return PhotosynthesisParams(
-        vcmax=_VCMAX,
-        jmax=_JMAX,
-        quantum_yield=_ALPHA,
-        theta=_THETA,
-        gamma_star=_GAMMA_STAR,
-        kc=_KC,
-        ko=_KO,
-        o2=_O2,
-        t_min=_TMIN,
-        t_opt_lo=_TOPT_LO,
-        t_opt_hi=_TOPT_HI,
-        t_max=_TMAX,
-    )
-
-
-def _canopy() -> CanopyParams:
-    return CanopyParams(sla_per_mol_c=_SLA_PER_MOL_C, extinction_coef=_K)
 
 
 # --- Q10 temperature multiplier: independent literals -----------------------
@@ -142,163 +102,6 @@ def test_growth_respiration_clamps_when_maintenance_meets_or_exceeds_gross(
 ) -> None:
     # MRES ≥ GASS ⇒ no growth ⇒ no growth respiration (never a carbon-creating deposit).
     assert growth_respiration_flux(gross, maintenance, growth_efficiency=_YG) == 0.0
-
-
-# --- the assembled MaintenanceRespiration flow ------------------------------
-_BIO = DomainId("biosphere")
-_PLANT_C = StockId("biosphere.plant_c")
-_CO2 = StockId("boundary.co2")
-
-
-def _state(plant_c0: float) -> State:
-    carbon = canonical_unit(Quantity.CARBON)
-    plant = Stock(
-        id=_PLANT_C,
-        domain=_BIO,
-        quantity=Quantity.CARBON,
-        unit=carbon,
-        amount=plant_c0,
-        kind=StockKind.POPULATION,
-        extinction_threshold=0.0,
-    )
-    co2 = Stock(
-        id=_CO2,
-        domain=DomainId("boundary"),
-        quantity=Quantity.CARBON,
-        unit=carbon,
-        amount=1.0e9,
-        kind=StockKind.BOUNDARY,
-        unclamped=True,
-    )
-    return State(n=0, stocks={_PLANT_C: plant, _CO2: co2}, rng_seed=0)
-
-
-def _env(snapshot: State, dt: float, *, par: float = 800.0, temp: float = 20.0):  # noqa: ANN202
-    resolver = SourceResolver(
-        forcings={
-            "par": constant(par),
-            "ci": constant(400.0),
-            "temp": constant(temp),
-            "daylength_s": constant(43200.0),
-        }
-    )
-    return resolver.bind(snapshot, dt)
-
-
-def _maintenance_flow() -> MaintenanceRespiration:
-    return MaintenanceRespiration(
-        id=FlowId("biosphere.maintenance_respiration"),
-        priority=0,
-        plant_c=_PLANT_C,
-        co2_sink=_CO2,
-        temp_var="temp",
-        params=_resp(),
-    )
-
-
-def test_maintenance_flow_leg_is_the_hand_computed_daily_flux() -> None:
-    state = _state(plant_c0=5.0)
-    result = _maintenance_flow().evaluate(state, _env(state, 1.0, temp=20.0), 1.0)
-    legs = {leg.stock: leg.amount for leg in result.legs}
-    expected = maintenance_respiration_flux(5.0, 20.0, params=_resp())
-    assert math.isclose(legs[_PLANT_C], -expected, rel_tol=1e-12)
-    assert math.isclose(legs[_CO2], expected, rel_tol=1e-12)
-
-
-def test_maintenance_flow_is_carbon_balanced() -> None:
-    state = _state(plant_c0=5.0)
-    result = _maintenance_flow().evaluate(state, _env(state, 1.0), 1.0)
-    assert_flow_balanced(result, state.stocks)
-
-
-def test_maintenance_flow_scales_linearly_with_dt() -> None:
-    state = _state(plant_c0=5.0)
-    flow = _maintenance_flow()
-    one = next(
-        leg.amount
-        for leg in flow.evaluate(state, _env(state, 1.0), 1.0).legs
-        if leg.stock == _PLANT_C
-    )
-    half = next(
-        leg.amount
-        for leg in flow.evaluate(state, _env(state, 0.5), 0.5).legs
-        if leg.stock == _PLANT_C
-    )
-    assert math.isclose(half, one * 0.5, rel_tol=1e-12)
-
-
-# --- the assembled GrowthRespiration flow (composed) ------------------------
-def _growth_flow() -> GrowthRespiration:
-    return GrowthRespiration(
-        id=FlowId("biosphere.growth_respiration"),
-        priority=0,
-        plant_c=_PLANT_C,
-        co2_sink=_CO2,
-        par_var="par",
-        ci_var="ci",
-        temp_var="temp",
-        daylength_var="daylength_s",
-        photo=_photo(),
-        canopy=_canopy(),
-        resp=_resp(),
-        ground_area=1.0,
-    )
-
-
-def test_growth_flow_leg_is_the_composed_gass_minus_mres_loss() -> None:
-    # Composed (Steps 4+5+6): GASS via the canopy/FvCB stack, MRES via the shared
-    # maintenance helper, both at the same operating point the flow reads from forcing.
-    state = _state(plant_c0=5.0)
-    lai = 5.0 * _SLA_PER_MOL_C / 1.0
-    gross = daily_canopy_assimilation(
-        800.0,
-        lai,
-        400.0,
-        20.0,
-        43200.0,
-        params=_photo(),
-        canopy=_canopy(),
-        ground_area=1.0,
-    )
-    mres = maintenance_respiration_flux(5.0, 20.0, params=_resp())
-    expected = growth_respiration_flux(gross, mres, growth_efficiency=_YG)
-    result = _growth_flow().evaluate(state, _env(state, 1.0), 1.0)
-    legs = {leg.stock: leg.amount for leg in result.legs}
-    assert math.isclose(legs[_PLANT_C], -expected, rel_tol=1e-12)
-    assert math.isclose(legs[_CO2], expected, rel_tol=1e-12)
-    # Cross-check against the pinned composed literal (mol C/day at this point).
-    assert math.isclose(expected, 0.32678769775306143, rel_tol=1e-12)
-
-
-def test_growth_flow_is_carbon_balanced() -> None:
-    state = _state(plant_c0=5.0)
-    result = _growth_flow().evaluate(state, _env(state, 1.0), 1.0)
-    assert_flow_balanced(result, state.stocks)
-
-
-def test_growth_flow_clamps_to_zero_in_the_dark() -> None:
-    # No light ⇒ GASS = 0 ⇒ MRES > GASS ⇒ growth respiration clamps to 0 (no deposit).
-    state = _state(plant_c0=5.0)
-    result = _growth_flow().evaluate(state, _env(state, 1.0, par=0.0), 1.0)
-    legs = {leg.stock: leg.amount for leg in result.legs}
-    assert legs[_PLANT_C] == 0.0
-    assert legs[_CO2] == 0.0
-
-
-def test_growth_flow_scales_linearly_with_dt() -> None:
-    state = _state(plant_c0=5.0)
-    flow = _growth_flow()
-    one = next(
-        leg.amount
-        for leg in flow.evaluate(state, _env(state, 1.0), 1.0).legs
-        if leg.stock == _PLANT_C
-    )
-    half = next(
-        leg.amount
-        for leg in flow.evaluate(state, _env(state, 0.5), 0.5).legs
-        if leg.stock == _PLANT_C
-    )
-    assert math.isclose(half, one * 0.5, rel_tol=1e-12)
 
 
 # --- config boundary: load_respiration_params -------------------------------

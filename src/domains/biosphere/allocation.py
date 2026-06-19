@@ -1,52 +1,26 @@
-"""Leaf/stem/root biomass allocation + senescence (Phase-1 Step 9).
+"""Leaf/stem/root/storage partitioning + senescence (Phase-1 Steps 9 + 11).
 
-The first **internal-redistribution** CARBON process and the first **multi-organ**
-stock structure. Step 5 deposits gross assimilate and Step 6 books the respiratory
-losses, leaving a daily structural increment ``DMI = Yg·max(0, GASS − MRES)``; Step 9
-partitions that increment among the plant organs and sheds aged tissue to litter. Two
-single-currency CARBON flows, each internally balanced (P1):
-
-* **Allocation** — ``plant_c -> {leaf_c, stem_c, root_c, storage_c}`` (Σ legs = 0). A
-  **multi-leg, recompute-DMI** flow (the :class:`GrowthRespiration`
-  pattern): because flows ``evaluate`` independently against the step-entry snapshot
-  (no flow can read another's result pre-arbitration), the structural increment is
-  **recomputed** here — ``GASS`` via the Step-4/5 canopy/FvCB stack, ``MRES`` via the
-  shared Step-6 maintenance helper, and ``DMI = Yg·available_for_growth(GASS, MRES)``
-  via the **same** :func:`~domains.biosphere.respiration.available_for_growth` that
-  ``growth_respiration_flux`` uses (agreement by construction — recomputing that budget
-  independently would risk a 3-way drift across assimilation/growth-resp/allocation).
-  The increment is split by **DVS-keyed** fractions (``DVS`` derived from the Step-8
-  ``thermal_time`` accumulator).
+The DVS-keyed dry-matter partition table + the litter-shedding flow. This module holds
+the **partition split functions** (``partition_fractions`` / ``partition``) and the
+**``Senescence`` flow**; the ``Allocation`` flow that deposits the partitioned
+increment ``DMI`` moved to ``domains.biosphere.carbon_budget`` at Step 11 (the buffer
+dissolution — it now sources ``DMI`` from ``co2_atmos``, recomputed via the shared
+``CarbonContext``, rather than draining a ``plant_c`` buffer).
 
 * **Senescence** — ``{leaf_c, stem_c, root_c} -> litter_sink`` (Σ legs = 0). A relative
   death rate per organ, ``rate · organ_c`` (→ 0 as the organ → 0, so positivity is
   structural). ``litter_sink`` is a **BOUNDARY** sink, distinct from the numerical
   extinction loss-sink (decision #6): real shed biomass, consumed by Phase-2 litter /
-  decomposition dynamics.
+  decomposition dynamics. ``storage_c`` (grain) is excluded — it is harvested, not shed.
 
 **Sum-to-1 under interpolation — the load-bearing balance constraint.** If the organ
-fractions did not sum to 1 at the evaluated DVS, the organ legs would not sum to
+fractions did not sum to 1 at the evaluated DVS, the allocation legs would not sum to
 ``DMI`` and the every-step conservation gate would hard-fail. Designed out two ways:
 the partition table is a **single DVS-keyed table of ``(dvs, FL, FS, FR, FO)`` rows**
 with shared breakpoints (sum-1 at every knot ⇒ sum-1 everywhere, ``lerp(1, 1) = 1`` —
 *not* independent tables, which would sum ≠ 1 between mismatched knots; the loader
-enforces the per-row sum); and the flow sets the ``plant_c`` leg to ``−Σ(organ legs)``
-so it **balances by construction** regardless.
-
-**The Step-11 transition (documented, not done here).** Once allocation drains ``DMI``,
-``plant_c`` reframes from "the biomass" to a near-zero **labile carbohydrate buffer**
-(``+GASS −MRES −GRES −DMI = 0`` per step when ``GASS ≥ MRES``). At Step 11 the *other*
-carbon flows are re-pointed **per-read, not per-flow** — every flow recomputing a shared
-quantity reads the same stock: every **LAI** recompute (``GrossAssimilation``,
-``GrowthRespiration``, ``Allocation``) reads ``leaf_c``; every **MRES** recompute
-(``MaintenanceRespiration``, ``GrowthRespiration``, ``Allocation``) reads
-``Σ(leaf + stem + root)``. The trap: ``GrowthRespiration`` reads ``plant_c`` *once* and
-feeds it to **both** its LAI and its MRES recompute — switching only the LAI read leaves
-its MRES on the ~empty buffer, so it no longer shares :func:`available_for_growth` with
-``Allocation`` and the budget stops telescoping. The conservation gate will *not* catch
-this (it is physics, not balance). ``Allocation`` here already reads the
-post-transition-correct stocks (``leaf_c`` for LAI, ``Σ`` organs for maintenance), so
-Step 11 re-points only the other flows to agree with it.
+enforces the per-row sum); and the ``Allocation`` flow sets its ``co2_atmos`` source leg
+to ``−Σ(organ legs)`` so it **balances by construction** regardless.
 
 **Storage organ (FO; the Step-11 precondition — built).** The committed oracle fixture
 has ``TWSO ≈ 11.5`` of ``TAGP ≈ 20.4 t/ha`` (grain is ~half the biomass), so a 3-organ
@@ -70,17 +44,6 @@ Production: Weather, Soils and Crops*, PUDOC, Wageningen.
 
 from dataclasses import dataclass
 
-from domains.biosphere.canopy import CanopyParams, leaf_area_index
-from domains.biosphere.phenology import PhenologyParams, development_stage
-from domains.biosphere.photosynthesis import (
-    PhotosynthesisParams,
-    daily_canopy_assimilation,
-)
-from domains.biosphere.respiration import (
-    RespirationParams,
-    available_for_growth,
-    maintenance_respiration_flux,
-)
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -182,102 +145,6 @@ def senescence_flux(organ_c: float, *, relative_death_rate: float) -> float:
     rate is the deferred Step-11 seam (standalone is a plain constant relative rate).
     """
     return relative_death_rate * organ_c
-
-
-@dataclass(frozen=True)
-class Allocation:
-    """CARBON redistribution ``plant_c -> {leaf_c, stem_c, root_c, storage_c}`` (P1).
-
-    Recomputes the daily structural increment ``DMI = Yg·available_for_growth(GASS,
-    MRES)`` from the step-entry snapshot (flows cannot read each other's results), then
-    splits it by DVS-keyed fractions (leaf/stem/root/storage; ``storage_c`` fills the
-    reproductive phase). ``GASS`` is recomputed via the Step-4/5
-    :func:`daily_canopy_assimilation` (LAI from ``leaf_c`` — the
-    post-transition-correct read), ``MRES`` via the Step-6
-    :func:`maintenance_respiration_flux` on the total organ biomass
-    ``Σ(leaf + stem + root)``, and ``DMI`` via the **shared**
-    :func:`available_for_growth` (no budget drift with growth respiration). ``DVS`` is
-    derived from the Step-8 ``thermal_time`` accumulator (``snapshot.aux``). The long
-    field list is the inherent cost of a flux-and-state-coupled quantity in an
-    independent-flow engine (the ``GrowthRespiration`` precedent).
-
-    The ``plant_c`` leg is set to ``−Σ(organ legs)`` so the flow balances by
-    construction; the loader's per-row sum-to-1 check enforces that ``Σ(organ legs)``
-    equals ``DMI``. ``flux = daily·dt`` — dt-linear (the daily rate is dt-independent;
-    the ``max(0, …)`` in ``available_for_growth`` clamps a daily rate, not a dt-gate).
-    """
-
-    id: FlowId
-    priority: int
-    plant_c: StockId
-    leaf_c: StockId
-    stem_c: StockId
-    root_c: StockId
-    storage_c: StockId
-    par_var: str
-    ci_var: str
-    temp_var: str
-    daylength_var: str
-    thermal_time_aux: str
-    photo: PhotosynthesisParams
-    canopy: CanopyParams
-    resp: RespirationParams
-    pheno: PhenologyParams
-    alloc: AllocationParams
-    ground_area: float
-
-    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
-        incident_par = env.get(self.par_var)
-        ci = env.get(self.ci_var)
-        temp_c = env.get(self.temp_var)
-        daylength_s = env.get(self.daylength_var)
-
-        leaf_carbon = snapshot.stocks[self.leaf_c].amount
-        biomass = (
-            leaf_carbon
-            + snapshot.stocks[self.stem_c].amount
-            + snapshot.stocks[self.root_c].amount
-        )
-        lai = leaf_area_index(
-            leaf_carbon,
-            sla_per_mol_c=self.canopy.sla_per_mol_c,
-            ground_area=self.ground_area,
-        )
-        gross = daily_canopy_assimilation(
-            incident_par,
-            lai,
-            ci,
-            temp_c,
-            daylength_s,
-            params=self.photo,
-            canopy=self.canopy,
-            ground_area=self.ground_area,
-            limitation=1.0,
-        )
-        maintenance = maintenance_respiration_flux(biomass, temp_c, params=self.resp)
-        dmi = self.resp.growth_efficiency * available_for_growth(gross, maintenance)
-
-        thermal_time = snapshot.aux.get(self.thermal_time_aux, 0.0)
-        dvs = development_stage(
-            thermal_time,
-            tsum_anthesis=self.pheno.tsum_anthesis,
-            tsum_maturity=self.pheno.tsum_maturity,
-        )
-        leaf, stem, root, storage = partition(dmi, dvs, self.alloc.table)
-
-        leaf_leg = leaf * dt
-        stem_leg = stem * dt
-        root_leg = root * dt
-        storage_leg = storage * dt
-        return FlowResult(
-            legs=(
-                Leg(self.plant_c, -(leaf_leg + stem_leg + root_leg + storage_leg)),
-                Leg(self.leaf_c, leaf_leg),
-                Leg(self.stem_c, stem_leg),
-                Leg(self.root_c, root_leg),
-                Leg(self.storage_c, storage_leg),
-            )
-        )
 
 
 @dataclass(frozen=True)

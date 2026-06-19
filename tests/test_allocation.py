@@ -7,15 +7,15 @@ Layers:
   ``partition_fractions`` (knot literals, the sum-to-1 invariant across a DVS sweep,
   the out-of-range clamp), ``partition`` (an exact split of a given DMI), and
   ``senescence_flux`` (∝ organ carbon, → 0 at zero).
-* **The assembled flows**: ``Allocation`` (a carbon-balanced 5-leg
-  leaf/stem/root/storage redistribution whose organ legs equal the recomposed
-  ``DMI·fractions`` and whose ``plant_c`` leg is ``−ΣDMI``; the dark-day
-  ``GASS < MRES`` → ``DMI = 0`` clamp; DVS read from ``snapshot.aux``; dt-linear) and
-  ``Senescence`` (a carbon-balanced
-  ``{organs → litter}`` flow; dt-linear).
+* **The assembled ``Senescence`` flow**: a carbon-balanced ``{organs → litter}``
+  ``FlowResult`` with the hand-computed losses; dt-linear.
 * **Config boundary** (``load_allocation_params`` / ``load_senescence_params``): the
   committed files load; a non-sum-1 row, non-increasing DVS, an out-of-range fraction /
   death rate, a bad unit, and a missing source are rejected.
+
+The ``Allocation`` flow moved to ``domains.biosphere.carbon_budget`` at Step 11 (the
+buffer dissolution; it now sources from ``co2_atmos``, not ``plant_c``) and is tested in
+``test_carbon_budget.py``; the DVS-keyed **split functions** stay here.
 """
 
 import math
@@ -27,7 +27,6 @@ import yaml
 from pydantic import ValidationError
 
 from domains.biosphere.allocation import (
-    Allocation,
     AllocationParams,
     PartitionRow,
     Senescence,
@@ -36,24 +35,13 @@ from domains.biosphere.allocation import (
     partition_fractions,
     senescence_flux,
 )
-from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.loader import (
     ALLOCATION_PARAMS_PATH,
     SENESCENCE_PARAMS_PATH,
     load_allocation_params,
     load_senescence_params,
 )
-from domains.biosphere.phenology import PhenologyParams
-from domains.biosphere.photosynthesis import (
-    PhotosynthesisParams,
-    daily_canopy_assimilation,
-)
-from domains.biosphere.respiration import (
-    RespirationParams,
-    available_for_growth,
-    maintenance_respiration_flux,
-)
-from simcore.environment import SourceResolver, constant
+from simcore.environment import SourceResolver
 from simcore.flow import assert_flow_balanced
 from simcore.ids import DomainId, FlowId, StockId
 from simcore.quantities import Quantity, StockKind, canonical_unit
@@ -68,56 +56,6 @@ _TABLE = (
 
 # Committed senescence placeholders (mirror senescence.yaml).
 _RDR_LEAF, _RDR_STEM, _RDR_ROOT = 0.02, 0.005, 0.01
-
-# FvCB + canopy + respiration + phenology placeholders (mirror the committed yamls;
-# the same operating point as the Step-6 GrowthRespiration test, so DMI = 3·GRES there).
-_VCMAX, _JMAX, _ALPHA, _THETA = 100.0, 180.0, 0.3, 0.7
-_GAMMA_STAR, _KC, _KO, _O2 = 42.75, 404.9, 278.4, 210.0
-_TMIN, _TOPT_LO, _TOPT_HI, _TMAX = 0.0, 15.0, 25.0, 35.0
-_SLA_PER_MOL_C, _K = 0.5872044444444445, 0.6
-_M_REF, _Q10, _T_REF, _YG = 0.02, 2.0, 25.0, 0.75
-_TSUM_ANTHESIS, _TSUM_MATURITY = 1100.0, 750.0
-_T_BASE, _T_CAP = 0.0, 30.0
-
-
-def _alloc_params() -> AllocationParams:
-    return AllocationParams(table=_TABLE)
-
-
-def _photo() -> PhotosynthesisParams:
-    return PhotosynthesisParams(
-        vcmax=_VCMAX,
-        jmax=_JMAX,
-        quantum_yield=_ALPHA,
-        theta=_THETA,
-        gamma_star=_GAMMA_STAR,
-        kc=_KC,
-        ko=_KO,
-        o2=_O2,
-        t_min=_TMIN,
-        t_opt_lo=_TOPT_LO,
-        t_opt_hi=_TOPT_HI,
-        t_max=_TMAX,
-    )
-
-
-def _canopy() -> CanopyParams:
-    return CanopyParams(sla_per_mol_c=_SLA_PER_MOL_C, extinction_coef=_K)
-
-
-def _resp() -> RespirationParams:
-    return RespirationParams(
-        maintenance_coef=_M_REF, q10=_Q10, t_ref=_T_REF, growth_efficiency=_YG
-    )
-
-
-def _pheno() -> PhenologyParams:
-    return PhenologyParams(
-        t_base=_T_BASE,
-        t_cap=_T_CAP,
-        tsum_anthesis=_TSUM_ANTHESIS,
-        tsum_maturity=_TSUM_MATURITY,
-    )
 
 
 # --- partition_fractions: knot literals + the clamp -------------------------
@@ -188,16 +126,13 @@ def test_senescence_flux_zero_organ_is_zero() -> None:
     assert senescence_flux(0.0, relative_death_rate=0.02) == 0.0
 
 
-# --- the assembled Allocation flow ------------------------------------------
+# --- the assembled Senescence flow ------------------------------------------
 _BIO = DomainId("biosphere")
 _BND = DomainId("boundary")
-_PLANT_C = StockId("biosphere.plant_c")
 _LEAF_C = StockId("biosphere.leaf_c")
 _STEM_C = StockId("biosphere.stem_c")
 _ROOT_C = StockId("biosphere.root_c")
-_STORAGE_C = StockId("biosphere.storage_c")
 _LITTER = StockId("boundary.litter")
-_THERMAL_TIME = "thermal_time"
 
 
 def _organ(stock_id: StockId, amount: float) -> Stock:
@@ -212,15 +147,7 @@ def _organ(stock_id: StockId, amount: float) -> Stock:
     )
 
 
-def _state(
-    *,
-    plant_c: float = 10.0,
-    leaf_c: float = 3.0,
-    stem_c: float = 1.0,
-    root_c: float = 1.0,
-    storage_c: float = 0.0,
-    thermal_time: float = 550.0,  # DVS = 550/1100 = 0.5 (mid vegetative ramp)
-) -> State:
+def _state(*, leaf_c: float = 3.0, stem_c: float = 1.0, root_c: float = 1.0) -> State:
     litter = Stock(
         id=_LITTER,
         domain=_BND,
@@ -230,157 +157,18 @@ def _state(
         kind=StockKind.BOUNDARY,
     )
     stocks = {
-        _PLANT_C: _organ(_PLANT_C, plant_c),
         _LEAF_C: _organ(_LEAF_C, leaf_c),
         _STEM_C: _organ(_STEM_C, stem_c),
         _ROOT_C: _organ(_ROOT_C, root_c),
-        _STORAGE_C: _organ(_STORAGE_C, storage_c),
         _LITTER: litter,
     }
-    return State(n=0, stocks=stocks, rng_seed=0, aux={_THERMAL_TIME: thermal_time})
+    return State(n=0, stocks=stocks, rng_seed=0)
 
 
-def _env(snapshot: State, dt: float, *, par: float = 800.0, temp: float = 20.0):  # noqa: ANN202
-    resolver = SourceResolver(
-        forcings={
-            "par": constant(par),
-            "ci": constant(400.0),
-            "temp": constant(temp),
-            "daylength_s": constant(43200.0),
-        }
-    )
-    return resolver.bind(snapshot, dt)
+def _env(snapshot: State, dt: float):  # noqa: ANN202 - Senescence ignores env (no forcing)
+    return SourceResolver().bind(snapshot, dt)
 
 
-def _allocation_flow() -> Allocation:
-    return Allocation(
-        id=FlowId("biosphere.allocation"),
-        priority=0,
-        plant_c=_PLANT_C,
-        leaf_c=_LEAF_C,
-        stem_c=_STEM_C,
-        root_c=_ROOT_C,
-        storage_c=_STORAGE_C,
-        par_var="par",
-        ci_var="ci",
-        temp_var="temp",
-        daylength_var="daylength_s",
-        thermal_time_aux=_THERMAL_TIME,
-        photo=_photo(),
-        canopy=_canopy(),
-        resp=_resp(),
-        pheno=_pheno(),
-        alloc=_alloc_params(),
-        ground_area=1.0,
-    )
-
-
-def _expected_dmi(*, leaf_c: float, biomass: float, par: float = 800.0) -> float:
-    """Recompute DMI from the public pure functions (an independent flow check)."""
-    lai = leaf_c * _SLA_PER_MOL_C / 1.0
-    gross = daily_canopy_assimilation(
-        par,
-        lai,
-        400.0,
-        20.0,
-        43200.0,
-        params=_photo(),
-        canopy=_canopy(),
-        ground_area=1.0,
-    )
-    mres = maintenance_respiration_flux(biomass, 20.0, params=_resp())
-    return _YG * available_for_growth(gross, mres)
-
-
-def test_allocation_legs_are_the_partitioned_structural_increment() -> None:
-    state = _state()
-    dmi = _expected_dmi(leaf_c=3.0, biomass=5.0)
-    leaf, stem, root, storage = partition(dmi, 0.5, _TABLE)  # DVS = 0.5 (storage = 0)
-    result = _allocation_flow().evaluate(state, _env(state, 1.0), 1.0)
-    legs = {leg.stock: leg.amount for leg in result.legs}
-    assert math.isclose(legs[_LEAF_C], leaf, rel_tol=1e-12)
-    assert math.isclose(legs[_STEM_C], stem, rel_tol=1e-12)
-    assert math.isclose(legs[_ROOT_C], root, rel_tol=1e-12)
-    assert math.isclose(legs[_STORAGE_C], storage, abs_tol=1e-12)
-    assert math.isclose(legs[_PLANT_C], -(leaf + stem + root + storage), rel_tol=1e-12)
-
-
-def test_allocation_dmi_agrees_with_step6_growth_resp_budget() -> None:
-    # Agreement-by-construction (the shared available_for_growth helper): at the Step-6
-    # GrowthRespiration point (all biomass in leaf, so LAI and maintenance read
-    # the same 5.0 mol C) DMI = Yg·A and GRES = (1−Yg)·A share A, so DMI = 3·GRES with
-    # Yg = 0.75. The Step-6 test pins GRES = 0.32678769775306143 at this point.
-    state = _state(leaf_c=5.0, stem_c=0.0, root_c=0.0)
-    dmi = _expected_dmi(leaf_c=5.0, biomass=5.0)
-    result = _allocation_flow().evaluate(state, _env(state, 1.0), 1.0)
-    legs = {leg.stock: leg.amount for leg in result.legs}
-    assert math.isclose(-legs[_PLANT_C], dmi, rel_tol=1e-12)
-    assert math.isclose(dmi, 3.0 * 0.32678769775306143, rel_tol=1e-12)
-
-
-def test_allocation_flow_is_carbon_balanced() -> None:
-    state = _state()
-    result = _allocation_flow().evaluate(state, _env(state, 1.0), 1.0)
-    assert_flow_balanced(result, state.stocks)
-
-
-def test_allocation_plant_leg_is_minus_sum_of_organ_legs() -> None:
-    # Balance-by-construction: the buffer drain equals the deposited organ carbon
-    # (leaf + stem + root + storage).
-    state = _state(thermal_time=1100.0 + 375.0)  # DVS = 1.5: storage leg is nonzero
-    result = _allocation_flow().evaluate(state, _env(state, 1.0), 1.0)
-    legs = {leg.stock: leg.amount for leg in result.legs}
-    organ_sum = legs[_LEAF_C] + legs[_STEM_C] + legs[_ROOT_C] + legs[_STORAGE_C]
-    assert legs[_STORAGE_C] > 0.0
-    assert math.isclose(legs[_PLANT_C], -organ_sum, rel_tol=1e-12)
-
-
-def test_allocation_clamps_to_zero_in_the_dark() -> None:
-    # No light ⇒ GASS = 0 ⇒ MRES > GASS ⇒ available_for_growth = 0 ⇒ DMI = 0 (no leg).
-    state = _state()
-    result = _allocation_flow().evaluate(state, _env(state, 1.0, par=0.0), 1.0)
-    for leg in result.legs:
-        assert leg.amount == 0.0
-
-
-def test_allocation_reads_dvs_from_aux() -> None:
-    # A different thermal_time ⇒ different DVS ⇒ different fractions (the aux is read).
-    veg = _allocation_flow().evaluate(
-        _state(thermal_time=550.0), _env(_state(), 1.0), 1.0
-    )
-    repro = _allocation_flow().evaluate(
-        _state(thermal_time=1100.0 + 375.0), _env(_state(), 1.0), 1.0
-    )
-    # DVS 0.5 → FR 0.275, FO 0.0; DVS 1.5 → FR 0.15, FO 0.40: the root share falls and a
-    # storage share appears, so the partition shifts (the aux-derived DVS is read).
-    veg_legs = {leg.stock: leg.amount for leg in veg.legs}
-    repro_legs = {leg.stock: leg.amount for leg in repro.legs}
-    veg_root_share = veg_legs[_ROOT_C] / -veg_legs[_PLANT_C]
-    repro_root_share = repro_legs[_ROOT_C] / -repro_legs[_PLANT_C]
-    repro_storage_share = repro_legs[_STORAGE_C] / -repro_legs[_PLANT_C]
-    assert math.isclose(veg_root_share, 0.275, rel_tol=1e-9)
-    assert math.isclose(repro_root_share, 0.15, rel_tol=1e-9)
-    assert math.isclose(repro_storage_share, 0.40, rel_tol=1e-9)
-    assert veg_legs[_STORAGE_C] == 0.0  # no grain in the vegetative phase
-
-
-def test_allocation_scales_linearly_with_dt() -> None:
-    state = _state()
-    flow = _allocation_flow()
-    one = next(
-        leg.amount
-        for leg in flow.evaluate(state, _env(state, 1.0), 1.0).legs
-        if leg.stock == _LEAF_C
-    )
-    half = next(
-        leg.amount
-        for leg in flow.evaluate(state, _env(state, 0.5), 0.5).legs
-        if leg.stock == _LEAF_C
-    )
-    assert math.isclose(half, one * 0.5, rel_tol=1e-12)
-
-
-# --- the assembled Senescence flow ------------------------------------------
 def _senescence_params() -> SenescenceParams:
     return SenescenceParams(rdr_leaf=_RDR_LEAF, rdr_stem=_RDR_STEM, rdr_root=_RDR_ROOT)
 
