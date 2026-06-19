@@ -3,10 +3,10 @@
 The first WATER-currency process. Layers (mirroring Steps 5/6):
 
 * **Rate laws** (``domains.biosphere.transpiration``, pure stdlib): the saturation
-  vapour pressure and its slope checked against **FAO-56 published table values**
-  (independent literals); the Penman–Monteith combination equation at a pinned
-  operating point and its dark/dry floor; the soil-water stress factor ``f_water``
-  cardinal values + the wilting/critical clamp.
+  vapour pressure against textbook/FAO-56 magnitudes and its slope against the analytic
+  derivative (finite-difference cross-check); the Penman–Monteith combination equation
+  at a pinned operating point, its dark/dry floor, and the negative-radiation clamp; the
+  soil-water stress factor ``f_water`` cardinal values + the wilting/critical clamp.
 * **The assembled flows**: ``Transpiration`` (water-balanced, dt-linear, self-limiting
   via ``f_water`` on the step-entry soil water) and ``Irrigation`` (water-balanced,
   tracking the irrigation forcing).
@@ -49,10 +49,11 @@ def _params() -> TranspirationParams:
     return TranspirationParams(aerodynamic_resistance=_RA, surface_resistance=_RS)
 
 
-# --- saturation vapour pressure + slope: FAO-56 table values ----------------
-# Genuine independent literals — the published FAO-56 (Allen et al. 1998) Table values
-# of e_s and Δ, NOT a restatement of the module formula. kPa, rel_tol loose enough to
-# absorb the table's own rounding.
+# --- saturation vapour pressure + slope: FAO-56 magnitudes ------------------
+# The e_s magnitudes are textbook/FAO-56 values (e_s(20 °C) ≈ 2.34 kPa) — a genuine
+# external cross-check. The slope literals are formula-consistent (FAO-56's 4098-form
+# and this module's analytic B·C derivative agree to these digits), so the *independent*
+# slope verification is the finite-difference derivative test below, not these numbers.
 @pytest.mark.parametrize(
     ("temp", "es_kpa", "slope_kpa"),
     [
@@ -92,6 +93,17 @@ def test_penman_monteith_zero_energy_zero_vpd_is_zero() -> None:
     # No available energy and no vapour deficit ⇒ no evaporative demand.
     tp = penman_monteith_transpiration(
         0.0, 0.0, 20.0, aerodynamic_resistance=_RA, surface_resistance=_RS
+    )
+    assert tp == 0.0
+
+
+def test_penman_monteith_clamps_negative_radiation_to_zero() -> None:
+    # Daily-average net radiation goes negative on short midwinter days (the
+    # winter-wheat season overwinters). Unclamped λE would be negative (≈−0.47
+    # mm/day here), flipping the sink into a deposit — the demand-side analogue of
+    # the Step 5/6 clamps. Potential transpiration is clamped to 0 (no dew model, P1).
+    tp = penman_monteith_transpiration(
+        -80.0, 50.0, 2.0, aerodynamic_resistance=_RA, surface_resistance=_RS
     )
     assert tp == 0.0
 

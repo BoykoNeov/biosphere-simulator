@@ -139,6 +139,14 @@ def penman_monteith_transpiration(
     then converts to a depth rate via ``λE / λ_vap · 86400`` (W m⁻² → kg s⁻¹ m⁻² →
     mm s⁻¹ at ρ_water = 1000 kg m⁻³ → mm day⁻¹). Raises ``ValueError`` for a
     non-positive ``aerodynamic_resistance`` (a zero would divide by zero).
+
+    The result is clamped to ``>= 0`` (the demand-side analogue of Step 5's ``Γ*``
+    and Step 6's ``max(0, …)`` clamps). ``λE`` goes negative only when ``Rn − G < 0``
+    — daily-average net radiation is negative on short midwinter days (and the
+    winter-wheat season overwinters), where a negative *potential* would flip this
+    sink into a deposit into ``soil_water`` and a withdrawal from the clamped vapour
+    sink (dew/condensation is not modelled in Phase 1). Clamping keeps transpiration
+    one-directional; ``f_water`` separately closes the *supply* side (soil depletion).
     """
     if not aerodynamic_resistance > 0.0:
         raise ValueError(
@@ -151,7 +159,7 @@ def penman_monteith_transpiration(
         1.0 + surface_resistance / aerodynamic_resistance
     )
     latent_flux = (delta * available_energy + aerodynamic_term) / denominator
-    return latent_flux / LATENT_HEAT_VAPORIZATION * SECONDS_PER_DAY
+    return max(0.0, latent_flux / LATENT_HEAT_VAPORIZATION * SECONDS_PER_DAY)
 
 
 def water_stress_factor(

@@ -380,8 +380,8 @@ closure. Light interception and phenology are **aux/derived**, not flows.*
 | Photosynthesis / FvCB (5) | CARBON | CO₂ boundary/forcing reservoir → plant structural C | ✓ 1-currency |
 | Growth respiration (5/6) | CARBON | plant C → atmosphere/boundary CO₂ (the explicit conversion loss, item 4) | ✓ |
 | Maintenance respiration (6) | CARBON | plant C → atmosphere/boundary CO₂ | ✓ |
-| Root water uptake (7) | WATER | soil-water POOL → plant water | ✓ |
-| Transpiration (7) | WATER | plant/soil water → boundary vapor sink | ✓ |
+| Root water uptake (7) | WATER | soil-water POOL → plant water | ✓ — *collapsed into transpiration; see Step-7 RESOLVED (3→2, no `plant_water`)* |
+| Transpiration (7) | WATER | soil-water POOL → boundary vapor sink | ✓ |
 | Irrigation (7) | WATER | boundary source → soil-water POOL | ✓ |
 | Phenology (8) | — | *aux:* thermal-time accumulator; `DVS=f(thermal_time)` | n/a (no leg) |
 | Allocation (9) | CARBON | plant C → leaf/stem/root C (internal redistribution) | ✓ |
