@@ -337,8 +337,11 @@ def test_gross_assimilation_rate_is_set_by_ci_not_co2_boundary_amount() -> None:
 
 
 def test_gross_assimilation_scales_linearly_with_dt() -> None:
-    # Increment form: the leg is dt · (daily rate). (The aggregator is itself dt-
-    # nonlinear via the day-length integration, P3 — but the dt factor here is linear.)
+    # Increment form: the leg is dt · (daily rate), and the daily rate is dt-INDEPENDENT
+    # — daily_canopy_assimilation reads the photoperiod from forcing (daylength_s), not
+    # dt — so the flow is genuinely dt-linear (the RK4 increment-form contract holds).
+    # This corrects P3's "not dt-refinable" premise; see the Step-5 RESOLVED note. The
+    # crop scenario still selects Euler-daily to match the oracle's daily numerics.
     state = _state(5.0, 1.0e9)
     flow = _flow()
     one = next(

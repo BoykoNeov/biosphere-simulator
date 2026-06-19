@@ -801,6 +801,21 @@ assimilated carbon into the plant pool.*
   Step 5 accepts the bias **because** `daily_canopy_assimilation` is the additive seam
   for the Gaussian; **closing it is Step 11**, not an assumption that the big-leaf
   already matches.
+- **P3-premise correction — the flow is dt-LINEAR, not dt-nonlinear (advisor-flagged
+  divergence from a locked decision; recorded in the Steps-1/2 style).** P3 asserts
+  Phase-1 biology "uses `dt` non-linearly (the day's Gaussian integration is inside
+  `evaluate`) … and is **not dt-refinable**." That mechanism does **not** hold for what
+  was built: `daily_canopy_assimilation` integrates over the **photoperiod
+  `daylength_s`** — an astronomical *forcing* read via `env.get`, **decoupled from the
+  integrator step `dt`** — so the daily rate is dt-independent and `flux = daily·dt` is
+  exactly the increment form (the Phase-0 RK4 contract *holds*; `test_..._scales_
+  linearly_with_dt` proves it). Decoupling the photoperiod from `dt` is the correct
+  modeling choice (and cleaner than P3 anticipated; even the Step-11 Gaussian, if it
+  integrates over `daylength_s`, stays dt-linear). **P3's conclusion stands, its
+  rationale is corrected:** the crop scenario still **selects Euler-daily — to match
+  the oracle's daily numerics (P3), not because the flow forfeits RK4 order.** (The
+  engine-numerics gates remain proven on the analytic Phase-0.5 scenarios; the gate
+  split is unaffected.)
 - **Clean-room (P5).** The FvCB equations are cited to Farquhar, von Caemmerer & Berry
   (1980); the cardinal-temperature response to degree-day/crop-model literature. All
   numeric VALUES (`Vcmax, Jmax, α, θ, Γ*, Kc, Ko, O, T_*`) are honest **provisional
