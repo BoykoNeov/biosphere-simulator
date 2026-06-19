@@ -29,7 +29,7 @@ Every param file opens with a provenance header citing the source of each value:
 
 ```yaml
 # <crop> — <process> parameters
-# Currency/units: <e.g. CARBON in mol; per-area rates in µmol CO2 m-2 s-1>
+# Currency/units: <e.g. CARBON in mol; per-area rates in umol/m^2/s>
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
 #
@@ -42,14 +42,24 @@ process: photosynthesis
 parameters:
   vcmax25:
     value: 80.0
-    unit: "umol m-2 s-1"
+    unit: "umol/m^2/s"
     source: "[A], Table 2"        # every value carries a source tag
   # ...
 ```
 
 Each value carries an inline `source:` tag resolving to an entry in the header's
 `Sources:` block (paper/report + table/page). A reviewer can audit every number to a
-citation without leaving the file.
+citation without leaving the file. If a value is not yet bound to a primary source,
+mark it `source: "TODO(cite) — provisional…"` rather than fabricate a citation or
+backfill from the WOFOST YAML.
+
+**Unit notation (pint).** Declared units must be pint-parseable: write powers and
+quotients with `^`/`**` and `/`, e.g. `"m^2/kg"`, `"umol/m^2/s"`, `"mm/day"`. Do
+**not** use the implicit-product `"m2 kg-1"` / `"umol m-2 s-1"` form — pint reads
+`kg-1` as `kg minus 1` (a `DimensionalityError`) and does not know `m2`. Per-area
+rate params are validated/converted at the boundary by `config.convert` (Scope-A
+discipline) when they have a fixed target unit, or recorded-and-trusted per P4 when
+they feed a deferred per-leg `Flow` dimensional check.
 
 ## Review checklist (per param file / PR)
 

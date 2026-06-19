@@ -33,6 +33,47 @@ from simcore.quantities import Quantity, canonical_unit
 _UREG = pint.UnitRegistry()
 
 
+def convert(value: str, target_unit: str) -> float:
+    """Validate a unit-bearing param string and convert it to an explicit unit.
+
+    The general boundary conversion: ``value`` is a ``"<magnitude> <unit>"`` string
+    (e.g. ``"0.0022 ha/kg"``) and ``target_unit`` is a pint-parseable unit
+    expression (e.g. ``"m^2/kg"``). The value must parse and be dimensionally
+    compatible with ``target_unit``; its magnitude is converted into that unit and
+    returned as a plain float.
+
+    This is the same Scope-A boundary discipline as :func:`to_canonical`, but for
+    params whose unit is **not** a conserved ``Quantity``'s canonical unit — e.g.
+    specific leaf area in m²/kg (Phase-1 Step 4). It is **not** the deferred per-leg
+    ``Flow`` dimensional check (P4): it validates one declared param against one
+    declared target unit, not a rate law's full dimensional signature.
+
+    Note on notation: pint reads ``"m^2/kg"`` / ``"m**2/kg"`` but **not** ``"m2
+    kg-1"`` (it parses ``kg-1`` as ``kg minus 1``). Param files use the ``^``/``/``
+    form (see ``docs/param-file-conventions.md``).
+
+    Raises ``UnitValidationError`` if ``value`` is unparseable, carries no unit or an
+    incompatible one, or converts to a non-finite magnitude.
+    """
+    try:
+        parsed = _UREG.Quantity(value)
+    except Exception as exc:  # pint raises several error types on malformed input
+        raise UnitValidationError(
+            f"param {value!r} is not a parseable quantity"
+        ) from exc
+    try:
+        converted = parsed.to(target_unit)
+    except pint.DimensionalityError as exc:
+        raise UnitValidationError(
+            f"param {value!r} is dimensionally incompatible with target unit "
+            f"{target_unit!r}"
+        ) from exc
+    magnitude = float(converted.magnitude)
+    if not math.isfinite(magnitude):
+        raise UnitValidationError(f"param {value!r} converts to a non-finite magnitude")
+    return magnitude
+
+
 def to_canonical(quantity: Quantity, value: str) -> float:
     """Validate and convert a unit-bearing param string to a canonical-unit float.
 

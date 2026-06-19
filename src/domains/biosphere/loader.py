@@ -17,12 +17,15 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from config import load_yaml, to_canonical
+from config import convert, load_yaml, to_canonical
+from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.demo import DemoParams
 from simcore.quantities import Quantity
 
 # The committed canonical demo params.
 DEMO_PARAMS_PATH: Path = Path(__file__).parent / "params" / "demo.yaml"
+# The committed winter-wheat canopy (Beer–Lambert) params (Phase-1 Step 4).
+CANOPY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "canopy.yaml"
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -126,4 +129,86 @@ def load_demo_params(path: str | Path = DEMO_PARAMS_PATH) -> DemoParams:
         k_resp=schema.rates.k_resp,
         k_harv=schema.rates.k_harv,
         dt=schema.dt,
+    )
+
+
+# --- canopy light interception (Phase-1 Step 4) -----------------------------
+# The structured ``value/unit/source`` param format (docs/param-file-conventions.md,
+# established at Step 3) — the first real crop param file. The schema is bespoke
+# (hand-written, like ``_DemoSchema``): a generic structured-param loader is premature
+# with one instance. Specific leaf area carries a per-area unit (m²/kg DM) that is
+# *not* a conserved Quantity's canonical unit, so it is validated by ``config.convert``
+# (Scope-A boundary discipline, generalized) rather than ``to_canonical``. The
+# extinction coefficient and carbon fraction are dimensionless, schema-validated floats.
+
+# The canonical target unit specific_leaf_area is converted into at the boundary.
+_SLA_TARGET_UNIT: str = "m^2/kg"
+
+
+class _CanopyValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template).
+
+    ``source`` is the clean-room provenance tag (required: every value cites its
+    origin or carries a ``TODO(cite)`` provisional marker); it is recorded, not
+    parsed.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _CanopyParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    extinction_coef: _CanopyValueUnit
+    specific_leaf_area: _CanopyValueUnit
+    carbon_fraction: _CanopyValueUnit
+
+
+class _CanopySchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _CanopyParameters
+
+
+def load_canopy_params(path: str | Path = CANOPY_PARAMS_PATH) -> CanopyParams:
+    """Load, schema-validate, and unit-validate the canopy params into ``CanopyParams``.
+
+    Folds the conventional specific leaf area (m²/kg dry matter) and the carbon
+    fraction (kg C/kg DM) into ``sla_per_mol_c`` (m² per mol leaf C) so the pure
+    ``canopy`` core never sees kg-DM or the molar-mass constant (the Step-1 lock):
+
+        ``sla_per_mol_c = sla[m²/kg DM] · M_C[kg/mol] / carbon_fraction[kg C/kg DM]``
+
+    (kg DM per mol C is ``M_C / carbon_fraction``). Raises ``ConfigError`` (incl.
+    ``UnitValidationError``) on a bad file or unit, ``ValueError`` on an out-of-range
+    carbon fraction or non-positive extinction coefficient, and
+    ``pydantic.ValidationError`` on a schema violation.
+    """
+    schema = _CanopySchema.model_validate(load_yaml(path))
+    params = schema.parameters
+
+    carbon_fraction = params.carbon_fraction.value
+    _check_carbon_fraction(carbon_fraction)
+
+    extinction_coef = params.extinction_coef.value
+    if not extinction_coef > 0.0:
+        raise ValueError(
+            f"extinction_coef must be > 0 (dimensionless), got {extinction_coef}"
+        )
+
+    sla_m2_per_kg = convert(
+        f"{params.specific_leaf_area.value} {params.specific_leaf_area.unit}",
+        _SLA_TARGET_UNIT,
+    )
+    sla_per_mol_c = sla_m2_per_kg * MOLAR_MASS_CARBON_KG_PER_MOL / carbon_fraction
+
+    return CanopyParams(
+        sla_per_mol_c=sla_per_mol_c,
+        extinction_coef=extinction_coef,
     )

@@ -1,0 +1,36 @@
+# winter_wheat — canopy light interception (Beer–Lambert) parameters
+# Currency/units: leaf CARBON in mol; LAI and intercepted fraction are dimensionless
+#   (m²/m² and a [0,1) fraction). specific_leaf_area is per-area (m²/kg dry matter),
+#   pint-validated and converted at the config boundary; carbon_fraction folds it to
+#   m²/mol C (the core never sees kg-DM). ground_area (m²) is SCENARIO data, supplied
+#   at evaluate time — it is deliberately NOT a crop param here (P4).
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   The intercepted-fraction LAW (1 − exp(−k·LAI)) is Monsi & Saeki [A]. The numeric
+#   parameter VALUES are provisional, literature-typical placeholders pending the
+#   Step-11 validation gate — flagged TODO(cite) until each is bound to a primary
+#   source (per the convention doc's provisional path; never backfilled from WOFOST).
+#
+# Sources:
+#   [A] Monsi, M. & Saeki, T. (1953), "Über den Lichtfaktor in den
+#       Pflanzengesellschaften und seine Bedeutung für die Stoffproduktion",
+#       Japanese Journal of Botany 14:22–52. (English translation: Ann. Bot.
+#       95:549–567, 2005.) — the canopy extinction law.
+
+name: winter_wheat
+process: canopy_light_interception
+
+parameters:
+  extinction_coef:
+    value: 0.6
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, literature-typical (wheat k≈0.4–0.7); primary citation pending Step 11"
+  specific_leaf_area:
+    value: 22.0
+    unit: "m^2/kg"
+    source: "TODO(cite) — provisional, literature-typical; primary citation pending Step 11"
+  carbon_fraction:
+    value: 0.45
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, literature-typical (~0.45 kg C/kg DM); primary citation pending Step 11"

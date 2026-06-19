@@ -1,10 +1,11 @@
 # Phase 1 — Single Producer
 
 **Status:** IN PROGRESS. **Steps 1 (units + area basis), 2 (the non-conserved aux
-channel), and 3 (the PCSE oracle harness + clean-room param discipline) are
-implemented, tested, and committed** — see their per-step `RESOLVED` blocks below.
-**The foundation (Steps 1–3) is complete; Step 4 (Beer–Lambert light interception) is
-next** — the first biological process, designed just-in-time. This plan **locks the three
+channel), 3 (the PCSE oracle harness + clean-room param discipline), and 4
+(Beer–Lambert light interception — the first biological process) are implemented,
+tested, and committed** — see their per-step `RESOLVED` blocks below. **The
+foundation (Steps 1–3) is complete; Step 5 (FvCB photosynthesis) is next** — the
+carbon-source flow that consumes the Step-4 canopy diagnostic, designed just-in-time. This plan **locks the three
 foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
 and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
 process steps as forward-pointers. Per the working-style rule and the advisor's
@@ -636,6 +637,74 @@ the behavioral-match helper accepts a within-band trajectory and rejects an
 out-of-band one (a discriminating control, like `fit_order`'s synthetic check); the
 purity gate stays green (PCSE not in `simcore`'s import closure); the marker
 de/selects the oracle tests as intended.
+
+## Step 4 design — Beer–Lambert light interception (Monsi & Saeki 1953)
+
+*The first biological process, designed just-in-time. Establishes the **canopy
+diagnostic** that Step 5 (FvCB) consumes — absorbed PAR = incident PAR × intercepted
+fraction.*
+
+### RESOLVED (2026-06-19) — the locks (advisor-reviewed)
+
+- **It is a pure diagnostic, NOT a `Flow` and NOT an `AuxProcess`.** Both LAI and the
+  intercepted fraction are **derived on demand** (P2: "LAI is derived, not stored"),
+  so light interception adds **no leg, no accumulator, no `State` field, and no
+  integrator wiring**. It is a standalone pure module (`domains/biosphere/canopy.py`),
+  built and unit-tested in isolation now (roadmap line 232 — "exists before
+  integration"); Step 5's carbon flow imports and calls it. The advisor flagged the
+  one temptation to resist — making LAI an aux accumulator "for symmetry with thermal
+  time"; it is not one.
+- **Two free functions, params via a `CanopyParams` dataclass (the `DemoParams`
+  idiom).** The physics is free functions so Beer–Lambert can be tested on a raw LAI
+  without routing through a contrived carbon value:
+  - `leaf_area_index(leaf_carbon, *, sla_per_mol_c, ground_area) = leaf_carbon ·
+    sla_per_mol_c / ground_area` (dimensionless m²/m²).
+  - `intercepted_fraction(lai, *, extinction_coef) = 1 − exp(−k·LAI)` ∈ [0, 1) — the
+    Monsi & Saeki extinction law (`I/I₀ = exp(−k·LAI)` transmitted). 0 at no leaf
+    area, → 1 as the canopy closes: the shape of a P1 limitation factor.
+  A "Canopy object with methods" would couple the two; deferred until a Step-5
+  consumer actually wants a carrier (anti-speculation).
+- **`carbon_fraction` folds into `sla_per_mol_c` at the loader (the Step-1 lock).**
+  Specific leaf area is conventionally m²/kg dry matter, but our currency is mol leaf
+  C. The kg-DM⇄mol-C conversion lives at the config boundary, not core, so the loader
+  computes `sla_per_mol_c = SLA[m²/kg] · M_C[kg/mol] / carbon_fraction[kg C/kg DM]`
+  (kg DM per mol C = M_C / f_C) and `canopy.py` never holds the molar-mass constant.
+  This is the **first consumer** of the carbon-fraction conversion (the plan expected
+  Step 9 — harmless; note the future dedup with allocation's tissue carbon fraction).
+- **`ground_area` (m²) is a scenario call-arg, NOT a crop param (P4).** It stays out
+  of `canopy.yaml` and `CanopyParams`; the physics takes it as an argument (guarded
+  `> 0`). Note its role here is a **divisor** (LAI = leaf area ÷ ground area) — the
+  mirror of the per-area-rate **× ground_area** *multiply* that mass-bearing
+  physiological flows use to turn a per-m² rate into an absolute leg.
+- **First real param file → the Step-3 structured `value/unit/source` format**
+  (`params/canopy.yaml`), loaded by a **bespoke** `load_canopy_params` (hand-written
+  schema like `_DemoSchema`; a generic structured-param loader is premature with one
+  instance). Specific leaf area carries a **per-area unit** (m²/kg) that is *not* a
+  conserved `Quantity`'s canonical unit, so it is validated by a new general
+  `config.convert(value, target_unit)` — the same Scope-A boundary discipline as
+  `to_canonical`, generalized to an explicit target unit (still **not** the deferred
+  per-leg `Flow` dimensional check). `extinction_coef` (k > 0) and `carbon_fraction`
+  (∈ (0, 1]) are dimensionless, bound-checked floats.
+- **pint notation correction (empirically forced).** The Step-3 convention doc's
+  example notation `"m2 kg-1"` / `"umol m-2 s-1"` is **unparseable** by the installed
+  pint: it reads `kg-1` as `kg minus 1` (`DimensionalityError`) and does not know
+  `m2`. Param-file units must use `^`/`**` and `/` — `"m^2/kg"`, `"umol/m^2/s"`,
+  `"mm/day"`. `docs/param-file-conventions.md` was corrected.
+- **Clean-room (P5).** The extinction LAW is cited to Monsi & Saeki (1953); the
+  numeric parameter VALUES are honest **provisional placeholders** (`TODO(cite)`,
+  literature-typical) pending the Step-11 validation gate — never fabricated to a
+  recalled citation and never backfilled from the unlicensed WOFOST YAML (the
+  convention doc's sanctioned provisional path; values are placeholders until Step 11
+  anyway).
+
+**Test plan (`tests/test_canopy.py`).** Beer–Lambert known values against
+**independent hand-computed literals** (not `1-exp(...)` restatements); the limits
+(LAI=0 → 0; large k·LAI → 1 from below); monotonicity in LAI; the `ground_area > 0`
+guard; the composed carbon→LAI→fraction chain; `config.convert` accepts a compatible
+unit (`ha/kg` → `m²/kg`) and rejects an incompatible/unparseable one; the committed
+`canopy.yaml` folds to the hand-computed `sla_per_mol_c`; the loader rejects a
+dimensionally-wrong SLA, an out-of-range carbon fraction / extinction coef, and a
+missing `source` tag (clean-room discipline at the boundary).
 
 ---
 
