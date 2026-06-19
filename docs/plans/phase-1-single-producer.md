@@ -12,8 +12,13 @@ carbon process and multi-organ stock structure), and 10 (nitrogen uptake + limit
 the NITROGEN-currency mirror of Step 7, supplying the last `f_N` limiter) are
 implemented, tested, and committed** — see their per-step `RESOLVED` blocks below. **All
 seven biological processes (Steps 4–10) are now complete; the foundation (Steps 1–3)
-was complete earlier; Step 11 (integration + behavioral validation) is next.** This
-plan **locks the three
+was complete earlier. Step 11 (integration) is complete: the season is assembled
+(`domains/biosphere/season.py`), conserves every step with `rationed == 0` by
+construction, is liveness-checked + golden-pinned, and qualitatively matches the oracle's
+shape — the `plant_c` buffer was dissolved (the load-bearing deviation, see the Step-11
+RESOLVED block) and CO₂ split into `co2_atmos`/`co2_resp`. The one remaining exit item,
+the *quantitative* oracle match, is explicitly DEFERRED (a user decision); the
+single-producer machinery is done.** This plan **locks the three
 foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
 and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
 process steps as forward-pointers. Per the working-style rule and the advisor's
@@ -1712,19 +1717,27 @@ stay green — the biology is validated against the oracle, **not** by dt-conver
       committed. *(Steps 4–10.)* The Step-11 season **re-exercises** them assembled
       (the rewiring per the transition checklists); shipping each standalone is what
       this criterion gates.
-- [ ] **Single-currency + multiplicative coupling (P1)** throughout; **OXYGEN not
+- [x] **Single-currency + multiplicative coupling (P1)** throughout; **OXYGEN not
       tracked**; every flow internally balanced in its one currency; the every-step
       conservation gate holds over a full season with `rationed == 0` (self-limiting
-      kinetics; Euler-daily, P3).
-- [ ] **Behavioral oracle match (P5)** — biomass trajectories, carbon gas exchange,
-      water use, and nitrogen dynamics **reproduce reference behavior** (growth-
-      chamber literature + WOFOST/PCSE) for the chosen crop, within tolerance (not
-      bit-exact). *(Step 11.)*
-- [ ] **Determinism + golden regression:** the crop scenario is bit-identical within
-      a build and registration-order-independent; a committed hex-float golden pins
-      it. *(Step 11.)*
-- [ ] **Engine invariants still hold:** core purity, determinism, frozen Phase-0/0.5
+      kinetics; Euler-daily, P3). *(Step 11 — `test_season`; `rationed == 0` is
+      structural after the `plant_c` buffer dissolution.)*
+- [~] **Behavioral oracle match (P5)** — **QUALITATIVE only; the quantitative gate is
+      DEFERRED (user decision).** The assembled season reproduces the oracle's *shape*
+      (DVS monotone 0→2, unimodal LAI, grain fills post-anthesis) under the same
+      NASAPower weather (`test_oracle_smoke`); the **magnitude** runs ~2 orders below the
+      oracle (uncalibrated `TODO(cite)` placeholders + the no-vernalization phenology
+      overrun) — recorded as a documented finding, not a validated match. Closing the gap
+      (literature-range calibration + vernalization) is a deferred follow-up. *(Step 11.)*
+- [x] **Determinism + golden regression:** the crop scenario is bit-identical within
+      a build and registration-order-independent; a committed hex-float golden pins it
+      (`test_regression_season` + `test_season`; transcendentals ⇒ within-build
+      bit-stable, cross-platform tolerance-gated). *(Step 11.)*
+- [x] **Engine invariants still hold:** core purity, determinism, frozen Phase-0/0.5
       API (additions only); the Phase-0/0.5 gates (incl. analytic convergence/order
       and 100k stability) stay green — the **biology is validated against the oracle,
       not by dt-convergence** (the gate split, P3).
-```
+
+> **Phase-1 status:** All criteria met **except the quantitative oracle match, which is
+> explicitly deferred** (the `[~]` above). The single-producer *machinery* is complete and
+> regression-pinned; behavioural calibration to the oracle is the next phase of work.

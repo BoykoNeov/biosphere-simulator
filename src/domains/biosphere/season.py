@@ -23,6 +23,16 @@ irrigation tops it) so it never drops below ``sw_critical``; ``plant_n`` is a PO
 only grows (nothing consumes it in Phase 1), initialised generously so its concentration
 stays above the critical-N threshold all season. Water/N-limited variants relax these.
 
+**DOCUMENTED FINDING — the committed season is NOT a validated oracle match.** The crop
+params are uncalibrated ``TODO(cite)`` placeholders and phenology has no vernalization
+(DVS overruns to maturity mid-season — the Step-8 seam), so the trajectory runs **~2
+orders of magnitude below the oracle** (peak LAI ≈ 0.09 vs ≈ 6). Step 11 ships the
+**machinery** — single-currency flows, the conservation gate, ``rationed == 0`` by
+construction, determinism, the golden — plus a *qualitative* shape match
+(``test_oracle_smoke``). The **quantitative** oracle gate (literature-range calibration,
+vernalization) is a **deferred** follow-up (a user decision). Do not read the committed
+golden as behavioural validation.
+
 Pure stdlib only (the YAML/pint loading is in ``loader.py``; this assembly stays
 importable headless, like ``demo.py``).
 """
