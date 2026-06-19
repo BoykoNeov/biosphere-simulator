@@ -1,0 +1,55 @@
+# winter_wheat — maintenance + growth respiration (carbon sink) params
+# Currency/units: both respiration losses are CARBON flows (mol C), plant_c → boundary
+#   CO₂. Rates are on a CARBON basis (mol C per mol C biomass) so the pure physics never
+#   holds the kg-DM⇄mol-C carbon fraction. Air temperature is FORCING read through the
+#   source resolver at evaluate time (the Q10 driver) — NOT a crop param.
+#
+# Units discipline (P4 / config/units.py): the per-day relative rate (1/day), the Q10
+#   ratio, growth efficiency, and the reference temperature are NOT conserved-Quantity
+#   canonical units, so they are schema-validated, bound-checked floats carrying a
+#   declared unit in the header (exact-string guarded at the loader). Full per-leg
+#   dimensional closure stays deferred.
+#
+# Model (maintenance-first paradigm — McCree/Penning de Vries/Thornley, the WOFOST
+#   carbon budget ASRC = GPHOT − MRES, then × CVF):
+#   MRES = maintenance_coef · plant_c · q10^((T − t_ref)/10)
+#   GRES = (1 − growth_efficiency) · max(0, GASS − MRES)
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   Step-11 validation gate — flagged TODO(cite) until each is bound to a primary
+#   source (never backfilled from WOFOST).
+#
+# Sources:
+#   [A] McCree, K.J. (1970), "An equation for the rate of respiration of white clover
+#       plants grown under controlled conditions", in Prediction and Measurement of
+#       Photosynthetic Productivity, PUDOC, Wageningen, 221–229.
+#   [B] Penning de Vries, F.W.T., Brunsting, A.H.M. & van Laar, H.H. (1974), "Products,
+#       requirements and efficiency of biosynthesis: a quantitative approach",
+#       J. Theor. Biol. 45:339–377.
+#   [C] Thornley, J.H.M. (1970), "Respiration, growth and maintenance in plants",
+#       Nature 227:304–305.
+#   [D] Amthor, J.S. (2000), "The McCree–de Wit–Penning de Vries–Thornley respiration
+#       paradigms: 30 years later", Annals of Botany 86:1–20.
+
+name: winter_wheat
+process: respiration
+
+parameters:
+  maintenance_coef:
+    value: 0.02
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical maintenance coefficient (~0.015–0.03 mol C/mol C/day at reference T); McCree [A]/Penning de Vries [B]; primary citation pending Step 11"
+  q10:
+    value: 2.0
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, classic Q10 ≈ 2 for maintenance respiration [B][D]; primary citation pending Step 11"
+  t_ref:
+    value: 25.0
+    unit: "degC"
+    source: "TODO(cite) — provisional Q10 reference temperature (~25 °C); primary citation pending Step 11"
+  growth_efficiency:
+    value: 0.75
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional carbon growth-conversion efficiency Yg (~0.7–0.85, composition-dependent) [B][C]; primary citation pending Step 11"

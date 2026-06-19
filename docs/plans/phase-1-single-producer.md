@@ -2,12 +2,12 @@
 
 **Status:** IN PROGRESS. **Steps 1 (units + area basis), 2 (the non-conserved aux
 channel), 3 (the PCSE oracle harness + clean-room param discipline), 4
-(Beer–Lambert light interception — the first biological process), and 5 (FvCB
-photosynthesis — the first carbon-source flow) are implemented, tested, and
-committed** — see their per-step `RESOLVED` blocks below. **The foundation
-(Steps 1–3) is complete; Step 6 (maintenance + growth respiration) is next** — the
-carbon-sink flows, including the growth-respiration leg that Step 5 flagged (gross
-assimilation → growth respiration → structural carbon). This plan **locks the three
+(Beer–Lambert light interception — the first biological process), 5 (FvCB
+photosynthesis — the first carbon-source flow), and 6 (maintenance + growth
+respiration — the carbon-sink flows) are implemented, tested, and committed** — see
+their per-step `RESOLVED` blocks below. **The foundation (Steps 1–3) is complete;
+Step 7 (Penman–Monteith transpiration + root uptake — the first WATER-currency
+flows) is next.** This plan **locks the three
 foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
 and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
 process steps as forward-pointers. Per the working-style rule and the advisor's
@@ -844,6 +844,102 @@ limit of `daily_canopy_assimilation` is finite (no division blow-up) and `= 0` a
 `LAI = 0`; the assembled `GrossAssimilation.evaluate` produces a **carbon-balanced**
 `FlowResult` (`assert_flow_balanced`) with the hand-computed daily mol-C leg; the
 committed `photosynthesis.yaml` loads to the expected `PhotosynthesisParams`; the
+loader rejects out-of-range/bad-unit params and a missing `source` tag.
+
+## Step 6 design — maintenance + growth respiration (the carbon sink flows)
+
+*The carbon **sink** counterpart to Step 5, designed just-in-time. Books the two
+respiratory losses that turn Step 5's gross-deposited carbon into the net structural
+increment — including the growth-respiration leg Step 5 flagged.*
+
+### RESOLVED (2026-06-19) — the locks (advisor-reviewed)
+
+- **Two single-currency CARBON sink `Flow`s, both `plant_c → boundary.co2`, each
+  internally balanced in carbon (P1).** New pure module
+  `domains/biosphere/respiration.py` (stdlib only), a `RespirationParams` dataclass
+  (the `PhotosynthesisParams`/`CanopyParams` idiom), a bespoke `load_respiration_params`
+  in `loader.py`, and `params/respiration.yaml` in the structured `value/unit/source`
+  format. Roadmap line 232: flow + unit test + param file + doc, standalone before
+  integration. Both respire into the **same** `boundary.co2` reservoir gross
+  assimilation draws from (open/unclamped in the Phase-1 single-producer system); a
+  separate atmosphere sink would be speculative.
+- **Maintenance respiration** — `MRES = maintenance_coef · plant_c · Q10^((T−T_ref)/10)`
+  (mol C day⁻¹). Proportional to standing biomass and rising with temperature via a
+  `Q10` response (**unbounded above**, unlike the FvCB cardinal factor — correct for
+  maintenance). Self-limiting in `plant_c` (→ 0 as biomass → 0), so positivity is
+  **structural** (no backstop dependence; P3). Cite: McCree (1970); Penning de Vries
+  et al. (1974); Thornley (1970); Amthor (2000).
+- **Growth respiration — the maintenance-first paradigm (the load-bearing
+  disambiguation; advisor-flagged, the plan prose was loose).** Plan line ~343's
+  "gross assimilation → growth respiration → structural carbon" does **not** say
+  whether maintenance is subtracted first. It is: growth respiration acts on the
+  assimilate **remaining after maintenance** — `GRES = (1−Yg)·max(0, GASS − MRES)`
+  (mol C day⁻¹), `Yg` = carbon growth-conversion efficiency. This is the
+  McCree–de Vries–Thornley budget and exactly how the **Step-11 WOFOST oracle** budgets
+  carbon (`ASRC = GPHOT − MRES`, then `× CVF`). The alternative (growth resp on gross,
+  lighter dependencies) was **rejected**: it is a *different carbon budget* that would
+  force an architecture shift mid-validation — A means Step 11 only tunes coefficients.
+  The `max(0, …)` clamp is **load-bearing** (the Step-6 analogue of Step 5's `Γ*`
+  clamp): when `MRES ≥ GASS` there is no growth, hence no growth respiration, and the
+  flow never flips into a carbon-creating *deposit*. Net `plant_c` change across the
+  three flows = `GASS − MRES − GRES = Yg·(GASS − MRES)` — the structural increment.
+  Cite: Penning de Vries et al. (1974); Thornley (1970).
+- **`GrowthRespiration` recomputes `GASS` and `MRES` — forced, not a smell.** Flows
+  `evaluate` independently against the step-entry snapshot (a flow cannot read another
+  flow's result pre-arbitration), so a **flux-coupled** quantity must recompute its
+  inputs: `GASS` via the Step-5 `daily_canopy_assimilation` seam, `MRES` via the
+  **same** `maintenance_respiration_flux` `MaintenanceRespiration` uses (so the two
+  flows can never drift on the maintenance value — the one genuine DRY hazard). Folding
+  growth resp into `GrossAssimilation` is foreclosed (it would break Step 5's committed
+  gross-leg tests); a single combined budget flow loses per-process diagnostics. The
+  long field list on `GrowthRespiration` (photosynthesis + canopy + respiration params,
+  `ground_area`, the same forcing-var names as `GrossAssimilation`) is the **inherent
+  cost** of a flux-coupled quantity in an independent-flow engine.
+- **dt-linearity preserved.** The `max(0, …)` clamps a *dt-independent daily rate*, so
+  `flux = const·dt` still holds (the RK4 increment-form contract carries over from
+  Step 5; the `scales_linearly_with_dt` tests pass for both flows). The clamp is not a
+  dt-nonlinearity.
+- **Carbon-basis rates (the Step-1 lock).** `maintenance_coef` and `Yg` are expressed
+  on a **carbon basis** (mol C per mol C biomass), so the pure physics never holds the
+  kg-DM⇄mol-C carbon fraction — it folds into the placeholder values, not the equations.
+- **Deferred seam — maturity/senescence (documented, like Step 5's f_water/f_N).**
+  WOFOST scales maintenance *down* as tissue matures (a development-stage / senescence
+  factor); that lands with phenology (Step 8) and the Step-11 oracle tuning. Standalone
+  Step 6 is plain `Q10·biomass` with the multiplier seam (`maturity` argument, default
+  1.0) in place, so Step 11 is a coefficient change, not a structural one.
+- **Known provisional behavior — winter biomass decline (the Step-6 analogue of
+  Step 5's documented big-leaf high-bias).** When `GASS < MRES` (dark, cold) the net
+  `plant_c` change is `−(MRES − GASS) < 0`: standing biomass shrinks. Physically real
+  for a respiring plant in carbon deficit; dormancy / vernalization is the Step-11
+  refinement — a known provisional behavior, not a bug.
+- **Self-limiting / positivity (P3).** Both fluxes → 0 as `plant_c` → 0 (maintenance
+  ∝ `plant_c`; growth resp ∝ `max(0, GASS − MRES)` with `GASS` → 0 as LAI → 0), so
+  positivity is structural. `rationed == 0` over a full Euler-daily season is a Step-11
+  *scenario* concern (keep `maintenance_coef·Q10^max·dt` well under 1 — realistic
+  ~0.06), not a Step-6 test.
+- **Clean-room (P5).** The respiration paradigm is cited to the McCree–de Vries–Thornley
+  literature; all numeric VALUES (`maintenance_coef`, `q10`, `t_ref`, `growth_efficiency`)
+  are honest **provisional literature-typical placeholders** (`TODO(cite)`), pending the
+  Step-11 validation gate — never fabricated to a recalled citation, never backfilled
+  from the unlicensed WOFOST YAML.
+
+**Tasks.**
+- `domains/biosphere/respiration.py` (PURE stdlib): `q10_factor`,
+  `maintenance_respiration_flux` (with the `maturity` seam), `growth_respiration_flux`
+  (the clamped maintenance-first loss), the `RespirationParams` dataclass, and the
+  `MaintenanceRespiration` + `GrowthRespiration` flows.
+- `params/respiration.yaml` (structured `value/unit/source`) + `load_respiration_params`
+  in `loader.py` (bespoke schema like `_PhotoSchema`; exact-string unit guard for the
+  non-canonical `1/day`/`dimensionless`/`degC` units; `maintenance_coef`/`q10` > 0,
+  `growth_efficiency` ∈ (0, 1]).
+
+**Test plan (`tests/test_respiration.py`).** `q10_factor`, `maintenance_respiration_flux`,
+and `growth_respiration_flux` against **independent hand-computed literals**; the
+`MRES ≥ GASS` → 0 growth-resp clamp; maintenance ∝ biomass, → 0 at zero biomass, and the
+`maturity` seam; the assembled `MaintenanceRespiration` and `GrowthRespiration` flows
+produce **carbon-balanced** `FlowResult`s (`assert_flow_balanced`) with the hand-computed
+/ composed daily mol-C legs, the dark-day (`PAR = 0`) growth-resp clamp, and `dt`-linear
+scaling; the committed `respiration.yaml` loads to the expected `RespirationParams`; the
 loader rejects out-of-range/bad-unit params and a missing `source` tag.
 
 ---

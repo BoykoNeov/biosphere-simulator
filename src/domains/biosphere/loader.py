@@ -21,6 +21,7 @@ from config import convert, load_yaml, to_canonical
 from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.demo import DemoParams
 from domains.biosphere.photosynthesis import PhotosynthesisParams
+from domains.biosphere.respiration import RespirationParams
 from simcore.quantities import Quantity
 
 # The committed canonical demo params.
@@ -31,6 +32,8 @@ CANOPY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "canopy.yaml"
 PHOTOSYNTHESIS_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "photosynthesis.yaml"
 )
+# The committed winter-wheat respiration params (Phase-1 Step 6).
+RESPIRATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "respiration.yaml"
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -347,4 +350,94 @@ def load_photosynthesis_params(
         t_opt_lo=t_opt_lo,
         t_opt_hi=t_opt_hi,
         t_max=t_max,
+    )
+
+
+# --- maintenance + growth respiration (Phase-1 Step 6) ----------------------
+# Same structured value/unit/source format as photosynthesis. Per P4 / config/units.py,
+# the per-day relative rate (1/day), the dimensionless Q10 ratio and growth efficiency,
+# and the reference temperature are NOT a conserved Quantity's canonical unit, so they
+# are schema-validated, bound-checked floats whose declared ``unit`` is exact-string
+# guarded (same discipline as FvCB). Air-temperature FORCING lives in the resolver.
+
+# Expected canonical unit string per respiration param (exact-match guard).
+_RESP_UNITS: dict[str, str] = {
+    "maintenance_coef": "1/day",
+    "q10": "dimensionless",
+    "t_ref": "degC",
+    "growth_efficiency": "dimensionless",
+}
+
+
+class _RespValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template).
+
+    ``source`` is the required clean-room provenance tag (recorded, not parsed); the
+    ``unit`` is exact-string validated against ``_RESP_UNITS`` in the loader.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _RespParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    maintenance_coef: _RespValueUnit
+    q10: _RespValueUnit
+    t_ref: _RespValueUnit
+    growth_efficiency: _RespValueUnit
+
+
+class _RespSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _RespParameters
+
+
+def _resp_value(params: _RespParameters, field: str) -> float:
+    """Read a respiration param's value, exact-string guarding its declared unit."""
+    entry: _RespValueUnit = getattr(params, field)
+    expected = _RESP_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_respiration_params(
+    path: str | Path = RESPIRATION_PARAMS_PATH,
+) -> RespirationParams:
+    """Load, schema- and bound-check the respiration params into ``RespirationParams``.
+
+    Each param carries a declared unit (exact-string guarded) and a required ``source``
+    tag (clean-room discipline). ``maintenance_coef`` and ``q10`` are strictly
+    positive; ``growth_efficiency`` ∈ (0, 1] (1 = no conversion loss; 0 would mean all
+    assimilate is respired away, never structural). ``t_ref`` is an unconstrained
+    reference temperature. Raises ``pydantic.ValidationError`` on a schema violation,
+    ``ValueError`` on a bad unit or out-of-range value.
+    """
+    schema = _RespSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _resp_value(params, field) for field in _RESP_UNITS}
+
+    for field in ("maintenance_coef", "q10"):
+        if not values[field] > 0.0:
+            raise ValueError(f"{field} must be > 0, got {values[field]}")
+    if not (0.0 < values["growth_efficiency"] <= 1.0):
+        raise ValueError(
+            f"growth_efficiency must be in (0, 1], got {values['growth_efficiency']}"
+        )
+
+    return RespirationParams(
+        maintenance_coef=values["maintenance_coef"],
+        q10=values["q10"],
+        t_ref=values["t_ref"],
+        growth_efficiency=values["growth_efficiency"],
     )
