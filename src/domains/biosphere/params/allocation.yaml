@@ -3,22 +3,23 @@
 #   structural increment DMI = Yg·max(0, GASS − MRES) (mol C/day) among the plant organs;
 #   it adds no new currency. The fractions are dimensionless and DVS-keyed.
 #
-# Schema shape (NEW — a list of rows, not the flat value/unit/source scalars used by the
-#   other process files): a single DVS-keyed partition table of (dvs, fl, fs, fr) rows.
-#   ONE shared-breakpoint table, NOT three independent FL/FS/FR tables — independent tables
+# Schema shape (a list of rows, not the flat value/unit/source scalars used by the other
+#   process files): a single DVS-keyed partition table of (dvs, fl, fs, fr, fo) rows.
+#   ONE shared-breakpoint table, NOT independent FL/FS/FR/FO tables — independent tables
 #   would interpolate to sums ≠ 1 between mismatched knots; a single table is sum-1
-#   everywhere by linearity (lerp(1,1)=1). The loader enforces, per row, fl+fs+fr == 1
+#   everywhere by linearity (lerp(1,1)=1). The loader enforces, per row, fl+fs+fr+fo == 1
 #   (within tol) and each fraction ∈ [0,1], and that the dvs knots strictly increase.
 #   Stage points: DVS 0 emergence, 1 anthesis, 2 maturity (see phenology.yaml). Fractions
 #   are flat-extrapolated outside the table.
 #
-# Model (DVS-keyed dry-matter partitioning; the WOFOST FLTB/FSTB/FRTB idiom):
-#   (FL, FS, FR) = piecewise-linear interp of the table at the current DVS;
-#   (leaf, stem, root) increment = DMI · (FL, FS, FR).
+# Model (DVS-keyed dry-matter partitioning; the WOFOST FLTB/FSTB/FRTB/FOTB idiom):
+#   (FL, FS, FR, FO) = piecewise-linear interp of the table at the current DVS;
+#   (leaf, stem, root, storage) increment = DMI · (FL, FS, FR, FO). FO (storage/grain)
+#   is 0 before anthesis and fills the reproductive phase (DVS > 1) — the Step-11
+#   storage-organ column the oracle fixture requires (TWSO ≈ 11.5 of TAGP ≈ 20.4 t/ha).
 #
-# Deferred Step-11 seams (documented in allocation.py): a grain/storage organ (a 4th
-#   fraction FO + a storage_c pool — REQUIRED at Step 11, the oracle fixture has
-#   TWSO ≈ 11.5 of TAGP ≈ 20.4 t/ha) and DVS-keyed senescence (see senescence.yaml).
+# Deferred Step-11 seam (documented in allocation.py): DVS-keyed senescence (see
+#   senescence.yaml). The storage organ (FO) is now built (this file's fo column).
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
@@ -37,8 +38,8 @@ process: allocation
 
 parameters:
   partition_table:
-    source: "TODO(cite) — provisional, literature-typical winter-wheat leaf/stem/root partition fractions [A][B]; primary citation pending Step 11 (and a storage-organ FO column)"
+    source: "TODO(cite) — provisional, literature-typical winter-wheat leaf/stem/root/storage partition fractions [A][B]; primary citation pending the Step-11 validation gate"
     rows:
-      - {dvs: 0.0, fl: 0.55, fs: 0.10, fr: 0.35}
-      - {dvs: 1.0, fl: 0.30, fs: 0.50, fr: 0.20}
-      - {dvs: 2.0, fl: 0.00, fs: 0.50, fr: 0.50}
+      - {dvs: 0.0, fl: 0.55, fs: 0.10, fr: 0.35, fo: 0.00}
+      - {dvs: 1.0, fl: 0.30, fs: 0.50, fr: 0.20, fo: 0.00}
+      - {dvs: 2.0, fl: 0.00, fs: 0.10, fr: 0.10, fo: 0.80}

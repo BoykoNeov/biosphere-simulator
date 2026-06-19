@@ -657,6 +657,7 @@ class _PartitionRowSchema(BaseModel):
     fl: float
     fs: float
     fr: float
+    fo: float
 
 
 class _PartitionTable(BaseModel):
@@ -686,8 +687,9 @@ def load_allocation_params(
     """Load, schema- and structurally-check the DVS-keyed partition table.
 
     Requires at least two rows (interpolation needs a bracket), strictly increasing
-    ``dvs`` knots, every fraction in ``[0, 1]``, and each row's ``fl + fs + fr == 1``
-    within tol — the last is load-bearing: a row that does not sum to 1 would make the
+    ``dvs`` knots, every fraction in ``[0, 1]``, and each row summing to 1
+    (``fl + fs + fr + fo``) within tol — the last is load-bearing: a row that does not
+    sum to 1 would make the
     allocation flow's organ legs miss the structural increment and trip the every-step
     conservation gate. ``source`` is required (clean-room discipline). Raises
     ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a structural
@@ -704,19 +706,26 @@ def load_allocation_params(
                 f"{prev.dvs} then {row.dvs}"
             )
     for row in rows:
-        for name, frac in (("fl", row.fl), ("fs", row.fs), ("fr", row.fr)):
+        for name, frac in (
+            ("fl", row.fl),
+            ("fs", row.fs),
+            ("fr", row.fr),
+            ("fo", row.fo),
+        ):
             if not (0.0 <= frac <= 1.0):
                 raise ValueError(
                     f"partition fraction {name} must be in [0, 1] at dvs={row.dvs}, "
                     f"got {frac}"
                 )
-        total = row.fl + row.fs + row.fr
+        total = row.fl + row.fs + row.fr + row.fo
         if abs(total - 1.0) > _PARTITION_SUM_ATOL:
             raise ValueError(
                 f"partition fractions must sum to 1 at dvs={row.dvs}, got {total}"
             )
     return AllocationParams(
-        table=tuple(PartitionRow(dvs=r.dvs, fl=r.fl, fs=r.fs, fr=r.fr) for r in rows)
+        table=tuple(
+            PartitionRow(dvs=r.dvs, fl=r.fl, fs=r.fs, fr=r.fr, fo=r.fo) for r in rows
+        )
     )
 
 

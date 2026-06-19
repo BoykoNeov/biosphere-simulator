@@ -7,10 +7,11 @@ Layers:
   ``partition_fractions`` (knot literals, the sum-to-1 invariant across a DVS sweep,
   the out-of-range clamp), ``partition`` (an exact split of a given DMI), and
   ``senescence_flux`` (∝ organ carbon, → 0 at zero).
-* **The assembled flows**: ``Allocation`` (a carbon-balanced 4-leg redistribution whose
-  organ legs equal the recomposed ``DMI·fractions`` and whose ``plant_c`` leg is
-  ``−ΣDMI``; the dark-day ``GASS < MRES`` → ``DMI = 0`` clamp; DVS read from
-  ``snapshot.aux``; dt-linear) and ``Senescence`` (a carbon-balanced
+* **The assembled flows**: ``Allocation`` (a carbon-balanced 5-leg
+  leaf/stem/root/storage redistribution whose organ legs equal the recomposed
+  ``DMI·fractions`` and whose ``plant_c`` leg is ``−ΣDMI``; the dark-day
+  ``GASS < MRES`` → ``DMI = 0`` clamp; DVS read from ``snapshot.aux``; dt-linear) and
+  ``Senescence`` (a carbon-balanced
   ``{organs → litter}`` flow; dt-linear).
 * **Config boundary** (``load_allocation_params`` / ``load_senescence_params``): the
   committed files load; a non-sum-1 row, non-increasing DVS, an out-of-range fraction /
@@ -58,11 +59,11 @@ from simcore.ids import DomainId, FlowId, StockId
 from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.state import State, Stock
 
-# Committed partition table (mirrors allocation.yaml).
+# Committed partition table (mirrors allocation.yaml; leaf/stem/root/storage fractions).
 _TABLE = (
-    PartitionRow(dvs=0.0, fl=0.55, fs=0.10, fr=0.35),
-    PartitionRow(dvs=1.0, fl=0.30, fs=0.50, fr=0.20),
-    PartitionRow(dvs=2.0, fl=0.00, fs=0.50, fr=0.50),
+    PartitionRow(dvs=0.0, fl=0.55, fs=0.10, fr=0.35, fo=0.00),
+    PartitionRow(dvs=1.0, fl=0.30, fs=0.50, fr=0.20, fo=0.00),
+    PartitionRow(dvs=2.0, fl=0.00, fs=0.10, fr=0.10, fo=0.80),
 )
 
 # Committed senescence placeholders (mirror senescence.yaml).
@@ -123,30 +124,31 @@ def _pheno() -> PhenologyParams:
 @pytest.mark.parametrize(
     ("dvs", "expected"),
     [
-        (0.0, (0.55, 0.10, 0.35)),  # emergence knot
-        (1.0, (0.30, 0.50, 0.20)),  # anthesis knot
-        (2.0, (0.00, 0.50, 0.50)),  # maturity knot
-        (0.5, (0.425, 0.30, 0.275)),  # midpoint of [0, 1] (independent lerp)
-        (1.5, (0.15, 0.50, 0.35)),  # midpoint of [1, 2]
-        (-1.0, (0.55, 0.10, 0.35)),  # below the table → clamp to first row
-        (3.0, (0.00, 0.50, 0.50)),  # above the table → clamp to last row
+        (0.0, (0.55, 0.10, 0.35, 0.00)),  # emergence knot
+        (1.0, (0.30, 0.50, 0.20, 0.00)),  # anthesis knot
+        (2.0, (0.00, 0.10, 0.10, 0.80)),  # maturity knot (grain dominant)
+        (0.5, (0.425, 0.30, 0.275, 0.00)),  # midpoint of [0, 1] (independent lerp)
+        (1.5, (0.15, 0.30, 0.15, 0.40)),  # midpoint of [1, 2] (grain filling)
+        (-1.0, (0.55, 0.10, 0.35, 0.00)),  # below the table → clamp to first row
+        (3.0, (0.00, 0.10, 0.10, 0.80)),  # above the table → clamp to last row
     ],
 )
 def test_partition_fractions_known_values(
-    dvs: float, expected: tuple[float, float, float]
+    dvs: float, expected: tuple[float, float, float, float]
 ) -> None:
-    fl, fs, fr = partition_fractions(dvs, _TABLE)
+    fl, fs, fr, fo = partition_fractions(dvs, _TABLE)
     assert math.isclose(fl, expected[0], abs_tol=1e-12)
     assert math.isclose(fs, expected[1], abs_tol=1e-12)
     assert math.isclose(fr, expected[2], abs_tol=1e-12)
+    assert math.isclose(fo, expected[3], abs_tol=1e-12)
 
 
 @pytest.mark.parametrize("dvs", [0.0, 0.13, 0.5, 0.99, 1.0, 1.37, 2.0, 5.0, -2.0])
 def test_partition_fractions_sum_to_one_everywhere(dvs: float) -> None:
     # The load-bearing invariant: a shared-breakpoint table is sum-1 at every DVS
     # (else the allocation legs would not sum to DMI and the gate would hard-fail).
-    fl, fs, fr = partition_fractions(dvs, _TABLE)
-    assert math.isclose(fl + fs + fr, 1.0, abs_tol=1e-12)
+    fl, fs, fr, fo = partition_fractions(dvs, _TABLE)
+    assert math.isclose(fl + fs + fr + fo, 1.0, abs_tol=1e-12)
 
 
 def test_partition_fractions_empty_table_raises() -> None:
@@ -156,11 +158,23 @@ def test_partition_fractions_empty_table_raises() -> None:
 
 # --- partition: exact split of a given DMI ----------------------------------
 def test_partition_splits_dmi_exactly() -> None:
-    leaf, stem, root = partition(2.0, 0.5, _TABLE)  # fractions (0.425, 0.30, 0.275)
+    # DVS 0.5 → (0.425, 0.30, 0.275, 0.0); storage = 0 in the vegetative phase.
+    leaf, stem, root, storage = partition(2.0, 0.5, _TABLE)
     assert math.isclose(leaf, 0.85, rel_tol=1e-12)
     assert math.isclose(stem, 0.60, rel_tol=1e-12)
     assert math.isclose(root, 0.55, rel_tol=1e-12)
-    assert math.isclose(leaf + stem + root, 2.0, rel_tol=1e-12)
+    assert storage == 0.0
+    assert math.isclose(leaf + stem + root + storage, 2.0, rel_tol=1e-12)
+
+
+def test_partition_fills_storage_in_the_reproductive_phase() -> None:
+    # DVS 1.5 → fractions (0.15, 0.30, 0.15, 0.40): the grain sink is now nonzero.
+    leaf, stem, root, storage = partition(2.0, 1.5, _TABLE)
+    assert math.isclose(leaf, 0.30, rel_tol=1e-12)
+    assert math.isclose(stem, 0.60, rel_tol=1e-12)
+    assert math.isclose(root, 0.30, rel_tol=1e-12)
+    assert math.isclose(storage, 0.80, rel_tol=1e-12)
+    assert math.isclose(leaf + stem + root + storage, 2.0, rel_tol=1e-12)
 
 
 # --- senescence_flux: independent literals ----------------------------------
@@ -181,6 +195,7 @@ _PLANT_C = StockId("biosphere.plant_c")
 _LEAF_C = StockId("biosphere.leaf_c")
 _STEM_C = StockId("biosphere.stem_c")
 _ROOT_C = StockId("biosphere.root_c")
+_STORAGE_C = StockId("biosphere.storage_c")
 _LITTER = StockId("boundary.litter")
 _THERMAL_TIME = "thermal_time"
 
@@ -203,6 +218,7 @@ def _state(
     leaf_c: float = 3.0,
     stem_c: float = 1.0,
     root_c: float = 1.0,
+    storage_c: float = 0.0,
     thermal_time: float = 550.0,  # DVS = 550/1100 = 0.5 (mid vegetative ramp)
 ) -> State:
     litter = Stock(
@@ -218,6 +234,7 @@ def _state(
         _LEAF_C: _organ(_LEAF_C, leaf_c),
         _STEM_C: _organ(_STEM_C, stem_c),
         _ROOT_C: _organ(_ROOT_C, root_c),
+        _STORAGE_C: _organ(_STORAGE_C, storage_c),
         _LITTER: litter,
     }
     return State(n=0, stocks=stocks, rng_seed=0, aux={_THERMAL_TIME: thermal_time})
@@ -243,6 +260,7 @@ def _allocation_flow() -> Allocation:
         leaf_c=_LEAF_C,
         stem_c=_STEM_C,
         root_c=_ROOT_C,
+        storage_c=_STORAGE_C,
         par_var="par",
         ci_var="ci",
         temp_var="temp",
@@ -277,13 +295,14 @@ def _expected_dmi(*, leaf_c: float, biomass: float, par: float = 800.0) -> float
 def test_allocation_legs_are_the_partitioned_structural_increment() -> None:
     state = _state()
     dmi = _expected_dmi(leaf_c=3.0, biomass=5.0)
-    leaf, stem, root = partition(dmi, 0.5, _TABLE)  # DVS = 0.5
+    leaf, stem, root, storage = partition(dmi, 0.5, _TABLE)  # DVS = 0.5 (storage = 0)
     result = _allocation_flow().evaluate(state, _env(state, 1.0), 1.0)
     legs = {leg.stock: leg.amount for leg in result.legs}
     assert math.isclose(legs[_LEAF_C], leaf, rel_tol=1e-12)
     assert math.isclose(legs[_STEM_C], stem, rel_tol=1e-12)
     assert math.isclose(legs[_ROOT_C], root, rel_tol=1e-12)
-    assert math.isclose(legs[_PLANT_C], -(leaf + stem + root), rel_tol=1e-12)
+    assert math.isclose(legs[_STORAGE_C], storage, abs_tol=1e-12)
+    assert math.isclose(legs[_PLANT_C], -(leaf + stem + root + storage), rel_tol=1e-12)
 
 
 def test_allocation_dmi_agrees_with_step6_growth_resp_budget() -> None:
@@ -306,11 +325,13 @@ def test_allocation_flow_is_carbon_balanced() -> None:
 
 
 def test_allocation_plant_leg_is_minus_sum_of_organ_legs() -> None:
-    # Balance-by-construction: the buffer drain equals the deposited organ carbon.
-    state = _state()
+    # Balance-by-construction: the buffer drain equals the deposited organ carbon
+    # (leaf + stem + root + storage).
+    state = _state(thermal_time=1100.0 + 375.0)  # DVS = 1.5: storage leg is nonzero
     result = _allocation_flow().evaluate(state, _env(state, 1.0), 1.0)
     legs = {leg.stock: leg.amount for leg in result.legs}
-    organ_sum = legs[_LEAF_C] + legs[_STEM_C] + legs[_ROOT_C]
+    organ_sum = legs[_LEAF_C] + legs[_STEM_C] + legs[_ROOT_C] + legs[_STORAGE_C]
+    assert legs[_STORAGE_C] > 0.0
     assert math.isclose(legs[_PLANT_C], -organ_sum, rel_tol=1e-12)
 
 
@@ -330,13 +351,17 @@ def test_allocation_reads_dvs_from_aux() -> None:
     repro = _allocation_flow().evaluate(
         _state(thermal_time=1100.0 + 375.0), _env(_state(), 1.0), 1.0
     )
-    # DVS 0.5 → FR 0.275; DVS 1.5 → FR 0.35: the root share rises, so the ratio shifts.
+    # DVS 0.5 → FR 0.275, FO 0.0; DVS 1.5 → FR 0.15, FO 0.40: the root share falls and a
+    # storage share appears, so the partition shifts (the aux-derived DVS is read).
     veg_legs = {leg.stock: leg.amount for leg in veg.legs}
     repro_legs = {leg.stock: leg.amount for leg in repro.legs}
     veg_root_share = veg_legs[_ROOT_C] / -veg_legs[_PLANT_C]
     repro_root_share = repro_legs[_ROOT_C] / -repro_legs[_PLANT_C]
+    repro_storage_share = repro_legs[_STORAGE_C] / -repro_legs[_PLANT_C]
     assert math.isclose(veg_root_share, 0.275, rel_tol=1e-9)
-    assert math.isclose(repro_root_share, 0.35, rel_tol=1e-9)
+    assert math.isclose(repro_root_share, 0.15, rel_tol=1e-9)
+    assert math.isclose(repro_storage_share, 0.40, rel_tol=1e-9)
+    assert veg_legs[_STORAGE_C] == 0.0  # no grain in the vegetative phase
 
 
 def test_allocation_scales_linearly_with_dt() -> None:
@@ -424,9 +449,9 @@ def _valid_alloc() -> dict[str, Any]:
             "partition_table": {
                 "source": "[A]",
                 "rows": [
-                    {"dvs": 0.0, "fl": 0.55, "fs": 0.10, "fr": 0.35},
-                    {"dvs": 1.0, "fl": 0.30, "fs": 0.50, "fr": 0.20},
-                    {"dvs": 2.0, "fl": 0.00, "fs": 0.50, "fr": 0.50},
+                    {"dvs": 0.0, "fl": 0.55, "fs": 0.10, "fr": 0.35, "fo": 0.00},
+                    {"dvs": 1.0, "fl": 0.30, "fs": 0.50, "fr": 0.20, "fo": 0.00},
+                    {"dvs": 2.0, "fl": 0.00, "fs": 0.10, "fr": 0.10, "fo": 0.80},
                 ],
             }
         },
@@ -441,7 +466,7 @@ def _write_alloc(tmp_path: Path, data: dict[str, Any]) -> Path:
 
 def test_alloc_loader_round_trips_a_valid_file(tmp_path: Path) -> None:
     p = load_allocation_params(_write_alloc(tmp_path, _valid_alloc()))
-    assert p.table[0] == PartitionRow(dvs=0.0, fl=0.55, fs=0.10, fr=0.35)
+    assert p.table[0] == PartitionRow(dvs=0.0, fl=0.55, fs=0.10, fr=0.35, fo=0.00)
 
 
 def test_alloc_loader_rejects_a_row_not_summing_to_one(tmp_path: Path) -> None:
@@ -463,9 +488,9 @@ def test_alloc_loader_rejects_out_of_range_fraction(tmp_path: Path, bad: float) 
     data = _valid_alloc()
     # Keep the row summing to 1 so the range check (not the sum check) is what bites:
     # set fl = bad and fs = 1 - bad - fr.
-    fr = data["parameters"]["partition_table"]["rows"][0]["fr"]
-    data["parameters"]["partition_table"]["rows"][0]["fl"] = bad
-    data["parameters"]["partition_table"]["rows"][0]["fs"] = 1.0 - bad - fr
+    row0 = data["parameters"]["partition_table"]["rows"][0]
+    row0["fl"] = bad
+    row0["fs"] = 1.0 - bad - row0["fr"] - row0["fo"]
     with pytest.raises(ValueError, match=r"must be in \[0, 1\]"):
         load_allocation_params(_write_alloc(tmp_path, data))
 
@@ -473,7 +498,7 @@ def test_alloc_loader_rejects_out_of_range_fraction(tmp_path: Path, bad: float) 
 def test_alloc_loader_rejects_too_few_rows(tmp_path: Path) -> None:
     data = _valid_alloc()
     data["parameters"]["partition_table"]["rows"] = [
-        {"dvs": 0.0, "fl": 0.55, "fs": 0.10, "fr": 0.35}
+        {"dvs": 0.0, "fl": 0.55, "fs": 0.10, "fr": 0.35, "fo": 0.00}
     ]
     with pytest.raises(ValueError, match=">= 2 rows"):
         load_allocation_params(_write_alloc(tmp_path, data))
@@ -488,7 +513,7 @@ def test_alloc_loader_rejects_a_missing_source(tmp_path: Path) -> None:
 
 def test_alloc_loader_rejects_an_unknown_field(tmp_path: Path) -> None:
     data = _valid_alloc()
-    data["parameters"]["partition_table"]["rows"][0]["fo"] = 0.0
+    data["parameters"]["partition_table"]["rows"][0]["fx"] = 0.0
     with pytest.raises(ValidationError):
         load_allocation_params(_write_alloc(tmp_path, data))
 

@@ -6,8 +6,8 @@ losses, leaving a daily structural increment ``DMI = Yg·max(0, GASS − MRES)``
 partitions that increment among the plant organs and sheds aged tissue to litter. Two
 single-currency CARBON flows, each internally balanced (P1):
 
-* **Allocation** — ``plant_c -> {leaf_c, stem_c, root_c}`` (Σ legs = 0, an internal
-  redistribution). A **multi-leg, recompute-DMI** flow (the :class:`GrowthRespiration`
+* **Allocation** — ``plant_c -> {leaf_c, stem_c, root_c, storage_c}`` (Σ legs = 0). A
+  **multi-leg, recompute-DMI** flow (the :class:`GrowthRespiration`
   pattern): because flows ``evaluate`` independently against the step-entry snapshot
   (no flow can read another's result pre-arbitration), the structural increment is
   **recomputed** here — ``GASS`` via the Step-4/5 canopy/FvCB stack, ``MRES`` via the
@@ -27,9 +27,9 @@ single-currency CARBON flows, each internally balanced (P1):
 **Sum-to-1 under interpolation — the load-bearing balance constraint.** If the organ
 fractions did not sum to 1 at the evaluated DVS, the organ legs would not sum to
 ``DMI`` and the every-step conservation gate would hard-fail. Designed out two ways:
-the partition table is a **single DVS-keyed table of ``(dvs, FL, FS, FR)`` rows** with
-shared breakpoints (sum-1 at every knot ⇒ sum-1 everywhere, since ``lerp(1, 1) = 1`` —
-*not* three independent tables, which would sum ≠ 1 between mismatched knots; the loader
+the partition table is a **single DVS-keyed table of ``(dvs, FL, FS, FR, FO)`` rows**
+with shared breakpoints (sum-1 at every knot ⇒ sum-1 everywhere, ``lerp(1, 1) = 1`` —
+*not* independent tables, which would sum ≠ 1 between mismatched knots; the loader
 enforces the per-row sum); and the flow sets the ``plant_c`` leg to ``−Σ(organ legs)``
 so it **balances by construction** regardless.
 
@@ -48,12 +48,18 @@ this (it is physics, not balance). ``Allocation`` here already reads the
 post-transition-correct stocks (``leaf_c`` for LAI, ``Σ`` organs for maintenance), so
 Step 11 re-points only the other flows to agree with it.
 
-**Deferred Step-11 seams.** (1) **Grain / storage organ** — the title is leaf/stem/root,
-but the committed oracle fixture has ``TWSO ≈ 11.5`` of ``TAGP ≈ 20.4 t/ha``, so a
-3-organ model cannot match the biomass curve; a 4th fraction ``FO`` + a ``storage_c``
-pool is an additive Step-11 precondition. (2) **Senescence keying** — DVS / leaf-age /
-self-shading scaling of the death rate (the Step-6 ``maturity``-seam shape); standalone
-is a plain per-organ constant relative rate.
+**Storage organ (FO; the Step-11 precondition — built).** The committed oracle fixture
+has ``TWSO ≈ 11.5`` of ``TAGP ≈ 20.4 t/ha`` (grain is ~half the biomass), so a 3-organ
+model cannot match the curve. The table carries a 4th fraction ``FO`` (``fo = 0`` before
+anthesis; storage fills the reproductive phase, ``DVS > 1``) and the flow deposits to a
+``storage_c`` pool. ``storage_c`` is **excluded from maintenance and senescence in Phase
+1** (grain is harvested, not shed; grain maintenance is a documented refinement seam) —
+it is a pure allocation sink, kept out of the ``Σ organs`` maintenance / ``f_N``
+biomass read and the ``Senescence`` flow.
+
+**Deferred Step-11 seam.** **Senescence keying** — DVS / leaf-age / self-shading scaling
+of the death rate (the Step-6 ``maturity``-seam shape); standalone is a plain per-organ
+constant relative rate.
 
 Pure stdlib only. Citations: Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M.
 & Bakema, A. (1989), *Simulation of Ecophysiological Processes of Growth in Several
@@ -83,16 +89,20 @@ from simcore.state import State
 
 @dataclass(frozen=True)
 class PartitionRow:
-    """One DVS knot of the leaf/stem/root partition table.
+    """One DVS knot of the leaf/stem/root/storage partition table.
 
-    ``fl + fs + fr`` must equal 1 (enforced at the config boundary); shared knots across
-    organs keep the interpolated fractions summing to 1 everywhere (``lerp(1, 1) = 1``).
+    ``fl + fs + fr + fo`` must equal 1 (enforced at the config boundary); shared knots
+    across organs keep the interpolated fractions summing to 1 everywhere
+    (``lerp(1, 1) = 1``). ``fo`` (storage / grain) is 0 before anthesis and fills the
+    reproductive phase (``DVS > 1``) — the Step-11 storage-organ column the committed
+    oracle fixture requires (``TWSO`` ≈ half of ``TAGP``).
     """
 
     dvs: float  # development stage at this knot (0 emergence, 1 anthesis, 2 maturity)
     fl: float  # leaf fraction of the structural increment
     fs: float  # stem fraction
     fr: float  # root fraction
+    fo: float  # storage-organ (grain) fraction
 
 
 @dataclass(frozen=True)
@@ -122,8 +132,8 @@ class SenescenceParams:
 
 def partition_fractions(
     dvs: float, table: tuple[PartitionRow, ...]
-) -> tuple[float, float, float]:
-    """Interpolate ``(FL, FS, FR)`` at ``dvs`` from the partition table.
+) -> tuple[float, float, float, float]:
+    """Interpolate ``(FL, FS, FR, FO)`` at ``dvs`` from the partition table.
 
     Piecewise-linear in ``dvs`` between the table knots; **flat extrapolation** outside
     the table (clamped to the first/last row). Because each knot sums to 1 and the knots
@@ -134,10 +144,10 @@ def partition_fractions(
         raise ValueError("partition table must have at least one row")
     if dvs <= table[0].dvs:
         first = table[0]
-        return (first.fl, first.fs, first.fr)
+        return (first.fl, first.fs, first.fr, first.fo)
     if dvs >= table[-1].dvs:
         last = table[-1]
-        return (last.fl, last.fs, last.fr)
+        return (last.fl, last.fs, last.fr, last.fo)
     for lo, hi in zip(table, table[1:], strict=False):
         if lo.dvs <= dvs <= hi.dvs:
             w = (dvs - lo.dvs) / (hi.dvs - lo.dvs)
@@ -145,6 +155,7 @@ def partition_fractions(
                 lo.fl + w * (hi.fl - lo.fl),
                 lo.fs + w * (hi.fs - lo.fs),
                 lo.fr + w * (hi.fr - lo.fr),
+                lo.fo + w * (hi.fo - lo.fo),
             )
     # Unreachable: dvs is strictly inside [table[0].dvs, table[-1].dvs] here, and the
     # knots are increasing (loader-enforced), so some adjacent pair always brackets it.
@@ -153,14 +164,14 @@ def partition_fractions(
 
 def partition(
     dmi: float, dvs: float, table: tuple[PartitionRow, ...]
-) -> tuple[float, float, float]:
-    """Split a daily increment ``dmi`` into ``(leaf, stem, root)`` (mol C/day).
+) -> tuple[float, float, float, float]:
+    """Split a daily increment ``dmi`` into ``(leaf, stem, root, storage)`` (mol C/day).
 
-    ``dmi · (FL, FS, FR)`` at the interpolated fractions (:func:`partition_fractions`).
-    The three returned values sum to ``dmi`` (the fractions sum to 1).
+    ``dmi · (FL, FS, FR, FO)`` at the interpolated fractions
+    (:func:`partition_fractions`). The four values sum to ``dmi`` (fractions sum to 1).
     """
-    fl, fs, fr = partition_fractions(dvs, table)
-    return (fl * dmi, fs * dmi, fr * dmi)
+    fl, fs, fr, fo = partition_fractions(dvs, table)
+    return (fl * dmi, fs * dmi, fr * dmi, fo * dmi)
 
 
 def senescence_flux(organ_c: float, *, relative_death_rate: float) -> float:
@@ -175,11 +186,12 @@ def senescence_flux(organ_c: float, *, relative_death_rate: float) -> float:
 
 @dataclass(frozen=True)
 class Allocation:
-    """CARBON redistribution ``plant_c -> {leaf_c, stem_c, root_c}`` (balanced, P1).
+    """CARBON redistribution ``plant_c -> {leaf_c, stem_c, root_c, storage_c}`` (P1).
 
     Recomputes the daily structural increment ``DMI = Yg·available_for_growth(GASS,
     MRES)`` from the step-entry snapshot (flows cannot read each other's results), then
-    splits it by DVS-keyed fractions. ``GASS`` is recomputed via the Step-4/5
+    splits it by DVS-keyed fractions (leaf/stem/root/storage; ``storage_c`` fills the
+    reproductive phase). ``GASS`` is recomputed via the Step-4/5
     :func:`daily_canopy_assimilation` (LAI from ``leaf_c`` — the
     post-transition-correct read), ``MRES`` via the Step-6
     :func:`maintenance_respiration_flux` on the total organ biomass
@@ -201,6 +213,7 @@ class Allocation:
     leaf_c: StockId
     stem_c: StockId
     root_c: StockId
+    storage_c: StockId
     par_var: str
     ci_var: str
     temp_var: str
@@ -250,17 +263,19 @@ class Allocation:
             tsum_anthesis=self.pheno.tsum_anthesis,
             tsum_maturity=self.pheno.tsum_maturity,
         )
-        leaf, stem, root = partition(dmi, dvs, self.alloc.table)
+        leaf, stem, root, storage = partition(dmi, dvs, self.alloc.table)
 
         leaf_leg = leaf * dt
         stem_leg = stem * dt
         root_leg = root * dt
+        storage_leg = storage * dt
         return FlowResult(
             legs=(
-                Leg(self.plant_c, -(leaf_leg + stem_leg + root_leg)),
+                Leg(self.plant_c, -(leaf_leg + stem_leg + root_leg + storage_leg)),
                 Leg(self.leaf_c, leaf_leg),
                 Leg(self.stem_c, stem_leg),
                 Leg(self.root_c, root_leg),
+                Leg(self.storage_c, storage_leg),
             )
         )
 
