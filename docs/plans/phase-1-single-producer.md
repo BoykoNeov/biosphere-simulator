@@ -1,8 +1,10 @@
 # Phase 1 — Single Producer
 
-**Status:** IN PROGRESS. **Steps 1 (units + area basis) and 2 (the non-conserved aux
-channel) are implemented, tested, and committed** — see their per-step `RESOLVED`
-blocks below. **Step 3 (PCSE oracle harness) is next.** This plan **locks the three
+**Status:** IN PROGRESS. **Steps 1 (units + area basis), 2 (the non-conserved aux
+channel), and 3 (the PCSE oracle harness + clean-room param discipline) are
+implemented, tested, and committed** — see their per-step `RESOLVED` blocks below.
+**The foundation (Steps 1–3) is complete; Step 4 (Beer–Lambert light interception) is
+next** — the first biological process, designed just-in-time. This plan **locks the three
 foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
 and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
 process steps as forward-pointers. Per the working-style rule and the advisor's
@@ -544,6 +546,74 @@ schema bump).
 *Realizes P5. Built early as infra (a target for the process steps); the full
 behavioral-match gate is Step 11.*
 
+### RESOLVED (2026-06-19) — the locks (advisor-reviewed; empirically grounded)
+
+- **Crop/oracle = winter wheat / WOFOST** (user-confirmed at Step 3, knowing the
+  licensing constraint below). Empirically verified with the installed
+  `pcse==6.0.13`: `YAMLCropDataProvider` exposes `wheat → Winter_wheat_101…106`, and
+  a full `Wofost72_PP` season (sow 2006-10-01, NL 52°N/5°E, NASAPower weather) runs
+  **305 daily steps** emitting `DVS, LAI, TAGP, TWLV/TWST/TWRT, TWSO, TRA, SM`
+  (final TAGP ≈ 20.4 t/ha, TWSO ≈ 11.5 t/ha — realistic). Winter wheat is the
+  closest oracle for the WOFOST-family equations Phase 1 reimplements (FvCB-style
+  assimilation, Penman–Monteith, DVS-keyed allocation, thermal time); LINTUL3 spring
+  wheat (the only *bundled* crop) is a looser light-use-efficiency oracle.
+- **The licensing safeguard (load-bearing — advisor-flagged blocker, now closed).**
+  PCSE itself is EUPL → running it as an oracle is *mere use*, and its **output is
+  facts** (`docs/reuse-and-licenses.md` lines 13/28). But winter-wheat **inputs**
+  come from the **`WOFOST_crop_parameters` repo, which has no license = all rights
+  reserved** ("Do NOT copy the files", reuse doc line 14). Winter wheat is **not
+  bundled** in PCSE; `YAMLCropDataProvider` **downloads** that repo to the user's
+  `~/.pcse` cache. Therefore the hard rule: **we commit ONLY the output trajectory
+  + a provenance record — NEVER the param YAML.** The download is a private,
+  transient local copy used to run the model (mere use → factual output); we
+  redistribute nothing. This holds regardless of crop and is the design's central
+  constraint.
+- **Provenance record (committed beside the fixture)** makes the clean lineage
+  auditable and regeneration reproducible: PCSE version (`6.0.13`), crop-parameter
+  source + repo version/branch, weather source (NASAPower, lat/lon, date range),
+  agromanagement (sow/harvest dates, variety), WOFOST model variant. A reviewer can
+  see the fixture is derived output, not copied params.
+- **Module placement (advisor-affirmed split).**
+  - **PCSE-driving runner → `tests/oracle/runner.py`** — a **non-`test_` module name**
+    so pytest's collection glob never imports it on a machine without `pcse` (no
+    collection-time `ImportError`). It lives under `tests/` (NOT a shipped hatch
+    package in `pyproject.toml`'s `packages=[…]`), so **EUPL PCSE code never enters
+    `src/`**. The companion `tests/oracle/test_oracle.py` does the `oracle`-marked,
+    `pytest.importorskip("pcse")` checks.
+  - **Behavioral-match tolerance helper → `src/lab/oracle_match.py`** — **pure
+    stdlib**, exactly like `lab/convergence.py:fit_order`. It compares two in-memory
+    trajectories; it needs **no PCSE**. (`lab` *ships* in the wheel, so this stays
+    PCSE-free by discipline — the AST purity gate only scans `simcore`; a one-line
+    test asserts nothing in `lab` imports `pcse`.)
+  - **Committed fixture decouples everything from PCSE:** the helper + its tests run
+    against the committed winter-wheat reference trajectory with **zero PCSE
+    dependency**. PCSE is needed *only* to regenerate the fixture.
+- **Fixture format = plain decimal JSON, not hex-float.** The oracle match is
+  **behavioral / within-a-band** (P5), not bit-exact — readable reference numbers
+  beat exact-float goldens, and there is no conflict with determinism invariant #7
+  (that governs *our* engine's bit-identity, not the oracle's). Variable set for the
+  first fixture: `day, DVS, LAI, TAGP, TWLV, TWST, TWRT, TWSO, TRA, SM` (a
+  `Wofost72_PP` potential-production season). N-limited variables and a
+  water-limited (`WLP`) variant are **JIT extensions** added when the water (Step 7)
+  and nitrogen (Step 10) processes land — Step 3 pins biomass + LAI + water-use now.
+- **Tolerance helper shape** (mirrors `fit_order`'s discipline — a measurement, not a
+  pass/fail policy): given a candidate trajectory and the reference, return a
+  per-variable discrepancy metric (max relative deviation and/or normalized RMSE over
+  aligned days) — pure float arithmetic. A **discriminating control test** proves it
+  bites: a within-band perturbation accepts, an out-of-band one rejects (the
+  synthetic check `fit_order` uses). The actual Phase-1 *gate* (which variables, what
+  band) is wired at Step 11.
+- **Clean-room param discipline — convention now, automated check deferred.** Step 3
+  establishes the **param-file header template** (cite the primary publication per
+  value) + a **review checklist** ("no value copied from the unlicensed WOFOST YAML")
+  in docs. **No crop param files exist yet** (they land in Steps 4–10), so an
+  automated header-presence check is premature — deferred until params arrive (the
+  repo's anti-speculation norm).
+- **Purity stays green by construction** — PCSE lives in `tests/oracle/`, outside all
+  `src/` packages; the existing AST gate (`tests/test_simcore_purity.py`) re-asserts
+  `simcore` imports nothing third-party. The `oracle` marker de/selects the oracle
+  tests; default `uv run pytest` stays green without PCSE via `importorskip`.
+
 **Tasks.**
 - Enable the `oracle = ["pcse"]` dependency group (`pyproject.toml`); register an
   `oracle` (and/or reuse `slow`) pytest marker; confirm `simcore` purity is
@@ -571,10 +641,10 @@ de/selects the oracle tests as intended.
 
 ## Exit criteria (Phase 1 — "research-grade single producer")
 
-- [ ] **Foundation locked:** science units + area basis (P4); the non-conserved aux
+- [x] **Foundation locked:** science units + area basis (P4); the non-conserved aux
       channel (P2) — additive to frozen State, serialized, observed, outside the
       conservation gate; PCSE oracle harness behind a marker, clean-room param
-      discipline (P5). *(Steps 1–3.)*
+      discipline (P5). *(Steps 1–3 — complete.)*
 - [ ] **Seven processes**, each shipped as **flow/aux-rate + unit test + param file
       + documentation** before integration (roadmap line 232): Beer–Lambert, FvCB,
       respiration, Penman–Monteith, phenology, allocation, nitrogen. *(Steps 4–10.)*

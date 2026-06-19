@@ -51,7 +51,8 @@ outbound license does **not** permit pulling copyleft source inbound.
 ## Practical rule for contributors (and Claude sessions)
 
 - Parameters and equations: cite the **paper/report**, not PCSE, in the
-  param-file headers and docstrings.
+  param-file headers and docstrings. The header template + review checklist live in
+  `docs/param-file-conventions.md`.
 - PCSE lives in the **test/dev dependency** set only, never a runtime import of
   `simcore` (also required by core purity).
 - If you find yourself copying a block of PCSE Python, stop — reimplement from the

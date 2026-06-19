@@ -21,10 +21,11 @@ dev = [
     "hypothesis>=6",
     "pyright>=1.1",
 ]
-# PCSE (EUPL) is an OFFLINE validation oracle only, needed once real biology
-# lands (Phase 1). Deferred here to keep the skeleton lean and numpy-free.
-# See docs/reuse-and-licenses.md — oracle use only, never imported by the core.
-# oracle = ["pcse"]
+# PCSE (EUPL) is an OFFLINE validation oracle only (Phase 1, Step 3). It drags
+# numpy + a large tree, so it stays a dev/test-only extra — never imported by the
+# pure core (re-asserted by tests/test_simcore_purity.py) and skipped cleanly when
+# absent (tests/oracle/ uses importorskip). See docs/reuse-and-licenses.md.
+oracle = ["pcse"]
 
 [build-system]
 requires = ["hatchling"]
@@ -47,12 +48,19 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# `oracle` is opt-IN: it needs the heavy `oracle` dep group AND network (NASAPower),
+# so — unlike `slow` — it must not run in the default loop, even on a machine that
+# happens to have pcse installed. Opt-in is enforced override-proof in
+# tests/conftest.py (an addopts `-m 'not oracle'` is NOT robust — a later `-m` such as
+# the fast-loop `-m "not slow"` would override it). Run the oracle tests with
+# `-m oracle`.
 addopts = "-ra"
 # `slow` is an opt-OUT handle, not deselected by default: a plain `uv run pytest`
 # runs the marked tests (the 100k stability gate stays real), while a fast iteration
 # loop skips them with `-m "not slow"`. See tests/test_stability.py.
 markers = [
     "slow: long-running gates (e.g. the 100k-step stability run); deselect with -m 'not slow'",
+    "oracle: PCSE/WOFOST oracle regeneration (needs the `oracle` dep group + network); skipped cleanly when pcse is absent (importorskip). Run with -m oracle.",
 ]
 
 [tool.pyright]
