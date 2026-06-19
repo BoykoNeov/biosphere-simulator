@@ -1465,6 +1465,224 @@ the carbon-fraction fold applied (a known value round-trips); the loader rejects
 unit, an out-of-range ``carbon_fraction``, ``n_residual ≥ n_critical``, a non-positive
 capacity, and a missing ``source`` tag (clean-room discipline at the boundary).
 
+## Step 11 design — integration + behavioral validation (the capstone)
+
+*Assembles the seven standalone processes into one single-producer season, applies the
+Step-9/10 transition (rewiring), and validates. Tightest-constraint-first: the binding
+constraint is the **always-on conservation + ``rationed == 0`` gate over the full
+season**, NOT the oracle match. Built in ~6 commits in that order. No new core
+machinery — Phase 1 is additive to the frozen Phase-0/0.5 surface (only ``State.aux``,
+already landed at Step 2).*
+
+### RESOLVED (2026-06-19) — the locks (advisor-reviewed; arbitration-grounded)
+
+- **THE LOAD-BEARING DEVIATION — the ``plant_c`` "labile buffer" is DISSOLVED; every
+  carbon fate is sourced from the unclamped ``co2_source`` boundary + the organ pools.**
+  The Step-9 transition prose ("``plant_c`` reframes to a near-zero labile buffer; net
+  ``+GASS −MRES −GRES −DMI = 0`` per step; Step 11 only re-points reads") was written
+  **without checking it against arbitration semantics, and it does not survive contact.**
+  The arbitration backstop computes ``scale_s = stocks[s].amount / demand_s`` against the
+  **start-of-step** amount — "withdrawals never draw against same-step inflows"
+  (``simcore/arbitration.py``). So a pool that nets to ~0 each step **cannot source any
+  same-step withdrawal**: ``GASS``'s same-step deposit into the buffer does not count
+  toward covering that step's ``MRES``/``GRES``/``DMI`` draws, so the backstop would fire
+  **every step** (not merely in winter — the advisor's flag-1 generalized). The Step-9
+  standalone tests passed only because they construct ``plant_c`` with an ad-hoc healthy
+  amount. A standing-reserve workaround (init ``plant_c`` large) only **postpones** firing
+  until an overwintering deficit exhausts the reserve — a design that *can* fire the
+  backstop violates "the backstop is the rare numerical guard, never the mechanism"
+  (decision #3) and the exit-criterion golden. **Rejected.** The correction:
+  - **No ``plant_c`` stock.** Gross assimilation ``GASS`` becomes a **recomputed
+    quantity** (a number computed inside ``evaluate`` from ``leaf_c`` + forcing), not a
+    flow that deposits into a pool. The flow ``GrossAssimilation`` **dissolves**.
+  - **``Allocation``**: ``co2_source -> {leaf_c, stem_c, root_c, storage_c}`` — deposits
+    the structural increment ``DMI`` split by the DVS-keyed fractions. Source is the
+    unclamped CO₂ boundary (skipped by arbitration), sinks are organs.
+  - **``GrowthRespiration``**: ``co2_source -> co2_sink`` — the growth-conversion loss
+    ``GRES = (1−Yg)·available_for_growth(GASS, MRES)``, assimilated-and-immediately-
+    respired (never becomes biomass; correct booking).
+  - **``MaintenanceRespiration``**: ``{co2_source(covered), organs(shortfall)} -> co2_sink``
+    — see the maintenance-first split below.
+  - **``Senescence``**: ``{leaf_c, stem_c, root_c} -> litter_sink`` (unchanged; storage
+    excluded — see FO below).
+  Every **clamped** carbon withdrawal is now from an organ pool (∝ that organ's amount,
+  self-limiting → 0 as the organ → 0) or from the unclamped boundary — so the carbon-side
+  backstop is **structurally impossible**, not merely tuned away. ``rationed == 0`` holds
+  **by construction**. This is a RESOLVED deviation, documented like Step 7's 3→2 collapse
+  and the ``auxiliary.py`` rename.
+
+- **Maintenance-first split (the no-double-count lock).** ``MaintenanceRespiration``
+  recomputes ``GASS`` (so it knows how much of today's assimilate covers maintenance) and
+  draws ``MRES = maintenance_respiration_flux(Σ organs, T)`` thus:
+  - ``covered = min(GASS, MRES)`` from ``co2_source`` (the maintenance paid out of today's
+    fixed carbon),
+  - ``shortfall = max(0, MRES − GASS)`` from the organ pools, **proportional to each
+    organ's share** of ``Σ(leaf + stem + root)`` (biomass shrinks in deficit — WOFOST-
+    faithful; the documented "winter biomass decline" now lands on real biomass, not the
+    phantom buffer). Guard ``Σ organs == 0 ⇒ MRES = 0`` (no leaves, no maintenance).
+  - ``co2_sink`` leg ``= +MRES`` (``= covered + shortfall``, balanced).
+  This **preserves** ``available_for_growth = max(0, GASS − MRES)`` shared by
+  ``GrowthRespiration`` (``GRES = (1−Yg)·available``) and ``Allocation``
+  (``DMI = Yg·available``), so the budget telescopes and
+  ``test_allocation_dmi_agrees_with_step6_growth_resp_budget`` survives. **Rejected
+  alternative:** "draw the full ``MRES`` from organs while ``available`` stays
+  ``GASS − MRES``" — this **double-charges maintenance** (once inside ``available``, once
+  on the organs) and silently slows biomass; the conservation gate does NOT catch it (it
+  balances). The min/shortfall split is the only structure that both conserves and budgets
+  correctly.
+  - *Trace to verify before coding (both conserve; neither touches a clamped stock beyond
+    self-limiting draws):* **surplus day** (``GASS ≥ MRES``): ``co2_source`` net ``= −GASS``
+    (``−DMI −GRES −MRES``, and ``DMI + GRES + MRES = (GASS−MRES) + MRES = GASS``); organs
+    grow by ``DMI``; ``co2_sink`` gains ``GRES + MRES``. **deficit day** (``GASS < MRES``):
+    ``available = 0`` so ``GRES = DMI = 0``; ``co2_source`` net ``= −covered = −GASS``;
+    organs shrink by ``shortfall = MRES − GASS``; ``co2_sink`` gains ``MRES``.
+
+- **Three GASS-recompute sites (UPDATES the Step-9/10 checklist — ``GrossAssimilation`` is
+  gone).** With the source flow dissolved, the flows that recompute ``GASS`` are
+  **``GrowthRespiration``, ``Allocation``, and ``MaintenanceRespiration``** (the last is a
+  *new* GASS site, forced by the maintenance split). The Step-9 checklist named
+  ``GrossAssimilation`` as a site; that line is superseded. The per-read discipline holds:
+  - every **LAI/GASS** recompute reads ``leaf_c`` for leaf carbon (all three sites);
+  - every **MRES** recompute reads ``Σ(leaf_c + stem_c + root_c)`` for biomass (all three
+    sites + ``f_N``'s denominator — a fourth consumer of that exact read);
+  - ``f_water · f_N`` enters the **same** ``limitation=`` factor identically across all
+    three GASS recomputes (Step-5 seam). If one site limits and another does not, the
+    budget stops telescoping and biomass drifts — a physics error the gate will NOT catch.
+
+- **The per-read field split on the committed flow classes (a real class change, not just
+  wiring).** ``GrowthRespiration`` today carries one ``plant_c`` field used for **both**
+  its leg source **and** its LAI/MRES reads. Re-sourcing forces splitting it: a
+  ``co2_source`` field (leg source) **plus** ``leaf_c`` and the organ ids (reads). Same for
+  the maintenance/allocation flows. Standalone tests gain fields; **their hand-computed
+  numbers are preserved** (never weaken a test to make it pass — fix the wiring).
+
+- **``f_water`` / ``f_N`` wiring (the limiter seams close).** ``f_water`` reads
+  ``soil_water`` via ``env.get`` (the shared-stock #16 path — soil water is a *sibling*
+  stock); ``f_N`` reads ``plant_n`` (a POOL) + ``Σ organs`` (a direct snapshot read — the
+  plant's *own* state). The flow takes the two limiter stock ids / var names and forms
+  ``limitation = f_water · f_N`` inside ``evaluate``, passed to
+  ``daily_canopy_assimilation(limitation=…)``. **``carbon_fraction`` parity:**
+  ``nitrogen.yaml``'s ``carbon_fraction`` MUST equal ``canopy.yaml``'s (both fold it —
+  ``sla → m²/mol C``; N-thresholds → ``kg N/mol C``); a Step-11 assertion line pins it
+  (the dedup of the duplicated entry stays deferred).
+
+- **FO / storage organ (the Step-9 precondition — now built).** The committed oracle
+  fixture has ``TWSO`` (storage/grain) as ~half of ``TAGP``, so a 3-organ model cannot
+  reproduce the biomass split. ``PartitionRow`` gains a 4th fraction ``fo``; the row sum
+  becomes ``fl + fs + fr + fo == 1`` (loader-enforced, shared-breakpoint table ⇒ sum-1
+  everywhere); ``partition`` returns ``(leaf, stem, root, storage)``; ``Allocation`` gains
+  a ``storage_c`` leg. **``storage_c`` is POPULATION CARBON** (extinction-eligible biomass,
+  like the others) but is **excluded from maintenance and senescence in Phase 1** (grain is
+  harvested, not shed; grain maintenance is small and a documented refinement seam) — so
+  ``storage_c`` is a pure allocation sink, kept **out of** the ``Σ organs`` maintenance/
+  ``f_N`` biomass read and out of the ``Senescence`` flow. This keeps the consistency web
+  at ``leaf/stem/root``. The pre-anthesis table rows have ``fo = 0`` (storage fills only at
+  ``DVS > 1``). Existing 3-fraction ``allocation.yaml`` + tests migrate to the 4-fraction
+  shape (the FO column added; standalone literals recomputed by hand).
+
+- **``rationed == 0`` whole-season proof (the enumeration IS the proof — state it).** Every
+  clamped stock's every withdrawal self-limits, so the Euler backstop never fires:
+  - **organ pools** (``leaf_c``/``stem_c``/``root_c``, POPULATION): drawn by ``Senescence``
+    (``rdr · organ``) and the maintenance ``shortfall`` (∝ organ share) — both ∝ the
+    organ's amount, → 0 as it → 0. ``storage_c``: only deposited into (no withdrawal).
+  - **``soil_water``** (POOL): drawn by ``Transpiration`` (``× water_stress_factor`` → 0 at
+    ``sw_wilting``) — Step 7, structural.
+  - **``soil_n``** (POOL): drawn by ``NitrogenUptake`` (``× soil_n_availability`` → 0 at
+    ``sn_residual``) — Step 10, structural.
+  - **``co2_source`` / ``water_source`` / ``n_source``** (unclamped BOUNDARY sources):
+    withdrawals **skipped** by arbitration (decision #13) — impose no constraint.
+  - **``co2_sink`` / ``vapor_sink`` / ``litter_sink`` / loss-sinks** (BOUNDARY): only
+    **receive** (positive legs) — no withdrawal demand, never rationed.
+  Carbon was the only gap (water/N were built self-limiting at Steps 7/10); the buffer
+  dissolution closes it. The well-fed bound (``coef · dt < 1`` per first-order draw) is a
+  scenario-param check, like the demo's.
+
+- **Oracle match = QUALITATIVE / loose smoke check; the tight quantitative gate is
+  DEFERRED (user decision, 2026-06-19).** Params are honest ``TODO(cite)`` placeholders;
+  clean-room forbids backfitting to WOFOST. So Step 11 ships the assembled season +
+  conservation + golden as the hard deliverable, and the oracle comparison is a **shape +
+  order-of-magnitude** check (e.g. biomass rises then plateaus, LAI is a unimodal hump, DVS
+  is monotone to ~2, peak TAGP is the right power of ten), using the committed
+  ``lab/oracle_match.py`` metrics with a **loose, documented band**. The observed gap is
+  recorded as a **finding**, not tuned away. A tight quantitative gate (with literature-
+  range calibration) is a deferred follow-up. **Calibration must never block the
+  deterministic commits** (FO, rewiring, assembly, golden).
+  - **Honest comparison needs the oracle's INPUTS, not just its outputs.** The fixture is
+    outputs (DVS/LAI/TAGP/…). Extend ``tests/oracle/runner.py`` to dump the **daily
+    NASAPower weather** PCSE consumed (temperature, radiation, vapour pressure / VPD inputs,
+    plus latitude/day-of-year for daylength) as a committed fixture — weather is **facts**,
+    license-clean (the same rule as the output fixture; no WOFOST param YAML is committed).
+    Our season is driven by **that** weather through a table-backed ``Schedule`` so the
+    comparison is against the same forcing. Our clean-room equations derive PAR / Rn / VPD /
+    daylength / Ci from the raw weather (documented, cited conversions); the PP (potential-
+    production) oracle variant means ``f_water = f_N = 1`` (non-limiting) for the first
+    season — soil water/N thresholds are set so the limiters stay at 1, matching ``_PP``.
+
+- **Time-varying forcing becomes real (P3).** The season uses a **table-backed
+  ``Schedule``** (``schedule(n, dt) = weather_table[n]``) — the first genuinely
+  ``n``-dependent forcing (Phase-0/0.5 were autonomous/constant). ``Euler`` is selected
+  (P3: Euler-daily biology; ``dt = 1 day``); RK4 stays available for the engine gates but
+  the crop scenario documents why it picks Euler.
+
+- **Golden + frozen-surface notes.** A committed **hex-float** snapshot pins the season
+  bit-exactly (determinism #7 + registration/aux-order independence). The frozen-surface
+  notes and the exit-criteria checkboxes below are updated; ``MEMORY.md`` + a memory file
+  record the buffer-dissolution deviation so it is not re-litigated.
+
+- **CO₂ is ONE stock (advisor-flagged).** A single **unclamped ``boundary.co2``** is *both*
+  the assimilation source and the respiration sink (CO₂ is non-limiting in the open
+  Phase-1 system — P1; the FvCB rate reads the ``ci_var`` *forcing*, never the stock
+  amount). So ``Allocation`` draws ``DMI`` from ``boundary.co2``, both respiration flows
+  deposit to ``boundary.co2``, and ``GrowthRespiration``'s two legs (``−GRES`` source,
+  ``+GRES`` sink) land on that one stock and net to 0 (a withdrawal skipped as unclamped).
+  Matches the ``respiration.py`` docstring ("the **same** ``boundary.co2`` reservoir") and
+  the demo's single ``atmospheric_c``. Settled before commit 4 (it sets the golden's stock
+  set). The litter and vapor sinks stay distinct BOUNDARY stocks.
+
+- **Seedling bootstrap + the no-extinction guard (advisor-flagged; same root as liveness).**
+  The season starts with **nonzero** ``leaf_c``/``stem_c``/``root_c`` (the oracle's day-0
+  row has ``TWLV``/``TWST``/``TWRT`` > 0, ``TWSO`` = 0): a zero ``leaf_c`` ⇒ LAI = 0 ⇒
+  GASS = 0 ⇒ the plant never grows (and the deterministic gates still pass — see liveness).
+  Organ ``extinction_threshold = 0`` for the well-fed season (no spurious extinction from
+  early senescence/maintenance snapping an organ below threshold), and the seedling is
+  sized to grow.
+
+- **Structural three-site agreement (advisor sharpening; commit 3).** Rather than *rely on
+  discipline* for the three GASS sites to pass identical args, extract **one helper** that
+  computes ``(GASS, MRES, available)`` from a (snapshot + params + ``limitation``) bundle;
+  ``GrowthRespiration``, ``MaintenanceRespiration``, and ``Allocation`` all call it, so they
+  **cannot drift** by passing different ``leaf_c``/``Σ organs``/``limitation``. Closes the
+  MRES/limitation side the way ``daily_canopy_assimilation`` already closes the GASS side.
+
+**Tasks (commit-sized, tightest-constraint-first).**
+1. This design block (advisor-reviewed).
+2. **FO/storage organ** — ``allocation.py`` 3→4 fractions + ``storage_c`` leg; loader sum-1
+   over 4 fractions; ``allocation.yaml`` FO column; standalone tests green (hand literals).
+3. **Carbon rewiring** — dissolve ``plant_c``; ``GrossAssimilation`` removed; re-source
+   ``GrowthRespiration``/``MaintenanceRespiration``/``Allocation`` per the deviation; the
+   per-read field split; ``f_water·f_N`` into ``limitation=`` across the three GASS sites;
+   ``carbon_fraction`` parity assertion; standalone tests migrated (numbers preserved).
+4. **Season assembly** — scenario module (all stocks + boundary reservoirs + loss-sinks,
+   the four carbon flows + the two water + two N flows + the thermal-time aux, table-backed
+   weather ``Schedule``); extend ``runner.py`` to dump the weather fixture; drive the full
+   season; assert conservation + ``rationed == 0`` every step.
+5. **Oracle smoke check** — loose qualitative match vs. the committed reference under the
+   same weather; document the gap.
+6. **Golden + docs** — hex-float season golden (determinism + order-independence); update
+   frozen-surface notes, exit criteria, ``MEMORY.md``/docs; commit + push.
+
+**Test plan.** Per-commit standalone tests stay green with hand-computed literals (FO split,
+the maintenance covered/shortfall split traced by hand on a surplus and a deficit day, the
+three-site ``limitation=`` parity); the assembled season conserves every step
+(``assert_conserved``, always-on) with summed ``rationed == 0`` and no extinction events on
+the well-fed scenario; a **liveness** assertion proves the plant actually grew (final organ
+biomass > initial; LAI peaks above a floor; DVS advances past 1) — because conservation and
+``rationed == 0`` both pass *trivially on a dead/null trajectory*, so liveness is what makes
+"green" meaningful; the season is bit-identical under flow/aux registration shuffle and
+matches the committed hex-float golden; the oracle smoke check passes the loose band and the
+gap is recorded; the Phase-0/0.5 gates (analytic convergence/order, 100k stability, purity)
+stay green — the biology is validated against the oracle, **not** by dt-convergence (P3).
+
 ---
 
 ## Exit criteria (Phase 1 — "research-grade single producer")
