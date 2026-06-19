@@ -29,8 +29,17 @@ import json
 from pathlib import Path
 from typing import Any
 
-# Fixture lives beside this module; the committed reference + its provenance.
+# Fixtures live beside this module: the reference trajectory (PCSE OUTPUT) and the raw
+# daily weather (NASAPower facts) the season is driven by — both license-clean (facts),
+# neither containing crop-parameter YAML.
 FIXTURE_PATH = Path(__file__).with_name("winter_wheat_reference.json")
+WEATHER_FIXTURE_PATH = Path(__file__).with_name("winter_wheat_weather.json")
+
+# Raw NASAPower weather fields captured per day (units per PCSE WeatherDataContainer:
+# TEMP/°C daily mean, IRRAD/J m⁻² day⁻¹ shortwave, VAP/hPa vapour pressure). These
+# are FACTS; our clean-room conversions to flow drivers live in src/domains/biosphere/
+# weather.py. Daylength is derived (latitude + day-of-year), not dumped.
+WEATHER_VARIABLES = ("TEMP", "IRRAD", "VAP")
 
 # --- forcing definition (also recorded verbatim in the fixture provenance) ----
 CROP_NAME = "wheat"
@@ -131,9 +140,59 @@ def run_winter_wheat() -> dict[str, Any]:
     return {"provenance": provenance, "trajectory": trajectory}
 
 
+def run_weather() -> dict[str, Any]:
+    """Capture the daily NASAPower weather over the winter-wheat season.
+
+    Returns ``{provenance, weather}`` where ``weather`` is one row per day
+    (``{day, TEMP, IRRAD, VAP}``, NASAPower facts) over ``[SOW_DATE, HARVEST_DATE]``.
+    The season scenario drives its forcing from this (via the clean-room conversions in
+    ``domains.biosphere.weather``), so the comparison to the oracle is under the *same*
+    weather. Imports PCSE lazily (the actual call requires it + network).
+    """
+    import datetime as dt
+
+    import pcse
+    from pcse.input import NASAPowerWeatherDataProvider
+
+    provider = NASAPowerWeatherDataProvider(latitude=LATITUDE, longitude=LONGITUDE)
+    weather: list[dict[str, Any]] = []
+    day = SOW_DATE
+    while day <= HARVEST_DATE:
+        rec = provider(day)
+        weather.append(
+            {"day": day.isoformat()}
+            | {var: float(getattr(rec, var)) for var in WEATHER_VARIABLES}
+        )
+        day += dt.timedelta(days=1)
+
+    provenance = {
+        "description": (
+            "Daily NASAPower weather over the winter-wheat season — raw observational "
+            "FACTS (not PCSE code, not crop-parameter YAML). Drives the Phase-1 season "
+            "via the clean-room conversions in domains/biosphere/weather.py. See "
+            "docs/reuse-and-licenses.md."
+        ),
+        "pcse_version": pcse.__version__,
+        "weather_source": "NASAPowerWeatherDataProvider",
+        "latitude": LATITUDE,
+        "longitude": LONGITUDE,
+        "sow_date": SOW_DATE.isoformat(),
+        "harvest_date": HARVEST_DATE.isoformat(),
+        "weather_variables": list(WEATHER_VARIABLES),
+        "variable_units": {"TEMP": "degC", "IRRAD": "J/m2/day", "VAP": "hPa"},
+        "n_days": len(weather),
+    }
+    return {"provenance": provenance, "weather": weather}
+
+
 def load_fixture() -> dict[str, Any]:
     """Load the committed reference fixture (no PCSE needed)."""
     return json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+
+
+def load_weather() -> dict[str, Any]:
+    """Load the committed raw-weather fixture (no PCSE needed)."""
+    return json.loads(WEATHER_FIXTURE_PATH.read_text(encoding="utf-8"))
 
 
 def column(fixture: dict[str, Any], variable: str) -> list[float]:
@@ -143,8 +202,8 @@ def column(fixture: dict[str, Any], variable: str) -> list[float]:
 
 
 def write_fixture() -> Path:
-    """Regenerate and overwrite the committed fixture. Run via ``-m``; requires the
-    ``oracle`` dep group + network (NASAPower)."""
+    """Regenerate + overwrite the committed reference fixture. Run via ``-m``; requires
+    the ``oracle`` dep group + network (NASAPower)."""
     result = run_winter_wheat()
     FIXTURE_PATH.write_text(
         json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -152,8 +211,20 @@ def write_fixture() -> Path:
     return FIXTURE_PATH
 
 
+def write_weather_fixture() -> Path:
+    """Regenerate and overwrite the committed raw-weather fixture. Run via ``-m``;
+    requires the ``oracle`` dep group + network (NASAPower)."""
+    result = run_weather()
+    WEATHER_FIXTURE_PATH.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return WEATHER_FIXTURE_PATH
+
+
 if __name__ == "__main__":
-    path = write_fixture()
-    data = json.loads(path.read_text(encoding="utf-8"))
-    prov = data["provenance"]
-    print(f"wrote {path} — {prov['n_days']} days, pcse {prov['pcse_version']}")
+    ref = write_fixture()
+    ref_data = json.loads(ref.read_text(encoding="utf-8"))
+    print(f"wrote {ref} — {ref_data['provenance']['n_days']} days")
+    wx = write_weather_fixture()
+    wx_data = json.loads(wx.read_text(encoding="utf-8"))
+    print(f"wrote {wx} — {wx_data['provenance']['n_days']} days")
