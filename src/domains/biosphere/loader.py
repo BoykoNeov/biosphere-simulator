@@ -22,6 +22,7 @@ from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.demo import DemoParams
 from domains.biosphere.photosynthesis import PhotosynthesisParams
 from domains.biosphere.respiration import RespirationParams
+from domains.biosphere.transpiration import TranspirationParams
 from simcore.quantities import Quantity
 
 # The committed canonical demo params.
@@ -34,6 +35,10 @@ PHOTOSYNTHESIS_PARAMS_PATH: Path = (
 )
 # The committed winter-wheat respiration params (Phase-1 Step 6).
 RESPIRATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "respiration.yaml"
+# The committed winter-wheat Penman–Monteith transpiration params (Phase-1 Step 7).
+TRANSPIRATION_PARAMS_PATH: Path = (
+    Path(__file__).parent / "params" / "transpiration.yaml"
+)
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -440,4 +445,83 @@ def load_respiration_params(
         q10=values["q10"],
         t_ref=values["t_ref"],
         growth_efficiency=values["growth_efficiency"],
+    )
+
+
+# --- Penman–Monteith transpiration (Phase-1 Step 7) -------------------------
+# Same structured value/unit/source format as respiration. The aerodynamic and surface
+# resistances (s/m) are NOT a conserved Quantity's canonical unit, so they are schema-
+# validated, bound-checked floats whose declared ``unit`` is exact-string guarded (same
+# discipline as FvCB/respiration). The weather FORCING (Rn, VPD, T) and the soil-water
+# stress thresholds live in the scenario/resolver, not this crop param file.
+
+# Expected canonical unit string per transpiration param (exact-match guard).
+_TRANSP_UNITS: dict[str, str] = {
+    "aerodynamic_resistance": "s/m",
+    "surface_resistance": "s/m",
+}
+
+
+class _TranspValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template).
+
+    ``source`` is the required clean-room provenance tag (recorded, not parsed); the
+    ``unit`` is exact-string validated against ``_TRANSP_UNITS`` in the loader.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _TranspParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    aerodynamic_resistance: _TranspValueUnit
+    surface_resistance: _TranspValueUnit
+
+
+class _TranspSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _TranspParameters
+
+
+def _transp_value(params: _TranspParameters, field: str) -> float:
+    """Read a transpiration param's value, exact-string guarding its declared unit."""
+    entry: _TranspValueUnit = getattr(params, field)
+    expected = _TRANSP_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_transpiration_params(
+    path: str | Path = TRANSPIRATION_PARAMS_PATH,
+) -> TranspirationParams:
+    """Load, schema- and bound-check the PM params into ``TranspirationParams``.
+
+    Each param carries a declared unit (exact-string guarded) and a required ``source``
+    tag (clean-room discipline). Both resistances are strictly positive (a zero ``r_a``
+    would divide by zero in the PM combination equation). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    non-positive value.
+    """
+    schema = _TranspSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _transp_value(params, field) for field in _TRANSP_UNITS}
+
+    for field in ("aerodynamic_resistance", "surface_resistance"):
+        if not values[field] > 0.0:
+            raise ValueError(f"{field} must be > 0, got {values[field]}")
+
+    return TranspirationParams(
+        aerodynamic_resistance=values["aerodynamic_resistance"],
+        surface_resistance=values["surface_resistance"],
     )

@@ -3,11 +3,12 @@
 **Status:** IN PROGRESS. **Steps 1 (units + area basis), 2 (the non-conserved aux
 channel), 3 (the PCSE oracle harness + clean-room param discipline), 4
 (Beer–Lambert light interception — the first biological process), 5 (FvCB
-photosynthesis — the first carbon-source flow), and 6 (maintenance + growth
-respiration — the carbon-sink flows) are implemented, tested, and committed** — see
+photosynthesis — the first carbon-source flow), 6 (maintenance + growth
+respiration — the carbon-sink flows), and 7 (Penman–Monteith transpiration + root
+uptake — the first WATER-currency flows) are implemented, tested, and committed** — see
 their per-step `RESOLVED` blocks below. **The foundation (Steps 1–3) is complete;
-Step 7 (Penman–Monteith transpiration + root uptake — the first WATER-currency
-flows) is next.** This plan **locks the three
+Step 8 (thermal-time phenology — the aux accumulator's rate function) is next.** This
+plan **locks the three
 foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
 and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
 process steps as forward-pointers. Per the working-style rule and the advisor's
@@ -941,6 +942,124 @@ produce **carbon-balanced** `FlowResult`s (`assert_flow_balanced`) with the hand
 / composed daily mol-C legs, the dark-day (`PAR = 0`) growth-resp clamp, and `dt`-linear
 scaling; the committed `respiration.yaml` loads to the expected `RespirationParams`; the
 loader rejects out-of-range/bad-unit params and a missing `source` tag.
+
+## Step 7 design — Penman–Monteith transpiration + root uptake (Monteith 1965)
+
+*The first **WATER**-currency flows, designed just-in-time. Establishes the soil-water
+state the season depletes/refills and the ``water_stress_factor`` (``f_water``) that
+the Step-11 integration wires into assimilation.*
+
+### RESOLVED (2026-06-19) — the locks (advisor-reviewed)
+
+- **Two WATER `Flow`s over a single `soil_water` POOL — the 3→2 deviation from the
+  inventory (recorded, like the Steps-5/6 corrections).** The foundation inventory
+  (line ~382) lists **three** water flows (root uptake `soil→plant`, transpiration
+  `plant/soil→vapor`, irrigation `source→soil`) implying a `plant_water` intermediate
+  pool. **Step 7 builds only two** — `Transpiration` (`soil_water → vapor_sink`) and
+  `Irrigation` (`water_source → soil_water`) — and **no `plant_water` pool**. The
+  discriminating test is *"does any Phase-1 limiter read **plant** water?"* — **no**:
+  `f_water` reads **soil** water availability, not plant water content. A `plant_water`
+  pool would be written by uptake and drained by transpiration but **read by nothing**
+  — a stock with no consumer, violating the repo norm that cut `Observation.kind/totals`
+  and keeps LAI derived-not-stored. Root uptake **≡** transpiration in a single-bucket
+  model (exactly the WOFOST `TRA` convention: one soil-water state, transpiration is
+  both the uptake and the loss; the "how much the roots can extract" physics lives in
+  `f_water`, not a separate leg). The inventory row already hedges ("plant/**soil**
+  water → vapor sink"). Contrast **nitrogen** (Step 10), where a `plant_n` pool *is*
+  justified because leaf-N concentration drives `f_N` — the asymmetry is principled,
+  not a shortcut. `soil_water` is a **POOL** (throttleable, never zeroed-with-loss);
+  `water_source`/`vapor_sink` are BOUNDARY reservoirs (irrigation supply / evaporative
+  sink), so each flow is internally balanced in WATER (P1).
+- **Penman–Monteith — the Step-5 split, with a deliberately *bounded* input interface
+  (the advisor's "lock it or it sprawls").** New pure module
+  `domains/biosphere/transpiration.py` (stdlib only), the citable hand-checkable
+  free functions + the flows:
+  - `saturation_vapor_pressure(temp_c)` = `A·exp(B·T/(T+C))` (Pa; Tetens / FAO-56
+    form, `A=610.8, B=17.27, C=237.3`) and `slope_svp(temp_c)` = `B·C·e_s/(T+C)²`
+    (Pa/°C — the analytic derivative of the same expression, so no separate `4098`
+    magic constant). Both check against **published FAO-56 table values**
+    (e_s(20 °C) ≈ 2.338 kPa, Δ(20 °C) ≈ 0.145 kPa/°C — genuine independent literals).
+  - `penman_monteith_transpiration(rn, vpd, temp_c, *, r_a, r_s, soil_heat_flux=0)` —
+    the combination equation `λE = [Δ·(Rn−G) + ρ_a·c_p·VPD/r_a] / [Δ + γ·(1 + r_s/r_a)]`
+    (W m⁻²), then `→ mm day⁻¹` via `λE / λ_vap · 86400`. Returns **potential**
+    transpiration (mm day⁻¹).
+  - **Minimal forcing set (locked):** net radiation `Rn` (daily-average W m⁻²), vapor
+    pressure deficit `VPD` (Pa), air temperature `T` (°C) — read via `env.get` as
+    scalar drivers (#16). **`r_a` and `r_s` are crop params, NOT derived from
+    wind+canopy-height+roughness** — that derivation is a Step-11 refinement that
+    would balloon the forcing set; a fixed pair is hand-checkable and bounded. `G`
+    defaults to 0 (negligible at the daily step).
+  - **Physical constants are module-level cited values** (like `MICROMOL_TO_MOL`):
+    `γ` (psychrometric, Pa/°C), `ρ_a` (air density), `c_p` (specific heat of air),
+    `λ_vap` (latent heat of vaporization), `SECONDS_PER_DAY`. Universal psychrometry
+    (FAO-56 standard values), **not** crop coefficients — clean-room-safe.
+  - **WOFOST uses Penman + a crop factor, not full PM** (the advisor's named trap).
+    Step 7 implements **what the plan cites** (PM, Monteith 1965) clean-room; the
+    WOFOST-ET formulation reconciliation is an explicit **Step-11** behavioral-tuning
+    concern, not a bend in the standalone physics now.
+- **mm/day ≡ kg·m⁻²·day⁻¹ — the clean area conversion (no scaling factor).** At water
+  density 1000 kg m⁻³, **1 mm depth over 1 m² = 1 kg**, so the absolute daily leg is
+  `kg day⁻¹ = T[mm day⁻¹] · ground_area[m²]` directly — the per-area-rate × `ground_area`
+  convention (P4), with the density identity stated as the module's documented
+  assumption (the mirror of FvCB's µmol→mol `1e-6`). `ground_area` is a scenario flow
+  field (not a crop param), exactly as in Steps 4–6.
+- **`water_stress_factor` (`f_water`) — the self-limiting/positivity mechanism (P3).**
+  `actual_transpiration = potential_PM · f_water(soil_water)` with
+  `f_water = clamp01((soil_water − sw_wilting)/(sw_critical − sw_wilting))` — 0 at/below
+  wilting, a linear ramp to 1 at/above a critical point (the available-water-fraction
+  form; cite the primary soil-water-stress literature, `TODO(cite)` placeholders). As
+  `soil_water → wilting`, `f_water → 0` and transpiration shuts off, so **positivity is
+  structural** (the WATER analogue of Step 5's `Γ*` clamp and Step 6's `max(0,…)`).
+  The `sw_wilting`/`sw_critical` thresholds are **scenario/soil data** (flow
+  construction args, like `ground_area`), **not** in `transpiration.yaml` — they couple
+  soil type + rooting depth, whose param-file home is deferred with soil modeling
+  (anti-speculation). `f_water` stays a pure function so Step 11 wires it into the
+  `GrossAssimilation`/respiration `Π fᵢ` `limitation` seam.
+- **Two over-deliveries deferred to Step 11 (advisor-flagged).**
+  1. **`f_water` is NOT wired into `GrossAssimilation.limitation` now.** The Step-5
+     `f_temp` precedent does **not** transfer — `f_temp` was wired early *because it
+     had no home step*; `f_water` has a home (this step produces it) and a consumer
+     step (Step 11 wires all limiters). Standalone-first (line 232): deliver the helper
+     + the water flows; leave the documented `limitation=1.0` seam untouched.
+     **`photosynthesis.py`/`respiration.py` are not modified.**
+  2. **No WLP / soil-moisture oracle fixture now.** The committed fixture is
+     `Wofost72_PP` (potential production — water non-limiting; `TRA` present, no `SM`).
+     A water-limited (`WLP`) variant feeds the Step-11 behavioral *gate* and needs PCSE
+     to regenerate — deferred to Step 11 per the gate's scope. The standalone Step-7
+     deliverable (flow + test + param + doc) needs no fixture.
+- **dt-linearity preserved.** Both the PM daily rate and `f_water` are evaluated at the
+  step-entry snapshot (forcing + `soil_water` amount), so `flux = daily·dt` is the
+  increment form (the RK4 contract carries over; `scales_linearly_with_dt` holds). The
+  `f_water` clamp is on a daily rate, not a dt-gate. Full-season `rationed == 0`
+  (choosing `sw_critical ≫ sw_wilting` so the ramp is gentle) is a Step-11 *scenario*
+  concern, like respiration's.
+- **Clean-room (P5).** The PM equation is cited to Monteith (1965) / Penman (1948); the
+  SVP/slope operational forms and standard psychrometric constants to FAO-56 (Allen et
+  al. 1998, a public FAO document) and Tetens (1930); the water-stress form to primary
+  soil-water literature. All crop VALUES (`r_a`, `r_s`) are honest provisional
+  literature-typical placeholders (`TODO(cite)`), never backfilled from the unlicensed
+  WOFOST YAML.
+
+**Tasks.**
+- `domains/biosphere/transpiration.py` (PURE stdlib): `saturation_vapor_pressure`,
+  `slope_svp`, `penman_monteith_transpiration` (→ mm day⁻¹), `water_stress_factor`,
+  the `TranspirationParams` dataclass (`r_a`, `r_s`), and the `Transpiration` +
+  `Irrigation` flows.
+- `params/transpiration.yaml` (structured `value/unit/source`: `r_a`, `r_s` in `s/m`)
+  + `load_transpiration_params` in `loader.py` (bespoke schema like `_RespSchema`;
+  exact-string unit guard; `r_a`, `r_s` > 0).
+
+**Test plan (`tests/test_transpiration.py`).** `saturation_vapor_pressure` and
+`slope_svp` against **FAO-56 published table values** (independent literals);
+`penman_monteith_transpiration` at a pinned operating point (composed from the module
+constants) and its `Rn=0, VPD=0 → 0` floor; `water_stress_factor` cardinal values
+(0 at/below wilting, 1 at/above critical, linear midpoint) + the clamp; the assembled
+`Transpiration` flow produces a **water-balanced** `FlowResult` (`assert_flow_balanced`)
+with the hand-computed `PM · f_water · ground_area` daily kg leg, the `f_water → 0`
+(dry-soil) shutoff, and `dt`-linear scaling; the `Irrigation` flow balances and tracks
+the irrigation forcing; the committed `transpiration.yaml` loads to the expected
+`TranspirationParams`; the loader rejects out-of-range/bad-unit params and a missing
+`source` tag.
 
 ---
 

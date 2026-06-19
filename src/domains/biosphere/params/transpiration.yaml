@@ -1,0 +1,49 @@
+# winter_wheat — Penman–Monteith transpiration (WATER) crop params
+# Currency/units: transpiration is a WATER flow (kg H₂O), soil_water → boundary vapor
+#   sink. The Penman–Monteith rate is per ground area (mm/day ≡ kg m⁻² day⁻¹ at water
+#   density 1000 kg/m³), converted to an absolute kg/day leg by the scenario ground_area
+#   inside evaluate. Weather drivers (net radiation Rn, vapour-pressure deficit VPD, air
+#   temperature T) are FORCING read through the source resolver — NOT crop params. The
+#   soil-water stress thresholds (wilting / critical) and ground_area are scenario data
+#   (flow args), not crop params.
+#
+# Units discipline (P4 / config/units.py): the aerodynamic and surface resistances
+#   (s/m) are NOT a conserved-Quantity canonical unit, so they are schema-validated,
+#   bound-checked floats carrying a declared unit in the header (exact-string guarded at
+#   the loader). Full per-leg dimensional closure stays deferred.
+#
+# Model (Penman–Monteith combination equation; Monteith 1965):
+#   λE = [Δ·(Rn − G) + ρ_a·c_p·VPD/r_a] / [Δ + γ·(1 + r_s/r_a)]   (W m⁻²)
+#   transpiration[mm/day] = λE / λ_vap · 86400
+#   actual = transpiration · f_water(soil_water)   (f_water → 0 at wilting; self-limit)
+# The psychrometric constants (γ, ρ_a, c_p, λ_vap) and SVP form are universal physics
+#   (FAO-56), held in transpiration.py — NOT crop coefficients. r_a is held fixed here;
+#   deriving it from wind + canopy height is a Step-11 refinement.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   Step-11 validation gate — flagged TODO(cite) until each is bound to a primary
+#   source (never backfilled from WOFOST).
+#
+# Sources:
+#   [A] Monteith, J.L. (1965), "Evaporation and environment", Symposia of the Society
+#       for Experimental Biology 19:205–234.
+#   [B] Penman, H.L. (1948), "Natural evaporation from open water, bare soil and grass",
+#       Proceedings of the Royal Society of London A 193:120–145.
+#   [C] Allen, R.G., Pereira, L.S., Raes, D. & Smith, M. (1998), "Crop
+#       evapotranspiration — Guidelines for computing crop water requirements", FAO
+#       Irrigation and Drainage Paper 56 (operational SVP/slope forms + constants).
+
+name: winter_wheat
+process: transpiration
+
+parameters:
+  aerodynamic_resistance:
+    value: 50.0
+    unit: "s/m"
+    source: "TODO(cite) — provisional, literature-typical canopy aerodynamic resistance r_a (~30–100 s/m, wind/height-dependent) [A][C]; primary citation pending Step 11"
+  surface_resistance:
+    value: 70.0
+    unit: "s/m"
+    source: "TODO(cite) — provisional, literature-typical bulk surface/canopy resistance r_s (~50–100 s/m for a well-watered crop) [A][C]; primary citation pending Step 11"

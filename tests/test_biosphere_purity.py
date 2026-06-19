@@ -27,9 +27,7 @@ _PURE_PACKAGES = {"simcore", "domains"}
 _BIOSPHERE_DIR = Path(domains.biosphere.__file__).parent
 # The config boundary: the ONE biosphere module allowed to import the outer stack.
 _BOUNDARY = "loader.py"
-_PURE_FILES = sorted(
-    p for p in _BIOSPHERE_DIR.rglob("*.py") if p.name != _BOUNDARY
-)
+_PURE_FILES = sorted(p for p in _BIOSPHERE_DIR.rglob("*.py") if p.name != _BOUNDARY)
 
 
 def _is_pure_top_level(name: str) -> bool:
