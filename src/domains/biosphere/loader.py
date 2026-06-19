@@ -206,6 +206,10 @@ def load_canopy_params(path: str | Path = CANOPY_PARAMS_PATH) -> CanopyParams:
         f"{params.specific_leaf_area.value} {params.specific_leaf_area.unit}",
         _SLA_TARGET_UNIT,
     )
+    if not sla_m2_per_kg > 0.0:
+        raise ValueError(
+            f"specific_leaf_area must be > 0 (m^2/kg), got {sla_m2_per_kg}"
+        )
     sla_per_mol_c = sla_m2_per_kg * MOLAR_MASS_CARBON_KG_PER_MOL / carbon_fraction
 
     return CanopyParams(

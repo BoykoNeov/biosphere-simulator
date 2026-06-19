@@ -202,6 +202,18 @@ def test_canopy_loader_rejects_a_dimensionally_wrong_sla(tmp_path: Path) -> None
         load_canopy_params(_write_canopy(tmp_path, data))
 
 
+@pytest.mark.parametrize("bad_sla", [0.0, -22.0])
+def test_canopy_loader_rejects_a_non_positive_sla(
+    tmp_path: Path, bad_sla: float
+) -> None:
+    # A non-positive specific leaf area would silently yield a non-positive LAI; guard
+    # it at the boundary (matching the demo loader's gt=0 rate discipline).
+    data = _valid_canopy()
+    data["parameters"]["specific_leaf_area"]["value"] = bad_sla
+    with pytest.raises(ValueError, match="specific_leaf_area"):
+        load_canopy_params(_write_canopy(tmp_path, data))
+
+
 @pytest.mark.parametrize("bad_fraction", [0.0, -0.1, 1.5])
 def test_canopy_loader_rejects_a_bad_carbon_fraction(
     tmp_path: Path, bad_fraction: float

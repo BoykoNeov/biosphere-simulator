@@ -325,8 +325,15 @@ implementing it). Each delivers flow/aux-rate + unit test + param file + doc.**
    not a mass flow:* computes intercepted-PAR fraction from LAI (`= f(leaf_carbon)`),
    feeding photosynthesis. Establishes the canopy diagnostic.
 5. **Photosynthesis — FvCB** (Farquhar et al. 1980). The carbon **source** flow
-   (CO₂ → plant carbon), gated by `f_light·f_temp·f_water·f_N` (limiters default to
+   (CO₂ → plant carbon), gated by `f_temp·f_water·f_N` (limiters default to
    1.0 until their step lands — each process standalone first, roadmap line 232).
+   *Light coupling caveat (JIT, from Step 4):* the Step-4 intercepted fraction
+   `f_int ∈ [0,1)` is **not** an independent `f_light` multiplier in the `Π fᵢ`
+   product. Light enters FvCB through the **electron-transport / light-response
+   curve**: absorbed PAR = incident PAR · `f_int` *drives* the assimilation curve.
+   Wiring `f_int` *both* into the light response *and* as a standalone limiter would
+   double-count light limitation — so the canopy diagnostic feeds **absorbed PAR**,
+   not a separate `f_light` factor.
    *Carbon-vs-DM caveat (JIT, Steps 5/9):* WOFOST-style conversion efficiency (kg DM
    per kg CH₂O) **implicitly destroys mass** — in our framework that carbon must go
    somewhere explicit (gross assimilation → **growth respiration** to
