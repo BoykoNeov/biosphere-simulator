@@ -1,0 +1,57 @@
+# winter_wheat — nitrogen uptake + limitation (NITROGEN) crop params
+# Currency/units: nitrogen is a NITROGEN flow (kg N). Uptake drains a depletable soil_n
+#   POOL into plant_n (POOL); fertilization refills soil_n from an n_source BOUNDARY.
+#   max_uptake_capacity is per ground area (kg N m⁻² day⁻¹), converted to an absolute
+#   kg N/day leg by the scenario ground_area inside evaluate. The soil-N availability
+#   thresholds (residual / critical) and ground_area are SCENARIO/soil data (flow args),
+#   not crop params. The N-application rate is FORCING read through the source resolver.
+#
+# Units discipline (P4 / config/units.py): max_uptake_capacity (kg/m^2/day) is per-area
+#   (NOT a conserved-Quantity canonical unit), so it is a schema-validated, bound-checked
+#   float carrying a declared unit, exact-string guarded at the loader. The concentration
+#   thresholds n_residual/n_critical are declared as kg N/kg DM (a dimensionless mass
+#   ratio "kg/kg") and the loader folds them to kg N/mol C via × M_C/carbon_fraction (the
+#   sla_per_mol_c precedent) so the pure core never holds the molar mass.
+#
+# carbon_fraction MUST equal canopy.yaml's value (Step-11 transition checklist item 3):
+#   both files fold it (sla → m²/mol C here; N-thresholds → kg N/mol C), and divergent
+#   values would model a silently inconsistent plant. The dedup of the duplicated entry
+#   is the Step-4 deferred nicety; the consistency requirement is enforced at Step 11.
+#
+# Model (capacity-gated uptake + critical-N-dilution stress):
+#   uptake   = max_uptake_capacity · soil_n_availability(soil_n)   (→ 0 at sn_residual)
+#   f_N      = ramp( plant_n / biomass_c ; n_residual, n_critical )  (the photosynthesis
+#              limiter, delivered standalone — wired into the Π fᵢ seam at Step 11)
+#   Demand-deficit (WOFOST NDEMTO) uptake is a deferred, additive Step-11 seam.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   Step-11 validation gate — flagged TODO(cite) until each is bound to a primary
+#   source (never backfilled from WOFOST).
+#
+# Sources:
+#   [A] Greenwood, D.J., Lemaire, G., Gosse, G., Cruz, P., Draycott, A. & Neeteson, J.J.
+#       (1990), "Decline in percentage N of C3 and C4 crops with increasing plant mass",
+#       Annals of Botany 66:425–436. (the critical-N-dilution curve.)
+
+name: winter_wheat
+process: nitrogen
+
+parameters:
+  max_uptake_capacity:
+    value: 0.0015
+    unit: "kg/m^2/day"
+    source: "TODO(cite) — provisional, literature-typical max N uptake (~15 kg N ha⁻¹ day⁻¹ = 0.0015 kg m⁻² day⁻¹ peak demand) [A]; primary citation pending Step 11"
+  n_residual:
+    value: 0.005
+    unit: "kg/kg"
+    source: "TODO(cite) — provisional, literature-typical residual (minimum) N concentration (~0.5% kg N/kg DM) [A]; primary citation pending Step 11"
+  n_critical:
+    value: 0.015
+    unit: "kg/kg"
+    source: "TODO(cite) — provisional, literature-typical critical N concentration (~1.5% kg N/kg DM) [A]; primary citation pending Step 11"
+  carbon_fraction:
+    value: 0.45
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, literature-typical (~0.45 kg C/kg DM); MUST match canopy.yaml (transition checklist item 3); primary citation pending Step 11"

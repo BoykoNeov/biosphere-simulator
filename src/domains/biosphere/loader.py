@@ -25,6 +25,7 @@ from domains.biosphere.allocation import (
 )
 from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.demo import DemoParams
+from domains.biosphere.nitrogen import NitrogenParams
 from domains.biosphere.phenology import PhenologyParams
 from domains.biosphere.photosynthesis import PhotosynthesisParams
 from domains.biosphere.respiration import RespirationParams
@@ -51,6 +52,8 @@ PHENOLOGY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "phenology.yaml
 ALLOCATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "allocation.yaml"
 # The committed winter-wheat senescence (relative death rate) params (Phase-1 Step 9).
 SENESCENCE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "senescence.yaml"
+# The committed winter-wheat nitrogen uptake + limitation params (Phase-1 Step 10).
+NITROGEN_PARAMS_PATH: Path = Path(__file__).parent / "params" / "nitrogen.yaml"
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -791,4 +794,107 @@ def load_senescence_params(
         rdr_leaf=values["rdr_leaf"],
         rdr_stem=values["rdr_stem"],
         rdr_root=values["rdr_root"],
+    )
+
+
+# --- nitrogen uptake + limitation (Phase-1 Step 10) -------------------------
+# Same structured value/unit/source format as respiration. The per-area uptake capacity
+# (kg/m^2/day) and the concentration thresholds (kg/kg = kg N/kg DM) are NOT a
+# conserved-Quantity canonical unit, so they are schema-validated, bound-checked floats
+# whose declared ``unit`` is exact-string guarded (the respiration discipline). The two
+# concentration thresholds are folded from kg N/kg DM to kg N/mol C via the carbon
+# fraction (the ``sla_per_mol_c`` precedent — the pure core never holds the molar mass),
+# so ``carbon_fraction`` lives here too. NOTE: it MUST equal ``canopy.yaml``'s value
+# (Step-11 transition checklist item 3) — divergence models a silently inconsistent
+# plant; the dedup of the duplicated entry is the Step-4 deferred nicety. The soil-N
+# availability thresholds, ``ground_area``, and the N-application FORCING are scenario
+# data in the resolver, not this crop param file.
+
+# Expected canonical unit string per nitrogen param (exact-match guard).
+_NITROGEN_UNITS: dict[str, str] = {
+    "max_uptake_capacity": "kg/m^2/day",
+    "n_residual": "kg/kg",
+    "n_critical": "kg/kg",
+    "carbon_fraction": "dimensionless",
+}
+
+
+class _NitrogenValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _NitrogenParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    max_uptake_capacity: _NitrogenValueUnit
+    n_residual: _NitrogenValueUnit
+    n_critical: _NitrogenValueUnit
+    carbon_fraction: _NitrogenValueUnit
+
+
+class _NitrogenSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _NitrogenParameters
+
+
+def _nitrogen_value(params: _NitrogenParameters, field: str) -> float:
+    """Read a nitrogen param's value, exact-string guarding its declared unit."""
+    entry: _NitrogenValueUnit = getattr(params, field)
+    expected = _NITROGEN_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_nitrogen_params(
+    path: str | Path = NITROGEN_PARAMS_PATH,
+) -> NitrogenParams:
+    """Load, schema- and bound-check the nitrogen params into ``NitrogenParams``.
+
+    Folds the conventional N-concentration thresholds (kg N/kg DM) to kg N/mol C via the
+    carbon fraction (``threshold · M_C / carbon_fraction`` — the ``sla_per_mol_c``
+    precedent) so the pure ``nitrogen`` core compares ``plant_n / biomass_c`` against
+    plain floats. Each param carries a declared unit (exact-string guarded) and a
+    required ``source`` tag (clean-room discipline). ``max_uptake_capacity`` is strictly
+    positive; ``carbon_fraction`` ∈ (0, 1]; the residual concentration is non-negative
+    and strictly below the critical one (a valid stress band). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    out-of-range value.
+    """
+    schema = _NitrogenSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _nitrogen_value(params, field) for field in _NITROGEN_UNITS}
+
+    if not values["max_uptake_capacity"] > 0.0:
+        raise ValueError(
+            f"max_uptake_capacity must be > 0, got {values['max_uptake_capacity']}"
+        )
+    carbon_fraction = values["carbon_fraction"]
+    _check_carbon_fraction(carbon_fraction)
+    n_residual, n_critical = values["n_residual"], values["n_critical"]
+    if n_residual < 0.0:
+        raise ValueError(f"n_residual must be >= 0 (kg N/kg DM), got {n_residual}")
+    if not n_residual < n_critical:
+        raise ValueError(
+            "N-concentration thresholds must satisfy n_residual < n_critical, "
+            f"got ({n_residual}, {n_critical})"
+        )
+
+    # kg N/kg DM -> kg N/mol C: × (kg DM per mol C) = × M_C / carbon_fraction.
+    fold = MOLAR_MASS_CARBON_KG_PER_MOL / carbon_fraction
+    return NitrogenParams(
+        max_uptake_capacity=values["max_uptake_capacity"],
+        n_residual_per_mol_c=n_residual * fold,
+        n_critical_per_mol_c=n_critical * fold,
     )

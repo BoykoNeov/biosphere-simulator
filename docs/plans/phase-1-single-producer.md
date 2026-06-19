@@ -8,9 +8,11 @@ respiration — the carbon-sink flows), 7 (Penman–Monteith transpiration + roo
 uptake — the first WATER-currency flows), and 8 (thermal-time phenology — the aux
 accumulator's rate function, the first consumer of the Step-2 channel), and 9
 (leaf/stem/root biomass allocation + senescence — the first internal-redistribution
-carbon process and multi-organ stock structure) are implemented, tested, and
-committed** — see their per-step `RESOLVED` blocks below. **The foundation
-(Steps 1–3) is complete; Step 10 (nitrogen uptake + limitation) is next.** This
+carbon process and multi-organ stock structure), and 10 (nitrogen uptake + limitation —
+the NITROGEN-currency mirror of Step 7, supplying the last `f_N` limiter) are
+implemented, tested, and committed** — see their per-step `RESOLVED` blocks below. **All
+seven biological processes (Steps 4–10) are now complete; the foundation (Steps 1–3)
+was complete earlier; Step 11 (integration + behavioral validation) is next.** This
 plan **locks the three
 foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
 and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
@@ -1333,6 +1335,135 @@ produces a carbon-balanced ``{organs → litter}`` ``FlowResult`` with the hand-
 ``dt``-linear scaling; the committed ``allocation.yaml``/``senescence.yaml`` load to the expected
 params; the loaders reject a non-sum-1 row, non-increasing DVS, an out-of-range fraction / death
 rate, a bad unit, and a missing ``source`` tag (clean-room discipline at the boundary).
+
+## Step 10 design — nitrogen uptake + limitation (the NITROGEN currency)
+
+*The last of the seven processes, designed just-in-time. The **NITROGEN-currency**
+analog of Step 7 (water): a depletable soil pool drained by a self-limiting uptake flow
+and refilled by a supply flow, plus the ``f_N`` stress factor that Step 11 wires into
+the photosynthesis ``Π fᵢ`` seam. Supplies the last populated limiter.*
+
+### RESOLVED (2026-06-19) — the locks (advisor-reviewed)
+
+- **Structural mirror of Step 7 — two flows + a delivered-but-unwired stress factor,
+  in one module ``domains/biosphere/nitrogen.py`` (stdlib only).** Roadmap line 232:
+  flow + unit test + param file + doc, **standalone before integration**. No committed
+  flow is modified; the ``f_N`` wiring into photosynthesis is **deferred to Step 11**
+  (the ``limitation=`` seam — exactly as Step 7 delivered ``water_stress_factor``
+  without wiring ``f_water`` into ``GrossAssimilation``).
+  - **``NitrogenUptake``** — NITROGEN flow ``soil_n (POOL) → plant_n (POOL)``, balanced
+    in N. ``potential = max_uptake_capacity[kg N m⁻² day⁻¹] · ground_area ·
+    soil_n_availability(soil_n)`` — self-limited as ``soil_n`` depletes (structural
+    positivity, P3; the WATER analog of transpiration's ``water_stress_factor``).
+  - **``Fertilization``** — NITROGEN flow ``n_source (BOUNDARY) → soil_n (POOL)``, a
+    scheduled supply (kg N m⁻² day⁻¹ forcing → kg day⁻¹ × ``ground_area``) — the
+    ``Irrigation`` mirror that refills the depleting pool so the season's N balance
+    closes (#13).
+  - **``nitrogen_stress_factor`` (= ``f_N``)** — a pure function reading the **plant's
+    own** N status (a direct snapshot read, decision #16), delivered + unit-tested
+    standalone, **not yet a flow input**.
+- **Two DISTINCT factor functions (the genuine new structure vs Step 7).** Step 7's
+  ``water_stress_factor`` did double duty (it limited transpiration *and* was
+  ``f_water``). Here the two roles split because they read **different stocks**:
+  - ``soil_n_availability(soil_n, *, sn_residual, sn_critical)`` limits **uptake**
+    (supply side) — reads ``soil_n``; linear ramp 0→1 over ``[sn_residual,
+    sn_critical]`` (the ``water_stress_factor`` shape). Its thresholds are
+    **scenario/soil data — call-args like ``sw_wilting``/``sw_critical``**, not crop
+    params.
+  - ``nitrogen_stress_factor(plant_n, biomass_c, *, n_residual_per_mol_c,
+    n_critical_per_mol_c)`` = ``f_N`` limits **photosynthesis** (plant status) — reads
+    ``plant_n`` + biomass. Linear ramp on the **concentration** ``plant_n / biomass_c``
+    (kg N / mol C). **Guard ``biomass_c <= 0`` → return 1.0** (neutral; photosynthesis
+    is already 0 at LAI=0 — never ``== 0``).
+- **Uptake is a max *capacity* gated by availability, NOT plant demand (the fixed-flux
+  lock).** ``max_uptake_capacity`` ignores plant need **by construction**; N-limitation
+  arises by **dilution** (biomass outgrows the fixed N supply → concentration falls →
+  ``f_N`` drops) and by **soil depletion** (``soil_n_availability`` → 0). The discriminating
+  reason to fix the flux now (over WOFOST's demand-deficit ``target_conc·biomass −
+  plant_n``) is **coupling surface**: fixed-flux keeps ``NitrogenUptake`` reading **only
+  ``soil_n``**, entirely out of the biomass-read consistency web that the transition
+  checklist below exists to manage. Demand-deficit is a **strictly additive Step-11
+  seam** — a changed ``potential`` formula + new reads inside ``evaluate`` (the
+  ``maturity``-seam shape), introduced where the web is already being managed.
+- **``f_N`` concentration in native currency units — the carbon-fraction fold lives at
+  the loader (the ``sla_per_mol_c`` precedent).** ``plant_n`` is kg N; biomass is mol C;
+  leaf-N concentration is conventionally kg N / kg DM. Rather than the pure core holding
+  ``M_C``/``carbon_fraction``, the loader pre-converts the residual/critical thresholds
+  ``kg N/kg DM → kg N/mol C`` via ``× M_C / carbon_fraction`` (identical in form to
+  ``sla_per_mol_c = sla · M_C / carbon_fraction``). The core function compares
+  ``plant_n / biomass_c`` against plain-float thresholds. So ``nitrogen.yaml`` carries a
+  ``carbon_fraction`` entry — see the consistency requirement in the checklist.
+- **Stocks: ``soil_n`` POOL, ``plant_n`` POOL, ``n_source`` BOUNDARY (all NITROGEN).**
+  ``plant_n`` is a **POOL** — an N substance reservoir, **never zeroed-with-loss** (the
+  POOL invariant), not extinction-eligible biomass. Each flow is internally balanced in
+  NITROGEN (P1): uptake ``soil_n → plant_n`` (Σ legs = 0), fertilization
+  ``n_source → soil_n`` (Σ = 0). Standalone tests construct the stocks ad hoc; the
+  scenario wiring (initial amounts, the season's stock set) is Step 11.
+- **Documented seams (NOT built — the established rhythm: simplest citable core now,
+  WOFOST elaboration deferred).**
+  - **Demand-deficit uptake** (WOFOST NDEMTO) — the fixed-flux refinement above.
+  - **N translocation / orphaning on extinction.** ``plant_n`` POOL ⇒ if Step-11 organs
+    go extinct (biomass → 0 with loss), their N stays orphaned in ``plant_n``. The same
+    seam as senescence-N-translocation; senescence (Step 9) stays **carbon-only** in
+    Phase 1. Noted, not built.
+  - **Whole-plant N concentration, not leaf-specific.** One ``plant_n`` pool ⇒ ``f_N``
+    is whole-plant; leaf-specific N would need per-organ N pools (deferred).
+  - **Temperature / root-density limitation of uptake** — availability-only here.
+- **Clean-room (P5).** The N-stress / critical-N-dilution concept is cited to crop-N
+  literature (the WOFOST ``NMINSO``/``NMAXLV`` / critical-N-curve idiom; Greenwood et al.
+  1990 critical-N dilution). All numeric VALUES (``max_uptake_capacity``, the N-concentration
+  thresholds, ``carbon_fraction``) are honest **provisional literature-typical placeholders**
+  (``TODO(cite)``), pending the Step-11 validation gate — never fabricated to a recalled
+  citation, never backfilled from the unlicensed WOFOST YAML.
+
+### THE TRANSITION — Step-10 additions to the Step-11 rewiring checklist
+
+*Now that ``f_N``'s exact reads are known, the Step-9 checklist item 3 ("apply
+``limitation=`` identically across all GASS recomputes") is concretized. All three below
+are **physics-not-balance** errors — the every-step conservation gate will **not** catch
+them (they shift magnitudes, not balance). They land in the written design now, while
+``f_N``'s reads are in hand:*
+
+1. **``f_N`` must enter ALL THREE GASS recomputes** — ``GrossAssimilation``,
+   ``GrowthRespiration``, **and** ``Allocation`` — folded into the same ``limitation=``
+   factor as ``f_water`` (Step 7). If it limits the deposit but not the GRES/DMI
+   recomputes, the carbon budget stops telescoping and ``plant_c`` stops netting to 0
+   (the drift ``test_allocation_dmi_agrees_with_step6_growth_resp_budget`` pins).
+2. **``f_N``'s biomass denominator must be the *same* ``Σ(leaf_c + stem_c + root_c)``
+   that MRES reads** — ``f_N`` is a **fourth consumer** of that exact biomass read
+   (alongside ``MaintenanceRespiration``, ``GrowthRespiration``, ``Allocation`` — Step-9
+   checklist item 2), not a new one. Step 11 points all four at one expression.
+3. **``carbon_fraction`` in ``nitrogen.yaml`` MUST equal ``canopy.yaml``'s.** Both fold
+   it (``sla → m²/mol C``; N-thresholds → ``kg N/mol C``); divergent values =
+   a silently inconsistent plant. The Step-4 note defers the *dedup* of the duplicated
+   entry; the **consistency requirement** is real now — a Step-11 assertion line, not an
+   optional nicety.
+
+**Tasks.**
+- ``domains/biosphere/nitrogen.py`` (PURE stdlib): ``NitrogenParams``
+  (``max_uptake_capacity`` + the two ``*_per_mol_c`` concentration thresholds, loader-folded);
+  ``soil_n_availability`` + ``nitrogen_stress_factor`` (the two ramp functions);
+  the ``NitrogenUptake`` (potential × availability) and ``Fertilization`` (scheduled supply)
+  flows.
+- ``params/nitrogen.yaml`` (value/unit/source: ``max_uptake_capacity`` in ``kg/m^2/day``,
+  ``n_residual``/``n_critical`` in ``kg/kg`` = kg N/kg DM, ``carbon_fraction`` in
+  ``dimensionless``) + ``load_nitrogen_params`` in ``loader.py`` (exact-string unit guards
+  like ``_RespSchema``; fold the kg N/kg DM → kg N/mol C conversion via ``M_C/carbon_fraction``;
+  bound checks: positive capacity, ``carbon_fraction ∈ (0, 1]``, ``n_residual < n_critical``).
+
+**Test plan (`tests/test_nitrogen.py`).** ``soil_n_availability`` against independent
+literals — the band limits (≤ residual → 0; ≥ critical → 1) and a midpoint ramp, and the
+``sn_residual < sn_critical`` guard; ``nitrogen_stress_factor`` likewise on the
+concentration, plus the ``biomass_c <= 0 → 1.0`` guard and the ``n_residual_per_mol_c <
+n_critical_per_mol_c`` guard; the assembled ``NitrogenUptake`` flow produces a
+**N-balanced** 2-leg ``FlowResult`` (``assert_flow_balanced``) equal to ``potential ·
+availability · ground_area · dt`` with the ``plant_n`` leg ``+`` and ``soil_n`` leg ``−``,
+the depleted-soil ``availability → 0`` shutoff, and ``dt``-linear scaling; the assembled
+``Fertilization`` flow produces a balanced ``{n_source → soil_n}`` result with
+``dt``-linear scaling; the committed ``nitrogen.yaml`` loads to the expected params with
+the carbon-fraction fold applied (a known value round-trips); the loader rejects a bad
+unit, an out-of-range ``carbon_fraction``, ``n_residual ≥ n_critical``, a non-positive
+capacity, and a missing ``source`` tag (clean-room discipline at the boundary).
 
 ---
 
