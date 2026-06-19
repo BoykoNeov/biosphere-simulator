@@ -1,0 +1,62 @@
+# winter_wheat — thermal-time phenology (degree-day) crop params
+# Channel/units: phenology is NOT a currency flow — it drives the non-conserved
+#   auxiliary channel (P2). ThermalTimeAccumulation writes the single accumulator
+#   `thermal_time` (°C·day) in increment form; development stage DVS = f(thermal_time)
+#   is DERIVED, never stored. Air temperature is FORCING read through the source
+#   resolver — NOT a crop param.
+#
+# Units discipline (P4 / config/units.py): the cardinal temperatures (degC) and the
+#   thermal-time sums (degC*day) are NOT a conserved-Quantity canonical unit, so they
+#   are schema-validated, bound-checked floats carrying a declared unit in the header
+#   (exact-string guarded at the loader). NOTE: "degC*day" is intentionally NOT
+#   pint-parseable — pint cannot multiply an offset unit (degC) — so it is validated by
+#   exact-string equality (like "degC"/"1/day"), never routed through config.convert.
+#   Full per-leg dimensional closure stays deferred.
+#
+# Model (cardinal-cap growing-degree-day; McMaster & Wilhelm 1997 — the WOFOST DTSMTB
+#   idiom):
+#   daily_thermal_time(T) = 0                if T <= t_base
+#                         = T − t_base       if t_base < T < t_cap
+#                         = t_cap − t_base   if T >= t_cap        (°C·day per day)
+#   DVS = tt / tsum_anthesis                         on [0, tsum_anthesis]   (0 → 1)
+#       = 1 + (tt − tsum_anthesis) / tsum_maturity   beyond, capped at 2.0   (1 → 2)
+#   Stage points: DVS 0 emergence, 1 anthesis, 2 maturity. The accumulator starts at
+#   emergence (tt=0 → DVS=0); sowing→emergence (TSUMEM) is a Step-11 scenario concern.
+#
+# Deferred Step-11 seams (winter wheat genuinely needs both; documented in phenology.py):
+#   photoperiod (a rate multiplier, no accumulator) and vernalization (a SECOND
+#   accumulator + VERNFAC). Standalone Step 8 is plain degree-day.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   Step-11 validation gate — flagged TODO(cite) until each is bound to a primary
+#   source (never backfilled from WOFOST).
+#
+# Sources:
+#   [A] McMaster, G.S. & Wilhelm, W.W. (1997), "Growing degree-days: one equation, two
+#       interpretations", Agricultural and Forest Meteorology 87:291–300.
+#   [B] van Keulen, H. & Wolf, J., eds. (1986), "Modelling of Agricultural Production:
+#       Weather, Soils and Crops", Simulation Monographs, PUDOC, Wageningen (the
+#       development-stage / thermal-sum (DVS/TSUM) concept).
+
+name: winter_wheat
+process: phenology
+
+parameters:
+  t_base:
+    value: 0.0
+    unit: "degC"
+    source: "TODO(cite) — provisional, literature-typical base temperature for winter-wheat development (~0 °C) [A]; primary citation pending Step 11"
+  t_cap:
+    value: 30.0
+    unit: "degC"
+    source: "TODO(cite) — provisional, literature-typical upper-cap temperature for the degree-day response (~30 °C) [A]; primary citation pending Step 11"
+  tsum_anthesis:
+    value: 1100.0
+    unit: "degC*day"
+    source: "TODO(cite) — provisional, literature-typical TSUM1 emergence→anthesis (~900–1200 °C·day for winter wheat) [B]; primary citation pending Step 11"
+  tsum_maturity:
+    value: 750.0
+    unit: "degC*day"
+    source: "TODO(cite) — provisional, literature-typical TSUM2 anthesis→maturity (~650–850 °C·day for winter wheat) [B]; primary citation pending Step 11"

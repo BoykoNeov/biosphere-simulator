@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from config import convert, load_yaml, to_canonical
 from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.demo import DemoParams
+from domains.biosphere.phenology import PhenologyParams
 from domains.biosphere.photosynthesis import PhotosynthesisParams
 from domains.biosphere.respiration import RespirationParams
 from domains.biosphere.transpiration import TranspirationParams
@@ -39,6 +40,8 @@ RESPIRATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "respiration.
 TRANSPIRATION_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "transpiration.yaml"
 )
+# The committed winter-wheat thermal-time phenology params (Phase-1 Step 8).
+PHENOLOGY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "phenology.yaml"
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -524,4 +527,98 @@ def load_transpiration_params(
     return TranspirationParams(
         aerodynamic_resistance=values["aerodynamic_resistance"],
         surface_resistance=values["surface_resistance"],
+    )
+
+
+# --- thermal-time phenology (Phase-1 Step 8) --------------------------------
+# Same structured value/unit/source format as transpiration. The cardinal temperatures
+# (degC) and the thermal-time sums (degC*day) are NOT a conserved Quantity's canonical
+# unit, so they are schema-validated, bound-checked floats whose declared ``unit`` is
+# exact-string guarded (same discipline as FvCB/respiration/transpiration). NOTE:
+# ``"degC*day"`` is deliberately NOT pint-parseable (pint cannot multiply the offset
+# unit degC), so it is validated by exact-string equality only — never routed through
+# ``config.convert``. Air-temperature FORCING lives in the scenario/resolver, not here.
+
+# Expected canonical unit string per phenology param (exact-match guard).
+_PHENOLOGY_UNITS: dict[str, str] = {
+    "t_base": "degC",
+    "t_cap": "degC",
+    "tsum_anthesis": "degC*day",
+    "tsum_maturity": "degC*day",
+}
+
+
+class _PhenologyValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template).
+
+    ``source`` is the required clean-room provenance tag (recorded, not parsed); the
+    ``unit`` is exact-string validated against ``_PHENOLOGY_UNITS`` in the loader.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _PhenologyParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    t_base: _PhenologyValueUnit
+    t_cap: _PhenologyValueUnit
+    tsum_anthesis: _PhenologyValueUnit
+    tsum_maturity: _PhenologyValueUnit
+
+
+class _PhenologySchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _PhenologyParameters
+
+
+def _phenology_value(params: _PhenologyParameters, field: str) -> float:
+    """Read a phenology param's value, exact-string guarding its declared unit."""
+    entry: _PhenologyValueUnit = getattr(params, field)
+    expected = _PHENOLOGY_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_phenology_params(
+    path: str | Path = PHENOLOGY_PARAMS_PATH,
+) -> PhenologyParams:
+    """Load, schema- and bound-check the phenology params into ``PhenologyParams``.
+
+    Each param carries a declared unit (exact-string guarded) and a required ``source``
+    tag (clean-room discipline). The cardinal temperatures must bracket a valid degree-
+    day ramp (``t_base < t_cap``); both thermal sums are strictly positive (they are
+    divisors in :func:`~domains.biosphere.phenology.development_stage`). ``t_base`` is
+    otherwise sign-unconstrained (winter wheat's development base is ≈ 0 °C). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    out-of-range value.
+    """
+    schema = _PhenologySchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _phenology_value(params, field) for field in _PHENOLOGY_UNITS}
+
+    if not values["t_base"] < values["t_cap"]:
+        raise ValueError(
+            "cardinal temperatures must satisfy t_base < t_cap, "
+            f"got ({values['t_base']}, {values['t_cap']})"
+        )
+    for field in ("tsum_anthesis", "tsum_maturity"):
+        if not values[field] > 0.0:
+            raise ValueError(f"{field} must be > 0, got {values[field]}")
+
+    return PhenologyParams(
+        t_base=values["t_base"],
+        t_cap=values["t_cap"],
+        tsum_anthesis=values["tsum_anthesis"],
+        tsum_maturity=values["tsum_maturity"],
     )

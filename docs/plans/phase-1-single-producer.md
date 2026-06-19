@@ -4,10 +4,11 @@
 channel), 3 (the PCSE oracle harness + clean-room param discipline), 4
 (Beer–Lambert light interception — the first biological process), 5 (FvCB
 photosynthesis — the first carbon-source flow), 6 (maintenance + growth
-respiration — the carbon-sink flows), and 7 (Penman–Monteith transpiration + root
-uptake — the first WATER-currency flows) are implemented, tested, and committed** — see
-their per-step `RESOLVED` blocks below. **The foundation (Steps 1–3) is complete;
-Step 8 (thermal-time phenology — the aux accumulator's rate function) is next.** This
+respiration — the carbon-sink flows), 7 (Penman–Monteith transpiration + root
+uptake — the first WATER-currency flows), and 8 (thermal-time phenology — the aux
+accumulator's rate function, the first consumer of the Step-2 channel) are implemented,
+tested, and committed** — see their per-step `RESOLVED` blocks below. **The foundation
+(Steps 1–3) is complete; Step 9 (leaf/stem/root biomass allocation) is next.** This
 plan **locks the three
 foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
 and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
@@ -1060,6 +1061,136 @@ with the hand-computed `PM · f_water · ground_area` daily kg leg, the `f_water
 the irrigation forcing; the committed `transpiration.yaml` loads to the expected
 `TranspirationParams`; the loader rejects out-of-range/bad-unit params and a missing
 `source` tag.
+
+## Step 8 design — thermal-time phenology (degree-day literature)
+
+*The aux accumulator's rate function — the **first real consumer of the Step-2
+non-conserved aux channel** (P2). Designed just-in-time. Establishes thermal time
+(°C·day) and the derived development stage `DVS = f(thermal_time)` that Step 9
+(allocation) and the Step-6 maintenance ``maturity`` seam consume.*
+
+### RESOLVED (2026-06-19) — the locks (advisor-reviewed)
+
+- **It is an ``AuxProcess``, NOT a ``Flow`` and NOT a pure diagnostic — the first
+  exercise of the Step-2 aux channel.** Thermal time *accumulates* with no balanced
+  counterparty (it is not a conserved quantity), so it is neither a `Flow` (which
+  would need a balanced leg, failing the conservation gate) nor a Step-4-style pure
+  diagnostic (which is recomputed, not integrated). It is exactly the
+  ``simcore.auxiliary.AuxProcess`` that P2 was built for: a new
+  ``ThermalTimeAccumulation`` writes the **single** accumulator name ``thermal_time``
+  (°C·day) in increment form ``{name: daily_thermal_time(T)·dt}``, advanced by one
+  explicit-Euler evaluation at the step-entry snapshot and carried across RK4 stages
+  (P2/P3). New pure module ``domains/biosphere/phenology.py`` (stdlib only).
+- **DVS is derived, NOT stored (the P2 lock; resist the second-accumulator
+  temptation).** ``development_stage(thermal_time, params)`` is a pure free function
+  computed on demand by consumers (Step 9 allocation; the Step-6 ``maturity`` seam) —
+  **not** a second accumulator. This is the phenology analogue of the Step-4 flag
+  (LAI is derived, not an aux "for symmetry"); P2's "DVS = f(thermal_time)" names it
+  explicitly. So the channel stays the **one** accumulator P2 minimized to.
+- **Degree-day rate — cardinal-cap form (hand-checkable).**
+  ``daily_thermal_time(temp_c, *, t_base, t_cap)`` (°C day⁻¹, i.e. °C·day per day):
+  **0** at/below ``t_base``; the linear ``temp − t_base`` on ``(t_base, t_cap)``;
+  capped at ``t_cap − t_base`` at/above ``t_cap``. The McMaster & Wilhelm (1997)
+  growing-degree-day form **with an upper cap** (the WOFOST ``DTSMTB`` idiom — a
+  piecewise-linear daily-temperature-sum response). Monotone non-decreasing in ``T``,
+  bounded, and independently hand-computable (the Step-4/5/6/7 literal-test discipline).
+- **DVS — two-phase TSUM scaling (the WOFOST ``TSUM1``/``TSUM2`` idiom).**
+  ``development_stage(thermal_time, *, tsum_anthesis, tsum_maturity)``: on
+  ``[0, tsum_anthesis]`` the vegetative ramp ``DVS = tt / tsum_anthesis ∈ [0, 1]``
+  (emergence → anthesis); beyond, the reproductive ramp
+  ``DVS = 1 + (tt − tsum_anthesis) / tsum_maturity``, **capped at 2.0** (anthesis →
+  maturity). Stage points: **DVS = 0** emergence, **1** anthesis/flowering, **2**
+  maturity. The accumulator starts at emergence (``tt = 0 ⇒ DVS = 0``); the
+  sowing→emergence sub-phase (``TSUMEM``) and *when the accumulator starts/resets* are
+  **scenario** concerns deferred to the Step-11 season assembly, not standalone-Step-8
+  physics. Cite the DVS/TSUM **concept** to published crop-model literature (van Keulen
+  & Wolf 1986; WOFOST methodology papers) — **never** the unlicensed WOFOST YAML;
+  values stay ``TODO(cite)`` provisional.
+- **WOFOST-equivalence (recorded so the Step-11 oracle match is auditable).** A *raw
+  thermal-time accumulator* + a *derived piecewise DVS* is mathematically **equivalent**
+  to WOFOST's phase-wise DVS integration **only because the base/cap response
+  (``DTSMTB``) is phase-invariant** — the same daily °C·day rate feeds both phases, just
+  normalized by ``TSUM1`` vs ``TSUM2``. This pre-empts the "why not integrate DVS
+  directly like WOFOST" question: with a phase-invariant rate the two formulations
+  coincide, and the single-accumulator form is the cleaner one.
+- **Deferred seams — vernalization and photoperiod are STRUCTURALLY DIFFERENT
+  (the load-bearing split; advisor-flagged, recorded like the Steps-5/6/7 deviations).**
+  Winter wheat genuinely needs both — without them thermal time accrues through a mild
+  winter and development runs far too fast (the Step-11 oracle gate would catch it).
+  Standalone Step 8 is plain degree-day; both are documented Step-11 refinements with
+  the seam left in place. But they are **not the same kind of deferral**:
+  1. **Photoperiod** is a pure function of latitude + day-of-year (astronomical),
+     read via ``env.get`` — a development-rate-modifying factor with **no accumulator**.
+     Clean to add later as a multiplier on ``daily_thermal_time`` (the FvCB-``f_temp``
+     shape), no state ripple.
+  2. **Vernalization** (the cold requirement) is WOFOST-style a **second state
+     accumulator** (vernalization-days), with a derived ``VERNFAC ∈ [0, 1]`` that
+     down-scales the development rate **only in the vegetative phase**. A second
+     accumulator rubs against P2's "essentially **one** accumulator" (line 104) — but
+     P2 says *essentially* one and names the channel "non-conserved scalar
+     accumulator**s**" (plural): "one" is the Phase-1 **estimate**, not a hard cap. A
+     Step-11 vernalization-days accumulator is therefore an **extension** of the
+     channel, not a violation of it — exactly the kind of growth P2's parallel-channel
+     design anticipated.
+  - **The single-accumulator/derived-DVS design *composes* with the deferred
+    refinement (why the deferral is principled, not merely postponed).** A future
+    vernalization-aware rate reads the snapshot ``evaluate`` already receives
+    (``evaluate(snapshot, env, dt)``): it can read ``snapshot.aux["thermal_time"]``,
+    derive the current DVS, and gate ``VERNFAC`` to the vegetative phase — so the
+    seam exists structurally. Standalone ``ThermalTimeAccumulation.evaluate`` does
+    **not** read ``snapshot`` (the rate depends only on forced temperature), but the
+    signature carries it, so the refinement slots in without an API change.
+- **Standalone — no existing flow is modified (the Step-7 ``f_water`` precedent).**
+  DVS *drives* allocation (Step 9) and the maintenance ``maturity`` down-scaling
+  (Step 6's documented seam), wired at those consumer steps. Step 8 delivers the
+  accumulator process + the ``development_stage`` helper + tests + param + doc; like
+  Step 7's ``water_stress_factor`` it ships its headline deliverable
+  (``development_stage``) validated by literals, not yet by a consumer — that is the
+  established standalone-first rhythm (roadmap line 232), not speculation.
+- **Forcing via ``env.get`` (#16).** Air temperature is read as a scalar driver
+  (``temp_var``, the same idiom as FvCB/transpiration; daily-mean temperature at the
+  daily step). Increment form ``{thermal_time: daily_thermal_time(T)·dt}`` is dt-linear
+  (the rate is dt-independent), advanced once per step at the step-entry snapshot and
+  carried unchanged across RK4 stages (P2/P3) — so a flow reading ``thermal_time``
+  would see a within-step constant.
+- **``"degC*day"`` is the first exact-string-guarded unit that genuinely will NOT
+  pint-parse (deliberate — recorded like the Step-4 pint-notation correction).** Offset
+  units (``degC``) cannot be multiplied in pint, so ``degC*day`` raises in
+  ``config.convert``. That is fine and intentional: the thermal-time params are
+  validated by the ``_resp_value``-style **exact-string guard** (pure string equality,
+  never invoking pint — exactly as ``"degC"``/``"1/day"``/``"dimensionless"`` already
+  are), **not** routed through ``config.convert``. Recorded so a later reader does not
+  "fix" it into a pint conversion. The cardinal temps carry ``"degC"``; the TSUM sums
+  carry ``"degC*day"``.
+- **Clean-room (P5).** The degree-day law is cited to McMaster & Wilhelm (1997); the
+  DVS/TSUM development-stage concept to crop-model literature (van Keulen & Wolf 1986;
+  WOFOST methodology). All numeric VALUES (``t_base``, ``t_cap``, ``tsum_anthesis``,
+  ``tsum_maturity``) are honest **provisional literature-typical placeholders**
+  (``TODO(cite)``), pending the Step-11 validation gate — never fabricated to a
+  recalled citation, never backfilled from the unlicensed WOFOST YAML.
+
+**Tasks.**
+- ``domains/biosphere/phenology.py`` (PURE stdlib): ``daily_thermal_time`` (the
+  cardinal-cap degree-day rate), ``development_stage`` (the two-phase DVS), the
+  ``PhenologyParams`` dataclass, and the ``ThermalTimeAccumulation`` ``AuxProcess``.
+- ``params/phenology.yaml`` (structured ``value/unit/source``: ``t_base``/``t_cap`` in
+  ``degC``, ``tsum_anthesis``/``tsum_maturity`` in ``degC*day``) +
+  ``load_phenology_params`` in ``loader.py`` (bespoke schema like ``_TranspSchema``;
+  exact-string unit guard; ``t_base < t_cap``; ``tsum_* > 0``; ``t_base`` sign
+  unconstrained — wheat's development base is ≈ 0 °C).
+
+**Test plan (`tests/test_phenology.py`).** ``daily_thermal_time`` against **independent
+hand-computed literals** (below base → 0; mid-band linear; at/above cap →
+``t_cap − t_base``) + monotonicity and the cap; ``development_stage`` cardinal points
+(``DVS = 0`` at ``tt = 0``; ``= 1`` at ``tt = tsum_anthesis``; ``= 2`` at
+``tt = tsum_anthesis + tsum_maturity``) + the linear midpoints and the 2.0 cap;
+``ThermalTimeAccumulation`` produces the increment-form ``{thermal_time: rate·dt}``,
+reads temperature through ``env.get`` (#16), and is a ``runtime_checkable``
+``AuxProcess``; integrated through the ``EulerIntegrator`` a constant-temperature
+season accumulates to ``daily_thermal_time(T)·n·dt`` (the ``test_aux`` precedent); the
+committed ``phenology.yaml`` loads to the expected ``PhenologyParams``; the loader
+rejects an out-of-range value (``t_base ≥ t_cap``, non-positive ``tsum``), a bad unit
+string, and a missing ``source`` tag (clean-room discipline at the boundary).
 
 ---
 
