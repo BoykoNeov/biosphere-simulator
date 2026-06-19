@@ -20,12 +20,17 @@ from pydantic import BaseModel, ConfigDict, Field
 from config import convert, load_yaml, to_canonical
 from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.demo import DemoParams
+from domains.biosphere.photosynthesis import PhotosynthesisParams
 from simcore.quantities import Quantity
 
 # The committed canonical demo params.
 DEMO_PARAMS_PATH: Path = Path(__file__).parent / "params" / "demo.yaml"
 # The committed winter-wheat canopy (Beer–Lambert) params (Phase-1 Step 4).
 CANOPY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "canopy.yaml"
+# The committed winter-wheat FvCB photosynthesis params (Phase-1 Step 5).
+PHOTOSYNTHESIS_PARAMS_PATH: Path = (
+    Path(__file__).parent / "params" / "photosynthesis.yaml"
+)
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -215,4 +220,131 @@ def load_canopy_params(path: str | Path = CANOPY_PARAMS_PATH) -> CanopyParams:
     return CanopyParams(
         sla_per_mol_c=sla_per_mol_c,
         extinction_coef=extinction_coef,
+    )
+
+
+# --- FvCB photosynthesis (Phase-1 Step 5) -----------------------------------
+# Same structured value/unit/source format as canopy. Per config/units.py, per-area
+# rates (µmol m⁻² s⁻¹) and mole-fraction concentrations are NOT a conserved Quantity's
+# canonical unit, so they are NOT routed through ``to_canonical``/``convert``: they are
+# schema-validated, bound-checked floats whose declared ``unit`` is exact-string
+# guarded (catches a mis-declared unit without invoking pint on awkward affine-degC /
+# mole-fraction units). The full per-leg dimensional check stays deferred (P4). The Ci,
+# PAR, temperature, and photoperiod FORCING live in the scenario/resolver, not here.
+
+# Expected canonical unit string per FvCB param (exact-match guard at the boundary).
+_PHOTO_UNITS: dict[str, str] = {
+    "vcmax": "umol/m^2/s",
+    "jmax": "umol/m^2/s",
+    "quantum_yield": "mol/mol",
+    "theta": "dimensionless",
+    "gamma_star": "umol/mol",
+    "kc": "umol/mol",
+    "ko": "mmol/mol",
+    "o2": "mmol/mol",
+    "t_min": "degC",
+    "t_opt_lo": "degC",
+    "t_opt_hi": "degC",
+    "t_max": "degC",
+}
+
+
+class _PhotoValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template).
+
+    ``source`` is the required clean-room provenance tag (recorded, not parsed); the
+    ``unit`` is exact-string validated against ``_PHOTO_UNITS`` in the loader.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _PhotoParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    vcmax: _PhotoValueUnit
+    jmax: _PhotoValueUnit
+    quantum_yield: _PhotoValueUnit
+    theta: _PhotoValueUnit
+    gamma_star: _PhotoValueUnit
+    kc: _PhotoValueUnit
+    ko: _PhotoValueUnit
+    o2: _PhotoValueUnit
+    t_min: _PhotoValueUnit
+    t_opt_lo: _PhotoValueUnit
+    t_opt_hi: _PhotoValueUnit
+    t_max: _PhotoValueUnit
+
+
+class _PhotoSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _PhotoParameters
+
+
+def _photo_value(params: _PhotoParameters, field: str) -> float:
+    """Read a FvCB param's value, exact-string guarding its declared unit."""
+    entry: _PhotoValueUnit = getattr(params, field)
+    expected = _PHOTO_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_photosynthesis_params(
+    path: str | Path = PHOTOSYNTHESIS_PARAMS_PATH,
+) -> PhotosynthesisParams:
+    """Load, schema- and bound-check the FvCB params into ``PhotosynthesisParams``.
+
+    Each param carries a declared unit (exact-string guarded against the documented
+    canonical unit) and a required ``source`` tag (clean-room discipline). Strictly
+    positive kinetic constants; ``quantum_yield``/``theta`` ∈ (0, 1]; the cardinal
+    temperatures strictly bracket a valid response (``t_min < t_opt_lo ≤ t_opt_hi <
+    t_max``) so both ramp denominators are positive. Raises ``pydantic.ValidationError``
+    on a schema violation, ``ValueError`` on a bad unit or out-of-range value.
+    """
+    schema = _PhotoSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _photo_value(params, field) for field in _PHOTO_UNITS}
+
+    for field in ("vcmax", "jmax", "gamma_star", "kc", "ko", "o2"):
+        if not values[field] > 0.0:
+            raise ValueError(f"{field} must be > 0, got {values[field]}")
+    for field in ("quantum_yield", "theta"):
+        if not (0.0 < values[field] <= 1.0):
+            raise ValueError(f"{field} must be in (0, 1], got {values[field]}")
+
+    t_min, t_opt_lo, t_opt_hi, t_max = (
+        values["t_min"],
+        values["t_opt_lo"],
+        values["t_opt_hi"],
+        values["t_max"],
+    )
+    if not (t_min < t_opt_lo <= t_opt_hi < t_max):
+        raise ValueError(
+            "cardinal temperatures must satisfy t_min < t_opt_lo <= t_opt_hi < t_max, "
+            f"got ({t_min}, {t_opt_lo}, {t_opt_hi}, {t_max})"
+        )
+
+    return PhotosynthesisParams(
+        vcmax=values["vcmax"],
+        jmax=values["jmax"],
+        quantum_yield=values["quantum_yield"],
+        theta=values["theta"],
+        gamma_star=values["gamma_star"],
+        kc=values["kc"],
+        ko=values["ko"],
+        o2=values["o2"],
+        t_min=t_min,
+        t_opt_lo=t_opt_lo,
+        t_opt_hi=t_opt_hi,
+        t_max=t_max,
     )

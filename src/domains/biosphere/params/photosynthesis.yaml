@@ -1,0 +1,77 @@
+# winter_wheat — FvCB photosynthesis (Farquhar, von Caemmerer & Berry 1980) params
+# Currency/units: gross assimilation is a CARBON source (mol C). Leaf-level FvCB rates
+#   are per-area (µmol CO₂ m⁻² leaf s⁻¹); the canopy aggregator multiplies by LAI,
+#   ground_area (m², SCENARIO data — NOT a crop param, P4), photoperiod, and converts
+#   µmol→mol. Ci (intercellular CO₂), incident PAR, air temperature, and photoperiod
+#   are FORCING read through the source resolver at evaluate time — also NOT crop params.
+#
+# Units discipline (P4 / config/units.py): per-area rates and mole-fraction
+#   concentrations are NOT conserved-Quantity canonical units, so they are
+#   schema-validated, bound-checked floats carrying a declared unit in the header
+#   (exact-string guarded at the loader). Full per-leg dimensional closure is deferred.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   The FvCB equations are Farquhar et al. [A]; the cardinal-temperature response is
+#   the WOFOST-style TMPFTB idiom [B]. All numeric VALUES are provisional,
+#   literature-typical placeholders pending the Step-11 validation gate — flagged
+#   TODO(cite) until each is bound to a primary source (never backfilled from WOFOST).
+#
+# Sources:
+#   [A] Farquhar, G.D., von Caemmerer, S. & Berry, J.A. (1980), "A biochemical model
+#       of photosynthetic CO₂ assimilation in leaves of C3 species", Planta 149:78–90.
+#   [B] Degree-day / crop-model cardinal-temperature response literature (the WOFOST
+#       AMAX temperature-response table TMPFTB) — primary citation pending Step 11.
+
+name: winter_wheat
+process: fvcb_photosynthesis
+
+parameters:
+  vcmax:
+    value: 100.0
+    unit: "umol/m^2/s"
+    source: "TODO(cite) — provisional, literature-typical C3 (Vcmax≈80–120); primary citation pending Step 11"
+  jmax:
+    value: 180.0
+    unit: "umol/m^2/s"
+    source: "TODO(cite) — provisional, literature-typical (Jmax≈1.5–2·Vcmax); primary citation pending Step 11"
+  quantum_yield:
+    value: 0.3
+    unit: "mol/mol"
+    source: "TODO(cite) — provisional, effective α (mol e⁻/mol absorbed photon ~0.3); primary citation pending Step 11"
+  theta:
+    value: 0.7
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, non-rectangular-hyperbola curvature (~0.7); primary citation pending Step 11"
+  gamma_star:
+    value: 42.75
+    unit: "umol/mol"
+    source: "TODO(cite) — provisional, CO₂ compensation point w/o Rd at ~25°C; primary citation pending Step 11"
+  kc:
+    value: 404.9
+    unit: "umol/mol"
+    source: "TODO(cite) — provisional, Rubisco Michaelis constant for CO₂ at ~25°C; primary citation pending Step 11"
+  ko:
+    value: 278.4
+    unit: "mmol/mol"
+    source: "TODO(cite) — provisional, Rubisco Michaelis constant for O₂ at ~25°C; primary citation pending Step 11"
+  o2:
+    value: 210.0
+    unit: "mmol/mol"
+    source: "TODO(cite) — provisional, atmospheric O₂ mole fraction (~21%); primary citation pending Step 11"
+  t_min:
+    value: 0.0
+    unit: "degC"
+    source: "TODO(cite) — provisional cardinal temperature (cool-season C3); primary citation pending Step 11"
+  t_opt_lo:
+    value: 15.0
+    unit: "degC"
+    source: "TODO(cite) — provisional cardinal temperature (cool-season C3); primary citation pending Step 11"
+  t_opt_hi:
+    value: 25.0
+    unit: "degC"
+    source: "TODO(cite) — provisional cardinal temperature (cool-season C3); primary citation pending Step 11"
+  t_max:
+    value: 35.0
+    unit: "degC"
+    source: "TODO(cite) — provisional cardinal temperature (cool-season C3); primary citation pending Step 11"

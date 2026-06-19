@@ -1,11 +1,13 @@
 # Phase 1 — Single Producer
 
 **Status:** IN PROGRESS. **Steps 1 (units + area basis), 2 (the non-conserved aux
-channel), 3 (the PCSE oracle harness + clean-room param discipline), and 4
-(Beer–Lambert light interception — the first biological process) are implemented,
-tested, and committed** — see their per-step `RESOLVED` blocks below. **The
-foundation (Steps 1–3) is complete; Step 5 (FvCB photosynthesis) is next** — the
-carbon-source flow that consumes the Step-4 canopy diagnostic, designed just-in-time. This plan **locks the three
+channel), 3 (the PCSE oracle harness + clean-room param discipline), 4
+(Beer–Lambert light interception — the first biological process), and 5 (FvCB
+photosynthesis — the first carbon-source flow) are implemented, tested, and
+committed** — see their per-step `RESOLVED` blocks below. **The foundation
+(Steps 1–3) is complete; Step 6 (maintenance + growth respiration) is next** — the
+carbon-sink flows, including the growth-respiration leg that Step 5 flagged (gross
+assimilation → growth respiration → structural carbon). This plan **locks the three
 foundation decisions** (the non-conserved aux channel, single-currency-flow coupling,
 and units/area + the Euler-daily/gate split) and **enumerates** the seven biological
 process steps as forward-pointers. Per the working-style rule and the advisor's
@@ -712,6 +714,122 @@ unit (`ha/kg` → `m²/kg`) and rejects an incompatible/unparseable one; the com
 `canopy.yaml` folds to the hand-computed `sla_per_mol_c`; the loader rejects a
 dimensionally-wrong SLA, an out-of-range carbon fraction / extinction coef, and a
 missing `source` tag (clean-room discipline at the boundary).
+
+## Step 5 design — FvCB photosynthesis (Farquhar, von Caemmerer & Berry 1980)
+
+*The first carbon **source** flow, designed just-in-time. Consumes the Step-4 canopy
+diagnostic (absorbed PAR = incident PAR × intercepted fraction) and deposits gross
+assimilated carbon into the plant pool.*
+
+### RESOLVED (2026-06-19) — the locks (advisor-reviewed)
+
+- **A single CARBON source `Flow` (`GrossAssimilation`), `boundary.co2 → plant_c`,
+  internally balanced in carbon (P1).** New pure module
+  `domains/biosphere/photosynthesis.py` (stdlib only), a `PhotosynthesisParams`
+  dataclass (the `CanopyParams`/`DemoParams` idiom), a bespoke
+  `load_photosynthesis_params` in `loader.py`, and `params/photosynthesis.yaml` in the
+  structured `value/unit/source` format. Roadmap line 232: flow + unit test + param
+  file + doc, standalone before integration.
+- **Two layers, split deliberately (advisor seam).**
+  - **Instantaneous leaf-level FvCB — the citable, exactly hand-checkable part**
+    (tested against independent literals, Step-4 style):
+    - Rubisco-limited `Ac = Vcmax·(Ci − Γ*) / (Ci + Kc·(1 + O/Ko))`.
+    - Electron transport `J` from absorbed PAR via the **non-rectangular hyperbola**
+      `θ·J² − (I₂ + Jmax)·J + I₂·Jmax = 0` (smaller root), `I₂ = α·absorbed_par`.
+    - Light/RuBP-limited `Aj = J·(Ci − Γ*) / (4·Ci + 8·Γ*)`.
+    - Gross leaf assimilation `Ag = max(0, min(Ac, Aj))`. The `Ac/Aj` form is
+      gross-of-dark-respiration, **net-of-photorespiration** — the `(Ci − Γ*)` factor
+      already books photorespiratory CO₂, so there is no hidden mass leak.
+  - **Provisional canopy + diurnal aggregator** `daily_canopy_assimilation(...)` — a
+    **free function the multilayer/diurnal Gaussian extends additively** (same
+    signature). Big-leaf: absorbed canopy PAR (per ground) `= incident_par · f_int`;
+    mean absorbed PAR per leaf area `= incident_par · f_int / LAI` drives the leaf
+    curve (well-defined as LAI→0: `f_int ≈ k·LAI`, so the ratio → `k·incident_par`,
+    finite; guarded `Ag = 0` at exactly `LAI = 0`); canopy rate `= Ag · LAI`; daily
+    flux `= canopy_rate · daylength_s · ground_area · 1e-6 (µmol→mol) · f_temp`.
+- **The Γ* clamp is load-bearing for a source flow.** When `Ci ≤ Γ*`, `(Ci − Γ*) ≤ 0`
+  flips `Ag` negative — the flow would *withdraw* from `plant_c` (a source turned
+  withdrawal, tripping positivity/extinction). `Ag = max(0, …)` clamps it to 0,
+  matching P3's "assimilation → 0 as CO₂/light → 0." The `Ci ≤ Γ*` → 0 case is unit-
+  tested.
+- **f_temp correction — a latent plan bug, recorded here (Steps 1/2 set the
+  precedent).** Plan line 329 lumps `f_temp` with `f_water`/`f_N` as "limiters default
+  to 1.0 **until their step lands**." But the step sequence lands `f_water` at Step 7
+  and `f_N` at Step 10 — **f_temp lands at no step** (Step-8 phenology drives DVS via
+  thermal time, *not* the instantaneous assimilation temperature response). So
+  "1.0 until its step lands" would silently mean "1.0 **forever**," and a
+  temperature-independent FvCB over a winter-wheat season (Oct→Aug; sub-zero winter →
+  20 °C+ summer) would assimilate near-max through winter — a **structural** mismatch
+  the Step-11 oracle gate would catch. → **Step 5 wires a multiplicative `f_temp(T)`
+  now** (temperature forcing via `env.get`; the WOFOST **TMPFTB** idiom — a cardinal-
+  temperature response of the assimilation rate, citable to crop-model literature). A
+  **piecewise-linear cardinal-temperature** factor (0 below `T_min`, ramp to 1 over
+  `[T_min, T_opt_lo]`, plateau 1 on `[T_opt_lo, T_opt_hi]`, ramp down to 0 over
+  `[T_opt_hi, T_max]`) — independently hand-checkable. `f_water`/`f_N` genuinely have
+  later steps, so they **stay 1.0** with the `Π fᵢ` seam left in place (a documented
+  multiplier in `evaluate`, additive at Steps 7/10).
+- **FvCB params stay at a reference temperature (no Arrhenius now).** Full
+  `Vcmax(T)/Jmax(T)/Γ*(T)` Arrhenius scaling is **out of scope** for Step 5; the
+  multiplicative `f_temp` is the right altitude (the temperature response of AMAX, not
+  re-deriving every kinetic constant). Folding Arrhenius into FvCB is a Step-11
+  refinement if the oracle match needs it.
+- **CO₂ pattern mirrors the demo's `light` (decision #16/#8 shape).** Intercellular CO₂
+  `Ci` (µmol mol⁻¹), incident PAR, air temperature, and photoperiod `daylength_s` are
+  read via `env.get` as **scalar drivers** (forcing or shared stock — the flow cannot
+  tell). **Unlike the demo (rate ∝ the withdrawn stock's amount), here the rate is set
+  by the `Ci` forcing, independent of `boundary.co2.amount`** — correct because CO₂ is
+  an **unclamped, non-limiting** boundary source in the open Phase-1 single-producer
+  system (P1; no rationing → `rationed == 0`). Using `Ci` directly as forcing is fine;
+  stomatal `Ci/Ca` coupling is naturally Step 7's (water).
+- **Light enters ONLY through absorbed PAR, never a separate `f_light` (Step-4
+  caveat).** The Step-4 intercepted fraction `f_int` drives the electron-transport
+  curve (absorbed PAR = incident · `f_int`); wiring `f_int` *also* as a standalone
+  `Π fᵢ` factor would double-count light limitation.
+- **Deposit gross, not net (carbon-vs-DM caveat).** Step 5 deposits `Ag` (gross
+  min(Ac,Aj)). The WOFOST conversion-efficiency / **growth-respiration** carbon loss
+  is an **explicit balanced leg in Step 6**, never a silent efficiency factor (a
+  dropped-carbon factor trips the every-step gate — the gate doing its job). Dark
+  respiration `Rd` (maintenance) is likewise Step 6.
+- **Stock structure — single provisional `plant_c` POPULATION pool (Step-9 note).**
+  The flow deposits into `biosphere.plant_c` and reads that **same** pool as
+  `leaf_carbon` for the canopy diagnostic. The leaf/stem/root organ split is the
+  explicit Step-9 transition; Step 5 does not pre-empt it.
+- **Big-leaf high-bias — named, not assumed away (advisor flag).** `Ag` is **concave**
+  in PAR (saturating `J`, then `min`), so a big-leaf on **daily-mean / canopy-mean**
+  PAR overestimates the true daily integral (Jensen) — exactly why WOFOST does the
+  intra-canopy/diurnal Gaussian, which P3 calls load-bearing for the oracle match.
+  Step 5 accepts the bias **because** `daily_canopy_assimilation` is the additive seam
+  for the Gaussian; **closing it is Step 11**, not an assumption that the big-leaf
+  already matches.
+- **Clean-room (P5).** The FvCB equations are cited to Farquhar, von Caemmerer & Berry
+  (1980); the cardinal-temperature response to degree-day/crop-model literature. All
+  numeric VALUES (`Vcmax, Jmax, α, θ, Γ*, Kc, Ko, O, T_*`) are honest **provisional
+  literature-typical placeholders** (`TODO(cite)`), pending the Step-11 validation gate
+  — never fabricated to a recalled citation, never backfilled from the unlicensed
+  WOFOST YAML.
+
+**Tasks.**
+- `domains/biosphere/photosynthesis.py` (PURE stdlib): the leaf-level free functions
+  (`rubisco_limited_rate`, `electron_transport_rate`, `light_limited_rate`,
+  `gross_leaf_assimilation`), `temperature_factor`, the provisional
+  `daily_canopy_assimilation` aggregator, the `PhotosynthesisParams` dataclass, and the
+  `GrossAssimilation` flow.
+- `params/photosynthesis.yaml` (structured `value/unit/source`) + `load_photosynthesis_params`
+  in `loader.py` (bespoke schema like `_CanopySchema`; dimensionless coefficients
+  bound-checked, the `Ci`/PAR/temperature *forcing* lives in the scenario/resolver, not
+  the crop param file).
+- Wire the `Π fᵢ` seam (`f_temp` populated; `f_water`/`f_N` = 1.0, documented additive).
+
+**Test plan (`tests/test_photosynthesis.py`).** `Ac`, `Aj`, the non-rectangular-
+hyperbola `J`, and `Ag = min(...)` against **independent hand-computed literals**;
+the **`Ci ≤ Γ*` → `Ag = 0`** clamp; `Ag → 0` as PAR → 0; monotonicity in PAR and Ci
+(below saturation); `temperature_factor` cardinal-point values (0 below `T_min`,
+1 in the plateau, 0 above `T_max`, linear ramps) against literals; the `LAI → 0`
+limit of `daily_canopy_assimilation` is finite (no division blow-up) and `= 0` at
+`LAI = 0`; the assembled `GrossAssimilation.evaluate` produces a **carbon-balanced**
+`FlowResult` (`assert_flow_balanced`) with the hand-computed daily mol-C leg; the
+committed `photosynthesis.yaml` loads to the expected `PhotosynthesisParams`; the
+loader rejects out-of-range/bad-unit params and a missing `source` tag.
 
 ---
 
