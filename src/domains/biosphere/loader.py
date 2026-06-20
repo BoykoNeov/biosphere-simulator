@@ -26,6 +26,7 @@ from domains.biosphere.allocation import (
 from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.decomposition import DecompositionParams
 from domains.biosphere.demo import DemoParams
+from domains.biosphere.microbial_respiration import MicrobialRespirationParams
 from domains.biosphere.nitrogen import NitrogenParams
 from domains.biosphere.phenology import PhenologyParams
 from domains.biosphere.photosynthesis import PhotosynthesisParams
@@ -58,6 +59,10 @@ NITROGEN_PARAMS_PATH: Path = Path(__file__).parent / "params" / "nitrogen.yaml"
 # The committed chamber litter-decomposition (first-order decay) params (P2 Step 4).
 DECOMPOSITION_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "decomposition.yaml"
+)
+# The committed chamber microbial-respiration (first-order rate) params (P2 Step 5).
+MICROBIAL_RESPIRATION_PARAMS_PATH: Path = (
+    Path(__file__).parent / "params" / "microbial_respiration.yaml"
 )
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
@@ -985,4 +990,83 @@ def load_decomposition_params(
 
     return DecompositionParams(
         decomposition_rate=values["decomposition_rate"],
+    )
+
+
+# --- microbial respiration (Phase-2 Step 5) ---------------------------------
+# Same structured value/unit/source format as decomposition. The first-order microbial
+# respiration rate (1/day) is NOT a conserved-Quantity canonical unit, so it is a
+# schema-validated, bound-checked float whose declared ``unit`` is exact-string guarded
+# (the decomposition / senescence discipline). A zero rate is valid (no respiration —
+# microbial biomass only grows, the Step-4 behaviour); negative is rejected.
+
+# Expected canonical unit string per microbial-respiration param (exact-match guard).
+_MICROBIAL_RESPIRATION_UNITS: dict[str, str] = {
+    "microbial_respiration_rate": "1/day",
+}
+
+
+class _MicrobialRespirationValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _MicrobialRespirationParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    microbial_respiration_rate: _MicrobialRespirationValueUnit
+
+
+class _MicrobialRespirationSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _MicrobialRespirationParameters
+
+
+def _microbial_respiration_value(
+    params: _MicrobialRespirationParameters, field: str
+) -> float:
+    """Read a microbial-respiration param's value, exact-string guarding its unit."""
+    entry: _MicrobialRespirationValueUnit = getattr(params, field)
+    expected = _MICROBIAL_RESPIRATION_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_microbial_respiration_params(
+    path: str | Path = MICROBIAL_RESPIRATION_PARAMS_PATH,
+) -> MicrobialRespirationParams:
+    """Load, schema- and bound-check the microbial-respiration params.
+
+    The first-order respiration rate carries a declared unit (exact-string guarded) and
+    a required ``source`` tag (clean-room discipline). The rate must be non-negative
+    (0 = no respiration; negative would create carbon). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    negative value.
+    """
+    schema = _MicrobialRespirationSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {
+        field: _microbial_respiration_value(params, field)
+        for field in _MICROBIAL_RESPIRATION_UNITS
+    }
+
+    if values["microbial_respiration_rate"] < 0.0:
+        raise ValueError(
+            "microbial_respiration_rate must be >= 0, got "
+            f"{values['microbial_respiration_rate']}"
+        )
+
+    return MicrobialRespirationParams(
+        microbial_respiration_rate=values["microbial_respiration_rate"],
     )

@@ -213,18 +213,27 @@ def test_sealed_assimilation_rises_then_declines(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
     # The emergent feedback's payoff: gross assimilation happens early (liveness — not a
-    # dead trajectory) and then declines by orders of magnitude as the pool draws down
-    # (Ci falls) and the plant senesces. Step 3 closes the loop (respiration refills the
-    # pool), so GASS settles low but need not hit ~0 — the open-loop "< 1e-3×peak" was a
-    # Step-2 artifact of carbon never returning. Recompute GASS from each snapshot.
+    # dead trajectory) and then collapses by orders of magnitude as the pool draws down
+    # (Ci falls) and the plant senesces. The collapse is asserted at the post-peak
+    # TROUGH, not the end: Step 3 closed the *gas* loop and Step 5 closes the *carbon*
+    # loop (decomposer respiration refills the CO₂ pool), so by season's end the pool
+    # has refilled and GASS partially RECOVERS (~4% of peak) — the closed-loop reality,
+    # not the Step-2 open-loop decline-to-~0. So the feedback is the deep mid-season
+    # trough (GASS hits 0 when Ci ≤ Γ* / dark winter), not a stay-collapsed end.
+    # Recompute GASS from each snapshot.
     states, _, _ = sealed
     scenario = SeasonScenario(sealed=True)
     resolver = weather_resolver(_weather(), scenario)
     ctx = _carbon_context(scenario)
     gass = [ctx.budget(s, resolver.bind(s, 1.0))[0] for s in states]
     peak = max(gass)
+    peak_idx = gass.index(peak)
     assert peak > 1e-3  # the plant did fix carbon (liveness)
-    assert gass[-1] < 1e-2 * peak  # ... then assimilation fell ~2 orders (the feedback)
+    # after peaking, assimilation collapses ≥ 2 orders at the trough (the feedback) ...
+    assert min(gass[peak_idx:]) < 1e-2 * peak
+    # ... and the closed carbon loop refills the pool, so GASS recovers above the trough
+    # by season's end (the closed-loop signature — an open-loop decline never would).
+    assert gass[-1] > 1e-2 * peak
 
 
 def test_sealed_conserves_total_carbon(

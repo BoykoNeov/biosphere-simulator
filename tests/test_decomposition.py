@@ -16,11 +16,13 @@ Three layers:
   and deposits the *same* amount into microbial biomass; it balances CARBON and touches
   no other quantity (single-currency).
 * **Integration (the sealed season)** — litter accumulates (senescence) then is drained
-  into microbial biomass (which only grows this step — the intentional intermediate),
-  total CARBON is conserved exactly (the sealed chamber has no boundary carbon
-  source/sink), OXYGEN stays exactly conserved (decomposition never touches the gas
-  system), and ``rationed == 0`` (the litter draw self-limits). The open field grows no
-  decomposer stocks and keeps ``litter_sink`` (the regression golden's path).
+  into microbial biomass, which is in turn fed AND respired (Step 5 supersedes the
+  Step-4 monotone-growth claim: microbial respiration now burns it back to CO₂), total
+  CARBON is conserved exactly (the sealed chamber has no boundary carbon source/sink),
+  OXYGEN stays exactly conserved *through* the microbial O₂ sink (PQ=1), and
+  ``rationed == 0`` (the draws self-limit). The open field grows no decomposer stocks
+  and keeps ``litter_sink`` (the regression golden's path). The microbial-respiration
+  leg behaviour itself is pinned in ``test_microbial_respiration.py``.
 
 Pure-stdlib data path (reads the committed JSON weather fixture; no PCSE).
 """
@@ -232,16 +234,20 @@ def test_sealed_litter_accumulates_then_drains(
     assert any(b < a for a, b in zip(litter, litter[1:], strict=False))
 
 
-def test_sealed_microbial_grows_monotonically(
+def test_sealed_microbial_is_fed_and_respired(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
-    # The Step-4 intentional intermediate: microbial biomass only GROWS (decay deposits;
-    # nothing withdraws it until Step 5's respiration). It is non-trivially fed.
+    # Step 5 supersedes the Step-4 monotone-growth claim: microbial biomass now has BOTH
+    # a source (decomposition deposits) and a sink (microbial respiration burns it to
+    # CO₂), so it is no longer monotone — it accumulates AND is genuinely drawn down on
+    # some step. (The decomposer mirror of the Step-2→Step-3 open→closed transition; the
+    # detailed respiration-leg behaviour is pinned in test_microbial_respiration.py.)
     states, _, _ = sealed
     mic = [s.stocks[MICROBIAL_CARBON].amount for s in states]
     assert mic[0] == 0.0
-    assert mic[-1] > 1e-3  # decomposition genuinely ran
-    assert all(b >= a for a, b in zip(mic, mic[1:], strict=False))  # monotone up
+    assert max(mic) > 1e-3  # decomposition genuinely built standing microbial biomass
+    # respiration genuinely withdraws carbon on some step (a strict draw-down).
+    assert any(b < a for a, b in zip(mic, mic[1:], strict=False))
 
 
 def test_sealed_conserves_carbon_exactly(
@@ -257,12 +263,15 @@ def test_sealed_conserves_carbon_exactly(
         assert math.isclose(_total_carbon(s), c0, rel_tol=0.0, abs_tol=1e-12)
 
 
-def test_sealed_decomposition_does_not_perturb_oxygen(
+def test_sealed_conserves_oxygen_through_microbial_respiration(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
-    # Decomposition is CARBON-only, so OXYGEN (2·(CO₂+O₂)) stays exactly conserved — the
-    # Step-3 invariant is untouched by the decomposer (the Step-4/Step-5 split guard: a
-    # future O₂-coupling crept into Step 4 would break this float-exact check).
+    # Decomposition itself is CARBON-only, but microbial respiration (Step 5) now DOES
+    # touch the gas system (microbial_C + O₂ → CO₂). Total OXYGEN (2·(CO₂+O₂)) stays
+    # exactly conserved regardless: every mol C respired returns a CO₂ (carrying 2
+    # oxygens) supplied by 1 consumed O₂ (−2 oxygens) — the PQ=1 composition fold nets
+    # OXYGEN to zero. The Step-3 ``2·(CO₂+O₂)`` invariant survives the new O₂ sink
+    # (a mis-stoichiometric microbial respiration leg would break this exact check).
     states, _, _ = sealed
     ox0 = _total_oxygen(states[0])
     for s in states:

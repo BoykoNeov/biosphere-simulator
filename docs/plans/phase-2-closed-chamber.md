@@ -96,7 +96,45 @@ wording, advisor-reviewed (Option A; see the Step-4 design): the Step-4 one-line
 CO₂" is ahead of itself — it needs O₂, hence Step 5; Step 4 is the carbon-only transfer.**
 **Deferred seams:** microbial death / turnover (`microbial_C → litter_C` recycling),
 microbe-explicit Michaelis kinetics, and the O₂-coupled microbial respiration (Step 5).
-**Next: Step 5 — microbial respiration (CARBON+OXYGEN).**
+
+**Step 5 (microbial respiration, CARBON+OXYGEN) is COMPLETE and landed.** A new
+`MicrobialRespiration` flow `microbial_carbon + O₂ → CO₂` burns microbial biomass back to
+CO₂ via first-order respiration (`m_resp·microbial_C`, self-limiting; `m_resp·dt = 0.05 ≪
+1`), the genuine multi-quantity (CARBON+OXYGEN) decomposer gas flux — the decomposer's
+mirror of plant maintenance respiration's biomass-burned shortfall, and the chamber's
+decomposer O₂ sink (the Biosphere-2 mechanism). **The carbon loop is now closed:** litter
+→ microbial → CO₂ → photosynthesis (Step 4 left `microbial_carbon` a sink-only
+intermediate; Step 5 gives it the CO₂-returning, O₂-consuming sink the Step-4 doc deferred
+here — gate-forced, since CO₂ into the `{CARBON:1,OXYGEN:2}` pool drags 2 oxygens
+pure-carbon microbes cannot supply). The three legs `(microbial −b, co2_pool +b, o2_pool
+−b)` balance CARBON and OXYGEN at PQ=1 in one flow; it is **simpler** than the plant
+shortfall it mirrors — sealed-only, always three legs, no `source == sink` netting
+(`microbial ≠` the pool). **Empirical (305-day sealed run):** `rationed == 0`, no
+extinction; total CARBON conserved float-exact (2.2e-16; microbial → pool is an internal
+transfer) **and** total OXYGEN conserved float-exact (the CO₂'s 2 oxygens come from the
+consumed O₂ — exercising fold site 2 through the new flux); `microbial_carbon` is now
+**non-monotone** (peaks ~0.040 at day 93, drained to ~0.012; 212 draw-down steps — the
+Step-4 monotone pile-up is superseded, microbial now ≈ decomposition-in/respiration-out
+balanced ~0.04 vs Step-4's 0.329), and the CO₂ pool refills further so end-of-season GASS
+**partially recovers** (~4% of peak, vs the mid-season collapse to 0) — the closed-carbon-
+loop signature. The open-field season + its regression golden are **bit-identical** (the
+flux is `sealed`-gated/appended, like `Decomposition`). **One scope refinement vs the
+plan, advisor-reviewed: O₂ self-limitation (`f_O2`) is DEFERRED to Step 7** (a magnitude
+bet): at the ~210 mol O₂ fill the standing microbial biomass is O(0.01) mol C, so over the
+season O₂ falls only ~0.0065 mol — measured min(O₂) ≈ 0.99997·fill, ~4 orders from
+rationing — exactly the Step-3 deferral logic; `f_O2` lands at Step 7's depleting
+multi-year run (applied to **both** microbial and plant maintenance respiration), guarded
+by `test_gas_exchange`/`test_microbial_respiration`'s O₂ ≫ 0 checks. New
+`tests/test_microbial_respiration.py` (15 tests) pins the rate law, the 3-leg
+CARBON+OXYGEN balance, dt-linearity, the self-limit, loader guards, and the integration
+(microbial drained, CARBON+OXYGEN conserved, `rationed == 0`, no extinction, O₂ ≫ 0); two
+superseded Step-4 tests (microbial monotone growth; the "decomposition never touches the
+gas system" oxygen framing) were revised to the closed-loop reality, and one Step-2/3
+chamber test (`test_sealed_assimilation_rises_then_declines`) was strengthened to assert
+the collapse at the post-peak *trough* (GASS hits 0) with an end-of-season *recovery*. All
+gates green (757 passed, ruff/pyright clean). **Deferred seams (unchanged):** microbial
+death/turnover recycling, microbe-explicit Michaelis substrate kinetics, and the `f_O2`
+above. **Next: Step 6 — mineralization (NITROGEN), litter/microbial N → `soil_n`.**
 
 The design review's two corrections were folded in before
 build: (1) the composition fold has **two** mandatory sites, not one — `flow.py` (legs) *and*
@@ -388,8 +426,14 @@ Phase-1 rhythm.**
    — the CO₂-releasing, O₂-consuming microbial respiration is **Step 5** (gate-forced: CO₂
    into the multi-quantity pool needs O₂; Option A, advisor-reviewed). `rationed == 0`,
    total CARBON + OXYGEN float-exact, open-field golden bit-identical; 16 tests.
-5. **Microbial respiration (CARBON+OXYGEN)** — `microbial_C + O₂ → CO₂`; the P2.1-dependent
-   decomposer gas flux that draws O₂ down (the Biosphere-2 O₂-sink mechanism).
+5. ~~**Microbial respiration (CARBON+OXYGEN)**~~ — **DONE.** `MicrobialRespiration` flow
+   `microbial_carbon + O₂ → CO₂` (first-order `m_resp·microbial_C`, self-limiting), the
+   multi-quantity decomposer gas flux closing the carbon loop (litter → microbial → CO₂ →
+   photosynthesis) and the chamber's decomposer O₂ sink. Sealed-only, always three legs,
+   no `source == sink` netting. `rationed == 0`, total CARBON + OXYGEN float-exact,
+   open-field golden bit-identical; microbial is now non-monotone (respired); 15 tests.
+   `f_O2` O₂ self-limitation **deferred to Step 7** (O₂ stays ≈ 0.99997·fill — ~4 orders
+   from rationing; the Step-3 deferral logic), guarded by an O₂ ≫ 0 test.
 6. **Mineralization (NITROGEN)** — litter/microbial N → `soil_n`; closes the N loop that
    Phase 1 fed externally.
 7. **Sealed-chamber integration + validation** — assemble the multi-year sealed season;
@@ -603,6 +647,67 @@ conserved** (the Step-4/Step-5 split guard — an O₂ leak into Step 4 would br
 
 ---
 
+## Step 5 design — microbial respiration (CARBON+OXYGEN; the decomposer gas flux, P2.3)
+
+*Realizes the O₂-coupled half of P2.3 (designed JIT, the Phase-1 rhythm; advisor-reviewed
+before build). Step 4 left `microbial_carbon` a sink-only intermediate; Step 5 gives it
+the CO₂-returning, O₂-consuming sink, **closing the carbon loop** (litter → microbial →
+CO₂ → photosynthesis) — a pure addition that tears up nothing in Step 4.*
+
+**The flow, minimized.** A new `microbial_respiration.py` (pure stdlib): the rate law
+`microbial_respiration_flux(microbial_c, m_resp) = m_resp · microbial_c` (mol C day⁻¹;
+first-order in standing microbial biomass, self-limiting → 0 as microbial → 0 — the
+maintenance/decomposition positivity pattern) + the `MicrobialRespiration` flow
+`microbial_carbon + o2_pool → carbon_pool`. The three legs `(microbial −b, co2_pool +b,
+o2_pool −b)` balance CARBON (`−b + b = 0`) **and** OXYGEN (the pool's `+2b` vs the O₂
+pool's `−2b`, via the P2.1 composition fold) at PQ=1 — the decomposer's mirror of plant
+maintenance respiration's biomass-burned shortfall, but **simpler**: microbial biomass and
+the CO₂/O₂ pools exist only when sealed, so the flow is sealed-only, **always three legs**,
+with no `source == sink` netting (`microbial ≠` the pool, unlike the plant *covered*
+CO₂→CO₂ round trip). `params/microbial_respiration.yaml` (provisional `m_resp = 0.05`/day,
+turnover ~20 days, `TODO(cite)`) + `load_microbial_respiration_params` (exact-unit guard,
+non-negative — the decomposition loader discipline). `season.py` appends it sealed-only
+(like `Decomposition`; Registry sorts by id → order-independent).
+
+**The rate-law fork (first-order vs CUE), locked.** First-order microbial respiration
+(maintenance/turnover) is chosen over a carbon-use-efficiency split on the decomposition
+flux: CUE `(1−CUE)→CO₂` would **rework Step 4** (the rejected Option B — Step 4 deposits
+100% of decay into microbial biomass), whereas first-order respiration is a **pure
+addition** draining the standing pool. It also matches the plan's `microbial_C + O₂ → CO₂`
+verbatim. Microbe-explicit Michaelis substrate kinetics (`Vmax·microbial·litter/(K_m+
+litter)`) stay deferred (need a microbial seed; first-order donor/standing control is the
+right minimal pick — the Step-4 rhythm).
+
+**The `f_O2` deferral (the magnitude bet, advisor-reviewed; one scope refinement vs the
+plan's "designed at step 5").** P2.2 flags an O₂ Michaelis factor `f_O2 = O2/(K_O2+O2)` so
+respiration keeps `rationed == 0` on a *depleting* O₂ pool. Microbial respiration's O₂ draw
+`m_resp·microbial_C` is **not** self-limiting on the O₂ pool, so a small enough fill *would*
+ration — but at the realistic ~210 mol O₂ fill the standing microbial biomass is O(0.01)
+mol C, so over the 305-day season O₂ falls only ~0.0065 mol (**measured min(O₂) ≈
+0.99997·fill, ~4 orders from rationing**). So `f_O2` would be ≈ 1 throughout and
+untestable-in-anger here — **deferred to Step 7**, where the multi-year run is *sized to
+deplete* O₂ (the explicit O₂-depletion target) and `f_O2` is applied to **both** microbial
+and plant maintenance respiration. This exactly mirrors the Step-3 deferral (the plan's
+"designed at step 5" wording predates the Step-3 magnitude discovery); it is guarded by the
+O₂ ≫ 0 checks in `test_gas_exchange`/`test_microbial_respiration` — if a future change
+pushes O₂ toward its floor, those break and flag `f_O2` has become load-bearing.
+
+**Test plan (`tests/test_microbial_respiration.py`, 15 tests, all green).** (a) *Rate law:*
+first-order in microbial biomass, zero at zero. (b) *Flow:* the 3-leg `microbial → CO₂ +
+O₂-consumed` transfer of the same amount, CARBON **and** OXYGEN balance (no WATER/NITROGEN
+residual), dt-linearity, self-limit at zero microbial. (c) *Loader:* committed rate,
+negative-rate + bad-unit rejection. (d) *Integration (sealed season):* microbial respired
+(a strict draw-down — the Step-4 monotone claim superseded), **total CARBON + OXYGEN
+conserved float-exact** (the closed loop; OXYGEN through the new sink), `rationed == 0`, no
+extinction, and O₂ ≫ 0 (the `f_O2`-deferral guard). Two superseded Step-4 tests (microbial
+monotone growth; the "decomposition never touches the gas system" oxygen framing) and one
+Step-2/3 chamber test (GASS collapse asserted at the *end* — now a mid-season *trough* with
+an end-of-season *recovery*, the closed-carbon-loop signature) were revised, not weakened.
+**Open field is byte-identical** — the flux is `sealed`-gated/appended; the regression
+golden is untouched.
+
+---
+
 ## Exit criteria (Phase 2 — "closed chamber / producer + decomposer")
 
 - [x] **Element-composition core (P2.1)** landed: stocks carry composition, the gate folds
@@ -620,9 +725,12 @@ conserved** (the Step-4/Step-5 split guard — an O₂ leak into Step 4 would br
       ~2.7×). *(Sustained multi-year oscillation awaits the decomposer return of litter
       carbon, Steps 4–7.)*
 - [ ] **Decomposer loop (P2.3):** litter → microbial biomass → CO₂; microbial respiration
-      draws O₂; mineralization returns N to `soil_n`. *(In progress: **Step 4 landed** the
-      `litter_carbon` POOL + first-order `litter → microbial` decay, CARBON-only; the
-      O₂-drawing microbial respiration → CO₂ is Step 5, mineralization Step 6.)*
+      draws O₂; mineralization returns N to `soil_n`. *(In progress: **Steps 4–5 landed** —
+      Step 4 the `litter_carbon` POOL + first-order `litter → microbial` decay (CARBON-
+      only); **Step 5 the O₂-drawing microbial respiration `microbial_C + O₂ → CO₂`**,
+      closing the carbon loop (litter → microbial → CO₂ → photosynthesis) with CARBON +
+      OXYGEN float-exact and `rationed == 0`. Mineralization (NITROGEN → `soil_n`) is
+      Step 6.)*
 - [ ] **Sealed multi-year run:** stable every-step conservation (all of CARBON/OXYGEN/WATER/
       NITROGEN), stable numerics, qualitatively believable dynamics incl. at least one
       closed-system phenomenon (O₂ depletion / Biosphere-2-style failure).

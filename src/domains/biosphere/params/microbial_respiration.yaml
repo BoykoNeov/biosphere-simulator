@@ -1,0 +1,43 @@
+# chamber — microbial respiration (first-order rate) decomposer gas-flux params
+# Currency/units: CARBON + OXYGEN (mol). Microbial respiration burns microbial biomass
+#   back to CO₂ consuming O₂: microbial_C + O₂ → CO₂, a first-order rate (1/day) in the
+#   standing microbial biomass, resp = m_resp · microbial_C (mol C/day). Self-limiting
+#   (→ 0 as microbial → 0), so positivity is structural. At PQ=1 each mol C respired
+#   returns 1 mol CO₂ to the pool (2 oxygens) and consumes 1 mol O₂ (those 2 oxygens) —
+#   a genuine multi-quantity flow (the P2.1 composition fold balances CARBON and OXYGEN).
+#   This closes the carbon loop (litter → microbial → CO₂ → photosynthesis) and is the
+#   chamber's decomposer O₂ sink (the Biosphere-2 soil-respiration mechanism).
+#
+# Units discipline (P4 / config/units.py): the first-order rate (1/day) is NOT a
+#   conserved-Quantity canonical unit, so it is a schema-validated, bound-checked float
+#   carrying a declared unit (exact-string guarded at the loader, like decomposition's
+#   decomposition_rate / senescence's rdr_*). A zero rate is valid (no respiration —
+#   microbial biomass would only grow, the Step-4 behaviour).
+#
+# Deferred seams (documented in microbial_respiration.py): the O₂ self-limitation
+#   Michaelis factor f_O2 = O2/(K_O2 + O2) (deferred to Step 7, where the multi-year run
+#   is sized to deplete O₂ — at this fill O₂ stays ~3 orders from rationing), microbial
+#   death/turnover as microbial_C → litter_C recycling, and microbe-explicit substrate
+#   Michaelis kinetics (Vmax · microbial_C · litter/(K_m + litter)).
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   Phase-2 validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] First-order microbial-pool turnover/respiration is the standard soil-carbon-model
+#       treatment (e.g. CENTURY: Parton, W.J. et al. (1987), "Analysis of factors
+#       controlling soil organic matter levels in Great Plains grasslands", Soil Sci.
+#       Soc. Am. J. 51:1173–1179; RothC: Jenkinson, D.S. (1990), "The turnover of organic
+#       carbon and nitrogen in soil", Phil. Trans. R. Soc. Lond. B 329:361–368). The
+#       microbial-biomass respiration constant m_resp; primary citation pending.
+
+name: chamber
+process: microbial_respiration
+
+parameters:
+  microbial_respiration_rate:
+    value: 0.05
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical first-order microbial respiration constant m_resp (microbial turnover ~20 days) [A]; primary citation pending Phase-2 validation gate"
