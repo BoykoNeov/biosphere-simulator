@@ -1,0 +1,35 @@
+# chamber — litter decomposition (first-order decay rate) decomposer params
+# Currency/units: CARBON (mol). Decomposition transfers decaying litter carbon into
+#   microbial biomass: a first-order donor-controlled rate (1/day), decay = k · litter_c
+#   (mol C/day). Self-limiting (→ 0 as litter → 0), so positivity is structural. Both
+#   pools are pure carbon ({CARBON: 1}) — single-currency CARBON, no oxygen (the
+#   CO₂-releasing, O₂-consuming microbial respiration is Phase-2 Step 5, not this step).
+#
+# Units discipline (P4 / config/units.py): the first-order rate (1/day) is NOT a
+#   conserved-Quantity canonical unit, so it is a schema-validated, bound-checked float
+#   carrying a declared unit (exact-string guarded at the loader, like senescence's
+#   rdr_* / respiration's maintenance_coef). A zero rate is valid (no decomposition).
+#
+# Deferred Step-5+ seams (documented in decomposition.py): microbial death / turnover
+#   (microbial_C → litter_C recycling), microbe-explicit Michaelis kinetics
+#   (Vmax · microbial_C · litter/(K_m + litter)), and the CO₂/O₂-coupled microbial
+#   respiration. Step 4 is the carbon-only litter → microbial transfer.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   Phase-2 validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] Olson, J.S. (1963), "Energy storage and the balance of producers and
+#       decomposers in ecological systems", Ecology 44(2):322–331 (first-order
+#       single-exponential litter-decay model; the decay constant k).
+
+name: chamber
+process: decomposition
+
+parameters:
+  decomposition_rate:
+    value: 0.02
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical first-order litter decay constant k (turnover ~50 days) [A]; primary citation pending Phase-2 validation gate"

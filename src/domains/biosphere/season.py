@@ -47,9 +47,11 @@ from domains.biosphere.carbon_budget import (
     GrowthRespiration,
     MaintenanceRespiration,
 )
+from domains.biosphere.decomposition import Decomposition
 from domains.biosphere.loader import (
     load_allocation_params,
     load_canopy_params,
+    load_decomposition_params,
     load_nitrogen_params,
     load_phenology_params,
     load_photosynthesis_params,
@@ -96,6 +98,13 @@ CO2_ATMOS: StockId = StockId("boundary.co2_atmos")
 # it and closes the gas loop — respiration returns CO₂ to the pool, not a boundary.)
 CARBON_POOL: StockId = StockId("biosphere.carbon_pool")
 O2_POOL: StockId = StockId("biosphere.o2_pool")
+# Sealed chamber decomposer (P2.3/Step 4): senescence feeds a finite ``litter_carbon``
+# POOL (replacing the open field's ``litter_sink`` BOUNDARY, exactly as Step 2 replaced
+# the ``co2_atmos`` boundary with the finite ``carbon_pool``); first-order decomposition
+# transfers it into ``microbial_carbon`` (a POPULATION, pure carbon). Single-currency
+# CARBON — the CO₂-releasing, O₂-consuming microbial respiration is Step 5.
+LITTER_CARBON: StockId = StockId("biosphere.litter_carbon")
+MICROBIAL_CARBON: StockId = StockId("biosphere.microbial_carbon")
 CO2_RESP: StockId = StockId("boundary.co2_resp")
 VAPOR_SINK: StockId = StockId("boundary.vapor_sink")
 LITTER_SINK: StockId = StockId("boundary.litter_sink")
@@ -226,11 +235,16 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
     """Assemble the season's initial ``State`` and the flow + aux ``Registry``.
 
     Stocks: four organ pools (POPULATION CARBON, extinction-eligible, ``threshold = 0``
-    on the well-fed run), ``soil_water``/``soil_n``/``plant_n`` POOLs, the unclamped
-    ``co2_atmos``/``water_source``/``n_source`` boundary sources, the ``co2_resp``/
-    ``vapor_sink``/``litter_sink`` boundary sinks, plus the carbon loss-sink for
-    extinction routing (#6). Flows in canonical id order; the aux process is a
-    registry construction dependency (advances ``State.aux``, P2).
+    on the well-fed run), ``soil_water``/``soil_n``/``plant_n`` POOLs, the
+    ``water_source``/``n_source`` boundary sources, the ``vapor_sink`` boundary sink,
+    plus the carbon loss-sink for extinction routing (#6). The carbon atmosphere is
+    scenario-dependent: **open field** adds the unclamped ``co2_atmos`` source, the
+    ``co2_resp`` + ``litter_sink`` boundary sinks; **sealed chamber** swaps in the
+    finite ``carbon_pool``/``o2_pool`` (gas exchange, Steps 2/3) and the decomposer
+    pools ``litter_carbon`` (POOL, senescence-fed) + ``microbial_carbon`` (pure-carbon
+    POPULATION, decay-fed) (Step 4), adds the ``Decomposition`` flow. Flows in
+    canonical id order; the aux process is a registry construction dependency (advances
+    ``State.aux``, P2).
     """
     carbon = canonical_unit(Quantity.CARBON)
     water = canonical_unit(Quantity.WATER)
@@ -269,7 +283,6 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         SOIL_N: pool(SOIL_N, Quantity.NITROGEN, nitrogen, scenario.soil_n0),
         PLANT_N: pool(PLANT_N, Quantity.NITROGEN, nitrogen, scenario.plant_n0),
         VAPOR_SINK: boundary.sink(VAPOR_SINK, Quantity.WATER),
-        LITTER_SINK: boundary.sink(LITTER_SINK, Quantity.CARBON),
         WATER_SOURCE: boundary.source(
             WATER_SOURCE, Quantity.WATER, scenario.water_source0
         ),
@@ -286,6 +299,11 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
     carbon_source = CARBON_POOL if scenario.sealed else CO2_ATMOS
     resp_sink = carbon_source if scenario.sealed else CO2_RESP
     o2_pool = O2_POOL if scenario.sealed else None
+    # Senescence destination (Step 4): a finite ``litter_carbon`` POOL in the sealed
+    # chamber (decomposition decays it into microbial biomass) vs the Phase-1
+    # ``litter_sink`` BOUNDARY in the open field (the regression golden's path —
+    # unchanged). Parametrized exactly like ``carbon_source``/``resp_sink``.
+    litter_target = LITTER_CARBON if scenario.sealed else LITTER_SINK
     if scenario.sealed:
         stocks[CARBON_POOL] = Stock(
             id=CARBON_POOL,
@@ -305,11 +323,21 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
             kind=StockKind.POOL,
             composition={Quantity.OXYGEN: 2.0},
         )
+        # The decomposer pools (Step 4). ``litter_carbon`` is a finite POOL fed by
+        # senescence and drained by first-order decomposition; ``microbial_carbon`` is a
+        # pure-carbon POPULATION the decay deposits into. Both start at 0 (no standing
+        # litter/microbes at sowing). microbial_carbon is a POPULATION (extinction-
+        # eligible) but only *grows* this step — nothing withdraws it until Step 5's
+        # microbial respiration — so threshold 0 never snaps (the carbon loss-sink below
+        # covers it once Step 5 makes it a source).
+        stocks[LITTER_CARBON] = pool(LITTER_CARBON, Quantity.CARBON, carbon, 0.0)
+        stocks[MICROBIAL_CARBON] = organ(MICROBIAL_CARBON, 0.0)
     else:
         stocks[CO2_ATMOS] = boundary.source(
             CO2_ATMOS, Quantity.CARBON, scenario.co2_atmos0
         )
         stocks[CO2_RESP] = boundary.sink(CO2_RESP, Quantity.CARBON)
+        stocks[LITTER_SINK] = boundary.sink(LITTER_SINK, Quantity.CARBON)
     # Only POPULATION carbon organs are extinction-eligible ⇒ only the carbon loss-sink.
     stocks.update(boundary.loss_sinks({Quantity.CARBON}))
 
@@ -349,7 +377,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
             leaf_c=LEAF_C,
             stem_c=STEM_C,
             root_c=ROOT_C,
-            litter_sink=LITTER_SINK,
+            litter_sink=litter_target,
             params=load_senescence_params(),
         ),
         Transpiration(
@@ -392,6 +420,19 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
             ground_area=scenario.ground_area,
         ),
     ]
+    if scenario.sealed:
+        # The decomposer (Step 4): first-order decay transfers litter carbon into
+        # microbial biomass (pure CARBON, single-currency). Sealed-only; the Registry
+        # sorts flows by id, so conditional addition stays order-independent.
+        flows.append(
+            Decomposition(
+                FlowId("biosphere.decomposition"),
+                0,
+                litter_carbon=LITTER_CARBON,
+                microbial_carbon=MICROBIAL_CARBON,
+                params=load_decomposition_params(),
+            )
+        )
     aux_processes: list[AuxProcess] = [
         ThermalTimeAccumulation(
             id=AuxId("biosphere.thermal_time"),

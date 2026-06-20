@@ -64,8 +64,39 @@ plan, advisor-reviewed: O₂ self-limitation (`f_O2`) is DEFERRED** — at a rea
 is not yet load-bearing; it lands where O₂ actually depletes (microbial respiration, Step
 5; the O₂-depletion validation, Step 7). A test pins O₂ ≫ 0 to guard that precondition.
 **The gas loop is closed; the carbon loop is still open** (senescence leaks organ carbon
-to `litter_sink` until the decomposer, Step 4). **Next: Step 4 — litter + decomposition
-(CARBON).**
+to `litter_sink` until the decomposer, Step 4).
+
+**Step 4 (litter + decomposition, CARBON only) is COMPLETE and landed.** The Phase-1
+`litter_sink` BOUNDARY is promoted to a finite `litter_carbon` POOL (senescence-fed,
+exactly as Step 2 promoted `co2_atmos` → the finite `carbon_pool`), and a new
+`Decomposition` flow `litter_carbon → microbial_carbon` transfers decaying litter into a
+pure-carbon `microbial_carbon` POPULATION via first-order donor-controlled decay
+(`k·litter`, Olson 1963; self-limiting like senescence, `k·dt = 0.02 ≪ 1`). It is
+**deliberately single-currency CARBON** — the central scope decision, surfaced by the
+user's "decomposition should also consume O₂, no?" and **confirmed correct**: aerobic
+decomposition *is* microbial respiration and genuinely consumes O₂, and in this model
+that coupling is not optional but **gate-forced** (CO₂ into the `{CARBON:1, OXYGEN:2}`
+pool drags 2 oxygens pure-carbon litter cannot supply → the P2.1 gate would hard-fail),
+so it is **sequenced to Step 5** (`microbial_C + O₂ → CO₂`), a pure *addition* that tears
+up nothing here. **Empirical (305-day sealed run):** `rationed == 0`, no extinction;
+litter accumulates then drains (0 → 0.106 → 0.013 mol C — non-vacuous, the emergent
+behaviour); `microbial_carbon` grows monotonically (0 → 0.329, the intentional
+intermediate — nothing withdraws it until Step 5); **total CARBON conserved float-exact
+(2.2e-16)** (the sealed chamber has no boundary carbon source/sink — decomposition is an
+internal CARBON transfer), and **OXYGEN stays exactly conserved** (decomposition never
+touches the gas system — the Step-4/Step-5 split guard). The open-field season + its
+regression golden are **bit-identical** (the decomposer is `sealed`-gated; Senescence's
+target is parametrized `litter_carbon`/`litter_sink` exactly like `carbon_source`/
+`resp_sink`). New `tests/test_decomposition.py` (16 tests) pins the rate law, the
+CARBON-only leg balance, dt-linearity, the litter accumulate-then-drain, the monotone
+microbial growth, exact CARBON + OXYGEN conservation, `rationed == 0`, and the
+untouched open field. All gates green (741 passed, ruff/pyright clean; one pre-existing
+E501 in `carbon_budget.py:60` trimmed in passing). **One scope refinement vs the plan
+wording, advisor-reviewed (Option A; see the Step-4 design): the Step-4 one-liner's "+
+CO₂" is ahead of itself — it needs O₂, hence Step 5; Step 4 is the carbon-only transfer.**
+**Deferred seams:** microbial death / turnover (`microbial_C → litter_C` recycling),
+microbe-explicit Michaelis kinetics, and the O₂-coupled microbial respiration (Step 5).
+**Next: Step 5 — microbial respiration (CARBON+OXYGEN).**
 
 The design review's two corrections were folded in before
 build: (1) the composition fold has **two** mandatory sites, not one — `flow.py` (legs) *and*
@@ -351,8 +382,12 @@ Phase-1 rhythm.**
    *covered* maintenance) net to no-ops (`source == sink` detection). Total OXYGEN
    float-exact; `rationed == 0`; open-field golden bit-identical. `f_O2` O₂ self-limitation
    deferred (O₂ ≫ rationing at the realistic fill; lands at Step 5/7), guarded by a test.
-4. **Litter + decomposition (CARBON)** — `litter_sink` → live `litter_carbon` POOL; senescence
-   feeds it; first-order/Michaelis decomposition to microbial biomass + CO₂ (cited kinetics).
+4. ~~**Litter + decomposition (CARBON)**~~ — **DONE.** `litter_sink` → live
+   `litter_carbon` POOL (senescence-fed); first-order donor-controlled decay (Olson 1963)
+   `litter_carbon → microbial_carbon` (pure-carbon POPULATION). **Single-currency CARBON**
+   — the CO₂-releasing, O₂-consuming microbial respiration is **Step 5** (gate-forced: CO₂
+   into the multi-quantity pool needs O₂; Option A, advisor-reviewed). `rationed == 0`,
+   total CARBON + OXYGEN float-exact, open-field golden bit-identical; 16 tests.
 5. **Microbial respiration (CARBON+OXYGEN)** — `microbial_C + O₂ → CO₂`; the P2.1-dependent
    decomposer gas flux that draws O₂ down (the Biosphere-2 O₂-sink mechanism).
 6. **Mineralization (NITROGEN)** — litter/microbial N → `soil_n`; closes the N loop that
@@ -493,6 +528,81 @@ stocks (the sealed chamber has no boundary carbon *source*), and the open-field 
 
 ---
 
+## Step 4 design — litter + decomposition (CARBON only; the first decomposer, P2.3)
+
+*Realizes the CARBON half of P2.3 (designed JIT, the Phase-1 rhythm; advisor-reviewed
+before build). The producer half (gas exchange) now has its mirror: dead organic carbon
+re-enters the cycle — but **only the carbon-only transfer** this step; the O₂-coupled
+respiration is Step 5.*
+
+**The user's question — and why it decides the scope.** The user asked "decomposition
+should also consume some oxygen, no?" — and they are exactly right. Aerobic decomposition
+*is* microbial respiration (`organic-C + O₂ → CO₂`). In this model the coupling is not a
+realism nicety but **gate-forced**: `litter_carbon`/`microbial_carbon` are pure carbon
+(`{CARBON:1}`), the chamber `carbon_pool` is `{CARBON:1, OXYGEN:2}`, so **any CO₂
+deposited into the pool drags 2 oxygens the litter cannot supply** — they can only come
+from the O₂ pool, exactly like plant maintenance respiration (`organ_C + O₂ → CO₂`). The
+P2.1 composition gate hard-fails otherwise. So the user's intuition is honored by
+*sequencing* the O₂ consumption to Step 5, not by skipping it.
+
+**The fork + the locked choice (Option A, advisor-reviewed).** The plan labels Step 4
+"(CARBON)" and Step 5 "(CARBON+OXYGEN)", and states "Decomposition's carbon/nitrogen
+transfers themselves need no O₂" — yet the Step-4 one-liner says "to microbial biomass +
+CO₂". Those conflict, because CO₂-into-the-pool needs O₂. Three resolutions:
+- **(A) Step 4 = litter→microbial carbon transfer only** (first-order `k·litter`, pure
+  CARBON). All CO₂ release + O₂ consumption is Step 5's `microbial_C + O₂ → CO₂`. **CHOSEN.**
+- (B) Step 4 splits decay into CUE→microbial + (1−CUE)→a single-currency `{CARBON:1}`
+  boundary CO₂ sink, rewired into pool+O₂ at Step 5. Matches "+ CO₂" literally but ships
+  scaffolding torn up one step later (the open→closed rework the producer already did,
+  Steps 2→3).
+- (C) Step 4 already consumes O₂ for the respired fraction. Pulls Step 5 forward,
+  contradicts the deliberate split + the `f_O2` deferral. **Rejected.**
+
+The discriminator is **additive-vs-rework into Step 5**: under A, Step 5 *purely adds*
+the respiration; Step 4 ships nothing Step 5 demolishes. A also matches the authoritative
+P2.3 sentence verbatim. The "+ CO₂" in the Step-4 one-liner is the part that is ahead of
+itself. (Consequence: `microbial_carbon` only **grows** this step — decay deposits,
+nothing withdraws until Step 5 — an intentional intermediate, like `plant_n` only growing
+in Phase 1; mirrors the producer rhythm Step 2 open draw-down → Step 3 closed loop.)
+
+**The change, minimized.**
+- **`decomposition.py`** (new, pure stdlib) — `decomposition_flux(litter_c, k) = k·litter_c`
+  (Olson 1963 first-order donor-controlled decay; self-limiting → 0 as litter → 0, so
+  positivity is structural — the senescence/respiration pattern) + the `Decomposition`
+  flow `litter_carbon → microbial_carbon` (single-currency CARBON; both pools `{CARBON:1}`,
+  so the gate folds it identically to Phase 1 and no O₂ appears). `flux = daily·dt`.
+- **`params/decomposition.yaml` + `load_decomposition_params`** — the first-order rate `k`
+  (1/day), the value/unit/source template + exact-string unit guard + non-negative bound
+  (the senescence loader discipline). Provisional `k = 0.02` (turnover ~50 days),
+  TODO(cite) Olson 1963.
+- **`season.py` (sealed-gated, golden-safe)** — add `litter_carbon` (POOL, 0) +
+  `microbial_carbon` (pure-carbon POPULATION, 0, `threshold = 0` — sink-only this step,
+  so `0 < 0` never snaps; the existing CARBON loss-sink already covers it once Step 5 makes
+  it a source). Senescence's destination is parametrized `litter_target = LITTER_CARBON if
+  sealed else LITTER_SINK` (exactly like `carbon_source`/`resp_sink`); `LITTER_SINK` moves
+  into the open-field-only branch; the `Decomposition` flow is appended only when sealed
+  (the Registry sorts by id → order-independent). **Open field is byte-identical** — the
+  regression golden is untouched.
+
+**Why `rationed == 0` (the backstop guard).** First-order `k·litter_c·dt` withdraws against
+the **start-of-step** litter amount; senescence's same-step inflow doesn't count (the
+arbitration memory), but `k·dt = 0.02 ≪ 1` so the draw never exceeds the pool — the Euler
+backstop stays unfired, mirroring senescence's `rate·organ_c`. (Microbe-explicit Michaelis
+kinetics would need a microbial seed + active decomposers; deferred — first-order donor
+control is the right minimal Step-4 pick.)
+
+**Test plan (`tests/test_decomposition.py`, 16 tests, all green).** (a) *Rate law:*
+first-order in litter, zero at zero litter. (b) *Flow:* litter→microbial transfer of the
+same amount, CARBON-only balance (no OXYGEN/WATER/NITROGEN residual), dt-linearity,
+self-limit at zero litter. (c) *Loader:* committed rate, negative-rate + bad-unit
+rejection. (d) *Integration (sealed season):* litter accumulates then drains (non-vacuous),
+microbial grows monotonically, **total CARBON conserved exactly**, **OXYGEN still exactly
+conserved** (the Step-4/Step-5 split guard — an O₂ leak into Step 4 would break it),
+`rationed == 0`, no extinction, and the open field grows no decomposer stocks (keeps
+`litter_sink`).
+
+---
+
 ## Exit criteria (Phase 2 — "closed chamber / producer + decomposer")
 
 - [x] **Element-composition core (P2.1)** landed: stocks carry composition, the gate folds
@@ -510,7 +620,9 @@ stocks (the sealed chamber has no boundary carbon *source*), and the open-field 
       ~2.7×). *(Sustained multi-year oscillation awaits the decomposer return of litter
       carbon, Steps 4–7.)*
 - [ ] **Decomposer loop (P2.3):** litter → microbial biomass → CO₂; microbial respiration
-      draws O₂; mineralization returns N to `soil_n`.
+      draws O₂; mineralization returns N to `soil_n`. *(In progress: **Step 4 landed** the
+      `litter_carbon` POOL + first-order `litter → microbial` decay, CARBON-only; the
+      O₂-drawing microbial respiration → CO₂ is Step 5, mineralization Step 6.)*
 - [ ] **Sealed multi-year run:** stable every-step conservation (all of CARBON/OXYGEN/WATER/
       NITROGEN), stable numerics, qualitatively believable dynamics incl. at least one
       closed-system phenomenon (O₂ depletion / Biosphere-2-style failure).

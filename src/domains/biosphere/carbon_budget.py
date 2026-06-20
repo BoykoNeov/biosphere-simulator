@@ -57,7 +57,7 @@ reservoir degeneracy the open field avoids, but here it is *correct* (the carbon
 to the same pool). What remains is the genuine multi-quantity (CARBON+OXYGEN) gas
 exchange at PQ=1: :class:`Allocation` is ``CO₂ → biomass + O₂`` (an O₂ leg = the carbon
 fixed) and the maintenance *shortfall* is ``biomass + O₂ → CO₂`` (O₂ consumed = the
-carbon burned). The composition fold (P2.1) balances OXYGEN automatically; the open-field
+carbon burned). The composition fold (P2.1) balances OXYGEN; the open-field
 single-currency paths are byte-identical (``o2_pool=None``, distinct source/sink).
 
 **Limitation (the ``Π fᵢ`` seam closes here).** ``CarbonContext.limitation`` forms

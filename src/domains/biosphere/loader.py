@@ -24,6 +24,7 @@ from domains.biosphere.allocation import (
     SenescenceParams,
 )
 from domains.biosphere.canopy import CanopyParams
+from domains.biosphere.decomposition import DecompositionParams
 from domains.biosphere.demo import DemoParams
 from domains.biosphere.nitrogen import NitrogenParams
 from domains.biosphere.phenology import PhenologyParams
@@ -54,6 +55,10 @@ ALLOCATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "allocation.ya
 SENESCENCE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "senescence.yaml"
 # The committed winter-wheat nitrogen uptake + limitation params (Phase-1 Step 10).
 NITROGEN_PARAMS_PATH: Path = Path(__file__).parent / "params" / "nitrogen.yaml"
+# The committed chamber litter-decomposition (first-order decay) params (P2 Step 4).
+DECOMPOSITION_PARAMS_PATH: Path = (
+    Path(__file__).parent / "params" / "decomposition.yaml"
+)
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -906,4 +911,78 @@ def load_nitrogen_params(
         max_uptake_capacity=values["max_uptake_capacity"],
         n_residual_per_mol_c=n_residual * fold,
         n_critical_per_mol_c=n_critical * fold,
+    )
+
+
+# --- litter decomposition (Phase-2 Step 4) ----------------------------------
+# Same structured value/unit/source format as senescence. The first-order decay rate
+# (1/day) is NOT a conserved-Quantity canonical unit, so it is a schema-validated,
+# bound-checked float whose declared ``unit`` is exact-string guarded (the senescence /
+# respiration discipline). A zero rate is valid (no decomposition); negative rejected.
+
+# Expected canonical unit string per decomposition param (exact-match guard).
+_DECOMPOSITION_UNITS: dict[str, str] = {
+    "decomposition_rate": "1/day",
+}
+
+
+class _DecompositionValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _DecompositionParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    decomposition_rate: _DecompositionValueUnit
+
+
+class _DecompositionSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _DecompositionParameters
+
+
+def _decomposition_value(params: _DecompositionParameters, field: str) -> float:
+    """Read a decomposition param's value, exact-string guarding its declared unit."""
+    entry: _DecompositionValueUnit = getattr(params, field)
+    expected = _DECOMPOSITION_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_decomposition_params(
+    path: str | Path = DECOMPOSITION_PARAMS_PATH,
+) -> DecompositionParams:
+    """Load, schema- and bound-check the decomposition params (``DecompositionParams``).
+
+    The first-order decay rate carries a declared unit (exact-string guarded) and a
+    required ``source`` tag (clean-room discipline). The rate must be non-negative
+    (0 = no decomposition; negative would create carbon). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    negative value.
+    """
+    schema = _DecompositionSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {
+        field: _decomposition_value(params, field) for field in _DECOMPOSITION_UNITS
+    }
+
+    if values["decomposition_rate"] < 0.0:
+        raise ValueError(
+            f"decomposition_rate must be >= 0, got {values['decomposition_rate']}"
+        )
+
+    return DecompositionParams(
+        decomposition_rate=values["decomposition_rate"],
     )
