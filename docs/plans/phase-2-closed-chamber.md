@@ -7,8 +7,34 @@ asserted; the Phase-1 1:1 behaviour is bit-identical (goldens regenerated for th
 `composition` block + schema v2→v3 only — zero amount drift). New `tests/test_composition.py`
 pins both gate paths, the POPULATION-single-quantity invariant, construction-time validation,
 and determinism; the multi-key round-trip is pinned in `test_sim_io_snapshot.py`. All gates
-green (686 passed, ruff/pyright clean). **Next: Step 2 — finite chamber atmosphere + the
-`Ci`-from-stock seam (P2.2).** The design review's two corrections were folded in before
+green (686 passed, ruff/pyright clean).
+
+**Step 2 (P2.2, the `Ci`-from-stock seam + finite chamber) is COMPLETE and landed.** The
+first emergent feedback runs with no control code: a sealed-chamber scenario sources
+photosynthesis from a finite `carbon_pool` POOL (replacing the open field's *unclamped*
+boundary), and FvCB derives `Ci` from the pool's live draw-down via
+`chamber.ci_from_co2_pool`, read as a shared stock (#16) — the same mechanism `f_water`
+uses for `soil_water`. Mechanically: the pool draws down → `Ci` falls → assimilation
+collapses toward Γ\*. Sized empirically (`air_mol=1000`, `co2_mol0=0.357`, Ci₀≈250) so the
+draw-down is **non-vacuous** — Ci falls ~5× (250→48), GASS collapses ~4 orders — while
+`rationed == 0` holds *purely from FvCB's Ci-shutoff*, never the Euler backstop (the central
+P2.2 numerical check; Phase 1 dodged a clamped pool, Step 2 re-clamps on purpose). New
+`tests/test_chamber.py` (20 tests) pins the conversion, the forcing-vs-pool seam + its
+all-or-nothing guard, the monotone draw-down, the meaningful Ci fall, the GASS collapse +
+liveness, and total-carbon conservation; the open-field season + its regression golden are
+**bit-identical** (the chamber is a `sealed` scenario variant — `build_season` is
+parametrized, not forked). All gates green (707 passed, ruff/pyright clean). **Three
+deliberate scope refinements vs the plan wording, all advisor-reviewed (see the Step-2
+design section): (1)** the pool is named honestly as a single-currency `carbon_pool`
+(`{CARBON:1}`), *not* a CO₂ stock — it is promoted to `{CARBON:1, OXYGEN:2}` + an O₂
+counterpart at Step 3, when flows go multi-quantity (the `Ci` read needs no rework — it
+reads the mol-carbon amount, unchanged by the promotion); **(2)** the O₂ POOL stock is
+deferred to Step 3 (an inert O₂ pool at Step 2 would be dead weight); **(3)** the
+deliverable is honestly the **draw-down decline**, not oscillation / O₂↔CO₂
+anti-correlation — respiration still drains to `co2_resp`, so the chamber is not yet closed
+(the return loop is Step 3). **Next: Step 3 — gas exchange as multi-quantity flows.**
+
+The design review's two corrections were folded in before
 build: (1) the composition fold has **two** mandatory sites, not one — `flow.py` (legs) *and*
 `conservation.py` (state deltas); missing the second falsely trips the OXYGEN gate every
 photosynthesis step; (2) an O₂ self-limitation mirror (Michaelis in O₂) is required so
@@ -365,6 +391,71 @@ conservation residual/ledger fold.
 
 ---
 
+## Step 2 design — the finite chamber atmosphere + the `Ci`-from-stock seam (P2.2)
+
+*Realizes P2.2 (designed JIT, the Phase-1 rhythm; advisor-reviewed before build). The first
+emergent feedback: flip `Ci` from a constant forcing to a live read of a finite carbon pool
+photosynthesis draws down — coupling **is** the feedback, no controller.*
+
+**The change, minimized.**
+- **`chamber.ci_from_co2_pool(co2_mol, *, air_mol, ci_ratio)`** (new, pure stdlib) — the
+  amount→`Ci` conversion: `Ca = co2_mol / air_mol · 1e6` (chamber CO₂ mole fraction,
+  µmol mol⁻¹), `Ci = ci_ratio · Ca` (the fixed C3 `Ci/Ca ≈ 0.7` stomatal set point;
+  Farquhar & Sharkey 1982). The resolver's `#16` shared-stock read returns the raw stock
+  *amount*, so the transform must live in domain code (it cannot live in the resolver).
+- **`CarbonContext` Ci-source seam** — three additive fields (`co2_pool_var`,
+  `chamber_air_mol`, `ci_ratio`), all defaulting `None`. `_ci(env)`: when `co2_pool_var` is
+  None (open field) it returns the `ci_var` forcing read (**Phase-1 behaviour exactly — the
+  regression golden is unchanged**); when set (sealed) it derives `Ci` from the pool amount
+  read via `co2_pool_var`. An `__post_init__` guard makes the triple all-or-nothing (a
+  partial wiring is a build bug). `budget` calls `self._ci(env)` in place of
+  `env.get(self.ci_var)`.
+- **`build_season` parametrized** (not forked) — `SeasonScenario.sealed` + chamber fields.
+  Sealed swaps the unclamped `co2_atmos` BOUNDARY source for a finite `carbon_pool` POOL
+  (`{CARBON:1}`), wires every gas-exchange flow's carbon source to it (by id — the
+  single-currency legs are byte-identical, only the source's *clamping* changes), passes the
+  Ci-source triple into the context, and adds `co2_pool → carbon_pool` to the resolver's
+  `shared` map. Open field is untouched.
+
+**Why `rationed == 0` is non-vacuous (the central numerical check).** Phase 1 sourced carbon
+from an *unclamped* boundary precisely to dodge the Euler backstop. Step 2 re-clamps on
+purpose: the finite POOL is throttleable, so a withdrawal exceeding the start-of-step amount
+*would* ration. It never does — FvCB's `(Ci − Γ*)` shutoff drives gross assimilation (and
+thus the carbon draw) → 0 as `Ci → Γ*`, so the pool self-limits at its floor and is never
+over-drawn. A chamber sized so large that `Ci` barely moves would pass `rationed == 0`
+trivially and verify nothing, so the pool is **sized empirically** (a probe sweep over
+`air_mol`) to land in the regime where the draw-down is real: `air_mol = 1000`,
+`co2_mol0 = 0.357` (Ci₀ ≈ 250 for continuity with the Phase-1 forcing). Over the committed
+weather the pool falls 0.357 → 0.069 mol C, `Ci` 250 → 48 (~5×, near the Γ\*≈42.75 floor),
+GASS collapses ~4 orders, `rationed == 0`, no extinction. (Too-small `air_mol≈50` Euler-
+overshoots `Ci` below Γ\* in one daily step; too-large barely dents `Ci` — both rejected by
+the probe.)
+
+**Three deliberate scope refinements vs the plan's "CO₂/O₂ POOL stocks at step 2" wording**
+(advisor-reviewed; recorded so they are not re-litigated):
+1. **Honest naming.** The pool is a single-currency `carbon_pool` (`{CARBON:1}`), not a
+   molecular CO₂ stock. It is promoted to `{CARBON:1, OXYGEN:2}` with an O₂ counterpart at
+   **Step 3**, when the flows go multi-quantity. `ci_from_co2_pool` reads the pool's
+   mol-carbon amount, which the promotion leaves unchanged → **the seam needs no rework.**
+2. **O₂ pool deferred to Step 3.** An inert O₂ pool at Step 2 (nothing reads/writes it)
+   would be dead weight; it lands where it is first used (microbial/plant respiration).
+3. **Draw-down decline, not oscillation.** Respiration still drains to the `co2_resp` sink
+   (no return path), so the chamber is **not** closed — the pool is a *monotonic draw-down*.
+   The O₂↔CO₂ anti-correlation / oscillation phenomena need Step 3's return loop and are
+   **not** claimed here.
+
+**Test plan (`tests/test_chamber.py`, 20 tests, all green).** (a) *Conversion:* hand value,
+linearity, zero-carbon→Ci 0, and rejection of degenerate chamber / negative / non-finite
+inputs. (b) *Seam:* open-field reads the `ci` forcing; sealed derives `Ci` from the pool;
+the partial-triple guard. (c) *Integration (the sealed season):* `rationed == 0` across the
+draw-down (the non-vacuous self-limit), no extinction, pool monotone non-increasing with a
+net draw-down, `Ci` monotone non-increasing and `< 0.5 · Ci₀` (meaningful), GASS peaks
+(liveness) then collapses `< 1e-3 · peak` (the feedback), total CARBON invariant across all
+stocks (the sealed chamber has no boundary carbon *source*), and the open-field path keeps
+`co2_atmos` / grows no `carbon_pool` (golden untouched).
+
+---
+
 ## Exit criteria (Phase 2 — "closed chamber / producer + decomposer")
 
 - [x] **Element-composition core (P2.1)** landed: stocks carry composition, the gate folds
@@ -372,10 +463,12 @@ conservation residual/ledger fold.
       regenerate only for the serialized field).
 - [ ] **The genuine multi-quantity stoichiometric flow** (P1's filed deferral) exists:
       gas exchange balances CARBON *and* OXYGEN in one flow at PQ=1.
-- [ ] **Emergent feedback (P2.2), no control code:** photosynthesis draws down a finite CO₂
-      pool → `Ci` falls → assimilation falls; CO₂ draw-down/oscillation + O₂↔CO₂
-      anti-correlation appear with no special code; `rationed == 0` on the finite pool
-      (FvCB Ci-shutoff).
+- [~] **Emergent feedback (P2.2), no control code:** **draw-down half landed (Step 2):**
+      photosynthesis draws down a finite carbon pool → `Ci` falls → assimilation falls, with
+      no special code; `rationed == 0` on the finite pool (FvCB Ci-shutoff), verified
+      non-vacuous (Ci falls ~5×). **Remaining (Step 3):** the CO₂ oscillation + O₂↔CO₂
+      anti-correlation need the multi-quantity return loop (respiration back to the pool +
+      the O₂ counterpart) — not yet built.
 - [ ] **Decomposer loop (P2.3):** litter → microbial biomass → CO₂; microbial respiration
       draws O₂; mineralization returns N to `soil_n`.
 - [ ] **Sealed multi-year run:** stable every-step conservation (all of CARBON/OXYGEN/WATER/

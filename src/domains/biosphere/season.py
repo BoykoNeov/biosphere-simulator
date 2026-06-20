@@ -89,6 +89,10 @@ SOIL_WATER: StockId = StockId("biosphere.soil_water")
 SOIL_N: StockId = StockId("biosphere.soil_n")
 PLANT_N: StockId = StockId("biosphere.plant_n")
 CO2_ATMOS: StockId = StockId("boundary.co2_atmos")
+# Sealed chamber (P2.2): a finite carbon source POOL replacing the open-field unclamped
+# ``co2_atmos`` boundary. Honest naming — at Step 2 it is a CARBON pool ({CARBON:1});
+# it is promoted to a true CO₂ stock ({CARBON:1, OXYGEN:2}) + O₂ counterpart at Step 3.
+CARBON_POOL: StockId = StockId("biosphere.carbon_pool")
 CO2_RESP: StockId = StockId("boundary.co2_resp")
 VAPOR_SINK: StockId = StockId("boundary.vapor_sink")
 LITTER_SINK: StockId = StockId("boundary.litter_sink")
@@ -107,6 +111,9 @@ FERTILIZATION_VAR = "fertilization"
 SOIL_WATER_VAR = (
     "soil_water"  # f_water reads soil_water as a shared sibling stock (#16)
 )
+# Sealed chamber (P2.2): FvCB reads the live carbon pool amount as a shared stock (#16)
+# and derives Ci from it (chamber.ci_from_co2_pool) — the draw-down feedback seam.
+CO2_POOL_VAR = "co2_pool"
 THERMAL_TIME = "thermal_time"
 
 SeasonIntegrator = EulerIntegrator | Rk4Integrator
@@ -134,6 +141,23 @@ class SeasonScenario:
     # would swamp the small daily flux below float resolution; the demo's amounts note).
     co2_atmos0: float = 0.0
     ci: float = 250.0  # intercellular CO₂ (µmol mol⁻¹ ≈ 0.7·ambient for C3)
+    # Sealed chamber (P2.2). ``sealed=False`` keeps the Phase-1 open field (unclamped
+    # ``co2_atmos`` boundary + constant ``ci`` forcing; the regression golden is
+    # untouched). ``sealed=True`` swaps in a finite ``carbon_pool`` POOL that
+    # photosynthesis draws down, and derives Ci from it (the draw-down feedback). The
+    # chamber air total + initial fill are sized (see the Step-2 design / probe) so Ci
+    # falls meaningfully toward Γ* without exhausting the pool (rationed == 0). The
+    # default fill reproduces the Phase-1 Ci=250 at t=0
+    # (Ci0 = ci_ratio·co2_mol0/air_mol·1e6).
+    sealed: bool = False
+    chamber_air_mol: float = 1000.0  # total chamber air (mol); 0-D well-mixed
+    # initial pool carbon (mol C); Ci0 = ci_ratio·co2_mol0/air_mol·1e6 ≈ 250 µmol mol⁻¹
+    # (continuity with the Phase-1 constant Ci forcing). Sized (Step-2 probe) so the
+    # draw-down spans ~40–60 days down toward Ci≈Γ* — Ci falls ~5×, gross assimilation
+    # collapses ~4 orders — while withdrawals stay far from exhausting the pool
+    # (rationed == 0; FvCB Ci-shutoff self-limits, never the Euler backstop).
+    chamber_co2_mol0: float = 0.357
+    ci_ratio: float = 0.7  # C3 Ci/Ca draw-down set point (Farquhar & Sharkey 1982)
     # water (PP, non-limiting): a store sized to stay above the band all season
     soil_water0: float = 1000.0  # kg
     water_source0: float = 0.0  # kg (unclamped supply; tracks cumulative irrigation)
@@ -157,7 +181,12 @@ DEFAULT_SCENARIO: SeasonScenario = SeasonScenario()
 
 
 def _carbon_context(scenario: SeasonScenario) -> CarbonContext:
-    """Build the shared carbon budget context from the committed crop params."""
+    """Build the shared carbon budget context from the committed crop params.
+
+    Open field (default): Ci is the ``ci_var`` forcing read. Sealed chamber (P2.2): the
+    chamber Ci-source triple is wired so Ci is derived from the live ``carbon_pool``
+    (read as the shared ``co2_pool`` var, #16) — the draw-down feedback.
+    """
     return CarbonContext(
         leaf_c=LEAF_C,
         stem_c=STEM_C,
@@ -175,6 +204,9 @@ def _carbon_context(scenario: SeasonScenario) -> CarbonContext:
         resp=load_respiration_params(),
         nitro=load_nitrogen_params(),
         ground_area=scenario.ground_area,
+        co2_pool_var=CO2_POOL_VAR if scenario.sealed else None,
+        chamber_air_mol=scenario.chamber_air_mol if scenario.sealed else None,
+        ci_ratio=scenario.ci_ratio if scenario.sealed else None,
     )
 
 
@@ -223,7 +255,6 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         SOIL_WATER: pool(SOIL_WATER, Quantity.WATER, water, scenario.soil_water0),
         SOIL_N: pool(SOIL_N, Quantity.NITROGEN, nitrogen, scenario.soil_n0),
         PLANT_N: pool(PLANT_N, Quantity.NITROGEN, nitrogen, scenario.plant_n0),
-        CO2_ATMOS: boundary.source(CO2_ATMOS, Quantity.CARBON, scenario.co2_atmos0),
         CO2_RESP: boundary.sink(CO2_RESP, Quantity.CARBON),
         VAPOR_SINK: boundary.sink(VAPOR_SINK, Quantity.WATER),
         LITTER_SINK: boundary.sink(LITTER_SINK, Quantity.CARBON),
@@ -232,6 +263,19 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         ),
         N_SOURCE: boundary.source(N_SOURCE, Quantity.NITROGEN, scenario.n_source0),
     }
+    # The carbon source the gas-exchange flows draw from: open field = the unclamped
+    # ``co2_atmos`` boundary (Phase-1); sealed chamber (P2.2) = a finite ``carbon_pool``
+    # POOL that draws down (the feedback). The flows reference it by id only, so the
+    # single-currency carbon legs are identical — only the source's clamping changes.
+    carbon_source = CARBON_POOL if scenario.sealed else CO2_ATMOS
+    if scenario.sealed:
+        stocks[CARBON_POOL] = pool(
+            CARBON_POOL, Quantity.CARBON, carbon, scenario.chamber_co2_mol0
+        )
+    else:
+        stocks[CO2_ATMOS] = boundary.source(
+            CO2_ATMOS, Quantity.CARBON, scenario.co2_atmos0
+        )
     # Only POPULATION carbon organs are extinction-eligible ⇒ only the carbon loss-sink.
     stocks.update(boundary.loss_sinks({Quantity.CARBON}))
 
@@ -243,7 +287,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
             FlowId("biosphere.allocation"),
             0,
             ctx=ctx,
-            co2_atmos=CO2_ATMOS,
+            co2_atmos=carbon_source,
             storage_c=STORAGE_C,
             thermal_time_aux=THERMAL_TIME,
             pheno=pheno,
@@ -253,14 +297,14 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
             FlowId("biosphere.growth_respiration"),
             0,
             ctx=ctx,
-            co2_atmos=CO2_ATMOS,
+            co2_atmos=carbon_source,
             co2_resp=CO2_RESP,
         ),
         MaintenanceRespiration(
             FlowId("biosphere.maintenance_respiration"),
             0,
             ctx=ctx,
-            co2_atmos=CO2_ATMOS,
+            co2_atmos=carbon_source,
             co2_resp=CO2_RESP,
         ),
         Senescence(
@@ -347,7 +391,9 @@ def weather_resolver(
     ``domains.biosphere.weather`` derive the per-day drivers (PAR, net radiation,
     VPD, photoperiod) the flows read. ``Ci``/irrigation/fertilization are constant
     schedules; ``soil_water`` is wired **shared** to the stock so ``f_water`` reads the
-    live sibling amount (#16).
+    live sibling amount (#16). In a sealed chamber (P2.2) the ``co2_pool`` var is also
+    wired **shared** to the finite ``carbon_pool`` so FvCB derives Ci from its live
+    draw-down (the ``ci`` forcing schedule is then unused but harmless — disjoint var).
     """
     temp: list[float] = []
     par: list[float] = []
@@ -376,7 +422,11 @@ def weather_resolver(
             IRRIGATION_VAR: _table([scenario.irrigation_mm_day]),
             FERTILIZATION_VAR: _table([scenario.fertilization_kg_m2_day]),
         },
-        shared={SOIL_WATER_VAR: SOIL_WATER},
+        shared=(
+            {SOIL_WATER_VAR: SOIL_WATER, CO2_POOL_VAR: CARBON_POOL}
+            if scenario.sealed
+            else {SOIL_WATER_VAR: SOIL_WATER}
+        ),
     )
 
 

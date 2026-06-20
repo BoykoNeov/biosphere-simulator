@@ -1,0 +1,240 @@
+"""Phase-2 Step-2 tests: the finite chamber atmosphere + the Ci-from-stock seam (P2.2).
+
+The first **emergent feedback**: a sealed chamber sources photosynthesis from a finite
+``carbon_pool`` (not the open field's unclamped boundary), and FvCB derives ``Ci`` from
+the pool's live draw-down (``chamber.ci_from_co2_pool`` read as a shared stock, #16).
+With no control code, the pool draws down → ``Ci`` falls → gross assimilation collapses
+toward Γ*. Three layers:
+
+* **The conversion** (:func:`ci_from_co2_pool`) — pure, hand-checkable.
+* **The seam** (:class:`CarbonContext` Ci source) — forcing (open) vs pool-derived
+  (sealed), and the all-or-nothing wiring guard.
+* **The integration** — the sealed season: ``rationed == 0`` across a *non-vacuous*
+  draw-down (Ci falls ~5×, GASS collapses ~4 orders; the central numerical check that
+  the finite pool self-limits via FvCB's Ci-shutoff, never the Euler backstop), total
+  carbon conserved (the sealed chamber has no boundary carbon *source*), and the
+  open-field path left untouched.
+
+**Scope honesty (Step 2).** The chamber carbon pool is single-currency CARBON and
+respiration still drains to the ``co2_resp`` sink, so the chamber is **not** closed —
+the pool is a monotonic draw-down, not an oscillating closed loop. The O₂ counterpart,
+``{CARBON:1, OXYGEN:2}`` composition, and the multi-quantity return loop (and thus the
+O₂↔CO₂ anti-correlation / oscillation phenomena) land at **Step 3**.
+
+Pure-stdlib data path (reads the committed JSON weather fixture; no PCSE).
+"""
+
+import json
+import math
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+from domains.biosphere.chamber import ci_from_co2_pool
+from domains.biosphere.season import (
+    CARBON_POOL,
+    CO2_ATMOS,
+    LEAF_C,
+    ROOT_C,
+    STEM_C,
+    STORAGE_C,
+    SeasonScenario,
+    _carbon_context,
+    build_season,
+    run_season,
+    weather_resolver,
+)
+from simcore.integrator import EulerIntegrator
+from simcore.quantities import Quantity
+from simcore.state import State
+
+_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_ORGANS = (LEAF_C, STEM_C, ROOT_C, STORAGE_C)
+
+
+def _weather() -> list[dict[str, float | str]]:
+    return json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
+
+
+def _run_sealed(
+    scenario: SeasonScenario,
+) -> tuple[list[State], int, tuple]:
+    state, registry = build_season(scenario)
+    resolver = weather_resolver(_weather(), scenario)
+    return run_season(EulerIntegrator(registry), state, resolver, 1.0, len(_weather()))
+
+
+def _total_carbon(s: State) -> float:
+    """Total CARBON across every stock (internal + boundary), folding composition.
+
+    The sealed chamber has no boundary carbon *source*, so this is invariant across
+    the whole run — the conservation gate's claim, asserted end-to-end here.
+    """
+    return sum(
+        stock.amount * stock.composition.get(Quantity.CARBON, 0.0)
+        for stock in s.stocks.values()
+    )
+
+
+# --- the conversion: ci_from_co2_pool (pure, hand-checked) -------------------
+def test_ci_from_co2_pool_hand_value() -> None:
+    # Ca = 0.5 mol / 1000 mol · 1e6 = 500 µmol mol⁻¹; Ci = 0.7 · 500 = 350.
+    assert math.isclose(
+        ci_from_co2_pool(0.5, air_mol=1000.0, ci_ratio=0.7), 350.0, rel_tol=1e-12
+    )
+
+
+def test_ci_from_co2_pool_is_linear_in_carbon() -> None:
+    a = ci_from_co2_pool(0.2, air_mol=1000.0, ci_ratio=0.7)
+    b = ci_from_co2_pool(0.4, air_mol=1000.0, ci_ratio=0.7)
+    assert math.isclose(b, 2.0 * a, rel_tol=1e-12)
+
+
+def test_ci_from_co2_pool_zero_carbon_is_zero_ci() -> None:
+    # An exhausted pool reads Ci = 0 (≤ Γ*) → FvCB shuts the source off entirely.
+    assert ci_from_co2_pool(0.0, air_mol=1000.0, ci_ratio=0.7) == 0.0
+
+
+@pytest.mark.parametrize(
+    ("co2_mol", "air_mol", "ci_ratio"),
+    [
+        (0.5, 0.0, 0.7),  # degenerate chamber (no air)
+        (0.5, -1.0, 0.7),
+        (0.5, 1000.0, 0.0),  # degenerate ratio
+        (0.5, 1000.0, -0.7),
+        (-0.5, 1000.0, 0.7),  # impossible negative carbon
+        (math.inf, 1000.0, 0.7),  # non-finite carbon
+        (math.nan, 1000.0, 0.7),
+    ],
+)
+def test_ci_from_co2_pool_rejects_bad_inputs(
+    co2_mol: float, air_mol: float, ci_ratio: float
+) -> None:
+    with pytest.raises(ValueError):
+        ci_from_co2_pool(co2_mol, air_mol=air_mol, ci_ratio=ci_ratio)
+
+
+# --- the seam: CarbonContext Ci source (forcing vs pool) --------------------
+def test_carbon_context_open_field_reads_ci_forcing() -> None:
+    # Default (open field): Ci is the constant ``ci`` forcing, not pool-derived.
+    scenario = SeasonScenario()
+    state, _ = build_season(scenario)
+    resolver = weather_resolver(_weather(), scenario)
+    ctx = _carbon_context(scenario)
+    assert ctx.co2_pool_var is None
+    assert ctx._ci(resolver.bind(state, 1.0)) == scenario.ci
+
+
+def test_carbon_context_sealed_derives_ci_from_pool() -> None:
+    # Sealed: Ci is derived from the live carbon-pool amount via ci_from_co2_pool.
+    scenario = SeasonScenario(sealed=True)
+    state, _ = build_season(scenario)
+    resolver = weather_resolver(_weather(), scenario)
+    ctx = _carbon_context(scenario)
+    pool0 = state.stocks[CARBON_POOL].amount
+    expected = ci_from_co2_pool(
+        pool0, air_mol=scenario.chamber_air_mol, ci_ratio=scenario.ci_ratio
+    )
+    assert ctx._ci(resolver.bind(state, 1.0)) == expected
+
+
+def test_carbon_context_partial_chamber_triple_rejected() -> None:
+    # The Ci-source triple (co2_pool_var, chamber_air_mol, ci_ratio) is all-or-nothing;
+    # a partial wiring is a build bug caught at construction.
+    sealed = _carbon_context(SeasonScenario(sealed=True))
+    with pytest.raises(ValueError, match="all-or-nothing|set together|left None"):
+        replace(sealed, ci_ratio=None)
+
+
+# --- the integration: the sealed season's emergent draw-down ----------------
+@pytest.fixture(scope="module")
+def sealed() -> tuple[list[State], int, tuple]:
+    return _run_sealed(SeasonScenario(sealed=True))
+
+
+def test_sealed_never_rations(sealed: tuple[list[State], int, tuple]) -> None:
+    # The central P2.2 numerical check: a *clamped* finite pool stays rationed == 0
+    # purely from FvCB's Ci-shutoff (the draw self-limits as Ci → Γ*), never the Euler
+    # backstop. Phase 1 dodged this with an unclamped boundary; the chamber re-clamps.
+    _, total_rationed, _ = sealed
+    assert total_rationed == 0
+
+
+def test_sealed_has_no_extinction_events(
+    sealed: tuple[list[State], int, tuple],
+) -> None:
+    _, _, events = sealed
+    assert events == ()
+
+
+def test_sealed_pool_draws_down_monotonically(
+    sealed: tuple[list[State], int, tuple],
+) -> None:
+    # The pool only ever loses carbon (no return path until Step 3), so it is monotone
+    # non-increasing (flat on cold days where f_temp = 0 → GASS = 0) and nets a real
+    # draw-down. A monotone increase anywhere would mean a spurious carbon source.
+    states, _, _ = sealed
+    pools = [s.stocks[CARBON_POOL].amount for s in states]
+    for prev, cur in zip(pools, pools[1:], strict=False):
+        assert cur <= prev
+    assert pools[-1] < pools[0]
+
+
+def test_sealed_ci_falls_meaningfully(
+    sealed: tuple[list[State], int, tuple],
+) -> None:
+    # NON-VACUOUS draw-down: Ci is monotone non-increasing and falls well below half its
+    # initial value (the probe lands ~0.19×). A chamber so large that Ci barely moves
+    # would pass rationed == 0 trivially and verify nothing — this guards against that.
+    states, _, _ = sealed
+    scenario = SeasonScenario(sealed=True)
+    cis = [
+        ci_from_co2_pool(
+            s.stocks[CARBON_POOL].amount,
+            air_mol=scenario.chamber_air_mol,
+            ci_ratio=scenario.ci_ratio,
+        )
+        for s in states
+    ]
+    for prev, cur in zip(cis, cis[1:], strict=False):
+        assert cur <= prev
+    assert cis[-1] < 0.5 * cis[0]
+
+
+def test_sealed_assimilation_collapses_as_ci_falls(
+    sealed: tuple[list[State], int, tuple],
+) -> None:
+    # The emergent feedback's payoff: gross assimilation actually happens early
+    # (liveness — not a dead trajectory) and then collapses by orders of magnitude as
+    # the pool depletes and Ci → Γ*. Recompute GASS from each snapshot via the budget.
+    states, _, _ = sealed
+    scenario = SeasonScenario(sealed=True)
+    resolver = weather_resolver(_weather(), scenario)
+    ctx = _carbon_context(scenario)
+    gass = [ctx.budget(s, resolver.bind(s, 1.0))[0] for s in states]
+    peak = max(gass)
+    assert peak > 1e-3  # the plant did fix carbon (liveness)
+    assert gass[-1] < 1e-3 * peak  # ... then assimilation collapsed (the feedback)
+
+
+def test_sealed_conserves_total_carbon(
+    sealed: tuple[list[State], int, tuple],
+) -> None:
+    # The sealed chamber has no boundary carbon SOURCE (the pool is internal), so total
+    # CARBON across all stocks — pool + organs + co2_resp + litter_sink + loss_sink — is
+    # invariant. This is the every-step gate's claim, asserted end-to-end. (The chamber
+    # still leaks carbon to co2_resp/litter_sink boundary sinks — it is not closed until
+    # Step 3 — but no carbon is created or destroyed.)
+    states, _, _ = sealed
+    total0 = _total_carbon(states[0])
+    for s in states:
+        assert math.isclose(_total_carbon(s), total0, rel_tol=1e-12, abs_tol=1e-12)
+
+
+def test_open_field_unchanged_by_chamber_additions() -> None:
+    # The default (open field) keeps the unclamped co2_atmos boundary source and grows
+    # no carbon_pool — the Phase-1 assembly (and its regression golden) is untouched.
+    state, _ = build_season(SeasonScenario())
+    assert CO2_ATMOS in state.stocks
+    assert CARBON_POOL not in state.stocks

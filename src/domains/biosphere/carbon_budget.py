@@ -64,6 +64,7 @@ from dataclasses import dataclass
 
 from domains.biosphere.allocation import AllocationParams, partition
 from domains.biosphere.canopy import CanopyParams, leaf_area_index
+from domains.biosphere.chamber import ci_from_co2_pool
 from domains.biosphere.nitrogen import NitrogenParams, nitrogen_stress_factor
 from domains.biosphere.phenology import PhenologyParams, development_stage
 from domains.biosphere.photosynthesis import (
@@ -117,6 +118,45 @@ class CarbonContext:
     resp: RespirationParams
     nitro: NitrogenParams
     ground_area: float
+    # Ci source (P2.2). Default None → the Phase-1 forcing read of ``ci_var`` (open
+    # field; the regression golden is unchanged). When ``co2_pool_var`` is set, Ci is
+    # derived from a finite chamber carbon pool read as a shared stock (#16) via
+    # ``chamber.ci_from_co2_pool`` — the sealed-chamber draw-down feedback (Step 2): the
+    # pool falls → Ci falls → assimilation falls, with no control code.
+    # ``chamber_air_mol`` (total chamber air) and ``ci_ratio`` (the C3 Ci/Ca set point)
+    # are chamber/scenario data (P4), required together with ``co2_pool_var`` (the
+    # all-or-nothing guard below).
+    co2_pool_var: str | None = None
+    chamber_air_mol: float | None = None
+    ci_ratio: float | None = None
+
+    def __post_init__(self) -> None:
+        # The chamber Ci-source fields are all-or-nothing: either the full sealed triple
+        # is wired or Ci stays the forcing read. A partial wiring is a build bug.
+        chamber = (self.co2_pool_var, self.chamber_air_mol, self.ci_ratio)
+        if any(v is not None for v in chamber) and any(v is None for v in chamber):
+            raise ValueError(
+                "CarbonContext chamber Ci-source fields (co2_pool_var, "
+                "chamber_air_mol, ci_ratio) must be set together or all left None"
+            )
+
+    def _ci(self, env: Environment) -> float:
+        """Intercellular CO₂ ``Ci`` (µmol mol⁻¹) — the forcing-vs-pool seam (P2.2).
+
+        Phase-1 open field: the ``ci_var`` forcing read. Sealed chamber: derived from
+        the live finite carbon pool (``co2_pool_var``, a shared stock #16) so the pool's
+        draw-down lowers ``Ci`` — the emergent feedback, no controller. The caller
+        (:meth:`budget`) cannot tell which branch answered.
+        """
+        if self.co2_pool_var is None:
+            return env.get(self.ci_var)
+        # __post_init__ guarantees the air/ratio are present when the pool var is.
+        assert self.chamber_air_mol is not None and self.ci_ratio is not None
+        return ci_from_co2_pool(
+            env.get(self.co2_pool_var),
+            air_mol=self.chamber_air_mol,
+            ci_ratio=self.ci_ratio,
+        )
 
     def _leaf_and_biomass(self, snapshot: State) -> tuple[float, float]:
         """``(leaf_carbon, Σ(leaf + stem + root))`` — the LAI and biomass reads.
@@ -173,7 +213,7 @@ class CarbonContext:
         gass = daily_canopy_assimilation(
             env.get(self.par_var),
             lai,
-            env.get(self.ci_var),
+            self._ci(env),
             env.get(self.temp_var),
             env.get(self.daylength_var),
             params=self.photo,
