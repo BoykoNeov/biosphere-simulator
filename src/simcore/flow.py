@@ -144,8 +144,14 @@ def per_quantity_residual(
     """
     residual: dict[Quantity, float] = {}
     for leg in sorted(result.legs, key=lambda leg: leg.stock):
-        quantity = stocks[leg.stock].quantity
-        residual[quantity] = residual.get(quantity, 0.0) + leg.amount
+        # Element-composition fold (P2.1): a leg contributes ``amount · coeff`` to
+        # *each* quantity its stock carries (CO2 books both CARBON and OXYGEN),
+        # instead of all of ``amount`` to one. A 1:1 stock folds ``amount · 1.0``
+        # to its single quantity — bit-identical to the pre-P2.1 path. Each
+        # quantity has its own accumulator, so inner iteration order is irrelevant;
+        # the canonical-order (#15) guarantee comes from the outer stock-id sort.
+        for quantity, coeff in stocks[leg.stock].composition.items():
+            residual[quantity] = residual.get(quantity, 0.0) + leg.amount * coeff
     return residual
 
 
@@ -167,8 +173,11 @@ def assert_flow_balanced(
     residual = per_quantity_residual(result, stocks)
     scale: dict[Quantity, float] = {}
     for leg in result.legs:
-        quantity = stocks[leg.stock].quantity
-        scale[quantity] = max(scale.get(quantity, 0.0), abs(leg.amount))
+        # Same composition fold as the residual: the tolerance denominator for
+        # quantity ``q`` is ``max |leg.amount · coeff_q|`` (P2.1). 1:1 folds to
+        # ``abs(leg.amount)`` — unchanged.
+        for quantity, coeff in stocks[leg.stock].composition.items():
+            scale[quantity] = max(scale.get(quantity, 0.0), abs(leg.amount * coeff))
     # Iterate sorted so the first reported failure is deterministic (a frozenset
     # has no defined iteration order); which quantity fails first is cosmetic, but
     # determinism everywhere is cheap and on-brand.

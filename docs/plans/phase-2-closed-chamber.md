@@ -1,17 +1,23 @@
 # Phase 2 — Closed Chamber / Producer + Decomposer
 
-**Status:** IN PROGRESS — **plan drafted and advisor design-reviewed; the load-bearing
-foundation design (P2.1, the element-composition core change) is written below and ready to
-implement (Step 1).** The review corrected two things, now folded in: (1) the composition fold
-has **two** mandatory sites, not one — `flow.py` (legs) *and* `conservation.py` (state
-deltas); missing the second falsely trips the OXYGEN gate every photosynthesis step; (2) an
-O₂ self-limitation mirror (Michaelis in O₂) is required so respiration keeps `rationed == 0`
-on a depleting O₂ pool (flagged for steps 3/5). PQ=1 with pure-carbon biomass is confirmed
-the correct, water-untouched formulation. No Phase-2 code yet. Phase 1 (single producer) is
-complete
-and regression-pinned (`docs/plans/phase-1-single-producer.md`); Phase 2 is **additive to
-the biology** but is the **first deliberate modification of the frozen Phase-0 conservation
-core** — a user-approved exception, scoped as tightly as the science allows (see P2.1).
+**Status:** IN PROGRESS — **Step 1 (P2.1, the element-composition core change) is COMPLETE
+and landed.** Stocks now carry a `composition` map; the conservation gate folds it at both
+mandatory sites (`flow.py` legs + `conservation.py` state deltas); OXYGEN is genuinely
+asserted; the Phase-1 1:1 behaviour is bit-identical (goldens regenerated for the additive
+`composition` block + schema v2→v3 only — zero amount drift). New `tests/test_composition.py`
+pins both gate paths, the POPULATION-single-quantity invariant, construction-time validation,
+and determinism; the multi-key round-trip is pinned in `test_sim_io_snapshot.py`. All gates
+green (686 passed, ruff/pyright clean). **Next: Step 2 — finite chamber atmosphere + the
+`Ci`-from-stock seam (P2.2).** The design review's two corrections were folded in before
+build: (1) the composition fold has **two** mandatory sites, not one — `flow.py` (legs) *and*
+`conservation.py` (state deltas); missing the second falsely trips the OXYGEN gate every
+photosynthesis step; (2) an O₂ self-limitation mirror (Michaelis in O₂) is required so
+respiration keeps `rationed == 0` on a depleting O₂ pool (flagged for steps 3/5). PQ=1 with
+pure-carbon biomass is confirmed the correct, water-untouched formulation. Phase 1 (single
+producer) is complete and regression-pinned (`docs/plans/phase-1-single-producer.md`); Phase 2
+is **additive to the biology** but Step 1 was the **first deliberate modification of the frozen
+Phase-0 conservation core** — a user-approved exception, scoped as tightly as the science
+allows (see P2.1).
 
 **Goal (roadmap lines 247–269):** *move the system boundaries inward — external forcing
 shrinks, internal feedback grows.* Seal the producer into a chamber with a finite
@@ -265,11 +271,14 @@ arbitration.
 **Foundation — designed in full (P2.1) and reviewed/built before the process steps, the
 Phase-1 rhythm.**
 
-1. **Element-composition core change (P2.1)** — `Stock.composition`, the
-   `per_quantity_residual` fold, `sim_io` serialization + schema bump, goldens regenerate.
-   Property tests: 1:1 default reproduces Phase-1 exactly; a 2-quantity flow
-   (CO₂→biomass+O₂) balances CARBON and OXYGEN; a deliberately mis-stoichiometric flow
-   trips the gate. **Pure infra — no biology yet.**
+1. ~~**Element-composition core change (P2.1)**~~ — **DONE.** `Stock.composition` (default
+   1:1, `hash=False`, validated incl. POPULATION-single-quantity), both fold sites
+   (`flow.per_quantity_residual`/`assert_flow_balanced` + `conservation.compute_ledger`/
+   `assert_conserved`), `sim_io` serialization (key-sorted hex-float) + schema v2→v3, four
+   goldens regenerated (diff = additive `composition` block + version only). Tests
+   (`tests/test_composition.py`): 1:1 default reproduces Phase-1 exactly; CO₂→biomass+O₂
+   balances CARBON and OXYGEN on **both** gate paths; mis-stoichiometric O₂ trips the gate;
+   order-independence; validation guards. **Pure infra — no biology yet.**
 
 **Process steps — enumerated now, each designed just-in-time (Phase-1 rhythm).**
 
@@ -358,7 +367,7 @@ conservation residual/ledger fold.
 
 ## Exit criteria (Phase 2 — "closed chamber / producer + decomposer")
 
-- [ ] **Element-composition core (P2.1)** landed: stocks carry composition, the gate folds
+- [x] **Element-composition core (P2.1)** landed: stocks carry composition, the gate folds
       it, OXYGEN is genuinely asserted; the Phase-1 1:1 behavior is preserved (goldens
       regenerate only for the serialized field).
 - [ ] **The genuine multi-quantity stoichiometric flow** (P1's filed deferral) exists:

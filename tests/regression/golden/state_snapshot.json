@@ -9,6 +9,9 @@
   "stocks": [
     {
       "amount": "0x1.921fb54442d18p+1",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "bio",
       "extinction_threshold": "0x0.0p+0",
       "id": "bio.atmo_c",
@@ -19,6 +22,9 @@
     },
     {
       "amount": "0x1.999999999999ap-4",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "bio",
       "extinction_threshold": "0x1.0c6f7a0b5ed8dp-20",
       "id": "bio.plant_c",
@@ -29,6 +35,9 @@
     },
     {
       "amount": "0x0.0000000000001p-1022",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
       "domain": "bio",
       "extinction_threshold": "0x0.0p+0",
       "id": "bio.water",
@@ -39,6 +48,9 @@
     },
     {
       "amount": "-0x0.0p+0",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.loss.carbon",
@@ -49,6 +61,9 @@
     },
     {
       "amount": "0x1.7e43c8800759cp+996",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.solar",
@@ -58,5 +73,5 @@
       "unit": "J"
     }
   ],
-  "version": 2
+  "version": 3
 }

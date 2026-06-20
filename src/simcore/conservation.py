@@ -90,7 +90,16 @@ def compute_ledger(before: State, after: State) -> tuple[QuantityLedger, ...]:
         b = before.stocks[sid]
         delta = after.stocks[sid].amount - b.amount
         bucket = boundary if b.kind is StockKind.BOUNDARY else stored
-        bucket[b.quantity] = bucket.get(b.quantity, 0.0) + delta
+        # Element-composition fold (P2.1) — the state-delta mirror of the leg fold
+        # in ``flow.per_quantity_residual``. This module deliberately does NOT
+        # reuse the leg path (it reasons over deltas, see the docstring), so it
+        # needs its own fold: a per-stock Δamount books to *each* quantity the
+        # stock carries (a CO2 pool's drop books to both CARBON and OXYGEN).
+        # Without this, the per-step OXYGEN gate would falsely trip on every
+        # photosynthesis step. A 1:1 stock folds ``delta · 1.0`` to its single
+        # quantity — bit-identical to the pre-P2.1 path.
+        for q, coeff in b.composition.items():
+            bucket[q] = bucket.get(q, 0.0) + delta * coeff
     quantities = sorted(set(boundary) | set(stored), key=lambda q: q.name)
     return tuple(
         QuantityLedger(
@@ -138,8 +147,12 @@ def assert_conserved(
     ledger = {ql.quantity: ql for ql in compute_ledger(before, after)}
     scale: dict[Quantity, float] = {}
     for sid, b in before.stocks.items():
-        d = abs(after.stocks[sid].amount - b.amount)
-        scale[b.quantity] = max(scale.get(b.quantity, 0.0), d)
+        d = after.stocks[sid].amount - b.amount
+        # Composition fold (P2.1), mirroring ``flow.assert_flow_balanced``'s scale:
+        # the tolerance denominator for ``q`` is ``max |Δ · coeff_q|``. 1:1 folds
+        # to ``abs(d)`` — unchanged.
+        for q, coeff in b.composition.items():
+            scale[q] = max(scale.get(q, 0.0), abs(d * coeff))
     # Sorted so the first reported failure is deterministic (a frozenset has no
     # defined iteration order) — cosmetic, but determinism everywhere is on-brand.
     for quantity in sorted(ASSERTED_QUANTITIES, key=lambda q: q.name):

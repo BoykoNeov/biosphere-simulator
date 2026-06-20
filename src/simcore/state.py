@@ -14,7 +14,7 @@ Pure stdlib only.
 
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 
 from simcore.ids import DomainId, StockId, UnitLabel
@@ -25,6 +25,12 @@ from simcore.quantities import Quantity, StockKind
 # blacklist (list/dict/set) and is effectively immutable, so one shared instance
 # is a safe default — every ``State`` re-wraps its own copy in ``__post_init__``.
 _EMPTY_AUX: Mapping[str, float] = MappingProxyType({})
+
+# Shared "not supplied" sentinel for ``Stock.composition`` (P2.1). Empty means
+# "default to the 1:1 ``{quantity: 1.0}`` map" — filled in ``__post_init__`` once
+# the stock's own quantity is known. Same safe-shared-MappingProxyType idiom as
+# ``_EMPTY_AUX`` (not in dataclass's mutable-default blacklist).
+_EMPTY_COMPOSITION: Mapping[Quantity, float] = MappingProxyType({})
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,18 @@ class Stock:
     # BOUNDARY source (e.g. solar): never throttled by arbitration min-scaling
     # (decision #13). Meaningful only for BOUNDARY stocks.
     unclamped: bool = False
+    # Element composition (P2.1): moles of each conserved quantity that one
+    # canonical unit of this stock contributes to the conservation ledger. The
+    # empty-sentinel default fills to the 1:1 ``{quantity: 1.0}`` map in
+    # ``__post_init__``, so every Phase-1 stock is unchanged. A gas-phase stock
+    # carries several: CO2={CARBON:1, OXYGEN:2}, O2={OXYGEN:2}; biomass stays
+    # {CARBON:1}. ``hash=False`` because a ``Mapping`` is unhashable — but it
+    # stays in ``__eq__`` so a dropped/garbled composition is caught by the
+    # snapshot round-trip. The conservation gate (``flow``/``conservation``)
+    # folds this map; nothing else (arbitration, integrator, observation) reads it.
+    composition: Mapping[Quantity, float] = field(
+        default=_EMPTY_COMPOSITION, hash=False
+    )
 
     def __post_init__(self) -> None:
         # NaN/Inf are forbidden anywhere in state (determinism/serialization).
@@ -69,6 +87,39 @@ class Stock:
                 f"Stock {self.id!r} is unclamped but kind={self.kind.name}; "
                 "unclamped is only valid on BOUNDARY stocks (decision #13)"
             )
+        # Element composition (P2.1). Empty (the not-supplied sentinel) → the 1:1
+        # ``{quantity: 1.0}`` default. Validate: every key a ``Quantity``, every
+        # coeff finite, and the stock's own quantity present with a positive coeff
+        # (so a stock always contributes to its nominal quantity). Detach from the
+        # caller's mapping and freeze read-only — same discipline as ``stocks``/``aux``.
+        composition = dict(self.composition) or {self.quantity: 1.0}
+        for q, coeff in composition.items():
+            if not isinstance(q, Quantity):
+                raise ValueError(
+                    f"Stock {self.id!r} composition key {q!r} is not a Quantity"
+                )
+            if not math.isfinite(coeff):
+                raise ValueError(
+                    f"Stock {self.id!r} composition[{q.name}] is not finite: {coeff!r}"
+                )
+        self_coeff = composition.get(self.quantity)
+        if self_coeff is None or self_coeff <= 0.0:
+            raise ValueError(
+                f"Stock {self.id!r} composition must include its own quantity "
+                f"{self.quantity.name} with a positive coeff (got {self_coeff!r})"
+            )
+        # A POPULATION stock must be single-quantity (P2.1 invariant): extinction
+        # routes its residual via ``loss_sink_id(stock.quantity)`` — one nominal
+        # quantity — so a multi-quantity POPULATION would leak the non-nominal
+        # quantities' mass at extinction. Reject at construction.
+        if self.kind is StockKind.POPULATION and set(composition) != {self.quantity}:
+            raise ValueError(
+                f"Stock {self.id!r} is POPULATION but multi-quantity "
+                f"(composition keys {sorted(k.name for k in composition)}); a "
+                "POPULATION stock must be single-quantity (extinction loss-sink "
+                "routing is single-quantity, P2.1)"
+            )
+        object.__setattr__(self, "composition", MappingProxyType(composition))
 
 
 @dataclass(frozen=True)

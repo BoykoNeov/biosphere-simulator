@@ -5,6 +5,9 @@
   "stocks": [
     {
       "amount": "0x1.36886f7980b35p+4",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "biosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.atmospheric_c",
@@ -15,6 +18,9 @@
     },
     {
       "amount": "0x1.05cd160cb9941p+5",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "biosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.plant_c",
@@ -25,6 +31,9 @@
     },
     {
       "amount": "0x1.0000000000000p+0",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.light",
@@ -35,6 +44,9 @@
     },
     {
       "amount": "0x0.0p+0",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.loss.carbon",
@@ -45,6 +57,9 @@
     },
     {
       "amount": "0x1.05f77591b430cp+10",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.outside_c",
@@ -54,5 +69,5 @@
       "unit": "mol"
     }
   ],
-  "version": 2
+  "version": 3
 }

@@ -265,10 +265,11 @@ def test_tampered_unclamped_non_boundary_rejected() -> None:
         sim_io.state_from_dict(data)
 
 
-@pytest.mark.parametrize("version", [0, 1, 3, "2", None])
+@pytest.mark.parametrize("version", [0, 1, 2, 4, "3", None])
 def test_unknown_schema_version_rejected(version: object) -> None:
-    # Includes the now-superseded v1: a v1 golden is rejected outright (no migration
-    # machinery; the v1->v2 aux bump regenerated all goldens).
+    # Includes the now-superseded v1/v2: a stale golden is rejected outright (no
+    # migration machinery; the v1->v2 aux and v2->v3 composition bumps each
+    # regenerated all goldens).
     data = sim_io.state_to_dict(_golden_state())
     data["version"] = version
     with pytest.raises(ValueError, match="schema version"):
@@ -283,7 +284,34 @@ def test_missing_version_rejected() -> None:
 
 
 def test_schema_version_constant_exposed() -> None:
-    assert sim_io.SCHEMA_VERSION == snapshot.SCHEMA_VERSION == 2
+    assert sim_io.SCHEMA_VERSION == snapshot.SCHEMA_VERSION == 3
+
+
+def test_multikey_composition_round_trips_and_key_sorts() -> None:
+    # The committed golden is all 1:1 (it only ever exercises ``{q: "0x1p+0"}``), so
+    # a non-unit, multi-key composition gets its own round-trip with teeth: a CO2-like
+    # POOL ``{CARBON:1, OXYGEN:2}`` must survive bit-for-bit and serialize key-sorted.
+    co2 = Stock(
+        id=StockId("bio.co2"),
+        domain=DomainId("bio"),
+        quantity=Quantity.CARBON,
+        unit=canonical_unit(Quantity.CARBON),
+        amount=math.pi,
+        kind=StockKind.POOL,
+        composition={Quantity.CARBON: 1.0, Quantity.OXYGEN: 2.0},
+    )
+    state = State(n=0, stocks={co2.id: co2}, rng_seed=0)
+
+    assert sim_io.loads(sim_io.dumps(state)) == state  # bit-identical round-trip
+
+    data = sim_io.state_to_dict(state)
+    stocks = data["stocks"]
+    assert isinstance(stocks, list)
+    comp = stocks[0]["composition"]
+    # Key-sorted by quantity value (canonical order, #15); coeffs as exact hex-floats.
+    assert list(comp.keys()) == ["carbon", "oxygen"]
+    assert comp["carbon"] == (1.0).hex()
+    assert comp["oxygen"] == (2.0).hex()
 
 
 def _regenerate() -> None:

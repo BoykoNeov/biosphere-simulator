@@ -60,8 +60,11 @@ from simcore.state import State, Stock
 # Snapshot schema version. Bump only when the on-disk shape changes; see the
 # module docstring for why a marker exists at all (and why no migration machinery
 # does yet). v2 adds the non-conserved ``aux`` channel (Phase-1 P2); v1 goldens are
-# rejected outright (no migration) and were regenerated at the bump.
-SCHEMA_VERSION = 2
+# rejected outright (no migration) and were regenerated at the bump. v3 adds the
+# per-stock element ``composition`` map (P2.1); v2 goldens were likewise
+# regenerated (the diff is purely the added ``composition`` block — amounts stay
+# bit-identical, the 1:1 fold being exact ×1.0).
+SCHEMA_VERSION = 3
 
 
 def _stock_to_dict(stock: Stock) -> dict[str, object]:
@@ -75,6 +78,15 @@ def _stock_to_dict(stock: Stock) -> dict[str, object]:
         "kind": stock.kind.value,
         "extinction_threshold": stock.extinction_threshold.hex(),
         "unclamped": stock.unclamped,
+        # Element composition (P2.1): a key-sorted object of hex-float coeffs,
+        # keyed by quantity value. Same exactness/canonical-order discipline as
+        # ``aux`` and amounts. A 1:1 stock serializes ``{"<its quantity>": "0x1p+0"}``.
+        "composition": {
+            q.value: coeff.hex()
+            for q, coeff in sorted(
+                stock.composition.items(), key=lambda kv: kv[0].value
+            )
+        },
     }
 
 
@@ -89,6 +101,9 @@ def _stock_from_dict(data: Mapping[str, Any]) -> Stock:
         kind=StockKind(data["kind"]),
         extinction_threshold=float.fromhex(data["extinction_threshold"]),
         unclamped=data["unclamped"],
+        composition={
+            Quantity(k): float.fromhex(v) for k, v in data["composition"].items()
+        },
     )
 
 

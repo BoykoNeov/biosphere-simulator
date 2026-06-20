@@ -7,6 +7,9 @@
   "stocks": [
     {
       "amount": "0x1.cdf6327600dfep-9",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "biosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.leaf_c",
@@ -17,6 +20,9 @@
     },
     {
       "amount": "0x1.ea3d70a3d700fp-1",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
       "domain": "biosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.plant_n",
@@ -27,6 +33,9 @@
     },
     {
       "amount": "0x1.0c4dddea2ea99p-5",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "biosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.root_c",
@@ -37,6 +46,9 @@
     },
     {
       "amount": "0x1.8e2b851eb85b6p+6",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
       "domain": "biosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.soil_n",
@@ -47,6 +59,9 @@
     },
     {
       "amount": "0x1.ff5b420f4af3dp+9",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
       "domain": "biosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.soil_water",
@@ -57,6 +72,9 @@
     },
     {
       "amount": "0x1.456847bd0f15fp-4",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "biosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.stem_c",
@@ -67,6 +85,9 @@
     },
     {
       "amount": "0x1.0db9aa52d810cp-2",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "biosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.storage_c",
@@ -77,6 +98,9 @@
     },
     {
       "amount": "-0x1.a5b59a5f1d63ap+0",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.co2_atmos",
@@ -87,6 +111,9 @@
     },
     {
       "amount": "0x1.8c55300be0facp-1",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.co2_resp",
@@ -97,6 +124,9 @@
     },
     {
       "amount": "0x1.4ee4d79eeb474p-1",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.litter_sink",
@@ -107,6 +137,9 @@
     },
     {
       "amount": "0x0.0p+0",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.loss.carbon",
@@ -117,6 +150,9 @@
     },
     {
       "amount": "0x0.0p+0",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.n_source",
@@ -127,6 +163,9 @@
     },
     {
       "amount": "0x1.25a4bdf0b50bfp+9",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.vapor_sink",
@@ -137,6 +176,9 @@
     },
     {
       "amount": "-0x1.3100000000000p+9",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.water_source",
@@ -146,5 +188,5 @@
       "unit": "kg"
     }
   ],
-  "version": 2
+  "version": 3
 }
