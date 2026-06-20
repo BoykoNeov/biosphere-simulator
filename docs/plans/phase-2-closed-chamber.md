@@ -134,7 +134,55 @@ chamber test (`test_sealed_assimilation_rises_then_declines`) was strengthened t
 the collapse at the post-peak *trough* (GASS hits 0) with an end-of-season *recovery*. All
 gates green (757 passed, ruff/pyright clean). **Deferred seams (unchanged):** microbial
 death/turnover recycling, microbe-explicit Michaelis substrate kinetics, and the `f_O2`
-above. **Next: Step 6 — mineralization (NITROGEN), litter/microbial N → `soil_n`.**
+above.
+
+**Step 6 (mineralization, NITROGEN — the nitrogen return loop) is COMPLETE and landed.**
+The carbon decomposer loop (Steps 4–5) gets its **nitrogen mirror**, closing the N cycle
+Phase 1 left open. Phase 1 drained `soil_n → plant_n` by uptake, refilled `soil_n` from an
+*external* `n_source` (fertilization), and left `plant_n` **monotone-growing** (nothing
+withdrew it). Step 6 returns plant N to the soil internally via two single-currency
+NITROGEN flows + a finite `litter_n` POOL (the N analogue of `litter_carbon`): **(1)
+`NitrogenSenescence` `plant_n → litter_n`** (first-order `n_sen·plant_n`, self-limiting —
+the N counterpart of carbon senescence; makes `plant_n` non-monotone, the consumption side
+the open loop lacked) and **(2) `Mineralization` `litter_n → soil_n`** (first-order
+donor-controlled net mineralization `k_min·litter_n`, Stanford & Smith 1972). The loop
+`soil_n → plant_n → litter_n → soil_n` now closes with no external supply (the inert
+`n_source`/fertilization stays wired at rate 0). Both are **single-currency NITROGEN** (all
+pools `{NITROGEN:1}`), so the gate folds them exactly like Phase 1 — **no core change**.
+**Empirical (305-day sealed run):** `rationed == 0`, no extinction; `litter_n` accumulates
+then drains (0 → 0.110 at day 67 → 0.058 mol — non-vacuous, the emergent N behaviour);
+`plant_n` is now **drained** (0.5 → 0.166, reversing the Phase-1 monotone growth);
+**total NITROGEN conserved float-exact (5.7e-14; the cycle is entirely internal)**.
+**Two scope refinements vs the plan wording, advisor-reviewed: (1) DIRECT
+`litter_n → soil_n`** net mineralization, **deferring** the microbe-mediated path the plan's
+"litter/**microbial** N" wording implies (immobilization `litter_n → microbial_n` then
+`microbial_n → soil_n` via turnover) — first-order net mineralization is the standard
+minimal soil-N treatment (mirrors Step 4 deferring microbe-explicit kinetics; the
+C:N-ratio-driven immobilization is the advanced seam). **(2) Mechanism, not feedback —
+`f_N ≡ 1`, the carbon trajectory is bit-identical** (the f_O2-deferral mirror): at the PP
+fill `plant_n` stays ~1000× above the critical-N concentration (measured min conc 0.604 vs
+critical 0.0004 kg N/mol C), so `f_N` is **exactly 1.0 every step** and the N loop has
+**zero effect on photosynthesis / carbon** — every prior sealed test
+(`test_chamber`/`test_gas_exchange`/`test_decomposition`/`test_microbial_respiration`)
+passes **unchanged** (the bit-identical proof). The deliverable is honestly **"N mass
+cycles internally and is conserved,"** *not* "emergent N feedback"; the N-limited regime
+(`f_N < 1` biting) is **deferred to Step 7's sized run** (exactly as Step 2 shipped
+draw-down-not-oscillation and Steps 3/5 deferred `f_O2`) — and *verified* not asserted
+(`test_mineralization` recomputes `f_N` each step and asserts `== 1.0`). The open-field
+season + its regression golden are **bit-identical** (the loop is `sealed`-gated/appended,
+like the carbon decomposer; no sealed golden exists — the sealed run is pinned
+behaviourally). N-senescence is first-order in `plant_n` (the litter C:N is **emergent**
+from two independent rates), not tied to the carbon-senescence flux at a fixed tissue N:C
+(which would *control* litter C:N — a documented refinement, with N resorption). New
+`tests/test_mineralization.py` (21 tests) pins both rate laws, the single-currency NITROGEN
+balance (no C/O/W residual), dt-linearity, self-limits, loader guards (both rates'
+negative/bad-unit rejection), and the integration (litter_n accumulate-then-drain, plant_n
+drained, total N float-exact, `rationed == 0`, no extinction, the `f_N == 1.0` decoupling,
+open field grows no `litter_n`). All gates green (779 passed, ruff/pyright clean).
+**Deferred seams:** microbe-mediated N (immobilization), C:N-ratio-driven
+immobilization/mineralization, N resorption, and the N-limited `f_N < 1` regime (Step 7).
+**Next: Step 7 — sealed-chamber integration + validation (multi-year run, qualitative
+closed-system phenomena, `f_O2`/`f_N` applied where they bite, hex-float golden).**
 
 The design review's two corrections were folded in before
 build: (1) the composition fold has **two** mandatory sites, not one — `flow.py` (legs) *and*
@@ -434,8 +482,16 @@ Phase-1 rhythm.**
    open-field golden bit-identical; microbial is now non-monotone (respired); 15 tests.
    `f_O2` O₂ self-limitation **deferred to Step 7** (O₂ stays ≈ 0.99997·fill — ~4 orders
    from rationing; the Step-3 deferral logic), guarded by an O₂ ≫ 0 test.
-6. **Mineralization (NITROGEN)** — litter/microbial N → `soil_n`; closes the N loop that
-   Phase 1 fed externally.
+6. ~~**Mineralization (NITROGEN)**~~ — **DONE.** A finite `litter_n` POOL (the N analogue
+   of `litter_carbon`) + two single-currency NITROGEN flows: `NitrogenSenescence`
+   (`plant_n → litter_n`, first-order, self-limiting — the N counterpart of carbon
+   senescence) and `Mineralization` (`litter_n → soil_n`, first-order donor-controlled net
+   mineralization, Stanford & Smith 1972). Closes `soil_n → plant_n → litter_n → soil_n`
+   internally (Phase 1 fed it from the external `n_source`). **DIRECT `litter_n → soil_n`**
+   (microbe-mediated N deferred) and **`f_N ≡ 1` / carbon bit-identical** (mechanism not
+   feedback; the N-limited regime deferred to Step 7 — the f_O2-deferral mirror, verified
+   per-step). `rationed == 0`, total NITROGEN float-exact, open-field golden bit-identical;
+   21 tests.
 7. **Sealed-chamber integration + validation** — assemble the multi-year sealed season;
    conservation + `rationed == 0`; qualitative closed-system phenomena (CO₂ oscillation,
    O₂↔CO₂ anti-correlation, an O₂-depletion failure mode); hex-float golden; frozen-surface
@@ -708,6 +764,93 @@ golden is untouched.
 
 ---
 
+## Step 6 design — mineralization (NITROGEN; the nitrogen return loop, P2.3)
+
+*Realizes the NITROGEN half of P2.3 (designed JIT, the Phase-1 rhythm; advisor-reviewed
+before build). The carbon decomposer loop (Steps 4–5) gets its nitrogen mirror: the cycle
+`soil_n → plant_n → litter_n → soil_n` closes internally, replacing the external `n_source`
+Phase 1 fed it from.*
+
+**The central scope realization — N must first ENTER an N pool.** `litter_carbon` and
+`microbial_carbon` are **pure CARBON** (`{CARBON:1}`) — they hold no nitrogen. So
+"mineralization (litter/microbial N → `soil_n`)" is **vacuous** unless organic N first
+exists. In Phase 1 `plant_n` only **grew** (uptake fed it; nothing withdrew it). So a
+faithful Step 6 needs both a **source** (the plant must shed N when it senesces) and a
+**return** (mineralization). This is irreducibly two transfers + one intermediate pool —
+larger than Steps 4/5, but it is the nature of closing the loop.
+
+**The change, minimized.** A new `mineralization.py` (pure stdlib) holding **both** halves
+of the N return loop (the `nitrogen.py` precedent — it holds uptake + fertilization):
+- **`nitrogen_senescence_flux(plant_n, n_sen) = n_sen·plant_n`** + the `NitrogenSenescence`
+  flow `plant_n → litter_n` (first-order in whole-plant N, self-limiting → 0 as `plant_n`
+  → 0; the carbon-senescence positivity pattern). Makes `plant_n` **non-monotone** — the
+  consumption side the open Phase-1 N loop lacked.
+- **`mineralization_flux(litter_n, k_min) = k_min·litter_n`** + the `Mineralization` flow
+  `litter_n → soil_n` (first-order donor-controlled net mineralization, Stanford & Smith
+  1972; self-limiting). The DIRECT release of mineral N back to soil.
+- Both **single-currency NITROGEN** (`litter_n`/`soil_n`/`plant_n` are all `{NITROGEN:1}`),
+  so the gate folds them exactly like Phase 1 — **no core change**.
+- **`params/mineralization.yaml` + `load_mineralization_params`** — both first-order rates
+  (`n_senescence_rate`, `mineralization_rate`, 1/day) in one honestly-named file (the N
+  return loop; keeps `senescence.yaml`/`SenescenceParams` byte-untouched — the surgical /
+  golden-safe choice), each value/unit/source-templated, exact-unit-guarded, non-negative
+  bound (the decomposition/microbial-respiration loader discipline). Provisional
+  `n_sen = 0.01`, `k_min = 0.03`, `TODO(cite)`.
+- **`season.py` (sealed-gated, golden-safe)** — add `litter_n` (POOL, 0) sealed-only; append
+  `NitrogenSenescence` + `Mineralization` sealed-only (id order; Registry sorts → order-
+  independent). The carbon `Senescence` flow is **untouched** (N-senescence is a *separate*
+  flow, not an N leg bolted onto it). Open field byte-identical.
+
+**The two scope refinements (advisor-reviewed; recorded so they are not re-litigated).**
+1. **DIRECT `litter_n → soil_n`, deferring microbe-mediated N.** The plan says "litter/
+   **microbial** N → soil_n"; this ships the direct first-order net mineralization and
+   defers the microbe-mediated path (N immobilization `litter_n → microbial_n` during
+   decomposition, then `microbial_n → soil_n` via microbial turnover). First-order net
+   mineralization is the standard minimal soil-N treatment — exactly as Step 4 chose
+   first-order donor decay over microbe-explicit Michaelis kinetics; the C:N-ratio-driven
+   immobilization is the advanced refinement seam.
+2. **Mechanism, not feedback — `f_N ≡ 1`, the carbon trajectory bit-identical (the f_O2
+   mirror).** With the chamber sized for potential production (PP, non-limiting N),
+   `plant_n` stays ~1000× above the critical-N concentration (measured min conc 0.604 vs
+   critical 0.0004 kg N/mol C), so `f_N` is **exactly 1.0 every step** and the N loop is a
+   **parallel cycle with zero effect on the carbon / plant trajectory**. So the deliverable
+   is honestly **"nitrogen mass cycles internally and is conserved,"** *not* "emergent N
+   feedback" (cf. Step 2's draw-down-not-oscillation, Steps 3/5's `f_O2` deferral). The
+   N-limited regime (`f_N < 1` throttling photosynthesis) is **deferred to Step 7**'s sized
+   multi-year run. The decoupling is **verified** — `test_mineralization` recomputes `f_N`
+   each step and asserts `== 1.0`, and the bit-identical carbon run is *additionally* pinned
+   by the **unchanged** prior sealed tests.
+
+**Why `rationed == 0` (the backstop guard).** Each first-order draw (`n_sen·plant_n·dt`,
+`k_min·litter_n·dt`, both `rate·dt ≪ 1`) withdraws against the **start-of-step** donor;
+same-step inflows don't count (the arbitration memory) but the draw never exceeds the pool
+— the senescence/decomposition self-limiting pattern. `litter_n` starts at 0, so on step 1
+mineralization sources 0 (reads start-of-step 0) and the pool accumulates first, then drains
+— exactly the `litter_carbon` → decomposition rhythm.
+
+**Why first-order in `plant_n` (the litter C:N is emergent — a deferred refinement).**
+N-shedding is a plain first-order relative rate on the whole-plant `plant_n` POOL. The
+alternative — shedding N in lockstep with the carbon-senescence flux at a fixed tissue N:C
+— would *control* the litter C:N ratio; here the litter C:N (`litter_carbon / litter_n`) is
+instead **emergent** from two independent rates. The simpler decoupled pick is the
+JIT-minimal Step-6 choice; the N:C-coupled shedding and N resorption before abscission
+(this model sheds all standing plant N) are documented refinement seams.
+
+**Test plan (`tests/test_mineralization.py`, 21 tests, all green).** (a) *Rate laws:*
+each flux first-order in its donor, zero at zero. (b) *Flow:* `plant_n → litter_n` /
+`litter_n → soil_n` transfers of the same amount, single-currency NITROGEN balance (no
+CARBON/OXYGEN/WATER residual), dt-linearity, self-limit at zero donor. (c) *Loader:*
+committed rates, both rates' negative + bad-unit rejection. (d) *Integration (sealed
+season):* `litter_n` accumulate-then-drain (non-vacuous), `plant_n` drained (declines from
+start — reversing the Phase-1 monotone growth), **total NITROGEN conserved float-exact**
+(`abs_tol 1e-9`, soil_n-dominated — the oxygen-test magnitude, not carbon's `1e-12`),
+`rationed == 0`, no extinction, the **`f_N == 1.0` decoupling** (recompute
+`nitrogen_stress_factor` per state), and the open field grows no `litter_n`. **Open field
+is byte-identical** — the loop is `sealed`-gated/appended; no sealed golden exists (the
+sealed run is pinned behaviourally), and the open-field regression golden is untouched.
+
+---
+
 ## Exit criteria (Phase 2 — "closed chamber / producer + decomposer")
 
 - [x] **Element-composition core (P2.1)** landed: stocks carry composition, the gate folds
@@ -724,13 +867,18 @@ golden is untouched.
       on the finite pools (FvCB Ci-shutoff; O₂ far from its floor), non-vacuous (Ci falls
       ~2.7×). *(Sustained multi-year oscillation awaits the decomposer return of litter
       carbon, Steps 4–7.)*
-- [ ] **Decomposer loop (P2.3):** litter → microbial biomass → CO₂; microbial respiration
-      draws O₂; mineralization returns N to `soil_n`. *(In progress: **Steps 4–5 landed** —
-      Step 4 the `litter_carbon` POOL + first-order `litter → microbial` decay (CARBON-
-      only); **Step 5 the O₂-drawing microbial respiration `microbial_C + O₂ → CO₂`**,
-      closing the carbon loop (litter → microbial → CO₂ → photosynthesis) with CARBON +
-      OXYGEN float-exact and `rationed == 0`. Mineralization (NITROGEN → `soil_n`) is
-      Step 6.)*
+- [x] **Decomposer loop (P2.3):** litter → microbial biomass → CO₂; microbial respiration
+      draws O₂; mineralization returns N to `soil_n`. **Landed (Steps 4–6):** Step 4 the
+      `litter_carbon` POOL + first-order `litter → microbial` decay (CARBON-only); **Step 5
+      the O₂-drawing microbial respiration `microbial_C + O₂ → CO₂`**, closing the carbon
+      loop (litter → microbial → CO₂ → photosynthesis) with CARBON + OXYGEN float-exact;
+      **Step 6 the nitrogen return loop** — a `litter_n` POOL with `NitrogenSenescence`
+      (`plant_n → litter_n`) + `Mineralization` (`litter_n → soil_n`), closing
+      `soil_n → plant_n → litter_n → soil_n` internally (DIRECT net mineralization;
+      microbe-mediated N deferred), total NITROGEN float-exact, `rationed == 0`. All
+      mechanism-level; `f_N ≡ 1` keeps it carbon-decoupled (the N-limited regime is the
+      Step-7 sized run). *(Remaining: the multi-year sealed run + closed-system
+      validation, Step 7.)*
 - [ ] **Sealed multi-year run:** stable every-step conservation (all of CARBON/OXYGEN/WATER/
       NITROGEN), stable numerics, qualitatively believable dynamics incl. at least one
       closed-system phenomenon (O₂ depletion / Biosphere-2-style failure).

@@ -53,6 +53,7 @@ from domains.biosphere.loader import (
     load_canopy_params,
     load_decomposition_params,
     load_microbial_respiration_params,
+    load_mineralization_params,
     load_nitrogen_params,
     load_phenology_params,
     load_photosynthesis_params,
@@ -61,6 +62,7 @@ from domains.biosphere.loader import (
     load_transpiration_params,
 )
 from domains.biosphere.microbial_respiration import MicrobialRespiration
+from domains.biosphere.mineralization import Mineralization, NitrogenSenescence
 from domains.biosphere.nitrogen import Fertilization, NitrogenUptake
 from domains.biosphere.phenology import ThermalTimeAccumulation
 from domains.biosphere.transpiration import Irrigation, Transpiration
@@ -108,6 +110,11 @@ O2_POOL: StockId = StockId("biosphere.o2_pool")
 # (``microbial_C + O₂ → CO₂``) — closing the carbon loop.
 LITTER_CARBON: StockId = StockId("biosphere.litter_carbon")
 MICROBIAL_CARBON: StockId = StockId("biosphere.microbial_carbon")
+# Sealed chamber nitrogen return loop (P2.3/Step 6): senescence sheds plant N into a
+# finite ``litter_n`` POOL (the N analogue of ``litter_carbon``); net mineralization
+# returns it to ``soil_n``, closing the cycle soil_n → plant_n → litter_n → soil_n that
+# Phase 1 fed externally from ``n_source``.
+LITTER_N: StockId = StockId("biosphere.litter_n")
 CO2_RESP: StockId = StockId("boundary.co2_resp")
 VAPOR_SINK: StockId = StockId("boundary.vapor_sink")
 LITTER_SINK: StockId = StockId("boundary.litter_sink")
@@ -247,7 +254,10 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
     pools ``litter_carbon`` (POOL, senescence-fed) + ``microbial_carbon`` (pure-carbon
     POPULATION, decay-fed) (Step 4), adds the ``Decomposition`` flow (Step 4) and the
     ``MicrobialRespiration`` gas flux ``microbial_C + O₂ → CO₂`` (Step 5, closing the
-    carbon loop). Flows in id order; the aux process is a registry construction
+    carbon loop). Step 6 adds the **nitrogen return loop** — a ``litter_n`` POOL with
+    the ``NitrogenSenescence`` (``plant_n → litter_n``) and ``Mineralization``
+    (``litter_n → soil_n``) flows — closing the N cycle internally (the loop Phase 1 fed
+    from ``n_source``). Flows in id order; the aux process is a registry construction
     dependency (advances ``State.aux``, P2).
     """
     carbon = canonical_unit(Quantity.CARBON)
@@ -337,6 +347,10 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         # extinction routing if it ever did.
         stocks[LITTER_CARBON] = pool(LITTER_CARBON, Quantity.CARBON, carbon, 0.0)
         stocks[MICROBIAL_CARBON] = organ(MICROBIAL_CARBON, 0.0)
+        # The nitrogen litter POOL (Step 6): N-senescence sheds plant N into it; net
+        # mineralization drains it back to soil_n. Starts at 0 (no standing organic N at
+        # sowing) — the N analogue of ``litter_carbon``. Single-currency NITROGEN.
+        stocks[LITTER_N] = pool(LITTER_N, Quantity.NITROGEN, nitrogen, 0.0)
     else:
         stocks[CO2_ATMOS] = boundary.source(
             CO2_ATMOS, Quantity.CARBON, scenario.co2_atmos0
@@ -453,6 +467,34 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
                 co2_pool=CARBON_POOL,
                 o2_pool=O2_POOL,
                 params=load_microbial_respiration_params(),
+            )
+        )
+        # The nitrogen return loop (Step 6), single-currency NITROGEN. N-senescence
+        # sheds plant N into ``litter_n``; net mineralization returns it to ``soil_n`` —
+        # closing soil_n → plant_n → litter_n → soil_n internally (the loop Phase 1 fed
+        # from the external ``n_source``). Both share ``load_mineralization_params``.
+        # Sealed-only (``litter_n`` exists only when sealed); the Registry sorts by id,
+        # so conditional addition stays order-independent. (At the PP fill ``plant_n``
+        # stays ~1000× above the critical-N concentration, so ``f_N ≡ 1`` and the loop
+        # is mechanism-only — zero effect on the carbon trajectory; the N-limited regime
+        # is Step 7's sized run, mirroring the ``f_O2`` deferral.)
+        mineral = load_mineralization_params()
+        flows.append(
+            NitrogenSenescence(
+                FlowId("biosphere.nitrogen_senescence"),
+                0,
+                plant_n=PLANT_N,
+                litter_n=LITTER_N,
+                params=mineral,
+            )
+        )
+        flows.append(
+            Mineralization(
+                FlowId("biosphere.mineralization"),
+                0,
+                litter_n=LITTER_N,
+                soil_n=SOIL_N,
+                params=mineral,
             )
         )
     aux_processes: list[AuxProcess] = [

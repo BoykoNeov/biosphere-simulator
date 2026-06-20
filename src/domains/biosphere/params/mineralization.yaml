@@ -1,0 +1,68 @@
+# chamber — nitrogen return loop (senescence-N shedding + net mineralization) params
+# Currency/units: NITROGEN (kg N). This file groups the TWO first-order rates (1/day)
+#   that close the chamber's nitrogen cycle — the N analogue of the carbon decomposer
+#   loop (decomposition.yaml + microbial_respiration.yaml):
+#     n_senescence_rate   plant_n  → litter_n   (dead-plant N enters the litter)
+#     mineralization_rate litter_n → soil_n     (net mineralization back to mineral N)
+#   With uptake (nitrogen.yaml) this closes the loop soil_n → plant_n → litter_n →
+#   soil_n that Phase 1 fed externally from an n_source BOUNDARY (fertilization).
+#   Both fluxes are first-order in their donor pool (rate · pool, kg N/day),
+#   self-limiting (→ 0 as the pool → 0), so positivity is structural.
+#
+# Why both rates live in ONE file (advisor-reviewed). Conceptually the shedding is a
+#   plant (senescence) process and mineralization is a soil process — the carbon side
+#   keeps senescence (allocation.py) and decomposition (decomposition.py) separate. They
+#   are grouped here because together they ARE the chamber's nitrogen return loop, and a
+#   dedicated file keeps the carbon senescence params (senescence.yaml / SenescenceParams)
+#   byte-untouched (the surgical / golden-safe choice — the open-field carbon path is
+#   unchanged). The file is named honestly for the loop, not for one of its two halves.
+#
+# Why first-order in plant_n (not tied to the carbon-senescence flux). N-shedding is a
+#   plain first-order relative rate on the whole-plant plant_n POOL (the carbon-senescence
+#   self-limiting pattern). The alternative — shedding N in lockstep with carbon
+#   senescence at a fixed tissue N:C — would *control* the litter C:N ratio; here the
+#   litter C:N (litter_carbon / litter_n) is instead **emergent** from two independent
+#   first-order rates. The simpler decoupled pick is the JIT-minimal Step-6 choice; an
+#   N:C-coupled shedding (and N resorption before abscission, which this model neglects —
+#   all standing plant N is shed) are documented refinement seams.
+#
+# Units discipline (P4 / config/units.py): the first-order rates (1/day) are NOT a
+#   conserved-Quantity canonical unit, so each is a schema-validated, bound-checked float
+#   carrying a declared unit (exact-string guarded at the loader, like decomposition's
+#   decomposition_rate / microbial_respiration's m_resp / senescence's rdr_*). A zero rate
+#   is valid (no shedding / no mineralization); negative is rejected (it would create N).
+#
+# Deferred seams (documented in mineralization.py): microbe-mediated N (immobilization
+#   litter_n → microbial_n during decomposition, then microbial_n → soil_n) vs this
+#   DIRECT net first-order litter_n → soil_n mineralization; C:N-ratio-driven
+#   immobilization/mineralization; N resorption; and the N-limited regime where f_N < 1
+#   becomes load-bearing (Step 7's sized multi-year run — at the PP fill plant_n stays
+#   ~1000× above the critical-N concentration, so f_N ≡ 1 and the loop is mechanism-only,
+#   with zero effect on the carbon trajectory; mirrors the f_O2 deferral).
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   Phase-2 validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] Stanford, G. & Smith, S.J. (1972), "Nitrogen mineralization potentials of soils",
+#       Soil Science Society of America Journal 36(3):465–472 (first-order net N
+#       mineralization kinetics; the mineralization rate constant).
+#   [B] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
+#       Simulation Monographs, PUDOC, Wageningen (relative death-rate senescence — the
+#       N-shedding rate is the NITROGEN counterpart of the carbon rdr_*).
+
+name: chamber
+process: mineralization
+
+parameters:
+  n_senescence_rate:
+    value: 0.01
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical first-order plant-N shedding rate (N turnover ~100 days) [B]; primary citation pending Phase-2 validation gate"
+  mineralization_rate:
+    value: 0.03
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical first-order net N mineralization constant (litter N turnover ~33 days) [A]; primary citation pending Phase-2 validation gate"
