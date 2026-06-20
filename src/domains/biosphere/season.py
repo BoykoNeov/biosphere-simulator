@@ -89,10 +89,13 @@ SOIL_WATER: StockId = StockId("biosphere.soil_water")
 SOIL_N: StockId = StockId("biosphere.soil_n")
 PLANT_N: StockId = StockId("biosphere.plant_n")
 CO2_ATMOS: StockId = StockId("boundary.co2_atmos")
-# Sealed chamber (P2.2): a finite carbon source POOL replacing the open-field unclamped
-# ``co2_atmos`` boundary. Honest naming — at Step 2 it is a CARBON pool ({CARBON:1});
-# it is promoted to a true CO₂ stock ({CARBON:1, OXYGEN:2}) + O₂ counterpart at Step 3.
+# Sealed chamber (P2.2/Step 3): the finite chamber atmosphere. ``carbon_pool`` is a
+# true CO₂ stock (``{CARBON:1, OXYGEN:2}``) and ``o2_pool`` its O₂ counterpart
+# (``{OXYGEN:2}``); gas exchange moves CARBON and OXYGEN through both at PQ=1. (At
+# Step 2 it was a single-currency ``{CARBON:1}`` draw-down with no O₂; Step 3 promotes
+# it and closes the gas loop — respiration returns CO₂ to the pool, not a boundary.)
 CARBON_POOL: StockId = StockId("biosphere.carbon_pool")
+O2_POOL: StockId = StockId("biosphere.o2_pool")
 CO2_RESP: StockId = StockId("boundary.co2_resp")
 VAPOR_SINK: StockId = StockId("boundary.vapor_sink")
 LITTER_SINK: StockId = StockId("boundary.litter_sink")
@@ -158,6 +161,15 @@ class SeasonScenario:
     # (rationed == 0; FvCB Ci-shutoff self-limits, never the Euler backstop).
     chamber_co2_mol0: float = 0.357
     ci_ratio: float = 0.7  # C3 Ci/Ca draw-down set point (Farquhar & Sharkey 1982)
+    # O₂ counterpart pool (mol O₂; Step 3). Sized to a realistic chamber O₂ fraction
+    # (~21% of ``chamber_air_mol``) — vastly larger than the O(0.1) mol C gas fluxes, so
+    # it never approaches arbitration rationing and plant respiration needs no O₂
+    # self-limitation (``f_O2``) yet. The depleting-O₂ regime (where ``f_O2`` becomes
+    # load-bearing) arrives with microbial respiration (Step 5) and the O₂-depletion
+    # validation (Step 7); a Step-3 test pins O₂ ≫ 0 to guard that deferral.
+    # Photosynthesis deposits O₂ here (PQ=1) and respiration draws it, so it
+    # anti-correlates with the CO₂ pool: ΔO₂ = −Δ(net CO₂), 2·(CO₂+O₂) conserved.
+    chamber_o2_mol0: float = 210.0
     # water (PP, non-limiting): a store sized to stay above the band all season
     soil_water0: float = 1000.0  # kg
     water_source0: float = 0.0  # kg (unclamped supply; tracks cumulative irrigation)
@@ -223,6 +235,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
     carbon = canonical_unit(Quantity.CARBON)
     water = canonical_unit(Quantity.WATER)
     nitrogen = canonical_unit(Quantity.NITROGEN)
+    oxygen = canonical_unit(Quantity.OXYGEN)
 
     def organ(stock_id: StockId, amount: float) -> Stock:
         return Stock(
@@ -255,7 +268,6 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         SOIL_WATER: pool(SOIL_WATER, Quantity.WATER, water, scenario.soil_water0),
         SOIL_N: pool(SOIL_N, Quantity.NITROGEN, nitrogen, scenario.soil_n0),
         PLANT_N: pool(PLANT_N, Quantity.NITROGEN, nitrogen, scenario.plant_n0),
-        CO2_RESP: boundary.sink(CO2_RESP, Quantity.CARBON),
         VAPOR_SINK: boundary.sink(VAPOR_SINK, Quantity.WATER),
         LITTER_SINK: boundary.sink(LITTER_SINK, Quantity.CARBON),
         WATER_SOURCE: boundary.source(
@@ -263,19 +275,41 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         ),
         N_SOURCE: boundary.source(N_SOURCE, Quantity.NITROGEN, scenario.n_source0),
     }
-    # The carbon source the gas-exchange flows draw from: open field = the unclamped
-    # ``co2_atmos`` boundary (Phase-1); sealed chamber (P2.2) = a finite ``carbon_pool``
-    # POOL that draws down (the feedback). The flows reference it by id only, so the
-    # single-currency carbon legs are identical — only the source's clamping changes.
+    # The carbon source the gas-exchange flows draw from, and the respiration sink:
+    #   * Open field (Phase-1): the unclamped ``co2_atmos`` BOUNDARY source + a separate
+    #     ``co2_resp`` BOUNDARY sink. Single-currency CARBON; the loop is open.
+    #   * Sealed chamber (Step 3): one finite CO₂ POOL (``{CARBON:1, OXYGEN:2}``) is
+    #     *both* the source and the respiration sink, plus an O₂ counterpart POOL. The
+    #     gas loop is closed — respiration returns CO₂ to the pool — the flows detect
+    #     ``source == sink`` to net the assimilate-respired round trips (see
+    #     ``carbon_budget``). O₂ legs balance OXYGEN at PQ=1.
     carbon_source = CARBON_POOL if scenario.sealed else CO2_ATMOS
+    resp_sink = carbon_source if scenario.sealed else CO2_RESP
+    o2_pool = O2_POOL if scenario.sealed else None
     if scenario.sealed:
-        stocks[CARBON_POOL] = pool(
-            CARBON_POOL, Quantity.CARBON, carbon, scenario.chamber_co2_mol0
+        stocks[CARBON_POOL] = Stock(
+            id=CARBON_POOL,
+            domain=BIOSPHERE,
+            quantity=Quantity.CARBON,
+            unit=carbon,
+            amount=scenario.chamber_co2_mol0,
+            kind=StockKind.POOL,
+            composition={Quantity.CARBON: 1.0, Quantity.OXYGEN: 2.0},
+        )
+        stocks[O2_POOL] = Stock(
+            id=O2_POOL,
+            domain=BIOSPHERE,
+            quantity=Quantity.OXYGEN,
+            unit=oxygen,
+            amount=scenario.chamber_o2_mol0,
+            kind=StockKind.POOL,
+            composition={Quantity.OXYGEN: 2.0},
         )
     else:
         stocks[CO2_ATMOS] = boundary.source(
             CO2_ATMOS, Quantity.CARBON, scenario.co2_atmos0
         )
+        stocks[CO2_RESP] = boundary.sink(CO2_RESP, Quantity.CARBON)
     # Only POPULATION carbon organs are extinction-eligible ⇒ only the carbon loss-sink.
     stocks.update(boundary.loss_sinks({Quantity.CARBON}))
 
@@ -292,20 +326,22 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
             thermal_time_aux=THERMAL_TIME,
             pheno=pheno,
             alloc=load_allocation_params(),
+            o2_pool=o2_pool,
         ),
         GrowthRespiration(
             FlowId("biosphere.growth_respiration"),
             0,
             ctx=ctx,
             co2_atmos=carbon_source,
-            co2_resp=CO2_RESP,
+            co2_resp=resp_sink,
         ),
         MaintenanceRespiration(
             FlowId("biosphere.maintenance_respiration"),
             0,
             ctx=ctx,
             co2_atmos=carbon_source,
-            co2_resp=CO2_RESP,
+            co2_resp=resp_sink,
+            o2_pool=o2_pool,
         ),
         Senescence(
             FlowId("biosphere.senescence"),

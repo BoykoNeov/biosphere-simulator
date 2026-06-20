@@ -48,6 +48,18 @@ respiration source; the dissolution removes that premise — see the plan's Step
 lock. A single stock would make ``GrowthRespiration`` a permanent no-op and respiration
 a silent ``Yg`` factor, which plan line 348 forbids.)
 
+**Sealed chamber — one CO₂ pool, the gas loop closed (Phase-2 Step 3).** When the carbon
+source *is* the respiration sink (one finite CO₂ POOL, ``{CARBON:1, OXYGEN:2}``), the
+flows detect ``co2_atmos == co2_resp`` and **net the assimilate-respired round trips**:
+``GrowthRespiration`` and the *covered* part of ``MaintenanceRespiration`` (carbon
+gross-assimilated and immediately respired) become CO₂→CO₂ no-ops — exactly the single-
+reservoir degeneracy the open field avoids, but here it is *correct* (the carbon returns
+to the same pool). What remains is the genuine multi-quantity (CARBON+OXYGEN) gas
+exchange at PQ=1: :class:`Allocation` is ``CO₂ → biomass + O₂`` (an O₂ leg = the carbon
+fixed) and the maintenance *shortfall* is ``biomass + O₂ → CO₂`` (O₂ consumed = the
+carbon burned). The composition fold (P2.1) balances OXYGEN automatically; the open-field
+single-currency paths are byte-identical (``o2_pool=None``, distinct source/sink).
+
 **Limitation (the ``Π fᵢ`` seam closes here).** ``CarbonContext.limitation`` forms
 ``f_water · f_N`` and applies it **inside** the shared budget, so every flow gets the
 identical factor — no flow passes its own. ``f_water`` reads the ``soil_water`` sibling
@@ -250,6 +262,12 @@ class Allocation:
     thermal_time_aux: str
     pheno: PhenologyParams
     alloc: AllocationParams
+    # Sealed chamber (P2.1 multi-quantity, Step 3). When set, photosynthesis is the
+    # genuine ``CO₂ → biomass + O₂`` flow: every mol C fixed into an organ releases
+    # 1 mol O₂ (PQ=1, pure-carbon biomass), deposited here. The organs carry no oxygen,
+    # so the O₂ leg supplies exactly the 2 oxygens the CO₂ pool gave up. None (open
+    # field) keeps the single-currency Phase-1 legs byte-identical.
+    o2_pool: StockId | None = None
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         _, _, available = self.ctx.budget(snapshot, env)
@@ -265,15 +283,20 @@ class Allocation:
         stem_leg = stem * dt
         root_leg = root * dt
         storage_leg = storage * dt
-        return FlowResult(
-            legs=(
-                Leg(self.co2_atmos, -(leaf_leg + stem_leg + root_leg + storage_leg)),
-                Leg(self.ctx.leaf_c, leaf_leg),
-                Leg(self.ctx.stem_c, stem_leg),
-                Leg(self.ctx.root_c, root_leg),
-                Leg(self.storage_c, storage_leg),
-            )
-        )
+        organ_total = leaf_leg + stem_leg + root_leg + storage_leg
+        legs = [
+            Leg(self.co2_atmos, -organ_total),
+            Leg(self.ctx.leaf_c, leaf_leg),
+            Leg(self.ctx.stem_c, stem_leg),
+            Leg(self.ctx.root_c, root_leg),
+            Leg(self.storage_c, storage_leg),
+        ]
+        if self.o2_pool is not None:
+            # O₂ released = carbon fixed into biomass (PQ=1). Uses the same
+            # ``organ_total`` sum that sources the CO₂ leg, so OXYGEN balances exactly
+            # (−2·organ_total from the CO₂ pool + 2·organ_total from this O₂ leg).
+            legs.append(Leg(self.o2_pool, organ_total))
+        return FlowResult(legs=tuple(legs))
 
 
 @dataclass(frozen=True)
@@ -294,6 +317,13 @@ class GrowthRespiration:
     co2_resp: StockId
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        if self.co2_atmos == self.co2_resp:
+            # Closed chamber (Step 3): growth-conversion carbon is gross-assimilated and
+            # immediately respired — a CO₂→CO₂ round trip on the single pool, with the
+            # photosynthetic O₂ release reconsumed by the respiration (PQ=1). Net gas
+            # change is zero, so this is an empty no-op flow. (Emitting both legs on the
+            # one pool stock would also trip ``FlowResult``'s duplicate-leg guard.)
+            return FlowResult(legs=())
         _, _, available = self.ctx.budget(snapshot, env)
         gres = (1.0 - self.ctx.resp.growth_efficiency) * available
         flux = gres * dt
@@ -323,6 +353,11 @@ class MaintenanceRespiration:
     ctx: CarbonContext
     co2_atmos: StockId
     co2_resp: StockId
+    # Sealed chamber (P2.1 multi-quantity, Step 3). When set, the biomass-sourced
+    # shortfall is the genuine ``biomass + O₂ → CO₂`` respiration: each mol C burned
+    # consumes 1 mol O₂ (PQ=1) drawn from here. None (open field) keeps the
+    # single-currency Phase-1 legs byte-identical.
+    o2_pool: StockId | None = None
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         gass, mres, _ = self.ctx.budget(snapshot, env)
@@ -330,6 +365,34 @@ class MaintenanceRespiration:
         covered = min(gass, mres)
         shortfall = mres - covered  # == max(0, MRES − GASS); biomass-sourced
         covered_flux = covered * dt
+        if self.co2_atmos == self.co2_resp:
+            # Closed chamber (Step 3): the ``covered`` maintenance (paid from today's
+            # assimilate) is a CO₂→CO₂ round trip on the single pool — net zero, and
+            # would duplicate the pool leg — so it is dropped. Only the biomass-burned
+            # ``shortfall`` is a real respiration: organs → CO₂ pool, consuming O₂.
+            legs: list[Leg] = []
+            organ_burn = 0.0  # Σ actual organ withdrawals (the carbon that returns)
+            if biomass > 0.0 and shortfall > 0.0:
+                stem = snapshot.stocks[self.ctx.stem_c].amount
+                root = snapshot.stocks[self.ctx.root_c].amount
+                for organ_id, organ_c in (
+                    (self.ctx.leaf_c, leaf),
+                    (self.ctx.stem_c, stem),
+                    (self.ctx.root_c, root),
+                ):
+                    share = shortfall * (organ_c / biomass) * dt
+                    legs.append(Leg(organ_id, -share))
+                    organ_burn += share
+            if organ_burn != 0.0:
+                # CO₂ returned to the pool = burned carbon; O₂ consumed = burned carbon
+                # (PQ=1). Both use the same ``organ_burn`` sum, so CARBON and OXYGEN
+                # balance exactly against the organ withdrawals.
+                legs.append(Leg(self.co2_resp, organ_burn))
+                if self.o2_pool is not None:
+                    legs.append(Leg(self.o2_pool, -organ_burn))
+            return FlowResult(legs=tuple(legs))
+        # Open field (Phase-1, byte-identical): covered from the atmosphere, shortfall
+        # from the organs, all deposited into the co2_resp boundary sink.
         legs = [Leg(self.co2_atmos, -covered_flux)]
         respired = covered_flux  # sum the actual withdrawals so the deposit balances
         if biomass > 0.0 and shortfall > 0.0:

@@ -10,16 +10,19 @@ toward Γ*. Three layers:
 * **The seam** (:class:`CarbonContext` Ci source) — forcing (open) vs pool-derived
   (sealed), and the all-or-nothing wiring guard.
 * **The integration** — the sealed season: ``rationed == 0`` across a *non-vacuous*
-  draw-down (Ci falls ~5×, GASS collapses ~4 orders; the central numerical check that
-  the finite pool self-limits via FvCB's Ci-shutoff, never the Euler backstop), total
-  carbon conserved (the sealed chamber has no boundary carbon *source*), and the
-  open-field path left untouched.
+  draw-down (Ci falls ~2.7× at its minimum; the central numerical check that the finite
+  pool self-limits via FvCB's Ci-shutoff, never the Euler backstop), total carbon
+  conserved (the sealed chamber has no boundary carbon *source*), and the open-field
+  path left untouched.
 
-**Scope honesty (Step 2).** The chamber carbon pool is single-currency CARBON and
-respiration still drains to the ``co2_resp`` sink, so the chamber is **not** closed —
-the pool is a monotonic draw-down, not an oscillating closed loop. The O₂ counterpart,
-``{CARBON:1, OXYGEN:2}`` composition, and the multi-quantity return loop (and thus the
-O₂↔CO₂ anti-correlation / oscillation phenomena) land at **Step 3**.
+**Scope (updated at Step 3).** Step 3 promoted the carbon pool to a true CO₂ stock
+(``{CARBON:1, OXYGEN:2}``) with an O₂ counterpart and **closed the gas loop**:
+respiration now returns CO₂ to the pool instead of draining to a boundary sink, so the
+pool is **no longer monotone** (it refills on deficit days) and gross assimilation need
+not collapse to ~0. The conversion and seam tests below are unchanged; the integration
+tests assert the closed-loop reality. The multi-quantity flow balance + the exact
+OXYGEN conservation / O₂↔CO₂ anti-correlation invariants live in
+``tests/test_gas_exchange.py``.
 
 Pure-stdlib data path (reads the committed JSON weather fixture; no PCSE).
 """
@@ -169,25 +172,30 @@ def test_sealed_has_no_extinction_events(
     assert events == ()
 
 
-def test_sealed_pool_draws_down_monotonically(
+def test_sealed_pool_draws_down_then_refills(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
-    # The pool only ever loses carbon (no return path until Step 3), so it is monotone
-    # non-increasing (flat on cold days where f_temp = 0 → GASS = 0) and nets a real
-    # draw-down. A monotone increase anywhere would mean a spurious carbon source.
+    # Step 3 closed the gas loop: respiration returns CO₂ to the pool, so the pool is no
+    # longer monotone (Step 2's open-loop draw-down). It still nets a real draw-down
+    # (carbon accumulates in living biomass + the litter sink) and reaches a minimum
+    # below its fill, but *rises* on deficit days when maintenance burns biomass to CO₂.
+    # The presence of refill steps is the closed-loop return path made observable.
     states, _, _ = sealed
     pools = [s.stocks[CARBON_POOL].amount for s in states]
-    for prev, cur in zip(pools, pools[1:], strict=False):
-        assert cur <= prev
-    assert pools[-1] < pools[0]
+    assert pools[-1] < pools[0]  # net draw-down over the season
+    assert min(pools) < pools[0]  # drew below the initial fill
+    refills = sum(1 for a, b in zip(pools, pools[1:], strict=False) if b > a)
+    assert refills > 0  # respiration returned CO₂ to the pool (the closed loop)
 
 
 def test_sealed_ci_falls_meaningfully(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
-    # NON-VACUOUS draw-down: Ci is monotone non-increasing and falls well below half its
-    # initial value (the probe lands ~0.19×). A chamber so large that Ci barely moves
-    # would pass rationed == 0 trivially and verify nothing — this guards against that.
+    # NON-VACUOUS draw-down: Ci falls well below half its initial value at its minimum
+    # (the probe lands ~0.37×). The closed loop refills the pool, so Ci is no longer
+    # monotone (it recovers) — we check the *minimum*, not every step. A chamber so big
+    # that Ci barely moved would pass rationed == 0 trivially and verify nothing — this
+    # guards against that.
     states, _, _ = sealed
     scenario = SeasonScenario(sealed=True)
     cis = [
@@ -198,17 +206,17 @@ def test_sealed_ci_falls_meaningfully(
         )
         for s in states
     ]
-    for prev, cur in zip(cis, cis[1:], strict=False):
-        assert cur <= prev
-    assert cis[-1] < 0.5 * cis[0]
+    assert min(cis) < 0.5 * cis[0]
 
 
-def test_sealed_assimilation_collapses_as_ci_falls(
+def test_sealed_assimilation_rises_then_declines(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
-    # The emergent feedback's payoff: gross assimilation actually happens early
-    # (liveness — not a dead trajectory) and then collapses by orders of magnitude as
-    # the pool depletes and Ci → Γ*. Recompute GASS from each snapshot via the budget.
+    # The emergent feedback's payoff: gross assimilation happens early (liveness — not a
+    # dead trajectory) and then declines by orders of magnitude as the pool draws down
+    # (Ci falls) and the plant senesces. Step 3 closes the loop (respiration refills the
+    # pool), so GASS settles low but need not hit ~0 — the open-loop "< 1e-3×peak" was a
+    # Step-2 artifact of carbon never returning. Recompute GASS from each snapshot.
     states, _, _ = sealed
     scenario = SeasonScenario(sealed=True)
     resolver = weather_resolver(_weather(), scenario)
@@ -216,17 +224,18 @@ def test_sealed_assimilation_collapses_as_ci_falls(
     gass = [ctx.budget(s, resolver.bind(s, 1.0))[0] for s in states]
     peak = max(gass)
     assert peak > 1e-3  # the plant did fix carbon (liveness)
-    assert gass[-1] < 1e-3 * peak  # ... then assimilation collapsed (the feedback)
+    assert gass[-1] < 1e-2 * peak  # ... then assimilation fell ~2 orders (the feedback)
 
 
 def test_sealed_conserves_total_carbon(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
     # The sealed chamber has no boundary carbon SOURCE (the pool is internal), so total
-    # CARBON across all stocks — pool + organs + co2_resp + litter_sink + loss_sink — is
-    # invariant. This is the every-step gate's claim, asserted end-to-end. (The chamber
-    # still leaks carbon to co2_resp/litter_sink boundary sinks — it is not closed until
-    # Step 3 — but no carbon is created or destroyed.)
+    # CARBON across all stocks — pool + organs + litter_sink + loss_sink — is invariant.
+    # This is the every-step gate's claim, asserted end-to-end. (Step 3 closed the *gas*
+    # loop — respiration returns CO₂ to the pool, no co2_resp sink — but the carbon loop
+    # is still open: senescence leaks organ carbon to the litter_sink boundary until the
+    # decomposer lands at Step 4. No carbon is created or destroyed either way.)
     states, _, _ = sealed
     total0 = _total_carbon(states[0])
     for s in states:

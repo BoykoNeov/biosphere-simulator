@@ -32,7 +32,40 @@ reads the mol-carbon amount, unchanged by the promotion); **(2)** the O₂ POOL 
 deferred to Step 3 (an inert O₂ pool at Step 2 would be dead weight); **(3)** the
 deliverable is honestly the **draw-down decline**, not oscillation / O₂↔CO₂
 anti-correlation — respiration still drains to `co2_resp`, so the chamber is not yet closed
-(the return loop is Step 3). **Next: Step 3 — gas exchange as multi-quantity flows.**
+(the return loop is Step 3).
+
+**Step 3 (gas exchange as multi-quantity CARBON+OXYGEN flows) is COMPLETE and landed.**
+The sealed `carbon_pool` is promoted to a true CO₂ stock (`{CARBON:1, OXYGEN:2}`) with an
+O₂ counterpart POOL (`{OXYGEN:2}`), and the **gas loop is closed**: respiration returns
+CO₂ to the pool instead of a boundary sink. Photosynthesis is now the genuine
+multi-quantity flow `CO₂ → biomass + O₂` (`Allocation` deposits an O₂ leg = the carbon
+fixed) and plant maintenance is `biomass + O₂ → CO₂` (the shortfall consumes O₂ = the
+carbon burned), each balancing CARBON **and** OXYGEN in one flow at PQ=1 — the P1-filed
+deferred multi-quantity stoichiometric flow, now real. **Key realization:** in the closed
+chamber only carbon transfers that change *organ* carbon carry net O₂; the
+"immediately-respired" carbon (growth respiration; the *covered* part of maintenance) is a
+CO₂→CO₂ round trip with the O₂ release reconsumed — a net no-op. The flows detect
+`co2_atmos == co2_resp` (closed chamber) and net those round trips away (which also avoids
+`FlowResult`'s duplicate-leg guard), leaving the pool's *withdrawal* = DMI only, so
+`rationed == 0` is preserved even more safely than Step 2's GASS-bounded draw. **Empirical
+(305-day sealed run):** `rationed == 0`, no extinction; total OXYGEN = `2·(CO₂+O₂)` =
+420.714 mol conserved to 1.7e-13 (float-exact, exercising conservation fold site 2); total
+CARBON conserved to 4.4e-16; the CO₂ pool is **no longer monotone** (159 refill steps —
+the closed loop made observable) but still nets a non-vacuous draw-down (Ci falls ~2.7× to
+min ~92.8); O₂ stays ≫ 0 (210 → 210.2). The open-field season + its regression golden are
+**bit-identical** (the closed branch is `o2_pool`/source==sink-gated; open paths preserve
+exact float accumulation). New `tests/test_gas_exchange.py` (15 tests) pins per-flow
+CARBON+OXYGEN balance, the closed-loop no-ops, exact OXYGEN conservation, the PQ=1
+anti-correlation, and the O₂≫0 deferral guard; three Step-2 sealed tests were revised from
+the superseded open-loop behavior (monotone pool / Ci, GASS collapse) to the closed-loop
+reality. All gates green (724 passed, ruff/pyright clean). **One scope refinement vs the
+plan, advisor-reviewed: O₂ self-limitation (`f_O2`) is DEFERRED** — at a realistic O₂ fill
+(~210 mol vs O(0.1) mol fluxes) plant respiration never approaches rationing, so `f_O2`
+is not yet load-bearing; it lands where O₂ actually depletes (microbial respiration, Step
+5; the O₂-depletion validation, Step 7). A test pins O₂ ≫ 0 to guard that precondition.
+**The gas loop is closed; the carbon loop is still open** (senescence leaks organ carbon
+to `litter_sink` until the decomposer, Step 4). **Next: Step 4 — litter + decomposition
+(CARBON).**
 
 The design review's two corrections were folded in before
 build: (1) the composition fold has **two** mandatory sites, not one — `flow.py` (legs) *and*
@@ -311,9 +344,13 @@ Phase-1 rhythm.**
 2. **Finite chamber atmosphere + the `Ci`-from-stock seam (P2.2)** — CO₂/O₂ POOL stocks;
    flip `Ci` from forcing to the live CO₂-pool read; verify FvCB self-limits the finite
    pool (`rationed == 0`). The first emergent feedback.
-3. **Gas exchange as multi-quantity flows** — rework assimilation (`CO₂ → biomass + O₂`)
-   and plant respiration (`biomass + O₂ → CO₂`) onto the finite pools with CARBON+OXYGEN
-   legs (PQ=1). Re-examines the Phase-1 carbon-budget rewiring against the now-clamped CO₂.
+3. ~~**Gas exchange as multi-quantity flows**~~ — **DONE.** Assimilation
+   (`CO₂ → biomass + O₂`) and plant maintenance (`biomass + O₂ → CO₂`) reworked onto the
+   finite CO₂/O₂ pools with CARBON+OXYGEN legs (PQ=1); the gas loop closed (respiration
+   returns CO₂ to the pool). The assimilate-respired round trips (growth respiration; the
+   *covered* maintenance) net to no-ops (`source == sink` detection). Total OXYGEN
+   float-exact; `rationed == 0`; open-field golden bit-identical. `f_O2` O₂ self-limitation
+   deferred (O₂ ≫ rationing at the realistic fill; lands at Step 5/7), guarded by a test.
 4. **Litter + decomposition (CARBON)** — `litter_sink` → live `litter_carbon` POOL; senescence
    feeds it; first-order/Michaelis decomposition to microbial biomass + CO₂ (cited kinetics).
 5. **Microbial respiration (CARBON+OXYGEN)** — `microbial_C + O₂ → CO₂`; the P2.1-dependent
@@ -461,14 +498,17 @@ stocks (the sealed chamber has no boundary carbon *source*), and the open-field 
 - [x] **Element-composition core (P2.1)** landed: stocks carry composition, the gate folds
       it, OXYGEN is genuinely asserted; the Phase-1 1:1 behavior is preserved (goldens
       regenerate only for the serialized field).
-- [ ] **The genuine multi-quantity stoichiometric flow** (P1's filed deferral) exists:
-      gas exchange balances CARBON *and* OXYGEN in one flow at PQ=1.
-- [~] **Emergent feedback (P2.2), no control code:** **draw-down half landed (Step 2):**
-      photosynthesis draws down a finite carbon pool → `Ci` falls → assimilation falls, with
-      no special code; `rationed == 0` on the finite pool (FvCB Ci-shutoff), verified
-      non-vacuous (Ci falls ~5×). **Remaining (Step 3):** the CO₂ oscillation + O₂↔CO₂
-      anti-correlation need the multi-quantity return loop (respiration back to the pool +
-      the O₂ counterpart) — not yet built.
+- [x] **The genuine multi-quantity stoichiometric flow** (P1's filed deferral) exists
+      (Step 3): gas exchange balances CARBON *and* OXYGEN in one flow at PQ=1
+      (`CO₂ → biomass + O₂` / `biomass + O₂ → CO₂`); per-flow + every-step OXYGEN balance
+      pinned, total OXYGEN float-exact.
+- [x] **Emergent feedback (P2.2), no control code:** **landed (Steps 2+3):**
+      photosynthesis draws a finite CO₂ pool → `Ci` falls → assimilation falls, and (Step
+      3) respiration returns CO₂ → the pool refills, so the CO₂↔O₂ anti-correlation is
+      exact (ΔO₂ = −Δ net CO₂, `2·(CO₂+O₂)` conserved) — no special code; `rationed == 0`
+      on the finite pools (FvCB Ci-shutoff; O₂ far from its floor), non-vacuous (Ci falls
+      ~2.7×). *(Sustained multi-year oscillation awaits the decomposer return of litter
+      carbon, Steps 4–7.)*
 - [ ] **Decomposer loop (P2.3):** litter → microbial biomass → CO₂; microbial respiration
       draws O₂; mineralization returns N to `soil_n`.
 - [ ] **Sealed multi-year run:** stable every-step conservation (all of CARBON/OXYGEN/WATER/
