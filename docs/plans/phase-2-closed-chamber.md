@@ -143,8 +143,8 @@ Phase 1 left open. Phase 1 drained `soil_n → plant_n` by uptake, refilled `soi
 withdrew it). Step 6 returns plant N to the soil internally via two single-currency
 NITROGEN flows + a finite `litter_n` POOL (the N analogue of `litter_carbon`): **(1)
 `NitrogenSenescence` `plant_n → litter_n`** (first-order `n_sen·plant_n`, self-limiting —
-the N counterpart of carbon senescence; makes `plant_n` non-monotone, the consumption side
-the open loop lacked) and **(2) `Mineralization` `litter_n → soil_n`** (first-order
+the N counterpart of carbon senescence; drains `plant_n` — no longer monotone-growing, the
+consumption side the open loop lacked) and **(2) `Mineralization` `litter_n → soil_n`** (first-order
 donor-controlled net mineralization `k_min·litter_n`, Stanford & Smith 1972). The loop
 `soil_n → plant_n → litter_n → soil_n` now closes with no external supply (the inert
 `n_source`/fertilization stays wired at rate 0). Both are **single-currency NITROGEN** (all
@@ -783,8 +783,8 @@ larger than Steps 4/5, but it is the nature of closing the loop.
 of the N return loop (the `nitrogen.py` precedent — it holds uptake + fertilization):
 - **`nitrogen_senescence_flux(plant_n, n_sen) = n_sen·plant_n`** + the `NitrogenSenescence`
   flow `plant_n → litter_n` (first-order in whole-plant N, self-limiting → 0 as `plant_n`
-  → 0; the carbon-senescence positivity pattern). Makes `plant_n` **non-monotone** — the
-  consumption side the open Phase-1 N loop lacked.
+  → 0; the carbon-senescence positivity pattern). **Drains** `plant_n` (no longer
+  monotone-growing) — the consumption side the open Phase-1 N loop lacked.
 - **`mineralization_flux(litter_n, k_min) = k_min·litter_n`** + the `Mineralization` flow
   `litter_n → soil_n` (first-order donor-controlled net mineralization, Stanford & Smith
   1972; self-limiting). The DIRECT release of mineral N back to soil.

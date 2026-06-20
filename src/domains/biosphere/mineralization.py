@@ -14,8 +14,9 @@ external supply:
   ``shed = n_senescence_rate · plant_n`` (kg N day⁻¹), self-limiting → 0 as plant_n → 0
   (the senescence / decomposition positivity pattern: a clamped POOL withdrawal ∝ its
   own start-of-step amount, so ``n_senescence_rate·dt < 1`` keeps the Euler backstop
-  unfired). This makes ``plant_n`` **non-monotone** (Phase 1 left it monotone-growing) —
-  the consumption side the open N loop lacked.
+  unfired). This **drains** ``plant_n`` (Phase 1 left it monotone-*growing*; it now
+  declines toward the uptake/shedding equilibrium) — the consumption side the open N
+  loop lacked.
 
 * **Mineralization** — ``litter_n -> soil_n`` (Σ legs = 0). Decomposing litter releases
   mineral N back to the soil pool. First-order donor-controlled net mineralization
@@ -119,7 +120,8 @@ class NitrogenSenescence:
     the whole-plant ``plant_n`` POOL into the ``litter_n`` POOL each step — the N
     counterpart of carbon senescence (``allocation.Senescence`` feeding
     ``litter_carbon``), and the consumption side the Phase-1 open N loop lacked
-    (``plant_n`` becomes non-monotone). Single-currency NITROGEN (both pools are
+    (``plant_n`` is now drained — no longer monotone-growing). Single-currency NITROGEN
+    (both pools are
     ``{NITROGEN: 1}``), so the gate folds it identically to Phase 1. Self-limiting
     (∝ the plant-N pool's amount), so ``rationed == 0`` is structural
     (``n_senescence_rate·dt < 1``). Sealed-only; ``flux = daily·dt`` (dt-linear).
