@@ -150,12 +150,16 @@ class CarbonContext:
         """
         if self.co2_pool_var is None:
             return env.get(self.ci_var)
-        # __post_init__ guarantees the air/ratio are present when the pool var is.
-        assert self.chamber_air_mol is not None and self.ci_ratio is not None
+        # __post_init__ guarantees the air/ratio are present when the pool var is; the
+        # explicit raise (vs assert) narrows the type and survives ``python -O``.
+        air_mol, ci_ratio = self.chamber_air_mol, self.ci_ratio
+        if air_mol is None or ci_ratio is None:
+            raise ValueError(
+                "sealed CarbonContext is missing chamber_air_mol/ci_ratio "
+                "(the all-or-nothing Ci-source guard should have caught this)"
+            )
         return ci_from_co2_pool(
-            env.get(self.co2_pool_var),
-            air_mol=self.chamber_air_mol,
-            ci_ratio=self.ci_ratio,
+            env.get(self.co2_pool_var), air_mol=air_mol, ci_ratio=ci_ratio
         )
 
     def _leaf_and_biomass(self, snapshot: State) -> tuple[float, float]:

@@ -47,6 +47,7 @@ from domains.biosphere.season import (
 )
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
+from simcore.registry import Registry
 from simcore.state import State
 
 _WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
@@ -230,6 +231,41 @@ def test_sealed_conserves_total_carbon(
     total0 = _total_carbon(states[0])
     for s in states:
         assert math.isclose(_total_carbon(s), total0, rel_tol=1e-12, abs_tol=1e-12)
+
+
+# --- determinism + flow-order independence on the sealed path (#7/#15) -------
+# Mirror the open-field season's guards over the new sealed wiring (the carbon_pool
+# stock + the co2_pool shared resolver entry): a stated Phase-2 invariant ("sealed runs
+# are bit-identical and registration-order-independent"). The full sealed golden lands
+# at Step 7; these pin the engine invariants for the Step-2 surface now.
+def test_sealed_is_deterministic() -> None:
+    a, _, _ = _run_sealed(SeasonScenario(sealed=True))
+    b, _, _ = _run_sealed(SeasonScenario(sealed=True))
+    assert a[-1].aux == b[-1].aux
+    for sid, stock in a[-1].stocks.items():
+        assert stock.amount == b[-1].stocks[sid].amount  # bit-identical
+
+
+def test_sealed_is_flow_registration_order_independent() -> None:
+    # The registry sorts flows by canonical id, so a reversed registration order gives a
+    # bit-identical sealed trajectory — including the carbon_pool draw-down.
+    scenario = SeasonScenario(sealed=True)
+    state, registry = build_season(scenario)
+    resolver = weather_resolver(_weather(), scenario)
+    forward, _, _ = run_season(
+        EulerIntegrator(registry), state, resolver, 1.0, len(_weather())
+    )
+    shuffled = Registry(
+        list(reversed(registry.flows)),
+        state.stocks,
+        aux_processes=registry.aux_processes,
+    )
+    state2, _ = build_season(scenario)
+    reversed_run, _, _ = run_season(
+        EulerIntegrator(shuffled), state2, resolver, 1.0, len(_weather())
+    )
+    for sid, stock in forward[-1].stocks.items():
+        assert stock.amount == reversed_run[-1].stocks[sid].amount
 
 
 def test_open_field_unchanged_by_chamber_additions() -> None:
