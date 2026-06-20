@@ -1741,3 +1741,37 @@ stay green — the biology is validated against the oracle, **not** by dt-conver
 > **Phase-1 status:** All criteria met **except the quantitative oracle match, which is
 > explicitly deferred** (the `[~]` above). The single-producer *machinery* is complete and
 > regression-pinned; behavioural calibration to the oracle is the next phase of work.
+
+---
+
+## Consolidation audit (2026-06-20) — pre-Phase-2 fresh-eyes review
+
+A timeboxed hardening pass before opening Phase 2, targeting the **gate-invisible
+physics risks the plan names** — the ones the conservation gate and `rationed == 0`
+pass *trivially* over (a wrong-but-balanced trajectory still conserves), so only a code
+read catches them. **Result: clean — no behaviour-preserving fix met the bar; the audit
+is the deliverable** (the season golden must stay bit-identical, so cosmetic churn is not
+hardening). Tree green (670 passed, oracle test opt-in).
+
+- **Three-site structural agreement — verified real.** `GASS`, `MRES`, and `available`
+  each have **exactly one** computation site, `CarbonContext.budget`
+  (`carbon_budget.py`); `limitation` (`f_water · f_N`) is computed *inside* `budget`,
+  never passed by a flow. `Allocation`, `GrowthRespiration`, `MaintenanceRespiration`
+  all route through `ctx.budget`, so they **cannot** drift on assimilation / maintenance
+  / limitation (structural, not disciplinary). Grep confirmed
+  `daily_canopy_assimilation` / `maintenance_respiration_flux` / `available_for_growth`
+  have no other assembled call site.
+- **Maintenance covered/shortfall split — traced by hand, matches the documented
+  surplus/deficit arithmetic.** `covered = min(GASS, MRES)`,
+  `shortfall = max(0, MRES − GASS)`; `co2_resp` deposit = Σ of *actual* withdrawals (not
+  `MRES·dt`) so float-rounding in the organ shares cannot break conservation; `available
+  = max(0, GASS − MRES)` is subtracted once ⇒ maintenance paid once (no double-charge).
+  Net `co2_atmos` loss = `GASS` on both surplus and deficit days, as documented.
+- **Storage-organ web — consistent.** `storage_c` is excluded from `Σ organs`
+  (maintenance / `f_N` biomass) and from `Senescence`; it is a pure allocation sink.
+- **`carbon_fraction` dedup** — a *conscious* deferral; the guard test
+  `test_committed_nitrogen_carbon_fraction_matches_canopy` already makes silent drift
+  impossible. Not an oversight; single-sourcing the two param files is a future option,
+  not a debt.
+
+The foundation is cleared to build Phase 2 on — see `phase-2-closed-chamber.md`.
