@@ -124,11 +124,24 @@ class CompartmentFlux:
     - ``crossing_in`` / ``crossing_out`` — gross folded flux **in / out** of the
       compartment carried by *crossing* flows (those touching more than one domain);
       legs of fully-internal flows are excluded (they cancel, contributing nothing).
+      These are **gross**: a multi-leg crossing flow that also redistributes *within*
+      the compartment (e.g. ``Allocation`` shuffling plant organs) inflates both sides
+      equally. The reporting payoff ("net carbon plants→atmosphere") is the **net**
+      ``crossing_in − crossing_out``; the gross pair is the audit detail behind it.
     - ``stored_delta`` — folded ``Σ (after − before)`` over the compartment's stocks.
-    - ``residual`` — ``(crossing_in − crossing_out) − stored_delta``. The identity
-      ``net crossing == ΔStored`` holds **by construction** (internal flows cancel), so
-      ``residual ≈ 0`` is the **apply-integrity** check — it trips only if a stock moved
-      by an amount no leg accounts for. It is *not* a wiring check.
+    - ``residual`` — ``(crossing_in − crossing_out) − stored_delta``, the
+      **apply-integrity** check: ``net crossing == ΔStored`` because internal flows
+      cancel, so a nonzero residual means a stock moved by an amount no leg accounts
+      for. It is *not* a wiring check (a mislabel moves both sides together).
+
+      **Holds only on a "clean" step** — ``flow_results`` are the **post-arbitration**
+      legs (a backstop-scaled flow's *applied* delta is its scaled leg, not the raw
+      ``evaluate()`` result) **and** no **non-flow** state change occurred. Extinction
+      routing (POPULATION → loss-sink, #6) is a *balanced non-flow* change that
+      ``after − before`` includes but **no leg** does, so an extinction step
+      legitimately yields ``residual ≠ 0`` for that stock's compartment. Such steps are
+      **expected exceptions to handle when this is wired live (Step 5)** — not bugs.
+      The Phase-1/2 goldens are ``rationed == 0`` + extinction-free, so neither arises.
 
     Folds element composition exactly as the global gate (``compute_ledger`` /
     ``flow.per_quantity_residual``): a CO₂-pool leg books both CARBON and OXYGEN.
@@ -157,7 +170,9 @@ def compartment_boundary_ledger(
     regardless of leg/stock construction order (#15).
 
     **Diagnostic only** — it never raises; callers assert ``abs(residual) <= tol`` (the
-    apply-integrity check) or read the crossing flux for reporting. A leg referencing an
+    apply-integrity check) or read the crossing flux for reporting. That identity holds
+    exactly only on a **clean step** (post-arbitration legs, no non-flow routing) — see
+    :class:`CompartmentFlux` for when it legitimately does not hold. A leg naming an
     unknown stock raises ``KeyError`` (referential integrity is the apply path's job).
     """
     stocks = before.stocks

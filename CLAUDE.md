@@ -7,10 +7,10 @@ station sim that runs the *same* simulation headless.
 
 **Source of truth for current work:** Phases 0, 0.5, 1, and 2 are **complete**
 (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
-**Next: Phase 3 — the subsystem hierarchy / multi-compartment structure**
-(`docs/plans/phase-3-modular-biosphere.md` — initial plan landed; Step 1, the hierarchy
-representation, not yet built; roadmap `roadmap_extracted.txt`). Reuse/licensing rules:
-`docs/reuse-and-licenses.md`.
+**In progress: Phase 3 — the subsystem hierarchy / multi-compartment structure**
+(`docs/plans/phase-3-modular-biosphere.md` — Step 1 (hierarchy representation) COMPLETE;
+**next Step 2 — reusable compartment builders, P3.2**; roadmap `roadmap_extracted.txt`).
+Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
 

@@ -1,12 +1,18 @@
 # Phase 3 — Modular Biosphere / Consumers
 
-**Status: NOT STARTED — initial plan (this document).** Phases 0, 0.5, 1, and 2 are
-complete and regression-pinned (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
+**Status: Step 1 COMPLETE (foundation); Steps 2–7 not started.** Phases 0, 0.5, 1, and 2
+are complete and regression-pinned (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 This plan **locks the load-bearing Phase-3 decision** (the subsystem-hierarchy
 representation, P3.1) and **enumerates** the process steps as forward-pointers, each to
 be designed just-in-time — the Phase-1/2 rhythm. Per that rhythm and the advisor's
 "design the representation in full and review it before enumerating process steps," the
 foundation (Step 1) is designed in detail below; the science steps are sketched only.
+**Step 1 landed** the subsystem hierarchy: stocks re-domained into leaf compartments
+(label-only — goldens regenerated with **domain-label-only diffs, byte-identical
+amounts**), the domain-side parent map + `descendant_stocks` view, and the
+per-compartment boundary-ledger diagnostic. Exit evidence: `git diff src/simcore/`
+**empty** (clean Option B), 820 tests pass. **Next: Step 2 — reusable compartment
+builders (P3.2).**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable
 compartments.* The headline is an **architectural upgrade**, not new physics: introduce a
@@ -289,12 +295,17 @@ conservation gate, arbitration, or the resolver.
 **Foundation — designed in full (P3.1) and reviewed/built before the process steps, the
 Phase-1/2 rhythm.**
 
-1. **The subsystem-hierarchy representation (P3.1)** — the parent map + re-domaining the
-   existing stocks into `atmosphere`/`soil`/`plants`/`water` leaf compartments (**no id
-   renames**); the per-compartment boundary-ledger diagnostic; the parent map + hierarchy
-   view **domain-side (Option B — resolved; `simcore` untouched)**. **Behavior-preserving:
-   goldens regenerate with domain-label-only diffs and identical amounts** — the self-check
-   that the restructure was safe. Pure infra — no new science. *(Designed in full below.)*
+1. **✅ COMPLETE — The subsystem-hierarchy representation (P3.1).** Re-domained the existing
+   stocks into `atmosphere`/`soil`/`plants`/`water` leaf compartments (**no id renames** —
+   only the `Stock.domain` label moved); the domain-side parent map + `descendant_stocks`
+   hierarchy view (Option B — `simcore` untouched); the per-compartment boundary-ledger
+   diagnostic (`compartment_boundary_ledger` → `CompartmentFlux`, in
+   `domains/biosphere/compartments.py`). **Behavior-preserving, verified: goldens
+   regenerated with domain-label-only diffs and byte-identical amounts** (19 changed lines,
+   all `"domain":`); `git diff src/simcore/` **empty** (clean Option B acceptance check); the
+   ledger's apply-integrity residual documented as exact only on clean steps (post-arbitration
+   legs, no non-flow routing — extinction/scaling are Step-5 live-wiring exceptions). Pure
+   infra — no new science. Landed in two commits (re-domain+hierarchy; boundary ledger).
 
 **Process steps — enumerated now, each designed just-in-time (the Phase-1/2 rhythm).**
 
