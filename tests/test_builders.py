@@ -2,16 +2,20 @@
 
 Each builder (``atmosphere``/``soil``/``plants``) is a pure function returning its own
 stocks, flows, aux, and resolver ``shared``-map; ``build_season`` composes them. These
-**structural** tests are load-bearing for what the byte-identical regression goldens
-**cannot** see: ``domain`` is amount-invariant (no reduction keys on it, P3.1), so a
-builder stamping the *wrong* leaf domain would still reproduce the golden byte-for-byte.
-They pin three things the golden is blind to:
+**structural** tests cover what the byte-identical goldens do not — and, for the domain
+check, *localize* a failure the golden would also catch:
 
-1. each builder emits only *its own* leaf's modeled stocks (boundary stocks excepted);
-2. the builders **partition** the season — disjoint ownership, and their union (plus the
-   composition-level loss-sink) is exactly ``build_season``'s stocks / flows / aux;
-3. **no builder imports another** (the P3.3 shared-stock rule: compartments meet only at
-   shared stocks read from the catalog / threaded through ``ChamberWiring``).
+1. each builder emits only *its own* leaf's modeled stocks. The snapshot serializer
+   **does** serialize ``domain`` (``sim_io/snapshot.py:74``), so a mis-stamped leaf
+   already breaks the golden byte-compare (``domain`` is amount-invariant — no reduction
+   keys on it, P3.1 — but still *emitted*). The check names *which* builder erred.
+2. the builders **partition** the season. *Disjoint* ownership is **genuinely
+   golden-blind** (``build_season`` unions via ``stocks[id] = s``, a dict that dedups,
+   so two builders emitting one id pass silently); *complete* = the union plus the
+   composition-level loss-sink == ``build_season``'s stocks / flows / aux.
+3. **no builder imports another** — **genuinely golden-blind** (pure source structure):
+   compartments meet only at shared stocks read from the catalog / threaded through
+   ``ChamberWiring`` (the P3.3 rule).
 """
 
 import ast
@@ -60,9 +64,10 @@ def _builds(scenario: SeasonScenario) -> dict[str, tuple[CompartmentBuild, Domai
 def test_each_builder_emits_only_its_own_leaf_modeled_stocks(
     scenario: SeasonScenario,
 ) -> None:
-    # The catch the golden can't see: a mis-stamped leaf. Every *modeled* (non-boundary)
-    # stock a builder emits must carry that builder's leaf domain. Boundary stocks
-    # (sources/sinks the compartment's flows drive) stay in the boundary namespace.
+    # Localizes a mis-stamped leaf to its builder. (The snapshot golden serializes
+    # ``domain`` too, so it also catches this — here we name the culprit.) Every modeled
+    # (non-boundary) stock must carry its builder's leaf domain; boundary stocks (the
+    # sources/sinks the compartment's flows drive) stay in the boundary namespace.
     for name, (build, leaf) in _builds(scenario).items():
         for stock in build.stocks:
             if stock.domain == BOUNDARY_DOMAIN:

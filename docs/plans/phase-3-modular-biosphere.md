@@ -15,10 +15,11 @@ per-compartment boundary-ledger diagnostic. Exit evidence: `git diff src/simcore
 is COMPLETE** — `season.py` split into `scenario` / `stocks` / `atmosphere` / `soil` /
 `plants` builder modules (`water` deferred to Step 3); both goldens **byte-identical
 WITHOUT regeneration** (the proof the restructure was safe); `git diff src/simcore/` still
-**empty**; 836 tests pass incl. the new `test_builders` (per-builder leaf-domain stamp,
-disjoint-and-complete partition vs `build_season`, and a no-cross-import guard — the
-structural checks the amount-blind goldens cannot see). **Next: Step 3 — close the water
-cycle (P3.3).**
+**empty**; 836 tests pass incl. the new `test_builders` — the **disjoint-ownership** and
+**no-cross-import** checks the snapshot goldens genuinely can't see (the `build_season`
+union dedups by id; imports are pure source structure), plus a per-builder leaf-stamp
+check that *localizes* a mis-stamp the goldens — which serialize `domain` — would also
+catch. **Next: Step 3 — close the water cycle (P3.3).**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable
 compartments.* The headline is an **architectural upgrade**, not new physics: introduce a
@@ -324,9 +325,11 @@ Phase-1/2 rhythm.**
    composition (`_compartments` aggregator → both `build_season` and `weather_resolver`)
    plus re-exports of the full symbol surface (no test import path changed). **Both goldens
    byte-identical WITHOUT regeneration**; `git diff src/simcore/` empty; 836 tests pass
-   (new `test_builders.py`: per-builder leaf-domain stamp, disjoint+complete partition, the
-   P3.3 no-cross-import guard — load-bearing because `domain` is amount-invariant so the
-   goldens are blind to a mis-stamped leaf). `test_sealed_chamber`'s f_O2 patch seam
+   (new `test_builders.py`: disjoint+complete partition and the P3.3 no-cross-import guard
+   — **genuinely golden-blind** (the `build_season` union dedups by id; imports are pure
+   source structure) — plus a per-builder leaf-stamp check that *localizes* a mis-stamp the
+   snapshot goldens, which serialize `domain`, would also catch). `test_sealed_chamber`'s
+   f_O2 patch seam
    followed the moved loaders to `plants`/`soil`. The composition pattern Phase 5 will reuse
    for sibling domains. **Designed in full below (§ "Step 2 design") — advisor-reviewed.**
 3. **Close the water cycle (P3.3)** — `water_vapor` (Atmosphere) + condensation +
