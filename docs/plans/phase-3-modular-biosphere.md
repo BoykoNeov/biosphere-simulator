@@ -335,7 +335,8 @@ Phase-1/2 rhythm.**
 3. **Close the water cycle (P3.3)** — `water_vapor` (Atmosphere) + condensation +
    recycling to `soil_water` (Soil); replace the `vapor_sink` BOUNDARY. The first real
    cross-compartment cycle; new golden. Verify the per-compartment boundary ledger balances
-   for every compartment the cycle touches.
+   (WATER-scoped) for every compartment the cycle touches. **Designed in full below
+   (§ "Step 3 design") — advisor-reviewed.**
 4. **Closure-preserving mortality + annual reset (P3.4)** — death routes organ +
    `storage_c` carbon to `litter_carbon`; annual phenology reset / re-sowing → sustained
    multi-year oscillation. New behavior + golden.
@@ -578,5 +579,155 @@ weaken them.)*
 
 Both goldens byte-identical **without regeneration** + full suite green + `git diff
 src/simcore/` empty. **If a golden drifts, stop and find the bug — do not regenerate.**
-</content>
-</invoke>
+
+---
+
+## Step 3 design — close the water cycle (P3.3)
+
+*Realizes P3.3 — the **first real cross-compartment cycle** and the one cycle still open.
+A **behavior change** (sealed only) with a **new sealed golden**; the open-field golden
+stays **byte-identical**. Carbon (Phase-2 Steps 2–5) and nitrogen (Step 6) are already
+closed; water is the last leak. Advisor-reviewed before building, the Step-1/2 rhythm.*
+
+**The leak, today.** The sealed chamber is not water-closed: `Transpiration` drains
+`soil_water (soil) → vapor_sink` (a BOUNDARY, water *out*) and `Irrigation` refills it
+`water_source → soil_water` (a BOUNDARY, water *in*). Two boundary crossings ⇒ the
+chamber exchanges water with the outside. Step 3 closes both.
+
+### The closed loop — four compartments, no control code
+
+Sealed only (open field keeps both boundaries unchanged — see "the fork"):
+
+```
+soil_water (soil) --Transpiration--> water_vapor (atmosphere)
+water_vapor (atmosphere) --Condensation--> condensate (water)
+condensate (water) --Recycling--> soil_water (soil)
+```
+
+A genuinely closed WATER loop: total water `soil_water + water_vapor + condensate` is
+conserved (each leg is a balanced 1:1 WATER transfer), distributed around the ring. It is
+**emergent from stock coupling** — no compartment imports another; each flow names a
+sibling's shared stock and the resolver (#16) cannot tell shared from forcing. This is the
+**structural validation** that the hierarchy works before consumers/perturbation pile on.
+
+- **Transpiration** (owned by **plants**, already): retargets its vapor leg from
+  `vapor_sink` to `water_vapor` via a new `ChamberWiring.vapor_target` field (`WATER_VAPOR`
+  sealed | `VAPOR_SINK` open) — exactly the `carbon_source` / `litter_carbon_target`
+  pattern. **Its legs touch soil + atmosphere (sealed) — neither is the plants
+  compartment** (flow ownership is organizational, not where the legs land; the integrator
+  sees a flat union, the ledger classifies by `stock.domain`).
+- **Condensation** (new flow, owned by **atmosphere**): `water_vapor → condensate`.
+- **Recycling** (new flow, owned by the new **water** builder): `condensate → soil_water`.
+
+### Drop irrigation + `water_source` in sealed (genuine closure)
+
+For a genuinely closed cycle **both** boundary crossings must go, mirroring how carbon
+dropped `co2_atmos`/`co2_resp` for the finite `carbon_pool`. **The nitrogen "inert
+boundary" precedent does NOT transfer:** N kept `n_source`/`Fertilization` because
+`fertilization_kg_m2_day == 0` (a zero-flux, harmless boundary), but
+`irrigation_mm_day == 2.0` is **nonzero** — left in, it would pump water into the chamber
+every step. So sealed **removes** `Irrigation` + `water_source` (soil builds them
+**open-only**, symmetric with plants building `vapor_sink`/`litter_sink` open-only).
+Consequence: `IRRIGATION_VAR` becomes a **provided-but-unread** forcing in the sealed
+resolver — harmless (`SourceResolver`/`Environment.get` resolve lazily on read; they do
+**not** assert every forcing is consumed — *confirm in Step 3*). No `shared`-map change.
+
+### Kinetics — first-order donor control (engineered condenser framing)
+
+Both new flows are first-order in their donor stock, the decomposition/mineralization
+template — `condensation = k_cond · water_vapor`, `recycling = k_rec · condensate`
+(kg day⁻¹). Structural positivity: each → 0 as its pool → 0, so `k·dt < 1` keeps the Euler
+backstop unfired (`rationed == 0`) with no `max(0, …)` clamp.
+
+**Citation framing (the honest part).** First-order means vapor condenses *regardless of
+humidity* — **wrong for natural atmospheric condensation** (which needs supersaturation;
+that is the deferred saturation/dew-point refinement, needing chamber volume + T-coupling
+with zero architectural payoff here), but **right for an engineered condenser + water-
+recovery loop** — a dehumidifier / condensing heat-exchanger at fixed clearance, which is
+what a sealed bioregenerative life-support chamber actually has (CELSS; Biosphere 2
+condensate management). Rates ship as `TODO(cite)` literature-typical placeholders pending
+a later validation gate — consistent with the season's documented "machinery, not
+validated behaviour" honesty and the decomposition/mineralization first-order precedent.
+
+### New stocks, modules, params (zero core change)
+
+- **Stocks** (both `{WATER: 1}`, single-currency ⇒ the conservation gate folds them
+  identically to Phase-1, **no core change**): `water_vapor` → **ATMOSPHERE**,
+  `condensate` → **WATER** (the `water` leaf compartment's first stocks — declared empty
+  since P3.1). Add both ids to the `stocks.py` catalog and to `STOCK_DOMAIN`. Initial
+  amounts `water_vapor0` / `condensate0` (scenario, default `0.0`, sealed-only — the
+  `litter_carbon0` precedent).
+- **`water_cycle.py`** (new process module): the `Condensation` + `Recycling` flow classes
+  + a `WaterCycleParams` dataclass (two first-order rates), mirroring how
+  `mineralization.py` holds two coupled flows for one loop. The flows read only
+  `snapshot.stocks` — **no `env.get`, no new forcing**.
+- **`water.py`** (new compartment builder, deferred here from Step 2): builds `condensate`
+  + the `Recycling` flow (sealed only; empty `CompartmentBuild` when open). Names
+  `soil_water` from the **catalog** (stable id; no builder imports another, P3.3).
+- **`atmosphere.py`**: sealed adds the `water_vapor` stock + the `Condensation` flow
+  (names `condensate` from the catalog).
+- **`water_cycle.yaml`** + `load_water_cycle_params()`: one file, two rates
+  (`condensation_rate` / `recycling_rate`, both `1/day`), loaded by **both** atmosphere
+  and water — the `mineralization.yaml` precedent (same file, two builders, separate
+  objects). Value/unit/source schema, exact-string unit guard, non-negative bound.
+- **`ChamberWiring`**: add `vapor_target: StockId`; `chamber_wiring()` selects
+  `WATER_VAPOR` (sealed) | `VAPOR_SINK` (open). Keep `Transpiration`'s `vapor_sink`
+  dataclass **field name** so the open flow object is byte-identical post-refactor.
+
+### Sequencing — isolate "refactor safe" from "new science" (the Step-1/2 discipline)
+
+1. **✅ DONE — Refactor only:** added `vapor_target: StockId` to `ChamberWiring`
+   (`chamber_wiring()` selects `VAPOR_SINK` **unconditionally** — sealed flips to
+   `WATER_VAPOR` only in substep 2, once that stock exists); `Transpiration` now reads
+   `vapor_sink=wiring.vapor_target` instead of the hardcoded `VAPOR_SINK` (the dataclass
+   **field name** `vapor_sink` is kept, so the flow object is identical). **Both goldens
+   byte-identical WITHOUT regeneration** (`wiring.vapor_target` resolves to the same
+   `StockId("boundary.vapor_sink")` in both chambers; `ChamberWiring` is never
+   serialized); `git diff src/simcore/` empty; full suite green (836 passed); ruff +
+   pyright clean. Pure indirection — no new stock/flow/science.
+2. **New science:** add the `water_vapor`/`condensate` stocks, `Condensation`/`Recycling`
+   flows, drop sealed irrigation. **Probe the sealed run before regenerating the golden:**
+   inspect `events` (does the producer go extinct? — gates the ledger test, below), min
+   `soil_water` (must stay ≫ `sw_critical = 60` so the plant is not newly water-stressed),
+   and `rationed == 0`. Size `k_cond`/`k_rec` so all three hold. *Then* regenerate the
+   sealed golden.
+2. **New science:** add the `water_vapor`/`condensate` stocks, `Condensation`/`Recycling`
+   flows, drop sealed irrigation. **Probe the sealed run before regenerating the golden:**
+   inspect `events` (does the producer go extinct? — gates the ledger test, below), min
+   `soil_water` (must stay ≫ `sw_critical = 60` so the plant is not newly water-stressed),
+   and `rationed == 0`. Size `k_cond`/`k_rec` so all three hold. *Then* regenerate the
+   sealed golden.
+
+### Test plan
+
+- **Open golden byte-identical** (`test_regression_season`) — the refactor proof.
+- **Sealed golden regenerated** (`test_regression_sealed_season`) — the new closed-water
+  behaviour, hex-float exact.
+- **Per-compartment boundary ledger — WATER-scoped** (the advisor's load-bearing catch):
+  assert the `compartment_boundary_ledger` residual ≈ 0 **for `Quantity.WATER`** on every
+  step of the sealed run, for soil / atmosphere / water (the compartments the cycle
+  touches). **Scoped to WATER deliberately:** the residual identity holds only on a *clean*
+  step (`rationed == 0` **and** no extinction routing), and the sealed producer *may* go
+  extinct — but extinction routes **CARBON** to the loss-sink and touches **no WATER
+  stock**, so WATER stays clean even if the plant dies. The full-ledger-every-step
+  assertion (handling the extinction exception) is **Step 5's** job — do not pull it
+  forward.
+- **Behavioral wiring assertion** (the check the ledger identity *cannot* do — both sides
+  move with a mislabel): the three cycle flows carry **only WATER**, in the ring directions
+  `soil → atmosphere → water → soil`. Written per cross-compartment flow (P3.1's
+  "wiring correctness is a separate behavioral assertion").
+- **Closed-loop conservation:** `soil_water + water_vapor + condensate` constant (to tol)
+  across the sealed run — the closure proof beyond the every-step global gate.
+- **`rationed == 0`** through the sealed run (structural positivity).
+- **`test_builders`** extended: `water.py` returns only `WATER`-domain stocks, imports no
+  sibling builder; the union still equals `build_season`'s.
+- **`test_compartments`**: `STOCK_DOMAIN` partition + `descendant_stocks(biosphere)` now
+  include `water_vapor`/`condensate`; the `water` leaf is no longer empty.
+- **Purity gate** green; **`git diff src/simcore/` empty** (all new code under
+  `domains/biosphere/`).
+
+### Acceptance gate
+
+Open golden byte-identical (no regeneration) + sealed golden regenerated & pinned + the
+WATER-scoped per-compartment ledger balances every step + behavioral wiring + closed-loop
+conservation + `rationed == 0` + full suite green + `git diff src/simcore/` empty.
