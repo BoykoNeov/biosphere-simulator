@@ -120,13 +120,31 @@ New decisions, numbered `P3.n`, carrying the Phase-0/0.5/1/2 invariants they dep
   *behavioral* assertion** — the plants↔atmosphere boundary exchanges only these quantities,
   in these directions — written per cross-compartment flow (Step 3+), not a conservation
   identity.
-- **Core change budget: zero *modifications*, at most one *addition*.** The parent map is an
-  **additive, defaulted** descriptor — the candidate home is `simcore.registry` (it already
-  owns `domain_index`; `parents: Mapping[DomainId, DomainId] | None = None`, default
-  empty = flat, every Phase-0/1/2 call site unchanged); the alternative is domain-side
-  metadata with `simcore` wholly untouched. Decide at Step-1 build (advisor-reviewed). The
-  frozen `Integrator.step`, `Flow`, `Stock` shape, conservation gate, arbitration, and
-  resolver are **untouched**.
+- **Core change budget: zero *modifications*, ZERO *additions* — RESOLVED to domain-side
+  (Option B), advisor-reviewed.** The parent map and the rollup helper that consumes it
+  **both live outside `simcore`** (under `domains/`, `sim_io/`, or a new reporting module),
+  reading `registry.domain_index` off the public API — never the reverse. **Why B over the
+  `simcore.registry(parents=...)` alternative (A): asymmetric reversibility.** B→A later
+  (if Phase 5 wants the hierarchy structurally in core) is *additive* — add the defaulted
+  `parents=` kwarg when the in-core consumer actually exists. A→B is a *breaking removal*
+  from a frozen surface (the `observation.py` `kind`-cut / `StepReport.ledger`-refusal
+  norm). With no in-core consumer in Phase 3 (per-compartment enforcement, integrator-sees-
+  compartments, and compartment-keyed multirate are all ruled out/deferred), take the
+  reversible branch. The roadmap's "registry generalizes to sibling domains" is about the
+  *pattern* (registry + resolver), not the parent map being a registry field — it does not
+  force A.
+- **Coupling constraint (the joint rule, do NOT split the difference):** "parent map
+  domain-side" is only coherent if its *consumer* is also outside `simcore`. If the rollup /
+  boundary-ledger helper is built inside `simcore` (e.g. in `observation.py`), core code
+  would read a domain-side parent map — an inversion worse than either clean option, and a
+  de-facto core reporting surface (which would argue A). Decide both jointly: map AND helper
+  outside `simcore`. **If during Step 1 you want the helper in `simcore`, stop and reconsider
+  A — never split (map out, consumer in).**
+- **Acceptance check for clean B:** after Step 1, `git diff src/simcore/` shows **zero new
+  symbols** — no `parents`, no `descendant_stocks`, no hierarchy method on `Registry`. If
+  that holds, "Phase 3 = zero core changes" stays literally true. The frozen
+  `Integrator.step`, `Flow`, `Stock` shape, conservation gate, arbitration, and resolver are
+  **untouched**.
 
 ### P3.2 — Reusable compartment **builders**: the composition pattern. *(Refactor is behavior-preserving and separate from new science.)*
 
@@ -240,15 +258,13 @@ New decisions, numbered `P3.n`, carrying the Phase-0/0.5/1/2 invariants they dep
 ## API additions (additive only — zero core *modifications*)
 
 ```python
-# --- simcore/registry.py (candidate home) : additive, defaulted parent map -----------
-class Registry:
-    def __init__(self, flows, stocks, aux_processes=None,
-                 parents: Mapping[DomainId, DomainId] | None = None) -> None: ...
-    #   parents: leaf-domain -> parent-domain (e.g. biosphere.plants -> biosphere).
-    #   Default None == flat (every Phase-0/1/2 call site unchanged). Derives a
-    #   read-only hierarchy view + a `descendant_stocks(domain)` helper over domain_index.
-    #   ALTERNATIVE: hold the parent map domain-side (scenario/reporting layer), leaving
-    #   simcore wholly untouched. Decide at Step-1 build (advisor-reviewed).
+# --- domain-side parent map + hierarchy view (Option B — RESOLVED; simcore UNTOUCHED) -
+#   The parent map `{biosphere.plants -> biosphere, ...}` and the read-only hierarchy view
+#   + `descendant_stocks(domain)` helper live OUTSIDE simcore (domains/ | sim_io/ | a new
+#   reporting module), reading `registry.domain_index` off the public API. NOT a Registry
+#   field. (Rejected Option A — `Registry(parents=...)` — would be a breaking removal if
+#   Phase 5 doesn't need it in core; B→A is additive when an in-core consumer appears.)
+#   Acceptance: `git diff src/simcore/` shows zero new symbols after Step 1.
 
 # --- a per-compartment boundary ledger (diagnostic; reporting layer, NOT the gate) ----
 #   For each compartment: sum cross-compartment flow legs (in/out) + ΔStored over its
@@ -275,10 +291,10 @@ Phase-1/2 rhythm.**
 
 1. **The subsystem-hierarchy representation (P3.1)** — the parent map + re-domaining the
    existing stocks into `atmosphere`/`soil`/`plants`/`water` leaf compartments (**no id
-   renames**); the per-compartment boundary-ledger diagnostic; the additive registry
-   descriptor (or domain-side metadata). **Behavior-preserving: goldens regenerate with
-   domain-label-only diffs and identical amounts** — the self-check that the restructure was
-   safe. Pure infra — no new science. *(Designed in full below.)*
+   renames**); the per-compartment boundary-ledger diagnostic; the parent map + hierarchy
+   view **domain-side (Option B — resolved; `simcore` untouched)**. **Behavior-preserving:
+   goldens regenerate with domain-label-only diffs and identical amounts** — the self-check
+   that the restructure was safe. Pure infra — no new science. *(Designed in full below.)*
 
 **Process steps — enumerated now, each designed just-in-time (the Phase-1/2 rhythm).**
 
@@ -326,10 +342,12 @@ exactly as Phase-1 Step 2 (the aux channel) and Phase-2 Step 1 (the composition 
   before committing the relabel.
 - **The parent map.** `{biosphere.atmosphere: biosphere, biosphere.soil: biosphere,
   biosphere.plants: biosphere, biosphere.water: biosphere}` — a flat-for-now two-level tree
-  under a `biosphere` root. Lands as the additive `Registry(parents=...)` descriptor (or
-  domain-side metadata — the one open build decision, advisor-reviewed). Derives a read-only
-  hierarchy view + `descendant_stocks(domain)` (union of a node's subtree's stock sets) for
-  reporting.
+  under a `biosphere` root. **Lands domain-side (Option B — RESOLVED), NOT as a Registry
+  field**; with its `descendant_stocks(domain)` hierarchy view (union of a node's subtree's
+  stock sets) in the same outside-`simcore` module, reading `registry.domain_index` off the
+  public API. **Coupling rule:** the helper that consumes the map must also live outside
+  `simcore` — if Step 1 pulls it into `simcore`, stop and reconsider Option A. Acceptance:
+  `git diff src/simcore/` shows zero new symbols.
 - **The per-compartment boundary ledger (diagnostic).** A reporting helper: given a
   `StepReport`'s flow legs + the before/after stocks, for each compartment classify legs as
   *internal* (both endpoints inside) vs *crossing* (one endpoint outside) and report the

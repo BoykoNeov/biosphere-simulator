@@ -47,6 +47,7 @@ from domains.biosphere.carbon_budget import (
     GrowthRespiration,
     MaintenanceRespiration,
 )
+from domains.biosphere.compartments import ATMOSPHERE, PLANTS, SOIL
 from domains.biosphere.decomposition import Decomposition
 from domains.biosphere.loader import (
     load_allocation_params,
@@ -83,9 +84,6 @@ from simcore.quantities import Quantity, StockKind, UnitLabel, canonical_unit
 from simcore.registry import Registry
 from simcore.state import State, Stock
 
-BIOSPHERE: DomainId = DomainId("biosphere")
-BOUNDARY: DomainId = DomainId("boundary")
-
 # --- stock ids --------------------------------------------------------------
 LEAF_C: StockId = StockId("biosphere.leaf_c")
 STEM_C: StockId = StockId("biosphere.stem_c")
@@ -120,6 +118,41 @@ VAPOR_SINK: StockId = StockId("boundary.vapor_sink")
 LITTER_SINK: StockId = StockId("boundary.litter_sink")
 WATER_SOURCE: StockId = StockId("boundary.water_source")
 N_SOURCE: StockId = StockId("boundary.n_source")
+
+# --- compartment assignment (Phase-3 P3.1) ----------------------------------
+# The explicit, single-source-of-truth table mapping each *modeled* biosphere stock to
+# its leaf compartment (``domains.biosphere.compartments``) — the Phase-3 relabel:
+# only the ``Stock.domain`` *label* moves — every stock id above is byte-identical — so
+# the goldens regenerate with domain-label-only diffs and identical amounts. Boundary
+# stocks are absent here: ``boundary.source``/``sink``/``loss_sinks`` already stamp them
+# ``domain="boundary"``. A modeled stock missing from this table is a wiring bug —
+# ``_stock_domain`` raises rather than silently defaulting.
+STOCK_DOMAIN: dict[StockId, DomainId] = {
+    LEAF_C: PLANTS,
+    STEM_C: PLANTS,
+    ROOT_C: PLANTS,
+    STORAGE_C: PLANTS,
+    PLANT_N: PLANTS,
+    SOIL_WATER: SOIL,
+    SOIL_N: SOIL,
+    LITTER_CARBON: SOIL,
+    LITTER_N: SOIL,
+    MICROBIAL_CARBON: SOIL,  # decomposer biomass lives in the soil compartment
+    CARBON_POOL: ATMOSPHERE,
+    O2_POOL: ATMOSPHERE,
+}
+
+
+def _stock_domain(stock_id: StockId) -> DomainId:
+    """The leaf compartment for a modeled stock; raise if unassigned (a wiring bug)."""
+    try:
+        return STOCK_DOMAIN[stock_id]
+    except KeyError:
+        raise KeyError(
+            f"modeled stock {stock_id!r} has no compartment in STOCK_DOMAIN "
+            f"(every modeled biosphere stock must be assigned a leaf compartment)"
+        ) from None
+
 
 # --- forcing var names (resolved through env.get, #16) ----------------------
 PAR_VAR = "par"
@@ -292,7 +325,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
     def organ(stock_id: StockId, amount: float) -> Stock:
         return Stock(
             id=stock_id,
-            domain=BIOSPHERE,
+            domain=_stock_domain(stock_id),
             quantity=Quantity.CARBON,
             unit=carbon,
             amount=amount,
@@ -305,7 +338,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
     ) -> Stock:
         return Stock(
             id=stock_id,
-            domain=BIOSPHERE,
+            domain=_stock_domain(stock_id),
             quantity=quantity,
             unit=unit,
             amount=amount,
@@ -345,7 +378,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
     if scenario.sealed:
         stocks[CARBON_POOL] = Stock(
             id=CARBON_POOL,
-            domain=BIOSPHERE,
+            domain=_stock_domain(CARBON_POOL),
             quantity=Quantity.CARBON,
             unit=carbon,
             amount=scenario.chamber_co2_mol0,
@@ -354,7 +387,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         )
         stocks[O2_POOL] = Stock(
             id=O2_POOL,
-            domain=BIOSPHERE,
+            domain=_stock_domain(O2_POOL),
             quantity=Quantity.OXYGEN,
             unit=oxygen,
             amount=scenario.chamber_o2_mol0,

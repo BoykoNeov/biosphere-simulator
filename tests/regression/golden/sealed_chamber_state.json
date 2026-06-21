@@ -11,7 +11,7 @@
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.atmosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.carbon_pool",
       "kind": "pool",
@@ -24,7 +24,7 @@
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.plants",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.leaf_c",
       "kind": "population",
@@ -37,7 +37,7 @@
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.soil",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.litter_carbon",
       "kind": "pool",
@@ -50,7 +50,7 @@
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.soil",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.litter_n",
       "kind": "pool",
@@ -63,7 +63,7 @@
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.soil",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.microbial_carbon",
       "kind": "population",
@@ -76,7 +76,7 @@
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.atmosphere",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.o2_pool",
       "kind": "pool",
@@ -89,7 +89,7 @@
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.plants",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.plant_n",
       "kind": "pool",
@@ -102,7 +102,7 @@
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.plants",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.root_c",
       "kind": "population",
@@ -115,7 +115,7 @@
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.soil",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.soil_n",
       "kind": "pool",
@@ -128,7 +128,7 @@
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.soil",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.soil_water",
       "kind": "pool",
@@ -141,7 +141,7 @@
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.plants",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.stem_c",
       "kind": "population",
@@ -154,7 +154,7 @@
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
-      "domain": "biosphere",
+      "domain": "biosphere.plants",
       "extinction_threshold": "0x0.0p+0",
       "id": "biosphere.storage_c",
       "kind": "population",
