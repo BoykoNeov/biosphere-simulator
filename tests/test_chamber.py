@@ -34,7 +34,7 @@ from pathlib import Path
 
 import pytest
 
-from domains.biosphere.chamber import ci_from_co2_pool
+from domains.biosphere.chamber import ci_from_co2_pool, oxygen_limitation_factor
 from domains.biosphere.season import (
     CARBON_POOL,
     CO2_ATMOS,
@@ -117,6 +117,63 @@ def test_ci_from_co2_pool_rejects_bad_inputs(
 ) -> None:
     with pytest.raises(ValueError):
         ci_from_co2_pool(co2_mol, air_mol=air_mol, ci_ratio=ci_ratio)
+
+
+# --- O₂ self-limitation: oxygen_limitation_factor (pure, hand-checked, Step 7) ---
+def test_oxygen_limitation_factor_hand_value() -> None:
+    # x_O2 = 1/2 = 0.5; f = 0.5 / (0.5 + 0.5) = 0.5 (O₂ at its half-saturation).
+    assert math.isclose(
+        oxygen_limitation_factor(1.0, air_mol=2.0, k_o2=0.5), 0.5, rel_tol=1e-12
+    )
+
+
+def test_oxygen_limitation_factor_saturates_to_one() -> None:
+    # O₂ ≫ K_O2 (the PP regime): f → 1, so respiration is unthrottled (the Steps-3/5
+    # behaviour is preserved until O₂ actually depletes).
+    f = oxygen_limitation_factor(210.0, air_mol=1000.0, k_o2=0.001)
+    assert 0.99 < f <= 1.0  # x_O2 = 0.21 ≫ 0.001 ⇒ f ≈ 0.9953
+
+
+def test_oxygen_limitation_factor_goes_to_zero_at_anoxia() -> None:
+    # O₂ → 0 ⇒ f → 0: the depleting-pool shutoff (the Ci-shutoff mirror) that keeps
+    # rationed == 0 as O₂ runs out. At zero O₂ the factor is exactly 0.
+    assert oxygen_limitation_factor(0.0, air_mol=1000.0, k_o2=0.001) == 0.0
+    near = oxygen_limitation_factor(0.05, air_mol=1000.0, k_o2=0.001)  # x=5e-5 ≪ k
+    assert near < 0.1  # sharply throttled near anoxia
+
+
+def test_oxygen_limitation_factor_is_monotone_in_o2() -> None:
+    # Strictly increasing in O₂ (Monod): more O₂ ⇒ less throttling.
+    fs = [
+        oxygen_limitation_factor(o2, air_mol=1000.0, k_o2=0.01)
+        for o2 in (1.0, 5.0, 50.0)
+    ]
+    assert fs[0] < fs[1] < fs[2]
+
+
+def test_oxygen_limitation_factor_k_zero_disables_limit() -> None:
+    # K_O2 = 0 ⇒ f = 1 for any O₂ > 0 (the Steps-3/5 "off" behaviour; no limitation).
+    assert oxygen_limitation_factor(210.0, air_mol=1000.0, k_o2=0.0) == 1.0
+    assert oxygen_limitation_factor(1e-9, air_mol=1000.0, k_o2=0.0) == 1.0
+
+
+@pytest.mark.parametrize(
+    ("o2_mol", "air_mol", "k_o2"),
+    [
+        (1.0, 0.0, 0.001),  # degenerate chamber (no air)
+        (1.0, -1.0, 0.001),
+        (1.0, 1000.0, -0.001),  # negative half-saturation
+        (1.0, 1000.0, math.inf),  # non-finite half-saturation
+        (-1.0, 1000.0, 0.001),  # impossible negative O₂
+        (math.inf, 1000.0, 0.001),  # non-finite O₂
+        (math.nan, 1000.0, 0.001),
+    ],
+)
+def test_oxygen_limitation_factor_rejects_bad_inputs(
+    o2_mol: float, air_mol: float, k_o2: float
+) -> None:
+    with pytest.raises(ValueError):
+        oxygen_limitation_factor(o2_mol, air_mol=air_mol, k_o2=k_o2)
 
 
 # --- the seam: CarbonContext Ci source (forcing vs pool) --------------------

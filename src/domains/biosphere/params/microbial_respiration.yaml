@@ -14,11 +14,13 @@
 #   decomposition_rate / senescence's rdr_*). A zero rate is valid (no respiration —
 #   microbial biomass would only grow, the Step-4 behaviour).
 #
-# Deferred seams (documented in microbial_respiration.py): the O₂ self-limitation
-#   Michaelis factor f_O2 = O2/(K_O2 + O2) (deferred to Step 7, where the multi-year run
-#   is sized to deplete O₂ — at this fill O₂ stays ~3 orders from rationing), microbial
-#   death/turnover as microbial_C → litter_C recycling, and microbe-explicit substrate
-#   Michaelis kinetics (Vmax · microbial_C · litter/(K_m + litter)).
+# The O₂ self-limitation Michaelis factor f_O2 = x_O2/(K_O2 + x_O2) is BUILT at Step 7
+#   (o2_half_saturation below; chamber.oxygen_limitation_factor), applied here and to the
+#   plant maintenance shortfall so respiration self-throttles on a depleting O₂ pool.
+#
+# Deferred seams (documented in microbial_respiration.py): microbial death/turnover as
+#   microbial_C → litter_C recycling, and microbe-explicit substrate Michaelis kinetics
+#   (Vmax · microbial_C · litter/(K_m + litter)).
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
@@ -32,6 +34,10 @@
 #       Soc. Am. J. 51:1173–1179; RothC: Jenkinson, D.S. (1990), "The turnover of organic
 #       carbon and nitrogen in soil", Phil. Trans. R. Soc. Lond. B 329:361–368). The
 #       microbial-biomass respiration constant m_resp; primary citation pending.
+#   [B] Davidson, E.A., Samanta, S., Caramori, S.S. & Savage, K. (2012), "The Dual
+#       Arrhenius and Michaelis–Menten kinetics model for decomposition of soil organic
+#       matter ...", Global Change Biology 18:371–384 (the Michaelis–Menten O₂-limitation
+#       form for respiration; our well-mixed chamber uses a sharper intrinsic-affinity Km).
 
 name: chamber
 process: microbial_respiration
@@ -41,3 +47,7 @@ parameters:
     value: 0.05
     unit: "1/day"
     source: "TODO(cite) — provisional, literature-typical first-order microbial respiration constant m_resp (microbial turnover ~20 days) [A]; primary citation pending Phase-2 validation gate"
+  o2_half_saturation:
+    value: 0.001
+    unit: "mol/mol"
+    source: "TODO(cite) — provisional, low/sharp O2 half-saturation (mole fraction) for the f_O2 self-limit (Phase-2 Step 7; chamber.oxygen_limitation_factor). Michaelis-Menten O2 limitation of respiration [B]; low/sharp because a 0-D well-mixed chamber has no soil-microsite diffusion limitation, so the intrinsic respiratory O2 affinity governs (f_O2 ~ 1 until near-anoxia); primary citation pending the Phase-2 validation gate"

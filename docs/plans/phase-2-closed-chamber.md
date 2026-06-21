@@ -851,6 +851,116 @@ sealed run is pinned behaviourally), and the open-field regression golden is unt
 
 ---
 
+## Step 7 design — sealed-chamber integration + validation (the Phase-2 capstone)
+
+*Closes Phase 2 (designed JIT, the Phase-1 rhythm; advisor-reviewed before build). Steps
+1–6 built every piece (the composition core, the finite gas pools, the multi-quantity gas
+exchange, the carbon decomposer loop, the nitrogen return loop); Step 7 **assembles a
+multi-year sealed run, applies the deferred kinetic self-limiters (`f_O2`, and `f_N`
+where it bites), and validates a closed-system phenomenon** against a hex-float golden.
+Zero `simcore` changes — `f_O2` is a domain-side pure function, the scenario is
+`season.py`, the golden is tests. Phase 2 thus changes **exactly one** core surface
+(P2.1), as promised.*
+
+**The probe that reframed the deliverable (the advisor's "look before you design").** The
+plan's headline phenomenon was "CO₂ oscillation across years." A cheap 3-year tiled run
+at the PP sizing (`bench/probe_multiyear.py`, throwaway) showed it is **not achievable**
+in this model: DVS is monotone (it only accumulates, never resets — no vernalization, no
+re-sowing) and caps at 2.0, where the partition table sends **`fl = 0` carbon to leaves**
+(all to storage/grain). So the plant matures mid-year-1, leaf carbon then decays to ~0
+(senescence drains it; nothing refills it), LAI → 0, and **photosynthesis stops after
+year 1** — no summer recovery, hence no sustained oscillation. The run instead settles to
+a **dead steady state** (organic carbon respired back to CO₂ except a permanent
+`storage_c` residue that pays no maintenance and never senesces). `rationed == 0`,
+`events == ()` hold across all 915 steps. **Sustained multi-year oscillation is therefore
+DEFERRED** (it needs annual phenology reset / re-sowing / vernalization — a Phase-3
+scenario seam), exactly as Step 2 shipped *draw-down, not oscillation*. What is real and
+already present is the **within-year draw-down → partial recovery** (Step 5) — a single
+seasonal cycle, not a sustained one.
+
+**The spine (exit-criteria; must land) vs the gravy (assert-if-it-falls-out, else defer)
+— the advisor's scoping.**
+- **Spine.** (1) The `f_O2` kinetic factor (a pure addition; applied to both plant
+  maintenance shortfall and microbial respiration). (2) **One canonical multi-year sealed
+  run** — all four quantities (CARBON/OXYGEN/WATER/NITROGEN) conserved float-exact,
+  `rationed == 0`, no extinction, deterministic, **hex-float golden** (the first sealed
+  golden). (3) **At least one closed-system phenomenon clearly asserted: O₂ depletion**
+  (the Biosphere-2 headline) — with the **O₂↔CO₂ anti-correlation riding along exact**
+  (`CO₂_mol + O₂_mol = const`, since only CO₂/O₂ carry OXYGEN and `2·(CO₂+O₂)` is
+  conserved). (4) Docs + `MEMORY.md` + the zero-`simcore`-change frozen-surface note.
+- **Gravy.** **`f_N < 1` biting** is a *separate sizing axis* (low total N) from the
+  O₂/litter axis, and is **not** an exit-criteria phenomenon (those are all gas-side). It
+  is asserted **if the canonical depleting run happens to dilute N below critical**;
+  otherwise a small targeted test pins it, and the fully N-limited multi-year regime is a
+  documented Phase-3 seam. Do not let N-tuning block the gas-phase capstone.
+
+**`f_O2` — the deferred O₂ self-limitation (Steps 3/5 → here).** A Monod factor in the O₂
+**mole fraction** (consistent with the `Ci` treatment, chamber-size-aware):
+`f_O2 = x_O2 / (K_O2 + x_O2)`, `x_O2 = o2_mol / air_mol`, a new pure
+`chamber.oxygen_limitation_factor(o2_mol, *, air_mol, k_o2)` → 0 as O₂ → 0, → 1 as
+O₂ ≫ K_O2. It multiplies the **O₂-consuming respiration fluxes only**:
+- **Microbial respiration** (`microbial_C + O₂ → CO₂`): `flux *= f_O2(o2_pool)`.
+- **Plant maintenance shortfall** (`biomass + O₂ → CO₂`, the only O₂-consuming plant leg
+  in the closed chamber — the *covered* maintenance is a CO₂→CO₂ no-op): the organ-burn
+  is scaled by `f_O2`. The budget's `MRES`/`available` (driving allocation + growth
+  respiration) are **unchanged** — only the realized burn shrinks, so the unmet
+  maintenance carbon simply **stays in biomass** (an O₂-limited-respiration model, the
+  respiratory mirror of FvCB's Ci-shutoff). **Conservation-safe**: `f_O2` scales the whole
+  flow, every leg still balances CARBON and OXYGEN.
+- **Open field is byte-identical** (`o2_pool=None` → `f_O2` not applied; the regression
+  golden is untouched). **PP-sealed is behaviourally green**: `K_O2` is **low/sharp**
+  (aerobic respiration is genuinely O₂-saturated until near-anoxia), so `f_O2 ≈ 1` at the
+  ~21% PP fill (the existing sealed behavioural tests still pass — conservation is
+  leg-balanced regardless, draws only shrink) and `f_O2` is **load-bearing only as O₂
+  approaches its floor** — i.e. in the depleting canonical run. `K_O2` is cited from the
+  aerobic-respiration O₂-half-saturation literature (clean-room, `TODO(cite)` provisional).
+  Placement: a per-process `o2_half_saturation` in `respiration.yaml` and
+  `microbial_respiration.yaml` (each respiration process declares its own kinetics — the
+  established per-process param pattern), read into the maintenance context and the
+  microbial flow respectively.
+
+**The canonical run — sized to deplete O₂ (the empirical heart, the Step-2 `air_mol`-probe
+rhythm).** At the PP O₂ fill (~210 mol) depletion is invisible (~0.026 % drop). The
+canonical sealed scenario **shrinks the O₂ fill and/or seeds initial organic carbon**
+(litter/biomass) so that net heterotrophy (decomposition + respiration of the dead plant's
+litter outpacing the year-1 photosynthetic O₂ release) draws O₂ down a **clear fraction**
+toward a floor where `f_O2` self-limits the draw and `rationed == 0` still holds (the
+positivity-from-kinetics invariant, now on a genuinely depleting pool — the thing Steps
+3/5 deferred). Exact sizing (`o2_mol0`, the organic seed, `K_O2`, the run length in years)
+is probed at build with `f_O2` in place, watching `rationed`, extinction, the four
+conservation residuals, and the O₂/CO₂/plant trajectories — and recorded here on commit.
+Weather is **tiled** (the daily table repeated `n_years×`; `_table` already reads rows in
+order, so a repeated list cycles the seasonal forcing — no new schedule code).
+
+**Failure mode = O₂ depletion, NOT extinction (advisor-affirmed).** Extinction routes a
+POPULATION's residual to the **boundary** loss-sink (`integrator.py`, #6) — total CARBON
+*including* the boundary stays conserved (the gate passes), but carbon leaving the chamber
+to a boundary contradicts the *sealed/closed* narrative and injects a discontinuity. So
+the canonical run asserts **`events == ()`** (the self-limiting first-order draws + `f_O2`
+keep the POPULATION pools off zero naturally — the assertion is a guard that should hold).
+Plant-extinction-as-failure is a documented seam (it belongs with Phase-3 multi-compartment
+structure, where a chamber boundary is explicit).
+
+**Test plan (`tests/test_sealed_chamber.py`, the integration capstone).** (a) *`f_O2`
+factor* (in `test_chamber.py` or here): Monod hand value, → 1 as O₂ ≫ K_O2, → 0 as
+O₂ → 0, degenerate-input guards; `f_O2 ≈ 1` at the PP fill (the deferral-guard, now
+*satisfied* not just asserted). (b) *Conservation (the canonical run):* each of CARBON,
+OXYGEN, WATER, NITROGEN invariant float-exact every step (the every-step gate end-to-end
+through `f_O2`-throttled fluxes). (c) *Stability:* `rationed == 0`, `events == ()` across
+the full multi-year horizon (`f_O2` is what makes `rationed == 0` survive the depleting
+O₂ pool — verify it is load-bearing by also showing an *un-throttled* control would
+ration / over-draw). (d) *The phenomenon:* O₂ depletes a clear fraction (assert `min(O₂) <
+α·fill` for a committed α) and the **O₂↔CO₂ anti-correlation is exact** (`CO₂_mol +
+O₂_mol == const` to float — pinned tight, not qualitative). (e) *Determinism:* the
+canonical run is bit-identical on a re-run (registration-order-independent). (f) *Golden:*
+byte-exact hex-float final-state snapshot (`test_regression_sealed_season.py`, the
+`_regenerate`/`__main__` discipline of the open-field golden) + round-trip load-back.
+(g) *`f_N` (gravy):* assert `f_N < 1` somewhere if the run dilutes N below critical, else
+a targeted low-N test pins the bite and the rest is a documented seam. **Open field
+remains byte-identical** (the existing season golden is untouched).
+
+---
+
 ## Exit criteria (Phase 2 — "closed chamber / producer + decomposer")
 
 - [x] **Element-composition core (P2.1)** landed: stocks carry composition, the gate folds

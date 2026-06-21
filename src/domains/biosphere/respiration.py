@@ -66,6 +66,11 @@ class RespirationParams:
     q10: float  # Q10 temperature sensitivity of maintenance (dimensionless)
     t_ref: float  # reference temperature for the Q10 response (°C)
     growth_efficiency: float  # Yg, mol structural C / mol available C (0 < Yg ≤ 1)
+    # O₂ half-saturation (mole fraction) for the sealed-chamber maintenance-shortfall
+    # respiration's ``f_O2`` self-limit (Phase-2 Step 7; ``chamber.oxygen_limitation_
+    # factor``). Low/sharp ⇒ ``f_O2 ≈ 1`` until near-anoxia, so it only bites on a
+    # depleting O₂ pool. Unused in the open field (no O₂ pool); 0 disables the limit.
+    o2_half_saturation: float
 
 
 def q10_factor(temp_c: float, *, q10: float, t_ref: float) -> float:

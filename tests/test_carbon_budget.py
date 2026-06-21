@@ -107,7 +107,11 @@ def _canopy() -> CanopyParams:
 
 def _resp() -> RespirationParams:
     return RespirationParams(
-        maintenance_coef=_M_REF, q10=_Q10, t_ref=_T_REF, growth_efficiency=_YG
+        maintenance_coef=_M_REF,
+        q10=_Q10,
+        t_ref=_T_REF,
+        growth_efficiency=_YG,
+        o2_half_saturation=0.001,
     )
 
 

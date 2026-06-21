@@ -76,7 +76,7 @@ from dataclasses import dataclass
 
 from domains.biosphere.allocation import AllocationParams, partition
 from domains.biosphere.canopy import CanopyParams, leaf_area_index
-from domains.biosphere.chamber import ci_from_co2_pool
+from domains.biosphere.chamber import ci_from_co2_pool, oxygen_limitation_factor
 from domains.biosphere.nitrogen import NitrogenParams, nitrogen_stress_factor
 from domains.biosphere.phenology import PhenologyParams, development_stage
 from domains.biosphere.photosynthesis import (
@@ -346,6 +346,16 @@ class MaintenanceRespiration:
 
     The shortfall is what makes biomass shrink in a carbon deficit (cold/dark
     overwintering) — the WOFOST-faithful behavior the dissolved buffer could not host.
+
+    **O₂ self-limitation (Step 7).** In the sealed chamber the shortfall's O₂ draw is
+    throttled by ``f_O2`` (``chamber.oxygen_limitation_factor`` of the live O₂ mole
+    fraction, ``K_O2 = ctx.resp.o2_half_saturation``, ``air_mol`` this flow's chamber
+    basis), so on a depleting O₂ pool the burn shuts off smoothly before the pool is
+    over-run (``rationed == 0`` from kinetics — the respiratory mirror of FvCB's
+    Ci-shutoff). The unburned ``(1−f_O2)·shortfall`` maintenance just stays in biomass.
+    ``f_O2`` only bites on deficit days (``shortfall > 0``, where ``available`` is
+    already 0), so it never perturbs allocation / growth respiration; at the PP fill it
+    is ≈ 1. Open field (``o2_pool=None``) is byte-identical Phase-1 behaviour.
     """
 
     id: FlowId
@@ -358,6 +368,10 @@ class MaintenanceRespiration:
     # consumes 1 mol O₂ (PQ=1) drawn from here. None (open field) keeps the
     # single-currency Phase-1 legs byte-identical.
     o2_pool: StockId | None = None
+    # Total chamber air (mol) — the intensive basis for the ``f_O2`` O₂ mole fraction
+    # (Step 7), mirroring ``MicrobialRespiration.air_mol``. Set with ``o2_pool`` when
+    # sealed (``scenario.chamber_air_mol``); None in the open field (f_O2 unused).
+    air_mol: float | None = None
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         gass, mres, _ = self.ctx.budget(snapshot, env)
@@ -370,6 +384,27 @@ class MaintenanceRespiration:
             # assimilate) is a CO₂→CO₂ round trip on the single pool — net zero, and
             # would duplicate the pool leg — so it is dropped. Only the biomass-burned
             # ``shortfall`` is a real respiration: organs → CO₂ pool, consuming O₂.
+            # f_O2 self-limit (Step 7): the O₂-consuming shortfall is throttled by the
+            # live O₂ mole fraction so it shuts off smoothly on a depleting pool
+            # (rationed == 0 from kinetics — the Ci-shutoff mirror). The unburned
+            # (1−f_O2)·shortfall maintenance simply stays in biomass (O₂-limited
+            # respiration). f_O2 only ever applies on a deficit day (shortfall > 0),
+            # where ``available`` is already 0 — so it never perturbs allocation /
+            # growth respiration. At the PP fill f_O2 ≈ 1 (low/sharp K_O2). K_O2 is the
+            # plant respiration param (``ctx.resp``); ``air_mol`` is this flow's chamber
+            # basis (mirrors MicrobialRespiration).
+            f_o2 = 1.0
+            if self.o2_pool is not None:
+                if self.air_mol is None:
+                    raise ValueError(
+                        "sealed MaintenanceRespiration is missing air_mol "
+                        "(must be set together with o2_pool)"
+                    )
+                f_o2 = oxygen_limitation_factor(
+                    snapshot.stocks[self.o2_pool].amount,
+                    air_mol=self.air_mol,
+                    k_o2=self.ctx.resp.o2_half_saturation,
+                )
             legs: list[Leg] = []
             organ_burn = 0.0  # Σ actual organ withdrawals (the carbon that returns)
             if biomass > 0.0 and shortfall > 0.0:
@@ -380,7 +415,7 @@ class MaintenanceRespiration:
                     (self.ctx.stem_c, stem),
                     (self.ctx.root_c, root),
                 ):
-                    share = shortfall * (organ_c / biomass) * dt
+                    share = f_o2 * shortfall * (organ_c / biomass) * dt
                     legs.append(Leg(organ_id, -share))
                     organ_burn += share
             if organ_burn != 0.0:

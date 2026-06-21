@@ -53,3 +53,7 @@ parameters:
     value: 0.75
     unit: "dimensionless"
     source: "TODO(cite) — provisional carbon growth-conversion efficiency Yg (~0.7–0.85, composition-dependent) [B][C]; primary citation pending Step 11"
+  o2_half_saturation:
+    value: 0.001
+    unit: "mol/mol"
+    source: "TODO(cite) — provisional, low/sharp O2 half-saturation (mole fraction) for the sealed-chamber maintenance-shortfall f_O2 self-limit (Phase-2 Step 7). Intrinsic respiratory O2 affinity: terminal-oxidase apparent Km for O2 is sub-uM dissolved O2 -> a tiny gas-phase mole fraction, so aerobic respiration is O2-saturated (f_O2 ~ 1) until near-anoxia in a well-mixed chamber (vs the larger soil-diffusion apparent Km of DAMM [Davidson et al. 2012, Glob. Change Biol. 18:371-384], a regime the 0-D chamber does not model); primary citation pending the Phase-2 validation gate"

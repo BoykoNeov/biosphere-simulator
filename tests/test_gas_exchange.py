@@ -230,6 +230,7 @@ def _maintenance() -> MaintenanceRespiration:
         co2_atmos=_CO2_POOL,
         co2_resp=_CO2_POOL,
         o2_pool=_O2_POOL,
+        air_mol=1000.0,  # f_O2 basis (Step 7); o2=210/1000 ⇒ f_O2 ≈ 1, balance holds
     )
 
 

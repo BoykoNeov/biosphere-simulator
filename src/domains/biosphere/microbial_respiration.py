@@ -26,23 +26,19 @@ maintenance).
   sink`` netting (``microbial_carbon ≠`` the CO₂ pool, unlike the *covered*
   plant-maintenance CO₂→CO₂ round trip).
 
-**Why no ``f_O2`` (O₂ self-limitation) yet — deferred to Step 7, a magnitude bet.**
-P2.2 flags an O₂ Michaelis factor (``f_O2 = O2 / (K_O2 + O2)`` → 0 as O₂ → 0) so
-respiration keeps ``rationed == 0`` on a *depleting* O₂ pool. Microbial respiration's O₂
-draw is ``m_resp · microbial_C`` — **not** self-limiting on the O₂ pool — so a small
-enough O₂ fill would ration. But at the realistic chamber fill (~210 mol O₂) the
-standing microbial biomass is O(0.01) mol C and the per-step O₂ draw is O(1e-4) mol, so
-over a single sealed season O₂ never approaches its floor (measured min(O₂) ≈
-0.99997·fill — O₂ falls only ~0.0065 mol of ~210 over the 305-day season, ~4 orders from
-rationing), exactly as Step 3 found for plant respiration. So ``f_O2`` would be ≈ 1
-throughout and untestable-in-anger here; it is **deferred to Step 7**, where the
-multi-year sealed run is *sized to deplete* O₂ (the explicit O₂-depletion validation
-target) and ``f_O2`` is applied to **both** microbial respiration and the plant
-maintenance shortfall. The deferral is guarded by ``test_gas_exchange``'s O₂ ≫ 0 check
-(now also covering the microbial O₂ draw): if a future change pushes O₂ toward zero,
-that test breaks and flags ``f_O2`` has become load-bearing. (This mirrors the Step-3
-scope decision, advisor-reviewed; the plan's "designed at step 5" wording predates the
-Step-3 magnitude discovery.)
+**``f_O2`` (O₂ self-limitation) — deferred from here, built at Step 7.** P2.2 flags an
+O₂ Michaelis factor (``f_O2 = x_O2 / (K_O2 + x_O2)`` → 0 as O₂ → 0) so respiration keeps
+``rationed == 0`` on a *depleting* O₂ pool. Microbial respiration's bare O₂ draw
+``m_resp · microbial_C`` is **not** self-limiting on the O₂ pool, so a small enough fill
+*would* ration. Steps 3/5 deferred the factor — at the ~210 mol PP fill the per-step O₂
+draw is O(1e-4) mol, so O₂ never approached its floor (~4 orders from rationing) and
+``f_O2 ≈ 1`` would have been untestable. **Step 7 builds it** (``chamber.oxygen_
+limitation_factor``, applied here and to the plant maintenance shortfall): the flux is
+scaled by ``f_O2`` of the live O₂ mole fraction, so on the canonical multi-year run
+(sized to deplete O₂) the draw shuts off smoothly before the pool is over-run — the
+respiratory mirror of FvCB's Ci-shutoff. ``K_O2`` is low/sharp (``f_O2 ≈ 1`` until
+near-anoxia), so the prior PP-sealed behaviour is preserved and ``f_O2`` is load-bearing
+only as O₂ approaches its floor.
 
 **Deferred seams (unchanged from Step 4).** Microbial death / turnover as a
 ``microbial_C → litter_C`` *recycling* (vs this respiration → CO₂); microbe-explicit
@@ -58,6 +54,7 @@ Phase-2 validation gate (see ``params/microbial_respiration.yaml``), clean-room.
 
 from dataclasses import dataclass
 
+from domains.biosphere.chamber import oxygen_limitation_factor
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -76,6 +73,11 @@ class MicrobialRespirationParams:
 
     # m_resp, first-order microbial respiration (mol C / mol C / day)
     microbial_respiration_rate: float
+    # O₂ half-saturation (mole fraction) for the ``f_O2`` self-limit (Phase-2 Step 7;
+    # ``chamber.oxygen_limitation_factor``). Low/sharp ⇒ ``f_O2 ≈ 1`` until near-anoxia,
+    # so the O₂ draw only self-throttles on a depleting pool (the central Step-7 guard
+    # that keeps ``rationed == 0`` as O₂ depletes). 0 disables the limit.
+    o2_half_saturation: float
 
 
 def microbial_respiration_flux(
@@ -102,9 +104,10 @@ class MicrobialRespiration:
     (the P2.1 composition fold): the CO₂ returned to the pool carries 2 oxygens supplied
     by the consumed O₂, so OXYGEN nets to zero. Sealed-chamber only (the pools/microbes
     exist only when sealed) — always three legs, no ``source == sink`` netting. The draw
-    self-limits (∝ the microbial pool's amount), so ``rationed == 0`` is structural
-    (``m_resp·dt < 1``; the O₂ draw is far from the O₂ pool's floor — see the module's
-    ``f_O2`` deferral). ``flux = daily·dt`` — dt-linear.
+    self-limits two ways, so ``rationed == 0`` is structural: in the substrate
+    (∝ the microbial pool's amount, ``m_resp·dt < 1``) **and** in O₂ (the ``f_O2``
+    Monod factor → 0 as O₂ → 0, Step 7), so neither the microbial pool nor the O₂ pool
+    is ever over-run. ``flux = daily · f_O2 · dt`` — dt-linear.
     """
 
     id: FlowId
@@ -113,13 +116,26 @@ class MicrobialRespiration:
     co2_pool: StockId
     o2_pool: StockId
     params: MicrobialRespirationParams
+    # Total chamber air (mol) — the intensive basis for the ``f_O2`` O₂ mole fraction
+    # (Step 7). Chamber/scenario data (P4), passed from ``scenario.chamber_air_mol``.
+    air_mol: float
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        # f_O2 self-limit (Step 7): the O₂ draw shuts off smoothly as O₂ → 0, so it
+        # never over-runs the pool on a depleting chamber (rationed == 0 from kinetics —
+        # the Ci-shutoff mirror). At the PP fill f_O2 ≈ 1 (low/sharp K_O2), so the
+        # Steps-3/5 behaviour is preserved until O₂ actually depletes.
+        f_o2 = oxygen_limitation_factor(
+            snapshot.stocks[self.o2_pool].amount,
+            air_mol=self.air_mol,
+            k_o2=self.params.o2_half_saturation,
+        )
         respired = (
             microbial_respiration_flux(
                 snapshot.stocks[self.microbial_carbon].amount,
                 microbial_respiration_rate=self.params.microbial_respiration_rate,
             )
+            * f_o2
             * dt
         )
         # CO₂ returned to the pool = carbon respired; O₂ consumed = carbon respired

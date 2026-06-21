@@ -32,11 +32,16 @@ from domains.biosphere.respiration import (
 
 # The committed winter-wheat provisional placeholders (mirror respiration.yaml).
 _M_REF, _Q10, _T_REF, _YG = 0.02, 2.0, 25.0, 0.75
+_O2_KSAT = 0.001  # committed O₂ half-saturation (mole fraction) for the Step-7 f_O2
 
 
 def _resp() -> RespirationParams:
     return RespirationParams(
-        maintenance_coef=_M_REF, q10=_Q10, t_ref=_T_REF, growth_efficiency=_YG
+        maintenance_coef=_M_REF,
+        q10=_Q10,
+        t_ref=_T_REF,
+        growth_efficiency=_YG,
+        o2_half_saturation=0.001,  # unused here (rate-law tests don't touch O₂)
     )
 
 
@@ -112,11 +117,18 @@ def test_respiration_params_file_exists() -> None:
 def test_load_respiration_params_matches_committed_values() -> None:
     p = load_respiration_params()
     assert isinstance(p, RespirationParams)
-    assert (p.maintenance_coef, p.q10, p.t_ref, p.growth_efficiency) == (
+    assert (
+        p.maintenance_coef,
+        p.q10,
+        p.t_ref,
+        p.growth_efficiency,
+        p.o2_half_saturation,
+    ) == (
         _M_REF,
         _Q10,
         _T_REF,
         _YG,
+        _O2_KSAT,
     )
 
 
@@ -132,6 +144,11 @@ def _valid_resp() -> dict[str, Any]:
                 "value": 0.75,
                 "unit": "dimensionless",
                 "source": "[B]",
+            },
+            "o2_half_saturation": {
+                "value": 0.001,
+                "unit": "mol/mol",
+                "source": "[C]",
             },
         },
     }

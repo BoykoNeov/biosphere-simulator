@@ -389,6 +389,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
             co2_atmos=carbon_source,
             co2_resp=resp_sink,
             o2_pool=o2_pool,
+            air_mol=scenario.chamber_air_mol if scenario.sealed else None,
         ),
         Senescence(
             FlowId("biosphere.senescence"),
@@ -467,6 +468,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
                 co2_pool=CARBON_POOL,
                 o2_pool=O2_POOL,
                 params=load_microbial_respiration_params(),
+                air_mol=scenario.chamber_air_mol,
             )
         )
         # The nitrogen return loop (Step 6), single-currency NITROGEN. N-senescence

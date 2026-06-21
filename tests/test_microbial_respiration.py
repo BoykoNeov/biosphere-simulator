@@ -122,14 +122,21 @@ def _state(*, microbial: float, co2: float = 0.357, o2: float = 210.0) -> State:
     return State(n=0, stocks=stocks, rng_seed=0)
 
 
-def _respiration(rate: float = 0.05) -> MicrobialRespiration:
+def _respiration(
+    rate: float = 0.05, *, o2_half_saturation: float = 0.0
+) -> MicrobialRespiration:
+    # o2_half_saturation defaults to 0 (f_O2 ≡ 1 for O₂ > 0) so the rate-law/balance
+    # unit tests isolate the base flux; f_O2 gets its own dedicated tests.
     return MicrobialRespiration(
         FlowId("biosphere.microbial_respiration"),
         0,
         microbial_carbon=_MICROBIAL,
         co2_pool=_CO2_POOL,
         o2_pool=_O2_POOL,
-        params=MicrobialRespirationParams(microbial_respiration_rate=rate),
+        params=MicrobialRespirationParams(
+            microbial_respiration_rate=rate, o2_half_saturation=o2_half_saturation
+        ),
+        air_mol=1000.0,
     )
 
 
@@ -202,6 +209,8 @@ def test_loader_rejects_negative_rate(tmp_path: Path) -> None:
     bad.write_text(
         "name: chamber\nprocess: microbial_respiration\nparameters:\n"
         '  microbial_respiration_rate:\n    value: -0.01\n    unit: "1/day"\n'
+        '    source: "test"\n'
+        '  o2_half_saturation:\n    value: 0.001\n    unit: "mol/mol"\n'
         '    source: "test"\n',
         encoding="utf-8",
     )
@@ -214,6 +223,8 @@ def test_loader_rejects_bad_unit(tmp_path: Path) -> None:
     bad.write_text(
         "name: chamber\nprocess: microbial_respiration\nparameters:\n"
         '  microbial_respiration_rate:\n    value: 0.05\n    unit: "1/year"\n'
+        '    source: "test"\n'
+        '  o2_half_saturation:\n    value: 0.001\n    unit: "mol/mol"\n'
         '    source: "test"\n',
         encoding="utf-8",
     )

@@ -402,6 +402,7 @@ _RESP_UNITS: dict[str, str] = {
     "q10": "dimensionless",
     "t_ref": "degC",
     "growth_efficiency": "dimensionless",
+    "o2_half_saturation": "mol/mol",
 }
 
 
@@ -426,6 +427,7 @@ class _RespParameters(BaseModel):
     q10: _RespValueUnit
     t_ref: _RespValueUnit
     growth_efficiency: _RespValueUnit
+    o2_half_saturation: _RespValueUnit
 
 
 class _RespSchema(BaseModel):
@@ -456,8 +458,10 @@ def load_respiration_params(
     tag (clean-room discipline). ``maintenance_coef`` and ``q10`` are strictly
     positive; ``growth_efficiency`` ∈ (0, 1] (1 = no conversion loss; 0 would mean all
     assimilate is respired away, never structural). ``t_ref`` is an unconstrained
-    reference temperature. Raises ``pydantic.ValidationError`` on a schema violation,
-    ``ValueError`` on a bad unit or out-of-range value.
+    reference temperature; ``o2_half_saturation`` (the sealed-chamber ``f_O2`` O₂
+    half-saturation, mole fraction) is non-negative (0 disables the O₂ limit). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    out-of-range value.
     """
     schema = _RespSchema.model_validate(load_yaml(path))
     params = schema.parameters
@@ -470,12 +474,17 @@ def load_respiration_params(
         raise ValueError(
             f"growth_efficiency must be in (0, 1], got {values['growth_efficiency']}"
         )
+    if values["o2_half_saturation"] < 0.0:
+        raise ValueError(
+            f"o2_half_saturation must be >= 0, got {values['o2_half_saturation']}"
+        )
 
     return RespirationParams(
         maintenance_coef=values["maintenance_coef"],
         q10=values["q10"],
         t_ref=values["t_ref"],
         growth_efficiency=values["growth_efficiency"],
+        o2_half_saturation=values["o2_half_saturation"],
     )
 
 
@@ -1009,6 +1018,7 @@ def load_decomposition_params(
 # Expected canonical unit string per microbial-respiration param (exact-match guard).
 _MICROBIAL_RESPIRATION_UNITS: dict[str, str] = {
     "microbial_respiration_rate": "1/day",
+    "o2_half_saturation": "mol/mol",
 }
 
 
@@ -1026,6 +1036,7 @@ class _MicrobialRespirationParameters(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     microbial_respiration_rate: _MicrobialRespirationValueUnit
+    o2_half_saturation: _MicrobialRespirationValueUnit
 
 
 class _MicrobialRespirationSchema(BaseModel):
@@ -1072,9 +1083,14 @@ def load_microbial_respiration_params(
             "microbial_respiration_rate must be >= 0, got "
             f"{values['microbial_respiration_rate']}"
         )
+    if values["o2_half_saturation"] < 0.0:
+        raise ValueError(
+            f"o2_half_saturation must be >= 0, got {values['o2_half_saturation']}"
+        )
 
     return MicrobialRespirationParams(
         microbial_respiration_rate=values["microbial_respiration_rate"],
+        o2_half_saturation=values["o2_half_saturation"],
     )
 
 
