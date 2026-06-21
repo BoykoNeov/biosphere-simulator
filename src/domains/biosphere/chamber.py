@@ -97,20 +97,23 @@ def oxygen_limitation_factor(o2_mol: float, *, air_mol: float, k_o2: float) -> f
     O₂ pool the draw shuts off smoothly before the pool is over-run — ``rationed == 0``
     from kinetics, the respiratory mirror of FvCB's Ci-shutoff.
 
-    ``o2_mol`` is read live from the chamber O₂ pool (non-negative — a POOL never goes
-    negative). ``air_mol`` (total chamber air) is chamber/scenario data (P4); ``k_o2``
-    is the O₂ half-saturation **mole fraction** (a respiration kinetic param). ``k_o2 =
-    0`` disables the limit (``f_O2 = 1`` for any O₂ > 0 — the Step-3/5 "off" behaviour).
-    Raises ``ValueError`` for a non-positive ``air_mol``, a negative/non-finite
-    ``k_o2``, or a non-finite/negative ``o2_mol``.
+    ``o2_mol`` is read live from the chamber O₂ pool. ``air_mol`` (total chamber air) is
+    chamber/scenario data (P4); ``k_o2`` is the O₂ half-saturation **mole fraction** (a
+    respiration kinetic param). ``k_o2 = 0`` disables the limit (``f_O2 = 1`` for any
+    O₂ > 0 — the Step-3/5 "off" behaviour). A POOL is clamped ≥ 0 by arbitration, but at
+    **full depletion** float rounding can leave the amount a tiny negative (dust); any
+    non-positive O₂ is therefore treated as the **anoxic floor** (``f_O2 = 0``,
+    respiration off) rather than rejected — so a depleting run self-limits smoothly to 0
+    without tripping on dust. Raises ``ValueError`` for a non-positive ``air_mol``, a
+    negative/non-finite ``k_o2``, or a non-finite ``o2_mol``.
     """
     if not air_mol > 0.0:
         raise ValueError(f"air_mol must be > 0 mol, got {air_mol!r}")
     if not (math.isfinite(k_o2) and k_o2 >= 0.0):
         raise ValueError(f"k_o2 must be finite and >= 0 (mol/mol), got {k_o2!r}")
-    if not math.isfinite(o2_mol) or o2_mol < 0.0:
-        raise ValueError(f"o2_mol must be finite and >= 0 mol, got {o2_mol!r}")
-    x_o2 = o2_mol / air_mol
+    if not math.isfinite(o2_mol):
+        raise ValueError(f"o2_mol must be finite, got {o2_mol!r}")
+    x_o2 = max(0.0, o2_mol) / air_mol  # clamp depletion float-dust to the anoxic floor
     denom = k_o2 + x_o2
     if denom <= 0.0:  # k_o2 == 0 and O₂ == 0: degenerate; no O₂ ⇒ no respiration
         return 0.0

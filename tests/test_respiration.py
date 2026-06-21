@@ -32,7 +32,7 @@ from domains.biosphere.respiration import (
 
 # The committed winter-wheat provisional placeholders (mirror respiration.yaml).
 _M_REF, _Q10, _T_REF, _YG = 0.02, 2.0, 25.0, 0.75
-_O2_KSAT = 0.001  # committed O₂ half-saturation (mole fraction) for the Step-7 f_O2
+_O2_KSAT = 0.0001  # committed O₂ half-saturation (mole fraction) for the Step-7 f_O2
 
 
 def _resp() -> RespirationParams:

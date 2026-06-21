@@ -48,6 +48,6 @@ parameters:
     unit: "1/day"
     source: "TODO(cite) — provisional, literature-typical first-order microbial respiration constant m_resp (microbial turnover ~20 days) [A]; primary citation pending Phase-2 validation gate"
   o2_half_saturation:
-    value: 0.001
+    value: 0.0001
     unit: "mol/mol"
-    source: "TODO(cite) — provisional, low/sharp O2 half-saturation (mole fraction) for the f_O2 self-limit (Phase-2 Step 7; chamber.oxygen_limitation_factor). Michaelis-Menten O2 limitation of respiration [B]; low/sharp because a 0-D well-mixed chamber has no soil-microsite diffusion limitation, so the intrinsic respiratory O2 affinity governs (f_O2 ~ 1 until near-anoxia); primary citation pending the Phase-2 validation gate"
+    source: "TODO(cite) — provisional, low/sharp O2 half-saturation (mole fraction) for the f_O2 self-limit (Phase-2 Step 7; chamber.oxygen_limitation_factor). Michaelis-Menten O2 limitation of respiration [B]; low/sharp (1e-4) because a 0-D well-mixed chamber has no soil-microsite diffusion limitation, so the intrinsic respiratory O2 affinity governs (terminal-oxidase Km ~ 0.1-1 uM dissolved O2 -> gas-phase ~1e-4 mol/mol; f_O2 ~ 1 until near-anoxia); primary citation pending the Phase-2 validation gate"

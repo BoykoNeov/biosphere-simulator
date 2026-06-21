@@ -189,6 +189,12 @@ class SeasonScenario:
     # Photosynthesis deposits O₂ here (PQ=1) and respiration draws it, so it
     # anti-correlates with the CO₂ pool: ΔO₂ = −Δ(net CO₂), 2·(CO₂+O₂) conserved.
     chamber_o2_mol0: float = 210.0
+    # Initial standing litter carbon (mol C) at sowing — the decomposer "soil organic
+    # matter" seed. Default 0 (the PP sealed run starts with no litter; senescence makes
+    # it). The Step-7 depleting run seeds a substantial litter pile so decomposition →
+    # microbial respiration draws the (smaller) O₂ pool down a clear fraction toward its
+    # floor (the Biosphere-2 soil-respiration O₂-depletion mechanism). Sealed-only.
+    litter_carbon0: float = 0.0
     # water (PP, non-limiting): a store sized to stay above the band all season
     soil_water0: float = 1000.0  # kg
     water_source0: float = 0.0  # kg (unclamped supply; tracks cumulative irrigation)
@@ -209,6 +215,24 @@ class SeasonScenario:
 # Module-level default (immutable, frozen dataclass) — used as the param default so the
 # signatures don't call SeasonScenario() in their defaults (ruff B008).
 DEFAULT_SCENARIO: SeasonScenario = SeasonScenario()
+
+# The canonical Phase-2 Step-7 sealed run: a deliberately **O₂-poor** chamber (2 mol O₂
+# in 1000 mol air ≈ 0.2 % — a scale choice, like the Step-2 ``air_mol`` probe, so the
+# tiny 1 m²-seedling gas fluxes can deplete O₂ non-vacuously) seeded with **3 mol C of
+# standing litter** (the "soil organic matter"). Decomposition + microbial respiration
+# draw O₂ down ~99 % to an acute trough while ``f_O2`` self-limits the draw (so
+# ``rationed == 0`` survives the depleting pool — the Biosphere-2 O₂-depletion failure
+# mode); the live producer then transiently refills O₂ before it dies, after which
+# the chamber settles CO₂-rich (Ci ≈ 1140). Sized empirically (probe; ``f_N ≡ 1`` here —
+# N stays non-limiting, so the N-limited regime is deferred). Run multi-year by tiling
+# the season weather ``SEALED_CHAMBER_YEARS×``. Shared by the validation test and the
+# regression golden so they cannot drift on the sizing.
+SEALED_CHAMBER_SCENARIO: SeasonScenario = SeasonScenario(
+    sealed=True,
+    chamber_o2_mol0=2.0,
+    litter_carbon0=3.0,
+)
+SEALED_CHAMBER_YEARS: int = 3
 
 
 def _carbon_context(scenario: SeasonScenario) -> CarbonContext:
@@ -345,7 +369,9 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         # self-limiting respiration draw (∝ its own amount, m_resp·dt ≪ 1) keeps it
         # positive so threshold 0 never snaps, and the carbon loss-sink below covers
         # extinction routing if it ever did.
-        stocks[LITTER_CARBON] = pool(LITTER_CARBON, Quantity.CARBON, carbon, 0.0)
+        stocks[LITTER_CARBON] = pool(
+            LITTER_CARBON, Quantity.CARBON, carbon, scenario.litter_carbon0
+        )
         stocks[MICROBIAL_CARBON] = organ(MICROBIAL_CARBON, 0.0)
         # The nitrogen litter POOL (Step 6): N-senescence sheds plant N into it; net
         # mineralization drains it back to soil_n. Starts at 0 (no standing organic N at

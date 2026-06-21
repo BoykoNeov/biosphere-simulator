@@ -142,6 +142,15 @@ def test_oxygen_limitation_factor_goes_to_zero_at_anoxia() -> None:
     assert near < 0.1  # sharply throttled near anoxia
 
 
+def test_oxygen_limitation_factor_clamps_depletion_dust_to_floor() -> None:
+    # At full depletion a POOL can carry a tiny negative (float rounding); f_O2 treats
+    # any non-positive O₂ as the anoxic floor (0.0), not an error — so a depleting run
+    # self-limits smoothly to 0 without tripping. (Large/structural negatives would be
+    # caught by the conservation gate, not here.)
+    assert oxygen_limitation_factor(-5e-20, air_mol=1000.0, k_o2=0.001) == 0.0
+    assert oxygen_limitation_factor(-1.0, air_mol=1000.0, k_o2=0.001) == 0.0
+
+
 def test_oxygen_limitation_factor_is_monotone_in_o2() -> None:
     # Strictly increasing in O₂ (Monod): more O₂ ⇒ less throttling.
     fs = [
@@ -164,7 +173,6 @@ def test_oxygen_limitation_factor_k_zero_disables_limit() -> None:
         (1.0, -1.0, 0.001),
         (1.0, 1000.0, -0.001),  # negative half-saturation
         (1.0, 1000.0, math.inf),  # non-finite half-saturation
-        (-1.0, 1000.0, 0.001),  # impossible negative O₂
         (math.inf, 1000.0, 0.001),  # non-finite O₂
         (math.nan, 1000.0, 0.001),
     ],
