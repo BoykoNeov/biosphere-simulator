@@ -1,6 +1,16 @@
 # Phase 2 — Closed Chamber / Producer + Decomposer
 
-**Status:** IN PROGRESS — **Step 1 (P2.1, the element-composition core change) is COMPLETE
+**Status: COMPLETE — all 7 steps landed (Steps 1–6 below; Step 7 the capstone).** The
+closed chamber runs: a finite atmosphere photosynthesis draws down (feedback emerges from
+stock coupling, no control code), a producer + decomposer carbon/oxygen/nitrogen loop, and
+a multi-year sealed run that reproduces the **Biosphere-2 O₂-depletion failure mode** with
+every-step conservation of all four quantities and `rationed == 0` from kinetics. Phase 2
+changed **exactly one** core surface (P2.1, the element-composition fold); everything else
+is additive. Exit criteria all met (see the bottom of this doc). All gates green (805
+passed, 1 skipped; ruff/pyright clean). The phase summary lives in `MEMORY.md`; the next
+phase is Phase 3 (the subsystem hierarchy / multi-compartment structure).
+
+**Step 1 (P2.1, the element-composition core change) is COMPLETE
 and landed.** Stocks now carry a `composition` map; the conservation gate folds it at both
 mandatory sites (`flow.py` legs + `conservation.py` state deltas); OXYGEN is genuinely
 asserted; the Phase-1 1:1 behaviour is bit-identical (goldens regenerated for the additive
@@ -181,8 +191,49 @@ drained, total N float-exact, `rationed == 0`, no extinction, the `f_N == 1.0` d
 open field grows no `litter_n`). All gates green (779 passed, ruff/pyright clean).
 **Deferred seams:** microbe-mediated N (immobilization), C:N-ratio-driven
 immobilization/mineralization, N resorption, and the N-limited `f_N < 1` regime (Step 7).
-**Next: Step 7 — sealed-chamber integration + validation (multi-year run, qualitative
-closed-system phenomena, `f_O2`/`f_N` applied where they bite, hex-float golden).**
+
+**Step 7 (sealed-chamber integration + validation — the Phase-2 capstone) is COMPLETE
+and landed, in two commits.** **7a — `f_O2`, the deferred O₂ self-limit** (Steps 3/5 → here):
+a Monod factor in the chamber O₂ mole fraction (`chamber.oxygen_limitation_factor`,
+`f_O2 = x_O2/(K_O2 + x_O2)`) throttling the O₂-consuming respiration fluxes (plant
+maintenance shortfall + microbial respiration) toward 0 as O₂ → 0 — the respiratory mirror
+of FvCB's Ci-shutoff. Conservation-safe (it scales the whole flow; every leg still balances
+CARBON+OXYGEN — advisor-verified). Open field byte-identical (`o2_pool=None`); each
+O₂-consuming flow carries its own `air_mol` basis + an `o2_half_saturation` param. `K_O2 =
+1e-4` mol/mol (low/sharp — terminal-oxidase O₂ affinity, no soil-diffusion limit in a
+well-mixed chamber), so `f_O2 ≈ 1` at the ~21 % PP fill (the prior sealed tests stay green)
+and it is load-bearing only near anoxia. **7b — the canonical depleting multi-year run +
+validation + the first sealed golden.** `SEALED_CHAMBER_SCENARIO`: a deliberately **O₂-poor**
+chamber (**2 mol O₂ in 1000 mol air**, a scale choice so the tiny 1 m²-seedling fluxes
+deplete O₂ non-vacuously — the Step-2 `air_mol`-probe rhythm) seeded with **3 mol C of
+standing litter**, run **3 years** by tiling the season weather (`_table` reads repeated
+rows in order). **The emergent three-act story (no control code):** (1) the seeded litter
+decomposes → microbial respiration draws O₂ down **~99 %** to an acute trough (min O₂ ≈
+0.004 of the 2-mol fill) — the **Biosphere-2 soil-respiration O₂-depletion failure mode** —
+while `f_O2` self-limits the draw so **`rationed == 0` holds on the depleting pool** (the
+central check; an un-throttled `K_O2 = 0` control **rations 77×** — `f_O2` is genuinely
+load-bearing); (2) the live producer photosynthesises at the elevated CO₂ (Ci ≈ 1600
+µmol mol⁻¹) and **transiently refills O₂** before it matures and dies — a coupled
+producer × `f_O2` swing (respiration backs off at the trough, letting photosynthesis
+out-pace it); (3) the plant dead, decomposition wins and the chamber settles **CO₂-rich**
+(Ci ≈ 1140). **Empirical (915-step run):** all four quantities (CARBON/OXYGEN/WATER/NITROGEN)
+conserved float-exact every step; `rationed == 0`; no extinction; O₂ depletes ≥ 95 % yet
+stays strictly positive (the `f_O2` floor); the O₂↔CO₂ anti-correlation is exact
+(`CO₂_mol + O₂_mol = const` — the OXYGEN-conservation law made *visible* by the 99 % swing,
+not an independent invariant); deterministic; `f_N ≡ 1` (N stays non-limiting, verified —
+the N-limited regime is deferred). New `tests/test_sealed_chamber.py` (12 tests) +
+`tests/test_regression_sealed_season.py` + `sealed_chamber_state.json` (the first **sealed**
+hex-float golden; the open field's golden is bit-identical). **Frozen-surface honesty:
+Step 7 is ZERO `simcore` changes** (`f_O2` is domain-side, the scenario is `season.py`, the
+golden is tests) — Phase 2 changed exactly one core surface (P2.1), as promised.
+**Sustained multi-year oscillation is DEFERRED** (the probe found the plant dies after year 1
+— DVS is monotone, no vernalization/re-sowing, and past-maturity partitioning sends no
+carbon to leaves; sustained oscillation needs annual phenology reset — a Phase-3 scenario
+seam). **Deferred seams:** the N-limited `f_N < 1` regime (a separate low-N sizing axis),
+annual phenology reset / re-sowing (→ sustained oscillation), plant-extinction-as-failure
+(brings in the boundary loss-sink, breaking strict closure — a Phase-3 multi-compartment
+concern), and the permanent `storage_c` carbon residue (grain pays no maintenance / never
+senesces, so a dead plant leaves locked carbon).
 
 The design review's two corrections were folded in before
 build: (1) the composition fold has **two** mandatory sites, not one — `flow.py` (legs) *and*
@@ -920,17 +971,30 @@ O₂ ≫ K_O2. It multiplies the **O₂-consuming respiration fluxes only**:
   microbial flow respectively.
 
 **The canonical run — sized to deplete O₂ (the empirical heart, the Step-2 `air_mol`-probe
-rhythm).** At the PP O₂ fill (~210 mol) depletion is invisible (~0.026 % drop). The
-canonical sealed scenario **shrinks the O₂ fill and/or seeds initial organic carbon**
-(litter/biomass) so that net heterotrophy (decomposition + respiration of the dead plant's
-litter outpacing the year-1 photosynthetic O₂ release) draws O₂ down a **clear fraction**
-toward a floor where `f_O2` self-limits the draw and `rationed == 0` still holds (the
-positivity-from-kinetics invariant, now on a genuinely depleting pool — the thing Steps
-3/5 deferred). Exact sizing (`o2_mol0`, the organic seed, `K_O2`, the run length in years)
-is probed at build with `f_O2` in place, watching `rationed`, extinction, the four
-conservation residuals, and the O₂/CO₂/plant trajectories — and recorded here on commit.
-Weather is **tiled** (the daily table repeated `n_years×`; `_table` already reads rows in
-order, so a repeated list cycles the seasonal forcing — no new schedule code).
+rhythm). COMMITTED SIZING (probed):** `SEALED_CHAMBER_SCENARIO` = a deliberately **O₂-poor**
+chamber **2 mol O₂ in 1000 mol air** (≈ 0.2 % — at the PP ~210 mol fill depletion is
+invisible, ~0.026 %; shrinking O₂ is the scale choice that makes the phenomenon
+non-vacuous, exactly the Step-2 `air_mol` logic) seeded with **3 mol C of standing litter**,
+run **`SEALED_CHAMBER_YEARS = 3`** years. **`K_O2 = 1e-4` mol/mol** (retuned from the 7a
+placeholder 0.001): low/sharp enough that `f_O2` starts at **0.95** (a healthy-but-O₂-poor
+chamber, *not* ≈ 1 — the fill is deliberately low) and bites hard at the trough
+(`f_O2 ≈ 0.04`). The seeded litter's decomposition + microbial respiration draw O₂ down
+**~99 %** to an acute trough where `f_O2` self-limits the draw and **`rationed == 0` still
+holds** (the positivity-from-kinetics invariant on a genuinely depleting pool — the thing
+Steps 3/5 deferred; an un-throttled `K_O2 = 0` control rations **77×**, the load-bearing
+proof). Weather is **tiled** (the daily table repeated `n_years×`; `_table` already reads
+rows in order, so a repeated list cycles the seasonal forcing — no new schedule code).
+
+**The emergent three-act trajectory (richer than first sketched — no control code).**
+(1) *Acute O₂ crash* (~day 120): litter → microbes → CO₂ draws O₂ 2.0 → ~0.004,
+`f_O2` → 0.04, CO₂ rises (Ci → ~1650). (2) *Producer-driven recovery* (to ~day 305): a
+**coupled producer × `f_O2`** swing — respiration backs off at the anoxic trough, so the
+still-living plant (photosynthesising at the high CO₂) **out-paces it and refills O₂** to
+~1.6 (the control, with no `f_O2`, just crashes O₂ to zero). (3) *Secular CO₂-rich end
+state*: the plant matures and dies (leaf → 0), decomposition wins, the chamber settles
+O₂-depleted / CO₂-rich (Ci ≈ 1140). One hardening fix surfaced in the build:
+`oxygen_limitation_factor` **clamps a float-dust-negative O₂ to the anoxic floor**
+(`f_O2 = 0`) rather than raising, so full depletion self-limits smoothly to 0.
 
 **Failure mode = O₂ depletion, NOT extinction (advisor-affirmed).** Extinction routes a
 POPULATION's residual to the **boundary** loss-sink (`integrator.py`, #6) — total CARBON
@@ -987,10 +1051,19 @@ remains byte-identical** (the existing season golden is untouched).
       `soil_n → plant_n → litter_n → soil_n` internally (DIRECT net mineralization;
       microbe-mediated N deferred), total NITROGEN float-exact, `rationed == 0`. All
       mechanism-level; `f_N ≡ 1` keeps it carbon-decoupled (the N-limited regime is the
-      Step-7 sized run). *(Remaining: the multi-year sealed run + closed-system
-      validation, Step 7.)*
-- [ ] **Sealed multi-year run:** stable every-step conservation (all of CARBON/OXYGEN/WATER/
-      NITROGEN), stable numerics, qualitatively believable dynamics incl. at least one
-      closed-system phenomenon (O₂ depletion / Biosphere-2-style failure).
-- [ ] **Determinism + golden + engine invariants:** bit-identical, order-independent,
-      hex-float golden; purity + Phase-0/0.5 gates stay green.
+      Step-7 sized run).
+- [x] **Sealed multi-year run (Step 7):** the canonical `SEALED_CHAMBER_SCENARIO` (O₂-poor
+      chamber + litter seed, tiled 3 years) holds **stable every-step conservation of all
+      four quantities** (CARBON/OXYGEN/WATER/NITROGEN, float-exact), stable numerics
+      (`rationed == 0`, no extinction), and a clear closed-system phenomenon: the
+      **Biosphere-2 O₂-depletion failure mode** (O₂ drawn down ~99 % to an acute trough,
+      `f_O2` self-limiting the draw — load-bearing, a control rations 77×) with the exact
+      O₂↔CO₂ anti-correlation and an emergent producer × `f_O2` recovery swing.
+      (`tests/test_sealed_chamber.py`.) *Sustained oscillation is deferred — the plant dies
+      after year 1; it needs annual phenology reset / re-sowing, a Phase-3 seam.*
+- [x] **Determinism + golden + engine invariants (Step 7):** the sealed run is bit-identical
+      on re-run and **registration-order-independent** (the Registry sorts by id; pinned by
+      `test_sealed_is_flow_registration_order_independent` on the sealed path), with the
+      first **sealed** hex-float golden (`sealed_chamber_state.json`); purity + Phase-0/0.5
+      gates stay green, and **Step 7 added zero `simcore` changes** — Phase 2 changed
+      exactly one core surface (P2.1).

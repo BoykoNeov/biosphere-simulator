@@ -5,10 +5,10 @@ biosphere is the first domain. Python is the canonical reference ("laboratory");
 a Rust core + Godot front-end come much later. End goal: a science-credible Godot
 station sim that runs the *same* simulation headless.
 
-**Source of truth for current work:** `docs/plans/phase-1-single-producer.md`
-(Phases 0 and 0.5 are complete — see `docs/plans/phase-0-engine-skeleton.md` and
-`docs/plans/phase-0.5-numerical-foundations.md`).
-Reuse/licensing rules: `docs/reuse-and-licenses.md`.
+**Source of truth for current work:** Phases 0, 0.5, 1, and 2 are **complete**
+(`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
+**Next: Phase 3 — the subsystem hierarchy / multi-compartment structure** (plan doc TBD;
+roadmap `roadmap_extracted.txt`). Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
 
