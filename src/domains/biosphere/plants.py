@@ -170,7 +170,7 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             FlowId("biosphere.transpiration"),
             0,
             soil_water=SOIL_WATER,
-            vapor_sink=VAPOR_SINK,
+            vapor_sink=wiring.vapor_target,
             rn_var=RN_VAR,
             vpd_var=VPD_VAR,
             temp_var=TEMP_VAR,

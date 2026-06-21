@@ -143,6 +143,7 @@ class ChamberWiring:
     resp_sink: StockId  # CARBON_POOL (sealed, == source) | CO2_RESP (open)
     o2_pool: StockId | None  # O2_POOL (sealed) | None (open)
     litter_carbon_target: StockId  # LITTER_CARBON (sealed) | LITTER_SINK (open)
+    vapor_target: StockId  # VAPOR_SINK (both) → WATER_VAPOR sealed at substep 2
 
 
 def chamber_wiring(sealed: bool) -> ChamberWiring:
@@ -152,12 +153,19 @@ def chamber_wiring(sealed: bool) -> ChamberWiring:
     (``source == sink``), an ``o2_pool`` balances OXYGEN, senescence feeds the finite
     ``litter_carbon`` POOL. Open: unclamped ``co2_atmos`` source + separate ``co2_resp``
     sink, no O₂ pool, and senescence sheds to the ``litter_sink`` BOUNDARY.
+
+    ``vapor_target`` is ``VAPOR_SINK`` for **both** chambers here (Step-3 substep 1,
+    the behaviour-preserving indirection — ``Transpiration`` now reads its sink id off
+    the wiring instead of hardcoding it). Substep 2 flips the sealed selection to a new
+    ``WATER_VAPOR`` stock to close the water cycle; until that stock exists, keeping
+    both at ``VAPOR_SINK`` is what holds the two goldens byte-identical.
     """
     return ChamberWiring(
         carbon_source=CARBON_POOL if sealed else CO2_ATMOS,
         resp_sink=CARBON_POOL if sealed else CO2_RESP,
         o2_pool=O2_POOL if sealed else None,
         litter_carbon_target=LITTER_CARBON if sealed else LITTER_SINK,
+        vapor_target=VAPOR_SINK,
     )
 
 
