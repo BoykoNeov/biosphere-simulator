@@ -8,8 +8,9 @@ station sim that runs the *same* simulation headless.
 **Source of truth for current work:** Phases 0, 0.5, 1, and 2 are **complete**
 (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 **In progress: Phase 3 — the subsystem hierarchy / multi-compartment structure**
-(`docs/plans/phase-3-modular-biosphere.md` — Step 1 (hierarchy representation) COMPLETE;
-**next Step 2 — reusable compartment builders, P3.2**; roadmap `roadmap_extracted.txt`).
+(`docs/plans/phase-3-modular-biosphere.md` — Steps 1–2 COMPLETE (hierarchy representation +
+reusable compartment builders: `season.py` split into `scenario`/`stocks`/`atmosphere`/`soil`/`plants`);
+**next Step 3 — close the water cycle, P3.3**; roadmap `roadmap_extracted.txt`).
 Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

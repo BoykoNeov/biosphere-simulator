@@ -36,7 +36,8 @@ from unittest.mock import patch
 
 import pytest
 
-import domains.biosphere.season as season
+import domains.biosphere.plants as plants
+import domains.biosphere.soil as soil
 from domains.biosphere.loader import (
     load_microbial_respiration_params,
     load_nitrogen_params,
@@ -73,7 +74,9 @@ def _run_canonical(*, k_o2: float | None = None) -> tuple[list[State], int, tupl
     Tiles the season weather ``SEALED_CHAMBER_YEARS×`` (``_table`` reads the rows in
     order, so a repeated list cycles the seasonal forcing). ``k_o2`` overrides the
     committed O₂ half-saturation in both respiration params (used by the load-bearing
-    control: ``k_o2 = 0`` disables ``f_O2``) by patching the season module's loaders.
+    control: ``k_o2 = 0`` disables ``f_O2``) by patching the builders' loaders at their
+    new homes (P3.2 split: ``load_respiration_params`` is called in ``plants`` via
+    ``_carbon_context``; ``load_microbial_respiration_params`` in ``soil``).
     """
     weather = _weather() * SEALED_CHAMBER_YEARS
     steps = len(weather)
@@ -83,8 +86,8 @@ def _run_canonical(*, k_o2: float | None = None) -> tuple[list[State], int, tupl
         resp = replace(load_respiration_params(), o2_half_saturation=k_o2)
         mic = replace(load_microbial_respiration_params(), o2_half_saturation=k_o2)
         with (
-            patch.object(season, "load_respiration_params", lambda: resp),
-            patch.object(season, "load_microbial_respiration_params", lambda: mic),
+            patch.object(plants, "load_respiration_params", lambda: resp),
+            patch.object(soil, "load_microbial_respiration_params", lambda: mic),
         ):
             state, registry = build_season(SEALED_CHAMBER_SCENARIO)
     resolver = weather_resolver(weather, SEALED_CHAMBER_SCENARIO)

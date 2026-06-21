@@ -1,6 +1,6 @@
 # Phase 3 — Modular Biosphere / Consumers
 
-**Status: Step 1 COMPLETE (foundation); Steps 2–7 not started.** Phases 0, 0.5, 1, and 2
+**Status: Steps 1–2 COMPLETE; Steps 3–7 not started.** Phases 0, 0.5, 1, and 2
 are complete and regression-pinned (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 This plan **locks the load-bearing Phase-3 decision** (the subsystem-hierarchy
 representation, P3.1) and **enumerates** the process steps as forward-pointers, each to
@@ -11,8 +11,14 @@ foundation (Step 1) is designed in detail below; the science steps are sketched 
 (label-only — goldens regenerated with **domain-label-only diffs, byte-identical
 amounts**), the domain-side parent map + `descendant_stocks` view, and the
 per-compartment boundary-ledger diagnostic. Exit evidence: `git diff src/simcore/`
-**empty** (clean Option B), 820 tests pass. **Next: Step 2 — reusable compartment
-builders (P3.2).**
+**empty** (clean Option B), 820 tests pass. **Step 2 (reusable compartment builders, P3.2)
+is COMPLETE** — `season.py` split into `scenario` / `stocks` / `atmosphere` / `soil` /
+`plants` builder modules (`water` deferred to Step 3); both goldens **byte-identical
+WITHOUT regeneration** (the proof the restructure was safe); `git diff src/simcore/` still
+**empty**; 836 tests pass incl. the new `test_builders` (per-builder leaf-domain stamp,
+disjoint-and-complete partition vs `build_season`, and a no-cross-import guard — the
+structural checks the amount-blind goldens cannot see). **Next: Step 3 — close the water
+cycle (P3.3).**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable
 compartments.* The headline is an **architectural upgrade**, not new physics: introduce a
@@ -309,10 +315,20 @@ Phase-1/2 rhythm.**
 
 **Process steps — enumerated now, each designed just-in-time (the Phase-1/2 rhythm).**
 
-2. **Reusable compartment builders (P3.2)** — refactor `season.py` into composable
-   per-compartment builders; the ecosystem is assembled from them. Still behavior-preserving:
-   goldens bit-identical (amounts). The composition pattern Phase 5 will reuse for sibling
-   domains.
+2. **✅ COMPLETE — Reusable compartment builders (P3.2).** Split the monolithic
+   `build_season` into per-compartment builder modules — `scenario.py` (the
+   `SeasonScenario`), `stocks.py` (the id/var catalog + `STOCK_DOMAIN` spec + the
+   `CompartmentBuild`/`ChamberWiring` types + `chamber_wiring` + `organ_stock`/`pool_stock`),
+   and `atmosphere.py` / `soil.py` / `plants.py` (each `build_<x>(scenario, wiring) ->
+   CompartmentBuild`; `_carbon_context` moved into `plants`). `season.py` is now the thin
+   composition (`_compartments` aggregator → both `build_season` and `weather_resolver`)
+   plus re-exports of the full symbol surface (no test import path changed). **Both goldens
+   byte-identical WITHOUT regeneration**; `git diff src/simcore/` empty; 836 tests pass
+   (new `test_builders.py`: per-builder leaf-domain stamp, disjoint+complete partition, the
+   P3.3 no-cross-import guard — load-bearing because `domain` is amount-invariant so the
+   goldens are blind to a mis-stamped leaf). `test_sealed_chamber`'s f_O2 patch seam
+   followed the moved loaders to `plants`/`soil`. The composition pattern Phase 5 will reuse
+   for sibling domains. **Designed in full below (§ "Step 2 design") — advisor-reviewed.**
 3. **Close the water cycle (P3.3)** — `water_vapor` (Atmosphere) + condensation +
    recycling to `soil_water` (Soil); replace the `vapor_sink` BOUNDARY. The first real
    cross-compartment cycle; new golden. Verify the per-compartment boundary ledger balances
@@ -403,5 +419,161 @@ behavior change. (If any amount drifts, an id was renamed or a reduction silentl
 - **Purity + frozen surface:** the `simcore` AST purity gate stays green; `Integrator.step`,
   `Flow`, the conservation gate, arbitration, and the resolver are untouched (the additive
   `parents` arg is defaulted; every existing call site compiles unchanged).
+
+---
+
+## Step 2 design — reusable compartment builders (P3.2)
+
+*Realizes P3.2. A **behavior-preserving** refactor: split the monolithic `build_season`
+assembly into per-compartment builder modules and recompose. No new stock / flow / aux /
+id / amount — the existing open-field and sealed goldens must pass **byte-identical, with
+no regeneration** (the proof the restructure is safe). New science (water cycle, mortality,
+perturbations) lands in the *separate* later steps; never mixed with this restructure.*
+
+**Why "no regeneration" (stronger than Step 1's "domain-label diffs").** Step 1 already
+moved the `domain` labels into both goldens; Step 2 only reshapes the *assembly code* that
+produces the same stocks/flows/state. The serializer emits stocks **sorted by id**
+(`sim_io/snapshot.py`: `for sid in sorted(state.stocks)` — verified), so the union order
+across builders is irrelevant to the bytes. Identical stocks + identical amounts + same
+sort ⇒ the committed goldens are reproduced **exactly**. `test_regression_season` /
+`test_regression_sealed_season` byte-compares are the gate — **if a golden needs
+regenerating, stop and find the bug (a dropped flow, a mis-wired id); that is a drift to
+fix, not a diff to absorb.**
+
+### The shape — three builder modules + a thin composition layer
+
+A **compartment builder** is a pure function
+`build_<compartment>(scenario, wiring) -> CompartmentBuild` returning its own stocks, flows,
+aux, and resolver shared-stock wiring. `season.build_season` becomes a thin **composition**:
+call each builder, union the parts, add the cross-cutting loss-sink, hand the flat union to
+`Registry` (which re-sorts flows by id — so builder/union order is behaviorally inert).
+
+```python
+@dataclass(frozen=True)
+class CompartmentBuild:
+    stocks: tuple[Stock, ...]
+    flows: tuple[Flow, ...]
+    aux: tuple[AuxProcess, ...]
+    shared: Mapping[str, StockId]   # forcing-var -> live stock (the resolver #16 seam)
+```
+
+**Module layout (new files; clean bottom-up DAG, no import cycles).**
+- `scenario.py` — `SeasonScenario` + `DEFAULT_SCENARIO`, extracted from `season.py` so a
+  builder can take a `scenario` argument **without importing `season`** (`season` imports
+  the builders; the reverse would cycle).
+- `stocks.py` — the **stock-id catalog** (every `StockId` + forcing-var-name constant + the
+  `STOCK_DOMAIN` declared partition) plus the two small composition types `ChamberWiring`
+  and `CompartmentBuild` and the `chamber_wiring(sealed)` factory. Imports only `simcore` +
+  `compartments` (the leaf `DomainId`s). This is the **shared interface** every builder
+  reads; it is *not* "a compartment," so reading ids from it does not violate "no
+  compartment imports another."
+- `atmosphere.py` / `soil.py` / `plants.py` — the three builder modules. **`water.py` is
+  deferred to Step 3** (it owns no stocks/flows yet — its first flow is Step-3 recycling;
+  shipping an empty module now would be noise).
+- `season.py` — slimmed to `_compartments(scenario)` (the aggregator), `build_season`,
+  `weather_resolver`, `run_season`, and **re-exports** of every symbol the tests import from
+  it today (the ids, `STOCK_DOMAIN`, `SeasonScenario`, `SEALED_CHAMBER_SCENARIO/YEARS`) — so
+  **no test import path changes**.
+
+**No builder imports another** (P3.3). Cross-compartment *forked* ids travel through
+`ChamberWiring`; stable cross-compartment ids are read from the `stocks.py` catalog. A
+builder never imports `atmosphere`/`soil`/`plants`. *(Alternative considered and rejected:
+keep `SeasonScenario`/ids in `season.py` and have builders type-reference them under
+`TYPE_CHECKING`. It avoids two new modules but creates a conceptual `season`↔builder cycle —
+extraction gives the clean DAG a Phase-5-reuse foundation deserves.)*
+
+### The `sealed` fork — one `ChamberWiring`, computed once
+
+The open-vs-sealed difference reduces to a handful of stock **ids whose identity depends on
+`sealed`**, threaded into flows that live in different compartments. Capture exactly those:
+
+```python
+@dataclass(frozen=True)
+class ChamberWiring:
+    carbon_source: StockId         # CARBON_POOL (sealed) | CO2_ATMOS (open)
+    resp_sink: StockId             # CARBON_POOL (sealed, == source) | CO2_RESP (open)
+    o2_pool: StockId | None        # O2_POOL (sealed) | None (open)
+    litter_carbon_target: StockId  # LITTER_CARBON (sealed) | LITTER_SINK (open)
+```
+
+`chamber_wiring(scenario.sealed)` computes it once (a pure selection over catalog ids — no
+two-phase resolve, confirmed in review). It is consumed **entirely by the plants builder**
+(the carbon-budget flows + `Senescence`); the **atmosphere**/**soil** builders *build the
+stock objects* those ids point at. That asymmetry — wiring read by plants, the stocks built
+by atmosphere/soil — is the shared-stock interface (P3.3) made concrete. Each builder
+additionally self-selects its sealed-only content off `scenario.sealed` (atmosphere: the gas
+pools vs the open `co2_atmos`/`co2_resp` boundaries; soil: the decomposer + N-return
+pools/flows). Stable cross-compartment targets that always have the same id when they exist
+(e.g. `NitrogenSenescence → litter_n`) are read from the catalog, not added to the wiring,
+to keep it lean.
+
+### Ownership — the enumerate-and-assign checklist
+
+Every stock, flow, and aux in today's `build_season`, assigned to **exactly one** owner
+(**process-home**: the compartment whose biology drives it). The union must equal the
+current set — that completeness *is* what the byte-identical golden verifies.
+
+| Owner | Modeled stocks | Boundary stocks | Flows | Aux | `shared` |
+|---|---|---|---|---|---|
+| **plants** | `leaf_c` `stem_c` `root_c` `storage_c` `plant_n` | `vapor_sink`; `litter_sink` (open) | `Allocation` `GrowthRespiration` `MaintenanceRespiration` `Senescence` `NitrogenUptake` `Transpiration`; `NitrogenSenescence` (sealed) | `ThermalTimeAccumulation` | — |
+| **soil** | `soil_water` `soil_n`; `litter_carbon` `litter_n` `microbial_carbon` (sealed) | `water_source` `n_source` | `Irrigation` `Fertilization`; `Decomposition` `MicrobialRespiration` `Mineralization` (sealed) | — | `soil_water → SOIL_WATER` |
+| **atmosphere** | `carbon_pool` `o2_pool` (sealed) | `co2_atmos` `co2_resp` (open) | — | — | `co2_pool → CARBON_POOL` (sealed) |
+| **composition (`build_season`)** | — | carbon **loss-sink** (cross-cutting, extinction #6) | — | — | — |
+
+- **Process-home resolves the two judgment calls.** **Transpiration → plants** (a canopy
+  flux; P3.3 itself frames transpiration as a plants→atmosphere flow — putting it in `water`
+  now would *fight* Step 3's recycling, not pre-position it). **NitrogenSenescence → plants**
+  (symmetry with carbon `Senescence`: both shed plant matter to soil litter through the
+  wiring; `Mineralization` stays soil). Flow ownership is behaviorally inert (Registry
+  re-sorts; the integrator sees a flat union) — the value is *organizational* clarity for
+  Step 3+.
+- **Boundary stocks** are built by the compartment of the flow that drives them
+  (`vapor_sink`/`litter_sink` → plants; `water_source`/`n_source` → soil;
+  `co2_atmos`/`co2_resp` → atmosphere). The **carbon loss-sink** spans compartments
+  (extinction routing for any POPULATION carbon) → **`build_season` adds it at composition
+  level**, not a builder.
+- The plant carbon-budget context (`CarbonContext` / `_carbon_context`) is plant-internal →
+  moves into `plants.py`.
+
+### The resolver `shared`-map seam (decided, not deferred)
+
+The `shared` map (#16) is structural (sealed-dependent), so it is a **builder output**, not
+inline-forked in `weather_resolver`. Both `build_season` and `weather_resolver` route through
+the single `_compartments(scenario)` aggregator: `build_season` unions stocks/flows/aux;
+`weather_resolver` merges `b.shared` for the live-stock wiring (forcings still come from the
+weather table). One source of truth, reproducing today's map exactly (open
+`{soil_water → SOIL_WATER}`; sealed adds `{co2_pool → CARBON_POOL}`). #16 makes
+shared-vs-forcing indistinguishable, so this is golden-safe.
+
+### `STOCK_DOMAIN` — kept as the declared partition spec
+
+Builders stamp `domain` as a **literal** (the plants builder stamps `PLANTS`, etc.) — domain
+assignment becomes structural, so the `_stock_domain` lookup is **removed**. `STOCK_DOMAIN`
+is **retained** (moved into `stocks.py`, re-exported from `season`) as the declared partition
+**spec**: `test_compartments.test_relabel_partitions_…` already asserts
+`built.domain == STOCK_DOMAIN[sid]`, which now binds the literal stamps to the spec (the
+drift guard). No `test_compartments` rewrite — only an import path the re-export preserves.
+*(Alternative — dissolve the table and assert the partition structurally — rejected: more
+churn, loses the one-glance partition, no gain, and CLAUDE.md says re-express invariants, not
+weaken them.)*
+
+### Test plan
+
+- **Goldens byte-identical, no regeneration** (the headline proof): `test_regression_season`
+  + `test_regression_sealed_season` pass **unchanged**.
+- **Full suite green** unchanged: `test_compartments` (partition spec + hierarchy view),
+  `test_sealed_chamber`, `test_season`, `test_oracle_smoke` all import `season`'s re-exported
+  surface as today.
+- **New structural test** (`test_builders.py`): each builder returns only stocks carrying its
+  own leaf domain (atmosphere→`ATMOSPHERE`, soil→`SOIL`, plants→`PLANTS`); the union of
+  builder stocks/flows/aux equals `build_season`'s; and **no builder module imports another**
+  (an import-graph / source guard encoding the P3.3 rule).
+- **Purity gate** stays green; **`git diff src/simcore/` stays empty** (all new code under
+  `domains/biosphere/`).
+
+### Acceptance gate
+
+Both goldens byte-identical **without regeneration** + full suite green + `git diff
+src/simcore/` empty. **If a golden drifts, stop and find the bug — do not regenerate.**
 </content>
 </invoke>
