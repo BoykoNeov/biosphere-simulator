@@ -1,14 +1,16 @@
 """Phase-3 P3.1 tests: the subsystem-hierarchy representation (domain-side).
 
-Covers ``domains.biosphere.compartments`` — the leaf-compartment parent map and the
-``descendant_stocks`` rollup — plus the invariant that the Phase-3 relabel partitions
-the *modeled* biosphere stocks across the four leaf compartments while leaving boundary
-stocks in the ``boundary`` namespace.
+Covers ``domains.biosphere.compartments`` — the leaf-compartment parent map, the
+``descendant_stocks`` rollup, and the **per-compartment boundary ledger** diagnostic —
+plus the invariant that the Phase-3 relabel partitions the *modeled* biosphere stocks
+across the four leaf compartments while leaving boundary stocks in the ``boundary``
+namespace.
 
 The **bit-identity** half of P3.1 (the relabel changes only ``domain`` labels — goldens
 regenerate with domain-label-only diffs and byte-identical amounts) is pinned by the
 existing ``test_regression_season`` / ``test_regression_sealed_season`` byte-compares;
-this file covers the new *structure* (the hierarchy view + the stock partition).
+this file covers the new *structure* (the hierarchy view + the stock partition) and the
+boundary-ledger diagnostic.
 """
 
 from collections.abc import Mapping
@@ -20,6 +22,8 @@ from domains.biosphere.compartments import (
     PLANTS,
     SOIL,
     WATER,
+    CompartmentFlux,
+    compartment_boundary_ledger,
     descendant_stocks,
 )
 from domains.biosphere.season import (
@@ -28,8 +32,10 @@ from domains.biosphere.season import (
     build_season,
 )
 from simcore.boundary import BOUNDARY_DOMAIN
+from simcore.flow import FlowResult, Leg
 from simcore.ids import DomainId, StockId
-from simcore.state import Stock
+from simcore.quantities import Quantity, StockKind, canonical_unit
+from simcore.state import State, Stock
 
 LEAVES = frozenset({ATMOSPHERE, SOIL, PLANTS, WATER})
 
@@ -142,3 +148,141 @@ def test_descendant_stocks_tolerates_a_malformed_cycle() -> None:
     a, b = DomainId("x.a"), DomainId("x.b")
     di = {a: frozenset({StockId("x.s")})}
     assert descendant_stocks(di, {a: b, b: a}, b) == frozenset({StockId("x.s")})
+
+
+# --- the per-compartment boundary ledger (diagnostic) -----------------------
+
+_P = StockId("test.plant_c")
+_A = StockId("test.atmos_c")
+_POOL = StockId("test.co2_pool")
+_S1 = StockId("test.soil_c1")
+_S2 = StockId("test.soil_c2")
+
+
+def _carbon(sid: StockId, domain: DomainId, amount: float) -> Stock:
+    """A 1:1 CARBON POOL stock (composition defaults to ``{CARBON: 1.0}``)."""
+    return Stock(
+        id=sid,
+        domain=domain,
+        quantity=Quantity.CARBON,
+        unit=canonical_unit(Quantity.CARBON),
+        amount=amount,
+        kind=StockKind.POOL,
+    )
+
+
+def _co2_pool(sid: StockId, domain: DomainId, amount: float) -> Stock:
+    """A CO₂ POOL carrying ``{CARBON: 1, OXYGEN: 2}`` (the composition-fold case)."""
+    return Stock(
+        id=sid,
+        domain=domain,
+        quantity=Quantity.CARBON,
+        unit=canonical_unit(Quantity.CARBON),
+        amount=amount,
+        kind=StockKind.POOL,
+        composition={Quantity.CARBON: 1.0, Quantity.OXYGEN: 2.0},
+    )
+
+
+def _state(*stocks: Stock) -> State:
+    return State(n=0, stocks={s.id: s for s in stocks}, rng_seed=0)
+
+
+def _by_key(
+    ledger: tuple[CompartmentFlux, ...],
+) -> dict[tuple[DomainId, Quantity], CompartmentFlux]:
+    return {(e.domain, e.quantity): e for e in ledger}
+
+
+def test_two_compartment_transfer_reports_crossing_flux_and_balances() -> None:
+    # A balanced carbon transfer plants -> atmosphere (2 mol C). The crossing flux
+    # matches the transfer on both sides and the apply-integrity residual is ~0.
+    before = _state(_carbon(_P, PLANTS, 10.0), _carbon(_A, ATMOSPHERE, 5.0))
+    after = _state(_carbon(_P, PLANTS, 8.0), _carbon(_A, ATMOSPHERE, 7.0))
+    result = FlowResult(legs=(Leg(_P, -2.0), Leg(_A, 2.0)))
+
+    ledger = compartment_boundary_ledger(before, after, [result])
+    by = _by_key(ledger)
+    plants = by[(PLANTS, Quantity.CARBON)]
+    atmos = by[(ATMOSPHERE, Quantity.CARBON)]
+
+    assert (plants.crossing_in, plants.crossing_out, plants.stored_delta) == (
+        0.0,
+        2.0,
+        -2.0,
+    )
+    assert (atmos.crossing_in, atmos.crossing_out, atmos.stored_delta) == (
+        2.0,
+        0.0,
+        2.0,
+    )
+    assert all(abs(e.residual) < 1e-12 for e in ledger)
+    # Canonical order: domain id then quantity name (atmosphere before plants).
+    assert [str(e.domain) for e in ledger] == [
+        "biosphere.atmosphere",
+        "biosphere.plants",
+    ]
+
+
+def test_internal_flow_contributes_zero_crossing_flux() -> None:
+    # A flow with both legs inside soil crosses no boundary: zero crossing flux, and the
+    # balanced internal transfer leaves the compartment's stored carbon unchanged.
+    before = _state(_carbon(_S1, SOIL, 10.0), _carbon(_S2, SOIL, 0.0))
+    after = _state(_carbon(_S1, SOIL, 7.0), _carbon(_S2, SOIL, 3.0))
+    result = FlowResult(legs=(Leg(_S1, -3.0), Leg(_S2, 3.0)))
+
+    ledger = compartment_boundary_ledger(before, after, [result])
+    soil = _by_key(ledger)[(SOIL, Quantity.CARBON)]
+    assert soil.crossing_in == 0.0 and soil.crossing_out == 0.0
+    assert soil.stored_delta == 0.0
+    assert abs(soil.residual) < 1e-12
+
+
+def test_balanced_but_misapplied_delta_trips_the_identity() -> None:
+    # The legs request a 2 mol plants->atmosphere transfer, but the apply moved only
+    # 1.5 each way — two compensating errors that net to zero GLOBALLY (total carbon 15
+    # preserved). The global gate would pass; the per-compartment apply-integrity
+    # residual catches it.
+    before = _state(_carbon(_P, PLANTS, 10.0), _carbon(_A, ATMOSPHERE, 5.0))
+    after = _state(_carbon(_P, PLANTS, 8.5), _carbon(_A, ATMOSPHERE, 6.5))
+    result = FlowResult(legs=(Leg(_P, -2.0), Leg(_A, 2.0)))
+
+    ledger = compartment_boundary_ledger(before, after, [result])
+    by = _by_key(ledger)
+    # Global mass is still conserved ...
+    assert abs(sum(e.stored_delta for e in ledger)) < 1e-12
+    # ... yet each compartment's residual is nonzero (the local catch).
+    assert abs(by[(PLANTS, Quantity.CARBON)].residual) == 0.5
+    assert abs(by[(ATMOSPHERE, Quantity.CARBON)].residual) == 0.5
+
+
+def test_composition_fold_books_both_carbon_and_oxygen() -> None:
+    # A leg on a CO₂ pool books CARBON·1 AND OXYGEN·2 of crossing flux (the same fold
+    # the global gate uses). The plant-organ side carries only CARBON.
+    organ = StockId("test.leaf_c")
+    before = _state(_carbon(organ, PLANTS, 10.0), _co2_pool(_POOL, ATMOSPHERE, 4.0))
+    after = _state(_carbon(organ, PLANTS, 9.0), _co2_pool(_POOL, ATMOSPHERE, 5.0))
+    result = FlowResult(legs=(Leg(organ, -1.0), Leg(_POOL, 1.0)))
+
+    ledger = compartment_boundary_ledger(before, after, [result])
+    by = _by_key(ledger)
+    assert by[(ATMOSPHERE, Quantity.CARBON)].crossing_in == 1.0  # 1 · coeff_C(1)
+    assert by[(ATMOSPHERE, Quantity.OXYGEN)].crossing_in == 2.0  # 1 · coeff_O(2) — fold
+    assert abs(by[(ATMOSPHERE, Quantity.CARBON)].residual) < 1e-12
+    assert abs(by[(ATMOSPHERE, Quantity.OXYGEN)].residual) < 1e-12
+    # The plant organ carries no oxygen, so there is no (plants, OXYGEN) entry.
+    assert (PLANTS, Quantity.OXYGEN) not in by
+    assert (ATMOSPHERE, Quantity.OXYGEN) in by
+
+
+def test_boundary_ledger_is_leg_order_independent() -> None:
+    # Folded in canonical stock-id order: a shuffled leg tuple yields an equal ledger.
+    before = _state(_carbon(_P, PLANTS, 10.0), _carbon(_A, ATMOSPHERE, 5.0))
+    after = _state(_carbon(_P, PLANTS, 8.0), _carbon(_A, ATMOSPHERE, 7.0))
+    forward = compartment_boundary_ledger(
+        before, after, [FlowResult(legs=(Leg(_P, -2.0), Leg(_A, 2.0)))]
+    )
+    reversed_legs = compartment_boundary_ledger(
+        before, after, [FlowResult(legs=(Leg(_A, 2.0), Leg(_P, -2.0)))]
+    )
+    assert forward == reversed_legs
