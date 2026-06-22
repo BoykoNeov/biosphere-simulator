@@ -32,6 +32,7 @@ construction, determinism, the golden) — not behavioural validation.
 Pure stdlib only (the YAML/pint loading is in ``loader.py``).
 """
 
+from collections.abc import Callable
 from datetime import date
 
 from domains.biosphere.atmosphere import build_atmosphere
@@ -119,7 +120,7 @@ from domains.biosphere.weather import (
     net_radiation,
     vapor_pressure_deficit,
 )
-from simcore import boundary
+from simcore import boundary, conservation
 from simcore.auxiliary import AuxProcess
 from simcore.environment import Schedule, SourceResolver
 from simcore.events import Event
@@ -240,6 +241,8 @@ def run_season(
     resolver: SourceResolver,
     dt: float,
     steps: int,
+    *,
+    reset: Callable[[int, State], State] | None = None,
 ) -> tuple[list[State], int, tuple[Event, ...]]:
     """Step ``steps`` times, returning ``(states, total_rationed, events)``.
 
@@ -247,11 +250,34 @@ def run_season(
     used by liveness, the oracle comparison, and the golden. ``total_rationed``
     sums the Euler backstop firings (the golden asserts ``== 0``); ``events`` are the
     extinction events (empty on the well-fed season).
+
+    **Scheduled scenario reset (P3.4, Step 4).** ``reset`` is an optional
+    **schedule-agnostic** hook ``(n, state) -> state`` consulted **before each step**:
+    it returns ``state`` *unchanged* (the same object) on a non-reset step, or a new
+    ``State`` on a reset boundary. The calendar (e.g. ``n % year == 0``) lives **inside
+    the caller's closure** — scheduling is a scenario/caller concern, not the driver's.
+    When a reset is applied the driver re-asserts the conservation gate across it
+    (:func:`conservation.assert_conserved`), so "conserved at every point" stays
+    literally true even though the reset is a discrete scenario intervention rather than
+    a flow-step (its only non-conserved write is ``thermal_time``, an aux accumulator
+    invisible to the gate). The stored trajectory records the **pre-reset** state (the
+    reset instant is not appended): the day a reset fires, ``states`` jumps from the
+    pre-reset state straight to the post-step state. **Default ``None`` ⇒ the loop is
+    byte-identical to the pre-Step-4 season** (the open/sealed regression goldens are
+    unaffected) — pure indirection.
     """
     states = [state]
     total_rationed = 0
     events: list[Event] = []
     for _ in range(steps):
+        if reset is not None:
+            reset_state = reset(state.n, state)
+            if reset_state is not state:
+                # The redistribution must balance every asserted quantity (carbon is
+                # only moved between in-system stocks; the aux thermal_time zero is
+                # outside the gate). A violation is a reset bug, not recoverable state.
+                conservation.assert_conserved(state, reset_state)
+                state = reset_state
         report = integrator.step_report(state, resolver, dt)
         state = report.state
         states.append(state)
