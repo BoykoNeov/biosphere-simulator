@@ -347,7 +347,9 @@ Phase-1/2 rhythm.**
    (§ "Step 3 design") — advisor-reviewed.**
 4. **Closure-preserving mortality + annual reset (P3.4)** — death routes organ +
    `storage_c` carbon to `litter_carbon`; annual phenology reset / re-sowing → sustained
-   multi-year oscillation. New behavior + golden.
+   multi-year oscillation. New behavior + golden. **Designed in full below
+   (§ "Step 4 design") — advisor-reviewed; oscillation de-risked by a scratch probe before
+   the design was committed.**
 5. **Modular sealed-ecosystem assembly + per-compartment diagnostics** — compose the full
    compartmentalized biosphere; assert `Inputs = Outputs + ΔStored` per compartment every
    step; a multi-year run exhibiting emergent cross-compartment dynamics (the exit
@@ -738,3 +740,196 @@ validated behaviour" honesty and the decomposition/mineralization first-order pr
 Open golden byte-identical (no regeneration) + sealed golden regenerated & pinned + the
 WATER-scoped per-compartment ledger balances every step + behavioral wiring + closed-loop
 conservation + `rationed == 0` + full suite green + `git diff src/simcore/` empty.
+
+---
+
+## Step 4 design — closure-preserving mortality + annual reset (P3.4)
+
+*Realizes P3.4 — the **last closure gap** (an annual plant locks its grain forever) and
+the prerequisite for **emergent behaviour** (a plant that dies after year 1 has no
+sustained dynamics). A **new behaviour** on a **new scenario** with a **new golden**; the
+open-field and sealed goldens stay **byte-identical** (no regeneration — the Phase-2
+three-act capstone is preserved). The oscillation was **de-risked by a scratch probe
+before this design was committed** (advisor-directed); the probe result is the load-bearing
+evidence below. Advisor-reviewed, the Step-1/2/3 rhythm.*
+
+**The two gaps, today (probed, not assumed).** A scratch driver applying the reset below
+to the canonical sealed run shows the baseline plant (`docs` Phase-2 finding, re-confirmed):
+DVS climbs to **2.0 (maturity) by the end of year 1 and stays pinned there forever**
+(`thermal_time` keeps accumulating but DVS caps at 2) — no regrowth, no oscillation. And
+**~1.885 mol C locks permanently in `storage_c`** (grain), filled in year 1, never recycled.
+That locked grain is **in-system and conserved — a dead-end, NOT a boundary leak** (it is a
+`POPULATION` carbon stock, not a BOUNDARY; the conservation gate still balances). It only
+*bites* when you want sustained cycling — which is exactly the new perennial scenario — so
+the fix lives there, and the Phase-2 sealed scenario keeps its locked grain (and its golden)
+untouched.
+
+### The load-bearing decision (P3.4-mech) — the annual reset lives in the **driver**, not a flow, not the aux process
+
+The annual phenology reset / re-sow is a **scheduled scenario intervention** (a sowing /
+harvest *calendar* event), exactly as P3.4 frames it ("a scenario-level annual reset on a
+schedule"). It is **not** emergent dynamics and **not** a rate law. Three candidate homes,
+two rejected:
+
+- **REJECTED — a reset-aware `ThermalTimeAccumulation`** that reads `snapshot.n` and
+  self-zeroes on the year boundary. Smuggles a *calendar schedule* into a *physics
+  accumulator* and pollutes the one clean aux process — exactly the "resist a second
+  accumulator for symmetry" discipline P2 set, inverted.
+- **REJECTED — a discrete flow firing on `snapshot.n`.** A flow returns `rate·dt` legs
+  (dt-linear, carried unchanged across RK4 stages); a once-a-year discrete transfer breaks
+  dt-linearity and the RK4 stage semantics, and "fires on calendar day N" is control-flow in
+  a rate law.
+- **CHOSEN — a pure `annual_reset(state, scenario) -> State` applied by the run driver at
+  year boundaries.** Both halves of the reset (zero `thermal_time`; redistribute carbon) in
+  one visible scenario-layer place. `thermal_time` is **aux — invisible to the conservation
+  gate** (`conservation` reasons only over `stocks`), so zeroing it is free and touches no
+  conserved mass. The carbon redistribution is **conserving by construction** (the litter
+  leg is the balancing residual — the senescence/maintenance idiom), and the driver
+  **re-asserts `conservation.assert_conserved(before, after)` across the reset** so
+  "conserved at every point" stays literally true even though the reset is not a flow-step.
+
+**The cost taken on vs the flow path** (which gets arbitration's non-negativity net for
+free): `annual_reset` must keep amounts ≥ 0 itself. Trivially safe — the seedling (0.16 mol
+C) is dwarfed by the grain reserve (~1.9 mol), and the guard `grain ≥ seedling_total` is
+asserted. All of this is **domain-side**: `git diff src/simcore/` stays **empty** (the
+acceptance check).
+
+### `annual_reset` — the conserving redistribution (carbon-only)
+
+At each year boundary the **old plant dies/harvests entirely to litter, except the seedling
+carbon retained from the grain (the seed bank)**, and `thermal_time` resets so the new
+seedling develops from DVS 0:
+
+```
+new leaf_c / stem_c / root_c := scenario seedling amounts (leaf_c0, stem_c0, root_c0)
+storage_c (grain)            := 0
+litter_carbon                += old_veg + grain − seedling_total     # the balancing residual
+thermal_time                 := 0
+```
+
+where `old_veg = old(leaf_c+stem_c+root_c)`, `seedling_total = leaf_c0+stem_c0+root_c0`. The
+litter leg is computed as the residual so carbon balances exactly (verified: drift
+≈ 5.8e-15 over a 5-year run). **Grain → 0 every year is what prevents seed-bank
+accumulation** (the damped-cascade trap: if the seed bank only shed `seedling_total` it
+would grow unboundedly, draining the active cycle). The dumped grain → `litter_carbon` →
+`microbial_carbon` → CO₂ (the Step-4/5 decomposition chain) refuels the next year's
+photosynthesis — **this is the carbon-recycling that makes the oscillation sustained, not
+emergent control code.**
+
+- **`t=0` sowing vs mid-run re-sow.** The initial state's organ amounts are a **legitimate
+  initial seed** (real biomass placed at sowing). Only **mid-run** re-sows must draw from an
+  in-system pool (the grain) — the closure caveat P3.4 names. `annual_reset` never injects
+  carbon from outside; the seedling comes from `storage_c`.
+- **Carbon-only; the N *windfall* (a documented deferral, framed honestly).** The reset
+  moves only CARBON. The plant's `plant_n` persists across the "death" — so the new seedling
+  **inherits the full standing N pool against ~1/6 the biomass**, and N *concentration jumps*
+  at the reset (it is an N **windfall**, not a neutral no-op). This is harmless **only
+  because N stays non-limiting** (`f_N ≡ 1`; `plant_n` probed in [0.15, 0.5], a high
+  concentration against the small reset biomass — the jump pushes `f_N` further into its
+  saturated `== 1` region, so it has zero effect on the carbon trajectory). The
+  **continuous** `NitrogenSenescence`/`Mineralization` loop keeps N cycling regardless. A
+  full N-reset (dump `plant_n` → `litter_n`, re-seed seedling N) is a deferred refinement —
+  it would matter only once `f_N < 1` (a Phase-3 N-limited regime, itself deferred).
+- **Keep the continuous `Senescence` flow as-is.** It handles **in-season** leaf/stem/root
+  turnover (the slow relative-death shed to litter); the **discrete annual** redistribution
+  handles the **death/harvest/re-sow boundary**. Two distinct mechanisms, not one extended.
+- **The loss-sink stays the numerical guard only (the closure headline) — but this is
+  *scenario-dependent*, not mechanism-guaranteed.** It holds because the reset catches the
+  organs (sets them to the seedling) before they decay to the extinction threshold, so **no
+  extinction fires** (`events == ()`) and the **carbon loss-sink stays exactly 0.0** (probed).
+  But that is a property of the *sizing*: a leaner scenario (smaller carbon pool, slower
+  decomposition, a thin year) could let an organ decay **below threshold mid-year**, before
+  the reset — and the **core** extinction pass would then route a residual to the BOUNDARY
+  loss-sink, **silently breaking "genuinely closed" while every per-step conservation test
+  still passes** (the loss-sink balances the ledger). **Consequence (the pre-golden gate, see
+  Sequencing):** on the *exact committed* `PERENNIAL_CHAMBER_SCENARIO`, assert
+  `events == () AND carbon_loss_sink == 0.0` **first**, before regenerating the golden — that
+  is the line between "closed" and "closed for these knobs." Death routes to **litter**
+  (in-system), never to the BOUNDARY loss-sink (decision #6: the loss-sink is the round-off
+  guard, not the death pathway).
+
+### Probe result — sustained oscillation is REAL (the de-risk)
+
+A scratch driver (`annual_reset` at each `n % len(weather) == 0`, `n > 0`) over **5 years**
+on the sealed chamber shows, with **`rationed == 0` and `events == ()` throughout**:
+
+- **DVS reaches maturity (2.0) every year** (0→2→0→2…; one step after each reset DVS ≈ 0.015)
+  — regrowth, not a one-shot.
+- A **stable emergent period-2 limit cycle** (overcompensation, classic in discrete
+  annual-plant models): biomass peaks alternate ≈ 0.73 / ≈ 1.00 mol C, grain ≈ 1.9 / 2.1,
+  CO₂ pool ≈ 0.72 / 0.32 — neither damped to zero nor exploding. **Genuine sustained
+  multi-year dynamics** — the P3.4 deliverable, and a clean "emergent behaviour for free"
+  demonstration (no cascade code).
+- **All four quantities conserved** across the whole run incl. the resets (CARBON drift
+  ≈ 5.8e-15; OXYGEN/WATER/NITROGEN ≤ 1e-12).
+
+The phenomenon does **not** depend on the O₂-poor capstone sizing — a clean ample-O₂ sealed
+chamber sustains identically (the O₂ crash is a year-1 transient orthogonal to the carbon
+oscillation).
+
+### Scope — a new scenario; both existing goldens untouched
+
+- **`PERENNIAL_CHAMBER_SCENARIO`** (new, in `scenario.py`): a sealed chamber sized to cycle
+  enough carbon for a clean oscillation (ample O₂ so the perennial carbon story is not
+  muddied by the O₂-depletion drama; a modest seeded litter pile to fuel year-1 growth — the
+  exact knobs pinned at implementation off the probe). Its **own** new golden.
+- **Open-field + Phase-2 sealed goldens stay byte-identical (no regeneration).** Substep 1 is
+  pure indirection; the perennial behaviour lives only on the new scenario + the new
+  driver-with-reset path. The Phase-2 sealed capstone keeps its locked grain (in-system
+  dead-end, documented) and its three-act narrative.
+
+### Sequencing — refactor-safe → new-science (the Step-1/2/3 discipline)
+
+1. **Refactor-only — the driver reset hook.** Give `run_season` an optional reset hook —
+   leaning to a single **schedule-agnostic** `reset: Callable[[int, State], State] | None =
+   None` called each step with `(n, state)`, the `n % year` calendar living **inside the
+   caller's closure** (scheduling belongs in the scenario/caller layer, not the driver); the
+   driver applies it and then `conservation.assert_conserved(before, after)`. (A
+   `reset_every: int` + `reset` pair is the readable alternative — low stakes.) Default
+   (no reset) ⇒ the loop is **identical** and open + sealed goldens pass **byte-identical
+   without regeneration**; **prove that before touching substep 2** (the refactor-safe proof).
+   `git diff src/simcore/` empty; full suite green. Pure indirection — no new
+   stock/flow/science.
+2. **New science — `annual_reset` + perennial scenario + golden + tests.** Implement
+   `annual_reset` (the carbon redistribution above), add `PERENNIAL_CHAMBER_SCENARIO`
+   (+ `PERENNIAL_CHAMBER_YEARS`). **Pre-golden gate on the committed scenario, in this order:**
+   `events == () AND carbon_loss_sink == 0.0` (genuine closure for *these* knobs) **and**
+   `rationed == 0` — *then* write & pin the new golden. If a mid-year extinction shows up,
+   that is a sizing bug to fix (or a scenario to re-size), not a diff to absorb. New tests
+   below.
+
+### Test plan
+
+- **Open + sealed goldens byte-identical** (no regeneration) — the refactor proof
+  (substep 1).
+- **Perennial golden** regenerated & pinned (hex-float exact), Euler-daily — the new
+  closed-loop perennial behaviour (substep 2).
+- **Sustained oscillation** (the headline): **every year reaches DVS = 2.0** (regrowth, not
+  a one-shot) **and every year's biomass peak exceeds a floor** (e.g. `> 0.5` mol C) — that
+  is exactly "sustained, not damped." **Do NOT assert period-matching** (`year[N] ≈
+  year[N+2]`): the cycle is a period-2 attractor still in its transient at year 5 (odd years
+  ≈ 0.717→0.727→0.730 rising, even ≈ 1.021→1.007 falling), so an equality/convergence
+  assertion would be flaky. (Cosmetic: the driver stores **pre-reset** states, so no test
+  should expect a DVS ≈ 0 entry at the exact year-boundary index — the reset instant is not
+  in the stored trajectory.)
+- **`annual_reset` conserves carbon** (a unit test on the pure function): total CARBON
+  before == after; only CARBON moves (O₂/N/water deltas zero); post-reset amounts ≥ 0;
+  `thermal_time == 0`; the seed-bank guard (`grain ≥ seedling_total`) holds.
+- **Genuine closure** (the P3.4 point): over the perennial run the **carbon loss-sink stays
+  exactly 0.0** and `events == ()` — death routes to litter, never to the BOUNDARY loss-sink.
+- **Conservation every step incl. across resets**: all four quantities invariant over the
+  whole multi-year run (the driver re-assert + the per-step gate together).
+- **`rationed == 0`** through the perennial run (structural positivity survives the discrete
+  reset — verified by the probe).
+- **`test_compartments` / `test_builders`** unchanged (no new stock/flow/compartment — the
+  reset reuses existing stocks; `annual_reset` is a driver helper, not a builder).
+- **Purity gate** green; **`git diff src/simcore/` empty** (all new code under
+  `domains/biosphere/`).
+
+### Acceptance gate
+
+Open + sealed goldens byte-identical (no regeneration) + perennial golden regenerated &
+pinned + sustained-oscillation behavioural test + `annual_reset` conservation/closure unit
+test + loss-sink stays 0.0 + every-step four-quantity conservation incl. resets +
+`rationed == 0` + full suite green + `git diff src/simcore/` empty. **If an existing golden
+drifts, stop and find the bug — do not regenerate.**
