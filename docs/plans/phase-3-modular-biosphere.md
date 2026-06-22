@@ -1,6 +1,6 @@
 # Phase 3 — Modular Biosphere / Consumers
 
-**Status: Steps 1–3 COMPLETE; Steps 4–7 not started.** Phases 0, 0.5, 1, and 2
+**Status: Steps 1–4 COMPLETE; Steps 5–7 not started.** Phases 0, 0.5, 1, and 2
 are complete and regression-pinned (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 This plan **locks the load-bearing Phase-3 decision** (the subsystem-hierarchy
 representation, P3.1) and **enumerates** the process steps as forward-pointers, each to
@@ -27,7 +27,17 @@ boundary leak is closed: `Transpiration` now feeds an in-system `water_vapor` (A
 WITHOUT regeneration** (water leaf empty there); sealed golden **regenerated** (only WATER
 moved — carbon/O₂/N + thermal_time byte-identical); `git diff src/simcore/` **empty**; 856
 tests pass incl. the new `test_water_cycle` (WATER-scoped per-compartment ledger, behavioral
-ring-wiring, closed-loop conservation, `rationed == 0`). **Next: Step 4.**
+ring-wiring, closed-loop conservation, `rationed == 0`). **Step 4 (closure-preserving
+mortality + annual reset, P3.4) is COMPLETE** — the last closure gap (an annual plant locks
+its grain forever) and the prerequisite for emergent behaviour (a one-shot plant has no
+sustained dynamics). A pure `annual_reset` driver transform applied at each year boundary
+(`run_perennial`) zeroes `thermal_time` + redistributes the old plant's organ/grain carbon
+(seedling retained from grain, the rest → `litter_carbon`, the loss-sink never touched) so a
+new `PERENNIAL_CHAMBER_SCENARIO` shows **sustained multi-year oscillation** — DVS reaches
+maturity every year, a stable emergent period-2 limit cycle — genuinely closed (carbon
+loss-sink 0.0, `events == ()`), `rationed == 0`, four-quantity-conserved incl. across the
+discrete resets. Open + sealed goldens **byte-identical** (no regeneration); new perennial
+golden pinned; `git diff src/simcore/` **empty**; 870 tests pass. **Next: Step 5.**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable
 compartments.* The headline is an **architectural upgrade**, not new physics: introduce a
@@ -345,11 +355,14 @@ Phase-1/2 rhythm.**
    cross-compartment cycle; new golden. Verify the per-compartment boundary ledger balances
    (WATER-scoped) for every compartment the cycle touches. **Designed in full below
    (§ "Step 3 design") — advisor-reviewed.**
-4. **Closure-preserving mortality + annual reset (P3.4)** — death routes organ +
-   `storage_c` carbon to `litter_carbon`; annual phenology reset / re-sowing → sustained
-   multi-year oscillation. New behavior + golden. **Designed in full below
-   (§ "Step 4 design") — advisor-reviewed; oscillation de-risked by a scratch probe before
-   the design was committed.**
+4. **✅ COMPLETE — Closure-preserving mortality + annual reset (P3.4)** — `annual_reset`
+   (a pure driver transform: zero `thermal_time` + redistribute the old plant's organ +
+   grain carbon to `litter_carbon`, retaining the seedling from the grain) applied each
+   year boundary by `run_perennial`; the new `PERENNIAL_CHAMBER_SCENARIO` shows sustained
+   multi-year oscillation (DVS = 2 every year, emergent period-2 cycle), genuinely closed
+   (loss-sink stays 0.0). New behavior + golden; open + sealed goldens byte-identical.
+   **Designed in full below (§ "Step 4 design") — advisor-reviewed; oscillation de-risked by
+   a scratch probe before the design was committed.**
 5. **Modular sealed-ecosystem assembly + per-compartment diagnostics** — compose the full
    compartmentalized biosphere; assert `Inputs = Outputs + ΔStored` per compartment every
    step; a multi-year run exhibiting emergent cross-compartment dynamics (the exit
@@ -880,23 +893,26 @@ oscillation).
 
 ### Sequencing — refactor-safe → new-science (the Step-1/2/3 discipline)
 
-1. **Refactor-only — the driver reset hook.** Give `run_season` an optional reset hook —
-   leaning to a single **schedule-agnostic** `reset: Callable[[int, State], State] | None =
-   None` called each step with `(n, state)`, the `n % year` calendar living **inside the
-   caller's closure** (scheduling belongs in the scenario/caller layer, not the driver); the
-   driver applies it and then `conservation.assert_conserved(before, after)`. (A
-   `reset_every: int` + `reset` pair is the readable alternative — low stakes.) Default
-   (no reset) ⇒ the loop is **identical** and open + sealed goldens pass **byte-identical
-   without regeneration**; **prove that before touching substep 2** (the refactor-safe proof).
-   `git diff src/simcore/` empty; full suite green. Pure indirection — no new
-   stock/flow/science.
-2. **New science — `annual_reset` + perennial scenario + golden + tests.** Implement
-   `annual_reset` (the carbon redistribution above), add `PERENNIAL_CHAMBER_SCENARIO`
-   (+ `PERENNIAL_CHAMBER_YEARS`). **Pre-golden gate on the committed scenario, in this order:**
-   `events == () AND carbon_loss_sink == 0.0` (genuine closure for *these* knobs) **and**
-   `rationed == 0` — *then* write & pin the new golden. If a mid-year extinction shows up,
-   that is a sizing bug to fix (or a scenario to re-size), not a diff to absorb. New tests
-   below.
+1. **✅ DONE — Refactor-only — the driver reset hook.** `run_season` gained an optional
+   **schedule-agnostic** `reset: Callable[[int, State], State] | None = None`, consulted
+   before each step: it returns `state` unchanged (same object) on a non-reset step or a new
+   `State` on a reset boundary; the `n % year` calendar lives **inside the caller's closure**
+   (scheduling is a scenario/caller concern). When a reset is applied the driver re-asserts
+   `conservation.assert_conserved(before, after)`. **Default `None` ⇒ the loop is identical**
+   — open + sealed goldens pass **byte-identical WITHOUT regeneration** (proven before
+   substep 2); `git diff src/simcore/` empty; full suite green (856). Pure indirection.
+2. **✅ DONE — New science — `annual_reset` + perennial scenario + golden + tests.**
+   `annual_reset(state, scenario)` (the carbon redistribution above) + `run_perennial`
+   (`run_season` with the reset scheduled every `year` steps); `PERENNIAL_CHAMBER_SCENARIO`
+   (+ `PERENNIAL_CHAMBER_YEARS = 5`, the ample-O₂ sibling of the sealed scenario). **Ran the
+   pre-golden gate on the committed scenario via the production path first:** `events == ()`,
+   `carbon_loss_sink == 0.0` (max over the run), `rationed == 0`, DVS = 2.0 every year,
+   biomass peak > 0.5 every year, all four quantities conserved (CARBON drift ≈ 3e-15) —
+   *then* pinned the new golden (the gate is baked into its `_final_state` generator). Open +
+   sealed goldens **byte-identical** (no regeneration). New `test_perennial_chamber`
+   (sustained-oscillation, genuine-closure, conservation-incl.-resets, determinism +
+   `annual_reset` unit tests) and `test_regression_perennial_season` (the third golden). Full
+   suite green (870); `git diff src/simcore/` empty; no new stock/flow/compartment.
 
 ### Test plan
 
