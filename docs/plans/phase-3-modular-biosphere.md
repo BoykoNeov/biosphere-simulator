@@ -366,7 +366,8 @@ Phase-1/2 rhythm.**
 5. **Modular sealed-ecosystem assembly + per-compartment diagnostics** — compose the full
    compartmentalized biosphere; assert `Inputs = Outputs + ΔStored` per compartment every
    step; a multi-year run exhibiting emergent cross-compartment dynamics (the exit
-   demonstration, short of decade-scale).
+   demonstration, short of decade-scale). **Designed in full below (§ "Step 5 design") —
+   advisor-reviewed.**
 6. **Perturbation harness + representative perturbations (P3.5)** — drought, lighting
    failure, atmospheric leak; assert cascade-for-free + conservation + `rationed == 0`
    through each.
@@ -949,3 +950,211 @@ pinned + sustained-oscillation behavioural test + `annual_reset` conservation/cl
 test + loss-sink stays 0.0 + every-step four-quantity conservation incl. resets +
 `rationed == 0` + full suite green + `git diff src/simcore/` empty. **If an existing golden
 drifts, stop and find the bug — do not regenerate.**
+
+---
+
+## Step 5 design — modular sealed-ecosystem assembly + per-compartment diagnostics (P3.1 ledger discharge)
+
+*Realizes the **deferred half of P3.1** — the per-compartment boundary ledger asserted
+**every step, every quantity, every compartment** (Step 1 built the diagnostic and proved
+it on a hand transfer; Step 3 ran it live but **WATER-scoped**, explicitly deferring the
+full-ledger + extinction-exception handling "to Step 5") — plus the **exit demonstration**:
+a multi-year run exhibiting **emergent cross-compartment dynamics**. **No new science, no
+behavior change, no new golden** — this is a **diagnostics + verification** step. The
+oscillation/closure are already pinned (Step 4); Step 5 proves the *architecture* claim
+(four compartments, one ledger, balance localized per compartment). Advisor-reviewed, the
+Step-1/2/3/4 rhythm.*
+
+**The assembly is already built — name it, do not rebuild it.** `build_season` already
+composes the four compartment builders into one flat union (the integrator stays global —
+P3.1), and `PERENNIAL_CHAMBER_SCENARIO` already activates **all four leaves
+non-trivially**: ATMOSPHERE (`carbon_pool`, `o2_pool`, `water_vapor`), SOIL (`soil_water`,
+`soil_n`, `litter_carbon`, `litter_n`, `microbial_carbon`), PLANTS (the `leaf_c`/`stem_c`/
+`root_c`/`storage_c` organs, `plant_n`), WATER (`condensate`). The carbon cycle (Phase-2),
+nitrogen cycle
+(Phase-2), water cycle (Step 3), and mortality/reset (Step 4) all run in it, genuinely
+closed (`events == ()`, loss-sink 0.0). **So "compose the full compartmentalized biosphere"
+is the *perennial scenario as-is*** — Step 5 adds **no new scenario, no alias, and no new
+golden** (a new bit-exact surface for zero modeling gain — rejected). The deliverable is to
+*verify and report on* that already-assembled ecosystem per compartment.
+
+### The value over the global gate (state it, or a reviewer asks "why not just the gate?")
+
+The every-step global conservation gate (#13) already proves *total* mass per quantity is
+invariant. The per-compartment ledger is **strictly stronger, not a duplicate**: it is
+**localized apply-integrity** — for each `(compartment, quantity)` the identity
+`net crossing flux == ΔStored` (internal flows cancel) **trips on a balanced-but-misapplied
+delta that nets to zero globally** (two compensating misapplications across compartments
+the global gate cannot see). It is **not** a wiring check (a flow mislabeled into the wrong
+compartment moves both sides of the identity together — that is the separate *behavioral*
+assertion, Step 3's `test_three_cycle_flows_carry_only_water_in_ring_order`). Asserting it
+**every step, every compartment, every quantity** is the architectural proof that the
+4-compartment split is apply-correct, and the **per-boundary flux** it reports
+("net carbon plants→atmosphere this step") is the debuggability payoff of the hierarchy.
+
+### The load-bearing decision (P3.5-ledger) — leg reconstruction is **test-side**, **no driver change**
+
+`StepReport` exposes `(state, events, rationed)` but **not** the per-step flow legs, which
+the ledger needs for the crossing flux. Three ways to get them; one chosen:
+
+- **REJECTED — expose legs from the integrator (`StepReport.flow_results`).** A `simcore`
+  *modification* of a frozen surface — blows the "zero core changes" budget
+  (`git diff src/simcore/` must stay empty). Off the table.
+- **REJECTED — an `observe` hook on `run_season`** (the Step-4 `reset`-hook shape: a
+  defaulted `observe: Callable | None` consulted each step, byte-identical when `None`). It
+  *works* and keeps the loop single-source, but it is **speculative generality** — a new
+  driver surface + a substep-1 byte-identical proof for a *consumer that does not exist*
+  (the only consumer is the Step-5 test). Against the plan's minimal-surface ethos. Revisit
+  only if a need arises that test-side reconstruction genuinely cannot serve.
+- **CHOSEN — reconstruct the legs test-side, the Step-3 precedent extended.** For Euler +
+  `rationed == 0`, a single `flow.evaluate(state, env.bind(state, dt), dt)` at the
+  start-of-step state **equals the applied legs** (no arbitration scaling ⇒
+  `_reduce(scaled) == _reduce(raw)`; the #16 seam binds the resolver to that same state).
+  Step 3 already does exactly this WATER-scoped; Step 5 generalizes it. **Zero production
+  code touched** beyond a small domain-side helper (below); `git diff src/simcore/` stays
+  trivially empty.
+
+**Handling the annual reset without a driver change (the perennial wrinkle).** The reset is
+a **pure, deterministic, schedule-known** transform, so the reconstruction re-derives the
+post-reset pre-step state itself — **no need to capture it live.** For transition
+`i → i+1` the before-step state is
+
+```
+before_step = annual_reset(states[i], scenario)   if i > 0 and i % year == 0
+            = states[i]                            otherwise
+```
+
+**mirroring `run_perennial`'s predicate verbatim** (so it cannot drift). Computing the
+ledger over `(before_step → states[i+1])` puts the reset **outside** the transition — the
+ledger then sees **only flow legs (+ extinction)**, never the reset's non-flow carbon
+redistribution. (The reset's own conservation is already discharged: the driver re-asserts
+`assert_conserved` across it, and `annual_reset` is unit-tested.) On the perennial run
+`events == ()`, so after this split **every** step is clean → all four residuals ≈ 0 with a
+**zero** non-flow correction. That is the headline: *the genuinely-closed ecosystem balances
+per compartment, every step, every quantity, with no correction term.*
+
+**Euler-only precondition (state it).** Leg reconstruction (single evaluation == applied
+legs) is sound **only** under Euler + `rationed == 0`; RK4 has no single "applied legs" (the
+⅙-combine of four stage derivatives). The biosphere is Euler-daily and every golden pins
+`rationed == 0`, so the precondition holds — but it is a precondition, asserted in the test
+(`rationed == 0`) before the ledger loop.
+
+### The extinction exception — a small named helper + a **hand-built** primary discharge
+
+Extinction (#6) is a **balanced non-flow change** the legs cannot see: a sub-threshold
+POPULATION organ snaps to 0 (its compartment loses `r`) and the residual routes to the
+**`boundary`-domain** loss-sink (`boundary.loss.<q>`, gains `r`). So on an extinction step
+the ledger residual is `+r` for the organ's compartment and `−r` for `boundary` — **not a
+bug, an expected exception** (the Step-1 `CompartmentFlux` docstring already flags this as
+"Step 5's job").
+
+- **The helper (keep the ledger flow-only).** A new domain-side
+  `expected_extinction_residuals(before, events) -> dict[(DomainId, Quantity), float]`
+  (in `compartments.py`, beside `compartment_boundary_ledger`): for each `ExtinctionEvent`
+  it books `+residual` to `(before.stocks[event.stock].domain, event.quantity)` and
+  `−residual` to `(BOUNDARY_DOMAIN, event.quantity)`. The full check asserts
+  `abs(entry.residual − expected.get((entry.domain, entry.quantity), 0.0)) <= tol`. **Do
+  NOT fold this into `compartment_boundary_ledger`** — its "residual holds by construction
+  on a clean step" property is exactly what makes a *nonzero* residual diagnostic; the
+  non-flow correction is a separate, named, testable concern. The helper is reusable by
+  Step 6 (perturbations may drive extinctions).
+- **Per-step events by bucketing.** `run_season` returns events as one flat tuple over the
+  run; each `ExtinctionEvent` carries `.n`, so per-step events are `[e for e in events if
+  e.n == before_step.n]` — no per-step return needed.
+- **PRIMARY discharge — a hand-built deterministic extinction step (the Step-1 idiom), not
+  "hope the sealed run dies."** Whether `SEALED_CHAMBER_SCENARIO` actually fires extinction
+  is incidental and possibly vacuous; hinging the deliverable on it is fragile. Instead a
+  unit test constructs a tiny two-compartment state with one POPULATION stock below
+  threshold + one clean crossing flow, steps it once (Euler), and asserts the raw ledger
+  residual is `+r` / `−r` on the organ-compartment / `boundary`, **and** that
+  `expected_extinction_residuals` zeroes both. This *deterministically* discharges the
+  forward-pointer.
+- **OPTIONAL realism — the sealed full run, probe-gated.** *If* a probe confirms
+  `SEALED_CHAMBER_SCENARIO` fires ≥ 1 extinction, add a full-ledger-every-step test on it
+  asserting `residual == expected_extinction_residuals` within per-quantity tol, **with a
+  non-vacuity assert** (≥ 1 step has a nonzero correction). If it does not die, drop this
+  test — nothing is lost (the hand-built test is the real discharge). No silent reliance.
+
+### The full ledger check — **all** domains incl. `boundary`, **per-quantity** tol
+
+- **No whitelist.** Step 3 whitelisted `{SOIL, ATMOSPHERE, WATER}` (WATER-scoped). The full
+  check must iterate **every** `(domain, quantity)` the ledger returns — **including
+  `boundary`** (where extinction's `−r` lands) and PLANTS. An *unexpected* nonzero anywhere
+  is precisely what this is meant to catch; whitelisting would silently skip it.
+- **Per-quantity tolerance, not flat 1e-7.** Reuse the table `test_perennial` already pins:
+  CARBON `1e-12`, OXYGEN `1e-11`, WATER `1e-7`, NITROGEN `1e-9`. A flat `1e-7` is far too
+  loose for the O(1) CARBON amounts and would hide real misapplication.
+- **Non-vacuity.** Assert the loop **saw real crossing flux** (some `entry.crossing_in` or
+  `crossing_out > 0` for CARBON, OXYGEN, WATER) — otherwise a frozen run would pass the
+  residual check trivially (the Step-3 `saw_crossing` precedent, per quantity).
+
+### The emergent cross-compartment demonstration — robust gate, loose narrative
+
+Heed `test_perennial`'s own lesson (*do NOT assert period-matching* — the period-2 cycle is
+still in transient at year 5). Two tiers:
+
+- **Gate (robust) — genuine cycling, no pure source/sink.** Over the run, each of
+  PLANTS / SOIL / ATMOSPHERE has **both** summed `crossing_in > 0` **and** summed
+  `crossing_out > 0` for CARBON. That is the "emergent cross-compartment dynamics" claim
+  turned into a check: carbon genuinely *cycles* through every leaf (photosynthesis draws
+  atmosphere→plants; respiration + the reset push plants→atmosphere/soil; decomposition
+  pushes soil→atmosphere), not a one-way drain. The reporting payoff (net per-boundary flux)
+  *is* this assertion.
+- **Narrative (loose) — direction only, never magnitude/timing.** The
+  reset → `litter_carbon` → decomposition → `microbial_carbon` → CO₂ → regrowth cascade is
+  the "cascade for free" story: assert only **direction** — `carbon_pool` (ATMOSPHERE) draws
+  **down** within a growing year, then **recovers** before the next reset (decomposition
+  refuels it) — never a magnitude or a day index. This shows cross-compartment coupling with
+  no cascade code, the P3 exit theme, without a flaky equality.
+
+### Sequencing — probe → verify (no refactor/science split; there is no behavior change)
+
+Unlike Steps 2–4 there is **no behavior change and no driver change**, so there is no
+"refactor-safe vs new-science" split — but the **Step-4 probe discipline still applies**:
+
+1. **Probe FIRST (gates the assertions, not the design).** Run the reconstruction over the
+   committed `PERENNIAL_CHAMBER_SCENARIO` trajectory and confirm **all four** residuals sit
+   within their per-quantity tol on **every** step — *including the four reset-boundary
+   steps* (the post-reset-state handling is the part most likely to have a bug). If a
+   boundary step shows a residual, the `annual_reset(states[i])` reconstruction has a bug to
+   **find**, not a tol to loosen. Also probe whether `SEALED_CHAMBER_SCENARIO` fires
+   extinction (gates the optional sealed test).
+2. **Then build:** the `expected_extinction_residuals` helper + the hand-built extinction
+   unit test + the perennial full-ledger-every-step test + the cross-compartment cycling
+   gate + the cascade-direction narrative test (+ the optional probe-gated sealed test). All
+   three existing goldens stay **byte-identical** (no behavior touched anywhere).
+
+### Test plan
+
+- **Perennial full per-compartment ledger, every step** (the headline): for every
+  `(domain, quantity)` incl. `boundary`, `abs(residual) <= tol[quantity]` on every step,
+  with the verbatim-mirrored reset reconstruction and a zero extinction correction
+  (`events == ()` pinned); per-quantity tol table; CARBON/OXYGEN/WATER non-vacuity.
+- **Extinction-exception discharge (hand-built, deterministic):** a one-step
+  below-threshold POPULATION + clean crossing flow yields ledger residual `+r` /`−r` on the
+  organ-compartment / `boundary`, and `expected_extinction_residuals` zeroes both.
+- **`expected_extinction_residuals` unit test:** an `ExtinctionEvent` on a known stock maps
+  to `{(organ_domain, q): +r, (boundary, q): −r}`; empty events ⇒ empty dict.
+- **Cross-compartment cycling gate:** PLANTS/SOIL/ATMOSPHERE each have summed
+  `crossing_in > 0` and `crossing_out > 0` for CARBON over the run.
+- **Cross-compartment cascade (direction only):** `carbon_pool` draws down then recovers
+  within a year (no magnitude/timing).
+- **(Optional, probe-gated) sealed full-ledger every step:** `residual ==
+  expected_extinction_residuals` within tol, with a non-vacuity assert (≥ 1 nonzero
+  correction). Dropped if the sealed run does not go extinct.
+- **All three goldens byte-identical** (open / sealed / perennial) — **no regeneration, no
+  new golden** (Step 5 changes no behavior).
+- **`test_compartments` / `test_builders`** unchanged (no new stock/flow/compartment).
+- **Purity gate** green; **`git diff src/simcore/` empty** (the helper lives in
+  `domains/biosphere/compartments.py`).
+
+### Acceptance gate
+
+Perennial full per-compartment ledger balances every step / every quantity / every domain
+(incl. `boundary`) within the per-quantity tol + extinction exception discharged by the
+hand-built unit test + `expected_extinction_residuals` unit-tested + cross-compartment
+CARBON cycling demonstrated (both directions, all three active leaves) + cascade-direction
+narrative + all three existing goldens byte-identical (**no regeneration, no new golden**) +
+full suite green + `git diff src/simcore/` empty. **The probe (perennial residuals within
+tol on every step incl. the boundary steps) must pass before any assertion is pinned — if a
+boundary step shows a residual, find the reconstruction bug, do not loosen the tol.**
