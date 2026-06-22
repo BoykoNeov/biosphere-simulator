@@ -54,7 +54,7 @@ demonstration — CARBON genuinely *cycles* through PLANTS/SOIL/ATMOSPHERE (both
 directions) and the chamber CO₂ pool draws down then recovers within each year (the
 reset→litter→decomposition→CO₂→regrowth cascade, direction-only). All three goldens
 **byte-identical** (no regeneration); the helper lives in `compartments.py` so
-`git diff src/simcore/` stays **empty**; 877 tests pass incl. the new
+`git diff src/simcore/` stays **empty**; 878 tests pass incl. the new
 `test_compartment_ledger`. **Next: Step 6.**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable

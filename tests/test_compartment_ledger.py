@@ -237,6 +237,32 @@ def test_expected_extinction_residuals_empty_events_is_empty() -> None:
     assert expected_extinction_residuals(State(n=0, stocks={}, rng_seed=0), []) == {}
 
 
+def test_expected_extinction_residuals_accumulates_within_a_compartment() -> None:
+    # Two POPULATION stocks in the SAME (compartment, quantity) extinct in one step: the
+    # helper sums their residuals (+ to the shared organ compartment, - to boundary). It
+    # folds events in tuple order; on a real step that order is the integrator's sorted
+    # stock-id order, which also drives its loss-sink bucketing, so the helper and the
+    # ledger agree. Multi-extinction under perturbations is a Step-6 path — the live
+    # float-order agreement is to be verified there against the real ledger.
+    a, b = StockId("bio.pop_a"), StockId("bio.pop_b")
+    before = State(
+        n=0,
+        stocks={
+            a: _population(a, PLANTS, 0.2, threshold=0.5),
+            b: _population(b, PLANTS, 0.3, threshold=0.5),
+        },
+        rng_seed=0,
+    )
+    events = (
+        ExtinctionEvent(n=1, stock=a, quantity=Quantity.CARBON, residual=0.2),
+        ExtinctionEvent(n=1, stock=b, quantity=Quantity.CARBON, residual=0.3),
+    )
+    assert expected_extinction_residuals(before, events) == {
+        (PLANTS, Quantity.CARBON): pytest.approx(0.5),
+        (BOUNDARY_DOMAIN, Quantity.CARBON): pytest.approx(-0.5),
+    }
+
+
 # --- the extinction exception: hand-built deterministic discharge (PRIMARY) ----------
 _POP = StockId("test.pop")
 _PLANT_POOL = StockId("test.plant_c")
