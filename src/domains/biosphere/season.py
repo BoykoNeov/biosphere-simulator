@@ -1,8 +1,9 @@
 """The single-producer season — the compartment-composition layer (P3.2).
 
 Phase-3 Step 2 split the monolithic ``build_season`` assembly into per-compartment
-**builder modules** (``atmosphere`` / ``soil`` / ``plants``; ``water`` arrives with the
-Step-3 water cycle). This module is now the thin **composition**: it calls each builder,
+**builder modules** (``atmosphere`` / ``soil`` / ``plants``); Step 3 added ``water``
+(the condensate pool + recycler) when it closed the water cycle. This module is now the
+thin **composition**: it calls each builder,
 unions the parts (the integrator stays global — one clock, one ledger, one conservation
 gate; compartments are a *grouping*, never a sub-solver), adds the cross-cutting carbon
 loss-sink, and hands the flat union to the ``Registry`` (which re-sorts flows by id, so
@@ -70,6 +71,9 @@ from domains.biosphere.stocks import (
     CO2_RESP as CO2_RESP,
 )
 from domains.biosphere.stocks import (
+    CONDENSATE as CONDENSATE,
+)
+from domains.biosphere.stocks import (
     LEAF_C as LEAF_C,
 )
 from domains.biosphere.stocks import (
@@ -105,6 +109,10 @@ from domains.biosphere.stocks import (
 from domains.biosphere.stocks import (
     STORAGE_C as STORAGE_C,
 )
+from domains.biosphere.stocks import (
+    WATER_VAPOR as WATER_VAPOR,
+)
+from domains.biosphere.water import build_water
 from domains.biosphere.weather import (
     daylength_seconds,
     incident_par,
@@ -139,6 +147,7 @@ def _compartments(scenario: SeasonScenario) -> tuple[CompartmentBuild, ...]:
         build_atmosphere(scenario, wiring),
         build_soil(scenario, wiring),
         build_plants(scenario, wiring),
+        build_water(scenario, wiring),
     )
 
 

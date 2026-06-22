@@ -69,6 +69,16 @@ class SeasonScenario:
     litter_carbon0: float = 0.0
     # water (PP, non-limiting): a store sized to stay above the band all season
     soil_water0: float = 1000.0  # kg
+    # Sealed water cycle (P3.3/Step 3): initial vapor + condensate (kg). Default 0 — the
+    # closed ring fills them from ``soil_water`` by transpiration → condensation; the
+    # whole-loop total ``soil_water + water_vapor + condensate`` is the conserved
+    # invariant (== soil_water0 when these start at 0). Sealed-only (the
+    # ``litter_carbon0`` precedent). The first-order condensation/recycling rates
+    # (water_cycle.yaml) keep the in-flight water tiny so ``soil_water`` stays ≫
+    # ``sw_critical`` — i.e. ``f_water ≡ 1``, so the carbon/O₂/N trajectory is
+    # bit-identical to the pre-cycle sealed run.
+    water_vapor0: float = 0.0  # kg
+    condensate0: float = 0.0  # kg
     water_source0: float = 0.0  # kg (unclamped supply; tracks cumulative irrigation)
     sw_wilting: float = 20.0  # kg
     sw_critical: float = 60.0  # kg

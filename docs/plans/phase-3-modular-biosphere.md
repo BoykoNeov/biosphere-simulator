@@ -1,6 +1,6 @@
 # Phase 3 — Modular Biosphere / Consumers
 
-**Status: Steps 1–2 COMPLETE; Steps 3–7 not started.** Phases 0, 0.5, 1, and 2
+**Status: Steps 1–3 COMPLETE; Steps 4–7 not started.** Phases 0, 0.5, 1, and 2
 are complete and regression-pinned (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 This plan **locks the load-bearing Phase-3 decision** (the subsystem-hierarchy
 representation, P3.1) and **enumerates** the process steps as forward-pointers, each to
@@ -19,7 +19,15 @@ WITHOUT regeneration** (the proof the restructure was safe); `git diff src/simco
 **no-cross-import** checks the snapshot goldens genuinely can't see (the `build_season`
 union dedups by id; imports are pure source structure), plus a per-builder leaf-stamp
 check that *localizes* a mis-stamp the goldens — which serialize `domain` — would also
-catch. **Next: Step 3 — close the water cycle (P3.3).**
+catch. **Step 3 (close the water cycle, P3.3) is COMPLETE** — the sealed chamber's last
+boundary leak is closed: `Transpiration` now feeds an in-system `water_vapor` (ATMOSPHERE)
+→ `Condensation` → `condensate` (the WATER leaf's first stocks) → `Recycling` →
+`soil_water`, a genuinely closed WATER ring; sealed drops `Irrigation` + `water_source`
+(the nonzero irrigation flux would otherwise pump water in). Open golden **byte-identical
+WITHOUT regeneration** (water leaf empty there); sealed golden **regenerated** (only WATER
+moved — carbon/O₂/N + thermal_time byte-identical); `git diff src/simcore/` **empty**; 856
+tests pass incl. the new `test_water_cycle` (WATER-scoped per-compartment ledger, behavioral
+ring-wiring, closed-loop conservation, `rationed == 0`). **Next: Step 4.**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable
 compartments.* The headline is an **architectural upgrade**, not new physics: introduce a
@@ -685,18 +693,17 @@ validated behaviour" honesty and the decomposition/mineralization first-order pr
    `StockId("boundary.vapor_sink")` in both chambers; `ChamberWiring` is never
    serialized); `git diff src/simcore/` empty; full suite green (836 passed); ruff +
    pyright clean. Pure indirection — no new stock/flow/science.
-2. **New science:** add the `water_vapor`/`condensate` stocks, `Condensation`/`Recycling`
-   flows, drop sealed irrigation. **Probe the sealed run before regenerating the golden:**
-   inspect `events` (does the producer go extinct? — gates the ledger test, below), min
-   `soil_water` (must stay ≫ `sw_critical = 60` so the plant is not newly water-stressed),
-   and `rationed == 0`. Size `k_cond`/`k_rec` so all three hold. *Then* regenerate the
-   sealed golden.
-2. **New science:** add the `water_vapor`/`condensate` stocks, `Condensation`/`Recycling`
-   flows, drop sealed irrigation. **Probe the sealed run before regenerating the golden:**
-   inspect `events` (does the producer go extinct? — gates the ledger test, below), min
-   `soil_water` (must stay ≫ `sw_critical = 60` so the plant is not newly water-stressed),
-   and `rationed == 0`. Size `k_cond`/`k_rec` so all three hold. *Then* regenerate the
-   sealed golden.
+2. **✅ DONE — New science:** added the `water_vapor`/`condensate` stocks,
+   `Condensation`/`Recycling` flows (new `water_cycle.py` + `water.py` builder + the
+   atmosphere `Condensation`), `chamber_wiring()` flipped `vapor_target` to `WATER_VAPOR`
+   when sealed, and dropped sealed `Irrigation` + `water_source`. **Probed the sealed run
+   before regenerating the golden:** `events == ()` (no extinction — the ledger test stays
+   WATER-clean), min `soil_water ≈ 980.9` (margin ≈ 920 above `sw_critical = 60`, so
+   `f_water ≡ 1` — the carbon/O₂/N trajectory is unperturbed), and `rationed == 0`. With
+   `k_cond = k_rec = 0.5` (`k·dt = 0.5 < 1`) all three hold, so the Euler backstop never
+   fires. *Then* regenerated the sealed golden (diff confirmed **only** WATER moved:
+   `condensate`/`water_vapor` added, `vapor_sink`/`water_source` removed, `soil_water`
+   amount changed; carbon/O₂/N + thermal_time **byte-identical**). Open golden untouched.
 
 ### Test plan
 

@@ -25,7 +25,7 @@ import pytest
 
 import domains.biosphere
 from domains.biosphere.atmosphere import build_atmosphere
-from domains.biosphere.compartments import ATMOSPHERE, PLANTS, SOIL
+from domains.biosphere.compartments import ATMOSPHERE, PLANTS, SOIL, WATER
 from domains.biosphere.plants import build_plants
 from domains.biosphere.scenario import (
     DEFAULT_SCENARIO,
@@ -35,12 +35,13 @@ from domains.biosphere.scenario import (
 from domains.biosphere.season import build_season
 from domains.biosphere.soil import build_soil
 from domains.biosphere.stocks import CompartmentBuild, chamber_wiring
+from domains.biosphere.water import build_water
 from simcore import boundary
 from simcore.boundary import BOUNDARY_DOMAIN
 from simcore.ids import DomainId
 from simcore.quantities import Quantity
 
-_BUILDER_MODULES = ("atmosphere", "soil", "plants")
+_BUILDER_MODULES = ("atmosphere", "soil", "plants", "water")
 _SCENARIOS = [
     pytest.param(DEFAULT_SCENARIO, id="open"),
     pytest.param(SEALED_CHAMBER_SCENARIO, id="sealed"),
@@ -54,6 +55,7 @@ def _builds(scenario: SeasonScenario) -> dict[str, tuple[CompartmentBuild, Domai
         "atmosphere": (build_atmosphere(scenario, wiring), ATMOSPHERE),
         "soil": (build_soil(scenario, wiring), SOIL),
         "plants": (build_plants(scenario, wiring), PLANTS),
+        "water": (build_water(scenario, wiring), WATER),
     }
 
 
@@ -78,13 +80,23 @@ def test_each_builder_emits_only_its_own_leaf_modeled_stocks(
             )
 
 
-def test_sealed_build_populates_all_three_leaves() -> None:
-    # Non-vacuity: when sealed, each builder genuinely owns modeled stocks (so the
-    # per-leaf check above is exercising real content, not passing on empty sets).
+def test_sealed_build_populates_all_four_leaves() -> None:
+    # Non-vacuity: when sealed, every builder (incl. water, which owns ``condensate``
+    # once the Step-3 cycle is closed) genuinely owns modeled stocks (so the per-leaf
+    # check above is exercising real content, not passing on empty sets).
     for name, (build, leaf) in _builds(SEALED_CHAMBER_SCENARIO).items():
         modeled = [s for s in build.stocks if s.domain != BOUNDARY_DOMAIN]
         assert modeled, f"{name} should own modeled stocks in the sealed chamber"
         assert all(s.domain == leaf for s in modeled)
+
+
+def test_open_field_water_builder_is_empty() -> None:
+    # The water cycle is sealed-only: in the open field the water leaf holds no stocks /
+    # flows (transpiration drains to a boundary, irrigation refills from one), so the
+    # open golden is byte-identical and the leaf stays empty (P3.1's "water declared
+    # empty").
+    build, _ = _builds(DEFAULT_SCENARIO)["water"]
+    assert build.stocks == () and build.flows == () and build.aux == ()
 
 
 # --- (2) the builders partition build_season (disjoint + complete) ----------

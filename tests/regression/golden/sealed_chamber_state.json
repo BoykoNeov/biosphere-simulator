@@ -20,6 +20,19 @@
       "unit": "mol"
     },
     {
+      "amount": "0x1.d0055eb898f15p+2",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.water",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.condensate",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
       "amount": "0x1.69d526b824360p-30",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
@@ -124,7 +137,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.0b08e316f06ddp+10",
+      "amount": "0x1.ec0c7a2d40e6cp+9",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -163,6 +176,19 @@
       "unit": "mol"
     },
     {
+      "amount": "0x1.14dec55379ccep+3",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.atmosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.water_vapor",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
       "amount": "0x0.0p+0",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
@@ -185,32 +211,6 @@
       "id": "boundary.n_source",
       "kind": "boundary",
       "quantity": "nitrogen",
-      "unclamped": true,
-      "unit": "kg"
-    },
-    {
-      "amount": "0x1.b8771ce90f925p+10",
-      "composition": {
-        "water": "0x1.0000000000000p+0"
-      },
-      "domain": "boundary",
-      "extinction_threshold": "0x0.0p+0",
-      "id": "boundary.vapor_sink",
-      "kind": "boundary",
-      "quantity": "water",
-      "unclamped": false,
-      "unit": "kg"
-    },
-    {
-      "amount": "-0x1.c980000000000p+10",
-      "composition": {
-        "water": "0x1.0000000000000p+0"
-      },
-      "domain": "boundary",
-      "extinction_threshold": "0x0.0p+0",
-      "id": "boundary.water_source",
-      "kind": "boundary",
-      "quantity": "water",
       "unclamped": true,
       "unit": "kg"
     }

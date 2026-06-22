@@ -118,10 +118,13 @@ def _total(s: State, q: Quantity) -> float:
 def test_sealed_conserves_every_quantity(
     sealed: tuple[list[State], int, tuple], quantity: Quantity, abs_tol: float
 ) -> None:
-    # The sealed chamber is closed for CARBON/OXYGEN/NITROGEN (no boundary source/sink);
-    # WATER cycles soil↔vapor with the unclamped irrigation/vapor boundaries, so its
-    # *total over all stocks incl. boundaries* is what is invariant. Every step the gate
-    # holds end-to-end through the f_O2-throttled gas fluxes over the multi-year run.
+    # The sealed chamber is now closed for ALL FOUR quantities (no boundary
+    # source/sink): CARBON/OXYGEN/NITROGEN since Phase 2, and WATER since Step 3 closed
+    # the cycle (soil_water → water_vapor → condensate → soil_water, replacing the
+    # irrigation / vapor boundaries). So each quantity's total over all stocks is
+    # invariant. Every step the gate holds end-to-end through the f_O2-throttled gas
+    # fluxes over the multi-year run. (The closed water loop is pinned tighter —
+    # per-compartment + ring — in test_water_cycle.py.)
     states, _, _ = sealed
     q0 = _total(states[0], quantity)
     for s in states:

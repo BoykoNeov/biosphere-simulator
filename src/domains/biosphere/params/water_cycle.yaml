@@ -1,0 +1,70 @@
+# chamber — water cycle closure (condensation + recycling) params
+# Currency/units: WATER (kg). This file groups the TWO first-order rates (1/day) that
+#   close the chamber's water cycle — the one cycle Phase 1/2 left open (transpiration
+#   drained soil_water to a vapor_sink BOUNDARY; irrigation refilled it from a
+#   water_source BOUNDARY). With the plants-owned Transpiration (retargeted to the
+#   in-system water_vapor stock), these close the ring:
+#     condensation_rate water_vapor → condensate  (the condenser recovers vapor)
+#     recycling_rate    condensate  → soil_water  (recovered water returns to the root zone)
+#   soil_water → water_vapor → condensate → soil_water closes with no boundary crossing.
+#   Both fluxes are first-order in their donor pool (rate · pool, kg/day), self-limiting
+#   (→ 0 as the pool → 0), so positivity is structural (rate·dt < 1 keeps the backstop off).
+#
+# Why both rates live in ONE file (the mineralization.yaml precedent). Conceptually
+#   condensation is an atmosphere process and recycling a water-compartment process — but
+#   together they ARE the chamber's water return loop, and one dedicated file (loaded by
+#   both the atmosphere and water builders, separate objects) keeps the Phase-1
+#   transpiration.yaml byte-untouched (the open-field water path is unchanged). The file
+#   is named honestly for the loop, not for one of its two halves.
+#
+# Why first-order (the honest part). First-order means vapor condenses *regardless of
+#   humidity* — WRONG for natural atmospheric condensation (which needs supersaturation;
+#   that saturation/dew-point refinement needs chamber volume + temperature coupling with
+#   zero architectural payoff here), but RIGHT for an engineered condenser + water-recovery
+#   loop — a dehumidifier / condensing heat-exchanger at fixed clearance, which is what a
+#   sealed bioregenerative life-support chamber actually has (CELSS; Biosphere 2 condensate
+#   management). The saturation-physics condensation is a documented refinement seam.
+#
+# Sizing discipline (the Step-3 linchpin). The rates are chosen large enough that the
+#   in-flight water (water_vapor + condensate ≈ T/k_cond + T/k_rec, T = transpiration
+#   flux) stays ≪ soil_water0, so soil_water stays ≫ sw_critical and f_water ≡ 1 — i.e.
+#   the carbon/O₂/N trajectory is bit-identical to the pre-cycle sealed run (verified by
+#   the golden diff: only the WATER stocks may change). Both rates satisfy rate·dt < 1 at
+#   the Euler-daily step for structural positivity (rationed == 0).
+#
+# Units discipline (P4 / config/units.py): the first-order rates (1/day) are NOT a
+#   conserved-Quantity canonical unit, so each is a schema-validated, bound-checked float
+#   carrying a declared unit (exact-string guarded at the loader, like decomposition's
+#   decomposition_rate / mineralization's two rates). A zero rate is valid (no condensation
+#   / no recycling); negative is rejected (it would create water).
+#
+# Deferred seams (documented in water_cycle.py): saturation/dew-point condensation
+#   (humidity-dependent, needs chamber volume + T-coupling); a finite condenser capacity;
+#   and explicit gas-phase humidity as a mole-fraction concentration.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] MacElroy, R.D. & Bredt, J. (1984), "Current concepts and future directions of
+#       CELSS", Adv. Space Res. 4(12):221–229 (closed-loop water recovery in controlled
+#       ecological life-support — the engineered condenser/recycler this models).
+#   [B] Nelson, M., Allen, J., Alling, A., Dempster, W.F. & Silverstone, S. (1993),
+#       "Using a closed ecological system to study Earth's biosphere: initial results
+#       from Biosphere 2", BioScience 43(4):225–236 (condensate management in a sealed
+#       chamber — the fast condenser turnover the rates approximate).
+
+name: chamber
+process: water_cycle
+
+parameters:
+  condensation_rate:
+    value: 0.5
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical engineered-condenser turnover (vapor recovered in ~2 days) [A][B]; primary citation pending validation gate"
+  recycling_rate:
+    value: 0.5
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical condensate-return turnover (recovered water recycled in ~2 days) [A][B]; primary citation pending validation gate"

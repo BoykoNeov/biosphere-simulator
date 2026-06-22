@@ -1,10 +1,24 @@
 """The soil compartment builder (P3.2) — water, nitrogen, and the decomposer pools.
 
 Owns ``soil_water`` / ``soil_n`` (the rooting-zone POOLs the plant draws from), the
-``water_source`` / ``n_source`` boundary supplies, and — in the sealed chamber — the
-decomposer sub-loop (``litter_carbon`` POOL, ``microbial_carbon`` POP, ``litter_n``
-POOL). Drives them with ``Irrigation`` / ``Fertilization`` (always) and, sealed,
-``Decomposition`` / ``MicrobialRespiration`` / ``Mineralization``.
+``n_source`` boundary supply (+ the ``water_source`` supply in the **open** field only),
+and — in the sealed chamber — the decomposer sub-loop (``litter_carbon`` POOL,
+``microbial_carbon`` POP, ``litter_n`` POOL). Drives them with ``Fertilization``
+(always), ``Irrigation`` (open only), and, sealed, ``Decomposition`` /
+``MicrobialRespiration`` / ``Mineralization``.
+
+**Sealed drops ``Irrigation`` + ``water_source`` (P3.3/Step 3 — genuine water
+closure).**
+Phase 1/2 refilled ``soil_water`` from a ``water_source`` BOUNDARY (water *in*) while
+transpiration drained it to a ``vapor_sink`` BOUNDARY (water *out*) — two boundary
+crossings, so the sealed chamber exchanged water with the outside. The Step-3 water
+cycle closes the loop (transpiration now feeds the in-system ``water_vapor`` →
+``condensate`` → ``soil_water`` ring), so sealed builds ``soil_water`` open-fed no
+longer: the irrigation input + its boundary are **open-only** (the mirror of how carbon
+dropped ``co2_atmos``/``co2_resp`` for the finite ``carbon_pool``). The nitrogen "inert
+boundary" precedent does **not** transfer — N kept ``n_source``/``Fertilization``
+because the fertilization flux is zero (a harmless boundary), but the irrigation flux is
+nonzero, so left in it would pump water into the closed chamber every step.
 
 ``MicrobialRespiration`` is a cross-compartment flux — it burns microbial C back to
 CO₂ in the atmosphere's ``carbon_pool`` consuming its ``o2_pool``; soil reads those two
@@ -62,18 +76,9 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
     stocks: list[Stock] = [
         pool_stock(SOIL_WATER, SOIL, Quantity.WATER, water, scenario.soil_water0),
         pool_stock(SOIL_N, SOIL, Quantity.NITROGEN, nitrogen, scenario.soil_n0),
-        boundary.source(WATER_SOURCE, Quantity.WATER, scenario.water_source0),
         boundary.source(N_SOURCE, Quantity.NITROGEN, scenario.n_source0),
     ]
     flows: list[Flow] = [
-        Irrigation(
-            FlowId("biosphere.irrigation"),
-            0,
-            water_source=WATER_SOURCE,
-            soil_water=SOIL_WATER,
-            irrigation_var=IRRIGATION_VAR,
-            ground_area=scenario.ground_area,
-        ),
         Fertilization(
             FlowId("biosphere.fertilization"),
             0,
@@ -83,6 +88,23 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
             ground_area=scenario.ground_area,
         ),
     ]
+    if not scenario.sealed:
+        # Open field: the irrigation input refills soil_water from a boundary supply.
+        # Sealed drops both — the water cycle closes the loop (P3.3), so an open water
+        # crossing would leak the chamber (the nonzero irrigation flux would pump it).
+        stocks.append(
+            boundary.source(WATER_SOURCE, Quantity.WATER, scenario.water_source0)
+        )
+        flows.append(
+            Irrigation(
+                FlowId("biosphere.irrigation"),
+                0,
+                water_source=WATER_SOURCE,
+                soil_water=SOIL_WATER,
+                irrigation_var=IRRIGATION_VAR,
+                ground_area=scenario.ground_area,
+            )
+        )
     if scenario.sealed:
         # The decomposer pools (Steps 4–6). ``litter_carbon`` is a finite POOL fed by
         # senescence (flow lives in plants) and drained by first-order decomposition;

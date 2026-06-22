@@ -22,7 +22,7 @@ Imports only ``simcore`` + ``compartments`` (the leaf ``DomainId``s) — no buil
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from domains.biosphere.compartments import ATMOSPHERE, PLANTS, SOIL
+from domains.biosphere.compartments import ATMOSPHERE, PLANTS, SOIL, WATER
 from simcore.auxiliary import AuxProcess
 from simcore.flow import Flow
 from simcore.ids import DomainId, StockId
@@ -60,6 +60,14 @@ MICROBIAL_CARBON: StockId = StockId("biosphere.microbial_carbon")
 # returns it to ``soil_n``, closing the cycle soil_n → plant_n → litter_n → soil_n that
 # Phase 1 fed externally from ``n_source``.
 LITTER_N: StockId = StockId("biosphere.litter_n")
+# Sealed chamber water cycle (P3.3/Step 3): the two stocks that close the one cycle
+# still open. ``water_vapor`` (in ATMOSPHERE) receives transpired water (the canopy
+# flux that drained to the ``vapor_sink`` BOUNDARY in Phase 1/2); first-order
+# condensation transfers it to ``condensate`` (in the WATER leaf — its first stocks,
+# declared empty since P3.1), which first-order recycling returns to ``soil_water``,
+# closing the ring soil → atmosphere → water → soil with no boundary crossing.
+WATER_VAPOR: StockId = StockId("biosphere.water_vapor")
+CONDENSATE: StockId = StockId("biosphere.condensate")
 CO2_RESP: StockId = StockId("boundary.co2_resp")
 VAPOR_SINK: StockId = StockId("boundary.vapor_sink")
 LITTER_SINK: StockId = StockId("boundary.litter_sink")
@@ -87,6 +95,8 @@ STOCK_DOMAIN: dict[StockId, DomainId] = {
     MICROBIAL_CARBON: SOIL,  # decomposer biomass lives in the soil compartment
     CARBON_POOL: ATMOSPHERE,
     O2_POOL: ATMOSPHERE,
+    WATER_VAPOR: ATMOSPHERE,  # transpired vapor (the water cycle's atmosphere leg)
+    CONDENSATE: WATER,  # the WATER leaf's first stock (recovered condensate)
 }
 
 # --- forcing var names (resolved through env.get, #16) ----------------------
@@ -143,7 +153,7 @@ class ChamberWiring:
     resp_sink: StockId  # CARBON_POOL (sealed, == source) | CO2_RESP (open)
     o2_pool: StockId | None  # O2_POOL (sealed) | None (open)
     litter_carbon_target: StockId  # LITTER_CARBON (sealed) | LITTER_SINK (open)
-    vapor_target: StockId  # VAPOR_SINK (both) → WATER_VAPOR sealed at substep 2
+    vapor_target: StockId  # WATER_VAPOR (sealed, closed loop) | VAPOR_SINK (open)
 
 
 def chamber_wiring(sealed: bool) -> ChamberWiring:
@@ -151,21 +161,23 @@ def chamber_wiring(sealed: bool) -> ChamberWiring:
 
     Sealed: gas exchange draws from and returns to the one finite ``carbon_pool``
     (``source == sink``), an ``o2_pool`` balances OXYGEN, senescence feeds the finite
-    ``litter_carbon`` POOL. Open: unclamped ``co2_atmos`` source + separate ``co2_resp``
-    sink, no O₂ pool, and senescence sheds to the ``litter_sink`` BOUNDARY.
+    ``litter_carbon`` POOL, and transpiration targets the in-system ``water_vapor``
+    stock that closes the water cycle (P3.3/Step 3). Open: unclamped ``co2_atmos``
+    source + separate ``co2_resp`` sink, no O₂ pool, senescence sheds to the
+    ``litter_sink`` BOUNDARY, and transpiration drains to the ``vapor_sink`` BOUNDARY.
 
-    ``vapor_target`` is ``VAPOR_SINK`` for **both** chambers here (Step-3 substep 1,
-    the behaviour-preserving indirection — ``Transpiration`` now reads its sink id off
-    the wiring instead of hardcoding it). Substep 2 flips the sealed selection to a new
-    ``WATER_VAPOR`` stock to close the water cycle; until that stock exists, keeping
-    both at ``VAPOR_SINK`` is what holds the two goldens byte-identical.
+    ``vapor_target`` flips to ``WATER_VAPOR`` (sealed) | ``VAPOR_SINK`` (open) — exactly
+    the ``carbon_source`` / ``litter_carbon_target`` pattern. ``Transpiration`` reads
+    its sink id off the wiring (the field name ``vapor_sink`` is kept, so the open flow
+    object is byte-identical), so the same canopy flux drains to a boundary (open) or
+    feeds the closed loop (sealed) with no change to the flow class.
     """
     return ChamberWiring(
         carbon_source=CARBON_POOL if sealed else CO2_ATMOS,
         resp_sink=CARBON_POOL if sealed else CO2_RESP,
         o2_pool=O2_POOL if sealed else None,
         litter_carbon_target=LITTER_CARBON if sealed else LITTER_SINK,
-        vapor_target=VAPOR_SINK,
+        vapor_target=WATER_VAPOR if sealed else VAPOR_SINK,
     )
 
 

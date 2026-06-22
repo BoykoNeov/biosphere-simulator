@@ -1,7 +1,8 @@
 """The plants compartment builder (P3.2) — the producer: organs, gas exchange, uptake.
 
-Owns the four organ carbon pools + ``plant_n``, the canopy water sink (``vapor_sink``),
-and — in the open field — the ``litter_sink`` BOUNDARY senescence sheds to. Drives the
+Owns the four organ carbon pools + ``plant_n``, and — in the open field — the canopy
+water sink (``vapor_sink``) + the ``litter_sink`` BOUNDARY senescence sheds to (sealed
+closes both loops, so neither boundary is built). Drives the
 plant carbon budget (``Allocation`` + the two respirations, over the shared
 :class:`CarbonContext`), ``Senescence``, ``Transpiration``, ``NitrogenUptake``, and —
 sealed — ``NitrogenSenescence``; plus the thermal-time aux accumulator.
@@ -123,10 +124,13 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
         organ_stock(ROOT_C, PLANTS, scenario.root_c0),
         organ_stock(STORAGE_C, PLANTS, scenario.storage_c0),
         pool_stock(PLANT_N, PLANTS, Quantity.NITROGEN, nitrogen, scenario.plant_n0),
-        boundary.sink(VAPOR_SINK, Quantity.WATER),
     ]
     if not scenario.sealed:
-        # Open field: senescence sheds organ carbon to a boundary sink (loop is open).
+        # Open field: transpiration drains to the vapor BOUNDARY and senescence sheds
+        # organ carbon to a boundary sink (both loops are open). Sealed closes them —
+        # the water cycle (transpiration → water_vapor, P3.3) and the decomposer
+        # (senescence → litter_carbon) — so neither boundary is built (genuine closure).
+        stocks.append(boundary.sink(VAPOR_SINK, Quantity.WATER))
         stocks.append(boundary.sink(LITTER_SINK, Quantity.CARBON))
 
     flows: list[Flow] = [

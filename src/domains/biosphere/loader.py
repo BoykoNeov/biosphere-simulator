@@ -33,6 +33,7 @@ from domains.biosphere.phenology import PhenologyParams
 from domains.biosphere.photosynthesis import PhotosynthesisParams
 from domains.biosphere.respiration import RespirationParams
 from domains.biosphere.transpiration import TranspirationParams
+from domains.biosphere.water_cycle import WaterCycleParams
 from simcore.quantities import Quantity
 
 # The committed canonical demo params.
@@ -70,6 +71,9 @@ MICROBIAL_RESPIRATION_PARAMS_PATH: Path = (
 MINERALIZATION_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "mineralization.yaml"
 )
+# The committed chamber water-cycle params (P3 Step 3): the two first-order rates
+# (condensation + recycling) that close the water loop.
+WATER_CYCLE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "water_cycle.yaml"
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -1169,4 +1173,80 @@ def load_mineralization_params(
     return MineralizationParams(
         n_senescence_rate=values["n_senescence_rate"],
         mineralization_rate=values["mineralization_rate"],
+    )
+
+
+# --- water cycle closure / condensation + recycling (Phase-3 Step 3) ---------
+# Same structured value/unit/source format as mineralization. The TWO first-order rates
+# (1/day) — condensation + recycling — are NOT conserved-Quantity canonical units, so
+# each is a schema-validated, bound-checked float whose declared ``unit`` is
+# exact-string guarded (the decomposition / mineralization discipline). A zero rate is
+# valid (no condensation / no recycling); negative is rejected.
+
+# Expected canonical unit string per water-cycle param (exact-match guard).
+_WATER_CYCLE_UNITS: dict[str, str] = {
+    "condensation_rate": "1/day",
+    "recycling_rate": "1/day",
+}
+
+
+class _WaterCycleValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _WaterCycleParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    condensation_rate: _WaterCycleValueUnit
+    recycling_rate: _WaterCycleValueUnit
+
+
+class _WaterCycleSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _WaterCycleParameters
+
+
+def _water_cycle_value(params: _WaterCycleParameters, field: str) -> float:
+    """Read a water-cycle param's value, exact-string guarding its declared unit."""
+    entry: _WaterCycleValueUnit = getattr(params, field)
+    expected = _WATER_CYCLE_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_water_cycle_params(
+    path: str | Path = WATER_CYCLE_PARAMS_PATH,
+) -> WaterCycleParams:
+    """Load, schema- and bound-check the water-cycle params (P3 Step 3).
+
+    Both first-order rates (the condensation rate and the recycling rate) carry a
+    declared unit (exact-string guarded) and a required ``source`` tag (clean-room
+    discipline).
+    Each must be non-negative (0 = off; negative would create water). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    negative value.
+    """
+    schema = _WaterCycleSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _water_cycle_value(params, field) for field in _WATER_CYCLE_UNITS}
+
+    for field, value in values.items():
+        if value < 0.0:
+            raise ValueError(f"{field} must be >= 0, got {value}")
+
+    return WaterCycleParams(
+        condensation_rate=values["condensation_rate"],
+        recycling_rate=values["recycling_rate"],
     )

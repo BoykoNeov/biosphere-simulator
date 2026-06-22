@@ -27,8 +27,10 @@ from domains.biosphere.compartments import (
     descendant_stocks,
 )
 from domains.biosphere.season import (
+    CONDENSATE,
     SEALED_CHAMBER_SCENARIO,
     STOCK_DOMAIN,
+    WATER_VAPOR,
     build_season,
 )
 from simcore.boundary import BOUNDARY_DOMAIN
@@ -56,7 +58,9 @@ def test_parent_map_is_flat_two_level_tree_under_biosphere() -> None:
     assert BIOSPHERE not in BIOSPHERE_PARENTS
 
 
-# --- the relabel partition (sealed = all twelve modeled stocks) -------------
+# --- the relabel partition (sealed = all fourteen modeled stocks) -----------
+# (12 carbon/N/water modeled stocks from Phases 1/2 + the two Step-3 water-cycle stocks
+# ``water_vapor`` (atmosphere) and ``condensate`` (water).)
 
 
 def test_relabel_partitions_modeled_stocks_into_leaves() -> None:
@@ -94,17 +98,28 @@ def test_descendant_stocks_leaf_equals_its_own_members() -> None:
     _, registry = build_season(SEALED_CHAMBER_SCENARIO)
     di = registry.domain_index
     # A leaf has no children, so its rollup is just its own members (== domain_index).
-    for leaf in (PLANTS, SOIL, ATMOSPHERE):
+    # All four leaves are populated in the sealed chamber (water gained ``condensate``
+    # in Step 3).
+    for leaf in (PLANTS, SOIL, ATMOSPHERE, WATER):
         assert descendant_stocks(di, BIOSPHERE_PARENTS, leaf) == di[leaf]
 
 
-def test_water_compartment_is_empty_until_step3() -> None:
-    _, registry = build_season(SEALED_CHAMBER_SCENARIO)
-    di = registry.domain_index
-    # No stock lives in ``water`` yet (water_vapor / condensate arrive in Step 3), so it
-    # is absent from the index and rolls up to nothing — without error.
-    assert WATER not in di
-    assert descendant_stocks(di, BIOSPHERE_PARENTS, WATER) == frozenset()
+def test_water_compartment_populated_when_sealed_empty_when_open() -> None:
+    # Step 3 closes the water cycle, so the ``water`` leaf — declared empty since P3.1 —
+    # gains ``condensate`` in the sealed chamber (``water_vapor`` lands in atmosphere).
+    sealed, sealed_reg = build_season(SEALED_CHAMBER_SCENARIO)
+    di = sealed_reg.domain_index
+    assert di[WATER] == frozenset({CONDENSATE})
+    assert descendant_stocks(di, BIOSPHERE_PARENTS, WATER) == frozenset({CONDENSATE})
+    assert (
+        sealed.stocks[WATER_VAPOR].domain == ATMOSPHERE
+    )  # vapor is an atmosphere stock
+    # The open field does not close the cycle, so the water leaf stays empty: absent
+    # from the index, it rolls up to nothing — without error.
+    _, open_reg = build_season()
+    open_di = open_reg.domain_index
+    assert WATER not in open_di
+    assert descendant_stocks(open_di, BIOSPHERE_PARENTS, WATER) == frozenset()
 
 
 def test_flat_default_reproduces_domain_index() -> None:
