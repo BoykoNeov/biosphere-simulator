@@ -32,13 +32,15 @@ from pathlib import Path
 
 import pytest
 
-from domains.biosphere.loader import load_phenology_params
+from domains.biosphere.loader import load_nitrogen_params, load_phenology_params
+from domains.biosphere.nitrogen import nitrogen_stress_factor
 from domains.biosphere.phenology import development_stage
 from domains.biosphere.season import (
     LEAF_C,
     LITTER_CARBON,
     PERENNIAL_CHAMBER_SCENARIO,
     PERENNIAL_CHAMBER_YEARS,
+    PLANT_N,
     ROOT_C,
     STEM_C,
     STORAGE_C,
@@ -188,6 +190,30 @@ def test_perennial_is_deterministic(
     states2, rationed2, events2 = _run_canonical()
     assert states2[-1] == states[-1]
     assert (rationed2, events2) == (rationed, events)
+
+
+# --- the carbon-only reset is justified: f_N ≡ 1 (verified, not assumed) -------------
+def test_perennial_f_n_stays_one(
+    perennial: tuple[list[State], int, tuple],
+) -> None:
+    # annual_reset is CARBON-only: plant_n persists across the death, so the small reset
+    # seedling inherits the full standing N (an N *windfall*). That is harmless ONLY if
+    # f_N stays == 1 — otherwise the concentration spike would feed limitation =
+    # f_water·f_N into gross assimilation and perturb the carbon trajectory (and the
+    # golden would silently encode a different model than documented). Pinned here (the
+    # test_sealed_f_n_stays_one precedent: verified, not assumed): the reset shrinks
+    # biomass to the seedling, which RAISES N concentration, so f_N == 1 is in fact more
+    # robust than the sealed run. Biomass is leaf+stem+root (storage excluded).
+    states, _, _ = perennial
+    nitro = load_nitrogen_params()
+    for s in states:
+        f_n = nitrogen_stress_factor(
+            s.stocks[PLANT_N].amount,
+            _vegetative(s),
+            n_residual_per_mol_c=nitro.n_residual_per_mol_c,
+            n_critical_per_mol_c=nitro.n_critical_per_mol_c,
+        )
+        assert f_n == 1.0
 
 
 # --- annual_reset (the pure transform) unit tests -----------------------------------
