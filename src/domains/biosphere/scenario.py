@@ -115,3 +115,21 @@ SEALED_CHAMBER_SCENARIO: SeasonScenario = SeasonScenario(
     litter_carbon0=3.0,
 )
 SEALED_CHAMBER_YEARS: int = 3
+
+# The Phase-3 Step-4 (P3.4) perennial chamber: the sealed scenario plus an **annual
+# phenology reset / re-sow** (applied by ``season.run_perennial`` at each year
+# boundary), giving **sustained multi-year oscillation** instead of the one-shot "plant
+# dies after year 1" baseline. The ample-O₂ sibling of ``SEALED_CHAMBER_SCENARIO``
+# (``chamber_o2_mol0`` at the default 210, not the O₂-poor 2.0): the O₂-depletion drama
+# is a Phase-2 capstone concern orthogonal to the perennial carbon oscillation, left out
+# here so the oscillation is the clean headline. The 3 mol seeded litter fuels year-1
+# growth; thereafter the closed carbon loop (organs/grain → litter at each reset →
+# microbial → CO₂ → regrowth) sustains it. Probed (5 yr): DVS reaches maturity every
+# year, a stable emergent period-2 limit cycle, ``rationed == 0``, ``events == ()`` (the
+# carbon loss-sink stays 0.0 — genuinely closed), all four quantities conserved. Shared
+# by the validation test and the regression golden so they cannot drift on the sizing.
+PERENNIAL_CHAMBER_SCENARIO: SeasonScenario = SeasonScenario(
+    sealed=True,
+    litter_carbon0=3.0,
+)
+PERENNIAL_CHAMBER_YEARS: int = 5

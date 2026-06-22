@@ -33,6 +33,7 @@ Pure stdlib only (the YAML/pint loading is in ``loader.py``).
 """
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
 
 from domains.biosphere.atmosphere import build_atmosphere
@@ -41,6 +42,12 @@ from domains.biosphere.plants import build_plants
 from domains.biosphere.scenario import (
     DEFAULT_SCENARIO,
     SeasonScenario,
+)
+from domains.biosphere.scenario import (
+    PERENNIAL_CHAMBER_SCENARIO as PERENNIAL_CHAMBER_SCENARIO,
+)
+from domains.biosphere.scenario import (
+    PERENNIAL_CHAMBER_YEARS as PERENNIAL_CHAMBER_YEARS,
 )
 from domains.biosphere.scenario import (
     SEALED_CHAMBER_SCENARIO as SEALED_CHAMBER_SCENARIO,
@@ -284,3 +291,86 @@ def run_season(
         total_rationed += report.rationed
         events.extend(report.events)
     return states, total_rationed, tuple(events)
+
+
+def annual_reset(state: State, scenario: SeasonScenario) -> State:
+    """The annual phenology reset / re-sow (P3.4) — a pure, carbon-conserving transform.
+
+    At each year boundary the **old plant dies/harvests entirely to litter, except the
+    seedling carbon retained from the grain (the seed bank)**, and ``thermal_time``
+    resets so the new seedling develops from DVS 0:
+
+    * new ``leaf_c``/``stem_c``/``root_c`` := the scenario sowing amounts;
+    * ``storage_c`` (grain) := 0 (all of it is either re-sown or shed to litter);
+    * ``litter_carbon`` += the **balancing residual**
+      ``old_veg + grain − seedling_total`` (the senescence/maintenance idiom — balance
+      by construction, not an independent formula), so CARBON is conserved exactly and
+      the loss-sink is never touched;
+    * ``thermal_time`` := 0 (an aux accumulator, invisible to the conservation gate).
+
+    **Grain → 0 every year is what keeps the cycle sustained** (a seed bank that only
+    shed ``seedling_total`` would grow unboundedly and drain the active cycle — the
+    damped-cascade trap); the dumped grain decomposes (litter → microbial → CO₂) to
+    refuel next year's photosynthesis. **Carbon-only** — ``plant_n`` persists across the
+    death (an N *windfall* for the small seedling), harmless only while ``f_N ≡ 1``; a
+    full N-reset is a deferred refinement. **Sealed-chamber only:** it sheds to the
+    in-system ``litter_carbon`` POOL and re-sows from the in-system grain (the open
+    field has no closed loop to re-sow into).
+
+    Raises ``ValueError`` if the seed bank cannot cover a seedling
+    (``grain < seedling_total``) — re-sow would conjure carbon or drive ``storage_c``
+    negative (the closure caveat: the seedling's carbon comes from an in-system pool).
+    """
+    seedling = {
+        LEAF_C: scenario.leaf_c0,
+        STEM_C: scenario.stem_c0,
+        ROOT_C: scenario.root_c0,
+    }
+    seedling_total = scenario.leaf_c0 + scenario.stem_c0 + scenario.root_c0
+    stocks = dict(state.stocks)
+    grain = stocks[STORAGE_C].amount
+    if grain < seedling_total:
+        raise ValueError(
+            f"annual_reset: seed bank too small to re-sow — storage_c {grain!r} < "
+            f"seedling {seedling_total!r}; the seedling's carbon must come from the "
+            "in-system grain (closure caveat P3.4)"
+        )
+    old_veg = sum(stocks[oid].amount for oid in seedling)
+    for organ_id, amount in seedling.items():
+        stocks[organ_id] = replace(stocks[organ_id], amount=amount)
+    stocks[STORAGE_C] = replace(stocks[STORAGE_C], amount=0.0)
+    litter_gain = old_veg + grain - seedling_total  # the balancing residual
+    stocks[LITTER_CARBON] = replace(
+        stocks[LITTER_CARBON], amount=stocks[LITTER_CARBON].amount + litter_gain
+    )
+    aux = dict(state.aux)
+    aux[THERMAL_TIME] = 0.0
+    return replace(state, stocks=stocks, aux=aux)
+
+
+def run_perennial(
+    integrator: SeasonIntegrator,
+    state: State,
+    scenario: SeasonScenario,
+    resolver: SourceResolver,
+    dt: float,
+    steps: int,
+    *,
+    year: int,
+) -> tuple[list[State], int, tuple[Event, ...]]:
+    """:func:`run_season` with :func:`annual_reset` applied every ``year`` steps (P3.4).
+
+    The concrete perennial driver: builds the schedule closure (reset at each ``n`` with
+    ``n > 0 and n % year == 0``) and hands it to :func:`run_season`'s ``reset`` hook
+    (which re-asserts conservation across each reset). ``year`` is the season length in
+    steps (``len(weather)``, the tiling period). Sustained multi-year oscillation, no
+    control code — the carbon recycles through the closed loop and each reset re-sows
+    the seedling from the grain.
+    """
+
+    def reset(n: int, current: State) -> State:
+        if n > 0 and n % year == 0:
+            return annual_reset(current, scenario)
+        return current
+
+    return run_season(integrator, state, resolver, dt, steps, reset=reset)
