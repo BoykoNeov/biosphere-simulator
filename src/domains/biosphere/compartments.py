@@ -39,6 +39,8 @@ Pure stdlib only (a plain mapping, a frozenset rollup, and a per-step delta fold
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
+from simcore.boundary import BOUNDARY_DOMAIN
+from simcore.events import ExtinctionEvent
 from simcore.flow import FlowResult
 from simcore.ids import DomainId, StockId
 from simcore.quantities import Quantity
@@ -219,3 +221,43 @@ def compartment_boundary_ledger(
         )
         for domain, quantity in keys
     )
+
+
+def expected_extinction_residuals(
+    before: State,
+    events: Iterable[ExtinctionEvent],
+) -> dict[tuple[DomainId, Quantity], float]:
+    """The per-``(compartment, quantity)`` ledger correction for a step's extinctions.
+
+    Extinction (#6) is a **balanced non-flow** change
+    :func:`compartment_boundary_ledger` cannot see (it folds only flow legs): a
+    sub-threshold POPULATION stock snaps to 0 — its compartment loses the snapped
+    ``residual`` ``r`` that *no leg* withdrew — and the same ``r`` routes to the
+    ``boundary``-domain loss-sink (``boundary.loss.<q>``) that *no leg* deposited. So on
+    an extinction step the **raw** ledger residual is **+r for the organ's compartment**
+    and **−r for ``boundary``** (for the snapped quantity), every other
+    ``(compartment, quantity)`` still clean. This returns exactly that expected
+    correction so a caller asserts
+    ``abs(entry.residual − expected.get((entry.domain, entry.quantity), 0.0)) <= tol``.
+
+    Kept **separate** from :func:`compartment_boundary_ledger` deliberately: that
+    helper's "residual ≈ 0 by construction on a clean step" property is precisely what
+    makes a *nonzero* residual diagnostic, so folding the non-flow correction into it
+    would blunt the very check it exists for. The correction is its own named, testable
+    concern (reused wherever extinctions can fire — Step 6 perturbations).
+
+    ``before`` supplies each extinct stock's compartment — its ``domain`` label, read at
+    the start-of-step snapshot (extinction never moves a stock between compartments).
+    ``events`` are the step's extinctions (filter the run's flat tuple by
+    ``ExtinctionEvent.n`` — the *post-apply* step count; empty ⇒ ``{}``). The sign
+    matches the integrator's routing: ``residual`` is the snapped (normally positive)
+    amount, booked **+to the organ / −to ``boundary``**; extinctions sharing a
+    ``(compartment, quantity)`` accumulate.
+    """
+    expected: dict[tuple[DomainId, Quantity], float] = {}
+    for event in events:
+        organ = (before.stocks[event.stock].domain, event.quantity)
+        sink = (BOUNDARY_DOMAIN, event.quantity)
+        expected[organ] = expected.get(organ, 0.0) + event.residual
+        expected[sink] = expected.get(sink, 0.0) - event.residual
+    return expected

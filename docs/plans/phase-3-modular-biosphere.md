@@ -1,6 +1,6 @@
 # Phase 3 — Modular Biosphere / Consumers
 
-**Status: Steps 1–4 COMPLETE; Steps 5–7 not started.** Phases 0, 0.5, 1, and 2
+**Status: Steps 1–5 COMPLETE; Steps 6–7 not started.** Phases 0, 0.5, 1, and 2
 are complete and regression-pinned (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 This plan **locks the load-bearing Phase-3 decision** (the subsystem-hierarchy
 representation, P3.1) and **enumerates** the process steps as forward-pointers, each to
@@ -37,7 +37,25 @@ new `PERENNIAL_CHAMBER_SCENARIO` shows **sustained multi-year oscillation** — 
 maturity every year, a stable emergent period-2 limit cycle — genuinely closed (carbon
 loss-sink 0.0, `events == ()`), `rationed == 0`, four-quantity-conserved incl. across the
 discrete resets. Open + sealed goldens **byte-identical** (no regeneration); new perennial
-golden pinned; `git diff src/simcore/` **empty**; 870 tests pass. **Next: Step 5.**
+golden pinned; `git diff src/simcore/` **empty**; 870 tests pass. **Step 5 (modular
+ecosystem assembly + per-compartment diagnostics, P3.1 ledger discharge) is COMPLETE** —
+the deferred half of P3.1 landed as a **diagnostics + verification** step (no new science,
+no behavior change, no new golden): the per-compartment boundary ledger now balances
+**every step / every quantity / every compartment** (boundary included, no whitelist) on
+the committed `PERENNIAL_CHAMBER_SCENARIO` — including the four annual-reset boundary steps
+(the before-step re-derived with `annual_reset`, mirroring `run_perennial`'s predicate
+verbatim; legs reconstructed test-side under Euler + `rationed == 0`, the Step-3
+precedent). The extinction exception (a balanced non-flow change the legs can't see: `+r`
+on the organ's compartment, `−r` on `boundary`) is discharged by a **hand-built
+deterministic** unit test + a small domain-side `expected_extinction_residuals` helper
+(probe: the sealed run does **not** go extinct over its horizon, so the optional sealed
+full-ledger test was dropped, as designed). Plus the emergent cross-compartment
+demonstration — CARBON genuinely *cycles* through PLANTS/SOIL/ATMOSPHERE (both crossing
+directions) and the chamber CO₂ pool draws down then recovers within each year (the
+reset→litter→decomposition→CO₂→regrowth cascade, direction-only). All three goldens
+**byte-identical** (no regeneration); the helper lives in `compartments.py` so
+`git diff src/simcore/` stays **empty**; 877 tests pass incl. the new
+`test_compartment_ledger`. **Next: Step 6.**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable
 compartments.* The headline is an **architectural upgrade**, not new physics: introduce a
@@ -363,11 +381,21 @@ Phase-1/2 rhythm.**
    (loss-sink stays 0.0). New behavior + golden; open + sealed goldens byte-identical.
    **Designed in full below (§ "Step 4 design") — advisor-reviewed; oscillation de-risked by
    a scratch probe before the design was committed.**
-5. **Modular sealed-ecosystem assembly + per-compartment diagnostics** — compose the full
-   compartmentalized biosphere; assert `Inputs = Outputs + ΔStored` per compartment every
-   step; a multi-year run exhibiting emergent cross-compartment dynamics (the exit
-   demonstration, short of decade-scale). **Designed in full below (§ "Step 5 design") —
-   advisor-reviewed.**
+5. **✅ COMPLETE — Modular sealed-ecosystem assembly + per-compartment diagnostics
+   (P3.1 ledger discharge)** — the assembly was already built (`PERENNIAL_CHAMBER_SCENARIO`
+   *is* the full closed 4-leaf ecosystem), so this was a **diagnostics + verification** step
+   (no new science, no behavior change, no new golden): the per-compartment boundary ledger
+   now balances `net crossing == ΔStored` **every step / every quantity / every compartment**
+   (boundary included) on the perennial run incl. the four reset-boundary steps; the
+   extinction exception discharged by a hand-built deterministic test + the domain-side
+   `expected_extinction_residuals` helper (the sealed run does not go extinct — probed — so
+   the optional sealed full-ledger test was dropped); plus the emergent cross-compartment
+   demonstration (CARBON cycles through every leaf both directions; chamber CO₂ draws down
+   then recovers per year). Legs reconstructed test-side (Euler + `rationed == 0`); all three
+   goldens byte-identical; `git diff src/simcore/` empty; new `test_compartment_ledger`.
+   **Designed in full below (§ "Step 5 design") — advisor-reviewed; the every-step residuals
+   (incl. boundary steps) and the no-extinction sealed finding de-risked by a scratch probe
+   before any assertion was pinned.**
 6. **Perturbation harness + representative perturbations (P3.5)** — drought, lighting
    failure, atmospheric leak; assert cascade-for-free + conservation + `rationed == 0`
    through each.
