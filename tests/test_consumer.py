@@ -64,6 +64,7 @@ from domains.biosphere.herbivory import (
     Grazing,
     HerbivoryParams,
 )
+from domains.biosphere.loader import load_herbivory_params
 from domains.biosphere.season import (
     CARBON_POOL,
     CONSUMER_CARBON,
@@ -541,3 +542,55 @@ def test_consumers_leaf_cycles_carbon_both_directions(consumer_run) -> None:
                 crossing_out += entry.crossing_out
     assert crossing_in > 0.0  # grazing in (plants → consumers)
     assert crossing_out > 0.0  # respiration + mortality out (→ atmosphere / soil)
+
+
+# --- loader (the committed params + the validation branches) ------------------
+
+
+def test_loader_reads_committed_rates() -> None:
+    # Pins the committed herbivory rates — which doubles as the guard that the YAML
+    # cannot silently drift away from the values the consumer golden was generated with
+    # (a drift would otherwise surface only as an opaque golden-byte mismatch).
+    params = load_herbivory_params()
+    assert params.grazing_rate == 0.004
+    assert params.respiration_rate == 0.02
+    assert params.mortality_rate == 0.01
+    assert params.o2_half_saturation == 0.0001
+
+
+def _herbivory_yaml(
+    *,
+    grazing: str = "0.004",
+    respiration: str = "0.02",
+    mortality: str = "0.01",
+    o2_unit: str = "mol/mol",
+) -> str:
+    return (
+        "name: chamber\nprocess: herbivory\nparameters:\n"
+        f'  grazing_rate:\n    value: {grazing}\n    unit: "1/day"\n'
+        '    source: "test"\n'
+        f'  respiration_rate:\n    value: {respiration}\n    unit: "1/day"\n'
+        '    source: "test"\n'
+        f'  mortality_rate:\n    value: {mortality}\n    unit: "1/day"\n'
+        '    source: "test"\n'
+        f'  o2_half_saturation:\n    value: 0.0001\n    unit: "{o2_unit}"\n'
+        '    source: "test"\n'
+    )
+
+
+def test_loader_rejects_negative_rate(tmp_path: Path) -> None:
+    # A negative rate would create carbon — rejected at the boundary (the generic
+    # `{field} must be >= 0` guard the loader shares with the other first-order rates).
+    bad = tmp_path / "herbivory.yaml"
+    bad.write_text(_herbivory_yaml(grazing="-0.01"), encoding="utf-8")
+    with pytest.raises(ValueError, match="grazing_rate must be >= 0"):
+        load_herbivory_params(bad)
+
+
+def test_loader_rejects_bad_unit(tmp_path: Path) -> None:
+    # The declared unit is exact-string guarded (the decomposition / microbial-resp
+    # discipline): a wrong unit is caught before pint ever runs.
+    bad = tmp_path / "herbivory.yaml"
+    bad.write_text(_herbivory_yaml(o2_unit="mmol/mol"), encoding="utf-8")
+    with pytest.raises(ValueError, match="must be declared in"):
+        load_herbivory_params(bad)
