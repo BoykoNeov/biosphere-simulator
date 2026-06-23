@@ -1,7 +1,7 @@
 # Phase 3 — Modular Biosphere / Consumers
 
-**Status: Steps 1–5 COMPLETE; Step 6 DESIGNED (§ "Step 6 design" below, advisor-reviewed
-+ scratch-probe de-risked) but NOT built; Step 7 not started.** Phases 0, 0.5, 1, and 2
+**Status: Steps 1–6 COMPLETE; Step 7 (optional stretch — minimal consumer) not started.**
+Phases 0, 0.5, 1, and 2
 are complete and regression-pinned (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 This plan **locks the load-bearing Phase-3 decision** (the subsystem-hierarchy
 representation, P3.1) and **enumerates** the process steps as forward-pointers, each to
@@ -56,8 +56,28 @@ directions) and the chamber CO₂ pool draws down then recovers within each year
 reset→litter→decomposition→CO₂→regrowth cascade, direction-only). All three goldens
 **byte-identical** (no regeneration); the helper lives in `compartments.py` so
 `git diff src/simcore/` stays **empty**; 878 tests pass incl. the new
-`test_compartment_ledger`. **Next: Step 6 — designed in full below (§ "Step 6 design"),
-advisor-reviewed and scratch-probe de-risked; ready to build.**
+`test_compartment_ledger`. **Step 6 (perturbation harness, P3.5) is COMPLETE** — a new
+domain-side `perturbations.py` (forcing-wrap helpers `window_override`/`with_forcing` +
+the `with_drought`/`with_lighting_failure`/`with_atmospheric_leak` builders + the windowed
+`LeakFlow`) composes perturbations **onto** the assembled `(state, registry, resolver)`
+outside `build_season`, so the three goldens stay **byte-identical** and `git diff
+src/simcore/` stays **empty** (zero core change, no new golden). Three representative
+perturbations each show a **cascade-for-free** (direction-only vs a baseline run, the
+Step-4/5 anti-flakiness rule): **drought** (open field, `DROUGHT_SCENARIO soil_water0=70`,
+irrigation cut `[30,130)`) — baseline `f_water ≡ 1` → cut drives `f_water ≈ 0.50` →
+biomass falls; **lighting_failure** (perennial chamber, PAR→0 `[30,80)`) — biomass stalls
++ chamber CO₂ *rises* (1.854→2.223); **atmospheric_leak** (perennial chamber, `carbon_pool
+→ leak_sink` `k=0.05` `[30,80)`) — `leak_sink` accumulates ~1.43, `carbon_pool`/`Ci`
+collapse, chamber opens (conservation still holds with the sink explicit — `_total` sums
+it). All keep `rationed == 0`, `events == ()`, four-quantity conservation; the
+per-compartment ledger balances **every step** under the **perturbed** resolver (the
+flagged leg-reconstruction bug avoided) for lighting + leak. Plus the hand-built
+two-extinction step (real integrator `report.events`, distinct residuals — discharges the
+`ea901d4` live-order forward-pointer), determinism re-runs (the no-golden insurance), and
+the reset-guard characterization (a full-year PAR blackout → `annual_reset` raises — the
+recoverable-regime boundary). 890 tests pass incl. the new `test_perturbations`; ruff +
+pyright clean. **Next: Step 7 (optional / stretch) — a minimal consumer, only if budget
+allows; otherwise Phase 3 exits here.**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable
 compartments.* The headline is an **architectural upgrade**, not new physics: introduce a
@@ -398,11 +418,22 @@ Phase-1/2 rhythm.**
    **Designed in full below (§ "Step 5 design") — advisor-reviewed; the every-step residuals
    (incl. boundary steps) and the no-extinction sealed finding de-risked by a scratch probe
    before any assertion was pinned.**
-6. **Perturbation harness + representative perturbations (P3.5)** — drought, lighting
-   failure, atmospheric leak; assert cascade-for-free + conservation + `rationed == 0`
-   through each. **Designed in full below (§ "Step 6 design") — advisor-reviewed; the
-   drought dead-band, the cascade directions, and the no-extinction / reset-guard regime
-   de-risked by a scratch probe before the design was committed (the Step-4/5 rhythm).**
+6. **✅ COMPLETE — Perturbation harness + representative perturbations (P3.5)** — the
+   domain-side `perturbations.py` (forcing-wrap helpers + the three perturbation builders +
+   the windowed `LeakFlow`) composes onto the assembled inputs; drought / lighting failure
+   / atmospheric leak each assert **cascade-for-free** (direction-only vs baseline) +
+   conservation + `rationed == 0` + the per-compartment ledger balances every step under
+   the **perturbed** resolver (lighting + leak); plus the hand-built two-extinction
+   live-order discharge, determinism re-runs, and the reset-guard characterization. Zero
+   core change, three goldens byte-identical, no new golden; 890 tests pass incl.
+   `test_perturbations`. **Designed in full below (§ "Step 6 design") — advisor-reviewed;
+   the drought dead-band, the cascade directions, and the no-extinction / reset-guard
+   regime de-risked by a scratch probe (the Step-4/5 rhythm). Implementation note: the
+   drought window landed at `[30, 130)` (not the `[30, 80)` the design cites for
+   lighting/leak) — open field has no annual reset, so its window is unconstrained, and the
+   wider window reproduces the design's probed `f_water ≈ 0.52` / `soil_water ≈ 41` deep
+   drawdown the `[30, 80)` window only grazes; lighting + leak keep `[30, 80)` (the
+   recoverable regime).**
 7. **(Optional / stretch) A minimal consumer** — one herbivore proving the trophic pattern
    (graze plant biomass → consumer biomass → respiration CO₂ + death-to-litter); full
    trophic webs deferred. Only if Steps 1–6 land with budget to spare.

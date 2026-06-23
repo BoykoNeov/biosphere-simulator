@@ -8,15 +8,20 @@ station sim that runs the *same* simulation headless.
 **Source of truth for current work:** Phases 0, 0.5, 1, and 2 are **complete**
 (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 **In progress: Phase 3 — the subsystem hierarchy / multi-compartment structure**
-(`docs/plans/phase-3-modular-biosphere.md` — Steps 1–5 COMPLETE (hierarchy representation +
+(`docs/plans/phase-3-modular-biosphere.md` — Steps 1–6 COMPLETE (hierarchy representation +
 reusable compartment builders: `season.py` split into `scenario`/`stocks`/`atmosphere`/`soil`/`plants`/`water`;
 water cycle closed, P3.3 — `soil_water`→`water_vapor`→`condensate`→`soil_water`, sealed now
 closed for all four quantities; P3.4 closure-preserving mortality + annual reset — `annual_reset`
 driver transform + `PERENNIAL_CHAMBER_SCENARIO` → sustained multi-year oscillation, death routes
 to litter not the loss-sink; P3.1 ledger discharge / Step 5 — per-compartment boundary ledger
 balances every step/quantity/compartment on the perennial run, extinction exception via the
-`expected_extinction_residuals` helper, all diagnostics-only with no behavior change);
-**next Step 6** (perturbation harness, P3.5); roadmap `roadmap_extracted.txt`).
+`expected_extinction_residuals` helper, all diagnostics-only with no behavior change;
+P3.5 perturbation harness / Step 6 — `perturbations.py` composes drought/lighting-failure/
+atmospheric-leak onto the assembled inputs outside `build_season`, each a cascade-for-free
+with conservation + `rationed == 0` + per-compartment ledger balanced under the perturbed
+resolver; zero core change, three goldens byte-identical, no new golden);
+**next Step 7** (optional / stretch — a minimal consumer; otherwise Phase 3 exits);
+roadmap `roadmap_extracted.txt`).
 Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

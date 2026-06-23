@@ -133,3 +133,17 @@ PERENNIAL_CHAMBER_SCENARIO: SeasonScenario = SeasonScenario(
     litter_carbon0=3.0,
 )
 PERENNIAL_CHAMBER_YEARS: int = 5
+
+# The Phase-3 Step-6 (P3.5) drought scenario: an **open-field** plot deliberately sized
+# **water-lean** so the irrigation-cut perturbation actually bites. The default open
+# field starts ``soil_water0 = 1000`` kg — a store so far above the stress band
+# (``sw_critical = 60``) that cutting irrigation never drops ``f_water`` below 1, i.e.
+# *no cascade* (the dead-band trap the advisor flagged and the Step-6 probe confirmed).
+# Here ``soil_water0 = 70`` kg sits just above ``sw_critical``: with irrigation on,
+# ``soil_water`` stays ≥ critical so baseline ``f_water ≡ 1`` (no spurious baseline
+# stress); cut irrigation over a window and the small daily transpiration draws
+# ``soil_water`` *below* the band, so ``f_water < 1`` and assimilation falls — the
+# drought cascade, emergent with no cascade code. Open field (``sealed=False``) is the
+# only scenario with irrigation to cut (the sealed chamber dropped it in Step 3 for
+# genuine water closure), so drought necessarily lives here. All other fields default.
+DROUGHT_SCENARIO: SeasonScenario = SeasonScenario(soil_water0=70.0)
