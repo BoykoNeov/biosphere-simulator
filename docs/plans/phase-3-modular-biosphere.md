@@ -1,6 +1,6 @@
 # Phase 3 — Modular Biosphere / Consumers
 
-**Status: Steps 1–6 COMPLETE; Step 7 (optional stretch — minimal consumer) not started.**
+**Status: Steps 1–7 COMPLETE — Phase 3 exits.**
 Phases 0, 0.5, 1, and 2
 are complete and regression-pinned (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 This plan **locks the load-bearing Phase-3 decision** (the subsystem-hierarchy
@@ -76,8 +76,38 @@ two-extinction step (real integrator `report.events`, distinct residuals — dis
 `ea901d4` live-order forward-pointer), determinism re-runs (the no-golden insurance), and
 the reset-guard characterization (a full-year PAR blackout → `annual_reset` raises — the
 recoverable-regime boundary). 890 tests pass incl. the new `test_perturbations`; ruff +
-pyright clean. **Next: Step 7 (optional / stretch) — a minimal consumer, only if budget
-allows; otherwise Phase 3 exits here.**
+pyright clean. **Step 7 (minimal consumer, P3 capstone) is COMPLETE** — a fifth leaf
+compartment `biosphere.consumers` (`CONSUMERS` DomainId + parent-map entry, domain-side)
+holds one `consumer_carbon` POPULATION; the new `herbivory.py` ships three balanced flows
+that lift the codebase's existing minimal consumer (decomposition + microbial respiration
+— microbes eating *dead* litter) up **one trophic level**: `Grazing` (`leaf_c →
+consumer_carbon`, mirrors `Decomposition`), `ConsumerRespiration` (`consumer_carbon + O₂ →
+carbon_pool`, mirrors `MicrobialRespiration`), `ConsumerMortality` (`consumer_carbon →
+litter_carbon` — death-to-litter per P3.4, never the loss-sink, mirrors `Senescence`). All
+**first-order donor-controlled** (advisor-reviewed: bilinear Lotka-Volterra/Holling is the
+explicitly-deferred coupled-dynamics scope and would forfeit structural `rationed == 0` +
+closure + reset-guard safety; Step 7 proves a trophic *level composes*, not that it
+oscillates). A new `CONSUMER_CHAMBER_SCENARIO` (perennial chamber + `consumer=True`,
+`run_perennial` unchanged, `annual_reset` stays plant-only so the herbivore persists across
+the re-sow) sized by a **Step-4-style probe** (grazing 0.004, respiration 0.02, mortality
+0.01 1/day): the consumer **persists** (biomass min 0.0014 / max 0.034, tracking
+`consumer* = grazing·leaf/(respiration+mortality)`), the plant still **fills grain** so
+`annual_reset` never trips its seed-bank guard (the recoverable regime), genuinely closed
+(loss-sink 0.0, `events == ()`), `rationed == 0`, four-quantity conserved every step. The
+**emergent cascade** (probe finding, overturning the naive "litter up"): the consumer is a
+carbon *recycler/shunt* — grazing lowers `leaf_c`, the consumer respires the bulk straight
+back so `carbon_pool` *rises* (the "CO₂ up" signature), and litter is net-*lower* (carbon
+shunted to CO₂ faster than the senescence path); death-to-litter is real as a **flux** (the
+`ConsumerMortality` leg + the CONSUMERS→SOIL crossing), asserted via the per-compartment
+ledger, not as a higher stock. The per-compartment ledger balances **every step incl. the
+CONSUMERS leaf** (reset-aware reconstruction, Step-5/6 machinery), and CONSUMERS shows both
+crossing directions for CARBON (grazing in, respiration+mortality out). A new
+`herbivory.yaml` + `load_herbivory_params`; a new fourth golden
+(`test_regression_consumer_season`, gated on the pre-golden closure assert); the three
+producer-only goldens **byte-identical** (the `consumer` flag defaults False); `git diff
+src/simcore/` **empty** (zero core change). 918 tests pass incl. the new `test_consumer`;
+ruff + pyright clean. **Phase 3 exits — the genuinely-closed ecosystem now spans producer,
+decomposer, AND consumer trophic levels, exhibiting emergent behaviour.**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable
 compartments.* The headline is an **architectural upgrade**, not new physics: introduce a
@@ -434,9 +464,18 @@ Phase-1/2 rhythm.**
    wider window reproduces the design's probed `f_water ≈ 0.52` / `soil_water ≈ 41` deep
    drawdown the `[30, 80)` window only grazes; lighting + leak keep `[30, 80)` (the
    recoverable regime).**
-7. **(Optional / stretch) A minimal consumer** — one herbivore proving the trophic pattern
-   (graze plant biomass → consumer biomass → respiration CO₂ + death-to-litter); full
-   trophic webs deferred. Only if Steps 1–6 land with budget to spare.
+7. **✅ COMPLETE — A minimal consumer (P3 capstone)** — a fifth leaf compartment
+   `biosphere.consumers` (`CONSUMERS` DomainId + parent-map entry, domain-side) with one
+   `consumer_carbon` POPULATION + the new `herbivory.py` (three balanced first-order flows
+   — `Grazing` `leaf_c → consumer_carbon`, `ConsumerRespiration` `consumer_carbon + O₂ →
+   carbon_pool`, `ConsumerMortality` `consumer_carbon → litter_carbon`); the codebase's
+   existing minimal consumer (decomposition + microbial respiration) lifted one trophic
+   level. New `CONSUMER_CHAMBER_SCENARIO` (perennial + `consumer=True`), `consumers.py`
+   builder, `herbivory.yaml` + loader, a fourth golden; producer-only goldens
+   byte-identical, `git diff src/simcore/` empty. **Designed in full below (§ "Step 7
+   design") — advisor-reviewed (first-order donor control over bilinear); the recoverable
+   regime + persistence + cascade direction de-risked by a Step-4-style probe before any
+   assertion/golden was pinned.** Full trophic webs / multiple consumer levels deferred.
 
 ---
 
@@ -1442,3 +1481,144 @@ existing goldens byte-identical (no regeneration, no new golden)** + full suite 
 a year, magnitude bounded so the grain refills before the reset) — a severe perturbation
 trips the `annual_reset` seed-bank guard, which is the regime boundary, not a shippable
 cascade.**
+
+---
+
+## Step 7 design — a minimal consumer (the trophic pattern; P3 capstone)
+
+*Realizes the optional/stretch consumer step — **one herbivore** proving the trophic
+pattern the roadmap's "optional consumers" compartment names (graze plant biomass →
+consumer biomass → respiration CO₂ + death-to-litter). A **new behaviour** on a **new
+scenario** with a **new (fourth) golden**; the three producer-only goldens stay
+**byte-identical**. Advisor-reviewed; the recoverable regime, persistence, and cascade
+direction were **de-risked by a Step-4-style probe before any assertion/golden was
+pinned** (the Step-4/5/6 rhythm). Full trophic webs / multiple consumer levels stay
+deferred (Scope).*
+
+**The reframing: the consumer already exists, one level down.** The decomposer pair
+`Decomposition` (`k·litter_carbon → microbial_carbon`) + `MicrobialRespiration`
+(`m_resp·microbial_carbon + O₂ → CO₂`) **is** a minimal consumer — microbes eating *dead*
+litter, first-order on the resource, burning biomass back to CO₂. The herbivore is that
+exact pattern lifted **one trophic level** (eating *live* `leaf_c`) plus a death-to-litter
+leg. So Step 7 is mostly *composition of an existing pattern*, not new physics.
+
+### The load-bearing decision (P3.7-kinetics) — first-order **donor control**, not a bilinear functional response
+
+Grazing intake is **first-order donor-controlled** `graze = k_graze · leaf_c` (the
+`Decomposition` form), **not** the bilinear predator-prey `k · leaf_c · consumer_carbon`
+(Lotka–Volterra / Holling Type I). The bilinear form gives consumer-driven limit cycles —
+but (advisor-reviewed) that is the **explicitly deferred** coupled-dynamics scope, and it
+would forfeit three properties the engine treats as load-bearing:
+1. **Structural `rationed == 0`.** A bilinear leaf-withdrawal rate `k·consumer·dt` is
+   *dynamic* (scales with the consumer pool), not a fixed `k·dt < 1` — so positivity stops
+   being structural and becomes a sizing property.
+2. **Closure safety.** First-order intake keeps refilling the consumer while `leaf > 0`, so
+   it cannot collapse to its extinction threshold → no route to the BOUNDARY loss-sink →
+   "genuinely closed" is robust. A bilinear near-zero consumer could cross threshold.
+3. **Reset-guard safety.** A bounded, non-amplifying graze draw keeps the plant filling
+   grain so `annual_reset` does not trip its seed-bank `ValueError` (the Step-6
+   recoverable-regime boundary).
+
+Step 7 must prove a trophic **level composes** under conservation / closure / `rationed ==
+0` — not that it oscillates (emergence is already banked by Step-4 oscillation + Step-6
+cascades). The bilinear/Holling response, assimilation efficiency < 1 (egesta → litter),
+and multiple consumer levels are documented refinement seams.
+
+### The three flows (`herbivory.py`) — each mirrors an existing balanced flow
+
+- **Grazing** (`leaf_c → consumer_carbon`, mirrors `Decomposition`): single-currency
+  CARBON transfer (Σ legs = 0). `graze = k_graze · leaf_c · dt`.
+- **ConsumerRespiration** (`consumer_carbon + o2_pool → carbon_pool`, mirrors
+  `MicrobialRespiration` exactly): CARBON+OXYGEN balanced in one flow at PQ=1 (the P2.1
+  composition fold); three legs, the `f_O2` Monod self-limit reused from
+  `chamber.oxygen_limitation_factor`.
+- **ConsumerMortality** (`consumer_carbon → litter_carbon`, mirrors `Senescence`):
+  single-currency CARBON transfer to the in-system litter POOL — **death-to-litter** (P3.4
+  / #6), never the numerical loss-sink, so the chamber stays genuinely closed.
+
+All first-order donor-controlled (self-limiting → 0 as the donor pool → 0), so `rationed ==
+0` is structural (`rate·dt < 1`). At steady state `consumer* = grazing·leaf /
+(respiration + mortality)`, so consumer biomass **tracks food availability** — a genuine
+(if simple) donor-controlled trophic response.
+
+### The fifth leaf compartment + the scenario (zero core change)
+
+- **`biosphere.consumers`** — a fifth leaf `DomainId` (`CONSUMERS`) + its `BIOSPHERE_PARENTS`
+  entry, both domain-side in `compartments.py`. Holds the one `consumer_carbon` POPULATION
+  (pure CARBON, `extinction_threshold = 0` — the `organ_stock` constructor). Added to the
+  `STOCK_DOMAIN` partition spec.
+- **`consumers.py`** builder — `build_consumers(scenario, wiring)`, empty unless
+  `scenario.sealed and scenario.consumer`; reads `leaf_c`/`carbon_pool`/`o2_pool`/
+  `litter_carbon` from the **catalog** (no sibling-builder import, P3.3 — the `soil`
+  builder reads `CARBON_POOL`/`O2_POOL` the same way). Wired into `season._compartments`.
+- **`CONSUMER_CHAMBER_SCENARIO`** = the perennial chamber (`sealed=True`,
+  `litter_carbon0=3.0`) + `consumer=True` + a `consumer_c0` seed. `run_perennial`
+  unchanged; **`annual_reset` stays plant-only**, so the herbivore persists across the
+  annual re-sow (it is not culled at harvest — orthogonal to the plant reset, and the
+  reset's conservation gate still balances since it touches no consumer stock).
+- `herbivory.yaml` (three first-order rates + `o2_half_saturation`) + `load_herbivory_params`.
+- **Producer-only goldens byte-identical**: `consumer` defaults False everywhere else, so
+  `_compartments` adds an empty consumers build, `STOCK_DOMAIN` gains an unbuilt key, and
+  `BIOSPHERE_PARENTS` gains a leaf absent from `domain_index` (the `water`-open-field
+  precedent). `git diff src/simcore/` stays **empty**.
+
+### Probe → sizing (the Step-4 discipline) — the recoverable regime + the cascade-direction finding
+
+The probe found the **reset-guard cliff** the advisor predicted: grazing ≥ 0.008 1/day
+suppresses photosynthesis enough that the plant cannot fill grain → `annual_reset` raises.
+Shipped at **grazing 0.004, respiration 0.02, mortality 0.01** (1/day): year-1 grain ≈
+0.63 (≈ 4× the 0.16 seedling threshold — comfortably recoverable), the consumer persists
+(biomass min 0.0014 / max 0.034), `rationed == 0`, `events == ()`, loss-sink 0.0,
+four-quantity conserved.
+
+**The cascade direction overturned a naive assumption (the value of probing).** The
+expectation "litter higher (death)" is **wrong**: the consumer is a carbon
+**recycler/shunt** — it grazes leaf and respires the bulk straight back to CO₂
+(respiration > mortality), so vs a no-consumer baseline `leaf_c` is **lower**,
+`carbon_pool` is **higher** (the "CO₂ rises" signature, here from a respiring consumer),
+and `litter_carbon` is net-**lower** (carbon shunted to CO₂ faster than the slower
+senescence path). Death-to-litter is real as a **flux** (the `ConsumerMortality` leg + the
+CONSUMERS→SOIL crossing, both positive every step), asserted via the per-compartment
+ledger, not as a higher stock level. The shipped cascade asserts are therefore leaf↓ /
+CO₂↑ / consumer>0 (direction-only, matched-index, the Step-4/5/6 anti-flakiness rule).
+
+### Golden — a fourth golden (the Step-4 shape)
+
+A genuinely new runnable closed scenario with new behaviour → a hex-float golden
+(`test_regression_consumer_season`), gated behind the **pre-golden closure assert**
+(`rationed == 0` AND `events == ()` AND loss-sink 0.0) baked into its `_final_state`
+generator (the perennial-golden precedent). The no-golden alternative (Step-5/6 style) is
+also defensible since Phase 4 owns freeze-as-reference; the golden is the cheaper,
+consistent regression pin.
+
+### Test plan (`test_consumer.py` + extensions)
+
+- **Flow unit tests:** grazing & mortality are single-currency CARBON transfers (Σ = 0);
+  consumer respiration balances CARBON+OXYGEN (PQ=1); mortality routes to `litter_carbon`
+  (the in-system POOL), not the loss-sink; self-limiting + dt-linear.
+- **Run validation:** consumer persists (> 0 every step, non-trivial peak); genuine closure
+  (loss-sink 0.0, `events == ()`); `rationed == 0`; four-quantity conservation every step
+  (per-quantity tol); determinism re-run; `annual_reset` leaves `consumer_carbon` untouched.
+- **Cascade (direction-only vs the no-consumer baseline):** leaf↓, `carbon_pool`↑,
+  consumer>0 at a matched within-year index.
+- **Per-compartment ledger every step incl. the CONSUMERS leaf** (Step-5/6 machinery,
+  reset-aware reconstruction; `events == ()` ⇒ zero correction); CONSUMERS has **both**
+  crossing directions for CARBON (grazing in, respiration+mortality out — the cross-
+  compartment trophic cycling).
+- **Extensions:** `test_builders` (fifth builder + the consumer scenario + empty-unless-
+  enabled + `"consumers"` added to the no-sibling-import guard); `test_compartments` (the
+  five-leaf parent map + the partition realized by the maximal consumer scenario + the
+  consumers-leaf rollup). Purity gate green; **`git diff src/simcore/` empty**.
+
+### Acceptance gate
+
+`herbivory.py` (three balanced first-order flows) + `consumers.py` builder + the
+`CONSUMERS` leaf/parent-map + `CONSUMER_CHAMBER_SCENARIO` + `herbivory.yaml`/loader; the
+consumer **persists**, the plant **fills grain** (recoverable regime — `annual_reset` never
+raises), genuine closure (loss-sink 0.0, `events == ()`), `rationed == 0`, four-quantity
+conservation every step, the per-compartment ledger balances every step incl. CONSUMERS,
+the leaf↓/CO₂↑ cascade vs baseline, a new fourth golden gated on the closure assert, the
+three producer-only goldens byte-identical, full suite green, ruff + pyright clean, `git
+diff src/simcore/` empty. **The pre-golden closure assert + the recoverable-regime probe
+must pass before the golden is pinned — if grazing starves the grain, the scenario is
+out of regime; re-size, do not loosen.**

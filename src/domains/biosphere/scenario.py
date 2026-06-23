@@ -67,6 +67,17 @@ class SeasonScenario:
     # microbial respiration draws the (smaller) O₂ pool down a clear fraction toward its
     # floor (the Biosphere-2 soil-respiration O₂-depletion mechanism). Sealed-only.
     litter_carbon0: float = 0.0
+    # Minimal consumer (P3 Step 7). ``consumer=False`` keeps every producer-only run
+    # (open
+    # field, the sealed/perennial chambers) byte-identical — the consumers leaf stays
+    # empty and no consumer stock/flow is built. ``consumer=True`` (only meaningful with
+    # ``sealed=True`` — the consumer reads the chamber's ``carbon_pool``/``o2_pool`` and
+    # the soil's ``litter_carbon``) builds the one ``consumer_carbon`` POPULATION + the
+    # grazing / consumer-respiration / mortality flows. ``consumer_c0`` is the herbivore
+    # biomass at sowing (small, nonzero — a consumer present from t=0); first-order
+    # grazing would refill it from leaf even from 0, but a positive seed reads honestly.
+    consumer: bool = False
+    consumer_c0: float = 0.01  # mol C (sealed + consumer only)
     # water (PP, non-limiting): a store sized to stay above the band all season
     soil_water0: float = 1000.0  # kg
     # Sealed water cycle (P3.3/Step 3): initial vapor + condensate (kg). Default 0 — the
@@ -133,6 +144,27 @@ PERENNIAL_CHAMBER_SCENARIO: SeasonScenario = SeasonScenario(
     litter_carbon0=3.0,
 )
 PERENNIAL_CHAMBER_YEARS: int = 5
+
+# The Phase-3 Step-7 minimal-consumer chamber: the perennial sealed chamber plus **one
+# herbivore** (``consumer=True``) proving the trophic pattern (graze ``leaf_c`` →
+# consumer
+# biomass → respiration CO₂ + death-to-litter). The consumer composes onto the *same*
+# closed perennial ecosystem (``annual_reset`` stays plant-only — the herbivore persists
+# across the re-sow), so it inherits the sustained multi-year oscillation and the
+# genuine
+# closure (loss-sink 0.0). Sized (probe, the Step-4 rhythm) so the consumer **persists**
+# (consumer* = grazing·leaf/(respiration+mortality) tracks the leaf), the plant still
+# **fills grain** so ``annual_reset`` never trips its seed-bank guard (the recoverable
+# regime), and ``rationed == 0`` / ``events == ()`` / four-quantity conservation all
+# hold.
+# Its own new golden. The producer-only goldens (open / sealed / perennial) stay
+# byte-identical (``consumer`` defaults False everywhere else).
+CONSUMER_CHAMBER_SCENARIO: SeasonScenario = SeasonScenario(
+    sealed=True,
+    litter_carbon0=3.0,
+    consumer=True,
+)
+CONSUMER_CHAMBER_YEARS: int = 5
 
 # The Phase-3 Step-6 (P3.5) drought scenario: an **open-field** plot deliberately sized
 # **water-lean** so the irrigation-cut perturbation actually bites. The default open

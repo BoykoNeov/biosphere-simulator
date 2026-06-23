@@ -22,7 +22,13 @@ Imports only ``simcore`` + ``compartments`` (the leaf ``DomainId``s) — no buil
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from domains.biosphere.compartments import ATMOSPHERE, PLANTS, SOIL, WATER
+from domains.biosphere.compartments import (
+    ATMOSPHERE,
+    CONSUMERS,
+    PLANTS,
+    SOIL,
+    WATER,
+)
 from simcore.auxiliary import AuxProcess
 from simcore.flow import Flow
 from simcore.ids import DomainId, StockId
@@ -68,6 +74,13 @@ LITTER_N: StockId = StockId("biosphere.litter_n")
 # closing the ring soil → atmosphere → water → soil with no boundary crossing.
 WATER_VAPOR: StockId = StockId("biosphere.water_vapor")
 CONDENSATE: StockId = StockId("biosphere.condensate")
+# Sealed chamber minimal consumer (P3 Step 7): the one herbivore biomass pool, a pure
+# carbon POPULATION (the ``microbial_carbon`` analogue, one trophic level up). Grazing
+# transfers live ``leaf_c`` into it; consumer respiration burns it back to CO₂
+# (consuming
+# O₂); mortality routes it to ``litter_carbon`` (death-to-litter, P3.4 — never the
+# loss-sink). Sealed + consumer-enabled only.
+CONSUMER_CARBON: StockId = StockId("biosphere.consumer_carbon")
 CO2_RESP: StockId = StockId("boundary.co2_resp")
 VAPOR_SINK: StockId = StockId("boundary.vapor_sink")
 LITTER_SINK: StockId = StockId("boundary.litter_sink")
@@ -97,6 +110,7 @@ STOCK_DOMAIN: dict[StockId, DomainId] = {
     O2_POOL: ATMOSPHERE,
     WATER_VAPOR: ATMOSPHERE,  # transpired vapor (the water cycle's atmosphere leg)
     CONDENSATE: WATER,  # the WATER leaf's first stock (recovered condensate)
+    CONSUMER_CARBON: CONSUMERS,  # herbivore biomass (the CONSUMERS leaf's one stock)
 }
 
 # --- forcing var names (resolved through env.get, #16) ----------------------

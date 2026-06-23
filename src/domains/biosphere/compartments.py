@@ -1,13 +1,15 @@
 """The biosphere subsystem hierarchy (Phase-3 P3.1) — domain-side, ``simcore``-free.
 
-Phase 3 splits the monolithic ``biosphere`` domain into four **leaf compartments** —
-``atmosphere`` / ``soil`` / ``plants`` / ``water`` — under a ``biosphere`` root::
+Phase 3 splits the monolithic ``biosphere`` domain into leaf **compartments** —
+``atmosphere`` / ``soil`` / ``plants`` / ``water`` (and, with the Step-7 minimal
+consumer, ``consumers``) — under a ``biosphere`` root::
 
     biosphere
       |- biosphere.atmosphere
       |- biosphere.soil
       |- biosphere.plants
-      `- biosphere.water
+      |- biosphere.water
+      `- biosphere.consumers
 
 A compartment is **a ``DomainId`` namespace plus its stock membership and a parent**
 — *not* a rich class and *never* a sub-solver (the integrator stays global; one clock,
@@ -50,22 +52,35 @@ from simcore.state import State
 # The root grouping node. After the Phase-3 relabel NO stock carries this domain
 # directly — ``biosphere`` owns its stocks transitively, through the four leaves.
 BIOSPHERE: DomainId = DomainId("biosphere")
-# The four leaf compartments. ``water`` is declared up front but holds no stocks
-# until Step 3 closes the water cycle (``water_vapor`` / ``condensate``).
+# The leaf compartments. ``water`` is declared up front but holds no stocks until Step 3
+# closes the water cycle (``water_vapor`` / ``condensate``); ``consumers`` likewise
+# holds
+# no stocks until the Step-7 minimal consumer (``consumer_carbon``) is enabled — both
+# are
+# empty in the open field and the producer-only sealed runs (the goldens stay
+# byte-identical), so the leaf is declared here but populated only when its scenario
+# flag
+# is set.
 ATMOSPHERE: DomainId = DomainId("biosphere.atmosphere")
 SOIL: DomainId = DomainId("biosphere.soil")
 PLANTS: DomainId = DomainId("biosphere.plants")
 WATER: DomainId = DomainId("biosphere.water")
+CONSUMERS: DomainId = DomainId("biosphere.consumers")
 
 # The parent map: leaf-domain -> parent-domain. A flat two-level tree for now; deepens
 # as compartments gain sub-structure (and the helpers below are already transitive, so
 # a deeper tree needs no code change). This is the descriptor that, under the rejected
 # Option A, would be ``Registry(parents=...)``; here it is plain domain-side data.
+# ``consumers`` (Step 7) is parented here even though it owns stocks only when a
+# consumer
+# scenario is run — an absent-from-``domain_index`` leaf rolls up to nothing without
+# error (the ``water``-open-field precedent), so declaring it up front is free.
 BIOSPHERE_PARENTS: Mapping[DomainId, DomainId] = {
     ATMOSPHERE: BIOSPHERE,
     SOIL: BIOSPHERE,
     PLANTS: BIOSPHERE,
     WATER: BIOSPHERE,
+    CONSUMERS: BIOSPHERE,
 }
 
 

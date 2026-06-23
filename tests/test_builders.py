@@ -25,26 +25,29 @@ import pytest
 
 import domains.biosphere
 from domains.biosphere.atmosphere import build_atmosphere
-from domains.biosphere.compartments import ATMOSPHERE, PLANTS, SOIL, WATER
+from domains.biosphere.compartments import ATMOSPHERE, CONSUMERS, PLANTS, SOIL, WATER
+from domains.biosphere.consumers import build_consumers
 from domains.biosphere.plants import build_plants
 from domains.biosphere.scenario import (
+    CONSUMER_CHAMBER_SCENARIO,
     DEFAULT_SCENARIO,
     SEALED_CHAMBER_SCENARIO,
     SeasonScenario,
 )
 from domains.biosphere.season import build_season
 from domains.biosphere.soil import build_soil
-from domains.biosphere.stocks import CompartmentBuild, chamber_wiring
+from domains.biosphere.stocks import CONSUMER_CARBON, CompartmentBuild, chamber_wiring
 from domains.biosphere.water import build_water
 from simcore import boundary
 from simcore.boundary import BOUNDARY_DOMAIN
-from simcore.ids import DomainId
+from simcore.ids import DomainId, FlowId
 from simcore.quantities import Quantity
 
-_BUILDER_MODULES = ("atmosphere", "soil", "plants", "water")
+_BUILDER_MODULES = ("atmosphere", "soil", "plants", "water", "consumers")
 _SCENARIOS = [
     pytest.param(DEFAULT_SCENARIO, id="open"),
     pytest.param(SEALED_CHAMBER_SCENARIO, id="sealed"),
+    pytest.param(CONSUMER_CHAMBER_SCENARIO, id="consumer"),
 ]
 
 
@@ -56,6 +59,7 @@ def _builds(scenario: SeasonScenario) -> dict[str, tuple[CompartmentBuild, Domai
         "soil": (build_soil(scenario, wiring), SOIL),
         "plants": (build_plants(scenario, wiring), PLANTS),
         "water": (build_water(scenario, wiring), WATER),
+        "consumers": (build_consumers(scenario, wiring), CONSUMERS),
     }
 
 
@@ -80,11 +84,15 @@ def test_each_builder_emits_only_its_own_leaf_modeled_stocks(
             )
 
 
-def test_sealed_build_populates_all_four_leaves() -> None:
-    # Non-vacuity: when sealed, every builder (incl. water, which owns ``condensate``
-    # once the Step-3 cycle is closed) genuinely owns modeled stocks (so the per-leaf
-    # check above is exercising real content, not passing on empty sets).
+def test_sealed_build_populates_all_four_producer_leaves() -> None:
+    # Non-vacuity: when sealed, every PRODUCER builder (incl. water, which owns
+    # ``condensate`` once the Step-3 cycle is closed) genuinely owns modeled stocks (so
+    # the per-leaf check above is exercising real content, not passing on empty sets).
+    # ``consumers`` is the optional Step-7 leaf — empty unless a consumer is enabled, so
+    # it is excluded here (covered by its own tests below).
     for name, (build, leaf) in _builds(SEALED_CHAMBER_SCENARIO).items():
+        if name == "consumers":
+            continue
         modeled = [s for s in build.stocks if s.domain != BOUNDARY_DOMAIN]
         assert modeled, f"{name} should own modeled stocks in the sealed chamber"
         assert all(s.domain == leaf for s in modeled)
@@ -97,6 +105,30 @@ def test_open_field_water_builder_is_empty() -> None:
     # empty").
     build, _ = _builds(DEFAULT_SCENARIO)["water"]
     assert build.stocks == () and build.flows == () and build.aux == ()
+
+
+def test_consumer_builder_empty_unless_consumer_enabled() -> None:
+    # The Step-7 consumer is the optional stretch leaf: empty in every producer-only run
+    # (open field AND the sealed/perennial chambers — ``consumer`` defaults False), so
+    # those goldens stay byte-identical and the consumers leaf holds no stocks/flows.
+    for scenario in (DEFAULT_SCENARIO, SEALED_CHAMBER_SCENARIO):
+        build, _ = _builds(scenario)["consumers"]
+        assert build.stocks == () and build.flows == () and build.aux == ()
+
+
+def test_consumer_chamber_populates_consumers_leaf() -> None:
+    # When enabled (sealed + consumer), the consumers builder owns exactly the one
+    # ``consumer_carbon`` POPULATION (stamped its CONSUMERS leaf) + the three trophic
+    # flows (grazing / consumer respiration / mortality), no boundary stock of its own.
+    build, leaf = _builds(CONSUMER_CHAMBER_SCENARIO)["consumers"]
+    assert [s.id for s in build.stocks] == [CONSUMER_CARBON]
+    assert build.stocks[0].domain == leaf == CONSUMERS
+    assert {f.id for f in build.flows} == {
+        FlowId("biosphere.grazing"),
+        FlowId("biosphere.consumer_respiration"),
+        FlowId("biosphere.consumer_mortality"),
+    }
+    assert build.aux == () and dict(build.shared) == {}
 
 
 # --- (2) the builders partition build_season (disjoint + complete) ----------

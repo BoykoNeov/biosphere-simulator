@@ -26,6 +26,7 @@ from domains.biosphere.allocation import (
 from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.decomposition import DecompositionParams
 from domains.biosphere.demo import DemoParams
+from domains.biosphere.herbivory import HerbivoryParams
 from domains.biosphere.microbial_respiration import MicrobialRespirationParams
 from domains.biosphere.mineralization import MineralizationParams
 from domains.biosphere.nitrogen import NitrogenParams
@@ -74,6 +75,9 @@ MINERALIZATION_PARAMS_PATH: Path = (
 # The committed chamber water-cycle params (P3 Step 3): the two first-order rates
 # (condensation + recycling) that close the water loop.
 WATER_CYCLE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "water_cycle.yaml"
+# The committed chamber minimal-consumer params (P3 Step 7): the three first-order rates
+# (grazing + consumer respiration + mortality) + the f_O2 O₂ half-saturation.
+HERBIVORY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "herbivory.yaml"
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
@@ -1249,4 +1253,91 @@ def load_water_cycle_params(
     return WaterCycleParams(
         condensation_rate=values["condensation_rate"],
         recycling_rate=values["recycling_rate"],
+    )
+
+
+# --- minimal consumer / herbivory (Phase-3 Step 7) ---------------------------
+# Same structured value/unit/source format as microbial_respiration. The three
+# first-order
+# rates (1/day) — grazing, consumer respiration, mortality — and the f_O2 O₂
+# half-saturation (mol/mol) are NOT conserved-Quantity canonical units, so each is a
+# schema-validated, bound-checked float whose declared ``unit`` is exact-string guarded
+# (the decomposition / microbial-respiration / senescence discipline). A zero rate is
+# valid (off); negative is rejected. ``o2_half_saturation`` is non-negative (0 disables
+# the f_O2 limit).
+
+# Expected canonical unit string per herbivory param (exact-match guard).
+_HERBIVORY_UNITS: dict[str, str] = {
+    "grazing_rate": "1/day",
+    "respiration_rate": "1/day",
+    "mortality_rate": "1/day",
+    "o2_half_saturation": "mol/mol",
+}
+
+
+class _HerbivoryValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _HerbivoryParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    grazing_rate: _HerbivoryValueUnit
+    respiration_rate: _HerbivoryValueUnit
+    mortality_rate: _HerbivoryValueUnit
+    o2_half_saturation: _HerbivoryValueUnit
+
+
+class _HerbivorySchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _HerbivoryParameters
+
+
+def _herbivory_value(params: _HerbivoryParameters, field: str) -> float:
+    """Read a herbivory param's value, exact-string guarding its declared unit."""
+    entry: _HerbivoryValueUnit = getattr(params, field)
+    expected = _HERBIVORY_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_herbivory_params(
+    path: str | Path = HERBIVORY_PARAMS_PATH,
+) -> HerbivoryParams:
+    """Load, schema- and bound-check the minimal-consumer params (P3 Step 7).
+
+    The three first-order rates (grazing intake, consumer respiration, mortality) and
+    the
+    ``f_O2`` O₂ half-saturation each carry a declared unit (exact-string guarded) and a
+    required ``source`` tag (clean-room discipline). Each rate must be non-negative
+    (0 = off; negative would create carbon); ``o2_half_saturation`` is non-negative
+    (0 disables the O₂ limit). Raises ``pydantic.ValidationError`` on a schema
+    violation,
+    ``ValueError`` on a bad unit or negative value.
+    """
+    schema = _HerbivorySchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _herbivory_value(params, field) for field in _HERBIVORY_UNITS}
+
+    for field, value in values.items():
+        if value < 0.0:
+            raise ValueError(f"{field} must be >= 0, got {value}")
+
+    return HerbivoryParams(
+        grazing_rate=values["grazing_rate"],
+        respiration_rate=values["respiration_rate"],
+        mortality_rate=values["mortality_rate"],
+        o2_half_saturation=values["o2_half_saturation"],
     )

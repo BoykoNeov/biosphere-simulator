@@ -1,0 +1,91 @@
+# chamber — minimal consumer (herbivory) first-order rate params (P3 Step 7)
+# Currency/units: CARBON (mol) + OXYGEN (mol, the respiration leg). The one herbivore is
+#   the codebase's existing minimal consumer (decomposition + microbial_respiration —
+#   microbes eating DEAD litter) lifted one trophic level: it eats LIVE leaf_c and routes
+#   its death to litter. Three first-order rates (1/day), each in its donor pool, close a
+#   trophic sub-loop with no control code:
+#     grazing_rate     leaf_c          → consumer_carbon   (graze live leaf into biomass)
+#     respiration_rate consumer_carbon → carbon_pool (+O₂) (metabolic cost back to CO₂)
+#     mortality_rate   consumer_carbon → litter_carbon     (death-to-litter, P3.4 / #6)
+#   Each flux is first-order in its donor (rate · pool, mol C/day), self-limiting (→ 0 as
+#   the pool → 0), so positivity is structural (rate·dt < 1 keeps the Euler backstop off).
+#   consumer_carbon stabilises where intake == losses: consumer* = grazing·leaf /
+#   (respiration + mortality), so the biomass TRACKS food availability — a genuine (if
+#   simple) donor-controlled trophic response, the Decomposition/MicrobialRespiration
+#   pattern one level up.
+#
+# The emergent cascade (Step-7 probe finding, direction-only — NOT a naive "litter up").
+#   The consumer is a carbon RECYCLER/shunt: it grazes leaf and respires the bulk of its
+#   intake straight back to CO2 (respiration > mortality), so vs a no-consumer baseline
+#   leaf_c is LOWER (grazed), consumer_carbon > 0, and carbon_pool is HIGHER (the consumer
+#   returns CO2 that photosynthesis would otherwise keep drawn down — the lighting-failure
+#   "CO2 rises" signature, here from a respiring consumer). litter_carbon is actually
+#   net-LOWER (carbon is shunted to CO2 via fast consumer respiration rather than
+#   accumulating through the slower senescence path); death-to-litter is real as a FLUX
+#   (the ConsumerMortality leg + the CONSUMERS->SOIL crossing are positive every step),
+#   not as a higher stock level.
+#
+# Why first-order donor control, NOT a bilinear k·leaf·consumer functional response (the
+#   honest part, advisor-reviewed). The predator-prey (Lotka-Volterra / Holling Type I)
+#   form gives consumer-driven limit cycles — but that is the EXPLICITLY DEFERRED full
+#   trophic-web / coupled-dynamics scope, and it would forfeit three load-bearing engine
+#   properties: structural rationed == 0 (a bilinear leaf-withdrawal rate k·consumer·dt is
+#   dynamic, not a fixed k·dt < 1); closure safety (a near-zero consumer could cross its
+#   extinction threshold → route to the BOUNDARY loss-sink → break "genuinely closed");
+#   and reset-guard safety (an amplifying graze draw makes it harder to keep the plant
+#   filling grain for annual_reset). First-order is the established minimal idiom
+#   (decomposition.yaml / senescence.yaml) and is exactly what Step 7 must prove — a
+#   trophic LEVEL composes under conservation / closure / rationed == 0, not that it
+#   oscillates. The bilinear/Holling response is a documented refinement seam.
+#
+# The O₂ self-limitation Michaelis factor f_O2 = x_O2/(K_O2 + x_O2) (o2_half_saturation
+#   below; chamber.oxygen_limitation_factor) self-throttles consumer respiration on a
+#   depleting O₂ pool — the microbial_respiration.yaml precedent. The perennial chamber is
+#   ample-O₂ (210 mol), so f_O2 ≈ 1 here (low/sharp K_O2); it is load-bearing only as O₂
+#   approaches its floor.
+#
+# Units discipline (P4 / config/units.py): the first-order rates (1/day) are NOT a
+#   conserved-Quantity canonical unit, so each is a schema-validated, bound-checked float
+#   carrying a declared unit (exact-string guarded at the loader, like decomposition's
+#   decomposition_rate / microbial_respiration's m_resp / senescence's rdr_*). A zero rate
+#   is valid (no grazing / no respiration / no mortality); negative is rejected.
+#
+# Deferred seams (documented in herbivory.py): the bilinear/Holling functional response;
+#   assimilation efficiency < 1 (egesta/feces routed straight to litter rather than the 1:1
+#   intake → biomass here); consumer phenology; and multiple consumer levels / full
+#   trophic webs.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#   All numeric VALUES are provisional, literature-typical placeholders pending the
+#   validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] Lotka, A.J. (1925), "Elements of Physical Biology", Williams & Wilkins, Baltimore
+#       (the linear functional response — first-order donor-controlled intake — and
+#       first-order consumer mortality). The bilinear interaction term is the deferred
+#       refinement; the donor-controlled limit is the minimal pick.
+#   [B] First-order biomass respiration/turnover is the standard consumer/decomposer
+#       treatment (e.g. the CENTURY-family microbial-pool turnover: Parton, W.J. et al.
+#       (1987), Soil Sci. Soc. Am. J. 51:1173-1179) — here applied to the consumer pool.
+
+name: chamber
+process: herbivory
+
+parameters:
+  grazing_rate:
+    value: 0.004
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical first-order grazing intake constant k_graze (the donor-controlled linear functional response, ~0.4%/day of standing leaf — sized (Step-7 probe) to keep the plant filling grain so annual_reset stays in the recoverable regime) [A]; primary citation pending validation gate"
+  respiration_rate:
+    value: 0.02
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical first-order consumer respiration constant c_resp (metabolic turnover ~50 days) [B]; primary citation pending validation gate"
+  mortality_rate:
+    value: 0.01
+    unit: "1/day"
+    source: "TODO(cite) — provisional, literature-typical first-order consumer mortality constant (death-to-litter, lifespan ~100 days) [A]; primary citation pending validation gate"
+  o2_half_saturation:
+    value: 0.0001
+    unit: "mol/mol"
+    source: "TODO(cite) — provisional, low/sharp O2 half-saturation (mole fraction) for the f_O2 self-limit (chamber.oxygen_limitation_factor), mirroring microbial_respiration.yaml; f_O2 ~ 1 until near-anoxia at the ample-O2 perennial fill; primary citation pending validation gate"

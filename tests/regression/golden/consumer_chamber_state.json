@@ -1,0 +1,232 @@
+{
+  "aux": {
+    "thermal_time": "0x1.975c28f5c28f3p+11"
+  },
+  "n": 1525,
+  "rng_seed": "0x0",
+  "stocks": [
+    {
+      "amount": "0x1.9aa0ebeffcc66p+0",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0",
+        "oxygen": "0x1.0000000000000p+1"
+      },
+      "domain": "biosphere.atmosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.carbon_pool",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.d0055eb898f15p+2",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.water",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.condensate",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.78b32c20bc9e8p-9",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.consumers",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.consumer_carbon",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.08076df3dea63p-7",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.leaf_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.8f2d8e02f5428p-3",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.litter_carbon",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.9999ae543d833p-5",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.litter_n",
+      "kind": "pool",
+      "quantity": "nitrogen",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.5bf5a2952ae1bp-4",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.microbial_carbon",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.a18186dc595f0p+7",
+      "composition": {
+        "oxygen": "0x1.0000000000000p+1"
+      },
+      "domain": "biosphere.atmosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.o2_pool",
+      "kind": "pool",
+      "quantity": "oxygen",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.33333d908527ep-3",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.plant_n",
+      "kind": "pool",
+      "quantity": "nitrogen",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.ef34acd71f6f9p-4",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.root_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.9133332b6d35cp+6",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.soil_n",
+      "kind": "pool",
+      "quantity": "nitrogen",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.ec0c7a2d40e68p+9",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.soil_water",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.2efa3e3e8b1d7p-2",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.stem_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.37253e2c42fdap+0",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.storage_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.14dec55379ccep+3",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.atmosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.water_vapor",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x0.0p+0",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.loss.carbon",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x0.0p+0",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.n_source",
+      "kind": "boundary",
+      "quantity": "nitrogen",
+      "unclamped": true,
+      "unit": "kg"
+    }
+  ],
+  "version": 3
+}

@@ -7,8 +7,8 @@ station sim that runs the *same* simulation headless.
 
 **Source of truth for current work:** Phases 0, 0.5, 1, and 2 are **complete**
 (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
-**In progress: Phase 3 — the subsystem hierarchy / multi-compartment structure**
-(`docs/plans/phase-3-modular-biosphere.md` — Steps 1–6 COMPLETE (hierarchy representation +
+**Phase 3 — the subsystem hierarchy / multi-compartment structure — is COMPLETE (exits)**
+(`docs/plans/phase-3-modular-biosphere.md` — Steps 1–7 COMPLETE (hierarchy representation +
 reusable compartment builders: `season.py` split into `scenario`/`stocks`/`atmosphere`/`soil`/`plants`/`water`;
 water cycle closed, P3.3 — `soil_water`→`water_vapor`→`condensate`→`soil_water`, sealed now
 closed for all four quantities; P3.4 closure-preserving mortality + annual reset — `annual_reset`
@@ -19,9 +19,14 @@ balances every step/quantity/compartment on the perennial run, extinction except
 P3.5 perturbation harness / Step 6 — `perturbations.py` composes drought/lighting-failure/
 atmospheric-leak onto the assembled inputs outside `build_season`, each a cascade-for-free
 with conservation + `rationed == 0` + per-compartment ledger balanced under the perturbed
-resolver; zero core change, three goldens byte-identical, no new golden);
-**next Step 7** (optional / stretch — a minimal consumer; otherwise Phase 3 exits);
-roadmap `roadmap_extracted.txt`).
+resolver; zero core change, three goldens byte-identical, no new golden;
+Step 7 minimal consumer — a fifth leaf `biosphere.consumers` + `herbivory.py` (first-order
+`Grazing`/`ConsumerRespiration`/`ConsumerMortality`, the decomposer pattern one trophic level
+up), `CONSUMER_CHAMBER_SCENARIO`, fourth golden; consumer persists, genuinely closed,
+`rationed == 0`, leaf↓/CO₂↑ cascade, per-compartment ledger balanced incl. CONSUMERS; zero
+core change, three producer-only goldens byte-identical);
+**Phase 3 exits — next is Phase 4** (decade-scale stability + freeze-as-reference, held out
+of Phase 3 scope); roadmap `roadmap_extracted.txt`).
 Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

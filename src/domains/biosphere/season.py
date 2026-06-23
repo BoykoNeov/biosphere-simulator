@@ -37,8 +37,15 @@ from dataclasses import replace
 from datetime import date
 
 from domains.biosphere.atmosphere import build_atmosphere
+from domains.biosphere.consumers import build_consumers
 from domains.biosphere.plants import _carbon_context as _carbon_context
 from domains.biosphere.plants import build_plants
+from domains.biosphere.scenario import (
+    CONSUMER_CHAMBER_SCENARIO as CONSUMER_CHAMBER_SCENARIO,
+)
+from domains.biosphere.scenario import (
+    CONSUMER_CHAMBER_YEARS as CONSUMER_CHAMBER_YEARS,
+)
 from domains.biosphere.scenario import (
     DEFAULT_SCENARIO,
     SeasonScenario,
@@ -80,6 +87,9 @@ from domains.biosphere.stocks import (
 )
 from domains.biosphere.stocks import (
     CONDENSATE as CONDENSATE,
+)
+from domains.biosphere.stocks import (
+    CONSUMER_CARBON as CONSUMER_CARBON,
 )
 from domains.biosphere.stocks import (
     LEAF_C as LEAF_C,
@@ -156,6 +166,7 @@ def _compartments(scenario: SeasonScenario) -> tuple[CompartmentBuild, ...]:
         build_soil(scenario, wiring),
         build_plants(scenario, wiring),
         build_water(scenario, wiring),
+        build_consumers(scenario, wiring),
     )
 
 

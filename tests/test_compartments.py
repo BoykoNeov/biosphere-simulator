@@ -19,6 +19,7 @@ from domains.biosphere.compartments import (
     ATMOSPHERE,
     BIOSPHERE,
     BIOSPHERE_PARENTS,
+    CONSUMERS,
     PLANTS,
     SOIL,
     WATER,
@@ -28,6 +29,8 @@ from domains.biosphere.compartments import (
 )
 from domains.biosphere.season import (
     CONDENSATE,
+    CONSUMER_CARBON,
+    CONSUMER_CHAMBER_SCENARIO,
     SEALED_CHAMBER_SCENARIO,
     STOCK_DOMAIN,
     WATER_VAPOR,
@@ -39,7 +42,7 @@ from simcore.ids import DomainId, StockId
 from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.state import State, Stock
 
-LEAVES = frozenset({ATMOSPHERE, SOIL, PLANTS, WATER})
+LEAVES = frozenset({ATMOSPHERE, SOIL, PLANTS, WATER, CONSUMERS})
 
 
 def _modeled_ids(stocks: Mapping[StockId, Stock]) -> frozenset[StockId]:
@@ -51,22 +54,28 @@ def _modeled_ids(stocks: Mapping[StockId, Stock]) -> frozenset[StockId]:
 
 
 def test_parent_map_is_flat_two_level_tree_under_biosphere() -> None:
-    # Exactly the four leaves are declared, each parented to the biosphere root.
+    # Exactly the five leaves are declared (the four producer leaves + the optional
+    # Step-7 ``consumers`` leaf), each parented to the biosphere root.
     assert set(BIOSPHERE_PARENTS) == set(LEAVES)
     assert set(BIOSPHERE_PARENTS.values()) == {BIOSPHERE}
     # The root is not itself a leaf (it owns stocks only transitively).
     assert BIOSPHERE not in BIOSPHERE_PARENTS
 
 
-# --- the relabel partition (sealed = all fourteen modeled stocks) -----------
+# --- the relabel partition (consumer chamber = all fifteen modeled stocks) ---
 # (12 carbon/N/water modeled stocks from Phases 1/2 + the two Step-3 water-cycle stocks
-# ``water_vapor`` (atmosphere) and ``condensate`` (water).)
+# ``water_vapor`` (atmosphere) / ``condensate`` (water) + the Step-7 ``consumer_carbon``
+# (consumers). The CONSUMER_CHAMBER_SCENARIO is the maximal build — it instantiates
+# every
+# modeled stock the ``STOCK_DOMAIN`` table assigns, including the consumer the
+# sealed/perennial chambers leave out.)
 
 
 def test_relabel_partitions_modeled_stocks_into_leaves() -> None:
-    state, _ = build_season(SEALED_CHAMBER_SCENARIO)
+    state, _ = build_season(CONSUMER_CHAMBER_SCENARIO)
     modeled = _modeled_ids(state.stocks)
-    # The sealed build instantiates exactly the modeled stocks the table assigns.
+    # The maximal (consumer) build instantiates exactly the modeled stocks the table
+    # assigns.
     assert modeled == set(STOCK_DOMAIN)
     # Each modeled stock carries the leaf its table entry names; every leaf is declared.
     for sid in modeled:
@@ -120,6 +129,27 @@ def test_water_compartment_populated_when_sealed_empty_when_open() -> None:
     open_di = open_reg.domain_index
     assert WATER not in open_di
     assert descendant_stocks(open_di, BIOSPHERE_PARENTS, WATER) == frozenset()
+
+
+def test_consumers_compartment_populated_when_enabled_empty_otherwise() -> None:
+    # The Step-7 consumer leaf: declared up front, owns ``consumer_carbon`` only when a
+    # consumer scenario is run; in every producer-only build it is absent from the index
+    # and rolls up to nothing — without error (the ``water``-open-field precedent). The
+    # root rollup still picks it up transitively when present.
+    cons, cons_reg = build_season(CONSUMER_CHAMBER_SCENARIO)
+    di = cons_reg.domain_index
+    assert di[CONSUMERS] == frozenset({CONSUMER_CARBON})
+    assert descendant_stocks(di, BIOSPHERE_PARENTS, CONSUMERS) == frozenset(
+        {CONSUMER_CARBON}
+    )
+    assert cons.stocks[CONSUMER_CARBON].domain == CONSUMERS
+    assert CONSUMER_CARBON in descendant_stocks(di, BIOSPHERE_PARENTS, BIOSPHERE)
+    # The sealed/perennial chambers (no consumer) leave the leaf empty: absent from the
+    # index, rolling up to nothing.
+    _, sealed_reg = build_season(SEALED_CHAMBER_SCENARIO)
+    sealed_di = sealed_reg.domain_index
+    assert CONSUMERS not in sealed_di
+    assert descendant_stocks(sealed_di, BIOSPHERE_PARENTS, CONSUMERS) == frozenset()
 
 
 def test_flat_default_reproduces_domain_index() -> None:
