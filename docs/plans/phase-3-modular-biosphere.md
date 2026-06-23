@@ -1,6 +1,7 @@
 # Phase 3 — Modular Biosphere / Consumers
 
-**Status: Steps 1–5 COMPLETE; Steps 6–7 not started.** Phases 0, 0.5, 1, and 2
+**Status: Steps 1–5 COMPLETE; Step 6 DESIGNED (§ "Step 6 design" below, advisor-reviewed
++ scratch-probe de-risked) but NOT built; Step 7 not started.** Phases 0, 0.5, 1, and 2
 are complete and regression-pinned (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber}.md`).
 This plan **locks the load-bearing Phase-3 decision** (the subsystem-hierarchy
 representation, P3.1) and **enumerates** the process steps as forward-pointers, each to
@@ -55,7 +56,8 @@ directions) and the chamber CO₂ pool draws down then recovers within each year
 reset→litter→decomposition→CO₂→regrowth cascade, direction-only). All three goldens
 **byte-identical** (no regeneration); the helper lives in `compartments.py` so
 `git diff src/simcore/` stays **empty**; 878 tests pass incl. the new
-`test_compartment_ledger`. **Next: Step 6.**
+`test_compartment_ledger`. **Next: Step 6 — designed in full below (§ "Step 6 design"),
+advisor-reviewed and scratch-probe de-risked; ready to build.**
 
 **Goal (roadmap lines 270–303):** *Assemble a complete ecosystem from reusable
 compartments.* The headline is an **architectural upgrade**, not new physics: introduce a
@@ -398,7 +400,9 @@ Phase-1/2 rhythm.**
    before any assertion was pinned.**
 6. **Perturbation harness + representative perturbations (P3.5)** — drought, lighting
    failure, atmospheric leak; assert cascade-for-free + conservation + `rationed == 0`
-   through each.
+   through each. **Designed in full below (§ "Step 6 design") — advisor-reviewed; the
+   drought dead-band, the cascade directions, and the no-extinction / reset-guard regime
+   de-risked by a scratch probe before the design was committed (the Step-4/5 rhythm).**
 7. **(Optional / stretch) A minimal consumer** — one herbivore proving the trophic pattern
    (graze plant biomass → consumer biomass → respiration CO₂ + death-to-litter); full
    trophic webs deferred. Only if Steps 1–6 land with budget to spare.
@@ -1186,3 +1190,224 @@ narrative + all three existing goldens byte-identical (**no regeneration, no new
 full suite green + `git diff src/simcore/` empty. **The probe (perennial residuals within
 tol on every step incl. the boundary steps) must pass before any assertion is pinned — if a
 boundary step shows a residual, find the reconstruction bug, do not loosen the tol.**
+
+---
+
+## Step 6 design — perturbation harness + representative perturbations (P3.5)
+
+*Realizes P3.5 — the **perturbation harness** and **2–3 representative perturbations**, each
+showing a **cascade with no cascade code** while **conservation + `rationed == 0`** hold
+through the perturbation. The harness is **diagnostics + new scenario-layer interventions**,
+not a core change: it composes perturbations **onto** the already-assembled
+`(state, registry, resolver)` outside `build_season`, so the three existing goldens and
+`src/simcore/` are untouched (`git diff src/simcore/` stays empty). **No new golden** (a
+perturbation is a behavioural demonstration, not a frozen reference trajectory — Phase 4
+freezes; the Step-5 "diagnostics, no golden" precedent). Advisor-reviewed; the drought
+dead-band, the cascade directions, and the no-extinction / reset-guard regime were
+**de-risked by a scratch probe before this design was committed** (the Step-4/5 discipline;
+the probe numbers are the load-bearing evidence below).*
+
+### The load-bearing decision (P3.5-harness) — a perturbation is a **forcing-schedule intervention** (#14), composed onto the assembled inputs
+
+Every perturbation reduces to a **pure function of the integer step `n`** — the legitimate
+forcing seam (#14: schedules take `(n, dt)`, evaluated at `t = n·dt`). The harness is a new
+domain-side module `domains/biosphere/perturbations.py` (all new code under
+`domains/biosphere/` — the acceptance check). **Two seam-types, both already legitimate:**
+
+1. **Forcing perturbation** (lighting failure, drought) — a pure `SourceResolver` transform
+   that wraps **one** forcing var's `Schedule` with a windowed override and rebuilds the
+   resolver with that var replaced. **No new stock / flow / sink; the ledger structure is
+   untouched** (only a forcing *value* changes), so conservation is structurally unaffected.
+   ```python
+   def window_override(base, *, start, end, value):       # value in [start, end), else base
+       def sched(n, dt): return value if start <= n < end else base(n, dt)
+       return sched
+   def with_forcing(resolver, var, sched) -> SourceResolver:   # rebuild, one var replaced
+       return SourceResolver(forcings={**dict(resolver.forcings), var: sched},
+                             shared=dict(resolver.shared))      # disjointness preserved
+   ```
+2. **Flow perturbation** (atmospheric leak) — augments `(state, registry)` with a `LeakFlow`
+   + a boundary leak-sink stock, the leak's **timing gated by a windowed forcing var** read
+   via `env.get` (so the calendar lives in a *schedule*, not the rate law — honouring the
+   Step-4 "no calendar in a flow body" discipline; the flow itself is a pure rate law). The
+   leak var (`LEAK_VAR`) is **local to `perturbations.py`, never added to the `stocks.py`
+   catalog** — baseline assembly must never see it, or the existing goldens are touched.
+   ```python
+   class LeakFlow:  # first-order donor control; timing via env.get(leak_var)
+       def evaluate(self, snapshot, env, dt):
+           amt = self.k_leak * snapshot.stocks[self.pool].amount * env.get(self.leak_var) * dt
+           return FlowResult(legs=(Leg(self.pool, -amt), Leg(self.sink, amt)))
+   ```
+
+**Rejected — a `Perturbation` protocol / dataclass with `.apply(state, registry, resolver)`.**
+Speculative generality for 2–3 perturbations (the same critique that killed the Step-5
+observe-hook): three small builder functions + the two shared helpers above are leaner and
+add no surface for a consumer that doesn't exist. B→protocol later is additive if a real
+multi-perturbation composition need appears.
+
+### The three perturbations — scenario assignment is **asymmetric** (name it), cascades verified against the wiring
+
+| Perturbation | Scenario | Mechanism | Cascade (emergent, no cascade code) |
+|---|---|---|---|
+| **drought** | **open field** (the only scenario with irrigation) | `with_forcing(IRRIGATION_VAR → 0)` over a window | `soil_water` drains → `water_stress_factor` `f_water < 1` → `limitation = f_water·f_N` cuts gross assimilation → biomass falls |
+| **lighting_failure** | **perennial chamber** | `with_forcing(PAR_VAR → 0)` over a within-year window | FvCB `J → 0` (`I₂ = α·PAR`) → `Ag → 0` → growth stalls, O₂ production drops, `carbon_pool` stops drawing down (CO₂ *rises*) |
+| **atmospheric_leak** | **perennial chamber** | `LeakFlow` `carbon_pool → leak_sink`, windowed | pool drains to boundary → `Ci = ci_from_co2_pool` falls → assimilation weakens; chamber **no longer closed** (the leak-sink accounts the lost mass) |
+
+- **The asymmetry is forced, not a smell.** `Irrigation`/`water_source` exist **only
+  open-field** (sealed dropped them in Step 3 for genuine water closure), so a "cut
+  irrigation" drought can only live on the open field. Lighting + leak target the closed
+  chamber — where the per-compartment-ledger-under-perturbation story actually matters.
+  **State this explicitly** so a reader does not expect all three on the perennial chamber.
+- **The leak sink is a matching-composition BOUNDARY stock.** `carbon_pool` is a true CO₂
+  stock `{CARBON: 1, OXYGEN: 2}`, so the leak-sink is built with the **same** composition
+  (a `Stock(domain=boundary, kind=BOUNDARY, composition={CARBON:1, OXYGEN:2})`, the
+  atmosphere-builder idiom) — the leg is then per-quantity balanced and the gate folds it
+  exactly (probe-verified: OXYGEN drift ≤ 6e-13). The leak vents **both** CARBON and OXYGEN
+  (2:1), a two-quantity boundary loss — a richer closure demonstration than an O₂-only leak.
+
+### Kinetics + positivity (the leak)
+
+First-order donor control `leak = k_leak · carbon_pool · active(n) · dt`. Structural
+positivity: `→ 0` as the pool `→ 0`, and `k_leak·dt < 1` keeps the Euler backstop unfired
+(`rationed == 0`) with no `max(0, …)` clamp — the decomposition / condensation precedent.
+Probe-confirmed `rationed == 0` for `k_leak ∈ {0.02, 0.05, 0.1}` (`dt = 1`). Ship
+`k_leak ≈ 0.05` (`leak_sink` accumulates ~1.4 mol C over the window; `Ci@80` falls from the
+~693 baseline to ~340 — a clear, non-vacuous Ci↓ cascade without over-draining toward the
+reset-guard regime below).
+
+### The recoverable-regime constraint — the perturbation × annual-reset interaction (a probe finding)
+
+**Graceful cascades require the *recoverable* regime: a window within one year and a
+magnitude bounded so the plant refills its grain (`storage_c`) before the next annual
+reset.** The probe found the failure mode at the boundary: a **severe or permanent**
+perturbation (a high-`k` or never-ending leak, or a full-year PAR blackout) suppresses
+photosynthesis enough that grain never refills, and at the year boundary `annual_reset`
+**raises `ValueError: seed bank too small to re-sow`** (the P3.4 closure caveat: the seedling
+must come from an in-system pool). That is a **driver crash, not a cascade** — and arguably
+*correct* behaviour: a sealed chamber whose plant cannot rebuild its seed bank genuinely
+cannot re-sow. So the shipped perturbations stay transient (window within year 1, e.g.
+`[30, 80)` of the 305-step season; `soil_water0 ≈ 70`, `k_leak ≈ 0.05`). **Optional
+one-line characterization test** pinning "severe leak → `annual_reset` raises" to lock the
+closure-caveat × perturbation interaction — *not* a shipped perturbation, and not a
+scope to grow.
+
+### Probe result — the cascades are REAL and the dead-band trap is REAL (the de-risk)
+
+A scratch driver (the inline harness above) over the committed scenarios, Euler-daily:
+
+- **drought — the dead-band trap, then the fix.** On the **default** open field
+  (`soil_water0 = 1000`, `sw_critical = 60`) cutting irrigation leaves `f_water` pinned at
+  **1.0000** — *no cascade* (the scenario is sized to stay above the band all season; the
+  advisor's catch). On a **water-lean `DROUGHT_SCENARIO`** (`soil_water0 ≈ 70`, just above
+  `sw_critical`) the contrast is clean: **baseline `f_water ≡ 1.0000`**, irrigation-cut
+  drives `f_water` to **≈ 0.52** (`soil_water` 70 → 41) and end-of-season biomass
+  0.116 → 0.105. `rationed == 0`, `events == ()`. *The dead-band means drought's cascade is
+  the one not guaranteed by the wiring — it must push `soil_water` across a threshold, so the
+  scenario is sized to do so.*
+- **lighting_failure — growth stalls, CO₂ rises.** `PAR → 0` on `[30, 80)`: biomass@80
+  **0.428 → 0.162** (growth halted), `carbon_pool`@80 **1.854 → 2.223** (the pool *rises* —
+  photosynthesis stopped drawing it down). `rationed == 0`, `events == ()`, four-quantity
+  conservation drift ≤ 1e-12 (CARBON 4.9e-15).
+- **atmospheric_leak — Ci collapses, chamber opens.** `k_leak = 0.05` on `[30, 80)`:
+  `leak_sink` accumulates ~1.43 mol C (the chamber is no longer closed), `carbon_pool`@80
+  **1.854 → 0.486**, `Ci@80` **~693 → ~340**. `rationed == 0`, `events == ()`, CARBON drift
+  3e-15, OXYGEN drift 4e-13 (the two-quantity boundary loss balances).
+- **No perturbation fires extinction.** Organs have `extinction_threshold = 0.0` and
+  maintenance respiration self-limits (→ 0 as the organ → 0), so an organ **asymptotes toward
+  0 without crossing threshold**; a *stronger* perturbation hits the reset-guard regime
+  first. **The design therefore does not hinge on extinction** (P3.5 requires cascade +
+  conservation + `rationed == 0`, *never* death; Scope defers species removal). The
+  per-compartment ledger tests run with `events == ()` and assert generically — still
+  non-vacuous (real crossing flux, including the leak's ATMOSPHERE→boundary leg).
+
+### The per-compartment ledger under perturbation (reuse Step 5; one subtle bug to avoid)
+
+The Step-5 machinery carries over unchanged: reconstruct legs test-side (Euler +
+`rationed == 0`), classify by `stock.domain`, assert
+`abs(residual − expected_extinction_residuals(before, step_events)) ≤ tol[quantity]` every
+step. With `events == ()` the correction is `{}` and the raw residual must be ≈ 0.
+
+- **THE BUG TO AVOID (build-time flag):** leg reconstruction must bind the **perturbed**
+  resolver (the one carrying `LEAK_VAR` / the zeroed PAR or irrigation schedule) — *not* the
+  baseline resolver — or the reconstructed legs disagree with the applied legs on exactly the
+  perturbed steps, and the ledger spuriously mismatches. The #16 seam means the flow's
+  `env.get` reads must come from the same resolver the run used.
+- **The leak adds a legitimate boundary crossing.** ATMOSPHERE loses CARBON+OXYGEN across its
+  boundary every leak step; the ledger *reports* this (the debuggability payoff) and its
+  `net crossing == ΔStored` identity still holds (the leak leg is an ordinary flow leg). The
+  leak-sink is `boundary`-domain, so the boundary compartment's `ΔStored` absorbs it — the
+  identity balances there too.
+
+### The deferred multi-extinction live-order agreement — a hand-built test (NOT a perturbation)
+
+`test_expected_extinction_residuals_accumulates_within_a_compartment` (commit `ea901d4`)
+pins the **helper's** multi-extinction accumulation, but its own comment explicitly defers
+one thing to Step 6: *"the live float-order agreement is to be verified there against the
+real ledger."* With a single extinction there is no order to verify; the ≥2-simultaneous
+case (the integrator's sorted-stock-id loss-sink bucketing vs the helper's event fold) is
+untested live. Since **no perturbation drives multi-extinction** (above), discharge it with a
+**hand-built deterministic two-extinction step** — two sub-threshold POPULATION stocks in one
+compartment, stepped once through the **real** integrator + `compartment_boundary_ledger`,
+asserting `residual == expected_extinction_residuals` within tol (the Step-5 hand-built
+single-extinction idiom, extended to two). Deterministic, no perturbation, closes the
+forward-pointer. *(If a reviewer deems the order agreement already implied by the
+commutative-sum structure of both sides, this test is optional — but it is cheap and the
+existing comment explicitly earmarks it.)*
+
+### No new golden (state it)
+
+A perturbation run gets **no hex-float golden** — it is a behavioural demonstration, and
+Phase 4 owns freeze-as-reference + the golden scenario suite (Scope). The regression guards
+are instead: the **cascade-vs-baseline** behavioural asserts (direction-only, see Test plan),
+every-step conservation + `rationed == 0`, and a **determinism re-run** (the perturbed run is
+bit-identical on a second build — the cheap insurance the goldens would otherwise give).
+**All three existing goldens stay byte-identical** (the harness never touches baseline
+assembly).
+
+### Sequencing — probe → build (the perturbation cascades are de-risked; no refactor/science split)
+
+There is no behavior change to baseline, so no "refactor-safe vs new-science" split — but the
+**Step-4/5 probe discipline is already discharged** (above). Build order:
+1. **The harness** — `perturbations.py`: `window_override`, `with_forcing`, `LeakFlow` +
+   `with_atmospheric_leak`, and the `DROUGHT_SCENARIO` (in `scenario.py`).
+2. **The three perturbation tests** + the per-compartment ledger-under-perturbation assertions
+   (perturbed-resolver leg reconstruction) + the hand-built two-extinction ledger test +
+   (optional) the reset-guard characterization test.
+
+### Test plan
+
+- **drought (open field):** baseline `f_water ≡ 1`; cut → `f_water < 1` within the window and
+  end-of-season biomass strictly below baseline (by-stock, **never `State == State`** — the
+  comparison is per-stock); `rationed == 0`; four-quantity conservation every step.
+- **lighting_failure (perennial):** within-window biomass strictly below baseline **and**
+  `carbon_pool` strictly above baseline (the "CO₂ rises" signature); `rationed == 0`;
+  conservation every step; per-compartment ledger balances every step (`events == ()`).
+- **atmospheric_leak (perennial):** `leak_sink` strictly increases within the window (chamber
+  opens); `carbon_pool` and `Ci` strictly below baseline; **conservation still holds with the
+  leak-sink explicit** (do NOT assert `loss_sink == 0` / closure — the leak legitimately moves
+  mass to the boundary); `rationed == 0`; per-compartment ledger balances every step, with the
+  ATMOSPHERE→boundary leak flux reported.
+- **Cascade asserts are direction-only** (the Step-4/5 anti-flakiness rule — never a magnitude
+  or a day index); each compares a **perturbed** run to a **baseline** run by specific stock
+  amounts.
+- **Determinism:** each perturbed run is bit-identical on a re-run (the no-golden insurance).
+- **Hand-built two-extinction ledger test:** `residual == expected_extinction_residuals`
+  within per-quantity tol through the real integrator (discharges the deferred live-order
+  agreement).
+- **(Optional) reset-guard characterization:** a severe leak → `annual_reset` raises
+  `ValueError` (locks the closure-caveat × perturbation regime boundary).
+- **Purity gate** green; **`git diff src/simcore/` empty** (all new code under
+  `domains/biosphere/`); all three existing goldens byte-identical; full suite green.
+
+### Acceptance gate
+
+`perturbations.py` harness (forcing-wrap + windowed `LeakFlow`) + the three representative
+perturbations each asserting **cascade-for-free** (direction-only vs baseline) + **every-step
+conservation** + **`rationed == 0`** + the **per-compartment ledger balances every step**
+under perturbation (perturbed-resolver leg reconstruction; `events == ()` ⇒ generic helper
+check) + the hand-built two-extinction ledger discharge + determinism re-run + **all three
+existing goldens byte-identical (no regeneration, no new golden)** + full suite green +
+`git diff src/simcore/` empty. **Perturbations stay in the recoverable regime (window within
+a year, magnitude bounded so the grain refills before the reset) — a severe perturbation
+trips the `annual_reset` seed-bank guard, which is the regime boundary, not a shippable
+cascade.**
