@@ -58,7 +58,9 @@ Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 - Reimplement science from **primary literature**; cite the paper, not PCSE.
 - **PCSE is EUPL (copyleft): offline validation oracle only, never ported or
   imported.** The WOFOST param YAML repo has no license — don't copy it.
-- Project's own license is **undecided** — assume clean-room until decided.
+- Project's own license is **BNCL-1.0** (Boyko Non-Commercial License v1.0) —
+  free to use/modify for non-commercial purposes; commercial use requires
+  separate written permission from the copyright holder.
 
 ## Commands (once the skeleton exists)
 
