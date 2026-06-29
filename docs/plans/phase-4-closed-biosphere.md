@@ -8,7 +8,12 @@ decade-scale runs" *operationally means* for an emergent limit cycle, P4.1) and 
 the process steps as forward-pointers, each to be designed just-in-time — the Phase-1/2/3
 rhythm. Per that rhythm and the advisor's standing "design the load-bearing decision in full
 and review it before enumerating process steps," P4.1 is designed in detail below; the
-remaining steps are sketched only. **No step is started until P4.1 is advisor-reviewed.**
+remaining steps are sketched only. **P4.1 has been advisor-reviewed** and revised accordingly:
+the mass-drift axis is split into a structural **ceiling** + a measured-round-off **detector**
+(the advisor's blocker — `N·BALANCE_ATOL` alone is a blind detector); the integrator-escalation
+path is corrected to **zero core diff** (RK4 already ships in `simcore`); and axis (b)'s
+**horizon-limited** reach + the period-2 **discrete** check are stated. The first *code* step
+(Step 1) is still designed just-in-time before it starts.
 
 ## Relationship to the roadmap + the central reframing
 
@@ -56,28 +61,45 @@ satisfiable** for a system whose *entire purpose* is to oscillate. You cannot as
 stops changing" — the emergent period-2 limit cycle is the deliverable, not a defect. So Phase 4
 must define **drift operationally for a limit cycle**, along three independent axes:
 
-- **(a) Mass-conservation drift — the hard invariant.** The per-step gate already bounds the
-  *per-step* residual to `BALANCE_ATOL/RTOL`. The decade-scale concern is **accumulation**: does
-  `Σ`(per-step residual) over `N` steps walk the **total** of each conserved quantity away from
-  its `step-0` value? For each quantity `q ∈ {CARBON, OXYGEN, NITROGEN, WATER}`, track
-  `total_q(n) = Σ`(amount · composition[q]) over **all** in-system + boundary stocks (the
-  `_total` sum the perturbation tests already use). Pass criterion:
-  `|total_q(N) − total_q(0)| ≤ DRIFT_ATOL(N)`, with `DRIFT_ATOL(N)` set to the **worst-case
-  accumulation bound** (`≈ N · BALANCE_ATOL`, the triangle-inequality ceiling) rather than a
-  hand-tuned magic number. This is the literal *"conservation of matter holds over decade-scale
-  runs."* (At `N ≈ 3050` and `BALANCE_ATOL ~ 1e-12`, the ceiling is `~3e-9` — comfortably tight;
-  Phase 2 already measured float-exact `~1e-13` totals at 305 steps.)
+- **(a) Mass-conservation drift — the hard invariant.** The decade-scale concern is
+  **accumulation**: does the **total** of each conserved quantity walk away from its `step-0`
+  value? For each `q ∈ {CARBON, OXYGEN, NITROGEN, WATER}`, track `total_q(n) = Σ`(amount ·
+  composition[q]) over **all** in-system + boundary stocks (the `_total` fold the perturbation
+  tests already use). The subtlety (advisor-flagged): the per-step **gate** residual
+  (`BALANCE_ATOL`, what `assert_conserved` tolerates) is **not** the drift mechanism. Our flows
+  are **structurally balanced per-stock by construction**, so `total_q` is conserved up to
+  **float round-off**, not up to `BALANCE_ATOL` — these differ by orders of magnitude
+  (`BALANCE_ATOL = BALANCE_RTOL = 1e-9` in `quantities.py`; Phase 0/2 measured round-off `~2e-13`
+  at 305 steps — ~4 orders tighter than the gate). So a single `N·BALANCE_ATOL` test is a loose
+  **ceiling** masquerading as a **detector**: at `N ≈ 3050` it is `~3e-6`, ~7 orders above the
+  round-off it claims to watch — a real mass-drift bug at `~1e-9` would sail straight through.
+  Axis (a) therefore has **two tiers, both derived (neither hand-tuned):**
+  - **Ceiling (never breach):** `|total_q(N) − total_q(0)| ≤ N · BALANCE_ATOL` — the hard assert,
+    the triangle-inequality worst case. Loud, loose, and structural; if it ever trips, the flow
+    legs themselves are unbalanced.
+  - **Detector (the real test):** fit `total_q(n) − total_q(0)` vs `n` and assert the **slope is
+    flat at round-off scale** — sub-linear, no systematic growth. The tight bound is **derived
+    from the round-off accumulation the Step-1 probe actually measures** over the decade run, not
+    from `BALANCE_ATOL`. This is what makes *"conservation of matter holds over decade-scale runs"*
+    a claim with teeth. *(Step 1 produces exactly this slope data — so this tier is finalized by
+    the probe, not pre-guessed here.)*
 
 - **(b) Limit-cycle stationarity — the emergent-behavior invariant.** Define a small vector of
   **per-year scalar summaries** (candidates: peak `leaf_c`, min `carbon_pool`, year-end
-  `consumer_carbon`, the period-2 phase). Across years `k = 1…Y`, the cycle is **stationary**
-  iff these summaries reach an attractor and **hold** it: `|summary(k) − summary(k−1)|` is
-  bounded and **non-increasing past the transient** — i.e. **not amplifying** (creeping toward
-  blow-up / `annual_reset` raising) and **not decaying** (creeping toward extinction). This is
-  direction-of-trend, not a magic equality — the Step-4/5/6/7 anti-flakiness discipline. The
-  5-year run is already a stable period-2 attractor (Phase 3 de-risk evidence), so the
-  expectation is **stationarity confirmed**; the metric exists to *catch* a slow drift that
-  5 years is too short to reveal.
+  `consumer_carbon`). Across years `k = 1…Y`, the cycle is **stationary** iff these summaries
+  reach an attractor and **hold** it: `|summary(k) − summary(k−1)|` is bounded and
+  **non-increasing past the transient** — i.e. **not amplifying** (creeping toward blow-up /
+  `annual_reset` raising) and **not decaying** (creeping toward extinction). This is
+  direction-of-trend, not a magic equality — the Step-4/5/6/7 anti-flakiness discipline.
+  The **period-2 structure** is a **discrete structural check** (the cycle *remains* period-2),
+  kept **separate** from the scalar stationarity vector — a phase index is not a scalar you can
+  call "non-increasing." **Horizon caveat (advisor):** axis (b) is **horizon-limited** — it
+  cannot see a drift slower than the run: a 30-yr decay is invisible in 10 yr. At decade scale,
+  axis (b) mostly **confirms** the Phase-3 attractor holds; it is the **100k-step stress**
+  (Step 3, ~328 yr) that actually does slow-drift detection. State the **detectable drift-rate
+  floor** the horizon affords (`~1/Y` per year) rather than claiming stationarity absolutely.
+  The 5-year run is already a stable period-2 attractor (Phase 3 de-risk evidence), so the
+  decade expectation is **stationarity confirmed**.
 
 - **(c) No structural failure over the full horizon — the closure invariant carried.** The
   Phase-3 closure asserts, now held for the **entire** decade-scale horizon: `rationed == 0`
@@ -85,9 +107,13 @@ must define **drift operationally for a limit cycle**, along three independent a
   loss-sink stays `0.0`.
 
 **The integrator question — PROBE Euler first; escalate only on evidence (the Step-4
-discipline).** The biosphere runs **Euler-daily** (P1.P3); RK4 exists in `simcore` since Phase
-0.5 but the biology has never used it. Decade-scale truncation error *might* drift the limit
-cycle — but escalating to RK4 is **not free**:
+discipline).** The biosphere runs **Euler-daily** (P1.P3). Decade-scale truncation error *might*
+drift the limit cycle. **Escalation is cheap mechanically but not free behaviorally** (advisor):
+`simcore/integrator.py` **already ships `Rk4Integrator`** alongside `EulerIntegrator` (both since
+Phase 0.5, both satisfying the same `Integrator`/`Substepper` protocols), and the biology has
+never used it. So escalating is a **domain-side choice of which integrator class to instantiate
+— `git diff src/simcore/` stays empty**; core purity is **not** at stake. What *is* at stake is
+two **behavioral preconditions**, to verify not assume:
 - RK4 interacts with the discrete `annual_reset` driver transform. (Resets land *on* step
   boundaries via `run_season`'s `reset` hook, between whole steps, so multistage substeps never
   straddle a reset — this is benign, but must be stated and tested, not assumed.)
@@ -125,15 +151,17 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
 `simcore` change** — the Phase-3 `git diff src/simcore/` empty discipline carries.
 
 ### Carried Phase-0/0.5/1/2/3 invariants that constrain Phase 4
-- **Core pure** (stdlib only); `git diff src/simcore/` **empty** unless a *named,
-  advisor-reviewed* integrator change is forced by P4.1's probe (the sole allowed exception).
+- **Core pure** (stdlib only); `git diff src/simcore/` **empty** — *unconditionally*. Even a
+  RK4 escalation reuses the existing `simcore.Rk4Integrator` (a domain-side instantiation
+  choice), so it touches **no** core file. There is no Phase-4 path that edits `simcore/`.
 - **Determinism** bit-identical within a build; integer step count (`t = n·dt`, never `+=`);
   canonical (flow-id) order on every reduction.
 - **Conservation asserted every step**; `rationed == 0` from kinetics (Euler backstop count `== 0`
   on goldens; under RK4 a needed scale is a hard error).
 - **Extinction conserves mass**; death routes to **litter**, not the loss-sink.
 - **Parameters are data** (YAML + schema); no hardcoded coefficients — including the new
-  drift tolerances, which are *derived* (`N · BALANCE_ATOL`), not tuned.
+  drift tolerances, which are *derived*, not tuned: the **ceiling** `N · BALANCE_ATOL` (structural)
+  and the **detector** slope bound (from the Step-1 measured round-off accumulation).
 
 ## Scope
 
@@ -155,15 +183,16 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
   Phase-3 capstone explicitly deferred these; Phase 4 is **stability + freeze**, not biology.
 - **No sibling domains** (power / thermal / atmosphere-ECLSS / crew) — **Phase 5** (lines 313–325).
 - **No Rust port** — moved to after station integration (line 7).
-- **No new core surface** unless P4.1's probe *forces* an integrator change — and then only that
-  one change, advisor-reviewed, with regenerated goldens + provenance.
+- **No new core surface, ever** — a RK4 escalation reuses the shipped `simcore.Rk4Integrator`
+  (zero core diff); the only artifacts it forces are domain-side (the integrator-selection call,
+  regenerated goldens + provenance), not a `simcore/` edit.
 
 ## API additions (additive; ideally **zero core change**)
 - `domains/biosphere/` or a new reporting/lab module: a **decade-scale driver wrapper** (reuses
   `run_perennial` — just a larger `steps`) + **drift-metric computation** (per-year summary
   vector; the `total_q` mass tracker reusing the perturbation `_total` fold).
-- `config/`: the **derived** drift tolerances (`DRIFT_ATOL(N) = N · BALANCE_ATOL`), surfaced as
-  data, not a literal.
+- `config/`: the **derived** two-tier drift tolerances — the ceiling `N · BALANCE_ATOL` and the
+  round-off slope bound — surfaced as data, not literals.
 - `tests/`: long-horizon golden(s) + drift-metric assertions; a marked-slow 100k-step stress.
 - `docs/biosphere-reference.md` + a freeze manifest (scenario → golden-hash, param-file hashes,
   integrator + dt).
@@ -176,7 +205,8 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
    the `annual_reset`×multistage design + the "needed scale is a hard error" precondition check.
    **Skipped entirely if Euler holds** (the expected outcome).
 3. **100k-step stability stress (line 211).** The "no drift" stress as a **marked-slow opt-in**
-   test; report the residual-accumulation bound vs the `N · BALANCE_ATOL` ceiling.
+   test — the **real slow-drift detector** (axis (b) is horizon-blind to anything slower than the
+   run). Report the round-off slope vs the `N · BALANCE_ATOL` ceiling.
 4. **Canonical golden capture (P4.2).** Pin the long-horizon perennial + consumer goldens + the
    drift-summary golden; re-affirm the four Phase-3 goldens (byte-identical, or
    regenerated-with-provenance if Step 2 changed the integrator).
@@ -185,7 +215,8 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
 
 ## Exit criteria (Phase 4 — "closed biosphere, frozen as reference")
 - **Conservation of matter holds over decade-scale runs:** total CARBON/OXYGEN/NITROGEN/WATER
-  bounded-drift (`≤ N · BALANCE_ATOL`) over ≥10 yr; the 100k-step stress run + its bound reported.
+  under the **ceiling** (`≤ N · BALANCE_ATOL`) **and** the **detector** (round-off-scale slope, no
+  systematic growth) over ≥10 yr; the 100k-step stress run + its measured slope reported.
 - **The emergent limit cycle is stationary** (bounded, non-amplifying, non-decaying) over the
   decade horizon; `rationed == 0`, `events == ()`, loss-sink `0.0` the whole way.
 - **The reference integrator + dt are locked** (Euler-held or RK4-escalated, **with evidence**).
@@ -193,7 +224,7 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
   the four Phase-3 goldens byte-identical (or regenerated-with-provenance).
 - **The biosphere domain is frozen:** `docs/biosphere-reference.md` + manifest naming the frozen
   surface + the unfreeze discipline.
-- `git diff src/simcore/` **empty** (or exactly the one named, advisor-reviewed integrator change).
+- `git diff src/simcore/` **empty** — unconditionally (RK4 escalation, if any, is domain-side).
 - Full suite green; ruff + pyright clean.
 - **Next: Phase 5 — Sibling Domains** (power / thermal / atmosphere-ECLSS / crew), each verified
   standalone against its own references before it touches the now-frozen biosphere (lines 313–325).
