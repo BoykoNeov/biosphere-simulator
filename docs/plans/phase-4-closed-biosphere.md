@@ -1,6 +1,6 @@
 # Phase 4 — Closed Biosphere (the reference domain, frozen)
 
-**Status: DRAFT — not started. Phase 3 exits.**
+**Status: DRAFT — not started (Step 1 designed in full below, advisor-reviewed). Phase 3 exits.**
 Phases 0, 0.5, 1, 2, and 3 are complete and regression-pinned
 (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber,3-modular-biosphere}.md`).
 This plan **locks the load-bearing Phase-4 decision** (what "conservation-stable over
@@ -13,7 +13,9 @@ the mass-drift axis is split into a structural **ceiling** + a measured-round-of
 (the advisor's blocker — `N·BALANCE_ATOL` alone is a blind detector); the integrator-escalation
 path is corrected to **zero core diff** (RK4 already ships in `simcore`); and axis (b)'s
 **horizon-limited** reach + the period-2 **discrete** check are stated. The first *code* step
-(Step 1) is still designed just-in-time before it starts.
+(Step 1) is now **designed in full and advisor-reviewed** below (§ *Step 1 — full design*) —
+the decade-scale Euler probe + drift instrumentation; the remaining steps (2–5) stay
+just-in-time forward-pointers.
 
 ## Relationship to the roadmap + the central reframing
 
@@ -200,7 +202,8 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
 ## Step sequence (sketched; each designed just-in-time, P4.1 first)
 1. **Decade-scale Euler probe + drift instrumentation (P4.1).** Run perennial + consumer to
    ≥10 yr; compute the three drift metrics (a/b/c); **decide Euler-holds vs escalate**. The
-   de-risk that gates everything — designed in full before code, advisor-reviewed.
+   de-risk that gates everything — **designed in full below** (§ *Step 1 — full design*),
+   advisor-reviewed.
 2. **(Conditional) integrator escalation.** *Only if Step 1 drifts:* RK4 for the biosphere, with
    the `annual_reset`×multistage design + the "needed scale is a hard error" precondition check.
    **Skipped entirely if Euler holds** (the expected outcome).
@@ -212,6 +215,123 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
    regenerated-with-provenance if Step 2 changed the integrator).
 5. **The freeze contract (P4.3).** `docs/biosphere-reference.md` + the manifest + the unfreeze
    discipline; the formal freeze of the biosphere domain.
+
+## Step 1 — full design: decade-scale Euler probe + drift instrumentation (P4.1)
+
+*The de-risk that gates all of Phase 4 — designed in full and advisor-reviewed before any
+code (the Phase-1/2/3 rhythm). A **measurement** step: run the two closed scenarios to
+decade scale, compute the three P4.1 drift axes, and **decide Euler-holds-vs-escalate on
+evidence**. Boundary/test-side only — `git diff src/simcore/` stays empty; no new golden
+(capture is P4.2/Step 4); the four Phase-3 goldens untouched.*
+
+### Deliverables (three artifacts, all domain/test-side)
+1. **`domains/biosphere/drift.py`** — pure-stdlib drift instrumentation over a trajectory
+   (`list[State]`). Promotes the `_total` fold (today duplicated in three test files —
+   `test_perennial_chamber`, `test_perturbations`, and implicitly the ledger test) to a
+   shared `total_quantity(state, q)`, and adds:
+   - **(a)** `mass_drift_trace(states, q) -> list[float]` = `[total_q(n) − total_q(0)]`;
+     `drift_slope(trace)` (least-squares slope vs `n`); `max_abs(trace)`.
+   - **(b)** `year_summaries(states, year, summary_fn) -> list[float]` (one scalar per year,
+     reusing the `states[y*year:(y+1)*year+1]` segmentation the perennial tests already use);
+     `same_phase_diffs(summaries, period=2)` = `[s[k] − s[k−2]]`; `is_stationary(diffs)` =
+     bounded + non-increasing-past-transient.
+   - **(b-discrete)** `period_phase(...)` — the period-2 structural check, kept **separate**
+     from the scalar vector.
+   It imports `simcore.state`/`simcore.quantities` + `domains.biosphere` only — a domain
+   module, **not** core. Stdlib-only.
+2. **`tests/test_drift.py`** — validates the *instrument* on **synthetic** traces, independent
+   of the biology:
+   - **slope recovery:** a known linear-drift trace recovers its slope;
+   - **discrimination (the teeth — advisor fold 2):** a synthetic trace with a deliberate leak
+     at **real-bug scale (~1e-9/step)** must **fail** the detector, while round-off-scale jitter
+     must **pass** — proving the bound sits *between* round-off and real-bug scale, not merely
+     that slope-of-a-line works;
+   - **stationarity:** a stationary period-2 trace passes `is_stationary`; an **amplifying** one
+     fails; a **decaying** one fails.
+3. **`tests/test_decade_stability.py`** — the actual probe on **both**
+   `PERENNIAL_CHAMBER_SCENARIO` and `CONSUMER_CHAMBER_SCENARIO`, asserting axes (a)/(b)/(c) +
+   the Euler-vs-RK4 **structural** agreement. Module-scoped fixtures (each decade run executes
+   once). Normal-speed (≈3050 steps × 2 scenarios × 2 integrators ≈ 12k gated steps — within
+   suite budget; the 100k stress is Step 3, marked-slow).
+
+### The three drift axes, made concrete
+**(a) Mass-conservation drift — two tiers, shape measured first (advisor fold 3).**
+`d_q(n) = total_q(n) − total_q(0)` for each `q ∈ {CARBON, OXYGEN, NITROGEN, WATER}`.
+- **Ceiling (never breach):** `max|d_q| ≤ N · BALANCE_ATOL ≈ 3050 · 1e-9 ≈ 3e-6` — the
+  triangle-inequality worst case; if it trips, the flow legs are unbalanced.
+- **Detector (the real test):** the run is **bit-deterministic**, so `d_q(n)` is a *fixed
+  measured trace*, not a random variable. **Measure its shape first** (bounded-oscillating /
+  √N walk / linear trend) before fixing the primary statistic. For a structurally-conserved
+  sum the error is most likely **bounded-oscillating or √N — not linearly trending** — so the
+  least-squares slope is ≈ machine-ε noise. Slope is still the right **systematic-leak
+  signature** (a leak is linear in `n`; round-off is not), so keep it, but **report `max|d_q|`
+  alongside** as the directly-interpretable bound and set the slope bound a small margin **above
+  the measured noise floor**. *Which is primary (slope vs `max|d_q|`) is decided after seeing
+  whether `d_q` trends or jitters.* The bound is a **documented constant with provenance** in
+  `drift.py` — **not** config YAML: a regression-guard threshold derived from round-off is part
+  of the *test*, not a model coefficient (the `BALANCE_ATOL`-is-a-`simcore`-constant precedent;
+  a pydantic schema for one diagnostic number is the speculative generality this codebase keeps
+  rejecting). The provenance records the **measurement procedure** (scenario, horizon, observed
+  `max|d_q|` + slope), so a future toolchain change can re-derive it — the goldens' regeneration
+  discipline.
+
+**(b) Limit-cycle stationarity — period-2-aware.** Per-year scalar summaries (peak `leaf_c`,
+min `carbon_pool`, year-end `consumer_carbon`). **The catch:** for a period-2 cycle
+`summary(k) − summary(k−1)` does **not** vanish — it is the cycle *amplitude*, oscillating
+between the two branches. So stationarity is tested on **same-phase differences**
+`summary(k) − summary(k−2)`, asserted **bounded and non-increasing past the transient**.
+**Stationary ≡ bounded + converging-or-converged** — explicitly **not** "must have reached the
+attractor": a still-converging-but-bounded cycle (amplitude shrinking toward a finite attractor)
+satisfies non-amplifying + bounded and is freezable. The period-2 *structure* (the cycle remains
+period-2) is the separate **discrete** check.
+
+**(c) Closure carried over the full horizon.** `rationed == 0`, `events == ()`, carbon
+loss-sink `0.0` on **every** step of the decade run (both scenarios) — the Phase-3 closure
+asserts, now held for the entire horizon.
+
+### Horizon — budget 15–20 yr, do NOT gate the lock on full convergence (advisor fold 4)
+At year 5 the period-2 gap is ~0.74 vs ~1.00 (≈26 % on an O(1) signal — the documented
+mid-transient). Ten years gives only ~4 same-phase differences per branch — thin to call a
+monotone trend, and the gap won't close by year 10. So **budget a ~15–20-yr working horizon up
+front** (stated, not discovered mid-probe), with the adaptive extension **capped at a few
+decades** so Step 1 doesn't bleed into the 100k stress (Step 3). **Critically: the lock criterion
+is bounded + non-amplifying, which a still-converging cycle satisfies — the lock does NOT require
+a reached attractor.** The Euler-holds verdict rests on:
+- (a) conservation — rock-solid (integrator-independent: balanced legs conserve regardless);
+- (c) closure — rock-solid;
+- (b) bounded / non-amplifying — satisfied by a converging cycle;
+- RK4 **structural** agreement (below).
+Full convergence to the attractor is **Step 3's (100k) job**, not Step 1's.
+
+### The decide-on-evidence core — Euler-vs-RK4 structural cross-check
+Run **Euler** decade → axes (a/b/c). Then run **RK4** decade through the *same* `run_perennial`
+(zero core change — `Rk4Integrator` already ships; `run_season` calls `integrator.step_report`,
+shared on `_BaseIntegrator`). This RK4 run is a **one-shot cross-check — no golden, no permanent
+RK4 instantiation; the shipped code stays Euler.** It also **empirically retires** the two RK4
+preconditions the plan flagged (rather than assuming them): that RK4 survives the discrete
+`annual_reset`×multistage interaction, and that no needed arbitration scale fires (under RK4 a
+needed scale is a hard error — verify it does not occur).
+
+**Agreement is QUALITATIVE / structural, not "within X" (advisor fold 1).** Euler and RK4 differ
+by O(truncation), so attractors will **not** match numerically — and "within X" needs an `X` we
+cannot principle for an uncalibrated model. Compare **structure**: both stationary, both period-2,
+both bounded, both closed.
+
+**Decision:**
+- Euler stationary (b) **and** (a)/(c) pass **and** Euler/RK4 structurally agree → **lock Euler,
+  with evidence** (the expected outcome). The RK4 cross-check is the *only* thing that
+  distinguishes "Euler is fine" from "Euler's truncation error produced a *stably-wrong*
+  attractor" — it is the evidence in *lock-with-evidence*, not over-building.
+- Euler drifts (amplifying / decaying / period-break) where RK4 does **not** → **escalate**
+  (Step 2): Euler's truncation error is the culprit.
+- **Both** drift → the drift is **real slow dynamics**, not truncation → re-examine the scenario
+  (a science finding, not an integrator choice).
+
+### Why this is zero-core and golden-safe
+`drift.py` is a domain module (imports `simcore` read-only + `domains.biosphere`); the tests are
+additive; the RK4 run instantiates the already-shipped `simcore.Rk4Integrator`. No `simcore/`
+edit, no new golden in Step 1, the four Phase-3 goldens untouched — `git diff src/simcore/` stays
+empty.
 
 ## Exit criteria (Phase 4 — "closed biosphere, frozen as reference")
 - **Conservation of matter holds over decade-scale runs:** total CARBON/OXYGEN/NITROGEN/WATER
