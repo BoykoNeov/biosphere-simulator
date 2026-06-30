@@ -214,22 +214,36 @@ def non_collapsing(summaries: Sequence[float], *, floor: float) -> bool:
 # --- axis (b-discrete): the period-2 structural check ------------------------
 
 
-def is_period_2(summaries: Sequence[float], *, transient: int = 0) -> bool:
-    """Discrete structural check: the series alternates (period-2) past ``transient``.
+def is_period_2(
+    summaries: Sequence[float], *, transient: int = 0, min_rel_gap: float = 1e-3
+) -> bool:
+    """Discrete structural check: a *sustained* period-2 cycle past ``transient``.
 
-    A period-2 limit cycle has the odd/even years on opposite branches, so the adjacent
-    difference ``summary(k+1) - summary(k)`` **alternates in sign** — the structural
-    signature, held even while the amplitude still converges. Kept SEPARATE from the
-    scalar stationarity vector: a phase index is not a scalar you can call
-    "non-increasing". Exact-zero adjacent differences are dropped (a flat segment
-    carries no phase).
+    A genuine period-2 limit cycle has the odd/even years on **opposite branches**, so
+    every adjacent difference ``summary(k+1) - summary(k)`` is (1) a real jump and (2)
+    alternating in sign. Both conditions must hold across the whole post-``transient``
+    tail:
+
+    * **alternation** — the structural period-2 signature;
+    * **a sustained branch gap** — EVERY adjacent ``|diff|`` exceeds ``min_rel_gap *
+      scale`` (``scale`` = ``max|summary|`` over the tail). This is the load-bearing
+      guard: a *damped* oscillation **converging to a fixed point (period-1)** rings —
+      its adjacent diffs alternate during the transient — but the gap collapses to ~0.
+      Without the gap floor that ringing is misread as period-2 (the consumer chamber is
+      period-1: the herbivore damps the producer cycle to a fixed point). So pick a
+      ``transient`` that reaches the settled tail before calling this.
+
+    Kept SEPARATE from the scalar stationarity vector: a phase index is not a scalar you
+    can call "non-increasing".
     """
     tail = list(summaries)[transient:]
-    rises = [
-        tail[k + 1] - tail[k] > 0.0
-        for k in range(len(tail) - 1)
-        if tail[k + 1] != tail[k]
-    ]
-    if len(rises) < 2:
+    if len(tail) < 3:
         return False
+    adjacent = [tail[k + 1] - tail[k] for k in range(len(tail) - 1)]
+    scale = max((abs(s) for s in tail), default=0.0)
+    floor = min_rel_gap * scale
+    # A collapsed adjacent gap means the branches merged → a fixed point, not a cycle.
+    if any(abs(d) <= floor for d in adjacent):
+        return False
+    rises = [d > 0.0 for d in adjacent]
     return all(rises[i] != rises[i + 1] for i in range(len(rises) - 1))

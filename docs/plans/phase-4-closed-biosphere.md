@@ -11,7 +11,10 @@ tests, ~7.7 s). Both closed scenarios run Euler **and** RK4 to a 15-yr horizon (
 machine-ε, no trend), ~6–9 orders under the `N·BALANCE_ATOL ≈ 4.6e-6` ceiling; derived detector
 bounds `MASS_DRIFT_ABS_BOUND = 1e-9` / `MASS_DRIFT_SLOPE_BOUND = 1e-11` sit *between* the noise
 floor and a 1e-9/step real-bug leak. **(b)** peak-`leaf_c` cycle bounded + non-amplifying +
-non-collapsing + period-2 in both scenarios (fully settled by ~yr 10). **(c)** `rationed == 0`,
+non-collapsing in both scenarios; the settled **period class differs (measured, not assumed):
+perennial is a genuine period-2 cycle** (two branches, gap ~0.07), **consumer is period-1** — the
+herbivore damps the producer oscillation to a **fixed point** (settled adjacent gap ~3e-5). Both
+fully settled by ~yr 10. **(c)** `rationed == 0`,
 `events == ()`, loss-sink `0.0` every step — for **both** integrators. The **RK4 cross-check
 empirically retired** the two preconditions (survives `annual_reset`×multistage; no arbitration
 hard-error) and **structurally agrees** with Euler → escalation (Step 2) is **skipped**. Zero

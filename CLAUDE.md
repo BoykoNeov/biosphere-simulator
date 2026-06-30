@@ -30,9 +30,11 @@ core change, three producer-only goldens byte-identical);
 (pure-stdlib drift instrument: `total_quantity` promoting the `_total` fold + three axes —
 mass-drift ceiling/detector, `is_stationary`/`non_collapsing` stationarity split, `is_period_2`)
 + `test_drift.py` + `test_decade_stability.py`; both closed scenarios probed Euler **and** RK4 to
-15 yr → **Euler LOCKED, with evidence** (drift jitters at √N round-off, cycle stationary+period-2,
-closure held, RK4 cross-check retired the preconditions & structurally agrees → Step 2 escalation
-skipped); zero core change, four Phase-3 goldens untouched, no new golden. Next: Step 3 (100k-step
+15 yr → **Euler LOCKED, with evidence** (drift jitters at √N round-off; cycle bounded/non-amplifying/
+non-collapsing — perennial settles to a **period-2** cycle, consumer to a **period-1 fixed point**
+(herbivore damps the producer oscillation, measured not assumed); closure held; RK4 cross-check
+retired the preconditions & structurally agrees → Step 2 escalation skipped); zero core change,
+four Phase-3 goldens untouched, no new golden. Next: Step 3 (100k-step
 marked-slow stress), Step 4 (golden capture), Step 5 (freeze contract). Roadmap `roadmap_extracted.txt`.
 Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 

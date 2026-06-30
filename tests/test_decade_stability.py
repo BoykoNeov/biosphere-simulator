@@ -15,10 +15,15 @@ drift axes, then runs the **same** scenarios under ``Rk4Integrator`` as a one-sh
   ceiling.
 * **(b) Limit-cycle stationarity** — the per-year ``peak leaf_c`` (and, for the
   consumer, ``year-end consumer_carbon``) summaries are **bounded + non-amplifying**
-  past the transient (``is_stationary``), **non-collapsing** (``non_collapsing`` —
-  alive, the mandatory level check that ``is_stationary`` is blind to), and structurally
-  **period-2** (``is_period_2``). The lock does NOT require a reached attractor — a
-  still-converging cycle is freezable. (At 15 yr these cycles are fully settled.)
+  past the transient (``is_stationary``) and **non-collapsing** (``non_collapsing`` —
+  alive, the mandatory level check that ``is_stationary`` is blind to). The lock does
+  NOT require a reached attractor — a still-converging cycle is freezable. The discrete
+  ``is_period_2`` check characterizes the settled attractor, and the two scenarios
+  DIFFER (verified, not assumed): the **perennial** settles to a genuine **period-2**
+  cycle (two
+  branches, gap ~0.07), while the **consumer is period-1** — the herbivore damps the
+  producer oscillation to a **fixed point** (settled adjacent gap ~3e-5). (At 15 yr both
+  are fully settled.)
 * **(c) Closure carried over the full horizon** — ``rationed == 0``, ``events == ()``,
   carbon loss-sink ``0.0`` on **every** step of the run, for **both** integrators.
 
@@ -81,6 +86,7 @@ DECADE_YEARS = 15  # >= the decade-scale (10-yr) target; the budgeted 15-20 yr h
 _STEPS = _YEAR * DECADE_YEARS
 _QUANTITIES = (Quantity.CARBON, Quantity.OXYGEN, Quantity.NITROGEN, Quantity.WATER)
 _TRANSIENT = 2  # same-phase diffs to drop before the non-amplifying trend (the sow-in)
+_PERIOD_TRANSIENT = 8  # years to drop before the period check — reach settled tail
 
 
 def _run(scenario, integrator_cls) -> tuple[list[State], int, tuple]:
@@ -140,7 +146,7 @@ def _year_end_consumer(segment) -> float:
 @pytest.mark.parametrize("quantity", _QUANTITIES)
 def test_decade_conservation_ceiling(runs, scenario, quantity) -> None:
     # The structural ceiling: the triangle-inequality worst case. If it ever trips, the
-    # flow legs themselves are unbalanced — a hard bug. Loud, loose (~N*1e-9, ~4.6e-6).
+    # flow legs themselves are unbalanced — a hard bug. Loose (~N*1e-9, ~4.6e-6).
     states, _, _ = runs[(scenario, "euler")]
     trace = mass_drift_trace(states, quantity)
     assert max_abs(trace) <= _STEPS * BALANCE_ATOL
@@ -178,15 +184,29 @@ def test_decade_leaf_cycle_is_stationary(runs, scenario) -> None:
     assert non_collapsing(summaries, floor=0.05)  # peak leaf never collapses to ~0
 
 
-@pytest.mark.parametrize("scenario", ["perennial", "consumer"])
-def test_decade_leaf_cycle_is_period_2(runs, scenario) -> None:
-    # The separate DISCRETE structural check: the cycle remains period-2 (odd/even years
-    # on opposite branches, so the adjacent difference alternates sign). Kept apart from
-    # the scalar stationarity vector (a phase index is not a scalar you call
-    # non-increasing).
-    states, _, _ = runs[(scenario, "euler")]
+def test_perennial_leaf_cycle_is_period_2(runs) -> None:
+    # The separate DISCRETE structural check: the PERENNIAL chamber settles to a genuine
+    # period-2 limit cycle — odd/even years sit on two distinct branches (measured gap
+    # ~0.07, ~28% of scale) sustained to year 15. (Verified, not assumed: the two
+    # consumer/perennial scenarios are NOT both period-2 — see consumer test below.)
+    states, _, _ = runs[("perennial", "euler")]
     summaries = year_summaries(states, _YEAR, _peak_leaf)
-    assert is_period_2(summaries)
+    assert is_period_2(summaries, transient=_PERIOD_TRANSIENT)
+
+
+def test_consumer_leaf_converges_to_a_fixed_point(runs) -> None:
+    # The CONSUMER chamber is period-1, NOT period-2: adding the herbivore DAMPS the
+    # producer oscillation to a fixed point. Past the transient the per-year peak_leaf
+    # converges to a single value (measured adjacent gap ~3e-5, ~1e-4 of scale), so the
+    # branch gap collapses and is_period_2 correctly returns False. Assert both the
+    # negative (not period-2) and the positive characterization (a settled fixed point:
+    # consecutive years nearly equal). This corrects the over-general "period-2" claim.
+    states, _, _ = runs[("consumer", "euler")]
+    summaries = year_summaries(states, _YEAR, _peak_leaf)
+    assert not is_period_2(summaries, transient=_PERIOD_TRANSIENT)
+    tail = summaries[_PERIOD_TRANSIENT:]
+    gap = max(abs(tail[k + 1] - tail[k]) for k in range(len(tail) - 1))
+    assert gap < 1e-3 * max(tail)  # a fixed point: the branches have merged
 
 
 def test_decade_consumer_biomass_is_stationary_and_alive(runs) -> None:
@@ -255,24 +275,26 @@ def test_rk4_preconditions_retired(runs, scenario) -> None:
 def test_euler_rk4_structural_agreement(runs, scenario) -> None:
     # Agreement is QUALITATIVE / structural, NOT "within X": Euler and RK4 differ by
     # O(truncation), so the attractors do not match numerically (asserted: the final
-    # states differ — the cross-check integrated differently). What must agree
-    # is the
-    # STRUCTURE — both period-2, both stationary, both non-collapsing. This is the one
-    # check that distinguishes "Euler is fine" from "Euler's truncation produced a
-    # stably-WRONG attractor".
+    # states differ — the cross-check integrated differently). What must agree is the
+    # STRUCTURE — same period class (period-2 perennial, period-1 consumer), both
+    # stationary, both non-collapsing. This is the one check that
+    # distinguishes "Euler is fine" from "Euler's truncation produced a stably-WRONG
+    # attractor": if RK4 disagreed on the period class, the lock would not hold.
     euler_states, _, _ = runs[(scenario, "euler")]
     rk4_states, _, _ = runs[(scenario, "rk4")]
     assert euler_states[-1] != rk4_states[-1]  # genuinely different integration
 
+    structure = []
     for states in (euler_states, rk4_states):
         summaries = year_summaries(states, _YEAR, _peak_leaf)
         diffs = same_phase_diffs(summaries, period=2)
         scale = max(summaries)
-        assert is_period_2(summaries)
         assert is_stationary(
             diffs, bound=0.1 * scale, slope_tol=0.01 * scale, transient=_TRANSIENT
         )
         assert non_collapsing(summaries, floor=0.05)
+        structure.append(is_period_2(summaries, transient=_PERIOD_TRANSIENT))
+    assert structure[0] == structure[1]  # Euler & RK4 agree on the period class
 
 
 def test_decade_run_is_deterministic(runs) -> None:

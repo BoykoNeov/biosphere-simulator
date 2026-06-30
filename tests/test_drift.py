@@ -233,6 +233,19 @@ def test_is_period_2_respects_the_transient() -> None:
     assert is_period_2(series, transient=2)
 
 
+def test_is_period_2_rejects_damped_oscillation_to_a_fixed_point() -> None:
+    # THE GUARD: a damped oscillation converging to a FIXED POINT (period-1) rings — its
+    # adjacent diffs alternate sign during the transient — but the branch gap collapses
+    # to ~0. A naive sign-alternation check false-passes it; the sustained-gap floor
+    # must reject it. (This is the real consumer-chamber behaviour: the herbivore damps
+    # the producer cycle to a fixed point, so it is period-1, not period-2.)
+    damped = [1.0, 3.0, 1.6, 2.6, 1.9, 2.3, 1.99, 2.05, 2.0, 2.0, 2.0, 2.0]
+    assert not is_period_2(damped, transient=6)  # settled tail has a collapsed gap
+    # ...while the SAME shape, if it sustained its amplitude, IS period-2:
+    sustained = [1.0, 3.0, 1.6, 2.6, 1.9, 2.3, 1.0, 3.0, 1.0, 3.0, 1.0, 3.0]
+    assert is_period_2(sustained, transient=6)
+
+
 @pytest.mark.parametrize("bad", [[], [1.0]])
 def test_year_summaries_handles_short_trajectories(bad: list[float]) -> None:
     # (len(states) - 1) // year == 0 when there is not even one full year: no summaries.
