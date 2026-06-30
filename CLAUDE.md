@@ -107,9 +107,27 @@ is joule-lossless (the discharge "loss" is *exergy*, tracked as the heat diagnos
 **modeled round-trip = η_c** (0.95 = optimistic vs a real ~0.90 cell; discharge-side loss deferred).
 18 per-flow tests (balance via `assert_flow_balanced` — the Step-2 gate; leg structure; dt-linearity;
 zero-input no-op; loader bounds). **Capacity is NOT a param** (POOL stocks have no upper clamp →
-sizing/scenario data, Step 3). Full suite green (1026 + 27 slow); **seven frozen + two demo goldens
-byte-identical**. **Next: P5.3** (Step 3) — `build_power`/`run_power` + day/night solar resolver +
-the bounded-SOC validation run; then Step 4 golden capture. `SelfDischarge` deferred (optional).
+sizing/scenario data, Step 3). Full suite green; **seven frozen + two demo goldens byte-identical**.
+**Step 3 (P5.3) COMPLETE — the standalone run harness + bounded-SOC validation**: new
+`scenario.py` (`PowerScenario`; `BOUNDED_SOC_SCENARIO` + `BOUNDED_SOC_DAYS=7`) + `system.py`
+(`build_power` — three stocks + two flows, **no loss-sinks** as Power has no POPULATION stock;
+`solar_schedule` — a half-sine over the daylight window, the weather-table analogue *computed*;
+`power_resolver`; `run_power` — the `season.py` `run_season` analogue **minus** the reset hook),
+**zero core change**. **The load is DERIVED for exact daily energy balance, not hand-tuned** — both
+flows are *forced* (state-independent), so SOC is a restoring-force-free accumulator with **no
+attractor**, and only **exact** daily balance is bounded (advisor physics call — option A over a
+probe-sized constant, whose qualitative-regime precedent doesn't transfer to a balance condition):
+`power_resolver` computes `load_w = load_fraction·η_c·(Σ_day solar)/steps_per_day` from the discrete
+daily solar sum + loaded η_c (`load_fraction=1` ⇒ balance ⇒ bounded periodic SOC; `>1` = free
+brownout knob; the **one** place a Power resolver reads a flow param — load is intrinsically
+η_c-coupled). `dt=3600 s`, 24 steps/day. Probe: swing ≈ 72% of `battery0`, min-SOC 11.3× a step's
+draw (`rationed==0` structural), day-over-day drift 1e-7 J. **14 validation tests** (the non-vacuous
+payload): per-step ENERGY ledger residual ≈ 0 + integral total-ENERGY invariant; `rationed==0`;
+`events==()`; **day-over-day SOC return** (true only under exact balance); material swing min>0;
+interior morning-crossover minimum; monotonic `waste_heat`; balance identity; determinism; **RK4 ≡
+Euler bit-for-bit** (forced ⇒ k1=k2=k3=k4, framed as the identity); registration-order independence.
+Seven frozen + two demo goldens byte-identical (no regen). **Next: Step 4** — hex-float Power golden
+capture (pre-golden closure gate + `__main__` regen). `SelfDischarge` deferred (optional).
 Cross-domain coupling is **Phase 6**.
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 

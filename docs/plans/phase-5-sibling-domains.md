@@ -1,6 +1,6 @@
 # Phase 5 — Sibling Domains (Power first; energy joins the conserved set)
 
-**Status: IN PROGRESS — Steps 1–2 COMPLETE.** The load-bearing decision (energy closure, P5.1)
+**Status: IN PROGRESS — Steps 1–3 COMPLETE.** The load-bearing decision (energy closure, P5.1)
 and the standalone Power domain (P5.2) are designed in full and advisor-reviewed below; Thermal /
 Atmosphere-ECLSS / Crew are forward-pointers, each to be designed just-in-time (the Phase-1/2/3/4
 rhythm). **Step 1 (P5.1a) — the isolated ENERGY-assert flip — is DONE** (ENERGY joined
@@ -9,9 +9,17 @@ Power commit's `git diff src/simcore/` is empty). **Step 2 (P5.2 core) — the s
 flows — is DONE** (new `src/domains/power/`: `power.battery` POOL + `boundary.solar_source`/
 `boundary.waste_heat`; `SolarCharge` 3-leg heat-named + `LoadDraw` dissipative; `charge.yaml`
 one-way η_c; 18 per-flow tests; zero core change; seven frozen + two demo goldens byte-identical).
-**Next: Step 3** — `build_power`/`run_power` + day/night resolver + the bounded-SOC validation run.
-The biosphere stays FROZEN (`docs/biosphere-reference.md`); Phase 5 builds *beside* it, never
-moves it.**
+**Step 3 (P5.3) — the standalone run harness + bounded-SOC validation — is DONE** (new
+`scenario.py` + `system.py`: `build_power`/`power_resolver`/`run_power`, the `season.py` analogue
+**minus** the reset hook; a half-sine day/night solar schedule; the **load derived for exact daily
+energy balance** — `load_w = load_fraction·η_c·(Σ_day solar)/steps_per_day`, since the *forced*
+flows make SOC a restoring-force-free accumulator where only exact balance is bounded (the
+advisor's physics correction — option A, not a hand-tuned constant); 14 validation tests:
+ENERGY conserved every step, `rationed == 0`, `events == ()`, day-over-day SOC return, material
+SOC swing, monotonic heat, determinism + RK4≡Euler + registration-order independence; **zero core
+change**, seven frozen + two demo goldens byte-identical). **Next: Step 4** — the hex-float Power
+golden capture (pre-golden closure gate + `__main__` regen). The biosphere stays FROZEN
+(`docs/biosphere-reference.md`); Phase 5 builds *beside* it, never moves it.**
 
 Phases 0, 0.5, 1, 2, 3, and 4 are complete and regression-pinned
 (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber,3-modular-biosphere,4-closed-biosphere}.md`).
@@ -332,13 +340,33 @@ cross-domain bug cannot hide in a standalone green.
    structure, dt-linearity, zero-input no-op, loader bounds. **Capacity is NOT a param** (POOL stocks
    have no upper clamp → sizing/scenario data, Step 3). Clean-room + cited. Seven frozen + two demo
    goldens byte-identical.
-3. **The Power scenario + day/night resolver + standalone run harness.** A Power scenario-data
-   object + a diurnal solar forcing schedule (the weather-table analogue); a `build_power` /
-   `run_power` mirroring `build_season` / `run_season`. The bounded-SOC validation run.
+3. **The Power scenario + day/night resolver + standalone run harness. — COMPLETE.** New
+   `scenario.py` (`PowerScenario` — `battery0`/`solar_peak_w`/`load_fraction`/`daylight_hours`/
+   `dt_seconds`/`steps_per_day`; `BOUNDED_SOC_SCENARIO` + `BOUNDED_SOC_DAYS = 7`) + `system.py`
+   (`build_power` — three stocks + two flows, **no loss-sinks** as Power has no POPULATION stock;
+   `solar_schedule` — a half-sine over the daylight window, the weather-table analogue *computed*;
+   `power_resolver`; `run_power` — the `run_season` analogue **minus** the reset hook). **The
+   load-bearing physics call (advisor):** both flows are *forced* (state-independent), so SOC is a
+   restoring-force-free accumulator with **no attractor** — boundedness is **not emergent**, it is
+   *constructed* by **exact daily energy balance**. So the load is **derived**, not hand-tuned:
+   `power_resolver` computes `load_w = load_fraction·η_c·(Σ_day solar)/steps_per_day` from the
+   discrete daily solar sum + the loaded η_c (`load_fraction = 1` ⇒ exact balance ⇒ bounded
+   periodic SOC; `>1` is the free brownout knob). This is the one place a Power resolver reads a
+   flow param — Power's load is intrinsically η_c-coupled. `dt = 3600 s`, 24 steps/day. Probe:
+   swing ≈ 72 % of `battery0`, min-SOC 11.3× a step's draw (`rationed == 0` structural),
+   day-over-day drift 1e-7 J (the exact-balance round-off). **14 validation tests** (the non-vacuous
+   payload checks the advisor named): per-step ENERGY ledger residual ≈ 0 + the integral
+   total-ENERGY invariant; `rationed == 0`; `events == ()`; **day-over-day SOC return** (true only
+   under exact balance); material swing with min > 0; interior (morning-crossover) daily minimum;
+   monotonic `waste_heat`; the balance identity; determinism; **RK4 ≡ Euler bit-for-bit** (forced
+   flows ⇒ k1=k2=k3=k4 — framed as the identity, not robustness); registration-order independence.
+   **Zero core change** (`git diff src/simcore/` empty); seven frozen + two demo goldens
+   byte-identical (no regen).
 4. **Standalone validation + golden capture.** Assert the augmented `ENERGY` ledger balances every
    step, `rationed == 0`, `events == ()`, bounded non-collapsing SOC oscillation, monotonic
    heat-generated; pin the hex-float Power golden (pre-golden closure gate + `__main__` regen, the
-   biosphere discipline). Determinism + registration-order-independence tests.
+   biosphere discipline). Determinism + registration-order-independence tests. *(Step 3 already
+   lands the validation assertions; Step 4 adds the pinned hex-float golden + its regen `__main__`.)*
 5. **(Forward-pointer) Thermal / Atmosphere-ECLSS / Crew** — each a sibling domain on the same
    pattern, designed just-in-time:
    - **Thermal** — heat **stocks**, conduction, radiator rejection. **Moves Power's `waste_heat`
