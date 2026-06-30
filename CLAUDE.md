@@ -25,8 +25,15 @@ Step 7 minimal consumer — a fifth leaf `biosphere.consumers` + `herbivory.py` 
 up), `CONSUMER_CHAMBER_SCENARIO`, fourth golden; consumer persists, genuinely closed,
 `rationed == 0`, leaf↓/CO₂↑ cascade, per-compartment ledger balanced incl. CONSUMERS; zero
 core change, three producer-only goldens byte-identical);
-**Phase 3 exits — next is Phase 4** (decade-scale stability + freeze-as-reference, held out
-of Phase 3 scope); roadmap `roadmap_extracted.txt`).
+**Phase 3 exits. Phase 4 — decade-scale stability + freeze-as-reference** is underway
+(`docs/plans/phase-4-closed-biosphere.md`): **Step 1 COMPLETE (P4.1)** — `domains/biosphere/drift.py`
+(pure-stdlib drift instrument: `total_quantity` promoting the `_total` fold + three axes —
+mass-drift ceiling/detector, `is_stationary`/`non_collapsing` stationarity split, `is_period_2`)
++ `test_drift.py` + `test_decade_stability.py`; both closed scenarios probed Euler **and** RK4 to
+15 yr → **Euler LOCKED, with evidence** (drift jitters at √N round-off, cycle stationary+period-2,
+closure held, RK4 cross-check retired the preconditions & structurally agrees → Step 2 escalation
+skipped); zero core change, four Phase-3 goldens untouched, no new golden. Next: Step 3 (100k-step
+marked-slow stress), Step 4 (golden capture), Step 5 (freeze contract). Roadmap `roadmap_extracted.txt`.
 Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

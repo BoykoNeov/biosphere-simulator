@@ -1,6 +1,22 @@
 # Phase 4 — Closed Biosphere (the reference domain, frozen)
 
-**Status: DRAFT — not started (Step 1 designed in full below, advisor-reviewed). Phase 3 exits.**
+**Status: Step 1 COMPLETE (the decade-scale Euler probe + drift instrumentation, P4.1).
+Steps 2–5 are just-in-time forward-pointers. Phase 3 exits.**
+
+**Step 1 outcome (measured, 2026-06-30) — EULER LOCKED, with evidence.** `domains/biosphere/drift.py`
+(pure-stdlib instrument: `total_quantity` promoting the `_total` fold + the three drift axes) +
+`tests/test_drift.py` (18 synthetic instrument tests) + `tests/test_decade_stability.py` (31 probe
+tests, ~7.7 s). Both closed scenarios run Euler **and** RK4 to a 15-yr horizon (4575 steps):
+**(a)** mass drift JITTERS at √N round-off (worst `max|d_q| ≈ 3.3e-12` WATER, slope `≈ 7.3e-16` —
+machine-ε, no trend), ~6–9 orders under the `N·BALANCE_ATOL ≈ 4.6e-6` ceiling; derived detector
+bounds `MASS_DRIFT_ABS_BOUND = 1e-9` / `MASS_DRIFT_SLOPE_BOUND = 1e-11` sit *between* the noise
+floor and a 1e-9/step real-bug leak. **(b)** peak-`leaf_c` cycle bounded + non-amplifying +
+non-collapsing + period-2 in both scenarios (fully settled by ~yr 10). **(c)** `rationed == 0`,
+`events == ()`, loss-sink `0.0` every step — for **both** integrators. The **RK4 cross-check
+empirically retired** the two preconditions (survives `annual_reset`×multistage; no arbitration
+hard-error) and **structurally agrees** with Euler → escalation (Step 2) is **skipped**. Zero
+`simcore` change; the four Phase-3 goldens untouched; no new golden (capture is Step 4). The
+`is_stationary`/`non_collapsing` split was an advisor correction folded in (see § P4.1, axis (b)).
 Phases 0, 0.5, 1, 2, and 3 are complete and regression-pinned
 (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber,3-modular-biosphere}.md`).
 This plan **locks the load-bearing Phase-4 decision** (what "conservation-stable over
@@ -89,13 +105,23 @@ must define **drift operationally for a limit cycle**, along three independent a
 - **(b) Limit-cycle stationarity — the emergent-behavior invariant.** Define a small vector of
   **per-year scalar summaries** (candidates: peak `leaf_c`, min `carbon_pool`, year-end
   `consumer_carbon`). Across years `k = 1…Y`, the cycle is **stationary** iff these summaries
-  reach an attractor and **hold** it: `|summary(k) − summary(k−1)|` is bounded and
-  **non-increasing past the transient** — i.e. **not amplifying** (creeping toward blow-up /
-  `annual_reset` raising) and **not decaying** (creeping toward extinction). This is
-  direction-of-trend, not a magic equality — the Step-4/5/6/7 anti-flakiness discipline.
-  The **period-2 structure** is a **discrete structural check** (the cycle *remains* period-2),
-  kept **separate** from the scalar stationarity vector — a phase index is not a scalar you can
-  call "non-increasing." **Horizon caveat (advisor):** axis (b) is **horizon-limited** — it
+  reach an attractor and **hold** it, tested on **same-phase** differences
+  `|summary(k) − summary(k−2)|` (for a period-2 cycle the *adjacent* difference is the cycle
+  amplitude and does not vanish). **Stationarity is TWO orthogonal axes, not one (advisor —
+  forced by the math, IMPLEMENTED):**
+  - **`is_stationary` = bounded + non-amplifying** (least-squares slope of `|diff|` ≤ tol — a
+    direction-of-trend test, not a magic equality). This catches **amplifying** drift (creeping
+    toward blow-up / `annual_reset` raising — `|diff|` grows, *diff-detectable*) and passes a
+    settled *or still-converging* cycle (the lock does NOT require a reached attractor).
+  - **`non_collapsing` = a level/floor check** (every summary stays above a floor). This is the
+    **only** detector of creeping **decay toward extinction**, which is **diff-blind**: geometric
+    decay `s[k] = C·rᵏ` shrinks `|diff|` *identically* to a cycle converging to a finite
+    attractor — the only difference is the *limit* (zero vs nonzero), a property of the **level**,
+    not the diffs. So `is_stationary` alone admits decay; the floor check is **mandatory, not
+    stylistic**.
+  The **period-2 structure** is a third, **discrete structural check** (`is_period_2` — the cycle
+  *remains* period-2), kept **separate** from the scalar stationarity vector — a phase index is
+  not a scalar you can call "non-increasing." **Horizon caveat (advisor):** axis (b) is **horizon-limited** — it
   cannot see a drift slower than the run: a 30-yr decay is invisible in 10 yr. At decade scale,
   axis (b) mostly **confirms** the Phase-3 attractor holds; it is the **100k-step stress**
   (Step 3, ~328 yr) that actually does slow-drift detection. State the **detectable drift-rate
@@ -200,13 +226,14 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
   integrator + dt).
 
 ## Step sequence (sketched; each designed just-in-time, P4.1 first)
-1. **Decade-scale Euler probe + drift instrumentation (P4.1).** Run perennial + consumer to
-   ≥10 yr; compute the three drift metrics (a/b/c); **decide Euler-holds vs escalate**. The
-   de-risk that gates everything — **designed in full below** (§ *Step 1 — full design*),
-   advisor-reviewed.
-2. **(Conditional) integrator escalation.** *Only if Step 1 drifts:* RK4 for the biosphere, with
-   the `annual_reset`×multistage design + the "needed scale is a hard error" precondition check.
-   **Skipped entirely if Euler holds** (the expected outcome).
+1. **Decade-scale Euler probe + drift instrumentation (P4.1). — COMPLETE.** Ran perennial +
+   consumer to 15 yr; computed the three drift metrics (a/b/c); **Euler holds → locked, with
+   evidence** (see the Step-1 outcome block at the top). The de-risk that gates everything —
+   designed in full below (§ *Step 1 — full design*), advisor-reviewed, now implemented.
+2. **(Conditional) integrator escalation. — SKIPPED.** Step 1 did not drift and the RK4
+   cross-check structurally agreed, so escalation is unneeded. (Had it been needed: RK4 for the
+   biosphere with the `annual_reset`×multistage design + the "needed scale is a hard error"
+   precondition check.)
 3. **100k-step stability stress (line 211).** The "no drift" stress as a **marked-slow opt-in**
    test — the **real slow-drift detector** (axis (b) is horizon-blind to anything slower than the
    run). Report the round-off slope vs the `N · BALANCE_ATOL` ceiling.
@@ -216,10 +243,13 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
 5. **The freeze contract (P4.3).** `docs/biosphere-reference.md` + the manifest + the unfreeze
    discipline; the formal freeze of the biosphere domain.
 
-## Step 1 — full design: decade-scale Euler probe + drift instrumentation (P4.1)
+## Step 1 — full design: decade-scale Euler probe + drift instrumentation (P4.1) — COMPLETE
 
-*The de-risk that gates all of Phase 4 — designed in full and advisor-reviewed before any
-code (the Phase-1/2/3 rhythm). A **measurement** step: run the two closed scenarios to
+*Implemented as designed (`drift.py` + `test_drift.py` + `test_decade_stability.py`); the
+measured outcome is the **EULER LOCKED** block at the top of this plan. The design below is
+retained as the as-built record. The de-risk that gates all of Phase 4 — designed in full and
+advisor-reviewed before any code (the Phase-1/2/3 rhythm). A **measurement** step: run the two
+closed scenarios to
 decade scale, compute the three P4.1 drift axes, and **decide Euler-holds-vs-escalate on
 evidence**. Boundary/test-side only — `git diff src/simcore/` stays empty; no new golden
 (capture is P4.2/Step 4); the four Phase-3 goldens untouched.*
@@ -246,8 +276,16 @@ evidence**. Boundary/test-side only — `git diff src/simcore/` stays empty; no 
      at **real-bug scale (~1e-9/step)** must **fail** the detector, while round-off-scale jitter
      must **pass** — proving the bound sits *between* round-off and real-bug scale, not merely
      that slope-of-a-line works;
-   - **stationarity:** a stationary period-2 trace passes `is_stationary`; an **amplifying** one
-     fails; a **decaying** one fails.
+   - **stationarity (the mandatory split — advisor, IMPLEMENTED):** `is_stationary` (bounded +
+     non-amplifying) **cannot** detect creeping decay: geometric decay `s[k] = C·rᵏ` shrinks the
+     same-phase diffs *identically* to a cycle converging to a finite attractor — the only
+     difference is the *limit* (zero vs nonzero), a property of the summary **level**, not its
+     diffs. So a stationary/converging trace **passes** `is_stationary`; an **amplifying** one
+     **fails** it (`|diff|` grows — diff-detectable); a **decaying** one **passes** `is_stationary`
+     (diff-blind) but **fails** the separate `non_collapsing` level/floor check, which owns
+     extinction. The test asserts *both* detectors explicitly, so it documents which axis owns
+     decay. *(This corrects the earlier "a decaying one fails `is_stationary`" — decay is routed
+     to `non_collapsing`, a third orthogonal axis the design had conflated into the diff axis.)*
 3. **`tests/test_decade_stability.py`** — the actual probe on **both**
    `PERENNIAL_CHAMBER_SCENARIO` and `CONSUMER_CHAMBER_SCENARIO`, asserting axes (a)/(b)/(c) +
    the Euler-vs-RK4 **structural** agreement. Module-scoped fixtures (each decade run executes
@@ -279,11 +317,15 @@ evidence**. Boundary/test-side only — `git diff src/simcore/` stays empty; no 
 min `carbon_pool`, year-end `consumer_carbon`). **The catch:** for a period-2 cycle
 `summary(k) − summary(k−1)` does **not** vanish — it is the cycle *amplitude*, oscillating
 between the two branches. So stationarity is tested on **same-phase differences**
-`summary(k) − summary(k−2)`, asserted **bounded and non-increasing past the transient**.
-**Stationary ≡ bounded + converging-or-converged** — explicitly **not** "must have reached the
-attractor": a still-converging-but-bounded cycle (amplitude shrinking toward a finite attractor)
-satisfies non-amplifying + bounded and is freezable. The period-2 *structure* (the cycle remains
-period-2) is the separate **discrete** check.
+`summary(k) − summary(k−2)`, asserted **bounded and non-amplifying past the transient** by
+`is_stationary` (least-squares slope of `|diff|` ≤ tol). **Stationary ≡ bounded +
+converging-or-converged** — explicitly **not** "must have reached the attractor": a
+still-converging-but-bounded cycle (amplitude shrinking toward a finite attractor) satisfies
+non-amplifying + bounded and is freezable. **`is_stationary` is diff-blind to decay** (geometric
+decay shrinks `|diff|` identically to convergence), so the **mandatory** companion
+`non_collapsing` (a level/floor check) owns the extinction axis — the split is forced by the
+math, not stylistic. The period-2 *structure* (the cycle remains period-2) is the separate
+**discrete** `is_period_2` check.
 
 **(c) Closure carried over the full horizon.** `rationed == 0`, `events == ()`, carbon
 loss-sink `0.0` on **every** step of the decade run (both scenarios) — the Phase-3 closure
