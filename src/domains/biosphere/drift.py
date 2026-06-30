@@ -135,12 +135,22 @@ def max_abs(trace: Sequence[float]) -> float:
 #   Bounds    : set BETWEEN the measured noise floor and the real-bug leak, so the
 #               detector has teeth (test_drift.py::test_detector_discriminates) yet
 #               never trips on round-off.
+#   Re-confirmed at 328 yr (the Step-3 100k stress, test_biosphere_stress.py — steps =
+#               328 * len(weather) = 100,040, Euler, both closed scenarios):
+#                 max|d_q|  ~ 7.4e-11  (WATER; CARBON ~2e-14, still the tightest)
+#                 |slope_q| ~ 7.5e-16  (WATER) — STILL ~3x machine-eps, no growth
+#               Over the 22x-longer run the SLOPE stayed flat (no systematic leak
+#               emerged), while max|d_q| grew ~linearly AT that machine-eps slope
+#               (slope * N ~ 7.5e-16 * 1e5 ~ 7.4e-11 ~ max|d_q|) — i.e. deterministic
+#               round-off in this fold's summation order, NOT a leak. Both bounds hold
+#               with margin at 100k (abs ~13x, slope ~4.5 orders), so they span both
+#               horizons; no re-derivation needed.
 #
-# ABS bound: ~300x the sqrt(N) round-off floor (3.3e-12), ~4600x under the ceiling; a
-# 1e-9/step leak breaches it within a few steps.
+# ABS bound: ~300x the 15-yr round-off floor (3.3e-12), ~13x the 328-yr floor (7.4e-11),
+# always >> a 1e-9/step leak (which puts max|d| at the ceiling ~1e-4 within ~328 yr).
 MASS_DRIFT_ABS_BOUND: float = 1e-9
-# SLOPE bound: ~4 orders above the noise slope (7.3e-16), ~2 orders below a 1e-9/step
-# leak's slope (1e-9).
+# SLOPE bound: ~4 orders above the measured round-off slope (~7.3e-16 at 15 yr, ~7.5e-16
+# at 328 yr — flat), ~2 orders below a 1e-9/step leak's slope (1e-9).
 MASS_DRIFT_SLOPE_BOUND: float = 1e-11
 
 

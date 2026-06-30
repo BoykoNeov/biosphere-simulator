@@ -1,7 +1,33 @@
 # Phase 4 — Closed Biosphere (the reference domain, frozen)
 
-**Status: Step 1 COMPLETE (the decade-scale Euler probe + drift instrumentation, P4.1).
-Steps 2–5 are just-in-time forward-pointers. Phase 3 exits.**
+**Status: Steps 1–3 COMPLETE (decade probe + drift instrumentation P4.1; integrator
+escalation SKIPPED; the 100k-step biosphere slow-drift stress). Step 4 (golden capture)
++ Step 5 (freeze contract) are just-in-time forward-pointers. Phase 3 exits.**
+
+**Step 3 outcome (measured, 2026-06-30) — EULER HOLDS AT 100k+, NO DRIFT.**
+`tests/test_biosphere_stress.py` (24 tests, marked `slow`, ~30 s) runs **both** closed
+scenarios (`PERENNIAL_CHAMBER_SCENARIO`, `CONSUMER_CHAMBER_SCENARIO`) Euler-daily to **328
+whole years (100,040 steps, "100k+")** — the **real slow-drift detector** (axis (b) is
+horizon-blind to anything slower than the run). **Streaming-chunked** (one year per chunk,
+carrying the exact `State` forward — bit-identical to a continuous run, *verified*; folds
+`total_quantity` + per-year summaries out and discards states → ~11 MB, not the ~0.8 GB
+retain-all). Euler-only: Step 1 already locked Euler *with evidence*, so RK4 (~4× cost) is
+not re-run. **(a)** mass drift over the 22×-longer run: worst `max|d_q| ≈ 7.4e-11` (WATER;
+CARBON ~2e-14) and worst `|slope| ≈ 7.5e-16` — the **slope stayed flat at ~3× machine-ε
+(no growth)** while `max|d_q|` grew ~linearly *at that machine-ε slope* (`slope·N ≈ 7.4e-11
+≈ max|d_q|`): deterministic round-off in the fold, **not** a leak. Both detector bounds
+hold with margin (~13× under `MASS_DRIFT_ABS_BOUND`, ~4.5 orders under
+`MASS_DRIFT_SLOPE_BOUND`), ~7 orders under the `N·BALANCE_ATOL ≈ 1e-4` ceiling — the bounds
+**span both horizons**, no re-derivation (drift.py PROVENANCE updated with the 328-yr
+numbers). **(b)** stationarity now **confirmed, not merely holding**: per-year `peak leaf_c`
+bounded + non-amplifying + non-collapsing, and the **period class is sustained the full
+horizon** — perennial holds genuine **period-2** (320 yr of strict alternation, gap ~0.07),
+consumer holds its **period-1** fixed point (gap ~3.4e-5) with stationary, alive biomass.
+**(c)** `rationed == 0`, `events == ()`, loss-sink `0.0` on **every** one of the 100,040
+steps, both scenarios — the strongest closure statement. Assertion-only (no golden — Step 4
+captures the *decade* snapshot); wall-clock + round-off-vs-ceiling **logged** (not capped);
+`git diff src/simcore/` empty (drift.py is a domain module); the four Phase-3 goldens
+untouched. Step 2 (integrator escalation) **stays SKIPPED** — Euler held at 100k+.
 
 **Step 1 outcome (measured, 2026-06-30) — EULER LOCKED, with evidence.** `domains/biosphere/drift.py`
 (pure-stdlib instrument: `total_quantity` promoting the `_total` fold + the three drift axes) +
@@ -237,9 +263,13 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
    cross-check structurally agreed, so escalation is unneeded. (Had it been needed: RK4 for the
    biosphere with the `annual_reset`×multistage design + the "needed scale is a hard error"
    precondition check.)
-3. **100k-step stability stress (line 211).** The "no drift" stress as a **marked-slow opt-in**
-   test — the **real slow-drift detector** (axis (b) is horizon-blind to anything slower than the
-   run). Report the round-off slope vs the `N · BALANCE_ATOL` ceiling.
+3. **100k-step stability stress (line 211). — COMPLETE.** `tests/test_biosphere_stress.py`
+   (marked-slow, opt-out): both closed scenarios Euler-daily to **328 whole years (100,040
+   steps)**, streaming-chunked (memory-safe, bit-identical to a continuous run). The **real
+   slow-drift detector** (axis (b) is horizon-blind to anything slower than the run): mass
+   drift slope stayed flat at machine-ε (no leak), period class sustained the full horizon,
+   closure held every step. Round-off slope vs the `N · BALANCE_ATOL` ceiling **logged**. See
+   the Step-3 outcome block at the top. Euler held → Step 2 stays skipped.
 4. **Canonical golden capture (P4.2).** Pin the long-horizon perennial + consumer goldens + the
    drift-summary golden; re-affirm the four Phase-3 goldens (byte-identical, or
    regenerated-with-provenance if Step 2 changed the integrator).

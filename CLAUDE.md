@@ -26,16 +26,22 @@ up), `CONSUMER_CHAMBER_SCENARIO`, fourth golden; consumer persists, genuinely cl
 `rationed == 0`, leaf↓/CO₂↑ cascade, per-compartment ledger balanced incl. CONSUMERS; zero
 core change, three producer-only goldens byte-identical);
 **Phase 3 exits. Phase 4 — decade-scale stability + freeze-as-reference** is underway
-(`docs/plans/phase-4-closed-biosphere.md`): **Step 1 COMPLETE (P4.1)** — `domains/biosphere/drift.py`
-(pure-stdlib drift instrument: `total_quantity` promoting the `_total` fold + three axes —
-mass-drift ceiling/detector, `is_stationary`/`non_collapsing` stationarity split, `is_period_2`)
-+ `test_drift.py` + `test_decade_stability.py`; both closed scenarios probed Euler **and** RK4 to
-15 yr → **Euler LOCKED, with evidence** (drift jitters at √N round-off; cycle bounded/non-amplifying/
-non-collapsing — perennial settles to a **period-2** cycle, consumer to a **period-1 fixed point**
-(herbivore damps the producer oscillation, measured not assumed); closure held; RK4 cross-check
-retired the preconditions & structurally agrees → Step 2 escalation skipped); zero core change,
-four Phase-3 goldens untouched, no new golden. Next: Step 3 (100k-step
-marked-slow stress), Step 4 (golden capture), Step 5 (freeze contract). Roadmap `roadmap_extracted.txt`.
+(`docs/plans/phase-4-closed-biosphere.md`): **Steps 1–3 COMPLETE.** Step 1 (P4.1) —
+`domains/biosphere/drift.py` (pure-stdlib drift instrument: `total_quantity` promoting the
+`_total` fold + three axes — mass-drift ceiling/detector, `is_stationary`/`non_collapsing`
+stationarity split, `is_period_2`) + `test_drift.py` + `test_decade_stability.py`; both closed
+scenarios probed Euler **and** RK4 to 15 yr → **Euler LOCKED, with evidence** (drift jitters at
+√N round-off; cycle bounded/non-amplifying/non-collapsing — perennial settles to a **period-2**
+cycle, consumer to a **period-1 fixed point** (herbivore damps the producer oscillation, measured
+not assumed); closure held; RK4 cross-check retired the preconditions & structurally agrees → Step
+2 escalation skipped). Step 3 (100k-step stress) — `test_biosphere_stress.py` (marked-slow,
+streaming-chunked, bit-identical to a continuous run): both closed scenarios Euler-daily to **328
+yr (100,040 steps)**, the real slow-drift detector → **EULER HOLDS, NO DRIFT** (mass-drift slope
+flat at machine-ε over the 22×-longer run, both detector bounds span both horizons; period class
+sustained the full horizon — perennial period-2, consumer period-1; closure held every step);
+zero core change, four Phase-3 goldens untouched, no new golden (capture is Step 4). Next: Step 4
+(golden capture: decade hex snapshot + drift-summary golden), Step 5 (freeze contract). Roadmap
+`roadmap_extracted.txt`.
 Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
