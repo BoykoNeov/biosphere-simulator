@@ -176,6 +176,67 @@ CONSUMER_CHAMBER_YEARS: int = 5
 # cannot drift.
 LONG_HORIZON_YEARS: int = 15
 
+# --- Additive dormant-machinery scenarios (NOT frozen reference scenarios) -----------
+# Two **additive, non-reference** scenarios that deliberately drive code paths the seven
+# frozen scenarios leave dormant: the ``f_N`` photosynthesis limiter (every frozen
+# scenario keeps ``f_N ≡ 1`` — verified by ``test_*_f_n_stays_one``) and the sealed
+# water cycle's ``f_water`` (tuned **inert** in the frozen chambers — ``soil_water``
+# stays far above the stress band, so ``f_water ≡ 1``). Purpose: flush latent bugs in
+# the never-run-hot limiter integration before Phase 5 builds on it. **These are NOT
+# part of the freeze reference** (not in ``biosphere-reference.manifest.json``): they
+# add no flow/aux/param — only new scenario *data* + their own goldens — so every frozen
+# trajectory stays byte-identical. Sized by probe (the Step-4 rhythm); see each note.
+
+# **N-limiting** (open field, single season): N-limitation **by dilution** — the primary
+# mechanism ``nitrogen.py`` names. A deliberately small fixed plant-N reserve
+# (``plant_n0`` ~ the f_N critical concentration times the seedling biomass) puts the
+# whole-plant N concentration ``plant_n / (leaf+stem+root)`` inside the
+# ``(n_residual, n_critical)`` band at sowing; as biomass grows the concentration falls
+# *through* the band, so ``f_N`` ramps below 1 and N-limits gross assimilation (probe:
+# ``f_N`` reaches ~0.55, biting on ~66 of 305 steps, then recovers as the plant dies
+# back). Uptake is shut **off**: ``soil_n0`` below the default ``sn_residual=1.0``,
+# so ``soil_n_availability ≡ 0`` and ``NitrogenUptake`` yields a structural zero leg
+# every step — which keeps ``plant_n`` constant so the bite is pure dilution,
+# unconfounded by uptake. (The ``soil_n_availability`` *middle* ramp cannot be
+# co-exercised arbitration-free **with this dilution bite**: it pins ``plant_n`` in
+# the tiny f_N band, where the frozen ``max_uptake_capacity = 0.0015`` kg N/m2/day is
+# ~15x that band per day, so any in-band uptake either floods ``plant_n`` past the f_N
+# band or exhausts ``soil_n`` in one step -> the Euler backstop. The ramp IS traversable
+# in a *healthy-plant* run with a narrow high soil-N band, but that would not make f_N
+# bite — a different experiment, out of this scenario's two-scenario scope. So this
+# scenario owns the f_N concentration ramp + the uptake-shutoff path; the availability
+# *middle* ramp stays an integrated never-run-hot path, unit-tested in
+# ``test_nitrogen.py``.) Open field (the only place with no N return loop), single
+# season, ``rationed == 0`` / ``events == ()`` / loss-sink ``0.0``.
+N_LIMITED_SCENARIO: SeasonScenario = SeasonScenario(
+    plant_n0=6e-5,  # kg N — tiny reserve ⇒ conc in the f_N band, diluted by growth
+    soil_n0=0.5,  # kg N < sn_residual (1.0) ⇒ availability ≡ 0, uptake off (dilution)
+)
+N_LIMITED_YEARS: int = 1
+
+# **Water-biting** (sealed chamber, single season): the sealed water cycle made to
+# **bite** instead of run inert. The frozen chambers start ``soil_water0 = 1000`` kg, so
+# the closed loop (``soil_water -> water_vapor -> condensate -> soil_water``) keeps
+# ``soil_water`` far above ``sw_critical = 60`` and ``f_water ≡ 1``. Here
+# ``soil_water0 = 50`` kg sits inside the ``(sw_wilting, sw_critical) = (20, 60)`` band:
+# the conserved loop total is only 50 kg, so ``soil_water`` settles ~40 kg (transp.
+# self-limits via its own ``water_stress_factor``, so the cycle reaches a stable fixed
+# point well **above** wilting — the plant survives), and ``f_water`` holds ~0.5 every
+# step (probe), water-limiting gross assimilation the whole season. Ample-O2 sibling of
+# the perennial chamber (``litter_carbon0 = 3``, default O2 = 210) so the carbon story
+# is the clean perennial one and the water bite is the only novelty. Single season, the
+# water-loop total conserved to round-off (probe drift ~4e-14), ``rationed == 0`` /
+# ``events == ()`` / loss-sink ``0.0`` by construction (the first-order donor-controlled
+# water flows can never overdraw). Keeps ``f_N ≡ 1`` (default ``plant_n0``) — purely
+# water.
+WATER_BITING_SCENARIO: SeasonScenario = SeasonScenario(
+    sealed=True,
+    litter_carbon0=3.0,
+    soil_water0=50.0,  # kg — inside (sw_wilting, sw_critical) ⇒ f_water < 1 all season
+)
+WATER_BITING_YEARS: int = 1
+
+
 # The Phase-3 Step-6 (P3.5) drought scenario: an **open-field** plot deliberately sized
 # **water-lean** so the irrigation-cut perturbation actually bites. The default open
 # field starts ``soil_water0 = 1000`` kg — a store so far above the stress band

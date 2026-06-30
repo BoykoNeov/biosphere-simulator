@@ -59,10 +59,22 @@ value enforcement stays with the scenario goldens, the gate owns only what they'
 a param/flow/aux added but wired into no golden; rationale: every param feeds a golden so a
 value change already moves one, and a raw hash is non-reproducible under `autocrlf`). Phase-0
 demo (`flows.py`/`demo.yaml`) scoped out by name. Seven goldens byte-identical (no regen);
-zero core change (`aux_processes` is a public read-only property). **Phase 4 EXITS → Phase 5
-(sibling domains: power / thermal / atmosphere-ECLSS / crew), each verified standalone then
-against the now-frozen biosphere.** Roadmap `roadmap_extracted.txt`.
-Reuse/licensing rules: `docs/reuse-and-licenses.md`.
+zero core change (`aux_processes` is a public read-only property). **Phase 4 EXITS.**
+**Pre-Phase-5 "cheap middle" — two additive dormant-machinery scenarios — COMPLETE
+(additive, NON-frozen; flushed the `f_N` + sealed-`f_water` limiter integrations):**
+`N_LIMITED_SCENARIO` (open field — tiny fixed `plant_n0` + uptake off via `soil_n0` below
+`sn_residual` → N-limitation **by dilution**, `f_N`↓ to ~0.55) and `WATER_BITING_SCENARIO`
+(sealed — `soil_water0=50` inside the `(sw_wilting, sw_critical)` band → the closed water
+cycle bites, `f_water`↓ to ~0.50, loop still conserved). Each: scenario *data* only (no new
+flow/aux/param), reconstruct-the-factor behavioral test (`test_{n_limited,water_biting}.py`)
++ a cascade-vs-baseline isolating the limiter, a regression golden whose pre-golden gate
+asserts the factor *actually bit* (a non-biting run can't re-pin it). The `soil_n_availability`
+*middle* ramp stays an integrated never-run-hot path (can't co-bite arbitration-free with
+dilution; unit-tested in `test_nitrogen.py`). Zero core change; **seven frozen goldens
+byte-identical** (no regen) — proof the reference didn't move; not in the freeze manifest
+(see `docs/biosphere-reference.md`). **Next: Phase 5** (sibling domains: power / thermal /
+atmosphere-ECLSS / crew), each verified standalone then against the now-frozen biosphere.
+Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
 

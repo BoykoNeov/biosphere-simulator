@@ -36,6 +36,16 @@ reviewed, and re-captured* — not silent.
 - **No new science.** Phase 4 added no flow, no trophic level, no coupled
   (Lotka-Volterra/Holling) dynamics — those were deferred at the Phase-3 capstone. The freeze
   captures the closed biosphere **as Phase 3 left it**.
+- **The two additive dormant-machinery scenarios** — `N_LIMITED_SCENARIO` (open field,
+  `f_N` driven below 1 by N-dilution) and `WATER_BITING_SCENARIO` (sealed chamber, the closed
+  water cycle's `f_water` driven below 1) — added *after* the freeze (the Phase-5 sequencing
+  decision) to flush the never-run-hot `f_N` and sealed-`f_water` limiter integrations before
+  Phase 5. They are **deliberately NON-frozen**: scenario *data* only (no new flow / aux /
+  param), their own goldens (`n_limited_state.json`, `water_biting_state.json`,
+  `test_{n_limited,water_biting}.py` + the two `test_regression_*` gates), and **not** in the
+  manifest. Adding them left all seven frozen goldens byte-identical — that byte-identity is
+  the proof the reference did not move. A future maintainer should read these as intentional
+  stress scenarios, not a freeze omission.
 
 ## The frozen surface
 
