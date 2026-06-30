@@ -8,7 +8,10 @@ trajectory-independent bound (see the step-10 design in the plan):
 
   * ``Photosynthesis``  ``atmospheric_c -> plant_c``   ``flux = k_photo·light·atm·dt``
         ``light = env.get(light_var)`` is read as a **scalar rate multiplier** — it
-        is *not* a consumed leg (energy is structure-only in Phase 0, decision #8).
+        is *not* a consumed energy leg (this demo tracks no ENERGY transfer; the
+        ``boundary.light`` stock is constant forcing). ``ENERGY`` itself became an
+        asserted conserved quantity in Phase 5 — see ``simcore.quantities`` — but
+        that does not change this flow: it touches only CARBON.
         This is the flow that carries the internal source-resolver case (#16): the
         caller cannot tell whether ``light`` came from a forcing schedule or a
         sibling-domain boundary stock.
@@ -33,7 +36,7 @@ from simcore.state import State
 
 @dataclass(frozen=True)
 class Photosynthesis:
-    """``atmospheric_c -> plant_c`` at first-order rate ``k_photo·light`` (#8/#16).
+    """``atmospheric_c -> plant_c`` at first-order rate ``k_photo·light`` (#16).
 
     ``light`` is read from ``env`` as a scalar rate multiplier (not a consumed leg);
     the carbon transfer itself is balanced. ``flux = k_photo·light·atm_c·dt``.

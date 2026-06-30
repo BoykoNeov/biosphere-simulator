@@ -133,8 +133,11 @@ def per_quantity_residual(
 ) -> dict[Quantity, float]:
     """Net leg sum per ``Quantity`` actually present in ``result`` (the diagnostic).
 
-    Includes ``ENERGY`` (exempt from the asserted balance but reported as a
-    diagnostic, decision #8). Quantities not touched are simply absent from the
+    Reports every quantity present, ``ENERGY`` included — ``ENERGY`` is now an
+    asserted conserved quantity (Phase 5; it was balance-exempt through Phase 4
+    under the original decision #8). This helper always reported every present
+    quantity; what changed in Phase 5 is that ``assert_flow_balanced`` now *asserts*
+    the ``ENERGY`` residual too. Quantities not touched are simply absent from the
     result (a missing quantity has a trivial 0 residual). Legs are folded in
     **canonical order** — sorted by stock id (decision #15) — so the sum is
     bit-identical regardless of leg construction order; this helper is the
