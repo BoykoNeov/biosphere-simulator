@@ -85,10 +85,13 @@ def loss_sinks(
 ) -> dict[StockId, Stock]:
     """Build one loss-sink per quantity, keyed by id (ready to merge into State).
 
-    Defaults to ``ASSERTED_QUANTITIES`` — the mass quantities the ledger balances.
-    ENERGY gets no loss-sink (it is balance-exempt, decision #8, and POPULATION
-    biomass is carbon anyway). Built in canonical (quantity-name) order so the
-    result is deterministic regardless of the input set's iteration order.
+    Defaults to ``ASSERTED_QUANTITIES`` — every conserved quantity the ledger
+    balances (ENERGY joined the set in Phase 5). A loss-sink exists to route a
+    snapped *POPULATION* residual; ENERGY has no POPULATION stock (biomass is
+    carbon), so its loss-sink is never used — harmless, and no production caller
+    builds it (``build_season``/``build_demo`` pass an explicit ``{CARBON}``). Built
+    in canonical (quantity-name) order so the result is deterministic regardless of
+    the input set's iteration order.
     """
     ordered = sorted(quantities, key=lambda q: q.name)
     return {s.id: s for s in (loss_sink(q) for q in ordered)}

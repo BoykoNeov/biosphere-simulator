@@ -87,12 +87,19 @@ def canonical_unit(quantity: Quantity) -> UnitLabel:
 
 
 # --- balance contract (shared by the step-3 flow check + step-8 ledger) ------
-# The quantities whose per-flow / per-step balance is ASSERTED. ENERGY is exempt
-# (decision #8: energy *closure* is Phase 5/6; here energy is a diagnostic only).
-# This is the single source of truth for "what we assert" — co-located with the
-# tolerances below ("how tightly") so the step-3 flow-balance helper and the
-# step-8 conservation gate cannot drift apart.
-ASSERTED_QUANTITIES: frozenset[Quantity] = frozenset(Quantity) - {Quantity.ENERGY}
+# The quantities whose per-flow / per-step balance is ASSERTED. ALL five members,
+# ENERGY included: ENERGY joined the conserved set in **Phase 5** (the Power domain —
+# "energy enters the ledger in practice", roadmap line 318), having been balance-exempt
+# through Phase 4 (the original decision #8 deferred energy *closure* to Phase 5/6).
+# Energy obeys Inputs = Outputs + ΔStored like any mass quantity; what differs is that
+# energy *degrades* — electricity → heat is a transmutation of *form* (one conserved
+# Quantity, in joules), with "usefulness is not conserved" tracked as the monotonic
+# heat-generated diagnostic, NOT a second conserved quantity (a per-quantity ledger
+# cannot balance a conversion across two of its quantities). See
+# docs/plans/phase-5-sibling-domains.md (P5.1). This is the single source of truth for
+# "what we assert" — co-located with the tolerances below ("how tightly") so the step-3
+# flow-balance helper and the step-8 conservation gate cannot drift apart.
+ASSERTED_QUANTITIES: frozenset[Quantity] = frozenset(Quantity)
 
 # The balance test is ``abs(residual) <= BALANCE_ATOL + BALANCE_RTOL * scale``,
 # where ``scale`` is the transfer magnitude (max ``|leg.amount|`` for the

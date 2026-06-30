@@ -108,7 +108,10 @@ def build_demo(params: DemoParams) -> tuple[State, Registry]:
     )
     outside = boundary.sink(OUTSIDE_C, Quantity.CARBON, params.outside_c0)
     # An "outside" solar reservoir, read as a scalar driver and never touched by a
-    # leg (so its delta is always 0; ENERGY is balance-exempt, #8). unclamped=True.
+    # leg, so its delta is always 0. ENERGY is now an asserted conserved quantity
+    # (Phase 5), but a zero per-step delta conserves trivially — this stock passes
+    # the gate untouched (and the Phase-0 demo gains a free ENERGY-conservation
+    # check). unclamped=True.
     light = boundary.source(LIGHT, Quantity.ENERGY, params.light)
 
     stocks: dict[StockId, Stock] = {

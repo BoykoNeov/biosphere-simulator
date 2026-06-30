@@ -16,9 +16,12 @@ integrity are *evaluation-time* properties, not registration-time:
     runs before the conservation gate. A typo'd stock id surfaces as a
     ``KeyError`` at the first step, by design.
 
-``ENERGY`` is exempt from the asserted balance (decision #8: energy closure is
-Phase 5/6). ``per_quantity_residual`` still reports it (the diagnostic);
-``assert_flow_balanced`` iterates only ``ASSERTED_QUANTITIES``.
+``ENERGY`` is **now asserted** like the mass quantities — it joined the conserved
+set in Phase 5 (the Power domain; was exempt through Phase 4 under the original
+decision #8). ``per_quantity_residual`` reports every quantity present (it always
+did); ``assert_flow_balanced`` iterates ``ASSERTED_QUANTITIES``, which now includes
+``ENERGY``. Electricity→heat is a transmutation of *form* within the one ENERGY
+currency (see ``simcore.quantities`` / phase-5 plan), not a cross-quantity flow.
 
 Pure stdlib only.
 """
@@ -164,9 +167,10 @@ def assert_flow_balanced(
 ) -> None:
     """Raise ``ConservationError`` if any asserted quantity fails to balance.
 
-    For each quantity in ``ASSERTED_QUANTITIES`` (every ``Quantity`` except the
-    exempt ``ENERGY``), require ``abs(residual) <= atol + rtol * scale`` where
-    ``scale`` is the transfer magnitude (max ``|leg.amount|`` for that quantity).
+    For each quantity in ``ASSERTED_QUANTITIES`` (every ``Quantity`` — ``ENERGY``
+    joined the conserved set in Phase 5), require
+    ``abs(residual) <= atol + rtol * scale`` where ``scale`` is the transfer
+    magnitude (max ``|leg.amount|`` for that quantity).
     The relative term keeps the check meaningful for the step-8 gate over real,
     varied magnitudes; step-3 synthetic flows (residual ~0) pass on ``atol`` alone.
     """

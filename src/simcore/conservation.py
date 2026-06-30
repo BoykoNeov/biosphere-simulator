@@ -65,8 +65,9 @@ class QuantityLedger:
 def compute_ledger(before: State, after: State) -> tuple[QuantityLedger, ...]:
     """Per-quantity ledger for the step ``before → after`` (canonical quantity order).
 
-    Covers every quantity *present* in the stocks, ``ENERGY`` included as a
-    diagnostic (balance-exempt, decision #8 — mirroring ``flow.per_quantity_residual``).
+    Covers every quantity *present* in the stocks, ``ENERGY`` included — it is now an
+    asserted conserved quantity (Phase 5; was a balance-exempt diagnostic through
+    Phase 4), mirroring ``flow.per_quantity_residual``.
     Per-stock deltas are accumulated within each ``StockKind`` partition in **sorted
     stock-id order** (decision #15: "every reduction"; float sums are non-associative,
     so this — not mapping iteration order — is what makes the ledger bit-identical
@@ -123,7 +124,7 @@ def assert_conserved(
 
     The every-step engine gate (decision #7 / CLAUDE.md "conservation is asserted
     every step — a failure is a bug"). For each ``ASSERTED_QUANTITIES`` member (every
-    ``Quantity`` except the exempt ``ENERGY``, #8), require
+    ``Quantity`` — ``ENERGY`` joined the conserved set in Phase 5), require
     ``abs(residual) <= atol + rtol * scale``, where ``scale`` is the transfer
     magnitude — ``max |per-stock Δ|`` for that quantity — matching
     ``flow.assert_flow_balanced``'s scale notion.

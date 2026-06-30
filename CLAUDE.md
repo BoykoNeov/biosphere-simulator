@@ -72,8 +72,26 @@ asserts the factor *actually bit* (a non-biting run can't re-pin it). The `soil_
 *middle* ramp stays an integrated never-run-hot path (can't co-bite arbitration-free with
 dilution; unit-tested in `test_nitrogen.py`). Zero core change; **seven frozen goldens
 byte-identical** (no regen) — proof the reference didn't move; not in the freeze manifest
-(see `docs/biosphere-reference.md`). **Next: Phase 5** (sibling domains: power / thermal /
-atmosphere-ECLSS / crew), each verified standalone then against the now-frozen biosphere.
+(see `docs/biosphere-reference.md`).
+**Phase 5 — sibling domains (power / thermal / atmosphere-ECLSS / crew), Power first — IN
+PROGRESS** (`docs/plans/phase-5-sibling-domains.md`; plan advisor-reviewed). The load-bearing
+decision is **energy closure (P5.1)**: `ENERGY` *joins the conserved set* (was balance-exempt
+through Phase 4, decision #8). **Energy is ONE conserved quantity (joules); electricity vs
+heat is a *form* distinction carried by the stock, NOT a separate `Quantity`** — a per-quantity
+ledger can't balance a conversion (`battery→waste_heat`) across two of its quantities; "every
+joule named" is the 3-leg lossy-flow pattern, "usefulness is not conserved" is the monotonic
+heat-generated diagnostic (roadmap 46–51). Standalone Power dumps heat to a `boundary.waste_heat`
+sink; **Thermal moves that boundary inward later** (the water-cycle-closure analogue for energy).
+**Step 1 (P5.1a) COMPLETE — the isolated `ASSERTED_QUANTITIES` flip**: `frozenset(Quantity)`
+now includes `ENERGY`; stale decision-#8 prose updated across `quantities.py`/`flow.py`/
+`conservation.py`/`boundary.py`/`demo.py`; three inverse-teeth unit tests flipped (ENERGY
+imbalance now *caught*). **Proven inert for existing runs** — the biosphere has no `ENERGY`
+stock and the Phase-0 demo's `boundary.light` has a permanently-zero delta, so **all seven
+frozen goldens + both demo goldens are byte-identical** (full suite green, 1035 passed). The one
+sanctioned `simcore/` edit (a frozenset the roadmap always intended to flip here, line 318 —
+**not** a biosphere-freeze violation; no frozen surface moved). **Next: P5.2** — the standalone
+Power domain (battery POOL + solar/waste-heat BOUNDARYs + energy-balanced flows). Cross-domain
+coupling is **Phase 6**.
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

@@ -4,8 +4,9 @@ The augmented (modeled + boundary) system is closed, so per asserted quantity th
 total mass across all stocks is unchanged each step (decision #13). ``compute_ledger``
 decomposes the per-step change into boundary (Input/Output) and stored (ΔStored)
 deltas; ``assert_conserved`` is the every-step engine gate, wired into the integrator
-so a violation raises ``ConservationError``. ``ENERGY`` is balance-exempt (#8):
-reported as a diagnostic, never asserted.
+so a violation raises ``ConservationError``. ``ENERGY`` joined the conserved set in
+Phase 5 (the Power domain) — it is now asserted like the mass quantities; it was a
+reported-but-exempt diagnostic through Phase 4.
 
 Built test-first against the "Step 8 design" section of the plan.
 """
@@ -142,10 +143,14 @@ def test_integrator_step_raises_on_unbalanced_flow(integrator_cls: type) -> None
 
 
 # --- ENERGY is exempt from the assertion but reported as a diagnostic -------
-def test_energy_only_imbalance_is_not_asserted_but_reported() -> None:
+def test_energy_imbalance_is_now_asserted_and_reported() -> None:
+    # ENERGY joined the conserved set in Phase 5: an energy-only imbalance now trips
+    # the every-step gate exactly like a mass quantity (was exempt-but-reported through
+    # Phase 4). The ledger decomposition still reports the residual.
     before = State(0, {E: _pool(E, 10.0, Quantity.ENERGY)}, 0)
     after = State(1, {E: _pool(E, 25.0, Quantity.ENERGY)}, 0)  # +15 from nowhere
-    assert_conserved(before, after)  # ENERGY exempt (#8) → must not raise
+    with pytest.raises(ConservationError):
+        assert_conserved(before, after)
     energy = _by_quantity(before, after)[Quantity.ENERGY]
     assert energy.residual == pytest.approx(15.0)
 

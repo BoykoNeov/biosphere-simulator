@@ -152,10 +152,12 @@ def test_assert_flow_balanced_rejects_carbon_imbalance() -> None:
         assert_flow_balanced(result, _stocks())
 
 
-def test_assert_flow_balanced_tolerates_energy_imbalance() -> None:
-    # ENERGY is exempt (decision #8: energy closure is Phase 5/6). Carbon balanced.
+def test_assert_flow_balanced_now_asserts_energy() -> None:
+    # ENERGY joined the conserved set in Phase 5: an energy-imbalanced flow now fails
+    # the per-flow balance check (carbon legs balanced; energy leg +3 from nowhere).
     result = FlowResult(legs=(Leg(ATM_C, -5.0), Leg(PLANT_C, 5.0), Leg(ENERGY, 3.0)))
-    assert_flow_balanced(result, _stocks())  # no raise despite the energy residual
+    with pytest.raises(ConservationError, match="ENERGY"):
+        assert_flow_balanced(result, _stocks())
 
 
 def test_assert_flow_balanced_applies_absolute_tolerance() -> None:

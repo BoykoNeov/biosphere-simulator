@@ -66,11 +66,14 @@ def test_loss_sink_is_a_zeroed_boundary_reservoir() -> None:
     assert s.unclamped is False  # a sink is never withdrawn from
 
 
-def test_loss_sinks_cover_every_mass_quantity_keyed_by_id() -> None:
+def test_loss_sinks_cover_every_asserted_quantity_keyed_by_id() -> None:
     sinks = loss_sinks()  # defaults to ASSERTED_QUANTITIES
     assert set(sinks) == {loss_sink_id(q) for q in ASSERTED_QUANTITIES}
-    # ENERGY is balance-exempt (#8) — it gets no loss-sink.
-    assert Quantity.ENERGY not in {s.quantity for s in sinks.values()}
+    # ENERGY joined the conserved set in Phase 5, so it is covered too. It has no
+    # POPULATION stock (extinction routes biomass carbon), so its loss-sink is never
+    # used — harmless, and no production caller builds it (build_season / build_demo
+    # pass an explicit {CARBON}).
+    assert Quantity.ENERGY in {s.quantity for s in sinks.values()}
     # Keyed by the stock's own id, so the dict merges straight into State.stocks.
     for sid, s in sinks.items():
         assert sid == s.id
