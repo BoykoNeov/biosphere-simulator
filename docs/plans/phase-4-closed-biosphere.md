@@ -1,8 +1,32 @@
 # Phase 4 — Closed Biosphere (the reference domain, frozen)
 
-**Status: Steps 1–3 COMPLETE (decade probe + drift instrumentation P4.1; integrator
-escalation SKIPPED; the 100k-step biosphere slow-drift stress). Step 4 (golden capture)
-+ Step 5 (freeze contract) are just-in-time forward-pointers. Phase 3 exits.**
+**Status: Steps 1–4 COMPLETE (decade probe + drift instrumentation P4.1; integrator
+escalation SKIPPED; the 100k-step biosphere slow-drift stress; the canonical long-horizon
+golden capture P4.2). Step 5 (freeze contract) is the last just-in-time forward-pointer.
+Phase 3 exits.**
+
+**Step 4 outcome (2026-06-30) — CANONICAL LONG-HORIZON GOLDENS CAPTURED.**
+`tests/test_regression_long_horizon.py` (7 tests, ~2 s, module-scoped fixture runs each
+15-yr scenario once) pins the closed biosphere at the **decade-scale horizon**
+(`LONG_HORIZON_YEARS = 15`, a new `scenario.py` constant — single source of truth shared by
+the long-horizon golden, the decade probe (`DECADE_YEARS` now aliases it), and the Step-5
+freeze manifest). Three new goldens, two kinds: **(1)** the final-`State` hex-float
+snapshots of the 15-yr perennial + consumer runs (`perennial_long_horizon_state.json`,
+`consumer_long_horizon_state.json`) via `sim_io`, exactly as the Phase-3 5-yr goldens at
+5 yr — the marginal value is real (post-yr-5 regressions in stocks the summaries don't
+surface: soil_water, N pools, the `thermal_time` aux). **(2)** the **drift-summary golden**
+(`drift_summary.json`, the genuinely new Phase-4 artifact) — the per-year limit-cycle
+summaries (peak `leaf_c` for both; year-end `consumer_carbon` for the consumer) as hex-float
+vectors + the period class (perennial `is_period_2` True, consumer False), the *stability*
+signature that catches a cycle-*shape* regression a single endpoint snapshot cannot. The
+mass-drift `max|d_q|`/`slope` numbers are **deliberately NOT byte-pinned** (~1e-11 round-off
+noise — a meaningful leak moves the vectors + snapshot anyway; the bound checks live in the
+decade/stress tests). Each golden bakes the **pre-golden closure gate** (`rationed == 0` /
+`events == ()` / loss-sink `0.0` before pinning); round-trip load-back + `__main__`
+`_regenerate()` mirror the existing discipline; hex-float via the stdlib `float.hex` (no new
+`sim_io` API). The **four Phase-3 goldens are re-affirmed byte-identical** (their own
+regression tests, zero new bytes — Step 2 was skipped, so nothing forced a regen).
+`git diff src/simcore/` empty; full suite green (976 fast + 27 slow), ruff + pyright clean.
 
 **Step 3 outcome (measured, 2026-06-30) — EULER HOLDS AT 100k+, NO DRIFT.**
 `tests/test_biosphere_stress.py` (24 tests, marked `slow`, ~30 s) runs **both** closed
@@ -270,9 +294,12 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
    drift slope stayed flat at machine-ε (no leak), period class sustained the full horizon,
    closure held every step. Round-off slope vs the `N · BALANCE_ATOL` ceiling **logged**. See
    the Step-3 outcome block at the top. Euler held → Step 2 stays skipped.
-4. **Canonical golden capture (P4.2).** Pin the long-horizon perennial + consumer goldens + the
-   drift-summary golden; re-affirm the four Phase-3 goldens (byte-identical, or
-   regenerated-with-provenance if Step 2 changed the integrator).
+4. **Canonical golden capture (P4.2). — COMPLETE.** `tests/test_regression_long_horizon.py`
+   pins the 15-yr (`LONG_HORIZON_YEARS`) perennial + consumer final-`State` goldens + the
+   **drift-summary golden** (per-year cycle summaries + period class — the stability
+   signature; mass-drift round-off NOT pinned). The four Phase-3 goldens re-affirmed
+   byte-identical (Step 2 skipped → no regen). Pre-golden closure gate + load-back +
+   `__main__` regen mirror the existing discipline. See the Step-4 outcome block at the top.
 5. **The freeze contract (P4.3).** `docs/biosphere-reference.md` + the manifest + the unfreeze
    discipline; the formal freeze of the biosphere domain.
 

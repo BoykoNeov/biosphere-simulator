@@ -166,6 +166,15 @@ CONSUMER_CHAMBER_SCENARIO: SeasonScenario = SeasonScenario(
 )
 CONSUMER_CHAMBER_YEARS: int = 5
 
+# The Phase-4 (P4.2) **decade-scale** horizon: the run length at which the closed
+# biosphere's emergent limit cycle is stability-validated (Step 1 probe) and pinned as the
+# canonical *long-horizon* golden (Step 4) — the run the freeze contract (Step 5) points
+# at. 15 (>= the decade-scale 10-yr target): both scenarios are fully settled by ~yr 10,
+# and 15 yr affords enough same-phase differences to characterize the attractor (10 yr
+# gives only ~4 per branch — too thin). Single source of truth shared by the long-horizon
+# golden, the decade probe, and the freeze manifest, so the frozen horizon cannot drift.
+LONG_HORIZON_YEARS: int = 15
+
 # The Phase-3 Step-6 (P3.5) drought scenario: an **open-field** plot deliberately sized
 # **water-lean** so the irrigation-cut perturbation actually bites. The default open
 # field starts ``soil_water0 = 1000`` kg — a store so far above the stress band

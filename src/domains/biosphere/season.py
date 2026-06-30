@@ -51,6 +51,9 @@ from domains.biosphere.scenario import (
     SeasonScenario,
 )
 from domains.biosphere.scenario import (
+    LONG_HORIZON_YEARS as LONG_HORIZON_YEARS,
+)
+from domains.biosphere.scenario import (
     PERENNIAL_CHAMBER_SCENARIO as PERENNIAL_CHAMBER_SCENARIO,
 )
 from domains.biosphere.scenario import (

@@ -64,6 +64,7 @@ from domains.biosphere.season import (
     CONSUMER_CARBON,
     CONSUMER_CHAMBER_SCENARIO,
     LEAF_C,
+    LONG_HORIZON_YEARS,
     PERENNIAL_CHAMBER_SCENARIO,
     build_season,
     run_perennial,
@@ -82,7 +83,9 @@ def _weather() -> list[dict[str, float | str]]:
 
 
 _YEAR = len(_weather())  # season length in steps (the tiling + reset period, ~305)
-DECADE_YEARS = 15  # >= the decade-scale (10-yr) target; the budgeted 15-20 yr horizon
+# The budgeted 15-yr working horizon (>= the decade-scale 10-yr target), shared as the
+# single source of truth with the long-horizon golden + the freeze manifest (scenario.py).
+DECADE_YEARS = LONG_HORIZON_YEARS
 _STEPS = _YEAR * DECADE_YEARS
 _QUANTITIES = (Quantity.CARBON, Quantity.OXYGEN, Quantity.NITROGEN, Quantity.WATER)
 _TRANSIENT = 2  # same-phase diffs to drop before the non-amplifying trend (the sow-in)

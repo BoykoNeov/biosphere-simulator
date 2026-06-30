@@ -26,7 +26,7 @@ up), `CONSUMER_CHAMBER_SCENARIO`, fourth golden; consumer persists, genuinely cl
 `rationed == 0`, leaf↓/CO₂↑ cascade, per-compartment ledger balanced incl. CONSUMERS; zero
 core change, three producer-only goldens byte-identical);
 **Phase 3 exits. Phase 4 — decade-scale stability + freeze-as-reference** is underway
-(`docs/plans/phase-4-closed-biosphere.md`): **Steps 1–3 COMPLETE.** Step 1 (P4.1) —
+(`docs/plans/phase-4-closed-biosphere.md`): **Steps 1–4 COMPLETE.** Step 1 (P4.1) —
 `domains/biosphere/drift.py` (pure-stdlib drift instrument: `total_quantity` promoting the
 `_total` fold + three axes — mass-drift ceiling/detector, `is_stationary`/`non_collapsing`
 stationarity split, `is_period_2`) + `test_drift.py` + `test_decade_stability.py`; both closed
@@ -39,9 +39,15 @@ streaming-chunked, bit-identical to a continuous run): both closed scenarios Eul
 yr (100,040 steps)**, the real slow-drift detector → **EULER HOLDS, NO DRIFT** (mass-drift slope
 flat at machine-ε over the 22×-longer run, both detector bounds span both horizons; period class
 sustained the full horizon — perennial period-2, consumer period-1; closure held every step);
-zero core change, four Phase-3 goldens untouched, no new golden (capture is Step 4). Next: Step 4
-(golden capture: decade hex snapshot + drift-summary golden), Step 5 (freeze contract). Roadmap
-`roadmap_extracted.txt`.
+zero core change, four Phase-3 goldens untouched. Step 4 (P4.2, golden capture) —
+`test_regression_long_horizon.py` pins the closed biosphere at the **decade-scale horizon**
+(`LONG_HORIZON_YEARS = 15`, new shared `scenario.py` constant): 15-yr perennial+consumer
+final-`State` hex goldens + the **drift-summary golden** (per-year cycle summaries + period
+class — the stability signature; mass-drift round-off deliberately NOT pinned, it's noise).
+Pre-golden closure gate + load-back + `__main__` regen mirror the existing discipline; the
+four Phase-3 goldens re-affirmed byte-identical (Step 2 skipped → no regen); zero core change.
+Next: Step 5 (freeze contract — `docs/biosphere-reference.md` + manifest + unfreeze
+discipline). Roadmap `roadmap_extracted.txt`.
 Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
