@@ -25,8 +25,9 @@ Step 7 minimal consumer — a fifth leaf `biosphere.consumers` + `herbivory.py` 
 up), `CONSUMER_CHAMBER_SCENARIO`, fourth golden; consumer persists, genuinely closed,
 `rationed == 0`, leaf↓/CO₂↑ cascade, per-compartment ledger balanced incl. CONSUMERS; zero
 core change, three producer-only goldens byte-identical);
-**Phase 3 exits. Phase 4 — decade-scale stability + freeze-as-reference** is underway
-(`docs/plans/phase-4-closed-biosphere.md`): **Steps 1–4 COMPLETE.** Step 1 (P4.1) —
+**Phase 3 exits. Phase 4 — decade-scale stability + freeze-as-reference — is COMPLETE
+(the biosphere is FROZEN AS THE REFERENCE; exits → Phase 5 sibling domains)**
+(`docs/plans/phase-4-closed-biosphere.md`): **Steps 1–5 COMPLETE.** Step 1 (P4.1) —
 `domains/biosphere/drift.py` (pure-stdlib drift instrument: `total_quantity` promoting the
 `_total` fold + three axes — mass-drift ceiling/detector, `is_stationary`/`non_collapsing`
 stationarity split, `is_period_2`) + `test_drift.py` + `test_decade_stability.py`; both closed
@@ -46,8 +47,19 @@ final-`State` hex goldens + the **drift-summary golden** (per-year cycle summari
 class — the stability signature; mass-drift round-off deliberately NOT pinned, it's noise).
 Pre-golden closure gate + load-back + `__main__` regen mirror the existing discipline; the
 four Phase-3 goldens re-affirmed byte-identical (Step 2 skipped → no regen); zero core change.
-Next: Step 5 (freeze contract — `docs/biosphere-reference.md` + manifest + unfreeze
-discipline). Roadmap `roadmap_extracted.txt`.
+Step 5 (P4.3, freeze contract) — `docs/biosphere-reference.md` (freeze contract +
+**unfreeze discipline**) + `docs/biosphere-reference.manifest.json` (generated: locked
+**Euler/`dt=1`**, `LONG_HORIZON_YEARS=15`, the **17-class flow set derived from assembled
+registries** — not hand-listed, aux assimilation/budget excluded by design, the 13
+clean-room param files + 7 scenarios→goldens, newline-normalized sha-256 **provenance**) +
+`tests/test_freeze_manifest.py` (the **completeness** gate — frozen *sets* vs the live tree,
+NOT byte-rehash: value enforcement stays with the scenario goldens, the gate owns only what
+they're blind to — a param/flow added but wired into no golden; rationale: every param feeds
+a golden so a value change already moves one, and a raw hash is non-reproducible under
+`autocrlf`). Phase-0 demo (`flows.py`/`demo.yaml`) scoped out by name. Seven goldens
+byte-identical (no regen); zero core change. **Phase 4 EXITS → Phase 5 (sibling domains:
+power / thermal / atmosphere-ECLSS / crew), each verified standalone then against the now-
+frozen biosphere.** Roadmap `roadmap_extracted.txt`.
 Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

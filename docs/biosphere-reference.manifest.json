@@ -1,0 +1,90 @@
+{
+  "_comment": "Phase-4 freeze manifest (P4.3). Names the frozen biosphere reference surface. See docs/biosphere-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Regenerate on a deliberate unfreeze: uv run python tests/test_freeze_manifest.py.",
+  "dt_days": 1.0,
+  "flow_set": [
+    "Allocation",
+    "Condensation",
+    "ConsumerMortality",
+    "ConsumerRespiration",
+    "Decomposition",
+    "Fertilization",
+    "Grazing",
+    "GrowthRespiration",
+    "Irrigation",
+    "MaintenanceRespiration",
+    "MicrobialRespiration",
+    "Mineralization",
+    "NitrogenSenescence",
+    "NitrogenUptake",
+    "Recycling",
+    "Senescence",
+    "Transpiration"
+  ],
+  "forcing": {
+    "weather_fixture": "winter_wheat_weather.json",
+    "weather_sha256": "cd61457e61d2b1ccce7d2468f94355c7e9636cfaf627dd84b1c58531a9373e80"
+  },
+  "frozen_at_phase": 4,
+  "integrator": "EulerIntegrator",
+  "long_horizon_years": 15,
+  "param_files": {
+    "allocation.yaml": "db32b1b1663cb800704b2a5d32609c1af66c62301dc7035ba847424540d4ebda",
+    "canopy.yaml": "7686da08e9a8f0a6d2643866a849df744dded40ad86443689cd5896b4d42bc65",
+    "decomposition.yaml": "a60fbbf54c5d30f93c746de3471fb9e320dfa2da857528354327e8517186bbe3",
+    "herbivory.yaml": "8d84d432fe90b15dd1b78a805b8efd29065b688ed8ee15f0f641973a1bab4bf7",
+    "microbial_respiration.yaml": "3f112eb51d6b659d751f08f6f4c114a9078651fe820f0c720aea35238c05df32",
+    "mineralization.yaml": "891368504775784f6c8eb93f827c8161e679c872322f9338d06545b7a7cb6a4e",
+    "nitrogen.yaml": "157ca0d69846874d2117a669309be1259113de4bca4fcc41299c71593b09a6ca",
+    "phenology.yaml": "cdc95130280e3cd2f4a2f7e53b0102c45067236a58d36243ebfa70a804c9be6d",
+    "photosynthesis.yaml": "51bb4fe98ab6176fcd1308c4b51d84b961ef3472eaa789c531ccec2114fc1e3c",
+    "respiration.yaml": "b6ec929a0129f41cb48e6b02b2ab7298eb7a590a6493e40feb57b73375d8e638",
+    "senescence.yaml": "97b1bf2b466eb6b67e77fe756787f01c8b49f394d56b713286c49ca90978ef0e",
+    "transpiration.yaml": "8859b2a8612372f9ae7d4468754d3b2d5a3e4530941281fb81327fc2daf303eb",
+    "water_cycle.yaml": "064781d4d18162cdc96f72f9efc7fae94682f1ed148e0e0ae88136c7d0def801"
+  },
+  "reference_doc": "docs/biosphere-reference.md",
+  "scenarios": {
+    "consumer_chamber": {
+      "golden": "consumer_chamber_state.json",
+      "golden_sha256": "12c0303592715ffe64293c69287df2263509b8d13c2d7318b7ba1650e37937db",
+      "scenario": "CONSUMER_CHAMBER_SCENARIO",
+      "years": 5
+    },
+    "consumer_long_horizon": {
+      "golden": "consumer_long_horizon_state.json",
+      "golden_sha256": "88a62780d728e91cd8b30e6f4b6522b48bc4aba83c643432f9affa6e8d2c0b44",
+      "scenario": "CONSUMER_CHAMBER_SCENARIO",
+      "years": 15
+    },
+    "drift_summary": {
+      "golden": "drift_summary.json",
+      "golden_sha256": "200fe04b90b99c128450bb412cc3363990016be6dc5645139bb1da8f4e202ff8",
+      "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
+      "years": 15
+    },
+    "open_season": {
+      "golden": "season_euler_state.json",
+      "golden_sha256": "b5796359be87c4080502a6daf557a7acd034866e3aa4fc188558005728039142",
+      "scenario": "DEFAULT_SCENARIO (open field)",
+      "years": 1
+    },
+    "perennial_chamber": {
+      "golden": "perennial_chamber_state.json",
+      "golden_sha256": "bf2449712b270646e44959d5e89efe622ffa45620d67a20cd76e02eb2e54e3c1",
+      "scenario": "PERENNIAL_CHAMBER_SCENARIO",
+      "years": 5
+    },
+    "perennial_long_horizon": {
+      "golden": "perennial_long_horizon_state.json",
+      "golden_sha256": "fe75492e92db65c9e0ef90df14525dbaf3e8300c71af1ecd3be720baf6e3da0b",
+      "scenario": "PERENNIAL_CHAMBER_SCENARIO",
+      "years": 15
+    },
+    "sealed_chamber": {
+      "golden": "sealed_chamber_state.json",
+      "golden_sha256": "a302b41d00243013eb717985c55534504de4757e68f5c5d0549481913261eec4",
+      "scenario": "SEALED_CHAMBER_SCENARIO",
+      "years": 3
+    }
+  }
+}

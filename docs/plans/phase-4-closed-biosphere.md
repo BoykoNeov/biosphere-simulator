@@ -1,9 +1,38 @@
 # Phase 4 — Closed Biosphere (the reference domain, frozen)
 
-**Status: Steps 1–4 COMPLETE (decade probe + drift instrumentation P4.1; integrator
-escalation SKIPPED; the 100k-step biosphere slow-drift stress; the canonical long-horizon
-golden capture P4.2). Step 5 (freeze contract) is the last just-in-time forward-pointer.
-Phase 3 exits.**
+**Status: PHASE 4 COMPLETE — Steps 1–5 done (decade probe + drift instrumentation P4.1;
+integrator escalation SKIPPED; the 100k-step biosphere slow-drift stress; the canonical
+long-horizon golden capture P4.2; the freeze contract P4.3). The biosphere domain is
+FROZEN AS THE REFERENCE. Phase 4 exits → Phase 5 (sibling domains).**
+
+**Step 5 outcome (2026-06-30) — THE BIOSPHERE IS FROZEN.** Three artifacts, all
+boundary-side (zero `simcore` change): **(1)** `docs/biosphere-reference.md` — the
+human-readable **freeze contract**: what is frozen (the locked **Euler + `dt = 1.0 day`**;
+the flow set; the 13 clean-room biosphere param files; the canonical scenarios + goldens;
+the `LONG_HORIZON_YEARS = 15` horizon; the weather forcing), the stability evidence it
+rests on (pointers to Steps 1/3, not restated), and the **unfreeze discipline**
+(advisor-reviewed unfreeze → regenerate the affected goldens *and* the manifest → provenance
+note; `git diff src/simcore/` empty unconditionally). The Phase-0 engine-skeleton demo
+(`flows.py` / `demo.yaml`) is scoped **out**, by name (frozen separately by its own Phase-0
+goldens). **(2)** `docs/biosphere-reference.manifest.json` — the **generated**
+machine-readable manifest naming the same surface, incl. the **17-class flow set derived
+from freshly assembled registries** (the union over the open field + the three chambers —
+never hand-listed; carbon assimilation + the budget are aux, not flows, so absent by
+design) and **newline-normalized sha-256 provenance** for every param/golden/forcing file.
+**(3)** `tests/test_freeze_manifest.py` (5 tests + `__main__` regen) — the **completeness
+gate**. **The load-bearing design decision (advisor-steered):** the gate checks
+**completeness — the frozen *sets* vs the live tree** (param-file set, the registry-derived
+flow set, the horizon == `LONG_HORIZON_YEARS`, file existence), NOT byte-rehash. Rationale:
+all 13 param files feed ≥1 canonical golden load-bearingly, so a *value* change already
+moves a golden and fails there — re-hashing would be redundant, **non-reproducible under
+`autocrlf`** (Windows), and would freeze *formatting* not *values*. So **value enforcement
+stays with the scenario goldens; the gate owns the one thing they're blind to — a
+param/flow added to the tree but wired into no golden.** Manifest hashes are
+**provenance** (newline-normalized → cross-platform stable), regenerated on a deliberate
+unfreeze. The four Phase-3 + three Phase-4 goldens stay **byte-identical** (no regen);
+full suite green (1008 fast + 27 slow); ruff + pyright clean (incl. two pre-existing
+comment-only E501 reflows in `scenario.py` / `test_decade_stability.py`); `git diff
+src/simcore/` empty. **Phase 4 EXITS.**
 
 **Step 4 outcome (2026-06-30) — CANONICAL LONG-HORIZON GOLDENS CAPTURED.**
 `tests/test_regression_long_horizon.py` (7 tests, ~2 s, module-scoped fixture runs each
@@ -300,8 +329,13 @@ rigor, applied to our own reference). This is **boundary-side docs + a manifest*
    signature; mass-drift round-off NOT pinned). The four Phase-3 goldens re-affirmed
    byte-identical (Step 2 skipped → no regen). Pre-golden closure gate + load-back +
    `__main__` regen mirror the existing discipline. See the Step-4 outcome block at the top.
-5. **The freeze contract (P4.3).** `docs/biosphere-reference.md` + the manifest + the unfreeze
-   discipline; the formal freeze of the biosphere domain.
+5. **The freeze contract (P4.3). — COMPLETE.** `docs/biosphere-reference.md` (freeze
+   contract + unfreeze discipline) + `docs/biosphere-reference.manifest.json` (generated;
+   the registry-derived flow set, the 13 param files, the 7 scenarios → goldens, the locked
+   Euler/`dt`, newline-normalized provenance hashes) + `tests/test_freeze_manifest.py` (the
+   **completeness** gate — frozen sets vs the live tree, NOT byte-rehash; value enforcement
+   stays with the scenario goldens). The formal freeze of the biosphere domain. See the
+   Step-5 outcome block at the top. **Phase 4 exits.**
 
 ## Step 1 — full design: decade-scale Euler probe + drift instrumentation (P4.1) — COMPLETE
 

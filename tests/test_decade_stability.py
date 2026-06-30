@@ -84,7 +84,8 @@ def _weather() -> list[dict[str, float | str]]:
 
 _YEAR = len(_weather())  # season length in steps (the tiling + reset period, ~305)
 # The budgeted 15-yr working horizon (>= the decade-scale 10-yr target), shared as the
-# single source of truth with the long-horizon golden + the freeze manifest (scenario.py).
+# single source of truth with the long-horizon golden + the freeze manifest
+# (scenario.py).
 DECADE_YEARS = LONG_HORIZON_YEARS
 _STEPS = _YEAR * DECADE_YEARS
 _QUANTITIES = (Quantity.CARBON, Quantity.OXYGEN, Quantity.NITROGEN, Quantity.WATER)
