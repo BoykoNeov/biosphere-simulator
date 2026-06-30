@@ -1,0 +1,56 @@
+# power — solar charge efficiency param (Phase 5, P5.2)
+# Currency/units: ENERGY (J). The one coefficient the Power core introduces.
+#
+# charge_efficiency (η_c) — ONE-WAY charge efficiency (dimensionless), stored/supplied:
+#   the fraction of supplied solar energy that reaches the battery; the remainder
+#   (1−η_c) is booked as charge-conversion HEAT (SolarCharge's 3rd leg). This is the
+#   structural enforcement of "every joule named" — the loss is a visible, balanced leg,
+#   not a hidden net delta. The implementation ALWAYS emits three legs; at η_c = 1 the
+#   heat leg is exactly 0 (no charge loss).
+#
+# One-way, NOT round-trip — and how the two relate IN THIS MODEL (the honest part).
+#   Discharge in the standalone model (LoadDraw) is JOULE-LOSSLESS: it moves the full Y
+#   from battery → waste_heat, first-law-conserved; the discharge "loss" is exergy
+#   (usefulness), tracked as the monotonic heat-generated diagnostic, NOT a joule loss.
+#   So charge is the ONLY joule-losing leg, and the MODELED electrical round-trip
+#   efficiency simply EQUALS η_c (no √-decomposition — that would assume a symmetric
+#   charge/discharge split, which this lossless-discharge model does not have).
+#
+#   Consequence: η_c = 0.95 is a realistic CHARGE-LEG figure, so the modeled round-trip
+#   (0.95) is OPTIMISTIC vs a real Li-ion ROUND-TRIP of ~0.90 — because the discharge-
+#   side conversion loss is a deferred seam (a second efficiency on LoadDraw, or the
+#   useful_work split). To model a CALIBRATED ~0.90 round-trip standalone, lump the whole
+#   loss onto η_c (set η_c ≈ 0.90) — a Phase-6 validation-gate calibration choice, NOT
+#   made here (Phase 5 ships machinery, not calibrated numbers; the value is provisional).
+#
+# Units discipline (P4 / config/units.py): a dimensionless efficiency is NOT a
+#   conserved-Quantity canonical unit, so it is a schema-validated, bound-checked float
+#   carrying a declared unit (exact-string guarded at the loader, like the biosphere's
+#   growth_efficiency). It must lie in (0, 1]: 0 (a battery that stores nothing) and
+#   negative/>1 (creates energy) are rejected.
+#
+# Capacity is NOT here (deliberate): POOL stocks have no upper clamp in this engine, so
+#   battery capacity is sizing/scenario data (the initial SOC + well-fed sizing), landed
+#   with build_power in Step 3 — not a flow coefficient. See power/stocks.py.
+#
+# Clean-room: value from cited primary literature ONLY (battery efficiency is textbook).
+#   The numeric VALUE is a provisional, literature-typical placeholder pending the
+#   validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] Dunn, B., Kamath, H., Tarascon, J.-M. (2011), "Electrical Energy Storage for the
+#       Grid: A Battery of Choices", Science 334(6058):928-935 — Li-ion round-trip
+#       efficiency ~0.90-0.95. (In this lossless-discharge model η_c IS the modeled
+#       round-trip, so a realistic charge-leg ~0.95 reads as an optimistic round-trip.)
+#   [B] Divya, K.C., Østergaard, J. (2009), "Battery energy storage technology for power
+#       systems — An overview", Electric Power Systems Research 79(4):511-520 — surveyed
+#       round-trip efficiencies by chemistry.
+
+name: power
+process: charge
+
+parameters:
+  charge_efficiency:
+    value: 0.95
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, literature-typical Li-ion one-way charge efficiency η_c ~0.95 (the charge-side leg). In this lossless-discharge model η_c IS the modeled round-trip, so 0.95 is optimistic vs a real ~0.90 round-trip; the discharge-side loss is a deferred seam [A][B]; primary citation pending validation gate"

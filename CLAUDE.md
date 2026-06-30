@@ -89,9 +89,28 @@ imbalance now *caught*). **Proven inert for existing runs** — the biosphere ha
 stock and the Phase-0 demo's `boundary.light` has a permanently-zero delta, so **all seven
 frozen goldens + both demo goldens are byte-identical** (full suite green, 1035 passed). The one
 sanctioned `simcore/` edit (a frozenset the roadmap always intended to flip here, line 318 —
-**not** a biosphere-freeze violation; no frozen surface moved). **Next: P5.2** — the standalone
-Power domain (battery POOL + solar/waste-heat BOUNDARYs + energy-balanced flows). Cross-domain
-coupling is **Phase 6**.
+**not** a biosphere-freeze violation; no frozen surface moved). A **Step-1 follow-up** commit
+then swept the last stale decision-#8 prose (`flow.py` `per_quantity_residual` + the Phase-0
+demo `flows.py`), comment-only, demo goldens byte-identical — so the Power feature commit's
+`git diff src/simcore/` is **empty** (a Phase-5 exit criterion).
+**Step 2 (P5.2 core) COMPLETE — the standalone Power flows (first carrier of energy closure)**:
+new `src/domains/power/` package (`stocks.py`/`flows.py`/`loader.py`/`params/charge.yaml`), all
+ENERGY (J), **zero core change**. Stocks: `power.battery` POOL + `boundary.solar_source`
+(unclamped source) + `boundary.waste_heat` (monotonic sink). Flows: **`SolarCharge`** (3-leg,
+heat-named — `solar_source → battery(+η_c) + waste_heat(+(1−η_c))`, **always 3 legs**;
+η_c=1 → heat leg exactly 0) + **`LoadDraw`** (2-leg dissipative — `battery → waste_heat`, 100%
+→ heat). Both **forced** (read `solar_power`/`load_power` W from `env`, ×dt → J — increment-form,
+dt-linear); positivity is a **sizing discipline** (well-fed battery), not structural — brownout
+is a later step. One param: `charge_efficiency` η_c ∈ (0,1] (the biosphere value/unit/source +
+exact-string-unit-guard loader discipline). **`charge_efficiency` is ONE-WAY charge** — discharge
+is joule-lossless (the discharge "loss" is *exergy*, tracked as the heat diagnostic), so the
+**modeled round-trip = η_c** (0.95 = optimistic vs a real ~0.90 cell; discharge-side loss deferred).
+18 per-flow tests (balance via `assert_flow_balanced` — the Step-2 gate; leg structure; dt-linearity;
+zero-input no-op; loader bounds). **Capacity is NOT a param** (POOL stocks have no upper clamp →
+sizing/scenario data, Step 3). Full suite green (1026 + 27 slow); **seven frozen + two demo goldens
+byte-identical**. **Next: P5.3** (Step 3) — `build_power`/`run_power` + day/night solar resolver +
+the bounded-SOC validation run; then Step 4 golden capture. `SelfDischarge` deferred (optional).
+Cross-domain coupling is **Phase 6**.
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

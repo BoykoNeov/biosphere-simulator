@@ -1,10 +1,17 @@
 # Phase 5 — Sibling Domains (Power first; energy joins the conserved set)
 
-**Status: PLAN — the load-bearing decision (energy closure, P5.1) and the standalone
-Power domain (P5.2) are designed in full and advisor-reviewed below; Thermal / Atmosphere-
-ECLSS / Crew are forward-pointers, each to be designed just-in-time (the Phase-1/2/3/4
-rhythm). Implementation begins with Step 1 — the isolated ENERGY-assert flip. The biosphere
-stays FROZEN (`docs/biosphere-reference.md`); Phase 5 builds *beside* it, never moves it.**
+**Status: IN PROGRESS — Steps 1–2 COMPLETE.** The load-bearing decision (energy closure, P5.1)
+and the standalone Power domain (P5.2) are designed in full and advisor-reviewed below; Thermal /
+Atmosphere-ECLSS / Crew are forward-pointers, each to be designed just-in-time (the Phase-1/2/3/4
+rhythm). **Step 1 (P5.1a) — the isolated ENERGY-assert flip — is DONE** (ENERGY joined
+`ASSERTED_QUANTITIES`, proven inert; a follow-up swept the last stale decision-#8 prose so the
+Power commit's `git diff src/simcore/` is empty). **Step 2 (P5.2 core) — the standalone Power
+flows — is DONE** (new `src/domains/power/`: `power.battery` POOL + `boundary.solar_source`/
+`boundary.waste_heat`; `SolarCharge` 3-leg heat-named + `LoadDraw` dissipative; `charge.yaml`
+one-way η_c; 18 per-flow tests; zero core change; seven frozen + two demo goldens byte-identical).
+**Next: Step 3** — `build_power`/`run_power` + day/night resolver + the bounded-SOC validation run.
+The biosphere stays FROZEN (`docs/biosphere-reference.md`); Phase 5 builds *beside* it, never
+moves it.**
 
 Phases 0, 0.5, 1, 2, 3, and 4 are complete and regression-pinned
 (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber,3-modular-biosphere,4-closed-biosphere}.md`).
@@ -304,17 +311,27 @@ cross-domain bug cannot hide in a standalone green.
 
 ## Step sequence (sketched; each designed just-in-time, P5.1 first)
 
-1. **Energy joins the conserved set (P5.1a) — the isolated core flip. — DESIGNED below; first to
-   implement.** Flip `ENERGY` into `ASSERTED_QUANTITIES`; update the stale decision-#8 prose across
-   `quantities.py` / `flow.py` / `conservation.py` / `boundary.py` / `demo.py`; run the **full
-   suite** (incl. `-m slow`) + ruff + pyright; **confirm zero golden churn** (all 7 frozen + both
-   demo goldens byte-identical). A **measurement step before any Power stock exists** — it proves
+1. **Energy joins the conserved set (P5.1a) — the isolated core flip. — COMPLETE.** Flipped
+   `ENERGY` into `ASSERTED_QUANTITIES`; updated the stale decision-#8 prose across
+   `quantities.py` / `flow.py` / `conservation.py` / `boundary.py` / `demo.py` (a follow-up commit
+   swept three more leftovers — `flow.py` `per_quantity_residual` + the Phase-0 demo `flows.py`);
+   full suite (incl. `-m slow`) + ruff + pyright green; **zero golden churn** (all 7 frozen + both
+   demo goldens byte-identical). A **measurement step before any Power stock exists** — it proved
    "flipping changes nothing for existing runs," isolating the one risky edit (the Phase-4-Step-1
-   "measure before capture" rhythm). No new golden; no Power code yet.
-2. **Power stocks + the energy-balanced flows (P5.2 core).** `power.battery` POOL,
-   `boundary.solar_source` + `boundary.waste_heat` BOUNDARYs; `SolarCharge` (3-leg, heat-named) +
-   `LoadDraw` (dissipative); per-flow `ENERGY` balance unit tests (the 3-leg charge sums to 0). Param
-   file(s) for efficiencies / capacities. Clean-room + cited.
+   "measure before capture" rhythm). No new golden; no Power code.
+2. **Power stocks + the energy-balanced flows (P5.2 core). — COMPLETE.** New `src/domains/power/`
+   (zero core change): `power.battery` POOL, `boundary.solar_source` (unclamped source) +
+   `boundary.waste_heat` (monotonic sink); `SolarCharge` (**always 3 legs**, heat-named —
+   `solar_source → battery(+η_c) + waste_heat(+(1−η_c))`; η_c=1 → heat leg exactly 0) + `LoadDraw`
+   (2-leg dissipative, 100 % → heat). Both **forced** (`solar_power`/`load_power` W via `env`, ×dt →
+   J; increment-form, dt-linear); positivity is a **sizing discipline**, not structural. One param,
+   `charge.yaml` `charge_efficiency` η_c ∈ (0,1] — **ONE-WAY charge** (discharge is joule-lossless;
+   the discharge loss is exergy → the heat diagnostic), so the **modeled round-trip = η_c**
+   (the √-decomposition does not apply to a lossless-discharge model). 18 per-flow tests: balance
+   via `assert_flow_balanced` (**the Step-2 gate** — a full conservation-gate run is Step 3), leg
+   structure, dt-linearity, zero-input no-op, loader bounds. **Capacity is NOT a param** (POOL stocks
+   have no upper clamp → sizing/scenario data, Step 3). Clean-room + cited. Seven frozen + two demo
+   goldens byte-identical.
 3. **The Power scenario + day/night resolver + standalone run harness.** A Power scenario-data
    object + a diurnal solar forcing schedule (the weather-table analogue); a `build_power` /
    `run_power` mirroring `build_season` / `run_season`. The bounded-SOC validation run.
