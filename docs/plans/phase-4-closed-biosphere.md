@@ -15,24 +15,30 @@ rests on (pointers to Steps 1/3, not restated), and the **unfreeze discipline**
 note; `git diff src/simcore/` empty unconditionally). The Phase-0 engine-skeleton demo
 (`flows.py` / `demo.yaml`) is scoped **out**, by name (frozen separately by its own Phase-0
 goldens). **(2)** `docs/biosphere-reference.manifest.json` — the **generated**
-machine-readable manifest naming the same surface, incl. the **17-class flow set derived
-from freshly assembled registries** (the union over the open field + the three chambers —
-never hand-listed; carbon assimilation + the budget are aux, not flows, so absent by
-design) and **newline-normalized sha-256 provenance** for every param/golden/forcing file.
-**(3)** `tests/test_freeze_manifest.py` (5 tests + `__main__` regen) — the **completeness
-gate**. **The load-bearing design decision (advisor-steered):** the gate checks
-**completeness — the frozen *sets* vs the live tree** (param-file set, the registry-derived
-flow set, the horizon == `LONG_HORIZON_YEARS`, file existence), NOT byte-rehash. Rationale:
-all 13 param files feed ≥1 canonical golden load-bearingly, so a *value* change already
-moves a golden and fails there — re-hashing would be redundant, **non-reproducible under
-`autocrlf`** (Windows), and would freeze *formatting* not *values*. So **value enforcement
-stays with the scenario goldens; the gate owns the one thing they're blind to — a
-param/flow added to the tree but wired into no golden.** Manifest hashes are
-**provenance** (newline-normalized → cross-platform stable), regenerated on a deliberate
-unfreeze. The four Phase-3 + three Phase-4 goldens stay **byte-identical** (no regen);
-full suite green (1008 fast + 27 slow); ruff + pyright clean (incl. two pre-existing
-comment-only E501 reflows in `scenario.py` / `test_decade_stability.py`); `git diff
-src/simcore/` empty. **Phase 4 EXITS.**
+machine-readable manifest naming the same surface, incl. the **17-class flow set + the
+aux set, both derived from freshly assembled registries** (the union over the open field +
+the three chambers — never hand-listed). **Note (corrected post-advisor):** gross
+assimilation is **not** an aux — it is a recomputed *quantity* inside the shared carbon
+budget (the `GrossAssimilation` flow was dissolved at P1 Step 11), entering via the
+`Allocation` flow; the **only** aux process is the thermal-time/DVS accumulator, now frozen
+via `aux_set` (the third 'wired-into-a-registry' axis the advisor flagged, closed with zero
+core change — `registry.aux_processes` is a public read-only property).
+**Newline-normalized sha-256 provenance** for every param/golden/forcing file. **(3)**
+`tests/test_freeze_manifest.py` (7 tests + `__main__` regen) — the **completeness gate**.
+**The load-bearing design decision (advisor-steered):** the gate checks **completeness —
+the frozen *sets* vs the live tree** (param-file set, the registry-derived flow + aux sets,
+horizon == `LONG_HORIZON_YEARS`, file existence) + a **teeth test** (an unfrozen file
+actually trips it), NOT byte-rehash. Rationale: all 13 param files feed ≥1 canonical golden
+load-bearingly, so a *value* change already moves a golden and fails there — re-hashing
+would be redundant, **non-reproducible under `autocrlf`** (Windows), and would freeze
+*formatting* not *values*. So **value enforcement stays with the scenario goldens; the gate
+owns the one thing they're blind to — a param/flow/aux added to the tree but wired into no
+golden.** Manifest hashes are **provenance** (newline-normalized → cross-platform stable),
+regenerated on a deliberate unfreeze. The four Phase-3 + three Phase-4 goldens stay
+**byte-identical** (no regen); full suite green (1010 passed incl. the 27 slow-marked, 1
+oracle skipped); ruff + pyright clean (incl. two pre-existing comment-only E501 reflows in
+`scenario.py` / `test_decade_stability.py`); `git diff src/simcore/` empty. **Phase 4
+EXITS.**
 
 **Step 4 outcome (2026-06-30) — CANONICAL LONG-HORIZON GOLDENS CAPTURED.**
 `tests/test_regression_long_horizon.py` (7 tests, ~2 s, module-scoped fixture runs each

@@ -42,6 +42,7 @@ review the manifest diff. Zero ``simcore`` change (docs + tests only).
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -122,26 +123,59 @@ def _normalized_sha256(path: Path) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
+def _canonical_registries() -> list[object]:
+    """The assembled registries of the four canonical scenarios (open field + chambers).
+
+    The single place the flow/aux sets are derived from — built fresh from the live
+    compartment builders, never hand-listed. The open field carries the
+    boundary-atmosphere producer flows; the sealed chambers add the decomposer /
+    water-cycle / consumer flows; the union over all four is the complete frozen set.
+    """
+    scenarios = (
+        None,  # the open-field DEFAULT_SCENARIO
+        SEALED_CHAMBER_SCENARIO,
+        PERENNIAL_CHAMBER_SCENARIO,
+        CONSUMER_CHAMBER_SCENARIO,
+    )
+    return [(build_season() if sc is None else build_season(sc))[1] for sc in scenarios]
+
+
 def _flow_set() -> list[str]:
     """The frozen flow-class set: the union of flow classes across the canonical builds.
 
-    **Derived, never hand-listed** (the advisor's lever): assemble each canonical
-    scenario's registry and collect ``type(flow).__name__``. The open field carries the
-    boundary-atmosphere producer flows; the sealed chambers add the decomposer / water-
-    cycle / consumer flows — so the union over all four is the complete frozen flow
-    surface. A flow class added to any compartment builder but wired into no golden
-    still appears here, so the completeness gate catches it.
+    **Derived, never hand-listed** (the advisor's lever): collect
+    ``type(flow).__name__`` from each canonical registry. A flow class added to any
+    compartment builder but wired into no golden still appears here, so the completeness
+    gate catches it. (Note: gross assimilation is a recomputed *quantity* inside the
+    shared carbon budget, not a standalone flow — it enters via ``Allocation`` — so no
+    ``Photosynthesis`` class appears here.)
     """
-    builds = (
-        build_season(),  # the open-field DEFAULT_SCENARIO
-        build_season(SEALED_CHAMBER_SCENARIO),
-        build_season(PERENNIAL_CHAMBER_SCENARIO),
-        build_season(CONSUMER_CHAMBER_SCENARIO),
+    return sorted(
+        {
+            type(flow).__name__
+            for registry in _canonical_registries()
+            for flow in registry.flows  # type: ignore[attr-defined]
+        }
     )
-    classes = {
-        type(flow).__name__ for _state, registry in builds for flow in registry.flows
-    }
-    return sorted(classes)
+
+
+def _aux_set() -> list[str]:
+    """The frozen aux-process-class set — the third 'wired into a registry' axis.
+
+    Symmetric with :func:`_flow_set`, derived from the public read-only
+    ``registry.aux_processes`` (**zero core change** — a property, not a new accessor).
+    Aux processes are the non-conserved accumulators the goldens are otherwise as blind
+    to as they are to a wired-but-output-inert flow; today the only one is the
+    thermal-time / DVS accumulator, but freezing the *set* means a future aux process
+    added but wired into no golden is caught here too.
+    """
+    return sorted(
+        {
+            type(proc).__name__
+            for registry in _canonical_registries()
+            for proc in registry.aux_processes  # type: ignore[attr-defined]
+        }
+    )
 
 
 def _frozen_param_files() -> list[str]:
@@ -175,6 +209,7 @@ def _build_manifest() -> dict[str, object]:
         "dt_days": 1.0,
         "long_horizon_years": LONG_HORIZON_YEARS,
         "flow_set": _flow_set(),
+        "aux_set": _aux_set(),
         "forcing": {
             "weather_fixture": WEATHER_FIXTURE.name,
             "weather_sha256": _normalized_sha256(WEATHER_FIXTURE),
@@ -220,6 +255,27 @@ def test_frozen_flow_set_is_complete() -> None:
     # canonical scenarios — derived, not hand-listed. Catches an unfrozen flow.
     manifest = _load_manifest()
     assert set(manifest["flow_set"]) == set(_flow_set())
+
+
+def test_frozen_aux_set_is_complete() -> None:
+    # The manifest's aux set equals the aux-process classes across the canonical
+    # scenarios — the third 'wired into a registry' axis (non-conserved accumulators)
+    # alongside flows + params. Catches an added-but-unfrozen aux process.
+    manifest = _load_manifest()
+    assert set(manifest["aux_set"]) == set(_aux_set())
+
+
+def test_completeness_gate_detects_an_unfrozen_param(monkeypatch, tmp_path) -> None:
+    # Teeth: the gate is plain set equality, so an unfrozen file on disk must break it.
+    # Seed a temp params dir with the frozen names + one phantom, point the glob there,
+    # and confirm the comparison no longer holds. The real params dir is untouched.
+    frozen = set(_load_manifest()["param_files"])
+    for name in frozen:
+        (tmp_path / name).touch()
+    (tmp_path / "phantom.yaml").touch()
+    monkeypatch.setattr(sys.modules[__name__], "PARAMS_DIR", tmp_path)
+    on_disk = {p.name for p in PARAMS_DIR.glob("*.yaml")} - _EXCLUDED_PARAMS
+    assert on_disk != frozen  # the phantom param is detected — the gate has teeth
 
 
 def test_manifest_horizon_matches_constant() -> None:

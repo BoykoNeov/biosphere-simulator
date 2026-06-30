@@ -54,7 +54,7 @@ daily canopy flux is not RK4-refinable. The integrator + dt have **no importable
 **documented** in the manifest and **enforced by the goldens** — an integrator or dt switch
 moves every committed golden.
 
-### The flow set
+### The flow set + the aux processes
 
 The flow classes assembled across the canonical scenarios — the frozen flow taxonomy. The
 manifest's `flow_set` is **derived from freshly assembled registries** (the union over the open
@@ -63,9 +63,17 @@ caught by the completeness gate even if no golden exercises it. As frozen, the s
 classes spanning the producer (allocation, the two respirations, senescence, transpiration,
 nitrogen uptake/senescence, the forcing-driven irrigation/fertilization), the decomposer
 (decomposition, microbial respiration, mineralization), the water cycle (condensation,
-recycling), and the consumer (grazing, consumer respiration, consumer mortality). Carbon
-assimilation and the carbon budget are **aux processes**, not flows, so they are not in
-`flow_set`. (See `flow_set` in the manifest for the exact list.)
+recycling), and the consumer (grazing, consumer respiration, consumer mortality).
+
+**Gross carbon assimilation is not a flow** (and not an aux): it is a recomputed *quantity*
+inside the shared `CarbonContext` budget — the `GrossAssimilation` flow was *dissolved* in the
+Phase-1 Step-11 buffer rewiring — entering the system through the `Allocation` flow's
+`co2_atmos → organs` leg. So there is no `Photosynthesis`/`GrossAssimilation` class in
+`flow_set`; that science is frozen via `Allocation`. The manifest also freezes the
+**`aux_set`** (the registries' non-conserved accumulators, derived symmetrically from the
+public `registry.aux_processes`) — today just the thermal-time / DVS accumulator that drives
+allocation — so a future aux process added but wired into no golden is caught too. (See
+`flow_set` / `aux_set` in the manifest for the exact lists.)
 
 ### The param files — 13 clean-room biosphere param files
 
@@ -139,8 +147,8 @@ Phase-3 scenario regression tests.
 
 `docs/biosphere-reference.manifest.json` is the machine-readable surface, **generated** by
 `tests/test_freeze_manifest.py` (`uv run python tests/test_freeze_manifest.py`). It names the
-integrator + dt, the horizon, the derived flow set, the param files (+ provenance hashes), the
-forcing (+ hash), and each scenario → golden (+ hash).
+integrator + dt, the horizon, the derived flow set + aux set, the param files (+ provenance
+hashes), the forcing (+ hash), and each scenario → golden (+ hash).
 
 **What the manifest gate checks vs. what the goldens check** — the division is deliberate:
 - **The scenario goldens own *values*.** Any value change to a frozen param file, a flow law,
@@ -150,10 +158,11 @@ forcing (+ hash), and each scenario → golden (+ hash).
   are **provenance only** — a re-derivable, newline-normalized record of *which content* was
   frozen, regenerated on a deliberate unfreeze.
 - **The manifest gate owns *completeness*** — the one thing the goldens are blind to: a param
-  file or flow class added to the tree but wired into no golden. The gate asserts the frozen
-  *sets* (param files, flow classes) against the live tree and the horizon against its
-  constant. A new-but-unfrozen param/flow fails the gate; that is the signal to either freeze
-  it (an unfreeze) or remove it.
+  file, flow class, or aux process added to the tree but wired into no golden. The gate asserts
+  the frozen *sets* (param files, flow classes, aux classes) against the live tree and the
+  horizon against its constant — and a teeth test confirms it actually fails on an unfrozen
+  file. A new-but-unfrozen param/flow/aux fails the gate; that is the signal to either freeze it
+  (an unfreeze) or remove it.
 
 ## The unfreeze discipline
 

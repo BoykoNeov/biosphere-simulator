@@ -1,5 +1,8 @@
 {
   "_comment": "Phase-4 freeze manifest (P4.3). Names the frozen biosphere reference surface. See docs/biosphere-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Regenerate on a deliberate unfreeze: uv run python tests/test_freeze_manifest.py.",
+  "aux_set": [
+    "ThermalTimeAccumulation"
+  ],
   "dt_days": 1.0,
   "flow_set": [
     "Allocation",

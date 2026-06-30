@@ -49,17 +49,19 @@ Pre-golden closure gate + load-back + `__main__` regen mirror the existing disci
 four Phase-3 goldens re-affirmed byte-identical (Step 2 skipped → no regen); zero core change.
 Step 5 (P4.3, freeze contract) — `docs/biosphere-reference.md` (freeze contract +
 **unfreeze discipline**) + `docs/biosphere-reference.manifest.json` (generated: locked
-**Euler/`dt=1`**, `LONG_HORIZON_YEARS=15`, the **17-class flow set derived from assembled
-registries** — not hand-listed, aux assimilation/budget excluded by design, the 13
-clean-room param files + 7 scenarios→goldens, newline-normalized sha-256 **provenance**) +
-`tests/test_freeze_manifest.py` (the **completeness** gate — frozen *sets* vs the live tree,
-NOT byte-rehash: value enforcement stays with the scenario goldens, the gate owns only what
-they're blind to — a param/flow added but wired into no golden; rationale: every param feeds
-a golden so a value change already moves one, and a raw hash is non-reproducible under
-`autocrlf`). Phase-0 demo (`flows.py`/`demo.yaml`) scoped out by name. Seven goldens
-byte-identical (no regen); zero core change. **Phase 4 EXITS → Phase 5 (sibling domains:
-power / thermal / atmosphere-ECLSS / crew), each verified standalone then against the now-
-frozen biosphere.** Roadmap `roadmap_extracted.txt`.
+**Euler/`dt=1`**, `LONG_HORIZON_YEARS=15`, the **17-class flow set + the aux set, both
+derived from assembled registries** — not hand-listed; gross assimilation is a recomputed
+*quantity* in the carbon budget folded into `Allocation`, NOT an aux — the one aux is the
+thermal-time/DVS accumulator, frozen via `aux_set`; the 13 clean-room param files + 7
+scenarios→goldens, newline-normalized sha-256 **provenance**) + `tests/test_freeze_manifest.py`
+(the **completeness** gate + a teeth test — frozen *sets* vs the live tree, NOT byte-rehash:
+value enforcement stays with the scenario goldens, the gate owns only what they're blind to —
+a param/flow/aux added but wired into no golden; rationale: every param feeds a golden so a
+value change already moves one, and a raw hash is non-reproducible under `autocrlf`). Phase-0
+demo (`flows.py`/`demo.yaml`) scoped out by name. Seven goldens byte-identical (no regen);
+zero core change (`aux_processes` is a public read-only property). **Phase 4 EXITS → Phase 5
+(sibling domains: power / thermal / atmosphere-ECLSS / crew), each verified standalone then
+against the now-frozen biosphere.** Roadmap `roadmap_extracted.txt`.
 Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
