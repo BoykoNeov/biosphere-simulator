@@ -1,16 +1,28 @@
 # Phase 5 — Sibling Domains (Power first; energy joins the conserved set)
 
-**Status: IN PROGRESS — Steps 1–4 (Power) + Step 5 (Thermal) + Step 6 (Atmosphere/ECLSS) COMPLETE;
-Crew remains the forward-pointer.** The load-bearing decision (energy closure, P5.1) and the
-standalone Power domain (P5.2–P5.5) are designed in full and advisor-reviewed below; **Thermal is
-the second complete standalone sibling** (Step 5 — full design in the "Step 5 — full design"
-section below); **Atmosphere/ECLSS is the third** (Step 6 — full design in the "Step 6 — full
-design" section below; advisor-reviewed before any code — the **first multi-quantity sibling**,
-three single-quantity cabin POOLs O₂/CO₂/H₂O with a forced crew seam + three control loops, all
+**Status: COMPLETE — Steps 1–4 (Power) + Step 5 (Thermal) + Step 6 (Atmosphere/ECLSS) + Step 7
+(Crew) all COMPLETE.** The load-bearing decision (energy closure, P5.1) and the standalone Power
+domain (P5.2–P5.5) are designed in full and advisor-reviewed below; **Thermal is the second
+complete standalone sibling** (Step 5 — full design in the "Step 5 — full design" section below);
+**Atmosphere/ECLSS is the third** (Step 6 — full design in the "Step 6 — full design" section
+below; advisor-reviewed before any code — the **first multi-quantity sibling**, three
+single-quantity cabin POOLs O₂/CO₂/H₂O with a forced crew seam + three control loops, all
 CARBON/OXYGEN/WATER conserved every step, geometric contraction, `rationed == 0`, RK4 ≢ Euler;
-41 tests + an additive **NON-frozen** golden; **zero core change**, full suite incl. `-m slow` +
-ruff + pyright green (**1173 passed**), all twelve existing goldens byte-identical). Crew is the
-last forward-pointer, designed just-in-time when reached (the Phase-1/2/3/4 rhythm).
+41 tests + an additive **NON-frozen** golden; **zero core change**, all twelve existing goldens
+byte-identical). **Crew is the fourth and last sibling** (Step 7 — full design in the "Step 7 —
+full design" section below; advisor-reviewed before any code — the **first net-consumer / open-loop
+sibling**: three *finite* provisioned-store POOLs (food/water/O₂) drawn down by three **forced**
+metabolic flows, two of them **fractional splits** (food-carbon → respired CO₂ + feces; water →
+humidity + urine — the `SolarCharge` η split on a *mass* quantity, justified because each output
+routes to a *different* Phase-6 destination). Multi-quantity like ECLSS (CARBON/OXYGEN/WATER
+conserved every step — the payload); **forced ⇒ RK4 ≡ Euler bit-identical** revived (the symmetric
+bookend to ECLSS/Thermal); no attractor — the stores just **run down** (mission-endurance /
+well-fed sizing), which *is* the argument for Phase-6 closure. **Crew is the real version of ECLSS's
+forced `CrewMetabolism` stand-in** — Phase 6 deletes that stand-in and wires Crew's outputs into the
+cabin (CO₂→`cabin_co2`, humidity→`cabin_h2o`, O₂←`cabin_o2`), a subset of Crew's fates. 32 tests +
+an additive **NON-frozen** golden; **zero core change**, full suite incl. `-m slow` + ruff + pyright
+green, all thirteen existing goldens byte-identical. **Phase 5 EXITS → Phase 6 (station
+integration / cross-domain coupling).**
 
 **Step 5 (Thermal) — COMPLETE.** New `src/domains/thermal/` (zero core change): a forced heat input
 → an in-system thermal node (POOL, sensible heat J with a **derived temperature** `T = T_space +
@@ -452,9 +464,34 @@ cross-domain bug cannot hide in a standalone green.
    geometric contraction (the `SelfDischarge` idiom, not Thermal's nonlinear one); RK4 ≢ Euler.
    Pressure / N₂ diluent / composition stocks are **deferred seams** (no standalone consumer). Pure
    mass-quantity domain (no new core decision — reuses the frozen mass machinery).
-7. **(Forward-pointer) Crew** — O₂ intake, CO₂ output, water/food consumption, waste; **forced
-   schedules at first**
-     (roadmap line 321). The eventual biosphere coupling (crew CO₂ ↔ plant uptake) is **Phase 6**.
+7. **Crew (COMPLETE)** — the fourth and last sibling, designed just-in-time (full design below).
+   New `src/domains/crew/` (zero core change): three **finite provisioned-store** POOLs
+   `crew.food_store` (CARBON) / `crew.water_store` (WATER) / `crew.o2_store` (OXYGEN) drawn down by
+   three **forced** metabolic flows — `OxygenConsumption` (2-leg, `o2_store → boundary.crew_o2_consumed`)
+   + `FoodMetabolism` (3-leg **split**, `food_store → exhaled_co2 (f_resp) + fecal_waste (1−f_resp)`)
+   + `WaterBalance` (3-leg **split**, `water_store → crew_humidity (f_ins) + urine (1−f_ins)`). Five
+   monotonic boundary output sinks. `crew.yaml` (two dimensionless split fractions
+   `respired_carbon_fraction` / `insensible_water_fraction`; the intake *rates* are scenario data).
+   **The load-bearing framing (advisor):** Crew is the **first net-consumer / open-loop sibling** — no
+   restoring force, no attractor; the stores just **run down** (`store(n) = store0 − n·rate·dt`), and
+   *that incompleteness is the argument for Phase-6 closure*. The two splits are **not** gold-plating:
+   the `SolarCharge` η-split on a *mass* quantity, justified because each output routes to a
+   *different* Phase-6 destination (CO₂→cabin air vs feces→solid-waste; humidity→cabin air vs
+   urine→water-recovery). **Crew is the real version of ECLSS's forced `CrewMetabolism` stand-in** —
+   Phase 6 deletes that stand-in and wires Crew's outputs into the cabin (a *subset* of Crew's fates).
+   Multi-quantity like ECLSS (CARBON/OXYGEN/WATER conserved every step — the payload); positivity by
+   **well-fed sizing** (`rationed == 0` because each store's endurance `store0/rate` exceeds the
+   mission); **forced ⇒ RK4 ≡ Euler bit-identical** *revived* (the symmetric bookend to ECLSS/Thermal,
+   framed as the identity). Validation (`MISSION_SCENARIO`, a 7-day provisioned mission, `dt = 3600 s`,
+   168 steps, each store depleting to ≈ 70 %): three-quantity every-step closure, `rationed == 0`,
+   `events == ()`, monotone depletion + closed-form `depletion_times`, monotonic output sinks,
+   RK4 ≡ Euler bit-identity, determinism, registration-order independence. Additive **NON-frozen**
+   golden (`crew_state.json` + pre-golden gate = three-quantity closure / `rationed == 0` / **material
+   depletion** — the "it bit" check). The crew's **atom-level stoichiometry** (`C_food + O₂ → CO₂ +
+   H₂O`) + composition stocks are **deferred seams** (ECLSS's atom-seam analogue). 32 tests (18 flow +
+   12 run + 2 golden). Zero core change (`git diff src/simcore/` empty); seven frozen + two
+   demo + two Power + one Thermal + one ECLSS golden byte-identical. The eventual biosphere/ECLSS
+   coupling (crew CO₂ ↔ plant uptake / cabin stocks) is **Phase 6**.
 
 ## Step 1 — full design: the isolated ENERGY-assert flip (P5.1a)
 
@@ -684,6 +721,83 @@ though the crew seam does not tie the species together.
   `o2_eq = 8.0 mol`); per-step three-quantity ledger residual ≤ 1.4e-14; geometric contraction
   exact to fp tol; RK4 ≢ Euler (agree to `rel=1e-4`).
 
+## Step 7 — full design: the Crew sibling domain (COMPLETE)
+
+*The fourth and last standalone sibling, designed just-in-time and advisor-reviewed before any code
+(the Phase-1/2/3/4/5 rhythm). Crew is the **net-consumer** side of the seam ECLSS's forced
+`CrewMetabolism` stood in for: standalone it draws down finite provisioned stores; **Phase 6 deletes
+ECLSS's stand-in and wires Crew's outputs into the cabin**. Scoped to Crew **alone** (a
+P5.2–P5.5-sized effort); cross-domain coupling is Phase 6.*
+
+### The load-bearing framing (advisor-decided): Crew is the first NET-CONSUMER / open-loop sibling — forced, no attractor, and its incompleteness is the argument for Phase-6 closure
+
+Every prior sibling either **loops** (biosphere), **oscillates** (Power), or reaches a **steady
+state** (Thermal / ECLSS). Crew just **runs down**: all three flows are **forced** (read an intake
+rate from `env` × dt, never a store amount), so each store is a pure linear-depletion accumulator
+`store(n) = store0 − n·rate·dt` — **no restoring force, no attractor**. Do **not** manufacture one
+(the ECLSS "don't manufacture Thermal-style nonlinearity" discipline; the roadmap says "forced
+schedules at first"). That standalone incompleteness — the crew starves once the stores empty unless
+the biosphere + ECLSS regenerate them — **is** the narrative argument for Phase-6 closure, not a
+weakness. Because no flow reads a stock, the forced-only **RK4 ≡ Euler bit-identity** (`k1 = k2 = k3
+= k4`) that ECLSS/Thermal/`SelfDischarge` broke is **revived** — the symmetric bookend (Crew is the
+second forced-only domain after Power's two-flow `BOUNDED_SOC`).
+
+### The three points the advisor sharpened (baked into the docstrings + plan)
+
+1. **Sell the identity as "net consumer / open-loop", not "finite stores" or "first mass split".**
+   The fractional split *is* `SolarCharge`'s η on a mass quantity — not big new machinery. The
+   distinct thing is that Crew is the only sibling that does not settle; its run-down motivates
+   integration.
+2. **Crew is the real version of ECLSS's forced `CrewMetabolism` stand-in.** ECLSS (Step 6) defined
+   this seam from the *cabin's* side (`metabolic_o2_sink` / `metabolic_co2_source` /
+   `metabolic_h2o_source`, a 6-leg forced flow). Crew owns the *other* side. The "Thermal builds the
+   receiver Phase 6 wires Power's `waste_heat` into" analogue: **Phase 6 deletes ECLSS's stand-in and
+   wires Crew's outputs into the cabin stocks** — but only a **subset**: CO₂ → `cabin_co2`, humidity
+   → `cabin_h2o`, O₂ intake ← `cabin_o2`. Crew's **urine, feces, and consumed-O₂** legs route to
+   *other* Phase-6 systems (water recovery, solid-waste, the atomic-coupling sink) — Crew is a
+   **superset** of ECLSS's crew seam.
+3. **The splits are justified by different Phase-6 destinations** (this is *why* they are two legs,
+   not "the first mass split"): CO₂ vs feces route to cabin-air vs solid-waste; humidity vs urine to
+   cabin-air vs water-recovery.
+
+### The implementation constraints the advisor flagged (all verified)
+
+- **The flows are purely forced — they never read a store amount** (no availability clamp). Positivity
+  is by **well-fed sizing** (the `LoadDraw` way — the mission is a fraction of each store's endurance
+  `store0/rate`), *not* structural `k·dt < 1` (which would need a donor-controlled `k·store` draw).
+  Clamping would break both the RK4 ≡ Euler bit-identity *and* the forced framing.
+- **Mirror `charge_split` exactly**: `carbon_split` / `water_split` compute each fraction
+  independently (`respired = f·q`, `feces = (1−f)·q`) and rely on `assert_flow_balanced`'s relative
+  tolerance for the ~1e-15 — no `q − respired` exact-sum trick.
+- **The integral invariant is cleaner than ECLSS**: the *store* holds the initial inventory, so no
+  negative-going boundary source is needed — **carbon total == food0**, water total == water0, oxygen
+  total == o2_0 (asserted per quantity).
+- **No POPULATION stock** (crew count is fixed scenario data, not a stock — modelling starvation
+  death is out of scope for "forced schedules"), so `events == ()` and no loss-sink. The atom-level
+  stoichiometry (`C_food + O₂ → CO₂ + H₂O`) + composition stocks are **deferred seams** (ECLSS's
+  atom-seam analogue).
+
+### Deliverables (all additive; zero core change)
+- **`src/domains/crew/`** — `stocks.py` (three `crew.*` finite POOLs + five `boundary.*` monotonic
+  sinks), `flows.py` (`OxygenConsumption` 2-leg forced + `FoodMetabolism` / `WaterBalance` 3-leg forced
+  splits; `carbon_split` / `water_split` as pure functions — the `charge_split` idiom on a mass
+  quantity), `loader.py` + `params/crew.yaml` (`respired_carbon_fraction` / `insensible_water_fraction`,
+  dimensionless, exact-string guarded, illustrative `TODO(cite)` — NOT NASA BVAD), `scenario.py`
+  (`CrewScenario` — store inventories + forced intake rates + dt; `MISSION_SCENARIO` + `MISSION_DAYS`),
+  `system.py` (`build_crew` / `crew_resolver` / `run_crew` + closed-form `depletion_times`).
+- **Tests (32):** `test_crew_flows.py` (18 — the split rate laws + endpoint collapse, per-quantity leg
+  balance via `assert_flow_balanced`, dt-linearity, zero-intake no-op, loader bounds/units),
+  `test_crew_run.py` (12 — three-quantity every-step closure, augmented-total invariants, `rationed ==
+  0` + stores-stay-positive/material, `events == ()`, monotone depletion + closed-form `depletion_times`,
+  monotonic sinks, determinism, **RK4 ≡ Euler bit-for-bit**, registration-order independence),
+  `test_regression_crew.py` (2 — additive **NON-frozen** golden `crew_state.json` with a pre-golden
+  gate: three-quantity closure / `rationed == 0` / **material depletion** — a degenerate or imbalanced
+  run is unpinnable).
+- **Acceptance (met):** `git diff src/simcore/` empty; full suite (incl. `-m slow`) + ruff + pyright
+  green (**1205 passed**, 1 oracle skip); **all thirteen existing goldens byte-identical** (seven
+  frozen + two demo + two Power + one Thermal + one ECLSS; no regen). Not in the biosphere freeze
+  manifest (additive/NON-frozen, the Power/Thermal/ECLSS discipline).
+
 ## Exit criteria (Phase 5 — "the engine carries more than biology")
 - **`ENERGY` is a conserved, every-step-asserted quantity** with explicit heat closure; the flip is
   proven inert for all existing runs (7 frozen + 2 demo goldens byte-identical; full suite green).
@@ -708,5 +822,21 @@ though the crew seam does not tie the species together.
   tolerance agreement, monotonic scrubber/condenser diagnostics, a hex-float golden). It builds the
   cabin-air **receiver**; **Phase 6 wires the Crew domain's O₂/CO₂/H₂O exchange (and the biosphere's
   O₂/CO₂ interface) into these cabin stocks**, and closes the crew's atom-level stoichiometry with
-  composition stocks (the flagged standalone seam). **Crew** remains the last forward-pointer,
-  designed just-in-time when reached. **Cross-domain coupling is Phase 6.**
+  composition stocks (the flagged standalone seam).
+- **Crew is COMPLETE** — the fourth and last standalone sibling and the **first net-consumer /
+  open-loop one**: three *finite* provisioned-store POOLs (food / water / O₂) drawn down by three
+  **forced** metabolic flows (two of them `SolarCharge`-style fractional splits — food-carbon →
+  respired CO₂ + feces, water → humidity + urine — split because each output routes to a *different*
+  Phase-6 destination), passing conservation + determinism alone (**all of CARBON / OXYGEN / WATER
+  conserved every step** — the payload; `rationed == 0` by well-fed sizing; `events == ()`; monotone
+  depletion + closed-form `depletion_times`; monotonic output sinks; **RK4 ≡ Euler bit-identical**
+  *revived* — the forced-only symmetric bookend; a hex-float golden). It is the **real version of
+  ECLSS's forced `CrewMetabolism` stand-in**; **Phase 6 deletes that stand-in and wires Crew's
+  outputs into the cabin stocks** (CO₂ → `cabin_co2`, humidity → `cabin_h2o`, O₂ ← `cabin_o2`, a
+  subset of Crew's fates), replaces the finite stores with regenerative sources, and closes the
+  crew's atom-level stoichiometry with composition stocks (the flagged standalone seam).
+- **Phase 5 EXITS.** The engine carries power, thermal, atmosphere/ECLSS and crew as first-class
+  siblings of the biosphere, each verified standalone (conservation + determinism alone). **Next:
+  Phase 6 — station integration / cross-domain coupling** (shared-stock wiring: Power fills electrical
+  energy the biosphere draws for lighting; Thermal receives Power's `waste_heat`; the Crew + biosphere
+  couple into the ECLSS cabin; composition stocks close the atomic seams).

@@ -1,0 +1,60 @@
+# crew — metabolic-split coefficients (Phase 5, Step 7)
+# Currency/units: CARBON (mol), WATER (kg), OXYGEN (mol). The coefficients the Crew core
+# introduces — the physiology fractions that split each ingested quantity across its named
+# output fates. The forced crew intake RATES and the initial store inventories are scenario
+# data (crew/scenario.py), NOT params (the biosphere/Power/Thermal/ECLSS data-vs-coefficient
+# split).
+#
+# The standalone Crew domain holds three finite provisioned-consumable POOLs (food_store /
+# water_store / o2_store) drawn down by three FORCED metabolic flows, each splitting an
+# ingested quantity across output fates that route to DIFFERENT Phase-6 destinations:
+#     O₂:    o2_store   → crew_o2_consumed                 (decoupled metabolic-O₂ sink)
+#     CARBON: food_store → exhaled_co2 (f_resp)            [→ ECLSS cabin_co2]
+#                        + fecal_waste ((1−f_resp))        [→ solid-waste system]
+#     WATER: water_store → crew_humidity (f_insensible)    [→ ECLSS cabin_h2o]
+#                        + urine ((1−f_insensible))        [→ water-recovery system]
+#
+# respired_carbon_fraction (f_resp) — fraction of ingested food carbon respired as CO₂
+#   (dimensionless), in [0, 1]. The remainder (1−f_resp) is egested as fecal solid carbon.
+#   The SolarCharge η_c analogue applied to a MASS quantity. Most ingested carbon is
+#   respired; the fecal fraction is the small remainder.
+#
+# insensible_water_fraction (f_insensible) — fraction of water intake leaving as
+#   insensible/respiratory humidity + perspiration (dimensionless), in [0, 1]. The
+#   remainder (1−f_insensible) leaves as urine.
+#
+# Forced (NOT donor-controlled): the three flows read intake RATES from env × dt and never
+#   read a store amount, so there is no restoring force and no attractor — the stores just
+#   deplete. Positivity is by WELL-FED SIZING (the mission is shorter than the closed-form
+#   time-to-depletion store0/rate — the LoadDraw discipline), NOT structural. Because no
+#   flow reads a stock, the forced-only RK4 ≡ Euler bit-identity holds (Crew revives it).
+#
+# Units discipline (P4 / config/units.py): neither fraction is a conserved-Quantity
+#   canonical unit, so each is a schema-validated, bound-checked float carrying a declared
+#   unit (exact-string guarded at the loader, like Power's charge_efficiency / ECLSS's
+#   rates), NOT routed through pint.
+#
+# Clean-room: the fractional split of ingested carbon into respired CO₂ vs fecal loss, and
+#   of water intake into insensible loss vs urine, is textbook human metabolism / mass
+#   balance. The numeric VALUES are provisional, ILLUSTRATIVE placeholders — deliberately
+#   NOT NASA BVAD / BioSim life-support numbers (Crew calibration against those references
+#   is Phase 6, the integrated-validation step). Flagged TODO(cite) until bound to a primary
+#   source at the validation gate.
+#
+# Sources:
+#   [A] Guyton, A.C., Hall, J.E. (2016), "Textbook of Medical Physiology", 13th ed.,
+#       Elsevier — respiratory vs fecal carbon partitioning; insensible water loss vs
+#       urinary output in the daily water balance.
+
+name: crew
+process: metabolic_split
+
+parameters:
+  respired_carbon_fraction:
+    value: 0.85
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, illustrative fraction of ingested food carbon respired as CO₂ (remainder egested as feces) [A]; NOT a NASA BVAD number; primary citation pending validation gate"
+  insensible_water_fraction:
+    value: 0.4
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, illustrative fraction of water intake leaving as insensible/respiratory humidity (remainder as urine) [A]; NOT a NASA BVAD number; primary citation pending validation gate"

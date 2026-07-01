@@ -1,0 +1,112 @@
+{
+  "aux": {},
+  "n": 168,
+  "rng_seed": "0x0",
+  "stocks": [
+    {
+      "amount": "0x1.d07c84b5dcc4dp+2",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.crew_humidity",
+      "kind": "boundary",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.2e66666666677p+9",
+      "composition": {
+        "oxygen": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.crew_o2_consumed",
+      "kind": "boundary",
+      "quantity": "oxygen",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.010a3d70a3d73p+8",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.exhaled_co2",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.6ae147ae147c0p+5",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.fecal_waste",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.5c5d638865949p+3",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.urine",
+      "kind": "boundary",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.5cccccccccd10p+9",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "crew",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "crew.food_store",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.5cccccccccd10p+10",
+      "composition": {
+        "oxygen": "0x1.0000000000000p+0"
+      },
+      "domain": "crew",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "crew.o2_store",
+      "kind": "pool",
+      "quantity": "oxygen",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.4ed916872b068p+5",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "crew",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "crew.water_store",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    }
+  ],
+  "version": 3
+}

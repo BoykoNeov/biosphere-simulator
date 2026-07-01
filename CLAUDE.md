@@ -219,9 +219,38 @@ per-species geometric-contraction + no-control contrast; additive **NON-frozen**
 **Zero core change** (`git diff src/simcore/` empty); full suite incl. `-m slow` + ruff + pyright
 green (**1173 passed**); **seven frozen + two demo + two Power + one Thermal golden byte-identical**
 (no regen).
-**Next: Crew** — the last forward-pointer sibling (O₂ intake / CO₂+H₂O output / water+food
-consumption / waste; forced schedules at first), designed just-in-time. Cross-domain coupling
-(wiring Crew + biosphere into the ECLSS cabin stocks) is **Phase 6**.
+**Step 7 (Crew) COMPLETE — the fourth and last sibling; the first net-consumer / open-loop one;
+PHASE 5 EXITS**: new `src/domains/crew/` (zero core change) — three **finite provisioned-store**
+POOLs `crew.food_store` (CARBON) / `crew.water_store` (WATER) / `crew.o2_store` (OXYGEN) drawn down
+by three **forced** metabolic flows + five monotonic boundary output sinks. Flows: **`OxygenConsumption`**
+(2-leg, `o2_store → crew_o2_consumed`) + **`FoodMetabolism`** (3-leg **split** `food_store → exhaled_co2
+(f_resp) + fecal_waste (1−f_resp)`) + **`WaterBalance`** (3-leg **split** `water_store → crew_humidity
+(f_ins) + urine (1−f_ins)`) — the two splits are `SolarCharge`'s η-split applied to a **mass** quantity
+(`carbon_split`/`water_split` mirror `charge_split`). `crew.yaml` (two dimensionless split fractions,
+exact-string guarded, illustrative `TODO(cite)` — NOT NASA BVAD; the intake **rates** are scenario data).
+**The load-bearing framing (advisor): Crew is the first NET-CONSUMER / open-loop sibling** — all flows
+**forced** (read rates, never a store), so no restoring force / no attractor; the stores just **run down**
+(`store(n)=store0−n·rate·dt`), and *that incompleteness is the argument for Phase-6 closure*. **The
+splits are justified because each output routes to a DIFFERENT Phase-6 destination** (CO₂→cabin-air vs
+feces→solid-waste; humidity→cabin-air vs urine→water-recovery), NOT "the first mass split". **Crew is
+the real version of ECLSS's forced `CrewMetabolism` stand-in** — Phase 6 deletes that stand-in and wires
+Crew's outputs into the cabin (CO₂→`cabin_co2`, humidity→`cabin_h2o`, O₂←`cabin_o2`, a *subset*; urine/
+feces/O₂-consumed route elsewhere). Multi-quantity like ECLSS (CARBON/OXYGEN/WATER conserved every step
+— the payload); positivity by **well-fed sizing** (`rationed==0` because each store's endurance
+`store0/rate` exceeds the mission — the `LoadDraw` way, never a store-availability clamp); **forced ⇒ RK4
+≡ Euler bit-identical REVIVED** (the symmetric bookend to ECLSS/Thermal, which broke it — framed as the
+identity). Integral invariant cleaner than ECLSS (the store holds the inventory → **carbon total==food0**,
+no negative-going source). No POPULATION stock (crew count is scenario data) ⇒ `events==()`; the atom-level
+stoichiometry (`C_food+O₂→CO₂+H₂O`) + composition stocks are **deferred seams**. Validation
+(`MISSION_SCENARIO`, 7-day provisioned mission, `dt=3600 s`, 168 steps, each store → ≈70%): 3-quantity
+every-step closure, `rationed==0`, `events==()`, monotone depletion + closed-form `depletion_times`,
+monotonic sinks, RK4 ≡ Euler bit-identity, determinism, registration-order independence; additive
+**NON-frozen** golden `crew_state.json` (pre-golden gate: 3-quantity closure / `rationed==0` / **material
+depletion** — the "it bit" check). **32 tests** (18 flow + 12 run + 2 golden). **Zero core
+change** (`git diff src/simcore/` empty); full suite incl. `-m slow` + ruff + pyright green (**1205
+passed**, 1 oracle skip); **all thirteen existing goldens byte-identical** (seven frozen + two demo + two
+Power + one Thermal + one ECLSS; no regen). **Phase 5 EXITS → Phase 6 (station integration / cross-domain
+coupling).**
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
