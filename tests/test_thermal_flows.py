@@ -50,8 +50,8 @@ from simcore.ids import FlowId
 from simcore.quantities import Quantity
 from simcore.state import State
 
-# A committed-params handle + a hand ThermalParams for the pure rate-law checks.
-_PARAMS = load_thermal_params()
+# A hand ThermalParams for the pure rate-law checks (matches radiator.yaml so the hand
+# values stay meaningful; the loader itself is exercised in the loader tests below).
 _HAND = ThermalParams(
     emissivity=0.85, radiator_area=10.0, heat_capacity=1.0e7, space_temperature=2.7
 )

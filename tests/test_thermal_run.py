@@ -209,9 +209,11 @@ def test_thermal_two_runs_contract_to_the_attractor() -> None:
         abs(h.stocks[NODE].amount - c.stocks[NODE].amount)
         for c, h in zip(cold, hot, strict=False)
     ]
-    assert all(
-        b < a for a, b in zip(diff, diff[1:], strict=False)
-    )  # strict contraction
+    # Non-increasing every step (``<=`` not ``<``: if the horizon is ever raised until
+    # both land on the same FP fixed point, ``d_n → 0`` and a strict ``<`` would fail
+    # though the physics is fine — the "ended much smaller" check below carries the
+    # actual contraction claim).
+    assert all(b <= a for a, b in zip(diff, diff[1:], strict=False))
     assert diff[-1] < 0.01 * diff[0]  # contracted by >100× over the horizon
 
 
