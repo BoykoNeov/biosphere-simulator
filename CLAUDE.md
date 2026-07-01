@@ -376,8 +376,45 @@ regenerated above the η_w=0 baseline — the "it bit" check / reached WATER ste
 (`git diff src/simcore/` empty) + **zero domain change** (`src/domains/` untouched); full suite incl. `-m slow` +
 ruff + pyright green (**1265 passed**, 1 oracle skip); **all seventeen existing goldens byte-identical** (seven
 frozen + two demo + two Power + one Thermal + one ECLSS + one Crew + the Step-1 station + the Step-2 cabin-gas + the
-Step-3 greenhouse; no regen — `water_recovery_state.json` is the eighteenth). NEXT: Step 5 (P6.5) — Power → biosphere lighting (a station lamp flow; PAR forcing
-from lamp draw).
+Step-3 greenhouse; no regen — `water_recovery_state.json` is the eighteenth).
+**Step 5 (P6.5) COMPLETE — Power → biosphere lighting; the phase's one NON-shared-stock coupling; energy
+enters biology**: new `src/station/lighting.py` + the station-owned **`Lamp`** flow (`station/flows.py`) +
+`lamp.yaml` (second station-owned param). The seam: a grow lamp `power.battery → light_used + waste_heat`
+(3-leg SolarCharge η-split, **forced**) whose electrical draw ALSO sets the biosphere's `par` **forcing**
+(`PAR = photon_efficacy·lamp_power_w/ground_area`), replacing the weather-table PAR. **Power and the
+biosphere share NO stock** (finding #3 / #16) — the lamp-draw schedule is the whole interface, feeding both
+the ENERGY ledger (this flow) and the PAR forcing (a value the frozen biosphere reads; a flow can't tell
+forcing from a shared stock). **The daylength coupling is the correctness crux** (advisor): `incident_par`
+returns a daytime-mean flux and FvCB re-multiplies by `daylength_s` (dose = PAR × daylength), so **both**
+`PAR_VAR` and `DAYLENGTH_VAR` come from the lamp (`daylength_s = photoperiod_hours·3600`) — verified the ONLY
+runtime `daylength_s` consumer is photosynthesis. **Scope (advisor-endorsed deviation): Power + biosphere
+only; the `waste_heat` leg → `boundary.waste_heat`, NOT `thermal.node`** (the plan's parenthetical would only
+re-test Step-1's node seam; inward move deferred to the sealed-station step — "boundary now, inward later").
+**One lamp param, the ENERGY split DERIVED**: `lamp.yaml` carries only `photon_efficacy` (µmol/J, illustrative
+2.5, Kusuma/Bugbee 2020); `η_lamp = photon_efficacy/PAR_UMOL_PER_J` via the inverse of the biosphere's own
+McCree constant (a σ/CODATA-style module constant, not a param) — efficacy and radiant fraction are two
+accountings of ONE device, consistent by derivation; loader guards `∈ (0, PAR_UMOL_PER_J]` (η_lamp = 1
+ceiling). **The frozen-`n` fast domain forces a daily-average lamp draw** (`substep` keeps `n`, so a within-day
+top-hat isn't an `n`-schedule; the biosphere carries the photoperiod internally via `daylength_s`, so Power
+draws the constant `lamp_power_w·photoperiod/24` — daily energy exact, only intra-day instantaneous power
+smeared; PAR uses the on-window intensity). **The two-rate driver is EXTRACTED** to `src/station/driver.py`
+(`run_master_day` generalizes `run_greenhouse`'s body — slow domain once/day via `step_report`, fast domain
+×`steps_per_day` via `substep` + per-substep conservation assert; `run_greenhouse` refactored to a thin
+wrapper, its golden byte-identical; `run_lighting` the second instance). **Minimal Power** (battery POOL + Lamp
+only — no SolarCharge/LoadDraw; the battery is a finite energy store draining, the Crew-store pattern).
+**Payload — the signed "it bit" gate (Euler-only, biosphere frozen)**: lamp-on ⇒ `bio_organic_C` grows (+0.11
+mol/7 days), lamp-off (PAR = 0) ⇒ declines (respiration only); PAR factor reconstructed; ENERGY closed every
+step (battery drains by exactly `lamp_power_w·photoperiod·3600·days`; `light_used`/`waste_heat` name the
+η-split); biosphere internal water/N loops still close; `rationed == 0`, `events == ()`; Power⊥biosphere stock
+sets disjoint. For Step 8: a schedule-derived PAR won't see brownout rationing automatically (flagged). **26
+tests** (unit: `lamp_energy_split`/`Lamp` legs+balance/loader bounds; run: the gate + determinism); additive
+**NON-frozen** golden `lighting_state.json` (pre-golden gate: every quantity closed / battery drained by the
+lamp energy / lit grew while dark declined). **Zero core change** (`git diff src/simcore/` empty) + **zero
+domain change** (`src/domains/` untouched); full suite incl. `-m slow` + ruff + pyright green (**1291 passed**,
+1 oracle skip); **all eighteen existing goldens byte-identical** (seven frozen + two demo + two Power + one
+Thermal + one ECLSS + one Crew + Step-1 station + Step-2 cabin-gas + Step-3 greenhouse + Step-4 water-recovery;
+no regen — `lighting_state.json` is the nineteenth). NEXT: Step 6 (P6.6) — the biomass/food loop (biosphere
+harvest → crew `food_store`; close CARBON through the trophic seam).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

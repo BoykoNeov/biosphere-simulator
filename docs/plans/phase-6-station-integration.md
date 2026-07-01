@@ -1,6 +1,6 @@
 # Phase 6 — Station Integration (cross-domain coupling)
 
-**Status: IN PROGRESS — Steps 1–4 (P6.1–P6.4) COMPLETE.** Pre-plan investigation complete and
+**Status: IN PROGRESS — Steps 1–5 (P6.1–P6.5) COMPLETE.** Pre-plan investigation complete and
 advisor-reviewed (two blocking checks run before this doc committed to anything; see
 "Load-bearing findings" below). Steps 1–3 are designed concretely here; Steps 4–10 get
 just-in-time design as Phase 5's siblings did ("each designed just-in-time"), because each
@@ -313,12 +313,71 @@ drain from the *same* topology) + this identity; the two WATER pools reach emerg
 golden `water_recovery_state.json`. Full suite incl. `-m slow` + ruff + pyright green (**1265
 passed**); all seventeen existing goldens byte-identical (no regen).
 
-**Step 5 (P6.5) — Power → biosphere lighting (energy enters biology).** A station **lamp**
-flow: `power.battery → light-used + waste_heat` (→ `thermal.node`, ENERGY-balanced), and
-the station resolver computes the biosphere's `par` **forcing** from the lamp's electrical
-draw (replacing the weather-table PAR). Lighting is now powered; a later lighting/brownout
-perturbation cascades into photosynthesis with no cascade code. Zero biosphere change (PAR
-stays a forcing). Just-in-time design.
+**Step 5 (P6.5) — Power → biosphere lighting (energy enters biology). COMPLETE.** A
+station-owned **`Lamp`** flow (`station.flows`): `power.battery → light_used + waste_heat`,
+3-leg SolarCharge η-split, forced. The station resolver computes the biosphere's `par`
+**forcing** from the same lamp-draw schedule (`PAR = photon_efficacy·lamp_power_w/
+ground_area`), replacing the weather-table PAR — the phase's **one non-shared-stock
+coupling** (finding #3 / #16: Power and the biosphere share *no* stock; the schedule feeds
+both the ENERGY ledger and the PAR forcing). Zero frozen / zero domain / zero core change
+(PAR stays a forcing).
+
+*Design decisions (advisor-reviewed; the plan's one-line framing under-specified three
+load-bearing points — corrected here):*
+
+- **The daylength coupling is the correctness crux.** `incident_par` returns a
+  *daytime-mean* flux and FvCB re-multiplies by `daylength_s` (daily dose = PAR ×
+  daylength), so overriding PAR alone silently corrupts the dose. **Both** `PAR_VAR` and
+  `DAYLENGTH_VAR` come from the lamp (`daylength_s = photoperiod_hours·3600`). Verified the
+  *only* runtime `DAYLENGTH_VAR` consumer is photosynthesis (phenology / transpiration /
+  net-radiation don't read it), so "day = lamp photoperiod" is consistent everywhere.
+
+- **Scope: Power + biosphere only; the `waste_heat` leg lands in `boundary.waste_heat`, NOT
+  `thermal.node`.** The plan's parenthetical `(→ thermal.node)` would only re-test Step-1's
+  node seam for no new thesis; the inward move is deferred to the sealed-station step (the
+  "boundary now, inward later" rhythm Power's own dissipation followed — the Steps-3/4
+  precedent for correcting the plan's first framing).
+
+- **One lamp param, the ENERGY split derived (not two accountings).** `lamp.yaml` carries
+  only `photon_efficacy` (µmol/J); the radiant fraction `η_lamp = photon_efficacy·
+  PAR_PHOTON_ENERGY_J_PER_UMOL = photon_efficacy / 4.57` is *derived* via the inverse of
+  the biosphere's own McCree PAR constant (a σ/CODATA-style module constant, not a param).
+  So efficacy and the radiant fraction are two accountings of one device, consistent by
+  derivation; the loader guards `photon_efficacy ∈ (0, PAR_UMOL_PER_J]` (the physical
+  ceiling η_lamp = 1). Illustrative LED value 2.5 µmol/J (η_lamp ≈ 0.55; Kusuma/Bugbee
+  2020), `TODO(cite)`.
+
+- **The frozen-`n` fast domain forces a daily-average lamp draw.** `substep` **keeps** `n`,
+  so a within-day top-hat is not an `n`-schedule; the biosphere carries the photoperiod
+  *internally* via `daylength_s`, so Power draws the constant daily-average
+  `lamp_power_w·photoperiod/24` — its daily **energy** (and the `light_used`/`waste_heat`
+  legs) is exact, only the unobserved intra-day instantaneous power is smeared. PAR uses
+  the on-window intensity.
+
+- **The two-rate driver is EXTRACTED (second instance).** `station/driver.py`
+  `run_master_day` generalizes `run_greenhouse`'s body (slow domain once/day via
+  `step_report`, fast domain ×`steps_per_day` via `substep` + per-substep conservation
+  assert); `run_greenhouse` refactored to a thin wrapper (greenhouse golden byte-identical),
+  `run_lighting` another. **Minimal Power** (battery POOL + Lamp only — no SolarCharge/
+  LoadDraw; the battery is a finite energy store draining, the Crew-store pattern).
+
+- **The payload — the signed "it bit" gate (Euler-only, biosphere frozen).** Lamp-on ⇒
+  `bio_organic_C` grows (+0.11 mol over 7 days); lamp-off (PAR = 0) ⇒ it declines
+  (respiration only) — the lamp genuinely carries the energy driving fixation. Plus: the PAR
+  factor reconstructed (`PAR = photon_efficacy·lamp_power_w/ground_area`), ENERGY closed
+  every step (battery drains by exactly `lamp_power_w·photoperiod·3600·days`; `light_used`/
+  `waste_heat` name the η-split), the biosphere internal water/N loops still close,
+  `rationed == 0`, `events == ()`, `battery > 0` (well-fed), Power⊥biosphere stock sets
+  disjoint. For Step 8: a schedule-derived PAR won't see brownout rationing automatically —
+  flagged, not solved here. **26 tests** (unit: `lamp_energy_split` / `Lamp` legs+balance /
+  loader bounds; run: the gate above + determinism); additive **NON-frozen** golden
+  `lighting_state.json` (pre-golden gate: every quantity closed / battery drained by the
+  lamp energy / lit grew while dark declined). **Zero core change** (`git diff src/simcore/`
+  empty) + **zero domain change** (`src/domains/` untouched); full suite incl. `-m slow` +
+  ruff + pyright green (**1291 passed**); **all eighteen existing goldens byte-identical**
+  (seven frozen + two demo + two Power + one Thermal + one ECLSS + one Crew + Step-1 station
+  + Step-2 cabin-gas + Step-3 greenhouse + Step-4 water-recovery; no regen —
+  `lighting_state.json` is the nineteenth). NEXT: Step 6 (P6.6) — the biomass / food loop.
 
 **Step 6 (P6.6) — the biomass / food loop.** Biosphere harvest → crew `food_store`
 (regenerative food); crew feces → soil/waste. Close CARBON through the trophic seam (the

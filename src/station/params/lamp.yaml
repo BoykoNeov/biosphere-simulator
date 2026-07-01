@@ -1,0 +1,61 @@
+# lamp — the station grow-lamp coefficient (Phase 6, Step 5)
+# Currency/unit: ENERGY (J) for the flow; the param is a µmol-per-J photon efficacy.
+# A STATION-owned param (like water_recovery.yaml — the lamp is a cross-domain device
+# that carries electrical ENERGY into biology, owned by no single domain). It
+# parameterises the station-owned Lamp flow (station/flows.py):
+#
+#     battery → light_used (+η_lamp) + waste_heat (+(1−η_lamp)),   draw = lamp_power·dt
+#
+# and, via the SAME lamp_power schedule, the biosphere's PAR forcing (station/lighting.py):
+#
+#     PAR = photon_efficacy · lamp_power / ground_area   (µmol photons m⁻² s⁻¹)
+#
+# The lamp is the phase's one NON-shared-stock coupling (finding #3 / #16): Power and the
+# biosphere share no stock — the lamp_power schedule is the whole interface, feeding the
+# ENERGY ledger (this flow) and the PAR forcing (a value the frozen biosphere reads).
+#
+# photon_efficacy (η_φ) — photosynthetic photon efficacy (µmol J⁻¹), > 0. The standard
+#   grow-lamp figure of merit: PAR photons emitted per joule of electrical input. It is
+#   the ONE lamp param — the ENERGY split is DERIVED from it:
+#       η_lamp = photon_efficacy · PAR_PHOTON_ENERGY_J_PER_UMOL
+#              = photon_efficacy / PAR_UMOL_PER_J        (= photon_efficacy / 4.57)
+#   where PAR_PHOTON_ENERGY_J_PER_UMOL (J µmol⁻¹) is the inverse of the biosphere's own
+#   McCree (1972) 4.57 µmol J⁻¹ PAR-band conversion (a σ/CODATA-style physical constant,
+#   NOT a param — station/flows.py). So efficacy and the radiant fraction are two
+#   accountings of ONE device, made consistent by derivation, never two params that could
+#   disagree. Physical ceiling: PAR_UMOL_PER_J (all input → PAR photons ⇒ η_lamp = 1, heat
+#   leg exactly 0); the loader rejects a value above it (over-unity) and a non-positive one.
+#   2.5 µmol J⁻¹ is a representative efficient horticultural-LED value (η_lamp ≈ 0.55) —
+#   real fixtures span ~2.1–3.0, the biological maximum ~4.1; deliberately mid-range and
+#   ILLUSTRATIVE, NOT a specific fixture's rated number (integrated life-support / lamp
+#   calibration is a later Phase-6 step). Flagged TODO(cite) until bound at the validation
+#   gate.
+#
+# Units discipline (P4 / config/units.py): µmol/J is not a conserved-Quantity canonical
+#   unit, so photon_efficacy is a schema-validated, bound-checked float carrying a declared
+#   unit (exact-string guarded at the loader, like Power's charge_efficiency / the ECLSS
+#   rates), NOT routed through pint.
+#
+# Clean-room: photon efficacy (PPF per watt) is the standard, textbook grow-lamp metric;
+#   the McCree PAR conversion (4.57 µmol J⁻¹, daylight) is the biosphere's own constant.
+#   The numeric VALUE is a provisional, ILLUSTRATIVE placeholder — deliberately NOT a
+#   rated fixture number. Flagged TODO(cite) pending a primary source at the validation
+#   gate.
+#
+# Sources:
+#   [A] McCree, K.J. (1972), "Test of current definitions of photosynthetically active
+#       radiation against leaf photosynthesis data", Agric. Meteorol. 10:443–453 — the PAR
+#       photon/energy conversion (~4.57 µmol J⁻¹, daylight), the biosphere's own constant
+#       (domains/biosphere/weather.py), inverted here for the radiant-energy split.
+#   [B] Kusuma, P., Pattison, P.M. & Bugbee, B. (2020), "From physics to fixtures to food:
+#       current and potential LED efficacy", Horticulture Research 7:56 — horticultural-LED
+#       photon efficacy (~2.1–3.0 µmol J⁻¹ current; ~4.1 biological max).
+
+name: lamp
+process: grow_lamp
+
+parameters:
+  photon_efficacy:
+    value: 2.5
+    unit: "umol/J"
+    source: "TODO(cite) — provisional, illustrative efficient-horticultural-LED photon efficacy (η_lamp ≈ 0.55; real fixtures ~2.1–3.0, bio max ~4.1 µmol/J) [B]; McCree PAR conversion [A]; NOT a rated fixture number; primary citation pending validation gate"

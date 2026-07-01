@@ -9,11 +9,12 @@ structured-param loader stays premature (the bespoke-schema-per-file discipline;
 shared loader waits for enough instances to justify it).
 
 Until Step 4 the station reused sibling params (``CrewRespiration`` took the crew's
-``respired_carbon_fraction``); ``station/params/water_recovery.yaml`` is the **first**
-station-owned param file — the single source of truth for the two water-recovery
-coefficients (``WaterRecoveryParams`` carries no inline defaults, per the "parameters
-are data" invariant). The forced crew intake rates + initial cabin inventories remain
-scenario data (``scenario.py``), not params.
+``respired_carbon_fraction``); ``station/params/water_recovery.yaml`` was the **first**
+station-owned param file, and ``station/params/lamp.yaml`` (Step 5, the grow-lamp photon
+efficacy) is the second — each the single source of truth for its flow's coefficients
+(``WaterRecoveryParams`` / ``LampParams`` carry no inline defaults, per the "parameters
+are data" invariant). The forced crew intake rates, initial cabin inventories, and the
+lamp power / photoperiod schedule remain scenario data (``scenario.py``), not params.
 """
 
 from __future__ import annotations
@@ -23,12 +24,16 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from config import load_yaml
-from station.flows import WaterRecoveryParams
+from domains.biosphere.weather import PAR_UMOL_PER_J
+from station.flows import LampParams, WaterRecoveryParams
 
 # The committed station water-recovery param file (Step 4 crew water loop).
 WATER_RECOVERY_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "water_recovery.yaml"
 )
+
+# The committed station grow-lamp param file (Step 5 Power → biosphere lighting).
+LAMP_PARAMS_PATH: Path = Path(__file__).parent / "params" / "lamp.yaml"
 
 # Expected canonical unit string per param (exact-match guard at the boundary). Neither
 # is a conserved-Quantity canonical unit, so each is schema-validated and exact-string
@@ -37,6 +42,11 @@ _WATER_RECOVERY_UNITS: dict[str, str] = {
     "recovery_rate": "1/s",
     "recovery_efficiency": "dimensionless",
 }
+
+# Expected canonical unit string for the lamp param (exact-match guard). Not a
+# conserved-Quantity canonical unit, so schema-validated + exact-string guarded (not
+# pint).
+_LAMP_UNITS: dict[str, str] = {"photon_efficacy": "umol/J"}
 
 
 class _ValueUnitSource(BaseModel):
@@ -106,3 +116,44 @@ def load_water_recovery_params(
         recovery_rate=recovery_rate,
         recovery_efficiency=recovery_efficiency,
     )
+
+
+class _LampParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    photon_efficacy: _ValueUnitSource
+
+
+class _LampSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _LampParameters
+
+
+def load_lamp_params(path: str | Path = LAMP_PARAMS_PATH) -> LampParams:
+    """Load, schema- and bound-check the grow-lamp param.
+
+    ``photon_efficacy`` carries a declared unit (exact-string guarded, ``umol/J``) and a
+    required ``source`` tag (clean-room discipline). Bounds: it must be **strictly
+    positive** (a lamp that emits nothing is inert / a wiring mistake) and **at most**
+    ``PAR_UMOL_PER_J`` — the physical ceiling at which all electrical input becomes PAR
+    photons (η_lamp = 1, the waste-heat leg exactly 0); a value above it would imply an
+    over-unity lamp (radiant PAR energy exceeding the input). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    out-of-range value.
+    """
+    schema = _LampSchema.model_validate(load_yaml(path))
+    entry = schema.parameters.photon_efficacy
+    expected = _LAMP_UNITS["photon_efficacy"]
+    if entry.unit != expected:
+        raise ValueError(
+            f"photon_efficacy must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    if not (0.0 < entry.value <= PAR_UMOL_PER_J):
+        raise ValueError(
+            f"photon_efficacy must be in (0, {PAR_UMOL_PER_J}] µmol/J (the physical "
+            f"ceiling where all input becomes PAR photons), got {entry.value}"
+        )
+    return LampParams(photon_efficacy=entry.value)

@@ -2,7 +2,7 @@
 
 The assembly layer owns flows whose stocks belong to *different* domains — the ones that
 cannot live in any single ``domains.*`` package without one domain importing another
-(the finding-#1 discipline). Two seams live here:
+(the finding-#1 discipline). Three seams live here:
 
   * **CrewRespiration** (Step 2) — the merged stoichiometric respiration flow
     ``food_store + cabin_o2 → cabin_co2 + fecal_waste``. It replaces, *in the coupled
@@ -28,18 +28,36 @@ cannot live in any single ``domains.*`` package without one domain importing ano
     **regenerative up to the recovery efficiency** — the net drain drops from the full
     intake to ``(1−η_w)·intake``, closed exactly at ``η_w = 1`` (``brine`` is the honest
     remaining WATER boundary, the Thermal ``boundary.space`` analogue). The split is the
-    ``SolarCharge`` / ``carbon_split`` idiom on the WATER quantity;
-    **donor-controlled** on ``recovered_water`` (∝ its own amount), so positivity is
-    structural (``k_rec·dt < 1``) and — unlike the *forced* crew flows — it makes
-    ``water_store`` **state-dependent**, breaking the forced RK4 ≡ Euler bit-identity
-    (the "it earned its keep" signal, the ``SelfDischarge`` analogue).
+    ``SolarCharge`` / ``carbon_split`` idiom on the WATER quantity; **donor-controlled**
+    on ``recovered_water`` (∝ its own amount), so positivity is structural (``k_rec·dt <
+    1``) and — unlike the *forced* crew flows — it makes ``water_store``
+    **state-dependent**, breaking the forced RK4 ≡ Euler bit-identity (the "it earned
+    its keep" signal, the ``SelfDischarge`` analogue).
 
-**Why the station layer, not the crew domain.** The crew domain *documents*
-``C_food + O₂ → CO₂ + H₂O`` atom coupling as a deferred **Phase-6** seam (its
-``o2_store`` / ``crew_o2_consumed`` are the honest decoupled stand-in); honoring that
-boundary means the atom-coupled flow lives in the assembly layer that owns cross-domain
-wiring, not in the crew package. Standalone Crew keeps its three decoupled flows
-verbatim, so ``crew_state.json`` is untouched — Step 2 is a *separate* assembly.
+  * **Lamp** (Step 5) — the grow-lamp flow ``battery → light_used (+η_lamp) + waste_heat
+    (+(1−η_lamp))`` that carries electrical ENERGY into biology. It is the phase's **one
+    non-shared-stock coupling** (finding #3 / #16): Power and the biosphere share *no*
+    stock; the link is the **lamp-draw schedule**, which feeds both this flow (the
+    ENERGY it withdraws from ``power.battery``) *and* the biosphere's ``par`` /
+    ``daylength_s`` **forcings** (``station.lighting`` computes ``PAR =
+    lamp_power·efficacy/ground_area`` from the same schedule). A flow cannot tell
+    forcing from a shared stock (#16), so the frozen biosphere is untouched — PAR stays
+    a forcing, merely *computed from the lamp* instead of a weather table. The ENERGY
+    split is the ``SolarCharge`` η-split: the radiant fraction ``η_lamp`` leaves as PAR
+    light (→ a ``light_used`` boundary sink), the remainder is waste heat. **Forced**
+    (reads the ``lamp_power`` schedule, not a stock), so RK4 ≡ Euler on the battery —
+    but the biosphere it lights is Euler-locked by its freeze, so the coupled run is
+    Euler-only (no cross-check, matching the greenhouse). The waste-heat leg lands in a
+    ``boundary.waste_heat`` sink here (the standalone-Power seam); moving it inward to
+    ``thermal.node`` is deferred to the sealed-station step, the "boundary now, inward
+    later" rhythm Power's own dissipation followed.
+
+**Why the station layer, not the crew domain.** The crew domain *documents* ``C_food +
+O₂ → CO₂ + H₂O`` atom coupling as a deferred **Phase-6** seam (its ``o2_store`` /
+``crew_o2_consumed`` are the honest decoupled stand-in); honoring that boundary means
+the atom-coupled flow lives in the assembly layer that owns cross-domain wiring, not in
+the crew package. Standalone Crew keeps its three decoupled flows verbatim, so
+``crew_state.json`` is untouched — Step 2 is a *separate* assembly.
 
 **Forced, like the crew flows it merges (RK4-order-safe).** The magnitude is the forced
 food-carbon intake ``q = env.get(crew_food_intake)·dt`` (mol C), never a stock read, so
@@ -71,6 +89,7 @@ efficiency are the first **station-owned** params
 
 from dataclasses import dataclass
 
+from domains.biosphere.weather import PAR_UMOL_PER_J
 from domains.crew.flows import carbon_split
 from domains.crew.stocks import FOOD_INTAKE_VAR
 from simcore.environment import Environment
@@ -78,32 +97,46 @@ from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
 from simcore.state import State
 
+# The ``lamp_power`` forcing var (W): the lamp's electrical draw schedule. The single
+# source both the :class:`Lamp` flow (the ENERGY it withdraws) and the biosphere's PAR
+# forcing (``station.lighting``) read — the non-shared-stock coupling (#16).
+LAMP_POWER_VAR: str = "lamp_power"
+
+# Mean PAR-band photon energy (J per µmol photons), the inverse of the biosphere's own
+# McCree (1972) ``4.57 µmol J⁻¹`` conversion (``domains.biosphere.weather``). A single
+# source of truth: the SAME constant the biosphere uses to turn PAR irradiance into a
+# photon flux is inverted here to book the radiant PAR energy the lamp emits. It is a
+# spectrum-averaged physical constant (a ``σ``/CODATA-style module constant with
+# provenance, NOT a tunable param — the ``drift.py`` discipline); the PAR-band average
+# is spectrum-dependent, and reusing the biosphere's daylight value for the LED here is
+# an illustrative approximation (calibration deferred to the validation step).
+PAR_PHOTON_ENERGY_J_PER_UMOL: float = 1.0 / PAR_UMOL_PER_J
+
 
 @dataclass(frozen=True)
 class CrewRespiration:
     """CARBON+OXYGEN flow ``food_store + cabin_o2 → cabin_co2 + fecal_waste`` (P6.2).
 
     The atom-coupled merge of standalone crew's ``OxygenConsumption`` + the CO₂ leg of
-    ``FoodMetabolism``. The forced food-carbon intake
-    ``q = env.get(crew_food_intake)·dt`` (mol C) is withdrawn from the finite food store
-    and **split** by ``respired_carbon_fraction`` (``carbon_split``) into ``respired``
+    ``FoodMetabolism``. The forced food-carbon intake ``q =
+    env.get(crew_food_intake)·dt`` (mol C) is withdrawn from the finite food store and
+    **split** by ``respired_carbon_fraction`` (``carbon_split``) into ``respired``
     (metabolized to CO₂) and ``feces`` (egested). Four legs:
 
       * ``food_store −q``        (CARBON −q)
       * ``cabin_co2 +respired``  (CARBON +respired **and** OXYGEN +2·respired, via the
-                                  ``{CARBON:1, OXYGEN:2}`` composition fold)
+        ``{CARBON:1, OXYGEN:2}`` composition fold)
       * ``cabin_o2 −respired``   (OXYGEN −2·respired, via the ``{OXYGEN:2}`` fold)
       * ``fecal_waste +feces``   (CARBON +feces)
 
-    CARBON balances (``−q + respired + feces = 0``) and OXYGEN balances
-    (``+2·respired − 2·respired = 0``) in one flow at PQ = 1 — the
-    ``MicrobialRespiration`` pattern. Only ``respired`` (not ``q``) draws O₂: egested
-    feces is not oxidized. **Forced** (reads ``env``, not a stock), so ``food_store``
-    stays bit-identical under Euler/RK4; ``flux = rate·dt`` is dt-linear. Always four
-    legs (a zero-amount leg at ``f_resp = 1`` / an empty step), the ``SolarCharge``
-    "emit the leg even at the degenerate split" convention. ``respired_carbon_fraction``
-    rides on ``params`` (the crew ``CrewParams`` — the same physiology fraction
-    standalone ``FoodMetabolism`` uses).
+    CARBON balances (``−q + respired + feces = 0``) and OXYGEN balances (``+2·respired −
+    2·respired = 0``) in one flow at PQ = 1 — the ``MicrobialRespiration`` pattern. Only
+    ``respired`` (not ``q``) draws O₂: egested feces is not oxidized. **Forced** (reads
+    ``env``, not a stock), so ``food_store`` stays bit-identical under Euler/RK4; ``flux
+    = rate·dt`` is dt-linear. Always four legs (a zero-amount leg at ``f_resp = 1`` / an
+    empty step), the ``SolarCharge`` "emit the leg even at the degenerate split"
+    convention. ``respired_carbon_fraction`` rides on ``params`` (the crew
+    ``CrewParams`` — the same physiology fraction standalone ``FoodMetabolism`` uses).
     """
 
     id: FlowId
@@ -224,5 +257,98 @@ class WaterRecovery:
                 Leg(self.recovered_water, -processed),
                 Leg(self.water_store, potable),
                 Leg(self.brine, brine),
+            )
+        )
+
+
+@dataclass(frozen=True)
+class LampParams:
+    """Station-owned grow-lamp coefficient: the photosynthetic photon efficacy.
+
+    Loads from ``station/params/lamp.yaml`` via ``station.loader`` with the same
+    ``{value, unit, source}`` + exact-string-unit-guard discipline the sibling param
+    files use (``photon_efficacy`` is not a conserved-Quantity canonical unit, so it is
+    schema-validated + exact-string guarded, not routed through pint — the
+    ``ChargeParams`` / ``EclssParams`` discipline):
+
+      * ``photon_efficacy`` (µmol J⁻¹) > 0: PAR photons emitted per joule of electrical
+        input — the standard grow-lamp figure of merit. It is the **one** lamp param:
+        the PAR photon flux is ``photon_efficacy · lamp_power / ground_area``, and the
+        ENERGY split ``η_lamp = photon_efficacy · PAR_PHOTON_ENERGY_J_PER_UMOL`` is
+        *derived* from it (radiant PAR energy = photon flux × mean photon energy), so
+        efficacy and the radiant fraction are two accountings of **one** device, made
+        consistent by derivation (never two independently-set params that could
+        disagree). The physical ceiling is ``PAR_UMOL_PER_J`` (all input → PAR photons ⇒
+        η_lamp = 1, heat leg 0); the loader rejects a value above it (an over-unity
+        lamp) and a non-positive one.
+    """
+
+    # η_φ, photosynthetic photon efficacy (µmol J⁻¹): PAR photons per joule electrical.
+    photon_efficacy: float
+
+
+def lamp_energy_split(
+    draw_joules: float, *, photon_efficacy: float
+) -> tuple[float, float]:
+    """Split lamp electrical draw into ``(radiant_par, waste_heat)`` (J), summing to
+    input.
+
+    The radiant PAR energy is ``η_lamp · draw`` where the radiant fraction ``η_lamp =
+    photon_efficacy · PAR_PHOTON_ENERGY_J_PER_UMOL`` (photons emitted × mean photon
+    energy), and the remainder ``(1 − η_lamp) · draw`` is waste heat. The
+    ``SolarCharge`` / ``carbon_split`` η-split idiom on ENERGY; the ~1e-15 round-off in
+    ``radiant + heat`` vs ``draw`` is covered by ``assert_flow_balanced``'s relative
+    tolerance (the invariant is determinism, not bit-exact ``Σ == 0``). At the physical
+    ceiling ``photon_efficacy = PAR_UMOL_PER_J`` (η_lamp = 1) ``heat`` is exactly 0; at
+    ``draw = 0`` both are 0.
+    """
+    radiant_fraction = photon_efficacy * PAR_PHOTON_ENERGY_J_PER_UMOL
+    radiant = radiant_fraction * draw_joules
+    heat = (1.0 - radiant_fraction) * draw_joules
+    return radiant, heat
+
+
+@dataclass(frozen=True)
+class Lamp:
+    """ENERGY flow ``battery → light_used (+η_lamp) + waste_heat (+(1−η_lamp))`` (P6.5).
+
+    The grow-lamp that carries electrical energy into biology. The forced draw ``D =
+    env.get(lamp_power)·dt`` (W·s = J) is withdrawn from ``power.battery`` and split
+    (:func:`lamp_energy_split`): the radiant fraction ``η_lamp·D`` leaves as PAR light
+    (into a ``light_used`` boundary sink — the photon energy the plants receive; its
+    downstream fate as absorbed heat is out of scope), the remainder ``(1−η_lamp)·D`` is
+    named as lamp waste heat (into ``waste_heat`` — a ``boundary.waste_heat`` sink here;
+    the inward move to ``thermal.node`` is deferred to the sealed-station step). Three
+    legs balance ENERGY exactly in intent (``−D + η·D + (1−η)·D = 0``). Always three
+    legs (zero-amount at η_lamp = 1 / lamp off); ``flux = rate·dt`` is dt-linear
+    (RK4-order-safe, multi-rate-safe).
+
+    **Forced** (reads the ``lamp_power`` schedule, not a stock), so the battery is
+    bit-identical under Euler/RK4 — but the biosphere this lamp lights is Euler-locked
+    by its freeze, so the coupled lighting run is Euler-only. Positivity of the battery
+    draw is a **sizing discipline** (a well-fed provisioned battery — the ``LoadDraw``
+    way), not structural: the lamp is forced, not donor-controlled. The SAME
+    ``lamp_power`` schedule also drives the biosphere's PAR forcing in
+    ``station.lighting`` (the non-shared-stock coupling, #16) — this flow only books the
+    *energy*; the *photons* are a forcing the frozen biosphere reads.
+    """
+
+    id: FlowId
+    priority: int
+    battery: StockId
+    light_used: StockId
+    waste_heat: StockId
+    params: LampParams
+
+    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        draw = env.get(LAMP_POWER_VAR) * dt
+        radiant, heat = lamp_energy_split(
+            draw, photon_efficacy=self.params.photon_efficacy
+        )
+        return FlowResult(
+            legs=(
+                Leg(self.battery, -draw),
+                Leg(self.light_used, radiant),
+                Leg(self.waste_heat, heat),
             )
         )
