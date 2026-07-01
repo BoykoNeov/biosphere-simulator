@@ -17,9 +17,24 @@ flows make SOC a restoring-force-free accumulator where only exact balance is bo
 advisor's physics correction — option A, not a hand-tuned constant); 14 validation tests:
 ENERGY conserved every step, `rationed == 0`, `events == ()`, day-over-day SOC return, material
 SOC swing, monotonic heat, determinism + RK4≡Euler + registration-order independence; **zero core
-change**, seven frozen + two demo goldens byte-identical). **Next: Step 4** — the hex-float Power
-golden capture (pre-golden closure gate + `__main__` regen). The biosphere stays FROZEN
-(`docs/biosphere-reference.md`); Phase 5 builds *beside* it, never moves it.**
+change**, seven frozen + two demo goldens byte-identical).
+**Step 4 (P5.4) — the hex-float Power golden capture — is DONE** (`tests/test_regression_power.py`
++ `tests/regression/golden/power_state.json`): pins `BOUNDED_SOC_SCENARIO`'s 7-day final `State`
+via `sim_io.dumps`, the additive-`n_limited`-golden discipline (byte-match + load-back + separate
+`__main__` regen; **additive, NON-frozen** — the Power domain's own regression pin, not in the
+biosphere manifest). The **pre-golden gate** bakes in Power's purpose — `rationed == 0`,
+`events == ()`, the **per-step ENERGY ledger balances** (residual ≤ 1e-6 — the energy-closure
+payload, the analogue of the N-limited "`f_N` actually bit" gate: an imbalanced run is
+**unpinnable**), material SOC swing, and day-boundary return to `battery0` (Step-3's exact
+tolerances, so legitimate 7-day round-off doesn't fail regen). A day-boundary final state is
+deliberately blind to intra-day *shape* (that coverage — interior minimum, half-sine, monotonic
+heat, RK4≡Euler — stays in `test_power_run.py`; the biosphere pinned-State + separate-behavioral
+division, no drift-summary analogue needed). Within-build bit-stability (`math.sin` transcendental
+caveat, as for the biosphere goldens). **Zero core change** (`git diff src/simcore/` empty); full
+suite (incl. `-m slow`) + ruff + pyright green (1069 passed); **seven frozen + two demo goldens
+byte-identical** (no regen). The biosphere stays FROZEN (`docs/biosphere-reference.md`); Phase 5
+builds *beside* it, never moves it. **Next: Step 5** — the forward-pointer siblings
+(Thermal / Atmosphere-ECLSS / Crew), each designed just-in-time; cross-domain coupling is Phase 6.**
 
 Phases 0, 0.5, 1, 2, 3, and 4 are complete and regression-pinned
 (`docs/plans/phase-{0-engine-skeleton,0.5-numerical-foundations,1-single-producer,2-closed-chamber,3-modular-biosphere,4-closed-biosphere}.md`).
@@ -362,11 +377,15 @@ cross-domain bug cannot hide in a standalone green.
    flows ⇒ k1=k2=k3=k4 — framed as the identity, not robustness); registration-order independence.
    **Zero core change** (`git diff src/simcore/` empty); seven frozen + two demo goldens
    byte-identical (no regen).
-4. **Standalone validation + golden capture.** Assert the augmented `ENERGY` ledger balances every
-   step, `rationed == 0`, `events == ()`, bounded non-collapsing SOC oscillation, monotonic
-   heat-generated; pin the hex-float Power golden (pre-golden closure gate + `__main__` regen, the
-   biosphere discipline). Determinism + registration-order-independence tests. *(Step 3 already
-   lands the validation assertions; Step 4 adds the pinned hex-float golden + its regen `__main__`.)*
+4. **Standalone validation + golden capture (P5.4) — COMPLETE.** Pinned the hex-float Power golden
+   (`tests/test_regression_power.py` + `regression/golden/power_state.json`): `BOUNDED_SOC_SCENARIO`'s
+   7-day final `State` via `sim_io.dumps`, byte-match + load-back + separate `__main__` regen (the
+   additive-`n_limited` discipline; additive/NON-frozen). Pre-golden gate = `rationed == 0` /
+   `events == ()` / **per-step ENERGY ledger balances** (residual ≤ 1e-6 — the closure payload, so an
+   imbalanced run is unpinnable) / material SOC swing / day-boundary return to `battery0` (Step-3's
+   exact tolerances). Step 3 already landed the behavioral assertions; Step 4 adds only the pinned
+   golden + regen. **Zero core change**; full suite (incl. `-m slow`) + ruff + pyright green (1069
+   passed); seven frozen + two demo goldens byte-identical.
 5. **(Forward-pointer) Thermal / Atmosphere-ECLSS / Crew** — each a sibling domain on the same
    pattern, designed just-in-time:
    - **Thermal** — heat **stocks**, conduction, radiator rejection. **Moves Power's `waste_heat`

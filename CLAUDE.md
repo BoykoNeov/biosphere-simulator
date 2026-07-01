@@ -126,9 +126,24 @@ payload): per-step ENERGY ledger residual ≈ 0 + integral total-ENERGY invarian
 `events==()`; **day-over-day SOC return** (true only under exact balance); material swing min>0;
 interior morning-crossover minimum; monotonic `waste_heat`; balance identity; determinism; **RK4 ≡
 Euler bit-for-bit** (forced ⇒ k1=k2=k3=k4, framed as the identity); registration-order independence.
-Seven frozen + two demo goldens byte-identical (no regen). **Next: Step 4** — hex-float Power golden
-capture (pre-golden closure gate + `__main__` regen). `SelfDischarge` deferred (optional).
-Cross-domain coupling is **Phase 6**.
+Seven frozen + two demo goldens byte-identical (no regen).
+**Step 4 (P5.4) COMPLETE — the hex-float Power golden capture**: `tests/test_regression_power.py` +
+`tests/regression/golden/power_state.json` pin `BOUNDED_SOC_SCENARIO`'s 7-day final `State` via
+`sim_io.dumps` (byte-match + load-back + separate `__main__` regen — the additive-`n_limited` golden
+discipline; **additive, NON-frozen** — the Power domain's own regression pin, NOT in the biosphere
+manifest). The **pre-golden gate** bakes Power's purpose in: `rationed == 0`, `events == ()`, the
+**per-step ENERGY ledger balances** (residual ≤ 1e-6 — the energy-closure payload, the analogue of
+the N-limited "`f_N` actually bit" gate: an imbalanced run is **unpinnable**), material SOC swing,
+day-boundary return to `battery0` (Step-3's exact tolerances so legitimate 7-day round-off doesn't
+fail regen). A day-boundary final state is deliberately blind to intra-day *shape* — that coverage
+(interior minimum, half-sine, monotonic heat, RK4≡Euler) stays in `test_power_run.py` (the biosphere
+pinned-State + separate-behavioral division; no drift-summary analogue needed). Within-build
+bit-stability only (`math.sin` transcendental caveat). **Zero core change** (`git diff src/simcore/`
+empty); full suite incl. `-m slow` + ruff + pyright green (**1069 passed**); **seven frozen + two
+demo goldens byte-identical** (no regen). **The standalone Power domain (P5.2–P5.4) is now
+complete.** **Next: Step 5** — the forward-pointer siblings (Thermal / Atmosphere-ECLSS / Crew),
+each designed just-in-time. `SelfDischarge` deferred (optional). Cross-domain coupling is
+**Phase 6**.
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
