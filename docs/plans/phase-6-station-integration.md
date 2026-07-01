@@ -1,10 +1,45 @@
 # Phase 6 — Station Integration (cross-domain coupling)
 
-**Status: PLANNED — not started.** Pre-plan investigation complete and advisor-reviewed
-(two blocking checks run before this doc committed to anything; see "Load-bearing
-findings" below). Steps 1–3 are designed concretely here; Steps 4–10 get just-in-time
-design as Phase 5's siblings did ("each designed just-in-time"), because each later seam's
-shape is only fully constrained once the seam before it exists.
+**Status: IN PROGRESS — Step 1 (P6.1) COMPLETE.** Pre-plan investigation complete and
+advisor-reviewed (two blocking checks run before this doc committed to anything; see
+"Load-bearing findings" below). Steps 1–3 are designed concretely here; Steps 4–10 get
+just-in-time design as Phase 5's siblings did ("each designed just-in-time"), because each
+later seam's shape is only fully constrained once the seam before it exists.
+
+**Step 1 (P6.1) COMPLETE — the `src/station/` assembly layer, proven on Power → Thermal
+heat closure.** New `src/station/` package (`scenario.py` / `system.py`, the assembly layer
+that imports both siblings and owns the wiring; **no domain imports another**). The seam:
+Power's dissipation legs are redirected from `boundary.waste_heat` into `thermal.node` by
+passing `thermal.node`'s id where `SolarCharge`/`LoadDraw` took `waste_heat`, and Thermal's
+forced `HeatInput` stand-in is dropped (Power's dissipation *is* the input now) — so
+`boundary.waste_heat`/`boundary.heat_source` are **absent** from the station state (the
+redirection is structural, not a shadow sink). `RadiatorReject` rejects that **real** load
+to deep space. `build_station`/`station_resolver`/`run_station` — the harness every later
+step reuses; `station_resolver` is exactly `power_resolver` (Thermal contributes no forcing
+once `HeatInput` drops — multi-resolver merging deferred to the first step that needs it).
+Single-quantity (ENERGY): the combined ledger balances every step over `solar_source +
+battery + node + space` (the payload). **The node's initial heat is DERIVED from Power's
+actual dissipation** (`equilibrium_node_heat` → `mean_dissipated_power` → the reused Thermal
+`equilibrium_temperature`; all supplied solar becomes heat in daily balance ⇒ mean ≈ 316 W ⇒
+`T_eq ≈ 160.1 K`), not a hand-set `heat_load`. **The two-start convergence test is the
+non-circular core** (advisor): two `node0` values (`0.5·Q_eq`/`1.5·Q_eq`) under identical
+Power forcing contract to one band over ~3 τ (τ ≈ 14.6 days) — the radiator alone governs
+the difference (the no-radiator contrast keeps it constant), so the equilibrium is set by
+dissipation *independent of IC* (starting at `Q_eq` alone would only show stability). The
+node band is asserted within ~1 K of the **mean-power** `T_eq` (the true attractor sits
+slightly below by the T⁴-convexity offset — honest, not pinned exact). Cheap corroboration:
+`battery`+`solar_source` **bit-identical to standalone Power** (coupling is pure sink
+re-wiring — the donor is unperturbed, verified empirically step-by-step); per-day `ΔSpace` ≈
+Power's per-day heat generation (the radiator carries a *real* load, quantitatively); RK4 ≢
+Euler on the node (nonlinear radiator, tolerance agreement) but bit-identical on the forced
+battery; determinism; registration-order independence. **16 tests** (14 run + 2 golden);
+additive **NON-frozen** golden `station_state.json` (pre-golden gate: `rationed == 0` /
+`events == ()` / combined ENERGY closed every step / no shadow sink / node at the
+dissipation-set equilibrium — an imbalanced/shadow-sink/runaway run is unpinnable). **Zero
+core change** (`git diff src/simcore/` empty), **zero domain change** (`src/domains/`
+untouched); full suite incl. `-m slow` + ruff + pyright green (**1221 passed**); **all
+fourteen existing goldens byte-identical** (seven frozen + two demo + two Power + one
+Thermal + one ECLSS + one Crew; no regen). `src/station` added to the wheel `packages` list.
 
 Phases 0–5 are complete and regression-pinned. Phase 4 **froze the biosphere as THE
 reference** (`docs/biosphere-reference.md` + manifest). Phase 5 built the four standalone

@@ -251,6 +251,33 @@ change** (`git diff src/simcore/` empty); full suite incl. `-m slow` + ruff + py
 passed**, 1 oracle skip); **all thirteen existing goldens byte-identical** (seven frozen + two demo + two
 Power + one Thermal + one ECLSS; no regen). **Phase 5 EXITS → Phase 6 (station integration / cross-domain
 coupling).**
+**Phase 6 — station integration / cross-domain coupling — IN PROGRESS**
+(`docs/plans/phase-6-station-integration.md`; plan advisor-reviewed). **Step 1 (P6.1) COMPLETE — the
+`src/station/` assembly layer, proven on Power → Thermal heat closure**: new `src/station/`
+(`scenario.py`/`system.py` — the layer that imports both siblings and owns the wiring; **no domain imports
+another**). The seam: Power's dissipation legs redirected from `boundary.waste_heat` into `thermal.node` by
+passing `thermal.node`'s id where `SolarCharge`/`LoadDraw` took `waste_heat`; Thermal's forced `HeatInput`
+stand-in dropped (Power's dissipation *is* the input now) ⇒ `boundary.waste_heat`/`boundary.heat_source`
+**absent** from the station state (the redirection is structural, not a shadow sink); `RadiatorReject` rejects
+the **real** load to deep space. `build_station`/`station_resolver`/`run_station` — the harness every later
+step reuses (`station_resolver` == `power_resolver`; multi-resolver merging deferred). Single-quantity
+(ENERGY): combined ledger balances every step over `solar_source+battery+node+space` (the payload). **Node's
+initial heat DERIVED from Power's actual dissipation** (`equilibrium_node_heat`→`mean_dissipated_power`→reused
+Thermal `equilibrium_temperature`; all solar → heat in daily balance ⇒ mean ≈316 W ⇒ `T_eq≈160.1 K`), not a
+hand-set `heat_load`. **The two-start convergence test is the non-circular core** (advisor): two `node0`
+(`0.5/1.5·Q_eq`) under identical Power forcing contract to one band over ~3 τ (τ≈14.6 d) — radiator alone
+governs the difference (no-radiator contrast keeps it constant) ⇒ equilibrium set by dissipation *independent
+of IC* (start-at-`Q_eq` alone only shows stability). Node band within ~1 K of the **mean-power** `T_eq` (true
+attractor slightly below by the T⁴-convexity offset — honest, not pinned exact). Corroboration:
+`battery`+`solar_source` **bit-identical to standalone Power** (coupling is pure sink re-wiring — donor
+unperturbed, verified step-by-step); per-day `ΔSpace` ≈ Power's per-day heat gen (real load, quantitatively);
+RK4≢Euler on the nonlinear node but bit-identical on the forced battery; determinism; registration-order
+independence. **16 tests** (14 run + 2 golden); additive **NON-frozen** golden `station_state.json`
+(pre-golden gate: `rationed==0`/`events==()`/combined ENERGY closed every step/no shadow sink/node at the
+dissipation-set equilibrium). **Zero core change** (`git diff src/simcore/` empty) + **zero domain change**
+(`src/domains/` untouched); full suite incl. `-m slow` + ruff + pyright green (**1221 passed**); **all
+fourteen existing goldens byte-identical** (seven frozen + two demo + two Power + one Thermal + one ECLSS +
+one Crew; no regen). NEXT: Step 2 (P6.2) — Crew ↔ ECLSS cabin gas loop (composition + merged respiration).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
