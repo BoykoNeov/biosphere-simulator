@@ -191,8 +191,37 @@ unlike Phase-3 water); **Phase 6 rewires Power's dissipation legs to feed `therm
 move — standalone builds the receiver). **Zero core change** (`git diff src/simcore/` empty); full
 suite incl. `-m slow` + ruff + pyright green (**1132 passed**); **seven frozen + two demo + two Power
 goldens byte-identical** (no regen).
-**Next: Step 6** — the remaining forward-pointer siblings (Atmosphere-ECLSS / Crew), each designed
-just-in-time. Cross-domain coupling is **Phase 6**.
+**Step 6 (Atmosphere/ECLSS) COMPLETE — the third standalone sibling; the first multi-quantity one;
+the cabin-air receiver Phase 6 wires Crew + biosphere into**: new `src/domains/eclss/` (zero core
+change) — three **single-quantity** cabin POOLs `eclss.cabin_o2`/`cabin_co2`/`cabin_h2o` (OXYGEN/
+CARBON/WATER — the first sibling touching >1 conserved quantity; all three already-asserted mass
+quantities, so **no new core decision**) + six boundary reservoirs (`o2_supply`, `co2_removed`,
+`humidity_condensate`, and the three `metabolic_*` crew-seam reservoirs). Flows: **`CrewMetabolism`**
+(the forced **multi-quantity** crew/Phase-6 seam — one flow, six legs across three quantities, each
+balanced independently: O₂ out of cabin, CO₂/H₂O into cabin) + three ECLSS control loops —
+**`CO2Scrubber`**/**`Condenser`** (first-order donor-controlled, `SelfDischarge` pattern, structural
+`k·dt<1`) + **`O2Makeup`** (**demand-controlled** toward a setpoint `k·(o2_setpoint−cabin_o2)·dt` —
+the advisor's fix so O₂ doesn't recapitulate Power's constructed-balance problem; a restoring force
+with **no readout**). `eclss.yaml` (3 rates 1/s + `o2_setpoint` mol; exact-string guarded;
+**illustrative `TODO(cite)`, deliberately NOT NASA BVAD/BioSim** — calibration is Phase 6). **Scope
+discipline (advisor):** pressure readouts / N₂ diluent / composition stocks (CO₂={CARBON:1,OXYGEN:2})
+are **deferred seams** — no standalone flow needs them. **The payload is the 3-quantity every-step
+gate** (the "it bit" check, the ENERGY-closed analogue). **Honest novelty:** linear ⇒ **geometric**
+contraction (reuse `d_n=d_0·(1−k·dt)^n`, per species — **not** Thermal's nonlinear one); RK4 ≢ Euler
+(tolerance agreement). Each species reaches an emergent steady state (`co2_eq=P/k_scrub`,
+`h2o_eq=P/k_cond`, `o2_eq=o2_setpoint−Con/k_makeup` → 3.0 mol / 0.04 kg / 8.0 mol). **The
+atom-conservation seam** (honest analogue of Thermal's permanent `boundary.space`): each quantity
+balances over its augmented system, but the crew seam does **not** tie the atoms together (real
+respiration binds inhaled O₂ into exhaled CO₂/H₂O) — three decoupled boundary reservoirs, closed by
+**Phase-6 crew coupling + composition stocks**. 41 tests (23 flow + 16 run + 2 golden) incl. the
+per-species geometric-contraction + no-control contrast; additive **NON-frozen** golden
+`eclss_state.json` (pre-golden gate: 3-quantity closure / `rationed==0` / reached steady state).
+**Zero core change** (`git diff src/simcore/` empty); full suite incl. `-m slow` + ruff + pyright
+green (**1173 passed**); **seven frozen + two demo + two Power + one Thermal golden byte-identical**
+(no regen).
+**Next: Crew** — the last forward-pointer sibling (O₂ intake / CO₂+H₂O output / water+food
+consumption / waste; forced schedules at first), designed just-in-time. Cross-domain coupling
+(wiring Crew + biosphere into the ECLSS cabin stocks) is **Phase 6**.
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

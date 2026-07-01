@@ -1,11 +1,16 @@
 # Phase 5 — Sibling Domains (Power first; energy joins the conserved set)
 
-**Status: IN PROGRESS — Steps 1–4 (Power) + Step 5 (Thermal) COMPLETE; Atmosphere-ECLSS / Crew
-remain forward-pointers.** The load-bearing decision (energy closure, P5.1) and the standalone
-Power domain (P5.2–P5.5) are designed in full and advisor-reviewed below; **Thermal is now the
-second complete standalone sibling** (Step 5 — full design in the "Step 5 — full design" section
-below; advisor-reviewed before any code). Atmosphere-ECLSS / Crew are forward-pointers, each to be
-designed just-in-time (the Phase-1/2/3/4 rhythm).
+**Status: IN PROGRESS — Steps 1–4 (Power) + Step 5 (Thermal) + Step 6 (Atmosphere/ECLSS) COMPLETE;
+Crew remains the forward-pointer.** The load-bearing decision (energy closure, P5.1) and the
+standalone Power domain (P5.2–P5.5) are designed in full and advisor-reviewed below; **Thermal is
+the second complete standalone sibling** (Step 5 — full design in the "Step 5 — full design"
+section below); **Atmosphere/ECLSS is the third** (Step 6 — full design in the "Step 6 — full
+design" section below; advisor-reviewed before any code — the **first multi-quantity sibling**,
+three single-quantity cabin POOLs O₂/CO₂/H₂O with a forced crew seam + three control loops, all
+CARBON/OXYGEN/WATER conserved every step, geometric contraction, `rationed == 0`, RK4 ≢ Euler;
+41 tests + an additive **NON-frozen** golden; **zero core change**, full suite incl. `-m slow` +
+ruff + pyright green (**1173 passed**), all twelve existing goldens byte-identical). Crew is the
+last forward-pointer, designed just-in-time when reached (the Phase-1/2/3/4 rhythm).
 
 **Step 5 (Thermal) — COMPLETE.** New `src/domains/thermal/` (zero core change): a forced heat input
 → an in-system thermal node (POOL, sensible heat J with a **derived temperature** `T = T_space +
@@ -439,11 +444,16 @@ cross-domain bug cannot hide in a standalone green.
    legs to feed `thermal.node`** (the inward move — a Phase-6 wiring act; standalone builds the
    *receiver*). Zero core change (`git diff src/simcore/` empty); seven frozen + two demo + two Power
    goldens byte-identical.
-6. **(Forward-pointer) Atmosphere-ECLSS / Crew** — each a sibling domain on the same pattern,
-   designed just-in-time:
-   - **Atmosphere / ECLSS** — O₂, CO₂, water vapor, pressure; mixing, scrubbing, condensation. Pure
-     mass-quantity domain (no new core decision — reuses the frozen mass machinery).
-   - **Crew** — O₂ intake, CO₂ output, water/food consumption, waste; **forced schedules at first**
+6. **Atmosphere / ECLSS (IN PROGRESS — full design above, "Step 6 — full design")** — the third
+   sibling, the cabin-air **medium** (the receiver Phase 6 wires Crew + biosphere into). Three
+   single-quantity cabin POOLs (O₂ / CO₂ / H₂O), one forced multi-quantity `CrewMetabolism` seam +
+   three ECLSS control flows (first-order `CO2Scrubber` / `Condenser`, demand-controlled `O2Makeup`).
+   The **first multi-quantity sibling** (the 3-quantity every-step gate is the payload); linear ⇒
+   geometric contraction (the `SelfDischarge` idiom, not Thermal's nonlinear one); RK4 ≢ Euler.
+   Pressure / N₂ diluent / composition stocks are **deferred seams** (no standalone consumer). Pure
+   mass-quantity domain (no new core decision — reuses the frozen mass machinery).
+7. **(Forward-pointer) Crew** — O₂ intake, CO₂ output, water/food consumption, waste; **forced
+   schedules at first**
      (roadmap line 321). The eventual biosphere coupling (crew CO₂ ↔ plant uptake) is **Phase 6**.
 
 ## Step 1 — full design: the isolated ENERGY-assert flip (P5.1a)
@@ -543,6 +553,137 @@ plain constant — **no** `balanced_load_w` analogue (the one place Power had to
 - **Acceptance (met):** `git diff src/simcore/` empty; full suite (incl. `-m slow`) + ruff + pyright
   green (1132 passed); seven frozen + two demo + two Power goldens byte-identical (no regen).
 
+## Step 6 — full design: the Atmosphere / ECLSS sibling domain (COMPLETE)
+
+*The third standalone sibling, designed just-in-time and advisor-reviewed before any code (the
+Phase-1/2/3/4/5 rhythm). Atmosphere is the **cabin-air medium** — the shared compartment both Crew
+(next sibling) and, in Phase 6, the biosphere couple into. It builds the **receiver** the same way
+Thermal did for Power's heat: standalone Atmosphere builds the cabin-air stocks + the ECLSS control
+loops; **Phase 6 wires Crew's O₂/CO₂/H₂O exchange (and the biosphere's O₂/CO₂ interface) into
+them**. Scoped to Atmosphere **alone** (a P5.2–P5.5-sized effort); Crew stays a forward-pointer.*
+
+### The load-bearing design decision — Atmosphere is the **first multi-quantity sibling**, NOT a nonlinear-attractor domain (advisor-decided: single-quantity pools + first-order kinetics)
+
+Power and Thermal were **single-quantity** (ENERGY only). Atmosphere is the first sibling whose
+every-step gate asserts **three** conserved quantities simultaneously — **CARBON** (CO₂),
+**OXYGEN** (O₂), **WATER** (humidity). *That* three-quantity per-step balance is the genuinely-new
+machinery and the "it actually bit" gate — the analogue of Thermal's "ENERGY closed every step."
+All three are **already** asserted, canonical-unit'd mass quantities (`quantities.py`), so this is
+**zero core change** — Atmosphere reuses the frozen mass machinery, exactly as the plan's Step-6
+forward-pointer promised ("no new core decision").
+
+**The scope discipline (advisor's #1 flag — resist over-scoping).** The temptation is to reach for
+ideal-gas **pressure** readouts, an inert **N₂ diluent**, and **composition stocks** (CO₂ =
+`{CARBON:1, OXYGEN:2}`). All three are **deferred as flagged seams**, by two discriminators (the
+`EnergyForm`-label / generic-loader deferral discipline — speculative generality is rejected until a
+consumer exists):
+- **Composition stock vs single-quantity pool?** → *Does any standalone flow convert between
+  species?* Standalone Atmosphere only **accumulates / scrubs / condenses** each species — **no
+  O₂↔CO₂ conversion** (that is crew respiration's atomic stoichiometry, which needs composition and
+  arrives with **Phase-6 crew coupling**). So each cabin stock is a **single-quantity POOL**
+  (`cabin_o2` pure OXYGEN, `cabin_co2` pure CARBON, `cabin_h2o` pure WATER), balancing per-quantity
+  trivially. Composition is a **Phase-6 seam**.
+- **Derived readout (partial pressure / concentration)?** → *Does a flow law need it?* Thermal
+  computed `temperature` **only because** the radiator law is `f(T)`. Every Atmosphere rate law is
+  **first-order in the stock amount** (`k·amount·dt`) or **demand-controlled in amount**
+  (`k·(target − amount)·dt`), so **no readout is needed** — pressure is deferred. (If Phase-6 UI or a
+  concentration-driven law needs it, add it then, with a consumer.)
+
+**Honest novelty framing — linear, so geometric, NOT the T⁴ nonlinear attractor.** Do **not**
+manufacture Thermal-style nonlinearity to match. First-order removal is **linear**, so contraction
+is **geometric** — the domain **reuses the `SelfDischarge` `d_n = d_0·(1 − k·dt)^n` contraction
+idiom**, per species, **not** Thermal's monotone-nonlinear contraction. Because every control flow
+reads a stock (donor-/demand-controlled), the forced-only RK4 ≡ Euler bit-identity **does not hold**
+— **RK4 ≢ Euler (a tolerance agreement)**, like `SelfDischarge` / Thermal.
+
+### The topology — three cabin POOLs, one forced crew-seam flow, three ECLSS control flows
+
+**Stocks (domain id `eclss` — the roadmap name; avoids the biosphere's `biosphere.atmosphere`
+compartment). Cabin pools single-quantity; boundary reservoirs under the shared `boundary`
+namespace, ids distinct from the biosphere's (`vapor_sink`/`water_source`/`co2_resp`/…):**
+- `eclss.cabin_o2` — **POOL** (OXYGEN, mol): breathable O₂ in the cabin air.
+- `eclss.cabin_co2` — **POOL** (CARBON, mol): metabolic CO₂ accumulating in the cabin.
+- `eclss.cabin_h2o` — **POOL** (WATER, kg): cabin humidity (respiration + perspiration).
+- `boundary.o2_supply` — **BOUNDARY source**, unclamped: the O₂-makeup tank (electrolysis/stored;
+  a documented forcing seam — Phase-6 couples it to Power/water electrolysis).
+- `boundary.co2_removed` — **BOUNDARY sink**: scrubber product (CDRA/LiOH); monotonic ⇒ free
+  *CO₂-scrubbed* diagnostic.
+- `boundary.humidity_condensate` — **BOUNDARY sink**: condenser product; monotonic ⇒ free
+  *water-recovered* diagnostic.
+- `boundary.metabolic_o2_sink` / `boundary.metabolic_co2_source` / `boundary.metabolic_h2o_source`
+  — the **crew-metabolism seam** reservoirs (see the atom-conservation seam note below).
+
+**Flows (all increment-form `flux = rate·dt`, rate in canonical-unit/s; dt-linear ⇒ RK4-order-safe,
+Phase-6-multi-rate-safe):**
+- **`CrewMetabolism`** — the **forced, multi-quantity crew/Phase-6 seam** (the analogue of Thermal's
+  forced `heat_source`). One flow, **six legs across three quantities, each balanced independently**:
+  O₂ `cabin_o2 → boundary.metabolic_o2_sink` (crew consumes O₂), CO₂ `boundary.metabolic_co2_source
+  → cabin_co2` (crew produces CO₂), H₂O `boundary.metabolic_h2o_source → cabin_h2o` (crew produces
+  humidity). Three forced rates read from `env`. This is the **single seam** Phase-6 rewires to the
+  Crew domain's own state.
+- **`CO2Scrubber`** — `cabin_co2 → boundary.co2_removed`, **first-order donor-controlled** `R =
+  k_scrub·cabin_co2·dt` (the `SelfDischarge` pattern, but load-bearing). Restoring force ⇒ CO₂ →
+  `co2_eq = P_co2 / k_scrub`. Positivity **structural** (`k_scrub·dt < 1`), so `rationed == 0` for
+  *its own* leg the `SelfDischarge` way.
+- **`Condenser`** — `cabin_h2o → boundary.humidity_condensate`, **first-order donor-controlled** `R =
+  k_cond·cabin_h2o·dt`. Restoring force ⇒ H₂O → `h2o_eq = P_h2o / k_cond`. Positivity structural
+  (`k_cond·dt < 1`).
+- **`O2Makeup`** — `boundary.o2_supply → cabin_o2`, **demand-controlled toward a setpoint** `S =
+  k_makeup·(o2_setpoint − cabin_o2)·dt` (the real ECLSS O₂-partial-pressure loop). **This is the
+  advisor's fix for "O₂ recapitulates Power's constructed-balance problem":** a *forced-constant*
+  makeup would leave `cabin_o2` a restoring-force-free accumulator (Power's derived-load situation);
+  the proportional controller makes it a **restoring force** — no readout needed — so all three
+  species share one "restoring force → attractor" story. Steady state `o2_eq = o2_setpoint −
+  Con_o2 / k_makeup` (makeup rate = consumption at equilibrium; `cabin_o2` sits just below the
+  setpoint). `S ≥ 0` whenever `cabin_o2 ≤ o2_setpoint`, which the consuming crew load keeps true
+  (positivity by the **well-fed sizing** discipline, the `LoadDraw` way — the depletion side is the
+  metabolic O₂ leg, sized so `cabin_o2` never empties).
+
+**The three attractors (all geometric — the SelfDischarge idiom, per species):** CO₂ and H₂O relax
+first-order to `P/k`; O₂ relaxes first-order (rate `1 − k_makeup·dt`) to `o2_setpoint − Con/k_makeup`.
+Each is a genuine restoring force (donor- or demand-controlled), so — unlike Power's *constructed*
+daily balance — boundedness is **emergent**, and unlike Thermal it is **linear/geometric** (reuse
+`d_n = d_0·(1 − k·dt)^n`, not the nonlinear monotone contraction).
+
+### The atom-conservation seam (the honest analogue of Thermal's "`boundary.space` is permanent")
+
+Standalone Atmosphere conserves **each quantity over its augmented system** (cabin pools + boundary
+reservoirs balance every step — the Phase-5 payload) but does **NOT** conserve the crew's
+**atom-level stoichiometry**: real respiration is `C_food + O₂ → CO₂ + H₂O`, so the O₂ atoms crew
+inhale end up *inside* the exhaled CO₂ and H₂O. Without composition stocks, the metabolic O₂ leaves
+to `boundary.metabolic_o2_sink` and the CO₂/H₂O carbon+water enter from separate boundary sources —
+three **decoupled** reservoirs. This is a **flagged seam**, not a bug: the atomic coupling is closed
+by **Phase-6 crew coupling + composition stocks** (`cabin_co2 = {CARBON:1, OXYGEN:2}`), exactly as
+Thermal's `waste_heat`-`somewhere` was made concrete only when the receiver existed. Standalone
+Atmosphere is decision #13's *augmented*-system "closed": each quantity balances every step even
+though the crew seam does not tie the species together.
+
+### Deliverables (all additive; zero core change)
+- **`src/domains/eclss/`** — `stocks.py` (three `cabin_*` POOLs + the six boundary reservoirs),
+  `flows.py` (`CrewMetabolism` 6-leg forced multi-quantity + `CO2Scrubber` / `Condenser` first-order
+  donor-controlled + `O2Makeup` demand-controlled; the rate laws as pure functions), `loader.py` +
+  `params/eclss.yaml` (`co2_scrub_rate` / `condense_rate` / `o2_makeup_gain` in `1/s`, `o2_setpoint`
+  in `mol` — exact-string unit-guarded, `TODO(cite)` **illustrative placeholders — NOT NASA
+  BVAD / BioSim numbers**, calibration is Phase 6), `scenario.py` (`EclssScenario` — initial cabin
+  amounts + the three forced metabolic rates + `dt_seconds`; `STEADY_STATE_SCENARIO`), `system.py`
+  (`build_eclss` / `eclss_resolver` / `run_eclss` + closed-form `steady_state` helpers per species).
+- **Tests:** `test_eclss_flows.py` (rate laws, per-quantity leg balance incl. the multi-quantity
+  `CrewMetabolism`, dt-linearity, floor self-limit, loader bounds/units), `test_eclss_run.py`
+  (**all three quantities conserved every step** — the payload, `rationed == 0`, `events == ()`,
+  each species → its steady state, **two-run geometric contraction per species** + a no-control
+  contrast that keeps the difference constant, monotonic `co2_removed` / `humidity_condensate` sinks,
+  determinism, **RK4 ≢ Euler tolerance agreement**, registration-order independence),
+  `test_regression_eclss.py` (additive **NON-frozen** golden `eclss_state.json`, pre-golden gate =
+  **three-quantity closure** / `rationed == 0` / **reached steady state** — an unconverged or
+  imbalanced run is unpinnable).
+- **Acceptance (met):** `git diff src/simcore/` empty; full suite (incl. `-m slow`) + ruff + pyright
+  green (**1173 passed**, 1 oracle skip); **all twelve existing goldens byte-identical** (seven
+  frozen + two demo + two Power + one Thermal; no regen). Not in the biosphere freeze manifest
+  (additive/NON-frozen, the Power/Thermal discipline). **41 tests landed** (23 flow + 16 run —
+  14 funcs, one parametrized ×3 — + 2 golden). Steady states reached exactly as designed (`co2_eq = 3.0 mol`, `h2o_eq = 0.04 kg`,
+  `o2_eq = 8.0 mol`); per-step three-quantity ledger residual ≤ 1.4e-14; geometric contraction
+  exact to fp tol; RK4 ≢ Euler (agree to `rel=1e-4`).
+
 ## Exit criteria (Phase 5 — "the engine carries more than biology")
 - **`ENERGY` is a conserved, every-step-asserted quantity** with explicit heat closure; the flip is
   proven inert for all existing runs (7 frozen + 2 demo goldens byte-identical; full suite green).
@@ -558,5 +699,14 @@ plain constant — **no** `balanced_load_w` analogue (the one place Power had to
   (emergent equilibrium temperature, `rationed == 0` by `τ >> dt` sizing, monotone contraction,
   RK4 ≢ Euler tolerance agreement, a hex-float golden). It builds the in-system receiver for Power's
   heat; **Phase 6 moves the `waste_heat` BOUNDARY inward** by rewiring Power's dissipation legs into
-  `thermal.node` (the energy analogue of the water-cycle closure). **Atmosphere-ECLSS / Crew** remain
-  forward-pointers, each designed just-in-time when reached. **Cross-domain coupling is Phase 6.**
+  `thermal.node` (the energy analogue of the water-cycle closure).
+- **Atmosphere / ECLSS is COMPLETE** — the third standalone sibling and the **first multi-quantity
+  one**: three single-quantity cabin POOLs (O₂ / CO₂ / H₂O) with a forced multi-quantity crew seam +
+  three ECLSS control loops, passing conservation + determinism alone (**all of CARBON / OXYGEN /
+  WATER conserved every step** — the payload, three emergent geometric steady states, `rationed == 0`
+  structural for CO₂/H₂O + well-fed for O₂, exact `d_n = d_0·(1 − k·dt)^n` contraction, RK4 ≢ Euler
+  tolerance agreement, monotonic scrubber/condenser diagnostics, a hex-float golden). It builds the
+  cabin-air **receiver**; **Phase 6 wires the Crew domain's O₂/CO₂/H₂O exchange (and the biosphere's
+  O₂/CO₂ interface) into these cabin stocks**, and closes the crew's atom-level stoichiometry with
+  composition stocks (the flagged standalone seam). **Crew** remains the last forward-pointer,
+  designed just-in-time when reached. **Cross-domain coupling is Phase 6.**

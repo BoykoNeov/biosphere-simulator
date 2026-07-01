@@ -1,0 +1,73 @@
+# eclss — cabin-air control-loop coefficients (Phase 5, Step 6)
+# Currency/units: OXYGEN (mol), CARBON (mol), WATER (kg). The coefficients the ECLSS core
+# introduces — the equipment properties of the three control loops. The forced crew
+# metabolic RATES and the initial cabin inventories are scenario data (eclss/scenario.py),
+# NOT params (the biosphere/Power/Thermal data-vs-coefficient split).
+#
+# The standalone ECLSS domain holds three single-quantity cabin POOLs (cabin_o2 / cabin_co2
+# / cabin_h2o) against a forced crew metabolic load, with three control loops driving each
+# species to a steady state:
+#     CO₂:  cabin_co2 → co2_removed,          R = k_scrub·cabin_co2        ⇒ co2_eq = P_co2/k_scrub
+#     H₂O:  cabin_h2o → humidity_condensate,  R = k_cond·cabin_h2o         ⇒ h2o_eq = P_h2o/k_cond
+#     O₂:   o2_supply → cabin_o2,             S = k_makeup·(o2_setpoint − cabin_o2)
+#                                                                          ⇒ o2_eq = o2_setpoint − Con_o2/k_makeup
+# (P_* the forced crew production rates, Con_o2 the forced crew consumption — scenario data.)
+#
+# co2_scrub_rate (k_scrub) — first-order CO₂ removal rate (1/s), > 0. CDRA/LiOH scrubber.
+#   Structural positivity requires k_scrub·dt < 1 (donor-controlled, self-limiting to 0).
+#   With dt = 60 s here, k_scrub·dt = 0.06 — comfortably < 1.
+#
+# condense_rate (k_cond) — first-order humidity-condensation rate (1/s), > 0. Condensing
+#   heat exchanger. Structural positivity requires k_cond·dt < 1 (here 0.03).
+#
+# o2_makeup_gain (k_makeup) — proportional gain of the O₂ partial-pressure regulator (1/s),
+#   > 0. Gives O₂ its restoring force (so O₂ does not recapitulate Power's constructed
+#   balance). The depleting side is the crew O₂ draw (scenario), sized so cabin_o2 never
+#   empties — positivity by well-fed sizing (the LoadDraw discipline), not structural.
+#
+# o2_setpoint — target cabin O₂ inventory the regulator drives toward (mol), > 0. The
+#   analogue of an O₂ partial-pressure setpoint at fixed cabin volume/temperature (a
+#   derived pressure readout is a deferred seam — no standalone flow needs it).
+#
+# Emergent (NOT params): the three steady states co2_eq / h2o_eq / o2_eq above are computed
+#   (system.steady_state) from these coefficients + the forced crew rates, never stored —
+#   each control loop IS a restoring force, so any constant crew load has a unique stable
+#   steady state (no derived/tuned load, unlike Power's balanced_load_w).
+#
+# Units discipline (P4 / config/units.py): none of these is a conserved-Quantity canonical
+#   unit, so each is a schema-validated, bound-checked float carrying a declared unit
+#   (exact-string guarded at the loader, like Power's charge_efficiency / Thermal's
+#   emissivity), NOT routed through pint.
+#
+# Clean-room: first-order gas scrubbing/condensation and proportional partial-pressure
+#   control are textbook process-control physics. The numeric VALUES are provisional,
+#   ILLUSTRATIVE placeholders — deliberately NOT NASA BVAD / BioSim life-support numbers
+#   (ECLSS calibration against those references is Phase 6, the integrated-validation step).
+#   Flagged TODO(cite) until bound to a primary source at the validation gate.
+#
+# Sources:
+#   [A] Seader, J.D., Henley, E.J., Roper, D.K. (2011), "Separation Process Principles",
+#       3rd ed., Wiley — first-order gas absorption / adsorption and condensation kinetics.
+#   [B] Ogata, K. (2010), "Modern Control Engineering", 5th ed., Prentice Hall —
+#       proportional (P) control of a setpoint-regulated first-order process.
+
+name: eclss
+process: cabin_air_control
+
+parameters:
+  co2_scrub_rate:
+    value: 1.0e-3
+    unit: "1/s"
+    source: "TODO(cite) — provisional, illustrative first-order CO₂ scrub rate (τ ≈ 1000 s), k·dt < 1 for dt = 60 s [A]; NOT a NASA BVAD number; primary citation pending validation gate"
+  condense_rate:
+    value: 5.0e-4
+    unit: "1/s"
+    source: "TODO(cite) — provisional, illustrative first-order humidity-condensation rate (τ ≈ 2000 s) [A]; NOT a NASA BVAD number; primary citation pending validation gate"
+  o2_makeup_gain:
+    value: 2.0e-3
+    unit: "1/s"
+    source: "TODO(cite) — provisional, illustrative proportional O₂-regulator gain (τ ≈ 500 s) [B]; NOT a NASA BVAD number; primary citation pending validation gate"
+  o2_setpoint:
+    value: 10.0
+    unit: "mol"
+    source: "TODO(cite) — provisional, illustrative target cabin O₂ inventory (sizing, not calibrated); NOT a NASA BVAD number; primary citation pending validation gate"

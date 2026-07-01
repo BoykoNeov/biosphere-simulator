@@ -1,0 +1,125 @@
+{
+  "aux": {},
+  "n": 900,
+  "rng_seed": "0x0",
+  "stocks": [
+    {
+      "amount": "0x1.3e0000000004ap+7",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.co2_removed",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.0a3d70a3d7189p+0",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.humidity_condensate",
+      "kind": "boundary",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "-0x1.440000000007fp+7",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.metabolic_co2_source",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": true,
+      "unit": "mol"
+    },
+    {
+      "amount": "-0x1.147ae147ae12cp+0",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.metabolic_h2o_source",
+      "kind": "boundary",
+      "quantity": "water",
+      "unclamped": true,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.b00000000004bp+7",
+      "composition": {
+        "oxygen": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.metabolic_o2_sink",
+      "kind": "boundary",
+      "quantity": "oxygen",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "-0x1.ac00000000044p+7",
+      "composition": {
+        "oxygen": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.o2_supply",
+      "kind": "boundary",
+      "quantity": "oxygen",
+      "unclamped": true,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.7fffffffffff8p+1",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "eclss",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "eclss.cabin_co2",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.47ae147adf87ep-5",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "eclss",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "eclss.cabin_h2o",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.0000000000004p+3",
+      "composition": {
+        "oxygen": "0x1.0000000000000p+0"
+      },
+      "domain": "eclss",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "eclss.cabin_o2",
+      "kind": "pool",
+      "quantity": "oxygen",
+      "unclamped": false,
+      "unit": "mol"
+    }
+  ],
+  "version": 3
+}
