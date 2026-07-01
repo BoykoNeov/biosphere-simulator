@@ -219,13 +219,55 @@ CO₂; O₂ makeup tops up cabin_o2), and the ledger *refuses* the decoupled ver
 non-vacuous gate. The feces / urine splits keep their separate Phase-6 destinations.
 
 **Step 3 (P6.3) — Biosphere ↔ cabin: crew and plants share the air (the emergent
-feedback).** Point the frozen biosphere's `ChamberWiring` (`carbon_source` / `resp_sink` /
-`o2_pool`) at the **cabin's** composition CO₂/O₂ stocks, and map the `co2_pool` forcing-var
-→ the cabin CO₂ id in the station resolver, so FvCB's `Ci` reads the live cabin CO₂
-(finding #3). Plants draw CO₂ from and return O₂ to the cabin the crew breathes; the
+feedback).** Couple the frozen biosphere's gas exchange to the Step-2 cabin's composition
+CO₂/O₂ stocks. Plants draw CO₂ from and return O₂ to the cabin the crew breathes; the
 CO₂/O₂ cross-domain feedback (crew exhales → cabin CO₂ rises → plants assimilate → cabin O₂
-rises → crew breathes) emerges with **no control code**. Zero frozen-code change (station
-re-wiring only); the standalone biosphere golden is untouched.
+rises → crew breathes) emerges with **no control code**. Zero frozen-code / zero domain /
+zero core change; the standalone biosphere golden is untouched.
+
+*Design decisions (advisor-reviewed 2026-07-01; the plan text above under-specified two
+load-bearing points — corrected here):*
+
+- **SEAM DIRECTION REVERSED.** The naive seam ("point the biosphere's `ChamberWiring` at
+  the cabin's CO₂/O₂ ids") is **blocked**: only `plants` consumes the wiring;
+  `soil.MicrobialRespiration` (built for EVERY sealed chamber) and
+  `consumers.ConsumerRespiration` read `CARBON_POOL`/`O2_POOL` from the **catalog,
+  hardcoded** — so re-pointing the wiring redirects only plant gas (microbial gas would
+  `KeyError` or leak one-way). Instead **keep the biosphere's `CARBON_POOL`/`O2_POOL`
+  (already `{C:1,O:2}`/`{O:2}`) as the shared cabin air, and re-point the CABIN's five
+  all-parameterized flows** (`CrewRespiration`/`CO2Scrubber`/`O2Makeup`/`Condenser`/
+  `WaterBalance`) at those ids. This reuses `build_season(sealed)` wholesale (build_atmosphere
+  included; the CARBON loss-sink + default `sealed` wiring + default
+  `{CO2_POOL_VAR: CARBON_POOL}` map all just work), and is the correct closed-station
+  physics (plants + microbes + crew share one cabin-air stock). `Ci`'s `air_mol` becomes the
+  biosphere scenario's `chamber_air_mol`, set to the cabin's air moles (a NON-frozen
+  greenhouse scenario).
+
+- **A master-step driver, not `simcore.multirate`.** The biosphere is structurally `dt=1`
+  **per-day** (weather indexed by `n`); the cabin is `dt=60 s` **per-second**
+  (`k_scrub·dt<1`). `multirate_step` splits ONE shared master `dt` (`dt/n_sub`) — no single
+  master dt serves both **units**, and it composes `substep` only, which by design freezes
+  the biosphere's `thermal_time` aux (phenology). So the station owns a bespoke master-step
+  driver: per day, cabin `substep(dt=60)`×1440 (keeps `n`; asserts conservation after each
+  substep to preserve the every-step teeth) then biosphere `step_report(dt=1)`×1 (advances
+  aux AND bumps `n`, so `n` stays the day count and the frozen `weather_resolver` works
+  unchanged). All public methods → zero core change. Two disjoint registries over one shared
+  stock dict + two integrators — multirate's model, orchestrated by hand for per-domain dt.
+
+- **The non-vacuous gate is a net-fixation CONSERVATION IDENTITY, not a cabin-pool shift.**
+  The fast ECLSS scrubber (τ≈1000 s) fully relaxes `CARBON_POOL` back to `P/k_scrub` between
+  the once-daily biosphere lumps (86 τ per day), so the regulated pools are identical (to fp)
+  at every day boundary — the plant's effect is *erased from the pool* and *conserved into*
+  (a) biosphere biomass and (b) reduced ECLSS work. So the gate is: with-plants the plant
+  fixes net carbon (`bio_organic_C` grows), the scrubber removes LESS CO₂
+  (`co2_removed_with < co2_removed_no`) and the makeup supplies LESS O₂
+  (`o2_supply_with > o2_supply_no`) — **the plant offloads life support** — and the three
+  agree to tolerance (`Δco2_removed ≈ bio_gain ≈ Δo2_supply`, RQ=1; catastrophic-cancellation
+  floor ~1e-10, so `atol≈1e-8`, not bit-exact). Booleans carry the sign robustly; an
+  un-biting (net-source) run flips them → correctly unpinnable. The seedling starts DVS 0 in
+  the growth phase so it is net-assimilating. Step 2's composition-failure gate does NOT
+  re-run (`{C:1,O:2}` is frozen inside `build_atmosphere`; Step 3 adds no new composition
+  requirement). Illustrative scale (crew dominates ~3400×); calibration deferred to Step 9.
 
 **Step 4 (P6.4) — the water loop.** Crew humidity + biosphere transpiration → cabin_h2o →
 condenser → water recovery → crew `water_store` (+ urine → water recovery). Close WATER

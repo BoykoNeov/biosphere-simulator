@@ -303,8 +303,45 @@ golden `cabin_gas_state.json` (pre-golden gate: 3-quantity closure / `rationed==
 steady state). **Zero core change** (`git diff src/simcore/` empty) + **zero domain change** (`src/domains/`
 untouched; `CabinScenario` additive in `station/scenario.py`); full suite incl. `-m slow` + ruff + pyright green
 (**1237 passed**); **all fifteen existing goldens byte-identical** (seven frozen + two demo + two Power + one
-Thermal + one ECLSS + one Crew + the Step-1 station; no regen). NEXT: Step 3 (P6.3) — biosphere ↔ cabin (frozen
-biosphere `ChamberWiring` → cabin gas stocks; the emergent crew↔plant CO₂/O₂ feedback).
+Thermal + one ECLSS + one Crew + the Step-1 station; no regen).
+**Step 3 (P6.3) COMPLETE — the biosphere ↔ cabin greenhouse; the emergent crew↔plant CO₂/O₂ feedback; plants
+offload life support via a net-fixation conservation identity**: new `src/station/greenhouse.py` (third assembly)
++ `GreenhouseScenario`. **The seam is REVERSED from the plan's first framing** (advisor-reviewed): the naive
+"point the biosphere's `ChamberWiring` at the cabin's CO₂/O₂ ids" is **blocked** — only `plants` consumes the
+wiring, while `soil.MicrobialRespiration` (built for EVERY sealed chamber) + `consumers.ConsumerRespiration` read
+`CARBON_POOL`/`O2_POOL` from the **catalog, hardcoded**, so re-pointing the wiring redirects only plant gas.
+Instead **keep the biosphere's `CARBON_POOL` (`{C:1,O:2}`) / `O2_POOL` (`{O:2}`) as the shared cabin air and
+re-point the CABIN's five all-parameterised flows** (`CrewRespiration`/`CO2Scrubber`/`O2Makeup`/`Condenser`/
+`WaterBalance`) at those ids — re-point the side that CAN be. Reuses `build_season(sealed)` **wholesale**
+(build_atmosphere included, CARBON loss-sink included, default `sealed` wiring + default `{CO2_POOL_VAR:
+CARBON_POOL}` Ci map all unchanged); physically correct (plants + microbes + crew breathe one cabin-air stock).
+**A bespoke two-rate master-step driver, NOT `simcore.multirate`** (advisor-reviewed): the biosphere is
+structurally `dt=1` **day** (weather indexed by `n`), the cabin `dt=60 s` **per second** (`k_scrub·dt<1`) — two
+different time UNITS, which `multirate_step` can't bridge (one shared master `dt` split as `dt/n_sub`) AND it
+composes `substep` only, which by design freezes the biosphere's `thermal_time` aux (phenology). The driver does
+the operator split by hand: per day, cabin `substep(dt=60)`×1440 (keeps `n`, conservation asserted after EACH
+substep — the every-step teeth) then biosphere `step_report(dt=1)`×1 (advances aux AND `n`, so `n` stays the day
+count and the frozen `weather_resolver` is reused unchanged). Two disjoint registries over one shared stock dict
++ two integrators; all public methods ⇒ zero core change. **The payload is a net-fixation CONSERVATION IDENTITY,
+not a cabin-pool shift** (advisor-reviewed, empirical): the fast scrubber (τ≈1000 s, 86 τ/day) fully relaxes
+`CARBON_POOL`/`O2_POOL` back to their regulator setpoints between the once-daily biosphere lumps, so the
+regulated pools are IDENTICAL (to fp) at every day boundary — the plant's effect is *erased from the pool* and
+*conserved into* (a) biosphere biomass and (b) reduced ECLSS work. So the "it bit" gate is: the plant fixes net
+carbon (`bio_organic_C` grows), the scrubber removes LESS CO₂ (`co2_removed_with < co2_removed_no`), the makeup
+supplies LESS O₂ (`o2_supply_with > o2_supply_no`), and the three agree to tolerance (`Δco2_removed ≈ bio_gain ≈
+Δo2_supply`, RQ=1; cancellation floor ~1e-10 ⇒ `atol=1e-8`, not bit-exact; booleans carry the sign, an un-biting
+net-source run flips them). Step 2's composition-failure gate does NOT re-run (`{C:1,O:2}` is frozen inside
+`build_atmosphere`; no new composition requirement). Illustrative scale (crew ~3400× the 1 m² seedling);
+calibration deferred to Step 9. The biosphere is **Euler-locked by its freeze** ⇒ an Euler run (no RK4
+cross-check). Crew stores re-sized for the multi-DAY horizon (draw is `rate·time`, dt-independent; `rationed==0`
+by well-fed sizing); biosphere internal water + N loops still close (not coupled to the cabin — Steps 4/6). 11
+tests (9 run + 2 golden); additive **NON-frozen** golden `greenhouse_state.json` (pre-golden gate: `rationed==0`
+/ `events==()` / every quantity closed every master day / plant fixes net carbon). **Zero core change** (`git
+diff src/simcore/` empty) + **zero domain change** (`src/domains/` untouched; `GreenhouseScenario` additive in
+`station/scenario.py`); full suite incl. `-m slow` + ruff + pyright green (**1248 passed**); **all sixteen
+existing goldens byte-identical** (seven frozen + two demo + two Power + one Thermal + one ECLSS + one Crew + the
+Step-1 station + the Step-2 cabin-gas; no regen). NEXT: Step 4 (P6.4) — the water loop (crew humidity + biosphere
+transpiration → cabin_h2o → condenser → water recovery → crew `water_store`).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

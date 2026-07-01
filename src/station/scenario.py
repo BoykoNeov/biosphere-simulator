@@ -38,6 +38,7 @@ Pure stdlib only (a frozen dataclass wrapping the Power scenario).
 
 from dataclasses import dataclass
 
+from domains.biosphere.scenario import SeasonScenario
 from domains.power.scenario import BOUNDED_SOC_SCENARIO, PowerScenario
 
 
@@ -180,3 +181,113 @@ CABIN_GAS_SCENARIO: CabinScenario = DEFAULT_CABIN_SCENARIO
 # count (no day structure). Long enough to reach the cabin steady states while the
 # stores stay well-fed (food ~22 %, water ~14 % depleted).
 CABIN_GAS_STEPS: int = 900
+
+
+# --- Step 3 (P6.3): biosphere ↔ cabin greenhouse
+# ------------------------------------
+
+# The greenhouse biosphere: a **sealed** chamber whose CO₂/O₂ pools ARE the cabin
+# air. Under the reverse seam (see ``station.greenhouse``) the biosphere's
+# ``CARBON_POOL`` / ``O2_POOL`` (already composition ``{C:1,O:2}`` / ``{O:2}``) are
+# the shared cabin-gas stocks the crew + ECLSS flows also act on, so their initial
+# fills + ``chamber_air_mol`` are sized to the CABIN, not the standalone 1 m²
+# chamber:
+# - ``chamber_o2_mol0 = 10``: at the ECLSS O₂ setpoint (``eclss.yaml`` o2_setpoint
+# = 10 mol) so the makeup regulator starts idle (a wildly different scale would
+# make the proportional regulator run backwards, dumping O₂ — the standalone 210
+# mol is incompatible with a 10 mol setpoint).
+# - ``chamber_co2_mol0 = 3.4``: at the crew-driven scrubber steady state
+# ``P/k_scrub = (f_resp·food_intake)/k_scrub = 3.4e-3/1e-3`` mol, so both the
+# with- and without-plant runs start at the crew equilibrium and the plant's net
+# draw is the only departure (the "it bit" contrast).
+# - ``chamber_air_mol = 9500``: sized so ``Ci = ci_ratio·CARBON_POOL/air_mol·1e6``
+# is ≈ 250 µmol mol⁻¹ at the crew-driven CO₂ (continuity with the frozen
+# chamber's fill), i.e. the plant photosynthesises in a healthy Ci regime. (The
+# resulting O₂ mole fraction ``x_O2 = 10/9500`` is low vs 21 %; that only
+# *weakens* respiration's O₂ draw via ``f_O2``, strengthening the net-sink
+# signal — an honest artefact of the illustrative, uncalibrated ECLSS scales,
+# calibration deferred to Step 9.)
+# - ``litter_carbon0 = 0``: no seeded soil organic matter, so microbial
+# respiration (a CO₂ *source*) stays minimal and the growing seedling is cleanly
+# net-assimilating over the window (the advisor's sign requirement).
+# ``consumer=False`` (default): a producer-only greenhouse — the consumer adds no
+# gas-seam novelty and complicates the net-sink sign. A NON-frozen scenario; the
+# frozen biosphere goldens are untouched.
+GREENHOUSE_BIO_SCENARIO: SeasonScenario = SeasonScenario(
+    sealed=True,
+    chamber_o2_mol0=10.0,
+    chamber_co2_mol0=3.4,
+    chamber_air_mol=9500.0,
+    litter_carbon0=0.0,
+)
+
+
+# The greenhouse crew stores, re-sized for the multi-DAY horizon. The Step-2
+# ``CabinScenario`` stores (food 1000 mol / water 20 kg) are sized for its 900-step
+# (~15 h) run; the crew draw is ``rate·time`` (dt-independent), so a 7-day
+# greenhouse draws ~345 mol C/day ⇒ ~2419 mol food and ~30 kg water over the
+# horizon. Sized to a ~60 % drawdown (food 4000 mol, water 50 kg) — a material,
+# honest depletion that never rations (``rationed == 0`` by well-fed sizing). Intake
+# rates + initial humidity are the Step-2 values (reused verbatim, so the cabin
+# steady states match).
+GREENHOUSE_CABIN_SCENARIO: CabinScenario = CabinScenario(
+    food_store0=4000.0,
+    water_store0=50.0,
+)
+
+
+@dataclass(frozen=True)
+class GreenhouseScenario:
+    """Step-3 biosphere ↔ cabin run data (P6.3): plants + crew share the cabin air.
+
+    References the two sibling scenarios it couples (the
+    ``StationScenario``-wrapping- ``PowerScenario`` rhythm): a **sealed**
+    :class:`SeasonScenario` whose CO₂/O₂ pools are the cabin air
+    (:data:`GREENHOUSE_BIO_SCENARIO`) and the Step-2 :class:`CabinScenario` for
+    the crew stores + intake rates + initial cabin humidity (the gas initial fills
+    come from ``bio``, so ``cabin.cabin_o2_0`` / ``cabin.cabin_co2_0`` are unused
+    here).
+
+    **The two-rate driver (see ``station.greenhouse.run_greenhouse``).** The
+    biosphere is structurally ``dt = 1`` day (weather indexed by the step count)
+    and the cabin ``dt = 60 s`` (ECLSS ``k_scrub·dt < 1``) — two different *time
+    units*, which ``simcore.multirate`` (one shared master ``dt``, aux-freezing
+    ``substep``) cannot bridge. So each master step is one day: the cabin
+    sub-steps ``steps_per_day`` times at ``cabin_dt`` (keeping ``n``), then the
+    biosphere takes one ``step_report`` at ``bio_dt`` (advancing phenology aux
+    **and** ``n``, so ``n`` stays the day count and the frozen weather resolver is
+    reused unchanged).
+    """
+
+    # The sealed biosphere whose gas pools are the cabin air (cabin-sized fills).
+    bio: SeasonScenario = GREENHOUSE_BIO_SCENARIO
+    # The crew stores (re-sized for the multi-day horizon) + intake rates + initial
+    # humidity; the gas initial fills come from ``bio``, so ``cabin.cabin_o2_0`` /
+    # ``cabin.cabin_co2_0`` are unused here.
+    cabin: CabinScenario = GREENHOUSE_CABIN_SCENARIO
+    # Horizon in master steps (days). Short and safely inside the seedling's growth
+    # phase (the sealed chamber's Ci draw-down spans ~40–60 days), so the biosphere
+    # is net- assimilating (a CO₂ sink) throughout — the signed feedback the demo
+    # shows. Cheap: the cabin fully relaxes within the first day, so a week already
+    # exhibits the shift.
+    days: int = 7
+    # Cabin sub-steps per biosphere day: 86400 s / 60 s = 1440 (the physical day at
+    # the ECLSS dt). ``cabin_dt·steps_per_day == 86400`` (one day) is required for
+    # the day mapping; enforced in ``build``/``run``.
+    steps_per_day: int = 1440
+    cabin_dt: float = 60.0  # s — ECLSS's binding dt (k_scrub·dt = 0.06 < 1)
+    bio_dt: float = 1.0  # day — the frozen biosphere's structural step
+
+
+# Module-level default (immutable) — the canonical Step-3 greenhouse.
+DEFAULT_GREENHOUSE_SCENARIO: GreenhouseScenario = GreenhouseScenario()
+
+# The Step-3 validation scenario: the frozen sealed biosphere breathing the crew's
+# cabin air. Every quantity (CARBON / OXYGEN / WATER / NITROGEN) conserved every
+# sub-step over the combined ledger (the payload); the plant is a **net CO₂ sink /
+# O₂ source** vs a no-plant baseline (the signed "it bit" gate); the biosphere's
+# internal water + N loops still close; ``rationed == 0`` (well-fed + kinetic
+# self-limits); the crew stores run down (open-loop, argument for Steps 4/6). The
+# defaults encode the sizing; this alias names the canonical run shared by the
+# validation test and the golden so they cannot drift.
+GREENHOUSE_SCENARIO: GreenhouseScenario = DEFAULT_GREENHOUSE_SCENARIO
