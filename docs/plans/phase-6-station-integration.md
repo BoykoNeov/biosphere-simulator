@@ -1,6 +1,6 @@
 # Phase 6 — Station Integration (cross-domain coupling)
 
-**Status: IN PROGRESS — Step 1 (P6.1) COMPLETE.** Pre-plan investigation complete and
+**Status: IN PROGRESS — Steps 1–2 (P6.1–P6.2) COMPLETE.** Pre-plan investigation complete and
 advisor-reviewed (two blocking checks run before this doc committed to anything; see
 "Load-bearing findings" below). Steps 1–3 are designed concretely here; Steps 4–10 get
 just-in-time design as Phase 5's siblings did ("each designed just-in-time"), because each
@@ -40,6 +40,51 @@ core change** (`git diff src/simcore/` empty), **zero domain change** (`src/doma
 untouched); full suite incl. `-m slow` + ruff + pyright green (**1221 passed**); **all
 fourteen existing goldens byte-identical** (seven frozen + two demo + two Power + one
 Thermal + one ECLSS + one Crew; no regen). `src/station` added to the wheel `packages` list.
+
+**Step 2 (P6.2) COMPLETE — the Crew ↔ ECLSS cabin gas loop; OXYGEN closes via composition
+CO₂ + a merged stoichiometric respiration flow.** New `src/station/cabin.py` (the second
+assembly, mirroring `domains.*.system` one level up) + `src/station/flows.py`
+(`CrewRespiration`, the first station-owned flow) + a `CabinScenario` in `station/scenario.py`.
+The seam: ECLSS's forced `CrewMetabolism` stand-in and its three `metabolic_*` reservoirs are
+dropped, and the standalone crew `o2_store` / `OxygenConsumption` are dropped too; the **real**
+crew breathes cabin air via the merged **`CrewRespiration`** (`food_store + cabin_o2 →
+cabin_co2 + fecal_waste` — the `biosphere.microbial_respiration` PQ = 1 template one trophic
+level up, **forced**, 4-leg; the O₂ leg magnitude is `respired`, since only metabolized carbon
+draws O₂, not egested feces) + the crew `WaterBalance` (`water_store → cabin_h2o + urine`);
+ECLSS's three control loops (`CO2Scrubber` / `Condenser` / `O2Makeup`) carry over unchanged.
+**Every CO₂-bearing stock across the loop is composition `{C:1,O:2}`** (`cabin_co2` *and* the
+scrubber sink `co2_removed`) and every O₂ stock is `{O:2}` (`cabin_o2` *and* the makeup source
+`o2_supply`) — built **inline in the station** (the `boundary` / `eclss` stock constructors take
+no composition arg, and extending them would be a core change), **zero core change**. **The
+payload is two non-vacuous gates** — per-quantity ledger balance is *trivial* (every flow
+balances internally): (1) the **decoupled** build (pure-carbon `cabin_co2`) raises
+`ConservationError` for OXYGEN on the **first step** (balance is evaluation-time — the gate is a
+one-step run, not a construction) — composition is load-bearing, the "it bit" gate (the N-limited
+`f_N` analogue); (2) **O₂ is genuinely drawn from the cabin** — `cabin_o2` starts at the setpoint
+(makeup idle) and is pulled **below** to `o2_eq = setpoint − f_resp·food/k_makeup` (8.3 mol), the
+makeup only topping up the deficit. **RQ = 1 is baked in by the PQ = 1 template** (O₂ consumption
+= CO₂ production in one flow; a realistic RQ ≈ 0.75 needs metabolic-water / food-composition
+machinery — deferred, matching the biosphere's `{CARBON:1}` biomass / PQ = 1 convention).
+**Closure is the augmented / atom-conservation sense, NOT a closed O₂/CO₂ cycle** (O₂ still enters
+from `o2_supply`, CO₂ still leaves to `co2_removed` — Thermal's permanent `boundary.space`
+analogue; the recycled cabin cycle where plants return O₂ is **Step 3**). WATER stays decoupled
+(`water_store → cabin_h2o`; metabolic water ignored — the plan's WATER scope boundary; food
+carries no WATER composition). The cabin reaches emergent per-species steady states
+(`cabin_steady_state` closed form — 8.3 mol O₂ / 3.4 mol CO₂ / 0.04 kg H₂O), while the crew
+**stores run down** (forced, open-loop — the argument for Steps 4/6 closure), well-fed
+(`rationed == 0`; CO₂/H₂O structural `k·dt<1`, `cabin_o2` + stores well-fed sizing). Forced stores
+**RK4 ≡ Euler bit-identical**; state-dependent cabin species **RK4 ≢ Euler** (mid-transient
+tolerance agreement — the Step-1 battery/node split, now stores/cabin). **dt = 60 s** (ECLSS's
+constraint is binding — crew's dt = 3600 breaks `k_scrub·dt < 1`); reuses `crew.yaml` +
+`eclss.yaml` params verbatim. **16 tests** (14 run + 2 golden); additive **NON-frozen** golden
+`cabin_gas_state.json` (pre-golden gate: 3-quantity closure / `rationed == 0` / O₂ below setpoint
+/ reached steady state — an imbalanced / undrawn / non-converged run is unpinnable). **Zero core
+change** (`git diff src/simcore/` empty) + **zero domain change** (`src/domains/` untouched —
+`CabinScenario` is additive in `station/scenario.py`); full suite incl. `-m slow` + ruff + pyright
+green (**1237 passed**); **all fifteen existing goldens byte-identical** (seven frozen + two demo +
+two Power + one Thermal + one ECLSS + one Crew + the Step-1 station; no regen). NEXT: Step 3 (P6.3)
+— biosphere ↔ cabin (point the frozen biosphere's `ChamberWiring` at the cabin gas stocks; the
+emergent crew↔plant CO₂/O₂ feedback with no control code).
 
 Phases 0–5 are complete and regression-pinned. Phase 4 **froze the biosphere as THE
 reference** (`docs/biosphere-reference.md` + manifest). Phase 5 built the four standalone
@@ -163,7 +208,7 @@ NON-frozen station golden. This step also establishes the station harness every 
 reuses.
 
 **Step 2 (P6.2) — Crew ↔ ECLSS cabin: the gas loop closes for OXYGEN (composition +
-merged respiration).** Delete ECLSS's forced `CrewMetabolism` stand-in; wire the **real**
+merged respiration). COMPLETE (see the Step-2 block above).** Delete ECLSS's forced `CrewMetabolism` stand-in; wire the **real**
 Crew flows to the cabin. The gas step per finding #2: `cabin_co2` and the scrubber sink
 `co2_removed` become composition `{C:1,O:2}`; Crew's separate `OxygenConsumption` +
 `FoodMetabolism`-CO₂ leg **merge** into one stoichiometric `food_store + cabin_o2 →
