@@ -370,13 +370,13 @@ only splits the *output*), so the water returned to the store equals **exactly**
 bit" gate is with-vs-without recovery (η_w=0 reproduces the open-loop drain, same topology) + the identity; the two
 WATER pools reach emergent steady states (`cabin_h2o → f_ins·intake/k_cond`, `recovered_water → intake/k_rec`);
 WATER's total is invariant (`brine` the only terminal WATER sink); `rationed==0` (structural + well-fed);
-`events==()`. **17 tests** (14 run + 2 golden + pre-golden gate); additive **NON-frozen** golden
-`water_recovery_state.json` (pre-golden gate: 3-quantity closed every step / `rationed==0` / `water_store`
+`events==()`. **17 tests** (15 run + 2 golden, the run set incl. the pre-golden gate); additive **NON-frozen**
+golden `water_recovery_state.json` (pre-golden gate: 3-quantity closed every step / `rationed==0` / `water_store`
 regenerated above the η_w=0 baseline — the "it bit" check / reached WATER steady states). **Zero core change**
 (`git diff src/simcore/` empty) + **zero domain change** (`src/domains/` untouched); full suite incl. `-m slow` +
-ruff + pyright green (**1265 passed**, 1 oracle skip); **all sixteen existing goldens byte-identical** (seven
+ruff + pyright green (**1265 passed**, 1 oracle skip); **all seventeen existing goldens byte-identical** (seven
 frozen + two demo + two Power + one Thermal + one ECLSS + one Crew + the Step-1 station + the Step-2 cabin-gas + the
-Step-3 greenhouse; no regen). NEXT: Step 5 (P6.5) — Power → biosphere lighting (a station lamp flow; PAR forcing
+Step-3 greenhouse; no regen — `water_recovery_state.json` is the eighteenth). NEXT: Step 5 (P6.5) — Power → biosphere lighting (a station lamp flow; PAR forcing
 from lamp draw).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 

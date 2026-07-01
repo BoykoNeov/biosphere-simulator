@@ -309,9 +309,9 @@ output), so the water returned to the store equals **exactly** η_w times the wa
 drain from the *same* topology) + this identity; the two WATER pools reach emergent steady states
 (`cabin_h2o → f_ins·intake/k_cond`, `recovered_water → intake/k_rec`); WATER's total is invariant
 (`brine` the only terminal WATER sink); `rationed == 0` (structural `k_rec·dt < 1` + well-fed);
-`events == ()`. **17 tests** (14 run + 2 golden + the pre-golden gate) + an additive **NON-frozen**
+`events == ()`. **17 tests** (15 run — incl. the pre-golden gate — + 2 golden) + an additive **NON-frozen**
 golden `water_recovery_state.json`. Full suite incl. `-m slow` + ruff + pyright green (**1265
-passed**); all sixteen existing goldens byte-identical (no regen).
+passed**); all seventeen existing goldens byte-identical (no regen).
 
 **Step 5 (P6.5) — Power → biosphere lighting (energy enters biology).** A station **lamp**
 flow: `power.battery → light-used + waste_heat` (→ `thermal.node`, ENERGY-balanced), and
