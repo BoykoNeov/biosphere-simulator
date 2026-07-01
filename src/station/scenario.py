@@ -291,3 +291,26 @@ DEFAULT_GREENHOUSE_SCENARIO: GreenhouseScenario = GreenhouseScenario()
 # defaults encode the sizing; this alias names the canonical run shared by the
 # validation test and the golden so they cannot drift.
 GREENHOUSE_SCENARIO: GreenhouseScenario = DEFAULT_GREENHOUSE_SCENARIO
+
+
+# --- Step 4 (P6.4): the crew water-recovery loop
+# -------------------------------------
+
+# The Step-4 validation scenario reuses the Step-2 cabin sizing VERBATIM (the same crew
+# stores + intake rates + dt = 60 s). Step 4 changes only the WATER *plumbing* — the two
+# terminal disposal sinks (``humidity_condensate`` / ``urine``) become a
+# ``recovered_water`` buffer POOL feeding a ``WaterRecovery`` flow back to the store —
+# not the crew load or the gas loop, so the cabin O₂/CO₂/H₂O steady states are the same
+# and reusing the scenario keeps them aligned. Step 4 is built on the **cabin**, not the
+# greenhouse (the biosphere is Euler-locked by its freeze, so RK4 ≢ Euler — the "it
+# earned its keep" signal that recovery made ``water_store`` state-dependent — is only
+# cross-checkable below the greenhouse). The ``water_store`` now REGENERATES
+# (net drain ``(1−η_w)·intake`` instead of the full intake), staying even more well-fed;
+# ``food_store`` depletes as before.
+WATER_RECOVERY_SCENARIO: CabinScenario = CABIN_GAS_SCENARIO
+
+# The horizon (steps). Reuses ``CABIN_GAS_STEPS`` (900 × 60 s ≈ 15 h): long enough for
+# ``recovered_water`` (τ = 1/k_rec ≈ 1000 s ≈ 17 steps) and ``cabin_h2o`` (τ ≈ 33 steps)
+# to reach their steady states while both stores stay well-fed, and for a MATERIAL
+# with-vs-without-recovery gap in ``water_store`` to accumulate (the "it bit" signal).
+WATER_RECOVERY_STEPS: int = CABIN_GAS_STEPS

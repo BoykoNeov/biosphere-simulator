@@ -1,0 +1,60 @@
+# water_recovery — the station water-processor coefficients (Phase 6, Step 4)
+# Currency/unit: WATER (kg). The first STATION-owned params (CrewRespiration reused the
+# crew's respired_carbon_fraction; these are new). They parameterise the station-owned
+# WaterRecovery flow (station/flows.py) that closes the crew water loop:
+#
+#     recovered_water → water_store (+η_w) + brine (+(1−η_w)),   processed = k_rec·recovered_water
+#
+# where recovered_water is the buffer POOL the ECLSS Condenser product + the crew urine
+# collect in (the crew analogue of the biosphere's `condensate`). Step 4 re-points those
+# two disposal paths inward, so the crew's finite water_store becomes REGENERATIVE:
+# instead of draining at the full intake rate, it drains at (1−η_w)·intake — closed
+# exactly at η_w = 1, with `brine` the honest remaining WATER boundary (the Thermal
+# `boundary.space` analogue).
+#
+# recovery_rate (k_rec) — first-order rate the processor draws down the recovered_water
+#   buffer (1/s), ≥ 0. Donor-controlled (∝ the buffer's own amount, → 0 as it empties),
+#   so structural positivity requires k_rec·dt < 1. With dt = 60 s here, k_rec·dt = 0.06 —
+#   comfortably < 1 (the same τ ≈ 1000 s regime as the ECLSS scrubber). Because it reads a
+#   stock, WaterRecovery makes water_store state-dependent → RK4 ≢ Euler (a tolerance
+#   agreement), unlike the forced crew draws (the "it earned its keep" signal).
+#
+# recovery_efficiency (η_w) — fraction of processed water returned to water_store as
+#   potable (dimensionless), in [0, 1]. The remainder (1−η_w) is unrecoverable brine. The
+#   SolarCharge η_c / carbon_split fractional-split idiom on the WATER quantity. η_w = 1 is
+#   perfect closure (brine leg exactly 0); η_w = 0 is open-loop (the store gets nothing
+#   back — the baseline the "it bit" gate compares against). 0.9 is an illustrative
+#   whole-system recovery (humidity condensate + urine combined) — deliberately below a
+#   real ISS-class urine+condensate recovery so `brine` carries a visible, honest loss.
+#
+# Units discipline (P4 / config/units.py): neither is a conserved-Quantity canonical unit,
+#   so each is a schema-validated, bound-checked float carrying a declared unit
+#   (exact-string guarded at the loader, like Power's charge_efficiency / the ECLSS rates),
+#   NOT routed through pint.
+#
+# Clean-room: closed-loop water recovery (condensate + urine processing → potable) is
+#   standard bioregenerative / physicochemical life-support engineering. The numeric VALUES
+#   are provisional, ILLUSTRATIVE placeholders — deliberately NOT NASA BVAD / ISS WRS
+#   numbers (integrated life-support calibration is a later Phase-6 step). Flagged
+#   TODO(cite) until bound to a primary source at the validation gate.
+#
+# Sources:
+#   [A] Olson, J.S. (1963), "Energy storage and the balance of producers and decomposers
+#       in ecological systems", Ecology 44(2):322–331 — the first-order linear-reservoir
+#       form (the same algebra governs an engineered processor drawing a buffer).
+#   [B] MacElroy, R.D. & Bredt, J. (1984), "Current concepts and future directions of
+#       CELSS", Adv. Space Res. 4(12):221–229 — closed-loop water recovery in controlled
+#       ecological life support.
+
+name: water_recovery
+process: crew_water_recovery
+
+parameters:
+  recovery_rate:
+    value: 1.0e-3
+    unit: "1/s"
+    source: "TODO(cite) — provisional, illustrative first-order water-processor rate (τ ≈ 1000 s), k·dt < 1 for dt = 60 s [A]; NOT a NASA BVAD / ISS WRS number; primary citation pending validation gate"
+  recovery_efficiency:
+    value: 0.9
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, illustrative whole-system water-recovery efficiency (condensate + urine combined), deliberately below a real ISS-class recovery so brine carries a visible loss [B]; NOT a NASA BVAD / ISS WRS number; primary citation pending validation gate"

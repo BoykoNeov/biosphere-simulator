@@ -25,7 +25,8 @@ demonstration:
   below the regulated setpoint (the plant draws *live* cabin CO₂), even though the
   scrubber restores it by day-end.
 * **The biosphere's internal water + N loops still close** (Step 3 does not couple
-  them to the cabin — that is Steps 4/6).
+  them to the cabin — the water ring stays independently closed, its unification with
+  the cabin humidity deferred to the sealed-station step; N couples in Step 6).
 
 The biosphere is **Euler-locked by its freeze**, so the greenhouse is an Euler run
 (no RK4 cross-check — the frozen biosphere's numerics are fixed at ``dt=1``
@@ -185,9 +186,14 @@ def test_intraday_cabin_co2_dip() -> None:
 
 
 def test_biosphere_internal_water_loop_closed() -> None:
-    # Step 3 does NOT couple the biosphere water cycle to the cabin (that is Step
-    # 4), so the internal ring soil_water → water_vapor → condensate → soil_water
-    # stays closed: its total is conserved to round-off across the whole run.
+    # Step 3 does NOT couple the biosphere water cycle to the cabin, so the internal
+    # ring soil_water → water_vapor → condensate → soil_water stays closed: its total
+    # is conserved to round-off across the whole run. Step 4 (the crew water-recovery
+    # loop) does NOT change this: it closes the CREW water independently (humidity +
+    # urine → recovery → water_store), while the biosphere ring stays independently
+    # closed here — station WATER conserves as (closed ring) + (crew loop). Unifying
+    # the two humid-air stocks (biosphere transpiration ⇄ cabin humidity) is a fidelity
+    # refinement deferred to the sealed-station step, NOT a closure requirement.
     states, _, _ = _run()
     loop = (SOIL_WATER, WATER_VAPOR, CONDENSATE)
     total0 = sum(_amt(states[0], s) for s in loop)

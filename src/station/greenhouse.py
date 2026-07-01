@@ -130,7 +130,9 @@ def _cabin_flows(crew_params: CrewParams, eclss_params: EclssParams) -> list[Flo
     ``CrewRespiration`` / ``CO2Scrubber`` act on ``CARBON_POOL`` (the shared cabin
     CO₂); ``O2Makeup`` / ``CrewRespiration`` on ``O2_POOL`` (the shared cabin O₂);
     ``Condenser`` / ``WaterBalance`` on the cabin-owned ``CABIN_H2O`` (WATER stays
-    decoupled from the biosphere's internal water cycle — that couples in Step 4).
+    decoupled from the biosphere's internal water cycle — Step 4 closes the *crew*
+    water loop independently on the cabin; unifying the two humid-air stocks is a
+    deferred fidelity refinement, not a closure requirement).
     Identical construction to ``station.cabin.build_cabin`` except the two gas ids
     are the biosphere's, not the ECLSS ``cabin_o2`` / ``cabin_co2``.
     """

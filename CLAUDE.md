@@ -340,8 +340,44 @@ tests (9 run + 2 golden); additive **NON-frozen** golden `greenhouse_state.json`
 diff src/simcore/` empty) + **zero domain change** (`src/domains/` untouched; `GreenhouseScenario` additive in
 `station/scenario.py`); full suite incl. `-m slow` + ruff + pyright green (**1248 passed**); **all sixteen
 existing goldens byte-identical** (seven frozen + two demo + two Power + one Thermal + one ECLSS + one Crew + the
-Step-1 station + the Step-2 cabin-gas; no regen). NEXT: Step 4 (P6.4) — the water loop (crew humidity + biosphere
-transpiration → cabin_h2o → condenser → water recovery → crew `water_store`).
+Step-1 station + the Step-2 cabin-gas; no regen).
+**Step 4 (P6.4) COMPLETE — the crew water-recovery loop; the crew's finite `water_store` becomes REGENERATIVE;
+built on the CABIN, not the greenhouse**: new `src/station/water.py` + the **first station-owned params**
+(`src/station/params/water_recovery.yaml` + `src/station/loader.py`). The seam re-points the Step-2 cabin's two
+WATER disposal sinks (`humidity_condensate` / `urine`) into a new `recovered_water` buffer POOL (the crew analogue
+of the biosphere's `condensate` — the ECLSS `Condenser` product + the crew urine collect there), and a
+station-owned **`WaterRecovery`** flow (`recovered_water → water_store (+η_w) + brine (+(1−η_w))`, 3-leg, the
+`SolarCharge`/`carbon_split` η-split on WATER, **donor-controlled** `k_rec`) returns the recovered fraction to
+`crew.water_store`, venting only the unrecoverable remainder to a `brine` sink. So the store's net drain drops
+from the full intake to `(1−η_w)·intake` — **regenerative up to the recovery efficiency**, fully closed only at
+η_w = 1 (`brine` the honest remaining WATER boundary, the Thermal `boundary.space` analogue). `water_recovery.yaml`
+(`recovery_rate` k_rec 1/s ≥ 0 structural `k·dt<1`; `recovery_efficiency` η_w dimensionless ∈ [0,1]; exact-string
+guarded, illustrative `TODO(cite)` — NOT NASA/ISS numbers). **Zero domain / zero core change** (assembly-level id
+re-pointing — the `Condenser`/`WaterBalance` flow classes untouched; a buffer pool + a new flow, NOT a split at
+the condenser, which would be a domain change). **Scope decision (advisor): closure ≠ humidity unification** —
+the plan's "crew humidity + **biosphere transpiration** → cabin_h2o" over-reached; coupling biosphere
+transpiration into the cabin is a **fidelity refinement, NOT a closure requirement**, and is **deferred** (Step 7).
+The biosphere's internal water ring is **already closed/sealed independently**
+(`test_biosphere_internal_water_loop_closed`); the crew loop closes independently the moment recovery is added —
+so station WATER conserves as (closed biosphere ring) + (crew loop closed up to brine). Built on the **cabin** (not
+the greenhouse) so the biosphere — **Euler-locked by its freeze** — stays out of the assembly and the **RK4 ≢
+Euler cross-check runs**: recovery makes `water_store` **state-dependent** (inflow ∝ the buffer level), **breaking**
+the forced RK4 ≡ Euler bit-identity the cabin stores had (the "it earned its keep" signal, the `SelfDischarge`
+analogue), while the forced `food_store` stays bit-identical. **The payload is a conservation identity** (the
+Step-3 offload analogue): the `recovered_water` dynamics + the forced intake are both **independent of η_w** (η_w
+only splits the *output*), so the water returned to the store equals **exactly** η_w × the water the open-loop
+(η_w=0) baseline sends to `brine` — `water_store_with − water_store_without ≈ η_w·brine_without` (~1e-13). The "it
+bit" gate is with-vs-without recovery (η_w=0 reproduces the open-loop drain, same topology) + the identity; the two
+WATER pools reach emergent steady states (`cabin_h2o → f_ins·intake/k_cond`, `recovered_water → intake/k_rec`);
+WATER's total is invariant (`brine` the only terminal WATER sink); `rationed==0` (structural + well-fed);
+`events==()`. **17 tests** (14 run + 2 golden + pre-golden gate); additive **NON-frozen** golden
+`water_recovery_state.json` (pre-golden gate: 3-quantity closed every step / `rationed==0` / `water_store`
+regenerated above the η_w=0 baseline — the "it bit" check / reached WATER steady states). **Zero core change**
+(`git diff src/simcore/` empty) + **zero domain change** (`src/domains/` untouched); full suite incl. `-m slow` +
+ruff + pyright green (**1265 passed**, 1 oracle skip); **all sixteen existing goldens byte-identical** (seven
+frozen + two demo + two Power + one Thermal + one ECLSS + one Crew + the Step-1 station + the Step-2 cabin-gas + the
+Step-3 greenhouse; no regen). NEXT: Step 5 (P6.5) — Power → biosphere lighting (a station lamp flow; PAR forcing
+from lamp draw).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

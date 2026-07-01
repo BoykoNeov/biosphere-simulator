@@ -1,10 +1,12 @@
 # Phase 6 — Station Integration (cross-domain coupling)
 
-**Status: IN PROGRESS — Steps 1–2 (P6.1–P6.2) COMPLETE.** Pre-plan investigation complete and
+**Status: IN PROGRESS — Steps 1–4 (P6.1–P6.4) COMPLETE.** Pre-plan investigation complete and
 advisor-reviewed (two blocking checks run before this doc committed to anything; see
 "Load-bearing findings" below). Steps 1–3 are designed concretely here; Steps 4–10 get
 just-in-time design as Phase 5's siblings did ("each designed just-in-time"), because each
-later seam's shape is only fully constrained once the seam before it exists.
+later seam's shape is only fully constrained once the seam before it exists. (Step 4 is
+designed in full under "Steps" below; the plan's original one-line framing over-reached on
+biosphere-transpiration coupling — corrected there.)
 
 **Step 1 (P6.1) COMPLETE — the `src/station/` assembly layer, proven on Power → Thermal
 heat closure.** New `src/station/` package (`scenario.py` / `system.py`, the assembly layer
@@ -269,10 +271,47 @@ load-bearing points — corrected here):*
   re-run (`{C:1,O:2}` is frozen inside `build_atmosphere`; Step 3 adds no new composition
   requirement). Illustrative scale (crew dominates ~3400×); calibration deferred to Step 9.
 
-**Step 4 (P6.4) — the water loop.** Crew humidity + biosphere transpiration → cabin_h2o →
-condenser → water recovery → crew `water_store` (+ urine → water recovery). Close WATER
-across the station (the crew's finite `water_store`, open-loop standalone, becomes
-regenerative). Just-in-time design.
+**Step 4 (P6.4) — the water loop. COMPLETE.** Built on the **cabin** (not the greenhouse):
+the crew's two WATER disposal sinks (`humidity_condensate` / `urine`) are re-pointed into a
+new `recovered_water` buffer POOL (the crew analogue of the biosphere's `condensate`), and a
+station-owned `WaterRecovery` flow (`recovered_water → water_store (+η_w) + brine (+(1−η_w))`,
+donor-controlled `k_rec`, the `SolarCharge`/`carbon_split` η-split on WATER) returns the
+recovered fraction to `crew.water_store`, venting only the unrecoverable remainder to a
+`brine` sink. The crew's finite `water_store` — open-loop and monotonically depleting
+standalone/cabin — becomes **regenerative up to the recovery efficiency** (net drain drops
+from the full intake to `(1−η_w)·intake`, fully closed only at η_w = 1; `brine` is the honest
+remaining WATER boundary, the Thermal `boundary.space` analogue). New `src/station/water.py`
++ the **first station-owned params** (`station/params/water_recovery.yaml` + `station/loader.py`;
+`k_rec` 1/s, `η_w` dimensionless, illustrative `TODO(cite)` — NOT NASA/ISS numbers). **Zero
+domain / zero core change** (assembly-level id re-pointing; the `Condenser`/`WaterBalance`
+flow classes are untouched — a buffer pool + a new flow, not a split at the condenser).
+
+*Scope decision (advisor-reviewed): closure ≠ humidity unification.* The plan's first framing
+("Crew humidity + **biosphere transpiration** → cabin_h2o → …") over-reached — coupling the
+biosphere's transpiration into the cabin humidity is **not** a closure requirement and is
+**deferred** (to Step 7 / out of scope). The biosphere's internal water ring
+(`soil_water → water_vapor → condensate → soil_water`) is **already closed and sealed
+independently** (`test_biosphere_internal_water_loop_closed`); the crew loop closes
+independently the moment recovery is added. So station WATER conserves as (closed biosphere
+ring) + (crew loop closed up to brine); unifying the two humid-air stocks is a *fidelity
+refinement*, not needed to close WATER. Building on the cabin (not the greenhouse) also keeps
+the biosphere — Euler-locked by its freeze — out of the assembly, so the **RK4 ≢ Euler
+cross-check runs**: recovery makes `water_store` state-dependent (its inflow ∝ the buffer
+level), **breaking** the forced RK4 ≡ Euler bit-identity the cabin stores had (the "it earned
+its keep" signal, the `SelfDischarge` analogue), while the forced `food_store` stays
+bit-identical.
+
+*The payload — a conservation identity (the Step-3 offload analogue).* The `recovered_water`
+dynamics and the forced intake are **both independent of η_w** (η_w only splits the processor's
+output), so the water returned to the store equals **exactly** η_w times the water the open-loop
+(η_w = 0) baseline sends to `brine`: `water_store_with − water_store_without ≈ η_w · brine_without`
+(to ~1e-13). The "it bit" gate is with-vs-without recovery (η_w = 0 reproduces the open-loop
+drain from the *same* topology) + this identity; the two WATER pools reach emergent steady states
+(`cabin_h2o → f_ins·intake/k_cond`, `recovered_water → intake/k_rec`); WATER's total is invariant
+(`brine` the only terminal WATER sink); `rationed == 0` (structural `k_rec·dt < 1` + well-fed);
+`events == ()`. **17 tests** (14 run + 2 golden + the pre-golden gate) + an additive **NON-frozen**
+golden `water_recovery_state.json`. Full suite incl. `-m slow` + ruff + pyright green (**1265
+passed**); all sixteen existing goldens byte-identical (no regen).
 
 **Step 5 (P6.5) — Power → biosphere lighting (energy enters biology).** A station **lamp**
 flow: `power.battery → light-used + waste_heat` (→ `thermal.node`, ENERGY-balanced), and
