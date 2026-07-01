@@ -1,0 +1,62 @@
+# power — battery self-discharge rate param (Phase 5, P5.5)
+# Currency/units: ENERGY (J). The second coefficient the Power core introduces (after
+#   charge.yaml's η_c) — and the first DONOR-CONTROLLED one.
+#
+# self_discharge_rate (k) — first-order self-discharge / shelf-loss rate (1/s):
+#   the fraction of the stored charge that leaks to heat per second, with no load
+#   present. The SelfDischarge flow bleeds leak = k·battery·dt (J) each step from the
+#   battery to waste_heat — two legs, ENERGY-balanced (−leak + leak = 0). This is the
+#   "every joule named" first law again: the leaked charge is not lost, it degrades to
+#   waste heat (a visible, balanced leg), tracked by the monotonic heat diagnostic.
+#
+# Donor-controlled — the load-bearing distinction from charge/load (the honest part).
+#   SolarCharge and LoadDraw are FORCED (they read env power, not a stock), so the SOC is
+#   a restoring-force-free accumulator (see scenario.py). SelfDischarge is FIRST-ORDER IN
+#   THE BATTERY (leak ∝ battery), the Decomposition/Grazing donor-controlled idiom lifted
+#   into the Power domain. Two consequences it EARNS ITS KEEP by:
+#     (1) positivity is STRUCTURAL, not sizing: the draw ∝ the donor's own start-of-step
+#         amount → self-limits to 0 as the battery empties, so k·dt < 1 keeps the Euler
+#         backstop unfired (the herbivory rate·dt < 1 discipline). (LoadDraw's positivity
+#         still leans on well-fed sizing — self-discharge does not change that.)
+#     (2) it is the Power domain's FIRST restoring force (the −k·battery term): the SOC
+#         gains a genuine attractor, so two runs from different initial SOC CONVERGE —
+#         their difference contracts exactly, d_n = d_0·(1 − k·dt)^n (proved forcing-
+#         independently by the two-run contraction test, test_power_self_discharge.py).
+#         The two forced flows alone leave that difference constant. Reading a stock also
+#         breaks the forced-only RK4 ≡ Euler bit-identity (now a tolerance-agreement).
+#
+# Units discipline (P4 / config/units.py): a first-order rate (1/s) is NOT a conserved-
+#   Quantity canonical unit, so it is a schema-validated, bound-checked float carrying a
+#   declared unit (exact-string guarded at the loader, like the biosphere's per-day
+#   decomposition_rate / herbivory rates — here per-SECOND, Power's natural time unit).
+#   Must be ≥ 0: 0 is valid (an ideal, leak-free cell — inert machinery, the herbivory
+#   "zero rate is valid" precedent); negative (creates energy) is rejected.
+#
+# Realistic magnitude — a genuine Li-ion figure, NOT tuned to make a test pop. Li-ion
+#   self-discharge is ~2-3 %/month [A][B]. k = 1.0e-8 /s = 1e-8 · (30·86400) ≈ 2.6 %/month
+#   — squarely in range. This is deliberately slow: over a week-scale run the SOC barely
+#   bends, so the attractor/restoring-force property is proved EXACTLY by the two-run
+#   contraction test (magnitude-independent), NOT by a visible convergence. Inflating k to
+#   force a visible bend would be dishonest; the contraction test earns the keep at the
+#   real value. See test_power_self_discharge.py.
+#
+# Clean-room: value from cited primary literature ONLY (battery self-discharge is
+#   textbook). The numeric VALUE is a provisional, literature-typical placeholder pending
+#   the validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] Dunn, B., Kamath, H., Tarascon, J.-M. (2011), "Electrical Energy Storage for the
+#       Grid: A Battery of Choices", Science 334(6058):928-935 — Li-ion low self-discharge
+#       (a few %/month) among storage chemistries.
+#   [B] Divya, K.C., Østergaard, J. (2009), "Battery energy storage technology for power
+#       systems — An overview", Electric Power Systems Research 79(4):511-520 — surveyed
+#       self-discharge rates by chemistry (Li-ion ~monthly-scale shelf loss).
+
+name: power
+process: self_discharge
+
+parameters:
+  self_discharge_rate:
+    value: 1.0e-8
+    unit: "1/s"
+    source: "TODO(cite) — provisional, literature-typical Li-ion self-discharge k ~1.0e-8/s ≈ 2.6 %/month [A][B]; realistic (not tuned) — the attractor property is proved magnitude-independently by the two-run contraction test; primary citation pending validation gate"

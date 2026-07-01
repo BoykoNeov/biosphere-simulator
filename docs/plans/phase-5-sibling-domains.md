@@ -248,9 +248,19 @@ Phase-6-multi-rate-safe):**
   load; this is the cleanest "every joule named" demonstration). Magnitude `env.get("load_power")·dt`
   (forced demand). *Useful work leaving the system (a pump moving fluid → a `useful_work` BOUNDARY
   sink) is the documented split-seam, deferred — standalone Power makes **heat** the star.*
-- *(optional)* `SelfDischarge`: `battery → waste_heat`, first-order `k·battery·dt` — a standing
-  leak; donor-controlled so it self-limits to 0 as the battery empties. Include only if it earns
-  its keep in the validation scenario.
+- `SelfDischarge` (**LANDED, P5.5**): `battery → waste_heat`, first-order `k·battery·dt` — a
+  standing leak; donor-controlled so it self-limits to 0 as the battery empties. It **earned its
+  keep**: as the Power domain's **first donor-controlled flow** it brings three properties the two
+  forced flows cannot — (1) `rationed == 0` structural for *its own* leg (`k·dt < 1`; LoadDraw still
+  leans on sizing), (2) the domain's **first restoring force** → a stable SOC attractor, proved
+  **magnitude-independently** by a two-run contraction test (`d_n = d_0·(1 − k·dt)^n` exactly;
+  forced-only keeps `d_n` constant), and (3) it **breaks** the forced-only RK4 ≡ Euler bit-identity
+  (now a tolerance agreement). Realistic Li-ion `k ≈ 1e-8/s` (~2.6 %/month; NOT inflated). Added as
+  an **opt-in third flow** of `build_power` (`self_discharge_params=None` default ⇒ the `BOUNDED_SOC`
+  golden + bit-identity untouched); reuses `BOUNDED_SOC_SCENARIO` verbatim so the leak is the *sole*
+  drift driver. Own behavioral test (`test_power_self_discharge.py`) + own additive **non-frozen**
+  golden (`power_self_discharge_state.json`). Zero core change; seven frozen + two demo + the
+  two-flow Power golden byte-identical.
 
 **`rationed == 0` from kinetics — the sizing discipline (carried from the biosphere).** A *forced
 constant* load can over-draw an empty battery → the Euler backstop fires (Euler-only, allowed, but

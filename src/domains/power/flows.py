@@ -29,16 +29,29 @@ round-trip *equals* η_c (charge is the only joule-losing leg); a realistic char
 ~0.90-round-trip cell — the discharge-side conversion loss is a deferred seam (see
 ``params/charge.yaml``).
 
-**Positivity / ``rationed == 0`` is a sizing discipline, not structural here.** Both
-flows are **forced** (driven by ``env`` power, not first-order in a stock), so a
-constant load *can* over-draw an empty battery → the Euler backstop would fire. The
-standalone validation keeps ``rationed == 0`` by **well-fed sizing** (the battery never
-empties — the Phase-1 "kept non-limiting" pattern), landed with the scenario in Step
-3/4. A
-donor-controlled (first-order-in-SOC) load and a brownout perturbation are documented
-seams. A first-order ``SelfDischarge`` (``battery → waste_heat``, ``k·battery·dt``,
-donor-controlled so it self-limits to 0) is the third, optional flow — added only if it
-earns its keep in the validation scenario.
+  * **SelfDischarge** — ``battery → waste_heat``, the first-order standing leak
+    ``leak = k·battery·dt`` (J). A donor-controlled (first-order-in-SOC) drain: the
+    stored charge slowly bleeds to heat even with no load. **Two legs** (``−leak`` from
+    the battery, ``+leak`` to ``waste_heat``) balance ENERGY exactly (``−leak + leak =
+    0``); a real cell's shelf-loss, textbook. Unlike the two forced flows this reads a
+    **stock**, so it is the Power domain's **first donor-controlled flow** — see below.
+
+**Positivity: ``SelfDischarge``'s leg is structural, ``LoadDraw``'s is not.** The two
+forced flows (``SolarCharge``/``LoadDraw``) are driven by ``env`` power, not by a stock,
+so a constant load *can* over-draw an empty battery → the Euler backstop would fire; the
+standalone validation keeps ``LoadDraw``'s positivity by **well-fed sizing** (the
+battery never empties — the Phase-1 "kept non-limiting" pattern), landed with the
+scenario in Step 3/4. ``SelfDischarge`` is different: its draw is ``k·battery·dt``, **∝
+the donor's own start-of-step amount**, so it self-limits to 0 as the battery empties —
+positivity is **structural** (``k·dt < 1`` keeps the backstop unfired), the
+``Decomposition`` / ``Grazing`` donor-controlled idiom. It is also the Power domain's
+**first restoring force** (the ``−k·battery`` term): the SOC gains a genuine attractor —
+two runs from different initial SOC **converge** (their difference contracts
+geometrically, ``d_n = d_0·(1 − k·dt)^n``), where the two forced flows alone leave that
+difference constant. Because it reads a stock, it also **breaks the RK4 ≡ Euler
+bit-identity** the forced-only system had (that identity survives only while every flow
+is state-independent). A donor-controlled *load* and a brownout perturbation remain
+documented seams.
 
 Pure stdlib only. Citation: battery charge/round-trip efficiency and the
 electricity-degrades-to-heat first law are textbook (clean-room, cited in
@@ -141,5 +154,69 @@ class LoadDraw:
             legs=(
                 Leg(self.battery, -draw),
                 Leg(self.waste_heat, draw),
+            )
+        )
+
+
+@dataclass(frozen=True)
+class SelfDischargeParams:
+    """Loader-produced self-discharge parameter: the first-order shelf-loss rate.
+
+    A provisional literature-typical placeholder pending the validation gate (see
+    ``params/self_discharge.yaml``). ``self_discharge_rate`` (k, 1/s) ≥ 0: the fraction
+    of stored charge that leaks to heat per second. 0 disables the leak (inert, a valid
+    "ideal cell" — the herbivory "zero rate is valid" precedent); negative is rejected
+    at the loader. Positivity of the flow is structural for ``k·dt < 1``
+    (donor-controlled, ∝ the battery's own amount).
+    """
+
+    # k, self-discharge rate battery → waste_heat (1/s). NOT per-day: Power's natural
+    # time unit is seconds (energy J, power W = J/s), unlike the biosphere's /day.
+    self_discharge_rate: float
+
+
+def self_discharge_flux(battery_joules: float, *, self_discharge_rate: float) -> float:
+    """Instantaneous self-discharge leak ``self_discharge_rate · battery`` (W = J/s).
+
+    First-order donor-controlled (the ``Decomposition`` / ``Grazing`` form), so it → 0
+    as the battery → 0 (positivity is structural). The leaked charge degrades to heat
+    (the :class:`SelfDischarge` flow); a flow multiplies by ``dt`` for the per-step
+    joule increment (the increment-form contract). At ``battery = 0``/``k = 0`` it is 0.
+    """
+    return self_discharge_rate * battery_joules
+
+
+@dataclass(frozen=True)
+class SelfDischarge:
+    """ENERGY flow ``battery → waste_heat`` — the first-order standing leak (P5.5).
+
+    Bleeds ``self_discharge_flux(battery, k)·dt`` of stored charge to heat each step — a
+    real cell's shelf-loss, degrading useful electrical energy to waste heat with no
+    load present. Two legs use the same magnitude ``leak`` ⇒ ENERGY balances exactly
+    (``−leak + leak = 0``). **Donor-controlled** (``leak ∝ battery``, the first Power
+    flow to read a stock), so positivity is structural (``k·dt < 1``) and the SOC gains
+    a restoring force (a stable attractor — two runs from different SOC converge).
+    Because it reads a stock it breaks the forced-only RK4 ≡ Euler bit-identity. ``flux
+    = rate·dt`` is dt-linear (RK4-order-safe, Phase-6-multi-rate-safe).
+    """
+
+    id: FlowId
+    priority: int
+    battery: StockId
+    waste_heat: StockId
+    params: SelfDischargeParams
+
+    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        leak = (
+            self_discharge_flux(
+                snapshot.stocks[self.battery].amount,
+                self_discharge_rate=self.params.self_discharge_rate,
+            )
+            * dt
+        )
+        return FlowResult(
+            legs=(
+                Leg(self.battery, -leak),
+                Leg(self.waste_heat, leak),
             )
         )

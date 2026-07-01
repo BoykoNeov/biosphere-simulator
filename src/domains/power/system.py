@@ -6,7 +6,14 @@ turns the Step-2 stocks/flows into a runnable standalone system: :func:`build_po
 the ``weather_resolver`` analogue), and :func:`run_power` (the stepping driver, the
 ``run_season`` analogue **minus** the annual-reset hook — Power has no phenology).
 
-**What this proves (honest framing).** Both Power flows are *forced*
+**Scope of this framing — the *default two-flow* build.** The claims below (and the RK4
+≡ Euler bit-identity) describe ``build_power``'s **default** system, ``SolarCharge`` +
+``LoadDraw`` only. Passing ``self_discharge_params`` opts a **third, donor-controlled**
+flow in (``SelfDischarge``, P5.5) — that build is *not* forced-only: it has a restoring
+force (an SOC attractor) and RK4 ≢ Euler bit-for-bit. See ``build_power`` and
+``test_power_self_discharge.py``; the two paragraphs below hold for the default build.
+
+**What this proves (honest framing).** Both *default* Power flows are *forced*
 (state-independent), so the system is a daily-balanced **forced linear** accumulator,
 **not** an emergent limit cycle / attractor (there is no restoring force — see
 ``scenario`` for why the load is sized for exact daily balance). The standalone
@@ -24,18 +31,25 @@ never fires and no ENERGY loss-sink is needed. The four mass quantities are abse
 the state ⇒ the conservation gate skips them (``ledger.get → None``); only ENERGY is
 checked.
 
-**RK4 ≡ Euler here, bit-for-bit.** Because the flows are state-independent, every RK4
-stage derivative is identical (``k1 = k2 = k3 = k4``) and the ⅙-combine reproduces
-``k1`` exactly — so integrator choice is the *identity*, not numerical-robustness
-evidence. The validation runs Euler (the locked scheme); the cross-check, if any,
-asserts that identity.
+**RK4 ≡ Euler here, bit-for-bit (default build).** Because the *default* flows are
+state-independent, every RK4 stage derivative is identical (``k1 = k2 = k3 = k4``) and
+the ⅙-combine reproduces ``k1`` exactly — so integrator choice is the *identity*, not
+numerical-robustness evidence. The validation runs Euler (the locked scheme); the
+cross-check, if any, asserts that identity. (The opt-in ``SelfDischarge`` build breaks
+this — its state-dependent leak makes RK4 ≢ Euler, a tolerance agreement instead.)
 
 Pure stdlib only in the spine; the YAML/pint charge param is loaded via ``loader.py``.
 """
 
 import math
 
-from domains.power.flows import ChargeParams, LoadDraw, SolarCharge
+from domains.power.flows import (
+    ChargeParams,
+    LoadDraw,
+    SelfDischarge,
+    SelfDischargeParams,
+    SolarCharge,
+)
 from domains.power.scenario import DEFAULT_POWER_SCENARIO, PowerScenario
 from domains.power.stocks import (
     BATTERY,
@@ -61,20 +75,31 @@ PowerIntegrator = EulerIntegrator | Rk4Integrator
 # ids the Step-2 per-flow tests already use.
 SOLAR_CHARGE: FlowId = FlowId("power.solar_charge")
 LOAD_DRAW: FlowId = FlowId("power.load_draw")
+SELF_DISCHARGE: FlowId = FlowId("power.self_discharge")
 
 
 def build_power(
-    charge_params: ChargeParams, scenario: PowerScenario = DEFAULT_POWER_SCENARIO
+    charge_params: ChargeParams,
+    scenario: PowerScenario = DEFAULT_POWER_SCENARIO,
+    self_discharge_params: SelfDischargeParams | None = None,
 ) -> tuple[State, Registry]:
     """Assemble the standalone Power system's initial ``State`` and flow ``Registry``.
 
     Three stocks — the ``power.battery`` POOL (initial SOC ``scenario.battery0``), the
     unclamped ``boundary.solar_source`` (cumulative supply bookkeeping, starts 0), and
     the ``boundary.waste_heat`` monotonic sink (starts 0) — and the two energy-balanced
-    flows ``SolarCharge`` (3-leg, heat-named, carrying the loaded η_c) + ``LoadDraw``
-    (2-leg dissipative). **No loss-sinks** (no POPULATION stock; see the module
-    docstring). The ``Registry`` re-sorts flows by id, so the build order is inert
-    (registration-order independence).
+    forced flows ``SolarCharge`` (3-leg, heat-named, carrying the loaded η_c) +
+    ``LoadDraw`` (2-leg dissipative). **No loss-sinks** (no POPULATION stock; see the
+    module docstring). The ``Registry`` re-sorts flows by id, so the build order is
+    inert (registration-order independence).
+
+    ``self_discharge_params`` is an **opt-in third flow** (default ``None`` ⇒ omitted).
+    When supplied, a donor-controlled ``SelfDischarge`` (``battery → waste_heat``,
+    ``k·battery·dt``) is added — the first-order standing leak (P5.5). Leaving it
+    ``None`` keeps the two-forced-flow system bit-identical (the ``BOUNDED_SOC`` golden
+    + the RK4 ≡ Euler bit-identity unchanged); adding it introduces the domain's first
+    restoring force and breaks that bit-identity (a tolerance-agreement instead) —
+    validated by the separate ``SELF_DISCHARGE`` scenario, not this default one.
     """
     battery = battery_stock(scenario.battery0)
     solar_source = boundary.source(SOLAR_SOURCE, Quantity.ENERGY, 0.0)
@@ -92,6 +117,16 @@ def build_power(
         ),
         LoadDraw(LOAD_DRAW, 0, battery=BATTERY, waste_heat=WASTE_HEAT),
     ]
+    if self_discharge_params is not None:
+        flows.append(
+            SelfDischarge(
+                SELF_DISCHARGE,
+                0,
+                battery=BATTERY,
+                waste_heat=WASTE_HEAT,
+                params=self_discharge_params,
+            )
+        )
     return state, Registry(flows, stocks)
 
 

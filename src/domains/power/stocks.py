@@ -14,8 +14,10 @@ across two of its quantities — see ``docs/plans/phase-5-sibling-domains.md`` P
     negative-going amount is cumulative supply bookkeeping. *Nuclear/grid input is the
     same shape with a flat schedule — a documented seam, not built.*
   * ``boundary.waste_heat`` — **BOUNDARY sink**, *thermal* energy: receives every
-    degraded joule (the charge-conversion loss, the dissipative load). Never withdrawn
-    from, so it is **monotonic by construction** ⇒ a free *heat-generated* diagnostic
+    degraded joule (the charge-conversion loss, the dissipative load, and — when the
+    opt-in ``SelfDischarge`` flow is present, P5.5 — the standing self-discharge leak).
+    Never withdrawn from, so it is **monotonic by construction** ⇒ a free
+    *heat-generated* diagnostic
     (the "usefulness is not conserved" accumulator, roadmap line 50). This is the **seam
     the Thermal sibling later moves inward** into a real heat stock + radiator rejection
     — the water-cycle-closure analogue for energy.

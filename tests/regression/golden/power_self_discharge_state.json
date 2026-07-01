@@ -1,0 +1,47 @@
+{
+  "aux": {},
+  "n": 336,
+  "rng_seed": "0x0",
+  "stocks": [
+    {
+      "amount": "-0x1.6d1761748065ep+28",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.solar_source",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": true,
+      "unit": "J"
+    },
+    {
+      "amount": "0x1.6d50808d0e758p+28",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.waste_heat",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": false,
+      "unit": "J"
+    },
+    {
+      "amount": "0x1.2d9b0e771f0f9p+24",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "power",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "power.battery",
+      "kind": "pool",
+      "quantity": "energy",
+      "unclamped": false,
+      "unit": "J"
+    }
+  ],
+  "version": 3
+}

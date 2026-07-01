@@ -9,7 +9,11 @@ sizing / forcing-shape wiring for the standalone validation run that
 are **forced** (``SolarCharge``/``LoadDraw`` read ``env`` power × dt; neither depends on
 a stock amount), so the battery SOC is a *pure accumulation* of the forcing sequence —
 ``battery(n) = battery0 + dt·Σ(η_c·solar(k) − load)``. There is **no restoring force /
-no attractor** (unlike the biosphere's nonlinearly-damped limit cycle). So a *bounded*,
+no attractor** (unlike the biosphere's nonlinearly-damped limit cycle) — *as long as
+this scenario drives only the two forced flows.* (The opt-in ``SelfDischarge`` flow,
+P5.5, adds a ``−k·battery`` restoring term; the self-discharge run reuses this scenario
+verbatim, so this "forced accumulator" derivation is specifically the load-balancing
+argument for the **two-flow** ``BOUNDED_SOC`` build.) So a *bounded*,
 day-periodic SOC requires the daily charge and discharge to **balance exactly**: any
 net daily imbalance drifts SOC linearly and unboundedly. We therefore do **not** store
 a hand-tuned ``load_w`` (which would balance only by comment, and break silently if the
@@ -81,3 +85,14 @@ DEFAULT_POWER_SCENARIO: PowerScenario = PowerScenario()
 # drift on the sizing. Run ``BOUNDED_SOC_DAYS`` days.
 BOUNDED_SOC_SCENARIO: PowerScenario = DEFAULT_POWER_SCENARIO
 BOUNDED_SOC_DAYS: int = 7
+
+# The self-discharge validation horizon (P5.5). The self-discharge run reuses
+# ``BOUNDED_SOC_SCENARIO`` **verbatim** (same daily-balanced forced flows) and merely
+# opts the donor-controlled ``SelfDischarge`` flow in via ``build_power`` — so the leak
+# is the **sole** driver of any departure from the balanced baseline (which returns to
+# ``battery0`` each day). It is not a new ``PowerScenario`` (no data differs); only the
+# horizon does. 14 days lets the realistic ~2.6 %/month leak decay the SOC ~1 % below
+# ``battery0`` — well above round-off (so "the leak bit" is unambiguous), far from empty
+# (so ``rationed == 0`` holds). The attractor/restoring-force property itself is proved
+# magnitude-independently by the two-run contraction test, not by this horizon's shape.
+SELF_DISCHARGE_DAYS: int = 14

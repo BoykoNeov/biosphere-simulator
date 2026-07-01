@@ -141,9 +141,32 @@ pinned-State + separate-behavioral division; no drift-summary analogue needed). 
 bit-stability only (`math.sin` transcendental caveat). **Zero core change** (`git diff src/simcore/`
 empty); full suite incl. `-m slow` + ruff + pyright green (**1069 passed**); **seven frozen + two
 demo goldens byte-identical** (no regen). **The standalone Power domain (P5.2–P5.4) is now
-complete.** **Next: Step 5** — the forward-pointer siblings (Thermal / Atmosphere-ECLSS / Crew),
-each designed just-in-time. `SelfDischarge` deferred (optional). Cross-domain coupling is
-**Phase 6**.
+complete.**
+**P5.5 COMPLETE — `SelfDischarge`, the first donor-controlled Power flow (it earned its
+keep)** (an add-on to the standalone Power domain, not a renumbered plan step): `battery →
+waste_heat`, first-order `leak = k·battery·dt` (2-leg, ENERGY-balanced), an
+**opt-in third flow** of `build_power` (`self_discharge_params: SelfDischargeParams | None = None`;
+default `None` ⇒ the two-flow `BOUNDED_SOC` golden + RK4≡Euler bit-identity **untouched**). Reuses
+`BOUNDED_SOC_SCENARIO` **verbatim** (`SELF_DISCHARGE_DAYS=14`) so the leak is the *sole* driver of
+departure from the daily-balanced baseline (which returns to `battery0`; the leaky run monotone-
+decays below it). New `params/self_discharge.yaml` (`self_discharge_rate` k, unit `1/s`, `k ≥ 0`,
+realistic Li-ion `1e-8/s` ≈ 2.6 %/month — **NOT inflated**; loader reuses the generic
+`_ValueUnitSource`). **Why it earns its keep** (the plan gates SelfDischarge on this): unlike the
+two *forced* flows it reads a **stock**, so (1) `rationed==0` is structural for *its own* leg
+(`k·dt<1`; LoadDraw still leans on sizing — not overclaimed), (2) it is the domain's **first
+restoring force** → a stable SOC attractor, proved **magnitude-independently** by a two-run
+**contraction test** (`d_n = d_0·(1−k·dt)^n` exactly to fp tol; forced-only keeps `d_n` constant —
+the clean distinguisher), and (3) it **breaks** the forced-only RK4≡Euler bit-identity (now a
+tolerance agreement). Energy still closed every step (the leak is `−leak+leak=0`); heat still
+monotonic. Tests: SelfDischarge flow unit tests + self-discharge loader in `test_power_flows.py`;
+behavioral `test_power_self_discharge.py` (contraction, forced-only contrast, baseline isolation,
+closure, broken bit-identity); additive **non-frozen** golden `test_regression_power_self_discharge`
++ `power_self_discharge_state.json` (pre-golden gate: `rationed==0`, ENERGY closed, SOC *departs*
+`battery0` — the "it bit" check; **not** the two-flow golden's "returns to `battery0`"). **Zero core
+change** (`git diff src/simcore/` empty); full suite incl. `-m slow` + ruff + pyright green
+(**1093 passed**); **seven frozen + two demo + the two-flow Power golden byte-identical** (no regen).
+**Next: Step 5** — the forward-pointer siblings (Thermal / Atmosphere-ECLSS / Crew), each designed
+just-in-time. Cross-domain coupling is **Phase 6**.
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

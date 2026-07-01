@@ -28,8 +28,16 @@ from pathlib import Path
 
 import pytest
 
-from domains.power.flows import ChargeParams, LoadDraw, SolarCharge, charge_split
-from domains.power.loader import load_charge_params
+from domains.power.flows import (
+    ChargeParams,
+    LoadDraw,
+    SelfDischarge,
+    SelfDischargeParams,
+    SolarCharge,
+    charge_split,
+    self_discharge_flux,
+)
+from domains.power.loader import load_charge_params, load_self_discharge_params
 from domains.power.stocks import (
     BATTERY,
     LOAD_POWER_VAR,
@@ -86,6 +94,16 @@ def _solar_charge(eta: float = 0.95) -> SolarCharge:
 def _load_draw() -> LoadDraw:
     return LoadDraw(
         FlowId("power.load_draw"), 0, battery=BATTERY, waste_heat=WASTE_HEAT
+    )
+
+
+def _self_discharge(k: float = 1.0e-8) -> SelfDischarge:
+    return SelfDischarge(
+        FlowId("power.self_discharge"),
+        0,
+        battery=BATTERY,
+        waste_heat=WASTE_HEAT,
+        params=SelfDischargeParams(self_discharge_rate=k),
     )
 
 
@@ -241,6 +259,71 @@ def test_load_draw_is_dt_linear() -> None:
     assert math.isclose(full[WASTE_HEAT], 2.0 * half[WASTE_HEAT], rel_tol=1e-12)
 
 
+# --- SelfDischarge (P5.5): the first donor-controlled Power flow ---------------------
+def test_self_discharge_flux_is_first_order_donor_controlled() -> None:
+    # leak = k · battery — proportional to the donor's own amount (the Decomposition /
+    # Grazing form), so it self-limits as the battery empties.
+    assert math.isclose(
+        self_discharge_flux(1_000.0, self_discharge_rate=1.0e-8),
+        1.0e-5,
+        rel_tol=1e-12,
+    )
+
+
+def test_self_discharge_flux_zero_at_empty_battery() -> None:
+    # battery = 0 ⇒ leak 0 (structural positivity: the draw vanishes as the donor does).
+    assert self_discharge_flux(0.0, self_discharge_rate=1.0e-8) == 0.0
+
+
+def test_self_discharge_flux_zero_at_zero_rate() -> None:
+    # k = 0 ⇒ leak 0 (an ideal leak-free cell — inert machinery, the "zero rate" case).
+    assert self_discharge_flux(1_000.0, self_discharge_rate=0.0) == 0.0
+
+
+def test_self_discharge_leaks_battery_to_heat() -> None:
+    # Two legs: leak = k·battery·dt leaves the battery (−leak), lands as heat (+leak).
+    state = _state(battery=1_000.0)
+    legs = {
+        leg.stock: leg.amount
+        for leg in _self_discharge(1.0e-8).evaluate(state, _env(state, 1.0), 1.0).legs
+    }
+    assert set(legs) == {BATTERY, WASTE_HEAT}
+    assert math.isclose(legs[BATTERY], -1.0e-5, rel_tol=1e-12)  # k·battery·dt withdrawn
+    assert math.isclose(legs[WASTE_HEAT], 1.0e-5, rel_tol=1e-12)  # degraded to heat
+
+
+def test_self_discharge_balances_energy_only() -> None:
+    # A single magnitude in both legs ⇒ ENERGY balances exactly; no other quantity hit.
+    state = _state(battery=1_000.0)
+    result = _self_discharge(1.0e-8).evaluate(state, _env(state, 1.0), 1.0)
+    assert_flow_balanced(result, state.stocks)
+    assert set(per_quantity_residual(result, state.stocks)) == {Quantity.ENERGY}
+
+
+def test_self_discharge_two_legs() -> None:
+    # Always two legs (battery → waste_heat) — no source==sink netting, unlike the 3-leg
+    # SolarCharge; at battery 0 the two legs are still emitted (both zero-amount).
+    for battery in (1_000.0, 0.0):
+        state = _state(battery=battery)
+        legs = _self_discharge(1.0e-8).evaluate(state, _env(state, 1.0), 1.0).legs
+        assert len(legs) == 2
+
+
+def test_self_discharge_is_dt_linear() -> None:
+    # flux = rate·dt — the increment-form contract (RK4 order; Phase-6 multi-rate-safe).
+    # Evaluated on the SAME snapshot, so the leak scales linearly in dt.
+    state = _state(battery=1_000.0)
+    half = {
+        leg.stock: leg.amount
+        for leg in _self_discharge(1.0e-8).evaluate(state, _env(state, 0.5), 0.5).legs
+    }
+    full = {
+        leg.stock: leg.amount
+        for leg in _self_discharge(1.0e-8).evaluate(state, _env(state, 1.0), 1.0).legs
+    }
+    assert math.isclose(full[WASTE_HEAT], 2.0 * half[WASTE_HEAT], rel_tol=1e-12)
+
+
 # --- loader ------------------------------------------------------------------
 def test_loader_reads_committed_efficiency() -> None:
     assert load_charge_params().charge_efficiency == 0.95
@@ -272,3 +355,44 @@ def test_loader_rejects_above_one_efficiency(tmp_path: Path) -> None:
 def test_loader_rejects_bad_unit(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="must be declared in"):
         load_charge_params(_write_charge(tmp_path, value=0.95, unit="J"))
+
+
+# --- self-discharge loader (P5.5) ----------------------------------------------------
+def test_loader_reads_committed_self_discharge_rate() -> None:
+    assert load_self_discharge_params().self_discharge_rate == 1.0e-8
+
+
+def _write_self_discharge(tmp_path: Path, *, value: float, unit: str = "1/s") -> Path:
+    bad = tmp_path / "self_discharge.yaml"
+    bad.write_text(
+        "name: power\nprocess: self_discharge\nparameters:\n"
+        f"  self_discharge_rate:\n    value: {value}\n    unit: {unit!r}\n"
+        '    source: "test"\n',
+        encoding="utf-8",
+    )
+    return bad
+
+
+def test_loader_accepts_zero_self_discharge_rate(tmp_path: Path) -> None:
+    # 0 = an ideal leak-free cell (inert machinery) — valid, the herbivory "zero rate"
+    # precedent (>= 0 is the bound, unlike the strictly-positive efficiency).
+    assert (
+        load_self_discharge_params(
+            _write_self_discharge(tmp_path, value=0.0)
+        ).self_discharge_rate
+        == 0.0
+    )
+
+
+def test_loader_rejects_negative_self_discharge_rate(tmp_path: Path) -> None:
+    # < 0 would CREATE energy on the leak.
+    with pytest.raises(ValueError, match="self_discharge_rate must be >= 0"):
+        load_self_discharge_params(_write_self_discharge(tmp_path, value=-1.0e-8))
+
+
+def test_loader_rejects_bad_self_discharge_unit(tmp_path: Path) -> None:
+    # Per-second is the exact-guarded unit (Power's natural time unit); /day rejected.
+    with pytest.raises(ValueError, match="must be declared in"):
+        load_self_discharge_params(
+            _write_self_discharge(tmp_path, value=1.0e-8, unit="1/day")
+        )
