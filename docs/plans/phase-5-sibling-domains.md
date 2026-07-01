@@ -1,9 +1,25 @@
 # Phase 5 — Sibling Domains (Power first; energy joins the conserved set)
 
-**Status: IN PROGRESS — Steps 1–3 COMPLETE.** The load-bearing decision (energy closure, P5.1)
-and the standalone Power domain (P5.2) are designed in full and advisor-reviewed below; Thermal /
-Atmosphere-ECLSS / Crew are forward-pointers, each to be designed just-in-time (the Phase-1/2/3/4
-rhythm). **Step 1 (P5.1a) — the isolated ENERGY-assert flip — is DONE** (ENERGY joined
+**Status: IN PROGRESS — Steps 1–4 (Power) + Step 5 (Thermal) COMPLETE; Atmosphere-ECLSS / Crew
+remain forward-pointers.** The load-bearing decision (energy closure, P5.1) and the standalone
+Power domain (P5.2–P5.5) are designed in full and advisor-reviewed below; **Thermal is now the
+second complete standalone sibling** (Step 5 — full design in the "Step 5 — full design" section
+below; advisor-reviewed before any code). Atmosphere-ECLSS / Crew are forward-pointers, each to be
+designed just-in-time (the Phase-1/2/3/4 rhythm).
+
+**Step 5 (Thermal) — COMPLETE.** New `src/domains/thermal/` (zero core change): a forced heat input
+→ an in-system thermal node (POOL, sensible heat J with a **derived temperature** `T = T_space +
+Q/C`) → a **nonlinear Stefan-Boltzmann radiator** (`R = εσA(T⁴ − T_space⁴)·dt`) rejecting to the
+**permanent** `boundary.space`. The genuinely-new machinery over Power (temperature, heat capacity,
+a nonlinear restoring force) yields a **real emergent equilibrium temperature** `T_eq` — a genuine
+attractor, unlike Power's *constructed* daily balance. The load-bearing implementation constraint
+(advisor): T⁴ trades `SelfDischarge`'s clean structural positivity for **sizing-dependent** positivity
+— structural at the floor (`R → 0` as `Q → 0`, the node referenced to `T_space`) + `τ = C/(4εσA·T_eq³)
+>> dt` near equilibrium (`rationed == 0` the `LoadDraw` way). 39 tests (22 flow + 15 run + 2 golden);
+additive **NON-frozen** golden. `boundary.space` is a permanent boundary Thermal cannot move inward —
+**Phase 6 rewires Power's dissipation legs to feed `thermal.node`** (standalone builds the receiver).
+Zero core change (`git diff src/simcore/` empty); full suite (incl. `-m slow`) + ruff + pyright green
+(**1132 passed**); seven frozen + two demo + two Power goldens byte-identical (no regen). **Step 1 (P5.1a) — the isolated ENERGY-assert flip — is DONE** (ENERGY joined
 `ASSERTED_QUANTITIES`, proven inert; a follow-up swept the last stale decision-#8 prose so the
 Power commit's `git diff src/simcore/` is empty). **Step 2 (P5.2 core) — the standalone Power
 flows — is DONE** (new `src/domains/power/`: `power.battery` POOL + `boundary.solar_source`/
@@ -396,12 +412,35 @@ cross-domain bug cannot hide in a standalone green.
    exact tolerances). Step 3 already landed the behavioral assertions; Step 4 adds only the pinned
    golden + regen. **Zero core change**; full suite (incl. `-m slow`) + ruff + pyright green (1069
    passed); seven frozen + two demo goldens byte-identical.
-5. **(Forward-pointer) Thermal / Atmosphere-ECLSS / Crew** — each a sibling domain on the same
-   pattern, designed just-in-time:
-   - **Thermal** — heat **stocks**, conduction, radiator rejection. **Moves Power's `waste_heat`
-     BOUNDARY inward** into a real heat stock (the water-cycle-closure analogue for energy). "Every
-     electrical sink names its heat output" is already enforced by P5.1(b); Thermal gives the heat
-     somewhere in-system to go.
+5. **Thermal (COMPLETE)** — the second sibling domain, designed just-in-time (full design below).
+   New `src/domains/thermal/` (zero core change): `thermal.node` POOL (sensible heat J, referenced
+   to `T_space` so `Q = C·(T − T_space) ≥ 0`) + `boundary.heat_source` (unclamped) +
+   `boundary.space` (monotonic sink). Flows: **`HeatInput`** (2-leg forced, `heat_source → node`,
+   heat→heat lossless — no charge-loss leg unlike Power's `SolarCharge`) + **`RadiatorReject`**
+   (2-leg **donor-controlled nonlinear** Stefan-Boltzmann `R = εσA(T⁴ − T_space⁴)·dt`,
+   `node → boundary.space`). `radiator.yaml` (ε / area / heat-capacity / T_space; σ is a CODATA
+   module constant, **not** a param). The genuinely-new machinery over Power: **temperature**
+   (`T = T_space + Q/C`, a derived readout — not a stock/aux), **heat capacity**, and a **nonlinear
+   restoring force** → a *real* **emergent equilibrium temperature** `T_eq` (a genuine attractor,
+   vs Power's *constructed* daily balance). Positivity is **structural at the floor** (`R → 0` as
+   `Q → 0`) and **by sizing near equilibrium** (`τ = C/(4εσA·T_eq³) >> dt` — the load-bearing
+   constraint, `rationed == 0` the `LoadDraw` way, not a structural `k·dt < 1` claim). Resolver is a
+   plain constant `heat_load` (the radiator is the balance — **no** derived load, unlike Power's
+   `balanced_load_w`). Validation (`EQUILIBRIUM_SCENARIO`, cold node warming to `T_eq ≈ 280.9 K`,
+   τ ≈ 65 steps, 720-step / ~11τ horizon): ENERGY conserved every step, `rationed == 0`,
+   `events == ()`, monotonic `space` sink, **T converges to `T_eq`**, **two-run monotone
+   contraction** (nonlinear, not geometric — the no-radiator contrast keeps the difference
+   *constant*), **RK4 ≢ Euler** (tolerance agreement — nonlinear donor-controlled), determinism,
+   registration-order independence. Additive **NON-frozen** golden (`thermal_state.json` +
+   pre-golden gate = ENERGY closed / `rationed == 0` / **reached equilibrium**). **`boundary.space`
+   is a permanent, true boundary** — heat leaves to deep space forever; standalone Thermal does NOT
+   "close" anything (unlike Phase-3 water). Power's `waste_heat` was a *temporary seam*; Thermal
+   reveals the "somewhere" = an in-system node + radiator, and **Phase 6 rewires Power's dissipation
+   legs to feed `thermal.node`** (the inward move — a Phase-6 wiring act; standalone builds the
+   *receiver*). Zero core change (`git diff src/simcore/` empty); seven frozen + two demo + two Power
+   goldens byte-identical.
+6. **(Forward-pointer) Atmosphere-ECLSS / Crew** — each a sibling domain on the same pattern,
+   designed just-in-time:
    - **Atmosphere / ECLSS** — O₂, CO₂, water vapor, pressure; mixing, scrubbing, condensation. Pure
      mass-quantity domain (no new core decision — reuses the frozen mass machinery).
    - **Crew** — O₂ intake, CO₂ output, water/food consumption, waste; **forced schedules at first**
@@ -440,6 +479,70 @@ proven-conserved energy ledger.*
   byte-identical; the demo's conservation test strengthens (now covers ENERGY) and stays green.
 - **The full suite is the empirical proof**, not the reasoning alone (the advisor's blocker, closed).
 
+## Step 5 — full design: the Thermal sibling domain (COMPLETE)
+
+*The second standalone sibling, designed just-in-time and advisor-reviewed before any code (the
+Phase-1/2/3/4 rhythm). Thermal is the domain that reveals **where Power's `waste_heat` "somewhere"
+actually is** — it builds the in-system receiver (a thermal node + a radiator) that Phase 6 wires
+Power's dissipation into. Scoped to Thermal **alone** (a P5.2–P5.5-sized effort); Atmosphere-ECLSS /
+Crew stay forward-pointers.*
+
+### The load-bearing design fork — the radiation law (advisor-decided: T⁴, not linear)
+
+A linear rejection `R = k·node` would be `SelfDischarge` with the sink renamed — **no new content**.
+The **Stefan-Boltzmann `R = εσA(T⁴ − T_space⁴)`** law is (i) the physically correct rejection mode in
+**vacuum** (radiation is the *only* mode with no medium), and (ii) genuinely-new machinery:
+**temperature** (`T = T_space + Q/C`, the first non-J derived readout — a pure function of the node
+amount, computed at evaluate-time, **not** a stock/aux/ledger entry), a **heat capacity**, and a
+**nonlinear restoring force**. It yields a **real emergent equilibrium temperature** `T_eq` where
+`εσA(T_eq⁴ − T_space⁴) = heat_load` — a *genuine* attractor, contrast Power's `BOUNDED_SOC` whose
+boundedness was *constructed* by an exactly-balanced derived load. Because the radiator **is** the
+restoring force, **any** constant `heat_load` lands at a unique stable `T_eq`, so the resolver is a
+plain constant — **no** `balanced_load_w` analogue (the one place Power had to derive its load).
+
+### The three T⁴ consequences the Power/SelfDischarge pattern-match would miss (advisor)
+
+1. **Positivity is NOT structural like `k·dt < 1`.** Radiated ∝ `T⁴`, not ∝ `Q`, so there is no
+   single-param guarantee. Two parts: (a) **at the floor — structural**: the node is **referenced to
+   `T_space`** (`Q = C·(T − T_space) ≥ 0`), so `R → 0` as `Q → 0` (the `T⁴ − T_space⁴` term vanishes)
+   and the radiator cannot pull `Q` negative (a *warm* reference would break this); (b) **near
+   equilibrium — by sizing**: the real risk is **Euler overshoot**, so the relaxation time
+   `τ = C/(4εσA·T_eq³)` must be `>> dt`. The scenario sizes the heat capacity `C` so `τ/dt` is tens of
+   steps (`τ ≈ 65` steps at `dt = 3600 s`). `rationed == 0` holds **by sizing** (framed like Power's
+   `LoadDraw`), **not** by a structural claim like `SelfDischarge`. **This is the load-bearing
+   implementation constraint — `τ >> dt` was nailed before capturing the golden.**
+2. **Contraction is monotone, not geometric.** `SelfDischarge`'s exact `d_n = d_0·(1−k·dt)^n` is a
+   *linear* law; `T⁴` is nonlinear, so two runs' difference contracts **monotonically** (asymptotically
+   geometric near `T_eq`). The test asserts monotone contraction + strong final shrinkage, **not** the
+   exact formula. The no-radiator contrast (forced `HeatInput` alone keeps the difference *constant*)
+   isolates the radiator as the restoring force.
+3. **`boundary.space` is a permanent, true boundary — standalone Thermal closes nothing.** Heat leaves
+   to deep space **forever** (you cannot move *that* inward). Power's `waste_heat` was a *temporary
+   seam*; Thermal reveals the "somewhere" = an in-system thermal POOL + a radiator to the permanent
+   space boundary. The inward move is a **Phase-6 wiring act** (rewire Power's dissipation legs to feed
+   `thermal.node`); standalone Thermal builds the *receiver*. "Closed" is decision #13's *augmented*
+   sense (node + boundary reservoirs balance every step, even though heat physically leaves).
+
+### Deliverables (all additive; zero core change)
+- **`src/domains/thermal/`** — `stocks.py` (`thermal.node` POOL + `boundary.heat_source` +
+  `boundary.space`), `flows.py` (`HeatInput` 2-leg forced + `RadiatorReject` 2-leg donor-controlled;
+  `temperature` / `radiated_power` rate laws; **`STEFAN_BOLTZMANN` σ as a CODATA module constant** —
+  a universal physical constant with provenance, the `drift.py` "documented constant, not YAML"
+  discipline, **not** a param), `loader.py` + `params/radiator.yaml` (ε / radiator_area / heat_capacity
+  / space_temperature — exact-string unit-guarded, absolute **K** for the T⁴ law), `scenario.py`
+  (`EQUILIBRIUM_SCENARIO` — cold node, constant `heat_load`, sized `τ >> dt`), `system.py`
+  (`build_thermal` / `thermal_resolver` / `run_thermal` + closed-form `equilibrium_temperature` /
+  `relaxation_time`).
+- **Tests (39):** `test_thermal_flows.py` (22 — rate laws, leg balance, dt-linearity, floor self-limit,
+  loader bounds/units), `test_thermal_run.py` (15 — ENERGY conserved every step, `rationed == 0`,
+  `events == ()`, `τ >> dt`, emergent `T_eq` + balance identity, monotone warming, two-run contraction
+  + no-radiator contrast, monotonic `space` sink, determinism, **RK4 ≢ Euler tolerance agreement**,
+  registration-order independence), `test_regression_thermal.py` (2 — additive **NON-frozen** golden
+  `thermal_state.json` with a pre-golden gate: ENERGY closed / `rationed == 0` / **reached
+  equilibrium** — an unconverged/imbalanced run is unpinnable).
+- **Acceptance (met):** `git diff src/simcore/` empty; full suite (incl. `-m slow`) + ruff + pyright
+  green (1132 passed); seven frozen + two demo + two Power goldens byte-identical (no regen).
+
 ## Exit criteria (Phase 5 — "the engine carries more than biology")
 - **`ENERGY` is a conserved, every-step-asserted quantity** with explicit heat closure; the flip is
   proven inert for all existing runs (7 frozen + 2 demo goldens byte-identical; full suite green).
@@ -451,6 +554,9 @@ proven-conserved energy ledger.*
 - `git diff src/simcore/` limited to the **one sanctioned** `ASSERTED_QUANTITIES` flip (+ stale-
   comment cleanup); the **biosphere-frozen surface is untouched** (no unfreeze).
 - Full suite green; ruff + pyright clean.
-- **Thermal / Atmosphere-ECLSS / Crew** remain forward-pointers, each designed just-in-time when
-  reached — Thermal moving Power's `waste_heat` BOUNDARY inward (the energy analogue of the
-  water-cycle closure). **Cross-domain coupling is Phase 6.**
+- **Thermal is COMPLETE** — a standalone sibling that passes conservation + determinism alone
+  (emergent equilibrium temperature, `rationed == 0` by `τ >> dt` sizing, monotone contraction,
+  RK4 ≢ Euler tolerance agreement, a hex-float golden). It builds the in-system receiver for Power's
+  heat; **Phase 6 moves the `waste_heat` BOUNDARY inward** by rewiring Power's dissipation legs into
+  `thermal.node` (the energy analogue of the water-cycle closure). **Atmosphere-ECLSS / Crew** remain
+  forward-pointers, each designed just-in-time when reached. **Cross-domain coupling is Phase 6.**

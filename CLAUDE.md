@@ -165,7 +165,33 @@ closure, broken bit-identity); additive **non-frozen** golden `test_regression_p
 `battery0` — the "it bit" check; **not** the two-flow golden's "returns to `battery0`"). **Zero core
 change** (`git diff src/simcore/` empty); full suite incl. `-m slow` + ruff + pyright green
 (**1093 passed**); **seven frozen + two demo + the two-flow Power golden byte-identical** (no regen).
-**Next: Step 5** — the forward-pointer siblings (Thermal / Atmosphere-ECLSS / Crew), each designed
+**Step 5 (Thermal) COMPLETE — the second standalone sibling; the first nonlinear attractor + the
+receiver Phase 6 moves Power's `waste_heat` into**: new `src/domains/thermal/` (zero core change) —
+`thermal.node` POOL (sensible heat J, **referenced to `T_space`** so `Q = C·(T − T_space) ≥ 0`) +
+`boundary.heat_source` (unclamped) + `boundary.space` (monotonic sink). Flows: **`HeatInput`**
+(2-leg forced, heat→heat lossless — no charge-loss leg unlike `SolarCharge`) + **`RadiatorReject`**
+(2-leg **donor-controlled nonlinear** Stefan-Boltzmann `R = εσA(T⁴ − T_space⁴)·dt`). `radiator.yaml`
+(ε / radiator_area / heat_capacity / space_temperature, exact-string K-guarded; **σ is a CODATA
+module constant, NOT a param** — a universal physical constant with provenance, the `drift.py`
+discipline). Genuinely-new machinery over Power: **temperature** (`T = T_space + Q/C`, a derived
+evaluate-time readout — **not** a stock/aux/ledger entry), **heat capacity**, and a **nonlinear
+restoring force** → a *real* **emergent equilibrium temperature** `T_eq ≈ 280.9 K` (a genuine
+attractor, vs Power's *constructed* daily balance). **The load-bearing constraint (advisor): T⁴
+trades `SelfDischarge`'s structural `k·dt<1` positivity for sizing-dependent positivity** — structural
+at the floor (`R → 0` as `Q → 0`, the `T_space` reference) + `τ = C/(4εσA·T_eq³) >> dt` near
+equilibrium (`τ ≈ 65` steps; `rationed == 0` the `LoadDraw` way, **not** structural). Resolver is a
+plain constant `heat_load` — **no** `balanced_load_w` (the radiator IS the balance). 39 tests (22
+flow + 15 run + 2 golden): ENERGY conserved every step, `rationed == 0`, `events == ()`, monotonic
+`space` sink, **T converges to `T_eq`**, **two-run monotone contraction** (nonlinear, not geometric;
+no-radiator contrast keeps the difference constant), **RK4 ≢ Euler** (tolerance agreement),
+determinism, registration-order independence; additive **NON-frozen** golden `thermal_state.json`
+(pre-golden gate: ENERGY closed / `rationed == 0` / **reached equilibrium**). **`boundary.space` is a
+permanent, true boundary — standalone Thermal closes nothing** (heat leaves to deep space forever,
+unlike Phase-3 water); **Phase 6 rewires Power's dissipation legs to feed `thermal.node`** (the inward
+move — standalone builds the receiver). **Zero core change** (`git diff src/simcore/` empty); full
+suite incl. `-m slow` + ruff + pyright green (**1132 passed**); **seven frozen + two demo + two Power
+goldens byte-identical** (no regen).
+**Next: Step 6** — the remaining forward-pointer siblings (Atmosphere-ECLSS / Crew), each designed
 just-in-time. Cross-domain coupling is **Phase 6**.
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 

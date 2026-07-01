@@ -1,0 +1,75 @@
+# thermal — radiator + node thermal properties (Phase 5, Step 5)
+# Currency/units: ENERGY (J). The coefficients the Thermal core introduces.
+#
+# The standalone Thermal domain rejects heat from an in-system node (thermal.node) to the
+# permanent deep-space boundary via the Stefan-Boltzmann grey-body law:
+#     R = ε·σ·A·(T⁴ − T_space⁴)      (W),   T = T_space + Q/C      (K)
+# where Q = node sensible heat (J) and σ is the CODATA physical constant (NOT a param —
+# it is fixed by physics; see thermal/flows.py STEFAN_BOLTZMANN). The four coefficients
+# below are the tunable radiative + thermal-mass properties.
+#
+# emissivity (ε) — grey-body emissivity of the radiator surface (dimensionless), ∈ (0, 1]:
+#   1 = a perfect black body; real radiator coatings ~0.8-0.9. The fraction of the
+#   black-body flux the surface actually radiates. Rejected: 0 (radiates nothing — no
+#   rejection path) and out-of-range.
+#
+# radiator_area (A) — radiating area (m²), > 0. Sizing of the radiator panel.
+#
+# heat_capacity (C) — the node's total heat capacity (J/K), > 0: thermal mass × specific
+#   heat. Sets the temperature readout T = T_space + Q/C AND the relaxation time
+#   τ = C/(4εσA·T_eq³). LOAD-BEARING: C is sized so τ >> dt (here τ ≈ 65 steps at
+#   dt = 3600 s) — the well-fed sizing that keeps Euler from overshooting the nonlinear
+#   radiator (rationed == 0). C = 1e7 J/K ≈ 2.4 t of water-equivalent thermal mass
+#   (station structure + coolant + water stores) — illustrative, not calibrated.
+#
+# space_temperature (T_space) — the radiative sink temperature (K), >= 0: deep space /
+#   CMB ≈ 2.7 K. Also the node's REFERENCE: Q = C·(T − T_space) >= 0, which puts the
+#   stock floor (Q = 0) at T = T_space where the radiator's (T⁴ − T_space⁴) term is
+#   exactly 0 — so radiation self-limits at the floor (structural positivity there).
+#
+# Absolute Kelvin (NOT degC): the Stefan-Boltzmann law is in absolute temperature (T⁴),
+#   unlike the biosphere's degC kinetics — documented, exact-string guarded at the loader.
+#
+# Emergent (NOT a param): the equilibrium temperature T_eq solves
+#   ε·σ·A·(T_eq⁴ − T_space⁴) = heat_load — with these params + heat_load 3000 W,
+#   T_eq ≈ 280.9 K. It is computed (system.equilibrium_temperature), never stored: the
+#   radiator IS the restoring force, so any constant load has a unique stable T_eq (no
+#   derived/tuned load, unlike Power's balanced_load_w).
+#
+# Units discipline (P4 / config/units.py): none of these is a conserved-Quantity canonical
+#   unit, so each is a schema-validated, bound-checked float carrying a declared unit
+#   (exact-string guarded at the loader, like Power's charge_efficiency / the biosphere's
+#   growth_efficiency), NOT routed through pint.
+#
+# Clean-room: values from cited primary literature ONLY (radiative heat transfer is
+#   textbook). The numeric VALUES are provisional, literature-typical placeholders pending
+#   the validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# Sources:
+#   [A] Incropera, F.P., DeWitt, D.P., Bergman, T.L., Lavine, A.S. (2007), "Fundamentals of
+#       Heat and Mass Transfer", 6th ed., Wiley — Stefan-Boltzmann grey-body radiation
+#       (E = εσT⁴), radiator emissivity ranges, radiation as the sole vacuum rejection mode.
+#   [B] Gilmore, D.G. (ed.) (2002), "Spacecraft Thermal Control Handbook, Vol. 1:
+#       Fundamental Technologies", 2nd ed., Aerospace Press — spacecraft radiator coating
+#       emissivities (~0.8-0.9) and deep-space sink temperature.
+
+name: thermal
+process: radiation
+
+parameters:
+  emissivity:
+    value: 0.85
+    unit: "dimensionless"
+    source: "TODO(cite) — provisional, literature-typical spacecraft radiator coating emissivity ε ~0.85 [A][B]; primary citation pending validation gate"
+  radiator_area:
+    value: 10.0
+    unit: "m^2"
+    source: "TODO(cite) — provisional, illustrative small-station radiator panel area (sizing, not calibrated); primary citation pending validation gate"
+  heat_capacity:
+    value: 1.0e7
+    unit: "J/K"
+    source: "TODO(cite) — provisional, illustrative node thermal mass ~2.4 t water-equivalent (station structure + coolant + water stores); sized so τ >> dt (well-fed sizing), not calibrated; primary citation pending validation gate"
+  space_temperature:
+    value: 2.7
+    unit: "K"
+    source: "TODO(cite) — deep-space / cosmic-microwave-background sink temperature ≈ 2.7 K [A][B]; primary citation pending validation gate"

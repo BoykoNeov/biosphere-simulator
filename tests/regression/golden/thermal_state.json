@@ -1,0 +1,47 @@
+{
+  "aux": {},
+  "n": 720,
+  "rng_seed": "0x0",
+  "stocks": [
+    {
+      "amount": "-0x1.cf7c580000000p+32",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.heat_source",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": true,
+      "unit": "J"
+    },
+    {
+      "amount": "0x1.29b31263b3d1ap+32",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.space",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": false,
+      "unit": "J"
+    },
+    {
+      "amount": "0x1.4b928b38985c7p+31",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "thermal",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "thermal.node",
+      "kind": "pool",
+      "quantity": "energy",
+      "unclamped": false,
+      "unit": "J"
+    }
+  ],
+  "version": 3
+}
