@@ -1,0 +1,48 @@
+name: CI
+
+# Phase-7 Step 0 (P7.0) added the Rust job alongside the pre-existing Python gate.
+# The Python reference and the native Rust port are checked in the same run so a
+# divergence surfaces immediately. The Rust port has NO reference authority — a
+# parity failure is an unfreeze-discipline finding about the Python reference, not a
+# licence to silently patch the Rust side.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    name: Python (ruff · pyright · pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Sync dependencies
+        run: uv sync
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Pyright
+        run: uv run pyright
+      - name: Pytest (fast loop)
+        run: uv run pytest -m "not slow"
+
+  rust:
+    name: Rust (test · clippy)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Cargo test
+        run: cargo test
+      - name: Cargo clippy (deny warnings)
+        run: cargo clippy --all-targets -- -D warnings

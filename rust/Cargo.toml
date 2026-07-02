@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = ["crates/simcore"]
+
+# Phase 7 native port of the frozen Python reference. The Rust crate tree mirrors
+# the Python package layout (`simcore` first; `domains` and `station` join in
+# Steps 3/5 when they hold code — no empty speculative crates now). The port has
+# NO reference authority: a divergence from a frozen golden is an unfreeze-
+# discipline finding about the Python reference, never a silent Rust "fix".

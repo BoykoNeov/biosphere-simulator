@@ -1,0 +1,15 @@
+[package]
+name = "simcore"
+version = "0.1.0"
+edition = "2021"
+description = "Native Rust port of the frozen Python `simcore` (Phase 7). Zero dependencies."
+publish = false
+
+[lib]
+name = "simcore"
+path = "src/lib.rs"
+
+# Zero third-party dependencies, mirroring the Python core's stdlib-only discipline
+# (the interchange codec and snapshot emitter are hand-rolled — std has no C99
+# hex-float parser and we deliberately avoid a JSON crate for a fixed, known shape).
+[dependencies]
