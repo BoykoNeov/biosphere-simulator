@@ -578,8 +578,41 @@ comment sync) + `test_crew_flows.py` (loader assertion 0.85/0.4→0.949/0.675). 
 `oracle_match` validation-against-reference precedent). **Zero core change** (`git diff src/simcore/`
 empty) + **zero domain-code change** (the only `src/domains/` touch is the two `crew.yaml` values +
 citations). Full suite incl. `-m slow` + ruff + pyright green (**1311 passed, 1 skipped**); **six
-goldens deliberately regenerated, all other goldens byte-identical**. NEXT: Step 10 (P6.10) — whole-
-station golden capture + freeze the station.
+goldens deliberately regenerated, all other goldens byte-identical**.
+**Step 10 (P6.10) COMPLETE — whole-station freeze contract + manifest + completeness gate;
+THE STATION IS FROZEN AS THE MULTI-DOMAIN REFERENCE; PHASE 6 EXITS → Phase 7**: three
+boundary-side artifacts, **zero core + zero domain change** (`git diff src/` empty) —
+`docs/station-reference.md` (freeze contract + unfreeze discipline), `docs/station-reference.manifest.json`
+(generated), `tests/test_station_freeze_manifest.py` (9 tests). **The whole-station golden
+capture was already done by Step 7** (`sealed_station_state.json` + `sealed_energy_drift_summary.json`
+ARE it) ⇒ **Step 10 adds NO new golden**, only the contract that freezes them. **Scope =
+WHOLE-ASSEMBLY freeze (advisor lean, USER-CONFIRMED, NOT station-layer-only)**: the station
+reference OWNS the Phase-5 siblings (power/thermal/eclss/crew flows + params) + the 4
+station seams + 3 station params + the 13 station/sibling scenarios→goldens; the
+**biosphere is DELEGATED** to its own `biosphere-reference.manifest.json` (`delegates_to`,
+NOT re-hashed). Reference-only would leave sibling flows/params changeable with no unfreeze
+ceremony *in exactly the layer Phase 7 ports* — the silent-change hole the whole-assembly
+cut closes; illustrative ECLSS/harvest/recovery rate-constants frozen as **"frozen-but-
+illustrative"** (consistent with Step 9 + the biosphere's own uncalibrated `TODO(cite)`
+freeze). **flow_set is DERIVED, never hand-listed** (16 classes = union over the 4
+standalone sibling registries — supplying the 5 *dropped* stand-ins `HeatInput`/
+`CrewMetabolism`/`OxygenConsumption`/`FoodMetabolism`/`SelfDischarge` — + the maximal sealed
+**fast** registry **with `with_harvest=True`**: THE ADVISOR TRAP — default
+`build_sealed_station` sets `with_harvest=False` so a default derivation silently DROPS
+`Harvest`; biosphere-slow reg EXCLUDED so no biosphere flow leaks in; explicit
+`test_frozen_flow_set_covers_the_four_station_seams` guards it). Manifest also names
+`integrator=EulerIntegrator` + per-scenario-dt note (Euler everywhere; sealed two-rate bio
+dt=1 day + fast dt=60 s; Tier-1 energy dt=3600 s), empty `aux_set` (biosphere aux
+delegated), 8 param files (provenance sha-256), 2 sealed horizons asserted vs
+`SEALED_STATION_YEARS`/`SEALED_ENERGY_YEARS`. **Terminological transition stated loudly**:
+promotes the 13 goldens "additive NON-frozen"→frozen station reference (future regen = an
+unfreeze event). Gate owns COMPLETENESS (param/flow/aux set vs live tree + teeth), goldens
+own VALUES (biosphere-manifest division). *Accepted deferrals*: the 13 golden test-file
+docstrings still say "NON-frozen (not in the *biosphere* manifest)" — still accurate, doc
+supersedes, not churned; `_SCENARIOS` hand-listed, no completeness teeth (biosphere
+precedent — shared golden dir). Full suite incl. `-m slow` + ruff + pyright green (**1312
+passed +1 oracle skip non-slow; 43 slow passed**); all goldens byte-identical (none moved).
+**PHASE 6 COMPLETE → Phase 7 (native Rust port of the frozen multi-domain station).**
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

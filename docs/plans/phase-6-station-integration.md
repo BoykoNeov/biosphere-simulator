@@ -1,6 +1,9 @@
 # Phase 6 — Station Integration (cross-domain coupling)
 
-**Status: IN PROGRESS — Steps 1–8 (P6.1–P6.8) COMPLETE.** Pre-plan investigation complete and
+**Status: COMPLETE — Steps 1–10 (P6.1–P6.10) DONE. PHASE 6 EXITS → Phase 7 (native
+port).** The station is frozen as THE multi-domain reference
+(`docs/station-reference.md` + `.manifest.json`, the whole-assembly freeze delegating the
+biosphere to its own Phase-4 manifest). Pre-plan investigation complete and
 advisor-reviewed (two blocking checks run before this doc committed to anything; see
 "Load-bearing findings" below). Steps 1–3 are designed concretely here; Steps 4–10 get
 just-in-time design as Phase 5's siblings did ("each designed just-in-time"), because each
@@ -1051,7 +1054,131 @@ change, not a `simcore/` or flow-class change) — `git diff src/simcore/` stays
 **Step 10 (P6.10) — whole-station golden capture + freeze the station.** The Phase-4
 analogue: pin the sealed-station scenario's final `State` + a stability signature as
 additive NON-frozen goldens, then a station freeze contract + manifest (the multi-domain
-reference Phase 7's native port will target). Just-in-time design.
+reference Phase 7's native port will target).
+
+**Step 10 (P6.10) COMPLETE — EXECUTION (2026-07-02).** Built exactly as designed below;
+no surprises. Three boundary-side artifacts, **zero core + zero domain change** (`git diff
+src/` empty): `docs/station-reference.md` (the whole-assembly freeze contract + unfreeze
+discipline + the biosphere-delegation relationship), `docs/station-reference.manifest.json`
+(generated), `tests/test_station_freeze_manifest.py` (9 tests: the completeness gate +
+teeth + regen). **No new golden** — Step 7's two sealed goldens ARE the whole-station
+capture; Step 10 only freezes them. **The derivation is correct + complete (advisor
+verify-before-done):** the 16-flow set is the union over the four standalone sibling
+registries (supplying the five dropped stand-ins `HeatInput` / `CrewMetabolism` /
+`OxygenConsumption` / `FoodMetabolism` / `SelfDischarge`) + the maximal sealed **fast**
+registry with **`with_harvest=True`** (the advisor trap — a default-only derivation drops
+`Harvest`; an explicit `test_frozen_flow_set_covers_the_four_station_seams` belt-and-
+suspenders guards it), biosphere-slow registry **excluded** (delegated, no biosphere flow
+leaks in); the sealed fast reg is a strict superset of every intermediate station
+assembly's flows, so the union has no hole. Manifest: `integrator = EulerIntegrator` +
+per-scenario-dt note, the 16 flows, empty `aux_set` (the biosphere aux is delegated), 8
+param files (5 sibling + 3 station, provenance hashes), 13 scenarios → goldens (5
+standalone siblings + 8 station steps), `delegates_to` → the biosphere manifest, the two
+sealed horizons asserted against `SEALED_STATION_YEARS` / `SEALED_ENERGY_YEARS`. **The
+terminological transition is stated loudly** in the doc: this promotes the 13 goldens from
+"additive NON-frozen" → the frozen station reference (a future regen is now an unfreeze
+event). *Known, accepted deferrals (advisor-flagged, non-blocking):* the 13 golden
+test-file docstrings still say "NON-frozen (not in the *biosphere* manifest)" — technically
+accurate (they're now in the *station* manifest, still not the biosphere one), the central
+doc supersedes, so not churned; and `_SCENARIOS` is hand-listed with no completeness teeth
+(the scenario analogue of the param/flow gate) — the biosphere precedent exactly (the
+shared `regression/golden/` dir mixes biosphere+demo+station goldens, so no clean
+glob-compare), acceptable as-is. **Verification:** full suite incl. `-m slow` + ruff +
+pyright green (**1312 passed + 1 oracle skip non-slow; 43 slow passed**); `git diff
+src/simcore/` empty + `src/domains/` untouched; **all goldens byte-identical** (Step 10
+adds/moves none). **PHASE 6 EXITS → Phase 7.** DESIGN (retained for provenance):
+
+**DESIGN (just-in-time, advisor-reviewed + user-confirmed 2026-07-02).** The station
+analogue of Phase-4 Step 5 (`docs/biosphere-reference.md` + `.manifest.json` +
+`tests/test_freeze_manifest.py`), one assembly level up. **The whole-station golden
+capture is already done** — Step 7's `sealed_station_state.json` (Tier-2 final `State`) +
+`sealed_energy_drift_summary.json` (Tier-1 energy stability signature) **are** the
+capture the plan line names (their "additive NON-frozen" status is their status
+*pre-Step-10*; Step 10 is what freezes them). So Step 10 adds **no new golden** — it is
+**contract + manifest + completeness gate only**, boundary-side (`git diff src/simcore/`
+empty, `src/domains/` untouched).
+
+- **Scope: FREEZE THE WHOLE ASSEMBLY (advisor lean, user-confirmed).** The station
+  reference **owns** the Phase-5 siblings (power / thermal / eclss / crew — their flow
+  classes + param files) **and** the four station seams + three station params + the 13
+  station/sibling scenarios → goldens. The **biosphere is delegated** to its existing
+  `biosphere-reference.manifest.json` (referenced, **not** re-hashed). *Why whole-assembly,
+  not station-layer-only:* reference-only would leave the sibling flows/params changeable
+  with **no unfreeze ceremony in exactly the layer Phase 7 ports** — a silent-change hole.
+  Freezing the illustrative ECLSS / harvest / recovery rate-constants under a
+  **"frozen-but-illustrative"** caveat is consistent with Step 9 (they stay illustrative)
+  and with the biosphere itself, which froze uncalibrated `TODO(cite)` params behind a
+  documented-finding note; the Tier-2 3-yr run + Step-9 BVAD already gave the siblings
+  multi-year conservation + validation evidence. **Terminological transition (stated
+  loudly):** this **promotes the 13 goldens from "additive NON-frozen" → the frozen
+  station reference**; a future casual regen (like Step 9's 6-golden move) now becomes an
+  **unfreeze event** with ceremony.
+
+- **The frozen station surface (what the manifest names).**
+  - **Numerics — Euler everywhere; dt per scenario (enforced by goldens, the biosphere
+    pattern).** The two-rate sealed reference is biosphere-slow **Euler, `dt = 1` day** +
+    everything-fast **Euler, `dt = 60 s`**; the Tier-1 energy loop is single-rate **Euler,
+    `dt = 3600 s`**; the standalone sibling / earlier-step scenarios carry their own dt.
+    No importable dt constant (each run helper selects it inline), so the manifest
+    **documents** `integrator == "EulerIntegrator"` + a per-scenario-dt note and the
+    **goldens enforce** it (an integrator / dt switch moves every golden).
+  - **The station+sibling flow set — DERIVED, never hand-listed (the completeness teeth).**
+    The union of `type(flow).__name__` over the **standalone sibling registries**
+    (`build_power` **with** `self_discharge_params`, `build_thermal`, `build_eclss`,
+    `build_crew`) **and** the maximal sealed **fast** registry
+    (`build_sealed_station(..., with_harvest=True)[2]`). **The `with_harvest=True` is
+    load-bearing** (advisor trap #1): the default `build_sealed_station` sets
+    `with_harvest=False` (harvest starves the re-sow), so a default-only derivation would
+    **silently drop `Harvest`** — the one flow the gate most needs to catch. The
+    biosphere's `bio_reg` is **never included** (delegated), so no biosphere flow leaks in.
+    The set is the 16 classes: `SolarCharge` / `LoadDraw` / `SelfDischarge` (power),
+    `HeatInput` / `RadiatorReject` (thermal), `CrewMetabolism` / `CO2Scrubber` / `Condenser`
+    / `O2Makeup` (eclss), `OxygenConsumption` / `FoodMetabolism` / `WaterBalance` (crew),
+    `CrewRespiration` / `WaterRecovery` / `Lamp` / `Harvest` (station). The dropped
+    stand-ins (`HeatInput`, `CrewMetabolism`, `OxygenConsumption`, `FoodMetabolism`,
+    `SelfDischarge`) live only in the **standalone** builds — pinned by the standalone
+    sibling goldens — which is exactly why the derivation unions those, not just the
+    coupled assembly. A derived **`aux_set`** too (symmetric; empty for the siblings/station
+    — the biosphere's `ThermalTimeAccumulation` is in the delegated `bio_reg`).
+  - **The eight frozen param files** — the five siblings (`charge.yaml`,
+    `self_discharge.yaml`, `radiator.yaml`, `eclss.yaml`, `crew.yaml`) + the three
+    station-owned (`water_recovery.yaml`, `lamp.yaml`, `harvest.yaml`), each with a
+    newline-normalized sha-256 **provenance** hash (value enforcement is the goldens, the
+    biosphere manifest's exact division). Biosphere params are **not** globbed (delegated).
+  - **The 13 scenarios → goldens** (+ provenance hashes): `power_state`,
+    `power_self_discharge_state`, `thermal_state`, `eclss_state`, `crew_state` (the five
+    standalone siblings) + `station_state`, `cabin_gas_state`, `greenhouse_state`,
+    `water_recovery_state`, `lighting_state`, `harvest_state`, `sealed_station_state`,
+    `sealed_energy_drift_summary` (the eight station steps). A `delegates_to` field points
+    at `biosphere-reference.manifest.json` and the two sealed horizons
+    (`SEALED_STATION_YEARS = 3`, `SEALED_ENERGY_YEARS = 15`) are asserted against their
+    importable constants (the biosphere `LONG_HORIZON_YEARS` pattern).
+
+- **Scoped out, by name** (mirroring the biosphere doc's explicit exclusions): the
+  **Phase-0 engine-skeleton demo** goldens (`demo_euler`, `demo_rk4`, `state_snapshot`);
+  the two **NON-frozen biosphere stress scenarios** (`n_limited`, `water_biting`); and the
+  **cross-domain perturbation harness** (`station/perturbations.py` — diagnostics, no
+  golden, the Phase-3 `perturbations.py` precedent; `ScaledFlow` is perturbation-only, so
+  it is deliberately **not** in the frozen flow set). The frozen biosphere is **delegated**,
+  not excluded.
+
+- **The completeness gate owns what the goldens are blind to** (the biosphere division):
+  the goldens own *values* (any param / flow-law / dt change moves a golden); the gate
+  owns *completeness* — a param file / flow class / aux process added to the frozen tree
+  but wired into no golden. Tests: the param-set / flow-set / aux-set equalities (derived
+  vs the live tree), a **teeth** test (an unfrozen phantom param breaks the set equality),
+  the two-horizon-constant checks, `named-files-exist`, `declares-locked-integrator`, and
+  the `__main__` regenerator.
+
+- **The three artifacts.** `docs/station-reference.md` (the freeze contract + unfreeze
+  discipline + the biosphere-delegation relationship), `docs/station-reference.manifest.json`
+  (generated by the test's `__main__`), `tests/test_station_freeze_manifest.py` (the gate
+  + teeth + regen).
+
+- **Exit criteria (same as every Phase-6 step):** `git diff src/simcore/` empty,
+  `src/domains/` untouched, full suite incl. `-m slow` + ruff + pyright green, and **all
+  goldens byte-identical** (Step 10 adds no golden and moves none). Then update the plan
+  doc, `CLAUDE.md`, and memory; commit + push to `main`. **Phase 6 EXITS → Phase 7.**
 
 ## Sequencing rationale
 

@@ -1,0 +1,106 @@
+{
+  "_comment": "Phase-6 Step-10 station freeze manifest (P6.10). Names the frozen WHOLE-ASSEMBLY station reference surface (Phase-5 siblings + the station seams); the biosphere is delegated to docs/biosphere-reference.manifest.json (see delegates_to). See docs/station-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Regenerate on a deliberate unfreeze: uv run python tests/test_station_freeze_manifest.py.",
+  "aux_set": [],
+  "delegates_to": "docs/biosphere-reference.manifest.json",
+  "flow_set": [
+    "CO2Scrubber",
+    "Condenser",
+    "CrewMetabolism",
+    "CrewRespiration",
+    "FoodMetabolism",
+    "Harvest",
+    "HeatInput",
+    "Lamp",
+    "LoadDraw",
+    "O2Makeup",
+    "OxygenConsumption",
+    "RadiatorReject",
+    "SelfDischarge",
+    "SolarCharge",
+    "WaterBalance",
+    "WaterRecovery"
+  ],
+  "frozen_at_phase": 6,
+  "integrator": "EulerIntegrator",
+  "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1 day + everything-fast dt=60 s; Tier-1 energy single-rate dt=3600 s.",
+  "param_files": {
+    "charge.yaml": "441f96c757e093a2c50c468c75a689254efe624f4f8917209e662f310d38d937",
+    "crew.yaml": "69f6f2ae1defacf137eb796c7042e2648e591eb3d5709e59717a48f13935ac23",
+    "eclss.yaml": "6e48827931bfabf8c5cc25cb97ae5d78cab0e61334b0a35ab88f21f66b006924",
+    "harvest.yaml": "8c748dc2be4fe88d90bcab3f0f1812cdbe9211aad6583a4d770fb9d789c34128",
+    "lamp.yaml": "390d44232390341191b4033bd3ec673ad160af36e8d4d37ead3d81cb6044d612",
+    "radiator.yaml": "cdee9d203ec27f636bdcda84c484fd4bdb1e7df5877b1259dcd6761446233ea7",
+    "self_discharge.yaml": "a3d3fb645441d56f7006c20f58d4425bd3df1be82f9685c27e8e0f9fc91eb95c",
+    "water_recovery.yaml": "a304fb062b8db3375a9f47a4d92489613f29d360d561073e48707f9b3287f807"
+  },
+  "reference_doc": "docs/station-reference.md",
+  "scenarios": {
+    "cabin_gas": {
+      "golden": "cabin_gas_state.json",
+      "golden_sha256": "c84998153af31ab070046b90cec77f9cdceb80a8a92d78e64cb90d03041578a7",
+      "scenario": "CABIN_GAS_SCENARIO (P6.2 crew\u2194ECLSS)"
+    },
+    "crew_mission": {
+      "golden": "crew_state.json",
+      "golden_sha256": "dbb4c81c2cdd15bb0659dc023306626768903172a8e4e9ba5726ecbc9a52e10c",
+      "scenario": "MISSION_SCENARIO (standalone Crew)"
+    },
+    "eclss_steady_state": {
+      "golden": "eclss_state.json",
+      "golden_sha256": "e69e39074460c2e519a1068da8513c7a168f9f7a2699498c364fe8790ffc898b",
+      "scenario": "STEADY_STATE_SCENARIO (standalone ECLSS)"
+    },
+    "greenhouse": {
+      "golden": "greenhouse_state.json",
+      "golden_sha256": "05a49865f5e12c43f92a89beb17422d5039d546e8502d3fb624fa19e1a797c57",
+      "scenario": "GREENHOUSE_SCENARIO (P6.3 biosphere\u2194cabin)"
+    },
+    "harvest": {
+      "golden": "harvest_state.json",
+      "golden_sha256": "9d9ebcc6ad5e8932452396aebc6bf14b65399518ce59e3f9aaac2ae13f70a34a",
+      "scenario": "HARVEST_SCENARIO (P6.6 biomass\u2192food)"
+    },
+    "lighting": {
+      "golden": "lighting_state.json",
+      "golden_sha256": "017e28f74ee6cad7d9a612a2f8cfed9c3efd95fd53e8561d64fec5c948046a54",
+      "scenario": "LIGHTING_SCENARIO (P6.5 Power\u2192biosphere lamp)"
+    },
+    "power_bounded_soc": {
+      "golden": "power_state.json",
+      "golden_sha256": "9cbe875d03461a531968d6f5601e7cf9c1dfdaae1e2f8616bb173976f9e007a0",
+      "scenario": "BOUNDED_SOC_SCENARIO (standalone Power)"
+    },
+    "power_self_discharge": {
+      "golden": "power_self_discharge_state.json",
+      "golden_sha256": "3250500d05effed0b39a02a93d4b3666288d218a4bf64b85a74d2ddf02e6d700",
+      "scenario": "SELF_DISCHARGE (standalone Power + SelfDischarge)"
+    },
+    "sealed_energy_drift": {
+      "golden": "sealed_energy_drift_summary.json",
+      "golden_sha256": "6a85d23e9a10f5f5ff038ffcbcc1a5371fb828cf337272bcf66cbc48de1fccde",
+      "scenario": "HEAT_CLOSURE_SCENARIO 15-yr (P6.7 Tier-1 energy stability signature)"
+    },
+    "sealed_station": {
+      "golden": "sealed_station_state.json",
+      "golden_sha256": "e79b8225b08ff870893b607a64a7c0adf741ca0f06d40fc99565ef468b62e529",
+      "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
+    },
+    "station_heat_closure": {
+      "golden": "station_state.json",
+      "golden_sha256": "359817b51f904ca7652a24036c431b936f250b50172e694967d8d55edd4028b0",
+      "scenario": "HEAT_CLOSURE_SCENARIO (P6.1 Power\u2192Thermal heat closure)"
+    },
+    "thermal_equilibrium": {
+      "golden": "thermal_state.json",
+      "golden_sha256": "91f8934ddb53be44c8c63d7f501f86f2d28cd35ef517d7e849b376a9940cab64",
+      "scenario": "EQUILIBRIUM_SCENARIO (standalone Thermal)"
+    },
+    "water_recovery": {
+      "golden": "water_recovery_state.json",
+      "golden_sha256": "37b53c3dadf38ee5e2c6156cd38e408d4757032084b70cfaf59cec73962bf1d8",
+      "scenario": "WATER_RECOVERY_SCENARIO (P6.4 crew water loop)"
+    }
+  },
+  "sealed_energy_years": 15,
+  "sealed_station_years": 3
+}
