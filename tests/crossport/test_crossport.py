@@ -1,9 +1,14 @@
-"""Phase-7 Step 0 (P7.0) cross-port harness tests.
+"""Phase-7 cross-port harness tests (Step 0 P7.0 + Step 1 P7.1).
 
-Four gates:
+Gates:
 
 1. The committed hex-float conformance vectors stay in sync with their generator
    (the Rust codec test reads the file; drift would silently weaken it).
+1a. **(Step 1)** The committed RNG conformance vectors stay in sync with
+   `gen_rng_vectors.py`, AND their fixed rows are *anchored* to the hand-pinned
+   known answers in `tests/test_rng.py` (`_GOLDEN` / `_SPLITMIX64_SEED0`, grounded
+   against published splitmix64) — so the generated file is externally anchored,
+   not self-referential.
 2. `tiers.json` classifies exactly the 20 frozen goldens (7 biosphere + 13 station),
    each with a consistent tier / transcendental-free verdict and graph evidence.
 3. **The Step-0 acceptance:** a Python `State` round-trips through the Rust
@@ -13,6 +18,9 @@ Four gates:
 4. The comparator applies the tier rules correctly (self-identity passes at both
    tiers; a 1-ULP flip fails Tier 1 but is absorbed by a Tier-2 band; a gross
    perturbation fails Tier 2).
+
+The Rust side of the Step-1 RNG gate (bit-exact `draw_u64` / `draw` against the
+committed vectors) lives in `rust/crates/simcore/tests/rng_vectors.rs`.
 """
 
 from __future__ import annotations
