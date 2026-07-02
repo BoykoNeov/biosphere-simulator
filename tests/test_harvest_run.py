@@ -21,9 +21,13 @@ freeze.
 import json
 from pathlib import Path
 
+import pytest
+
 from domains.biosphere.stocks import (
     CONDENSATE,
     LEAF_C,
+    LITTER_CARBON,
+    MICROBIAL_CARBON,
     ROOT_C,
     SOIL_WATER,
     STEM_C,
@@ -31,7 +35,7 @@ from domains.biosphere.stocks import (
     WATER_VAPOR,
 )
 from domains.crew.loader import load_crew_params
-from domains.crew.stocks import FOOD_STORE
+from domains.crew.stocks import FECAL_WASTE, FOOD_STORE
 from domains.eclss.loader import load_eclss_params
 from simcore.conservation import compute_ledger
 from simcore.ids import StockId
@@ -66,9 +70,16 @@ def _weather() -> list[dict[str, float | str]]:
     return json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
 
 
-def _run(*, with_harvest: bool = True) -> tuple[list[State], int, tuple[object, ...]]:
+def _run(
+    *, with_harvest: bool = True, close_feces: bool = True
+) -> tuple[list[State], int, tuple[object, ...]]:
     state, bio_reg, cabin_reg = build_harvest(
-        _CREW, _ECLSS, _HARVEST, _SC, with_harvest=with_harvest
+        _CREW,
+        _ECLSS,
+        _HARVEST,
+        _SC,
+        with_harvest=with_harvest,
+        close_feces=close_feces,
     )
     return run_harvest(
         EulerIntegrator(bio_reg),
@@ -185,6 +196,49 @@ def test_biosphere_internal_water_loop_closed() -> None:
     assert abs(totalf - total0) <= 1e-9, (
         f"biosphere internal water loop must stay closed (drift {totalf - total0:.2e})"
     )
+
+
+def test_feces_closes_into_litter() -> None:
+    # Seam 2 "it bit": with close_feces the crew's fecal carbon is routed into the
+    # biosphere LITTER_CARBON pool (closing the trophic ring), so litter grows massively
+    # vs the open (close_feces=False) baseline — and the litter feeds
+    # MicrobialRespiration (microbial biomass grows too). The ~3400x crew-vs-seedling
+    # mismatch makes this a dominating perturbation (measured ~342 mol litter vs ~0.01
+    # open), not a subtle one.
+    closed = _run(close_feces=True)[0][-1]
+    open_ = _run(close_feces=False)[0][-1]
+    assert _amt(closed, LITTER_CARBON) > _amt(open_, LITTER_CARBON) + 1.0, (
+        "closing feces must route crew carbon into litter (litter grows materially)"
+    )
+    assert _amt(closed, MICROBIAL_CARBON) > _amt(open_, MICROBIAL_CARBON), (
+        "the feces-fed litter must feed microbial respiration (active, not throttled)"
+    )
+
+
+def test_no_shadow_fecal_sink() -> None:
+    # The re-point is structural (the Step-1 no-shadow-sink property): with close_feces
+    # the orphaned FECAL_WASTE boundary sink is ABSENT from the assembled state (feces
+    # lands in LITTER_CARBON instead); the open baseline keeps it (and it fills).
+    closed, _, _ = build_harvest(_CREW, _ECLSS, _HARVEST, _SC, close_feces=True)
+    open_, _, _ = build_harvest(_CREW, _ECLSS, _HARVEST, _SC, close_feces=False)
+    assert FECAL_WASTE not in closed.stocks, (
+        "closing feces must omit the orphaned FECAL_WASTE sink (no shadow sink)"
+    )
+    assert FECAL_WASTE in open_.stocks, "the open baseline keeps the FECAL_WASTE sink"
+
+
+def test_feces_routing_perturbs_food_and_grain_only_at_roundoff() -> None:
+    # The two seams are near-orthogonal: routing feces into litter feeds microbial
+    # respiration, whose CO₂ enters the shared CARBON_POOL the plant reads for Ci — but
+    # the ECLSS scrubber holds CARBON_POOL at its setpoint, so the plant's carbon budget
+    # (grain fill → food_store) is unchanged except at the fp-round-off level (the
+    # Step-3 "regulators erase the pool perturbation" physics). Not bit-identical, but
+    # agreeing to ~1e-12 relative — the increments compose without material
+    # interference.
+    closed = _run(close_feces=True)[0][-1]
+    open_ = _run(close_feces=False)[0][-1]
+    assert _amt(closed, FOOD_STORE) == pytest.approx(_amt(open_, FOOD_STORE), rel=1e-12)
+    assert _amt(closed, STORAGE_C) == pytest.approx(_amt(open_, STORAGE_C), rel=1e-9)
 
 
 def test_determinism() -> None:

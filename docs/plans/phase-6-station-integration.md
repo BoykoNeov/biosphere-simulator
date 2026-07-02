@@ -379,8 +379,31 @@ load-bearing points — corrected here):*
   + Step-2 cabin-gas + Step-3 greenhouse + Step-4 water-recovery; no regen —
   `lighting_state.json` is the nineteenth). NEXT: Step 6 (P6.6) — the biomass / food loop.
 
-**Step 6 (P6.6) — the biomass / food loop — SEAM 1 COMPLETE (the ``Harvest`` flow); seam
-2 (feces → litter) NEXT.** *Execution log:* the go/no-go grain-fills spike + the coupled
+**Step 6 (P6.6) — the biomass / food loop — COMPLETE (both seams; the trophic CARBON ring
+is closed).**
+
+*Seam 2 execution log (feces → litter):* the design's "crew-scale feces DOMINATES the
+litter dynamics (~3400×)" premise was **confirmed** (feces ≈ 363 mol C / 7 days vs seedling
+litter 0.0135), but a **regime spike (advisor-flagged) inverted its "Δlitter ≈ feces"
+identity**: at ``x_O2 ≈ 10/9500`` the microbes are **active, not throttled** — litter → ~342
+mol, microbial biomass → ~20 mol, so microbes consume ~21 mol of the routed carbon and
+``Δlitter ≈ feces`` does **not** hold. So the seam-2 gate is **per-quantity closure +
+``FECAL_WASTE`` sink absent (no shadow sink) + litter grows materially (with vs without) +
+``rationed == 0`` + ``events == ()``**, NOT a three-way identity. Wired via a
+default-preserving ``fecal_waste_target: StockId = FECAL_WASTE`` param on
+``build_greenhouse``/``_cabin_flows`` (drops the ``FECAL_WASTE`` sink when re-pointed;
+station-layer change, zero domain/core) + a ``close_feces: bool`` knob on ``build_harvest``
+(default ``True`` = closed ring). Both ``fecal_waste`` and ``litter_carbon`` verified pure
+``{CARBON:1}`` (clean swap). **Finding:** closing feces perturbs the plant's grain/food only
+at the **fp round-off level** (rel ~1e-15) — microbial CO₂ enters the shared ``CARBON_POOL``
+the plant reads for Ci, but the ECLSS scrubber holds the pool at setpoint (the Step-3
+regulator-erasure physics), so the two seams are near-orthogonal but **not** bit-identical.
+The ``harvest_state.json`` golden was regenerated to the closed ring (Step 6's own additive
+golden; the other nineteen stay byte-identical). +3 seam-2 tests
+(litter-grows/no-shadow-sink/near-orthogonal), full suite **1305 passed**, ruff + pyright +
+``-m slow`` green, ``git diff src/{simcore,domains}/`` empty.
+
+*Seam 1 execution log:* the go/no-go grain-fills spike + the coupled
 ``k_harvest`` probe both **passed on the recommended path** — ``thermal_time0 = 1300`` (DVS
 1.27, past anthesis), ``harvest_rate = 1e-5`` /s (``k·dt = 6e-4``). Seam 1 landed
 ``station/{flows.py:Harvest, loader.py:load_harvest_params, scenario.py:HarvestScenario,

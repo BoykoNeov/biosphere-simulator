@@ -115,7 +115,11 @@ def _gas_boundary(
     )
 
 
-def _cabin_flows(crew_params: CrewParams, eclss_params: EclssParams) -> list[Flow]:
+def _cabin_flows(
+    crew_params: CrewParams,
+    eclss_params: EclssParams,
+    fecal_waste_target: StockId = FECAL_WASTE,
+) -> list[Flow]:
     """The five cabin flows, re-pointed at the biosphere's gas pools (the reverse seam).
 
     ``CrewRespiration`` / ``CO2Scrubber`` act on ``CARBON_POOL`` (the shared cabin CO₂);
@@ -126,6 +130,14 @@ def _cabin_flows(crew_params: CrewParams, eclss_params: EclssParams) -> list[Flo
     fidelity refinement, not a closure requirement). Identical construction to
     ``station.cabin.build_cabin`` except the two gas ids are the biosphere's, not the
     ECLSS ``cabin_o2`` / ``cabin_co2``.
+
+    ``fecal_waste_target`` is where ``CrewRespiration`` egests its fecal carbon; the
+    default ``FECAL_WASTE`` boundary sink is the greenhouse's open loop (Steps 3–5).
+    Step 6 seam 2 passes the biosphere's ``LITTER_CARBON`` pool to close the trophic
+    CARBON ring (feces → litter → microbes → CO₂); the caller then omits the
+    ``FECAL_WASTE`` boundary sink (see :func:`build_greenhouse`), so the re-point is
+    structural (no shadow sink). Only ``build_harvest`` passes a non-default target —
+    the default keeps the greenhouse / lighting / water goldens byte-identical.
     """
     return [
         CrewRespiration(
@@ -134,7 +146,7 @@ def _cabin_flows(crew_params: CrewParams, eclss_params: EclssParams) -> list[Flo
             food_store=FOOD_STORE,
             cabin_co2=CARBON_POOL,  # the seam: crew exhales into the biosphere CO₂ pool
             cabin_o2=O2_POOL,  # the seam: crew breathes the biosphere O₂ pool
-            fecal_waste=FECAL_WASTE,
+            fecal_waste=fecal_waste_target,
             respired_carbon_fraction=crew_params.respired_carbon_fraction,
         ),
         WaterBalance(
@@ -171,6 +183,7 @@ def build_greenhouse(
     scenario: GreenhouseScenario = GREENHOUSE_SCENARIO,
     *,
     with_plants: bool = True,
+    fecal_waste_target: StockId = FECAL_WASTE,
 ) -> tuple[State, Registry, Registry]:
     """Assemble the greenhouse: ``(state, bio_reg, cabin_reg)`` (biosphere ↔ cabin).
 
@@ -191,25 +204,33 @@ def build_greenhouse(
     ``CARBON_POOL`` / ``O2_POOL`` relax to the crew-driven ECLSS steady state with no
     plant draw. The signed feedback gate compares the two (with-plants CO₂ lower / O₂
     higher).
+
+    ``fecal_waste_target`` is where ``CrewRespiration`` egests fecal carbon. The default
+    ``FECAL_WASTE`` is the greenhouse's open loop, and its boundary sink is included in
+    the cabin stocks. Step 6 seam 2 (:func:`station.harvest.build_harvest`) passes the
+    biosphere's ``LITTER_CARBON`` to close the trophic CARBON ring — a **biosphere**
+    stock already in the shared dict, so the ``FECAL_WASTE`` boundary sink is then
+    **omitted** (the re-point is structural, no shadow sink — the Step-1 property). The
+    default keeps the greenhouse / lighting / water goldens byte-identical.
     """
     bio_state, full_bio_registry = build_season(scenario.bio)
     bio_stocks = dict(bio_state.stocks)
 
-    cabin_stocks = {
-        s.id: s
-        for s in (
-            food_store_stock(scenario.cabin.food_store0),
-            water_store_stock(scenario.cabin.water_store0),
-            cabin_h2o_stock(scenario.cabin.cabin_h2o_0),
-            _gas_boundary(O2_SUPPLY, Quantity.OXYGEN, O2_COMPOSITION, unclamped=True),
-            _gas_boundary(
-                CO2_REMOVED, Quantity.CARBON, CO2_COMPOSITION, unclamped=False
-            ),
-            boundary.sink(HUMIDITY_CONDENSATE, Quantity.WATER, 0.0),
-            boundary.sink(FECAL_WASTE, Quantity.CARBON, 0.0),
-            boundary.sink(URINE, Quantity.WATER, 0.0),
-        )
-    }
+    cabin_stock_seq = [
+        food_store_stock(scenario.cabin.food_store0),
+        water_store_stock(scenario.cabin.water_store0),
+        cabin_h2o_stock(scenario.cabin.cabin_h2o_0),
+        _gas_boundary(O2_SUPPLY, Quantity.OXYGEN, O2_COMPOSITION, unclamped=True),
+        _gas_boundary(CO2_REMOVED, Quantity.CARBON, CO2_COMPOSITION, unclamped=False),
+        boundary.sink(HUMIDITY_CONDENSATE, Quantity.WATER, 0.0),
+        boundary.sink(URINE, Quantity.WATER, 0.0),
+    ]
+    # The FECAL_WASTE boundary sink exists only for the open loop; when feces is
+    # re-pointed into the biosphere (seam 2) it would be an orphan shadow sink, so it is
+    # omitted — feces then lands in LITTER_CARBON (already a biosphere stock).
+    if fecal_waste_target == FECAL_WASTE:
+        cabin_stock_seq.append(boundary.sink(FECAL_WASTE, Quantity.CARBON, 0.0))
+    cabin_stocks = {s.id: s for s in cabin_stock_seq}
     overlap = bio_stocks.keys() & cabin_stocks.keys()
     if overlap:
         raise ValueError(
@@ -220,7 +241,9 @@ def build_greenhouse(
     stocks = {**bio_stocks, **cabin_stocks}
     state = State(n=0, stocks=stocks, rng_seed=0, aux={THERMAL_TIME: 0.0})
 
-    cabin_registry = Registry(_cabin_flows(crew_params, eclss_params), stocks)
+    cabin_registry = Registry(
+        _cabin_flows(crew_params, eclss_params, fecal_waste_target), stocks
+    )
     # with_plants=False ⇒ the biosphere contributes no flows/aux (the no-plant
     # baseline); ``CARBON_POOL``/``O2_POOL`` then move only under the cabin (crew +
     # ECLSS).

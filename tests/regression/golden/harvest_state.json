@@ -6,7 +6,7 @@
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.b33333333332ap+1",
+      "amount": "0x1.b33333333333ap+1",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -33,7 +33,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.b307c65a64a2dp-5",
+      "amount": "0x1.b307c65a64a2ep-5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -46,7 +46,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.bad46a4f91ac2p-7",
+      "amount": "0x1.55d50698e4d50p+8",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -72,7 +72,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.8dc40a91a2a71p-11",
+      "amount": "0x1.389586bad5768p+4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -85,7 +85,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.099999999999dp+3",
+      "amount": "0x1.0999999999996p+3",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },
@@ -111,7 +111,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.53498df761497p-4",
+      "amount": "0x1.53498df761498p-4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -150,7 +150,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.85b76a7120057p-5",
+      "amount": "0x1.85b76a7120059p-5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -163,7 +163,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.7bad8da887dc5p-10",
+      "amount": "0x1.7bad8da887dccp-10",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -189,7 +189,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.01089d1058e62p+11",
+      "amount": "0x1.01396f11b3f1bp+11",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -197,19 +197,6 @@
       "domain": "boundary",
       "extinction_threshold": "0x0.0p+0",
       "id": "boundary.co2_removed",
-      "kind": "boundary",
-      "quantity": "carbon",
-      "unclamped": false,
-      "unit": "mol"
-    },
-    {
-      "amount": "0x1.6ae147ae14893p+8",
-      "composition": {
-        "carbon": "0x1.0000000000000p+0"
-      },
-      "domain": "boundary",
-      "extinction_threshold": "0x0.0p+0",
-      "id": "boundary.fecal_waste",
       "kind": "boundary",
       "quantity": "carbon",
       "unclamped": false,
@@ -255,7 +242,7 @@
       "unit": "kg"
     },
     {
-      "amount": "-0x1.00d236a9f2787p+11",
+      "amount": "-0x1.010308ab4d83bp+11",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },

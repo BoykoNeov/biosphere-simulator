@@ -10,11 +10,17 @@ depleting in standalone Crew / the greenhouse — becomes **regenerative** up to
 harvest it captures. It is the **CARBON twin of Step 4's** ``WaterRecovery`` (WATER),
 one trophic level.
 
-**This is seam 1 of the two the plan splits (advisor-flagged).** It lands the
-``Harvest`` flow alone; the ``fecal_waste → litter_carbon`` re-pointing (seam 2, which
-makes the CARBON ring fully *closed*) is a **separate** increment, because crew-scale
-feces dumped into a seedling-scale litter pool dominates the litter dynamics (~3400×
-mismatch) and must be understood on its own, not conflated with the harvest signal.
+**The plan splits this into two seams (advisor-flagged, landed as separate commits).**
+Seam 1 is the ``Harvest`` flow (``with_harvest``). Seam 2 (``close_feces``) re-points
+``CrewRespiration``'s fecal carbon into the biosphere's ``LITTER_CARBON`` pool, closing
+the trophic CARBON ring (feces → litter → microbes → CO₂). They were landed separately
+because crew-scale feces (~363 mol C / 7 days) dumped into the seedling-scale litter
+pool **dominates** the litter dynamics (~3400× mismatch), and that had to be
+understood on its own. The measured regime is **active microbial** (not throttled):
+litter → ~342 mol, microbial biomass → ~20 mol, so ``Δlitter ≈ feces`` does *not*
+hold (microbes consume ~21 mol) — the seam-2 gate is closure + no-shadow-sink +
+litter-grows-materially, not a three-way identity (calibration of the magnitude
+mismatch deferred to Step 9).
 
 **Why the reproductive plant.** ``storage_c`` fills only after anthesis (``FO > 0``
 needs ``DVS > 1``), and the default seedling sits at ``DVS < 1`` with ``storage_c0 = 0``
@@ -52,9 +58,9 @@ Pure stdlib only in the spine; the harvest rate loads via ``station.loader``. Re
 flow + the phenology injection.
 """
 
-from domains.biosphere.stocks import STORAGE_C, THERMAL_TIME
+from domains.biosphere.stocks import LITTER_CARBON, STORAGE_C, THERMAL_TIME
 from domains.crew.flows import CrewParams
-from domains.crew.stocks import FOOD_STORE
+from domains.crew.stocks import FECAL_WASTE, FOOD_STORE
 from domains.eclss.flows import EclssParams
 from simcore.environment import SourceResolver
 from simcore.events import Event
@@ -84,23 +90,41 @@ def build_harvest(
     scenario: HarvestScenario = HARVEST_SCENARIO,
     *,
     with_harvest: bool = True,
+    close_feces: bool = True,
 ) -> tuple[State, Registry, Registry]:
     """Assemble the harvest greenhouse: ``(state, bio_reg, cabin_reg)``.
 
     Reuses :func:`station.greenhouse.build_greenhouse` (the sealed biosphere ↔ cabin gas
-    loop, verbatim — zero greenhouse change) and layers on the two Step-6 additions:
+    loop — zero greenhouse-behavior change; the greenhouse gains only an optional
+    ``fecal_waste_target`` param, default-preserving) and layers on the Step-6
+    additions:
 
       1. the biosphere ``thermal_time`` aux is started at ``scenario.thermal_time0``
          (past anthesis ⇒ a grain-filling plant), overriding the greenhouse's ``0.0`` —
          the station owns the ``State``'s aux dict, so ``SeasonScenario`` stays
-         untouched; and
+         untouched;
       2. the :class:`station.flows.Harvest` flow (``storage_c → food_store``) is
-         appended to the cabin / fast registry (``with_harvest=True``).
+         appended to the cabin / fast registry (``with_harvest=True`` — seam 1); and
+      3. ``close_feces=True`` (seam 2) re-points ``CrewRespiration``'s fecal carbon into
+         the biosphere's ``LITTER_CARBON`` pool (via ``build_greenhouse``'s
+         ``fecal_waste_target``), closing the trophic CARBON ring (feces → litter →
+         microbes → CO₂) and **omitting** the orphaned ``FECAL_WASTE`` boundary sink (no
+         shadow sink). ``close_feces=False`` keeps feces on the open ``FECAL_WASTE``
+         sink — the "it bit" baseline the seam-2 gate compares against.
 
-    ``with_harvest=False`` is the **baseline arm**: the identical greenhouse +
-    phenology, but **no** ``Harvest`` flow — so ``storage_c`` accumulates all the grain
-    fill and ``food_store`` depletes at the full crew rate (the "it bit" gate compares
-    the two).
+    ``with_harvest=False`` is the seam-1 baseline (no ``Harvest`` flow — ``storage_c``
+    accumulates all fill, ``food_store`` depletes at the full crew rate).
+
+    **Seam-2 regime (measured, not assumed — advisor-flagged).** Crew-scale feces (~363
+    mol C / 7 days) dumped into the seedling-scale ``LITTER_CARBON`` (starts 0) makes
+    ``MicrobialRespiration`` **active** (litter → ~342 mol, microbial biomass → ~20
+    mol), not throttled — so ``Δlitter ≈ feces`` does **not** hold (microbes consume ~21
+    mol of the routed carbon). The gate is therefore per-quantity closure +
+    ``FECAL_WASTE`` sink absent + litter grows materially (with vs without the re-point)
+    + ``rationed == 0`` (the once-daily microbial O₂ draw is refilled by ``O2Makeup``) +
+    ``events == ()`` —
+    **not** a three-way identity. This ~3400× crew-vs-plant magnitude mismatch is the
+    documented scope boundary (calibration deferred to Step 9).
 
     The two flow registries (biosphere-slow vs cabin-fast) are asserted to have
     **disjoint flow-id sets** over the one shared stock dict: a duplicate ``FlowId``
@@ -109,7 +133,11 @@ def build_harvest(
     the driver steps together).
     """
     state, bio_reg, cabin_reg = build_greenhouse(
-        crew_params, eclss_params, scenario.greenhouse, with_plants=True
+        crew_params,
+        eclss_params,
+        scenario.greenhouse,
+        with_plants=True,
+        fecal_waste_target=LITTER_CARBON if close_feces else FECAL_WASTE,
     )
 
     # (1) Start the biosphere phenology past anthesis (a grain-filling plant). The

@@ -1,12 +1,14 @@
 """Regression-snapshot gate: the golden biomass/food-loop run (P6.6).
 
-Pins ``HARVEST_SCENARIO`` (the reproductive greenhouse plant filling grain that the
-station-owned ``Harvest`` flow drains into the crew ``food_store``, Euler, over the
-embedded greenhouse horizon) bit-exactly. The **final coupled State** is serialized via
-the ``sim_io`` hex-float serializer and byte-compared to a committed golden, so any bit
-change in the coupled trajectory (the ``Harvest`` law, the harvest rate, the
-``thermal_time0`` phenology start, the reused greenhouse gas loop, the crew/ECLSS
-coefficients, the sizing, the reduction order) surfaces here.
+Pins ``HARVEST_SCENARIO`` (the **closed** trophic ring: the reproductive greenhouse
+plant filling grain that the station-owned ``Harvest`` flow drains into the crew
+``food_store`` [seam 1], with crew feces re-pointed into the biosphere ``LITTER_CARBON``
+pool [seam 2], Euler, over the embedded greenhouse horizon) bit-exactly. The **final
+coupled State** is serialized via the ``sim_io`` hex-float serializer and byte-compared
+to a committed golden, so any bit change in the coupled trajectory (the ``Harvest`` law,
+the harvest rate, the ``thermal_time0`` phenology start, the feces re-point, the reused
+greenhouse gas loop, the crew/ECLSS coefficients, the sizing, the reduction order)
+surfaces here.
 
 **This is an additive, NON-frozen golden** — not in
 ``docs/biosphere-reference.manifest.json`` (that manifest is the frozen *biosphere*
@@ -23,11 +25,14 @@ Mirrors ``test_regression_water_recovery`` (the additive-scenario discipline): f
 purpose**: the run is well-fed (``rationed == 0``), event-free (``events == ()``), **all
 three mass quantities (CARBON / OXYGEN / WATER) balance every master day** (the closure
 payload), the ``Harvest`` **actually moved carbon** — ``food_store`` ended above the
-no-harvest baseline and ``storage_c`` below it (the "it bit" check, the analogue of the
-water-recovery "regenerated above the open-loop baseline" gate) — and the two-way
-identity (``Δfood_store = Δstorage_c``) holds. So the golden is **impossible to
-regenerate from a degenerate run** (an imbalance / a non-harvesting run / a broken
-identity fails the gate, not silently re-freezes).
+no-harvest baseline and ``storage_c`` below it (the seam-1 "it bit" check) — the two-way
+identity (``Δfood_store = Δstorage_c``) holds, **and** seam 2 closed the ring: the
+orphaned ``FECAL_WASTE`` sink is absent and ``LITTER_CARBON`` grew materially vs the
+open-feces baseline (``Δlitter ≈ feces`` does NOT hold — microbes actively consume the
+litter, the measured regime — so the seam-2 gate is closure + no-shadow-sink +
+litter-grows, not a three-way identity). So the golden is **impossible to regenerate
+from a degenerate run** (an imbalance / a non-harvesting / non-closing run fails the
+gate, not silently re-freezes).
 
 **Bit-stability caveat** (as for the biosphere / Power / Thermal / ECLSS / station /
 cabin / water-recovery / lighting goldens): the coupled flows use only +−×÷ (no
@@ -39,9 +44,9 @@ import json
 from pathlib import Path
 
 import sim_io
-from domains.biosphere.stocks import STORAGE_C
+from domains.biosphere.stocks import LITTER_CARBON, STORAGE_C
 from domains.crew.loader import load_crew_params
-from domains.crew.stocks import FOOD_STORE
+from domains.crew.stocks import FECAL_WASTE, FOOD_STORE
 from domains.eclss.loader import load_eclss_params
 from simcore.conservation import compute_ledger
 from simcore.integrator import EulerIntegrator
@@ -74,9 +79,14 @@ def _weather() -> list[dict[str, float | str]]:
     return json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
 
 
-def _run(*, with_harvest: bool) -> list[State]:
+def _run(*, with_harvest: bool, close_feces: bool = True) -> list[State]:
     state, bio_reg, cabin_reg = build_harvest(
-        _CREW, _ECLSS, _HARVEST, _SCENARIO, with_harvest=with_harvest
+        _CREW,
+        _ECLSS,
+        _HARVEST,
+        _SCENARIO,
+        with_harvest=with_harvest,
+        close_feces=close_feces,
     )
     states, rationed, events = run_harvest(
         EulerIntegrator(bio_reg),
@@ -122,6 +132,19 @@ def _final_state() -> State:
     assert abs(d_food - d_storage) <= _IDENTITY_ABS_TOL, (
         "golden run's harvest must satisfy Δfood_store = Δstorage_c (a CARBON transfer)"
     )
+    # Seam 2 (the closed ring): the orphaned FECAL_WASTE boundary sink is absent (feces
+    # is routed into the biosphere LITTER_CARBON), and litter grew materially vs the
+    # open (feces → boundary sink) baseline — the "it bit" check. `Δlitter ≈ feces` does
+    # NOT hold (microbes actively consume the litter — the measured regime), so the gate
+    # is closure + no-shadow-sink + litter-grows, not a three-way identity.
+    assert FECAL_WASTE not in final.stocks, (
+        "golden run must close the feces loop (no orphaned FECAL_WASTE shadow sink)"
+    )
+    open_feces_final = _run(with_harvest=True, close_feces=False)[-1]
+    assert (
+        final.stocks[LITTER_CARBON].amount
+        > open_feces_final.stocks[LITTER_CARBON].amount + 1.0
+    ), "golden run must route crew feces into litter (litter grows materially)"
     return final
 
 

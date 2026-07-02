@@ -413,8 +413,46 @@ lamp energy / lit grew while dark declined). **Zero core change** (`git diff src
 domain change** (`src/domains/` untouched); full suite incl. `-m slow` + ruff + pyright green (**1291 passed**,
 1 oracle skip); **all eighteen existing goldens byte-identical** (seven frozen + two demo + two Power + one
 Thermal + one ECLSS + one Crew + Step-1 station + Step-2 cabin-gas + Step-3 greenhouse + Step-4 water-recovery;
-no regen — `lighting_state.json` is the nineteenth). NEXT: Step 6 (P6.6) — the biomass/food loop (biosphere
-harvest → crew `food_store`; close CARBON through the trophic seam).
+no regen — `lighting_state.json` is the nineteenth).
+**Step 6 (P6.6) COMPLETE — the biomass/food loop; the trophic CARBON ring closes; crew food becomes
+regenerative** (landed as TWO advisor-flagged increments/commits over the Step-3 greenhouse). New
+`src/station/harvest.py` + `station/flows.py:Harvest`+`HarvestParams` + `params/harvest.yaml` +
+`loader.py:load_harvest_params` + `scenario.py:HarvestScenario`; **zero core + zero domain change**
+(`git diff src/{simcore,domains}/` empty). **SEAM 1 — the `Harvest` flow** (`storage_c → food_store`,
+donor-controlled `k·storage_c·dt`, 2-leg single-currency `{CARBON:1}` transfer, in the cabin/fast
+registry): the CARBON twin of Step-4 `WaterRecovery`, one trophic level — the biosphere's grain drains
+into the crew's finite `food_store`, so the open-loop store becomes **regenerative** up to the harvest.
+**The reproductive-plant precondition** (`storage_c` fills only post-anthesis, `FO>0` needs `DVS>1`):
+`HarvestScenario.thermal_time0=1300` (DVS 1.27) starts the biosphere phenology past anthesis via a
+**station-level `State`-aux injection** in `build_harvest` (the station owns the greenhouse State's aux
+dict ⇒ `SeasonScenario` untouched, zero domain change). Go/no-go grain-fill spike + coupled `k_harvest`
+probe (`harvest_rate=1e-5`/s, `k·dt=6e-4`) passed the recommended path: grain settles to a **positive
+quasi-steady** (day-boundary min ~7e-4–1.4e-3 mol, ~89% of the ~1.3e-2 mol/7-day fill captured). Payload
+= the **two-way identity** `Δfood_store = Δstorage_c = cumulative harvest` to ~1.8e-9 (the ~1580-mol
+food-store cancellation floor; signal 7 orders above) — **exact because grain fill is identical
+with/without harvest** (verified before building, advisor-flagged: only `annual_reset` reads `storage_c`
+and doesn't fire ≤7d; `Allocation`'s `FO·DMI` is independent of `storage_c`'s level; `CrewRespiration`
+is forced; `Harvest` touches neither `CARBON_POOL` nor a photosynthesis input). Driver is **slow-first**
+(biosphere refills grain, then 1440 cabin substeps drain it ⇒ day-boundary snapshot is the intra-day
+*minimum*). **SEAM 2 — feces → litter re-point** (`close_feces`, closes the ring feces → litter →
+microbes → CO₂): wired via a default-preserving `fecal_waste_target: StockId = FECAL_WASTE` param on
+`build_greenhouse`/`_cabin_flows` (drops the `FECAL_WASTE` sink when re-pointed — station-layer change,
+zero domain/core) + a `close_feces: bool` knob on `build_harvest` (default `True`). A **regime spike
+(advisor-flagged) INVERTED the design's `Δlitter ≈ feces` identity**: the design's ~3400× domination
+premise is right (feces ≈363 mol vs seedling litter 0.0135), but at `x_O2 ≈ 10/9500` the microbes are
+**active, not throttled** (litter→~342 mol, microbial biomass→~20 mol, consuming ~21 mol) ⇒ the seam-2
+gate is **per-quantity closure + `FECAL_WASTE` sink absent + litter-grows-materially (with/without) +
+`rationed==0` + `events==()`**, NOT a three-way identity. Both `fecal_waste`/`litter_carbon` verified
+pure `{CARBON:1}`. Finding: closing feces perturbs grain/food only at **fp round-off** (rel ~1e-15) —
+microbial CO₂ enters the shared `CARBON_POOL` but the scrubber holds it at setpoint (Step-3
+regulator-erasure), so the seams are near-orthogonal, not bit-identical. The ~3400× magnitude mismatch =
+a **direction+conservation demo, not a self-sufficient loop** (crew draws ~345 mol C/day vs plant fills
+~1.6e-3/day; food still net-depletes; calibration deferred to Step 9). Euler-only (biosphere frozen).
+Additive **NON-frozen** golden `harvest_state.json` (closed ring; regenerated in seam 2). **33 tests**
+(12 run + 2 golden after seam 1; +3 seam-2 run tests). Full suite incl. `-m slow` + ruff + pyright green
+(**1305 passed**, 1 oracle skip); **all nineteen pre-Step-6 goldens byte-identical** (`harvest_state.json`
+is the twentieth). NEXT: Step 7 (P6.7) — the sealed station: multi-year matter+energy stability
+(the Phase-4 analogue at station scale).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
