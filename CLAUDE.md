@@ -492,8 +492,53 @@ golden**; **Tier 3** (assertion-only landmine — `close_feces=True`: litter qua
 earning the instrument its keep). **15 sealed tests** (Tier-1 + Tier-2 stability, Tier-3 landmine,
 2 regression goldens). Two additive **NON-frozen** goldens (`sealed_station_state.json`,
 `sealed_energy_drift_summary.json`) — **NOT in the freeze manifest**. Full suite incl. `-m slow` +
-ruff + pyright green; **all twenty existing goldens byte-identical** (no regen). NEXT: Step 8 (P6.8)
-— the cross-domain perturbation harness (cascades, no cascade code).
+ruff + pyright green; **all twenty existing goldens byte-identical** (no regen).
+**Step 8 (P6.8) COMPLETE — the cross-domain perturbation harness (cascades, no cascade code);
+Phase-3's `perturbations.py` discipline carried CROSS-DOMAIN**: new `src/station/perturbations.py`
+(the station harness) + `tests/test_station_perturbations.py` (**17 tests, NOT slow-marked** —
+seconds per substrate). **Zero core + zero domain change** (`git diff src/{simcore,domains}/` empty
+— the harness *imports* Phase-3's generic `window_override`/`with_forcing`/`LeakFlow`/`LEAK_SINK`/
+`LEAK_VAR` from `domains.biosphere.perturbations` and composes them at the station layer). **No
+golden** (the Phase-3 "diagnostics, no golden" precedent; determinism re-runs are the insurance).
+**The genuinely-new thing over Phase-3** (whose three perturbations were single-domain, all inside
+the biosphere): a disturbance applied to ONE domain cascades into ANOTHER through a shared stock /
+shared forcing (#16), **no cascade code** — each shipped perturbation demonstrates a *distinct*
+emergent cross-domain propagation (spike-gated; two collapsing to one signature would merge — none
+did). **The load-bearing finding (advisor #1, spike-CONFIRMED): the station regulators ERASE the
+naive pool-level signature** — every station gas pool is regulated, so under every matter
+perturbation the day-boundary `CARBON_POOL`/`O2_POOL`/`Ci` come back IDENTICAL to baseline (Step-3
+regulator-erasure, now under disturbance); the signature is regulator **effort** + sinks, NOT pool
+level, and the two gas pools **do not fail the same way**: `CARBON_POOL` is only-*removed*
+(`CO2Scrubber` donor-controlled can't push CO₂ up) so a leak lowers it in-window ⇒ Ci dips ⇒
+`biomass↓`+`co2_removed↓`; `O2_POOL` is actively *defended* (`O2Makeup` demand-controlled to
+setpoint) so a leak shows up as `o2_supply` **effort↑↑** with `cabin_o2` flat. **Five perturbations,
+three seam-types, two substrates:** (1) *forcing override* (reused Phase-3 generics) — brownout
+(`solar_power`), crew load spike (`food_intake`), lighting failure (zeroes **both** `par` AND
+`lamp_power`, the #16 lamp is one intervention/two legs); (2) *added leak flow* — `with_station_leak`
+adds a windowed `LeakFlow` to the **fast** registry over the shared stock dict (`FlowId` kept out of
+`bio_reg` for the disjointness guard, `LEAK_SINK` composition **mirrors the pool** so `{C:1,O:2}`
+vents CARBON+OXYGEN in balance); (3) *windowed flow-scaler* — the legitimately-new `ScaledFlow`
+(frozen dataclass wrapping an inner `Flow`, `id`/`priority` delegated, `evaluate` multiplies **all**
+legs by a windowed `health∈[0,1]` forcing so the whole flow scales and stays balanced — the
+"arbitration scales the whole flow" invariant as a perturbation; **`health=1` outside the window is
+bit-identical**, `x·1.0==x`); `with_radiator_failure` wraps `RadiatorReject`. **Substrate split by
+physics+compute:** *energy* perturbations (brownout/radiator) on the cheap single-rate diurnal
+`run_station` (Power→Thermal, the diurnal SOC swing + node attractor need `n` to advance); *matter*
+perturbations (leak/crew/lighting) on a short two-rate `run_sealed` (`SealedStationScenario(years=1,
+season_days=305)`, 8 days, window `[2,7)` **inside year 1** so the `slow_reset` `annual_reset`
+landmine cannot bite — the short horizon is the FIX, advisor #2). **`rationed` *behaves* ≠
+`rationed==0`** (advisor #3): brownout carries BOTH regimes — a graceful arm (~5 h 50 % afternoon dip
+⇒ `rationed==0`, SOC dips, node cools) and a **failure** arm (multi-day full blackout empties the
+tight battery ⇒ `rationed>0` **bounded**, still conserving — the Euler backstop conserves as it
+rations, the Tier-3-landmine precedent); the other four graceful. **Conservation** proven by the
+completed run (per-sub-step ledger assert) + relative day-boundary drift teeth reusing
+`sealed_tier2_helper.relative_drift` over (CARBON,OXYGEN,WATER,NITROGEN) summing **incl. `LEAK_SINK`**
+(total conserved as chamber-interior closure breaks — the Phase-3 leak discipline; no `loss_sink==0`
+for leak arms; Phase-3's absolute `TOL` does NOT transport at station scales 1e0–1e10). Spiked
+`k_leak=1e-3` (`k·dt=0.06` at 60 s, the `k_scrub` scale). Determinism re-runs on both substrates
+stand in for the absent golden. Full suite incl. `-m slow` + ruff + pyright green (**1338 passed, 1
+skipped**); **all twenty existing goldens byte-identical** (no regen). NEXT: Step 9 (P6.9) — NASA
+BVAD / BioSim validation (one crew configuration).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
