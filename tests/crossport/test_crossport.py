@@ -182,6 +182,45 @@ def test_rust_crew_snapshot_roundtrips_through_sim_io() -> None:
     )
 
 
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_rust_composite_snapshot_exercises_aux_and_multicomposition() -> None:
+    """The `crew_state` acceptance leaves two emitter branches untested: a non-empty
+    `aux` map and a multi-element `composition` (its inter-coefficient comma logic).
+    Both are live paths for real frozen data (biosphere `thermal_time` aux; the CO₂
+    `{carbon:1, oxygen:2}` stocks in cabin_gas/greenhouse/sealed). The `emit_composite`
+    example builds a synthetic State reaching both; here we confirm `sim_io.loads`
+    accepts it and the aux value + every composition coefficient survive intact.
+    """
+    from simcore.ids import StockId
+    from simcore.quantities import Quantity
+
+    proc = subprocess.run(
+        ["cargo", "run", "-q", "--example", "emit_composite"],
+        cwd=RUST_CRATE_DIR,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, f"cargo run failed:\n{proc.stderr}"
+
+    state = snapshot.loads(proc.stdout)
+
+    # Non-empty aux branch.
+    assert state.aux["thermal_time"] == float.fromhex("0x1.31851eb851eb8p+13")
+    # Multi-element composition (comma logic) — CO₂ as {carbon:1, oxygen:2}.
+    co2 = state.stocks[StockId("boundary.co2_removed")].composition
+    assert co2 == {Quantity.CARBON: 1.0, Quantity.OXYGEN: 2.0}
+    # Single-element composition with a non-unit coefficient.
+    o2 = state.stocks[StockId("eclss.cabin_o2")].composition
+    assert o2 == {Quantity.OXYGEN: 2.0}
+    # Non-zero seed round-trips through the 0x-hex string form.
+    assert state.rng_seed == 0xDEADBEEF
+
+    # The emitter's output is a stable fixed point of the canonical Python form.
+    assert snapshot.dumps(state) == snapshot.dumps(
+        snapshot.loads(snapshot.dumps(state))
+    )
+
+
 # --------------------------------------------------------------------------- #
 # 4. Comparator applies the tier rules                                        #
 # --------------------------------------------------------------------------- #
