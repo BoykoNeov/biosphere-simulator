@@ -52,6 +52,15 @@ cannot live in any single ``domains.*`` package without one domain importing ano
     ``thermal.node`` is deferred to the sealed-station step, the "boundary now, inward
     later" rhythm Power's own dissipation followed.
 
+  * **Harvest** (Step 6) — the trophic biomass→food flow ``storage_c → food_store`` that
+    makes the crew's finite ``food_store`` **regenerative**. It is the CARBON twin of
+    ``WaterRecovery``: donor-controlled (``k_harvest·storage_c·dt``), self-limiting, and
+    the seam that closes CARBON through one trophic level — the biosphere fixes cabin
+    CO₂ into grain and this flow moves that grain into the crew's food. Both stocks are
+    ``{CARBON:1}``, so it is a single-currency transfer (no composition fold, no
+    η-split); it reads a biosphere stock and writes a crew stock, so — like every seam
+    here — it lives in the assembly layer, never in ``domains.*``.
+
 **Why the station layer, not the crew domain.** The crew domain *documents* ``C_food +
 O₂ → CO₂ + H₂O`` atom coupling as a deferred **Phase-6** seam (its ``o2_store`` /
 ``crew_o2_consumed`` are the honest decoupled stand-in); honoring that boundary means
@@ -350,5 +359,77 @@ class Lamp:
                 Leg(self.battery, -draw),
                 Leg(self.light_used, radiant),
                 Leg(self.waste_heat, heat),
+            )
+        )
+
+
+@dataclass(frozen=True)
+class HarvestParams:
+    """Station-owned grain-harvest coefficient (the harvester's first-order rate).
+
+    Loads from ``station/params/harvest.yaml`` via ``station.loader`` with the same
+    ``{value, unit, source}`` + exact-string-unit-guard discipline the sibling param
+    files use (``harvest_rate`` is not a conserved-Quantity canonical unit, so it is
+    schema-validated + exact-string guarded, not routed through pint — the
+    ``WaterRecoveryParams`` / ``LampParams`` discipline):
+
+      * ``harvest_rate`` (k_harvest, 1/s) ≥ 0: the first-order rate at which the
+        harvester draws grain from the biosphere's ``storage_c`` organ into the crew
+        ``food_store``. Donor-controlled (∝ the standing grain), so structural
+        positivity requires ``k_harvest·dt < 1`` (self-limiting to 0 as the grain
+        empties — the ``SelfDischarge`` / biosphere ``Grazing`` pattern). A zero rate
+        disables harvest (the "it bit" gate's ``with_harvest=False`` baseline).
+    """
+
+    harvest_rate: float
+
+
+@dataclass(frozen=True)
+class Harvest:
+    """CARBON flow ``storage_c → food_store`` (P6.6) — the trophic biomass→food seam.
+
+    The station-owned flow that makes the crew's finite ``food_store`` **regenerative**.
+    The biosphere's grain / storage organ (``storage_c``, a pure ``{CARBON:1}`` pool the
+    plant fills post-anthesis and — by ``allocation.py`` — the one organ **excluded**
+    from maintenance / senescence / the ``f_N`` biomass sum, so it accumulates without
+    being clawed back) is drawn into the crew ``food_store`` at ``harvested = k_harvest
+    · storage_c · dt`` (mol C). Two legs balance CARBON exactly (``−harvested +
+    harvested = 0``); both stocks are ``{CARBON:1}`` so it is a **single-currency
+    transfer** — no composition fold (unlike ``CrewRespiration``) and no η-split (unlike
+    ``WaterRecovery`` / ``Lamp``: harvested grain has a single fate, the crew's food).
+
+    **Donor-controlled** (reads the ``storage_c`` stock, ∝ its amount), so positivity is
+    **structural** (``k_harvest·dt < 1``, self-limiting to 0 as the grain empties — the
+    biosphere ``Grazing`` / ``SelfDischarge`` pattern, *not* the forced "well-fed
+    sizing" the crew flows lean on). It reads a **biosphere** stock and writes a
+    **crew** stock — a cross-domain flow, so it belongs in the station layer, never
+    in ``domains.*`` (the finding-#1 discipline). ``flux = rate·dt`` is dt-linear.
+
+    The biosphere refills ``storage_c`` once per master day (the slow ``Allocation``
+    step); this flow — living in the cabin / fast registry — drains it across the day's
+    sub-steps, so the grain settles to a positive quasi-steady (daily harvest ≈ daily
+    fill): a **regenerative** source being drained, not a static reservoir emptied. The
+    ``Allocation`` grain-fill leg (``FO·DMI``) is independent of ``storage_c``'s own
+    level, and no other biosphere flow reads ``storage_c`` (only ``annual_reset``, which
+    does not fire in a ≤7-day run), so harvest is its **only** new sink and does not
+    perturb the plant's carbon budget — the with/without-harvest grain fill is
+    identical, which makes the two-way conservation identity (``Δfood_store = cumulative
+    harvest = Δstorage_c``) exact to floating point.
+    """
+
+    id: FlowId
+    priority: int
+    storage_c: StockId
+    food_store: StockId
+    params: HarvestParams
+
+    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        harvested = (
+            self.params.harvest_rate * snapshot.stocks[self.storage_c].amount * dt
+        )
+        return FlowResult(
+            legs=(
+                Leg(self.storage_c, -harvested),
+                Leg(self.food_store, harvested),
             )
         )

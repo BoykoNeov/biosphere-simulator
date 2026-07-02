@@ -379,7 +379,30 @@ load-bearing points — corrected here):*
   + Step-2 cabin-gas + Step-3 greenhouse + Step-4 water-recovery; no regen —
   `lighting_state.json` is the nineteenth). NEXT: Step 6 (P6.6) — the biomass / food loop.
 
-**Step 6 (P6.6) — the biomass / food loop — DESIGN (just-in-time; not yet executed).**
+**Step 6 (P6.6) — the biomass / food loop — SEAM 1 COMPLETE (the ``Harvest`` flow); seam
+2 (feces → litter) NEXT.** *Execution log:* the go/no-go grain-fills spike + the coupled
+``k_harvest`` probe both **passed on the recommended path** — ``thermal_time0 = 1300`` (DVS
+1.27, past anthesis), ``harvest_rate = 1e-5`` /s (``k·dt = 6e-4``). Seam 1 landed
+``station/{flows.py:Harvest, loader.py:load_harvest_params, scenario.py:HarvestScenario,
+harvest.py, params/harvest.yaml}`` + ``tests/{test_harvest_run.py (9), test_regression_harvest.py
+(2) + golden/harvest_state.json}``. Grain settles to a **positive quasi-steady** (day-boundary
+min ~7e-4–1.4e-3 mol; captures ~89 % of the ~1.3e-2 mol/7-day fill), the **two-way identity**
+``Δfood_store = Δstorage_c = cumulative harvest`` holds to ~1.8e-9 (the ~1580-mol food-store
+cancellation floor; the ~1.2e-2 signal sits 7 orders above), ``rationed == 0``, ``events == ()``,
+every mass quantity closes every master day. **Zero core / zero domain change**
+(``git diff src/{simcore,domains}/`` empty), ruff + pyright + full suite incl. ``-m slow`` green
+(**1302 passed**), all nineteen existing goldens byte-identical (``harvest_state.json`` is the
+twentieth). The **exact-identity properties were verified before building** (advisor-flagged):
+(1) only ``annual_reset`` reads ``storage_c`` and it doesn't fire ≤7 days, and ``Allocation``'s
+``FO·DMI`` fill leg is independent of ``storage_c``'s level → harvest doesn't perturb fill;
+(2) ``CrewRespiration`` is forced (independent of ``food_store``) → the regenerated store doesn't
+perturb the cabin gas; (3) ``Harvest`` touches neither ``CARBON_POOL`` nor a photosynthesis
+input. The driver is **slow-first** (biosphere refills grain, then 1440 cabin sub-steps drain it),
+so the day-boundary snapshot is the intra-day *minimum* ``storage_c``. **Seam 2 (the
+``fecal_waste → litter_carbon`` re-pointing) is the next increment** — the design below is its
+spec.
+
+**Step 6 (P6.6) — the biomass / food loop — DESIGN (just-in-time).**
 Biosphere harvest → crew `food_store` (regenerative food); crew feces → soil/waste. Close
 CARBON through the trophic seam (the crew's finite `food_store`, open-loop standalone,
 becomes regenerative). Built on the **greenhouse** (Step 3): it is the only assembly where a

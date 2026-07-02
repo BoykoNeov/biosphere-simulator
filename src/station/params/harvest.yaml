@@ -1,0 +1,54 @@
+# harvest — the station grain-harvest coefficient (Phase 6, Step 6)
+# Currency/unit: CARBON (mol). A STATION-owned param (like water_recovery / lamp; the
+# CrewRespiration merge reused the crew's respired_carbon_fraction). It parameterises the
+# station-owned Harvest flow (station/flows.py) that makes the crew's food regenerative:
+#
+#     storage_c → food_store,   harvested = k_harvest · storage_c · dt
+#
+# storage_c is the biosphere's grain / storage organ — the one plant pool allocation.py
+# excludes from maintenance / senescence / the f_N biomass sum (it is "harvested, not
+# shed"), so it accumulates post-anthesis without being clawed back. Harvest is its only
+# new sink (annual_reset, its sole existing consumer, does not fire in a ≤7-day run). So
+# the biosphere fixes cabin CO₂ into grain and this flow moves that grain into the crew's
+# food_store, closing CARBON through one trophic level (the CARBON twin of Step 4's
+# WaterRecovery).
+#
+# harvest_rate (k_harvest) — first-order rate the harvester draws grain from storage_c
+#   (1/s), ≥ 0. Donor-controlled (∝ the standing grain, → 0 as it empties), so structural
+#   positivity requires k_harvest·dt < 1. The flow lives in the cabin / fast registry
+#   (dt = 60 s), so k_harvest·dt = 6e-4 — comfortably < 1. The biosphere refills grain
+#   once per master day and this flow drains it across the day's 1440 sub-steps, so the
+#   grain settles to a positive quasi-steady (daily harvest ≈ daily fill): a regenerative
+#   source being drained, not a static reservoir emptied. Because it reads a stock it is
+#   donor-controlled like biosphere Grazing (herbivory.py) one trophic level up — but the
+#   biosphere it couples is Euler-locked by its freeze, so the coupled run is Euler-only
+#   (no RK4 cross-check, matching the greenhouse).
+#
+# Units discipline (P4 / config/units.py): 1/s is not a conserved-Quantity canonical unit,
+#   so it is a schema-validated, bound-checked float carrying a declared unit
+#   (exact-string guarded at the loader, like water_recovery's recovery_rate / the ECLSS
+#   rates), NOT routed through pint.
+#
+# Clean-room: a first-order draw of a biomass reservoir (the linear-reservoir form; the
+#   same algebra as biosphere Grazing / decomposition) is standard bioregenerative
+#   life-support / crop-harvest modelling. The numeric VALUE is a provisional, ILLUSTRATIVE
+#   placeholder — deliberately NOT a NASA BVAD / BioSim number (integrated life-support
+#   calibration is a later Phase-6 step). Flagged TODO(cite) until bound to a primary
+#   source at the validation gate.
+#
+# Sources:
+#   [A] Olson, J.S. (1963), "Energy storage and the balance of producers and decomposers
+#       in ecological systems", Ecology 44(2):322–331 — the first-order linear-reservoir
+#       form (the same algebra governs an engineered harvester drawing a grain pool).
+#   [B] MacElroy, R.D. & Bredt, J. (1984), "Current concepts and future directions of
+#       CELSS", Adv. Space Res. 4(12):221–229 — bioregenerative food production in
+#       controlled ecological life support (the plant → crew food loop this closes).
+
+name: harvest
+process: crew_food_harvest
+
+parameters:
+  harvest_rate:
+    value: 1.0e-5
+    unit: "1/s"
+    source: "TODO(cite) — provisional, illustrative first-order grain-harvest rate; k·dt = 6e-4 < 1 for dt = 60 s, sized so the daily-refilled grain settles to a positive quasi-steady (daily harvest ≈ daily fill) [A][B]; NOT a NASA BVAD / BioSim number; primary citation pending validation gate"

@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict
 
 from config import load_yaml
 from domains.biosphere.weather import PAR_UMOL_PER_J
-from station.flows import LampParams, WaterRecoveryParams
+from station.flows import HarvestParams, LampParams, WaterRecoveryParams
 
 # The committed station water-recovery param file (Step 4 crew water loop).
 WATER_RECOVERY_PARAMS_PATH: Path = (
@@ -34,6 +34,9 @@ WATER_RECOVERY_PARAMS_PATH: Path = (
 
 # The committed station grow-lamp param file (Step 5 Power → biosphere lighting).
 LAMP_PARAMS_PATH: Path = Path(__file__).parent / "params" / "lamp.yaml"
+
+# The committed station grain-harvest param file (Step 6 biomass/food loop).
+HARVEST_PARAMS_PATH: Path = Path(__file__).parent / "params" / "harvest.yaml"
 
 # Expected canonical unit string per param (exact-match guard at the boundary). Neither
 # is a conserved-Quantity canonical unit, so each is schema-validated and exact-string
@@ -47,6 +50,11 @@ _WATER_RECOVERY_UNITS: dict[str, str] = {
 # conserved-Quantity canonical unit, so schema-validated + exact-string guarded (not
 # pint).
 _LAMP_UNITS: dict[str, str] = {"photon_efficacy": "umol/J"}
+
+# Expected canonical unit string for the harvest param (exact-match guard). Not a
+# conserved-Quantity canonical unit, so schema-validated + exact-string guarded (not
+# pint).
+_HARVEST_UNITS: dict[str, str] = {"harvest_rate": "1/s"}
 
 
 class _ValueUnitSource(BaseModel):
@@ -157,3 +165,40 @@ def load_lamp_params(path: str | Path = LAMP_PARAMS_PATH) -> LampParams:
             f"ceiling where all input becomes PAR photons), got {entry.value}"
         )
     return LampParams(photon_efficacy=entry.value)
+
+
+class _HarvestParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    harvest_rate: _ValueUnitSource
+
+
+class _HarvestSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _HarvestParameters
+
+
+def load_harvest_params(path: str | Path = HARVEST_PARAMS_PATH) -> HarvestParams:
+    """Load, schema- and bound-check the grain-harvest param.
+
+    ``harvest_rate`` carries a declared unit (exact-string guarded, ``1/s``) and a
+    required ``source`` tag (clean-room discipline). Bound: it must be ``≥ 0`` (a zero
+    rate disables harvest — the ``with_harvest=False`` baseline the "it bit" gate
+    compares against; the ``k_harvest·dt < 1`` structural bound is a scenario-``dt``
+    concern, checked in the run, not here — the ``recovery_rate`` discipline). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    out-of-range value.
+    """
+    schema = _HarvestSchema.model_validate(load_yaml(path))
+    entry = schema.parameters.harvest_rate
+    expected = _HARVEST_UNITS["harvest_rate"]
+    if entry.unit != expected:
+        raise ValueError(
+            f"harvest_rate must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    if entry.value < 0.0:
+        raise ValueError(f"harvest_rate must be >= 0, got {entry.value}")
+    return HarvestParams(harvest_rate=entry.value)
