@@ -558,7 +558,20 @@ analogue at station scale — assemble the fully-coupled sealed station, run mul
 prove **conservation of matter AND energy holds, numerics are stable (no drift / no
 collapse), and the cross-domain dynamics are believable**. Reuse the `biosphere/drift.py`
 instrument (mass-drift ceiling, stationarity, period class) across every conserved quantity
-+ ENERGY. Just-in-time design.
++ ENERGY. Just-in-time design. **Design-input landmine from Step 6 (advisor-flagged, record
+now):** Step 6's feces→litter loop is **not a bounded attractor** at the current illustrative
+scales — the ~3400× crew-vs-plant magnitude mismatch means litter influx (~52 mol C/day)
+vastly exceeds microbial consumption, so `litter_carbon` grows monotonically (342 mol by
+day 7, still climbing) and `microbial_carbon` with it (→20 mol, still climbing). Over 7 days
+`rationed == 0`, but at multi-year scale (a) the once-daily microbial O₂ draw grows with the
+litter pile and will eventually exceed what `O2Makeup` refills in a day → `rationed > 0` (the
+Euler backstop firing), and (b) the unbounded litter/microbial growth is itself a
+non-stationarity `drift.py` would flag — an artifact of the uncalibrated mismatch, not a real
+instability. So Step 7 must **either calibrate the crew-vs-plant scale before the multi-year
+run, or scope the sealed run to the sub-systems that are actually stationary** (the gas /
+water / energy loops the regulators hold), treating the food/litter loop's magnitude as a
+Step-9 calibration prerequisite. Do not assume the fully-coupled station is stationary as
+shipped.
 
 **Step 8 (P6.8) — cross-domain perturbation harness (cascades, no cascade code).** The
 Phase-3 `perturbations.py` discipline, cross-domain: compose brownout / radiator failure /

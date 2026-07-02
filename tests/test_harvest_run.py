@@ -5,17 +5,19 @@ fills ``storage_c`` (grain) once per master day, the station-owned ``Harvest`` f
 drains it into the crew ``food_store`` across the day's cabin sub-steps, so the crew's
 finite food becomes **regenerative** (the CARBON twin of Step 4's ``WaterRecovery``).
 
-**This is seam 1 of the two the plan splits** — the ``Harvest`` flow alone. The
-``fecal_waste → litter_carbon`` re-pointing (seam 2, which closes the CARBON ring) is a
-separate increment, so the food-regeneration signal is not conflated with the crew-scale
-feces flux dominating the seedling-scale litter pool.
+Covers **both** seams the plan splits (landed as separate commits, exercised together
+here). Seam 1 is the ``Harvest`` flow (``with_harvest``); seam 2 (``close_feces``,
+default on) re-points crew feces into the biosphere ``LITTER_CARBON`` pool to close the
+CARBON ring.
 
-The payload is the signed **two-way conservation identity** (``Δfood_store = cumulative
-harvest = Δstorage_c``): harvest is ``storage_c``'s only new sink and the ``Allocation``
-grain-fill leg is independent of ``storage_c``'s level, so grain fill is identical with
-and without harvest → the identity is exact to the fp cancellation floor (an un-biting
-run flips the signs). Euler-only: the greenhouse biosphere is Euler-locked by its
-freeze.
+The seam-1 payload is the signed **two-way conservation identity** (``Δfood_store =
+cumulative harvest = Δstorage_c``): harvest is ``storage_c``'s only new sink and the
+``Allocation`` grain-fill leg is independent of ``storage_c``'s level, so grain fill is
+identical with and without harvest → the identity is exact to the fp cancellation floor
+(an un-biting run flips the signs). The seam-2 payload is closure + no-shadow-sink +
+litter-grows-materially (crew-scale feces makes ``MicrobialRespiration`` **active**, so
+``Δlitter ≈ feces`` does *not* hold — a three-way identity is not the gate). Euler-only:
+the greenhouse biosphere is Euler-locked by its freeze.
 """
 
 import json
@@ -112,9 +114,10 @@ def test_rationed_zero_and_event_free() -> None:
 
 def test_every_day_boundary_conserves() -> None:
     # The payload: over each master day every conserved mass quantity balances across
-    # the combined biosphere+cabin ledger (harvest only moves CARBON storage_c →
-    # food_store, both {C:1}, so CARBON stays closed; OXYGEN / WATER inherit the
-    # greenhouse closure).
+    # the combined biosphere+cabin ledger. Harvest moves CARBON storage_c → food_store
+    # (both {C:1}); with close_feces the feces → litter re-point also feeds active
+    # microbial respiration, so OXYGEN closure here is non-trivial (microbes draw cabin
+    # O₂ to decompose the feces), not merely inherited from the greenhouse.
     states, _, _ = _run()
     for before, after in zip(states, states[1:], strict=False):
         ledger = {ql.quantity: ql for ql in compute_ledger(before, after)}
