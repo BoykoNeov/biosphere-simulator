@@ -11,6 +11,10 @@
 //! f64 values*, never JSON bytes. The Rust emitter need only produce valid JSON
 //! that round-trips through Python `loads`; it is not required to match Python's
 //! `json.dumps` string spelling byte-for-byte.
+//!
+//! Step 1 (P7.1) adds `rng` — the counter-based splitmix64 generator, the first
+//! ported engine component and a pure-integer Tier-1 bit-exact target.
 
 pub mod hexfloat;
+pub mod rng;
 pub mod snapshot;

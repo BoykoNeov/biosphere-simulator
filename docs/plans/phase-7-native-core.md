@@ -196,7 +196,34 @@ Stand up the `rust/` cargo workspace (crates mirroring `simcore` / `domains` / `
 *Acceptance:* the harness round-trips a Python State through the Rust codec/emitter and back;
 `tiers.json` classifies all 20 goldens with the graph-inspection evidence noted.
 
-### Step 1 (P7.1) — port `simcore.rng` + the splitmix64 hex-vector conformance
+### Step 1 (P7.1) — port `simcore.rng` + the splitmix64 hex-vector conformance — ✅ COMPLETE
+
+> **DONE.** `rust/crates/simcore/src/rng.rs` ports `mix64` / `keyed_hash` / `CounterRng`
+> (`draw_u64` → `u64`, `draw` → `f64`) with native `u64` wrapping (`wrapping_mul`/
+> `wrapping_add`; the Python `& MASK64` masks are implicit in `u64`). The fold order is the
+> load-bearing bit: `step` folded first, then each key word, each mixed as
+> `mix64((h + GAMMA) ^ word)`. **The three Python `keyed_hash` `TypeError` guards have no Rust
+> analogue by design** — a non-`u64` word does not type-check, so the `u64` type system
+> subsumes them statically (their absence is the check moving to compile time, not a dropped
+> behavior). `draw` is **bit-exact by construction**, not by luck: `x >> 11` is ≤53 bits (`as
+> f64` lossless) and the divisor is 2⁵³ (power-of-two division ⇒ no rounding).
+>
+> **Vectors follow the Step-0 generated-file discipline** (the grid is what justifies the
+> machinery over hand-inlining 9 constants): `tests/crossport/gen_rng_vectors.py` computes
+> `mix64` (published splitmix64-seed0 + edges) and `draw` (the 6 `_GOLDEN` fixed inputs + a
+> seed×key×step grid, 73 rows) from the frozen `simcore.rng`, writing committed
+> `rust/crates/simcore/tests/data/rng_vectors.txt`. Rust `tests/rng_vectors.rs` gates every row
+> **Tier-1 bit-exact** — `draw_u64` as an exact `u64`, `draw` as its exact `float.hex()`
+> spelling decoded through the Step-0 hex-float codec (a mismatch surfaces as a bit difference,
+> never rounding noise). **The circularity is dissolved** by
+> `test_crossport.py::test_rng_vectors_anchor_to_published_known_answers`: it binds the file's
+> fixed rows to the hand-pinned `_GOLDEN` / `_SPLITMIX64_SEED0` in `tests/test_rng.py` (grounded
+> against *published* splitmix64), so the chain is Rust == file == Python, Python == published —
+> not self-referential. Plus `test_rng_vectors_in_sync` (regen-drift guard). **Zero core +
+> zero domain change** (`git diff src/` empty; Rust under `rust/`, generator + tests under
+> `tests/crossport/` — permitted test tooling). All 20 frozen goldens byte-identical (no
+> regen); `cargo test` + `clippy -D warnings` green; Python suite green incl. `-m slow`.
+
 
 The tightest, purest constraint first (advisor: "go RNG-vectors first"). Port `mix64` /
 `keyed_hash` / `CounterRng` with `u64` wrapping (`wrapping_mul`/`wrapping_add`, `& MASK64` free

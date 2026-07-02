@@ -30,6 +30,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 
 import compare  # noqa: E402
+import gen_rng_vectors  # noqa: E402
 import gen_vectors  # noqa: E402
 
 from sim_io import snapshot  # noqa: E402
@@ -39,6 +40,11 @@ GOLDEN_DIR = REPO_ROOT / "tests" / "regression" / "golden"
 RUST_CRATE_DIR = REPO_ROOT / "rust" / "crates" / "simcore"
 TIERS_PATH = Path(__file__).parent / "tiers.json"
 
+# The hand-pinned RNG known-answer vectors live in tests/test_rng.py; import them to
+# anchor the generated cross-port file to external truth (published splitmix64).
+sys.path.insert(0, str(REPO_ROOT / "tests"))
+from test_rng import _GOLDEN as _RNG_GOLDEN  # noqa: E402
+from test_rng import _SPLITMIX64_SEED0  # noqa: E402
 
 # --------------------------------------------------------------------------- #
 # 1. Vector file in sync with its generator                                   #
@@ -52,6 +58,59 @@ def test_hexfloat_vectors_in_sync() -> None:
         "hex-float vectors are stale — regenerate with "
         "`uv run python tests/crossport/gen_vectors.py`"
     )
+
+
+def test_rng_vectors_in_sync() -> None:
+    """The committed RNG vector file equals `gen_rng_vectors.render()` (regen
+    discipline — the Rust `tests/rng_vectors.rs` reads this exact file)."""
+    on_disk = gen_rng_vectors.VECTORS_PATH.read_text(encoding="utf-8").replace(
+        "\r\n", "\n"
+    )
+    assert on_disk == gen_rng_vectors.render(), (
+        "RNG vectors are stale — regenerate with "
+        "`uv run python tests/crossport/gen_rng_vectors.py`"
+    )
+
+
+def test_rng_vectors_anchor_to_published_known_answers() -> None:
+    """Dissolve the circularity: the generated file is computed from `CounterRng`,
+    so on its own it only proves Rust == Python. This test anchors its fixed rows to
+    the hand-pinned known-answer vectors in `tests/test_rng.py` — which are grounded
+    against *published* splitmix64 output — so the full chain is Rust == file ==
+    Python, and Python == published. Without this, the whole cross-port RNG gate
+    would be self-referential.
+    """
+    text = gen_rng_vectors.render()
+    mix_rows: dict[int, int] = {}
+    draw_rows: dict[tuple[int, tuple[int, ...], int], tuple[int, str]] = {}
+    for line in text.splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        fields = line.split("\t")
+        if fields[0] == "mix64":
+            mix_rows[int(fields[1], 16)] = int(fields[2], 16)
+        elif fields[0] == "draw":
+            seed = int(fields[1], 16)
+            key = tuple(int(w) for w in fields[2].split(",") if w)
+            step = int(fields[3])
+            draw_rows[(seed, key, step)] = (int(fields[4], 16), fields[5])
+
+    # Anchor the mix64 primitive: splitmix64(seed=0) emits finalizer(i*GAMMA) for
+    # i = 1, 2, 3 — the published constants in _SPLITMIX64_SEED0.
+    gamma = 0x9E3779B97F4A7C15
+    mask64 = 0xFFFFFFFFFFFFFFFF
+    for i, expected in enumerate(_SPLITMIX64_SEED0, start=1):
+        assert mix_rows[(i * gamma) & mask64] == expected, (
+            f"mix64 vector for i={i} does not match published splitmix64(seed=0)"
+        )
+
+    # Anchor the keyed draws: every _GOLDEN row's (u64, float_hex) must appear in the
+    # generated file with the pinned values.
+    for seed, key, step, u64, fhex in _RNG_GOLDEN:
+        assert draw_rows[(seed, key, step)] == (u64, fhex), (
+            f"draw vector for (seed={seed:#x}, key={key}, step={step}) does not "
+            f"match the hand-pinned _GOLDEN known answer"
+        )
 
 
 # --------------------------------------------------------------------------- #

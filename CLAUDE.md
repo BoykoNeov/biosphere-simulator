@@ -656,8 +656,40 @@ Per-golden grep evidence recorded. **The acceptance**: the Rust `emit_crew` JSON
 (`.github/workflows/ci.yml`): a Python job (ruff/pyright/pytest) + a Rust job (cargo test +
 `clippy -D warnings`). **Zero core + zero domain change** (`git diff src/` empty); all twenty
 frozen goldens byte-identical (no regen). Rust `cargo test` + `clippy -D warnings` green; Python
-fast suite **1324 passed** (1312 baseline + 12 crossport) + ruff/format/pyright green. **Next:
-Step 1 (P7.1) — port `simcore.rng` (splitmix64) against the existing hex vectors (Tier-1 bit-exact).**
+fast suite **1324 passed** (1312 baseline + 12 crossport) + ruff/format/pyright green.
+**Step 1 (P7.1) COMPLETE — `simcore.rng` (splitmix64) ported, Tier-1 bit-exact against Python
+vectors; the first ported engine component and the cross-port integer discipline proven
+end-to-end before any float**: new `rust/crates/simcore/src/rng.rs` (`mix64`/`keyed_hash`/
+`CounterRng`; `draw_u64`→`u64`, `draw`→`f64`) with native `u64` wrapping (`wrapping_mul`/
+`wrapping_add`; Python's `& MASK64` masks implicit in `u64`). **The fold order is the one
+load-bearing bit** — `step` folded first, then each key word, each mixed as
+`mix64((h + GAMMA) ^ word)` (sanity: `mix64(GAMMA) == 0xE220A8397B1DCDAF`, the empty-key
+seed0/step0 draw). **The three Python `keyed_hash` `TypeError` guards have NO Rust analogue BY
+DESIGN** (advisor blind-spot flag): a non-`u64` word doesn't type-check, so the `u64` type
+system subsumes them statically — their absence is the check moving to compile time, not a
+dropped behavior (stated so a reviewer doesn't count "3 missing behaviors"). **`draw` is
+bit-exact by CONSTRUCTION, not luck** (advisor): `x >> 11` is ≤53 bits (`as f64` lossless) and
+the divisor is 2⁵³ (power-of-two division ⇒ no rounding). **Vectors reuse the Step-0
+generated-file discipline** (the seed×key×step grid is what justifies the machinery over
+hand-inlining 9 constants — breadth is where a fold-order/masking bug surfaces):
+`tests/crossport/gen_rng_vectors.py` computes `mix64` (published splitmix64-seed0 + ≤64-bit
+edges; a wider-than-64-bit input is unexpressible in `u64`, subsumed like the `TypeError`
+guards) + `draw` (the 6 `_GOLDEN` fixed inputs + grid, 73 rows) from the frozen `simcore.rng`,
+writing committed `rust/crates/simcore/tests/data/rng_vectors.txt`; Rust `tests/rng_vectors.rs`
+gates every row **Tier-1 bit-exact** — `draw_u64` as exact `u64`, `draw` as its exact
+`float.hex()` decoded through the Step-0 hex-float codec (mismatch ⇒ a bit difference, never
+rounding noise). **The circularity is dissolved** (advisor): the generated file computed from
+`CounterRng` alone only proves Rust == Python, so `test_crossport.py::
+test_rng_vectors_anchor_to_published_known_answers` binds its fixed rows to the hand-pinned
+`_GOLDEN`/`_SPLITMIX64_SEED0` in `tests/test_rng.py` (grounded against *published* splitmix64) —
+chain: Rust == file == Python, Python == published; plus `test_rng_vectors_in_sync` (regen-drift
+guard). **Zero core + zero domain change** (`git diff src/` empty; `rng.rs` under `rust/`,
+generator + tests under `tests/crossport/` — permitted test tooling); all twenty frozen goldens
+byte-identical (no regen). `cargo test` + `clippy -D warnings` green; full Python suite incl.
+`-m slow` **1369 passed, 1 skipped** (oracle opt-in) + ruff/format/pyright green. **Next: Step 2
+(P7.2) — port the whole `simcore` engine (state/flow/arbitration/conservation/integrator/
+registry/environment/boundary/events/aux/multirate) + a synthetic pure-arithmetic scenario
+bit-exact (Tier-1) under Euler AND RK4.**
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
