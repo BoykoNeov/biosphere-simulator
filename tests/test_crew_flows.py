@@ -267,9 +267,11 @@ def test_water_balance_zero_intake_is_a_noop() -> None:
 
 # --- loader: the committed crew.yaml -----------------------------------------
 def test_loader_reads_committed_params() -> None:
+    # BVAD-calibrated at Phase-6 Step 9 (was 0.85 / 0.4 illustrative) — see
+    # crew.yaml, docs/bvad-reference.md, tests/test_bvad_validation.py.
     p = load_crew_params()
-    assert p.respired_carbon_fraction == pytest.approx(0.85)
-    assert p.insensible_water_fraction == pytest.approx(0.4)
+    assert p.respired_carbon_fraction == pytest.approx(0.949)
+    assert p.insensible_water_fraction == pytest.approx(0.675)
 
 
 def _write(tmp_path: Path, body: str) -> Path:

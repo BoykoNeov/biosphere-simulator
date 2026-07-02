@@ -4,7 +4,7 @@
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.d07c84b5dcc4dp+2",
+      "amount": "0x1.87e90ff972484p+3",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -30,7 +30,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.010a3d70a3d73p+8",
+      "amount": "0x1.1efa43fe5c91fp+8",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -43,7 +43,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.6ae147ae147c0p+5",
+      "amount": "0x1.ed844d013a90bp+3",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -56,7 +56,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.5c5d638865949p+3",
+      "amount": "0x1.79652bd3c3604p+2",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },

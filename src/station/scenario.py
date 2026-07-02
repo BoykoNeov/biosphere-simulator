@@ -147,10 +147,12 @@ class CabinScenario:
     food_store0: float = 1000.0
     water_store0: float = 20.0
     # Forced constant crew intake rates (the standalone stand-in for the crew's real
-    # schedule; illustrative, NOT NASA BVAD). With f_resp = 0.85 the food intake gives
-    # CO₂/O₂ production = 0.85·4e-3 = 3.4e-3 mol/s ⇒ cabin_co2_eq = 3.4 mol, cabin_o2_eq
-    # = 10 − 3.4e-3/2e-3 = 8.3 mol; with f_ins = 0.4 the water intake gives humidity
-    # 0.4·5e-5 = 2e-5 kg/s ⇒ cabin_h2o_eq = 0.04 kg. All comfortably positive
+    # schedule; illustrative sizing, NOT NASA BVAD per-crew rates — the BVAD-calibrated
+    # crew load lives in the Step-9 validation scenario, tests/test_bvad_validation.py).
+    # With the BVAD-calibrated f_resp = 0.949 the food intake gives CO₂/O₂ production =
+    # 0.949·4e-3 = 3.796e-3 mol/s ⇒ cabin_co2_eq = 3.796 mol, cabin_o2_eq = 10 −
+    # 3.796e-3/2e-3 = 8.10 mol; with f_ins = 0.675 the water intake gives humidity
+    # 0.675·5e-5 = 3.375e-5 kg/s ⇒ cabin_h2o_eq = 0.0675 kg. All comfortably positive
     # (``cabin.cabin_steady_state``).
     food_intake_rate: float = 4.0e-3  # mol/s (carbon), food drawn from the food store
     water_intake_rate: float = 5.0e-5  # kg/s, water drawn from the water store
@@ -193,16 +195,18 @@ CABIN_GAS_STEPS: int = 900
 # ``chamber_o2_mol0 = 10``: at the ECLSS O₂ setpoint (``eclss.yaml`` o2_setpoint = 10
 # mol) so the makeup regulator starts idle (a wildly different scale would make the
 # proportional regulator run backwards, dumping O₂ — the standalone 210 mol is
-# incompatible with a 10 mol setpoint). - ``chamber_co2_mol0 = 3.4``: at the crew-driven
-# scrubber steady state ``P/k_scrub = (f_resp·food_intake)/k_scrub = 3.4e-3/1e-3`` mol,
-# so both the with- and without-plant runs start at the crew equilibrium and the plant's
-# net draw is the only departure (the "it bit" contrast). - ``chamber_air_mol = 9500``:
-# sized so ``Ci = ci_ratio·CARBON_POOL/air_mol·1e6`` is ≈ 250 µmol mol⁻¹ at the
-# crew-driven CO₂ (continuity with the frozen chamber's fill), i.e. the plant
-# photosynthesises in a healthy Ci regime. (The resulting O₂ mole fraction ``x_O2 =
-# 10/9500`` is low vs 21 %; that only *weakens* respiration's O₂ draw via ``f_O2``,
-# strengthening the net-sink signal — an honest artefact of the illustrative,
-# uncalibrated ECLSS scales, calibration deferred to Step 9.) - ``litter_carbon0 = 0``:
+# incompatible with a 10 mol setpoint). - ``chamber_co2_mol0 = 3.796``: at crew-driven
+# scrubber steady state ``P/k_scrub = (f_resp·food_intake)/k_scrub = 3.796e-3/1e-3`` mol
+# (with the BVAD-calibrated f_resp = 0.949, Step 9), so both the with- and without-plant
+# runs start at the crew equilibrium and the plant's net draw is the only departure (the
+# "it bit" contrast). - ``chamber_air_mol = 9500``: sized so ``Ci =
+# ci_ratio·CARBON_POOL/air_mol·1e6`` is ≈ 280 µmol mol⁻¹ at the crew-driven CO₂
+# (continuity with the frozen chamber's fill), i.e. the plant photosynthesises in a
+# healthy Ci regime. (The resulting O₂ mole fraction ``x_O2 = 10/9500`` is low vs 21 %;
+# that only *weakens* respiration's O₂ draw via ``f_O2``, strengthening the net-sink
+# signal — an honest artefact of the illustrative, uncalibrated ECLSS scales, which stay
+# illustrative: Step 9 calibrated the crew physiology, not the ECLSS equipment sizing.)
+# - ``litter_carbon0 = 0``:
 # no seeded soil organic matter, so microbial respiration (a CO₂ *source*) stays minimal
 # and the growing seedling is cleanly net-assimilating over the window (the advisor's
 # sign requirement). ``consumer=False`` (default): a producer-only greenhouse — the
@@ -211,7 +215,7 @@ CABIN_GAS_STEPS: int = 900
 GREENHOUSE_BIO_SCENARIO: SeasonScenario = SeasonScenario(
     sealed=True,
     chamber_o2_mol0=10.0,
-    chamber_co2_mol0=3.4,
+    chamber_co2_mol0=3.796,
     chamber_air_mol=9500.0,
     litter_carbon0=0.0,
 )
@@ -506,8 +510,8 @@ SEALED_ENERGY_YEARS: int = LONG_HORIZON_YEARS
 SEALED_ENERGY_DAYS: int = SEALED_ENERGY_YEARS * SEALED_STATION_SEASON_DAYS
 
 # The Tier-2 sealed biosphere: the greenhouse cabin-sized sealed chamber
-# (``GREENHOUSE_BIO_SCENARIO`` — Ci ≈ 258 held by the scrubber) made
-# **perennial-capable**
+# (``GREENHOUSE_BIO_SCENARIO`` — Ci ≈ 288 held by the scrubber at the BVAD-calibrated
+# f_resp = 0.949, Step 9) made **perennial-capable**
 # by seeding ``litter_carbon0 = 3.0`` (year-1 decomposer fuel; thereafter the closed
 # loop
 # — organs/grain → litter at each re-sow → microbial → CO₂ → regrowth — sustains it, as

@@ -965,10 +965,88 @@ domain change** (`src/domains/` untouched — the harness *imports* Phase-3's ge
   skipped**); **all twenty existing goldens byte-identical** (no regen). **Phase 6 continues
   → Step 9 (NASA BVAD / BioSim validation).**
 
-**Step 9 (P6.9) — NASA BVAD / BioSim validation (one crew configuration).** Clean-room from
-**primary literature** under `docs/reuse-and-licenses.md` — cite the reference, copy no
-dataset (the PCSE-oracle discipline). Validate integrated consumption/production for at
-least one crew config. Just-in-time design.
+**Step 9 (P6.9) — NASA BVAD validation (one crew configuration). COMPLETE** (2026-07-02;
+executed as designed — the RQ ~11.8 % O₂ under-prediction is the measured headline; six
+downstream goldens deliberately regenerated, frozen seven + Power/Thermal/ECLSS untouched;
+sealed Tier-2 re-verified to converge; 1311 passed). DESIGN (advisor-reviewed,
+just-in-time) below. Clean-room from **primary literature** under `docs/reuse-and-licenses.md` —
+cite the reference, copy no dataset (the PCSE-oracle discipline). Validate integrated crew
+consumption/production against NASA BVAD for one crew config, and bind the deferred crew
+physiology params to that reference before Step 10 freezes the station.
+
+**Primary source (recorded durably in `docs/bvad-reference.md`):** NASA/TP-2015-218570 **Rev 2**
+(Feb 2022), Table **3-31** "Summary of Nominal Human Metabolic Interface Values", p. 58 — 82 kg
+reference crewmember, RQ **0.860**. Key per-CM-day values: CO₂ load **1.085 kg** (= 24.654 mol),
+O₂ consumed **0.895 kg** (= 27.970 mol), food solids dry **0.800 kg**, fecal solid dry **0.032 kg**,
+resp+persp water **2.946 kg**, urine water **1.420 kg**, metabolic water **0.490 kg**, metabolic
+heat **12.426 MJ** (≈ 143.8 W). BioSim is architecture-only (license unverified) — **numbers cite
+BVAD, not BioSim** (`reuse-and-licenses.md`).
+
+**The load-bearing framing (advisor): calibration ≠ validation; the ONE genuine structural output
+is RQ.** The crew flows are *forced* (intake rates = scenario data) and the splits are params, so
+every quantity we *set* matches BVAD **by construction** (vacuous). Three columns, kept visibly
+separate in the test:
+- **Calibrated (set → matches, "calibration checkpoints" NOT validation):** food-carbon intake,
+  water intake, CO₂ production, feces, humidity, urine.
+- **Structural prediction (genuine — can fail):** `CrewRespiration` is **PQ = 1 ⇒ RQ = 1.0** (one
+  mol O₂ consumed per mol CO₂ produced), independent of the fraction values. Calibrate CO₂ to BVAD
+  (24.654 mol) ⇒ model O₂ = 24.654 mol = 0.789 kg vs BVAD 0.895 kg. **RQ = 1 cannot hit both O₂ and
+  CO₂** — it forces O₂ ≈ **11.8 % low** (or CO₂ ≈ 13.4 % high if O₂ is the calibrated one). Pinned as
+  a **number, not a bound**: `model_O2 / bvad_O2 = 0.8814 ± tol` (the daily-effective molar RQ; a
+  regression that silently changed RQ trips it — the `fit_order`/`nrmse` "measure the known error"
+  discipline). **This ~12 % miss is the headline result of the step.**
+- **Not modeled (honest gaps, documented):** metabolic water (0.490 kg/CM-d — our `WaterBalance` is
+  intake-split only, no oxidation water); metabolic heat (143.8 W/CM — crew is not an ENERGY source
+  into `thermal.node`); RQ variation with activity (0.86 nominal / 0.95–0.96 exercise — single fixed
+  RQ). All three are seams for later, not Step-9 scope.
+
+**Recalibrate BOTH crew fractions (the deferred debt comes due here — Step 10 freezes next).** The
+churn cost is fixed at first touch, so recalibrate both (advisor):
+- `insensible_water_fraction` 0.4 → **0.675** = 2.946/(2.946+1.420) — humidity vs urine water, clean
+  from Table 3-31 (fecal water 0.101 kg excluded — our model has no fecal-water fate; note the
+  modeling boundary so "water intake" is not read as BVAD's potable figure).
+- `respired_carbon_fraction` 0.85 → **0.949** from the carbon balance `C_food = C_CO₂ + C_feces`:
+  C_CO₂ = 24.654 mol, C_feces = 0.032 kg × **0.50** (carbon fraction of dry feces, 44–55 % — **Rose
+  et al. 2015** CREST review citing Feachem 1983; *the same Rose 2015 BVAD Table 3-31 cites for its
+  fecal numbers*) = 1.332 mol ⇒ f_resp = 24.654/25.986 = 0.949 (range [0.944, 0.955] over the 44–55 %
+  uncertainty). Both `crew.yaml` values get BVAD/Rose citations, `TODO(cite)` removed.
+- **Equipment rate-constants stay illustrative** (`eclss.yaml` k_scrub/k_cond/k_makeup, harvest/
+  recovery rates): BVAD publishes no first-order τ, only steady-state *throughput* (= crew
+  production), which the closure check already validates — and keeping them still leaves their
+  goldens byte-identical.
+
+**Deliberate golden regen (stated loudly — the departure from "byte-identical every step").** The
+`crew.yaml` change moves the **6 non-frozen goldens downstream of the crew fractions**: `crew_state`,
+`cabin_gas_state`, `greenhouse_state`, `harvest_state`, `water_recovery_state`, `sealed_station_state`
+(regen via each test's `__main__`, pre-golden gates re-assert). **Byte-identical (the invariant that
+matters, called out):** the **seven frozen biosphere goldens** (crew doesn't touch them) + Power ×2 +
+Thermal + ECLSS (its own forced `CrewMetabolism` stand-in, verified independent of `crew.yaml`) + the
+two demo + `n_limited`/`water_biting` + `lighting` + `station` + `sealed_energy_drift_summary`
+(energy-only Tier-1, no crew). `crew.yaml` is **not** in the freeze manifest (verified).
+
+**The deliverable — `tests/test_bvad_validation.py`, run on the CABIN assembly** (the "integrated"
+word: crew respiring into ECLSS, not standalone-crew arithmetic). A BVAD-calibrated `CabinScenario`
+built **in the test** (N-CM crew load = N × per-CM rates; N and per-CM values folded into the two
+intake rates — doesn't touch the shipped `CABIN_GAS_SCENARIO`/its golden). Run to steady state, read
+actual flow fluxes, assert:
+1. **Calibration checkpoints** (tight band, labeled as such): per-CM CO₂ production, feces (→ dry via
+   0.50), humidity, urine reproduce Table 3-31.
+2. **Structural payload (pinned, can fail):** `model_O2_consumption / bvad_O2 = 0.8814 ± tol`.
+3. **Closure (what "integrated" buys):** at steady state, ECLSS scrubber removal flux = crew CO₂
+   production flux; O₂ makeup flux = crew O₂ consumption flux (throughput matches load).
+No new golden (a validation-against-reference test, the `oracle_match` precedent — computed
+comparison, not a regression pin).
+
+**Verify-before-commit (advisor):** the Tier-2 sealed run converged at the *old* fractions; f_resp
+0.85→0.949 (more carbon to CO₂ ⇒ higher scrubber load) and f_ins 0.4→0.675 shift the loads, so
+**re-run the ~1.3 M-substep sealed Tier-2 stability test and confirm it still converges + regen its
+golden** (the regulators should absorb the shift — an assumption until the run passes). Also re-run
+the Step-8 perturbation suite (no golden; qualitative assertions) and the Tier-3 landmine.
+
+**Zero core + zero domain change target:** `crew.yaml` is a Phase-5 domain *param* (a data/citation
+change, not a `simcore/` or flow-class change) — `git diff src/simcore/` stays empty; the only
+`src/domains/` touch is the two `crew.yaml` values + citations. Everything else is station-layer
+(the new test) + regenerated goldens + doc.
 
 **Step 10 (P6.10) — whole-station golden capture + freeze the station.** The Phase-4
 analogue: pin the sealed-station scenario's final `State` + a stability signature as

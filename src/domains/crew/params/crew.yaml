@@ -36,25 +36,51 @@
 #
 # Clean-room: the fractional split of ingested carbon into respired CO₂ vs fecal loss, and
 #   of water intake into insensible loss vs urine, is textbook human metabolism / mass
-#   balance. The numeric VALUES are provisional, ILLUSTRATIVE placeholders — deliberately
-#   NOT NASA BVAD / BioSim life-support numbers (Crew calibration against those references
-#   is Phase 6, the integrated-validation step). Flagged TODO(cite) until bound to a primary
-#   source at the validation gate.
+#   balance. As of Phase 6 Step 9 (the integrated-validation gate) both VALUES are
+#   CALIBRATED to NASA BVAD Table 3-31 (Rev 2, 2022) — the deferred TODO(cite) debt comes
+#   due here, before Step 10 freezes the station. Derivations (see docs/bvad-reference.md
+#   and docs/plans/phase-6-station-integration.md Step 9):
+#
+#   respired_carbon_fraction (f_resp) — from the steady-body-mass carbon balance
+#     C_food = C_CO₂ + C_feces (our model has exactly two carbon fates: respired CO₂ +
+#     feces). C_CO₂ = BVAD CO₂ load 1.085 kg/CM-d ÷ 44.009 g/mol = 24.654 mol. C_feces =
+#     BVAD fecal solid dry 0.032 kg/CM-d × 0.50 (carbon fraction of dry feces, 44–55 %,
+#     [B]) ÷ 12.011 g/mol = 1.332 mol. f_resp = 24.654 / (24.654 + 1.332) = 0.949 (range
+#     [0.944, 0.955] over the 44–55 % feces-carbon uncertainty).
+#
+#   insensible_water_fraction (f_insensible) — humidity vs urine of the two water fates
+#     the model carries: BVAD resp+persp water 2.946 / (2.946 + urine 1.420) = 0.675.
+#     (BVAD fecal water 0.101 kg/CM-d is excluded — the model has no fecal-water fate; and
+#     BVAD metabolic water 0.490 kg/CM-d is not modeled — WaterBalance is intake-split
+#     only. So this "water intake" is humidity + urine, NOT BVAD's potable-water figure.)
+#
+# NOTE — RQ = 1.0 is baked into CrewRespiration (PQ = 1: one O₂ consumed per CO₂ produced),
+#   vs BVAD's nominal RQ 0.86 (daily-effective 0.881). Calibrating CO₂ to BVAD therefore
+#   makes the model's O₂ consumption ≈ 11.8 % low — the one genuinely un-tuned structural
+#   prediction, pinned in tests/test_bvad_validation.py. That miss is a documented model
+#   limitation (a fixed RQ, no metabolic-water machinery), not a parameter error.
 #
 # Sources:
-#   [A] Guyton, A.C., Hall, J.E. (2016), "Textbook of Medical Physiology", 13th ed.,
-#       Elsevier — respiratory vs fecal carbon partitioning; insensible water loss vs
-#       urinary output in the daily water balance.
+#   [A] Anderson, M.S., Ewert, M.K., Keener, J.F. (eds.) (2022), "Life Support Baseline
+#       Values and Assumptions Document", NASA/TP-2015-218570 Rev 2, NASA JSC, Table 3-31
+#       "Summary of Nominal Human Metabolic Interface Values", p. 58 (public domain, US
+#       Government work). https://ntrs.nasa.gov/citations/20210024855
+#   [B] Rose, C., Parker, A., Jefferson, B., Cartmell, E. (2015), "The Characterization of
+#       Feces and Urine: A Review of the Literature to Inform Advanced Treatment
+#       Technology", Critical Reviews in Environmental Science and Technology 45(17):
+#       1827–1879 — carbon content of feces 44–55 % of dry solids (citing Feachem 1983);
+#       the same review NASA BVAD Table 3-31 cites (ref. 5, "Rose 2015") for its fecal and
+#       urine solid-waste values, so the two numbers are coherent.
 
 name: crew
 process: metabolic_split
 
 parameters:
   respired_carbon_fraction:
-    value: 0.85
+    value: 0.949
     unit: "dimensionless"
-    source: "TODO(cite) — provisional, illustrative fraction of ingested food carbon respired as CO₂ (remainder egested as feces) [A]; NOT a NASA BVAD number; primary citation pending validation gate"
+    source: "NASA BVAD Table 3-31 [A] + feces carbon fraction [B]: from C_food = C_CO₂ + C_feces, f_resp = 24.654 / (24.654 + 1.332) = 0.949 (range [0.944, 0.955] over the 44–55% feces-carbon uncertainty). See docs/bvad-reference.md."
   insensible_water_fraction:
-    value: 0.4
+    value: 0.675
     unit: "dimensionless"
-    source: "TODO(cite) — provisional, illustrative fraction of water intake leaving as insensible/respiratory humidity (remainder as urine) [A]; NOT a NASA BVAD number; primary citation pending validation gate"
+    source: "NASA BVAD Table 3-31 [A]: humidity vs urine of the two modeled water fates, 2.946 / (2.946 + 1.420) = 0.675 (fecal + metabolic water not modeled). See docs/bvad-reference.md."

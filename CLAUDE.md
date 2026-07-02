@@ -537,8 +537,49 @@ completed run (per-sub-step ledger assert) + relative day-boundary drift teeth r
 for leak arms; Phase-3's absolute `TOL` does NOT transport at station scales 1e0–1e10). Spiked
 `k_leak=1e-3` (`k·dt=0.06` at 60 s, the `k_scrub` scale). Determinism re-runs on both substrates
 stand in for the absent golden. Full suite incl. `-m slow` + ruff + pyright green (**1338 passed, 1
-skipped**); **all twenty existing goldens byte-identical** (no regen). NEXT: Step 9 (P6.9) — NASA
-BVAD / BioSim validation (one crew configuration).
+skipped**); **all twenty existing goldens byte-identical** (no regen).
+**Step 9 (P6.9) COMPLETE — NASA BVAD integrated crew-metabolic validation; the deferred crew
+physiology params bound to primary literature (the FIRST deliberate golden regen of the phase)**:
+new `docs/bvad-reference.md` (Table 3-31 recorded verbatim) + `tests/test_bvad_validation.py` (8
+tests, run on the CABIN assembly — "integrated", not standalone-crew arithmetic). **Primary source:
+NASA/TP-2015-218570 Rev 2 (Feb 2022), Table 3-31, p.58** — 82 kg reference CM, RQ 0.860 (public
+domain; BioSim architecture-only, license unverified → numbers cite BVAD, not BioSim; the feces
+carbon fraction cites **Rose et al. 2015**, the same review BVAD Table 3-31 uses for its fecal
+numbers). **The load-bearing framing (advisor): calibration ≠ validation — the ONE genuinely
+un-tuned output is RQ.** Crew flows are forced + splits are params, so every quantity we SET matches
+BVAD by construction; three columns kept visibly separate in the test: **calibrated** (CO₂/feces/
+humidity/urine — "calibration checkpoints", bookkeeping); **structural prediction** (`CrewRespiration`
+is PQ=1 ⇒ **RQ=1.0**, independent of the fractions ⇒ with CO₂ calibrated to BVAD the model's **O₂
+consumption is ≈11.8 % low** vs BVAD's RQ 0.86 / daily-effective 0.881 — pinned as `model_O2/bvad_O2 =
+0.8814`, a *number* not a bound; the guarded structural fact is `model_O2 == model_CO2`, the ratio
+asserts are then arithmetic); **closure** (ECLSS scrubber throughput = crew CO₂ production, O₂ makeup
+= O₂ consumption — what "integrated" buys). **Not "validated accurate" — CALIBRATED + the residual
+QUANTIFIED**: metabolic water (0.490 kg/CM-d) + metabolic heat (~575 W for 4 CM) are documented
+NOT-modeled gaps (WaterBalance is intake-split only; crew is not an ENERGY source into `thermal.node`).
+**Recalibrated BOTH crew fractions in `crew.yaml`** (the deferred TODO(cite) debt, due before Step 10
+freezes): `respired_carbon_fraction` 0.85→**0.949** (from the carbon balance `C_food=C_CO₂+C_feces`,
+feces C via the 0.50 dry-feces carbon fraction), `insensible_water_fraction` 0.4→**0.675** (2.946/
+(2.946+1.420) humidity vs urine); `TODO(cite)` → BVAD/Rose citations. **The equipment rate-constants
+(`eclss.yaml` k_scrub/k_cond/k_makeup, harvest/recovery rates) STAY illustrative** — BVAD publishes no
+first-order τ, only throughput (validated by closure); one line for Step 10's freeze contract to be
+honest about literature-bound (crew) vs sizing (ECLSS/harvest/recovery) params. **FIRST DELIBERATE
+GOLDEN REGEN of the phase — stated loudly, NOT an accidental break:** the `crew.yaml` change
+intentionally moved the **6 non-frozen goldens downstream of the crew fractions** (`crew_state`,
+`cabin_gas_state`, `greenhouse_state`, `harvest_state`, `water_recovery_state`, `sealed_station_state`;
+regen via each test's `__main__`, pre-golden gates re-asserted). **The invariant that did NOT move
+(git-confirmed byte-identical):** the seven frozen biosphere goldens + Power×2 + Thermal + ECLSS (its
+own forced `CrewMetabolism` stand-in, independent of `crew.yaml`) + two demo + `n_limited`/
+`water_biting` + `lighting` + `station` + `sealed_energy_drift_summary` (energy-only Tier-1, no crew);
+`crew.yaml` is **not** in the freeze manifest. **Advisor verify-before-commit PASSED:** the ~1.3 M-
+substep sealed Tier-2 run still converges at the recalibrated fractions (the regulators absorb the
+shift), Tier-3 landmine + Step-8 perturbations still hold. Station-layer touch only: `station/
+scenario.py` (the greenhouse `chamber_co2_mol0` derived IC 3.4→3.796 tracks the new f_resp + stale-
+comment sync) + `test_crew_flows.py` (loader assertion 0.85/0.4→0.949/0.675). No new golden (the
+`oracle_match` validation-against-reference precedent). **Zero core change** (`git diff src/simcore/`
+empty) + **zero domain-code change** (the only `src/domains/` touch is the two `crew.yaml` values +
+citations). Full suite incl. `-m slow` + ruff + pyright green (**1311 passed, 1 skipped**); **six
+goldens deliberately regenerated, all other goldens byte-identical**. NEXT: Step 10 (P6.10) — whole-
+station golden capture + freeze the station.
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
