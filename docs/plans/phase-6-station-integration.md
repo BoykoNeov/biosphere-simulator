@@ -553,6 +553,44 @@ two-rate `run_master_day` driver.
   `harvest_state.json` is the twentieth). Then update the plan doc, `CLAUDE.md`, and memory;
   commit + push to `main`.
 
+**Step 7 (P6.7) — the sealed station: multi-year matter+energy stability — COMPLETE
+(executed; all spikes passed, all tiers delivered).** New `src/station/sealed.py`
+(`build_sealed_station` composing every Phase-6 seam over one shared stock dict + two
+registries — biosphere-slow + everything-fast ~11 flows; `sealed_bio_resolver` /
+`sealed_fast_resolver` / `run_sealed` / `sealed_reset`) + `SealedStationScenario` + a new
+`slow_reset` hook on `station.driver.run_master_day` (the annual re-sow machinery the ≤7-day
+runs never fired) + shared `tests/sealed_tier2_helper.py` + a session-scoped
+`sealed_tier2_run` conftest fixture; three test files (stability / landmine / regression) +
+two additive **NON-frozen** goldens (`sealed_station_state.json`,
+`sealed_energy_drift_summary.json`). **Zero core + zero domain change** (`git diff
+src/{simcore,domains}/` empty). **Execution findings vs the design (advisor-guided):** (1)
+the load-bearing spike PASSED — the coupled biosphere under pinned CO₂ (scrubber-held Ci≈258)
+is **period-1** (grain-at-re-sow byte-identical every year) with a **converging** decomposer
+pool (peak total-organic-C 29.10→29.196→29.196, diffs shrinking ~450×), re-sows cleanly,
+`rationed==0`; (2) the `annual_reset` hook was the real work item (a plumbing gap, not a
+physics finding — the discriminator the advisor flagged); (3) **harvest DROPPED from Tier 2**
+(measured: it drains `storage_c` to 0.011<0.16 seed bank → starves the re-sow; its food-loop
+conservation is pinned in Step 6); (4) Power runs **constant daily-average** solar/load in the
+fast lane (`substep` freezes `n` ⇒ diurnal shape inexpressible — the Step-5 lamp-average
+precedent; the diurnal SOC swing + node attractor are Tier 1's job via single-rate
+`run_station`); (5) the `drift.py` **absolute** bounds do NOT transfer (station stocks 1e0–1e10;
+OXYGEN's `o2_supply` reaches ~2e5 while its conserved total is ~27) — normalize by the **max
+single-stock magnitude** (`quantity_scale`), not `total(0)`, giving horizon-invariant relative
+drift ~1e-11 abs / ~1e-14 slope; (6) the biomass watch uses **total organic C** (not peak
+leaf_c, which hides the decomposer) and asserts the year-over-year diffs **SHRINK** (genuine
+convergence, stronger than `is_stationary`'s non-amplifying clause which passes a linear ramp);
+(7) **Tier 3 landmine** (`close_feces=True`) sharper than designed — litter is quasi-steady
+(~2600) but `microbial_carbon` grows unbounded and **`rationed>0` from day 25**; the *same*
+`is_stationary(bound=1.0)` that passes Tier 2 (~0.09 diffs) FAILS the landmine (~1e4 diffs, via
+the bound clause) — the symmetric discriminator. **Deliverables: Tier 1** (energy decade,
+`run_station` 15 yr, node period-1 fixed point at `T_eq≈160.08 K`, SOC daily-periodic, ENERGY
+relative drift flat) + its **drift-summary golden**; **Tier 2** (3-season combined-ledger run,
+~915 days × 1440 sub-steps ≈ 1.3 M sub-steps ~3 min, every-quantity + ENERGY relative drift
+flat, biomass bounded/converging, regulated pools stationary, `rationed==0`, feces open) + its
+**final-State golden**; **Tier 3** (assertion-only landmine). Full suite incl. `-m slow` + ruff
++ pyright green; **all twenty existing goldens byte-identical** (the two new goldens are
+additive, NOT in the freeze manifest). Original design (unchanged, retained for provenance):
+
 **Step 7 (P6.7) — the sealed station: multi-year matter+energy stability — DESIGN
 (just-in-time, advisor-reviewed).** The Phase-4 analogue at station scale: assemble the
 fully-coupled sealed station, run multi-year, and prove **conservation of matter AND energy

@@ -36,9 +36,9 @@ is a day count, like Power's ``BOUNDED_SOC_DAYS``.
 Pure stdlib only (a frozen dataclass wrapping the Power scenario).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from domains.biosphere.scenario import SeasonScenario
+from domains.biosphere.scenario import LONG_HORIZON_YEARS, SeasonScenario
 from domains.power.scenario import BOUNDED_SOC_SCENARIO, PowerScenario
 
 
@@ -476,3 +476,158 @@ HARVEST_SCENARIO: HarvestScenario = DEFAULT_HARVEST_SCENARIO
 # ``events == ()``. The defaults encode the sizing; this alias names the canonical run
 # shared by the validation test and the golden so they cannot drift.
 LIGHTING_SCENARIO: LightingScenario = DEFAULT_LIGHTING_SCENARIO
+
+
+# --- Step 7 (P6.7): the sealed station — multi-year matter + energy stability ---------
+
+# The length of one winter-wheat season in the weather fixture (days) — the
+# ``annual_reset`` period (``run_perennial``'s ``year`` = ``len(weather)``). The multi-
+# year sealed run tiles this weather ``years×`` and re-sows at each ``n % SEASON == 0``.
+SEALED_STATION_SEASON_DAYS: int = 305
+
+# The Tier-2 combined-ledger horizon (whole seasons). 3: enough for the biomass watch to
+# see the decomposer pool's approach to steady state across ≥3 same-phase year summaries
+# (spike-measured: peak total-organic-C converges 29.10 → 29.196 → 29.196, diffs
+# shrinking ~450× — geometric, NOT a ramp), and enough to fire ``annual_reset`` twice
+# (at
+# day 305 / 610). The plant itself is **period-1** (grain-at-re-sow byte-identical every
+# year: the pinned-CO₂ regulator-erasure removes the CO₂-pool feedback that drove
+# Phase-4's period-2). ~915 days × 1440 sub-steps ≈ 1.3 M sub-steps (~3 min
+# marked-slow).
+SEALED_STATION_YEARS: int = 3
+
+# The Tier-1 energy-decade horizon (days): the clean Phase-4 analogue for ENERGY, run
+# via
+# the single-rate ``run_station`` (diurnal solar ⇒ ``n`` advances ⇒ the SB radiator's
+# real emergent ``T_eq`` attractor). Decoupled from the biosphere, so it is cheap
+# (24 steps/day × 15 yr ≈ 131 k steps ≈ seconds). Reuses the frozen biosphere's
+# decade-scale horizon so the two references share one horizon constant.
+SEALED_ENERGY_YEARS: int = LONG_HORIZON_YEARS
+SEALED_ENERGY_DAYS: int = SEALED_ENERGY_YEARS * SEALED_STATION_SEASON_DAYS
+
+# The Tier-2 sealed biosphere: the greenhouse cabin-sized sealed chamber
+# (``GREENHOUSE_BIO_SCENARIO`` — Ci ≈ 258 held by the scrubber) made
+# **perennial-capable**
+# by seeding ``litter_carbon0 = 3.0`` (year-1 decomposer fuel; thereafter the closed
+# loop
+# — organs/grain → litter at each re-sow → microbial → CO₂ → regrowth — sustains it, as
+# in
+# ``PERENNIAL_CHAMBER_SCENARIO``). Started from DVS 0 (``thermal_time0 = 0``): the plant
+# develops naturally through each tiled season and matures in time to re-sow, so no
+# past-anthesis injection (unlike ``HarvestScenario``) — ``annual_reset`` resets
+# phenology
+# each year regardless.
+SEALED_STATION_BIO_SCENARIO: SeasonScenario = replace(
+    GREENHOUSE_BIO_SCENARIO, litter_carbon0=3.0
+)
+
+# The Tier-2 crew stores, sized well-fed over the multi-year horizon. The crew draws
+# ~345 mol C/day, so ~316 k mol over 915 days ⇒ food_store0 = 5e5 keeps ~37 % remaining;
+# water regenerates via recovery so 2e4 kg is ample. Intake rates + dt reuse the cabin.
+SEALED_STATION_CABIN_SCENARIO: CabinScenario = CabinScenario(
+    food_store0=5.0e5,
+    water_store0=2.0e4,
+)
+
+# The Tier-2 Power sub-scenario: the standalone microgrid re-timed to the cabin's fast
+# rate (``dt = 60 s``, 1440 sub-steps/day) so Power + Thermal sit in the one fast
+# registry
+# alongside the cabin (spike #1: the SB radiator is *more* Euler-stable at dt = 60).
+# Under
+# the two-rate driver ``substep`` freezes ``n`` within a day, so the diurnal solar shape
+# is not expressible — Power runs the **constant daily-average** solar/load (the Step-5
+# lamp-average precedent); the diurnal SOC swing + node attractor are Tier 1's job
+# (single-rate ``run_station``, where ``n`` advances).
+SEALED_STATION_POWER_SCENARIO: PowerScenario = replace(
+    BOUNDED_SOC_SCENARIO, dt_seconds=60.0, steps_per_day=1440
+)
+
+
+@dataclass(frozen=True)
+class SealedStationScenario:
+    """Step-7 sealed-station run data (P6.7): the fully-coupled multi-year station.
+
+    References the sibling scenarios it assembles (the ``StationScenario``-wrapping-
+    ``PowerScenario`` rhythm), one biosphere shared by the greenhouse gas seam **and**
+    the
+    lamp: a perennial sealed :class:`SeasonScenario`
+    (:data:`SEALED_STATION_BIO_SCENARIO`)
+    that both breathes cabin air (the greenhouse reverse seam) and is lit by the lamp
+    (``PAR`` / ``daylength`` from the lamp schedule, replacing the weather table). The
+    fast registry holds the 5 cabin flows + ``SolarCharge`` / ``LoadDraw`` (Power) +
+    ``Lamp`` + ``RadiatorReject`` (Thermal) + ``WaterRecovery`` — the union of every
+    Phase-6 shared-stock seam, all at ``dt = 60 s`` with waste-heat legs →
+    ``thermal.node``
+    (the Step-1 inward move); the biosphere-slow registry is ``build_season`` verbatim,
+    re-sown by ``annual_reset`` each year via the driver's new slow-reset hook.
+
+    **Scope (spike-measured, advisor-endorsed).** ``with_harvest`` defaults **off**:
+    harvest drains ``storage_c`` to ~0.01 mol by the year boundary — below the 0.16-mol
+    seed bank ``annual_reset`` needs — so it starves the re-sow (its food-loop
+    conservation is already pinned in Step 6). ``close_feces`` defaults **off**: the
+    litter/microbial loop is the one *unregulated* loop and grows unbounded at
+    illustrative crew-vs-plant scale (Step 6's ~3400× mismatch), so it is scoped out of
+    Tier 2 (the regulators hold everything else stationary) and *characterized* in the
+    Tier-3 landmine test. Matter is then open at the feces boundary — consistent with
+    the
+    crew stores draining (provisioning is not closed; whole-system matter stationarity
+    is
+    deferred to Step 9 calibration). Energy earns a genuine subsystem attractor (Tier
+    1);
+    matter earns conservation-to-round-off + regulated-pool stationarity + the period-1
+    plant. **The golden must never claim "the station is stationary."**
+    """
+
+    # The perennial sealed biosphere (greenhouse gas seam + lamp light), re-sown yearly.
+    bio: SeasonScenario = SEALED_STATION_BIO_SCENARIO
+    # The crew stores (multi-year sized) + intake rates + initial cabin humidity.
+    cabin: CabinScenario = SEALED_STATION_CABIN_SCENARIO
+    # The Power microgrid at the fast rate (constant daily-average solar/load).
+    power: PowerScenario = SEALED_STATION_POWER_SCENARIO
+    # The grow-lamp electrical schedule (the Step-5 values) + the provisioned battery.
+    # The
+    # lamp draws the daily-average ``lamp_power_w · photoperiod_hours / 24`` and sets
+    # the
+    # biosphere PAR to the on-window ``photon_efficacy · lamp_power_w / ground_area``.
+    lamp_power_w: float = 200.0
+    photoperiod_hours: int = 16
+    battery0: float = 2.0e10  # J — well-fed over the multi-year lamp drain
+    # The Tier-2 horizon: whole seasons (each ``season_days`` long, the re-sow period).
+    years: int = SEALED_STATION_YEARS
+    season_days: int = SEALED_STATION_SEASON_DAYS
+    # The two-rate timing: 1440 cabin/Power sub-steps of 60 s per biosphere day of 1
+    # day.
+    steps_per_day: int = 1440
+    cabin_dt: float = 60.0  # s — ECLSS's binding dt (k_scrub·dt = 0.06 < 1)
+    bio_dt: float = 1.0  # day — the frozen biosphere's structural step
+
+    @property
+    def days(self) -> int:
+        """The Tier-2 master-day horizon (``years · season_days``).
+
+        Tiling the weather ``years×`` covers exactly ``[0, days)`` with no ``_table``
+        end-clamp, and ``annual_reset`` fires at each ``n % season_days == 0`` (``n >
+        0``)
+        — ``years − 1`` re-sows over the run, ``years`` full grown seasons for the
+        biomass
+        watch's year summaries.
+        """
+        return self.years * self.season_days
+
+
+# Module-level default (immutable) — the canonical Step-7 sealed station.
+DEFAULT_SEALED_STATION_SCENARIO: SealedStationScenario = SealedStationScenario()
+
+# The Tier-2 validation scenario: the fully-coupled sealed station over multiple annual
+# cycles. Every conserved quantity (CARBON / OXYGEN / WATER / NITROGEN) **and** ENERGY
+# conserved every sub-step over the combined ledger (the integration + longevity
+# payload,
+# axis-(a) drift flat per quantity on the day-boundary trace); the regulated pools
+# (CO₂ / O₂ / H₂O, node/T) stationary; the coupled biosphere biomass **bounded** (the
+# pinned-CO₂ watch: the plant period-1, the decomposer pool converging); ``rationed ==
+# 0``,
+# ``events`` = the annual re-sows handled by the driver hook. Whole-system matter
+# stationarity **deferred** (stores drain, feces open). Euler-only (the biosphere is
+# Euler-locked by its freeze). The defaults encode the sizing; this alias names the
+# canonical run shared by the validation test and the golden so they cannot drift.
+SEALED_STATION_SCENARIO: SealedStationScenario = DEFAULT_SEALED_STATION_SCENARIO

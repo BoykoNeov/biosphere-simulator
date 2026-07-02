@@ -31,6 +31,8 @@ each flow touches only its own domain's stocks.
 All public integrator methods → **zero core change**. Pure stdlib only.
 """
 
+from collections.abc import Callable
+
 from simcore import conservation
 from simcore.environment import SourceResolver
 from simcore.events import Event
@@ -55,6 +57,7 @@ def run_master_day(
     steps_per_day: int,
     slow_dt: float,
     fast_dt: float,
+    slow_reset: Callable[[int, State], State] | None = None,
 ) -> tuple[list[State], int, tuple[Event, ...]]:
     """Step ``days`` master days (slow once + fast ×``steps_per_day`` each), slow-first.
 
@@ -66,6 +69,20 @@ def run_master_day(
     entry per day boundary (length ``days + 1``; a golden pins the final one).
     ``total_rationed`` sums both integrators' Euler-backstop firings (validation asserts
     ``== 0``); ``events`` are extinction events (empty on the well-fed station seams).
+
+    **Scheduled slow-domain reset (P6.7).** ``slow_reset`` is the two-rate analogue of
+    :func:`domains.biosphere.season.run_season`'s ``reset`` hook — a schedule-agnostic
+    ``(n, state) -> state`` consulted **before each master day's slow step** (the point
+    at which ``n`` is the day count). It returns ``state`` *unchanged* on a non-reset
+    day or a new ``State`` on a boundary; the calendar (``n % year == 0``) lives in the
+    caller's closure. When a reset fires the driver re-asserts the conservation gate
+    across it, so "conserved at every point" stays literally true even across the
+    discrete intervention (``annual_reset`` moves CARBON only between in-system stocks,
+    touching no other quantity — the assert is the teeth that proves it in the *coupled*
+    ledger). This is what the ≤7-day greenhouse / lighting / harvest runs never needed
+    (sub-seasonal, so ``annual_reset`` never fired) but the multi-year sealed station
+    does — without it the biosphere never re-sows. **Default ``None`` ⇒ byte-identical
+    to the pre-P6.7 driver** (the greenhouse / lighting / harvest goldens unaffected).
 
     Requires ``fast_dt · steps_per_day == 86400`` (one day) so the slow domain's
     once-daily step maps ``n`` to the day a day-indexed weather resolver reads; else a
@@ -81,6 +98,14 @@ def run_master_day(
     total_rationed = 0
     events: list[Event] = []
     for _day in range(days):
+        # Scheduled slow-domain reset (the re-sow hook), applied before the slow step so
+        # n is the day count. Conservation re-asserted across it (the run_season idiom):
+        # annual_reset is CARBON-conserving, so this proves it in the coupled ledger.
+        if slow_reset is not None:
+            reset_state = slow_reset(state.n, state)
+            if reset_state is not state:
+                conservation.assert_conserved(state, reset_state)
+                state = reset_state
         # Slow operator: one full day-step. step_report advances the phenology aux
         # (substep would not) and bumps n by 1 — so n counts days and a frozen
         # day-indexed weather table reads the right row. Its own conservation gate

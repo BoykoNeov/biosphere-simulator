@@ -1,0 +1,389 @@
+{
+  "aux": {
+    "thermal_time": "0x1.975c28f5c28f3p+11"
+  },
+  "n": 915,
+  "rng_seed": "0x0",
+  "stocks": [
+    {
+      "amount": "0x1.b33333333333ap+1",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0",
+        "oxygen": "0x1.0000000000000p+1"
+      },
+      "domain": "biosphere.atmosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.carbon_pool",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.d0055eb898f15p+2",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.water",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.condensate",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.3640e63e393e3p-2",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.leaf_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.048511c900887p+2",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.litter_carbon",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.99bed3ff235fap-5",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.litter_n",
+      "kind": "pool",
+      "quantity": "nitrogen",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.06d44371a669cp+1",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.microbial_carbon",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.0999999999996p+3",
+      "composition": {
+        "oxygen": "0x1.0000000000000p+1"
+      },
+      "domain": "biosphere.atmosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.o2_pool",
+      "kind": "pool",
+      "quantity": "oxygen",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.3345d065fb340p-3",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.plant_n",
+      "kind": "pool",
+      "quantity": "nitrogen",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.e3979dc771611p+0",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.root_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.9133253d4d1dep+6",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.soil_n",
+      "kind": "pool",
+      "quantity": "nitrogen",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.ec0c7a2d40e6cp+9",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.soil_water",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.93eb33546c4d6p+2",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.stem_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.d2340b58e1f5cp+3",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.storage_c",
+      "kind": "population",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.14dec55379ccep+3",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.atmosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.water_vapor",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.8b45604173d72p+8",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.brine",
+      "kind": "boundary",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.0677174a92964p+18",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0",
+        "oxygen": "0x1.0000000000000p+1"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.co2_removed",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.7293333335b12p+15",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.fecal_waste",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.57b2c91147144p+32",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.light_used",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": false,
+      "unit": "J"
+    },
+    {
+      "amount": "0x0.0p+0",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.loss.carbon",
+      "kind": "boundary",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x0.0p+0",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.n_source",
+      "kind": "boundary",
+      "quantity": "nitrogen",
+      "unclamped": true,
+      "unit": "kg"
+    },
+    {
+      "amount": "-0x1.0676aa7dc505bp+18",
+      "composition": {
+        "oxygen": "0x1.0000000000000p+1"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.o2_supply",
+      "kind": "boundary",
+      "quantity": "oxygen",
+      "unclamped": true,
+      "unit": "mol"
+    },
+    {
+      "amount": "-0x1.76fa0ef1643cbp+34",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.solar_source",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": true,
+      "unit": "J"
+    },
+    {
+      "amount": "0x1.be1f52ad16ce2p+34",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "boundary",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "boundary.space",
+      "kind": "boundary",
+      "quantity": "energy",
+      "unclamped": false,
+      "unit": "J"
+    },
+    {
+      "amount": "0x1.66f0000066f00p+17",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "crew",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "crew.food_store",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.32528e561ed87p+14",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "crew",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "crew.water_store",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.47ae147ae146cp-5",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "eclss",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "eclss.cabin_h2o",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.999999999998ap-5",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "eclss",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "eclss.recovered_water",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
+      "amount": "0x1.19e7f80000000p+33",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "power",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "power.battery",
+      "kind": "pool",
+      "quantity": "energy",
+      "unclamped": false,
+      "unit": "J"
+    },
+    {
+      "amount": "0x1.88bb681977d89p+30",
+      "composition": {
+        "energy": "0x1.0000000000000p+0"
+      },
+      "domain": "thermal",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "thermal.node",
+      "kind": "pool",
+      "quantity": "energy",
+      "unclamped": false,
+      "unit": "J"
+    }
+  ],
+  "version": 3
+}

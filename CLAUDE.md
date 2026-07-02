@@ -451,8 +451,49 @@ a **direction+conservation demo, not a self-sufficient loop** (crew draws ~345 m
 Additive **NON-frozen** golden `harvest_state.json` (closed ring; regenerated in seam 2). **33 tests**
 (12 run + 2 golden after seam 1; +3 seam-2 run tests). Full suite incl. `-m slow` + ruff + pyright green
 (**1305 passed**, 1 oracle skip); **all nineteen pre-Step-6 goldens byte-identical** (`harvest_state.json`
-is the twentieth). NEXT: Step 7 (P6.7) — the sealed station: multi-year matter+energy stability
-(the Phase-4 analogue at station scale).
+is the twentieth).
+**Step 7 (P6.7) COMPLETE — the sealed station: multi-year matter + energy stability (the Phase-4
+analogue at station scale); PHASE 6's stability capstone**: new `src/station/sealed.py`
+(`build_sealed_station` composing **every** Phase-6 seam over one shared stock dict + two registries
+— biosphere-slow + everything-fast ~11 flows, waste-heat legs → `thermal.node` the Step-1 inward
+move) + `SealedStationScenario` + a `slow_reset` hook added to `station.driver.run_master_day` (the
+`annual_reset` re-sow machinery the ≤7-day greenhouse/lighting/harvest runs never fired — a plumbing
+gap, **not** a physics finding; the discriminator advisor-flagged) + shared
+`tests/sealed_tier2_helper.py` + a session-scoped `sealed_tier2_run` conftest fixture. **Zero core +
+zero domain change** (`git diff src/{simcore,domains}/` empty; the driver/scenario edits are
+station-layer). **The thesis splits in two (never conflated):** (A) integration + longevity — the
+NEW thing — the full assembly *sustains* every-quantity + ENERGY conservation to round-off over many
+annual cycles; (B) physical stationarity is a per-subsystem *characterization*, not a whole-station
+claim (energy earns a real attractor; matter earns conservation + regulated-pool stationarity + the
+period-1 plant; whole-system matter stationarity **deferred** — stores drain, feces open). **The
+load-bearing spike PASSED:** the coupled biosphere under **pinned CO₂** (scrubber-held Ci≈258, the
+regime the freeze never validated) is **period-1** (grain-at-re-sow byte-identical every year — the
+constant Ci removes the CO₂-pool feedback that drove Phase-4's period-2) with a **converging**
+decomposer pool (peak total-organic-C 29.10→29.196→29.196, diffs shrinking ~450×), re-sows cleanly,
+`rationed==0`. **Scope calls (spike-measured, advisor-endorsed):** harvest **DROPPED from Tier 2**
+(drains `storage_c` to 0.011 < the 0.16 seed bank → starves the re-sow; its food-loop conservation
+is pinned in Step 6); `close_feces=False` (the litter loop is the one *unregulated* one). Power runs
+**constant daily-average** solar/load in the fast lane (`substep` freezes `n` ⇒ the diurnal shape is
+inexpressible — the Step-5 lamp-average precedent; the diurnal SOC swing + node attractor are Tier
+1's job). **Two advisor-flagged test-design fixes:** (1) `drift.py`'s *absolute* bounds do NOT
+transfer (station stocks 1e0–1e10; OXYGEN's `o2_supply` reaches ~2e5 while its conserved total is
+~27) — normalize by the **max single-stock magnitude** (`quantity_scale`), NOT `total(0)`, giving
+horizon-invariant relative drift ~1e-11 abs / ~1e-14 slope; (2) the biomass watch uses **total
+organic C** (not peak leaf_c, which hides the moving decomposer) and asserts the year-over-year diffs
+**SHRINK** (genuine convergence — stronger than `is_stationary`'s non-amplifying clause, which passes
+a linear ramp). **Three-tier delivery: Tier 1** (energy decade — `run_station` 15 yr diurnal; node a
+**period-1 fixed point** at `T_eq≈160.08 K`, SOC daily-periodic, ENERGY relative drift flat) + a
+**drift-summary golden**; **Tier 2** (3-season combined-ledger run, ~915 days × 1440 sub-steps ≈ 1.3 M
+sub-steps ~3 min; every-quantity + ENERGY relative drift flat on the day-boundary trace, biomass
+bounded/converging, regulated pools stationary, `rationed==0`, feces boundary open) + a **final-State
+golden**; **Tier 3** (assertion-only landmine — `close_feces=True`: litter quasi-steady but
+`microbial_carbon` grows unbounded and **`rationed>0` from day 25**; the *same* `is_stationary(bound=
+1.0)` that passes Tier 2 (~0.09 diffs) FAILS the landmine (~1e4 diffs) — the symmetric discriminator
+earning the instrument its keep). **15 sealed tests** (Tier-1 + Tier-2 stability, Tier-3 landmine,
+2 regression goldens). Two additive **NON-frozen** goldens (`sealed_station_state.json`,
+`sealed_energy_drift_summary.json`) — **NOT in the freeze manifest**. Full suite incl. `-m slow` +
+ruff + pyright green; **all twenty existing goldens byte-identical** (no regen). NEXT: Step 8 (P6.8)
+— the cross-domain perturbation harness (cascades, no cascade code).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
