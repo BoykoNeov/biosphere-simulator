@@ -553,25 +553,177 @@ two-rate `run_master_day` driver.
   `harvest_state.json` is the twentieth). Then update the plan doc, `CLAUDE.md`, and memory;
   commit + push to `main`.
 
-**Step 7 (P6.7) — the sealed station: multi-year matter+energy stability.** The Phase-4
-analogue at station scale — assemble the fully-coupled sealed station, run multi-year, and
-prove **conservation of matter AND energy holds, numerics are stable (no drift / no
-collapse), and the cross-domain dynamics are believable**. Reuse the `biosphere/drift.py`
-instrument (mass-drift ceiling, stationarity, period class) across every conserved quantity
-+ ENERGY. Just-in-time design. **Design-input landmine from Step 6 (advisor-flagged, record
-now):** Step 6's feces→litter loop is **not a bounded attractor** at the current illustrative
-scales — the ~3400× crew-vs-plant magnitude mismatch means litter influx (~52 mol C/day)
-vastly exceeds microbial consumption, so `litter_carbon` grows monotonically (342 mol by
-day 7, still climbing) and `microbial_carbon` with it (→20 mol, still climbing). Over 7 days
-`rationed == 0`, but at multi-year scale (a) the once-daily microbial O₂ draw grows with the
-litter pile and will eventually exceed what `O2Makeup` refills in a day → `rationed > 0` (the
-Euler backstop firing), and (b) the unbounded litter/microbial growth is itself a
-non-stationarity `drift.py` would flag — an artifact of the uncalibrated mismatch, not a real
-instability. So Step 7 must **either calibrate the crew-vs-plant scale before the multi-year
-run, or scope the sealed run to the sub-systems that are actually stationary** (the gas /
-water / energy loops the regulators hold), treating the food/litter loop's magnitude as a
-Step-9 calibration prerequisite. Do not assume the fully-coupled station is stationary as
-shipped.
+**Step 7 (P6.7) — the sealed station: multi-year matter+energy stability — DESIGN
+(just-in-time, advisor-reviewed).** The Phase-4 analogue at station scale: assemble the
+fully-coupled sealed station, run multi-year, and prove **conservation of matter AND energy
+holds, numerics are stable (no drift / no collapse), and the cross-domain dynamics are
+believable**, reusing the `biosphere/drift.py` instrument across every conserved quantity
+**and** ENERGY. Zero core, zero domain change (the Phase-6 discipline); a new
+`src/station/` assembly + tests + additive NON-frozen goldens.
+
+- **The thesis splits in two — keep them separate, never conflate (advisor-reviewed).**
+  - **(A) Numerical conservation — the genuinely NEW thing Step 7 proves.** The *combined*
+    matter+energy ledger conserves to floating-point round-off **every step** over a
+    multi-year horizon: `drift.py` axis-(a) (`mass_drift_slope` ~ machine-ε, `max|d_q|` at
+    the round-off floor, not the ceiling) flat across **every** quantity *and* ENERGY on
+    **one** shared ledger. The separate ledgers were proven only at short horizons (Steps
+    1–6) and never together — "the combined ledger conserves over multi-year" is the new
+    claim. Do not give it up cheaply.
+  - **(B) Physical stationarity — a per-subsystem CHARACTERIZATION, not a whole-station
+    claim.** **Energy** earns a genuine full-subsystem attractor-stationarity proof (a real
+    `T_eq`, a permanent `boundary.space`, daily-periodic forcing — the clean Phase-4
+    analogue). **Matter** earns conservation-to-round-off + numerical stability +
+    regulated-*pool* stationarity (ECLSS / recovery hold CO₂/O₂/H₂O at their setpoints);
+    whole-system matter stationarity is **deferred** — the open-loop crew stores deplete
+    monotonically (provisioning is not closed) and the food/litter magnitude is uncalibrated
+    (Step 9). **The golden's framing must never say "the station is stationary."**
+
+- **The fork: SCOPE, do NOT calibrate (advisor-endorsed).** The plan's own Step-7 fork was
+  "calibrate the crew-vs-plant scale before the multi-year run, OR scope to the subsystems the
+  regulators hold stationary." Take **scope**: calibrating crew-vs-plant scale is the substance
+  of **Step 9** (NASA BVAD, clean-room from primary literature); doing it now front-runs Step 9
+  and picks numbers with no literature basis (just to pass a test). Concretely, **exclude the
+  feces→litter coupling via `close_feces=False`** — the existing greenhouse default. That is
+  *principled scoping, not an ad-hoc exclusion*: litter/microbial is the **one unregulated
+  loop**, so turning it off **is** "scope to the loops the regulators hold." Matter is then open
+  at the feces boundary — consistent with being open at store provisioning. No new machinery.
+
+- **The driver is NOT the obstacle — it is a TWO-rate build (advisor corrected my first
+  read).** Power is forced / dt-linear and Thermal's T⁴ radiator is *more* Euler-stable at
+  smaller `dt`, so **both sit in the fast registry at `dt = 60 s`** alongside the cabin — the
+  station is one slow domain (biosphere, 1 day) + one fast domain (everything else, 60 s),
+  which the existing `run_master_day` already expresses. There is **no** three-time-scale
+  problem. (`run_station`'s single-rate energy loop is untouched and needs only a horizon bump
+  for Tier 1 below — zero new code there.) The two *real* gates to a single unified build are
+  **compute** and **a unified scenario** (below).
+
+- **Compute is the real lever — measured 2026-07-02 (`GREENHOUSE_SCENARIO`, 24 stocks).** The
+  cabin sub-step costs **~76 µs** (5 flows + a full-ledger conservation assert each). So:
+  - A unified **15-yr** run ≈ 1440·365·15 ≈ **7.9 M** sub-steps ≈ **~10 min** — too slow even
+    for a marked-`slow` test (the Phase-4 100k stress is ~30 s). **15-yr unified is out.**
+  - A unified **~2-yr** run ≈ 1440·365·2 ≈ **1.05 M** sub-steps ≈ **~80 s** — acceptable
+    marked-`slow`. **This is the combined-ledger horizon.**
+  - The **energy loop alone** (Power→Thermal, 24 steps/day) at 15 yr ≈ 131 k steps ≈ **seconds**
+    — the decade-scale energy proof is cheap.
+  - **Memory is a non-issue:** `run_master_day` retains only **day-boundary** states (≈730 for
+    2 yr) and asserts conservation after **every** sub-step *internally*, so a completed run
+    already proves per-step closure, and axis-(a) drift runs on the ~730-point day-boundary
+    trace. No streaming/chunking needed (unlike the Phase-4 stress, which streamed only to
+    bound a full-`list[State]` retention this driver never does).
+
+- **The three-tier delivery (forced by the compute finding).**
+  1. **Tier 1 — the energy decade proof (the clean Phase-4 analogue, cheap).** `run_station`
+     (Power→Thermal) at **15 yr**, ENERGY only: a real emergent `T_eq` attractor, a permanent
+     boundary, daily-periodic forcing. `drift.py` on ENERGY → `mass_drift_slope` flat
+     (conservation to round-off), `node`/T **stationary** (period-1 fixed point,
+     `is_stationary` + `non_collapsing`), SOC a period-1 daily cycle, `rationed == 0`,
+     `events == ()`. **Only a scenario-horizon change** (a `SEALED_ENERGY_YEARS` alias); zero
+     new engine code. This is the genuine full-subsystem attractor proof (B) promises for
+     energy.
+  2. **Tier 2 — the combined-ledger multi-year conservation (the NEW thing, (A)).** The unified
+     fully-coupled two-rate sealed station: biosphere-slow (1 day) + everything-fast (60 s) —
+     Power→Thermal (energy, waste-heat legs → `thermal.node`, the Step-1 inward seam) +
+     biosphere ↔ cabin ↔ crew ↔ ECLSS (the greenhouse) + water-recovery + lighting (energy →
+     biology) + harvest (biomass → food), **`close_feces=False`**. Run **~2 yr**, marked-`slow`.
+     Proves matter **and** energy conserve to round-off on **one** ledger every sub-step;
+     regulated pools (CO₂/O₂/H₂O, node/T) stationary; `rationed == 0`; whole-system matter
+     stationarity honestly deferred (stores drain — documented, not asserted stationary).
+     - **The unified scenario is the second real gate (a new composition, moderate).** One
+       biosphere that both **breathes cabin air** (`CO2_POOL_VAR → CARBON_POOL`, the greenhouse
+       reverse seam, unchanged) **and is lit by the lamp** (point `PAR_VAR` / `DAYLENGTH_VAR` at
+       the Step-5 lamp schedule instead of the weather table). The fast registry then holds the
+       5 cabin flows + `SolarCharge`/`LoadDraw` + `Lamp` + `RadiatorReject` + `WaterRecovery` +
+       `Harvest` (~11 flows), all at `dt = 60 s`; the biosphere-slow registry is `build_season`
+       verbatim. **Fallback if the lamp+cabin-air+harvest composition proves thorny:** drop to
+       **greenhouse + energy + water-recovery** — the combined ledger *still* spans ENERGY (the
+       Power/Thermal stocks are disjoint from the matter stocks, so per-quantity balance holds
+       flow-by-flow) plus all matter; only the energy→biology *dynamic* coupling is lost, not
+       the conservation payload.
+  3. **Tier 3 — the landmine as a TEST, not a prose caveat (advisor addition).** A *separate*
+     run with **`close_feces=True`** at illustrative scale, run long enough that `litter_carbon`
+     grows unbounded → `drift.py` axis-(b) **correctly flags** the non-stationarity
+     (`is_stationary` fails: `|same_phase_diff|` amplifies) and, run further, the once-daily
+     microbial O₂ draw overtakes `O2Makeup`'s daily refill → **`rationed > 0`** (the Euler
+     backstop firing). This is the drift instrument *earning its keep* and **empirically pinning
+     the Step-9 calibration prerequisite** — far stronger than a comment. (An assertion test, no
+     golden: it deliberately produces a non-stationary / rationing run.)
+
+- **EXECUTION STEP 0 — go/no-go spikes, BEFORE any test/golden scaffolding (the Step-6
+  discipline; each can force a scope pivot).**
+  1. **Power + Thermal stable at `dt = 60`.** Confirm the nonlinear radiator Euler-steps
+     cleanly at 60 s (τ grows 60× in step units ⇒ *more* stable, but verify), `rationed == 0`,
+     ENERGY closed — and that the solar/load/lamp schedules are expressible per-60-s-substep
+     (they are forced / dt-linear). If not, energy stays at its own `dt` in a *separate* fast
+     lane (still two-rate) — but this should just work.
+  2. **The unified lamp+cabin-air biosphere assembles + conserves for one master day.** A
+     one-day run of Tier 2's build with every quantity + ENERGY closed after each sub-step (the
+     Step-2 composition-mismatch-style gate). Decides recommended-vs-fallback for Tier 2.
+  3. **`annual_reset` re-sow survives harvest over ≥2 yr (the Step-6-flagged landmine).** Over
+     multi-year the biosphere's `annual_reset` **fires** at year boundaries, and its seed-bank
+     guard needs `storage_c ≥ seedling_total`; harvest drains `storage_c`, so a too-greedy
+     `k_harvest` **starves the re-sow** → a non-stationary / collapsing biosphere. Confirm the
+     re-sow holds (plant persists, `events == ()`, `rationed == 0`) with harvest ON; **if it
+     starves, drop harvest from the Tier-2 multi-year run** (its food-loop conservation is
+     already proven at Step 6's short horizon) or size `k_harvest` to leave the seed bank.
+  4. **The ~2-yr Tier-2 wall-clock is acceptable marked-`slow`** (re-measure on the *full* ~11-
+     flow build; ~80 s is the ~5-flow estimate — the real build is heavier). If it blows the
+     budget, shorten to the smallest horizon that (a) is ≥2 yr and (b) fires `annual_reset`
+     ≥once, or thin the assert cadence with an env knob (the Phase-4 stress `slow` precedent).
+
+- **Honest scope / deferrals.** *Calibration:* crew-vs-plant magnitude → **Step 9** (the
+  feces→litter mismatch, the store-provisioning imbalance). *Matter closure:* open at the feces
+  boundary (`close_feces=False`) and the store provisioning — a **characterization**, not a
+  closed ecosystem. *Biosphere stationarity:* **inherited from the freeze** (Euler-locked; the
+  Step-3 regulator-erasure finding makes the plant a tiny bounded perturbation on the regulated
+  pools) — Tier 2 does **not** re-derive the biosphere's period-2 cycle inside the expensive
+  coupled run (that was Phase-4's job, to 328 yr). *Numerics:* the coupled build carries the
+  frozen biosphere ⇒ **Euler-only** (no RK4 cross-check); Tier 1's energy loop *could* RK4-cross-
+  check but the standalone Thermal already did, so it adds no decision value here.
+
+- **The artifacts to create** (the established per-step skeleton; `system.py`/Step 1 supplies
+  the energy assembly, `harvest.py`/Step 6 the maximal matter assembly + the two-rate driver).
+  1. `src/station/sealed.py` (a non-reserved name — cf. the `aux.py`→`auxiliary.py` rule):
+     `build_sealed_station` composing all seams over one shared stock dict + two registries
+     (biosphere-slow / everything-fast), with a `close_feces: bool` and a `with_energy_coupling`
+     (lighting) knob for the fallback; the unified fast/slow resolvers; a thin `run_sealed`
+     wrapper over `run_master_day`; module-level `FlowId` constants for any new ids (none
+     expected — all flows are reused). Assert the two registries' flow-id sets disjoint (the
+     `build_harvest` guard) and the biosphere/cabin/energy stock-id sets disjoint.
+  2. `src/station/scenario.py`: a `SealedStationScenario` referencing the sub-scenarios
+     (greenhouse + Power + lamp + water-recovery + harvest) + horizons (`SEALED_STATION_YEARS`
+     for Tier 2, `SEALED_ENERGY_YEARS` for Tier 1). No new params (all loaded from the sibling
+     YAMLs).
+  3. `tests/test_sealed_station_stability.py` (marked `slow`): Tier 1 (energy decade —
+     `drift.py` ENERGY stationarity + closure) and Tier 2 (combined-ledger ~2-yr — per-sub-step
+     closure across every quantity + ENERGY via the run completing, axis-(a) drift flat on the
+     day-boundary trace for *each* quantity + ENERGY, regulated-pool stationarity, `rationed ==
+     0`, `events` handled, determinism + registration-order independence).
+  4. `tests/test_sealed_station_landmine.py` (Tier 3, assertion-only, no golden): `close_feces=
+     True`, `litter_carbon` grows unbounded, axis-(b) `is_stationary` **fails**, and (run
+     further) `rationed > 0` — the instrument flagging the uncalibrated non-stationarity.
+  5. `tests/test_regression_sealed_station.py` + `tests/regression/golden/sealed_station_state.
+     json` (Tier-2 day-boundary final `State`) **+ a drift-summary golden** (the per-quantity +
+     ENERGY stability signature — the Phase-4 Step-4 analogue; mass-drift round-off deliberately
+     **not** pinned, it is noise). Pre-golden gate bakes in: `rationed == 0`, every-sub-step
+     closure, energy at the dissipation-set `T_eq`, regulated pools at their setpoints, feces
+     boundary open (Tier-2 scope). Additive **NON-frozen**, not in the freeze manifest,
+     `__main__` regen.
+
+- **Exit criteria (same as every Phase-6 step):** `git diff src/simcore/` empty (zero core
+  change), `src/domains/` untouched (zero domain change), full suite incl. `-m slow` + ruff +
+  pyright green, and **all twenty existing goldens byte-identical** (the new
+  `sealed_station_state.json` + drift-summary golden are additive). Then update the plan doc,
+  `CLAUDE.md`, and memory; commit + push to `main`.
+
+*Design-input landmine from Step 6 (advisor-flagged, retained for provenance — Tier 3 turns
+it into a test):* Step 6's feces→litter loop is **not a bounded attractor** at illustrative
+scales — the ~3400× crew-vs-plant mismatch means litter influx (~52 mol C/day) vastly exceeds
+microbial consumption, so `litter_carbon` grows monotonically (342 mol by day 7, still
+climbing) and `microbial_carbon` with it (→20 mol). Over 7 days `rationed == 0`, but at
+multi-year scale (a) the once-daily microbial O₂ draw grows with the litter pile and
+eventually exceeds `O2Makeup`'s daily refill → `rationed > 0`, and (b) the unbounded growth is
+itself a non-stationarity `drift.py` flags — an artifact of the uncalibrated mismatch, not a
+real instability. Scoped out of Tier 2 (`close_feces=False`) and *characterized* in Tier 3.
 
 **Step 8 (P6.8) — cross-domain perturbation harness (cascades, no cascade code).** The
 Phase-3 `perturbations.py` discipline, cross-domain: compose brownout / radiator failure /
