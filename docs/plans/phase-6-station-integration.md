@@ -562,13 +562,18 @@ believable**, reusing the `biosphere/drift.py` instrument across every conserved
 `src/station/` assembly + tests + additive NON-frozen goldens.
 
 - **The thesis splits in two — keep them separate, never conflate (advisor-reviewed).**
-  - **(A) Numerical conservation — the genuinely NEW thing Step 7 proves.** The *combined*
-    matter+energy ledger conserves to floating-point round-off **every step** over a
-    multi-year horizon: `drift.py` axis-(a) (`mass_drift_slope` ~ machine-ε, `max|d_q|` at
-    the round-off floor, not the ceiling) flat across **every** quantity *and* ENERGY on
-    **one** shared ledger. The separate ledgers were proven only at short horizons (Steps
-    1–6) and never together — "the combined ledger conserves over multi-year" is the new
-    claim. Do not give it up cheaply.
+  - **(A) Integration + longevity — the genuinely NEW thing Step 7 proves.** *Not*
+    "combined matter+energy conservation" in a cross-quantity sense — energy and matter
+    **share no stock** (the lamp couples them only through the PAR *forcing*; no flow
+    converts energy↔matter), so per-quantity balance holds flow-by-flow and "the combined
+    ledger conserves" reduces to "two disjoint per-quantity ledgers each conserve," which
+    the short-horizon Steps 1–6 already showed. What is genuinely new is that the **full
+    multi-seam assembly** — one `State`, ~11 flows across five domains, merged slow/fast
+    resolvers, no stock- or flow-id collisions — **sustains** every-quantity conservation to
+    round-off with **no drift** over **many annual cycles**: `drift.py` axis-(a)
+    (`mass_drift_slope` ~ machine-ε, `max|d_q|` at the round-off floor, not the ceiling)
+    flat across **every** quantity *and* ENERGY on the day-boundary trace. Integration +
+    longevity, not a conversion-conservation the model does not contain.
   - **(B) Physical stationarity — a per-subsystem CHARACTERIZATION, not a whole-station
     claim.** **Energy** earns a genuine full-subsystem attractor-stationarity proof (a real
     `T_eq`, a permanent `boundary.space`, daily-periodic forcing — the clean Phase-4
@@ -625,9 +630,16 @@ believable**, reusing the `biosphere/drift.py` instrument across every conserved
      Power→Thermal (energy, waste-heat legs → `thermal.node`, the Step-1 inward seam) +
      biosphere ↔ cabin ↔ crew ↔ ECLSS (the greenhouse) + water-recovery + lighting (energy →
      biology) + harvest (biomass → food), **`close_feces=False`**. Run **~2 yr**, marked-`slow`.
-     Proves matter **and** energy conserve to round-off on **one** ledger every sub-step;
-     regulated pools (CO₂/O₂/H₂O, node/T) stationary; `rationed == 0`; whole-system matter
-     stationarity honestly deferred (stores drain — documented, not asserted stationary).
+     Proves the assembly sustains every-quantity + ENERGY conservation to round-off every
+     sub-step over many annual cycles (A); regulated pools (CO₂/O₂/H₂O, node/T) stationary;
+     `rationed == 0`; whole-system matter stationarity honestly deferred (stores drain —
+     documented, not asserted stationary). **Critically, Tier 2 must WATCH the coupled
+     biosphere's own biomass trajectory** (a year-boundary summary — peak `leaf_c` or total
+     organic C — added to the axis-(a) drift check), because the coupled plant runs under a
+     **pinned-CO₂** regime the freeze never validated (see the deferrals note): a
+     slowly-growing coupled biosphere is **mass-conserving** (the scrubber tops `CARBON_POOL`
+     back up), so axis-(a) alone stays flat and would silently mask it — the same failure
+     mode Tier 3 catches for litter, which must not reappear unwatched in the plant.
      - **The unified scenario is the second real gate (a new composition, moderate).** One
        biosphere that both **breathes cabin air** (`CO2_POOL_VAR → CARBON_POOL`, the greenhouse
        reverse seam, unchanged) **and is lit by the lamp** (point `PAR_VAR` / `DAYLENGTH_VAR` at
@@ -658,13 +670,21 @@ believable**, reusing the `biosphere/drift.py` instrument across every conserved
   2. **The unified lamp+cabin-air biosphere assembles + conserves for one master day.** A
      one-day run of Tier 2's build with every quantity + ENERGY closed after each sub-step (the
      Step-2 composition-mismatch-style gate). Decides recommended-vs-fallback for Tier 2.
-  3. **`annual_reset` re-sow survives harvest over ≥2 yr (the Step-6-flagged landmine).** Over
-     multi-year the biosphere's `annual_reset` **fires** at year boundaries, and its seed-bank
-     guard needs `storage_c ≥ seedling_total`; harvest drains `storage_c`, so a too-greedy
-     `k_harvest` **starves the re-sow** → a non-stationary / collapsing biosphere. Confirm the
-     re-sow holds (plant persists, `events == ()`, `rationed == 0`) with harvest ON; **if it
-     starves, drop harvest from the Tier-2 multi-year run** (its food-loop conservation is
-     already proven at Step 6's short horizon) or size `k_harvest` to leave the seed bank.
+  3. **The coupled biosphere completes ≥2 annual cycles cleanly under PINNED CO₂ — the
+     first-order unknown (advisor-flagged).** This is the load-bearing spike. The coupled plant
+     runs with `CARBON_POOL`/`O2_POOL` **held at ECLSS setpoints** (Ci ≈ 250 constant,
+     regulator-erasure) — a *different atmospheric boundary condition* than the freeze ever
+     tested (the freeze's sealed chamber has a self-swinging CO₂ pool, part of its period-2
+     cycle). So the coupled biosphere's multi-year biomass trajectory + clean `annual_reset`
+     re-sow are **empirical unknowns, MEASURED here, not inherited**. Confirm — **independent of
+     harvest** — that over ≥2 yr the plant persists, `annual_reset` re-sows, biomass stocks stay
+     **bounded** (no year-over-year growth/decay ramp), `events == ()`, `rationed == 0`. **Only
+     then** layer harvest on as the *second-order* worry: `annual_reset`'s seed-bank guard needs
+     `storage_c ≥ seedling_total`, and harvest drains `storage_c`, so a too-greedy `k_harvest`
+     **starves the re-sow** → collapse. If the pinned-CO₂ base run drifts, that is the finding
+     (a Step-9 / recalibration input, characterized like Tier 3); if only harvest starves the
+     re-sow, **drop harvest from the Tier-2 run** (its food-loop conservation is already proven
+     short-horizon) or size `k_harvest` to leave the seed bank.
   4. **The ~2-yr Tier-2 wall-clock is acceptable marked-`slow`** (re-measure on the *full* ~11-
      flow build; ~80 s is the ~5-flow estimate — the real build is heavier). If it blows the
      budget, shorten to the smallest horizon that (a) is ≥2 yr and (b) fires `annual_reset`
@@ -673,10 +693,15 @@ believable**, reusing the `biosphere/drift.py` instrument across every conserved
 - **Honest scope / deferrals.** *Calibration:* crew-vs-plant magnitude → **Step 9** (the
   feces→litter mismatch, the store-provisioning imbalance). *Matter closure:* open at the feces
   boundary (`close_feces=False`) and the store provisioning — a **characterization**, not a
-  closed ecosystem. *Biosphere stationarity:* **inherited from the freeze** (Euler-locked; the
-  Step-3 regulator-erasure finding makes the plant a tiny bounded perturbation on the regulated
-  pools) — Tier 2 does **not** re-derive the biosphere's period-2 cycle inside the expensive
-  coupled run (that was Phase-4's job, to 328 yr). *Numerics:* the coupled build carries the
+  closed ecosystem. *Biosphere stationarity:* **NOT inherited from the freeze —
+  MEASURED** (advisor-corrected). The freeze validated a *sealed chamber with a self-swinging
+  CO₂ pool*; the coupled plant runs under a **pinned**-CO₂ regime (scrubber-held setpoints) the
+  freeze never tested, so it is not the same dynamical system and its multi-year trajectory is
+  an empirical unknown (see go/no-go spike #3 + the Tier-2 biomass-drift watch). What Tier 2
+  *does* inherit is Euler-lock (⇒ Euler-only, below); what it must *measure* is the coupled
+  biosphere staying bounded under pinned CO₂ over ≥2 annual cycles. Tier 2 does **not** re-derive
+  the biosphere's period-2 cycle (only ~2 cycles fit — too few for `is_period_2`); that discrete
+  period characterization was Phase-4's job (to 328 yr, under the *self-swinging* boundary). *Numerics:* the coupled build carries the
   frozen biosphere ⇒ **Euler-only** (no RK4 cross-check); Tier 1's energy loop *could* RK4-cross-
   check but the standalone Thermal already did, so it adds no decision value here.
 
@@ -694,20 +719,25 @@ believable**, reusing the `biosphere/drift.py` instrument across every conserved
      for Tier 2, `SEALED_ENERGY_YEARS` for Tier 1). No new params (all loaded from the sibling
      YAMLs).
   3. `tests/test_sealed_station_stability.py` (marked `slow`): Tier 1 (energy decade —
-     `drift.py` ENERGY stationarity + closure) and Tier 2 (combined-ledger ~2-yr — per-sub-step
-     closure across every quantity + ENERGY via the run completing, axis-(a) drift flat on the
-     day-boundary trace for *each* quantity + ENERGY, regulated-pool stationarity, `rationed ==
-     0`, `events` handled, determinism + registration-order independence).
+     `drift.py` ENERGY stationarity + closure + the drift-summary signature) and Tier 2 (~2-yr —
+     per-sub-step closure across every quantity + ENERGY via the run completing, axis-(a) drift
+     flat on the day-boundary trace for *each* quantity + ENERGY, **coupled-biosphere biomass
+     bounded** (a year-boundary summary — the pinned-CO₂ watch, so a conservation-masked biomass
+     ramp is caught), regulated-pool stationarity, `rationed == 0`, `events` handled, determinism
+     + registration-order independence).
   4. `tests/test_sealed_station_landmine.py` (Tier 3, assertion-only, no golden): `close_feces=
      True`, `litter_carbon` grows unbounded, axis-(b) `is_stationary` **fails**, and (run
      further) `rationed > 0` — the instrument flagging the uncalibrated non-stationarity.
   5. `tests/test_regression_sealed_station.py` + `tests/regression/golden/sealed_station_state.
-     json` (Tier-2 day-boundary final `State`) **+ a drift-summary golden** (the per-quantity +
-     ENERGY stability signature — the Phase-4 Step-4 analogue; mass-drift round-off deliberately
-     **not** pinned, it is noise). Pre-golden gate bakes in: `rationed == 0`, every-sub-step
-     closure, energy at the dissipation-set `T_eq`, regulated pools at their setpoints, feces
-     boundary open (Tier-2 scope). Additive **NON-frozen**, not in the freeze manifest,
-     `__main__` regen.
+     json` (Tier-2 day-boundary final `State`). Pre-golden gate bakes in: `rationed == 0`,
+     every-sub-step closure, energy at the dissipation-set `T_eq`, regulated pools at their
+     setpoints, coupled biosphere biomass bounded, feces boundary open (Tier-2 scope). Additive
+     **NON-frozen**, not in the freeze manifest, `__main__` regen. **The Phase-4 Step-4
+     drift-*summary* stability-signature golden belongs on TIER 1** (energy, 15 yr — where a
+     period class + per-year summaries are actually characterizable), **not Tier 2** (~2 yr = 2
+     per-year points, no period class → it would pin noise). So Tier 1 gets the drift-summary
+     golden (energy stationarity signature; mass-drift round-off deliberately not pinned); Tier
+     2 gets only the final-State golden + gate above.
 
 - **Exit criteria (same as every Phase-6 step):** `git diff src/simcore/` empty (zero core
   change), `src/domains/` untouched (zero domain change), full suite incl. `-m slow` + ruff +
