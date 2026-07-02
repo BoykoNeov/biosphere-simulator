@@ -233,7 +233,59 @@ integer discipline end-to-end before any float enters.
 
 *Acceptance:* Rust `draw_u64`/`draw` reproduce the Python hex vectors bit-for-bit.
 
-### Step 2 (P7.2) — port `simcore` engine + a synthetic pure-arithmetic bit-exact gate
+### Step 2 (P7.2) — port `simcore` engine + a synthetic pure-arithmetic bit-exact gate — ✅ COMPLETE
+
+> **DONE.** Ported the whole engine to `rust/crates/simcore/src/` (12 new modules +
+> `error.rs`): `ids`/`quantities` (the two-projection `Quantity::value`/`name` + the
+> name-sorted `ASSERTED_QUANTITIES`), `state` (Stock/State + all invariants, re-fired on
+> every `with_amount`/`State::new` "replace"), `flow` (Leg/FlowResult/`Flow` trait +
+> balance), `arbitration` (min-scaling + `check_no_overdraw`), `conservation` (ledger +
+> every-step gate), `environment` (`SourceResolver`/`BoundEnvironment` + the `Environment`
+> trait), `boundary`, `events`, `auxiliary` (`AuxProcess` trait), `registry`, `integrator`
+> (Euler + RK4 + extinction + aux + `substep`, the `_BaseIntegrator` spine as a private
+> `Scheme` trait + shared free-fns), `multirate` (Strang/Lie). Errors are one
+> `SimError { Conservation, Arbitration, Validation, Reference }` enum mirroring Python's
+> four raise sites (`ConservationError`/`ArbitrationError`/`ValueError`/`KeyError`); the
+> three Python `keyed_hash`/`TypeError`-style guards that the type system subsumes stay
+> subsumed. **`observation` is a conscious deferral** (a consumer-facing projection; no
+> golden is an `Observation`, the cross-port gate compares `State` snapshots) — noted in
+> `lib.rs` so Step 6 doesn't assume a complete surface.
+>
+> **The load-bearing discipline (advisor): op-order, not math, is what bit-exactness
+> lives on.** Float `+`/`*` are commutative but not associative, so every arithmetic
+> grouping in the integrator mirrors the Python source **character-for-character**
+> (`(k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0`, `stock.amount + factor * delta`), and every
+> Python `sorted()` is replicated. `BTreeMap<String, _>` gives sorted-by-id iteration for
+> free (String UTF-8 order == Python `str` sort for ASCII ids), but the **three distinct
+> reduction orders** are each walked over the correct ordered source, never collect-then-
+> refold: `reduce`/`_scale_factors` in **flow-order × leg-order**, `per_quantity_residual`
+> in **sorted-leg order**, `compute_ledger` in **sorted-stock order**, `aux_increments` in
+> **process-order × sorted-name**.
+>
+> **The gate:** `tests/crossport/gen_engine_vectors.py` defines a **synthetic,
+> transcendental-free** scenario *on the frozen `src/simcore`* (a forced unclamped-source
+> inflow, a donor-controlled leak + transfer off a pool — so RK4's 4 stages genuinely
+> differ — a donor-controlled drain taking a POPULATION stock to **extinction**, one aux
+> process reading the pool), runs it under **Euler / RK4 / multi-rate Strang** + a second
+> **rationing** scenario (Euler min-scaling fires), and writes the committed flat
+> `rust/crates/simcore/tests/data/engine_vectors.txt` (per-step per-stock `float.hex()` +
+> aux + rationed + events). Rust `tests/engine_vectors.rs` defines the **same** scenario
+> and gates every step **Tier-1 bit-exact** via the Step-0 hex-float codec (stock amounts,
+> aux, `rationed` count, extinction event stock/quantity/residual). **No external anchor**
+> (unlike the RNG's published splitmix64): `src/simcore` *is* the reference, so Rust ==
+> Python is the whole goal; `test_crossport.py::test_engine_vectors_in_sync` only checks
+> the file stays in sync. **The advisor's dead-branch catch:** `_combine`'s "missing key ⇒
+> 0.0" union fallback never fires in the trajectory (every stage emits the same stock
+> set), so it gets a **dedicated Rust unit test** on disjoint-key stages rather than a
+> contorted scenario. Error paths are Rust unit tests: an imbalanced flow →
+> `ConservationError`; an RK4 over-draw → `ArbitrationError`. Aux stays **frozen** under
+> multi-rate (`substep` leaves it untouched — verified: `thermal_time` constant at 7.0
+> across the whole multirate run).
+>
+> **Zero core + zero domain change** (`git diff src/` empty; the Rust lives under `rust/`,
+> the generator + test tooling under `tests/crossport/`). All 20 frozen goldens
+> byte-identical (no regen). `cargo test` (44: 34 lib + 3 engine + 4 hexfloat + 3 rng) +
+> `clippy -D warnings` green; the full Python suite incl. `-m slow` + ruff + pyright green.
 
 Port the whole engine (state/flow/arbitration/conservation/integrator/registry/environment/
 boundary/events/aux/multirate). Validate with a **synthetic, transcendental-free scenario**

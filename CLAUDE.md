@@ -686,10 +686,44 @@ chain: Rust == file == Python, Python == published; plus `test_rng_vectors_in_sy
 guard). **Zero core + zero domain change** (`git diff src/` empty; `rng.rs` under `rust/`,
 generator + tests under `tests/crossport/` — permitted test tooling); all twenty frozen goldens
 byte-identical (no regen). `cargo test` + `clippy -D warnings` green; full Python suite incl.
-`-m slow` **1369 passed, 1 skipped** (oracle opt-in) + ruff/format/pyright green. **Next: Step 2
-(P7.2) — port the whole `simcore` engine (state/flow/arbitration/conservation/integrator/
-registry/environment/boundary/events/aux/multirate) + a synthetic pure-arithmetic scenario
-bit-exact (Tier-1) under Euler AND RK4.**
+`-m slow` **1369 passed, 1 skipped** (oracle opt-in) + ruff/format/pyright green.
+**Step 2 (P7.2) COMPLETE — the WHOLE `simcore` engine ported + a synthetic pure-arithmetic
+scenario bit-exact (Tier-1) under Euler AND RK4 AND multi-rate**: 12 new modules under
+`rust/crates/simcore/src/` + `error.rs` (`ids`/`quantities`/`state`/`flow`/`arbitration`/
+`conservation`/`environment`/`boundary`/`events`/`auxiliary`/`registry`/`integrator`/
+`multirate`). Errors = one `SimError { Conservation, Arbitration, Validation, Reference }`
+enum mirroring Python's four raise sites (`ConservationError`/`ArbitrationError`/`ValueError`/
+`KeyError`); state invariants re-fire on every `with_amount`/`State::new` "replace" like Python's
+`__post_init__` on `dataclasses.replace`; the `_BaseIntegrator` spine is a private `Scheme`
+trait + shared free-fns (Euler/RK4 differ only in `_deltas`); both integrators impl `Substepper`
+so `multirate_step` takes `&dyn Substepper`. **`observation` DEFERRED consciously** (consumer
+projection; no golden is an `Observation`; noted in `lib.rs` so Step 6 doesn't assume a complete
+surface). **THE load-bearing discipline (advisor): op-order, not math, is what bit-exactness
+lives on** — float `+`/`*` are commutative but NOT associative, so every integrator grouping
+mirrors Python character-for-character (`(k1 + 2.0*k2 + 2.0*k3 + k4) / 6.0`,
+`stock.amount + factor * delta`) and every `sorted()` is replicated; `BTreeMap<String,_>` gives
+sorted-by-id iteration free (String UTF-8 == Python `str` sort for ASCII), but the **THREE
+distinct reduction orders** are each walked over the correct ordered source, never
+collect-then-refold (`reduce`/`_scale_factors` flow×leg order; `per_quantity_residual`
+sorted-leg; `compute_ledger` sorted-stock; `aux_increments` process×sorted-name). **THE gate**:
+`tests/crossport/gen_engine_vectors.py` defines a synthetic transcendental-free scenario on the
+frozen `src/simcore` (forced unclamped-source inflow + donor-controlled leak+transfer off a pool
+so RK4's 4 stages genuinely differ + donor drain taking a POPULATION stock to EXTINCTION + one
+aux process reading the pool), runs it under euler/rk4/multirate-Strang + a rationing scenario
+(Euler min-scaling fires), writes committed flat `engine_vectors.txt` (per-step per-stock
+`float.hex()` + aux + rationed + events); Rust `tests/engine_vectors.rs` defines the SAME
+scenario and gates every step Tier-1 bit-exact via the Step-0 hexfloat codec. **NO external
+anchor** (unlike RNG's published splitmix64): `src/simcore` IS the reference, so Rust==Python is
+the whole goal; `test_engine_vectors_in_sync` only guards regen drift. **Advisor's dead-branch
+catch**: `_combine`'s "missing-key⇒0.0" union fallback never fires in the trajectory (every
+stage emits the same stock set) → a DEDICATED Rust unit test on disjoint-key stages, not a
+contorted scenario. Error paths = Rust unit tests (imbalanced flow→`ConservationError`; RK4
+over-draw→`ArbitrationError`). Aux verified FROZEN under multi-rate (`substep` leaves it
+untouched — `thermal_time` constant at 7.0 across the whole multirate run). **Zero core + zero
+domain change** (`git diff src/` empty); all twenty frozen goldens byte-identical (no regen);
+`cargo test` (44) + `clippy -D warnings` green; full Python suite incl. `-m slow` + ruff/pyright
+green. **Next: Step 3 (P7.3) — port the four Phase-5 siblings + validate the 5 standalone
+goldens (`crew_state` Tier-1, the rest Tier-2 — the first real libm audit: `powf(4.0)`, `sin`).**
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

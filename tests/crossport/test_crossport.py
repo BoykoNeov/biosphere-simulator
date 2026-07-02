@@ -38,6 +38,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 
 import compare  # noqa: E402
+import gen_engine_vectors  # noqa: E402
 import gen_rng_vectors  # noqa: E402
 import gen_vectors  # noqa: E402
 
@@ -77,6 +78,21 @@ def test_rng_vectors_in_sync() -> None:
     assert on_disk == gen_rng_vectors.render(), (
         "RNG vectors are stale — regenerate with "
         "`uv run python tests/crossport/gen_rng_vectors.py`"
+    )
+
+
+def test_engine_vectors_in_sync() -> None:
+    """The committed engine trajectory file equals `gen_engine_vectors.render()`
+    (regen discipline — the Rust `tests/engine_vectors.rs` gates against this exact
+    file bit-for-bit under Euler / RK4 / multi-rate / rationing). No external anchor
+    is needed: `src/simcore` *is* the cross-port reference, so proving Rust == Python
+    is the whole goal (unlike the RNG's published-splitmix64 grounding)."""
+    on_disk = gen_engine_vectors.VECTORS_PATH.read_text(encoding="utf-8").replace(
+        "\r\n", "\n"
+    )
+    assert on_disk == gen_engine_vectors.render(), (
+        "engine vectors are stale — regenerate with "
+        "`uv run python tests/crossport/gen_engine_vectors.py`"
     )
 
 
