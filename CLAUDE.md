@@ -613,6 +613,51 @@ supersedes, not churned; `_SCENARIOS` hand-listed, no completeness teeth (biosph
 precedent — shared golden dir). Full suite incl. `-m slow` + ruff + pyright green (**1312
 passed +1 oracle skip non-slow; 43 slow passed**); all goldens byte-identical (none moved).
 **PHASE 6 COMPLETE → Phase 7 (native Rust port of the frozen multi-domain station).**
+**Phase 7 — native Rust port of the frozen station — IN PROGRESS**
+(`docs/plans/phase-7-native-core.md`; plan advisor-reviewed). The port validates against
+the 20 frozen goldens under a **3-tier cross-port parity contract** (tiered per SCENARIO,
+not per flow — divergence propagates through coupled graphs): **Tier 0** structural/discrete
+EXACT for every scenario (integer `n`, stock-id set, `events`, `rationed==0`, period/stability
+class, conservation-every-step-in-Rust) — the primary gate; **Tier 1** bit-exact float
+trajectories only for transcendental-free graphs; **Tier 2** a *measured* relative band for
+anything a transcendental touches. **The port has NO reference authority** — a surfaced Python
+bug is an unfreeze-discipline finding, never a silent Rust fix. Rust lives in a new sibling
+`rust/` workspace; the only Python additions are the cross-port harness under `tests/crossport/`
+(`git diff src/` stays empty).
+**Step 0 (P7.0) COMPLETE — the `rust/` workspace + the port-agnostic comparison harness**:
+new `rust/` cargo workspace (member `crates/simcore`; `domains`/`station` deferred to Steps
+3/5 when they hold code — no speculative empty crates, advisor). **`hexfloat`** — a hand-rolled
+**C99 hex-float codec** (`f64` ⇄ `float.hex()`; Rust std has none) that reconstructs IEEE-754
+bits by **inverting the formatter** (exact, no rounding/power-of-two-scaling pitfalls), pinned
+against **30 Python-emitted vectors** (`tests/crossport/gen_vectors.py` → committed
+`hexfloat_vectors.txt`) covering ±0.0 / min-max subnormal / min-max normal / the real
+`crew_state` amounts — **both directions bit-exact**, and `format` reproduces CPython's spelling
+digit-for-digit (a stronger result than required). **`snapshot`** — serialize-only `State`/`Stock`
+structs + a **zero-dep JSON emitter** in the `sim_io` shape (schema v3), **no invariant logic**
+(the Python constructors re-fire on load). Two examples (`emit_crew`, `emit_composite`) hand-build
+frozen-derived States; `emit_composite` deliberately covers the non-empty-`aux` + multi-element
+`{carbon:1,oxygen:2}` composition branches the crew golden misses (advisor). **Python side**
+(`tests/crossport/`): **`compare.py`** — port-agnostic comparator applying the 3-tier rules
+(Tier-0 structural EXACT always; Tier-1 bit-exact via `struct` pack; Tier-2 measured band via
+`lab.oracle_match`), comparing **parsed f64 values, never JSON bytes** (advisor #5 — so a port
+need only emit `loads`-parseable JSON, C#-reusable at Phase 8); it **refuses to invent a Tier-2
+band** (measured, not derived — `band`/`floor` stay null in `tiers.json` until a later step
+measures them against real port output). **`tiers.json`** — classifies all 20 goldens by
+**graph inspection**, rule (advisor): **classify by ops EXECUTED, not the closed form** (a
+geometric contraction `d_n=d0·(1−k·dt)^n` is n sequential multiplies — IEEE basic ops,
+bit-identical across ports — NOT a `pow()` call). **Tier-1 (transcendental-free, bit-exact) =
+crew / eclss / cabin_gas / water_recovery** (all cabin-based, NO biosphere; verified by literal
+`grep -F '**'` over their full file sets — zero code-level power operators); **Tier-2 (16)** =
+all 7 biosphere (FvCB `canopy.py:77` exp / `photosynthesis.py:106` sqrt / `transpiration.py:108`
+exp + weather trig), both Power (`power/system.py:156` half-sine `math.sin`), thermal + station +
+sealed (`thermal/flows.py:130` `t**4` Stefan-Boltzmann), greenhouse/harvest/lighting (biosphere).
+Per-golden grep evidence recorded. **The acceptance**: the Rust `emit_crew` JSON → `sim_io.loads`
+→ `sim_io.dumps` reproduces `crew_state.json` **byte-for-byte**. First **CI** in the repo
+(`.github/workflows/ci.yml`): a Python job (ruff/pyright/pytest) + a Rust job (cargo test +
+`clippy -D warnings`). **Zero core + zero domain change** (`git diff src/` empty); all twenty
+frozen goldens byte-identical (no regen). Rust `cargo test` + `clippy -D warnings` green; Python
+fast suite **1324 passed** (1312 baseline + 12 crossport) + ruff/format/pyright green. **Next:
+Step 1 (P7.1) — port `simcore.rng` (splitmix64) against the existing hex vectors (Tier-1 bit-exact).**
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

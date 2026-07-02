@@ -160,7 +160,20 @@ Mirrors the Python package layout so the port stays a line-by-line correspondenc
 
 ## Steps
 
-### Step 0 (P7.0) — workspace + the port-agnostic comparison harness
+### Step 0 (P7.0) — workspace + the port-agnostic comparison harness — ✅ COMPLETE
+
+> **DONE.** `rust/` workspace (member `crates/simcore`; `domains`/`station` deferred to
+> Steps 3/5 — no speculative empty crates). Hand-rolled C99 hex-float codec pinned against
+> 30 Python-emitted vectors (both directions bit-exact; `format` matches CPython spelling).
+> Zero-dep `sim_io`-shape snapshot emitter (serialize-only, no invariant logic). Python-side
+> `tests/crossport/`: `compare.py` (Tier-0 exact / Tier-1 `struct`-pack bit-exact / Tier-2
+> `lab.oracle_match` measured band, compares parsed f64 not JSON bytes, refuses to invent a
+> band) + `tiers.json` (all 20 classified by executed-ops, grep evidence; Tier-1 = crew /
+> eclss / cabin_gas / water_recovery, verified transcendental-free). Acceptance met: Rust
+> `emit_crew` → `sim_io.loads` → `dumps` == `crew_state.json` byte-for-byte (+ `emit_composite`
+> covers the aux/multi-composition branches). First CI added. `git diff src/` empty; 20 goldens
+> byte-identical; Python 1324 passed + Rust cargo test/clippy green. Commits `f5759ee`, `9694dba`.
+
 
 Stand up the `rust/` cargo workspace (crates mirroring `simcore` / `domains` / `station`) and,
 **Python-side**, the cross-port comparator + a golden-classification table. Concretely:
