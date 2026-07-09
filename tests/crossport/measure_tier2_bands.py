@@ -153,6 +153,93 @@ def measured_sensitivity(key: str) -> float:
 STEP3_TIER2_KEYS = ("power_bounded_soc", "power_self_discharge", "thermal_equilibrium")
 
 
+# --------------------------------------------------------------------------- #
+# Step 4 (P7.4): the biosphere Tier-2 band                                     #
+# --------------------------------------------------------------------------- #
+# All 7 biosphere goldens share ONE band. Rust-vs-Python is bit-exact locally (same UCRT
+# libm, measured 0.0, a same-libm artifact), so the band is justified by the propagated
+# +/-1-ULP transcendental sensitivity, exactly as Step 3. The dominant per-step
+# transcendental is the FvCB canopy `math.exp`; a one-time comprehensive sweep
+# (canopy.exp / photosynthesis.sqrt / transpiration.exp / weather.sin over the perennial
+# + consumer 15-yr runs) found the WORST at 6.7e-14 (canopy.exp / perennial 15-yr; the
+# contracting limit cycle barely amplifies one ULP). `BIOSPHERE_BAND = 1e-11` sits
+# ~150x above that (the Step-3 margin) and far below any meaningful drift. This measure
+# re-runs the representative worst case (canopy.exp on both 15-yr scenarios); it is slow
+# (~20 s: six 15-yr runs), so its guard test is `-m slow`, not the CI-fast Step-3 one.
+
+BIOSPHERE_BAND = 1e-11
+# The 7 biosphere `tiers.json` keys that share BIOSPHERE_BAND.
+BIOSPHERE_TIER2_KEYS = (
+    "open_season",
+    "sealed_chamber",
+    "perennial_chamber",
+    "perennial_long_horizon",
+    "consumer_chamber",
+    "consumer_long_horizon",
+    "drift_summary",
+)
+
+
+def _biosphere_perennial_final(scenario, years: int) -> list[float]:
+    from domains.biosphere.season import build_season, run_perennial, weather_resolver
+
+    weather = _weather() * years
+    state, registry = build_season(scenario)
+    states, _, _ = run_perennial(
+        EulerIntegrator(registry),
+        state,
+        scenario,
+        weather_resolver(weather, scenario),
+        1.0,
+        len(weather),
+        year=len(_weather()),
+    )
+    return _amounts(states[-1])
+
+
+def _weather() -> list[dict]:
+    import json
+    from pathlib import Path
+
+    fixture = (
+        Path(__file__).resolve().parents[2]
+        / "tests"
+        / "oracle"
+        / "winter_wheat_weather.json"
+    )
+    return json.loads(fixture.read_text(encoding="utf-8"))["weather"]
+
+
+def measured_biosphere_sensitivity() -> float:
+    """Worst propagated 1-ULP `canopy.exp` sensitivity over the two 15-yr runs.
+
+    The representative dominant transcendental; only `domains.biosphere.canopy`'s `math`
+    reference is shimmed (restored in `finally`), so no other code is affected.
+    """
+    import domains.biosphere.canopy as canopy
+    from domains.biosphere.scenario import (
+        CONSUMER_CHAMBER_SCENARIO,
+        PERENNIAL_CHAMBER_SCENARIO,
+    )
+
+    worst = 0.0
+    for scenario in (PERENNIAL_CHAMBER_SCENARIO, CONSUMER_CHAMBER_SCENARIO):
+        base = _biosphere_perennial_final(scenario, 15)
+        original = canopy.math
+        for up in (True, False):
+            try:
+                canopy.math = types.SimpleNamespace(
+                    exp=lambda x, _up=up: _nudge(math.exp(x), _up)
+                )
+                perturbed = _biosphere_perennial_final(scenario, 15)
+            finally:
+                canopy.math = original
+            worst = max(worst, max_abs_relative_deviation(base, perturbed, floor=FLOOR))
+    return worst
+
+
 if __name__ == "__main__":
     for k in STEP3_TIER2_KEYS:
         print(f"{k:24s} sensitivity = {measured_sensitivity(k):.6e}")
+    bio = measured_biosphere_sensitivity()
+    print(f"{'biosphere (canopy.exp)':24s} sensitivity = {bio:.6e}")

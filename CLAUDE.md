@@ -757,8 +757,34 @@ an active CI check — deferred future work: a real cross-libm gate (Rust in the
 committed Linux golden). **`git diff src/` empty** (Phase-7 exit criterion — all changes under
 `rust/` + `tests/crossport/`); `cargo test` + `clippy -D warnings` green; Python ruff/format/pyright
 + full suite incl. `-m slow` green; twenty frozen goldens byte-identical (no regen).
-**Next: Step 4 (P7.4) — port the biosphere; validate the 7 frozen biosphere goldens (all Tier 2;
-the heaviest libm-audit surface — `exp`/`pow`/`log` in FvCB, `sin` in weather).**
+**Step 4 (P7.4) COMPLETE — the WHOLE biosphere ported; all 7 frozen goldens pass their tier, every
+one BIT-EXACT locally (same UCRT libm, `max_rel_dev==0.0`)**: new `domains::biosphere` module tree
+(`weather`/`science`/`flows`/`stocks`/`system`/`params`) mirroring the Python layout — the 17 flows
++ `CarbonContext` + `ThermalTimeAccumulation` aux + the 5 compartment builders + `build_season`/
+`weather_resolver`/`run_season`/`annual_reset`/`run_perennial`. Every `evaluate` mirrors the Python
+arithmetic **and leg-emission order** char-for-char; every `math.*` op-for-op (advisor traps handled:
+`MaintenanceRespiration`'s shortfall loop walks the fixed `(leaf,stem,root)` tuple with running
+`respired`/`organ_burn`, NOT sorted order; the `co2_atmos` reduction sums across Allocation/Growth/
+Maintenance in flow-id×leg order). **Advisor strategy = validate cheapest-golden-FIRST**: the open
+field passed before any sealed code (it exercises the whole hard core incl. `carbon_budget`), then
+sealed→consumer→multi-year→drift, each bit-exact on first correct build. **Weather (heaviest libm
+surface) runs IN RUST** (`gen_biosphere_weather.py`→committed `weather_facts.txt` raw facts; Rust
+runs daylength sin/tan/acos + vpd exp itself; a cheap 305-row de-risk confirmed bit-exact up front).
+**Params = core-ready post-fold hex-floats** (`gen_biosphere_params.py` emits the dataclass fields
+`sla_per_mol_c`/`n_*_per_mol_c` pre-folded + the partition table; Rust `include_str!`s it, no YAML/
+pint — the Step-3 Option-C precedent). **Drift summary keeps `drift.py` Python-side (advisor #3)**:
+Rust `emit_drift` emits only the raw per-step `leaf_c`/`consumer_carbon` series, Python folds
+`year_summaries`+`is_period_2` (avoids re-porting the pre-reset-append segmentation); period class
+matches EXACTLY (Tier-0: perennial period-2, consumer period-1). **Tier-2 band MEASURED not derived
+(advisor #2)**: local deviation 0.0 (same-libm artifact), so band = propagated ±1-ULP sensitivity;
+one-time sweep (canopy.exp/photo.sqrt/transp.exp/weather.sin × both 15-yr runs) worst = **6.7e-14**
+(the contracting limit cycle barely amplifies — NOT chaotic), `BIOSPHERE_BAND=1e-11` (~150× above);
+all 7 `tiers.json` bands filled 1e-11/1e-12, slow-marked re-measurement gate asserts band>sensitivity.
+**Parity gate LOCAL-ONLY** (`skipif cargo`): 6 state cases + drift + 2 in-sync gates + slow band gate;
+Rust `cargo test` gains 4 biosphere integration tests. **`git diff src/` empty** + zero domain-code
+change; `cargo test`+`clippy -D warnings` green; full Python suite incl. `-m slow`+ruff+pyright green;
+**all 20 frozen goldens byte-identical** (no regen). **Next: Step 5 (P7.5) — port the station
+assembly; validate the 8 station/coupled goldens.**
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

@@ -367,19 +367,80 @@ Step-0's hand-built ones):**
   Python `ruff`/`format`/`pyright`/`pytest` (incl. `-m slow`) green; the 20 frozen goldens
   byte-identical (no regen).
 
-### Step 4 (P7.4) — port the biosphere; validate the 7 frozen biosphere goldens
+### Step 4 (P7.4) — port the biosphere; validate the 7 frozen biosphere goldens — ✅ COMPLETE
 
 The bulk of the work — the clean-room crop science (FvCB photosynthesis, the weather half-sine
 + daylength, phenology/thermal-time aux, allocation, the carbon budget, nitrogen, water cycle,
 decomposition/mineralization, consumers, the compartment/chamber builders + `run_season` +
 `annual_reset`). All **Tier 2**. The heaviest libm-audit surface (`exp`/`pow`/`log` in FvCB,
-`sin` in weather). Sub-divide just-in-time (the plan gets refined here once Step 3 sets the
-translation cadence). The biosphere is **Euler-locked by its own freeze** — no RK4 cross-check
+`sin` in weather). The biosphere is **Euler-locked by its own freeze** — no RK4 cross-check
 needed (matches the Phase-6 greenhouse runs).
 
 *Acceptance:* the 7 frozen biosphere goldens (`biosphere-reference.manifest.json`) pass Tier 2;
 Tier-0 invariants exact (the biosphere's period/stability signature included where its goldens
 carry one — the Phase-4 drift-summary).
+
+**COMPLETE — the whole biosphere ported, all 7 frozen goldens pass their tier; every one came
+out BIT-EXACT locally (same UCRT libm, `max_rel_dev == 0.0`), the strongest possible cross-port
+result:**
+
+* **New `domains::biosphere` module tree** (`rust/crates/domains/src/biosphere/`) mirroring the
+  Python layout: `weather`, `science` (all pure rate laws — canopy/FvCB/respiration/PM
+  transpiration/phenology/allocation/nitrogen/chamber), `flows` (the 17 flow structs +
+  `CarbonContext` + the `ThermalTimeAccumulation` aux), `stocks` (id catalog + `ChamberWiring`),
+  `system` (`SeasonScenario` + the 5 compartment builders + `build_season` + `weather_resolver`
+  + `run_season`/`annual_reset`/`run_perennial`), `params`. Every `evaluate` mirrors the Python
+  arithmetic **and leg-emission order** char-for-char; every `math.*` op-for-op (`exp`→`.exp()`,
+  `sqrt`→`.sqrt()`, `q10**e`→`.powf(e)`, `(t+c)**2`→`.powf(2.0)`, `math.radians`→`.to_radians()`).
+  The advisor's op-order traps handled: `MaintenanceRespiration`'s shortfall loop walks the fixed
+  `(leaf, stem, root)` tuple with running `respired`/`organ_burn` accumulation (not sorted/map
+  order); the `co2_atmos` reduction sums across Allocation/GrowthRespiration/MaintenanceRespiration
+  in flow-id × leg order.
+
+* **Advisor strategy — validate cheapest-golden-first, not big-bang.** The open field
+  (`season_euler_state`, 1 yr, no sealing/reset/consumer) was made to pass **before** any sealed
+  code — it exercises the entire hard core (FvCB, canopy, respiration, transpiration, nitrogen,
+  allocation, senescence, the phenology aux, the coupled carbon budget, weather), so it *is* the
+  integration test for `carbon_budget`. Then layered: sealed (chamber pools, decomposition,
+  microbial resp, water cycle, mineralization, `source==sink` netting, f_O2) → consumer
+  (herbivory) → multi-year (`annual_reset`/`run_perennial`) → drift. Each layer came out bit-exact
+  on the first correct build.
+
+* **Weather (the heaviest libm surface) exercised IN RUST** (`gen_biosphere_weather.py` →
+  committed `weather_facts.txt` of raw NASAPower facts + day-of-year; the Rust `weather` module
+  runs the clean-room `daylength_seconds` (sin/tan/acos), `incident_par`, `net_radiation`,
+  `vapor_pressure_deficit` (exp) conversions itself). A cheap cross-port de-risk on the 305 fixture
+  rows confirmed **bit-exact** (0 mismatches) up front — `exp`/`tan`/`acos`/`sin` all match on this
+  UCRT, de-risking the whole transcendental surface before the big modules.
+
+* **Params — core-ready (post-fold) hex-floats** (`gen_biosphere_params.py` loads all 13 frozen
+  YAMLs through the Python loaders and emits the *dataclass fields* — `sla_per_mol_c`,
+  `n_*_per_mol_c` pre-folded — + the structured partition table; the Rust crate `include_str!`s it,
+  linking no YAML parser + porting no pint fold). The Step-3 Option-C precedent (advisor-endorsed),
+  superseding the plan's original serde-YAML sketch.
+
+* **Drift summary — `drift.py` stays Python-side (advisor #3).** The Rust `emit_drift` example
+  emits only the *raw per-step* `leaf_c`/`consumer_carbon` trajectories; the Python parity gate
+  folds them into per-year `year_summaries` + `is_period_2` and compares — so the segmentation (the
+  pre-reset-append trap) and the classifier are never ported. The **period class matches exactly**
+  (Tier 0): perennial period-2, consumer period-1.
+
+* **Tier-2 band — MEASURED, not derived (advisor #2).** The local Rust-vs-Python deviation is
+  `0.0` (a same-libm artifact), so the band is justified by the propagated ±1-ULP transcendental
+  sensitivity, exactly as Step 3. A one-time comprehensive sweep (canopy.exp / photosynthesis.sqrt
+  / transpiration.exp / weather.sin over both 15-yr runs) found the WORST at **6.7e-14** — the
+  contracting limit cycle barely amplifies a one-ULP nudge (NOT chaotic). `BIOSPHERE_BAND = 1e-11`
+  (~150× above, the Step-3 margin); a slow-marked test re-measures the representative worst case
+  and asserts `band > sensitivity` (and `≤ 1e-9` for teeth). All 7 biosphere `tiers.json` bands
+  filled to `1e-11`/`1e-12`.
+
+* **Parity gate LOCAL-ONLY** (`skipif cargo`; the Python CI job has no Rust — the Step-0/3
+  precedent): 6 `test_rust_biosphere_states_match_tier2` cases + `test_rust_biosphere_drift_summary_matches`
+  + the two in-sync gates (`weather_facts`/`biosphere_params`) + the slow band gate. Rust
+  `cargo test` gains 4 biosphere integration tests (open/sealed/perennial runs + the annual_reset
+  seed-bank guard). **`git diff src/` empty** (all changes under `rust/` + `tests/crossport/`) +
+  **zero domain-code change**; `cargo test` + `clippy -D warnings` green; the full Python suite
+  incl. `-m slow` + ruff + pyright green; **all 20 frozen goldens byte-identical** (no regen).
 
 ### Step 5 (P7.5) — port the station assembly; validate the 8 station/coupled goldens
 

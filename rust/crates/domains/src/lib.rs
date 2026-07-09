@@ -16,6 +16,7 @@
 //! step) are asserted in Rust by [`run`] + the emit examples (conservation is enforced
 //! inside `step_report`, so a completed run is itself the proof).
 
+pub mod biosphere;
 pub mod crew;
 pub mod eclss;
 pub mod params;

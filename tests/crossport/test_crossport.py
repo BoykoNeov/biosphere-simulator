@@ -38,6 +38,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 
 import compare  # noqa: E402
+import gen_biosphere_params  # noqa: E402
+import gen_biosphere_weather  # noqa: E402
 import gen_engine_vectors  # noqa: E402
 import gen_rng_vectors  # noqa: E402
 import gen_sibling_params  # noqa: E402
@@ -111,6 +113,34 @@ def test_sibling_params_in_sync() -> None:
     assert on_disk == gen_sibling_params.render(), (
         "sibling params are stale — regenerate with "
         "`uv run python tests/crossport/gen_sibling_params.py`"
+    )
+
+
+def test_biosphere_params_in_sync() -> None:
+    """The committed biosphere-param file equals `gen_biosphere_params.render()` (Step
+    4, P7.4 — the Rust biosphere `include_str!`s it to get the 13 frozen crop params as
+    core-ready hex-floats + the partition table). Same rationale as the sibling params:
+    the frozen loaders + the golden suite ground the values."""
+    on_disk = gen_biosphere_params.PARAMS_PATH.read_text(encoding="utf-8").replace(
+        "\r\n", "\n"
+    )
+    assert on_disk == gen_biosphere_params.render(), (
+        "biosphere params are stale — regenerate with "
+        "`uv run python tests/crossport/gen_biosphere_params.py`"
+    )
+
+
+def test_biosphere_weather_facts_in_sync() -> None:
+    """The committed raw-weather-facts file equals `gen_biosphere_weather.render()`
+    (Step 4, P7.4 — the Rust `biosphere::weather` reads it and runs the clean-room
+    conversions ITSELF, exercising the daylength sin/tan/acos + vpd exp cross-port).
+    Source of truth: the committed oracle fixture."""
+    on_disk = gen_biosphere_weather.FACTS_PATH.read_text(encoding="utf-8").replace(
+        "\r\n", "\n"
+    )
+    assert on_disk == gen_biosphere_weather.render(), (
+        "biosphere weather facts are stale — regenerate with "
+        "`uv run python tests/crossport/gen_biosphere_weather.py`"
     )
 
 
@@ -422,6 +452,171 @@ def test_rust_siblings_match_their_tier(example: str, golden: str, key: str) -> 
         )
     assert result.ok, f"{example} vs {golden} (tier {tier}):\n{result.report()}"
     assert result.numeric_pairs, "expected numeric leaves to be compared"
+
+
+# --------------------------------------------------------------------------- #
+# 3c. Step-4 (P7.4): the ported biosphere runs match their Tier-2 band         #
+# --------------------------------------------------------------------------- #
+
+# (example binary, cli args, golden filename, tiers.json key). All 7 are Tier-2.
+_BIOSPHERE_STATE_CASES = [
+    ("emit_season", [], "season_euler_state.json", "open_season"),
+    ("emit_sealed", [], "sealed_chamber_state.json", "sealed_chamber"),
+    ("emit_perennial", [], "perennial_chamber_state.json", "perennial_chamber"),
+    (
+        "emit_perennial",
+        ["long"],
+        "perennial_long_horizon_state.json",
+        "perennial_long_horizon",
+    ),
+    ("emit_consumer", [], "consumer_chamber_state.json", "consumer_chamber"),
+    (
+        "emit_consumer",
+        ["long"],
+        "consumer_long_horizon_state.json",
+        "consumer_long_horizon",
+    ),
+]
+
+# The transient (in years) dropped before the period-2 check — the value the frozen
+# drift_summary golden was captured with (long_horizon test's _PERIOD_TRANSIENT).
+_DRIFT_PERIOD_TRANSIENT = 8
+
+
+def _run_example(example: str, args: list[str]) -> dict:
+    """Run a Rust biosphere emit example and parse its JSON stdout."""
+    proc = subprocess.run(
+        ["cargo", "run", "-q", "--example", example, *(["--", *args] if args else [])],
+        cwd=RUST_DOMAINS_DIR,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, f"cargo run {example} {args} failed:\n{proc.stderr}"
+    return json.loads(proc.stdout)
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+@pytest.mark.parametrize("example,args,golden,key", _BIOSPHERE_STATE_CASES)
+def test_rust_biosphere_states_match_tier2(
+    example: str, args: list[str], golden: str, key: str
+) -> None:
+    """Run each ported biosphere scenario (`build_season` + `run_season`/`run_perennial`
+    Euler-daily) and compare its final `State` to the frozen golden at **Tier 2** (the
+    measured `tiers.json` band). Every FvCB/transpiration/weather transcendental runs in
+    Rust; locally (same UCRT libm) the deviation is bit-exact 0.0, well inside the band.
+    Compared on parsed f64 (via `sim_io.loads`), never JSON bytes.
+
+    LOCAL-ONLY (`skipif cargo` + no Rust in the Python CI job) — the Step-0/3 precedent.
+    """
+    candidate = _run_example(example, args)
+    snapshot.loads(json.dumps(candidate))  # validate it is a well-formed snapshot
+    reference = compare.load_json(GOLDEN_DIR / golden)
+    entry = {g["key"]: g for g in _tiers()}[key]
+    result = compare.compare(
+        reference,
+        candidate,
+        tier=entry["float_tier"],
+        band=entry["band"],
+        floor=entry["floor"],
+    )
+    assert result.ok, f"{example} {args} vs {golden}:\n{result.report()}"
+    assert result.numeric_pairs, "expected numeric leaves to be compared"
+
+
+def _fold_drift_summary(raw: dict) -> dict:
+    """Fold the Rust raw per-step series into the `drift_summary` shape, Python-side.
+
+    The plan (advisor #3) keeps ALL of `drift.py` Python-side: Rust emits the raw
+    `leaf_c` / `consumer_carbon` trajectories; here we apply the same per-year
+    segmentation the golden used (`year_summaries`: peak over each
+    `[y*year:(y+1)*year+1]` segment; year-end = the segment's last state) and the same
+    `is_period_2` classifier — so no segmentation logic lives in Rust.
+    """
+    from domains.biosphere.drift import is_period_2
+
+    year = raw["season_days"]
+    horizon = raw["horizon_years"]
+
+    def series(name: str) -> list[float]:
+        return [float.fromhex(h) for h in raw[name]]
+
+    p_leaf_s, c_leaf_s, c_carbon_s = (
+        series("perennial_leaf"),
+        series("consumer_leaf"),
+        series("consumer_carbon"),
+    )
+    n = (len(p_leaf_s) - 1) // year
+
+    def peak(s: list[float]) -> list[float]:
+        return [max(s[y * year : (y + 1) * year + 1]) for y in range(n)]
+
+    def year_end(s: list[float]) -> list[float]:
+        return [s[(y + 1) * year] for y in range(n)]
+
+    p_leaf, c_leaf, c_carbon = peak(p_leaf_s), peak(c_leaf_s), year_end(c_carbon_s)
+    return {
+        "horizon_years": horizon,
+        "perennial": {
+            "peak_leaf": [v.hex() for v in p_leaf],
+            "is_period_2": is_period_2(p_leaf, transient=_DRIFT_PERIOD_TRANSIENT),
+        },
+        "consumer": {
+            "peak_leaf": [v.hex() for v in c_leaf],
+            "consumer_carbon": [v.hex() for v in c_carbon],
+            "is_period_2": is_period_2(c_leaf, transient=_DRIFT_PERIOD_TRANSIENT),
+        },
+    }
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_rust_biosphere_drift_summary_matches() -> None:
+    """The Rust 15-yr perennial + consumer runs reproduce the `drift_summary` golden:
+    the per-year `peak_leaf`/`consumer_carbon` vectors within the Tier-2 band, and the
+    `is_period_2` stability signature (perennial period-2, consumer period-1) EXACTLY
+    (Tier 0 — a flipped period class is a real port bug, the plan's primary gate).
+
+    Rust emits only the raw per-step series; `_fold_drift_summary` applies `drift.py`
+    Python-side (advisor #3), so the classifier is never ported.
+    """
+    raw = _run_example("emit_drift", [])
+    derived = _fold_drift_summary(raw)
+    golden = compare.load_json(GOLDEN_DIR / "drift_summary.json")
+    entry = {g["key"]: g for g in _tiers()}["drift_summary"]
+    result = compare.compare(
+        golden,
+        derived,
+        tier=entry["float_tier"],
+        band=entry["band"],
+        floor=entry["floor"],
+    )
+    assert result.ok, f"drift_summary parity:\n{result.report()}"
+    # Tier-0: the period class is a classification — exact, and the headline result.
+    assert derived["perennial"]["is_period_2"] is True, "perennial must be period-2"
+    assert derived["consumer"]["is_period_2"] is False, "consumer must be period-1"
+
+
+@pytest.mark.slow
+def test_biosphere_tier2_band_sits_above_measured_sensitivity() -> None:
+    """The shared biosphere Tier-2 band (`1e-11`, all 7 goldens) sits above the freshly
+    re-measured ±1-ULP transcendental sensitivity — the "measured, never derived"
+    provenance (`measure_tier2_bands.measured_biosphere_sensitivity`, the representative
+    worst-case `canopy.exp` over both 15-yr runs). Marked `-m slow` (six 15-yr runs),
+    unlike the CI-fast Step-3 band test. Also pins the band tight (<= 1e-9) so a real
+    port defect still trips Tier 2.
+    """
+    by_key = {g["key"]: g for g in _tiers()}
+    sensitivity = measure_tier2_bands.measured_biosphere_sensitivity()
+    for key in measure_tier2_bands.BIOSPHERE_TIER2_KEYS:
+        entry = by_key[key]
+        assert entry["float_tier"] == 2, key
+        band = entry["band"]
+        assert band == measure_tier2_bands.BIOSPHERE_BAND, (
+            f"{key}: band {band!r} != the shared BIOSPHERE_BAND"
+        )
+        assert sensitivity < band, (
+            f"{key}: 1-ULP sensitivity {sensitivity:.3e} not below band {band:.3e}"
+        )
+        assert band <= 1e-9, f"{key}: band {band:.3e} too loose to catch a port defect"
 
 
 # --------------------------------------------------------------------------- #
