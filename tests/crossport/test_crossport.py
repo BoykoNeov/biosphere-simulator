@@ -40,13 +40,16 @@ sys.path.insert(0, str(Path(__file__).parent))
 import compare  # noqa: E402
 import gen_engine_vectors  # noqa: E402
 import gen_rng_vectors  # noqa: E402
+import gen_sibling_params  # noqa: E402
 import gen_vectors  # noqa: E402
+import measure_tier2_bands  # noqa: E402
 
 from sim_io import snapshot  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_DIR = REPO_ROOT / "tests" / "regression" / "golden"
 RUST_CRATE_DIR = REPO_ROOT / "rust" / "crates" / "simcore"
+RUST_DOMAINS_DIR = REPO_ROOT / "rust" / "crates" / "domains"
 TIERS_PATH = Path(__file__).parent / "tiers.json"
 
 # The hand-pinned RNG known-answer vectors live in tests/test_rng.py; import them to
@@ -93,6 +96,21 @@ def test_engine_vectors_in_sync() -> None:
     assert on_disk == gen_engine_vectors.render(), (
         "engine vectors are stale — regenerate with "
         "`uv run python tests/crossport/gen_engine_vectors.py`"
+    )
+
+
+def test_sibling_params_in_sync() -> None:
+    """The committed sibling-param file equals `gen_sibling_params.render()` (regen
+    discipline — the Rust `domains` crate `include_str!`s this exact file to get the
+    12 Phase-5 coefficients, each loaded through its frozen Python loader). No external
+    anchor is needed: the Python loaders + the ~1300-test suite ground the values, and
+    decimal params round-trip bit-identically across correctly-rounding parsers."""
+    on_disk = gen_sibling_params.PARAMS_PATH.read_text(encoding="utf-8").replace(
+        "\r\n", "\n"
+    )
+    assert on_disk == gen_sibling_params.render(), (
+        "sibling params are stale — regenerate with "
+        "`uv run python tests/crossport/gen_sibling_params.py`"
     )
 
 
@@ -202,10 +220,29 @@ def test_tiers_entries_are_internally_consistent() -> None:
             assert g["transcendentals"], (
                 f"{g['golden']}: Tier-2 must cite ≥1 transcendental site"
             )
-        # Bands are unmeasured until a later step produces port numbers.
-        assert g["band"] is None and g["floor"] is None, (
-            f"{g['golden']}: band/floor must stay null until measured vs port output"
-        )
+        # Tier 1 is bit-exact — no band/floor. Tier-2 bands are measured, never derived
+        # (compare.py), so a Tier-2 entry is EITHER unmeasured (both null) OR measured
+        # (both positive floats); a measured band is justified against a fresh
+        # sensitivity measurement by test_tier2_bands_sit_above_measured_sensitivity
+        # (Step 3, P7.3). Step 3 measured exactly the three standalone-sibling bands.
+        if g["float_tier"] == 1:
+            assert g["band"] is None and g["floor"] is None, (
+                f"{g['golden']}: Tier-1 is bit-exact — band/floor must be null"
+            )
+        else:
+            both_null = g["band"] is None and g["floor"] is None
+            both_measured = (
+                isinstance(g["band"], (int, float))
+                and not isinstance(g["band"], bool)
+                and isinstance(g["floor"], (int, float))
+                and not isinstance(g["floor"], bool)
+                and g["band"] > 0
+                and g["floor"] > 0
+            )
+            assert both_null or both_measured, (
+                f"{g['golden']}: Tier-2 band/floor must be both-null (unmeasured) or "
+                f"both-positive (measured), got band={g['band']!r} floor={g['floor']!r}"
+            )
 
 
 def test_tier1_set_is_the_four_transcendental_free_scenarios() -> None:
@@ -226,6 +263,30 @@ def test_power_is_tier2_not_tier1() -> None:
     assert by_name["power_state.json"]["float_tier"] == 2
     assert not by_name["power_state.json"]["transcendental_free"]
     assert any("sin" in t for t in by_name["power_state.json"]["transcendentals"])
+
+
+def test_tier2_bands_sit_above_measured_sensitivity() -> None:
+    """The three Step-3 Tier-2 bands (power / power_self_discharge / thermal) are
+    MEASURED, not derived: each committed `tiers.json` band sits above the freshly
+    re-measured ±1-ULP transcendental sensitivity (`measure_tier2_bands.py`). This is
+    the honest provenance the relaxed `test_tiers_entries_are_internally_consistent`
+    relies on, and it is pure Python (no `cargo`) so it runs on CI. It also pins the
+    band *tight* (≤ 1e-9) so a real port defect still trips Tier 2."""
+    by_key = {g["key"]: g for g in _tiers()}
+    for key in measure_tier2_bands.STEP3_TIER2_KEYS:
+        entry = by_key[key]
+        assert entry["float_tier"] == 2, key
+        band, floor = entry["band"], entry["floor"]
+        assert band is not None and floor is not None, f"{key}: band/floor unmeasured"
+        sensitivity = measure_tier2_bands.measured_sensitivity(key)
+        assert sensitivity < band, (
+            f"{key}: measured ±1-ULP sensitivity {sensitivity:.3e} is not below the "
+            f"tiers.json band {band:.3e}"
+        )
+        assert band <= 1e-9, (
+            f"{key}: band {band:.3e} is too loose — a Tier-2 band must still catch a "
+            f"real port defect"
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -302,6 +363,65 @@ def test_rust_composite_snapshot_exercises_aux_and_multicomposition() -> None:
     assert snapshot.dumps(state) == snapshot.dumps(
         snapshot.loads(snapshot.dumps(state))
     )
+
+
+# --------------------------------------------------------------------------- #
+# 3b. Step-3 (P7.3): the four ported siblings run in Rust and match their tier #
+# --------------------------------------------------------------------------- #
+
+# (example binary, golden filename, tiers.json key). crew/eclss are Tier-1 (bit-exact);
+# power/power_self_discharge/thermal are Tier-2 (measured band from tiers.json).
+_SIBLING_CASES = [
+    ("emit_crew", "crew_state.json", "crew_mission"),
+    ("emit_eclss", "eclss_state.json", "eclss_steady_state"),
+    ("emit_power", "power_state.json", "power_bounded_soc"),
+    (
+        "emit_power_self_discharge",
+        "power_self_discharge_state.json",
+        "power_self_discharge",
+    ),
+    ("emit_thermal", "thermal_state.json", "thermal_equilibrium"),
+]
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+@pytest.mark.parametrize("example,golden,key", _SIBLING_CASES)
+def test_rust_siblings_match_their_tier(example: str, golden: str, key: str) -> None:
+    """Run each ported standalone sibling (`build_*` + Euler `run` in the Rust `domains`
+    crate) and compare its final `State` to the frozen golden at its assigned tier:
+    **crew / eclss Tier-1 bit-exact** (transcendental-free — the real proof the engine
+    computes the frozen values, not just that Step-0's hand-built ones round-trip);
+    **power / power_self_discharge / thermal Tier-2** within the measured `tiers.json`
+    band. Compared on parsed f64 (via `sim_io.loads`), never JSON bytes.
+
+    NOTE: `skipif cargo is None` and the Python CI job installs no Rust, so this parity
+    gate — including the crew/eclss bit-exact claims — is LOCAL-ONLY, never on CI
+    (pre-existing Step-0 precedent). A real cross-libm CI gate (Rust in the Python job,
+    or a committed Linux-generated golden) is deferred future work.
+    """
+    proc = subprocess.run(
+        ["cargo", "run", "-q", "--example", example],
+        cwd=RUST_DOMAINS_DIR,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, f"cargo run {example} failed:\n{proc.stderr}"
+
+    # Validate it parses as a snapshot, then compare parsed values (port-agnostic).
+    snapshot.loads(proc.stdout)
+    candidate = json.loads(proc.stdout)
+    reference = compare.load_json(GOLDEN_DIR / golden)
+
+    entry = {g["key"]: g for g in _tiers()}[key]
+    tier = entry["float_tier"]
+    if tier == compare.TIER_1_BIT_EXACT:
+        result = compare.compare(reference, candidate, tier=tier)
+    else:
+        result = compare.compare(
+            reference, candidate, tier=tier, band=entry["band"], floor=entry["floor"]
+        )
+    assert result.ok, f"{example} vs {golden} (tier {tier}):\n{result.report()}"
+    assert result.numeric_pairs, "expected numeric leaves to be compared"
 
 
 # --------------------------------------------------------------------------- #

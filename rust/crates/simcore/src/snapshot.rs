@@ -19,6 +19,7 @@
 //! mirrors the Python core's stdlib-only discipline.
 
 use crate::hexfloat;
+use crate::state as engine;
 
 /// The on-disk schema version. Must equal `sim_io.snapshot.SCHEMA_VERSION`;
 /// Python `loads` rejects any other value outright.
@@ -110,6 +111,42 @@ impl State {
     }
 }
 
+/// Project a computed engine [`engine::State`] into this serialize-only snapshot —
+/// the bridge Step 3 needs to emit a *run's* result (Step 0's examples hand-built
+/// the snapshot directly). The engine's typed `Quantity`/`StockKind` enums become
+/// their lowercase canonical values (`Quantity::value` / `StockKind::value`), exactly
+/// as the Python golden spells them; every float is carried verbatim (the hex-float
+/// formatting happens in [`State::to_json`]). No invariant logic — the engine already
+/// validated the state, and Python's constructors re-fire on load.
+pub fn from_engine(state: &engine::State) -> State {
+    let stocks = state
+        .stocks
+        .values()
+        .map(|s| Stock {
+            id: s.id.clone(),
+            domain: s.domain.clone(),
+            quantity: s.quantity.value().to_string(),
+            unit: s.unit.clone(),
+            amount: s.amount,
+            kind: s.kind.value().to_string(),
+            extinction_threshold: s.extinction_threshold,
+            unclamped: s.unclamped,
+            composition: s
+                .composition
+                .iter()
+                .map(|(q, coeff)| (q.value().to_string(), *coeff))
+                .collect(),
+        })
+        .collect();
+    let aux = state.aux.iter().map(|(k, v)| (k.clone(), *v)).collect();
+    State {
+        n: state.n,
+        rng_seed: state.rng_seed,
+        aux,
+        stocks,
+    }
+}
+
 /// Emit one stock object (indented two levels, field keys sorted alphabetically
 /// to mirror the Python `sort_keys=True` layout).
 fn push_stock(out: &mut String, s: &Stock) {
@@ -189,6 +226,50 @@ fn push_json_string(out: &mut String, s: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn from_engine_projects_typed_state() {
+        use crate::quantities::{Quantity, StockKind};
+        use crate::state::{State as EngineState, Stock as EngineStock};
+        use std::collections::BTreeMap;
+
+        // A gas-phase composition stock + a non-empty aux + a non-zero seed exercise the
+        // enum→value projection and every branch to_json cares about.
+        let stock = EngineStock::new(
+            "eclss.cabin_co2".to_string(),
+            "eclss".to_string(),
+            Quantity::Carbon,
+            "mol".to_string(),
+            3.0,
+            StockKind::Pool,
+            0.0,
+            false,
+            BTreeMap::from([(Quantity::Carbon, 1.0), (Quantity::Oxygen, 2.0)]),
+        )
+        .unwrap();
+        let engine_state = EngineState::new(
+            5,
+            BTreeMap::from([(stock.id.clone(), stock)]),
+            0xDEAD,
+            BTreeMap::from([("thermal_time".to_string(), 1.5)]),
+        )
+        .unwrap();
+
+        let snap = from_engine(&engine_state);
+        assert_eq!(snap.n, 5);
+        assert_eq!(snap.rng_seed, 0xDEAD);
+        assert_eq!(snap.aux, vec![("thermal_time".to_string(), 1.5)]);
+        assert_eq!(snap.stocks.len(), 1);
+        let s = &snap.stocks[0];
+        assert_eq!(s.quantity, "carbon"); // lowercase enum value
+        assert_eq!(s.kind, "pool");
+        assert_eq!(
+            s.composition,
+            vec![("carbon".to_string(), 1.0), ("oxygen".to_string(), 2.0)]
+        );
+        // The projection is a valid snapshot the emitter serializes without panic.
+        assert!(snap.to_json().contains("\"quantity\": \"carbon\""));
+    }
 
     #[test]
     fn emits_parseable_shape() {

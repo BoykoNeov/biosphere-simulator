@@ -722,8 +722,43 @@ over-draw→`ArbitrationError`). Aux verified FROZEN under multi-rate (`substep`
 untouched — `thermal_time` constant at 7.0 across the whole multirate run). **Zero core + zero
 domain change** (`git diff src/` empty); all twenty frozen goldens byte-identical (no regen);
 `cargo test` (44) + `clippy -D warnings` green; full Python suite incl. `-m slow` + ruff/pyright
-green. **Next: Step 3 (P7.3) — port the four Phase-5 siblings + validate the 5 standalone
-goldens (`crew_state` Tier-1, the rest Tier-2 — the first real libm audit: `powf(4.0)`, `sin`).**
+green.
+**Step 3 (P7.3) COMPLETE — the four Phase-5 siblings ported; all 5 standalone goldens pass their
+tier; crew AND eclss came out Tier-1 BIT-EXACT (the engine now *computes* the frozen values, not
+just round-trips Step-0's hand-built ones)**: new `rust/crates/domains` crate (depends only on
+zero-dep `simcore`) — `power`/`thermal`/`eclss`/`crew` modules + a shared Euler `run`
+(final-state-only). Every `evaluate` mirrors the Python arithmetic **char-for-char** (the Tier-1
+tripwire, advisor: crew split op-order `respired=f·q` / `feces=(1−f)·q` NOT `q−f·q`; ECLSS
+`(k·stock)·dt` + `(setpoint−cabin_o2)` demand term). **Derivations PORTED not smuggled** (advisor):
+Power's `solar_schedule` half-sine + `daily_solar_energy` + `balanced_load_w` re-computed in Rust
+(that re-computation IS the port). **Param fork → Option C** (advisor: decimals round-trip
+bit-identically across any correct-rounding parser, so serde_yaml buys nothing + adds a deprecated
+dep + the `1.0e7` YAML-1.1 risk): `gen_sibling_params.py` loads the 12 coeffs through the FROZEN
+Python loaders → committed hex-float `rust/crates/domains/src/sibling_params.txt`, `include_str!`d
+(no YAML parser); `test_sibling_params_in_sync` guards drift. New **`snapshot::from_engine`** bridge
+(`state::State→snapshot::State`, enum→lowercase-value) + 5 emit examples that run each scenario,
+assert Tier-0 (`rationed==0`/`events==()`; conservation-every-step enforced inside `step_report`),
+print the snapshot. **THE calibration finding (advisor): the direct Tier-2 measurement is
+degenerate** — the 3 Tier-2 scenarios (power `sin`, thermal `powf`) *also* read `max_rel_dev=0.0`
+vs the goldens because Rust `f64::sin`/`powf` and CPython `math.sin`/`**` resolve to the SAME system
+libm on one machine (a same-libm artifact, NOT a cross-libm measurement); a band "above 0" would be
+a DERIVED guess violating the "measured never derived" contract. So `measure_tier2_bands.py` measures
+the **propagated ±1-ULP transcendental SENSITIVITY** (perturb `sin`/`t**4` one ULP, re-run to final):
+power 5.2e-15 / power+self-discharge 4.1e-15 / thermal 1.9e-16 (the contracting attractor damps it).
+Bands set to **1e-12** (~190× above max, floor 1e-12) — absorbs realistic multi-ULP cross-libm
+divergence, a real port defect still trips; `test_tier2_bands_sit_above_measured_sensitivity`
+(pure-Python, runs on CI) re-measures + asserts `band>sensitivity`;
+`test_tiers_entries_are_internally_consistent` relaxed (Tier-1⇒null band; Tier-2⇒both-null OR
+both-positive). **Parity gate is LOCAL-ONLY (advisor, stated loudly):**
+`test_rust_siblings_match_their_tier` is `skipif cargo is None` + the Python CI job installs no Rust,
+so the whole Rust-vs-Python comparison (incl. crew/eclss Tier-1) runs locally, NEVER on CI
+(pre-existing Step-0 precedent); the band is future-proofing (C# Phase 8 / cross-platform devs), not
+an active CI check — deferred future work: a real cross-libm gate (Rust in the Python CI job, or a
+committed Linux golden). **`git diff src/` empty** (Phase-7 exit criterion — all changes under
+`rust/` + `tests/crossport/`); `cargo test` + `clippy -D warnings` green; Python ruff/format/pyright
++ full suite incl. `-m slow` green; twenty frozen goldens byte-identical (no regen).
+**Next: Step 4 (P7.4) — port the biosphere; validate the 7 frozen biosphere goldens (all Tier 2;
+the heaviest libm-audit surface — `exp`/`pow`/`log` in FvCB, `sin` in weather).**
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

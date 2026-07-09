@@ -3,5 +3,12 @@
 version = 4
 
 [[package]]
+name = "domains"
+version = "0.1.0"
+dependencies = [
+ "simcore",
+]
+
+[[package]]
 name = "simcore"
 version = "0.1.0"

@@ -1,5 +1,5 @@
 {
-  "_comment": "Cross-port parity classification for the 20 frozen goldens (7 biosphere + 13 station). Authored in Phase-7 Step 0 (P7.0) by inspecting each scenario's reachable evaluation graph (flows + resolver + schedule + scenario data) for transcendental ops. The `float_tier` is the tier for FLOAT TRAJECTORIES; the Tier-0 structural gate (see `_tier0`) is EXACT for every scenario regardless. Rule (advisor): classify by the ops the simulator EXECUTES, not the closed-form solution — a geometric contraction d_n=d0*(1-k*dt)^n is n sequential multiplies (IEEE basic ops, bit-identical across ports), NOT a pow() call, so it is Tier 1. Only a `math.{sin,cos,exp,log,pow,sqrt,tan}` / `**` in the per-step graph drops a scenario to Tier 2. `band`/`floor` are null until MEASURED against actual Rust-port output in a later step (Tier-2 tolerances are measured, never derived).",
+  "_comment": "Cross-port parity classification for the 20 frozen goldens (7 biosphere + 13 station). Authored in Phase-7 Step 0 (P7.0) by inspecting each scenario's reachable evaluation graph (flows + resolver + schedule + scenario data) for transcendental ops. The `float_tier` is the tier for FLOAT TRAJECTORIES; the Tier-0 structural gate (see `_tier0`) is EXACT for every scenario regardless. Rule (advisor): classify by the ops the simulator EXECUTES, not the closed-form solution — a geometric contraction d_n=d0*(1-k*dt)^n is n sequential multiplies (IEEE basic ops, bit-identical across ports), NOT a pow() call, so it is Tier 1. Only a `math.{sin,cos,exp,log,pow,sqrt,tan}` / `**` in the per-step graph drops a scenario to Tier 2. `band`/`floor` are null until MEASURED (Tier-2 tolerances are measured, never derived). Step-3 (P7.3) measured the three standalone-sibling Tier-2 bands (power / power_self_discharge / thermal) via the propagated ±1-ULP transcendental SENSITIVITY (`measure_tier2_bands.py`), NOT the direct Rust-vs-Python deviation — which reads 0.0 on one machine because both call the same system libm (a same-libm artifact, not a cross-libm measurement). The band sits above that sensitivity; `test_crossport.py` re-measures and asserts band > sensitivity. The remaining Tier-2 bands stay null until their step. NOTE: the Rust-example-vs-Python comparison is `skipif cargo is None` and the Python CI job has no Rust, so the parity gate (incl. the crew/eclss Tier-1 bit-exact checks) is LOCAL-ONLY, never on CI (pre-existing Step-0 precedent); a real cross-libm gate is future work.",
   "_tier0": {
     "_comment": "Universal structural/discrete gate — EXACT for EVERY scenario, all tiers. Enforced by compare.py independent of float_tier. This is the primary parity gate (the plan: 'Tier 0 is the primary gate'). The per-step-in-Rust conservation assertion and the events==()/rationed==0/period-class invariants are Rust-run-side and land with the engine in Steps 2+; the snapshot-visible subset is listed here.",
     "exact_fields": [
@@ -174,9 +174,9 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["power/system.py:156 (math.sin, math.pi)"],
-      "evidence": "The solar_schedule is a half-sine over the daylight window (math.sin/math.pi). Advisor-flagged: power is NOT Tier 1 despite the derived daily balance. Tier 2.",
-      "band": null,
-      "floor": null
+      "evidence": "The solar_schedule is a half-sine over the daylight window (math.sin/math.pi). Advisor-flagged: power is NOT Tier 1 despite the derived daily balance. Tier 2. Step-3 (P7.3) calibration: measured ±1-ULP sin-sensitivity propagates to 5.2e-15 (measure_tier2_bands.py); same-libm Rust-vs-Python deviation is 0.0. Band 1e-12 (~190x above measured) absorbs realistic multi-ULP cross-libm divergence while a real port defect still trips.",
+      "band": 1e-12,
+      "floor": 1e-12
     },
     {
       "golden": "power_self_discharge_state.json",
@@ -187,9 +187,9 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["power/system.py:156 (math.sin, math.pi)"],
-      "evidence": "Reuses BOUNDED_SOC_SCENARIO's half-sine solar (inherits math.sin); the SelfDischarge leak itself is linear but the graph is already transcendental. Tier 2.",
-      "band": null,
-      "floor": null
+      "evidence": "Reuses BOUNDED_SOC_SCENARIO's half-sine solar (inherits math.sin); the SelfDischarge leak itself is linear but the graph is already transcendental. Tier 2. Step-3 (P7.3) calibration: measured ±1-ULP sin-sensitivity propagates to 4.1e-15 (measure_tier2_bands.py); same-libm Rust-vs-Python deviation is 0.0. Band 1e-12.",
+      "band": 1e-12,
+      "floor": 1e-12
     },
     {
       "golden": "thermal_state.json",
@@ -200,9 +200,9 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["thermal/flows.py:130 (t**4 Stefan-Boltzmann)"],
-      "evidence": "RadiatorReject computes eps*sigma*A*(T^4 - T_space^4) via `**` every step — the nonlinear attractor. Must be op-for-op powf(4.0). Tier 2.",
-      "band": null,
-      "floor": null
+      "evidence": "RadiatorReject computes eps*sigma*A*(T^4 - T_space^4) via `**` every step — the nonlinear attractor. Must be op-for-op powf(4.0). Tier 2. Step-3 (P7.3) calibration: measured ±1-ULP t**4-sensitivity propagates to only 1.9e-16 (measure_tier2_bands.py; the contracting attractor damps it); same-libm Rust-vs-Python deviation is 0.0. Band 1e-12.",
+      "band": 1e-12,
+      "floor": 1e-12
     },
     {
       "golden": "station_state.json",

@@ -300,7 +300,7 @@ the aux single-Euler-increment placement, `substep` keeping `n`.
 every-step conservation gate fires identically; a deliberately-imbalanced synthetic flow
 raises `ConservationError` in Rust too.
 
-### Step 3 (P7.3) — port the four Phase-5 siblings; validate the 5 standalone goldens
+### Step 3 (P7.3) — port the four Phase-5 siblings; validate the 5 standalone goldens — ✅ COMPLETE
 
 Port power/thermal/eclss/crew flows + loaders + scenarios + `run_power`. Validate
 `power_state`, `power_self_discharge_state`, `thermal_state`, `eclss_state`, `crew_state`.
@@ -312,6 +312,60 @@ every step, steady-state reached) asserted exactly for all five.
 
 *Acceptance:* 5 standalone goldens pass their assigned tier; the measured Tier-2 deviations are
 recorded and the bands set above them (the first real tolerance calibration data point).
+
+**COMPLETE — the four siblings ported, all 5 standalone goldens pass their tier; crew AND eclss
+came out Tier-1 bit-exact (the engine now *computes* the frozen values, not just round-trips
+Step-0's hand-built ones):**
+
+* **New `domains` Rust crate** (`rust/crates/domains`, depends only on zero-dep `simcore`) with
+  `power`/`thermal`/`eclss`/`crew` modules + a shared Euler `run` (final-state-only; the goldens
+  pin the final `State`). Every flow's `evaluate` mirrors the Python arithmetic **character-for-
+  character** — the load-bearing bit for the Tier-1 pair: the crew split op-order (`respired =
+  f·q`, `feces = (1−f)·q`, NOT `q − f·q`), the ECLSS `(k·stock)·dt` grouping and the
+  `(setpoint − cabin_o2)` demand term. **The derivations are PORTED, not smuggled** (advisor):
+  Power's `solar_schedule` half-sine + `daily_solar_energy` + `balanced_load_w` are re-computed
+  in Rust off the scenario constants — that re-computation *is* the port.
+
+* **Param fork resolved to Option C** (advisor: decimal params round-trip bit-identically across
+  any correct-rounding parser, so serde_yaml buys nothing and adds a deprecated dep + the
+  `1.0e7` YAML-1.1 risk). `tests/crossport/gen_sibling_params.py` loads the 12 coefficients
+  through the **frozen Python loaders** (pydantic schema + unit guard + bound check) and emits a
+  committed hex-float file `rust/crates/domains/src/sibling_params.txt`; the crate `include_str!`s
+  it (no YAML parser). `test_sibling_params_in_sync` guards drift (the `gen_rng_vectors` discipline).
+
+* **`snapshot::from_engine`** — the new `state::State → snapshot::State` bridge in `simcore`
+  (projects the typed `Quantity`/`StockKind` enums to their lowercase values); 5 emit examples
+  (`rust/crates/domains/examples/emit_*.rs`) run each scenario, assert Tier-0 (`rationed==0`,
+  `events==()`; conservation-every-step is enforced inside `step_report`, so a completed run *is*
+  the proof), and print the snapshot.
+
+* **The calibration finding — Tier-2 bands are the plan's "first real tolerance data point," and
+  the direct measurement is degenerate (advisor):** crew/eclss are **Tier-1 bit-exact**; but the
+  three Tier-2 scenarios (power `sin`, thermal `powf`) *also* came out with `max_rel_dev = 0.0`
+  vs the goldens — because Rust `f64::sin`/`powf` and CPython `math.sin`/`**` resolve to the
+  **same system libm** on one machine. That 0.0 is a same-libm artifact, **not** a cross-libm
+  measurement, so a band set "above 0" would be a *derived* guess violating the "measured, never
+  derived" contract. Instead `tests/crossport/measure_tier2_bands.py` measures the **propagated
+  ±1-ULP transcendental sensitivity** (perturb `sin`/`t**4` by one ULP, re-run to final state):
+  power `5.2e-15`, power+self-discharge `4.1e-15`, thermal `1.9e-16` (the contracting attractor
+  damps it). Bands set to `1e-12` (~190× above the max, floor `1e-12`) — absorbs realistic
+  multi-ULP cross-libm divergence while a real port defect still trips. `tiers.json` bands are
+  filled for exactly these three; `test_tier2_bands_sit_above_measured_sensitivity` (pure Python,
+  runs on CI) re-measures and asserts `band > sensitivity`;
+  `test_tiers_entries_are_internally_consistent` relaxed to "Tier-1 ⇒ null band; Tier-2 ⇒ both-null
+  (unmeasured) or both-positive (measured)."
+
+* **The parity gate is LOCAL-ONLY (advisor, stated loudly):** `test_rust_siblings_match_their_tier`
+  is `skipif cargo is None`, and the Python CI job installs no Rust — so the whole Rust-vs-Python
+  comparison (incl. the crew/eclss Tier-1 claims) runs locally, **never on CI** (pre-existing
+  Step-0 precedent; Step-0's acceptance skips identically). The measured band is currently
+  future-proofing (C# at Phase 8, cross-platform devs), not an active CI check. **Deferred future
+  work:** a real cross-libm gate — Rust in the Python CI job, or a committed Linux-generated golden.
+
+* **`git diff src/` empty** (the Phase-7 exit criterion): every change is under `rust/` or
+  `tests/crossport/` (permitted test tooling). Full Rust `cargo test` + `clippy -D warnings` green;
+  Python `ruff`/`format`/`pyright`/`pytest` (incl. `-m slow`) green; the 20 frozen goldens
+  byte-identical (no regen).
 
 ### Step 4 (P7.4) — port the biosphere; validate the 7 frozen biosphere goldens
 

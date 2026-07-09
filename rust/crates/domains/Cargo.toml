@@ -1,0 +1,17 @@
+[package]
+name = "domains"
+version = "0.1.0"
+edition = "2021"
+description = "Native Rust port of the frozen Python `domains.*` Phase-5 siblings (Phase 7, P7.3). Depends only on the zero-dep `simcore` crate."
+publish = false
+
+[lib]
+name = "domains"
+path = "src/lib.rs"
+
+# The only dependency is the sibling `simcore` engine crate (itself zero-dep). No
+# third-party crates: param values arrive via a Python-generated hex-float file
+# (`src/sibling_params.txt`, read with include_str!), NOT a YAML parser — mirroring
+# the Python core's stdlib-only discipline and avoiding the deprecated serde_yaml.
+[dependencies]
+simcore = { path = "../simcore" }
