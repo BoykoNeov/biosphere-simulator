@@ -12,6 +12,16 @@
 //! "core is pure" true across the FFI boundary (the analogue of Phase-7 making
 //! `crew::carbon_split` `pub` rather than importing outward).
 //!
+//! # The display projection (P8.2)
+//!
+//! **[`SimSession::observation_json`]** returns the multi-domain dashboard read — stocks
+//! grouped per-domain plus the derived readouts (node temperature, battery SOC, per-quantity
+//! totals, conservation residual, `events`, `rationed`), all computed Rust-side in
+//! [`station::display`]. It is human-facing and **zero-parity** (plain decimal floats), kept
+//! strictly separate from the bit-exact hex-float [`SimSession::snapshot_json`] parity path.
+//! Step 2 also grows the fixed palette from `cabin_gas` to `{cabin_gas, station}` — the
+//! Power → Thermal `station` is the entry with a real temperature and battery SOC to show.
+//!
 //! # Two things beyond a naive `stock_amount` getter (advisor)
 //!
 //! 1. **[`SimSession::snapshot_json`]** returns the *Rust-side* `sim_io` hex-float JSON
@@ -30,6 +40,8 @@ use simcore::error::SimError;
 use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
 
+use station::display::{project, BatteryReadout, DisplayContext, ThermalReadout};
+
 /// The frozen owned-state session (Phase-8 Step 0). Aliased so the *Godot* class below
 /// can also be called `SimSession` (its registered Godot name) without shadowing.
 use station::session::SimSession as CoreSession;
@@ -39,32 +51,83 @@ use station::session::SimSession as CoreSession;
 // without a Godot runtime; the `#[func]` methods are thin wrappers.
 // ---------------------------------------------------------------------------
 
-/// Build the owned session for a fixed-palette scenario id (confirmed decision #1:
-/// "build systems" = a fixed, code-defined palette; registry construction stays in
-/// Rust). Step 1 ships the one Tier-1 tripwire scenario; later steps grow the palette.
-fn build_session(scenario_id: &str) -> Result<CoreSession, SimError> {
+/// Build the owned session **and its display context** for a fixed-palette scenario id
+/// (confirmed decision #1: "build systems" = a fixed, code-defined palette; registry
+/// construction stays in Rust). Step 1 shipped the one Tier-1 tripwire (`cabin_gas`); Step 2
+/// (P8.2) adds `station` (Power → Thermal) — the one palette entry with a real temperature
+/// and battery SOC to show. The [`DisplayContext`] carries the per-scenario constants the
+/// display readouts need but `State` lacks (thermal params, battery reference, the declared
+/// shared-stock ids) — see [`station::display`].
+fn build_session(scenario_id: &str) -> Result<(CoreSession, DisplayContext), SimError> {
     match scenario_id {
         "cabin_gas" => build_cabin_gas(),
+        "station" => build_station(),
         other => Err(SimError::Validation(format!(
-            "godot_bridge: unknown scenario id {other:?} (Step-1 palette: \"cabin_gas\")"
+            "godot_bridge: unknown scenario id {other:?} (P8.2 palette: \"cabin_gas\", \
+             \"station\")"
         ))),
     }
 }
 
 /// The coupled crew ↔ ECLSS `CABIN_GAS_SCENARIO` as a single-rate session — mirrors the
-/// [`station::run_station`] setup (and `tests/session_parity.rs`) exactly.
-fn build_cabin_gas() -> Result<CoreSession, SimError> {
+/// [`station::run_station`] setup (and `tests/session_parity.rs`) exactly. No thermal node
+/// or battery (both readouts project to `None`); the shared stocks are the three cabin-air
+/// pools the crew breathes and ECLSS regulates (a construction-time fact of the assembly).
+fn build_cabin_gas() -> Result<(CoreSession, DisplayContext), SimError> {
     let crew = domains::params::crew();
     let eclss = domains::params::eclss();
     let scenario = station::scenario::CABIN_GAS_SCENARIO;
     let (state, registry) = station::cabin::build_cabin(&crew, &eclss, &scenario)?;
     let resolver = station::cabin::cabin_resolver(&scenario)?;
-    Ok(CoreSession::single_rate(
+    let session = CoreSession::single_rate(
         EulerIntegrator::new(registry),
         state,
         resolver,
         scenario.dt_seconds,
-    ))
+    );
+    let ctx = DisplayContext {
+        thermal: None,
+        battery: None,
+        shared_stock_ids: vec![
+            domains::eclss::CABIN_O2.to_string(),
+            domains::eclss::CABIN_CO2.to_string(),
+            domains::eclss::CABIN_H2O.to_string(),
+        ],
+    };
+    Ok((session, ctx))
+}
+
+/// The coupled Power → Thermal `HEAT_CLOSURE_SCENARIO` as a single-rate session — mirrors
+/// the [`station::system::build_station`] setup (and `examples/emit_station.rs`) exactly.
+/// This is the palette entry with a real node temperature and battery SOC: the display
+/// context carries the thermal params (`T = T_space + Q/C`) and the initial battery charge
+/// (the SOC reference), and highlights `thermal.node` — the stock Power dissipates into and
+/// Thermal radiates from (cross-domain by construction, the Step-1 seam).
+fn build_station() -> Result<(CoreSession, DisplayContext), SimError> {
+    let charge = domains::params::charge();
+    let thermal = domains::params::thermal();
+    let scenario = station::scenario::HEAT_CLOSURE_SCENARIO;
+    let (state, registry) = station::system::build_station(&charge, &thermal, &scenario, None)?;
+    let resolver = station::system::station_resolver(&charge, &scenario)?;
+    let session = CoreSession::single_rate(
+        EulerIntegrator::new(registry),
+        state,
+        resolver,
+        scenario.power.dt_seconds,
+    );
+    let ctx = DisplayContext {
+        thermal: Some(ThermalReadout {
+            node_id: domains::thermal::NODE.to_string(),
+            heat_capacity: thermal.heat_capacity,
+            space_temperature: thermal.space_temperature,
+        }),
+        battery: Some(BatteryReadout {
+            battery_id: domains::power::BATTERY.to_string(),
+            initial_charge: scenario.power.battery0,
+        }),
+        shared_stock_ids: vec![domains::thermal::NODE.to_string()],
+    };
+    Ok((session, ctx))
 }
 
 const MXCSR_FTZ: u32 = 1 << 15; // flush-to-zero          (0x8000)
@@ -122,6 +185,9 @@ unsafe impl ExtensionLibrary for GodotBridgeExtension {}
 #[class(init, base=RefCounted)]
 pub struct SimSession {
     inner: Option<CoreSession>,
+    /// Per-scenario display constants (thermal params, battery reference, shared-stock
+    /// ids) built alongside `inner` — the display readouts need what `State` lacks.
+    display: Option<DisplayContext>,
     base: Base<RefCounted>,
 }
 
@@ -133,8 +199,9 @@ impl SimSession {
     #[func]
     fn build(&mut self, scenario_id: GString) -> bool {
         match build_session(&scenario_id.to_string()) {
-            Ok(session) => {
+            Ok((session, display)) => {
                 self.inner = Some(session);
+                self.display = Some(display);
                 true
             }
             Err(err) => {
@@ -219,6 +286,31 @@ impl SimSession {
         }
     }
 
+    /// The **display projection** as plain-float JSON (P8.2) — the multi-domain dashboard
+    /// read: stocks grouped per-domain, per-quantity totals, the declared shared-stock ids,
+    /// and the derived scalars (node temperature, battery SOC % of initial, last-step
+    /// conservation residual, `events`, `rationed`). Every number is computed Rust-side
+    /// ([`project`] → [`station::display::DisplayProjection::to_json`]); the game only
+    /// renders it. Unlike [`snapshot_json`](Self::snapshot_json) this is a human-facing,
+    /// zero-parity readout, so it uses normal decimal formatting — the bit-exact snapshot
+    /// path stays on the hex-float codec. Empty string before [`build`](Self::build).
+    #[func]
+    fn observation_json(&self) -> GString {
+        match (self.inner.as_ref(), self.display.as_ref()) {
+            (Some(session), Some(ctx)) => {
+                let proj = project(
+                    session.state(),
+                    ctx,
+                    session.total_rationed(),
+                    session.events().len(),
+                    session.max_residual(),
+                );
+                GString::from(proj.to_json().as_str())
+            }
+            _ => GString::from(""),
+        }
+    }
+
     /// Total flows scaled by the Euler backstop so far (a golden run asserts `0`).
     #[func]
     fn total_rationed(&self) -> i64 {
@@ -246,8 +338,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn build_session_knows_cabin_gas_and_rejects_unknown() {
+    fn build_session_knows_the_palette_and_rejects_unknown() {
         assert!(build_session("cabin_gas").is_ok());
+        assert!(build_session("station").is_ok());
         // `CoreSession` isn't `Debug`, so match the `Err` without `unwrap_err`.
         match build_session("no_such_scenario") {
             Err(SimError::Validation(_)) => {}
@@ -260,7 +353,7 @@ mod tests {
     /// `rationed == 0` / no events — the same Tier-0 payload the emit example asserts.
     #[test]
     fn cabin_gas_session_steps_well_fed() {
-        let mut session = build_session("cabin_gas").unwrap();
+        let (mut session, _ctx) = build_session("cabin_gas").unwrap();
         session
             .step_n(station::scenario::CABIN_GAS_STEPS)
             .unwrap();
@@ -270,6 +363,45 @@ mod tests {
         // The snapshot codec is reachable and non-empty (byte-parity vs the golden is
         // the Python smoke's job — this only proves the wrapper path is wired).
         assert!(from_engine(session.state()).to_json().contains("cabin_o2"));
+    }
+
+    /// The P8.2 display projection is reachable through the bridge and carries the derived
+    /// readouts. `cabin_gas` (no node, no battery) reports both scalars `null` and
+    /// highlights the three cabin-air pools; `station` (Power → Thermal) reports a real
+    /// temperature and SOC and highlights `thermal.node`.
+    #[test]
+    fn observation_projection_carries_the_derived_readouts() {
+        let (mut cabin, cabin_ctx) = build_session("cabin_gas").unwrap();
+        cabin.step_n(50).unwrap();
+        let json = project(
+            cabin.state(),
+            &cabin_ctx,
+            cabin.total_rationed(),
+            cabin.events().len(),
+            cabin.max_residual(),
+        )
+        .to_json();
+        assert!(json.contains("\"temperature_k\":null"));
+        assert!(json.contains("\"soc_percent_of_initial\":null"));
+        assert!(json.contains("eclss.cabin_o2")); // grouped + highlighted
+        assert!(json.contains("\"eclss\":["));
+
+        let (mut station, station_ctx) = build_session("station").unwrap();
+        station.step_n(station::scenario::HEAT_CLOSURE_DAYS * 24).unwrap();
+        let proj = project(
+            station.state(),
+            &station_ctx,
+            station.total_rationed(),
+            station.events().len(),
+            station.max_residual(),
+        );
+        // Node warmed to a physical equilibrium (hundreds of K); SOC returns near 100%
+        // of initial after whole balanced days.
+        let t = proj.temperature_k.expect("station has a node temperature");
+        assert!((100.0..400.0).contains(&t), "T_eq out of range: {t}");
+        let soc = proj.soc_percent_of_initial.expect("station has a battery SOC");
+        assert!((80.0..120.0).contains(&soc), "SOC out of range: {soc}");
+        assert!(proj.to_json().contains("\"shared_stock_ids\":[\"thermal.node\"]"));
     }
 
     #[test]

@@ -1,9 +1,9 @@
 # Phase 8 — Godot Front-End (the sim becomes visible)
 
-**Status: IN PROGRESS — Steps 0–1 COMPLETE.** This is the plan of record for
+**Status: IN PROGRESS — Steps 0–2 COMPLETE.** This is the plan of record for
 putting a **Godot front-end** on top of the **frozen** native Rust core (Phase 7). Pre-plan
 orientation complete and advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED**
-(see "Confirmed scope decisions"). Steps 0–1 are designed concretely here; Steps 2–8 get
+(see "Confirmed scope decisions"). Steps 0–2 are designed concretely here; Steps 3–8 get
 just-in-time design as each prior step nails the constraints (the Phase-5/6/7 discipline).
 
 The roadmap's charge (lines 363–373):
@@ -203,12 +203,52 @@ Original design notes (kept for provenance):
 - Acceptance: Godot loads the extension, GDScript drives `step()`, one live value renders, and the
   cross-boundary smoke passes bit-exact.
 
-### Step 2 (P8.2) — the display projection (revive `observation`)
+### Step 2 (P8.2) — the display projection (revive `observation`) — **COMPLETE**
 
-Multi-domain state visible. Work item #2. All stocks grouped per-domain + derived readouts
-(`T = T_space + Q/C`, SOC %, conservation residual, `events`, `rationed`) computed Rust-side and
-projected to Godot. UI renders a multi-domain dashboard; **shared stocks highlighted** (roadmap
-369 — "the UI visualizes all domains and their shared stocks"). Zero parity concern.
+Multi-domain state visible. Work item #2. **What landed** (all additive under `rust/` + `godot/`;
+`git diff src/` empty; engine crates carry no gdext types; 20 frozen goldens byte-identical — no
+science changed):
+
+- **Three layers, split by what each may touch** (advisor):
+  1. **`simcore::observation`** — the faithful port of the frozen `observe` surface
+     (`Observation { n, stocks }`, `StockObservation { id, domain, quantity, unit, amount }`,
+     id-sorted; `amount` held as raw bits for `Eq`/`Hash`). **No aggregates bolted on** — Python's
+     `observation.py` deliberately has none, and it is a frozen API. Held to the frozen surface:
+     the 7 unit tests port `test_observation.py`'s teeth (exact-copy, id-order, insertion-order
+     independence, empty, exact-amount, seed-drop, `n`-in-equality). The Phase-7 `lib.rs` deferral
+     note is now the revival note.
+  2. **`station::display`** (new) — the *whole* derived-readout layer: `group_by_domain` /
+     `per_quantity_totals` (need only `&State`) + `temperature` (reuses `domains::thermal::temperature`
+     verbatim) + SOC + `DisplayProjection::to_json` (plain decimal floats — the hex-float parity path
+     stays on `simcore::snapshot`). The three things `State` lacks — thermal params, the SOC
+     reference, and the shared-stock ids — are **declared per scenario in a `DisplayContext`** the
+     bridge fills (the sharing is a *construction-time fact of the assembly*, not recoverable from a
+     `Stock`'s single `domain` or a `Flow` — which exposes no static stock refs). **SOC is "% of
+     initial charge," not "% of capacity"** (honest label — a POOL battery has no capacity param, so
+     the only exact reference is `battery0`; SOC legitimately swings past 100% when charged above
+     start).
+  3. **`godot_bridge` + `godot/`** — `SimSession::observation_json()` (the P8.2 dashboard read) and
+     the `godot/main.gd` multi-domain dashboard (per-domain groups, shared-stock `*` highlight,
+     temperature / SOC / residual readouts).
+- **Residual is session-level, not observation-level** (a per-step before→after ledger quantity):
+  `SimSession` retains the pre-step `State` and computes `compute_ledger(prev, cur)` max-residual
+  **on demand** (`max_residual()`), so a caller that never asks pays only the per-step clone. The
+  clone is parity-neutral — it does not touch the integrator/op-order, so `session_parity.rs` stays
+  bit-exact (verified: all three fast parity cases green).
+- **Palette grown to `{cabin_gas, station}`** (advisor: `station` only — already ported, single-rate,
+  the one entry with a *real* temperature and battery SOC; two-rate greenhouse/sealed deferred).
+  Verified headless through the *actual cdylib* (`godot/dashboard_smoke.gd`): the `station` day-24
+  dashboard reads **node T ≈ 160.08 K** (the documented Step-1 `T_eq`), **SOC = 100.0 % of initial**
+  (returns to `battery0` after balanced days), `thermal.node` highlighted shared, ENERGY total
+  conserved, residual at round-off. `cabin_gas` reports both scalars `null` and highlights the three
+  cabin-air pools.
+- **Zero parity concern for the new readouts** (display-only, plain floats) — but the frozen `observe`
+  port is held to its surface. UI pixels remain the interactive (GUI / MCP) clause; the load-bearing
+  proof is the Rust `station::display` + bridge tests + the headless dashboard smoke.
+
+Original charge (kept for provenance): all stocks grouped per-domain + derived readouts computed
+Rust-side and projected to Godot; UI renders a multi-domain dashboard with shared stocks highlighted
+(roadmap 369). Zero parity concern.
 
 ### Step 3 (P8.3) — time controls
 

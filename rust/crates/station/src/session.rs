@@ -24,6 +24,7 @@
 //! from the (fixed-palette) scenario id, load the `State`, and stepping continues
 //! bit-identically. Phase-8 save/load (Step 7) rests on this.
 
+use simcore::conservation::compute_ledger;
 use simcore::environment::SourceResolver;
 use simcore::error::SimError;
 use simcore::events::Event;
@@ -61,6 +62,12 @@ enum Mode {
 pub struct SimSession {
     mode: Mode,
     state: State,
+    /// The state *before* the most recent [`step`](SimSession::step) — retained so the
+    /// display layer can read the last step's conservation residual on demand
+    /// ([`max_residual`](SimSession::max_residual)) without the stepping path computing a
+    /// ledger it doesn't need. `None` before the first step. Display-only; never read by
+    /// the parity-critical stepping code, so it cannot affect the trajectory.
+    prev_state: Option<State>,
     total_rationed: u64,
     events: Vec<Event>,
 }
@@ -82,6 +89,7 @@ impl SimSession {
                 dt,
             },
             state: initial,
+            prev_state: None,
             total_rationed: 0,
             events: Vec::new(),
         }
@@ -127,6 +135,7 @@ impl SimSession {
                 reset,
             },
             state: initial,
+            prev_state: None,
             total_rationed: 0,
             events: Vec::new(),
         })
@@ -153,10 +162,36 @@ impl SimSession {
         &self.events
     }
 
+    /// The largest absolute per-quantity conservation residual over the **most recent**
+    /// [`step`](SimSession::step) — a display-only "how well is mass/energy balancing"
+    /// health readout (the engine already *asserts* conservation every step, so this reads
+    /// at round-off, ~1e-15). `None` before the first step (no prior state to difference).
+    ///
+    /// Computed lazily from the retained previous state, so a caller that never asks pays
+    /// nothing beyond the per-step clone. A two-rate `step` covers a whole master day, so
+    /// its residual is the day-over-day balance (still ≈ 0 — every sub-step conserved).
+    pub fn max_residual(&self) -> Option<f64> {
+        let prev = self.prev_state.as_ref()?;
+        // compute_ledger errors only if the stock-id key set changed (Phase 0 never
+        // adds/removes stocks mid-run); treat that impossible case as "no reading".
+        let ledger = compute_ledger(prev, &self.state).ok()?;
+        Some(
+            ledger
+                .iter()
+                .map(|q| q.residual.abs())
+                .fold(0.0_f64, f64::max),
+        )
+    }
+
     /// Advance **one natural unit**: one `step_report` (single-rate) or one master day
     /// (two-rate). Bit-identical to the corresponding single iteration of the runner's
     /// loop, because it calls the same primitive.
     pub fn step(&mut self) -> Result<(), SimError> {
+        // Retain the pre-step state for the display residual readout. This is a plain
+        // clone of the value we are about to replace — it does not touch the integrator,
+        // resolver, or op-order, so the advanced `State` is bit-identical with or without
+        // it (the parity tests, which read only the final state, are unaffected).
+        self.prev_state = Some(self.state.clone());
         match &self.mode {
             Mode::SingleRate {
                 integrator,
@@ -206,5 +241,45 @@ impl SimSession {
             self.step()?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cabin::{build_cabin, cabin_resolver};
+    use crate::scenario::{CABIN_GAS_SCENARIO, CABIN_GAS_STEPS};
+
+    use super::*;
+
+    fn cabin_gas_session() -> SimSession {
+        let crew = domains::params::crew();
+        let eclss = domains::params::eclss();
+        let (state, registry) = build_cabin(&crew, &eclss, &CABIN_GAS_SCENARIO).unwrap();
+        let resolver = cabin_resolver(&CABIN_GAS_SCENARIO).unwrap();
+        SimSession::single_rate(
+            EulerIntegrator::new(registry),
+            state,
+            resolver,
+            CABIN_GAS_SCENARIO.dt_seconds,
+        )
+    }
+
+    #[test]
+    fn max_residual_is_none_before_first_step() {
+        assert!(cabin_gas_session().max_residual().is_none());
+    }
+
+    #[test]
+    fn max_residual_reads_at_roundoff_on_healthy_run() {
+        // The engine asserts conservation every step, so the display residual is only ever
+        // round-off. A generous bound proves the readout is wired and sane (not that the
+        // gate holds — that's the engine's job).
+        let mut session = cabin_gas_session();
+        session.step_n(CABIN_GAS_STEPS).unwrap();
+        let residual = session.max_residual().expect("residual after stepping");
+        assert!(
+            residual < 1e-6,
+            "healthy cabin_gas step residual should be round-off, got {residual}"
+        );
     }
 }

@@ -23,9 +23,11 @@
 //! transcendental-free scenario gated bit-exact (Tier 1) under Euler, RK4, and
 //! multi-rate against a Python-generated trajectory (`tests/engine_vectors.rs`).
 //!
-//! `observation` is a **conscious deferral** (a consumer-facing projection; no golden
-//! is an `Observation`, and the cross-port gate compares `State` snapshots directly).
-//! It ports trivially when a later step needs it.
+//! `observation` (Phase-8 P8.2) revives the frozen `simcore.observe` surface — a
+//! consumer-facing projection deferred through Phase 7 (no golden is an `Observation`,
+//! and the cross-port gate compares `State` snapshots directly). It is display-only and
+//! carries no aggregates; the derived Godot readouts (per-domain totals, temperature,
+//! SOC) live one layer out in `station::display`, keeping this module the faithful port.
 
 pub mod arbitration;
 pub mod auxiliary;
@@ -39,6 +41,7 @@ pub mod hexfloat;
 pub mod ids;
 pub mod integrator;
 pub mod multirate;
+pub mod observation;
 pub mod quantities;
 pub mod registry;
 pub mod rng;

@@ -15,6 +15,7 @@
 //! `assert_conserved` teeth (the primary Tier-0 gate — `substep` deliberately skips it).
 
 pub mod cabin;
+pub mod display;
 pub mod driver;
 pub mod flows;
 pub mod greenhouse;

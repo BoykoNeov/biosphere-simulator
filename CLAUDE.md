@@ -930,6 +930,41 @@ new code under `rust/crates/godot_bridge/`, `godot/`, `tests/crossport/`); works
 whole-project ruff+format+pyright green, the Godot parity test passes; **all 20 frozen goldens
 byte-identical** (no regen — Phase 8 changes no science). Next: Step 2 (the display projection — revive
 `observation`).
+**Step 2 (P8.2) COMPLETE — the display projection (revive `observation`); multi-domain state visible
+(work item #2)**: three layers split by what each may touch (advisor). **(1) `simcore::observation`** —
+the faithful port of the frozen `observe` surface deferred through Phase 7 (`Observation { n, stocks }`,
+`StockObservation { id, domain, quantity, unit, amount }`, id-sorted; `amount` held as raw bits so the
+type is `Eq`/`Hash` — the Python plain-data/hashable property). **NO aggregates bolted on** (Python's
+`observation.py` deliberately has none; it is a frozen API) — held to the surface by 7 unit tests porting
+`test_observation.py`'s teeth (exact-copy, id-order, insertion-order independence, empty, exact-amount,
+seed-drop, `n`-in-equality); the Phase-7 `lib.rs` deferral note became the revival note. **(2) new
+`station::display`** — the *whole* derived-readout layer (only `station` sees both `domains::thermal`
+params and station scenario data): `group_by_domain`/`per_quantity_totals` (need only `&State`) +
+`temperature` (**reuses `domains::thermal::temperature` verbatim**) + SOC + `DisplayProjection::to_json`
+(**plain decimal floats** — the hex-float parity path stays on `simcore::snapshot`). The three things
+`State` lacks — thermal params, the SOC reference, the shared-stock ids — are **declared per scenario in a
+`DisplayContext`** the bridge fills (the sharing is a **construction-time fact of the assembly**, NOT
+recoverable from a `Stock`'s single `domain` nor a `Flow`, which exposes no static stock refs — advisor).
+**SOC is "% of initial charge," NOT "% of capacity"** (honest label: a POOL battery has no capacity param,
+so `battery0` is the only exact reference; SOC legitimately swings past 100% when charged above start).
+**(3) `godot_bridge` + `godot/`** — `SimSession::observation_json()` (the dashboard read) + `godot/main.gd`
+multi-domain dashboard (per-domain groups, `*` shared-stock highlight, temperature/SOC/residual). **Residual
+is session-level** (a per-step before→after ledger quantity, not a projection of one `State`): `SimSession`
+retains the pre-step `State` and computes `compute_ledger(prev,cur)` max-residual **on demand**
+(`max_residual()`) — a caller that never asks pays only the per-step clone, which is **parity-neutral** (does
+not touch integrator/op-order ⇒ `session_parity.rs` stays bit-exact, verified). **Palette grown
+`{cabin_gas, station}`** (advisor: `station` only — already ported, single-rate, the one entry with a *real*
+temperature + battery SOC; two-rate greenhouse/sealed deferred). **Verified headless through the ACTUAL
+cdylib** (`godot/dashboard_smoke.gd`, `godot --headless --script`): the `station` day-24 dashboard reads
+**node T ≈ 160.08 K** (the documented Step-1 `T_eq`), **SOC = 100.0 % of initial** (returns to `battery0`
+after balanced days), `thermal.node` highlighted shared, ENERGY total conserved, residual at round-off;
+`cabin_gas` reports both scalars `null` and highlights the three cabin-air pools. **Zero parity concern for
+the new readouts** (display-only) — pixels stay the interactive (GUI/MCP) clause; the Step-1 cabin_gas FFI
+parity smoke still passes (rebuilt cdylib didn't disturb the bit-exact snapshot path). **Zero core + zero
+domain change** (`git diff src/` empty — all additive under `rust/` + `godot/`; engine crates carry no gdext
+types); `cargo test` (workspace: simcore 45 / station 10 / godot_bridge 5 / domains 9 / session_parity 3+1
+ignored) + `clippy --all-targets -D warnings` green; **all 20 frozen goldens byte-identical** (no regen).
+Next: Step 3 (time controls — play/pause/single-step/fast-forward off the render thread).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
