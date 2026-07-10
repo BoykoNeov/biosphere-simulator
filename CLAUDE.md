@@ -848,6 +848,40 @@ through the station/biosphere unfreeze discipline; a band loosens only on a re-m
 rise), + port-agnostic/C#-at-Phase-8 note. Verified: ruff + pyright (0 errors) + crossport slow &
 non-slow green on **both** Windows (same-libm, 0.0) and the Linux container (cross-libm, in band);
 20 goldens byte-identical; `git diff src/` empty. **PHASE 7 COMPLETE → Phase 8 (Godot front-end).**
+**Phase 8 — Godot front-end (the sim becomes visible; nothing scientific changes) — IN PROGRESS**
+(`docs/plans/phase-8-godot-frontend.md`; plan advisor-reviewed twice). **Architecture USER-DECIDED:
+Godot consumes the existing frozen Rust core via GDExtension/`gdext` — NO C# port** (Godot MCP staged
+at untracked `addons/gdai-mcp-plugin-godot/`). **Two USER-CONFIRMED scopes:** "build systems" = **fixed
+code-defined palette** (declarative authoring stays Phase 9); "runs headless on a server" =
+**architecture-satisfies, NO netcode**. **THE load-bearing decision:** parity is provable in **pure Rust
+before Godot** — incremental stepping bit-identical to run-to-completion. **The four named Rust work
+items:** (1) steppable owned-state session; (2) revive `observation` as the display projection (zero
+parity concern); (3) snapshot loader (emit-only today; cheap under fixed-palette); (4) port the
+perturbation primitives (excluded from Phase 7 as "diagnostics"). **Purity invariant = Phase-8's "`git
+diff src/` empty":** `gdext` lives ONLY in an additive binding crate; engine crates carry NO gdext types.
+**Step 0 (P8.0) COMPLETE — the steppable `SimSession` + the parity teeth (pure Rust, no Godot; work item
+#1)**: new `rust/crates/station/src/session.rs` — `SimSession`, an enum-backed owned-state struct
+(`SingleRate`/`TwoRate`) owning `State + registries + resolvers`, with `single_rate(…)`/`two_rate(…)`
+constructors + a **mode-agnostic** `step()` (advances the natural unit — one `step_report` single-rate;
+one **master day** two-rate) / `step_n(k)` (the parity-safe fast-forward primitive) / `state()`/`n()`/
+`total_rationed()`/`events()`; documents the **`(seed,key,n)` determinism corollary** (no sequential RNG
+state ⇒ trivial save/load, the Step-7 foundation). **Parity is by CONSTRUCTION not luck** — the inversion
+of the Phase-7 owned-loop runners is a **shared-code extract**: `run_master_day`'s per-day body →
+pub `driver::advance_one_master_day` (called by BOTH the runner AND the session); the sealed re-sow
+closure → pub `sealed::sealed_reset_hook` (`OwnedResetHook`, built by BOTH `run_sealed` AND the two-rate
+session); both extracts **behavior-preserving** (goldens byte-identical incl. the ~1.3 M-substep sealed
+run, verified by re-emitting `greenhouse`/`harvest`/`lighting`/`sealed_station` + diffing). **Parity tests**
+(`tests/session_parity.rs`, states compared by **exact hex-float JSON** = bit-exact): single-rate
+`cabin_gas` (Tier-1) `N×step()==run_station(N)`; two-rate greenhouse (`reset=None`)`==run_greenhouse`;
+two-rate sealed (`reset=Some`) short-horizon`==run_master_day`; **`#[ignore]`d full-horizon
+`run_sealed(915 days)==915×step()`** crossing all 3 season boundaries (the reset-adopt branch; passes 127 s
+release). **This intra-process gate is deliberately NOT the cross-boundary check** (advisor) — the genuine
+`gdext`-cdylib-vs-headless FP-env (FTZ/DAZ) parity is **Step 1's smoke + Step 8's gate**. Pre-existing
+unrelated cargo warning noted: duplicate `emit_crew` example basename across `simcore`/`domains` (NOT
+introduced here). **Zero core + zero domain-code change** (`git diff src/` empty; all changes under
+`rust/crates/station/`); `cargo test` + `clippy -D warnings` green; **all 20 frozen goldens byte-identical**
+(no regen). Next: Step 1 (the `gdext` binding crate + minimal Godot vertical slice + the first
+cross-boundary parity smoke).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
