@@ -29,6 +29,64 @@ pub const SECONDS_PER_DAY: f64 = 86400.0;
 /// the `run_season`/`annual_reset` re-sow hook, cross-domain (the P6.7 `slow_reset`).
 pub type ResetHook<'a> = &'a dyn Fn(u64, &State) -> Result<Option<State>, SimError>;
 
+/// An **owned** reset hook — the boxed form a caller-driven [`crate::session::SimSession`]
+/// holds so it is self-contained across steps (a game loop can't keep a borrow alive
+/// between frames). Coerces to [`ResetHook`] via `&*hook` at the call site.
+pub type OwnedResetHook = Box<dyn Fn(u64, &State) -> Result<Option<State>, SimError>>;
+
+/// Advance exactly **one** master day in place: consult `slow_reset` (adopting a returned
+/// re-sow state after a conservation check), run one slow `step_report` (advancing the
+/// phenology aux **and** `n`), then `steps_per_day` fast `substep`s at `fast_dt` (keeping
+/// `n`), asserting conservation over the full shared ledger after **each** sub-step.
+/// Returns `(next_state, day_rationed, day_events)`.
+///
+/// This is the per-day body of [`run_master_day`], extracted so a caller-driven session
+/// ([`crate::session::SimSession::step`]) steps day-by-day through the **same** code — the
+/// Phase-8 parity discipline: incremental stepping is bit-identical to run-to-completion
+/// because it *is* the same function. Does not validate `fast_dt·steps_per_day == 86400`
+/// (the runner / session constructor owns that once).
+#[allow(clippy::too_many_arguments)]
+pub fn advance_one_master_day(
+    slow_integrator: &EulerIntegrator,
+    fast_integrator: &EulerIntegrator,
+    state: &State,
+    slow_resolver: &SourceResolver,
+    fast_resolver: &SourceResolver,
+    steps_per_day: u64,
+    slow_dt: f64,
+    fast_dt: f64,
+    slow_reset: Option<ResetHook<'_>>,
+) -> Result<(State, u64, Vec<Event>), SimError> {
+    let mut state = state.clone();
+    let mut total_rationed = 0u64;
+    let mut events: Vec<Event> = Vec::new();
+    // Scheduled slow-domain reset (re-sow), applied before the slow step (n = day count).
+    // Conservation re-asserted across it (annual_reset is CARBON-conserving).
+    if let Some(reset_fn) = slow_reset {
+        if let Some(reset_state) = reset_fn(state.n, &state)? {
+            assert_conserved_default(&state, &reset_state)?;
+            state = reset_state;
+        }
+    }
+    // Slow operator: one full day-step (advances the phenology aux AND n).
+    let slow_report = slow_integrator.step_report(&state, slow_resolver, slow_dt)?;
+    state = slow_report.state;
+    total_rationed += slow_report.rationed;
+    events.extend(slow_report.events);
+    // Fast operator: steps_per_day sub-steps at fast_dt (n kept). substep skips the
+    // conservation assert, so we own it here — after each sub-step, over the full shared
+    // ledger — keeping the every-step teeth.
+    for _ in 0..steps_per_day {
+        let before = state.clone();
+        let fast_report = fast_integrator.substep(&state, fast_resolver, fast_dt)?;
+        state = fast_report.state;
+        assert_conserved_default(&before, &state)?;
+        total_rationed += fast_report.rationed;
+        events.extend(fast_report.events);
+    }
+    Ok((state, total_rationed, events))
+}
+
 /// Step `days` master days (slow once + fast ×`steps_per_day` each), slow-first.
 ///
 /// Per day: `slow_reset` (if given) is consulted before the slow step (where `n` is the day
@@ -65,30 +123,20 @@ pub fn run_master_day(
     let mut total_rationed = 0u64;
     let mut events: Vec<Event> = Vec::new();
     for _day in 0..days {
-        // Scheduled slow-domain reset (re-sow), applied before the slow step (n = day
-        // count). Conservation re-asserted across it (annual_reset is CARBON-conserving).
-        if let Some(reset_fn) = slow_reset {
-            if let Some(reset_state) = reset_fn(state.n, &state)? {
-                assert_conserved_default(&state, &reset_state)?;
-                state = reset_state;
-            }
-        }
-        // Slow operator: one full day-step (advances the phenology aux AND n).
-        let slow_report = slow_integrator.step_report(&state, slow_resolver, slow_dt)?;
-        state = slow_report.state;
-        total_rationed += slow_report.rationed;
-        events.extend(slow_report.events);
-        // Fast operator: steps_per_day sub-steps at fast_dt (n kept). substep skips the
-        // conservation assert, so we own it here — after each sub-step, over the full
-        // shared ledger — keeping the every-step teeth.
-        for _ in 0..steps_per_day {
-            let before = state.clone();
-            let fast_report = fast_integrator.substep(&state, fast_resolver, fast_dt)?;
-            state = fast_report.state;
-            assert_conserved_default(&before, &state)?;
-            total_rationed += fast_report.rationed;
-            events.extend(fast_report.events);
-        }
+        let (next, day_rationed, day_events) = advance_one_master_day(
+            slow_integrator,
+            fast_integrator,
+            &state,
+            slow_resolver,
+            fast_resolver,
+            steps_per_day,
+            slow_dt,
+            fast_dt,
+            slow_reset,
+        )?;
+        state = next;
+        total_rationed += day_rationed;
+        events.extend(day_events);
         states.push(state.clone());
     }
     Ok((states, total_rationed, events))

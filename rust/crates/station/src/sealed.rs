@@ -41,7 +41,7 @@ use simcore::quantities::Quantity;
 use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
-use crate::driver::{run_master_day, ResetHook};
+use crate::driver::{run_master_day, OwnedResetHook};
 use crate::flows::{
     CrewRespiration, Harvest, HarvestParams, Lamp, LampParams, WaterRecovery, WaterRecoveryParams,
     CREW_RESPIRATION, HARVEST, LAMP, LAMP_POWER_VAR, PAR_PHOTON_ENERGY_J_PER_UMOL, WATER_RECOVERY,
@@ -316,6 +316,25 @@ pub fn sealed_fast_resolver(
     SourceResolver::new(forcings, std::collections::HashMap::new())
 }
 
+/// The sealed station's annual re-sow hook, **owned** (boxed) so a caller-driven
+/// [`crate::session::SimSession`] can hold it. `annual_reset` fires on each season
+/// boundary (Python `n > 0 && n % season_days == 0`); `run_sealed` and the two-rate
+/// session build it via this same function so both step the identical re-sow logic
+/// (the Phase-8 parity discipline).
+pub fn sealed_reset_hook(scenario: &SealedStationScenario) -> OwnedResetHook {
+    let season_days = scenario.season_days as u64;
+    let bio = scenario.bio;
+    Box::new(
+        move |n: u64, current: &State| -> Result<Option<State>, SimError> {
+            if n > 0 && n.is_multiple_of(season_days) {
+                Ok(Some(annual_reset(current, &bio)?))
+            } else {
+                Ok(None)
+            }
+        },
+    )
+}
+
 /// The two-rate driver over the multi-year horizon, with the annual re-sow hook.
 pub fn run_sealed(
     bio_integrator: &EulerIntegrator,
@@ -325,17 +344,7 @@ pub fn run_sealed(
     fast_resolver: &SourceResolver,
     scenario: &SealedStationScenario,
 ) -> Result<(Vec<State>, u64, Vec<Event>), SimError> {
-    let season_days = scenario.season_days as u64;
-    let bio = scenario.bio;
-    let reset = move |n: u64, current: &State| -> Result<Option<State>, SimError> {
-        // Python: `n > 0 and n % season_days == 0` (is_multiple_of is true at n=0).
-        if n > 0 && n.is_multiple_of(season_days) {
-            Ok(Some(annual_reset(current, &bio)?))
-        } else {
-            Ok(None)
-        }
-    };
-    let reset_ref: ResetHook = &reset;
+    let reset = sealed_reset_hook(scenario);
     run_master_day(
         bio_integrator,
         fast_integrator,
@@ -346,6 +355,6 @@ pub fn run_sealed(
         scenario.steps_per_day,
         scenario.bio_dt,
         scenario.cabin_dt,
-        Some(reset_ref),
+        Some(&*reset),
     )
 }

@@ -1,6 +1,6 @@
 # Phase 8 — Godot Front-End (the sim becomes visible)
 
-**Status: PLANNED — not started. Awaiting Step-0 kickoff.** This is the plan of record for
+**Status: IN PROGRESS — Step 0 COMPLETE.** This is the plan of record for
 putting a **Godot front-end** on top of the **frozen** native Rust core (Phase 7). Pre-plan
 orientation complete and advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED**
 (see "Confirmed scope decisions"). Steps 0–1 are designed concretely here; Steps 2–8 get
@@ -133,18 +133,34 @@ Early steps concrete; later steps just-in-time. Each step: additive-only, `git d
 engine crates carry no gdext types, all frozen goldens byte-identical unless a deliberate,
 loudly-stated regen (none expected — Phase 8 changes no science).
 
-### Step 0 (P8.0) — the steppable session + the parity teeth (pure Rust, no Godot)
+### Step 0 (P8.0) — the steppable session + the parity teeth (pure Rust, no Godot) — **COMPLETE**
 
-The riskiest *correctness* claim first, provable without the FFI toolchain. Deliver the session
-struct (work item #1) and the parity gate that makes the exit criterion true:
+The riskiest *correctness* claim first, proven without the FFI toolchain: work item #1 (the
+session) and the parity gate that makes the exit criterion true. **What landed** (all under
+`rust/`; `git diff src/` empty; all 20 frozen goldens byte-identical — verified by re-emitting
+`greenhouse`/`harvest`/`lighting`/`sealed_station` and diffing):
 
-- New `station::session` (`SimSession { state, registries, resolver }`) with `step()`,
-  `step_n(k)`, `step_day()` (two-rate), and `state()`. Invert `run_station`'s owned loop into
-  caller-driven steps; reuse `step_report` / `run_master_day` verbatim (no new arithmetic).
-- **Parity tests (`cargo test`):** `N×session.step()` bit-identical to `run_station(N)`
-  (single-rate — BOUNDED_SOC power); `days×session.step_day()` bit-identical to the sealed
-  two-rate run. This is the "same sim headless" guarantee.
-- Document the `(seed, key, n)` determinism corollary in the session module.
+- **`station::session::SimSession`** — an enum-backed owned-state struct (`SingleRate` /
+  `TwoRate`) with `single_rate(…)` / `two_rate(…)` constructors and `step()` / `step_n(k)` /
+  `state()` / `n()` / `total_rationed()` / `events()`. One **mode-agnostic** `step()` advances
+  the natural unit (one `step_report` single-rate; one **master day** two-rate) — cleaner for the
+  Godot loop than separate `step`/`step_day`. Documents the `(seed, key, n)` determinism
+  corollary.
+- **The inversion is a shared-code extract, not a re-implementation** (so parity is by
+  construction, not by luck): the per-day body of `driver::run_master_day` was extracted into a
+  pub **`driver::advance_one_master_day`** that *both* the runner and the session call; the sealed
+  re-sow closure was extracted into a pub **`sealed::sealed_reset_hook`** (`OwnedResetHook`) that
+  both `run_sealed` and the two-rate session build. Both extractions are behavior-preserving
+  (goldens byte-identical, incl. the ~1.3 M-substep sealed run).
+- **Parity tests (`tests/session_parity.rs`, `cargo test`)**, states compared by exact hex-float
+  JSON (bit-exact): single-rate `cabin_gas` (Tier-1) `N×step()` == `run_station(N)`; two-rate
+  greenhouse (`reset=None`) `days×step()` == `run_greenhouse`; two-rate sealed
+  (`reset=Some(sealed_reset_hook)`) short-horizon == `run_master_day`; plus an `#[ignore]`d
+  full-horizon `run_sealed(915 days)` == `915×step()` (crosses all 3 season boundaries →
+  reset-adopt branch; passes in 127 s release).
+- **Scope note honored:** this intra-process gate is deliberately *not* the cross-boundary check.
+  The genuine `gdext`-cdylib-vs-headless parity (FTZ/DAZ FP-env) is Step 1's smoke + Step 8's gate,
+  as designed above.
 
 ### Step 1 (P8.1) — the GDExtension binding crate + minimal Godot vertical slice
 

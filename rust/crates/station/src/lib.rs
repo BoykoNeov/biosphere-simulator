@@ -23,6 +23,7 @@ pub mod lighting;
 pub mod params;
 pub mod scenario;
 pub mod sealed;
+pub mod session;
 pub mod stocks;
 pub mod system;
 pub mod water;
