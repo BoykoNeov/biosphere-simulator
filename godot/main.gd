@@ -53,9 +53,12 @@ func _render(json_text: String) -> String:
 		lines.append("[%s]" % domain)
 		for stock in domains[domain]:
 			var mark := " *" if shared.has(stock["id"]) else "  "
-			lines.append("%s %s = %.6g %s" % [mark, stock["id"], float(stock["amount"]), stock["unit"]])
+			# GDScript's `%` formatter supports %d/%f/%s/%x but NOT %g/%e — use str()
+			# for the wide-dynamic-range amounts (tiny mols to ~1e9 J).
+			lines.append("%s %s = %s %s" % [mark, stock["id"], str(float(stock["amount"])), stock["unit"]])
 	lines.append("(* = shared cross-domain stock)")
 	return "\n".join(lines)
 
 func _fmt(v: Variant) -> String:
-	return "n/a" if v == null else "%.2e" % float(v)
+	# str() renders small residuals in scientific form (no %e in GDScript).
+	return "n/a" if v == null else str(float(v))
