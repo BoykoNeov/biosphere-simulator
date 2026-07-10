@@ -20,6 +20,7 @@ pub mod driver;
 pub mod flows;
 pub mod greenhouse;
 pub mod harvest;
+pub mod inspection;
 pub mod lighting;
 pub mod params;
 pub mod scenario;

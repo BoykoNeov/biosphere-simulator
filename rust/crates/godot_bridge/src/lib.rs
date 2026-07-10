@@ -408,6 +408,30 @@ impl SimSession {
         }
     }
 
+    /// The **flow-level inspection** as plain-float JSON (P8.4) — every flow with its
+    /// evaluated legs at the current state, for the "select a stock, see the contributing
+    /// flows and their legs" panel: `{"n":..,"flows":[{"id":..,"legs":[{"stock":..,
+    /// "amount":..}]}]}`. Computed Rust-side ([`station::inspection`]); the game only renders
+    /// it. **Single-rate palette entries only** (`cabin_gas`, `station`): a two-rate session
+    /// (`greenhouse` / `sealed`) returns `""` — inspecting its fast registry alone would hide
+    /// the biosphere flows (see [`station::inspection`]), so it is deferred exactly as P8.2
+    /// deferred the two-rate scalar readouts. Empty string before [`build`](Self::build) or on
+    /// an evaluation error (logged).
+    #[func]
+    fn flow_inspection_json(&self) -> GString {
+        match self.inner.as_ref() {
+            Some(session) => match session.inspect_flows() {
+                Ok(Some(insp)) => GString::from(insp.to_json().as_str()),
+                Ok(None) => GString::from(""), // two-rate: deferred, not an error
+                Err(err) => {
+                    godot_error!("SimSession.flow_inspection_json failed: {err:?}");
+                    GString::from("")
+                }
+            },
+            None => GString::from(""),
+        }
+    }
+
     /// Total flows scaled by the Euler backstop so far (a golden run asserts `0`).
     #[func]
     fn total_rationed(&self) -> i64 {
@@ -513,6 +537,37 @@ mod tests {
         assert_eq!(session.n(), 3, "three master days");
         assert_eq!(session.total_rationed(), 0);
         assert!(session.events().is_empty());
+    }
+
+    /// The P8.4 flow inspection is reachable through the bridge for single-rate palette
+    /// entries and carries the real station flows + their legs; a two-rate entry returns
+    /// `None` (deferred).
+    #[test]
+    fn flow_inspection_single_rate_carries_flows_two_rate_is_none() {
+        let (mut station, _ctx) = build_session("station").unwrap();
+        station.step_n(5).unwrap();
+        let insp = station
+            .inspect_flows()
+            .unwrap()
+            .expect("station is single-rate");
+        let ids: Vec<&str> = insp.flows.iter().map(|f| f.id.as_str()).collect();
+        // The Power → Thermal station registry: charge + load draw + radiator (HeatInput
+        // dropped — Power's dissipation is the input, the Step-1 seam).
+        assert!(ids.contains(&"power.solar_charge"), "flows: {ids:?}");
+        assert!(ids.contains(&"power.load_draw"), "flows: {ids:?}");
+        assert!(ids.contains(&"thermal.radiator_reject"), "flows: {ids:?}");
+        // The radiator moves heat off `thermal.node` (a contributing flow for the node).
+        let touching = insp.flows_touching(domains::thermal::NODE);
+        assert!(
+            touching.iter().any(|(id, _)| *id == "thermal.radiator_reject"),
+            "radiator should touch the node: {touching:?}"
+        );
+        let json = insp.to_json();
+        assert!(json.starts_with("{\"n\":") && json.contains("\"flows\":["));
+
+        // Two-rate greenhouse → None (deferred, not an error).
+        let (greenhouse, _ctx) = build_session("greenhouse").unwrap();
+        assert!(greenhouse.inspect_flows().unwrap().is_none());
     }
 
     #[test]

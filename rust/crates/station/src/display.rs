@@ -258,7 +258,8 @@ impl DisplayProjection {
 }
 
 /// Append a finite `f64` as a JSON number (Rust's shortest round-tripping decimal).
-fn push_f64(out: &mut String, v: f64) {
+/// Shared with [`crate::inspection`] (the flow-level slice of the same display projection).
+pub(crate) fn push_f64(out: &mut String, v: f64) {
     // Every value routed here is finite (amounts/totals from a validated State; derived
     // temperature/SOC of finite inputs). Guard defensively anyway — JSON has no NaN/Inf.
     if v.is_finite() {
@@ -277,8 +278,9 @@ fn push_opt_f64(out: &mut String, v: Option<f64>) {
 }
 
 /// Append a JSON string literal, escaping the characters JSON requires (mirrors the
-/// snapshot emitter — our ids/units contain none of these in practice).
-fn push_json_string(out: &mut String, s: &str) {
+/// snapshot emitter — our ids/units contain none of these in practice). Shared with
+/// [`crate::inspection`].
+pub(crate) fn push_json_string(out: &mut String, s: &str) {
     out.push('"');
     for ch in s.chars() {
         match ch {

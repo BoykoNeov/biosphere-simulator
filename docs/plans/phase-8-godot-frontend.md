@@ -1,6 +1,6 @@
 # Phase 8 — Godot Front-End (the sim becomes visible)
 
-**Status: IN PROGRESS — Steps 0–2 COMPLETE.** This is the plan of record for
+**Status: IN PROGRESS — Steps 0–4 COMPLETE.** This is the plan of record for
 putting a **Godot front-end** on top of the **frozen** native Rust core (Phase 7). Pre-plan
 orientation complete and advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED**
 (see "Confirmed scope decisions"). Steps 0–2 are designed concretely here; Steps 3–8 get
@@ -260,10 +260,51 @@ it **must run off the render thread** or the UI freezes. That worker thread must
 FP env** as headless, so the FTZ/DAZ verification from Step 1 is **per-thread-the-sim-can-run-on**,
 not one-time.
 
-### Step 4 (P8.4) — flow inspection
+### Step 4 (P8.4) — flow inspection — **COMPLETE**
 
-Expose per-flow **legs** (the flow-level slice of the projection) so a player can see where
-matter/energy moves. UI: select a stock → see the contributing flows and their legs. Item #2.
+Expose per-flow **legs** (the flow-level slice of the display projection) so a player can see
+where matter/energy moves. Item #2 (display-only, zero parity). **What landed** (all additive
+under `rust/` + `godot/` + `tests/crossport/`; `git diff src/` empty; engine crates carry no
+gdext types; 20 frozen goldens byte-identical — no science changed):
+
+- **`station::inspection`** (new module, following the P8.2 split: the Rust-only *derived*
+  read lives in `station`, not the frozen `simcore` port) — `inspect_flows(registry, state,
+  resolver, dt) -> FlowInspection`. It **mirrors the integrator's private `evaluate_all`**:
+  binds the resolver to the same `state`+`dt` and iterates `registry.flows()` in canonical
+  order, so the inspected legs are **exactly the next Euler step's `k1`** (fidelity by
+  construction, not approximation). `FlowInspection { n, flows: [InspectedFlow { id, legs }] }`
+  + `flows_touching(stock)` (the "select a stock → contributing flows" primitive) + a plain-
+  float `to_json` (reuses the crate-local display JSON helpers; the hex-float parity path stays
+  on `simcore::snapshot`).
+- **The truthfulness teeth (advisor #2), so the view can't lie:** the per-stock sum of the
+  inspected legs, added to the current amount, reproduces the amount after `step()`. Proven
+  both synthetically (a forced-inflow + donor-leak registry in `inspection.rs`) **and on the
+  real single-rate `cabin_gas`** (`session.rs`): `before + Σ(inspected legs) == after` for
+  every stock. Holds because the palette is `rationed == 0` **and** POOL-only (no extinction) —
+  **both** well-fed assumptions named in the module doc as Step-5 seams (a rationed flow's raw
+  legs, or an extinction loss-sink delta, would break the identity).
+- **Single-rate only, two-rate deferred loudly (advisor #1).** `SimSession::inspect_flows()`
+  returns `Some` for single-rate (`cabin_gas`, `station`) and **`None` for two-rate**
+  (`greenhouse` / `sealed`). Inspecting a two-rate session's *fast* registry alone would show a
+  greenhouse player everything *except* the plant (the biosphere's 17 carbon-moving flows live
+  in the once-daily *slow* registry) — complete-looking but silently wrong. So it is scoped out
+  exactly as P8.2 deferred the two-rate scalar readouts; a future step wanting it must surface
+  both registries as *separately-labeled rate groups*, never summed.
+- **Bridge + Godot.** `SimSession::flow_inspection_json()` (`""` for two-rate / pre-build).
+  `godot/main.gd` renders the flow panel: each flow with its signed legs + a **rendered join
+  for the highlighted shared stocks** (the `flows_touching` primitive; interactive
+  click-selection is the GUI clause, per the P8.2/P8.3 precedent — the load-bearing proof is
+  the Rust projection + headless smoke). Two headless cdylib smokes: `flow_smoke.gd`
+  (`station` inspection crosses the boundary — real ids `power.solar_charge` / `power.load_draw`
+  / `thermal.radiator_reject`, the `thermal.node` join shows the radiator withdrawing + Power's
+  dissipation feeding it; `greenhouse` → `""`) and `main_ui_smoke.gd` (instantiates `main.tscn`
+  so `main.gd`'s new panel is parsed/run — the Step-3 `ui_smoke.gd` precedent for UI otherwise
+  loaded by nothing). `tests/crossport/test_godot_flow_inspection.py` gates both (local-only
+  `skipif godot||cargo`).
+- **Zero core + zero domain change** (`git diff src/{simcore/…}` — the Python tree — empty;
+  all Rust changes under `rust/`); `cargo test` + `clippy --all-targets -D warnings` green;
+  whole-project ruff/format/pyright green; full crossport suite green (48 passed); 20 frozen
+  goldens byte-identical (no regen). Next: Step 5 (perturbations — the interactive cascades).
 
 ### Step 5 (P8.5) — perturbations (the interactive cascades)
 

@@ -1014,6 +1014,39 @@ whole-project ruff/format/pyright green, the 3 Godot crossport tests pass; **all
 byte-identical** (no regen — Step 3 changes no science). NOTE `godot/project.godot` has PRE-EXISTING
 editor/MCP cruft (excluded from the commit). Next: Step 4 (flow inspection — expose per-flow legs so a
 player can see where matter/energy moves; work item #2).
+**Step 4 (P8.4) COMPLETE — flow inspection (the flow-level slice of the display projection); where
+matter/energy moves, made inspectable; work item #2**: new `rust/crates/station/src/inspection.rs`
+(following the P8.2 split — the Rust-only *derived* read lives in `station`, NOT the frozen `simcore`
+port) + `SimSession::inspect_flows()` + bridge `flow_inspection_json()` + `godot/main.gd` flow panel +
+two headless smokes + `tests/crossport/test_godot_flow_inspection.py`. **Zero core + zero domain + zero
+engine-crate change** (`git diff src/` empty; all Rust under `rust/crates/station` + `godot_bridge`;
+`simcore`/`domains` untouched). **`inspect_flows(registry, state, resolver, dt)` MIRRORS the integrator's
+private `evaluate_all`** — binds the resolver to the SAME state+dt and iterates `registry.flows()` in
+canonical order ⇒ the inspected legs are EXACTLY the next Euler step's `k1` (fidelity by construction);
+`FlowInspection{n, flows:[InspectedFlow{id, legs}]}` + `flows_touching(stock)` (the "select a stock →
+contributing flows" primitive) + plain-float `to_json` (reuses crate-local display JSON helpers made
+`pub(crate)`; hex-float parity path stays on `simcore::snapshot`). **THE truthfulness teeth (advisor #2)
+so the view can't lie**: per-stock `before + Σ(inspected legs) == after` — proven synthetically
+(forced-inflow+donor-leak registry) AND on real single-rate `cabin_gas`; holds because the palette is
+`rationed==0` AND POOL-only (no extinction) — **BOTH** well-fed assumptions NAMED in the module doc as
+Step-5 seams (a rationed flow's raw legs, or an extinction loss-sink delta, would break the identity;
+raw pre-arbitration legs, no `scale_f` plumbing while well-fed). **Single-rate ONLY, two-rate deferred
+LOUDLY (advisor #1)**: `inspect_flows()` returns `Some` for single-rate (`cabin_gas`/`station`), `None`
+for two-rate (`greenhouse`/`sealed`) — inspecting the fast registry ALONE would show a greenhouse player
+everything EXCEPT the plant (the 17 carbon-moving biosphere flows live in the once-daily SLOW registry),
+complete-looking but silently wrong; scoped out exactly as P8.2 deferred the two-rate scalars (a future
+step must surface both registries as separately-labeled rate groups, never summed). **"Select a stock" =
+the `flows_touching` primitive (tested Rust-side) + `main.gd` rendering the join for the highlighted
+shared stocks**; interactive click-selection is the GUI clause (P8.2/P8.3 precedent — load-bearing proof
+is the Rust projection + headless smoke). Two smokes: `flow_smoke.gd` (`station` inspection crosses the
+cdylib — real ids `power.solar_charge`/`power.load_draw`/`thermal.radiator_reject`, the `thermal.node`
+join shows radiator withdrawing + Power dissipation feeding it; `greenhouse`→`""`) + `main_ui_smoke.gd`
+(instantiates `main.tscn` so `main.gd`'s panel is parsed/run — the Step-3 `ui_smoke.gd` precedent for UI
+loaded by nothing). Teeth ran on cabin_gas+synthetic (not the ~1e9 J station sum — same code path).
+`cargo test` + `clippy --all-targets -D warnings` green; whole-project ruff/format/pyright green; full
+crossport suite green (**48 passed**); **all 20 frozen goldens byte-identical** (no regen). `godot/
+project.godot` PRE-EXISTING cruft excluded. Next: Step 5 (perturbations — the interactive cascades; port
+`window_override`/`with_forcing`/`LeakFlow`/`ScaledFlow` to Rust; work item #4).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

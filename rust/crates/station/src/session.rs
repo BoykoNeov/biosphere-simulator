@@ -183,6 +183,31 @@ impl SimSession {
         )
     }
 
+    /// The **flow-level display read** at the current state (Phase-8 P8.4) — every flow with
+    /// its evaluated legs, for the "select a stock, see the contributing flows" panel. See
+    /// [`crate::inspection`].
+    ///
+    /// Returns `Ok(Some(_))` for a **single-rate** session (the one registry evaluated at the
+    /// current state — exactly the next step's `k1`) and `Ok(None)` for a **two-rate** one:
+    /// a master day steps two registries at different rates and inspecting the fast one alone
+    /// would hide the biosphere flows (see the module docs). Display-only; does not touch the
+    /// stepping path, so it cannot affect the trajectory.
+    pub fn inspect_flows(&self) -> Result<Option<crate::inspection::FlowInspection>, SimError> {
+        match &self.mode {
+            Mode::SingleRate {
+                integrator,
+                resolver,
+                dt,
+            } => Ok(Some(crate::inspection::inspect_flows(
+                integrator.registry(),
+                &self.state,
+                resolver,
+                *dt,
+            )?)),
+            Mode::TwoRate { .. } => Ok(None),
+        }
+    }
+
     /// Advance **one natural unit**: one `step_report` (single-rate) or one master day
     /// (two-rate). Bit-identical to the corresponding single iteration of the runner's
     /// loop, because it calls the same primitive.
@@ -267,6 +292,30 @@ mod tests {
     #[test]
     fn max_residual_is_none_before_first_step() {
         assert!(cabin_gas_session().max_residual().is_none());
+    }
+
+    #[test]
+    fn inspect_flows_reconstructs_the_step_delta_on_cabin_gas() {
+        // The truthfulness teeth on a real single-rate scenario (advisor #2): the flow
+        // inspection at the current state is exactly what the next step applies, so
+        // `before + Σ(inspected legs) == after` for every stock. cabin_gas is well-fed
+        // (`rationed == 0`), so raw legs == applied deltas.
+        let mut session = cabin_gas_session();
+        session.step_n(100).unwrap();
+        let before = session.state().clone();
+        let insp = session.inspect_flows().unwrap().expect("single-rate has inspection");
+        assert_eq!(insp.n, before.n);
+        session.step().unwrap();
+        let after = session.state();
+        for (sid, s0) in &before.stocks {
+            let sum: f64 = insp.flows_touching(sid).iter().map(|(_, a)| a).sum();
+            let s1 = after.stocks[sid].amount;
+            assert!(
+                (s0.amount + sum - s1).abs() <= 1e-12 * s1.abs() + 1e-12,
+                "inspection lied about {sid}: {} + {sum} != {s1}",
+                s0.amount,
+            );
+        }
     }
 
     #[test]
