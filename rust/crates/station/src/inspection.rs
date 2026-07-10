@@ -14,19 +14,25 @@
 //! it: the per-stock sum of the inspected legs, added to the current amount, reproduces the
 //! amount after `step()`.
 //!
-//! **Raw per-flow legs, not post-apply deltas.** The legs are each flow's own evaluated
-//! request (`dt·rate`), so `before + Σ(legs) == after` (the fidelity teeth) rests on **two**
-//! well-fed assumptions, both true for every Phase-8 palette scenario:
-//! * **`rationed == 0`** — no flow was scaled by the Euler backstop's proportional
-//!   min-scaling. **Seam for Step 5:** once perturbations add brownout / leaks, a *rationed*
-//!   flow's raw legs no longer equal what moved (arbitration scales the whole flow); the
-//!   module then revisits surfacing the per-flow `scale_f`.
-//! * **no extinction** — no POPULATION stock snapped to 0 this step. Extinction routes the
-//!   snapped residual to a loss-sink *after* the flows apply, so that delta is absent from
-//!   the legs. The palette stocks are all POOL (no extinction), so this holds.
+//! **Raw legs (requested) + a per-flow `scale` (rationing), so the view stays truthful under
+//! failure.** Each [`InspectedFlow`] keeps its flow's own evaluated request
+//! ([`InspectedFlow::legs`], `dt·rate` — what it *wants* to move) **and** the fraction the
+//! Euler backstop would actually apply ([`InspectedFlow::scale`]). The amount that moves is
+//! `leg · scale`, so the identity is `before + Σ(scale·leg) == after`
+//! ([`FlowInspection::applied_delta`]) — it holds even when a flow is **rationed**. This
+//! discharges the P8.4 seam: Phase-8 Step 5 added perturbations (a deep brownout empties the
+//! battery ⇒ `LoadDraw` rations on the single-rate `station` palette entry), so `scale < 1`
+//! is now reachable through the palette. Raw legs are deliberately kept un-scaled (not
+//! pre-multiplied) so a "requested vs delivered" panel can show the shortfall — the signal a
+//! failure-observation game wants; the rationing `scale` is the annotation that makes it
+//! honest.
 //!
-//! Neither is pre-solved here (no scaling / extinction plumbing while every palette run is
-//! well-fed and POOL-only) — they are named so a later step that breaks them knows to look.
+//! One assumption remains, and it stays true here: **no extinction** — a POPULATION stock
+//! snapping to 0 routes its residual to a loss-sink *after* the flows apply, so that delta
+//! would be absent from the legs. The single-rate palette (`cabin_gas`, `station`) is
+//! POOL-only (no extinction), and two-rate inspection returns `None` (below), so this cannot
+//! bite; it is named so a future step that surfaces a POPULATION stock through inspection
+//! knows to look.
 //!
 //! **Single-rate only (advisor).** A two-rate (`greenhouse` / `sealed`) session steps a
 //! *master day*: the biosphere flows (photosynthesis, allocation, respiration — the ones
@@ -51,16 +57,28 @@ use simcore::state::State;
 
 use crate::display::{push_f64, push_json_string};
 
-/// One flow's evaluated legs at a moment (the flow-centric row). `legs` are in the flow's
-/// own emission order; a flow nets its own touches into at most one leg per stock
-/// ([`FlowResult`](simcore::flow::FlowResult) invariant).
+/// One flow's evaluated legs at a moment (the flow-centric row). `legs` are the flow's
+/// **requested** transfer in its own emission order; a flow nets its own touches into at
+/// most one leg per stock ([`FlowResult`](simcore::flow::FlowResult) invariant). `scale`
+/// is the fraction the Euler backstop would actually apply this step (see the field doc) —
+/// `legs · scale` is what *moves*.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InspectedFlow {
     /// The canonical flow id (e.g. `power.solar_charge`).
     pub id: String,
-    /// The per-step legs (`amount` per dt in the stock's canonical unit; `> 0` deposits,
-    /// `< 0` withdraws).
+    /// The per-step **requested** legs (`amount` per dt in the stock's canonical unit;
+    /// `> 0` deposits, `< 0` withdraws). These are the flow's own evaluated request — what
+    /// it *wants* to move. Under rationing the amount actually applied is `leg · scale`;
+    /// the raw request is kept (not pre-scaled) so a "requested vs delivered" panel can show
+    /// the shortfall — the signal a failure-observation game wants.
     pub legs: Vec<Leg>,
+    /// The per-flow scale factor the Euler min-scaling backstop would apply to this whole
+    /// flow this step: `1.0` when the flow is unthrottled, `< 1.0` when it over-draws a
+    /// clamped stock (the same factor [`min_scaling`](simcore::arbitration::min_scaling)
+    /// folds into the applied legs). So the amount that actually moves for each leg is
+    /// `leg.amount · scale`. On a well-fed run this is always `1.0`; a deep brownout that
+    /// empties the battery drives `LoadDraw`'s scale below 1 — the reachable rationing case.
+    pub scale: f64,
 }
 
 /// The flow-level projection of one simulation moment: every flow with its evaluated legs,
@@ -88,14 +106,27 @@ pub fn inspect_flows(
     dt: f64,
 ) -> Result<FlowInspection, SimError> {
     let bound = resolver.bind(state, dt);
-    let mut flows = Vec::with_capacity(registry.len());
+    let mut results = Vec::with_capacity(registry.len());
+    let mut ids = Vec::with_capacity(registry.len());
     for flow in registry.flows() {
-        let result = flow.evaluate(state, &bound, dt)?;
-        flows.push(InspectedFlow {
-            id: flow.id().to_string(),
-            legs: result.legs,
-        });
+        results.push(flow.evaluate(state, &bound, dt)?);
+        ids.push(flow.id().to_string());
     }
+    // The same per-flow scale the next Euler step's min-scaling backstop applies — computed
+    // over the *same* evaluated results and start-of-step stocks. `1.0` unless a flow
+    // over-draws a clamped stock (the reachable rationing case; a display read, never fed
+    // back into stepping).
+    let factors = simcore::arbitration::scale_factors(&results, &state.stocks)?;
+    let flows = ids
+        .into_iter()
+        .zip(results)
+        .zip(factors)
+        .map(|((id, result), scale)| InspectedFlow {
+            id,
+            legs: result.legs,
+            scale,
+        })
+        .collect();
     Ok(FlowInspection { n: state.n, flows })
 }
 
@@ -116,11 +147,31 @@ impl FlowInspection {
         out
     }
 
+    /// The net amount actually applied to `stock` this step — `Σ (scale · leg.amount)` over
+    /// the flows touching it, in canonical order. Unlike summing [`flows_touching`] (which
+    /// reports the *requested* legs), this folds in each flow's rationing `scale`, so
+    /// `before + applied_delta(stock) == after` holds **even when a flow is rationed** —
+    /// this is the same quantity the integrator's `reduce(min_scaling(...))` applies. On a
+    /// well-fed run (`scale == 1` everywhere) it equals the raw sum. This is what discharges
+    /// the P8.4 "raw legs == applied" seam once perturbations can drive `scale < 1`.
+    pub fn applied_delta(&self, stock: &str) -> f64 {
+        let mut acc = 0.0;
+        for flow in &self.flows {
+            for leg in &flow.legs {
+                if leg.stock == stock {
+                    acc += flow.scale * leg.amount;
+                }
+            }
+        }
+        acc
+    }
+
     /// Serialize to plain-float JSON for the Godot flow-inspection panel:
-    /// `{"n":..,"flows":[{"id":"power.solar_charge","legs":[{"stock":"..","amount":..}]}]}`.
-    /// Plain decimal floats (this is a zero-parity display read; the hex-float codec stays
-    /// on [`simcore::snapshot`]). Reuses the crate-local JSON emit helpers from
-    /// [`crate::display`].
+    /// `{"n":..,"flows":[{"id":"power.solar_charge","scale":1.0,"legs":[{"stock":"..","amount":..}]}]}`.
+    /// `scale` is the per-flow rationing factor (`1.0` unthrottled, `< 1.0` rationed) so the
+    /// panel can show requested (`legs`) vs delivered (`legs · scale`). Plain decimal floats
+    /// (this is a zero-parity display read; the hex-float codec stays on
+    /// [`simcore::snapshot`]). Reuses the crate-local JSON emit helpers from [`crate::display`].
     pub fn to_json(&self) -> String {
         let mut out = String::from("{");
         out.push_str(&format!("\"n\":{},", self.n));
@@ -133,6 +184,10 @@ impl FlowInspection {
             push_json_string(&mut out, "id");
             out.push(':');
             push_json_string(&mut out, &flow.id);
+            out.push(',');
+            push_json_string(&mut out, "scale");
+            out.push(':');
+            push_f64(&mut out, flow.scale);
             out.push(',');
             push_json_string(&mut out, "legs");
             out.push_str(":[");
@@ -212,6 +267,26 @@ mod tests {
             FlowResult::new(vec![
                 Leg::new("d.pool".to_string(), -leak)?,
                 Leg::new("boundary.sink".to_string(), leak)?,
+            ])
+        }
+    }
+
+    /// A flow that unconditionally withdraws 8 from `d.pool` into `boundary.sink` — used to
+    /// force the Euler backstop to ration (two of these over a pool of 10).
+    struct BigDraw(&'static str);
+    impl Flow for BigDraw {
+        fn id(&self) -> &str {
+            self.0
+        }
+        fn evaluate(
+            &self,
+            _snapshot: &State,
+            _env: &dyn Environment,
+            _dt: f64,
+        ) -> Result<FlowResult, SimError> {
+            FlowResult::new(vec![
+                Leg::new("d.pool".to_string(), -8.0)?,
+                Leg::new("boundary.sink".to_string(), 8.0)?,
             ])
         }
     }
@@ -300,26 +375,75 @@ mod tests {
 
         let integrator = EulerIntegrator::new(registry);
         let report = integrator.step_report(&state, &resolver, dt).unwrap();
-        assert_eq!(report.rationed, 0, "well-fed: raw legs must equal applied");
+        assert_eq!(report.rationed, 0, "well-fed: every scale == 1");
+        assert!(insp.flows.iter().all(|f| f.scale == 1.0));
 
         for (sid, before) in &state.stocks {
-            let sum: f64 = insp.flows_touching(sid).iter().map(|(_, a)| a).sum();
+            let applied = insp.applied_delta(sid);
             let after = report.state.stocks[sid].amount;
             assert!(
-                (before.amount + sum - after).abs() <= 1e-12 * after.abs() + 1e-12,
-                "flow inspection lied about {sid}: before {} + Σlegs {sum} != after {after}",
+                (before.amount + applied - after).abs() <= 1e-12 * after.abs() + 1e-12,
+                "flow inspection lied about {sid}: before {} + Δ {applied} != after {after}",
                 before.amount,
             );
         }
     }
 
+    /// The seam discharged (advisor): under rationing (`scale < 1`) the raw legs no longer
+    /// equal what moved, but `before + Σ(scale·leg) == after` still holds. Build a flow that
+    /// over-draws a clamped pool so the Euler backstop scales it, and confirm the identity
+    /// via [`applied_delta`], plus that the raw-leg sum would *disagree* (proving the scale is
+    /// load-bearing, not decorative).
     #[test]
-    fn json_is_wellformed_and_carries_the_legs() {
+    fn inspection_is_truthful_when_a_flow_is_rationed() {
+        // A pool holding 10, two flows each requesting -8 → demand 16 > 10, so both scale to
+        // 10/16 = 0.625.
+        let stocks = BTreeMap::from([
+            ("boundary.sink".to_string(), boundary("boundary.sink")),
+            ("d.pool".to_string(), pool("d.pool", 10.0)),
+        ]);
+        let state = State::new(0, stocks.clone(), 0, BTreeMap::new()).unwrap();
+        let registry = Registry::flows_only(
+            vec![Box::new(BigDraw("test.a")), Box::new(BigDraw("test.b"))],
+            &stocks,
+        )
+        .unwrap();
+        let resolver = SourceResolver::empty();
+        let dt = 1.0;
+
+        let insp = inspect_flows(&registry, &state, &resolver, dt).unwrap();
+        assert!(
+            insp.flows.iter().all(|f| (f.scale - 0.625).abs() < 1e-12),
+            "both flows should ration to 10/16"
+        );
+
+        let integrator = EulerIntegrator::new(registry);
+        let report = integrator.step_report(&state, &resolver, dt).unwrap();
+        assert_eq!(report.rationed, 2, "both flows rationed");
+
+        // applied_delta (scale-aware) reconstructs the step exactly...
+        for (sid, before) in &state.stocks {
+            let after = report.state.stocks[sid].amount;
+            assert!(
+                (before.amount + insp.applied_delta(sid) - after).abs() <= 1e-12,
+                "scale-aware identity failed for {sid}"
+            );
+        }
+        // ...while the raw-leg sum would over-report the pool draw (the seam the scale fixes):
+        // raw = -16, applied = -10.
+        let raw: f64 = insp.flows_touching("d.pool").iter().map(|(_, a)| a).sum();
+        assert_eq!(raw, -16.0);
+        assert_eq!(insp.applied_delta("d.pool"), -10.0);
+    }
+
+    #[test]
+    fn json_is_wellformed_and_carries_the_legs_and_scale() {
         let (registry, state, resolver, dt) = setup();
         let json = inspect_flows(&registry, &state, &resolver, dt).unwrap().to_json();
         assert!(json.starts_with('{') && json.ends_with('}'));
         assert!(json.contains("\"n\":5"));
         assert!(json.contains("\"id\":\"test.inflow\""));
+        assert!(json.contains("\"scale\":1")); // well-fed → unthrottled
         assert!(json.contains("\"stock\":\"d.pool\""));
         assert!(json.contains("\"amount\":6")); // the +6 inflow leg
     }

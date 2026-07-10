@@ -308,11 +308,11 @@ mod tests {
         session.step().unwrap();
         let after = session.state();
         for (sid, s0) in &before.stocks {
-            let sum: f64 = insp.flows_touching(sid).iter().map(|(_, a)| a).sum();
+            let applied = insp.applied_delta(sid);
             let s1 = after.stocks[sid].amount;
             assert!(
-                (s0.amount + sum - s1).abs() <= 1e-12 * s1.abs() + 1e-12,
-                "inspection lied about {sid}: {} + {sum} != {s1}",
+                (s0.amount + applied - s1).abs() <= 1e-12 * s1.abs() + 1e-12,
+                "inspection lied about {sid}: {} + {applied} != {s1}",
                 s0.amount,
             );
         }

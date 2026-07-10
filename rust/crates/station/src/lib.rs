@@ -23,6 +23,7 @@ pub mod harvest;
 pub mod inspection;
 pub mod lighting;
 pub mod params;
+pub mod perturbations;
 pub mod scenario;
 pub mod sealed;
 pub mod session;

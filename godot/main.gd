@@ -15,6 +15,10 @@ var sim: SimSession
 # The declared cross-domain stock ids (from the display projection) — reused by the flow
 # panel's "select a stock → contributing flows" join.
 var _shared_ids: Array = []
+# The active perturbation label (P8.5) — "" when running the baseline scenario. A key press
+# rebuilds the session with a windowed perturbation (build-time config; a live "trigger now"
+# is deferred — the window opens from n=0 on rebuild).
+var _active_perturbation := ""
 @onready var label: Label = $Label
 
 func _ready() -> void:
@@ -22,6 +26,34 @@ func _ready() -> void:
 	if not sim.build(SCENARIO):
 		label.text = "build(%s) failed — see stderr" % SCENARIO
 		sim = null
+
+# P8.5 interactive "perturb systems": a key press rebuilds the `station` scenario with a
+# windowed perturbation, so the player watches the cross-domain cascade unfold from n=0.
+#   1 → graceful brownout   2 → deep brownout (rationing)   3 → radiator failure   0 → baseline
+# The composers compute the cascade (station::perturbations); the UI only picks and displays.
+func _input(event: InputEvent) -> void:
+	if sim == null or not (event is InputEventKey and event.pressed):
+		return
+	match event.keycode:
+		KEY_1:
+			_apply_perturbation("brownout", 0.5, "brownout (graceful)")
+		KEY_2:
+			_apply_perturbation("brownout", 0.0, "brownout (deep → rationing)")
+		KEY_3:
+			_apply_perturbation("radiator_failure", 0.0, "radiator failure (overheat)")
+		KEY_0:
+			_active_perturbation = ""
+			sim.build(SCENARIO)  # back to the baseline
+
+# Rebuild `sim` with a windowed perturbation over an illustrative [day 2, day 8) window
+# (24 steps/day). Sets the active-perturbation label and returns whether the rebuild
+# succeeded. `magnitude` is the one knob (brownout factor / radiator health).
+func _apply_perturbation(kind: String, magnitude: float, label_text: String) -> bool:
+	if sim.build_perturbed(SCENARIO, kind, 2 * 24, 8 * 24, magnitude):
+		_active_perturbation = label_text
+		return true
+	_active_perturbation = "%s — build_perturbed failed (see stderr)" % label_text
+	return false
 
 func _process(_delta: float) -> void:
 	if sim == null:
@@ -42,7 +74,11 @@ func _render(json_text: String) -> String:
 		shared[id] = true
 
 	var lines := PackedStringArray()
-	lines.append("%s   n = %d" % [SCENARIO, int(proj["n"])])
+	var header := "%s   n = %d" % [SCENARIO, int(proj["n"])]
+	if _active_perturbation != "":
+		header += "   [perturbation: %s]" % _active_perturbation
+	lines.append(header)
+	lines.append("(keys: 1 brownout · 2 deep brownout · 3 radiator failure · 0 baseline)")
 	lines.append("rationed = %d   events = %d   residual = %s" % [
 		int(proj["rationed"]), int(proj["events"]), _fmt(proj["max_residual"]),
 	])
@@ -76,14 +112,19 @@ func _render_flows(json_text: String) -> String:
 
 	var flows: Array = insp["flows"]
 	var lines := PackedStringArray()
-	lines.append("[flows]  (where matter/energy moves this step)")
+	lines.append("[flows]  (where matter/energy moves this step; legs are REQUESTED)")
 	for flow in flows:
-		lines.append("  %s" % flow["id"])
+		# P8.5: `scale` < 1 ⇒ the Euler backstop rationed this flow (a deep brownout empties
+		# the battery so LoadDraw cannot be met). Legs are the request; delivered = leg·scale.
+		var scale := float(flow["scale"])
+		var scale_note := "   ⚠ rationed → %.3f delivered" % scale if scale < 1.0 else ""
+		lines.append("  %s%s" % [flow["id"], scale_note])
 		for leg in flow["legs"]:
 			# +deposit / -withdraw, wide dynamic range → str() (no %g/%e in GDScript).
 			var amount := float(leg["amount"])
 			var sign := "+" if amount >= 0.0 else ""
-			lines.append("      %s%s  %s" % [sign, str(amount), leg["stock"]])
+			var delivered := "  (delivered %s)" % str(amount * scale) if scale < 1.0 else ""
+			lines.append("      %s%s  %s%s" % [sign, str(amount), leg["stock"], delivered])
 
 	# The "select a stock" view for the shared cross-domain stocks: which flows touch each.
 	lines.append("")

@@ -149,3 +149,8 @@ def test_main_dashboard_renders_the_flow_panel() -> None:
     )
     assert report["has_flows_panel"] is True
     assert report["has_contributing"] is True
+    # P8.5: the interactive "perturb systems" trigger runs headless (the keypress path)
+    # and updates the dashboard header — the load-bearing rationing/cascade is proven by
+    # test_godot_perturbations.py; here we only confirm the UI trigger path is wired.
+    assert report["perturbation_triggered"] is True
+    assert report["header_shows_perturbation"] is True

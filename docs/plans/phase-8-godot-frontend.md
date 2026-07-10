@@ -306,13 +306,56 @@ gdext types; 20 frozen goldens byte-identical — no science changed):
   whole-project ruff/format/pyright green; full crossport suite green (48 passed); 20 frozen
   goldens byte-identical (no regen). Next: Step 5 (perturbations — the interactive cascades).
 
-### Step 5 (P8.5) — perturbations (the interactive cascades)
+### Step 5 (P8.5) — perturbations (the interactive cascades) — **COMPLETE**
 
-Port the perturbation primitives to Rust (work item #4: `window_override` / `with_forcing` /
-`LeakFlow` / `ScaledFlow`). Player triggers brownout / crew-load spike / atmospheric leak /
-radiator failure from the UI; the cross-domain cascade emerges for free (the Phase-3/Step-8
-discipline, now driven interactively). Inherits Phase-7 tier rules; conservation still asserted
-every step.
+Port the perturbation primitives to Rust (work item #4) and revisit the P8.4 raw-vs-applied
+seam. **What landed** (all additive under `rust/` + `godot/` + `tests/crossport/`; `git diff
+src/` empty; engine crates carry no gdext types; 20 frozen goldens byte-identical — no science
+changed):
+
+- **The ownership wall was `SourceResolver` *and* `Registry`, not just flows (advisor #1).** A
+  `Schedule` is a non-`Clone` `Box<dyn Fn>` and a flow a non-`Clone` `Box<dyn Flow>`, so Python's
+  borrow-and-shallow-copy (`{**resolver.forcings}`, `list(registry.flows)`) has no Rust analogue.
+  Fix, symmetric: additive `pub fn into_parts(self)` on **both** `SourceResolver` (→ `(forcings,
+  shared)`) and `Registry` (→ `(flows, aux)`) in `simcore`. Every composer is an **own-in/own-out
+  move-pipeline** — consume, transform the owned map/vec, rebuild via `new`. Applied *before* the
+  session takes ownership, so the "compose, then run" order matches Python.
+- **The generics ported to `domains::biosphere::perturbations`** (`window_override` owning its base
+  `Schedule`, `with_forcing` consuming the resolver, `LeakFlow`, `LEAK_SINK`/`LEAK_VAR`) and the
+  **composers to `station::perturbations`** (`window_scale`, `ScaledFlow` wrapping a `Box<dyn Flow>`,
+  and the five `with_*`: brownout, crew-load spike, lighting failure, radiator failure consuming a
+  `Registry`, station leak consuming both registries). Unit tests mirror the Python behavioural
+  asserts (`ScaledFlow` bit-identity at `health = 1`, window schedules, forcing wiring); an
+  integration file `station/tests/perturbations.rs` runs the full cascades — brownout graceful/deep
+  (single-rate; **rationing emerges + still conserves**), radiator failure heats + outside-window
+  bit-identity, and the four two-rate matter cascades (carbon/O₂ leak, crew spike, lighting failure)
+  with the regulator-erasure setpoint-return + determinism re-run. **No golden** (the "diagnostics,
+  no golden" precedent); a completed run *is* the every-step conservation proof.
+- **The P8.4 seam discharged, not documented (advisor #2).** `arbitration::scale_factors` is now
+  `pub`; `InspectedFlow` gains a `scale: f64` (the per-flow min-scaling factor) alongside the raw
+  (requested) legs, and `FlowInspection::applied_delta(stock)` returns `Σ(scale·leg)`, so
+  `before + applied_delta == after` holds **even under rationing**. Proven both synthetically and
+  on a **real palette scenario** — a deep brownout on single-rate `station` drives `LoadDraw` into
+  rationing (`scale < 1`) and the identity still holds. Raw legs are kept un-scaled (requested vs
+  delivered — the shortfall a failure-observation game wants); the only remaining assumption (no
+  extinction) stays true (POOL-only single-rate palette; two-rate inspection is `None`).
+- **Interactive wiring — build-time windowed, typed scalar FFI (advisor #3).** `SimSession`
+  (bridge) gains `build_perturbed(scenario_id, kind, start, end, magnitude)` — typed scalars, **no
+  JSON parser**. The perturbation is a pure function of `n` over `[start, end)` (deterministic /
+  parity-clean); a live "trigger now" is deferred (it would need a session-rebuild command on the
+  Step-3 worker). Energy perturbations apply to single-rate `station`, matter to two-rate `sealed`;
+  a bad scenario/kind pairing is a `Validation` error. `main.gd` gains keyboard triggers (1/2/3/0)
+  and renders the `scale` (requested vs delivered) so the seam is visible.
+- **The cross-boundary smoke, concentrated on single-rate brownout on `station` (advisor).**
+  `godot/perturbation_smoke.gd` drives `build_perturbed("station", "brownout", …)` through the
+  *actual cdylib*, tracks the min per-flow `scale` across the run, and emits the final snapshot;
+  `tests/crossport/test_godot_perturbations.py` asserts it is **byte-identical** to the headless
+  `emit_perturbed_brownout` example (the "FFI didn't corrupt determinism" proof on a *perturbed*
+  Tier-2 run), that the failure cascade emerged (`rationed > 0`, `min_scale < 1`), and `fp_clean`.
+  `main_ui_smoke.gd` additionally fires the interactive trigger headless (the keypress path).
+- **Zero core + zero domain-code change** (`git diff src/` — the Python tree — empty; all Rust
+  under `rust/`). The new `pub` accessors (`into_parts` ×2, `scale_factors`) are behaviour-neutral,
+  so all 20 frozen goldens stay byte-identical and cross-port parity is unaffected.
 
 ### Step 6 (P8.6) — build systems (fixed palette)
 

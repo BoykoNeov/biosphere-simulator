@@ -61,6 +61,21 @@ impl Registry {
         &self.flows
     }
 
+    /// Consume the registry and yield back its owned `(flows, aux_processes)` (in
+    /// canonical id-sorted order). The inverse of [`Registry::new`] and the primitive a
+    /// flow-modifying perturbation harness rebuilds through: Rust cannot clone a
+    /// `Box<dyn Flow>` out of a `&Registry` (unlike Python's `list(registry.flows)`), so
+    /// a perturbation that wraps or appends a flow *consumes* the registry, transforms
+    /// the owned vec, and rebuilds via [`Registry::new`]. The derived `domain_index` is
+    /// dropped — `new` re-derives it over the (possibly changed) stock set.
+    // The `(Vec<Box<dyn Flow>>, Vec<Box<dyn AuxProcess>>)` tuple is exactly the two owned
+    // fields it returns (mirroring `new`'s params); a type alias would obscure more than it
+    // clarifies here.
+    #[allow(clippy::type_complexity)]
+    pub fn into_parts(self) -> (Vec<Box<dyn Flow>>, Vec<Box<dyn AuxProcess>>) {
+        (self.flows, self.aux_processes)
+    }
+
     /// The aux processes in canonical id-sorted order (empty if none).
     pub fn aux_processes(&self) -> &[Box<dyn AuxProcess>] {
         &self.aux_processes
@@ -163,6 +178,26 @@ mod tests {
         )
         .unwrap();
         let ids: Vec<&str> = reg.flows().iter().map(|f| f.id()).collect();
+        assert_eq!(ids, ["a.flow", "m.flow", "z.flow"]);
+    }
+
+    #[test]
+    fn into_parts_yields_owned_flows_for_rebuild() {
+        // The perturbation-harness primitive: decompose a registry into its owned flows,
+        // and rebuild via `new` (Rust cannot clone a Box<dyn Flow> out of a &Registry).
+        let stocks = BTreeMap::from([("x".to_string(), stock("x"))]);
+        let reg = Registry::flows_only(
+            vec![Box::new(NoopFlow("z.flow")), Box::new(NoopFlow("a.flow"))],
+            &stocks,
+        )
+        .unwrap();
+        let (mut flows, aux) = reg.into_parts();
+        assert_eq!(flows.iter().map(|f| f.id()).collect::<Vec<_>>(), ["a.flow", "z.flow"]);
+        assert!(aux.is_empty());
+        // Rebuild with an extra flow — the harness pattern (append, re-sort).
+        flows.push(Box::new(NoopFlow("m.flow")));
+        let rebuilt = Registry::new(flows, &stocks, aux).unwrap();
+        let ids: Vec<&str> = rebuilt.flows().iter().map(|f| f.id()).collect();
         assert_eq!(ids, ["a.flow", "m.flow", "z.flow"]);
     }
 

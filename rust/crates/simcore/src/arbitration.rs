@@ -26,7 +26,7 @@ use crate::state::Stock;
 /// sum is accumulated in that order, which is what makes the float result stable under
 /// registration shuffle (#15). A leg naming an unknown stock returns
 /// [`SimError::Reference`].
-fn scale_factors(
+fn compute_scale_factors(
     results: &[FlowResult],
     stocks: &HashMap<&StockId, &Stock>,
 ) -> Result<Vec<f64>, SimError> {
@@ -85,6 +85,20 @@ fn view(stocks: &std::collections::BTreeMap<StockId, Stock>) -> HashMap<&StockId
     stocks.iter().collect()
 }
 
+/// The per-flow scale factors the Euler backstop would apply this step, aligned with
+/// `results` in canonical (flow-id) order: `1.0` for an unthrottled flow, `< 1.0` for one
+/// [`min_scaling`] would scale down. This is the *same* computation `min_scaling` folds
+/// into its scaled legs — exposed on its own so a **display read** (flow inspection) can
+/// report what actually moved when a flow is rationed. `min_scaling` returns only the
+/// scaled results + a firing count, not the per-flow factor a "requested vs delivered"
+/// panel needs. Pure/read-only; does not touch the stepping path.
+pub fn scale_factors(
+    results: &[FlowResult],
+    stocks: &std::collections::BTreeMap<StockId, Stock>,
+) -> Result<Vec<f64>, SimError> {
+    compute_scale_factors(results, &view(stocks))
+}
+
 /// Euler backstop: scale the over-drawing whole flows; return `(scaled, fired)`.
 ///
 /// `fired` counts the flows scaled this step (one per flow with `scale_f < 1`) — the
@@ -96,7 +110,7 @@ pub fn min_scaling(
     stocks: &std::collections::BTreeMap<StockId, Stock>,
 ) -> Result<(Vec<FlowResult>, u64), SimError> {
     let v = view(stocks);
-    let factors = scale_factors(results, &v)?;
+    let factors = compute_scale_factors(results, &v)?;
     let mut scaled: Vec<FlowResult> = Vec::with_capacity(results.len());
     let mut fired: u64 = 0;
     for (result, f) in results.iter().zip(factors.iter()) {
@@ -120,7 +134,7 @@ pub fn check_no_overdraw(
     stocks: &std::collections::BTreeMap<StockId, Stock>,
 ) -> Result<(), SimError> {
     let v = view(stocks);
-    for (i, f) in scale_factors(results, &v)?.iter().enumerate() {
+    for (i, f) in compute_scale_factors(results, &v)?.iter().enumerate() {
         if *f < 1.0 {
             return Err(SimError::Arbitration(format!(
                 "flow #{i} (canonical order) would over-draw a stock (scale_f={f:?} < 1) \
@@ -187,6 +201,31 @@ mod tests {
             check_no_overdraw(&results, &stocks),
             Err(SimError::Arbitration(_))
         ));
+    }
+
+    #[test]
+    fn scale_factors_exposes_the_per_flow_factor() {
+        // The public accessor returns exactly what min_scaling folds in: 1.0 for the
+        // unthrottled flow, 100/120 for each of the two over-drawing flows.
+        let stocks = BTreeMap::from([
+            ("a".to_string(), pool("a", 100.0)),
+            ("b".to_string(), pool("b", 100.0)),
+            ("snk".to_string(), pool("snk", 0.0)),
+        ]);
+        let over = FlowResult::new(vec![
+            Leg::new("a".to_string(), -60.0).unwrap(),
+            Leg::new("snk".to_string(), 60.0).unwrap(),
+        ])
+        .unwrap();
+        let fine = FlowResult::new(vec![
+            Leg::new("b".to_string(), -1.0).unwrap(),
+            Leg::new("snk".to_string(), 1.0).unwrap(),
+        ])
+        .unwrap();
+        let results = vec![over.clone(), over, fine];
+        let factors = scale_factors(&results, &stocks).unwrap();
+        let scale = 100.0_f64 / 120.0;
+        assert_eq!(factors, vec![scale, scale, 1.0]);
     }
 
     #[test]

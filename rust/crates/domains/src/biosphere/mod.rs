@@ -11,6 +11,7 @@
 
 pub mod flows;
 pub mod params;
+pub mod perturbations;
 pub mod science;
 pub mod stocks;
 pub mod system;

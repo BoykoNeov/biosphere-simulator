@@ -13,10 +13,14 @@
 
 extends SceneTree
 
-const FRAMES_TO_RUN := 4
+const BASELINE_FRAMES := 4     # let the baseline dashboard render
+const PERTURBED_FRAMES := 4    # after the interactive trigger, confirm the header/panel update
+                               # (rationing visibility is proven by perturbation_smoke.gd)
 
 var inst: Node
 var frames := 0
+var perturbed := false
+var perturb_ok := false
 
 func _initialize() -> void:
 	var scene: PackedScene = load("res://main.tscn")
@@ -32,13 +36,27 @@ func _process(_delta: float) -> bool:
 		_emit({"ok": false, "error": "instance is null"})
 		return true
 	frames += 1
-	if frames < FRAMES_TO_RUN:
+
+	# Phase 1: baseline dashboard rendered — then fire the P8.5 interactive trigger (the same
+	# path a `2` keypress takes), a deep brownout that will ration LoadDraw as the battery
+	# empties (so the flow panel eventually shows a scale < 1).
+	if not perturbed and frames >= BASELINE_FRAMES:
+		perturb_ok = inst._apply_perturbation("brownout", 0.0, "deep brownout (smoke)")
+		perturbed = true
+		frames = 0
 		return false
+
+	if not perturbed or frames < PERTURBED_FRAMES:
+		return false
+
 	var text: String = inst.get_node("Label").text
 	_emit({
-		"ok": text.contains("[flows]") and text.contains("station"),
+		"ok": text.contains("[flows]") and text.contains("station") and perturb_ok,
 		"has_flows_panel": text.contains("[flows]"),
 		"has_contributing": text.contains("[contributing flows]"),
+		"perturbation_triggered": perturb_ok,
+		"header_shows_perturbation": text.contains("[perturbation:"),
+		"rationing_visible": text.contains("rationed →"),
 		"text_len": text.length(),
 	})
 	return true

@@ -83,6 +83,17 @@ impl SourceResolver {
         &self.shared
     }
 
+    /// Consume the resolver and yield back its owned wiring `(forcings, shared)`. The
+    /// inverse of [`SourceResolver::new`] and the primitive a forcing perturbation
+    /// rebuilds through: a [`Schedule`] is a non-`Clone` `Box<dyn Fn>`, so Rust cannot
+    /// shallow-copy the `HashMap<String, Schedule>` the way Python's `{**resolver.forcings}`
+    /// copies a dict of callables. A perturbation that swaps or adds one var's schedule
+    /// therefore *consumes* the resolver, mutates the owned map, and rebuilds via
+    /// [`SourceResolver::new`] (which re-checks the forcing⊕shared disjointness, #16).
+    pub fn into_parts(self) -> (HashMap<String, Schedule>, HashMap<String, StockId>) {
+        (self.forcings, self.shared)
+    }
+
     /// Bind to one snapshot + `dt` for a single derivative evaluation. The bound view
     /// is lightweight — it holds references, copies nothing.
     pub fn bind<'a>(&'a self, snapshot: &'a State, dt: f64) -> BoundEnvironment<'a> {
@@ -168,6 +179,26 @@ mod tests {
             SourceResolver::new(forcings, shared),
             Err(SimError::Validation(_))
         ));
+    }
+
+    #[test]
+    fn into_parts_yields_owned_wiring_for_rebuild() {
+        // The forcing-perturbation primitive: decompose the resolver into its owned maps,
+        // swap one schedule, rebuild (a Schedule is a non-Clone Box<dyn Fn>, so the maps
+        // must be *moved* out, not borrowed-and-copied).
+        let mut forcings: HashMap<String, Schedule> = HashMap::new();
+        forcings.insert("f".to_string(), constant(2.5).unwrap());
+        let shared = HashMap::from([("g".to_string(), "s".to_string())]);
+        let resolver = SourceResolver::new(forcings, shared).unwrap();
+
+        let (mut forcings, shared) = resolver.into_parts();
+        forcings.insert("f".to_string(), constant(9.0).unwrap()); // swap the schedule
+        let rebuilt = SourceResolver::new(forcings, shared).unwrap();
+
+        let state = state_with("s", 7.0);
+        let bound = rebuilt.bind(&state, 1.0);
+        assert_eq!(bound.get("f").unwrap(), 9.0); // the swapped value
+        assert_eq!(bound.get("g").unwrap(), 7.0); // shared preserved
     }
 
     #[test]

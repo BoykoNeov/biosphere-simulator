@@ -43,6 +43,10 @@ use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
 
 use station::display::{project, BatteryReadout, DisplayContext, ThermalReadout};
+use station::perturbations::{
+    with_brownout, with_crew_load_spike, with_lighting_failure, with_radiator_failure,
+    with_station_leak,
+};
 
 /// The frozen owned-state session (Phase-8 Step 0). Aliased so the *Godot* class below
 /// can also be called `SimSession` (its registered Godot name) without shadowing.
@@ -227,6 +231,177 @@ fn build_sealed_session() -> Result<(CoreSession, DisplayContext), SimError> {
     Ok((session, ctx))
 }
 
+/// Build a **perturbed** session for a fixed-palette scenario (Phase-8 P8.5) — the
+/// interactive "perturb systems" primitive (work item #4). **Build-time windowed:** the
+/// perturbation is a pure function of the integer step `n` over `[start, end)`, so it is
+/// deterministic / parity-clean and needs no live-mutation surface on the session (a live
+/// "trigger now" is expressible as a window opening at the current `n`, but is deferred —
+/// build-time config satisfies the fixed-palette posture). Energy perturbations (`brownout`,
+/// `radiator_failure`) apply to the single-rate `station`; matter perturbations
+/// (`carbon_leak`, `o2_leak`, `crew_spike`, `lighting_failure`) to the two-rate `sealed`.
+/// `magnitude` is the one scalar knob (brownout/crew factor, radiator health, leak rate;
+/// ignored by `lighting_failure`). The cross-domain cascade emerges for free — the composers
+/// are `station::perturbations`, computing no game logic here.
+pub(crate) fn build_perturbed_session(
+    scenario_id: &str,
+    kind: &str,
+    start: u64,
+    end: u64,
+    magnitude: f64,
+) -> Result<(CoreSession, DisplayContext), SimError> {
+    match scenario_id {
+        "station" => build_station_perturbed(kind, start, end, magnitude),
+        "sealed" => build_sealed_perturbed(kind, start, end, magnitude),
+        other => Err(SimError::Validation(format!(
+            "godot_bridge: perturbations apply to 'station' (energy) or 'sealed' (matter), \
+             not {other:?}"
+        ))),
+    }
+}
+
+/// The single-rate `station` (Power → Thermal) under an energy perturbation. `brownout` dims
+/// the solar forcing (deep ⇒ the battery empties and `LoadDraw` rations — the failure
+/// cascade); `radiator_failure` throttles `RadiatorReject` (the node overheats).
+fn build_station_perturbed(
+    kind: &str,
+    start: u64,
+    end: u64,
+    magnitude: f64,
+) -> Result<(CoreSession, DisplayContext), SimError> {
+    let charge = domains::params::charge();
+    let thermal = domains::params::thermal();
+    let scenario = station::scenario::HEAT_CLOSURE_SCENARIO;
+    let (state, registry) = station::system::build_station(&charge, &thermal, &scenario, None)?;
+    let resolver = station::system::station_resolver(&charge, &scenario)?;
+    let (registry, resolver) = match kind {
+        "brownout" => (registry, with_brownout(resolver, start, end, magnitude)?),
+        "radiator_failure" => {
+            with_radiator_failure(&state, registry, resolver, start, end, magnitude)?
+        }
+        other => {
+            return Err(SimError::Validation(format!(
+                "station perturbations are 'brownout' | 'radiator_failure', not {other:?}"
+            )))
+        }
+    };
+    let session = CoreSession::single_rate(
+        EulerIntegrator::new(registry),
+        state,
+        resolver,
+        scenario.power.dt_seconds,
+    );
+    let ctx = DisplayContext {
+        thermal: Some(ThermalReadout {
+            node_id: domains::thermal::NODE.to_string(),
+            heat_capacity: thermal.heat_capacity,
+            space_temperature: thermal.space_temperature,
+        }),
+        battery: Some(BatteryReadout {
+            battery_id: domains::power::BATTERY.to_string(),
+            initial_charge: scenario.power.battery0,
+        }),
+        shared_stock_ids: vec![domains::thermal::NODE.to_string()],
+    };
+    Ok((session, ctx))
+}
+
+/// The two-rate `sealed` station under a matter perturbation — the leak (per-pool), crew
+/// spike, or lighting failure, over one shared stock dict + two registries, with the real
+/// re-sow hook. The station regulators erase the naive pool level, so the cascade surfaces as
+/// regulator effort + sinks (P6.8). `carbon_leak` / `o2_leak` pass `magnitude` as the leak
+/// rate `k_leak`; `crew_spike` as the intake factor; `lighting_failure` ignores it.
+fn build_sealed_perturbed(
+    kind: &str,
+    start: u64,
+    end: u64,
+    magnitude: f64,
+) -> Result<(CoreSession, DisplayContext), SimError> {
+    let charge = domains::params::charge();
+    let thermal = domains::params::thermal();
+    let crew = domains::params::crew();
+    let eclss = domains::params::eclss();
+    let recovery = station::params::water_recovery();
+    let lamp = station::params::lamp();
+    let harvest = station::params::harvest();
+    let scenario = station::scenario::sealed_station_scenario();
+    let (state, bio_reg, fast_reg) = station::sealed::build_sealed_station(
+        &charge, &thermal, &crew, &eclss, &recovery, &lamp, &harvest, &scenario, false, false,
+    )?;
+    let bio_res = station::sealed::sealed_bio_resolver(&lamp, &scenario)?;
+    let fast_res = station::sealed::sealed_fast_resolver(&charge, &scenario)?;
+
+    let (state, bio_reg, fast_reg, bio_res, fast_res) = match kind {
+        "carbon_leak" => {
+            let (s, b, f, fr) = with_station_leak(
+                &state,
+                bio_reg,
+                fast_reg,
+                fast_res,
+                domains::biosphere::stocks::CARBON_POOL,
+                magnitude,
+                start,
+                end,
+            )?;
+            (s, b, f, bio_res, fr)
+        }
+        "o2_leak" => {
+            let (s, b, f, fr) = with_station_leak(
+                &state,
+                bio_reg,
+                fast_reg,
+                fast_res,
+                domains::biosphere::stocks::O2_POOL,
+                magnitude,
+                start,
+                end,
+            )?;
+            (s, b, f, bio_res, fr)
+        }
+        "crew_spike" => {
+            let fr = with_crew_load_spike(fast_res, start, end, magnitude)?;
+            (state, bio_reg, fast_reg, bio_res, fr)
+        }
+        "lighting_failure" => {
+            let (br, fr) = with_lighting_failure(bio_res, fast_res, start, end)?;
+            (state, bio_reg, fast_reg, br, fr)
+        }
+        other => {
+            return Err(SimError::Validation(format!(
+                "sealed perturbations are 'carbon_leak' | 'o2_leak' | 'crew_spike' | \
+                 'lighting_failure', not {other:?}"
+            )))
+        }
+    };
+    let session = CoreSession::two_rate(
+        EulerIntegrator::new(bio_reg),
+        EulerIntegrator::new(fast_reg),
+        state,
+        bio_res,
+        fast_res,
+        scenario.steps_per_day,
+        scenario.bio_dt,
+        scenario.cabin_dt,
+        Some(station::sealed::sealed_reset_hook(&scenario)),
+    )?;
+    let ctx = DisplayContext {
+        thermal: Some(ThermalReadout {
+            node_id: domains::thermal::NODE.to_string(),
+            heat_capacity: thermal.heat_capacity,
+            space_temperature: thermal.space_temperature,
+        }),
+        battery: Some(BatteryReadout {
+            battery_id: domains::power::BATTERY.to_string(),
+            initial_charge: scenario.battery0,
+        }),
+        shared_stock_ids: vec![
+            domains::thermal::NODE.to_string(),
+            domains::biosphere::stocks::CARBON_POOL.to_string(),
+            domains::biosphere::stocks::O2_POOL.to_string(),
+        ],
+    };
+    Ok((session, ctx))
+}
+
 const MXCSR_FTZ: u32 = 1 << 15; // flush-to-zero          (0x8000)
 const MXCSR_DAZ: u32 = 1 << 6; //  denormals-are-zero     (0x0040)
 
@@ -303,6 +478,46 @@ impl SimSession {
             }
             Err(err) => {
                 godot_error!("SimSession.build failed: {err:?}");
+                false
+            }
+        }
+    }
+
+    /// Construct a **perturbed** session (Phase-8 P8.5) — the interactive "perturb systems"
+    /// primitive. `scenario_id` is `"station"` (energy) or `"sealed"` (matter); `kind` is the
+    /// perturbation (`brownout` / `radiator_failure` for station; `carbon_leak` / `o2_leak` /
+    /// `crew_spike` / `lighting_failure` for sealed); `[start, end)` is the window in steps
+    /// (single-rate) or master days (two-rate); `magnitude` the one scalar knob. Returns
+    /// `false` (and logs) on a negative window, an unknown scenario/kind pairing, or a build
+    /// error. Idempotently replaces any prior session. The cross-domain cascade then emerges
+    /// as the session steps — no game-side domain logic.
+    #[func]
+    fn build_perturbed(
+        &mut self,
+        scenario_id: GString,
+        kind: GString,
+        start: i64,
+        end: i64,
+        magnitude: f64,
+    ) -> bool {
+        if start < 0 || end < 0 {
+            godot_error!("SimSession.build_perturbed negative window start={start} end={end}");
+            return false;
+        }
+        match build_perturbed_session(
+            &scenario_id.to_string(),
+            &kind.to_string(),
+            start as u64,
+            end as u64,
+            magnitude,
+        ) {
+            Ok((session, display)) => {
+                self.inner = Some(session);
+                self.display = Some(display);
+                true
+            }
+            Err(err) => {
+                godot_error!("SimSession.build_perturbed failed: {err:?}");
                 false
             }
         }
@@ -568,6 +783,52 @@ mod tests {
         // Two-rate greenhouse → None (deferred, not an error).
         let (greenhouse, _ctx) = build_session("greenhouse").unwrap();
         assert!(greenhouse.inspect_flows().unwrap().is_none());
+    }
+
+    /// The P8.5 perturbation primitive: a perturbed `station` (deep brownout) builds and, as
+    /// it steps, drives `LoadDraw` into rationing (the failure cascade emerges) while still
+    /// stepping without error (conservation holds — the Euler backstop rations as it conserves).
+    #[test]
+    fn build_perturbed_station_brownout_emerges_rationing() {
+        let spd = station::scenario::HEAT_CLOSURE_SCENARIO.power.steps_per_day;
+        // Deep blackout on days [2, 8): factor 0.0.
+        let (mut session, _ctx) =
+            build_perturbed_session("station", "brownout", 2 * spd, 8 * spd, 0.0).unwrap();
+        session.step_n(12 * spd).unwrap();
+        assert!(session.total_rationed() > 0, "the failure cascade should ration");
+    }
+
+    /// A perturbed `sealed` (carbon leak) builds with the augmented `LEAK_SINK` stock and steps
+    /// well-fed (`rationed == 0` — `k_leak·dt < 1`), the leak-sink accumulating.
+    #[test]
+    fn build_perturbed_sealed_carbon_leak_builds_and_steps() {
+        let (mut session, _ctx) =
+            build_perturbed_session("sealed", "carbon_leak", 1, 5, 1.0e-3).unwrap();
+        // The leak augments the state with a boundary sink mirroring CARBON_POOL's composition.
+        assert!(session.state().stocks.contains_key("boundary.leak_sink"));
+        session.step_n(3).unwrap();
+        assert_eq!(session.total_rationed(), 0);
+    }
+
+    /// Perturbation validation: an unknown scenario/kind pairing is a Validation error (the
+    /// UI surfaces it as `false`, never a silent wrong build).
+    #[test]
+    fn build_perturbed_rejects_bad_pairings() {
+        // Wrong substrate: brownout is a station (energy) perturbation, not sealed.
+        assert!(matches!(
+            build_perturbed_session("sealed", "brownout", 1, 5, 0.0),
+            Err(SimError::Validation(_))
+        ));
+        // Unknown kind.
+        assert!(matches!(
+            build_perturbed_session("station", "no_such_kind", 1, 5, 0.0),
+            Err(SimError::Validation(_))
+        ));
+        // Unknown scenario (cabin_gas/greenhouse are not perturbable in the palette).
+        assert!(matches!(
+            build_perturbed_session("cabin_gas", "brownout", 1, 5, 0.0),
+            Err(SimError::Validation(_))
+        ));
     }
 
     #[test]
