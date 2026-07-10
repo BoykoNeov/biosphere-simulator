@@ -36,6 +36,8 @@
 
 use godot::prelude::*;
 
+use domains::crew::FECAL_WASTE;
+
 use simcore::error::SimError;
 use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
@@ -45,6 +47,9 @@ use station::display::{project, BatteryReadout, DisplayContext, ThermalReadout};
 /// The frozen owned-state session (Phase-8 Step 0). Aliased so the *Godot* class below
 /// can also be called `SimSession` (its registered Godot name) without shadowing.
 use station::session::SimSession as CoreSession;
+
+/// P8.3 — the off-render-thread time controller (play / pause / step / fast-forward).
+mod time_control;
 
 // ---------------------------------------------------------------------------
 // Free functions (no gdext) — the testable core. `cargo test` exercises these
@@ -58,13 +63,17 @@ use station::session::SimSession as CoreSession;
 /// and battery SOC to show. The [`DisplayContext`] carries the per-scenario constants the
 /// display readouts need but `State` lacks (thermal params, battery reference, the declared
 /// shared-stock ids) — see [`station::display`].
-fn build_session(scenario_id: &str) -> Result<(CoreSession, DisplayContext), SimError> {
+pub(crate) fn build_session(
+    scenario_id: &str,
+) -> Result<(CoreSession, DisplayContext), SimError> {
     match scenario_id {
         "cabin_gas" => build_cabin_gas(),
         "station" => build_station(),
+        "greenhouse" => build_greenhouse_session(),
+        "sealed" => build_sealed_session(),
         other => Err(SimError::Validation(format!(
-            "godot_bridge: unknown scenario id {other:?} (P8.2 palette: \"cabin_gas\", \
-             \"station\")"
+            "godot_bridge: unknown scenario id {other:?} (palette: \"cabin_gas\", \"station\", \
+             \"greenhouse\", \"sealed\")"
         ))),
     }
 }
@@ -130,6 +139,94 @@ fn build_station() -> Result<(CoreSession, DisplayContext), SimError> {
     Ok((session, ctx))
 }
 
+/// The biosphere ↔ cabin `greenhouse` as a **two-rate** session (P8.3) — the palette's
+/// first two-rate entry, and the reason time controls run off the render thread: each
+/// [`CoreSession::step`] is one **master day** = one slow biosphere step + `steps_per_day`
+/// (1440) fast cabin sub-steps, so fast-forwarding many days is real compute the UI must
+/// not block on. Mirrors [`station::greenhouse::run_greenhouse`]'s setup (and
+/// `tests/session_parity.rs`) with `reset = None`. The shared stocks are the biosphere
+/// carbon/O₂ pools the cabin flows are re-pointed at (one cabin air stock; a construction-
+/// time fact of the reversed greenhouse seam). No thermal node or battery in this assembly,
+/// so both scalar readouts project to `None`.
+fn build_greenhouse_session() -> Result<(CoreSession, DisplayContext), SimError> {
+    let crew = domains::params::crew();
+    let eclss = domains::params::eclss();
+    let scenario = station::scenario::greenhouse_scenario();
+    let (state, bio_registry, cabin_registry) =
+        station::greenhouse::build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE)?;
+    let session = CoreSession::two_rate(
+        EulerIntegrator::new(bio_registry),
+        EulerIntegrator::new(cabin_registry),
+        state,
+        station::greenhouse::greenhouse_bio_resolver(&scenario)?,
+        station::greenhouse::greenhouse_cabin_resolver(&scenario)?,
+        scenario.steps_per_day,
+        scenario.bio_dt,
+        scenario.cabin_dt,
+        None,
+    )?;
+    let ctx = DisplayContext {
+        thermal: None,
+        battery: None,
+        shared_stock_ids: vec![
+            domains::biosphere::stocks::CARBON_POOL.to_string(),
+            domains::biosphere::stocks::O2_POOL.to_string(),
+        ],
+    };
+    Ok((session, ctx))
+}
+
+/// The full sealed station as a **two-rate** session (P8.3) — the multi-year, re-sown
+/// scenario that *is* "fast-forward decades." Mirrors [`station::sealed::run_sealed`]'s
+/// construction (and the sealed branch of `tests/session_parity.rs`): every Phase-6 seam over
+/// one shared stock dict + two registries, with the real `sealed_reset_hook` re-sowing the
+/// biosphere each season. It carries a real node temperature and battery SOC (Power → Thermal
+/// is inside), and highlights the cross-domain shared stocks (`thermal.node` + the biosphere
+/// carbon/O₂ pools the cabin breathes). This is the palette entry the off-render-thread
+/// fast-forward exists for: each master day is 1440 fast sub-steps, and a decade is thousands
+/// of master days.
+fn build_sealed_session() -> Result<(CoreSession, DisplayContext), SimError> {
+    let charge = domains::params::charge();
+    let thermal = domains::params::thermal();
+    let crew = domains::params::crew();
+    let eclss = domains::params::eclss();
+    let recovery = station::params::water_recovery();
+    let lamp = station::params::lamp();
+    let harvest = station::params::harvest();
+    let scenario = station::scenario::sealed_station_scenario();
+    let (state, bio_registry, fast_registry) = station::sealed::build_sealed_station(
+        &charge, &thermal, &crew, &eclss, &recovery, &lamp, &harvest, &scenario, false, false,
+    )?;
+    let session = CoreSession::two_rate(
+        EulerIntegrator::new(bio_registry),
+        EulerIntegrator::new(fast_registry),
+        state,
+        station::sealed::sealed_bio_resolver(&lamp, &scenario)?,
+        station::sealed::sealed_fast_resolver(&charge, &scenario)?,
+        scenario.steps_per_day,
+        scenario.bio_dt,
+        scenario.cabin_dt,
+        Some(station::sealed::sealed_reset_hook(&scenario)),
+    )?;
+    let ctx = DisplayContext {
+        thermal: Some(ThermalReadout {
+            node_id: domains::thermal::NODE.to_string(),
+            heat_capacity: thermal.heat_capacity,
+            space_temperature: thermal.space_temperature,
+        }),
+        battery: Some(BatteryReadout {
+            battery_id: domains::power::BATTERY.to_string(),
+            initial_charge: scenario.battery0,
+        }),
+        shared_stock_ids: vec![
+            domains::thermal::NODE.to_string(),
+            domains::biosphere::stocks::CARBON_POOL.to_string(),
+            domains::biosphere::stocks::O2_POOL.to_string(),
+        ],
+    };
+    Ok((session, ctx))
+}
+
 const MXCSR_FTZ: u32 = 1 << 15; // flush-to-zero          (0x8000)
 const MXCSR_DAZ: u32 = 1 << 6; //  denormals-are-zero     (0x0040)
 
@@ -139,7 +236,7 @@ const MXCSR_DAZ: u32 = 1 << 6; //  denormals-are-zero     (0x0040)
 /// — which is why the wrapper is an instance method (Step 3 moves stepping to a worker
 /// thread → re-check there).
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-fn read_mxcsr() -> u32 {
+pub(crate) fn read_mxcsr() -> u32 {
     let mut csr: u32 = 0;
     // SAFETY: `stmxcsr` stores the 32-bit MXCSR into the 4-byte slot `csr` points at;
     // the pointer is valid, aligned, and exclusively borrowed for the store.
@@ -157,13 +254,13 @@ fn read_mxcsr() -> u32 {
 /// smoke target is Windows/x86_64, so report a clean control word rather than block the
 /// build; revisit if a non-x86 port is ever gated on FP-env parity.
 #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
-fn read_mxcsr() -> u32 {
+pub(crate) fn read_mxcsr() -> u32 {
     0
 }
 
 /// True iff FTZ **and** DAZ are both OFF — the IEEE / headless default the cross-boundary
 /// parity guarantee relies on.
-fn fp_flags_clean(mxcsr: u32) -> bool {
+pub(crate) fn fp_flags_clean(mxcsr: u32) -> bool {
     (mxcsr & (MXCSR_FTZ | MXCSR_DAZ)) == 0
 }
 
@@ -341,6 +438,8 @@ mod tests {
     fn build_session_knows_the_palette_and_rejects_unknown() {
         assert!(build_session("cabin_gas").is_ok());
         assert!(build_session("station").is_ok());
+        assert!(build_session("greenhouse").is_ok());
+        assert!(build_session("sealed").is_ok());
         // `CoreSession` isn't `Debug`, so match the `Err` without `unwrap_err`.
         match build_session("no_such_scenario") {
             Err(SimError::Validation(_)) => {}
@@ -402,6 +501,18 @@ mod tests {
         let soc = proj.soc_percent_of_initial.expect("station has a battery SOC");
         assert!((80.0..120.0).contains(&soc), "SOC out of range: {soc}");
         assert!(proj.to_json().contains("\"shared_stock_ids\":[\"thermal.node\"]"));
+    }
+
+    /// The two-rate `sealed` arm (the "decades" scenario) builds and steps a few master days
+    /// well-fed with the real re-sow hook wired in — cheap coverage of the palette arm without
+    /// the multi-year cost (the full-horizon parity lives in `tests/session_parity.rs`).
+    #[test]
+    fn sealed_session_steps_well_fed() {
+        let (mut session, _ctx) = build_session("sealed").unwrap();
+        session.step_n(3).unwrap();
+        assert_eq!(session.n(), 3, "three master days");
+        assert_eq!(session.total_rationed(), 0);
+        assert!(session.events().is_empty());
     }
 
     #[test]

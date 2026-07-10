@@ -965,6 +965,55 @@ domain change** (`git diff src/` empty — all additive under `rust/` + `godot/`
 types); `cargo test` (workspace: simcore 45 / station 10 / godot_bridge 5 / domains 9 / session_parity 3+1
 ignored) + `clippy --all-targets -D warnings` green; **all 20 frozen goldens byte-identical** (no regen).
 Next: Step 3 (time controls — play/pause/single-step/fast-forward off the render thread).
+**Step 3 (P8.3) COMPLETE — time controls OFF the render thread (play/pause/single-step/
+fast-forward); the fast-forward silent-observer loop driven from an interactive UI**: new
+`rust/crates/godot_bridge/src/time_control.rs` (the `TimeController` GDExtension class) +
+interactive `godot/time_dashboard.{tscn,gd}` + headless `godot/time_smoke.gd` + `godot/ui_smoke.gd`
++ `tests/crossport/test_godot_time_controls.py`. **THE load-bearing feasibility finding: the
+`CoreSession` is NOT `Send`** — its resolvers are `Box<dyn Fn(u64,f64)->f64>` (no `+ Send`), a
+frozen engine type we do not touch — so instead of moving the session to a worker (which would
+force a `+ Send` core change) the **worker BUILDS + OWNS the session** (born/lives/dies on the
+worker thread, never crosses a boundary); only plain-data `Send` types cross (`Cmd` down an
+`mpsc` channel, the `Shared` JSON/counters back up via `Arc<Mutex<…>>`). ⇒ **no `Send` bound, no
+engine change, no state loader** (the Step-7 concern sidestepped — the worker is the single owner
+from birth). **Architecture:** the `TimeController` spawns **one** long-lived Rust `std::thread`
+(NOT a Godot-managed pool thread — the FP call below); the render thread's `_process` reads the
+latest published snapshot each frame and **never blocks on a step**, however expensive. The
+existing synchronous `SimSession` class is **UNTOUCHED** (the Step-1/8 bit-exact parity smoke
+depends on it) — `TimeController` is purely additive. **FP verification is per-thread (advisor
+#3): the worker reads MXCSR on ITSELF at startup and publishes `fp_clean`** — but honestly it is
+clean **BY CONSTRUCTION** on a Rust `std::thread` (inherits the process-default IEEE env), so this
+is a **guard against a future design that hands stepping to a Godot pool thread that set FTZ/DAZ
+for SIMD**, NOT an active detector of that risk (the log does not overclaim it *verifies* the
+pool-thread case). **Fast-forward = the silent-observer `step_n` loop** (free & parity-safe, work
+item #1), run in time-budgeted batches (~6 ms) that publish progress and re-check commands so
+Pause/Shutdown interrupt promptly; **Play** is throttled (`speed` steps per ~16 ms tick — watchable);
+**SingleStep** one unit then pause. **Palette grew `{cabin_gas, station}` → `+ greenhouse` (two-rate,
+`reset=None`, 7-day) `+ sealed` (two-rate, the multi-year re-sown "fast-forward DECADES" scenario,
+`false,false` flags mirroring `session_parity`, with a real node T + battery SOC)** — the two-rate
+arms (each step = 1440 fast sub-steps) are the whole reason threading matters (single-rate steps are
+µs). **Threaded-parity teeth (cargo, no Godot): worker FF-to-N == synchronous `step_n(N)` bit-exact
+(hex-float snapshot) for cabin_gas AND greenhouse** — "the sim on the worker thread == the sim on
+the main thread"; plus play-advances-then-pause-stops, single-step-advances-one, FF-reaches-target,
+`fp_clean` on the worker thread, and the sealed arm builds+steps 3 master days well-fed
+(`rationed==0`). **13 `godot_bridge` tests.** **Godot deliverable:** `time_dashboard.{tscn,gd}` —
+scenario picker + Play/Pause/Step/Fast-forward buttons + a speed `HSlider` + a **horizon scrubber**
+`HSlider` (drag → `fast_forward_to`; forward-only, backward deferred to Step-7 save/load), widgets
+built in code so the `.tscn` stays tiny; the render loop reads the core-computed `observation_json`
+and formats it (computes nothing). **Headless cross-boundary proofs (LOCAL-ONLY `skipif godot||cargo`,
+CI-immune):** `time_smoke.gd` drives `TimeController.fast_forward_to(900)` **off-thread through the
+actual cdylib** ⇒ the worker's FF result is **byte-identical to headless `emit_cabin_gas`** + Tier-1
+bit-exact vs the frozen `cabin_gas_state.json`, with `fp_clean` **on the worker thread** (`mxcsr=0x1F80`,
+FTZ/DAZ off), `rationed==0`/`step_count==900`/no fault; `ui_smoke.gd` **instantiates the dashboard
+headless** so its GDScript is parsed and `_ready`→`_build_ui` runs (advisor-gated — the UI was
+otherwise loaded by nothing I ran; caught + fixed a base-class shadow `for name`→`for scenario_name`).
+**Zero core + zero domain change + zero ENGINE-crate change** (`git diff src/` empty; `simcore`/
+`domains`/`station` untouched — the change is entirely in the additive `godot_bridge` crate + `godot/`
++ `tests/crossport/`); full workspace `cargo test` + `clippy --all-targets -D warnings` green,
+whole-project ruff/format/pyright green, the 3 Godot crossport tests pass; **all 20 frozen goldens
+byte-identical** (no regen — Step 3 changes no science). NOTE `godot/project.godot` has PRE-EXISTING
+editor/MCP cruft (excluded from the commit). Next: Step 4 (flow inspection — expose per-flow legs so a
+player can see where matter/energy moves; work item #2).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
