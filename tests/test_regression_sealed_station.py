@@ -55,6 +55,7 @@ from domains.crew.stocks import FECAL_WASTE
 from domains.power.loader import load_charge_params
 from domains.thermal.loader import load_thermal_params
 from domains.thermal.stocks import NODE
+from golden_platform import windows_golden_only
 from sealed_tier2_helper import (
     QUANTITIES,
     REL_DRIFT_BOUND,
@@ -133,12 +134,14 @@ def _gate(states: list[State], rationed: int, events: tuple[object, ...]) -> Non
     )
 
 
+@windows_golden_only
 def test_sealed_station_golden_bytes_match(sealed_tier2_run) -> None:
     _gate(sealed_tier2_run.states, sealed_tier2_run.rationed, sealed_tier2_run.events)
     expected = sim_io.dumps(sealed_tier2_run.states[-1]).encode("utf-8")
     assert expected == STATE_GOLDEN.read_bytes()
 
 
+@windows_golden_only
 def test_sealed_station_golden_loads_back(sealed_tier2_run) -> None:
     text = STATE_GOLDEN.read_text(encoding="utf-8")
     assert sim_io.loads(text) == sealed_tier2_run.states[-1]
@@ -201,12 +204,14 @@ def _energy_summary_dumps(states: list[State]) -> str:
     return json.dumps(_to_hex(data), indent=2, sort_keys=True) + "\n"
 
 
+@windows_golden_only
 def test_energy_drift_summary_bytes_match(energy_states) -> None:
     assert _energy_summary_dumps(energy_states).encode("utf-8") == (
         ENERGY_SUMMARY_GOLDEN.read_bytes()
     )
 
 
+@windows_golden_only
 def test_energy_drift_summary_loads_back(energy_states) -> None:
     parsed = json.loads(ENERGY_SUMMARY_GOLDEN.read_text(encoding="utf-8"))
     assert parsed["horizon_years"] == SEALED_ENERGY_YEARS

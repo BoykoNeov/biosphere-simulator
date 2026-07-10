@@ -42,6 +42,7 @@ from domains.biosphere.stocks import (
     STORAGE_C,
 )
 from domains.power.stocks import BATTERY, WASTE_HEAT
+from golden_platform import windows_golden_only
 from simcore.conservation import compute_ledger
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
@@ -128,11 +129,13 @@ def _final_state() -> State:
     return final
 
 
+@windows_golden_only
 def test_lighting_golden_bytes_match() -> None:
     expected = sim_io.dumps(_final_state()).encode("utf-8")
     assert expected == GOLDEN_PATH.read_bytes()
 
 
+@windows_golden_only
 def test_lighting_golden_loads_back() -> None:
     text = GOLDEN_PATH.read_text(encoding="utf-8")
     assert sim_io.loads(text) == _final_state()

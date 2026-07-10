@@ -48,6 +48,7 @@ from domains.power.loader import load_charge_params
 from domains.power.scenario import BOUNDED_SOC_DAYS, BOUNDED_SOC_SCENARIO
 from domains.power.stocks import BATTERY
 from domains.power.system import build_power, power_resolver, run_power
+from golden_platform import windows_golden_only
 from simcore.conservation import compute_ledger
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -109,6 +110,7 @@ def _final_state() -> State:
     return states[-1]
 
 
+@windows_golden_only
 def test_power_golden_bytes_match() -> None:
     # Byte-exact compare against the committed golden — any bit change in the Power
     # output fails here (within-build; see the transcendental caveat in the module doc).
@@ -116,6 +118,7 @@ def test_power_golden_bytes_match() -> None:
     assert expected == GOLDEN_PATH.read_bytes()
 
 
+@windows_golden_only
 def test_power_golden_loads_back() -> None:
     # The committed golden round-trips back to the exact final State (also the check
     # that sim_io serializes a pure-ENERGY Power State cleanly — no POPULATION/mass).

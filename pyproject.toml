@@ -74,6 +74,14 @@ markers = [
 
 [tool.pyright]
 include = ["src", "tests"]
+# `tests/oracle/` depends on the OPTIONAL `oracle` dep group (pcse, EUPL — an offline
+# validation oracle, deliberately not a base dependency). CI's `uv sync` does not install
+# it, so pyright would report `reportMissingImports` on the lazy `import pcse` in
+# tests/oracle/runner.py and fail the Python job (it passes locally only because the dev
+# venv happens to have pcse). The oracle runner is optional tooling over an untyped
+# external lib; excluding it from type-checking keeps CI green without vendoring pcse. The
+# default excludes are re-listed because setting `exclude` overrides them.
+exclude = ["**/node_modules", "**/__pycache__", "**/.*", "tests/oracle"]
 # Check against the supported floor (matches requires-python and ruff target),
 # even though the dev interpreter is pinned to 3.13 via .python-version.
 pythonVersion = "3.12"

@@ -71,6 +71,7 @@ from domains.biosphere.season import (
     run_perennial,
     weather_resolver,
 )
+from golden_platform import windows_golden_only
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -201,6 +202,7 @@ def _drift_summary_dumps(trajectories: dict[str, list[State]]) -> str:
 # --- the long-horizon State snapshots ----------------------------------------
 
 
+@windows_golden_only
 def test_perennial_long_horizon_golden_bytes_match(trajectories) -> None:
     # Byte-exact: any bit change in the 15-yr perennial output fails here (within-build;
     # see the transcendental caveat in the module doc).
@@ -208,6 +210,7 @@ def test_perennial_long_horizon_golden_bytes_match(trajectories) -> None:
     assert expected == PERENNIAL_GOLDEN.read_bytes()
 
 
+@windows_golden_only
 def test_perennial_long_horizon_golden_loads_back(trajectories) -> None:
     # The committed golden round-trips back to the exact final State (it routes through
     # the core constructors, so a tampered golden fails to load).
@@ -215,11 +218,13 @@ def test_perennial_long_horizon_golden_loads_back(trajectories) -> None:
     assert sim_io.loads(text) == trajectories["perennial"][-1]
 
 
+@windows_golden_only
 def test_consumer_long_horizon_golden_bytes_match(trajectories) -> None:
     expected = sim_io.dumps(trajectories["consumer"][-1]).encode("utf-8")
     assert expected == CONSUMER_GOLDEN.read_bytes()
 
 
+@windows_golden_only
 def test_consumer_long_horizon_golden_loads_back(trajectories) -> None:
     text = CONSUMER_GOLDEN.read_text(encoding="utf-8")
     assert sim_io.loads(text) == trajectories["consumer"][-1]
@@ -228,6 +233,7 @@ def test_consumer_long_horizon_golden_loads_back(trajectories) -> None:
 # --- the drift-summary golden ------------------------------------------------
 
 
+@windows_golden_only
 def test_drift_summary_golden_bytes_match(trajectories) -> None:
     # Byte-exact: a regression in the limit-cycle *shape* (per-year peak_leaf /
     # consumer_carbon) or the period class fails here — the stability regression catcher
@@ -238,6 +244,7 @@ def test_drift_summary_golden_bytes_match(trajectories) -> None:
     )
 
 
+@windows_golden_only
 def test_drift_summary_golden_loads_back(trajectories) -> None:
     # The committed golden's hex vectors decode (float.fromhex) to exactly the freshly
     # computed summary floats, and the period booleans match — a tampered golden fails.

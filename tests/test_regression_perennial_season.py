@@ -37,6 +37,7 @@ from domains.biosphere.season import (
     run_perennial,
     weather_resolver,
 )
+from golden_platform import windows_golden_only
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -83,6 +84,7 @@ def _final_state() -> State:
     return states[-1]
 
 
+@windows_golden_only
 def test_perennial_golden_bytes_match() -> None:
     # Byte-exact compare against the committed golden — any bit change in the perennial
     # output fails here (within-build; see the transcendental caveat in the module doc).
@@ -90,6 +92,7 @@ def test_perennial_golden_bytes_match() -> None:
     assert expected == GOLDEN_PATH.read_bytes()
 
 
+@windows_golden_only
 def test_perennial_golden_loads_back() -> None:
     # The committed golden round-trips back to the exact final State (it routes through
     # the core constructors, so a tampered golden fails to load).

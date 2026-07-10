@@ -44,6 +44,7 @@ from domains.power.stocks import WASTE_HEAT
 from domains.thermal.flows import temperature
 from domains.thermal.loader import load_thermal_params
 from domains.thermal.stocks import HEAT_SOURCE, NODE
+from golden_platform import windows_golden_only
 from simcore.conservation import compute_ledger
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -120,6 +121,7 @@ def _final_state() -> State:
     return states[-1]
 
 
+@windows_golden_only
 def test_station_golden_bytes_match() -> None:
     # Byte-exact compare against the committed golden — any bit change in the coupled
     # output fails here (within-build; see the transcendental caveat in the module doc).
@@ -127,6 +129,7 @@ def test_station_golden_bytes_match() -> None:
     assert expected == GOLDEN_PATH.read_bytes()
 
 
+@windows_golden_only
 def test_station_golden_loads_back() -> None:
     # The committed golden round-trips back to the exact final State (also the check
     # that sim_io serializes a combined two-domain pure-ENERGY State cleanly).

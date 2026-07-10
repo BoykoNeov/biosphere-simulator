@@ -35,6 +35,7 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.transpiration import water_stress_factor
+from golden_platform import windows_golden_only
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -93,6 +94,7 @@ def _final_state() -> State:
     return states[-1]
 
 
+@windows_golden_only
 def test_water_biting_golden_bytes_match() -> None:
     # Byte-exact compare against the committed golden — any bit change fails here
     # (within-build; see the transcendental caveat in the module doc).
@@ -100,6 +102,7 @@ def test_water_biting_golden_bytes_match() -> None:
     assert expected == GOLDEN_PATH.read_bytes()
 
 
+@windows_golden_only
 def test_water_biting_golden_loads_back() -> None:
     # The committed golden round-trips back to the exact final State.
     text = GOLDEN_PATH.read_text(encoding="utf-8")

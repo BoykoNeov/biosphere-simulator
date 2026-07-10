@@ -48,6 +48,7 @@ from domains.biosphere.stocks import LITTER_CARBON, STORAGE_C
 from domains.crew.loader import load_crew_params
 from domains.crew.stocks import FECAL_WASTE, FOOD_STORE
 from domains.eclss.loader import load_eclss_params
+from golden_platform import windows_golden_only
 from simcore.conservation import compute_ledger
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -148,6 +149,7 @@ def _final_state() -> State:
     return final
 
 
+@windows_golden_only
 def test_harvest_golden_bytes_match() -> None:
     # Byte-exact compare against the committed golden — any bit change in the coupled
     # output fails here (within-build; the flows are transcendental-free).
@@ -155,6 +157,7 @@ def test_harvest_golden_bytes_match() -> None:
     assert expected == GOLDEN_PATH.read_bytes()
 
 
+@windows_golden_only
 def test_harvest_golden_loads_back() -> None:
     # The committed golden round-trips back to the exact final State.
     text = GOLDEN_PATH.read_text(encoding="utf-8")

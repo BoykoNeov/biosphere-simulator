@@ -44,6 +44,7 @@ from domains.thermal.system import (
     run_thermal,
     thermal_resolver,
 )
+from golden_platform import windows_golden_only
 from simcore.conservation import compute_ledger
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -107,6 +108,7 @@ def _final_state() -> State:
     return states[-1]
 
 
+@windows_golden_only
 def test_thermal_golden_bytes_match() -> None:
     # Byte-exact compare against the committed golden — any bit change in the Thermal
     # output fails here (within-build; see the transcendental caveat in the module doc).
@@ -114,6 +116,7 @@ def test_thermal_golden_bytes_match() -> None:
     assert expected == GOLDEN_PATH.read_bytes()
 
 
+@windows_golden_only
 def test_thermal_golden_loads_back() -> None:
     # The committed golden round-trips back to the exact final State (also the check
     # that sim_io serializes a pure-ENERGY Thermal State cleanly — no POPULATION/mass).
