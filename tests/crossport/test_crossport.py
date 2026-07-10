@@ -425,10 +425,13 @@ def test_rust_siblings_match_their_tier(example: str, golden: str, key: str) -> 
     **power / power_self_discharge / thermal Tier-2** within the measured `tiers.json`
     band. Compared on parsed f64 (via `sim_io.loads`), never JSON bytes.
 
-    NOTE: `skipif cargo is None` and the Python CI job installs no Rust, so this parity
-    gate — including the crew/eclss bit-exact claims — is LOCAL-ONLY, never on CI
-    (pre-existing Step-0 precedent). A real cross-libm CI gate (Rust in the Python job,
-    or a committed Linux-generated golden) is deferred future work.
+    Runs wherever `cargo` is on PATH: locally, and — since Phase-7 Step 6 (P7.6) — on
+    the dedicated `crossport` CI job (Ubuntu, both toolchains; see
+    `.github/workflows/ci.yml`). That job is the repo's first genuine cross-libm gate:
+    glibc-Rust vs the UCRT-generated committed goldens (the local run is same-libm, so
+    bit-exact 0.0; CI is the real UCRT-vs-glibc measurement the Tier-2 bands were sized
+    to absorb). `skipif cargo is None` skips a cargo-less local run. See
+    docs/native-port-reference.md.
     """
     proc = subprocess.run(
         ["cargo", "run", "-q", "--example", example],
@@ -507,7 +510,9 @@ def test_rust_biosphere_states_match_tier2(
     Rust; locally (same UCRT libm) the deviation is bit-exact 0.0, well inside the band.
     Compared on parsed f64 (via `sim_io.loads`), never JSON bytes.
 
-    LOCAL-ONLY (`skipif cargo` + no Rust in the Python CI job) — the Step-0/3 precedent.
+    Runs locally and, since Step 6 (P7.6), on the `crossport` CI job — where glibc-Rust
+    vs the UCRT goldens is the real cross-libm measurement the Tier-2 band absorbs.
+    `skipif cargo is None` skips a cargo-less local run.
     """
     candidate = _run_example(example, args)
     snapshot.loads(json.dumps(candidate))  # validate it is a well-formed snapshot
@@ -667,8 +672,9 @@ def test_rust_station_states_match_their_tier(
     greenhouse / lighting / harvest Tier-2** within the measured `tiers.json` band.
     Compared on parsed f64 (via `sim_io.loads`), never JSON bytes.
 
-    LOCAL-ONLY (`skipif cargo` + no Rust in the Python CI job) — the Step-0/3/4
-    precedent. The two-rate goldens' Tier-0 conservation gate (every sub-step, in Rust)
+    Runs locally and, since Step 6 (P7.6), on the `crossport` CI job (glibc-Rust vs the
+    UCRT goldens — the real cross-libm gate); `skipif cargo is None` skips a cargo-less
+    local run. The two-rate goldens' Tier-0 conservation gate (every sub-step, in Rust)
     fired inside the driver during the emit run — a completed run is itself the proof.
     """
     candidate = json.loads(_run_station_example(example))

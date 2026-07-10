@@ -1,10 +1,19 @@
 name: CI
 
 # Phase-7 Step 0 (P7.0) added the Rust job alongside the pre-existing Python gate.
-# The Python reference and the native Rust port are checked in the same run so a
-# divergence surfaces immediately. The Rust port has NO reference authority — a
-# parity failure is an unfreeze-discipline finding about the Python reference, not a
-# licence to silently patch the Rust side.
+# Phase-7 Step 6 (P7.6) added the `crossport` job — the third job carries BOTH
+# toolchains so the Python comparator actually gates the Rust port's snapshots against
+# the 20 frozen goldens (`tests/crossport/`). The Python reference and the native Rust
+# port are checked in the same run so a divergence surfaces immediately. The Rust port
+# has NO reference authority — a parity failure is an unfreeze-discipline finding about
+# the Python reference, not a licence to silently patch the Rust side.
+#
+# The Ubuntu runner uses glibc's libm for BOTH CPython `math.*` and Rust `f64::sin/exp/
+# powf`, while the committed goldens were generated on Windows/UCRT — so this job is the
+# repo's first genuine cross-libm parity measurement (glibc-Rust vs UCRT-golden), not a
+# same-libm no-op. Tier-1 scenarios (transcendental-free) stay bit-exact on any
+# platform; the Tier-2 bands (measured in `tiers.json`) are what absorb the real
+# UCRT-vs-glibc last-ULP divergence. See docs/native-port-reference.md.
 
 on:
   push:
@@ -46,3 +55,23 @@ jobs:
         run: cargo test
       - name: Cargo clippy (deny warnings)
         run: cargo clippy --all-targets -- -D warnings
+
+  crossport:
+    name: Cross-port parity (Rust port vs 20 frozen goldens)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Sync Python dependencies
+        run: uv sync
+      # The whole tests/crossport/ suite, INCLUDING -m slow: the two sealed goldens
+      # (sealed_station ~1.3M substeps + the 15-yr energy drift) are slow-marked, and
+      # omitting them would gate only 18 of the 20. Each parity test shells out to
+      # `cargo run --example …`; the first invocation builds the rust/ workspace (a
+      # second build for the --release sealed cases). The Python comparator applies the
+      # per-scenario tier rules (Tier-0 exact / Tier-1 bit-exact / Tier-2 measured band).
+      - name: Cross-port parity suite (incl. slow sealed goldens)
+        run: uv run pytest tests/crossport/

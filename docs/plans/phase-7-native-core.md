@@ -516,7 +516,57 @@ incl. the two Tier-1 (`cabin_gas`/`water_recovery`) which the *engine now comput
   frozen goldens byte-identical** (no regen). **Only Step 6 remains (full-suite CI wiring + the
   cross-port reference doc) → Phase 7 EXITS.**
 
-### Step 6 (P7.6) — full-suite parity gate + the cross-port reference doc; PHASE 7 EXITS
+### Step 6 (P7.6) — full-suite parity gate + the cross-port reference doc; PHASE 7 EXITS — ✅ COMPLETE
+
+> **DONE. PHASE 7 EXITS → Phase 8 (Godot).** Two deliverables, **zero code change**
+> (`git diff src/` empty; the only touches are `.github/workflows/ci.yml`,
+> `tests/crossport/` docstrings + the `tiers.json` `_comment`, and the new doc — all
+> boundary/test tooling).
+>
+> **The `crossport` CI job (the whole 20-golden parity suite, now on CI).** Steps 0–5 ran
+> the Rust-vs-Python comparison **local-only** (`skipif cargo is None`; the Python CI job
+> had no Rust) — repeatedly flagged as "a real cross-libm CI gate is deferred future work."
+> Step 6 *is* that deferred work: a third Ubuntu job carrying **both** toolchains
+> (`setup-uv` + `dtolnay/rust-toolchain@stable`) runs `uv run pytest tests/crossport/`
+> **including `-m slow`**, so the comparator gates all 20 goldens (the two sealed goldens
+> are slow-marked — omitting slow would gate 18/20). The existing `skipif cargo` guard is
+> kept (a cargo-less local run still skips), so no test logic changed — only the toolchain
+> is now present on a CI job. The stale "LOCAL-ONLY / never on CI / deferred future work"
+> notes across the three parity docstrings + the `tiers.json` `_comment` were swept.
+>
+> **The load-bearing correction (advisor): this is the repo's first *genuine cross-libm*
+> gate, and the signal is glibc-Rust vs the UCRT *golden*, not Rust-vs-fresh-Python.** On
+> one Ubuntu runner both CPython `math.*` and Rust `f64::sin/exp/powf` lower to glibc's
+> libm, so Rust-vs-fresh-Python there is a same-libm no-op (0.0, tells you nothing). The
+> real cross-libm number comes from the **committed goldens being UCRT-generated (Windows)**
+> — so the CI comparison is **glibc-Rust vs UCRT-golden**, genuinely nonzero, exactly the
+> untested claim the Tier-2 bands were sized to absorb. Tier-1 (transcendental-free) stays
+> bit-exact on any platform; only Tier-2 is exposed.
+>
+> **De-risked on Linux BEFORE landing the gate blocking (advisor #3): Windows local cannot
+> observe this** (UCRT-vs-UCRT = 0.0). A `linux/amd64` Docker container (rust image + uv)
+> replicated the exact CI comparison against the committed goldens — **all 20 goldens pass
+> their tier**: the four Tier-1 bit-exact (as guaranteed for pure-arithmetic graphs on any
+> platform), every Tier-2 within band **including the ~1.3 M-substep sealed multi-year run
+> and the 15-yr energy drift**, every Tier-0 invariant exact (`39 passed` non-slow +
+> `4 passed` slow, both green on glibc vs the UCRT goldens). So the measured bands genuinely
+> absorb real UCRT-vs-glibc divergence over decade-scale horizons — the gate is safe to land
+> blocking on `main`.
+>
+> **`docs/native-port-reference.md`** — the cross-port tolerance contract (the mirror of the
+> freeze contracts): the three-tier recap, the per-scenario tier table (all 20 goldens,
+> `tiers.json` named authoritative so prose can't drift), the measured Tier-2 bands + their
+> ±1-ULP-sensitivity provenance (measured, framed by use), the **op-for-op libm audit table**
+> (every `**`/`math.*` site → its exact `.powf(4.0)`/`.exp()`/`.sin()` Rust equivalent with
+> file:line), the **discovered-discrepancy protocol** (a surfaced Python bug routes through
+> the station/biosphere unfreeze discipline — the port has no reference authority; a band
+> loosens only on a re-measured sensitivity rise), and the port-agnostic / C#-at-Phase-8
+> note.
+>
+> **Verification:** ruff + pyright (0 errors) + the crossport suite (slow **and** non-slow)
+> green on **both** Windows (same-libm, `max_rel_dev` 0.0) and the Linux container
+> (cross-libm, within band); all 20 frozen goldens byte-identical (`git status` on the
+> golden dir clean); `git diff src/` empty. **PHASE 7 EXITS → Phase 8 (Godot front-end).**
 
 Wire the whole 20-golden cross-port suite into CI (`cargo test` produces the snapshots; the
 Python comparator gates them). Write **`docs/native-port-reference.md`** — the cross-port

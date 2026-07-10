@@ -816,8 +816,38 @@ period-1 `is_stationary` signature EXACTLY (Tier-0). Parity gate LOCAL-ONLY (`sk
 station State cases + 2 slow sealed cases (release) + 2 band guards + `test_station_params_in_sync`.
 **`git diff src/` empty** + zero core / zero domain-code change; `cargo test`+`clippy -D warnings`
 green; full Python suite incl. `-m slow`+ruff+pyright green; **all 20 frozen goldens byte-identical**
-(no regen). **Next: Step 6 (P7.6) — wire the 20-golden parity suite into CI + write
-`docs/native-port-reference.md` → Phase 7 EXITS → Phase 8 (Godot).**
+(no regen).
+**Step 6 (P7.6) COMPLETE — full-suite parity gate wired into CI + the cross-port reference doc;
+PHASE 7 EXITS → Phase 8 (Godot)**: two boundary/test-tooling deliverables, **zero code change**
+(`git diff src/` empty; only `.github/workflows/ci.yml`, `tests/crossport/` docstrings + the
+`tiers.json` `_comment`, and the new `docs/native-port-reference.md`). **The `crossport` CI job**:
+Steps 0–5 ran the Rust-vs-Python parity comparison **local-only** (`skipif cargo is None`; the
+Python CI job had no Rust — repeatedly flagged "a real cross-libm CI gate is deferred future
+work"); Step 6 IS that work — a third Ubuntu job carries **both** toolchains (`setup-uv` +
+`dtolnay/rust-toolchain@stable`) and runs `uv run pytest tests/crossport/` **incl. `-m slow`** so
+the comparator gates all **20** goldens (the two sealed goldens are slow-marked — omitting slow
+gates 18/20). `skipif cargo` kept (cargo-less local run still skips) ⇒ no test logic changed, only
+the toolchain is now present; the stale "LOCAL-ONLY/never-on-CI/deferred" notes (3 parity docstrings
++ `tiers.json` `_comment`) swept. **THE load-bearing correction (advisor): the first *genuine
+cross-libm* gate, and the signal is glibc-Rust vs the UCRT *golden*, NOT Rust-vs-fresh-Python** —
+on one Ubuntu runner both CPython `math.*` and Rust `f64::sin/exp/powf` lower to glibc (same-libm
+no-op, 0.0), but the committed goldens are **UCRT-generated (Windows)**, so CI is **glibc-Rust vs
+UCRT-golden** (genuinely nonzero — exactly what the Tier-2 bands were sized to absorb; Tier-1
+transcendental-free stays bit-exact on any platform, only Tier-2 exposed). **De-risked on Linux
+BEFORE landing blocking (Windows local can't observe it — UCRT-vs-UCRT=0.0)**: a `linux/amd64`
+Docker container (rust image + uv) replicated the exact CI comparison vs the committed goldens —
+**all 20 pass their tier** (4 Tier-1 bit-exact; every Tier-2 within band incl. the ~1.3 M-substep
+sealed multi-year run + 15-yr energy drift; every Tier-0 exact; `39 passed` non-slow + `4 passed`
+slow, green on glibc vs UCRT goldens) ⇒ bands genuinely absorb real UCRT-vs-glibc divergence over
+decade-scale horizons. **`docs/native-port-reference.md`** = the cross-port tolerance contract
+(mirror of the freeze contracts): 3-tier recap, per-scenario tier table (20 goldens; `tiers.json`
+named authoritative), measured Tier-2 bands + ±1-ULP-sensitivity provenance, the **op-for-op libm
+audit table** (`**`/`math.*` → `.powf(4.0)`/`.exp()`/`.sin()` with file:line), the
+**discovered-discrepancy protocol** (port has NO reference authority — a surfaced Python bug routes
+through the station/biosphere unfreeze discipline; a band loosens only on a re-measured sensitivity
+rise), + port-agnostic/C#-at-Phase-8 note. Verified: ruff + pyright (0 errors) + crossport slow &
+non-slow green on **both** Windows (same-libm, 0.0) and the Linux container (cross-libm, in band);
+20 goldens byte-identical; `git diff src/` empty. **PHASE 7 COMPLETE → Phase 8 (Godot front-end).**
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
