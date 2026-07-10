@@ -75,8 +75,18 @@ pub const EQUILIBRIUM_STEPS: u64 = 720;
 
 /// The node temperature (K), the derived readout `T = T_space + Q/C`. Op-order mirrors
 /// Python `temperature`.
-fn temperature(node_joules: f64, heat_capacity: f64, space_temperature: f64) -> f64 {
+pub fn temperature(node_joules: f64, heat_capacity: f64, space_temperature: f64) -> f64 {
     space_temperature + node_joules / heat_capacity
+}
+
+/// The emergent steady-state node temperature `T_eq` (K), a closed form: the temperature
+/// at which Stefan-Boltzmann rejection balances a forced `heat_load_w`. Op-order mirrors
+/// Python `equilibrium_temperature`: `(heat_load/(εσA) + T_space⁴)^(1/4)` — `**0.25` →
+/// `.powf(0.25)`, `**4` → `.powf(4.0)`, the plan's libm audit. The station derives the
+/// coupled node's initial heat `Q_eq = C·(T_eq − T_space)` from this (`sealed_node_heat`).
+pub fn equilibrium_temperature(params: &ThermalParams, heat_load_w: f64) -> f64 {
+    let driving = heat_load_w / (params.emissivity * STEFAN_BOLTZMANN * params.radiator_area);
+    (driving + params.space_temperature.powf(4.0)).powf(0.25)
 }
 
 /// The instantaneous radiated power `ε·σ·A·(T⁴ − T_space⁴)` (W). Op-order mirrors Python
@@ -131,6 +141,19 @@ pub struct RadiatorReject {
     params: ThermalParams,
 }
 
+impl RadiatorReject {
+    /// Construct a `RadiatorReject` with the given ids — the station reuses it verbatim
+    /// (`node`/`space` unchanged) to reject the coupled Power/lamp dissipation load.
+    pub fn new(id: String, node: String, space: String, params: ThermalParams) -> Self {
+        RadiatorReject {
+            id,
+            node,
+            space,
+            params,
+        }
+    }
+}
+
 impl Flow for RadiatorReject {
     fn id(&self) -> &str {
         &self.id
@@ -151,7 +174,7 @@ impl Flow for RadiatorReject {
 }
 
 /// The sensible-heat POOL `thermal.node` (ENERGY, J), referenced to T_space.
-fn node_stock(amount: f64) -> Result<Stock, SimError> {
+pub fn node_stock(amount: f64) -> Result<Stock, SimError> {
     Stock::new(
         NODE.to_string(),
         THERMAL_DOMAIN.to_string(),

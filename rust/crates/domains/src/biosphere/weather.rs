@@ -20,7 +20,7 @@ const SECONDS_PER_DAY: f64 = 86400.0;
 /// PAR is ~50% of global shortwave by energy (McCree 1972; FAO uses 0.5).
 const PAR_ENERGY_FRACTION: f64 = 0.5;
 /// PAR photon flux per unit PAR energy: ~4.57 µmol photons per J (McCree 1972).
-const PAR_UMOL_PER_J: f64 = 4.57;
+pub const PAR_UMOL_PER_J: f64 = 4.57;
 /// FAO-56 reference-crop albedo (net shortwave Rns = (1 − α)·Rs).
 const ALBEDO: f64 = 0.23;
 

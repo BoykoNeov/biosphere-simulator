@@ -1,0 +1,18 @@
+[package]
+name = "station"
+version = "0.1.0"
+edition = "2021"
+description = "Native Rust port of the frozen Python `station.*` cross-domain assembly (Phase 7, P7.5). The layer that imports both the siblings and the biosphere and owns all cross-domain wiring — no domain imports another."
+publish = false
+
+[lib]
+name = "station"
+path = "src/lib.rs"
+
+# Depends on `domains` (the four siblings + the biosphere) and the zero-dep `simcore`
+# engine. No third-party crates: the three station-owned param values arrive via a
+# Python-generated hex-float file (`src/station_params.txt`, read with include_str!),
+# NOT a YAML parser — the Step-3/4 Option-C precedent.
+[dependencies]
+simcore = { path = "../simcore" }
+domains = { path = "../domains" }

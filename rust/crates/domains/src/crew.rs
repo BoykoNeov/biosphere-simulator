@@ -96,8 +96,10 @@ pub const MISSION_SCENARIO: CrewScenario = CrewScenario {
 pub const MISSION_DAYS: u64 = 7;
 
 /// Split ingested food carbon into `(respired_co2, egested_feces)` (mol). Op-order
-/// mirrors Python `carbon_split`: `respired = f·food`, `feces = (1 − f)·food`.
-fn carbon_split(food_mol: f64, respired_carbon_fraction: f64) -> (f64, f64) {
+/// mirrors Python `carbon_split`: `respired = f·food`, `feces = (1 − f)·food`. Pub so the
+/// station-owned `CrewRespiration` reuses the SAME split (its Tier-1 bit-exactness
+/// depends on the identical op-order — never re-inline it).
+pub fn carbon_split(food_mol: f64, respired_carbon_fraction: f64) -> (f64, f64) {
     let respired = respired_carbon_fraction * food_mol;
     let feces = (1.0 - respired_carbon_fraction) * food_mol;
     (respired, feces)
@@ -172,6 +174,26 @@ pub struct WaterBalance {
     crew_humidity: String,
     urine: String,
     params: CrewParams,
+}
+
+impl WaterBalance {
+    /// Construct a `WaterBalance` with the given ids — the station re-points
+    /// `crew_humidity` at the cabin H₂O pool and `urine` at the recovery buffer.
+    pub fn new(
+        id: String,
+        water_store: String,
+        crew_humidity: String,
+        urine: String,
+        params: CrewParams,
+    ) -> Self {
+        WaterBalance {
+            id,
+            water_store,
+            crew_humidity,
+            urine,
+            params,
+        }
+    }
 }
 
 impl Flow for WaterBalance {

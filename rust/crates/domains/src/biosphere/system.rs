@@ -502,8 +502,17 @@ fn table_schedule(values: Vec<f64>) -> Schedule {
     Box::new(move |n, _dt| values[(n as usize).min(last)])
 }
 
-/// Build the forcing resolver, tiling the raw weather facts over `years`.
-pub fn weather_resolver(scenario: &SeasonScenario, years: usize) -> Result<SourceResolver, SimError> {
+/// The weather forcing table (per-var schedules), tiling the raw facts over `years`.
+///
+/// Factored out of [`weather_resolver`] so the station lighting / sealed seams can rebuild
+/// the resolver with `PAR`/`daylength` overridden by the lamp (a built `SourceResolver`'s
+/// `Box<dyn Fn>` schedules are not `Clone`, so they cannot be copied out of an existing
+/// resolver — the override must reconstruct the map). The Python analogue is the
+/// `dict(base.forcings)` copy; here we regenerate the same table.
+pub fn weather_forcings(
+    scenario: &SeasonScenario,
+    years: usize,
+) -> Result<HashMap<String, Schedule>, SimError> {
     let (latitude, rows) = super::weather::weather_facts();
     let f = super::weather::season_forcing(latitude, &rows, years);
     let mut forcings: HashMap<String, Schedule> = HashMap::new();
@@ -515,13 +524,24 @@ pub fn weather_resolver(scenario: &SeasonScenario, years: usize) -> Result<Sourc
     forcings.insert(CI_VAR.to_string(), constant(scenario.ci)?);
     forcings.insert(IRRIGATION_VAR.to_string(), constant(scenario.irrigation_mm_day)?);
     forcings.insert(FERTILIZATION_VAR.to_string(), constant(scenario.fertilization_kg_m2_day)?);
-    // shared (#16): soil_water always; the sealed chamber's co2_pool.
+    Ok(forcings)
+}
+
+/// The weather shared-stock map (#16): `soil_water` always; the sealed chamber's
+/// `co2_pool → CARBON_POOL`. Factored out alongside [`weather_forcings`] for the same
+/// resolver-rebuild reason.
+pub fn weather_shared(scenario: &SeasonScenario) -> HashMap<String, String> {
     let mut shared: HashMap<String, String> = HashMap::new();
     shared.insert(SOIL_WATER_VAR.to_string(), SOIL_WATER.to_string());
     if scenario.sealed {
         shared.insert(CO2_POOL_VAR.to_string(), CARBON_POOL.to_string());
     }
-    SourceResolver::new(forcings, shared)
+    shared
+}
+
+/// Build the forcing resolver, tiling the raw weather facts over `years`.
+pub fn weather_resolver(scenario: &SeasonScenario, years: usize) -> Result<SourceResolver, SimError> {
+    SourceResolver::new(weather_forcings(scenario, years)?, weather_shared(scenario))
 }
 
 /// The annual phenology reset / re-sow (P3.4) — a pure, carbon-conserving transform.

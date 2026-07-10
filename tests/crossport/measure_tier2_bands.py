@@ -238,8 +238,169 @@ def measured_biosphere_sensitivity() -> float:
     return worst
 
 
+# --------------------------------------------------------------------------- #
+# Step 5 (P7.5): the station Tier-2 bands                                       #
+# --------------------------------------------------------------------------- #
+# The six coupled Tier-2 station goldens split by which transcendentals their graph
+# executes (the same measured-not-derived discipline):
+#
+#   * station_state / sealed_energy_drift — Power→Thermal only (the half-sine
+#     `math.sin` + the Stefan-Boltzmann `t**4`), NO biosphere. Band 1e-12, the Step-3
+#     power/thermal margin; justified by the propagated 1-ULP sensitivity of the
+#     *coupled* 7-day run (below) — the 15-yr energy-drift run shares the exact same
+#     graph and its `T⁴` attractor only damps the perturbation further, so the 7-day
+#     measure bounds both.
+#   * greenhouse / lighting / harvest / sealed_station — a biosphere FvCB
+#     transcendental in the graph, so they share BIOSPHERE_BAND (1e-11), justified by a
+#     cheap 7-day greenhouse `canopy.exp` measurement (below) + the structural argument
+#     that the station regulators (scrubber/makeup) hold the shared gas pools at their
+#     setpoints between the once-daily biosphere lumps (Step-3 regulator-erasure), so a
+#     1-ULP nudge cannot amplify across master days. Measuring on the cheap 7-day
+#     greenhouse (NOT the 1.3M-substep sealed run) is the deliberate cost choice; the
+#     1e-11 band is the same one the 7 frozen biosphere goldens already carry, ~150x
+#     above the measured biosphere sensitivity.
+
+STATION_ENERGY_TIER2_KEYS = ("station_heat_closure", "sealed_energy_drift")
+STATION_BIOSPHERE_TIER2_KEYS = ("greenhouse", "lighting", "harvest", "sealed_station")
+
+
+def _station_final() -> list[float]:
+    from domains.power.loader import load_charge_params
+    from domains.thermal.loader import load_thermal_params
+    from station.scenario import HEAT_CLOSURE_DAYS, HEAT_CLOSURE_SCENARIO
+    from station.system import build_station, run_station, station_resolver
+
+    charge = load_charge_params()
+    thermal = load_thermal_params()
+    state, registry = build_station(charge, thermal, HEAT_CLOSURE_SCENARIO)
+    resolver = station_resolver(charge, HEAT_CLOSURE_SCENARIO)
+    steps = HEAT_CLOSURE_DAYS * HEAT_CLOSURE_SCENARIO.power.steps_per_day
+    states, _, _ = run_station(
+        EulerIntegrator(registry),
+        state,
+        resolver,
+        HEAT_CLOSURE_SCENARIO.power.dt_seconds,
+        steps,
+    )
+    return _amounts(states[-1])
+
+
+def measured_station_energy_sensitivity() -> float:
+    """Worst propagated 1-ULP sensitivity of the coupled Power→Thermal 7-day run.
+
+    Perturbs the half-sine ``math.sin`` (``power.system``) and the Stefan-Boltzmann
+    ``t**4`` (``thermal.flows.radiated_power``) one ULP each and re-runs the *coupled*
+    station; the worse of the two propagated deviations is the floor the station_state
+    / sealed_energy_drift band (1e-12) must sit above. Both module references are
+    restored in ``finally``.
+    """
+    import domains.power.system as psys
+    import domains.thermal.flows as tflows
+    from domains.thermal.flows import STEFAN_BOLTZMANN, temperature
+
+    base = _station_final()
+    worst = 0.0
+    # (1) the half-sine sin.
+    original_math = psys.math
+    for up in (True, False):
+        try:
+            psys.math = types.SimpleNamespace(
+                pi=math.pi, sin=lambda x, _up=up: _nudge(math.sin(x), _up)
+            )
+            worst = max(
+                worst, max_abs_relative_deviation(base, _station_final(), floor=FLOOR)
+            )
+        finally:
+            psys.math = original_math
+    # (2) the Stefan-Boltzmann t**4.
+    original_rp = tflows.radiated_power
+    for up in (True, False):
+
+        def perturbed_radiated_power(node_joules, *, params, _up=up):
+            t = temperature(
+                node_joules,
+                heat_capacity=params.heat_capacity,
+                space_temperature=params.space_temperature,
+            )
+            t4 = _nudge(t**4, _up)
+            return (
+                params.emissivity
+                * STEFAN_BOLTZMANN
+                * params.radiator_area
+                * (t4 - params.space_temperature**4)
+            )
+
+        try:
+            tflows.radiated_power = perturbed_radiated_power
+            worst = max(
+                worst, max_abs_relative_deviation(base, _station_final(), floor=FLOOR)
+            )
+        finally:
+            tflows.radiated_power = original_rp
+    return worst
+
+
+def _greenhouse_final() -> list[float]:
+    from domains.crew.loader import load_crew_params
+    from domains.eclss.loader import load_eclss_params
+    from station.greenhouse import (
+        build_greenhouse,
+        greenhouse_bio_resolver,
+        greenhouse_cabin_resolver,
+        run_greenhouse,
+    )
+    from station.scenario import GREENHOUSE_SCENARIO
+
+    crew = load_crew_params()
+    eclss = load_eclss_params()
+    weather = _weather()
+    state, bio_reg, cabin_reg = build_greenhouse(
+        crew, eclss, GREENHOUSE_SCENARIO, with_plants=True
+    )
+    states, _, _ = run_greenhouse(
+        EulerIntegrator(bio_reg),
+        EulerIntegrator(cabin_reg),
+        state,
+        greenhouse_bio_resolver(weather, GREENHOUSE_SCENARIO),
+        greenhouse_cabin_resolver(GREENHOUSE_SCENARIO),
+        GREENHOUSE_SCENARIO,
+    )
+    return _amounts(states[-1])
+
+
+def measured_greenhouse_sensitivity() -> float:
+    """Propagated 1-ULP ``canopy.exp`` sensitivity of the 7-day greenhouse.
+
+    The representative biosphere-coupled measurement — cheap (a 7-day two-rate run), the
+    deliberate choice over sweeping the 1.3M-sub-step sealed run. Only
+    ``domains.biosphere.canopy``'s ``math`` reference is shimmed (restored in
+    ``finally``).
+    """
+    import domains.biosphere.canopy as canopy
+
+    base = _greenhouse_final()
+    worst = 0.0
+    original = canopy.math
+    for up in (True, False):
+        try:
+            canopy.math = types.SimpleNamespace(
+                exp=lambda x, _up=up: _nudge(math.exp(x), _up)
+            )
+            worst = max(
+                worst,
+                max_abs_relative_deviation(base, _greenhouse_final(), floor=FLOOR),
+            )
+        finally:
+            canopy.math = original
+    return worst
+
+
 if __name__ == "__main__":
     for k in STEP3_TIER2_KEYS:
-        print(f"{k:24s} sensitivity = {measured_sensitivity(k):.6e}")
+        print(f"{k:28s} sensitivity = {measured_sensitivity(k):.6e}")
     bio = measured_biosphere_sensitivity()
-    print(f"{'biosphere (canopy.exp)':24s} sensitivity = {bio:.6e}")
+    print(f"{'biosphere (canopy.exp)':28s} sensitivity = {bio:.6e}")
+    station = measured_station_energy_sensitivity()
+    print(f"{'station (sin+t**4)':28s} sensitivity = {station:.6e}")
+    greenhouse = measured_greenhouse_sensitivity()
+    print(f"{'greenhouse (canopy.exp)':28s} sensitivity = {greenhouse:.6e}")

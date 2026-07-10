@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/simcore", "crates/domains"]
+members = ["crates/simcore", "crates/domains", "crates/station"]
 
 # Phase 7 native port of the frozen Python reference. The Rust crate tree mirrors
 # the Python package layout (`simcore` first; `domains` joins in Step 3 when it

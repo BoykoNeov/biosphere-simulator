@@ -783,8 +783,41 @@ all 7 `tiers.json` bands filled 1e-11/1e-12, slow-marked re-measurement gate ass
 **Parity gate LOCAL-ONLY** (`skipif cargo`): 6 state cases + drift + 2 in-sync gates + slow band gate;
 Rust `cargo test` gains 4 biosphere integration tests. **`git diff src/` empty** + zero domain-code
 change; `cargo test`+`clippy -D warnings` green; full Python suite incl. `-m slow`+ruff+pyright green;
-**all 20 frozen goldens byte-identical** (no regen). **Next: Step 5 (P7.5) — port the station
-assembly; validate the 8 station/coupled goldens.**
+**all 20 frozen goldens byte-identical** (no regen).
+**Step 5 (P7.5) COMPLETE — the WHOLE station assembly ported (new `rust/crates/station`); all 8
+coupled goldens pass their tier, every one BIT-EXACT locally (`max_rel_dev == 0.0`), incl. the two
+Tier-1 (`cabin_gas`/`water_recovery`) the engine now *computes***: new crate (deps `domains` +
+zero-dep `simcore`) mirroring the Python `station/` layout — `flows` (the 4 seams + param structs),
+`params` (3 station-owned coeffs from a generated hex-float file), `scenario`, `stocks` (shared
+composition gas-pool builders), `driver` (`run_master_day`), `system` (Power→Thermal), `cabin`,
+`water`, `greenhouse`, `lighting`, `harvest`, `sealed`. Every `evaluate`/builder mirrors the Python
+arithmetic + stock/leg construction order char-for-char; **`CrewRespiration` REUSES
+`domains::crew::carbon_split`** (made `pub`) so its Tier-1 bit-exactness rides the identical split
+op-order. **The re-pointed sibling flows got `pub fn new(...)` constructors** (SolarCharge/LoadDraw/
+RadiatorReject/CO2Scrubber/Condenser/O2Makeup/WaterBalance — additive under `rust/`, so the Step-3
+sibling goldens stay byte-identical; the seams are *which id each flow points at*).
+**`equilibrium_temperature` ported op-for-op** (`**0.25`/`**4` → `.powf`; absent from the Rust
+surface) so `node0`/`sealed_node_heat` start the coupled run at the identical dissipation-set
+equilibrium. **The Tier-0 primary gate (advisor): the two-rate driver's per-sub-step
+`assert_conserved_default`** — `substep` skips the ledger gate, so `run_master_day` re-asserts after
+EVERY fast sub-step + across each `slow_reset`; the sealed Tier-2 run completing (~1.3 M sub-steps,
+~53 s release, 3 annual re-sows via the ported `slow_reset` hook) IS the proof the five-domain
+combined ledger balanced every sub-step. **Resolver override can't clone (advisor): `Box<dyn Fn>`
+schedules aren't `Clone`** → refactored `weather_resolver` into `weather_forcings`+`weather_shared`;
+lighting/sealed rebuild the table + insert the lamp's PAR/daylength overrides (the Python
+`dict(base.forcings)` analogue). **Bands MEASURED not derived**: `station_state`/`sealed_energy_drift`
+(Power→Thermal `sin`+`T⁴`) → **1e-12** (measured ±1-ULP `sin`+`t**4` sensitivity 5.2e-15); the four
+biosphere-coupled (`greenhouse`/`lighting`/`harvest`/`sealed_station`) → **BIOSPHERE_BAND 1e-11**
+(a cheap 7-day greenhouse `canopy.exp` measurement 2.7e-15 + the regulator-erasure/period-1
+argument — NOT a ±1-ULP sweep of the 1.3 M-substep run). **Drift summary Python-side (advisor #3)**:
+`emit_sealed_energy_drift` emits only the raw 15-yr node-heat series; `_fold_energy_drift_summary`
+folds temp/year-peaks/`is_stationary` — matches the golden's `node_peak_temp_k` (Tier-2) AND the
+period-1 `is_stationary` signature EXACTLY (Tier-0). Parity gate LOCAL-ONLY (`skipif cargo`): 6 fast
+station State cases + 2 slow sealed cases (release) + 2 band guards + `test_station_params_in_sync`.
+**`git diff src/` empty** + zero core / zero domain-code change; `cargo test`+`clippy -D warnings`
+green; full Python suite incl. `-m slow`+ruff+pyright green; **all 20 frozen goldens byte-identical**
+(no regen). **Next: Step 6 (P7.6) — wire the 20-golden parity suite into CI + write
+`docs/native-port-reference.md` → Phase 7 EXITS → Phase 8 (Godot).**
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

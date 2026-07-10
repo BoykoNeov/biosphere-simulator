@@ -1,0 +1,14 @@
+# Cross-port station params (Phase-7 Step 5, P7.5) — GENERATED, do not edit.
+# Source of truth: the frozen Python station loaders (station.loader). Each
+# value passes through the actual pydantic schema + unit guard + bound check,
+# then is emitted as a C99 hex-float; the Rust crate reads this file via
+# include_str! (src/params.rs) — no YAML parser. Decimal params round-trip
+# bit-identically across correct-rounding parsers, so these hex-floats pin
+# the loader-produced bits exactly.
+# Regenerate: uv run python tests/crossport/gen_station_params.py
+#
+# name	hexfloat
+recovery_rate	0x1.0624dd2f1a9fcp-10
+recovery_efficiency	0x1.ccccccccccccdp-1
+photon_efficacy	0x1.4000000000000p+1
+harvest_rate	0x1.4f8b588e368f1p-17

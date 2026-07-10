@@ -116,6 +116,27 @@ pub struct SolarCharge {
     params: ChargeParams,
 }
 
+impl SolarCharge {
+    /// Construct a `SolarCharge` with the given ids — the station re-points `waste_heat`
+    /// at `thermal.node` (the Step-1 inward heat seam); standalone Power builds it with
+    /// `waste_heat = WASTE_HEAT` internally.
+    pub fn new(
+        id: String,
+        solar_source: String,
+        battery: String,
+        waste_heat: String,
+        params: ChargeParams,
+    ) -> Self {
+        SolarCharge {
+            id,
+            solar_source,
+            battery,
+            waste_heat,
+            params,
+        }
+    }
+}
+
 impl Flow for SolarCharge {
     fn id(&self) -> &str {
         &self.id
@@ -141,6 +162,18 @@ pub struct LoadDraw {
     id: String,
     battery: String,
     waste_heat: String,
+}
+
+impl LoadDraw {
+    /// Construct a `LoadDraw` with the given ids — the station re-points `waste_heat` at
+    /// `thermal.node` (the Step-1 inward heat seam).
+    pub fn new(id: String, battery: String, waste_heat: String) -> Self {
+        LoadDraw {
+            id,
+            battery,
+            waste_heat,
+        }
+    }
 }
 
 impl Flow for LoadDraw {
@@ -192,7 +225,7 @@ impl Flow for SelfDischarge {
 }
 
 /// The stored-electrical-energy POOL `power.battery` (ENERGY, J).
-fn battery_stock(amount: f64) -> Result<Stock, SimError> {
+pub fn battery_stock(amount: f64) -> Result<Stock, SimError> {
     Stock::new(
         BATTERY.to_string(),
         POWER_DOMAIN.to_string(),

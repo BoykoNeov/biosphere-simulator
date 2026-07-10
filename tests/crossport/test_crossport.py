@@ -43,6 +43,7 @@ import gen_biosphere_weather  # noqa: E402
 import gen_engine_vectors  # noqa: E402
 import gen_rng_vectors  # noqa: E402
 import gen_sibling_params  # noqa: E402
+import gen_station_params  # noqa: E402
 import gen_vectors  # noqa: E402
 import measure_tier2_bands  # noqa: E402
 
@@ -612,6 +613,189 @@ def test_biosphere_tier2_band_sits_above_measured_sensitivity() -> None:
         band = entry["band"]
         assert band == measure_tier2_bands.BIOSPHERE_BAND, (
             f"{key}: band {band!r} != the shared BIOSPHERE_BAND"
+        )
+        assert sensitivity < band, (
+            f"{key}: 1-ULP sensitivity {sensitivity:.3e} not below band {band:.3e}"
+        )
+        assert band <= 1e-9, f"{key}: band {band:.3e} too loose to catch a port defect"
+
+
+# --------------------------------------------------------------------------- #
+# 3d. Step-5 (P7.5): the ported station assemblies match their tier            #
+# --------------------------------------------------------------------------- #
+
+RUST_WORKSPACE_DIR = REPO_ROOT / "rust"
+
+# (example binary, golden filename, tiers.json key). The 6 fast station State goldens:
+# cabin_gas / water_recovery Tier-1 bit-exact (transcendental-free, cabin-only);
+# station / greenhouse / lighting / harvest Tier-2 (sin+T^4 or FvCB in the graph). The
+# ~1.3M-substep sealed_station and the 15-yr energy drift are separate slow tests below.
+_STATION_STATE_CASES = [
+    ("emit_cabin_gas", "cabin_gas_state.json", "cabin_gas"),
+    ("emit_water_recovery", "water_recovery_state.json", "water_recovery"),
+    ("emit_station", "station_state.json", "station_heat_closure"),
+    ("emit_greenhouse", "greenhouse_state.json", "greenhouse"),
+    ("emit_lighting", "lighting_state.json", "lighting"),
+    ("emit_harvest", "harvest_state.json", "harvest"),
+]
+
+
+def _run_station_example(example: str, *, release: bool = False) -> str:
+    """Run a Rust `station` emit example from the workspace; return its stdout."""
+    cmd = ["cargo", "run", "-q"]
+    if release:
+        cmd.append("--release")
+    cmd += ["-p", "station", "--example", example]
+    proc = subprocess.run(cmd, cwd=RUST_WORKSPACE_DIR, capture_output=True, text=True)
+    assert proc.returncode == 0, f"cargo run {example} failed:\n{proc.stderr}"
+    return proc.stdout
+
+
+def _station_entry(key: str) -> dict:
+    return {g["key"]: g for g in _tiers()}[key]
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+@pytest.mark.parametrize("example,golden,key", _STATION_STATE_CASES)
+def test_rust_station_states_match_their_tier(
+    example: str, golden: str, key: str
+) -> None:
+    """Run each ported station assembly (`build_*` + the single- or two-rate runner in
+    the Rust `station` crate) and compare its final `State` to the frozen golden at its
+    assigned tier: **cabin_gas / water_recovery Tier-1 bit-exact** (transcendental-free
+    — the real proof the engine computes the frozen coupled values); **station /
+    greenhouse / lighting / harvest Tier-2** within the measured `tiers.json` band.
+    Compared on parsed f64 (via `sim_io.loads`), never JSON bytes.
+
+    LOCAL-ONLY (`skipif cargo` + no Rust in the Python CI job) — the Step-0/3/4
+    precedent. The two-rate goldens' Tier-0 conservation gate (every sub-step, in Rust)
+    fired inside the driver during the emit run — a completed run is itself the proof.
+    """
+    candidate = json.loads(_run_station_example(example))
+    snapshot.loads(json.dumps(candidate))  # validate it is a well-formed snapshot
+    reference = compare.load_json(GOLDEN_DIR / golden)
+    entry = _station_entry(key)
+    tier = entry["float_tier"]
+    if tier == compare.TIER_1_BIT_EXACT:
+        result = compare.compare(reference, candidate, tier=tier)
+    else:
+        result = compare.compare(
+            reference, candidate, tier=tier, band=entry["band"], floor=entry["floor"]
+        )
+    assert result.ok, f"{example} vs {golden} (tier {tier}):\n{result.report()}"
+    assert result.numeric_pairs, "expected numeric leaves to be compared"
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_rust_sealed_station_matches_tier2() -> None:
+    """The ~1.3 M-sub-step sealed-station run (release build, ~1 min) reproduces
+    `sealed_station_state.json` at Tier 2. Its real payload is the per-sub-step
+    conservation assert inside the two-rate driver (the Tier-0 gate): a completed run is
+    itself proof the five-domain ledger balanced every sub-step over the run."""
+    candidate = json.loads(_run_station_example("emit_sealed_station", release=True))
+    snapshot.loads(json.dumps(candidate))
+    reference = compare.load_json(GOLDEN_DIR / "sealed_station_state.json")
+    entry = _station_entry("sealed_station")
+    result = compare.compare(
+        reference, candidate, tier=2, band=entry["band"], floor=entry["floor"]
+    )
+    assert result.ok, f"sealed_station:\n{result.report()}"
+    assert result.numeric_pairs
+
+
+def _fold_energy_drift_summary(raw: dict) -> dict:
+    """Fold the Rust raw per-step node-heat series into the drift-summary
+    shape, Python-side (advisor #3 — all of `drift.py` stays Python-side). Rust emits
+    only the raw `thermal.node` heat trajectory; here we apply `temp = space_temp +
+    node/C`, the per-year peak segmentation (`year_summaries`' `[y*year:(y+1)*year+1]`
+    slice), and the `is_stationary` classifier — no segmentation logic lives in Rust."""
+    from domains.biosphere.drift import is_stationary, same_phase_diffs
+    from domains.thermal.loader import load_thermal_params
+    from station.scenario import SEALED_STATION_SEASON_DAYS
+
+    thermal = load_thermal_params()
+    node = [float.fromhex(h) for h in raw["node_heat"]]
+    temps = [thermal.space_temperature + q / thermal.heat_capacity for q in node]
+    year = raw["steps_per_day"] * SEALED_STATION_SEASON_DAYS
+    n = (len(temps) - 1) // year
+    peaks = [max(temps[y * year : (y + 1) * year + 1]) for y in range(n)]
+    return {
+        "horizon_years": raw["horizon_years"],
+        "node_peak_temp_k": [v.hex() for v in peaks],
+        "is_stationary": is_stationary(
+            same_phase_diffs(peaks, period=1), bound=0.1, slope_tol=1e-3
+        ),
+    }
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_rust_sealed_energy_drift_summary_matches() -> None:
+    """The Rust 15-yr Power→Thermal run reproduces the `sealed_energy_drift_summary`
+    golden: the per-year `node_peak_temp_k` vector within the station Tier-2 band,
+    and the `is_stationary` signature (the node's period-1 fixed point) EXACTLY
+    (Tier 0 — a flipped classification is a real port bug). Rust emits only the raw
+    per-step node-heat series; `_fold_energy_drift_summary` folds it Python-side."""
+    raw = json.loads(_run_station_example("emit_sealed_energy_drift", release=True))
+    derived = _fold_energy_drift_summary(raw)
+    golden = compare.load_json(GOLDEN_DIR / "sealed_energy_drift_summary.json")
+    entry = _station_entry("sealed_energy_drift")
+    result = compare.compare(
+        golden, derived, tier=2, band=entry["band"], floor=entry["floor"]
+    )
+    assert result.ok, f"sealed_energy_drift parity:\n{result.report()}"
+    # Tier-0: the stability signature is a classification — exact, the headline result.
+    assert derived["is_stationary"] is True, "the node must be a period-1 fixed point"
+
+
+def test_station_params_in_sync() -> None:
+    """The committed station-param file equals `gen_station_params.render()` (Step 5,
+    P7.5 — the Rust `station` crate `include_str!`s it to get the 3 station-owned
+    coefficients as hex-floats). Same rationale as the sibling params: the frozen
+    station loaders ground the values, and decimals round-trip bit-exactly."""
+    on_disk = gen_station_params.PARAMS_PATH.read_text(encoding="utf-8").replace(
+        "\r\n", "\n"
+    )
+    assert on_disk == gen_station_params.render(), (
+        "station params are stale — regenerate with "
+        "`uv run python tests/crossport/gen_station_params.py`"
+    )
+
+
+def test_station_energy_tier2_bands_sit_above_measured_sensitivity() -> None:
+    """The station_state / sealed_energy_drift bands (1e-12, Power→Thermal only) sit
+    above the freshly re-measured ±1-ULP sin+t**4 sensitivity of the coupled 7-day run —
+    the measured, never-derived provenance. Pure Python (no cargo), CI-fast (a 7-day
+    single-rate run), like the Step-3 band test; pins the band tight (<= 1e-9)."""
+    by_key = {g["key"]: g for g in _tiers()}
+    sensitivity = measure_tier2_bands.measured_station_energy_sensitivity()
+    for key in measure_tier2_bands.STATION_ENERGY_TIER2_KEYS:
+        entry = by_key[key]
+        assert entry["float_tier"] == 2, key
+        band = entry["band"]
+        assert band == 1e-12, f"{key}: band {band!r} != 1e-12"
+        assert sensitivity < band, (
+            f"{key}: 1-ULP sensitivity {sensitivity:.3e} not below band {band:.3e}"
+        )
+        assert band <= 1e-9, f"{key}: band {band:.3e} too loose to catch a port defect"
+
+
+@pytest.mark.slow
+def test_station_biosphere_tier2_bands_sit_above_measured_sensitivity() -> None:
+    """The four biosphere-coupled station bands (greenhouse / lighting / harvest /
+    sealed_station) share BIOSPHERE_BAND (1e-11), justified by the 7-day greenhouse
+    `canopy.exp` measurement (NOT a sweep of the 1.3M-substep sealed run — the
+    deliberate cost choice) + the regulator-erasure argument. Marked
+    `-m slow` (the 7-day greenhouse FvCB run); pins the band tight (<= 1e-9)."""
+    by_key = {g["key"]: g for g in _tiers()}
+    sensitivity = measure_tier2_bands.measured_greenhouse_sensitivity()
+    for key in measure_tier2_bands.STATION_BIOSPHERE_TIER2_KEYS:
+        entry = by_key[key]
+        assert entry["float_tier"] == 2, key
+        band = entry["band"]
+        assert band == measure_tier2_bands.BIOSPHERE_BAND, (
+            f"{key}: band {band!r} != BIOSPHERE_BAND"
         )
         assert sensitivity < band, (
             f"{key}: 1-ULP sensitivity {sensitivity:.3e} not below band {band:.3e}"

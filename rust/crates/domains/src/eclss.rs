@@ -171,6 +171,19 @@ pub struct CO2Scrubber {
     params: EclssParams,
 }
 
+impl CO2Scrubber {
+    /// Construct a `CO2Scrubber` with the given ids — the station re-points `cabin_co2` at
+    /// the shared cabin/biosphere CO₂ pool (the reverse greenhouse seam).
+    pub fn new(id: String, cabin_co2: String, co2_removed: String, params: EclssParams) -> Self {
+        CO2Scrubber {
+            id,
+            cabin_co2,
+            co2_removed,
+            params,
+        }
+    }
+}
+
 impl Flow for CO2Scrubber {
     fn id(&self) -> &str {
         &self.id
@@ -201,6 +214,24 @@ pub struct Condenser {
     params: EclssParams,
 }
 
+impl Condenser {
+    /// Construct a `Condenser` with the given ids — the station re-points
+    /// `humidity_condensate` at the `recovered_water` buffer (the Step-4 water seam).
+    pub fn new(
+        id: String,
+        cabin_h2o: String,
+        humidity_condensate: String,
+        params: EclssParams,
+    ) -> Self {
+        Condenser {
+            id,
+            cabin_h2o,
+            humidity_condensate,
+            params,
+        }
+    }
+}
+
 impl Flow for Condenser {
     fn id(&self) -> &str {
         &self.id
@@ -228,6 +259,19 @@ pub struct O2Makeup {
     o2_supply: String,
     cabin_o2: String,
     params: EclssParams,
+}
+
+impl O2Makeup {
+    /// Construct an `O2Makeup` with the given ids — the station re-points `cabin_o2` at
+    /// the shared cabin/biosphere O₂ pool (the reverse greenhouse seam).
+    pub fn new(id: String, o2_supply: String, cabin_o2: String, params: EclssParams) -> Self {
+        O2Makeup {
+            id,
+            o2_supply,
+            cabin_o2,
+            params,
+        }
+    }
 }
 
 impl Flow for O2Makeup {

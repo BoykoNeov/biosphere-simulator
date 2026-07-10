@@ -12,3 +12,11 @@ dependencies = [
 [[package]]
 name = "simcore"
 version = "0.1.0"
+
+[[package]]
+name = "station"
+version = "0.1.0"
+dependencies = [
+ "domains",
+ "simcore",
+]
