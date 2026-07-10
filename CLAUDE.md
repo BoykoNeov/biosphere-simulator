@@ -882,6 +882,54 @@ introduced here). **Zero core + zero domain-code change** (`git diff src/` empty
 `rust/crates/station/`); `cargo test` + `clippy -D warnings` green; **all 20 frozen goldens byte-identical**
 (no regen). Next: Step 1 (the `gdext` binding crate + minimal Godot vertical slice + the first
 cross-boundary parity smoke).
+**Step 1 (P8.1) COMPLETE — the GDExtension binding crate + minimal Godot vertical slice + the FIRST
+genuine cross-boundary parity smoke (the FFI boundary proven end-to-end)**: new additive
+`rust/crates/godot_bridge` (cdylib; **the ONLY crate that depends on `gdext`** — the Phase-8 purity
+invariant, analogue of Phase-7's `git diff src/` empty) wrapping the Step-0 `station::session::SimSession`.
+**gdext↔Godot resolved EMPIRICALLY, not pinned from memory** (advisor #1): `cargo add godot` → `0.5.4`,
+whose `cargo info` shows an `api-4-7` feature and defaults to the latest bundled API; the installed
+Godot is **4.7.stable** — and the load log confirms forward-compat works (`Initialize godot-rust (API
+v4.6.stable, runtime v4.7.stable)`), so **NO `api-custom` `--dump-extension-api` fallback needed**.
+Single-precision Godot is fine (GDScript `float` is 64-bit ⇒ `f64` returns bit-preserved; the
+`double-precision` feature is about `real_t`/vectors, not plain `f64`), **verified via the smoke, not
+just reasoned**. The Godot class `SimSession` (registered name; Rust type aliases the core session as
+`CoreSession` to avoid shadowing) exposes `build(scenario_id)` / `step()` / `step_n(k)` / `step_count()`
+/ `total_rationed()` / `stock_amount(id)->f64` (the Label readout) **+ two beyond a naive getter
+(advisor)**: (1) **`snapshot_json()->GString`** returns the **Rust-side** `sim_io` hex-float JSON
+(`from_engine(state).to_json()`), so ALL float→string formatting stays inside the cdylib and the
+bit-exact claim is never hostage to GDScript's float printing; (2) **`mxcsr()`/`fp_clean()`** read the
+x86 **MXCSR** (inline-asm `stmxcsr`, NOT the clippy-`-D warnings`-tripping deprecated `_mm_getcsr`) **on
+the stepping thread** — FTZ (bit 15, `0x8000`) + DAZ (bit 6, `0x0040`) asserted OFF (the direct check
+the bit-exact smoke ALONE cannot make: `cabin_gas` may never produce a denormal, so a passing snapshot
+doesn't by itself prove flush-to-zero is off). Testable logic (`build_session`, `fp_flags_clean`,
+`read_mxcsr`) lives in plain free functions ⇒ **4 crate unit tests** run under `cargo test` with no
+Godot runtime. **Minimal Godot project in `godot/`** (a subdir, NOT repo root, so Godot's importer never
+scans `rust/target`/the Python tree/docs — only this small project): `project.godot` + `simcore.gdextension`
+(entry `gdext_rust_init`, libs at `res://../rust/target/{debug,release}/…` the canonical gdext
+sibling-project layout) + `main.tscn`/`main.gd` (the "one live value renders in a Label" slice — one
+`step()`/frame, the game loop OWNS the loop) + `smoke.gd` (the headless SceneTree parity driver).
+**The load-bearing cross-boundary smoke** (`tests/crossport/test_godot_parity.py`, **local-only**
+`skipif godot||cargo absent` — CI installs neither, the Rust-vs-Python `test_crossport.py` precedent):
+`godot --headless --path godot --script res://smoke.gd` drives Tier-1 `cabin_gas` (transcendental-free ⇒
+bit-exact any platform) through the **actual cdylib Godot loads**, emits a stdout-marker JSON report, and
+the Python comparator asserts **(a)** the Godot snapshot == headless `emit_cabin_gas` byte-for-byte
+(pure-Rust `to_json` both sides, no formatting confound — the direct FFI-didn't-corrupt-determinism
+proof), **(b)** Tier-1 bit-exact vs the frozen `cabin_gas_state.json` (reusing `compare.compare(tier=1)`),
+**(c)** `fp_clean` (measured `mxcsr=0x1FA0` = default masks + benign precision flag; FTZ/DAZ both 0),
+**(d)** Tier-0 `rationed==0`/`step_count==900`. **A fresh checkout needs one `godot --import` pass** to
+write `.godot/extension_list.cfg` before `--script` sees the class (the test does it idempotently). The
+live-Label render was positively verified headless through the real engine frame loop (`cabin_gas n=…,
+eclss.cabin_o2 = 9.240222 mol, fp_clean = true`); on-screen **pixels** need a display server (user GUI
+run / MCP screenshot — the interactive clause, the MCP is NOT needed for the load-bearing smoke, advisor).
+Godot cache `godot/.godot/` gitignored; `.uid` files committed (Godot best practice); the staged
+third-party MCP addon `addons/` gitignored (external tooling, prebuilt binaries, not referenced by the
+`godot/` project). **Zero core + zero domain change** + **zero engine-crate change** (`git diff src/`
+empty; `simcore`/`domains`/`station` untouched — the binding *wraps* the session, never modifies it; all
+new code under `rust/crates/godot_bridge/`, `godot/`, `tests/crossport/`); workspace `cargo test` +
+`clippy --all-targets -D warnings` green (gdext builds into the workspace with no Godot/LLVM present),
+whole-project ruff+format+pyright green, the Godot parity test passes; **all 20 frozen goldens
+byte-identical** (no regen — Phase 8 changes no science). Next: Step 2 (the display projection — revive
+`observation`).
 Roadmap `roadmap_extracted.txt`. Reuse/licensing rules: `docs/reuse-and-licenses.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)

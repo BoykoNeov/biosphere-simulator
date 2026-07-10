@@ -1,0 +1,17 @@
+; Phase-8 (P8.1) minimal Godot project — the vertical slice that loads the
+; `godot_bridge` GDExtension and drives the frozen Rust core. Kept in a `godot/`
+; subdir (not repo root) so Godot's resource importer never scans `rust/target`,
+; the Python tree, or the docs — only this small project. The load-bearing
+; cross-boundary parity smoke (`smoke.gd`) needs no editor and no MCP.
+
+config_version=5
+
+[application]
+
+config/name="Biosphere Station — Phase 8 slice"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7")
+
+[native_extensions]
+
+paths=PackedStringArray("res://simcore.gdextension")

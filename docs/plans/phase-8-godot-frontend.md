@@ -1,6 +1,6 @@
 # Phase 8 — Godot Front-End (the sim becomes visible)
 
-**Status: IN PROGRESS — Step 0 COMPLETE.** This is the plan of record for
+**Status: IN PROGRESS — Steps 0–1 COMPLETE.** This is the plan of record for
 putting a **Godot front-end** on top of the **frozen** native Rust core (Phase 7). Pre-plan
 orientation complete and advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED**
 (see "Confirmed scope decisions"). Steps 0–1 are designed concretely here; Steps 2–8 get
@@ -162,10 +162,33 @@ session) and the parity gate that makes the exit criterion true. **What landed**
   The genuine `gdext`-cdylib-vs-headless parity (FTZ/DAZ FP-env) is Step 1's smoke + Step 8's gate,
   as designed above.
 
-### Step 1 (P8.1) — the GDExtension binding crate + minimal Godot vertical slice
+### Step 1 (P8.1) — the GDExtension binding crate + minimal Godot vertical slice — **COMPLETE**
 
 The riskiest *toolchain* thing (the FFI boundary) on the smallest surface — can't design around a
-remembered `gdext`↔Godot version; prove it end-to-end:
+remembered `gdext`↔Godot version; prove it end-to-end. **What landed** (all additive under
+`rust/crates/godot_bridge/`, `godot/`, `tests/crossport/`; `git diff src/` empty; engine crates
+untouched; 20 frozen goldens byte-identical):
+
+- **gdext↔Godot resolved empirically:** `godot = "0.5.4"` (has an `api-4-7` feature, defaults to the
+  latest bundled API); installed Godot is **4.7.stable**. The load log confirms forward-compat
+  (`API v4.6 → runtime v4.7`), so **no `api-custom` fallback**. Single-precision Godot is fine (`f64`
+  returns are bit-preserved) — verified by the smoke, not just reasoned.
+- **`rust/crates/godot_bridge`** (cdylib, the *only* gdext-dependent crate) wraps the Step-0 session as
+  a `SimSession` GDExtension class: `build` / `step` / `step_n` / `step_count` / `total_rationed` /
+  `stock_amount` **+ `snapshot_json()`** (Rust-side hex-float JSON — the parity path never leaves the
+  golden codec) **+ `mxcsr()`/`fp_clean()`** (inline-asm `stmxcsr`, FTZ/DAZ read on the stepping
+  thread). 4 crate unit tests (free-function core, no Godot runtime).
+- **`godot/` project** (subdir, not repo root — keeps the importer off `rust/target`/Python/docs):
+  `project.godot` + `simcore.gdextension` + `main.tscn`/`main.gd` (the live-Label slice) + `smoke.gd`.
+- **The cross-boundary smoke** (`tests/crossport/test_godot_parity.py`, local-only `skipif
+  godot||cargo`): drives Tier-1 `cabin_gas` through the *actual cdylib* and asserts the snapshot is
+  bit-exact vs headless `emit_cabin_gas` **and** vs the frozen golden, `fp_clean` (FTZ/DAZ off,
+  measured `mxcsr=0x1FA0`), and `rationed==0`/`step_count==900`. The Step-8 gating version promotes it.
+- **Live-Label render** positively verified headless through the real frame loop
+  (`eclss.cabin_o2 = 9.240222 mol`); on-screen pixels are the interactive (user-GUI / MCP) clause —
+  the MCP is **not** needed for the load-bearing smoke (advisor).
+
+Original design notes (kept for provenance):
 
 - New additive `rust/crates/godot_bridge` (depends on `station` + `gdext`; **no gdext types leak
   into the engine crates**). A `SimSession` GDExtension class wrapping the Step-0 session:

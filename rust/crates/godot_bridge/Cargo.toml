@@ -1,0 +1,30 @@
+[package]
+name = "godot_bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Phase-8 (P8.1) GDExtension binding: the ONLY crate that depends on `gdext`. Wraps the frozen station `SimSession` so Godot's game loop can drive the sim one step at a time. No gdext type ever leaks into the engine crates (`simcore`/`domains`/`station`) — the Phase-8 purity invariant, the analogue of Phase-7's `git diff src/` empty."
+publish = false
+
+# A GDExtension library is a C-ABI dynamic library Godot dlopen's at load time and
+# calls the exported `gdext_rust_init` entry symbol of. Hence `cdylib` (not the
+# default `rlib`); the engine resolves the extension's callbacks at load, so the
+# .dll/.so builds standalone with NO Godot present (CI builds it without a Godot
+# binary).
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# gdext (godot-rust) 0.5.4 bundles Godot API levels through `api-4-7` and defaults to
+# the latest (4.7) — matching the installed Godot 4.7.stable. Resolved EMPIRICALLY
+# (`cargo add godot` + `cargo info godot` showed the `api-4-7` feature), NOT pinned
+# from memory, per the plan's "prove the toolchain end-to-end" charge. The default
+# api needs no `godot --dump-extension-api` (the `api-custom` fallback) and no LLVM,
+# so it builds on the Linux CI runner unchanged.
+godot = "0.5.4"
+
+# The frozen native core. `station` re-exports the two-rate driver + the four sibling
+# / biosphere assemblies; `simcore` gives the integrator + the `snapshot` codec the
+# bit-exact parity smoke reuses; `domains` gives the clean-room param sets.
+station = { path = "../station" }
+simcore = { path = "../simcore" }
+domains = { path = "../domains" }

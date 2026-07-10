@@ -31,3 +31,10 @@ Thumbs.db
 
 # Extracted/working artifacts
 roadmap_extracted.txt
+
+# Godot front-end (Phase 8). The project lives in `godot/`; `.godot/` is the
+# generated import/cache dir (never committed). The `.uid` files ARE committed
+# (stable resource identifiers, Godot best practice). `addons/` is the staged
+# third-party MCP plugin (prebuilt binaries, external tooling) — kept out of the repo.
+godot/.godot/
+addons/
