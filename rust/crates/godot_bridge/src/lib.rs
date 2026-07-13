@@ -42,6 +42,7 @@ use simcore::error::SimError;
 use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
 
+use station::builder::{assemble, BuildContext, Component};
 use station::display::{project, BatteryReadout, DisplayContext, ThermalReadout};
 use station::perturbations::{
     with_brownout, with_crew_load_spike, with_lighting_failure, with_radiator_failure,
@@ -80,6 +81,69 @@ pub(crate) fn build_session(
              \"greenhouse\", \"sealed\")"
         ))),
     }
+}
+
+/// Build a session from a **fixed-palette composition** (Phase-8 P8.6) — the player picks a
+/// set of parts (`"power_plant"`, `"radiator"`, `"self_discharge"`) rather than a whole
+/// pre-built scenario. Delegates to [`station::builder::assemble`] (each part a thin delegate
+/// to the frozen domain constructors, wired by shared stock id), so a `{power_plant, radiator}`
+/// composition is bit-identical to the frozen `build_station` (`tests/builder_parity.rs`) — the
+/// builder is a pure refactor, no new science. The [`DisplayContext`] is derived from which
+/// parts are present: a `radiator` contributes the node temperature readout (and highlights
+/// `thermal.node`), a `power_plant` the battery SOC. Single-rate only (the whole ENERGY palette
+/// runs at the Power dt); two-rate composition is deferred (P8.6 scope).
+pub(crate) fn build_composed_session(
+    component_ids: &[String],
+) -> Result<(CoreSession, DisplayContext), SimError> {
+    let components: Vec<Component> = component_ids
+        .iter()
+        .map(|id| {
+            Component::from_id(id).ok_or_else(|| {
+                SimError::Validation(format!(
+                    "godot_bridge: unknown component id {id:?} (palette: \"power_plant\", \
+                     \"radiator\", \"self_discharge\")"
+                ))
+            })
+        })
+        .collect::<Result<_, _>>()?;
+    let scenario = station::scenario::HEAT_CLOSURE_SCENARIO;
+    let ctx = BuildContext {
+        charge: domains::params::charge(),
+        thermal: domains::params::thermal(),
+        self_discharge: domains::params::self_discharge(),
+        scenario,
+    };
+    let (state, registry, resolver) = assemble(&components, &ctx)?;
+    let session = CoreSession::single_rate(
+        EulerIntegrator::new(registry),
+        state,
+        resolver,
+        scenario.power.dt_seconds,
+    );
+
+    // The display readouts reflect what was actually composed: a node temperature only with a
+    // radiator (the stock that carries heat), a battery SOC only with a power plant.
+    let has_power = components.contains(&Component::PowerPlant);
+    let has_radiator = components.contains(&Component::Radiator);
+    let display = DisplayContext {
+        thermal: has_radiator.then(|| ThermalReadout {
+            node_id: domains::thermal::NODE.to_string(),
+            heat_capacity: ctx.thermal.heat_capacity,
+            space_temperature: ctx.thermal.space_temperature,
+        }),
+        battery: has_power.then(|| BatteryReadout {
+            battery_id: domains::power::BATTERY.to_string(),
+            initial_charge: scenario.power.battery0,
+        }),
+        // `thermal.node` is the cross-domain shared stock (Power dissipates in, radiator sheds
+        // out) — highlighted only when a radiator makes it exist.
+        shared_stock_ids: if has_radiator {
+            vec![domains::thermal::NODE.to_string()]
+        } else {
+            vec![]
+        },
+    };
+    Ok((session, display))
 }
 
 /// The coupled crew ↔ ECLSS `CABIN_GAS_SCENARIO` as a single-rate session — mirrors the
@@ -483,6 +547,29 @@ impl SimSession {
         }
     }
 
+    /// Construct a session from a **fixed-palette composition** (Phase-8 P8.6) — the player
+    /// passes the chosen part ids (`"power_plant"`, `"radiator"`, `"self_discharge"`) and the
+    /// bounded Rust builder assembles them (registry construction stays Rust-side). Returns
+    /// `false` (and logs) on an unknown id, an empty/duplicate set, or a dependency violation
+    /// (`self_discharge` without `power_plant`); `true` on success. Idempotently replaces any
+    /// prior session. A `{power_plant, radiator}` composition reproduces the frozen `station`
+    /// bit-for-bit — the builder is a pure refactor, not new science.
+    #[func]
+    fn build_composed(&mut self, component_ids: PackedStringArray) -> bool {
+        let ids: Vec<String> = component_ids.to_vec().iter().map(|g| g.to_string()).collect();
+        match build_composed_session(&ids) {
+            Ok((session, display)) => {
+                self.inner = Some(session);
+                self.display = Some(display);
+                true
+            }
+            Err(err) => {
+                godot_error!("SimSession.build_composed failed: {err:?}");
+                false
+            }
+        }
+    }
+
     /// Construct a **perturbed** session (Phase-8 P8.5) — the interactive "perturb systems"
     /// primitive. `scenario_id` is `"station"` (energy) or `"sealed"` (matter); `kind` is the
     /// perturbation (`brownout` / `radiator_failure` for station; `carbon_leak` / `o2_leak` /
@@ -740,6 +827,62 @@ mod tests {
         let soc = proj.soc_percent_of_initial.expect("station has a battery SOC");
         assert!((80.0..120.0).contains(&soc), "SOC out of range: {soc}");
         assert!(proj.to_json().contains("\"shared_stock_ids\":[\"thermal.node\"]"));
+    }
+
+    /// The P8.6 fixed-palette composition path: `{power_plant, radiator}` builds a single-rate
+    /// session that steps well-fed and reaches a physical node temperature (the byte-identity
+    /// with `build_station` is proven Rust-side in `station/tests/builder_parity.rs`; here we
+    /// only prove the *bridge* wires the composition + its derived display context).
+    #[test]
+    fn composed_energy_station_builds_steps_and_carries_readouts() {
+        let (mut session, ctx) =
+            build_composed_session(&["power_plant".into(), "radiator".into()]).unwrap();
+        session.step_n(station::scenario::HEAT_CLOSURE_DAYS * 24).unwrap();
+        assert_eq!(session.total_rationed(), 0);
+        assert!(session.events().is_empty());
+        // The display context reflects the parts: a radiator ⇒ node temperature + highlight,
+        // a power plant ⇒ battery SOC.
+        let proj = project(
+            session.state(),
+            &ctx,
+            session.total_rationed(),
+            session.events().len(),
+            session.max_residual(),
+        );
+        let t = proj.temperature_k.expect("radiator ⇒ node temperature");
+        assert!((100.0..400.0).contains(&t), "T_eq out of range: {t}");
+        assert!(proj.soc_percent_of_initial.is_some(), "power plant ⇒ battery SOC");
+        assert!(proj.to_json().contains("thermal.node"));
+    }
+
+    /// Composition subsets shape the display context: a lone `power_plant` (dissipating to the
+    /// boundary sink) has a battery SOC but no node temperature; a `power_plant + self_discharge`
+    /// still single-rate, no radiator.
+    #[test]
+    fn composed_power_plant_alone_has_soc_but_no_temperature() {
+        let (session, ctx) = build_composed_session(&["power_plant".into()]).unwrap();
+        let proj = project(session.state(), &ctx, 0, 0, session.max_residual());
+        assert!(proj.temperature_k.is_none(), "no radiator ⇒ no node temperature");
+        assert!(proj.soc_percent_of_initial.is_some(), "power plant ⇒ SOC");
+
+        // Adding the leak keeps it single-rate and buildable.
+        assert!(build_composed_session(&["power_plant".into(), "self_discharge".into()]).is_ok());
+    }
+
+    /// The bridge surfaces the builder's validation as an `Err` (the UI renders it as `false`):
+    /// an unknown component id, an empty set, and the `self_discharge`-without-`power_plant`
+    /// dependency violation.
+    #[test]
+    fn composed_rejects_bad_compositions() {
+        assert!(matches!(
+            build_composed_session(&["no_such_part".into()]),
+            Err(SimError::Validation(_))
+        ));
+        assert!(matches!(build_composed_session(&[]), Err(SimError::Validation(_))));
+        assert!(matches!(
+            build_composed_session(&["self_discharge".into()]),
+            Err(SimError::Validation(_))
+        ));
     }
 
     /// The two-rate `sealed` arm (the "decades" scenario) builds and steps a few master days

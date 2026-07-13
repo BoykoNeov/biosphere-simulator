@@ -202,6 +202,26 @@ pub struct SelfDischarge {
     params: SelfDischargeParams,
 }
 
+impl SelfDischarge {
+    /// Construct a `SelfDischarge` with the given ids — the station/palette builder re-points
+    /// `waste_heat` at `thermal.node` when a radiator is present (the dissipation seam), else
+    /// the boundary sink. Additive over [`build_power`]'s internal struct-literal construction
+    /// (which stays untouched, so the frozen sibling goldens can't move).
+    pub fn new(
+        id: String,
+        battery: String,
+        waste_heat: String,
+        params: SelfDischargeParams,
+    ) -> Self {
+        SelfDischarge {
+            id,
+            battery,
+            waste_heat,
+            params,
+        }
+    }
+}
+
 impl Flow for SelfDischarge {
     fn id(&self) -> &str {
         &self.id

@@ -1,6 +1,6 @@
 # Phase 8 — Godot Front-End (the sim becomes visible)
 
-**Status: IN PROGRESS — Steps 0–4 COMPLETE.** This is the plan of record for
+**Status: IN PROGRESS — Steps 0–6 COMPLETE.** This is the plan of record for
 putting a **Godot front-end** on top of the **frozen** native Rust core (Phase 7). Pre-plan
 orientation complete and advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED**
 (see "Confirmed scope decisions"). Steps 0–2 are designed concretely here; Steps 3–8 get
@@ -357,11 +357,58 @@ changed):
   under `rust/`). The new `pub` accessors (`into_parts` ×2, `scale_factors`) are behaviour-neutral,
   so all 20 frozen goldens stay byte-identical and cross-port parity is unaffected.
 
-### Step 6 (P8.6) — build systems (fixed palette)
+### Step 6 (P8.6) — build systems (fixed palette) — **COMPLETE**
 
 Place & connect from a fixed, code-defined component palette; registry mutation stays Rust-side
 and bounded (confirmed decision #1). The player composes a station from known parts; arbitrary
 authoring is Phase 9.
+
+**Scope USER-DECIDED: the ENERGY palette (Option 1 of 3).** Three parts — `PowerPlant` ·
+`Radiator` · `SelfDischarge` — one **single-rate** ENERGY station (all `dt = 3600 s`, all
+frozen/delegated). A second gas family (Cabin/ECLSS) and two-rate composition are additive,
+deferred follow-ons (Option 1 is a strict substrate for them, nothing thrown away).
+
+- **`station::builder`** (new) — `Component` enum + `assemble(components, ctx) → (State,
+  Registry, SourceResolver)`. Each component is a **thin delegate to the frozen domain
+  constructors** (a `Radiator` is the *same* `RadiatorReject::new`/ids/params `build_station`
+  uses); components connect by the Phase-6 mechanism — **choosing which stock id each flow points
+  at** (finding #1). Power's dissipation legs (incl. the `SelfDischarge` leak) land in
+  `thermal.node` when a `Radiator` is present, else in the `boundary.waste_heat` sink. Empty /
+  duplicate sets rejected; `SelfDischarge` without `PowerPlant` rejected early (it reads the
+  battery — a named `Validation`, not a bare registry referential error).
+- **Two byte-identity anchors (advisor) — the builder is a *pure refactor*, proven not asserted.**
+  (1) `assemble([PowerPlant, Radiator])` reproduces the frozen `build_station` **bit-for-bit**
+  (stepped over the heat-closure horizon, Radiator-first to prove `Registry` sort-by-id makes
+  order irrelevant); (2) `assemble([PowerPlant, SelfDischarge])` (no radiator) reproduces the
+  frozen standalone `build_power(charge, BOUNDED_SOC, Some(sd))` **bit-for-bit** — Rust-vs-Rust
+  (bit-exact on one libm), chaining transitively to the frozen `power_self_discharge` golden via
+  the Step-3 crossport test, plus a **non-vacuity** check (the leaky SOC departs the two-flow
+  baseline — an inert leak would still pass the equality). `SelfDischarge::new` added as additive
+  Rust in `domains` (the Step-5 constructor precedent; `build_power`'s struct-literal untouched).
+- **Two IC modes, never a re-derivation engine.** Reproduce path (`{PowerPlant, Radiator}`) uses
+  the scenario's exact `equilibrium_node_heat` → byte-identity; free-composition (a radiator with
+  no plant) starts the node cold at `Q = 0`. A player who omits the radiator gets a node that
+  heats unbounded — a **legitimate, conservation-closed *failure*** the exit criterion wants
+  ("observe failure/stability"), not a bug. A composition is a **runtime object** — not in the
+  freeze manifest, no golden; the every-step conservation assert makes even a novel composition
+  safe (a violation surfaces to the player, never a silent fix).
+- **Bridge FFI** — `SimSession::build_composed(component_ids: PackedStringArray)` (typed, no JSON)
+  delegates to `assemble`; the `DisplayContext` is **derived from which parts are present** (a
+  radiator ⇒ node temperature + `thermal.node` highlight, a power plant ⇒ battery SOC). Unknown
+  id / empty / dependency violations surface as `false`.
+- **The load-bearing cross-boundary proof** — `godot/compose_smoke.gd` builds `{power_plant,
+  radiator}` via `build_composed` through the *actual cdylib* and steps the 7-day horizon;
+  `tests/crossport/test_godot_compose.py` asserts the snapshot is **byte-identical to the headless
+  `emit_station`** (the palette composition equals the frozen station across the FFI boundary — a
+  pure refactor, and the boundary preserved determinism), with `rationed == 0` and FTZ/DAZ OFF.
+- **Thin palette UI** — `compose_dashboard.{tscn,gd}` (checkboxes per part + Build/Step + preset
+  recipes incl. the radiator-less overheat), widgets built in code; `compose_ui_smoke.gd`
+  instantiates it headless so `_ready → _build_ui` + Build + a stepped day actually run (the P8.3
+  `ui_smoke` precedent — the UI is otherwise loaded by nothing).
+- **Zero core + zero domain-code change** (`git diff src/` — the Python tree — empty). The only
+  Rust `domains` touch is the additive `SelfDischarge::new`; all 20 frozen goldens byte-identical,
+  cross-port parity unaffected. `cargo test` + `clippy --all-targets -D warnings`, ruff/format/
+  pyright, and the crossport suite green.
 
 ### Step 7 (P8.7) — save / load
 

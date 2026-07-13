@@ -14,6 +14,7 @@
 //! character-for-character; the two-rate [`driver::run_master_day`] ports the per-substep
 //! `assert_conserved` teeth (the primary Tier-0 gate — `substep` deliberately skips it).
 
+pub mod builder;
 pub mod cabin;
 pub mod display;
 pub mod driver;
