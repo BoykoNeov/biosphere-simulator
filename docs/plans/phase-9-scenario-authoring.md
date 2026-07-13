@@ -1,6 +1,6 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: DRAFT — PLANNED, not started.** Plan of record for turning the frozen
+**Status: IN PROGRESS — Step 0 COMPLETE; Steps 1–7 planned.** Plan of record for turning the frozen
 multi-domain engine into an **authoring platform**: new stations, ecosystems, species, and
 domains are declared in **data**, not programmed. Pre-plan orientation complete and
 advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED** (see "Confirmed scope
@@ -140,15 +140,34 @@ the same file into the same graph as Python.** Contract:
 
 ## Step spine (concrete-first; JIT the rest — this project's rhythm)
 
-- **Step 0 — the scenario-file format + Python interpreter (composition subset only).** Define
-  the YAML schema (pydantic) for the *composition* reading (existing flow types + params/
-  param-pack refs + ICs + wiring), and the Python interpreter that builds
-  `(State, Registry, resolver)` from it by calling the frozen constructors. **Acceptance = the
-  byte-identity anchor:** a hand-written `station.yaml` re-expressing an existing frozen scenario
-  reproduces its golden **byte-for-byte** (`declarative(station.yaml) == build_station ==
-  golden`) — the interpreter proven faithful, needing no new golden. (No Python composition/
-  palette analogue exists today — Phase-8 built `assemble`/`build_scenario` only in Rust — so
-  Step 0 *creates* the Python composition layer. De-risks the whole format before any DSL.)
+- **Step 0 — the scenario-file format + Python interpreter (composition subset only). COMPLETE.**
+  New additive boundary package `src/authoring/` (`schema.py` pydantic scenario schema · `flow_registry.py`
+  the author-selectable frozen-flow surface + named param loaders · `interpreter.py` lowers a validated
+  `ScenarioSpec` → `(State, Registry, resolver)` by calling the frozen constructors, no float math ·
+  `run.py` single-rate/no-reset harness · `errors.py`). **Anchor = the frozen standalone Crew, chosen
+  because it has ZERO derived ICs** (every value is plain scenario data): `tests/authoring/scenarios/
+  crew_mission.yaml` re-expresses `MISSION_SCENARIO`. Proven three ways, strongest first (advisor):
+  (1) **structural equality** — `interpret(...).state == build_crew(...)[0]` and
+  `registry.flows == expected.flows` (frozen flow dataclasses incl. `params: CrewParams` are equatable),
+  the failure-localizing primary gate; (2) **loaded values == frozen `CrewScenario`** — the pyyaml
+  YAML-1.1 numeric-string guard (dotless `1e-3` parses as a *string*; every float carries a decimal
+  point + a pydantic-`float` coercion backstop); (3) **byte-identity** — the interpreted 168-step Euler
+  run reproduces `crew_state.json` byte-for-byte (no new golden; the frozen golden is the oracle).
+  Plus the **decision-B safety teeth**: `crew_broken_wiring.yaml` (a CARBON withdrawal wired at an
+  OXYGEN stock) interprets cleanly then raises `ConservationError` on step 1 — bad wiring surfaced,
+  never silently fixed. **The flow-type registry is explicit, not introspected** (a `StockId` is a
+  `str` alias — field-type introspection can't tell a wiring field from any str field; and the registry
+  *is* the author-selectable contract Step 7 freezes). Params reuse the frozen `load_crew_params` loader
+  by name ⇒ the param contribution is byte-identical *trivially*; what byte-identity genuinely tests is
+  wiring + ICs + forcings (inline/override packs are Step 1). 7 tests. **Zero core + zero domain change**
+  (`git diff src/{simcore,domains}/` empty — purely additive boundary + tests + YAML); the VM entering
+  `simcore` is Step 2's deliberate one-time break, not now. All 20 frozen goldens byte-identical.
+  > **Derived ICs surfaced & deferred (advisor).** The plan's original literal `station.yaml` anchor is
+  > NOT declaratively expressible — `station`'s `node0` = f(Power's mean dissipation), the greenhouse's
+  > `chamber_co2_mol0` = f(crew fractions), etc. Crew is the Step-0 anchor *because* it has none. Before
+  > a coupled scenario (station/greenhouse) can be authored, the **derived-IC mechanism** must be decided:
+  > precompute-and-inline (author lowers the derived value to a literal) vs letting it bleed into the DSL
+  > (a computed-IC expression). That is a later sub-step (likely Step 3 templates), NOT Step 0.
 - **Step 1 — parameter packs (data-only).** A param-pack file that bundles/overrides existing
   YAML params, referenced by a scenario file. Nearly free — a subset of the Step-0 format;
   proves the "cultivar = param pack" species primitive cheaply.

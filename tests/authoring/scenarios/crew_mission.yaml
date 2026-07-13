@@ -1,0 +1,92 @@
+# The Step-0 composition anchor: a hand-written declarative re-expression of the
+# frozen standalone Crew MISSION_SCENARIO (domains/crew). The authoring interpreter
+# must build a graph structurally identical to build_crew(...) + crew_resolver(...)
+# and — run 7 days (168 steps) Euler — reproduce tests/regression/golden/crew_state.json
+# byte-for-byte. NOTHING here is frozen or reference: this is a runtime authored
+# artifact (Phase-9 decision B), and crew is the anchor precisely because it has NO
+# derived initial conditions (every value below is plain scenario data) — station /
+# greenhouse need the derived-IC mechanism, a later sub-step.
+#
+# All floats carry an explicit decimal point (1.0e-3, not 1e-3): yaml.safe_load uses
+# the YAML-1.1 float resolver, under which a dotless exponent parses as a *string*.
+name: crew_mission
+integrator: euler
+dt: 3600.0        # CrewScenario.dt_seconds
+steps: 168        # MISSION_DAYS (7) * steps_per_day (24)
+rng_seed: 0
+
+stocks:
+  # The three finite provisioned-consumable POOLs (initial inventories = scenario data).
+  - id: crew.food_store
+    domain: crew
+    quantity: carbon
+    kind: pool
+    amount: 1000.0        # CrewScenario.food_store0
+  - id: crew.water_store
+    domain: crew
+    quantity: water
+    kind: pool
+    amount: 60.0          # CrewScenario.water_store0
+  - id: crew.o2_store
+    domain: crew
+    quantity: oxygen
+    kind: pool
+    amount: 2000.0        # CrewScenario.o2_store0
+  # The five monotonic boundary output sinks (all start at 0).
+  - id: boundary.exhaled_co2
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.fecal_waste
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.crew_humidity
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+  - id: boundary.urine
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+  - id: boundary.crew_o2_consumed
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: crew.oxygen_consumption
+    type: crew.oxygen_consumption
+    priority: 0
+    wiring:
+      o2_store: crew.o2_store
+      o2_consumed: boundary.crew_o2_consumed
+  - id: crew.food_metabolism
+    type: crew.food_metabolism
+    priority: 0
+    wiring:
+      food_store: crew.food_store
+      exhaled_co2: boundary.exhaled_co2
+      fecal_waste: boundary.fecal_waste
+    params: crew
+  - id: crew.water_balance
+    type: crew.water_balance
+    priority: 0
+    wiring:
+      water_store: crew.water_store
+      crew_humidity: boundary.crew_humidity
+      urine: boundary.urine
+    params: crew
+
+forcings:
+  crew_o2_intake:
+    const: 1.0e-3     # CrewScenario.o2_intake_rate (mol/s)
+  crew_food_intake:
+    const: 5.0e-4     # CrewScenario.food_intake_rate (mol/s carbon)
+  crew_water_intake:
+    const: 3.0e-5     # CrewScenario.water_intake_rate (kg/s)

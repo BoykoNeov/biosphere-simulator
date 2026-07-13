@@ -1,0 +1,50 @@
+# The decision-B safety case: a WELL-FORMED scenario that WIRES a flow badly.
+# Identical to crew_mission.yaml except crew.food_metabolism's withdrawal leg
+# (food_store) is pointed at the OXYGEN store instead of the carbon food store. The
+# file interprets cleanly (structure is valid — the interpreter cannot know the
+# quantities disagree), then the very first step fails the per-quantity conservation
+# gate: the flow withdraws from an OXYGEN stock but deposits into CARBON sinks, so
+# neither quantity balances -> ConservationError on step 1. This discharges the
+# "bad wiring surfaces at runtime, never silently fixed" property concretely — the
+# authoring layer buys conservation safety, NOT scientific validity.
+name: crew_broken_wiring
+integrator: euler
+dt: 3600.0
+steps: 1
+rng_seed: 0
+
+stocks:
+  - id: crew.food_store
+    domain: crew
+    quantity: carbon
+    kind: pool
+    amount: 1000.0
+  - id: crew.o2_store
+    domain: crew
+    quantity: oxygen
+    kind: pool
+    amount: 2000.0
+  - id: boundary.exhaled_co2
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.fecal_waste
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: crew.food_metabolism
+    type: crew.food_metabolism
+    priority: 0
+    wiring:
+      food_store: crew.o2_store     # <-- the bug: an OXYGEN stock for a CARBON withdrawal
+      exhaled_co2: boundary.exhaled_co2
+      fecal_waste: boundary.fecal_waste
+    params: crew
+
+forcings:
+  crew_food_intake:
+    const: 5.0e-4
