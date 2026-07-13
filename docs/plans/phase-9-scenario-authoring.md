@@ -1,6 +1,12 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Steps 0–1 COMPLETE; Steps 2–7 planned (Step 2 gated on decision D).** Plan of record for turning the frozen
+**Status: PAUSED — Steps 0–1 COMPLETE (composition + parameter packs); Steps 2–7 DEFERRED
+(USER-DECIDED).** At the decision-D checkpoint the user chose to **pause Phase 9 after Steps 0–1**
+rather than confirm the kinetics-DSL shape: the composition interpreter + parameter packs ship as
+a self-contained, useful authoring layer, and the **authored-kinetics scope (Steps 2–7) is deferred**
+to a future decision. Nothing below Step 1 is built. Resuming requires re-confirming decision D (the
+bounded-closed-grammar reading — the only reading compatible with the non-negotiable invariants).
+Plan of record for turning the frozen
 multi-domain engine into an **authoring platform**: new stations, ecosystems, species, and
 domains are declared in **data**, not programmed. Pre-plan orientation complete and
 advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED** (see "Confirmed scope
