@@ -2,10 +2,17 @@
 
 The interpreter is the boundary act at the heart of Phase 9: it turns declarative
 data into ``(State, Registry, resolver)`` **by calling the frozen constructors** —
-``simcore.boundary`` / ``Stock`` / the frozen ``Flow`` classes / ``SourceResolver``
-— and does no float arithmetic itself. So the parity risk is purely *structural*
-(same ids, same quantities/units, same param values, same wiring), and the pure
-engine is untouched.
+``simcore.boundary`` / ``Stock`` / the frozen ``Flow`` classes / ``SourceResolver``.
+Through Steps 0–2 it did *no* float arithmetic, so the parity risk was purely
+*structural* (same ids, same quantities/units, same param values, same wiring).
+
+**Step 3 amends that (deliberately, see** :mod:`authoring.template` **).** A
+*template* scenario declares ``parameters`` and may write a stock ``amount`` / forcing
+``const`` as an **expression** over them (``param('crew_count') * 1000.0``); the
+interpreter now evaluates those expressions to literals at build time (IEEE
+``+ − ×``). This is the only float math the boundary does, it is deterministic, and
+the frozen engine stays untouched — but it is a new cross-port *boundary-eval* surface
+Step 4's Rust interpreter must match (not merely structural parity).
 
 Everything decidable from the file structure alone is checked here and raised as an
 :class:`AuthoringError` (unknown flow type, wiring that does not match the flow
@@ -23,6 +30,7 @@ from authoring.errors import AuthoringError
 from authoring.expr_parser import parse_rate_expr
 from authoring.flow_registry import FLOW_TYPES, PARAM_LOADERS, load_param_set
 from authoring.schema import FlowSpec, ParamPackRef, ScenarioSpec, StockSpec
+from authoring.template import eval_numeric_field, resolve_parameters
 from config import load_yaml
 from simcore.environment import SourceResolver, constant
 from simcore.expr import (
@@ -73,14 +81,17 @@ class BuiltScenario:
     """
 
 
-def _build_stock(spec: StockSpec) -> Stock:
+def _build_stock(spec: StockSpec, params: dict[str, float]) -> Stock:
     """Lower one :class:`StockSpec` to a frozen ``Stock``.
 
     ``unit`` is derived from ``quantity`` via the canonical-unit table (the single
     source of truth — never authored), so an authored stock cannot carry a
     mislabelled unit. An unknown quantity/kind value surfaces as an
-    ``AuthoringError`` (rather than a raw ``ValueError`` from the enum lookup).
+    ``AuthoringError`` (rather than a raw ``ValueError`` from the enum lookup). The
+    ``amount`` is a literal or a **template expression** over ``params`` (Step 3),
+    lowered to a float here.
     """
+    amount = eval_numeric_field(spec.amount, params, where=f"stock {spec.id!r} amount")
     try:
         quantity = Quantity(spec.quantity)
     except ValueError as exc:
@@ -109,7 +120,7 @@ def _build_stock(spec: StockSpec) -> Stock:
         domain=DomainId(spec.domain),
         quantity=quantity,
         unit=canonical_unit(quantity),
-        amount=spec.amount,
+        amount=amount,
         kind=kind,
         extinction_threshold=spec.extinction_threshold,
         unclamped=spec.unclamped,
@@ -314,21 +325,30 @@ def _build_flow(spec: FlowSpec, stocks: dict[StockId, Stock], base_dir: Path) ->
     return type_spec.cls(FlowId(spec.id), spec.priority, **kwargs)
 
 
-def interpret(spec: ScenarioSpec, base_dir: Path | None = None) -> BuiltScenario:
+def interpret(
+    spec: ScenarioSpec,
+    base_dir: Path | None = None,
+    overrides: dict[str, float] | None = None,
+) -> BuiltScenario:
     """Build the runnable ``(State, Registry, resolver)`` graph from a scenario spec.
 
-    Stocks are lowered and keyed by id (a duplicate id is an ``AuthoringError``);
-    flows are lowered via the registry (``Registry`` re-sorts them into canonical
-    order, so authoring order is inert); forcings become constant schedules. Single
-    ``State`` at ``n=0`` with the authored seed. ``base_dir`` is the directory that
-    any parameter-pack path is resolved against (defaults to the process CWD — set it
-    to the scenario file's parent via :func:`load_scenario`).
+    Template ``parameters`` are resolved first (defaults + ``overrides``; an override
+    of an undeclared name is an ``AuthoringError``), then any stock ``amount`` /
+    forcing ``const`` **expression** over them is evaluated to a literal (Step 3).
+    Stocks are lowered and keyed by id (a duplicate id is an ``AuthoringError``); flows
+    are
+    lowered via the registry (``Registry`` re-sorts them into canonical order, so
+    authoring order is inert); forcings become constant schedules. Single ``State`` at
+    ``n=0`` with the authored seed. ``base_dir`` is the directory that any
+    parameter-pack path is resolved against (defaults to the process CWD — set it to
+    the scenario file's parent via :func:`load_scenario`).
     """
     if base_dir is None:
         base_dir = Path()
+    params = resolve_parameters(spec.parameters, overrides)
     stocks: dict[StockId, Stock] = {}
     for stock_spec in spec.stocks:
-        stock = _build_stock(stock_spec)
+        stock = _build_stock(stock_spec, params)
         if stock.id in stocks:
             raise AuthoringError(f"duplicate stock id {stock.id!r}")
         stocks[stock.id] = stock
@@ -336,7 +356,12 @@ def interpret(spec: ScenarioSpec, base_dir: Path | None = None) -> BuiltScenario
     flows = [_build_flow(flow_spec, stocks, base_dir) for flow_spec in spec.flows]
     registry = Registry(flows, stocks)
     resolver = SourceResolver(
-        forcings={name: constant(f.const) for name, f in spec.forcings.items()}
+        forcings={
+            name: constant(
+                eval_numeric_field(f.const, params, where=f"forcing {name!r} const")
+            )
+            for name, f in spec.forcings.items()
+        }
     )
     return BuiltScenario(
         name=spec.name,
@@ -350,13 +375,17 @@ def interpret(spec: ScenarioSpec, base_dir: Path | None = None) -> BuiltScenario
     )
 
 
-def load_scenario(path: str) -> BuiltScenario:
+def load_scenario(
+    path: str, overrides: dict[str, float] | None = None
+) -> BuiltScenario:
     """Read a scenario YAML file, validate its schema, and interpret it.
 
     ``load_yaml`` is the safe (``yaml.safe_load``, top-level-mapping) read shared
     with the param loaders; ``ScenarioSpec.model_validate`` applies the schema
     (``extra="forbid"`` + float coercion — the pyyaml numeric-string backstop).
-    Parameter-pack paths are resolved relative to ``path``'s directory.
+    Parameter-pack paths are resolved relative to ``path``'s directory. ``overrides``
+    instantiates a template's ``parameters`` (Step 3) — the "one template, many
+    habitats" knob.
     """
     spec = ScenarioSpec.model_validate(load_yaml(path))
-    return interpret(spec, base_dir=Path(path).parent)
+    return interpret(spec, base_dir=Path(path).parent, overrides=overrides)

@@ -37,7 +37,14 @@ class StockSpec(BaseModel):
     domain: str
     quantity: str
     kind: str
-    amount: float
+    amount: float | str
+    """The initial amount: a literal float, or a **template expression** (Step 3).
+
+    A string is a bounded-grammar expression over the scenario's declared
+    ``parameters`` (e.g. ``"param('crew_count') * 1000.0"``), evaluated to a literal at
+    interpret time (:func:`authoring.template.eval_numeric_field`). A bare float is the
+    Step-0 form, unchanged — all-literal scenarios still lower identically.
+    """
     composition: dict[str, float] | None = None
     unclamped: bool = False
     extinction_threshold: float = 0.0
@@ -128,20 +135,27 @@ class ForcingSpec(BaseModel):
     """A forcing schedule. Step 0 = constant forcings only (``const``).
 
     Computed schedules (the Power half-sine, biosphere weather) are a later step;
-    the Step-0 composition anchor (crew) uses only constant forced rates.
+    the Step-0 composition anchor (crew) uses only constant forced rates. ``const``
+    is a literal float or a **template expression** over the declared ``parameters``
+    (Step 3), evaluated to a literal at interpret time (like a stock ``amount``).
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    const: float
+    const: float | str
 
 
 class ScenarioSpec(BaseModel):
-    """A whole authored scenario: run config + stocks + flows + forcings.
+    """A whole authored scenario: run config + parameters + stocks + flows + forcings.
 
     ``integrator`` is "euler" or "rk4"; ``dt`` the step size (seconds); ``steps``
     the run length; ``rng_seed`` the state seed (default 0). The interpreter builds
     a single-rate, no-reset graph from this (Step 0 scope).
+
+    ``parameters`` (Step 3) is the **template contract**: named scalars with default
+    values that an instantiation may override (``interpret(..., overrides=…)``), and
+    that a stock ``amount`` / forcing ``const`` expression may read via ``param('…')``.
+    Empty (the Step-0 form) means a fully-literal scenario with no knobs.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -151,6 +165,7 @@ class ScenarioSpec(BaseModel):
     dt: float
     steps: int
     rng_seed: int = 0
+    parameters: dict[str, float] = Field(default_factory=dict)
     stocks: list[StockSpec]
     flows: list[FlowSpec]
     forcings: dict[str, ForcingSpec] = Field(default_factory=dict)

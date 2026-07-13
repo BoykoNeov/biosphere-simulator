@@ -1,0 +1,102 @@
+# The Step-3 templates anchor: the frozen standalone Crew MISSION_SCENARIO re-expressed
+# as a TEMPLATE parametrized by `crew_count`. One template → many habitats: the three
+# provisioned stores and the three metabolic intake forcings all scale linearly with the
+# crew size (the crew flows are forced ⇒ dynamics are linear in the rates + initial
+# inventories). NOTHING here is frozen or reference — a runtime authored artifact
+# (Phase-9 decision B).
+#
+# Faithfulness gate: instantiate at crew_count = 1.0 → `1.0 * base == base` exactly (IEEE
+# multiply by 1.0 is identity) → identical to crew_mission.yaml → reproduces
+# tests/regression/golden/crew_state.json BYTE-FOR-BYTE.
+# "It bit" gate: instantiate at crew_count = 4.0 → every stock ≈ 4× (reconstruct to
+# tolerance — accumulate-then-scale ≠ scale-then-accumulate in fp), still conserved,
+# rationed == 0, and NOT byte-identical to the golden (the knob is load-bearing).
+#
+# Template expressions read `param('crew_count')` (the template-parameter namespace, an
+# overload of the kinetics-DSL `param` keyword) and are evaluated to literals at build
+# time. All floats carry an explicit decimal point (the YAML-1.1 dotless-exponent hazard).
+name: crew_habitat_template
+integrator: euler
+dt: 3600.0        # CrewScenario.dt_seconds
+steps: 168        # MISSION_DAYS (7) * steps_per_day (24)
+rng_seed: 0
+
+parameters:
+  crew_count: 1.0   # default = the single-reference-crew MISSION_SCENARIO
+
+stocks:
+  # The three finite provisioned-consumable POOLs — initial inventory scales with crew.
+  - id: crew.food_store
+    domain: crew
+    quantity: carbon
+    kind: pool
+    amount: "param('crew_count') * 1000.0"    # crew_count * CrewScenario.food_store0
+  - id: crew.water_store
+    domain: crew
+    quantity: water
+    kind: pool
+    amount: "param('crew_count') * 60.0"      # crew_count * CrewScenario.water_store0
+  - id: crew.o2_store
+    domain: crew
+    quantity: oxygen
+    kind: pool
+    amount: "param('crew_count') * 2000.0"    # crew_count * CrewScenario.o2_store0
+  # The five monotonic boundary output sinks: always empty at start (crew-count-independent).
+  - id: boundary.exhaled_co2
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.fecal_waste
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.crew_humidity
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+  - id: boundary.urine
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+  - id: boundary.crew_o2_consumed
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: crew.oxygen_consumption
+    type: crew.oxygen_consumption
+    priority: 0
+    wiring:
+      o2_store: crew.o2_store
+      o2_consumed: boundary.crew_o2_consumed
+  - id: crew.food_metabolism
+    type: crew.food_metabolism
+    priority: 0
+    wiring:
+      food_store: crew.food_store
+      exhaled_co2: boundary.exhaled_co2
+      fecal_waste: boundary.fecal_waste
+    params: crew
+  - id: crew.water_balance
+    type: crew.water_balance
+    priority: 0
+    wiring:
+      water_store: crew.water_store
+      crew_humidity: boundary.crew_humidity
+      urine: boundary.urine
+    params: crew
+
+forcings:
+  # Metabolic intake rates scale with crew size (total station metabolic demand).
+  crew_o2_intake:
+    const: "param('crew_count') * 1.0e-3"     # crew_count * o2_intake_rate (mol/s)
+  crew_food_intake:
+    const: "param('crew_count') * 5.0e-4"     # crew_count * food_intake_rate (mol/s C)
+  crew_water_intake:
+    const: "param('crew_count') * 3.0e-5"     # crew_count * water_intake_rate (kg/s)

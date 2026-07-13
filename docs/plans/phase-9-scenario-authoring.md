@@ -1,12 +1,16 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Steps 0–2 COMPLETE (composition + parameter packs + the bounded kinetics
-DSL); Steps 3–7 JIT.** Decision D (the bounded-closed-grammar reading) was **CONFIRMED by the user**
-(2026-07-13) and Step 2 landed: the pure-stdlib expression VM + `DeclarativeFlow` entered `simcore`
-as the deliberate one-time additive break, proven faithful by re-expressing the frozen `SelfDischarge`
-bit-identically (Euler + RK4). Step 2 shipped only the unambiguous arithmetic core; division, the
-function set, and a named-constant surface are deferred until a real flow forces each (see the Step 2
-entry). Plan of record for turning the frozen
+**Status: IN PROGRESS — Steps 0–3 COMPLETE (composition + parameter packs + the bounded kinetics
+DSL + templates); Steps 4–7 JIT.** Decision D (the bounded-closed-grammar reading) was **CONFIRMED
+by the user** (2026-07-13) and Step 2 landed: the pure-stdlib expression VM + `DeclarativeFlow`
+entered `simcore` as the deliberate one-time additive break, proven faithful by re-expressing the
+frozen `SelfDischarge` bit-identically (Euler + RK4). Step 2 shipped only the unambiguous arithmetic
+core; division, the function set, and a named-constant surface are deferred until a real flow forces
+each (see the Step 2 entry). **Step 3 (templates)** added `parameters` + boundary-time
+parameter-expressions (`param('crew_count') * base`) that lower to literals at interpret time — the
+"one template, many habitats" knob, anchored by re-expressing the frozen Crew as a `crew_count`
+template (byte-identical at 1.0, 4× at 4.0); it **deliberately amends decision A** (the boundary now
+does `+ − ×`, a new Step-4 cross-port surface). Plan of record for turning the frozen
 multi-domain engine into an **authoring platform**: new stations, ecosystems, species, and
 domains are declared in **data**, not programmed. Pre-plan orientation complete and
 advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED** (see "Confirmed scope
@@ -230,8 +234,52 @@ the same file into the same graph as Python.** Contract:
   (decision B; display-surfacing is a later step). **Zero domain change**; full suite (incl.
   `-m slow`) + ruff + pyright green; all 20 frozen goldens byte-identical (no regen). The
   load-bearing "the VM is faithful" proof, and the (B) analogue of Step 0's anchor.
-- **Step 3 — templates (JIT).** Parametrized / partial / composable scenario files (a habitat
-  template instantiated with a power budget + crew size) on top of Steps 0–2.
+- **Step 3 — templates. COMPLETE.** Parametrized scenario files (a habitat template
+  instantiated with a **crew size**, the roadmap's own example) on top of Steps 0–2. New
+  additive `src/authoring/template.py` + a `parameters:` block on `ScenarioSpec` + a
+  `float | str` widening of the two numeric fields (`StockSpec.amount`, `ForcingSpec.const`)
+  + an `overrides=` arg threaded through `interpret`/`load_scenario`. **The mechanism:** a
+  template declares named scalar `parameters` (with defaults); a stock `amount` / forcing
+  `const` may be a **bounded-grammar expression** over them (`param('crew_count') * 1000.0`);
+  an instantiation supplies `overrides`, and the interpreter **evaluates those expressions
+  to literals at build time** (`resolve_parameters` + `eval_numeric_field`), which the frozen
+  constructors then receive unchanged. **This deliberately amends decision A** (Steps 0–2 did
+  *no* boundary float math ⇒ "parity is purely structural"): boundary-eval `+ − ×` is now a
+  **new cross-port surface** Step 4's Rust interpreter must match — benign (IEEE-deterministic,
+  decimals round-trip), stated not slipped, load-bearing for Step 7's freeze. **The grammar is
+  reused, the context is not** (advisor #5): template expressions parse with the *same*
+  `expr_parser` (so Step 4 mirrors one parser, precedence pinned in one place) but evaluate at
+  build time where no `State`/`env`/`n` exists — only `Const`/`ParamRef`/`Neg`/`BinOp` are
+  legal, `param('…')` resolves against the **template-parameter** namespace (a documented
+  *overload* of the kinetics-DSL `param`, disjoint context), and a `stock`/`forcing`/`n` ref is
+  an `AuthoringError`; the `+ − ×` op-order mirrors `simcore.expr.eval_expr` so a boundary
+  literal is bit-identical to what the engine VM would compute (one op-order, both ports).
+  **Anchor = the frozen Crew re-expressed as a template** (`crew_habitat_template.yaml`,
+  parametrized by `crew_count`; `crew_mission.yaml` untouched so Steps 0/1 keep their goldens):
+  (1) **faithfulness → byte-identity** — at `crew_count = 1.0` (default AND explicit override)
+  `1.0 * base == base` **exactly** ⇒ reproduces `crew_state.json` byte-for-byte (the whole
+  template→resolve→evaluate→interpret→run path validated against the frozen golden); (2) **the
+  knob is load-bearing ("it bit")** — at `crew_count = 4.0` every stock ≈ 4× (reconstruct to
+  `rel_tol=1e-12` — accumulate-then-scale ≠ scale-then-accumulate in fp, the
+  `n_limited`/`water_biting` discipline), CARBON/WATER/OXYGEN conserved every step,
+  `rationed == 0`/`events == ()`, and the final state is **not** byte-identical to the golden
+  (a non-scaling knob could not move it — the Step-1 changed-pack analogue). 12 tests (2
+  byte-identity + 3 the-4×-gate + 7 referential-integrity/unit). **Zero core + zero domain
+  change** (`git diff src/{simcore,domains}/` empty — purely additive boundary + tests + YAML);
+  all 20 frozen goldens byte-identical (no regen).
+  > **The derived-IC fork is resolved *in principle*, not *handled* (advisor #3).** The
+  > mechanism *is* the fork's resolution: a computed expression, evaluated in the **boundary**,
+  > lowered to a literal before the engine (a hybrid of the plan's "precompute-and-inline" vs
+  > "DSL bleed" fork — DSL grammar, boundary timing). But the `crew_count` anchor needs only
+  > template params + multiplication. Making the greenhouse `chamber_co2_mol0 =
+  > f_resp·food_intake/k_scrub` expressible needs **two** still-deferred things: **division**
+  > (boundary-only-cheap — a template `/0` is a build-time `AuthoringError`, deterministic in
+  > both ports; it does NOT reopen the engine-VM `/0` choice Step 2 deferred) **and reading a
+  > loaded flow-param into the template namespace** (`f_resp` from `crew.yaml`). Both are the
+  > flagged **next increment**. The **simulation-derived** tier (station `node0` = f(run Power,
+  > take mean)) needs running a sub-sim — genuinely larger, deferred further.
+  > **File composition/includes** (merging fragments) is out of Step 3's parametrization scope —
+  > deferred to Step 6 (species/domain bundles).
 - **Step 4 — the Rust interpreter + parse-parity (JIT).** Rust YAML parser (boundary, decision
   E) + the AST/VM ported to Rust `simcore` + parse-parity (Tier-0) + cross-port trajectory
   parity (Tier-1/2). The genuinely-new cross-port surface of this phase.
