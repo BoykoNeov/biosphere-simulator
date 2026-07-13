@@ -75,3 +75,47 @@ jobs:
       # per-scenario tier rules (Tier-0 exact / Tier-1 bit-exact / Tier-2 measured band).
       - name: Cross-port parity suite (incl. slow sealed goldens)
         run: uv run pytest tests/crossport/
+
+  godot-parity:
+    name: Cross-boundary parity (Godot cdylib vs headless)
+    runs-on: ubuntu-latest
+    # Phase-8 Step 8 (P8.8) promotes the Step-1 cross-boundary smoke from a silently-skipped
+    # local test to a real gate. This job installs headless Godot AND the Rust toolchain, so
+    # the Godot cross-boundary smokes (`tests/crossport/test_godot_*.py`, which `skipif` when
+    # Godot/cargo are absent) actually RUN: each drives a scenario through the actual
+    # `godot_bridge` cdylib Godot loads and asserts the snapshot is byte-identical to the
+    # headless `emit_*` reference, with FTZ/DAZ OFF on the stepping thread. This is the genuine
+    # glibc-Rust-cdylib-vs-headless FP-environment check the intra-process `session_parity.rs`
+    # cannot make. De-risked in a Linux container before landing (the Phase-7-Step-6
+    # precedent). The comparisons are same-platform-emit (bit-exact) or Tier-1 (`cabin_gas`,
+    # transcendental-free), so the Tier-2 cross-libm bands are not exercised here.
+    #
+    # `-m "not slow"` excludes the ~4-minute sealed season-crossing smoke (a mandatory-local /
+    # release-time gate; its full-horizon parity is already gated intra-process + by the frozen
+    # sealed golden). See docs/phase-8-reference.md.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install headless Godot 4.7
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            unzip libfontconfig1 libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 \
+            libxext6 libx11-6
+          GODOT_VER=4.7-stable
+          curl -fL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VER}/Godot_v${GODOT_VER}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp
+          sudo mv "/tmp/Godot_v${GODOT_VER}_linux.x86_64" /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          godot --headless --version
+      - name: Sync Python dependencies
+        run: uv sync
+      # The fast Godot cross-boundary smokes (the slow sealed season-crossing run is
+      # mandatory-local, `-m slow`). Each shells out to `cargo build -p godot_bridge` (the
+      # cdylib Godot dlopen's) and `cargo run --example emit_*` (the headless reference).
+      - name: Godot cross-boundary parity smokes (fast)
+        run: uv run pytest tests/crossport/ -k godot -m "not slow"

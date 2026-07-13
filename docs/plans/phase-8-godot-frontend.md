@@ -1,6 +1,6 @@
 # Phase 8 — Godot Front-End (the sim becomes visible)
 
-**Status: IN PROGRESS — Steps 0–7 COMPLETE.** This is the plan of record for
+**Status: COMPLETE — Steps 0–8 DONE. PHASE 8 EXITS.** This is the plan of record for
 putting a **Godot front-end** on top of the **frozen** native Rust core (Phase 7). Pre-plan
 orientation complete and advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED**
 (see "Confirmed scope decisions"). Steps 0–2 are designed concretely here; Steps 3–8 get
@@ -476,21 +476,62 @@ no science changed):
   (**53 passed**, +2 save/load), ruff/pyright green; **all 20 frozen goldens byte-identical** (no
   regen). Next: Step 8 (objectives + the gating cross-boundary parity harness + Phase-8 exit).
 
-### Step 8 (P8.8) — objectives + headless-parity harness + Phase-8 exit
+### Step 8 (P8.8) — objectives + headless harness + gating cross-boundary parity + Phase-8 exit — **COMPLETE**
 
-- **The headless harness** (confirmed decision #2): a CLI / `cargo test` entry that drives the
-  same `SimSession` to bit-identical results — the concrete "runs headless on a server"
-  architecture proof. No netcode.
-- **The gating cross-boundary parity check (advisor #2):** the Step-1 smoke promoted to a gate —
-  ≥1 scenario (Tier-1 `cabin_gas`, ideally the sealed run too) driven through the *actual* `gdext`
-  cdylib, final `State` compared to the headless trajectory, FP env asserted to match. This is the
-  step that actually *verifies* the exit criterion's "exact same simulation" clause across the
-  Godot boundary.
-- **Objectives**: stability/failure goals a player pursues (survive N years, keep every quantity
-  conserved under a perturbation schedule, avoid `rationed > 0`).
-- **Exit criterion** (roadmap 373): a player can build · perturb · fast-forward decades · inspect
-  flows · observe failure/stability across all five domains, while the exact same simulation runs
-  headless. Doc/freeze as the phase warrants.
+The Phase-8 capstone. **What landed** (all additive under `rust/` + `godot/` +
+`tests/crossport/` + `docs/`; `git diff src/` — the Python tree — empty; engine crates carry
+no gdext types; **all 20 frozen goldens byte-identical** — no science changed):
+
+- **The load-bearing extraction (advisor): "the exact same simulation" is now by
+  *construction*.** The named-scenario dispatch was moved out of the gdext-dependent bridge
+  into a **gdext-free `station::palette::build_scenario(id) -> (SimSession, DisplayContext)`**.
+  The bridge's `build_session` is now a thin wrapper over it; the new headless CLI calls it
+  directly. One shared builder, so the two entry points cannot drift — the Step-0
+  `advance_one_master_day` / `sealed_reset_hook` extraction discipline. Behavior-preserving
+  (the bridge's 28 unit tests + the Godot smokes still pass unchanged).
+- **The headless CLI (confirmed decision #2)** — a thin **gdext-free `sim` bin** in `station`
+  (`src/bin/sim.rs`): `sim <scenario> <steps>` builds via `palette::build_scenario`, advances,
+  and prints the bit-exact `sim_io` hex-float snapshot. The concrete "runs headless on a
+  server" artifact (no Godot, no netcode). Bit-identity **gated**: `sim cabin_gas 900` /
+  `sim station 168` / `sim greenhouse 7` are **byte-for-byte** equal to the matching `emit_*`
+  examples (`tests/crossport/test_headless_cli.py`, cargo-only ⇒ runs in the existing
+  `crossport` CI job).
+- **Objectives (thin, zero domain logic)** — `station::objectives`: an
+  `Objective::survive(target_step)` and an `ObjectiveReport` whose clauses (`reached_target` /
+  `conserved` / `no_rationing` / `no_extinction` / `survived`) are a boolean fold over the
+  session diagnostics (`n`, `total_rationed`, `events`, `max_residual`). **Not** a DSL or a
+  scheduler — a deep brownout drives `rationed > 0`, flipping `survived`, so the *same*
+  objective distinguishes stability from failure. Exposed via bridge `objectives_json`.
+- **The gating cross-boundary parity (advisor #2), the genuinely-new work:**
+  - **(a) it actually runs in a gate.** A new **`godot-parity` CI job** installs headless
+    Godot 4.7 + the Rust toolchain and runs the fast Godot cross-boundary smokes
+    (`tests/crossport/test_godot_*.py -m "not slow"`), promoting Step-1's smoke from a
+    silently-skipped local test to a real gate. **De-risked in a Linux/glibc Docker container
+    first** (the Phase-7-Step-6 precedent) — the `.gdextension` already lists Linux `.so`
+    entries; the smoke comparisons are same-platform-emit (bit-exact) or Tier-1 (`cabin_gas`),
+    so no Tier-2 cross-libm band is exercised.
+  - **(b) the two-rate run** (Step-1 was single-rate only): `test_godot_two_rate_parity` drives
+    **greenhouse** (7 master days, fast) and **sealed** (`SEALED_RESUME_DAYS = 310` master
+    days, `@pytest.mark.slow`) through the actual cdylib, each **byte-identical** to a headless
+    `emit_*` (`emit_greenhouse` / new `emit_sealed_resume`), FTZ/DAZ OFF. The sealed run crosses
+    one 305-day season so the **re-sow (`slow_reset`) adopt branch** fires across the FFI (the
+    genuinely-new coverage); the full multi-year science parity stays gated by the frozen
+    `sealed_station_state.json` golden (the `session_parity.rs` full-horizon resume-parity case
+    is `#[ignore]`d, run-manually). The slow sealed smoke (~4 min through the debug
+    cdylib) is a **mandatory-local / release-time gate**, kept off the shared CI runner.
+  - `test_godot_objectives` proves both a stable win (`survived`) and a brownout failure
+    (`no_rationing == false ⇒ survived == false`) through the cdylib.
+- **The freeze decision — a doc, not a manifest (advisor, USER default):**
+  `docs/phase-8-reference.md` records the architecture, the purity invariant, the shared
+  builder, the Godot-boundary parity contract, objectives, and the met exit criterion. **No
+  freeze manifest / completeness gate** — Phase 8 added a consumer + CLI + objectives, changed
+  no science, and kept all 20 goldens byte-identical; there is no new *frozen* surface to gate,
+  and the Phase-7 freeze remains sufficient.
+- **Exit criterion (roadmap 373) — met.** A player can **build** (fixed palette) · **perturb**
+  (windowed cascades) · **fast-forward decades** (off the render thread) · **inspect flows** ·
+  **set objectives** · **save/load** · **observe failure or stability** across all five domains,
+  while the **exact same** simulation runs headless (the shared palette builder + the CLI +
+  the cross-boundary parity gate prove it). **PHASE 8 COMPLETE.**
 
 ## Open items for just-in-time resolution
 

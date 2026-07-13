@@ -207,6 +207,14 @@ pub const SEALED_ENERGY_YEARS: usize = LONG_HORIZON_YEARS;
 /// The Tier-1 energy-decade horizon (days).
 pub const SEALED_ENERGY_DAYS: u64 = (SEALED_ENERGY_YEARS * SEALED_STATION_SEASON_DAYS) as u64;
 
+/// The Phase-8 (P8.8) sealed **cross-boundary parity** horizon (master days) — a handful of
+/// days past one season so the smoke exercises the re-sow (`slow_reset`) adopt branch across
+/// the Godot FFI boundary, without paying the full multi-year run through headless Godot (the
+/// full-horizon parity is proven intra-process in `tests/session_parity.rs` + the frozen
+/// `sealed_station_state.json` golden). Shared by `examples/emit_sealed_resume.rs` and
+/// `godot/sealed_smoke.gd`.
+pub const SEALED_RESUME_DAYS: u64 = SEALED_STATION_SEASON_DAYS as u64 + 5;
+
 /// The Tier-2 perennial-capable sealed biosphere (greenhouse chamber + `litter_carbon0=3`).
 pub fn sealed_station_bio_scenario() -> SeasonScenario {
     SeasonScenario {

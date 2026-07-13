@@ -23,6 +23,8 @@ pub mod greenhouse;
 pub mod harvest;
 pub mod inspection;
 pub mod lighting;
+pub mod objectives;
+pub mod palette;
 pub mod params;
 pub mod perturbations;
 pub mod scenario;

@@ -36,8 +36,6 @@
 
 use godot::prelude::*;
 
-use domains::crew::FECAL_WASTE;
-
 use simcore::error::SimError;
 use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
@@ -76,16 +74,11 @@ use save::{parse_save_record, save_record_json, Recipe};
 pub(crate) fn build_session(
     scenario_id: &str,
 ) -> Result<(CoreSession, DisplayContext), SimError> {
-    match scenario_id {
-        "cabin_gas" => build_cabin_gas(),
-        "station" => build_station(),
-        "greenhouse" => build_greenhouse_session(),
-        "sealed" => build_sealed_session(),
-        other => Err(SimError::Validation(format!(
-            "godot_bridge: unknown scenario id {other:?} (palette: \"cabin_gas\", \"station\", \
-             \"greenhouse\", \"sealed\")"
-        ))),
-    }
+    // The named-scenario dispatch lives gdext-free in `station::palette` so the headless CLI
+    // (`station`'s `sim` bin) and this Godot cdylib build from the **same** shared builder —
+    // the by-construction "the exact same simulation runs headless" guarantee (Phase-8 Step 8).
+    // This wrapper adds nothing but the Godot plumbing.
+    station::palette::build_scenario(scenario_id)
 }
 
 /// Build a session from a **fixed-palette composition** (Phase-8 P8.6) — the player picks a
@@ -164,155 +157,6 @@ pub(crate) fn build_from_recipe(
         Recipe::Named(id) => build_session(id),
         Recipe::Composed(ids) => build_composed_session(ids),
     }
-}
-
-/// The coupled crew ↔ ECLSS `CABIN_GAS_SCENARIO` as a single-rate session — mirrors the
-/// [`station::run_station`] setup (and `tests/session_parity.rs`) exactly. No thermal node
-/// or battery (both readouts project to `None`); the shared stocks are the three cabin-air
-/// pools the crew breathes and ECLSS regulates (a construction-time fact of the assembly).
-fn build_cabin_gas() -> Result<(CoreSession, DisplayContext), SimError> {
-    let crew = domains::params::crew();
-    let eclss = domains::params::eclss();
-    let scenario = station::scenario::CABIN_GAS_SCENARIO;
-    let (state, registry) = station::cabin::build_cabin(&crew, &eclss, &scenario)?;
-    let resolver = station::cabin::cabin_resolver(&scenario)?;
-    let session = CoreSession::single_rate(
-        EulerIntegrator::new(registry),
-        state,
-        resolver,
-        scenario.dt_seconds,
-    );
-    let ctx = DisplayContext {
-        thermal: None,
-        battery: None,
-        shared_stock_ids: vec![
-            domains::eclss::CABIN_O2.to_string(),
-            domains::eclss::CABIN_CO2.to_string(),
-            domains::eclss::CABIN_H2O.to_string(),
-        ],
-    };
-    Ok((session, ctx))
-}
-
-/// The coupled Power → Thermal `HEAT_CLOSURE_SCENARIO` as a single-rate session — mirrors
-/// the [`station::system::build_station`] setup (and `examples/emit_station.rs`) exactly.
-/// This is the palette entry with a real node temperature and battery SOC: the display
-/// context carries the thermal params (`T = T_space + Q/C`) and the initial battery charge
-/// (the SOC reference), and highlights `thermal.node` — the stock Power dissipates into and
-/// Thermal radiates from (cross-domain by construction, the Step-1 seam).
-fn build_station() -> Result<(CoreSession, DisplayContext), SimError> {
-    let charge = domains::params::charge();
-    let thermal = domains::params::thermal();
-    let scenario = station::scenario::HEAT_CLOSURE_SCENARIO;
-    let (state, registry) = station::system::build_station(&charge, &thermal, &scenario, None)?;
-    let resolver = station::system::station_resolver(&charge, &scenario)?;
-    let session = CoreSession::single_rate(
-        EulerIntegrator::new(registry),
-        state,
-        resolver,
-        scenario.power.dt_seconds,
-    );
-    let ctx = DisplayContext {
-        thermal: Some(ThermalReadout {
-            node_id: domains::thermal::NODE.to_string(),
-            heat_capacity: thermal.heat_capacity,
-            space_temperature: thermal.space_temperature,
-        }),
-        battery: Some(BatteryReadout {
-            battery_id: domains::power::BATTERY.to_string(),
-            initial_charge: scenario.power.battery0,
-        }),
-        shared_stock_ids: vec![domains::thermal::NODE.to_string()],
-    };
-    Ok((session, ctx))
-}
-
-/// The biosphere ↔ cabin `greenhouse` as a **two-rate** session (P8.3) — the palette's
-/// first two-rate entry, and the reason time controls run off the render thread: each
-/// [`CoreSession::step`] is one **master day** = one slow biosphere step + `steps_per_day`
-/// (1440) fast cabin sub-steps, so fast-forwarding many days is real compute the UI must
-/// not block on. Mirrors [`station::greenhouse::run_greenhouse`]'s setup (and
-/// `tests/session_parity.rs`) with `reset = None`. The shared stocks are the biosphere
-/// carbon/O₂ pools the cabin flows are re-pointed at (one cabin air stock; a construction-
-/// time fact of the reversed greenhouse seam). No thermal node or battery in this assembly,
-/// so both scalar readouts project to `None`.
-fn build_greenhouse_session() -> Result<(CoreSession, DisplayContext), SimError> {
-    let crew = domains::params::crew();
-    let eclss = domains::params::eclss();
-    let scenario = station::scenario::greenhouse_scenario();
-    let (state, bio_registry, cabin_registry) =
-        station::greenhouse::build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE)?;
-    let session = CoreSession::two_rate(
-        EulerIntegrator::new(bio_registry),
-        EulerIntegrator::new(cabin_registry),
-        state,
-        station::greenhouse::greenhouse_bio_resolver(&scenario)?,
-        station::greenhouse::greenhouse_cabin_resolver(&scenario)?,
-        scenario.steps_per_day,
-        scenario.bio_dt,
-        scenario.cabin_dt,
-        None,
-    )?;
-    let ctx = DisplayContext {
-        thermal: None,
-        battery: None,
-        shared_stock_ids: vec![
-            domains::biosphere::stocks::CARBON_POOL.to_string(),
-            domains::biosphere::stocks::O2_POOL.to_string(),
-        ],
-    };
-    Ok((session, ctx))
-}
-
-/// The full sealed station as a **two-rate** session (P8.3) — the multi-year, re-sown
-/// scenario that *is* "fast-forward decades." Mirrors [`station::sealed::run_sealed`]'s
-/// construction (and the sealed branch of `tests/session_parity.rs`): every Phase-6 seam over
-/// one shared stock dict + two registries, with the real `sealed_reset_hook` re-sowing the
-/// biosphere each season. It carries a real node temperature and battery SOC (Power → Thermal
-/// is inside), and highlights the cross-domain shared stocks (`thermal.node` + the biosphere
-/// carbon/O₂ pools the cabin breathes). This is the palette entry the off-render-thread
-/// fast-forward exists for: each master day is 1440 fast sub-steps, and a decade is thousands
-/// of master days.
-fn build_sealed_session() -> Result<(CoreSession, DisplayContext), SimError> {
-    let charge = domains::params::charge();
-    let thermal = domains::params::thermal();
-    let crew = domains::params::crew();
-    let eclss = domains::params::eclss();
-    let recovery = station::params::water_recovery();
-    let lamp = station::params::lamp();
-    let harvest = station::params::harvest();
-    let scenario = station::scenario::sealed_station_scenario();
-    let (state, bio_registry, fast_registry) = station::sealed::build_sealed_station(
-        &charge, &thermal, &crew, &eclss, &recovery, &lamp, &harvest, &scenario, false, false,
-    )?;
-    let session = CoreSession::two_rate(
-        EulerIntegrator::new(bio_registry),
-        EulerIntegrator::new(fast_registry),
-        state,
-        station::sealed::sealed_bio_resolver(&lamp, &scenario)?,
-        station::sealed::sealed_fast_resolver(&charge, &scenario)?,
-        scenario.steps_per_day,
-        scenario.bio_dt,
-        scenario.cabin_dt,
-        Some(station::sealed::sealed_reset_hook(&scenario)),
-    )?;
-    let ctx = DisplayContext {
-        thermal: Some(ThermalReadout {
-            node_id: domains::thermal::NODE.to_string(),
-            heat_capacity: thermal.heat_capacity,
-            space_temperature: thermal.space_temperature,
-        }),
-        battery: Some(BatteryReadout {
-            battery_id: domains::power::BATTERY.to_string(),
-            initial_charge: scenario.battery0,
-        }),
-        shared_stock_ids: vec![
-            domains::thermal::NODE.to_string(),
-            domains::biosphere::stocks::CARBON_POOL.to_string(),
-            domains::biosphere::stocks::O2_POOL.to_string(),
-        ],
-    };
-    Ok((session, ctx))
 }
 
 /// Build a **perturbed** session for a fixed-palette scenario (Phase-8 P8.5) — the
@@ -820,6 +664,34 @@ impl SimSession {
             },
             None => GString::from(""),
         }
+    }
+
+    /// The **objectives** evaluation (P8.8) as plain JSON — whether a "survive to
+    /// `target_step`" goal is met, and each health clause behind it (`reached_target`,
+    /// `conserved`, `no_rationing`, `no_extinction`, `survived`). Pure predicates over the
+    /// session diagnostics (`n`, `total_rationed`, `events`, `max_residual`) — no game-side
+    /// domain logic ([`station::objectives`]). A perturbation that drives rationing or an
+    /// extinction flips `survived`, so the same objective distinguishes a stable run from a
+    /// failing one. Empty string before [`build`](Self::build); rejects a negative target.
+    #[func]
+    fn objectives_json(&self, target_step: i64) -> GString {
+        let Some(session) = self.inner.as_ref() else {
+            godot_error!("SimSession.objectives_json called before build()");
+            return GString::from("");
+        };
+        if target_step < 0 {
+            godot_error!("SimSession.objectives_json negative target_step={target_step}");
+            return GString::from("");
+        }
+        let objective = station::objectives::Objective::survive(target_step as u64);
+        let report = station::objectives::evaluate(
+            &objective,
+            session.n(),
+            session.total_rationed(),
+            session.events().len(),
+            session.max_residual(),
+        );
+        GString::from(report.to_json().as_str())
     }
 
     /// Total flows scaled by the Euler backstop so far (a golden run asserts `0`).
