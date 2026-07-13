@@ -16,17 +16,33 @@ that wires a flow badly interprets cleanly and surfaces as a runtime
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 
 from authoring.errors import AuthoringError
-from authoring.flow_registry import FLOW_TYPES, load_param_set
+from authoring.expr_parser import parse_rate_expr
+from authoring.flow_registry import FLOW_TYPES, PARAM_LOADERS, load_param_set
 from authoring.schema import FlowSpec, ParamPackRef, ScenarioSpec, StockSpec
 from config import load_yaml
 from simcore.environment import SourceResolver, constant
+from simcore.expr import (
+    BinOp,
+    DeclarativeFlow,
+    Expr,
+    ForcingRef,
+    Neg,
+    ParamRef,
+    StockRef,
+)
 from simcore.flow import Flow
 from simcore.ids import DomainId, FlowId, StockId
-from simcore.quantities import Quantity, StockKind, canonical_unit
+from simcore.quantities import (
+    BALANCE_ATOL,
+    BALANCE_RTOL,
+    Quantity,
+    StockKind,
+    canonical_unit,
+)
 from simcore.registry import Registry
 from simcore.state import State, Stock
 
@@ -47,6 +63,14 @@ class BuiltScenario:
     integrator: str
     dt: float
     steps: int
+    has_authored_kinetics: bool = False
+    """True if any flow is an authored :class:`~simcore.expr.DeclarativeFlow`.
+
+    The **"authored ≠ validated"** marker (decision B): conservation + determinism are
+    guaranteed for such a run, scientific validity is not. The display projection
+    (Godot, a later step) surfaces this; carrying it on the built scenario is where the
+    fact originates.
+    """
 
 
 def _build_stock(spec: StockSpec) -> Stock:
@@ -118,13 +142,154 @@ def _resolve_params(spec: FlowSpec, param_set: str, base_dir: Path) -> object:
     return load_param_set(param_set, None)
 
 
-def _build_flow(spec: FlowSpec, base_dir: Path) -> Flow:
-    """Lower one :class:`FlowSpec` to a frozen ``Flow`` via the flow-type registry.
+def _kinetics_param_map(spec: FlowSpec) -> dict[str, float]:
+    """Resolve an authored-kinetics flow's params to a ``name -> float`` map.
 
-    Validates the wiring dict against the flow type's declared fields (exact match)
-    and resolves the params object (named default or a pack, relative to ``base_dir``)
-    for a params-taking flow — structural failures raise :class:`AuthoringError`.
+    ``spec.params`` is a **string** naming a :data:`PARAM_LOADERS` set (whose frozen
+    loader produces a params dataclass — flattened here to floats the rate's
+    ``param("…")`` reads, so authored params still pass the frozen bounds/unit guards),
+    or ``None`` for a param-free rate. Parameter **packs** for authored flows are
+    deferred (a pack needs an explicit set name to pick the loader, which the
+    frozen-type path derives from ``FlowTypeSpec`` but a kinetics flow has not) — a
+    :class:`ParamPackRef` here is an :class:`AuthoringError`, consistent with Step 1's
+    "full-file packs only" deferrals.
     """
+    if spec.params is None:
+        return {}
+    if isinstance(spec.params, ParamPackRef):
+        raise AuthoringError(
+            f"flow {spec.id!r}: parameter packs for authored 'kinetics' flows are "
+            f"deferred; name a param set (a {sorted(PARAM_LOADERS)} key) instead"
+        )
+    if spec.params not in PARAM_LOADERS:
+        raise AuthoringError(
+            f"flow {spec.id!r}: unknown param set {spec.params!r} "
+            f"(known: {sorted(PARAM_LOADERS)})"
+        )
+    params_obj = load_param_set(spec.params, None)
+    # Frozen param loaders return a flat frozen dataclass of floats (ChargeParams,
+    # SelfDischargeParams, …); flatten it to the name→float map the rate's param("…")
+    # reads. ``is_dataclass`` + not-a-type narrows the loader's ``object`` return.
+    if not is_dataclass(params_obj) or isinstance(params_obj, type):
+        raise AuthoringError(
+            f"flow {spec.id!r}: param set {spec.params!r} did not load a dataclass"
+        )
+    return {name: float(value) for name, value in asdict(params_obj).items()}
+
+
+def _collect_refs(node: Expr, params: set[str], stocks: set[StockId]) -> None:
+    """Recursively collect ``param``/``stock`` reference names from a rate AST.
+
+    ``forcing`` references are intentionally *not* collected — like the frozen flows'
+    ``env.get``, a forcing var's referential integrity is resolve-time (a ``KeyError``
+    at the first step if unwired), not a build check.
+    """
+    if isinstance(node, ParamRef):
+        params.add(node.name)
+    elif isinstance(node, StockRef):
+        stocks.add(node.stock)
+    elif isinstance(node, ForcingRef):
+        pass  # resolve-time (env.get), by design
+    elif isinstance(node, Neg):
+        _collect_refs(node.operand, params, stocks)
+    elif isinstance(node, BinOp):
+        _collect_refs(node.left, params, stocks)
+        _collect_refs(node.right, params, stocks)
+    # Const, StepN: no references.
+
+
+def _check_stoichiometry_balanced(
+    flow_id: str,
+    stoichiometry: tuple[tuple[StockId, float], ...],
+    stocks: dict[StockId, Stock],
+) -> None:
+    """Verify the coefficient vector balances per quantity (decision C, build time).
+
+    Computes ``Σ(coeff · composition[q])`` over the stoichiometry for each conserved
+    quantity and requires it within ``assert_flow_balanced``'s **relative** tolerance
+    (exact for integer coefficients like ``−1/+1``; tolerance-backed for fractional
+    split coefficients ``f/(1−f)``, exactly as ``charge_split`` relies on). Because the
+    single scalar ``rate·dt`` multiplies every leg, a balanced coefficient vector keeps
+    ``Σ legs = 0`` for *any* rate/state — so an unbalanced authored flow is rejected
+    here, before it can run, rather than only surfacing at the every-step gate.
+    """
+    residual: dict[Quantity, float] = {}
+    scale: dict[Quantity, float] = {}
+    for stock_id, coeff in stoichiometry:
+        for quantity, comp in stocks[stock_id].composition.items():
+            residual[quantity] = residual.get(quantity, 0.0) + coeff * comp
+            scale[quantity] = max(scale.get(quantity, 0.0), abs(coeff * comp))
+    for quantity in sorted(residual, key=lambda q: q.name):
+        tol = BALANCE_ATOL + BALANCE_RTOL * scale.get(quantity, 0.0)
+        if abs(residual[quantity]) > tol:
+            raise AuthoringError(
+                f"flow {flow_id!r}: authored stoichiometry is not balanced for "
+                f"{quantity.name} (Σ coeff·composition = {residual[quantity]!r}, "
+                f"tolerance {tol!r}); an authored flow must conserve every quantity"
+            )
+
+
+def _build_declarative_flow(
+    spec: FlowSpec, stocks: dict[StockId, Stock], base_dir: Path
+) -> Flow:
+    """Lower a :class:`FlowSpec` with ``kinetics`` to a :class:`DeclarativeFlow`.
+
+    Parses the rate expression, coerces the stoichiometry coefficients to ``float``,
+    resolves the param map, then applies the build-time structural checks
+    (referential integrity of ``param``/``stock`` reads, non-empty stoichiometry over
+    known stocks, and balance-by-construction). Any structural failure is an
+    :class:`AuthoringError`; a *well-formed* but physically-nonsensical rate runs (it
+    still conserves) — "authored ≠ validated" (decision B).
+    """
+    kinetics = spec.kinetics
+    assert kinetics is not None  # guaranteed by the caller's branch
+    rate = parse_rate_expr(kinetics.rate)
+    stoichiometry = tuple(
+        (StockId(stock_id), float(coeff))
+        for stock_id, coeff in kinetics.stoichiometry.items()
+    )
+    if not stoichiometry:
+        raise AuthoringError(f"flow {spec.id!r}: kinetics 'stoichiometry' is empty")
+    param_map = _kinetics_param_map(spec)
+
+    ref_params: set[str] = set()
+    ref_stocks: set[StockId] = set()
+    _collect_refs(rate, ref_params, ref_stocks)
+    for name in sorted(ref_params):
+        if name not in param_map:
+            raise AuthoringError(
+                f"flow {spec.id!r}: rate references param {name!r} not in its param "
+                f"set (available: {sorted(param_map)})"
+            )
+    for stock_id in sorted(ref_stocks) + [sid for sid, _ in stoichiometry]:
+        if stock_id not in stocks:
+            raise AuthoringError(
+                f"flow {spec.id!r}: references unknown stock {stock_id!r}"
+            )
+    _check_stoichiometry_balanced(spec.id, stoichiometry, stocks)
+
+    return DeclarativeFlow(
+        id=FlowId(spec.id),
+        priority=spec.priority,
+        rate=rate,
+        stoichiometry=stoichiometry,
+        params=tuple(sorted(param_map.items())),
+    )
+
+
+def _build_flow(spec: FlowSpec, stocks: dict[StockId, Stock], base_dir: Path) -> Flow:
+    """Lower one :class:`FlowSpec` to a ``Flow``: a frozen type, or authored kinetics.
+
+    A ``kinetics`` flow is lowered to a :class:`DeclarativeFlow`
+    (:func:`_build_declarative_flow`). A frozen-``type`` flow validates its wiring dict
+    against the flow type's declared fields (exact match) and resolves the params
+    object (named default or a pack, relative to ``base_dir``) — structural failures
+    raise :class:`AuthoringError`. (The schema validator has already guaranteed exactly
+    one of ``type``/``kinetics`` is set.)
+    """
+    if spec.kinetics is not None:
+        return _build_declarative_flow(spec, stocks, base_dir)
+    assert spec.type is not None  # schema validator: type xor kinetics
     type_spec = FLOW_TYPES.get(spec.type)
     if type_spec is None:
         raise AuthoringError(
@@ -168,7 +333,7 @@ def interpret(spec: ScenarioSpec, base_dir: Path | None = None) -> BuiltScenario
             raise AuthoringError(f"duplicate stock id {stock.id!r}")
         stocks[stock.id] = stock
     state = State(n=0, stocks=stocks, rng_seed=spec.rng_seed)
-    flows = [_build_flow(flow_spec, base_dir) for flow_spec in spec.flows]
+    flows = [_build_flow(flow_spec, stocks, base_dir) for flow_spec in spec.flows]
     registry = Registry(flows, stocks)
     resolver = SourceResolver(
         forcings={name: constant(f.const) for name, f in spec.forcings.items()}
@@ -181,6 +346,7 @@ def interpret(spec: ScenarioSpec, base_dir: Path | None = None) -> BuiltScenario
         integrator=spec.integrator,
         dt=spec.dt,
         steps=spec.steps,
+        has_authored_kinetics=any(f.kinetics is not None for f in spec.flows),
     )
 
 

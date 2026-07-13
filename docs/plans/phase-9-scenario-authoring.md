@@ -1,12 +1,12 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: PAUSED — Steps 0–1 COMPLETE (composition + parameter packs); Steps 2–7 DEFERRED
-(USER-DECIDED).** At the decision-D checkpoint the user chose to **pause Phase 9 after Steps 0–1**
-rather than confirm the kinetics-DSL shape: the composition interpreter + parameter packs ship as
-a self-contained, useful authoring layer, and the **authored-kinetics scope (Steps 2–7) is deferred**
-to a future decision. Nothing below Step 1 is built. Resuming requires re-confirming decision D (the
-bounded-closed-grammar reading — the only reading compatible with the non-negotiable invariants).
-Plan of record for turning the frozen
+**Status: IN PROGRESS — Steps 0–2 COMPLETE (composition + parameter packs + the bounded kinetics
+DSL); Steps 3–7 JIT.** Decision D (the bounded-closed-grammar reading) was **CONFIRMED by the user**
+(2026-07-13) and Step 2 landed: the pure-stdlib expression VM + `DeclarativeFlow` entered `simcore`
+as the deliberate one-time additive break, proven faithful by re-expressing the frozen `SelfDischarge`
+bit-identically (Euler + RK4). Step 2 shipped only the unambiguous arithmetic core; division, the
+function set, and a named-constant surface are deferred until a real flow forces each (see the Step 2
+entry). Plan of record for turning the frozen
 multi-domain engine into an **authoring platform**: new stations, ecosystems, species, and
 domains are declared in **data**, not programmed. Pre-plan orientation complete and
 advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED** (see "Confirmed scope
@@ -91,7 +91,7 @@ stoichiometric coefficients; they *cannot* express an unbalanced flow. Conservat
 is then a redundant backstop, not the primary guard — the grammar makes imbalance
 inexpressible.
 
-### D. The kinetics DSL is a bounded, closed, deterministic grammar — **NOT** an arbitrary evaluator. **(NEEDS-CONFIRM sub-fork)**
+### D. The kinetics DSL is a bounded, closed, deterministic grammar — **NOT** an arbitrary evaluator. **(USER-CONFIRMED 2026-07-13; Step 2 built on it.)**
 
 This is the decision that lets USER-CONFIRMED scope (1) coexist with the non-negotiables. The
 expression grammar is a **fixed, finite, closed set** of primitives:
@@ -196,13 +196,40 @@ the same file into the same graph as Python.** Contract:
   (values in the scenario file) also deferred (needs a from-dict loader surface `_CrewSchema` doesn't
   expose). 5 tests. **Zero core + zero domain change** (`git diff src/{simcore,domains}/` empty). Full
   suite green; all 20 frozen goldens byte-identical.
-- **Step 2 — the bounded kinetics DSL (decision D), Python side.** The closed expression grammar
-  + the pure-stdlib AST/VM in `simcore` + a `DeclarativeFlow` (rate-expr × stoichiometry,
-  balanced by construction — decision C) + the Python parser in the boundary. **Acceptance =
-  re-express ONE frozen flow as a DSL flow** (e.g. `SelfDischarge = k·battery`,
-  transcendental-free ⇒ Tier-1) and prove the DSL run is **bit-identical** to the frozen
-  constructor's trajectory. The load-bearing "the VM is faithful" proof, and the (B) analogue of
-  Step 0's anchor.
+- **Step 2 — the bounded kinetics DSL (decision D), Python side. COMPLETE
+  (decision D CONFIRMED by the user; the deliberate one-time additive `simcore` break landed).**
+  New additive `src/simcore/expr.py` — the plain-data AST (`Const`/`StockRef`/`ParamRef`/
+  `ForcingRef`/`StepN`/`Neg`/`BinOp`), a pure-stdlib `eval_expr`, and `DeclarativeFlow`
+  (rate-expr × stoichiometry, balanced by construction — decision C). The **only** `simcore`
+  change is this new file (`git diff --stat src/simcore/` empty; the "zero core change since
+  freeze" streak broken **once, on purpose**, like adding an integrator). The Python parser is
+  `src/authoring/expr_parser.py` (a tiny recursive-descent infix parser, explicitly-pinned
+  precedence/associativity — the sole Tier-0 parse-parity surface Step 4 mirrors); `schema.py`
+  gains `KineticsSpec` + a `type`-xor-`kinetics` `FlowSpec` union; the interpreter builds the
+  `DeclarativeFlow`, validating referential integrity (`param`/`stock` reads) and
+  **balance-by-construction** against the stock compositions (relative tolerance, mirroring
+  `assert_flow_balanced` — exact for integer coeffs, tolerance-backed for fractional splits).
+  **Acceptance = re-express the frozen `SelfDischarge` (`k·battery`, transcendental-free ⇒
+  Tier-1)** as a `kinetics` YAML flow (`self_discharge_dsl.yaml`, reusing the frozen
+  `self_discharge` param set so `k` is the frozen value) and prove the interpreted run is
+  **bit-identical to the frozen constructor's trajectory, per step, under BOTH Euler and RK4**
+  (RK4 nontrivial — `SelfDischarge` is donor-controlled ⇒ RK4 ≢ Euler); the frozen flow is the
+  oracle (no new golden). 39 tests (VM op-for-op + `DeclarativeFlow` + parser + the safety spine
+  + the anchor). **Advisor-driven scope calls (locked so Step 7's freeze inherits them):**
+  (1) **no `dt` token in the rate grammar** — the rate is the instantaneous (dt-independent)
+  rate and `DeclarativeFlow` supplies the single `× dt`, so RK4-order-safety is *structural*, not
+  a documented hope; `n` stays (dt-independent); (2) **ship only the unambiguous arithmetic core
+  (`+ − ×`, unary `−`, refs) + defer** division (`/0` is a Python-raise-vs-Rust-`inf` cross-port
+  choice) **and the whole function set** (`exp ln pow sqrt abs min max clamp monod` + bounded
+  conditionals — `monod`/`clamp`/`ifpos` each carry a real semantic choice) until a real flow
+  forces the definition (the `_DemoSchema` "bespoke until a second instance" discipline, applied
+  to the grammar); (3) a faithful **transcendental** anchor additionally needs a **named-constant**
+  surface (Stefan-Boltzmann σ is a CODATA *module constant*, not a param), unresolved here —
+  `SelfDischarge` dodges it; both (2)/(3) are flagged so Step 4's Rust port does not assume the
+  grammar is complete. `BuiltScenario.has_authored_kinetics` is the "authored ≠ validated" marker
+  (decision B; display-surfacing is a later step). **Zero domain change**; full suite (incl.
+  `-m slow`) + ruff + pyright green; all 20 frozen goldens byte-identical (no regen). The
+  load-bearing "the VM is faithful" proof, and the (B) analogue of Step 0's anchor.
 - **Step 3 — templates (JIT).** Parametrized / partial / composable scenario files (a habitat
   template instantiated with a power budget + crew size) on top of Steps 0–2.
 - **Step 4 — the Rust interpreter + parse-parity (JIT).** Rust YAML parser (boundary, decision
@@ -222,8 +249,13 @@ the same file into the same graph as Python.** Contract:
 
 ## Open questions / risks to resolve in review
 
-- **The kinetics-DSL sub-fork (decision D) is NEEDS-CONFIRM.** Everything downstream assumes a
-  bounded closed grammar; an unbounded evaluator is a different plan.
+- **The kinetics-DSL sub-fork (decision D) is RESOLVED** — USER-CONFIRMED (2026-07-13) as the
+  bounded closed grammar; Step 2 built the VM on it.
+- **The deferred grammar surface (Step 2 scope calls).** Division (`/0` cross-port choice), the
+  closed function set (`exp ln pow sqrt abs min max clamp monod` + bounded conditionals — each
+  ambiguous op needs a real flow to fix its definition), and a **named-constant** surface (σ for a
+  Stefan-Boltzmann re-expression) are all deferred; Step 4 (Rust port) must NOT assume the grammar
+  is complete, and each op joins when a real frozen flow forces its semantics.
 - **Rust YAML dependency** (decision E) — crate vs hand-rolled subset; the deprecated-`serde_yaml`
   + YAML-1.1 numeric hazards from the Phase-7 notes.
 - **Where the VM lives** — a stdlib `simcore` addition breaks the "zero core change since freeze"

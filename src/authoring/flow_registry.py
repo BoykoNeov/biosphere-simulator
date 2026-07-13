@@ -34,6 +34,7 @@ from domains.crew.flows import (
     WaterBalance,
 )
 from domains.crew.loader import load_crew_params
+from domains.power.loader import load_self_discharge_params
 from simcore.flow import Flow
 
 
@@ -87,6 +88,11 @@ FLOW_TYPES: dict[str, FlowTypeSpec] = {
 # around the guards.
 PARAM_LOADERS: dict[str, Callable[..., object]] = {
     "crew": load_crew_params,
+    # The Power self-discharge rate set (P5.5). Registered for Step 2's
+    # authored-kinetics anchor: a ``DeclarativeFlow`` re-expressing ``SelfDischarge``
+    # reads its ``k`` from this frozen loader (``param("self_discharge_rate")``), so the
+    # authored value is the frozen one — bit-identical — passing the frozen guards.
+    "self_discharge": load_self_discharge_params,
 }
 
 

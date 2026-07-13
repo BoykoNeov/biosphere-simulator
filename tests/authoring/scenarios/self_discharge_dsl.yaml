@@ -1,0 +1,40 @@
+# Phase 9 Step 2 — the authored-kinetics re-expression anchor.
+#
+# Re-expresses the frozen Power ``SelfDischarge`` flow (P5.5) as a declarative
+# ``kinetics`` flow: an instantaneous rate ``k · battery`` × a −1/+1 ENERGY
+# stoichiometry (battery → waste_heat). The interpreter builds a
+# ``simcore.expr.DeclarativeFlow``; the anchor test proves its trajectory is
+# **bit-identical** to the frozen ``SelfDischarge`` constructor's, under Euler AND RK4
+# (RK4 is nontrivial: the flow is donor-controlled, so RK4 ≢ Euler).
+#
+# ``k`` comes from the frozen ``self_discharge`` param set (``params:`` below) — the
+# *same* frozen loader/value/bounds — so the authored rate constant is the frozen one.
+# Transcendental-free ⇒ Tier-1 bit-exact. No forcings (donor-controlled reads the
+# battery stock directly). Exponents are written signed (YAML-1.1 float resolver).
+
+name: self_discharge_dsl
+integrator: euler
+dt: 3600.0
+steps: 336
+rng_seed: 0
+
+stocks:
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 1.0e+7
+  - id: boundary.waste_heat
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: power.self_discharge
+    kinetics:
+      rate: 'param("self_discharge_rate") * stock("power.battery")'
+      stoichiometry:
+        power.battery: -1
+        boundary.waste_heat: 1
+    params: self_discharge

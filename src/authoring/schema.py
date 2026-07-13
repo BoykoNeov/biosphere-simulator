@@ -16,7 +16,7 @@ forcings equal the frozen reference values, so a silent string-parse fails loudl
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StockSpec(BaseModel):
@@ -60,25 +60,68 @@ class ParamPackRef(BaseModel):
     pack: str
 
 
-class FlowSpec(BaseModel):
-    """One flow's declaration: a frozen flow *type* + wiring + optional params.
+class KineticsSpec(BaseModel):
+    """An **authored kinetics** flow: a rate expression × a stoichiometry (Step 2).
 
-    ``type`` is a key into :data:`authoring.flow_registry.FLOW_TYPES` (the
-    author-selectable frozen-flow surface). ``wiring`` maps the flow constructor's
-    stock-id fields → stock ids declared in this scenario. ``params`` selects the
-    params object for flow types that take one, and must be omitted for those that
-    do not: a **string** names the flow type's frozen default set (its committed
-    file — the Step-0 form), or a :class:`ParamPackRef` supplies a parameter pack
-    (Step 1). Partial-merge/bundling packs are deferred (full-file packs only).
+    The declarative alternative to selecting a frozen flow ``type``. ``rate`` is a
+    bounded-grammar expression string (see
+    :func:`authoring.expr_parser.parse_rate_expr`) giving the **instantaneous** rate —
+    ``dt``-independent (the grammar has no ``dt``
+    token, so RK4-order-safety is structural). ``stoichiometry`` maps each touched
+    stock id → its (integer/rational) coefficient; the flow emits ``coeff · rate · dt``
+    per leg, so it is **balanced by construction** for any rate value provided the
+    coefficient vector balances per quantity — which the interpreter verifies against
+    the stock compositions at build time (decision C).
+
+    **Authored ≠ validated** (decision B): conservation + determinism are guaranteed,
+    scientific validity is the author's responsibility — an authored-kinetics run
+    carries no calibration claim, no golden, no manifest entry.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rate: str
+    stoichiometry: dict[str, float]
+
+
+class FlowSpec(BaseModel):
+    """One flow: either a frozen flow *type* + wiring, or authored *kinetics*.
+
+    Exactly one of ``type`` (a key into :data:`authoring.flow_registry.FLOW_TYPES`, the
+    author-selectable frozen-flow surface — with ``wiring`` mapping the constructor's
+    stock-id fields → declared stock ids) **xor** ``kinetics`` (an authored
+    rate×stoichiometry flow, Step 2) must be given; the model validator enforces the
+    exclusivity and that a kinetics flow carries no ``wiring`` (its stoichiometry names
+    stocks directly). ``params`` selects the params object: a **string** names a
+    frozen param set (a frozen flow type's default set — the Step-0 form; or, for a
+    kinetics flow, a :data:`authoring.flow_registry.PARAM_LOADERS` key whose loaded
+    values the rate's ``param("…")`` reads, so authored params still pass the frozen
+    bounds/unit guards), or a :class:`ParamPackRef` supplies a parameter pack (Step 1).
+    It must be omitted for a param-free flow. Partial-merge/bundling packs are deferred.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     id: str
-    type: str
+    type: str | None = None
     priority: int = 0
-    wiring: dict[str, str]
+    wiring: dict[str, str] = Field(default_factory=dict)
+    kinetics: KineticsSpec | None = None
     params: str | ParamPackRef | None = None
+
+    @model_validator(mode="after")
+    def _check_type_xor_kinetics(self) -> FlowSpec:
+        if (self.type is None) == (self.kinetics is None):
+            raise ValueError(
+                f"flow {self.id!r}: give exactly one of 'type' (a frozen flow type) "
+                f"or 'kinetics' (an authored rate×stoichiometry flow)"
+            )
+        if self.kinetics is not None and self.wiring:
+            raise ValueError(
+                f"flow {self.id!r}: an authored 'kinetics' flow takes no 'wiring' "
+                f"(its stoichiometry names stocks directly)"
+            )
+        return self
 
 
 class ForcingSpec(BaseModel):
