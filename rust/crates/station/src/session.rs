@@ -257,6 +257,45 @@ impl SimSession {
         Ok(())
     }
 
+    /// **Resume from a saved `State`** (Phase-8 P8.7 save/load) — replace this session's
+    /// current state with a loaded one, keeping the registries / resolvers / reset hook
+    /// this session was built with. The caller rebuilds the session from the save's
+    /// recipe (the fixed-palette scenario id / composition), then hands the loaded
+    /// [`State`] here; because the core RNG is `(seed, key, n)`-keyed (no sequential
+    /// state) and the loaded state carries `n` + the seed, stepping continues
+    /// **bit-identically** to a run that never saved (see the module determinism
+    /// corollary and `tests/session_save_load.rs`).
+    ///
+    /// The loaded state's stock-id set **must equal** this session's — the registry
+    /// evaluates flows against exactly these ids, so a mismatch (a save from a different
+    /// recipe, or a corrupt file) is rejected loudly here rather than surfacing as an
+    /// opaque referential error mid-step. `n` is unconstrained (it *is* the resume
+    /// point).
+    ///
+    /// The diagnostic counters restart from the load point: `total_rationed` and
+    /// `events` count only from here (the save carries `(scenario-id, State, n)` and
+    /// *nothing else* — no accumulated history). This is immaterial for the well-fed
+    /// palette (`rationed == 0`, no events) and never affects the trajectory (they are
+    /// display-only). The residual readout resets too (no prior step across a load).
+    pub fn load_state(&mut self, state: State) -> Result<(), SimError> {
+        let current: std::collections::BTreeSet<&String> = self.state.stocks.keys().collect();
+        let loaded: std::collections::BTreeSet<&String> = state.stocks.keys().collect();
+        if current != loaded {
+            return Err(SimError::Validation(format!(
+                "load_state: the saved state's stock-id set does not match this session's \
+                 (built for a different recipe, or a corrupt save?). session has {} stocks, \
+                 loaded {}",
+                current.len(),
+                loaded.len()
+            )));
+        }
+        self.state = state;
+        self.prev_state = None;
+        self.total_rationed = 0;
+        self.events.clear();
+        Ok(())
+    }
+
     /// Advance `k` natural units (fast-forward). Because observation is separate from
     /// stepping, "advance `k` without observing intermediates" is just this loop — the
     /// free, parity-safe fast-forward primitive Phase-8 Step 3 drives off the render

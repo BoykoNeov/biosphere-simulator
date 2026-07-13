@@ -1,6 +1,6 @@
 # Phase 8 — Godot Front-End (the sim becomes visible)
 
-**Status: IN PROGRESS — Steps 0–6 COMPLETE.** This is the plan of record for
+**Status: IN PROGRESS — Steps 0–7 COMPLETE.** This is the plan of record for
 putting a **Godot front-end** on top of the **frozen** native Rust core (Phase 7). Pre-plan
 orientation complete and advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED**
 (see "Confirmed scope decisions"). Steps 0–2 are designed concretely here; Steps 3–8 get
@@ -410,11 +410,71 @@ deferred follow-ons (Option 1 is a strict substrate for them, nothing thrown awa
   cross-port parity unaffected. `cargo test` + `clippy --all-targets -D warnings`, ruff/format/
   pyright, and the crossport suite green.
 
-### Step 7 (P8.7) — save / load
+### Step 7 (P8.7) — save / load — **COMPLETE**
 
-The Rust snapshot **loader** (work item #3). Save = `(scenario-id, State, n)`; rebuild the
-registry from the palette-composed scenario id; resume is deterministic via `(seed, key, n)`. No
-full structural serializer (fixed-palette scope).
+The Rust snapshot **loader** (work item #3) + a versioned save-record wrapper + the resume-parity
+teeth. **What landed** (all additive under `rust/` + `godot/` + `tests/crossport/`; `git diff src/`
+— the Python tree — empty; engine crates carry no gdext types; 20 frozen goldens byte-identical —
+no science changed):
+
+- **The loader — work item #3 proper** (`simcore`, pure engine Rust, zero-dep, no gdext):
+  `simcore::snapshot::from_json` / `from_json_value` — the inverse of `from_engine` → `to_json`,
+  reconstructing an engine `State` **through `Stock::new` / `State::new`** so every core invariant
+  re-fires on load (mirrors Python `sim_io.snapshot.state_from_dict`). Supported by a new **minimal
+  zero-dep JSON value parser** `simcore::json` (recursive-descent; objects/arrays/strings-with-
+  escapes/numbers/literals; numbers kept as the raw lexeme and read as **integers, never via `f64`**
+  — the >2^53 precision discipline) and additive `Quantity::from_value` / `StockKind::from_value`
+  (the inverse of `value()`, `Result<_, Validation>` on unknown, mirroring Python `Quantity(v)`
+  raising). The Step-5 "no JSON parser" note was scoped to perturbation FFI scalars; work item #3 is
+  the sanctioned parser. **Fail-loud**: unknown/missing schema version, non-finite amount (caught by
+  the constructor), an unclamped non-BOUNDARY stock, an unknown quantity — all rejected loudly.
+  `rng_seed` parsed from its `0x`-hex (or decimal) string so a >2^53 seed survives bit-for-bit.
+- **The cross-port proof leads with parsed-value equality** (advisor): a cargo test loads the
+  **Python-generated** frozen `state_snapshot.json` and asserts the exact bits (pi, `0.1`, a
+  subnormal, signed `-0.0` loss-sink, the `0x0123456789abcdef` seed, POPULATION w/ extinction `1e-6`,
+  an unclamped ENERGY source) — **zero dependence on emitter formatting**. **Bonus** (empirically
+  verified first, not assumed): Rust `to_json` *is* byte-identical to Python `dumps` on this platform
+  (`emit_cabin_gas` reproduces `cabin_gas_state.json` byte-for-byte), so re-emitting the loaded
+  golden reproduces the file byte-for-byte too.
+- **The versioned save-record wrapper — embeds, does NOT extend, the frozen v3 snapshot** (advisor):
+  new `godot_bridge::save` — `Recipe::Named(scenario-id)` | `Recipe::Composed(component-ids)`,
+  `save_record_json(recipe, state)` nests the frozen v3 snapshot **verbatim** under a `"state"` key
+  (`from_engine` → `to_json`, byte-untouched) + its own `save_version` with the same fail-loud-at-
+  parse discipline (a serialization format is the one place forward-compat can't be retrofitted).
+  `parse_save_record` composes the two codecs (parse the wrapper's own JSON → `save_version` check →
+  recipe → `snapshot::from_json_value` on the embedded state sub-value). A save is `(recipe, State)`
+  and **nothing else** (the `(seed, key, n)` determinism corollary). **Perturbed sessions are
+  deferred loudly** (recipe `None` ⇒ `save` reports it unavailable — a build-time window has no
+  fixed-palette recipe, exactly as two-rate flow inspection was deferred).
+- **`SimSession::load_state`** (`station`) — inject a loaded `State` into a session rebuilt from the
+  recipe; **validates the loaded stock-id set equals the session's** (loud `Validation` on mismatch —
+  the wrong-recipe / corrupt-save guard), resets `prev_state` and the diagnostic counters (the save
+  carries no accumulated `rationed`/`events` history — they restart from the load point, immaterial
+  for the well-fed palette, never trajectory-affecting).
+- **The load-bearing gate is resume-parity, pure Rust** (`station/tests/session_save_load.rs`, states
+  compared by exact hex-float JSON): a session **saved at step A** (serialized `to_json`, reloaded
+  `from_json`) and stepped **B more** is **bit-identical** to a straight run of `A+B`. Single-rate
+  `cabin_gas` (Tier-1); two-rate `greenhouse` (proves the biosphere **`thermal_time` aux / phenology**
+  survives the round-trip — the reason a two-rate case matters); an `#[ignore]`d sealed resume that
+  **crosses a season boundary** (the reset-adopt branch — the genuinely-new save/load + re-sow
+  combination, verified bit-identical in 220 s); plus the `load_state` stock-set-mismatch rejection.
+- **Bridge FFI + cross-boundary smoke** — `SimSession::save() -> GString` / `load(text) -> bool` +
+  recipe tracking (set by `build` / `build_composed`; `None` for perturbed) + `build_from_recipe`
+  (the dispatch save/load shares with the build FFI). **The smoke does a real `FileAccess` disk
+  round-trip** (advisor — the honest "save/load through the real engine" proof, beyond the string-
+  level cargo test): `godot/save_smoke.gd` builds `cabin_gas`, steps to 300, `save()`s and writes the
+  file with `FileAccess`, then a **fresh** `SimSession` reads it back, `load()`s (rebuild-from-recipe
+  + restore state), and resumes to 900; `tests/crossport/test_godot_save_load.py` asserts the resumed
+  snapshot is **byte-identical to headless `emit_cabin_gas`** (save/load through the FFI + file
+  preserved determinism, reproducing the frozen `cabin_gas`), `saved_ok` / `loaded_ok` / `rationed ==
+  0` / FTZ/DAZ OFF. Thin `save_dashboard.{tscn,gd}` (Build/Step/Save/Load buttons over `FileAccess`)
+  + `save_ui_smoke.gd` (instantiates it headless so `_ready` → `_build_ui` + a Build/Save/Load cycle
+  actually run — the P8.3/P8.6 `ui_smoke` precedent).
+- **Zero core + zero domain-code change** (`git diff src/` empty; the `simcore` loader/parser/
+  `from_value` are additive pure engine Rust with no gdext, consistent with the purity invariant);
+  full workspace `cargo test` + `clippy --all-targets -D warnings` green, whole crossport suite green
+  (**53 passed**, +2 save/load), ruff/pyright green; **all 20 frozen goldens byte-identical** (no
+  regen). Next: Step 8 (objectives + the gating cross-boundary parity harness + Phase-8 exit).
 
 ### Step 8 (P8.8) — objectives + headless-parity harness + Phase-8 exit
 

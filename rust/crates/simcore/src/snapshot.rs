@@ -18,7 +18,12 @@
 //! pull a serde dependency: the shape is fixed and small, and staying zero-dep
 //! mirrors the Python core's stdlib-only discipline.
 
+use std::collections::BTreeMap;
+
+use crate::error::SimError;
 use crate::hexfloat;
+use crate::json::{self, JsonValue};
+use crate::quantities::{Quantity, StockKind};
 use crate::state as engine;
 
 /// The on-disk schema version. Must equal `sim_io.snapshot.SCHEMA_VERSION`;
@@ -147,6 +152,128 @@ pub fn from_engine(state: &engine::State) -> State {
     }
 }
 
+/// Parse `sim_io` snapshot JSON text into a computed engine [`engine::State`] — the
+/// **load** half of the codec (P8.7, work item #3), the inverse of
+/// [`from_engine`] → [`State::to_json`]. Convenience wrapper over [`json::parse`] +
+/// [`from_json_value`]; the save-record wrapper (`godot_bridge`) parses its outer
+/// object once and calls [`from_json_value`] on the embedded `state` sub-value.
+pub fn from_json(text: &str) -> Result<engine::State, SimError> {
+    let value = json::parse(text).map_err(|e| SimError::Validation(e.to_string()))?;
+    from_json_value(&value)
+}
+
+/// Reconstruct an engine [`engine::State`] from a parsed snapshot [`JsonValue`].
+///
+/// Mirrors Python `sim_io.snapshot.state_from_dict`: an unknown/missing schema
+/// `version` is rejected at parse (fail-loud, no migration machinery), and every
+/// stock/state routes through [`engine::Stock::new`] / [`engine::State::new`] so the
+/// core invariants re-fire on load — a tampered save (non-finite amount, an
+/// unclamped non-BOUNDARY stock, a key/id mismatch) fails loudly here rather than
+/// producing a malformed state. Floats are read through the exact hex-float
+/// [`hexfloat::parse`]; `rng_seed` from its `0x`-hex (or decimal) string, so a
+/// >2^53 seed survives bit-for-bit.
+pub fn from_json_value(value: &JsonValue) -> Result<engine::State, SimError> {
+    let version = value.get("version").and_then(JsonValue::as_i64);
+    if version != Some(SCHEMA_VERSION as i64) {
+        return Err(SimError::Validation(format!(
+            "unsupported snapshot schema version {:?}; this build reads version \
+             {SCHEMA_VERSION} only",
+            value.get("version")
+        )));
+    }
+
+    let n = value
+        .get("n")
+        .and_then(JsonValue::as_u64)
+        .ok_or_else(|| SimError::Validation("snapshot missing integer 'n'".to_string()))?;
+
+    let seed_str = value
+        .get("rng_seed")
+        .and_then(JsonValue::as_str)
+        .ok_or_else(|| SimError::Validation("snapshot missing string 'rng_seed'".to_string()))?;
+    let rng_seed = parse_seed(seed_str)?;
+
+    let mut aux = BTreeMap::new();
+    let aux_obj = value
+        .get("aux")
+        .and_then(JsonValue::as_object)
+        .ok_or_else(|| SimError::Validation("snapshot missing object 'aux'".to_string()))?;
+    for (name, hexv) in aux_obj {
+        let h = hexv.as_str().ok_or_else(|| {
+            SimError::Validation(format!("aux[{name:?}] is not a hex-float string"))
+        })?;
+        aux.insert(name.clone(), parse_hex(h)?);
+    }
+
+    let stocks_arr = value
+        .get("stocks")
+        .and_then(JsonValue::as_array)
+        .ok_or_else(|| SimError::Validation("snapshot missing array 'stocks'".to_string()))?;
+    let mut stocks = BTreeMap::new();
+    for s in stocks_arr {
+        let stock = stock_from_json(s)?;
+        stocks.insert(stock.id.clone(), stock);
+    }
+
+    engine::State::new(n, stocks, rng_seed, aux)
+}
+
+/// One stock object → a validated engine [`engine::Stock`] (through the constructor).
+fn stock_from_json(v: &JsonValue) -> Result<engine::Stock, SimError> {
+    let get_str = |key: &str| -> Result<&str, SimError> {
+        v.get(key)
+            .and_then(JsonValue::as_str)
+            .ok_or_else(|| SimError::Validation(format!("stock missing string field {key:?}")))
+    };
+
+    let composition_obj = v
+        .get("composition")
+        .and_then(JsonValue::as_object)
+        .ok_or_else(|| SimError::Validation("stock missing object 'composition'".to_string()))?;
+    let mut composition = BTreeMap::new();
+    for (q, coeffv) in composition_obj {
+        let coeff = coeffv.as_str().ok_or_else(|| {
+            SimError::Validation(format!("composition[{q:?}] is not a hex-float string"))
+        })?;
+        composition.insert(Quantity::from_value(q)?, parse_hex(coeff)?);
+    }
+
+    let unclamped = v
+        .get("unclamped")
+        .and_then(JsonValue::as_bool)
+        .ok_or_else(|| SimError::Validation("stock missing bool 'unclamped'".to_string()))?;
+
+    engine::Stock::new(
+        get_str("id")?.to_string(),
+        get_str("domain")?.to_string(),
+        Quantity::from_value(get_str("quantity")?)?,
+        get_str("unit")?.to_string(),
+        parse_hex(get_str("amount")?)?,
+        StockKind::from_value(get_str("kind")?)?,
+        parse_hex(get_str("extinction_threshold")?)?,
+        unclamped,
+        composition,
+    )
+}
+
+/// A hex-float string → `f64`, mapping the codec's [`hexfloat::ParseError`] into a
+/// [`SimError::Validation`] (the fail-loud discipline: a tampered value never coerces).
+fn parse_hex(s: &str) -> Result<f64, SimError> {
+    hexfloat::parse(s).map_err(|e| SimError::Validation(e.to_string()))
+}
+
+/// Parse the `rng_seed` string — a `0x`-hex (as [`State::to_json`] emits) or a plain
+/// decimal, mirroring Python's `int(s, 0)`. Stored as a string (not a JSON number)
+/// so a full 64-bit seed survives without the >2^53 f64 precision loss.
+fn parse_seed(s: &str) -> Result<u64, SimError> {
+    let s = s.trim();
+    let parsed = match s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+        Some(hex) => u64::from_str_radix(hex, 16),
+        None => s.parse::<u64>(),
+    };
+    parsed.map_err(|_| SimError::Validation(format!("invalid rng_seed {s:?}")))
+}
+
 /// Emit one stock object (indented two levels, field keys sorted alphabetically
 /// to mirror the Python `sort_keys=True` layout).
 fn push_stock(out: &mut String, s: &Stock) {
@@ -269,6 +396,165 @@ mod tests {
         );
         // The projection is a valid snapshot the emitter serializes without panic.
         assert!(snap.to_json().contains("\"quantity\": \"carbon\""));
+    }
+
+    /// A representative engine state (nasty floats, POPULATION with extinction, an
+    /// unclamped BOUNDARY source, a multi-key composition, aux, a >2^53 seed) round-
+    /// trips through `to_json` → `from_json` bit-for-bit. Bit-exactness is asserted by
+    /// re-emitting: the hex-float codec distinguishes `-0.0` from `0.0` where `==`
+    /// would not, so equal `to_json` bytes ⇒ every bit survived.
+    #[test]
+    fn from_json_round_trips_bit_for_bit() {
+        use crate::quantities::{Quantity, StockKind};
+        use crate::state::{State as EngineState, Stock as EngineStock};
+
+        let stocks = BTreeMap::from([
+            (
+                "bio.atmo_c".to_string(),
+                EngineStock::new(
+                    "bio.atmo_c".to_string(),
+                    "bio".to_string(),
+                    Quantity::Carbon,
+                    "mol".to_string(),
+                    std::f64::consts::PI,
+                    StockKind::Pool,
+                    0.0,
+                    false,
+                    BTreeMap::new(),
+                )
+                .unwrap(),
+            ),
+            (
+                "bio.plant_c".to_string(),
+                EngineStock::new(
+                    "bio.plant_c".to_string(),
+                    "bio".to_string(),
+                    Quantity::Carbon,
+                    "mol".to_string(),
+                    0.1,
+                    StockKind::Population,
+                    1e-6,
+                    false,
+                    BTreeMap::new(),
+                )
+                .unwrap(),
+            ),
+            (
+                "bio.co2".to_string(),
+                EngineStock::new(
+                    "bio.co2".to_string(),
+                    "bio".to_string(),
+                    Quantity::Carbon,
+                    "mol".to_string(),
+                    -0.0, // signed zero survives via hex-float
+                    StockKind::Pool,
+                    0.0,
+                    false,
+                    BTreeMap::from([(Quantity::Carbon, 1.0), (Quantity::Oxygen, 2.0)]),
+                )
+                .unwrap(),
+            ),
+            (
+                "boundary.solar".to_string(),
+                EngineStock::new(
+                    "boundary.solar".to_string(),
+                    "boundary".to_string(),
+                    Quantity::Energy,
+                    "J".to_string(),
+                    5e-324, // smallest positive subnormal
+                    StockKind::Boundary,
+                    0.0,
+                    true, // unclamped source
+                    BTreeMap::new(),
+                )
+                .unwrap(),
+            ),
+        ]);
+        let aux = BTreeMap::from([
+            ("thermal_time".to_string(), std::f64::consts::PI),
+            ("neg_zero".to_string(), -0.0),
+        ]);
+        let state = EngineState::new(7, stocks, 0x0123_4567_89AB_CDEF, aux).unwrap();
+
+        let text = from_engine(&state).to_json();
+        let back = from_json(&text).expect("from_json must accept our own to_json");
+        assert_eq!(back.n, 7);
+        assert_eq!(back.rng_seed, 0x0123_4567_89AB_CDEF);
+        // Re-emit and byte-compare: equal hex-float bytes ⇒ bit-exact (incl. -0.0).
+        assert_eq!(from_engine(&back).to_json(), text);
+    }
+
+    /// The cross-port proof: the Rust loader reads the **Python-generated** frozen
+    /// `state_snapshot.json` golden and reconstructs the exact bits (parsed-value
+    /// equality — no dependence on emitter formatting). The golden spans pi, `0.1`,
+    /// a subnormal, signed `-0.0`, a >2^53 seed, POPULATION with extinction, and an
+    /// unclamped ENERGY source.
+    #[test]
+    fn loads_the_python_golden_bit_exact() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../tests/regression/golden/state_snapshot.json"
+        );
+        let text = std::fs::read_to_string(path).expect("read state_snapshot.json golden");
+        let state = from_json(&text).expect("Rust loads the Python golden");
+
+        assert_eq!(state.n, 42);
+        assert_eq!(state.rng_seed, 0x0123_4567_89AB_CDEF); // >2^53, survives exactly
+        // Exact bits via .hex()-equivalent (compare raw f64 bits — distinguishes -0.0).
+        assert_eq!(
+            state.stocks["bio.atmo_c"].amount.to_bits(),
+            std::f64::consts::PI.to_bits()
+        );
+        assert_eq!(state.stocks["bio.plant_c"].extinction_threshold, 1e-6);
+        assert!(matches!(
+            state.stocks["bio.plant_c"].kind,
+            crate::quantities::StockKind::Population
+        ));
+        assert_eq!(state.stocks["bio.water"].amount, 5e-324);
+        // The loss-sink's -0.0 keeps its sign bit (value equality would miss it).
+        assert_eq!(state.stocks["boundary.loss.carbon"].amount.to_bits(), (-0.0_f64).to_bits());
+        assert!(state.stocks["boundary.solar"].unclamped);
+        assert_eq!(state.aux["neg_zero"].to_bits(), (-0.0_f64).to_bits());
+
+        // Bonus (byte-identity holds on this platform — Rust to_json == Python dumps):
+        // re-emitting the loaded golden reproduces the file byte-for-byte.
+        assert_eq!(from_engine(&state).to_json(), text);
+    }
+
+    #[test]
+    fn from_json_rejects_bad_version_and_tampering() {
+        // Unknown schema version → loud reject (no migration machinery).
+        let v2 = r#"{"aux":{},"n":0,"rng_seed":"0x0","stocks":[],"version":2}"#;
+        assert!(matches!(from_json(v2), Err(SimError::Validation(_))));
+
+        // A non-finite amount is caught by Stock::new (invariants re-fire on load).
+        let nan = r#"{"aux":{},"n":0,"rng_seed":"0x0","version":3,"stocks":[
+            {"amount":"nan","composition":{"carbon":"0x1.0p+0"},"domain":"d",
+             "extinction_threshold":"0x0.0p+0","id":"x","kind":"pool",
+             "quantity":"carbon","unclamped":false,"unit":"mol"}]}"#;
+        assert!(matches!(from_json(nan), Err(SimError::Validation(_))));
+
+        // An unclamped non-BOUNDARY stock is rejected by the constructor guard.
+        let unclamped_pool = r#"{"aux":{},"n":0,"rng_seed":"0x0","version":3,"stocks":[
+            {"amount":"0x1.0p+0","composition":{"carbon":"0x1.0p+0"},"domain":"d",
+             "extinction_threshold":"0x0.0p+0","id":"x","kind":"pool",
+             "quantity":"carbon","unclamped":true,"unit":"mol"}]}"#;
+        assert!(matches!(from_json(unclamped_pool), Err(SimError::Validation(_))));
+
+        // An unknown quantity value fails at from_value.
+        let bad_q = r#"{"aux":{},"n":0,"rng_seed":"0x0","version":3,"stocks":[
+            {"amount":"0x1.0p+0","composition":{"carbon":"0x1.0p+0"},"domain":"d",
+             "extinction_threshold":"0x0.0p+0","id":"x","kind":"pool",
+             "quantity":"unobtainium","unclamped":false,"unit":"mol"}]}"#;
+        assert!(matches!(from_json(bad_q), Err(SimError::Validation(_))));
+    }
+
+    #[test]
+    fn parse_seed_accepts_hex_and_decimal() {
+        assert_eq!(super::parse_seed("0x0").unwrap(), 0);
+        assert_eq!(super::parse_seed("0x123456789abcdef").unwrap(), 0x0123_4567_89AB_CDEF);
+        assert_eq!(super::parse_seed("42").unwrap(), 42);
+        assert!(super::parse_seed("0xnope").is_err());
     }
 
     #[test]

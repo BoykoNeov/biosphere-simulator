@@ -10,6 +10,7 @@
 //! `ENERGY` is in the asserted conserved set (it joined in Phase 5 — the Power
 //! domain); the balance gate asserts every member independently.
 
+use crate::error::SimError;
 use crate::ids::UnitLabel;
 
 /// A conserved quantity tracked by the ledger. `PHOSPHORUS` is reserved in the
@@ -33,6 +34,22 @@ impl Quantity {
             Quantity::Nitrogen => "nitrogen",
             Quantity::Oxygen => "oxygen",
             Quantity::Energy => "energy",
+        }
+    }
+
+    /// Parse a lowercase canonical value (`"carbon"`) back into a [`Quantity`] — the
+    /// inverse of [`Quantity::value`], used by the snapshot *loader* (P8.7). Mirrors
+    /// Python `Quantity(value)` raising `ValueError` on an unknown member.
+    pub fn from_value(value: &str) -> Result<Quantity, SimError> {
+        match value {
+            "carbon" => Ok(Quantity::Carbon),
+            "water" => Ok(Quantity::Water),
+            "nitrogen" => Ok(Quantity::Nitrogen),
+            "oxygen" => Ok(Quantity::Oxygen),
+            "energy" => Ok(Quantity::Energy),
+            other => Err(SimError::Validation(format!(
+                "unknown quantity value {other:?}"
+            ))),
         }
     }
 
@@ -98,6 +115,20 @@ impl StockKind {
         }
     }
 
+    /// Parse a lowercase canonical value (`"pool"`) back into a [`StockKind`] — the
+    /// inverse of [`StockKind::value`], used by the snapshot *loader* (P8.7). Mirrors
+    /// Python `StockKind(value)` raising `ValueError` on an unknown member.
+    pub fn from_value(value: &str) -> Result<StockKind, SimError> {
+        match value {
+            "pool" => Ok(StockKind::Pool),
+            "population" => Ok(StockKind::Population),
+            "boundary" => Ok(StockKind::Boundary),
+            other => Err(SimError::Validation(format!(
+                "unknown stock kind value {other:?}"
+            ))),
+        }
+    }
+
     /// The uppercase member name (`"POOL"`) — used in error messages.
     pub fn name(&self) -> &'static str {
         match self {
@@ -125,6 +156,24 @@ mod tests {
         assert_eq!(Quantity::Nitrogen.canonical_unit(), "kg");
         assert_eq!(Quantity::Oxygen.canonical_unit(), "mol");
         assert_eq!(Quantity::Energy.canonical_unit(), "J");
+    }
+
+    #[test]
+    fn from_value_inverts_value() {
+        for q in ASSERTED_QUANTITIES {
+            assert_eq!(Quantity::from_value(q.value()).unwrap(), q);
+        }
+        for k in [StockKind::Pool, StockKind::Population, StockKind::Boundary] {
+            assert_eq!(StockKind::from_value(k.value()).unwrap(), k);
+        }
+        assert!(matches!(
+            Quantity::from_value("CARBON"),
+            Err(SimError::Validation(_))
+        )); // value() is lowercase; name() is not accepted
+        assert!(matches!(
+            StockKind::from_value("nope"),
+            Err(SimError::Validation(_))
+        ));
     }
 
     #[test]

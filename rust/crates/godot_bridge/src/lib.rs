@@ -56,6 +56,11 @@ use station::session::SimSession as CoreSession;
 /// P8.3 — the off-render-thread time controller (play / pause / step / fast-forward).
 mod time_control;
 
+/// P8.7 — the versioned save-record wrapper (recipe + embedded v3 state snapshot).
+mod save;
+
+use save::{parse_save_record, save_record_json, Recipe};
+
 // ---------------------------------------------------------------------------
 // Free functions (no gdext) — the testable core. `cargo test` exercises these
 // without a Godot runtime; the `#[func]` methods are thin wrappers.
@@ -144,6 +149,21 @@ pub(crate) fn build_composed_session(
         },
     };
     Ok((session, display))
+}
+
+/// Rebuild a session from a save's [`Recipe`] (Phase-8 P8.7) — the dispatch save/load
+/// shares with the build FFI: a [`Recipe::Named`] scenario goes through
+/// [`build_session`], a [`Recipe::Composed`] palette set through
+/// [`build_composed_session`]. The registry is reconstructed deterministically from the
+/// recipe; the caller then restores the saved `State` via
+/// [`station::session::SimSession::load_state`].
+pub(crate) fn build_from_recipe(
+    recipe: &Recipe,
+) -> Result<(CoreSession, DisplayContext), SimError> {
+    match recipe {
+        Recipe::Named(id) => build_session(id),
+        Recipe::Composed(ids) => build_composed_session(ids),
+    }
 }
 
 /// The coupled crew ↔ ECLSS `CABIN_GAS_SCENARIO` as a single-rate session — mirrors the
@@ -524,6 +544,10 @@ pub struct SimSession {
     /// Per-scenario display constants (thermal params, battery reference, shared-stock
     /// ids) built alongside `inner` — the display readouts need what `State` lacks.
     display: Option<DisplayContext>,
+    /// How this session was built (P8.7) — set by `build` / `build_composed`, so `save`
+    /// can record the recipe alongside the state. `None` for a perturbed session (not
+    /// saveable) or before any build.
+    recipe: Option<Recipe>,
     base: Base<RefCounted>,
 }
 
@@ -534,10 +558,12 @@ impl SimSession {
     /// any prior session.
     #[func]
     fn build(&mut self, scenario_id: GString) -> bool {
-        match build_session(&scenario_id.to_string()) {
+        let id = scenario_id.to_string();
+        match build_session(&id) {
             Ok((session, display)) => {
                 self.inner = Some(session);
                 self.display = Some(display);
+                self.recipe = Some(Recipe::Named(id));
                 true
             }
             Err(err) => {
@@ -561,6 +587,7 @@ impl SimSession {
             Ok((session, display)) => {
                 self.inner = Some(session);
                 self.display = Some(display);
+                self.recipe = Some(Recipe::Composed(ids));
                 true
             }
             Err(err) => {
@@ -601,6 +628,10 @@ impl SimSession {
             Ok((session, display)) => {
                 self.inner = Some(session);
                 self.display = Some(display);
+                // A perturbed session is not saveable (P8.7 scope): the perturbation is a
+                // build-time window that has no place in the fixed-palette recipe. `save`
+                // reports it unavailable rather than dropping the perturbation silently.
+                self.recipe = None;
                 true
             }
             Err(err) => {
@@ -683,6 +714,63 @@ impl SimSession {
             Some(session) => GString::from(from_engine(session.state()).to_json().as_str()),
             None => GString::from(""),
         }
+    }
+
+    /// **Save** the session (P8.7) — the save-record JSON (`save_version` + the build
+    /// `recipe` + the current `State` as an embedded v3 snapshot). The game writes this to
+    /// disk (`FileAccess`); [`load`](Self::load) restores it. Returns `""` (and logs) if no
+    /// saveable session is built — before `build`, or for a **perturbed** session (not
+    /// saveable, P8.7 scope: the perturbation window has no recipe). The state is carried
+    /// through the bit-exact hex-float codec, so a save round-trips a resumable trajectory.
+    #[func]
+    fn save(&self) -> GString {
+        match (self.recipe.as_ref(), self.inner.as_ref()) {
+            (Some(recipe), Some(session)) => {
+                GString::from(save_record_json(recipe, session.state()).as_str())
+            }
+            (None, Some(_)) => {
+                godot_error!(
+                    "SimSession.save: this session is not saveable (perturbed sessions have \
+                     no fixed-palette recipe — P8.7 scope)"
+                );
+                GString::from("")
+            }
+            _ => {
+                godot_error!("SimSession.save called before build()");
+                GString::from("")
+            }
+        }
+    }
+
+    /// **Load** a save record (P8.7) — rebuild the session from the record's `recipe` (the
+    /// fixed-palette scenario / composition) and restore the saved `State`, so stepping
+    /// resumes bit-identically (the `(seed, key, n)` determinism corollary). Returns
+    /// `false` (and logs) on a malformed record, an unknown `save_version`, an unknown
+    /// recipe, or a stock-set mismatch. Idempotently replaces any prior session.
+    #[func]
+    fn load(&mut self, save_text: GString) -> bool {
+        let (recipe, state) = match parse_save_record(&save_text.to_string()) {
+            Ok(pair) => pair,
+            Err(err) => {
+                godot_error!("SimSession.load: bad save record: {err:?}");
+                return false;
+            }
+        };
+        let (mut session, display) = match build_from_recipe(&recipe) {
+            Ok(pair) => pair,
+            Err(err) => {
+                godot_error!("SimSession.load: recipe rebuild failed: {err:?}");
+                return false;
+            }
+        };
+        if let Err(err) = session.load_state(state) {
+            godot_error!("SimSession.load: state restore failed: {err:?}");
+            return false;
+        }
+        self.inner = Some(session);
+        self.display = Some(display);
+        self.recipe = Some(recipe);
+        true
     }
 
     /// The **display projection** as plain-float JSON (P8.2) — the multi-domain dashboard
@@ -972,6 +1060,92 @@ mod tests {
             build_perturbed_session("cabin_gas", "brownout", 1, 5, 0.0),
             Err(SimError::Validation(_))
         ));
+    }
+
+    /// The P8.7 save/load path through the bridge free functions: a session saved at
+    /// step A (via `save_record_json`), reloaded (`parse_save_record` → `build_from_recipe`
+    /// → `load_state`), and stepped B more, is bit-identical to a straight run of A+B. The
+    /// station-level `tests/session_save_load.rs` proves the relation directly; this proves
+    /// the *bridge composition* of recipe + record + rebuild is wired correctly.
+    #[test]
+    fn save_load_round_trip_through_the_bridge_resumes_bit_identical() {
+        let (mut straight, _) = build_session("cabin_gas").unwrap();
+        straight.step_n(300).unwrap();
+        let straight_final = from_engine(straight.state()).to_json();
+
+        let (mut saver, _) = build_session("cabin_gas").unwrap();
+        saver.step_n(120).unwrap();
+        let record = save_record_json(&Recipe::Named("cabin_gas".to_string()), saver.state());
+
+        let (recipe, state) = parse_save_record(&record).unwrap();
+        assert_eq!(recipe, Recipe::Named("cabin_gas".to_string()));
+        let (mut resumed, _) = build_from_recipe(&recipe).unwrap();
+        resumed.load_state(state).unwrap();
+        resumed.step_n(180).unwrap();
+
+        assert_eq!(
+            from_engine(resumed.state()).to_json(),
+            straight_final,
+            "bridge save/load resume is bit-identical to a straight run"
+        );
+    }
+
+    /// The **two-rate** bridge save/load path end-to-end: a `greenhouse` session saved at
+    /// day 2 (via the bridge record) and resumed through `build_from_recipe` + `load_state`
+    /// is bit-identical to a straight run — the pure-Rust `session_save_load.rs` proves the
+    /// relation, this proves the bridge composition (`Recipe::Named` two-rate rebuild + the
+    /// two-rate `load_state`) is wired. Cheap (a few master days).
+    #[test]
+    fn save_load_round_trip_two_rate_greenhouse_through_the_bridge() {
+        let (mut straight, _) = build_session("greenhouse").unwrap();
+        straight.step_n(3).unwrap();
+        let straight_final = from_engine(straight.state()).to_json();
+
+        let (mut saver, _) = build_session("greenhouse").unwrap();
+        saver.step_n(2).unwrap();
+        let record = save_record_json(&Recipe::Named("greenhouse".to_string()), saver.state());
+
+        let (recipe, state) = parse_save_record(&record).unwrap();
+        let (mut resumed, _) = build_from_recipe(&recipe).unwrap();
+        resumed.load_state(state).unwrap();
+        assert_eq!(resumed.n(), 2, "loaded two-rate state carries the master-day count");
+        resumed.step_n(1).unwrap();
+
+        assert_eq!(
+            from_engine(resumed.state()).to_json(),
+            straight_final,
+            "two-rate bridge save/load resume is bit-identical (aux/phenology survives)"
+        );
+    }
+
+    #[test]
+    fn build_from_recipe_dispatches_named_and_composed() {
+        assert!(build_from_recipe(&Recipe::Named("station".to_string())).is_ok());
+        assert!(build_from_recipe(&Recipe::Composed(vec![
+            "power_plant".to_string(),
+            "radiator".to_string()
+        ]))
+        .is_ok());
+        assert!(matches!(
+            build_from_recipe(&Recipe::Named("no_such".to_string())),
+            Err(SimError::Validation(_))
+        ));
+    }
+
+    /// A composed recipe survives the full round-trip too (save records both palette paths).
+    #[test]
+    fn save_load_round_trip_composed_recipe() {
+        let (mut saver, _) =
+            build_composed_session(&["power_plant".into(), "radiator".into()]).unwrap();
+        saver.step_n(24).unwrap();
+        let record = save_record_json(
+            &Recipe::Composed(vec!["power_plant".to_string(), "radiator".to_string()]),
+            saver.state(),
+        );
+        let (recipe, state) = parse_save_record(&record).unwrap();
+        let (mut resumed, _) = build_from_recipe(&recipe).unwrap();
+        resumed.load_state(state).unwrap();
+        assert_eq!(resumed.n(), 24, "resumed composed session carries n");
     }
 
     #[test]

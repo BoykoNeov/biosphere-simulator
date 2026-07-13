@@ -40,6 +40,7 @@ pub mod flow;
 pub mod hexfloat;
 pub mod ids;
 pub mod integrator;
+pub mod json;
 pub mod multirate;
 pub mod observation;
 pub mod quantities;
