@@ -1,0 +1,85 @@
+# crew_mission with the crew flows' params supplied by a NO-OP parameter pack
+# (packs/crew_noop.yaml restates the frozen 0.949/0.675). The run must reproduce
+# crew_state.json byte-for-byte — the pack-path faithfulness gate. Pack paths resolve
+# relative to THIS file's directory.
+name: crew_mission_pack_noop
+integrator: euler
+dt: 3600.0
+steps: 168
+rng_seed: 0
+
+stocks:
+  - id: crew.food_store
+    domain: crew
+    quantity: carbon
+    kind: pool
+    amount: 1000.0
+  - id: crew.water_store
+    domain: crew
+    quantity: water
+    kind: pool
+    amount: 60.0
+  - id: crew.o2_store
+    domain: crew
+    quantity: oxygen
+    kind: pool
+    amount: 2000.0
+  - id: boundary.exhaled_co2
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.fecal_waste
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.crew_humidity
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+  - id: boundary.urine
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+  - id: boundary.crew_o2_consumed
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: crew.oxygen_consumption
+    type: crew.oxygen_consumption
+    priority: 0
+    wiring:
+      o2_store: crew.o2_store
+      o2_consumed: boundary.crew_o2_consumed
+  - id: crew.food_metabolism
+    type: crew.food_metabolism
+    priority: 0
+    wiring:
+      food_store: crew.food_store
+      exhaled_co2: boundary.exhaled_co2
+      fecal_waste: boundary.fecal_waste
+    params:
+      pack: packs/crew_noop.yaml
+  - id: crew.water_balance
+    type: crew.water_balance
+    priority: 0
+    wiring:
+      water_store: crew.water_store
+      crew_humidity: boundary.crew_humidity
+      urine: boundary.urine
+    params:
+      pack: packs/crew_noop.yaml
+
+forcings:
+  crew_o2_intake:
+    const: 1.0e-3
+  crew_food_intake:
+    const: 5.0e-4
+  crew_water_intake:
+    const: 3.0e-5

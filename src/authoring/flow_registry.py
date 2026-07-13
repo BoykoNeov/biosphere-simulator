@@ -13,16 +13,20 @@ mirrors frozen constructor signatures; the signatures it mirrors are frozen, so 
 not incidental drift.
 
 Step 0 registers the standalone **Crew** flows (the composition anchor). Later steps
-grow this to the rest of the frozen flow set. Parameter *sets* are named separately
-(:data:`PARAM_LOADERS`) so "this flow type takes a params object" (a fixed fact of
-the class) is decoupled from "which param set" (a per-flow authoring choice); a
-flow type either takes params (``takes_params=True``) or does not.
+grow this to the rest of the frozen flow set. A flow type's **param set** (its
+``param_set`` name, a key into :data:`PARAM_LOADERS`, or ``None`` for a param-free
+flow) is a fixed fact of the class — it names *which frozen loader* produces the
+flow's params object. "Which concrete param values" is the per-flow authoring choice
+(Step 1): the named default committed file, or a **parameter pack** — a param file in
+the same ``{value, unit, source}`` schema that the *same frozen loader* reads (so a
+pack's values are validated by the frozen bounds/unit guards, never bypassing them).
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from domains.crew.flows import (
     FoodMetabolism,
@@ -42,14 +46,15 @@ class FlowTypeSpec:
     dataclass is a callable that returns a ``Flow``-conforming instance);
     ``wiring_fields`` the exact set of constructor keyword fields that take a
     ``StockId`` (the interpreter requires the scenario's ``wiring`` dict to match
-    this set exactly); ``takes_params`` whether the constructor takes a ``params``
-    object (looked up in :data:`PARAM_LOADERS`). Every frozen flow shares the
-    ``(id, priority, *wiring[, params])`` shape.
+    this set exactly); ``param_set`` names the frozen loader that produces this
+    flow's params object (a key into :data:`PARAM_LOADERS`), or ``None`` for a
+    param-free flow. Every frozen flow shares the ``(id, priority, *wiring[,
+    params])`` shape.
     """
 
     cls: Callable[..., Flow]
     wiring_fields: tuple[str, ...]
-    takes_params: bool
+    param_set: str | None
 
 
 # The author-selectable frozen-flow surface. Keys are stable authoring type names
@@ -59,25 +64,39 @@ FLOW_TYPES: dict[str, FlowTypeSpec] = {
     "crew.oxygen_consumption": FlowTypeSpec(
         cls=OxygenConsumption,
         wiring_fields=("o2_store", "o2_consumed"),
-        takes_params=False,
+        param_set=None,
     ),
     "crew.food_metabolism": FlowTypeSpec(
         cls=FoodMetabolism,
         wiring_fields=("food_store", "exhaled_co2", "fecal_waste"),
-        takes_params=True,
+        param_set="crew",
     ),
     "crew.water_balance": FlowTypeSpec(
         cls=WaterBalance,
         wiring_fields=("water_store", "crew_humidity", "urine"),
-        takes_params=True,
+        param_set="crew",
     ),
 }
 
 
-# Named frozen param sets. A flow type with ``takes_params=True`` references one of
-# these by name in its ``params`` field; the interpreter calls the loader to get the
-# exact frozen params object (so the param contribution is byte-identical to the
-# frozen build). Inline/override parameter *packs* are Step 1.
-PARAM_LOADERS: dict[str, Callable[[], object]] = {
+# Named frozen param loaders. Each takes an **optional path** (defaulting to the
+# committed frozen param file). A flow references its set by name (``params: crew``
+# → the loader's default file) or supplies a **pack** (``params: {pack: …}`` → the
+# same loader called with the pack's path), so a pack's values flow through the
+# frozen loader's schema/bounds/unit validation — a pack is a param file, not a way
+# around the guards.
+PARAM_LOADERS: dict[str, Callable[..., object]] = {
     "crew": load_crew_params,
 }
+
+
+def load_param_set(param_set: str, pack_path: Path | None) -> object:
+    """Load a flow type's params: the committed default, or a pack file.
+
+    ``param_set`` is the flow type's :attr:`FlowTypeSpec.param_set`; ``pack_path``
+    is ``None`` for the committed default or an already-resolved path to a pack file
+    (a param file in the frozen loader's own ``{value, unit, source}`` schema). The
+    pack is read by the *same frozen loader*, so its values are validated identically.
+    """
+    loader = PARAM_LOADERS[param_set]
+    return loader() if pack_path is None else loader(pack_path)

@@ -43,15 +43,33 @@ class StockSpec(BaseModel):
     extinction_threshold: float = 0.0
 
 
+class ParamPackRef(BaseModel):
+    """A reference to a **parameter pack** — an alternate param file (Step 1).
+
+    ``pack`` is a path to a param file in the frozen loader's own
+    ``{value, unit, source}`` schema, resolved **relative to the scenario file's
+    directory** (so a modder-shipped scenario+pack bundle relocates intact). The
+    *same* frozen loader reads it, so a pack's values pass the frozen schema/bounds/
+    unit validation — a pack is a param file, not a way around the guards. The
+    "cultivar = param pack" species primitive: an author overrides a value (e.g. a
+    metabolic fraction) by shipping a full pack file with the changed value.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    pack: str
+
+
 class FlowSpec(BaseModel):
     """One flow's declaration: a frozen flow *type* + wiring + optional params.
 
     ``type`` is a key into :data:`authoring.flow_registry.FLOW_TYPES` (the
     author-selectable frozen-flow surface). ``wiring`` maps the flow constructor's
-    stock-id fields → stock ids declared in this scenario. ``params`` names a frozen
-    param-set (:data:`authoring.flow_registry.PARAM_LOADERS`) for flow types that
-    take a params object; it must be omitted for those that do not. Parameter
-    *packs* (inline/override) are Step 1.
+    stock-id fields → stock ids declared in this scenario. ``params`` selects the
+    params object for flow types that take one, and must be omitted for those that
+    do not: a **string** names the flow type's frozen default set (its committed
+    file — the Step-0 form), or a :class:`ParamPackRef` supplies a parameter pack
+    (Step 1). Partial-merge/bundling packs are deferred (full-file packs only).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -60,7 +78,7 @@ class FlowSpec(BaseModel):
     type: str
     priority: int = 0
     wiring: dict[str, str]
-    params: str | None = None
+    params: str | ParamPackRef | None = None
 
 
 class ForcingSpec(BaseModel):

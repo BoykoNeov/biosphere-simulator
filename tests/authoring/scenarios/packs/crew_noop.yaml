@@ -1,0 +1,18 @@
+# A NO-OP parameter pack: restates the frozen crew.yaml values (0.949 / 0.675)
+# with a different `source:` string. Since `source` is recorded-not-parsed (only
+# `value` + `unit` feed the run), loading crew flows through this pack must produce a
+# CrewParams identical to the committed default — so the run is byte-identical to
+# crew_state.json. This is the pack-path faithfulness gate: the pack mechanism reuses
+# the frozen load_crew_params loader (schema + bounds + exact-unit guard) verbatim.
+name: crew
+process: metabolic_split
+
+parameters:
+  respired_carbon_fraction:
+    value: 0.949
+    unit: "dimensionless"
+    source: "test no-op pack: restates the frozen BVAD value 0.949 (source string differs to prove it is recorded-not-parsed)"
+  insensible_water_fraction:
+    value: 0.675
+    unit: "dimensionless"
+    source: "test no-op pack: restates the frozen BVAD value 0.675"

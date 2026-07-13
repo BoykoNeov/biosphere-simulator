@@ -1,0 +1,20 @@
+# A CHANGED parameter pack — the "cultivar" primitive: a crew whose respired-carbon
+# fraction is 0.80 (vs the frozen 0.949), insensible-water fraction unchanged (0.675).
+# Loaded by the SAME frozen load_crew_params loader, so 0.80 still passes the [0, 1]
+# bound + exact-unit guard. Effect (predicted, reconstruct-the-factor): FoodMetabolism
+# respires LESS CO2 (0.80 vs 0.949 of the drawn food carbon) and egests MORE feces;
+# food_store depletion is UNCHANGED (the intake q is forced, independent of the split);
+# CARBON stays conserved every step. WaterBalance is untouched (insensible unchanged).
+# Illustrative test data only — NOT a calibrated cultivar (Phase-9 "authored != validated").
+name: crew
+process: metabolic_split
+
+parameters:
+  respired_carbon_fraction:
+    value: 0.80
+    unit: "dimensionless"
+    source: "test cultivar pack: illustrative lowered respired fraction (NOT calibrated); exercises the reconstruct-the-factor gate"
+  insensible_water_fraction:
+    value: 0.675
+    unit: "dimensionless"
+    source: "test cultivar pack: unchanged from the frozen value 0.675"

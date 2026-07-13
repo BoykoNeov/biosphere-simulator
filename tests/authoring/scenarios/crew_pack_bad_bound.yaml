@@ -1,0 +1,40 @@
+# A minimal scenario referencing the out-of-range pack (packs/crew_bad_bound.yaml).
+# load_scenario must raise ValueError from the frozen loader's bound check — packs
+# reuse the frozen validation, never route around it.
+name: crew_pack_bad_bound
+integrator: euler
+dt: 3600.0
+steps: 1
+rng_seed: 0
+
+stocks:
+  - id: crew.food_store
+    domain: crew
+    quantity: carbon
+    kind: pool
+    amount: 1000.0
+  - id: boundary.exhaled_co2
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.fecal_waste
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: crew.food_metabolism
+    type: crew.food_metabolism
+    priority: 0
+    wiring:
+      food_store: crew.food_store
+      exhaled_co2: boundary.exhaled_co2
+      fecal_waste: boundary.fecal_waste
+    params:
+      pack: packs/crew_bad_bound.yaml
+
+forcings:
+  crew_food_intake:
+    const: 5.0e-4

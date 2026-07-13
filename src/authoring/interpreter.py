@@ -17,10 +17,11 @@ that wires a flow badly interprets cleanly and surfaces as a runtime
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from authoring.errors import AuthoringError
-from authoring.flow_registry import FLOW_TYPES, PARAM_LOADERS
-from authoring.schema import FlowSpec, ScenarioSpec, StockSpec
+from authoring.flow_registry import FLOW_TYPES, load_param_set
+from authoring.schema import FlowSpec, ParamPackRef, ScenarioSpec, StockSpec
 from config import load_yaml
 from simcore.environment import SourceResolver, constant
 from simcore.flow import Flow
@@ -92,12 +93,37 @@ def _build_stock(spec: StockSpec) -> Stock:
     )
 
 
-def _build_flow(spec: FlowSpec) -> Flow:
+def _resolve_params(spec: FlowSpec, param_set: str, base_dir: Path) -> object:
+    """Resolve a params-taking flow's params object (named default or a pack).
+
+    ``spec.params`` is a **string** naming the flow type's frozen default set (must
+    equal ``param_set``) or a :class:`ParamPackRef`; a pack path is resolved relative
+    to ``base_dir`` (the scenario file's directory). The frozen loader reads both, so
+    a pack's values pass the frozen bounds/unit validation.
+    """
+    if spec.params is None:
+        raise AuthoringError(
+            f"flow {spec.id!r} ({spec.type}): this flow type requires 'params' "
+            f"(the set name {param_set!r} or a {{pack: …}} reference)"
+        )
+    if isinstance(spec.params, ParamPackRef):
+        pack_path = base_dir / spec.params.pack
+        return load_param_set(param_set, pack_path)
+    # A bare string names the flow type's default committed set.
+    if spec.params != param_set:
+        raise AuthoringError(
+            f"flow {spec.id!r} ({spec.type}): param set {spec.params!r} does not "
+            f"match this flow type's set {param_set!r}"
+        )
+    return load_param_set(param_set, None)
+
+
+def _build_flow(spec: FlowSpec, base_dir: Path) -> Flow:
     """Lower one :class:`FlowSpec` to a frozen ``Flow`` via the flow-type registry.
 
     Validates the wiring dict against the flow type's declared fields (exact match)
-    and resolves the param set for a params-taking flow — both as
-    :class:`AuthoringError` (decidable from the file structure).
+    and resolves the params object (named default or a pack, relative to ``base_dir``)
+    for a params-taking flow — structural failures raise :class:`AuthoringError`.
     """
     type_spec = FLOW_TYPES.get(spec.type)
     if type_spec is None:
@@ -113,35 +139,28 @@ def _build_flow(spec: FlowSpec) -> Flow:
     kwargs: dict[str, object] = {
         field: StockId(spec.wiring[field]) for field in type_spec.wiring_fields
     }
-    if type_spec.takes_params:
-        if spec.params is None:
-            raise AuthoringError(
-                f"flow {spec.id!r} ({spec.type}): this flow type requires a "
-                f"'params' set (one of {sorted(PARAM_LOADERS)})"
-            )
-        loader = PARAM_LOADERS.get(spec.params)
-        if loader is None:
-            raise AuthoringError(
-                f"flow {spec.id!r}: unknown param set {spec.params!r} "
-                f"(known: {sorted(PARAM_LOADERS)})"
-            )
-        kwargs["params"] = loader()
+    if type_spec.param_set is not None:
+        kwargs["params"] = _resolve_params(spec, type_spec.param_set, base_dir)
     elif spec.params is not None:
         raise AuthoringError(
             f"flow {spec.id!r} ({spec.type}): this flow type takes no params, "
-            f"but a 'params' set {spec.params!r} was given"
+            f"but 'params' was given"
         )
     return type_spec.cls(FlowId(spec.id), spec.priority, **kwargs)
 
 
-def interpret(spec: ScenarioSpec) -> BuiltScenario:
+def interpret(spec: ScenarioSpec, base_dir: Path | None = None) -> BuiltScenario:
     """Build the runnable ``(State, Registry, resolver)`` graph from a scenario spec.
 
     Stocks are lowered and keyed by id (a duplicate id is an ``AuthoringError``);
     flows are lowered via the registry (``Registry`` re-sorts them into canonical
     order, so authoring order is inert); forcings become constant schedules. Single
-    ``State`` at ``n=0`` with the authored seed.
+    ``State`` at ``n=0`` with the authored seed. ``base_dir`` is the directory that
+    any parameter-pack path is resolved against (defaults to the process CWD — set it
+    to the scenario file's parent via :func:`load_scenario`).
     """
+    if base_dir is None:
+        base_dir = Path()
     stocks: dict[StockId, Stock] = {}
     for stock_spec in spec.stocks:
         stock = _build_stock(stock_spec)
@@ -149,7 +168,7 @@ def interpret(spec: ScenarioSpec) -> BuiltScenario:
             raise AuthoringError(f"duplicate stock id {stock.id!r}")
         stocks[stock.id] = stock
     state = State(n=0, stocks=stocks, rng_seed=spec.rng_seed)
-    flows = [_build_flow(flow_spec) for flow_spec in spec.flows]
+    flows = [_build_flow(flow_spec, base_dir) for flow_spec in spec.flows]
     registry = Registry(flows, stocks)
     resolver = SourceResolver(
         forcings={name: constant(f.const) for name, f in spec.forcings.items()}
@@ -171,5 +190,7 @@ def load_scenario(path: str) -> BuiltScenario:
     ``load_yaml`` is the safe (``yaml.safe_load``, top-level-mapping) read shared
     with the param loaders; ``ScenarioSpec.model_validate`` applies the schema
     (``extra="forbid"`` + float coercion — the pyyaml numeric-string backstop).
+    Parameter-pack paths are resolved relative to ``path``'s directory.
     """
-    return interpret(ScenarioSpec.model_validate(load_yaml(path)))
+    spec = ScenarioSpec.model_validate(load_yaml(path))
+    return interpret(spec, base_dir=Path(path).parent)

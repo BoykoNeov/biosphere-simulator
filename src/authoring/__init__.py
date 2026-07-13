@@ -24,13 +24,20 @@ which ``simcore`` may never do.
 from authoring.errors import AuthoringError
 from authoring.interpreter import BuiltScenario, interpret, load_scenario
 from authoring.run import run_scenario
-from authoring.schema import FlowSpec, ForcingSpec, ScenarioSpec, StockSpec
+from authoring.schema import (
+    FlowSpec,
+    ForcingSpec,
+    ParamPackRef,
+    ScenarioSpec,
+    StockSpec,
+)
 
 __all__ = [
     "AuthoringError",
     "BuiltScenario",
     "FlowSpec",
     "ForcingSpec",
+    "ParamPackRef",
     "ScenarioSpec",
     "StockSpec",
     "interpret",

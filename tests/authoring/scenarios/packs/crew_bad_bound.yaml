@@ -1,0 +1,16 @@
+# A pack with an OUT-OF-RANGE value (respired_carbon_fraction 1.5, outside [0, 1]).
+# Loading it through the frozen load_crew_params loader must raise ValueError — the
+# proof that a pack does NOT bypass the frozen bounds/unit validation (it is read by
+# the same loader as the committed default).
+name: crew
+process: metabolic_split
+
+parameters:
+  respired_carbon_fraction:
+    value: 1.5
+    unit: "dimensionless"
+    source: "test bad-bound pack: 1.5 is outside [0, 1] and must be rejected by the frozen loader"
+  insensible_water_fraction:
+    value: 0.675
+    unit: "dimensionless"
+    source: "test bad-bound pack"

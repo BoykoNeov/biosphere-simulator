@@ -1,6 +1,6 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Step 0 COMPLETE; Steps 1–7 planned.** Plan of record for turning the frozen
+**Status: IN PROGRESS — Steps 0–1 COMPLETE; Steps 2–7 planned (Step 2 gated on decision D).** Plan of record for turning the frozen
 multi-domain engine into an **authoring platform**: new stations, ecosystems, species, and
 domains are declared in **data**, not programmed. Pre-plan orientation complete and
 advisor-reviewed; two load-bearing scope decisions **USER-CONFIRMED** (see "Confirmed scope
@@ -168,9 +168,28 @@ the same file into the same graph as Python.** Contract:
   > a coupled scenario (station/greenhouse) can be authored, the **derived-IC mechanism** must be decided:
   > precompute-and-inline (author lowers the derived value to a literal) vs letting it bleed into the DSL
   > (a computed-IC expression). That is a later sub-step (likely Step 3 templates), NOT Step 0.
-- **Step 1 — parameter packs (data-only).** A param-pack file that bundles/overrides existing
-  YAML params, referenced by a scenario file. Nearly free — a subset of the Step-0 format;
-  proves the "cultivar = param pack" species primitive cheaply.
+- **Step 1 — parameter packs (data-only). COMPLETE.** A **parameter pack is a param file the
+  *frozen* loader reads** (`load_crew_params(path=…)`) — the tightest constraint is "don't bypass
+  the frozen bounds/exact-unit/pydantic validation," and a pack-is-a-param-file satisfies it for
+  free (advisor). `schema.FlowSpec.params` now accepts a bare **string** (the flow type's frozen
+  default set — the Step-0 form) OR a `ParamPackRef` (`{pack: <path>}`); the loader is tied to the
+  flow type via `FlowTypeSpec.param_set` (a fixed fact of the class), and `flow_registry.load_param_set`
+  dispatches default-vs-pack. **Pack paths resolve relative to the scenario file's directory**
+  (`interpret(spec, base_dir=…)`, threaded from `load_scenario`) so a modder scenario+pack bundle
+  relocates intact (Step-5 forward-fit). **Step-0's byte-identity gate doesn't transfer** (a changed
+  pack diverges by design) — split into (a) a **no-op pack** (restates the frozen 0.949/0.675, only
+  `source:` differs — recorded-not-parsed) reproducing `crew_state.json` **byte-for-byte** (the
+  faithfulness gate) + (b) a **changed "cultivar" pack** (`respired_carbon_fraction` 0.949→0.80) whose
+  effect is *reconstructed*: less `exhaled_co2`, more `fecal_waste` in the exact 0.80/0.20 split,
+  `food_store` depletion + the whole WATER/OXYGEN side **bit-identical** (the forced intake `q` is
+  independent of the split), CARBON conserved every step — the `n_limited`/`water_biting`
+  reconstruct-the-factor "it bit" gate. Plus a **bad-bound pack** (`resp` 1.5) → `ValueError` from the
+  frozen loader (packs reuse the guards, never route around them). **Full-file packs only** — no
+  partial-merge (would merge at the YAML-dict level *before* the loader, never `dataclasses.replace`
+  after), no multi-domain bundling (earns its keep at templates/species) — both deferred; inline params
+  (values in the scenario file) also deferred (needs a from-dict loader surface `_CrewSchema` doesn't
+  expose). 5 tests. **Zero core + zero domain change** (`git diff src/{simcore,domains}/` empty). Full
+  suite green; all 20 frozen goldens byte-identical.
 - **Step 2 — the bounded kinetics DSL (decision D), Python side.** The closed expression grammar
   + the pure-stdlib AST/VM in `simcore` + a `DeclarativeFlow` (rate-expr × stoichiometry,
   balanced by construction — decision C) + the Python parser in the boundary. **Acceptance =
