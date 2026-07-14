@@ -379,6 +379,24 @@ fn apply_includes_namespaces_ids_and_rate_refs() {
 }
 
 #[test]
+fn prefixed_forcing_bound_bundle_fails_loudly() {
+    // The crew-forcing blocker, LOCKED cross-port (the load-bearing Step-6c scope claim):
+    // the frozen crew flows read intake forcings by a hardcoded name, so namespacing the
+    // forcing keys orphans that lookup. The build is clean (namespacing is well-formed),
+    // but the run must FAIL LOUDLY — `Environment::get` returns `SimError::Reference` at
+    // step 1 — never a silent, still-conserving wrong run.
+    let built = interpret_in_scenarios(
+        "name: s\nintegrator: euler\ndt: 3600.0\nsteps: 1\n\
+         includes:\n  - bundle: bundles/crew.domain.yaml\n    prefix: crewA\n",
+    )
+    .expect("a prefixed crew include builds cleanly");
+    assert!(
+        run_scenario(built).is_err(),
+        "a prefixed forcing-bound (crew) bundle must fail loudly, not run silently wrong"
+    );
+}
+
+#[test]
 fn same_bundle_twice_same_prefix_is_duplicate() {
     // Namespacing enables multi-instance, but two instances under the SAME prefix still
     // collide (the prefix must distinguish them) — the collision guard stays honest.

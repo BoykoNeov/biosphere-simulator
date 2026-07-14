@@ -295,6 +295,35 @@ def test_apply_includes_namespaces_ids_and_rate_refs() -> None:
     assert rate.right.stock == "bat_a.power.battery"
 
 
+def test_prefixed_forcing_bound_bundle_fails_loudly(tmp_path: Path) -> None:
+    # The crew-forcing blocker, LOCKED (the load-bearing scope claim for Step 6c): the
+    # frozen crew flows read intake forcings by a *hardcoded* module constant
+    # (`crew_o2_intake` etc.), so namespacing the forcing keys orphans that lookup. The
+    # run must FAIL LOUDLY — `Environment.get` raises `KeyError` at step 1 — never a
+    # silent, still-conserving wrong run (zero intake). This pins WHY a prefixed crew is
+    # unsupported and guards `Environment.get`'s raise-on-missing contract against a
+    # future forcings refactor that would quietly reopen the footgun.
+    import shutil
+
+    bundles = tmp_path / "bundles"
+    bundles.mkdir()
+    shutil.copy(
+        SCENARIO_DIR / "bundles" / "crew.domain.yaml", bundles / "crew.domain.yaml"
+    )
+    scenario = _write(
+        tmp_path,
+        "s.yaml",
+        _SCENARIO_HEAD
+        + "includes:\n  - bundle: bundles/crew.domain.yaml\n    prefix: crewA\n",
+    )
+    built = load_scenario(str(scenario))
+    # It BUILDS cleanly — the namespacing itself is well-formed (forcings prefixed)...
+    assert any(k.startswith("crewA.") for k in built.resolver.forcings)
+    # ...but the frozen flow's hardcoded forcing name is now unreachable → KeyError.
+    with pytest.raises(KeyError, match="crew_"):
+        run_scenario(built)
+
+
 def test_same_bundle_twice_same_prefix_is_duplicate(tmp_path: Path) -> None:
     # Namespacing is what makes multi-instance work — but two instances under the SAME
     # prefix still collide (the prefix must distinguish them). This keeps the collision
