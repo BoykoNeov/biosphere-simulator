@@ -75,6 +75,55 @@ pub struct ForcingSpec {
     pub const_: NumericField,
 }
 
+/// A reusable **domain / species bundle**: stocks + flows + forcings + parameters
+/// (mirrors Python `authoring.schema.BundleSpec`, Phase 9, Step 6). A scenario
+/// [`ScenarioSpec::includes`] one or more bundle files; [`crate::compose::apply_includes`]
+/// merges each bundle's declarations into the scenario's flat graph.
+///
+/// A bundle carries **no run config** (integrator/dt/steps/name/rng_seed) and **no
+/// nested** `includes` — both are rejected by the allowed-key set below (exactly
+/// `[parameters, stocks, flows, forcings]`), the `extra="forbid"` analogue: run config
+/// lives only in the top-level scenario, and includes are flat, one level deep.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BundleSpec {
+    pub parameters: Vec<(String, f64)>,
+    pub stocks: Vec<StockSpec>,
+    pub flows: Vec<FlowSpec>,
+    pub forcings: Vec<(String, ForcingSpec)>,
+}
+
+impl BundleSpec {
+    /// Validate and bind a parsed bundle document into a [`BundleSpec`] (the
+    /// `BundleSpec.model_validate` analogue). The allowed-key set is exactly
+    /// `[parameters, stocks, flows, forcings]`, so a stray `steps:`/`integrator:` (run
+    /// config) or a nested `includes:` is a schema error — the two Python
+    /// bundle-schema-reject cases.
+    pub fn from_yaml(doc: &YamlValue) -> Result<BundleSpec, AuthoringError> {
+        let entries = doc.as_mapping("bundle")?;
+        reject_unknown_keys(
+            entries,
+            &["parameters", "stocks", "flows", "forcings"],
+            "bundle",
+        )?;
+        let parameters = match field(entries, "parameters") {
+            None => Vec::new(),
+            Some(value) => parse_parameters(value)?,
+        };
+        let stocks = parse_stock_list(entries, "bundle.stocks")?;
+        let flows = parse_flow_list(entries, "bundle.flows")?;
+        let forcings = match field(entries, "forcings") {
+            None => Vec::new(),
+            Some(value) => parse_forcings(value)?,
+        };
+        Ok(BundleSpec {
+            parameters,
+            stocks,
+            flows,
+            forcings,
+        })
+    }
+}
+
 /// A whole authored scenario (mirrors `ScenarioSpec`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScenarioSpec {
@@ -83,6 +132,9 @@ pub struct ScenarioSpec {
     pub dt: f64,
     pub steps: u64,
     pub rng_seed: u64,
+    /// Bundle-file paths to compose in (Step 6), resolved relative to the scenario
+    /// file's directory. Merged by [`crate::compose::apply_includes`] before interpret.
+    pub includes: Vec<String>,
     pub parameters: Vec<(String, f64)>,
     pub stocks: Vec<StockSpec>,
     pub flows: Vec<FlowSpec>,
@@ -102,6 +154,7 @@ impl ScenarioSpec {
                 "dt",
                 "steps",
                 "rng_seed",
+                "includes",
                 "parameters",
                 "stocks",
                 "flows",
@@ -114,20 +167,24 @@ impl ScenarioSpec {
         let dt = require_f64(entries, "dt", "scenario")?;
         let steps = require_u64(entries, "steps", "scenario")?;
         let rng_seed = opt_u64(entries, "rng_seed", "scenario")?.unwrap_or(0);
+        let includes = match field(entries, "includes") {
+            None => Vec::new(),
+            Some(value) => value
+                .as_sequence("scenario.includes")?
+                .iter()
+                .map(|v| scalar_str(v, "scenario.includes item"))
+                .collect::<Result<Vec<_>, _>>()?,
+        };
         let parameters = match field(entries, "parameters") {
             None => Vec::new(),
             Some(value) => parse_parameters(value)?,
         };
-        let stocks = require_field(entries, "stocks", "scenario")?
-            .as_sequence("scenario.stocks")?
-            .iter()
-            .map(parse_stock)
-            .collect::<Result<Vec<_>, _>>()?;
-        let flows = require_field(entries, "flows", "scenario")?
-            .as_sequence("scenario.flows")?
-            .iter()
-            .map(parse_flow)
-            .collect::<Result<Vec<_>, _>>()?;
+        // `stocks`/`flows` are OPTIONAL (Step 6, carry-forward i): a scenario may omit
+        // its inline stocks/flows when it composes them from `includes` (the frozen
+        // `crew_station.yaml` has neither). The Python `ScenarioSpec` relaxed these to
+        // `Field(default_factory=list)`; this mirror matches.
+        let stocks = parse_stock_list(entries, "scenario.stocks")?;
+        let flows = parse_flow_list(entries, "scenario.flows")?;
         let forcings = match field(entries, "forcings") {
             None => Vec::new(),
             Some(value) => parse_forcings(value)?,
@@ -138,11 +195,44 @@ impl ScenarioSpec {
             dt,
             steps,
             rng_seed,
+            includes,
             parameters,
             stocks,
             flows,
             forcings,
         })
+    }
+}
+
+/// Parse an optional `stocks:` sequence (shared by `ScenarioSpec` and `BundleSpec`);
+/// an absent key is an empty list (Step 6, carry-forward i).
+fn parse_stock_list(
+    entries: &[(String, YamlValue)],
+    ctx: &str,
+) -> Result<Vec<StockSpec>, AuthoringError> {
+    match field(entries, "stocks") {
+        None => Ok(Vec::new()),
+        Some(value) => value
+            .as_sequence(ctx)?
+            .iter()
+            .map(parse_stock)
+            .collect::<Result<Vec<_>, _>>(),
+    }
+}
+
+/// Parse an optional `flows:` sequence (shared by `ScenarioSpec` and `BundleSpec`); an
+/// absent key is an empty list.
+fn parse_flow_list(
+    entries: &[(String, YamlValue)],
+    ctx: &str,
+) -> Result<Vec<FlowSpec>, AuthoringError> {
+    match field(entries, "flows") {
+        None => Ok(Vec::new()),
+        Some(value) => value
+            .as_sequence(ctx)?
+            .iter()
+            .map(parse_flow)
+            .collect::<Result<Vec<_>, _>>(),
     }
 }
 

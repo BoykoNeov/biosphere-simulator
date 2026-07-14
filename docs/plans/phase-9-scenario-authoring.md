@@ -1,10 +1,11 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b + Step 5 + Step 6a COMPLETE (composition +
-parameter packs + the bounded kinetics DSL + templates + the Rust VM/parser port with parse- &
-trajectory-parity + the Rust runtime scenario-FILE interpreter + Godot loading an authored file at
-runtime through the frozen cdylib + Python file-composition via reusable domain/species bundles);
-Step 6b (the Rust `includes` port) + Step 6c (multi-instance id-namespacing) + Step 7 JIT.** Step 4
+**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b + Step 5 + Step 6a + Step 6b COMPLETE
+(composition + parameter packs + the bounded kinetics DSL + templates + the Rust VM/parser port with
+parse- & trajectory-parity + the Rust runtime scenario-FILE interpreter + Godot loading an authored
+file at runtime through the frozen cdylib + Python file-composition via reusable domain/species
+bundles + the Rust `includes` port with cross-port composition parity); Step 6c (multi-instance
+id-namespacing) + Step 7 JIT.** Step 4
 was SPLIT (advisor-recommended,
 USER-CONFIRMED): 4a ported the AST/VM + rate-expr parser to Rust with the two cross-port parity
 surfaces (parse-parity Tier-0 + SelfDischarge trajectory-parity Tier-1, Euler+RK4) at **zero YAML
@@ -498,21 +499,38 @@ the same file into the same graph as Python.** Contract:
     @4× + 3 two-domain merge + 8 merge-semantics/fence). **Zero core + zero domain change** (`git diff
     src/{simcore,domains}/` empty — purely additive boundary + tests + YAML); all 20 frozen goldens
     byte-identical (no regen).
-  - **Step 6b — the Rust `includes` port (DEFERRED, mirroring 4a/4b; MANDATORY eventually).**
-    `includes` is a new **file-level parse-parity surface** (decision E): Step 7 cannot freeze an
-    includes grammar only one port implements. The Rust side (`rust/crates/authoring/`) must gain the
-    same merge in `yaml.rs`/`schema.rs`/`interpreter.rs` (a `BundleSpec` mirror + the flatten), with the
-    two anchors gated on the crossport CI job exactly as 4b's file anchors are. Not a nicety like the
-    `station::sim` file dispatch was — the composition grammar is a freeze surface. **Two advisor-flagged
-    carry-forwards:** (i) 6a **relaxed `ScenarioSpec.stocks`/`flows` from required → optional** (a scenario
-    may now legally omit inline stocks/flows when it includes bundles — `crew_station.yaml` has none); this
-    is a real schema change Step 7's freeze doc must record, and the Rust `schema.rs` mirror must match.
-    (ii) The **includes-first-then-inline order** is a cross-port semantic documented + collision-tested but
-    not *positively* order-tested (no 6a byte-identity depends on it); 6b should add a one-line anchor that
-    mixes an include with an inline stock and pins the resulting stock order, so a Rust port that merged
-    inline-first can't pass silently. (The **crossport anchor list is a fixed `_ANCHORS` tuple** in
-    `tests/crossport/authoring_files.py`, NOT a glob — so the new `crew_station`/`station_composed`/`bundles`
-    files are correctly *not* fed to the not-yet-`includes`-aware Rust parser; that safety is structural.)
+  - **Step 6b — the Rust `includes` port. COMPLETE.** `includes` is a new **file-level parse-parity
+    surface** (decision E): Step 7 cannot freeze an includes grammar only one port implements. The Rust
+    `authoring` crate gained the same merge — new `compose.rs` (`apply_includes` + an order-preserving
+    `Merger`, mirroring the Python module char-for-char: includes-first-then-inline, duplicate
+    stock-id/flow-id/forcing-key/parameter-name → `AuthoringError`, bundle-flow param-pack deferred),
+    a `BundleSpec` mirror + `ScenarioSpec.includes` in `schema.rs`, and **`apply_includes` threaded into
+    `interpret`** (not only `load_scenario`) so a spec with non-empty `includes` can never reach the rest
+    of interpret un-applied (`interpret` gained a `base_dir` param — its only Rust use is bundle
+    resolution, packs deferred). **Carry-forward (i) DONE:** `ScenarioSpec.stocks`/`flows` relaxed
+    required → optional in the Rust `schema.rs` mirror (shared `parse_stock_list`/`parse_flow_list`
+    helpers; `crew_station.yaml` has neither inline) — the schema change Step 7's freeze doc must record.
+    **Carry-forward (ii) DONE, with a finding:** the includes-first-then-inline order is **unobservable in
+    the serialized outputs** (`sim_io` + the graph dump both id-sort stocks / canonical-sort flows /
+    name-sort forcings — a run/graph-dump anchor cannot distinguish includes-first from inline-first), so
+    it is pinned by a **unit test on the `Vec`/list `apply_includes` returns** *before* the interpreter
+    canonicalizes it (both ports — Rust `apply_includes_orders_includes_before_inline` +
+    Python `test_apply_includes_orders_includes_before_inline`, closing the 6a positive-order gap). A new
+    **mixed include+inline anchor** (`crew_station_inline_battery.yaml` — the crew bundle included + the
+    battery domain declared inline, the only anchor with BOTH sources non-empty) carries the run/graph-dump
+    coverage (its graph == `station_composed`'s, asserted both ports) but is honestly labeled "proves
+    include+inline coexist, not order". **Crossport `ANCHORS` grew by four** (fixed tuple, not a glob):
+    `crew_station.yaml`@default → **byte-identical to `crew_state.json`** (the load-bearing composition
+    faithfulness anchor, Tier-1), `crew_station.yaml`@`crew_count=4.0` (override reaches a **bundle-declared**
+    param through the merge), `station_composed.yaml` (two-bundle merge, `has_authored_kinetics=1` in the
+    dump, run-match+graph-dump), and the mixed anchor — all on the crossport CI job (`skipif cargo`, Tier-1
+    so glibc-vs-UCRT-golden holds). 25 Rust authoring tests (12 new: 4 compose-build + the order pin + the
+    mixed-equals-composition + 7 compose rejects using `CARGO_TARGET_TMPDIR`) + 16 Python compose tests
+    (2 new: the order pin + mixed-equals-composition). **Zero core + zero domain change** (`git diff src/`
+    empty — all Rust under `rust/crates/authoring/`, the new anchor + crossport wiring under `tests/`);
+    `cargo test` (workspace) + `clippy --all-targets -D warnings` green; ruff/format/pyright green; **all 20
+    frozen goldens byte-identical** (no regen). Blocks Step 7's freeze (the composition grammar is now a
+    two-port surface Step 7 can freeze); Step 6c (multi-instance namespacing) still deferred.
   - **Step 6c — multi-instance id-namespacing/prefixing (DEFERRED, principled).** Disjoint-id
     composition (crew + battery) needs no prefixing; prefixing is *only forced* by two instances of the
     **same** bundle (the `test_including_same_bundle_twice_is_duplicate` collision demonstrates exactly

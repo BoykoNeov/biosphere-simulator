@@ -35,9 +35,12 @@ import pytest
 from pydantic import ValidationError
 
 import sim_io
+from authoring.compose import apply_includes
 from authoring.errors import AuthoringError
 from authoring.interpreter import load_scenario
 from authoring.run import run_scenario
+from authoring.schema import ScenarioSpec
+from config import load_yaml
 from domains.crew.loader import load_crew_params
 from domains.crew.scenario import MISSION_SCENARIO
 from domains.crew.system import build_crew
@@ -53,6 +56,7 @@ from simcore.state import State, Stock
 SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
 CREW_STATION = SCENARIO_DIR / "crew_station.yaml"
 STATION_COMPOSED = SCENARIO_DIR / "station_composed.yaml"
+MIXED_INLINE_BATTERY = SCENARIO_DIR / "crew_station_inline_battery.yaml"
 GOLDEN_PATH = Path(__file__).parent / "regression" / "golden" / "crew_state.json"
 
 _ENERGY = Quantity.ENERGY
@@ -172,6 +176,48 @@ def test_two_domain_merge_battery_half_matches_self_discharge() -> None:
     frozen = _frozen_self_discharge_final()
     for sid in (StockId("power.battery"), StockId("boundary.waste_heat")):
         assert final.stocks[sid].amount == frozen.stocks[sid].amount
+
+
+# --- Merge order: includes-first-then-inline (positively pinned, both ports) ----------
+
+
+def test_apply_includes_orders_includes_before_inline() -> None:
+    # Carry-forward (ii): 6a documented + collision-tested the includes-first ordering
+    # but never *positively* order-tested it (no byte-identity depends on it — the
+    # serialized outputs are id-sorted). Pin it on the list `apply_includes` returns,
+    # *before* the interpreter canonicalizes it to id-sorted maps. The mixed anchor has
+    # BOTH a crew-bundle include and an inline battery domain, so a port that merged
+    # inline-first would fail here. (The Rust `scenario_files.rs` has the mirror.)
+    spec = ScenarioSpec.model_validate(load_yaml(str(MIXED_INLINE_BATTERY)))
+    merged = apply_includes(spec, MIXED_INLINE_BATTERY.parent)
+    assert [s.id for s in merged.stocks] == [
+        "crew.food_store",
+        "crew.water_store",
+        "crew.o2_store",
+        "boundary.exhaled_co2",
+        "boundary.fecal_waste",
+        "boundary.crew_humidity",
+        "boundary.urine",
+        "boundary.crew_o2_consumed",
+        "power.battery",
+        "boundary.waste_heat",
+    ]
+    assert [f.id for f in merged.flows] == [
+        "crew.oxygen_consumption",
+        "crew.food_metabolism",
+        "crew.water_balance",
+        "power.self_discharge",
+    ]
+    assert merged.includes == []  # emptied after the merge
+
+
+def test_mixed_include_and_inline_equals_two_bundle_composition() -> None:
+    # The mixed anchor (crew bundle + inline battery) builds the same graph as
+    # station_composed (crew bundle + battery bundle); its final state matches, and the
+    # inline SelfDischarge marks it authored.
+    mixed = run_scenario(load_scenario(str(MIXED_INLINE_BATTERY)))[0][-1]
+    composed = run_scenario(load_scenario(str(STATION_COMPOSED)))[0][-1]
+    assert mixed.stocks == composed.stocks
 
 
 # --- Merge semantics: no silent override, deferrals, schema fences --------------------

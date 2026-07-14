@@ -24,6 +24,7 @@ use simcore::quantities::{Quantity, StockKind, BALANCE_ATOL, BALANCE_RTOL};
 use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
+use crate::compose::apply_includes;
 use crate::errors::AuthoringError;
 use crate::expr_parser::parse_rate_expr;
 use crate::flow_registry::{build_frozen_flow, flow_type, kinetics_param_map, FLOW_TYPE_NAMES};
@@ -51,15 +52,27 @@ pub struct BuiltScenario {
 
 /// Build the runnable graph from a scenario spec (the `interpret` analogue).
 ///
-/// Template `parameters` are resolved first (defaults + `overrides`), then any stock
+/// Any `includes` are merged first ([`crate::compose::apply_includes`]): each bundle
+/// file's parameters/stocks/flows/forcings are flattened into the scenario (bundles
+/// first, then inline; a duplicate across sources is an error), yielding a
+/// self-contained spec lowered exactly as a hand-flattened one — so composition adds no
+/// per-step surface. `base_dir` is the directory bundle paths resolve against (mirroring
+/// Python `interpret(spec, base_dir=…)`); its **only** Rust use is bundle resolution
+/// (parameter packs are deferred in the Rust port), and running the merge here — not
+/// only in [`load_scenario`] — means a spec with non-empty `includes` can never reach
+/// the rest of `interpret` un-applied.
+///
+/// Template `parameters` are resolved next (defaults + `overrides`), then any stock
 /// `amount` / forcing `const` expression over them is evaluated to a literal. Stocks
 /// are lowered and keyed by id (a duplicate id is an error); flows are lowered via the
 /// registry (`Registry` re-sorts into canonical id order, so authoring order is inert);
 /// forcings become constant schedules.
 pub fn interpret(
     spec: &ScenarioSpec,
+    base_dir: &std::path::Path,
     overrides: &BTreeMap<String, f64>,
 ) -> Result<BuiltScenario, AuthoringError> {
+    let spec = apply_includes(spec, base_dir)?;
     let params = resolve_parameters(&spec.parameters, overrides)?;
 
     let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
@@ -114,7 +127,9 @@ pub fn load_scenario(
     })?;
     let doc = parse_document(&text)?;
     let spec = ScenarioSpec::from_yaml(&doc)?;
-    interpret(&spec, overrides)
+    // Bundle paths (Step 6) resolve relative to the scenario file's directory.
+    let base_dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+    interpret(&spec, base_dir, overrides)
 }
 
 /// Lower one [`StockSpec`] to a frozen `Stock` (the `_build_stock` analogue). The unit

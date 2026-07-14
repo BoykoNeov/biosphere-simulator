@@ -1,0 +1,47 @@
+# Phase 9 Step 6b — the MIXED include + inline anchor (both sources non-empty).
+#
+# Includes the crew species bundle AND declares the battery ENERGY domain INLINE (the
+# same stocks + SelfDischarge kinetics that station_composed.yaml pulls from a second
+# bundle). This is the only anchor where BOTH an `includes` and inline `stocks`/`flows`
+# are present, so it exercises the includes-first-then-inline merge path end-to-end
+# (crew bundle stocks/flows first, then the inline battery pair).
+#
+# NOTE on what this proves: the serialized outputs (sim_io, the graph dump) are all
+# id-sorted, so a run/graph-dump anchor cannot distinguish includes-first from
+# inline-first — it proves "include + inline coexist and both contribute", not order.
+# The includes-FIRST ordering is pinned separately by a unit test on the Vec that
+# `apply_includes` returns *before* the interpreter canonicalizes it (both ports).
+#
+# Disjoint domains (crew CARBON/WATER/OXYGEN + battery ENERGY) ⇒ every quantity conserves
+# every step; the resulting graph is identical to station_composed.yaml's, so its final
+# state matches too. `has_authored_kinetics` is True (the inline SelfDischarge). Floats
+# carry an explicit decimal point / signed exponent (the YAML-1.1 numeric hazard).
+
+name: crew_station_inline_battery
+integrator: euler
+dt: 3600.0
+steps: 168
+
+includes:
+  - bundles/crew.domain.yaml
+
+stocks:
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 1.0e+7
+  - id: boundary.waste_heat
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: power.self_discharge
+    kinetics:
+      rate: 'param("self_discharge_rate") * stock("power.battery")'
+      stoichiometry:
+        power.battery: -1
+        boundary.waste_heat: 1
+    params: self_discharge
