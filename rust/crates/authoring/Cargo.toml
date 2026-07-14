@@ -1,0 +1,17 @@
+[package]
+name = "authoring"
+version = "0.1.0"
+edition = "2021"
+description = "Native Rust port of the frozen Python `authoring` boundary (Phase 9, Step 4a). The rate-expression parser (text→simcore::expr AST) + the canonical S-expr renderer that the cross-port parse-parity gate diffs. Depends only on the zero-dep `simcore` crate."
+publish = false
+
+[lib]
+name = "authoring"
+path = "src/lib.rs"
+
+# Only the sibling `simcore` engine crate (for the AST + hex-float codec). No YAML
+# parser: runtime scenario-file loading (decision E) is Step 4b/5. This crate ports
+# only the rate-grammar parser — the sole Tier-0 parse-parity surface — so the crux
+# needs no new dependency, mirroring the Python core's stdlib-only discipline.
+[dependencies]
+simcore = { path = "../simcore" }

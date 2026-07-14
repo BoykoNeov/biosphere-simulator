@@ -28,6 +28,13 @@
 //! and the cross-port gate compares `State` snapshots directly). It is display-only and
 //! carries no aggregates; the derived Godot readouts (per-domain totals, temperature,
 //! SOC) live one layer out in `station::display`, keeping this module the faithful port.
+//!
+//! `expr` (Phase-9 Step 4a) ports the bounded kinetics-DSL VM — the plain-data AST +
+//! `eval_expr` + `DeclarativeFlow` (rate-expr × stoichiometry). It is the Rust mirror
+//! of the one deliberate one-time `simcore` extension the Python side made in Phase-9
+//! Step 2; the rate-expression *parser* (text→AST) stays in the boundary `authoring`
+//! crate (decision A). The grammar is the arithmetic core only (`+ - *`, unary `-`,
+//! refs, `n`) — division and the function set remain deferred in both ports.
 
 pub mod arbitration;
 pub mod auxiliary;
@@ -36,6 +43,7 @@ pub mod conservation;
 pub mod environment;
 pub mod error;
 pub mod events;
+pub mod expr;
 pub mod flow;
 pub mod hexfloat;
 pub mod ids;

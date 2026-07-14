@@ -1,7 +1,11 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Steps 0–3 COMPLETE (composition + parameter packs + the bounded kinetics
-DSL + templates); Steps 4–7 JIT.** Decision D (the bounded-closed-grammar reading) was **CONFIRMED
+**Status: IN PROGRESS — Steps 0–3 + Step 4a COMPLETE (composition + parameter packs + the bounded
+kinetics DSL + templates + the Rust VM/parser port with parse- & trajectory-parity); Step 4b + 5–7
+JIT.** Step 4 was SPLIT (advisor-recommended, USER-CONFIRMED): 4a ported the AST/VM + rate-expr
+parser to Rust with the two cross-port parity surfaces (parse-parity Tier-0 + SelfDischarge
+trajectory-parity Tier-1, Euler+RK4) at **zero YAML dependency**; the Rust YAML/schema/interpreter
+(decision E) folds into 4b/Step 5. Decision D (the bounded-closed-grammar reading) was **CONFIRMED
 by the user** (2026-07-13) and Step 2 landed: the pure-stdlib expression VM + `DeclarativeFlow`
 entered `simcore` as the deliberate one-time additive break, proven faithful by re-expressing the
 frozen `SelfDischarge` bit-identically (Euler + RK4). Step 2 shipped only the unambiguous arithmetic
@@ -280,9 +284,57 @@ the same file into the same graph as Python.** Contract:
   > take mean)) needs running a sub-sim — genuinely larger, deferred further.
   > **File composition/includes** (merging fragments) is out of Step 3's parametrization scope —
   > deferred to Step 6 (species/domain bundles).
-- **Step 4 — the Rust interpreter + parse-parity (JIT).** Rust YAML parser (boundary, decision
-  E) + the AST/VM ported to Rust `simcore` + parse-parity (Tier-0) + cross-port trajectory
-  parity (Tier-1/2). The genuinely-new cross-port surface of this phase.
+- **Step 4 — the Rust interpreter + parse-parity.** SPLIT (advisor-recommended,
+  USER-CONFIRMED) into **4a — the crux (no YAML dep)** and **4b — the file parser
+  (decision E, folds into Step 5)**. The genuinely-new cross-port surface of this phase —
+  rate-grammar parse-parity + authored-flow trajectory parity — is provable with **zero
+  YAML dependency**: the trajectory anchor builds a `DeclarativeFlow` in Rust directly
+  from a *parsed rate string* (the `gen_engine_vectors` inline-flow discipline), and
+  parse-parity tests rate *strings*, not files. So the heaviest, most precedent-loaded
+  decision (E, the Rust YAML dep — Phase-7 chose Option-C hex-floats *precisely to avoid*
+  one, and `serde_yaml` is deprecated) is separated out and does not gate the crux.
+  - **Step 4a — the VM + parser port + the two parity surfaces. COMPLETE.** Two new Rust
+    modules, **zero YAML dep**: (1) `rust/crates/simcore/src/expr.rs` — the mechanical
+    mirror of the Phase-9 Step-2 `simcore.expr` extension (the `Expr` enum
+    `Const`/`StockRef`/`ParamRef`/`ForcingRef`/`StepN`/`Neg`/`BinOp`, `eval_expr`,
+    `DeclarativeFlow` implementing the `Flow` trait — `increment = rate*dt`, `coeff*increment`
+    per leg, op-order char-for-char); (2) a new boundary crate `rust/crates/authoring`
+    (depends only on `simcore`) with `expr_parser.rs` (the recursive-descent parser, the
+    **sole Tier-0 parse-parity surface** — precedence/associativity pinned identically to
+    the Python `authoring.expr_parser`) + `sexpr.rs` (the canonical S-expr renderer the
+    parity gate diffs). **The deferred grammar is deferred in both ports (do NOT complete
+    it):** the `BinaryOp` enum literally cannot represent `/`, and `/`/unknown-idents/`**`
+    are *rejected* exactly as Python raises `AuthoringError` — the "helpful Rust dev adds
+    all the ops" trap structurally foreclosed. **Two parity surfaces**, both against
+    committed generated-vector files (the `gen_engine_vectors` discipline — `src/authoring`
+    + `simcore.expr` ARE the reference, no external anchor; `test_crossport.py` guards
+    in-sync): (i) **parse-parity** (Tier-0 structural) — 20 accept cases (every node type +
+    precedence/associativity + exact-literal round-trip: `Const` renders through the
+    hex-float codec so a literal's parity is *bit-exact*) each lowering to the identical
+    canonical S-expr in both ports, + 16 reject cases (both ports must error; **message
+    text NOT pinned** — Tier-0 is accept→same-AST, reject→both-error); (ii)
+    **trajectory-parity** (Tier-1 bit-exact) — the frozen `SelfDischarge` re-expression
+    anchor (`k·battery`, the plan's Step-2 anchor, **no new golden** — and it gives two
+    free checks: Rust-DSL == Python-DSL AND Rust-DSL == the already-ported Rust
+    `SelfDischarge`) + a **synthetic authored scenario** additionally exercising every
+    remaining VM node in the *evaluated* path (`ForcingRef`/`StepN`/`Neg`/`+`/`-`, which the
+    Mul-only SelfDischarge misses — the "synthetic scenario" engine-vectors discipline),
+    both run under **Euler AND RK4** (RK4 nontrivial — donor-controlled ⇒ RK4 ≢ Euler) and
+    gated per-step bit-exact via the hex-float codec (`rationed==0`/`events==()` asserted).
+    `simcore` gains 17 expr unit tests; `authoring` 14 parser + 2 vector-gated integration
+    tests. **Zero core + zero domain change** (`git diff src/` empty — the whole crux is
+    under `rust/` + `tests/crossport/`, and `simcore.expr` was already extended in Step 2);
+    `cargo test` + `clippy -D warnings` green; full Python suite incl. `-m slow` + ruff +
+    pyright green; all 20 frozen goldens byte-identical (no regen). The template
+    **boundary-eval** surface (Step-3's `param('crew_count')*base`) is *interpreter* scope,
+    so it defers with 4b, not the crux.
+  - **Step 4b — the Rust YAML/schema/interpreter (decision E; folds into Step 5, JIT).**
+    Runtime scenario-file parsing: the Rust YAML dep decision (a vetted crate vs a
+    hand-rolled closed-subset parser — the project's revealed preference is hand-rolled/
+    no-dep, but hand-rolling means reimplementing the pydantic schema validation too), the
+    schema, the interpreter (calling the frozen constructors + the template boundary-eval),
+    and the file-level parse-parity (stock-id/flow-id sets, wiring, param packs). Blocks
+    Step 5 (Godot loads a file), not 4a.
 - **Step 5 — Godot loads a file at runtime (JIT).** The `godot_bridge` gains a "build session
   from a scenario file path" entry; the "author, not program" payoff. Cross-boundary parity
   smoke: the file-loaded session (through the actual cdylib) == the headless-built one, the

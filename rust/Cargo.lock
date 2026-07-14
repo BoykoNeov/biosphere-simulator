@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "authoring"
+version = "0.1.0"
+dependencies = [
+ "simcore",
+]
+
+[[package]]
 name = "domains"
 version = "0.1.0"
 dependencies = [

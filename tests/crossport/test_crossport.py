@@ -38,6 +38,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 
 import compare  # noqa: E402
+import gen_authoring_vectors  # noqa: E402
 import gen_biosphere_params  # noqa: E402
 import gen_biosphere_weather  # noqa: E402
 import gen_engine_vectors  # noqa: E402
@@ -99,6 +100,35 @@ def test_engine_vectors_in_sync() -> None:
     assert on_disk == gen_engine_vectors.render(), (
         "engine vectors are stale — regenerate with "
         "`uv run python tests/crossport/gen_engine_vectors.py`"
+    )
+
+
+def test_authoring_parse_vectors_in_sync() -> None:
+    """The committed authoring parse-parity file equals `render_parse()` (regen
+    discipline — the Rust `authoring/tests/authoring_vectors.rs` gates the same rate
+    strings, re-deriving each S-expr with its own parser + `render_sexpr`; a divergence
+    is a Tier-0 parse-parity failure). `src/authoring` + `simcore.expr` are the
+    reference, so proving Rust == Python is the whole goal (no external anchor)."""
+    on_disk = gen_authoring_vectors.PARSE_PATH.read_text(encoding="utf-8").replace(
+        "\r\n", "\n"
+    )
+    assert on_disk == gen_authoring_vectors.render_parse(), (
+        "authoring parse vectors are stale — regenerate with "
+        "`uv run python tests/crossport/gen_authoring_vectors.py`"
+    )
+
+
+def test_authoring_traj_vectors_in_sync() -> None:
+    """The committed authoring trajectory file equals `render_traj()` (regen discipline
+    — the Rust integration test rebuilds the SelfDischarge anchor + the synthetic
+    full-VM scenario from the same parsed rate strings and gates each per-step amount
+    bit-exact under Euler AND RK4). Transcendental-free ⇒ Tier-1."""
+    on_disk = gen_authoring_vectors.TRAJ_PATH.read_text(encoding="utf-8").replace(
+        "\r\n", "\n"
+    )
+    assert on_disk == gen_authoring_vectors.render_traj(), (
+        "authoring trajectory vectors are stale — regenerate with "
+        "`uv run python tests/crossport/gen_authoring_vectors.py`"
     )
 
 
