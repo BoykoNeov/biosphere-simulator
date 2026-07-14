@@ -19,8 +19,20 @@
 //!   order is only observable on the returned spec, not on a run/graph-dump).
 //! - **No silent override:** a duplicate stock id, flow id, forcing key, or parameter
 //!   name across any two sources is an [`AuthoringError`]. Disjoint-domain composition
-//!   (crew + battery) needs no id-namespacing; multi-instance prefixing is deferred
-//!   (Step 6c).
+//!   (crew + battery) needs no id-namespacing.
+//! - **Multi-instance id-namespacing** (Step 6c): an include may be a
+//!   [`IncludeSpec::Prefixed`] (`{bundle, prefix}`) instead of a bare path. A `prefix`
+//!   namespaces every id the bundle declares (stock id / flow id / forcing key →
+//!   `<prefix>.<id>`) and every reference to it — `wiring` values, `stoichiometry` keys,
+//!   and the `stock(...)`/`forcing(...)` refs inside a `kinetics` rate (parsed to the
+//!   AST, prefixed via [`prefix_expr_refs`], re-emitted by
+//!   [`crate::expr_parser::render_rate_expr`]). This lets the **same** bundle be included
+//!   more than once (two batteries) without the id collision a bare double-include hits.
+//!   `param(...)` refs are never rewritten (a rate's `param` names a *frozen* param set,
+//!   shared across instances); bundle-**parameter** namespacing is deferred. A bundle
+//!   whose *frozen* flows bind a forcing by a hardcoded name (the crew flows'
+//!   `crew_o2_intake` constant) can't reach a namespaced forcing key — the documented
+//!   crew-forcing blocker; kinetics / disjoint bundles namespace cleanly.
 //! - **Flat, one level deep:** a bundle carries no `includes` of its own (rejected by
 //!   [`BundleSpec::from_yaml`]'s allowed-key set).
 //! - **Run config lives only in the top-level scenario** (also enforced by the bundle
@@ -35,8 +47,14 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use simcore::expr::Expr;
+
 use crate::errors::AuthoringError;
-use crate::schema::{BundleSpec, FlowSpec, ForcingSpec, ParamsSpec, ScenarioSpec, StockSpec};
+use crate::expr_parser::{parse_rate_expr, render_rate_expr};
+use crate::schema::{
+    BundleSpec, FlowSpec, ForcingSpec, IncludeSpec, KineticsSpec, ParamsSpec, ScenarioSpec,
+    StockSpec,
+};
 use crate::yaml::parse_document;
 
 /// Merge `spec.includes` bundle files into a flat [`ScenarioSpec`].
@@ -56,9 +74,20 @@ pub fn apply_includes(
 
     let mut merger = Merger::default();
     for inc in &spec.includes {
-        let bundle = load_bundle(&base_dir.join(inc), inc)?;
+        let (path, prefix) = match inc {
+            IncludeSpec::Bare(p) => (p.as_str(), None),
+            IncludeSpec::Prefixed { bundle, prefix } => (bundle.as_str(), Some(prefix.as_str())),
+        };
+        let bundle = load_bundle(&base_dir.join(path), path)?;
+        let (bundle, source) = match prefix {
+            None => (bundle, format!("bundle {path:?}")),
+            Some(px) => (
+                namespace_bundle(&bundle, px)?,
+                format!("bundle {path:?} (prefix {px:?})"),
+            ),
+        };
         merger.merge(
-            &format!("bundle {inc:?}"),
+            &source,
             &bundle.parameters,
             &bundle.stocks,
             &bundle.flows,
@@ -172,6 +201,88 @@ impl Merger {
         }
         Ok(())
     }
+}
+
+/// Rewrite `stock`/`forcing` reference names in a rate AST under `prefix` (Step 6c) —
+/// the Rust mirror of Python `_prefix_expr_refs`. `stock(...)`/`forcing(...)` args are
+/// bundle ids/keys → `<prefix>.<name>`; `param(...)` is **left untouched** (in a rate it
+/// names a *frozen* param set, shared across instances). `Const`/`StepN` carry no refs.
+fn prefix_expr_refs(node: &Expr, prefix: &str) -> Expr {
+    match node {
+        Expr::StockRef(id) => Expr::StockRef(format!("{prefix}.{id}")),
+        Expr::ForcingRef(name) => Expr::ForcingRef(format!("{prefix}.{name}")),
+        Expr::Neg(operand) => Expr::Neg(Box::new(prefix_expr_refs(operand, prefix))),
+        Expr::BinOp { op, left, right } => Expr::BinOp {
+            op: *op,
+            left: Box::new(prefix_expr_refs(left, prefix)),
+            right: Box::new(prefix_expr_refs(right, prefix)),
+        },
+        Expr::Const(_) | Expr::ParamRef(_) | Expr::StepN => node.clone(),
+    }
+}
+
+/// Return a copy of `flow` with its id, wiring targets, stoichiometry keys and
+/// kinetics-rate stock/forcing refs namespaced under `prefix` (the `_namespace_flow`
+/// analogue).
+fn namespace_flow(flow: &FlowSpec, prefix: &str) -> Result<FlowSpec, AuthoringError> {
+    let wiring: Vec<(String, String)> = flow
+        .wiring
+        .iter()
+        .map(|(k, v)| (k.clone(), format!("{prefix}.{v}")))
+        .collect();
+    let kinetics = match &flow.kinetics {
+        None => None,
+        Some(k) => {
+            let ast = parse_rate_expr(&k.rate)?;
+            Some(KineticsSpec {
+                rate: render_rate_expr(&prefix_expr_refs(&ast, prefix)),
+                stoichiometry: k
+                    .stoichiometry
+                    .iter()
+                    .map(|(s, c)| (format!("{prefix}.{s}"), *c))
+                    .collect(),
+            })
+        }
+    };
+    Ok(FlowSpec {
+        id: format!("{prefix}.{}", flow.id),
+        type_: flow.type_.clone(),
+        priority: flow.priority,
+        wiring,
+        kinetics,
+        params: flow.params.clone(),
+    })
+}
+
+/// Return a copy of `bundle` with every declared id namespaced under `prefix` (the
+/// `_namespaced_bundle` analogue). Stock ids, flow ids (+ their references) and forcing
+/// keys become `<prefix>.<id>`; `parameters` are **not** prefixed (bundle-parameter
+/// namespacing deferred — a param-bearing bundle is un-multi-instanceable for the
+/// crew-forcing reason, so a second prefixed instance collides on the parameter name).
+fn namespace_bundle(bundle: &BundleSpec, prefix: &str) -> Result<BundleSpec, AuthoringError> {
+    let stocks: Vec<StockSpec> = bundle
+        .stocks
+        .iter()
+        .map(|s| StockSpec {
+            id: format!("{prefix}.{}", s.id),
+            ..s.clone()
+        })
+        .collect();
+    let mut flows = Vec::with_capacity(bundle.flows.len());
+    for flow in &bundle.flows {
+        flows.push(namespace_flow(flow, prefix)?);
+    }
+    let forcings: Vec<(String, ForcingSpec)> = bundle
+        .forcings
+        .iter()
+        .map(|(k, v)| (format!("{prefix}.{k}"), v.clone()))
+        .collect();
+    Ok(BundleSpec {
+        parameters: bundle.parameters.clone(),
+        stocks,
+        flows,
+        forcings,
+    })
 }
 
 /// Read + validate one bundle file (`extra="forbid"` — no run config, no nesting).

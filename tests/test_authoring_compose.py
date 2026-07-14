@@ -57,6 +57,7 @@ SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
 CREW_STATION = SCENARIO_DIR / "crew_station.yaml"
 STATION_COMPOSED = SCENARIO_DIR / "station_composed.yaml"
 MIXED_INLINE_BATTERY = SCENARIO_DIR / "crew_station_inline_battery.yaml"
+TWO_BATTERIES = SCENARIO_DIR / "two_batteries.yaml"
 GOLDEN_PATH = Path(__file__).parent / "regression" / "golden" / "crew_state.json"
 
 _ENERGY = Quantity.ENERGY
@@ -218,6 +219,96 @@ def test_mixed_include_and_inline_equals_two_bundle_composition() -> None:
     mixed = run_scenario(load_scenario(str(MIXED_INLINE_BATTERY)))[0][-1]
     composed = run_scenario(load_scenario(str(STATION_COMPOSED)))[0][-1]
     assert mixed.stocks == composed.stocks
+
+
+# --- Step 6c: multi-instance id-namespacing (the SAME bundle included twice) ----------
+
+
+def test_namespaced_same_bundle_twice_runs_and_conserves() -> None:
+    # The battery domain included twice under distinct prefixes: namespacing rewrites
+    # every id so the two instances do not collide (the bare double-include collides,
+    # below). Disjoint after prefixing ⇒ ENERGY conserves every step, the run completing
+    # is the proof; both instances mark it authored (their SelfDischarge kinetics).
+    built = load_scenario(str(TWO_BATTERIES))
+    states, rationed, events = run_scenario(built)
+    assert rationed == 0
+    assert events == ()
+    final = states[-1]
+    assert set(final.stocks) == {
+        "bat_a.power.battery",
+        "bat_a.boundary.waste_heat",
+        "bat_b.power.battery",
+        "bat_b.boundary.waste_heat",
+    }
+    assert built.has_authored_kinetics is True
+
+
+def test_namespaced_instances_each_match_frozen_self_discharge() -> None:
+    # Projection faithfulness: each namespaced half is bit-for-bit a frozen single
+    # SelfDischarge run over the same horizon (dt=3600, 168 steps) — namespacing changed
+    # only the ids, not the dynamics. The two instances are identical (same bundle, same
+    # frozen `k`), so they also equal each other exactly.
+    final = run_scenario(load_scenario(str(TWO_BATTERIES)))[0][-1]
+    frozen = _frozen_self_discharge_final()
+    frozen_batt = frozen.stocks[StockId("power.battery")].amount
+    frozen_waste = frozen.stocks[StockId("boundary.waste_heat")].amount
+    for prefix in ("bat_a", "bat_b"):
+        assert final.stocks[StockId(f"{prefix}.power.battery")].amount == frozen_batt
+        assert (
+            final.stocks[StockId(f"{prefix}.boundary.waste_heat")].amount
+            == frozen_waste
+        )
+
+
+def test_apply_includes_namespaces_ids_and_rate_refs() -> None:
+    # The namespacing surface, made explicit on the merged spec (before the interpreter
+    # canonicalizes it): stock ids, flow ids, stoichiometry keys are all prefixed, and —
+    # the load-bearing part — the kinetics rate's `stock(...)` ref is rewritten to the
+    # prefixed id (a structural AST rewrite, re-emitted). Parse the rewritten rate back
+    # and assert the ref, so a string-level regression is caught.
+    from authoring.expr_parser import parse_rate_expr
+    from simcore.expr import BinOp, StockRef
+
+    spec = ScenarioSpec.model_validate(load_yaml(str(TWO_BATTERIES)))
+    merged = apply_includes(spec, TWO_BATTERIES.parent)
+    assert [s.id for s in merged.stocks] == [
+        "bat_a.power.battery",
+        "bat_a.boundary.waste_heat",
+        "bat_b.power.battery",
+        "bat_b.boundary.waste_heat",
+    ]
+    assert [f.id for f in merged.flows] == [
+        "bat_a.power.self_discharge",
+        "bat_b.power.self_discharge",
+    ]
+    flow_a = next(f for f in merged.flows if f.id == "bat_a.power.self_discharge")
+    assert flow_a.kinetics is not None
+    assert set(flow_a.kinetics.stoichiometry) == {
+        "bat_a.power.battery",
+        "bat_a.boundary.waste_heat",
+    }
+    # The rate `param("self_discharge_rate") * stock("power.battery")` — the stock ref
+    # is now the prefixed id; the frozen param-set name is untouched (both share k).
+    rate = parse_rate_expr(flow_a.kinetics.rate)
+    assert isinstance(rate, BinOp) and rate.op == "*"
+    assert isinstance(rate.right, StockRef)
+    assert rate.right.stock == "bat_a.power.battery"
+
+
+def test_same_bundle_twice_same_prefix_is_duplicate(tmp_path: Path) -> None:
+    # Namespacing is what makes multi-instance work — but two instances under the SAME
+    # prefix still collide (the prefix must distinguish them). This keeps the collision
+    # guard honest: prefixing is not a blanket "duplicates now allowed".
+    _write(tmp_path, "b.yaml", _MINI_BUNDLE)
+    scenario = _write(
+        tmp_path,
+        "s.yaml",
+        _SCENARIO_HEAD
+        + "includes:\n  - bundle: b.yaml\n    prefix: dup\n"
+        + "  - bundle: b.yaml\n    prefix: dup\n",
+    )
+    with pytest.raises(AuthoringError, match="duplicate stock id"):
+        load_scenario(str(scenario))
 
 
 # --- Merge semantics: no silent override, deferrals, schema fences --------------------

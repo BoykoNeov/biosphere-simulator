@@ -85,6 +85,32 @@ def test_parse_errors_are_authoring_errors(text: str) -> None:
         parse_rate_expr(text)
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1.5",
+        "1000.0",
+        "1.0e-8",
+        'stock("power.battery")',
+        'param("self_discharge_rate") * stock("power.battery")',
+        "1.0 + 2.0 * 3.0",
+        "10.0 - 3.0 - 2.0",
+        "(1.0 + 2.0) * 3.0",
+        '-param("k") * n',
+        'forcing("load_power") + n',
+    ],
+)
+def test_render_rate_expr_round_trips(text: str) -> None:
+    # `render_rate_expr` is the inverse of `parse_rate_expr` used by Step-6c
+    # id-namespacing to re-emit a rate whose refs were prefixed. The contract is
+    # per-port round-trip stability: parse(render(parse(text))) == parse(text). Fully
+    # parenthesized, so precedence/associativity survive the round-trip.
+    from authoring.expr_parser import render_rate_expr
+
+    ast = parse_rate_expr(text)
+    assert parse_rate_expr(render_rate_expr(ast)) == ast
+
+
 # --- the safety spine (build-time structural checks) ----------------------
 def _minimal_kinetics_spec(**flow_overrides: object) -> dict[str, object]:
     """A minimal well-formed single-kinetics-flow scenario dict (battery→waste_heat)."""

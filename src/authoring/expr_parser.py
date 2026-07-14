@@ -235,3 +235,35 @@ def parse_rate_expr(text: str) -> Expr:
     if not tokens:
         raise AuthoringError(f"empty rate expression {text!r}")
     return _Parser(tokens, text).parse()
+
+
+def render_rate_expr(node: Expr) -> str:
+    """Render an AST back to a rate-expression string that :func:`parse_rate_expr`
+    round-trips (``parse_rate_expr(render_rate_expr(node)) == node``).
+
+    Fully parenthesized, so the round-trip holds regardless of precedence/associativity.
+    The **inverse** of the parser, used by composition's id-namespacing (Step 6c): after
+    a bundle's ``stock``/``forcing`` refs are prefixed on the AST, the rate is emitted
+    to a string the interpreter re-parses. Its exact spelling is a **per-port internal
+    detail** — the structural graph dump omits rate strings and the trajectory depends
+    only on the AST — so the contract is per-port round-trip stability, *not* cross-port
+    byte-identity (a ``Const`` is rendered via ``repr``, which round-trips on this port;
+    the Rust mirror uses ``f64::Display``, which round-trips on that port).
+    """
+    if isinstance(node, Const):
+        return repr(node.value)
+    if isinstance(node, StockRef):
+        return f'stock("{node.stock}")'
+    if isinstance(node, ParamRef):
+        return f'param("{node.name}")'
+    if isinstance(node, ForcingRef):
+        return f'forcing("{node.name}")'
+    if isinstance(node, StepN):
+        return "n"
+    if isinstance(node, Neg):
+        return f"(-{render_rate_expr(node.operand)})"
+    if isinstance(node, BinOp):
+        return (
+            f"({render_rate_expr(node.left)} {node.op} {render_rate_expr(node.right)})"
+        )
+    raise AuthoringError(f"cannot render unknown expression node {node!r}")

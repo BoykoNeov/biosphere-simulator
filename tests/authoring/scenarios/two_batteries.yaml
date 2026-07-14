@@ -1,0 +1,28 @@
+# Phase 9 Step 6c — multi-instance id-namespacing: the SAME bundle included twice.
+#
+# Two instances of the reusable battery ENERGY domain (bundles/battery.domain.yaml),
+# each under its own `prefix`, so their ids do not collide. Namespacing rewrites every
+# id the bundle declares (`power.battery` -> `bat_a.power.battery`, etc.) AND every
+# reference to it (the SelfDischarge kinetics `stock("power.battery")` ref + the
+# stoichiometry keys), so each instance is an independent, balanced battery. Included
+# WITHOUT a prefix twice, the same bundle would collide on every id (the concrete reason
+# 6c exists — `test_including_same_bundle_twice_is_duplicate`).
+#
+# Disjoint after namespacing (bat_a / bat_b share no stock, forcing or quantity value),
+# so ENERGY conserves every step and each half is bit-identical to a frozen single
+# SelfDischarge run over the same horizon (dt=3600 s, 168 steps — the Step-2 kinetics
+# oracle). Transcendental-free (`k*battery`) => Tier-1 cross-port bit-exact.
+#
+# The battery bundle carries no forcings (donor-controlled reads its stock directly) and
+# no `parameters`, so it namespaces cleanly — unlike the crew species, whose frozen flows
+# bind `crew_o2_intake` by a hardcoded module constant a namespaced key can't reach.
+
+name: two_batteries
+integrator: euler
+dt: 3600.0
+steps: 168
+includes:
+  - bundle: bundles/battery.domain.yaml
+    prefix: bat_a
+  - bundle: bundles/battery.domain.yaml
+    prefix: bat_b

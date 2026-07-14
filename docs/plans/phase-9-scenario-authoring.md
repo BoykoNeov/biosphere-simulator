@@ -1,11 +1,11 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b + Step 5 + Step 6a + Step 6b COMPLETE
+**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b + Step 5 + Step 6a + Step 6b + Step 6c COMPLETE
 (composition + parameter packs + the bounded kinetics DSL + templates + the Rust VM/parser port with
 parse- & trajectory-parity + the Rust runtime scenario-FILE interpreter + Godot loading an authored
 file at runtime through the frozen cdylib + Python file-composition via reusable domain/species
-bundles + the Rust `includes` port with cross-port composition parity); Step 6c (multi-instance
-id-namespacing) + Step 7 JIT.** Step 4
+bundles + the Rust `includes` port with cross-port composition parity + multi-instance id-namespacing
+so the SAME bundle composes twice); Step 7 (the format/grammar freeze doc) JIT.** Step 4
 was SPLIT (advisor-recommended,
 USER-CONFIRMED): 4a ported the AST/VM + rate-expr parser to Rust with the two cross-port parity
 surfaces (parse-parity Tier-0 + SelfDischarge trajectory-parity Tier-1, Euler+RK4) at **zero YAML
@@ -461,7 +461,7 @@ the same file into the same graph as Python.** Contract:
     Step 6 (species / domain definitions).
 - **Step 6 — species / domain definitions.** SPLIT (advisor-recommended, mirroring 4a/4b) into
   **6a — the Python file-composition layer (COMPLETE)** + **6b — the Rust `includes` port
-  (deferred-not-dropped)** + **6c — multi-instance id-namespacing (deferred)**.
+  (COMPLETE)** + **6c — multi-instance id-namespacing (COMPLETE)**.
   - **Step 6a — reusable domain/species bundles + `include` composition. COMPLETE.** New additive
     boundary module `src/authoring/compose.py` (`apply_includes`) + a `BundleSpec` schema model
     (`parameters`/`stocks`/`flows`/`forcings`, `extra="forbid"` ⇒ run-config keys **and** nested
@@ -531,12 +531,41 @@ the same file into the same graph as Python.** Contract:
     `cargo test` (workspace) + `clippy --all-targets -D warnings` green; ruff/format/pyright green; **all 20
     frozen goldens byte-identical** (no regen). Blocks Step 7's freeze (the composition grammar is now a
     two-port surface Step 7 can freeze); Step 6c (multi-instance namespacing) still deferred.
-  - **Step 6c — multi-instance id-namespacing/prefixing (DEFERRED, principled).** Disjoint-id
-    composition (crew + battery) needs no prefixing; prefixing is *only forced* by two instances of the
-    **same** bundle (the `test_including_same_bundle_twice_is_duplicate` collision demonstrates exactly
-    why). Kept out to honor "bespoke until a second instance". **Shared-stock composition** (two bundles
-    pointing at one shared stock — the Phase-6 cabin sharing, hand-coded in `station/`) is a further,
-    larger deferral.
+  - **Step 6c — multi-instance id-namespacing/prefixing. COMPLETE.** An include may now be a
+    `{bundle, prefix}` mapping (a new `IncludeSpec`, the `includes` field widened to `list[str |
+    IncludeSpec]` both ports) instead of a bare path; a `prefix` **namespaces** every id the bundle
+    declares — stock id / flow id / forcing key → `<prefix>.<id>` — and every *reference* to them:
+    `wiring` values, `stoichiometry` keys, and the `stock(...)`/`forcing(...)` refs inside a `kinetics`
+    rate. **The load-bearing scope finding (advisor): the crew species is BLOCKED from clean
+    multi-instancing** — the crew analogue of the 6a greenhouse `CARBON_POOL` blocker: the frozen crew
+    flows read intake forcings by a **hardcoded module constant** (`O2_INTAKE_VAR = "crew_o2_intake"` in
+    `crew/stocks.py`), so two crew instances both read `crew_o2_intake` and a namespaced forcing key
+    orphans the frozen flow's lookup. So the general namespacing machine was **not** built: the clean
+    multi-instance anchor is **two `battery.domain` instances** (kinetics-only, forcing-free — every
+    reference namespaceable at the boundary), and forcing-bound frozen bundles + **bundle-parameter
+    namespacing** are documented deferrals (the only param-bearing bundle, crew, is blocked for the
+    forcing reason anyway ⇒ two prefixed instances collide on the parameter name, the honest boundary).
+    **The architecture (advisor): compose stays the sole owner, the interpreter stays oblivious** (the
+    6a/6b "compose flattens, interpreter lowers exactly as before" invariant) — the rate rewrite is a
+    **structural AST walk** (`_prefix_expr_refs`, mirroring `_collect_refs`; `param(...)` refs untouched
+    — in a rate they name a *frozen* param set, correctly shared across instances), NOT a string-scan
+    (which would reintroduce the cross-port string-transform surface this phase has paid to avoid). The
+    prefixed rate is re-emitted to a string the interpreter re-parses by a new **`render_rate_expr`** (the
+    parser's inverse, both ports) — whose exact spelling is a **per-port internal detail** (the graph dump
+    omits rate strings; the trajectory depends only on the AST), so its contract is per-port round-trip
+    stability (`parse∘render = id`, unit-tested both ports), **not** cross-port byte-identity. Anchor
+    `two_batteries.yaml` (`battery.domain` ×2, prefixes `bat_a`/`bat_b`, dt=3600/168 steps): namespaced
+    run conserves + `rationed==0`, each half **bit-identical** to a frozen single `SelfDischarge` run
+    (projection faithfulness), the merged-spec ids + rewritten rate ref asserted explicitly, and
+    same-prefix-twice still collides (the guard stays honest). Transcendental-free (`k·battery`) ⇒
+    **Tier-1** crossport anchor (graph-dump + run-match, `skipif cargo`, glibc-vs-UCRT holds). Rust mirror:
+    `IncludeSpec` enum + `parse_include` in `schema.rs`, `render_rate_expr` in `expr_parser.rs`,
+    `prefix_expr_refs`/`namespace_bundle`/`namespace_flow` + the union resolution in `compose.rs`. **Zero
+    core + zero domain change** (`git diff src/{simcore,domains}/` empty — the change is purely the
+    boundary `src/authoring` + the Rust `authoring` crate + tests + the anchor YAML); full suite incl.
+    `-m slow` + ruff + pyright green; `cargo test` + `clippy --all-targets` green; all 20 frozen goldens
+    byte-identical (no regen). **Shared-stock composition** (two bundles pointing at one shared stock —
+    the Phase-6 cabin sharing, hand-coded in `station/`) is a further, larger deferral.
 - **Step 7 — the format/grammar freeze doc (JIT).** The Phase-4/6/8 freeze-contract analogue,
   one level up: freeze the **DSL grammar + file schema + the VM** (so mods authored against them
   stay stable), *not* new goldens. `docs/authoring-reference.md` + completeness gate on the

@@ -62,6 +62,13 @@ ANCHORS: tuple[tuple[str, dict[str, float], str | None], ...] = (
     # first-then-inline merge path end-to-end (the resulting order is pinned by a
     # unit test on `apply_includes`'s Vec — the serialized outputs are id-sorted).
     ("crew_station_inline_battery.yaml", {}, None),
+    # --- Step 6c: multi-instance id-namespacing (`{bundle, prefix}` includes) ---
+    # The SAME battery bundle included twice under distinct prefixes (bat_a / bat_b) —
+    # namespacing rewrites every id + the kinetics rate's `stock(...)` ref, so the two
+    # instances compose without colliding. Transcendental-free (`k·battery`) ⇒ Tier-1;
+    # run-match + graph-dump carry parity (no golden — 4 namespaced stocks, not a frozen
+    # graph). Proves the id-prefixing + rate re-render match across ports.
+    ("two_batteries.yaml", {}, None),
 )
 
 

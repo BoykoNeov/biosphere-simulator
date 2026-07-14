@@ -365,6 +365,35 @@ pub fn parse_rate_expr(text: &str) -> Result<Expr, ParseError> {
     .parse()
 }
 
+/// Render an AST back to a rate-expression string that [`parse_rate_expr`] round-trips
+/// (`parse_rate_expr(render_rate_expr(node)) == node`) — the Rust mirror of Python
+/// `authoring.expr_parser.render_rate_expr`.
+///
+/// Fully parenthesized, so the round-trip holds regardless of precedence/associativity.
+/// The **inverse** of the parser, used by composition's id-namespacing (Step 6c): after
+/// a bundle's `stock`/`forcing` refs are prefixed on the AST, the rate is re-emitted to a
+/// string the interpreter re-parses. Its exact spelling is a **per-port internal detail**
+/// (the structural graph dump omits rate strings; the trajectory depends only on the
+/// AST), so the contract is per-port round-trip stability, **not** cross-port
+/// byte-identity — a `Const` renders via `f64::Display`, which round-trips on this port
+/// (Python uses `repr`, which round-trips on that one).
+pub fn render_rate_expr(node: &Expr) -> String {
+    match node {
+        Expr::Const(v) => format!("{v}"),
+        Expr::StockRef(id) => format!("stock(\"{id}\")"),
+        Expr::ParamRef(name) => format!("param(\"{name}\")"),
+        Expr::ForcingRef(name) => format!("forcing(\"{name}\")"),
+        Expr::StepN => "n".to_string(),
+        Expr::Neg(operand) => format!("(-{})", render_rate_expr(operand)),
+        Expr::BinOp { op, left, right } => format!(
+            "({} {} {})",
+            render_rate_expr(left),
+            op.symbol(),
+            render_rate_expr(right)
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -448,5 +477,33 @@ mod tests {
     #[test]
     fn empty_ref_argument_is_rejected() {
         assert!(parse_rate_expr(r#"stock("")"#).is_err());
+    }
+
+    // --- render_rate_expr is the parser's inverse (Step 6c namespacing) -----
+    #[test]
+    fn render_rate_expr_round_trips() {
+        // Per-port round-trip stability: parse(render(parse(text))) == parse(text).
+        // Fully parenthesized, so precedence/associativity survive; `Const` round-trips
+        // through f64::Display on this port.
+        for text in [
+            "1.5",
+            "1000.0",
+            "1.0e-8",
+            r#"stock("power.battery")"#,
+            r#"param("self_discharge_rate") * stock("power.battery")"#,
+            "1.0 + 2.0 * 3.0",
+            "10.0 - 3.0 - 2.0",
+            "(1.0 + 2.0) * 3.0",
+            r#"-param("k") * n"#,
+            r#"forcing("load_power") + n"#,
+        ] {
+            let ast = parse_rate_expr(text).unwrap();
+            let rendered = render_rate_expr(&ast);
+            assert_eq!(
+                parse_rate_expr(&rendered).unwrap(),
+                ast,
+                "round-trip failed for {text:?} (rendered {rendered:?})"
+            );
+        }
     }
 }

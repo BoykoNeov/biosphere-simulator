@@ -269,6 +269,134 @@ fn mixed_include_and_inline_equals_two_bundle_composition() {
     }
 }
 
+// --- Step 6c: multi-instance id-namespacing (the SAME bundle included twice) -----
+
+/// Interpret an inline scenario whose bundle paths resolve against the committed
+/// scenarios dir (so an inline scenario can `include` the real `battery.domain.yaml`).
+fn interpret_in_scenarios(yaml: &str) -> Result<BuiltScenario, authoring::AuthoringError> {
+    let doc = parse_document(yaml).expect("parse inline scenario");
+    let spec = ScenarioSpec::from_yaml(&doc).expect("bind inline scenario");
+    interpret(&spec, &scenarios_dir(), &no_overrides())
+}
+
+/// The single-battery oracle: the same bundle included ONCE (bare), same horizon — each
+/// namespaced half of `two_batteries` must reproduce this bit-for-bit.
+fn single_battery_final_amount() -> f64 {
+    let built = interpret_in_scenarios(
+        "name: one_battery\nintegrator: euler\ndt: 3600.0\nsteps: 168\n\
+         includes:\n  - bundles/battery.domain.yaml\n",
+    )
+    .expect("interpret single battery");
+    let result = run_scenario(built).expect("run single battery");
+    result.final_state.stocks["power.battery"].amount
+}
+
+#[test]
+fn namespaced_same_bundle_twice_runs_and_conserves() {
+    // The battery domain included twice under distinct prefixes: namespacing rewrites
+    // every id so the two instances do not collide (the bare double-include DOES collide).
+    // Disjoint after prefixing ⇒ ENERGY conserves every step, the run completing is the
+    // proof; both instances mark it authored (their SelfDischarge kinetics).
+    let built = load_scenario(&scenarios_dir().join("two_batteries.yaml"), &no_overrides())
+        .expect("load two_batteries");
+    assert!(built.has_authored_kinetics);
+    let mut ids: Vec<&str> = built.state.stocks.keys().map(|s| s.as_str()).collect();
+    ids.sort_unstable();
+    assert_eq!(
+        ids,
+        vec![
+            "bat_a.boundary.waste_heat",
+            "bat_a.power.battery",
+            "bat_b.boundary.waste_heat",
+            "bat_b.power.battery",
+        ]
+    );
+    let result = run_scenario(built).expect("run two_batteries");
+    assert_eq!(result.total_rationed, 0);
+    assert!(result.events.is_empty());
+}
+
+#[test]
+fn namespaced_instances_each_match_single_battery() {
+    // Projection faithfulness: each namespaced half is bit-for-bit a single-battery run
+    // over the same horizon — namespacing changed only ids, not dynamics. The two
+    // identical instances also equal each other exactly.
+    let result = run_scenario(
+        load_scenario(&scenarios_dir().join("two_batteries.yaml"), &no_overrides())
+            .expect("load two_batteries"),
+    )
+    .expect("run two_batteries");
+    let oracle = single_battery_final_amount();
+    let a = result.final_state.stocks["bat_a.power.battery"].amount;
+    let b = result.final_state.stocks["bat_b.power.battery"].amount;
+    assert_eq!(a, oracle);
+    assert_eq!(b, oracle);
+}
+
+#[test]
+fn apply_includes_namespaces_ids_and_rate_refs() {
+    use simcore::expr::Expr;
+
+    let path = scenarios_dir().join("two_batteries.yaml");
+    let doc = parse_document(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let spec = ScenarioSpec::from_yaml(&doc).unwrap();
+    let merged = apply_includes(&spec, path.parent().unwrap()).expect("apply_includes");
+
+    let stock_ids: Vec<&str> = merged.stocks.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(
+        stock_ids,
+        vec![
+            "bat_a.power.battery",
+            "bat_a.boundary.waste_heat",
+            "bat_b.power.battery",
+            "bat_b.boundary.waste_heat",
+        ]
+    );
+    let flow_ids: Vec<&str> = merged.flows.iter().map(|f| f.id.as_str()).collect();
+    assert_eq!(
+        flow_ids,
+        vec!["bat_a.power.self_discharge", "bat_b.power.self_discharge"]
+    );
+    // The load-bearing part: the kinetics rate's `stock(...)` ref is rewritten to the
+    // prefixed id (a structural AST rewrite, re-emitted). Stoichiometry keys too.
+    let flow_a = merged
+        .flows
+        .iter()
+        .find(|f| f.id == "bat_a.power.self_discharge")
+        .unwrap();
+    let kin = flow_a.kinetics.as_ref().unwrap();
+    let stoich_keys: Vec<&str> = kin.stoichiometry.iter().map(|(s, _)| s.as_str()).collect();
+    assert!(stoich_keys.contains(&"bat_a.power.battery"));
+    assert!(stoich_keys.contains(&"bat_a.boundary.waste_heat"));
+    let rate = authoring::parse_rate_expr(&kin.rate).unwrap();
+    match rate {
+        Expr::BinOp { right, .. } => match *right {
+            Expr::StockRef(id) => assert_eq!(id, "bat_a.power.battery"),
+            other => panic!("rate rhs not a StockRef: {other:?}"),
+        },
+        other => panic!("rate not a BinOp: {other:?}"),
+    }
+}
+
+#[test]
+fn same_bundle_twice_same_prefix_is_duplicate() {
+    // Namespacing enables multi-instance, but two instances under the SAME prefix still
+    // collide (the prefix must distinguish them) — the collision guard stays honest.
+    let err = interpret_in_scenarios(
+        "name: s\nintegrator: euler\ndt: 3600.0\nsteps: 1\n\
+         includes:\n  - bundle: bundles/battery.domain.yaml\n    prefix: dup\n\
+         \x20 - bundle: bundles/battery.domain.yaml\n    prefix: dup\n",
+    );
+    match err {
+        Err(e) => assert!(
+            e.message.contains("duplicate stock id"),
+            "unexpected error: {}",
+            e.message
+        ),
+        Ok(_) => panic!("expected a duplicate-stock-id error for same-prefix includes"),
+    }
+}
+
 // --- Step 6b: compose reject cases -------------------------------------------
 //
 // Unlike the inline-YAML rejects below, these need real bundle files on disk (a bundle

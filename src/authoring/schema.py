@@ -145,6 +145,35 @@ class ForcingSpec(BaseModel):
     const: float | str
 
 
+class IncludeSpec(BaseModel):
+    """A **prefixed** bundle include — a bundle instance under a namespace (Step 6c).
+
+    The bare-string include form (``- bundles/battery.domain.yaml``) merges a bundle's
+    ids verbatim; a mapping form (``{bundle: <path>, prefix: <name>}``) **namespaces**
+    every id the bundle declares — each stock id, flow id and forcing key becomes
+    ``<prefix>.<id>``, and every reference to them (``wiring`` values, ``stoichiometry``
+    keys, and the ``stock(...)``/``forcing(...)`` refs inside a ``kinetics`` rate) is
+    rewritten to match (:func:`authoring.compose.apply_includes`). This is what lets the
+    **same** bundle be included more than once without the id collision a bare double
+    include hits (:func:`authoring.compose` documents the surface).
+
+    **Only disjoint / kinetics-style bundles are multi-instanceable.** A frozen flow
+    that binds a forcing by a *hardcoded* name (the crew flows read ``crew_o2_intake``
+    etc. from a frozen module constant, not through wiring) cannot find a namespaced
+    forcing key — a prefixed crew include would raise a resolve-time ``KeyError``.
+    Prefixing a forcing-bound frozen bundle is therefore an unsupported (documented)
+    case, the crew analogue of the greenhouse's hardcoded ``CARBON_POOL`` blocker.
+    Bundle **parameter** namespacing is likewise deferred (the only param-bearing
+    bundle, crew, is blocked for the forcing reason anyway) — two prefixed instances of
+    a param-bearing bundle collide on the parameter name, the honest boundary.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    bundle: str
+    prefix: str = Field(min_length=1)
+
+
 class BundleSpec(BaseModel):
     """A reusable **domain / species bundle**: stocks + flows + forcings (Step 6).
 
@@ -181,9 +210,11 @@ class ScenarioSpec(BaseModel):
     that a stock ``amount`` / forcing ``const`` expression may read via ``param('…')``.
     Empty (the Step-0 form) means a fully-literal scenario with no knobs.
 
-    ``includes`` (Step 6) is a list of **bundle-file paths** (each a
-    :class:`BundleSpec`), resolved relative to the scenario file's directory. Each
-    included bundle's parameters/stocks/flows/forcings merge into this scenario's
+    ``includes`` (Step 6) is a list of bundle includes, resolved relative to the
+    scenario file's directory. Each element is either a bare **bundle-file path** (a
+    verbatim merge — each a :class:`BundleSpec`) or a :class:`IncludeSpec`
+    (``{bundle, prefix}`` — a **namespaced** instance, Step 6c). Each included bundle's
+    parameters/stocks/flows/forcings merge into this scenario's
     (:func:`authoring.compose.apply_includes`, run at the top of ``interpret``): a
     scenario is thus *composed* from reusable domain/species bundles + its own inline
     declarations. A duplicate id/key/parameter across any two sources is an
@@ -198,7 +229,7 @@ class ScenarioSpec(BaseModel):
     dt: float
     steps: int
     rng_seed: int = 0
-    includes: list[str] = Field(default_factory=list)
+    includes: list[str | IncludeSpec] = Field(default_factory=list)
     parameters: dict[str, float] = Field(default_factory=dict)
     stocks: list[StockSpec] = Field(default_factory=list)
     flows: list[FlowSpec] = Field(default_factory=list)

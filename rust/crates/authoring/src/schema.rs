@@ -124,6 +124,20 @@ impl BundleSpec {
     }
 }
 
+/// One bundle include (mirrors the Python `str | IncludeSpec` union). A [`Bare`] path
+/// merges a bundle's ids verbatim; a [`Prefixed`] `{bundle, prefix}` **namespaces** every
+/// id the bundle declares (Step 6c — [`crate::compose::apply_includes`]).
+///
+/// [`Bare`]: IncludeSpec::Bare
+/// [`Prefixed`]: IncludeSpec::Prefixed
+#[derive(Debug, Clone, PartialEq)]
+pub enum IncludeSpec {
+    /// A bare bundle-file path (verbatim merge).
+    Bare(String),
+    /// A namespaced instance: the bundle at `bundle`, every id prefixed with `prefix`.
+    Prefixed { bundle: String, prefix: String },
+}
+
 /// A whole authored scenario (mirrors `ScenarioSpec`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScenarioSpec {
@@ -132,9 +146,10 @@ pub struct ScenarioSpec {
     pub dt: f64,
     pub steps: u64,
     pub rng_seed: u64,
-    /// Bundle-file paths to compose in (Step 6), resolved relative to the scenario
-    /// file's directory. Merged by [`crate::compose::apply_includes`] before interpret.
-    pub includes: Vec<String>,
+    /// Bundle includes to compose in (Step 6), resolved relative to the scenario file's
+    /// directory. Merged by [`crate::compose::apply_includes`] before interpret; a
+    /// [`IncludeSpec::Prefixed`] entry namespaces the bundle's ids (Step 6c).
+    pub includes: Vec<IncludeSpec>,
     pub parameters: Vec<(String, f64)>,
     pub stocks: Vec<StockSpec>,
     pub flows: Vec<FlowSpec>,
@@ -172,7 +187,7 @@ impl ScenarioSpec {
             Some(value) => value
                 .as_sequence("scenario.includes")?
                 .iter()
-                .map(|v| scalar_str(v, "scenario.includes item"))
+                .map(parse_include)
                 .collect::<Result<Vec<_>, _>>()?,
         };
         let parameters = match field(entries, "parameters") {
@@ -233,6 +248,34 @@ fn parse_flow_list(
             .iter()
             .map(parse_flow)
             .collect::<Result<Vec<_>, _>>(),
+    }
+}
+
+/// Bind one `includes` item: a scalar path → [`IncludeSpec::Bare`]; a `{bundle, prefix}`
+/// mapping → [`IncludeSpec::Prefixed`] (Step 6c). Mirrors the Python `str | IncludeSpec`
+/// union; the mapping is `extra="forbid"` (keys exactly `[bundle, prefix]`) and `prefix`
+/// must be non-empty (the Python `Field(min_length=1)`).
+fn parse_include(value: &YamlValue) -> Result<IncludeSpec, AuthoringError> {
+    match value {
+        YamlValue::Scalar { .. } => {
+            Ok(IncludeSpec::Bare(scalar_str(value, "scenario.includes item")?))
+        }
+        YamlValue::Mapping(_) => {
+            let entries = value.as_mapping("scenario.includes item")?;
+            reject_unknown_keys(entries, &["bundle", "prefix"], "include")?;
+            let bundle = require_str(entries, "bundle", "include")?;
+            let prefix = require_str(entries, "prefix", "include")?;
+            if prefix.is_empty() {
+                return Err(AuthoringError::new(
+                    "include: 'prefix' must be non-empty".to_string(),
+                ));
+            }
+            Ok(IncludeSpec::Prefixed { bundle, prefix })
+        }
+        _ => Err(AuthoringError::new(
+            "scenario.includes item must be a bundle path or a {bundle, prefix} mapping"
+                .to_string(),
+        )),
     }
 }
 

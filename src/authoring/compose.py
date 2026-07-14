@@ -14,8 +14,24 @@ reusable bundles (a crew species, a battery domain) rather than re-declared inli
   declaration order exactly (the single-bundle byte-identity anchor).
 - **No silent override:** a duplicate stock id, flow id, forcing key, or parameter name
   across any two sources is an :class:`AuthoringError` (``extra="forbid"``, a level up).
-  Disjoint-domain composition (crew + battery) needs no id-namespacing; **multi-instance
-  prefixing is deferred** — only *forced* by two instances of one bundle (Step 6c).
+  Disjoint-domain composition (crew + battery) needs no id-namespacing.
+- **Multi-instance id-namespacing** (Step 6c): an include may be a
+  :class:`~authoring.schema.IncludeSpec` (``{bundle, prefix}``) instead of a bare path.
+  A ``prefix`` namespaces every id the bundle declares — each stock id, flow id and
+  forcing key becomes ``<prefix>.<id>`` — and every *reference* is rewritten to match:
+  ``wiring`` values (stock ids), ``stoichiometry`` keys (stock ids), and the
+  ``stock(...)``/``forcing(...)`` references inside a ``kinetics`` rate (parsed to the
+  AST, prefixed there via :func:`_prefix_expr_refs`, and re-emitted by
+  :func:`~authoring.expr_parser.render_rate_expr`). This lets the **same** bundle
+  be included more than once — two ``{bundle: battery.domain, prefix: bat_a|bat_b}``
+  instances compose without the id collision a bare double-include hits. ``param(...)``
+  refs are **never** rewritten: in a rate they name a *frozen* param set (two instances
+  correctly share ``k``); bundle-**parameter** namespacing is deferred (the only
+  param-bearing bundle, crew, is un-multi-instanceable for the forcing reason below).
+  A bundle whose *frozen* flows bind a forcing by a **hardcoded** name (the crew flows'
+  ``crew_o2_intake`` module constant) cannot find a namespaced forcing key — so a
+  prefixed crew include fails at resolve time, the documented crew-forcing blocker (the
+  greenhouse ``CARBON_POOL`` analogue); kinetics / disjoint bundles namespace cleanly.
 - **Flat, one level deep:** a bundle carries no ``includes`` of its own (rejected by
   ``BundleSpec``'s ``extra="forbid"``) — nested includes are out of scope.
 - **Run config lives only in the top-level scenario** (a bundle has no integrator/dt/
@@ -34,6 +50,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from authoring.errors import AuthoringError
+from authoring.expr_parser import parse_rate_expr, render_rate_expr
 from authoring.schema import (
     BundleSpec,
     FlowSpec,
@@ -43,6 +60,8 @@ from authoring.schema import (
     StockSpec,
 )
 from config import ConfigError, load_yaml
+from simcore.expr import BinOp, Expr, ForcingRef, Neg, StockRef
+from simcore.ids import StockId
 
 
 def apply_includes(spec: ScenarioSpec, base_dir: Path) -> ScenarioSpec:
@@ -110,14 +129,15 @@ def apply_includes(spec: ScenarioSpec, base_dir: Path) -> ScenarioSpec:
             forcings[key] = forcing
 
     for inc in spec.includes:
-        bundle = _load_bundle(base_dir / inc, inc)
-        merge(
-            f"bundle {inc!r}",
-            bundle.parameters,
-            bundle.stocks,
-            bundle.flows,
-            bundle.forcings,
-        )
+        path = inc if isinstance(inc, str) else inc.bundle
+        prefix = None if isinstance(inc, str) else inc.prefix
+        bundle = _load_bundle(base_dir / path, path)
+        if prefix is not None:
+            bundle = _namespaced_bundle(bundle, prefix)
+            source = f"bundle {path!r} (prefix {prefix!r})"
+        else:
+            source = f"bundle {path!r}"
+        merge(source, bundle.parameters, bundle.stocks, bundle.flows, bundle.forcings)
     merge("the scenario", spec.parameters, spec.stocks, spec.flows, spec.forcings)
 
     return spec.model_copy(
@@ -127,6 +147,72 @@ def apply_includes(spec: ScenarioSpec, base_dir: Path) -> ScenarioSpec:
             "stocks": stocks,
             "flows": flows,
             "forcings": forcings,
+        }
+    )
+
+
+def _prefix_expr_refs(node: Expr, prefix: str) -> Expr:
+    """Rewrite ``stock``/``forcing`` reference names in a rate AST under ``prefix``.
+
+    ``stock(...)`` and ``forcing(...)`` args are bundle ids/keys → namespaced to
+    ``<prefix>.<name>``. ``param(...)`` is **left untouched** — in a rate it names a
+    *frozen* param set (two instances of the bundle share the same ``k``), not a
+    namespaced bundle parameter. ``Const``/``StepN`` carry no refs. Structural mirror of
+    :func:`authoring.interpreter._collect_refs`.
+    """
+    if isinstance(node, StockRef):
+        return StockRef(StockId(f"{prefix}.{node.stock}"))
+    if isinstance(node, ForcingRef):
+        return ForcingRef(f"{prefix}.{node.name}")
+    if isinstance(node, Neg):
+        return Neg(_prefix_expr_refs(node.operand, prefix))
+    if isinstance(node, BinOp):
+        return BinOp(
+            node.op,
+            _prefix_expr_refs(node.left, prefix),
+            _prefix_expr_refs(node.right, prefix),
+        )
+    return node  # Const, ParamRef (frozen set), StepN — unchanged.
+
+
+def _namespace_flow(flow: FlowSpec, prefix: str) -> FlowSpec:
+    """Return a copy of ``flow`` with its id, wiring targets, stoichiometry keys and
+    kinetics-rate stock/forcing refs namespaced under ``prefix`` (Step 6c)."""
+    update: dict[str, object] = {"id": f"{prefix}.{flow.id}"}
+    if flow.wiring:
+        update["wiring"] = {k: f"{prefix}.{v}" for k, v in flow.wiring.items()}
+    if flow.kinetics is not None:
+        rate_ast = parse_rate_expr(flow.kinetics.rate)
+        update["kinetics"] = flow.kinetics.model_copy(
+            update={
+                "rate": render_rate_expr(_prefix_expr_refs(rate_ast, prefix)),
+                "stoichiometry": {
+                    f"{prefix}.{sid}": coeff
+                    for sid, coeff in flow.kinetics.stoichiometry.items()
+                },
+            }
+        )
+    return flow.model_copy(update=update)
+
+
+def _namespaced_bundle(bundle: BundleSpec, prefix: str) -> BundleSpec:
+    """Return a copy of ``bundle`` with every declared id namespaced under ``prefix``.
+
+    Stock ids, flow ids (+ their references) and forcing keys become ``<prefix>.<id>``;
+    ``parameters`` are **not** prefixed (bundle-parameter namespacing deferred — a
+    param-bearing bundle is un-multi-instanceable for the crew-forcing reason, so a
+    second prefixed instance collides on the parameter name, the honest boundary).
+    """
+    return bundle.model_copy(
+        update={
+            "stocks": [
+                st.model_copy(update={"id": f"{prefix}.{st.id}"})
+                for st in bundle.stocks
+            ],
+            "flows": [_namespace_flow(fl, prefix) for fl in bundle.flows],
+            "forcings": {
+                f"{prefix}.{key}": forcing for key, forcing in bundle.forcings.items()
+            },
         }
     )
 
