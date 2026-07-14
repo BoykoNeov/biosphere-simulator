@@ -1,22 +1,39 @@
-//! Native Rust port of the frozen Python `authoring` boundary (Phase 9, Step 4a).
+//! Native Rust port of the frozen Python `authoring` boundary (Phase 9).
 //!
 //! The Python `src/authoring` package is the declarative-scenario boundary layer:
-//! schema → interpreter → run, plus the rate-expression parser. Step 4a ports **only
-//! the parser** — the sole Tier-0 parse-parity surface — because the genuinely-new
-//! cross-port surface of this phase (rate-grammar parse-parity + authored-flow
-//! trajectory parity) is provable with no YAML dependency: the trajectory anchor builds
-//! a [`simcore::expr::DeclarativeFlow`] directly from a parsed rate string.
+//! schema → interpreter → run, plus the rate-expression parser. This crate mirrors it.
 //!
-//! Runtime scenario-file parsing (the YAML/schema/interpreter, decision E) is Step
-//! 4b/5, where the crate/hand-rolled YAML choice actually gets resolved; keeping it out
-//! of here is why the crux needs no new dependency.
+//! **Step 4a** ported the rate-grammar parser (the sole Tier-0 parse-parity surface) +
+//! the canonical S-expr renderer, at **zero YAML dependency** — the parse-parity +
+//! trajectory-parity crux is provable from rate *strings*, no file.
 //!
-//! - [`expr_parser`] — text → [`simcore::expr::Expr`] AST (recursive-descent, pinned
-//!   precedence/associativity, the deferred grammar rejected as in Python).
-//! - [`sexpr`] — the canonical S-expression renderer the parse-parity gate diffs.
+//! **Step 4b** adds runtime scenario-**file** parsing (decision E, USER-CONFIRMED
+//! hand-rolled over a vetted crate): the closed-subset YAML reader ([`yaml`]), the
+//! schema ([`schema`]), the interpreter ([`interpreter`]) calling the frozen
+//! constructors (+ Step-3 template boundary-eval, [`template`]), and the run harness
+//! ([`run`]). File-level parse-parity is the byte-identity of the interpreted run vs the
+//! frozen golden, plus the canonical structural [`graph_dump`]. **Parameter packs are
+//! deferred in the Rust port** (see [`flow_registry`] / [`interpreter`]).
+//!
+//! Purity: this is a boundary crate; it depends only on `simcore` (the engine, the AST,
+//! the hex-float codec) and `domains` (the frozen crew flows, the Option-C param
+//! constants), exactly as the Python `authoring` package imports `simcore` + `domains`.
 
+pub mod errors;
 pub mod expr_parser;
+pub mod flow_registry;
+pub mod graph_dump;
+pub mod interpreter;
+pub mod run;
+pub mod schema;
 pub mod sexpr;
+pub mod template;
+pub mod yaml;
 
+pub use errors::AuthoringError;
 pub use expr_parser::{parse_rate_expr, ParseError};
+pub use graph_dump::render_graph_dump;
+pub use interpreter::{interpret, load_scenario, BuiltScenario};
+pub use run::{run_scenario, RunResult};
+pub use schema::ScenarioSpec;
 pub use sexpr::render_sexpr;

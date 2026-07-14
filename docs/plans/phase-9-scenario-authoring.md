@@ -1,11 +1,16 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Steps 0–3 + Step 4a COMPLETE (composition + parameter packs + the bounded
-kinetics DSL + templates + the Rust VM/parser port with parse- & trajectory-parity); Step 4b + 5–7
-JIT.** Step 4 was SPLIT (advisor-recommended, USER-CONFIRMED): 4a ported the AST/VM + rate-expr
-parser to Rust with the two cross-port parity surfaces (parse-parity Tier-0 + SelfDischarge
-trajectory-parity Tier-1, Euler+RK4) at **zero YAML dependency**; the Rust YAML/schema/interpreter
-(decision E) folds into 4b/Step 5. Decision D (the bounded-closed-grammar reading) was **CONFIRMED
+**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b COMPLETE (composition + parameter packs + the
+bounded kinetics DSL + templates + the Rust VM/parser port with parse- & trajectory-parity + the Rust
+runtime scenario-FILE interpreter); Steps 5–7 JIT.** Step 4 was SPLIT (advisor-recommended,
+USER-CONFIRMED): 4a ported the AST/VM + rate-expr parser to Rust with the two cross-port parity
+surfaces (parse-parity Tier-0 + SelfDischarge trajectory-parity Tier-1, Euler+RK4) at **zero YAML
+dependency**; **4b (COMPLETE) added the runtime scenario-file layer** — decision E resolved
+USER-CONFIRMED to a **hand-rolled closed-subset YAML parser** (one grammar owned on both ports, no
+crate), the schema/interpreter calling the frozen constructors + Step-3 template boundary-eval, and
+file-level parse-parity (byte-identity vs `crew_state.json` + Rust≡Python run + a canonical
+structural graph dump); **parameter packs deferred in the Rust port**. Step 5 (Godot loads a file)
+is unblocked. Decision D (the bounded-closed-grammar reading) was **CONFIRMED
 by the user** (2026-07-13) and Step 2 landed: the pure-stdlib expression VM + `DeclarativeFlow`
 entered `simcore` as the deliberate one-time additive break, proven faithful by re-expressing the
 frozen `SelfDischarge` bit-identically (Euler + RK4). Step 2 shipped only the unambiguous arithmetic
@@ -328,13 +333,64 @@ the same file into the same graph as Python.** Contract:
     pyright green; all 20 frozen goldens byte-identical (no regen). The template
     **boundary-eval** surface (Step-3's `param('crew_count')*base`) is *interpreter* scope,
     so it defers with 4b, not the crux.
-  - **Step 4b — the Rust YAML/schema/interpreter (decision E; folds into Step 5, JIT).**
-    Runtime scenario-file parsing: the Rust YAML dep decision (a vetted crate vs a
-    hand-rolled closed-subset parser — the project's revealed preference is hand-rolled/
-    no-dep, but hand-rolling means reimplementing the pydantic schema validation too), the
-    schema, the interpreter (calling the frozen constructors + the template boundary-eval),
-    and the file-level parse-parity (stock-id/flow-id sets, wiring, param packs). Blocks
-    Step 5 (Godot loads a file), not 4a.
+  - **Step 4b — the Rust YAML/schema/interpreter (decision E). COMPLETE.** Runtime
+    scenario-**file** parsing landed entirely under `rust/crates/authoring/` +
+    `tests/crossport/` (`git diff src/` empty; the one `rust/crates/domains/src/crew.rs`
+    touch is two additive `pub fn new` constructors for `OxygenConsumption`/`FoodMetabolism`
+    — the Phase-8 "re-pointed sibling flows got `pub fn new`" idiom, under `rust/`, golden
+    unaffected). **Decision E resolved USER-CONFIRMED = hand-rolled closed-subset YAML
+    parser** over a vetted crate (`serde_yaml` is deprecated, but the load-bearing reason is
+    the **parse-parity boundary**: a crate forces reconciling *two* independent YAML-1.1
+    impls against pyyaml — the `1.0e7`-is-a-string hazard, decimal edges — whereas a
+    documented closed subset collapses that to **one grammar owned on both ports**, the
+    Option-C/hex-float/sexpr ethos). Modules: `yaml.rs` (indent-based reader over the
+    documented subset — block maps, `- ` list-of-maps, quoted/bare scalars, `#` comments;
+    the YAML-1.1 numeric rule — a float needs a `.` and a signed exponent — pinned in
+    `is_yaml_number`, so a dotless `1e-3` is a *string* like pyyaml; anchors/flow-style/
+    tags/multiline **excluded and rejected**, not silently mis-parsed), `schema.rs`
+    (`ScenarioSpec` mirror + `extra="forbid"` + the `type`-xor-`kinetics` validation +
+    the `number|expr` union typed via bare-vs-quoted), `flow_registry.rs` (the three crew
+    types → frozen constructors + named param sets from the Option-C constants),
+    `template.rs` (Step-3 build-time `+ − ×` boundary-eval, op-order mirroring
+    `simcore.expr`), `interpreter.rs` (`build_stock`/`build_flow`/balance-by-construction +
+    referential-integrity checks/`load_scenario`), `run.rs` (euler/rk4 final-state),
+    `graph_dump.rs` (the canonical structural dump). **The reframe that shrank it
+    (advisor): the crew engine is already Tier-1 bit-exact in Rust (Phase-7), and the
+    interpreter does no trajectory math — so `crew_mission → crew_state.json` byte-identity
+    is near-automatic once the Rust interpreter builds the same graph; literal parity rides
+    on `f64::from_str` being correctly-rounded (since 1.55, like Python `float()`).**
+    **Parameter packs are DEFERRED in the Rust port** (advisor-endorsed scope call): all
+    three anchors use *named default* sets (`params: crew`/`self_discharge`) mapped to the
+    existing Option-C constants; a `{pack: …}` reference is a clean interpret-time error
+    (a Rust pack reader would re-run the frozen bounds/unit validation on an arbitrary
+    file, which no anchor exercises and Step 5 does not need) — this bounds decision E's
+    "param packs" parity line. A **non-zero priority on a frozen flow type** is likewise
+    rejected loudly (the frozen crew constructors carry no priority field, shared with the
+    station callers; no anchor uses one; a `kinetics` flow honors priority fully).
+    **Consequence (advisor): reject-parity is NOT a cross-port surface in 4b** (unlike
+    4a's reject→both-error rate strings) — because the Rust port deliberately rejects a
+    *superset* of what Python accepts (a `{pack: …}` ref + a non-zero frozen-flow priority
+    both *succeed* in Python, *error* in Rust), the Rust reject tests prove "the
+    interpreter never silently mis-builds," and accept→same-graph is the whole parity
+    story, carried by the byte-identity/run-match/graph-dump gates. **The
+    file-level parse-parity gates (advisor: the `.yaml` IS the shared artifact — no vector
+    file):** (1) **byte-identity** — the Rust interpreter's run of `crew_mission` and the
+    `crew_habitat_template` at its default (`crew_count=1.0` ⇒ `1.0*base==base` exactly)
+    reproduces the FROZEN `crew_state.json` byte-for-byte (transcendental-free ⇒ Tier-1,
+    platform-independent); (2) **Rust run ≡ Python run** for every anchor incl. `@4.0` +
+    `self_discharge_dsl` (Rust-parse ≡ Python-parse ≡ same trajectory, via `sim_io`
+    round-trip); (3) **structural graph-dump parity** — a canonical dump (id-sorted stocks
+    with hex-float amounts, flow ids + **priorities**, forcing constants) rendered
+    *identically* by both ports (the fact a final-state snapshot is blind to — priorities,
+    present-but-inert flows, the bit-exact Step-3 boundary-eval of `param('crew_count')*const`
+    on the `@4.0` case). All three run on the crossport CI job (`skipif cargo`), Tier-1 so
+    glibc-vs-UCRT-golden holds. **Tests:** 12 Rust unit (`yaml.rs`) + 10 Rust integration
+    (`scenario_files.rs`, incl. the reject cases — unknown type, type-xor-kinetics,
+    unbalanced stoichiometry, unknown-stock ref, frozen-priority + pack deferrals) + 12
+    Python crossport (4 graph-dump + 4 run-matches + 2 golden + the 2 in-sync 4a).
+    **Zero core + zero frozen-golden change** (`git diff src/` empty; 20 goldens
+    byte-identical, no regen); `cargo test` (workspace) + `clippy --all-targets` +
+    ruff/format/pyright green. Blocks Step 5 (Godot loads a file), not 4a.
 - **Step 5 — Godot loads a file at runtime (JIT).** The `godot_bridge` gains a "build session
   from a scenario file path" entry; the "author, not program" payoff. Cross-boundary parity
   smoke: the file-loaded session (through the actual cdylib) == the headless-built one, the

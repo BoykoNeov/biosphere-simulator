@@ -37,6 +37,7 @@ import pytest
 # pytest's import mode.
 sys.path.insert(0, str(Path(__file__).parent))
 
+import authoring_files  # noqa: E402
 import compare  # noqa: E402
 import gen_authoring_vectors  # noqa: E402
 import gen_biosphere_params  # noqa: E402
@@ -54,6 +55,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_DIR = REPO_ROOT / "tests" / "regression" / "golden"
 RUST_CRATE_DIR = REPO_ROOT / "rust" / "crates" / "simcore"
 RUST_DOMAINS_DIR = REPO_ROOT / "rust" / "crates" / "domains"
+RUST_AUTHORING_DIR = REPO_ROOT / "rust" / "crates" / "authoring"
+SCENARIOS_DIR = REPO_ROOT / "tests" / "authoring" / "scenarios"
 TIERS_PATH = Path(__file__).parent / "tiers.json"
 
 # The hand-pinned RNG known-answer vectors live in tests/test_rng.py; import them to
@@ -908,3 +911,115 @@ def test_compare_detects_structural_mismatch() -> None:
     assert not r.ok
     details = " ".join(d.detail for d in r.structural_diffs)
     assert "discrete mismatch" in details
+
+
+# --------------------------------------------------------------------------- #
+# 4. Phase-9 Step-4b: the Rust scenario-FILE interpreter matches Python        #
+# --------------------------------------------------------------------------- #
+#
+# Unlike the rate-string parity of Step 4a (committed vector files), the shared
+# cross-port artifact is the scenario `.yaml` itself — both the Python interpreter
+# (`src/authoring`) and the Rust one (`rust/crates/authoring`) read the SAME committed
+# file. All anchors are transcendental-free (crew `+ - *`, self_discharge `k·battery`)
+# ⇒ Tier-1 bit-exact on any platform (the crossport CI job's glibc-vs-UCRT-golden gate
+# holds). See `tests/crossport/authoring_files.py` for the anchor set + the shared
+# `render_graph_dump` parity contract.
+
+
+def _run_authoring_example(example: str, scenario_file: str, overrides: dict) -> str:
+    """Run a Rust `authoring` example (`emit_authored` / `dump_graph`) on a scenario
+    file, returning its stdout. Overrides are passed in the `param=value` CLI form."""
+    args = [
+        "cargo",
+        "run",
+        "-q",
+        "--example",
+        example,
+        "--",
+        str(SCENARIOS_DIR / scenario_file),
+    ]
+    for name, value in overrides.items():
+        args.append(f"{name}={value}")
+    proc = subprocess.run(args, cwd=RUST_AUTHORING_DIR, capture_output=True, text=True)
+    assert proc.returncode == 0, (
+        f"cargo run {example} {scenario_file} failed:\n{proc.stderr}"
+    )
+    return proc.stdout
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+@pytest.mark.parametrize(
+    "scenario_file,overrides",
+    [(f, ov) for (f, ov, _golden) in authoring_files.ANCHORS],
+    ids=[
+        f"{f}:{','.join(f'{k}={v}' for k, v in ov.items()) or 'default'}"
+        for (f, ov, _golden) in authoring_files.ANCHORS
+    ],
+)
+def test_rust_authoring_graph_dump_matches_python(
+    scenario_file: str, overrides: dict
+) -> None:
+    """The Rust interpreter's canonical structural graph dump equals the Python
+    interpreter's, byte-for-byte (Tier-0 file-level parse-parity). This catches graph
+    facts a final-state snapshot is blind to: flow priorities, present-but-inert flows,
+    and — via the hex-float amounts / forcing constants — the bit-exact Step-3
+    boundary-eval of a template expression (`param('crew_count') * 1000.0`)."""
+    built = authoring_files.load_anchor(SCENARIOS_DIR, scenario_file, overrides)
+    python_dump = authoring_files.render_graph_dump(built)
+    rust_dump = _run_authoring_example("dump_graph", scenario_file, overrides)
+    assert rust_dump == python_dump, (
+        f"Rust vs Python graph dump diverged for {scenario_file} {overrides}"
+    )
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+@pytest.mark.parametrize(
+    "scenario_file,overrides",
+    [(f, ov) for (f, ov, _golden) in authoring_files.ANCHORS],
+    ids=[
+        f"{f}:{','.join(f'{k}={v}' for k, v in ov.items()) or 'default'}"
+        for (f, ov, _golden) in authoring_files.ANCHORS
+    ],
+)
+def test_rust_authoring_run_matches_python(scenario_file: str, overrides: dict) -> None:
+    """The Rust interpreter's RUN of an anchor file reproduces the Python interpreter's
+    final `State` — Rust-parse(file) ≡ Python-parse(file) ≡ same trajectory. Compared on
+    parsed f64 via `sim_io.loads`/`dumps` (port-agnostic, never JSON bytes)."""
+    from authoring.run import run_scenario
+
+    built = authoring_files.load_anchor(SCENARIOS_DIR, scenario_file, overrides)
+    states, rationed, events = run_scenario(built)
+    assert rationed == 0 and events == (), (scenario_file, rationed, events)
+    python_final = snapshot.dumps(states[-1])
+
+    rust_json = _run_authoring_example("emit_authored", scenario_file, overrides)
+    rust_final = snapshot.dumps(snapshot.loads(rust_json))
+
+    assert rust_final == python_final, (
+        f"Rust vs Python interpreted run diverged for {scenario_file} {overrides}"
+    )
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+@pytest.mark.parametrize(
+    "scenario_file,overrides,golden",
+    [(f, ov, g) for (f, ov, g) in authoring_files.ANCHORS if g is not None],
+)
+def test_rust_authoring_run_byte_identical_to_frozen_golden(
+    scenario_file: str, overrides: dict, golden: str
+) -> None:
+    """The strongest anchor: the Rust interpreter's run of the composition anchor
+    (`crew_mission`) and the template at its default (`crew_habitat_template`,
+    crew_count = 1.0 ⇒ `1.0 * base == base`) reproduces the FROZEN `crew_state.json`
+    golden byte-for-byte through `sim_io.loads`/`dumps` (transcendental-free ⇒ Tier-1,
+    platform-independent). The whole file→schema→interpret→run→emit path validated
+    against the reference the Python side is also pinned to."""
+    rust_json = _run_authoring_example("emit_authored", scenario_file, overrides)
+    reemitted = snapshot.dumps(snapshot.loads(rust_json))
+    golden_text = (
+        (GOLDEN_DIR / golden).read_text(encoding="utf-8").replace("\r\n", "\n")
+    )
+    assert reemitted == golden_text, (
+        f"Rust interpreted run of {scenario_file} {overrides} "
+        f"did not reproduce {golden}"
+    )

@@ -120,6 +120,19 @@ pub struct OxygenConsumption {
     o2_consumed: String,
 }
 
+impl OxygenConsumption {
+    /// Construct an `OxygenConsumption` with the given ids. Pub so the Phase-9
+    /// `authoring` interpreter can build it by wiring (the additive-under-`rust/`
+    /// idiom — the Python `authoring` package selects the frozen flow the same way).
+    pub fn new(id: String, o2_store: String, o2_consumed: String) -> Self {
+        OxygenConsumption {
+            id,
+            o2_store,
+            o2_consumed,
+        }
+    }
+}
+
 impl Flow for OxygenConsumption {
     fn id(&self) -> &str {
         &self.id
@@ -145,6 +158,26 @@ pub struct FoodMetabolism {
     exhaled_co2: String,
     fecal_waste: String,
     params: CrewParams,
+}
+
+impl FoodMetabolism {
+    /// Construct a `FoodMetabolism` with the given ids + params. Pub so the Phase-9
+    /// `authoring` interpreter can build it by wiring (see [`OxygenConsumption::new`]).
+    pub fn new(
+        id: String,
+        food_store: String,
+        exhaled_co2: String,
+        fecal_waste: String,
+        params: CrewParams,
+    ) -> Self {
+        FoodMetabolism {
+            id,
+            food_store,
+            exhaled_co2,
+            fecal_waste,
+            params,
+        }
+    }
 }
 
 impl Flow for FoodMetabolism {
