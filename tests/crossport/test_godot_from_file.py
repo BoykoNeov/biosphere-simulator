@@ -48,6 +48,8 @@ GOLDEN_DIR = REPO_ROOT / "tests" / "regression" / "golden"
 RUST_WORKSPACE_DIR = REPO_ROOT / "rust"
 GODOT_PROJECT_DIR = REPO_ROOT / "godot"
 SCENARIO = REPO_ROOT / "tests" / "authoring" / "scenarios" / "crew_mission.yaml"
+_SCEN_DIR = REPO_ROOT / "tests" / "authoring" / "scenarios"
+TEMPLATE = _SCEN_DIR / "crew_habitat_template.yaml"
 
 # The crew_mission horizon (MISSION_DAYS 7 * steps_per_day 24), declared in the file.
 CREW_STEPS = 168
@@ -177,6 +179,53 @@ def test_godot_file_loaded_scenario_cross_boundary_parity() -> None:
     golden = compare.load_json(GOLDEN_DIR / "crew_state.json")
     result = compare.compare(golden, json.loads(godot_snapshot), tier=1)
     assert result.ok, result.report()
+
+
+def _run_template_smoke() -> dict:
+    """Run `from_file_template_smoke.gd` (the `build_from_file_with` array-FFI driver)
+    headless through the actual cdylib, passing the template's absolute path."""
+    assert GODOT is not None
+    proc = subprocess.run(
+        [
+            GODOT,
+            "--headless",
+            "--path",
+            str(GODOT_PROJECT_DIR),
+            "--script",
+            "res://from_file_template_smoke.gd",
+            "--",
+            str(TEMPLATE),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    out = proc.stdout
+    assert _SMOKE_BEGIN in out and _SMOKE_END in out, (
+        "template smoke markers missing — extension may not have loaded:\n"
+        f"stdout:\n{out}\nstderr:\n{proc.stderr}"
+    )
+    payload = out.split(_SMOKE_BEGIN, 1)[1].split(_SMOKE_END, 1)[0].strip()
+    return json.loads(payload)
+
+
+def test_godot_build_from_file_with_template_override() -> None:
+    """The templated-override array FFI (`build_from_file_with`) end-to-end through the
+    cdylib — the one FFI surface no other smoke / cargo test / UI drives. Also shows the
+    Phase-9 "load a template, not just a fixed scenario" capability: `crew_count` bites
+    exactly 4× (initial `crew.food_store`, read at n=0) through the array FFI."""
+    _build_cdylib()
+    _ensure_godot_import()
+    report = _run_template_smoke()
+    assert report["ok"] is True, f"template smoke did not complete ok: {report}"
+    assert report["fp_clean"] is True
+    base = report["food_default"]
+    big = report["food_4x"]
+    assert base > 0.0, f"default food store should be positive: {base}"
+    # 1.0*base vs 4.0*base at n=0 — exact 4× (build-time eval, no accumulation).
+    assert big == pytest.approx(4.0 * base, rel=1e-12), (
+        f"crew_count=4.0 should 4× the food store via the array FFI: {base=} {big=}"
+    )
 
 
 def _run_ui_smoke() -> tuple[dict, str]:

@@ -435,7 +435,11 @@ the same file into the same graph as Python.** Contract:
     committed file*; a byte-identity failure can then only mean an FFI/FP divergence, never a
     two-different-files confound (advisor #1). `crew_mission` is the anchor because it is Tier-1
     (transcendental-free ⇒ platform-independent bit-exact) and already golden-pinned (Step 4b) —
-    the Step-1 `cabin_gas` smoke pattern, one authoring level up.
+    the Step-1 `cabin_gas` smoke pattern, one authoring level up. A companion
+    `from_file_template_smoke.gd` drives the typed-array `build_from_file_with` FFI end-to-end
+    (advisor: the one FFI surface no other smoke/cargo/UI reached) and doubles as the "load a
+    **template**, not just a fixed scenario" demo — `crew_count = 4.0` bites exactly 4× the
+    initial food store through the array boundary.
   - **The interactive face** — `from_file_dashboard.{tscn,gd}` (a path `LineEdit` + Load/Step/Run
     buttons over `build_from_file`; the default path `res://../tests/.../crew_mission.yaml`
     globalizes + loads end-to-end, `res://`-parent-dir resolution **verified headless**) +
