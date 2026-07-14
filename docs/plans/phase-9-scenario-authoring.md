@@ -1,8 +1,9 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b COMPLETE (composition + parameter packs + the
-bounded kinetics DSL + templates + the Rust VM/parser port with parse- & trajectory-parity + the Rust
-runtime scenario-FILE interpreter); Steps 5–7 JIT.** Step 4 was SPLIT (advisor-recommended,
+**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b + Step 5 COMPLETE (composition + parameter packs
++ the bounded kinetics DSL + templates + the Rust VM/parser port with parse- & trajectory-parity + the
+Rust runtime scenario-FILE interpreter + Godot loading an authored file at runtime through the frozen
+cdylib); Steps 6–7 JIT.** Step 4 was SPLIT (advisor-recommended,
 USER-CONFIRMED): 4a ported the AST/VM + rate-expr parser to Rust with the two cross-port parity
 surfaces (parse-parity Tier-0 + SelfDischarge trajectory-parity Tier-1, Euler+RK4) at **zero YAML
 dependency**; **4b (COMPLETE) added the runtime scenario-file layer** — decision E resolved
@@ -391,10 +392,66 @@ the same file into the same graph as Python.** Contract:
     **Zero core + zero frozen-golden change** (`git diff src/` empty; 20 goldens
     byte-identical, no regen); `cargo test` (workspace) + `clippy --all-targets` +
     ruff/format/pyright green. Blocks Step 5 (Godot loads a file), not 4a.
-- **Step 5 — Godot loads a file at runtime (JIT).** The `godot_bridge` gains a "build session
-  from a scenario file path" entry; the "author, not program" payoff. Cross-boundary parity
-  smoke: the file-loaded session (through the actual cdylib) == the headless-built one, the
-  Phase-8 FTZ/DAZ discipline.
+- **Step 5 — Godot loads a file at runtime. COMPLETE.** The `godot_bridge` gains a "build a
+  session from a scenario **file** path" entry — the "author, not program" payoff, the first
+  time a modder/player loads a new authored scenario with **no recompile**. **What landed** (all
+  additive under `rust/crates/godot_bridge/` + `godot/` + `tests/crossport/`; `git diff src/` —
+  the Python tree — empty; engine crates carry no gdext types; **all 20 frozen goldens
+  byte-identical** — no science changed):
+  - **The bridge-side wrap is the only new Rust** (advisor-confirmed placement): the shared
+    graph-build already lives in the frozen `authoring` crate, so `build_session_from_file(path,
+    overrides)` just calls **`authoring::load_scenario`** (the *same* code the headless
+    `emit_authored` example runs) and wraps the resulting graph in the single-rate
+    [`SimSession`]. `godot_bridge` gains an `authoring` dependency; **`station` does not** (a
+    boundary→engine dep would invert the layering). FFI: `build_from_file(path)` +
+    `build_from_file_with(path, names, values)` (typed parallel-array template overrides, no JSON
+    parser — the P8.5 typed-scalar ethos) + `total_steps()` (the file declares its own horizon,
+    so the caller steps exactly what the headless run does).
+  - **Single-rate / Euler only, scoped loudly.** `authoring::run` is single-rate, and
+    `SimSession::single_rate` is Euler — so a file requesting `rk4` (no single-rate rk4 session
+    exists) is a loud `Validation`, deferred exactly as two-rate authoring is. A file-loaded
+    session is **not saveable** via the P8.7 recipe wrapper (identity = the on-disk file, not a
+    palette id) — the perturbed-session precedent; a `File` recipe is a deferred follow-on. The
+    `DisplayContext` is **empty** (authored files carry no display hints in the schema) — the one
+    combination no palette entry exercises (all four declare ≥1 shared stock), so a cargo test
+    asserts the empty-`shared_stock_ids` observation still projects well-formed (both scalars
+    `null`).
+  - **The drift guard is a pure-Rust cargo test** (advisor #3): `SimSession::single_rate.step()`
+    and `authoring::run_scenario`'s Euler loop are *parallel* implementations (not a shared
+    extract like Step-0's `advance_one_master_day`), so the file-loaded session's final state is
+    asserted **bit-identical** (exact hex-float `to_json`) to `run_scenario`'s — the only thing
+    keeping the wrap faithful. Plus: file loads + steps the 168-step horizon well-fed; the
+    template `crew_count = 4.0` override bites (≈4× the food store); rk4 + missing-file rejected.
+    (32 bridge cargo tests, +4.)
+  - **The load-bearing cross-boundary parity smoke** (`godot/from_file_smoke.gd` +
+    `tests/crossport/test_godot_from_file.py`, local-only `skipif godot||cargo`): drives
+    `build_from_file(crew_mission.yaml)` through the **actual cdylib** and asserts the snapshot is
+    **byte-identical to headless `emit_authored <file>`** (the FFI-didn't-corrupt-determinism
+    proof) AND **Tier-1 bit-exact vs the frozen `crew_state.json`** (the authored crew re-proves
+    the known golden *through the file-load boundary*), with FTZ/DAZ **OFF** on the stepping
+    thread and `total_steps == step_count == 168` / `rationed == 0`. **The absolute scenario path
+    is passed to both sides** — to the smoke via a `--` user arg (`OS.get_cmdline_user_args()`,
+    verified working headless) and to `emit_authored` as a CLI arg — so both load the *identical
+    committed file*; a byte-identity failure can then only mean an FFI/FP divergence, never a
+    two-different-files confound (advisor #1). `crew_mission` is the anchor because it is Tier-1
+    (transcendental-free ⇒ platform-independent bit-exact) and already golden-pinned (Step 4b) —
+    the Step-1 `cabin_gas` smoke pattern, one authoring level up.
+  - **The interactive face** — `from_file_dashboard.{tscn,gd}` (a path `LineEdit` + Load/Step/Run
+    buttons over `build_from_file`; the default path `res://../tests/.../crew_mission.yaml`
+    globalizes + loads end-to-end, `res://`-parent-dir resolution **verified headless**) +
+    `from_file_ui_smoke.gd` (instantiates it headless so `_ready → _build_ui` + a real Load+Step
+    run — the P8.3/P8.6 `ui_smoke` precedent; the UI is otherwise loaded by nothing). On-screen
+    pixels are the GUI clause; the load-bearing proof is the cargo drift-guard + the headless
+    smoke.
+  - **The headless "same sim" reference is `emit_authored`** (a real headless file-runner sharing
+    `authoring::load_scenario`); extending the `station::sim` bin to dispatch files is a deferred
+    nicety, not required — the shared graph-build is already `authoring`, and the SimSession wrap
+    is the only bridge-only code (drift-guarded by the cargo test). **Zero core + zero domain +
+    zero engine-crate change** (`git diff src/` empty; `simcore`/`domains`/`station` untouched —
+    the change is entirely the additive `authoring` dep + `build_from_file` on `godot_bridge`,
+    plus `godot/` scripts + the crossport test); `cargo test` (workspace) + `clippy --all-targets
+    -D warnings` green; ruff/format/pyright green; the 2 new Godot crossport tests pass. Next:
+    Step 6 (species / domain definitions).
 - **Step 6 — species / domain definitions (JIT).** A *species* = flow-set + param-pack + stock
   template; a *domain* = a named stock+flow bundle over a quantity set — authored bundles built
   on Steps 2/4, composing into scenarios.

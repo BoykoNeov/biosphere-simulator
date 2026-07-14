@@ -28,3 +28,10 @@ godot = "0.5.4"
 station = { path = "../station" }
 simcore = { path = "../simcore" }
 domains = { path = "../domains" }
+
+# The Phase-9 declarative-authoring boundary (the runtime scenario-file loader). Step 5
+# ("Godot loads a file") wraps `authoring::load_scenario` in a `SimSession` — the only
+# bridge-specific part is the trivial `BuiltScenario → SimSession` wrap; the shared
+# graph-build stays in `authoring`, so `station` needs no dependency on it (that would
+# invert the engine/boundary layering).
+authoring = { path = "../authoring" }

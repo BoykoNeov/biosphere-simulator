@@ -34,6 +34,9 @@
 //!    FTZ/DAZ read is a complementary check: a game engine that sets those per-thread for
 //!    SIMD throughput would silently diverge from the IEEE-default headless run.
 
+use std::collections::BTreeMap;
+use std::path::Path;
+
 use godot::prelude::*;
 
 use simcore::error::SimError;
@@ -142,6 +145,61 @@ pub(crate) fn build_composed_session(
         },
     };
     Ok((session, display))
+}
+
+/// Build a session from a **declarative scenario file** (Phase-9 P8/Step-5 — "Godot loads a
+/// file at runtime"): the "author, not program" payoff. The file is parsed + interpreted by
+/// the frozen [`authoring`] boundary ([`authoring::load_scenario`]) — the *same* code the
+/// headless `emit_authored` example runs — and this wraps the resulting graph in the
+/// single-rate [`CoreSession`]. The only bridge-specific part is that trivial
+/// `BuiltScenario → SimSession` wrap; the graph build (schema, wiring, balance-by-construction,
+/// template boundary-eval) all stays in `authoring`, so a file-loaded session is bit-identical
+/// to the headless run (proven intra-process by the faithfulness cargo test, and across the FFI
+/// boundary by `from_file_smoke.gd`).
+///
+/// Returns the session, an (empty) [`DisplayContext`] — authored files declare no display hints
+/// yet, so both derived scalars project `null` and no stock is highlighted (zero parity concern,
+/// display-only) — and the authored `steps` horizon the file itself declares (so the caller can
+/// step exactly what the headless run does). `overrides` instantiate a template's `parameters`
+/// (Step-3 `param('crew_count')` knobs); pass an empty map for the common no-override case.
+///
+/// **Single-rate / Euler only** (the [`SimSession::single_rate`] shape the [`authoring::run`]
+/// harness itself is scoped to): a file requesting `rk4` (no single-rate rk4 session exists) is a
+/// loud [`SimError::Validation`], deferred exactly as two-rate authoring is. Any authoring parse/
+/// interpret failure (unknown flow type, bad wiring, unbalanced authored stoichiometry, a missing
+/// file) is mapped to a [`SimError::Validation`] the UI renders as `false`.
+pub(crate) fn build_session_from_file(
+    path: &Path,
+    overrides: &BTreeMap<String, f64>,
+) -> Result<(CoreSession, DisplayContext, u64), SimError> {
+    let built = authoring::load_scenario(path, overrides)
+        .map_err(|e| SimError::Validation(format!("authoring: {}", e.message)))?;
+    if built.integrator != "euler" {
+        return Err(SimError::Validation(format!(
+            "godot_bridge: file-loaded scenario {:?} requested integrator {:?}, but a \
+             file-loaded session is single-rate Euler only (rk4 file scenarios are deferred, \
+             exactly as two-rate authoring is)",
+            built.name, built.integrator
+        )));
+    }
+    let steps = built.steps;
+    let session = CoreSession::single_rate(
+        EulerIntegrator::new(built.registry),
+        built.state,
+        built.resolver,
+        built.dt,
+    );
+    // Authored files carry no display hints in the schema (no thermal node / battery / declared
+    // shared stocks), so the display context is empty. The observation projection still renders
+    // (per-domain stock groups + per-quantity totals); a Step-6 refinement could let a file
+    // declare hints. This empty-context path is otherwise unexercised by the palette (all four
+    // entries declare ≥1 shared stock), so a cargo test asserts `observation_json` is well-formed.
+    let display = DisplayContext {
+        thermal: None,
+        battery: None,
+        shared_stock_ids: vec![],
+    };
+    Ok((session, display, steps))
 }
 
 /// Rebuild a session from a save's [`Recipe`] (Phase-8 P8.7) — the dispatch save/load
@@ -392,7 +450,34 @@ pub struct SimSession {
     /// can record the recipe alongside the state. `None` for a perturbed session (not
     /// saveable) or before any build.
     recipe: Option<Recipe>,
+    /// The horizon a **file-loaded** scenario declares (Phase-9 Step 5) — `steps` from the
+    /// scenario file, so the caller can step exactly what the headless run does
+    /// (`total_steps()`). `None` for palette / composed / perturbed sessions (their horizon
+    /// is a known constant, not file-declared).
+    authored_steps: Option<u64>,
     base: Base<RefCounted>,
+}
+
+/// Non-`#[func]` helpers, kept out of the `#[godot_api]` block. Shared by
+/// `build_from_file` / `build_from_file_with`.
+impl SimSession {
+    fn build_from_file_impl(&mut self, path: &str, overrides: &BTreeMap<String, f64>) -> bool {
+        match build_session_from_file(Path::new(path), overrides) {
+            Ok((session, display, steps)) => {
+                self.inner = Some(session);
+                self.display = Some(display);
+                self.authored_steps = Some(steps);
+                // No fixed-palette recipe (its identity is the on-disk file) — not saveable, the
+                // perturbed-session precedent. A `File` recipe is a deferred follow-on.
+                self.recipe = None;
+                true
+            }
+            Err(err) => {
+                godot_error!("SimSession.build_from_file failed: {err:?}");
+                false
+            }
+        }
+    }
 }
 
 #[godot_api]
@@ -408,6 +493,7 @@ impl SimSession {
                 self.inner = Some(session);
                 self.display = Some(display);
                 self.recipe = Some(Recipe::Named(id));
+                self.authored_steps = None;
                 true
             }
             Err(err) => {
@@ -432,6 +518,7 @@ impl SimSession {
                 self.inner = Some(session);
                 self.display = Some(display);
                 self.recipe = Some(Recipe::Composed(ids));
+                self.authored_steps = None;
                 true
             }
             Err(err) => {
@@ -476,6 +563,7 @@ impl SimSession {
                 // build-time window that has no place in the fixed-palette recipe. `save`
                 // reports it unavailable rather than dropping the perturbation silently.
                 self.recipe = None;
+                self.authored_steps = None;
                 true
             }
             Err(err) => {
@@ -483,6 +571,63 @@ impl SimSession {
                 false
             }
         }
+    }
+
+    /// Construct a session from a **declarative scenario file** (Phase-9 Step 5 — "Godot
+    /// loads a file at runtime"): the "author, not program" payoff. `path` is an **OS
+    /// filesystem path** (from GDScript, `ProjectSettings.globalize_path(...)` or a
+    /// `--`-passed absolute path — not a `res://` URI). The file is parsed + interpreted by
+    /// the frozen [`authoring`] boundary and wrapped in the single-rate session; a modder /
+    /// player can load new authored scenarios with no recompile. Returns `false` (and logs)
+    /// on any authoring error (unknown flow type, bad wiring, unbalanced authored
+    /// stoichiometry, a missing file, or a two-rate/`rk4` scenario — deferred). Idempotently
+    /// replaces any prior session. Use [`total_steps`](Self::total_steps) to read the
+    /// file-declared horizon, then [`step_n`](Self::step_n) it.
+    ///
+    /// A file-loaded session is **not saveable** via the P8.7 recipe wrapper (its identity is
+    /// the file + overrides on disk, not a fixed-palette id) — [`save`](Self::save) reports it
+    /// unavailable, exactly like a perturbed session. A `File` recipe is a deferred follow-on.
+    #[func]
+    fn build_from_file(&mut self, path: GString) -> bool {
+        self.build_from_file_impl(&path.to_string(), &BTreeMap::new())
+    }
+
+    /// [`build_from_file`](Self::build_from_file) for a **template** — supply parallel arrays
+    /// of parameter names + values (the Step-3 `parameters` overrides, e.g. `crew_count = 4.0`)
+    /// as **typed scalars, no JSON parser** (the P8.5 typed-FFI ethos). The arrays must be the
+    /// same length; a mismatch (or any authoring/build error) returns `false` and logs.
+    #[func]
+    fn build_from_file_with(
+        &mut self,
+        path: GString,
+        override_names: PackedStringArray,
+        override_values: PackedFloat64Array,
+    ) -> bool {
+        let names = override_names.to_vec();
+        let values = override_values.to_vec();
+        if names.len() != values.len() {
+            godot_error!(
+                "SimSession.build_from_file_with: override_names ({}) and override_values ({}) \
+                 length mismatch",
+                names.len(),
+                values.len()
+            );
+            return false;
+        }
+        let overrides: BTreeMap<String, f64> = names
+            .iter()
+            .zip(values.iter())
+            .map(|(n, v)| (n.to_string(), *v))
+            .collect();
+        self.build_from_file_impl(&path.to_string(), &overrides)
+    }
+
+    /// The horizon a **file-loaded** scenario declared (`steps` from the file), so the caller
+    /// steps exactly what the headless `emit_authored` run does. `-1` for a palette / composed /
+    /// perturbed session (their horizon is a known constant, not file-declared) or before build.
+    #[func]
+    fn total_steps(&self) -> i64 {
+        self.authored_steps.map(|s| s as i64).unwrap_or(-1)
     }
 
     /// Advance one natural unit (one `step_report` for the single-rate `cabin_gas`).
@@ -614,6 +759,7 @@ impl SimSession {
         self.inner = Some(session);
         self.display = Some(display);
         self.recipe = Some(recipe);
+        self.authored_steps = None;
         true
     }
 
@@ -1018,6 +1164,101 @@ mod tests {
         let (mut resumed, _) = build_from_recipe(&recipe).unwrap();
         resumed.load_state(state).unwrap();
         assert_eq!(resumed.n(), 24, "resumed composed session carries n");
+    }
+
+    /// The scenario-file directory (repo `tests/authoring/scenarios`), from the crate root.
+    fn scenarios_dir() -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tests/authoring/scenarios")
+    }
+
+    /// Phase-9 Step 5: a declarative scenario **file** builds a single-rate session that steps
+    /// the file-declared horizon well-fed (the same Tier-0 payload the emit example asserts).
+    #[test]
+    fn build_session_from_file_loads_crew_and_steps_well_fed() {
+        let path = scenarios_dir().join("crew_mission.yaml");
+        let (mut session, _ctx, steps) =
+            build_session_from_file(&path, &BTreeMap::new()).unwrap();
+        assert_eq!(steps, 168, "crew_mission declares 168 steps");
+        session.step_n(steps).unwrap();
+        assert_eq!(session.n(), 168);
+        assert_eq!(session.total_rationed(), 0);
+        assert!(session.events().is_empty());
+        assert!(from_engine(session.state()).to_json().contains("crew.food_store"));
+    }
+
+    /// **The drift guard.** `SimSession::single_rate.step()` and `authoring::run_scenario`'s
+    /// Euler loop are *parallel* implementations (not a shared extract like Step-0's
+    /// `advance_one_master_day`), so this exact hex-float equality is the only thing keeping
+    /// the file-loaded session bit-identical to the headless run.
+    #[test]
+    fn build_session_from_file_is_bit_identical_to_run_scenario() {
+        let path = scenarios_dir().join("crew_mission.yaml");
+        let (mut session, _ctx, steps) =
+            build_session_from_file(&path, &BTreeMap::new()).unwrap();
+        session.step_n(steps).unwrap();
+        let session_final = from_engine(session.state()).to_json();
+
+        let built = authoring::load_scenario(&path, &BTreeMap::new()).unwrap();
+        let result = authoring::run_scenario(built).unwrap();
+        let headless_final = from_engine(&result.final_state).to_json();
+
+        assert_eq!(
+            session_final, headless_final,
+            "the file-loaded SimSession must be bit-identical to authoring::run_scenario"
+        );
+    }
+
+    /// A **template** file with a `crew_count` override: the knob bites (≈4× the food store —
+    /// the Step-3 gate), and the empty-`shared_stock_ids` display path (unexercised by the
+    /// palette, all of whose entries declare ≥1 shared stock) still projects a well-formed
+    /// observation with both derived scalars `null`.
+    #[test]
+    fn build_session_from_file_template_override_bites_and_projects() {
+        let path = scenarios_dir().join("crew_habitat_template.yaml");
+        let (base, _c, _s) = build_session_from_file(&path, &BTreeMap::new()).unwrap();
+        let base_food = base.state().stocks.get("crew.food_store").unwrap().amount;
+
+        let overrides: BTreeMap<String, f64> =
+            [("crew_count".to_string(), 4.0)].into_iter().collect();
+        let (session, ctx, _s) = build_session_from_file(&path, &overrides).unwrap();
+        let big_food = session.state().stocks.get("crew.food_store").unwrap().amount;
+        assert!(
+            (big_food - 4.0 * base_food).abs() < 1e-9 * base_food.max(1.0),
+            "crew_count=4.0 should ~4× the food store: base={base_food} big={big_food}"
+        );
+
+        assert!(ctx.shared_stock_ids.is_empty());
+        let proj = project(session.state(), &ctx, 0, 0, session.max_residual());
+        let json = proj.to_json();
+        assert!(json.contains("\"temperature_k\":null"));
+        assert!(json.contains("\"soc_percent_of_initial\":null"));
+        assert!(json.contains("\"shared_stock_ids\":[]"));
+        assert!(json.contains("crew.food_store"));
+    }
+
+    /// A missing file and an `rk4` file-loaded scenario are both loud `Validation` errors (the
+    /// UI renders `false`). The rk4 file is derived from the committed `crew_mission` by
+    /// swapping the integrator, written to a unique temp path.
+    #[test]
+    fn build_session_from_file_rejects_rk4_and_missing_file() {
+        let missing = scenarios_dir().join("no_such_scenario.yaml");
+        assert!(matches!(
+            build_session_from_file(&missing, &BTreeMap::new()),
+            Err(SimError::Validation(_))
+        ));
+
+        let crew =
+            std::fs::read_to_string(scenarios_dir().join("crew_mission.yaml")).unwrap();
+        let rk4 = crew.replace("integrator: euler", "integrator: rk4");
+        assert!(rk4.contains("integrator: rk4"), "the integrator swap must apply");
+        let tmp = std::env::temp_dir().join("godot_bridge_from_file_rk4.yaml");
+        std::fs::write(&tmp, rk4).unwrap();
+        let result = build_session_from_file(&tmp, &BTreeMap::new());
+        let _ = std::fs::remove_file(&tmp);
+        assert!(
+            matches!(result, Err(SimError::Validation(_))),
+            "an rk4 file-loaded scenario must be rejected (single-rate Euler only; deferred)"
+        );
     }
 
     #[test]
