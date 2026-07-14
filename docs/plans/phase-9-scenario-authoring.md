@@ -1,9 +1,11 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b + Step 5 COMPLETE (composition + parameter packs
-+ the bounded kinetics DSL + templates + the Rust VM/parser port with parse- & trajectory-parity + the
-Rust runtime scenario-FILE interpreter + Godot loading an authored file at runtime through the frozen
-cdylib); Steps 6–7 JIT.** Step 4 was SPLIT (advisor-recommended,
+**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b + Step 5 + Step 6a COMPLETE (composition +
+parameter packs + the bounded kinetics DSL + templates + the Rust VM/parser port with parse- &
+trajectory-parity + the Rust runtime scenario-FILE interpreter + Godot loading an authored file at
+runtime through the frozen cdylib + Python file-composition via reusable domain/species bundles);
+Step 6b (the Rust `includes` port) + Step 6c (multi-instance id-namespacing) + Step 7 JIT.** Step 4
+was SPLIT (advisor-recommended,
 USER-CONFIRMED): 4a ported the AST/VM + rate-expr parser to Rust with the two cross-port parity
 surfaces (parse-parity Tier-0 + SelfDischarge trajectory-parity Tier-1, Euler+RK4) at **zero YAML
 dependency**; **4b (COMPLETE) added the runtime scenario-file layer** — decision E resolved
@@ -456,9 +458,58 @@ the same file into the same graph as Python.** Contract:
     plus `godot/` scripts + the crossport test); `cargo test` (workspace) + `clippy --all-targets
     -D warnings` green; ruff/format/pyright green; the 2 new Godot crossport tests pass. Next:
     Step 6 (species / domain definitions).
-- **Step 6 — species / domain definitions (JIT).** A *species* = flow-set + param-pack + stock
-  template; a *domain* = a named stock+flow bundle over a quantity set — authored bundles built
-  on Steps 2/4, composing into scenarios.
+- **Step 6 — species / domain definitions.** SPLIT (advisor-recommended, mirroring 4a/4b) into
+  **6a — the Python file-composition layer (COMPLETE)** + **6b — the Rust `includes` port
+  (deferred-not-dropped)** + **6c — multi-instance id-namespacing (deferred)**.
+  - **Step 6a — reusable domain/species bundles + `include` composition. COMPLETE.** New additive
+    boundary module `src/authoring/compose.py` (`apply_includes`) + a `BundleSpec` schema model
+    (`parameters`/`stocks`/`flows`/`forcings`, `extra="forbid"` ⇒ run-config keys **and** nested
+    `includes` rejected for free) + an `includes: list[str]` field on `ScenarioSpec`; the merge runs
+    at the top of `interpret`, so **both** entry points compose and the interpreter lowers the flat
+    result exactly as before (**no new per-step surface** — composition is a boundary flatten). A
+    *domain* = a named stock+flow bundle over a quantity set; a *species* = a flow-set + param-set +
+    stock-template (a bundle whose stock amounts are template expressions over its own `parameters`).
+    **The load-bearing anchor decision (advisor): byte-identity forces single-bundle.** A crew+battery
+    composed `State` has 10 stocks — never byte-identical to the 8-stock `crew_state.json` — so the
+    **faithfulness anchor is a single-bundle include** and the two-domain merge is at most a
+    projection "it bit". Two anchors: **(1) `crew_station.yaml`** (nothing but
+    `includes: [bundles/crew.domain.yaml]` + run config) reproduces the frozen `crew_state.json`
+    **byte-for-byte** (the bundle is a `crew_count` template at default `1.0` ⇒ `1.0*base==base`
+    exactly; if `includes` were a no-op the graph would be empty, not the golden — so byte-identity
+    also proves the include contributes the *whole* graph) + a structural-equality gate
+    (`built.state == build_crew(...)[0]`, flows equal); **(2) `station_composed.yaml`** (the "it bit"
+    — the genuinely-new **>1 file merged into one graph**, over Step 3) includes BOTH the crew species
+    (CARBON/WATER/OXYGEN) and a disjoint **battery ENERGY domain** (`bundles/battery.domain.yaml` —
+    battery POOL + waste_heat sink + the frozen Power `SelfDischarge` **kinetics**, `k*battery`,
+    reusing the registered `self_discharge` param set — **zero new `FLOW_TYPES` surface** right before
+    Step 7 freezes it; Power's forced `SolarCharge`/`LoadDraw` need forcing schedules `run.py` lacks,
+    so kinetics is the clean second domain). Disjoint ⇒ every quantity conserves every step, so the
+    run completing IS the merge proof; faithfulness by **projection** (the crew half == `crew_state.json`,
+    the battery half == a frozen `SelfDischarge` 168-step run — both independently frozen-anchored);
+    `has_authored_kinetics` **ORs across bundles** (the composed run inherits the battery's
+    "authored != validated" marker). **Merge semantics fixed here (all cross-port — 6b + Step 7 inherit
+    them):** includes-first-then-inline order; a duplicate stock id / flow id / forcing key / parameter
+    name across any two sources is an `AuthoringError` (no silent override — the `extra="forbid"`
+    discipline one level up); `overrides=` reaches a bundle-declared parameter (verified — `crew_count`
+    lives in the include); run config + nested includes in a bundle are schema-rejected; **parameter
+    packs inside a bundle are deferred** (a bundle pack must resolve against the *bundle's* directory —
+    per-flow source-dir threading no anchor exercises; a `{pack:…}` on a bundle flow is a clean error,
+    matching Step 1 / the Rust port's "packs deferred"). 14 tests (2 byte-identity/structural + 1 reuse
+    @4× + 3 two-domain merge + 8 merge-semantics/fence). **Zero core + zero domain change** (`git diff
+    src/{simcore,domains}/` empty — purely additive boundary + tests + YAML); all 20 frozen goldens
+    byte-identical (no regen).
+  - **Step 6b — the Rust `includes` port (DEFERRED, mirroring 4a/4b; MANDATORY eventually).**
+    `includes` is a new **file-level parse-parity surface** (decision E): Step 7 cannot freeze an
+    includes grammar only one port implements. The Rust side (`rust/crates/authoring/`) must gain the
+    same merge in `yaml.rs`/`schema.rs`/`interpreter.rs` (a `BundleSpec` mirror + the flatten), with the
+    two anchors gated on the crossport CI job exactly as 4b's file anchors are. Not a nicety like the
+    `station::sim` file dispatch was — the composition grammar is a freeze surface.
+  - **Step 6c — multi-instance id-namespacing/prefixing (DEFERRED, principled).** Disjoint-id
+    composition (crew + battery) needs no prefixing; prefixing is *only forced* by two instances of the
+    **same** bundle (the `test_including_same_bundle_twice_is_duplicate` collision demonstrates exactly
+    why). Kept out to honor "bespoke until a second instance". **Shared-stock composition** (two bundles
+    pointing at one shared stock — the Phase-6 cabin sharing, hand-coded in `station/`) is a further,
+    larger deferral.
 - **Step 7 — the format/grammar freeze doc (JIT).** The Phase-4/6/8 freeze-contract analogue,
   one level up: freeze the **DSL grammar + file schema + the VM** (so mods authored against them
   stay stable), *not* new goldens. `docs/authoring-reference.md` + completeness gate on the

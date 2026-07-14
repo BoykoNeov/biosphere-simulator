@@ -145,6 +145,30 @@ class ForcingSpec(BaseModel):
     const: float | str
 
 
+class BundleSpec(BaseModel):
+    """A reusable **domain / species bundle**: stocks + flows + forcings (Step 6).
+
+    A *domain* is a named stock+flow bundle over a quantity set; a *species* is a
+    flow-set + param-set + stock-template (a bundle whose stock ``amount``s are
+    template expressions over its own ``parameters`` — e.g. the crew "species"
+    parametrized by ``crew_count``). A scenario **includes** one or more bundle files
+    (:attr:`ScenarioSpec.includes`); the interpreter merges each bundle's parameters/
+    stocks/flows/forcings into the scenario's flat graph
+    (:func:`authoring.compose.apply_includes`).
+
+    A bundle carries **no run config** (integrator/dt/steps/name/rng_seed) and **no
+    nested** ``includes`` — both are rejected by ``extra="forbid"`` (run config lives
+    only in the top-level scenario; includes are flat, one level deep — Step 6 scope).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    parameters: dict[str, float] = Field(default_factory=dict)
+    stocks: list[StockSpec] = Field(default_factory=list)
+    flows: list[FlowSpec] = Field(default_factory=list)
+    forcings: dict[str, ForcingSpec] = Field(default_factory=dict)
+
+
 class ScenarioSpec(BaseModel):
     """A whole authored scenario: run config + parameters + stocks + flows + forcings.
 
@@ -156,6 +180,15 @@ class ScenarioSpec(BaseModel):
     values that an instantiation may override (``interpret(..., overrides=…)``), and
     that a stock ``amount`` / forcing ``const`` expression may read via ``param('…')``.
     Empty (the Step-0 form) means a fully-literal scenario with no knobs.
+
+    ``includes`` (Step 6) is a list of **bundle-file paths** (each a
+    :class:`BundleSpec`), resolved relative to the scenario file's directory. Each
+    included bundle's parameters/stocks/flows/forcings merge into this scenario's
+    (:func:`authoring.compose.apply_includes`, run at the top of ``interpret``): a
+    scenario is thus *composed* from reusable domain/species bundles + its own inline
+    declarations. A duplicate id/key/parameter across any two sources is an
+    ``AuthoringError`` (no silent override). Empty (the pre-Step-6 form) means a
+    self-contained scenario.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -165,7 +198,8 @@ class ScenarioSpec(BaseModel):
     dt: float
     steps: int
     rng_seed: int = 0
+    includes: list[str] = Field(default_factory=list)
     parameters: dict[str, float] = Field(default_factory=dict)
-    stocks: list[StockSpec]
-    flows: list[FlowSpec]
+    stocks: list[StockSpec] = Field(default_factory=list)
+    flows: list[FlowSpec] = Field(default_factory=list)
     forcings: dict[str, ForcingSpec] = Field(default_factory=dict)

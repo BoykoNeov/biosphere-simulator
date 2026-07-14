@@ -1,0 +1,21 @@
+# Phase 9 Step 6 — the single-bundle FAITHFULNESS anchor (byte-identity).
+#
+# A thin scenario that is *nothing but* an include of the reusable crew species bundle
+# plus its run config. The interpreter merges bundles/crew.domain.yaml's stocks/flows/
+# forcings/parameters into this scenario's (empty) inline set, so the built graph has
+# exactly the eight frozen crew ids. At the bundle's default `crew_count = 1.0`,
+# `1.0 * base == base` exactly ⇒ this reproduces tests/regression/golden/crew_state.json
+# BYTE-FOR-BYTE — the whole compose→flatten→interpret→run path validated against the
+# frozen Crew golden (no new golden; the frozen one is the oracle).
+#
+# If `includes` were a no-op this scenario would build an empty graph, not the golden —
+# so byte-identity also proves the include contributes the entire graph.
+
+name: crew_station
+integrator: euler
+dt: 3600.0        # CrewScenario.dt_seconds
+steps: 168        # MISSION_DAYS (7) * steps_per_day (24)
+rng_seed: 0
+
+includes:
+  - bundles/crew.domain.yaml

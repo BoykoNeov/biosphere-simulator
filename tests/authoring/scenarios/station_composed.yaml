@@ -1,0 +1,23 @@
+# Phase 9 Step 6 — the two-domain MERGE "it bit": a station composed from two bundles.
+#
+# Includes BOTH the crew species (CARBON/WATER/OXYGEN) and the battery domain (ENERGY).
+# The genuinely-new capability over Step 3: >1 file merged into one graph. The two
+# domains are disjoint (no shared stock/forcing/quantity), so the union conserves every
+# quantity every step — a bad merge would surface as a ConservationError, so the run
+# completing IS the merge proof.
+#
+# This composed run is NOT byte-identical to any golden (10 stocks, not the crew golden's
+# 8) — its faithfulness is proven by PROJECTION: the crew half of the final state matches
+# the frozen crew golden, and the battery half matches a frozen SelfDischarge run over the
+# same horizon (both halves independently frozen-anchored). `has_authored_kinetics` is
+# True (the battery's SelfDischarge kinetics) — the composed run inherits the
+# "authored != validated" marker.
+
+name: station_composed
+integrator: euler
+dt: 3600.0
+steps: 168
+
+includes:
+  - bundles/crew.domain.yaml
+  - bundles/battery.domain.yaml

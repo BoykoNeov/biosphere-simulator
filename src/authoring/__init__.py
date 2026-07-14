@@ -21,10 +21,12 @@ Rust side). Pure boundary code: it may depend on pydantic/yaml (via ``config``),
 which ``simcore`` may never do.
 """
 
+from authoring.compose import apply_includes
 from authoring.errors import AuthoringError
 from authoring.interpreter import BuiltScenario, interpret, load_scenario
 from authoring.run import run_scenario
 from authoring.schema import (
+    BundleSpec,
     FlowSpec,
     ForcingSpec,
     ParamPackRef,
@@ -35,11 +37,13 @@ from authoring.schema import (
 __all__ = [
     "AuthoringError",
     "BuiltScenario",
+    "BundleSpec",
     "FlowSpec",
     "ForcingSpec",
     "ParamPackRef",
     "ScenarioSpec",
     "StockSpec",
+    "apply_includes",
     "interpret",
     "load_scenario",
     "run_scenario",

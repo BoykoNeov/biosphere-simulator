@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 
+from authoring.compose import apply_includes
 from authoring.errors import AuthoringError
 from authoring.expr_parser import parse_rate_expr
 from authoring.flow_registry import FLOW_TYPES, PARAM_LOADERS, load_param_set
@@ -332,7 +333,13 @@ def interpret(
 ) -> BuiltScenario:
     """Build the runnable ``(State, Registry, resolver)`` graph from a scenario spec.
 
-    Template ``parameters`` are resolved first (defaults + ``overrides``; an override
+    Any ``includes`` are merged first (:func:`authoring.compose.apply_includes`):
+    each referenced bundle file's parameters/stocks/flows/forcings are flattened into
+    the scenario (bundles first, then inline; a duplicate across sources is an
+    ``AuthoringError``), yielding a self-contained spec lowered exactly as a
+    hand-flattened one — so composition adds no per-step surface.
+
+    Template ``parameters`` are resolved next (defaults + ``overrides``; an override
     of an undeclared name is an ``AuthoringError``), then any stock ``amount`` /
     forcing ``const`` **expression** over them is evaluated to a literal (Step 3).
     Stocks are lowered and keyed by id (a duplicate id is an ``AuthoringError``); flows
@@ -345,6 +352,7 @@ def interpret(
     """
     if base_dir is None:
         base_dir = Path()
+    spec = apply_includes(spec, base_dir)
     params = resolve_parameters(spec.parameters, overrides)
     stocks: dict[StockId, Stock] = {}
     for stock_spec in spec.stocks:

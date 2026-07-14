@@ -1,0 +1,96 @@
+# Phase 9 Step 6 — the reusable crew SPECIES bundle (a domain/species definition).
+#
+# A *species* = flow-set + param-set + stock-template. This bundle factors the frozen
+# standalone Crew out of crew_habitat_template.yaml (Step 3) into a REUSABLE include:
+# the three provisioned-store POOLs + five boundary sinks (the stock template, scaled by
+# `crew_count`), the three metabolic flows (the flow-set + the frozen `crew` param set),
+# and the three intake forcings (also scaled). A scenario `includes` this file to compose
+# a crew into a habitat — the "authored, not programmed" payoff (Phase-9 decision B; this
+# is a runtime artifact, never frozen/reference).
+#
+# A bundle carries NO run config (integrator/dt/steps live only in the top-level scenario)
+# and NO nested includes (both rejected by BundleSpec's extra="forbid"). Instantiated at
+# the default `crew_count = 1.0`, `1.0 * base == base` exactly ⇒ a scenario that includes
+# only this bundle reproduces tests/regression/golden/crew_state.json byte-for-byte.
+#
+# All floats carry an explicit decimal point (the YAML-1.1 dotless-exponent hazard).
+
+parameters:
+  crew_count: 1.0   # default = the single-reference-crew MISSION_SCENARIO
+
+stocks:
+  # The three finite provisioned-consumable POOLs — initial inventory scales with crew.
+  - id: crew.food_store
+    domain: crew
+    quantity: carbon
+    kind: pool
+    amount: "param('crew_count') * 1000.0"    # crew_count * CrewScenario.food_store0
+  - id: crew.water_store
+    domain: crew
+    quantity: water
+    kind: pool
+    amount: "param('crew_count') * 60.0"      # crew_count * CrewScenario.water_store0
+  - id: crew.o2_store
+    domain: crew
+    quantity: oxygen
+    kind: pool
+    amount: "param('crew_count') * 2000.0"    # crew_count * CrewScenario.o2_store0
+  # The five monotonic boundary output sinks: always empty at start (crew-count-independent).
+  - id: boundary.exhaled_co2
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.fecal_waste
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.crew_humidity
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+  - id: boundary.urine
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+  - id: boundary.crew_o2_consumed
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: crew.oxygen_consumption
+    type: crew.oxygen_consumption
+    priority: 0
+    wiring:
+      o2_store: crew.o2_store
+      o2_consumed: boundary.crew_o2_consumed
+  - id: crew.food_metabolism
+    type: crew.food_metabolism
+    priority: 0
+    wiring:
+      food_store: crew.food_store
+      exhaled_co2: boundary.exhaled_co2
+      fecal_waste: boundary.fecal_waste
+    params: crew
+  - id: crew.water_balance
+    type: crew.water_balance
+    priority: 0
+    wiring:
+      water_store: crew.water_store
+      crew_humidity: boundary.crew_humidity
+      urine: boundary.urine
+    params: crew
+
+forcings:
+  # Metabolic intake rates scale with crew size (total station metabolic demand).
+  crew_o2_intake:
+    const: "param('crew_count') * 1.0e-3"     # crew_count * o2_intake_rate (mol/s)
+  crew_food_intake:
+    const: "param('crew_count') * 5.0e-4"     # crew_count * food_intake_rate (mol/s C)
+  crew_water_intake:
+    const: "param('crew_count') * 3.0e-5"     # crew_count * water_intake_rate (kg/s)
