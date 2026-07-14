@@ -503,7 +503,16 @@ the same file into the same graph as Python.** Contract:
     includes grammar only one port implements. The Rust side (`rust/crates/authoring/`) must gain the
     same merge in `yaml.rs`/`schema.rs`/`interpreter.rs` (a `BundleSpec` mirror + the flatten), with the
     two anchors gated on the crossport CI job exactly as 4b's file anchors are. Not a nicety like the
-    `station::sim` file dispatch was — the composition grammar is a freeze surface.
+    `station::sim` file dispatch was — the composition grammar is a freeze surface. **Two advisor-flagged
+    carry-forwards:** (i) 6a **relaxed `ScenarioSpec.stocks`/`flows` from required → optional** (a scenario
+    may now legally omit inline stocks/flows when it includes bundles — `crew_station.yaml` has none); this
+    is a real schema change Step 7's freeze doc must record, and the Rust `schema.rs` mirror must match.
+    (ii) The **includes-first-then-inline order** is a cross-port semantic documented + collision-tested but
+    not *positively* order-tested (no 6a byte-identity depends on it); 6b should add a one-line anchor that
+    mixes an include with an inline stock and pins the resulting stock order, so a Rust port that merged
+    inline-first can't pass silently. (The **crossport anchor list is a fixed `_ANCHORS` tuple** in
+    `tests/crossport/authoring_files.py`, NOT a glob — so the new `crew_station`/`station_composed`/`bundles`
+    files are correctly *not* fed to the not-yet-`includes`-aware Rust parser; that safety is structural.)
   - **Step 6c — multi-instance id-namespacing/prefixing (DEFERRED, principled).** Disjoint-id
     composition (crew + battery) needs no prefixing; prefixing is *only forced* by two instances of the
     **same** bundle (the `test_including_same_bundle_twice_is_duplicate` collision demonstrates exactly
