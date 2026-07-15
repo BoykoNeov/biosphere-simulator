@@ -1,11 +1,16 @@
 # Phase 9 — Scenario Authoring & Modding (the model becomes a platform)
 
-**Status: IN PROGRESS — Steps 0–3 + Step 4a + Step 4b + Step 5 + Step 6a + Step 6b + Step 6c COMPLETE
+**Status: COMPLETE — Steps 0–7 ALL DONE; PHASE 9 EXITS.**
 (composition + parameter packs + the bounded kinetics DSL + templates + the Rust VM/parser port with
 parse- & trajectory-parity + the Rust runtime scenario-FILE interpreter + Godot loading an authored
 file at runtime through the frozen cdylib + Python file-composition via reusable domain/species
 bundles + the Rust `includes` port with cross-port composition parity + multi-instance id-namespacing
-so the SAME bundle composes twice); Step 7 (the format/grammar freeze doc) JIT.** Step 4
+so the SAME bundle composes twice + **Step 7, the platform freeze contract** —
+`docs/authoring-reference.md` + `docs/authoring-reference.manifest.json` +
+`tests/test_authoring_freeze_manifest.py`: the grammar / file schema / VM node-op set / flow-type
+registry are **FROZEN** as the author-facing contract, every frozen set **derived** from its live
+source, the gate owning **completeness** while the parse/traj vectors + anchors own semantics and
+values, and the grammar recorded as **deliberately incomplete**.) Step 4
 was SPLIT (advisor-recommended,
 USER-CONFIRMED): 4a ported the AST/VM + rate-expr parser to Rust with the two cross-port parity
 surfaces (parse-parity Tier-0 + SelfDischarge trajectory-parity Tier-1, Euler+RK4) at **zero YAML
@@ -566,26 +571,95 @@ the same file into the same graph as Python.** Contract:
     `-m slow` + ruff + pyright green; `cargo test` + `clippy --all-targets` green; all 20 frozen goldens
     byte-identical (no regen). **Shared-stock composition** (two bundles pointing at one shared stock —
     the Phase-6 cabin sharing, hand-coded in `station/`) is a further, larger deferral.
-- **Step 7 — the format/grammar freeze doc (JIT).** The Phase-4/6/8 freeze-contract analogue,
-  one level up: freeze the **DSL grammar + file schema + the VM** (so mods authored against them
-  stay stable), *not* new goldens. `docs/authoring-reference.md` + completeness gate on the
-  grammar/schema surface.
+- **Step 7 — the format/grammar freeze doc. COMPLETE.** The Phase-4/6/8 freeze-contract
+  analogue one level up: the prior contracts freeze **science** (params, flow laws, scenarios →
+  goldens); this one freezes the **author-facing platform** — the DSL grammar, the file schema,
+  the VM's node/op set, the flow-type registry — so mods authored today keep working. Three
+  boundary-side artifacts, **zero code change** (`git diff src/` empty), **no new golden**.
+  - **Manifest + gate, NOT doc-only (advisor).** The Phase-8 `phase-8-reference.md` precedent
+    (a doc, no manifest) **does not transfer**: Phase 8 added a *consumer* and changed no
+    science, so there was no new frozen surface to gate. Phase 9 adds real author-facing
+    surface with no prior owner, and the plan's own charge — a "completeness gate on the
+    grammar/schema surface" — needs a machine-readable list to check against. So:
+    `docs/authoring-reference.md` + `docs/authoring-reference.manifest.json` +
+    `tests/test_authoring_freeze_manifest.py` (10 tests), mirroring the station trio.
+  - **Every frozen set DERIVED from its live single source of truth, never hand-listed** (the
+    discipline both prior manifests rest on): `expr_nodes` from `typing.get_args(simcore.expr.Expr)`
+    (the closed union); `binary_ops` from `_BINARY_OPS`, `ref_keywords` from `_REF_KEYWORDS`,
+    `integrator_names` from `run._INTEGRATORS` (private imports — each *is* the single source of
+    truth, which is the point of deriving over transcribing); `schema_fields` from pydantic
+    `model_fields` over the spec models found by **scanning** `authoring.schema` (so a whole new
+    spec model is caught, not just a new field on a known one); `flow_types` from `FLOW_TYPES`
+    **incl. each type's `wiring_fields`/`param_set`** (a renamed wiring field breaks every file
+    that names it — as much the contract as the type name); `param_loaders` from `PARAM_LOADERS`.
+  - **The VM is frozen by its GRAMMAR SURFACE, not a sha-256 of `expr.py`** (advisor): a code
+    hash adds reformat/lint noise without a real gate, and the VM's *behavior* is already pinned
+    bit-exactly by `traj_vectors.txt`; the node union + op set are what an author writes against.
+    Symmetrically, **`crew.yaml`/`self_discharge.yaml` are NOT re-hashed** — `delegates_to`
+    points at `station-reference.manifest.json` (the station→biosphere delegation discipline;
+    one owner per frozen artifact).
+  - **The gate owns COMPLETENESS only; it re-asserts no values** — the division the biosphere
+    manifest established, with the owners already in place: `parse_vectors.txt` owns grammar
+    *semantics* (a precedence/associativity change moves an S-expr), `traj_vectors.txt` owns the
+    VM's *arithmetic*, the 9 crossport anchors + `crew_state.json` byte-identity own the
+    *interpreter*, the station manifest owns *param values*. The gap none of them can see — and
+    the only thing this gate owns — is a grammar node / op / schema field / spec model / flow
+    type / param loader **added to the live tree but exercised by nothing** (the biosphere's
+    "added a flow, wired into no golden" hole, one authoring level up). Two **teeth** tests
+    (a phantom flow type; a phantom spec model) confirm it actually fails. The two vector-file
+    hashes are **provenance only**, and `test_manifest_records_the_grammar_is_incomplete` pins
+    that `binary_ops == {+,−,×}` with no `/`.
+  - **The doc records the carry-forwards Steps 2–6c parked for it**: the *deliberately
+    incomplete* grammar table (`/` pending the cross-port `x/0` choice; the function set pending
+    a flow that forces `monod`/`clamp`/`ifpos` semantics; named constants pending a σ surface) —
+    so freezing the subset never reads as completeness; the **no-`dt`-token** structural
+    RK4-safety; the composition grammar (includes-first-then-inline, dup = error, flat/one-level,
+    `overrides` reaching a bundle param); `{bundle, prefix}` namespacing incl. **`param()` never
+    prefixed**; the **`stocks`/`flows` required→optional relaxation** (Step 6b); `render_rate_expr`'s
+    spelling as a **per-port** round-trip contract, not cross-port; decision A's template
+    amendment (boundary `+ − ×`). Plus the deferrals by name (crew forcing-bound bundles
+    un-prefixable, bundle-param namespacing, bundle packs, shared-stock composition, nested
+    includes, single-rate/no-reset, `const`-only forcings, simulation-derived ICs).
+  - **Cross-port boundary stated honestly**: the manifest freezes the **Python** surface of
+    record; the Rust mirror is gated by the parse/traj vectors + anchors, so a Python schema
+    field with no Rust mirror is caught only once an anchor exercises it (parity surfaces own
+    cross-port fidelity; this gate owns single-port completeness).
+  - **Scope held (advisor)**: no new goldens, no new features, no deferred-grammar resolution,
+    and **no louder "authored ≠ validated" surfacing** — `has_authored_kinetics` exists and
+    renders in the graph dump; how prominently a consumer marks an uncalibrated run is recorded
+    as a **follow-up feature**, not built here. Decision B (closure + determinism only;
+    scientific validity is the author's) is restated as the contract, not re-litigated.
+  - **Zero core + zero domain change** (`git diff src/` empty — docs + tests only); full suite
+    incl. `-m slow` + ruff + pyright green; **all 20 frozen goldens byte-identical** (no regen —
+    an authoring change that moved a science golden would be a bug, not an unfreeze).
 
-## Open questions / risks to resolve in review
+## Open questions / risks — all RESOLVED (Step 7 closed the last of them)
 
-- **The kinetics-DSL sub-fork (decision D) is RESOLVED** — USER-CONFIRMED (2026-07-13) as the
+- **The kinetics-DSL sub-fork (decision D) — RESOLVED.** USER-CONFIRMED (2026-07-13) as the
   bounded closed grammar; Step 2 built the VM on it.
-- **The deferred grammar surface (Step 2 scope calls).** Division (`/0` cross-port choice), the
-  closed function set (`exp ln pow sqrt abs min max clamp monod` + bounded conditionals — each
-  ambiguous op needs a real flow to fix its definition), and a **named-constant** surface (σ for a
-  Stefan-Boltzmann re-expression) are all deferred; Step 4 (Rust port) must NOT assume the grammar
-  is complete, and each op joins when a real frozen flow forces its semantics.
-- **Rust YAML dependency** (decision E) — crate vs hand-rolled subset; the deprecated-`serde_yaml`
-  + YAML-1.1 numeric hazards from the Phase-7 notes.
-- **Where the VM lives** — a stdlib `simcore` addition breaks the "zero core change since freeze"
-  streak *deliberately and once*; confirm that framing (a one-time engine primitive, not
-  per-scenario code) is acceptable, and that it enters the freeze manifest as a frozen VM.
-- **"Authored ≠ validated" surfacing** — how prominently the display / CLI marks an
-  authored-kinetics run as uncalibrated (decision B).
-- **Scientific-validity ownership** — with (B), conservation-closed nonsense is authorable; the
-  plan guarantees closure + determinism only. Confirm that is the intended contract.
+- **The deferred grammar surface (Step 2 scope calls) — RESOLVED as a recorded deferral, not a
+  gap.** Division (`/0` cross-port choice), the closed function set (`exp ln pow sqrt abs min max
+  clamp monod` + bounded conditionals — each ambiguous op needs a real flow to fix its
+  definition), and a **named-constant** surface (σ for a Stefan-Boltzmann re-expression) are all
+  deferred; Step 4 (Rust port) did NOT assume the grammar complete, and Step 7's freeze doc
+  carries the *deliberately incomplete* table + a manifest `grammar_note` + a test pinning
+  `binary_ops == {+,−,×}`, so each op now joins by a **deliberate unfreeze** rather than drift.
+- **Rust YAML dependency (decision E) — RESOLVED.** USER-CONFIRMED as a **hand-rolled
+  closed-subset parser** (one grammar owned on both ports, no crate — sidestepping the
+  deprecated-`serde_yaml` + YAML-1.1 numeric hazards); Step 4b built it.
+- **Where the VM lives — RESOLVED.** The one-time additive `simcore/expr.py` framing held: a
+  single frozen engine primitive (like adding an integrator), never per-scenario code, with every
+  frozen golden byte-identical across the break. It **does** enter a freeze manifest — Step 7's —
+  but frozen **by its grammar surface (the node union + op set), NOT by a sha-256 of the file**
+  (advisor: a code hash adds reformat noise without a real gate; the VM's behavior is already
+  pinned bit-exactly by `traj_vectors.txt`).
+- **"Authored ≠ validated" surfacing — RESOLVED as an explicit follow-up, deliberately not built.**
+  `has_authored_kinetics` exists (ORs across bundles) and renders in the structural graph dump;
+  how prominently a consumer (Godot / the CLI) marks such a run uncalibrated is recorded in
+  `docs/authoring-reference.md` under *Documented boundaries* as a follow-up feature. Step 7 is a
+  freeze contract, not a display change (advisor: don't expand the step to build it).
+- **Scientific-validity ownership — RESOLVED, restated as the contract.** Decision B stands: the
+  platform guarantees **conservation + determinism only** (balance structural via decision C's
+  `rate × stoichiometry`), and conservation-closed nonsense is authorable **by design**;
+  scientific validity is the author's. `docs/authoring-reference.md` states this as the
+  load-bearing asymmetry — the *platform* is frozen, the *scenarios authored on it never are*.

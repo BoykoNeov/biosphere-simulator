@@ -1,0 +1,119 @@
+{
+  "_comment": "Phase-9 Step-7 authoring freeze manifest (P9.7). Names the frozen AUTHOR-FACING platform surface: the bounded kinetics grammar + VM node/op set, the scenario file schema, the author-selectable flow-type registry, and the named param loaders. Param VALUES are delegated to docs/station-reference.manifest.json (see delegates_to). See docs/authoring-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (grammar semantics are enforced by parse_vectors.txt, the VM's arithmetic by traj_vectors.txt, and the interpreter by the crossport anchors). Regenerate on a deliberate unfreeze: uv run python tests/test_authoring_freeze_manifest.py.",
+  "binary_ops": [
+    "*",
+    "+",
+    "-"
+  ],
+  "delegates_to": "docs/station-reference.manifest.json",
+  "expr_nodes": [
+    "BinOp",
+    "Const",
+    "ForcingRef",
+    "Neg",
+    "ParamRef",
+    "StepN",
+    "StockRef"
+  ],
+  "flow_types": {
+    "crew.food_metabolism": {
+      "cls": "FoodMetabolism",
+      "param_set": "crew",
+      "wiring_fields": [
+        "exhaled_co2",
+        "fecal_waste",
+        "food_store"
+      ]
+    },
+    "crew.oxygen_consumption": {
+      "cls": "OxygenConsumption",
+      "param_set": null,
+      "wiring_fields": [
+        "o2_consumed",
+        "o2_store"
+      ]
+    },
+    "crew.water_balance": {
+      "cls": "WaterBalance",
+      "param_set": "crew",
+      "wiring_fields": [
+        "crew_humidity",
+        "urine",
+        "water_store"
+      ]
+    }
+  },
+  "frozen_at_phase": 9,
+  "grammar_note": "The grammar is bounded and closed, and DELIBERATELY INCOMPLETE (decision D): division, the function set (exp ln pow sqrt abs min max clamp monod), bounded conditionals and a named-constant surface are all deferred until a real frozen flow forces each semantic choice. Freezing this subset does NOT imply completeness; adding an op is a deliberate unfreeze. There is no 'dt' token by construction (RK4-order-safety is structural). Precedence + associativity are enforced by parse_vectors.txt, not recorded here.",
+  "integrator_names": [
+    "euler",
+    "rk4"
+  ],
+  "param_loaders": [
+    "crew",
+    "self_discharge"
+  ],
+  "parity_vectors": {
+    "parse_vectors.txt": "5b4bff2f56cd799ac6b94584d464567d49448d192039d4cf3939191f5693ca63",
+    "traj_vectors.txt": "473fb1ca6b0c6d53cd8e9a03be113ae8104cb49a56096922b63ae75fcfdb6763"
+  },
+  "ref_keywords": [
+    "forcing",
+    "param",
+    "stock"
+  ],
+  "reference_doc": "docs/authoring-reference.md",
+  "schema_fields": {
+    "BundleSpec": [
+      "flows",
+      "forcings",
+      "parameters",
+      "stocks"
+    ],
+    "FlowSpec": [
+      "id",
+      "kinetics",
+      "params",
+      "priority",
+      "type",
+      "wiring"
+    ],
+    "ForcingSpec": [
+      "const"
+    ],
+    "IncludeSpec": [
+      "bundle",
+      "prefix"
+    ],
+    "KineticsSpec": [
+      "rate",
+      "stoichiometry"
+    ],
+    "ParamPackRef": [
+      "pack"
+    ],
+    "ScenarioSpec": [
+      "dt",
+      "flows",
+      "forcings",
+      "includes",
+      "integrator",
+      "name",
+      "parameters",
+      "rng_seed",
+      "steps",
+      "stocks"
+    ],
+    "StockSpec": [
+      "amount",
+      "composition",
+      "domain",
+      "extinction_threshold",
+      "id",
+      "kind",
+      "quantity",
+      "unclamped"
+    ]
+  },
+  "step_token": "n"
+}
