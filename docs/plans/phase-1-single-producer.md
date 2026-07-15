@@ -1,6 +1,8 @@
 # Phase 1 — Single Producer
 
-**Status:** IN PROGRESS. **Steps 1 (units + area basis), 2 (the non-conserved aux
+**Status: COMPLETE — Steps 1–11 done; Phase 1 exits.** (The one exit item, the
+*quantitative* oracle match, is explicitly DEFERRED by user decision — see the
+Step-11 block.) **Steps 1 (units + area basis), 2 (the non-conserved aux
 channel), 3 (the PCSE oracle harness + clean-room param discipline), 4
 (Beer–Lambert light interception — the first biological process), 5 (FvCB
 photosynthesis — the first carbon-source flow), 6 (maintenance + growth

@@ -1,6 +1,9 @@
 # Phase 7 — Native Core (the Rust port)
 
-**Status: PLANNED — not started. Awaiting Step-0 kickoff.** This is the plan of record for
+**Status: COMPLETE — Steps 0–6 DONE. PHASE 7 EXITS → Phase 8 (Godot front-end).** The
+cross-port tolerance contract this plan designed is now recorded in
+`docs/native-port-reference.md`; per-step outcomes are in the step blocks below.
+This is the plan of record for
 porting the **frozen** multi-domain station (Phase 6's `docs/station-reference.md` +
 `docs/biosphere-reference.md`) to a native Rust core, validated against the frozen golden
 suite within a **defined tolerance contract**. Pre-plan orientation complete and
