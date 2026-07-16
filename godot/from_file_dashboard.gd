@@ -18,7 +18,15 @@ extends Control
 var sim: SimSession
 var _path_edit: LineEdit
 var _status_label: Label
+var _uncalibrated_label: Label
 var _dashboard_label: Label
+
+# The "authored ≠ validated" banner (`docs/authoring-reference.md`, decision B). An authored
+# `kinetics` rate law gets conservation + determinism from the platform and NO calibration claim,
+# so a run that used one must never read as reference science. Shown only when the core says so —
+# `has_authored_kinetics()` is a session constant, read once at Load like `fp_clean()`.
+const UNCALIBRATED_TEXT := "⚠ UNCALIBRATED — this run uses authored kinetics. Conservation and determinism are guaranteed; the science is not. Not reference."
+const UNCALIBRATED_COLOR := Color(1.0, 0.65, 0.0)
 
 # A default scenario path relative to the Godot project dir (../tests/...). Globalized to an OS
 # path at Load time — `build_from_file` reads a filesystem path, not a `res://` URI.
@@ -40,11 +48,13 @@ func _on_load() -> void:
 	sim = SimSession.new()
 	if not sim.build_from_file(path):
 		_status_label.text = "build_from_file(%s) rejected — see stderr" % path
+		_uncalibrated_label.visible = false
 		sim = null
 		return
 	_status_label.text = "loaded %s — %d steps, fp_clean=%s" % [
 		path, sim.total_steps(), sim.fp_clean(),
 	]
+	_uncalibrated_label.visible = sim.has_authored_kinetics()
 	_refresh()
 
 func _on_step() -> void:
@@ -108,6 +118,17 @@ func _build_ui() -> void:
 	_status_label = Label.new()
 	_status_label.text = "type a scenario path and press Load"
 	root.add_child(_status_label)
+
+	_uncalibrated_label = Label.new()
+	_uncalibrated_label.text = UNCALIBRATED_TEXT
+	_uncalibrated_label.add_theme_color_override("font_color", UNCALIBRATED_COLOR)
+	_uncalibrated_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_uncalibrated_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Hidden until a load says otherwise — a banner shown by default would be noise, and a
+	# banner that is *always* on stops being read.
+	_uncalibrated_label.visible = false
+	root.add_child(_uncalibrated_label)
+
 	_dashboard_label = Label.new()
 	root.add_child(_dashboard_label)
 

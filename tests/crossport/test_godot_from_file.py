@@ -50,6 +50,9 @@ GODOT_PROJECT_DIR = REPO_ROOT / "godot"
 SCENARIO = REPO_ROOT / "tests" / "authoring" / "scenarios" / "crew_mission.yaml"
 _SCEN_DIR = REPO_ROOT / "tests" / "authoring" / "scenarios"
 TEMPLATE = _SCEN_DIR / "crew_habitat_template.yaml"
+# A kinetics-bearing scenario — the "authored ≠ validated" marker's positive case
+# (SCENARIO, `crew_mission.yaml`, is authored but kinetics-free: the negative).
+AUTHORED_SCENARIO = _SCEN_DIR / "self_discharge_dsl.yaml"
 
 # The crew_mission horizon (MISSION_DAYS 7 * steps_per_day 24), declared in the file.
 CREW_STEPS = 168
@@ -265,3 +268,62 @@ def test_godot_from_file_ui_loads() -> None:
     assert report["child_count"] > 0, "dashboard built no widgets (_build_ui skipped)"
     assert report["step_count"] > 0, "the default scenario did not load + step"
     assert "SCRIPT ERROR" not in stderr, f"GDScript error in UI smoke:\n{stderr}"
+
+
+def _run_marker_smoke() -> dict:
+    """Run `authored_marker_smoke.gd` headless, passing both scenario paths as `--` user
+    args; return the parsed report."""
+    assert GODOT is not None
+    proc = subprocess.run(
+        [
+            GODOT,
+            "--headless",
+            "--path",
+            str(GODOT_PROJECT_DIR),
+            "--script",
+            "res://authored_marker_smoke.gd",
+            "--",
+            str(AUTHORED_SCENARIO),
+            str(SCENARIO),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    out = proc.stdout
+    assert _SMOKE_BEGIN in out and _SMOKE_END in out, (
+        "marker smoke markers missing — extension may not have loaded:\n"
+        f"stdout:\n{out}\nstderr:\n{proc.stderr}"
+    )
+    payload = out.split(_SMOKE_BEGIN, 1)[1].split(_SMOKE_END, 1)[0].strip()
+    return json.loads(payload)
+
+
+def test_godot_authored_kinetics_marker_crosses_the_boundary() -> None:
+    """The **"authored ≠ validated"** marker (`docs/authoring-reference.md`, decision B)
+    reaches a consumer intact, through the real cdylib.
+
+    The load-bearing case is `after_palette_rebuild`. Every `SimSession` build path
+    replaces `inner` on the same object, so the marker is a field that can go stale: a
+    session built from an authored file and then rebuilt into the frozen `station`
+    scenario must report `false` again. A stale `true` cries wolf on reference science;
+    a missed *set* would present an uncalibrated run as reference — the failure that
+    matters. `plain_file_marker` pins the other edge: `crew_mission.yaml` is file-loaded
+    but declares no `kinetics`, so the marker tracks authored **rate laws**, not
+    file-loadedness.
+    """
+    _build_cdylib()
+    _ensure_godot_import()
+    report = _run_marker_smoke()
+    assert report["ok"] is True, f"marker smoke did not complete ok: {report}"
+    assert report["authored_marker"] is True, (
+        "self_discharge_dsl.yaml declares a kinetics flow — the run is uncalibrated"
+    )
+    assert report["after_palette_rebuild"] is False, (
+        "rebuilding the same SimSession into the frozen `station` palette scenario "
+        "must clear the marker — a stale flag would mark reference science uncalibrated"
+    )
+    assert report["plain_file_marker"] is False, (
+        "crew_mission.yaml is authored but kinetics-free — being file-loaded is not "
+        "itself an uncalibrated-science claim"
+    )

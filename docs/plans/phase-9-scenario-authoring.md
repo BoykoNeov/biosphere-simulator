@@ -653,11 +653,31 @@ the same file into the same graph as Python.** Contract:
   but frozen **by its grammar surface (the node union + op set), NOT by a sha-256 of the file**
   (advisor: a code hash adds reformat noise without a real gate; the VM's behavior is already
   pinned bit-exactly by `traj_vectors.txt`).
-- **"Authored ≠ validated" surfacing — RESOLVED as an explicit follow-up, deliberately not built.**
-  `has_authored_kinetics` exists (ORs across bundles) and renders in the structural graph dump;
-  how prominently a consumer (Godot / the CLI) marks such a run uncalibrated is recorded in
-  `docs/authoring-reference.md` under *Documented boundaries* as a follow-up feature. Step 7 is a
-  freeze contract, not a display change (advisor: don't expand the step to build it).
+- **"Authored ≠ validated" surfacing — RESOLVED as an explicit follow-up; the Godot half BUILT
+  2026-07-16 (post-phase).** Step 7 deliberately did not build it (advisor: a freeze contract is
+  not a display change). Taken up afterwards as the first post-roadmap task, scoped to the real
+  gap — the bridge computed `built.has_authored_kinetics` and **dropped it**, so no Godot consumer
+  could see it:
+  - `godot_bridge`: `build_session_from_file` now returns a named `FileSession` (session, display,
+    steps, marker) instead of a 3-tuple, and `SimSession` carries the marker with a
+    `#[func] has_authored_kinetics()` getter — a session constant, read once at load like
+    `fp_clean()`.
+  - **The staleness invariant** (advisor): every `SimSession` build path replaces `inner` in
+    place, so the marker is mirrored at **exactly** the five `authored_steps` assignment sites
+    (file → `built.has_authored_kinetics`; named / composed / perturbed / save-loaded → `false`).
+    *Mirror the sites, not the values* — an authored file with no kinetics flow is `false` too.
+    The site counts are equal by construction; if they ever diverge, a clear-site was missed.
+  - `from_file_dashboard`: an UNCALIBRATED banner, hidden unless the core sets the marker (a
+    banner that is always on stops being read).
+  - Gated by a cargo test (the loader half, incl. the negative: `crew_mission` is file-loaded but
+    kinetics-free) and `authored_marker_smoke.gd` +
+    `test_godot_authored_kinetics_marker_crosses_the_boundary` (the live-object half, which only
+    Godot can exercise). **Mutation-verified**: deleting the `build()` clear-site fails the smoke
+    with `assert True is False`.
+  - **Not an unfreeze**: the marker is an interpreter *output*, named by no manifest key; `git
+    diff src/` empty, gdext still only in `godot_bridge`, all 20 frozen goldens untouched.
+  - **Still deferred**: CLI surfacing beyond `dump_graph` (blocked on `station::sim` file
+    dispatch, itself deferred) and authored-file display hints.
 - **Scientific-validity ownership — RESOLVED, restated as the contract.** Decision B stands: the
   platform guarantees **conservation + determinism only** (balance structural via decision C's
   `rate × stoichiometry`), and conservation-closed nonsense is authorable **by design**;

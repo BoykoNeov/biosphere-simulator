@@ -157,21 +157,36 @@ pub(crate) fn build_composed_session(
 /// to the headless run (proven intra-process by the faithfulness cargo test, and across the FFI
 /// boundary by `from_file_smoke.gd`).
 ///
-/// Returns the session, an (empty) [`DisplayContext`] — authored files declare no display hints
-/// yet, so both derived scalars project `null` and no stock is highlighted (zero parity concern,
-/// display-only) — and the authored `steps` horizon the file itself declares (so the caller can
-/// step exactly what the headless run does). `overrides` instantiate a template's `parameters`
-/// (Step-3 `param('crew_count')` knobs); pass an empty map for the common no-override case.
+/// Returns a [`FileSession`]: the session, an (empty) [`DisplayContext`] — authored files declare
+/// no display hints yet, so both derived scalars project `null` and no stock is highlighted (zero
+/// parity concern, display-only) — the authored `steps` horizon the file itself declares (so the
+/// caller can step exactly what the headless run does), and the "authored ≠ validated" marker.
+/// `overrides` instantiate a template's `parameters` (Step-3 `param('crew_count')` knobs); pass an
+/// empty map for the common no-override case.
 ///
 /// **Single-rate / Euler only** (the [`SimSession::single_rate`] shape the [`authoring::run`]
 /// harness itself is scoped to): a file requesting `rk4` (no single-rate rk4 session exists) is a
 /// loud [`SimError::Validation`], deferred exactly as two-rate authoring is. Any authoring parse/
 /// interpret failure (unknown flow type, bad wiring, unbalanced authored stoichiometry, a missing
 /// file) is mapped to a [`SimError::Validation`] the UI renders as `false`.
+/// A file-loaded session and the two constants the *file* declares about it. Named (not a
+/// 4-tuple) because `steps` and `has_authored_kinetics` are read back out to GDScript as session
+/// constants and must not be mixed up positionally on the way.
+pub(crate) struct FileSession {
+    session: CoreSession,
+    display: DisplayContext,
+    /// The file-declared horizon.
+    steps: u64,
+    /// The "authored ≠ validated" marker: this run used at least one authored `kinetics` flow, so
+    /// the platform vouches for its conservation + determinism and **nothing about its science**
+    /// (`docs/authoring-reference.md`, decision B). ORs across included bundles.
+    has_authored_kinetics: bool,
+}
+
 pub(crate) fn build_session_from_file(
     path: &Path,
     overrides: &BTreeMap<String, f64>,
-) -> Result<(CoreSession, DisplayContext, u64), SimError> {
+) -> Result<FileSession, SimError> {
     let built = authoring::load_scenario(path, overrides)
         .map_err(|e| SimError::Validation(format!("authoring: {}", e.message)))?;
     if built.integrator != "euler" {
@@ -183,6 +198,7 @@ pub(crate) fn build_session_from_file(
         )));
     }
     let steps = built.steps;
+    let has_authored_kinetics = built.has_authored_kinetics;
     let session = CoreSession::single_rate(
         EulerIntegrator::new(built.registry),
         built.state,
@@ -199,7 +215,12 @@ pub(crate) fn build_session_from_file(
         battery: None,
         shared_stock_ids: vec![],
     };
-    Ok((session, display, steps))
+    Ok(FileSession {
+        session,
+        display,
+        steps,
+        has_authored_kinetics,
+    })
 }
 
 /// Rebuild a session from a save's [`Recipe`] (Phase-8 P8.7) — the dispatch save/load
@@ -455,6 +476,14 @@ pub struct SimSession {
     /// (`total_steps()`). `None` for palette / composed / perturbed sessions (their horizon
     /// is a known constant, not file-declared).
     authored_steps: Option<u64>,
+    /// Whether the live session used any authored `kinetics` — the "authored ≠ validated"
+    /// marker a consumer surfaces so a player never reads an uncalibrated run as reference
+    /// science (`docs/authoring-reference.md`, decision B). Assigned at **exactly** the sites
+    /// `authored_steps` is: only a file-loaded session can be authored, and every other build
+    /// path clears it, so a `SimSession` rebuilt from an authored file into a palette scenario
+    /// cannot stay falsely flagged. `false` (not `true`) for an authored file that declares no
+    /// kinetics flow — mirror the *sites*, not the values.
+    has_authored_kinetics: bool,
     base: Base<RefCounted>,
 }
 
@@ -463,10 +492,11 @@ pub struct SimSession {
 impl SimSession {
     fn build_from_file_impl(&mut self, path: &str, overrides: &BTreeMap<String, f64>) -> bool {
         match build_session_from_file(Path::new(path), overrides) {
-            Ok((session, display, steps)) => {
-                self.inner = Some(session);
-                self.display = Some(display);
-                self.authored_steps = Some(steps);
+            Ok(built) => {
+                self.inner = Some(built.session);
+                self.display = Some(built.display);
+                self.authored_steps = Some(built.steps);
+                self.has_authored_kinetics = built.has_authored_kinetics;
                 // No fixed-palette recipe (its identity is the on-disk file) — not saveable, the
                 // perturbed-session precedent. A `File` recipe is a deferred follow-on.
                 self.recipe = None;
@@ -494,6 +524,7 @@ impl SimSession {
                 self.display = Some(display);
                 self.recipe = Some(Recipe::Named(id));
                 self.authored_steps = None;
+                self.has_authored_kinetics = false;
                 true
             }
             Err(err) => {
@@ -519,6 +550,7 @@ impl SimSession {
                 self.display = Some(display);
                 self.recipe = Some(Recipe::Composed(ids));
                 self.authored_steps = None;
+                self.has_authored_kinetics = false;
                 true
             }
             Err(err) => {
@@ -564,6 +596,7 @@ impl SimSession {
                 // reports it unavailable rather than dropping the perturbation silently.
                 self.recipe = None;
                 self.authored_steps = None;
+                self.has_authored_kinetics = false;
                 true
             }
             Err(err) => {
@@ -628,6 +661,19 @@ impl SimSession {
     #[func]
     fn total_steps(&self) -> i64 {
         self.authored_steps.map(|s| s as i64).unwrap_or(-1)
+    }
+
+    /// Whether this run used any authored `kinetics` — the **"authored ≠ validated"** marker
+    /// (`docs/authoring-reference.md`, decision B). `true` means the platform vouches for the
+    /// run's **conservation + determinism only**: an authored rate law carries no calibration
+    /// claim and no place in any reference, so a UI must not let it read as science. A session
+    /// constant (read it once at load, not per step), like [`fp_clean`](Self::fp_clean).
+    /// Always `false` for a palette / composed / perturbed / save-loaded session — only a
+    /// file-loaded scenario can be authored, and an authored file with no `kinetics` flow is
+    /// `false` too (the marker is about authored *rate laws*, not about being file-loaded).
+    #[func]
+    fn has_authored_kinetics(&self) -> bool {
+        self.has_authored_kinetics
     }
 
     /// Advance one natural unit (one `step_report` for the single-rate `cabin_gas`).
@@ -760,6 +806,7 @@ impl SimSession {
         self.display = Some(display);
         self.recipe = Some(recipe);
         self.authored_steps = None;
+        self.has_authored_kinetics = false;
         true
     }
 
@@ -1176,14 +1223,55 @@ mod tests {
     #[test]
     fn build_session_from_file_loads_crew_and_steps_well_fed() {
         let path = scenarios_dir().join("crew_mission.yaml");
-        let (mut session, _ctx, steps) =
-            build_session_from_file(&path, &BTreeMap::new()).unwrap();
+        let FileSession {
+            mut session, steps, ..
+        } = build_session_from_file(&path, &BTreeMap::new()).unwrap();
         assert_eq!(steps, 168, "crew_mission declares 168 steps");
         session.step_n(steps).unwrap();
         assert_eq!(session.n(), 168);
         assert_eq!(session.total_rationed(), 0);
         assert!(session.events().is_empty());
         assert!(from_engine(session.state()).to_json().contains("crew.food_store"));
+    }
+
+    /// The **"authored ≠ validated"** marker rides out of the loader (the Godot-side surfacing
+    /// of `docs/authoring-reference.md` decision B). The load-bearing half is the *negative*:
+    /// `crew_mission` is file-loaded but declares no `kinetics`, so the marker tracks authored
+    /// **rate laws** — not merely "came from a file". `self_discharge_dsl` is the positive.
+    /// The bridge must not re-derive either: both mirror `BuiltScenario::has_authored_kinetics`,
+    /// which the `authoring` crate already owns and ORs across included bundles.
+    #[test]
+    fn build_session_from_file_carries_the_authored_kinetics_marker() {
+        let plain =
+            build_session_from_file(&scenarios_dir().join("crew_mission.yaml"), &BTreeMap::new())
+                .unwrap();
+        assert!(
+            !plain.has_authored_kinetics,
+            "crew_mission is file-loaded but has no kinetics flow — the marker is about \
+             authored rate laws, not about being authored"
+        );
+
+        let authored = build_session_from_file(
+            &scenarios_dir().join("self_discharge_dsl.yaml"),
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert!(
+            authored.has_authored_kinetics,
+            "a kinetics flow marks the run uncalibrated"
+        );
+
+        // Never re-derived bridge-side: the marker is exactly what `authoring` decided.
+        for name in ["crew_mission.yaml", "self_discharge_dsl.yaml"] {
+            let path = scenarios_dir().join(name);
+            let via_bridge = build_session_from_file(&path, &BTreeMap::new())
+                .unwrap()
+                .has_authored_kinetics;
+            let via_authoring = authoring::load_scenario(&path, &BTreeMap::new())
+                .unwrap()
+                .has_authored_kinetics;
+            assert_eq!(via_bridge, via_authoring, "{name}: bridge must not re-derive");
+        }
     }
 
     /// **The drift guard.** `SimSession::single_rate.step()` and `authoring::run_scenario`'s
@@ -1193,8 +1281,9 @@ mod tests {
     #[test]
     fn build_session_from_file_is_bit_identical_to_run_scenario() {
         let path = scenarios_dir().join("crew_mission.yaml");
-        let (mut session, _ctx, steps) =
-            build_session_from_file(&path, &BTreeMap::new()).unwrap();
+        let FileSession {
+            mut session, steps, ..
+        } = build_session_from_file(&path, &BTreeMap::new()).unwrap();
         session.step_n(steps).unwrap();
         let session_final = from_engine(session.state()).to_json();
 
@@ -1215,12 +1304,22 @@ mod tests {
     #[test]
     fn build_session_from_file_template_override_bites_and_projects() {
         let path = scenarios_dir().join("crew_habitat_template.yaml");
-        let (base, _c, _s) = build_session_from_file(&path, &BTreeMap::new()).unwrap();
-        let base_food = base.state().stocks.get("crew.food_store").unwrap().amount;
+        let base = build_session_from_file(&path, &BTreeMap::new()).unwrap();
+        let base_food = base
+            .session
+            .state()
+            .stocks
+            .get("crew.food_store")
+            .unwrap()
+            .amount;
 
         let overrides: BTreeMap<String, f64> =
             [("crew_count".to_string(), 4.0)].into_iter().collect();
-        let (session, ctx, _s) = build_session_from_file(&path, &overrides).unwrap();
+        let FileSession {
+            session,
+            display: ctx,
+            ..
+        } = build_session_from_file(&path, &overrides).unwrap();
         let big_food = session.state().stocks.get("crew.food_store").unwrap().amount;
         assert!(
             (big_food - 4.0 * base_food).abs() < 1e-9 * base_food.max(1.0),

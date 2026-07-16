@@ -42,8 +42,11 @@ This is the load-bearing asymmetry of the whole phase. The **platform** is froze
   redundant backstop. **Scientific validity is the author's responsibility** —
   conservation-closed nonsense is authorable, by design;
 - a run that used any authored kinetics carries `has_authored_kinetics` (rendered in the
-  structural graph dump) — the uncalibrated marker. *How loudly a consumer surfaces that
-  to a player is deliberately out of scope here* (see *Documented boundaries*).
+  structural graph dump) — the uncalibrated marker. *How loudly each consumer surfaces it
+  is not frozen here*: Godot reads it over the FFI and banners the run (see *Documented
+  boundaries*), the CLI shows it in the graph dump, and a future consumer picks its own
+  volume. What this contract fixes is that the marker is **available and honest**, not how
+  it is drawn.
 
 The scenario files under `tests/authoring/scenarios/` are consequently **test fixtures
 and cross-port anchors, not a frozen scenario library**. Their byte-identity to
@@ -291,9 +294,16 @@ A future maintainer should read these as intentional scope, each surfaced when i
 - **Derived initial conditions** — the *simulation-derived* tier (the station's `node0` =
   run Power, take the mean) needs running a sub-sim; deferred further than the
   arithmetic-derived tier templates cover.
-- **"Authored ≠ validated" surfacing** — `has_authored_kinetics` exists and is rendered in
-  the graph dump; how prominently a consumer (Godot / the CLI) marks such a run
-  uncalibrated is a **follow-up feature**, deliberately not built here.
+- **"Authored ≠ validated" surfacing** — *the Godot half is now BUILT* (the recorded Step-7
+  follow-up, done 2026-07-16). `SimSession.has_authored_kinetics()` exposes the marker across
+  the FFI boundary and `from_file_dashboard` shows an UNCALIBRATED banner when it is set;
+  `tests/crossport/test_godot_from_file.py::test_godot_authored_kinetics_marker_crosses_the_boundary`
+  gates it (including that the flag **clears** when the same session is rebuilt into a palette
+  scenario — the marker is per-session state, not per-file). Consumer-side display only: no
+  frozen surface moved (the marker is an interpreter *output*, named by no manifest key), the
+  science is untouched, and no golden shifted. **Still deferred:** the CLI surfaces the marker
+  only through `dump_graph`, because `station::sim` has no scenario-file dispatch (its own
+  deferral, below-adjacent); an authored file still declares no display hints.
 
 ## The unfreeze discipline
 
