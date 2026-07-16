@@ -42,16 +42,52 @@
 #   growth_efficiency), NOT routed through pint.
 #
 # Clean-room: values from cited primary literature ONLY (radiative heat transfer is
-#   textbook). The numeric VALUES are provisional, literature-typical placeholders pending
-#   the validation gate — flagged TODO(cite) until bound to a primary source.
+#   textbook).
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   All four TODO(cite) tags discharged. TWO are CITED and TWO are DESIGN — the split is the
+#   point (see docs/param-file-conventions.md, "Two provenance classes"): [A]/[B] establish
+#   the radiative FORM, which licenses no VALUE at all.
+#     ε          → CITED [C] (a range-bind; 0.85 is a tabulated white-coating emittance)
+#     T_space    → CITED [E] (the CMB is a measured physical constant)
+#     A, C       → DESIGN (a fictional station's panel; a stability-driven thermal mass)
+#
+#   NOTE on [B] Gilmore: the pre-2026 header cited it for "radiator coating emissivities
+#   (~0.8-0.9)". Gilmore is a commercial Aerospace Press title that could NOT be opened, so
+#   that attribution was unverifiable. It is replaced by [C], a PUBLIC-DOMAIN NASA table
+#   that was opened and read. [B] is retained for the deep-space-sink concept only. The
+#   rule that forced this: a locus you cannot open is a locus you may not cite.
 #
 # Sources:
 #   [A] Incropera, F.P., DeWitt, D.P., Bergman, T.L., Lavine, A.S. (2007), "Fundamentals of
 #       Heat and Mass Transfer", 6th ed., Wiley — Stefan-Boltzmann grey-body radiation
-#       (E = εσT⁴), radiator emissivity ranges, radiation as the sole vacuum rejection mode.
+#       (E = εσT⁴), radiation as the sole vacuum rejection mode. FORM ONLY — a textbook that
+#       cannot be opened here, and which in any case fixes no value of ours.
 #   [B] Gilmore, D.G. (ed.) (2002), "Spacecraft Thermal Control Handbook, Vol. 1:
-#       Fundamental Technologies", 2nd ed., Aerospace Press — spacecraft radiator coating
-#       emissivities (~0.8-0.9) and deep-space sink temperature.
+#       Fundamental Technologies", 2nd ed., Aerospace Press — spacecraft thermal control;
+#       the deep-space sink. NOT OPENABLE (commercial) — cited for concept, never for a value.
+#   [C] Henninger, J.H. (1984), "Solar Absorptance and Thermal Emittance of Some Common
+#       Spacecraft Thermal-Control Coatings", NASA Reference Publication 1121, NASA Goddard
+#       Space Flight Center (public domain, US Government work). "WHITE COATINGS" table,
+#       printed p. 8: 35 white thermal-control coatings, normal emittance ε_n spanning
+#       0.82–0.92 (solar absorptance α spans 0.06–0.44; the two columns do not overlap).
+#       Measurements at room temperature (300 K), method pp. 2–4.
+#       https://ntrs.nasa.gov/citations/19840015630
+#       CAVEAT, recorded deliberately: this is a 1984 SCAN whose name↔value row pairing is
+#       vertically offset under text extraction, so a PER-COATING attribution is NOT
+#       reliable and none is made here. The RANGE is pairing-independent and is what is
+#       cited. (Verified independently by two extractions, 2026-07-16.)
+#   [D] Bond, T.A., Kramer, L.J., Marsik, S.J. (2008), "Review of End-of-Life Thermal
+#       Control Coating Performance", NASA/TM-2008-215173, NASA Glenn Research Center
+#       (public domain). Table 1, p. 2: Z-93P (zinc oxide in potassium silicate — the
+#       ISS-radiator paint family) thermal emittance before irradiation ≈ 0.919–0.921, with
+#       "no change when exposed to the simulated space environment".
+#       https://ntrs.nasa.gov/citations/20080018585
+#       CONTRAST — a real optimized radiator coating, ~0.07 above ours.
+#   [E] Fixsen, D.J. (2009), "The Temperature of the Cosmic Microwave Background",
+#       The Astrophysical Journal 707(2):916–920. Abstract: the CMB temperature from a
+#       review of measurements in the literature is T = 2.72548 ± 0.00057 K.
+#       https://arxiv.org/abs/0911.1955
 
 name: thermal
 process: radiation
@@ -60,16 +96,16 @@ parameters:
   emissivity:
     value: 0.85
     unit: "dimensionless"
-    source: "TODO(cite) — provisional, literature-typical spacecraft radiator coating emissivity ε ~0.85 [A][B]; primary citation pending validation gate"
+    source: "[C], WHITE COATINGS table p. 8 (RANGE-bind): 35 spacecraft white thermal-control coatings span normal emittance ε_n 0.82–0.92, and 0.85 appears as a tabulated value. Ours is a generic grey-body radiator surface sitting mid-range. Deliberately NOT attributed to a named coating — [C] is a scan whose row pairing is unreliable (see header). DELTA: a real optimized ISS-class radiator paint (Z-93P) measures ε ≈ 0.92 [D], so 0.85 is ~0.07 conservative (under-predicts rejection ~8 %); 0.92 is the sourced number if a Z-93 radiator is ever wanted."
   radiator_area:
     value: 10.0
     unit: "m^2"
-    source: "TODO(cite) — provisional, illustrative small-station radiator panel area (sizing, not calibrated); primary citation pending validation gate"
+    source: "DESIGN — sizing choice, not a literature value: the illustrative panel area of a fictional small station. No source can fix it — a radiator area is the OUTPUT of a sizing exercise for a specific vehicle, not a physical constant, so any real figure (ISS carries ~1,680 m²) would describe a different vehicle rather than validate ours. Radiative form from [A]. Not calibrated."
   heat_capacity:
     value: 1.0e7
     unit: "J/K"
-    source: "TODO(cite) — provisional, illustrative node thermal mass ~2.4 t water-equivalent (station structure + coolant + water stores); sized so τ >> dt (well-fed sizing), not calibrated; primary citation pending validation gate"
+    source: "DESIGN — solver-stability choice, not a literature value: node thermal mass sized so the radiator relaxation time τ = C/(4εσA·T_eq³) >> dt (≈ 65 steps at dt = 3600 s), which is what keeps Euler off the arbitration backstop on a nonlinear T⁴ sink. It is a property of OUR integrator, not of any station, so no source can adjudicate it. The '~2.4 t water-equivalent' gloss is a post-hoc plausibility anchor (it shows the value is not absurd for structure + coolant + water stores), NOT a derivation — do not promote it to a citation. Not calibrated."
   space_temperature:
     value: 2.7
     unit: "K"
-    source: "TODO(cite) — deep-space / cosmic-microwave-background sink temperature ≈ 2.7 K [A][B]; primary citation pending validation gate"
+    source: "[E], abstract: the CMB temperature is T = 2.72548 ± 0.00057 K (Fixsen 2009, from a review of literature measurements). DELTA: ours is rounded to 2 s.f. and is 0.93 % low. Impact is negligible by construction — T_space enters only as T_space⁴ against T_eq⁴ (2.7⁴ ≈ 53 K⁴ vs 281⁴ ≈ 6.2e9 K⁴, a ~3e-10 share of the driving term) and as the Q = C·(T − T_space) reference, shifting the readout by 0.025 K. Recorded, not corrected: changing a frozen value is calibration, not citation."

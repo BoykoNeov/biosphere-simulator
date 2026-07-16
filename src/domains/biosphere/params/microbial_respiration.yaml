@@ -37,7 +37,59 @@
 #   [B] Davidson, E.A., Samanta, S., Caramori, S.S. & Savage, K. (2012), "The Dual
 #       Arrhenius and Michaelis–Menten kinetics model for decomposition of soil organic
 #       matter ...", Global Change Biology 18:371–384 (the Michaelis–Menten O₂-limitation
-#       form for respiration; our well-mixed chamber uses a sharper intrinsic-affinity Km).
+#       form for respiration). FORM ONLY — and it never COULD bind our Km: [B] is a
+#       soil/aggregate-scale model whose apparent Km convolves microsite diffusion
+#       limitation with enzyme affinity, ~3 orders LOOSER than a cellular Km. A 0-D
+#       well-mixed chamber has no diffusion barrier, so the cellular scale [C]/[D] is the
+#       right pick. The pre-2026 header's concession ("our chamber uses a sharper
+#       intrinsic-affinity Km") is therefore CORRECT and stands. Not openable (the free
+#       Harvard Forest PDF is an image-only scan).
+#   [C] Trojan, D., Garcia-Robledo, E., Meier, D.V., Hausmann, B., Revsbech, N.P.,
+#       Eichorst, S.A., Woebken, D. (2021), "Microaerobic lifestyle at nanomolar O₂
+#       concentrations mediated by low-affinity terminal oxidases in abundant soil
+#       bacteria", mSystems 6(4):e00250-21. https://doi.org/10.1128/mSystems.00250-21
+#       (open access; verified 2026-07-16). Whole-cell APPARENT Km(app) for O₂ of soil
+#       Acidobacteria: 166 ± 11, 250 ± 5, 113 ± 24, 288 ± 34, and 37 ± 2 nmol O₂ liter⁻¹.
+#   [D] Stolper, D.A., Revsbech, N.P., Canfield, D.E. (2010), "Aerobic growth at nanomolar
+#       oxygen concentrations", PNAS 107(44):18755–18760 (verified 2026-07-16). Results,
+#       "Growth Under Oxygen-Limiting Conditions": "we obtained a best-fit Ks value of
+#       121 ± 20 nM O2" (Escherichia coli K-12) — an independent corroboration within ~2 %
+#       of our value.
+#   [E] FAO (2004), "Assessing carbon stocks and modelling win-win scenarios of carbon
+#       sequestration through land-use changes", RothC section — reporting the RothC-26.3
+#       per-pool constants of Coleman & Jenkinson. https://www.fao.org/4/y5490e/y5490e08.htm
+#       (verified 2026-07-16): "the decomposition rate constants (k) in per year values for
+#       each compartment are set in RothC at: DPM = 10.0, RPM = 0.3, BIO = 0.66, and
+#       HUM =0.02" — with modifiers a (temperature), b (moisture), c (plant retainment)
+#       applied on top. SECONDARY (FAO reporting Coleman & Jenkinson) and CONTRAST only.
+#       Note the correct primary target is the RothC-26.3 model description, NOT the
+#       Jenkinson 1990 Phil. Trans. paper cited in [A] — the per-pool constants live in the
+#       former. See the plan doc's paywalled list.
+#   [F] CLM5 Technical Note, "Decomposition" — the CENTURY-based pool structure, stated to
+#       follow Parton et al. (1988). Table 2.21.3 (turnover times at a 25 °C reference):
+#       "SOM 1 (active) | 0.17 year" and "Litter 1 (metabolic) | 0.066 year".
+#       https://escomp.github.io/CTSM/release-clm5.0/tech_note/Decomposition/CLM50_Tech_Note_Decomposition.html
+#       SECONDARY (an implementation of Parton) and CONTRAST only.
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   Split outcome — one CITED, one still OPEN:
+#
+#   o2_half_saturation → CITED [C] + [D]. Our 1e-4 mol/mol ≈ 123 nM dissolved (via
+#     x = 0.2095 × C/258 µM at air saturation, 25 °C; cross-checked against Henry's law,
+#     H_cp ≈ 1.3e-3 mol L⁻¹ atm⁻¹ → 9.5e-5, the two routes agreeing within ~5 %). That sits
+#     INSIDE [C]'s measured soil-bacteria band (99–288 nM) — essentially on top of the
+#     113 ± 24 nM organism — and within 2 % of [D]'s E. coli Ks. Caveat kept deliberately:
+#     the sources report nM and the mole-fraction conversion is OURS, which caps confidence.
+#     TERMINOLOGY FIX: the pre-2026 header called this a "terminal-oxidase Km"; the
+#     bracketing values are WHOLE-CELL APPARENT Km. Isolated oxidase is far sharper
+#     (3–8 nM). "Whole-cell respiratory O₂ affinity" is the accurate description.
+#
+#   microbial_respiration_rate → STILL TODO(cite), with a finding. See its tag.
+#
+#   THE SCALE GAP, recorded because it is what makes [B] un-bindable and is easy to
+#   re-litigate: isolated oxidase 3–8 nM ≪ whole-cell/community apparent ~24–391 nM ≪
+#   soil/aggregate model scale ~150 µM (~58 % of air saturation) — about three orders end
+#   to end. Km values for O₂ are only comparable WITHIN a scale; ours is cellular.
 
 name: chamber
 process: microbial_respiration
@@ -46,8 +98,8 @@ parameters:
   microbial_respiration_rate:
     value: 0.05
     unit: "1/day"
-    source: "TODO(cite) — provisional, literature-typical first-order microbial respiration constant m_resp (microbial turnover ~20 days) [A]; primary citation pending Phase-2 validation gate"
+    source: "TODO(cite) — STILL OPEN, with a measured finding (2026-07-16): 0.05/day = 18.25/yr is ~28× RothC's microbial-biomass (BIO) pool constant of 0.66/yr [E] and ~3.1× CLM5/CENTURY's active-SOM pool (0.17 yr turnover = 5.9/yr) [F] — 3–28× faster than any published microbial/active-pool constant, across two independent model lineages. The gap widens further because both lineages apply temperature/moisture modifiers (≤ 1) ON TOP of k, lowering the realized rate. [A] cites the FORM only and is not openable; [E]/[F] are SECONDARY implementations, so even they would not be a primary bind. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
   o2_half_saturation:
     value: 0.0001
     unit: "mol/mol"
-    source: "TODO(cite) — provisional, low/sharp O2 half-saturation (mole fraction) for the f_O2 self-limit (Phase-2 Step 7; chamber.oxygen_limitation_factor). Michaelis-Menten O2 limitation of respiration [B]; low/sharp (1e-4) because a 0-D well-mixed chamber has no soil-microsite diffusion limitation, so the intrinsic respiratory O2 affinity governs (terminal-oxidase Km ~ 0.1-1 uM dissolved O2 -> gas-phase ~1e-4 mol/mol; f_O2 ~ 1 until near-anoxia); primary citation pending the Phase-2 validation gate"
+    source: "[C] + [D]: our 1e-4 mol/mol ≈ 123 nM dissolved sits INSIDE the measured whole-cell apparent Km(app) band for soil bacteria (99–288 nM [C], essentially on top of the 113 ± 24 nM organism) and within ~2 % of the 121 ± 20 nM E. coli Ks [D]. Low/sharp is CORRECT here and the reason is structural: a 0-D well-mixed chamber has no soil-microsite diffusion limitation, so the cellular respiratory O2 affinity governs — NOT the soil/aggregate-scale apparent Km (~150 uM, ~1200x looser) that [B] models. f_O2 ~ 1 until near-anoxia. CAVEATS: the sources report nM and the mole-fraction conversion is ours; and this is a WHOLE-CELL apparent Km, not the 'terminal-oxidase Km' the pre-2026 tag claimed (isolated oxidase is sharper still, 3-8 nM)."

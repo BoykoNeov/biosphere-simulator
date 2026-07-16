@@ -23,6 +23,67 @@ If you cannot find a literature source for a value, that is a flag — request t
 from a citable source, mark it provisional with a `TODO(cite)`, or omit the process —
 do **not** fill the gap from the WOFOST YAML.
 
+## Two provenance classes: a CITED value and a DESIGN choice
+
+*Added post-roadmap (bucket 3 scope C, 2026-07-16), when discharging the `TODO(cite)`
+debt on the 27 params no oracle can validate. See
+[`docs/plans/post-roadmap-citation.md`](plans/post-roadmap-citation.md).*
+
+The rule above presumes every value *has* a citation. **Many do not — and cannot.** A
+param file's `Sources:` block may support either of two very different things:
+
+* **the functional FORM** — "first-order gas scrubbing is textbook" (Seader), "P-control
+  of a first-order process is textbook" (Ogata), "litter decays exponentially" (Olson);
+* **the VALUE** — a source that names a number, or a range our number sits inside.
+
+A form citation does **not** license a value. Seader establishes that CO₂ scrubbing is
+first-order; he says nothing about whether *our* rate is `1e-3 /s`. There is no primary
+source for *"our station's radiator is 10 m²"*, or for a heat capacity chosen so
+`τ >> dt` — those are **modelling choices**, and dressing one in a citation is exactly
+the fabrication this document exists to prevent. **A wrong citation is worse than an
+admitted gap:** `TODO(cite)` is honest, whereas a fabricated locus survives review by
+looking finished.
+
+So a value's `source:` tag resolves to exactly one of:
+
+| class | when | tag |
+|---|---|---|
+| **CITED** | a primary source supports the value | `source: "[A], Table 2: …"` — the locus **must** have been opened |
+| **DESIGN** | the number is a sizing/modelling choice; no source can fix it | `source: "DESIGN — <what kind of choice>, not a literature value: <rationale>"` |
+| **TODO(cite)** | genuinely unresolved — still looking | `source: "TODO(cite) — provisional…"` |
+
+A DESIGN tag is a **positive, finished statement**, not deferred debt: it records that
+someone looked, established no source could exist, and says what the number *is* instead
+(a sizing choice, a stability constraint, a chosen behaviour). It still names the form
+citation where one exists — the form is cited, the value is ours:
+
+```yaml
+  heat_capacity:
+    value: 1.0e7
+    unit: "J/K"
+    source: "DESIGN — sizing choice, not a literature value: node thermal mass ~2.4 t
+      water-equivalent, sized so the radiator relaxation time τ = C/(4εσA·T_eq³) >> dt
+      (well-fed sizing, keeps Euler off the backstop). Radiative form from [A]; the
+      magnitude is ours. Not calibrated."
+```
+
+**Three rules for the DESIGN class:**
+
+1. **State the rationale, not just the label.** "DESIGN — illustrative" is useless; the
+   reader needs *why this number* — the constraint it satisfies (`k·dt < 1`), the
+   behaviour it produces, or the scale it represents.
+2. **Never use DESIGN to dodge a findable citation.** It is for numbers no source *can*
+   fix, not for numbers you did not look for. Look first.
+3. **DESIGN does not mean arbitrary.** Where a real system's figure is known, record it
+   as context so a reader can see whether ours is plausible or wildly off — even though
+   the value stays a choice.
+
+**Citing ≠ calibrating.** Binding a value to a source that merely *permits* it does not
+validate the model, and neither class asserts correctness (`docs/authoring-reference.md`,
+"Frozen is not calibrated"). And when a source *disagrees* with a frozen value, the
+disagreement is recorded as a **finding** — **changing the number is calibration**, a
+separate act with its own unfreeze discipline and moved goldens.
+
 ## Param-file header template
 
 Every param file opens with a provenance header citing the source of each value:
@@ -64,7 +125,13 @@ they feed a deferred per-leg `Flow` dimensional check.
 ## Review checklist (per param file / PR)
 
 - [ ] Header present with a `Sources:` block and the clean-room notice.
-- [ ] **Every** value has a `source:` tag resolving to a `Sources:` entry.
+- [ ] **Every** value has a `source:` tag resolving to a `Sources:` entry — **or** a
+      `DESIGN` tag carrying its rationale (see "Two provenance classes").
+- [ ] **Every cited locus was actually opened.** No page/table/figure reference is
+      written from a search snippet, an abstract, or memory. If it could not be read,
+      it is not cited — cite the verifiable range instead, or mark `TODO(cite)`.
+- [ ] **No form citation is passed off as a value citation.** If the source only
+      establishes the equation, the value is `DESIGN` (or `TODO(cite)`), not `[A]`.
 - [ ] No value copied from the `WOFOST_crop_parameters` YAML or PCSE source (the
       values are *independently* literature-derived — the oracle match is behavioral,
       so they need not, and should not, equal WOFOST's).

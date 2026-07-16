@@ -41,16 +41,61 @@
 #   real value. See test_power_self_discharge.py.
 #
 # Clean-room: value from cited primary literature ONLY (battery self-discharge is
-#   textbook). The numeric VALUE is a provisional, literature-typical placeholder pending
-#   the validation gate — flagged TODO(cite) until bound to a primary source.
+#   textbook).
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   TODO(cite) NOT discharged — it REMAINS OPEN, deliberately, and now carries a measured
+#   finding instead of a promise. This is the honest outcome, not a failure to look: a
+#   dedicated literature sweep could not bind 2.6 %/month to ANY primary source, and the
+#   evidence that IS accessible points LOWER. Recorded rather than papered over.
+#
+#   FINDING 1 — "1–3 %/month" is VENDOR FOLKLORE, not literature. The canonical figure that
+#   would bracket our value saturates the trade press (Battery University, cell-maker
+#   blogs) and is absent from primary literature, which reports self-discharge either as
+#   µA-scale float currents or as temperature-dependent curves — never as a canonical
+#   %/month constant. Re-confirmed across independent searches. That saturation IS the
+#   finding: a number everyone repeats and nobody publishes.
+#
+#   FINDING 2 — ours is ~6× the measured room-temperature rate, and above the WHOLE curve.
+#   [C] measures self-discharge in exactly our units (%/30 d) for an LFP cell at 50 % SOC
+#   across 10–55 °C. Read from its Fig. 5f: ≈ 0.4 %/30 d at 25 °C, rising to ≈ 2.35 at
+#   55 °C. Our 2.6 %/month is therefore ~6–7× the 25 °C figure and sits ABOVE EVERY POINT
+#   on the measured 10–55 °C curve — i.e. it is a hot-cell / older-cell characterization,
+#   not a room-temperature one. (Honest caveat: those are READINGS OFF A PLOTTED CURVE, not
+#   quoted numbers — [C] states the value only graphically — and it is one LFP cell. That
+#   imprecision is exactly why this stays TODO(cite) rather than becoming a bind.)
+#
+#   WHY THE VALUE STANDS ANYWAY: it is CONSERVATIVE, and conservative is safe here — a
+#   pessimistic shelf-loss makes the power margin harder, never easier, and the attractor
+#   property the flow earns its keep by is proved MAGNITUDE-INDEPENDENTLY by the two-run
+#   contraction test. Changing it would be calibration (scope B), which moves goldens.
+#
+#   ⚠ THE PRE-2026 CITATIONS [A] AND [B] ARE UNVERIFIED — both paywalled, neither opened,
+#   so the "a few %/month" once attributed to them was never checked. Skeptical read on
+#   [A]: it is a grid-storage REVIEW in Science, not a self-discharge measurement paper, so
+#   even if the sentence exists it would be a weak locus for this param. Demoted to leads.
 #
 # Sources:
+#   [C] Schimpe, M., Naumann, M., Truong, N., Hesse, H.C., Santhanagopalan, S., Saxon, A.,
+#       Jossen, A. (2018), "Energy efficiency evaluation of a stationary lithium-ion
+#       battery container storage system via electro-thermal modeling and detailed
+#       component analysis", Applied Energy 210:211–229. DOE public-access accepted
+#       manuscript: https://www.osti.gov/servlets/purl/1409737 (verified 2026-07-16).
+#       § 2.2.1 method: "Cell self-discharge s is measured via a separate experiment. Cells
+#       are fully discharged at 25 C to a low cut-off rate of C/50, charged to 50 % SOC,
+#       rested for one month and again fully discharged at 25 C. ... Storage temperatures
+#       are 10 C, 15 C, 25 C, 35 C, 45 C and 55 C. Results are shown in Fig. 5f, indicating
+#       a strong increase at higher temperatures." Fig. 5f axis: "Self-Discharge s /
+#       (%/30 d)"; caption: "f) Self-discharge rate over temperature at State of Charge
+#       50 %". CONTRAST — the measured rate our value is compared against, NOT its source
+#       (the value is graphical; see FINDING 2's caveat).
 #   [A] Dunn, B., Kamath, H., Tarascon, J.-M. (2011), "Electrical Energy Storage for the
-#       Grid: A Battery of Choices", Science 334(6058):928-935 — Li-ion low self-discharge
-#       (a few %/month) among storage chemistries.
+#       Grid: A Battery of Choices", Science 334(6058):928-935. UNVERIFIED — paywalled, not
+#       opened; the "few %/month" attributed to it is not confirmed here.
 #   [B] Divya, K.C., Østergaard, J. (2009), "Battery energy storage technology for power
-#       systems — An overview", Electric Power Systems Research 79(4):511-520 — surveyed
-#       self-discharge rates by chemistry (Li-ion ~monthly-scale shelf loss).
+#       systems — An overview", Electric Power Systems Research 79(4):511-520. UNVERIFIED —
+#       paywalled, not opened. Most likely home of a citable by-chemistry %/month figure if
+#       anyone retrieves it (see docs/plans/post-roadmap-citation.md, the paywalled list).
 
 name: power
 process: self_discharge
@@ -59,4 +104,4 @@ parameters:
   self_discharge_rate:
     value: 1.0e-8
     unit: "1/s"
-    source: "TODO(cite) — provisional, literature-typical Li-ion self-discharge k ~1.0e-8/s ≈ 2.6 %/month [A][B]; realistic (not tuned) — the attractor property is proved magnitude-independently by the two-run contraction test; primary citation pending validation gate"
+    source: "TODO(cite) — STILL OPEN, with a measured finding (2026-07-16): no primary source binds 2.6 %/month. The bracketing '1–3 %/month' is VENDOR folklore, absent from primary literature; [C] measures ≈ 0.4 %/30 d at 25 °C for an LFP cell, so ours is ~6–7× the room-temperature rate and above every point on [C]'s whole 10–55 °C curve — a hot/older-cell figure. Kept because it is CONSERVATIVE (pessimistic shelf-loss only tightens the power margin) and because the attractor property is proved magnitude-independently by the two-run contraction test. [A][B] are UNVERIFIED (paywalled, never opened). Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."

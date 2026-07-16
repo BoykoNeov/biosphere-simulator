@@ -33,18 +33,57 @@
 #   NOT routed through pint.
 #
 # Clean-room: closed-loop water recovery (condensate + urine processing → potable) is
-#   standard bioregenerative / physicochemical life-support engineering. The numeric VALUES
-#   are provisional, ILLUSTRATIVE placeholders — deliberately NOT NASA BVAD / ISS WRS
-#   numbers (integrated life-support calibration is a later Phase-6 step). Flagged
-#   TODO(cite) until bound to a primary source at the validation gate.
+#   standard bioregenerative / physicochemical life-support engineering. Both VALUES are
+#   DESIGN choices — deliberately NOT NASA BVAD / ISS WRS numbers.
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   Both TODO(cite) tags discharged as DESIGN: [A]/[B] cite the FORM, and no primary source
+#   can fix either VALUE (see docs/param-file-conventions.md, "Two provenance classes").
+#   The real-system figures were looked up and are recorded below as the CONTRAST each
+#   value is defined against — deliberately not as its source.
+#
+#   η_w = 0.9 — the header's long-standing claim "deliberately below a real ISS-class
+#     recovery" was CHECKED AND HOLDS [C]: real ISS total water recovery is 93–94 %
+#     (pre-Brine-Processor) and 98 % (with the BPA, demonstrated 2023). Our 0.9 sits ~3–4
+#     points below the pre-BPA figure and 8 below current ISS, so `brine` carries a
+#     visible loss BY CONSTRUCTION. Binding 0.9 to [C] would misrepresent it — the source
+#     fixes the REAL number (0.93–0.98), and ours is deliberately outside that range.
+#     NOTE the two near-miss figures that must NOT be used here: the UPA-only urine-loop
+#     recovery (85–87 % [D]) is a DIFFERENT subsystem, and BVAD carries no whole-system
+#     WRS recovery value at all.
+#
+#   k_rec = 1e-3 /s (τ ≈ 1000 s ≈ 17 min) — a solver-stability choice (k·dt = 0.06 < 1 at
+#     dt = 60 s), and ~2–3 ORDERS OF MAGNITUDE faster than any real processor: the ISS UPA
+#     is designed for a nominal 9 kg/day, and the WPA produced ~7 399 L across a year over
+#     44 ARFTA cycles [D] — a real batch cadence of ~8 DAYS, where the model relaxes in
+#     minutes. Deliberate (a fast buffer keeps the loop's closure visible on a short run),
+#     but NOT physically representative. If realism is ever wanted here, the anchor is
+#     days, not minutes. (The ~8-day and order-of-magnitude figures are arithmetic on [D]'s
+#     quoted numbers, not quotes.)
 #
 # Sources:
 #   [A] Olson, J.S. (1963), "Energy storage and the balance of producers and decomposers
 #       in ecological systems", Ecology 44(2):322–331 — the first-order linear-reservoir
-#       form (the same algebra governs an engineered processor drawing a buffer).
+#       form (the same algebra governs an engineered processor drawing a buffer). FORM ONLY.
 #   [B] MacElroy, R.D. & Bredt, J. (1984), "Current concepts and future directions of
 #       CELSS", Adv. Space Res. 4(12):221–229 — closed-loop water recovery in controlled
-#       ecological life support.
+#       ecological life support. FORM ONLY.
+#   [C] NASA (2023), "NASA Achieves Water Recovery Milestone on International Space
+#       Station", ISS Research news item (public domain, US Government work), quoting Jill
+#       Williamson, NASA ECLSS water subsystems manager: "Before the BPA, our total water
+#       recovery was between 93 and 94% overall" and "We have now demonstrated that we can
+#       reach total water recovery of 98%, thanks to the brine processor".
+#       https://www.nasa.gov/missions/station/iss-research/nasa-achieves-water-recovery-milestone-on-international-space-station/
+#       CONTRAST ONLY — the real ISS figure our η_w is deliberately below, not its source.
+#   [D] Williamson, J., Wilson, J.P., Robinson, K., Luong, H. (2023), "Status of ISS Water
+#       Management and Recovery", ICES-2023-097, 52nd International Conference on
+#       Environmental Systems, Calgary (NASA/NTRS 20230006217, public domain): "The UPA was
+#       designed to process a nominal load of 9 kg/day (19.8 lbs/day) of wastewater
+#       consisting of urine and flush water"; "Between February of 2022 and February 2023,
+#       WPA has produced approximately 7,399 L (16,314 lbs) of product water"; and the UPA
+#       "designed to recover 85% of the water content from the pretreated urine".
+#       https://ntrs.nasa.gov/citations/20230006217
+#       CONTRAST ONLY — real processor throughput, not the source of k_rec.
 
 name: water_recovery
 process: crew_water_recovery
@@ -53,8 +92,8 @@ parameters:
   recovery_rate:
     value: 1.0e-3
     unit: "1/s"
-    source: "TODO(cite) — provisional, illustrative first-order water-processor rate (τ ≈ 1000 s), k·dt < 1 for dt = 60 s [A]; NOT a NASA BVAD / ISS WRS number; primary citation pending validation gate"
+    source: "DESIGN — solver-stability choice, not a literature value: first-order processor rate τ ≈ 1000 s, picked so k·dt = 0.06 < 1 at dt = 60 s (donor-controlled positivity). First-order form from [A]; the magnitude is ours. CONTRAST: real ISS processors run ~2–3 orders slower (UPA nominal 9 kg/day; WPA 44 ARFTA cycles/yr ≈ 8-day cadence [D]) — deliberately fast, NOT physically representative. Not calibrated."
   recovery_efficiency:
     value: 0.9
     unit: "dimensionless"
-    source: "TODO(cite) — provisional, illustrative whole-system water-recovery efficiency (condensate + urine combined), deliberately below a real ISS-class recovery so brine carries a visible loss [B]; NOT a NASA BVAD / ISS WRS number; primary citation pending validation gate"
+    source: "DESIGN — pedagogical choice, not a literature value: whole-system recovery (condensate + urine) set BELOW real ISS-class on purpose, so the brine leg carries a visible, honest loss. Closed-loop form from [B]; the magnitude is ours. CONTRAST (verified 2026-07-16): real ISS total recovery is 93–94 % pre-BPA and 98 % with the BPA [C] — both above ours, so the long-standing 'deliberately below ISS-class' claim HOLDS. Not bindable to [C]: that source fixes the real number, not ours. Not calibrated."

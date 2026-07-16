@@ -34,17 +34,51 @@
 #   with build_power in Step 3 — not a flow coefficient. See power/stocks.py.
 #
 # Clean-room: value from cited primary literature ONLY (battery efficiency is textbook).
-#   The numeric VALUE is a provisional, literature-typical placeholder pending the
-#   validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   TODO(cite) discharged as CITED, bound to [C] — a NEW source, opened and read. η_c = 0.95
+#   is one of only ~5 params in the project whose value a primary source genuinely fixes.
+#
+#   TWO readings of the bind, both recorded because the model's structure makes them differ:
+#     * AS LITERALLY DEFINED (a one-way charge-leg ENERGY efficiency), 0.95 ≈ [C]'s measured
+#       0.945 at 25 °C / 1P — an essentially exact match, marginally optimistic.
+#     * AS MODELED (discharge is joule-lossless, so η_c IS the modeled round-trip), 0.95 is
+#       ~5 points optimistic against [C]'s measured round-trip of 0.8991 at 25 °C.
+#   So [C] CONFIRMS this file's own long-standing concession ("0.95 is optimistic vs a real
+#   Li-ion round-trip of ~0.90") — from primary literature, in one paper, both legs measured.
+#   The concession was right; it is now evidenced rather than asserted.
+#
+#   ⚠ THE PRE-2026 CITATIONS [A] AND [B] ARE UNVERIFIED, and are demoted here rather than
+#   trusted. Both are paywalled (Science; Elsevier) and could NOT be opened, so the numbers
+#   this header used to attribute to them — "[A] Li-ion round-trip efficiency ~0.90-0.95",
+#   "[B] surveyed round-trip efficiencies by chemistry" — were never checked against the
+#   papers. They may well be right; that is exactly the problem. A locus nobody can open is
+#   a locus nobody can audit, which is why the review checklist in
+#   docs/param-file-conventions.md now requires that every cited locus was actually opened.
+#   They are retained as unverified secondary leads ONLY, and the value no longer rests on
+#   them. Note also (skeptical read): [A] is a grid-storage REVIEW, so even if the sentence
+#   exists it would be a review assertion, not primary data.
 #
 # Sources:
+#   [C] Bašić, H., Bobanac, V., Pandžić, H. (2023), "Determination of Lithium-Ion Battery
+#       Capacity for Practical Applications", Batteries 9(9):459.
+#       https://doi.org/10.3390/batteries9090459 (open access; verified 2026-07-16).
+#       § 3.2.3 + Table 3 ("One-way energy efficiencies for NMC battery cell"): "At 1P, the
+#       discharging efficiency at 25 °C is over 0.95, while at 0 °C, it is just above 0.92.
+#       The charging efficiencies are much closer, at 0.945 and 0.935."
+#       § 3.2.2 (round-trip): "the fixed round-trip efficiency measured for a 1.0P
+#       charging/discharging cycle at an environmental temperature of 0 °C is 0.8648, while
+#       at an environmental temperature of 25 °C, it amounts to 0.8991."
+#       NOTE: efficiency is strongly rate-dependent (their Table 3 sweeps 0.1P–1.0P, rising
+#       toward ~0.985 at low rates), so 0.945 is the 1P figure and ours is defensible at
+#       low-to-moderate C-rate. NOTE ALSO: COULOMBIC efficiency is a different quantity
+#       (>99 %; "Coulombic losses ... are less than 1%") — ours is an ENERGY efficiency.
 #   [A] Dunn, B., Kamath, H., Tarascon, J.-M. (2011), "Electrical Energy Storage for the
-#       Grid: A Battery of Choices", Science 334(6058):928-935 — Li-ion round-trip
-#       efficiency ~0.90-0.95. (In this lossless-discharge model η_c IS the modeled
-#       round-trip, so a realistic charge-leg ~0.95 reads as an optimistic round-trip.)
+#       Grid: A Battery of Choices", Science 334(6058):928-935. UNVERIFIED — paywalled,
+#       not opened; the round-trip figure once attributed to it is not confirmed here.
 #   [B] Divya, K.C., Østergaard, J. (2009), "Battery energy storage technology for power
-#       systems — An overview", Electric Power Systems Research 79(4):511-520 — surveyed
-#       round-trip efficiencies by chemistry.
+#       systems — An overview", Electric Power Systems Research 79(4):511-520. UNVERIFIED —
+#       paywalled, not opened; the by-chemistry survey attributed to it is not confirmed.
 
 name: power
 process: charge
@@ -53,4 +87,4 @@ parameters:
   charge_efficiency:
     value: 0.95
     unit: "dimensionless"
-    source: "TODO(cite) — provisional, literature-typical Li-ion one-way charge efficiency η_c ~0.95 (the charge-side leg). In this lossless-discharge model η_c IS the modeled round-trip, so 0.95 is optimistic vs a real ~0.90 round-trip; the discharge-side loss is a deferred seam [A][B]; primary citation pending validation gate"
+    source: "[C], § 3.2.3 + Table 3: measured one-way CHARGE energy efficiency of an NMC cell is 0.945 at 25 °C / 1P (0.935 at 0 °C) — ours is 0.95, an essentially exact match, marginally optimistic. DELTA (the model-structure caveat): because discharge here is joule-lossless, η_c IS the modeled round-trip, and [C] § 3.2.2 measures the real round-trip at 0.8991 (25 °C) — so as MODELED, 0.95 is ~5 points optimistic. That confirms this file's own concession from primary literature; the discharge-side loss remains a deferred seam. Rate-dependent: 0.945 is the 1P figure, rising toward ~0.985 at low rates. An ENERGY efficiency, not coulombic (>99 %)."

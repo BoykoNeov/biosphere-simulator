@@ -30,10 +30,59 @@
 #   Step-11 validation gate — flagged TODO(cite) until each is bound to a primary
 #   source (never backfilled from WOFOST).
 #
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   The project's best-sourced biosphere file: THREE of four values CITED, one still open.
+#     carbon_fraction     → CITED [B]  (essentially exact for wheat shoots)
+#     n_critical          → CITED [A]  (on the verified curve — read the delta, it matters)
+#     n_residual          → CITED [C]  (an empirical analogue; read the concept caveat)
+#     max_uptake_capacity → STILL TODO(cite), with a finding — see its tag.
+#
+#   THE n_critical DELTA IS THE SUBSTANTIVE ONE, and it is a genuine modelling
+#   simplification with a quantifiable cost. Critical N is NOT a constant in the
+#   literature — [A] is a DILUTION CURVE, %N = 5.7·W^−0.5 for C3 crops (W in t/ha). Our
+#   single constant 1.5 % equals that curve only at W = (5.7/1.5)² ≈ 14.4 t/ha, i.e. near
+#   maturity for high-yielding winter wheat. Earlier in the season the curve sits far
+#   above: ≈ 4.0 % at 2 t/ha (~2.7× ours), ≈ 2.5 % at 5 t/ha. CONSEQUENCE: a fixed 1.5 %
+#   substantially UNDER-STATES critical N through early and mid season, so N limitation
+#   triggers later than the Greenwood curve implies — or never. The constant is effectively
+#   the late-season asymptote. (Validity caveat: [A]'s abstract states only the lower bound
+#   W > 1 t/ha; whether 14.4 t/ha sits inside the fitted range is unconfirmed — the full
+#   text is paywalled. See the plan doc's list.)
+#
 # Sources:
 #   [A] Greenwood, D.J., Lemaire, G., Gosse, G., Cruz, P., Draycott, A. & Neeteson, J.J.
 #       (1990), "Decline in percentage N of C3 and C4 crops with increasing plant mass",
-#       Annals of Botany 66:425–436. (the critical-N-dilution curve.)
+#       Annals of Botany 66:425–436. https://academic.oup.com/aob/article/66/4/425/257815
+#       (abstract verified 2026-07-16; full text paywalled). Abstract: "When W was greater
+#       than 1 t ha−1, 86% of the variance in ln % N was removed by the model % N = a·W−b
+#       with b = −0·5 for all crops, and a = 5·7% for C3 crops and 4·1 % for C4 crops."
+#       (Quoted as rendered; the page's OCR shows "I t ha−1"/"In % N" for "1 t ha−1"/
+#       "ln % N".) NOTE: this is the GENERIC C3 curve — the wheat-SPECIFIC curve (Justes
+#       et al. 1994) is paywalled and unread; see the plan doc.
+#   [B] Raimanova, I., Svoboda, P., Moulik, M., Wollnerova, J., Haberle, J. (2024), "The
+#       Effect of Water Availability on the Carbon Content of Grain and Above- and
+#       Belowground Residues in Common and Einkorn Wheat", Plants 13(2):181.
+#       https://doi.org/10.3390/plants13020181 (open access; verified 2026-07-16).
+#       Abstract: "On average, the C contents of grain, straw, chaff, and roots reached
+#       45.0, 45.7, 42.6, and 34.9%, respectively." Discussion (naming our value outright):
+#       "The average values of grains and straw were 45.05% (±0.81%) and 45.66% (±1.09%),
+#       which are near to the value of 45% used for the calculation of C content in plant
+#       dry mass; a general value of 50% is also used."
+#   [C] Van Hecke, J., la Cour, R., Jørgensen, H., Schjoerring, J.K. (2020), "Residual
+#       nitrogen pools in mature winter wheat straw as affected by nitrogen application",
+#       Plant and Soil 453:561–575. https://doi.org/10.1007/s11104-020-04600-6 (abstract
+#       verified 2026-07-16; full text paywalled). Results: "Total straw N concentration
+#       increased from 0.29 to 0.69% with increasing level of N application" (five N levels,
+#       60–280 kg N/ha).
+#   [D] Meng, Q., Yue, S., Chen, X., Cui, Z., Ye, Y., Ma, W., Tong, Y., Zhang, F. (2013),
+#       "Understanding Dry Matter and Nitrogen Accumulation with Time-Course for
+#       High-Yielding Wheat Production in China", PLoS ONE 8(7):e68783.
+#       https://doi.org/10.1371/journal.pone.0068783 (open access; verified 2026-07-16).
+#       Results: "During this period, 2.44 kg N ha−1 accumulated per day and 61 kg N ha−1
+#       accumulated in total. Moreover, 50 kg ha−1 N, with 0.7 kg N ha−1 per day,
+#       accumulated from sowing to regreening; 38 kg ha−1 N, with 1.1 kg N ha−1 per day,
+#       accumulated from regreening to stem elongation; and 37 kg ha−1 N, with 1.0 kg N
+#       ha−1 per day, accumulated post-anthesis." CONTRAST for max_uptake_capacity.
 
 name: winter_wheat
 process: nitrogen
@@ -42,16 +91,16 @@ parameters:
   max_uptake_capacity:
     value: 0.0015
     unit: "kg/m^2/day"
-    source: "TODO(cite) — provisional, literature-typical max N uptake (~15 kg N ha⁻¹ day⁻¹ = 0.0015 kg m⁻² day⁻¹ peak demand) [A]; primary citation pending Step 11"
+    source: "TODO(cite) — STILL OPEN, with a measured finding (2026-07-16): 0.0015 kg/m²/day = 15 kg N/ha/day is ~6× the FASTEST period-average N accumulation reported for high-yielding wheat (2.44 kg N/ha/day at stem-elongation→anthesis; 0.7–1.1 in other stages) [D]. A period average understates the instantaneous peak, but not plausibly by 6×. The honest reading: this is a non-binding NUMERICAL SAFETY CEILING, not an empirical quantity — at ~6× realistic peak demand it essentially never becomes the active constraint. NOT relabelled DESIGN: nothing in the header says it was deliberately sized as a cap, so calling it a design choice would retrofit an intention. If it should ever bite, the realistic range is ~3–5 kg N/ha/day (0.0003–0.0005 kg/m²/day) — but changing it is calibration = scope B. See docs/plans/post-roadmap-citation.md."
   n_residual:
     value: 0.005
     unit: "kg/kg"
-    source: "TODO(cite) — provisional, literature-typical residual (minimum) N concentration (~0.5% kg N/kg DM) [A]; primary citation pending Step 11"
+    source: "[C], Results: mature winter-wheat straw N spans 0.29–0.69 % across five N-application levels; our 0.5 % sits near the midpoint of that measured range. CONCEPT CAVEAT (do not overstate): [C] measures N REMAINING IN MATURE STRAW AFTER REMOBILIZATION to grain — the empirical analogue of a structural floor, not a defined 'minimum below which tissue N cannot fall'. And the range is fertilizer-dependent (straw N rises 2.4× with N supply), so the observed residual is partly luxury uptake; a TRUE structural floor would sit nearer the low-N end (~0.29 %). Ours is therefore conservative-to-slightly-high as a hard floor."
   n_critical:
     value: 0.015
     unit: "kg/kg"
-    source: "TODO(cite) — provisional, literature-typical critical N concentration (~1.5% kg N/kg DM) [A]; primary citation pending Step 11"
+    source: "[A], abstract: the C3 critical-N dilution curve is %N = 5.7·W^−0.5 (W in t/ha), 86 % of variance in ln %N, validity stated for W > 1 t/ha. DELTA (substantive): critical N is NOT a constant in the literature — it declines with crop mass. Ours equals the curve only at W ≈ 14.4 t/ha (near maturity); at 2 t/ha the curve gives ≈ 4.0 % (~2.7× ours) and at 5 t/ha ≈ 2.5 %. So a fixed 1.5 % UNDER-STATES critical N through early/mid season and makes N limitation trigger late or never — it is effectively the late-season asymptote. Unconfirmed: whether 14.4 t/ha lies inside [A]'s fitted range (full text paywalled); and [A] is the generic C3 curve, not the wheat-specific one (Justes 1994, unread)."
   carbon_fraction:
     value: 0.45
     unit: "dimensionless"
-    source: "TODO(cite) — provisional, literature-typical (~0.45 kg C/kg DM); MUST match canopy.yaml (transition checklist item 3); primary citation pending Step 11"
+    source: "[B], Discussion: measured wheat C content is 45.05 % (±0.81) in grain and 45.66 % (±1.09) in straw, which the paper states are 'near to the value of 45% used for the calculation of C content in plant dry mass'. Essentially exact for above-ground dry matter — the project's single strongest bind. DELTA: [B] measures ROOTS at 34.9 %, ~10 points below shoots, so wherever this fraction is applied to root biomass it overestimates root C by ~29 %. MUST match canopy.yaml (transition checklist item 3)."

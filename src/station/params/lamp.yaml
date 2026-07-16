@@ -38,9 +38,12 @@
 #
 # Clean-room: photon efficacy (PPF per watt) is the standard, textbook grow-lamp metric;
 #   the McCree PAR conversion (4.57 µmol J⁻¹, daylight) is the biosphere's own constant.
-#   The numeric VALUE is a provisional, ILLUSTRATIVE placeholder — deliberately NOT a
-#   rated fixture number. Flagged TODO(cite) pending a primary source at the validation
-#   gate.
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   TODO(cite) discharged as CITED. [B] was opened and read: it supports the VALUE (not
+#   merely the form), because it tabulates MEASURED commercial fixture efficacies and our
+#   2.5 sits inside that measured band. This is one of only ~5 params in the project whose
+#   number a primary source genuinely fixes.
 #
 # Sources:
 #   [A] McCree, K.J. (1972), "Test of current definitions of photosynthetically active
@@ -48,8 +51,14 @@
 #       photon/energy conversion (~4.57 µmol J⁻¹, daylight), the biosphere's own constant
 #       (domains/biosphere/weather.py), inverted here for the radiant-energy split.
 #   [B] Kusuma, P., Pattison, P.M. & Bugbee, B. (2020), "From physics to fixtures to food:
-#       current and potential LED efficacy", Horticulture Research 7:56 — horticultural-LED
-#       photon efficacy (~2.1–3.0 µmol J⁻¹ current; ~4.1 biological max).
+#       current and potential LED efficacy", Horticulture Research 7:56.
+#       https://doi.org/10.1038/s41438-020-0283-7 (open access; verified 2026-07-16).
+#       Table 2 + "Typical Fixture Efficacy": tested commercially-available fixtures reach
+#       "fixture efficacies of 2.5 to 2.8 µmol J⁻¹ for white + red fixtures and 3 µmol J⁻¹
+#       for blue + red fixtures", against "current typical values of 2–3 µmol J⁻¹"
+#       (Summary). "Potential Fixture Efficacy": calculated LIMITS of 3.4 µmol J⁻¹
+#       (white + red) and 4.1 µmol J⁻¹ (blue + red) — the "~4.1 bio max" the pre-2026
+#       header claimed, now confirmed against the paper rather than asserted.
 
 name: lamp
 process: grow_lamp
@@ -58,4 +67,4 @@ parameters:
   photon_efficacy:
     value: 2.5
     unit: "umol/J"
-    source: "TODO(cite) — provisional, illustrative efficient-horticultural-LED photon efficacy (η_lamp ≈ 0.55; real fixtures ~2.1–3.0, bio max ~4.1 µmol/J) [B]; McCree PAR conversion [A]; NOT a rated fixture number; primary citation pending validation gate"
+    source: "[B], Table 2 + 'Typical Fixture Efficacy': tested commercial horticultural-LED fixtures achieve 2.5–2.8 µmol/J (white + red) and 3.0 (blue + red), against 'current typical values of 2–3 µmol J⁻¹'; calculated limits are 3.4 / 4.1 µmol/J. Ours sits at the BOTTOM of the measured commercial band — an efficient-but-not-best fixture (η_lamp ≈ 0.55 via the McCree PAR conversion [A]). Still not a specific rated fixture: it is a generic efficient LED, cited to the measured range rather than to a product."

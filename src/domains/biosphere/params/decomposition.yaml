@@ -17,13 +17,49 @@
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
-#   All numeric VALUES are provisional, literature-typical placeholders pending the
-#   Phase-2 validation gate — flagged TODO(cite) until bound to a primary source.
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   TODO(cite) NOT discharged — it REMAINS OPEN and now carries a measured finding. [A] is a
+#   FORM citation (Olson gives the single-exponential model); it never fixed this value.
+#
+#   FINDING — our k is ~1.5× ABOVE THE MAXIMUM OF EVERY FIELD MEASUREMENT IN A 293-VALUE
+#   GLOBAL DATABASE. k = 0.02 /day = 7.3 /yr. [B] compiled 293 litter-decay k values from
+#   70 studies across 110 sites: the range is 0.006–4.993 /yr, mean 0.581, median 0.300. So
+#   ours is ~1.5× the observed maximum, ~12.6× the mean, ~24× the median — outside the
+#   entire observed distribution. Olson's own fastest biome (tropical forest) tops out
+#   ~4 /yr [C], and ours is ~1.8× that. This is not a near-miss; it is off the end.
+#
+#   THE COUNTER-READING, recorded because honesty cuts both ways: 7.3 /yr is unremarkable
+#   for a LABILE/DECOMPOSABLE FRACTION rather than bulk litter — RothC's DPM (decomposable
+#   plant material) pool runs k = 10.0 /yr and CENTURY's metabolic litter ≈ 15 /yr, which
+#   would put ours BELOW both. So the value would be defensible if this pool meant "the
+#   decomposable fraction".
+#   ⚠ BUT THAT RE-READING IS REFUSED HERE, deliberately. This model has ONE litter pool, not
+#   a DPM/RPM split. Relabelling the parameter as a "labile fraction" to make 7.3 /yr look
+#   ordinary would be reinterpreting what the parameter MEANS in order to make a citation
+#   fit — confirmation bias wearing a provenance hat, and a semantic MODEL change rather
+#   than a citation edit. Re-anchoring the pool's meaning (or the number) is scope B.
+#   Recorded both ways so a future maintainer inherits the choice, not just the conclusion.
 #
 # Sources:
 #   [A] Olson, J.S. (1963), "Energy storage and the balance of producers and
 #       decomposers in ecological systems", Ecology 44(2):322–331 (first-order
-#       single-exponential litter-decay model; the decay constant k).
+#       single-exponential litter-decay model; the decay constant k). FORM ONLY — and
+#       NOT OPENABLE (Wiley/JSTOR closed); its own k table would settle whether 7.3 /yr is
+#       inside Olson's tabulated range. See the paywalled list in the plan doc.
+#   [B] Zhang, D., Hui, D., Luo, Y., Zhou, G. (2008), "Rates of litter decomposition in
+#       terrestrial ecosystems: global patterns and controlling factors", Journal of Plant
+#       Ecology 1(2):85–93. https://academic.oup.com/jpe/article/1/2/85/989869 (verified
+#       2026-07-16): "The database of litter decomposition rate derived in this study
+#       includes 293 k values from the 70 studies ranging from 0.006 to 4.993 g g−1 yr−1";
+#       "The 293 k values had a left-skewed distribution with a medium [sic] of 0.300
+#       g g−1 yr−1 and a mean of 0.581 g g−1 yr−1." CONTRAST — the measured distribution
+#       ours falls outside, NOT the source of our value.
+#   [C] FAO, Unasylva No. 126, reporting Olson's k for tropical forest litter: "The
+#       recomposition [sic — OCR of 'decomposition'] parameter k for tropical forests,
+#       according to Olson, ranges from slightly more than one to slightly more than four
+#       in any given stand." https://www.fao.org/4/n6845e/n6845e05.htm
+#       SECONDARY — FAO reporting Olson; Olson itself was not opened.
 
 name: chamber
 process: decomposition
@@ -32,4 +68,4 @@ parameters:
   decomposition_rate:
     value: 0.02
     unit: "1/day"
-    source: "TODO(cite) — provisional, literature-typical first-order litter decay constant k (turnover ~50 days) [A]; primary citation pending Phase-2 validation gate"
+    source: "TODO(cite) — STILL OPEN, with a measured finding (2026-07-16): 0.02/day = 7.3/yr is ~1.5× ABOVE THE MAXIMUM of all 293 field-measured litter-decay k values in [B] (range 0.006–4.993/yr, mean 0.581, median 0.300) and ~1.8× Olson's fastest biome [C] — outside the entire observed distribution. It would be ordinary as a LABILE-fraction constant (RothC DPM = 10/yr), but this model has ONE litter pool, so that re-reading is refused: it would change what the parameter means to fit a citation. [A] cites the FORM only and is not openable. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."

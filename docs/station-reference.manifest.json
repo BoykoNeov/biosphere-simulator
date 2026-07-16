@@ -24,14 +24,14 @@
   "integrator": "EulerIntegrator",
   "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1 day + everything-fast dt=60 s; Tier-1 energy single-rate dt=3600 s.",
   "param_files": {
-    "charge.yaml": "441f96c757e093a2c50c468c75a689254efe624f4f8917209e662f310d38d937",
+    "charge.yaml": "f89672c05f0a640ef33e206f0f02646555f2eac0a4963fc655a4c8a8db8fba8a",
     "crew.yaml": "69f6f2ae1defacf137eb796c7042e2648e591eb3d5709e59717a48f13935ac23",
-    "eclss.yaml": "6e48827931bfabf8c5cc25cb97ae5d78cab0e61334b0a35ab88f21f66b006924",
-    "harvest.yaml": "8c748dc2be4fe88d90bcab3f0f1812cdbe9211aad6583a4d770fb9d789c34128",
-    "lamp.yaml": "390d44232390341191b4033bd3ec673ad160af36e8d4d37ead3d81cb6044d612",
-    "radiator.yaml": "cdee9d203ec27f636bdcda84c484fd4bdb1e7df5877b1259dcd6761446233ea7",
-    "self_discharge.yaml": "a3d3fb645441d56f7006c20f58d4425bd3df1be82f9685c27e8e0f9fc91eb95c",
-    "water_recovery.yaml": "a304fb062b8db3375a9f47a4d92489613f29d360d561073e48707f9b3287f807"
+    "eclss.yaml": "b063c5f41e36ced3cf15c18dbff1ebac46d5b9a47bb794e7e38ebededeb8d095",
+    "harvest.yaml": "358ae0150f64cf67f5b83b2357af0f786ee657ab88d1cfbb87866ac1eb08ff05",
+    "lamp.yaml": "f4407882cab6cf06ab103a23030cff2d5081af2a86057ef1decf4124145a44eb",
+    "radiator.yaml": "56229679bd3d369b08658e8401ff3579355ffb4fda62038f1e2ca7952a15af81",
+    "self_discharge.yaml": "0e9d387b5a3c139f90ba04234e9cefc88f2470fdacaafe2e26b143490037701b",
+    "water_recovery.yaml": "782d5178083a1b4fdae0d0966357069774910c78e4a541d6e029153a89b294f7"
   },
   "reference_doc": "docs/station-reference.md",
   "scenarios": {

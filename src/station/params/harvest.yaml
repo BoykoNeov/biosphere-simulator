@@ -31,18 +31,43 @@
 #
 # Clean-room: a first-order draw of a biomass reservoir (the linear-reservoir form; the
 #   same algebra as biosphere Grazing / decomposition) is standard bioregenerative
-#   life-support / crop-harvest modelling. The numeric VALUE is a provisional, ILLUSTRATIVE
-#   placeholder — deliberately NOT a NASA BVAD / BioSim number (integrated life-support
-#   calibration is a later Phase-6 step). Flagged TODO(cite) until bound to a primary
-#   source at the validation gate.
+#   life-support / crop-harvest modelling. The VALUE is a DESIGN choice — deliberately NOT
+#   a NASA BVAD / BioSim number.
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   TODO(cite) discharged as DESIGN. [A]/[B] cite the FORM; neither fixes the VALUE.
+#
+#   The interesting part: this param is un-bindable for a reason DEEPER than "no number
+#   exists" — it is a FORM MISMATCH. A real wheat crop is a BATCH: sown, then harvested
+#   once, at 75–90 days after planting ([C], verified — see below). Our model uses a
+#   CONTINUOUS first-order rate with τ ≈ 1.16 days. Two independent mismatches: the value
+#   is ~65–78× faster than a real wheat cycle, AND a first-order decay constant cannot
+#   represent a discrete harvest event at a fixed dAP at all. So even a perfectly-read
+#   BVAD growth period would be a form citation, not a value citation — the exact
+#   "method citation stretched into a value citation" failure this scope exists to avoid.
+#   The continuous rate is a deliberate simplification (it gives the crew a smooth food
+#   supply and a quasi-steady grain pool); it is not a model of harvesting.
 #
 # Sources:
 #   [A] Olson, J.S. (1963), "Energy storage and the balance of producers and decomposers
 #       in ecological systems", Ecology 44(2):322–331 — the first-order linear-reservoir
 #       form (the same algebra governs an engineered harvester drawing a grain pool).
+#       FORM ONLY.
 #   [B] MacElroy, R.D. & Bredt, J. (1984), "Current concepts and future directions of
 #       CELSS", Adv. Space Res. 4(12):221–229 — bioregenerative food production in
 #       controlled ecological life support (the plant → crew food loop this closes).
+#       FORM ONLY.
+#   [C] Anderson, M.S., Ewert, M.K., Keener, J.F. (eds.) (2022), "Life Support Baseline
+#       Values and Assumptions Document", NASA/TP-2015-218570 Rev 2, NASA JSC (public
+#       domain) — Table 4-89 "Exploration Life Support Cultivars, Intended Usage, and
+#       Environmental Growth Conditions", printed p. 172. The Wheat row reads: photosynthetic
+#       photon flux 115 mol/(m²·d), diurnal photo-period 20–24 h/d, GROWTH PERIOD 75–90 dAP
+#       ("days after planting"), air day/night 20/20 °C, nutrient solution 18 °C.
+#       https://ntrs.nasa.gov/citations/20210024855
+#       CONTRAST ONLY — a real wheat growth period, not the source of k_harvest.
+#       (Read directly from the rendered table 2026-07-16. Recorded because it is a trap:
+#       under naive PDF text extraction this table's rows shift, and the Wheat row picks up
+#       Soybean's "97" — the neighbouring row. The verified figure is 75–90, not 97.)
 
 name: harvest
 process: crew_food_harvest
@@ -51,4 +76,4 @@ parameters:
   harvest_rate:
     value: 1.0e-5
     unit: "1/s"
-    source: "TODO(cite) — provisional, illustrative first-order grain-harvest rate; k·dt = 6e-4 < 1 for dt = 60 s, sized so the daily-refilled grain settles to a positive quasi-steady (daily harvest ≈ daily fill) [A][B]; NOT a NASA BVAD / BioSim number; primary citation pending validation gate"
+    source: "DESIGN — behavioural choice, not a literature value: first-order rate sized so the daily-refilled grain pool settles to a positive quasi-steady (daily harvest ≈ daily fill), with k·dt = 6e-4 < 1 at dt = 60 s. First-order form from [A][B]; the magnitude is ours, picked to produce a desired fixed point. NOT bindable even in principle — a real wheat crop is a BATCH harvested once at 75–90 dAP [C], so our continuous τ ≈ 1.16 days is both ~65–78× fast AND the wrong functional form (a rate constant cannot express a discrete event). CONTRAST only; deliberately not calibrated."

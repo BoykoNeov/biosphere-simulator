@@ -40,16 +40,53 @@
 #   emissivity), NOT routed through pint.
 #
 # Clean-room: first-order gas scrubbing/condensation and proportional partial-pressure
-#   control are textbook process-control physics. The numeric VALUES are provisional,
-#   ILLUSTRATIVE placeholders — deliberately NOT NASA BVAD / BioSim life-support numbers
-#   (ECLSS calibration against those references is Phase 6, the integrated-validation step).
-#   Flagged TODO(cite) until bound to a primary source at the validation gate.
+#   control are textbook process-control physics. All four VALUES are DESIGN choices —
+#   deliberately NOT NASA BVAD / BioSim life-support numbers.
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   All four TODO(cite) tags discharged as DESIGN. This file is the CLEAREST case in the
+#   project of the distinction in docs/param-file-conventions.md ("Two provenance classes"):
+#   [A] establishes that gas scrubbing is first-order and [B] that P-control is standard —
+#   NEITHER says anything about whether OUR k is 1e-3 /s. Citing them for the values would
+#   be fabrication. Each is a choice we made, and each says which constraint it satisfies.
+#
+#   Two structural reasons no source CAN fix these, worth recording because they are not
+#   obvious and they foreclose a future "just go find the number" attempt:
+#     * Real CO₂ removal (CDRA) is a CYCLIC two-bed thermal/pressure-swing adsorption
+#       process with breakthrough behaviour — not a first-order decay at all. A lumped k is
+#       our abstraction; real hardware is not characterized that way, so no paper reports
+#       "k_scrub = 1e-3 /s". Same for the CCAA condensing heat exchanger, whose rate is set
+#       by coolant temperature, airflow and dewpoint.
+#     * o2_setpoint is a MOL INVENTORY. Real systems regulate O₂ PARTIAL PRESSURE, never a
+#       mole count, so the UNITS THEMSELVES foreclose citation. (If a bindable setpoint is
+#       ever wanted, the honest path is to restate it as a ppO₂ target, cite a ppO₂
+#       requirement, and derive n = pV/RT from a cabin volume — a model change, not a
+#       citation edit.)
+#
+#   REALITY CHECK on k_scrub (context, not a source — see [C]): the ISS CDRA runs a nominal
+#   144-MINUTE bed-swing cycle (≈ 8 640 s) at 34.7 m³/hr. Our τ ≈ 1 000 s cabin time
+#   constant is ~8× SHORTER than the period of the machine that would be doing the
+#   scrubbing, and a volumetric-throughput estimate puts a real cabin's effective k at
+#   ~1e-4 /s or below — so ours is ~1 to 1.5 orders of magnitude fast. Optimistic, same
+#   physical family, not absurd. (The conversion assumes a cabin volume, which [C] does not
+#   state — flagged as our arithmetic, not the source's.)
 #
 # Sources:
 #   [A] Seader, J.D., Henley, E.J., Roper, D.K. (2011), "Separation Process Principles",
 #       3rd ed., Wiley — first-order gas absorption / adsorption and condensation kinetics.
+#       FORM ONLY. Commercial textbook, not openable here; never promoted to a value cite.
 #   [B] Ogata, K. (2010), "Modern Control Engineering", 5th ed., Prentice Hall —
-#       proportional (P) control of a setpoint-regulated first-order process.
+#       proportional (P) control of a setpoint-regulated first-order process. FORM ONLY.
+#   [C] Watanabe, K., et al. (NASA Marshall Space Flight Center) (2015), "Optimization of
+#       the Carbon Dioxide Removal Assembly (CDRA-4EU) in Support of the International
+#       Space Station and Advanced Exploration Systems", ICES / NASA-NTRS 20150016500
+#       (public domain): "the CDRA-4EU performance when flow rate was increase to
+#       approximately 42.5 m3/hr (25 SCFM) from the the nominal flow of 34.7 m3/hr (20.4
+#       standard cubic feet per minute (SCFM)), while the cycle time was reduced from the
+#       nominal 144 minutes to 90 minutes, near the minimum that would allow time for the
+#       CO2 sorbent beds to heat to the nominal set point of 204°C (400F)".
+#       https://ntrs.nasa.gov/citations/20150016500
+#       CONTRAST ONLY — real CDRA throughput/cadence, not the source of k_scrub.
 
 name: eclss
 process: cabin_air_control
@@ -58,16 +95,16 @@ parameters:
   co2_scrub_rate:
     value: 1.0e-3
     unit: "1/s"
-    source: "TODO(cite) — provisional, illustrative first-order CO₂ scrub rate (τ ≈ 1000 s), k·dt < 1 for dt = 60 s [A]; NOT a NASA BVAD number; primary citation pending validation gate"
+    source: "DESIGN — solver-stability choice, not a literature value: first-order CO₂ scrub τ ≈ 1000 s, picked so k·dt = 0.06 < 1 at dt = 60 s (donor-controlled positivity). First-order form from [A]; the magnitude is ours. No source CAN fix it — real CDRA is cyclic swing adsorption, not first-order decay. CONTRAST: ISS CDRA runs a 144-min bed-swing cycle [C], ~8× our τ, so ours is ~1–1.5 orders fast. Not calibrated."
   condense_rate:
     value: 5.0e-4
     unit: "1/s"
-    source: "TODO(cite) — provisional, illustrative first-order humidity-condensation rate (τ ≈ 2000 s) [A]; NOT a NASA BVAD number; primary citation pending validation gate"
+    source: "DESIGN — solver-stability choice, not a literature value: humidity-condensation τ ≈ 2000 s, k·dt = 0.03 < 1 at dt = 60 s. First-order form from [A]; the magnitude is ours. No source CAN fix it — a real condensing heat exchanger's rate is set by coolant temperature, airflow and dewpoint, and is not published as a rate constant. No public-domain figure converting cleanly to a first-order k was found; none is asserted. Not calibrated."
   o2_makeup_gain:
     value: 2.0e-3
     unit: "1/s"
-    source: "TODO(cite) — provisional, illustrative proportional O₂-regulator gain (τ ≈ 500 s) [B]; NOT a NASA BVAD number; primary citation pending validation gate"
+    source: "DESIGN — controller-tuning choice, not a literature value: proportional gain (τ ≈ 500 s) giving cabin O₂ its restoring force. The clearest DESIGN case in the file — a P gain is a property of the controller WE wrote, tuned against OUR plant and OUR dt. [B] supports the control law's form; no source can state our gain. Not calibrated."
   o2_setpoint:
     value: 10.0
     unit: "mol"
-    source: "TODO(cite) — provisional, illustrative target cabin O₂ inventory (sizing, not calibrated); NOT a NASA BVAD number; primary citation pending validation gate"
+    source: "DESIGN — sizing choice, not a literature value: target cabin O₂ inventory. PERMANENTLY un-bindable as written — real systems regulate O₂ PARTIAL PRESSURE, never a mole count, so the units themselves foreclose citation (restating it as a ppO₂ target would be a model change, not a citation edit). Not calibrated."

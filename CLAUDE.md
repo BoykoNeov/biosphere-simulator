@@ -48,8 +48,8 @@ Each row's detail is in `docs/plans/phase-<n>-*.md`.
 | Tier 1: grow the flow registry (9 Power/Thermal/ECLSS flows + 3 loaders) | COMPLETE — the authoring platform **unfrozen** (`flow_types` 3→12, `param_loaders` 2→5); `docs/plans/post-roadmap-flow-registry-growth.md` |
 | Tier 2: the grammar — `monod` | COMPLETE — the **grammar unfrozen** (`expr_nodes` 7→8); saturation is now sayable. Forced by the frozen `chamber.oxygen_limitation_factor`, whose kernel it mirrors bit-exactly; bare `/` stays deferred. `docs/plans/post-roadmap-grammar-monod.md` |
 | Bucket 3 scope (A): validation — diagnose + pin the oracle gap | COMPLETE — **no golden moved, nothing unfrozen**. The gap is **structural, not merely uncalibrated**: the canopy never bootstraps (1.75 % light interception at sowing vs the oracle's 97.8 %; LAI peaks day 32 of ~305 and collapses *before* anthesis) and phenology runs ~1.6x fast (no vernalization) — two *independent* missing sciences; param values are only the **third** cause. So the deferred "quantitative oracle match" is **not a calibration task**. Pinned by `tests/test_oracle_gap.py`; `docs/plans/post-roadmap-validation.md` |
-| Bucket 3 scope (B): the full oracle match (vernalization + juvenile canopy expansion, then recalibration) | OPEN, not started — a **phase, not a step**: new science ×2 (clean-room, hand-mirrored into Rust), then the 7 frozen biosphere goldens + **cascaded station goldens** under the biosphere unfreeze discipline |
-| Bucket 3 scope (C): cite the 15 no-oracle params (10 sibling + 5 non-PP biosphere) | OPEN, not started — no structural blocker; **is an unfreeze** (the manifest hashes whole-file content, so a `source:` edit moves the hash even with the value untouched) |
+| Bucket 3 scope (B): the full oracle match (vernalization + juvenile canopy expansion, then recalibration) | OPEN, not started — a **phase, not a step**: new science ×**3** (clean-room, hand-mirrored into Rust), then the 7 frozen biosphere goldens + **cascaded station goldens** under the biosphere unfreeze discipline. **Scope (C) grew it**: the decomposer rates are a third, independent piece — see below |
+| Bucket 3 scope (C): cite the no-oracle params | COMPLETE — **a partial discharge, and a second structural finding**. The count was **27**, not 15 (the "5" were *files*, holding 13 params; +4 station folded in). Outcome: **8 CITED, 12 DESIGN, 7 still TODO(cite) + a measured finding** — because ~half the values have no citation to find (a *form* citation never licenses a *value*; citing a sizing choice IS the fabrication failure mode). **The headline is not the citations:** the **decomposer side runs 3–28× fast** (microbial respiration ~28× RothC BIO; mineralization ~3.9× the Stanford & Smith mean; litter decay ~1.5× above a 293-value global max) — the mirror of scope (A)'s canopy collapse, on the *return* side of the loop, and a new scope-(B) candidate. Also found: a **cross-kingdom param copy** (herbivory `o2_half_saturation` mirrored from the microbial file, ~4× sharper than animal physiology) and **two unverified citations** in the frozen tree (Dunn 2011 / Divya 2009 — paywalled, never opened). No golden moved; 26/26 artifacts byte-identical. `docs/plans/post-roadmap-citation.md` |
 
 ## The freeze contracts (four; each has an unfreeze discipline — follow it)
 
@@ -58,6 +58,15 @@ each doc spells out the ceremony. The three manifests have a paired gate
 (`tests/test_freeze_manifest.py` biosphere, `test_station_freeze_manifest.py`,
 `test_authoring_freeze_manifest.py`) that owns **completeness** (something added
 but exercised by nothing); the goldens own **values**.
+
+**The gap between the two (scope C, 2026-07-16): a provenance-only edit is an unfreeze that
+NOTHING CATCHES.** The manifests' per-file sha-256 is **provenance, not an assertion** — no
+test compares it. So editing only a param's `source:` (which the loaders *record but never
+parse*, and which the Rust generator never emits) moves the recorded hash, keeps every golden
+byte-identical, and turns **nothing** red. It is still an unfreeze by each doc's own
+definition — the ceremony is simply **honor-system there**. That cuts both ways: mechanically
+trivial, and *because* nothing catches a skipped discipline, follow it deliberately
+(advisor review → regenerate the manifest as the git-visible record → document).
 
 | Contract | Freezes | Doc |
 |---|---|---|

@@ -52,7 +52,44 @@
 #   [B] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
 #       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
 #       Simulation Monographs, PUDOC, Wageningen (relative death-rate senescence — the
-#       N-shedding rate is the NITROGEN counterpart of the carbon rdr_*).
+#       N-shedding rate is the NITROGEN counterpart of the carbon rdr_*). FORM ONLY —
+#       a print monograph with no accessible full text; never opened.
+#   [C] Schomberg, H.H., et al. (2009), "Assessing Indices for Predicting Potential
+#       Nitrogen Mineralization in Soils under Different Management Systems", Soil Science
+#       Society of America Journal 73:1575–1586. USDA-ARS public copy, verified 2026-07-16:
+#       https://www.ars.usda.gov/ARSUserFiles/35278/Schomberg%20et%20al%202009%20SSSAJ%2073%201575-1586.pdf
+#       p. 1581: "Values of k ranged from 0.018 wk−1 for the 5- to 15-cm depth of the
+#       Pullman soil in stubble mulch tillage to 0.174 wk−1 for the 0- to 5-cm depth of the
+#       Bama soil in no-till with non-inversion deep tillage. The average k for all soils
+#       was 0.070 wk−1. This is similar to the average k of 0.054 wk−1 reported by Stanford
+#       and Smith (1972) for several U.S. soils, 0.067 wk−1 for 42 soils from the
+#       Saskatchewan province reported by Jalil et al. (1996) and 0.080 wk−1 reported by
+#       Curtin and Wen (1999)." CONTRAST — the measured range ours falls outside.
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   NEITHER TODO(cite) discharged — both REMAIN OPEN, now carrying findings. [A] and [B]
+#   are FORM citations; neither ever fixed a value, and neither could be opened.
+#
+#   FINDING (mineralization_rate) — ~3.9× the Stanford & Smith mean, and above the fastest
+#   soil ever measured in a 43-soil set. Ours 0.03 /day = 0.21 /wk. [C]'s own 41-week
+#   incubations across 43 soil × tillage × depth combinations span k = 0.018–0.174 /wk
+#   (mean 0.070); Stanford & Smith's mean is 0.054 /wk = 0.0077 /day. So ours is ~3.9× the
+#   S&S mean and ~1.2× above [C]'s single fastest soil — outside the whole observed range.
+#   Four independent studies cluster at 0.054–0.080 /wk, so this is not one odd dataset.
+#   Crucially these are ALREADY optimal-condition potential rates (35 °C, field capacity),
+#   so the gap CANNOT be explained away by temperature/moisture modifiers.
+#   Provenance caveat: the 0.054 /wk figure is [C] QUOTING Stanford & Smith — S&S itself is
+#   paywalled (Wiley, HTTP 402) and was not opened. [C] is primary for its own 0.018–0.174
+#   range, which independently places ours outside.
+#
+#   FINDING (n_senescence_rate) — NO ACCESSIBLE PRIMARY SUPPORT AT ALL, and the highest
+#   clean-room risk in the project. The accessible N-resorption literature is built around
+#   resorption EFFICIENCY (a dimensionless %, ~50 % typical), not a relative rate (1/day) —
+#   the wrong SHAPE to bind a first-order constant, so there is nothing to compare against.
+#   ⚠ The relative-death-rate (rdr) tradition [B] seeded flows directly into WOFOST/PCSE, so
+#   searches for numeric RDR / N-senescence values land almost exclusively on WOFOST-lineage
+#   sources, which are LEGALLY OFF-LIMITS here. A future maintainer must not "just look it
+#   up": retrieving the [B] monograph is the only clean path (see the plan doc's list).
 
 name: chamber
 process: mineralization
@@ -61,8 +98,8 @@ parameters:
   n_senescence_rate:
     value: 0.01
     unit: "1/day"
-    source: "TODO(cite) — provisional, literature-typical first-order plant-N shedding rate (N turnover ~100 days) [B]; primary citation pending Phase-2 validation gate"
+    source: "TODO(cite) — STILL OPEN, no accessible primary support (2026-07-16). The N-resorption literature reports resorption EFFICIENCY (a %, ~50 % typical), not a 1/day rate — the wrong shape to bind this constant, so no delta is computable. [B] cites the FORM and is a print monograph that could not be opened. ⚠ CLEAN-ROOM HAZARD: the rdr tradition flows into WOFOST/PCSE, so numeric RDR sources found by search are almost all WOFOST-lineage and legally unusable — do NOT backfill from them. Retrieving [B] is the only clean path. See docs/plans/post-roadmap-citation.md."
   mineralization_rate:
     value: 0.03
     unit: "1/day"
-    source: "TODO(cite) — provisional, literature-typical first-order net N mineralization constant (litter N turnover ~33 days) [A]; primary citation pending Phase-2 validation gate"
+    source: "TODO(cite) — STILL OPEN, with a measured finding (2026-07-16): 0.03/day = 0.21/wk is ~3.9× the Stanford & Smith mean (0.054/wk = 0.0077/day) and ~1.2× ABOVE the fastest of 43 soils measured in [C] (range 0.018–0.174/wk, mean 0.070) — outside the whole observed range, with four independent studies clustering at 0.054–0.080/wk. These are already OPTIMAL-condition potential rates (35 °C, field capacity), so temperature/moisture modifiers cannot explain the gap. [A] cites the FORM only and is paywalled. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
