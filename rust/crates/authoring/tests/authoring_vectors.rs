@@ -215,6 +215,64 @@ fn synthetic_scenario() -> Scenario {
     (stocks, vec![Box::new(forced), Box::new(leak)], resolver, 0.5)
 }
 
+/// The monod scenario (Tier 2): a saturating, donor-controlled drain
+/// (`vmax · monod(pool, k)` — the frozen `f_O2` story in miniature, self-limiting so
+/// positivity comes from kinetics and never the backstop) plus a saturating forced
+/// inflow (`monod(q, kq) · vin`, covering a ForcingRef inside a monod arg and a monod on
+/// the left of a `*`). Nonlinear in the pool ⇒ RK4 ≢ Euler.
+///
+/// **Tier-1 bit-exact**, deliberately: division is an IEEE-754 basic op
+/// (correctly-rounded, deterministic cross-port), NOT a libm transcendental like
+/// `RadiatorReject`'s `powf` — so this is checked to the bit, not to a band.
+fn monod_scenario() -> Scenario {
+    let mut stocks = BTreeMap::new();
+    stocks.insert(
+        "sim.pool".to_string(),
+        carbon_stock("sim.pool", "sim", 100.0, StockKind::Pool),
+    );
+    stocks.insert(
+        "boundary.src".to_string(),
+        boundary::source("boundary.src".to_string(), Quantity::Carbon, 0.0, true).unwrap(),
+    );
+    stocks.insert(
+        "boundary.snk".to_string(),
+        boundary::sink("boundary.snk".to_string(), Quantity::Carbon, 0.0).unwrap(),
+    );
+    let drain_rate =
+        parse_rate_expr(r#"param("vmax") * monod(stock("sim.pool"), param("k"))"#).unwrap();
+    let drain = DeclarativeFlow::new(
+        "sim.saturating_drain".to_string(),
+        0,
+        drain_rate,
+        vec![
+            ("sim.pool".to_string(), -1.0),
+            ("boundary.snk".to_string(), 1.0),
+        ],
+        vec![("k".to_string(), 10.0), ("vmax".to_string(), 2.0)],
+    );
+    let inflow_rate = parse_rate_expr(r#"monod(forcing("q"), param("kq")) * param("vin")"#).unwrap();
+    let inflow = DeclarativeFlow::new(
+        "sim.saturating_in".to_string(),
+        0,
+        inflow_rate,
+        vec![
+            ("boundary.src".to_string(), -1.0),
+            ("sim.pool".to_string(), 1.0),
+        ],
+        vec![("kq".to_string(), 1.0), ("vin".to_string(), 3.0)],
+    );
+    let mut forcings = std::collections::HashMap::new();
+    forcings.insert("q".to_string(), constant(2.0).unwrap());
+    let resolver = SourceResolver::new(forcings, std::collections::HashMap::new()).unwrap();
+    (stocks, vec![Box::new(drain), Box::new(inflow)], resolver, 0.5)
+}
+
+/// Every scenario name present in the vector file — the guard against the file and this
+/// harness drifting apart (see `no_vector_scenario_goes_unchecked`).
+fn scenarios_in_file(expected: &Expected) -> std::collections::BTreeSet<String> {
+    expected.keys().map(|(s, ..)| s.clone()).collect()
+}
+
 /// One step under the chosen scheme (the two integrators are distinct types).
 fn step_report(
     scheme: &str,
@@ -271,8 +329,13 @@ fn check_scenario(
     }
 }
 
+/// The scenarios this harness knows how to rebuild. Keep in lockstep with
+/// `gen_authoring_vectors.py::_SCENARIOS` — `no_vector_scenario_goes_unchecked` fails if
+/// they drift.
+const CHECKED_SCENARIOS: [&str; 3] = ["self_discharge", "synthetic", "monod"];
+
 #[test]
-fn trajectory_parity_self_discharge_and_synthetic() {
+fn trajectory_parity_all_scenarios() {
     let expected = load_expected();
 
     let (stocks, _flows, env, dt) = self_discharge_scenario();
@@ -295,5 +358,31 @@ fn trajectory_parity_self_discharge_and_synthetic() {
         dt,
         24,
         &expected,
+    );
+
+    let (stocks, _flows, env, dt) = monod_scenario();
+    check_scenario("monod", &stocks, || monod_scenario().1, &env, dt, 24, &expected);
+}
+
+/// **The gate's completeness half.** `load_expected` reads the whole vector file into a
+/// map, but `trajectory_parity_all_scenarios` only checks the scenarios it hardcodes —
+/// so a scenario ADDED to the generator was silently ungated: its rows landed in the
+/// file, the harness never rebuilt them, and the suite stayed green with the new
+/// trajectory unverified cross-port. Found when Tier 2 added `monod`.
+///
+/// This is the `test_authoring_freeze_manifest.py` "added to the tree, exercised by
+/// nothing" hole, one level down in the parity harness. Asserting set-equality both ways
+/// also catches the reverse drift (a scenario removed from the generator but still
+/// checked here would panic on a missing key — loudly, but with a worse message).
+#[test]
+fn no_vector_scenario_goes_unchecked() {
+    let in_file = scenarios_in_file(&load_expected());
+    let checked: std::collections::BTreeSet<String> =
+        CHECKED_SCENARIOS.iter().map(|s| s.to_string()).collect();
+    assert_eq!(
+        in_file, checked,
+        "traj_vectors.txt and this harness have drifted: every scenario in the file must \
+         be rebuilt and bit-checked here (add a *_scenario() builder + a check_scenario \
+         call, and list it in CHECKED_SCENARIOS)"
     );
 }

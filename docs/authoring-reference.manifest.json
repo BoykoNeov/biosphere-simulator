@@ -10,6 +10,7 @@
     "BinOp",
     "Const",
     "ForcingRef",
+    "Monod",
     "Neg",
     "ParamRef",
     "StepN",
@@ -121,7 +122,7 @@
     }
   },
   "frozen_at_phase": 9,
-  "grammar_note": "The grammar is bounded and closed, and DELIBERATELY INCOMPLETE (decision D): division, the function set (exp ln pow sqrt abs min max clamp monod), bounded conditionals and a named-constant surface are all deferred until a real frozen flow forces each semantic choice. Freezing this subset does NOT imply completeness; adding an op is a deliberate unfreeze. There is no 'dt' token by construction (RK4-order-safety is structural). Precedence + associativity are enforced by parse_vectors.txt, not recorded here.",
+  "grammar_note": "The grammar is bounded and closed, and DELIBERATELY INCOMPLETE (decision D): bare division, the rest of the function set (exp ln pow sqrt abs min max clamp), bounded conditionals and a named-constant surface are all deferred until a real frozen flow forces each semantic choice. Freezing this subset does NOT imply completeness; adding an op is a deliberate unfreeze. 'monod' (S/(S+K)) landed post-roadmap as exactly such an unfreeze \u2014 forced by the frozen biosphere.chamber.oxygen_limitation_factor, whose kernel it mirrors (including denom<=0 -> 0, which makes it total). It guards its own denominator, so it resolved x/0 INTERNALLY and bare '/' stays deferred. There is no 'dt' token by construction (RK4-order-safety is structural). Precedence + associativity are enforced by parse_vectors.txt, not recorded here.",
   "integrator_names": [
     "euler",
     "rk4"
@@ -134,8 +135,8 @@
     "thermal"
   ],
   "parity_vectors": {
-    "parse_vectors.txt": "5b4bff2f56cd799ac6b94584d464567d49448d192039d4cf3939191f5693ca63",
-    "traj_vectors.txt": "473fb1ca6b0c6d53cd8e9a03be113ae8104cb49a56096922b63ae75fcfdb6763"
+    "parse_vectors.txt": "21a6afe132be63b409da3fab4ac72f5bdf53bc3f7b66df2f89857f499466ca65",
+    "traj_vectors.txt": "4f0118f90e266ffc411ffc374acb745bfbddef0bfaa024112be78fbf2bec221a"
   },
   "ref_keywords": [
     "forcing",

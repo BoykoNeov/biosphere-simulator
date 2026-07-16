@@ -18,9 +18,16 @@
 //!          | "stock"   "(" string ")"
 //!          | "param"   "(" string ")"
 //!          | "forcing" "(" string ")"
+//!          | "monod"   "(" expr "," expr ")"
 //!          | "n"
 //!          | "(" expr ")"
 //! ```
+//!
+//! `monod` is the sole **function** form (the post-roadmap Tier-2 unfreeze; see
+//! [`simcore::expr::Expr::Monod`]). Unlike the ref keywords it takes two full
+//! sub-expressions, in the frozen order `monod(substrate, half_saturation)`. Its `,` is
+//! the grammar's only comma and is legal nowhere else — a bare `a, b` at top level is a
+//! parse error, so it cannot be mistaken for a sequencing operator.
 //!
 //! `number` is standard decimal/float syntax (`1`, `1.5`, `1.0e-8` — parsed by *this*
 //! parser, so the YAML-1.1 dotless-`1e-3`-is-a-string hazard does not apply here).
@@ -66,6 +73,7 @@ enum TokKind {
     Star,
     LParen,
     RParen,
+    Comma,
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +85,10 @@ struct Token {
 
 /// The three reference forms — the closed keyword set (`n` is handled separately).
 const REF_KEYWORDS: [&str; 3] = ["stock", "param", "forcing"];
+
+/// The sole function form (Tier 2). Kept distinct from [`REF_KEYWORDS`] because it takes
+/// full sub-expressions, not a quoted string.
+const MONOD_KEYWORD: &str = "monod";
 
 /// Split `text` into tokens over its char sequence (code-point positions mirror
 /// Python's `text[i]` indexing). A stray character is a [`ParseError`].
@@ -114,6 +126,11 @@ fn tokenize(text: &str) -> Result<Vec<Token>, ParseError> {
             }
             ')' => {
                 tokens.push(Token { kind: TokKind::RParen, value: ")".into(), pos: i });
+                i += 1;
+                continue;
+            }
+            ',' => {
+                tokens.push(Token { kind: TokKind::Comma, value: ",".into(), pos: i });
                 i += 1;
                 continue;
             }
@@ -304,14 +321,59 @@ impl Parser {
                 _ => Expr::ForcingRef(arg),
             });
         }
+        if tok.value == MONOD_KEYWORD {
+            return self.monod_call(tok);
+        }
         Err(self.error(
             format!(
-                "unknown identifier {:?} (expected a number, 'n', or \
-                 stock/param/forcing(\"…\"))",
+                "unknown identifier {:?} (expected a number, 'n', \
+                 stock/param/forcing(\"…\"), or monod(…, …))",
                 tok.value
             ),
             tok.pos,
         ))
+    }
+
+    /// Consume `( expr "," expr )` after the `monod` keyword.
+    ///
+    /// Arity is **exact**: two full sub-expressions in the frozen order
+    /// `monod(substrate, half_saturation)`. Both under- and over-application are parse
+    /// errors (`monod(a)` finds `)` where it needs `,`; `monod(a,b,c)` finds `,` where
+    /// it needs `)`), so the arity cannot be got wrong silently.
+    fn monod_call(&mut self, keyword: &Token) -> Result<Expr, ParseError> {
+        match self.peek() {
+            Some(t) if t.kind == TokKind::LParen => self.advance(),
+            _ => {
+                return Err(
+                    self.error(format!("expected '(' after {:?}", keyword.value), keyword.pos)
+                )
+            }
+        };
+        let substrate = self.expr()?;
+        match self.peek() {
+            Some(t) if t.kind == TokKind::Comma => self.advance(),
+            _ => {
+                return Err(self.error(
+                    "monod(…) takes exactly two arguments — expected ',' after the substrate",
+                    keyword.pos,
+                ))
+            }
+        };
+        let half_saturation = self.expr()?;
+        match self.peek() {
+            Some(t) if t.kind == TokKind::RParen => self.advance(),
+            _ => {
+                return Err(self.error(
+                    "monod(…) takes exactly two arguments — expected ')' after the \
+                     half-saturation",
+                    keyword.pos,
+                ))
+            }
+        };
+        Ok(Expr::Monod {
+            substrate: Box::new(substrate),
+            half_saturation: Box::new(half_saturation),
+        })
     }
 
     /// Consume `( "string" )` after a `stock`/`param`/`forcing` keyword.
@@ -391,6 +453,15 @@ pub fn render_rate_expr(node: &Expr) -> String {
             op.symbol(),
             render_rate_expr(right)
         ),
+        // Its own parentheses already delimit the args, so no outer pair is needed.
+        Expr::Monod {
+            substrate,
+            half_saturation,
+        } => format!(
+            "monod({}, {})",
+            render_rate_expr(substrate),
+            render_rate_expr(half_saturation)
+        ),
     }
 }
 
@@ -438,9 +509,66 @@ mod tests {
         assert_eq!(sexpr(r#"forcing("par") + n"#), r#"(+ (forcing "par") n)"#);
     }
 
+    // --- monod: the Tier-2 grammar unfreeze --------------------------------
+    #[test]
+    fn parses_monod_in_the_frozen_arg_order() {
+        // monod(substrate, half_saturation) — a frozen semantic choice, also pinned by
+        // a parse vector.
+        assert_eq!(
+            sexpr(r#"monod(stock("sim.s"), param("k"))"#),
+            r#"(monod (stock "sim.s") (param "k"))"#
+        );
+    }
+
+    #[test]
+    fn monod_takes_full_subexpressions() {
+        assert_eq!(
+            sexpr(r#"monod(n - param("floor"), param("k") * n)"#),
+            r#"(monod (- n (param "floor")) (* (param "k") n))"#
+        );
+    }
+
+    #[test]
+    fn monod_composes_with_the_frozen_arithmetic() {
+        // Vmax · monod(S, K) — why the 2-arg form needs no 3-arg variant.
+        assert_eq!(
+            sexpr(r#"param("vmax") * monod(n, param("k"))"#),
+            r#"(* (param "vmax") (monod n (param "k")))"#
+        );
+    }
+
+    #[test]
+    fn monod_nests() {
+        assert_eq!(
+            sexpr(r#"monod(monod(n, param("a")), param("b"))"#),
+            r#"(monod (monod n (param "a")) (param "b"))"#
+        );
+    }
+
+    #[test]
+    fn monod_arity_and_comma_misuse_are_rejected() {
+        // Both under- and over-application error, so arity cannot be got wrong
+        // silently; the comma is legal nowhere but inside the call.
+        for text in [
+            "monod(n)",
+            "monod(n, n, n)",
+            "monod()",
+            "monod(n n)",
+            "monod(n,)",
+            "monod n, n",
+            "n, n",
+            "monod(n, n",
+            ",",
+        ] {
+            assert!(parse_rate_expr(text).is_err(), "should reject {text:?}");
+        }
+    }
+
     // --- the deferred grammar is rejected (do NOT complete it) -------------
     #[test]
     fn division_is_rejected() {
+        // monod landed WITHOUT lifting this: it guards its own denominator, so x/0 is
+        // resolved internally and the raw form is never exposed.
         assert!(parse_rate_expr("n / n").is_err());
     }
 
@@ -496,6 +624,10 @@ mod tests {
             "(1.0 + 2.0) * 3.0",
             r#"-param("k") * n"#,
             r#"forcing("load_power") + n"#,
+            r#"monod(stock("sim.s"), param("k"))"#,
+            r#"param("vmax") * monod(stock("sim.s"), param("k"))"#,
+            r#"monod(monod(n, param("a")), param("b"))"#,
+            "monod(-n, 1.0 + 2.0)",
         ] {
             let ast = parse_rate_expr(text).unwrap();
             let rendered = render_rate_expr(&ast);

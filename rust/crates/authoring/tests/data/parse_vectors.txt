@@ -21,6 +21,12 @@ accept	forcing("q") + n * param("g") - param("c")	(- (+ (forcing "q") (* n (para
 accept	0.1 + 0.2	(+ (const 0x1.999999999999ap-4) (const 0x1.999999999999ap-3))
 accept	123456789.123456789	(const 0x1.d6f34547e6b75p+26)
 accept	1e10 * 2.0	(* (const 0x1.2a05f20000000p+33) (const 0x1.0000000000000p+1))
+accept	monod(stock("sim.a"), param("k"))	(monod (stock "sim.a") (param "k"))
+accept	param("vmax") * monod(stock("sim.a"), param("k"))	(* (param "vmax") (monod (stock "sim.a") (param "k")))
+accept	monod(stock("sim.a") - param("floor"), param("k") * 2.0)	(monod (- (stock "sim.a") (param "floor")) (* (param "k") (const 0x1.0000000000000p+1)))
+accept	monod(-n, 1.0 + 2.0)	(monod (neg n) (+ (const 0x1.0000000000000p+0) (const 0x1.0000000000000p+1)))
+accept	monod(monod(n, param("a")), param("b"))	(monod (monod n (param "a")) (param "b"))
+accept	n + monod(n, param("k")) * n	(+ n (* (monod n (param "k")) n))
 reject	n / n
 reject	exp(n)
 reject	sqrt(n)
@@ -37,3 +43,12 @@ reject	stock(n)
 reject	* n
 reject	n +
 reject	dt
+reject	monod(n)
+reject	monod(n, n, n)
+reject	monod()
+reject	monod(n n)
+reject	monod(n,)
+reject	monod n, n
+reject	monod(n, n
+reject	n, n
+reject	,

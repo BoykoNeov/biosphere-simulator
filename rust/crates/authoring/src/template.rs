@@ -98,6 +98,15 @@ fn eval_build_time(
                 BinaryOp::Mul => l * r,
             })
         }
+        // Rate-only (Tier 2), and a *deliberate, reversible* deferral rather than a
+        // limitation: no frozen flow forces a saturating initial condition, and the
+        // build-time-legal node set is its own frozen surface. Rejected precisely — the
+        // generic message below would claim the author wrote a stock/forcing/n they did
+        // not.
+        Expr::Monod { .. } => Err(AuthoringError::new(format!(
+            "{where_}: monod(…) is a kinetics-rate form and is not available in a \
+             template expression {whole:?} (which is arithmetic over param('…') only)"
+        ))),
         // StockRef / ForcingRef / StepN — legal in a kinetics *rate*, but there is no
         // State/env/n at build time.
         Expr::StockRef(_) | Expr::ForcingRef(_) | Expr::StepN => Err(AuthoringError::new(format!(

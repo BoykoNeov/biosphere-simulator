@@ -18,6 +18,7 @@
 //! n                        # StepN
 //! (neg <e>)                # unary minus
 //! (+ <l> <r>)              # BinOp; op ∈ + - *
+//! (monod <s> <k>)          # Monod; substrate then half_saturation (the frozen order)
 //! ```
 //!
 //! `Const` renders through [`simcore::hexfloat::format`] (not a decimal spelling) so a
@@ -40,6 +41,14 @@ pub fn render_sexpr(expr: &Expr) -> String {
         Expr::BinOp { op, left, right } => {
             format!("({} {} {})", op.symbol(), render_sexpr(left), render_sexpr(right))
         }
+        Expr::Monod {
+            substrate,
+            half_saturation,
+        } => format!(
+            "(monod {} {})",
+            render_sexpr(substrate),
+            render_sexpr(half_saturation)
+        ),
     }
 }
 

@@ -36,11 +36,14 @@ from config import load_yaml
 from simcore.environment import SourceResolver, constant
 from simcore.expr import (
     BinOp,
+    Const,
     DeclarativeFlow,
     Expr,
     ForcingRef,
+    Monod,
     Neg,
     ParamRef,
+    StepN,
     StockRef,
 )
 from simcore.flow import Flow
@@ -195,6 +198,14 @@ def _collect_refs(node: Expr, params: set[str], stocks: set[StockId]) -> None:
     ``forcing`` references are intentionally *not* collected — like the frozen flows'
     ``env.get``, a forcing var's referential integrity is resolve-time (a ``KeyError``
     at the first step if unwired), not a build check.
+
+    **Exhaustive over the ``Expr`` union, deliberately.** This walk used to end in an
+    implicit fall-through, which silently skipped build-time referential validation of
+    any unhandled node's subtree — an unknown ``param``/``stock`` inside it would then
+    surface as a runtime ``KeyError`` instead of a clean ``AuthoringError``. Found when
+    Tier 2 added ``Monod``; the ref-free nodes are now named explicitly and an unknown
+    node raises, so the next grammar addition cannot slip. Structural mirror of
+    :func:`authoring.compose._prefix_expr_refs`.
     """
     if isinstance(node, ParamRef):
         params.add(node.name)
@@ -207,7 +218,13 @@ def _collect_refs(node: Expr, params: set[str], stocks: set[StockId]) -> None:
     elif isinstance(node, BinOp):
         _collect_refs(node.left, params, stocks)
         _collect_refs(node.right, params, stocks)
-    # Const, StepN: no references.
+    elif isinstance(node, Monod):
+        _collect_refs(node.substrate, params, stocks)
+        _collect_refs(node.half_saturation, params, stocks)
+    elif isinstance(node, (Const, StepN)):
+        pass  # no references
+    else:  # pragma: no cover - exhaustive over the Expr union
+        raise AuthoringError(f"cannot validate unknown expression node {node!r}")
 
 
 def _check_stoichiometry_balanced(

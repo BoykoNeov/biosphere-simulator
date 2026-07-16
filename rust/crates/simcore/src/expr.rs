@@ -103,6 +103,28 @@ pub enum Expr {
         left: Box<Expr>,
         right: Box<Expr>,
     },
+    /// Saturating kinetics `substrate / (substrate + half_saturation)` — the sole
+    /// function form, added by the post-roadmap Tier-2 grammar unfreeze
+    /// (`docs/plans/post-roadmap-grammar-monod.md`). See the Python `simcore.expr.Monod`
+    /// docstring for the full rationale; the load-bearing facts for this port are:
+    ///
+    /// * **a frozen flow forced the definition** — this is the kernel of
+    ///   `domains::biosphere::chamber::oxygen_limitation_factor` (frozen Phase-2 Step 7,
+    ///   cited to Davidson et al. 2012), so neither the 2-arg shape nor the degenerate
+    ///   case is invented here;
+    /// * **`denom <= 0` → `0.0`** mirrors that frozen flow exactly, making the node
+    ///   **total**: every finite input yields a finite `f64` — never NaN, never ±inf.
+    ///   This is why `monod` could land while bare `/` stays deferred: the raw `x/0`
+    ///   (Python-raise vs Rust-`inf`) is never reachable, so the ports cannot disagree;
+    /// * **only the kernel is mirrored** — the frozen `max(0.0, o2_mol)/air_mol` arg
+    ///   prep is the author's sub-expressions, not part of `monod`;
+    /// * **Tier-1 bit-exact** — division is an IEEE-754 *basic* op (correctly-rounded,
+    ///   deterministic cross-port), not a libm transcendental like `RadiatorReject`'s
+    ///   `powf`. The traj vectors assert bit-exactness accordingly.
+    Monod {
+        substrate: Box<Expr>,
+        half_saturation: Box<Expr>,
+    },
 }
 
 /// Evaluate `node` to an `f64` against a snapshot/env/param context.
@@ -147,6 +169,24 @@ pub fn eval_expr(
                 BinaryOp::Sub => l - r,
                 BinaryOp::Mul => l * r,
             })
+        }
+        Expr::Monod {
+            substrate,
+            half_saturation,
+        } => {
+            // substrate before half_saturation — the same fixed left-to-right order
+            // BinOp uses, mirroring Python.
+            let s = eval_expr(substrate, snapshot, env, params)?;
+            let k = eval_expr(half_saturation, snapshot, env, params)?;
+            let denom = s + k;
+            if denom <= 0.0 {
+                // The frozen f_O2's own choice, verbatim ("no O₂ ⇒ no respiration"):
+                // the degenerate 0/0 returns 0 rather than NaN, which is what makes this
+                // node total. Also catches a negative denominator (an author's negative
+                // K), where s/denom would otherwise flip sign.
+                return Ok(0.0);
+            }
+            Ok(s / denom)
         }
     }
 }
@@ -400,6 +440,83 @@ mod tests {
             binop(BinaryOp::Sub, Expr::StockRef(BATTERY.to_string()), Expr::StepN),
         );
         assert_eq!(eval(&expr, 8.0, 2, &[("k", 0.5)]), 0.5 * (8.0 - 2.0));
+    }
+
+    // --- monod (the Tier-2 grammar unfreeze) -------------------------------
+    fn monod(substrate: f64, half_saturation: f64) -> f64 {
+        eval(
+            &Expr::Monod {
+                substrate: Box::new(Expr::Const(substrate)),
+                half_saturation: Box::new(Expr::Const(half_saturation)),
+            },
+            5.0,
+            3,
+            &[],
+        )
+    }
+
+    #[test]
+    fn monod_is_the_textbook_curve_on_its_natural_domain() {
+        assert_eq!(monod(0.0, 2.0), 0.0);
+        assert_eq!(monod(2.0, 2.0), 0.5); // half-saturated exactly at S == K
+        assert_eq!(monod(1.0, 0.0), 1.0); // K == 0 disables the limit (frozen behaviour)
+        let rising: Vec<f64> = [0.0, 0.5, 1.0, 2.0, 10.0, 100.0]
+            .iter()
+            .map(|s| monod(*s, 2.0))
+            .collect();
+        for w in rising.windows(2) {
+            assert!(w[0] <= w[1], "monod must rise monotonically in S");
+        }
+        assert!(rising.iter().all(|v| (0.0..1.0).contains(v)));
+    }
+
+    #[test]
+    fn monod_degenerate_case_is_zero_not_nan() {
+        // The frozen f_O2's own choice ("no O₂ ⇒ no respiration"), mirrored. This is
+        // what makes the node total and keeps NaN off the hex-float golden contract.
+        assert_eq!(monod(0.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn monod_is_total_over_finite_inputs() {
+        // Never NaN, never ±inf, never an error — so bare x/0's Python-raise-vs-Rust-inf
+        // split is unreachable through monod, which is why `/` could stay deferred.
+        let finite = [
+            0.0, -0.0, 1.0, -1.0, 5.0, -5.0, 1e-300, 1e300, -1e300, 0.5, -0.5,
+        ];
+        for s in finite {
+            for k in finite {
+                assert!(
+                    monod(s, k).is_finite(),
+                    "monod({s}, {k}) must be finite, got {}",
+                    monod(s, k)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn monod_does_not_sign_flip_on_a_negative_denominator() {
+        assert_eq!(monod(-3.0, 1.0), 0.0); // denom = -2; naive would give +1.5
+        assert_eq!(monod(5.0, -5.0), 0.0); // denom == 0, nonzero numerator: no inf
+    }
+
+    #[test]
+    fn monod_does_not_clamp_its_substrate() {
+        // Only the frozen kernel is mirrored; its max(0,·) arg prep is the author's
+        // sub-expression. A negative substrate with a positive denominator passes
+        // through honestly rather than being silently clamped.
+        assert_eq!(monod(-1.5, 2.0), -1.5 / 0.5);
+    }
+
+    #[test]
+    fn monod_reads_refs_and_evaluates_substrate_first() {
+        // k · monod(battery, k) — the shape a real saturating authored rate uses.
+        let expr = Expr::Monod {
+            substrate: Box::new(Expr::StockRef(BATTERY.to_string())),
+            half_saturation: Box::new(Expr::ParamRef("k".to_string())),
+        };
+        assert_eq!(eval(&expr, 3.0, 0, &[("k", 1.0)]), 3.0 / 4.0);
     }
 
     // --- DeclarativeFlow ---------------------------------------------------

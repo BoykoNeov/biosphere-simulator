@@ -17,6 +17,7 @@ exactly):
              | "stock"   "(" string ")"
              | "param"   "(" string ")"
              | "forcing" "(" string ")"
+             | "monod"   "(" expr "," expr ")"
              | "n"
              | "(" expr ")"
 
@@ -24,6 +25,13 @@ exactly):
 *this* parser, so the YAML-1.1 dotless-``1e-3``-is-a-string hazard does not apply
 here). A ``stock``/``param``/``forcing`` argument is a **quoted string** id/name, so
 any dotted id (``power.battery``) is expressible without an identifier sub-grammar.
+
+``monod`` is the sole **function** form (the post-roadmap Tier-2 unfreeze; see
+:class:`simcore.expr.Monod` for the frozen flow that forced its semantics). Unlike the
+ref keywords it takes two **full sub-expressions**, in the frozen order
+``monod(substrate, half_saturation)``. Its ``,`` is the grammar's only comma and is
+legal **nowhere else** — a bare ``a, b`` at top level is a parse error, so the token
+cannot be mistaken for a sequencing operator.
 
 Every malformed input (unknown identifier, bad token, unbalanced parens, trailing
 junk, an unsupported operator such as ``/``) raises :class:`AuthoringError` with the
@@ -36,16 +44,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from authoring.errors import AuthoringError
-from simcore.expr import BinOp, Const, Expr, ForcingRef, Neg, ParamRef, StepN, StockRef
+from simcore.expr import (
+    BinOp,
+    Const,
+    Expr,
+    ForcingRef,
+    Monod,
+    Neg,
+    ParamRef,
+    StepN,
+    StockRef,
+)
 from simcore.ids import StockId
 
 # The three reference forms and the bare ``n`` token — the closed identifier set.
 _REF_KEYWORDS: frozenset[str] = frozenset({"stock", "param", "forcing"})
 
+# The sole function form (Tier 2). Kept distinct from _REF_KEYWORDS because it takes
+# full sub-expressions, not a quoted string.
+_MONOD_KEYWORD: str = "monod"
+
 
 @dataclass(frozen=True)
 class _Token:
-    kind: str  # "num" | "ident" | "str" | "+" | "-" | "*" | "(" | ")"
+    kind: str  # "num" | "ident" | "str" | "+" | "-" | "*" | "(" | ")" | ","
     value: str
     pos: int
 
@@ -60,7 +82,7 @@ def _tokenize(text: str) -> list[_Token]:
         if c.isspace():
             i += 1
             continue
-        if c in "+-*()":
+        if c in "+-*(),":
             tokens.append(_Token(c, c, i))
             i += 1
             continue
@@ -191,10 +213,44 @@ class _Parser:
             if tok.value == "param":
                 return ParamRef(arg)
             return ForcingRef(arg)
+        if tok.value == _MONOD_KEYWORD:
+            return self._monod_call(tok)
         raise self._error(
             f"unknown identifier {tok.value!r} at position {tok.pos} "
-            f"(expected a number, 'n', or stock/param/forcing(\"…\"))"
+            f"(expected a number, 'n', stock/param/forcing(\"…\"), or monod(…, …))"
         )
+
+    def _monod_call(self, keyword: _Token) -> Expr:
+        """Consume ``( expr "," expr )`` after the ``monod`` keyword.
+
+        Arity is **exact**: two full sub-expressions in the frozen order
+        ``monod(substrate, half_saturation)``. Both under- and over-application are
+        parse errors (``monod(a)`` finds ``)`` where it needs ``,``; ``monod(a,b,c)``
+        finds ``,`` where it needs ``)``), so the arity cannot be got wrong silently.
+        """
+        opener = self._peek()
+        if opener is None or opener.kind != "(":
+            raise self._error(
+                f"expected '(' after {keyword.value!r} at position {keyword.pos}"
+            )
+        self._advance()
+        substrate = self._expr()
+        comma = self._peek()
+        if comma is None or comma.kind != ",":
+            raise self._error(
+                f"monod(…) takes exactly two arguments — expected ',' after the "
+                f"substrate (at position {keyword.pos})"
+            )
+        self._advance()
+        half_saturation = self._expr()
+        closer = self._peek()
+        if closer is None or closer.kind != ")":
+            raise self._error(
+                f"monod(…) takes exactly two arguments — expected ')' after the "
+                f"half-saturation (at position {keyword.pos})"
+            )
+        self._advance()
+        return Monod(substrate, half_saturation)
 
     def _call_string_arg(self, keyword: _Token) -> str:
         """Consume ``( "string" )`` after a ``stock``/``param``/``forcing`` keyword."""
@@ -265,5 +321,11 @@ def render_rate_expr(node: Expr) -> str:
     if isinstance(node, BinOp):
         return (
             f"({render_rate_expr(node.left)} {node.op} {render_rate_expr(node.right)})"
+        )
+    if isinstance(node, Monod):
+        # Its own parentheses already delimit the args, so no outer pair is needed.
+        return (
+            f"monod({render_rate_expr(node.substrate)}, "
+            f"{render_rate_expr(node.half_saturation)})"
         )
     raise AuthoringError(f"cannot render unknown expression node {node!r}")

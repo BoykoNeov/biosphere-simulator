@@ -46,6 +46,7 @@ from simcore.expr import (
     DeclarativeFlow,
     Expr,
     ForcingRef,
+    Monod,
     Neg,
     ParamRef,
     StepN,
@@ -93,6 +94,11 @@ def render_sexpr(node: Expr) -> str:
         return f"(neg {render_sexpr(node.operand)})"
     if isinstance(node, BinOp):
         return f"({node.op} {render_sexpr(node.left)} {render_sexpr(node.right)})"
+    if isinstance(node, Monod):
+        return (
+            f"(monod {render_sexpr(node.substrate)} "
+            f"{render_sexpr(node.half_saturation)})"
+        )
     raise TypeError(f"not an Expr node: {node!r}")  # pragma: no cover
 
 
@@ -125,13 +131,25 @@ _ACCEPT_CASES: tuple[str, ...] = (
     "0.1 + 0.2",
     "123456789.123456789",
     "1e10 * 2.0",
+    # monod (Tier 2) — the arg ORDER is a frozen semantic choice, so it is pinned here
+    # cross-port, not merely unit-tested per port.
+    'monod(stock("sim.a"), param("k"))',
+    # Vmax arrives through the already-frozen `*` — why no 3-arg form is needed.
+    'param("vmax") * monod(stock("sim.a"), param("k"))',
+    # full sub-expressions as args (not just refs), incl. precedence inside an arg
+    'monod(stock("sim.a") - param("floor"), param("k") * 2.0)',
+    "monod(-n, 1.0 + 2.0)",
+    # nesting, and monod interacting with the surrounding precedence
+    'monod(monod(n, param("a")), param("b"))',
+    'n + monod(n, param("k")) * n',
 )
 
 # The reject cases — the deferred grammar + malformed input. BOTH ports must error; the
 # message text is not a parity target (Tier-0 is accept→same-AST, reject→both-error).
 _REJECT_CASES: tuple[str, ...] = (
-    "n / n",  # division deferred
-    "exp(n)",  # unknown function/identifier
+    "n / n",  # division STILL deferred — monod guards its own denominator, so it
+    # resolved x/0 internally without exposing the raw form
+    "exp(n)",  # unknown function/identifier — the rest of the set is still deferred
     "sqrt(n)",
     "n ** 2",  # ** is two '*' tokens then a bad primary
     "   ",  # empty
@@ -146,6 +164,18 @@ _REJECT_CASES: tuple[str, ...] = (
     "* n",  # leading binary op
     "n +",  # dangling binary op
     "dt",  # no dt token (grammar-enforced)
+    # monod arity — both under- and over-application error, so the arity of the one
+    # function form cannot be got wrong silently on either port
+    "monod(n)",
+    "monod(n, n, n)",
+    "monod()",
+    "monod(n n)",  # missing comma
+    "monod(n,)",  # dangling comma
+    "monod n, n",  # missing parens
+    "monod(n, n",  # unbalanced
+    # the comma is confined to the call — it is NOT a sequencing operator
+    "n, n",
+    ",",
 )
 
 
@@ -247,6 +277,67 @@ def _syn_resolver() -> SourceResolver:
     return SourceResolver(forcings={"q": constant(SYN_Q)})
 
 
+# Monod scenario constants (Tier 2). A saturating drain + a saturating forced inflow.
+MON_DT = 0.5
+MON_STEPS = 24
+MON_POOL0 = 100.0
+MON_VMAX = 2.0  # max drain rate
+MON_K = 10.0  # drain half-saturation
+MON_Q = 2.0  # forcing "q"
+MON_KQ = 1.0  # inflow half-saturation
+MON_VIN = 3.0  # max inflow rate
+
+
+def _monod_traj() -> dict[str, list[_Row]]:
+    """An authored scenario exercising ``Monod`` in the *evaluated* path.
+
+    Tier-1 **bit-exact**: division is an IEEE-754 basic op (correctly-rounded,
+    deterministic cross-port), not a libm transcendental — so this vector asserts
+    bit-identity like the ``SelfDischarge`` anchor, NOT a tolerance band.
+
+    The drain is the frozen ``f_O2`` story in miniature and is why ``monod`` earns its
+    place: ``vmax · monod(pool, k)`` is **donor-controlled and self-limiting** — as the
+    pool falls the rate smoothly shuts off, so positivity comes from *kinetics*, never
+    the Euler backstop (``rationed == 0``). It is also nonlinear in the pool, so
+    RK4 ≢ Euler and the two schemes are independent evidence. The inflow additionally
+    covers a ``ForcingRef`` inside a monod arg and a monod on the *left* of a ``*``.
+
+    Sized well-fed: inflow ``3.0 · 2/(2+1) = 2.0`` against a drain that starts at
+    ``2.0 · 100/110 ≈ 1.82``, so the pool rises gently and never approaches zero.
+    """
+    pool = _carbon_stock("sim.pool", _SIM, MON_POOL0, StockKind.POOL)
+    src = boundary.source(StockId("boundary.src"), Quantity.CARBON, 0.0)
+    snk = boundary.sink(StockId("boundary.snk"), Quantity.CARBON, 0.0)
+    stocks = {pool.id: pool, src.id: src, snk.id: snk}
+
+    # rate = vmax * monod(pool, k) — saturating, donor-controlled, self-limiting.
+    drain_rate = parse_rate_expr('param("vmax") * monod(stock("sim.pool"), param("k"))')
+    drain = DeclarativeFlow(
+        id=FlowId("sim.saturating_drain"),
+        priority=0,
+        rate=drain_rate,
+        stoichiometry=(
+            (StockId("sim.pool"), -1.0),
+            (StockId("boundary.snk"), 1.0),
+        ),
+        params=(("k", MON_K), ("vmax", MON_VMAX)),
+    )
+    # rate = monod(q, kq) * vin — a monod over a ForcingRef, on the left of a `*`.
+    inflow_rate = parse_rate_expr('monod(forcing("q"), param("kq")) * param("vin")')
+    inflow = DeclarativeFlow(
+        id=FlowId("sim.saturating_in"),
+        priority=0,
+        rate=inflow_rate,
+        stoichiometry=(
+            (StockId("boundary.src"), -1.0),
+            (StockId("sim.pool"), 1.0),
+        ),
+        params=(("kq", MON_KQ), ("vin", MON_VIN)),
+    )
+    resolver = SourceResolver(forcings={"q": constant(MON_Q)})
+    return _run_both(stocks, [drain, inflow], resolver, MON_DT, MON_STEPS)
+
+
 # --------------------------------------------------------------------------- #
 # Trajectory capture (mirrors gen_engine_vectors.py).                          #
 # --------------------------------------------------------------------------- #
@@ -294,10 +385,11 @@ def _collect() -> dict[str, dict[str, list[_Row]]]:
     return {
         "self_discharge": _self_discharge_traj(),
         "synthetic": _synthetic_traj(),
+        "monod": _monod_traj(),
     }
 
 
-_SCENARIOS = ("self_discharge", "synthetic")
+_SCENARIOS = ("self_discharge", "synthetic", "monod")
 _SCHEMES = ("euler", "rk4")
 
 

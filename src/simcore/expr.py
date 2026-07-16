@@ -21,22 +21,25 @@ unambiguous arithmetic core exercised by the re-expression anchor (``SelfDischar
   * reads: a stock amount by id (``StockRef``), a param by name (``ParamRef``), a
     forcing by name (``ForcingRef``, resolved through ``env.get`` — #16), and the
     integer step ``n`` (``StepN``);
-  * binary ``+ - *`` (``BinOp``) and unary ``-`` (``Neg``).
+  * binary ``+ - *`` (``BinOp``) and unary ``-`` (``Neg``);
+  * saturating kinetics ``monod`` (``Monod``) — the post-roadmap Tier-2 unfreeze; see
+    that node's docstring for the frozen flow that forced its definition.
 
 **Deliberately deferred** until a real frozen flow forces the semantic definition
 (the ``_DemoSchema``/``_CanopySchema`` "bespoke until a second instance justifies it"
 discipline, applied to the grammar):
 
   * ``/`` — division is IEEE-unambiguous *except* at ``x/0`` (Python raises
-    ``ZeroDivisionError``; Rust f64 yields ``inf``) — a cross-port semantic choice to
-    settle when the first divider (``monod``) lands;
-  * the closed **function set** ``exp ln pow sqrt abs min max clamp monod`` +
-    bounded conditionals — each of ``monod``/``clamp``/``ifpos`` carries a real
-    definitional choice (``x/(x+k)``? inclusive bounds? ``>0`` vs ``≥0``?), and a
-    faithful transcendental anchor additionally needs a **named-constant** surface
-    (Stefan-Boltzmann's σ is a CODATA *module constant*, not a param — see
-    ``domains.thermal``), unresolved here. Both are Step-4 notes so the Rust port
-    does not assume the grammar is complete.
+    ``ZeroDivisionError``; Rust f64 yields ``inf``). ``monod`` (the first divider)
+    has now landed **without** lifting this: it guards its own denominator, so it
+    resolves ``x/0`` *internally* and never exposes the raw form. Bare ``/`` would
+    re-introduce exactly the hazard this defers, and no frozen flow forces it;
+  * the rest of the closed **function set** — ``exp ln pow sqrt abs min max clamp`` +
+    bounded conditionals. ``clamp``/``ifpos`` still carry a real definitional choice
+    (inclusive bounds? ``>0`` vs ``≥0``?), and a faithful transcendental anchor
+    additionally needs a **named-constant** surface (Stefan-Boltzmann's σ is a CODATA
+    *module constant*, not a param — see ``domains.thermal``), unresolved here. Kept
+    explicit so the Rust port does not assume the grammar is complete.
 
 **No ``dt`` token, by construction.** Exposing ``dt`` to the rate grammar would let an
 author write ``coeff·dt·f(dt)`` — non-linear in ``dt`` — silently forfeiting RK4 order
@@ -130,7 +133,56 @@ class BinOp:
     right: Expr
 
 
-Expr = Const | StockRef | ParamRef | ForcingRef | StepN | Neg | BinOp
+@dataclass(frozen=True)
+class Monod:
+    """Saturating kinetics ``substrate / (substrate + half_saturation)``.
+
+    The **one shape ``+ − ×`` cannot approximate**, and the most common functional form
+    in the science this project models — Michaelis-Menten, Monod and Holling type II all
+    share this algebra. Added by the post-roadmap Tier-2 grammar unfreeze
+    (``docs/plans/post-roadmap-grammar-monod.md``).
+
+    **A frozen flow forced the definition** (the grammar's own precondition): this is
+    the kernel of ``domains.biosphere.chamber.oxygen_limitation_factor`` — frozen since
+    Phase-2 Step 7, cited to Davidson et al. 2012, and used by three frozen flows. Both
+    of the choices the grammar had to make were therefore *already made, and cited*:
+
+    * **2-arg, dimensionless** (not a 3-arg ``Vmax·S/(S+K)``). The frozen ``f_O2`` is a
+      dimensionless factor applied as ``daily · f_O2 · dt``, so ``Vmax`` arrives through
+      the already-frozen ``*``. Arg order is ``monod(substrate, half_saturation)``,
+      matching the frozen signature and Michaelis-Menten convention — a **frozen
+      semantic choice**, pinned by a parse vector.
+    * **``denom <= 0`` → ``0.0``**, mirroring the frozen line-for-line ("no O₂ ⇒ no
+      respiration"). This makes the node **total**: for all finite inputs it returns a
+      finite float — never NaN, never ±inf, never raising. So ``0/0`` cannot reach a
+      hex-float golden, and the Python-raise-vs-Rust-``inf`` split never arises because
+      no raw ``x/0`` is reachable.
+
+    **Only the kernel is mirrored, not the frozen function's argument preparation.** The
+    frozen ``max(0.0, o2_mol)/air_mol`` and its ``ValueError`` guards are *arg prep* for
+    a depleting physical pool; for an authored rate that layer **is the sub-expressions
+    the author composed**. Baking a silent ``max(0, ·)`` in here would change
+    ``monod(stock("a") - stock("b"), k)`` invisibly — the silent-failure class this
+    platform exists to avoid. Off the natural domain (``S ≥ 0``, ``K > 0``, where the
+    result is the textbook ``[0, 1)`` and bit-identical to frozen ``f_O2``) the node
+    stays total and yields conservation-closed nonsense the author owns, by design.
+
+    **Tier-1 bit-exact, not Tier-2.** Division is an IEEE-754 *basic* operation —
+    correctly-rounded and deterministic cross-port, exactly like ``+ − *``. The
+    "a transcendental moves an authored flow Tier-1 → Tier-2" rule covers *libm* calls
+    (``RadiatorReject``'s ``T⁴`` via ``pow``); this is not in that class.
+
+    **RK4-order-safe.** ``S/(S+K)`` is C∞ on the natural domain, so RK4's convergence
+    order survives — which the obvious cheap alternative ``min(k·S, Vmax)`` would
+    destroy (its kink is non-differentiable). The ``denom <= 0`` branch is a derivative
+    discontinuity only at the pathological boundary, which ``K > 0`` never reaches.
+    """
+
+    substrate: Expr
+    half_saturation: Expr
+
+
+Expr = Const | StockRef | ParamRef | ForcingRef | StepN | Neg | BinOp | Monod
 
 # The op set Step 2 ships (unambiguous IEEE arithmetic). Division and the function
 # set are deferred (see the module docstring); the parser and evaluator both reject
@@ -182,6 +234,19 @@ def eval_expr(
         # interpreter re-validates), but kept explicit so a malformed op is a loud
         # error rather than a silent wrong answer.
         raise ValueError(f"unsupported binary op {node.op!r}")
+    if isinstance(node, Monod):
+        # substrate before half_saturation — the same fixed left-to-right order BinOp
+        # uses, mirrored by the Rust port.
+        substrate = eval_expr(node.substrate, snapshot, env, params)
+        half_saturation = eval_expr(node.half_saturation, snapshot, env, params)
+        denom = substrate + half_saturation
+        if denom <= 0.0:
+            # The frozen f_O2's own choice, verbatim ("no O₂ ⇒ no respiration"): the
+            # degenerate 0/0 returns 0 rather than NaN, which is what makes this node
+            # total. Also catches a negative denominator (an author's negative K), where
+            # S/denom would otherwise flip sign.
+            return 0.0
+        return substrate / denom
     raise TypeError(f"not an Expr node: {node!r}")  # pragma: no cover - exhaustive
 
 

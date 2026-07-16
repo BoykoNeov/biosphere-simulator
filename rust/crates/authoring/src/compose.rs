@@ -217,6 +217,13 @@ fn prefix_expr_refs(node: &Expr, prefix: &str) -> Expr {
             left: Box::new(prefix_expr_refs(left, prefix)),
             right: Box::new(prefix_expr_refs(right, prefix)),
         },
+        Expr::Monod {
+            substrate,
+            half_saturation,
+        } => Expr::Monod {
+            substrate: Box::new(prefix_expr_refs(substrate, prefix)),
+            half_saturation: Box::new(prefix_expr_refs(half_saturation, prefix)),
+        },
         Expr::Const(_) | Expr::ParamRef(_) | Expr::StepN => node.clone(),
     }
 }

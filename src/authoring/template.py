@@ -35,7 +35,7 @@ from collections.abc import Mapping
 
 from authoring.errors import AuthoringError
 from authoring.expr_parser import parse_rate_expr
-from simcore.expr import BinOp, Const, Expr, Neg, ParamRef
+from simcore.expr import BinOp, Const, Expr, Monod, Neg, ParamRef
 
 
 def resolve_parameters(
@@ -109,6 +109,16 @@ def _eval(node: Expr, params: Mapping[str, float], *, where: str, whole: str) ->
             return left * right
         raise AuthoringError(  # pragma: no cover - parser only emits + - *
             f"{where}: unsupported operator {node.op!r} in {whole!r}"
+        )
+    if isinstance(node, Monod):
+        # Rate-only (Tier 2), and a *deliberate, reversible* deferral rather than a
+        # limitation: no frozen flow forces a saturating initial condition, and the
+        # build-time-legal node set is its own frozen surface. Rejected precisely — the
+        # generic message below would claim the author wrote a stock/forcing/n they did
+        # not, which is exactly the kind of lying error this platform does not ship.
+        raise AuthoringError(
+            f"{where}: monod(…) is a kinetics-rate form and is not available in a "
+            f"template expression {whole!r} (which is arithmetic over param('…') only)"
         )
     # StockRef / ForcingRef / StepN — legal in a kinetics *rate* (evaluated per step
     # against a State/env), but there is no State/env/n at build time.

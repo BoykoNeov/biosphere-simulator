@@ -349,6 +349,13 @@ fn collect_refs(node: &Expr, params: &mut Vec<String>, stocks: &mut Vec<String>)
             collect_refs(left, params, stocks);
             collect_refs(right, params, stocks);
         }
+        Expr::Monod {
+            substrate,
+            half_saturation,
+        } => {
+            collect_refs(substrate, params, stocks);
+            collect_refs(half_saturation, params, stocks);
+        }
         Expr::Const(_) | Expr::StepN => {}
     }
 }

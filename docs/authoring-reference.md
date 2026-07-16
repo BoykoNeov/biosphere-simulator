@@ -86,6 +86,7 @@ primary := number
          | "stock"   "(" string ")"
          | "param"   "(" string ")"
          | "forcing" "(" string ")"
+         | "monod"   "(" expr "," expr ")"
          | "n"
          | "(" expr ")"
 ```
@@ -94,6 +95,11 @@ A `stock`/`param`/`forcing` argument is a **quoted string**, so any dotted id
 (`power.battery`) is expressible without an identifier sub-grammar. `number` is standard
 decimal/float syntax parsed by *this* parser, so the YAML-1.1 dotless-`1e-3`-is-a-string
 hazard does not apply inside a rate.
+
+`monod` is the sole **function** form (the post-roadmap Tier-2 unfreeze — see *Saturating
+kinetics* below). Unlike the ref keywords it takes two **full sub-expressions**, and its
+`,` is the grammar's only comma — legal nowhere else, so a bare `a, b` at top level is a
+parse error rather than a sequencing operator.
 
 **There is no `dt` token, by construction.** Exposing `dt` would let an author write
 `f(dt)·dt` — non-linear in `dt` — silently forfeiting RK4 order. The rate is the
@@ -109,13 +115,61 @@ instance justifies it" discipline, applied to the grammar):
 
 | Deferred | Why it is not shipped |
 | --- | --- |
-| `/` (division) | IEEE-unambiguous *except* at `x/0` — Python raises `ZeroDivisionError`, Rust f64 yields `inf`. A **cross-port semantic choice**, to settle when the first divider (`monod`) lands. |
-| `exp ln pow sqrt abs min max clamp monod` | Each of `monod`/`clamp`/`ifpos` carries a real definitional choice (`x/(x+k)`? inclusive bounds? `>0` vs `≥0`?). A transcendental also moves an authored flow from Tier-1 to Tier-2 under the [cross-port contract](native-port-reference.md). |
+| `/` (bare division) | IEEE-unambiguous *except* at `x/0` — Python raises `ZeroDivisionError`, Rust f64 yields `inf`. A **cross-port semantic choice**, and **still open**: `monod` (the first divider) landed *without* lifting it, because `monod` guards its own denominator and so resolves `x/0` **internally**, never exposing the raw form. Shipping bare `/` would re-introduce exactly the hazard this defers, and no frozen flow forces it. |
+| `exp ln pow sqrt abs min max clamp` | `clamp`/`ifpos` still carry a real definitional choice (inclusive bounds? `>0` vs `≥0`?). A transcendental also moves an authored flow from Tier-1 to Tier-2 under the [cross-port contract](native-port-reference.md) — note this does **not** apply to `monod`, whose division is an IEEE *basic* op. |
 | bounded conditionals | Same — the comparison's edge semantics need a real flow. |
 | named constants | A faithful Stefan-Boltzmann re-expression needs σ as a **module constant, not a param** (the `domains.thermal` / CODATA discipline). Unresolved. |
 
 Adding any of them is a **deliberate unfreeze** (grammar node/op sets move ⇒ the
-completeness gate fires), landing on **both ports** with new parse vectors.
+completeness gate fires), landing on **both ports** with new parse vectors. **`monod` is
+the worked example** — it left this table by that exact route; see below.
+
+### Saturating kinetics — `monod(substrate, half_saturation)` (post-roadmap Tier 2)
+
+`monod(S, K) = S/(S+K)` — the one shape `+ − ×` cannot approximate, and the most common
+functional form in the science this project models (Michaelis-Menten, Monod and Holling
+type II share this algebra). Plan of record:
+[`docs/plans/post-roadmap-grammar-monod.md`](plans/post-roadmap-grammar-monod.md).
+
+**A frozen flow forced the definition — this is not a semantics the grammar invented.**
+The op is the kernel of `domains.biosphere.chamber.oxygen_limitation_factor` (frozen
+Phase-2 Step 7, cited to Davidson et al. 2012, used by three frozen flows), so both
+choices the grammar had to make were *already made, and cited*:
+
+| choice | resolution | because |
+|---|---|---|
+| 2-arg vs 3-arg `Vmax·S/(S+K)` | **2-arg, dimensionless** | frozen `f_O2` is dimensionless and applied as `daily · f_O2 · dt` — `Vmax` arrives through the already-frozen `*`, so a 3-arg form would freeze an argument order for nothing |
+| `monod(0,0)` = `0/0` → NaN? | **`denom <= 0` → `0.0`** | the frozen line, verbatim ("no O₂ ⇒ no respiration") |
+
+Arg order is `monod(substrate, half_saturation)` — a **frozen semantic choice**, pinned by
+a parse vector, matching the frozen signature and MM convention.
+
+Three properties an author can rely on:
+
+- **It is total.** Every finite input returns a finite float: never NaN, never ±inf, never
+  raising. So `0/0` cannot reach a hex-float golden, and the Python-raise-vs-Rust-`inf`
+  split is unreachable. A negative denominator returns `0` rather than sign-flipping to a
+  positive-looking factor.
+- **It is Tier-1 bit-exact**, not Tier-2. Division is an IEEE-754 *basic* operation
+  (correctly-rounded, deterministic cross-port), unlike the libm transcendentals. On the
+  natural domain (`S ≥ 0`, `K > 0`) it is **bit-identical to the frozen `f_O2`** —
+  gated by `tests/test_authoring_monod.py`, the `SelfDischarge`-oracle pattern applied to
+  a grammar primitive.
+- **It is RK4-order-safe.** `S/(S+K)` is C∞ on the natural domain. The obvious cheap
+  alternative `min(k·S, Vmax)` is *not* equivalent: its kink is non-differentiable and
+  destroys RK4's convergence order, and `rk4` is a frozen integrator name.
+
+**What it does NOT do: clamp your substrate.** Only the frozen *kernel* is mirrored; the
+frozen function's `max(0.0, o2_mol)/air_mol` is **argument preparation** for a depleting
+physical pool, and in an authored rate that layer is *the sub-expressions you composed*. A
+silent `max(0, ·)` would make `monod(stock("a") - stock("b"), k)` quietly mean something
+else. If you need the clamp, write it.
+
+> **`monod` is still bound by *Frozen is not calibrated*, from the other side.** It makes a
+> saturating law *sayable*; the `K` you put in it is yours, and the platform will not tell
+> you it is wrong. A rate using `monod` is authored kinetics, so it *does* raise
+> `has_authored_kinetics` — unlike a frozen `type`, which raises nothing and is no more
+> validated.
 
 ### The VM — `simcore/expr.py` (the one-time core addition, decision A)
 
@@ -340,15 +394,24 @@ proven bit-exact by the hex-float graph dump.
 
 The contract is earned by Steps 0–6c (full detail + measured results in the plan):
 
-- **Grammar semantics are cross-port pinned** — `parse_vectors.txt`: 20 accept cases
-  render an **identical canonical S-expr** on both ports; 16 reject cases error on both
+- **Grammar semantics are cross-port pinned** — `parse_vectors.txt`: 26 accept cases
+  render an **identical canonical S-expr** on both ports; 25 reject cases error on both
   (the *message* is deliberately not pinned). A precedence or associativity change moves
-  a rendering and fails.
+  a rendering and fails. Since Tier 2 this also pins `monod`'s **arg order** and its
+  arity/comma rejections — the comma is legal nowhere but inside the call.
 - **The VM's arithmetic is cross-port bit-exact** — `traj_vectors.txt`: the frozen
   `SelfDischarge` re-expressed as an authored flow is bit-identical to the frozen
   constructor's trajectory, per step, under **Euler *and* RK4** (RK4 is nontrivial —
   `SelfDischarge` is donor-controlled ⇒ RK4 ≢ Euler). The frozen flow is the oracle; no
-  new golden was invented.
+  new golden was invented. Tier 2 added a third scenario carrying `monod` in the
+  *evaluated* path — a saturating, donor-controlled drain that self-limits so
+  `rationed == 0` comes from **kinetics, not the backstop** (the frozen `f_O2` story in
+  miniature), bit-exact on both ports under both schemes.
+- **The `monod` op IS the frozen science** — `tests/test_authoring_monod.py` pins the
+  kernel **bit-exact** against `chamber.oxygen_limitation_factor` across its frozen
+  domain, and pins totality (no finite input yields NaN/±inf) by measurement rather than
+  argument. This is the `SelfDischarge` oracle pattern applied to a *grammar primitive*:
+  the evidence that the op is the frozen law, not merely inspired by it.
 - **The interpreter is faithful** — the twelve crossport anchors
   (`tests/crossport/authoring_files.py::ANCHORS`, the authoritative live list), including
   an authored crew run **byte-identical to the frozen `crew_state.json`** — via a bare

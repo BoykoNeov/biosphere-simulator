@@ -185,13 +185,18 @@ def _build_manifest() -> dict[str, object]:
         "delegates_to": STATION_MANIFEST,
         "grammar_note": (
             "The grammar is bounded and closed, and DELIBERATELY INCOMPLETE "
-            "(decision D): division, the function set (exp ln pow sqrt abs min max "
-            "clamp monod), bounded conditionals and a named-constant surface are all "
-            "deferred until a real frozen flow forces each semantic choice. Freezing "
-            "this subset does NOT imply completeness; adding an op is a deliberate "
-            "unfreeze. There is no 'dt' token by construction (RK4-order-safety is "
-            "structural). Precedence + associativity are enforced by "
-            "parse_vectors.txt, not recorded here."
+            "(decision D): bare division, the rest of the function set (exp ln pow "
+            "sqrt abs min max clamp), bounded conditionals and a named-constant "
+            "surface are all deferred until a real frozen flow forces each semantic "
+            "choice. Freezing this subset does NOT imply completeness; adding an op is "
+            "a deliberate unfreeze. 'monod' (S/(S+K)) landed post-roadmap as exactly "
+            "such an unfreeze — forced by the frozen "
+            "biosphere.chamber.oxygen_limitation_factor, whose kernel it mirrors "
+            "(including denom<=0 -> 0, which makes it total). It guards its own "
+            "denominator, so it resolved x/0 INTERNALLY and bare '/' stays deferred. "
+            "There is no 'dt' token by construction (RK4-order-safety is structural). "
+            "Precedence + associativity are enforced by parse_vectors.txt, not "
+            "recorded here."
         ),
         "expr_nodes": _expr_nodes(),
         "binary_ops": sorted(_BINARY_OPS),

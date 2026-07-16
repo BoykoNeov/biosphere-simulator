@@ -60,7 +60,17 @@ from authoring.schema import (
     StockSpec,
 )
 from config import ConfigError, load_yaml
-from simcore.expr import BinOp, Expr, ForcingRef, Neg, StockRef
+from simcore.expr import (
+    BinOp,
+    Const,
+    Expr,
+    ForcingRef,
+    Monod,
+    Neg,
+    ParamRef,
+    StepN,
+    StockRef,
+)
 from simcore.ids import StockId
 
 
@@ -159,6 +169,14 @@ def _prefix_expr_refs(node: Expr, prefix: str) -> Expr:
     *frozen* param set (two instances of the bundle share the same ``k``), not a
     namespaced bundle parameter. ``Const``/``StepN`` carry no refs. Structural mirror of
     :func:`authoring.interpreter._collect_refs`.
+
+    **Exhaustive over the ``Expr`` union, deliberately.** This walk used to end in a
+    permissive ``return node``, which silently left an unhandled node's refs
+    *unprefixed* — a wrong-stock or resolve-time ``KeyError`` at step 1, discovered
+    when Tier 2 added ``Monod``. The ref-free nodes are now named explicitly and an
+    unknown node raises, so the next grammar addition cannot slip through here. (The
+    Rust mirror gets this for free: its ``match`` on the ``Expr`` enum is exhaustive by
+    construction.)
     """
     if isinstance(node, StockRef):
         return StockRef(StockId(f"{prefix}.{node.stock}"))
@@ -172,7 +190,16 @@ def _prefix_expr_refs(node: Expr, prefix: str) -> Expr:
             _prefix_expr_refs(node.left, prefix),
             _prefix_expr_refs(node.right, prefix),
         )
-    return node  # Const, ParamRef (frozen set), StepN — unchanged.
+    if isinstance(node, Monod):
+        return Monod(
+            _prefix_expr_refs(node.substrate, prefix),
+            _prefix_expr_refs(node.half_saturation, prefix),
+        )
+    if isinstance(node, (Const, ParamRef, StepN)):
+        return node  # Const/StepN carry no refs; ParamRef names a frozen set.
+    raise AuthoringError(  # pragma: no cover - exhaustive over the Expr union
+        f"cannot namespace unknown expression node {node!r}"
+    )
 
 
 def _namespace_flow(flow: FlowSpec, prefix: str) -> FlowSpec:
