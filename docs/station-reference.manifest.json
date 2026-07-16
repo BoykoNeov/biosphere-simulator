@@ -30,7 +30,7 @@
     "harvest.yaml": "358ae0150f64cf67f5b83b2357af0f786ee657ab88d1cfbb87866ac1eb08ff05",
     "lamp.yaml": "f4407882cab6cf06ab103a23030cff2d5081af2a86057ef1decf4124145a44eb",
     "radiator.yaml": "56229679bd3d369b08658e8401ff3579355ffb4fda62038f1e2ca7952a15af81",
-    "self_discharge.yaml": "0e9d387b5a3c139f90ba04234e9cefc88f2470fdacaafe2e26b143490037701b",
+    "self_discharge.yaml": "db7c1261953dac6e6bc16654df29be5708dd0a8a539c518d0cd7c2d26d9af72e",
     "water_recovery.yaml": "782d5178083a1b4fdae0d0966357069774910c78e4a541d6e029153a89b294f7"
   },
   "reference_doc": "docs/station-reference.md",

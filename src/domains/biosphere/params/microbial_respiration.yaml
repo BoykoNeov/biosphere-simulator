@@ -51,14 +51,33 @@
 #       are NOT in that paper, they are in [E].
 #   [B] Davidson, E.A., Samanta, S., Caramori, S.S. & Savage, K. (2012), "The Dual
 #       Arrhenius and Michaelis–Menten kinetics model for decomposition of soil organic
-#       matter ...", Global Change Biology 18:371–384 (the Michaelis–Menten O₂-limitation
-#       form for respiration). FORM ONLY — and it never COULD bind our Km: [B] is a
-#       soil/aggregate-scale model whose apparent Km convolves microsite diffusion
-#       limitation with enzyme affinity, ~3 orders LOOSER than a cellular Km. A 0-D
-#       well-mixed chamber has no diffusion barrier, so the cellular scale [C]/[D] is the
-#       right pick. The pre-2026 header's concession ("our chamber uses a sharper
-#       intrinsic-affinity Km") is therefore CORRECT and stands. Not openable (the free
-#       Harvard Forest PDF is an image-only scan).
+#       matter at hourly to seasonal time scales", Global Change Biology 18:371–384 (the
+#       Michaelis–Menten O₂-limitation form for respiration). OPENED AND READ 2026-07-16
+#       (round 2 — it was #9 on the plan doc's retrieval list; round 1 could not open it,
+#       the free Harvard Forest copy being an image-only CCITTFax scan. A text copy was
+#       supplied). FORM ONLY — the round-1 verdict SURVIVES, and is now exact rather than
+#       estimated.
+#       THE VALUE: p. 377, "The value used for kMO2 (0.121 cm³ O2 cm⁻³ air)". As a gas
+#       volume fraction this is directly comparable to our mole fraction (ideal gas), so
+#       ours (1e-4) is 1210× SHARPER — i.e. 3.08 orders. EVERY ROUND-1 ESTIMATE IS
+#       CONFIRMED TO THE DIGIT, which is worth recording because they were inferences from
+#       secondary description: round 1 said "~3 orders LOOSER" (actual 3.08), "~1200×"
+#       (actual 1210×), "~150 µM" (actual 149 µM dissolved-equivalent), and "~58 % of air
+#       saturation" (actual 58 %). The inference chain was sound.
+#       ⚠ THE REAL FINDING — kMO2 IS NOT AN AFFINITY MEASUREMENT AT ALL, which is a
+#       STRONGER reason it cannot bind ours than the scale argument round 1 made. The same
+#       sentence continues: it "is the value of [O2] according to Eqn (6) at the mean value
+#       of soil moisture (0.229 cm³ H2O cm⁻³ soil) in 2009 at this site." Davidson SET the
+#       half-saturation constant equal to the modelled ambient O₂ at his site's mean soil
+#       moisture — a calibration convention that places the O₂ term near 0.5 at the
+#       operating point. It is therefore site- and model-specific bookkeeping, not a
+#       measured property of any organism or enzyme, and it could not license ANY
+#       physiological Km — ours or anyone's. (Consistently, kMO2 appears in none of the
+#       paper's fitted-parameter tables; only aSx, EaSx and kMSx are calibrated.)
+#       So: a 0-D well-mixed chamber has no diffusion barrier AND [B]'s constant is not an
+#       affinity anyway — the cellular scale [C]/[D]/[G] is the right pick on both counts.
+#       The pre-2026 header's concession ("our chamber uses a sharper intrinsic-affinity
+#       Km") is CORRECT and stands.
 #   [C] Trojan, D., Garcia-Robledo, E., Meier, D.V., Hausmann, B., Revsbech, N.P.,
 #       Eichorst, S.A., Woebken, D. (2021), "Microaerobic lifestyle at nanomolar O₂
 #       concentrations mediated by low-affinity terminal oxidases in abundant soil
@@ -121,8 +140,14 @@
 #
 #   THE SCALE GAP, recorded because it is what makes [B] un-bindable and is easy to
 #   re-litigate: isolated oxidase 3–8 nM ≪ whole-cell/community apparent ~24–391 nM ≪
-#   soil/aggregate model scale ~150 µM (~58 % of air saturation) — about three orders end
-#   to end. Km values for O₂ are only comparable WITHIN a scale; ours is cellular.
+#   soil/aggregate model scale 149 µM (58 % of air saturation) — 3.08 orders end to end.
+#   Km values for O₂ are only comparable WITHIN a scale; ours is cellular.
+#   ROUND 2: the top of that ladder is now EXACT, read from [B] itself (kMO2 = 0.121 cm³ O₂
+#   cm⁻³ air), not inferred — and round 1's inferred "~150 µM / ~58 % / ~3 orders" all
+#   land on the measured figures. [G] additionally shows the MIDDLE rung is not a single
+#   scale either: whole-cell apparent Km itself spans 280× with cell size alone (~d^2.6),
+#   because it too is diffusion-limited. The ladder is a continuum of diffusion path
+#   lengths, not three discrete tiers.
 
 name: chamber
 process: microbial_respiration
@@ -135,4 +160,4 @@ parameters:
   o2_half_saturation:
     value: 0.0001
     unit: "mol/mol"
-    source: "[C] + [D] + [G]: our 1e-4 mol/mol ≈ 123 nM dissolved sits INSIDE the measured whole-cell apparent Km(app) band for soil bacteria (99–288 nM [C], essentially on top of the 113 ± 24 nM organism), within ~2 % of the 121 ± 20 nM E. coli Ks [D], and inside the 11–3120 nM span across 9 bacteria in [G]. ⚠ CONFIDENCE CAVEAT (round 2, from [G]): do NOT read the '~2 %' as accuracy — [G] measures the SAME organism (E. coli) at 22.2 nM, 5.5× from [D], so a single-species apparent Km carries several-fold inter-study spread by nature ([G] p. 86: it scales as ~d^2.6 and is a diffusion artifact, not an organism constant). The bind survives — ours is inside every measured bacterial span — but it is a bracket, not a match. Low/sharp is CORRECT here and the reason is structural: a 0-D well-mixed chamber has no soil-microsite diffusion limitation, so the cellular respiratory O2 affinity governs — NOT the soil/aggregate-scale apparent Km (~150 uM, ~1200x looser) that [B] models. f_O2 ~ 1 until near-anoxia. CAVEATS: the sources report nM and the mole-fraction conversion is ours; and this is a WHOLE-CELL apparent Km, not the 'terminal-oxidase Km' the pre-2026 tag claimed (isolated oxidase is sharper still, 3-8 nM)."
+    source: "[C] + [D] + [G]: our 1e-4 mol/mol ≈ 123 nM dissolved sits INSIDE the measured whole-cell apparent Km(app) band for soil bacteria (99–288 nM [C], essentially on top of the 113 ± 24 nM organism), within ~2 % of the 121 ± 20 nM E. coli Ks [D], and inside the 11–3120 nM span across 9 bacteria in [G]. ⚠ CONFIDENCE CAVEAT (round 2, from [G]): do NOT read the '~2 %' as accuracy — [G] measures the SAME organism (E. coli) at 22.2 nM, 5.5× from [D], so a single-species apparent Km carries several-fold inter-study spread by nature ([G] p. 86: it scales as ~d^2.6 and is a diffusion artifact, not an organism constant). The bind survives — ours is inside every measured bacterial span — but it is a bracket, not a match. Low/sharp is CORRECT here and the reason is structural: a 0-D well-mixed chamber has no soil-microsite diffusion limitation, so the cellular respiratory O2 affinity governs — NOT the soil/aggregate-scale constant (kMO2 = 0.121 mol/mol = 149 uM-equivalent, exactly 1210x looser, read from [B] in round 2) that [B] models. [B]'s constant is doubly inapplicable: besides the scale, it is not an affinity at all — Davidson SET it equal to the modelled ambient O2 at his site's mean soil moisture, a calibration convention rather than a measurement. f_O2 ~ 1 until near-anoxia. CAVEATS: the sources report nM and the mole-fraction conversion is ours; and this is a WHOLE-CELL apparent Km, not the 'terminal-oxidase Km' the pre-2026 tag claimed (isolated oxidase is sharper still, 3-8 nM)."

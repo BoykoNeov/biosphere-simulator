@@ -48,12 +48,57 @@
 # Sources:
 #   [A] Stanford, G. & Smith, S.J. (1972), "Nitrogen mineralization potentials of soils",
 #       Soil Science Society of America Journal 36(3):465–472 (first-order net N
-#       mineralization kinetics; the mineralization rate constant).
+#       mineralization kinetics; the mineralization rate constant). STILL NOT OPENED —
+#       it was #6 on the plan doc's retrieval list and is one of the three items NOT
+#       supplied in round 2 (with Dunn 2011 and Divya 2009). It stays on that list.
+#       ROUND-2 NEGATIVE RESULT, recorded so the search is not repeated: a 29-source
+#       literature corpus was searched for any first-hand mineralization rate constant that
+#       could replace the [C]-quoting-[A] chain, and there is none. [D] — a dedicated
+#       review AND meta-analysis of N mineralization, the single most likely substitute —
+#       cites [A] for the first-order form (p. 163) and never reproduces its k. Luo & Smith
+#       (2022), "Land Carbon Cycle Modeling", likewise cites [A] for form only ("Generally,
+#       first-order kinetics are used to simulate soil carbon cycling (Stanford and Smith
+#       1972 …)"). Four soil texts/monographs in the corpus contain no mineralization rate
+#       constant at all. CONCLUSION: k = 0.054 wk⁻¹ is reachable ONLY from [A] itself;
+#       secondary literature propagates [A]'s FORM and quotes its mean without republishing
+#       the underlying per-soil data. Retrieval of [A] remains the only upgrade path.
 #   [B] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
 #       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
-#       Simulation Monographs, PUDOC, Wageningen (relative death-rate senescence — the
-#       N-shedding rate is the NITROGEN counterpart of the carbon rdr_*). FORM ONLY —
-#       a print monograph with no accessible full text; never opened.
+#       Simulation Monographs 29, PUDOC, Wageningen. OPENED AND READ 2026-07-16 (round 2).
+#       It was #2 on the plan doc's retrieval list, predicted to be "the only clean-room-safe
+#       route" that would "settle the one param with no accessible support".
+#       ⚠ IT DOES NOT SETTLE IT — the prediction was WRONG, and the reason is worth keeping:
+#       THE BOOK HAS NO NITROGEN-SHEDDING RATE TO GIVE. Its senescence treatment (§3.2.6,
+#       p. 95) is about LEAF BIOMASS death, not N transfer. It names N remobilization as a
+#       distinct and unquantified process — "nutrient remobilization, in particular
+#       nitrogen, often plays a crucial role. The fundamental processes involve
+#       physiological ageing and protein (enzyme) breakdown. These processes are difficult
+#       to quantify" — which CORROBORATES round 1's diagnosis first-hand: N resorption is
+#       not published in the shape (1/day) this parameter needs. Retrieval cannot fix that.
+#       WHAT IT DOES GIVE — the FORM, and a structural mismatch with ours. p. 95 offers two
+#       treatments: a descriptive one where "the relative rate of loss is a function of the
+#       development stage", and a mechanistic one "setting the death rate of leaves and
+#       roots to a certain fraction per day once the conditions for growth deteriorate".
+#       BOTH are DS- or condition-dependent; OURS IS A BARE CONSTANT, i.e. the degenerate
+#       case of the book's function. So even the FORM citation is partial — a fact round 1
+#       could not have known without opening the book.
+#       Its own numeric example of that function (p. 113, exercise T10) is a leaf relative
+#       death rate FUNCTION LLVT = 0.0/day at DS 0–1.0, 0.03/day at DS 1.5, 0.15/day at
+#       DS 2.0 — i.e. ZERO until anthesis, then a steep ramp. Ours (0.01/day, flat) is
+#       therefore non-zero where the book is zero and 3–15× slower where the book is fast.
+#       ⚠ THAT IS A SCALE NOTE, NOT A DELTA, and must not be quoted as one: LLVT is leaf
+#       BIOMASS death in RICE, ours is N shedding in wheat — different currency, different
+#       crop. The book adds (p. 95) that such numbers "should be calibrated to mimick
+#       specific situations". No delta is computable; the round-1 tag's claim stands.
+#       OCR NOTE: the p. 113 listing text is badly mangled ("PUNCTION LLVT = 020., 1.,0:,
+#       1:5,0.03; 2-,0.15"). The reading above was VERIFIED by arithmetic, not guessed —
+#       T10 states the pattern it reproduces ("The reproductive period lasts about 30 days.
+#       In the first 15 days, loss is 20%, in the second 15 days 75% of what remained"), and
+#       integrating the reconstructed table gives 20.1% and 74.1%. No other digit reading
+#       reproduces both.
+#       CLEAN-ROOM: this is a printed 1989 monograph — published literature, NOT the EUPL
+#       PCSE source and NOT the unlicensed WOFOST_crop_parameters YAML repo. Citing its
+#       printed prose/table is "cite the paper, not PCSE" (docs/reuse-and-licenses.md).
 #   [C] Schomberg, H.H., et al. (2009), "Assessing Indices for Predicting Potential
 #       Nitrogen Mineralization in Soils under Different Management Systems", Soil Science
 #       Society of America Journal 73:1575–1586. USDA-ARS public copy, verified 2026-07-16:
@@ -65,6 +110,19 @@
 #       and Smith (1972) for several U.S. soils, 0.067 wk−1 for 42 soils from the
 #       Saskatchewan province reported by Jalil et al. (1996) and 0.080 wk−1 reported by
 #       Curtin and Wen (1999)." CONTRAST — the measured range ours falls outside.
+#   [D] Ros, G.H., Temminghoff, E.J.M. & Hoffland, E. (2011), "Nitrogen mineralization: a
+#       review and meta-analysis of the predictive value of soil tests", European Journal of
+#       Soil Science 62:162–173. OPENED AND READ 2026-07-16 (round 2; an unlisted source,
+#       not on the retrieval list — checked as a candidate substitute for [A]).
+#       IT DOES NOT SUBSTITUTE, and that is the point of recording it. Its meta-analysis is
+#       of how well chemical/biological SOIL TESTS predict mineralization (n = 2552 across
+#       ~400 studies), NOT a compilation of first-order rate constants — so it yields no k
+#       distribution to compare ours against. What it does confirm is provenance of the
+#       FORM: p. 163, "Potential mineralizable N refers to the amount of N that mineralizes
+#       under optimum and constant environmental conditions, and is usually derived by
+#       fitting a first-order kinetic model to inorganic N concentrations over time
+#       (Stanford & Smith, 1972)" — i.e. the first-order model this file uses is [A]'s, and
+#       the field still treats [A] as its origin 39 years on. FORM corroboration only.
 #
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
 #   NEITHER TODO(cite) discharged — both REMAIN OPEN, now carrying findings. [A] and [B]
@@ -98,8 +156,8 @@ parameters:
   n_senescence_rate:
     value: 0.01
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, no accessible primary support (2026-07-16). The N-resorption literature reports resorption EFFICIENCY (a %, ~50 % typical), not a 1/day rate — the wrong shape to bind this constant, so no delta is computable. [B] cites the FORM and is a print monograph that could not be opened. ⚠ CLEAN-ROOM HAZARD: the rdr tradition flows into WOFOST/PCSE, so numeric RDR sources found by search are almost all WOFOST-lineage and legally unusable — do NOT backfill from them. Retrieving [B] is the only clean path. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN, no primary support EXISTS in the shape this parameter needs — which round 2 established first-hand rather than by assumption (2026-07-16). [B] WAS RETRIEVED AND READ, and it does NOT settle this param: the plan doc predicted it was 'the only clean-room-safe route' to a number, but the book has no N-shedding rate at all — its senescence treatment is LEAF BIOMASS death (§3.2.6, p. 95), and it names N remobilization as a distinct process that is 'difficult to quantify'. That CORROBORATES the round-1 diagnosis from the horse's mouth: the N-resorption literature reports resorption EFFICIENCY (a %, ~50 % typical), not a 1/day rate, so no delta is computable and retrieval cannot fix it. NEW STRUCTURAL FINDING from opening [B]: its relative loss rate is a FUNCTION of development stage (0/day before anthesis, ramping to 0.15/day by DS 2.0), whereas ours is a bare CONSTANT — so ours is the degenerate case of the cited form, non-zero exactly where the source is zero. That is a FORM gap, not just a value gap, and it makes this param a scope-B structural candidate alongside the canopy and the decomposer rates rather than a mere citation debt. ⚠ CLEAN-ROOM HAZARD (unchanged): the rdr tradition flows into WOFOST/PCSE, so numeric RDR sources found by search are almost all WOFOST-lineage and legally unusable — do NOT backfill from them. [B]'s printed pages are literature and safe; PCSE's params are not. Changing the value/form is scope B. See docs/plans/post-roadmap-citation.md."
   mineralization_rate:
     value: 0.03
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, with a measured finding (2026-07-16): 0.03/day = 0.21/wk is ~3.9× the Stanford & Smith mean (0.054/wk = 0.0077/day) and ~1.2× ABOVE the fastest of 43 soils measured in [C] (range 0.018–0.174/wk, mean 0.070) — outside the whole observed range, with four independent studies clustering at 0.054–0.080/wk. These are already OPTIMAL-condition potential rates (35 °C, field capacity), so temperature/moisture modifiers cannot explain the gap. [A] cites the FORM only and is paywalled. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN, with a measured finding UNCHANGED by round 2 (2026-07-16): 0.03/day = 0.21/wk is ~3.9× the Stanford & Smith mean (0.054/wk = 0.0077/day) and ~1.2× ABOVE the fastest of 43 soils measured in [C] (range 0.018–0.174/wk, mean 0.070) — outside the whole observed range, with four independent studies clustering at 0.054–0.080/wk. These are already OPTIMAL-condition potential rates (35 °C, field capacity), so temperature/moisture modifiers cannot explain the gap. ROUND 2: unlike the other decomposer params, this one could NOT be upgraded — [A] was not among the sources supplied, and a search of a 29-source corpus (including [D], a dedicated N-mineralization review AND meta-analysis) found NO first-hand k anywhere to replace the [C]-quoting-[A] chain; the secondary literature propagates [A]'s form and quotes its mean without republishing its data. So this remains the weakest-provenance member of the decomposer finding: the 3.9× rests on [C] quoting [A], not on [A] read directly. The finding is corroborated independently by [C]'s OWN 43-soil measurements (ours is above their maximum), which do not depend on [A] at all. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
