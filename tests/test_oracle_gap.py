@@ -8,12 +8,11 @@ by how much, and why*, so the gap is documented rather than merely known.
 **What this file is for.** ``test_oracle_smoke.py`` records the *magnitude* gap (peak
 LAI ~0.09 vs ~6.3), attributing it to "uncalibrated placeholders + the phenology
 overrun". That attribution is **incomplete**, and magnitude is not the most diagnostic
-signal. The
-measurement behind this file (recorded in the plan doc) found the dominant cause is
-structural and invisible to the suite: **our canopy peaks on day 32 of ~305 and
-collapses before anthesis**, which ``test_oracle_smoke``'s ``_is_unimodal`` cannot see
-— it asks only for an interior peak with both ends below half-peak, and a day-32 peak
-satisfies that.
+signal. The measurement behind this file (recorded in the plan doc) found the dominant
+cause is structural and invisible to the suite: **our canopy peaks on day ~32 of ~305
+and collapses before anthesis**, which ``test_oracle_smoke``'s ``_is_unimodal`` cannot
+see — it asks only for an interior peak with both ends below half-peak, and a day-32
+peak satisfies that.
 
 **These tests PIN KNOWN-WRONG BEHAVIOR.** This is the ``lab.fit_order`` / BVAD
 ``test_rq_structural_prediction`` idiom the project already uses: *measure* the known
@@ -206,18 +205,27 @@ def test_gap_canopy_never_bootstraps_light_interception() -> None:
 def test_gap_canopy_peaks_absurdly_early_the_timing_teeth() -> None:
     """CAUSE 1, the signal ``test_oracle_smoke`` is BLIND to.
 
-    Our LAI peaks on **day 32** of ~305 and collapses *before* anthesis (day 138); the
+    Our LAI peaks on **day ~32** of ~305 and collapses *before* anthesis (day ~138); the
     oracle's peaks on **day 212**, at anthesis, which is what a wheat canopy does.
     ``_is_unimodal`` passes on both — it asks only for an interior peak with ends below
     half-peak — so the suite recorded a 74x magnitude gap while the more diagnostic
     *timing* failure underneath it went unremarked. These are the teeth.
+
+    Our-side days are pinned as ranges rather than exact integers — see the comment on
+    the assertion; the gap being measured is ~180 days wide, so nothing is lost.
     """
     our_lai = _our_lai(_season_states())
     oracle_lai = [r["LAI"] for r in _reference()]
     our_peak_day = our_lai.index(max(our_lai))
     oracle_peak_day = oracle_lai.index(max(oracle_lai))
 
-    assert our_peak_day == 32
+    # Our-side day is a RANGE, not `== 32`, and deliberately so: this is an argmax over
+    # a smooth hump (days 31/32/33 differ by ~1e-3), so a last-ULP libm difference off
+    # the Windows/UCRT generation platform could flip the winner — the cross-platform
+    # trap `tests/golden_platform.py` documents. The finding is "day ~32, not day ~212";
+    # a ±4-day window pins it exactly as hard and survives any conformant libm. (The
+    # oracle side is read from committed JSON, so it IS cross-platform exact.)
+    assert 28 <= our_peak_day <= 36
     assert oracle_peak_day == 212
 
     # The canopy peaks before anthesis and is gone by it — the collapse, as a number.
@@ -251,10 +259,17 @@ def test_gap_phenology_runs_fast() -> None:
     our_maturity, oracle_maturity = _first_day_at(our, 2.0), _first_day_at(oracle, 2.0)
     assert our_anthesis is not None and oracle_anthesis is not None
     assert our_maturity is not None and oracle_maturity is not None
-    assert (our_anthesis, oracle_anthesis) == (138, 217)
-    assert (our_maturity, oracle_maturity) == (218, 292)
-    assert oracle_anthesis - our_anthesis == 79
-    assert oracle_maturity - our_maturity == 74
+
+    # Oracle side: exact (committed JSON, cross-platform stable).
+    assert (oracle_anthesis, oracle_maturity) == (217, 292)
+    # Our side: a threshold crossing of a thermal-time sum that a last-ULP libm
+    # difference could nudge across a day boundary off Windows/UCRT — so ±2 days, which
+    # still pins "mid-February, ~11 weeks early" beyond any doubt. See the argmax note
+    # in `test_gap_canopy_peaks_absurdly_early_the_timing_teeth`.
+    assert our_anthesis == pytest.approx(138, abs=2)
+    assert our_maturity == pytest.approx(218, abs=2)
+    assert oracle_anthesis - our_anthesis == pytest.approx(79, abs=2)
+    assert oracle_maturity - our_maturity == pytest.approx(74, abs=2)
 
 
 def test_gap_allocation_is_root_heavy() -> None:
@@ -274,12 +289,16 @@ def test_gap_allocation_is_root_heavy() -> None:
     our_dvs = _our_dvs(states, n)
     oracle_dvs = [r["DVS"] for r in ref[:n]]
 
+    # Our-side band is 1e-2, not 5e-3: the sample index is a DVS threshold crossing, so
+    # a last-ULP libm difference off Windows/UCRT can shift it a day, and the root
+    # fraction moves ~2e-3/day here (measured). The finding is a 0.13–0.24 gap, so the
+    # looser band costs no diagnostic power. Oracle side is committed JSON — exact.
     for target, our_root, oracle_root in ((0.5, 0.390, 0.256), (1.0, 0.385, 0.146)):
         oi, ri = _first_day_at(our_dvs, target), _first_day_at(oracle_dvs, target)
         assert oi is not None and ri is not None
-        assert _organ_fractions(states[oi])["root"] == pytest.approx(our_root, abs=5e-3)
+        assert _organ_fractions(states[oi])["root"] == pytest.approx(our_root, abs=1e-2)
         assert _oracle_fractions(ref[ri])["root"] == pytest.approx(
-            oracle_root, abs=5e-3
+            oracle_root, abs=1e-3
         )
         # The bias, as the comparison that matters: we hold ~1.5–2.6x their root share.
         assert _organ_fractions(states[oi])["root"] > _oracle_fractions(ref[ri])["root"]
