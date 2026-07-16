@@ -44,8 +44,22 @@
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
-#   All numeric VALUES are provisional, literature-typical placeholders pending the
-#   validation gate — flagged TODO(cite) until bound to a primary source.
+#   Both VALUES are DESIGN choices.
+#
+# PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   Both TODO(cite) tags discharged as DESIGN. [A]/[B] establish that an engineered
+#   condenser/recycler IS the closed-loop water architecture; neither fixes a RATE.
+#
+#   THIS FILE'S SCOPE DISPOSITION, recorded because it had fallen through a crack: scope
+#   (A)'s two-column table sorted the biosphere params into "7 potential-production files"
+#   (oracle-validatable) and "5 non-PP files" (no oracle) — and water_cycle.yaml is in
+#   NEITHER. It is a no-oracle file, and therefore scope (C)'s, which was established
+#   empirically rather than assumed: the Condensation flow that consumes these params
+#   exists ONLY in the `if scenario.sealed:` branch of atmosphere.py, and the oracle
+#   trajectory runs `build_season()` — whose default scenario is sealed=False, and whose
+#   assembled registry contains no condensation flow at all. So these rates are never even
+#   LOADED in an oracle run and cannot move that trajectory. (The 7-vs-5 omission is
+#   inherited from scope (A) and is now closed.)
 #
 # Sources:
 #   [A] MacElroy, R.D. & Bredt, J. (1984), "Current concepts and future directions of
@@ -63,8 +77,8 @@ parameters:
   condensation_rate:
     value: 0.5
     unit: "1/day"
-    source: "TODO(cite) — provisional, literature-typical engineered-condenser turnover (vapor recovered in ~2 days) [A][B]; primary citation pending validation gate"
+    source: "DESIGN — round-number choice, not a literature value: 0.5/day = a chosen ~2-day engineered-condenser turnover, fast enough that the closed water ring visibly closes on a season-scale run. No source can fix it — this is the condenser of a FICTIONAL sealed chamber, and a real unit's rate follows from its coolant temperature, airflow and surface area (the humidity/dew-point coupling this model explicitly defers). Closed-loop architecture from [A][B]; the magnitude is ours. Not calibrated."
   recycling_rate:
     value: 0.5
     unit: "1/day"
-    source: "TODO(cite) — provisional, literature-typical condensate-return turnover (recovered water recycled in ~2 days) [A][B]; primary citation pending validation gate"
+    source: "DESIGN — round-number choice, not a literature value: 0.5/day = a chosen ~2-day condensate-return turnover, deliberately matched to condensation_rate so neither half of the ring is the bottleneck. No source can fix a plumbing cadence we invented for a fictional chamber. Closed-loop architecture from [A][B]; the magnitude is ours. Not calibrated."

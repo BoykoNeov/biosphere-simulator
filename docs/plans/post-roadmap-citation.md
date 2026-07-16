@@ -15,25 +15,36 @@ Scope (A) established that the 57 params split by *what can validate them*, not 
 
 | set | validated by | act |
 |---|---|---|
-| the ~7 potential-production crop param files (`photosynthesis`, `canopy`, `phenology`, `allocation`, `respiration`, `senescence`, `transpiration`) | the WOFOST oracle trajectory | **calibration** — citation and calibration are the same act ⇒ **scope (B)** |
-| everything else — the 5 non-PP biosphere files, all 10 Power/Thermal/ECLSS params, and the 4 station params | **no oracle exists** | **literature citation** — a lighter, separate act ⇒ **scope (C), this doc** |
+| the **7** potential-production crop param files (`photosynthesis`, `canopy`, `phenology`, `allocation`, `respiration`, `senescence`, `transpiration`) — 30 uncited params | the WOFOST oracle trajectory | **calibration** — citation and calibration are the same act ⇒ **scope (B)** |
+| everything else — the **6** non-PP biosphere files, all 10 Power/Thermal/ECLSS params, and the 4 station params | **no oracle exists** | **literature citation** — a lighter, separate act ⇒ **scope (C), this doc** |
 
 Scope (C) is the second row. It is independent of scope (B)'s two structural gaps
 (vernalization; juvenile canopy expansion) and has **no blocker**.
 
 ## Two corrections to the scope as sold
 
-**1. The count was wrong: 27 params, not 15.** `CLAUDE.md` and the direction memory both
+**1. The count was wrong: 29 params, not 15.** `CLAUDE.md` and the direction memory both
 said "15 no-oracle params (10 sibling + 5 non-PP biosphere)". The "5" counted **files**, not
-params — those 5 files hold **13** params. Measured (2026-07-16):
+params — and it was itself short by one file. Measured (2026-07-16):
 
 | set | files | uncited params |
 |---|---|---|
-| non-PP biosphere | `decomposition`, `mineralization`, `microbial_respiration`, `nitrogen`, `herbivory` | **13** |
+| non-PP biosphere | `decomposition`, `mineralization`, `microbial_respiration`, `nitrogen`, `herbivory`, **`water_cycle`** | **15** |
 | sibling (Power/Thermal/ECLSS) | `charge`, `self_discharge`, `radiator`, `eclss` | **10** |
 | station | `harvest`, `lamp`, `water_recovery` | **4** |
 | crew | `crew` | 0 — already BVAD-calibrated (Phase 6 Step 9) |
-| **total** | | **27** |
+| **total** | | **29** |
+
+**`water_cycle.yaml` had fallen through a crack that predates this scope, and is now closed.**
+Scope (A)'s own two-column table sorted the biosphere into "7 PP files" and "5 non-PP files"
+— **water_cycle is in neither**, so its 2 params were invisible to both scopes. It is
+scope (C)'s, established empirically rather than assumed: the `Condensation` flow that
+consumes these params exists only in the `if scenario.sealed:` branch of `atmosphere.py`, and
+the oracle trajectory runs `build_season()`, whose default scenario is `sealed=False` and
+whose assembled registry contains **no condensation flow at all**. The params are never even
+*loaded* in an oracle run, so they cannot move that trajectory. (Caught on advisor review of
+this document, after it had already been written up as "complete" — an inherited omission is
+still an omission.)
 
 The 4 station params were excluded from scope (C) as sold but carry identical debt and
 already sit under the **same station manifest** the 10 sibling params force a regeneration
@@ -150,14 +161,19 @@ a subagent reported a locus, it was re-fetched before it landed — which caught
 
 ## The tally: a PARTIAL discharge, honestly
 
-27 params carried `TODO(cite)`. They did **not** all become citations, because ~half had no
+29 params carried `TODO(cite)`. They did **not** all become citations, because half had no
 citation to find:
 
 | class | count | meaning |
 |---|---|---|
-| **CITED** | **8** (+2 crew already cited = 10 of 29) | a primary source, opened and read, supports the value |
-| **DESIGN** | **12** | a deliberate sizing/stability/behavioural choice; no source *can* fix it |
+| **CITED** | **8** (+2 crew already cited = 10 of 31) | a primary source, opened and read, supports the value |
+| **DESIGN** | **14** | a deliberate sizing/stability/behavioural choice; no source *can* fix it |
 | **TODO(cite) + finding** | **7** | looked, found nothing that binds — and found evidence the value is off |
+
+Scope (C)'s full surface is **31** params across 13 files (29 that carried debt + crew's 2,
+already cited). Audited file-by-file after the fact; the **30** `TODO(cite)` params that
+remain in the tree are all in the 7 potential-production files, which are scope (B)'s by
+construction.
 
 The 7 that stay open are **not** a failure to look. Each now carries a *measured* finding in
 its `source:` tag instead of a promise. Per `param-file-conventions.md`, a `TODO(cite)` is
@@ -167,6 +183,10 @@ answer is "no source binds this, and here is what the literature does say".
 **The 8 new CITED:** `emissivity`, `space_temperature`, `photon_efficacy`,
 `charge_efficiency`, `carbon_fraction`, `n_critical`, `n_residual`, and microbial
 `o2_half_saturation`.
+
+**The 14 DESIGN:** the 4 ECLSS loop constants, `radiator_area`, `heat_capacity`,
+`harvest_rate`, `recovery_rate`, `recovery_efficiency`, both `water_cycle` rates, and
+herbivory's `grazing_rate` / `respiration_rate` / `mortality_rate`.
 
 **The 7 still open, with their deltas:** `self_discharge_rate` (~6–7× the measured 25 °C
 rate), `decomposition_rate` (~1.5× above a 293-value global max), `mineralization_rate`
