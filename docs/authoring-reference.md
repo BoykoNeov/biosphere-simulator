@@ -412,7 +412,15 @@ The contract is earned by Steps 0–6c (full detail + measured results in the pl
   domain, and pins totality (no finite input yields NaN/±inf) by measurement rather than
   argument. This is the `SelfDischarge` oracle pattern applied to a *grammar primitive*:
   the evidence that the op is the frozen law, not merely inspired by it.
-- **The interpreter is faithful** — the twelve crossport anchors
+- **`monod` survives the file path too** — `monod_dsl.yaml` is the deliberate twin of
+  `self_discharge_dsl.yaml` (same battery, same frozen param set, same ±1 split) with the
+  rate made saturating, so the diff between them is exactly what Tier 2 added. It exists
+  because the traj vectors build a `DeclarativeFlow` *programmatically*, leaving one real
+  surface uncovered: the **comma** is the first rate-grammar character that is also
+  YAML-significant. It is sized so the battery actually drains (the monod factor slides
+  0.667 → 0.226) — an earlier draft was inert and the crossport suite passed anyway,
+  which is worth remembering: **a dead anchor is trivially bit-exact.**
+- **The interpreter is faithful** — the fourteen crossport anchor runs
   (`tests/crossport/authoring_files.py::ANCHORS`, the authoritative live list), including
   an authored crew run **byte-identical to the frozen `crew_state.json`** — via a bare
   file, via a template at its default, and via a single-bundle `include` — and, since

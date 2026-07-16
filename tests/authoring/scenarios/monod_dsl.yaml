@@ -1,0 +1,74 @@
+# Post-roadmap Tier 2 — the `monod` file-path anchor.
+#
+# The deliberate twin of ``self_discharge_dsl.yaml``: the same battery, the same frozen
+# ``self_discharge`` param set, the same −1/+1 ENERGY stoichiometry — with the rate made
+# **saturating**. Read the two side by side and the only difference is the grammar op,
+# which is the point: it isolates what Tier 2 added.
+#
+#   self_discharge_dsl:  rate = k · battery                  (linear in charge)
+#   monod_dsl:           rate = k · battery · monod(battery, K) · 400
+#
+# So the leak is the frozen one **rolled off at low charge**: as battery ≫ K the monod
+# factor → 1 and the rate approaches the frozen linear leak; as battery ≪ K it → 0
+# quadratically. Plausible, and conservation-closed — but NOT calibrated and not claimed
+# to be (see the two invented numbers below).
+#
+# **What this anchor carries that the Step-4a traj vectors do not.** The vectors build a
+# ``DeclarativeFlow`` *programmatically*; nothing drove a monod rate **string** through
+# ``load_scenario`` → ``interpret``. The concrete new surface is the **comma**: it is the
+# first character the rate grammar has ever needed that is also YAML-significant (a flow
+# indicator). A rate is a quoted scalar here, so it is safe — but "safe by inspection" is
+# how the dt hazard got missed, so it is anchored rather than argued.
+#
+# **Why the `* 400.0`, and why it is not noise.** The frozen `self_discharge_rate` is
+# sized so a battery barely moves over two weeks (~1 % drained). At that rate the monod
+# factor sits at 0.667 for the entire run and never traverses its curve — the op would be
+# *evaluated* but not *exercised*, and the cross-port check would be comparing a flat
+# line. (Measured: an earlier draft of this file drained 1.6e-9 of the battery and the
+# crossport suite passed anyway. **A dead anchor is trivially bit-exact.**) Scaled up, the
+# battery drains 1.0e7 → ~1.5e6 and the factor slides 0.667 → 0.226, so the saturation is
+# genuinely on the path. `rationed == 0` throughout: the roll-off is kinetic, so the draw
+# self-limits without the Euler backstop — the frozen `f_O2` argument, in a battery.
+#
+# **The half-saturation is a bare literal, and that is a finding, not laziness.** No
+# registered param loader exposes a half-saturation — `charge`/`crew`/`eclss`/
+# `self_discharge`/`thermal` between them offer an efficiency, two fractions, four ECLSS
+# gains, a leak rate and four radiator properties. The frozen `K_O2` that motivated
+# `monod` lives in the biosphere, whose loaders are unregistered (the same structural
+# reason its flows are). So an author writing monod today invents `K` inline, exactly as
+# this file does. See docs/plans/post-roadmap-grammar-monod.md, "The sequence".
+#
+# Transcendental-free ⇒ **Tier-1 bit-exact**: `*` and monod's `/` are both IEEE-754 basic
+# ops (correctly-rounded, deterministic cross-port) — monod is NOT a libm transcendental
+# and does not move this file to Tier 2. Donor-controlled (reads the battery stock), so
+# no forcings, and RK4 ≢ Euler. Exponents are written signed (YAML-1.1 float resolver).
+
+name: monod_dsl
+integrator: euler
+dt: 3600.0
+steps: 336
+rng_seed: 0
+
+stocks:
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 1.0e+7
+  - id: boundary.waste_heat
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: power.saturating_discharge
+    kinetics:
+      # The comma lives inside a single-quoted scalar — the surface this anchor exists
+      # to pin. K = 5.0e+6 is half the initial charge, so the run starts at the curve's
+      # knee rather than on either asymptote.
+      rate: 'param("self_discharge_rate") * stock("power.battery") * monod(stock("power.battery"), 5.0e+6) * 400.0'
+      stoichiometry:
+        power.battery: -1
+        boundary.waste_heat: 1
+    params: self_discharge

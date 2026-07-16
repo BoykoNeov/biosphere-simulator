@@ -72,6 +72,15 @@ ANCHORS: tuple[tuple[str, dict[str, float], str | None, int], ...] = (
     # (built into a DeclarativeFlow by the Rust interpreter). No golden — its trajectory
     # parity rode Step 4a's traj vectors; here the file→graph path is what is validated.
     ("self_discharge_dsl.yaml", {}, None, 1),
+    # --- Post-roadmap Tier 2: the `monod` grammar op, on the FILE path ---
+    # The deliberate twin of self_discharge_dsl (same battery, same frozen param set,
+    # same ±1 ENERGY split) with the rate made saturating, so the diff between them is
+    # exactly what Tier 2 added. Step 4a's traj vectors build a DeclarativeFlow
+    # programmatically; this drives a monod rate STRING through load_scenario→interpret.
+    # The concrete new surface is the **comma** — the first rate-grammar character that
+    # is also YAML-significant. Tier 1: monod's `/` is an IEEE basic op, not a libm
+    # transcendental, so this stays bit-exact (contrast thermal_node's `T**4` below).
+    ("monod_dsl.yaml", {}, None, 1),
     # --- Step 6b: file composition (`includes` / bundles) ---
     # Single-bundle include: the crew species bundle IS the whole graph. At the bundle's
     # default `crew_count = 1.0` (`1.0 * base == base`) this reproduces the crew golden

@@ -315,6 +315,20 @@ and so resolves `x/0` internally while never exposing the raw form.
   not a reference-authority violation (Rust found nothing *wrong* in Python; it simply
   cannot express the hazard), but it is the first time the port's type system did the
   reference's quality control, and it is why the Python walks are now exhaustive by hand.
+* **A dead anchor is trivially bit-exact — found by nearly shipping one.** The
+  `monod_dsl.yaml` file anchor (added as the advisor's optional defense-in-depth, then
+  kept for a stronger reason: the **comma** is the first rate-grammar character that is
+  also YAML-significant) was in its first draft *dimensionally wrong* — `k · monod(…)` is
+  `1/s`, not the `J/s` the frozen `k · battery` produces, because the `battery` factor was
+  dropped. Its rate was `1.3e-8 J/s` and it drained **1.6e-9** of the battery over 336
+  steps. **The crossport suite passed it — 97 green.** Bit-exact cross-port equality of a
+  flat line is trivially satisfiable, so the gate that "proves" an anchor says nothing
+  about whether the anchor *does* anything. Caught by measuring the trajectory instead of
+  trusting the comment describing it (which claimed the run "slides down the curve" —
+  false). Now sized so the battery drains 1.0e7 → 1.5e6 and the monod factor genuinely
+  traverses 0.667 → 0.226, with `rationed == 0` from the kinetic roll-off. **Generalizes
+  past this anchor:** every parity gate in this repo answers "do the ports agree?", never
+  "is there anything here to agree about?" — an inert fixture is invisible to all of them.
 * **The manifest's `grammar_note` was stale by construction.** It enumerated the deferred
   set as `(exp ln pow sqrt abs min max clamp monod)` — a hand-written string, not a
   derived set, so landing `monod` left the manifest *actively wrong* while every gate
@@ -348,8 +362,17 @@ Tier 1 (reuse) and Tier 2 (expressiveness) are done. **Bucket 3 — validation**
 unchanged and un-started; see `post-roadmap-flow-registry-growth.md`, "The sequence".
 
 Tier 2 sharpens the case for it in a way Tier 1 did not. Tier 1 widened the gap between
-"selectable" and "trustworthy" by making more uncalibrated science reachable. Tier 2 is
-more pointed: it puts the frozen `K_O2` — an uncited placeholder — directly into an
-author's hands, and the very test proving `monod` is bit-exact against the frozen flow is
-**silent on whether either is right**. The op is provably the frozen law; the frozen law is
-provably nothing yet.
+"selectable" and "trustworthy" by making more uncalibrated science reachable. Tier 2 makes
+the gap **structural**: the very test proving `monod` is bit-exact against the frozen flow
+is **silent on whether either is right**. The op is provably the frozen law; the frozen law
+is provably nothing yet.
+
+**And a late finding sharpens it further — the shape is reachable, the value is not.**
+`monod`'s half-saturation has **no home in any registered param set**. The five loaders
+expose `charge_efficiency`, the two crew fractions, the four ECLSS gains,
+`self_discharge_rate`, and the four thermal properties — **not one half-saturation among
+them**. The frozen `K_O2 = 1.5e-4` that motivated the whole op lives in the biosphere,
+whose loaders are unregistered for the same structural reason its flows are. So an author
+writing `monod` must supply `K` as a **literal** or repurpose an unrelated frozen constant
+(or ship a `pack:`). Tier 2 made the frozen `f_O2`'s *shape* reachable and left its *value*
+behind. That is not a bug — it is the calibration gap, now visible in the grammar itself.
