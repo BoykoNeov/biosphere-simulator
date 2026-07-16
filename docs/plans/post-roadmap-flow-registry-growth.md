@@ -290,10 +290,19 @@ backstop scales the over-draw so nothing goes properly negative, which is exactl
 nothing raises; the only signal is the `rationed` count, and `states, _, _ =
 run_scenario(built)` discards it.
 
-Pinned by `tests/test_authoring_dt_hazard.py` (5 tests), which asserts the **actual**
-behavior rather than the hoped-for one. Deliberately **not fixed**: a strict/raise mode is
-a platform behavior change well outside a registration unfreeze, and surfacing `rationed`
-prominently (a run summary, a Godot warning) is a capability-gap item with its own design.
+Pinned by `tests/test_authoring_dt_hazard.py`, which asserts the **actual** behavior rather
+than the hoped-for one. Deliberately **not fixed** *here*: a strict/raise mode is a platform
+behavior change well outside a registration unfreeze, and surfacing `rationed` prominently
+(a run summary, a Godot warning) is a capability-gap item with its own design.
+
+> **SUPERSEDED (2026-07-17) — the silence above is FIXED; the hazard is not.** That
+> capability-gap item was taken: `run_scenario` now raises `RationedError` in both ports
+> (`docs/plans/post-roadmap-rationing-gate.md`). Everything else on this page still holds —
+> the frozen sizings, `k_scrub·dt = 3.6`, the 37 firings, the airless cabin, the
+> composability constraint, and both mechanisms below. The pin was **flipped, not deleted**
+> (it now has 7 tests and still asserts the asphyxiation via `allow_rationing=True`). Read
+> "it is silent" above as history: an author now gets an exception instead of a corpse, but
+> the `dt` they must design around has not moved.
 
 Two mechanisms, not one — worth separating because they fail independently:
 

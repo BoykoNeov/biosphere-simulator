@@ -83,6 +83,27 @@ hazard pin — so the blast radius was exactly one test and **zero existing cont
 * **A stale pointer fixed**: `tests/authoring/scenarios/eclss_cabin.yaml` cited
   `tests/authoring/test_frozen_flow_dt_hazard.py` — a path that **has never existed**.
 
+### The second entry point — checked, not assumed (advisor catch)
+
+The claim "`run_scenario` is the top of the author's stack" was **imprecise, and I asserted
+it before checking**. There are **two** ways to run an authored file:
+`authoring::run_scenario` (the library path), and `godot_bridge`'s
+`build_session_from_file`, which calls `load_scenario` and builds a `CoreSession`
+**directly, bypassing `run_scenario` entirely** — and is pinned as *bit-identical* to it
+(`godot_bridge/src/lib.rs`), so at `dt = 3600` it asphyxiates identically. It did **not**
+get the gate.
+
+Checked rather than reasoned about, and the split holds: that path **is not silent**. It
+surfaces `rationed` in the observation projection, exposes `SimSession.total_rationed()` to
+GDScript, prints it (`from_file_dashboard.gd`), and `objectives_json` works on **any** built
+session — including file-built ones (they carry no `recipe`, but objectives need only the
+session) — so an authored file *can* be scored `no_rationing = false` → `survived = false`.
+
+So the design split is real rather than an excuse: **library caller → exception; interactive
+session → visible diagnostic + objective failure.** A player should *see* the cabin die; an
+author calling a function gets an exception. What is honest to say is "the top of the
+**library** run path", not "the author's stack" — and the doc/plan now say that.
+
 ### Two design choices worth their own line
 
 **`RationedError` is deliberately NOT an `AuthoringError`.** Both ports define that class
@@ -137,9 +158,9 @@ behavior; what changed is that the harness now refuses to return it.
   flow rationed. `StepReport.rationed` is a bare count; widening it is a `simcore` change
   with a cross-port cascade. The station's inspection layer already surfaces `min_scale`
   per flow — that is where the shape would come from.
-* **An author-facing run CLI / Godot banner.** There is no run CLI today (`station::sim`
-  has no scenario-file dispatch — the standing bucket-2 item); `run_scenario` is the top of
-  the author's stack, which is *why* the raise lives there.
+* **An author-facing run CLI.** There is no run CLI today (`station::sim` has no
+  scenario-file dispatch — the standing bucket-2 item); `run_scenario` is the top of the
+  **library** run path, which is *why* the raise lives there.
 * **`eclss.o2_makeup`'s unclamped reversal** — the *sibling* hazard in the same family
   (frozen scope escaped by authoring), still open: wire `cabin_o2` above the setpoint and
   the "makeup" flow silently vents cabin O₂ back into the tank. It conserves, it does not

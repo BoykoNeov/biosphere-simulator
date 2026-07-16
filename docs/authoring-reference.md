@@ -399,8 +399,16 @@ coupled multi-flow dynamic), and it would live in the **frozen registry**, so it
 unfreeze with its own ceremony. Also deferred: **per-flow attribution** in the error (the
 message names the count and `dt`, not *which* flow rationed — `StepReport.rationed` is a
 bare count, and widening it is a `simcore` change), and an author-facing **run CLI** /
-Godot banner (there is no run CLI today; `run_scenario` is the top of the author's stack,
-which is why the raise lives there).
+Godot banner (there is no run CLI today; `run_scenario` is the top of the **library** run
+path, which is why the raise lives there).
+
+**The other way to run an authored file** is `godot_bridge`'s `build_session_from_file`,
+which bypasses `run_scenario` and so does **not** raise — deliberately. It is not silent
+either: `rationed` is in the observation projection, `SimSession.total_rationed()` is
+exposed to GDScript, and `objectives_json` scores a rationed session
+`no_rationing = false` → `survived = false`. **Library caller → exception; interactive
+session → visible diagnostic + objective failure.** A player should watch the cabin die;
+an author calling a function gets an exception.
 
 The same scoping bites one other place, mildly: `eclss.o2_makeup` is a *linear, unclamped*
 proportional controller. Its frozen docstring notes an above-setpoint venting clamp is "a

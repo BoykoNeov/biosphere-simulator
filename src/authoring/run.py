@@ -68,9 +68,10 @@ def run_scenario(
             f"means dt is too large for some flow's frozen rate constant: the "
             f"over-draw was clamped at zero, so the run still conserved every "
             f"quantity and still finished — but a clamped stock is an emptied one "
-            f"(a cabin with no oxygen conserves mass perfectly). Reduce dt "
-            f"(ECLSS's frozen rates want dt <= ~60 s) and re-run; see 'The dt "
-            f"constraint' in docs/authoring-reference.md. To inspect the rationed "
-            f"run instead of failing, pass allow_rationing=True."
+            f"(a cabin with no oxygen conserves mass perfectly). Reduce dt and "
+            f"re-run; each flow type's constraint is tabulated under 'The dt "
+            f"constraint' in docs/authoring-reference.md (e.g. ECLSS's frozen "
+            f"rates want dt <= ~60 s). To inspect the rationed run instead of "
+            f"failing, pass allow_rationing=True."
         )
     return states, total_rationed, tuple(events)

@@ -54,9 +54,10 @@ pub fn run_scenario(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
              frozen rate constant: the over-draw was clamped at zero, so the run still \
              conserved every quantity and still finished — but a clamped stock is an \
              emptied one (a cabin with no oxygen conserves mass perfectly). Reduce dt \
-             (ECLSS's frozen rates want dt <= ~60 s) and re-run; see 'The dt \
-             constraint' in docs/authoring-reference.md. To inspect the rationed run \
-             instead of failing, use run_scenario_allowing_rationing.",
+             and re-run; each flow type's constraint is tabulated under 'The dt \
+             constraint' in docs/authoring-reference.md (e.g. ECLSS's frozen rates want \
+             dt <= ~60 s). To inspect the rationed run instead of failing, use \
+             run_scenario_allowing_rationing.",
             result.total_rationed
         )));
     }
