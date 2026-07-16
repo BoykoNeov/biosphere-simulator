@@ -669,11 +669,20 @@ the same file into the same graph as Python.** Contract:
     The site counts are equal by construction; if they ever diverge, a clear-site was missed.
   - `from_file_dashboard`: an UNCALIBRATED banner, hidden unless the core sets the marker (a
     banner that is always on stops being read).
-  - Gated by a cargo test (the loader half, incl. the negative: `crew_mission` is file-loaded but
-    kinetics-free) and `authored_marker_smoke.gd` +
-    `test_godot_authored_kinetics_marker_crosses_the_boundary` (the live-object half, which only
-    Godot can exercise). **Mutation-verified**: deleting the `build()` clear-site fails the smoke
-    with `assert True is False`.
+  - Gated at three levels, each covering what the one below cannot: a **cargo test** (the loader,
+    incl. the negative — `crew_mission` is file-loaded but kinetics-free — and that the bridge
+    never re-derives what `authoring` decided); **`authored_marker_smoke.gd`** (the live
+    `SimSession` across a rebuild, which only Godot can exercise); and the extended
+    **`from_file_ui_smoke.gd`** (the *banner*, driven through the real widget — the deliverable a
+    player actually sees, which asserting the getter's bool does not cover).
+  - **Both mutation-verified** (advisor: "a passing test proves nothing until you've seen it
+    fail"): deleting the `build()` clear-site fails the marker smoke (`assert True is False`);
+    deleting the `_uncalibrated_label.visible = …` binding fails the UI smoke
+    (`assert False is True`).
+  - **Completeness, not just parity** (advisor): the 5-vs-5 site count only proves the two fields
+    agree — so every `self.inner = …` write (all 5) was checked to pair with a marker assignment,
+    and there is no `self.inner = None` reset path. Parity alone would have hidden a shared
+    stale-site in `authored_steps` itself.
   - **Not an unfreeze**: the marker is an interpreter *output*, named by no manifest key; `git
     diff src/` empty, gdext still only in `godot_bridge`, all 20 frozen goldens untouched.
   - **Still deferred**: CLI surfacing beyond `dump_graph` (blocked on `station::sim` file

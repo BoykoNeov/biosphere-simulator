@@ -297,9 +297,10 @@ A future maintainer should read these as intentional scope, each surfaced when i
 - **"Authored ≠ validated" surfacing** — *the Godot half is now BUILT* (the recorded Step-7
   follow-up, done 2026-07-16). `SimSession.has_authored_kinetics()` exposes the marker across
   the FFI boundary and `from_file_dashboard` shows an UNCALIBRATED banner when it is set;
-  `tests/crossport/test_godot_from_file.py::test_godot_authored_kinetics_marker_crosses_the_boundary`
-  gates it (including that the flag **clears** when the same session is rebuilt into a palette
-  scenario — the marker is per-session state, not per-file). Consumer-side display only: no
+  `tests/crossport/test_godot_from_file.py` gates **both** halves — the marker crossing the FFI
+  (including that the flag **clears** when the same session is rebuilt into a palette scenario:
+  it is per-session state, not per-file) and the banner *itself* being drawn, driven through the
+  real widget on a kinetics-bearing file. Consumer-side display only: no
   frozen surface moved (the marker is an interpreter *output*, named by no manifest key), the
   science is untouched, and no golden shifted. **Still deferred:** the CLI surfaces the marker
   only through `dump_graph`, because `station::sim` has no scenario-file dispatch (its own

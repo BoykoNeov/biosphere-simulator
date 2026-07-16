@@ -260,7 +260,13 @@ def test_godot_from_file_ui_loads() -> None:
     `_build_ui`, Load resolves the default `res://../tests/.../crew_mission.yaml`
     (globalized to an OS path) through the real `build_from_file`, and stepping advances
     the live sim. Closes the gap that the cargo tests + `from_file_smoke.gd` never load
-    the dashboard scene, and proves the `res://`-parent-dir default resolves e2e."""
+    the dashboard scene, and proves the `res://`-parent-dir default resolves e2e.
+
+    Also gates the **"authored ≠ validated" banner** — the deliverable a player actually
+    sees. The other marker tests assert the getter's bool; only this one drives the
+    `_uncalibrated_label.visible = sim.has_authored_kinetics()` binding through the real
+    widget, so dropping that line is caught here and nowhere else.
+    """
     _build_cdylib()
     _ensure_godot_import()
     report, stderr = _run_ui_smoke()
@@ -268,6 +274,21 @@ def test_godot_from_file_ui_loads() -> None:
     assert report["child_count"] > 0, "dashboard built no widgets (_build_ui skipped)"
     assert report["step_count"] > 0, "the default scenario did not load + step"
     assert "SCRIPT ERROR" not in stderr, f"GDScript error in UI smoke:\n{stderr}"
+
+    # The banner, both edges: hidden for the kinetics-free default, shown for an
+    # authored kinetics file, and cleared again on reload (a latched banner would cry
+    # wolf on the next scenario — and a banner that is always on stops being read).
+    assert report["banner_default_visible"] is False, (
+        "crew_mission.yaml declares no kinetics — banner must stay hidden, or it stops "
+        "meaning anything"
+    )
+    assert report["banner_authored_visible"] is True, (
+        "self_discharge_dsl.yaml declares a kinetics flow — the player must be told "
+        "the run is uncalibrated"
+    )
+    assert report["banner_after_reload_visible"] is False, (
+        "reloading the kinetics-free default must clear the banner, not latch it on"
+    )
 
 
 def _run_marker_smoke() -> dict:
