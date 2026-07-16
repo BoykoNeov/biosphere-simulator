@@ -32,10 +32,10 @@ pub mod template;
 pub mod yaml;
 
 pub use compose::apply_includes;
-pub use errors::AuthoringError;
+pub use errors::{AuthoringError, ErrorKind};
 pub use expr_parser::{parse_rate_expr, render_rate_expr, ParseError};
 pub use graph_dump::render_graph_dump;
 pub use interpreter::{interpret, load_scenario, BuiltScenario};
-pub use run::{run_scenario, RunResult};
+pub use run::{run_scenario, run_scenario_allowing_rationing, RunResult};
 pub use schema::ScenarioSpec;
 pub use sexpr::render_sexpr;

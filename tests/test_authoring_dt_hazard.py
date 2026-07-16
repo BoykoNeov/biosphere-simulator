@@ -22,32 +22,50 @@ scope. It is reachable by an author who wrote **no kinetics at all**, and whose 
 therefore carries **no ``UNCALIBRATED`` banner** (that marker tracks *who wrote the rate
 law*, never whether a run is sound).
 
-**THE FINDING THIS FILE PINS: the failure is SILENT.** Measured, not assumed (the plan
-required settling this empirically rather than by reasoning). At ``dt = 3600`` the run
+**THE FINDING THIS FILE PINNED: the failure was SILENT.** Measured, not assumed (the
+plan required settling this empirically rather than by reasoning). At ``dt = 3600`` the
+run
 
-  * does **not** raise,
-  * **conserves** every quantity every step (the ledger gate never trips),
-  * completes with ``rationed = 37``,
-  * and leaves ``cabin_o2`` at ``-1.4e-14`` — **a cabin with no oxygen**.
+  * did **not** raise,
+  * **conserved** every quantity every step (the ledger gate never trips),
+  * completed with ``rationed = 37``,
+  * and left ``cabin_o2`` at ``-1.4e-14`` — **a cabin with no oxygen**.
 
 The arbitration backstop does its job: it scales the over-draw so no stock goes properly
-negative, which is exactly why nothing is raised. The *only* signal is the ``rationed``
-count returned from :func:`authoring.run.run_scenario` — and a caller who writes
+negative, which is exactly why nothing was raised. The *only* signal was the
+``rationed`` count returned from :func:`authoring.run.run_scenario` — and a caller who
+writes
 ``states, _, _ = run_scenario(built)`` (the natural way to call it) discards it. So the
-platform reports a successful, conserving run of a habitat that asphyxiated its crew.
+platform reported a successful, conserving run of a habitat that asphyxiated its crew.
 
-That is a **flagged finding, not a defect to paper over** — and deliberately NOT fixed
-here. Adding a strict/raise mode would be a platform behavior change well outside a
-registration unfreeze, and surfacing ``rationed`` more prominently (a run summary, the
-Godot banner) is a capability-gap item with its own design. What Tier 1 owes is that the
-hazard is *pinned and documented* rather than latent: this file is the gate, and
-``docs/authoring-reference.md`` ("The dt constraint") is the author-facing warning.
+**UPDATE (post-roadmap): the SILENCE is fixed; the HAZARD is not.** ``run_scenario`` now
+raises :class:`authoring.errors.RationedError` on ``total_rationed > 0``. Read the
+distinction carefully, because this file is the thing that keeps it honest:
+
+  * **What changed** — the *harness* refuses to hand back a rationed trajectory. That
+    reaches the verdict the rest of the project had already reached everywhere else (the
+    goldens assert ``rationed == 0``; ``StepReport`` calls a nonzero count "a failing
+    gate, not a warning"; RK4 hard-errors on the identical condition;
+    ``station.objectives`` scores a rationed run ``survived = False``). It is a
+    consistency fix, not a new policy.
+  * **What did NOT change** — the physics, the params, the frozen sizings, or the fact
+    that ``k_scrub·dt = 3.6`` at ``dt = 3600``. The cabin still asphyxiates; you can
+    still watch it do so with ``allow_rationing=True``, and the tests below still assert
+    that it does, at the same numbers as before. **We made the failure loud. We did not
+    make the scenario work** — and a reader who takes a green run here as "the dt hazard
+    is handled" has misread it exactly backwards.
+
+The composability constraint below is likewise untouched: an author must still pick a
+``dt``, and there is still no ``dt`` natural to both ECLSS and Thermal. What they get
+now is an exception instead of a corpse.
 
 The **composability** corollary, which is why this matters beyond one scenario: the
 frozen sizings disagree with each other. ECLSS is sized for ``dt = 60``; Thermal's
 ``heat_capacity`` is sized so ``tau ~ 65 steps`` at ``dt = 3600``. A scenario composing
 both must pick ONE ``dt``, and only ``dt <= ~60`` is safe for both (a smaller dt only
 ever helps Thermal). There is no ``dt`` that is natural for both domains.
+
+``docs/authoring-reference.md`` ("The dt constraint") remains the author-facing warning.
 """
 
 from __future__ import annotations
@@ -58,6 +76,7 @@ from typing import Any
 
 import pytest
 
+from authoring.errors import RationedError
 from authoring.interpreter import interpret
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
@@ -72,8 +91,8 @@ FROZEN_DT = 60.0  # EclssScenario.dt_seconds — what the rates are sized for
 UNSAFE_DT = 3600.0  # 1 h — k_scrub * dt = 3.6 > 1
 
 
-def _run_at(dt: float, steps: int) -> tuple[list, int, tuple]:
-    """Interpret the ECLSS anchor with ``dt``/``steps`` overridden, and run it.
+def _build_at(dt: float, steps: int) -> Any:
+    """Interpret the ECLSS anchor with ``dt``/``steps`` overridden.
 
     Mutates a parsed copy of the committed anchor rather than shipping a second,
     near-duplicate scenario file: the *only* difference that matters is ``dt``, and
@@ -82,8 +101,19 @@ def _run_at(dt: float, steps: int) -> tuple[list, int, tuple]:
     raw: dict[str, Any] = copy.deepcopy(load_yaml(str(ECLSS_YAML)))
     raw["dt"] = dt
     raw["steps"] = steps
-    built = interpret(ScenarioSpec.model_validate(raw), base_dir=SCENARIO_DIR)
-    return run_scenario(built)
+    return interpret(ScenarioSpec.model_validate(raw), base_dir=SCENARIO_DIR)
+
+
+def _run_at(
+    dt: float, steps: int, *, allow_rationing: bool = False
+) -> tuple[list, int, tuple]:
+    """Build at ``dt`` and run; ``allow_rationing`` opts back in to pre-fix behavior.
+
+    The default is the *author's* path (raises on rationing); the tests that inspect the
+    asphyxiated trajectory pass ``allow_rationing=True`` deliberately — that is the
+    escape hatch doing its one job, and using it here is not a workaround but the point.
+    """
+    return run_scenario(_build_at(dt, steps), allow_rationing=allow_rationing)
 
 
 def test_the_frozen_rates_are_sized_for_the_frozen_dt() -> None:
@@ -110,29 +140,68 @@ def test_at_the_frozen_dt_the_backstop_never_fires() -> None:
     assert events == ()
 
 
-def test_at_an_unsafe_dt_the_failure_is_silent_not_loud() -> None:
-    # THE FINDING. Everything about this run says "success" except the one integer a
-    # caller is free to discard.
-    states, rationed, events = _run_at(UNSAFE_DT, 15)
+def test_at_an_unsafe_dt_the_run_now_raises_instead_of_returning() -> None:
+    # THE GATE (the post-roadmap fix). The author's natural call — no escape hatch — now
+    # refuses to hand back the trajectory. This is the assertion that would have saved
+    # the fictional crew: it fails LOUDLY at the surface an author actually touches.
+    with pytest.raises(RationedError) as excinfo:
+        _run_at(UNSAFE_DT, 15)
 
-    # It does not raise (the call above completing IS that assertion) and it conserves —
-    # the every-step ledger gate lives inside step_report, so a completed run proves it.
-    assert events == ()
-
-    # The backstop fired: the ONLY signal that anything went wrong.
-    assert rationed > 0, (
-        "expected the Euler backstop to ration the over-draw at k*dt = 3.6; "
-        "if this is 0 the hazard's mechanism has changed and the docs are stale"
+    # The message must carry the two things an author needs to act: how bad, and which
+    # knob. Asserted because a diagnostic nobody can act on is barely better than the
+    # silence it replaced.
+    msg = str(excinfo.value)
+    assert "37" in msg, f"the count must be named, got: {msg}"
+    assert "dt" in msg and "3600" in msg, (
+        f"the offending knob must be named, got: {msg}"
+    )
+    assert "allow_rationing" in msg, (
+        "the escape hatch must be discoverable from the error"
     )
 
-    # And here is what it silently permitted: the cabin oxygen is gone. The backstop
-    # clamps at zero (its job), so this is ~0 from below by float roundoff, not a
-    # properly negative stock — which is precisely why nothing raised.
+
+def test_the_underlying_hazard_is_UNCHANGED_only_its_silence_was_fixed() -> None:
+    # THE FINDING, PRESERVED. The raise above is a messenger; this asserts the message
+    # is still true. Everything the pre-fix version of this file measured still holds:
+    # the physics was never touched, and `allow_rationing=True` shows it unchanged.
+    #
+    # Keep this test. If a future dt-guard, recalibration, or kinetics change makes the
+    # cabin survive at dt=3600, THIS is the test that should turn red and be rewritten
+    # with new numbers — not quietly deleted because "the hazard is fixed now".
+    states, rationed, events = _run_at(UNSAFE_DT, 15, allow_rationing=True)
+
+    # Still conserves every step (the ledger gate lives in step_report, so completing
+    # proves it) and still emits no events. Conservation was never the problem.
+    assert events == ()
+
+    # Still exactly 37 backstop firings — the same number the docs quote.
+    assert rationed == 37, (
+        "expected the Euler backstop to ration 37x at k*dt = 3.6; if this changed, the "
+        "hazard's mechanism moved and docs/authoring-reference.md + this file are stale"
+    )
+
+    # And the cabin is still airless. The backstop clamps at zero (its job), so this is
+    # ~0 from below by float roundoff, not a properly negative stock — which is
+    # precisely why nothing raised before, and why conservation alone could never have
+    # caught it.
     cabin_o2_final = states[-1].stocks["eclss.cabin_o2"].amount
     assert cabin_o2_final == pytest.approx(0.0, abs=1e-9)
 
     # Sharpen it: the crew started with a full 10 mol cabin and ended with none of it.
     assert states[0].stocks["eclss.cabin_o2"].amount == pytest.approx(10.0)
+
+
+def test_the_escape_hatch_is_the_only_way_to_get_a_rationed_trajectory() -> None:
+    # The escape hatch must be *deliberate*: same scenario, same dt, opposite outcomes,
+    # differing only by the opt-in. This pins that the default is the safe one — a
+    # regression that flipped the default would leave the test above green (it opts in)
+    # and only this test would notice.
+    with pytest.raises(RationedError):
+        run_scenario(_build_at(UNSAFE_DT, 15))
+    _states, rationed, _events = run_scenario(
+        _build_at(UNSAFE_DT, 15), allow_rationing=True
+    )
+    assert rationed == 37
 
 
 def test_the_forced_draw_alone_exceeds_the_cabin_at_the_unsafe_dt() -> None:

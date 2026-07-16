@@ -14,7 +14,9 @@ use std::path::{Path, PathBuf};
 use authoring::interpreter::interpret;
 use authoring::schema::ScenarioSpec;
 use authoring::yaml::parse_document;
-use authoring::{apply_includes, load_scenario, run_scenario, BuiltScenario};
+use authoring::{
+    apply_includes, load_scenario, run_scenario, run_scenario_allowing_rationing, BuiltScenario,
+};
 
 /// The repo's committed scenario directory (shared with the Python anchor tests).
 fn scenarios_dir() -> PathBuf {
@@ -662,4 +664,78 @@ fn param_pack_on_a_frozen_type_is_deferred() {
          params:\n      pack: some_pack.yaml\n"
     );
     assert!(interpret_str(&yaml).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// The `dt` hazard gate (post-roadmap) — the Rust mirror of Python's
+// tests/test_authoring_dt_hazard.py. Python is the reference; this file exists so the
+// two ports cannot silently disagree about whether a rationed authored run is an error.
+//
+// The hazard itself: every frozen rate constant was sized against the `dt` of its own
+// frozen scenario, but an author picks `dt`. At dt = 3600 `eclss.co2_scrubber`'s k*dt is
+// 3.6 — it demands 3.6x the whole CO2 pool in one step. The backstop clamps it, so the
+// run conserves every quantity and completes normally *with an airless cabin*. Nothing
+// was raised; the only signal was the rationed count, which callers discard.
+// ---------------------------------------------------------------------------
+
+/// Read the committed ECLSS anchor and retarget its `dt`/`steps`, mirroring the Python
+/// test's "mutate a parsed copy of the one committed file" approach — so the *only*
+/// difference that matters stays unmissable, and neither port ships a near-duplicate
+/// hazard fixture that could drift from the anchor.
+fn eclss_anchor_at(dt: &str, steps: &str) -> BuiltScenario {
+    let text = std::fs::read_to_string(scenarios_dir().join("eclss_cabin.yaml"))
+        .expect("read eclss_cabin.yaml");
+    let retargeted = text
+        .replace("dt: 60.0", &format!("dt: {dt}"))
+        .replace("steps: 900", &format!("steps: {steps}"));
+    assert!(
+        retargeted.contains(&format!("dt: {dt}")),
+        "the anchor's `dt: 60.0` line moved — this helper is silently a no-op now"
+    );
+    interpret_str(&retargeted).expect("interpret the retargeted anchor")
+}
+
+#[test]
+fn at_the_frozen_dt_the_backstop_never_fires() {
+    // The control: same graph, same frozen params, the sized dt. Without this, the
+    // assertion below would not implicate dt.
+    let result = run_scenario(eclss_anchor_at("60.0", "900")).expect("run at the sized dt");
+    assert_eq!(result.total_rationed, 0);
+    assert!(result.events.is_empty());
+}
+
+#[test]
+fn at_an_unsafe_dt_the_run_is_rejected_not_returned() {
+    // THE GATE. The author's natural call refuses to hand back the trajectory.
+    // (Matched rather than `expect_err`: `RunResult` is deliberately not `Debug`, and
+    // deriving it on the reference type to prettify a test assertion is the tail wagging
+    // the dog.)
+    let err = match run_scenario(eclss_anchor_at("3600.0", "15")) {
+        Ok(_) => panic!("a rationed authored run must be an error, not a result"),
+        Err(e) => e,
+    };
+
+    // Rationed, NOT Structural — the same file at dt = 60 is perfectly valid, so this
+    // failure is not decidable from the file's structure. Matching the kind (rather than
+    // sniffing the message) is the point of ErrorKind existing.
+    assert_eq!(err.kind, authoring::ErrorKind::Rationed);
+    assert!(err.message.contains("37"), "count must be named: {}", err.message);
+    assert!(err.message.contains("3600"), "dt must be named: {}", err.message);
+}
+
+#[test]
+fn the_underlying_hazard_is_unchanged_only_its_silence_was_fixed() {
+    // THE FINDING, PRESERVED — and the Rust half of the cross-port claim that both ports
+    // ration *identically* (37), not merely that both refuse. The escape hatch shows the
+    // physics is untouched: we made the failure loud, we did not make the scenario work.
+    let result = run_scenario_allowing_rationing(eclss_anchor_at("3600.0", "15"))
+        .expect("the escape hatch returns the rationed run");
+    assert_eq!(result.total_rationed, 37, "the hazard's mechanism moved — docs are stale");
+    assert!(result.events.is_empty());
+
+    // The cabin is airless: clamped at zero by the backstop (hence ~0 from below by
+    // roundoff, never properly negative — which is exactly why nothing raised before,
+    // and why the every-step conservation gate could never have caught this).
+    let cabin_o2 = result.final_state.stocks["eclss.cabin_o2"].amount;
+    assert!(cabin_o2.abs() < 1e-9, "expected an emptied cabin, got {cabin_o2}");
 }

@@ -12,6 +12,12 @@
 //! The every-step conservation gate runs inside `integrator.step_report`, so a
 //! completed run is itself proof the authored graph balanced every step — an authored
 //! mis-wiring surfaces here as a [`SimError::Conservation`] (the safety property).
+//!
+//! **Rationing is a hard error here (post-roadmap).** Conservation is *not* sufficient:
+//! the `dt` hazard produces a run that balances every step and still asphyxiates the
+//! cabin, because the backstop clamps the over-draw at zero rather than going negative.
+//! So this harness gates on `total_rationed == 0` too — the second half of "the authored
+//! graph is sound". See Python `authoring.errors.RationedError`, the reference for this.
 
 use simcore::error::SimError;
 use simcore::events::Event;
@@ -32,7 +38,42 @@ pub struct RunResult {
 /// Step `built` to completion under its requested integrator. An unknown integrator
 /// name is an [`AuthoringError`]; a conservation failure (a mis-wire) is the
 /// [`SimError`] the every-step gate raises.
+///
+/// **Rationing is a hard error** ([`crate::errors::ErrorKind::Rationed`]): if the Euler backstop fired
+/// at all, the authored `dt` is too large for some flow's frozen rate constant, and the
+/// trajectory is not returned. Mirrors Python `authoring.run.run_scenario`'s default.
+/// Use [`run_scenario_allowing_rationing`] to inspect such a run instead of failing.
 pub fn run_scenario(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
+    let dt = built.dt;
+    let steps = built.steps;
+    let result = run_scenario_allowing_rationing(built)?;
+    if result.total_rationed > 0 {
+        return Err(AuthoringError::rationed(format!(
+            "the arbitration backstop fired {} time(s) at dt={dt:?} over {steps} \
+             step(s). On an authored graph this means dt is too large for some flow's \
+             frozen rate constant: the over-draw was clamped at zero, so the run still \
+             conserved every quantity and still finished — but a clamped stock is an \
+             emptied one (a cabin with no oxygen conserves mass perfectly). Reduce dt \
+             (ECLSS's frozen rates want dt <= ~60 s) and re-run; see 'The dt \
+             constraint' in docs/authoring-reference.md. To inspect the rationed run \
+             instead of failing, use run_scenario_allowing_rationing.",
+            result.total_rationed
+        )));
+    }
+    Ok(result)
+}
+
+/// [`run_scenario`] without the rationing gate — returns the trajectory even if the
+/// backstop fired. The Rust stand-in for Python's `allow_rationing=True` kwarg (Rust has
+/// no default arguments, and widening `run_scenario`'s signature would churn every
+/// caller for a flag that should be rare).
+///
+/// For **deliberately studying** a rationed run, not for making a scenario "work": a
+/// rationed authored run is one whose `dt` is wrong, and the stocks it clamped at zero
+/// are stocks it emptied.
+pub fn run_scenario_allowing_rationing(
+    built: BuiltScenario,
+) -> Result<RunResult, AuthoringError> {
     let steps = built.steps;
     let dt = built.dt;
     let resolver = built.resolver;

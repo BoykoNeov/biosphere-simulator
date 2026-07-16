@@ -28,7 +28,10 @@
 # dt = 60.0 is LOAD-BEARING, not a default: k_scrub*dt = 0.06 and k_cond*dt = 0.03 (both
 # << 1), so the two donor-controlled draws self-limit and the Euler backstop never fires.
 # The frozen eclss.yaml rates are sized for exactly this dt. At dt = 3600 they would give
-# k*dt = 3.6 / 1.8 > 1 -- see tests/authoring/test_frozen_flow_dt_hazard.py.
+# k*dt = 3.6 / 1.8 > 1, and run_scenario now RAISES RationedError rather than returning
+# an asphyxiated cabin -- see tests/test_authoring_dt_hazard.py, which drives this very
+# file at both dts. (That path was previously cited here as
+# tests/authoring/test_frozen_flow_dt_hazard.py, which has never existed.)
 #
 # All floats carry an explicit decimal point (2.0e-5, not 2e-5): yaml.safe_load uses the
 # YAML-1.1 float resolver, under which a dotless exponent parses as a *string*.

@@ -22,7 +22,7 @@ which ``simcore`` may never do.
 """
 
 from authoring.compose import apply_includes
-from authoring.errors import AuthoringError
+from authoring.errors import AuthoringError, RationedError
 from authoring.interpreter import BuiltScenario, interpret, load_scenario
 from authoring.run import run_scenario
 from authoring.schema import (
@@ -41,6 +41,7 @@ __all__ = [
     "FlowSpec",
     "ForcingSpec",
     "ParamPackRef",
+    "RationedError",
     "ScenarioSpec",
     "StockSpec",
     "apply_includes",

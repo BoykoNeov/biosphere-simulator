@@ -352,23 +352,55 @@ from any single flow: **ECLSS is sized for `dt = 60`; Thermal for `dt = 3600`.**
 composing both must pick one `dt`, and only **`dt ≤ ~60`** is safe for both (a smaller `dt`
 only ever helps Thermal's overshoot margin). There is no `dt` natural to both domains.
 
-**The failure is SILENT.** Measured, not assumed (`tests/test_authoring_dt_hazard.py`). At
-`dt = 3600` the ECLSS cabin does **not** raise, **conserves** every quantity every step,
-completes with `rationed = 37` — and ends with `cabin_o2` at `-1.4e-14`. *The cabin has no
-oxygen and the platform reports success.* The arbitration backstop scales the over-draw so
-nothing goes properly negative, which is exactly why nothing is raised; the only signal is
-the `rationed` count from `run_scenario`, and `states, _, _ = run_scenario(built)` throws it
-away.
+**The failure WAS silent — it now raises.** Measured, not assumed
+(`tests/test_authoring_dt_hazard.py`). At `dt = 3600` the ECLSS cabin did **not** raise,
+**conserved** every quantity every step, completed with `rationed = 37` — and ended with
+`cabin_o2` at `-1.4e-14`. *The cabin had no oxygen and the platform reported success.* The
+arbitration backstop scales the over-draw so nothing goes properly negative, which is
+exactly why nothing was raised; the only signal was the `rationed` count from
+`run_scenario`, and `states, _, _ = run_scenario(built)` throws it away.
 
-So: **`rationed > 0` on an authored run means your `dt` is wrong.** Check it. It is not
-checked for you, and no banner will tell you — the run authored no kinetics, so it carries
-no marker either.
+`run_scenario` now raises **`RationedError`** (Rust: `AuthoringError` with
+`kind = ErrorKind::Rationed`) whenever `total_rationed > 0`, in both ports. The escape
+hatch is `allow_rationing=True` (Rust: `run_scenario_allowing_rationing`) — for
+*inspecting* a rationed run, never for making a scenario "work".
+
+**Read the scope of that fix precisely, because it is easy to over-read:**
+
+* **The silence is fixed. The hazard is not.** The physics, the params, and every frozen
+  sizing are untouched; `k_scrub·dt` is still `3.6` at `dt = 3600` and the cabin still
+  asphyxiates — you can still watch it with the escape hatch, and both ports' tests still
+  assert that it does, at the same numbers. **You get an exception instead of a corpse.**
+  The table above is still the thing you must design around.
+* **It is a consistency fix, not a new policy.** Every other layer had already reached
+  this verdict: the goldens assert `rationed == 0`; `simcore.integrator.StepReport` calls
+  a nonzero count *"a failing gate, not a warning"*; RK4 hard-errors on the identical
+  condition (`ArbitrationError`); `station.objectives` scores a rationed run
+  `survived = False`. `run_scenario` was the lone surface that detected it and said
+  nothing.
+* **`RationedError` is deliberately not an `AuthoringError`.** That class is defined as
+  what is decidable *from the file structure alone, before any step runs* — and the same
+  file at a smaller `dt` is fine. Nothing about rationing is structural.
+* **Conservation was never going to catch this**, which is the transferable lesson: the
+  backstop clamps at zero rather than going negative, so a run can balance perfectly and
+  still have emptied the stock that keeps the crew alive. *Mass conservation is not
+  survival.* An authored graph now needs **two** things to be sound — it balances, **and**
+  it never rationed.
 
 None of this is a bug in the frozen flows. Each is correct at the `dt` it was sized for;
 the frozen sizing argument is simply scoped to the frozen scenario, and **authoring is what
-escapes that scope**. Making it loud (a strict mode, a run summary, a Godot warning) is a
-capability-gap item with its own design — deliberately not folded into a registration
-unfreeze.
+escapes that scope**.
+
+**Still deferred, by name** (the rest of "make it loud", which this did not do): a
+**build-time** `k·dt < 1` precondition per flow type — it would catch the scrubber/condenser
+*before* running rather than after, but it is only a partial detector (it cannot see
+`eclss.crew_metabolism`, whose failure is `forcing·dt > stock`, not `k·dt > 1`, nor any
+coupled multi-flow dynamic), and it would live in the **frozen registry**, so it is an
+unfreeze with its own ceremony. Also deferred: **per-flow attribution** in the error (the
+message names the count and `dt`, not *which* flow rationed — `StepReport.rationed` is a
+bare count, and widening it is a `simcore` change), and an author-facing **run CLI** /
+Godot banner (there is no run CLI today; `run_scenario` is the top of the author's stack,
+which is why the raise lives there).
 
 The same scoping bites one other place, mildly: `eclss.o2_makeup` is a *linear, unclamped*
 proportional controller. Its frozen docstring notes an above-setpoint venting clamp is "a

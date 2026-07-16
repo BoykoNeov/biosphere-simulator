@@ -13,19 +13,55 @@ use std::fmt;
 
 use crate::expr_parser::ParseError;
 
-/// A scenario-authoring failure decidable at parse/interpret time (never a runtime
-/// conservation failure — that is [`simcore::error::SimError`]).
+/// What kind of authoring failure this is — the Rust stand-in for Python's *two* error
+/// classes (`AuthoringError` / `RationedError`).
+///
+/// Python can express the split as separate types because `run_scenario` raises; Rust
+/// returns one `Result`, and widening its error into an enum would churn 61 construction
+/// sites for no behavioral gain. So the distinction lives here instead, and it is a real
+/// one — see [`ErrorKind::Rationed`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorKind {
+    /// Decidable from the scenario file alone, before any step runs (the original and
+    /// still overwhelmingly common case): unknown flow type, bad wiring, a duplicate id.
+    Structural,
+    /// The Euler arbitration backstop fired during the run — the author's `dt` is too
+    /// large for some flow's frozen rate constant. **Not structural**: the same file at a
+    /// smaller `dt` is fine, and this is only knowable by running. Mirrors Python
+    /// `authoring.errors.RationedError`; see that class for why a conserving, completed,
+    /// non-raising run can still have asphyxiated its crew.
+    Rationed,
+}
+
+/// An authoring failure surfaced by the authoring boundary. Usually decidable at
+/// parse/interpret time ([`ErrorKind::Structural`]); [`ErrorKind::Rationed`] is the one
+/// runtime verdict this layer reaches on its own (engine-side conservation failures stay
+/// [`simcore::error::SimError`] until `run_scenario` converts them at its boundary).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthoringError {
     /// The human-readable message (not parity-pinned).
     pub message: String,
+    /// Which failure surface this is. Match on it rather than sniffing `message` — the
+    /// text is explicitly not a parity target and may be reworded freely.
+    pub kind: ErrorKind,
 }
 
 impl AuthoringError {
-    /// Construct an [`AuthoringError`] from anything string-like.
+    /// Construct a [`ErrorKind::Structural`] [`AuthoringError`] from anything
+    /// string-like. (The default: every pre-existing call site means this one.)
     pub fn new(message: impl Into<String>) -> AuthoringError {
         AuthoringError {
             message: message.into(),
+            kind: ErrorKind::Structural,
+        }
+    }
+
+    /// Construct a [`ErrorKind::Rationed`] [`AuthoringError`] — the run completed but
+    /// needed the backstop, so its `dt` is wrong.
+    pub fn rationed(message: impl Into<String>) -> AuthoringError {
+        AuthoringError {
+            message: message.into(),
+            kind: ErrorKind::Rationed,
         }
     }
 }
