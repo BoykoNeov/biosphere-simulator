@@ -397,13 +397,25 @@ the source is zero. That is a **form** gap, not a value gap, which promotes `n_s
 from citation debt to a **scope-(B) structural candidate**, alongside the canopy and the
 decomposer rates.
 
-**2. A negative result, recorded so nobody re-runs it.** Stanford & Smith 1972 (#6) was not
+**2. Negative results, recorded so nobody re-runs them.** Stanford & Smith 1972 (#6) was not
 supplied. A search of the whole 29-source corpus found **no first-hand mineralization k
 anywhere** — including Ros 2011, a dedicated N-mineralization review *and* meta-analysis and
 the likeliest substitute, which cites S&S for the form and never reproduces its number.
 `mineralization_rate` is now the **weakest-provenance** member of the decomposer finding: its
 3.9x rests on Schomberg quoting S&S. (The finding survives independently: ours is above
 Schomberg's *own* 43-soil maximum, which does not depend on S&S at all.)
+
+Likewise `max_uptake_capacity` — **the one open param of the seven that round 2 could not
+advance**, and the only one where the round-2 batch offered candidates that turned out to be
+off-target. Two nitrogen papers in the corpus were checked against it and neither bears on a
+crop's instantaneous N-uptake capacity: TSWJ (2007) models an **alpine forest** N budget (its
+"NH4/NO3 uptake rate" hits are labels in a flux diagram, and it never mentions wheat), and Liu
+et al. (2022) is **basin-scale** N-flow accounting for the Yellow River ("wheat" appears only
+in its bibliography). Meng 2013 stays the only relevant anchor. Recorded explicitly because
+the honest tally is **6 of 7 open params advanced, not 7** — this one is accounted for, not
+skipped. *(Caught on advisor review, after this section had already been written as though the
+sweep were complete — the same failure mode as round 1's `water_cycle.yaml` omission: the
+paragraph that describes the sweep is not the sweep.)*
 
 **3. The live miscitation risk survived.** Dunn 2011 (#3) and Divya 2009 (#4) — the two
 citations *already in our tree* attributing numbers nobody ever checked — were not supplied.
@@ -454,9 +466,18 @@ ways: **Stanford & Smith 1972** (would firm up the weakest decomposer delta), **
 and **Divya 2009** (would settle whether our own tree miscites them). Items 1, 2, 7-12 are
 discharged — retrieved and read.
 
-**The corpus is not exhausted.** ~15 supplied sources were never opened, because they are
-scope-(B) science rather than citation targets — Soltani & Sinclair (*Modeling physiology of
-crop development*), Teh, Luo & Smith's *Land Carbon Cycle Modeling*, the soil-microbiology
-and soil-modeling texts. Those are exactly the vernalization / canopy-expansion /
-decomposer-recalibration references scope (B) would need. They are on disk and gitignored;
-scope (B) starts with a fuller shelf than it did this morning.
+**The corpus is not exhausted.** ~15 supplied sources went unopened. Most are **scope-(B)
+science rather than citation targets** — Soltani & Sinclair (*Modeling physiology of crop
+development*), Teh, Luo & Smith's *Land Carbon Cycle Modeling*, the soil-microbiology and
+soil-modeling texts: exactly the vernalization / canopy-expansion / decomposer-recalibration
+references scope (B) would need. They are on disk and gitignored; scope (B) starts with a
+fuller shelf than it did this morning.
+
+⚠ But **"the extras are scope-B science" was an assumption, and it is not uniformly true** —
+worth recording as a caveat on the sentence above rather than leaving it to read as a survey.
+Spot-checking the two that plausibly touched a scope-(C) param (TSWJ 2007 and Liu 2022, both
+nitrogen papers) found they are **neither**: not scope-(B) science, not citation targets, just
+off-target for this model (forest N cycling; regional N accounting). The unopened remainder has
+been *characterized*, not *audited*. A future scope should re-derive that judgement per source
+rather than inherit this paragraph — the `water_cycle.yaml` lesson is that an inherited
+partition is exactly where things fall through.
