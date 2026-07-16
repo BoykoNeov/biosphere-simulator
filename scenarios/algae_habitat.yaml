@@ -1,0 +1,176 @@
+# algae_habitat — the first authored habitat (post-roadmap, 2026-07-16).
+#
+# A FULLY CLOSED carbon+oxygen habitat, authored entirely in this file: no engine code,
+# no Python, no Rust. The roadmap's closing charge, taken literally —
+#
+#     "New stations and ecosystems are authored, not programmed."
+#     "It is about closure of matter — and energy — cycles."
+#
+# The loop: a crew eats algae and exhales CO2; the algae photosynthesise that CO2 back
+# into biomass and O2; the crew breathes the O2; a decomposer remineralises the crew's
+# egested carbon back to CO2. CARBON and OXYGEN each close with **zero boundary stocks** —
+# every atom stays in the habitat. Design + the full steady-state/stability arithmetic:
+# docs/plans/post-roadmap-authored-habitat.md.
+#
+# AUTHORED != VALIDATED (Phase-9 decision B). Every flow LAW here is authored kinetics and
+# therefore UNCALIBRATED: the algae/decomposer rate constants are invented — plausible
+# first-order forms placed to put the fixed point somewhere physically sensible — not
+# derived from literature. The platform guarantees conservation + determinism only;
+# scientific validity is the author's, and this run makes no calibration claim. It carries
+# has_authored_kinetics = True, so Godot banners it UNCALIBRATED and the graph dump marks
+# it. The ONE frozen, calibrated input is respired_carbon_fraction (0.949, NASA BVAD Table
+# 3-31) read from the frozen `crew` param set via param() — the self_discharge_dsl
+# precedent: the authored rate constant is the frozen one.
+#
+# NUMERICS (why these constants). Every rate is a product of non-negative stocks/params/
+# forcings/constants, so the bounded {+,-,*} grammar covers it with no deferred op. Every
+# rate is strictly positive by construction — one flow per physical process, never a
+# sign-flipping net term (a negative rate would silently reverse a flow's direction).
+# Every k*dt <= 4.3e-3 << 1, so donor-controlled draws self-limit and the Euler arbitration
+# backstop never fires. The (biomass, CO2) Jacobian has trace -1.8e-6 < 0 and det 6.0e-13
+# > 0: stable, non-oscillatory, slowest mode tau ~26 d — so a 1-year run converges with
+# dt/tau ~ 5e-3 to spare.
+#
+# The run starts deliberately OFF the fixed point (biomass 200, CO2 1300) and relaxes to
+# (food 1900, CO2 500, biomass 1000, feces 100, O2 2800): the culture blooms 5x while
+# scrubbing the cabin CO2 down 2.6x and driving O2 up. A habitat that "closes" because
+# nothing moves would prove nothing.
+#
+# All floats carry an explicit decimal point (the YAML-1.1 dotless-exponent hazard).
+
+name: algae_habitat
+integrator: euler
+dt: 3600.0        # 1 h
+steps: 8760       # one sealed year
+rng_seed: 0
+
+stocks:
+  # The shared cabin gas. CO2 carries {carbon:1, oxygen:2} and O2 carries {oxygen:2} —
+  # this composition annotation is the ONLY reason OXYGEN closes (station/cabin.py's
+  # finding: the ledger refuses a decoupled pure-carbon CO2, since respiration would
+  # consume O2 with nowhere for the atoms to go).
+  - id: cabin.co2
+    domain: cabin
+    quantity: carbon
+    kind: pool
+    amount: 1300.0
+    composition:
+      carbon: 1.0
+      oxygen: 2.0
+  - id: cabin.o2
+    domain: cabin
+    quantity: oxygen
+    kind: pool
+    amount: 2000.0
+    composition:
+      oxygen: 2.0
+
+  # The algal culture. A POOL, not a POPULATION: this is bulk biomass, and POPULATION
+  # would pull in extinction -> loss-sink routing that needs a declared loss sink.
+  - id: algae.biomass
+    domain: algae
+    quantity: carbon
+    kind: pool
+    amount: 200.0
+
+  # The crew's larder — refilled by harvest, drawn down by the forced metabolic intake.
+  - id: crew.food_store
+    domain: crew
+    quantity: carbon
+    kind: pool
+    amount: 2000.0
+
+  # Egested carbon. A POOL, not a boundary sink: waste.decomposition returns it to the
+  # cabin, which is what makes CARBON close completely.
+  - id: waste.feces
+    domain: waste
+    quantity: carbon
+    kind: pool
+    amount: 0.0
+
+forcings:
+  crew_food_intake:
+    const: 5.0e-4   # mol C/s — the frozen crew figure at crew_count = 1
+  light:
+    const: 1.0      # dimensionless multiplier; an always-lit photobioreactor
+
+flows:
+  # --- the crew half -------------------------------------------------------------
+  # The ingested food carbon splits by the frozen f_resp into respired CO2 and egested
+  # feces. Authored as TWO flows rather than one merged four-legged CrewRespiration
+  # because stoichiometry takes literal floats only: a merged flow would hardcode
+  # 0.949/0.051 as coefficients, duplicating a BVAD-calibrated frozen value and drifting
+  # if it is ever recalibrated. Carrying the fraction in the RATE instead keeps every
+  # coefficient an exact integer AND sources f_resp from the frozen loader.
+
+  # food_store + cabin_o2 -> cabin_co2, at RQ = 1 (one O2 consumed per CO2 produced).
+  # CARBON: -1 +1 = 0.  OXYGEN: +1*2 -1*2 = 0 (via the composition fold).
+  - id: crew.respiration
+    kinetics:
+      rate: 'param("respired_carbon_fraction") * forcing("crew_food_intake")'
+      stoichiometry:
+        crew.food_store: -1
+        cabin.co2: 1
+        cabin.o2: -1
+    params: crew
+
+  # The egested remainder, (1 - f_resp) * intake. Strictly positive: f_resp is bounded to
+  # [0,1] by the frozen loader. Egested carbon is NOT oxidised, so it draws no O2.
+  # CARBON: -1 +1 = 0.
+  - id: crew.egestion
+    kinetics:
+      rate: 'forcing("crew_food_intake") - param("respired_carbon_fraction") * forcing("crew_food_intake")'
+      stoichiometry:
+        crew.food_store: -1
+        waste.feces: 1
+    params: crew
+
+  # --- the algae half ------------------------------------------------------------
+  # cabin_co2 -> algae_biomass + cabin_o2. FIRST-ORDER IN CO2 ONLY, matching the frozen
+  # Photosynthesis idiom — deliberately NOT proportional to biomass: that would make the
+  # per-step CO2 draw-fraction k*light*biomass*dt grow with the culture (~18 at the
+  # steady-state biomass and dt=3600 — CO2 negative in a single step). With this form
+  # k_eff = k*light is constant, k_eff*dt = 4.3e-3 << 1 unconditionally.
+  # CARBON: -1 +1 = 0.  OXYGEN: -1*2 +1*2 = 0.
+  - id: algae.photosynthesis
+    kinetics:
+      rate: '1.2e-6 * forcing("light") * stock("cabin.co2")'
+      stoichiometry:
+        cabin.co2: -1
+        algae.biomass: 1
+        cabin.o2: 1
+
+  # The culture's own maintenance respiration: biomass -> CO2, consuming O2. Donor-
+  # controlled, so it self-limits as the culture thins.
+  # CARBON: -1 +1 = 0.  OXYGEN: +1*2 -1*2 = 0.
+  - id: algae.respiration
+    kinetics:
+      rate: '1.0e-7 * stock("algae.biomass")'
+      stoichiometry:
+        algae.biomass: -1
+        cabin.co2: 1
+        cabin.o2: -1
+
+  # Harvest: biomass -> the crew's larder. This closes the FOOD loop. k_harv is set by the
+  # closure condition k_harv * B_ss = crew_food_intake (5.0e-7 * 1000 = 5.0e-4): the crew
+  # draw is FORCED, not donor-controlled, so its positivity is by SIZING, not structure —
+  # the culture must sustain a biomass that feeds it.
+  # CARBON: -1 +1 = 0.
+  - id: algae.harvest
+    kinetics:
+      rate: '5.0e-7 * stock("algae.biomass")'
+      stoichiometry:
+        algae.biomass: -1
+        crew.food_store: 1
+
+  # --- closing the loop ----------------------------------------------------------
+  # Decomposition: feces + O2 -> CO2. THE flow that makes CARBON close — without it the
+  # egested branch is a dead-end sink and the habitat slowly starves. Donor-controlled.
+  # CARBON: -1 +1 = 0.  OXYGEN: +1*2 -1*2 = 0.
+  - id: waste.decomposition
+    kinetics:
+      rate: '2.55e-7 * stock("waste.feces")'
+      stoichiometry:
+        waste.feces: -1
+        cabin.co2: 1
+        cabin.o2: -1

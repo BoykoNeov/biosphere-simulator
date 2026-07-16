@@ -40,6 +40,12 @@ phase.** The simulator "is not really about plants; it is about closure of matte
 
 Each row's detail is in `docs/plans/phase-<n>-*.md`.
 
+**Post-roadmap** (the roadmap has no Phase 10 — work past it is chosen, not scheduled):
+
+| Work | Status |
+|---|---|
+| The first authored habitat (`scenarios/algae_habitat.yaml`) | COMPLETE — `docs/plans/post-roadmap-authored-habitat.md` |
+
 ## The freeze contracts (four; each has an unfreeze discipline — follow it)
 
 Changing anything a manifest names is an **unfreeze event**, not a refactor —
@@ -66,6 +72,8 @@ added a consumer and changed no science).
   (boundary code). `src/{sim_io,config,lab}/` — boundary.
 - `rust/crates/{simcore,domains,station,authoring,godot_bridge}/` — the native port.
 - `godot/` — the front-end (a subdir, so Godot's importer never scans the tree).
+- `scenarios/` — authored **content** (runtime artifacts, never reference). Distinct
+  from `tests/authoring/scenarios/`, which are fixtures / cross-port anchors.
 - `tests/regression/golden/` — 25 golden files; the **20** in
   `tests/crossport/tiers.json` (7 biosphere + 13 station) carry the cross-port
   tier contract.
