@@ -1,13 +1,14 @@
 # Post-roadmap: validation — the oracle match and the uncited params (bucket 3)
 
-**Status: DIAGNOSIS COMPLETE, scope not yet chosen.** Third of the three sequenced
+**Status: scope (A) — the honest first increment — COMPLETE (2026-07-16). Scopes (B) and
+(C) remain open, unstarted, and are the user's choice.** Third of the three sequenced
 post-roadmap items (`post-roadmap-flow-registry-growth.md`, "The sequence"). Tier 1
 (reuse) and Tier 2 (the grammar) are done; this is the one that establishes what is
 **true**.
 
-**No golden has moved and none may move before the scope decision below is taken.** The
-diagnosis is measurement only — it reads the two committed PCSE-free fixtures and runs the
-season. Nothing in `src/` has been touched.
+**No golden moved and nothing was unfrozen.** The outcome block is at the foot — read it
+before the plan body; the diagnosis overturned the plan's own framing, and the record of
+*how* is the useful part.
 
 ## The charge
 
@@ -173,3 +174,92 @@ The diagnosis makes the options concrete. Recorded here so the choice is deliber
 The sequencing rationale recorded in the Tier-1 plan — deviation is legitimate "as long as
 it is deliberate and documented" — makes (A) coherent: it converts an *undocumented* gap
 into a documented one, which is precisely the standard the project already holds itself to.
+
+---
+
+# OUTCOME — scope (A) COMPLETE (2026-07-16)
+
+**The user chose (A).** Shipped: the diagnosis above, `tests/test_oracle_gap.py` (8 tests,
+three columns), and the `season.py` attribution correction. **Citation was deliberately
+dropped from this increment** — see "What (A) did not do".
+
+Exit criteria held exactly: **no golden moved** (`git diff tests/regression/golden/`
+empty), **nothing was unfrozen** (all three manifest gates green, unregenerated),
+`git diff src/simcore/` empty. The only `src/` edit is a docstring.
+
+## What Tier 1 predicted, and this confirms
+
+Tier 1's most transferable finding was: *"a frozen flow's safety argument is scoped to the
+frozen scenario data, and authoring is what escapes that scope … Tier 2 / bucket 3 should
+expect more of it."* Bucket 3 found the **same shape one level up**: the season's
+*documentation* was scoped to the evidence someone had actually looked at. The docstring
+said "uncalibrated placeholders + no vernalization" — both true, neither dominant — because
+peak LAI was the only thing ever measured. The dominant cause (a canopy that never
+bootstraps) was never named because nobody had computed light interception. **An
+explanation is only as good as the measurement behind it**, and prose that ranks causes
+without measuring them will rank them wrong.
+
+## Two errors this increment made, and how they were caught
+
+Recorded because both were *plausible, confidently stated, and wrong* — the failure mode
+this bucket exists to fight:
+
+1. **The matched-day confound (a wrong scientific conclusion).** The first partitioning
+   comparison sampled both trajectories at the same *calendar day* and concluded "we
+   over-allocate to storage, 0.69 vs 0.52". At matched **DVS** the sign reverses (0.403 vs
+   0.521 — we *under*-allocate). The matched-day read was measuring cause 2 (the phenology
+   overrun: ~87 extra days at DVS 2, senescing and grain-filling) and mislabelling it as an
+   allocation finding. Caught by advisor review, not by the tests. Now pinned by
+   `test_method_matched_day_comparison_is_invalid`, which asserts **both** reads and that
+   they disagree in sign — the confound cannot quietly return.
+2. **Conflating "no golden moved" with "nothing unfrozen" (a wrong process conclusion).**
+   On discovering that the manifest hashes *whole-file* content, the reasoning ran: a
+   citation edit changes a param file's hash but not its value, so the goldens stay
+   byte-identical, so scope (A)'s "no golden moves" survives — therefore citation fits in
+   (A). That is true about goldens and **silent about the promise that actually conflicts**.
+   `biosphere-reference.md` is explicit: *"Changing **any** frozen item … is an unfreeze"*,
+   and step 4 calls the manifest regeneration "the git-visible record of exactly what was
+   unfrozen". The scope box shown to the user said `Unfreeze: NO`. Caught by advisor review.
+   **They are two different promises; keeping one does not keep the other.**
+
+## What (A) did not do, and why
+
+**Citation was dropped**, deliberately, on two independent grounds:
+
+* **It is out of scope as sold.** Discharging a `TODO(cite)` edits a param file → changes
+  its whole-file hash → fails the manifest gate until regenerated → *is* an unfreeze by the
+  project's own definition, even with the value untouched and every golden byte-identical.
+  The user selected a scope whose box read `Unfreeze: NO`.
+* **The diagnosis demoted it.** Params are the **third** cause. Citing them while the
+  canopy intercepts 1.75 % of light is polish on the wrong surface.
+
+Citation belongs to scope (C), which is unaffected by the two structural gaps and can be
+taken independently. **When it happens: never invent a source or a value.** Where the
+literature disagrees with our number, record the delta as a finding — *changing* the number
+is calibration, which is scope (B).
+
+## The state this leaves the project in
+
+The crop model is exactly as wrong as it was this morning. What changed is that it is now
+wrong **in writing, with numbers, ranked, and gated** — and the ranking is measured rather
+than assumed. Specifically:
+
+* The dominant failure (canopy collapse) has teeth for the first time
+  (`test_gap_canopy_peaks_absurdly_early_the_timing_teeth`). It was previously invisible:
+  `test_oracle_smoke`'s `_is_unimodal` passes on a canopy peaking day 32 of ~305.
+* The tests **pin known-wrong behavior** (the `lab.fit_order` / BVAD idiom). A green run
+  means "still wrong in exactly the documented way", not "right". **Anyone who fixes a gap
+  turns this file red on purpose** — update the number and the docs; do not delete the test.
+* The scope-(B) blockers are recorded and verified, not guessed: the Rust biosphere params
+  are *generated* (mechanical cascade), but new science needs a hand-mirrored port edit;
+  and the station goldens **re-run** biosphere science, so they cascade too.
+
+## Recommended next
+
+**(C), the citation half** — independent of both structural gaps, no blocker, and it
+retires the "55 uncited params" debt on its own timeline. **(B) is a phase, not a step**:
+two pieces of new science (vernalization; juvenile canopy expansion), clean-room from
+Penning de Vries / van Keulen — **never** reverse-engineered from PCSE — each hand-mirrored
+into Rust, then the PP recalibration, then the 7 frozen biosphere goldens + the cascaded
+station goldens under the full unfreeze ceremony. Both remain the user's choice; the
+roadmap has nothing to say here.

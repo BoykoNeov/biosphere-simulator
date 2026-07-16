@@ -47,7 +47,9 @@ Each row's detail is in `docs/plans/phase-<n>-*.md`.
 | The first authored habitat (`scenarios/algae_habitat.yaml`) | COMPLETE — `docs/plans/post-roadmap-authored-habitat.md` |
 | Tier 1: grow the flow registry (9 Power/Thermal/ECLSS flows + 3 loaders) | COMPLETE — the authoring platform **unfrozen** (`flow_types` 3→12, `param_loaders` 2→5); `docs/plans/post-roadmap-flow-registry-growth.md` |
 | Tier 2: the grammar — `monod` | COMPLETE — the **grammar unfrozen** (`expr_nodes` 7→8); saturation is now sayable. Forced by the frozen `chamber.oxygen_limitation_factor`, whose kernel it mirrors bit-exactly; bare `/` stays deferred. `docs/plans/post-roadmap-grammar-monod.md` |
-| Bucket 3: validation (the deferred oracle match + the 55 uncited params) | SEQUENCED, not started — `docs/plans/post-roadmap-flow-registry-growth.md`, "The sequence" |
+| Bucket 3 scope (A): validation — diagnose + pin the oracle gap | COMPLETE — **no golden moved, nothing unfrozen**. The gap is **structural, not merely uncalibrated**: the canopy never bootstraps (1.75 % light interception at sowing vs the oracle's 97.8 %; LAI peaks day 32 of ~305 and collapses *before* anthesis) and phenology runs ~1.6x fast (no vernalization) — two *independent* missing sciences; param values are only the **third** cause. So the deferred "quantitative oracle match" is **not a calibration task**. Pinned by `tests/test_oracle_gap.py`; `docs/plans/post-roadmap-validation.md` |
+| Bucket 3 scope (B): the full oracle match (vernalization + juvenile canopy expansion, then recalibration) | OPEN, not started — a **phase, not a step**: new science ×2 (clean-room, hand-mirrored into Rust), then the 7 frozen biosphere goldens + **cascaded station goldens** under the biosphere unfreeze discipline |
+| Bucket 3 scope (C): cite the 15 no-oracle params (10 sibling + 5 non-PP biosphere) | OPEN, not started — no structural blocker; **is an unfreeze** (the manifest hashes whole-file content, so a `source:` edit moves the hash even with the value untouched) |
 
 ## The freeze contracts (four; each has an unfreeze discipline — follow it)
 

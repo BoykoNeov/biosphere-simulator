@@ -23,11 +23,31 @@ live-stock seam) — so shared wiring has one source of truth. Euler at ``dt = 1
 scenario in ``scenario.py``, and ``_carbon_context`` in ``plants.py``; this module
 re-exports every symbol the tests import from ``season`` so no test import path changed.
 
-**DOCUMENTED FINDING — the committed season is NOT a validated oracle match.** The crop
-params are uncalibrated ``TODO(cite)`` placeholders, phenology lacks vernalization, so
-the trajectory runs ~2 orders of magnitude below the oracle. The season ships the
-*machinery* (single-currency flows, the conservation gate, ``rationed == 0`` by
-construction, determinism, the golden) — not behavioural validation.
+**DOCUMENTED FINDING — the committed season is NOT a validated oracle match.** The
+season ships the *machinery* (single-currency flows, the conservation gate,
+``rationed == 0`` by construction, determinism, the golden) — not behavioural
+validation.
+
+The gap is **structural, not merely uncalibrated** (measured; bucket 3 / scope A, pinned
+by ``tests/test_oracle_gap.py``, planned in ``docs/plans/post-roadmap-validation.md``).
+An earlier reading of this docstring — "uncalibrated placeholders + no vernalization,
+~2 orders of magnitude below the oracle" — was incomplete on both counts: it named the
+weakest of three causes first, and magnitude is not the most diagnostic signal. Ranked:
+
+1. **The canopy never bootstraps** (dominant). The sown seedling intercepts **1.75 %**
+   of incident light; assimilation is too small for leaf growth to outpace the
+   2 %/day leaf death rate, so LAI peaks on **day 32** and collapses *before* anthesis.
+   The oracle reaches **97.8 %** interception. LAI₀ matches the oracle — the initial
+   condition is fine; the growth dynamics are not. Needs a juvenile canopy-expansion
+   phase (temperature-driven, not assimilate-limited) — new science.
+2. **Phenology runs ~1.6x fast** — anthesis in mid-February (day 138 vs 217). No
+   vernalization term exists (see ``phenology.py``). **Independent of (1)**: DVS runs on
+   thermal time, so neither fix implies the other.
+3. **Param values** — real, but third. No tuning within literature ranges fixes a canopy
+   that intercepts 1.75 % of light.
+
+Consequently the deferred Phase-1 "quantitative oracle match" is **not a calibration
+task**; two of its three causes are missing science.
 
 Pure stdlib only (the YAML/pint loading is in ``loader.py``).
 """
