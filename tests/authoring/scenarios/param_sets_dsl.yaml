@@ -1,0 +1,82 @@
+# The Tier-1 param-set kinetics anchor — the `self_discharge_dsl.yaml` precedent, for the
+# three param sets Tier 1 registered (`charge`, `thermal`, `eclss`).
+#
+# WHY THIS FILE EXISTS. Registering a param loader widens TWO surfaces, not one: a set is
+# reachable as a frozen flow type's `param_set` (covered by eclss_cabin / power_bus /
+# thermal_node) AND as an authored `kinetics` rate's `param("…")` source, because every
+# frozen loader returns a flat dataclass of floats. The second surface has a cross-port
+# hazard the first does not: Python flattens the loader's dataclass with `asdict()`, so its
+# key names are DERIVED, while Rust's `kinetics_param_map` HARDCODES them. A typo on the
+# Rust side (`emisivity`) would make an authored rate resolve fine in Python and fail only
+# in Rust — a Python-only registration, which the Rust registry's own docstring calls "a
+# broken contract, not a half-done one". Nothing else catches it: the frozen-`type` anchors
+# never touch `kinetics_param_map`, and the Rust unit test only asserts the map is
+# non-empty. This anchor makes both ports resolve the SAME key names from the SAME file.
+#
+# Each rate therefore reads EVERY param in its set — anchoring all nine key names (1 charge
+# + 4 thermal + 4 eclss), not just one per set.
+#
+# THIS SCENARIO IS DELIBERATELY NONSENSE, and that is the honest framing. A battery whose
+# leak rate is the sum of a radiator's emissivity, area, heat capacity and the temperature
+# of deep space models NOTHING. It is conservation-closed nonsense — which the platform
+# explicitly permits ("scientific validity is the author's responsibility"; decision B) —
+# authored here on purpose, because the property under test is PARITY OF PARAM RESOLUTION,
+# and physical meaning would only add ways to be wrong. It carries has_authored_kinetics =
+# True, exactly as it should: every rate here is invented.
+#
+# NUMERICS. Every rate is `(sum of positive frozen params) * tiny * stock("power.battery")`
+# — donor-controlled, so each self-limits and positivity is structural. The coefficients are
+# chosen so each per-step draw-fraction is << 1 at dt = 3600 (charge 3.4e-6, thermal 3.6e-5,
+# eclss 3.6e-8; the scale differences just reflect the params' wildly different magnitudes —
+# heat_capacity is 1.0e+7, co2_scrub_rate is 1.0e-3). The backstop never fires. ENERGY
+# closes over battery + waste_heat: three flows, each -1/+1, so `Σ legs = 0` per flow.
+# Transcendental-free (`+ - *`) ⇒ Tier-1 bit-exact across ports.
+#
+# All floats carry an explicit decimal point (the YAML-1.1 dotless-exponent hazard).
+name: param_sets_dsl
+integrator: euler
+dt: 3600.0        # 1 h
+steps: 168        # 7 days
+rng_seed: 0
+
+stocks:
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 1.0e+9
+  - id: boundary.waste_heat
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  # `charge` — the one-param set. Anchors: charge_efficiency.
+  - id: dsl.charge_set
+    kinetics:
+      rate: 'param("charge_efficiency") * 1.0e-9 * stock("power.battery")'
+      stoichiometry:
+        power.battery: -1
+        boundary.waste_heat: 1
+    params: charge
+
+  # `thermal` — the four-param set. Anchors: emissivity, radiator_area, heat_capacity,
+  # space_temperature. The sum is dominated by heat_capacity (1.0e+7), hence the 1.0e-15.
+  - id: dsl.thermal_set
+    kinetics:
+      rate: '(param("emissivity") + param("radiator_area") + param("heat_capacity") + param("space_temperature")) * 1.0e-15 * stock("power.battery")'
+      stoichiometry:
+        power.battery: -1
+        boundary.waste_heat: 1
+    params: thermal
+
+  # `eclss` — the four-param set. Anchors: co2_scrub_rate, condense_rate, o2_makeup_gain,
+  # o2_setpoint. The sum is dominated by o2_setpoint (10.0 mol).
+  - id: dsl.eclss_set
+    kinetics:
+      rate: '(param("co2_scrub_rate") + param("condense_rate") + param("o2_makeup_gain") + param("o2_setpoint")) * 1.0e-12 * stock("power.battery")'
+      stoichiometry:
+        power.battery: -1
+        boundary.waste_heat: 1
+    params: eclss

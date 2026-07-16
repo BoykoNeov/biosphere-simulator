@@ -337,6 +337,26 @@ any single flow's documentation.
   removes Power's only transcendental. So the authored descendant is *more strictly gated*
   than the frozen reference it descends from. This is also why it gets no golden: it cannot
   reproduce a run it cannot express.
+* **Registering a param loader opens *two* surfaces, and the second had no anchor** (found
+  in review). A set is reachable as a frozen type's `param_set` *and* as an authored
+  `kinetics` rate's `param("…")`. Only the second carries a cross-port hazard: Python
+  derives the key names via `asdict()`, Rust **hardcodes** them in `kinetics_param_map`, so
+  a typo there resolves in Python and fails only in Rust — the "Python-only registration is
+  a broken contract" failure the Rust registry's own docstring warns about, and one the
+  frozen-`type` anchors cannot see (they never touch that map). Closed by
+  `param_sets_dsl.yaml`, a Tier-1 anchor reading **all nine** new key names, following the
+  `self_discharge_dsl.yaml` precedent exactly. It is deliberately nonsense physics
+  (a battery leaking at a rate summed from a radiator's emissivity and the temperature of
+  deep space) — conservation-closed nonsense is what the platform permits, and the property
+  under test is param resolution, not physics. It passed first try, so the Rust key names
+  were right; the point is that this is now *proven* rather than assumed.
+  `test_the_kinetics_anchor_reads_every_key_of_the_three_new_sets` guards the anchor itself,
+  so adding a param to a frozen set cannot leave a key silently un-anchored.
+* **Consciously accepted, not overlooked:** `thermal.heat_input` rides in the Tier-2 file,
+  so its *run* parity is not bit-checked even though it would qualify for Tier 1 alone. A
+  third scenario file to win that buys ~nothing — the graph dump already proves its wiring
+  on both ports, and it is the same `env.get(name)·dt` shape as `power.load_draw`, which
+  *is* bit-checked in `power_bus.yaml`.
 
 ## Step 5: the honesty obligation, discharged
 

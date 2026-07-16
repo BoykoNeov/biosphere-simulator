@@ -117,7 +117,19 @@ ANCHORS: tuple[tuple[str, dict[str, float], str | None, int], ...] = (
     # `T**4`, so this is excluded from the bit-exact run comparison and carried by the
     # graph dump (which is bit-exact for it) + a Rust unit test on its param wiring. See
     # the `float_tier` note above for why this is not band-compared instead.
+    # Consciously accepted: `thermal.heat_input` rides in this Tier-2 file, so its RUN
+    # parity is not bit-checked either — though it is a pure-multiply forced flow that
+    # would qualify for Tier 1 alone. A third file to win that buys ~nothing: the graph
+    # dump already proves its wiring on both ports, and it is the same `env.get(n)*dt`
+    # shape as power.load_draw, which IS bit-checked in power_bus.
     ("thermal_node.yaml", {}, None, 2),
+    # The three new param sets reached through authored `kinetics` — the OTHER surface a
+    # registered loader opens, and the one with a cross-port hazard the frozen-`type`
+    # anchors cannot see: Python DERIVES the param key names via asdict(); Rust pins
+    # them in `kinetics_param_map`. A typo there resolves in Python and fails only in
+    # Rust. Reads all nine key names. Deliberately nonsense physics — the property under
+    # test is param resolution. The `self_discharge_dsl.yaml` precedent.
+    ("param_sets_dsl.yaml", {}, None, 1),
 )
 
 # The float tiers, mirroring `compare.py`'s constants (not imported: this module is the

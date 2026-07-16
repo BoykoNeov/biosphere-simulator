@@ -119,6 +119,30 @@ def test_every_named_param_set_resolves_to_a_flat_float_dataclass() -> None:
             assert isinstance(getattr(obj, f.name), float), f"{name}.{f.name}"
 
 
+def test_the_kinetics_anchor_reads_every_key_of_the_three_new_sets() -> None:
+    """`param_sets_dsl.yaml` reads all nine key names of `charge`/`thermal`/`eclss`.
+
+    Registering a loader opens **two** surfaces: a frozen type's `param_set`, and an
+    authored rate's ``param("…")``. Only the second has a cross-port hazard — Python
+    derives the key names via ``asdict()``, Rust hardcodes them in
+    `kinetics_param_map` — so the anchor makes both ports resolve the same names from
+    one file.
+
+    This test guards the *anchor*, not the ports: it asserts the file still reads every
+    key, so that adding a param to a frozen set (which the Rust map must mirror by hand)
+    cannot leave a key silently un-anchored while the crossport test still passes.
+    """
+    text = (SCENARIO_DIR / "param_sets_dsl.yaml").read_text(encoding="utf-8")
+    for set_name in ("charge", "thermal", "eclss"):
+        obj = cast("Any", load_param_set(set_name, None))
+        for f in fields(obj):
+            assert f'param("{f.name}")' in text, (
+                f"{set_name}.{f.name} is reachable from a kinetics rate but "
+                f"param_sets_dsl.yaml never reads it — the Rust kinetics_param_map "
+                f"key for it is unanchored"
+            )
+
+
 def test_every_flow_types_param_set_is_a_known_loader() -> None:
     # A `param_set` naming a loader that does not exist is a registry typo that would
     # surface as a KeyError deep inside load_param_set, at run time, for whoever first
@@ -242,9 +266,7 @@ def test_authored_power_battery_decays_at_exactly_the_self_discharge_law() -> No
     k = load_self_discharge_params().self_discharge_rate
     b0 = states[0].stocks[BATTERY].amount
     predicted = b0 * (1.0 - k * built.dt) ** built.steps
-    assert states[-1].stocks[BATTERY].amount == pytest.approx(
-        predicted, rel=1e-9
-    )
+    assert states[-1].stocks[BATTERY].amount == pytest.approx(predicted, rel=1e-9)
     # ...and it really does decay (a scenario where nothing moved would pass the
     # conservation test above and prove nothing).
     assert states[-1].stocks[BATTERY].amount < b0
