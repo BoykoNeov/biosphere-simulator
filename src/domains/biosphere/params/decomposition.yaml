@@ -19,15 +19,20 @@
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
 #
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
-#   TODO(cite) NOT discharged — it REMAINS OPEN and now carries a measured finding. [A] is a
-#   FORM citation (Olson gives the single-exponential model); it never fixed this value.
+#   TODO(cite) NOT discharged — it REMAINS OPEN and now carries a measured finding.
+#   ROUND 2 (2026-07-16): [A] was obtained and read. The finding SURVIVED first-hand
+#   checking and is now PRIMARY-BACKED — round 1 could only reach Olson through an FAO
+#   paraphrase [C]; the number now comes from Olson's own Results page.
 #
 #   FINDING — our k is ~1.5× ABOVE THE MAXIMUM OF EVERY FIELD MEASUREMENT IN A 293-VALUE
-#   GLOBAL DATABASE. k = 0.02 /day = 7.3 /yr. [B] compiled 293 litter-decay k values from
-#   70 studies across 110 sites: the range is 0.006–4.993 /yr, mean 0.581, median 0.300. So
-#   ours is ~1.5× the observed maximum, ~12.6× the mean, ~24× the median — outside the
-#   entire observed distribution. Olson's own fastest biome (tropical forest) tops out
-#   ~4 /yr [C], and ours is ~1.8× that. This is not a near-miss; it is off the end.
+#   GLOBAL DATABASE, and ~1.8× above the fastest ecosystem Olson himself measured.
+#   k = 0.02 /day = 7.3 /yr. [B] compiled 293 litter-decay k values from 70 studies across
+#   110 sites: the range is 0.006–4.993 /yr, mean 0.581, median 0.300. So ours is ~1.5× the
+#   observed maximum, ~12.6× the mean, ~24× the median — outside the entire observed
+#   distribution. Independently, [A] p. 326 spans ~0.009–4 /yr across Olson's own sites,
+#   topping out near k = 4 for African tropical forest; ours is ~1.8× that.
+#   TWO INDEPENDENT SOURCES, 45 YEARS APART, PUT THE CEILING AT ~4–5 /yr AND OURS ABOVE IT.
+#   This is not a near-miss; it is off the end.
 #
 #   THE COUNTER-READING, recorded because honesty cuts both ways: 7.3 /yr is unremarkable
 #   for a LABILE/DECOMPOSABLE FRACTION rather than bulk litter — RothC's DPM (decomposable
@@ -42,11 +47,26 @@
 #   Recorded both ways so a future maintainer inherits the choice, not just the conclusion.
 #
 # Sources:
-#   [A] Olson, J.S. (1963), "Energy storage and the balance of producers and
-#       decomposers in ecological systems", Ecology 44(2):322–331 (first-order
-#       single-exponential litter-decay model; the decay constant k). FORM ONLY — and
-#       NOT OPENABLE (Wiley/JSTOR closed); its own k table would settle whether 7.3 /yr is
-#       inside Olson's tabulated range. See the paywalled list in the plan doc.
+#   [A] Olson, J.S. (1963), "Energy storage and the balance of producers and decomposers in
+#       ecological systems", Ecology 44(2):322–331 (first-order single-exponential
+#       litter-decay model; the decay constant k). OPENED AND READ 2026-07-16 — it was #7
+#       on the plan doc's retrieval list, whose open question was "whether 7.3 /yr is inside
+#       Olson's tabulated range". ANSWER: NO, it is ~1.8× above the top of it.
+#       p. 326, "Results on Estimating Decomposition Parameters", gives Olson's OWN
+#       empirical estimates of k (from his Eq. [4]): "The estimates of k … range from high
+#       values near k = 4 for the African forests, down to about 1 for two forests from
+#       Columbia. Pine forests of southeastern United States have values scattering around
+#       the line for k = 0.25 (1/4), while Minnesota pine forests range down toward the line
+#       for k = 0.0625 (1/16)." He then cites Jenny et al. (1949) for "very slow decay
+#       parameters, down to 0.009 for lodgepole pine at 3,000 m altitude". So Olson's own
+#       measured span is ~0.009–4 /yr, and our 7.3 /yr sits ~1.8× ABOVE its fastest end
+#       (African tropical forest — the fastest-decaying ecosystem he found).
+#       ⚠ READING NOTE: Olson's Tables I and II (pp. 327–328) also carry a "k" column
+#       running 4 → 0.001, and it would be easy to cite those as "Olson's range". They are
+#       NOT measurements — they are illustrative tables of exponentials (round k values
+#       chosen to tabulate half-times and steady-state levels). The empirical claim is the
+#       p. 326 prose above. Cited accordingly.
+#       Now a VALUE citation (CONTRAST), no longer FORM-only.
 #   [B] Zhang, D., Hui, D., Luo, Y., Zhou, G. (2008), "Rates of litter decomposition in
 #       terrestrial ecosystems: global patterns and controlling factors", Journal of Plant
 #       Ecology 1(2):85–93. https://academic.oup.com/jpe/article/1/2/85/989869 (verified
@@ -59,7 +79,11 @@
 #       recomposition [sic — OCR of 'decomposition'] parameter k for tropical forests,
 #       according to Olson, ranges from slightly more than one to slightly more than four
 #       in any given stand." https://www.fao.org/4/n6845e/n6845e05.htm
-#       SECONDARY — FAO reporting Olson; Olson itself was not opened.
+#       SECONDARY — FAO reporting Olson. SUPERSEDED by [A], which has now been opened and
+#       read first-hand. Retained only because checking it against [A] VINDICATED it: FAO's
+#       paraphrase faithfully reproduces Olson's p. 326 span (~1 for the Columbian forests
+#       to ~4 for the African). Recorded because round 1 flagged this chain as a risk, and
+#       the risk did not materialize here — unlike the Dunn/Divya chain in power/.
 
 name: chamber
 process: decomposition
@@ -68,4 +92,4 @@ parameters:
   decomposition_rate:
     value: 0.02
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, with a measured finding (2026-07-16): 0.02/day = 7.3/yr is ~1.5× ABOVE THE MAXIMUM of all 293 field-measured litter-decay k values in [B] (range 0.006–4.993/yr, mean 0.581, median 0.300) and ~1.8× Olson's fastest biome [C] — outside the entire observed distribution. It would be ordinary as a LABILE-fraction constant (RothC DPM = 10/yr), but this model has ONE litter pool, so that re-reading is refused: it would change what the parameter means to fit a citation. [A] cites the FORM only and is not openable. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN, with a measured finding, now PRIMARY-BACKED (2026-07-16, round 2: [A] was obtained and read first-hand; round 1 reached Olson only via an FAO paraphrase). 0.02/day = 7.3/yr is ~1.5× ABOVE THE MAXIMUM of all 293 field-measured litter-decay k values in [B] (range 0.006–4.993/yr, mean 0.581, median 0.300), and ~1.8× above the fastest ecosystem Olson himself estimated ([A] p. 326: ~0.009/yr for high-altitude lodgepole pine up to ~4/yr for African forest). Two independent sources 45 years apart put the ceiling at ~4–5/yr; ours is above both — outside the entire observed distribution. It would be ordinary as a LABILE-fraction constant (RothC DPM = 10/yr), but this model has ONE litter pool, so that re-reading is refused: it would change what the parameter means to fit a citation. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."

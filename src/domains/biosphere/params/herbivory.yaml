@@ -68,6 +68,30 @@
 #   [B] First-order biomass respiration/turnover is the standard consumer/decomposer
 #       treatment (e.g. the CENTURY-family microbial-pool turnover: Parton, W.J. et al.
 #       (1987), Soil Sci. Soc. Am. J. 51:1173-1179) — here applied to the consumer pool.
+#   [C] Longmuir, I.S. (1954), "Respiration Rate of Bacteria as a Function of Oxygen
+#       Concentration", Biochem. J. 57(1):81–87. OPENED AND READ 2026-07-16 (round 2; it
+#       was on the plan doc's "free but tooling-blocked" list — PMC hosts page images only,
+#       but a text PDF was obtained). WHY IT MATTERS HERE: it does NOT give an animal
+#       number, it gives the MECHANISM that makes this parameter's cross-kingdom copy
+#       indefensible. Table 1 (p. 85) measures whole-cell apparent Km(O₂) across 9 bacteria
+#       spanning 0.5–4.0 µm, and finds Km RISES WITH CELL SIZE: "the larger organisms
+#       having a larger Km … the relationship is of the form Km = A·d^x, where A is the
+#       proportionality factor, d is the cell diameter" (p. 86), fitted as a log-log line of
+#       "slope 2.6032 and intercept of -7.0460", fiducial limits ±0.2605 in log Km. Km spans
+#       1.10e-8 M (Micrococcus candicans, d = 0.5 µm) to 3.12e-6 M (B. megatherium in
+#       glycine, d = 4.0 µm) — a 280× spread from CELL SIZE ALONE.
+#       Longmuir's own conclusion (p. 86) is the load-bearing sentence: "It is obvious that
+#       a variation of Km which is a function of size is not likely to be due to a variation
+#       in the affinity of the respiratory enzymes for oxygen. An explanation based on
+#       diffusion seems more probable." I.e. whole-cell apparent Km is largely a DIFFUSION
+#       PATH-LENGTH artifact, not intrinsic enzyme affinity — so it is NOT transferable
+#       between organisms of different size. That is exactly the operation that produced
+#       this parameter (a ~1 µm soil bacterium's Km copied onto a grazing animal).
+#       TABLE ALIGNMENT VERIFIED (the extraction collapses Table 1's columns, and a
+#       misaligned row is this scope's known failure mode): the positional organism→(d, Km)
+#       reading was checked against the paper's OWN published regression, and all 9 rows
+#       reproduce Km = 10^-7.0460 · d^2.6032 within Longmuir's stated ±0.2605 fiducial band
+#       (worst residual +0.119). A misaligned read could not regenerate the fitted line.
 
 name: chamber
 process: herbivory
@@ -88,4 +112,4 @@ parameters:
   o2_half_saturation:
     value: 0.0001
     unit: "mol/mol"
-    source: "TODO(cite) — STILL OPEN, with a finding that CONTRADICTS the old tag (2026-07-16). It was set by 'mirroring microbial_respiration.yaml' — but that mirroring crosses a KINGDOM BOUNDARY and is not physiologically justified: the consumer is an animal, so the soil-bacteria Km values that DO bind the microbial file (99–288 nM) cannot transfer. At the animal scale, mitochondrial effective Km is ≈ 0.49 µM ≈ 4e-4 mol/mol, so our 1e-4 is ~4× SHARPER than animal respiration warrants (and 1–2 orders sharper than typical intact-mitochondria P50, ~1.7–22 µM). NOT bound to an animal source: a weak cross-kingdom bind is worse than an admitted gap. Behaviourally inert today (f_O2 ≈ 1 at the ample-O2 chamber fill) — it would bite only near anoxia, which is exactly where the 4× error lives. Changing it is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN, with a finding that CONTRADICTS the old tag, now MECHANISTICALLY EXPLAINED by a primary source (2026-07-16, round 2: [C] obtained and read). It was set by 'mirroring microbial_respiration.yaml' — but that mirroring crosses a KINGDOM BOUNDARY and is not physiologically justified: the consumer is an animal, so the soil-bacteria Km values that DO bind the microbial file (99–288 nM) cannot transfer. [C] supplies the REASON that transfer is invalid, which round 1 asserted but could not source: whole-cell apparent Km(O2) scales with organism SIZE as Km = A·d^2.6032 — a 280× spread across bacteria of 0.5–4.0 µm alone — because, in Longmuir's own words, it is a DIFFUSION artifact and 'not likely to be due to a variation in the affinity of the respiratory enzymes for oxygen'. An apparent Km is therefore a property of the diffusion path, not of respiration, and copying one across a ~5-order size gap (1 µm bacterium → grazing animal) is unsound in DIRECTION as well as magnitude: a larger organism must be LOOSER, never sharper. At the animal scale, mitochondrial effective Km is ≈ 0.49 µM ≈ 4e-4 mol/mol, so our 1e-4 is ~4× SHARPER than animal respiration warrants (and 1–2 orders sharper than typical intact-mitochondria P50, ~1.7–22 µM). ⚠ FALSE-VINDICATION TRAP IN [C], flagged deliberately: its pig-/ox-heart rows read 1.86e-8 and 2.39e-8 M (~19–24 nM) — SHARPER than our 123 nM — and could be misquoted as 'animal tissue is sharp, so 1e-4 is fine'. It is not: those are succinate-oxidizing heart-muscle PREPARATIONS (subcellular respiratory material with the diffusion barrier removed, carrying no cell diameter and excluded from the size regression), not intact animals. Comparing them to an organism-scale half-saturation is the very scale error [C] exists to demonstrate. STILL NOT bound to an animal source: a weak cross-kingdom bind is worse than an admitted gap. Behaviourally inert today (f_O2 ≈ 1 at the ample-O2 chamber fill) — it would bite only near anoxia, which is exactly where the 4× error lives. Changing it is calibration = scope B. See docs/plans/post-roadmap-citation.md."

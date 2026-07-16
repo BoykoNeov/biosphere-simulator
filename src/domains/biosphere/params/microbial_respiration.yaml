@@ -28,12 +28,27 @@
 #   Phase-2 validation gate — flagged TODO(cite) until bound to a primary source.
 #
 # Sources:
-#   [A] First-order microbial-pool turnover/respiration is the standard soil-carbon-model
-#       treatment (e.g. CENTURY: Parton, W.J. et al. (1987), "Analysis of factors
-#       controlling soil organic matter levels in Great Plains grasslands", Soil Sci.
-#       Soc. Am. J. 51:1173–1179; RothC: Jenkinson, D.S. (1990), "The turnover of organic
-#       carbon and nitrogen in soil", Phil. Trans. R. Soc. Lond. B 329:361–368). The
-#       microbial-biomass respiration constant m_resp; primary citation pending.
+#   [A] Parton, W.J., Schimel, D.S., Cole, C.V. & Ojima, D.S. (1987), "Analysis of factors
+#       controlling soil organic matter levels in Great Plains grasslands", Soil Sci. Soc.
+#       Am. J. 51:1173–1179 — the CENTURY model description. OPENED AND READ 2026-07-16
+#       (previously "primary citation pending"; it was #1 on the plan doc's retrieval list).
+#       p. 1174 defines "K_i = the maximum decomposition rate parameter (per week) for the
+#       ith state variable (K_i = 0.076, 0.28, 0.094, 0.35, 0.14, 0.0038, and 0.00013)"
+#       over the 7 state variables (surface structural/metabolic, soil structural/metabolic,
+#       active, slow, passive SOM). So K5 = 0.14 week⁻¹ = the ACTIVE SOM pool — defined
+#       p. 1173 as "an active fraction (active SOM) of soil C and N consisting of live
+#       microbes and microbial products, along with soil organic matter with a short
+#       turnover time (1-5 yr)". = 0.02/day = 7.3/yr, MAXIMUM (unmodified).
+#       INDEX ALIGNMENT VERIFIED three ways (the list is positional, and a misread row is
+#       this scope's known failure mode): (i) p. 1176 names K6 outright — "The decay rate
+#       for the slow SOM pool (K6 = 0.0038 week⁻¹)" — matching position 6; (ii) Eq. [5]
+#       p. 1176 modifies K5 as "the decay rate of active SOM", matching position 5;
+#       (iii) p. 1174's "decay rates for the soil surface litter are 20% lower than the
+#       soil litter" holds EXACTLY on the positional reading — K1/K3 = 0.076/0.094 = 0.809
+#       and K2/K4 = 0.28/0.35 = 0.800.
+#       Also RothC: Jenkinson, D.S. (1990), "The turnover of organic carbon and nitrogen in
+#       soil", Phil. Trans. R. Soc. Lond. B 329:361–368 — FORM only; the per-pool constants
+#       are NOT in that paper, they are in [E].
 #   [B] Davidson, E.A., Samanta, S., Caramori, S.S. & Savage, K. (2012), "The Dual
 #       Arrhenius and Michaelis–Menten kinetics model for decomposition of soil organic
 #       matter ...", Global Change Biology 18:371–384 (the Michaelis–Menten O₂-limitation
@@ -55,21 +70,39 @@
 #       "Growth Under Oxygen-Limiting Conditions": "we obtained a best-fit Ks value of
 #       121 ± 20 nM O2" (Escherichia coli K-12) — an independent corroboration within ~2 %
 #       of our value.
-#   [E] FAO (2004), "Assessing carbon stocks and modelling win-win scenarios of carbon
-#       sequestration through land-use changes", RothC section — reporting the RothC-26.3
-#       per-pool constants of Coleman & Jenkinson. https://www.fao.org/4/y5490e/y5490e08.htm
-#       (verified 2026-07-16): "the decomposition rate constants (k) in per year values for
-#       each compartment are set in RothC at: DPM = 10.0, RPM = 0.3, BIO = 0.66, and
-#       HUM =0.02" — with modifiers a (temperature), b (moisture), c (plant retainment)
-#       applied on top. SECONDARY (FAO reporting Coleman & Jenkinson) and CONTRAST only.
-#       Note the correct primary target is the RothC-26.3 model description, NOT the
-#       Jenkinson 1990 Phil. Trans. paper cited in [A] — the per-pool constants live in the
-#       former. See the plan doc's paywalled list.
+#   [E] Coleman, K. & Jenkinson, D.S., "RothC — A model for the turnover of carbon in soil.
+#       Model description and users guide (Windows version)", Rothamsted Research,
+#       Harpenden (updated June 2014). PRIMARY, OPENED AND READ 2026-07-16 — this REPLACES
+#       the pre-2026 header's FAO (2004) secondary, which merely reported these constants.
+#       §1.5 "Decomposition rate constants", p. 10: "The decomposition rate constants (k),
+#       in years⁻¹, for each compartment are set at: DPM : 10.0 / RPM : 0.3 / BIO : 0.66 /
+#       HUM : 0.02", and §1.3 p. 9 names BIO as "Microbial Biomass" — i.e. BIO = 0.66/yr is
+#       the constant for a pool that IS, by name and definition, ours. §1.4 p. 9 confirms
+#       the modifiers multiply k: a compartment "declines to Y·e^(−abckt)", where a is
+#       temperature, b moisture, c soil cover — each ≤ 1, so the REALIZED rate is at or
+#       below k. p. 10 also notes the values "were originally set by tuning the model to
+#       data from some of the long-term field experiments at Rothamsted (Jenkinson et al
+#       1987; Jenkinson et al 1992) : they are not normally altered when using the model."
 #   [F] CLM5 Technical Note, "Decomposition" — the CENTURY-based pool structure, stated to
 #       follow Parton et al. (1988). Table 2.21.3 (turnover times at a 25 °C reference):
 #       "SOM 1 (active) | 0.17 year" and "Litter 1 (metabolic) | 0.066 year".
 #       https://escomp.github.io/CTSM/release-clm5.0/tech_note/Decomposition/CLM50_Tech_Note_Decomposition.html
-#       SECONDARY (an implementation of Parton) and CONTRAST only.
+#       SECONDARY (an implementation of Parton) and CONTRAST only. Now corroborated by the
+#       primary [A] it implements (7.3/yr vs CLM5's 5.9/yr — same order, CLM5 slightly slower).
+#   [G] Longmuir, I.S. (1954), "Respiration Rate of Bacteria as a Function of Oxygen
+#       Concentration", Biochem. J. 57(1):81–87. OPENED AND READ 2026-07-16 (round 2).
+#       Table 1, p. 85: whole-cell apparent Km(O₂) for 9 bacteria, 1.10e-8 M (Micrococcus
+#       candicans) to 3.12e-6 M (B. megatherium in glycine) — i.e. 11–3120 nM. Our 123 nM
+#       sits inside that span, a THIRD independent bracket for o2_half_saturation.
+#       ⚠ BUT IT ALSO TEMPERS [D]. Longmuir's E. coli Km is 2.22e-8 M = 22.2 nM, whereas
+#       [D]'s E. coli Ks is 121 ± 20 nM — TWO PRIMARY MEASUREMENTS OF THE SAME ORGANISM
+#       THAT DISAGREE BY ~5.5×. So the pre-round-2 tag's "within ~2 % of [D]" is true but
+#       must NOT be read as 2 % accuracy: it is agreement with one of two available E. coli
+#       numbers, and the real inter-study spread for a single species is several-fold.
+#       Per [G] p. 86 the spread is expected — apparent Km scales as ~d^2.6 and is a
+#       diffusion artifact, so it is method- and condition-sensitive, not a constant of the
+#       organism. The bind survives (ours is inside every measured bacterial span); the
+#       CONFIDENCE claim is what changes.
 #
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
 #   Split outcome — one CITED, one still OPEN:
@@ -98,8 +131,8 @@ parameters:
   microbial_respiration_rate:
     value: 0.05
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, with a measured finding (2026-07-16): 0.05/day = 18.25/yr is ~28× RothC's microbial-biomass (BIO) pool constant of 0.66/yr [E] and ~3.1× CLM5/CENTURY's active-SOM pool (0.17 yr turnover = 5.9/yr) [F] — 3–28× faster than any published microbial/active-pool constant, across two independent model lineages. The gap widens further because both lineages apply temperature/moisture modifiers (≤ 1) ON TOP of k, lowering the realized rate. [A] cites the FORM only and is not openable; [E]/[F] are SECONDARY implementations, so even they would not be a primary bind. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN, and the finding is now PRIMARY-BACKED at both ends (2026-07-16, round 2: [A] and [E] were obtained and read; round 1 had only secondaries). 0.05/day = 18.25/yr is ABOVE EVERY published constant for a nominally-microbial pool, but HOW FAR depends on which pool is the analogue, and the two canonical lineages disagree by ~11× on that: vs RothC's BIO = 0.66/yr [E] — a pool named 'Microbial Biomass', the strict analogue — ours is ~28× fast; vs CENTURY's active SOM, K5 = 0.14/wk = 7.3/yr MAXIMUM [A] — 'live microbes and microbial products' plus short-turnover SOM, a broader/faster pool — ours is ~2.5× fast. CLM5's 5.9/yr [F] corroborates [A] independently (~3.1×). THE 11× SPREAD IS ITSELF THE FINDING: 'the microbial pool' is not one thing, so 2.5× and 28× are both honest and neither is THE answer. BOTH ARE RECORDED DELIBERATELY — picking the 2.5× anchor because it flatters the value would be the same re-anchoring trap this scope refused for decomposition_rate (a value defended by redefining what the parameter means). Every comparison here UNDERSTATES the gap: [E] §1.4 applies a·b·c ≤ 1 on top of k, and [A] Eq. [5] further cuts K5 by texture (K5·(1−0.75·T); a T=0.5 loam gives 4.6/yr ⇒ ours ~4.0×). Round 1's '3–28×' becomes ~2.5–28×. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
   o2_half_saturation:
     value: 0.0001
     unit: "mol/mol"
-    source: "[C] + [D]: our 1e-4 mol/mol ≈ 123 nM dissolved sits INSIDE the measured whole-cell apparent Km(app) band for soil bacteria (99–288 nM [C], essentially on top of the 113 ± 24 nM organism) and within ~2 % of the 121 ± 20 nM E. coli Ks [D]. Low/sharp is CORRECT here and the reason is structural: a 0-D well-mixed chamber has no soil-microsite diffusion limitation, so the cellular respiratory O2 affinity governs — NOT the soil/aggregate-scale apparent Km (~150 uM, ~1200x looser) that [B] models. f_O2 ~ 1 until near-anoxia. CAVEATS: the sources report nM and the mole-fraction conversion is ours; and this is a WHOLE-CELL apparent Km, not the 'terminal-oxidase Km' the pre-2026 tag claimed (isolated oxidase is sharper still, 3-8 nM)."
+    source: "[C] + [D] + [G]: our 1e-4 mol/mol ≈ 123 nM dissolved sits INSIDE the measured whole-cell apparent Km(app) band for soil bacteria (99–288 nM [C], essentially on top of the 113 ± 24 nM organism), within ~2 % of the 121 ± 20 nM E. coli Ks [D], and inside the 11–3120 nM span across 9 bacteria in [G]. ⚠ CONFIDENCE CAVEAT (round 2, from [G]): do NOT read the '~2 %' as accuracy — [G] measures the SAME organism (E. coli) at 22.2 nM, 5.5× from [D], so a single-species apparent Km carries several-fold inter-study spread by nature ([G] p. 86: it scales as ~d^2.6 and is a diffusion artifact, not an organism constant). The bind survives — ours is inside every measured bacterial span — but it is a bracket, not a match. Low/sharp is CORRECT here and the reason is structural: a 0-D well-mixed chamber has no soil-microsite diffusion limitation, so the cellular respiratory O2 affinity governs — NOT the soil/aggregate-scale apparent Km (~150 uM, ~1200x looser) that [B] models. f_O2 ~ 1 until near-anoxia. CAVEATS: the sources report nM and the mole-fraction conversion is ours; and this is a WHOLE-CELL apparent Km, not the 'terminal-oxidase Km' the pre-2026 tag claimed (isolated oxidase is sharper still, 3-8 nM)."

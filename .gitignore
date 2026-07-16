@@ -32,6 +32,13 @@ Thumbs.db
 # Extracted/working artifacts
 roadmap_extracted.txt
 
+# Reference literature (post-roadmap bucket 3). Locally-held PDFs of the papers and
+# textbooks the param headers cite — the retrieval list in docs/plans/post-roadmap-citation.md.
+# NEVER committed: this repo is public and most of these are copyrighted (commercial
+# textbooks, publisher PDFs). We cite them; we do not redistribute them. Citations must
+# stand on their own bibliographic locus, readable without this folder.
+sources/
+
 # Godot front-end (Phase 8). The project lives in `godot/`; `.godot/` is the
 # generated import/cache dir (never committed). The `.uid` files ARE committed
 # (stable resource identifiers, Godot best practice). `addons/` is the staged
