@@ -41,6 +41,83 @@
         "urine",
         "water_store"
       ]
+    },
+    "eclss.co2_scrubber": {
+      "cls": "CO2Scrubber",
+      "param_set": "eclss",
+      "wiring_fields": [
+        "cabin_co2",
+        "co2_removed"
+      ]
+    },
+    "eclss.condenser": {
+      "cls": "Condenser",
+      "param_set": "eclss",
+      "wiring_fields": [
+        "cabin_h2o",
+        "humidity_condensate"
+      ]
+    },
+    "eclss.crew_metabolism": {
+      "cls": "CrewMetabolism",
+      "param_set": null,
+      "wiring_fields": [
+        "cabin_co2",
+        "cabin_h2o",
+        "cabin_o2",
+        "metabolic_co2_source",
+        "metabolic_h2o_source",
+        "metabolic_o2_sink"
+      ]
+    },
+    "eclss.o2_makeup": {
+      "cls": "O2Makeup",
+      "param_set": "eclss",
+      "wiring_fields": [
+        "cabin_o2",
+        "o2_supply"
+      ]
+    },
+    "power.load_draw": {
+      "cls": "LoadDraw",
+      "param_set": null,
+      "wiring_fields": [
+        "battery",
+        "waste_heat"
+      ]
+    },
+    "power.self_discharge": {
+      "cls": "SelfDischarge",
+      "param_set": "self_discharge",
+      "wiring_fields": [
+        "battery",
+        "waste_heat"
+      ]
+    },
+    "power.solar_charge": {
+      "cls": "SolarCharge",
+      "param_set": "charge",
+      "wiring_fields": [
+        "battery",
+        "solar_source",
+        "waste_heat"
+      ]
+    },
+    "thermal.heat_input": {
+      "cls": "HeatInput",
+      "param_set": null,
+      "wiring_fields": [
+        "heat_source",
+        "node"
+      ]
+    },
+    "thermal.radiator_reject": {
+      "cls": "RadiatorReject",
+      "param_set": "thermal",
+      "wiring_fields": [
+        "node",
+        "space"
+      ]
     }
   },
   "frozen_at_phase": 9,
@@ -50,8 +127,11 @@
     "rk4"
   ],
   "param_loaders": [
+    "charge",
     "crew",
-    "self_discharge"
+    "eclss",
+    "self_discharge",
+    "thermal"
   ],
   "parity_vectors": {
     "parse_vectors.txt": "5b4bff2f56cd799ac6b94584d464567d49448d192039d4cf3939191f5693ca63",

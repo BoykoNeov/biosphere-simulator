@@ -136,6 +136,36 @@ pub struct CrewMetabolism {
     metabolic_h2o_source: String,
 }
 
+impl CrewMetabolism {
+    /// Construct a `CrewMetabolism` with the given ids.
+    ///
+    /// Additive over [`build_eclss`]'s internal struct-literal construction (which stays
+    /// untouched, so the frozen eclss golden cannot move) — the `SelfDischarge::new`
+    /// precedent. Added by the post-roadmap **Tier-1** unfreeze so the `authoring` crate
+    /// can build this flow from a scenario file. See `thermal::HeatInput::new` for why
+    /// exactly these two flows lacked a public constructor.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        id: String,
+        cabin_o2: String,
+        cabin_co2: String,
+        cabin_h2o: String,
+        metabolic_o2_sink: String,
+        metabolic_co2_source: String,
+        metabolic_h2o_source: String,
+    ) -> Self {
+        CrewMetabolism {
+            id,
+            cabin_o2,
+            cabin_co2,
+            cabin_h2o,
+            metabolic_o2_sink,
+            metabolic_co2_source,
+            metabolic_h2o_source,
+        }
+    }
+}
+
 impl Flow for CrewMetabolism {
     fn id(&self) -> &str {
         &self.id

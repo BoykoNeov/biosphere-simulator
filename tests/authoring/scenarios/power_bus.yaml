@@ -1,0 +1,113 @@
+# The Tier-1 Power anchor: all three registered Power flow types on one battery bus.
+#
+# Unlike eclss_cabin.yaml (which reproduces the frozen ECLSS golden byte-for-byte), this
+# file deliberately does NOT re-express the frozen Power scenario, because it CANNOT: the
+# frozen power_bounded_soc run is driven by a computed HALF-SINE solar schedule
+# (power/system.py, `math.sin`), and an authored file declares CONSTANT forcings only
+# (computed schedules are a documented Phase-9 deferral). So there is no golden to match.
+#
+# That deferral has a silver lining worth naming: `math.sin` is exactly what makes the
+# frozen power goldens Tier-2 (tiers.json). Replacing the schedule with a constant removes
+# the only transcendental in Power's reachable graph, so THIS file is Tier-1 bit-exact
+# across ports -- an authored scenario that is *more* strictly gated than the frozen one
+# it descends from.
+#
+# NOTHING here is frozen or reference: a runtime authored artifact (Phase-9 decision B).
+# The flow LAWS are frozen and literature-derived; their NUMBERS are not calibrated
+# (charge.yaml's eta_c and self_discharge.yaml's k are both TODO(cite) placeholders). This
+# file carries no UNCALIBRATED banner only because it authors no kinetics -- which means
+# "no authored kinetics", NOT "validated". See docs/authoring-reference.md.
+#
+# THE SIZING (why these constants). Solar and load are balanced through the charge
+# efficiency: eta_c * solar = 0.95 * 1000 W = 950 W = load, so the two FORCED flows cancel
+# on the battery and the ONLY net effect on the SOC is the donor-controlled self-discharge
+# leak -- the cleanest possible demonstration of the third flow. The battery decays by
+# (1 - k*dt)^336 ~ 1.2 % over the run. LoadDraw is forced, so its positivity is by WELL-FED
+# SIZING, not structure: the 1.0e+9 J battery is ~1000x a step's draw, and it is never
+# drawn below its initial value, so the Euler backstop never fires.
+#
+# dt = 3600.0 is safe for every flow here: k*dt = 1.0e-8 * 3600 = 3.6e-5 << 1 (structural
+# positivity for self_discharge holds until dt ~ 1.0e+8 s, i.e. ~3 years/step). Contrast
+# eclss_cabin.yaml, whose frozen rates cap dt at ~60 s -- the per-flow dt constraint is a
+# property of the frozen PARAMS, not of the platform. See docs/authoring-reference.md.
+#
+# ENERGY closes over the augmented system every step: solar_source (unclamped, going
+# negative as it supplies) + battery + waste_heat sums to a constant. waste_heat is
+# monotonic by construction -- the free "heat generated" diagnostic, receiving the
+# charge-conversion loss, the whole dissipative load, and the self-discharge leak.
+#
+# All floats carry an explicit decimal point (1.0e+9, not 1e9): the YAML-1.1 float
+# resolver parses a dotless exponent as a *string*.
+name: power_bus
+integrator: euler
+dt: 3600.0        # 1 h
+steps: 336        # 14 days
+rng_seed: 0
+
+stocks:
+  # The stored-electrical-energy POOL -- the bus AND the storage (there is deliberately no
+  # pass-through bus pool: a near-zero pass-through cannot source a flow under the
+  # arbitration backstop, which scales withdrawals against the start-of-step amount).
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 1.0e+9         # J -- well-fed sizing (~1000x a step's draw)
+
+  # The electrical supply: a BOUNDARY *source*, so `unclamped: true` -- arbitration must
+  # never throttle the supply. Its negative-going amount is cumulative supply bookkeeping.
+  - id: boundary.solar_source
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+  # The terminal heat sink: every degraded joule lands here. Never withdrawn from =>
+  # monotonic by construction => a free heat-generated diagnostic.
+  - id: boundary.waste_heat
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  # FORCED on the hardcoded `solar_power` name. THREE legs: the eta_c split names the
+  # charge-conversion loss as heat rather than hiding it as a net delta. At eta_c = 0.95,
+  # 950 W reaches the battery and 50 W is booked as heat.
+  - id: power.solar_charge
+    type: power.solar_charge
+    priority: 0
+    wiring:
+      solar_source: boundary.solar_source
+      battery: power.battery
+      waste_heat: boundary.waste_heat
+    params: charge
+
+  # FORCED on the hardcoded `load_power` name. 100 % dissipative -- the cleanest "every
+  # joule named". Positivity by well-fed sizing, NOT structural.
+  - id: power.load_draw
+    type: power.load_draw
+    priority: 0
+    wiring:
+      battery: power.battery
+      waste_heat: boundary.waste_heat
+
+  # DONOR-CONTROLLED (leak = k * battery * dt): the only flow here that reads a stock, so
+  # the only one whose positivity is structural -- and the only restoring force, giving the
+  # SOC a genuine attractor.
+  - id: power.self_discharge
+    type: power.self_discharge
+    priority: 0
+    wiring:
+      battery: power.battery
+      waste_heat: boundary.waste_heat
+    params: self_discharge
+
+forcings:
+  # Keys are the frozen hardcoded module constants (power/stocks.py). Renaming one makes
+  # the owning flow raise at step 1 -- they are NOT reachable through wiring.
+  solar_power:
+    const: 1000.0     # W -- eta_c * 1000 = 950 W reaches the battery
+  load_power:
+    const: 950.0      # W -- exactly the charged power, so the SOC drifts only by leak

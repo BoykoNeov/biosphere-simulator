@@ -1,0 +1,106 @@
+# The Thermal anchor: both registered Thermal flow types -- a heated node relaxing to its
+# emergent equilibrium temperature through the Stefan-Boltzmann radiator.
+#
+# THIS IS THE ONE TIER-2 ANCHOR, and that is the whole reason it is called out separately.
+# `thermal.radiator_reject` evaluates `T**4` (ported to Rust as `powf(4.0)`), a
+# grep-confirmed transcendental site in tiers.json -- so by the project's own tiering rule
+# ("classify by the ops the simulator EXECUTES, not the closed-form solution, and not
+# observed equality on one machine") this scenario is Tier-2, NOT bit-exact.
+#
+# So it is deliberately EXCLUDED from the bit-exact cross-port RUN parametrization in
+# tests/crossport/authoring_files.py (tier=2 there), and covered instead by:
+#   * the cross-port GRAPH DUMP, which IS bit-exact for it -- the dump renders authored
+#     literals through float.hex() and never calls the radiator's evaluate(), so the
+#     transcendental cannot reach it. That is what proves the registry lowers this file to
+#     the right graph on both ports, which is the only NEW thing an authored thermal anchor
+#     can establish;
+#   * a Rust unit test that the authored RadiatorReject is wired to params::thermal() --
+#     the one sliver the dump cannot see, since params are not rendered in it;
+#   * the Python run test below (conservation, rationed == 0, determinism).
+#
+# The radiator's own cross-port ARITHMETIC is already frozen by thermal_state.json's
+# measured Tier-2 band; re-proving it here would add nothing. No new measured band is minted
+# for this file: a measured band is a frozen tolerance, and freezing one for a runtime-only
+# authored artifact would cut against "authored != validated".
+#
+# NOTHING here is frozen or reference. The Stefan-Boltzmann law is textbook and cited; the
+# radiator.yaml NUMBERS are TODO(cite) placeholders ("illustrative", "not calibrated"). No
+# UNCALIBRATED banner here means "no authored kinetics", NOT "validated".
+#
+# THE SIZING. heat_load = 3000 W against the frozen eps/sigma/A gives an emergent
+# equilibrium at T_eq ~ 280.9 K (Q_eq = C*(T_eq - T_space) ~ 2.78e+9 J) -- emergent, never
+# stored: the radiator IS the restoring force, so any constant load has a unique stable
+# T_eq and no derived/tuned load is needed (unlike Power). The node starts far below it, at
+# Q = 1.0e+9 J (T ~ 102.7 K), and warms; a run that "equilibrates" because it started at
+# equilibrium would prove nothing.
+#
+# dt = 3600.0 is LOAD-BEARING and is the frozen sizing: C = 1.0e+7 J/K is chosen so that
+# tau = C/(4*eps*sigma*A*T_eq^3) ~ 65 steps at dt = 3600 s, which is what keeps Euler from
+# overshooting the nonlinear radiator (rationed == 0). 336 steps ~ 5.2 tau. Positivity here
+# is STRUCTURAL ONLY AT THE FLOOR (R -> 0 as Q -> 0, because the node is referenced to
+# T_space so the T^4 - T_space^4 driving term vanishes there); near equilibrium it is by
+# SIZING. A much larger dt overshoots -- the T^4 law has no k*dt < 1 guarantee to lean on.
+#
+# All floats carry an explicit decimal point: the YAML-1.1 float resolver parses a dotless
+# exponent as a *string*.
+name: thermal_node
+integrator: euler
+dt: 3600.0        # 1 h -- see the tau >> dt sizing note above
+steps: 336        # 14 days ~ 5.2 tau
+rng_seed: 0
+
+stocks:
+  # The sensible-heat POOL, referenced to T_space: its amount is Q = C*(T - T_space) >= 0,
+  # so temperature is the DERIVED readout T = T_space + Q/C (computed at evaluate-time --
+  # not a stock, not an aux accumulator). The reference is what puts the floor at
+  # T = T_space where radiation self-limits.
+  - id: thermal.node
+    domain: thermal
+    quantity: energy
+    kind: pool
+    amount: 1.0e+9        # J -- T ~ 102.7 K, far below T_eq ~ 280.9 K
+
+  # The forced heat input: a BOUNDARY *source*, so `unclamped: true`. Standalone this
+  # stands in for Power's dissipation; Phase-6 coupling feeds the node from Power's legs.
+  - id: boundary.heat_source
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+  # Deep space -- the one PERMANENT boundary that cannot be moved inward: in vacuum,
+  # radiation is the only rejection mode and the joules genuinely leave forever. Never
+  # withdrawn from => monotonic => a free heat-rejected diagnostic.
+  - id: boundary.space
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  # FORCED on the hardcoded `heat_load` name. Heat -> heat, no form change => TWO legs and
+  # no loss leg (contrast power.solar_charge's three-leg eta_c split).
+  - id: thermal.heat_input
+    type: thermal.heat_input
+    priority: 0
+    wiring:
+      heat_source: boundary.heat_source
+      node: thermal.node
+
+  # DONOR-CONTROLLED and NONLINEAR: R = eps*sigma*A*(T^4 - T_space^4)*dt, with T read off
+  # the node's own amount. The transcendental that makes this file Tier-2. It is also the
+  # domain's restoring force -- a genuine nonlinear attractor, unlike Power's SOC whose
+  # boundedness had to be constructed by exact balance.
+  - id: thermal.radiator_reject
+    type: thermal.radiator_reject
+    priority: 0
+    wiring:
+      node: thermal.node
+      space: boundary.space
+    params: thermal
+
+forcings:
+  # The frozen hardcoded module constant (thermal/stocks.py), not reachable through wiring.
+  heat_load:
+    const: 3000.0     # W -- gives T_eq ~ 280.9 K with the frozen radiator params

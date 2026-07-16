@@ -1,0 +1,155 @@
+# The Tier-1 ECLSS anchor: a declarative re-expression of the frozen standalone ECLSS
+# STEADY_STATE_SCENARIO (domains/eclss). The authoring interpreter must build a graph
+# structurally identical to build_eclss(...) + eclss_resolver(...) and — run 900 steps
+# Euler — reproduce tests/regression/golden/eclss_state.json BYTE-FOR-BYTE.
+#
+# This is the strongest anchor the newly-registered flow types can carry: the crew
+# (`crew_mission.yaml` -> crew_state.json) precedent, now for a domain with THREE
+# conserved quantities and a six-leg forced flow. Transcendental-free (`+ - *` only) =>
+# Tier-1 bit-exact on both ports (eclss_state.json is float_tier 1 in tiers.json).
+#
+# NOTHING here is frozen or reference: this is a runtime authored artifact (Phase-9
+# decision B). Reproducing the golden proves the REGISTRY LOWERS CORRECTLY — it makes no
+# claim that the ECLSS numbers are calibrated. They are not: every eclss.yaml param is a
+# TODO(cite) placeholder ("NOT a NASA BVAD number"), and this file carries no
+# UNCALIBRATED banner only because it authors no kinetics. See docs/authoring-reference.md,
+# "Frozen is not calibrated".
+#
+# THE CABIN POOLS ARE SINGLE-QUANTITY — deliberately, and this is easy to get wrong.
+# eclss.cabin_co2 is CARBON with the frozen 1:1 default composition, NOT
+# {carbon: 1, oxygen: 2}: standalone ECLSS does not tie the crew's atoms together (the
+# metabolic O2 leaves to a decoupled sink; CO2/H2O enter from separate sources), and
+# atomic coupling is a flagged Phase-6 seam. Annotating composition here would NOT be a
+# refinement — it would break OXYGEN balance on crew_metabolism and surface as a runtime
+# ConservationError (the interpreter's build-time stoichiometry check covers authored
+# `kinetics` flows only, never frozen `type` flows). Contrast scenarios/algae_habitat.yaml,
+# whose authored respiration REQUIRES the composition fold.
+#
+# dt = 60.0 is LOAD-BEARING, not a default: k_scrub*dt = 0.06 and k_cond*dt = 0.03 (both
+# << 1), so the two donor-controlled draws self-limit and the Euler backstop never fires.
+# The frozen eclss.yaml rates are sized for exactly this dt. At dt = 3600 they would give
+# k*dt = 3.6 / 1.8 > 1 -- see tests/authoring/test_frozen_flow_dt_hazard.py.
+#
+# All floats carry an explicit decimal point (2.0e-5, not 2e-5): yaml.safe_load uses the
+# YAML-1.1 float resolver, under which a dotless exponent parses as a *string*.
+name: eclss_cabin
+integrator: euler
+dt: 60.0          # EclssScenario.dt_seconds — see the dt note above
+steps: 900        # STEADY_STATE_STEPS (~27 tau of the slowest loop, H2O)
+rng_seed: 0
+
+stocks:
+  # The three cabin-air POOLs. cabin_o2 starts AT the setpoint (the regulator idles) and
+  # the crew draw pulls it down to o2_eq = 8.0; CO2/H2O start at 0 (a clean cabin) and
+  # rise to co2_eq = 3.0 mol / h2o_eq = 0.04 kg. No `composition` — see the note above.
+  - id: eclss.cabin_o2
+    domain: eclss
+    quantity: oxygen
+    kind: pool
+    amount: 10.0          # EclssScenario.cabin_o2_0 (== the frozen o2_setpoint)
+  - id: eclss.cabin_co2
+    domain: eclss
+    quantity: carbon
+    kind: pool
+    amount: 0.0           # EclssScenario.cabin_co2_0
+  - id: eclss.cabin_h2o
+    domain: eclss
+    quantity: water
+    kind: pool
+    amount: 0.0           # EclssScenario.cabin_h2o_0
+
+  # The O2-makeup tank: a BOUNDARY *source*, so `unclamped: true` — arbitration must
+  # never throttle the supply, and its negative-going amount is pure ledger bookkeeping.
+  - id: boundary.o2_supply
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+  # The two monotonic equipment-product sinks (never withdrawn from => clamped).
+  - id: boundary.co2_removed
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.humidity_condensate
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+
+  # The three decoupled crew-metabolism seam reservoirs. The two *sources* are unclamped;
+  # the O2 *sink* is not (a sink is never withdrawn from, so min-scaling never applies).
+  - id: boundary.metabolic_o2_sink
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+  - id: boundary.metabolic_co2_source
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+  - id: boundary.metabolic_h2o_source
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+flows:
+  # FORCED, six legs across three quantities (each balanced independently). Reads three
+  # HARDCODED forcing names through env.get -- o2_consumption / co2_production /
+  # h2o_production -- NOT through wiring, which is why the forcing keys below must match
+  # exactly and why this flow cannot be included under a `{bundle, prefix}` namespace.
+  - id: eclss.crew_metabolism
+    type: eclss.crew_metabolism
+    priority: 0
+    wiring:
+      cabin_o2: eclss.cabin_o2
+      cabin_co2: eclss.cabin_co2
+      cabin_h2o: eclss.cabin_h2o
+      metabolic_o2_sink: boundary.metabolic_o2_sink
+      metabolic_co2_source: boundary.metabolic_co2_source
+      metabolic_h2o_source: boundary.metabolic_h2o_source
+
+  # DONOR-CONTROLLED: R = k_scrub * cabin_co2 * dt. The CO2 restoring force.
+  - id: eclss.co2_scrubber
+    type: eclss.co2_scrubber
+    priority: 0
+    wiring:
+      cabin_co2: eclss.cabin_co2
+      co2_removed: boundary.co2_removed
+    params: eclss
+
+  # DONOR-CONTROLLED: R = k_cond * cabin_h2o * dt. The humidity restoring force.
+  - id: eclss.condenser
+    type: eclss.condenser
+    priority: 0
+    wiring:
+      cabin_h2o: eclss.cabin_h2o
+      humidity_condensate: boundary.humidity_condensate
+    params: eclss
+
+  # DEMAND-CONTROLLED toward o2_setpoint: S = k_makeup * (o2_setpoint - cabin_o2) * dt.
+  # NOT clamped -- above the setpoint the frozen law goes negative and the flow reverses.
+  # Safe here because cabin_o2 starts AT the setpoint and the crew draw keeps it below.
+  - id: eclss.o2_makeup
+    type: eclss.o2_makeup
+    priority: 0
+    wiring:
+      o2_supply: boundary.o2_supply
+      cabin_o2: eclss.cabin_o2
+    params: eclss
+
+forcings:
+  # The forced constant crew metabolic rates (EclssScenario). Keys are the frozen
+  # hardcoded module constants -- renaming one makes crew_metabolism raise at step 1.
+  o2_consumption:
+    const: 0.004      # mol/s, crew O2 intake out of the cabin
+  co2_production:
+    const: 0.003      # mol/s, crew CO2 exhaled into the cabin
+  h2o_production:
+    const: 2.0e-5     # kg/s, crew humidity (respiration + perspiration)

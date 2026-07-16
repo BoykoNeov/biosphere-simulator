@@ -115,6 +115,28 @@ pub struct HeatInput {
     node: String,
 }
 
+impl HeatInput {
+    /// Construct a `HeatInput` with the given ids.
+    ///
+    /// Additive over [`build_thermal`]'s internal struct-literal construction (which stays
+    /// untouched, so the frozen thermal golden cannot move) — the `SelfDischarge::new`
+    /// precedent. Added by the post-roadmap **Tier-1** unfreeze so the `authoring` crate,
+    /// a *different* crate, can build this flow from a scenario file; the fields are
+    /// private, so a struct literal is unreachable from outside this module.
+    ///
+    /// This flow and `eclss::CrewMetabolism` were the only two of the nine registered
+    /// sibling flows lacking a public constructor, for the same reason: both are the
+    /// *forced stand-ins* that Phase-6 station coupling **drops**, so nothing outside
+    /// their own module had ever needed to build one.
+    pub fn new(id: String, heat_source: String, node: String) -> Self {
+        HeatInput {
+            id,
+            heat_source,
+            node,
+        }
+    }
+}
+
 impl Flow for HeatInput {
     fn id(&self) -> &str {
         &self.id

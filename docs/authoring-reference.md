@@ -56,10 +56,12 @@ reference.
 ### Delegated, not re-frozen
 
 - **Param values.** An authored file reaches frozen param values only through the named
-  loaders (`crew`, `self_discharge`). Those files are frozen by
-  [`docs/station-reference.manifest.json`](station-reference.manifest.json), named here
+  loaders (`crew`, `self_discharge`, `charge`, `thermal`, `eclss`). Those files are frozen
+  by [`docs/station-reference.manifest.json`](station-reference.manifest.json), named here
   via `delegates_to` and **never re-hashed** — the same pointer discipline by which the
-  station manifest delegates the biosphere. One owner per frozen artifact.
+  station manifest delegates the biosphere. One owner per frozen artifact. Delegation is
+  about *ownership*, not endorsement: the station manifest freezes what those values **are**,
+  not that they are **right** — see *Frozen is not calibrated*.
 - **All science.** Flow laws, integrators, the engine's conservation/arbitration
   machinery: frozen by the biosphere/station/native-port contracts. This reference
   freezes only the *selection surface* over them.
@@ -197,9 +199,129 @@ field — and more to the point, this registry *is* the authoring contract, a de
 curated public surface. It is **expected to grow** (Step 0 registered the three standalone
 Crew flows as the composition anchor); each addition is an unfreeze.
 
-`PARAM_LOADERS` names the frozen loaders a file may reach (`crew`, `self_discharge`). A
-**parameter pack** is read by the *same frozen loader*, so a pack's values pass the frozen
-schema/bounds/unit validation — **a pack is a param file, not a way around the guards**.
+The post-roadmap **Tier-1 unfreeze** grew it to **twelve**, adding the nine standalone
+Power / Thermal / ECLSS flows (`docs/plans/post-roadmap-flow-registry-growth.md`). The
+`FORCED` column is the fact you most need and cannot see from the type name — it decides
+how positivity holds, and whether the flow is multi-instanceable:
+
+| type | wiring fields | param set | driver |
+|---|---|---|---|
+| `crew.oxygen_consumption` | `o2_store`, `o2_consumed` | — | FORCED `crew_o2_intake` |
+| `crew.food_metabolism` | `food_store`, `exhaled_co2`, `fecal_waste` | `crew` | FORCED `crew_food_intake` |
+| `crew.water_balance` | `water_store`, `crew_humidity`, `urine` | `crew` | FORCED `crew_water_intake` |
+| `power.solar_charge` | `solar_source`, `battery`, `waste_heat` | `charge` | FORCED `solar_power` |
+| `power.load_draw` | `battery`, `waste_heat` | — | FORCED `load_power` |
+| `power.self_discharge` | `battery`, `waste_heat` | `self_discharge` | donor (`k·battery`) |
+| `thermal.heat_input` | `heat_source`, `node` | — | FORCED `heat_load` |
+| `thermal.radiator_reject` | `node`, `space` | `thermal` | donor, **nonlinear `T⁴`** |
+| `eclss.crew_metabolism` | `cabin_o2`, `cabin_co2`, `cabin_h2o`, `metabolic_o2_sink`, `metabolic_co2_source`, `metabolic_h2o_source` | — | FORCED ×3 (`o2_consumption`, `co2_production`, `h2o_production`) |
+| `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor (`k_scrub·cabin_co2`) |
+| `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor (`k_cond·cabin_h2o`) |
+| `eclss.o2_makeup` | `o2_supply`, `cabin_o2` | `eclss` | demand (`k·(setpoint − cabin_o2)`) |
+
+**The biosphere is absent for a structural reason, not a calibration one.** `Allocation`
+takes a composite `ctx: CarbonContext` (four param objects + four stock ids) plus `pheno`
+and `alloc` — which a flat `wiring_fields` tuple and a single `param_set` cannot express.
+It also needs the aux accumulator, the shared `co2_pool` feedback var, and the two-rate
+master-day driver, all deferred. It wants a *frozen-compartment include*, not flow-type
+entries. That is a phase of work, not a step.
+
+`PARAM_LOADERS` names the frozen loaders a file may reach: `crew`, `self_discharge`,
+`charge`, `thermal`, `eclss`. A **parameter pack** is read by the *same frozen loader*, so
+a pack's values pass the frozen schema/bounds/unit validation — **a pack is a param file,
+not a way around the guards**. Because every loader returns a flat dataclass of floats,
+each set is reachable *both* as a frozen type's `param_set` and as a `kinetics` rate's
+`param("…")` source — so an authored rate may read η_c, the radiator properties or the
+ECLSS gains and get the **frozen** value through the **frozen** guards.
+
+### Frozen is not calibrated — read this before trusting a number
+
+The registry decides **which rate laws** an author may select. It says nothing about
+whether those laws' **numbers** are right, and for these nine flows they are not known to
+be. This is the single most misreadable fact on this page, so it is stated plainly:
+
+> **55 of the project's 57 parameters are uncited placeholders.** Every param reachable
+> through the loaders above carries `source: "TODO(cite) — provisional … pending
+> validation gate"` **except `crew`'s two**, which are calibrated to NASA BVAD Table 3-31.
+> `eclss.yaml` says so in as many words: *"deliberately NOT NASA BVAD / BioSim life-support
+> numbers"*.
+
+The *equations* are honest, cited primary literature (Stefan–Boltzmann is Incropera; the
+ECLSS loops are Seader/Ogata; the FvCB biosphere is Farquhar et al. 1980). The *values* are
+plausible guesses. **Structure is literature-derived; values are not calibrated.** The gate
+that would settle them — the deferred Phase-1 quantitative oracle match — has never run,
+and its tests are opt-in (`-m oracle`) and absent from the default gate.
+
+Two consequences an author must hold onto:
+
+1. **No `UNCALIBRATED` banner means "no authored kinetics" — NOT "validated."**
+   `has_authored_kinetics` measures **who wrote the rate law**, never whether the science
+   is validated. Those are independent axes, and the marker is silent on the second one:
+
+   | axis | asks | fixed by |
+   |---|---|---|
+   | **shape** of the law | is the functional form right? | the registry / the grammar |
+   | **values** in the law | are the numbers right? | validation (not yet done) |
+
+   A scenario built entirely from frozen types carries **no** marker and is **no more
+   validated** than one that authored its own kinetics. It is merely *not the author's
+   fault*. A calibration signal for the values axis is future work: it cannot discriminate
+   until there is something to discriminate — today it would report "uncalibrated" for
+   everything except crew, which this section already says in prose.
+
+2. **Selecting a frozen flow buys you reuse and conservation, not credibility.** That is
+   still worth a great deal: the law's *shape* is literature-derived and cross-port
+   pinned, and you inherit the frozen bounds/unit guards. Just don't read the absence of a
+   warning as an endorsement.
+
+Deviating from reality is **legitimate** here — interesting, educational, even fun — *as
+long as it is deliberate and documented*. This section is the "documented" half.
+
+### The `dt` constraint — the frozen params assume one, and you pick it
+
+**This is the sharpest hazard on the platform, and registration is what created it.** Every
+frozen rate constant was sized against the `dt` of *its own frozen scenario*, and that
+sizing is part of the flow's positivity argument — but it lives in a YAML comment, not in
+the code. Selecting a flow type hands you the `dt` knob with no guard attached.
+
+| flow | constraint | frozen sizing | breaks at |
+|---|---|---|---|
+| `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** |
+| `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** |
+| `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** |
+| `eclss.crew_metabolism` | forced draw < stock | `0.004·60 = 0.24` of 10 mol | `0.004·3600 = 14.4` of 10 mol |
+| `power.self_discharge` | `k·dt < 1` | `dt = 3600` → `3.6e-5` | `dt ≈ 1e8` s (~3 yr) |
+| `thermal.radiator_reject` | `τ = C/(4εσA·T_eq³) ≫ dt` | `dt = 3600` → `τ ≈ 65` steps | a much larger `dt` overshoots |
+
+**The composability constraint** falls straight out of that table, and it is not derivable
+from any single flow: **ECLSS is sized for `dt = 60`; Thermal for `dt = 3600`.** A scenario
+composing both must pick one `dt`, and only **`dt ≤ ~60`** is safe for both (a smaller `dt`
+only ever helps Thermal's overshoot margin). There is no `dt` natural to both domains.
+
+**The failure is SILENT.** Measured, not assumed (`tests/test_authoring_dt_hazard.py`). At
+`dt = 3600` the ECLSS cabin does **not** raise, **conserves** every quantity every step,
+completes with `rationed = 37` — and ends with `cabin_o2` at `-1.4e-14`. *The cabin has no
+oxygen and the platform reports success.* The arbitration backstop scales the over-draw so
+nothing goes properly negative, which is exactly why nothing is raised; the only signal is
+the `rationed` count from `run_scenario`, and `states, _, _ = run_scenario(built)` throws it
+away.
+
+So: **`rationed > 0` on an authored run means your `dt` is wrong.** Check it. It is not
+checked for you, and no banner will tell you — the run authored no kinetics, so it carries
+no marker either.
+
+None of this is a bug in the frozen flows. Each is correct at the `dt` it was sized for;
+the frozen sizing argument is simply scoped to the frozen scenario, and **authoring is what
+escapes that scope**. Making it loud (a strict mode, a run summary, a Godot warning) is a
+capability-gap item with its own design — deliberately not folded into a registration
+unfreeze.
+
+The same scoping bites one other place, mildly: `eclss.o2_makeup` is a *linear, unclamped*
+proportional controller. Its frozen docstring notes an above-setpoint venting clamp is "a
+deferred seam that never arises here" — true of every frozen scenario, but an author can
+wire `cabin_o2` above the `10.0 mol` setpoint, at which point the rate goes negative and
+the flow silently **reverses** (venting cabin O₂ back into the supply tank). It conserves
+and it does not ration; it is simply not what "makeup" suggests.
 
 ### Templates — the boundary's arithmetic (decision A, as amended)
 
@@ -227,10 +349,24 @@ The contract is earned by Steps 0–6c (full detail + measured results in the pl
   constructor's trajectory, per step, under **Euler *and* RK4** (RK4 is nontrivial —
   `SelfDischarge` is donor-controlled ⇒ RK4 ≢ Euler). The frozen flow is the oracle; no
   new golden was invented.
-- **The interpreter is faithful** — the nine crossport anchors
+- **The interpreter is faithful** — the twelve crossport anchors
   (`tests/crossport/authoring_files.py::ANCHORS`, the authoritative live list), including
   an authored crew run **byte-identical to the frozen `crew_state.json`** — via a bare
-  file, via a template at its default, and via a single-bundle `include`.
+  file, via a template at its default, and via a single-bundle `include` — and, since
+  Tier 1, an authored ECLSS cabin **byte-identical to the frozen `eclss_state.json`** on
+  *both* ports. That last one carries the registry's weight: it takes the byte-identity
+  claim from one single-quantity domain to a three-quantity one whose six-leg forced flow
+  balances CARBON, OXYGEN and WATER independently, across nine stocks the registry had to
+  wire correctly (including the unclamped-source vs clamped-sink split and the
+  single-quantity cabin compositions) with **no build-time stoichiometry check to catch a
+  mistake** — that check runs for authored `kinetics` flows only, never for frozen `type`
+  flows, so an error would surface only as a runtime `ConservationError`.
+- **The registry mirrors the frozen constructors** — `test_authoring_frozen_flows.py`
+  derives each frozen class's *actual* dataclass fields and asserts every `FlowTypeSpec`
+  declares exactly `(id, priority, *wiring[, params])`. Added by Tier 1 because nothing
+  owned it: the manifest gate owns completeness, the anchors own does-it-run, and neither
+  notices a `wiring_fields` entry naming a field that does not exist on a type no anchor
+  happens to exercise.
 - **The safety spine has teeth** — a mis-wired flow (e.g. a carbon leg pointed at an
   oxygen stock) interprets cleanly and then raises `ConservationError` on step 1: bad
   wiring is **surfaced, never silently fixed**.
@@ -273,12 +409,23 @@ it. Parity surfaces own cross-port fidelity; this gate owns single-port complete
 
 A future maintainer should read these as intentional scope, each surfaced when it was hit:
 
-- **A forcing-bound frozen bundle cannot be prefixed.** The frozen crew flows read
-  `crew_o2_intake` etc. from a **hardcoded module constant**, not through wiring, so they
-  cannot find a namespaced forcing key — a prefixed crew include fails at resolve time.
-  (The greenhouse `CARBON_POOL` analogue: re-point the side that *can* be.) Kinetics /
-  disjoint bundles namespace cleanly, which is why the multi-instance anchor is two
-  batteries.
+- **A forcing-bound frozen flow cannot be prefixed — and Tier 1 widened this from three
+  flows to nine.** The frozen crew flows read `crew_o2_intake` etc. from a **hardcoded
+  module constant**, not through wiring, so they cannot find a namespaced forcing key — a
+  prefixed crew include fails at resolve time. (The greenhouse `CARBON_POOL` analogue:
+  re-point the side that *can* be.) Kinetics / disjoint bundles namespace cleanly, which is
+  why the multi-instance anchor is two batteries.
+
+  Six of the nine flows Tier 1 registered are forcing-bound the same way, so the same
+  boundary applies to each: `power.solar_charge` (`solar_power`), `power.load_draw`
+  (`load_power`), `thermal.heat_input` (`heat_load`), and `eclss.crew_metabolism` (all
+  three of `o2_consumption` / `co2_production` / `h2o_production`). **Single-instance
+  authoring works** — declare a forcing under the exact hardcoded name, as
+  `power_bus.yaml` / `thermal_node.yaml` / `eclss_cabin.yaml` do — but a second, prefixed
+  instance collides on the forcing key. Two batteries are multi-instanceable because
+  `power.self_discharge` is donor-controlled and reads a *stock*; two solar arrays are not.
+  Renaming a forcing key is not a build error: it surfaces as a resolve-time `KeyError` at
+  step 1.
 - **Bundle-parameter namespacing** — two prefixed instances of a param-bearing bundle
   collide on the parameter name. The honest boundary; the only param-bearing bundle (crew)
   is un-multi-instanceable for the forcing reason anyway.

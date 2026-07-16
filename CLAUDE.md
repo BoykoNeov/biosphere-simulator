@@ -45,7 +45,7 @@ Each row's detail is in `docs/plans/phase-<n>-*.md`.
 | Work | Status |
 |---|---|
 | The first authored habitat (`scenarios/algae_habitat.yaml`) | COMPLETE — `docs/plans/post-roadmap-authored-habitat.md` |
-| Tier 1: grow the flow registry (9 Power/Thermal/ECLSS flows + 3 loaders) | PLANNED — an **unfreeze**; `docs/plans/post-roadmap-flow-registry-growth.md` |
+| Tier 1: grow the flow registry (9 Power/Thermal/ECLSS flows + 3 loaders) | COMPLETE — the authoring platform **unfrozen** (`flow_types` 3→12, `param_loaders` 2→5); `docs/plans/post-roadmap-flow-registry-growth.md` |
 | Tier 2: the grammar (`monod`) → bucket 3: validation (the deferred oracle match) | SEQUENCED, not started — same doc, "The sequence" |
 
 ## The freeze contracts (four; each has an unfreeze discipline — follow it)

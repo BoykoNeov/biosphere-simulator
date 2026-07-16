@@ -950,10 +950,10 @@ def _run_authoring_example(example: str, scenario_file: str, overrides: dict) ->
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
 @pytest.mark.parametrize(
     "scenario_file,overrides",
-    [(f, ov) for (f, ov, _golden) in authoring_files.ANCHORS],
+    [(f, ov) for (f, ov, _golden, _tier) in authoring_files.ANCHORS],
     ids=[
         f"{f}:{','.join(f'{k}={v}' for k, v in ov.items()) or 'default'}"
-        for (f, ov, _golden) in authoring_files.ANCHORS
+        for (f, ov, _golden, _tier) in authoring_files.ANCHORS
     ],
 )
 def test_rust_authoring_graph_dump_matches_python(
@@ -963,7 +963,14 @@ def test_rust_authoring_graph_dump_matches_python(
     interpreter's, byte-for-byte (Tier-0 file-level parse-parity). This catches graph
     facts a final-state snapshot is blind to: flow priorities, present-but-inert flows,
     and — via the hex-float amounts / forcing constants — the bit-exact Step-3
-    boundary-eval of a template expression (`param('crew_count') * 1000.0`)."""
+    boundary-eval of a template expression (`param('crew_count') * 1000.0`).
+
+    **Every anchor, including the Tier-2 one.** The dump renders authored literals via
+    `float.hex()` and never calls a flow's `evaluate`, so no transcendental can reach
+    it — it is bit-exact even for `thermal_node.yaml`'s `T**4` radiator. That is why a
+    Tier-2 flow can still be anchored: the dump proves the registry lowers the file to
+    the right graph on both ports, the only *new* thing an authored thermal anchor can
+    establish (its runtime arithmetic parity is already frozen by thermal_state)."""
     built = authoring_files.load_anchor(SCENARIOS_DIR, scenario_file, overrides)
     python_dump = authoring_files.render_graph_dump(built)
     rust_dump = _run_authoring_example("dump_graph", scenario_file, overrides)
@@ -975,16 +982,28 @@ def test_rust_authoring_graph_dump_matches_python(
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
 @pytest.mark.parametrize(
     "scenario_file,overrides",
-    [(f, ov) for (f, ov, _golden) in authoring_files.ANCHORS],
+    [
+        (f, ov)
+        for (f, ov, _golden, tier) in authoring_files.ANCHORS
+        if tier == authoring_files.TIER_1_BIT_EXACT
+    ],
     ids=[
         f"{f}:{','.join(f'{k}={v}' for k, v in ov.items()) or 'default'}"
-        for (f, ov, _golden) in authoring_files.ANCHORS
+        for (f, ov, _golden, tier) in authoring_files.ANCHORS
+        if tier == authoring_files.TIER_1_BIT_EXACT
     ],
 )
 def test_rust_authoring_run_matches_python(scenario_file: str, overrides: dict) -> None:
     """The Rust interpreter's RUN of an anchor file reproduces the Python interpreter's
     final `State` — Rust-parse(file) ≡ Python-parse(file) ≡ same trajectory. Compared on
-    parsed f64 via `sim_io.loads`/`dumps` (port-agnostic, never JSON bytes)."""
+    parsed f64 via `sim_io.loads`/`dumps` (port-agnostic, never JSON bytes).
+
+    **Tier-1 anchors only.** A Tier-2 anchor (`thermal_node.yaml` — the `T**4` radiator)
+    is excluded by classification, NOT by observation: this `==` would in fact pass for
+    it on any single machine, where Rust and CPython share one libm. Asserting it would
+    label a `powf` flow bit-exact, contradicting tiers.json's rule ("classify by the ops
+    the simulator EXECUTES") and breaking the moment a run compared across libms. See
+    `authoring_files.ANCHORS` for what covers a Tier-2 anchor instead."""
     from authoring.run import run_scenario
 
     built = authoring_files.load_anchor(SCENARIOS_DIR, scenario_file, overrides)
@@ -1003,17 +1022,24 @@ def test_rust_authoring_run_matches_python(scenario_file: str, overrides: dict) 
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
 @pytest.mark.parametrize(
     "scenario_file,overrides,golden",
-    [(f, ov, g) for (f, ov, g) in authoring_files.ANCHORS if g is not None],
+    [(f, ov, g) for (f, ov, g, _tier) in authoring_files.ANCHORS if g is not None],
 )
 def test_rust_authoring_run_byte_identical_to_frozen_golden(
     scenario_file: str, overrides: dict, golden: str
 ) -> None:
     """The strongest anchor: the Rust interpreter's run of the composition anchor
-    (`crew_mission`) and the template at its default (`crew_habitat_template`,
-    crew_count = 1.0 ⇒ `1.0 * base == base`) reproduces the FROZEN `crew_state.json`
-    golden byte-for-byte through `sim_io.loads`/`dumps` (transcendental-free ⇒ Tier-1,
-    platform-independent). The whole file→schema→interpret→run→emit path validated
-    against the reference the Python side is also pinned to."""
+    (`crew_mission`), the template at its default (`crew_habitat_template`,
+    crew_count = 1.0 ⇒ `1.0 * base == base`), and — since Tier 1 — the ECLSS cabin
+    (`eclss_cabin` ⇒ `eclss_state.json`) reproduce their FROZEN goldens byte-for-byte
+    through `sim_io.loads`/`dumps` (transcendental-free ⇒ Tier-1, platform-independent).
+    The whole file→schema→interpret→run→emit path validated against the reference the
+    Python side is also pinned to.
+
+    `eclss_cabin` is the first golden here that is not `crew_state.json`: it takes the
+    claim from one single-quantity domain to a three-quantity one whose six-leg forced
+    flow balances CARBON, OXYGEN and WATER independently — through nine stocks the
+    registry had to wire (incl. the unclamped-vs-clamped boundary split) with no
+    build-time stoichiometry check to catch a mistake."""
     rust_json = _run_authoring_example("emit_authored", scenario_file, overrides)
     reemitted = snapshot.dumps(snapshot.loads(rust_json))
     golden_text = (
