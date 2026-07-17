@@ -1,16 +1,27 @@
 # Post-roadmap: multi-rate authoring — the author picks a coupling cadence, not a global `dt`
 
-**Status: IN PROGRESS — Steps 1–6 of 7 done.** A **phase, not a step** — an authoring
-unfreeze (schema + interpreter + run harness), the Rust mirror, the freeze manifest, and
-the cross-port tiers. **The user opened the unfreeze on 2026-07-17.** The knob is
-decided, built (Step 2), **drives** (Step 3), has **paid off the phase's stated
-motivation** (Step 4 — the scenario `docs/authoring-reference.md` calls *impossible* is
-authored, committed and green), **the hazard it does not itself close is now closed**
-(Step 5: the build-time `k·h < 1` precondition), **the Rust port is level** (Step 6 —
-including the driver; the Step-6 landmine was decided, not inherited) and **the two ports
-are now compared on a multi-rate file** (Step 6b — `eclss_multirate_cabin.yaml`, the
-anchor Step 6 wrongly believed impossible). No golden has moved and `src/` is untouched.
-Remaining: the unfreeze ceremony + the reference-doc narrative (7).
+**Status: COMPLETE — all 7 steps done; the authoring platform is RE-FROZEN with the
+multi-rate surface in it.** A **phase, not a step** — an authoring unfreeze (schema +
+interpreter + run harness), the Rust mirror, the freeze manifest, and the cross-port
+tiers. **The user opened the unfreeze on 2026-07-17.** The knob is decided, built
+(Step 2), **drives** (Step 3), has **paid off the phase's stated motivation** (Step 4 —
+the scenario `docs/authoring-reference.md` called *impossible* is authored, committed and
+green), **the hazard it does not itself close is closed** (Step 5: the build-time
+`k·h < 1` precondition), **the Rust port is level** (Step 6 — including the driver; the
+Step-6 landmine was decided, not inherited), **the two ports are compared on a multi-rate
+file** (Step 6b — `eclss_multirate_cabin.yaml`, the anchor Step 6 wrongly believed
+impossible), and **the contract now says all of it** (Step 7 — the ceremony + the
+narrative; the manifest regenerated to a **byte-identical** file, which is the incremental
+discipline confirmed rather than a formality). **No golden moved and `src/` is untouched
+across all seven steps.**
+
+**The author-facing surface changed as follows** (the consolidated record):
+`ScenarioSpec.n_sub` + `FlowSpec.rate_class` (schema), `rate_classes: [fast, slow]` (a new
+frozen vocabulary, closed at two by `multirate_step`'s signature),
+`FlowTypeSpec.rate_params` + 4 populated rows (registry), the `k·h < 1` build-time
+precondition + the `allow_unsafe_step` hatch (interpreter), and the `multirate_step`
+driver + aux tripwire (run) — on **both ports**, with `eclss_thermal_habitat.yaml` and
+`eclss_multirate_cabin.yaml` as the authored anchors.
 
 **Step 5 corrected a formula this document specified.** The precondition is **not**
 `k·(dt/n_sub) < 1` for every flow: the slow set steps at **`dt/2`** under Strang,
@@ -393,7 +404,13 @@ surface, not a licence to edit the core.
    *this phase keeps invalidating sentences written before the platform could do the thing
    they deny*, and the reference doc is where they accumulate. Step 7 owns the rewrite.
 7. **The consolidated unfreeze ceremony** + the reference-doc narrative, per
-   `docs/authoring-reference.md`, "The unfreeze discipline". **The manifest itself moves
+   `docs/authoring-reference.md`, "The unfreeze discipline". ✅ **DONE** — see "Step 7:
+   COMPLETE" below. The reserved narrative did **two** sweeps, not one: *forward* (the
+   frozen surface had **zero prose** — a hole no gate can see, because the doc is not one
+   of the equality gate's two sides) and *backward* (the meta-finding, which took a
+   **fifth** instance in a section the phase never touched — and it was only **half**
+   false, since its "two-rate master-day driver" is the biosphere's mechanism, not
+   `multirate_step`). **The manifest itself moves
    *incrementally*, not here** (advisor, Step 2): `test_frozen_schema_surface_is_complete`
    is plain equality against the live tree, so it goes red the *instant* a schema field
    lands — and this project commits each step to `main`. Deferring the regeneration to
@@ -1008,6 +1025,111 @@ limitation you just removed* is not enough, because **the claim you must re-read
 you wrote yourself in the step that removed it.** A scope decision recorded as a fact ("X
 appears in zero crossport files") outlives the reasoning that made it right ("...*and it is
 Tier-2, which is why*"), and the fact reads like the rule.
+
+## Step 7: COMPLETE — the ceremony, and the prose no gate was watching
+
+The consolidated unfreeze ceremony and the reference-doc narrative. **Doc-only:
+`git diff src/` empty, no golden moved, and the manifest regenerated to a
+byte-identical file.**
+
+**That no-op IS the result, not a formality.** Step 2 ruled the manifest must regenerate
+*at each step that moves the surface*, never batched here, because the gate is plain
+equality and batching would leave it red — i.e. **disabled** — across Steps 3–6b. Running
+the generator at the ceremony and getting **zero diff** is that ruling being confirmed
+rather than asserted: the surface was already frozen, step by step, as it moved. A
+ceremony that *had* produced a diff would have meant four steps of gate-blind drift.
+
+**SWEEP 1 (forward) — the finding: a frozen surface had ZERO prose, and no gate could
+have said so.** `ScenarioSpec.n_sub`, `FlowSpec.rate_class`, the `rate_classes`
+vocabulary, and `flow_types[*].rate_params` were all frozen in the manifest, mirrored on
+both ports, exercised by anchors — and **named nowhere in the human-readable account**.
+The schema table listed `name/integrator/dt/steps/rng_seed`; the registry table had four
+columns and none was `rate_params`. Every gate was green the whole time, and correctly
+so:
+
+> **`test_frozen_schema_surface_is_complete` equates the manifest against the live tree.
+> The reference doc is not one of the two sides.** So a surface can be in the code ✓, in
+> the manifest ✓, gate green ✓, and described in no prose ✗ — with nothing red.
+
+That is the **sibling of Step 5's lesson**, one turn further: Step 5 found that *an
+equality gate is blind to a field absent from both sides*; this is *an equality gate is
+blind to everything that is not one of its sides at all*. The manifest's `reference_doc`
+key is a **pointer, not an assertion** — the same "provenance, not a gate" shape scope C
+named for the per-file sha-256. The freeze has always had a machine-checked half and an
+honor-system half, and the honor-system half is the one an author actually reads.
+**Named, not fixed** — a candidate gate (assert every manifest-frozen name appears in the
+doc) is recorded below rather than built, because a *mention* is not a *description* and
+the gate would buy a green light for prose that says nothing.
+
+**SWEEP 2 (backward) — the meta-finding taken to a FIFTH instance, and this one was in a
+section the phase never touched.** `docs/authoring-reference.md`'s Documented boundaries
+read *"**The interpreter builds single-rate, no-reset graphs only**"*. Steps 4/5/6/6b each
+falsified a claim about the limitation they had just removed; this one had sat outside the
+`dt`-hazard narrative the whole phase, so every previous sweep — which followed the
+*hazard*, not the *concept* — walked straight past it. **Grep the concepts, not the
+sections you edited.**
+
+**And it was only HALF false, which is the catch that mattered** (advisor, before the
+rewrite): the "two-rate master-day driver" in that bullet is the **biosphere's daily/annual
+cadence with a reset hook** — *not* `multirate_step`. Two different mechanisms sharing a
+word. Multi-rate's fast/slow operator split **is** now authorable; the master-day driver is
+**not**, and stays deferred with the rest of the biosphere. Correcting the bullet to "the
+interpreter builds multi-rate graphs now" would have swapped a stale claim for a **false**
+one — the failure mode this sweep exists to prevent, committed by the sweep itself. The
+bullet now splits the two by name and says which half moved.
+
+**The four superseded boxes are GONE, not stacked.** Steps 4–6 each left a `⚠ SUPERSEDED` /
+`✅ RESOLVED` / `✅ BUILT` box explicitly naming Step 7 as the rewrite owner. The whole point
+of reserving the narrative for the ceremony is that the boxes get **resolved into
+present-tense prose** — a fifth "✅ now-done" box would have been the opposite of owning the
+rewrite (advisor). The history they carry is demoted to a line where it still teaches (the
+deferral's own `dt/n_sub` guess was *wrong in the unsafe direction*; the losing bridge
+argument is preserved in full, because the user's decision has a real cost and the record
+must state it), and dropped where it was only scaffolding. The `(Step 5)` refs in the `dt`
+table went too: with multiple post-roadmap plans, a bare step number no longer identifies a
+plan.
+
+**What the reference doc now says that it did not**: a dedicated *Multi-rate* section (the
+knob, the per-flow-not-per-domain ruling, the four frozen semantic choices as a table, the
+three-case effective step, the identity path and why **the branch, not the identity**,
+preserves the goldens, the measured payoff, and the three things it does NOT do); the
+precondition documented at the table it protects, with the **pack** as its load-bearing
+reason for living at build time; `rate_params` as a column with its empty cells marked
+*declaration, not omission*; and four new **deferrals by name** — author-visible `split`,
+per-rate-class integrator, the general `dt` precondition, and **the Rust pack deferral as a
+cross-port soundness precondition** (the Step-6 finding, which was recorded only in this
+plan and belonged in the contract).
+
+**The discipline's literal wording was not followed, deliberately.** Step 5 of the unfreeze
+discipline says *"update this file **and the Phase-9 plan**"*. Post-roadmap work does not:
+Tier 1 and Tier 2 both wrote their own `post-roadmap-*.md` and left
+`phase-9-scenario-authoring.md` alone (it mentions post-roadmap work once, as a
+forward-looking note). The Phase-9 plan is the record of **Phase 9**; this plan is the
+record of **this unfreeze**. Following the sentence literally would corrupt a completed
+phase's record with work that is not its own. The wording predates the existence of
+post-roadmap plans — the same shape as every claim this phase has falsified, in the
+discipline itself.
+
+**A smaller finding with the same shape: `(Step 5)` stopped identifying a step.** The `dt`
+table's "caught by" cells read **"build (Step 5)"**, and the reference doc also carried
+"Recorded schema relaxation **(Step 6b)**" — written when "the plan" meant
+`phase-9-scenario-authoring.md` and a bare step number was unique. **This plan has its own
+Step 5 and its own Step 6b**, so both refs silently became ambiguous the moment it started,
+and "Step 6b" now names two different pieces of work in one document. Not stale — *unresolvable*,
+which is worse, because it still reads as precise. Bare step numbers are now qualified
+(`Phase-9 Step 6b`, `Phase-2 Step 7`) or dropped where the section already explains itself.
+**The transferable rule: a cross-document identifier that was unique when written stops
+being unique when a sibling document appears — and nothing about the original text changes
+to signal it.**
+
+### Candidate, named not built: a doc-coverage gate
+
+Assert every manifest-frozen name (`schema_fields` values, `flow_types` keys,
+`rate_classes`, `param_loaders`) appears in `docs/authoring-reference.md`. It would have
+caught Sweep 1 in Step 2 instead of Step 7. **Not built** because a name appearing in the
+doc is not the same as the doc *explaining* it, and a green light for that is worse than
+the honest honor-system half — the freeze's prose is reviewed, not grepped. Recorded so the
+next maintainer decides deliberately rather than rediscovering the hole.
 
 ## The measurements this rests on
 

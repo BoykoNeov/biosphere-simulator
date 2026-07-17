@@ -194,18 +194,24 @@ key is a schema error, not a silent drop. The manifest freezes each model's fiel
 
 | Model | Role |
 | --- | --- |
-| `ScenarioSpec` | the whole file: run config (`name`/`integrator`/`dt`/`steps`/`rng_seed`) + `includes` + `parameters` + `stocks` + `flows` + `forcings` |
+| `ScenarioSpec` | the whole file: run config (`name`/`integrator`/`dt`/`steps`/`rng_seed`/`n_sub`) + `includes` + `parameters` + `stocks` + `flows` + `forcings` |
 | `BundleSpec` | a reusable domain/species bundle: `parameters`/`stocks`/`flows`/`forcings` — **no run config, no nested `includes`** (both rejected by `extra="forbid"`) |
 | `IncludeSpec` | the `{bundle, prefix}` namespaced include form |
 | `StockSpec` | one stock: id/domain/quantity/kind/amount + optional `composition`/`unclamped`/`extinction_threshold` |
-| `FlowSpec` | one flow: a frozen `type` + `wiring` **xor** authored `kinetics`, + `priority`/`params` |
+| `FlowSpec` | one flow: a frozen `type` + `wiring` **xor** authored `kinetics`, + `priority`/`params`/`rate_class` |
 | `KineticsSpec` | `rate` (the grammar above) × `stoichiometry` |
 | `ForcingSpec` | `const` — **constant forcings only** |
 | `ParamPackRef` | `{pack: …}` — an alternate param file read by the *same* frozen loader |
 
-`integrator` is one of the frozen names `euler` / `rk4`.
+`integrator` is one of the frozen names `euler` / `rk4`; `rate_class` is one of `fast` /
+`slow`. **Both vocabularies are frozen separately from the field that carries them**, by the
+manifest's `integrator_names` and `rate_classes` keys — `schema_fields` records that a field
+*exists*, never what it may *say*, so a silently-added third value would move no frozen set
+without them. The `rate_classes` pair is **closed at two by `multirate_step`'s own
+signature** (it takes exactly two `Substepper`s), unlike the flow-type registry, which is
+expected to grow.
 
-**Recorded schema relaxation (Step 6b):** `stocks` and `flows` are **optional** on both
+**Recorded schema relaxation (Phase-9 Step 6b):** `stocks` and `flows` are **optional** on both
 `ScenarioSpec` and `BundleSpec` — a scenario composed purely from includes declares
 neither inline. This was a required→optional change on both ports; it is frozen in that
 relaxed form.
@@ -243,35 +249,43 @@ renders a `Const` via `repr`, Rust via `f64::Display`; both round-trip on their 
 ### The author-selectable flow-type registry
 
 `FLOW_TYPES` (`src/authoring/flow_registry.py`) maps an authoring type name → the frozen
-class + its **exact `wiring` field set** + its param set. The manifest freezes all three
-per entry: **the wiring names are as much the contract as the type name** — renaming one
-breaks every scenario file that names it.
+class + its **exact `wiring` field set** + its param set + its `rate_params`. The manifest
+freezes all four per entry: **the wiring names are as much the contract as the type name** —
+renaming one breaks every scenario file that names it.
 
 The registry is **explicit, not introspected, by design**: a `StockId` is a `str` alias at
 runtime, so field-type introspection cannot tell a wiring field from any other string
 field — and more to the point, this registry *is* the authoring contract, a deliberately
-curated public surface. It is **expected to grow** (Step 0 registered the three standalone
-Crew flows as the composition anchor); each addition is an unfreeze.
+curated public surface. It is **expected to grow** (Phase-9 Step 0 registered the three
+standalone Crew flows as the composition anchor); each addition is an unfreeze.
 
 The post-roadmap **Tier-1 unfreeze** grew it to **twelve**, adding the nine standalone
 Power / Thermal / ECLSS flows (`docs/plans/post-roadmap-flow-registry-growth.md`). The
 `FORCED` column is the fact you most need and cannot see from the type name — it decides
 how positivity holds, and whether the flow is multi-instanceable:
 
-| type | wiring fields | param set | driver |
-|---|---|---|---|
-| `crew.oxygen_consumption` | `o2_store`, `o2_consumed` | — | FORCED `crew_o2_intake` |
-| `crew.food_metabolism` | `food_store`, `exhaled_co2`, `fecal_waste` | `crew` | FORCED `crew_food_intake` |
-| `crew.water_balance` | `water_store`, `crew_humidity`, `urine` | `crew` | FORCED `crew_water_intake` |
-| `power.solar_charge` | `solar_source`, `battery`, `waste_heat` | `charge` | FORCED `solar_power` |
-| `power.load_draw` | `battery`, `waste_heat` | — | FORCED `load_power` |
-| `power.self_discharge` | `battery`, `waste_heat` | `self_discharge` | donor (`k·battery`) |
-| `thermal.heat_input` | `heat_source`, `node` | — | FORCED `heat_load` |
-| `thermal.radiator_reject` | `node`, `space` | `thermal` | donor, **nonlinear `T⁴`** |
-| `eclss.crew_metabolism` | `cabin_o2`, `cabin_co2`, `cabin_h2o`, `metabolic_o2_sink`, `metabolic_co2_source`, `metabolic_h2o_source` | — | FORCED ×3 (`o2_consumption`, `co2_production`, `h2o_production`) |
-| `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor (`k_scrub·cabin_co2`) |
-| `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor (`k_cond·cabin_h2o`) |
-| `eclss.o2_makeup` | `o2_supply`, `cabin_o2` | `eclss` | demand (`k·(setpoint − cabin_o2)`) |
+| type | wiring fields | param set | driver | `rate_params` |
+|---|---|---|---|---|
+| `crew.oxygen_consumption` | `o2_store`, `o2_consumed` | — | FORCED `crew_o2_intake` | — |
+| `crew.food_metabolism` | `food_store`, `exhaled_co2`, `fecal_waste` | `crew` | FORCED `crew_food_intake` | — |
+| `crew.water_balance` | `water_store`, `crew_humidity`, `urine` | `crew` | FORCED `crew_water_intake` | — |
+| `power.solar_charge` | `solar_source`, `battery`, `waste_heat` | `charge` | FORCED `solar_power` | — |
+| `power.load_draw` | `battery`, `waste_heat` | — | FORCED `load_power` | — |
+| `power.self_discharge` | `battery`, `waste_heat` | `self_discharge` | donor (`k·battery`) | `self_discharge_rate` |
+| `thermal.heat_input` | `heat_source`, `node` | — | FORCED `heat_load` | — |
+| `thermal.radiator_reject` | `node`, `space` | `thermal` | donor, **nonlinear `T⁴`** | — (`τ ≫ dt` is not a predicate) |
+| `eclss.crew_metabolism` | `cabin_o2`, `cabin_co2`, `cabin_h2o`, `metabolic_o2_sink`, `metabolic_co2_source`, `metabolic_h2o_source` | — | FORCED ×3 (`o2_consumption`, `co2_production`, `h2o_production`) | — (state-dependent) |
+| `eclss.co2_scrubber` | `cabin_co2`, `co2_removed` | `eclss` | donor (`k_scrub·cabin_co2`) | `co2_scrub_rate` |
+| `eclss.condenser` | `cabin_h2o`, `humidity_condensate` | `eclss` | donor (`k_cond·cabin_h2o`) | `condense_rate` |
+| `eclss.o2_makeup` | `o2_supply`, `cabin_o2` | `eclss` | demand (`k·(setpoint − cabin_o2)`) | `o2_makeup_gain` |
+
+**`rate_params` names the first-order rate constants** — the `k` in a `dx/dt = k·x` or
+`k·(S−x)` leg, in `1/s` — and is the subset the build-time `k·h < 1` precondition reads (see
+*The `dt` constraint*). An **empty** cell is a **declaration, not an omission**: a param-free
+flow has no `k` to read, and the two annotated rows are uncoverable for reasons the
+`rate_params` docstring records. It is an explicit list rather than "every float on the
+params object" because `EclssParams` also carries **`o2_setpoint`, which is an inventory in
+mol, not a rate**, and checking it would be meaningless.
 
 **The biosphere is absent for a structural reason, not a calibration one.** `Allocation`
 takes a composite `ctx: CarbonContext` (four param objects + four stock ids) plus `pheno`
@@ -340,22 +354,44 @@ the code. Selecting a flow type hands you the `dt` knob with no guard attached.
 
 | flow | constraint | frozen sizing | breaks at | caught by |
 |---|---|---|---|---|
-| `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** | **build** (Step 5) + rationing |
-| `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** | **build** (Step 5) + rationing |
-| `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** | **build ONLY** (Step 5) — rationing sees nothing in `1 ≤ k·dt < 2`; see below |
+| `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** | **build** + rationing |
+| `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** | **build** + rationing |
+| `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** | **build ONLY** — rationing sees nothing in `1 ≤ k·dt < 2`; see below |
 | `eclss.crew_metabolism` | forced draw < stock | `0.004·60 = 0.24` of 10 mol | `0.004·3600 = 14.4` of 10 mol | rationing (**state-dependent — no build check possible**) |
-| `power.self_discharge` | `k·dt < 1` | `dt = 3600` → `3.6e-5` | `dt ≈ 1e8` s (~3 yr) | **build** (Step 5) + rationing |
+| `power.self_discharge` | `k·dt < 1` | `dt = 3600` → `3.6e-5` | `dt ≈ 1e8` s (~3 yr) | **build** + rationing |
 | `thermal.radiator_reject` | `τ = C/(4εσA·T_eq³) ≫ dt` | `dt = 3600` → `τ ≈ 65` steps | a much larger `dt` overshoots | — (**"≫" is not a predicate**) |
 
-**The "build" cells are multi-rate Step 5** (2026-07-17): the four rows whose constraint is a
-first-order `k` declare it as `rate_params` in the registry, and `interpret` refuses
-`k·h ≥ 1` before any step runs. **`h` is the *effective* step, not the file's `dt`** —
-`dt` single-rate, `dt/n_sub` for a **fast** flow, and **`dt/2` for a `rate_class: slow` one**
-(Strang's half-step, *independent of `n_sub`*). The last is the trap: a slow flow's step is
+**The "build" cells are the precondition**, and it is the platform's answer to the row it
+names: the four rows whose constraint is a first-order `k` declare it as `rate_params` in the
+registry, and `interpret` refuses `k·h ≥ 1` **before any step runs**. **`h` is the *effective*
+step, not the file's `dt`** — `dt` single-rate, `dt/n_sub` for a **fast** flow, and **`dt/2`
+for a `rate_class: slow` one** (Strang's half-step, *independent of `n_sub`*; see
+*Multi-rate*, below, for what those keys mean). The last is the trap: a slow flow's step is
 **not** `dt/n_sub`, and treating it as such reports a safe `k·h` for an unsafe flow. The two
 rows without a "build" cell are uncoverable **by declaration, not by omission** — see the
 `rate_params` docstring. Escape hatch for studying an unsafe run:
-`interpret(..., allow_unsafe_step=True)`.
+`interpret(..., allow_unsafe_step=True)` (Rust: `interpret_allowing_unsafe_step`).
+
+**The precondition's honest claim is "the platform catches the `k·dt` family", never "your
+`dt` is safe".** It reads a **declared** first-order rate constant and compares it against the
+step that flow is actually integrated at. It cannot see `thermal.radiator_reject`'s `τ ≫ dt`,
+`eclss.crew_metabolism`'s state-dependent over-draw, or an authored `kinetics` rate — the last
+by construction, since `rate_params` lives on `FlowTypeSpec` and a kinetics flow has none.
+**Neither gate subsumes the other**, which is why rationing was not retired when this landed:
+the build check sees the param **pack** and the demand-controlled flow; rationing sees the
+state-dependent over-draw. The **general** precondition stays deferred — a research problem,
+not a consumer-phase task.
+
+**It is at build time for the pack, not for the convenience.** The obvious argument — an
+author learns before a long run — is true and secondary. The load-bearing one: a
+`{pack: …}` may inflate a gain past every frozen guard (unit ✓, bound `> 0` ✓ — **a gain has
+no `dt`-independent ceiling**, which is precisely why this can never be a loader bound), and
+a pack's values exist only *after* `interpret` resolves them, so `run_scenario` — which
+receives an already-built flow — **structurally cannot see it**. `packs/eclss_hot_makeup.yaml`
+measures exactly that: the committed ECLSS anchor, at its own frozen and correct `dt = 60`,
+taken from `k·dt = 0.12` to **1.2** purely by a pack. Because `o2_makeup` is
+demand-controlled, without the build check that pack exports an oscillating cabin with
+`rationed == 0` and **no gate anywhere reporting a problem**.
 
 **The `o2_makeup` row is not like the others, and its `< 1` means something different.**
 Every other row is **donor-controlled** or forced: the draw is `k·dt·stock`, so at `k·dt > 1`
@@ -375,8 +411,17 @@ the uncaught case is the *quiet* one, not the violent one.
 
 **The composability constraint** falls straight out of that table, and it is not derivable
 from any single flow: **ECLSS is sized for `dt = 60`; Thermal for `dt = 3600`.** A scenario
-composing both must pick one `dt`, and only **`dt ≤ ~60`** is safe for both (a smaller `dt`
-only ever helps Thermal's overshoot margin). There is no `dt` natural to both domains.
+composing both **at a single `dt`** must pick one, and only **`dt ≤ ~60`** is safe for both
+(a smaller `dt` only ever helps Thermal's overshoot margin). **There is no single `dt`
+natural to both domains — which is why the author no longer has to pick one.** This
+paragraph used to end "there is no `dt` natural to both domains" full stop, and read as a
+statement about the platform rather than about single-rate integration; multi-rate falsified
+it (see *Multi-rate*, below, and `tests/authoring/scenarios/eclss_thermal_habitat.yaml` —
+the file this sentence called impossible). Both halves of the bind are measured, and
+multi-rate escapes both: the shared `dt` is **unsafe** (single-rate `dt = 3600`: 840
+rationings, `cabin_o2` = **72.0** against a truth of 8.0) *and* the safe shared `dt` is
+**wasteful** (single-rate `dt = 60`: clean, and **20160** Thermal evaluations for a `τ` of
+~65 steps).
 
 **The failure WAS silent — it now raises.** Measured, not assumed
 (`tests/test_authoring_dt_hazard.py`). At `dt = 3600` the ECLSS cabin did **not** raise,
@@ -417,75 +462,57 @@ None of this is a bug in the frozen flows. Each is correct at the `dt` it was si
 the frozen sizing argument is simply scoped to the frozen scenario, and **authoring is what
 escapes that scope**.
 
-> ⚠ **SUPERSEDED — the paragraph below is stale and is left standing deliberately.** The
-> build-time precondition it defers **shipped** in multi-rate Step 5 (2026-07-17): the
-> registry now carries `rate_params`, and `interpret` refuses `k·h ≥ 1`, with
-> `allow_unsafe_step=True` as the study hatch. Its two predictions were both right (it is a
-> *partial* detector; it is the *only* protection for `eclss.o2_makeup`) and one guess was
-> **wrong in the unsafe direction**: the effective sub-step is `dt/n_sub` for the **fast**
-> set only — a **slow** flow steps at **`dt/2`** under Strang, regardless of `n_sub`. This
-> section's narrative rewrite is **Step 7**'s (this phase's plan reserves the reference-doc
-> narrative for the consolidated ceremony, and the "impossible" composability sentence three
-> paragraphs up is stale for the same reason — Step 4 falsified it). Until then, read
-> `docs/plans/post-roadmap-multirate-authoring.md`, "Step 5: COMPLETE".
+**The build-time precondition this section used to defer is the "build" column above** — it
+landed in the multi-rate unfreeze (2026-07-17) and is documented at the table rather than
+here. The deferral's own two predictions both held (it is a *partial* detector; it is the
+*only* protection for `eclss.o2_makeup`), and its one guess was **wrong in the unsafe
+direction**: it specified the effective sub-step as `dt/n_sub` for every flow, which
+false-PASSES a **slow** flow — see *Multi-rate*, below.
 
-**Still deferred, by name** (the rest of "make it loud", which this did not do): a
-**build-time** `k·dt < 1` precondition per flow type — it would catch the scrubber/condenser
-*before* running rather than after, but it is only a partial detector (it cannot see
-`eclss.crew_metabolism`, whose failure is `forcing·dt > stock`, not `k·dt > 1`, nor any
-coupled multi-flow dynamic), and it would live in the **frozen registry**, so it is an
-unfreeze with its own ceremony. **It must cover `eclss.o2_makeup`, where it would be the
-*only* protection** rather than an earlier one — see "the hazard rationing cannot see"
-below; reading that row as "already covered by rationing" is the mistake to avoid. And if
-multi-rate is ever authorable, the precondition must check the **effective sub-step**
-(`dt/n_sub`), never the master `dt`. Also deferred: **per-flow attribution** in the error (the
-message names the count and `dt`, not *which* flow rationed — `StepReport.rationed` is a
-bare count, and widening it is a `simcore` change), and an author-facing **run CLI** /
-Godot banner (there is no run CLI today; `run_scenario` is the top of the **library** run
-path, which is why the raise lives there).
+**Still deferred, by name** (the rest of "make it loud", which the rationing gate did not
+do): **per-flow attribution** in the error — the message names the count and `dt`, not
+*which* flow rationed, because `StepReport.rationed` is a bare count and widening it is a
+`simcore` change — and an author-facing **run CLI** / Godot banner (there is no run CLI
+today; `run_scenario` is the top of the **library** run path, which is why the raise lives
+there).
 
 **The other way to run an authored file** is `godot_bridge`'s `build_session_from_file`,
-which bypasses `run_scenario` and so does **not** raise — deliberately. It is not silent
-either: `rationed` is in the observation projection, `SimSession.total_rationed()` is
-exposed to GDScript, and `objectives_json` scores a rationed session
-`no_rationing = false` → `survived = false`. **Library caller → exception; interactive
-session → visible diagnostic + objective failure.** A player should watch the cabin die;
-an author calling a function gets an exception.
+which bypasses `run_scenario` and so does **not** raise — deliberately. Read that as
+**"does not raise *on rationing*, and does not refuse an unsafe `k·h` step either"**: the
+asymmetry was designed when rationing was the only gate, and the `k·h` precondition lives in
+`interpret`, *upstream of the split*, so this path had to choose. **It passes the study
+hatch** (`authoring::load_scenario_allowing_unsafe_step`), which keeps the split literally
+true. It is not silent either: `rationed` is in the observation projection,
+`SimSession.total_rationed()` is exposed to GDScript, and `objectives_json` scores a rationed
+session `no_rationing = false` → `survived = false`. **Library caller → exception;
+interactive session → visible diagnostic + objective failure.** A player should watch the
+cabin die; an author calling a function gets an exception.
 
-> ✅ **RESOLVED in multi-rate Step 6 (2026-07-17) — the split above stands, and now says
-> what it means.** Read "does not raise" as **"does not raise *on rationing*, and does not
-> refuse an unsafe `k·h` step either"**. The asymmetry was designed when rationing was the
-> only gate; Step 5's precondition lives in **`interpret`**, *upstream of the split*, so
-> mirroring it into Rust would have made this path refuse an unsafe scenario at build and
-> the player would never see the cabin. **The user decided the fork: the bridge passes the
-> hatch.** `build_session_from_file` builds through
-> `authoring::load_scenario_allowing_unsafe_step`, so the sentence above is literally true
-> again — a player still watches the cabin die.
->
-> **The honest cost, since the losing argument was strong.** Refusing was recommended (by
-> the implementer and the advisor) on two points that remain true: this path already maps
-> every `AuthoringError` → `SimError::Validation` **which the UI renders**, so refusing
-> would have created no *silence*, only an earlier diagnostic; and *"watch the cabin die"*
-> is factually wrong for what the precondition intercepts — the `k·h` family produces a
-> **meaningless** run (measured: `72.0`, **nine times too much** O₂, oscillating), not a
-> death. The real "cabin dies" cases are the **state-dependent** ones
-> (`eclss.crew_metabolism`'s forced over-draw), which declare `rate_params=()`, are **not**
-> refused by the precondition, and still run and die here exactly as documented.
->
-> **So, stated plainly: `build_session_from_file` is the one surface where the `k·dt`
-> family is unguarded.** For the demand-controlled `eclss.o2_makeup` — where the build
-> check is the *only* detector there has ever been (see the next section) — an unsafe
-> makeup gain reaches a session with **every diagnostic reading clean**: `rationed` stays
-> 0, `no_rationing` stays true, `survived` stays true, and the cabin oscillates. That is
-> consistent with what a session *is* ("authored ≠ validated" — for watching, not for
-> vouching), and it is a real hole. An author who wants a verdict calls `run_scenario`.
->
-> **Separately, and NOT on precondition grounds**: this path also now refuses a
-> **multi-rate** file (`n_sub`/`rate_class`), parallel to the rk4 refusal and for the same
-> reason — `SimSession::single_rate` cannot drive `multirate_step`, and silently
-> single-rating the file would run it at the master cadence the author chose *because* it
-> is unsafe un-sub-stepped. Full record: `docs/plans/post-roadmap-multirate-authoring.md`,
-> "Step 6: COMPLETE".
+**Stated plainly, because this one has a cost: `build_session_from_file` is the one surface
+where the `k·dt` family is unguarded.** For the demand-controlled `eclss.o2_makeup` — where
+the build check is the *only* detector there has ever been (see the next section) — an unsafe
+makeup gain reaches a session with **every diagnostic reading clean**: `rationed` stays 0,
+`no_rationing` stays true, `survived` stays true, and the cabin oscillates. That is
+consistent with what a session *is* ("authored ≠ validated" — for watching, not for
+vouching), **and it is a real hole**. An author who wants a verdict calls `run_scenario`.
+
+**The case for refusing instead was strong and is recorded, not buried** — it was the
+recommendation of both the implementer and the advisor, and two of its points remain true:
+this path already maps every `AuthoringError` → `SimError::Validation` **which the UI
+renders**, so refusing would have created no *silence*, only an earlier diagnostic; and
+*"watch the cabin die"* is **factually wrong for what the precondition intercepts** — the
+`k·h` family produces a **meaningless** run (measured: `72.0`, **nine times too much** O₂,
+oscillating), not a death. The genuine "cabin dies" cases are the **state-dependent** ones
+(`eclss.crew_metabolism`'s forced over-draw), which declare `rate_params = ()`, are **not**
+refused by the precondition, and still run and die here exactly as documented. The decision
+went the other way on the hatch's own stated purpose — studying an unsafe run *is* what it
+exists for — and a maintainer reopening this should read both halves.
+
+**Separately, and NOT on precondition grounds**: this path also refuses a **multi-rate**
+file (`n_sub`/`rate_class`), parallel to the rk4 refusal and for the same reason —
+`SimSession::single_rate` cannot drive `multirate_step`, and silently single-rating the file
+would run it at the master cadence the author chose *because* it is unsafe un-sub-stepped.
+The alternative to refusing was never honouring it; it was a silent cross-port divergence.
 
 ### `eclss.o2_makeup` — the hazard rationing cannot see (post-roadmap, measured)
 
@@ -538,27 +565,21 @@ exceeding it, nothing rations, and the measured cabin swings **12 ↔ 4 mol fore
 `o2_supply` drains past **−800 mol** — reported as a clean, conserving, unrationed run. An
 author who registers `eclss.o2_makeup` *without* a scrubber never had that coincidence at all.
 
-**This corrects the deferred build-time precondition named above:** a `k·dt < 1` check is
-the right bound for the donor-controlled rows *and* for `o2_makeup` — but for opposite
-reasons (over-draw vs export fidelity), and only `o2_makeup`'s is otherwise unenforced. A
-precondition that skipped `o2_makeup` as "already covered by rationing" would be wrong.
+**The build-time precondition is what stands here, and in the band that matters it is the
+*only* thing that does.** `eclss.o2_makeup` declares `rate_params = ("o2_makeup_gain",)` and
+**is** checked at build. For the `1 ≤ k·dt < 2` rows that is not an *earlier* catch but the
+**sole** one — they export `rationed = 0`, so no run-time gate ever fires. (Read that scoped
+to the band, not to the whole table: the `2.40` row **diverges**, and a divergence grows
+until it *does* over-draw, which is why rationing finally catches that one at `rationed = 2`.
+The uncaught case is the **quiet** one, not the violent one.) The bound is the right one for
+the donor-controlled rows *and* for this one, but **for opposite reasons** — over-draw there,
+export fidelity here — and a precondition that had skipped `o2_makeup` as "already covered by
+rationing" would have been wrong about the only row that needed it.
 
-> ✅ **BUILT — multi-rate Step 5 (2026-07-17).** The paragraph above was right on every
-> count and the precondition was built to it: `eclss.o2_makeup` declares
-> `rate_params = ("o2_makeup_gain",)` and **is** checked. For this row the build check is
-> not an *earlier* catch, it is the **only** catch — every table row above still exports
-> `rationed = 0`. Two things the paragraph could not have known, both measured in Step 5:
-> a **param pack** can inflate `o2_makeup_gain` past the bound while passing every frozen
-> loader guard (which is the load-bearing reason the check is at *build* time — the pack's
-> value does not exist any earlier, and `run_scenario` cannot see it at all); and
-> `o2_setpoint`, which sits on the same params object, **must never be checked** — it is an
-> inventory in mol, not a rate, which is exactly why `rate_params` is an explicit
-> declaration rather than "every float on the params object".
->
-> **The `1 ≤ k·dt < 2` rows in the table above can no longer be built without
-> `allow_unsafe_step=True`.** `tests/test_authoring_export_fidelity.py` — the file that
-> *measured* them — now passes it deliberately, and that is the precondition working: the
-> only remaining way into this band is to say so out loud.
+**The `1 ≤ k·dt < 2` rows in the table above can no longer be built without
+`allow_unsafe_step=True`.** `tests/test_authoring_export_fidelity.py` — the file that
+*measured* them — passes it deliberately, and that is the precondition working: the only
+remaining way into this band is to say so out loud.
 
 **None of this is a bug in the frozen flow.** The continuous law `dx/dt = k(S − x)` is
 unconditionally stable — it decays to `S` from anywhere and cannot oscillate. The
@@ -567,6 +588,118 @@ solver property, not a physics one. The model reproduces its own closed-form sol
 textbook first-order error (halve `dt`, halve the error — pinned), and at `k·dt = 1` it hits
 the analytic *deadbeat* prediction exactly (`12 → 10 → 10 → 10`). Reworking the kinetics
 would be fixing the wrong layer.
+
+### Multi-rate — the author picks a coupling cadence, not a global `dt` (post-roadmap)
+
+The escape from the constraint two sections up. **`dt` stops being "the step everything is
+solved at" and becomes the *coupling cadence* — what neighbouring domains see** — while each
+flow sub-steps at the `dt` its own rate constant demands. Plan of record:
+[`docs/plans/post-roadmap-multirate-authoring.md`](plans/post-roadmap-multirate-authoring.md).
+
+```yaml
+name: eclss_thermal_habitat
+integrator: euler
+dt: 3600.0          # the COUPLING CADENCE — what neighbours see, not what ECLSS solves at
+n_sub: 60           # the fast set sub-steps at dt/n_sub = 60 s
+
+flows:
+  - id: eclss.o2_makeup
+    type: eclss.o2_makeup
+    # rate_class: fast  <- the default; sub-steps at 60 s
+  - id: thermal.radiator_reject
+    type: thermal.radiator_reject
+    rate_class: slow    # tau ~ 65 steps at dt=3600; stepping it 60x is pure waste
+```
+
+The knob is **two schema fields** (`ScenarioSpec.n_sub`, `FlowSpec.rate_class`) driving
+`simcore.multirate.multirate_step`, which was built in Phase 0.5 and is **consumed, not
+changed**, here — `git diff src/simcore/` is empty for the whole unfreeze.
+
+**The partition is per-flow, not per-domain**, and that is `multirate_step`'s own ruling
+inherited rather than re-litigated: *"a cross-domain flow has no single-domain rate, so the
+rate-class is a property of the flow, assigned by the scenario assembler; the driver takes
+the two pre-built integrators and does not infer the partition."* The core **refuses to
+guess**, so the authoring layer must ask. A per-flow *property* also has **zero
+referential-integrity surface**: the rate-class travels *with* the flow into a bundle, and
+`{bundle, prefix}` id-rewriting cannot touch it — which a top-level `fast: [flow-id, …]`
+list of **id references** could not have claimed.
+
+**The frozen semantic choices** — each one, like `monod`'s, is a decision a reader can
+otherwise only recover from a test:
+
+| choice | resolution | because |
+|---|---|---|
+| `rate_class` default | **`fast`** | fast + `n_sub = 1` ⇒ an **empty slow set** ⇒ the bit-exact identity path (below). Default `slow` could not do this: with an empty *fast* set, Strang runs two `dt/2` half-steps, which is **not** one Euler step |
+| the operator split | **Strang, not author-visible** | the core's own default and the higher nominal order. Lie is *cheaper* on the slow set (1 slow eval per master step vs 2) — the justification is **order/safety, not performance**, and Strang's `dt/2` is the *safer* slow step |
+| `n_sub = 1` + a non-empty slow set | **`AuthoringError`** | it buys no rate separation and no perf win **while still moving the answer** (measured: `+1.2e-01` on the cabin). A misconfiguration, refused rather than honoured |
+| the integrator per rate class | **one, from `integrator`** | `multirate_step` would accept `slow=rk4, fast=euler`; exposing it is deferred by name |
+
+**The effective step is per-rate-class, and this is the trap the whole surface turns on:**
+
+| case | the step that flow is integrated at |
+|---|---|
+| single-rate | `dt` |
+| multi-rate, **fast** | `dt/n_sub` |
+| multi-rate, **slow** | **`dt/2`** — Strang's half-step, ***independent of `n_sub`*** |
+
+`n_sub` governs the **fast** set only. A slow flow steps at `dt/2` whether `n_sub` is 2, 60
+or 1000, so reading its step as `dt/n_sub` reports a safe number for an unsafe flow —
+measured at `k·h = 0.06` where the truth is **1.8**, with 24 rationings and `cabin_co2`
+emptied to exactly 0.0. `interpreter._effective_step` is the one place the three cases are
+named; the `dt/2` divisor **tracks the pinned split by assertion, not by comment**, because
+Lie would step the slow set at the full `dt` and quietly loosen the check 2×.
+
+**The identity path — why this unfreeze moved no golden.** `n_sub` defaults to 1 and
+`rate_class` to `fast` ⇒ an empty slow set ⇒ `multirate_step` reproduces the single-rate
+`step` **bit-for-bit** (`simcore`'s own contract, measured through the authoring layer over
+every stock of every step, under both splits). But **the goldens rest on the branch, not on
+that identity**: `run_scenario` routes on `is_multirate`, so a scenario that declares no
+cadence takes the **pre-multi-rate loop verbatim** and never reaches the driver — pinned by
+monkeypatching `multirate_step` to raise (Rust, which has no monkeypatch, pins the same
+branch *behaviorally* via aux). The identity is corroborating; the branch is load-bearing.
+
+**What it resolves, measured** (`tests/test_authoring_multirate_run.py`):
+
+| mode, on the ECLSS anchor at master `dt = 3600` (truth = 8.0) | verdict | final `cabin_o2` |
+|---|---|---|
+| single-rate `dt = 3600` | **refused at build**; rations under the hatch | diverges — **72.0** |
+| multi-rate `n_sub = 60` | `rationed == 0` | **8.000000000000007** |
+| single-rate `dt = 60` (the reference run) | `rationed == 0` | **8.000000000000007** |
+
+The bottom two rows are the point in one line: master `dt = 3600` with `n_sub = 60` lands on
+the *same* value as `dt = 60`, **while exporting hourly**. The top row is the contrast that
+gives them meaning — *the identical file at the identical `dt`, minus the `n_sub` knob* — and
+its direction is worth reading, because the intuitive word for it is wrong: **72.0 is nine
+times too much oxygen, not too little.** The hazard is not "the cabin suffocates", it is
+"the number is meaningless" — `k·dt = 7.2` makes the update map alternate and grow, so the
+*sign* of the error is an accident of where the oscillation is sampled.
+
+`eclss_thermal_habitat.yaml` is the composition this reference called impossible: ECLSS
+fast, Thermal slow, `rationed == 0`, the cabin at `o2_eq` and the node warming 102.70 →
+277.44 K against `T_eq ≈ 280.9` (`tests/test_authoring_multirate_composability.py`, which
+also pins the same 72.0 divergence on the *composed* graph, at 840 rationings over 336
+steps — the same broken map, sampled elsewhere).
+
+**What it does NOT do — three, and the first is the one to read:**
+
+* **Multi-rate is the performance enabler, NOT the hazard closer.** An unsafe **effective
+  sub-step** is the identical hazard one level down (`n_sub = 2` at `dt = 3600` gives 36.0
+  against a truth of 8.0). The build-time precondition is the direct closer; that `n_sub = 2`
+  now fails to *build* is the precondition's doing, not the knob's.
+* **It costs accuracy versus single-rate RK4.** Strang is 2nd-order *only if both operators
+  are RK4*, and **a Euler operator silently collapses Strang back to 1st order** — our frozen
+  flows are Euler. The operators' non-commutativity is an O(`dt²`) term no sub-integration
+  removes. It is worth it here only because the alternative at a coarse `dt` is not a *less
+  accurate* value but a **meaningless** one.
+* **It is not a licence to raise `dt`.** `k·dt < 1` stays operative on the **effective**
+  sub-step, for the export-fidelity reason above.
+
+**The saving is real but narrower than the cadence ratio suggests.** Thermal's evaluations
+drop **30×**, not the 60× the ratio implies — Strang steps the slow set at `dt/2`, *twice*
+per master step, so `20160 / (336 × 2) = 30.0` exactly. And the honest whole-run number is
+**2.31×**: multi-rate saves the *slow* domain's work, and in that anchor the slow domain is
+the cheap one. The large wall win lands where the slow set is **expensive** — the biosphere
+— which is precisely the domain the registry cannot yet reach.
 
 ### Templates — the boundary's arithmetic (decision A, as amended)
 
@@ -583,7 +716,9 @@ proven bit-exact by the hex-float graph dump.
 
 ## The evidence the freeze rests on
 
-The contract is earned by Steps 0–6c (full detail + measured results in the plan):
+The contract is earned by Phase-9 Steps 0–6c and, since, by each post-roadmap unfreeze
+(Tier 1's registry growth, Tier 2's `monod`, multi-rate) — full detail + measured results in
+each plan of record:
 
 - **Grammar semantics are cross-port pinned** — `parse_vectors.txt`: 26 accept cases
   render an **identical canonical S-expr** on both ports; 25 reject cases error on both
@@ -623,6 +758,16 @@ The contract is earned by Steps 0–6c (full detail + measured results in the pl
   the Rust interpreter to lower an all-fast partition left **the whole crossport suite
   green**. The partition there is a fixture device, not a sizing claim — see the file's
   header and "Frozen is not calibrated".
+- **The `k·h` precondition refuses the right things, and nothing else** — the risk a
+  *refusal* carries is refusing something that already worked, so
+  `test_the_committed_scenarios_all_pass_the_precondition` asserts every committed scenario
+  still builds on the author's default path, with no hatch. That is the assertion behind "no
+  golden moved". The bound is `< 1` and not `≤ 1` by measurement (`k·h` exactly 1.0 — the
+  deadbeat case — is **refused**; one `dt` unit below it builds), and the effective-step
+  formula has teeth: reverting `_effective_step` to a flat `dt/n_sub` turns **5 red across 2
+  files** on the Python side and 3 on the Rust side. Its behavior change is *itself*
+  evidence — 22 committed pins across six files asserted the run-time rationing verdict and
+  **could no longer construct their own subject** once the error moved to build time.
 - **The interpreter is faithful** — the fifteen crossport anchor runs
   (`tests/crossport/authoring_files.py::ANCHORS`, the authoritative live list), including
   an authored crew run **byte-identical to the frozen `crew_state.json`** — via a bare
@@ -709,8 +854,35 @@ A future maintainer should read these as intentional scope, each surfaced when i
 - **Shared-stock composition** — two bundles pointing at one shared stock (the Phase-6
   cabin sharing, hand-coded in `station/`) is a larger deferral.
 - **Nested includes** — rejected; composition is flat, one level deep.
-- **The interpreter builds single-rate, no-reset graphs only** — the two-rate master-day
-  driver and the `annual_reset` hook are not authorable.
+- **The interpreter builds no-reset graphs only** — the biosphere's **two-rate master-day
+  driver** and the `annual_reset` hook are not authorable. This bullet used to open "builds
+  single-rate, no-reset graphs only", which the multi-rate unfreeze falsified — but **only
+  half of it**, and the two "rates" here are different mechanisms that happen to share a
+  word. `multirate_step`'s fast/slow **operator split** is now authorable (see *Multi-rate*);
+  the biosphere's **master-day driver** — a daily/annual cadence with a reset hook — is a
+  different thing entirely and stays deferred, with the rest of the biosphere.
+- **Author-visible `split`** — `multirate_step` takes Strang **or** Lie; the harness pins
+  Strang, and exposing the choice would buy an author no order they can use (Euler operators
+  collapse Strang to 1st order anyway) while loosening the slow set's `k·h` check by exactly
+  2× — Lie steps the slow set at the full `dt`. It is a **study** tool, per `simcore`'s own
+  "fallback / comparison" framing, not an authoring knob.
+- **Per-rate-class integrator** — `multirate_step` would accept `slow=rk4, fast=euler`; both
+  substeppers are built from the scenario's single `integrator`.
+- **The general `dt` precondition** — `k·h < 1` covers the *declared first-order rate*
+  family and nothing wider. `τ ≫ dt`, state-dependent forced draws, and authored `kinetics`
+  are uncoverable for the reasons recorded at *The `dt` constraint*; a general one is a
+  research problem, not a consumer-phase task.
+- **Parameter packs on the Rust port — and this one is a cross-port *soundness*
+  precondition, not a feature gap.** `ParamsSpec::Pack` is a Rust error (a Phase-9 ruling),
+  so Rust's `k·h` check reads the **frozen** constant (`flow_registry::frozen_rate_value`)
+  where Python reads the **pack-resolved** value off the built flow. That is sound **only
+  while the deferral holds**: the day packs land in Rust, `frozen_rate_value` becomes a
+  **false PASS in the unsafe direction** — reporting the frozen `k` while the flow runs the
+  pack's inflated one — and it would be invisible for exactly `eclss.o2_makeup`, the flow
+  the check uniquely exists for. Pinned rather than commented
+  (`pack_deferral_is_what_makes_the_frozen_rate_read_sound`). **A deferral in one port is
+  load-bearing for a safety check in the other**; adding packs to Rust means fixing the read
+  in the same commit.
 - **Computed forcing schedules** (the Power half-sine, biosphere weather) — `const` only.
 - **Derived initial conditions** — the *simulation-derived* tier (the station's `node0` =
   run Power, take the mean) needs running a sub-sim; deferred further than the
