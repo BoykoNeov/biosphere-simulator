@@ -1,12 +1,13 @@
 # Post-roadmap: multi-rate authoring — the author picks a coupling cadence, not a global `dt`
 
-**Status: DESIGNED, not built.** A **phase, not a step** — an authoring unfreeze
-(schema + interpreter + run harness), the Rust mirror, the freeze manifest, and the
-cross-port tiers. **The user opened the unfreeze on 2026-07-17** and the design-level
-advisor pass on the author-facing knob is **DONE** (below): the knob is decided, the
-blocking identity is **measured bit-exact through the authoring layer**, and the payoff is
-**measured**. No code is written and no frozen surface has moved. One decision is open —
-whether the effective-sub-step precondition folds into this phase.
+**Status: IN PROGRESS — Steps 1–3 of 7 done.** A **phase, not a step** — an authoring
+unfreeze (schema + interpreter + run harness), the Rust mirror, the freeze manifest, and
+the cross-port tiers. **The user opened the unfreeze on 2026-07-17.** The knob is
+decided, built (Step 2), and now **drives** (Step 3): master `dt=3600` + `n_sub=60`
+through `run_scenario` lands on the truth while exporting hourly. No golden has moved and
+`src/simcore/` is untouched. Remaining: the composability anchor (4), the
+effective-sub-step precondition (5 — folded in by user decision), the Rust mirror (6),
+and the unfreeze ceremony (7).
 
 Predecessors: `post-roadmap-flow-registry-growth.md` (Tier 1 created the `dt` hazard by
 registering the flows), `post-roadmap-rationing-gate.md` (made the *donor-controlled* half
@@ -327,8 +328,7 @@ surface, not a licence to edit the core.
 2. **Advisor pass on the knob** ✅ **DONE** — (a) + default `fast`, top-level `n_sub`,
    Strang pinned, `n_sub=1`-with-slow refused, aux tripwire. **Then schema +
    interpreter** ✅ **DONE** — see "Step 2: COMPLETE" below.
-3. **The run harness** — `multirate_step` per master step; `rationed` summed over
-   sub-operations (its contract already aggregates); `RationedError` semantics preserved.
+3. **The run harness** ✅ **DONE** — see "Step 3: COMPLETE" below.
 4. **The composability anchor**: an authored Thermal+ECLSS scenario at master `dt = 3600`
    with ECLSS fast (`n_sub = 60`) — the scenario the reference currently calls impossible.
    Conservation + determinism, `rationed == 0`, and the exported `cabin_o2` monotone.
@@ -406,6 +406,70 @@ reader would have seen `rate_classes: [fast, slow]` and had to infer it governed
 called `rate`. Renamed while it was one unpushed commit; after the push it would have been
 a full authoring unfreeze. The design pass's actual argument (a per-flow **property**, not
 an id **reference**) is untouched by the spelling.
+
+## Step 3: COMPLETE — the knob drives, and the goldens are safe by construction
+
+**The phase's headline is now reachable from the surface an author calls.** Master
+`dt=3600` + `n_sub=60` through `run_scenario` lands on `cabin_o2 == 8.0` with
+`rationed == 0`, at 24 master commits — the export-fidelity charge answered end-to-end.
+`git diff src/simcore/` is **empty**; the freeze manifest did **not** move (Step 3 adds
+no schema field, integrator name, or flow type — the surface it touches is `run.py`,
+which the manifest does not name); 1832 tests green, no golden moved.
+
+**The branch, not the identity, is what preserves the goldens — and Step 3 is where that
+became true.** `run_scenario` routes on `is_multirate`: a declared cadence goes to
+`multirate_step`, **everything else takes the pre-multi-rate loop verbatim**. Step 1's
+identity means routing *everything* through the driver would also work — which is exactly
+why the branch needed a pin of its own. Had it leaked, **every golden would have stayed
+green** while all 25 silently came to rest on the `n_sub=1` identity holding forever;
+the leak would surface only years later, as a future `simcore` driver change moving 25
+files at once with no cause attached. `test_a_single_rate_scenario_never_touches_the_driver`
+monkeypatches `multirate_step` to raise and runs a single-rate scenario through the
+harness. Keeping the third registry (Step 2) only buys the safety if something asserts
+the harness actually uses it.
+
+**A Step-1 instruction was superseded, and the sequence is the finding** (cf. the
+`rate_class` naming catch, same flavour). `test_authoring_multirate_identity.py`'s header
+told Step 3 to *"re-point the byte-identity pin through `run_scenario`"* — and the
+advisor independently repeated it as scoped-but-unnamed work. **Both were wrong, for a
+reason that did not exist when the note was written**: Step 2's branch makes
+`is_multirate` *false* at `n_sub=1`, so a re-pointed test would drive the **single-rate
+path**. Not a weaker test of the driver — a test of the wrong path, and one that (sharing
+its golden oracle with `test_authoring_frozen_flows.py`) would collapse into a duplicate
+of that file while losing the driver-faithfulness check entirely. The driver at `n_sub=1`
+is reachable **only** by calling it directly. The note's *spirit* — exercise the driver
+through the harness — is satisfied at `n_sub=60`, where the driver actually runs.
+**The identity is thereby demoted from load-bearing to corroborating**, which is a
+promotion for the phase: golden preservation moved from *measured* to *by construction*.
+
+**The aux tripwire lives in `run.py`, multi-rate branch only.** `step_report` advances
+aux; `multirate_step` never does (P2) — so routing an aux-bearing graph through the
+driver freezes every accumulator **silently**, and the conservation gate structurally
+cannot see it (aux is non-conserved by definition). Three rulings: it is **not** in
+`multirate_step`, because `simcore` is frozen and this is a consumer phase; it is **not**
+on the single-rate path, because `step_report` handles aux correctly and refusing it
+there would ban a working shape; and it is an `AuthoringError` despite firing at run
+time, because it is decidable from the graph's structure alone and is raised before any
+step runs. It also **cannot be reached from any authored file** — `interpret` never wires
+`aux_processes` — which is a second, independent argument for `run.py`: a hand-built
+`BuiltScenario` can reach it there, so the guard is *testable*. In `interpret` it would
+have been unreachable and untestable both.
+
+**`RationedError`'s message is conditional, and that was a real catch.** *"Increase
+`n_sub` or reduce `dt`"* is honest on the multi-rate path and **wrong** on the
+single-rate one — there is no `n_sub` to raise, and naming it sends an author hunting for
+a key their scenario does not have. The multi-rate variant also reports the **effective
+sub-step** `dt/n_sub` rather than the master `dt`, which is no longer the step any flow
+was integrated at: quoting it would name the one number that is *not* the cause. It
+further warns that **the slow set steps at `dt/2` regardless of `n_sub`** under Strang, so
+raising `n_sub` will not rescue a slow flow's over-draw — re-class it fast, or reduce `dt`.
+
+**Still not the hazard closer, and the harness says so.** `n_sub=2` at `dt=3600` raises
+`RationedError` through the harness — but that is **luck of shape, not the gate working**:
+what the backstop sees is the *donor-controlled* scrubber's over-draw. `o2_makeup` is
+demand-controlled and its near-setpoint oscillation stays invisible to rationing at any
+`dt` (`test_authoring_export_fidelity.py`). Step 5's build-time `k·(dt/n_sub) < 1` check
+remains the direct closer; this run-time catch is not a substitute.
 
 ## The measurements this rests on
 

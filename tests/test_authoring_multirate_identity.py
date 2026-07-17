@@ -1,4 +1,4 @@
-"""Multi-rate authoring, Step 1: the identity the whole phase rests on.
+"""Multi-rate authoring, Step 1: the identity, measured through the authoring layer.
 
 **Why this file exists before any schema change.** The plan's golden-preservation
 argument is that multi-rate authoring need not move a single golden, because
@@ -10,12 +10,28 @@ real authored graph, against a real frozen golden. The advisor ruled that gap
 *blocking*: if it is not byte-exact here, the knob design is moot and the phase stops.
 It is byte-exact; this file is that proof, promoted from probe to pin.
 
-**What this file does NOT yet claim.** It drives ``multirate_step`` over the
-*interpreted graph* — it does **not** go through :func:`authoring.run.run_scenario`,
-which is single-rate until Step 3, nor through any schema key, which does not exist
-until Step 2. The partition here is built by hand exactly as the interpreter will build
-it. When Step 3 lands the harness, the byte-identity pin below should be re-pointed
-through ``run_scenario`` and this note deleted.
+**Step 3 demoted this from load-bearing to corroborating — which is a promotion for the
+phase.** The title above used to end "the identity the whole phase rests on", and at
+Step 1 that was exactly right: the goldens were to be preserved *because* the identity
+held. Step 2's three-registry design changed the mechanism, and Step 3's harness made it
+real: :func:`authoring.run.run_scenario` **branches** on ``BuiltScenario.is_multirate``
+and drives a single-rate scenario down the pre-multi-rate loop verbatim, so the 25
+goldens are preserved **by construction** — they never reach the driver at all
+(``test_authoring_multirate_run.py::test_a_single_rate_scenario_never_touches_the_driver``
+is that guarantee's pin). Nothing here weakened; what it carries got lighter. It is now
+defence-in-depth on the driver's faithfulness, not the fact the phase stands or falls
+on.
+
+**Why this file still drives ``multirate_step`` by hand — and must.** The note here used
+to instruct Step 3 to re-point the byte-identity pin through ``run_scenario``. That
+instruction is **superseded**: it was written before the branch existed, and the branch
+makes it impossible. ``is_multirate`` is *false* at ``n_sub=1`` with an empty slow set,
+so a re-pointed test would exercise the **single-rate path** — not a weaker test of the
+driver but a test of the wrong thing, and (sharing its golden oracle with
+``test_authoring_frozen_flows.py``) a duplicate of that file, with the
+driver-faithfulness check lost. The driver at ``n_sub=1`` is reachable **only** from
+here. The through-harness coverage the note was reaching for does exist — at
+``n_sub=60``, where the driver actually runs: ``test_authoring_multirate_run.py``.
 
 **The identity carries an UNSTATED precondition: no aux processes.** ``step_report``
 advances ``State.aux``; ``multirate_step`` deliberately never does (P2, *"Aux ×

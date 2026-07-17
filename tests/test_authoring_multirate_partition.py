@@ -15,11 +15,10 @@ trajectories. Everything Step 1 measured about the hand-partition transfers to t
 authored one exactly insofar as the two registries are equal, so that is what is
 asserted.
 
-**What this file does NOT claim.** Nothing here *runs* multi-rate through
-:func:`authoring.run.run_scenario`, which is single-rate until Step 3 — ``interpret``
-now *builds* the partition, but no harness consumes it yet. The aux tripwire
-(``multirate_step`` never advances aux) likewise belongs to Step 3, where the driver is
-actually called.
+**What this file does NOT claim.** Nothing here *runs* multi-rate: ``interpret`` builds
+the partition, and this file pins the built shape. Step 3 landed the harness that
+consumes it — the through-``run_scenario`` behaviour (the payoff, the ``RationedError``
+semantics, the aux tripwire) is pinned in ``tests/test_authoring_multirate_run.py``.
 
 **The legality matrix, which is the whole design in four rows:**
 
