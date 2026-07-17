@@ -51,11 +51,23 @@ fn build_allowing_unsafe(yaml: &str) -> Result<BuiltScenario, authoring::Authori
 /// condenser (`k_cond = 5e-4`, half the scrubber's — the only ECLSS flow that may legally
 /// be slow at `dt=3600`). `dt`/`n_sub`/the two rate classes are the knobs under test.
 fn cabin_yaml(dt: &str, n_sub: &str, scrub_class: &str, cond_class: &str) -> String {
+    cabin_yaml_steps(dt, "4", n_sub, scrub_class, cond_class)
+}
+
+/// [`cabin_yaml`] with the horizon parametrised — so a multi-rate run and a single-rate
+/// run can cover the **same simulated time** and be compared.
+fn cabin_yaml_steps(
+    dt: &str,
+    steps: &str,
+    n_sub: &str,
+    scrub_class: &str,
+    cond_class: &str,
+) -> String {
     format!(
         "name: multirate_probe\n\
          integrator: euler\n\
          dt: {dt}\n\
-         steps: 4\n\
+         steps: {steps}\n\
          n_sub: {n_sub}\n\
          stocks:\n\
          \x20 - id: eclss.cabin_co2\n    domain: eclss\n    quantity: carbon\n    kind: pool\n    amount: 10.0\n\
@@ -242,6 +254,93 @@ fn the_bound_is_strictly_less_than_one() {
         Err(e) => assert!(e.message.contains("co2_scrub_rate"), "{}", e.message),
     }
     build(&cabin_yaml("999.0", "1", "fast", "fast")).expect("k*h just under 1.0 builds");
+}
+
+// ---------------------------------------------------------------------------
+// The driver actually RUNS — the phase's headline capability.
+//
+// Everything above this block either builds-only or is refused before a step runs, so
+// none of it executes `run::run_multirate`. That gap shipped once: `panic!()` at the top
+// of the driver left the whole suite GREEN, because clippy only proves the loop is
+// *reachable* from production, never that a test *exercises* it. The two tests below are
+// the trajectory coverage — without them a bug in state threading, `rationed`
+// aggregation, or event stamping ships green.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_multirate_run_reproduces_the_single_rate_trajectory_bitwise() {
+    // THE HEADLINE, as a Rust-side correctness pin (not a cross-port vector — the ECLSS
+    // flows are linear, so no `T**4` is reachable and nothing here needs a measured band).
+    //
+    // Master dt=3600 with n_sub=60 and an EMPTY slow set is uniform sub-stepping: Strang's
+    // slow half-steps are no-ops over an empty registry, so the master step is exactly 60
+    // Euler sub-steps at 60 s. Over the same simulated time (4 h) that must be
+    // **bit-identical** to a single-rate dt=60 run of 240 steps — the Python Step-1/Step-3
+    // identity, one port over. This is what "exports hourly, solves at 60 s" means, and it
+    // is the claim the whole phase rests on.
+    let multi = run_scenario(
+        build(&cabin_yaml_steps("3600.0", "4", "60", "fast", "fast")).expect("multi builds"),
+    )
+    .expect("the multi-rate run is clean");
+    let single = run_scenario(
+        build(&cabin_yaml_steps("60.0", "240", "1", "fast", "fast")).expect("single builds"),
+    )
+    .expect("the single-rate reference run is clean");
+
+    assert_eq!(multi.total_rationed, 0, "the point is a CLEAN coarse export");
+    for id in ["eclss.cabin_co2", "eclss.cabin_h2o", "eclss.co2_removed"] {
+        let m = multi.final_state.stocks[id].amount;
+        let s = single.final_state.stocks[id].amount;
+        assert_eq!(
+            m.to_bits(),
+            s.to_bits(),
+            "{id}: multi-rate must REPRODUCE the fine trajectory, not approximate it \
+             (multi={m:?}, single={s:?})"
+        );
+    }
+    // The master clock advances once per master step — 4, not 240. That is the export
+    // cadence the neighbours see, and the whole reason for the knob.
+    assert_eq!(multi.final_state.n, 4);
+    assert_eq!(single.final_state.n, 240);
+    // The graph must actually have moved, or "bit-identical" is a statement about two
+    // runs that both did nothing.
+    assert!(
+        multi.final_state.stocks["eclss.cabin_co2"].amount < 10.0,
+        "the scrubber must have drawn the cabin down"
+    );
+}
+
+#[test]
+fn a_non_empty_slow_set_is_driven_at_dt_over_2() {
+    // The ONLY place the slow sub-integrator is driven at runtime — everywhere else `dt/2`
+    // is asserted as a constant (`the_effective_step_is_per_rate_class…`) rather than
+    // stepped. With the condenser slow at dt=3600 (legal: 5e-4 * 1800 = 0.9 < 1), Strang
+    // runs it as two dt/2 half-steps around the fast block.
+    let built = build(&cabin_yaml("3600.0", "60", "fast", "slow")).expect("builds");
+    assert_eq!(built.slow_registry.flows().len(), 1, "the condenser is slow");
+    let result = run_scenario(built).expect("the partitioned run is clean");
+
+    assert_eq!(result.total_rationed, 0, "0.9 < 1 ⇒ no over-draw");
+    assert_eq!(result.final_state.n, 4);
+    // Both rate classes moved their own stock — i.e. BOTH sub-integrators ran. A driver
+    // that silently dropped the slow registry would leave cabin_h2o at exactly 10.0.
+    assert!(
+        result.final_state.stocks["eclss.cabin_h2o"].amount < 10.0,
+        "the SLOW flow must have run (its stock is untouched if the slow set was dropped)"
+    );
+    assert!(
+        result.final_state.stocks["eclss.cabin_co2"].amount < 10.0,
+        "the fast flow must have run too"
+    );
+    // Conservation is asserted inside `multirate_step` over the whole master step, so a
+    // completed run is itself proof the split balanced — but the boundary sinks make it
+    // explicit that the draw went somewhere rather than vanishing.
+    let h2o_total = result.final_state.stocks["eclss.cabin_h2o"].amount
+        + result.final_state.stocks["eclss.humidity_condensate"].amount;
+    assert!(
+        (h2o_total - 10.0).abs() < 1e-9,
+        "water must be conserved across the split, got {h2o_total:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------

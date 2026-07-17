@@ -827,6 +827,45 @@ independent argument for the aux tripwire living in `run.rs`: `interpret` never 
 this plan's `dt/n_sub` formula turns **3 red**, including
 `a_slow_flow_is_judged_at_dt_over_2_not_the_plans_formula` with exactly the right message
 ("must be refused, not passed at 0.06"). Leaking the routing branch turns **2 red**.
+Narrowing the bridge to `load_scenario`, and dropping the multi-rate refusal, each turn
+**1 red**.
+
+**THE STEP'S OWN NEAR-MISS, and it is the one worth reading: the driver I argued hardest to
+include had ZERO trajectory coverage, and the whole suite was green** (advisor catch, at the
+"I believe this is done" call). Every multi-rate test above either **built only** or was
+**refused before a step ran** (the aux multi-rate case hits `check_no_aux` first), and the
+two aux runs plus the rationed-message test all take the **single-rate** path. No committed
+anchor is multi-rate, and the cross-port trajectory vector was correctly declined — so
+**nothing executed `run_multirate`**. Proved with the file's own idiom rather than argued:
+`panic!("REACHED")` at the top of the driver left **every test passing**. Now it turns 2
+red.
+
+**The mechanism is worth naming, because every local signal said "covered": clippy is
+green as long as production *calls* the function — reachable ≠ exercised.** Coverage
+existed for the *build* surface (16 pins) and for the *refusals*, so the block looked
+dense; what was missing was the one thing the phase is for. The fix is two runtime pins:
+`a_multirate_run_reproduces_the_single_rate_trajectory_bitwise` (master `dt=3600`,
+`n_sub=60`, 4 steps == single-rate `dt=60`, 240 steps, **bit-identical** by `to_bits()` on
+every stock — Python's Step-1/Step-3 identity, one port over, and a Rust-side *correctness*
+pin, not a cross-port vector: the ECLSS flows are linear, so no `T**4` is reachable and no
+band is minted) and `a_non_empty_slow_set_is_driven_at_dt_over_2` (condenser slow — **the
+only place the `dt/2` slow path is *stepped* rather than asserted as a constant**, and a
+driver that dropped the slow registry leaves `cabin_h2o` at exactly 10.0). Both assert the
+graph actually moved, so "bit-identical" cannot be two runs that did nothing.
+
+**The transferable rule: a mirror step must prove the mirrored code RUNS, not just that it
+compiles and refuses.** A port phase's tests skew toward *rejection* cases (they are cheap
+and the errors are the visible surface), and rejection tests never reach the happy path.
+When the deferral/mirror argument is *"otherwise the port builds what it cannot run"*, the
+test that settles it is the one that **runs it**.
+
+**The two bridge behaviors the user's decision created are pinned too** — the hatch-pass
+(`build_session_from_file_still_builds_an_unsafe_step_the_player_can_watch`) and the
+multi-rate refusal. The hatch pin carries its own control: it first asserts the **library**
+path *refuses* the same file, because without that the test would not implicate the hatch —
+it would just be a scenario that happens to build. That pin is what makes "silently start
+refusing here" (a one-word edit, `load_scenario_allowing_unsafe_step` → `load_scenario`)
+impossible to make by accident — which is precisely what Step 6 was told not to do.
 
 **The `dt`-hazard migration repeated on the Rust side, and it is the evidence the closer
 works**: 2 committed Rust pins asserted the *run-time* rationing verdict at `dt=3600` and

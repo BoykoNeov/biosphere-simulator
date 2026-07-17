@@ -1416,6 +1416,83 @@ mod tests {
         );
     }
 
+    /// Write `text` to a unique temp scenario file, run `f`, then clean up.
+    fn with_temp_scenario<T>(name: &str, text: String, f: impl FnOnce(&Path) -> T) -> T {
+        let tmp = std::env::temp_dir().join(name);
+        std::fs::write(&tmp, text).unwrap();
+        let out = f(&tmp);
+        let _ = std::fs::remove_file(&tmp);
+        out
+    }
+
+    #[test]
+    fn build_session_from_file_still_builds_an_unsafe_step_the_player_can_watch() {
+        // **THE USER'S DECISION, PINNED** (multi-rate Step 6). The build-time `k·h < 1`
+        // precondition lives in `authoring::interpret`, upstream of the deliberate
+        // library-vs-interactive split — so this path builds through
+        // `load_scenario_allowing_unsafe_step` ON PURPOSE, keeping the documented
+        // asymmetry literal: *library caller -> exception; interactive session -> visible
+        // diagnostic + objective failure.* A player watches the cabin misbehave; an author
+        // calling `authoring::run_scenario` gets an exception.
+        //
+        // Without this pin, "silently start refusing here" is a one-word edit
+        // (`load_scenario_allowing_unsafe_step` -> `load_scenario`) that no other test
+        // notices — which is exactly how the split would be narrowed by accident, the
+        // thing Step 6 was told not to do.
+        let cabin = std::fs::read_to_string(scenarios_dir().join("eclss_cabin.yaml")).unwrap();
+        // dt=3600 makes k_scrub*dt = 3.6 >= 1: refused by `authoring::load_scenario`, and
+        // deliberately NOT refused here.
+        let unsafe_dt = cabin
+            .replace("dt: 60.0", "dt: 3600.0")
+            .replace("steps: 900", "steps: 15");
+        assert!(unsafe_dt.contains("dt: 3600.0"), "the dt swap must apply");
+
+        with_temp_scenario("godot_bridge_unsafe_step.yaml", unsafe_dt, |path| {
+            // The control, and it is load-bearing: the LIBRARY path must refuse this file.
+            // Without it the assertion below would not implicate the hatch at all — it
+            // would just be a scenario that happens to build.
+            assert!(
+                authoring::load_scenario(path, &BTreeMap::new()).is_err(),
+                "the library path must refuse an unsafe k*h — otherwise this test proves \
+                 nothing about the hatch"
+            );
+            assert!(
+                build_session_from_file(path, &BTreeMap::new()).is_ok(),
+                "the INTERACTIVE path must still build it: the player is meant to watch \
+                 the cabin, not get a build error"
+            );
+        });
+    }
+
+    #[test]
+    fn build_session_from_file_rejects_a_multirate_scenario() {
+        // NOT the precondition (the test above pins that an unsafe step still builds here).
+        // A declared cadence needs `multirate_step`, which drives the interpreter's
+        // two-registry partition; `CoreSession::single_rate` drives the whole registry once
+        // per step. Silently taking the single-rate path would run the graph at the MASTER
+        // cadence the author chose precisely because it is unsafe un-sub-stepped — the same
+        // file meaning different things on the two ports. Deferred exactly as rk4 is.
+        let cabin = std::fs::read_to_string(scenarios_dir().join("eclss_cabin.yaml")).unwrap();
+        let multirate = cabin.replace("dt: 60.0", "dt: 3600.0\nn_sub: 60");
+        assert!(multirate.contains("n_sub: 60"), "the n_sub insert must apply");
+        with_temp_scenario("godot_bridge_multirate.yaml", multirate, |path| {
+            // It must be a legal scenario for the refusal to mean anything — the library
+            // path builds it fine (k_scrub * 3600/60 = 0.06 < 1).
+            assert!(
+                authoring::load_scenario(path, &BTreeMap::new()).is_ok(),
+                "the multi-rate file must be VALID, or the bridge refusal is vacuous"
+            );
+            assert!(
+                matches!(
+                    build_session_from_file(path, &BTreeMap::new()),
+                    Err(SimError::Validation(_))
+                ),
+                "a multi-rate file-loaded scenario must be rejected, never silently \
+                 single-rated at the master cadence"
+            );
+        });
+    }
+
     #[test]
     fn fp_flags_clean_decodes_ftz_and_daz() {
         assert!(fp_flags_clean(0));
