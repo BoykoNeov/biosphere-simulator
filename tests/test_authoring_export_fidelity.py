@@ -73,7 +73,26 @@ DT_DIVERGENT = 1200.0  # k·dt = 2.40  — diverges until something over-draws
 
 
 def _build(raw: dict[str, Any]) -> Any:
-    return interpret(ScenarioSpec.model_validate(raw), base_dir=SCENARIO_DIR)
+    """Interpret, with the Step-5 rate precondition DELIBERATELY disabled.
+
+    ``allow_unsafe_step=True`` is load-bearing for this whole file and is not a
+    workaround. Every regime below except ``DT_MONOTONE`` violates ``k_makeup·dt < 1`` —
+    that is the *definition* of the bands this file exists to measure — so once the
+    build-time precondition landed (multi-rate Step 5), these scenarios cannot be
+    constructed at all without the study hatch. That is the precondition **working**: an
+    author can no longer reach the oscillating band by accident, and the only remaining
+    way in is to say so explicitly, which is exactly what this line does.
+
+    The findings are unchanged; only the door is. ``interpret`` now refuses these steps,
+    so the hazard has a build-time guard where it previously had none (``o2_makeup``) or
+    only a run-time one (the donor-controlled flows). The measurements stand as the
+    record of *why* the bound is ``< 1`` and not the textbook ``< 2``.
+    """
+    return interpret(
+        ScenarioSpec.model_validate(raw),
+        base_dir=SCENARIO_DIR,
+        allow_unsafe_step=True,
+    )
 
 
 def _full_cabin(dt: float, steps: int, cabin_o2_0: float) -> Any:

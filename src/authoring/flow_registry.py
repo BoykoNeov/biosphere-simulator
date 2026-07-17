@@ -86,6 +86,30 @@ class FlowTypeSpec:
     cls: Callable[..., Flow]
     wiring_fields: tuple[str, ...]
     param_set: str | None
+    rate_params: tuple[str, ...] = ()
+    """The params on this type's ``param_set`` that are FIRST-ORDER RATE CONSTANTS.
+
+    Names the ``k`` in a ``dx/dt = k·x`` (or ``k·(S−x)``) leg, in ``1/s`` — the subset
+    the interpreter's build-time ``k·h < 1`` precondition checks (h = the effective step
+    this flow is integrated at; see ``interpreter._effective_step``). Empty for a flow
+    type with no first-order rate to check, which is the majority and is **not** a gap:
+
+    * a param-free flow has nothing to read;
+    * ``thermal.radiator_reject``'s constraint is ``τ = C/(4εσA·T_eq³) ≫ dt`` — **"≫" is
+      not a predicate**, and making it one means inventing a safety factor the science
+      does not supply;
+    * ``eclss.crew_metabolism``'s is ``forced draw < stock`` — state-dependent, not
+      param-only, so a build check (which sees only the *initial* amount) is
+      necessary-not-sufficient. Rationing stays its guard.
+
+    **An explicit declaration, not "every float on the params object"** — and
+    ``EclssParams`` is exactly why: it carries ``o2_setpoint``, a target *inventory* in
+    mol, which is **not** a rate. Multiplying it by a step size is meaningless, and
+    checking it would refuse every correct ECLSS scenario. The field names here are the
+    real dataclass fields (``co2_scrub_rate``, not the docs' ``k_scrub`` shorthand);
+    ``tests/test_authoring_rate_precondition.py`` reads them off the frozen loaders
+    rather than transcribing, so a renamed param cannot leave a dead entry here.
+    """
 
 
 # The author-selectable frozen-flow surface. Keys are stable authoring type names
@@ -141,6 +165,7 @@ FLOW_TYPES: dict[str, FlowTypeSpec] = {
         cls=SelfDischarge,
         wiring_fields=("battery", "waste_heat"),
         param_set="self_discharge",
+        rate_params=("self_discharge_rate",),
     ),
     # --- Thermal (ENERGY, J) --------------------------------------------------
     # FORCED on ``heat_load`` (W). Heat → heat, no form change ⇒ two legs, no loss leg.
@@ -185,6 +210,7 @@ FLOW_TYPES: dict[str, FlowTypeSpec] = {
         cls=CO2Scrubber,
         wiring_fields=("cabin_co2", "co2_removed"),
         param_set="eclss",
+        rate_params=("co2_scrub_rate",),
     ),
     # DONOR-CONTROLLED. k_cond = 5.0e-4 /s, likewise sized for dt = 60 s (k·dt = 0.03);
     # k·dt = 1.8 > 1 at dt = 3600 s.
@@ -192,6 +218,7 @@ FLOW_TYPES: dict[str, FlowTypeSpec] = {
         cls=Condenser,
         wiring_fields=("cabin_h2o", "humidity_condensate"),
         param_set="eclss",
+        rate_params=("condense_rate",),
     ),
     # DEMAND-CONTROLLED toward o2_setpoint (the one flow of this shape). Not clamped:
     # above the setpoint the frozen law goes NEGATIVE, reversing the flow's direction —
@@ -201,6 +228,14 @@ FLOW_TYPES: dict[str, FlowTypeSpec] = {
         cls=O2Makeup,
         wiring_fields=("o2_supply", "cabin_o2"),
         param_set="eclss",
+        # `o2_makeup_gain` ONLY — `o2_setpoint` sits on the same params object and is a
+        # target inventory (mol), not a rate. THE ONE RATIONING CANNOT SEE, so this row
+        # is the precondition's whole reason for existing: the draw is proportional to
+        # the setpoint ERROR, not the stock, so it never over-draws and the backstop
+        # never fires however large k*dt gets (test_authoring_export_fidelity.py). For
+        # this flow the build check is not a convenience over the run-time catch — it is
+        # the ONLY catch.
+        rate_params=("o2_makeup_gain",),
     ),
 }
 

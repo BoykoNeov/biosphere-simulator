@@ -53,18 +53,34 @@ HOURS = 24
 CABIN_O2 = StockId("eclss.cabin_o2")
 
 
-def _build(n_sub: int = 1, dt: float = UNSAFE_DT, steps: int = HOURS) -> BuiltScenario:
+def _build(
+    n_sub: int = 1,
+    dt: float = UNSAFE_DT,
+    steps: int = HOURS,
+    *,
+    allow_unsafe_step: bool = False,
+) -> BuiltScenario:
     """The ECLSS anchor re-interpreted at an overridden run config.
 
     The anchor **file** is never edited (the ``test_authoring_dt_hazard._build_at``
     discipline): only its in-memory dict, so the graph under test stays the committed
     one and only its cadence moves.
+
+    Unlike ``test_authoring_multirate_identity._at_dt``, the cadence here is declared on
+    the **spec**, so the Step-5 precondition is judging the configuration that actually
+    runs — and ``allow_unsafe_step`` therefore defaults to **False**. The rows that pass
+    ``True`` are the ones deliberately running a step the platform now refuses, in order
+    to show what it is refusing.
     """
     raw: dict[str, Any] = copy.deepcopy(load_yaml(str(ECLSS_YAML)))
     raw["dt"] = dt
     raw["steps"] = steps
     raw["n_sub"] = n_sub
-    return interpret(ScenarioSpec.model_validate(raw), base_dir=SCENARIO_DIR)
+    return interpret(
+        ScenarioSpec.model_validate(raw),
+        base_dir=SCENARIO_DIR,
+        allow_unsafe_step=allow_unsafe_step,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -122,37 +138,68 @@ def test_the_harness_rescues_the_cabin_at_the_unsafe_master_dt() -> None:
 
 def test_the_same_scenario_single_rate_raises() -> None:
     # The contrast that gives the test above its meaning: the identical file at the
-    # identical dt, minus the n_sub knob, is a RationedError. Multi-rate is what moved
-    # it from "raises" to "correct" — not some other edit in this step.
+    # identical dt, minus the n_sub knob, is refused. Multi-rate is what moved it from
+    # "refused" to "correct" — not some other edit in this step.
+    #
+    # Step 5 moved WHERE it is refused: the build now rejects it (k_scrub*3600 = 3.6),
+    # so the author never reaches the run. Both stages are asserted — the run-time gate
+    # is still the one that catches state-dependent over-draws no build check can
+    # decide.
+    with pytest.raises(AuthoringError, match="co2_scrub_rate"):
+        _build(n_sub=1, dt=UNSAFE_DT)
     with pytest.raises(RationedError):
-        run_scenario(_build(n_sub=1, dt=UNSAFE_DT))
+        run_scenario(_build(n_sub=1, dt=UNSAFE_DT, allow_unsafe_step=True))
 
 
 # ---------------------------------------------------------------------------
-# 3. MULTI-RATE IS NOT A SAFETY KNOB — the effective sub-step is the same hazard
+# 3. MULTI-RATE IS NOT A SAFETY KNOB — and Step 5 is what closes that
 # ---------------------------------------------------------------------------
+
+
+def test_the_build_refuses_an_unsafe_effective_substep() -> None:
+    # THE ADVISOR'S POINT, CLOSED. `n_sub=2` at dt=3600 is the case that made
+    # "multi-rate is the performance enabler, NOT the hazard closer" true: the knob
+    # READS as safety,
+    # the effective sub-step is 1800 s, and the cabin lands on 36.0 against a truth of
+    # 8.0. Step 5 is the direct closer, and this is it — refused at BUILD, from params +
+    # dt + n_sub alone, before a step runs.
+    #
+    # The check is on the EFFECTIVE sub-step dt/n_sub, never the master dt. That
+    # distinction is the whole reason this file's headline case (n_sub=60, same dt)
+    # builds happily two tests above while this one does not: same dt, same graph, same
+    # params — different effective step.
+    with pytest.raises(AuthoringError) as excinfo:
+        _build(n_sub=2, dt=UNSAFE_DT)
+    msg = str(excinfo.value)
+    assert "dt/n_sub=1800.0" in msg, f"the EFFECTIVE step must be named, got: {msg}"
+    assert "n_sub" in msg  # the fast-flow remedy: raise n_sub, cadence untouched
 
 
 def test_an_unsafe_effective_substep_still_rations_through_the_harness() -> None:
-    # The advisor's point, now pinned at the surface an author touches: n_sub=2 gives an
-    # effective k·dt of 3.60 — "multi-rate is on" and the cabin is still wrong (Step 1
-    # measured 36.0 against a truth of 8.0). The knob READS as safety and is not.
+    # The run-time half of the same case, reached now only via the study hatch. Kept
+    # rather than deleted: it is the evidence that the build refusal above is refusing
+    # something REAL, not being conservative for its own sake.
     #
-    # That this raises is luck of shape, not the gate working: the backstop sees the
-    # DONOR-controlled scrubber over-draw. `o2_makeup` is demand-controlled and its
-    # near-setpoint oscillation is invisible to rationing at any dt
-    # (test_authoring_export_fidelity.py). Hence Step 5's build-time k·(dt/n_sub)
-    # check — this run-time catch is not a substitute for it.
+    # That this raises at all is luck of shape, not the run-time gate working: the
+    # backstop sees the DONOR-controlled scrubber over-draw. `o2_makeup` is
+    # demand-controlled and its near-setpoint oscillation is invisible to rationing at
+    # any dt (test_authoring_export_fidelity.py) — which is exactly why the build check
+    # had to exist, and why it is not a mere convenience over this one.
     with pytest.raises(RationedError):
-        run_scenario(_build(n_sub=2, dt=UNSAFE_DT))
+        run_scenario(_build(n_sub=2, dt=UNSAFE_DT, allow_unsafe_step=True))
 
 
 def test_the_escape_hatch_works_on_the_multirate_path_too() -> None:
     # `allow_rationing=True` is for STUDYING a rationed run, and multi-rate must not
     # quietly become the one path where the hatch is unavailable — the n_sub=2 run above
     # is exactly the kind of run worth inspecting rather than only failing.
+    #
+    # BOTH hatches are needed now, and they are not redundant: allow_unsafe_step opens
+    # the BUILD, allow_rationing opens the RUN. Two independent gates at two stages, so
+    # studying a hazard that trips both means saying so twice. That verbosity is the
+    # feature — neither hatch silently implies the other.
     states, rationed, _events = run_scenario(
-        _build(n_sub=2, dt=UNSAFE_DT), allow_rationing=True
+        _build(n_sub=2, dt=UNSAFE_DT, allow_unsafe_step=True), allow_rationing=True
     )
     assert rationed > 0  # summed across sub-operations by multirate_step's own contract
     assert states[-1].stocks[CABIN_O2].amount != pytest.approx(O2_EQ, abs=1e-6)
@@ -170,11 +217,11 @@ def test_the_rationed_message_offers_n_sub_only_where_n_sub_exists() -> None:
     # key that (until they add it) does nothing. Conditional, therefore — not one string
     # with everything in it.
     with pytest.raises(RationedError) as multi:
-        run_scenario(_build(n_sub=2, dt=UNSAFE_DT))
+        run_scenario(_build(n_sub=2, dt=UNSAFE_DT, allow_unsafe_step=True))
     assert "n_sub" in str(multi.value)
 
     with pytest.raises(RationedError) as single:
-        run_scenario(_build(n_sub=1, dt=UNSAFE_DT))
+        run_scenario(_build(n_sub=1, dt=UNSAFE_DT, allow_unsafe_step=True))
     assert "n_sub" not in str(single.value)
 
 

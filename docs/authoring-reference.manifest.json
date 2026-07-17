@@ -20,6 +20,7 @@
     "crew.food_metabolism": {
       "cls": "FoodMetabolism",
       "param_set": "crew",
+      "rate_params": [],
       "wiring_fields": [
         "exhaled_co2",
         "fecal_waste",
@@ -29,6 +30,7 @@
     "crew.oxygen_consumption": {
       "cls": "OxygenConsumption",
       "param_set": null,
+      "rate_params": [],
       "wiring_fields": [
         "o2_consumed",
         "o2_store"
@@ -37,6 +39,7 @@
     "crew.water_balance": {
       "cls": "WaterBalance",
       "param_set": "crew",
+      "rate_params": [],
       "wiring_fields": [
         "crew_humidity",
         "urine",
@@ -46,6 +49,9 @@
     "eclss.co2_scrubber": {
       "cls": "CO2Scrubber",
       "param_set": "eclss",
+      "rate_params": [
+        "co2_scrub_rate"
+      ],
       "wiring_fields": [
         "cabin_co2",
         "co2_removed"
@@ -54,6 +60,9 @@
     "eclss.condenser": {
       "cls": "Condenser",
       "param_set": "eclss",
+      "rate_params": [
+        "condense_rate"
+      ],
       "wiring_fields": [
         "cabin_h2o",
         "humidity_condensate"
@@ -62,6 +71,7 @@
     "eclss.crew_metabolism": {
       "cls": "CrewMetabolism",
       "param_set": null,
+      "rate_params": [],
       "wiring_fields": [
         "cabin_co2",
         "cabin_h2o",
@@ -74,6 +84,9 @@
     "eclss.o2_makeup": {
       "cls": "O2Makeup",
       "param_set": "eclss",
+      "rate_params": [
+        "o2_makeup_gain"
+      ],
       "wiring_fields": [
         "cabin_o2",
         "o2_supply"
@@ -82,6 +95,7 @@
     "power.load_draw": {
       "cls": "LoadDraw",
       "param_set": null,
+      "rate_params": [],
       "wiring_fields": [
         "battery",
         "waste_heat"
@@ -90,6 +104,9 @@
     "power.self_discharge": {
       "cls": "SelfDischarge",
       "param_set": "self_discharge",
+      "rate_params": [
+        "self_discharge_rate"
+      ],
       "wiring_fields": [
         "battery",
         "waste_heat"
@@ -98,6 +115,7 @@
     "power.solar_charge": {
       "cls": "SolarCharge",
       "param_set": "charge",
+      "rate_params": [],
       "wiring_fields": [
         "battery",
         "solar_source",
@@ -107,6 +125,7 @@
     "thermal.heat_input": {
       "cls": "HeatInput",
       "param_set": null,
+      "rate_params": [],
       "wiring_fields": [
         "heat_source",
         "node"
@@ -115,6 +134,7 @@
     "thermal.radiator_reject": {
       "cls": "RadiatorReject",
       "param_set": "thermal",
+      "rate_params": [],
       "wiring_fields": [
         "node",
         "space"

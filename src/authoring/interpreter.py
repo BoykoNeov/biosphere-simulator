@@ -73,6 +73,111 @@ expected to grow, this vocabulary cannot grow without a ``simcore`` change.
 """
 
 
+_SLOW_STEP_DIVISOR: float = 2.0
+"""The divisor giving the SLOW set's effective step under the pinned split: ``dt/2``.
+
+**This tracks ``authoring.run._SPLIT``, and the coupling is the point.** Strang runs the
+slow set as two ``dt/2`` half-steps around the fast block (``simcore.multirate``:
+``ops = [(slow, dt/2), *fast_ops, (slow, dt/2)]`` ), so ``dt/2`` — *not* ``dt/n_sub`` —
+is the step a slow flow is actually integrated at. Under **Lie** the slow set would step
+at the full ``dt``, making this divisor too permissive by 2×. It is not imported from
+``run`` because ``run`` imports *this* module;
+``tests/test_authoring_rate_precondition.py`` asserts ``run._SPLIT is Split.STRANG``
+instead, so flipping the split goes red **here** rather than silently loosening the
+check.
+"""
+
+
+def _effective_step(dt: float, n_sub: int, *, multirate: bool, slow: bool) -> float:
+    """The step size a flow is ACTUALLY integrated at — the number ``k`` multiplies.
+
+    Three cases, and conflating them is the trap this function exists to name:
+
+    * **single-rate** → ``dt``. The whole registry steps once per master step.
+    * **multi-rate, fast** → ``dt/n_sub``. The point of the cadence knob.
+    * **multi-rate, slow** → ``dt/2`` (:data:`_SLOW_STEP_DIVISOR`), *independent of*
+      ``n_sub``, because Strang splits the slow set into two half-steps.
+
+    **The plan for this step specified ``k·(dt/n_sub) < 1`` for every flow, and that is
+    measured WRONG for the slow set** — a false PASS in the unsafe direction. With
+    ``eclss.co2_scrubber`` classed slow at master ``dt=3600``, ``n_sub=60``, the formula
+    reports ``k·h = 0.06`` (safe) while the flow truly steps at 1800 s → ``k·h = 1.8``:
+    the run rations 24 times and empties ``cabin_co2`` to exactly 0.0. A check that
+    greenlights that is worse than no check, because it reads as a guarantee.
+
+    Note ``dt/n_sub`` coincides with ``dt`` at ``n_sub=1``, so the single-rate case is
+    not a special case of the formula so much as the same arithmetic — the slow case is
+    the one that genuinely differs. This is the **same Strang fact** that turned Step
+    4's predicted 60× Thermal saving into a measured 30×; it has now bitten two separate
+    claims in this phase, from the same blind spot: reasoning about ``n_sub`` as though
+    it governed both sets.
+    """
+    if not multirate:
+        return dt
+    return dt / _SLOW_STEP_DIVISOR if slow else dt / n_sub
+
+
+def _rate_precondition_message(
+    flow_id: str,
+    flow_type: str,
+    param: str,
+    k: float,
+    h: float,
+    dt: float,
+    *,
+    slow: bool,
+    multirate: bool,
+) -> str:
+    """The ``AuthoringError`` text — the remedy is conditional on the flow's rate class.
+
+    "Increase ``n_sub``" is honest for a **fast** flow and actively misleading for a
+    **slow** one, which steps at ``dt/2`` however large ``n_sub`` grows: an author who
+    followed that advice would raise ``n_sub``, watch nothing change, and conclude the
+    check is broken. Mirrors ``run._rationed_message`` 's conditional structure — the
+    same hazard, named at build time instead of run time.
+
+    Every remedy quotes a **concrete number** the author can act on (the dt ceiling, the
+    minimum ``n_sub``) rather than restating the inequality: the author already knows
+    ``k*h < 1`` failed — what they need is the value that satisfies it.
+    """
+    if not multirate:
+        where = f"dt={h!r}"
+        remedy = (
+            f"Reduce dt below {1.0 / k!r} s, or adopt a multi-rate cadence: keep dt as "
+            f"the export cadence neighbours see and add 'n_sub' > {k * dt!r} so this "
+            f"flow sub-steps at dt/n_sub"
+        )
+    elif slow:
+        where = f"dt/2={h!r} (the slow set's Strang half-step, NOT dt/n_sub)"
+        remedy = (
+            f"This flow is rate_class 'slow', so it steps at dt/2 REGARDLESS of n_sub "
+            f"(Strang splitting) — raising n_sub will NOT help it. Either reduce dt "
+            f"below {2.0 / k!r} s, or re-class this flow 'fast' so that n_sub governs "
+            f"its step too"
+        )
+    else:
+        where = f"dt/n_sub={h!r} (master dt={dt!r})"
+        remedy = (
+            f"Increase n_sub past {k * dt!r} (i.e. to at least "
+            f"{int(k * dt) + 1}), which leaves the master export cadence untouched, "
+            f"or reduce dt"
+        )
+    return (
+        f"flow {flow_id!r} ({flow_type}): param {param!r} = {k!r} /s is a first-order "
+        f"rate constant, and this scenario integrates the flow at {where}, giving "
+        f"k*h = {k * h!r} >= 1. The step is too large for this flow's frozen rate: "
+        f"over one step the law removes more than the whole stock (or, for a "
+        f"demand-controlled flow, overshoots its setpoint and oscillates). k*h < 1 is "
+        f"the platform's EXPORT-FIDELITY bound, deliberately stricter than the "
+        f"textbook stability bound k*h < 2: this engine couples domains, so a "
+        f"neighbour must be able to USE the exported value, not merely watch it "
+        f"converge eventually. "
+        f"{remedy}. See 'The dt constraint' in docs/authoring-reference.md. To build "
+        f"the unsafe scenario anyway — to STUDY it, not to make it work — pass "
+        f"allow_unsafe_step=True."
+    )
+
+
 @dataclass(frozen=True)
 class BuiltScenario:
     """The interpreted graph plus its run config — everything a run needs.
@@ -367,6 +472,80 @@ def _slow_flow_ids(spec: ScenarioSpec) -> frozenset[FlowId]:
     return frozenset(slow)
 
 
+def _check_rate_preconditions(
+    spec: ScenarioSpec,
+    flows: list[Flow],
+    slow_ids: frozenset[FlowId],
+) -> None:
+    """Refuse a scenario whose step is too large for a declared rate (Step 5).
+
+    For every frozen flow type declaring
+    :attr:`~authoring.flow_registry.FlowTypeSpec.rate_params`, read each ``k`` off the
+    **pack-resolved** params object and require ``k · h < 1``, where ``h`` is that
+    flow's :func:`_effective_step`.
+
+    **Why build time, and why here rather than in ``run``** — a ``params: {pack: …}``
+    may inflate a gain, and a pack's values exist only *after* this function's caller
+    resolves them. ``run_scenario`` receives an already-built flow and cannot see what
+    the pack asked for, so the pack case is checkable **only** at this point in the
+    pipeline. That is the load-bearing reason, ahead of the (real, but secondary)
+    convenience of failing before a long run rather than after it.
+
+    **Read off the built flow, not re-resolved.** ``flows`` is in ``spec.flows`` order
+    (the caller's list comprehension), so the zip is positional and exact; re-loading
+    each pack would double the file reads and, worse, could disagree with what was
+    actually built. Transcendental-free (``+ − × <``) ⇒ the Rust mirror is byte-safe.
+
+    **What this honestly does NOT cover, by declaration rather than omission**: authored
+    ``kinetics`` (the author wrote the rate law, so the platform cannot know its
+    constant — decision B's "authored ≠ validated" boundary),
+    ``thermal.radiator_reject`` (``τ ≫ dt`` is not a predicate), and
+    ``eclss.crew_metabolism`` (``forced draw < stock`` is state-dependent). So the claim
+    is "the platform catches the ``k·dt`` family", never "your dt is safe". See
+    ``FlowTypeSpec.rate_params``.
+    """
+    multirate = spec.n_sub > 1 or bool(slow_ids)
+    # strict=True asserts the positional correspondence this function's contract rests
+    # on (`flows` is built by a comprehension over `spec.flows`). If that ever stops
+    # holding, a silent zip-truncation would check the WRONG flow's params against the
+    # wrong rate class — the failure would be a wrong verdict, not a crash, so it must
+    # be loud.
+    for flow_spec, flow in zip(spec.flows, flows, strict=True):
+        if flow_spec.type is None:  # authored kinetics — structurally uncheckable
+            continue
+        type_spec = FLOW_TYPES[flow_spec.type]  # _build_flow already validated the name
+        if not type_spec.rate_params:
+            continue
+        params_obj = getattr(flow, "params", None)
+        if params_obj is None:  # pragma: no cover — a registry bug, not authored input
+            raise AuthoringError(
+                f"flow {flow_spec.id!r} ({flow_spec.type}): declares rate_params "
+                f"{list(type_spec.rate_params)} but its built flow carries no params "
+                f"object; the flow-type registry is inconsistent"
+            )
+        h = _effective_step(
+            spec.dt,
+            spec.n_sub,
+            multirate=multirate,
+            slow=FlowId(flow_spec.id) in slow_ids,
+        )
+        for param in type_spec.rate_params:
+            k = float(getattr(params_obj, param))
+            if k * h >= 1.0:
+                raise AuthoringError(
+                    _rate_precondition_message(
+                        flow_spec.id,
+                        flow_spec.type,
+                        param,
+                        k,
+                        h,
+                        spec.dt,
+                        slow=FlowId(flow_spec.id) in slow_ids,
+                        multirate=multirate,
+                    )
+                )
+
+
 def _build_flow(spec: FlowSpec, stocks: dict[StockId, Stock], base_dir: Path) -> Flow:
     """Lower one :class:`FlowSpec` to a ``Flow``: a frozen type, or authored kinetics.
 
@@ -408,6 +587,8 @@ def interpret(
     spec: ScenarioSpec,
     base_dir: Path | None = None,
     overrides: dict[str, float] | None = None,
+    *,
+    allow_unsafe_step: bool = False,
 ) -> BuiltScenario:
     """Build the runnable ``(State, Registry, resolver)`` graph from a scenario spec.
 
@@ -445,6 +626,21 @@ def interpret(
     the configuration the measured payoff rests on (master ``dt=3600``, ``n_sub=60``
     lands on the same value as a single-rate ``dt=60`` run while exporting 60x less
     often).
+
+    Finally the **rate precondition** (Step 5): every frozen flow type declaring
+    ``rate_params`` must satisfy ``k · h < 1`` at its own effective step ``h``
+    (:func:`_check_rate_preconditions`). This **moves the ``k·dt`` family's failure from
+    run time to build time** — a donor-controlled flow that used to surface as
+    ``run_scenario`` 's ``RationedError`` after a full run is now refused here, before
+    any step. For the demand-controlled ``eclss.o2_makeup`` it is not a *move* but the
+    **only** catch there has ever been: rationing structurally cannot see it.
+
+    ``allow_unsafe_step=True`` skips that check — the
+    ``run_scenario(allow_rationing=True)`` idiom, and for the same purpose: **studying**
+    an unsafe run (``tests/test_authoring_export_fidelity.py`` exists to measure the
+    oscillation the bound excludes, and cannot construct its own subject otherwise),
+    never making a scenario "work". It does not make the step safe; it makes the
+    platform stop objecting.
     """
     if base_dir is None:
         base_dir = Path()
@@ -472,6 +668,8 @@ def interpret(
             f"(the fast set then sub-steps at dt/n_sub, which is the point of the "
             f"partition), or drop the 'rate_class: slow' key(s) to run single-rate."
         )
+    if not allow_unsafe_step:
+        _check_rate_preconditions(spec, flows, slow_ids)
     # The disjoint partition over the SAME stock dict (N3). Built unconditionally: with
     # no authored rate_class keys the slow set is empty and `fast_registry` holds every
     # flow, so this is inert for every pre-multi-rate scenario.
@@ -501,7 +699,10 @@ def interpret(
 
 
 def load_scenario(
-    path: str, overrides: dict[str, float] | None = None
+    path: str,
+    overrides: dict[str, float] | None = None,
+    *,
+    allow_unsafe_step: bool = False,
 ) -> BuiltScenario:
     """Read a scenario YAML file, validate its schema, and interpret it.
 
@@ -510,7 +711,14 @@ def load_scenario(
     (``extra="forbid"`` + float coercion — the pyyaml numeric-string backstop).
     Parameter-pack paths are resolved relative to ``path``'s directory. ``overrides``
     instantiates a template's ``parameters`` (Step 3) — the "one template, many
-    habitats" knob.
+    habitats" knob. ``allow_unsafe_step`` is forwarded to :func:`interpret` — threaded
+    rather than omitted so that the file-loading surface an author actually calls is not
+    the one place the study hatch is unavailable.
     """
     spec = ScenarioSpec.model_validate(load_yaml(path))
-    return interpret(spec, base_dir=Path(path).parent, overrides=overrides)
+    return interpret(
+        spec,
+        base_dir=Path(path).parent,
+        overrides=overrides,
+        allow_unsafe_step=allow_unsafe_step,
+    )

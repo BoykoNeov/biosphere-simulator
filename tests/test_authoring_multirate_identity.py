@@ -235,11 +235,27 @@ def _at_dt(dt: float, steps: int) -> BuiltScenario:
     Mirrors ``test_authoring_dt_hazard._build_at`` — the anchor file itself is never
     edited; only its run config is overridden, so the graph under test stays the frozen
     one.
+
+    ``allow_unsafe_step=True`` for a reason specific to this file, and worth naming
+    because it is *not* the dt_hazard file's reason. The scenarios here are
+    **single-rate specs used as a flow bag**: the tests hand-drive ``multirate_step``
+    with an ``n_sub`` the spec never declares (that is the whole design of
+    ``_run_multirate`` above, which predates the ``n_sub`` key and is what pins the
+    *driver* rather than the harness). So ``interpret`` sees ``n_sub=1`` at ``dt=3600``
+    and refuses on the single-rate rule — even for the rows where the hand-passed
+    ``n_sub`` makes the *actual* effective step perfectly safe (``n_sub=60`` → 60 s).
+    The build check is judging a cadence this spec does not describe, so disabling it
+    here is correct rather than a concession: the scenario that gets *run* is not the
+    scenario that was *declared*.
     """
     raw: dict[str, Any] = copy.deepcopy(load_yaml(str(ECLSS_YAML)))
     raw["dt"] = dt
     raw["steps"] = steps
-    return interpret(ScenarioSpec.model_validate(raw), base_dir=SCENARIO_DIR)
+    return interpret(
+        ScenarioSpec.model_validate(raw),
+        base_dir=SCENARIO_DIR,
+        allow_unsafe_step=True,
+    )
 
 
 def _at_unsafe_dt(steps: int = HOURS) -> BuiltScenario:

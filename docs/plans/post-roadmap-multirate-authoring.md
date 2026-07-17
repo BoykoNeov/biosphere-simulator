@@ -1,13 +1,20 @@
 # Post-roadmap: multi-rate authoring — the author picks a coupling cadence, not a global `dt`
 
-**Status: IN PROGRESS — Steps 1–4 of 7 done.** A **phase, not a step** — an authoring
+**Status: IN PROGRESS — Steps 1–5 of 7 done.** A **phase, not a step** — an authoring
 unfreeze (schema + interpreter + run harness), the Rust mirror, the freeze manifest, and
 the cross-port tiers. **The user opened the unfreeze on 2026-07-17.** The knob is
-decided, built (Step 2), **drives** (Step 3), and has now **paid off the phase's stated
-motivation** (Step 4): the scenario `docs/authoring-reference.md` calls *impossible* is
-authored, committed and green. No golden has moved and `src/simcore/` is untouched.
-Remaining: the effective-sub-step precondition (5 — folded in by user decision), the Rust
-mirror (6), and the unfreeze ceremony (7).
+decided, built (Step 2), **drives** (Step 3), has **paid off the phase's stated
+motivation** (Step 4 — the scenario `docs/authoring-reference.md` calls *impossible* is
+authored, committed and green), and **the hazard it does not itself close is now closed**
+(Step 5: the build-time `k·h < 1` precondition). No golden has moved and `src/simcore/` is
+untouched. Remaining: the Rust mirror (6) and the unfreeze ceremony (7).
+
+**Step 5 corrected a formula this document specified.** The precondition is **not**
+`k·(dt/n_sub) < 1` for every flow: the slow set steps at **`dt/2`** under Strang,
+independent of `n_sub`, so that formula **false-PASSES** an unsafe slow flow (measured:
+reports 0.06 where the truth is 1.8). It is the *same* Strang fact that made Step 4's
+predicted 60× a measured 30×. The wrong formula is left standing where it was written and
+corrected at the point of use — the Step-4 precedent.
 
 Predecessors: `post-roadmap-flow-registry-growth.md` (Tier 1 created the `dt` hazard by
 registering the flows), `post-roadmap-rationing-gate.md` (made the *donor-controlled* half
@@ -77,11 +84,16 @@ demands.
 `n_sub` whose **effective sub-step** is unsafe — the identical hazard, one level down
 (**measured**: `n_sub=2` at `dt=3600` gives `36.0` against a truth of `8.0`). The direct
 closer is the **build-time precondition**, and multi-rate *changes what it must check*: the
-**effective sub-step `dt/n_sub`**, never the master `dt`.
+**effective sub-step**, never the master `dt`.
 
 **→ So the precondition FOLDS INTO this phase (user decision, 2026-07-17): the whole `k·dt`
 family.** See "The precondition" below. Without it this phase would ship a knob that reads
 as safety while the hazard is unchanged.
+
+**✅ CLOSED in Step 5** — `n_sub=2` at `dt=3600` no longer builds. Read the paragraph above
+with one correction it did not know: *"the effective sub-step `dt/n_sub`"* is right for the
+**fast** set only. The slow set's effective sub-step is **`dt/2`**, and writing `dt/n_sub`
+there is exactly the false-PASS Step 5 measured.
 
 **It costs accuracy versus single-rate RK4, and the honest framing matters.** From
 `simcore/multirate.py`'s own contract: Lie is globally 1st-order; Strang is 2nd-order *only
@@ -214,10 +226,15 @@ error from **run time to build time** for the other three — the author learns 
 run, not after.
 
 A new **optional** `rate_params` field on `FlowTypeSpec` names which of a flow type's params
-are first-order rate constants. The interpreter checks `k · (dt/n_sub) < 1` for each, at
-build time, from the **pack-resolved** params object it already holds — so a param **pack**
-that inflates a gain is caught too, which only a build check can do. Transcendental-free
+are first-order rate constants. The interpreter checks `k · h < 1` for each, at build time,
+from the **pack-resolved** params object it already holds — so a param **pack** that
+inflates a gain is caught too, which only a build check can do. Transcendental-free
 (`+ − × <`) ⇒ the Rust mirror is byte-safe.
+
+> **CORRECTED IN STEP 5.** This paragraph originally read `k · (dt/n_sub) < 1`. `h` is the
+> **per-rate-class effective step** — `dt` single-rate, `dt/n_sub` fast, **`dt/2` slow** —
+> and `dt/n_sub` for a slow flow is a **false PASS in the unsafe direction** (measured:
+> 0.06 reported, 1.8 actual, 24 rationings, `cabin_co2 → 0.0`). See "Step 5: COMPLETE".
 
 | flow type | `rate_params` | today at its frozen `dt` |
 |---|---|---|
@@ -309,7 +326,7 @@ oscillating divergence is simply at a different point. Both are the same broken 
 | `authoring/schema.py` | the partition + `n_sub` knob | **authoring unfreeze** |
 | `authoring/interpreter.py` | build two disjoint registries over one stock dict | **authoring unfreeze** |
 | `authoring/run.py` | drive `multirate_step`; sum `rationed` across sub-ops | **authoring unfreeze** |
-| `authoring/flow_registry.py` | `rate_params` on `FlowTypeSpec` + 4 rows — the precondition **folds in** | **authoring unfreeze** |
+| `authoring/flow_registry.py` | ✅ `rate_params` on `FlowTypeSpec` + 4 rows — the precondition **folds in** | **authoring unfreeze** |
 | `docs/authoring-reference.manifest.json` | regenerate **at each step that moves the surface** (2: `schema_fields` + `rate_classes`; 5: `flow_types`), never batched to the end — the gate is plain equality and would sit red meanwhile | manifest |
 | `rust/crates/authoring` | the hand-mirrored port | native-port tolerance contract |
 | `tests/crossport/tiers.json` | a multi-rate anchor, if one is added | cross-port tiers |
@@ -330,9 +347,10 @@ surface, not a licence to edit the core.
    interpreter** ✅ **DONE** — see "Step 2: COMPLETE" below.
 3. **The run harness** ✅ **DONE** — see "Step 3: COMPLETE" below.
 4. **The composability anchor** ✅ **DONE** — see "Step 4: COMPLETE" below.
-5. **The effective-sub-step precondition** — **folded in** (user, the whole `k·dt` family):
-   `rate_params` on `FlowTypeSpec`, checked as `k·(dt/n_sub) < 1` at build time. The three
-   uncoverable shapes documented by name, not faked.
+5. **The effective-sub-step precondition** ✅ **DONE** — see "Step 5: COMPLETE" below.
+   (As written this step said "checked as `k·(dt/n_sub) < 1`". **That formula is wrong for
+   the slow set and the step corrected it** — left standing here rather than edited away,
+   the Step-4 `60×`/`30×` precedent.)
 6. **Rust mirror**, hand-written, then the cross-port tier.
 7. **The consolidated unfreeze ceremony** + the reference-doc narrative, per
    `docs/authoring-reference.md`, "The unfreeze discipline". **The manifest itself moves
@@ -573,6 +591,108 @@ precedent applies when the cross-port question is taken up: exclude from the bit
 parametrization, cover by the **graph dump** (which never calls `evaluate()`). Recorded
 here, not solved here.
 
+## Step 5: COMPLETE — the hazard is closed, and the plan's own formula was the bug
+
+**The direct closer landed.** `interpret` now refuses a scenario whose step is too large
+for a declared first-order rate: `k·h < 1`, checked at build time from the pack-resolved
+params. `n_sub=2` at `dt=3600` — the case that made *"multi-rate is the performance
+enabler, NOT the hazard closer"* true — **no longer builds**. `git diff src/simcore/` is
+empty; **no golden moved**; the manifest moved deliberately (`flow_types` gains
+`rate_params`). `tests/test_authoring_rate_precondition.py` (16 pins) + 22 migrated across
+six files.
+
+**THE FINDING: this plan specified the check, and the formula it specified is measurably
+wrong.** The scope section above says *"The interpreter checks `k · (dt/n_sub) < 1` for
+each"* — one formula for every flow. There are **three** cases, and the slow one differs:
+
+| case | effective step `h` |
+|---|---|
+| single-rate | `dt` |
+| multi-rate, **fast** | `dt/n_sub` |
+| multi-rate, **slow** | **`dt/2`** — Strang's half-step, *independent of `n_sub`* |
+
+Measured, before any code was written: `eclss.co2_scrubber` classed **slow** at master
+`dt=3600`, `n_sub=60` — the plan's formula reports `k·h = 1e-3 · 60 = 0.06` and **PASSES**;
+the flow truly steps at 1800 s (`k·h = 1.8`), rations **24** times over 24 steps, and
+empties `cabin_co2` to **exactly 0.0**. **A false PASS in the unsafe direction is worse
+than no check, because it reads as a guarantee.**
+
+**And it is the SAME Strang fact that turned Step 4's predicted 60× into a measured 30×.**
+That is the finding behind the finding: one blind spot — *reasoning about `n_sub` as though
+it governed both rate classes* — has now produced two wrong claims in this phase, a
+performance number and a **safety** predicate. Step 4 caught its instance and did not
+generalize it; the formula in this very document was written after that catch and still
+carried the error. `interpreter._effective_step` is now the one place the three cases are
+named, and `test_the_effective_step_is_per_rate_class_not_dt_over_n_sub` +
+`test_a_slow_flow_is_judged_at_dt_over_2_not_the_plans_formula` pin it. Mutation-checked:
+reverting `_effective_step` to the plan's formula turns **5 tests red across 2 files**.
+
+**The `dt/2` divisor is coupled to `_SPLIT`, and the coupling is pinned, not commented**
+(advisor). `dt/2` is true only because the harness pins Strang; **Lie steps the slow set at
+the full `dt`**, which would make the divisor too permissive by exactly 2× — silently, in
+the unsafe direction. `interpreter` cannot import `run._SPLIT` (`run` imports `interpreter`),
+so `test_the_slow_step_tracks_the_split_actually_used` asserts `run._SPLIT is Split.STRANG`
+and names its own remedy. Exposing author-visible `split` now goes red *here*.
+
+**The behavior change, stated plainly: the `k·dt` family moves from run-time
+`RationedError` to build-time `AuthoringError`.** That is intended ("moves the error to
+build time" — the user's own reason for choosing the whole family), and it is **observable**:
+22 committed pins across six files asserted the run-time verdict and had to migrate. The
+migration is itself the evidence the closer works — *those tests could no longer construct
+their own subject*.
+
+**`allow_unsafe_step=True` on `interpret`/`load_scenario` is the escape hatch**, the
+`run_scenario(allow_rationing=True)` idiom, for **studying** an unsafe run — never for
+making a scenario work. `test_authoring_export_fidelity.py` is the case that proves it must
+exist: that file's whole subject is the oscillating band the bound excludes, so post-Step-5
+it cannot build its own scenarios without saying so explicitly. **Both hatches are needed
+and neither implies the other** — `allow_unsafe_step` opens the *build*, `allow_rationing`
+opens the *run*. Two gates at two stages; the verbosity is the feature.
+
+**Build time is the locus for the PACK, not for the convenience** (advisor). The obvious
+argument — an author learns before a long run — is true and *secondary*. The load-bearing
+one: a **param pack may inflate a gain**, and a pack's values exist only *after* `interpret`
+resolves them, so `run_scenario` (which receives an already-built flow) **structurally
+cannot see it**. `packs/eclss_hot_makeup.yaml` measures it: the committed anchor at its own
+frozen, correct `dt=60`, made unsafe purely by a pack that passes **every** frozen guard
+(unit exact-string ✓, bound `> 0` ✓ — a gain has no `dt`-independent upper bound, which is
+precisely why this can never be a loader bound). `k·dt` goes `0.12 → 1.2`, and because
+`o2_makeup` is demand-controlled, **without the build check this exports an oscillating
+cabin with `rationed == 0` and no gate anywhere reporting a problem.**
+
+**A manifest hole nearly shipped, and the equality gate could not have caught it**
+(advisor). Adding `rate_params` to `FlowTypeSpec` is *not enough*:
+`test_frozen_flow_type_registry_is_complete` compares the manifest against `_flow_types()`,
+so had that derivation omitted the field, **both sides would omit it, the gate would stay
+green, and `rate_params` would never be frozen at all** — a field governing which scenarios
+the platform *refuses to build*, unfrozen and unnoticed. An equality gate is blind to a
+field absent from both things it equates. This is the scope-C *"a provenance-only edit is an
+unfreeze that NOTHING CATCHES"* shape, one level up. Fixed atomically (field + derivation +
+regenerate) and given teeth from outside the derivation:
+`test_the_manifest_actually_records_the_rate_params`.
+
+**The honest scope is unchanged and now executable**: *"the platform catches the `k·dt`
+family"*, **never** *"your dt is safe"*. The three uncoverable shapes are declared
+`rate_params=()` — a ruling, not an oversight — and pinned:
+`thermal.radiator_reject` (`τ ≫ dt`; **"≫" is not a predicate**, and inventing a safety
+factor the science does not supply would be a *fabricated* guarantee), `eclss.crew_metabolism`
+(`forced draw < stock` is **state-dependent**; a build check sees only the initial amount),
+and **authored `kinetics`** (the author wrote the law — decision B's "authored ≠ validated"
+boundary; `rate_params` lives on `FlowTypeSpec`, which a kinetics flow does not have, so the
+check skips it *by construction* rather than by a special case). **Neither gate subsumes the
+other**, which is why the run-time one was not removed: the build check sees the pack and the
+demand-controlled flow; rationing sees the state-dependent over-draw.
+
+**A test's own example turned out to be unsafe** — `test_a_true_partition_at_n_sub_gt_1_builds`
+partitioned the **scrubber** slow at `dt=3600`. It now uses the **condenser**, which is the
+*only* ECLSS flow that can legally be slow at that cadence (`k_cond = 5e-4`, half the
+scrubber's ⇒ `5e-4 · 1800 = 0.9 < 1`). Same graph, same `dt`, same `n_sub` — only `k`
+differs, and it decides membership of the slow set.
+
+**Every committed scenario still builds on the author's default path** (no hatch), pinned
+by `test_the_committed_scenarios_all_pass_the_precondition` — the assertion behind "no
+golden moved", since the risk a *refusal* carries is refusing something that already worked.
+
 ## The measurements this rests on
 
 All from this session; probes under `M:\claud_projects\temp\o2-makeup-probe\`, findings
@@ -601,3 +721,18 @@ Step 4 adds (probes under `M:\claud_projects\temp\multirate-step4\`, pinned in
 | the whole-run saving is far smaller | wall **1.31 s** vs **3.02 s** = 2.31× (the fast set dominates) |
 | the cheap Thermal run is still right | `cabin_o2` **bit-identical**; node within **0.014 %** (0.04 K) |
 | the firing rate is unchanged by composing | 840/336 = **2.5/step** — the Step-3 bare anchor's 60/24 |
+
+Step 5 adds (probes under `M:\claud_projects\temp\multirate-step5\`, pinned in
+`tests/test_authoring_rate_precondition.py`):
+
+| claim | measured |
+|---|---|
+| **this plan's own formula false-PASSES a slow flow** | scrubber slow, `dt=3600`, `n_sub=60`: formula says `k·h = 0.06` ✓; truth is **1.8** — 24 rationings, `cabin_co2` → **0.0** |
+| the slow set's step ignores `n_sub` entirely | `dt/2 = 1800` at `n_sub` = 2, 60, 600 **and** 1000 |
+| the same flow at the same `dt` is fine as **fast** | `1.8 → 0.06`; only `rate_class` moved |
+| a **pack** defeats every pre-Step-5 guard | `eclss_hot_makeup.yaml` loads clean (unit ✓, bound `> 0` ✓) and takes the anchor's own `dt=60` from `k·dt = 0.12` to **1.2** |
+| the pack hazard is invisible to `run_scenario` | `o2_makeup` is demand-controlled ⇒ `rationed == 0` at any `dt` |
+| the bound is `< 1`, not `≤ 1` | `dt=500` (`k·h` **exactly 1.0**, the deadbeat case) is **refused**; `dt=499` builds |
+| the condenser is the only ECLSS flow that may be slow at `dt=3600` | `5e-4 · 1800 = 0.9 < 1` vs the scrubber's `1.8` |
+| no committed scenario is refused | all build with **no hatch** — the "no golden moved" assertion |
+| the pins have teeth | reverting `_effective_step` to the plan's formula ⇒ **5 red across 2 files** |

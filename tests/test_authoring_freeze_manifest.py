@@ -151,15 +151,25 @@ def _flow_types() -> dict[str, dict[str, Any]]:
     """The author-selectable frozen-flow surface — derived from ``FLOW_TYPES``.
 
     Each entry records the frozen class it lowers to, the exact ``wiring`` field set the
-    interpreter demands, and the named param set (or ``None`` for a param-free flow).
-    The wiring names are part of the contract an author writes against, not an
-    implementation detail — a renamed wiring field breaks every file that names it.
+    interpreter demands, the named param set (or ``None`` for a param-free flow), and
+    the ``rate_params`` the build-time ``k·h < 1`` precondition checks. The wiring names
+    are part of the contract an author writes against, not an implementation detail — a
+    renamed wiring field breaks every file that names it.
+
+    **``rate_params`` belongs here because it is author-visible behavior, not metadata**
+    (multi-rate Step 5): it decides which scenarios the platform *refuses to build*.
+    Dropping a name from it silently un-checks a flow — a committed file that used to be
+    rejected starts lowering, which is exactly the "added but exercised by nothing" hole
+    one level up. Emitting it from *this* derivation is what freezes it: the gate
+    compares the manifest against this function, so a field the function omits is a
+    field the manifest cannot pin, however faithfully ``FlowTypeSpec`` records it.
     """
     return {
         name: {
             "cls": spec.cls.__name__,
             "wiring_fields": sorted(spec.wiring_fields),
             "param_set": spec.param_set,
+            "rate_params": sorted(spec.rate_params),
         }
         for name, spec in FLOW_TYPES.items()
     }
@@ -270,6 +280,33 @@ def test_frozen_flow_type_registry_is_complete() -> None:
     # or a wiring field renamed — either silently breaks committed scenario files.
     manifest = _load_manifest()
     assert manifest["flow_types"] == _flow_types()
+
+
+def test_the_manifest_actually_records_the_rate_params() -> None:
+    # Teeth for a hole the equality gate STRUCTURALLY cannot see, and it nearly shipped
+    # (advisor catch, multi-rate Step 5). `test_frozen_flow_type_registry_is_complete`
+    # compares the manifest against `_flow_types()` — so if `_flow_types()` omitted
+    # `rate_params`, BOTH sides would omit it, the gate would stay GREEN, and the field
+    # would never be frozen at all despite sitting on `FlowTypeSpec` in the live tree.
+    # An equality gate cannot detect a field absent from both of the things it equates.
+    # This test names the value from outside that derivation, so the omission goes red.
+    #
+    # `eclss.o2_makeup` is the row that matters most: its `o2_makeup_gain` is the ONE
+    # rate the run-time backstop can never catch (demand-controlled — the draw tracks
+    # the setpoint error, not the stock), so if this entry silently emptied, the hazard
+    # would be unguarded at BOTH build and run time. `o2_setpoint` must never join it:
+    # it is an inventory, not a rate.
+    flow_types = _load_manifest()["flow_types"]
+    assert flow_types["eclss.o2_makeup"]["rate_params"] == ["o2_makeup_gain"]
+    assert flow_types["eclss.co2_scrubber"]["rate_params"] == ["co2_scrub_rate"]
+    assert flow_types["eclss.condenser"]["rate_params"] == ["condense_rate"]
+    assert flow_types["power.self_discharge"]["rate_params"] == ["self_discharge_rate"]
+    # The uncheckable shapes are recorded as EMPTY, not absent — documented, not faked.
+    # radiator_reject's constraint is tau >> dt ("≫" is not a predicate);
+    # crew_metabolism's is state-dependent (forced draw < stock), which a build check
+    # cannot decide.
+    assert flow_types["thermal.radiator_reject"]["rate_params"] == []
+    assert flow_types["eclss.crew_metabolism"]["rate_params"] == []
 
 
 def test_frozen_param_loader_set_is_complete() -> None:

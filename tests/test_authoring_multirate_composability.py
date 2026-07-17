@@ -78,7 +78,9 @@ def _temperature(node_joules: float) -> float:
     return T_SPACE + node_joules / HEAT_CAPACITY
 
 
-def _build(*, single_rate: bool = False, **overrides: Any) -> BuiltScenario:
+def _build(
+    *, single_rate: bool = False, allow_unsafe_step: bool = False, **overrides: Any
+) -> BuiltScenario:
     """The habitat anchor re-interpreted at an overridden run config.
 
     The anchor **file** is never edited (the ``test_authoring_dt_hazard._build_at``
@@ -88,6 +90,12 @@ def _build(*, single_rate: bool = False, **overrides: Any) -> BuiltScenario:
     ``single_rate=True`` drops the partition as well as ``n_sub`` — see
     ``test_going_single_rate_means_dropping_the_partition_not_just_n_sub`` for why
     that is not merely a convenience.
+
+    ``allow_unsafe_step`` defaults to **False**, and that default is deliberate: the
+    committed anchor must clear the Step-5 precondition on the *author's* path, so the
+    tests asserting the anchor runs are only worth anything if the check is live for
+    them. Only the "the shared dt is unsafe" contrast rows pass ``True`` — they exist
+    precisely to construct the configuration the precondition now refuses.
     """
     raw: dict[str, Any] = copy.deepcopy(load_yaml(str(HABITAT_YAML)))
     if single_rate:
@@ -95,7 +103,11 @@ def _build(*, single_rate: bool = False, **overrides: Any) -> BuiltScenario:
         for flow in raw["flows"]:
             flow.pop("rate_class", None)
     raw.update(overrides)
-    return interpret(ScenarioSpec.model_validate(raw), base_dir=SCENARIO_DIR)
+    return interpret(
+        ScenarioSpec.model_validate(raw),
+        base_dir=SCENARIO_DIR,
+        allow_unsafe_step=allow_unsafe_step,
+    )
 
 
 @contextmanager
@@ -294,10 +306,19 @@ def test_the_thermal_node_warms_to_equilibrium_on_the_slow_set(
 
 def test_the_shared_dt_is_unsafe_the_first_half_of_the_constraint() -> None:
     # Half one: the same graph, the same master dt, minus the partition. k_scrub*3600 =
-    # 3.6 > 1, the scrubber over-draws, and the run is a RationedError. This is what
-    # "only dt <= ~60 is safe for both" means from the ECLSS side.
+    # 3.6 > 1, the scrubber over-draws. This is what "only dt <= ~60 is safe for both"
+    # means from the ECLSS side.
+    #
+    # The claim is now measured at BOTH stages, and Step 5 added the first one. The
+    # platform refuses to BUILD the shared-dt scenario (k*h is decidable from params +
+    # dt with no run at all); with the study hatch, the run then rations exactly as
+    # before. Asserting the pair is what keeps "unsafe" from quietly narrowing to
+    # "unsafe by whichever gate happens to fire first" — a later relaxation of either
+    # stage leaves the other still pinned.
+    with pytest.raises(AuthoringError, match="co2_scrub_rate"):
+        _build(single_rate=True)
     with pytest.raises(RationedError):
-        run_scenario(_build(single_rate=True))
+        run_scenario(_build(single_rate=True, allow_unsafe_step=True))
 
 
 def test_the_unsafe_shared_dt_wrecks_the_cabin_not_merely_rations() -> None:
@@ -320,7 +341,7 @@ def test_the_unsafe_shared_dt_wrecks_the_cabin_not_merely_rations() -> None:
     # steps). Adding the Thermal half changed neither the firing rate nor the endpoint,
     # which is itself evidence the two rate classes do not interact here.
     states, rationed, _events = run_scenario(
-        _build(single_rate=True), allow_rationing=True
+        _build(single_rate=True, allow_unsafe_step=True), allow_rationing=True
     )
     assert rationed == 840
     assert states[-1].stocks[CABIN_O2].amount == pytest.approx(72.0, abs=1e-6)
@@ -421,7 +442,12 @@ def test_the_partition_is_inert_without_a_cadence_only_if_dropped() -> None:
     # scenario over the WHOLE registry — six flows, one cadence — which is what the two
     # contrasts above actually run. Pinned so those contrasts cannot silently degrade
     # into running some other graph than the anchor's.
-    built = _build(single_rate=True)
+    #
+    # "Legal" here means *well-formed*, not *safe*: at the master dt this graph trips
+    # the Step-5 precondition, hence the hatch. The distinction is the point of the test
+    # — dropping the partition changes the scenario's SHAPE (one registry, one cadence),
+    # which is what is asserted below, and leaves its dt hazard entirely intact.
+    built = _build(single_rate=True, allow_unsafe_step=True)
     assert built.is_multirate is False
     assert len(built.registry.flows) == 6
     assert not built.slow_registry.flows

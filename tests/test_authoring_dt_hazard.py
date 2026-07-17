@@ -76,7 +76,7 @@ from typing import Any
 
 import pytest
 
-from authoring.errors import RationedError
+from authoring.errors import AuthoringError, RationedError
 from authoring.interpreter import interpret
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
@@ -97,11 +97,24 @@ def _build_at(dt: float, steps: int) -> Any:
     Mutates a parsed copy of the committed anchor rather than shipping a second,
     near-duplicate scenario file: the *only* difference that matters is ``dt``, and
     keeping one file makes that unmissable.
+
+    ``allow_unsafe_step=True`` because multi-rate Step 5 added a **build-time**
+    ``k·h < 1`` precondition, which refuses ``UNSAFE_DT`` before a single step runs. The
+    hazard this file documents is therefore now caught **twice, at two different
+    stages**, and the tests below still exercise the *run-time* gate deliberately:
+    disabling the build check is what keeps them pointed at the ``RationedError`` they
+    were written to pin, instead of silently becoming duplicate tests of the build
+    check. ``test_the_build_now_refuses_ the_unsafe_dt_before_any_step_runs`` covers the
+    new stage.
     """
     raw: dict[str, Any] = copy.deepcopy(load_yaml(str(ECLSS_YAML)))
     raw["dt"] = dt
     raw["steps"] = steps
-    return interpret(ScenarioSpec.model_validate(raw), base_dir=SCENARIO_DIR)
+    return interpret(
+        ScenarioSpec.model_validate(raw),
+        base_dir=SCENARIO_DIR,
+        allow_unsafe_step=True,
+    )
 
 
 def _run_at(
@@ -138,6 +151,31 @@ def test_at_the_frozen_dt_the_backstop_never_fires() -> None:
     _states, rationed, events = _run_at(FROZEN_DT, 900)
     assert rationed == 0
     assert events == ()
+
+
+def test_the_build_now_refuses_the_unsafe_dt_before_any_step_runs() -> None:
+    # THE SECOND GATE (multi-rate Step 5), one stage earlier than the one below. The
+    # author's natural call is `interpret` WITHOUT the study hatch, and it now refuses:
+    # k_scrub * 3600 = 3.6 >= 1 is decidable from the params + dt alone, so there is no
+    # reason to make an author spend a long run to learn it.
+    #
+    # This is why every other test in this file passes allow_unsafe_step=True: the
+    # run-time gate they pin is now UNREACHABLE by an author's default path. Both gates
+    # are kept because they catch different populations — this one sees a param PACK
+    # that inflates a gain (visible only after interpretation) and the demand-controlled
+    # o2_makeup that rationing structurally cannot see; the run-time one sees the
+    # state-dependent over-draws (crew_metabolism's forced draw) that no build check can
+    # decide. Neither subsumes the other.
+    raw: dict[str, Any] = copy.deepcopy(load_yaml(str(ECLSS_YAML)))
+    raw["dt"] = UNSAFE_DT
+    raw["steps"] = 15
+    with pytest.raises(AuthoringError) as excinfo:
+        interpret(ScenarioSpec.model_validate(raw), base_dir=SCENARIO_DIR)
+
+    msg = str(excinfo.value)
+    assert "co2_scrub_rate" in msg, f"the offending param must be named, got: {msg}"
+    assert "3.6" in msg, f"the k*h value must be named, got: {msg}"
+    assert "allow_unsafe_step" in msg, "the study hatch must be discoverable"
 
 
 def test_at_an_unsafe_dt_the_run_now_raises_instead_of_returning() -> None:

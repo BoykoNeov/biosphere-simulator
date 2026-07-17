@@ -340,12 +340,22 @@ the code. Selecting a flow type hands you the `dt` knob with no guard attached.
 
 | flow | constraint | frozen sizing | breaks at | caught by |
 |---|---|---|---|---|
-| `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** | rationing |
-| `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** | rationing |
-| `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** | **nothing in `1 ≤ k·dt < 2`** — see below |
-| `eclss.crew_metabolism` | forced draw < stock | `0.004·60 = 0.24` of 10 mol | `0.004·3600 = 14.4` of 10 mol | rationing |
-| `power.self_discharge` | `k·dt < 1` | `dt = 3600` → `3.6e-5` | `dt ≈ 1e8` s (~3 yr) | rationing |
-| `thermal.radiator_reject` | `τ = C/(4εσA·T_eq³) ≫ dt` | `dt = 3600` → `τ ≈ 65` steps | a much larger `dt` overshoots | — |
+| `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** | **build** (Step 5) + rationing |
+| `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** | **build** (Step 5) + rationing |
+| `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** | **build ONLY** (Step 5) — rationing sees nothing in `1 ≤ k·dt < 2`; see below |
+| `eclss.crew_metabolism` | forced draw < stock | `0.004·60 = 0.24` of 10 mol | `0.004·3600 = 14.4` of 10 mol | rationing (**state-dependent — no build check possible**) |
+| `power.self_discharge` | `k·dt < 1` | `dt = 3600` → `3.6e-5` | `dt ≈ 1e8` s (~3 yr) | **build** (Step 5) + rationing |
+| `thermal.radiator_reject` | `τ = C/(4εσA·T_eq³) ≫ dt` | `dt = 3600` → `τ ≈ 65` steps | a much larger `dt` overshoots | — (**"≫" is not a predicate**) |
+
+**The "build" cells are multi-rate Step 5** (2026-07-17): the four rows whose constraint is a
+first-order `k` declare it as `rate_params` in the registry, and `interpret` refuses
+`k·h ≥ 1` before any step runs. **`h` is the *effective* step, not the file's `dt`** —
+`dt` single-rate, `dt/n_sub` for a **fast** flow, and **`dt/2` for a `rate_class: slow` one**
+(Strang's half-step, *independent of `n_sub`*). The last is the trap: a slow flow's step is
+**not** `dt/n_sub`, and treating it as such reports a safe `k·h` for an unsafe flow. The two
+rows without a "build" cell are uncoverable **by declaration, not by omission** — see the
+`rate_params` docstring. Escape hatch for studying an unsafe run:
+`interpret(..., allow_unsafe_step=True)`.
 
 **The `o2_makeup` row is not like the others, and its `< 1` means something different.**
 Every other row is **donor-controlled** or forced: the draw is `k·dt·stock`, so at `k·dt > 1`
@@ -406,6 +416,18 @@ hatch is `allow_rationing=True` (Rust: `run_scenario_allowing_rationing`) — fo
 None of this is a bug in the frozen flows. Each is correct at the `dt` it was sized for;
 the frozen sizing argument is simply scoped to the frozen scenario, and **authoring is what
 escapes that scope**.
+
+> ⚠ **SUPERSEDED — the paragraph below is stale and is left standing deliberately.** The
+> build-time precondition it defers **shipped** in multi-rate Step 5 (2026-07-17): the
+> registry now carries `rate_params`, and `interpret` refuses `k·h ≥ 1`, with
+> `allow_unsafe_step=True` as the study hatch. Its two predictions were both right (it is a
+> *partial* detector; it is the *only* protection for `eclss.o2_makeup`) and one guess was
+> **wrong in the unsafe direction**: the effective sub-step is `dt/n_sub` for the **fast**
+> set only — a **slow** flow steps at **`dt/2`** under Strang, regardless of `n_sub`. This
+> section's narrative rewrite is **Step 7**'s (this phase's plan reserves the reference-doc
+> narrative for the consolidated ceremony, and the "impossible" composability sentence three
+> paragraphs up is stale for the same reason — Step 4 falsified it). Until then, read
+> `docs/plans/post-roadmap-multirate-authoring.md`, "Step 5: COMPLETE".
 
 **Still deferred, by name** (the rest of "make it loud", which this did not do): a
 **build-time** `k·dt < 1` precondition per flow type — it would catch the scrubber/condenser
@@ -485,6 +507,23 @@ author who registers `eclss.o2_makeup` *without* a scrubber never had that coinc
 the right bound for the donor-controlled rows *and* for `o2_makeup` — but for opposite
 reasons (over-draw vs export fidelity), and only `o2_makeup`'s is otherwise unenforced. A
 precondition that skipped `o2_makeup` as "already covered by rationing" would be wrong.
+
+> ✅ **BUILT — multi-rate Step 5 (2026-07-17).** The paragraph above was right on every
+> count and the precondition was built to it: `eclss.o2_makeup` declares
+> `rate_params = ("o2_makeup_gain",)` and **is** checked. For this row the build check is
+> not an *earlier* catch, it is the **only** catch — every table row above still exports
+> `rationed = 0`. Two things the paragraph could not have known, both measured in Step 5:
+> a **param pack** can inflate `o2_makeup_gain` past the bound while passing every frozen
+> loader guard (which is the load-bearing reason the check is at *build* time — the pack's
+> value does not exist any earlier, and `run_scenario` cannot see it at all); and
+> `o2_setpoint`, which sits on the same params object, **must never be checked** — it is an
+> inventory in mol, not a rate, which is exactly why `rate_params` is an explicit
+> declaration rather than "every float on the params object".
+>
+> **The `1 ≤ k·dt < 2` rows in the table above can no longer be built without
+> `allow_unsafe_step=True`.** `tests/test_authoring_export_fidelity.py` — the file that
+> *measured* them — now passes it deliberately, and that is the precondition working: the
+> only remaining way into this band is to say so out loud.
 
 **None of this is a bug in the frozen flow.** The continuous law `dx/dt = k(S − x)` is
 unconditionally stable — it decays to `S` from anywhere and cannot oscillate. The

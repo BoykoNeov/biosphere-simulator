@@ -1,0 +1,46 @@
+# A parameter pack that INFLATES A GAIN — the case only a BUILD-TIME check can see.
+#
+# `o2_makeup_gain` is 2.0e-2 /s, 10x the frozen 2.0e-3. It is a perfectly LEGAL pack: the
+# frozen `load_eclss_params` reads it, the exact-unit guard passes ("1/s"), and the bound
+# check passes (the loader requires only `> 0` — a gain has no frozen upper bound, because
+# there is no dt-independent value at which a gain becomes "too big"). Every guard the
+# platform had before multi-rate Step 5 says yes.
+#
+# And yet it makes `eclss_cabin.yaml`'s OWN FROZEN dt = 60 s unsafe: k_makeup*60 = 1.2 >= 1.
+# The scenario file is untouched and correct; the dt is the file's own load-bearing,
+# carefully-sized value; the hazard arrives entirely through the pack.
+#
+# THIS IS WHY THE PRECONDITION IS AT BUILD TIME AND NOT IN `run_scenario` — it is the
+# load-bearing reason, ahead of the (real, but secondary) convenience of failing before a
+# long run. A pack's values exist only AFTER interpretation resolves them; `run_scenario`
+# receives an already-constructed flow and cannot know the pack asked for anything unusual.
+# So this hazard is checkable at exactly one point in the pipeline, and `interpret` is it.
+#
+# Worse, `o2_makeup` is DEMAND-controlled: its draw tracks the setpoint ERROR, not the
+# stock, so it never over-draws and the Euler backstop NEVER FIRES however large k*dt gets
+# (tests/test_authoring_export_fidelity.py). Without the build check this pack would export
+# an oscillating cabin with `rationed == 0` and no gate anywhere reporting a problem.
+#
+# Illustrative test data only — NOT a calibrated anything (Phase-9 "authored != validated").
+# The three unchanged values are copied from the frozen file so the pack is a complete
+# param set, as the frozen loader requires.
+name: eclss
+process: cabin_air_control
+
+parameters:
+  co2_scrub_rate:
+    value: 1.0e-3
+    unit: "1/s"
+    source: "test pack: unchanged from the frozen value 1.0e-3"
+  condense_rate:
+    value: 5.0e-4
+    unit: "1/s"
+    source: "test pack: unchanged from the frozen value 5.0e-4"
+  o2_makeup_gain:
+    value: 2.0e-2
+    unit: "1/s"
+    source: "test pack: illustrative 10x-inflated regulator gain (NOT calibrated); exercises the build-time k*h < 1 precondition against a pack, the one inflation path run_scenario structurally cannot see"
+  o2_setpoint:
+    value: 10.0
+    unit: "mol"
+    source: "test pack: unchanged from the frozen value 10.0"

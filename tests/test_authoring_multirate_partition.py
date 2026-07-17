@@ -217,10 +217,45 @@ def test_a_true_partition_at_n_sub_gt_1_builds() -> None:
     # natural to both domains"): a slow set stepping at the master cadence while the
     # fast set sub-steps. Step 4 makes this a real Thermal+ECLSS anchor; here it is the
     # shape only.
-    built = _build(slow=(SCRUBBER,), n_sub=60, dt=3600.0)
-    assert _ids(built.slow_registry) == (SCRUBBER,)
+    #
+    # THE SLOW FLOW IS THE CONDENSER, AND THAT IS NOT AN ARBITRARY PICK. This test used
+    # the scrubber until Step 5, when it turned out its own example was unsafe: a slow
+    # flow steps at dt/2 = 1800 s (Strang), and k_scrub*1800 = 1.8 >= 1. The condenser
+    # is the ONLY ECLSS flow that can legally be slow at this dt, because its k is half
+    # the scrubber's: 5e-4 * 1800 = 0.9 < 1. Same graph, same dt, same n_sub — only k
+    # differs, and it decides membership of the slow set. That is Step 5's rule made
+    # concrete at the shape level, and it is the mirror of the test below.
+    built = _build(slow=(CONDENSER,), n_sub=60, dt=3600.0)
+    assert _ids(built.slow_registry) == (CONDENSER,)
     assert MAKEUP in _ids(built.fast_registry)
     assert built.is_multirate is True
+
+
+def test_a_flow_may_be_too_fast_to_BE_slow_and_n_sub_cannot_rescue_it() -> None:
+    # The mirror of the test above, and the correction of a formula this phase's own
+    # plan got wrong. The plan specified the precondition as k*(dt/n_sub) < 1 for every
+    # flow. For the SLOW set that is false: Strang runs it as two dt/2 half-steps around
+    # the fast block (simcore/multirate.py), so its step is dt/2 REGARDLESS of n_sub.
+    #
+    # The consequence is not academic — the plan's formula would report
+    # k_scrub*(3600/60) = 0.06 and PASS this scenario, while the flow truly steps at
+    # 1800 s (k*h = 1.8), over-draws, rations 24x and empties cabin_co2 to exactly 0.0.
+    # A false PASS in the UNSAFE direction is worse than no check, because it reads as a
+    # guarantee.
+    #
+    # Raising n_sub is the intuitive fix and it does nothing at all: n_sub governs only
+    # the fast set. The message must say so, because an author who tries it will
+    # otherwise conclude the check is broken rather than that their flow is misclassed.
+    with pytest.raises(AuthoringError) as excinfo:
+        _build(slow=(SCRUBBER,), n_sub=60, dt=3600.0)
+    msg = str(excinfo.value)
+    assert "dt/2=1800.0" in msg, f"the slow set's REAL step must be named, got: {msg}"
+    assert "1.8" in msg
+    assert "REGARDLESS of n_sub" in msg, "raising n_sub must be named as NOT the fix"
+
+    # And the same flow at the same dt is fine as FAST — the partition, not the graph,
+    # is what was wrong. This is the remedy the message offers, executed.
+    assert _build(n_sub=60, dt=3600.0).is_multirate is True
 
 
 # ---------------------------------------------------------------------------
