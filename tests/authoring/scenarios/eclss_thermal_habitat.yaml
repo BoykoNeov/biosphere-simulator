@@ -1,0 +1,285 @@
+# THE COMPOSABILITY ANCHOR (multi-rate authoring, Step 4) — the scenario
+# docs/authoring-reference.md currently calls IMPOSSIBLE.
+#
+# That file's "The dt constraint" says, in as many words:
+#
+#     "ECLSS is sized for dt = 60; Thermal for dt = 3600. A scenario composing both must
+#      pick one dt, and only dt <= ~60 is safe for both. THERE IS NO dt NATURAL TO BOTH
+#      DOMAINS."
+#
+# This file is that scenario, and the sentence is false the moment an author may pick a
+# COUPLING CADENCE instead of a global dt. Master dt = 3600 (what neighbours see); ECLSS
+# fast at n_sub = 60 (an effective 60 s sub-step — its own frozen sizing); Thermal slow
+# (the master cadence, which is its own frozen sizing). Both domains are integrated at the
+# dt their own rate constants demand, out of ONE file, at ONE export cadence.
+#
+# THE CONSTRAINT HAD TWO HALVES AND BOTH ARE ESCAPED — pinned as the pair, because either
+# alone is unconvincing (tests/test_authoring_multirate_composability.py):
+#   * the shared dt is UNSAFE   — this graph single-rate at dt = 3600 raises RationedError
+#                                 (k_scrub*dt = 3.6 > 1: the scrubber over-draws);
+#   * the safe shared dt is WASTEFUL — single-rate at dt = 60 runs clean and makes Thermal
+#                                 pay 20160 steps to resolve a tau of ~65 steps.
+# Multi-rate escapes both at once. That is the whole claim.
+#
+# THE TWO DOMAINS SHARE NO STOCK — AND THAT IS FORCED BY THE REGISTRY, NOT CHOSEN.
+# There is no ECLSS->Thermal flow to write: no ECLSS flow type carries a heat leg (the
+# waste-heat seam is power.solar_charge / power.load_draw -> a thermal node, i.e.
+# Power<->Thermal, and those are BOTH slow). In the frozen registry the cross-rate-class
+# boundary and the cross-stock boundary never overlap: coupling lives WITHIN a domain (the
+# shared cabin) or across SAME-timescale domains. So the fast and slow operators here act
+# on disjoint stocks -- indeed on disjoint QUANTITIES (oxygen/carbon/water vs energy; four
+# independent conservation books) -- and Strang's operator non-commutativity term is
+# therefore exactly zero for this file.
+#
+# Read that honestly: this anchor proves the CADENCE decoupling, NOT cross-rate coupling
+# fidelity. It is not a gap, because coupling fidelity is pinned twice already and neither
+# needs this file: tests/test_authoring_multirate_partition.py measures that a slow flow
+# sharing stocks with fast flows DOES perturb them (a FORCED slow crew_metabolism moves the
+# cabin +1.2e-01 -- the fast flows see a half-metabolised cabin), and simcore's own
+# tests/test_multirate.py owns the driver's splitting arithmetic. Manufacturing a coupled
+# cross-rate case here would mean declaring Power "fast" against its 1e-8 self-discharge
+# rate -- an artificial scenario asserting an artificial fact.
+#
+# WHAT IS GENUINELY NEW HERE, beyond falsifying the sentence: this is the FIRST NON-EMPTY
+# SLOW SET ever driven through authoring.run_scenario. Every Step-3 multi-rate run declared
+# `n_sub` with an empty slow set (uniform sub-stepping), so `_run_multirate`'s slow
+# sub-integrator has never had a flow in it from any authored file. Step 4 gives it two.
+#
+# NOTHING here is frozen or reference: a runtime authored artifact (Phase-9 decision B),
+# composed from two domains whose params are TODO(cite)/DESIGN placeholders. Reproducing
+# nothing and endorsing nothing -- it proves the PLATFORM lowers a two-cadence file
+# correctly. "Authored != validated" (docs/authoring-reference.md).
+#
+# TIER 2, NOT TIER 1 -- inherited from thermal_node.yaml and left for Step 6.
+# `thermal.radiator_reject` evaluates T**4 (Rust: powf(4.0)), a transcendental site, so by
+# the project's tiering rule this file is NOT bit-exact cross-port. thermal_node.yaml's
+# precedent applies when the cross-port question is taken up: exclude from the bit-exact run
+# parametrization, cover by the graph dump (which never calls evaluate()).
+#
+# THE SIZING is each domain's own frozen sizing, deliberately unchanged -- the point is that
+# multi-rate lets both hold AT ONCE, so inventing a third would defeat it:
+#   * steps = 336 master steps = 14 days = ~5.2 tau of Thermal's tau ~ 65 steps at dt=3600.
+#     The node starts at Q = 1.0e+9 J (T ~ 102.7 K), FAR below T_eq ~ 280.9 K (Q_eq ~
+#     2.78e+9 J), and warms: a run that equilibrates because it started at equilibrium
+#     proves nothing (thermal_node.yaml's own warning).
+#   * ECLSS's effective sub-step is dt/n_sub = 3600/60 = 60 s, exactly eclss_cabin.yaml's
+#     load-bearing dt: k_scrub*60 = 0.06, k_cond*60 = 0.03, k_makeup*60 = 0.12, all << 1.
+#     Its o2 tau = 1/k_makeup = 500 s, so the cabin reaches o2_eq = 8.0 inside the FIRST
+#     master hour (3600 s = 7.2 tau) and holds -- which is the export-fidelity point stated
+#     as a trajectory: a neighbour sampling this file hourly sees 8.0, not the 0.0 mol a
+#     single-rate dt=1800 run exports.
+#
+# THE SLOW SET STEPS AT dt/2 = 1800 s, NOT dt -- Strang runs it as two half-steps around the
+# fast block. That is SAFER for Thermal (tau ~ 130 half-steps), never worse, so the frozen
+# tau >> dt sizing holds a fortiori. It is also why the realized Thermal saving is ~30x and
+# not the 60x cadence ratio: 20160 single-rate-safe steps / (336 * 2) = 30. The missing
+# factor of 2 IS Strang's documented slow-set cost (see authoring/run.py, `_SPLIT`) -- Lie
+# would evaluate the slow set once per master step and cost 60x, at a lower nominal order.
+# Measured, not asserted from the cadence ratio: test_thermal_stops_paying_eclss_dt.
+#
+# All floats carry an explicit decimal point (2.0e-5, not 2e-5): yaml.safe_load uses the
+# YAML-1.1 float resolver, under which a dotless exponent parses as a *string*.
+name: eclss_thermal_habitat
+integrator: euler
+dt: 3600.0        # THE COUPLING CADENCE -- what neighbours see, not what ECLSS solves at
+n_sub: 60         # the fast set sub-steps at dt/n_sub = 60 s (ECLSS's frozen sizing)
+steps: 336        # 14 days ~ 5.2 tau of Thermal's relaxation
+rng_seed: 0
+
+stocks:
+  # ---------------------------------------------------------------------------
+  # ECLSS -- the FAST side. Three cabin-air POOLs across three quantities.
+  # cabin_o2 starts AT the setpoint (the regulator idles) and the crew draw pulls it to
+  # o2_eq = 8.0; CO2/H2O start at 0 (a clean cabin). No `composition`: the cabin pools are
+  # SINGLE-QUANTITY, because standalone ECLSS does not tie the crew's atoms together --
+  # annotating {carbon: 1, oxygen: 2} here would break OXYGEN balance on crew_metabolism
+  # and surface as a runtime ConservationError (there is no build-time stoichiometry check
+  # for frozen `type` flows). See eclss_cabin.yaml's header.
+  # ---------------------------------------------------------------------------
+  - id: eclss.cabin_o2
+    domain: eclss
+    quantity: oxygen
+    kind: pool
+    amount: 10.0          # == the frozen o2_setpoint
+  - id: eclss.cabin_co2
+    domain: eclss
+    quantity: carbon
+    kind: pool
+    amount: 0.0
+  - id: eclss.cabin_h2o
+    domain: eclss
+    quantity: water
+    kind: pool
+    amount: 0.0
+
+  # The O2-makeup tank: a BOUNDARY *source*, so `unclamped: true` -- arbitration must never
+  # throttle the supply, and its negative-going amount is pure ledger bookkeeping.
+  - id: boundary.o2_supply
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+  # The two monotonic equipment-product sinks (never withdrawn from => clamped).
+  - id: boundary.co2_removed
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.humidity_condensate
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+
+  # The three decoupled crew-metabolism seam reservoirs. The two *sources* are unclamped;
+  # the O2 *sink* is not (a sink is never withdrawn from, so min-scaling never applies).
+  - id: boundary.metabolic_o2_sink
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+  - id: boundary.metabolic_co2_source
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+  - id: boundary.metabolic_h2o_source
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+  # ---------------------------------------------------------------------------
+  # THERMAL -- the SLOW side. A fourth quantity (energy), sharing nothing with the above.
+  # ---------------------------------------------------------------------------
+
+  # The sensible-heat POOL, referenced to T_space: Q = C*(T - T_space) >= 0, so temperature
+  # is the DERIVED readout T = T_space + Q/C (computed at evaluate-time -- not a stock, not
+  # an aux accumulator). The reference is what puts the floor at T = T_space where radiation
+  # self-limits.
+  - id: thermal.node
+    domain: thermal
+    quantity: energy
+    kind: pool
+    amount: 1.0e+9        # J -- T ~ 102.7 K, far below T_eq ~ 280.9 K
+
+  # The forced heat input: a BOUNDARY *source*, so `unclamped: true`.
+  - id: boundary.heat_source
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+  # Deep space -- the one PERMANENT boundary that cannot be moved inward. Never withdrawn
+  # from => monotonic => a free heat-rejected diagnostic.
+  - id: boundary.space
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  # ---------------------------------------------------------------------------
+  # THE FAST SET -- ECLSS. `rate_class` is omitted: `fast` is the default, and leaving it
+  # implicit is deliberate. The default is what makes every pre-multi-rate file lower to
+  # its old trajectory by construction; spelling it here would suggest it were a choice.
+  # ---------------------------------------------------------------------------
+
+  # FORCED, six legs across three quantities (each balanced independently). Reads three
+  # HARDCODED forcing names through env.get -- NOT through wiring -- which is why the
+  # forcing keys below must match exactly.
+  - id: eclss.crew_metabolism
+    type: eclss.crew_metabolism
+    priority: 0
+    wiring:
+      cabin_o2: eclss.cabin_o2
+      cabin_co2: eclss.cabin_co2
+      cabin_h2o: eclss.cabin_h2o
+      metabolic_o2_sink: boundary.metabolic_o2_sink
+      metabolic_co2_source: boundary.metabolic_co2_source
+      metabolic_h2o_source: boundary.metabolic_h2o_source
+
+  # DONOR-CONTROLLED: R = k_scrub * cabin_co2 * dt. k_scrub*3600 = 3.6 > 1 -- THIS is the
+  # flow that makes the master dt unsafe single-rate, and sub-stepping is what tames it.
+  - id: eclss.co2_scrubber
+    type: eclss.co2_scrubber
+    priority: 0
+    wiring:
+      cabin_co2: eclss.cabin_co2
+      co2_removed: boundary.co2_removed
+    params: eclss
+
+  # DONOR-CONTROLLED: R = k_cond * cabin_h2o * dt.
+  - id: eclss.condenser
+    type: eclss.condenser
+    priority: 0
+    wiring:
+      cabin_h2o: eclss.cabin_h2o
+      humidity_condensate: boundary.humidity_condensate
+    params: eclss
+
+  # DEMAND-CONTROLLED toward o2_setpoint: S = k_makeup * (o2_setpoint - cabin_o2) * dt.
+  # THE ONE RATIONING CANNOT SEE: its draw is proportional to the ERROR, not the stock, so
+  # near the setpoint it never over-draws and the backstop never fires however large k*dt
+  # is (tests/test_authoring_export_fidelity.py). Its k*dt < 1 is honoured by the author or
+  # not at all -- which is why `rationed == 0` below is NOT self-certifying, and why the
+  # build-time precondition (Step 5) is the real closer.
+  - id: eclss.o2_makeup
+    type: eclss.o2_makeup
+    priority: 0
+    wiring:
+      o2_supply: boundary.o2_supply
+      cabin_o2: eclss.cabin_o2
+    params: eclss
+
+  # ---------------------------------------------------------------------------
+  # THE SLOW SET -- Thermal. tau ~ 65 steps at the master dt already; sub-stepping it 60x
+  # would be pure waste, and that waste is exactly what the single global dt used to force.
+  # ---------------------------------------------------------------------------
+
+  # FORCED on the hardcoded `heat_load` name. Heat -> heat, no form change => TWO legs and
+  # no loss leg. A forced flow's own legs split EXACTLY across Strang's two half-steps
+  # (measured, tests/test_authoring_multirate_partition.py) -- 2 * (dt/2) * 3000 W is the
+  # same joules as dt * 3000 W, to roundoff.
+  - id: thermal.heat_input
+    type: thermal.heat_input
+    priority: 0
+    rate_class: slow
+    wiring:
+      heat_source: boundary.heat_source
+      node: thermal.node
+
+  # DONOR-CONTROLLED and NONLINEAR: R = eps*sigma*A*(T^4 - T_space^4)*dt, T read off the
+  # node's own amount. The transcendental that makes this file Tier-2, and the domain's
+  # restoring force. Positivity here is STRUCTURAL ONLY AT THE FLOOR (R -> 0 as Q -> 0);
+  # near equilibrium it is by SIZING -- the T^4 law has no k*dt < 1 guarantee to lean on,
+  # which is why `rationed == 0` for the slow set is MEASURED below and not reasoned.
+  - id: thermal.radiator_reject
+    type: thermal.radiator_reject
+    priority: 0
+    rate_class: slow
+    wiring:
+      node: thermal.node
+      space: boundary.space
+    params: thermal
+
+forcings:
+  # ECLSS -- the forced constant crew metabolic rates. Keys are the frozen hardcoded module
+  # constants; renaming one makes crew_metabolism raise at step 1.
+  o2_consumption:
+    const: 0.004      # mol/s, crew O2 intake out of the cabin
+  co2_production:
+    const: 0.003      # mol/s, crew CO2 exhaled into the cabin
+  h2o_production:
+    const: 2.0e-5     # kg/s, crew humidity (respiration + perspiration)
+
+  # Thermal -- the frozen hardcoded module constant (thermal/stocks.py). Standalone this
+  # stands in for Power's dissipation; the real Power->Thermal seam is hand-coded in
+  # station/ and both its ends are slow, so it is not the cross-rate case.
+  heat_load:
+    const: 3000.0     # W -- gives T_eq ~ 280.9 K with the frozen radiator params

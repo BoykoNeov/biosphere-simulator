@@ -1,13 +1,13 @@
 # Post-roadmap: multi-rate authoring — the author picks a coupling cadence, not a global `dt`
 
-**Status: IN PROGRESS — Steps 1–3 of 7 done.** A **phase, not a step** — an authoring
+**Status: IN PROGRESS — Steps 1–4 of 7 done.** A **phase, not a step** — an authoring
 unfreeze (schema + interpreter + run harness), the Rust mirror, the freeze manifest, and
 the cross-port tiers. **The user opened the unfreeze on 2026-07-17.** The knob is
-decided, built (Step 2), and now **drives** (Step 3): master `dt=3600` + `n_sub=60`
-through `run_scenario` lands on the truth while exporting hourly. No golden has moved and
-`src/simcore/` is untouched. Remaining: the composability anchor (4), the
-effective-sub-step precondition (5 — folded in by user decision), the Rust mirror (6),
-and the unfreeze ceremony (7).
+decided, built (Step 2), **drives** (Step 3), and has now **paid off the phase's stated
+motivation** (Step 4): the scenario `docs/authoring-reference.md` calls *impossible* is
+authored, committed and green. No golden has moved and `src/simcore/` is untouched.
+Remaining: the effective-sub-step precondition (5 — folded in by user decision), the Rust
+mirror (6), and the unfreeze ceremony (7).
 
 Predecessors: `post-roadmap-flow-registry-growth.md` (Tier 1 created the `dt` hazard by
 registering the flows), `post-roadmap-rationing-gate.md` (made the *donor-controlled* half
@@ -329,9 +329,7 @@ surface, not a licence to edit the core.
    Strang pinned, `n_sub=1`-with-slow refused, aux tripwire. **Then schema +
    interpreter** ✅ **DONE** — see "Step 2: COMPLETE" below.
 3. **The run harness** ✅ **DONE** — see "Step 3: COMPLETE" below.
-4. **The composability anchor**: an authored Thermal+ECLSS scenario at master `dt = 3600`
-   with ECLSS fast (`n_sub = 60`) — the scenario the reference currently calls impossible.
-   Conservation + determinism, `rationed == 0`, and the exported `cabin_o2` monotone.
+4. **The composability anchor** ✅ **DONE** — see "Step 4: COMPLETE" below.
 5. **The effective-sub-step precondition** — **folded in** (user, the whole `k·dt` family):
    `rate_params` on `FlowTypeSpec`, checked as `k·(dt/n_sub) < 1` at build time. The three
    uncoverable shapes documented by name, not faked.
@@ -471,6 +469,110 @@ demand-controlled and its near-setpoint oscillation stays invisible to rationing
 `dt` (`test_authoring_export_fidelity.py`). Step 5's build-time `k·(dt/n_sub) < 1` check
 remains the direct closer; this run-time catch is not a substitute.
 
+## Step 4: COMPLETE — the impossible scenario is authored, and it cost Thermal 30× less
+
+**The sentence is falsified.** `docs/authoring-reference.md` says: *"ECLSS is sized for
+`dt = 60`; Thermal for `dt = 3600`. A scenario composing both must pick one `dt`, and only
+`dt ≤ ~60` is safe for both. **There is no `dt` natural to both domains.**"*
+`tests/authoring/scenarios/eclss_thermal_habitat.yaml` is that scenario: master `dt=3600`,
+ECLSS fast at `n_sub=60`, Thermal slow. `rationed == 0`, the cabin holds `o2_eq` and the
+node warms 102.70 K → 277.44 K against `T_eq ≈ 280.9`, both monotone, bit-identical across
+runs. 13 pins in `tests/test_authoring_multirate_composability.py`. `git diff src/` empty;
+**the manifest did not move** (Step 4 adds no schema field, integrator name, or flow type).
+
+**The constraint had two halves, and pinning only one would have been the easy mistake.**
+Either alone is unconvincing — so both are measured, on the *same graph*:
+
+| the graph | | |
+|---|---|---|
+| single-rate at the master `dt=3600` | **`RationedError`**, 840 firings | the shared `dt` is **unsafe** |
+| single-rate at `dt=60` (the reference's own escape) | clean, `rationed == 0` — and **20160** Thermal evals | the safe shared `dt` is **wasteful** |
+| **multi-rate, master `dt=3600`, `n_sub=60`** | clean, **672** Thermal evals | escapes **both** |
+
+The unsafe row is worth reading past the exception: with `allow_rationing=True` it ends at
+`cabin_o2 = 72.0` against a truth of `8.0` — the regulator **diverged**, it did not drift.
+**And the direction matters, because the intuitive word for it is wrong**: 72.0 is *nine
+times too much* oxygen, not too little. The hazard is not "the cabin suffocates", it is
+"the number is meaningless" — `k_makeup·dt = 7.2` makes the update map
+`o2 → −6.2·o2 + 57.6`, which alternates and grows, so the *sign* of the error is an
+accident of where the oscillation is sampled. The reference's `−1.4e-14` (15 steps) and
+this `72.0` (336 steps) are the **same broken map at different phases**. An author who
+learns "asphyxiation" will accept a run that happens to land high; pinned as
+`amount > O2_EQ` alongside the value, so the direction cannot quietly drop out.
+A free cross-check fell out: 840 firings / 336 steps = **2.5 per step**, exactly the rate
+the Step-3 table measured on the *bare* ECLSS anchor (60 / 24). Adding the Thermal half
+changed neither the firing rate nor the endpoint — itself evidence the two rate classes do
+not interact here.
+
+**The payoff is 30×, NOT the 60× this plan predicted — and the missing factor of two is
+Strang's bill, not an error.** The advisor caught this *before* the measurement, which is
+the only reason the number was checked rather than parroted: this plan says above that
+*"Thermal is forced to pay 60× the steps it needs"*, and 60 is the cadence ratio
+(`3600/60`). But **Strang steps the slow set at `dt/2`, twice per master step** — so
+Thermal's realized evals are `336 × 2 = 672`, and `20160 / 672 = 30.0` exactly. Lie would
+realize the full 60× (one slow evaluation per master step) at a lower nominal order and a
+coarser slow-set step; the split was pinned to Strang on order/safety grounds in Step 2,
+and 30× rather than 60× is what that decision costs. **The 60× claim above is left standing
+as written and corrected here rather than edited away** — the cadence ratio *is* 60; what
+is 30 is the saving.
+
+**And the honest whole-run number is smaller still: wall clock improves 2.31×, not 30×.**
+Multi-rate saves the **slow domain's** work, and in this anchor the slow domain is the cheap
+one — ECLSS's 20160 fast sub-steps still happen and dominate (measured: 1.31 s vs 3.02 s).
+The 30× is a real, exact, integer fact about Thermal's evaluations; it is not a claim about
+the run. The wall win would be large where the *slow* set is the expensive one — which is
+precisely the biosphere (17 flows + aux), and precisely the domain multi-rate cannot reach
+yet. Not asserted in a test: an eval count is deterministic, a wall clock is a flake.
+
+**What the anchor does NOT prove, and the reason is structural.** The two domains share no
+stock — they share no *quantity* (oxygen/carbon/water vs energy; four independent
+conservation books). So the Strang operators commute **exactly**, the splitting error is
+zero, and **no coupling fidelity is exercised**. This is **forced by the registry, not
+chosen**: no ECLSS flow type carries a heat leg, so there is no ECLSS→Thermal flow to
+write. In the frozen registry the cross-rate-class boundary and the cross-stock boundary
+**never overlap** — coupling lives *within* a domain (the shared cabin) or across
+*same-timescale* domains (Power↔Thermal, both slow). Manufacturing a coupled cross-rate
+case would mean declaring Power "fast" against its `1e-8` self-discharge rate: an
+artificial scenario asserting an artificial fact. It is not a gap, because coupling
+fidelity is pinned twice already and neither pin needs this file —
+`test_authoring_multirate_partition.py` (a slow flow sharing stocks with fast flows *does*
+perturb them: `+1.2e-01` on the cabin, and a *forced* one at that) and simcore's own
+`test_multirate.py`. The disjointness is an **assertion**
+(`test_the_two_rate_classes_share_no_stock`), not a comment: if a future registry addition
+couples the domains, it goes red — the correct moment to re-read this paragraph, because
+the anchor would then be proving strictly more than it claims.
+
+**What IS new: the first non-empty slow set ever driven through `run_scenario`.** Every
+Step-3 multi-rate run declared `n_sub` with an **empty** slow set (uniform sub-stepping),
+so `_run_multirate`'s slow sub-integrator had never held a flow from any authored file.
+Step 4 gives it two — and `rationed == 0` for the slow set is measured rather than reasoned
+precisely because Thermal's `T⁴` law has **no `k·dt < 1` guarantee** to lean on.
+
+**A Step-2 ruling reached further than Step 2 knew: "the same graph, single-rate" is not
+`n_sub=1`.** Building the contrasts hit `AuthoringError` at *build* time — the interpreter
+**refuses** `n_sub=1` with a non-empty slow set (it buys no rate separation and still moves
+the answer). So going single-rate means **dropping the `rate_class: slow` keys too**, not
+just the cadence. Both contrast rows above rest on that, so it is pinned
+(`test_going_single_rate_means_dropping_the_partition_not_just_n_sub`) rather than left as
+a helper detail. The refusal's own message already said so — *"drop the 'rate_class: slow'
+key(s) to run single-rate"* — which is the Step-2 message doing exactly the job it was
+written for, on the first author who needed it.
+
+**The cheap Thermal run is still right, and the two ways it agrees are different claims.**
+Against the expensive `dt=60` run: `cabin_o2` is **bit-identical** (`float.hex()`), the node
+agrees to **0.014 %** (`0.04 K`). The cabin is exact because the fast set is integrated at
+60 s either way and the operators are disjoint — multi-rate *reproduces* the ECLSS
+trajectory rather than approximating it. The node differs because it is genuinely stepped
+coarser (1800 s vs 60 s); that residual is Euler's discretization error on `T⁴` across a
+30× step, and its smallness is not luck — it is `τ ≫ dt` doing its job, which is why
+Thermal never needed the fine step.
+
+**Tier-2, and left for Step 6 by precedent.** `thermal.radiator_reject` evaluates `T**4`
+(Rust: `powf(4.0)`), so this file is **not** bit-exact cross-port. `thermal_node.yaml`'s
+precedent applies when the cross-port question is taken up: exclude from the bit-exact run
+parametrization, cover by the **graph dump** (which never calls `evaluate()`). Recorded
+here, not solved here.
+
 ## The measurements this rests on
 
 All from this session; probes under `M:\claud_projects\temp\o2-makeup-probe\`, findings
@@ -486,3 +588,16 @@ pinned in `tests/test_authoring_export_fidelity.py` (12 pins, green).
 | cost is purely per-step | ~60–96 µs/step flat; `dt=1` **83 s** vs `dt=3600` **0.017 s** |
 | backward Euler does not meet the bar | **10.61** vs truth **8.33** at `dt=1800` (27 % off) |
 | the oscillating band is invisible | `dt=900`: `12 → 8.4 → 11.28 → 8.976`, `rationed = 0` |
+
+Step 4 adds (probes under `M:\claud_projects\temp\multirate-step4\`, pinned in
+`tests/test_authoring_multirate_composability.py`):
+
+| claim | measured |
+|---|---|
+| the "impossible" composition runs | master `dt=3600` + `n_sub=60`, Thermal slow: `rationed = 0` |
+| the shared `dt` is unsafe | single-rate `dt=3600`: **840** firings, `cabin_o2` = **72.0** vs truth 8.0 |
+| the safe shared `dt` is wasteful | single-rate `dt=60`: clean, and **20160** Thermal evals |
+| Thermal's saving is 30×, not 60× | `20160 / (336×2) = 30.0` exactly — Strang's `dt/2` slow set |
+| the whole-run saving is far smaller | wall **1.31 s** vs **3.02 s** = 2.31× (the fast set dominates) |
+| the cheap Thermal run is still right | `cabin_o2` **bit-identical**; node within **0.014 %** (0.04 K) |
+| the firing rate is unchanged by composing | 840/336 = **2.5/step** — the Step-3 bare anchor's 60/24 |
