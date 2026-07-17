@@ -452,6 +452,23 @@ exposed to GDScript, and `objectives_json` scores a rationed session
 session → visible diagnostic + objective failure.** A player should watch the cabin die;
 an author calling a function gets an exception.
 
+> ⚠ **SCOPE NARROWED — read "does not raise" as "does not raise *on rationing*".** That
+> asymmetry was designed when rationing was the only gate, and it is scoped to
+> `run_scenario`. Multi-rate Step 5's precondition lives in **`interpret`**, which is
+> *upstream of the split*: `build_session_from_file` builds through
+> `authoring::load_scenario` (`rust/crates/godot_bridge/src/lib.rs`), so **when Step 6
+> mirrors the precondition into the Rust interpreter, this path will refuse an unsafe
+> scenario at build** — the player never sees the cabin. **No tension today**: the Rust
+> interpreter is not yet mirrored, so the shipped bridge is unchanged.
+>
+> **Step 6 must decide this deliberately rather than inherit it.** It is genuinely open,
+> and the precedent cuts both ways: this same function *already* refuses rk4 files at build
+> ("single-rate Euler only"), so build-time refusal is not foreign to the session path — an
+> unsafe `k·h` is likewise decidable from the file. Against that: *"watch the cabin die"* is
+> a **study-the-unsafe-run** case, which is exactly what `allow_unsafe_step=True` exists
+> for, so passing the hatch here would be the reading consistent with the hatch's own
+> purpose. Recorded in `docs/plans/post-roadmap-multirate-authoring.md`, Step 6.
+
 ### `eclss.o2_makeup` — the hazard rationing cannot see (post-roadmap, measured)
 
 The same scoping bites `eclss.o2_makeup`, and **not mildly**. This section used to call it

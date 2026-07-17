@@ -352,6 +352,34 @@ surface, not a licence to edit the core.
    the slow set and the step corrected it** — left standing here rather than edited away,
    the Step-4 `60×`/`30×` precedent.)
 6. **Rust mirror**, hand-written, then the cross-port tier.
+
+   **⚠ Step 6 carries an OPEN DECISION it must not inherit silently** (advisor, after
+   Step 5). The precondition lives in `interpret` — which is **upstream of the deliberate
+   library-vs-interactive split**. `godot_bridge::build_session_from_file` builds through
+   `authoring::load_scenario` (`rust/crates/godot_bridge/src/lib.rs:190`), so **mirroring
+   the precondition makes the interactive path refuse an unsafe scenario at build**, and
+   the player never sees the cabin die. That silently narrows a *designed* asymmetry:
+   `docs/authoring-reference.md` says this path "does **not** raise — deliberately"
+   (*"Library caller → exception; interactive session → visible diagnostic + objective
+   failure"*), which was scoped to **rationing**, the only gate that existed when it was
+   written. **No tension today** — the Rust interpreter is unmirrored, so the shipped
+   bridge is unchanged; this is a Step-6 landmine, not a Step-5 bug.
+
+   The call is genuinely open and the precedent cuts both ways:
+   * **For refusing**: `build_session_from_file` *already* rejects rk4 files at build
+     ("single-rate Euler only"), so build-time refusal is not foreign to the session path,
+     and an unsafe `k·h` is likewise decidable from the file — the same class as rk4.
+   * **For the hatch**: *"a player should watch the cabin die"* **is** a
+     study-the-unsafe-run case, which is precisely what `allow_unsafe_step=True` exists
+     for. Passing it in the bridge is the reading consistent with the hatch's own purpose,
+     and preserves the documented split intact.
+
+   Either is defensible; **inheriting one by accident is not**. Marked in the reference
+   doc in place — the **third** instance of this phase's recurring pattern (a doc claim
+   whose scope silently narrowed), after Step 4's "no `dt` natural to both domains" and
+   Step 5's "still deferred" precondition paragraph. That it is the third is the finding:
+   *this phase keeps invalidating sentences written before the platform could do the thing
+   they deny*, and the reference doc is where they accumulate. Step 7 owns the rewrite.
 7. **The consolidated unfreeze ceremony** + the reference-doc narrative, per
    `docs/authoring-reference.md`, "The unfreeze discipline". **The manifest itself moves
    *incrementally*, not here** (advisor, Step 2): `test_frozen_schema_surface_is_complete`
