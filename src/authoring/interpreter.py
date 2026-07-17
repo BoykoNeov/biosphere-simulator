@@ -58,23 +58,50 @@ from simcore.quantities import (
 from simcore.registry import Registry
 from simcore.state import State, Stock
 
+_RATE_CLASSES: tuple[str, ...] = ("fast", "slow")
+"""The legal :attr:`authoring.schema.FlowSpec.rate_class` values — the author-visible
+**rate-class vocabulary**.
+
+The single source of truth in the manifest-derivation sense (like ``run._INTEGRATORS``):
+``tests/test_authoring_freeze_manifest.py`` reads *this* rather than transcribing it,
+so a class added here but exercised by nothing still trips the completeness gate.
+
+**Closed at two, by the core's own signature** — ``multirate_step`` takes exactly two
+``Substepper``s (decision N3: the driver takes the two pre-built integrators and does
+not infer the partition). So unlike the flow-type registry, which is explicitly
+expected to grow, this vocabulary cannot grow without a ``simcore`` change.
+"""
+
 
 @dataclass(frozen=True)
 class BuiltScenario:
     """The interpreted graph plus its run config — everything a run needs.
 
     ``integrator`` is the requested kind ("euler"/"rk4"); the run harness
-    (:mod:`authoring.run`) constructs the matching integrator from ``registry`` and
-    steps ``steps`` times at ``dt``.
+    (:mod:`authoring.run`) constructs the matching integrator(s) and steps ``steps``
+    times at ``dt``.
+
+    **Three registries, deliberately.** ``registry`` is the whole flow set (the
+    single-rate path, and the structural-equality surface tests compare against);
+    ``slow_registry`` / ``fast_registry`` are its **disjoint partition over the same
+    stock dict** (decision N3), which is what ``multirate_step`` consumes. They are
+    always built, so the shape does not depend on whether multi-rate was declared;
+    ``slow ∪ fast == registry`` and ``slow ∩ fast == ∅`` by construction. Keeping the
+    full ``registry`` is what lets the run harness take **today's single-rate code
+    path** verbatim when no partition is declared, rather than leaning on the
+    (measured, but load-bearing) ``n_sub=1`` identity.
     """
 
     name: str
     state: State
     registry: Registry
+    slow_registry: Registry
+    fast_registry: Registry
     resolver: SourceResolver
     integrator: str
     dt: float
     steps: int
+    n_sub: int = 1
     has_authored_kinetics: bool = False
     """True if any flow is an authored :class:`~simcore.expr.DeclarativeFlow`.
 
@@ -83,6 +110,19 @@ class BuiltScenario:
     (Godot, a later step) surfaces this; carrying it on the built scenario is where the
     fact originates.
     """
+
+    @property
+    def is_multirate(self) -> bool:
+        """True if this scenario declared a multi-rate cadence — i.e. needs the driver.
+
+        Either a sub-stepped fast set (``n_sub > 1``) *or* a non-empty slow partition.
+        The two are not independent: ``interpret`` refuses a slow set at ``n_sub == 1``,
+        so on any **built** scenario this is equivalent to ``n_sub > 1``. The robust
+        form is written anyway — the equivalence is a consequence of that refusal, not a
+        property of multi-rate, and hard-coding it here would silently mislower a
+        scenario the day the refusal is relaxed.
+        """
+        return self.n_sub > 1 or bool(self.slow_registry.flows)
 
 
 def _build_stock(spec: StockSpec, params: dict[str, float]) -> Stock:
@@ -306,6 +346,27 @@ def _build_declarative_flow(
     )
 
 
+def _slow_flow_ids(spec: ScenarioSpec) -> frozenset[FlowId]:
+    """The declared **slow** partition, with the rate-class vocabulary validated.
+
+    Must run over the **post-**:func:`~authoring.compose.apply_includes` spec, and that
+    is the whole reason this is not a pydantic ``model_validator`` on ``ScenarioSpec``:
+    a *bundle* may contribute ``rate_class: slow`` flows, and a schema-level validator
+    sees only the scenario's own inline ``flows`` — it would miss them, and (worse)
+    would miss them silently, lowering a partitioned scenario as if it were single-rate.
+    """
+    slow: set[FlowId] = set()
+    for flow_spec in spec.flows:
+        if flow_spec.rate_class not in _RATE_CLASSES:
+            raise AuthoringError(
+                f"flow {flow_spec.id!r}: unknown rate class {flow_spec.rate_class!r} "
+                f"(known: {sorted(_RATE_CLASSES)})"
+            )
+        if flow_spec.rate_class == "slow":
+            slow.add(FlowId(flow_spec.id))
+    return frozenset(slow)
+
+
 def _build_flow(spec: FlowSpec, stocks: dict[StockId, Stock], base_dir: Path) -> Flow:
     """Lower one :class:`FlowSpec` to a ``Flow``: a frozen type, or authored kinetics.
 
@@ -366,6 +427,24 @@ def interpret(
     ``n=0`` with the authored seed. ``base_dir`` is the directory that any
     parameter-pack path is resolved against (defaults to the process CWD — set it to
     the scenario file's parent via :func:`load_scenario`).
+
+    Finally the flows are **partitioned by rate class** into the two disjoint registries
+    ``multirate_step`` consumes (N3), over the one shared stock dict. This runs *after*
+    the include merge, so a bundle-contributed ``rate_class: slow`` flow is seen. Two
+    combinations are refused here rather than honoured:
+
+    * an unknown ``rate_class`` → ``AuthoringError`` (the ``quantity``/``kind`` rule);
+    * ``n_sub = 1`` **with** a non-empty slow set → ``AuthoringError``. It buys no rate
+      separation and no perf win while silently perturbing the trajectory, via the slow
+      set's own two-half-step discretization *and* the mid-step coupling — both
+      measured, over all three flow shapes, in
+      ``tests/test_authoring_multirate_identity.py``.
+
+    ``n_sub > 1`` with an **empty** slow set is deliberately **legal**: it is uniform
+    sub-stepping, which decouples the export cadence from the solver step, and it is
+    the configuration the measured payoff rests on (master ``dt=3600``, ``n_sub=60``
+    lands on the same value as a single-rate ``dt=60`` run while exporting 60x less
+    often).
     """
     if base_dir is None:
         base_dir = Path()
@@ -380,6 +459,24 @@ def interpret(
     state = State(n=0, stocks=stocks, rng_seed=spec.rng_seed)
     flows = [_build_flow(flow_spec, stocks, base_dir) for flow_spec in spec.flows]
     registry = Registry(flows, stocks)
+    slow_ids = _slow_flow_ids(spec)
+    if spec.n_sub == 1 and slow_ids:
+        raise AuthoringError(
+            f"n_sub=1 with a non-empty slow set ({sorted(slow_ids)}): a partition at "
+            f"n_sub=1 buys NO rate separation (the fast set takes one full-dt "
+            f"sub-step) and no performance win — yet it is not inert. It does not "
+            f"reproduce the single-rate trajectory: the slow set is split into two "
+            f"dt/2 half-steps ((1-k*dt/2)^2 != (1-k*dt)) and, the dominant effect, the "
+            f"fast flows read slow-updated stocks mid-step. So this is a "
+            f"misconfiguration that would silently move the answer. Either raise n_sub "
+            f"(the fast set then sub-steps at dt/n_sub, which is the point of the "
+            f"partition), or drop the 'rate_class: slow' key(s) to run single-rate."
+        )
+    # The disjoint partition over the SAME stock dict (N3). Built unconditionally: with
+    # no authored rate_class keys the slow set is empty and `fast_registry` holds every
+    # flow, so this is inert for every pre-multi-rate scenario.
+    slow_registry = Registry([f for f in flows if f.id in slow_ids], stocks)
+    fast_registry = Registry([f for f in flows if f.id not in slow_ids], stocks)
     resolver = SourceResolver(
         forcings={
             name: constant(
@@ -392,10 +489,13 @@ def interpret(
         name=spec.name,
         state=state,
         registry=registry,
+        slow_registry=slow_registry,
+        fast_registry=fast_registry,
         resolver=resolver,
         integrator=spec.integrator,
         dt=spec.dt,
         steps=spec.steps,
+        n_sub=spec.n_sub,
         has_authored_kinetics=any(f.kinetics is not None for f in spec.flows),
     )
 

@@ -80,6 +80,7 @@ import authoring.schema
 import simcore.expr
 from authoring.expr_parser import _REF_KEYWORDS
 from authoring.flow_registry import FLOW_TYPES, PARAM_LOADERS
+from authoring.interpreter import _RATE_CLASSES
 from authoring.run import _INTEGRATORS
 from simcore.expr import _BINARY_OPS
 
@@ -203,6 +204,7 @@ def _build_manifest() -> dict[str, object]:
         "ref_keywords": sorted(_REF_KEYWORDS),
         "step_token": "n",
         "integrator_names": sorted(_INTEGRATORS),
+        "rate_classes": sorted(_RATE_CLASSES),
         "schema_fields": _schema_fields(),
         "flow_types": _flow_types(),
         "param_loaders": sorted(PARAM_LOADERS),
@@ -238,12 +240,21 @@ def test_frozen_grammar_node_set_is_complete() -> None:
 
 def test_frozen_operator_and_token_sets_are_complete() -> None:
     # The op set + the closed identifier set (the three ref keywords) + the legal
-    # integrator names are the rest of the author-visible vocabulary. Deriving each from
-    # its single source of truth is what makes "someone added `/`" fail here.
+    # integrator names + the legal rate classes are the rest of the author-visible
+    # vocabulary. Deriving each from its single source of truth is what makes "someone
+    # added `/`" fail here.
+    #
+    # `rate_classes` is the multi-rate analogue of `integrator_names`, and it exists
+    # because `schema_fields` records that `rate` EXISTS but not what it may say — the
+    # same gap `integrator_names` fills for `integrator`. Unlike the flow-type registry
+    # (explicitly expected to grow), this one is closed at two by `multirate_step`'s own
+    # signature: it takes exactly two `Substepper`s, so a third class cannot be added
+    # without a `simcore` change.
     manifest = _load_manifest()
     assert set(manifest["binary_ops"]) == set(_BINARY_OPS)
     assert set(manifest["ref_keywords"]) == set(_REF_KEYWORDS)
     assert set(manifest["integrator_names"]) == set(_INTEGRATORS)
+    assert set(manifest["rate_classes"]) == set(_RATE_CLASSES)
 
 
 def test_frozen_schema_surface_is_complete() -> None:

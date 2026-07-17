@@ -138,6 +138,10 @@
     "parse_vectors.txt": "21a6afe132be63b409da3fab4ac72f5bdf53bc3f7b66df2f89857f499466ca65",
     "traj_vectors.txt": "4f0118f90e266ffc411ffc374acb745bfbddef0bfaa024112be78fbf2bec221a"
   },
+  "rate_classes": [
+    "fast",
+    "slow"
+  ],
   "ref_keywords": [
     "forcing",
     "param",
@@ -156,6 +160,7 @@
       "kinetics",
       "params",
       "priority",
+      "rate_class",
       "type",
       "wiring"
     ],
@@ -179,6 +184,7 @@
       "forcings",
       "includes",
       "integrator",
+      "n_sub",
       "name",
       "parameters",
       "rng_seed",

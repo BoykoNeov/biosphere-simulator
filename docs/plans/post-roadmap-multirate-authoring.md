@@ -101,7 +101,7 @@ single-domain rate, so the rate-class is a property of the flow, assigned by the
 assembler; the driver takes the two pre-built integrators and does not infer the
 partition."* So `simcore` **refuses to guess**, and the authoring layer must ask.
 
-### The shape: (a) per-flow `rate: fast | slow`, defaulting to `fast`
+### The shape: (a) per-flow `rate_class: fast | slow`, defaulting to `fast`
 
 ```yaml
 name: eclss_thermal_habitat
@@ -112,11 +112,18 @@ n_sub: 60           # the fast set sub-steps at dt/n_sub = 60 s
 flows:
   - id: eclss.o2_makeup
     type: eclss.o2_makeup
-    # rate: fast  <- the default; sub-steps at 60 s
+    # rate_class: fast  <- the default; sub-steps at 60 s
   - id: thermal.radiator_reject
     type: thermal.radiator_reject
-    rate: slow      # tau ~ 65 steps at dt=3600; stepping it 60x is pure waste
+    rate_class: slow    # tau ~ 65 steps at dt=3600; stepping it 60x is pure waste
 ```
+
+**Spelled `rate_class`, not `rate` (Step 2, user's call).** The design pass argued *where*
+the knob lives and never weighed the spelling — so `rate:` was never actually decided, it
+was assumed. A bare `rate:` would sit one nesting level above `kinetics.rate`, the rate
+*law*, and a flow may carry both. `rate_class` also matches what the concept is called
+everywhere else it appears (`interpreter._RATE_CLASSES`, the manifest's `rate_classes`),
+so `rate:` was the lone inconsistency rather than the convention.
 
 **(b) was rejected, and the bundle argument alone is decisive** (advisor). A top-level
 `fast: [flow-id, …]` list is a list of **id references**, and `{bundle, prefix}` includes
@@ -302,7 +309,7 @@ oscillating divergence is simply at a different point. Both are the same broken 
 | `authoring/interpreter.py` | build two disjoint registries over one stock dict | **authoring unfreeze** |
 | `authoring/run.py` | drive `multirate_step`; sum `rationed` across sub-ops | **authoring unfreeze** |
 | `authoring/flow_registry.py` | `rate_params` on `FlowTypeSpec` + 4 rows — the precondition **folds in** | **authoring unfreeze** |
-| `docs/authoring-reference.manifest.json` | regenerate; the git-visible record | manifest |
+| `docs/authoring-reference.manifest.json` | regenerate **at each step that moves the surface** (2: `schema_fields` + `rate_classes`; 5: `flow_types`), never batched to the end — the gate is plain equality and would sit red meanwhile | manifest |
 | `rust/crates/authoring` | the hand-mirrored port | native-port tolerance contract |
 | `tests/crossport/tiers.json` | a multi-rate anchor, if one is added | cross-port tiers |
 | `simcore/` | **NONE** — `multirate_step` already exists and is proven | purity invariant |
@@ -318,7 +325,8 @@ surface, not a licence to edit the core.
    the probe to a committed pin*, not establishing the fact. Test-first, before any schema
    change.
 2. **Advisor pass on the knob** ✅ **DONE** — (a) + default `fast`, top-level `n_sub`,
-   Strang pinned, `n_sub=1`-with-slow refused, aux tripwire. Then schema + interpreter.
+   Strang pinned, `n_sub=1`-with-slow refused, aux tripwire. **Then schema +
+   interpreter** ✅ **DONE** — see "Step 2: COMPLETE" below.
 3. **The run harness** — `multirate_step` per master step; `rationed` summed over
    sub-operations (its contract already aggregates); `RationedError` semantics preserved.
 4. **The composability anchor**: an authored Thermal+ECLSS scenario at master `dt = 3600`
@@ -328,8 +336,76 @@ surface, not a licence to edit the core.
    `rate_params` on `FlowTypeSpec`, checked as `k·(dt/n_sub) < 1` at build time. The three
    uncoverable shapes documented by name, not faked.
 6. **Rust mirror**, hand-written, then the cross-port tier.
-7. **Regenerate the authoring manifest**; document; unfreeze ceremony per
-   `docs/authoring-reference.md`, "The unfreeze discipline".
+7. **The consolidated unfreeze ceremony** + the reference-doc narrative, per
+   `docs/authoring-reference.md`, "The unfreeze discipline". **The manifest itself moves
+   *incrementally*, not here** (advisor, Step 2): `test_frozen_schema_surface_is_complete`
+   is plain equality against the live tree, so it goes red the *instant* a schema field
+   lands — and this project commits each step to `main`. Deferring the regeneration to
+   Step 7 would mean a red gate across Steps 3–6, which does not "save" the ceremony, it
+   just **disables the gate** for the four steps most likely to drift. So each step
+   regenerates the surface it moves (Step 2: `schema_fields` + `rate_classes`; Step 5:
+   `flow_types`/`rate_params`), and Step 7 owns the *narrative*: the reference doc, the
+   deferrals-by-name, and the consolidated record of what was unfrozen and why.
+
+## Step 2: COMPLETE — the knob exists, and it is inert until asked for
+
+**Nothing runs multi-rate yet.** `interpret` now *builds* the partition; no harness
+consumes it (Step 3). `git diff src/simcore/` is **empty**, as the purity invariant
+demands — this is a consumer phase.
+
+**The surface, as decided:** `ScenarioSpec.n_sub: int = Field(default=1, ge=1)` and
+`FlowSpec.rate: str = "fast"`. `BuiltScenario` gains `slow_registry` / `fast_registry`
+(the disjoint N3 partition over the one shared stock dict), `n_sub`, and an
+`is_multirate` property.
+
+**Three registries, not two — and the third is the safety.** `registry` (the whole flow
+set) is kept alongside the partition. That is what lets Step 3's harness run every
+*existing* scenario down **today's single-rate code path verbatim**, instead of routing it
+through `multirate_step` and *relying* on the `n_sub=1` identity. The identity is measured
+(Step 1) — but "measured" and "load-bearing for all 25 goldens" are different risk
+postures, and there is no reason to take the second when the first is free.
+`is_multirate` is written in the robust form (`n_sub > 1 or slow non-empty`) even though
+the refusal makes it equivalent to `n_sub > 1`: the equivalence is a *consequence of the
+refusal*, not a property of multi-rate.
+
+**The validation lives in the interpreter, not in a pydantic `model_validator` — and this
+is not a style choice.** A `model_validator` on `ScenarioSpec` runs at *schema* time, and
+`apply_includes` merges bundles at the *top of* `interpret`. A **bundle** may contribute
+`rate: slow` flows, which a schema-level check would never see — it would lower a
+partitioned scenario as single-rate, silently. Pinned both ways
+(`test_a_bundle_contributed_slow_flow_is_seen` + the refusal reached *through* an
+include). `n_sub`'s `ge=1` **is** schema-level, correctly: it is a shape constraint (cf.
+`IncludeSpec.prefix`'s `min_length=1`), not a graph-level judgement.
+
+**`n_sub > 1` with an EMPTY slow set is LEGAL, and this row nearly got refused.** It looks
+like a misconfiguration ("multi-rate with nothing slow"), which is exactly the intuition
+that would have deleted the phase's headline: it is *uniform sub-stepping* — the export
+cadence decoupled from the solver step — and it is the configuration the measured payoff
+runs on (Step 1's `_run_multirate(_at_unsafe_dt(), 60)` passes `slow_ids=()`). The four-row
+legality matrix is pinned in `tests/test_authoring_multirate_partition.py`.
+
+**The manifest moved, deliberately** (the unfreeze, git-visible): `schema_fields` gains
+`FlowSpec.rate` + `ScenarioSpec.n_sub`, and a new **`rate_classes`** key records the legal
+values — the gap `integrator_names` already fills for `integrator`, since `schema_fields`
+records that `rate` *exists* but not what it may *say*. Derived from a live
+`interpreter._RATE_CLASSES`, never transcribed. Unlike the flow-type registry (expected to
+grow), this vocabulary is **closed at two by `multirate_step`'s own signature** — it takes
+exactly two `Substepper`s, so a third class cannot appear without a `simcore` change.
+
+**The key is `rate_class`, not `rate` — a naming hazard caught *before* the freeze.** The
+first cut used `rate:`, following this plan's own YAML example, and flagged the collision
+with `KineticsSpec.rate` (the rate *law*, one nesting level down on the same flow) three
+separate times while doing so. The advisor named that for what it was: the design pass had
+argued *where* the knob lives — per-flow property vs top-level id list, on the
+referential-integrity argument — and **never weighed the spelling**, so `rate:` was
+assumed, not decided, and three flags is not a resolution. The deciding argument turned out
+not to be the collision at all but an inconsistency introduced by the work itself: the
+concept was already named "rate class" in `interpreter._RATE_CLASSES` and in the manifest's
+own `rate_classes` key, so the YAML was the *only* place spelling it `rate` — a manifest
+reader would have seen `rate_classes: [fast, slow]` and had to infer it governed a field
+called `rate`. Renamed while it was one unpushed commit; after the push it would have been
+a full authoring unfreeze. The design pass's actual argument (a per-flow **property**, not
+an id **reference**) is untouched by the spelling.
 
 ## The measurements this rests on
 

@@ -115,6 +115,38 @@ class FlowSpec(BaseModel):
     wiring: dict[str, str] = Field(default_factory=dict)
     kinetics: KineticsSpec | None = None
     params: str | ParamPackRef | None = None
+    rate_class: str = "fast"
+    """The **rate class**: which side of the multi-rate partition this flow steps on.
+
+    ``"fast"`` (the default) sub-steps ``n_sub`` times at ``dt/n_sub`` *inside* each
+    master step; ``"slow"`` steps once at the master ``dt`` (as two ``dt/2`` halves
+    under Strang splitting). The legal values are validated by the interpreter, not here
+    (:data:`authoring.interpreter._RATE_CLASSES`) — the ``integrator``/``quantity``/
+    ``kind`` discipline, where an unknown value is an ``AuthoringError`` rather than a
+    pydantic error.
+
+    **Spelled ``rate_class``, not ``rate``, deliberately.** ``KineticsSpec.rate`` — one
+    nesting level down, on the same flow — is the *rate law* (how fast the flow runs);
+    this is the *rate class* (which cadence it is integrated on). A flow may carry both,
+    so a bare ``rate:`` here would put two senses of the word in one block. The name
+    also matches what the concept is called everywhere else it appears:
+    :data:`authoring.interpreter._RATE_CLASSES` and the manifest's ``rate_classes``.
+
+    **This is a *property*, not a *reference* — which is exactly why it lives on the
+    flow.** The rate class travels *with* the flow, inside a bundle, and ``compose``'s
+    ``{bundle, prefix}`` rewrite cannot touch it, because prefixing rewrites **ids**.
+    The rejected alternative — a top-level ``fast: [flow-id, …]`` list — would have been
+    a list of id *references*, i.e. a new rewrite surface in ``compose.apply_includes``
+    that silently mis-fires the moment someone forgets it. This shape has zero
+    referential-integrity surface.
+
+    **Defaulting to ``"fast"`` is load-bearing, not a convenience.** ``rate_class``
+    defaulting to fast + ``n_sub`` defaulting to 1 ⇒ an **empty slow set** ⇒ a file with
+    no multi-rate keys lowers to today's single-rate trajectory *by construction* (the
+    identity path, measured in ``tests/test_authoring_multirate_identity.py``).
+    Defaulting to ``"slow"`` could not do this: with an empty fast set, Strang would run
+    two ``dt/2`` half-steps, which is **not** one full Euler step.
+    """
 
     @model_validator(mode="after")
     def _check_type_xor_kinetics(self) -> FlowSpec:
@@ -202,8 +234,16 @@ class ScenarioSpec(BaseModel):
     """A whole authored scenario: run config + parameters + stocks + flows + forcings.
 
     ``integrator`` is "euler" or "rk4"; ``dt`` the step size (seconds); ``steps``
-    the run length; ``rng_seed`` the state seed (default 0). The interpreter builds
-    a single-rate, no-reset graph from this (Step 0 scope).
+    the run length; ``rng_seed`` the state seed (default 0). The interpreter builds a
+    no-reset graph from this (annual-reset/phenology remains out of scope).
+
+    ``dt`` + ``n_sub`` + each flow's ``rate_class`` are the **multi-rate** knob
+    (post-roadmap): ``dt`` is the **coupling cadence** at which a step commits and peers
+    read; the fast flow set sub-steps internally at ``dt/n_sub``. Omitting both keys is
+    the single-rate path — an empty slow set at ``n_sub = 1`` — which reproduces the
+    pre-multi-rate trajectory bit-for-bit. The one refused combination is ``n_sub = 1``
+    *with* a non-empty slow set: it buys no rate separation and no performance win, yet
+    silently moves the answer (see :func:`authoring.interpreter.interpret`).
 
     ``parameters`` (Step 3) is the **template contract**: named scalars with default
     values that an instantiation may override (``interpret(..., overrides=…)``), and
@@ -228,6 +268,24 @@ class ScenarioSpec(BaseModel):
     integrator: str
     dt: float
     steps: int
+    n_sub: int = Field(default=1, ge=1)
+    """How many sub-steps the **fast** flow set takes inside one master ``dt`` step.
+
+    This is the knob that turns ``dt`` into a **coupling cadence** — what a neighbouring
+    domain sees exported — rather than what the fast flows solve at, which becomes the
+    **effective sub-step** ``dt/n_sub``. Default 1 (with the default all-fast partition)
+    is the single-rate path, bit-identical to the pre-multi-rate engine.
+
+    ``ge=1`` mirrors ``simcore.multirate.multirate_step``'s own ``n_sub >= 1`` guard at
+    the file boundary, so a nonsensical value is a schema error on the author's file
+    rather than a ``ValueError`` surfacing from the core mid-run.
+
+    **``n_sub`` does not by itself make a step safe** — it only makes ``dt/n_sub`` the
+    number that must satisfy ``k·dt < 1``. Measured: ``n_sub=2`` at ``dt=3600`` still
+    wrecks the cabin (36.0 against a truth of 8.0). Multi-rate is the *performance
+    enabler*, not the hazard closer; the build-time precondition on the **effective**
+    sub-step is a later step.
+    """
     rng_seed: int = 0
     includes: list[str | IncludeSpec] = Field(default_factory=list)
     parameters: dict[str, float] = Field(default_factory=dict)
