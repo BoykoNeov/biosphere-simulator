@@ -1,9 +1,12 @@
 # Post-roadmap: multi-rate authoring — the author picks a coupling cadence, not a global `dt`
 
-**Status: PLANNED, not started.** A **phase, not a step** — an authoring unfreeze
+**Status: DESIGNED, not built.** A **phase, not a step** — an authoring unfreeze
 (schema + interpreter + run harness), the Rust mirror, the freeze manifest, and the
-cross-port tiers. Nothing below has been built. The design-level advisor pass on the
-author-facing knob is **owed before the first frozen-surface change**.
+cross-port tiers. **The user opened the unfreeze on 2026-07-17** and the design-level
+advisor pass on the author-facing knob is **DONE** (below): the knob is decided, the
+blocking identity is **measured bit-exact through the authoring layer**, and the payoff is
+**measured**. No code is written and no frozen surface has moved. One decision is open —
+whether the effective-sub-step precondition folds into this phase.
 
 Predecessors: `post-roadmap-flow-registry-growth.md` (Tier 1 created the `dt` hazard by
 registering the flows), `post-roadmap-rationing-gate.md` (made the *donor-controlled* half
@@ -87,27 +90,107 @@ coarse `dt` is not a *less accurate* value but a *meaningless* one (0 mol, 18 mo
 sub-step, for the export-fidelity reason (see the reference's "the hazard rationing cannot
 see").
 
-## The design question owed to the advisor — the author-facing knob
+## The author-facing knob — DECIDED (design pass, advisor + measured, 2026-07-17)
 
 The partition is **per-flow, not per-domain** (decision N3): *"A cross-domain flow has no
 single-domain rate, so the rate-class is a property of the flow, assigned by the scenario
 assembler; the driver takes the two pre-built integrators and does not infer the
-partition."* So `simcore` **refuses to guess**, and the authoring layer must ask. Candidate
-shapes, none chosen:
+partition."* So `simcore` **refuses to guess**, and the authoring layer must ask.
 
-* **(a) Per-flow `rate: fast | slow`** + a top-level `n_sub`. Closest to the core's own
-  model; most explicit; verbose.
-* **(b) Top-level `fast: [flow-id, …]` + `n_sub`.** One place to look; the partition reads
-  as one decision rather than N scattered ones.
-* **(c) Derive it** from each flow type's registered rate constant + the master `dt`. Most
-  convenient, **most dangerous**: it re-introduces the inference N3 deliberately refused,
-  and it cannot see authored `kinetics` flows (whose rate law the author wrote).
-* **(d) Per-flow `substeps: N`** — sugar over (a)+`n_sub`, but `multirate_step` takes ONE
-  `n_sub` for the whole fast set, so this would over-promise.
+### The shape: (a) per-flow `rate: fast | slow`, defaulting to `fast`
 
-Open, for the advisor pass: **(b) vs (a)**; whether `split` (Strang/Lie) is author-visible
-or pinned to Strang; and whether `n_sub` is validated against the effective-sub-step bound
-at build time (which folds the deferred precondition into this phase rather than after it).
+```yaml
+name: eclss_thermal_habitat
+integrator: euler
+dt: 3600.0          # the COUPLING CADENCE — what neighbours see, not what ECLSS solves at
+n_sub: 60           # the fast set sub-steps at dt/n_sub = 60 s
+
+flows:
+  - id: eclss.o2_makeup
+    type: eclss.o2_makeup
+    # rate: fast  <- the default; sub-steps at 60 s
+  - id: thermal.radiator_reject
+    type: thermal.radiator_reject
+    rate: slow      # tau ~ 65 steps at dt=3600; stepping it 60x is pure waste
+```
+
+**(b) was rejected, and the bundle argument alone is decisive** (advisor). A top-level
+`fast: [flow-id, …]` list is a list of **id references**, and `{bundle, prefix}` includes
+**rewrite ids** (`<prefix>.<id>`) — so the list becomes a new rewrite surface in
+`compose.apply_includes` that silently mis-fires the moment someone forgets it. Under (a)
+the rate-class travels **with the flow**, inside the bundle, and prefixing cannot touch it
+because it is a *property*, not a reference. (a) therefore has **zero referential-integrity
+surface** and simply *is* N3. (c) re-introduces the inference N3 refused and cannot see
+authored `kinetics`; (d) over-promises (`multirate_step` takes ONE `n_sub` for the fast set).
+
+**Default `fast` is load-bearing, not a convenience.** `rate` defaulting to `fast` +
+`n_sub` defaulting to `1` ⇒ empty slow set ⇒ **the bit-exact identity path**. A scenario
+with no multi-rate keys lowers to today's trajectory *by construction*. Default `slow`
+could not do this: with an empty fast set, Strang would run two `dt/2` half-steps, which is
+**not** one full Euler step.
+
+### `split` (Strang/Lie): NOT author-visible — pinned to Strang
+
+Strang is the core's own default and carries the higher nominal order. **The justification
+is order/safety, not performance** (advisor correction — I had it backwards): Lie is
+actually *cheaper* on the slow set (1 slow evaluation per master step vs Strang's 2).
+Strang additionally steps the slow set at `dt/2`, which is *safer* for the slow set's own
+`k·dt`. Lie is documented in `simcore` as "fallback / comparison" — a **study** tool, not an
+authoring choice — and our Euler flows collapse Strang to 1st order anyway, so exposing the
+knob buys an author no order they can use. **Deferred by name:** author-visible `split`.
+
+### Mixed integrators: NOT exposed
+
+`multirate_step` takes two `Substepper`s and would accept `slow=rk4, fast=euler`. Both are
+built from the scenario's single `integrator`. **Deferred by name:** per-rate-class
+integrator.
+
+### `n_sub = 1` with a NON-empty slow set: an `AuthoringError`
+
+The advisor surfaced this as an unconsidered case; it is now **measured**, and the first
+reading of the probe was wrong twice — worth recording, because the wrong readings are the
+intuitive ones:
+
+| `n_sub=1`, slow set | all-stock result |
+|---|---|
+| `[]` (the identity path) | **BIT-IDENTICAL** |
+| `[co2_scrubber]` | DIFFERS — `cabin_co2 −4.57e-02` |
+| `[o2_makeup]` | DIFFERS — `cabin_o2 +6.19e-02` |
+| `[crew_metabolism]` (FORCED) | DIFFERS — `cabin_o2 +1.20e-01` |
+
+So **every** non-empty slow partition at `n_sub=1` perturbs, via **two** mechanisms:
+the slow flow's own two-half-step discretization (`(1−k·dt/2)² ≠ (1−k·dt)`), *and* — the
+dominant one — the **coupling**: fast flows now read slow-updated stocks mid-step. The
+forced row proves the second is independent of flow shape: `crew_metabolism`'s own legs
+split exactly (its residual is roundoff, `−1.25e-12`), yet the cabin moves by `1.2e-01`
+because the fast flows see a half-metabolised cabin.
+
+Two hypotheses died here. "It only perturbs *coupled* flows" — false, the scrubber perturbs
+its own stocks. "A *forced* flow splits exactly, so it is safe" — false in the only sense
+that matters; its own legs do, the trajectory does not. (The first probe pass compared
+**only `cabin_o2`** and read "bit-identical" off flows that never touch it — blind evidence
+for a claim about "the trajectory". Compare every stock.)
+
+A partition at `n_sub=1` therefore buys **no rate separation and no perf win** while
+silently moving the answer: a misconfiguration, refused at build time, not honoured.
+
+### The aux tripwire — future-proofing, not a present fix
+
+`multirate_step` **never advances aux** (P2: *"Aux × multi-rate is out of scope"*), while
+`step_report` does — so the identity claim carries an **unstated precondition**: *no aux
+processes*. It holds today only because `interpret` calls `Registry(flows, stocks)` and
+**never wires `aux_processes`** — the authoring layer cannot express aux at all, and the one
+aux-bearing domain (biosphere) is deferred from the registry for exactly this family of
+reasons. So the guard can never fire from authored input **today**; it is a tripwire for the
+phase that makes the biosphere authorable, where aux would otherwise **silently freeze**.
+Raise in the multi-rate run path if `registry.aux_processes` is non-empty, pointing at
+simcore's P2 boundary.
+
+### `RationedError`'s message
+
+Says *"Reduce dt and re-run"*. Under multi-rate the honest advice is **"increase `n_sub` or
+reduce `dt`"** — the message is part of the fix, since it is what an author reads at the
+moment they hit the hazard.
 
 ## The golden-preservation argument — why this need not move a single golden
 
@@ -125,10 +208,45 @@ over **both** Euler and RK4, green. (Checked rather than assumed: the first draf
 plan asserted it was an unmeasured docstring claim, which was the very error this session
 exists to correct. Check the premise.)
 
-What is **not** yet pinned is the identity at the **authoring** level: the simcore test
-proves it on a synthetic registry, not that `authoring.run` driving `multirate_step` at
-`n_sub = 1` reproduces `eclss_state.json`. That is a narrow, real gap and it is Step 1 —
-but it is an *extension* of an existing proof, not a load-bearing unknown.
+What was **not** pinned is the identity at the **authoring** level: the simcore test proves
+it on a synthetic registry, not that `authoring.run` driving `multirate_step` at `n_sub = 1`
+reproduces the real authored graph. The advisor ruled this **blocking** — *"if it isn't
+byte-exact through the authoring layer, the knob design is moot and the phase stops there"*
+— so it was measured **before** any design was committed to:
+
+> `eclss_cabin.yaml` (the Tier-1 ECLSS anchor, 900 steps, 4 flows, 3 quantities), single-rate
+> vs `multirate_step` at `n_sub=1` with an empty slow registry, compared by `float.hex()`
+> over **every stock of every step**: **BIT-IDENTICAL**, under **both** Strang *and* Lie.
+> (`M:\claud_projects\temp\multirate-authoring\identity_probe.py`.)
+
+So the golden-preservation argument is **measured, not inferred**, and Step 1 is now the
+narrower job of *promoting the probe to a committed pin* rather than establishing the fact.
+
+## The payoff — measured, and it does NOT close the hazard
+
+The plan's central claim was inference until now: that the master `dt` which wrecks the
+cabin is rescued by sub-stepping. Measured on the ECLSS anchor at master `dt = 3600`
+(truth = `o2_eq` = 8.0):
+
+| mode | effective `k·dt` | `rationed` | final `cabin_o2` |
+|---|---|---|---|
+| single-rate `dt=3600` | 7.20 | 60 | **72.000000** (diverged) |
+| multi-rate `n_sub=2` | 3.60 | 95 | **36.000000** (still broken) |
+| multi-rate `n_sub=10` | 0.72 | 0 | **8.000000** |
+| multi-rate `n_sub=60` | 0.12 | 0 | **8.000000000000007** |
+| single-rate `dt=60` (reference) | 0.12 | 0 | **8.000000000000007** |
+
+**The bottom two rows are the phase in one line**: master `dt=3600` with `n_sub=60` lands on
+the *same* value as `dt=60`, while exporting **hourly**. That is the user's charge answered.
+
+**The `n_sub=2` row is the advisor's point made concrete, and it is the argument for the
+precondition**: an author who "switches on multi-rate" and picks `n_sub=2` gets **36.0**
+instead of **8.0**. Multi-rate hands out a knob that *looks* like safety; the effective
+sub-step is the same hazard one level down.
+
+(The single-rate `dt=3600` row reads **72.0**, not the `≈0` the reference records — no
+contradiction: `test_authoring_dt_hazard` samples at **15** steps, this at **24**, and an
+oscillating divergence is simply at a different point. Both are the same broken run.)
 
 ## Scope — every surface this touches
 
@@ -149,12 +267,12 @@ surface, not a licence to edit the core.
 
 ## Steps (provisional — the advisor pass may reshape 2–3)
 
-1. **Extend the identity pin to the authoring path.** `simcore` already proves
-   `n_sub = 1` + empty slow ⇒ bit-identical, on both integrators. Carry it up: `authoring.run`
-   driving `multirate_step` at `n_sub = 1` must reproduce `eclss_state.json` byte-for-byte
-   on the committed ECLSS anchor. Test-first, before any schema change. If this fails, the
-   de-risking argument is gone and the phase stops here.
-2. **Advisor pass on the knob** ((a)–(d) above), then schema + interpreter.
+1. **Extend the identity pin to the authoring path.** ✅ **MEASURED** (see above:
+   bit-identical over every stock of every step, both splits) — this step is now *promoting
+   the probe to a committed pin*, not establishing the fact. Test-first, before any schema
+   change.
+2. **Advisor pass on the knob** ✅ **DONE** — (a) + default `fast`, top-level `n_sub`,
+   Strang pinned, `n_sub=1`-with-slow refused, aux tripwire. Then schema + interpreter.
 3. **The run harness** — `multirate_step` per master step; `rationed` summed over
    sub-operations (its contract already aggregates); `RationedError` semantics preserved.
 4. **The composability anchor**: an authored Thermal+ECLSS scenario at master `dt = 3600`
