@@ -342,7 +342,7 @@ the code. Selecting a flow type hands you the `dt` knob with no guard attached.
 |---|---|---|---|---|
 | `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** | rationing |
 | `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** | rationing |
-| `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** | **nothing** — see below |
+| `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** | **nothing in `1 ≤ k·dt < 2`** — see below |
 | `eclss.crew_metabolism` | forced draw < stock | `0.004·60 = 0.24` of 10 mol | `0.004·3600 = 14.4` of 10 mol | rationing |
 | `power.self_discharge` | `k·dt < 1` | `dt = 3600` → `3.6e-5` | `dt ≈ 1e8` s (~3 yr) | rationing |
 | `thermal.radiator_reject` | `τ = C/(4εσA·T_eq³) ≫ dt` | `dt = 3600` → `τ ≈ 65` steps | a much larger `dt` overshoots | — |
@@ -354,6 +354,14 @@ Those bounds are *enforced*. `eclss.o2_makeup` is the registry's only **demand-c
 flow — its draw is `k·dt·(setpoint − stock)`, proportional to the **error**, not the stock.
 Near the setpoint that draw is small no matter how large `k·dt` is, so it **never over-draws
 and the backstop never fires**. Its `< 1` is honoured by the author or not at all.
+
+Read that "caught by" cell precisely — it is scoped to a *band*, not to the row's tabulated
+`dt`. At the tabulated `dt = 3600` (`k·dt = 7.2`) the controller **diverges**, and a
+divergence grows until it *does* over-draw, so rationing catches that one (measured:
+`rationed = 4`). What nothing catches is the **`1 ≤ k·dt < 2` band** (`dt ≈ 500–1000`), where
+the oscillation stays near the setpoint, never over-draws, and converges to the right
+endpoint. It is the *amplitude* that trips the gate, never the oscillation — which is why
+the uncaught case is the *quiet* one, not the violent one.
 
 **The composability constraint** falls straight out of that table, and it is not derivable
 from any single flow: **ECLSS is sized for `dt = 60`; Thermal for `dt = 3600`.** A scenario
