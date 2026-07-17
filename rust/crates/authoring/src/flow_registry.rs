@@ -49,6 +49,20 @@ pub struct FlowTypeSpec {
     pub wiring_fields: &'static [&'static str],
     /// The frozen param-set name this flow's constructor consumes, if any.
     pub param_set: Option<&'static str>,
+    /// Which of this type's params are **first-order rate constants** (units 1/s) — the
+    /// multi-rate Step-5 precondition's input. `interpret` requires `k · h < 1` for each,
+    /// where `h` is the flow's effective step (`crate::interpreter::effective_step`).
+    ///
+    /// Empty for a flow whose `dt` constraint this check honestly **cannot** express — a
+    /// ruling, not an oversight, and the three cases are named in Python
+    /// `flow_registry.FlowTypeSpec.rate_params`: `thermal.radiator_reject` (`τ ≫ dt` is
+    /// not a predicate), `eclss.crew_metabolism` (`forced draw < stock` is
+    /// state-dependent, so a build check sees only the initial amount), and authored
+    /// `kinetics` (the author wrote the rate law — decision B's "authored ≠ validated";
+    /// a kinetics flow has no `FlowTypeSpec` at all, so it skips the check *by
+    /// construction*). So the claim is "the platform catches the `k·dt` family", never
+    /// "your dt is safe".
+    pub rate_params: &'static [&'static str],
 }
 
 /// Look up a frozen flow type by its authoring name (the `FLOW_TYPES` dict analogue).
@@ -57,36 +71,44 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
         "crew.oxygen_consumption" => Some(FlowTypeSpec {
             wiring_fields: &["o2_store", "o2_consumed"],
             param_set: None,
+            rate_params: &[],
         }),
         "crew.food_metabolism" => Some(FlowTypeSpec {
             wiring_fields: &["food_store", "exhaled_co2", "fecal_waste"],
             param_set: Some("crew"),
+            rate_params: &[],
         }),
         "crew.water_balance" => Some(FlowTypeSpec {
             wiring_fields: &["water_store", "crew_humidity", "urine"],
             param_set: Some("crew"),
+            rate_params: &[],
         }),
         // --- Tier 1: Power ---
         "power.solar_charge" => Some(FlowTypeSpec {
             wiring_fields: &["solar_source", "battery", "waste_heat"],
             param_set: Some("charge"),
+            rate_params: &[],
         }),
         "power.load_draw" => Some(FlowTypeSpec {
             wiring_fields: &["battery", "waste_heat"],
             param_set: None,
+            rate_params: &[],
         }),
         "power.self_discharge" => Some(FlowTypeSpec {
             wiring_fields: &["battery", "waste_heat"],
             param_set: Some("self_discharge"),
+            rate_params: &["self_discharge_rate"],
         }),
         // --- Tier 1: Thermal ---
         "thermal.heat_input" => Some(FlowTypeSpec {
             wiring_fields: &["heat_source", "node"],
             param_set: None,
+            rate_params: &[],
         }),
         "thermal.radiator_reject" => Some(FlowTypeSpec {
             wiring_fields: &["node", "space"],
             param_set: Some("thermal"),
+            rate_params: &[],
         }),
         // --- Tier 1: ECLSS ---
         "eclss.crew_metabolism" => Some(FlowTypeSpec {
@@ -99,18 +121,22 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
                 "metabolic_h2o_source",
             ],
             param_set: None,
+            rate_params: &[],
         }),
         "eclss.co2_scrubber" => Some(FlowTypeSpec {
             wiring_fields: &["cabin_co2", "co2_removed"],
             param_set: Some("eclss"),
+            rate_params: &["co2_scrub_rate"],
         }),
         "eclss.condenser" => Some(FlowTypeSpec {
             wiring_fields: &["cabin_h2o", "humidity_condensate"],
             param_set: Some("eclss"),
+            rate_params: &["condense_rate"],
         }),
         "eclss.o2_makeup" => Some(FlowTypeSpec {
             wiring_fields: &["o2_supply", "cabin_o2"],
             param_set: Some("eclss"),
+            rate_params: &["o2_makeup_gain"],
         }),
         _ => None,
     }
@@ -321,6 +347,44 @@ pub fn kinetics_param_map(param_set: &str) -> Result<BTreeMap<String, f64>, Auth
         }
     }
     Ok(map)
+}
+
+/// Read one **frozen** rate constant `k` by (param set, param name) — the value the
+/// multi-rate precondition multiplies by the effective step.
+///
+/// **This is the one place the Rust mirror reads `k` from a different source than Python
+/// does, and the asymmetry is load-bearing.** Python's `_check_rate_preconditions` reads
+/// `k` off the *built flow's* params object, because a `params: {pack: …}` may have
+/// **inflated** it — that pack case is Step 5's load-bearing reason the check lives at
+/// build time at all (`packs/eclss_hot_makeup.yaml` takes the anchor's own frozen
+/// `dt=60` from `k·dt = 0.12` to `1.2`, passing every other frozen guard). Rust cannot
+/// reproduce that read: a `Box<dyn Flow>` exposes no params accessor. It does not need
+/// to — **parameter packs are deferred in the Rust port** ([`crate::interpreter`]), so a
+/// Rust flow's params are *always* the frozen set, and the frozen constant *is* the
+/// value the flow was built with.
+///
+/// So the mirror carries the **rule** but not the **rationale**, and it is correct only
+/// while that deferral holds. **If packs are ever added to Rust, this function becomes a
+/// false PASS in the unsafe direction** — it would report the frozen `k` while the flow
+/// ran the pack's inflated one, which is exactly the shape Step 5 caught in the plan's
+/// own `dt/n_sub` formula. That coupling is pinned, not commented:
+/// `pack_deferral_is_what_makes_the_frozen_rate_read_sound` asserts a pack is still
+/// rejected and names this function as its remedy.
+///
+/// Reuses [`kinetics_param_map`] rather than re-matching the sets, so a set flattened
+/// there is automatically readable here — one table, not two that can drift.
+pub fn frozen_rate_value(param_set: &str, param: &str) -> Result<f64, AuthoringError> {
+    let map = kinetics_param_map(param_set)?;
+    map.get(param).copied().ok_or_else(|| {
+        // A registry bug (a `rate_params` name that no param set carries), not authored
+        // input — but loud rather than silently unchecked: an unreadable `k` must never
+        // degrade to "assume safe".
+        AuthoringError::new(format!(
+            "flow-type registry is inconsistent: rate param {param:?} is not in frozen \
+             param set {param_set:?} (available: {:?})",
+            map.keys().collect::<Vec<_>>()
+        ))
+    })
 }
 
 #[cfg(test)]

@@ -67,6 +67,22 @@ pub struct FlowSpec {
     pub wiring: Vec<(String, String)>,
     pub kinetics: Option<KineticsSpec>,
     pub params: Option<ParamsSpec>,
+    /// This flow's **rate class** — `"fast"` (the default) or `"slow"`; the multi-rate
+    /// partition knob (mirrors Python `FlowSpec.rate_class`).
+    ///
+    /// A `"fast"` flow sub-steps `n_sub` times at `dt/n_sub` *inside* each master step; a
+    /// `"slow"` flow steps at the master rate (two `dt/2` Strang halves). The vocabulary
+    /// is validated in the **interpreter**, not here — a *bundle* may contribute
+    /// `rate_class: slow` flows, and a schema-level check runs before
+    /// [`crate::compose::apply_includes`] would ever see them.
+    ///
+    /// **Defaulting to `"fast"` is load-bearing, not a convenience**: `rate_class` fast +
+    /// `n_sub` 1 ⇒ an **empty slow set** ⇒ a file with no multi-rate keys lowers to the
+    /// pre-multi-rate trajectory bit-for-bit.
+    ///
+    /// **Spelled `rate_class`, not `rate`**: [`KineticsSpec::rate`] — the rate *law*, one
+    /// nesting level down on the same flow — already owns that key.
+    pub rate_class: String,
 }
 
 /// A constant forcing schedule (mirrors `ForcingSpec`; Step-0 constants only).
@@ -154,6 +170,20 @@ pub struct ScenarioSpec {
     pub stocks: Vec<StockSpec>,
     pub flows: Vec<FlowSpec>,
     pub forcings: Vec<(String, ForcingSpec)>,
+    /// How many sub-steps the **fast** flow set takes inside one master `dt` (mirrors
+    /// Python `ScenarioSpec.n_sub`; default 1, must be `>= 1`).
+    ///
+    /// With `n_sub > 1`, `dt` becomes the **coupling cadence** — what neighbouring
+    /// domains see exported — while the fast set is solved at the finer `dt/n_sub`. That
+    /// is the whole knob: master `dt=3600` + `n_sub=60` lands on the same value a
+    /// single-rate `dt=60` run does, while exporting 60× less often.
+    ///
+    /// **`n_sub` does not by itself make a step safe** — it only makes `dt/n_sub` the
+    /// number that must satisfy `k·h < 1`, which
+    /// [`crate::interpreter::check_rate_preconditions`] enforces at build time. And it
+    /// governs the **fast set only**: a slow flow steps at `dt/2` however large `n_sub`
+    /// grows.
+    pub n_sub: u32,
 }
 
 impl ScenarioSpec {
@@ -174,6 +204,7 @@ impl ScenarioSpec {
                 "stocks",
                 "flows",
                 "forcings",
+                "n_sub",
             ],
             "scenario",
         )?;
@@ -182,6 +213,24 @@ impl ScenarioSpec {
         let dt = require_f64(entries, "dt", "scenario")?;
         let steps = require_u64(entries, "steps", "scenario")?;
         let rng_seed = opt_u64(entries, "rng_seed", "scenario")?.unwrap_or(0);
+        // `n_sub >= 1` IS a schema-level check, correctly: it is a shape constraint (cf.
+        // Python's `Field(default=1, ge=1)` and `IncludeSpec.prefix`'s `min_length=1`),
+        // not a graph-level judgement. The graph-level rulings — the rate-class
+        // vocabulary and the `n_sub=1`-with-a-slow-set refusal — need the post-include
+        // spec and so live in the interpreter.
+        let n_sub_raw = opt_u64(entries, "n_sub", "scenario")?.unwrap_or(1);
+        if n_sub_raw < 1 {
+            return Err(AuthoringError::new(format!(
+                "scenario: n_sub must be >= 1, got {n_sub_raw} (1 is the single-rate \
+                 default; it mirrors simcore::multirate::multirate_step's own guard)"
+            )));
+        }
+        let n_sub = u32::try_from(n_sub_raw).map_err(|_| {
+            AuthoringError::new(format!(
+                "scenario: n_sub {n_sub_raw} is implausibly large (max {})",
+                u32::MAX
+            ))
+        })?;
         let includes = match field(entries, "includes") {
             None => Vec::new(),
             Some(value) => value
@@ -215,6 +264,7 @@ impl ScenarioSpec {
             stocks,
             flows,
             forcings,
+            n_sub,
         })
     }
 }
@@ -331,13 +381,24 @@ fn parse_flow(value: &YamlValue) -> Result<FlowSpec, AuthoringError> {
     let entries = value.as_mapping("flow")?;
     reject_unknown_keys(
         entries,
-        &["id", "type", "priority", "wiring", "kinetics", "params"],
+        &[
+            "id",
+            "type",
+            "priority",
+            "wiring",
+            "kinetics",
+            "params",
+            "rate_class",
+        ],
         "flow",
     )?;
     let id = require_str(entries, "id", "flow")?;
     let ctx = format!("flow {id:?}");
     let type_ = opt_str(entries, "type", &ctx)?;
     let priority = opt_i64(entries, "priority", &ctx)?.unwrap_or(0);
+    // The vocabulary check is the INTERPRETER's (`slow_flow_ids`), not this layer's —
+    // see `FlowSpec::rate_class`. Here it is bound as a bare string.
+    let rate_class = opt_str(entries, "rate_class", &ctx)?.unwrap_or_else(|| "fast".to_string());
     let wiring = match field(entries, "wiring") {
         None => Vec::new(),
         Some(v) => {
@@ -379,6 +440,7 @@ fn parse_flow(value: &YamlValue) -> Result<FlowSpec, AuthoringError> {
         wiring,
         kinetics,
         params,
+        rate_class,
     })
 }
 

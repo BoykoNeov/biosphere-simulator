@@ -452,22 +452,40 @@ exposed to GDScript, and `objectives_json` scores a rationed session
 session → visible diagnostic + objective failure.** A player should watch the cabin die;
 an author calling a function gets an exception.
 
-> ⚠ **SCOPE NARROWED — read "does not raise" as "does not raise *on rationing*".** That
-> asymmetry was designed when rationing was the only gate, and it is scoped to
-> `run_scenario`. Multi-rate Step 5's precondition lives in **`interpret`**, which is
-> *upstream of the split*: `build_session_from_file` builds through
-> `authoring::load_scenario` (`rust/crates/godot_bridge/src/lib.rs`), so **when Step 6
-> mirrors the precondition into the Rust interpreter, this path will refuse an unsafe
-> scenario at build** — the player never sees the cabin. **No tension today**: the Rust
-> interpreter is not yet mirrored, so the shipped bridge is unchanged.
+> ✅ **RESOLVED in multi-rate Step 6 (2026-07-17) — the split above stands, and now says
+> what it means.** Read "does not raise" as **"does not raise *on rationing*, and does not
+> refuse an unsafe `k·h` step either"**. The asymmetry was designed when rationing was the
+> only gate; Step 5's precondition lives in **`interpret`**, *upstream of the split*, so
+> mirroring it into Rust would have made this path refuse an unsafe scenario at build and
+> the player would never see the cabin. **The user decided the fork: the bridge passes the
+> hatch.** `build_session_from_file` builds through
+> `authoring::load_scenario_allowing_unsafe_step`, so the sentence above is literally true
+> again — a player still watches the cabin die.
 >
-> **Step 6 must decide this deliberately rather than inherit it.** It is genuinely open,
-> and the precedent cuts both ways: this same function *already* refuses rk4 files at build
-> ("single-rate Euler only"), so build-time refusal is not foreign to the session path — an
-> unsafe `k·h` is likewise decidable from the file. Against that: *"watch the cabin die"* is
-> a **study-the-unsafe-run** case, which is exactly what `allow_unsafe_step=True` exists
-> for, so passing the hatch here would be the reading consistent with the hatch's own
-> purpose. Recorded in `docs/plans/post-roadmap-multirate-authoring.md`, Step 6.
+> **The honest cost, since the losing argument was strong.** Refusing was recommended (by
+> the implementer and the advisor) on two points that remain true: this path already maps
+> every `AuthoringError` → `SimError::Validation` **which the UI renders**, so refusing
+> would have created no *silence*, only an earlier diagnostic; and *"watch the cabin die"*
+> is factually wrong for what the precondition intercepts — the `k·h` family produces a
+> **meaningless** run (measured: `72.0`, **nine times too much** O₂, oscillating), not a
+> death. The real "cabin dies" cases are the **state-dependent** ones
+> (`eclss.crew_metabolism`'s forced over-draw), which declare `rate_params=()`, are **not**
+> refused by the precondition, and still run and die here exactly as documented.
+>
+> **So, stated plainly: `build_session_from_file` is the one surface where the `k·dt`
+> family is unguarded.** For the demand-controlled `eclss.o2_makeup` — where the build
+> check is the *only* detector there has ever been (see the next section) — an unsafe
+> makeup gain reaches a session with **every diagnostic reading clean**: `rationed` stays
+> 0, `no_rationing` stays true, `survived` stays true, and the cabin oscillates. That is
+> consistent with what a session *is* ("authored ≠ validated" — for watching, not for
+> vouching), and it is a real hole. An author who wants a verdict calls `run_scenario`.
+>
+> **Separately, and NOT on precondition grounds**: this path also now refuses a
+> **multi-rate** file (`n_sub`/`rate_class`), parallel to the rk4 refusal and for the same
+> reason — `SimSession::single_rate` cannot drive `multirate_step`, and silently
+> single-rating the file would run it at the master cadence the author chose *because* it
+> is unsafe un-sub-stepped. Full record: `docs/plans/post-roadmap-multirate-authoring.md`,
+> "Step 6: COMPLETE".
 
 ### `eclss.o2_makeup` — the hazard rationing cannot see (post-roadmap, measured)
 

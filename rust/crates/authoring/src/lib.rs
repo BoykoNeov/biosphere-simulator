@@ -35,7 +35,10 @@ pub use compose::apply_includes;
 pub use errors::{AuthoringError, ErrorKind};
 pub use expr_parser::{parse_rate_expr, render_rate_expr, ParseError};
 pub use graph_dump::render_graph_dump;
-pub use interpreter::{interpret, load_scenario, BuiltScenario};
-pub use run::{run_scenario, run_scenario_allowing_rationing, RunResult};
+pub use interpreter::{
+    effective_step, interpret, interpret_allowing_unsafe_step, load_scenario,
+    load_scenario_allowing_unsafe_step, BuiltScenario, RATE_CLASSES,
+};
+pub use run::{run_scenario, run_scenario_allowing_rationing, RunResult, SPLIT};
 pub use schema::ScenarioSpec;
 pub use sexpr::render_sexpr;

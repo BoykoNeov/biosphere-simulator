@@ -23,6 +23,16 @@
 //! read out here generically. Wiring parity is instead **trajectory-covered** — a
 //! mis-wire moves the run (or breaks conservation), so it surfaces in the byte-identity
 //! / run-match gates. Do not read this dump as claiming wiring-parity it does not carry.
+//!
+//! **The multi-rate partition (`n_sub` + per-flow rate class) is rendered even though no
+//! anchor is multi-rate yet, and that is the point.** No file in
+//! `tests/crossport/authoring_files.py::ANCHORS` declares a cadence today, so these
+//! fields are inert — `n_sub 1`, every flow `fast`. Adding them now closes the hole a
+//! *future* multi-rate anchor would otherwise walk into: a dump blind to the partition
+//! would diff **green** while the two ports lowered *different* partitions. That is
+//! precisely the shape multi-rate Step 5 caught in the freeze manifest — an equality gate
+//! is blind to a field absent from both sides of the equation, so the moment to add the
+//! field is *before* the case that needs it, not after.
 
 use simcore::hexfloat;
 
@@ -31,23 +41,24 @@ use crate::interpreter::BuiltScenario;
 /// Render `built` to the canonical structural dump text (LF-terminated lines).
 ///
 /// Sections, each already in a deterministic order:
-/// * `scenario <name>` and `config <integrator> <dt.hex> <steps> <rng_seed>`;
+/// * `scenario <name>` and `config <integrator> <dt.hex> <steps> <rng_seed> <n_sub>`;
 /// * one `stock` line per stock, **id-sorted** (the `State.stocks` are a `BTreeMap`),
 ///   carrying every field the interpreter sets — the initial amount is hex-float so
 ///   the boundary-eval is bit-exact;
 /// * one `flow` line per flow in **canonical id-sorted** registry order, with its
-///   priority (the fact final-state byte-identity is blind to);
+///   priority (the fact final-state byte-identity is blind to) and its **rate class**;
 /// * one `forcing` line per forcing, name-sorted, with its constant value (evaluated at
 ///   `n=0, dt=0`) hex-float — the other boundary-eval site.
 pub fn render_graph_dump(built: &BuiltScenario) -> String {
     let mut lines: Vec<String> = Vec::new();
     lines.push(format!("scenario\t{}", built.name));
     lines.push(format!(
-        "config\t{}\t{}\t{}\t{}",
+        "config\t{}\t{}\t{}\t{}\t{}",
         built.integrator,
         hexfloat::format(built.dt),
         built.steps,
         built.state.rng_seed,
+        built.n_sub,
     ));
     lines.push(format!(
         "has_authored_kinetics\t{}",
@@ -80,9 +91,28 @@ pub fn render_graph_dump(built: &BuiltScenario) -> String {
         ));
     }
 
-    // Flows — canonical id-sorted registry order, with priority.
+    // Flows — canonical id-sorted registry order, with priority and rate class.
+    //
+    // The rate class is read back off the **built partition** (`slow_registry`
+    // membership), never off the spec: what this dump must prove is that both ports
+    // *lowered* the same partition, and re-reading the authored key would assert only
+    // that both ports can read YAML. It is rendered for **every** flow, not just when the
+    // scenario is multi-rate, and that is deliberate — a field rendered conditionally is
+    // a field the diff cannot see in the case that matters.
+    let slow_ids: std::collections::BTreeSet<&str> =
+        built.slow_registry.flows().iter().map(|f| f.id()).collect();
     for flow in built.registry.flows() {
-        lines.push(format!("flow\t{}\t{}", flow.id(), flow.priority()));
+        let rate_class = if slow_ids.contains(flow.id()) {
+            "slow"
+        } else {
+            "fast"
+        };
+        lines.push(format!(
+            "flow\t{}\t{}\t{}",
+            flow.id(),
+            flow.priority(),
+            rate_class
+        ));
     }
 
     // Forcings — name-sorted; the constant value is the schedule at (n=0, dt=0).

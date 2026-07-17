@@ -164,11 +164,19 @@ pub(crate) fn build_composed_session(
 /// `overrides` instantiate a template's `parameters` (Step-3 `param('crew_count')` knobs); pass an
 /// empty map for the common no-override case.
 ///
-/// **Single-rate / Euler only** (the [`SimSession::single_rate`] shape the [`authoring::run`]
-/// harness itself is scoped to): a file requesting `rk4` (no single-rate rk4 session exists) is a
-/// loud [`SimError::Validation`], deferred exactly as two-rate authoring is. Any authoring parse/
-/// interpret failure (unknown flow type, bad wiring, unbalanced authored stoichiometry, a missing
-/// file) is mapped to a [`SimError::Validation`] the UI renders as `false`.
+/// **Single-rate / Euler only** (the [`SimSession::single_rate`] shape): a file requesting `rk4`
+/// (no single-rate rk4 session exists) or declaring a **multi-rate cadence** (`n_sub`/`rate_class`
+/// — that needs `multirate_step`, not a single-rate session) is a loud
+/// [`SimError::Validation`]. Any authoring parse/interpret failure (unknown flow type, bad wiring,
+/// unbalanced authored stoichiometry, a missing file) is mapped to a [`SimError::Validation`] the
+/// UI renders as `false`.
+///
+/// **An unsafe `k·h` step is deliberately NOT refused here** — this path builds through
+/// `load_scenario_allowing_unsafe_step`, preserving the designed split (*library caller →
+/// exception; interactive session → visible diagnostic + objective failure*). See the decision
+/// note in the body; it is the one surface where the `k·dt` family is unguarded, which is a
+/// statement about what a session *is* ("authored ≠ validated": for watching, not for vouching),
+/// not an oversight.
 /// A file-loaded session and the two constants the *file* declares about it. Named (not a
 /// 4-tuple) because `steps` and `has_authored_kinetics` are read back out to GDScript as session
 /// constants and must not be mixed up positionally on the way.
@@ -187,7 +195,34 @@ pub(crate) fn build_session_from_file(
     path: &Path,
     overrides: &BTreeMap<String, f64>,
 ) -> Result<FileSession, SimError> {
-    let built = authoring::load_scenario(path, overrides)
+    // **The study hatch is passed here DELIBERATELY (user decision, multi-rate Step 6).**
+    //
+    // Multi-rate Step 5 put a build-time `k·h < 1` precondition in `authoring::interpret`
+    // — *upstream* of this deliberate split (`docs/authoring-reference.md`): **library
+    // caller → exception; interactive session → visible diagnostic + objective failure.**
+    // "A player should watch the cabin die; an author calling a function gets an
+    // exception." Calling plain `load_scenario` here would refuse an unsafe scenario at
+    // build and the player would never see the cabin — silently narrowing that split,
+    // which was designed when rationing was the only gate.
+    //
+    // So the session path keeps the run: `allow_unsafe_step` exists for **studying** an
+    // unsafe run, and an interactive session watching a regulator diverge *is* that case.
+    // The diagnostic is not lost — `rationed` is in the observation projection,
+    // `SimSession::total_rationed()` is exposed to GDScript, and `objectives_json` scores
+    // a rationed session `no_rationing = false` → `survived = false`.
+    //
+    // **The honest cost, recorded rather than glossed**: this is the one surface where
+    // the `k·dt` family is unguarded, and for the *demand-controlled* `eclss.o2_makeup`
+    // the build check is the only detector there has ever been — rationing structurally
+    // cannot see its near-setpoint oscillation, so an unsafe makeup gain reaches a
+    // session here with **every** diagnostic reading clean. A session is for watching, not
+    // for vouching ("authored ≠ validated"); an author who wants the verdict calls
+    // `run_scenario`.
+    //
+    // The alternative reading — inherit the refusal, since this function *already* rejects
+    // rk4 at build and an unsafe `k·h` is likewise decidable from the file — was live and
+    // is defensible. It was decided, not inherited.
+    let built = authoring::load_scenario_allowing_unsafe_step(path, overrides)
         .map_err(|e| SimError::Validation(format!("authoring: {}", e.message)))?;
     if built.integrator != "euler" {
         return Err(SimError::Validation(format!(
@@ -195,6 +230,27 @@ pub(crate) fn build_session_from_file(
              file-loaded session is single-rate Euler only (rk4 file scenarios are deferred, \
              exactly as two-rate authoring is)",
             built.name, built.integrator
+        )));
+    }
+    // A declared multi-rate cadence needs `multirate_step`, which drives the interpreter's
+    // two-registry partition; `CoreSession::single_rate` drives the whole registry once per
+    // step. Refusing is not a preference — **honouring the file is not among the options
+    // here.** Silently taking the single-rate path would run the graph at the *master*
+    // cadence the author chose precisely because it is unsafe un-sub-stepped (measured on
+    // `eclss_thermal_habitat`: master `dt=3600` single-rate ends at `cabin_o2 = 72.0`
+    // against a truth of 8.0 — diverged, not drifted), i.e. the same file would mean
+    // different things on the two ports. Note this refusal is NOT the precondition: the
+    // hatch above deliberately admits an unsafe *single-rate* file, which is the case the
+    // player is meant to watch.
+    if built.is_multirate() {
+        return Err(SimError::Validation(format!(
+            "godot_bridge: file-loaded scenario {:?} declares a multi-rate cadence \
+             (n_sub={}), but a file-loaded session is single-rate only — a multi-rate \
+             session would need simcore::multirate::multirate_step, not \
+             SimSession::single_rate. Deferred exactly as rk4 file scenarios are. Run it \
+             headless via authoring::run_scenario, or drop 'n_sub'/'rate_class' to load it \
+             here.",
+            built.name, built.n_sub
         )));
     }
     let steps = built.steps;

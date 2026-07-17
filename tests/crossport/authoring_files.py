@@ -162,11 +162,19 @@ def render_graph_dump(built: BuiltScenario) -> str:
     MUST stay byte-identical to Rust `authoring::graph_dump::render_graph_dump`. LF
     newlines; a trailing newline. Floats via `float.hex()` (bit-exact vs the Rust
     hex-float codec).
+
+    **The multi-rate partition (`n_sub` + per-flow rate class) is rendered even though no
+    ANCHOR is multi-rate**, so today those fields are inert (`n_sub 1`, every flow
+    `fast`). They are here *before* the case that needs them, on the multi-rate Step-5
+    lesson: an equality gate is blind to a field absent from **both** sides, so a dump
+    that omitted the partition would diff **green** for a future multi-rate anchor whose
+    two ports lowered *different* partitions.
     """
     lines: list[str] = []
     lines.append(f"scenario\t{built.name}")
     lines.append(
-        f"config\t{built.integrator}\t{built.dt.hex()}\t{built.steps}\t{built.state.rng_seed}"
+        f"config\t{built.integrator}\t{built.dt.hex()}\t{built.steps}\t"
+        f"{built.state.rng_seed}\t{built.n_sub}"
     )
     lines.append(f"has_authored_kinetics\t{1 if built.has_authored_kinetics else 0}")
 
@@ -181,9 +189,14 @@ def render_graph_dump(built: BuiltScenario) -> str:
             f"{stock.extinction_threshold.hex()}\t{comp_str}"
         )
 
-    # Flows — canonical id-sorted registry order, with priority.
+    # Flows — canonical id-sorted registry order, with priority and rate class.
+    # The class is read off the BUILT partition (`slow_registry` membership), never the
+    # spec: what the dump must prove is that both ports *lowered* the same partition —
+    # re-reading the authored key would assert only that both can read YAML.
+    slow_ids = {flow.id for flow in built.slow_registry.flows}
     for flow in built.registry.flows:
-        lines.append(f"flow\t{flow.id}\t{flow.priority}")
+        rate_class = "slow" if flow.id in slow_ids else "fast"
+        lines.append(f"flow\t{flow.id}\t{flow.priority}\t{rate_class}")
 
     # Forcings — name-sorted; the constant value is the schedule at (n=0, dt=0).
     for name in sorted(built.resolver.forcings):

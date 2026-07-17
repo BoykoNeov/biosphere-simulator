@@ -114,6 +114,11 @@ pub fn apply_includes(
         stocks: merger.stocks,
         flows: merger.flows,
         forcings: merger.forcings,
+        // Run config is the scenario's alone — a bundle carries none (its allowed-key set
+        // forbids it), so the cadence passes through the merge untouched. The *rate
+        // classes* of bundle-contributed flows do arrive here, which is exactly why the
+        // partition is read from the POST-merge spec.
+        n_sub: spec.n_sub,
     })
 }
 
@@ -258,6 +263,13 @@ fn namespace_flow(flow: &FlowSpec, prefix: &str) -> Result<FlowSpec, AuthoringEr
         wiring,
         kinetics,
         params: flow.params.clone(),
+        // Carried verbatim — and that is the multi-rate knob's design argument made
+        // concrete. `rate_class` is a **property** of the flow, not an id **reference**,
+        // so namespacing cannot touch it. The rejected alternative (a top-level
+        // `fast: [flow-id, …]` list) would have been a list of id references, i.e. a new
+        // rewrite surface right here that silently mis-fires the moment someone forgets
+        // it.
+        rate_class: flow.rate_class.clone(),
     })
 }
 

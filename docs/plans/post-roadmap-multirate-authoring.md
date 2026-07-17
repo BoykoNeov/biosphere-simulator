@@ -1,13 +1,14 @@
 # Post-roadmap: multi-rate authoring — the author picks a coupling cadence, not a global `dt`
 
-**Status: IN PROGRESS — Steps 1–5 of 7 done.** A **phase, not a step** — an authoring
+**Status: IN PROGRESS — Steps 1–6 of 7 done.** A **phase, not a step** — an authoring
 unfreeze (schema + interpreter + run harness), the Rust mirror, the freeze manifest, and
 the cross-port tiers. **The user opened the unfreeze on 2026-07-17.** The knob is
 decided, built (Step 2), **drives** (Step 3), has **paid off the phase's stated
 motivation** (Step 4 — the scenario `docs/authoring-reference.md` calls *impossible* is
-authored, committed and green), and **the hazard it does not itself close is now closed**
-(Step 5: the build-time `k·h < 1` precondition). No golden has moved and `src/simcore/` is
-untouched. Remaining: the Rust mirror (6) and the unfreeze ceremony (7).
+authored, committed and green), **the hazard it does not itself close is now closed**
+(Step 5: the build-time `k·h < 1` precondition), and **the Rust port is level** (Step 6 —
+including the driver; the Step-6 landmine was decided, not inherited). No golden has moved
+and `src/` is untouched. Remaining: the unfreeze ceremony + the reference-doc narrative (7).
 
 **Step 5 corrected a formula this document specified.** The precondition is **not**
 `k·(dt/n_sub) < 1` for every flow: the slow set steps at **`dt/2`** under Strang,
@@ -351,7 +352,10 @@ surface, not a licence to edit the core.
    (As written this step said "checked as `k·(dt/n_sub) < 1`". **That formula is wrong for
    the slow set and the step corrected it** — left standing here rather than edited away,
    the Step-4 `60×`/`30×` precedent.)
-6. **Rust mirror**, hand-written, then the cross-port tier.
+6. **Rust mirror**, hand-written, then the cross-port tier. ✅ **DONE** — see "Step 6:
+   COMPLETE" below. **The open decision below was DECIDED, not inherited: the user chose
+   the HATCH** (against my recommendation and the advisor's — both argued "refuse"). The
+   arguments on both sides are preserved as written.
 
    **⚠ Step 6 carries an OPEN DECISION it must not inherit silently** (advisor, after
    Step 5). The precondition lives in `interpret` — which is **upstream of the deliberate
@@ -720,6 +724,128 @@ differs, and it decides membership of the slow set.
 **Every committed scenario still builds on the author's default path** (no hatch), pinned
 by `test_the_committed_scenarios_all_pass_the_precondition` — the assertion behind "no
 golden moved", since the risk a *refusal* carries is refusing something that already worked.
+
+## Step 6: COMPLETE — the mirror carries the rule but not the reason
+
+**The port is level with Python.** `rust/crates/authoring` now has `n_sub` + `rate_class`
+(schema), `rate_params` + the 4 rows (registry), the partition / the `n_sub=1`-with-slow
+refusal / `effective_step` / `check_rate_preconditions` / the `allow_unsafe_step` hatch
+(interpreter), and the `multirate_step` driver + aux tripwire (run). `git diff src/` is
+**empty** — the Python reference is untouched, as a consumer phase demands. **No golden
+moved; the manifest did NOT move** (it freezes the *Python* surface, and Step 6 adds no
+Python surface — the Step-3/4 precedent). 16 new Rust pins + 1 migrated; whole Rust suite
+and the 76 cross-port tests green.
+
+**Scope was decided by one fact, checked rather than assumed: no multi-rate scenario is in
+the cross-port parity set.** `eclss_thermal_habitat.yaml` appears in **zero** crossport
+files, and it is Tier-2 (`T**4`) anyway — graph-dump-only by Step 4's own ruling. So no
+trajectory parity vector was minted for it (a measured band is a frozen tolerance, and
+freezing one for a runtime-only authored artifact cuts against "authored ≠ validated").
+**The `multirate_step` driver was mirrored anyway**, for two reasons the parity set does
+not see: without it Rust would *build* a multi-rate scenario it cannot *run*, and if
+`run.rs` ignored `n_sub` it would silently run it single-rate at the master cadence — the
+same file meaning different things on the two ports. And `SLOW_STEP_DIVISOR`'s `dt/2` would
+otherwise be a magic constant with **nothing in Rust actually stepping at `dt/2`** for it
+to track.
+
+**THE FINDING: the mirror carries the RULE but not the RATIONALE, and the difference is a
+latent safety bug.** Step 5's *load-bearing* argument for build time was the **param
+pack** — a pack's values exist only after `interpret` resolves them, so `run_scenario`
+structurally cannot see an inflated gain. **Parameter packs are deferred in the Rust
+port** (`ParamsSpec::Pack` → error, a Phase-9 Step-4b ruling). So:
+
+* Python reads `k` off the **pack-resolved built flow**; Rust reads the **frozen
+  constant** (`flow_registry::frozen_rate_value`) — a `Box<dyn Flow>` exposes no params
+  accessor, and it does not need one *while packs cannot exist*.
+* The precondition's unique-over-rationing value therefore **narrows in Rust to exactly
+  `eclss.o2_makeup`** (the one demand-controlled flow, invisible to the backstop at any
+  `dt`). Everything else it catches, rationing would also catch — earlier, but not
+  uniquely.
+* **The day packs are added to Rust, `frozen_rate_value` becomes a false PASS in the
+  unsafe direction** — reporting the frozen `k` while the flow runs the pack's inflated
+  one. That is the *same shape* Step 5 caught in this plan's own `dt/n_sub` formula, and
+  it would be invisible for exactly the flow the check exists for. Pinned, not commented:
+  `pack_deferral_is_what_makes_the_frozen_rate_read_sound` asserts a pack is still refused
+  and names the remedy. **A deferral in one port became a safety precondition in the
+  other** — the scope-C "the mirror cannot mirror the reason" shape.
+
+**THE OPEN DECISION: decided by the user — the bridge PASSES the hatch.** I recommended
+refusing and so did the advisor; the user chose the hatch, and the plan itself called both
+readings defensible. `build_session_from_file` builds through
+`load_scenario_allowing_unsafe_step`, so the documented split survives **literally**:
+*library caller → exception; interactive session → visible diagnostic + objective failure*
+— "a player should watch the cabin die."
+
+**The cost is recorded rather than glossed, because the losing argument was not weak.** The
+advisor's discriminator, which the plan never named: the bridge already maps every
+`AuthoringError` → `SimError::Validation`, which the UI renders — so refusing would have
+created **no silence**, just an earlier diagnostic. And *"watch the cabin die" is factually
+wrong for what the precondition intercepts*: the `k·h` family yields a **meaningless** run
+(measured: `72.0`, 9× too much O₂, oscillating), not a death. The genuine die cases are
+**state-dependent** rationing (`crew_metabolism`), which declares `rate_params=()`, is
+**not** refused by the precondition, and still runs and dies on the documented path — so
+refusing would have cost nothing the split actually protects. Against that, the hatch's own
+stated purpose *is* "study the unsafe run", and a session watching a regulator diverge is
+that case. **So the honest statement of what was chosen**: `build_session_from_file` is now
+the **one surface where the `k·dt` family is unguarded**, and for the demand-controlled
+`eclss.o2_makeup` an unsafe gain reaches a session with **every diagnostic reading clean**.
+That is defensible as a statement about what a session *is* — for watching, not vouching
+("authored ≠ validated") — and it is a real hole, not a non-issue. Both halves belong in
+the record.
+
+**A second bridge question fell out of the driver mirror, and it is NOT the same
+question.** With `n_sub` mirrored, a multi-rate file reaching the bridge would be *built*
+with its partition and then run **single-rate** by `CoreSession::single_rate` — at the
+master cadence the author chose *precisely because* it is unsafe un-sub-stepped. So the
+bridge refuses a multi-rate file, parallel to the rk4 refusal and for the same reason
+(no such session exists), **not** on precondition grounds. Honouring it was never among
+the options; the alternative to refusing was a silent cross-port divergence.
+
+**The graph dump grew `n_sub` + per-flow rate class — before any anchor needs them.** No
+ANCHOR is multi-rate, so the fields are inert today (`n_sub 1`, every flow `fast`). They
+were added anyway on Step 5's own lesson: **an equality gate is blind to a field absent
+from both sides**, so a dump omitting the partition would diff **green** for a future
+multi-rate anchor whose two ports lowered *different* partitions. Rendered
+**unconditionally** (a field rendered only when multi-rate is a field the diff cannot see
+in the case that matters) and read off the **built partition**, never the spec — what the
+dump must prove is that both ports *lowered* the same partition; re-reading the authored
+key would assert only that both can read YAML. The format is a parity contract, so both
+sides moved in lockstep; the 76 cross-port tests are the proof.
+
+**The routing branch is pinned BEHAVIORALLY, because Rust has no monkeypatch.** Python
+pins it by monkeypatching `multirate_step` to raise. Rust has no such seam — so the pin
+uses **aux** as the observable: `step_report` advances `State.aux`, `multirate_step`
+deliberately never does (P2), so a hand-built single-rate aux graph that runs with its
+accumulator **frozen** proves the branch leaked. Mutation-checked: leaking the branch turns
+`a_single_rate_scenario_never_touches_the_driver` red. Arguably stronger than the
+monkeypatch — it detects the *consequence*, not the call. This is also the second
+independent argument for the aux tripwire living in `run.rs`: `interpret` never wires
+`aux_processes`, so a hand-built `BuiltScenario` is the *only* way to reach it, and in
+`interpret` the guard would be unreachable and untestable both.
+
+**Every pin was mutation-checked** (the Step-5 discipline). Reverting `effective_step` to
+this plan's `dt/n_sub` formula turns **3 red**, including
+`a_slow_flow_is_judged_at_dt_over_2_not_the_plans_formula` with exactly the right message
+("must be refused, not passed at 0.06"). Leaking the routing branch turns **2 red**.
+
+**The `dt`-hazard migration repeated on the Rust side, and it is the evidence the closer
+works**: 2 committed Rust pins asserted the *run-time* rationing verdict at `dt=3600` and
+**could no longer construct their own subject**. They adopted the hatch (the Python
+`_build_at` precedent — keeping them pointed at the run-time gate rather than silently
+becoming duplicate build-check tests), and the new stage got its own test. One honest port
+difference surfaced there: the hatch is discoverable *by its Rust name*
+(`interpret_allowing_unsafe_step`, the no-default-args idiom), not Python's
+`allow_unsafe_step=True` kwarg — the message text is explicitly not a parity target, so
+each port names its own API.
+
+**A self-inflicted hazard worth recording**: a bare `cargo fmt` reformatted the **entire**
+Rust tree (rustfmt 1.8.0 against a tree formatted by an older version), touching simcore /
+domains / station — none of it needed, since **there is no CI fmt gate** (`cargo test` +
+`cargo clippy -D warnings` are the Rust gates). It was fully reverted, including the
+fmt-only hunks *inside* the files this step legitimately edits, so the diff is exactly the
+change. On a repo with a frozen core, a formatter run is not a no-op: it is an unreviewed
+edit to files the purity invariant says this phase must not touch. Use `rustfmt <file>` on
+new files; never bare `cargo fmt`.
 
 ## The measurements this rests on
 

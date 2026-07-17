@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use authoring::interpreter::interpret;
+use authoring::interpreter::{interpret, interpret_allowing_unsafe_step};
 use authoring::schema::ScenarioSpec;
 use authoring::yaml::parse_document;
 use authoring::{
@@ -34,6 +34,14 @@ fn interpret_str(yaml: &str) -> Result<BuiltScenario, authoring::AuthoringError>
     let doc = parse_document(yaml)?;
     let spec = ScenarioSpec::from_yaml(&doc)?;
     interpret(&spec, Path::new("."), &no_overrides())
+}
+
+/// [`interpret_str`] with the build-time rate precondition disabled — for fixtures whose
+/// whole subject is the unsafe step (the `dt`-hazard block below).
+fn interpret_str_allowing_unsafe_step(yaml: &str) -> Result<BuiltScenario, authoring::AuthoringError> {
+    let doc = parse_document(yaml)?;
+    let spec = ScenarioSpec::from_yaml(&doc)?;
+    interpret_allowing_unsafe_step(&spec, Path::new("."), &no_overrides())
 }
 
 #[test]
@@ -682,7 +690,23 @@ fn param_pack_on_a_frozen_type_is_deferred() {
 /// test's "mutate a parsed copy of the one committed file" approach — so the *only*
 /// difference that matters stays unmissable, and neither port ships a near-duplicate
 /// hazard fixture that could drift from the anchor.
+///
+/// **The study hatch is passed deliberately** (multi-rate Step 6, mirroring Python's
+/// `_build_at`). Step 5 added a **build-time** `k·h < 1` precondition, which refuses
+/// `dt = 3600` before a single step runs — so the hazard is now caught **twice, at two
+/// different stages**. Disabling the build check is what keeps the tests below pointed at
+/// the *run-time* `Rationed` verdict they were written to pin, instead of silently
+/// becoming duplicate tests of the build check. The new stage has its own test:
+/// `the_build_now_refuses_the_unsafe_dt_before_any_step_runs`.
 fn eclss_anchor_at(dt: &str, steps: &str) -> BuiltScenario {
+    interpret_str_allowing_unsafe_step(&eclss_anchor_yaml_at(dt, steps))
+        .expect("interpret the retargeted anchor")
+}
+
+/// The retargeted anchor's YAML text — split out from [`eclss_anchor_at`] so the
+/// build-refusal test can drive the **author's default path** (no hatch) over the exact
+/// same bytes the run-time tests use.
+fn eclss_anchor_yaml_at(dt: &str, steps: &str) -> String {
     let text = std::fs::read_to_string(scenarios_dir().join("eclss_cabin.yaml"))
         .expect("read eclss_cabin.yaml");
     let retargeted = text
@@ -692,7 +716,7 @@ fn eclss_anchor_at(dt: &str, steps: &str) -> BuiltScenario {
         retargeted.contains(&format!("dt: {dt}")),
         "the anchor's `dt: 60.0` line moved — this helper is silently a no-op now"
     );
-    interpret_str(&retargeted).expect("interpret the retargeted anchor")
+    retargeted
 }
 
 #[test]
@@ -702,6 +726,53 @@ fn at_the_frozen_dt_the_backstop_never_fires() {
     let result = run_scenario(eclss_anchor_at("60.0", "900")).expect("run at the sized dt");
     assert_eq!(result.total_rationed, 0);
     assert!(result.events.is_empty());
+}
+
+#[test]
+fn the_build_now_refuses_the_unsafe_dt_before_any_step_runs() {
+    // The stage that did not exist when this file was written (multi-rate Step 5, now
+    // mirrored). The author's natural call is `interpret` WITHOUT the study hatch, and it
+    // refuses: k_scrub * 3600 = 3.6 >= 1 is decidable from the params + dt alone, so
+    // there is no reason to make an author spend a long run to learn it.
+    //
+    // This is why every other test in this block passes the hatch: the run-time gate they
+    // pin is now UNREACHABLE by an author's default path. Both gates are kept because
+    // they catch different populations — the build check sees the demand-controlled
+    // `eclss.o2_makeup` that rationing structurally cannot see at any dt; the run-time
+    // one sees the state-dependent over-draws (crew_metabolism's forced draw) that no
+    // build check can decide. **Neither subsumes the other.**
+    //
+    // Matched rather than `expect_err`: `BuiltScenario` is deliberately not `Debug` (the
+    // `RunResult` precedent — deriving it on a reference type to prettify a test
+    // assertion is the tail wagging the dog).
+    let err = match interpret_str(&eclss_anchor_yaml_at("3600.0", "15")) {
+        Ok(_) => panic!("an unsafe k*h must be refused at build on the author's default path"),
+        Err(e) => e,
+    };
+
+    // Structural, NOT Rationed — this verdict IS decidable from the file alone, which is
+    // the whole difference between the two stages. (Contrast the run-time gate below,
+    // where the identical file at dt=60 is perfectly valid.)
+    assert_eq!(err.kind, authoring::ErrorKind::Structural);
+    assert!(
+        err.message.contains("co2_scrub_rate"),
+        "the offending param must be named: {}",
+        err.message
+    );
+    assert!(
+        err.message.contains("3.6"),
+        "the k*h value must be named: {}",
+        err.message
+    );
+    // The hatch must be discoverable from the message — but by its RUST name. Python's is
+    // the kwarg `allow_unsafe_step=True`; Rust has no default arguments, so the hatch is
+    // a separate function (the `run_scenario_allowing_rationing` idiom). The message text
+    // is explicitly not a parity target (`crate::errors`), so each port names its own API.
+    assert!(
+        err.message.contains("interpret_allowing_unsafe_step"),
+        "the study hatch must be discoverable: {}",
+        err.message
+    );
 }
 
 #[test]
