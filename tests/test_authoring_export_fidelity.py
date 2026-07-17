@@ -50,6 +50,7 @@ from authoring.interpreter import interpret
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from simcore.ids import StockId
 
 SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
@@ -200,7 +201,7 @@ def test_a_forced_flow_is_exactly_dt_invariant() -> None:
     for dt in (1.0, 60.0, 300.0):
         steps = int(duration / dt)
         states, _r, _e = run_scenario(_full_cabin(dt, steps, 20.0))
-        sink = states[-1].stocks["boundary.metabolic_o2_sink"].amount
+        sink = states[-1].stocks[StockId("boundary.metabolic_o2_sink")].amount
         assert sink == pytest.approx(expected, rel=1e-9), f"dt={dt}"
 
 
