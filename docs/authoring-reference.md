@@ -338,14 +338,22 @@ frozen rate constant was sized against the `dt` of *its own frozen scenario*, an
 sizing is part of the flow's positivity argument — but it lives in a YAML comment, not in
 the code. Selecting a flow type hands you the `dt` knob with no guard attached.
 
-| flow | constraint | frozen sizing | breaks at |
-|---|---|---|---|
-| `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** |
-| `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** |
-| `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** |
-| `eclss.crew_metabolism` | forced draw < stock | `0.004·60 = 0.24` of 10 mol | `0.004·3600 = 14.4` of 10 mol |
-| `power.self_discharge` | `k·dt < 1` | `dt = 3600` → `3.6e-5` | `dt ≈ 1e8` s (~3 yr) |
-| `thermal.radiator_reject` | `τ = C/(4εσA·T_eq³) ≫ dt` | `dt = 3600` → `τ ≈ 65` steps | a much larger `dt` overshoots |
+| flow | constraint | frozen sizing | breaks at | caught by |
+|---|---|---|---|---|
+| `eclss.co2_scrubber` | `k_scrub·dt < 1` | `dt = 60` → `0.06` | `dt = 3600` → **3.6** | rationing |
+| `eclss.condenser` | `k_cond·dt < 1` | `dt = 60` → `0.03` | `dt = 3600` → **1.8** | rationing |
+| `eclss.o2_makeup` | `k_makeup·dt < 1` | `dt = 60` → `0.12` | `dt = 3600` → **7.2** | **nothing** — see below |
+| `eclss.crew_metabolism` | forced draw < stock | `0.004·60 = 0.24` of 10 mol | `0.004·3600 = 14.4` of 10 mol | rationing |
+| `power.self_discharge` | `k·dt < 1` | `dt = 3600` → `3.6e-5` | `dt ≈ 1e8` s (~3 yr) | rationing |
+| `thermal.radiator_reject` | `τ = C/(4εσA·T_eq³) ≫ dt` | `dt = 3600` → `τ ≈ 65` steps | a much larger `dt` overshoots | — |
+
+**The `o2_makeup` row is not like the others, and its `< 1` means something different.**
+Every other row is **donor-controlled** or forced: the draw is `k·dt·stock`, so at `k·dt > 1`
+it demands more than the whole stock, the backstop must scale it, and `run_scenario` raises.
+Those bounds are *enforced*. `eclss.o2_makeup` is the registry's only **demand-controlled**
+flow — its draw is `k·dt·(setpoint − stock)`, proportional to the **error**, not the stock.
+Near the setpoint that draw is small no matter how large `k·dt` is, so it **never over-draws
+and the backstop never fires**. Its `< 1` is honoured by the author or not at all.
 
 **The composability constraint** falls straight out of that table, and it is not derivable
 from any single flow: **ECLSS is sized for `dt = 60`; Thermal for `dt = 3600`.** A scenario
@@ -396,7 +404,11 @@ escapes that scope**.
 *before* running rather than after, but it is only a partial detector (it cannot see
 `eclss.crew_metabolism`, whose failure is `forcing·dt > stock`, not `k·dt > 1`, nor any
 coupled multi-flow dynamic), and it would live in the **frozen registry**, so it is an
-unfreeze with its own ceremony. Also deferred: **per-flow attribution** in the error (the
+unfreeze with its own ceremony. **It must cover `eclss.o2_makeup`, where it would be the
+*only* protection** rather than an earlier one — see "the hazard rationing cannot see"
+below; reading that row as "already covered by rationing" is the mistake to avoid. And if
+multi-rate is ever authorable, the precondition must check the **effective sub-step**
+(`dt/n_sub`), never the master `dt`. Also deferred: **per-flow attribution** in the error (the
 message names the count and `dt`, not *which* flow rationed — `StepReport.rationed` is a
 bare count, and widening it is a `simcore` change), and an author-facing **run CLI** /
 Godot banner (there is no run CLI today; `run_scenario` is the top of the **library** run
@@ -410,12 +422,69 @@ exposed to GDScript, and `objectives_json` scores a rationed session
 session → visible diagnostic + objective failure.** A player should watch the cabin die;
 an author calling a function gets an exception.
 
-The same scoping bites one other place, mildly: `eclss.o2_makeup` is a *linear, unclamped*
-proportional controller. Its frozen docstring notes an above-setpoint venting clamp is "a
-deferred seam that never arises here" — true of every frozen scenario, but an author can
-wire `cabin_o2` above the `10.0 mol` setpoint, at which point the rate goes negative and
-the flow silently **reverses** (venting cabin O₂ back into the supply tank). It conserves
-and it does not ration; it is simply not what "makeup" suggests.
+### `eclss.o2_makeup` — the hazard rationing cannot see (post-roadmap, measured)
+
+The same scoping bites `eclss.o2_makeup`, and **not mildly**. This section used to call it
+mild; measuring it (`tests/test_authoring_export_fidelity.py`) showed otherwise, and the
+reason it is worse is the reason it is *invisible*.
+
+**The reversal is real, and it is the harmless half.** `eclss.o2_makeup` is a *linear,
+unclamped* proportional controller. Its frozen docstring notes an above-setpoint venting
+clamp is "a deferred seam that never arises here" — true of every frozen scenario, but an
+author can wire `cabin_o2` above the `10.0 mol` setpoint, at which point the rate goes
+negative and the flow **reverses**, venting cabin O₂ back into the supply tank (measured:
+wired at `20.0`, step 1 moves `−1.2 mol` cabin → tank). It conserves, it does not ration;
+it is simply not what "makeup" suggests. **Do not "fix" this with a clamp**: the symmetry
+IS the restoring force — `o2_eq = o2_setpoint − Con_o2/k_makeup` is an attractor from both
+sides only because the controller is linear, and clamping would trade a clean geometric
+contraction for a piecewise nonlinearity. The reversal is correct P-control.
+
+**The harmful half is the oscillation, and `k·dt < 1` is what stands between you and it.**
+The textbook stability bound of a proportional controller is `k·dt < 2`, not `< 1` — so it
+is tempting to read the table's `< 1` as over-conservative and relax it. **Do not.** The
+band between them is where this platform gets hurt:
+
+| `k_makeup·dt` | dt | exported `cabin_o2` | rationed | verdict |
+|---|---|---|---|---|
+| `0.12` | 60 | `20 → 18.6 → 17.3 …` monotone | 0 | the frozen dt; export-clean |
+| `1.80` | 900 | `12 → 8.4 → 11.28 → 8.976 → 10.8` | **0** | converges — **exports oscillation** |
+| `2.00` | 1000 | `12 → 8 → 12 → 8 …` **forever** | **0** | undamped; never converges |
+| `2.40` | 1200 | `12 → 7.2 → 13.9 → 4.51 → 17.7 → 0` | 2 | diverges → finally caught |
+
+`1 ≤ k·dt < 2` reaches the **correct equilibrium** — so an endpoint check passes,
+conservation passes, and `rationed == 0`. Only the *intermediates* are wrong. In a coupled
+station those intermediates are **exported to neighbouring domains every step**, and a
+neighbour reading `cabin_o2` sees oxygen sloshing ±20 % that no real cabin does. Converging
+to the right answer eventually does not license exporting wrong answers on the way — which
+is why **`k·dt < 1` (monotonicity) is the operative bound here, not `k·dt < 2` (stability)**.
+`< 2` answers "does the solver diverge". `< 1` answers "is the exported trajectory usable by
+a neighbour". This project couples domains, so `< 1` governs.
+
+**Why no gate sees it — the transferable part.** Rationing detects **large excursions that
+over-draw**. It is structurally blind to **near-setpoint oscillation that stays positive**,
+because a demand-controlled draw shrinks as it approaches the setpoint. The `dt` fix above
+taught *mass conservation is not survival*; this teaches the next one:
+**`rationed == 0` does not mean the exported trajectory is right.**
+
+**The full cabin is protected only by coincidence** — `k_scrub·dt = 1` and `k_makeup·dt = 2`
+both land at `dt = 1000`, so the *scrubber's* gate usually fires first and hides the makeup
+loop's own cliff. At `dt = 1000` exactly the scrub draw *equals* the stock rather than
+exceeding it, nothing rations, and the measured cabin swings **12 ↔ 4 mol forever** while
+`o2_supply` drains past **−800 mol** — reported as a clean, conserving, unrationed run. An
+author who registers `eclss.o2_makeup` *without* a scrubber never had that coincidence at all.
+
+**This corrects the deferred build-time precondition named above:** a `k·dt < 1` check is
+the right bound for the donor-controlled rows *and* for `o2_makeup` — but for opposite
+reasons (over-draw vs export fidelity), and only `o2_makeup`'s is otherwise unenforced. A
+precondition that skipped `o2_makeup` as "already covered by rationing" would be wrong.
+
+**None of this is a bug in the frozen flow.** The continuous law `dx/dt = k(S − x)` is
+unconditionally stable — it decays to `S` from anywhere and cannot oscillate. The
+oscillation is **explicit Euler failing to track a stable equation at too large a step**: a
+solver property, not a physics one. The model reproduces its own closed-form solution with
+textbook first-order error (halve `dt`, halve the error — pinned), and at `k·dt = 1` it hits
+the analytic *deadbeat* prediction exactly (`12 → 10 → 10 → 10`). Reworking the kinetics
+would be fixing the wrong layer.
 
 ### Templates — the boundary's arithmetic (decision A, as amended)
 
