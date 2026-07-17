@@ -73,10 +73,14 @@ demands.
 
 **Multi-rate is the performance enabler, not the hazard closer** (advisor, this session).
 `multirate_step` splits one master `dt` into `dt/n_sub`. An author can still choose an
-`n_sub` whose **effective sub-step** is unsafe — the identical hazard, one level down. The
-direct closer remains the deferred **build-time precondition**, and multi-rate *changes what
-it must check*: the **effective sub-step `dt/n_sub`**, never the master `dt`. The two are
-complementary; shipping multi-rate does not retire the guard, it complicates it.
+`n_sub` whose **effective sub-step** is unsafe — the identical hazard, one level down
+(**measured**: `n_sub=2` at `dt=3600` gives `36.0` against a truth of `8.0`). The direct
+closer is the **build-time precondition**, and multi-rate *changes what it must check*: the
+**effective sub-step `dt/n_sub`**, never the master `dt`.
+
+**→ So the precondition FOLDS INTO this phase (user decision, 2026-07-17): the whole `k·dt`
+family.** See "The precondition" below. Without it this phase would ship a knob that reads
+as safety while the hazard is unchanged.
 
 **It costs accuracy versus single-rate RK4, and the honest framing matters.** From
 `simcore/multirate.py`'s own contract: Lie is globally 1st-order; Strang is 2nd-order *only
@@ -192,6 +196,48 @@ Says *"Reduce dt and re-run"*. Under multi-rate the honest advice is **"increase
 reduce `dt`"** — the message is part of the fix, since it is what an author reads at the
 moment they hit the hazard.
 
+## The precondition — DECIDED: the whole `k·dt` family (user, 2026-07-17)
+
+Offered as minimal (`o2_makeup` alone — my recommendation and the advisor's) vs the whole
+family vs defer. **The user chose the whole family**, on the uniformity argument: *"the
+platform checks `k·dt` for any flow that declares a rate constant"* is a rule an author can
+hold in their head; *"`o2_makeup` is special"* is trivia they will forget. It also moves the
+error from **run time to build time** for the other three — the author learns before a long
+run, not after.
+
+A new **optional** `rate_params` field on `FlowTypeSpec` names which of a flow type's params
+are first-order rate constants. The interpreter checks `k · (dt/n_sub) < 1` for each, at
+build time, from the **pack-resolved** params object it already holds — so a param **pack**
+that inflates a gain is caught too, which only a build check can do. Transcendental-free
+(`+ − × <`) ⇒ the Rust mirror is byte-safe.
+
+| flow type | `rate_params` | today at its frozen `dt` |
+|---|---|---|
+| `eclss.co2_scrubber` | `co2_scrub_rate` | `1e-3 · 60 = 0.06` |
+| `eclss.condenser` | `condense_rate` | `5e-4 · 60 = 0.03` |
+| `eclss.o2_makeup` | `o2_makeup_gain` | `2e-3 · 60 = 0.12` — **the one rationing cannot see** |
+| `power.self_discharge` | `self_discharge_rate` | `1e-8 · 3600 = 3.6e-5` |
+
+**The field names are the real ones, checked** — `k_scrub`/`k_cond` are only the docs'
+shorthand; the dataclass fields are `co2_scrub_rate` / `condense_rate`. `EclssParams` also
+carries **`o2_setpoint`, which is NOT a rate** and must never be checked — which is exactly
+why `rate_params` is an explicit declaration and not "every float on the params object".
+
+**What it honestly CANNOT cover — document, do not fake:**
+
+* `thermal.radiator_reject` — the constraint is `τ = C/(4εσA·T_eq³) ≫ dt`. **"≫" is not a
+  predicate**; making it one means inventing a safety factor the science does not supply.
+* `eclss.crew_metabolism` — `forced draw < stock` is **state-dependent**, not param-only. A
+  build check sees only the *initial* amount, so it is necessary-not-sufficient. Rationing
+  catches it at run time; that stays its guard.
+* **authored `kinetics`** — structurally uncheckable: the author wrote the rate law, so the
+  platform cannot know its constant. This is exactly decision B's "authored ≠ validated"
+  boundary, not a gap to be closed.
+
+So the precondition's honest claim is **"the platform catches the `k·dt` family"**, never
+"your `dt` is safe". The **general** precondition stays deferred — a research problem, not a
+consumer-phase task.
+
 ## The golden-preservation argument — why this need not move a single golden
 
 `multirate_step`'s own contract: *"With `n_sub == 1` and an **empty** slow registry, a
@@ -255,7 +301,7 @@ oscillating divergence is simply at a different point. Both are the same broken 
 | `authoring/schema.py` | the partition + `n_sub` knob | **authoring unfreeze** |
 | `authoring/interpreter.py` | build two disjoint registries over one stock dict | **authoring unfreeze** |
 | `authoring/run.py` | drive `multirate_step`; sum `rationed` across sub-ops | **authoring unfreeze** |
-| `authoring/flow_registry.py` | only if the precondition folds in | **authoring unfreeze** |
+| `authoring/flow_registry.py` | `rate_params` on `FlowTypeSpec` + 4 rows — the precondition **folds in** | **authoring unfreeze** |
 | `docs/authoring-reference.manifest.json` | regenerate; the git-visible record | manifest |
 | `rust/crates/authoring` | the hand-mirrored port | native-port tolerance contract |
 | `tests/crossport/tiers.json` | a multi-rate anchor, if one is added | cross-port tiers |
@@ -278,7 +324,9 @@ surface, not a licence to edit the core.
 4. **The composability anchor**: an authored Thermal+ECLSS scenario at master `dt = 3600`
    with ECLSS fast (`n_sub = 60`) — the scenario the reference currently calls impossible.
    Conservation + determinism, `rationed == 0`, and the exported `cabin_o2` monotone.
-5. **The effective-sub-step precondition** (or an explicit deferral, recorded by name).
+5. **The effective-sub-step precondition** — **folded in** (user, the whole `k·dt` family):
+   `rate_params` on `FlowTypeSpec`, checked as `k·(dt/n_sub) < 1` at build time. The three
+   uncoverable shapes documented by name, not faked.
 6. **Rust mirror**, hand-written, then the cross-port tier.
 7. **Regenerate the authoring manifest**; document; unfreeze ceremony per
    `docs/authoring-reference.md`, "The unfreeze discipline".
