@@ -132,6 +132,22 @@ ANCHORS: tuple[tuple[str, dict[str, float], str | None, int], ...] = (
     # dump already proves its wiring on both ports, and it is the same `env.get(n)*dt`
     # shape as power.load_draw, which IS bit-checked in power_bus.
     ("thermal_node.yaml", {}, None, 2),
+    # --- Multi-rate Step 6: THE MULTI-RATE ANCHOR ---
+    # The only anchor that declares a coupling cadence, and the reason the graph dump's
+    # `n_sub` + rate-class columns are not two constants being compared to each other.
+    # Master dt = 1800 / n_sub = 30 (fast h = 60 s — ECLSS's frozen sizing), with
+    # `eclss.condenser` slow (h = dt/2 = 900 s — Strang, NOT dt/n_sub). Pure ECLSS ⇒
+    # transcendental-free ⇒ **Tier 1**, which is the whole point of preferring it to the
+    # obvious candidate: `eclss_thermal_habitat.yaml` is Tier-2 (`T**4`), so it could
+    # only ever be graph-dump-covered, leaving the multi-rate DRIVER uncompared across
+    # ports. Here both gates bite, so `run_multirate` (Rust) and `_run_multirate`
+    # (Python) are finally compared to *each other* — until this row, each port only
+    # pinned its own. `eclss.cabin_h2o` is shared across the rate-class boundary, so the
+    # Strang operators do not commute and a mis-lowered partition is a ~29 % trajectory
+    # divergence, not a rendering nit (measured:
+    # tests/test_authoring_multirate_crossport_anchor.py). No golden — no frozen
+    # scenario runs ECLSS multi-rate, so there is nothing to be byte-identical to.
+    ("eclss_multirate_cabin.yaml", {}, None, 1),
     # The three new param sets reached through authored `kinetics` — the OTHER surface a
     # registered loader opens, and the one with a cross-port hazard the frozen-`type`
     # anchors cannot see: Python DERIVES the param key names via asdict(); Rust pins
@@ -163,12 +179,15 @@ def render_graph_dump(built: BuiltScenario) -> str:
     newlines; a trailing newline. Floats via `float.hex()` (bit-exact vs the Rust
     hex-float codec).
 
-    **The multi-rate partition (`n_sub` + per-flow rate class) is rendered even though no
-    ANCHOR is multi-rate**, so today those fields are inert (`n_sub 1`, every flow
-    `fast`). They are here *before* the case that needs them, on the multi-rate Step-5
-    lesson: an equality gate is blind to a field absent from **both** sides, so a dump
-    that omitted the partition would diff **green** for a future multi-rate anchor whose
-    two ports lowered *different* partitions.
+    **The multi-rate partition (`n_sub` + per-flow rate class) is rendered for every
+    anchor, inert or not.** These fields were added *before* any anchor was multi-rate,
+    on the multi-rate Step-5 lesson: an equality gate is blind to a field absent from
+    **both** sides, so a dump that omitted the partition would diff **green** for a
+    multi-rate anchor whose two ports lowered *different* partitions.
+    `eclss_multirate_cabin.yaml` is now that anchor (`n_sub 30`, `eclss.condenser`
+    slow), so the columns are live — but they stay rendered unconditionally, because a
+    field rendered only in the interesting case is a field the diff cannot see when it
+    matters.
     """
     lines: list[str] = []
     lines.append(f"scenario\t{built.name}")

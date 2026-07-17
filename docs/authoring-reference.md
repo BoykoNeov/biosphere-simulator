@@ -611,7 +611,19 @@ The contract is earned by Steps 0–6c (full detail + measured results in the pl
   YAML-significant. It is sized so the battery actually drains (the monod factor slides
   0.667 → 0.226) — an earlier draft was inert and the crossport suite passed anyway,
   which is worth remembering: **a dead anchor is trivially bit-exact.**
-- **The interpreter is faithful** — the fourteen crossport anchor runs
+- **The multi-rate partition is cross-port** — `eclss_multirate_cabin.yaml` (multi-rate
+  Step 6b) is the one anchor that declares a coupling cadence, so it is the only place the
+  two ports are compared on a **partition** rather than on a single-rate graph. It is pure
+  ECLSS *deliberately*: the obvious candidate (`eclss_thermal_habitat.yaml`) is Tier-2
+  (`T**4`) and could only ever be graph-dump-covered, and **the graph dump cannot see a
+  mis-*driven* partition — only a mis-*rendered* one** (measured: forcing the Rust driver
+  to split Lie leaves the dump green and turns the run red). Its teeth are the fast/slow
+  **shared stock** (`eclss.cabin_h2o`): the Strang operators do not commute, so dropping
+  its single `rate_class: slow` key moves the trajectory ~29 %. Before it existed, mutating
+  the Rust interpreter to lower an all-fast partition left **the whole crossport suite
+  green**. The partition there is a fixture device, not a sizing claim — see the file's
+  header and "Frozen is not calibrated".
+- **The interpreter is faithful** — the fifteen crossport anchor runs
   (`tests/crossport/authoring_files.py::ANCHORS`, the authoritative live list), including
   an authored crew run **byte-identical to the frozen `crew_state.json`** — via a bare
   file, via a template at its default, and via a single-bundle `include` — and, since

@@ -1,0 +1,222 @@
+# THE MULTI-RATE CROSS-PORT ANCHOR (multi-rate Step 6) — the first file in ANCHORS that
+# declares a coupling cadence, and the only one whose two ports must agree on a PARTITION.
+#
+# Until this file existed, `tests/crossport/authoring_files.py::ANCHORS` held no multi-rate
+# scenario, so:
+#   * the graph dump's `n_sub` + per-flow rate-class columns rendered INERT on both sides
+#     (`n_sub 1`, every flow `fast`) — an equality gate comparing two constants;
+#   * `authoring::run_multirate` (Rust) and `authoring.run._run_multirate` (Python) had
+#     never been compared to each other AT ALL. Each port pinned its own driver; nothing
+#     pinned that they agree.
+# Both holes are the same shape as the one Step 6's own near-miss review caught (the Rust
+# driver had zero trajectory coverage while the suite was green): a surface that is
+# PRESENT but never EXERCISED where it matters. This file exercises it.
+#
+# WHY THIS FILE RATHER THAN eclss_thermal_habitat.yaml, the obvious candidate: that one is
+# TIER 2 (`thermal.radiator_reject` evaluates T**4), so by the project's tiering rule it is
+# excluded from the bit-exact RUN comparison and could only ever be graph-dump-covered —
+# which leaves the multi-rate DRIVER uncompared, i.e. the half that matters most. This
+# graph is pure ECLSS: `+ - *` only, no transcendental anywhere on the reachable per-step
+# path, so it is TIER 1 and both cross-port gates bite.
+#
+# THE PARTITION IS A FIXTURE DEVICE, NOT A SIZING CLAIM — read this before copying it.
+# `eclss.condenser` is declared `slow` because it is ECLSS's slowest loop (tau = 1/k_cond =
+# 2000 s, 2x the scrubber's and 4x the regulator's), which makes it the least arbitrary
+# choice available — but ECLSS's four flows are all the same order, so there is no honest
+# two-timescale story here the way there is in eclss_thermal_habitat (ECLSS vs Thermal).
+# The property under test is PARITY, not physics: does each port lower the same partition
+# and drive the same trajectory. The `param_sets_dsl.yaml` precedent ("deliberately
+# nonsense physics — the property under test is param resolution") applies verbatim.
+#
+# And the partition is *measurably* bad physics, which is exactly what gives this anchor
+# its teeth. `eclss.cabin_h2o` is THE ONE STOCK SHARED ACROSS THE RATE-CLASS BOUNDARY (fast
+# crew_metabolism pours in; slow condenser draws down), so the Strang operators here do NOT
+# commute — unlike eclss_thermal_habitat, whose two domains share no stock and indeed no
+# quantity, making its splitting error exactly zero. Consequence, and it is the point:
+#
+#   * declared slow (this file):    cabin_h2o settles at ~2.84e-02 kg
+#   * declared fast (single-rate):  cabin_h2o settles at  4.00e-02 kg = P_h2o/k_cond
+#
+# ~29 % apart. So a port that mis-classified this flow — or threaded `n_sub` differently,
+# or split at `dt` instead of `dt/2` — does not drift; it lands somewhere else entirely,
+# and `test_rust_authoring_run_matches_python` goes red. That is a stronger gate than the
+# graph dump alone, which would catch a mis-rendered class but not a mis-DRIVEN one. (The
+# numbers above are stated as the measured outcome, not as algebra to trust: they are
+# asserted in tests/test_authoring_multirate_crossport_anchor.py.)
+#
+# A red here is a PORT FINDING, never a reason to retune this file. The two ports lowering
+# different partitions is the defect this anchor exists to surface.
+#
+# THE SIZING satisfies the Step-5 build-time precondition on BOTH rate classes at once,
+# which is itself part of what is being anchored (a cross-port disagreement about the
+# effective step would show up as one port refusing to build):
+#   * fast set: h = dt/n_sub = 1800/30 = 60 s — exactly eclss_cabin.yaml's load-bearing dt,
+#     the frozen sizing. k_scrub*h = 0.06, k_makeup*h = 0.12. Both << 1.
+#   * slow set: h = dt/2 = 900 s — Strang steps the slow set at dt/2 regardless of n_sub
+#     (multi-rate Step 5's finding; the divisor is `interpreter._effective_step` and is
+#     coupled to `run._SPLIT`). k_cond*h = 0.45 < 1. Deliberately NOT the 3600/60 cadence of
+#     eclss_thermal_habitat, which would put the condenser at k*h = 0.90 — legal, but at
+#     90 % of the bound for no gain in what this file proves.
+#   * steps = 48 master steps at dt = 1800 = 86400 s = 1 day = ~43 tau of the slowest loop,
+#     so every pool is at its steady state by the end and none of them is where it started
+#     (cabin_o2 10.0 -> 8.0; cabin_co2 0.0 -> 3.0; cabin_h2o 0.0 -> ~0.028). A DEAD ANCHOR
+#     IS TRIVIALLY BIT-EXACT — the monod_dsl.yaml lesson, applied deliberately here.
+#
+# NO GOLDEN, and not for want of trying: no frozen scenario runs ECLSS multi-rate, so there
+# is nothing to be byte-identical TO. Run-match + graph-dump carry the parity, as they do
+# for the other seven golden-less anchors. Nothing here is frozen or reference: a runtime
+# authored artifact (Phase-9 decision B), and every eclss.yaml param it leans on is a
+# DESIGN placeholder, not a calibrated number. "Authored != validated"
+# (docs/authoring-reference.md).
+#
+# THE STOCKS ARE eclss_cabin.yaml's, unchanged, including the trap in its header: the cabin
+# pools are SINGLE-QUANTITY. Annotating cabin_co2 as {carbon: 1, oxygen: 2} would break
+# OXYGEN balance on crew_metabolism and surface as a runtime ConservationError — the
+# interpreter's build-time stoichiometry check covers authored `kinetics` flows only, never
+# frozen `type` flows.
+#
+# All floats carry an explicit decimal point (2.0e-5, not 2e-5): yaml.safe_load uses the
+# YAML-1.1 float resolver, under which a dotless exponent parses as a *string*.
+name: eclss_multirate_cabin
+integrator: euler
+dt: 1800.0        # THE COUPLING CADENCE — what a neighbour would see, not what ECLSS solves at
+n_sub: 30         # the fast set sub-steps at dt/n_sub = 60 s (ECLSS's frozen sizing)
+steps: 48         # 1 day ~ 43 tau of the slowest loop (H2O) — every pool reaches steady state
+rng_seed: 0
+
+stocks:
+  # The three cabin-air POOLs. cabin_o2 starts AT the setpoint (the regulator idles) and the
+  # crew draw pulls it down to o2_eq = 8.0; CO2/H2O start at 0 (a clean cabin). No
+  # `composition` — see the header.
+  - id: eclss.cabin_o2
+    domain: eclss
+    quantity: oxygen
+    kind: pool
+    amount: 10.0          # == the frozen o2_setpoint
+  - id: eclss.cabin_co2
+    domain: eclss
+    quantity: carbon
+    kind: pool
+    amount: 0.0
+  # THE ONE STOCK SHARED ACROSS THE RATE-CLASS BOUNDARY: fast crew_metabolism pours in, slow
+  # condenser draws down. This is what makes the Strang operators non-commuting here, and
+  # what makes a mis-lowered partition a visible trajectory divergence rather than a
+  # rendering nit.
+  - id: eclss.cabin_h2o
+    domain: eclss
+    quantity: water
+    kind: pool
+    amount: 0.0
+
+  # The O2-makeup tank: a BOUNDARY *source*, so `unclamped: true` — arbitration must never
+  # throttle the supply, and its negative-going amount is pure ledger bookkeeping.
+  - id: boundary.o2_supply
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+  # The two monotonic equipment-product sinks (never withdrawn from => clamped).
+  - id: boundary.co2_removed
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+  - id: boundary.humidity_condensate
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+
+  # The three decoupled crew-metabolism seam reservoirs. The two *sources* are unclamped;
+  # the O2 *sink* is not (a sink is never withdrawn from, so min-scaling never applies).
+  - id: boundary.metabolic_o2_sink
+    domain: boundary
+    quantity: oxygen
+    kind: boundary
+    amount: 0.0
+  - id: boundary.metabolic_co2_source
+    domain: boundary
+    quantity: carbon
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+  - id: boundary.metabolic_h2o_source
+    domain: boundary
+    quantity: water
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+flows:
+  # --------------------------------------------------------------------------------
+  # THE FAST SET. `rate_class` is omitted: `fast` is the default, and leaving it implicit
+  # is deliberate (eclss_thermal_habitat.yaml's convention) — the default is what makes
+  # every pre-multi-rate file lower to its old trajectory by construction, so spelling it
+  # here would suggest it were a choice.
+  # --------------------------------------------------------------------------------
+
+  # FORCED, six legs across three quantities (each balanced independently). Reads three
+  # HARDCODED forcing names through env.get -- NOT through wiring -- which is why the
+  # forcing keys below must match exactly. `rate_params = ()` (state-dependent, no k), so
+  # the Step-5 precondition does not apply to it on either port.
+  - id: eclss.crew_metabolism
+    type: eclss.crew_metabolism
+    priority: 0
+    wiring:
+      cabin_o2: eclss.cabin_o2
+      cabin_co2: eclss.cabin_co2
+      cabin_h2o: eclss.cabin_h2o
+      metabolic_o2_sink: boundary.metabolic_o2_sink
+      metabolic_co2_source: boundary.metabolic_co2_source
+      metabolic_h2o_source: boundary.metabolic_h2o_source
+
+  # DONOR-CONTROLLED: R = k_scrub * cabin_co2 * dt. k_scrub * (dt/n_sub) = 0.06 << 1.
+  - id: eclss.co2_scrubber
+    type: eclss.co2_scrubber
+    priority: 0
+    wiring:
+      cabin_co2: eclss.cabin_co2
+      co2_removed: boundary.co2_removed
+    params: eclss
+
+  # DEMAND-CONTROLLED toward o2_setpoint: S = k_makeup * (o2_setpoint - cabin_o2) * dt.
+  # THE ONE RATIONING CANNOT SEE (its draw is proportional to the ERROR, not the stock), so
+  # `rationed == 0` for this file is NOT self-certifying for it — the build-time
+  # precondition is. k_makeup * (dt/n_sub) = 0.12 << 1, checked on both ports.
+  - id: eclss.o2_makeup
+    type: eclss.o2_makeup
+    priority: 0
+    wiring:
+      o2_supply: boundary.o2_supply
+      cabin_o2: eclss.cabin_o2
+    params: eclss
+
+  # --------------------------------------------------------------------------------
+  # THE SLOW SET — one flow, and the whole reason this file exists. See the header: this
+  # is a fixture device, not a sizing claim.
+  # --------------------------------------------------------------------------------
+
+  # DONOR-CONTROLLED: R = k_cond * cabin_h2o * dt. Stepped at dt/2 = 900 s by Strang
+  # (NOT at dt/n_sub — multi-rate Step 5's finding, and the plan's own formula was wrong
+  # about it), giving k_cond * h = 0.45 < 1: the build-time precondition passes, on both
+  # ports, via each one's `effective_step(..., slow=true)`.
+  - id: eclss.condenser
+    type: eclss.condenser
+    priority: 0
+    rate_class: slow
+    wiring:
+      cabin_h2o: eclss.cabin_h2o
+      humidity_condensate: boundary.humidity_condensate
+    params: eclss
+
+forcings:
+  # The forced constant crew metabolic rates (EclssScenario). Keys are the frozen hardcoded
+  # module constants -- renaming one makes crew_metabolism raise at step 1.
+  o2_consumption:
+    const: 0.004      # mol/s, crew O2 intake out of the cabin
+  co2_production:
+    const: 0.003      # mol/s, crew CO2 exhaled into the cabin
+  h2o_production:
+    const: 2.0e-5     # kg/s, crew humidity (respiration + perspiration)

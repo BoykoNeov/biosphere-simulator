@@ -24,15 +24,17 @@
 //! mis-wire moves the run (or breaks conservation), so it surfaces in the byte-identity
 //! / run-match gates. Do not read this dump as claiming wiring-parity it does not carry.
 //!
-//! **The multi-rate partition (`n_sub` + per-flow rate class) is rendered even though no
-//! anchor is multi-rate yet, and that is the point.** No file in
-//! `tests/crossport/authoring_files.py::ANCHORS` declares a cadence today, so these
-//! fields are inert — `n_sub 1`, every flow `fast`. Adding them now closes the hole a
-//! *future* multi-rate anchor would otherwise walk into: a dump blind to the partition
-//! would diff **green** while the two ports lowered *different* partitions. That is
-//! precisely the shape multi-rate Step 5 caught in the freeze manifest — an equality gate
-//! is blind to a field absent from both sides of the equation, so the moment to add the
-//! field is *before* the case that needs it, not after.
+//! **The multi-rate partition (`n_sub` + per-flow rate class) is rendered for every
+//! anchor, inert or not.** These fields were added *before* any anchor declared a cadence,
+//! on the shape multi-rate Step 5 caught in the freeze manifest: an equality gate is blind
+//! to a field absent from both sides of the equation, so a dump omitting the partition
+//! would diff **green** while the two ports lowered *different* partitions. The moment to
+//! add the field is *before* the case that needs it, not after.
+//!
+//! `eclss_multirate_cabin.yaml` in `tests/crossport/authoring_files.py::ANCHORS` is now
+//! that case (`n_sub 30`, `eclss.condenser` slow) — but the fields stay unconditional,
+//! because a field rendered only in the interesting case is a field the diff cannot see
+//! when it matters. Every other anchor still renders `n_sub 1` / all-`fast`.
 
 use simcore::hexfloat;
 

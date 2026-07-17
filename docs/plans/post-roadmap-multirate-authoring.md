@@ -6,9 +6,11 @@ the cross-port tiers. **The user opened the unfreeze on 2026-07-17.** The knob i
 decided, built (Step 2), **drives** (Step 3), has **paid off the phase's stated
 motivation** (Step 4 — the scenario `docs/authoring-reference.md` calls *impossible* is
 authored, committed and green), **the hazard it does not itself close is now closed**
-(Step 5: the build-time `k·h < 1` precondition), and **the Rust port is level** (Step 6 —
-including the driver; the Step-6 landmine was decided, not inherited). No golden has moved
-and `src/` is untouched. Remaining: the unfreeze ceremony + the reference-doc narrative (7).
+(Step 5: the build-time `k·h < 1` precondition), **the Rust port is level** (Step 6 —
+including the driver; the Step-6 landmine was decided, not inherited) and **the two ports
+are now compared on a multi-rate file** (Step 6b — `eclss_multirate_cabin.yaml`, the
+anchor Step 6 wrongly believed impossible). No golden has moved and `src/` is untouched.
+Remaining: the unfreeze ceremony + the reference-doc narrative (7).
 
 **Step 5 corrected a formula this document specified.** The precondition is **not**
 `k·(dt/n_sub) < 1` for every flow: the slow set steps at **`dt/2`** under Strang,
@@ -353,9 +355,15 @@ surface, not a licence to edit the core.
    the slow set and the step corrected it** — left standing here rather than edited away,
    the Step-4 `60×`/`30×` precedent.)
 6. **Rust mirror**, hand-written, then the cross-port tier. ✅ **DONE** — see "Step 6:
-   COMPLETE" below. **The open decision below was DECIDED, not inherited: the user chose
-   the HATCH** (against my recommendation and the advisor's — both argued "refuse"). The
-   arguments on both sides are preserved as written.
+   COMPLETE" (the mirror) and "Step 6b: COMPLETE" (the cross-port tier) below. **The open
+   decision below was DECIDED, not inherited: the user chose the HATCH** (against my
+   recommendation and the advisor's — both argued "refuse"). The arguments on both sides
+   are preserved as written. **The "then the cross-port tier" half nearly went unbuilt**:
+   Step 6 reasoned its way to "no multi-rate anchor is possible" from a fact that was only
+   true of `eclss_thermal_habitat` (Tier-2). A *linear* multi-rate anchor is Tier-1 and
+   carries both gates — 6b built it, and measured that without it the crossport suite was
+   **completely blind** to a partition divergence (33 green with the Rust partition
+   destroyed).
 
    **⚠ Step 6 carries an OPEN DECISION it must not inherit silently** (advisor, after
    Step 5). The precondition lives in `interpret` — which is **upstream of the deliberate
@@ -736,17 +744,27 @@ moved; the manifest did NOT move** (it freezes the *Python* surface, and Step 6 
 Python surface — the Step-3/4 precedent). 16 new Rust pins + 1 migrated; whole Rust suite
 and the 76 cross-port tests green.
 
-**Scope was decided by one fact, checked rather than assumed: no multi-rate scenario is in
-the cross-port parity set.** `eclss_thermal_habitat.yaml` appears in **zero** crossport
-files, and it is Tier-2 (`T**4`) anyway — graph-dump-only by Step 4's own ruling. So no
-trajectory parity vector was minted for it (a measured band is a frozen tolerance, and
-freezing one for a runtime-only authored artifact cuts against "authored ≠ validated").
-**The `multirate_step` driver was mirrored anyway**, for two reasons the parity set does
-not see: without it Rust would *build* a multi-rate scenario it cannot *run*, and if
-`run.rs` ignored `n_sub` it would silently run it single-rate at the master cadence — the
-same file meaning different things on the two ports. And `SLOW_STEP_DIVISOR`'s `dt/2` would
-otherwise be a magic constant with **nothing in Rust actually stepping at `dt/2`** for it
-to track.
+**Scope was initially decided by one fact, checked rather than assumed: no multi-rate
+scenario was in the cross-port parity set.** `eclss_thermal_habitat.yaml` appears in
+**zero** crossport files, and it is Tier-2 (`T**4`) anyway — graph-dump-only by Step 4's
+own ruling. So no trajectory parity vector was minted for it (a measured band is a frozen
+tolerance, and freezing one for a runtime-only authored artifact cuts against "authored ≠
+validated"). **The `multirate_step` driver was mirrored anyway**, for two reasons the
+parity set did not see: without it Rust would *build* a multi-rate scenario it cannot
+*run*, and if `run.rs` ignored `n_sub` it would silently run it single-rate at the master
+cadence — the same file meaning different things on the two ports. And
+`SLOW_STEP_DIVISOR`'s `dt/2` would otherwise be a magic constant with **nothing in Rust
+actually stepping at `dt/2`** for it to track.
+
+> ⚠️ **The generalisation from that fact was WRONG, and Step 6b (below) fixed it.** The
+> reasoning above is sound *for `eclss_thermal_habitat`* — a Tier-2 file genuinely cannot
+> carry a bit-exact run comparison. What it silently became was the blanket claim *"no
+> multi-rate anchor is possible"*, and that does not follow: the Tier-2 obstacle is
+> `thermal.radiator_reject`'s `T**4`, not multi-rate. **A pure-ECLSS multi-rate file is
+> Tier-1**, so it carries *both* cross-port gates. Step 6b built it
+> (`eclss_multirate_cabin.yaml`). **This is the same phase's meta-finding turned on its own
+> author**: the sentence was written when the limitation was real, and survived the step
+> that removed it — see the closing "third claim falsified" note, which now has a fourth.
 
 **THE FINDING: the mirror carries the RULE but not the RATIONALE, and the difference is a
 latent safety bug.** Step 5's *load-bearing* argument for build time was the **param
@@ -801,11 +819,13 @@ bridge refuses a multi-rate file, parallel to the rk4 refusal and for the same r
 (no such session exists), **not** on precondition grounds. Honouring it was never among
 the options; the alternative to refusing was a silent cross-port divergence.
 
-**The graph dump grew `n_sub` + per-flow rate class — before any anchor needs them.** No
-ANCHOR is multi-rate, so the fields are inert today (`n_sub 1`, every flow `fast`). They
-were added anyway on Step 5's own lesson: **an equality gate is blind to a field absent
-from both sides**, so a dump omitting the partition would diff **green** for a future
-multi-rate anchor whose two ports lowered *different* partitions. Rendered
+**The graph dump grew `n_sub` + per-flow rate class — before any anchor needed them.** At
+the time no ANCHOR was multi-rate, so the fields were inert (`n_sub 1`, every flow
+`fast`). They were added anyway on Step 5's own lesson: **an equality gate is blind to a
+field absent from both sides**, so a dump omitting the partition would diff **green** for a
+future multi-rate anchor whose two ports lowered *different* partitions. **Step 6b made
+that "future anchor" real within the same step**, and the foresight paid: the fields were
+already there and already correct when `eclss_multirate_cabin.yaml` landed. Rendered
 **unconditionally** (a field rendered only when multi-rate is a field the diff cannot see
 in the case that matters) and read off the **built partition**, never the spec — what the
 dump must prove is that both ports *lowered* the same partition; re-reading the authored
@@ -835,10 +855,16 @@ include had ZERO trajectory coverage, and the whole suite was green** (advisor c
 "I believe this is done" call). Every multi-rate test above either **built only** or was
 **refused before a step ran** (the aux multi-rate case hits `check_no_aux` first), and the
 two aux runs plus the rationed-message test all take the **single-rate** path. No committed
-anchor is multi-rate, and the cross-port trajectory vector was correctly declined — so
+anchor was multi-rate, and the cross-port trajectory vector had been declined — so
 **nothing executed `run_multirate`**. Proved with the file's own idiom rather than argued:
 `panic!("REACHED")` at the top of the driver left **every test passing**. Now it turns 2
 red.
+
+**That review surfaced TWO gaps, not one, and only the first was fixed at the time** — so
+"Step 6 COMPLETE" was true of the *mirror* and premature for the *step*, whose own charge
+reads "Rust mirror, hand-written, **then the cross-port tier**". The second gap: the
+declined cross-port vector was the right call for `eclss_thermal_habitat` and the *wrong*
+call as a blanket rule (see the box above). Step 6b is that half.
 
 **The mechanism is worth naming, because every local signal said "covered": clippy is
 green as long as production *calls* the function — reachable ≠ exercised.** Coverage
@@ -886,6 +912,103 @@ change. On a repo with a frozen core, a formatter run is not a no-op: it is an u
 edit to files the purity invariant says this phase must not touch. Use `rustfmt <file>` on
 new files; never bare `cargo fmt`.
 
+## Step 6b: COMPLETE — the anchor, and the proof the parity set was blind
+
+The other half of Step 6's charge ("Rust mirror, hand-written, **then the cross-port
+tier**"), and the second of the two gaps the near-miss review surfaced. **Nothing
+unfrozen, no golden moved, the manifest did not move; `git diff src/` empty.**
+
+**THE HOLE, measured rather than argued.** With the Rust interpreter mutated to ignore
+`rate_class` entirely — lowering an all-fast partition where Python lowers a slow set,
+i.e. *the two ports meaning different things by the same file* — the **entire pre-anchor
+crossport suite stayed green: 33 passed**. Nothing in it was sensitive to a partition,
+because nothing in it *had* one. That is the same shape as the near-miss one level up
+(present, never exercised), and it is why the graph dump's inert `n_sub`/rate-class
+columns were necessary but nowhere near sufficient: **a field both ports render identically
+for `n_sub 1` proves nothing about `n_sub 30`.**
+
+**THE ANCHOR: `tests/authoring/scenarios/eclss_multirate_cabin.yaml`** — master `dt=1800`,
+`n_sub=30` (fast `h=60`, ECLSS's frozen sizing), `eclss.condenser` slow (`h = dt/2 = 900`
+⇒ `k·h = 0.45`). Registered in `ANCHORS` as `(file, {}, None, 1)`; 15 anchors now.
+
+**Why not `eclss_thermal_habitat.yaml`, the obvious candidate — and why the Step-6
+reasoning that declined it was right about that file and wrong as a rule.** It is Tier-2
+(`T**4`), so it is excluded from the bit-exact run comparison **by classification** and
+could only ever be graph-dump-covered — leaving `run_multirate` vs `_run_multirate`
+uncompared, which is the half that matters. The Tier-2 obstacle is the *radiator*, not
+multi-rate. Pure ECLSS is `+ - *` only ⇒ **Tier 1** ⇒ **both** gates bite. The blocking
+constraint was never "multi-rate cannot be anchored"; it was "*that* file cannot be".
+
+**`1800/30`, not `3600/60`** (advisor): the cadence ratio is irrelevant to what is being
+proved, and `3600/60` would ride the condenser at `k·h = 0.90` — legal, but at 90 % of the
+bound for no gain.
+
+**THE TEETH ARE THE SHARED STOCK, and this is the design point worth carrying.**
+`eclss.cabin_h2o` is touched by the fast `crew_metabolism` (inflow) *and* the slow
+`condenser` (drawdown) — the **first and only** anchor where the cross-rate boundary and
+the cross-stock boundary overlap. So the Strang operators do **not** commute, and the
+partition is *in the trajectory*, not merely in the rendering:
+
+| the condenser declared | `cabin_h2o` settles at |
+|---|---|
+| `slow` (as committed) | **2.838709677419354e-02** |
+| `fast` (one key dropped, nothing else) | **4.0e-02** = `P_h2o/k_cond` |
+
+~29 % apart, from removing a single YAML key. **`eclss_thermal_habitat` could not have done
+this**: its two domains share no stock and indeed no *quantity*, so its splitting error is
+exactly zero and its run gate would pass whether or not the ports agreed on the partition.
+Step 4 pinned that disjointness as an assertion; Step 6b needed its opposite, and had to
+author it.
+
+**The partition here is a FIXTURE DEVICE and the file says so in its own header.** ECLSS's
+four flows are all the same order — the condenser is merely the slowest (`τ = 2000 s`), so
+classing it slow is the *least arbitrary* choice available, not a sizing claim. It is
+measurably bad physics (the 29 % above is discretization error, not a better answer), and
+that is the point: the gap is the signal. The `param_sets_dsl.yaml` precedent ("deliberately
+nonsense physics — the property under test is param resolution") applies verbatim. **A red
+in these gates is a port finding, never a reason to retune the fixture.**
+
+**Both gates confirmed to bite, and they bite DIFFERENTLY** (mutation-checked):
+
+| mutation | dump | run |
+|---|---|---|
+| Rust lowers an all-fast partition | **red** | **red** |
+| Rust's driver splits `Lie` where `SPLIT` says `Strang` | green | **red** |
+
+The second row is the one that justifies insisting on a **Tier-1** anchor: a split drift
+changes no graph fact, so **the dump structurally cannot see a mis-*driven* partition —
+only a mis-*rendered* one.** Graph-dump-only coverage would have shipped it.
+
+**Stated honestly — what this anchor does NOT uniquely guard.** Both mutations above are
+*also* caught by Rust's own Step-6 pins (2 red and 1 red respectively), so this is not the
+sole guard against either. Its unique contribution is narrower and more durable: it is the
+only thing that compares the two ports' partitions **to each other at all**. A divergence
+that is self-consistent on each side — a default, a vocabulary entry, an interaction with
+`includes`/prefixing — is caught here or nowhere. (The `rate_class`-survives-prefixing
+claim in `compose.rs` remains **unanchored**: this file declares no `includes`. Named, not
+fixed.)
+
+**The Python side owns "is the anchor worth anchoring"**
+(`tests/test_authoring_multirate_crossport_anchor.py`, 7 pins) — a cross-port equality gate
+is fully satisfied by two ports agreeing on nothing interesting, so it cannot ask this of
+itself. Two failure modes excluded by measurement: **a dead anchor is trivially bit-exact**
+(the `monod_dsl.yaml` lesson — every pool is shown to move, and to land on its analytic
+steady state), and **an inert partition is trivially bit-exact too** (the shared stock is
+asserted, so an edit that breaks the sharing goes red rather than silently gutting the
+gate). The `k·h` margins are read from the **frozen loader**, not transcribed, so a param
+edit that pushed a class over the bound surfaces as a margin failure rather than a mystery
+build error inside a cargo subprocess.
+
+**THE META-FINDING NOW HAS A FOURTH INSTANCE — and this one is the phase's own.** Steps 4,
+5 and 6 each falsified a doc claim written before the platform could do the thing. Step 6b
+falsifies a claim written **by Step 6, in this document, one section up** — "no multi-rate
+scenario is in the cross-port parity set", true when written and quietly generalised into
+"none can be". The lesson therefore sharpens: *grep the reference doc for claims about the
+limitation you just removed* is not enough, because **the claim you must re-read is the one
+you wrote yourself in the step that removed it.** A scope decision recorded as a fact ("X
+appears in zero crossport files") outlives the reasoning that made it right ("...*and it is
+Tier-2, which is why*"), and the fact reads like the rule.
+
 ## The measurements this rests on
 
 All from this session; probes under `M:\claud_projects\temp\o2-makeup-probe\`, findings
@@ -929,3 +1052,17 @@ Step 5 adds (probes under `M:\claud_projects\temp\multirate-step5\`, pinned in
 | the condenser is the only ECLSS flow that may be slow at `dt=3600` | `5e-4 · 1800 = 0.9 < 1` vs the scrubber's `1.8` |
 | no committed scenario is refused | all build with **no hatch** — the "no golden moved" assertion |
 | the pins have teeth | reverting `_effective_step` to the plan's formula ⇒ **5 red across 2 files** |
+
+Step 6b adds (pinned in `tests/test_authoring_multirate_crossport_anchor.py`, 7 pins, and
+in the two `eclss_multirate_cabin.yaml` rows of `tests/crossport/test_crossport.py`):
+
+| claim | measured |
+|---|---|
+| **the crossport suite was blind to the partition** | Rust mutated to lower an all-fast partition ⇒ the 33 pre-anchor authoring crossport tests **all pass** |
+| the new anchor catches that mutation | dump **red** *and* run **red** |
+| a split drift is invisible to the dump | Rust driver forced to `Split::Lie`: dump **green**, run **red** — why Tier-1 (not graph-dump-only) was required |
+| the partition is in the trajectory, not the rendering | drop `rate_class: slow` alone: `cabin_h2o` **2.8387e-02 → 4.0e-02** (~29 %), `cabin_o2`/`cabin_co2` bit-identical |
+| the anchor is not dead | `cabin_o2` 10.0 → **8.0**, `cabin_co2` 0.0 → **3.0**, `cabin_h2o` 0.0 → **2.8387e-02**; 43 τ of the slowest loop |
+| both rate classes clear the precondition, no hatch | fast `k·h` = 0.06 / 0.12; slow `k·h` = **0.45** — read off the frozen loader |
+| the run is clean on both ports | `rationed == 0`, `events == ()` (what Rust's `emit_authored` asserts before printing) |
+| the mutations are *also* caught in-port | all-fast ⇒ **2 red** in Rust's own pins; `Lie` ⇒ **1 red**. The anchor's unique value is comparing the ports **to each other**, not sole guardianship |
