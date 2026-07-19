@@ -4,8 +4,11 @@
 # Step 6b closed the cross-port partition hole with `eclss_multirate_cabin.yaml` and
 # named, without fixing, what that file could not reach: "the `rate_class`-survives-
 # prefixing claim in `compose.rs` remains UNANCHORED: this file declares no `includes`."
-# This is that anchor. It is the only scenario in the repo where the multi-rate partition
-# and the `{bundle, prefix}` rewrite meet.
+# This is that anchor. It is the first scenario in the repo where the multi-rate
+# partition and the `{bundle, prefix}` rewrite meet. ("First", not "only", deliberately:
+# an "only" claim is falsified by the next file that qualifies, and nothing goes red when
+# it is — this phase falsified six such sentences, one of them in the very comment block
+# this row was inserted below.)
 #
 # The shape: the SAME battery ENERGY domain twice, once from each bundle —
 #   bat_fast  <- bundles/battery.domain.yaml       (no rate class => "fast", the default)

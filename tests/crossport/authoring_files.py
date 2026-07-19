@@ -133,7 +133,7 @@ ANCHORS: tuple[tuple[str, dict[str, float], str | None, int], ...] = (
     # shape as power.load_draw, which IS bit-checked in power_bus.
     ("thermal_node.yaml", {}, None, 2),
     # --- Multi-rate Step 6: THE MULTI-RATE ANCHOR ---
-    # The only anchor that declares a coupling cadence, and the reason the graph dump's
+    # The FIRST anchor to declare a coupling cadence, and the reason the graph dump's
     # `n_sub` + rate-class columns are not two constants being compared to each other.
     # Master dt = 1800 / n_sub = 30 (fast h = 60 s — ECLSS's frozen sizing), with
     # `eclss.condenser` slow (h = dt/2 = 900 s — Strang, NOT dt/n_sub). Pure ECLSS ⇒
@@ -151,7 +151,7 @@ ANCHORS: tuple[tuple[str, dict[str, float], str | None, int], ...] = (
     # --- The compose gap: the multi-rate partition x `{bundle, prefix}` namespacing ---
     # Step 6b named this and did not fix it: "the `rate_class`-survives-prefixing claim
     # in `compose.rs` remains UNANCHORED — this file declares no `includes`." The row
-    # above still declares none; this one is the only anchor where a rate class and a
+    # above still declares none; this one is the first anchor where a rate class and a
     # prefix meet. The same battery domain from two bundles differing by ONE key, so a
     # bundle-declared slow flow must reach the built partition under its NAMESPACED id
     # (`bat_slow.power.self_discharge`) and its fast twin must not.

@@ -1194,6 +1194,26 @@ flat graph, not two scopes.
 | the partition is not decorative | dropping it moves `bat_slow.power.battery` by **1.0756 J** (~1.1e-7); `bat_fast…` **bit-identical** |
 | dropping the field is not the reachable bug | Python `model_copy` carries it structurally; Rust struct literal will not compile without it |
 
+**THE META-FINDING TAKES A SEVENTH INSTANCE, AND THIS ONE IS THE MOST EMBARRASSING —
+caught at the "done" call, after the push.** The `eclss_multirate_cabin` comment block in
+`tests/crossport/authoring_files.py` opens *"The **only** anchor that declares a coupling
+cadence…"*. `two_batteries_multirate.yaml` declares `n_sub: 2` and a `rate_class: slow`
+flow, and **was inserted on the very next line**. The commit message invoking the sixth
+instance created the seventh, one line below a sentence it had to scroll past to write.
+Two more of the same shape went with it: this fixture's own header said *"the only
+scenario where the partition and the prefix rewrite meet"*, and `CLAUDE.md` said Step 6's
+Rust run was *"the only place `dt/2` is stepped rather than asserted"* — which the new
+`a_prefixed_slow_flow_reaches_the_built_partition` also falsifies.
+
+**The transferable rule, and it is mechanical rather than a resolution to be careful:
+prefer "the FIRST X" to "the ONLY X".** Both are true when written; "first" is
+*chronological* and stays true forever, while "only" is a **census** that the next
+qualifying file silently falsifies — and no gate is watching, because adding a file that
+qualifies is exactly the kind of change that turns nothing red. Every surviving "the
+first anchor where…" sentence in this phase is fine for precisely this reason. When
+inserting into a list, **re-read the neighbouring entry's superlatives**, because the
+insertion is what breaks them.
+
 **Not touched, and not an oversight:** no schema field, flow type, integrator or rate-class
 value moved, so **the manifest does not regenerate** and no golden moves. This adds a
 fixture and pins to a frozen surface — it does not move the surface. `git diff src/` is
