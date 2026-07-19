@@ -388,6 +388,77 @@ fn apply_includes_namespaces_ids_and_rate_refs() {
     }
 }
 
+/// THE COMPOSE GAP, closed (post-roadmap multi-rate; Step 6b named it and did not fix
+/// it). `compose.rs` asserts on the line that copies the field that `rate_class` is a
+/// **property**, not an id **reference**, so prefixing carries it verbatim — and until
+/// this test that claim was a comment. Step 6b's multi-rate anchor
+/// (`eclss_multirate_cabin.yaml`) declares no `includes`, so no file in either port had
+/// ever put a rate class and a prefix together.
+///
+/// `two_batteries_multirate.yaml` includes the SAME battery domain from two bundles that
+/// differ by exactly one key, so the two prefixed copies of one flow must come out of the
+/// merge with DIFFERENT rate classes. The mirror of
+/// `tests/test_authoring_multirate_compose.py`.
+#[test]
+fn apply_includes_carries_rate_class_through_prefixing() {
+    let path = scenarios_dir().join("two_batteries_multirate.yaml");
+    let doc = parse_document(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let spec = ScenarioSpec::from_yaml(&doc).unwrap();
+    let merged = apply_includes(&spec, path.parent().unwrap()).expect("apply_includes");
+
+    let class_of = |id: &str| {
+        merged
+            .flows
+            .iter()
+            .find(|f| f.id == id)
+            .unwrap_or_else(|| panic!("flow {id} missing from the merge"))
+            .rate_class
+            .clone()
+    };
+    assert_eq!(
+        class_of("bat_slow.power.self_discharge"),
+        "slow",
+        "prefixing lost the bundle-declared rate class"
+    );
+    assert_eq!(class_of("bat_fast.power.self_discharge"), "fast");
+}
+
+/// The same claim one layer down: the class must reach the BUILT partition, under the
+/// NAMESPACED id. Rust is the port where this can go wrong in a second way Python's
+/// cannot — it lowers the flows a second time to build the two disjoint registries (a
+/// `Box<dyn Flow>` is owned, so one flow cannot sit in two of them), where Python shares
+/// one flow object across three views.
+///
+/// What an empty slow set here would mean is the reason this is asserted at all: at
+/// `n_sub >= 2` it is a legal, quiet, single-rate-equivalent build — no error, no
+/// rationing, no event.
+#[test]
+fn a_prefixed_slow_flow_reaches_the_built_partition() {
+    let built = load_scenario(
+        &scenarios_dir().join("two_batteries_multirate.yaml"),
+        &no_overrides(),
+    )
+    .expect("load two_batteries_multirate");
+
+    assert_eq!(built.n_sub, 2);
+    let slow: Vec<&str> = built.slow_registry.flows().iter().map(|f| f.id()).collect();
+    assert_eq!(
+        slow,
+        vec!["bat_slow.power.self_discharge"],
+        "the bundle-contributed slow flow did not reach the built partition"
+    );
+    let mut fast: Vec<&str> = built.fast_registry.flows().iter().map(|f| f.id()).collect();
+    fast.sort_unstable();
+    assert_eq!(
+        fast,
+        vec!["bat_fast.power.self_discharge", "power.trickle_load"]
+    );
+
+    let result = run_scenario(built).expect("run two_batteries_multirate");
+    assert_eq!(result.total_rationed, 0);
+    assert!(result.events.is_empty());
+}
+
 #[test]
 fn prefixed_forcing_bound_bundle_fails_loudly() {
     // The crew-forcing blocker, LOCKED cross-port (the load-bearing Step-6c scope claim):

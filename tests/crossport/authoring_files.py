@@ -148,6 +148,38 @@ ANCHORS: tuple[tuple[str, dict[str, float], str | None, int], ...] = (
     # tests/test_authoring_multirate_crossport_anchor.py). No golden — no frozen
     # scenario runs ECLSS multi-rate, so there is nothing to be byte-identical to.
     ("eclss_multirate_cabin.yaml", {}, None, 1),
+    # --- The compose gap: the multi-rate partition x `{bundle, prefix}` namespacing ---
+    # Step 6b named this and did not fix it: "the `rate_class`-survives-prefixing claim
+    # in `compose.rs` remains UNANCHORED — this file declares no `includes`." The row
+    # above still declares none; this one is the only anchor where a rate class and a
+    # prefix meet. The same battery domain from two bundles differing by ONE key, so a
+    # bundle-declared slow flow must reach the built partition under its NAMESPACED id
+    # (`bat_slow.power.self_discharge`) and its fast twin must not.
+    #
+    # THE GRAPH DUMP IS THE LOAD-BEARING HALF HERE, and that is the mirror image of the
+    # row above. Step 6b needed Tier 1 because a mis-DRIVEN partition (a split drift)
+    # changes no graph fact, so the dump structurally cannot see it. This claim is the
+    # other kind: a dropped/hardcoded `rate_class` is a mis-BUILT partition, which the
+    # dump renders directly — it reads the class off `slow_registry` membership, never
+    # off the authored key. The run comparison rides along because the file is
+    # transcendental-free (`k*battery`) => Tier 1, not because it is the stronger gate.
+    #
+    # The run half is not decorative either, but it is honestly WEAK, and the number is
+    # recorded rather than rounded up to Step 6b's headline: the inline
+    # `power.trickle_load`
+    # (fast) drains the SLOW instance's battery, so the two rate classes share a stock,
+    # Strang does not commute, and dropping the partition moves that stock by ~1.1 J on
+    # ~9.88e6 J (~1.1e-7 relative) — nonzero, ~2^-23, robustly above any rounding, and
+    # bit-exactly compared. It is nothing like the 29 % of `eclss_multirate_cabin`,
+    # because `k*dt` is 3.6e-5 here rather than 0.45. Without that inline flow the two
+    # prefixed instances would be disjoint, the operators would commute EXACTLY, and the
+    # run half would pass on a port that had dropped `rate_class` altogether — the "a
+    # partition with no shared stock is decorative" lesson, applied rather than
+    # repeated.
+    #
+    # No golden: 5 namespaced stocks are not a frozen graph (the `two_batteries`
+    # precedent).
+    ("two_batteries_multirate.yaml", {}, None, 1),
     # The three new param sets reached through authored `kinetics` — the OTHER surface a
     # registered loader opens, and the one with a cross-port hazard the frozen-`type`
     # anchors cannot see: Python DERIVES the param key names via asdict(); Rust pins

@@ -1,0 +1,43 @@
+# Post-roadmap multi-rate, the compose gap — the battery ENERGY domain, declared SLOW.
+#
+# A byte-for-byte copy of `battery.domain.yaml` with ONE key added:
+# `rate_class: slow` on the flow. It exists as a separate file rather than a key on the
+# original because `battery.domain.yaml` is included by `two_batteries.yaml` and
+# `station_composed.yaml`, both of which declare no `n_sub` — and `n_sub = 1` with a
+# non-empty slow set is an AuthoringError. Adding the key there would not "extend an
+# anchor", it would break two frozen-adjacent ones.
+#
+# THE CLAIM THIS BUNDLE EXISTS TO ANCHOR (`compose.rs` / `compose.py`, previously named
+# and NOT fixed): `rate_class` is a **property** of the flow, not an id **reference**, so
+# `{bundle, prefix}` namespacing carries it verbatim — the rejected alternative (a
+# top-level `fast: [flow-id, ...]` list) would have been a list of id references, i.e. a
+# rewrite surface that mis-fires the moment someone forgets it. Both ports assert the
+# claim in a comment; until `two_batteries_multirate.yaml` neither asserted it in a test,
+# because no anchor file that declared `includes` also declared a rate class.
+#
+# The flow carries authored `kinetics`, so it declares `rate_params = ()` (decision B) and
+# the build-time k*h precondition does not judge it. That is convenient here rather than
+# load-bearing: k = 1.0e-8 /s gives k*(dt/2) = 1.8e-5 at this file's master dt, which
+# would clear the bound comfortably if the precondition did look.
+
+stocks:
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 1.0e+7
+  - id: boundary.waste_heat
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: power.self_discharge
+    kinetics:
+      rate: 'param("self_discharge_rate") * stock("power.battery")'
+      stoichiometry:
+        power.battery: -1
+        boundary.waste_heat: 1
+    params: self_discharge
+    rate_class: slow

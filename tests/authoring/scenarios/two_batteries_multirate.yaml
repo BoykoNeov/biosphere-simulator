@@ -1,0 +1,67 @@
+# Post-roadmap multi-rate, the compose gap — a PREFIXED bundle flow whose rate class
+# must survive namespacing.
+#
+# Step 6b closed the cross-port partition hole with `eclss_multirate_cabin.yaml` and
+# named, without fixing, what that file could not reach: "the `rate_class`-survives-
+# prefixing claim in `compose.rs` remains UNANCHORED: this file declares no `includes`."
+# This is that anchor. It is the only scenario in the repo where the multi-rate partition
+# and the `{bundle, prefix}` rewrite meet.
+#
+# The shape: the SAME battery ENERGY domain twice, once from each bundle —
+#   bat_fast  <- bundles/battery.domain.yaml       (no rate class => "fast", the default)
+#   bat_slow  <- bundles/battery_slow.domain.yaml  (`rate_class: slow`)
+# so ONE bundle-declared slow flow must land in the built slow registry under its
+# NAMESPACED id, `bat_slow.power.self_discharge`, and its fast twin must not. The two
+# realistic ways a port breaks this both fail that assertion: prefixing that rebuilds the
+# flow without copying `rate_class` (it silently defaults to fast), and a partition
+# computed BEFORE `apply_includes` (bundle-contributed slow flows are never seen). Both
+# leave the slow set EMPTY, which at n_sub = 2 is a legal, quiet, single-rate-equivalent
+# build — no error, no complaint.
+#
+# `power.trickle_load` IS NOT DECORATION. Without it the two instances are disjoint after
+# namespacing, the Strang operators commute exactly, and the trajectory is identical
+# whether or not the partition survives — the "a partition with no shared stock is
+# decorative" lesson from Step 6b, which this file would otherwise repeat. The inline
+# flow is fast and drains `bat_slow.power.battery`, the stock the SLOW flow also writes,
+# so the rate-class boundary and the shared-stock boundary overlap and the split error is
+# genuinely nonzero. It doubles as the proof that an inline flow can REFERENCE a
+# namespaced id (the author knows the prefix they wrote) — the merge is one flat graph,
+# not two scopes.
+#
+# n_sub = 2, the smallest legal value with a non-empty slow set (n_sub = 1 is refused).
+# Nothing here needs a large cadence ratio: the subject is which SET each flow lands in,
+# not what sub-stepping buys. Transcendental-free (`k * battery`) => Tier 1, so the
+# cross-port row carries both the run and the graph dump. The dump is the load-bearing
+# half — it renders the rate class off the BUILT partition, and a dropped `rate_class` is
+# a mis-BUILT partition, which is exactly the failure a dump can see (the mirror image of
+# Step 6b's mis-DRIVEN split, which it cannot).
+#
+# Floats carry an explicit decimal point / signed exponent (the YAML-1.1 numeric hazard).
+
+name: two_batteries_multirate
+integrator: euler
+dt: 3600.0
+n_sub: 2
+steps: 168
+
+includes:
+  - bundle: bundles/battery.domain.yaml
+    prefix: bat_fast
+  - bundle: bundles/battery_slow.domain.yaml
+    prefix: bat_slow
+
+stocks:
+  - id: boundary.trickle_sink
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+flows:
+  - id: power.trickle_load
+    kinetics:
+      rate: 'param("self_discharge_rate") * stock("bat_slow.power.battery")'
+      stoichiometry:
+        bat_slow.power.battery: -1
+        boundary.trickle_sink: 1
+    params: self_discharge

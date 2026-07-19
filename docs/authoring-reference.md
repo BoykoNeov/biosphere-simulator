@@ -624,6 +624,17 @@ referential-integrity surface**: the rate-class travels *with* the flow into a b
 `{bundle, prefix}` id-rewriting cannot touch it — which a top-level `fast: [flow-id, …]`
 list of **id references** could not have claimed.
 
+That last sentence was, for four commits, **asserted in three places and checked in none**:
+both ports carried it as a comment on the line that copies the field, and no anchor file
+declared a rate class *and* an `includes`. It is now anchored on both ports and compared
+across them (`two_batteries_multirate.yaml` — a bundle-declared `rate_class: slow` must
+reach the built partition under its **namespaced** id). The failure it guards is silent
+rather than loud: whether the class is lost in the rewrite or the partition is computed
+*before* `apply_includes`, the result is an **empty slow set**, which at `n_sub ≥ 2` builds
+and runs clean. The graph dump is the primary gate here — it reads each flow's class off
+`slow_registry` membership, so a mis-**built** partition is exactly what it renders (the
+mirror of a mis-**driven** one, which it structurally cannot see).
+
 **The frozen semantic choices** — each one, like `monod`'s, is a decision a reader can
 otherwise only recover from a test:
 

@@ -1002,8 +1002,8 @@ sole guard against either. Its unique contribution is narrower and more durable:
 only thing that compares the two ports' partitions **to each other at all**. A divergence
 that is self-consistent on each side — a default, a vocabulary entry, an interaction with
 `includes`/prefixing — is caught here or nowhere. (The `rate_class`-survives-prefixing
-claim in `compose.rs` remains **unanchored**: this file declares no `includes`. Named, not
-fixed.)
+claim in `compose.rs` was **unanchored** here — this file declares no `includes`. Named
+then, **fixed now**: see "The compose gap" below.)
 
 **The Python side owns "is the anchor worth anchoring"**
 (`tests/test_authoring_multirate_crossport_anchor.py`, 7 pins) — a cross-port equality gate
@@ -1130,6 +1130,74 @@ caught Sweep 1 in Step 2 instead of Step 7. **Not built** because a name appeari
 doc is not the same as the doc *explaining* it, and a green light for that is worse than
 the honest honor-system half — the freeze's prose is reviewed, not grepped. Recorded so the
 next maintainer decides deliberately rather than rediscovering the hole.
+
+## The compose gap: COMPLETE — the one claim Step 6b named and did not fix
+
+Step 6b closed the cross-port partition hole and, in the same breath, named what its own
+anchor could not reach: *"the `rate_class`-survives-prefixing claim in `compose.rs`
+remains unanchored: this file declares no `includes`."* This closes it. It is deliberately
+**small** — a fixture, four Python pins, two Rust pins, one cross-port row — because the
+claim is narrow and the temptation was to re-run Step 6b at bundle scale.
+
+**The vehicle.** `tests/authoring/scenarios/two_batteries_multirate.yaml` includes the
+same battery ENERGY domain from two bundles that differ by exactly one key
+(`bundles/battery_slow.domain.yaml` is `battery.domain.yaml` + `rate_class: slow`), so the
+two prefixed copies of *one* flow must emerge from the merge with *different* rate
+classes. A separate bundle rather than a key on the original: `battery.domain.yaml` is
+included by `two_batteries.yaml` and `station_composed.yaml`, neither of which declares
+`n_sub`, and `n_sub = 1` with a non-empty slow set is an `AuthoringError` — the key would
+not have extended an anchor, it would have broken two.
+
+**THE HOLE, MEASURED — and the measurement is the point, not the fix.** With `compose.rs`
+mutated to hardcode `rate_class: "fast"` (the two ports then meaning different things by
+the same bundle), the pre-existing Rust authoring suite is **34 passed, 0 failed**. Only
+the new pins go red. Same shape as Step 6b's "33 green with the partition destroyed", one
+level down: nothing was sensitive to a *bundle-contributed* rate class because no fixture
+had one.
+
+**What the failure would actually look like, corrected from what I first wrote.** The
+drafted rationale said a port could "reconstruct the flow without copying `rate_class`, so
+it defaults to fast". **That is not reachable on either port** — Python's `_namespace_flow`
+is a `model_copy(update=...)`, which carries every field it does not name *structurally*,
+and Rust's is a full struct literal, where an omitted field does not compile. The
+reachable failure is a **wrong value** (a hardcoded default, a partial reconstruction) or a
+partition computed **before** `apply_includes`. Both land in the same place: **an empty
+slow set**, which at `n_sub ≥ 2` is a legal, quiet, single-rate-equivalent build — no
+error, no rationing, no event. The mutation above was run precisely because "carried
+verbatim" is the kind of claim that is easy to argue and cheap to check.
+
+**The dump is the load-bearing half here — the mirror image of Step 6b.** That step needed
+Tier 1 because a mis-*driven* partition (a split drift) changes no graph fact, so the dump
+structurally cannot see it. This claim is the other kind: a mis-*built* partition is
+exactly what the dump renders, since it reads the class off `slow_registry` membership and
+never off the authored key. The run comparison rides along because the file is
+transcendental-free ⇒ Tier 1, not because it is the stronger gate.
+
+**The run half is not decorative, and the honest number is small.** Step 6b's lesson was
+applied rather than rediscovered: two prefixed instances of the same bundle are *disjoint*,
+so the Strang operators would commute exactly and the run gate would pass on a port that
+had dropped `rate_class` altogether. The inline `power.trickle_load` (fast) drains
+`bat_slow.power.battery` — the stock the **slow** flow also writes — so the boundaries
+overlap and the splitting error is genuinely nonzero. It is also genuinely **small**:
+~1.1 J on ~9.88e6 J (**~1.1e-7** relative), because `k·dt` is 3.6e-5 here against
+`eclss_multirate_cabin`'s 0.45 and its 29 %. Recorded at its true size rather than rounded
+up to the headline — under a bit-exact Tier-1 comparison a ~2^-23 relative delta is a live
+gate, and it *did* turn the cross-port run red under the mutation. The inline flow doubles
+as the only pin that an inline flow may **reference a namespaced id**: the merge is one
+flat graph, not two scopes.
+
+| claim | measured |
+|---|---|
+| the Rust suite was blind to a bundle rate class | `compose.rs` hardcoded to `"fast"` ⇒ the 34 pre-existing authoring tests **all pass** |
+| the new pins catch it | 2 Rust red, 3 Python red, **both** cross-port gates red |
+| the partition survives prefixing | `bat_slow.power.self_discharge` ∈ `slow_registry`; `bat_fast…` ∈ `fast_registry` |
+| the partition is not decorative | dropping it moves `bat_slow.power.battery` by **1.0756 J** (~1.1e-7); `bat_fast…` **bit-identical** |
+| dropping the field is not the reachable bug | Python `model_copy` carries it structurally; Rust struct literal will not compile without it |
+
+**Not touched, and not an oversight:** no schema field, flow type, integrator or rate-class
+value moved, so **the manifest does not regenerate** and no golden moves. This adds a
+fixture and pins to a frozen surface — it does not move the surface. `git diff src/` is
+empty.
 
 ## The measurements this rests on
 
