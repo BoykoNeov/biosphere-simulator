@@ -48,16 +48,39 @@
 #   Li-ion round-trip of ~0.90") — from primary literature, in one paper, both legs measured.
 #   The concession was right; it is now evidenced rather than asserted.
 #
-#   ⚠ THE PRE-2026 CITATIONS [A] AND [B] ARE UNVERIFIED, and are demoted here rather than
-#   trusted. Both are paywalled (Science; Elsevier) and could NOT be opened, so the numbers
-#   this header used to attribute to them — "[A] Li-ion round-trip efficiency ~0.90-0.95",
-#   "[B] surveyed round-trip efficiencies by chemistry" — were never checked against the
-#   papers. They may well be right; that is exactly the problem. A locus nobody can open is
-#   a locus nobody can audit, which is why the review checklist in
-#   docs/param-file-conventions.md now requires that every cited locus was actually opened.
-#   They are retained as unverified secondary leads ONLY, and the value no longer rests on
-#   them. Note also (skeptical read): [A] is a grid-storage REVIEW, so even if the sentence
-#   exists it would be a review assertion, not primary data.
+#   ✅ [A] AND [B] WERE OPENED IN ROUND 4 (2026-07-20, supplied by the user) — and UNLIKE
+#   self_discharge.yaml, WHERE THE PARALLEL ATTRIBUTION WAS FALSE, BOTH CHECK OUT HERE.
+#   That contrast is the point worth keeping: the same two papers, cited in two files by the
+#   same author at the same time, one attribution true and one fabricated. Being right about
+#   a source in one place is no evidence at all about the next place — the unit of trust is
+#   the CLAIM, not the paper and not the person.
+#     [A] — SUBSTANTIALLY CONFIRMED, upper bound slightly overstated. Table 1, p. 929
+#           ("Energy storage for utility transmission and distribution grid support"),
+#           Li-ion row, "% Efficiency (total cycles)" column: "90–94 (4500)". This file
+#           attributed "~0.90-0.95" to it; the printed range is 0.90–0.94. Ours (0.95) is
+#           therefore ABOVE [A]'s stated range, not inside it — a small but real correction,
+#           and it points the same way every other source here does (see [C]: ours is
+#           optimistic).
+#           ⚠ AND IT IS NOT [A]'s DATA. Table 1 is captioned "[Courtesy of EPRI]" and sourced
+#           to ref (1), EPRI Report 1020676 ("Electrical energy storage technology options",
+#           2010). So [A] is a review REPRODUCING a utility report's table. The round-1
+#           skeptical read ("a review assertion, not primary data") was CORRECT and if
+#           anything understated: it is a reproduced table, one step further removed.
+#     [B] — CONFIRMED AS A CLAIM, BUT ITS NUMBER IS UNUSABLE. Divya 2009 Table 1, p. 514
+#           does survey efficiency by chemistry, as attributed: lead-acid 72–78 %, NiCd
+#           72–78 %, NaS 89 % (at 325 °C), VRB 85 %, ZnBr 75 %, metal-air 50 %, PSB 75 %.
+#           ⚠ But its Li-ion entry is "η ≈ 100%" (p. 513 text: "storage efficiency close to
+#           100%"), which cannot be a round-trip energy efficiency — it is contradicted by
+#           [C]'s MEASURED 0.8991 round-trip at 25 °C, and is most likely a coulombic figure
+#           or an unqualified reproduction. [B]'s Table 1 is cited to refs [10–12], three
+#           bare URLs. So [B] is NOT usable as support: taken literally it would license a
+#           HIGHER efficiency than ours and contradict the measured primary this file now
+#           rests on. Demoting it in round 1 was the right call for a reason round 1 could
+#           not yet see.
+#   NET EFFECT ON THE VALUE: none. The value already rests on [C], a measured primary
+#   obtained in round 2, precisely so that it would not depend on [A]/[B]. That decision is
+#   what contained this — had 0.95 still rested on "[A] says 0.90-0.95", round 4 would have
+#   found a frozen value resting on a misquoted reproduction of a third party's table.
 #
 # Sources:
 #   [C] Bašić, H., Bobanac, V., Pandžić, H. (2023), "Determination of Lithium-Ion Battery
@@ -74,11 +97,20 @@
 #       low-to-moderate C-rate. NOTE ALSO: COULOMBIC efficiency is a different quantity
 #       (>99 %; "Coulombic losses ... are less than 1%") — ours is an ENERGY efficiency.
 #   [A] Dunn, B., Kamath, H., Tarascon, J.-M. (2011), "Electrical Energy Storage for the
-#       Grid: A Battery of Choices", Science 334(6058):928-935. UNVERIFIED — paywalled,
-#       not opened; the round-trip figure once attributed to it is not confirmed here.
+#       Grid: A Battery of Choices", Science 334(6058):928-935.
+#       doi:10.1126/science.1212741. OPENED AND READ 2026-07-20 (round 4).
+#       Table 1, p. 929, Li-ion row, "% Efficiency (total cycles)": "90–94 (4500)". Caption:
+#       "[Courtesy of EPRI]"; table sourced to its ref (1), EPRI Report 1020676 (2010).
+#       CONFIRMS the by-chemistry efficiency attribution with the upper bound corrected
+#       0.95 → 0.94. A REVIEW REPRODUCING A REPORT'S TABLE — a contrast/lead, never a bind.
 #   [B] Divya, K.C., Østergaard, J. (2009), "Battery energy storage technology for power
-#       systems — An overview", Electric Power Systems Research 79(4):511-520. UNVERIFIED —
-#       paywalled, not opened; the by-chemistry survey attributed to it is not confirmed.
+#       systems — An overview", Electric Power Systems Research 79(4):511-520.
+#       doi:10.1016/j.epsr.2008.09.017. OPENED AND READ 2026-07-20 (round 4).
+#       Table 1, p. 514 surveys η by chemistry as attributed (lead-acid 72–78 %, NiCd
+#       72–78 %, NaS 89 %, VRB 85 %, ZnBr 75 %, metal-air 50 %, PSB 75 %) — but gives
+#       Li-ion "η ≈ 100%", which is not a credible round-trip energy efficiency and is
+#       contradicted by [C]'s measured 0.8991. Table cited to refs [10–12], three bare URLs.
+#       NOT USABLE AS SUPPORT for this param; retained as the record of a checked lead.
 
 name: power
 process: charge
@@ -87,4 +119,4 @@ parameters:
   charge_efficiency:
     value: 0.95
     unit: "dimensionless"
-    source: "[C], § 3.2.3 + Table 3: measured one-way CHARGE energy efficiency of an NMC cell is 0.945 at 25 °C / 1P (0.935 at 0 °C) — ours is 0.95, an essentially exact match, marginally optimistic. DELTA (the model-structure caveat): because discharge here is joule-lossless, η_c IS the modeled round-trip, and [C] § 3.2.2 measures the real round-trip at 0.8991 (25 °C) — so as MODELED, 0.95 is ~5 points optimistic. That confirms this file's own concession from primary literature; the discharge-side loss remains a deferred seam. Rate-dependent: 0.945 is the 1P figure, rising toward ~0.985 at low rates. An ENERGY efficiency, not coulombic (>99 %)."
+    source: "[C], § 3.2.3 + Table 3: measured one-way CHARGE energy efficiency of an NMC cell is 0.945 at 25 °C / 1P (0.935 at 0 °C) — ours is 0.95, an essentially exact match, marginally optimistic. DELTA (the model-structure caveat): because discharge here is joule-lossless, η_c IS the modeled round-trip, and [C] § 3.2.2 measures the real round-trip at 0.8991 (25 °C) — so as MODELED, 0.95 is ~5 points optimistic. That confirms this file's own concession from primary literature; the discharge-side loss remains a deferred seam. Rate-dependent: 0.945 is the 1P figure, rising toward ~0.985 at low rates. An ENERGY efficiency, not coulombic (>99 %). ROUND 4 (2026-07-20): [A] and [B] were finally opened and neither changes the value, which already rested on [C] by design. [A] Table 1 gives Li-ion '90-94', so this file's old '~0.90-0.95' attribution overstated its upper bound and ours (0.95) sits ABOVE [A]'s range — a second source agreeing ours is optimistic; note [A]'s table is '[Courtesy of EPRI]', a review reproducing EPRI Report 1020676, not primary data. [B]'s by-chemistry survey is real but gives Li-ion 'η ≈ 100%', not credible as a round-trip and contradicted by [C]'s measured 0.8991 — unusable as support. ⚠ Contrast self_discharge.yaml, where the SAME two papers were cited by the same author at the same time and the attribution there is FALSE: the unit of trust is the claim, not the paper."

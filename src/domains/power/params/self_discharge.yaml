@@ -32,9 +32,20 @@
 #   Must be ≥ 0: 0 is valid (an ideal, leak-free cell — inert machinery, the herbivory
 #   "zero rate is valid" precedent); negative (creates energy) is rejected.
 #
-# Realistic magnitude — a genuine Li-ion figure, NOT tuned to make a test pop. Li-ion
-#   self-discharge is ~2-3 %/month [A][B]. k = 1.0e-8 /s = 1e-8 · (30·86400) ≈ 2.6 %/month
-#   — squarely in range. This is deliberately slow: over a week-scale run the SOC barely
+# Realistic magnitude — k = 1.0e-8 /s = 1e-8 · (30·86400) ≈ 2.6 %/month.
+#   ⚠ THIS BLOCK'S ORIGINAL JUSTIFICATION IS FALSIFIED (round 4, 2026-07-20). It read:
+#   "a genuine Li-ion figure, NOT tuned to make a test pop. Li-ion self-discharge is
+#   ~2-3 %/month [A][B] … squarely in range." Both citations were finally OPENED, and
+#   NEITHER supports it: [A] contains no self-discharge figure of any kind (one qualitative
+#   mention in the whole paper; zero occurrences of "%/month" — verified by text extraction,
+#   not by eye), and [B]'s Table 1 gives Li-ion self-discharge as 1 %/month, so 2.6 %/month
+#   is ~2.6× ABOVE its only cited by-chemistry number rather than "squarely in range".
+#   The sentence was a FALSE ATTRIBUTION to two papers nobody had opened — the exact hazard
+#   the round-1 review checklist was written to catch. See FINDING 1 and FINDING 3 below.
+#   THE VALUE IS UNCHANGED AND THE REASONS IT STANDS ARE BELOW — but they are now
+#   "conservative + magnitude-independent test", NOT "a genuine Li-ion figure". Those are
+#   different warrants and only the second was ever claimed here.
+#   This is deliberately slow: over a week-scale run the SOC barely
 #   bends, so the attractor/restoring-force property is proved EXACTLY by the two-run
 #   contraction test (magnitude-independent), NOT by a visible convergence. Inflating k to
 #   force a visible bend would be dishonest; the contraction test earns the keep at the
@@ -49,18 +60,41 @@
 #   dedicated literature sweep could not bind 2.6 %/month to ANY primary source, and the
 #   evidence that IS accessible points LOWER. Recorded rather than papered over.
 #
-#   FINDING 1 — "1–3 %/month" is VENDOR FOLKLORE, not literature. The canonical figure that
-#   would bracket our value saturates the trade press (Battery University, cell-maker
-#   blogs) and is absent from primary literature, which reports self-discharge either as
-#   µA-scale float currents or as temperature-dependent curves — never as a canonical
-#   %/month constant. Re-confirmed across independent searches. That saturation IS the
-#   finding: a number everyone repeats and nobody publishes.
-#   ROUND 2 (2026-07-16) STRENGTHENS THIS: [D] was obtained and read — a 2023 study devoted
-#   entirely to long-term self-discharge measurement across three cell chemistries — and it
-#   TOO reports no %/month figure, only float currents "in the order of µA". A dedicated
-#   modern primary declining to state the number is stronger evidence for FINDING 1 than any
-#   number of failed searches: the constant is not merely hard to find, it is not how the
-#   field measures the quantity.
+#   FINDING 1 — ⚠ NARROWED BY ROUND 4 (2026-07-20), AND TWO-THIRDS OF IT WAS FALSE.
+#   As originally written it made three claims. [B] was opened in round 4 and splits them:
+#     * "1–3 %/month is VENDOR FOLKLORE, **not literature**" — FALSE. [B] is a peer-reviewed
+#       paper in an Elsevier journal (Electric Power Systems Research).
+#     * "primary literature reports µA float currents or temperature curves, **NEVER** a
+#       canonical %/month constant" — FALSE. [B]'s Table 1 is exactly such a constant, for
+#       eight chemistries: lead-acid 2–5 %/month, NiCd 5–20 %/month, Li-ion 1 %/month,
+#       NaS "no self-discharge", VRB/ZnBr/metal-air/PSB "negligible".
+#     * "absent from PRIMARY literature" — SURVIVES, but only on the primary/review
+#       distinction, and only because of the provenance fact below.
+#   WHAT SURVIVES, stated as narrowly as the evidence allows: the %/month constant DOES
+#   appear in peer-reviewed literature, and its citation chain there terminates in web
+#   resources rather than in a measurement. [B]'s Table 1 caption attributes the whole table
+#   to refs [10–12], which are three bare URLs — Sandia National Laboratory (sandia.gov/ess),
+#   ECN RESDAS (ecn.nl/resdas), and the Electricity Storage Association
+#   (electricity-storage.org). No measurement, method, cell or temperature is given for the
+#   1 %/month anywhere in [B]. That is a PROVENANCE observation and is all that is claimed
+#   here: it is NOT an assertion about how the number got there or anyone's intent.
+#   ⚠ DO NOT UPGRADE THIS BACK INTO "the finding survives in a stronger form." It does not.
+#   A prediction and a claim were BOTH tested here and they came apart: round 2's RETRIEVAL
+#   prediction ("[B] is the most likely home of a citable by-chemistry %/month figure") was
+#   CONFIRMED exactly, while FINDING 1's ABSENCE claim was FALSIFIED by that same table. The
+#   confirmed prediction is the thing most likely to blur the falsification — the qualifier
+#   dropping and the fact reading like the rule is this project's own recurring failure.
+#   ROUND 2 (2026-07-16): [D] was obtained and read — a 2023 study devoted entirely to
+#   long-term self-discharge measurement across three cell chemistries — and it reports no
+#   %/month figure, only float currents "in the order of µA". A dedicated modern primary
+#   declining to state the number is stronger evidence than any number of failed searches:
+#   the constant is not how the field MEASURES the quantity.
+#   ROUND 4 NOTE: this [D] observation is the part of FINDING 1 that came through round 4
+#   INTACT, and it is now doing more work than before, because it is the whole of what is
+#   left. The contrast is the sharpest form of the surviving claim: [D] MEASURES
+#   self-discharge and gives no %/month; [B] gives a %/month and measures nothing, citing
+#   three URLs. Those are not in conflict — they are the review/primary split, observed
+#   directly in two papers on the same quantity.
 #
 #   FINDING 2 — ours is ~6× the measured room-temperature rate, and above the WHOLE curve.
 #   [C] measures self-discharge in exactly our units (%/30 d) for an LFP cell at 50 % SOC
@@ -71,24 +105,58 @@
 #   quoted numbers — [C] states the value only graphically — and it is one LFP cell. That
 #   imprecision is exactly why this stays TODO(cite) rather than becoming a bind.)
 #
-#   WHY THE VALUE STANDS ANYWAY: it is CONSERVATIVE, and conservative is safe here — a
-#   pessimistic shelf-loss makes the power margin harder, never easier, and the attractor
-#   property the flow earns its keep by is proved MAGNITUDE-INDEPENDENTLY by the two-run
-#   contraction test. Changing it would be calibration (scope B), which moves goldens.
+#   FINDING 3 (round 4) — a THIRD independent source now sits BELOW our value, and it is
+#   the one our own file used to cite in support of it. [B] Table 1: Li-ion self-discharge
+#   1 %/month. Ours is 2.59 %/month ⇒ ~2.6× above it. The three accessible sources now read:
+#       [B] 1 %/month (review; by-chemistry table, cited to three URLs)
+#       [C] ≈ 0.4 %/30 d at 25 °C  (measured, graphical; ours ~6–7×)
+#       [D] "order of µA" float current ⇒ 0.02–0.65 %/month on its 3 cells (ours 4–100×)
+#   They disagree with each other by an order of magnitude — which is itself informative
+#   about how well-determined this quantity is — but they agree on the SIGN: every one of
+#   them puts the true rate BELOW 2.59 %/month, and ours is above the highest of the three.
 #
-#   ⚠ THE PRE-2026 CITATIONS [A] AND [B] ARE STILL UNVERIFIED AFTER ROUND 2 — both
-#   paywalled, neither opened, so the "a few %/month" once attributed to them has STILL
-#   never been checked. Skeptical read on [A]: it is a grid-storage REVIEW in Science, not a
-#   self-discharge measurement paper, so even if the sentence exists it would be a weak
-#   locus for this param. Demoted to leads.
-#   ROUND 2 STATUS: [A] and [B] were #3 and #4 on the retrieval list and were NOT among the
-#   sources supplied — they are, with Stanford & Smith (#6), the three items the round-2
-#   batch did not cover. So THE ONE LIVE MISCITATION RISK IN THE FROZEN TREE SURVIVES this
-#   round untouched. It is flagged here rather than quietly dropped: every OTHER open item
-#   in this file has now been advanced, which makes it easy to misread the file as settled.
-#   It is not. FINDING 1 now makes the skeptical read likelier still — if a dedicated 2023
-#   measurement study [D] does not state a %/month constant, a 2011 grid-storage review is
-#   an improbable place for one to be, and the attribution may simply be wrong.
+#   WHY THE VALUE STANDS ANYWAY — and ⚠ NOTE THE WARRANT CHANGED. Two separate things, kept
+#   separate deliberately (they were run together before round 4, which is how a falsified
+#   citation went unnoticed under a still-true conclusion):
+#     (1) THE VALUE MAY STAND: it is CONSERVATIVE, and conservative is safe here — a
+#         pessimistic shelf-loss makes the power margin harder, never easier — and the
+#         attractor property the flow earns its keep by is proved MAGNITUDE-INDEPENDENTLY
+#         by the two-run contraction test. Neither reason depends on any citation.
+#     (2) THE VALUE'S ORIGINAL JUSTIFICATION IS FALSIFIED: "a genuine Li-ion figure …
+#         ~2-3 %/month [A][B]" is false against both papers (see the magnitude block).
+#   ⚠ (1) DOES NOT RESCUE (2), and the two must not be merged again. What is now open is a
+#   question this file cannot answer and does not pre-answer: whether a value in a FROZEN
+#   reference may rest on "conservative + a magnitude-independent test" ALONE when every
+#   source accessible to us disagrees with it and the sources it cited never supported it.
+#   If the answer is no, the fix is RECALIBRATION = scope B (moves goldens, cascades to the
+#   station goldens). That is a user decision, not a scope-C one. Recorded, not resolved.
+#   See docs/plans/post-roadmap-citation.md (round 4).
+#
+#   ✅ RESOLVED — THE MISCITATION RISK MATERIALIZED, AND IT WAS REAL (round 4, 2026-07-20).
+#   [A] and [B] were supplied by the user and OPENED. Rounds 1–3 could only record the risk;
+#   round 4 measured it. The verdict on each:
+#     [A] — CONFIRMED MISCITATION. Dunn 2011 contains NO self-discharge figure at all. The
+#          word "self-discharge" occurs exactly ONCE in the entire paper, qualitatively
+#          ("a premium will be placed on energy-efficient systems that do not lose energy
+#          through self-discharge or parasitic losses", p. 934), and "%/month" occurs ZERO
+#          times. Verified by TEXT EXTRACTION over the full paper, not by reading page
+#          images — the round-3 lesson (a verbatim/absence claim in a frozen file is ungated,
+#          so it gets a mechanical check, not an eye-read). An absence claim especially: it
+#          is the one kind of claim skimming cannot establish.
+#     [B] — CONFIRMED PRESENT, AND CONTRADICTS THE VALUE IT WAS CITED FOR. Divya 2009 DOES
+#          carry the by-chemistry %/month table round 2 predicted (Table 1, p. 514) — but
+#          its Li-ion entry is 1 %/month, not the "2-3 %/month" this file attributed to it.
+#   ⚠ THE SKEPTICAL READ ON [A] WAS RIGHT, AND FOR THE RIGHT REASON, WHICH IS WORTH KEEPING:
+#   rounds 1–3 reasoned "a 2011 grid-storage REVIEW is an improbable place for a
+#   self-discharge constant, so the attribution may simply be wrong." It was wrong, exactly
+#   there. Structural skepticism about a LOCUS ("is this the kind of paper that would even
+#   contain this number?") predicted a specific miscitation before anyone could open the
+#   paper. That reasoning is cheap, needs no retrieval, and is worth applying to every
+#   remaining unopened citation in the tree rather than waiting for a PDF.
+#   ⚠ BUT NOTE WHAT IT DID NOT PREDICT: the same skeptical read was applied to [B] and got
+#   the OPPOSITE result — [B] is also a review, and it DID contain the number. The heuristic
+#   forecasts absence in a review, not presence, and it is not a substitute for opening the
+#   paper. Two reviews, same prior, opposite outcomes.
 #
 # Sources:
 #   [C] Schimpe, M., Naumann, M., Truong, N., Hesse, H.C., Santhanagopalan, S., Saxon, A.,
@@ -105,15 +173,34 @@
 #       50 %". CONTRAST — the measured rate our value is compared against, NOT its source
 #       (the value is graphical; see FINDING 2's caveat).
 #   [A] Dunn, B., Kamath, H., Tarascon, J.-M. (2011), "Electrical Energy Storage for the
-#       Grid: A Battery of Choices", Science 334(6058):928-935. STILL UNVERIFIED — paywalled,
-#       not opened; the "few %/month" attributed to it is not confirmed here. It was #3 on
-#       the plan doc's retrieval list and was NOT among the sources supplied in round 2, so
-#       this miscitation risk PERSISTS — recorded so it is not mistaken for settled.
+#       Grid: A Battery of Choices", Science 334(6058):928-935.
+#       OPENED AND READ 2026-07-20 (round 4 — supplied by the user; #3 on the retrieval list
+#       since round 1). ⚠ IT DOES NOT SUPPORT THIS PARAM AND NEVER DID. Full-text extraction:
+#       "self-discharge" ×1 (qualitative, p. 934, quoted above), "%/month" ×0, "per month"
+#       ×0. There is no self-discharge rate in the paper for any chemistry. RETAINED AS A
+#       CITATION HERE ONLY AS THE RECORD OF A FALSIFIED ONE — it is not evidence for the
+#       value and must not be re-promoted to support it. (It DOES bear on charge.yaml's
+#       efficiency claim, where it says something real; see that file.)
 #   [B] Divya, K.C., Østergaard, J. (2009), "Battery energy storage technology for power
-#       systems — An overview", Electric Power Systems Research 79(4):511-520. STILL
-#       UNVERIFIED — paywalled, not opened. #4 on the retrieval list, also NOT supplied in
-#       round 2. Most likely home of a citable by-chemistry %/month figure if anyone
-#       retrieves it (see docs/plans/post-roadmap-citation.md, the paywalled list).
+#       systems — An overview", Electric Power Systems Research 79(4):511-520.
+#       doi:10.1016/j.epsr.2008.09.017
+#       OPENED AND READ 2026-07-20 (round 4 — supplied by the user; #4 on the retrieval
+#       list). Table 1, p. 514 ("Battery technologies—characteristics and commercial units
+#       used in electric utilities [10–12]"), Lithium ion row, verbatim: "η ≈ 100%, cost
+#       700–1000, life span 3000 cycle at 80% depth of discharge, operating temperature
+#       −30 to 60 °C, 90–190 Wh/kg, SELF-DISCHARGE 1%/MONTH, high cost due to special
+#       packaging and internal over charge protection". Other rows, verbatim: lead-acid
+#       flooded and VRLA "self-discharge 2–5%/month"; NiCd "self-discharge 5–20%/month";
+#       NaS "no self-discharge, due to high operating temperature it has to be heated in
+#       stand-by mode and this reduces its overall η"; VRB/ZnBr/metal-air/PSB "negligible
+#       self-discharge".
+#       ⚠ PROVENANCE OF THAT TABLE — the reason this is a CONTRAST and not a bind: the
+#       caption attributes it to refs [10–12], which are three bare URLs (Sandia National
+#       Laboratory sandia.gov/ess; ECN RESDAS ecn.nl/resdas; Electricity Storage Association
+#       electricity-storage.org). [B] reports no measurement, method, cell chemistry detail,
+#       temperature or SOC for the 1 %/month. So it does not bind the value either — it
+#       CONTRADICTS the number this file attributed to it, without itself being a locus a
+#       value could honestly rest on. Both halves matter; see FINDING 1 and FINDING 3.
 #   [D] Azzam, M., Ehrensberger, M., Scheuer, R., Endisch, C. & Lewerenz, M. (2023),
 #       "Long-Term Self-Discharge Measurements and Modelling for Various Cell Types and Cell
 #       Potentials", Energies 16(9):3889. https://doi.org/10.3390/en16093889
@@ -146,4 +233,4 @@ parameters:
   self_discharge_rate:
     value: 1.0e-8
     unit: "1/s"
-    source: "TODO(cite) — STILL OPEN, with a measured finding, now corroborated by a SECOND independent primary (2026-07-16, round 2: [D] obtained and read). No primary source binds 2.6 %/month. The bracketing '1–3 %/month' is VENDOR folklore, absent from primary literature — and [D], a 2023 study devoted entirely to long-term self-discharge across three chemistries, ALSO reports no %/month constant, only float currents 'in the order of µA'. A dedicated modern primary declining to state the number is the strongest form of that finding: it is not how the field measures the quantity. Two independent primaries now put the true rate BELOW ours: [C] measures ≈ 0.4 %/30 d at 25 °C for an LFP cell (ours ~6–7×, and above every point on its whole 10–55 °C curve — a hot/older-cell figure); and ours implies a 40–115 µA float current on [D]'s three 18650 cells (Table 1: 1.1/2.15/3.2 Ah), one to two orders above [D]'s measured 'order of µA'. Both comparisons are order-of-magnitude, NOT binds — [C]'s value is graphical and [D]'s per-cell currents live in Figures 4–6, never in text. Kept because it is CONSERVATIVE (pessimistic shelf-loss only tightens the power margin) and because the attractor property is proved magnitude-independently by the two-run contraction test. ⚠ [A][B] REMAIN UNVERIFIED — not supplied in round 2, so the live miscitation risk in this file SURVIVES even though every other open item here advanced. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN. ⚠ ROUND 4 (2026-07-20) — THE MISCITATION MATERIALIZED: [A] and [B] were supplied and OPENED, and the justification this param carried from Phase 5 until now ('a genuine Li-ion figure … ~2-3 %/month [A][B] … squarely in range') is FALSE AGAINST BOTH. [A] Dunn 2011 contains NO self-discharge figure at all — 'self-discharge' appears once, qualitatively, and '%/month' zero times (verified by full-text extraction, not by eye: an ABSENCE claim is the one kind skimming cannot establish). [B] Divya 2009 DOES carry the by-chemistry %/month table round 2 predicted (Table 1, p. 514) but gives Li-ion 1 %/month — so ours is ~2.6x ABOVE its only cited number, not 'squarely in range'. FINDING 1 is NARROWED, and two of its three claims were FALSE: the %/month constant is NOT absent from peer-reviewed literature ([B] is Elsevier, and tabulates it for eight chemistries). What survives is only the primary/review split — [B]'s Table 1 is cited to refs [10-12], three bare URLs (Sandia ESS, ECN RESDAS, Electricity Storage Association), with no measurement, method, cell or temperature given; while [D], which MEASURES the quantity, still reports no %/month. THREE accessible sources now bracket ours from BELOW: [B] 1 %/month, [C] ~0.4 %/30 d at 25 C, [D] 0.02-0.65 %/month implied. They disagree with each other by an order of magnitude but agree on the sign. THE VALUE IS UNCHANGED and its warrant is now explicitly 'conservative (pessimistic shelf-loss only tightens the power margin) + the attractor property is proved magnitude-independently by the two-run contraction test' — NOT 'a genuine Li-ion figure', which was never true. ⚠ Whether a FROZEN value may rest on that warrant alone, when every accessible source disagrees and its cited sources never supported it, is an OPEN scope-B question deliberately NOT pre-answered here (recalibration moves goldens and cascades to station goldens = a user decision). ROUND 2 CONTEXT BELOW STANDS EXCEPT WHERE ROUND 4 NARROWED IT (marked inline). No primary source binds 2.6 %/month. [SUPERSEDED BY ROUND 4 — the bracketing '1–3 %/month' was called VENDOR folklore 'absent from primary literature'; that is FALSE as written, see above: [B] tabulates it in a peer-reviewed journal. Only the primary/review half survives.] And [D], a 2023 study devoted entirely to long-term self-discharge across three chemistries, ALSO reports no %/month constant, only float currents 'in the order of µA'. A dedicated modern primary declining to state the number is the strongest form of that finding: it is not how the field measures the quantity. Two independent primaries now put the true rate BELOW ours: [C] measures ≈ 0.4 %/30 d at 25 °C for an LFP cell (ours ~6–7×, and above every point on its whole 10–55 °C curve — a hot/older-cell figure); and ours implies a 40–115 µA float current on [D]'s three 18650 cells (Table 1: 1.1/2.15/3.2 Ah), one to two orders above [D]'s measured 'order of µA'. Both comparisons are order-of-magnitude, NOT binds — [C]'s value is graphical and [D]'s per-cell currents live in Figures 4–6, never in text. Kept because it is CONSERVATIVE (pessimistic shelf-loss only tightens the power margin) and because the attractor property is proved magnitude-independently by the two-run contraction test. ✅ [A][B] ARE NO LONGER UNVERIFIED — supplied and opened in round 4, which is how the false attribution above was found; the risk this line used to flag as live is the risk that materialized. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."

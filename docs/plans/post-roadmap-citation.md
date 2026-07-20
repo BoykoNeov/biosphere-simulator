@@ -3,9 +3,14 @@
 **Status: COMPLETE** (2026-07-16), then **ROUND 2 COMPLETE** (2026-07-16) — the user
 supplied ~10 of the 12 sources on this doc's own retrieval list, and the open items were
 re-run against them — then **ROUND 3 (2026-07-20)**, a deliberately bounded retrieval pass
-at the 3 residual items. **Jump to "ROUND 3" at the very bottom for the current state.**
-Rounds 1 and 2 are preserved below unedited, including the predictions later rounds
+at the 3 residual items — then **ROUND 4 (2026-07-20)**, where the user supplied **2 of the
+3** and the **miscitation risk this scope had flagged since round 1 MATERIALIZED**: one of
+the two was a **confirmed false attribution in the frozen tree**.
+**Jump to "ROUND 4" at the very bottom for the current state.**
+Rounds 1–3 are preserved below unedited, including the predictions later rounds
 falsified — the point of a living record is that you can see what was believed at the time.
+Round 4 falsifies rounds 1–2 in one place each, and confirms a round-2 prediction in a
+third; all three are marked in place rather than rewritten.
 
 The third and last scope of bucket 3 (validation). Scope (A) — diagnose + pin the oracle
 gap — is COMPLETE (`post-roadmap-validation.md`). Scope (B) — the full oracle match —
@@ -615,3 +620,179 @@ The narrow exception is real and is left on the table: the two battery texts in 
 batteries*) do bear on `self_discharge_rate`, a scope-(C) param, so auditing **those two** would
 be legitimately in scope — with a low prior of a bind, per FINDING 4. Recorded as an available
 increment, not a pending obligation.
+
+---
+
+# ROUND 4 — the risk materialized (2026-07-20)
+
+The user supplied **2 of the 3** residual items: Dunn 2011 and Divya 2009. Stanford & Smith
+1972 was not available and remains the **sole** item on the retrieval list (12 → 3 → 1).
+
+Round 3 confirmed a *ceiling*. Round 4 is the first round since round 2 to change what the
+tree *says*, and the first round of this entire scope to find a **fabricated attribution
+rather than a weak one**.
+
+## The headline: rounds 1–3 flagged a risk; round 4 measured it, and it was real
+
+Every round of this scope carried the same warning — two citations sat in the frozen tree,
+attached to numbers, and **nobody had opened either paper**. It was recorded as a *risk*
+because that is all an unopened paper can be. Both are now open:
+
+| Claim in the tree | Source | Verdict |
+|---|---|---|
+| `self_discharge.yaml`: "Li-ion self-discharge is ~2-3 %/month **[A]**" | Dunn 2011 | ❌ **FALSE — confirmed miscitation.** The paper contains **no self-discharge figure at all.** |
+| `self_discharge.yaml`: "…~2-3 %/month **[B]**" | Divya 2009 | ❌ **FALSE.** [B] *does* give the number — as **1 %/month**. Ours is 2.6× above it. |
+| `charge.yaml`: "**[A]** Li-ion round-trip efficiency ~0.90-0.95" | Dunn 2011 | ⚠ **Substantially true, bound overstated:** printed range is **90–94**. And it is EPRI's table, reproduced. |
+| `charge.yaml`: "**[B]** surveyed round-trip efficiencies by chemistry" | Divya 2009 | ⚠ **True as a claim, unusable as support:** it lists Li-ion at **η ≈ 100 %**. |
+
+**Two of four attributions were false; the two that held were in the other file.** The same
+two papers, cited in two files by the same author at the same time, produced a fabricated
+attribution in one and a sound one in the other. **The unit of trust is the claim, not the
+paper and not the person** — which is why the round-1 checklist requiring that every cited
+locus was *actually opened* is per-locus and not per-source.
+
+## [A] Dunn 2011: an absence, established mechanically
+
+`self-discharge` occurs **once** in the entire paper, qualitatively, with no number:
+
+> "a premium will be placed on energy-efficient systems that do not lose energy through
+> self-discharge or parasitic losses" (p. 934)
+
+`%/month` occurs **zero** times. `per month`: zero.
+
+⚠ **This was verified by full-text extraction, not by reading page images** — deliberately,
+and it is round 3's lesson applied one step further. Round 3 established that a verbatim
+quote in a frozen file is ungated and must be checked against the scan rather than
+remembered. **An ABSENCE claim is strictly worse: it is the one kind of claim that skimming
+structurally cannot establish**, because the evidence for it is distributed over every page
+you did not read carefully. "I read it and didn't see a number" is not a finding; a
+character-level count over the extracted text is. Recorded because the same discipline is
+owed to every other absence claim this scope has made.
+
+**The round-1 skeptical read was right, and for the right reason.** Rounds 1–3 reasoned:
+*a 2011 grid-storage REVIEW is an improbable place for a self-discharge constant, so the
+attribution may simply be wrong.* It was wrong, exactly there. Reasoning about whether a
+**locus is the kind of document that would even contain the claim** predicted a specific
+miscitation with no retrieval at all — cheap, and worth applying to every remaining unopened
+citation rather than waiting for a PDF.
+
+⚠ **But note what it did NOT predict.** The identical read was applied to [B] — also a
+review — and got the **opposite** result: [B] *did* contain the number. The heuristic
+forecasts *absence* in a review; it does not forecast presence, and it is not a substitute
+for opening the paper. Two reviews, same prior, opposite outcomes.
+
+## [B] Divya 2009: the round-2 prediction confirmed — and FINDING 1 falsified by the same table
+
+Round 2 predicted [B] was *"the most likely home of a citable by-chemistry %/month figure."*
+**That prediction was exactly right.** Table 1 (p. 514) tabulates self-discharge for eight
+chemistries: lead-acid 2–5 %/month, NiCd 5–20 %/month, **Li-ion 1 %/month**, NaS "no
+self-discharge", VRB/ZnBr/metal-air/PSB "negligible".
+
+And the same table **falsifies FINDING 1**, which had claimed the %/month constant was
+*"VENDOR FOLKLORE, not literature … absent from primary literature … never a canonical
+%/month constant."* Of its three claims:
+
+- "not **literature**" — **FALSE.** [B] is peer-reviewed, in an Elsevier journal.
+- "**never** as a canonical %/month constant" — **FALSE.** Table 1 is exactly that.
+- "absent from **primary** literature" — **survives**, on the primary/review distinction only.
+
+**What survives, stated as narrowly as the evidence allows:** the %/month constant *does*
+appear in peer-reviewed literature, and its citation chain there terminates in **web
+resources rather than in a measurement**. [B]'s Table 1 is attributed to refs **[10–12]** —
+three bare URLs (Sandia National Laboratory `sandia.gov/ess`; ECN RESDAS `ecn.nl/resdas`;
+Electricity Storage Association `electricity-storage.org`). No measurement, method, cell,
+temperature or SOC is given for the 1 %/month anywhere in the paper.
+
+That is a **provenance observation and nothing more**. It is *not* a claim about how the
+number got there or about anyone's intent, and it was deliberately not written up as one.
+
+⚠ **This is recorded as a NARROWING, not as "the finding survives in a stronger form"** —
+which is how it was first drafted, and which advisor caught. Two-thirds of FINDING 1 was
+simply wrong. **A prediction and a claim were both tested here and they came apart**:
+round 2's *retrieval* prediction was confirmed while FINDING 1's *absence* claim was
+falsified, **by the same page**. The satisfaction of the correct prediction is precisely
+what tempts one to blur the falsification — the qualifier dropping and the fact reading like
+the rule, which is this project's own recurring failure, here caught *before* it was written
+into a frozen file rather than after.
+
+**The sharpest surviving form of FINDING 1 is a contrast between two papers on one quantity:**
+[D] Azzam 2023 **measures** self-discharge and reports **no %/month**, only µA float
+currents; [B] **reports a %/month** and measures nothing, citing three URLs.
+
+## The value: unchanged, but its warrant changed — and that is now an open scope-B question
+
+`self_discharge_rate = 1.0e-8 /s` ≈ **2.59 %/month**. Three accessible sources now bracket it
+from **below**, and they disagree with *each other* by an order of magnitude while agreeing
+on the **sign**:
+
+| Source | Figure | Ours vs it |
+|---|---|---|
+| [B] Divya 2009 (review, cited to 3 URLs) | 1 %/month | ~2.6× |
+| [C] Schimpe 2018 (measured, graphical) | ≈ 0.4 %/30 d at 25 °C | ~6–7× |
+| [D] Azzam 2023 (measured, float current) | 0.02–0.65 %/month implied | ~4–100× |
+
+**Two things are true at once and are kept apart deliberately** — running them together is
+how a falsified citation survived under a still-defensible conclusion for four rounds:
+
+1. **The value may stand.** It is *conservative* (a pessimistic shelf-loss only tightens the
+   power margin, never loosens it), and the attractor property the flow earns its keep by is
+   proved **magnitude-independently** by the two-run contraction test. Neither reason depends
+   on any citation.
+2. **The value's original justification is falsified.** *"A genuine Li-ion figure … ~2-3
+   %/month [A][B] … squarely in range"* is false against both cited papers. Correcting that
+   text is **required** scope-(C) work, not optional — it is a known-false attribution.
+
+⚠ **(1) does not rescue (2).** What is now open is a question this scope deliberately does
+**not** pre-answer: *may a value in a FROZEN reference rest on "conservative + a
+magnitude-independent test" alone, when every source accessible to us disagrees with it and
+the sources it cited never supported it?* If the answer is no, the fix is **recalibration =
+scope (B)** — it moves the power goldens and cascades to the station goldens. **That is a
+user decision.** Recorded, not resolved.
+
+## What round 4 changed, and what it did not
+
+**Changed** (both `power/` params, i.e. the **STATION** freeze contract — *not* biosphere;
+round 3 had edited biosphere and the reflex to regenerate that same manifest was caught on
+advisor review before it shipped a stale station hash):
+
+- `self_discharge.yaml` — the falsified magnitude justification marked in place; FINDING 1
+  narrowed with its two false sub-claims named; FINDING 3 added (the third source below
+  ours); [A]/[B] promoted from `UNVERIFIED` to opened, with verdicts; two stale fragments in
+  the machine-visible `source:` string corrected (it still asserted "[A][B] REMAIN
+  UNVERIFIED" and "absent from primary literature").
+- `charge.yaml` — [A]/[B] promoted to opened; the 0.90-0.95 → **90–94** correction recorded,
+  with the "[Courtesy of EPRI]" reproduction noted; [B] marked unusable-as-support.
+
+**Not changed: no value, no golden, no code.** `git diff src/` touches only the two YAML
+headers and their `source:` strings. Manifest diff = **exactly the two param hashes**.
+`rust/crates/domains/src/sibling_params.txt` regenerated **byte-identical** (proven by
+rewriting it and finding `rust/` clean, not asserted) — the Rust generator emits
+`name<TAB><value.hex()>` and never the provenance, which is the same structural reason a
+provenance-only edit is an unfreeze **nothing catches**.
+
+**The honor-system ceremony was followed deliberately** *because* nothing enforces it:
+advisor review → regenerate the manifest as the git-visible record → document here.
+
+## What this leaves
+
+**The retrieval list is 1 item: Stanford & Smith 1972.** Down from 12 (round 1) → 3
+(rounds 2–3) → 1.
+
+**The residual risk is now materially smaller and better characterized.** Rounds 1–3 closed
+with *"two unverified citations in the frozen tree + one secondary-mediated number."* The two
+unverified citations are now **verified — and one of them was false**, which is a worse
+*finding* than the risk it replaced but a **better state**, because a known-false attribution
+that is labelled is not a hazard; an unopened one is. What remains:
+
+- **`mineralization_rate`** — still mediated by [C]-quoting-[A]; needs S&S 1972.
+- **`self_discharge_rate`** — now correctly attributed to nothing, with three sources below
+  it and an **open scope-(B) question** on whether that is tolerable in a frozen reference.
+
+⚠ **Round 4 does not re-open the scope-substitution question round 3 settled.** The ~15
+unopened corpus sources are still mostly scope-(B) science, and opening them under a
+scope-(C) banner would still be starting scope (B). The narrow exception is **unchanged and
+now more pointed**: the two battery texts already in `sources/` (Braun, *Electrochemical
+Energy Systems*; SAE, *Progress in modeling and simulation of batteries*) bear directly on
+`self_discharge_rate` — the one param round 4 left with an open question. Still an available
+increment, still not a pending obligation, but it is now the increment that would speak to
+the **live** question rather than a general tidy-up.
