@@ -255,7 +255,20 @@ Recorded as decisions rather than silently taken:
 
 # OUTCOME — increment 1 (measured 2026-07-20, BEFORE the unfreeze ceremony)
 
-**The science landed, and it did something the diagnosis said it would not.**
+> ## ⛔ READ THIS FIRST — the endpoint match below is a FALSE POSITIVE
+>
+> Vernalization moves our anthesis from 79 days early to 3 days late. **That match is
+> achieved by a mechanism the oracle does not have**, and the increment is therefore
+> **NOT accepted**: no golden was regenerated and the ceremony was stopped at step 1.
+>
+> The oracle (WOFOST 7.2 `Winter_wheat_101`) **does not arrest development in winter** —
+> it runs a **photoperiod**-modulated rate. Evidence in "The check that stopped the
+> ceremony" below. Everything in "What it was aimed at" is arithmetically correct and
+> **scientifically misattributed**; the internal-coupling finding after it survives
+> intact, because it never referenced the oracle.
+
+**The science landed, and it did something the diagnosis said it would not — and then a
+review check showed it landed for the wrong reason.**
 
 ## What it was aimed at: the phenology overrun, essentially closed
 
@@ -282,14 +295,19 @@ Scope (A) finding 2 states, in bold:
 > **DVS runs on thermal time, independent of biomass — so fixing phenology does not fix
 > finding 1, and vice versa.**
 
+**This half survives the check below, and is stated deliberately WITHOUT reference to the
+oracle** — it is a before/after on our own model, so it holds whatever the oracle's
+mechanism turns out to be. (The oracle-relative version, "the peak-LAI gap fell 43.4× →
+4.4×", is *not* used: it imports a target whose validity the next section puts in
+question. Advisor catch.)
+
 Measured, changing **only** phenology and **no param value**:
 
-| canopy metric | oracle | BEFORE | AFTER |
+| canopy metric (ours) | BEFORE | AFTER | change |
 |---|---|---|---|
-| peak LAI | 6.337 (day 212) | 0.146 (day 32) | **1.441 (day 254)** |
-| peak light interception | 97.8 % | 5.00 % | **57.9 %** |
-| peak-LAI gap | — | **43.4×** | **4.4×** |
-| f_int at day 212 | — | 0.79 % | **17.1 %** |
+| peak LAI | 0.146 (day 32) | **1.441 (day 254)** | **9.9×** |
+| peak light interception | 5.00 % | **57.9 %** | 11.6× |
+| leaf at season end, as fraction of peak | < 20 % | **40 %** | spiral gone |
 
 **The dominant cause fell by an order of magnitude as a side effect of fixing the second
 cause.** `tests/test_oracle_gap.py::test_method_the_death_spiral_mechanism` now **fails**:
@@ -318,13 +336,91 @@ after a correctly-argued one-way statement. Scope (A) could not have caught it w
 running exactly this experiment, but it could have *scoped* the claim to the direction it
 had evidence for.
 
-**Consequence for increment 2: it is now much smaller than planned, and its brief has
-changed.** The remaining canopy gap is 4.4× rather than 43×, and the surviving defect is
-different in kind — our LAI now peaks on **day 254, 34 days AFTER anthesis (day 220)**,
-where wheat should peak at or just before anthesis and decline through grain fill. That
-is a senescence/allocation *timing* defect, not a failure to bootstrap. Whether it still
-warrants a juvenile-expansion regime switch — the thing increment 2 was scoped as — is
-now an open question that must be re-derived, **not** inherited from scope (A).
+**Consequence for increment 2 — flagged, but NOT yet actionable.** It is tempting to
+conclude "increment 2 is now much smaller"; that conclusion is **contingent on the
+phenology fix being the right one**, and the next section shows it is not. What can be
+said oracle-independently is that *a* phenology slowdown, whatever its mechanism, largely
+dissolves the death spiral by keeping `fl` high — so increment 2's brief must be
+**re-derived after the phenology mechanism is settled**, never inherited from scope (A).
+The surviving defect also looks different in kind (our LAI now peaks 34 days *after* our
+own anthesis, where wheat should peak at or just before it and decline through grain
+fill) — a senescence/allocation *timing* question rather than a failure to bootstrap.
+
+## The check that stopped the ceremony (advisor, at the pre-regeneration review)
+
+The advisor asked a question I had raised in passing and walked past: **the oracle's crop
+identity.** An early note in this session read *"the bundled oracle is
+lintul3_springwheat … but the season is winter wheat sown 1 Oct"*, and it was not chased.
+Spring wheat has no cold requirement; LINTUL3 often carries no vernalization at all. If
+the oracle did not model dormancy, a 57-day arrest matching its anthesis date would be
+**the right answer for the wrong physics** — precisely what clean-room exists to prevent.
+
+**Half of that dissolved on inspection, and the dangerous half did not.** The fixture's
+`provenance` block — which had been visible all along and never opened — says
+`model_variant: Wofost72_PP`, `variety_name: Winter_wheat_101`, sown 2006-10-01 at
+lat 52. So it *is* full WOFOST 7.2 winter wheat, not LINTUL3 spring wheat. **But the crop
+label was never the question; the mechanism was**, and WOFOST 7.2 carries vernalization
+only when enabled.
+
+### The oracle does not arrest — measured
+
+| window | oracle mean dDVS/day |
+|---|---|
+| winter, days 60–150 | **0.00163** (nonzero) |
+| spring, days 180–215 | 0.01674 |
+
+The oracle's DVS climbs *through* the cold window (0.0302 → 0.1770), with only 24
+zero-advance days in 217. Its late anthesis is a **rate** effect, not an arrest.
+
+### And the rate it runs is photoperiod-modulated — the discriminating test
+
+Dividing the oracle's daily DVS advance by our *unvernalized* degree-day rate isolates a
+multiplier with the temperature effect removed. It correlates with **daylength at
+lat 52 at r = 0.972**, rising monotonically 0.02 → 1.71 from the shortest days to the
+longest.
+
+That correlation alone would be suggestive (daylength and temperature co-vary
+seasonally), so the discriminating test is what the two hypotheses do **after the cold
+requirement is satisfied**:
+
+| day | daylength (h) | our vernalization factor | oracle's implied multiplier |
+|---|---|---|---|
+| 100 | 7.81 | **1.000** (saturated) | 0.200 |
+| 140 | 9.84 | **1.000** | 0.641 |
+| 180 | 12.55 | **1.000** | 1.241 |
+| 210 | 14.53 | **1.000** | 1.711 |
+
+**CUMVER saturates on day 91. A vernalization mechanism would be flat from there — the
+factor is pinned at 1 and cannot rise again. The oracle's multiplier instead keeps
+climbing 0.20 → 1.71, tracking daylength the whole way.** Vernalization cannot produce
+that shape; photoperiod can and does.
+
+**Conclusion: the oracle's missing science is PHOTOPERIOD, not vernalization** — and
+photoperiod is the *other* deferred seam `phenology.py` has documented since Phase 1
+("a pure astronomical function (latitude + day-of-year) read via ``env.get`` — a
+development-rate multiplier with **no accumulator**"). `DAYLENGTH_VAR` already exists as a
+forcing.
+
+### What this costs, and what it does not
+
+**The two terms are substitutes for hitting the anthesis date, not complements.**
+Vernalization already lands anthesis at +3 d; adding photoperiod on top would overshoot
+far later. So this is a genuine fork, not an "add the other one too".
+
+**It does not invalidate the code.** The implementation is faithful to its source (it
+reproduces [C]'s worked example exactly), the params are honestly cited, and real winter
+wheat genuinely *does* require vernalization — WOFOST's `Winter_wheat_101` is itself a
+simplification of the physiology. What is falsified is only the claim that **this** term
+is what reconciles us with **this** oracle.
+
+**The lesson, which is the transferable part:** an endpoint match is not evidence of a
+mechanism. Two different sciences moved anthesis by ~76 days from opposite premises
+(total arrest vs. proportional slowing) and one of them agreed with the target to 3 days.
+The diagnosis in scope (A) named "no vernalization" as the cause of finding 2 from
+`grep`-level evidence — *there is no vernalization term in `src/`* — which is true, and
+**says nothing about whether the oracle has one**. The check that settles it is
+comparing the *shape* of the target's trajectory, not its endpoints, and it costs one
+query against data that was already loaded.
 
 ## What did NOT change
 
