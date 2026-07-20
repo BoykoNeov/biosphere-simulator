@@ -69,7 +69,7 @@ def _scalars() -> list[tuple[str, float]]:
     transp = load_transpiration_params()
     pheno = load_phenology_params()
     vern = load_vernalization_params()
-    photo = load_photoperiod_params()
+    photoperiod = load_photoperiod_params()
     senesc = load_senescence_params()
     nitro = load_nitrogen_params()
     decomp = load_decomposition_params()
@@ -109,8 +109,8 @@ def _scalars() -> list[tuple[str, float]]:
         ("vern.t_ceiling_v", vern.t_ceiling_v),
         ("vern.vsen", vern.vsen),
         ("vern.vdsat", vern.vdsat),
-        ("photo.cpp", photo.cpp),
-        ("photo.ppsen", photo.ppsen),
+        ("photo.cpp", photoperiod.cpp),
+        ("photo.ppsen", photoperiod.ppsen),
         ("senesc.rdr_leaf", senesc.rdr_leaf),
         ("senesc.rdr_stem", senesc.rdr_stem),
         ("senesc.rdr_root", senesc.rdr_root),

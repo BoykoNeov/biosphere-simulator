@@ -159,10 +159,29 @@ PERENNIAL_CHAMBER_YEARS: int = 5
 # hold.
 # Its own new golden. The producer-only goldens (open / sealed / perennial) stay
 # byte-identical (``consumer`` defaults False everywhere else).
+# Chamber ENLARGED 2x (post-roadmap scope (B) increment 1). The vernalization +
+# photoperiod sciences produce a ~5x larger, correctly-developing plant, and the
+# herbivore grazes leaf so the plant regrows by drawing MORE from the CO2 pool -- this
+# chamber's carbon throughput exceeds the herbivore-free perennial's. At the original
+# 0.357 mol / 1000 mol air it over-drew the pool at step 196 (1.29x), tripping the Euler
+# backstop (rationed == 1) and RK4's hard ArbitrationError (scale_f 0.9506). All three
+# gas quantities scale by the SAME factor so BOTH intensive variables are invariant:
+# Ci0 = ci_ratio*co2/air*1e6 = 250 and x_O2 = o2/air = 0.21 both unchanged -- a bigger
+# chamber holding the same gas, not a different atmosphere. The factor is the smallest
+# round one past the ~1.5x exhaustion threshold (carbon draw-down is scale-INVARIANT
+# above it: FvCB Ci-shutoff pins Ci to a fixed fraction toward Gamma*), ~2x peak-draw
+# headroom. SEALED and PERENNIAL keep their frozen sizing -- neither rations, and
+# SEALED's O2-depletion drama depends on its coupled O2/litter tuning (see
+# docs/plans/post-roadmap-oracle-match.md). CONSEQUENCE, recorded: this is no longer
+# literally "the perennial chamber + one herbivore" but a LARGER chamber that also holds
+# a herbivore, because the herbivore raises carbon demand.
 CONSUMER_CHAMBER_SCENARIO: SeasonScenario = SeasonScenario(
     sealed=True,
     litter_carbon0=3.0,
     consumer=True,
+    chamber_air_mol=2000.0,
+    chamber_co2_mol0=0.714,
+    chamber_o2_mol0=420.0,
 )
 CONSUMER_CHAMBER_YEARS: int = 5
 

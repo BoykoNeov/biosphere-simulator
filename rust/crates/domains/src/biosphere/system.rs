@@ -25,7 +25,7 @@ use super::flows::{
     Allocation, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration,
     Decomposition, Fertilization, Grazing, GrowthRespiration, Irrigation, MaintenanceRespiration,
     Mineralization, MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling,
-    Senescence, ThermalTimeAccumulation, Transpiration,
+    Senescence, ThermalTimeAccumulation, Transpiration, VernalizationAccumulation,
 };
 use super::params;
 use super::stocks::*;
@@ -402,7 +402,7 @@ fn build_plants(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Resul
             tsum_maturity: p.pheno.tsum_maturity,
             vernalization: Some(p.vern),
             vernalization_accumulator: Some(VERNALIZATION_DAYS.to_string()),
-            photoperiod: Some(p.photo),
+            photoperiod: Some(p.photoperiod),
             daylength_var: Some(DAYLENGTH_VAR.to_string()),
         }),
         Box::new(VernalizationAccumulation {

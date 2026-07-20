@@ -821,13 +821,49 @@ Three ways to resolve it, none free:
 **SEALED does not ration and needs no carbon fix on its own** — it is dragged in *only*
 because it shares the default CO₂/air. That fact is what makes (ii) coherent.
 
+### The sub-decision — CONSUMER-SPECIFIC enlargement (user ruling)
+
+The user chose **(ii)**: enlarge only the CONSUMER chamber (`chamber_air_mol` 1000→2000,
+`chamber_co2_mol0` 0.357→0.714, `chamber_o2_mol0` 210→420 — all three ×2 so Ci0=250 and
+x_O2=0.21 both hold), leaving SEALED and PERENNIAL frozen. SEALED's O₂-depletion drama is
+untouched. Recorded consequence: the consumer chamber is no longer literally "the
+perennial chamber + one herbivore" but a *larger* chamber that also holds one — physically
+because the herbivore raises carbon throughput. Verified: `rationed == 0` and `events ==
+()` under **both** Euler and RK4 over the 5-year consumer run.
+
+### The re-triage at the chosen sizing (advisor block 3 — done)
+
+Full `-m "not slow"`, no `-x`, **after** re-sizing: **67 failed, 1851 passed.** Triaged
+against the pre-resize run, every red is accounted for:
+
+* **Fixed by the resize (3)** — `test_consumer_never_rations`, the consumer
+  per-compartment ledger, and `test_decade_run_is_deterministic` (the RK4
+  `ArbitrationError`) are **gone**. This confirms the resize did exactly its job.
+* **The unfreeze itself** — 22 `test_regression_*` golden byte/loads pairs +
+  `test_frozen_aux_set_is_complete` (the new aux process). Fixed by regenerating.
+* **Deliberate re-pins** — 6 `test_oracle_gap`, 2 `test_oracle_smoke`.
+* **The period-2 flip, second instance** — `test_decade_stability::
+  test_perennial_leaf_cycle_is_period_2` is the decade twin of the stress-test flip
+  already handled; same canopy-closure mechanism, same fix.
+* **Two horizon artifacts** — `test_sealed_producer_recovers_o2_after_trough` and
+  `test_chamber::test_sealed_assimilation_rises_then_declines` (the healthy plant's
+  productive phase moved past those short fixtures' windows).
+* **The constraint-order inversion** — `test_water_biting_cascade_vs_ample`.
+* **A false alarm, identified and cleared** — 7 `test_rust_authoring_graph_dump_matches_python`
+  cases (authoring scenarios untouched by this work) failed because the suite ran
+  *concurrently with* `cargo build`, against a mid-rebuild Rust binary. Re-run against the
+  finished binary: **16 passed.** Not a real casualty.
+
+**Nothing is unexplained**, so regeneration will not conflate a moved golden with a test
+that needed changing.
+
 ## Still to do for increment 1
 
-Ceremony **blocked** pending the sub-decision above (uniform+retune / consumer-specific /
-uniform+accept), then: regenerate the affected goldens, re-triage the full suite at the
-chosen sizing (advisor: re-run `-m "not slow"` with no `-x` *after* re-sizing, not off the
-pre-resizing triage), regenerate the manifest, record provenance, run all gates; compile
-and anchor the Rust mirror. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
+Ceremony now UNBLOCKED. Regenerate the 22 goldens + manifest, re-pin the behavioral tests
+(oracle_gap/smoke numbers, the decade period-2 flip, the two horizon artifacts, the
+water-biting inversion), record provenance, run all gates; the Rust mirror compiles and
+the params regenerate — still to compile the full workspace clean and add a cross-port
+anchor. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
 can dominate a short-horizon chamber run, and perennial/long-horizon now re-vernalize
 every cycle — conservation will not catch a plant that simply never develops), the Rust
 hand-mirror, then goldens → manifest → provenance → gates.

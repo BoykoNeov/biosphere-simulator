@@ -162,7 +162,7 @@ pub struct BiosphereParams {
     pub transp: TranspirationParams,
     pub pheno: PhenologyParams,
     pub vern: VernalizationParams,
-    pub photo: PhotoperiodParams,
+    pub photoperiod: PhotoperiodParams,
     pub senesc: SenescenceParams,
     pub nitro: NitrogenParams,
     pub decomp: DecompositionParams,
@@ -258,7 +258,7 @@ pub fn biosphere() -> BiosphereParams {
             vsen: get(&t, "vern.vsen"),
             vdsat: get(&t, "vern.vdsat"),
         },
-        photo: PhotoperiodParams {
+        photoperiod: PhotoperiodParams {
             cpp: get(&t, "photo.cpp"),
             ppsen: get(&t, "photo.ppsen"),
         },
