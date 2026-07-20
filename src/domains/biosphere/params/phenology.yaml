@@ -137,3 +137,21 @@ parameters:
     value: 50.0
     unit: "day"
     source: "Soltani & Sinclair (2012) Ch. 8 Table 8.1 'Wheat / Winter Europe' and p. 92 — vernalization days saturating the response; 50 is [C]'s headline wheat value (Ritchie 1991). Baloch et al. (2003) report 60–70 for Pacific Northwest wheats [C]"
+
+  # --- photoperiod (post-roadmap scope (B) increment 1) -----------------------
+  # Wheat is a LONG-DAY plant: development toward flowering slows under short days.
+  # [C] Ch. 7 Eqn 7.6 (long-day form), Table 7.2 row "Wheat / Winter Europe" — the SAME
+  # cultivar class as the Table 8.1 vernalization row, so the two terms are consistently
+  # parameterized. Literature RANGE recorded rather than invented: [C] p. 82 cites Major &
+  # Kiniry (1991) at CPP ≈ 17.7 h for long-day crops incl. wheat, and Ritchie (1991) at
+  # 19 h for several spring and winter wheat cultivars; Table 7.2's own wheat rows span
+  # CPP 14–17 and ppsen 0.09–0.17. Moving these is calibration (scope-B decision 1) and
+  # leaving the range is a FINDING, not a licence to widen it.
+  cpp:
+    value: 16.0
+    unit: "h"
+    source: "Soltani & Sinclair (2012) Ch. 7 Table 7.2, row 'Wheat / Winter Europe' — critical photoperiod; [C] attributes the table to Jones et al. (2003) and Ahmadi (2007) [C]"
+  ppsen:
+    value: 0.09
+    unit: "1/h"
+    source: "Soltani & Sinclair (2012) Ch. 7 Table 7.2, row 'Wheat / Winter Europe' — photoperiod sensitivity coefficient; table spans 0.09–0.17 across the 7 wheat rows [C]"

@@ -104,6 +104,20 @@ class VernalizationParams:
     vdsat: float  # VDSAT, vernalization days that saturate the response (day)
 
 
+@dataclass(frozen=True)
+class PhotoperiodParams:
+    """Photoperiod (daylength) parameters — Soltani & Sinclair (2012) Ch. 7, Eqn 7.6.
+
+    Wheat is a **long-day** plant: development toward flowering is fastest under long
+    days and slows linearly below a critical photoperiod. Like
+    :class:`VernalizationParams` this is optional — a day-neutral crop carries none and
+    gets the plain degree-day rate byte-for-byte.
+    """
+
+    cpp: float  # CPP, critical photoperiod (h); at/above it there is no slowdown
+    ppsen: float  # photoperiod sensitivity coefficient (1/h)
+
+
 def daily_thermal_time(temp_c: float, *, t_base: float, t_cap: float) -> float:
     """Daily thermal-time increment (°C·day per day) — the cardinal-cap GDD rate.
 
@@ -196,6 +210,34 @@ def vernalization_factor(
     return max(0.0, min(1.0, 1.0 - vsen * (vdsat - vernalization_days)))
 
 
+def photoperiod_factor(daylength_h: float, *, cpp: float, ppsen: float) -> float:
+    """Development-rate multiplier ``ppfun ∈ [0, 1]`` — Soltani & Sinclair Eqn 7.6.
+
+    The **long-day** form (wheat, barley, oat, rye, rapeseed):
+    ``ppfun = 1 − ppsen·(CPP − PP)`` below the critical photoperiod ``cpp`` and **1**
+    at/above it, **clamped to [0, 1]** — the source is explicit that a negative value is
+    replaced by zero, "because phenological development is only a forward process and
+    cannot be negative".
+
+    Unlike :func:`vernalization_factor` this reads an *instantaneous* driver, not an
+    accumulator: photoperiod has **no memory**, so the factor rises and falls with the
+    season rather than saturating once. That difference is what distinguishes the two
+    mechanisms in the oracle trajectory (see
+    ``docs/plans/post-roadmap-oracle-match.md``): a saturating factor cannot reproduce
+    a multiplier that keeps climbing after the cold requirement is met.
+
+    Raises ``ValueError`` unless ``cpp > 0`` and ``ppsen >= 0`` (a negative sensitivity
+    would make short days *accelerate* a long-day plant).
+    """
+    if not cpp > 0.0:
+        raise ValueError(f"cpp must be > 0, got {cpp!r}")
+    if ppsen < 0.0:
+        raise ValueError(f"ppsen must be >= 0, got {ppsen!r}")
+    if daylength_h >= cpp:
+        return 1.0
+    return max(0.0, min(1.0, 1.0 - ppsen * (cpp - daylength_h)))
+
+
 def development_stage(
     thermal_time: float, *, tsum_anthesis: float, tsum_maturity: float
 ) -> float:
@@ -255,6 +297,8 @@ class ThermalTimeAccumulation:
     params: PhenologyParams
     vernalization: VernalizationParams | None = None
     vernalization_accumulator: str | None = None  # the aux name read, e.g. "vern_days"
+    photoperiod: PhotoperiodParams | None = None
+    daylength_var: str | None = None  # forcing var name read, e.g. "daylength_s"
 
     def evaluate(
         self, snapshot: State, env: Environment, dt: float
@@ -263,24 +307,49 @@ class ThermalTimeAccumulation:
         rate = daily_thermal_time(
             temp_c, t_base=self.params.t_base, t_cap=self.params.t_cap
         )
-        rate *= self._vernalization_factor(snapshot)
+        if self._is_vegetative(snapshot):
+            # Both modifiers are vegetative-only and MULTIPLY (the source's Eqn 7.4
+            # "biological day": BD = tempfun · ppfun, extended by Eqn 8.2's verfun).
+            # Either may be absent; each contributes 1 when it is.
+            rate *= self._vernalization_factor(snapshot)
+            rate *= self._photoperiod_factor(env)
         return {self.accumulator: rate * dt}
 
-    def _vernalization_factor(self, snapshot: State) -> float:
-        """The Eqn-8.6 multiplier: 1 unless configured *and* still vegetative."""
-        if self.vernalization is None or self.vernalization_accumulator is None:
-            return 1.0
-        dvs = development_stage(
-            snapshot.aux.get(self.accumulator, 0.0),
-            tsum_anthesis=self.params.tsum_anthesis,
-            tsum_maturity=self.params.tsum_maturity,
+    def _is_vegetative(self, snapshot: State) -> bool:
+        """``DVS < 1``. Both modifiers are gated here — wheat is insensitive to cold
+        and to daylength at/after anthesis, so past it the plain rate is exact."""
+        return (
+            development_stage(
+                snapshot.aux.get(self.accumulator, 0.0),
+                tsum_anthesis=self.params.tsum_anthesis,
+                tsum_maturity=self.params.tsum_maturity,
+            )
+            < 1.0
         )
-        if dvs >= 1.0:  # insensitive at/after anthesis — the factor is fixed at 1
+
+    def _vernalization_factor(self, snapshot: State) -> float:
+        """The Eqn-8.6 multiplier — 1 when vernalization is not configured."""
+        if self.vernalization is None or self.vernalization_accumulator is None:
             return 1.0
         return vernalization_factor(
             snapshot.aux.get(self.vernalization_accumulator, 0.0),
             vsen=self.vernalization.vsen,
             vdsat=self.vernalization.vdsat,
+        )
+
+    def _photoperiod_factor(self, env: Environment) -> float:
+        """The Eqn-7.6 multiplier — 1 when photoperiod is not configured.
+
+        Reads the daylength forcing in **seconds** (the repo's canonical
+        ``daylength_s``, produced by ``weather.daylength_seconds``) and converts to the
+        hours the source's ``CPP``/``ppsen`` are expressed in.
+        """
+        if self.photoperiod is None or self.daylength_var is None:
+            return 1.0
+        return photoperiod_factor(
+            env.get(self.daylength_var) / 3600.0,
+            cpp=self.photoperiod.cpp,
+            ppsen=self.photoperiod.ppsen,
         )
 
 

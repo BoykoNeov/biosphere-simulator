@@ -31,6 +31,7 @@ from domains.biosphere.loader import (
     load_mineralization_params,
     load_nitrogen_params,
     load_phenology_params,
+    load_photoperiod_params,
     load_photosynthesis_params,
     load_respiration_params,
     load_senescence_params,
@@ -224,6 +225,8 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             params=pheno,
             vernalization=vern,
             vernalization_accumulator=VERNALIZATION_DAYS,
+            photoperiod=load_photoperiod_params(),
+            daylength_var=DAYLENGTH_VAR,
         ),
         VernalizationAccumulation(
             id=AuxId("biosphere.vernalization_days"),

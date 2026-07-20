@@ -30,7 +30,11 @@ from domains.biosphere.herbivory import HerbivoryParams
 from domains.biosphere.microbial_respiration import MicrobialRespirationParams
 from domains.biosphere.mineralization import MineralizationParams
 from domains.biosphere.nitrogen import NitrogenParams
-from domains.biosphere.phenology import PhenologyParams, VernalizationParams
+from domains.biosphere.phenology import (
+    PhenologyParams,
+    PhotoperiodParams,
+    VernalizationParams,
+)
 from domains.biosphere.photosynthesis import PhotosynthesisParams
 from domains.biosphere.respiration import RespirationParams
 from domains.biosphere.transpiration import TranspirationParams
@@ -597,6 +601,9 @@ _PHENOLOGY_UNITS: dict[str, str] = {
     "t_ceiling_v": "degC",
     "vsen": "1/day",
     "vdsat": "day",
+    # photoperiod (scope (B) increment 1): the Eqn-7.6 pair.
+    "cpp": "h",
+    "ppsen": "1/h",
 }
 
 
@@ -627,6 +634,8 @@ class _PhenologyParameters(BaseModel):
     t_ceiling_v: _PhenologyValueUnit
     vsen: _PhenologyValueUnit
     vdsat: _PhenologyValueUnit
+    cpp: _PhenologyValueUnit
+    ppsen: _PhenologyValueUnit
 
 
 class _PhenologySchema(BaseModel):
@@ -1407,3 +1416,29 @@ def load_herbivory_params(
         mortality_rate=values["mortality_rate"],
         o2_half_saturation=values["o2_half_saturation"],
     )
+
+
+def load_photoperiod_params(
+    path: str | Path = PHENOLOGY_PARAMS_PATH,
+) -> PhotoperiodParams:
+    """Load the photoperiod params into ``PhotoperiodParams`` (scope (B) inc. 1).
+
+    Reads the **same file** as :func:`load_phenology_params` and
+    :func:`load_vernalization_params` — the source treats photoperiod as part of
+    phenology (Ch. 7), so it shares ``phenology.yaml``.
+
+    Bound-checks ``cpp > 0`` (a non-positive critical photoperiod has no curve) and
+    ``ppsen >= 0`` (a negative sensitivity would make short days *accelerate* a long-day
+    plant). Raises ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on
+    a bad unit or out-of-range value.
+    """
+    schema = _PhenologySchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _phenology_value(params, field) for field in _PHENOLOGY_UNITS}
+
+    if not values["cpp"] > 0.0:
+        raise ValueError(f"cpp must be > 0, got {values['cpp']}")
+    if values["ppsen"] < 0.0:
+        raise ValueError(f"ppsen must be >= 0, got {values['ppsen']}")
+
+    return PhotoperiodParams(cpp=values["cpp"], ppsen=values["ppsen"])

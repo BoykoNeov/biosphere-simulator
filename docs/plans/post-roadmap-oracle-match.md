@@ -441,8 +441,100 @@ et al. (2003) and Porter & Gawith (1999) are not in `sources/` and were not open
 residual risk, 2026-07-20 — and per scope (C) round 6, *that is a fact about this
 afternoon's shelf, not a property of the literature*.
 
+---
+
+# The user's decision, and increment 1 as it actually shipped
+
+Put to the user as a three-way fork (photoperiod instead / both / vernalization only).
+**The user chose BOTH, explicitly accepting that "the oracle stops being usable as the
+phenology target".** Physiological realism over the oracle match: real winter wheat
+requires vernalization *and* is photoperiod-sensitive, and WOFOST's `Winter_wheat_101` —
+which models only the latter — is itself a simplification of the physiology.
+
+So increment 1 ships **two** terms, not one. The photoperiod half:
+
+**Source: [C] Ch. 7, Eqn 7.6 (the long-day form), p. 78; Table 7.2 p. 84.** Wheat is a
+long-day plant — development toward flowering slows below a critical photoperiod:
+
+```
+ppfun = 1 − ppsen · (CPP − PP)   if PP < CPP     (clamped to [0, 1] — the source is
+      = 1                        if PP >= CPP     explicit that a negative becomes 0)
+```
+
+Params from Table 7.2 row **"Wheat / Winter Europe"** — the *same cultivar class* as the
+Table 8.1 vernalization row, so the two terms are consistently parameterized:
+`CPP = 16 h`, `ppsen = 0.09 h⁻¹`. Range recorded, not invented: Major & Kiniry (1991) give
+CPP ≈ 17.7 h for long-day crops including wheat, Ritchie (1991) 19 h; Table 7.2's seven
+wheat rows span CPP 14–17 and ppsen 0.09–0.17.
+
+**It needed no new infrastructure.** `weather.daylength_seconds` (FAO-56) and the
+`daylength_s` forcing already existed and were already wired into the season resolver.
+A pleasant emergent consequence: `lighting.py` drives `daylength_s` from
+`scenario.photoperiod_hours`, so a **station greenhouse's lamp schedule now controls
+flowering** — physically correct, and free.
+
+Unlike vernalization, photoperiod is an **instantaneous** driver with no accumulator — it
+adds no aux state. That difference is precisely what the discriminating test above turned
+on.
+
+## The measured result — and the second surprise
+
+| stage | oracle | ORIGINAL | vernalization only | **vern + photoperiod** |
+|---|---|---|---|---|
+| DVS 0.5 | 193 | 47 | 170 | **211** |
+| DVS 1.0 (anthesis) | 217 | 138 | 220 | **251** |
+| DVS 2.0 (maturity) | 292 | 218 | 267 | **294** |
+
+Anthesis overshoots to +34 d, exactly as predicted when the fork was put to the user
+(the two terms are substitutes for hitting that date). **Maturity, however, lands on
+day 294 against the oracle's 292.**
+
+### ⚠ THE SECOND FINDING: the canopy gap closed too — with NO canopy science at all
+
+| canopy metric | oracle | ORIGINAL | vern only | **vern + photoperiod** |
+|---|---|---|---|---|
+| peak LAI | 6.337 (d 212) | 0.146 (d 32) | 1.441 (d 254) | **5.191 (d 263)** |
+| peak light interception | 97.8 % | 5.00 % | 57.9 % | **95.56 %** |
+| peak-LAI gap | — | **43.4×** | 4.4× | **1.22×** |
+
+**Scope (A)'s dominant, structural, "the canopy can never get off the ground" failure is
+essentially gone — and not one line of canopy science was written, nor one param value
+moved.** Light interception went from 5 % to 95.56 % against the oracle's 97.8 %.
+
+**Increment 2 — "implement a juvenile canopy-expansion phase" — now looks unnecessary.**
+That was the *dominant* item in scope (A)'s ranking and the larger half of scope (B) as
+scoped. It appears to have been, in its entirety, a **downstream consequence of the
+phenology error**: a crop that races through its vegetative phase leaves the high-`fl`
+allocation region before it can build a canopy, and the 2 %/day leaf death rate then eats
+what little it built. Fix the development rate and the "source-limited death spiral"
+never starts.
+
+This is the same one-directional-coupling lesson as the first finding, now with its full
+consequence visible: **scope (A) ranked the canopy first because it measured magnitudes,
+and magnitude is not causal order.** The measurement was right; the *ranking* invited an
+inference the measurement did not support.
+
+### What is left is genuinely cause 3 — param values
+
+The residual is now a **phase-partition** error, which is exactly a `tsum` question:
+
+| phase | ours | oracle |
+|---|---|---|
+| emergence → anthesis | 251 d | 217 d |
+| anthesis → maturity | **43 d** | **75 d** |
+
+Our reproductive phase is too short and our vegetative phase too long — i.e.
+`tsum_anthesis` is too high relative to `tsum_maturity`. Both are `TODO(cite)`
+placeholders (`1100` / `750`) and both are **deliberately untouched** under decision 1.
+Peak LAI also still arrives 51 days after the oracle's.
+
+**So the phase has landed where the diagnosis said it could not: two structural fixes in,
+and what remains is calibration.** The acceptance-bar question the user deferred is now
+live, with a number behind it.
+
 ## Still to do for increment 1
 
-The measurement above is the *pre-ceremony* result. Remaining: advisor review (unfreeze
-discipline step 1, before regenerating anything), the Rust hand-mirror, then the goldens →
-manifest → provenance → gates.
+Ceremony not yet run. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
+can dominate a short-horizon chamber run, and perennial/long-horizon now re-vernalize
+every cycle — conservation will not catch a plant that simply never develops), the Rust
+hand-mirror, then goldens → manifest → provenance → gates.
