@@ -23,9 +23,29 @@
 #   Stage points: DVS 0 emergence, 1 anthesis, 2 maturity. The accumulator starts at
 #   emergence (tt=0 → DVS=0); sowing→emergence (TSUMEM) is a Step-11 scenario concern.
 #
-# Deferred Step-11 seams (winter wheat genuinely needs both; documented in phenology.py):
-#   photoperiod (a rate multiplier, no accumulator) and vernalization (a SECOND
-#   accumulator + VERNFAC). Standalone Step 8 is plain degree-day.
+# Vernalization (ADDED post-roadmap, bucket-3 scope (B) increment 1, 2026-07-20 — the
+#   seam this file previously listed as deferred). A SECOND accumulator
+#   (`vernalization_days`) plus the derived factor `verfun`, from [C] Ch. 8:
+#     VERDAY(T) = 0                              if T <= t_base_v
+#               = (T − TBV)/(TP1V − TBV)         if TBV < T < TP1V
+#               = 1                              if TP1V <= T <= TP2V
+#               = (TCV − T)/(TCV − TP2V)         if TP2V < T < TCV
+#               = 0                              if T >= TCV                  (Eqn 8.3)
+#     verfun    = 1 − vsen·(VDSAT − CUMVER)      if CUMVER < VDSAT, clamped to [0,1]
+#               = 1                              if CUMVER >= VDSAT           (Eqn 8.6)
+#   `verfun` multiplies the thermal-time increment in the VEGETATIVE phase only (DVS < 1;
+#   wheat is insensitive beyond anthesis). Our DVS is DERIVED from thermal_time (the P2
+#   lock), so scaling the increment scales DVS's advance identically — a faithful
+#   re-expression of [C] Eqn 8.2 in this channel's idiom.
+#
+#   Deliberate simplifications, each FORCED by the available forcing (see phenology.py):
+#     - crown temperature ≈ air temperature ([C] p. 92: they differ only under SNOW cover,
+#       and no snow/precipitation forcing exists here);
+#     - de-vernalization ([C] Eqn 8.5) is UNIMPLEMENTABLE — it needs daily MAXIMUM
+#       temperature and the forcing carries daily-mean only. Inert on this weather
+#       regardless: the trigger is TMAX > 30 °C and the seasonal max daily mean is 22.2 °C.
+#
+# Still-deferred seam: photoperiod (a rate multiplier, no accumulator).
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
@@ -39,6 +59,23 @@
 #   [B] van Keulen, H. & Wolf, J., eds. (1986), "Modelling of Agricultural Production:
 #       Weather, Soils and Crops", Simulation Monographs, PUDOC, Wageningen (the
 #       development-stage / thermal-sum (DVS/TSUM) concept).
+#   [C] Soltani, A. & Sinclair, T.R. (2012), "Modeling Physiology of Crop Development,
+#       Growth and Yield", CABI, Wallingford. ISBN 978-1-84593-970-0. Chapter 8,
+#       "Phenology — Vernalization", pp. 90–93 (Eqn 8.3 the VERDAY cardinal-temperature
+#       response; Fig. 8.1 the wheat cardinals; Eqn 8.6 the verfun saturation curve;
+#       Table 8.1 the per-cultivar vsen/VDSAT estimates). [C] attributes these in turn to
+#       Ritchie (1991), Roberts & Summerfield (1987) and Jones et al. (2003).
+#       ⚠ [C] is a SECONDARY source quoting primaries — the scope-(C) chain shape whose
+#       record stands at 2 sound : 1 fabricated. What is verified FIRST-HAND here is that
+#       our implementation reproduces [C]'s own worked example on p. 91 exactly (5 days at
+#       7 °C → 5 VERDAY; at 10 °C or −0.5 °C → 2.5 VERDAY). The underlying Ritchie (1991)
+#       and Porter & Gawith (1999) papers are NOT in `sources/` and were NOT opened, so
+#       the LOCUS check that caught Dunn 2011 has not been run on them. Recorded as a
+#       dated residual risk (2026-07-20), not glossed.
+#   [D] Porter, J.R. & Gawith, M. (1999), "Temperatures and the growth and development of
+#       wheat: a review", European Journal of Agronomy 10:23–36 — cited BY [C] p. 91 for
+#       an alternative wheat cardinal set (−1.3 / 3.8 / 6.0 / 15.7 °C). Recorded as the
+#       sanctioned literature RANGE, not used as the value. NOT opened first-hand.
 
 name: winter_wheat
 process: phenology
@@ -60,3 +97,43 @@ parameters:
     value: 750.0
     unit: "degC*day"
     source: "TODO(cite) — provisional, literature-typical TSUM2 anthesis→maturity (~650–850 °C·day for winter wheat) [B]; primary citation pending Step 11"
+
+  # --- vernalization (post-roadmap scope (B) increment 1) ---------------------
+  # CITED, not TODO(cite): these four cardinals are [C] Fig. 8.1's wheat parameterization
+  # (p. 91 text: "Temperatures lower than -1 °C or higher than 12 °C do not contribute to
+  # vernalization … For temperatures in the range of 0 to -1 and from 8 to 12, the
+  # effectiveness … is between 0 and 1"), consistent with [C]'s cited 0–8 °C optimum for
+  # wheat (Ritchie 1991). [D]'s review reports -1.3/3.8/6.0/15.7 and APSIM uses 0–15 with
+  # a 2 °C peak — recorded in the header as the literature RANGE. Fig. 8.1 is taken as
+  # primary because it is the formulation's OWN wheat parameterization; a later
+  # calibration that needs to move these has a sanctioned range to move WITHIN, and
+  # leaving that range is a FINDING, not a licence to widen it.
+  t_base_v:
+    value: -1.0
+    unit: "degC"
+    source: "Soltani & Sinclair (2012) Ch. 8 Fig. 8.1 and p. 91 text — TBV, base temperature for wheat vernalization [C]"
+  t_opt_lower_v:
+    value: 0.0
+    unit: "degC"
+    source: "Soltani & Sinclair (2012) Ch. 8 Fig. 8.1; the 0–8 °C wheat optimum attributed to Ritchie (1991) [C]"
+  t_opt_upper_v:
+    value: 8.0
+    unit: "degC"
+    source: "Soltani & Sinclair (2012) Ch. 8 Fig. 8.1; the 0–8 °C wheat optimum attributed to Ritchie (1991) [C]"
+  t_ceiling_v:
+    value: 12.0
+    unit: "degC"
+    source: "Soltani & Sinclair (2012) Ch. 8 Fig. 8.1 and p. 91 text — TCV, above which VERDAY is 0 [C]"
+  # Table 8.1 (p. 93), row "Wheat / Winter Europe" — the correct row for a winter wheat
+  # sown 1 October on European weather. NOTE the implication, which is a property of the
+  # cited values and not a choice here: vsen·VDSAT = 1.65 > 1, so verfun clamps to 0 at
+  # CUMVER = 0 — this cultivar is QUALITATIVE ([C] Fig. 8.2), i.e. development is fully
+  # ARRESTED, not merely slowed, until ~19.7 vernalization days accumulate.
+  vsen:
+    value: 0.033
+    unit: "1/day"
+    source: "Soltani & Sinclair (2012) Ch. 8 Table 8.1, row 'Wheat / Winter Europe' — sensitivity of development rate to vernalization; [C] attributes the table to Ritchie (1991), Jones et al. (2003), Mirdavardoost (2009). Table spans 0.0012–0.04 across 18 cultivar rows"
+  vdsat:
+    value: 50.0
+    unit: "day"
+    source: "Soltani & Sinclair (2012) Ch. 8 Table 8.1 'Wheat / Winter Europe' and p. 92 — vernalization days saturating the response; 50 is [C]'s headline wheat value (Ritchie 1991). Baloch et al. (2003) report 60–70 for Pacific Northwest wheats [C]"

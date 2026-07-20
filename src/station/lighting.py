@@ -71,7 +71,12 @@ photon efficacy via ``station.loader``.
 """
 
 from domains.biosphere.season import build_season, weather_resolver
-from domains.biosphere.stocks import DAYLENGTH_VAR, PAR_VAR, THERMAL_TIME
+from domains.biosphere.stocks import (
+    DAYLENGTH_VAR,
+    PAR_VAR,
+    THERMAL_TIME,
+    VERNALIZATION_DAYS,
+)
 from domains.power.stocks import BATTERY, WASTE_HEAT, battery_stock
 from simcore import boundary
 from simcore.environment import SourceResolver, constant
@@ -177,7 +182,12 @@ def build_lighting(
             "biosphere share NO stock, only the lamp-draw schedule)"
         )
     stocks = {**bio_stocks, **power_stocks}
-    state = State(n=0, stocks=stocks, rng_seed=0, aux={THERMAL_TIME: 0.0})
+    state = State(
+        n=0,
+        stocks=stocks,
+        rng_seed=0,
+        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0},
+    )
 
     power_flows: list[Flow] = (
         [

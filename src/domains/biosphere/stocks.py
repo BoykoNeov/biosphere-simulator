@@ -129,6 +129,9 @@ SOIL_WATER_VAR = (
 # and derives Ci from it (chamber.ci_from_co2_pool) — the draw-down feedback seam.
 CO2_POOL_VAR = "co2_pool"
 THERMAL_TIME = "thermal_time"
+# The SECOND aux accumulator (post-roadmap scope (B) inc. 1): cumulative vernalization
+# days (CUMVER), which gate thermal-time accrual through the vegetative phase.
+VERNALIZATION_DAYS = "vernalization_days"
 
 
 # --- compartment-composition types ------------------------------------------

@@ -58,7 +58,12 @@ Pure stdlib only in the spine; the harvest rate loads via ``station.loader``. Re
 flow + the phenology injection.
 """
 
-from domains.biosphere.stocks import LITTER_CARBON, STORAGE_C, THERMAL_TIME
+from domains.biosphere.stocks import (
+    LITTER_CARBON,
+    STORAGE_C,
+    THERMAL_TIME,
+    VERNALIZATION_DAYS,
+)
 from domains.crew.flows import CrewParams
 from domains.crew.stocks import FECAL_WASTE, FOOD_STORE
 from domains.eclss.flows import EclssParams
@@ -147,7 +152,10 @@ def build_harvest(
         n=state.n,
         stocks=state.stocks,
         rng_seed=state.rng_seed,
-        aux={THERMAL_TIME: scenario.thermal_time0},
+        # thermal_time0 starts the crop PAST anthesis (DVS > 1), where the
+        # vernalization factor is fixed at 1 — so a zero cold accumulator here is
+        # inert by construction, not an omission.
+        aux={THERMAL_TIME: scenario.thermal_time0, VERNALIZATION_DAYS: 0.0},
     )
 
     # (2) Append the Harvest flow to the cabin / fast registry (drained across the day's

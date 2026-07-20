@@ -35,10 +35,14 @@ from domains.biosphere.loader import (
     load_respiration_params,
     load_senescence_params,
     load_transpiration_params,
+    load_vernalization_params,
 )
 from domains.biosphere.mineralization import NitrogenSenescence
 from domains.biosphere.nitrogen import NitrogenUptake
-from domains.biosphere.phenology import ThermalTimeAccumulation
+from domains.biosphere.phenology import (
+    ThermalTimeAccumulation,
+    VernalizationAccumulation,
+)
 from domains.biosphere.scenario import SeasonScenario
 from domains.biosphere.stocks import (
     CI_VAR,
@@ -59,6 +63,7 @@ from domains.biosphere.stocks import (
     TEMP_VAR,
     THERMAL_TIME,
     VAPOR_SINK,
+    VERNALIZATION_DAYS,
     VPD_VAR,
     ChamberWiring,
     CompartmentBuild,
@@ -207,12 +212,24 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
                 params=load_mineralization_params(),
             )
         )
+    # Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,
+    # and thermal time accrues *gated by them* through the vegetative phase. Both read
+    # the same forcing; the gating is a snapshot read, so their order is immaterial.
+    vern = load_vernalization_params()
     aux: tuple[AuxProcess, ...] = (
         ThermalTimeAccumulation(
             id=AuxId("biosphere.thermal_time"),
             accumulator=THERMAL_TIME,
             temp_var=TEMP_VAR,
             params=pheno,
+            vernalization=vern,
+            vernalization_accumulator=VERNALIZATION_DAYS,
+        ),
+        VernalizationAccumulation(
+            id=AuxId("biosphere.vernalization_days"),
+            accumulator=VERNALIZATION_DAYS,
+            temp_var=TEMP_VAR,
+            params=vern,
         ),
     )
     return CompartmentBuild(

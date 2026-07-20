@@ -74,6 +74,7 @@ from domains.biosphere.stocks import (
     PAR_VAR,
     STORAGE_C,
     THERMAL_TIME,
+    VERNALIZATION_DAYS,
 )
 from domains.crew.flows import CrewParams, WaterBalance
 from domains.crew.stocks import (
@@ -298,7 +299,12 @@ def build_sealed_station(
             "silent dict overwrite would drop a stock)"
         )
     stocks = {**bio_stocks, **fast_stocks}
-    state = State(n=0, stocks=stocks, rng_seed=0, aux={THERMAL_TIME: 0.0})
+    state = State(
+        n=0,
+        stocks=stocks,
+        rng_seed=0,
+        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0},
+    )
 
     # --- fast flows -----------------------------------------------------------------
     fast_flows: list[Flow] = [

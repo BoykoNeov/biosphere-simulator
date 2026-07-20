@@ -30,7 +30,7 @@ from domains.biosphere.herbivory import HerbivoryParams
 from domains.biosphere.microbial_respiration import MicrobialRespirationParams
 from domains.biosphere.mineralization import MineralizationParams
 from domains.biosphere.nitrogen import NitrogenParams
-from domains.biosphere.phenology import PhenologyParams
+from domains.biosphere.phenology import PhenologyParams, VernalizationParams
 from domains.biosphere.photosynthesis import PhotosynthesisParams
 from domains.biosphere.respiration import RespirationParams
 from domains.biosphere.transpiration import TranspirationParams
@@ -590,6 +590,13 @@ _PHENOLOGY_UNITS: dict[str, str] = {
     "t_cap": "degC",
     "tsum_anthesis": "degC*day",
     "tsum_maturity": "degC*day",
+    # vernalization (scope (B) increment 1): four cardinals + the Eqn-8.6 pair.
+    "t_base_v": "degC",
+    "t_opt_lower_v": "degC",
+    "t_opt_upper_v": "degC",
+    "t_ceiling_v": "degC",
+    "vsen": "1/day",
+    "vdsat": "day",
 }
 
 
@@ -614,6 +621,12 @@ class _PhenologyParameters(BaseModel):
     t_cap: _PhenologyValueUnit
     tsum_anthesis: _PhenologyValueUnit
     tsum_maturity: _PhenologyValueUnit
+    t_base_v: _PhenologyValueUnit
+    t_opt_lower_v: _PhenologyValueUnit
+    t_opt_upper_v: _PhenologyValueUnit
+    t_ceiling_v: _PhenologyValueUnit
+    vsen: _PhenologyValueUnit
+    vdsat: _PhenologyValueUnit
 
 
 class _PhenologySchema(BaseModel):
@@ -666,6 +679,59 @@ def load_phenology_params(
         t_cap=values["t_cap"],
         tsum_anthesis=values["tsum_anthesis"],
         tsum_maturity=values["tsum_maturity"],
+    )
+
+
+def load_vernalization_params(
+    path: str | Path = PHENOLOGY_PARAMS_PATH,
+) -> VernalizationParams:
+    """Load the vernalization params into ``VernalizationParams`` (scope (B) inc. 1).
+
+    Reads the **same file** as :func:`load_phenology_params` — vernalization is part of
+    phenology (its source puts it in the phenology chapter), so it shares
+    ``phenology.yaml`` rather than opening a new param file. Two loaders over one file
+    mirrors the existing mineralization precedent (the plant and soil builders load the
+    same file into separate objects).
+
+    Bound-checks the Eqn-8.3 cardinals as a well-ordered response with a strictly
+    positive ramp on each side (``t_base_v < t_opt_lower_v <= t_opt_upper_v <
+    t_ceiling_v`` — the two strict pairs are divisors), and the Eqn-8.6 pair as
+    ``vdsat > 0`` (a divisor-free but curve-defining requirement) and ``vsen >= 0`` (a
+    negative sensitivity would make cold *retard* development). Raises
+    ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad unit or
+    out-of-range value.
+    """
+    schema = _PhenologySchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _phenology_value(params, field) for field in _PHENOLOGY_UNITS}
+
+    if not values["t_base_v"] < values["t_opt_lower_v"]:
+        raise ValueError(
+            "vernalization cardinals must satisfy t_base_v < t_opt_lower_v, got "
+            f"({values['t_base_v']}, {values['t_opt_lower_v']})"
+        )
+    if not values["t_opt_lower_v"] <= values["t_opt_upper_v"]:
+        raise ValueError(
+            "vernalization cardinals must satisfy t_opt_lower_v <= t_opt_upper_v, got "
+            f"({values['t_opt_lower_v']}, {values['t_opt_upper_v']})"
+        )
+    if not values["t_opt_upper_v"] < values["t_ceiling_v"]:
+        raise ValueError(
+            "vernalization cardinals must satisfy t_opt_upper_v < t_ceiling_v, got "
+            f"({values['t_opt_upper_v']}, {values['t_ceiling_v']})"
+        )
+    if not values["vdsat"] > 0.0:
+        raise ValueError(f"vdsat must be > 0, got {values['vdsat']}")
+    if values["vsen"] < 0.0:
+        raise ValueError(f"vsen must be >= 0, got {values['vsen']}")
+
+    return VernalizationParams(
+        t_base_v=values["t_base_v"],
+        t_opt_lower_v=values["t_opt_lower_v"],
+        t_opt_upper_v=values["t_opt_upper_v"],
+        t_ceiling_v=values["t_ceiling_v"],
+        vsen=values["vsen"],
+        vdsat=values["vdsat"],
     )
 
 

@@ -48,7 +48,12 @@ Pure stdlib only in the spine; crew / ECLSS / crop params load via the sibling l
 from collections.abc import Mapping
 
 from domains.biosphere.season import build_season, weather_resolver
-from domains.biosphere.stocks import CARBON_POOL, O2_POOL, THERMAL_TIME
+from domains.biosphere.stocks import (
+    CARBON_POOL,
+    O2_POOL,
+    THERMAL_TIME,
+    VERNALIZATION_DAYS,
+)
 from domains.crew.flows import CrewParams, WaterBalance
 from domains.crew.stocks import (
     FECAL_WASTE,
@@ -239,7 +244,12 @@ def build_greenhouse(
             "overwrite would drop a stock)"
         )
     stocks = {**bio_stocks, **cabin_stocks}
-    state = State(n=0, stocks=stocks, rng_seed=0, aux={THERMAL_TIME: 0.0})
+    state = State(
+        n=0,
+        stocks=stocks,
+        rng_seed=0,
+        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0},
+    )
 
     cabin_registry = Registry(
         _cabin_flows(crew_params, eclss_params, fecal_waste_target), stocks

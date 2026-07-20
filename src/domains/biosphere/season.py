@@ -98,6 +98,7 @@ from domains.biosphere.stocks import (
     RN_VAR,
     TEMP_VAR,
     THERMAL_TIME,
+    VERNALIZATION_DAYS,
     VPD_VAR,
     CompartmentBuild,
     chamber_wiring,
@@ -211,7 +212,12 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
     stocks.update(boundary.loss_sinks({Quantity.CARBON}))
     flows: list[Flow] = [flow for build in builds for flow in build.flows]
     aux_processes: list[AuxProcess] = [aux for build in builds for aux in build.aux]
-    state = State(n=0, stocks=stocks, rng_seed=0, aux={THERMAL_TIME: 0.0})
+    state = State(
+        n=0,
+        stocks=stocks,
+        rng_seed=0,
+        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0},
+    )
     return state, Registry(flows, stocks, aux_processes=aux_processes)
 
 
@@ -379,6 +385,9 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
     )
     aux = dict(state.aux)
     aux[THERMAL_TIME] = 0.0
+    # A re-sown crop must re-vernalize: the cold requirement is per-cycle, so the
+    # second accumulator resets alongside the first (both are outside the gate).
+    aux[VERNALIZATION_DAYS] = 0.0
     return replace(state, stocks=stocks, aux=aux)
 
 
