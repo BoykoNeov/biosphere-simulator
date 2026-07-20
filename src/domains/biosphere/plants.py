@@ -216,25 +216,38 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
     # Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,
     # and thermal time accrues *gated by them* through the vegetative phase. Both read
     # the same forcing; the gating is a snapshot read, so their order is immaterial.
-    vern = load_vernalization_params()
-    aux: tuple[AuxProcess, ...] = (
-        ThermalTimeAccumulation(
-            id=AuxId("biosphere.thermal_time"),
-            accumulator=THERMAL_TIME,
-            temp_var=TEMP_VAR,
-            params=pheno,
-            vernalization=vern,
-            vernalization_accumulator=VERNALIZATION_DAYS,
-            photoperiod=load_photoperiod_params(),
-            daylength_var=DAYLENGTH_VAR,
+    #
+    # Both modifiers are OPTIONAL (the phenology.py seam) and gated by the scenario. The
+    # frozen winter wheat keeps both (defaults True → the aux tuple below is unchanged →
+    # goldens byte-identical). A DAY-NEUTRAL crop turns both off: no VernalizationAccum-
+    # ulation is built, and ThermalTimeAccumulation carries neither modifier, so thermal
+    # time advances at the plain degree-day rate (byte-for-byte, per phenology.py). The
+    # vern params load only when needed.
+    vern = load_vernalization_params() if scenario.vernalization else None
+    thermal_time = ThermalTimeAccumulation(
+        id=AuxId("biosphere.thermal_time"),
+        accumulator=THERMAL_TIME,
+        temp_var=TEMP_VAR,
+        params=pheno,
+        vernalization=vern,
+        vernalization_accumulator=(
+            VERNALIZATION_DAYS if scenario.vernalization else None
         ),
-        VernalizationAccumulation(
-            id=AuxId("biosphere.vernalization_days"),
-            accumulator=VERNALIZATION_DAYS,
-            temp_var=TEMP_VAR,
-            params=vern,
-        ),
+        photoperiod=load_photoperiod_params() if scenario.photoperiod else None,
+        daylength_var=DAYLENGTH_VAR if scenario.photoperiod else None,
     )
+    aux: tuple[AuxProcess, ...] = (thermal_time,)
+    if scenario.vernalization:
+        assert vern is not None  # loaded just above when the flag is set
+        aux = (
+            thermal_time,
+            VernalizationAccumulation(
+                id=AuxId("biosphere.vernalization_days"),
+                accumulator=VERNALIZATION_DAYS,
+                temp_var=TEMP_VAR,
+                params=vern,
+            ),
+        )
     return CompartmentBuild(
         stocks=tuple(stocks), flows=tuple(flows), aux=aux, shared={}
     )

@@ -103,6 +103,21 @@ class SeasonScenario:
     fertilization_kg_m2_day: float = 0.0  # kg N m⁻² day⁻¹ (soil store already ample)
     # location (for the astronomical daylength); matches the oracle plot
     latitude: float = 52.0
+    # Phenology modifiers (post-roadmap day-neutral crop). Both default True — the
+    # frozen winter wheat carries vernalization (cold requirement) AND photoperiod
+    # (long-day slowdown), so every frozen scenario keeps both and the goldens are
+    # byte-identical. A **day-neutral** crop sets BOTH False: ``build_plants`` then
+    # builds ``ThermalTimeAccumulation`` with neither modifier and omits
+    # ``VernalizationAccumulation`` entirely, so DVS advances on thermal time alone (the
+    # ``phenology.py`` optional-modifier seam — output is byte-identical to the plain
+    # degree-day rate when both are absent). Independent bools because the two modifiers
+    # are independent in the model (a photoperiod-only crop — vernalization off,
+    # daylength on — stays expressible). Reuses the SAME cited winter-wheat crop params
+    # (phenology.yaml); a day-neutral wheat is winter-wheat physiology with the cold/
+    # daylength gates removed (ceremony 2: "vernalization is optional by design"), not a
+    # new param file. See docs/plans/post-roadmap-day-neutral-crop.md.
+    vernalization: bool = True
+    photoperiod: bool = True
 
 
 # Module-level default (immutable, frozen dataclass) — used as the param default so the
@@ -254,6 +269,28 @@ WATER_BITING_SCENARIO: SeasonScenario = SeasonScenario(
     soil_water0=50.0,  # kg — inside (sw_wilting, sw_critical) ⇒ f_water < 1 all season
 )
 WATER_BITING_YEARS: int = 1
+
+
+# The post-roadmap **day-neutral** crop (the "second wheat"): an open-field plot with
+# BOTH phenology modifiers OFF (``vernalization=False``, ``photoperiod=False``), so
+# development advances on **thermal time alone**. It is the warm-habitat crop ceremony 2
+# left open (``docs/plans/post-roadmap-oracle-match.md``): a cold-requiring winter wheat
+# would never flower in a warm, lamp-lit habitat, so the habitat needs a crop with no
+# cold or daylight gate. It reuses the **same cited winter-wheat crop params**
+# (phenology.yaml — a day-neutral wheat is winter-wheat physiology with the gates
+# removed, not a new param file), so it is **additive scenario data + its own
+# diagnostic**, NOT a frozen reference and NOT an unfreeze (the N_LIMITED/WATER_BITING
+# precedent; every frozen scenario keeps both modifiers ON, so their goldens are
+# byte-identical). Validated as a
+# DIAGNOSTIC against the bundled LINTUL3 spring-wheat oracle (a light-use-efficiency
+# model, a different family — never a fit target, ruling B); see
+# ``docs/plans/post-roadmap-day-neutral-crop.md`` and
+# ``tests/test_oracle_gap_spring_wheat.py``.
+DAY_NEUTRAL_SCENARIO: SeasonScenario = SeasonScenario(
+    vernalization=False,
+    photoperiod=False,
+)
+DAY_NEUTRAL_YEARS: int = 1
 
 
 # The Phase-3 Step-6 (P3.5) drought scenario: an **open-field** plot deliberately sized
