@@ -62,6 +62,16 @@ pub struct SeasonScenario {
     pub sn_critical: f64,
     pub fertilization_kg_m2_day: f64,
     pub latitude: f64,
+    /// Whether the crop requires vernalization (a cold cue) to leave the vegetative phase
+    /// — scope (B) inc. 1's `phenology.py` seam, mirrored (`plants.py::build_plants`).
+    /// `true` for the frozen winter wheat (every full literal / spread keeps it → goldens
+    /// byte-identical); a DAY-NEUTRAL crop sets it `false` so thermal time advances at the
+    /// plain degree-day rate (no `VernalizationAccumulation`, no `verfun` gate).
+    pub vernalization: bool,
+    /// Whether the crop's development is photoperiod-sensitive (long-day wheat) — the
+    /// companion modifier. `true` for the frozen winter wheat; a DAY-NEUTRAL crop sets it
+    /// `false` so flowering ignores daylength.
+    pub photoperiod: bool,
 }
 
 /// The Phase-1 winter-wheat PP plot defaults (open field, N/water non-limiting).
@@ -95,6 +105,8 @@ pub const DEFAULT_SCENARIO: SeasonScenario = SeasonScenario {
     sn_critical: 50.0,
     fertilization_kg_m2_day: 0.0,
     latitude: 52.0,
+    vernalization: true,
+    photoperiod: true,
 };
 
 /// The O₂-poor sealed chamber (Phase-2 capstone). Run 3 years via `run_season`.
@@ -447,27 +459,36 @@ fn build_plants(
     // Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,
     // and thermal time accrues *gated by them* (and by daylength) through the vegetative
     // phase. Mirrors domains/biosphere/plants.py.
-    let aux: Vec<Box<dyn AuxProcess>> = vec![
-        Box::new(ThermalTimeAccumulation {
-            id: "biosphere.thermal_time".to_string(),
-            accumulator: THERMAL_TIME.to_string(),
-            temp_var: TEMP_VAR.to_string(),
-            t_base: p.pheno.t_base,
-            t_cap: p.pheno.t_cap,
-            tsum_anthesis: p.pheno.tsum_anthesis,
-            tsum_maturity: p.pheno.tsum_maturity,
-            vernalization: Some(p.vern),
-            vernalization_accumulator: Some(VERNALIZATION_DAYS.to_string()),
-            photoperiod: Some(p.photoperiod),
-            daylength_var: Some(DAYLENGTH_VAR.to_string()),
-        }),
-        Box::new(VernalizationAccumulation {
+    //
+    // Both modifiers are OPTIONAL and gated by the scenario (the `phenology.py` seam). The
+    // frozen winter wheat keeps both (defaults `true` → the aux vector below is unchanged →
+    // goldens byte-identical). A DAY-NEUTRAL crop turns both off: no
+    // `VernalizationAccumulation` is built, and `ThermalTimeAccumulation` carries neither
+    // modifier, so thermal time advances at the plain degree-day rate (byte-for-byte, per
+    // `plants.py`).
+    let mut aux: Vec<Box<dyn AuxProcess>> = vec![Box::new(ThermalTimeAccumulation {
+        id: "biosphere.thermal_time".to_string(),
+        accumulator: THERMAL_TIME.to_string(),
+        temp_var: TEMP_VAR.to_string(),
+        t_base: p.pheno.t_base,
+        t_cap: p.pheno.t_cap,
+        tsum_anthesis: p.pheno.tsum_anthesis,
+        tsum_maturity: p.pheno.tsum_maturity,
+        vernalization: scenario.vernalization.then_some(p.vern),
+        vernalization_accumulator: scenario
+            .vernalization
+            .then(|| VERNALIZATION_DAYS.to_string()),
+        photoperiod: scenario.photoperiod.then_some(p.photoperiod),
+        daylength_var: scenario.photoperiod.then(|| DAYLENGTH_VAR.to_string()),
+    })];
+    if scenario.vernalization {
+        aux.push(Box::new(VernalizationAccumulation {
             id: "biosphere.vernalization_days".to_string(),
             accumulator: VERNALIZATION_DAYS.to_string(),
             temp_var: TEMP_VAR.to_string(),
             params: p.vern,
-        }),
-    ];
+        }));
+    }
     Ok(CompartmentBuild { stocks, flows, aux })
 }
 

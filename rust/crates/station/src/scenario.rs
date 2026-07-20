@@ -152,6 +152,30 @@ pub struct LightingScenario {
     pub power_dt: f64,
     /// The biosphere structural step (day).
     pub bio_dt: f64,
+    /// Optional constant habitat air temperature (°C). `None` (the default / frozen
+    /// `lighting_scenario()`) keeps the weather-table temperature untouched — the frozen
+    /// golden is byte-identical. `Some(t)` overrides `TEMP_VAR` with `constant(t)` in
+    /// [`crate::lighting::lighting_bio_resolver`] (beside the lamp's PAR / daylength
+    /// overrides) — a warm, lamp-lit habitat: the lamp supplies light, the environment
+    /// supplies warmth. Authored content, not a controlled-environment chamber (VPD / net
+    /// radiation stay weather-driven — the deferred refinement the lighting docstring
+    /// names).
+    pub habitat_temp_c: Option<f64>,
+}
+
+/// The day-neutral crop the lamp-lit habitat needs (scope (B) day-neutral crop): the
+/// sealed self-contained chamber with BOTH phenology gates removed (`vernalization =
+/// false`, `photoperiod = false`) + `litter_carbon0 = 3` decomposer fuel. Reuses the same
+/// cited winter-wheat params — a day-neutral wheat is winter-wheat physiology with the
+/// gates removed, not a new param file (the Python `DAY_NEUTRAL_SCENARIO` analogue).
+pub fn day_neutral_lighting_bio_scenario() -> SeasonScenario {
+    SeasonScenario {
+        sealed: true,
+        litter_carbon0: 3.0,
+        vernalization: false,
+        photoperiod: false,
+        ..DEFAULT_SCENARIO
+    }
 }
 
 /// `LIGHTING_SCENARIO`: the sealed biosphere lit by a battery-powered grow lamp.
@@ -165,6 +189,28 @@ pub fn lighting_scenario() -> LightingScenario {
         steps_per_day: 24,
         power_dt: 3600.0,
         bio_dt: 1.0,
+        habitat_temp_c: None,
+    }
+}
+
+/// A warm, lamp-lit habitat growing the DAY-NEUTRAL crop — the lamp-lit-habitat *product*
+/// form the day-neutral crop was made for (`docs/plans/post-roadmap-day-neutral-crop.md`,
+/// "Lamp-lit `LightingScenario` wiring"). At 20 °C the frozen winter wheat is permanently
+/// arrested (no cold cue ⇒ `verfun ≡ 0`), while this day-neutral crop develops on thermal
+/// time under the lamp. Authored content (conservation + determinism, no golden — "authored
+/// ≠ validated"): the battery is sized well-fed over the longer development horizon (the
+/// lamp draws `1.152e7 J/day`).
+pub fn day_neutral_lighting_scenario() -> LightingScenario {
+    LightingScenario {
+        bio: day_neutral_lighting_bio_scenario(),
+        battery0: 3.0e9,
+        lamp_power_w: 200.0,
+        photoperiod_hours: 16,
+        days: 120,
+        steps_per_day: 24,
+        power_dt: 3600.0,
+        bio_dt: 1.0,
+        habitat_temp_c: Some(20.0),
     }
 }
 

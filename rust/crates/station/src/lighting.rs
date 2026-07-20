@@ -11,7 +11,7 @@
 
 use std::collections::BTreeMap;
 
-use domains::biosphere::stocks::{DAYLENGTH_VAR, PAR_VAR, THERMAL_TIME};
+use domains::biosphere::stocks::{DAYLENGTH_VAR, PAR_VAR, TEMP_VAR, THERMAL_TIME};
 use domains::biosphere::system::{build_season, weather_forcings, weather_shared};
 use domains::power::{battery_stock, BATTERY, WASTE_HEAT};
 use simcore::boundary;
@@ -119,6 +119,14 @@ pub fn lighting_bio_resolver(
         DAYLENGTH_VAR.to_string(),
         constant(scenario.photoperiod_hours as f64 * 3600.0)?,
     );
+    // A warm lamp-lit habitat overrides the weather-table temperature with a constant
+    // (the lamp supplies light, the environment supplies warmth) — beside the PAR /
+    // daylength overrides, in this non-frozen station module (the embedded `weather_facts`
+    // cold table is untouched). `None` leaves the weather temperature in place, so the
+    // frozen lighting golden is byte-identical.
+    if let Some(temp_c) = scenario.habitat_temp_c {
+        forcings.insert(TEMP_VAR.to_string(), constant(temp_c)?);
+    }
     SourceResolver::new(forcings, weather_shared(&scenario.bio))
 }
 

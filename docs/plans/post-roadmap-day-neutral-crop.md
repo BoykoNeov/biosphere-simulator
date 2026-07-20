@@ -197,3 +197,52 @@ connor/hoogenboom/pereira/Teh carry none). Reusing our own cited winter-wheat `t
 PCSE) is the ruling-B-clean choice — independently justified params, gap recorded not fit.
 The day-neutral crop is therefore winter-wheat physiology with the cold/daylength gates
 removed (ceremony 2: "vernalization is optional by design"), **not** a new param file.
+
+---
+
+# FOLLOW-UP (2026-07-21) — the lamp-lit `LightingScenario` wiring, landed **Rust-first**
+
+Step 4 / "Demonstrations" deferred the lamp-lit habitat wiring as *"lamp-lit-habitat
+**product** work, which is Rust-first under the pivot."* That deferred piece is now done —
+**and the port was the load-bearing decision, not the design.** The design was Python-shaped
+in my head; an advisor catch pointed out the plan had already decided the port for this exact
+item (the pivot's dividing line: *authored content, no golden moved → Rust*), and that
+"validation is Python" (true, done) does not govern where the **product wiring** lives.
+
+**What shipped (Rust only; no Python touched — `git diff src/` empty):**
+
+* `SeasonScenario` gained `vernalization` / `photoperiod` **bool** fields (both default
+  `true`), and `build_plants` now gates the two modifiers on them — the additive,
+  default-preserving mirror of the Python scope-(B)-inc-1 change. This is the **port
+  converging** on a capability Python already had (not the port claiming reference
+  authority): every existing scenario spreads `..DEFAULT_SCENARIO`, so all cross-port
+  trajectories stay bit-identical. Rust could not previously express a gate-removed crop
+  (`build_plants` hard-wired `Some(p.vern)` / `Some(p.photoperiod)`).
+* `LightingScenario` gained an optional `habitat_temp_c: Option<f64>` (default `None` →
+  frozen `lighting_scenario()` byte-identical). When `Some`, `lighting_bio_resolver`
+  overrides `TEMP_VAR` with a constant — **one line beside the existing lamp PAR/daylength
+  overrides, in the non-frozen `crates/station/src/lighting.rs`** (the embedded cold
+  `weather_facts()` table is untouched; no synthetic-weather facility needed — the initial
+  "warm weather isn't expressible in Rust" read was an overstatement the advisor corrected).
+* `day_neutral_lighting_scenario()` — a **warm (20 °C), lamp-lit, day-neutral** sealed
+  habitat (`litter_carbon0 = 3`, both gates off), battery sized well-fed for the 120-day
+  development horizon (`battery0 = 3e9` J; the lamp draws `1.152e7` J/day, ~46 % drawdown).
+* `tests/day_neutral_lighting.rs` (8 pins) — **authored ≠ validated**: conservation +
+  determinism, **no golden**. The payload is the **contrast** — under the *identical* warm +
+  lamp habitat the day-neutral crop reaches maturity (DVS ≥ 2) while the frozen winter wheat
+  is pinned at DVS 0 / `thermal_time == 0` (arrest, `verfun ≡ 0`); plus ENERGY closes over
+  the Power ledger, the biosphere internal water loop stays closed, `rationed == 0`,
+  `events == ()`, lamp-on-grows / lamp-off-declines, bit-identical re-run.
+
+**The dead demo stayed dead.** The lamp is framed as carrying ENERGY/PAR that drives fixation
+(real) — never as photoperiod/flowering control (a day-neutral crop ignores daylength).
+
+**Honest residual (a documented, not fixed, gap):** the temperature override warms `TEMP_VAR`
+but leaves VPD / net-radiation weather-driven — a partial controlled environment, exactly the
+"fully controlled-environment chamber is a deferred refinement" the lighting docstring already
+names. Acceptable for authored content; noted on `LightingScenario.habitat_temp_c`.
+
+**Gates:** the full `domains` + `station` suites pass; `cargo clippy --all-targets` clean;
+frozen `lighting_state.json` byte-identical + its cross-port tier green; `git diff src/`
+empty. This is the **first application of the pivot's "new content is Rust-first, no Python
+mirror owed"** rule to a concrete deliverable.
