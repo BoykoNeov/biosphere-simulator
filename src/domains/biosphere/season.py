@@ -28,6 +28,18 @@ season ships the *machinery* (single-currency flows, the conservation gate,
 ``rationed == 0`` by construction, determinism, the golden) — not behavioural
 validation.
 
+⚠ **SUPERSEDED by scope (B) increment 1 + ceremony 2 (2026-07-20) — the ranked scope-A
+diagnosis below is kept as the historical record but no longer describes the model.**
+Increment 1 added **vernalization + photoperiod** (so "no vernalization term exists" in
+cause 2 is now FALSE — see ``phenology.py``), which slowed development and, as a
+*downstream* effect (``Allocation`` reads DVS), let the canopy bootstrap to **95.6 %**
+interception with **no canopy science** — so cause 1's "needs a juvenile canopy-
+expansion phase" did **not** hold. Ceremony 2 then found cause 3 already sound: the two
+`tsum` values are literature-centred (Penning de Vries 1989), the residual
+reproductive-phase gap is **cultivar variation** vs the oracle, and **no value moved**.
+Full record:
+``docs/plans/post-roadmap-oracle-match.md``.
+
 The gap is **structural, not merely uncalibrated** (measured; bucket 3 / scope A, pinned
 by ``tests/test_oracle_gap.py``, planned in ``docs/plans/post-roadmap-validation.md``).
 An earlier reading of this docstring — "uncalibrated placeholders + no vernalization,

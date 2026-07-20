@@ -49,9 +49,11 @@
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
-#   All numeric VALUES are provisional, literature-typical placeholders pending the
-#   Step-11 validation gate — flagged TODO(cite) until each is bound to a primary
-#   source (never backfilled from WOFOST).
+#   The two thermal sums (tsum_anthesis, tsum_maturity) are CITED as of scope-(B)
+#   ceremony 2 (2026-07-20) — first-hand to [E] Penning de Vries et al. 1989 (see their
+#   per-param source strings and the derivation note there). t_base/t_cap remain
+#   TODO(cite) — provisional, literature-typical placeholders pending the Step-11 gate,
+#   flagged until each is bound to a primary source (never backfilled from WOFOST).
 #
 # Sources:
 #   [A] McMaster, G.S. & Wilhelm, W.W. (1997), "Growing degree-days: one equation, two
@@ -76,6 +78,24 @@
 #       wheat: a review", European Journal of Agronomy 10:23–36 — cited BY [C] p. 91 for
 #       an alternative wheat cardinal set (−1.3 / 3.8 / 6.0 / 15.7 °C). Recorded as the
 #       sanctioned literature RANGE, not used as the value. NOT opened first-hand.
+#   [E] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
+#       Simulation Monographs 29, PUDOC, Wageningen / IRRI, Los Baños. ISBN 90-220-0937-2.
+#       Section 3.1 "Phenological development": Table 12 (p. 76 — the VEGETATIVE
+#       development-rate constant at a reference temperature) and Table 15 (p. 82 — the
+#       post-flowering / REPRODUCTIVE rate constant). The FIRST-HAND basis for the two
+#       tsum VALUES below (ceremony 2). Read as PAGE IMAGES: pdftotext garbled exactly the
+#       table digits at issue (the scope-(C) round-6 hazard), so the winter-wheat rows were
+#       transcribed from the rendered pages, not the text layer. Penning de Vries uses a
+#       development-RATE-constant formalism (1/day at a reference temperature), NOT a °C·day
+#       thermal sum — the conversion to our TSUM idiom is a documented derivation (per-param
+#       below), not a direct transcription. ⚠ n = 2 winter-wheat cultivars from one lineage
+#       (Angus et al. 1981; de Vos CABO) — a cited value, NOT the definitive winter-wheat
+#       range. The book explicitly EXCLUDES vernalization (p. 81: "not considered here … it
+#       is implicitly assumed that crops requiring low temperatures … such as winter cereals,
+#       have been sufficiently exposed to cold"), which is one of the two supports for the
+#       ceremony-2 double-count observation on our vern+photoperiod stack (see
+#       docs/plans/post-roadmap-oracle-match.md).
 
 name: winter_wheat
 process: phenology
@@ -89,14 +109,27 @@ parameters:
     value: 30.0
     unit: "degC"
     source: "TODO(cite) — provisional, literature-typical upper-cap temperature for the degree-day response (~30 °C) [A]; primary citation pending Step 11"
+  # CITED as of ceremony 2 (2026-07-20). DERIVATION (base-temp-free): [E]'s vegetative
+  # rate constant r (1/day) at reference temperature Tref is the inverse of the phase
+  # duration at constant Tref, so the equivalent linear-GDD thermal sum is
+  # TSUM1 = (Tref − t_base)/r. With Tref = 20 °C (the two winter-wheat rows' reference)
+  # and t_base = 0, this is exactly "match the phase duration at a constant 20 °C" —
+  # base-temp-free, since [E]'s r carries no base temperature.
+  #   ⚠ This is a SINGLE-POINT anchor at 20 °C, NOT a full-range equivalence: [E]'s
+  #   temperature response is non-linear (Fig. 31 — the pre-flowering curve is already
+  #   ~0.6 of its max at 10 °C, not 0 at base 0), so the two formalisms agree only NEAR
+  #   20 °C. This matters ASYMMETRICALLY: the vegetative window spans a cold winter (far
+  #   from 20 °C), so the tsum_anthesis comparison is soft; but the reproductive window is
+  #   ~15–19 °C (June–July at lat 52), right beside the anchor, so the tsum_maturity
+  #   comparison below — the load-bearing one — is robust.
   tsum_anthesis:
     value: 1100.0
     unit: "degC*day"
-    source: "TODO(cite) — provisional, literature-typical TSUM1 emergence→anthesis (~900–1200 °C·day for winter wheat) [B]; primary citation pending Step 11"
+    source: "Penning de Vries et al. (1989) Table 12 [E], winter-wheat rows (verified off the page image): cv UQ189 0.0195/d and cv Arminda 0.015/d, both at 20 °C reference. TSUM1 = 20/r → 1026 (UQ189) … 1333 (Arminda) °C·day at base 0; our 1100 sits inside this two-cultivar range (= 55 d to anthesis at a constant 20 °C, vs 51–67 d for the two cultivars). DVS/TSUM concept: van Keulen & Wolf (1986) [B]; cardinal-cap GDD form: McMaster & Wilhelm (1997) [A]. ⚠ n=2 cultivars, one lineage — a cited value, not the definitive range; see the ceremony-2 note in docs/plans/post-roadmap-oracle-match.md"
   tsum_maturity:
     value: 750.0
     unit: "degC*day"
-    source: "TODO(cite) — provisional, literature-typical TSUM2 anthesis→maturity (~650–850 °C·day for winter wheat) [B]; primary citation pending Step 11"
+    source: "Penning de Vries et al. (1989) Table 15 [E], winter-wheat REPRODUCTIVE rows (verified off the page image): cv UQ189 0.0275/d and cv Arminda 0.0255/d at 20 °C. TSUM2 = 20/r → 727 (UQ189) … 784 (Arminda) °C·day at base 0; our 750 is dead-centre (= 37.5 d grain fill at a constant 20 °C, vs 36.4–39.2 d). The WOFOST oracle's implied TSUM2 is ~1207 (a 75-day reproductive phase), ~1.5× above these two cultivars — a longer-grain-fill parameterization, i.e. CULTIVAR VARIATION, not a calibration error here (ruling B: the oracle is a diagnostic, never a fit target). DVS/TSUM concept: van Keulen & Wolf (1986) [B]. ⚠ n=2 cultivars; see the ceremony-2 note in docs/plans/post-roadmap-oracle-match.md"
 
   # --- vernalization (post-roadmap scope (B) increment 1) ---------------------
   # CITED, not TODO(cite): these four cardinals are [C] Fig. 8.1's wheat parameterization

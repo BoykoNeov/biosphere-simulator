@@ -1,7 +1,11 @@
 # Post-roadmap: the full oracle match — bucket 3 scope (B)
 
-**Status: INCREMENT 1 COMPLETE (2026-07-20). Biosphere unfrozen + re-frozen; the station
-cascade (sealed_station) followed. Recalibration = ceremony 2, OPEN.**
+**Status: INCREMENT 1 COMPLETE + CEREMONY 2 COMPLETE (both 2026-07-20). Increment 1
+unfroze + re-froze the biosphere (station cascade followed). Ceremony 2 is a
+citation-only outcome — the recalibration premise was falsified (both `tsum` values are
+already literature-centred), so NO value/golden/code moved; only the two `tsum`
+`source:` strings were retired from `TODO(cite)` to Penning de Vries 1989 (honor-system
+provenance unfreeze). See "Ceremony 2 — DONE" at the foot.**
 
 Shipped: vernalization + photoperiod (clean-room), `phenology.yaml` 4→12 cited params, a
 second aux accumulator, the CONSUMER chamber enlarged 2×, **13 goldens regenerated** (12
@@ -550,9 +554,17 @@ The residual is now a **phase-partition** error, which is exactly a `tsum` quest
 | anthesis → maturity | **43 d** | **75 d** |
 
 Our reproductive phase is too short and our vegetative phase too long — i.e.
-`tsum_anthesis` is too high relative to `tsum_maturity`. Both are `TODO(cite)`
+`tsum_anthesis` is too high relative to `tsum_maturity`. Both were `TODO(cite)`
 placeholders (`1100` / `750`) and both are **deliberately untouched** under decision 1.
 Peak LAI also still arrives 51 days after the oracle's.
+
+> ⚠ **SUPERSEDED by ceremony 2 (see foot).** This section reads "what remains is
+> calibration"; ceremony 2 measured it and found the opposite — both values were already
+> **literature-centred** (now cited to Penning de Vries 1989, no longer `TODO(cite)`), the
+> oracle's longer grain fill is a *different cultivar*, and the partition is
+> calendar-impossible to close at our anthesis regardless. NO value moved. The "reproductive
+> phase too short" framing here is a phase-*partition* observation that survives; the
+> inference "…so it needs recalibration" does not.
 
 **So the phase has landed where the diagnosis said it could not: two structural fixes in,
 and what remains is calibration.** The acceptance-bar question the user deferred is now
@@ -893,11 +905,97 @@ that needed changing.
 9. **Gates** — `-m "not slow"` 1919 passed, `-m slow` green, `ruff`/`pyright`/`clippy`
    clean, `git diff src/simcore/` empty.
 
-## Ceremony 2 (OPEN) — the recalibration
+## Ceremony 2 — DONE (2026-07-20): a citation + finding, NO value moved
 
-The `tsum` phase partition (reproductive phase 43 d vs 75 d) moved only within cited
-literature ranges, the oracle read as a diagnostic. Its own advisor review → goldens →
-manifests → provenance, under the same discipline. Not started; the user's call on when. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
-can dominate a short-horizon chamber run, and perennial/long-horizon now re-vernalize
-every cycle — conservation will not catch a plant that simply never develops), the Rust
-hand-mirror, then goldens → manifest → provenance → gates.
+**The premise was falsified and NO golden moved.** Ceremony 2 was scoped as "recalibrate
+the `tsum` partition (reproductive 43 d vs 75 d) within cited literature ranges." The
+measurement dissolved that scope four ways; the value is the findings. The only artifacts
+that moved are **two `source:` strings** (`tsum_anthesis`, `tsum_maturity`, retired from
+`TODO(cite)` to a first-hand citation) — an honor-system provenance unfreeze: the
+biosphere manifest's `phenology.yaml` hash moved, **no golden, no `src/` code, no Rust
+value** (`biosphere_params.txt` byte-identical — the port never emitted `source:`), station
++ authoring manifests untouched.
+
+### Finding 1 — our tsum values are ALREADY literature-centred (the recalibration is a no-op)
+
+The current `TODO(cite)` range attributed to [B] van Keulen & Wolf 1986 (`~900–1200` /
+`~650–850`) was **never verified** — [B] is not on the shelf. The verifiable first-hand
+source is **[E] Penning de Vries et al. 1989** (Tables 12 & 15, read off the page images —
+`pdftotext` garbled exactly the table digits, the scope-(C) round-6 hazard). [E] gives a
+development-**rate constant** (1/day at a reference temperature), not a °C·day sum, so the
+value transfers by a **documented derivation**, cleanest stated base-temp-free as *phase
+duration at a constant 20 °C*:
+
+| param | ours | PdV cv UQ189 | PdV cv Arminda | verdict |
+|---|---|---|---|---|
+| `tsum_anthesis` (TSUM1) | 1100 (55.0 d) | 1026 (51.3 d) | 1333 (66.7 d) | in range |
+| `tsum_maturity` (TSUM2) | 750 (37.5 d) | 727 (36.4 d) | 784 (39.2 d) | **dead-centre** |
+
+The oracle's implied TSUM2 ≈ **1207 °C·day** (its 75-day reproductive phase) is ~1.5× above
+these two cultivars — a **longer-grain-fill parameterization, i.e. cultivar variation**, not
+our error. Under **ruling B** (oracle = diagnostic, never a fit target) moving `tsum_maturity`
++54 % out of the cited range to hit it is exactly the backfitting forbidden. So the correct
+recalibration is **no move**. ⚠ Honest scope: n = 2 cultivars from one lineage — a *cited
+value*, not "the winter-wheat TSUM2 literature range"; a shelf fact, dated, not a property of
+the literature (the meta-finding shape, held in check by an advisor catch).
+
+### Finding 2 — the partition is calendar-impossible anyway (a second, citation-independent leg)
+
+Verified against the advisor's "check the mechanism" catch: our day-251 anthesis is **June 9**
+— the reproductive window is warm June–July (daily TT flat ~14–19 °C·day), **not** a cooling
+tail. The ceiling is the **305-day fixture horizon** × late anthesis: only ~54 fixture-days
+and **~912 °C·day** of grain-fill budget remain, so `tsum_maturity > ~912` **never matures in
+any season** (per-season on both ports; perennial re-sows every 305 d). The oracle's 75 days
+fit only because *its* anthesis is day 217. So the partition can't be closed by `tsum`
+regardless of the citation debate.
+
+### Finding 3 — the "maturity match" (294 vs 292) is TWO ERRORS CANCELLING
+
+Anthesis +34 d late and reproductive phase −32 d short net to a maturity *date* error of ≈0.
+`test_fixed_maturity_lands_within_two_days` read as validation and was **coincidence**; renamed
+`test_maturity_lands_within_two_days_but_it_is_two_errors_cancelling` and re-documented (the
+ungated-prose-half pattern — the false story lived in the assertion's own narrative). Corrected
+regardless of any param move.
+
+### The user's steer, and why NO science changed either
+
+Put the finding to the user; they chose to **reopen the double-modulation** (treat the +34 d
+anthesis overshoot as the real defect, not `tsum`). Measured each term in isolation:
+
+| config | anthesis | overshoot | canopy peak-LI |
+|---|---|---|---|
+| both (current) | 251 | +34 d | 0.956 |
+| drop vernalization (photoperiod only) | 231 | +14 d | 0.713 |
+| drop photoperiod (vern only) | 220 | +3 d | 0.579 |
+| neither (pre-inc-1) | 138 | — | 0.050 (death spiral) |
+
+Two results: (a) **removing a term re-opens the canopy gap** (the dominant scope-A failure) —
+canopy closure scales with vegetative length, so the +34 d overshoot is the *price* of the
+closed canopy; and (b) reopening does **not** close the partition either (that's the TSUM2
+magnitude, Finding 1). There **is** a citable case that vernalization is the term to cut —
+increment 1 measured the oracle is photoperiod-driven (r=0.972), and **[E] itself excludes
+vernalization** for winter cereals (p. 81, "assumed sufficiently exposed to cold") — so the
++34 d is plausibly a **double-count** of one correlated winter slowdown (cold-arrest stacked on
+photoperiod). But June 9 is a **realistic** NW-European winter-wheat anthesis date, so under
+ruling B "34 d late vs a non-target oracle" is not clearly a defect at all.
+
+**The resolution (user): "why not both".** The tension was never model-level — vernalization is
+**optional by design** (`ThermalTimeAccumulation` takes `vernalization=None`; loaders take a
+crop-file path), so a cold-requiring winter wheat and a day-neutral/photoperiod-only wheat are
+both expressible. The tension was only that there is **one FROZEN reference crop**, currently
+carrying both terms. So: **keep the validated reference untouched** (winter wheat, both terms —
+correct against a real cold field), and when the closed habitat needs a warm-climate crop, add
+it as a **second, authored** crop (photoperiod-only, lamp-controllable via `lighting.py`), under
+"authored ≠ validated" — additive content, not a reference change. This also answers the
+deployment worry: the frozen winter wheat dropped into a warm, lamp-lit habitat would never
+flower (no cold), but the fix is *a different crop*, not bending the validated one.
+
+### Open / deferred after ceremony 2
+
+* **A day-neutral (photoperiod-only) habitat crop as authored content** — the "second wheat".
+  Needs small plumbing (let a scenario select its crop-param file; `load_*_params(path=…)`
+  already supports it) but touches no frozen science. Picked up when the habitat design calls
+  for it; the user's call on when.
+* The partition residual (43 d vs 75 d) is now a **permanent, explained** pin in
+  `test_oracle_gap.py` (cultivar variation), not a to-do.
+* Scope (C)'s decomposer rates + `n_senescence_rate` form-gap remain separate open pieces.

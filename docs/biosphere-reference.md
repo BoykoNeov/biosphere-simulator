@@ -105,9 +105,12 @@ or PCSE source. The manifest records a newline-normalized sha-256 of each as **p
 > ~1.22×** (peak LAI 5.19 vs the oracle's 6.34) and the canopy now bootstraps — with **no
 > canopy science written**, because the "structural" canopy collapse was downstream of the
 > phenology error (`docs/plans/post-roadmap-oracle-match.md`, findings). The **residual is
-> now cause 3 — param values**: the `tsum` phase partition (reproductive phase too short),
-> whose recalibration is the deferred scope-B ceremony 2, to be moved only within cited
-> literature ranges (**the oracle is a diagnostic, never a fit target**). The frozen
+> now cause 3 — param values**: the `tsum` phase partition (reproductive phase too short).
+> **Ceremony 2 (2026-07-20) investigated it and moved NO value** — both `tsum` values are
+> already literature-centred (now cited to Penning de Vries 1989), and the oracle's longer
+> grain fill is a *different cultivar*, so matching it would leave the cited range
+> (backfitting, forbidden by ruling B — **the oracle is a diagnostic, never a fit target**).
+> Only two `source:` strings changed; see the Unfreeze log. The frozen
 > reference remains the **machinery** — balanced flows, the conservation gate, `rationed ==
 > 0`, determinism, the emergent limit cycle (now a period-1 fixed point; see below) — with
 > two real sciences added and a residual documented, not a validated oracle match.
@@ -226,6 +229,22 @@ so the discipline is enforced, not merely requested.
   a genuine cross-port reset bug). `git diff src/simcore/` empty. Full record + the four
   findings: `docs/plans/post-roadmap-oracle-match.md`. Recalibration of the `tsum` residual
   is deferred (scope-B ceremony 2), oracle-as-diagnostic-only.
+
+- **2026-07-20 — scope (B) ceremony 2: `tsum` citation (a provenance-only unfreeze; NO
+  value moved).** The recalibration premise was **falsified**: both thermal sums are
+  already literature-centred (Penning de Vries et al. 1989 Tables 12 & 15, first-hand off
+  the page images — `tsum_maturity = 750` is dead-centre of the winter-wheat range
+  [727, 784] °C·day; `tsum_anthesis = 1100` ∈ [1026, 1333]). The oracle's implied
+  TSUM2 (~1207) is a longer-grain-fill **cultivar**, not our error, and matching it would
+  leave the cited range (backfitting, forbidden by ruling B) — and is calendar-impossible
+  at our anthesis anyway. So the two `tsum` `source:` strings were retired from
+  `TODO(cite)` to [E] Penning de Vries 1989; **`phenology.yaml`'s manifest hash moved,
+  nothing else** — no golden, no `src/`, no Rust value (`biosphere_params.txt`
+  byte-identical), station/authoring manifests untouched. This is the scope-(C) shape: a
+  provenance edit no golden catches, so the ceremony (advisor review → regenerate the
+  manifest as the git-visible record → provenance) was run deliberately. Full record +
+  the double-modulation exploration + the "why not both / day-neutral habitat crop"
+  resolution: `docs/plans/post-roadmap-oracle-match.md` ("Ceremony 2 — DONE").
 
 ## Phase-5 handoff
 

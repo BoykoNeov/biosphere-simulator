@@ -23,11 +23,25 @@ FALSIFIED**:
 * the matched-day storage confound **dissolved** — with timing near-correct, both the
   matched-day and matched-DVS reads now agree (see ``test_method_*``).
 
-**What remains is genuinely cause 3 — param values**, specifically the ``tsum`` phase
-partition: our vegetative phase is too long and reproductive phase too short. That is
-the target of the deferred recalibration increment (scope-B ceremony 2), to be moved
-only within cited literature ranges (the oracle is a diagnostic, never a fit target —
-the plan's "the bar, decided"). These tests pin that residual as numbers.
+The residual is the ``tsum`` phase partition: our reproductive phase is ~43 days vs the
+oracle's 75. **Scope-B ceremony 2 (2026-07-20) investigated it and moved NO value** —
+the outcome is a finding, not a recalibration:
+
+* Both tsum values are **already literature-centred** (Penning de Vries 1989, Tables
+  12 & 15, first-hand): ``tsum_maturity = 750`` is dead-centre of the winter-wheat range
+  [727, 784] °C·day; ``tsum_anthesis = 1100`` sits inside [1026, 1333]. The oracle's
+  implied TSUM2 (~1207) is ~1.5× above these — a longer-grain-fill *cultivar*, not a
+  calibration error. Matching it would leave the cited range = backfitting, forbidden by
+  ruling B (the oracle is a diagnostic, never a fit target).
+* The partition is **calendar-bounded anyway**: at our (ratified) day-251 anthesis only
+  ~54 fixture-days remain, so ``tsum_maturity > ~912`` never even matures.
+* The maturity "match" below (day 294 vs 292) is **two errors cancelling**, not
+  validation — see ``test_fixed_maturity_lands_within_two_days``.
+
+So these tests still pin the *same numbers* (nothing moved); only the story changed —
+from "the target of a deferred recalibration" to "a recorded cultivar-variation +
+double-modulation finding". Plan of record: ``docs/plans/post-roadmap-oracle-match.md``
+("Ceremony 2").
 
 PCSE-free: both fixtures are read as JSON; ``lab.oracle_match`` is stdlib.
 """
@@ -186,12 +200,17 @@ def test_fixed_the_canopy_now_bootstraps() -> None:
     assert max(oracle_lai) / max(our_lai) == pytest.approx(1.22, abs=0.1)
 
 
-def test_fixed_maturity_lands_within_two_days() -> None:
-    """Phenology no longer runs fast — maturity is now nearly exact.
+def test_maturity_lands_within_two_days_but_it_is_two_errors_cancelling() -> None:
+    """Maturity day 294 vs the oracle's 292 — but this is NOT validation (ceremony 2).
 
-    Scope (A): maturity 74 days early. Increment 1: maturity day **294 vs the oracle's
-    292** — within 2 days. The overrun is closed; what remains is a phase-*partition*
-    error (the vegetative/reproductive split), pinned in column 2.
+    It reads like a near-exact match, and that is the trap. It is **two errors
+    cancelling**: our anthesis is ~34 days LATE (day 251 vs 217, the ratified
+    vern+photoperiod overshoot) and our reproductive phase is ~32 days SHORT (43 d vs
+    75), so the maturity *date* nets to ~0 error while the *partition* underneath is
+    wrong. The assertion passes and stays pinned; only the story is corrected, so the
+    coincidence is not mistaken for a validated endpoint (ungated-prose-half pattern,
+    caught in the assertion's own narrative). See
+    ``test_gap_phase_partition_is_wrong_vegetative_too_long`` for the partition itself.
     """
     ref = _reference()
     our = _our_dvs(_season_states(), len(ref))
@@ -215,13 +234,18 @@ def test_fixed_maturity_lands_within_two_days() -> None:
 def test_gap_phase_partition_is_wrong_vegetative_too_long() -> None:
     """THE PAYLOAD — the residual after both sciences: the tsum partition is off.
 
-    Maturity is right (~day 293) but the *split* is not: our vegetative phase (emergence
-    → anthesis) is **251 days vs the oracle's 217**, and our reproductive phase
-    (anthesis → maturity) is only **43 days vs 75**. So ``tsum_anthesis`` is too high
-    relative to ``tsum_maturity`` — a pure param-calibration item (both are
-    ``TODO(cite)`` placeholders, 1100/750). This is the target of the deferred
-    recalibration increment, to be moved only within cited literature ranges (the oracle
-    is a diagnostic, not a fit target).
+    Maturity date is right (~day 293) but the *split* is not: our vegetative phase
+    (emergence → anthesis) is **251 days vs the oracle's 217**, and our reproductive
+    phase (anthesis → maturity) is only **43 days vs 75**.
+
+    **Ceremony 2 (2026-07-20) resolved this to a finding, not a recalibration** (both
+    values are now CITED, no longer ``TODO(cite)``): ``tsum_maturity = 750`` is
+    dead-centre of the first-hand winter-wheat range [727, 784] °C·day (Penning de
+    Vries 1989), while the oracle's implied ~1207 is a longer-grain-fill *cultivar*.
+    The gap is cultivar variation, not our error: closing it would leave the cited
+    range (backfitting, forbidden by ruling B) and is calendar-impossible at our
+    anthesis anyway. This test therefore pins a *permanent, explained* residual, not a
+    to-do.
     """
     ref = _reference()
     our = _our_dvs(_season_states(), len(ref))
