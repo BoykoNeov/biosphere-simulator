@@ -32,6 +32,12 @@ Both were put to the user before any science was written, on the advisor's argum
 starting calibration against an undefined target is how recalibration chases noise
 forever.
 
+> **⚠ DECISION 1 WAS SUPERSEDED ON THE SAME DAY — see "The bar, decided" below.** It is
+> kept here unedited because the *reasoning* is what licensed the two increments, and
+> because the route by which its trigger fired is itself a finding: the bar was deferred
+> "until increment 2 measures the residual", **increment 2 then dissolved**, and the
+> residual arrived anyway from a direction nobody planned.
+
 ### Decision 1 — the acceptance bar is DEFERRED until increment 2 has measured the residual
 
 **There is no acceptance bar in the tree, and this was verified rather than assumed.**
@@ -477,6 +483,15 @@ Unlike vernalization, photoperiod is an **instantaneous** driver with no accumul
 adds no aux state. That difference is precisely what the discriminating test above turned
 on.
 
+**Its sensitivity window carries the same approximation as vernalization's, and that is
+now stated symmetrically.** The source ends wheat's photoperiod sensitivity at *terminal
+spikelet* (Ritchie 1991), which is before anthesis; we gate at `DVS < 1` because our stage
+set has no terminal-spikelet point. So the slowdown is applied slightly longer than
+prescribed — the identical trade already documented for the cold requirement. It was
+written up for vernalization only and left implicit for photoperiod (advisor catch);
+recorded in `phenology.yaml` for both now, because a stage set that gained a
+terminal-spikelet point would narrow **both** windows, not one.
+
 ## The measured result — and the second surprise
 
 | stage | oracle | ORIGINAL | vernalization only | **vern + photoperiod** |
@@ -588,6 +603,51 @@ discrete structural property over the full horizon, still fails on a period brea
 gains a `max(tail) > 1.0` assertion so that a degenerate fixed point at a dead plant
 cannot pass where the oscillating baseline used to. The module docstring's period-2
 paragraph is corrected in place with the supersession marked.
+
+---
+
+# The bar, decided (2026-07-20) — and the Phase-1 tension resolved
+
+Decision 1 deferred the acceptance bar until "the residual after both structural fixes is
+a measured number". **That trigger fired by an unplanned route**: increment 2 (the canopy)
+dissolved, so the measurement that was supposed to come *from* it never happened — but the
+residual it was meant to expose showed up anyway, as the phase-partition error above
+(reproductive phase 43 d vs 75 d). The advisor flagged that the condition was satisfied
+and that re-deferring it a second time would let the user's own selected option — which
+read *"forces the deferred bar decision NOW"* — pass silently.
+
+**Two rulings, both the user's:**
+
+### Ruling A — the ceremony is STAGED
+
+Freeze the **structural science alone** now; the `tsum` recalibration becomes its own
+later increment with its own ceremony. Costs a second station cascade, and buys the thing
+the staged discipline exists for: **each golden diff is attributable to exactly one
+cause.** Provenance does not regress in the meantime — the `tsum` params remain the *same*
+`TODO(cite)` placeholders already sitting in the frozen tree, while the six new
+vernalization + two new photoperiod params all arrive **cited**.
+
+### Ruling B — the bar is LITERATURE RANGES ONLY; the oracle is a diagnostic, never a target
+
+This retires the tension that has been open since Phase 1. The books said *"clean-room
+forbids backfitting to WOFOST"* while the scope-B row said *"then recalibration"*, and
+those could not both govern. The resolution:
+
+> **A param may move only within a cited literature range. The oracle is read as a
+> diagnostic and is never fitted to. Whatever gap remains is recorded as a finding.**
+
+This is not a compromise between the two; it is the consistent position both were reaching
+for, and it now also follows from the user's earlier ruling that **the oracle is not the
+phenology target** — an instrument you have declared unfit as a target cannot coherently
+be restored as a fitting objective. `test_oracle_gap.py`'s existing idiom (pin the gap as
+a measured number with its cause) is exactly the right shape for it and needs no change of
+philosophy, only new numbers.
+
+**This is also the honest reading of what just happened.** The vernalization endpoint match
+was a **false positive that an endpoint bar would have rewarded** — anthesis within 3 days,
+by a mechanism the target does not possess. A bar that scores endpoint agreement would have
+graded the wrong physics as success. Ruling B removes the incentive entirely rather than
+trying to build a cleverer scorer.
 
 ## Still to do for increment 1
 

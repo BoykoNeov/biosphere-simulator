@@ -147,6 +147,15 @@ parameters:
   # 19 h for several spring and winter wheat cultivars; Table 7.2's own wheat rows span
   # CPP 14–17 and ppsen 0.09–0.17. Moving these is calibration (scope-B decision 1) and
   # leaving the range is a FINDING, not a licence to widen it.
+  #
+  # SENSITIVITY WINDOW — the SAME deliberate approximation as vernalization, stated here
+  # symmetrically rather than left implicit. [C] p. 76 ends wheat's photoperiod
+  # sensitivity at TERMINAL SPIKELET / stem elongation (Ritchie 1991), which is BEFORE
+  # anthesis. Our stage set has no terminal-spikelet point (DVS runs 0 -> 1 -> 2 over
+  # emergence -> anthesis -> maturity), so the factor is gated at DVS < 1 — slightly
+  # GENEROUS, applying the slowdown a little longer than the source prescribes. Same
+  # trade and same reason as the vernalization gate above; recorded because a stage set
+  # with a terminal-spikelet point would narrow BOTH windows, not just one.
   cpp:
     value: 16.0
     unit: "h"
