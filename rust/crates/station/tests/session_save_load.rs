@@ -11,9 +11,11 @@
 //! `(recipe, State)` and nothing else.
 //!
 //! States are compared by their exact hex-float `sim_io` JSON, so a match is bit-exact.
-//! Coverage: single-rate (`cabin_gas`, Tier-1), two-rate with accumulated `thermal_time`
-//! (`greenhouse` — proves the biosphere aux/phenology survives the round-trip), and an
-//! `#[ignore]`d sealed resume that crosses a season boundary (the reset-adopt branch).
+//! Coverage: single-rate (`cabin_gas`, Tier-1), two-rate with an accumulated aux
+//! (`greenhouse` — proves the biosphere aux/phenology survives the round-trip; since scope
+//! (B) increment 1 the save point is past day 14, where `vernalization_days` first
+//! accrues, because thermal_time is arrested at warm sowing), and an `#[ignore]`d sealed
+//! resume that crosses a season boundary (the reset-adopt branch).
 
 use domains::crew::FECAL_WASTE;
 use domains::params;
@@ -68,7 +70,11 @@ fn assert_resume_parity(build: impl Fn() -> SimSession, save_at: u64, total: u64
     // Non-vacuous: the state actually advanced (a no-op run would pass trivially).
     let mut fresh = build();
     fresh.step_n(save_at).unwrap();
-    assert_ne!(snap(fresh.state()), straight_final, "the run is non-trivial");
+    assert_ne!(
+        snap(fresh.state()),
+        straight_final,
+        "the run is non-trivial"
+    );
 }
 
 /// Single-rate `cabin_gas` (Tier-1, transcendental-free): save at 120, resume to 300.
@@ -115,14 +121,21 @@ fn greenhouse_resume_after_save_preserves_aux_phenology() {
         )
         .unwrap()
     };
-    // Pre-flight: thermal_time is non-zero by the save point (else the aux claim is vacuous).
+    // Pre-flight: some aux accumulator is non-zero by the save point (else the aux claim
+    // is vacuous). ⚠ Save point moved 2 → 16 by post-roadmap scope (B) increment 1: with
+    // vernalization + photoperiod, thermal_time is ARRESTED at sowing (verfun = 0 until
+    // the cold requirement is met) and it is too warm in early October to vernalize, so
+    // BOTH accumulators are legitimately 0 for the first ~14 days. `vernalization_days`
+    // first accrues on day 14 (temperature drops below the 12 °C ceiling). Saving at day
+    // 16 makes the guard meaningful again — and now it proves the SECOND accumulator
+    // round-trips, a strictly stronger check than the old single-accumulator one.
     let mut probe = build();
-    probe.step_n(2).unwrap();
+    probe.step_n(16).unwrap();
     assert!(
         probe.state().aux.values().any(|&v| v != 0.0),
-        "greenhouse should have accumulated aux by day 2"
+        "greenhouse should have accumulated vernalization_days by day 16"
     );
-    assert_resume_parity(build, 2, 4);
+    assert_resume_parity(build, 16, 18);
 }
 
 /// `load_state` rejects a state whose stock-id set does not match the session's registry —
