@@ -540,7 +540,7 @@ exactly as round 2 left it. The value provenance is unchanged.
 **What it does upgrade is the argument's premise.** The FINDING's load-bearing clause is that
 S&S's rates are *already optimal-condition potential rates*, which is what forbids explaining
 our ~3.9× gap away with temperature/moisture modifiers. That clause was [C]-mediated. [E]
-states it first-hand: *"an incubation procedure conducted at optimum temperature (35°C) and
+states it first-hand: *"an incubation procedure conducted at optimum temperature (35° C) and
 moisture conditions (approximate field capacity)"*, over *"39 widely differing soils"*, a
 30-week incubation with 0.01 M CaCl₂ leaching, and *"nitrogen mineralization obeyed simple
 first-order kinetics"*. **So the chain is broken for the CONDITIONS and survives for the
@@ -550,10 +550,37 @@ Also new first-hand: *"values of N₀ ranged from about 20 to over 300 mg kg⁻�
 That is a **pool size, not a rate** — it binds nothing here and is recorded only because it is
 [A] data we now hold directly. Flagged in the file so it cannot be misquoted as a rate.
 
-**A note on how it was read.** The PDF is a scan; text extraction returned binary garbage.
-The page was read as an **image** instead. This is the round-2 discipline holding (Justes 1994
-stayed unread rather than guessed) — the difference is that here the render was legible, so it
-was read rather than skipped.
+**And a citation correction nobody could have made without opening something.** [E]'s printed
+header gives *"Soil Sci. Soc. Amer. Proc. 36:465-72, 1972"* — ***Proceedings*, not *Journal***.
+SSSAJ was named *Soil Science Society of America Proceedings* until 1976, so this doc's own
+retrieval list (#6) and `mineralization.yaml`'s [A] entry both cite a 1972 paper under a title
+it did not yet have. The DOI is unaffected. Cosmetic, but it is exactly the class of error an
+unopened citation accumulates — and it is the second time this scope has found a **provenance**
+defect rather than a value one.
+
+## How it was read, and the quote check that followed
+
+The PDF is a scan; text extraction returned binary garbage. The page was read as an **image**
+instead — the round-2 discipline holding (Justes 1994 stayed unread rather than guessed), the
+difference being that here the render was legible.
+
+**Then every quoted fragment was re-checked against the image, fragment-by-fragment, after
+first transcription** — because eye-reading a scan is precisely how round 1 produced its one
+real error (BVAD wheat read off the soybean row), and because **no test, lint, or manifest gate
+can see a misquote inside a frozen provenance file**. Verbatim text committed to the tree is
+ungated by construction, which puts it in the same family as the freeze's prose half.
+
+The re-read was not ceremonial — it changed three things and confirmed a fourth:
+
+* **corrected** the printed spacing `35° C` (first transcribed `35°C`);
+* **corrected** a citation taken from a **handwritten archival scrawl** on the scan
+  (`CC/AB+ES`) rather than the printed header (`CC/NUMBER 28`) — recording an annotation as if
+  it were the document;
+* **surfaced** the *Proceedings*/*Journal* correction above;
+* **confirmed** a fragment that had been flagged as a likely fabrication-inside-quotes:
+  *"leaching intervals"* is genuinely printed, hyphenated across a line break as
+  `leaching in-/tervals`. The suspicion was reasonable and wrong — which is the argument for
+  checking rather than arguing.
 
 ## The sentence round 3 falsified — and it was this scope's own
 

@@ -66,7 +66,7 @@
 #       as originally written ("retrieval of [A] remains the only upgrade path"). [A]'s
 #       CONDITIONS were upgradable without [A], via an author's own retrospective.
 #   [E] Smith, S.J. (1987), "This Week's Citation Classic: Stanford G & Smith S J, Nitrogen
-#       mineralization potentials of soils", Current Contents CC/AB-ES #28, July 13 1987,
+#       mineralization potentials of soils", Current Contents, CC/NUMBER 28, July 13 1987,
 #       p. 20 (ISI). OPENED AND READ 2026-07-20 (round 3). Open access, page images:
 #       https://garfield.library.upenn.edu/classics1987/A1987H917300001.pdf
 #       WHAT IT IS: a first-person retrospective written by S.J. Smith — [A]'s own second
@@ -77,9 +77,19 @@
 #       ⚠ IT DOES NOT GIVE k. No rate constant appears anywhere in it — so the 0.054 wk⁻¹
 #       figure remains reachable only through [C] quoting [A], exactly as round 2 recorded.
 #       The value provenance is UNCHANGED by round 3.
+#       ⚠ CITATION CORRECTION IT SETTLES — [A]'s AS-PUBLISHED VENUE. [E]'s printed header
+#       gives "Soil Sci. Soc. Amer. Proc. 36:465-72, 1972" — *Proceedings*, not *Journal*.
+#       SSSAJ carried the name "Soil Science Society of America Proceedings" until 1976, so
+#       the [A] entry above (and the plan doc's retrieval list) cite a 1972 paper under a
+#       title it did not yet have. The DOI is unaffected and resolves under the modern name,
+#       so this is a cosmetic-but-real provenance error of exactly the kind an unopened
+#       citation accumulates. Recorded rather than silently rewritten: [A]'s own line is left
+#       as-is because that is how every secondary in this file cites it, and changing it
+#       would desynchronize us from [C] and [D]. Anyone quoting [A] as PRIMARY should use
+#       the Proceedings form.
 #       WHAT IT DOES GIVE — first-hand confirmation of the experimental conditions that the
 #       FINDING below rests on, previously known only through [C]: "an incubation procedure
-#       conducted at optimum temperature (35°C) and moisture conditions (approximate field
+#       conducted at optimum temperature (35° C) and moisture conditions (approximate field
 #       capacity)"; "For 39 widely differing soils"; "We continued the incubation for 30
 #       weeks using leaching intervals first of two and two weeks, then four, four, and six
 #       weeks, then six weeks, and finally eight weeks" (leached with 0.01 M CaCl2); and the
@@ -94,6 +104,15 @@
 #       over 300 mg kg-1 air-dry soil". This is a POOL SIZE, not a rate — it binds nothing
 #       here and must not be quoted as if it did; recorded because it is [A] data we now
 #       hold directly.
+#       QUOTE VERIFICATION (the round-1 lesson, applied): every fragment above was
+#       re-checked against the page IMAGE fragment-by-fragment after first transcription,
+#       because eye-reading a scan is precisely how round 1 produced its one real error (the
+#       BVAD wheat figure read off the soybean row). The re-read corrected three things: the
+#       printed spacing "35° C" (transcribed "35°C"); a citation recorded from a HANDWRITTEN
+#       archival scrawl on the scan ("CC/AB+ES") rather than the printed header ("CC/NUMBER
+#       28"); and it surfaced the Proceedings/Journal correction above. It also CONFIRMED a
+#       fragment flagged as suspect — "leaching intervals" is genuinely printed, hyphenated
+#       across a line break as "leaching in-/tervals", not an inserted word.
 #       ROUND-3 NEGATIVE RESULTS, recorded so the search is not repeated: [A] itself was
 #       re-attempted and is still Wiley-paywalled; Dunn 2011 (Science) and Divya 2009
 #       (Elsevier; DTU Orbit is metadata-only) were re-attempted and are still closed — the
