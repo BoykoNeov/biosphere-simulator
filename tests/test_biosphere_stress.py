@@ -40,11 +40,20 @@ semantics.
   slope bound) — see drift.py's PROVENANCE, now spanning both horizons.
 * **(b) Limit-cycle stationarity — now confirmed, not merely "holding".** Over 328 yr
   the per-year ``peak leaf_c`` is **bounded + non-amplifying** (``is_stationary``) and
-  **non-collapsing**; the period class is **sustained for the full horizon**: the
-  **perennial** holds a genuine **period-2** cycle (320 yr of strict alternation, gap
-  ~0.07 ~= 28% of scale), the **consumer** holds its **period-1** fixed point (settled
-  adjacent gap ~3.4e-5 ~= 1e-4 of scale) and its standing biomass stays stationary +
-  alive. This is the horizon where "the attractor holds" becomes a *measurement*.
+  **non-collapsing**; the period class is **sustained for the full horizon**. **BOTH**
+  scenarios now hold a **period-1 fixed point**: the **consumer** always did (the
+  herbivore damps the producer oscillation; settled adjacent gap ~3.4e-5 ~= 1e-4 of
+  scale), and the **perennial** joined it in post-roadmap scope (B) increment 1.
+
+  ⚠ *This paragraph read "the perennial holds a genuine period-2 cycle (320 yr of
+  strict alternation, gap ~0.07 ~= 28% of scale)" until 2026-07-20.* That cycle turned
+  out to be a property of the **broken canopy regime**, not of the perennial chamber:
+  adding the two missing phenology sciences (vernalization + photoperiod) dissolved it,
+  and **either one alone** is sufficient. The plant converged **upward** — peak leaf
+  0.253 -> 1.222, ~4.8x — so this is damping by canopy closure, not collapse. Table and
+  mechanism in ``test_stress_perennial_fixed_point_sustained`` below and
+  ``docs/plans/post-roadmap-oracle-match.md``. This is the horizon where "the attractor
+  holds" becomes a *measurement* — including when the attractor itself changes class.
 * **(c) Closure carried over the full horizon.** ``rationed == 0`` (kinetics, not the
   Euler backstop), ``events == ()`` (no extinction), carbon loss-sink ``0.0`` on *every*
   one of all 100,040 steps — the strongest closure statement, over ~328 years.
@@ -261,14 +270,41 @@ def test_stress_leaf_cycle_is_stationary(runs, scenario) -> None:
 
 
 @pytest.mark.skipif(_YEARS < _DECADE_YEARS, reason="period check needs >= decade scale")
-def test_stress_perennial_period_2_sustained(runs) -> None:
-    # The DISCRETE structural check, now over the FULL horizon: the perennial chamber
-    # holds a genuine period-2 limit cycle for all 328 years — odd/even years stay on
-    # two distinct branches (gap ~0.07, ~28% of scale), 320 yr of strict alternation.
-    # This is the slow-drift detection axis (b) at decade scale could not do: a period
-    # break anywhere in ~328 yr trips is_period_2.
+def test_stress_perennial_fixed_point_sustained(runs) -> None:
+    # CHANGED by post-roadmap scope (B) increment 1 (vernalization + photoperiod). This
+    # test previously asserted a period-2 limit cycle (`is_period_2`, gap ~0.07, ~28%
+    # of scale). That cycle was NOT a robust property of the perennial chamber — it was
+    # property of the BROKEN CANOPY REGIME underneath it, and adding the two missing
+    # phenology sciences dissolved it. The test is flipped, not weakened: it still
+    # pins a discrete structural property over the horizon and still fails on a period
+    # break — the branch it pins is simply the other one now.
+    #
+    # Measured, isolating each term (docs/plans/post-roadmap-oracle-match.md):
+    #
+    #   config                  peak leaf   max adjacent gap
+    #   both inert (baseline)     0.2530    7.157e-02  (28.28% — reproduces the old pin)
+    #   vernalization only        1.0171    4.44e-16   (fixed point)
+    #   photoperiod only          1.0795    0.0        (fixed point)
+    #   both (shipped)            1.2215    1.55e-15   (fixed point)
+    #
+    # EITHER term alone collapses it, so this is not photoperiod entrainment (the first
+    # hypothesis, measured and REJECTED). The mechanism is canopy closure flattening the
+    # year-to-year return map: at baseline the starved canopy sits at ~5% light
+    # interception, where Beer-Lambert is still nearly LINEAR in LAI, so a good year
+    # begets a bad one with gain > 1. Slowing development lets the canopy close (~95.6%
+    # interception), where Beer-Lambert SATURATES — a change in starting leaf barely
+    # moves intercepted light, the map's slope at the fixed point drops below 1, and the
+    # 2-cycle loses stability. Same damping story as the consumer chamber below, where a
+    # herbivore rather than light saturation supplies the damping.
     summaries = runs["perennial"].peak_leaf
-    assert is_period_2(summaries, transient=_PERIOD_TRANSIENT)
+    assert not is_period_2(summaries, transient=_PERIOD_TRANSIENT)
+    tail = summaries[_PERIOD_TRANSIENT:]
+    gap = max(abs(tail[k + 1] - tail[k]) for k in range(len(tail) - 1))
+    assert gap < 1e-3 * max(tail)  # the branches have merged → a fixed point
+    # ...and it converged UP, not by collapsing: the plant is ~4.8x healthier than the
+    # oscillating baseline (0.253 -> 1.222). A degenerate "fixed point" at a dead plant
+    # would pass the two assertions above; this one cannot.
+    assert max(tail) > 1.0
 
 
 @pytest.mark.skipif(_YEARS < _DECADE_YEARS, reason="period check needs >= decade scale")

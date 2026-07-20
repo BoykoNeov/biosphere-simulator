@@ -532,6 +532,63 @@ Peak LAI also still arrives 51 days after the oracle's.
 and what remains is calibration.** The acceptance-bar question the user deferred is now
 live, with a number behind it.
 
+## ⚠ THE THIRD FINDING: the perennial period-2 limit cycle was an artifact, and it is gone
+
+The advisor's ceremony warning — *"a 57-day arrest can dominate a short-horizon chamber
+run, and perennial/long-horizon now re-vernalize every cycle; conservation will not catch
+a plant that never develops"* — paid off, though not where expected. The full suite came
+back **693 passed, 1 failed**, and the failure is
+`test_stress_perennial_period_2_sustained`: the perennial chamber's **period-2 limit
+cycle collapsed to a fixed point**.
+
+That test pinned a *documented structural property* — "a genuine period-2 limit cycle for
+all 328 years, 320 yr of strict alternation, gap ~0.07 ~= 28 % of scale". So the question
+is whether the new science broke the model or corrected it.
+
+**Measured, isolating each term over 16 years of the sealed perennial chamber:**
+
+| config | peak leaf | max adjacent gap |
+|---|---|---|
+| **baseline** (both inert) | 0.2530 | 7.157e-02 (**28.28 %** of scale) |
+| vernalization only | 1.0171 | 4.44e-16 |
+| photoperiod only | 1.0795 | 0.0 |
+| both (shipped) | 1.2215 | 1.55e-15 |
+
+Two things follow, and the first validates the second:
+
+1. **The baseline row reproduces the committed test's own numbers exactly** ("gap ~0.07,
+   ~28 % of scale" → 7.157e-02, 28.28 %). The harness is measuring the same thing the
+   test was, so the comparison is sound rather than merely suggestive.
+2. **Either term alone collapses the cycle**, and the system converges **upward** — peak
+   leaf 0.253 → 1.222, **~4.8×**. A degenerate fixed point (a plant that never develops)
+   would go the other way.
+
+**The first hypothesis was photoperiod entrainment — measured and REJECTED.** Daylength
+is a strict annual function, so "photoperiod entrains the free-running oscillation" is an
+attractive and textbook-shaped story. It is also wrong: vernalization alone, which has no
+annual phase structure at all, kills the cycle just as completely. Recorded because it
+was *drafted as the explanation* before the isolating run, and only the fourth row of
+that table stopped it — the same "plausible, confidently stated, wrong" failure mode
+scope (A) recorded twice.
+
+**The mechanism that survives** is canopy closure flattening the year-to-year return map.
+At baseline the starved canopy sits at ~5 % light interception, where Beer–Lambert is
+still nearly **linear** in LAI, so a good year begets a bad one with loop gain > 1.
+Slowing development lets the canopy close (~95.6 % interception), where Beer–Lambert
+**saturates**: a change in starting leaf barely moves intercepted light, the map's slope
+at the fixed point drops below 1, and the 2-cycle loses stability. This is the same
+damping story as the consumer chamber, which was already period-1 — there a herbivore
+supplies the damping instead of light saturation. (Stated as the *supported* reading: the
+interception numbers are measured, the return-map slope argument is reasoning from them.)
+
+**So the period-2 cycle was an artifact of the broken canopy regime, not a property of
+the perennial chamber** — a third documented behavior that turns out to have been
+downstream of the phenology error. The test is **flipped, not weakened**: it still pins a
+discrete structural property over the full horizon, still fails on a period break, and
+gains a `max(tail) > 1.0` assertion so that a degenerate fixed point at a dead plant
+cannot pass where the oscillating baseline used to. The module docstring's period-2
+paragraph is corrected in place with the supersession marked.
+
 ## Still to do for increment 1
 
 Ceremony not yet run. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
