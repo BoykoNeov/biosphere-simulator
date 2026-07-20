@@ -634,6 +634,12 @@ batteries*) do bear on `self_discharge_rate`, a scope-(C) param, so auditing **t
 be legitimately in scope — with a low prior of a bind, per FINDING 4. Recorded as an available
 increment, not a pending obligation.
 
+> ✅ **TAKEN IN ROUND 6 (2026-07-20) — see the round-6 section.** Both texts were opened. The
+> low prior of a bind was **correct** (neither binds the value), but the round was not null:
+> Braun's Table 1.5 gives Li-ion **5 %/month**, the first accessible source *above* ours, which
+> **falsified FINDING 3's closing sentence**; Turner contains no self-discharge rate at all
+> (confirmed absence, 98 scanned pages, OCR'd). **No increment is left on the table.**
+
 ---
 
 # ROUND 4 — the risk materialized (2026-07-20)
@@ -867,6 +873,11 @@ Energy Systems*; SAE, *Progress in modeling and simulation of batteries*) bear d
 increment, still not a pending obligation, but it is now the increment that would speak to
 the **live** question rather than a general tidy-up.
 
+> ✅ **TAKEN IN ROUND 6 (2026-07-20).** And it did speak to the live question — by
+> **falsifying its premise**. Round 4's *"every source accessible to us disagrees with it"* is
+> false: Braun gives 5 %/month and ours is **bracketed**, not above everything. The scope-(B)
+> question is **restated, not answered**; see the round-6 section.
+
 ---
 
 # ROUND 5 — the list reaches zero (2026-07-20)
@@ -1089,4 +1100,187 @@ sha-256 is provenance, not an assertion — nothing goes red). Followed delibera
   manifest while editing `power/`).
 - Manifest regenerated as the git-visible record; `biosphere_params.txt` re-generated and
   verified **byte-identical** (no value moved).
+- **No value, golden, or code changed.**
+
+---
+
+# ROUND 6 — the increment on the table, taken (2026-07-20)
+
+**Round 3 named an exception, round 4 sharpened it, round 5 left it standing: the two battery
+texts already in `sources/` (Braun; SAE/Turner) bear on `self_discharge_rate` and auditing
+*those two* is legitimately scope (C).** Round 6 took it. Both were opened. It is the first
+round in this scope that was not blocked on the user supplying anything — the sources had
+been on the shelf since round 1.
+
+**Result: one hit, one confirmed absence, and a falsified sentence of our own.**
+
+## [E] Braun — the first accessible source ABOVE our value
+
+Braun's **Table 1.5** (printed p. 37), *"Comparison of technical specifications and
+performance data of energy storage systems"*, Lithium ion column, Self-discharge rate row:
+
+> **`5%/month`**
+
+Ours is 2.592 %/month. So for the first time in six rounds, **an accessible source sits above
+us** — we are 0.518x it, where [B] Divya's 1 %/month is 0.2x it.
+
+**The reading was guarded, because the table is printed rotated 90 degrees** and an
+off-by-one-column misread is the live hazard. The guard was a plausibility check on the whole
+column: energy density 200–350 W h/L, cycle lifetime 2000–7000, lifetime 5–20 y, system
+efficiency 80–85 %, reaction time 3–5 ms — every one a sane Li-ion figure, and none of them
+sane for the neighbouring NaS or Lead-acid columns. That is round 5's rule applied (**a quote
+check verifies characters; only arithmetic — or here, physical plausibility — verifies
+numbers**), one column over from where the number itself sits.
+
+**The digits had to be read from a page image, and this time that was forced, not chosen.**
+Text extraction over the whole book works fine for words (`self-discharge` x8) and finds the
+cell (`%/month` x1) — but a font-encoding failure renders **every numeral in that table as
+U+FFFD**. The mechanical channel failed on precisely the characters at issue, which is the
+one circumstance where round 3's page-image method is the *right* tool rather than a fallback.
+
+## What this does NOT do — the narrowing discipline, applied to ourselves
+
+⚠ **This is not a vindication of 2.592, and the temptation to read it as one is exactly what
+round 4 warned about** when its confirmed prediction landed on the same page as its falsified
+claim.
+
+[E] is **not better provenance than [B]**. Braun's Table 1.5 is captioned *"Reprinted from
+Energy Procedia, 73, Bocklisch T, Hybrid Energy Storage Systems for Renewable Energy
+Applications, 103 – 111, Copyright (2015) … with permission from Elsevier"* — so the textbook
+is the **vehicle** and Bocklisch 2015 (conference proceedings) is the **origin**, and Braun
+adds no measurement of his own. No method, cell, chemistry detail, temperature or SOC is given
+for the 5 %/month: structurally **the same gap** as [B]'s three bare URLs. Braun's own
+section 4.5.1 *"Self-discharge"* is qualitative lead-acid electrochemistry (the PbO2/H2SO4
+reaction, Knallgas venting) and gives no rate for any chemistry.
+
+It is a **fourth tabulated number**, not a measurement. It brackets the value; it does not
+bind it.
+
+## What it DOES do — FINDING 1's surviving half becomes observed rather than argued
+
+The accessible field now splits **cleanly by genre**, two papers per side:
+
+| | source | value | what it is |
+|---|---|---|---|
+| **TABULATE** | [B] Divya 2009 | 1 %/month | cited to three bare URLs |
+| **TABULATE** | [E] Braun/Bocklisch | 5 %/month | reprinted table, no method |
+| **MEASURE** | [C] Schimpe 2018 | ~0.4 %/30 d @ 25 C | graphical |
+| **MEASURE** | [D] Azzam 2023 | 0.02–0.65 %/month implied | µA float currents |
+
+- The two that **state the constant disagree 5x with each other** — and **our value falls
+  between them** (2.592, just above their geometric mean of 2.236).
+- The two that **measure the quantity** decline to state a %/month at all, and **both still
+  sit below us**. Round 6 did not disturb this half in any way.
+
+Round 4 left FINDING 1's surviving claim — the review/primary split — resting on a contrast
+between two papers. It now rests on **four, two per side**, and the review side's internal 5x
+disagreement is new evidence for the same point: *this constant is a genre convention, not a
+determined quantity.*
+
+## [F] Turner/SAE — a confirmed absence, and why the method is the finding
+
+**No self-discharge rate for any chemistry, across all 98 pages.**
+
+⚠ **The method is load-bearing and is recorded in full, because this is exactly the claim
+round 4 proved a skim cannot make.** The obstacle was worse than round 4's: this PDF is a
+**scan with no text layer at all** — `pdftotext` returns **98 bytes for 98 pages**. Extraction,
+the tool round 4's lesson prescribes, was simply unavailable.
+
+So the text layer was **manufactured**: all 98 pages rendered at 200 dpi and OCR'd through the
+Windows Media OCR engine (en-US), **with the output quality-checked verbatim against a page
+that had been read by eye before any count was trusted**. That check is not ceremony — an
+absence claim built on unverified OCR is a *worse* artifact than an honest "could not read
+it", because it launders a tooling failure into a finding. Over the resulting ~282 000
+characters: `%/month` **x0**, `float current` x0, `leakage` x0, `self-discharge` x3,
+`per month` x2 — the latter both about **DC-fast-charger usage frequency**, not batteries
+losing charge.
+
+**The one hit that mattered was not a keyword hit.** One of the three is
+`Rsd — a resistance representing the cell self-discharge`, an element of an equivalent-circuit
+LFP model. **`Rsd*CQ` is a time constant, i.e. `1/k` — our parameter in disguise**, and a
+keyword count would have filed it as "structural mention, no number" and moved on. It was
+chased specifically: `Rsd` appears only inside the EKF state equations
+(`a1 = e^(-t/Rsd*CQ)`), **never with a value** — it is absent from the Simulink diagram
+(Figure 8 shows R0/R1/R2/C1/C2 only), the paper has no parameter table, and the only "table"
+tokens nearby are Simulink lookup-block names (`R_table_1Temp`). Confirmed by reading the page
+image, not only the OCR.
+
+⚠ **The locus-plausibility read was right again — and again that is not why this is
+recorded.** A collection of nine modeling/simulation papers is an improbable home for a
+shelf-loss constant, and it held none. But round 6 checked all 98 pages mechanically anyway,
+because **the identical read applied to [B] in round 2 got the opposite result**. The
+heuristic is what made this text worth OCR'ing carefully; it is never what settles it.
+
+## ⚠ THE META-FINDING, TENTH INSTANCE — and it is round 4's own rule, one step sideways
+
+FINDING 3 closed with:
+
+> *"they agree on the SIGN: every one of them puts the true rate BELOW 2.59 %/month, and ours
+> is above the highest of the three."*
+
+**False as of round 6.** And the failure is structurally identical to the one round 4 *itself*
+diagnosed and coined the fix for, one turn earlier:
+
+> *a retrieval ceiling is a fact about one afternoon's ACCESS, never a property of the source*
+
+Round 4 applied that to **retrieval** claims and then wrote a **bracketing** claim flat, in the
+same document, in the same round. A fact about *three papers then in hand* ("all three
+accessible sources sit below us") was recorded as a property of the literature ("ours is above
+the highest"), and **the qualifier is what got dropped** — the same mechanism as round 3's
+*"[A] is the only upgrade path"* and round 5's *"[B] is the only clean path"*.
+
+**The rule generalizes, and this is round 6's contribution to it:** *any* "every source says X"
+is a statement about **your shelf**, not about the literature. Date it and scope it — the
+sentence has the same shelf life as the retrieval ceilings do, and this one expired in four
+days.
+
+## The open scope-(B) question is RESTATED, not answered
+
+Round 4's question had a premise round 6 falsified. As posed:
+
+> may a frozen value rest on "conservative + a magnitude-independent test" alone **when every
+> source accessible to us disagrees with it** and the sources it cited never supported it?
+
+The bolded premise is now **false**. Restated honestly:
+
+> may a frozen value rest on "conservative + a magnitude-independent test" when it is
+> **bracketed** by two review tables that disagree 5x with each other, sits **above both
+> sources that actually measured** the quantity, and was **originally attributed to two papers
+> that never supported it**?
+
+**The case for leaving it alone got stronger; the case for recalibration got weaker; neither is
+settled.** The clause that still bites is the middle one — we are defensible against the
+*tabulated* literature and high against the *measured* literature. Deliberately **not**
+pre-answered here: changing the value is calibration = **scope (B)**, moving power goldens and
+cascading to station goldens, which is a user decision.
+
+## Status after round 6
+
+- **Retrieval: EXHAUSTED for this param, not blocked** — the distinction round 5 drew on
+  `n_senescence_rate` now applies here too. Every source in the corpus bearing on
+  `self_discharge_rate` has been opened. This is a fact about the accessible corpus **as of
+  2026-07-20**, dated per the rule above, and not a property of the literature.
+- **Residual risk: unchanged in kind, reduced in force.** `self_discharge_rate` remains *"a
+  param correctly attributed to nothing"* — [A] and [B] still do not support it. But it is no
+  longer *"a param every accessible source contradicts"*, which is what round 4 recorded.
+- The ~15 other unopened corpus sources remain **out of scope** (round 3's scope-substitution
+  ruling, reaffirmed by rounds 4 and 5). Round 6 discharges the *named exception* to that
+  ruling and creates no new one — **there is now no increment left on the table.**
+
+## Ceremony
+
+Provenance-only edit, so an **honor-system unfreeze** (`CLAUDE.md`: the manifests' per-file
+sha-256 is provenance, not an assertion — nothing goes red). Followed deliberately:
+
+- Advisor review **before** the retrieval (it set the >= 2.6 %/month discriminator, forbade
+  taking the top of any range, and pre-committed the null result as a success — which mattered,
+  since the round returned one hit and one null).
+- Files touched: `self_discharge.yaml` — **`power/`, so the STATION manifest.** Confirmed by
+  `grep -l self_discharge docs/*.manifest.json` rather than assumed. This is round 4's error
+  (reaching for the biosphere manifest while editing `power/`) and round 5's fix, applied a
+  third time. The authoring manifest also names `self_discharge`, but only the *flow-type and
+  param names* (`power.self_discharge`, `self_discharge_rate`), which a comment-only edit does
+  not move — **verified by regenerating it and observing no diff**, not by argument.
+- Manifest regenerated as the git-visible record; `sibling_params.txt` verified
+  **byte-identical** (no value moved).
 - **No value, golden, or code changed.**
