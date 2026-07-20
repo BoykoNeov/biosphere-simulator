@@ -267,12 +267,16 @@ def test_drift_summary_golden_loads_back(trajectories) -> None:
     )
 
 
-def test_drift_summary_period_class_is_pinned_distinct() -> None:
-    # Documents the headline measured result the golden encodes: the perennial chamber
-    # is period-2, the consumer is period-1 (the herbivore damps the producer cycle to a
-    # fixed point) — verified distinct, not assumed. Reads the committed golden.
+def test_drift_summary_period_class_is_pinned() -> None:
+    # ⚠ Re-pinned by post-roadmap scope (B) increment 1. Both chambers are now period-1
+    # fixed points: the perennial's old period-2 cycle was an artifact of the broken
+    # canopy regime, and closing the canopy (vernalization + photoperiod) flattened the
+    # year-to-year return map below unit gain — see
+    # test_biosphere_stress.py::test_stress_perennial_fixed_point_sustained and
+    # docs/plans/post-roadmap-oracle-match.md. The consumer was always period-1. They are
+    # no longer DISTINCT in period class; the golden encodes both as False.
     parsed = json.loads(DRIFT_SUMMARY_GOLDEN.read_text(encoding="utf-8"))
-    assert parsed["perennial"]["is_period_2"] is True
+    assert parsed["perennial"]["is_period_2"] is False
     assert parsed["consumer"]["is_period_2"] is False
 
 
