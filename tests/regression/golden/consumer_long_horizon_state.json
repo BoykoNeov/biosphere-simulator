@@ -1,12 +1,13 @@
 {
   "aux": {
-    "thermal_time": "0x1.975c28f5c28f3p+11"
+    "thermal_time": "0x1.faee95997478fp+10",
+    "vernalization_days": "0x1.1ebeb851eb852p+7"
   },
   "n": 4575,
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.97db069d98df8p+0",
+      "amount": "0x1.1b416747bfaffp-2",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -33,7 +34,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.7b07f22c31d48p-9",
+      "amount": "0x1.b37a0cf317df2p-5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -46,7 +47,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.09a65ccfd8df1p-7",
+      "amount": "0x1.a40290c8e9cc9p-3",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -59,7 +60,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.916068520bbd8p-3",
+      "amount": "0x1.f3f91eb477454p-1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -85,7 +86,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.5dcf2820e877dp-4",
+      "amount": "0x1.a52a4653b5ff1p-2",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -98,7 +99,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.a18712a6fe26cp+7",
+      "amount": "0x1.a46ff85a676dcp+8",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },
@@ -124,7 +125,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.f1fbd6330881ap-4",
+      "amount": "0x1.162fa457eb26fp-1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -163,7 +164,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.30c6d44988d75p-2",
+      "amount": "0x1.cbb2f216550cfp-1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -176,7 +177,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.38e32f82cc8bdp+0",
+      "amount": "0x1.0a51d4f175bd6p-1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },

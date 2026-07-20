@@ -1,6 +1,7 @@
 {
   "aux": {
-    "thermal_time": "0x1.5da6666666667p+10"
+    "thermal_time": "0x1.5da6666666667p+10",
+    "vernalization_days": "0x0.0p+0"
   },
   "n": 7,
   "rng_seed": "0x0",

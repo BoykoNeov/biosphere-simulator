@@ -277,9 +277,9 @@ def test_sealed_ci_falls_meaningfully(
 def test_sealed_assimilation_rises_then_declines(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
-    # The emergent feedback's payoff: gross assimilation happens early (liveness — not a
-    # dead trajectory) and then collapses by orders of magnitude as the pool draws down
-    # (Ci falls) and the plant senesces. The collapse is asserted at the post-peak
+    # The emergent feedback's payoff: gross assimilation happens early (liveness — not
+    # a dead trajectory) and then collapses by orders of magnitude as the pool draws
+    # down (Ci falls) and the plant senesces. The collapse is asserted at the post-peak
     # TROUGH, not the end: Step 3 closed the *gas* loop and Step 5 closes the *carbon*
     # loop (decomposer respiration refills the CO₂ pool), so by season's end the pool
     # has refilled and GASS partially RECOVERS (~4% of peak) — the closed-loop reality,
@@ -294,8 +294,14 @@ def test_sealed_assimilation_rises_then_declines(
     peak = max(gass)
     peak_idx = gass.index(peak)
     assert peak > 1e-3  # the plant did fix carbon (liveness)
-    # after peaking, assimilation collapses ≥ 2 orders at the trough (the feedback) ...
-    assert min(gass[peak_idx:]) < 1e-2 * peak
+    # ⚠ Collapse depth RE-PINNED by scope (B) increment 1. This asserted a ≥2-order
+    # collapse (`< 1e-2 * peak`). With vernalization + photoperiod the plant is
+    # healthier and better-paced, so the post-peak Ci-drawdown feedback is MILDER: GASS
+    # falls to ~8 % of peak, not < 1 %. The feedback shape is unchanged (peak → clear
+    # collapse → closed-loop recovery); only its depth moved, because a starved plant
+    # crashed harder than a closing canopy does. Re-pinned to the measured depth, still
+    # a real collapse.
+    assert min(gass[peak_idx:]) < 0.15 * peak
     # ... and the closed carbon loop refills the pool, so GASS recovers above the trough
     # by season's end (the closed-loop signature — an open-loop decline never would).
     assert gass[-1] > 1e-2 * peak
@@ -305,11 +311,12 @@ def test_sealed_conserves_total_carbon(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
     # The sealed chamber has no boundary carbon SOURCE (the pool is internal), so total
-    # CARBON across all stocks — pool + organs + litter_sink + loss_sink — is invariant.
-    # This is the every-step gate's claim, asserted end-to-end. (Step 3 closed the *gas*
-    # loop — respiration returns CO₂ to the pool, no co2_resp sink — but the carbon loop
-    # is still open: senescence leaks organ carbon to the litter_sink boundary until the
-    # decomposer lands at Step 4. No carbon is created or destroyed either way.)
+    # CARBON across all stocks — pool + organs + litter_sink + loss_sink — is
+    # invariant. This is the every-step gate's claim, asserted end-to-end. (Step 3
+    # closed the *gas* loop — respiration returns CO₂ to the pool, no co2_resp sink —
+    # but the carbon loop is still open: senescence leaks organ carbon to the
+    # litter_sink boundary until the decomposer lands at Step 4. No carbon is created or
+    # destroyed either way.)
     states, _, _ = sealed
     total0 = _total_carbon(states[0])
     for s in states:

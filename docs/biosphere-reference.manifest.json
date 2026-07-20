@@ -1,7 +1,8 @@
 {
   "_comment": "Phase-4 freeze manifest (P4.3). Names the frozen biosphere reference surface. See docs/biosphere-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Regenerate on a deliberate unfreeze: uv run python tests/test_freeze_manifest.py.",
   "aux_set": [
-    "ThermalTimeAccumulation"
+    "ThermalTimeAccumulation",
+    "VernalizationAccumulation"
   ],
   "dt_days": 1.0,
   "flow_set": [
@@ -38,7 +39,7 @@
     "microbial_respiration.yaml": "bb0a3dadedf7cea756dc270be1a6c190695830d829463244ae82c1d3e6bcbbd0",
     "mineralization.yaml": "064f66a0ef7a5928769b396e973eb27c86ec2e104fea6c6eac044ae6d2a2a907",
     "nitrogen.yaml": "084327610b52b2fed047466ed7eb6351ba17707e0206c56f482eb0d3e90e2579",
-    "phenology.yaml": "cdc95130280e3cd2f4a2f7e53b0102c45067236a58d36243ebfa70a804c9be6d",
+    "phenology.yaml": "ab9aa8b4953a710f9645c22b743c10efb8c84cf5fbb47480ca3a7179732fbe7a",
     "photosynthesis.yaml": "51bb4fe98ab6176fcd1308c4b51d84b961ef3472eaa789c531ccec2114fc1e3c",
     "respiration.yaml": "b6ec929a0129f41cb48e6b02b2ab7298eb7a590a6493e40feb57b73375d8e638",
     "senescence.yaml": "97b1bf2b466eb6b67e77fe756787f01c8b49f394d56b713286c49ca90978ef0e",
@@ -49,43 +50,43 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "12c0303592715ffe64293c69287df2263509b8d13c2d7318b7ba1650e37937db",
+      "golden_sha256": "17b8a7e1ac3831fce4e207424a3d8094a206045ffe96e43efee4b3fa51c8269f",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "88a62780d728e91cd8b30e6f4b6522b48bc4aba83c643432f9affa6e8d2c0b44",
+      "golden_sha256": "359e08a1c6e808650b61176958af35ac80484408b684bcc0905303bdeab7f74c",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
     "drift_summary": {
       "golden": "drift_summary.json",
-      "golden_sha256": "200fe04b90b99c128450bb412cc3363990016be6dc5645139bb1da8f4e202ff8",
+      "golden_sha256": "92610242d7c29dd61a13f61809cc87893b78ac6e0eb9ea10d3e58b3d089866c3",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
       "years": 15
     },
     "open_season": {
       "golden": "season_euler_state.json",
-      "golden_sha256": "b5796359be87c4080502a6daf557a7acd034866e3aa4fc188558005728039142",
+      "golden_sha256": "7c37ba1b7a2a83ac60082f784386af3e099d742282f6eda8103b15635e1bcc4f",
       "scenario": "DEFAULT_SCENARIO (open field)",
       "years": 1
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "bf2449712b270646e44959d5e89efe622ffa45620d67a20cd76e02eb2e54e3c1",
+      "golden_sha256": "7373eaa9d148ffef4e58443299ae0ba5f46b356109be154ce7373b8ade14dba6",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "fe75492e92db65c9e0ef90df14525dbaf3e8300c71af1ecd3be720baf6e3da0b",
+      "golden_sha256": "a5bebc37a9658d87821d3d639c601bda9d0d4221a33bed80f6c7f325bdf96dce",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "a302b41d00243013eb717985c55534504de4757e68f5c5d0549481913261eec4",
+      "golden_sha256": "efc2900241c72e0718b6e66914c05728a5a71c1f47964a3de5d56fc6e64e8902",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

@@ -1,12 +1,13 @@
 {
   "aux": {
-    "thermal_time": "0x1.975c28f5c28f3p+11"
+    "thermal_time": "0x1.faee95997478fp+10",
+    "vernalization_days": "0x1.1ebeb851eb852p+7"
   },
   "n": 305,
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.cdf6327600dfep-9",
+      "amount": "0x1.5bfac2608115bp+2",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -32,7 +33,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.0c4dddea2ea99p-5",
+      "amount": "0x1.1645a7733b399p+3",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -71,7 +72,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.456847bd0f15fp-4",
+      "amount": "0x1.37ae63bb79d62p+4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -84,7 +85,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.0db9aa52d810cp-2",
+      "amount": "0x1.669d96e450ac1p+4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -97,7 +98,7 @@
       "unit": "mol"
     },
     {
-      "amount": "-0x1.a5b59a5f1d63ap+0",
+      "amount": "-0x1.0b936aabfd447p+7",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -110,7 +111,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.8c55300be0facp-1",
+      "amount": "0x1.abfb298de3cb5p+5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -123,7 +124,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.4ee4d79eeb474p-1",
+      "amount": "0x1.86c6df7b8feb2p+4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },

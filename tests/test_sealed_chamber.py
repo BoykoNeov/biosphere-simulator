@@ -151,9 +151,9 @@ def test_sealed_no_extinction(sealed: tuple[list[State], int, tuple]) -> None:
 def test_sealed_o2_depletes_then_stays_positive(
     sealed: tuple[list[State], int, tuple],
 ) -> None:
-    # O₂ is drawn down a clear fraction (≥ 95 %) toward an acute trough — the depletion
-    # phenomenon — yet stays strictly positive (the f_O2 floor; no literal anoxia / no
-    # negative pool). The headline closed-system result.
+    # O₂ is drawn down a clear fraction (≥ 95 %) toward an acute trough — the
+    # depletion phenomenon — yet stays strictly positive (the f_O2 floor; no literal
+    # anoxia / no negative pool). The headline closed-system result.
     states, _, _ = sealed
     o2 = [s.stocks[O2_POOL].amount for s in states]
     assert min(o2) > 0.0  # f_O2 self-limit keeps the pool off zero
@@ -180,10 +180,26 @@ def test_sealed_producer_recovers_o2_after_trough(
     # The emergent producer–decomposer swing (no control code): after the acute trough
     # the live plant photosynthesises at the high CO₂ and REFILLS O₂ before it dies —
     # so O₂ is non-monotone (a local trough then a rise), the dynamic anti-correlation.
+    #
+    # ⚠ SCOPED TO YEAR 1 by post-roadmap scope (B) increment 1. This fixture tiles the
+    # season SEALED_CHAMBER_YEARS× with NO annual reset, so the plant matures and dies
+    # in year 1 and is never re-sown; years 2+ are pure decomposition and O₂ decays
+    # monotonically toward zero (measured: trough → 1e-29, 1e-59, … at the LAST step of
+    # each horizon). The trough→refill this test is about is a LIVE-plant phenomenon
+    # and lives entirely in year 1 (single season: O₂ dips to ~0.03 mid-season, then the
+    # live producer refills it to ~2.2 by season end). Before increment 1 the fast,
+    # starved plant happened to leave the global min inside year 1; the healthier,
+    # slower plant moves the global min to the dead-plant tail — so the recovery must
+    # be checked on the live-plant window, not the whole multi-year decay. Scoping the
+    # window is the fix, not weakening the assertion: the refill claim is unchanged,
+    # only measured where the producer is alive.
     states, _, _ = sealed
-    o2 = [s.stocks[O2_POOL].amount for s in states]
+    year_one = states[: len(_weather())]  # the only year with a living producer
+    o2 = [s.stocks[O2_POOL].amount for s in year_one]
     trough = min(range(len(o2)), key=lambda i: o2[i])
-    assert max(o2[trough:]) > o2[trough] + 0.1  # recovers well above the trough
+    assert (
+        max(o2[trough:]) > o2[trough] + 0.1
+    )  # the live plant refills O₂ after the dip
 
 
 # --- f_O2 is load-bearing: an un-throttled control rations -------------------

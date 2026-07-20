@@ -57,7 +57,8 @@ from simcore.state import State
 
 _WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
 _NITRO = load_nitrogen_params()
-# A meaningful bite, not float noise (the advisor's bar — ≤ ~0.9 sustained, not 0.999).
+# A meaningful bite, not float noise (the advisor's bar — ≤ ~0.9 sustained, not
+# 0.999).
 _BITE_CEILING = 0.9
 
 
@@ -115,9 +116,9 @@ def test_water_biting_f_water_bites(
 def test_water_biting_stays_above_wilting(
     water_biting: tuple[list[State], int, tuple],
 ) -> None:
-    # The closed loop settles to a stable fixed point ABOVE the wilting point — the bite
-    # is sustained water stress, not progressive drainage to a dead plant. (soil_water
-    # never reaching sw_wilting is what keeps f_water > 0.)
+    # The closed loop settles to a stable fixed point ABOVE the wilting point — the
+    # bite is sustained water stress, not progressive drainage to a dead plant.
+    # (soil_water never reaching sw_wilting is what keeps f_water > 0.)
     states, _, _ = water_biting
     assert all(
         s.stocks[SOIL_WATER].amount > WATER_BITING_SCENARIO.sw_wilting for s in states
@@ -150,14 +151,38 @@ def test_water_biting_loop_stays_closed(
 def test_water_biting_cascade_vs_ample(
     water_biting: tuple[list[State], int, tuple],
 ) -> None:
-    # Direction-only cascade: against an otherwise-IDENTICAL ample-water baseline (only
-    # soil_water0 raised to the frozen-chamber 1000 kg → f_water ≡ 1), the water-biting
-    # run reaches a LOWER peak vegetative biomass. Isolates f_water — the one changed
-    # field is soil_water0.
+    # Cascade: against an otherwise-IDENTICAL ample-water baseline (only soil_water0
+    # raised to 1000 kg → f_water ≡ 1), the water-biting run grows LESS. Isolates
+    # f_water — the one changed field is soil_water0.
+    #
+    # ⚠ METRIC CHANGED by scope (B) increment 1 (constant-order finding). This asserted
+    # `max(veg) stressed < max(veg) ample` — a PEAK comparison. That peak now INVERTS
+    # (stressed 2.82 > ample 2.71), and the inversion is a real finding, not a bug: with
+    # vernalization + photoperiod the ample plant grows fast enough to exhaust the
+    # SEALED CO₂ pool and become carbon-limited (measured: ample drives carbon_pool
+    # lower), so it senesces off a lower, earlier peak — while the water-throttled
+    # plant grows slower, rations its carbon over time, and peaks later and higher. The
+    # BINDING CONSTRAINT switched from water to carbon, so peak biomass no longer
+    # isolates f_water.
+    #
+    # Integrated (cumulative) biomass still does, and robustly: over the season the
+    # water-stressed run accumulates ~25 % LESS vegetative biomass (measured ~246 vs
+    # ~330), and at every early-to-mid-season point it is strictly lower. f_water
+    # remains load-bearing; only the peak-vs-integral distinction had to be drawn. (See
+    # docs/plans/post-roadmap-oracle-match.md, the co-adaptation finding.)
     states, _, _ = water_biting
     ample, _, _ = _run(replace(WATER_BITING_SCENARIO, soil_water0=1000.0))
     assert min(_f_water(s) for s in ample) == 1.0  # baseline is genuinely water-replete
-    assert max(_vegetative(s) for s in states) < max(_vegetative(s) for s in ample)
+
+    n = min(len(states), len(ample))
+    integrated_stressed = sum(_vegetative(states[i]) for i in range(n))
+    integrated_ample = sum(_vegetative(ample[i]) for i in range(n))
+    # f_water bites: the stressed run accumulates clearly less biomass over the season.
+    assert integrated_stressed < 0.85 * integrated_ample
+    # And the constraint-order finding, pinned: the PEAK inverts (carbon now binds the
+    # faster ample run). A regression that un-inverted it — e.g. an unbounded CO₂ pool
+    # — would turn this red and signal the coupling changed.
+    assert max(_vegetative(s) for s in states) > max(_vegetative(s) for s in ample)
 
 
 def test_water_biting_f_n_stays_one(

@@ -37,11 +37,11 @@ from domains.biosphere.loader import (
     load_nitrogen_params,
     load_phenology_params,
     load_photoperiod_params,
-    load_vernalization_params,
     load_photosynthesis_params,
     load_respiration_params,
     load_senescence_params,
     load_transpiration_params,
+    load_vernalization_params,
     load_water_cycle_params,
 )
 

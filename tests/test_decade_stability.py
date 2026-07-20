@@ -18,18 +18,19 @@ drift axes, then runs the **same** scenarios under ``Rk4Integrator`` as a one-sh
   past the transient (``is_stationary``) and **non-collapsing** (``non_collapsing`` —
   alive, the mandatory level check that ``is_stationary`` is blind to). The lock does
   NOT require a reached attractor — a still-converging cycle is freezable. The discrete
-  ``is_period_2`` check characterizes the settled attractor, and the two scenarios
-  DIFFER (verified, not assumed): the **perennial** settles to a genuine **period-2**
-  cycle (two
-  branches, gap ~0.07), while the **consumer is period-1** — the herbivore damps the
-  producer oscillation to a **fixed point** (settled adjacent gap ~3e-5). (At 15 yr both
-  are fully settled.)
+  ``is_period_2`` check characterizes the settled attractor. ⚠ Since post-roadmap scope
+  (B) increment 1 **both** scenarios are period-1 fixed points: adding vernalization +
+  photoperiod closed the canopy, so the perennial's period-2 cycle (an artifact of the
+  broken canopy regime) lost stability and converged upward to a fixed point — see
+  ``test_perennial_leaf_cycle_is_a_fixed_point`` below and
+  ``docs/plans/post-roadmap-oracle-match.md``. The consumer was always period-1 (the
+  herbivore damps the producer oscillation).
 * **(c) Closure carried over the full horizon** — ``rationed == 0``, ``events == ()``,
   carbon loss-sink ``0.0`` on **every** step of the run, for **both** integrators.
 
 **The decide-on-evidence core.** Euler and RK4 differ by O(truncation), so their
-attractors will NOT match numerically — agreement is **qualitative/structural** (both
-period-2, both stationary, both bounded, both closed). The RK4 run also **empirically
+attractors will NOT match numerically — agreement is **qualitative/structural** (same
+period class, both stationary, both bounded, both closed). The RK4 run also **empirically
 retires** the two preconditions the plan flagged (rather than assuming them): that RK4
 survives the discrete ``annual_reset`` x multistage interaction (it completes without
 raising) and that no needed arbitration scale fires (``rationed == 0``; under RK4 a
@@ -188,14 +189,25 @@ def test_decade_leaf_cycle_is_stationary(runs, scenario) -> None:
     assert non_collapsing(summaries, floor=0.05)  # peak leaf never collapses to ~0
 
 
-def test_perennial_leaf_cycle_is_period_2(runs) -> None:
-    # The separate DISCRETE structural check: the PERENNIAL chamber settles to a genuine
-    # period-2 limit cycle — odd/even years sit on two distinct branches (measured gap
-    # ~0.07, ~28% of scale) sustained to year 15. (Verified, not assumed: the two
-    # consumer/perennial scenarios are NOT both period-2 — see consumer test below.)
+def test_perennial_leaf_cycle_is_a_fixed_point(runs) -> None:
+    # CHANGED by post-roadmap scope (B) increment 1 (vernalization + photoperiod). This
+    # asserted a period-2 limit cycle ("gap ~0.07, ~28% of scale") until 2026-07-20.
+    # That cycle was a property of the BROKEN CANOPY REGIME, not of the perennial
+    # chamber: with the two phenology sciences the canopy closes (~95% light
+    # interception vs ~5%), Beer-Lambert saturates, the year-to-year return map's slope
+    # drops below 1, and the 2-cycle loses stability — converging UPWARD to a period-1
+    # fixed point (peak leaf ~0.25 -> ~1.2). Same mechanism, same flip, and the same
+    # evidence as test_biosphere_stress.py::test_stress_perennial_fixed_point_sustained
+    # and docs/plans/post-roadmap-oracle-match.md. Flipped, not weakened: still a
+    # discrete structural pin, still fails on a period BREAK, plus a liveness floor so a
+    # degenerate fixed point at a dead plant cannot pass where the oscillator used to.
     states, _, _ = runs[("perennial", "euler")]
     summaries = year_summaries(states, _YEAR, _peak_leaf)
-    assert is_period_2(summaries, transient=_PERIOD_TRANSIENT)
+    assert not is_period_2(summaries, transient=_PERIOD_TRANSIENT)
+    tail = summaries[_PERIOD_TRANSIENT:]
+    gap = max(abs(tail[k + 1] - tail[k]) for k in range(len(tail) - 1))
+    assert gap < 1e-3 * max(tail)  # branches merged → a fixed point
+    assert max(tail) > 1.0  # converged UP, not collapsed (liveness)
 
 
 def test_consumer_leaf_converges_to_a_fixed_point(runs) -> None:

@@ -9,23 +9,30 @@ trajectory under the **same** NASAPower weather: right *shape*, recorded *gap*.
 What it asserts (shape — the model behaves like an annual crop, as the oracle does):
   * development ``DVS`` is monotone non-decreasing and completes the ``0 → 2`` cycle
     for **both** our season and the oracle; their aligned ``DVS`` series agree within a
-    loose band (``lab.oracle_match.nrmse``; loose because our placeholder phenology
-    runs faster — no vernalization, the documented overrun).
-  * ``LAI`` is **unimodal** (emerges low, peaks mid-season, senesces low) for both.
+    loose band (``lab.oracle_match.nrmse``; nrmse ~0.09 since increment 1 — kept loose,
+    not tightened, as the tight gate is the deferred recalibration's business).
+  * ``LAI`` forms a mid-season hump for both — the oracle fully unimodal, ours
+    bootstrapping from a low emergence but not yet fully senescing by season end (the
+    short-reproductive-phase residual; see the re-pinned test below).
   * grain forms (our ``storage_c`` / the oracle ``TWSO`` both end positive).
 
-What it RECORDS as a documented finding (NOT a pass it pretends to achieve): the
-**magnitude gap** — the oracle's peak LAI (~6) is ~2 orders of magnitude above ours
-(~0.09), driven by the uncalibrated placeholders + the phenology overrun. The test pins
-that the gap is *large and in the known direction* so a future reader cannot mistake the
-committed season for a validated match; closing it (literature-range calibration +
-vernalization) is the deferred quantitative gate.
+⚠ **Updated by post-roadmap scope (B) increment 1 (2026-07-20).** This file used to
+record a **magnitude gap of ~2 orders** (oracle peak LAI ~6 vs ours ~0.09). Increment 1
+added vernalization + photoperiod (clean-room from Soltani & Sinclair 2012), and the gap
+**closed to ~1.22x** — the canopy now bootstraps (see ``test_oracle_gap.py``, the
+quantitative pin, and ``docs/plans/post-roadmap-oracle-match.md``). The two tests that
+recorded the *old* magnitude gap and the *old* full-senescence LAI shape are re-pinned
+below to the new reality: the gap is small, and our LAI hump does not fully senesce by
+season end because the residual reproductive phase is too short (~43 d vs ~75 d — a
+``tsum`` calibration item, the deferred recalibration increment's target).
 
 PCSE-free: both committed fixtures are read as JSON; ``lab.oracle_match`` is stdlib.
 """
 
 import json
 from pathlib import Path
+
+import pytest
 
 from domains.biosphere.canopy import leaf_area_index
 from domains.biosphere.loader import load_canopy_params
@@ -111,9 +118,11 @@ def test_development_completes_for_both() -> None:
 
 
 def test_development_within_loose_band() -> None:
-    # Loose: our placeholder phenology runs faster (anthesis earlier, no vernalization),
-    # so the aligned DVS series differ in *timing* but follow the same 0 → 2 arc — a
-    # wide, documented qualitative band, not the deferred tight gate.
+    # Since increment 1 (vernalization + photoperiod) the aligned DVS series are much
+    # closer — nrmse ~0.09, well inside this loose qualitative band (it was the
+    # phenology overrun that used to make it loose; maturity now lands within ~2 days).
+    # Kept as a loose band, not tightened: the tight quantitative gate is the deferred
+    # recalibration increment's business, and this file stays qualitative.
     ref = _reference()
     our = _our_dvs(_season_states(), len(ref))
     oracle = [r["DVS"] for r in ref]
@@ -121,11 +130,23 @@ def test_development_within_loose_band() -> None:
 
 
 # --- shape: LAI is a single mid-season hump for both ------------------------
-def test_lai_is_unimodal_for_both() -> None:
+def test_lai_hump_forms_oracle_fully_unimodal_ours_incompletely_senesced() -> None:
+    # ⚠ Re-pinned by increment 1. The oracle LAI is fully unimodal (emerges low, peaks,
+    # senesces low). Ours now forms a real interior hump too (it bootstraps — was a
+    # day-32 collapse in scope A), BUT does not end below half-peak: the residual
+    # ~43-day reproductive phase (vs the oracle's ~75) leaves the canopy incompletely
+    # senesced at season end (~62 % of peak). That incomplete senescence is the
+    # tsum-partition residual surfacing in LAI shape; a recalibration that lengthens
+    # grain fill turns this red.
     our_lai = _our_lai(_season_states())
     oracle_lai = [r["LAI"] for r in _reference()]
-    assert _is_unimodal(our_lai)
-    assert _is_unimodal(oracle_lai)
+    assert _is_unimodal(oracle_lai)  # the oracle: a clean single hump
+    # Ours: a genuine interior peak, rising from a low emergence (the bootstrap).
+    our_peak_idx = our_lai.index(max(our_lai))
+    assert 0 < our_peak_idx < len(our_lai) - 1
+    assert our_lai[0] < 0.5 * max(our_lai)
+    # ...but NOT fully senesced by season end — the pinned residual.
+    assert our_lai[-1] > 0.5 * max(our_lai)
 
 
 # --- shape: grain forms in both ---------------------------------------------
@@ -135,12 +156,17 @@ def test_grain_forms_in_both() -> None:
     assert max(r["TWSO"] for r in _reference()) > 0.0
 
 
-# --- recorded finding: the magnitude gap (the deferred quantitative gate) ----
-def test_magnitude_gap_is_large_and_documented() -> None:
-    # NOT a match we pretend to achieve: the oracle's peak LAI is ~2 orders of magnitude
-    # above ours (uncalibrated placeholders + phenology overrun). Pinning the gap's
-    # direction + scale stops a reader mistaking the committed season for validated.
+# --- recorded finding: the magnitude gap CLOSED (increment 1) ----------------
+def test_magnitude_gap_closed_to_a_small_residual() -> None:
+    # ⚠ Re-pinned by increment 1. This asserted `oracle_peak > 10.0 * our_peak` — a ~2
+    # order-of-magnitude gap — until 2026-07-20. Vernalization + photoperiod closed it:
+    # the oracle's peak LAI is now only ~1.22x ours (6.34 vs 5.19), with NO canopy
+    # science written (the gap was downstream of the phenology error). Pinned as a small
+    # residual in the known direction; a recalibration that closes it further turns this
+    # red.
     our_peak = max(_our_lai(_season_states()))
     oracle_peak = max(r["LAI"] for r in _reference())
-    assert our_peak > 0.0  # the canopy did form (liveness)
-    assert oracle_peak > 10.0 * our_peak  # the known, deferred-calibration gap
+    assert our_peak > 4.0  # the canopy now genuinely closes (was ~0.09 in scope A)
+    ratio = oracle_peak / our_peak
+    assert ratio == pytest.approx(1.22, abs=0.15)  # small residual, oracle still higher
+    assert ratio < 2.0
