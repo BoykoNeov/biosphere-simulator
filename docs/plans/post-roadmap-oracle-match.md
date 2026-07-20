@@ -748,9 +748,86 @@ which reads as a physics bug and is actually a *constraint-order change*. The ge
 check: when a fix makes a subsystem substantially bigger or faster, ask which constraints
 were slack **because** of the bug, not merely which tests fail.
 
+## The re-sizing investigation (the user chose "re-size in this increment")
+
+The chamber CO₂/air was sized when the plant was starved. Deriving the fix rather than
+tuning it, and the derivation itself is a finding.
+
+### `chamber_air_mol` feeds TWO mole fractions, not one (advisor catch)
+
+The first instinct was **carbon-only** scaling — raise `chamber_air_mol` + `chamber_co2_mol0`
+together (holding `Ci0 = ci_ratio·co2_mol0/air_mol·1e6 = 250`), leave O₂ alone. That is
+**wrong**, and the reason is that `air_mol` is the denominator of *both* intensive
+variables the chamber exposes:
+
+* `Ca = co2_mol / air_mol · 1e6` → Ci (photosynthesis), and
+* `x_O2 = o2_mol / air_mol` → the `oxygen_limitation_factor` (f_O2) that throttles
+  maintenance respiration (`chamber.py:36`, `carbon_budget.py:405`).
+
+Carbon-only scaling (air 1000→2000, O₂ held at its value) would **halve x_O2** and
+silently change respiration physics — freezing a chamber whose gas is no longer air. So
+the correct move is **full uniform scaling**: air, CO₂, *and each scenario's own O₂* by
+the same factor, which holds **both** mole fractions invariant. A genuinely bigger
+chamber with the same gas.
+
+### The scale-invariance, and why ×2 (not "derived from demand")
+
+Above a ~1.5× exhaustion threshold the carbon pool draws down to a **scale-invariant
+~0.20 of its start** — the FvCB Ci-shutoff pins Ci to a fixed fraction toward Γ*
+regardless of absolute size, which is the design's own "Ci falls ~5×" intent. So the
+number is **not** derived from cumulative carbon demand (the draw-down is scale-free); ×2
+is simply the **smallest round factor past the threshold, with ~2× peak-draw headroom**.
+The genuinely derived result is the scale-invariance itself.
+
+### Which scenarios actually break (measured; RK4 verified per advisor)
+
+| scenario | Euler rationed x1 | RK4 x1 | RK4 x2 |
+|---|---|---|---|
+| SEALED | 0 | — (one-shot) | — |
+| PERENNIAL | 0 | **OK** | OK |
+| CONSUMER | **1** (step 196) | **ArbitrationError** (scale_f 0.9506) | **OK** |
+
+**Only the CONSUMER chamber breaks** — under *both* integrators — and ×2 clears both. The
+mechanism is physical: the herbivore grazes leaf, the plant regrows by drawing *more* from
+the CO₂ pool, so carbon throughput (and peak draw) is higher than the herbivore-free
+perennial. Perennial and SEALED do not ration at all.
+
+### ⚠ THE OPEN SUB-DECISION — uniform ×2 weakens SEALED's O₂-depletion drama
+
+This is the one piece I will **not** bake into a frozen golden without a ruling, because
+it trades off two frozen scenarios' scientific purposes:
+
+Uniform ×2 holds x_O2 invariant, but SEALED's **O₂ draws down only to 42 % of its start
+(vs 1.3 % at x1)**. SEALED exists to stage O₂ depletion for the f_O2 limiter test, and
+that depletion is driven by microbial respiration of a **fixed litter pile**
+(`litter_carbon0 = 3.0`). Doubling the O₂ pool without doubling the depletion driver makes
+the same absolute draw a shallower *fraction*. **SEALED's CO₂ pool, O₂ pool, and litter
+pile were hand-tuned as a coupled set for the starved plant** — the co-adaptation finding,
+one level deeper — and they do not cleanly rescale by a single factor.
+
+Three ways to resolve it, none free:
+
+* **(i) Uniform ×2 everywhere, re-tune SEALED's O₂/litter** so the depletion drama
+  survives with a healthy plant. Most physically coherent ("one bigger chamber"), but
+  re-tunes a second coupled scenario and moves the most goldens.
+* **(ii) Consumer-specific enlargement** — give only the CONSUMER chamber the bigger CO₂
+  reserve, leave SEALED and PERENNIAL at their frozen sizing. Most surgical (SEALED's O₂
+  drama untouched, fewest goldens moved), and physically defensible (the herbivore raises
+  carbon demand). Cost: the consumer chamber is no longer literally "the perennial chamber
+  + one herbivore" — a narrative the scenarios currently lean on.
+* **(iii) Uniform ×2 and accept the shallower SEALED depletion**, re-pinning the f_O2
+  test if it still exercises the limiter. Cheapest; risks the f_O2 test becoming vacuous.
+
+**SEALED does not ration and needs no carbon fix on its own** — it is dragged in *only*
+because it shares the default CO₂/air. That fact is what makes (ii) coherent.
+
 ## Still to do for increment 1
 
-Ceremony **blocked** pending the scenario decision above. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
+Ceremony **blocked** pending the sub-decision above (uniform+retune / consumer-specific /
+uniform+accept), then: regenerate the affected goldens, re-triage the full suite at the
+chosen sizing (advisor: re-run `-m "not slow"` with no `-x` *after* re-sizing, not off the
+pre-resizing triage), regenerate the manifest, record provenance, run all gates; compile
+and anchor the Rust mirror. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
 can dominate a short-horizon chamber run, and perennial/long-horizon now re-vernalize
 every cycle — conservation will not catch a plant that simply never develops), the Rust
 hand-mirror, then goldens → manifest → provenance → gates.
