@@ -9,22 +9,22 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use simcore::auxiliary::AuxProcess;
 use simcore::boundary;
 use simcore::conservation::assert_conserved_default;
 use simcore::environment::{constant, Schedule, SourceResolver};
 use simcore::error::SimError;
 use simcore::events::Event;
 use simcore::flow::Flow;
-use simcore::auxiliary::AuxProcess;
 use simcore::integrator::EulerIntegrator;
 use simcore::quantities::{Quantity, StockKind};
 use simcore::registry::Registry;
 use simcore::state::{State, Stock};
 
 use super::flows::{
-    Allocation, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration,
-    Decomposition, Fertilization, Grazing, GrowthRespiration, Irrigation, MaintenanceRespiration,
-    Mineralization, MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling,
+    Allocation, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration, Decomposition,
+    Fertilization, Grazing, GrowthRespiration, Irrigation, MaintenanceRespiration,
+    MicrobialRespiration, Mineralization, NitrogenSenescence, NitrogenUptake, Recycling,
     Senescence, ThermalTimeAccumulation, Transpiration, VernalizationAccumulation,
 };
 use super::params;
@@ -126,11 +126,21 @@ pub fn perennial_chamber_scenario() -> SeasonScenario {
 }
 
 /// The minimal-consumer chamber scenario (`CONSUMER_CHAMBER_SCENARIO`).
+///
+/// Chamber ENLARGED 2x (post-roadmap scope (B) increment 1): the vernalization +
+/// photoperiod sciences give a ~5x larger plant, and the herbivore raises carbon
+/// throughput, so the original 0.357 mol / 1000 mol air over-drew the CO2 pool. All three
+/// gas quantities scale by the same factor so Ci0 (250) and x_O2 (0.21) both stay
+/// invariant. SEALED and PERENNIAL keep their frozen sizing. Mirrors the Python
+/// `CONSUMER_CHAMBER_SCENARIO`; see docs/plans/post-roadmap-oracle-match.md.
 pub fn consumer_chamber_scenario() -> SeasonScenario {
     SeasonScenario {
         sealed: true,
         litter_carbon0: 3.0,
         consumer: true,
+        chamber_air_mol: 2000.0,
+        chamber_co2_mol0: 0.714,
+        chamber_o2_mol0: 420.0,
         ..DEFAULT_SCENARIO
     }
 }
@@ -209,7 +219,10 @@ fn carbon_context(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Car
     }
 }
 
-fn build_atmosphere(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result<CompartmentBuild, SimError> {
+fn build_atmosphere(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+) -> Result<CompartmentBuild, SimError> {
     if scenario.sealed {
         let stocks = vec![
             composition_pool(
@@ -226,7 +239,12 @@ fn build_atmosphere(scenario: &SeasonScenario, p: &params::BiosphereParams) -> R
                 scenario.chamber_o2_mol0,
                 BTreeMap::from([(Quantity::Oxygen, 2.0)]),
             )?,
-            pool_stock(WATER_VAPOR, ATMOSPHERE, Quantity::Water, scenario.water_vapor0)?,
+            pool_stock(
+                WATER_VAPOR,
+                ATMOSPHERE,
+                Quantity::Water,
+                scenario.water_vapor0,
+            )?,
         ];
         let flows: Vec<Box<dyn Flow>> = vec![Box::new(Condensation {
             id: "biosphere.condensation".to_string(),
@@ -241,7 +259,12 @@ fn build_atmosphere(scenario: &SeasonScenario, p: &params::BiosphereParams) -> R
         })
     } else {
         let stocks = vec![
-            boundary::source(CO2_ATMOS.to_string(), Quantity::Carbon, scenario.co2_atmos0, true)?,
+            boundary::source(
+                CO2_ATMOS.to_string(),
+                Quantity::Carbon,
+                scenario.co2_atmos0,
+                true,
+            )?,
             boundary::sink(CO2_RESP.to_string(), Quantity::Carbon, 0.0)?,
         ];
         Ok(CompartmentBuild {
@@ -252,11 +275,19 @@ fn build_atmosphere(scenario: &SeasonScenario, p: &params::BiosphereParams) -> R
     }
 }
 
-fn build_soil(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result<CompartmentBuild, SimError> {
+fn build_soil(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+) -> Result<CompartmentBuild, SimError> {
     let mut stocks = vec![
         pool_stock(SOIL_WATER, SOIL, Quantity::Water, scenario.soil_water0)?,
         pool_stock(SOIL_N, SOIL, Quantity::Nitrogen, scenario.soil_n0)?,
-        boundary::source(N_SOURCE.to_string(), Quantity::Nitrogen, scenario.n_source0, true)?,
+        boundary::source(
+            N_SOURCE.to_string(),
+            Quantity::Nitrogen,
+            scenario.n_source0,
+            true,
+        )?,
     ];
     let mut flows: Vec<Box<dyn Flow>> = vec![Box::new(Fertilization {
         id: "biosphere.fertilization".to_string(),
@@ -266,7 +297,12 @@ fn build_soil(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result<
         ground_area: scenario.ground_area,
     })];
     if !scenario.sealed {
-        stocks.push(boundary::source(WATER_SOURCE.to_string(), Quantity::Water, scenario.water_source0, true)?);
+        stocks.push(boundary::source(
+            WATER_SOURCE.to_string(),
+            Quantity::Water,
+            scenario.water_source0,
+            true,
+        )?);
         flows.push(Box::new(Irrigation {
             id: "biosphere.irrigation".to_string(),
             water_source: WATER_SOURCE.to_string(),
@@ -276,7 +312,12 @@ fn build_soil(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result<
         }));
     }
     if scenario.sealed {
-        stocks.push(pool_stock(LITTER_CARBON, SOIL, Quantity::Carbon, scenario.litter_carbon0)?);
+        stocks.push(pool_stock(
+            LITTER_CARBON,
+            SOIL,
+            Quantity::Carbon,
+            scenario.litter_carbon0,
+        )?);
         stocks.push(organ_stock(MICROBIAL_CARBON, SOIL, 0.0)?);
         stocks.push(pool_stock(LITTER_N, SOIL, Quantity::Nitrogen, 0.0)?);
         flows.push(Box::new(Decomposition {
@@ -308,7 +349,10 @@ fn build_soil(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result<
     })
 }
 
-fn build_plants(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result<CompartmentBuild, SimError> {
+fn build_plants(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+) -> Result<CompartmentBuild, SimError> {
     let wiring = chamber_wiring(scenario.sealed);
     let ctx = carbon_context(scenario, p);
     let mut stocks = vec![
@@ -319,8 +363,16 @@ fn build_plants(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Resul
         pool_stock(PLANT_N, PLANTS, Quantity::Nitrogen, scenario.plant_n0)?,
     ];
     if !scenario.sealed {
-        stocks.push(boundary::sink(VAPOR_SINK.to_string(), Quantity::Water, 0.0)?);
-        stocks.push(boundary::sink(LITTER_SINK.to_string(), Quantity::Carbon, 0.0)?);
+        stocks.push(boundary::sink(
+            VAPOR_SINK.to_string(),
+            Quantity::Water,
+            0.0,
+        )?);
+        stocks.push(boundary::sink(
+            LITTER_SINK.to_string(),
+            Quantity::Carbon,
+            0.0,
+        )?);
     }
     let mut flows: Vec<Box<dyn Flow>> = vec![
         Box::new(Allocation {
@@ -345,7 +397,11 @@ fn build_plants(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Resul
             co2_atmos: wiring.carbon_source.clone(),
             co2_resp: wiring.resp_sink.clone(),
             o2_pool: wiring.o2_pool.clone(),
-            air_mol: if scenario.sealed { Some(scenario.chamber_air_mol) } else { None },
+            air_mol: if scenario.sealed {
+                Some(scenario.chamber_air_mol)
+            } else {
+                None
+            },
         }),
         Box::new(Senescence {
             id: "biosphere.senescence".to_string(),
@@ -412,18 +468,22 @@ fn build_plants(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Resul
             params: p.vern,
         }),
     ];
-    Ok(CompartmentBuild {
-        stocks,
-        flows,
-        aux,
-    })
+    Ok(CompartmentBuild { stocks, flows, aux })
 }
 
-fn build_water(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result<CompartmentBuild, SimError> {
+fn build_water(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+) -> Result<CompartmentBuild, SimError> {
     if !scenario.sealed {
         return Ok(CompartmentBuild::empty());
     }
-    let stocks = vec![pool_stock(CONDENSATE, WATER, Quantity::Water, scenario.condensate0)?];
+    let stocks = vec![pool_stock(
+        CONDENSATE,
+        WATER,
+        Quantity::Water,
+        scenario.condensate0,
+    )?];
     let flows: Vec<Box<dyn Flow>> = vec![Box::new(Recycling {
         id: "biosphere.recycling".to_string(),
         condensate: CONDENSATE.to_string(),
@@ -437,11 +497,18 @@ fn build_water(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result
     })
 }
 
-fn build_consumers(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result<CompartmentBuild, SimError> {
+fn build_consumers(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+) -> Result<CompartmentBuild, SimError> {
     if !(scenario.sealed && scenario.consumer) {
         return Ok(CompartmentBuild::empty());
     }
-    let stocks = vec![organ_stock(CONSUMER_CARBON, CONSUMERS, scenario.consumer_c0)?];
+    let stocks = vec![organ_stock(
+        CONSUMER_CARBON,
+        CONSUMERS,
+        scenario.consumer_c0,
+    )?];
     let flows: Vec<Box<dyn Flow>> = vec![
         Box::new(Grazing {
             id: "biosphere.grazing".to_string(),
@@ -472,7 +539,10 @@ fn build_consumers(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Re
     })
 }
 
-fn compartments(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Result<Vec<CompartmentBuild>, SimError> {
+fn compartments(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+) -> Result<Vec<CompartmentBuild>, SimError> {
     Ok(vec![
         build_atmosphere(scenario, p)?,
         build_soil(scenario, p)?,
@@ -506,7 +576,10 @@ pub fn build_season(scenario: &SeasonScenario) -> Result<(State, Registry), SimE
         0,
         stocks.clone(),
         0,
-        BTreeMap::from([(THERMAL_TIME.to_string(), 0.0)]),
+        BTreeMap::from([
+            (THERMAL_TIME.to_string(), 0.0),
+            (VERNALIZATION_DAYS.to_string(), 0.0),
+        ]),
     )?;
     let registry = Registry::new(flows, &stocks, aux)?;
     Ok((state, registry))
@@ -539,8 +612,14 @@ pub fn weather_forcings(
     forcings.insert(RN_VAR.to_string(), table_schedule(f.net_radiation));
     forcings.insert(VPD_VAR.to_string(), table_schedule(f.vpd));
     forcings.insert(CI_VAR.to_string(), constant(scenario.ci)?);
-    forcings.insert(IRRIGATION_VAR.to_string(), constant(scenario.irrigation_mm_day)?);
-    forcings.insert(FERTILIZATION_VAR.to_string(), constant(scenario.fertilization_kg_m2_day)?);
+    forcings.insert(
+        IRRIGATION_VAR.to_string(),
+        constant(scenario.irrigation_mm_day)?,
+    );
+    forcings.insert(
+        FERTILIZATION_VAR.to_string(),
+        constant(scenario.fertilization_kg_m2_day)?,
+    );
     Ok(forcings)
 }
 
@@ -557,7 +636,10 @@ pub fn weather_shared(scenario: &SeasonScenario) -> HashMap<String, String> {
 }
 
 /// Build the forcing resolver, tiling the raw weather facts over `years`.
-pub fn weather_resolver(scenario: &SeasonScenario, years: usize) -> Result<SourceResolver, SimError> {
+pub fn weather_resolver(
+    scenario: &SeasonScenario,
+    years: usize,
+) -> Result<SourceResolver, SimError> {
     SourceResolver::new(weather_forcings(scenario, years)?, weather_shared(scenario))
 }
 
@@ -572,15 +654,30 @@ pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, S
         )));
     }
     let old_veg = stocks[LEAF_C].amount + stocks[STEM_C].amount + stocks[ROOT_C].amount;
-    stocks.insert(LEAF_C.to_string(), stocks[LEAF_C].with_amount(scenario.leaf_c0)?);
-    stocks.insert(STEM_C.to_string(), stocks[STEM_C].with_amount(scenario.stem_c0)?);
-    stocks.insert(ROOT_C.to_string(), stocks[ROOT_C].with_amount(scenario.root_c0)?);
+    stocks.insert(
+        LEAF_C.to_string(),
+        stocks[LEAF_C].with_amount(scenario.leaf_c0)?,
+    );
+    stocks.insert(
+        STEM_C.to_string(),
+        stocks[STEM_C].with_amount(scenario.stem_c0)?,
+    );
+    stocks.insert(
+        ROOT_C.to_string(),
+        stocks[ROOT_C].with_amount(scenario.root_c0)?,
+    );
     stocks.insert(STORAGE_C.to_string(), stocks[STORAGE_C].with_amount(0.0)?);
     let litter_gain = old_veg + grain - seedling_total; // the balancing residual
     let new_litter = stocks[LITTER_CARBON].amount + litter_gain;
-    stocks.insert(LITTER_CARBON.to_string(), stocks[LITTER_CARBON].with_amount(new_litter)?);
+    stocks.insert(
+        LITTER_CARBON.to_string(),
+        stocks[LITTER_CARBON].with_amount(new_litter)?,
+    );
     let mut aux = state.aux.clone();
     aux.insert(THERMAL_TIME.to_string(), 0.0);
+    // A re-sown crop must re-vernalize: the cold requirement is per-cycle, so the second
+    // accumulator resets alongside the first (both are outside the conservation gate).
+    aux.insert(VERNALIZATION_DAYS.to_string(), 0.0);
     State::new(state.n, stocks, state.rng_seed, aux)
 }
 
@@ -641,7 +738,15 @@ pub fn run_perennial(
             Ok(None)
         }
     };
-    run_season(integrator, initial, resolver, dt, steps, Some(&reset), observer)
+    run_season(
+        integrator,
+        initial,
+        resolver,
+        dt,
+        steps,
+        Some(&reset),
+        observer,
+    )
 }
 
 #[cfg(test)]
@@ -682,9 +787,15 @@ mod tests {
         let (final_state, rationed, events) =
             run_perennial_final(&perennial_chamber_scenario(), PERENNIAL_CHAMBER_YEARS)
                 .expect("perennial");
-        assert_eq!(final_state.n as usize, SEASON_DAYS * PERENNIAL_CHAMBER_YEARS);
+        assert_eq!(
+            final_state.n as usize,
+            SEASON_DAYS * PERENNIAL_CHAMBER_YEARS
+        );
         assert_eq!(rationed, 0);
-        assert!(events.is_empty(), "death routes to litter, never the loss-sink");
+        assert!(
+            events.is_empty(),
+            "death routes to litter, never the loss-sink"
+        );
         // Genuinely closed: the carbon loss-sink stays exactly 0.
         assert_eq!(
             final_state.stocks["boundary.loss.carbon"].amount, 0.0,

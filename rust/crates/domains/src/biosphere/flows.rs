@@ -16,11 +16,11 @@ use simcore::error::SimError;
 use simcore::flow::{Flow, FlowResult, Leg};
 use simcore::state::State;
 
+use super::params;
 use super::params::{
     CanopyParams, NitrogenParams, PartitionRow, PhenologyParams, PhotosynthesisParams,
     RespirationParams,
 };
-use super::params;
 use super::science;
 
 /// Read a stock amount from the snapshot (a missing id is a build bug, like Python's
@@ -109,7 +109,8 @@ impl CarbonContext {
             self.ground_area,
             self.limitation(snapshot, env)?,
         );
-        let mres = science::maintenance_respiration_flux(biomass, env.get(&self.temp_var)?, &self.resp);
+        let mres =
+            science::maintenance_respiration_flux(biomass, env.get(&self.temp_var)?, &self.resp);
         Ok((gass, mres, science::available_for_growth(gass, mres)))
     }
 }
@@ -132,11 +133,24 @@ impl Flow for Allocation {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let (_, _, available) = self.ctx.budget(snapshot, env)?;
         let dmi = self.ctx.resp.growth_efficiency * available;
-        let thermal_time = snapshot.aux.get(&self.thermal_time_aux).copied().unwrap_or(0.0);
-        let dvs = science::development_stage(thermal_time, self.pheno.tsum_anthesis, self.pheno.tsum_maturity);
+        let thermal_time = snapshot
+            .aux
+            .get(&self.thermal_time_aux)
+            .copied()
+            .unwrap_or(0.0);
+        let dvs = science::development_stage(
+            thermal_time,
+            self.pheno.tsum_anthesis,
+            self.pheno.tsum_maturity,
+        );
         let (leaf, stem, root, storage) = science::partition(dmi, dvs, &self.table);
         let leaf_leg = leaf * dt;
         let stem_leg = stem * dt;
@@ -169,14 +183,22 @@ impl Flow for GrowthRespiration {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         if self.co2_atmos == self.co2_resp {
             return Ok(FlowResult::empty());
         }
         let (_, _, available) = self.ctx.budget(snapshot, env)?;
         let gres = (1.0 - self.ctx.resp.growth_efficiency) * available;
         let flux = gres * dt;
-        FlowResult::new(vec![leg(&self.co2_atmos, -flux)?, leg(&self.co2_resp, flux)?])
+        FlowResult::new(vec![
+            leg(&self.co2_atmos, -flux)?,
+            leg(&self.co2_resp, flux)?,
+        ])
     }
 }
 
@@ -194,7 +216,12 @@ impl Flow for MaintenanceRespiration {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let (gass, mres, _) = self.ctx.budget(snapshot, env)?;
         let (leaf, biomass) = self.ctx.leaf_and_biomass(snapshot);
         let covered = gass.min(mres);
@@ -205,8 +232,14 @@ impl Flow for MaintenanceRespiration {
             // biomass-burned shortfall is a real respiration, O₂-throttled by f_O2.
             let mut f_o2 = 1.0;
             if let Some(o2) = &self.o2_pool {
-                let air_mol = self.air_mol.expect("sealed MaintenanceRespiration has air_mol");
-                f_o2 = science::oxygen_limitation_factor(amt(snapshot, o2), air_mol, self.ctx.resp.o2_half_saturation);
+                let air_mol = self
+                    .air_mol
+                    .expect("sealed MaintenanceRespiration has air_mol");
+                f_o2 = science::oxygen_limitation_factor(
+                    amt(snapshot, o2),
+                    air_mol,
+                    self.ctx.resp.o2_half_saturation,
+                );
             }
             let mut legs: Vec<Leg> = Vec::new();
             let mut organ_burn = 0.0;
@@ -270,7 +303,12 @@ impl Flow for Senescence {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let leaf = self.rdr_leaf * amt(snapshot, &self.leaf_c) * dt;
         let stem = self.rdr_stem * amt(snapshot, &self.stem_c) * dt;
         let root = self.rdr_root * amt(snapshot, &self.root_c) * dt;
@@ -302,7 +340,12 @@ impl Flow for Transpiration {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let net_radiation = env.get(&self.rn_var)?;
         let vpd = env.get(&self.vpd_var)?;
         let temp_c = env.get(&self.temp_var)?;
@@ -317,7 +360,10 @@ impl Flow for Transpiration {
         let f_water = science::water_stress_factor(soil_water, self.sw_wilting, self.sw_critical);
         let daily_kg = potential * f_water * self.ground_area;
         let flux = daily_kg * dt;
-        FlowResult::new(vec![leg(&self.soil_water, -flux)?, leg(&self.vapor_sink, flux)?])
+        FlowResult::new(vec![
+            leg(&self.soil_water, -flux)?,
+            leg(&self.vapor_sink, flux)?,
+        ])
     }
 }
 
@@ -334,11 +380,19 @@ impl Flow for Irrigation {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, _snapshot: &State, env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        _snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let rate_mm_day = env.get(&self.irrigation_var)?;
         let daily_kg = rate_mm_day * self.ground_area;
         let flux = daily_kg * dt;
-        FlowResult::new(vec![leg(&self.water_source, -flux)?, leg(&self.soil_water, flux)?])
+        FlowResult::new(vec![
+            leg(&self.water_source, -flux)?,
+            leg(&self.soil_water, flux)?,
+        ])
     }
 }
 
@@ -357,7 +411,12 @@ impl Flow for NitrogenUptake {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let soil_n = amt(snapshot, &self.soil_n);
         let availability = science::soil_n_availability(soil_n, self.sn_residual, self.sn_critical);
         let daily_kg = self.max_uptake_capacity * self.ground_area * availability;
@@ -379,7 +438,12 @@ impl Flow for Fertilization {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, _snapshot: &State, env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        _snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let rate = env.get(&self.fertilization_var)?;
         let daily_kg = rate * self.ground_area;
         let flux = daily_kg * dt;
@@ -401,7 +465,12 @@ impl Flow for Decomposition {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let decayed = self.decomposition_rate * amt(snapshot, &self.litter_carbon) * dt;
         FlowResult::new(vec![
             leg(&self.litter_carbon, -decayed)?,
@@ -425,9 +494,19 @@ impl Flow for MicrobialRespiration {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
-        let f_o2 = science::oxygen_limitation_factor(amt(snapshot, &self.o2_pool), self.air_mol, self.o2_half_saturation);
-        let respired = self.microbial_respiration_rate * amt(snapshot, &self.microbial_carbon) * f_o2 * dt;
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let f_o2 = science::oxygen_limitation_factor(
+            amt(snapshot, &self.o2_pool),
+            self.air_mol,
+            self.o2_half_saturation,
+        );
+        let respired =
+            self.microbial_respiration_rate * amt(snapshot, &self.microbial_carbon) * f_o2 * dt;
         FlowResult::new(vec![
             leg(&self.microbial_carbon, -respired)?,
             leg(&self.co2_pool, respired)?,
@@ -448,7 +527,12 @@ impl Flow for NitrogenSenescence {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let shed = self.n_senescence_rate * amt(snapshot, &self.plant_n) * dt;
         FlowResult::new(vec![leg(&self.plant_n, -shed)?, leg(&self.litter_n, shed)?])
     }
@@ -466,9 +550,17 @@ impl Flow for Mineralization {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let mineralized = self.mineralization_rate * amt(snapshot, &self.litter_n) * dt;
-        FlowResult::new(vec![leg(&self.litter_n, -mineralized)?, leg(&self.soil_n, mineralized)?])
+        FlowResult::new(vec![
+            leg(&self.litter_n, -mineralized)?,
+            leg(&self.soil_n, mineralized)?,
+        ])
     }
 }
 
@@ -484,9 +576,17 @@ impl Flow for Condensation {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let condensed = self.condensation_rate * amt(snapshot, &self.water_vapor) * dt;
-        FlowResult::new(vec![leg(&self.water_vapor, -condensed)?, leg(&self.condensate, condensed)?])
+        FlowResult::new(vec![
+            leg(&self.water_vapor, -condensed)?,
+            leg(&self.condensate, condensed)?,
+        ])
     }
 }
 
@@ -502,9 +602,17 @@ impl Flow for Recycling {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let recycled = self.recycling_rate * amt(snapshot, &self.condensate) * dt;
-        FlowResult::new(vec![leg(&self.condensate, -recycled)?, leg(&self.soil_water, recycled)?])
+        FlowResult::new(vec![
+            leg(&self.condensate, -recycled)?,
+            leg(&self.soil_water, recycled)?,
+        ])
     }
 }
 
@@ -520,9 +628,17 @@ impl Flow for Grazing {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let grazed = self.grazing_rate * amt(snapshot, &self.leaf_c) * dt;
-        FlowResult::new(vec![leg(&self.leaf_c, -grazed)?, leg(&self.consumer_carbon, grazed)?])
+        FlowResult::new(vec![
+            leg(&self.leaf_c, -grazed)?,
+            leg(&self.consumer_carbon, grazed)?,
+        ])
     }
 }
 
@@ -541,8 +657,17 @@ impl Flow for ConsumerRespiration {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
-        let f_o2 = science::oxygen_limitation_factor(amt(snapshot, &self.o2_pool), self.air_mol, self.o2_half_saturation);
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let f_o2 = science::oxygen_limitation_factor(
+            amt(snapshot, &self.o2_pool),
+            self.air_mol,
+            self.o2_half_saturation,
+        );
         let respired = self.respiration_rate * amt(snapshot, &self.consumer_carbon) * f_o2 * dt;
         FlowResult::new(vec![
             leg(&self.consumer_carbon, -respired)?,
@@ -564,9 +689,17 @@ impl Flow for ConsumerMortality {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, _env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
         let died = self.mortality_rate * amt(snapshot, &self.consumer_carbon) * dt;
-        FlowResult::new(vec![leg(&self.consumer_carbon, -died)?, leg(&self.litter_carbon, died)?])
+        FlowResult::new(vec![
+            leg(&self.consumer_carbon, -died)?,
+            leg(&self.litter_carbon, died)?,
+        ])
     }
 }
 
@@ -605,13 +738,20 @@ impl AuxProcess for ThermalTimeAccumulation {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, snapshot: &State, env: &dyn Environment, dt: f64) -> Result<BTreeMap<String, f64>, SimError> {
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<BTreeMap<String, f64>, SimError> {
         let temp_c = env.get(&self.temp_var)?;
         let mut rate = science::daily_thermal_time(temp_c, self.t_base, self.t_cap);
         if self.is_vegetative(snapshot) {
             // The source's Eqn 7.4 "biological day" BD = tempfun * ppfun, extended by
             // Eqn 8.2's verfun: the modifiers MULTIPLY. Either may be absent.
-            if let (Some(v), Some(acc)) = (self.vernalization, self.vernalization_accumulator.as_ref()) {
+            if let (Some(v), Some(acc)) =
+                (self.vernalization, self.vernalization_accumulator.as_ref())
+            {
                 let cum = snapshot.aux.get(acc).copied().unwrap_or(0.0);
                 rate *= science::vernalization_factor(cum, v.vsen, v.vdsat);
             }
@@ -640,7 +780,12 @@ impl AuxProcess for VernalizationAccumulation {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, _snapshot: &State, env: &dyn Environment, dt: f64) -> Result<BTreeMap<String, f64>, SimError> {
+    fn evaluate(
+        &self,
+        _snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<BTreeMap<String, f64>, SimError> {
         let p = self.params;
         let rate = science::vernalization_day(
             env.get(&self.temp_var)?,

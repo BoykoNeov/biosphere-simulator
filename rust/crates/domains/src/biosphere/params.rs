@@ -184,7 +184,9 @@ fn parse() -> (BTreeMap<&'static str, f64>, Vec<PartitionRow>) {
             continue;
         }
         let mut fields = line.split('\t');
-        let head = fields.next().expect("biosphere param line has a leading field");
+        let head = fields
+            .next()
+            .expect("biosphere param line has a leading field");
         if head == "partition_row" {
             let mut next = || {
                 hexfloat::parse(fields.next().expect("partition_row field"))
