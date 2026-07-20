@@ -93,6 +93,17 @@
 #       both verified first-hand. This entry is the POSITIVE CONTROL: it is the evidence
 #       that "secondary-quoting-primary" is a risk flag and not a verdict, which is why
 #       round 4's finding must not be generalized into distrust of every such chain here.
+#       ✅ ROUND 5 (2026-07-20) ADDED A THIRD DATA POINT AND IT ALSO HELD: mineralization.yaml's
+#       [C]-quoting-[A] chain (Schomberg 2009 quoting Stanford & Smith 1972) was retired by
+#       reading [A] first-hand, and [C] reproduces its 0.054 wk⁻¹ correctly to the digit. So
+#       the scope's full record on secondary-quoting-primary chains, all three verified
+#       against the primary, is TWO SOUND (this one, and S&S) to ONE FABRICATED (Dunn). The
+#       conclusion is unchanged but now better supported: check the chain, do not assume it.
+#       ⚠ Note what distinguishes the failure from the two successes — it is not the chain
+#       shape. Both sound cases transmit a number the primary actually prints; the Dunn case
+#       attributed a number to a paper that never contained one. That is a locus failure, not
+#       a transmission failure, and no amount of care about "secondaries" would have caught
+#       it — only opening the cited paper does.
 
 name: chamber
 process: decomposition

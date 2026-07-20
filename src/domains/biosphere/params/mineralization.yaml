@@ -47,26 +47,71 @@
 #
 # Sources:
 #   [A] Stanford, G. & Smith, S.J. (1972), "Nitrogen mineralization potentials of soils",
-#       Soil Science Society of America Journal 36(3):465–472 (first-order net N
-#       mineralization kinetics; the mineralization rate constant). STILL NOT OPENED —
-#       it was #6 on the plan doc's retrieval list. ⚠ UPDATED BY ROUND 4 (2026-07-20): it is
-#       no longer "one of three items not supplied"; Dunn 2011 and Divya 2009 WERE supplied
-#       and opened in round 4, so [A] is now the SOLE remaining item on that list
-#       (12 → 3 → 1). It stays on it.
-#       ROUND-2 NEGATIVE RESULT, recorded so the search is not repeated: a 29-source
-#       literature corpus was searched for any first-hand mineralization rate constant that
-#       could replace the [C]-quoting-[A] chain, and there is none. [D] — a dedicated
-#       review AND meta-analysis of N mineralization, the single most likely substitute —
-#       cites [A] for the first-order form (p. 163) and never reproduces its k. Luo & Smith
-#       (2022), "Land Carbon Cycle Modeling", likewise cites [A] for form only ("Generally,
-#       first-order kinetics are used to simulate soil carbon cycling (Stanford and Smith
-#       1972 …)"). Four soil texts/monographs in the corpus contain no mineralization rate
-#       constant at all. CONCLUSION: k = 0.054 wk⁻¹ is reachable ONLY from [A] itself;
-#       secondary literature propagates [A]'s FORM and quotes its mean without republishing
-#       the underlying per-soil data. Retrieval of [A]'s k remains the only upgrade path
-#       FOR THE VALUE — but see [E]: round 3 (2026-07-20) showed that sentence was too broad
-#       as originally written ("retrieval of [A] remains the only upgrade path"). [A]'s
-#       CONDITIONS were upgradable without [A], via an author's own retrospective.
+#       Soil Sci. Soc. Amer. Proc. 36(3):465–472 (first-order net N mineralization kinetics;
+#       the mineralization rate constant).
+#       ✅ OPENED AND READ 2026-07-20 (ROUND 5) — SUPPLIED BY THE USER. It was #6 on the
+#       plan doc's retrieval list and, after round 4, the SOLE remaining item on it. THE
+#       LIST IS NOW EMPTY (12 → 3 → 1 → 0). The [C]-quoting-[A] chain that carried this
+#       param through four rounds is CLOSED: the value is first-hand.
+#       VENUE, now settled by the primary itself: the running header on p. 466 reads
+#       "SOIL SCI. SOC. AMER. PROC., VOL. 36, 1972". Round 3 inferred the Proceedings form
+#       from [E]'s header and was right; [A] confirms it directly. The entry above is
+#       corrected accordingly (it previously said "Journal", a name SSSAJ did not carry
+#       until 1976).
+#
+#       THE NUMBER, first-hand (p. 469): "we conclude that the value of k, 0.054 ± .009,
+#       obtained from pooling the regressions for 29 soils constitutes the most reliable
+#       estimate of the mineralization rate constant applicable to the range of soils
+#       studied." And: "The mean value of k, 0.054, denotes that at 35C the mineralizable N
+#       fraction is released at an average rate of 5.4% per week". [C]'s quotation of this
+#       number is CONFIRMED TO THE DIGIT — see the note under [C].
+#       ⚠ WHAT 0.054 ACTUALLY IS, which no secondary in this file conveyed: it is a WEIGHTED
+#       AVERAGE OF 29 POOLED REGRESSIONS, not a plain mean of all 39 soils. Covariance
+#       analysis showed 29 soils' k differences were attributable to sampling variation
+#       (that subset spans 0.044–0.069); the other 10 were divergent (3 soils below 0.044,
+#       7 above 0.069) and were EXCLUDED from the pooled estimate. [A] itself nonetheless
+#       calls 0.054 "the mean value of k", so this file's "the S&S mean" wording stands.
+#
+#       NEW — THE FULL PER-SOIL DISTRIBUTION (Table 3, col. 8), which is the thing the
+#       secondary literature never republished and the reason retrieval was worth doing.
+#       All 39 k values span 0.035 to 0.095 week⁻¹ (arithmetic mean of the 39: 0.058).
+#       Half-time t½ = 0.693/k = 12.8 ± 2.2 weeks for the pooled estimate.
+#       ⚠ EXTRACTION VERIFIED BY ARITHMETIC, NOT EYE — the [B]/p.113 discipline in this same
+#       file, applied here (and see [E]: round 3 did NOT apply it there, and erred). The
+#       column was machine-extracted from the scan, then checked against [A]'s own prose
+#       four independent ways, all of which must hold simultaneously: the column has exactly
+#       39 entries ("39 widely differing soils"); exactly 3 lie below 0.044 ("the three soils
+#       with k values below 0.044"); exactly 7 lie above 0.069 ("the remaining seven soils
+#       (k > 0.069)"); and the residual 29 span exactly 0.044–0.069 ("values of k ranged from
+#       0.044 to 0.069"), matching the pooled count. A mis-read digit would break at least
+#       one of these.
+#
+#       CONDITIONS — now PRIMARY, no longer [E]-mediated. p. 467: soil leached, "Excess water
+#       was removed under vacuum (60 cm Hg). The tubes were then stoppered and incubated at
+#       35C", with "restoration of optimal soil water contents" at each of the 7 leachings
+#       (2, 4, 8, 12, 16, 22, 30 weeks cumulative). p. 469: "Water, oxygen supply, and levels
+#       of essential nutrients were considered to be near optimal for N mineralization."
+#       ⚠ NOTE the wording: [A] says "optimal soil water contents" / 60 cm Hg suction; the
+#       phrase "approximate field capacity" is [E]'s 1987 gloss, not [A]'s. Substantively
+#       consistent (both mean near-optimal moisture), but quote [A] for [A].
+#       ⚠ AND [A] QUALIFIES ITS OWN OPTIMUM, which cuts AGAINST our finding and is recorded
+#       for that reason (p. 469): "The temperature of incubation, 35C, generally is regarded
+#       as being near optimum for nitrification, but probably less than optimum for
+#       ammonification". So a genuinely temperature-optimal k could sit somewhat ABOVE 0.054.
+#       This narrows the "optimal conditions forbid a modifier explanation" clause rather
+#       than voiding it: the ammonification optimum is a matter of a few °C, nowhere near a
+#       3.9× effect, and it does not touch the harder bound (ours vs the FASTEST of 39).
+#
+#       SUPERSEDED BY THIS ENTRY — the round-2 negative result, retained as method history:
+#       a 29-source corpus was searched for any first-hand k that could replace the
+#       [C]-quoting-[A] chain and there was none ([D], a dedicated N-mineralization review
+#       AND meta-analysis, cites [A] for form only at p. 163 and never reproduces its k;
+#       Luo & Smith (2022) likewise cites it for form; four soil texts carry no rate constant
+#       at all). That conclusion — "k = 0.054 wk⁻¹ is reachable ONLY from [A] itself" — was
+#       CORRECT, and round 5 discharged it the only way it could be discharged: by opening
+#       [A]. Rounds 3 and 4 each showed the sentence attached to it ("retrieval of [A]
+#       remains the only upgrade path") was too broad; round 5 shows the underlying survey
+#       was sound.
 #   [E] Smith, S.J. (1987), "This Week's Citation Classic: Stanford G & Smith S J, Nitrogen
 #       mineralization potentials of soils", Current Contents, CC/NUMBER 28, July 13 1987,
 #       p. 20 (ISI). OPENED AND READ 2026-07-20 (round 3). Open access, page images:
@@ -74,8 +119,14 @@
 #       WHAT IT IS: a first-person retrospective written by S.J. Smith — [A]'s own second
 #       author — about [A]. That makes it AUTHOR TESTIMONY ABOUT the paper, which is
 #       stronger than a third-party paraphrase for the claims it actually makes, but it is
-#       NOT the paper and NOT its data table. It does not supersede [A] on the retrieval
-#       list, and [A] stays there.
+#       NOT the paper and NOT its data table.
+#       ⚠ DEMOTED TO CORROBORATING BY ROUND 5 (2026-07-20). [A] is now OPEN, so everything
+#       [E] was carrying — the conditions, the protocol, the venue — is available first-hand
+#       from the paper, and [A] is what should be quoted. [E] earned its round-3 prose only
+#       BECAUSE [A] was closed. It is retained (not deleted) because it corroborates [A]
+#       independently and because the slip below is worth keeping visible; but nothing should
+#       be built on it now. Round 5 checked it against [A] and the two AGREE throughout —
+#       author memory 15 years on held up, with the one transcription caveat below.
 #       ⚠ IT DOES NOT GIVE k. No rate constant appears anywhere in it — so the 0.054 wk⁻¹
 #       figure remains reachable only through [C] quoting [A], exactly as round 2 recorded.
 #       The value provenance is UNCHANGED by round 3.
@@ -89,14 +140,38 @@
 #       as-is because that is how every secondary in this file cites it, and changing it
 #       would desynchronize us from [C] and [D]. Anyone quoting [A] as PRIMARY should use
 #       the Proceedings form.
+#       ⚠ ROUND 5 ACTED ON THIS AND THE SENTENCE ABOVE IS NOW SUPERSEDED: [A]'s line HAS been
+#       corrected to the Proceedings form. Round 3's reasoning was sound while [A] was closed
+#       — it declined to rewrite a citation on the strength of a *retrospective's* header. But
+#       round 5 read [A] itself, whose own running header (p. 466) says "SOIL SCI. SOC. AMER.
+#       PROC., VOL. 36, 1972", and "anyone quoting [A] as PRIMARY should use the Proceedings
+#       form" is now us. The desynchronization worry stands and is simply accepted: [C] and
+#       [D] cite the modern name, we cite the as-published one, and this note explains why.
+#       ✅ [E]'s header is thereby CONFIRMED BY THE PRIMARY — a second, independent check on
+#       author testimony that came back clean.
 #       WHAT IT DOES GIVE — first-hand confirmation of the experimental conditions that the
 #       FINDING below rests on, previously known only through [C]: "an incubation procedure
 #       conducted at optimum temperature (35° C) and moisture conditions (approximate field
 #       capacity)"; "For 39 widely differing soils"; "We continued the incubation for 30
-#       weeks using leaching intervals first of two and two weeks, then four, four, and six
+#       weeks using leaching intervals first of two and two weeks, then four, four, and four
 #       weeks, then six weeks, and finally eight weeks" (leached with 0.01 M CaCl2); and the
 #       form, "nitrogen mineralization obeyed simple first-order kinetics", with N0 taken
 #       from the best linear fit of log(N0-Nt) vs t.
+#       ⚠ THE QUOTE ABOVE WAS WRONG IN THIS FILE UNTIL ROUND 5, AND THE ERROR WAS OURS, NOT
+#       [E]'s. Round 3 transcribed the sequence as "four, four, and SIX weeks, then six
+#       weeks"; the page reads "four, four, and FOUR weeks, then six weeks". Corrected above
+#       and confirmed twice over: the page image re-read, and [A] itself, whose p. 467 gives
+#       the identical schedule ("periods of 2, 4, 4, 4, 6, and 8 weeks (cumulative: 2, 4, 8,
+#       12, 16, 22, and 30 weeks)"). So [E] remembered its own protocol correctly.
+#       WHY IT MATTERS AS A METHOD NOTE (one line, not a new finding): round 3's version
+#       sums to 32 weeks, inside a sentence that says "for 30 weeks" — the contradiction was
+#       IN OUR OWN QUOTE and arithmetic would have caught it instantly. Round 3 ran exactly
+#       that check on [B]'s mangled p. 113 table in THIS FILE ("VERIFIED by arithmetic, not
+#       guessed") and did not run it here. Its fragment-by-fragment re-read caught the things
+#       that LOOKED odd (spacing, a handwritten scrawl, a venue) and missed the digit that
+#       read fluently. A quote check verifies characters; only arithmetic verifies numbers.
+#       Nothing downstream rested on the schedule — no finding, no value — which is why this
+#       is a method note and not a correction notice.
 #       WHY THAT MATTERS: the FINDING's load-bearing clause is that S&S's rates are ALREADY
 #       optimal-condition potential rates, which is what forbids explaining our ~3.9x gap
 #       away with temperature/moisture modifiers. That clause was [C]-mediated; it is now
@@ -116,8 +191,18 @@
 #       fragment flagged as suspect — "leaching intervals" is genuinely printed, hyphenated
 #       across a line break as "leaching in-/tervals", not an inserted word.
 #       ROUND-3 NEGATIVE RESULTS, recorded so the search is not repeated: [A] itself was
-#       re-attempted and is still Wiley-paywalled — THIS HALF STANDS.
-#       ⚠ THE OTHER HALF WAS FALSIFIED BY ROUND 4, ONE DAY LATER, and is corrected in place:
+#       re-attempted and is still Wiley-paywalled.
+#       ⚠⚠ THAT BLOCK IS NOW FALSIFIED IN FULL — every element of it, across two days.
+#       Round 3 recorded three sources as closed "so the search is not repeated". Round 4
+#       opened two of them (one exposing a false attribution in power/); ROUND 5 OPENED THE
+#       THIRD. A block whose stated purpose was to STOP searching had a shelf life of about
+#       a day per item, and the sentence below — written by round 4, correcting round 3 — is
+#       the one that predicted it: a retrieval ceiling is a fact about one afternoon's
+#       ACCESS, never a property of the source. Left in place, fully marked, because the
+#       three-strikes record is more instructive than a clean deletion would be. THE
+#       OPERATIVE RULE: never write a retrieval failure flat; date it and scope it to the
+#       channel that failed.
+#       The round-4 correction of the other two halves, retained verbatim:
 #       round 3 wrote that "Dunn 2011 (Science) and Divya 2009 (Elsevier; DTU Orbit is
 #       metadata-only) were re-attempted and are still closed". BOTH WERE SUPPLIED BY THE
 #       USER AND OPENED in round 4, and opening them found a CONFIRMED FALSE ATTRIBUTION in
@@ -179,6 +264,19 @@
 #       and Smith (1972) for several U.S. soils, 0.067 wk−1 for 42 soils from the
 #       Saskatchewan province reported by Jalil et al. (1996) and 0.080 wk−1 reported by
 #       Curtin and Wen (1999)." CONTRAST — the measured range ours falls outside.
+#       ✅ ROUND 5 (2026-07-20) VERIFIED [C]'s QUOTATION OF [A] AGAINST [A] ITSELF: the
+#       0.054 wk⁻¹ figure is reproduced CORRECTLY, to the digit. This is the SECOND POSITIVE
+#       CONTROL in this scope, alongside decomposition.yaml's FAO-quoting-Olson chain — and
+#       it matters because the THIRD such chain examined (Dunn/Divya, power/self_discharge)
+#       was a confirmed FALSE attribution. Three secondary-quoting-primary chains checked
+#       first-hand: two sound, one fabricated. That ratio is the reason round 4's finding was
+#       recorded as a risk flag and not a verdict about the shape.
+#       ⚠ ONE LOOSE EDGE, worth naming precisely: [C] calls 0.054 "the average k … for
+#       several U.S. soils". The number is right, but "several" understates 39, and it is not
+#       a plain average — it is the pooled estimate over 29 soils after 10 divergent ones
+#       were excluded (see [A]). No conclusion in this file turned on that, but it is a fair
+#       illustration of what a secondary loses in transmission even when its NUMBER is exact:
+#       the chain was accurate and still not sufficient.
 #   [D] Ros, G.H., Temminghoff, E.J.M. & Hoffland, E. (2011), "Nitrogen mineralization: a
 #       review and meta-analysis of the predictive value of soil tests", European Journal of
 #       Soil Science 62:162–173. OPENED AND READ 2026-07-16 (round 2; an unlisted source,
@@ -194,25 +292,60 @@
 #       the field still treats [A] as its origin 39 years on. FORM corroboration only.
 #
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
-#   NEITHER TODO(cite) discharged — both REMAIN OPEN, now carrying findings. [A] and [B]
-#   are FORM citations; neither ever fixed a value, and neither could be opened.
+#   NEITHER TODO(cite) discharged — both REMAIN OPEN, now carrying findings. But the REASON
+#   is no longer "the sources could not be opened": as of round 5 (2026-07-20) BOTH have
+#   been read first-hand ([B] in round 2, [A] in round 5), and this scope's retrieval list
+#   is EMPTY. What keeps them open is that neither source ever fixed OUR values —
+#   [B] has no N-shedding rate to give (and its form is DS-dependent where ours is a bare
+#   constant), and [A] is a CONTRAST: it is the distribution ours falls outside, not the
+#   origin of 0.03. That is the same status decomposition.yaml's Olson entry reached — a
+#   VALUE citation by contrast, no longer FORM-only. Retrieval is finished here; what
+#   remains is a calibration question, i.e. scope B.
 #
-#   FINDING (mineralization_rate) — ~3.9× the Stanford & Smith mean, and above the fastest
-#   soil ever measured in a 43-soil set. Ours 0.03 /day = 0.21 /wk. [C]'s own 41-week
-#   incubations across 43 soil × tillage × depth combinations span k = 0.018–0.174 /wk
-#   (mean 0.070); Stanford & Smith's mean is 0.054 /wk = 0.0077 /day. So ours is ~3.9× the
-#   S&S mean and ~1.2× above [C]'s single fastest soil — outside the whole observed range.
-#   Four independent studies cluster at 0.054–0.080 /wk, so this is not one odd dataset.
-#   Crucially these are ALREADY optimal-condition potential rates (35 °C, field capacity),
-#   so the gap CANNOT be explained away by temperature/moisture modifiers. ROUND 3: that
-#   clause is now first-hand — [E], written by [A]'s own second author, states the 35 °C /
-#   approximate-field-capacity protocol directly. The PREMISE of the gap argument no longer
-#   depends on a secondary.
-#   Provenance caveat (NARROWED, not lifted, by round 3): the 0.054 /wk NUMBER is still [C]
-#   QUOTING Stanford & Smith — [A] itself is paywalled (Wiley, HTTP 402) and was not opened,
-#   and [E] gives no rate constant. So the chain survives for the VALUE and is broken for the
-#   CONDITIONS. [C] is primary for its own 0.018–0.174 range, which independently places ours
-#   outside.
+#   FINDING (mineralization_rate) — ~3.9× the Stanford & Smith mean, and 2.2× ABOVE THE
+#   FASTEST OF THE 39 SOILS S&S MEASURED. Ours 0.03 /day = 0.21 /wk.
+#   ✅ FULLY PRIMARY-BACKED AS OF ROUND 5 — the provenance caveat below is LIFTED, not
+#   narrowed. [A] was supplied and read, so the number no longer comes through [C].
+#   The bound, first-hand from [A]'s Table 3: all 39 per-soil k values span 0.035–0.095 /wk
+#   (pooled estimate 0.054 ± 0.009 = 0.0077 /day; arithmetic mean of the 39 = 0.058). Ours
+#   is ~3.9× the pooled mean, ~3.3× the mean+1SD, and ~2.2× above the single fastest soil in
+#   the set. Independently, [C]'s own 43 soil × tillage × depth combinations span
+#   0.018–0.174 /wk (mean 0.070) and ours is ~1.2× above THEIR fastest. Four independent
+#   studies cluster at 0.054–0.080 /wk, so this is not one odd dataset.
+#   ⚠ THE 2.2× IS THE HARD BOUND AND IT REPLACES THE OLD 1.2×: it is first-hand, it is
+#   against a single measured soil rather than a mean, and it does not depend on [C] at all.
+#   Round 3 could only offer "1.2× above [C]'s fastest of 43" as its tightest first-hand
+#   number; round 5 supersedes that.
+#   Conditions: these are ALREADY optimal-condition potential rates — 35C, "restoration of
+#   optimal soil water contents", and [A]'s own "Water, oxygen supply, and levels of
+#   essential nutrients were considered to be near optimal" — so the gap CANNOT be explained
+#   away by temperature/moisture modifiers. Round 3 made that clause author-testimony via
+#   [E]; round 5 makes it [A]'s own sentence. ⚠ With [A]'s own qualifier attached: 35C is
+#   "near optimum for nitrification, but probably less than optimum for ammonification", so
+#   the true optimal k may sit somewhat above 0.054. A few °C, not 3.9×; and it does not
+#   touch the 2.2×-above-the-fastest-soil bound at all.
+#
+#   ⚠⚠ THE COUNTER-READING THAT ACTUALLY BITES — POOL IDENTITY. Recorded because the sibling
+#   file decomposition.yaml records its analogue, and this note would be less honest than its
+#   sibling without it. S&S measured net mineralization of SOIL organic N (N0, the
+#   mineralizable fraction of mixed-age soil organic matter, 5–40 % of total soil N). OUR
+#   litter_n is FRESH DEAD-PLANT N. Fresh plant residue N mineralizes on a different — and
+#   generally faster — footing than bulk soil N0, so "2.2× above S&S's fastest soil" is in
+#   part a LITTER rate compared against a SOIL rate, and some of the gap may be that
+#   mismatch rather than our value being wrong.
+#   ⚠ BUT THE RE-ANCHORING IS REFUSED HERE, exactly as decomposition.yaml refuses the
+#   DPM/RPM labile-fraction re-read, and for the same reason: redefining what the pool MEANS
+#   in order to make a citation fit is a semantic MODEL change, not a citation edit —
+#   confirmation bias wearing a provenance hat. Three things also cut against it: (i) [C] and
+#   [D] both treat [A] as THE canonical first-order reference for exactly this kind of model
+#   term, 37–39 years on; (ii) this param's own flow is litter_n → soil_n, i.e. it is the
+#   model's only mineralization step and inherits [A]'s form by construction; and (iii) it is
+#   one member of a CLUSTER that all run fast on the same side of the loop (litter decay
+#   ~1.5× a 293-value global max; microbial respiration ~2.5–28×), which a pool-identity
+#   argument specific to N does not explain.
+#   So: recorded as a live alternative reading, NOT adopted. Re-anchoring the pool's meaning
+#   (or the number) is scope B. A future maintainer inherits the choice, not just the
+#   conclusion.
 #
 #   FINDING (n_senescence_rate) — NO ACCESSIBLE PRIMARY SUPPORT AT ALL, and the highest
 #   clean-room risk in the project. The accessible N-resorption literature is built around
@@ -221,7 +354,19 @@
 #   ⚠ The relative-death-rate (rdr) tradition [B] seeded flows directly into WOFOST/PCSE, so
 #   searches for numeric RDR / N-senescence values land almost exclusively on WOFOST-lineage
 #   sources, which are LEGALLY OFF-LIMITS here. A future maintainer must not "just look it
-#   up": retrieving the [B] monograph is the only clean path (see the plan doc's list).
+#   up".
+#   ⚠ STALE SENTENCE CORRECTED BY ROUND 5: this paragraph used to end "retrieving the [B]
+#   monograph is the only clean path (see the plan doc's list)". [B] WAS RETRIEVED AND READ
+#   IN ROUND 2, and it does not settle this param — the book has no N-shedding rate to give.
+#   So the only named path had already been walked and had already failed, three rounds
+#   before anyone re-read the sentence. It survived because every subsequent round arrived
+#   here following mineralization_rate (the param with the live retrieval question) and this
+#   is the OTHER param's finding. Same shape as the round-3/4/5 ceiling block above: a
+#   pointer to future work outlives the work. THE HONEST STATUS: retrieval is EXHAUSTED for
+#   n_senescence_rate — not blocked, exhausted. Nothing in the accessible literature has the
+#   shape (1/day) this param needs, which is a fact about the literature, not about access,
+#   and no further reading will change it. The path forward is scope B (adopt the
+#   DS-dependent FORM [B] actually gives), not another citation hunt.
 
 name: chamber
 process: mineralization
@@ -230,8 +375,8 @@ parameters:
   n_senescence_rate:
     value: 0.01
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, no primary support EXISTS in the shape this parameter needs — which round 2 established first-hand rather than by assumption (2026-07-16). [B] WAS RETRIEVED AND READ, and it does NOT settle this param: the plan doc predicted it was 'the only clean-room-safe route' to a number, but the book has no N-shedding rate at all — its senescence treatment is LEAF BIOMASS death (§3.2.6, p. 95), and it names N remobilization as a distinct process that is 'difficult to quantify'. That CORROBORATES the round-1 diagnosis from the horse's mouth: the N-resorption literature reports resorption EFFICIENCY (a %, ~50 % typical), not a 1/day rate, so no delta is computable and retrieval cannot fix it. NEW STRUCTURAL FINDING from opening [B]: its relative loss rate is a FUNCTION of development stage (0/day before anthesis, ramping to 0.15/day by DS 2.0), whereas ours is a bare CONSTANT — so ours is the degenerate case of the cited form, non-zero exactly where the source is zero. That is a FORM gap, not just a value gap, and it makes this param a scope-B structural candidate alongside the canopy and the decomposer rates rather than a mere citation debt. ⚠ CLEAN-ROOM HAZARD (unchanged): the rdr tradition flows into WOFOST/PCSE, so numeric RDR sources found by search are almost all WOFOST-lineage and legally unusable — do NOT backfill from them. [B]'s printed pages are literature and safe; PCSE's params are not. Changing the value/form is scope B. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN, no primary support EXISTS in the shape this parameter needs — which round 2 established first-hand rather than by assumption (2026-07-16). [B] WAS RETRIEVED AND READ, and it does NOT settle this param: the plan doc predicted it was 'the only clean-room-safe route' to a number, but the book has no N-shedding rate at all — its senescence treatment is LEAF BIOMASS death (§3.2.6, p. 95), and it names N remobilization as a distinct process that is 'difficult to quantify'. That CORROBORATES the round-1 diagnosis from the horse's mouth: the N-resorption literature reports resorption EFFICIENCY (a %, ~50 % typical), not a 1/day rate, so no delta is computable and retrieval cannot fix it. NEW STRUCTURAL FINDING from opening [B]: its relative loss rate is a FUNCTION of development stage (0/day before anthesis, ramping to 0.15/day by DS 2.0), whereas ours is a bare CONSTANT — so ours is the degenerate case of the cited form, non-zero exactly where the source is zero. That is a FORM gap, not just a value gap, and it makes this param a scope-B structural candidate alongside the canopy and the decomposer rates rather than a mere citation debt. ⚠ CLEAN-ROOM HAZARD (unchanged): the rdr tradition flows into WOFOST/PCSE, so numeric RDR sources found by search are almost all WOFOST-lineage and legally unusable — do NOT backfill from them. [B]'s printed pages are literature and safe; PCSE's params are not. ⚠ ROUND 5 (2026-07-20) CORRECTED A STALE POINTER attached to this param's finding: it used to end 'retrieving the [B] monograph is the only clean path', but [B] had ALREADY been retrieved and read in round 2 and had ALREADY failed to settle this. The only named path had been walked three rounds earlier; the sentence survived because later rounds arrived here following the OTHER param (mineralization_rate), which had the live retrieval question. HONEST STATUS: retrieval for this param is EXHAUSTED, not blocked — nothing in the accessible literature carries a 1/day N-shedding rate, which is a fact about the literature rather than about access, so no further reading will change it. Changing the value/form is scope B, and the specific move available is to adopt the DS-dependent FORM [B] actually gives (zero before anthesis) rather than hunt another citation. See docs/plans/post-roadmap-citation.md."
   mineralization_rate:
     value: 0.03
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, with a measured finding UNCHANGED by round 2 (2026-07-16): 0.03/day = 0.21/wk is ~3.9× the Stanford & Smith mean (0.054/wk = 0.0077/day) and ~1.2× ABOVE the fastest of 43 soils measured in [C] (range 0.018–0.174/wk, mean 0.070) — outside the whole observed range, with four independent studies clustering at 0.054–0.080/wk. These are already OPTIMAL-condition potential rates (35 °C, field capacity), so temperature/moisture modifiers cannot explain the gap. ROUND 2: unlike the other decomposer params, this one could NOT be upgraded — [A] was not among the sources supplied, and a search of a 29-source corpus (including [D], a dedicated N-mineralization review AND meta-analysis) found NO first-hand k anywhere to replace the [C]-quoting-[A] chain; the secondary literature propagates [A]'s form and quotes its mean without republishing its data. So this remains the weakest-provenance member of the decomposer finding: the 3.9× rests on [C] quoting [A], not on [A] read directly. The finding is corroborated independently by [C]'s OWN 43-soil measurements (ours is above their maximum), which do not depend on [A] at all. ROUND 3 (2026-07-20) — a PARTIAL upgrade, and only to the ARGUMENT, not the number: [A] is still paywalled, but [E] (a Current Contents 'Citation Classic' retrospective written by S.J. Smith, [A]'s own second author) was found and read. It gives NO k, so the 3.9× still rests on the [C]-quoting-[A] chain and this param is STILL the weakest-provenance member. What it does give first-hand is [A]'s protocol — 39 soils, 30-week incubation, and crucially the OPTIMUM 35 °C / approximate-field-capacity conditions. That is the premise that forbids explaining the gap away with temperature/moisture modifiers, and it is no longer secondary-mediated. Round 3 also CONFIRMED the retrieval ceiling rather than inheriting it: [A], Dunn 2011 and Divya 2009 were each re-attempted and were each still closed. ⚠ ROUND 4 (2026-07-20) FALSIFIED TWO-THIRDS OF THAT ONE DAY LATER: Dunn 2011 and Divya 2009 were supplied by the user and opened (and opening them exposed a confirmed FALSE attribution in power/self_discharge.yaml). Only [A] is still closed, and it is now the SOLE remaining item on the retrieval list (12 -> 3 -> 1). This param is UNAFFECTED — its 3.9x still rests on the [C]-quoting-[A] chain, unchanged — but the ceiling sentence is corrected because a stale negative result SUPPRESSES a future search. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN as a VALUE, but the PROVENANCE QUESTION IS CLOSED as of round 5 (2026-07-20): [A] Stanford & Smith 1972 was supplied by the user and READ FIRST-HAND. It was the last item on this scope's retrieval list (12 -> 3 -> 1 -> 0), and it had carried this param as the weakest-provenance member of the decomposer finding through four rounds via the [C]-quoting-[A] chain. THAT CHAIN IS NOW RETIRED, AND IT WAS SOUND: [C] reproduces [A]'s 0.054/wk correctly to the digit — the second verified positive control in this scope alongside decomposition.yaml's FAO-quoting-Olson, against one confirmed FALSE attribution (Dunn, power/self_discharge.yaml). THE FINDING IS UNCHANGED IN DIRECTION AND STRONGER IN FORCE: 0.03/day = 0.21/wk against [A]'s own Table 3, whose 39 per-soil k values span 0.035-0.095/wk (pooled estimate 0.054 +/- 0.009 over 29 soils after 10 divergent ones were excluded; arithmetic mean of the 39 = 0.058). Ours is ~3.9x the pooled mean, ~3.3x the mean+1SD, and ~2.2x ABOVE THE FASTEST SINGLE SOIL IN THE SET. That 2.2x is the new hard bound and it replaces round 3's '~1.2x above [C]'s fastest of 43', which was the tightest first-hand number available while [A] was closed; [C]'s 0.018-0.174/wk range still corroborates independently. The per-soil column was machine-extracted from the scan and VERIFIED BY ARITHMETIC against [A]'s own prose four ways simultaneously (39 entries; exactly 3 below 0.044; exactly 7 above 0.069; residual 29 spanning exactly 0.044-0.069) — not eye-read. CONDITIONS are now [A]'s own sentences rather than [E]'s testimony: 35C, 'restoration of optimal soil water contents', 'Water, oxygen supply, and levels of essential nutrients were considered to be near optimal' — so temperature/moisture modifiers cannot explain the gap, with [A]'s own qualifier recorded that 35C is 'near optimum for nitrification, but probably less than optimum for ammonification' (a few degrees, not 3.9x). ⚠ THE LIVE COUNTER-READING IS POOL IDENTITY, NOT PROVENANCE: S&S measured SOIL organic N0 (5-40% of total soil N, mixed-age); our litter_n is FRESH DEAD-PLANT N, which mineralizes faster, so part of the gap may be a litter-vs-soil mismatch. It is RECORDED AND REFUSED exactly as decomposition.yaml refuses the DPM/RPM labile-fraction re-read — redefining what the pool MEANS to make a citation fit is a semantic model change, not a citation edit — and it does not explain why the whole decomposer cluster runs fast on the same side of the loop. Changing the value, or re-anchoring the pool, is calibration = scope B. See docs/plans/post-roadmap-citation.md."

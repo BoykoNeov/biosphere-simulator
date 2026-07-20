@@ -5,12 +5,25 @@ supplied ~10 of the 12 sources on this doc's own retrieval list, and the open it
 re-run against them — then **ROUND 3 (2026-07-20)**, a deliberately bounded retrieval pass
 at the 3 residual items — then **ROUND 4 (2026-07-20)**, where the user supplied **2 of the
 3** and the **miscitation risk this scope had flagged since round 1 MATERIALIZED**: one of
-the two was a **confirmed false attribution in the frozen tree**.
-**Jump to "ROUND 4" at the very bottom for the current state.**
-Rounds 1–3 are preserved below unedited, including the predictions later rounds
+the two was a **confirmed false attribution in the frozen tree** — and finally
+**ROUND 5 (2026-07-20)**, where the user supplied the last item and **the retrieval list
+reached ZERO (12 → 3 → 1 → 0)**. Round 5's chain **held** (Schomberg quotes Stanford & Smith
+correctly to the digit), and reading the primary was **still** worth it: it replaced the
+finding's soft bound with a hard first-hand one (`2.2×` above the fastest of 39 measured
+soils, up from `1.2×` above a secondary's fastest).
+**Jump to "ROUND 5" at the very bottom for the current state.**
+Rounds 1–4 are preserved below unedited, including the predictions later rounds
 falsified — the point of a living record is that you can see what was believed at the time.
 Round 4 falsifies rounds 1–2 in one place each, and confirms a round-2 prediction in a
-third; all three are marked in place rather than rewritten.
+third; round 5 falsifies the **last surviving third** of round 3's "negative results" block
+(all three of its items are now open) and finds a second stale pointer on the other param;
+all are marked in place rather than rewritten.
+
+**Scope (C) is CLOSED on retrieval grounds.** Its residual risk is down to **one param
+correctly attributed to nothing** (`self_discharge_rate`). ⚠ But the **scope-B pressure went
+UP**: `mineralization_rate`'s "runs too fast" finding is now first-hand and quantitatively
+harder than when it was chain-mediated. Closing the citation question sharpened the
+calibration question rather than softening it.
 
 The third and last scope of bucket 3 (validation). Scope (A) — diagnose + pin the oracle
 gap — is COMPLETE (`post-roadmap-validation.md`). Scope (B) — the full oracle match —
@@ -830,6 +843,10 @@ advisor review → regenerate the manifest as the git-visible record → documen
 
 **The retrieval list is 1 item: Stanford & Smith 1972.** Down from 12 (round 1) → 3
 (rounds 2–3) → 1.
+> ⚠ **SUPERSEDED BY ROUND 5 (2026-07-20), the same day.** The user supplied Stanford &
+> Smith and **the list reached 0**. Left in place as the state round 4 closed in — and as
+> the fourth consecutive round in which a "what remains to retrieve" line expired within a
+> day of being written. See "ROUND 5" at the bottom.
 
 **The residual risk is now materially smaller and better characterized.** Rounds 1–3 closed
 with *"two unverified citations in the frozen tree + one secondary-mediated number."* The two
@@ -849,3 +866,227 @@ Energy Systems*; SAE, *Progress in modeling and simulation of batteries*) bear d
 `self_discharge_rate` — the one param round 4 left with an open question. Still an available
 increment, still not a pending obligation, but it is now the increment that would speak to
 the **live** question rather than a general tidy-up.
+
+---
+
+# ROUND 5 — the list reaches zero (2026-07-20)
+
+**The user supplied Stanford & Smith 1972 — the last item on the retrieval list.** It was
+`#6` on round 1's list of 12, survived rounds 2, 3 and 4, and after round 4 was the sole
+remaining entry. **The list is now empty: 12 → 3 → 1 → 0.**
+
+**Headline: the chain held, and reading the primary was still worth doing.** Those are two
+separate results and the second is the one that justified the round.
+
+## What was at stake
+
+`mineralization_rate` was, by this scope's own repeated assessment, **the
+weakest-provenance member of the decomposer finding**. Its "~3.9× the Stanford & Smith mean"
+rested on **[C] (Schomberg 2009) quoting [A] (Stanford & Smith 1972)** — a
+secondary-quoting-primary chain, the exact shape that round 4 had just proven can be
+fabricated (Dunn 2011 was cited in `power/self_discharge.yaml` for a self-discharge figure
+it does not contain). Round 2 had searched a 29-source corpus and established that **no
+first-hand `k` existed anywhere in it** to replace the chain; round 3 found [E], an author's
+retrospective, which confirmed the *conditions* but gave **no rate constant**. So the number
+itself had never been read at its source, through four rounds.
+
+## Result 1 — the chain was sound
+
+**[C] reproduces [A]'s `0.054 ± 0.009 wk⁻¹` correctly, to the digit.** Verified against [A]
+p. 469: *"we conclude that the value of k, 0.054 ± .009, obtained from pooling the
+regressions for 29 soils constitutes the most reliable estimate of the mineralization rate
+constant."*
+
+That makes **three** secondary-quoting-primary chains this scope has now checked first-hand:
+
+| chain | verdict |
+|---|---|
+| FAO quoting Olson 1963 (`decomposition.yaml`) | ✅ sound (round 2) |
+| Schomberg 2009 quoting Stanford & Smith 1972 (`mineralization.yaml`) | ✅ **sound (round 5)** |
+| `self_discharge.yaml` citing Dunn 2011 | ❌ **fabricated (round 4)** |
+
+**Two sound, one fabricated.** Round 4's finding stands as a risk flag and is now firmly
+*not* a verdict about the shape — which is exactly how it was recorded at the time, and the
+restraint has paid off.
+
+⚠ **And note what distinguishes the failure from the two successes — it is not the chain.**
+Both sound cases transmit a number the primary actually prints. The Dunn case attributed a
+number to a paper that **never contained one**. That is a **locus** failure, not a
+**transmission** failure, and no amount of general suspicion toward secondaries would have
+caught it. Only opening the cited paper does.
+
+## Result 2 — the primary gave more than the chain ever could, and the finding got harder
+
+This is why the round was worth running even though the chain held. The secondary literature
+propagates [A]'s **form** and quotes its **mean**; it never republishes the per-soil data.
+[A]'s Table 3 has it.
+
+**All 39 per-soil `k` values span `0.035–0.095 wk⁻¹`** (arithmetic mean of the 39: `0.058`).
+
+Ours is `0.03 /day = 0.21 /wk`:
+
+| comparison | factor |
+|---|---|
+| vs the pooled mean `0.054` | **3.9×** |
+| vs mean + 1 SD (`0.063`) | 3.3× |
+| vs **the fastest single soil of the 39** (`0.095`) | **2.2×** |
+
+**The 2.2× is the new hard bound and it replaces round 3's "~1.2× above [C]'s fastest of
+43".** It is first-hand, it is against one measured soil rather than a mean, and it does not
+depend on [C] at all. The direction of the finding is unchanged; its force is roughly
+doubled.
+
+### The extraction was verified by arithmetic, not by eye
+
+The Table 3 column came out of a scan. It was checked against [A]'s own prose **four ways
+that must all hold simultaneously**:
+
+- the column has exactly **39** entries — *"39 widely differing soils"*
+- exactly **3** lie below 0.044 — *"the three soils with k values below 0.044"*
+- exactly **7** lie above 0.069 — *"the remaining seven soils (k > 0.069)"*
+- the residual **29** span exactly **0.044–0.069** — *"values of k ranged from 0.044 to
+  0.069"*, matching the pooled count
+
+A single mis-read digit breaks at least one of these. This is the `[B]`/p.113 discipline
+already recorded in the same file ("VERIFIED by arithmetic, not guessed"), applied here —
+and see the [E] slip below for what happens when it *isn't* applied.
+
+### What no secondary conveyed: 0.054 is not a plain mean
+
+**It is a weighted average of 29 pooled regressions, after 10 divergent soils were
+excluded** (3 below 0.044, 7 above 0.069). [C] calls it *"the average k … for several U.S.
+soils"* — the number is right, but "several" understates 39 and "average" flattens the
+pooling. Nothing in this file turned on the distinction, and [A] itself calls 0.054 "the
+mean value of k", so our wording stands. It is recorded as a clean illustration of what a
+secondary loses **even when its number is exact**: the chain was accurate and still not
+sufficient.
+
+### Conditions are now [A]'s own sentences
+
+The finding's load-bearing clause — that these are *already* optimal-condition potential
+rates, so the gap cannot be explained away with temperature/moisture modifiers — was
+[C]-mediated in round 1, upgraded to author testimony ([E]) in round 3, and is now the
+paper's own: 35 C incubation, *"restoration of optimal soil water contents"*, and *"Water,
+oxygen supply, and levels of essential nutrients were considered to be near optimal for N
+mineralization."*
+
+⚠ **With [A]'s own qualifier, recorded because it cuts against us:** *"The temperature of
+incubation, 35C, generally is regarded as being near optimum for nitrification, but probably
+less than optimum for ammonification."* A truly temperature-optimal `k` could therefore sit
+somewhat above 0.054. That is a matter of a few degrees, nowhere near 3.9×, and it does not
+touch the 2.2×-above-the-fastest-soil bound at all — but it narrows the clause rather than
+leaving it absolute.
+
+⚠ Also corrected: [E]'s *"approximate field capacity"* is the **author's 1987 gloss**. [A]
+says 60 cm Hg suction and "optimal soil water contents". Substantively the same claim; quote
+[A] for [A].
+
+## The counter-reading that actually bites — pool identity
+
+Recorded because the sibling file records its analogue, and this note would be **less honest
+than its sibling** without it (advisor catch — my draft had only the temperature caveat,
+which is the weaker of the two).
+
+**S&S measured net mineralization of SOIL organic N** — `N0`, the mineralizable fraction of
+mixed-age soil organic matter, 5–40 % of total soil N. **Our `litter_n` is fresh dead-plant
+N**, which mineralizes on a different and generally faster footing. So "2.2× above S&S's
+fastest soil" is **in part a litter rate compared against a soil rate**, and some of the gap
+may be that mismatch rather than our value being wrong.
+
+⚠ **The re-anchoring is REFUSED**, exactly as `decomposition.yaml` refuses the DPM/RPM
+labile-fraction re-read, and for the same reason: **redefining what the pool MEANS in order
+to make a citation fit is a semantic model change, not a citation edit** — confirmation bias
+wearing a provenance hat. Three things also cut against it:
+
+1. [C] and [D] both treat [A] as **the** canonical first-order reference for exactly this
+   kind of model term, 37–39 years on.
+2. This param's flow is `litter_n → soil_n` — the model's only mineralization step, which
+   inherits [A]'s form by construction.
+3. It is one member of a **cluster** that all run fast on the same side of the loop (litter
+   decay ~1.5× a 293-value global max; microbial respiration ~2.5–28×). A pool-identity
+   argument specific to N does not explain the cluster.
+
+Recorded as a live alternative reading, **not adopted**. Re-anchoring the pool's meaning —
+or the number — is **scope B**.
+
+## The [E] slip: our error, not the author's
+
+Round 3 transcribed [E]'s incubation schedule as *"four, four, and **six** weeks, then six
+weeks"*. **The page reads "four, four, and FOUR weeks."** Corrected in place, and confirmed
+twice: the page image re-read, and [A] p. 467 giving the identical schedule (*"periods of 2,
+4, 4, 4, 6, and 8 weeks (cumulative: 2, 4, 8, 12, 16, 22, and 30 weeks)"*). **[E] remembered
+its own protocol correctly; we mis-copied it.**
+
+**Why it is a method note and not a correction notice:** nothing downstream rested on the
+schedule — no finding, no value. What makes it worth one line is *how it survived*. Round
+3's version sums to **32 weeks**, inside a sentence that says **"for 30 weeks"**. The
+contradiction was **in our own quote**, and arithmetic would have caught it instantly.
+
+**Round 3 ran exactly that check on [B]'s mangled p. 113 table in the same file** — and did
+not run it on [E]. Its fragment-by-fragment re-read caught the things that *looked* odd
+(spacing, a handwritten archival scrawl, a venue error) and missed **the digit that read
+fluently**.
+
+> **A quote check verifies characters; only arithmetic verifies numbers.** They are different
+> checks, and the careful-looking one is not the one that catches a wrong digit.
+
+## The round-3 "negative results" block is now falsified in full
+
+Round 3 recorded three sources as closed, explicitly *"so the search is not repeated"*.
+Round 4 opened two of them. **Round 5 opened the third.**
+
+**Every element of a block whose stated purpose was to stop searching had a shelf life of
+about a day per item.** Round 4's correction of it — *a retrieval ceiling is a fact about one
+afternoon's ACCESS, never a property of the source* — is now confirmed three times over. The
+block is left in place, fully marked, because the three-strikes record teaches more than a
+clean deletion would.
+
+**Operative rule, unchanged and now well-earned:** never write a retrieval failure flat. Date
+it, and scope it to the channel that failed.
+
+## A second stale pointer, found on the other param
+
+`n_senescence_rate`'s finding ended: *"retrieving the [B] monograph is the only clean path
+(see the plan doc's list)."*
+
+**[B] was retrieved and read in round 2, and it does not settle the param** — the book has no
+N-shedding rate to give. So **the only named path had already been walked and had already
+failed, three rounds before anyone re-read the sentence.**
+
+It survived for a structural reason worth naming: every subsequent round arrived at this file
+following **`mineralization_rate`**, the param with the live retrieval question. This is the
+*other* param's finding, and nothing routed attention to it. Same shape as the ceiling block
+above — **a pointer to future work outlives the work.**
+
+Corrected to the honest status: retrieval for `n_senescence_rate` is **EXHAUSTED, not
+blocked**. Nothing in the accessible literature carries a 1/day N-shedding rate — a fact
+about the literature, not about access — so no further reading will change it. The path
+forward is scope B: adopt the DS-dependent **form** [B] actually gives (zero before
+anthesis), rather than hunt another citation.
+
+## Scope C, closed on retrieval grounds
+
+**The retrieval list is empty.** Scope (C) is now best read as **CLOSED**, with its residual
+risk reduced from *"1 secondary-mediated number + 1 param correctly attributed to nothing"*
+to **one param correctly attributed to nothing** (`self_discharge_rate`, round 4).
+
+⚠ **But the scope-B pressure went UP, not down.** The "runs too fast" finding on
+`mineralization_rate` is now **first-hand and quantitatively harder** (2.2× above the fastest
+of 39 measured soils, not 1.2× above a secondary's fastest). Closing the citation question
+did not soften the calibration question — it sharpened it. That sits alongside round 4's open
+`self_discharge_rate` question as a **user decision**, since recalibration moves goldens.
+
+## Ceremony
+
+Provenance-only edit, so an **honor-system unfreeze** (`CLAUDE.md`: the manifests' per-file
+sha-256 is provenance, not an assertion — nothing goes red). Followed deliberately:
+
+- Advisor review **before** writing (it caught the missing pool-identity counter-reading and
+  the "[A] is open" framing, and flagged that [E] must be demoted rather than layered on).
+- Files touched: `mineralization.yaml`, `decomposition.yaml` — **both biosphere**, so the
+  **biosphere** manifest. Confirmed by `grep -l mineralization.yaml docs/*.manifest.json`
+  rather than assumed; round 4's error was the mirror of this (reaching for the biosphere
+  manifest while editing `power/`).
+- Manifest regenerated as the git-visible record; `biosphere_params.txt` re-generated and
+  verified **byte-identical** (no value moved).
+- **No value, golden, or code changed.**
