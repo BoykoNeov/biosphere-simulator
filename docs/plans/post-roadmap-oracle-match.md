@@ -649,9 +649,108 @@ by a mechanism the target does not possess. A bar that scores endpoint agreement
 graded the wrong physics as success. Ruling B removes the incentive entirely rather than
 trying to build a cleverer scorer.
 
+---
+
+# ⛔ THE CEREMONY IS BLOCKED — the frozen scenarios were co-adapted to the broken plant
+
+**This is the fourth finding, it was nearly missed, and it changes the size of the
+increment.**
+
+The advisor blocked the ceremony on a process point: the earlier suite run used `-x`, so
+it **stopped at the first failure** and everything collected after it never executed. The
+phenology fixture and the stress test had been fixed *in isolation*, and no clean full run
+existed. Entering a 20-golden regeneration with an unknown red set would conflate "this
+golden moved because the science moved" with "this test needed flipping".
+
+Full `-m "not slow"` run, no `-x`: **32 failed, 1849 passed, 37 errors.**
+
+## The casualty set, triaged
+
+**Expected — these ARE the unfreeze** (fixed by regenerating): all 9 `test_regression_*`
+season/station goldens, the 6 `test_regression_long_horizon` errors, and
+`test_freeze_manifest::test_frozen_aux_set_is_complete` (a new aux process exists).
+
+**Expected re-pins** (they pin known-wrong behavior on purpose): 6 in `test_oracle_gap.py`,
+2 in `test_oracle_smoke.py`.
+
+**NOT expected — six failures, and they reduce to TWO root causes:**
+
+### Root cause A — the sealed chambers' CO₂ pool is now the binding constraint
+
+The plant is ~5× larger. The sealed chambers were sized when it was starved.
+
+* `test_consumer::test_consumer_never_rations` — **`rationed == 1`**. Traced to step 196:
+  `biosphere.allocation` demands **0.2381 mol C** from a `carbon_pool` holding **0.1852** —
+  a **1.29× over-draw**, so the Euler backstop fires. Project policy is `rationed == 0`,
+  and bucket 2 made this a hard error.
+* `test_decade_stability::test_decade_run_is_deterministic` — `ArbitrationError`,
+  `scale_f = 0.9506 < 1`. The **same over-draw**, promoted to a hard error because RK4
+  requires positivity from the kinetics rather than the backstop.
+* `test_consumer::test_per_compartment_ledger_balances_every_step` — residual −0.0528 in
+  `biosphere.atmosphere` CARBON **at step 196**. Same event; the ledger sees the scaled
+  draw.
+* `test_water_biting::test_water_biting_cascade_vs_ample` — **the direction inverted**:
+  the water-*stressed* run now reaches a HIGHER peak vegetative biomass (2.8151) than the
+  ample baseline (2.7057).
+
+  That last one looks like a bug and is not. Measured: the **ample** run drives
+  `carbon_pool` *lower* (min **0.0730** vs **0.0792**, from the same 0.3570 start). It
+  grows faster, exhausts the sealed CO₂ sooner, and is carbon-limited earlier. **The
+  binding constraint has switched from water to carbon**, so relieving water stress no
+  longer buys biomass. The test isolates `f_water` on the assumption that water is what
+  binds — an assumption that was true of the starved plant and is now false.
+
+### Root cause B — delayed phenology moved the productive phase past short test horizons
+
+* `test_sealed_chamber::test_sealed_producer_recovers_o2_after_trough` — O₂ declines to
+  ~1.3e-29 at the **last** step of that fixture's horizon and never recovers, so
+  `max(o2[trough:])` is a one-element list. (In the full-length sealed season O₂ *does*
+  recover: trough 0.026 at step 137, ending at 2.236 — so this is a **horizon** artifact,
+  not a broken loop.)
+* `test_chamber::test_sealed_assimilation_rises_then_declines` — assimilation no longer
+  collapses below 1 % of peak (0.00229 vs a 0.000284 threshold). The healthier plant
+  simply does not crash.
+
+## Why this is a scope escalation, not a long list of test edits
+
+Every one of these tests is **correct about the model it was written against**. What
+changed is that several frozen **scenario knobs** — the sealed chambers' CO₂ sizing above
+all — were implicitly calibrated to a plant that could never grow. The scenarios and the
+broken plant were **co-adapted**, and fixing only one half exposes the seam.
+
+That means the honest fix is not "regenerate the goldens". It is a **decision about the
+scenarios**, and scenario knobs are themselves frozen items:
+
+* **Re-size the sealed chambers** (raise the CO₂/air content) so a correctly-developing
+  plant is not carbon-starved. Physically principled — a chamber sized for a 5× larger
+  plant — but it moves frozen scenario data *and* makes the golden diff reflect two
+  changes at once, which is what ruling A's staging exists to avoid.
+* **Accept carbon limitation as the chambers' new physics** and re-pin the behavioral
+  tests (including flipping the water-biting direction assertion, with the measurement
+  above as its justification). Cheaper and changes no scenario data — but it freezes a
+  chamber whose plant is CO₂-starved, and it does **not** resolve the `rationed == 1` /
+  `ArbitrationError`, which are policy violations rather than re-pinnable expectations.
+* **Split the increment** — land the science with the scenarios re-sized as part of the
+  same unfreeze, treating "the chambers were sized for a broken plant" as a finding of
+  this increment rather than a follow-on.
+
+**This is a user decision and the ceremony stops here.** No golden has been regenerated;
+`git diff tests/regression/golden/` is empty.
+
+## The transferable lesson
+
+**A model and its scenarios co-evolve, and a scenario can silently encode a bug's
+consequences.** Nothing in the freeze contract records *why* the chamber holds the CO₂ it
+holds; the number was chosen when it was sufficient, and it was sufficient only because
+the plant could not grow. Correcting the plant made a previously-slack constraint bind —
+and the tell was not the rationing (which is loud) but the **water-biting inversion**,
+which reads as a physics bug and is actually a *constraint-order change*. The generalizable
+check: when a fix makes a subsystem substantially bigger or faster, ask which constraints
+were slack **because** of the bug, not merely which tests fail.
+
 ## Still to do for increment 1
 
-Ceremony not yet run. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
+Ceremony **blocked** pending the scenario decision above. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
 can dominate a short-horizon chamber run, and perennial/long-horizon now re-vernalize
 every cycle — conservation will not catch a plant that simply never develops), the Rust
 hand-mirror, then goldens → manifest → provenance → gates.

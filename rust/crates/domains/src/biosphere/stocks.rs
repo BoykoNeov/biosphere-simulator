@@ -50,6 +50,8 @@ pub const FERTILIZATION_VAR: &str = "fertilization";
 pub const SOIL_WATER_VAR: &str = "soil_water";
 pub const CO2_POOL_VAR: &str = "co2_pool";
 pub const THERMAL_TIME: &str = "thermal_time";
+/// The SECOND aux accumulator (scope (B) inc. 1): cumulative vernalization days.
+pub const VERNALIZATION_DAYS: &str = "vernalization_days";
 
 /// The handful of stock ids whose identity depends on `sealed`, computed once.
 #[derive(Debug, Clone)]

@@ -388,13 +388,30 @@ fn build_plants(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Resul
             n_senescence_rate: p.miner.n_senescence_rate,
         }));
     }
-    let aux: Vec<Box<dyn AuxProcess>> = vec![Box::new(ThermalTimeAccumulation {
-        id: "biosphere.thermal_time".to_string(),
-        accumulator: THERMAL_TIME.to_string(),
-        temp_var: TEMP_VAR.to_string(),
-        t_base: p.pheno.t_base,
-        t_cap: p.pheno.t_cap,
-    })];
+    // Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,
+    // and thermal time accrues *gated by them* (and by daylength) through the vegetative
+    // phase. Mirrors domains/biosphere/plants.py.
+    let aux: Vec<Box<dyn AuxProcess>> = vec![
+        Box::new(ThermalTimeAccumulation {
+            id: "biosphere.thermal_time".to_string(),
+            accumulator: THERMAL_TIME.to_string(),
+            temp_var: TEMP_VAR.to_string(),
+            t_base: p.pheno.t_base,
+            t_cap: p.pheno.t_cap,
+            tsum_anthesis: p.pheno.tsum_anthesis,
+            tsum_maturity: p.pheno.tsum_maturity,
+            vernalization: Some(p.vern),
+            vernalization_accumulator: Some(VERNALIZATION_DAYS.to_string()),
+            photoperiod: Some(p.photo),
+            daylength_var: Some(DAYLENGTH_VAR.to_string()),
+        }),
+        Box::new(VernalizationAccumulation {
+            id: "biosphere.vernalization_days".to_string(),
+            accumulator: VERNALIZATION_DAYS.to_string(),
+            temp_var: TEMP_VAR.to_string(),
+            params: p.vern,
+        }),
+    ];
     Ok(CompartmentBuild {
         stocks,
         flows,

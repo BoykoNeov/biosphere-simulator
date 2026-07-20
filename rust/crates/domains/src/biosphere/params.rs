@@ -67,6 +67,24 @@ pub struct PhenologyParams {
     pub tsum_maturity: f64,
 }
 
+/// Vernalization (cold-requirement) params — Soltani & Sinclair (2012) Ch. 8.
+#[derive(Debug, Clone, Copy)]
+pub struct VernalizationParams {
+    pub t_base_v: f64,
+    pub t_opt_lower_v: f64,
+    pub t_opt_upper_v: f64,
+    pub t_ceiling_v: f64,
+    pub vsen: f64,
+    pub vdsat: f64,
+}
+
+/// Photoperiod (daylength) params — Soltani & Sinclair (2012) Ch. 7, long-day form.
+#[derive(Debug, Clone, Copy)]
+pub struct PhotoperiodParams {
+    pub cpp: f64,
+    pub ppsen: f64,
+}
+
 /// Per-organ relative senescence (death) rates.
 #[derive(Debug, Clone, Copy)]
 pub struct SenescenceParams {
@@ -143,6 +161,8 @@ pub struct BiosphereParams {
     pub resp: RespirationParams,
     pub transp: TranspirationParams,
     pub pheno: PhenologyParams,
+    pub vern: VernalizationParams,
+    pub photo: PhotoperiodParams,
     pub senesc: SenescenceParams,
     pub nitro: NitrogenParams,
     pub decomp: DecompositionParams,
@@ -229,6 +249,18 @@ pub fn biosphere() -> BiosphereParams {
             t_cap: get(&t, "pheno.t_cap"),
             tsum_anthesis: get(&t, "pheno.tsum_anthesis"),
             tsum_maturity: get(&t, "pheno.tsum_maturity"),
+        },
+        vern: VernalizationParams {
+            t_base_v: get(&t, "vern.t_base_v"),
+            t_opt_lower_v: get(&t, "vern.t_opt_lower_v"),
+            t_opt_upper_v: get(&t, "vern.t_opt_upper_v"),
+            t_ceiling_v: get(&t, "vern.t_ceiling_v"),
+            vsen: get(&t, "vern.vsen"),
+            vdsat: get(&t, "vern.vdsat"),
+        },
+        photo: PhotoperiodParams {
+            cpp: get(&t, "photo.cpp"),
+            ppsen: get(&t, "photo.ppsen"),
         },
         senesc: SenescenceParams {
             rdr_leaf: get(&t, "senesc.rdr_leaf"),

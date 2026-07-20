@@ -20,6 +20,7 @@ use super::params::{
     CanopyParams, NitrogenParams, PartitionRow, PhenologyParams, PhotosynthesisParams,
     RespirationParams,
 };
+use super::params;
 use super::science;
 
 /// Read a stock amount from the snapshot (a missing id is a build bug, like Python's
@@ -572,21 +573,82 @@ impl Flow for ConsumerMortality {
 // --- the thermal-time aux ---------------------------------------------------
 
 /// `AuxProcess` advancing the `thermal_time` accumulator.
+///
+/// Optionally vernalization- and photoperiod-aware (post-roadmap scope (B) inc. 1): when
+/// the modifier fields are `Some`, the degree-day rate is scaled by the Eqn-8.6 and
+/// Eqn-7.6 factors, applied ONLY in the vegetative phase (`DVS < 1` — wheat is
+/// insensitive to both cold and daylength at/after anthesis). With both `None` this is
+/// byte-for-byte the pre-scope-(B) plain degree-day rate.
 pub struct ThermalTimeAccumulation {
     pub id: String,
     pub accumulator: String,
     pub temp_var: String,
     pub t_base: f64,
     pub t_cap: f64,
+    pub tsum_anthesis: f64,
+    pub tsum_maturity: f64,
+    pub vernalization: Option<params::VernalizationParams>,
+    pub vernalization_accumulator: Option<String>,
+    pub photoperiod: Option<params::PhotoperiodParams>,
+    pub daylength_var: Option<String>,
+}
+
+impl ThermalTimeAccumulation {
+    /// `DVS < 1` — the gate both modifiers share.
+    fn is_vegetative(&self, snapshot: &State) -> bool {
+        let tt = snapshot.aux.get(&self.accumulator).copied().unwrap_or(0.0);
+        science::development_stage(tt, self.tsum_anthesis, self.tsum_maturity) < 1.0
+    }
 }
 
 impl AuxProcess for ThermalTimeAccumulation {
     fn id(&self) -> &str {
         &self.id
     }
-    fn evaluate(&self, _snapshot: &State, env: &dyn Environment, dt: f64) -> Result<BTreeMap<String, f64>, SimError> {
+    fn evaluate(&self, snapshot: &State, env: &dyn Environment, dt: f64) -> Result<BTreeMap<String, f64>, SimError> {
         let temp_c = env.get(&self.temp_var)?;
-        let rate = science::daily_thermal_time(temp_c, self.t_base, self.t_cap);
+        let mut rate = science::daily_thermal_time(temp_c, self.t_base, self.t_cap);
+        if self.is_vegetative(snapshot) {
+            // The source's Eqn 7.4 "biological day" BD = tempfun * ppfun, extended by
+            // Eqn 8.2's verfun: the modifiers MULTIPLY. Either may be absent.
+            if let (Some(v), Some(acc)) = (self.vernalization, self.vernalization_accumulator.as_ref()) {
+                let cum = snapshot.aux.get(acc).copied().unwrap_or(0.0);
+                rate *= science::vernalization_factor(cum, v.vsen, v.vdsat);
+            }
+            if let (Some(pp), Some(var)) = (self.photoperiod, self.daylength_var.as_ref()) {
+                rate *= science::photoperiod_factor(env.get(var)? / 3600.0, pp.cpp, pp.ppsen);
+            }
+        }
+        Ok(BTreeMap::from([(self.accumulator.clone(), rate * dt)]))
+    }
+}
+
+/// `AuxProcess` advancing the `vernalization_days` accumulator (the SECOND accumulator).
+///
+/// Structural mirror of `ThermalTimeAccumulation`. Reads AIR temperature: the source
+/// prescribes crown temperature but notes the two differ only under snow cover, and no
+/// snow forcing exists. De-vernalization (Eqn 8.5) needs daily MAXIMUM temperature, which
+/// the forcing does not carry, so it is unimplementable rather than omitted.
+pub struct VernalizationAccumulation {
+    pub id: String,
+    pub accumulator: String,
+    pub temp_var: String,
+    pub params: params::VernalizationParams,
+}
+
+impl AuxProcess for VernalizationAccumulation {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(&self, _snapshot: &State, env: &dyn Environment, dt: f64) -> Result<BTreeMap<String, f64>, SimError> {
+        let p = self.params;
+        let rate = science::vernalization_day(
+            env.get(&self.temp_var)?,
+            p.t_base_v,
+            p.t_opt_lower_v,
+            p.t_opt_upper_v,
+            p.t_ceiling_v,
+        );
         Ok(BTreeMap::from([(self.accumulator.clone(), rate * dt)]))
     }
 }

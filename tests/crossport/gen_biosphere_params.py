@@ -36,6 +36,8 @@ from domains.biosphere.loader import (
     load_mineralization_params,
     load_nitrogen_params,
     load_phenology_params,
+    load_photoperiod_params,
+    load_vernalization_params,
     load_photosynthesis_params,
     load_respiration_params,
     load_senescence_params,
@@ -66,6 +68,8 @@ def _scalars() -> list[tuple[str, float]]:
     resp = load_respiration_params()
     transp = load_transpiration_params()
     pheno = load_phenology_params()
+    vern = load_vernalization_params()
+    photo = load_photoperiod_params()
     senesc = load_senescence_params()
     nitro = load_nitrogen_params()
     decomp = load_decomposition_params()
@@ -99,6 +103,14 @@ def _scalars() -> list[tuple[str, float]]:
         ("pheno.t_cap", pheno.t_cap),
         ("pheno.tsum_anthesis", pheno.tsum_anthesis),
         ("pheno.tsum_maturity", pheno.tsum_maturity),
+        ("vern.t_base_v", vern.t_base_v),
+        ("vern.t_opt_lower_v", vern.t_opt_lower_v),
+        ("vern.t_opt_upper_v", vern.t_opt_upper_v),
+        ("vern.t_ceiling_v", vern.t_ceiling_v),
+        ("vern.vsen", vern.vsen),
+        ("vern.vdsat", vern.vdsat),
+        ("photo.cpp", photo.cpp),
+        ("photo.ppsen", photo.ppsen),
         ("senesc.rdr_leaf", senesc.rdr_leaf),
         ("senesc.rdr_stem", senesc.rdr_stem),
         ("senesc.rdr_root", senesc.rdr_root),

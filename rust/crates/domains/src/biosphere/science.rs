@@ -171,6 +171,63 @@ pub fn daily_thermal_time(temp_c: f64, t_base: f64, t_cap: f64) -> f64 {
     temp_c - t_base
 }
 
+/// Vernalization days per calendar day (day/day) — Soltani & Sinclair (2012) Eqn 8.3.
+///
+/// The 3-segment linear cold response with four cardinal temperatures (base `TBV`, lower
+/// optimum `TP1V`, upper optimum `TP2V`, ceiling `TCV`): 0 at/below base, a linear ramp to
+/// 1 at the lower optimum, the full-effect plateau across the optimum band, a linear ramp
+/// back to 0 at the ceiling, and 0 at/above it. Hand-mirrored from
+/// `domains/biosphere/phenology.py::vernalization_day` (post-roadmap scope (B) inc. 1).
+///
+/// The Python side raises on ill-ordered cardinals; here the ordering is a *loader*
+/// invariant (the params arrive already validated through `biosphere_params.txt`), so
+/// this stays a total function — the same split the rest of this module uses.
+pub fn vernalization_day(
+    temp_c: f64,
+    t_base_v: f64,
+    t_opt_lower_v: f64,
+    t_opt_upper_v: f64,
+    t_ceiling_v: f64,
+) -> f64 {
+    if temp_c <= t_base_v || temp_c >= t_ceiling_v {
+        return 0.0;
+    }
+    if temp_c < t_opt_lower_v {
+        return (temp_c - t_base_v) / (t_opt_lower_v - t_base_v);
+    }
+    if temp_c <= t_opt_upper_v {
+        return 1.0;
+    }
+    (t_ceiling_v - temp_c) / (t_ceiling_v - t_opt_upper_v)
+}
+
+/// Development-rate multiplier `verfun ∈ [0, 1]` — Soltani & Sinclair (2012) Eqn 8.6.
+///
+/// `1 − vsen·(vdsat − CUMVER)` below saturation, 1 at/above it, clamped to `[0, 1]`. The
+/// clamp is load-bearing: with the cited winter-wheat values (`vsen = 0.033`,
+/// `vdsat = 50`) the unclamped value is −0.65 at zero cold, i.e. development is fully
+/// ARRESTED rather than merely slowed until ~19.7 vernalization days accrue (a
+/// *qualitative* cultivar in the source's terms).
+pub fn vernalization_factor(vernalization_days: f64, vsen: f64, vdsat: f64) -> f64 {
+    if vernalization_days >= vdsat {
+        return 1.0;
+    }
+    (1.0 - vsen * (vdsat - vernalization_days)).clamp(0.0, 1.0)
+}
+
+/// Development-rate multiplier `ppfun ∈ [0, 1]` — Soltani & Sinclair (2012) Eqn 7.6.
+///
+/// The LONG-DAY form (wheat): `1 − ppsen·(CPP − PP)` below the critical photoperiod and 1
+/// at/above it, clamped to `[0, 1]` (the source is explicit that a negative value becomes
+/// zero, since development is a forward-only process). `daylength_h` is in HOURS — the
+/// caller converts from the canonical `daylength_s` forcing.
+pub fn photoperiod_factor(daylength_h: f64, cpp: f64, ppsen: f64) -> f64 {
+    if daylength_h >= cpp {
+        return 1.0;
+    }
+    (1.0 - ppsen * (cpp - daylength_h)).clamp(0.0, 1.0)
+}
+
 /// Development stage `DVS ∈ [0, 2]` from thermal time (TSUM1/TSUM2).
 pub fn development_stage(thermal_time: f64, tsum_anthesis: f64, tsum_maturity: f64) -> f64 {
     if thermal_time <= 0.0 {
