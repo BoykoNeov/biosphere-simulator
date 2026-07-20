@@ -44,7 +44,9 @@ snapshot-visible set (`tiers.json._tier0`):
 - per-stock `domain` / `quantity` / `unit` / `kind` / `unclamped` and the **composition key
   set** (which quantities a stock carries);
 - the **stability-signature booleans** — `is_period_2` / `is_stationary` in the drift-summary
-  goldens (the period class: perennial period-2, consumer/station period-1).
+  goldens (the period class: since scope (B) increment 1, **perennial and consumer are both
+  period-1** — the perennial's former period-2 cycle was a broken-canopy artifact that
+  closing the canopy dissolved; station is period-1 too). Both ports must agree on the class.
 
 Plus two Rust-run-side invariants that a completed emit run *proves* rather than the snapshot
 carrying: **`events == ()`** and **`rationed == 0`** (asserted in the emit examples), and

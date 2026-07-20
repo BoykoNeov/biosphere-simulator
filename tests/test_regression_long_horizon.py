@@ -236,8 +236,8 @@ def test_consumer_long_horizon_golden_loads_back(trajectories) -> None:
 @windows_golden_only
 def test_drift_summary_golden_bytes_match(trajectories) -> None:
     # Byte-exact: a regression in the limit-cycle *shape* (per-year peak_leaf /
-    # consumer_carbon) or the period class fails here — the stability regression catcher
-    # a single final-state snapshot cannot provide.
+    # consumer_carbon) or the period class fails here — the stability regression
+    # catcher a single final-state snapshot cannot provide.
     assert (
         _drift_summary_dumps(trajectories).encode("utf-8")
         == DRIFT_SUMMARY_GOLDEN.read_bytes()
@@ -273,8 +273,8 @@ def test_drift_summary_period_class_is_pinned() -> None:
     # canopy regime, and closing the canopy (vernalization + photoperiod) flattened the
     # year-to-year return map below unit gain — see
     # test_biosphere_stress.py::test_stress_perennial_fixed_point_sustained and
-    # docs/plans/post-roadmap-oracle-match.md. The consumer was always period-1. They are
-    # no longer DISTINCT in period class; the golden encodes both as False.
+    # docs/plans/post-roadmap-oracle-match.md. The consumer was always period-1. They
+    # are no longer DISTINCT in period class; the golden encodes both as False.
     parsed = json.loads(DRIFT_SUMMARY_GOLDEN.read_text(encoding="utf-8"))
     assert parsed["perennial"]["is_period_2"] is False
     assert parsed["consumer"]["is_period_2"] is False

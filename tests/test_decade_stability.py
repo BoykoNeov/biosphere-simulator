@@ -29,9 +29,10 @@ drift axes, then runs the **same** scenarios under ``Rk4Integrator`` as a one-sh
   carbon loss-sink ``0.0`` on **every** step of the run, for **both** integrators.
 
 **The decide-on-evidence core.** Euler and RK4 differ by O(truncation), so their
-attractors will NOT match numerically — agreement is **qualitative/structural** (same
-period class, both stationary, both bounded, both closed). The RK4 run also **empirically
-retires** the two preconditions the plan flagged (rather than assuming them): that RK4
+attractors will NOT match numerically — agreement is **qualitative/structural**
+(same period class, all stationary, bounded, closed). The RK4 run also
+**empirically retires** the two preconditions the plan flagged (rather than assuming
+them): that RK4
 survives the discrete ``annual_reset`` x multistage interaction (it completes without
 raising) and that no needed arbitration scale fires (``rationed == 0``; under RK4 a
 needed scale is a hard error).

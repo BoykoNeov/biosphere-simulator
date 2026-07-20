@@ -81,11 +81,12 @@ Phase-1 Step-11 buffer rewiring — entering the system through the `Allocation`
 `co2_atmos → organs` leg. So there is no `Photosynthesis`/`GrossAssimilation` class in
 `flow_set`; that science is frozen via `Allocation`. The manifest also freezes the
 **`aux_set`** (the registries' non-conserved accumulators, derived symmetrically from the
-public `registry.aux_processes`) — today just the thermal-time / DVS accumulator that drives
-allocation — so a future aux process added but wired into no golden is caught too. (See
-`flow_set` / `aux_set` in the manifest for the exact lists.)
+public `registry.aux_processes`) — the thermal-time / DVS accumulator that drives
+allocation, and (since post-roadmap scope (B) increment 1) the **vernalization-days**
+accumulator that gates it — so a future aux process added but wired into no golden is caught
+too. (See `flow_set` / `aux_set` in the manifest for the exact lists.)
 
-### The param files — 13 clean-room biosphere param files
+### The param files — 13 clean-room biosphere param files (phenology grew, scope B inc. 1)
 
 `src/domains/biosphere/params/*.yaml` minus `demo.yaml`: `canopy`, `photosynthesis`,
 `respiration`, `transpiration`, `phenology`, `allocation`, `senescence`, `nitrogen`
@@ -96,12 +97,20 @@ consumer). Each is clean-room from primary literature
 [`docs/reuse-and-licenses.md`](reuse-and-licenses.md)) — **never** the unlicensed WOFOST YAML
 or PCSE source. The manifest records a newline-normalized sha-256 of each as **provenance**.
 
-> **Documented finding (carried, not hidden).** The committed crop params are uncalibrated
-> `TODO(cite)` placeholders; phenology lacks vernalization, so the trajectory runs ~2 orders
-> below the PCSE oracle. The frozen reference is the **machinery** — single-currency balanced
-> flows, the every-step conservation gate, `rationed == 0` by construction, determinism, the
-> emergent closed-loop limit cycle — **not** a validated oracle match. A calibration pass is a
-> future, deliberate unfreeze.
+> **Documented finding (carried, not hidden) — UPDATED by scope (B) increment 1
+> (2026-07-20).** This note read *"phenology lacks vernalization, so the trajectory runs
+> ~2 orders below the PCSE oracle"* until increment 1 added **vernalization** and
+> **photoperiod** (clean-room from Soltani & Sinclair 2012; `phenology.yaml` grew 4→12
+> params, all cited; a second aux accumulator was added). The magnitude gap **closed to
+> ~1.22×** (peak LAI 5.19 vs the oracle's 6.34) and the canopy now bootstraps — with **no
+> canopy science written**, because the "structural" canopy collapse was downstream of the
+> phenology error (`docs/plans/post-roadmap-oracle-match.md`, findings). The **residual is
+> now cause 3 — param values**: the `tsum` phase partition (reproductive phase too short),
+> whose recalibration is the deferred scope-B ceremony 2, to be moved only within cited
+> literature ranges (**the oracle is a diagnostic, never a fit target**). The frozen
+> reference remains the **machinery** — balanced flows, the conservation gate, `rationed ==
+> 0`, determinism, the emergent limit cycle (now a period-1 fixed point; see below) — with
+> two real sciences added and a residual documented, not a validated oracle match.
 
 ### The driving forcing
 
@@ -140,9 +149,12 @@ The freeze is earned by Phase 4 Steps 1–4 (full detail + measured numbers in t
   systematic growth) at 15 yr and at the 100k-step (328 yr) stress — mass-drift slope flat at
   machine-ε, deterministic round-off, not a leak.
 - **The emergent limit cycle is stationary** (bounded, non-amplifying, non-collapsing) the
-  whole horizon: the **perennial chamber holds a genuine period-2 cycle**, the **consumer
-  chamber a period-1 fixed point** (the herbivore damps the producer oscillation — measured,
-  not assumed).
+  whole horizon. ⚠ Both chambers are now **period-1 fixed points** (scope (B) increment 1):
+  the perennial's old **period-2** cycle was a property of the *broken canopy regime*, and
+  closing the canopy (vernalization + photoperiod) flattened the year-to-year return map
+  below unit gain, so the 2-cycle lost stability and converged upward — measured, either
+  phenology term alone suffices (`docs/plans/post-roadmap-oracle-match.md`). The consumer was
+  always period-1 (the herbivore damps the producer oscillation).
 - **Closure carried every step:** `rationed == 0` (kinetics, not the Euler backstop),
   `events == ()` (no extinction), carbon loss-sink `0.0` (death routes to litter) — on every
   one of the 100,040 stress steps, both scenarios.
@@ -199,6 +211,21 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
 
 An undocumented unfreeze fails CI by construction (a moved golden, or the completeness gate),
 so the discipline is enforced, not merely requested.
+
+### Unfreeze log
+
+- **2026-07-20 — scope (B) increment 1: vernalization + photoperiod.** Two clean-room
+  sciences (Soltani & Sinclair 2012, Ch. 8 Eqn 8.3/8.6 and Ch. 7 Eqn 7.6) added to
+  `phenology.py` as a second aux accumulator + two vegetative-phase rate multipliers.
+  `phenology.yaml` grew 4→12 params (all **cited**, not `TODO(cite)`); `aux_set` grew
+  `{ThermalTimeAccumulation}` → `{…, VernalizationAccumulation}`. The **CONSUMER chamber
+  was enlarged 2×** (a coupled scenario-data change — the healthier plant over-drew its
+  CO₂ pool; SEALED/PERENNIAL kept their sizing). **12 goldens regenerated** + the manifest;
+  the perennial period class moved period-2 → period-1 (a broken-canopy artifact
+  dissolved). Advisor-reviewed before regeneration; hand-mirrored into Rust (which surfaced
+  a genuine cross-port reset bug). `git diff src/simcore/` empty. Full record + the four
+  findings: `docs/plans/post-roadmap-oracle-match.md`. Recalibration of the `tsum` residual
+  is deferred (scope-B ceremony 2), oracle-as-diagnostic-only.
 
 ## Phase-5 handoff
 

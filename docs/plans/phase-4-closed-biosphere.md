@@ -1,5 +1,14 @@
 # Phase 4 — Closed Biosphere (the reference domain, frozen)
 
+> ⚠ **Superseded measurement (2026-07-20, scope (B) increment 1):** every "perennial holds
+> a genuine **period-2** cycle" claim below was true of the biosphere Phase 4 froze, but that
+> cycle was a property of the **broken canopy regime**. Adding vernalization + photoperiod
+> closed the canopy, flattened the year-to-year return map below unit gain, and the perennial
+> converged to a **period-1 fixed point** — so **both** chambers are now period-1. The
+> historical numbers below are kept as the record of what Phase 4 measured; the current
+> contract is `docs/biosphere-reference.md` and the change is in
+> `docs/plans/post-roadmap-oracle-match.md`.
+
 **Status: PHASE 4 COMPLETE — Steps 1–5 done (decade probe + drift instrumentation P4.1;
 integrator escalation SKIPPED; the 100k-step biosphere slow-drift stress; the canonical
 long-horizon golden capture P4.2; the freeze contract P4.3). The biosphere domain is

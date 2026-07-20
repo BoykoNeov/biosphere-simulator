@@ -629,11 +629,11 @@ def test_rust_biosphere_drift_summary_matches() -> None:
         floor=entry["floor"],
     )
     assert result.ok, f"drift_summary parity:\n{result.report()}"
-    # Tier-0: the period class is a classification — exact, and the headline result. Since
-    # post-roadmap scope (B) increment 1 BOTH chambers are period-1 fixed points (the
-    # perennial's period-2 cycle was a broken-canopy artifact that closing the canopy
-    # dissolved; see docs/plans/post-roadmap-oracle-match.md). Both ports agree on the new
-    # class — that agreement is what this parity check verifies.
+    # Tier-0: the period class is a classification — exact, and the headline result.
+    # Since post-roadmap scope (B) increment 1 BOTH chambers are period-1 fixed points
+    # (the perennial's period-2 cycle was a broken-canopy artifact that closing the
+    # canopy dissolved; see docs/plans/post-roadmap-oracle-match.md). Both ports agree
+    # on the new class — that agreement is what this parity check verifies.
     assert derived["perennial"]["is_period_2"] is False, "perennial now period-1"
     assert derived["consumer"]["is_period_2"] is False, "consumer must be period-1"
 

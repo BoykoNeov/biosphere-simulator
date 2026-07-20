@@ -228,7 +228,8 @@ def test_gap_phase_partition_is_wrong_vegetative_too_long() -> None:
     oracle = [r["DVS"] for r in ref]
     our_ant, oracle_ant = _first_day_at(our, 1.0), _first_day_at(oracle, 1.0)
     our_mat, oracle_mat = _first_day_at(our, 2.0), _first_day_at(oracle, 2.0)
-    assert None not in (our_ant, oracle_ant, our_mat, oracle_mat)
+    assert our_ant is not None and oracle_ant is not None
+    assert our_mat is not None and oracle_mat is not None
 
     # Oracle side: exact (committed JSON, cross-platform stable).
     assert (oracle_ant, oracle_mat) == (217, 292)
