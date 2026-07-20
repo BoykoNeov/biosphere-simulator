@@ -49,8 +49,10 @@
 #   [A] Stanford, G. & Smith, S.J. (1972), "Nitrogen mineralization potentials of soils",
 #       Soil Science Society of America Journal 36(3):465–472 (first-order net N
 #       mineralization kinetics; the mineralization rate constant). STILL NOT OPENED —
-#       it was #6 on the plan doc's retrieval list and is one of the three items NOT
-#       supplied in round 2 (with Dunn 2011 and Divya 2009). It stays on that list.
+#       it was #6 on the plan doc's retrieval list. ⚠ UPDATED BY ROUND 4 (2026-07-20): it is
+#       no longer "one of three items not supplied"; Dunn 2011 and Divya 2009 WERE supplied
+#       and opened in round 4, so [A] is now the SOLE remaining item on that list
+#       (12 → 3 → 1). It stays on it.
 #       ROUND-2 NEGATIVE RESULT, recorded so the search is not repeated: a 29-source
 #       literature corpus was searched for any first-hand mineralization rate constant that
 #       could replace the [C]-quoting-[A] chain, and there is none. [D] — a dedicated
@@ -114,9 +116,18 @@
 #       fragment flagged as suspect — "leaching intervals" is genuinely printed, hyphenated
 #       across a line break as "leaching in-/tervals", not an inserted word.
 #       ROUND-3 NEGATIVE RESULTS, recorded so the search is not repeated: [A] itself was
-#       re-attempted and is still Wiley-paywalled; Dunn 2011 (Science) and Divya 2009
-#       (Elsevier; DTU Orbit is metadata-only) were re-attempted and are still closed — the
-#       round-1 ceiling is confirmed, not merely inherited. The USDA-NRCS "Potentially
+#       re-attempted and is still Wiley-paywalled — THIS HALF STANDS.
+#       ⚠ THE OTHER HALF WAS FALSIFIED BY ROUND 4, ONE DAY LATER, and is corrected in place:
+#       round 3 wrote that "Dunn 2011 (Science) and Divya 2009 (Elsevier; DTU Orbit is
+#       metadata-only) were re-attempted and are still closed". BOTH WERE SUPPLIED BY THE
+#       USER AND OPENED in round 4, and opening them found a CONFIRMED FALSE ATTRIBUTION in
+#       power/self_discharge.yaml (Dunn contains no self-discharge figure at all). So round
+#       3's "the round-1 ceiling is confirmed" was true of [A] and WRONG about the other two
+#       — a retrieval ceiling is a fact about one afternoon's access, not a property of the
+#       source, and recording it as a flat negative made it read like the latter. That is
+#       this scope's own meta-finding again, and the reason this line is corrected rather
+#       than left as period detail: a stale negative result actively SUPPRESSES a search.
+#       The USDA-NRCS "Potentially
 #       Mineralizable Nitrogen" tech note was attempted twice and both fetches failed at the
 #       network layer; it is a SECONDARY anyway (NRCS-quoting-[A] is the same chain problem
 #       as [C]-quoting-[A]), so it could not have bound the value had it loaded.
@@ -223,4 +234,4 @@ parameters:
   mineralization_rate:
     value: 0.03
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, with a measured finding UNCHANGED by round 2 (2026-07-16): 0.03/day = 0.21/wk is ~3.9× the Stanford & Smith mean (0.054/wk = 0.0077/day) and ~1.2× ABOVE the fastest of 43 soils measured in [C] (range 0.018–0.174/wk, mean 0.070) — outside the whole observed range, with four independent studies clustering at 0.054–0.080/wk. These are already OPTIMAL-condition potential rates (35 °C, field capacity), so temperature/moisture modifiers cannot explain the gap. ROUND 2: unlike the other decomposer params, this one could NOT be upgraded — [A] was not among the sources supplied, and a search of a 29-source corpus (including [D], a dedicated N-mineralization review AND meta-analysis) found NO first-hand k anywhere to replace the [C]-quoting-[A] chain; the secondary literature propagates [A]'s form and quotes its mean without republishing its data. So this remains the weakest-provenance member of the decomposer finding: the 3.9× rests on [C] quoting [A], not on [A] read directly. The finding is corroborated independently by [C]'s OWN 43-soil measurements (ours is above their maximum), which do not depend on [A] at all. ROUND 3 (2026-07-20) — a PARTIAL upgrade, and only to the ARGUMENT, not the number: [A] is still paywalled, but [E] (a Current Contents 'Citation Classic' retrospective written by S.J. Smith, [A]'s own second author) was found and read. It gives NO k, so the 3.9× still rests on the [C]-quoting-[A] chain and this param is STILL the weakest-provenance member. What it does give first-hand is [A]'s protocol — 39 soils, 30-week incubation, and crucially the OPTIMUM 35 °C / approximate-field-capacity conditions. That is the premise that forbids explaining the gap away with temperature/moisture modifiers, and it is no longer secondary-mediated. Round 3 also CONFIRMED the retrieval ceiling rather than inheriting it: [A], Dunn 2011 and Divya 2009 were each re-attempted and are each still closed. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN, with a measured finding UNCHANGED by round 2 (2026-07-16): 0.03/day = 0.21/wk is ~3.9× the Stanford & Smith mean (0.054/wk = 0.0077/day) and ~1.2× ABOVE the fastest of 43 soils measured in [C] (range 0.018–0.174/wk, mean 0.070) — outside the whole observed range, with four independent studies clustering at 0.054–0.080/wk. These are already OPTIMAL-condition potential rates (35 °C, field capacity), so temperature/moisture modifiers cannot explain the gap. ROUND 2: unlike the other decomposer params, this one could NOT be upgraded — [A] was not among the sources supplied, and a search of a 29-source corpus (including [D], a dedicated N-mineralization review AND meta-analysis) found NO first-hand k anywhere to replace the [C]-quoting-[A] chain; the secondary literature propagates [A]'s form and quotes its mean without republishing its data. So this remains the weakest-provenance member of the decomposer finding: the 3.9× rests on [C] quoting [A], not on [A] read directly. The finding is corroborated independently by [C]'s OWN 43-soil measurements (ours is above their maximum), which do not depend on [A] at all. ROUND 3 (2026-07-20) — a PARTIAL upgrade, and only to the ARGUMENT, not the number: [A] is still paywalled, but [E] (a Current Contents 'Citation Classic' retrospective written by S.J. Smith, [A]'s own second author) was found and read. It gives NO k, so the 3.9× still rests on the [C]-quoting-[A] chain and this param is STILL the weakest-provenance member. What it does give first-hand is [A]'s protocol — 39 soils, 30-week incubation, and crucially the OPTIMUM 35 °C / approximate-field-capacity conditions. That is the premise that forbids explaining the gap away with temperature/moisture modifiers, and it is no longer secondary-mediated. Round 3 also CONFIRMED the retrieval ceiling rather than inheriting it: [A], Dunn 2011 and Divya 2009 were each re-attempted and were each still closed. ⚠ ROUND 4 (2026-07-20) FALSIFIED TWO-THIRDS OF THAT ONE DAY LATER: Dunn 2011 and Divya 2009 were supplied by the user and opened (and opening them exposed a confirmed FALSE attribution in power/self_discharge.yaml). Only [A] is still closed, and it is now the SOLE remaining item on the retrieval list (12 -> 3 -> 1). This param is UNAFFECTED — its 3.9x still rests on the [C]-quoting-[A] chain, unchanged — but the ceiling sentence is corrected because a stale negative result SUPPRESSES a future search. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."

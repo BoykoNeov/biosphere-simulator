@@ -84,6 +84,15 @@
 #       paraphrase faithfully reproduces Olson's p. 326 span (~1 for the Columbian forests
 #       to ~4 for the African). Recorded because round 1 flagged this chain as a risk, and
 #       the risk did not materialize here — unlike the Dunn/Divya chain in power/.
+#       ✅ ROUND 4 (2026-07-20) UPGRADED THAT CONTRAST FROM A HEDGE TO A MEASURED FACT. When
+#       this line was written, the Dunn/Divya chain was merely *unverified*, so the contrast
+#       was really "checked vs unchecked". Both have now been opened, and the Dunn chain
+#       DID materialize: power/self_discharge.yaml attributed a self-discharge rate to a
+#       paper containing no such figure. So the two are now a genuine matched pair — the
+#       SAME shape (a secondary transmitting a primary's number) with OPPOSITE outcomes,
+#       both verified first-hand. This entry is the POSITIVE CONTROL: it is the evidence
+#       that "secondary-quoting-primary" is a risk flag and not a verdict, which is why
+#       round 4's finding must not be generalized into distrust of every such chain here.
 
 name: chamber
 process: decomposition

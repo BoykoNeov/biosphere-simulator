@@ -763,12 +763,65 @@ advisor review before it shipped a stale station hash):
 - `charge.yaml` — [A]/[B] promoted to opened; the 0.90-0.95 → **90–94** correction recorded,
   with the "[Courtesy of EPRI]" reproduction noted; [B] marked unusable-as-support.
 
-**Not changed: no value, no golden, no code.** `git diff src/` touches only the two YAML
-headers and their `source:` strings. Manifest diff = **exactly the two param hashes**.
-`rust/crates/domains/src/sibling_params.txt` regenerated **byte-identical** (proven by
-rewriting it and finding `rust/` clean, not asserted) — the Rust generator emits
-`name<TAB><value.hex()>` and never the provenance, which is the same structural reason a
-provenance-only edit is an unfreeze **nothing catches**.
+**Not changed: no value, no golden, no code.** `git diff src/` touches only YAML headers and
+`source:` strings. Both `rust/.../sibling_params.txt` and `.../biosphere_params.txt`
+regenerated **byte-identical** (proven by rewriting them and finding `rust/` clean, not
+asserted) — the Rust generator emits `name<TAB><value.hex()>` and never the provenance,
+which is the same structural reason a provenance-only edit is an unfreeze **nothing catches**.
+
+### ⚠ The sweep was incomplete when this section was first written, and shipped that way
+
+**This section originally said "manifest diff = exactly the two param hashes." That was
+false, and it was committed.** It is corrected here rather than silently: the real diff is
+**four hashes across BOTH manifests** — station (`charge`, `self_discharge`) and biosphere
+(`mineralization`, `decomposition`).
+
+The opening grep of round 4 returned **four** files containing Dunn/Divya. The sweep fixed
+the **two `power/` ones and declared done**, leaving behind — in `mineralization.yaml`, a
+file round 3 had edited the previous day:
+
+> "ROUND-3 NEGATIVE RESULTS, recorded so the search is not repeated: … Dunn 2011 (Science)
+> and Divya 2009 … were re-attempted and are still closed — the round-1 ceiling is
+> confirmed, not merely inherited."
+
+**Round 4 opened both, and left that sentence standing.** Caught on the closing advisor call,
+from evidence that had been in the transcript since the first tool call.
+
+**This is the project meta-finding's ninth instance and the most pointed one yet: it is
+self-inflicted, and it happened one turn after writing the lesson down.** Round 4 spent its
+entire length being careful about stale sentences *inside* two files while creating one
+across two others.
+
+Three things worth carrying:
+
+1. **A stale NEGATIVE result is worse than a stale positive**, because its stated purpose is
+   to stop work: *"recorded so the search is not repeated."* A false negative in a
+   provenance file **actively suppresses** the search that would correct it.
+2. **A retrieval ceiling is a fact about one afternoon's access, not a property of the
+   source.** Round 3 wrote it flat ("are still closed"), which reads as a property. Date it,
+   scope it to the attempt, or it will be believed after it stops being true — and here it
+   stopped being true in **one day**.
+3. **When a grep hands you N sites, the sweep is not finished at N−2.** The in-file stale
+   fragments were caught by hand; the cross-domain ones needed the same care and the tool had
+   already pointed straight at them.
+
+**Comment-only edits DO move the normalized hash** (measured, not assumed), so this follow-up
+was a **second honor-system unfreeze**, not a free correction — same ceremony, run again.
+
+### The positive control: `decomposition.yaml` is the opposite case
+
+`decomposition.yaml`'s note read *"round 1 flagged this chain as a risk, and the risk did not
+materialize here — unlike the Dunn/Divya chain in `power/`."* When written, the Dunn/Divya
+chain was merely **unverified**, so the contrast was really "checked vs unchecked." Round 4
+**upgraded it from a hedge to a measured fact**: FAO's paraphrase faithfully reproduces
+Olson's span, and Dunn's attribution was fabricated. The two are now a **matched pair — the
+same shape (a secondary transmitting a primary's number), opposite outcomes, both verified
+first-hand.**
+
+That entry is kept deliberately as the **positive control**, and it is the reason round 4's
+finding must **not** be generalized into distrust of every secondary-quoting-primary chain in
+the tree. "Secondary quoting a primary" is a **risk flag, not a verdict** — one of the two
+checked chains was clean.
 
 **The honor-system ceremony was followed deliberately** *because* nothing enforces it:
 advisor review → regenerate the manifest as the git-visible record → document here.
