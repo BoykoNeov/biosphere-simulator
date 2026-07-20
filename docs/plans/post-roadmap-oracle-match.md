@@ -1,6 +1,17 @@
 # Post-roadmap: the full oracle match — bucket 3 scope (B)
 
-**Status: IN PROGRESS. Increment 1 (vernalization) started 2026-07-20.**
+**Status: INCREMENT 1 COMPLETE (2026-07-20). Biosphere unfrozen + re-frozen; the station
+cascade (sealed_station) followed. Recalibration = ceremony 2, OPEN.**
+
+Shipped: vernalization + photoperiod (clean-room), `phenology.yaml` 4→12 cited params, a
+second aux accumulator, the CONSUMER chamber enlarged 2×, **13 goldens regenerated** (12
+biosphere + the cascaded `sealed_station`), both the biosphere and station manifests
+regenerated, hand-mirrored into Rust (which surfaced a genuine cross-port reset bug), full
+`-m "not slow"` (1919 passed) + `-m slow` green, `ruff`/`pyright`/`clippy` clean,
+`git diff src/simcore/` empty. Four findings below; the acceptance bar decided
+(literature-ranges-only, oracle-as-diagnostic). **What increment 2 was scoped as (juvenile
+canopy expansion) is NOT needed** — finding 1. The residual is the `tsum` phase partition
+(recalibration, ceremony 2).
 
 The scope-(B) option recorded in [`post-roadmap-validation.md`](post-roadmap-validation.md)
 ("The scope decision"), taken by the user after scopes (A) and (C) closed. That plan's
@@ -857,13 +868,36 @@ against the pre-resize run, every red is accounted for:
 **Nothing is unexplained**, so regeneration will not conflate a moved golden with a test
 that needed changing.
 
-## Still to do for increment 1
+## Increment 1 — DONE (the ceremony, as executed)
 
-Ceremony now UNBLOCKED. Regenerate the 22 goldens + manifest, re-pin the behavioral tests
-(oracle_gap/smoke numbers, the decade period-2 flip, the two horizon artifacts, the
-water-biting inversion), record provenance, run all gates; the Rust mirror compiles and
-the params regenerate — still to compile the full workspace clean and add a cross-port
-anchor. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
+1. **Science + params + tests** — vernalization & photoperiod, 38 new unit tests
+   (incl. the source's own worked example and the memory-vs-no-memory discriminator).
+2. **Advisor review before regenerating** (discipline step 1) — twice: once on the science,
+   once at the "done" call; the second caught the false-positive mechanism.
+3. **The scenario decision** — CONSUMER chamber enlarged 2× (user ruling), derived and
+   RK4-verified, not tuned.
+4. **Full-suite re-triage at the chosen sizing** (advisor block, no `-x`) — every red
+   accounted for before regenerating.
+5. **13 goldens regenerated** (12 biosphere + the `-m slow` station cascade `sealed_station`)
+   + **both manifests** (biosphere and station).
+6. **Behavioral tests re-pinned**, each documenting what moved and why: `test_oracle_gap`
+   (rewritten to the new residual), `test_oracle_smoke` (gap closed), the period-2 flip in
+   three places (stress, decade, drift-summary golden), the two horizon artifacts, the
+   water-biting constraint-order inversion.
+7. **Rust hand-mirror** — science, params, both aux processes, the driver wiring; surfaced
+   and fixed a genuine cross-port bug (the reset didn't re-zero the vernalization
+   accumulator); cross-port parity re-verified against a fresh release binary.
+8. **Provenance** — `biosphere-reference.md` (aux_set, the finding box, the limit-cycle
+   bullet, an Unfreeze-log entry), `native-port-reference.md`, a superseded-measurement
+   banner on the Phase-4 plan, the `CLAUDE.md` status row, and memory.
+9. **Gates** — `-m "not slow"` 1919 passed, `-m slow` green, `ruff`/`pyright`/`clippy`
+   clean, `git diff src/simcore/` empty.
+
+## Ceremony 2 (OPEN) — the recalibration
+
+The `tsum` phase partition (reproductive phase 43 d vs 75 d) moved only within cited
+literature ranges, the oracle read as a diagnostic. Its own advisor review → goldens →
+manifests → provenance, under the same discipline. Not started; the user's call on when. Remaining: full-suite degeneracy review (advisor: a 57-day arrest
 can dominate a short-horizon chamber run, and perennial/long-horizon now re-vernalize
 every cycle — conservation will not catch a plant that simply never develops), the Rust
 hand-mirror, then goldens → manifest → provenance → gates.
