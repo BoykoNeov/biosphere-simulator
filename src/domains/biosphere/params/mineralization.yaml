@@ -61,7 +61,46 @@
 #       1972 …)"). Four soil texts/monographs in the corpus contain no mineralization rate
 #       constant at all. CONCLUSION: k = 0.054 wk⁻¹ is reachable ONLY from [A] itself;
 #       secondary literature propagates [A]'s FORM and quotes its mean without republishing
-#       the underlying per-soil data. Retrieval of [A] remains the only upgrade path.
+#       the underlying per-soil data. Retrieval of [A]'s k remains the only upgrade path
+#       FOR THE VALUE — but see [E]: round 3 (2026-07-20) showed that sentence was too broad
+#       as originally written ("retrieval of [A] remains the only upgrade path"). [A]'s
+#       CONDITIONS were upgradable without [A], via an author's own retrospective.
+#   [E] Smith, S.J. (1987), "This Week's Citation Classic: Stanford G & Smith S J, Nitrogen
+#       mineralization potentials of soils", Current Contents CC/AB-ES #28, July 13 1987,
+#       p. 20 (ISI). OPENED AND READ 2026-07-20 (round 3). Open access, page images:
+#       https://garfield.library.upenn.edu/classics1987/A1987H917300001.pdf
+#       WHAT IT IS: a first-person retrospective written by S.J. Smith — [A]'s own second
+#       author — about [A]. That makes it AUTHOR TESTIMONY ABOUT the paper, which is
+#       stronger than a third-party paraphrase for the claims it actually makes, but it is
+#       NOT the paper and NOT its data table. It does not supersede [A] on the retrieval
+#       list, and [A] stays there.
+#       ⚠ IT DOES NOT GIVE k. No rate constant appears anywhere in it — so the 0.054 wk⁻¹
+#       figure remains reachable only through [C] quoting [A], exactly as round 2 recorded.
+#       The value provenance is UNCHANGED by round 3.
+#       WHAT IT DOES GIVE — first-hand confirmation of the experimental conditions that the
+#       FINDING below rests on, previously known only through [C]: "an incubation procedure
+#       conducted at optimum temperature (35°C) and moisture conditions (approximate field
+#       capacity)"; "For 39 widely differing soils"; "We continued the incubation for 30
+#       weeks using leaching intervals first of two and two weeks, then four, four, and six
+#       weeks, then six weeks, and finally eight weeks" (leached with 0.01 M CaCl2); and the
+#       form, "nitrogen mineralization obeyed simple first-order kinetics", with N0 taken
+#       from the best linear fit of log(N0-Nt) vs t.
+#       WHY THAT MATTERS: the FINDING's load-bearing clause is that S&S's rates are ALREADY
+#       optimal-condition potential rates, which is what forbids explaining our ~3.9x gap
+#       away with temperature/moisture modifiers. That clause was [C]-mediated; it is now
+#       confirmed by an author of [A]. The gap argument no longer depends on a secondary
+#       for its premise — only for its number.
+#       ALSO NEW (first-hand, unavailable before): "values of N0 ranged from about 20 to
+#       over 300 mg kg-1 air-dry soil". This is a POOL SIZE, not a rate — it binds nothing
+#       here and must not be quoted as if it did; recorded because it is [A] data we now
+#       hold directly.
+#       ROUND-3 NEGATIVE RESULTS, recorded so the search is not repeated: [A] itself was
+#       re-attempted and is still Wiley-paywalled; Dunn 2011 (Science) and Divya 2009
+#       (Elsevier; DTU Orbit is metadata-only) were re-attempted and are still closed — the
+#       round-1 ceiling is confirmed, not merely inherited. The USDA-NRCS "Potentially
+#       Mineralizable Nitrogen" tech note was attempted twice and both fetches failed at the
+#       network layer; it is a SECONDARY anyway (NRCS-quoting-[A] is the same chain problem
+#       as [C]-quoting-[A]), so it could not have bound the value had it loaded.
 #   [B] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
 #       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
 #       Simulation Monographs 29, PUDOC, Wageningen. OPENED AND READ 2026-07-16 (round 2).
@@ -135,10 +174,15 @@
 #   S&S mean and ~1.2× above [C]'s single fastest soil — outside the whole observed range.
 #   Four independent studies cluster at 0.054–0.080 /wk, so this is not one odd dataset.
 #   Crucially these are ALREADY optimal-condition potential rates (35 °C, field capacity),
-#   so the gap CANNOT be explained away by temperature/moisture modifiers.
-#   Provenance caveat: the 0.054 /wk figure is [C] QUOTING Stanford & Smith — S&S itself is
-#   paywalled (Wiley, HTTP 402) and was not opened. [C] is primary for its own 0.018–0.174
-#   range, which independently places ours outside.
+#   so the gap CANNOT be explained away by temperature/moisture modifiers. ROUND 3: that
+#   clause is now first-hand — [E], written by [A]'s own second author, states the 35 °C /
+#   approximate-field-capacity protocol directly. The PREMISE of the gap argument no longer
+#   depends on a secondary.
+#   Provenance caveat (NARROWED, not lifted, by round 3): the 0.054 /wk NUMBER is still [C]
+#   QUOTING Stanford & Smith — [A] itself is paywalled (Wiley, HTTP 402) and was not opened,
+#   and [E] gives no rate constant. So the chain survives for the VALUE and is broken for the
+#   CONDITIONS. [C] is primary for its own 0.018–0.174 range, which independently places ours
+#   outside.
 #
 #   FINDING (n_senescence_rate) — NO ACCESSIBLE PRIMARY SUPPORT AT ALL, and the highest
 #   clean-room risk in the project. The accessible N-resorption literature is built around
@@ -160,4 +204,4 @@ parameters:
   mineralization_rate:
     value: 0.03
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, with a measured finding UNCHANGED by round 2 (2026-07-16): 0.03/day = 0.21/wk is ~3.9× the Stanford & Smith mean (0.054/wk = 0.0077/day) and ~1.2× ABOVE the fastest of 43 soils measured in [C] (range 0.018–0.174/wk, mean 0.070) — outside the whole observed range, with four independent studies clustering at 0.054–0.080/wk. These are already OPTIMAL-condition potential rates (35 °C, field capacity), so temperature/moisture modifiers cannot explain the gap. ROUND 2: unlike the other decomposer params, this one could NOT be upgraded — [A] was not among the sources supplied, and a search of a 29-source corpus (including [D], a dedicated N-mineralization review AND meta-analysis) found NO first-hand k anywhere to replace the [C]-quoting-[A] chain; the secondary literature propagates [A]'s form and quotes its mean without republishing its data. So this remains the weakest-provenance member of the decomposer finding: the 3.9× rests on [C] quoting [A], not on [A] read directly. The finding is corroborated independently by [C]'s OWN 43-soil measurements (ours is above their maximum), which do not depend on [A] at all. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "TODO(cite) — STILL OPEN, with a measured finding UNCHANGED by round 2 (2026-07-16): 0.03/day = 0.21/wk is ~3.9× the Stanford & Smith mean (0.054/wk = 0.0077/day) and ~1.2× ABOVE the fastest of 43 soils measured in [C] (range 0.018–0.174/wk, mean 0.070) — outside the whole observed range, with four independent studies clustering at 0.054–0.080/wk. These are already OPTIMAL-condition potential rates (35 °C, field capacity), so temperature/moisture modifiers cannot explain the gap. ROUND 2: unlike the other decomposer params, this one could NOT be upgraded — [A] was not among the sources supplied, and a search of a 29-source corpus (including [D], a dedicated N-mineralization review AND meta-analysis) found NO first-hand k anywhere to replace the [C]-quoting-[A] chain; the secondary literature propagates [A]'s form and quotes its mean without republishing its data. So this remains the weakest-provenance member of the decomposer finding: the 3.9× rests on [C] quoting [A], not on [A] read directly. The finding is corroborated independently by [C]'s OWN 43-soil measurements (ours is above their maximum), which do not depend on [A] at all. ROUND 3 (2026-07-20) — a PARTIAL upgrade, and only to the ARGUMENT, not the number: [A] is still paywalled, but [E] (a Current Contents 'Citation Classic' retrospective written by S.J. Smith, [A]'s own second author) was found and read. It gives NO k, so the 3.9× still rests on the [C]-quoting-[A] chain and this param is STILL the weakest-provenance member. What it does give first-hand is [A]'s protocol — 39 soils, 30-week incubation, and crucially the OPTIMUM 35 °C / approximate-field-capacity conditions. That is the premise that forbids explaining the gap away with temperature/moisture modifiers, and it is no longer secondary-mediated. Round 3 also CONFIRMED the retrieval ceiling rather than inheriting it: [A], Dunn 2011 and Divya 2009 were each re-attempted and are each still closed. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."

@@ -2,9 +2,10 @@
 
 **Status: COMPLETE** (2026-07-16), then **ROUND 2 COMPLETE** (2026-07-16) — the user
 supplied ~10 of the 12 sources on this doc's own retrieval list, and the open items were
-re-run against them. **Jump to "ROUND 2" at the bottom for what changed.** Round 1's text is
-preserved below unedited, including the predictions round 2 falsified — the point of a
-living record is that you can see what was believed at the time.
+re-run against them — then **ROUND 3 (2026-07-20)**, a deliberately bounded retrieval pass
+at the 3 residual items. **Jump to "ROUND 3" at the very bottom for the current state.**
+Rounds 1 and 2 are preserved below unedited, including the predictions later rounds
+falsified — the point of a living record is that you can see what was believed at the time.
 
 The third and last scope of bucket 3 (validation). Scope (A) — diagnose + pin the oracle
 gap — is COMPLETE (`post-roadmap-validation.md`). Scope (B) — the full oracle match —
@@ -481,3 +482,109 @@ off-target for this model (forest N cycling; regional N accounting). The unopene
 been *characterized*, not *audited*. A future scope should re-derive that judgement per source
 rather than inherit this paragraph — the `water_cycle.yaml` lesson is that an inherited
 partition is exactly where things fall through.
+
+---
+
+# ROUND 3 — the residual retrieval list, bounded (2026-07-20)
+
+**The scope as picked was "read the 3 unread sources". The premise was false again — the
+third time in this scope, and the same shape each time.** Round 2 closed saying the retrieval
+list was down to 3 (Stanford & Smith 1972, Dunn 2011, Divya 2009), all "still unread". That
+reads like a *reading* task. It is a **retrieval** task, and round 1 had already failed at it:
+none of the three is in `sources/` (29 files, checked), because none was ever supplied. Cf.
+round 1's own lesson — *"the scope name presumed a fact that was false"* — and `water_cycle.yaml`.
+
+**Nothing moved.** No `value:` line touched; **1880 passed / 1 skipped** (the opt-in oracle;
+round 2's 1779 baseline plus the multi-rate phase's additions); the biosphere manifest
+regenerated to a diff of **exactly one param hash** (`mineralization.yaml`) and nothing else —
+no golden hash, no flow/aux set; `rust/.../biosphere_params.txt` regenerated **byte-identical**
+(rewritten by its generator and absent from `git status` — proven, not asserted). The station
+manifest is untouched. The honor-system unfreeze ceremony was followed deliberately.
+
+## What was attempted, and the ceiling confirmed rather than inherited
+
+One bounded pass, **legitimate open channels only** — author copies, institutional
+repositories, publisher-open, PMC. Pirate mirrors were explicitly excluded and blocked at the
+search layer: this repo's posture is *cite, don't redistribute* (`sources/` is gitignored
+because the corpus is copyrighted), and hunting an illegitimate copy would violate that and
+the clean-room discipline at once.
+
+| target | outcome |
+|---|---|
+| **Stanford & Smith 1972** (#6) | Still Wiley-paywalled. **But the search surfaced a lead round 1 never had — see below.** |
+| **Dunn 2011** (#3) | Still closed (Science). ResearchGate "request full text", ScienceOpen and SCIRP are metadata/reference stubs, not text. |
+| **Divya 2009** (#4) | Still closed (Elsevier). DTU Orbit remains **metadata-only**, exactly as round 1 recorded — re-confirmed, not assumed. |
+| USDA-NRCS "Potentially Mineralizable Nitrogen" tech note | Attempted twice, both fetches failed at the network layer (`ECONNRESET`). **A secondary anyway** — NRCS-quoting-S&S is the same chain problem as [C]-quoting-S&S — so it could not have bound the value had it loaded. |
+
+That the two battery items are still closed matters for the **live miscitation risk**: Dunn
+2011 and Divya 2009 are cited *in our own tree* (`self_discharge.yaml`, `charge.yaml`) for
+numbers nobody has ever checked. Round 3 does **not** clear them. They stay UNVERIFIED leads,
+and round 2's skeptical read stands (FINDING 4: if a dedicated 2023 measurement study states
+no %/month constant, a 2011 grid-storage *review* is an improbable place for one).
+
+## The one real result: an author's own retrospective on [A]
+
+**[E] Smith, S.J. (1987), "This Week's Citation Classic"**, *Current Contents* CC/AB-ES #28,
+July 13 1987, p. 20 — open access page images at
+`garfield.library.upenn.edu/classics1987/A1987H917300001.pdf`. A **first-person retrospective
+written by [A]'s own second author** about [A].
+
+It is **author testimony about the paper, not the paper** — stronger than a third-party
+paraphrase for the claims it makes, and *not* a substitute for [A]. [A] stays on the retrieval
+list.
+
+**⚠ It gives no k.** The 0.054 wk⁻¹ figure is still reachable only through [C] quoting [A].
+`mineralization_rate` remains the **weakest-provenance member of the decomposer finding**,
+exactly as round 2 left it. The value provenance is unchanged.
+
+**What it does upgrade is the argument's premise.** The FINDING's load-bearing clause is that
+S&S's rates are *already optimal-condition potential rates*, which is what forbids explaining
+our ~3.9× gap away with temperature/moisture modifiers. That clause was [C]-mediated. [E]
+states it first-hand: *"an incubation procedure conducted at optimum temperature (35°C) and
+moisture conditions (approximate field capacity)"*, over *"39 widely differing soils"*, a
+30-week incubation with 0.01 M CaCl₂ leaching, and *"nitrogen mineralization obeyed simple
+first-order kinetics"*. **So the chain is broken for the CONDITIONS and survives for the
+NUMBER** — a narrowing of the caveat, not a lifting of it.
+
+Also new first-hand: *"values of N₀ ranged from about 20 to over 300 mg kg⁻¹ air-dry soil"*.
+That is a **pool size, not a rate** — it binds nothing here and is recorded only because it is
+[A] data we now hold directly. Flagged in the file so it cannot be misquoted as a rate.
+
+**A note on how it was read.** The PDF is a scan; text extraction returned binary garbage.
+The page was read as an **image** instead. This is the round-2 discipline holding (Justes 1994
+stayed unread rather than guessed) — the difference is that here the render was legible, so it
+was read rather than skipped.
+
+## The sentence round 3 falsified — and it was this scope's own
+
+`mineralization.yaml` [A] read: *"Retrieval of [A] remains the only upgrade path."* Written in
+round 2, true of the **value**, and **too broad as written** — [A]'s *conditions* turned out to
+be upgradable without [A], through a document round 2 never looked for. Corrected in place.
+
+This is the project meta-finding again, on its own terms: **a conclusion recorded as a flat
+fact outlives the reasoning that scoped it.** Round 2 concluded "no first-hand k exists in the
+corpus" — correct — and wrote it down as "only [A] can upgrade this", which is a *different and
+larger* claim. The tell is the same one `CLAUDE.md` records for the multi-rate phase: the
+qualifier ("…for the value") gets dropped, and the fact reads like the rule.
+
+## What this leaves
+
+**The retrieval list is still 3 items.** Nothing was discharged; the ceiling was *confirmed*.
+All three need the user (or an institutional library) to supply them, which is exactly how
+round 2 happened.
+
+**Scope (C) is best read as CLOSED, with a documented residual risk rather than undone work.**
+The residual is: two unverified citations in the frozen tree (Dunn, Divya) and one
+secondary-mediated number (S&S's k). Each is flagged loudly in its own param file. Further
+progress is **blocked on retrieval**, not on effort.
+
+⚠ **What round 3 deliberately did NOT do: audit the ~15 unopened corpus sources.** That was
+considered and rejected on advisor review as a **scope substitution**. Round 2 characterized
+those extras as *"mostly scope-B science rather than citation targets"* (Soltani & Sinclair,
+Teh, Luo & Smith) — so opening them under a scope-(C) banner is **starting scope (B)**, which
+the post-roadmap framing makes an explicit user decision, not something to fold in silently.
+The narrow exception is real and is left on the table: the two battery texts in the corpus
+(Braun, *Electrochemical Energy Systems*; SAE, *Progress in modeling and simulation of
+batteries*) do bear on `self_discharge_rate`, a scope-(C) param, so auditing **those two** would
+be legitimately in scope — with a low prior of a bind, per FINDING 4. Recorded as an available
+increment, not a pending obligation.
