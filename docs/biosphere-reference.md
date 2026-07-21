@@ -217,6 +217,34 @@ so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-07-21 — scope (B) decomposer calibration (a VALUE unfreeze; two carbon-side
+  rates moved).** The scope-C diagnosis (the decomposer cluster runs fast vs the primary
+  literature) drove a calibration of the two **carbon-side** rates from above-range to
+  top-of-range: `decomposition_rate` 0.02 → **0.011**/day (7.3 → 4.0/yr; Olson 1963's
+  fastest ecosystem, near Zhang 2008's 293-litter max) and `microbial_respiration_rate`
+  0.05 → **0.016**/day (18.25 → 5.84/yr; the CENTURY/CLM5 active-SOM range). Both land at
+  the **fast edge**, forced by chamber closure: central literature values starve the
+  recycled-CO₂ loop and crash annual re-sow (measured; RothC-BIO 0.66/yr is infeasible at
+  any litter size — resizing overshoots into rationing). So "runs fast" is **reduced, not
+  resolved**, and the residual is documented (real residue like wheat straw decays nearer
+  Zhang's median; the strict RothC microbial-biomass reading is ~8.8× below ours). The
+  micro re-anchoring (active-SOM over strict microbial-biomass) is deliberate and
+  recorded, not a relabel to excuse the old value. `mineralization_rate` was
+  **investigated and deliberately NOT moved** — its cited range is the wrong pool (soil
+  N₀ vs fresh residue N), the model's N scale is non-physical, and the rate is
+  behaviorally inert; the real gap is the missing immobilization **form** (a documented
+  deferred seam), recorded in its `source:`. **6 frozen goldens regenerated** (sealed,
+  perennial, consumer, both long-horizon, drift_summary) + water_biting + 4 station
+  goldens (greenhouse/harvest/lighting/sealed_station); the manifest's 3 param hashes
+  (incl. mineralization's comment-only edit) + 6 golden hashes moved. **Period class held
+  period-1** (Tier-0 exact — no flip); the closed-chamber plant shrinks ~19% (perennial
+  fixed point 1.222 → 0.994, still robustly alive), so the `test_biosphere_stress`
+  `>1.0` guard was updated to `>0.9` with the reason in place. Crossport sensitivity
+  6.47e-15 ≪ band 1e-11. Advisor-reviewed before regeneration; hand-mirrored into Rust
+  (`biosphere_params.txt`, two hexfloats). `git diff src/simcore/` empty. Full record +
+  the resize measurement + the honest ruling-B framing:
+  `docs/plans/post-roadmap-decomposer-calibration.md`.
+
 - **2026-07-20 — scope (B) increment 1: vernalization + photoperiod.** Two clean-room
   sciences (Soltani & Sinclair 2012, Ch. 8 Eqn 8.3/8.6 and Ch. 7 Eqn 7.6) added to
   `phenology.py` as a second aux accumulator + two vegetative-phase rate multipliers.

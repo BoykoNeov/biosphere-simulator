@@ -134,10 +134,10 @@ Step 10 invents **no new scenario** and adds **no new golden** — it pins the s
 | `WATER_RECOVERY_SCENARIO` | P6.4 | `water_recovery_state.json` |
 | `LIGHTING_SCENARIO` (Power→biosphere) | P6.5 | `lighting_state.json` |
 | `HARVEST_SCENARIO` (biomass→food) | P6.6 | `harvest_state.json` |
-| `SEALED_STATION_SCENARIO` (Tier-2, 3 yr) | P6.7 | `sealed_station_state.json` |
+| `SEALED_STATION_SCENARIO` (Tier-2, 4 yr) | P6.7 | `sealed_station_state.json` |
 | `HEAT_CLOSURE_SCENARIO` 15-yr (Tier-1) | P6.7 | `sealed_energy_drift_summary.json` |
 
-The two sealed horizons are importable constants (`SEALED_STATION_YEARS = 3`,
+The two sealed horizons are importable constants (`SEALED_STATION_YEARS = 4`,
 `SEALED_ENERGY_YEARS = 15`, `station/scenario.py`) recorded in the manifest and asserted
 against those constants, so the frozen horizons cannot drift. Each golden is a hex-float
 byte snapshot via `sim_io` (the energy drift-summary is the per-year peak-node-temperature
@@ -230,6 +230,26 @@ biosphere change follows *its* discipline instead.) The procedure:
 
 An undocumented unfreeze fails CI by construction (a moved golden, or the completeness
 gate), so the discipline is enforced, not merely requested.
+
+### Unfreeze log
+
+- **2026-07-21 — scope (B) decomposer-calibration cascade (biosphere-delegated values +
+  a sealed horizon).** The biosphere unfreeze (decomposer rates 0.02→0.011 / 0.05→0.016;
+  see `docs/biosphere-reference.md`) cascaded to the four station scenarios that embed a
+  **sealed** biosphere: `greenhouse`, `harvest`, `lighting`, `sealed_station` goldens
+  regenerated (the biosphere-free goldens — crew/eclss/cabin/water_recovery/power/thermal/
+  station/sealed_energy — are byte-identical). **`SEALED_STATION_YEARS` moved 3 → 4**: the
+  calibration enlarged the biosphere soil-pool equilibria ~2–3×, so the sealed_station's
+  **year-1 soil-establishment spin-up** (the `annual_reset` plant-dump, ~60 mol C into
+  litter) now spans a full year; 4 seasons give the biomass watch two settled post-spin-up
+  same-phase diffs, and the pre-golden gate + `test_sealed_station_stability` skip the
+  spin-up via `is_stationary(transient=1)` (bound unchanged at 1.0 — a documented spin-up
+  skip, not a relaxed amplitude bound). 4 is also the max `rationed==0` horizon (year 5
+  rations, year 6 collapses — both **measured** pre-existing and rate-independent: OLD and
+  NEW rates both ration at year 5 with the identical count, so the calibration lengthened
+  the soil-settling transient, not the stable window). The manifest's `sealed_station_years` + the four station
+  golden hashes moved; `delegates_to` biosphere. Advisor-reviewed. Full record:
+  `docs/plans/post-roadmap-decomposer-calibration.md`.
 
 ## Phase-7 handoff
 

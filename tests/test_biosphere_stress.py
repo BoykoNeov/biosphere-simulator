@@ -50,7 +50,9 @@ semantics.
   out to be a property of the **broken canopy regime**, not of the perennial chamber:
   adding the two missing phenology sciences (vernalization + photoperiod) dissolved it,
   and **either one alone** is sufficient. The plant converged **upward** — peak leaf
-  0.253 -> 1.222, ~4.8x — so this is damping by canopy closure, not collapse. Table and
+  0.253 -> 1.222, ~4.8x (then -> 0.994, ~3.9x, after the 2026-07-21 scope-B decomposer
+  calibration shrank the closed-chamber plant ~19%) — so this is damping by canopy
+  closure, not collapse. Table and
   mechanism in ``test_stress_perennial_fixed_point_sustained`` below and
   ``docs/plans/post-roadmap-oracle-match.md``. This is the horizon where "the attractor
   holds" becomes a *measurement* — including when the attractor itself changes class.
@@ -279,13 +281,17 @@ def test_stress_perennial_fixed_point_sustained(runs) -> None:
     # pins a discrete structural property over the horizon and still fails on a period
     # break — the branch it pins is simply the other one now.
     #
-    # Measured, isolating each term (docs/plans/post-roadmap-oracle-match.md):
+    # Measured, isolating each term (docs/plans/post-roadmap-oracle-match.md). NOTE: the
+    # peak leaf below is pre-2026-07-21, at the OLD decomposer rates; the scope-B
+    # calibration (docs/plans/post-roadmap-decomposer-calibration.md) later shrank the
+    # shipped fixed point to 0.994. The qualitative point (either phenology term alone
+    # -> fixed point) holds; only the magnitudes shifted with slower carbon recycling.
     #
     #   config                  peak leaf   max adjacent gap
     #   both inert (baseline)     0.2530    7.157e-02  (28.28% — reproduces the old pin)
     #   vernalization only        1.0171    4.44e-16   (fixed point)
     #   photoperiod only          1.0795    0.0        (fixed point)
-    #   both (shipped)            1.2215    1.55e-15   (fixed point)
+    #   both (shipped, old k)     1.2215    1.55e-15   (fixed point; now 0.994 at new k)
     #
     # EITHER term alone collapses it, so this is not photoperiod entrainment (the first
     # hypothesis, measured and REJECTED). The mechanism is canopy closure flattening the
@@ -301,10 +307,16 @@ def test_stress_perennial_fixed_point_sustained(runs) -> None:
     tail = summaries[_PERIOD_TRANSIENT:]
     gap = max(abs(tail[k + 1] - tail[k]) for k in range(len(tail) - 1))
     assert gap < 1e-3 * max(tail)  # the branches have merged → a fixed point
-    # ...and it converged UP, not by collapsing: the plant is ~4.8x healthier than the
-    # oscillating baseline (0.253 -> 1.222). A degenerate "fixed point" at a dead plant
-    # would pass the two assertions above; this one cannot.
-    assert max(tail) > 1.0
+    # ...and it converged UP, not by collapsing: the plant is ~3.9x healthier than the
+    # oscillating baseline (0.253 -> 0.9942). It was 1.2215 with the pre-calibration
+    # fast decomposers; the scope-B decomposer calibration (decomp 0.02->0.011, micro
+    # 0.05->0.016; docs/plans/post-roadmap-decomposer-calibration.md) slows the
+    # recycled-CO2 loop and shrinks the closed-chamber plant ~19%, so the sustained
+    # fixed point drops to 0.9942 -- still a robustly-alive plant (CO2min 0.039, storage
+    # 0.308 >> 0.16 seed), ~3.9x the 0.253 dead baseline. A degenerate "fixed point" at
+    # a dead plant would pass the two assertions above; this one cannot. Floor 0.9 keeps
+    # the alive-not-dead guard with margin over 0.253.
+    assert max(tail) > 0.9
 
 
 @pytest.mark.skipif(_YEARS < _DECADE_YEARS, reason="period check needs >= decade scale")

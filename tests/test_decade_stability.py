@@ -197,10 +197,11 @@ def test_perennial_leaf_cycle_is_a_fixed_point(runs) -> None:
     # chamber: with the two phenology sciences the canopy closes (~95% light
     # interception vs ~5%), Beer-Lambert saturates, the year-to-year return map's slope
     # drops below 1, and the 2-cycle loses stability — converging UPWARD to a period-1
-    # fixed point (peak leaf ~0.25 -> ~1.2). Same mechanism, same flip, and the same
-    # evidence as test_biosphere_stress.py::test_stress_perennial_fixed_point_sustained
-    # and docs/plans/post-roadmap-oracle-match.md. Flipped, not weakened: still a
-    # discrete structural pin, still fails on a period BREAK, plus a liveness floor so a
+    # fixed point (peak leaf ~0.25 -> ~1.2, then ~0.99 after the scope-B decomposer
+    # calibration). Same mechanism, same flip, and the same evidence as
+    # test_biosphere_stress.py::test_stress_perennial_fixed_point_sustained and
+    # docs/plans/post-roadmap-oracle-match.md. Flipped, not weakened: still a discrete
+    # structural pin, still fails on a period BREAK, plus a liveness floor so a
     # degenerate fixed point at a dead plant cannot pass where the oscillator used to.
     states, _, _ = runs[("perennial", "euler")]
     summaries = year_summaries(states, _YEAR, _peak_leaf)
@@ -208,7 +209,10 @@ def test_perennial_leaf_cycle_is_a_fixed_point(runs) -> None:
     tail = summaries[_PERIOD_TRANSIENT:]
     gap = max(abs(tail[k + 1] - tail[k]) for k in range(len(tail) - 1))
     assert gap < 1e-3 * max(tail)  # branches merged → a fixed point
-    assert max(tail) > 1.0  # converged UP, not collapsed (liveness)
+    # Liveness floor 0.9: the scope-B decomposer calibration shrinks the closed-chamber
+    # plant ~19% (fixed point 1.22 -> 0.994; docs/plans/post-roadmap-decomposer-
+    # calibration.md), still ~3.9x the 0.253 dead baseline -- converged UP, not dead.
+    assert max(tail) > 0.9
 
 
 def test_consumer_leaf_converges_to_a_fixed_point(runs) -> None:
@@ -250,7 +254,11 @@ def test_decade_min_carbon_pool_stationary(runs) -> None:
     assert is_stationary(
         diffs, bound=0.2 * scale, slope_tol=0.02 * scale, transient=_TRANSIENT
     )
-    assert non_collapsing(summaries, floor=0.05)
+    # Floor past the ``_TRANSIENT`` sow-in years (as the paired is_stationary): the
+    # scope-B decomposer calibration slows carbon recycling, so the year-2 CO2 minimum
+    # dips to ~0.039 during soil establishment before settling to ~0.055 (> 0.05) — the
+    # settled attractor still clears the floor; only the sow-in transient dips below it.
+    assert non_collapsing(summaries[_TRANSIENT:], floor=0.05)
 
 
 # --- axis (c): closure carried over the full horizon, BOTH integrators -------

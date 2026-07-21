@@ -489,16 +489,22 @@ LIGHTING_SCENARIO: LightingScenario = DEFAULT_LIGHTING_SCENARIO
 # year sealed run tiles this weather ``years×`` and re-sows at each ``n % SEASON == 0``.
 SEALED_STATION_SEASON_DAYS: int = 305
 
-# The Tier-2 combined-ledger horizon (whole seasons). 3: enough for the biomass watch to
-# see the decomposer pool's approach to steady state across ≥3 same-phase year summaries
-# (spike-measured: peak total-organic-C converges 29.10 → 29.196 → 29.196, diffs
-# shrinking ~450× — geometric, NOT a ramp), and enough to fire ``annual_reset`` twice
-# (at
-# day 305 / 610). The plant itself is **period-1** (grain-at-re-sow byte-identical every
-# year: the pinned-CO₂ regulator-erasure removes the CO₂-pool feedback that drove
-# Phase-4's period-2). ~915 days × 1440 sub-steps ≈ 1.3 M sub-steps (~3 min
-# marked-slow).
-SEALED_STATION_YEARS: int = 3
+# The Tier-2 combined-ledger horizon (whole seasons). 4 (was 3 pre-2026-07-21): the
+# scope-B decomposer calibration (decomp 0.02->0.011, micro 0.05->0.016;
+# docs/plans/post-roadmap-decomposer-calibration.md) enlarged the soil-pool
+# equilibria ~2-3x (litter ~ 1/k_decomp, microbial ~ 1/k_microresp), so the year-1
+# soil-establishment spin-up now spans a full year: year 1 is the only year without a
+# prior year's annual plant-dump (``annual_reset`` sheds old_veg+grain-seedling ~60
+# mol C into litter) already in the soil, so its peak total-organic-C is a one-time
+# transient (year-1->2 same-phase diff 7.85) that then settles (0.329, 0.012). 4
+# seasons give the biomass watch two genuinely-settling post-spin-up diffs
+# [0.329, 0.012] (the gate + stability check skip the year-1 spin-up via
+# ``is_stationary(transient=1)``); 3 would leave one still-settling diff (0.329). 4 is
+# also the max ``rationed==0`` horizon -- year 5 rations (measured), year 6 collapses
+# (pre-existing at OLD rates too -- the sealed station was always a bounded-window
+# demo). The plant is **period-1** (grain-at-re-sow identical every year). ~1220 days
+# x 1440 sub-steps ~= 1.76 M sub-steps (~4 min marked-slow).
+SEALED_STATION_YEARS: int = 4
 
 # The Tier-1 energy-decade horizon (days): the clean Phase-4 analogue for ENERGY, run
 # via

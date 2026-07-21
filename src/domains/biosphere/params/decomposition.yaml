@@ -18,7 +18,19 @@
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
 #
+# ✅ CALIBRATED 2026-07-21 (scope B — docs/plans/post-roadmap-decomposer-calibration.md).
+#   decomposition_rate 0.02 → 0.011/day (7.3 → 4.0/yr). The scope-C finding below (ours is
+#   ~1.5× ABOVE the observed ceiling) drove the move: the value is now AT the top of the cited
+#   range (Olson's fastest ecosystem [A]; near Zhang's 293-litter max [B]), no longer above it.
+#   ⚠ It sits at the FAST EDGE because the sealed chambers close ONLY there — central literature
+#   values starve the recycled-CO₂ loop (measured, re-sow crashes below ~0.004/day). So the
+#   cluster finding is REDUCED, not RESOLVED; the residual (real residue like wheat straw decays
+#   nearer Zhang's 0.30/yr median) is documented, not fitted away. The one-litter-pool /
+#   no-labile-relabel discipline below STILL HOLDS — 4.0/yr is bulk-litter-of-the-fastest-
+#   ecosystem, not a relabeled labile fraction. Full record: the calibration plan doc.
+#
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   [SUPERSEDED BY THE CALIBRATION ABOVE — kept as the diagnosis that drove it.]
 #   TODO(cite) NOT discharged — it REMAINS OPEN and now carries a measured finding.
 #   ROUND 2 (2026-07-16): [A] was obtained and read. The finding SURVIVED first-hand
 #   checking and is now PRIMARY-BACKED — round 1 could only reach Olson through an FAO
@@ -110,6 +122,6 @@ process: decomposition
 
 parameters:
   decomposition_rate:
-    value: 0.02
+    value: 0.011
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, with a measured finding, now PRIMARY-BACKED (2026-07-16, round 2: [A] was obtained and read first-hand; round 1 reached Olson only via an FAO paraphrase). 0.02/day = 7.3/yr is ~1.5× ABOVE THE MAXIMUM of all 293 field-measured litter-decay k values in [B] (range 0.006–4.993/yr, mean 0.581, median 0.300), and ~1.8× above the fastest ecosystem Olson himself estimated ([A] p. 326: ~0.009/yr for high-altitude lodgepole pine up to ~4/yr for African forest). Two independent sources 45 years apart put the ceiling at ~4–5/yr; ours is above both — outside the entire observed distribution. It would be ordinary as a LABILE-fraction constant (RothC DPM = 10/yr), but this model has ONE litter pool, so that re-reading is refused: it would change what the parameter means to fit a citation. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "CALIBRATED 2026-07-21 (scope B, docs/plans/post-roadmap-decomposer-calibration.md): 0.02 → 0.011/day (7.3 → 4.0/yr). WAS ~1.5× ABOVE the top of the cited ranges; NOW AT the top — 4.0/yr is the fastest ecosystem Olson [A] p.326 measured (African tropical forest) and near the max of Zhang's 293-litter database [B] (0.006–4.993/yr, mean 0.581, median 0.300). ⚠ FAST-EDGE, CLOSURE-DRIVEN, NOT CENTRAL: the sealed chambers close ONLY at the fast edge — central literature values (Zhang median 0.30/yr ≈ 0.0008/day) starve the recycled-CO₂ loop and crash annual re-sow (measured; survivable floor ~0.004/day). So the finding 'decomposer cluster runs fast' is REDUCED (above-range → top-of-range), NOT RESOLVED: the actual habitat residue (wheat straw, C/N~80) decays nearer Zhang's 0.30/yr median than the tropical extreme. This model has ONE bulk litter pool; 4.0/yr is defended as bulk litter of the fastest measured ecosystem, NOT by relabeling the pool a 'labile fraction' (that re-reading stays refused; see the header). Cited to [A] Olson 1963 (VALUE, fast-edge) + [B] Zhang 2008 (CONTRAST/distribution)."

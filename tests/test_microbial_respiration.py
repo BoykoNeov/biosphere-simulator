@@ -201,7 +201,9 @@ def test_respiration_self_limits_at_zero_microbial() -> None:
 
 # --- loader ------------------------------------------------------------------
 def test_loader_reads_committed_rate() -> None:
-    assert load_microbial_respiration_params().microbial_respiration_rate == 0.05
+    # 0.016/day since the scope-B decomposer calibration (was 0.05; 18.25 -> 5.84/yr,
+    # docs/plans/post-roadmap-decomposer-calibration.md).
+    assert load_microbial_respiration_params().microbial_respiration_rate == 0.016
 
 
 def test_loader_rejects_negative_rate(tmp_path: Path) -> None:

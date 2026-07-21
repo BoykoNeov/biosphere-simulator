@@ -119,11 +119,20 @@ def _gate(states: list[State], rationed: int, events: tuple[object, ...]) -> Non
     final = states[-1]
     assert 0.0 < final.stocks[CARBON_POOL].amount < 10.0
     assert 0.0 < final.stocks[O2_POOL].amount < 20.0
-    # Biomass bounded (the pinned-CO₂ watch): year-over-year same-phase diffs shrink.
+    # Biomass bounded (the pinned-CO2 watch): year-over-year same-phase diffs shrink.
+    # ``transient=1`` skips the year-1 soil-establishment spin-up: after the scope-B
+    # decomposer calibration (docs/plans/post-roadmap-decomposer-calibration.md) the
+    # soil equilibria are ~2-3x larger, so year 1 -- the only year with no prior annual
+    # plant-dump (``annual_reset`` sheds ~60 mol C into litter) already in the soil --
+    # is a one-time transient (year-1->2 diff ~7.85). Years 2-4 are the settled tail
+    # (diffs 0.329, 0.012): is_stationary sees two shrinking diffs there. Skipping a
+    # documented spin-up year is NOT relaxing the amplitude bound (that would pass
+    # amplifying drift); the bound stays 1.0 and the run must still be non-amplifying
+    # past year 1.
     peaks = year_summaries(states, SEALED_STATION_SCENARIO.season_days, peak_organic_c)
     diffs = same_phase_diffs(peaks, period=1)
-    assert is_stationary(diffs, bound=1.0, slope_tol=1e-2), (
-        f"golden sealed run's biomass must be bounded, diffs={diffs}"
+    assert is_stationary(diffs, bound=1.0, slope_tol=1e-2, transient=1), (
+        f"golden sealed biomass must be bounded past the year-1 spin-up, diffs={diffs}"
     )
     # Feces boundary OPEN (Tier-2 scope, close_feces=False): the FECAL_WASTE sink exists
     # and

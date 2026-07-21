@@ -170,7 +170,9 @@ def test_decomposition_self_limits_at_zero_litter() -> None:
 
 # --- loader ------------------------------------------------------------------
 def test_loader_reads_committed_rate() -> None:
-    assert load_decomposition_params().decomposition_rate == 0.02
+    # 0.011/day since the scope-B decomposer calibration (was 0.02; 7.3 -> 4.0/yr,
+    # docs/plans/post-roadmap-decomposer-calibration.md).
+    assert load_decomposition_params().decomposition_rate == 0.011
 
 
 def test_loader_rejects_negative_rate(tmp_path: Path) -> None:

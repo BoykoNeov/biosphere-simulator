@@ -46,8 +46,8 @@ senesc.rdr_root	0x1.47ae147ae147bp-7
 nitro.max_uptake_capacity	0x1.89374bc6a7efap-10
 nitro.n_residual_per_mol_c	0x1.17e067e3fd0b9p-13
 nitro.n_critical_per_mol_c	0x1.a3d09bd5fb915p-12
-decomp.decomposition_rate	0x1.47ae147ae147bp-6
-micro.microbial_respiration_rate	0x1.999999999999ap-5
+decomp.decomposition_rate	0x1.6872b020c49bap-7
+micro.microbial_respiration_rate	0x1.0624dd2f1a9fcp-6
 micro.o2_half_saturation	0x1.a36e2eb1c432dp-14
 miner.n_senescence_rate	0x1.47ae147ae147bp-7
 miner.mineralization_rate	0x1.eb851eb851eb8p-6

@@ -123,7 +123,18 @@
 #       organism. The bind survives (ours is inside every measured bacterial span); the
 #       CONFIDENCE claim is what changes.
 #
+# ✅ CALIBRATED 2026-07-21 (scope B — docs/plans/post-roadmap-decomposer-calibration.md).
+#   microbial_respiration_rate 0.05 → 0.016/day (18.25 → 5.84/yr). The scope-C finding below
+#   (ours is above BOTH lineages) drove the move: the value now sits INSIDE the active-SOM range
+#   (CLM5 [F] 5.9/yr, CENTURY K5 max [A] 7.3/yr). ⚠ This DELIBERATELY re-anchors to the active-SOM
+#   lineage over the strict RothC 'Microbial Biomass' pool (0.66/yr [E]) — the trap scope C
+#   flagged, made openly: the load-bearing reason is CLOSURE (0.66/yr is below the chamber's
+#   survivable floor; measured), and the ~8.8× residual vs RothC is recorded, not fitted away.
+#   Forced to the FAST edge of the active-SOM range too (CENTURY's 7.3/yr max rations the
+#   perennial; only ~5.9/yr closes). Full record: the calibration plan doc.
+#
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
+#   [microbial_respiration_rate SUPERSEDED BY THE CALIBRATION ABOVE — kept as the diagnosis.]
 #   Split outcome — one CITED, one still OPEN:
 #
 #   o2_half_saturation → CITED [C] + [D]. Our 1e-4 mol/mol ≈ 123 nM dissolved (via
@@ -154,9 +165,9 @@ process: microbial_respiration
 
 parameters:
   microbial_respiration_rate:
-    value: 0.05
+    value: 0.016
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, and the finding is now PRIMARY-BACKED at both ends (2026-07-16, round 2: [A] and [E] were obtained and read; round 1 had only secondaries). 0.05/day = 18.25/yr is ABOVE EVERY published constant for a nominally-microbial pool, but HOW FAR depends on which pool is the analogue, and the two canonical lineages disagree by ~11× on that: vs RothC's BIO = 0.66/yr [E] — a pool named 'Microbial Biomass', the strict analogue — ours is ~28× fast; vs CENTURY's active SOM, K5 = 0.14/wk = 7.3/yr MAXIMUM [A] — 'live microbes and microbial products' plus short-turnover SOM, a broader/faster pool — ours is ~2.5× fast. CLM5's 5.9/yr [F] corroborates [A] independently (~3.1×). THE 11× SPREAD IS ITSELF THE FINDING: 'the microbial pool' is not one thing, so 2.5× and 28× are both honest and neither is THE answer. BOTH ARE RECORDED DELIBERATELY — picking the 2.5× anchor because it flatters the value would be the same re-anchoring trap this scope refused for decomposition_rate (a value defended by redefining what the parameter means). Every comparison here UNDERSTATES the gap: [E] §1.4 applies a·b·c ≤ 1 on top of k, and [A] Eq. [5] further cuts K5 by texture (K5·(1−0.75·T); a T=0.5 loam gives 4.6/yr ⇒ ours ~4.0×). Round 1's '3–28×' becomes ~2.5–28×. Changing the value is calibration = scope B. See docs/plans/post-roadmap-citation.md."
+    source: "CALIBRATED 2026-07-21 (scope B, docs/plans/post-roadmap-decomposer-calibration.md): 0.05 → 0.016/day (18.25 → 5.84/yr). WAS above EVERY published constant for a nominally-microbial pool; NOW INSIDE the active-SOM range — 5.84/yr sits in the CENTURY/CLM5 active-SOM band (CLM5 [F] active-SOM turnover 5.9/yr; CENTURY K5 max [A] 7.3/yr). ⚠ DELIBERATE, DOCUMENTED RE-ANCHORING (the trap scope C flagged, made openly, not silently): choosing the active-SOM lineage over the strict microbial-biomass lineage (RothC BIO 0.66/yr [E], 'ours by name and definition') is a semantic pick. Scope B makes it because (1) the value moves DOWN into a cited range, not relabeled to excuse 18.25, and (2) the load-bearing reason is CLOSURE — RothC BIO 0.66/yr = 0.0018/day is BELOW the chamber's survivable floor (~0.004/day; measured — crashes annual re-sow at ANY litter size, resizing overshoots into rationing). RESIDUAL RECORDED: 5.84/0.66 = ~8.8× above the strict microbial-biomass reading; 'runs fast' is REDUCED (above-all → active-SOM range), NOT RESOLVED vs RothC. ⚠ ALSO CLOSURE-FORCED TO THE FAST EDGE OF THAT range: CENTURY's 7.3/yr max (0.02/day) trips perennial rationing at the calibrated decomp; only ~5.9/yr closes clean. Cited to [A]/[F] active-SOM (VALUE) with the [E] RothC residual kept explicit. o2_half_saturation unchanged (CITED)."
   o2_half_saturation:
     value: 0.0001
     unit: "mol/mol"

@@ -47,7 +47,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.ec4b7afe2ef84p-7",
+      "amount": "0x1.f8dc328337c00p-7",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -73,7 +73,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.a71ee11898393p-11",
+      "amount": "0x1.eff3ca47b2ce0p-12",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -190,7 +190,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.1ef8386b2add2p+11",
+      "amount": "0x1.1ef8380390eb5p+11",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -256,7 +256,7 @@
       "unit": "kg"
     },
     {
-      "amount": "-0x1.1ebb7c00abe3cp+11",
+      "amount": "-0x1.1ebb7b9911f21p+11",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },

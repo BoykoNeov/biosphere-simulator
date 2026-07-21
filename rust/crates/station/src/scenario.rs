@@ -244,8 +244,11 @@ pub fn harvest_scenario() -> HarvestScenario {
 /// The season length / re-sow period (days).
 pub const SEALED_STATION_SEASON_DAYS: usize = 305;
 
-/// The Tier-2 combined-ledger horizon (whole seasons).
-pub const SEALED_STATION_YEARS: usize = 3;
+/// The Tier-2 combined-ledger horizon (whole seasons). 4 since the scope-B decomposer
+/// calibration (2026-07-21): the enlarged soil-pool equilibria lengthen the year-1
+/// soil-establishment spin-up, so the Python biomass gate needs 2 settled post-spin-up
+/// diffs. Mirrors Python `station.scenario.SEALED_STATION_YEARS`; the golden is horizon 4.
+pub const SEALED_STATION_YEARS: usize = 4;
 
 /// The Tier-1 energy-decade horizon (years) — reuses the biosphere's decade horizon.
 pub const SEALED_ENERGY_YEARS: usize = LONG_HORIZON_YEARS;
