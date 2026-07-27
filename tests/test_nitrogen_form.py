@@ -26,11 +26,15 @@ the
 recomputes
    the senescence flux; a test compares it against ``Senescence``'s own litter leg.
 4. **litter C:N landed in a defensible place, and WHERE THE RESIDUAL LIVES.** The shed
-   material is straw-like (C:N 90, from two cited params); the litter POOL sits ~5x
-   higher because ``mineralization_rate`` drains N ~2.7x faster than
-   ``decomposition_rate`` drains C. That ratio is now OBSERVABLE, which retires the
-   decomposer calibration's finding that ``mineralization_rate`` is "behaviorally
-   inert".
+   material is straw-like (C:N 90, from two cited params). The litter POOL is **two
+   regimes, not one number**: a shedding-fed chamber sits ~2x higher (173-192) because
+   ``mineralization_rate`` drains N ~2.7x faster than ``decomposition_rate`` drains C,
+   while a reset-driven chamber is dominated by the annual dump of N-rich dying tissue
+   and reads ~10. Either way the ratio is now OBSERVABLE, which retires the decomposer
+   calibration's finding that ``mineralization_rate`` is "behaviorally inert".
+   ⚠ This line said "~5x" until 2026-07-27 — a leftover from the discredited 1.894
+   factor, still standing after the correction that removed the factor itself. When a
+   number is withdrawn, grep for its CONSEQUENCES, not just its name.
 """
 
 from __future__ import annotations
@@ -60,6 +64,7 @@ from domains.biosphere.season import (
     STEM_C,
     STORAGE_C,
     build_season,
+    run_perennial,
     run_season,
     weather_resolver,
 )
@@ -297,44 +302,116 @@ def test_shed_material_has_a_straw_like_carbon_to_nitrogen_ratio() -> None:
     assert 60.0 < shed_cn < 120.0, "shed C:N left the real-residue band"
 
 
-def test_litter_pool_cn_tracks_the_decomposer_rate_ratio_but_never_reaches_it() -> None:
-    """⚠ THE RESIDUAL AND ITS CAUSE — and the shape of a claim I got wrong first.
+def _litter_rows(
+    scenario: sc.SeasonScenario, years: int, *, resets: bool
+) -> list[tuple[float, float]]:
+    """``(litter_n, litter_carbon)`` per step, under the scenario's OWN golden driver.
+
+    ⚠ ``resets`` is not a knob — it is a property of the scenario, and getting it wrong
+    is what this module's correction was about. ``PERENNIAL_CHAMBER_SCENARIO`` and
+    ``CONSUMER_CHAMBER_SCENARIO`` are driven by :func:`run_perennial` in
+    ``test_regression_perennial_season.py`` / ``test_regression_consumer_season.py``;
+    the annual reset IS what makes them perennial. Running them through
+    :func:`run_season` produces a *different chamber* — see the caller's docstring.
+    """
+    season = _weather(1)
+    weather = season * years
+    state, registry = build_season(scenario)
+    resolver = weather_resolver(weather, scenario)
+    if resets:
+        states, rationed, _ = run_perennial(
+            EulerIntegrator(registry),
+            state,
+            scenario,
+            resolver,
+            1.0,
+            len(weather),
+            year=len(season),
+        )
+    else:
+        states, rationed, _ = run_season(
+            EulerIntegrator(registry), state, resolver, 1.0, len(weather)
+        )
+    assert rationed == 0
+    return [(s.stocks[LITTER_N].amount, s.stocks[LITTER_CARBON].amount) for s in states]
+
+
+def test_litter_pool_cn_is_TWO_regimes_set_by_which_event_fills_the_pool() -> None:
+    """⚠ THE RESIDUAL AND ITS CAUSE — and the SECOND correction to this claim.
 
     The litter POOL's C:N is not the shed material's: nitrogen mineralizes OUT of litter
     (``mineralization_rate`` 0.03/day) faster than carbon decomposes out of it
-    (``decomposition_rate`` 0.011/day), so the pool runs N-poor. The quasi-steady law
-    for a
-    pool under CONTINUOUS input is::
+    (``decomposition_rate`` 0.011/day), so a shedding-fed pool runs N-poor. The
+    quasi-steady law for a pool under CONTINUOUS input is::
 
         pool C:N  ->  (shed C:N) x (k_min / k_decomp)   =  90 x 2.727  =  245.5
 
-    ⚠ **An earlier version of this test asserted that law times a "measured geometry
-    factor of 1.894", and that factor was an ARTEFACT of one scenario at one horizon.**
-    It was fitted to ``sealed_chamber``'s *final* state after 3 years. Measured across
-    the four sealed scenarios, the end-of-run value is 210 (1 yr), 465 (3 yr), 9076 and
-    11877 (5 yr) — i.e. **there is no horizon-independent factor**, and the doc that
-    recorded one was describing a coincidence. This test now pins the two things that
-    are actually true and an assertion that the discredited claim cannot come back.
+    **CORRECTION 1 (kept, still true).** An earlier version asserted that law times a
+    "measured geometry factor of 1.894". That factor was fitted to ``sealed_chamber``'s
+    *final* state at one horizon and is not a constant of the model. Do not write one
+    down.
 
-    **Why the end-of-run number is meaningless.** Our litter input is a PULSE (the
-    annual reset dump), not a continuous feed, and between pulses both currencies drain
-    — carbon with a ~63-day half-life, nitrogen with a ~23-day one. So the end-of-season
-    snapshot is the tail, where N has drained ~2.7x further, and the ratio of two
-    vanishing numbers inflates without bound: by year 5 ``litter_n`` is **1.3e-11 kg**.
-    Quoting that as "the litter C:N" is quoting numerical dust.
+    ⚠ **CORRECTION 2 (this test, 2026-07-27) — correction 1's OWN replacement band was
+    measured on a MIS-DRIVEN scenario set, and the meta-finding took another instance.**
+    Correction 1 replaced the bad factor with "pool C:N is **173-192**, a tight band
+    across all four sealed scenarios", and pinned that tightness with
+    ``max(peak_ratios)/min(peak_ratios) < 1.2``. But it drove **all four** scenarios
+    through :func:`run_season`, and two of them — ``PERENNIAL_CHAMBER_SCENARIO`` and
+    ``CONSUMER_CHAMBER_SCENARIO`` — are driven by :func:`run_perennial` in their own
+    regression goldens. **The annual reset is what makes them perennial**, and dropping
+    it changes the answer by an order of magnitude. Measured under each golden's own
+    driver:
 
-    **What is true:** while the pool is substantial (at peak ``litter_n``), pool C:N is
-    **173-192 across all four sealed scenarios** — consistently *below* the quasi-steady
-    law, because the pulsed pool never gets there. That is ~2.2x wheat straw's ~80, from
-    the frozen form's 0.004: four orders of improvement with an honest residual.
+    ======================  ==============  ================  =====================
+    scenario                pool C:N @peak  fraction of law   regime
+    ======================  ==============  ================  =====================
+    ``sealed_chamber``      191.78          0.781             shedding-fed
+    ``water_biting``        173.37          0.706             shedding-fed
+    ``perennial``            10.91          0.044             reset-dump-dominated
+    ``consumer``              9.87          0.040             reset-dump-dominated
+    ======================  ==============  ================  =====================
+
+    So the true spread is **19.4x, not 1.11x**, and the assertion that certified the
+    tightness has been RETIRED rather than widened — a widened bound would preserve the
+    shape of a claim that is simply gone. Note what this means: the pin that existed
+    *specifically* to stop a constant factor being written down was itself certifying a
+    stability that is a driver artefact.
+
+    **THE MECHANISM, and it is why these are two quantities rather than one wide band:
+    "peak ``litter_n``" silently names two different events.** In a shedding-fed chamber
+    the peak is the seasonal senescence maximum, and the pool C:N is ~0.71-0.78 of the
+    law. In a reset-driven chamber the peak is the **annual dump** — measured at step
+    611 of 1525 for ``perennial``, i.e. one step past the year-2 boundary at 610 — which
+    deposits the dying plant's whole retained N at its own elevated concentration. That
+    material has C:N ~5.6-6.1, so the pool it lands in reads ~10. That elevated
+    concentration is not incidental: it is this work's own recorded limitation, that
+    shedding at the residual concentration leaves a senescing plant holding its N while
+    its biomass denominator collapses.
+
+    ⚠ **Two further sentences of correction 1 were driver artefacts and are WITHDRAWN**,
+    recorded rather than quietly dropped because a wrong number that reads fluently is
+    the thing this project keeps catching:
+
+    * *"the end-of-run value is 210 (1 yr), 465 (3 yr), 9076 and 11877 (5 yr)"* — the
+      5-year figures are wrong. Correctly driven they are **242.9** and **235.2**.
+    * *"by year 5 ``litter_n`` is 1.3e-11 kg ... quoting numerical dust"* — false for
+      the actual perennial chamber, whose final ``litter_n`` is **6.05e-05 kg**, six
+      orders larger. A pool starved of input for five years drains to dust; the
+      perennial chamber is refilled every year by the very reset that was dropped.
+
+    What survives from correction 1, and is still pinned below: there is no
+    horizon-independent factor, and the END-OF-RUN snapshot is not the pool's C:N
+    (``sealed_chamber`` ends at 464.7 against a peak-time 191.8 — 2.4x its own value).
+    The *reason* is unchanged and correct: the input is a pulse, and between pulses N
+    drains ~2.7x faster than C, so a tail reading is inflated.
 
     **This retires a recorded finding.** The decomposer calibration declined to move
     ``mineralization_rate`` for three reasons; two are now false. It is no longer
-    "behaviorally inert" — it sets this ratio — and N and C are no longer "uncoupled",
-    which was the other half of the argument that litter C:N was not a physical
-    quantity. Only the pool-identity objection survives (S&S measured soil N0; ours is
-    fresh residue N). Recalibrating is scope B and a separate user decision, so the
-    value is UNMOVED and the consequence is pinned here instead.
+    "behaviorally inert" — it sets the shedding-fed ratio — and N and C are no longer
+    "uncoupled", which was the other half of the argument that litter C:N was not a
+    physical quantity. Only the pool-identity objection survives (S&S measured soil N0;
+    ours is fresh residue N). Recalibrating is scope B and a separate user decision, so
+    the value is UNMOVED and the consequence is pinned here instead.
     """
     nitro = load_nitrogen_params()
     mineral = load_mineralization_params()
@@ -344,51 +421,73 @@ def test_litter_pool_cn_tracks_the_decomposer_rate_ratio_but_never_reaches_it() 
     law = shed_cn * (mineral.mineralization_rate / decomp.decomposition_rate)
     assert math.isclose(law, 245.5, rel_tol=1e-3), law
 
-    cases = [
-        (sc.SEALED_CHAMBER_SCENARIO, 3),
-        (sc.PERENNIAL_CHAMBER_SCENARIO, 5),
-        (sc.CONSUMER_CHAMBER_SCENARIO, 5),
-        (sc.WATER_BITING_SCENARIO, 1),
-    ]
-    peak_ratios: list[float] = []
-    final_ratios: list[float] = []
-    for scenario, years in cases:
-        state, registry = build_season(scenario)
-        weather = _weather(years)
-        states, rationed, _ = run_season(
-            EulerIntegrator(registry),
-            state,
-            weather_resolver(weather, scenario),
-            1.0,
-            len(weather),
-        )
-        assert rationed == 0
-        rows = [
-            (s.stocks[LITTER_N].amount, s.stocks[LITTER_CARBON].amount) for s in states
-        ]
+    def peak(rows: list[tuple[float, float]]) -> tuple[float, int]:
         peak_n = max(r[0] for r in rows)
         assert peak_n > 0.0
-        at_peak = next(lc * _M_C / ln for ln, lc in rows if ln == peak_n)
-        final_n, final_c = rows[-1]
-        assert final_n > 0.0
+        i = next(k for k, r in enumerate(rows) if r[0] == peak_n)
+        return rows[i][1] * _M_C / peak_n, i
 
-        # 1. while the pool is substantial, the pool C:N sits in a narrow band BELOW the
-        #    quasi-steady law — the pulsed input never lets it converge upward.
+    # --- regime 1: SHEDDING-FED (no annual reset) -------------------------------------
+    shedding_fractions: list[float] = []
+    for scenario, years in (
+        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS),
+        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS),
+    ):
+        rows = _litter_rows(scenario, years, resets=False)
+        at_peak, _ = peak(rows)
+        # below the law (a pulsed pool never converges upward) and the right order for
+        # real residue (wheat straw ~80) — which the pre-(A) form's 0.004 was not.
         assert 150.0 < at_peak < 220.0, (scenario, at_peak)
         assert at_peak < law, (scenario, at_peak, law)
-        # 2. and it is the right order for real residue (wheat straw ~80), which the
-        #    frozen form's 0.004 was not by four orders.
         assert 1.5 < at_peak / 80.0 < 3.0, (scenario, at_peak)
+        shedding_fractions.append(at_peak / law)
+    # THIS is the relationship the scope-B projection below is entitled to use, and its
+    # scope is exactly these two scenarios — never "the four sealed scenarios".
+    assert all(0.65 < f < 0.85 for f in shedding_fractions), shedding_fractions
 
-        peak_ratios.append(at_peak / law)
-        final_ratios.append((final_c * _M_C / final_n) / law)
+    # --- regime 2: RESET-DUMP-DOMINATED ----------------------------------------------
+    season_len = len(_weather(1))
+    for scenario, years in (
+        (sc.PERENNIAL_CHAMBER_SCENARIO, sc.PERENNIAL_CHAMBER_YEARS),
+        (sc.CONSUMER_CHAMBER_SCENARIO, sc.CONSUMER_CHAMBER_YEARS),
+    ):
+        rows = _litter_rows(scenario, years, resets=True)
+        at_peak, i_peak = peak(rows)
+        # an order of magnitude BELOW the shedding-fed band, and below real straw
+        assert 5.0 < at_peak < 20.0, (scenario, at_peak)
+        # the mechanism, asserted rather than described: the peak IS the annual dump —
+        # it lands one step past a year boundary (the reset fires before that step).
+        assert i_peak % season_len == 1, (scenario, i_peak, season_len)
+        # and the dumped material itself is N-rich, which is what pulls the pool down
+        dump_c = rows[i_peak][1] - rows[i_peak - 1][1]
+        dump_n = rows[i_peak][0] - rows[i_peak - 1][0]
+        assert dump_c > 0.0 and dump_n > 0.0, (scenario, dump_c, dump_n)
+        assert 4.0 < (dump_c * _M_C / dump_n) < 8.0, (scenario, dump_c * _M_C / dump_n)
 
-    # 3. THE ANTI-REGRESSION PIN for the claim this test used to make. The peak-time
-    # ratio    is stable across scenarios (a real relationship); the END-OF-RUN ratio is
-    # not —    it spans more than an order of magnitude with the horizon, so no constant
-    # factor    describes it and none may be written down again.
-    assert max(peak_ratios) / min(peak_ratios) < 1.2, peak_ratios
-    assert max(final_ratios) / min(final_ratios) > 10.0, final_ratios
+    # --- the ANTI-REGRESSION pins ----------------------------------------------------
+    # 1. The four sealed scenarios do NOT share a peak-time ratio. This replaces the
+    #    retired `< 1.2` assertion, in the opposite direction, so correction 1's band
+    #    cannot be restored without this going red.
+    all_fractions = [
+        peak(_litter_rows(s, y, resets=r))[0] / law
+        for s, y, r in (
+            (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, False),
+            (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, False),
+            (sc.PERENNIAL_CHAMBER_SCENARIO, sc.PERENNIAL_CHAMBER_YEARS, True),
+            (sc.CONSUMER_CHAMBER_SCENARIO, sc.CONSUMER_CHAMBER_YEARS, True),
+        )
+    ]
+    assert max(all_fractions) / min(all_fractions) > 10.0, all_fractions
+    # 2. The END-OF-RUN snapshot is still not the pool's C:N — the surviving half of
+    #    correction 1, now stated on the one scenario that actually shows it rather than
+    #    as a cross-scenario spread (which, correctly driven, is only ~2.2x).
+    sealed = _litter_rows(
+        sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, resets=False
+    )
+    sealed_peak, _ = peak(sealed)
+    sealed_end = sealed[-1][1] * _M_C / sealed[-1][0]
+    assert sealed_end / sealed_peak > 2.0, (sealed_end, sealed_peak)
+    assert sealed_end > law, (sealed_end, law)
 
 
 def test_the_cited_mineralization_range_would_put_litter_cn_at_real_residue() -> None:
@@ -400,6 +499,17 @@ def test_the_cited_mineralization_range_would_put_litter_cn_at_real_residue() ->
     Stanford & Smith's 39-soil range lands litter C:N at **31-83 with a pooled-mean
     47**, i.e. at or below wheat straw's ~80, against **~184** for our uncited 0.03/day.
 
+    ⚠ **SCOPE CORRECTED (2026-07-27), magnitude UNCHANGED.** The 0.75 fraction was
+    recorded as "the measured peak-time fraction" across *four* sealed scenarios; two of
+    those were mis-driven (see the test above), and correctly driven they sit at 0.040
+    and 0.044, not 0.75. **The projection survives because it was only ever entitled to
+    the SHEDDING-FED regime** — which is where a ``k_min / k_decomp`` relationship means
+    anything at all, since a reset-dump-dominated pool takes its C:N from the dying
+    plant and not from either rate. Correctly driven, the two shedding-fed scenarios
+    give 0.781 and 0.706, so 0.75 remains a fair midpoint and every number below is
+    unmoved. The lesson is that a number can be right while the sentence justifying it
+    is wrong: the fraction was defensible, "across all four sealed scenarios" was not.
+
     The DIRECTION is unchanged and is the point: two independent lines — the citation
     bound (2.2x above the fastest of 39 soils) and the litter C:N target — both say
     ``mineralization_rate`` is too fast. The magnitude is now quoted honestly.
@@ -408,7 +518,9 @@ def test_the_cited_mineralization_range_would_put_litter_cn_at_real_residue() ->
     mineral = load_mineralization_params()
     decomp = load_decomposition_params()
     shed_cn = _CARBON_FRACTION / (nitro.n_residual_per_mol_c / nitro.dm_kg_per_mol_c)
-    # the measured peak-time fraction of the quasi-steady law (see the test above)
+    # The measured peak-time fraction of the quasi-steady law in the SHEDDING-FED
+    # scenarios only (0.706 / 0.781; asserted in the test above). Not a property of the
+    # reset-driven chambers, whose pool C:N is set by the annual dump.
     observed_fraction = 0.75
 
     def pool_cn(k_min: float) -> float:
