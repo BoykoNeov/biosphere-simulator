@@ -471,6 +471,140 @@ fixture held `plant_n0 = 0.2` kg, which under demand-deficit is 130× target ⇒
 **every uptake test would have passed vacuously on zero legs**; the default is now an N-starved
 plant and the demand-limited branch got its own tests.
 
+## THE (B) DIAGNOSIS — measured 2026-07-27, **built: NOT YET (a user decision, see below)**
+
+Read-only probes in `M:/claud_projects/temp/ncycle_b/`, the (A) discipline repeated. **The
+headline is that (B) cannot deliver the thing it is named for, and the reason is measured.**
+
+### B-finding 1 — CUE is 1.0 in this tree, which CONSTRAINS the form before any choice is made
+
+The canonical immobilization treatment needs a carbon-use efficiency: the fraction of
+decomposed litter C assimilated into microbes rather than respired. Ours is **1.0** —
+`Decomposition` moves *100 %* of decayed litter C into `microbial_carbon`, and respiration is
+a **separate** first-order draw on that pool (`decomposition.py` / `microbial_respiration.py`,
+by the deliberate Step-4/Step-5 split). ⇒ **introducing a literature CUE (~0.3–0.4) would move
+CARBON**, re-opening the decomposer calibration under its measured fast-edge closure
+requirement — i.e. it would cost like **(D)**, not like (B).
+
+⇒ **Design requirement, not a preference: (B)'s N legs must be computed off the carbon
+partition `Decomposition` and `MicrobialRespiration` ALREADY apply**, never off a second,
+independently-parameterised CUE. That is (A)'s recomputation-drift hazard one flow over (the
+shed-C == `Senescence`'s-litter-leg pin) and needs the same pin.
+
+### B-finding 2 — ⚠ the pool-identity objection BITES, so the C:N-driven mineral-N draw is UNAVAILABLE
+
+The textbook form imposes a homeostatic microbial C:N (~8; CENTURY/RothC active pool) and
+draws the shortfall from mineral N. That is only legitimate if our `microbial_carbon` *means*
+what those models' pool means. Measured, it does not:
+
+| | `microbial_carbon` / `litter_carbon` | real standing microbial biomass |
+|---|---|---|
+| peak / mean / final | up to 40 / 0.73–6.16 / — | a few **%** of litter C |
+
+`microbial_carbon` peaks at ~0.95–1.01 mol C against a litter pool of ~3.0 — **comparable to
+litter, not a few percent of it**. It is a *transit* pool holding carbon a real model would
+already have respired (finding 1's CUE = 1.0 is exactly why). Imposing C:N = 8 on it would
+demand **90–152× the litter N present** and hold an N stock inflated by the same pool
+mismatch.
+
+⇒ **Refused, for the reason this project has refused twice before** — `decomposition.yaml`'s
+DPM/RPM labile-fraction re-read and `mineralization.yaml`'s soil-N₀-vs-litter-N re-anchoring:
+*redefining what a pool MEANS so a literature constant fits is a semantic model change wearing
+a provenance hat.* So **(B) does not deliver immobilization**, and the option's name in the
+table below is wrong and is corrected there. What it delivers is **microbe-mediated N transit,
+stoichiometric with carbon** — and the immobilization seam stays open with a **measured
+obstacle** instead of a deferral, which is a stronger record than a half-built mechanism.
+
+### B-finding 3 — the available form, and the identity that retires `mineralization_rate`
+
+    litter_n  --> microbial_n     moved = decomposed_C * (litter_n / litter_C)
+    microbial_n --> soil_n        moved = respired_C   * (microbial_n / microbial_C)
+
+replacing the direct `Mineralization` (`litter_n → soil_n` at the free `mineralization_rate`).
+Both recompute their carbon sibling's flux from the same params object — `f_O2` included on
+the respiration leg, which is a *reason* to recompute rather than reuse a bare rate.
+
+**The identity that makes this a citation upgrade rather than a calibration:** since
+`decomposed_C / litter_C ≡ decomposition_rate`, the first N leg **is** `decomposition_rate ·
+litter_n`. So the form **replaces an uncited free rate with the carbon rate stoichiometry
+forces it to equal** — `mineralization_rate` is **RETIRED**, no new parameter appears, and
+that is the second weakly-supported param discharged by a form change rather than a citation
+hunt (after `n_senescence_rate`). ⚠ Write it in the **recomputed-stoichiometric** form, never
+collapsed to the rate: the identity holds only while `Decomposition` stays first-order, and
+the collapsed form would silently outlive that.
+
+### B-finding 4 — INVARIANCE MEASURED, not inherited — including `sealed_station`
+
+The plan recorded "(B) is behaviorally inert for carbon (Finding 2)". Inherited inertness is
+exactly the claim finding 5 had to overturn for (A), so it was re-measured by *running* the
+candidate flows in-process (not integrating offline):
+
+| scenario | driver | carbon max abs delta | `rationed` | N conserved |
+|---|---|---|---|---|
+| `sealed_chamber` | `run_season` | **0.0 (byte-identical)** | 0 | exact |
+| `perennial` | `run_perennial` | **0.0** | 0 | exact |
+| `consumer` | `run_perennial` | **0.0** | 0 | exact |
+| `water_biting` | `run_season` | **0.0** | 0 | exact |
+| **`sealed_station`** | `run_sealed` (two-rate) | **0.0** | 0 | exact |
+
+`sealed_station` was run **because no probe had touched it** and it is in the cascade (⇒ the
+station manifest); the decomposer calibration had already found it behaves unlike the
+biosphere chambers. The structural backing is finding 7 (`f_N` is the only N→C channel, and it
+reads `plant_n`, which (B) never touches) plus `soil_n` staying ≫ `sn_critical` (100 → 99.98,
+band top 50) so availability never leaves 1.0.
+
+⚠ **A probe bug worth recording, because the control did NOT catch it.** The first run showed
+a 2.281 carbon delta. Two confounders were tested and both came back **clean** (flow-id
+reduction order; an added zero-amount stock) — which reads as "the effect is real". It was
+not: `Registry(flows, stocks)` had silently dropped the **aux processes**, so `thermal_time`
+froze at 0 and DVS never advanced. The tell was not the control but a **crash signature** —
+`annual_reset` failing with `storage_c 0.0`, i.e. a plant that never filled grain. **A control
+that comes back clean eliminates only the confounders you thought of; it is not evidence the
+effect is real.**
+
+### B-finding 5 — the payoff, stated at its real size, and it is TWO REGIMES
+
+| scenario | regime | frozen | under (B) |
+|---|---|---|---|
+| `sealed_chamber` | shedding-fed | 191.8 | **100.6** |
+| `water_biting` | shedding-fed | 173.4 | **98.7** |
+| `sealed_station` | reset-driven | 51.4 | **44.2** |
+| `perennial` | reset-driven | 10.9 | **10.1** |
+| `consumer` | reset-driven | 9.9 | **9.1** |
+
+In the shedding-fed chambers pool C:N goes from ~2.2× wheat straw to **~1.24×** — a **~1.8×
+refinement, not a fix**, and it must not be written up as one (the ~4-orders headline belongs
+to (A)). In the reset-driven chambers the pool is governed by the annual dump and barely
+moves, because the dump's C:N is set by the dying plant, not by either rate. Emergent
+microbial C:N is ~107–123 (shedding-fed) / ~11–13 (reset-driven), i.e. it inherits the litter
+value as the linear structure predicts.
+
+### B-finding 6 — `microbial_n` may be a POOL; the extinction hazard is structurally unreachable
+
+`microbial_carbon` is an `organ_stock`, i.e. a POPULATION, so extinction could in principle
+zero it with the residual to the loss-sink and orphan its nitrogen. It cannot here:
+`organ_stock` sets `extinction_threshold = 0.0` and the pass fires on `amount < threshold`, so
+it requires a **negative** amount, which the flows' structural positivity prevents (`events ==
+()` in every run above corroborates). ⇒ `microbial_n` as a POOL is safe. **Named seam:** if
+anyone ever raises `microbial_carbon`'s threshold above 0, the N counterpart must be zeroed
+with it or the emergent C:N breaks.
+
+### What (B) would cost, and why it is not started
+
+An unfreeze of **two** contracts: biosphere manifest (`flow_set` 17 → 18, `param_files` for
+`mineralization.yaml`), station manifest, the goldens carrying N stocks (`sealed_chamber`,
+`perennial`, `consumer`, both long-horizons, `water_biting`, `sealed_station`), the Rust
+mirror (`biosphere_params.txt` loses a param; two flow structs; a stock) and the crossport
+tier. Same size as (A)'s.
+
+⚠ **The decision is the user's, and the reason is not process — it is that what (B) BUYS
+changed.** The recorded case for (B) was immobilization; B-finding 2 measures that as
+unavailable without a pool-identity re-anchoring this project refuses. What remains is
+*retiring `mineralization_rate` by stoichiometry* (strong, and the same move that discharged
+`n_senescence_rate`) plus a *~1.8× refinement* on one of two regimes (modest). That is a
+different trade than the plan's table promised, and it should be seen before two frozen
+contracts are opened.
+
 ## The scope options — (A) TAKEN; (B)/(C)/(D) still open
 
 Ordered by dependency. Each is carbon-invariant except (D).
@@ -485,9 +619,19 @@ Ordered by dependency. Each is carbon-invariant except (D).
   not assumed (finding 6), and it is conditional on the target form**: a flat target
   ≥ ~2× `n_critical` is invariant in all 7 scenarios; a declining Greenwood dilution
   target bites in `day_neutral`. That choice is (A)'s one real scientific decision.
-* **(B) Immobilization** — `microbial_n` stock + C:N-driven `litter_n → microbial_n →
-  soil_n`. Meaningful only after (A) makes C:N a real ratio. Behaviorally inert for
-  carbon on its own (Finding 2).
+* **(B) ~~Immobilization~~ → MICROBE-MEDIATED N TRANSIT** — `microbial_n` stock +
+  **stoichiometric** `litter_n → microbial_n → soil_n`, each leg carried by the carbon flux
+  its sibling already moves. ⚠ **The name was wrong and is corrected here**: the
+  C:N-driven mineral-N draw that "immobilization" means is **UNAVAILABLE**, because our
+  `microbial_carbon` is a *transit* pool (comparable to litter C, not a few % of it — CUE
+  is 1.0 in this tree), so imposing a homeostatic microbial C:N would be the pool-identity
+  re-anchoring this project has twice refused. See **B-findings 1–2** above; the
+  immobilization seam stays open with a *measured obstacle*. What (B) does deliver:
+  **`mineralization_rate` RETIRED by stoichiometry** (`decomposed_C/litter_C ≡
+  decomposition_rate`, so the free rate is replaced by the carbon rate it must equal —
+  the `n_senescence_rate` move again) and a **~1.8×** pool-C:N refinement in the
+  shedding-fed regime only. Carbon invariance is now **MEASURED in all five sealed
+  scenarios incl. `sealed_station`** (B-finding 4), not inherited from Finding 2.
 * **(C) The DS-dependent shedding form** ([B], p. 95: 0/day before anthesis ramping to
   0.15/day by DS 2.0). Largely *subsumed* by (A) if C senescence is the driver — but note
   the frozen carbon `rdr_leaf/stem/root` are themselves flat constants, so (A) inherits
@@ -518,9 +662,12 @@ manifest-named items, so it is a biosphere **unfreeze**, not Rust-first content.
 
 ## Open questions for the user
 
-1. **Which option(s)?** (A) is the coherent minimum and the one that discharges the
-   uncitable param. (B) needs (A). (D) is the only one with a carbon effect and is
-   expected to conflict with the decomposer calibration.
+1. **Which option(s)?** (A) is TAKEN. **(B) is now fully diagnosed and NOT started —
+   awaiting this decision** (see "THE (B) DIAGNOSIS" above): it is measured carbon-invariant
+   in all five sealed scenarios and would retire `mineralization_rate` by stoichiometry, but
+   it **cannot deliver immobilization** (pool identity), so the trade is "retire a contested
+   param + a ~1.8× refinement" against "unfreeze two contracts". (D) is the only one with a
+   carbon effect and is expected to conflict with the decomposer calibration.
 2. ✅ **RESOLVED BY FINDING 9 — and neither branch of this fork was the answer.** The user's
    criterion ("what represents reality more faithfully") turned the fork into a **retrieval
    question**, and the paper was already in `sources/`. Greenwood's published equation carries
