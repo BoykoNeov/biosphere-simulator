@@ -1,6 +1,7 @@
 # Post-roadmap — the nitrogen-cycle FORM gap
 
-**Status: DIAGNOSIS COMPLETE (2026-07-27), scope NOT yet decided. No file touched.**
+**Status: DIAGNOSIS COMPLETE (2026-07-27), advisor-reviewed. Scope NOT yet decided —
+a user call. No frozen file touched; `git diff src/` empty.**
 
 The chosen successor to the scope-(B) decomposer calibration
 (`post-roadmap-decomposer-calibration.md`), which closed the **carbon** return side and
@@ -42,7 +43,15 @@ against the observed `0.150036`. **`plant_n`'s steady state is the ratio of two
 uncited constants** — a capacity flagged as ~6× realistic peak uptake, over a rate for
 which "retrieval is exhausted". That, not the IC, is why a 52 g plant holds 0.15 kg N.
 
-### Finding 2 — `f_N` cannot bite at ANY physically-defensible N scale. Not a param artifact.
+### Finding 2 — in the sealed chamber, `f_N` cannot bite at any physically-defensible SOIL-N scale. Not a param artifact.
+
+⚠ **Read the scope in that heading literally.** This was measured on **one** of the seven
+frozen scenarios (`sealed_chamber`), with uptake **on**, varying the **soil** side. It is
+*not* the claim "`f_N` cannot bite" — `n_limited` bites in the frozen tree at min **0.176**
+(187/306 steps), and finding 5 below shows the **plant** side is where the real margin
+lives. An earlier draft of this section, of the `CLAUDE.md` row and of the memory hook all
+stated it flat; that is the project meta-finding's **11th** instance, with the
+counterexample already recorded in the same file (advisor catch).
 
 Moving the whole N sub-system together (`soil_n0`, the availability band,
 `max_uptake_capacity`, `plant_n0`) to physical per-m² values, and then **starving** it to
@@ -121,6 +130,77 @@ what shape is needed. Resorption efficiency — the quantity the literature *doe
 — is directly expressible in the coupled form (shed a fraction `1 − eff` of the tissue N
 at senescence, retain the rest), so the ~50 % figure becomes usable where it was not.
 
+### Finding 5 — the margin holding `f_N` at 1 is on the PLANT side, and (A) removes it
+
+The advisor connected findings 1 and 2 and predicted the plan's "(A) is carbon-invariant"
+footnote was wrong. The arithmetic:
+
+| | value |
+|---|---|
+| whole-season N demand at `n_critical` | 0.000785 kg |
+| frozen `plant_n` **equilibrium** (`uptake/k_sen`, finding 1) | 0.15 kg → **191×** critical |
+| frozen `plant_n` **initial condition** (`plant_n0`) | 0.50 kg → **637×** critical |
+
+Finding 2 varied the **soil** side while the frozen plant dynamics pinned `plant_n` at
+0.15 kg *regardless* of it. Option (A) removes exactly that mechanism: demand-based uptake
+drives the tissue concentration to a **target**, and coupled shedding removes the
+`uptake/k_sen` brake. The margin collapses from ~191× to ~1×, so invariance is no longer
+inherited — it is decided by where the target sits relative to `n_critical` = 1.5 % DM.
+**So invariance had to be measured, not footnoted.**
+
+### Finding 6 — invariance MEASURED: it holds for a flat coherent target, in all 7 scenarios; the target FORM is load-bearing
+
+`probe_fn_under_A.py` / `probe_fn_all_scenarios.py` integrate the (A) plant-N ODE
+(demand-deficit uptake + N:C-coupled shedding, ± 50 % resorption) on the **recorded**
+carbon trajectory and evaluate `f_N` at every step. Finding 2's zero-feedback result is
+what makes this **exact**: `f_N ≡ 1` ⇒ carbon unchanged ⇒ the recorded trajectory *is* the
+(A) trajectory (a fixed point, not a screen).
+
+`f_N` minimum under (A), per scenario:
+
+| scenario | frozen | (A) flat 3.0 % DM | (A) dilution 4.5→1.2 % | (A) flat 1.5 % (= `n_critical`) |
+|---|---|---|---|---|
+| `sealed_chamber` | 1.0 | **1.0** | 1.0 | 0.828 |
+| `perennial_chamber` | 1.0 | **1.0** | 1.0 | 0.828 |
+| `consumer_chamber` | 1.0 | **1.0** | 1.0 | 0.754 |
+| `water_biting` | 1.0 | **1.0** | 1.0 | 0.842 |
+| `drought` | 1.0 | **1.0** | 1.0 | 0.808 |
+| `day_neutral` | 1.0 | **1.0** | **0.713** ⚠ | 0.893 |
+| `n_limited` (uptake **off**) | 0.176 | 0.0 | 0.0 | 0.0 |
+
+Four results:
+
+1. **At a flat target ≥ ~2× critical (3.0 % DM), (A) is carbon-invariant in every
+   scenario** — `f_N ≡ 1.0`, zero steps below 1, and uptake capacity is **never** binding
+   (0 capped steps: the 52 g plant's demand is met every step). Invariance is *proven*,
+   not assumed.
+2. **A target at `n_critical` itself bites everywhere** (0.75–0.89). That is not a
+   surprise but a tautology: "critical" *means* "below this you are stressed", so
+   targeting it is targeting your own stress threshold. The dip's size is a one-step lag
+   against ~11 %/day relative growth at DVS 0.32 — **real, not a probe artifact**, since
+   in-tree flows also evaluate at the step-entry snapshot.
+3. **The advisor's declining-dilution-curve prediction is half right, and the half that
+   fails is instructive.** A Greenwood-style 4.5 → 1.2 % DM target crosses below
+   `n_critical` late season, yet `f_N` stays 1.0 in the winter-wheat scenarios — because
+   **`f_N`'s denominator collapses**: `leaf+stem+root` falls from 1.9612 to 0.0157 mol C
+   (**×0.008**) as carbon translocates to storage and senesces, while coupled shedding
+   only removes N in proportion to *senescence* carbon. Concentration therefore **rises**
+   late season instead of falling. Robust to the demand denominator (whole-plant incl.
+   storage gives the identical numbers) and to 50 % resorption.
+4. ⚠ **But it DOES bite in `day_neutral` (0.713)** — the one scenario whose phenology is
+   not vernalization/photoperiod-gated, so DVS advances (and the target declines) while
+   vegetative biomass is still growing. **So the target's functional form is a
+   load-bearing scientific choice, not a detail**, and the answer is scenario-dependent.
+
+⚠ **`n_limited` preserves the biting regime but not its magnitude** (0.176 → 0.0): with
+uptake off, coupled shedding is concentration-*neutral*, so dilution by growth drives
+conc → 0 unopposed. The regime pin holds; the value moves a lot. It is not one of the
+7 frozen scenarios, but it does have a golden.
+
+⚠ **"Carbon-invariant" ≠ "no golden moves".** The goldens record N stocks, so `plant_n` /
+`litter_n` / `soil_n` values change under (A) in every case. The cascade is the same size
+either way; what the target choice decides is whether the **science** (carbon) changes too.
+
 ## The scope options (NOT yet decided — needs advisor review + a user call)
 
 Ordered by dependency. Each is carbon-invariant except (D).
@@ -131,8 +211,10 @@ Ordered by dependency. Each is carbon-invariant except (D).
   refinement seam for the "fixed-flux lock"). **Both are needed together**: coupled
   shedding alone removes the `uptake/k_sen` brake, so a capacity-based uptake that
   ignores demand would let `plant_n` accumulate without bound. Retires `n_senescence_rate`
-  (uncitable) in favour of a tissue N:C (citable). Carbon-invariant — to be *verified*,
-  not assumed, since `f_N` reads `plant_n`.
+  (uncitable) in favour of a tissue N:C (citable). **Carbon invariance is now MEASURED,
+  not assumed (finding 6), and it is conditional on the target form**: a flat target
+  ≥ ~2× `n_critical` is invariant in all 7 scenarios; a declining Greenwood dilution
+  target bites in `day_neutral`. That choice is (A)'s one real scientific decision.
 * **(B) Immobilization** — `microbial_n` stock + C:N-driven `litter_n → microbial_n →
   soil_n`. Meaningful only after (A) makes C:N a real ratio. Behaviorally inert for
   carbon on its own (Finding 2).
@@ -169,10 +251,17 @@ manifest-named items, so it is a biosphere **unfreeze**, not Rust-first content.
 1. **Which option(s)?** (A) is the coherent minimum and the one that discharges the
    uncitable param. (B) needs (A). (D) is the only one with a carbon effect and is
    expected to conflict with the decomposer calibration.
-2. **Is a behaviorally-inert deliverable acceptable?** (A)+(B) improve *physical
-   fidelity and citation standing* with a measured **zero** effect on every carbon
-   trajectory. That is the same shape as the original Step-6 deliverable ("nitrogen mass
-   cycles internally and is conserved," NOT "emergent N feedback") — honest, but it must
-   be *stated* as such up front rather than discovered at the end.
+2. **Which tissue-N target form — and therefore, is the deliverable inert or not?**
+   Finding 6 makes this the *real* question, and it is a fork, not a footnote:
+   * **flat target ≥ ~2× `n_critical`** (e.g. 3.0 % DM) → `f_N ≡ 1` in all 7 scenarios,
+     **carbon byte-identical**, N stocks move. A fidelity-and-citation deliverable, the
+     same honest shape as the original Step-6 one ("nitrogen mass cycles internally and is
+     conserved," NOT "emergent N feedback") — but now *stated up front* rather than
+     discovered at the end.
+   * **declining Greenwood dilution target** (4.5 → 1.2 % DM) → more physical, still
+     carbon-invariant in the six winter-wheat scenarios, but **moves `day_neutral`**
+     (`f_N` → 0.713). A science change, with the authored crop as the thing that moves.
+
+   Either way the goldens' N stocks move, so the cascade cost is the same.
 3. **(D) as a separate, explicitly-priced decision?** It is where the science is, and it
    is also where the closure constraint bites hardest.
