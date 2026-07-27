@@ -691,13 +691,30 @@ def test_the_regulator_is_BIT_IDENTICALLY_inert_on_the_frozen_form(
     threshold (LAI 6) is above every frozen peak: ``open_season`` 5.191, and every
     chamber between 0.068 and 0.632, i.e. 9-88x below it.
 
-    This also pins that the one-knot-table path reproduces ``allocation.Senescence``
-    exactly, which is what lets the regulator be run on the frozen form at all.
+    ⚠ **THREE runs, not two, and the third is the point.** Running the regulator on the
+    frozen form needs the flat rates re-expressed as one-knot tables
+    (``_FROZEN_AS_TABLES``), i.e. a RECONSTRUCTION of a frozen quantity. Comparing
+    reconstruction-without-regulator against reconstruction-with-regulator would prove
+    only that the regulator is inert **relative to the reconstruction** — a bug in the
+    reconstruction cancels perfectly and the test stays green. That is exactly the
+    hazard finding 10 names: *reconstruct a frozen quantity only to CHECK it against the
+    recorded one, never to replace it.* So the real ``allocation.Senescence`` is the
+    baseline, and the two legs are asserted SEPARATELY:
+
+      1. ``frozen`` == ``reconstruction`` — the reconstruction is faithful;
+      2. ``reconstruction`` == ``reconstruction + regulator`` — the regulator is inert.
+
+    Asserted apart rather than as one conjunction so that a failure says WHICH.
     """
 
-    def run(shade):
+    def run(*, reconstruct: bool, shade: float):
+        # tables=None AND shade=0 skips ``_candidate`` entirely => the real frozen flow.
         states, rationed, _ = _run(
-            scenario, years, resets=resets, tables=None, shade=shade
+            scenario,
+            years,
+            resets=resets,
+            tables=_FROZEN_AS_TABLES() if reconstruct else None,
+            shade=shade,
         )
         assert rationed == 0
         return [
@@ -708,7 +725,11 @@ def test_the_regulator_is_BIT_IDENTICALLY_inert_on_the_frozen_form(
             for s in states
         ]
 
-    assert run(0.0) == run(VKS_SHADE_RATE), label
+    frozen = run(reconstruct=False, shade=0.0)
+    rebuilt = run(reconstruct=True, shade=0.0)
+    regulated = run(reconstruct=True, shade=VKS_SHADE_RATE)
+    assert frozen == rebuilt, f"{label}: the one-knot reconstruction is NOT faithful"
+    assert rebuilt == regulated, f"{label}: the regulator is NOT inert"
 
 
 def test_frozen_peak_lai_is_below_the_threshold_and_open_season_is_CLOSE() -> None:

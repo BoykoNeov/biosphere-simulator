@@ -177,6 +177,14 @@ Every chamber is 9–88× below the LAI-6 threshold, but `open_season` peaks at 
 frozen scenario within reach of it, and any calibration growing the open-field canopy
 ~16 % makes a *sourced, non-fitted* mechanism start firing in a frozen scenario.
 
+⚠ **This margin is on LAI, NOT on biomass**, and the two must not be conflated — the
+14.4248 t/ha Greenwood crossing of finding 6 is a *mass* margin (~12 %), this is a *leaf
+area* one (~16 %), and they are different quantities that move differently. This repo
+has already been bitten twice by exactly that ambiguity: Greenwood's `W` versus `f_N`'s
+own denominator (finding 9 of the (A) work), and the mass-versus-concentration margin
+finding 6 documents just above. For scale: it takes the DS-keyed form roughly *tripling*
+the canopy to make the regulator fire at all.
+
 Pinned, in the style `test_nitrogen_form.py` established for the 14.4248 t/ha Greenwood
 crossing — because a margin that lives only in prose is the "freeze's prose half is
 ungated" shape.
