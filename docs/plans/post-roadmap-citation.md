@@ -416,6 +416,17 @@ the source is zero. That is a **form** gap, not a value gap, which promotes `n_s
 from citation debt to a **scope-(B) structural candidate**, alongside the canopy and the
 decomposer rates.
 
+⚠ **CORRECTED 2026-07-27 (option-(C) diagnosis) — "→ 0.15/day at DS 2.0" is a
+DE-QUALIFIED RESTATEMENT and the sentence is left standing because the way it is wrong
+is the finding.** 0.15/day comes from an **exercise answer** (p. 113, T10);
+`docs/retired/mineralization.yaml:268` recorded that locus correctly, and every
+paraphrase downstream — including this one — dropped it. The table §3.2.6 p. 95
+actually cites is **Listing 5** (p. 212, "Crop data for rice (variety IR36)"), whose
+`LLVT` peaks at **0.012/day**, 12.5× lower. **The form finding above is UNCHANGED** —
+both tables are zero below DS 1.0 — but the magnitude is not what this file says, and
+measured, the two tables land on opposite sides of the frozen `f_N` tripwire. See "THE
+(C) DIAGNOSIS" in `docs/plans/post-roadmap-nitrogen-cycle-form.md`.
+
 **2. Negative results, recorded so nobody re-runs them.** Stanford & Smith 1972 (#6) was not
 supplied. A search of the whole 29-source corpus found **no first-hand mineralization k
 anywhere** — including Ros 2011, a dedicated N-mineralization review *and* meta-analysis and

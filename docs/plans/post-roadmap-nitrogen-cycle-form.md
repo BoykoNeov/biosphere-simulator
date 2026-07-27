@@ -747,9 +747,19 @@ not deepen it. `f_N` stays exactly 1.0 in every sealed scenario; `n_limited` rep
 recorded 0.175851 / 187 steps unchanged.
 
 
-## The scope options — (A) and (B) TAKEN; (C)/(D) still open
+## The scope options — (A) and (B) TAKEN; (C) DIAGNOSED + PRICED; (D) still open
 
-Ordered by dependency. Each is carbon-invariant except (D).
+Ordered by dependency.
+
+⚠ **This section used to say "Each is carbon-invariant except (D)." That is FALSE for
+(C), and it is the line that made (C) look cheap** (advisor catch, then measured — see
+"THE (C) DIAGNOSIS" below). The sentence was written when (A) and (B) were the live
+options and is true of *them*; it was never checked against (C). (C) keys the **carbon**
+relative death rate on DVS, so every carbon golden moves and the cascade is (D)-sized.
+There is no reading in which (C) touches only the N leg: [A] §3.2.6 is about *biomass*
+loss, and under (A) the N shed is **carried by** the carbon flux, so a DS-keyed N-only
+form would break (A)'s `shed C:N = carbon_fraction/n_residual = 90` identity. The
+subset-claim-written-flat shape again — this time about our own option list.
 
 * **(A) N:C-coupled shedding + demand-based uptake — "make the N cycle physically
   scaled".** Two seams already documented in the frozen tree (`mineralization.py`'s
@@ -775,10 +785,19 @@ Ordered by dependency. Each is carbon-invariant except (D).
   the `n_senescence_rate` move again) and a **~1.8×** pool-C:N refinement in the
   shedding-fed regime only. Carbon invariance is now **MEASURED in all five sealed
   scenarios incl. `sealed_station`** (B-finding 4), not inherited from Finding 2.
-* **(C) The DS-dependent shedding form** ([B], p. 95: 0/day before anthesis ramping to
-  0.15/day by DS 2.0). Largely *subsumed* by (A) if C senescence is the driver — but note
-  the frozen carbon `rdr_leaf/stem/root` are themselves flat constants, so (A) inherits
-  flatness, **not** DS-dependence. (C) stays a separate, additive item.
+* **(C) The DS-dependent shedding form — ✅ DIAGNOSED + PRICED 2026-07-27, NOT built
+  (see "THE (C) DIAGNOSIS" below).** ⚠ **This bullet used to read "([B], p. 95: 0/day
+  before anthesis ramping to 0.15/day by DS 2.0)" and the magnitude was read off the
+  WRONG LOCUS** — 0.15/day is an *exercise answer* on p. 113; the table p. 95 actually
+  cites (Listing 5, the rice IR36 crop file, p. 212) peaks at **0.012/day**, 12.5×
+  lower. Both agree on the *form* (zero below DS 1.0), which is the half that matters.
+  The rest of the old bullet stands: the frozen carbon `rdr_leaf/stem/root` are flat
+  constants, so (A) inherits flatness, **not** DS-dependence, and (C) is a separate
+  item. What the diagnosis adds is the price — it is a **carbon** change (see the
+  correction above), it **breaks `perennial`** (RK4 hard-error; the decade CO₂ floor
+  fails by ~an order and loses its fixed point), and it takes `open_season`'s peak
+  canopy to **LAI 16.4** against real wheat's 5–8, because our flat `rdr_leaf` has been
+  standing in for canopy-regulation science the tree does not have.
 * **(D) ⚠ The N→C throttle — the only option that makes the N cycle load-bearing, and it
   fights last week's calibration.** Real soils decompose high-C:N residue *slower*
   because microbes are N-starved. Adding that factor is what would give N a carbon
@@ -788,6 +807,219 @@ Ordered by dependency. Each is carbon-invariant except (D).
   decomposition. **Expect it to break closure in every sealed scenario.** This is a
   genuine scientific conflict, not an implementation risk, and it should be priced before
   being attempted, not during.
+
+## THE (C) DIAGNOSIS — measured 2026-07-27; **PRICED AT (D) SIZE AND NOT BUILT**
+
+Read-only probes in `M:/claud_projects/temp/ncycle_c/`. Nothing in the repo was run
+against a modified `src/`; the candidate flows are defined in the probe and swapped into
+a freshly-built registry, so every number below is the model, run end to end.
+
+⚠ **The zero-feedback license that made the (A)/(B) diagnoses cheap DOES NOT APPLY
+HERE.** (A) and (B) could be integrated offline against the *recorded* carbon trajectory
+because `f_N ≡ 1` made carbon independent of the N form. (C) changes carbon at the
+source, so nothing could be reused and every scenario was re-run. And (C) is
+**DVS-keyed**, i.e. it depends on exactly the aux accumulator that probe B2's first bug
+froze at 0 — so the probes **assert `max(DVS) == 2.0`** before believing any delta
+(they do, in all eight scenarios).
+
+### C-finding 1 — our own record quotes the WRONG TABLE, and the source has two
+
+[A] Penning de Vries et al. 1989 contains **two** definitions of `LLVT`, the leaf
+relative-death-rate function:
+
+| Locus | `LLVT` (DS → 1/day) | peak |
+|---|---|---|
+| **Listing 5, p. 212** — *"Crop data for rice (variety IR36)"*, the one §3.2.6 cites by name | `0,0  1.0,0  1.3,0.007  1.8,0.012  2.5,0.012` | **0.012** |
+| **T10, p. 113** — an *exercise answer* deriving a table from a hypothetical loss pattern | `0,0  1.0,0  1.5,0.03  2.0,0.15` | **0.15** |
+
+⚠ **And the failure is NOT that round 2 mis-read the page — it is that the qualifier
+was dropped downstream, which is this project's meta-finding in its purest form.**
+`docs/retired/mineralization.yaml:268` records the entry correctly and carefully:
+*"Its own numeric example of that function (**p. 113, exercise T10**) is …"*, with the
+currency and crop caveats attached (*"⚠ THAT IS A SCALE NOTE, NOT A DELTA … LLVT is leaf
+BIOMASS death in RICE"*). Every **restatement** then de-qualified it into "the source's
+function": the same file's own summary at line 424 (*"0/day before anthesis, ramping to
+0.15/day by DS 2.0"*), `post-roadmap-citation.md:413`, and this plan's (C) bullet. The
+careful sentence stayed put while the careless paraphrase travelled.
+
+**And the more authoritative table was never retrieved at all.** §3.2.6 p. 95 says
+*"Listing 5 contains a numerical example that corresponds with observations on a rice
+crop in the Philippines (functions LLVT and LRTT)"* — it points at the crop file, not at
+the exercise. For five citation rounds the record's number for this form came from the
+lower-authority locus while the one the text cites sat unopened in the same PDF. 12.5×
+apart at the terminal rate, and the direction of the comparison with our flat `0.02/day`
+flips with it (Listing 5's peak is *below* ours; T10's is 7.5× *above*).
+
+**Generalized**: *when a source is quoted for a number, check whether it also contains
+that number somewhere more authoritative.* Round 4's rule was "open the paper you cite";
+this is one level in — open the **right part** of the paper you cited, and treat an
+example-in-an-exercise as provisional until the reference parameterization is looked
+for. A locus error survives inside a correctly-attributed quote.
+
+**The form claim survives both** — every reading of this source has the rate at **zero
+below DS 1.0** — so the round-2 structural finding ("ours is the degenerate case of the
+cited form, non-zero exactly where the source is zero") is unaffected. It is the
+magnitude that was mis-sourced, and C-finding 4 shows the magnitude decides whether a
+frozen golden's `f_N` moves.
+
+Both tables were read off **page images**, forced not chosen: extraction renders the
+line as `PUNCTION LLVT = 020., 1.,0:, 1:5,0.03; 2-,0.15`. And T10 supplies its own
+**arithmetic check**, which is the round-5 discipline paying off — it states the loss
+pattern the table reproduces (*"the reproductive period lasts about 30 days. In the
+first 15 days, loss is 20 %, in the second 15 days 75 % of what remained"*), and the
+digits satisfy both halves simultaneously: DS 1.0→1.5 at mean 0.015/day gives
+`1−e^(−0.225)` = **20.2 %**, DS 1.5→2.0 at mean 0.09/day gives `1−e^(−1.35)` =
+**74.1 %**.
+
+### C-finding 2 — what the primary actually licenses (p. 95, first-hand)
+
+* The descriptive form is DS-keyed for **leaf and root** (`LLVT`, `LRTT`). Listing 5's
+  root table is `0,0  1.0,0  1.3,0.011  1.8,0.010  2.5,0.010` — and its post-anthesis
+  plateau (0.010–0.011/day) is within 10 % of our flat `rdr_root = 0.01/day`.
+* **There is no stem function at all**, in either the listing or the text: *"except for
+  their reserves, stems do not lose weight."* Our `rdr_stem = 0.005/day` is unsupported
+  by this source in **existence**, not merely in value.
+* The worked example is **rice IR36**, not wheat. Same lineage caveat as the day-neutral
+  crop work: the *shape* is transferable, the *numbers* are another crop's.
+* The source states its own expected outcome — *"Description such as this usually
+  results in a loss of 40-60 % of leaf area at harvest time"* — which is a checkable
+  band, and C-finding 5 checks it.
+* The source explicitly sanctions calibration: *"These numbers can be used as default
+  values, but should be calibrated to mimick specific situations."* See C-finding 7 for
+  why that permission does **not** unblock (C) here.
+
+### C-finding 3 — (C) is a CARBON change; the plan's invariance line was false
+
+Stated in the corrected section header above. Measured: every carbon stock moves in
+every scenario. The reason it cannot be reduced to an N-only change is structural — [A]
+§3.2.6 is about biomass loss, and (A) made the N shed a *function of* the carbon shed,
+so DS-keying only the N leg would break the `shed C:N = 90` identity (A) shipped.
+
+⚠ **And (C) has an (A)-style recomputation-drift hazard one flow over**:
+`mineralization.py` recomputes `senescence_flux(organ, rdr_*)` off the **flat**
+`SenescenceParams`, so a (C) that changed only `allocation.Senescence` would silently
+keep shedding N at the old rates. The probe implements both legs off one shared table
+object for exactly this reason; a build would have to do the same, and pin it (the
+existing `shed-C == Senescence`'s litter leg pin is the precedent).
+
+### C-finding 4 — the tripwire FIRES, and which table you read decides whether it does
+
+`test_nitrogen_form.py` pins `open_season`'s peak at 12.633 t/ha against the **14.4248
+t/ha** Greenwood crossing, with the comment *"any calibration that grows the open-field
+crop ~15 % pushes the target below `n_critical` and moves a frozen golden."* (C) is that
+calibration. **Measured, not inferred from the crossing** (`f_N` read off the
+trajectory, and it is a live feedback — `carbon_budget.py:207` multiplies gross
+assimilation by `f_water · f_N`, so the peak below is already self-consistent):
+
+| open_season | peak W (t/ha) | vs crossing | min `f_N` | steps `f_N < 1` |
+|---|---|---|---|---|
+| frozen | 12.6331 | 0.876× | 1.000000 | 0 / 306 |
+| **Listing 5** | **18.6777** (+47.8 %) | **1.295×** | **0.995213** | **6 / 306** |
+| T10 | 13.8790 (+9.9 %) | 0.962× | 1.000000 | 0 / 306 |
+
+So the pin did its job: this is the **first time `f_N` bites in a frozen scenario**.
+⚠ **State the size honestly** — 0.5 % over 6 of 306 steps. The tripwire fires; nitrogen
+does not thereby become load-bearing. And note T10 lands at **96.2 %** of the crossing,
+i.e. the locus error of C-finding 1 was worth ~4 % of clearance either side of a
+threshold: the wrong table would have reported "the tripwire does not fire."
+
+### C-finding 5 — ⚠ THE STRUCTURAL FINDING: the flat `rdr_leaf` is standing in for canopy regulation we do not have
+
+Peak leaf area index, `open_season` (real wheat peaks at ~5–8):
+
+| | peak LAI | final LAI | leaf lost by season end |
+|---|---|---|---|
+| frozen (flat 0.02/day) | **5.1908** | 3.1927 | **38.5 %** |
+| Listing 5 | **16.3971** | 11.4802 | 30.0 % |
+| T10 | **16.1561** | 0.3356 | 97.9 % |
+
+**Both source tables give the same peak canopy** (16.40 / 16.16) — because both are
+zero below DS 1.0, and the peak is reached at anthesis. So this is **not** the
+locus question of C-finding 1; it is the *shared* half of the form, the half every
+reading of the source agrees on. A canopy of LAI 16 is 2–3× real wheat.
+
+The tree has no self-shading leaf death, no leaf-age cohorts, no SLA aging — nothing
+that regulates a canopy on the way up. **The flat `rdr_leaf` has been doing that job**,
+and removing it (which is what the primary says to do) exposes the gap. This is the
+decomposer calibration's deepest finding again, on the other side of the plant: *the
+references were propped up by an unphysical rate, and making the rate faithful leaves
+the demo measurably worse.*
+
+⚠ **The corroboration is the primary's own stated outcome, and it cuts against the
+primary's own table**: [A] says the descriptive form *"usually results in a loss of
+40-60 % of leaf area at harvest time."* In our tree the **frozen flat form** lands at
+**38.5 %** — just under the band — while Listing 5 gives **30.0 %** and T10 **97.9 %**.
+That does not vindicate the flat form *as a form*: it says the flat rate was
+(implicitly) sized to produce roughly the right *integrated* loss while getting the
+*timing* entirely wrong — shedding hardest when the source says zero.
+
+### C-finding 6 — closure: Listing 5 breaks `perennial`; T10 breaks re-sow everywhere
+
+**Euler alone reads clean and that is the trap** — `rationed == 0` under Listing 5 in
+all eight scenarios. Increment 1's record ("rationed under Euler, hard-errored under
+RK4") repeats exactly:
+
+* **`perennial`, Listing 5, RK4 → `ArbitrationError`** (`scale_f = 0.95277 < 1`). A
+  needed scale is a hard error under a higher-order scheme, so this is not a
+  near-miss. `test_decade_closure_held` runs RK4 over the full 15 years.
+* **`perennial`'s decade CO₂ guard fails by ~an order AND loses its fixed point.**
+  Per-year minimum `carbon_pool`, the way `test_decade_min_carbon_pool_stationary`
+  computes it:
+  * frozen: `[0.07402, 0.03873, 0.05421, 0.05481, 0.05484, 0.05484, …]` — settles on
+    an attractor; past the `_TRANSIENT = 2` sow-in years the min is **0.054208 > 0.05**
+    ✓. (This reconstruction was **validated against the committed test comment first**
+    — *"dips to ~0.039 during soil establishment before settling to ~0.055"* — per
+    finding 10's rule that you reconstruct a frozen quantity only to CHECK it. Probe C2
+    had invented its own transient rule and reported 0.0387; C3 uses the test's.)
+  * Listing 5: `[0.00848, 0.01853, 0.01092, 0.01020, 0.01396, 0.00591, 0.02020,
+    0.02396, 0.00650, …]` — **fails the 0.05 floor by ~an order**, and never settles:
+    it wanders 0.006–0.027 for fifteen years, so `is_stationary` fails too.
+* **T10 hard-errors at `annual_reset` in all four reset-driven scenarios**: *"seed bank
+  too small to re-sow — storage_c 0.1407 < seedling 0.16."* Grain never fills, so
+  closure fails at the sow.
+* `consumer`, `sealed_chamber` and `water_biting` **survive** Listing 5 on both
+  integrators (`consumer`'s decade CO₂ min settles at 0.14083, clear of the floor).
+
+Liveness moves the *other* way, as expected for a bigger plant: `perennial` peak leaf
+0.994 → 1.424, `consumer` 1.076 → 1.254.
+
+### C-finding 7 — the crop transfer, and the calibration trap the source itself opens
+
+The rice table's *shape* transfers; the *consequence* is amplified by our crop. Rice
+IR36's whole season is 102–135 days ([A], p. 113); our winter wheat reaches anthesis at
+day ~251. "Zero below DS 1.0" therefore removes shedding over ~250 days rather than
+~60 — and `e^(−0.02·250) ≈ 0.0067`, a ~150× difference in retained vegetative leaf
+carbon. That, not the post-anthesis knots, is what produces LAI 16.
+
+[A] explicitly permits calibrating the values (*"should be calibrated to mimick specific
+situations"*), which is the obvious escape: pick a table that keeps `perennial` closed.
+⚠ **Refused, for the reason this repo has refused three times before.** Our only
+available calibration target is *closure of an artificial chamber* and *our own frozen
+goldens* — not observations. Choosing a model form's constants for their effect on
+frozen output is the consumer-chamber-2× / DPM-RPM-labile / ruling-B shape. If (C) is
+ever built, its table must come from a source, and the chambers must be shown to
+survive it — not the other way round.
+
+### THE PRICE, and why (C) is blocked on a missing science rather than on effort
+
+(C) is a full biosphere **and** station unfreeze — a carbon change moves *every* golden,
+both manifests, `biosphere_params.txt`, the Rust mirror and the crossport tier — i.e.
+the cascade this plan reserved for (D). And unlike (A)/(B), **it does not stand alone**:
+taking the primary's form as printed either
+
+* breaks `perennial` (RK4 hard error, decade CO₂ floor, lost fixed point), **or**
+* requires the canopy-regulation science of C-finding 5, which the tree does not have
+  and which is a scope of its own, **or**
+* requires a calibration whose only target is our own goldens (C-finding 7, refused).
+
+So the honest status is **DIAGNOSED, PRICED, NOT RECOMMENDED AS SPECIFIED** — the
+`rdr_*` form gap is real and first-hand, and the thing that blocks closing it is a
+*different* missing science, not the citation. That reading is the same one scope (A)
+reached about the oracle gap ("not a calibration task"), arrived at independently.
+
+The natural successor is therefore **not** (C) or (D) but the canopy regulator (leaf-age
+or self-shading-driven death), which is what would let the primary's form be adopted
+without a fitted table. Left as a user call; nothing here is built.
 
 ## Cost of the cascade (any of A–D)
 

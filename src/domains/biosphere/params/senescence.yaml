@@ -13,6 +13,57 @@
 #   keying of the death rate (the Step-6 maturity-seam shape). Standalone Step 9 is a
 #   plain per-organ constant relative rate.
 #
+# ⚠ THAT SEAM WAS DIAGNOSED AND PRICED 2026-07-27 (option (C) of the nitrogen-cycle FORM
+#   work; docs/plans/post-roadmap-nitrogen-cycle-form.md, "THE (C) DIAGNOSIS"). It is
+#   REAL, it is FIRST-HAND, and it is NOT TAKEN — because closing it needs a science this
+#   tree does not have, not a citation. Summary; the per-param tags below carry the rest.
+#
+#   [A] sec. 3.2.6 (p. 95) gives the descriptive form as a FUNCTION OF DEVELOPMENT STAGE
+#   for LEAF and ROOT, and says of stems "except for their reserves, stems do not lose
+#   weight". Its cited numerical example is Listing 5, "Crop data for rice (variety
+#   IR36)" (p. 212):
+#       FUNCTION LLVT = 0.0,0.0  1.0,0.0  1.3,0.007  1.8,0.012  2.5,0.012   (leaf)
+#       FUNCTION LRTT = 0.0,0.0  1.0,0.0  1.3,0.011  1.8,0.010  2.5,0.010   (root)
+#       (no stem function exists)
+#   Read off the page image -- extraction garbles the numerals.
+#
+#   ⚠ AN EARLIER RECORD OF THIS QUOTED 0.15/day AS THE TERMINAL LEAF RATE. That is from
+#   an EXERCISE ANSWER (p. 113, T10), not from the crop file sec. 3.2.6 cites; 12.5x
+#   apart. See docs/retired/mineralization.yaml's dated correction. THE FORM CLAIM
+#   SURVIVES BOTH READINGS (every one has the rate at ZERO below DS 1.0); only the
+#   magnitude was mis-sourced.
+#
+#   MEASURED, running the DS-keyed form end-to-end against the frozen tree (read-only
+#   probes; nothing built):
+#     * PEAK CANOPY GOES UNPHYSICAL. open_season peak LAI 5.19 -> 16.40 against real
+#       wheat's ~5-8 -- and BOTH source tables give the same peak (16.40 / 16.16),
+#       because both are zero below DS 1.0. So THE FLAT rdr_leaf BELOW HAS BEEN STANDING
+#       IN FOR CANOPY-REGULATION SCIENCE THE TREE DOES NOT HAVE (no self-shading leaf
+#       death, no leaf-age cohorts, no SLA aging). Removing it -- which is what the
+#       primary says to do -- exposes that gap. Corroborated against the primary's OWN
+#       stated outcome ("a loss of 40-60 % of leaf area at harvest time", p. 95): the
+#       FROZEN flat form lands at 38.5 %, Listing 5 at 30.0 %, the exercise table at
+#       97.9 %. The flat rate was implicitly sized to give roughly the right INTEGRATED
+#       loss while getting the TIMING entirely wrong -- shedding hardest where the source
+#       says zero.
+#     * CLOSURE BREAKS IN `perennial`. Euler reports rationed == 0 in all 8 scenarios
+#       (the trap); under RK4 `perennial` HARD-ERRORS (ArbitrationError, scale_f
+#       0.95277), and its decade per-year CO2 minimum falls from a settled 0.05484
+#       attractor to a wandering 0.006-0.027 -- failing the 0.05 floor by ~an order and
+#       losing stationarity. The exercise table is worse: annual_reset hard-errors ("seed
+#       bank too small to re-sow") in all four reset-driven scenarios.
+#     * IT IS A CARBON CHANGE, so it moves EVERY golden + both manifests + the Rust
+#       mirror. open_season peak biomass 12.633 -> 18.678 t/ha (+47.8 %), which CROSSES
+#       the 14.4248 t/ha Greenwood point tests/test_nitrogen_form.py pins: f_N drops to
+#       0.995213 for 6/306 steps -- the FIRST time f_N bites in a frozen scenario.
+#
+#   [A] permits calibrating the values ("These numbers can be used as default values, but
+#   should be calibrated to mimick specific situations"). ⚠ REFUSED HERE: our only
+#   available calibration target is closure of an artificial chamber and our own frozen
+#   goldens, not observations -- the consumer-chamber-2x / DPM-RPM-labile / ruling-B
+#   shape this project has refused before. If (C) is ever built, the table must come from
+#   a source and the chambers must be shown to survive it, not the reverse.
+#
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
 #   All numeric VALUES are provisional, literature-typical placeholders pending the
@@ -30,12 +81,12 @@ parameters:
   rdr_leaf:
     value: 0.02
     unit: "1/day"
-    source: "TODO(cite) — provisional, literature-typical leaf relative death rate [A]; primary citation pending Step 11"
+    source: "TODO(cite) — STILL OPEN, and as of 2026-07-27 it carries the heaviest finding in this file. [A]'s cited table (Listing 5, rice IR36, p. 212) is LLVT = 0.0/day at DS 0-1.0, 0.007 at DS 1.3, 0.012 at DS 1.8+ — so our 0.02/day flat is non-zero over the ENTIRE vegetative phase where the source is exactly zero, and ~1.7x the source's terminal rate where the source is fastest. FORM gap and VALUE gap, and the form is the load-bearing half. ⚠ BUT THE FLAT RATE IS DOING WORK THE SOURCE'S FORM DOES NOT REPLACE, which is why it is NOT moved: running the DS-keyed form end-to-end takes open_season's peak LAI from 5.19 to 16.40 (real wheat ~5-8), because the tree has no self-shading leaf death, no leaf-age cohorts and no SLA aging — this constant has been the canopy's only regulator on the way up. Measured on BOTH source tables, which give the same peak (16.40 / 16.16) since both are zero below DS 1.0, so it is not a reading question. Corroborating, and against the source's own table: [A] p. 95 says the descriptive form 'usually results in a loss of 40-60 % of leaf area at harvest time', and in our tree the FROZEN flat form gives 38.5 % while Listing 5 gives 30.0 % — the flat rate was implicitly sized to the right INTEGRATED loss with the timing entirely wrong. ⚠ AMPLIFIED BY CROP TRANSFER: rice IR36's whole season is 102-135 days, our winter wheat reaches anthesis at day ~251, so 'zero below DS 1.0' removes ~250 days of shedding rather than ~60 (e^-(0.02*250) ~ 0.0067). Changing it is a CARBON change: open_season peak biomass 12.633 -> 18.678 t/ha, crossing the 14.4248 t/ha Greenwood point pinned in tests/test_nitrogen_form.py (f_N 0.995213 for 6/306 steps — the first f_N bite in a frozen scenario), and `perennial` HARD-ERRORS under RK4 while reporting rationed == 0 under Euler. Blocked on a missing canopy regulator, not on retrieval. See docs/plans/post-roadmap-nitrogen-cycle-form.md, 'THE (C) DIAGNOSIS'."
   rdr_stem:
     value: 0.005
     unit: "1/day"
-    source: "TODO(cite) — provisional, literature-typical stem relative death rate [A]; primary citation pending Step 11"
+    source: "TODO(cite) — STILL OPEN, and 2026-07-27 sharpened it from a value gap to an EXISTENCE gap: [A] p. 95 states 'except for their reserves, stems do not lose weight', and Listing 5 (the crop file sec. 3.2.6 cites) carries LLVT and LRTT but NO stem death function at all. So this parameter is not merely uncited at 0.005/day — the source we cite for the senescence form says the quantity is zero. NOT set to zero, because that is a value change to a frozen param with a carbon effect, i.e. scope (C)/(D) work, and it cannot be taken in isolation from rdr_leaf (see its tag: removing pre-anthesis shedding takes peak LAI to 16.4). Recorded, not fitted. ⚠ Note the scope of the quote: [A] says it while describing the MECHANISTIC variant, and 'except for their reserves' concedes stem reserve mobilization, which our single stem_c pool cannot express separately — so the honest reading is 'no structural stem death', not 'no stem carbon ever leaves'. See docs/plans/post-roadmap-nitrogen-cycle-form.md, 'THE (C) DIAGNOSIS' (C-finding 2)."
   rdr_root:
     value: 0.01
     unit: "1/day"
-    source: "TODO(cite) — provisional, literature-typical root relative death rate [A]; primary citation pending Step 11"
+    source: "TODO(cite) — STILL OPEN, but 2026-07-27 found it is the CLOSEST of the three to its source and the finding is worth keeping separate from rdr_leaf's. [A]'s cited table (Listing 5, rice IR36, p. 212) gives LRTT = 0.0/day at DS 0-1.0, 0.011 at DS 1.3, 0.010 at DS 1.8+ — so our flat 0.01/day is within ~10 % of the source's post-anthesis plateau. The gap here is ONLY the form (zero before anthesis), with the magnitude already effectively literature-centred; do not quote the rdr_leaf 'runs fast' finding as covering all three. Unmoved for the same reason as its siblings: DS-keying is a carbon change that breaks `perennial`'s closure and needs a canopy regulator first. See docs/plans/post-roadmap-nitrogen-cycle-form.md, 'THE (C) DIAGNOSIS'."

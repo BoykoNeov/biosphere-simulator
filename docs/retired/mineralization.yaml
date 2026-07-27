@@ -426,6 +426,27 @@ process: mineralization
 #   where senescence.yaml's flat rdr_* now own it; it did not go away. It is option (C) in
 #   docs/plans/post-roadmap-nitrogen-cycle-form.md and remains OPEN.
 #
+#   ⚠ CORRECTED 2026-07-27 (option-(C) diagnosis) — THE PARAGRAPH ABOVE IS LEFT AS
+#   WRITTEN, because the way it is wrong is the finding. "Ramping to 0.15/day by DS 2.0"
+#   is a DE-QUALIFIED RESTATEMENT of this file's own line 268, which correctly says
+#   "p. 113, exercise T10" and attaches the rice/biomass caveats. The careful sentence
+#   stayed put; the careless paraphrase travelled (here, into
+#   post-roadmap-citation.md:413, and into the plan's option-(C) bullet).
+#   AND THE MORE AUTHORITATIVE TABLE WAS NEVER RETRIEVED: sec. 3.2.6 p. 95 points at
+#   LISTING 5 ("Crop data for rice (variety IR36)", p. 212), not at the exercise, and
+#   Listing 5 gives FUNCTION LLVT = 0.0,0.0  1.0,0.0  1.3,0.007  1.8,0.012  2.5,0.012 --
+#   a terminal rate of 0.012/day, 12.5x BELOW the exercise answer and BELOW our own flat
+#   0.02/day. It also gives LRTT (root) = ...1.3,0.011  1.8,0.010  2.5,0.010, within 10 %
+#   of our flat rdr_root, and NO stem function at all ("except for their reserves, stems
+#   do not lose weight", p. 95).
+#   The FORM finding above is UNCHANGED and survives both tables -- every reading has the
+#   rate at ZERO below DS 1.0. Only the magnitude was mis-sourced, and it mattered:
+#   measured, the two tables land on opposite sides of the frozen f_N tripwire.
+#   THE RULE: a locus error survives inside a correctly-attributed quote. When a source
+#   is quoted for a number, check whether it carries that number somewhere more
+#   authoritative. See "THE (C) DIAGNOSIS" in
+#   docs/plans/post-roadmap-nitrogen-cycle-form.md.
+#
 #   Its retired provenance note is preserved verbatim below so five rounds of negative
 #   results are not lost (a stale negative result suppresses the next search - round 4's
 #   lesson - so this is kept readable rather than deleted):
