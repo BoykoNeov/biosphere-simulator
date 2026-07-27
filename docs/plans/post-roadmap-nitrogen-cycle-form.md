@@ -471,7 +471,7 @@ fixture held `plant_n0 = 0.2` kg, which under demand-deficit is 130× target ⇒
 **every uptake test would have passed vacuously on zero legs**; the default is now an N-starved
 plant and the demand-limited branch got its own tests.
 
-## THE (B) DIAGNOSIS — measured 2026-07-27, **built: NOT YET (a user decision, see below)**
+## THE (B) DIAGNOSIS — measured 2026-07-27, **BUILT 2026-07-27** (see the build section below)
 
 Read-only probes in `M:/claud_projects/temp/ncycle_b/`, the (A) discipline repeated. **The
 headline is that (B) cannot deliver the thing it is named for, and the reason is measured.**
@@ -589,7 +589,7 @@ it requires a **negative** amount, which the flows' structural positivity preven
 anyone ever raises `microbial_carbon`'s threshold above 0, the N counterpart must be zeroed
 with it or the emergent C:N breaks.
 
-### What (B) would cost, and why it is not started
+### What (B) cost (recorded as diagnosed; the build section below reports what happened)
 
 An unfreeze of **two** contracts: biosphere manifest (`flow_set` 17 → 18, `param_files` for
 `mineralization.yaml`), station manifest, the goldens carrying N stocks (`sealed_chamber`,
@@ -605,7 +605,118 @@ unavailable without a pool-identity re-anchoring this project refuses. What rema
 different trade than the plan's table promised, and it should be seen before two frozen
 contracts are opened.
 
-## The scope options — (A) TAKEN; (B)/(C)/(D) still open
+
+## THE (B) IMPLEMENTATION — built 2026-07-27
+
+Biosphere unfrozen + re-frozen; station manifest cascaded. **The headline is not the
+~1.8x refinement the diagnosis priced — it is that the litter pool's C:N stopped being a
+free quantity at all.**
+
+### What shipped
+
+* `Mineralization` (`litter_n -> soil_n` at a free `mineralization_rate`) **deleted**,
+  replaced by two flows in `mineralization.py`:
+  `LitterNitrogenTransfer` (`litter_n -> microbial_n`, carried by `Decomposition`'s
+  `decomposed_C`) and `MicrobialNitrogenRelease` (`microbial_n -> soil_n`, carried by
+  `MicrobialRespiration`'s `respired_C`, **`f_O2` included**). One shared kernel,
+  `carried_nitrogen(moved_C, pool_N, pool_C)`.
+* **`mineralization_rate` RETIRED, and `params/mineralization.yaml` with it** — the file
+  had no other parameter left, since (A) had already retired `n_senescence_rate`. This is
+  the first param *file* the project has removed rather than re-valued: a `param_files`
+  **membership** change, not a hash move. Its provenance record (five rounds of negative
+  retrieval results) is archived verbatim at `docs/retired/mineralization.yaml`, because a
+  stale *negative* result suppresses the next search and is the more expensive thing to
+  lose. Pinned by a test, so it cannot be quietly tidied away.
+* New stock `biosphere.microbial_n` — a **POOL**, deliberately not a POPULATION like its
+  carbon sibling (B-finding 6): `organ_stock`'s extinction pass would orphan nitrogen the
+  carbon side still holds. The seam is pinned as a test, not a comment.
+
+### The results, measured
+
+* **Carbon byte-identical in all 8 scenarios probed, and `drift_summary.json` regenerated
+  BYTE-UNCHANGED** — the zero-carbon-effect claim confirmed at the artifact level, not
+  just per-stock. `rationed == 0`, `events == ()`, N conserved exactly everywhere.
+* **10 goldens moved and every one moved ONLY in nitrogen** (verified structurally, by
+  parsing both snapshots per stock and grouping by *quantity* — a grep over a unified diff
+  cannot tell you which stock an `"amount"` line belongs to). Each gained `microbial_n` and
+  moved exactly `soil_n` + `litter_n`. `open_season` and `n_limited` are **structurally
+  untouched**: open field builds no `litter_n`, so there is no `Mineralization` to replace.
+* Cross-port: **101 passed**; Rust reproduces the new stock and the moved values.
+
+### THE FINDING — the C:N law changed KIND, not just magnitude
+
+The diagnosis priced (B) as "a ~1.8x refinement in one of two regimes". That understated
+it, and the reason is an identity the diagnosis had already written down without following
+through: under the retired form, N left the litter pool at a FREE rate while C left at
+`decomposition_rate`, so the pool was pushed 2.727x away from its input's ratio. Both
+currencies now leave on the **same** flux, so the pushing factor is exactly **1**:
+
+    old:  pool C:N -> (shed C:N) x (k_min / k_decomp)  =  90 x 2.727  =  245.5
+    new:  pool C:N -> shed C:N                          =  90
+
+Measured: shedding-fed chambers sit at **98.7-100.6** at peak `litter_n` (1.10-1.12x the
+shed ratio, the pulsed-input transient), and `sealed_chamber` **ends at 90.6** — within
+0.7 % of it. Against wheat straw's ~80 that is **~1.25x**, where the pre-(A) form gave
+**0.004** and the post-(A) direct form gave 173-192.
+
+The point is not the number. **The litter pool's C:N stopped being an accident of two
+unrelated rate constants and became a function of the composition of the material that
+fell into it** — and both numbers fixing that composition are cited (`carbon_fraction`
+0.45, `n_residual` Van Hecke 2020).
+
+### Three previously-pinned claims RETIRED, and none of them was wrong
+
+Each was a true measurement of a form that no longer exists, so they are **resolved**
+rather than corrected — the distinction matters, because this project's habit is retiring
+*artefacts*, and these are not artefacts:
+
+1. the **245.5 quasi-steady law** — its `k_min` no longer exists;
+2. *"a shedding-fed pool runs N-poor at 0.71-0.78 of the law"* — it ran N-poor **because**
+   N drained 2.7x faster than C; with equal drains it does not;
+3. *"the end-of-run snapshot is inflated ~2.4x and horizon-dependent over an order of
+   magnitude"* — the inflation **was** the differential drain showing in the tail between
+   pulses. **The horizon-dependence that correction 1's anti-regression pin existed to
+   guard against is gone at its source**, so that pin was replaced by its **inverse**
+   (`end/peak` must now be ~1) rather than relaxed. A pin that guards against a mechanism
+   you have removed is not protection, it is decoration.
+
+The **scope-B projection test is retired too, and its premise rather than its arithmetic
+is what failed**: it projected the pool C:N if `mineralization_rate` were moved into
+Stanford & Smith's 39-soil range (31-83, mean 47). There is no such rate to move. The
+question was not answered — no value was chosen from a cited band — it was **dissolved**.
+That also disposes of the last surviving objection from the decomposer calibration: a
+parameter that does not exist cannot be mis-anchored to the wrong pool.
+
+⚠ **What this does NOT claim.** The decomposer cluster's **carbon** rates are untouched
+and still run at the fast edge of their literature ranges (`decomposition_rate` 4.0/yr,
+Olson's fastest ecosystem), and the litter pool's C:N now *inherits* that carbon rate. The
+honest statement is that the N cycle no longer contributes a **separate** uncited rate —
+not that the decomposer side is now fully cited.
+
+⚠ **The second regime is untouched**, which is why it is still two regimes: a reset-driven
+chamber's pool is filled by the annual dump, whose C:N is set by the dying plant rather
+than by any rate (10.9 -> 10.0, 9.9 -> 9.1).
+
+### The blocking catch this build started from
+
+⚠ **B-finding 4's invariance table had five rows; the manifest freezes seven** — it
+omitted both 15-year long-horizons, `drift_summary`, and `open_season`. That is this
+project's own 12th meta-finding one option later ("check a scenario list against the
+MANIFEST, never against its own length"), and it was not bookkeeping: (B) parks nitrogen
+in a **standing** `microbial_n` pool, so `soil_n` sits permanently lower, and
+`soil_n -> availability -> uptake -> plant_n -> f_N` is a real **second-order** channel.
+Finding 7's "f_N is the only N->C channel" proof closes the **direct read**, not the
+**supply path**.
+
+Measured over the full manifest roster, each scenario driven the way its own golden drives
+it: the drain is **standing, not accumulating** — `perennial`'s `min(soil_n)` is
+`99.995967` at **both** 5 and 15 years, identically. Worst drain anywhere is `8.6e-4` kg
+against a 100 kg pool with `sn_critical` 50, i.e. ~5 orders from biting, and a decade does
+not deepen it. `f_N` stays exactly 1.0 in every sealed scenario; `n_limited` reproduces its
+recorded 0.175851 / 187 steps unchanged.
+
+
+## The scope options — (A) and (B) TAKEN; (C)/(D) still open
 
 Ordered by dependency. Each is carbon-invariant except (D).
 
@@ -619,7 +730,8 @@ Ordered by dependency. Each is carbon-invariant except (D).
   not assumed (finding 6), and it is conditional on the target form**: a flat target
   ≥ ~2× `n_critical` is invariant in all 7 scenarios; a declining Greenwood dilution
   target bites in `day_neutral`. That choice is (A)'s one real scientific decision.
-* **(B) ~~Immobilization~~ → MICROBE-MEDIATED N TRANSIT** — `microbial_n` stock +
+* **(B) ~~Immobilization~~ → MICROBE-MEDIATED N TRANSIT — ✅ TAKEN, built 2026-07-27
+  (see "THE (B) IMPLEMENTATION" above).** `microbial_n` stock +
   **stoichiometric** `litter_n → microbial_n → soil_n`, each leg carried by the carbon flux
   its sibling already moves. ⚠ **The name was wrong and is corrected here**: the
   C:N-driven mineral-N draw that "immobilization" means is **UNAVAILABLE**, because our
@@ -662,8 +774,15 @@ manifest-named items, so it is a biosphere **unfreeze**, not Rust-first content.
 
 ## Open questions for the user
 
-1. **Which option(s)?** (A) is TAKEN. **(B) is now fully diagnosed and NOT started —
-   awaiting this decision** (see "THE (B) DIAGNOSIS" above): it is measured carbon-invariant
+1. ✅ **RESOLVED — (A) and (B) are both TAKEN** (B built 2026-07-27; the user's
+   direction was "do what you recommend", and the recommendation was (B) for the
+   parameter retirement rather than for the C:N refinement). **What remains open is (C)
+   and (D)**, and (D) still fights the fast-edge closure requirement head-on, so it stays
+   a decision to price before attempting rather than one to drift into. The original
+   framing is kept below for the record:
+
+   ~~(A) is TAKEN. **(B) is now fully diagnosed and NOT started — awaiting this
+   decision**~~ (see "THE (B) DIAGNOSIS" above): it is measured carbon-invariant
    in all five sealed scenarios and would retire `mineralization_rate` by stoichiometry, but
    it **cannot deliver immobilization** (pool identity), so the trade is "retire a contested
    param + a ~1.8× refinement" against "unfreeze two contracts". (D) is the only one with a

@@ -28,7 +28,6 @@ from domains.biosphere.decomposition import DecompositionParams
 from domains.biosphere.demo import DemoParams
 from domains.biosphere.herbivory import HerbivoryParams
 from domains.biosphere.microbial_respiration import MicrobialRespirationParams
-from domains.biosphere.mineralization import MineralizationParams
 from domains.biosphere.nitrogen import NitrogenParams
 from domains.biosphere.phenology import (
     PhenologyParams,
@@ -70,11 +69,6 @@ DECOMPOSITION_PARAMS_PATH: Path = (
 # The committed chamber microbial-respiration (first-order rate) params (P2 Step 5).
 MICROBIAL_RESPIRATION_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "microbial_respiration.yaml"
-)
-# The committed chamber nitrogen-return-loop params (P2 Step 6): the two first-order
-# rates (N-senescence shedding + net mineralization) that close the N cycle.
-MINERALIZATION_PARAMS_PATH: Path = (
-    Path(__file__).parent / "params" / "mineralization.yaml"
 )
 # The committed chamber water-cycle params (P3 Step 3): the two first-order rates
 # (condensation + recycling) that close the water loop.
@@ -1200,90 +1194,30 @@ def load_microbial_respiration_params(
     )
 
 
-# --- nitrogen return loop / mineralization (Phase-2 Step 6) ------------------
-# Same structured value/unit/source format as decomposition. The TWO first-order rates
-# (1/day) — N-senescence shedding + net mineralization — are NOT conserved-Quantity
-# canonical units, so each is a schema-validated, bound-checked float whose declared
-# ``unit`` is exact-string guarded (the decomposition / microbial-respiration /
-# senescence discipline). A zero rate is valid (no shedding / no mineralization);
-# negative is rejected.
-
-# Expected canonical unit string per mineralization param (exact-match guard).
-_MINERALIZATION_UNITS: dict[str, str] = {
-    "mineralization_rate": "1/day",
-}
-
-
-class _MineralizationValueUnit(BaseModel):
-    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    value: float
-    unit: str
-    source: str
-
-
-class _MineralizationParameters(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    mineralization_rate: _MineralizationValueUnit
-
-
-class _MineralizationSchema(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    name: str
-    process: str
-    parameters: _MineralizationParameters
-
-
-def _mineralization_value(params: _MineralizationParameters, field: str) -> float:
-    """Read a mineralization param's value, exact-string guarding its declared unit."""
-    entry: _MineralizationValueUnit = getattr(params, field)
-    expected = _MINERALIZATION_UNITS[field]
-    if entry.unit != expected:
-        raise ValueError(
-            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
-        )
-    return entry.value
-
-
-def load_mineralization_params(
-    path: str | Path = MINERALIZATION_PARAMS_PATH,
-) -> MineralizationParams:
-    """Load, schema- and bound-check the nitrogen-return-loop params (P2 Step 6).
-
-    Since the post-roadmap N-cycle form change this file holds **one** rate: N shedding
-    is no longer a first-order rate on ``plant_n`` but is coupled to the senescing
-    carbon at a cited residual concentration (see ``mineralization.py``), so
-    ``n_senescence_rate`` — the project's highest clean-room risk, a 1/day rate no
-    source publishes — is gone rather than merely re-cited. The net mineralization rate
-    carries a declared unit (exact-string guarded) and a required ``source`` tag
-    (clean-room discipline). Each must be non-negative (0 = off; negative would create
-    nitrogen). Raises ``pydantic.ValidationError`` on a schema violation, ``ValueError``
-    on a bad unit or negative value.
-    """
-    schema = _MineralizationSchema.model_validate(load_yaml(path))
-    params = schema.parameters
-    values = {
-        field: _mineralization_value(params, field) for field in _MINERALIZATION_UNITS
-    }
-
-    for field, value in values.items():
-        if value < 0.0:
-            raise ValueError(f"{field} must be >= 0, got {value}")
-
-    return MineralizationParams(
-        mineralization_rate=values["mineralization_rate"],
-    )
+# --- nitrogen return loop: NO PARAM FILE (post-roadmap, the N-cycle form gap) --------
+# There is deliberately no ``load_mineralization_params`` and no
+# ``mineralization.yaml``. The nitrogen return loop's two flows carry no rate of their
+# own: ``NitrogenSenescence`` sheds at a cited tissue concentration from
+# ``nitrogen.yaml``, and the microbe-mediated
+# return legs (``LitterNitrogenTransfer`` / ``MicrobialNitrogenRelease``) recompute the
+# carbon flux their decomposer siblings already move, so they take
+# ``load_decomposition_params`` / ``load_microbial_respiration_params``.
+#
+# Both of this file's original rates were retired by FORM changes rather than by finding
+# citations, which is why the file itself is gone:
+#   n_senescence_rate    -> N shedding coupled to senescing carbon (option (A))
+#   mineralization_rate  -> the identity
+#                           ``decomposed_C / litter_C == decomposition_rate`` makes the
+#                           free rate redundant with the carbon rate (option (B))
+# See ``mineralization.py`` and docs/plans/post-roadmap-nitrogen-cycle-form.md.
 
 
 # --- water cycle closure / condensation + recycling (Phase-3 Step 3) ---------
-# Same structured value/unit/source format as mineralization. The TWO first-order rates
+# Same structured value/unit/source format as decomposition. The TWO first-order rates
 # (1/day) — condensation + recycling — are NOT conserved-Quantity canonical units, so
 # each is a schema-validated, bound-checked float whose declared ``unit`` is
-# exact-string guarded (the decomposition / mineralization discipline). A zero rate is
+# exact-string guarded (the decomposition / microbial-respiration discipline). A zero
+# rate is
 # valid (no condensation / no recycling); negative is rejected.
 
 # Expected canonical unit string per water-cycle param (exact-match guard).

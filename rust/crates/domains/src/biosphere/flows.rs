@@ -581,8 +581,7 @@ impl Flow for NitrogenSenescence {
         // law rather than routing it through `science`, so this mirrors the expression, not
         // a shared helper — the drift hazard that buys is pinned Python-side by comparing
         // this flow's shed carbon against Senescence's own litter leg).
-        let shed_carbon =
-            self.rdr_leaf * leaf + self.rdr_stem * stem + self.rdr_root * root;
+        let shed_carbon = self.rdr_leaf * leaf + self.rdr_stem * stem + self.rdr_root * root;
         let plant_n = amt(snapshot, &self.plant_n);
         let biomass_c = leaf + stem + root;
         let shed = if shed_carbon <= 0.0 || plant_n <= 0.0 || biomass_c <= 0.0 {
@@ -594,15 +593,33 @@ impl Flow for NitrogenSenescence {
     }
 }
 
-/// NITROGEN `litter_n -> soil_n`.
-pub struct Mineralization {
-    pub id: String,
-    pub litter_n: String,
-    pub soil_n: String,
-    pub mineralization_rate: f64,
+/// The nitrogen belonging to `moved_carbon` at the donor pool's own N:C.
+///
+/// The one kernel behind both microbe-mediated legs: a carbon flux leaving a pool takes
+/// that pool's nitrogen with it. Returns 0.0 for an empty or non-positive pool, so
+/// positivity is structural (never a divide-by-zero, never a negative leg).
+fn carried_nitrogen(moved_carbon: f64, pool_n: f64, pool_c: f64) -> f64 {
+    if moved_carbon <= 0.0 || pool_n <= 0.0 || pool_c <= 0.0 {
+        return 0.0;
+    }
+    moved_carbon * (pool_n / pool_c)
 }
 
-impl Flow for Mineralization {
+/// NITROGEN `litter_n -> microbial_n`, carried by the decomposed carbon.
+///
+/// The N leg of `Decomposition`. It RECOMPUTES that flow's carbon flux from the same
+/// rate rather than collapsing to `decomposition_rate * litter_n`: the two are equal
+/// only while `Decomposition` stays first-order, and the collapsed form would read
+/// identically today and silently outlive that premise.
+pub struct LitterNitrogenTransfer {
+    pub id: String,
+    pub litter_n: String,
+    pub microbial_n: String,
+    pub litter_carbon: String,
+    pub decomposition_rate: f64,
+}
+
+impl Flow for LitterNitrogenTransfer {
     fn id(&self) -> &str {
         &self.id
     }
@@ -612,10 +629,55 @@ impl Flow for Mineralization {
         _env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let mineralized = self.mineralization_rate * amt(snapshot, &self.litter_n) * dt;
+        let litter_c = amt(snapshot, &self.litter_carbon);
+        // The identical flux Decomposition sends litter_carbon -> microbial_carbon.
+        let decomposed = self.decomposition_rate * litter_c * dt;
+        let moved = carried_nitrogen(decomposed, amt(snapshot, &self.litter_n), litter_c);
         FlowResult::new(vec![
-            leg(&self.litter_n, -mineralized)?,
-            leg(&self.soil_n, mineralized)?,
+            leg(&self.litter_n, -moved)?,
+            leg(&self.microbial_n, moved)?,
+        ])
+    }
+}
+
+/// NITROGEN `microbial_n -> soil_n`, carried by the respired carbon.
+///
+/// The N leg of `MicrobialRespiration`, `f_O2` included -- which is the clearest reason
+/// this recomputes rather than reusing a bare rate: the N release must throttle with the
+/// carbon as O2 depletes.
+pub struct MicrobialNitrogenRelease {
+    pub id: String,
+    pub microbial_n: String,
+    pub soil_n: String,
+    pub microbial_carbon: String,
+    pub o2_pool: String,
+    pub microbial_respiration_rate: f64,
+    pub o2_half_saturation: f64,
+    pub air_mol: f64,
+}
+
+impl Flow for MicrobialNitrogenRelease {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let microbial_c = amt(snapshot, &self.microbial_carbon);
+        // The identical flux MicrobialRespiration burns to CO2 -- f_O2 included.
+        let f_o2 = science::oxygen_limitation_factor(
+            amt(snapshot, &self.o2_pool),
+            self.air_mol,
+            self.o2_half_saturation,
+        );
+        let respired = self.microbial_respiration_rate * microbial_c * f_o2 * dt;
+        let moved = carried_nitrogen(respired, amt(snapshot, &self.microbial_n), microbial_c);
+        FlowResult::new(vec![
+            leg(&self.microbial_n, -moved)?,
+            leg(&self.soil_n, moved)?,
         ])
     }
 }

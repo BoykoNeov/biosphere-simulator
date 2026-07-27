@@ -22,6 +22,10 @@ pub const O2_POOL: &str = "biosphere.o2_pool";
 pub const LITTER_CARBON: &str = "biosphere.litter_carbon";
 pub const MICROBIAL_CARBON: &str = "biosphere.microbial_carbon";
 pub const LITTER_N: &str = "biosphere.litter_n";
+/// The N counterpart of `microbial_carbon` -- the transit pool the microbe-mediated
+/// return leg routes through. A POOL, not a POPULATION like its carbon sibling: an
+/// extinction pass on a POPULATION would orphan the nitrogen the carbon side holds.
+pub const MICROBIAL_N: &str = "biosphere.microbial_n";
 pub const WATER_VAPOR: &str = "biosphere.water_vapor";
 pub const CONDENSATE: &str = "biosphere.condensate";
 pub const CONSUMER_CARBON: &str = "biosphere.consumer_carbon";

@@ -7,13 +7,18 @@ left ``plant_n`` monotone-growing (uptake fed it; nothing withdrew it) and refil
 * **N-senescence** ``plant_n → litter_n`` — the plant sheds N into a finite ``litter_n``
   POOL (the N analogue of carbon senescence feeding ``litter_carbon``); first-order in
   plant_n, so ``plant_n`` is now drained (no longer monotone-growing).
-* **Mineralization** ``litter_n → soil_n`` — decomposing litter releases mineral N back
-  to the soil; direct first-order net mineralization (Stanford & Smith 1972).
+* **LitterNitrogenTransfer** ``litter_n → microbial_n`` and **MicrobialNitrogenRelease**
+  ``microbial_n → soil_n`` — the **microbe-mediated** return leg (post-roadmap, the
+  N-cycle form gap option (B)). These replaced a *direct* ``litter_n → soil_n``
+  mineralization at a free ``mineralization_rate``; each now carries the nitrogen
+  belonging to the carbon its decomposer sibling already moved, so the free rate is
+  retired and ``params/mineralization.yaml`` no longer exists.
 
-Both are single-currency NITROGEN flows (no core change). Four layers:
+All are single-currency NITROGEN flows (no core change). Four layers:
 
-* **Rate laws** — both fluxes are ``rate·donor`` (→ 0 as the donor → 0; positivity
-  structural).
+* **Rate laws** — the shedding flux, plus the one ``carried_nitrogen`` kernel behind
+  both return legs (→ 0 as the donor → 0; positivity structural and *inherited* from the
+  carbon leg's own ``k·dt < 1`` bound).
 * **Flow level** — each flow transfers the same amount donor → receiver and balances
   NITROGEN only (no CARBON/OXYGEN/WATER residual).
 * **Integration (the sealed season)** — ``litter_n`` accumulates then drains,
@@ -37,18 +42,23 @@ import math
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 
 from domains.biosphere.allocation import SenescenceParams
-from domains.biosphere.loader import (
-    load_mineralization_params,
-    load_nitrogen_params,
+from domains.biosphere.decomposition import (
+    Decomposition,
+    DecompositionParams,
+    decomposition_flux,
+)
+from domains.biosphere.loader import load_nitrogen_params
+from domains.biosphere.microbial_respiration import (
+    MicrobialRespiration,
+    MicrobialRespirationParams,
 )
 from domains.biosphere.mineralization import (
-    Mineralization,
-    MineralizationParams,
+    LitterNitrogenTransfer,
+    MicrobialNitrogenRelease,
     NitrogenSenescence,
-    mineralization_flux,
+    carried_nitrogen,
     nitrogen_shedding_flux,
 )
 from domains.biosphere.nitrogen import NitrogenParams, nitrogen_stress_factor
@@ -79,6 +89,10 @@ _LEAF_C = StockId("biosphere.leaf_c")
 _STEM_C = StockId("biosphere.stem_c")
 _ROOT_C = StockId("biosphere.root_c")
 _SOIL_N = StockId("biosphere.soil_n")
+_MICROBIAL_N = StockId("biosphere.microbial_n")
+_LITTER_C = StockId("biosphere.litter_carbon")
+_MICROBIAL_C = StockId("biosphere.microbial_carbon")
+_O2 = StockId("biosphere.o2_pool")
 
 
 def _weather() -> list[dict[str, float | str]]:
@@ -124,19 +138,41 @@ def test_n_shedding_flux_is_zero_at_every_degenerate_input() -> None:
     assert nitrogen_shedding_flux(2.0, 1.0, 0.0, n_residual_per_mol_c=0.001) == 0.0
 
 
-def test_mineralization_flux_is_first_order_in_litter_n() -> None:
-    # min = mineralization_rate · litter_n: a hand value + linearity in the standing N.
-    assert math.isclose(
-        mineralization_flux(2.0, mineralization_rate=0.03), 0.06, rel_tol=1e-12
-    )
-    assert math.isclose(
-        mineralization_flux(5.0, mineralization_rate=0.03), 0.15, rel_tol=1e-12
-    )
+def test_carried_nitrogen_moves_the_donor_pools_own_ratio() -> None:
+    # moved_C · (pool_N / pool_C): a hand value + linearity in the carbon moved.
+    assert math.isclose(carried_nitrogen(0.5, 2.0, 10.0), 0.1, rel_tol=1e-12)
+    assert math.isclose(carried_nitrogen(1.0, 2.0, 10.0), 0.2, rel_tol=1e-12)
 
 
-def test_mineralization_flux_is_zero_at_zero_litter_n() -> None:
-    # Self-limiting: no standing litter N ⇒ no mineralization (positivity structural).
-    assert mineralization_flux(0.0, mineralization_rate=0.03) == 0.0
+def test_carried_nitrogen_is_zero_at_every_degenerate_input() -> None:
+    # Never a divide-by-zero, never a negative leg — an empty or absent pool moves
+    # nothing, which is what makes positivity structural rather than clamped.
+    assert carried_nitrogen(0.0, 2.0, 10.0) == 0.0
+    assert carried_nitrogen(0.5, 0.0, 10.0) == 0.0
+    assert carried_nitrogen(0.5, 2.0, 0.0) == 0.0
+    assert carried_nitrogen(-1.0, 2.0, 10.0) == 0.0
+
+
+def test_carried_n_on_a_first_order_carbon_flux_is_that_same_rate() -> None:
+    """THE IDENTITY THAT RETIRED ``mineralization_rate`` — pinned, not just documented.
+
+    ``Decomposition`` withdraws ``k · litter_C``, so the nitrogen riding it is
+    ``k · litter_C · (litter_N / litter_C) == k · litter_N``. The free mineralization
+    rate was therefore never independent: stoichiometry forces it to equal the carbon
+    decay rate, and that is *why* retiring it is a citation upgrade rather than a
+    recalibration.
+
+    ⚠ Pinned as an EQUIVALENCE, never as an implementation. The flow deliberately does
+    NOT collapse to ``decomposition_rate · litter_n``: the identity holds only while
+    ``Decomposition`` stays first-order, and a collapsed form would read identically
+    today and silently outlive that premise. This test is what would go red if the two
+    ever diverged.
+    """
+    k, litter_c, litter_n = 0.011, 7.0, 0.25
+    decomposed = decomposition_flux(litter_c, decomposition_rate=k)
+    assert math.isclose(
+        carried_nitrogen(decomposed, litter_n, litter_c), k * litter_n, rel_tol=1e-12
+    )
 
 
 # --- flow level --------------------------------------------------------------
@@ -168,6 +204,10 @@ def _state(
     litter_n: float = 0.1,
     soil_n: float = 100.0,
     leaf_c: float = 1.0,
+    microbial_n: float = 0.02,
+    litter_c: float = 4.0,
+    microbial_c: float = 1.0,
+    o2: float = 210.0,
 ) -> State:
     stocks = {
         _PLANT_N: _n_pool(_PLANT_N, plant_n),
@@ -177,12 +217,24 @@ def _state(
         _LEAF_C: _c_pool(_LEAF_C, leaf_c),
         _STEM_C: _c_pool(_STEM_C, 0.0),
         _ROOT_C: _c_pool(_ROOT_C, 0.0),
+        # The microbe-mediated return legs read the carbon pools they ride.
+        _MICROBIAL_N: _n_pool(_MICROBIAL_N, microbial_n),
+        _LITTER_C: _c_pool(_LITTER_C, litter_c),
+        _MICROBIAL_C: _c_pool(_MICROBIAL_C, microbial_c),
+        _O2: _c_pool(_O2, o2),
     }
     return State(n=0, stocks=stocks, rng_seed=0)
 
 
-def _params(*, mineral: float = 0.03) -> MineralizationParams:
-    return MineralizationParams(mineralization_rate=mineral)
+# Decomposer rates chosen so each leg is a single hand-checkable term.
+_DECOMP_PARAMS = DecompositionParams(decomposition_rate=0.011)
+# o2_half_saturation = 0 disables f_O2 (the loader permits it), so the release leg's
+# arithmetic is exact here; f_O2 gets its own dedicated test below rather than riding
+# along in every other one.
+_MRESP_PARAMS = MicrobialRespirationParams(
+    microbial_respiration_rate=0.016, o2_half_saturation=0.0
+)
+_AIR_MOL = 1000.0
 
 
 # The coupled N-shedding flow needs the organ carbon stocks and the senescence rates
@@ -215,13 +267,29 @@ def _senescence() -> NitrogenSenescence:
     )
 
 
-def _mineralization() -> Mineralization:
-    return Mineralization(
-        FlowId("biosphere.mineralization"),
+def _litter_transfer() -> LitterNitrogenTransfer:
+    return LitterNitrogenTransfer(
+        FlowId("biosphere.litter_n_transfer"),
         0,
         litter_n=_LITTER_N,
+        microbial_n=_MICROBIAL_N,
+        litter_carbon=_LITTER_C,
+        params=_DECOMP_PARAMS,
+    )
+
+
+def _microbial_release(
+    *, params: MicrobialRespirationParams = _MRESP_PARAMS
+) -> MicrobialNitrogenRelease:
+    return MicrobialNitrogenRelease(
+        FlowId("biosphere.microbial_n_release"),
+        0,
+        microbial_n=_MICROBIAL_N,
         soil_n=_SOIL_N,
-        params=_params(),
+        microbial_carbon=_MICROBIAL_C,
+        o2_pool=_O2,
+        params=params,
+        air_mol=_AIR_MOL,
     )
 
 
@@ -243,20 +311,52 @@ def test_n_senescence_moves_plant_n_to_litter_n() -> None:
     assert math.isclose(legs[_LITTER_N], shed, rel_tol=1e-12)
 
 
-def test_mineralization_moves_litter_n_to_soil_n() -> None:
-    state = _state(litter_n=2.0)
+def test_litter_transfer_moves_litter_n_to_microbial_n() -> None:
+    # The N riding the decomposing carbon: k·litter_C · (litter_N/litter_C).
+    state = _state(litter_n=2.0, litter_c=4.0)
     legs = {
         leg.stock: leg.amount
-        for leg in _mineralization().evaluate(state, _env(state, 1.0), 1.0).legs
+        for leg in _litter_transfer().evaluate(state, _env(state, 1.0), 1.0).legs
     }
-    mineralized = 0.03 * 2.0
-    assert math.isclose(legs[_LITTER_N], -mineralized, rel_tol=1e-12)
-    assert math.isclose(legs[_SOIL_N], mineralized, rel_tol=1e-12)
+    moved = 0.011 * 4.0 * (2.0 / 4.0)
+    assert math.isclose(legs[_LITTER_N], -moved, rel_tol=1e-12)
+    assert math.isclose(legs[_MICROBIAL_N], moved, rel_tol=1e-12)
+
+
+def test_microbial_release_moves_microbial_n_to_soil_n() -> None:
+    # The N riding the respired carbon: m_resp·microbial_C · (microbial_N/microbial_C).
+    state = _state(microbial_n=0.05, microbial_c=2.0)
+    legs = {
+        leg.stock: leg.amount
+        for leg in _microbial_release().evaluate(state, _env(state, 1.0), 1.0).legs
+    }
+    moved = 0.016 * 2.0 * (0.05 / 2.0)
+    assert math.isclose(legs[_MICROBIAL_N], -moved, rel_tol=1e-12)
+    assert math.isclose(legs[_SOIL_N], moved, rel_tol=1e-12)
+
+
+def test_the_return_leg_is_a_TRANSIT_not_a_jump_to_soil() -> None:
+    """litter_n never reaches soil_n in one step — the form change, seen structurally.
+
+    Under the retired direct ``Mineralization`` a single flow carried litter_n → soil_n.
+    Now the nitrogen must pass through ``microbial_n``, so no flow touches both
+    ``litter_n`` and ``soil_n``. This is what "microbe-MEDIATED" means operationally,
+    and
+    it is pinned so that collapsing the two legs back into one goes red.
+    """
+    for flow in (_litter_transfer(), _microbial_release()):
+        state = _state()
+        touched = {
+            leg.stock for leg in flow.evaluate(state, _env(state, 1.0), 1.0).legs
+        }
+        assert not {_LITTER_N, _SOIL_N} <= touched
 
 
 def test_flows_balance_nitrogen_only() -> None:
     # Single-currency NITROGEN: each flow balances and touches no CARBON/OXYGEN/WATER.
-    for flow in (_senescence(), _mineralization()):
+    # ⚠ Note the release leg READS the O₂ pool (for f_O2) but never puts a LEG on it —
+    # the carbon sibling owns the O₂ draw. A leg here would double-count it.
+    for flow in (_senescence(), _litter_transfer(), _microbial_release()):
         state = _state()
         result = flow.evaluate(state, _env(state, 1.0), 1.0)
         assert_flow_balanced(result, state.stocks)
@@ -265,7 +365,11 @@ def test_flows_balance_nitrogen_only() -> None:
 
 def test_flows_are_dt_linear() -> None:
     # flux = daily·dt — the increment-form contract (here Euler-daily).
-    for flow, donor in ((_senescence(), _PLANT_N), (_mineralization(), _LITTER_N)):
+    for flow, donor in (
+        (_senescence(), _PLANT_N),
+        (_litter_transfer(), _LITTER_N),
+        (_microbial_release(), _MICROBIAL_N),
+    ):
         state = _state()
         half = {
             leg.stock: leg.amount
@@ -297,62 +401,209 @@ def test_n_senescence_self_limits_when_no_carbon_is_senescing() -> None:
     assert all(leg.amount == 0.0 for leg in legs)
 
 
-def test_mineralization_self_limits_at_zero_litter_n() -> None:
-    state = _state(litter_n=0.0)
-    legs = _mineralization().evaluate(state, _env(state, 1.0), 1.0).legs
-    assert all(leg.amount == 0.0 for leg in legs)
+def test_return_legs_self_limit_at_an_empty_donor() -> None:
+    # Positivity structural on both legs, from the N side...
+    for flow, state in (
+        (_litter_transfer(), _state(litter_n=0.0)),
+        (_microbial_release(), _state(microbial_n=0.0)),
+    ):
+        assert all(
+            leg.amount == 0.0
+            for leg in flow.evaluate(state, _env(state, 1.0), 1.0).legs
+        )
 
 
-# --- loader ------------------------------------------------------------------
-def test_loader_reads_committed_rates() -> None:
-    params = load_mineralization_params()
-    assert params.mineralization_rate == 0.03
+def test_return_legs_self_limit_when_no_carbon_is_moving() -> None:
+    # ...and from the CARBON side, which is the half the retired rate form could not
+    # express: no carbon decomposing/respiring ⇒ no nitrogen released, however much N is
+    # standing in the pool. That coupling is the whole point of the change.
+    for flow, state in (
+        (_litter_transfer(), _state(litter_n=5.0, litter_c=0.0)),
+        (_microbial_release(), _state(microbial_n=5.0, microbial_c=0.0)),
+    ):
+        assert all(
+            leg.amount == 0.0
+            for leg in flow.evaluate(state, _env(state, 1.0), 1.0).legs
+        )
 
 
-def test_loader_no_longer_accepts_the_retired_shedding_rate(tmp_path: Path) -> None:
-    """``n_senescence_rate`` is GONE, and the schema must SAY so rather than ignore it.
+# --- the parameter file is GONE (both its rates retired by FORM changes) -----
+def test_there_is_no_mineralization_param_file_or_loader() -> None:
+    """Both rates this file ever held were retired by changing the FORM.
 
-    It was the project's highest clean-room risk: a 1/day N-shedding rate that five
-    rounds of citation work established no primary source publishes. ``extra="forbid"``
-    is what makes the removal load-bearing — a file still carrying the key is a hard
-    error, so a stale param file cannot quietly supply a value that nothing reads any
-    more.
+    ``n_senescence_rate`` (option (A)) — a 1/day N-shedding rate five rounds of citation
+    work established no primary source publishes, the project's highest clean-room risk
+    — went when shedding became coupled to the senescing carbon at a *cited* residual
+    tissue concentration. ``mineralization_rate`` (option (B)) went when the return leg
+    became microbe-mediated and stoichiometric, because
+    ``decomposed_C / litter_C == decomposition_rate`` makes a free N rate redundant with
+    the carbon one.
+
+    With no parameter left, the file and its loader are gone. This is pinned rather than
+    merely deleted because a *stale param file* is the failure mode: a
+    ``mineralization.yaml`` still sitting in ``params/`` would be silently unread, and
+    the manifest's ``param_files`` gate compares membership — so an accidental
+    re-addition must fail here, loudly, at the source.
     """
-    stale = tmp_path / "mineralization.yaml"
-    stale.write_text(
-        "name: chamber\nprocess: mineralization\nparameters:\n"
-        '  n_senescence_rate:\n    value: 0.01\n    unit: "1/day"\n'
-        '    source: "retired"\n'
-        '  mineralization_rate:\n    value: 0.03\n    unit: "1/day"\n'
-        '    source: "test"\n',
-        encoding="utf-8",
+    import domains.biosphere.loader as loader_module
+
+    assert not hasattr(loader_module, "load_mineralization_params")
+    assert not hasattr(loader_module, "MINERALIZATION_PARAMS_PATH")
+    params_dir = Path(loader_module.__file__).parent / "params"
+    assert not (params_dir / "mineralization.yaml").exists()
+
+
+def test_the_retired_provenance_record_is_preserved() -> None:
+    """The five rounds of negative retrieval results outlive the parameter.
+
+    This project's own citation work found that *a stale negative result is worse than a
+    stale positive one, because it suppresses the next search*. Deleting the file would
+    have destroyed exactly the record that stops someone re-running searches already
+    known to be exhausted, so it is archived verbatim instead. Pinned so the archive
+    cannot be quietly tidied away later.
+    """
+    archive = Path(__file__).parent.parent / "docs" / "retired" / "mineralization.yaml"
+    text = archive.read_text(encoding="utf-8")
+    assert "RETIRED PARAMETER FILE" in text
+    assert "n_senescence_rate" in text
+    assert "mineralization_rate" in text
+    # The dated-ceiling warning is the transferable lesson, not decoration.
+    assert "one afternoon's access" in text
+
+
+def test_the_return_legs_take_the_DECOMPOSER_params_not_their_own() -> None:
+    """No N rate reappears by the back door — the legs are wired to the carbon rates.
+
+    If someone later gives these flows a parameter of their own, the identity that
+    retired ``mineralization_rate`` silently stops holding while every trajectory still
+    looks plausible. Pinning the *wiring* catches that at the type level.
+    """
+    assert isinstance(_litter_transfer().params, DecompositionParams)
+    assert isinstance(_microbial_release().params, MicrobialRespirationParams)
+
+
+# --- the recomputation-drift guard (the NitrogenSenescence idiom, one flow over) ---
+def test_transfer_leg_recomputes_EXACTLY_the_carbon_Decomposition_moves() -> None:
+    """The N leg's ``decomposed_C`` must equal ``Decomposition``'s own litter leg.
+
+    A flow may read only the step-entry snapshot, so there is no channel by which
+    ``Decomposition`` could hand this flow its computed flux — recomputation from the
+    same params on the same snapshot is the only pure form. The hazard that creates is
+    that the two silently drift apart if someone changes one and not the other, and the
+    symptom would be a wrong litter C:N rather than a crash. So the agreement is pinned
+    against the *actual sibling flow*, not against a re-derivation of it.
+    """
+    state = _state(litter_n=2.0, litter_c=4.0)
+    carbon_leg = {
+        leg.stock: leg.amount
+        for leg in Decomposition(
+            FlowId("biosphere.decomposition"),
+            0,
+            litter_carbon=_LITTER_C,
+            microbial_carbon=_MICROBIAL_C,
+            params=_DECOMP_PARAMS,
+        )
+        .evaluate(state, _env(state, 1.0), 1.0)
+        .legs
+    }
+    n_leg = {
+        leg.stock: leg.amount
+        for leg in _litter_transfer().evaluate(state, _env(state, 1.0), 1.0).legs
+    }
+    decomposed_c = -carbon_leg[_LITTER_C]
+    # The N moved is exactly that carbon at the litter pool's own N:C.
+    assert math.isclose(-n_leg[_LITTER_N], decomposed_c * (2.0 / 4.0), rel_tol=1e-12)
+
+
+def test_release_leg_recomputes_EXACTLY_the_carbon_MicrobialRespiration_burns() -> None:
+    """Same guard on the respiration leg — and here ``f_O2`` is the live part.
+
+    ``MicrobialRespiration`` self-throttles as O₂ depletes. If the N leg did not carry
+    the same factor it would keep mineralizing nitrogen out of a pool whose carbon had
+    stopped moving, which is precisely the decoupling this whole change removes.
+    """
+    params = MicrobialRespirationParams(
+        microbial_respiration_rate=0.016, o2_half_saturation=0.05
     )
-    with pytest.raises(ValidationError):
-        load_mineralization_params(stale)
+    # An O₂ mole fraction low enough that f_O2 is meaningfully below 1.
+    state = _state(microbial_n=0.05, microbial_c=2.0, o2=50.0)
+    carbon_leg = {
+        leg.stock: leg.amount
+        for leg in MicrobialRespiration(
+            FlowId("biosphere.microbial_respiration"),
+            0,
+            microbial_carbon=_MICROBIAL_C,
+            # Any distinct carbon pool: only the microbial leg is read here.
+            co2_pool=_LITTER_C,
+            o2_pool=_O2,
+            params=params,
+            air_mol=_AIR_MOL,
+        )
+        .evaluate(state, _env(state, 1.0), 1.0)
+        .legs
+    }
+    n_leg = {
+        leg.stock: leg.amount
+        for leg in _microbial_release(params=params)
+        .evaluate(state, _env(state, 1.0), 1.0)
+        .legs
+    }
+    respired_c = -carbon_leg[_MICROBIAL_C]
+    assert math.isclose(-n_leg[_MICROBIAL_N], respired_c * (0.05 / 2.0), rel_tol=1e-12)
 
 
-def test_loader_rejects_negative_rate(tmp_path: Path) -> None:
-    bad = tmp_path / "mineralization.yaml"
-    bad.write_text(
-        "name: chamber\nprocess: mineralization\nparameters:\n"
-        "  mineralization_rate:\n    value: -0.01\n"
-        '    unit: "1/day"\n    source: "test"\n',
-        encoding="utf-8",
+def test_release_leg_throttles_with_f_o2_rather_than_ignoring_it() -> None:
+    """The f_O2 factor is load-bearing here, not inherited decoration.
+
+    Guards the specific collapsed form the module docstring warns against: writing the
+    leg as ``microbial_respiration_rate · microbial_n`` would pass every other test in
+    this file and go red only here.
+    """
+    params = MicrobialRespirationParams(
+        microbial_respiration_rate=0.016, o2_half_saturation=0.05
     )
-    with pytest.raises(ValueError, match="mineralization_rate must be >= 0"):
-        load_mineralization_params(bad)
-
-
-def test_loader_rejects_bad_unit(tmp_path: Path) -> None:
-    bad = tmp_path / "mineralization.yaml"
-    bad.write_text(
-        "name: chamber\nprocess: mineralization\nparameters:\n"
-        '  mineralization_rate:\n    value: 0.03\n    unit: "1/year"\n'
-        '    source: "test"\n',
-        encoding="utf-8",
+    rich = _state(microbial_n=0.05, microbial_c=2.0, o2=210.0)
+    poor = _state(microbial_n=0.05, microbial_c=2.0, o2=5.0)
+    flow = _microbial_release(params=params)
+    moved_rich = -next(
+        leg.amount
+        for leg in flow.evaluate(rich, _env(rich, 1.0), 1.0).legs
+        if leg.stock == _MICROBIAL_N
     )
-    with pytest.raises(ValueError, match="must be declared in"):
-        load_mineralization_params(bad)
+    moved_poor = -next(
+        leg.amount
+        for leg in flow.evaluate(poor, _env(poor, 1.0), 1.0).legs
+        if leg.stock == _MICROBIAL_N
+    )
+    assert moved_poor < moved_rich
+    # And an uncollapsed form is the ONLY way this holds: the bare rate would give the
+    # identical number in both states.
+    assert not math.isclose(moved_poor, moved_rich, rel_tol=1e-9)
+
+
+def test_microbial_n_is_a_POOL_so_extinction_can_never_orphan_it() -> None:
+    """The named seam from the (B) diagnosis, pinned as a test rather than a comment.
+
+    ``microbial_carbon`` is a POPULATION (``organ_stock``), so an extinction pass could
+    in principle zero it and route the residual to the loss-sink. Were its nitrogen
+    counterpart also a POPULATION, that pass would orphan N and break the emergent C:N.
+    ``microbial_n`` is therefore a POOL, and POOL stocks are never zeroed-with-loss (the
+    project's extinction invariant).
+
+    ⚠ The seam this pins is on the CARBON side: if anyone ever raises
+    ``microbial_carbon``'s extinction threshold above 0, the N counterpart must be
+    zeroed
+    with it. A comment would not survive that edit; this goes red.
+    """
+    from domains.biosphere import scenario as sc
+
+    state, _ = build_season(sc.SEALED_CHAMBER_SCENARIO)
+    micro_n = state.stocks[_MICROBIAL_N]
+    micro_c = state.stocks[StockId("biosphere.microbial_carbon")]
+    assert micro_n.kind is StockKind.POOL
+    assert micro_n.quantity is Quantity.NITROGEN
+    # The carbon sibling's threshold is what makes the asymmetry safe today.
+    assert micro_c.extinction_threshold == 0.0
 
 
 # --- integration: the sealed season -----------------------------------------

@@ -86,13 +86,22 @@ allocation, and (since post-roadmap scope (B) increment 1) the **vernalization-d
 accumulator that gates it — so a future aux process added but wired into no golden is caught
 too. (See `flow_set` / `aux_set` in the manifest for the exact lists.)
 
-### The param files — 13 clean-room biosphere param files (phenology grew, scope B inc. 1)
+### The param files — 12 clean-room biosphere param files
+
+⚠ **12, not 13: `mineralization.yaml` was RETIRED**, and it is the first param *file* this
+project has removed rather than re-valued. Both rates it ever held were discharged by
+**form** changes rather than by finding citations — `n_senescence_rate` when N shedding
+became coupled to the senescing carbon (option (A)), and `mineralization_rate` when the
+return leg became microbe-mediated and stoichiometric (option (B)). With no parameter left,
+the file went with them; its provenance record — five rounds of negative retrieval results —
+is archived verbatim at `docs/retired/mineralization.yaml`, because a stale *negative* result
+suppresses the next search and is the more expensive thing to lose.
 
 `src/domains/biosphere/params/*.yaml` minus `demo.yaml`: `canopy`, `photosynthesis`,
 `respiration`, `transpiration`, `phenology`, `allocation`, `senescence`, `nitrogen`
-(Phase-1 producer); `decomposition`, `microbial_respiration`, `mineralization` (Phase-2
-decomposer + N return loop); `water_cycle` (Phase-3 water closure); `herbivory` (Phase-3
-consumer). Each is clean-room from primary literature
+(Phase-1 producer); `decomposition`, `microbial_respiration` (Phase-2 decomposer — and,
+since option (B), the N return loop too: its legs carry no rate of their own);
+`water_cycle` (Phase-3 water closure); `herbivory` (Phase-3 consumer). Each is clean-room from primary literature
 ([`docs/param-file-conventions.md`](param-file-conventions.md),
 [`docs/reuse-and-licenses.md`](reuse-and-licenses.md)) — **never** the unlicensed WOFOST YAML
 or PCSE source. The manifest records a newline-normalized sha-256 of each as **provenance**.
@@ -268,20 +277,53 @@ so the discipline is enforced, not merely requested.
   recorded this arithmetic since the citation scope's round 2 ("ours equals the curve only at
   W ≈ 14.44 t/ha") as a *delta*; the form change makes it a *mechanism*.
 
-  ⚠ **Two of the three reasons the decomposer calibration gave for NOT moving
-  `mineralization_rate` are now false.** It is no longer "behaviorally inert" — it sets the
-  litter pool's C:N — and N and C are no longer "uncoupled", which was the other half of the
-  argument that litter C:N was not a physical quantity. The **shed material** is now straw-like
-  (C:N **90**, from two cited concentrations), but the **litter pool** sits at **173–192**
-  (measured at peak `litter_n` across all four sealed scenarios) because N mineralizes out
-  ~2.7× faster than C decomposes out — a band sitting *below* the quasi-steady law
-  `90 × 2.727 = 245.5`, because litter input is a *pulse* and the pool never converges upward.
-  Stanford & Smith's 39-soil range (0.005–0.0136/day) would put the pool at **31–83**, at or
-  below real residue, with their pooled mean at **47**.
-  ⚠ **CORRECTED 2026-07-27 (advisor catch, then measurement): the litter POOL C:N figures first recorded here were WRONG, and the error was the meta-finding's shape again — a number fitted to ONE scenario at ONE horizon, written as a law.** The original text asserted `pool C:N ≈ (shed C:N)·(k_min/k_decomp)·**1.894**` ≈ 465, with 1.894 called a "measured geometry factor". It was fitted to `sealed_chamber`'s **final** state after 3 years, and the end-of-run value is horizon-dependent across more than an order of magnitude: **210** (1 yr, `water_biting`), **465** (3 yr, `sealed_chamber`), **9076** and **11877** (5 yr, `perennial`/`consumer`). My first explanation for the outliers — seeded `litter_carbon0` with no N counterpart — was **also false**: all four scenarios seed `litter_carbon0 = 3.0`. **The real mechanism:** litter input is a *pulse* (the annual dump), not a continuous feed, and between pulses both currencies drain — carbon with a ~63-day half-life, nitrogen with a ~23-day one — so the end-of-season snapshot is a **tail**, and by year 5 it is the ratio of two vanishing numbers (`litter_n` = **1.3e-11 kg**). Quoting that as "the litter C:N" is quoting numerical dust. **What is actually true, measured at peak `litter_n` across all four sealed scenarios: pool C:N = 173–192**, a tight band sitting *below* the quasi-steady law `90 × 2.727 = 245.5` (0.71–0.78× it) because the pulsed pool never converges upward. That is **~2.2× wheat straw's ~80**, not ~5×. **And the scope-B projection shrinks with it**: applying Stanford & Smith's 39-soil range to the measured relationship gives **31–83 (pooled mean 47)**, not the "78–211, mean 119" this row first carried — every cited value lands at or below real residue, against **~184** for our uncited 0.03/day. **The DIRECTION is unchanged and is the point** (two independent lines still say `mineralization_rate` is too fast); only the magnitude was inflated. Pinned now — including an explicit anti-regression assertion that the end-of-run ratio spans >10× with horizon, so no constant factor may be written down again — in `tests/test_nitrogen_form.py`.
-   Only the pool-identity objection survives (they measured soil N₀; ours is fresh
-  residue N). The value is **UNMOVED** — recalibrating it is scope B and a separate decision —
-  and the consequence is pinned instead.
+  ⚠ **All three reasons the decomposer calibration gave for NOT moving
+  `mineralization_rate` are now moot — because the parameter no longer exists.** Option (A)
+  falsified two of them (it was not "behaviorally inert" — it set the litter pool's C:N — and
+  N and C were no longer "uncoupled"), leaving only **pool identity**: Stanford & Smith
+  measured soil organic N₀, ours is fresh residue N. Option (B) then retired the parameter
+  outright, and a parameter that does not exist cannot be mis-anchored to the wrong pool. The
+  question was not *answered* — no value was chosen from a cited band — it was **dissolved**.
+
+  **The litter pool C:N law, as it now stands.** Under the retired direct `Mineralization`,
+  nitrogen left the litter pool at a free `mineralization_rate` while carbon left it at
+  `decomposition_rate`, so the pool's ratio was pushed ~2.7× away from its input's and the
+  quasi-steady law was `(shed C:N) × (k_min/k_decomp)` = `90 × 2.727` = 245.5. The
+  microbe-mediated legs carry N on the **same** first-order carbon flux, so the pushing factor
+  is exactly **1** and the pool converges on the ratio of the material fed into it:
+
+      pool C:N  →  shed C:N  =  carbon_fraction / n_residual  =  90
+
+  Measured, the shedding-fed chambers sit at **98.7–100.6** at peak `litter_n` (1.10–1.12× the
+  shed ratio, the pulsed-input transient) and `sealed_chamber` **ends at 90.6** — within 0.7 %
+  of it. Against wheat straw's ~80 that is **~1.25×**, where the pre-(A) form gave **0.004**
+  and the post-(A) direct form gave 173–192. That is not merely a smaller error: the litter
+  pool's C:N stopped being an accident of two unrelated rate constants and became a function
+  of the *composition of the material that fell in*, both of whose numbers are cited.
+
+  ⚠ **Three previously-recorded claims are retired here, and none of them was WRONG** — each
+  was a true measurement of a form that no longer exists, so they are resolved rather than
+  corrected: the 245.5 law (its `k_min` is gone); "a shedding-fed pool runs N-poor at 0.71–0.78
+  of the law" (it ran N-poor *because* N drained 2.7× faster than C); and "the end-of-run
+  snapshot is inflated ~2.4× and horizon-dependent over an order of magnitude" — the inflation
+  **was** the differential drain, so with equal drains there is none. The horizon-dependence
+  that the earlier anti-regression pin existed to guard against is gone **at its source**,
+  which is why that pin was replaced by its inverse (`end/peak` must now be ≈ 1) rather than
+  merely relaxed.
+
+  ⚠ **What this does NOT claim.** The decomposer cluster's **carbon** rates are untouched and
+  still run at the fast edge of their literature ranges (`decomposition_rate` 4.0/yr, Olson's
+  fastest ecosystem), and the litter pool's C:N now inherits whatever that carbon rate is.
+  The honest statement is that the N cycle no longer contributes a *separate* uncited rate —
+  **not** that the decomposer side is now fully cited.
+
+  ⚠ **The second regime is untouched, and that is the point of calling it two regimes.** A
+  reset-driven chamber's pool is filled by the **annual dump**, whose C:N is set by the dying
+  plant rather than by any rate, so (B) barely moves it (10.9 → 10.0, 9.9 → 9.1). "Peak
+  `litter_n`" still names two different events — the seasonal senescence maximum in a
+  shedding-fed chamber, versus the dump one step past a year boundary in a reset-driven one.
+  All of it is pinned in `tests/test_nitrogen_form.py`, each scenario driven the way its own
+  golden drives it.
 
   ⚠ **A recorded limitation, not an oversight:** shedding at the residual concentration means a
   senescing plant **retains** most of its nitrogen while its denominator collapses, so tissue
@@ -308,7 +350,16 @@ so the discipline is enforced, not merely requested.
   **investigated and deliberately NOT moved** — its cited range is the wrong pool (soil
   N₀ vs fresh residue N), the model's N scale is non-physical, and the rate is
   behaviorally inert; the real gap is the missing immobilization **form** (a documented
-  deferred seam), recorded in its `source:`. **6 frozen goldens regenerated** (sealed,
+  deferred seam), recorded in its `source:`.
+  ⚠ **All three of those grounds are now spent, and by 2026-07-27 the parameter itself is
+  gone** — option (A) falsified "inert" and "non-physical scale", and option (B) retired
+  the parameter (and its file) outright, so the pool-identity objection has nothing left
+  to attach to. The `source:` this sentence points at now lives in
+  `docs/retired/mineralization.yaml`. Note also that the "missing immobilization form"
+  named here turned out to be **unavailable**, not merely unbuilt: our `microbial_carbon`
+  is a *transit* pool (CUE = 1.0), so the textbook homeostatic microbial C:N would demand
+  90–152× the litter N present. What shipped is microbe-mediated N **transit**; the
+  immobilization seam stays open with a *measured obstacle* rather than a deferral. **6 frozen goldens regenerated** (sealed,
   perennial, consumer, both long-horizon, drift_summary) + water_biting + 4 station
   goldens (greenhouse/harvest/lighting/sealed_station); the manifest's 3 param hashes
   (incl. mineralization's comment-only edit) + 6 golden hashes moved. **Period class held

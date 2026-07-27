@@ -3,9 +3,11 @@
 Owns ``soil_water`` / ``soil_n`` (the rooting-zone POOLs the plant draws from), the
 ``n_source`` boundary supply (+ the ``water_source`` supply in the **open** field only),
 and — in the sealed chamber — the decomposer sub-loop (``litter_carbon`` POOL,
-``microbial_carbon`` POP, ``litter_n`` POOL). Drives them with ``Fertilization``
-(always), ``Irrigation`` (open only), and, sealed, ``Decomposition`` /
-``MicrobialRespiration`` / ``Mineralization``.
+``microbial_carbon`` POP, ``litter_n`` + ``microbial_n`` POOLs). Drives them with
+``Fertilization`` (always), ``Irrigation`` (open only), and, sealed, ``Decomposition`` /
+``MicrobialRespiration`` plus the two microbe-mediated nitrogen legs
+``LitterNitrogenTransfer`` / ``MicrobialNitrogenRelease`` (which replaced a direct
+``Mineralization`` — see ``mineralization.py``).
 
 **Sealed drops ``Irrigation`` + ``water_source`` (P3.3/Step 3 — genuine water
 closure).**
@@ -34,10 +36,12 @@ from domains.biosphere.decomposition import Decomposition
 from domains.biosphere.loader import (
     load_decomposition_params,
     load_microbial_respiration_params,
-    load_mineralization_params,
 )
 from domains.biosphere.microbial_respiration import MicrobialRespiration
-from domains.biosphere.mineralization import Mineralization
+from domains.biosphere.mineralization import (
+    LitterNitrogenTransfer,
+    MicrobialNitrogenRelease,
+)
 from domains.biosphere.nitrogen import Fertilization
 from domains.biosphere.scenario import SeasonScenario
 from domains.biosphere.stocks import (
@@ -47,6 +51,7 @@ from domains.biosphere.stocks import (
     LITTER_CARBON,
     LITTER_N,
     MICROBIAL_CARBON,
+    MICROBIAL_N,
     N_SOURCE,
     O2_POOL,
     SOIL_N,
@@ -117,6 +122,10 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
         )
         stocks.append(organ_stock(MICROBIAL_CARBON, SOIL, 0.0))
         stocks.append(pool_stock(LITTER_N, SOIL, Quantity.NITROGEN, nitrogen, 0.0))
+        # ``microbial_n`` — the N counterpart of ``microbial_carbon``, and the transit
+        # pool the return leg now routes through. A POOL, not a POPULATION like its
+        # carbon sibling: see the asymmetry note in ``stocks.py``.
+        stocks.append(pool_stock(MICROBIAL_N, SOIL, Quantity.NITROGEN, nitrogen, 0.0))
         # The decomposer (Step 4): first-order decay litter_carbon → microbial_carbon.
         flows.append(
             Decomposition(
@@ -141,15 +150,32 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
                 air_mol=scenario.chamber_air_mol,
             )
         )
-        # Net mineralization (Step 6): litter_n → soil_n, closing the N return loop with
-        # the plants-owned ``NitrogenSenescence`` (plant_n → litter_n).
+        # The microbe-mediated N return leg (post-roadmap option (B)), closing the N
+        # loop with the plants-owned ``NitrogenSenescence`` (plant_n → litter_n). These
+        # two replaced a direct ``litter_n → soil_n`` flux at a free
+        # ``mineralization_rate``: each leg is carried by the carbon its sibling flow
+        # already moved, so no rate of their own appears — they take the *decomposer*
+        # params, which is the whole point (see mineralization.py's docstring).
         flows.append(
-            Mineralization(
-                FlowId("biosphere.mineralization"),
+            LitterNitrogenTransfer(
+                FlowId("biosphere.litter_n_transfer"),
                 0,
                 litter_n=LITTER_N,
+                microbial_n=MICROBIAL_N,
+                litter_carbon=LITTER_CARBON,
+                params=load_decomposition_params(),
+            )
+        )
+        flows.append(
+            MicrobialNitrogenRelease(
+                FlowId("biosphere.microbial_n_release"),
+                0,
+                microbial_n=MICROBIAL_N,
                 soil_n=SOIL_N,
-                params=load_mineralization_params(),
+                microbial_carbon=MICROBIAL_CARBON,
+                o2_pool=O2_POOL,
+                params=load_microbial_respiration_params(),
+                air_mol=scenario.chamber_air_mol,
             )
         )
     shared: dict[str, StockId] = {SOIL_WATER_VAR: SOIL_WATER}

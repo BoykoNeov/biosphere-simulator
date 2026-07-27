@@ -15,9 +15,10 @@
     "Grazing",
     "GrowthRespiration",
     "Irrigation",
+    "LitterNitrogenTransfer",
     "MaintenanceRespiration",
+    "MicrobialNitrogenRelease",
     "MicrobialRespiration",
-    "Mineralization",
     "NitrogenSenescence",
     "NitrogenUptake",
     "Recycling",
@@ -37,7 +38,6 @@
     "decomposition.yaml": "491f196483f5d131131369b0c15c5dc6f368e60d38be185067484f4c0f34af13",
     "herbivory.yaml": "33903c12acd162cc377a9fe4536a971cc3d2f4943a959a69aeebc5a989198c1b",
     "microbial_respiration.yaml": "de5a01c81a5c9ab20229259369511e8e8a9e42b0ef932b99a6bd3d1f1e8f6d8a",
-    "mineralization.yaml": "ca1792fb3426b2ea34dd717604093b90871835a4a2c7bd94337190e886e629f5",
     "nitrogen.yaml": "f012a5cfad4d40efa29ab917c05c0e9c8d831426cb39415f990a44950abf240a",
     "phenology.yaml": "534aff0b9a7557a16cbcafc61d87279dd61b96fc5df17b7837fc67e225201d38",
     "photosynthesis.yaml": "51bb4fe98ab6176fcd1308c4b51d84b961ef3472eaa789c531ccec2114fc1e3c",
@@ -50,13 +50,13 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "a3313516096bfbbfe91f550eebaa34ef32f35d88aa5cf946f3fe0df470d2902f",
+      "golden_sha256": "d30a45d3c4cf9fe0c6d02b2fed7def5dd8c46f5278527425d40c17da6d376a17",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "158f49ccdc43f2fc43a9125e5e40aff9c94cbec3caea7865f984fb799f5a58af",
+      "golden_sha256": "120fc81e08064ec5755c8d3f911d533b41a0327f8ab00571902a7bc229f9a005",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
@@ -74,19 +74,19 @@
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "ea9e6c336284c27b79be86dda49f3fde5ad4a70a3df0f4da8b0158c05e45bade",
+      "golden_sha256": "1c6b8a472b2aad6b24d2cf7e70fd94c9bfbf88066c636f93f95c0e8a06da9ed3",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "52bb06862002a2030bc512175ffd78586793788c05319f85eaa95559ee6ee3e1",
+      "golden_sha256": "25a7ec4b4e9d806870185a5ab19d58d8b8f1c15b80e84e28f19081e457a2f0e3",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "555b91084be9b188da1f8093c7db69493e1b3033e0832e6879a93016a7359b9e",
+      "golden_sha256": "5ab2557ef6e1ddf78d2656567ee762f8f616c7fca66c04e2574e5938368071fe",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

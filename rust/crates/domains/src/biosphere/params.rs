@@ -118,11 +118,12 @@ pub struct MicrobialRespirationParams {
     pub o2_half_saturation: f64,
 }
 
-/// Nitrogen-return-loop params (N-senescence shedding + net mineralization).
-#[derive(Debug, Clone, Copy)]
-pub struct MineralizationParams {
-    pub mineralization_rate: f64,
-}
+// The nitrogen return loop has NO params struct: both rates it ever held were retired
+// by FORM changes. `n_senescence_rate` went when shedding became coupled to the senescing
+// carbon at a cited residual concentration; `mineralization_rate` went when the return leg
+// became microbe-mediated, because `decomposed_C / litter_C == decomposition_rate`
+// identically, so the free N rate was redundant with the carbon one. The N legs therefore
+// take `DecompositionParams` / `MicrobialRespirationParams`.
 
 /// Water-cycle params (condensation + recycling).
 #[derive(Debug, Clone, Copy)]
@@ -170,7 +171,6 @@ pub struct BiosphereParams {
     pub nitro: NitrogenParams,
     pub decomp: DecompositionParams,
     pub micro: MicrobialRespirationParams,
-    pub miner: MineralizationParams,
     pub water: WaterCycleParams,
     pub herb: HerbivoryParams,
     pub alloc: AllocationParams,
@@ -287,9 +287,6 @@ pub fn biosphere() -> BiosphereParams {
         micro: MicrobialRespirationParams {
             microbial_respiration_rate: get(&t, "micro.microbial_respiration_rate"),
             o2_half_saturation: get(&t, "micro.o2_half_saturation"),
-        },
-        miner: MineralizationParams {
-            mineralization_rate: get(&t, "miner.mineralization_rate"),
         },
         water: WaterCycleParams {
             condensation_rate: get(&t, "water.condensation_rate"),

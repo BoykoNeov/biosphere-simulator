@@ -1,3 +1,32 @@
+# ============================================================================
+# RETIRED PARAMETER FILE — ARCHIVED PROVENANCE, NOT LOADED BY ANYTHING.
+#
+# This was `src/domains/biosphere/params/mineralization.yaml`. Both parameters it ever
+# held were retired by FORM changes rather than by finding citations, so the file has no
+# remaining parameter and was removed from the biosphere manifest's `param_files`:
+#
+#   n_senescence_rate    (retired 2026-07-27, N-cycle form gap option (A)) — N shedding
+#                        became coupled to the senescing carbon at a cited residual
+#                        tissue concentration (`nitrogen.yaml`'s `n_residual`).
+#   mineralization_rate  (retired 2026-07-27, option (B)) — the microbe-mediated return
+#                        leg carries N with the carbon its decomposer sibling already
+#                        moves, and `decomposed_C / litter_C == decomposition_rate`
+#                        identically, so the free rate was redundant with the carbon one.
+#
+# IT IS KEPT VERBATIM AND READABLE ON PURPOSE. It records five rounds of negative
+# retrieval results, and this project's own citation work established that *a stale
+# negative result is worse than a stale positive one, because it suppresses the next
+# search*. Deleting it would destroy exactly the record that stops someone re-running a
+# search that is already known to be exhausted.
+#
+# ⚠ Read the dated retrieval ceilings below as facts about one afternoon's access, never
+# as properties of the literature — that qualifier is the one this project has watched
+# itself drop repeatedly.
+#
+# The live discussion is in `src/domains/biosphere/mineralization.py` and
+# `docs/plans/post-roadmap-nitrogen-cycle-form.md`.
+# ============================================================================
+
 # chamber — nitrogen return loop (senescence-N shedding + net mineralization) params
 # Currency/units: NITROGEN (kg N). This file groups the TWO first-order rates (1/day)
 #   that close the chamber's nitrogen cycle — the N analogue of the carbon decomposer

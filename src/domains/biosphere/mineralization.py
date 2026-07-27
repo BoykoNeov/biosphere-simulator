@@ -17,25 +17,57 @@ external supply:
   the Euler backstop unfired). This **drains** ``plant_n`` (Phase 1 left it
   monotone-*growing*) — the consumption side the open N loop lacked.
 
-* **Mineralization** — ``litter_n -> soil_n`` (Σ legs = 0). Decomposing litter releases
-  mineral N back to the soil pool. First-order donor-controlled net mineralization
-  (Stanford & Smith 1972): ``min = mineralization_rate · litter_n`` (kg N day⁻¹),
-  self-limiting → 0 as litter_n → 0 (the same structural positivity). This is the
-  **DIRECT net-mineralization** flux ``litter_n → soil_n``.
+* **LitterNitrogenTransfer** — ``litter_n -> microbial_n`` (Σ legs = 0), and
+* **MicrobialNitrogenRelease** — ``microbial_n -> soil_n`` (Σ legs = 0).
+
+  Together these are the **microbe-mediated** return leg, and they replaced a direct
+  first-order ``litter_n → soil_n`` net mineralization — see "The return leg rides the
+  carbon" below.
 
 Both are **single-currency NITROGEN** flows (``litter_n``/``soil_n``/``plant_n`` are all
 ``{NITROGEN: 1}``), so the every-step conservation gate folds them exactly like Phase 1
 — no core change. Sealed-chamber only (``litter_n`` exists only when sealed); appended
 to the registry like ``Decomposition`` / ``MicrobialRespiration``.
 
-**Scope refinement vs the plan wording — DIRECT vs microbe-mediated N (advisor-reviewed,
-like Steps 4/5).** The plan says "litter/**microbial** N → soil_n"; this ships the
-direct first-order ``litter_n → soil_n`` net mineralization and **defers** the
-microbe-mediated path (N immobilization ``litter_n → microbial_n`` during decomposition,
-then ``microbial_n → soil_n`` during microbial turnover). First-order net mineralization
-is the standard minimal soil-N treatment (Stanford & Smith 1972) and matches how Step 4
-chose first-order donor decay over microbe-explicit Michaelis kinetics; microbe-mediated
-immobilization is the C:N-ratio-driven advanced path, a documented refinement seam.
+**The return leg rides the carbon (post-roadmap, the N-cycle form gap, option (B)).**
+Step 6 shipped the *direct* first-order ``litter_n → soil_n`` flux at a free
+``mineralization_rate``, deferring the microbe-mediated path as a refinement seam. That
+seam is now built, and the reason is not realism-for-its-own-sake — it is that **the
+free rate is gone**:
+
+    litter_n    -> microbial_n     moved = decomposed_C · (litter_n / litter_C)
+    microbial_n -> soil_n          moved = respired_C   · (microbial_n / microbial_C)
+
+Each leg carries the nitrogen that belongs to the carbon its sibling flow **already**
+moved this step — ``Decomposition``'s ``decomposed_C`` and ``MicrobialRespiration``'s
+``respired_C`` (``f_O2`` included). Since ``decomposed_C / litter_C ≡
+decomposition_rate`` identically, the first leg *is* ``decomposition_rate · litter_n``:
+the form **replaces an uncited free rate with the carbon rate stoichiometry forces it to
+equal**. ``mineralization_rate`` is therefore **RETIRED** — no parameter takes its
+place, and ``params/mineralization.yaml`` is gone with it. That is the second
+weakly-supported parameter in this file discharged by a **form** change rather than a
+citation hunt (after ``n_senescence_rate``, below).
+
+⚠ **Written recomputed-stoichiometric, never collapsed to the rate.** The identity above
+holds only while ``Decomposition`` stays first-order; a collapsed
+``decomposition_rate · litter_n`` would read identically today and silently outlive that
+premise. The respiration leg makes the point plainly — it carries ``f_O2``, so there is
+no bare rate to collapse *to*.
+
+⚠ **This is N transit, NOT immobilization, and the distinction is measured.** The
+canonical immobilization treatment imposes a homeostatic microbial C:N (~8) and draws
+the shortfall from mineral N. That requires our ``microbial_carbon`` to *mean* what
+CENTURY/RothC's microbial pool means, and it does not: carbon-use efficiency is **1.0**
+here (``Decomposition`` moves 100 % of decayed litter C into microbes and respiration is
+a separate draw — the deliberate Step-4/5 split), so the pool holds carbon a real model
+would already have respired. Measured, it peaks *comparable to* the litter pool rather
+than at the few percent standing microbial biomass actually is, and imposing C:N = 8 on
+it would demand 90–152× the litter N present. Re-labelling the pool to make that
+constant fit is the same move this project refused for ``decomposition.yaml``'s DPM/RPM
+labile-fraction re-read and for the soil-N₀-vs-litter-N re-anchoring below: *redefining
+what a pool MEANS so a literature constant fits is a semantic model change wearing a
+provenance hat.* **So immobilization remains a deferred seam — now with a measured
+obstacle instead of a deferral,** which is the more useful record.
 
 **Mechanism, not feedback — the deliverable, framed honestly (the f_O2 mirror).** With
 the chamber sized for potential production (PP, non-limiting N), ``f_N ≡ 1`` and this
@@ -80,39 +112,41 @@ Two things are fixed by the same change, and the second is why it was worth an u
   N remaining in mature straw *after remobilization*). **Changing the form changed which
   citation shape was needed** — that, not calibration, is what got the param off TODO.
 
-Still deferred: microbe-mediated immobilization (``litter_n → microbial_n → soil_n``,
-below) and DS-dependent shedding rates.
+Still deferred: **C:N-driven immobilization** (a mineral-N draw when residue is
+N-poor — see the measured obstacle above, which is why this is not merely "not built
+yet") and DS-dependent shedding rates (option (C); the DS-dependence gap moved to the
+*carbon* side when shedding became carbon-driven, where ``senescence.yaml``'s flat
+``rdr_*`` now own it).
 
-Pure stdlib only. Citations: Stanford, G. & Smith, S.J. (1972), "Nitrogen mineralization
-potentials of soils", Soil Science Society of America Journal 36(3):465–472 (first-order
-net N mineralization); Penning de Vries, F.W.T. et al. (1989), "Simulation
-of Ecophysiological Processes of Growth in Several Annual Crops", Simulation Monographs,
-PUDOC, Wageningen (the relative-death-rate senescence form the N-shedding mirrors).
-Provisional ``TODO(cite)`` rate values pending the Phase-2 validation gate (see
-``params/mineralization.yaml``), clean-room.
+Pure stdlib only. Citations: Penning de Vries, F.W.T. et al. (1989), "Simulation of
+Ecophysiological Processes of Growth in Several Annual Crops", Simulation Monographs,
+PUDOC, Wageningen (the relative-death-rate senescence form the N-shedding mirrors); Van
+Hecke, M.M. et al. (2020) for ``n_residual`` (see ``params/nitrogen.yaml``).
+⚠ **Stanford & Smith (1972) is no longer cited here, and its removal is a finding,
+not tidying** — it supported the retired ``mineralization_rate``, and the
+citation-scope work had
+established first-hand that its measured pool (soil organic N₀) was **not our pool**
+(fresh dead-plant N). The value it was cited for sat ~2.2× above the fastest of its own
+39 soils. Retiring the parameter is what discharged that mismatch; the provenance record
+is preserved in ``docs/plans/post-roadmap-nitrogen-cycle-form.md``. This module's two
+decomposer-carried rates now come from ``params/decomposition.yaml`` and
+``params/microbial_respiration.yaml``, which own their own provenance.
 """
 
 from dataclasses import dataclass
 
 from domains.biosphere.allocation import SenescenceParams, senescence_flux
+from domains.biosphere.chamber import oxygen_limitation_factor
+from domains.biosphere.decomposition import DecompositionParams, decomposition_flux
+from domains.biosphere.microbial_respiration import (
+    MicrobialRespirationParams,
+    microbial_respiration_flux,
+)
 from domains.biosphere.nitrogen import NitrogenParams
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
 from simcore.state import State
-
-
-@dataclass(frozen=True)
-class MineralizationParams:
-    """Loader-produced nitrogen-return-loop parameters: the two first-order rates.
-
-    Provisional literature-typical placeholders pending the Phase-2 validation gate (see
-    ``params/mineralization.yaml``). Zero rates are valid (no shedding / no
-    mineralization); negative is rejected at the loader.
-    """
-
-    # first-order net mineralization rate, litter_n → soil_n (kg N / kg N / day)
-    mineralization_rate: float
 
 
 def nitrogen_shedding_flux(
@@ -154,15 +188,23 @@ def nitrogen_shedding_flux(
     return min(tissue_conc, n_residual_per_mol_c) * shed_carbon
 
 
-def mineralization_flux(litter_n: float, *, mineralization_rate: float) -> float:
-    """Daily net mineralization ``mineralization_rate · litter_n`` (kg N day⁻¹).
+def carried_nitrogen(moved_carbon: float, pool_n: float, pool_c: float) -> float:
+    """The nitrogen belonging to ``moved_carbon`` at the donor pool's own N:C.
 
-    First-order donor-controlled (Stanford & Smith 1972): proportional to the standing
-    litter N, so it → 0 as litter_n → 0 (positivity is structural — the decomposition
-    self-limiting pattern). The mineralized nitrogen returns to the ``soil_n`` POOL (the
-    :class:`Mineralization` flow).
+    The one kernel behind both microbe-mediated legs: a carbon flux leaving a pool takes
+    that pool's nitrogen with it, ``moved_C · (pool_N / pool_C)``. Uniform composition —
+    the pool is well-mixed, so what leaves carries the average, not a preferentially
+    enriched or depleted fraction.
+
+    Positivity is structural and inherited, not re-argued: the carbon flux is itself a
+    clamped first-order withdrawal ``k · pool_C``, so the N withdrawal is ``k · pool_N``
+    — the same bound (``k·dt < 1``) that keeps the carbon leg from over-running its pool
+    keeps this one from over-running the N pool. Returns 0.0 for an empty or
+    non-positive pool (never a divide-by-zero, never a negative leg).
     """
-    return mineralization_rate * litter_n
+    if moved_carbon <= 0.0 or pool_n <= 0.0 or pool_c <= 0.0:
+        return 0.0
+    return moved_carbon * (pool_n / pool_c)
 
 
 @dataclass(frozen=True)
@@ -228,37 +270,106 @@ class NitrogenSenescence:
 
 
 @dataclass(frozen=True)
-class Mineralization:
-    """NITROGEN flow ``litter_n -> soil_n`` (balanced, P2 Step 6).
+class LitterNitrogenTransfer:
+    """NITROGEN flow ``litter_n -> microbial_n``, carried by the decomposed carbon.
 
-    Releases ``mineralization_flux(litter_n, mineralization_rate)·dt`` of nitrogen from
-    the ``litter_n`` POOL back to the ``soil_n`` POOL each step — closing the nitrogen
-    cycle ``soil_n → plant_n → litter_n → soil_n`` that Phase 1 fed externally from an
-    ``n_source`` BOUNDARY. Direct net first-order mineralization (Stanford & Smith 1972;
-    the microbe-mediated immobilization path is deferred — see the module docstring).
-    Single-currency NITROGEN (both pools are ``{NITROGEN: 1}``). Self-limiting (∝ the
-    litter-N pool's amount), so ``rationed == 0`` is structural
-    (``mineralization_rate·dt < 1``). Sealed-chamber only. ``flux = daily·dt`` —
-    dt-linear.
+    The nitrogen leg of :class:`decomposition.Decomposition`: the N that belongs to the
+    litter carbon decomposing into microbial biomass this step, at the litter pool's own
+    N:C. **The carbon flux is recomputed here from the same** ``DecompositionParams``
+    **object**, not shared through state — a flow may read only the step-entry snapshot,
+    so recomputation is the only pure form (the :class:`NitrogenSenescence` idiom, one
+    flow over). The hazard that creates — the two drifting apart if someone changes the
+    carbon side alone — is pinned by a test asserting this flow's ``decomposed_C``
+    equals ``Decomposition``'s own leg.
+
+    Single-currency NITROGEN (both pools are ``{NITROGEN: 1}``), so the
+    conservation gate folds it exactly. Self-limiting (the withdrawal is
+    ``decomposition_rate · litter_n``
+    by the identity in the module docstring), so ``rationed == 0`` is structural under
+    the same ``k·dt < 1`` the carbon leg already carries. Sealed-chamber only.
+    ``flux = daily·dt`` — dt-linear.
     """
 
     id: FlowId
     priority: int
     litter_n: StockId
-    soil_n: StockId
-    params: MineralizationParams
+    microbial_n: StockId
+    litter_carbon: StockId
+    params: DecompositionParams
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
-        mineralized = (
-            mineralization_flux(
-                snapshot.stocks[self.litter_n].amount,
-                mineralization_rate=self.params.mineralization_rate,
+        stocks = snapshot.stocks
+        litter_c = stocks[self.litter_carbon].amount
+        # The identical flux Decomposition sends litter_carbon → microbial_carbon.
+        decomposed = (
+            decomposition_flux(
+                litter_c, decomposition_rate=self.params.decomposition_rate
             )
             * dt
         )
+        moved = carried_nitrogen(decomposed, stocks[self.litter_n].amount, litter_c)
         return FlowResult(
             legs=(
-                Leg(self.litter_n, -mineralized),
-                Leg(self.soil_n, mineralized),
+                Leg(self.litter_n, -moved),
+                Leg(self.microbial_n, moved),
+            )
+        )
+
+
+@dataclass(frozen=True)
+class MicrobialNitrogenRelease:
+    """NITROGEN flow ``microbial_n -> soil_n``, carried by the respired carbon.
+
+    The nitrogen leg of :class:`microbial_respiration.MicrobialRespiration`, and the
+    close of the cycle ``soil_n → plant_n → litter_n → microbial_n → soil_n`` that
+    Phase 1 fed externally from an ``n_source`` BOUNDARY. As microbes respire their
+    carbon back to CO₂ they release the nitrogen that carbon carried, at the microbial
+    pool's own N:C.
+
+    **``f_O2`` is applied here too, and that is the clearest reason this flow recomputes
+    rather than reusing a bare rate:** microbial respiration self-throttles as O₂
+    depletes, so the N release must throttle with it — a collapsed
+    ``microbial_respiration_rate · microbial_n`` would keep mineralizing nitrogen from a
+    pool whose carbon had stopped moving.
+
+    Single-currency NITROGEN. Self-limiting in the substrate (∝ the microbial N pool)
+    and in O₂ (the ``f_O2`` Monod factor → 0 as O₂ → 0), so ``rationed == 0`` is
+    structural.
+    Sealed-chamber only. ``flux = daily · f_O2 · dt`` — dt-linear.
+    """
+
+    id: FlowId
+    priority: int
+    microbial_n: StockId
+    soil_n: StockId
+    microbial_carbon: StockId
+    o2_pool: StockId
+    params: MicrobialRespirationParams
+    # Total chamber air (mol) — the intensive basis for the ``f_O2`` O₂ mole fraction,
+    # exactly as MicrobialRespiration takes it (from ``scenario.chamber_air_mol``).
+    air_mol: float
+
+    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        stocks = snapshot.stocks
+        microbial_c = stocks[self.microbial_carbon].amount
+        # The identical flux MicrobialRespiration burns to CO₂ — f_O2 included.
+        f_o2 = oxygen_limitation_factor(
+            stocks[self.o2_pool].amount,
+            air_mol=self.air_mol,
+            k_o2=self.params.o2_half_saturation,
+        )
+        respired = (
+            microbial_respiration_flux(
+                microbial_c,
+                microbial_respiration_rate=self.params.microbial_respiration_rate,
+            )
+            * f_o2
+            * dt
+        )
+        moved = carried_nitrogen(respired, stocks[self.microbial_n].amount, microbial_c)
+        return FlowResult(
+            legs=(
+                Leg(self.microbial_n, -moved),
+                Leg(self.soil_n, moved),
             )
         )

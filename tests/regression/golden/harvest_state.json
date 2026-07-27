@@ -60,7 +60,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.d8ca6fa4367fap-20",
+      "amount": "0x1.f3bd080315f2ap-20",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -84,6 +84,19 @@
       "quantity": "carbon",
       "unclamped": false,
       "unit": "mol"
+    },
+    {
+      "amount": "0x1.002374cab6741p-24",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.microbial_n",
+      "kind": "pool",
+      "quantity": "nitrogen",
+      "unclamped": false,
+      "unit": "kg"
     },
     {
       "amount": "0x1.034395810624ap+3",
@@ -125,7 +138,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.8ffff6e5045e5p+6",
+      "amount": "0x1.8ffff6da472a6p+6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },

@@ -62,10 +62,23 @@ O2_POOL: StockId = StockId("biosphere.o2_pool")
 LITTER_CARBON: StockId = StockId("biosphere.litter_carbon")
 MICROBIAL_CARBON: StockId = StockId("biosphere.microbial_carbon")
 # Sealed chamber nitrogen return loop (P2.3/Step 6): senescence sheds plant N into a
-# finite ``litter_n`` POOL (the N analogue of ``litter_carbon``); net mineralization
-# returns it to ``soil_n``, closing the cycle soil_n → plant_n → litter_n → soil_n that
-# Phase 1 fed externally from ``n_source``.
+# finite ``litter_n`` POOL (the N analogue of ``litter_carbon``); mineralization returns
+# it to ``soil_n``, closing the cycle soil_n → plant_n → litter_n → soil_n that Phase 1
+# fed externally from ``n_source``.
+#
+# ⚠ The return leg is **microbe-mediated** (post-roadmap, the N-cycle form gap option
+# (B)): the N does not jump litter → soil directly but rides the carbon, litter_n →
+# ``microbial_n`` → soil_n, each leg carried by the very carbon flux its sibling flow
+# already moves. So ``microbial_n`` is the N analogue of ``microbial_carbon`` and, like
+# it, is a SOIL stock the plant's ``annual_reset`` never touches.
+#
+# It is a **POOL**, not a POPULATION like its carbon sibling, and that asymmetry is
+# deliberate: ``organ_stock`` carries an extinction pass that would zero the stock and
+# route the residual to the loss-sink, which for a nitrogen counterpart would orphan N
+# the carbon side still holds. A POOL is never zeroed-with-loss (the project's
+# extinction invariant), so the emergent C:N cannot be broken that way.
 LITTER_N: StockId = StockId("biosphere.litter_n")
+MICROBIAL_N: StockId = StockId("biosphere.microbial_n")
 # Sealed chamber water cycle (P3.3/Step 3): the two stocks that close the one cycle
 # still open. ``water_vapor`` (in ATMOSPHERE) receives transpired water (the canopy
 # flux that drained to the ``vapor_sink`` BOUNDARY in Phase 1/2); first-order
@@ -106,6 +119,7 @@ STOCK_DOMAIN: dict[StockId, DomainId] = {
     LITTER_CARBON: SOIL,
     LITTER_N: SOIL,
     MICROBIAL_CARBON: SOIL,  # decomposer biomass lives in the soil compartment
+    MICROBIAL_N: SOIL,  # its nitrogen counterpart (the microbe-mediated N transit pool)
     CARBON_POOL: ATMOSPHERE,
     O2_POOL: ATMOSPHERE,
     WATER_VAPOR: ATMOSPHERE,  # transpired vapor (the water cycle's atmosphere leg)
