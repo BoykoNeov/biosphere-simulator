@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -411,11 +412,17 @@ def test_litter_pool_cn_is_TWO_regimes_set_by_which_event_fills_the_pool() -> No
     ):
         rows = _litter_rows(scenario, years, resets=False)
         at_peak, _ = peak(rows)
-        # AT the shed ratio now, not 2.7x pushed away from it.
+        # AT the shed ratio now, not 2.7x pushed away from it. The residual above
+        # it is NOT a "pulsed transient" (equal drains make the ratio exactly invariant
+        # between pulses) -- it is the N-free `litter_carbon0` seed these scenarios
+        # carry, measured in
+        # test_the_pool_cn_IS_the_shed_ratio_and_the_deviation_is_the_N_FREE_SEED.
         assert 95.0 < at_peak < 110.0, (scenario, at_peak)
         assert 1.0 < at_peak / shed_cn < 1.2, (scenario, at_peak)
         # and therefore within ~1.25x of real wheat straw (~80), where the frozen
-        # pre-(A) form gave 0.004 and the post-(A) direct form gave 173-192.
+        # pre-(A) form gave 0.004 and the post-(A) direct form gave 173-192. ⚠ These
+        # two bounds are SCENARIO facts, not model facts: adding a `litter_n0`
+        # counterpart would drop them to the model's own 1.125x and SHOULD go red.
         assert 1.1 < at_peak / 80.0 < 1.4, (scenario, at_peak)
         shedding_ratios.append(at_peak / shed_cn)
 
@@ -519,8 +526,69 @@ def test_the_free_mineralization_rate_no_longer_EXISTS_to_be_calibrated() -> Non
     peak_n = max(r[0] for r in rows)
     i = next(k for k, r in enumerate(rows) if r[0] == peak_n)
     at_peak = rows[i][1] * _M_C / peak_n
-    # Within the pulsed-input transient of the cited shed ratio - no free rate in sight.
+    # At the cited shed ratio, up to this scenario's N-free `litter_carbon0` seed (see
+    # the seed test below) - no free rate in sight either way.
     assert 1.0 < at_peak / shed_cn < 1.2, (at_peak, shed_cn)
+
+
+def test_the_pool_cn_IS_the_shed_ratio_and_the_deviation_is_the_N_FREE_SEED() -> None:
+    """⚠ CORRECTS this file's own first attribution — and the correction makes the
+    result STRONGER, which is exactly why it was worth chasing rather than leaving.
+
+    The test above measures the shedding-fed pool at 98.7-100.6 against a shed ratio of
+    90, and the first write-up called that gap "the pulsed-input transient". **That
+    explanation cannot be right, and the reason is one line of algebra.** With both
+    currencies draining on the same first-order flux, ``dC/dt = -kC`` and
+    ``dN/dt = -kN``, so ``d(C/N)/dt = 0``: the ratio is *exactly invariant* between
+    pulses. Pulsing structurally cannot move it. That mechanism was real under the
+    RETIRED form — where N drained 2.7x faster than C, so a tail between pulses really
+    did inflate — and it got carried forward into a regime where it no longer exists.
+    **The same shape as the three claims this work retired one function above**: an
+    explanation outliving the mechanism that made it true.
+
+    The pool can only sit above the shed ratio if something *entered* above it, and the
+    chambers do exactly that: they seed ``litter_carbon0 = 3.0`` mol C with **no
+    ``litter_n0`` counterpart**, i.e. C:N = infinity. That seam was already named in the
+    (A) record; it turns out to be the whole of the deviation.
+
+    Measured with the seed removed, the pool C:N is the shed ratio **to 1.4e-15
+    relative, at every step of the run** — not a band, an identity. So:
+
+    * the MODEL's litter pool C:N is ``carbon_fraction / n_residual`` exactly, i.e.
+      **1.125x wheat straw's ~80**, not 1.25x;
+    * the committed scenarios' deviation is a known **unphysical initial condition**,
+      and it decays at ``decomposition_rate`` like anything else in the pool — which is
+      why ``sealed_chamber`` (3 yr) ends at 90.6 while ``water_biting`` (1 yr) still
+      reads 98.6 with ~0.10 mol of seed carbon left.
+
+    ⚠ If anyone ever adds a ``litter_n0`` counterpart, the committed-scenario bounds in
+    the test above should go red — and that would be a **good** reason: it would mean
+    the scenarios stopped seeding N-free carbon.
+    """
+    nitro = load_nitrogen_params()
+    shed_cn = _CARBON_FRACTION / (nitro.n_residual_per_mol_c / nitro.dm_kg_per_mol_c)
+
+    for scenario, years in (
+        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS),
+        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS),
+    ):
+        seedless = replace(scenario, litter_carbon0=0.0)
+        rows = _litter_rows(seedless, years, resets=False)
+        ratios = [c * _M_C / n for n, c in rows if n > 0.0]
+        assert ratios, scenario
+        # An IDENTITY at every step, not a band at the peak.
+        worst = max(abs(r - shed_cn) / shed_cn for r in ratios)
+        assert worst < 1e-12, (scenario, worst, min(ratios), max(ratios))
+
+    # And the committed scenarios sit ABOVE it by exactly the seed's doing: the same
+    # scenario with the seed present is measurably higher at its peak.
+    seeded = _litter_rows(
+        sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, resets=False
+    )
+    peak_n = max(r[0] for r in seeded)
+    i = next(k for k, r in enumerate(seeded) if r[0] == peak_n)
+    assert seeded[i][1] * _M_C / peak_n > shed_cn * 1.05
+    assert sc.SEALED_CHAMBER_SCENARIO.litter_carbon0 > 0.0
 
 
 def test_nitrogen_is_conserved_across_the_annual_reset() -> None:

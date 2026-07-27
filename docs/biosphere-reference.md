@@ -294,12 +294,24 @@ so the discipline is enforced, not merely requested.
 
       pool C:N  →  shed C:N  =  carbon_fraction / n_residual  =  90
 
-  Measured, the shedding-fed chambers sit at **98.7–100.6** at peak `litter_n` (1.10–1.12× the
-  shed ratio, the pulsed-input transient) and `sealed_chamber` **ends at 90.6** — within 0.7 %
-  of it. Against wheat straw's ~80 that is **~1.25×**, where the pre-(A) form gave **0.004**
-  and the post-(A) direct form gave 173–192. That is not merely a smaller error: the litter
-  pool's C:N stopped being an accident of two unrelated rate constants and became a function
-  of the *composition of the material that fell in*, both of whose numbers are cited.
+  Measured, the shedding-fed chambers sit at **98.7–100.6** at peak `litter_n` and
+  `sealed_chamber` **ends at 90.6** — within 0.7 % of the shed ratio. That is not merely a
+  smaller error: the litter pool's C:N stopped being an accident of two unrelated rate
+  constants and became a function of the *composition of the material that fell in*, both of
+  whose numbers are cited.
+
+  ⚠ **The residual above 90 is the N-FREE SEED, not a "pulsed transient"** (corrected
+  2026-07-27 after an advisor catch, then measured). With both currencies draining on the
+  same flux, `d(C/N)/dt = 0` — the ratio is exactly invariant between pulses, so pulsing
+  *cannot* move it; that mechanism belonged to the retired differential-drain form. The
+  chambers seed `litter_carbon0 = 3.0` mol C with **no `litter_n0` counterpart** (C:N = ∞),
+  a seam the (A) record already named, and with the seed removed the pool C:N equals the
+  shed ratio **to 1.4e-15 relative at every step** — an identity, not a band. So the
+  **model's** litter pool C:N is `carbon_fraction / n_residual` exactly = 90, i.e. **1.125×**
+  wheat straw rather than 1.25×, and the committed scenarios' excess is a known unphysical
+  IC that decays at `decomposition_rate` (hence `sealed_chamber` at 3 yr ends at 90.6 while
+  `water_biting` at 1 yr still reads 98.6). Pinned in `tests/test_nitrogen_form.py`; the
+  committed-scenario bounds are labelled **scenario facts, not model facts**.
 
   ⚠ **Three previously-recorded claims are retired here, and none of them was WRONG** — each
   was a true measurement of a form that no longer exists, so they are resolved rather than

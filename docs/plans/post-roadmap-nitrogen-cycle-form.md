@@ -654,15 +654,46 @@ currencies now leave on the **same** flux, so the pushing factor is exactly **1*
     old:  pool C:N -> (shed C:N) x (k_min / k_decomp)  =  90 x 2.727  =  245.5
     new:  pool C:N -> shed C:N                          =  90
 
-Measured: shedding-fed chambers sit at **98.7-100.6** at peak `litter_n` (1.10-1.12x the
-shed ratio, the pulsed-input transient), and `sealed_chamber` **ends at 90.6** — within
-0.7 % of it. Against wheat straw's ~80 that is **~1.25x**, where the pre-(A) form gave
+Measured: shedding-fed chambers sit at **98.7-100.6** at peak `litter_n`, and
+`sealed_chamber` **ends at 90.6** — within 0.7 % of the shed ratio. Against wheat straw's
+~80 that is **~1.25x** as committed, and **exactly 1.125x for the model itself** once the
+N-free seed is accounted for (see the correction below), where the pre-(A) form gave
 **0.004** and the post-(A) direct form gave 173-192.
 
 The point is not the number. **The litter pool's C:N stopped being an accident of two
 unrelated rate constants and became a function of the composition of the material that
 fell into it** — and both numbers fixing that composition are cited (`carbon_fraction`
 0.45, `n_residual` Van Hecke 2020).
+
+⚠ **CORRECTION (2026-07-27, advisor catch then measured) — the residual above the shed
+ratio is the N-FREE SEED, not "the pulsed-input transient", and the correction makes the
+result STRONGER.** The first write-up of this section explained the 98.7-100.6 measurement
+as a pulsed-input transient around a shed ratio of 90. **That cannot be right, by one line
+of algebra**: with both currencies draining on the same first-order flux, `dC/dt = -kC`
+and `dN/dt = -kN`, so `d(C/N)/dt = 0` — the ratio is *exactly invariant* between pulses,
+and pulsing structurally cannot move it. The transient was real under the **retired** form,
+where N drained 2.7x faster than C. **It is the same failure this section retires three
+other claims for: an explanation outliving the mechanism that made it true** — and I wrote
+it in the same commit that retired them.
+
+The pool can only sit above the shed ratio if something *entered* above it, and the sealed
+chambers do exactly that: they seed `litter_carbon0 = 3.0` mol C with **no `litter_n0`
+counterpart** (C:N = ∞) — a seam the (A) record had already named. Measured with the seed
+removed, the litter pool C:N equals the shed ratio **to 1.4e-15 relative, at every step**
+— an identity, not a band. So:
+
+* **the MODEL's litter pool C:N is `carbon_fraction / n_residual` exactly = 90**, i.e.
+  **1.125x** wheat straw's ~80, not 1.25x;
+* the committed scenarios' deviation is a known **unphysical initial condition** that
+  decays at `decomposition_rate` like anything else in the pool — which is why
+  `sealed_chamber` (3 yr) ends at **90.6** while `water_biting` (1 yr) still reads 98.6
+  with ~0.10 mol of seed carbon left. The end-vs-peak difference was never horizon
+  *dependence* of the law; it is the seed washing out.
+
+Pinned in `tests/test_nitrogen_form.py`
+(`test_the_pool_cn_IS_the_shed_ratio_and_the_deviation_is_the_N_FREE_SEED`), and the
+committed-scenario bounds are now labelled **scenario facts, not model facts**: adding a
+`litter_n0` counterpart should turn them red, for a good reason.
 
 ### Three previously-pinned claims RETIRED, and none of them was wrong
 
