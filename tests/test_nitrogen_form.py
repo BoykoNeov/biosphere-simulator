@@ -19,9 +19,22 @@ the
 2. **The 14.42 t/ha crossing point.** ``f_N ≡ 1`` in every frozen scenario holds on a
 ~12 %
    margin, not structurally: ``open_season`` peaks at 12.633 t/ha and the target meets
-   ``n_critical`` at 14.42. Anything that grows the open-field crop ~15 % moves a frozen
-   golden, so the margin is asserted rather than mentioned (the "freeze's prose half is
-   ungated" lesson).
+   ``n_critical`` at 14.42. The margin is asserted rather than mentioned (the "freeze's
+   prose half is ungated" lesson).
+
+   ⚠ **This item originally continued "Anything that grows the open-field crop ~15 %
+   moves a frozen golden." THAT INFERENCE IS MEASURED FALSE (2026-07-27** —
+   ``docs/plans/post-roadmap-canopy-regulator.md`` **finding 6).** A counterexample at
+   **+24.5 %** exists: the DS-keyed form plus the Van Keulen & Seligman canopy regulator
+   peaks at 15.725 t/ha, *is* past the crossing, and leaves ``f_N`` at exactly 1.0 for
+   all 306 steps. ``f_N`` reads the plant's **actual** concentration, not its target,
+   and demand-deficit uptake clamps at zero deficit — so past the crossing the plant
+   sits **15-30 % above** its target with no route back down. Peak mass does not even
+   *order* the bite (the bare form crosses ``n_critical`` at a **lower** mass, 15.068).
+   **The ASSERTIONS below are sound and CONSERVATIVE and are deliberately unchanged** —
+   14.4248 fires before the earliest measured bite, which is what a tripwire should do.
+   *The value may stand* and *its justification is falsified* are both true, and the
+   first does not rescue the second (round 4's ``self_discharge``).
 3. **The two carbon legs of one physical event cannot drift.** The shed-N flow
 recomputes
    the senescence flux; a test compares it against ``Senescence``'s own litter leg.
@@ -167,9 +180,16 @@ def test_open_season_peaks_below_the_crossing_with_the_margin_pinned() -> None:
 
     So ``f_N == 1`` across the frozen set is **not structural** — it is a ~12 % margin
     on one scenario. A weather-fixture change, a canopy improvement, or any calibration
-    that grows the open-field crop ~15 % pushes the target below ``n_critical`` and
-    moves a frozen golden. That is exactly the kind of claim that rots silently in
-    prose, so it is asserted here.
+    that grows the open-field crop ~15 % pushes the target below ``n_critical``. That is
+    exactly the kind of claim that rots silently in prose, so it is asserted here.
+
+    ⚠ **The docstring used to end "…below ``n_critical`` AND MOVES A FROZEN GOLDEN".
+    The second conjunct does not follow, and a +24.5 % counterexample was measured
+    2026-07-27** (``docs/plans/post-roadmap-canopy-regulator.md`` finding 6, pinned in
+    ``test_senescence_form.py::test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting``).
+    ``f_N`` reads the plant's actual concentration, not its target. **The assertions
+    below are unchanged**: as a guard, 14.4248 fires *before* the earliest measured bite
+    (15.068 t/ha), which is the right direction for a tripwire to err in.
     """
     scenario = sc.DEFAULT_SCENARIO
     state, registry = build_season(scenario)

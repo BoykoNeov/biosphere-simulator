@@ -936,6 +936,11 @@ threshold: the wrong table would have reported "the tripwire does not fire."
 
 ### C-finding 5 — ⚠ THE STRUCTURAL FINDING: the flat `rdr_leaf` is standing in for canopy regulation we do not have
 
+> ⚠ **"we do not have" was true of the CODE and false of the SHELF.** The regulator was
+> retrieved, verified and measured on 2026-07-27 —
+> `docs/plans/post-roadmap-canopy-regulator.md`. It fixes this finding's canopy
+> (16.40 → 6.244) and does **not** unblock (C). Everything below stands as measured.
+
 Peak leaf area index, `open_season` (real wheat peaks at ~5–8):
 
 | | peak LAI | final LAI | leaf lost by season end |
@@ -1029,8 +1034,11 @@ the cascade this plan reserved for (D). And unlike (A)/(B), **it does not stand 
 taking the primary's form as printed either
 
 * breaks `perennial` (RK4 hard error, decade CO₂ floor, lost fixed point), **or**
-* requires the canopy-regulation science of C-finding 5, which the tree does not have
-  and which is a scope of its own, **or**
+* ~~requires the canopy-regulation science of C-finding 5, which the tree does not have
+  and which is a scope of its own~~ — ⚠ **DISCHARGED 2026-07-27**: the science was on the
+  shelf ([A] p. 101, Van Keulen & Seligman 1987), it works (LAI 16.40 → 6.244), and it
+  changes **nothing** in the seven scenarios that block (C). See the box at the end of
+  this section, **or**
 * requires a calibration whose only target is our own goldens (C-finding 7, refused).
 
 So the honest status is **DIAGNOSED, PRICED, NOT RECOMMENDED AS SPECIFIED** — the
@@ -1041,6 +1049,35 @@ reached about the oracle gap ("not a calibration task"), arrived at independentl
 The natural successor is therefore **not** (C) or (D) but the canopy regulator (leaf-age
 or self-shading-driven death), which is what would let the primary's form be adopted
 without a fitted table. Left as a user call; nothing here is built.
+
+> ⚠ **TAKEN THE SAME DAY, AND HALF OF THAT SENTENCE IS NOW MEASURED FALSE** (2026-07-27
+> — `docs/plans/post-roadmap-canopy-regulator.md`). **The regulator exists and was
+> already on our shelf**: [A] **p. 101** — six pages after the §3.2.6 this whole
+> diagnosis quotes — reports Van Keulen & Seligman (1987) at **5 %/day of leaf area once
+> LAI exceeds 6 m² m⁻², for WHEAT**, verified on the page image. It takes `open_season`'s
+> peak LAI from 16.40 to **6.244**, inside the realistic band, with nothing fitted. So
+> "blocked on a **missing** science" was a statement about where we had looked: every
+> search went to the *senescence* section, and V-K&S's rule is filed under *leaf area*
+> because it is expressed as an area rate. **The (C) locus finding one level up — right
+> book, right topic, wrong section — and this time the un-found thing was declared
+> nonexistent rather than un-found.**
+>
+> **But "which is what would let the primary's form be adopted" is FALSE, and that is the
+> real result.** The regulator fires in **exactly one of eight** scenarios. Every chamber
+> peaks at LAI 0.068–0.632 against a threshold of 6 (9–88× below), so on the frozen tree
+> it is **bit-identically inert**; and `perennial` — where (C) actually died — hard-errors
+> under RK4 at `scale_f = 0.9527733243688737` **with and without it, to all sixteen
+> digits**, with the decade CO₂ minimum unchanged at 0.005910. The chambers are
+> **carbon-limited by design** (52 g DM/m²); a mutual-shading rule regulates canopy
+> *closure*, and their canopies never close. **The canopy regulator is a field-scale
+> mechanism and (C)'s blocker is a chamber-scale one.**
+>
+> ⇒ **(C) stays refused, and exactly ONE of the three branches above is discharged.**
+> "Requires the canopy-regulation science" is struck — the science exists and works on
+> the canopy — but discharging it did **not** help, because "breaks `perennial`" is
+> measured *identical* with the regulator in place, and "requires a fitted calibration"
+> stays refused. The escape route is now closed **by measurement rather than by
+> absence**, which is a strictly better place to be blocked.
 
 ## Cost of the cascade (any of A–D)
 

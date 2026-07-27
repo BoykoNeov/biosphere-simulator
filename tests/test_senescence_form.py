@@ -18,8 +18,21 @@ measurement kept only in prose rots. What is pinned, and why each one is here:
 2. **⚠ THE STRUCTURAL FINDING: the flat ``rdr_leaf`` is standing in for canopy
    regulation the tree does not have.** Taking the primary's form takes ``open_season``
    peak LAI from 5.19 to 16.4, against real wheat's ~5-8 — and *both* tables give the
-   same peak, because both are zero below DS 1.0. So it is not a reading question, and
-   (C) cannot be built until something else regulates the canopy on the way up.
+   same peak, because both are zero below DS 1.0. So it is not a reading question.
+
+   ⚠ **This section originally continued "…and (C) cannot be built until something else
+   regulates the canopy on the way up", which read as "the science is missing". THAT IS
+   MEASURED FALSE (2026-07-27, one day later** —
+   ``docs/plans/post-roadmap-canopy-regulator.md``**).** The regulator was on the shelf
+   all along: [A] **p. 101** quotes Van Keulen & Seligman (1987) at *5 %/day of leaf
+   area once LAI exceeds 6*, for **wheat**, and it takes the peak from 16.40 to **6.24**
+   with nothing fitted. Five citation rounds and the (C) diagnosis missed it because
+   every search went to §3.2.6 (p. 95, "Senescence and death"), and V-K&S's rule lives
+   six pages later in the **leaf area** section — *the (C) locus finding one level up:
+   right book, right topic, wrong section, and the conclusion drawn was not "we did not
+   find it" but "it does not exist".* The original wording is kept because the way it is
+   wrong IS the finding. **Section 6 below has the replacement claim, which is narrower
+   and survives: the regulator fixes the canopy and does NOT unblock (C).**
 3. **The frozen flat form is nearer the primary's own stated outcome than the primary's
    own table is** (38.5 % leaf lost by season end vs the stated 40-60 % band; Listing 5
    gives 30.0 %). It does not vindicate the flat form — it says the constant was
@@ -32,6 +45,16 @@ measurement kept only in prose rots. What is pinned, and why each one is here:
 5. **Euler reads clean and RK4 does not.** ``perennial`` reports ``rationed == 0`` under
    Euler and hard-errors under RK4 — increment 1's record repeating exactly, and the
    reason a Euler-only screen of a carbon change is not evidence.
+6. **THE CANOPY REGULATOR: found, sourced, measured — and it does NOT unblock (C).**
+   It fires in **exactly one of eight** scenarios. Every chamber peaks at LAI
+   0.068-0.632 against a threshold of 6, so on the frozen tree it is **bit-identically
+   inert**, and ``perennial`` hard-errors under RK4 at ``scale_f =
+   0.9527733243688737`` **with and without it, to all sixteen digits**. The chambers
+   are carbon-limited by design; a mutual-shading rule regulates canopy CLOSURE, and
+   their canopies never close. So exactly ONE of (C)'s three branches is discharged
+   ("requires the canopy-regulation science") and discharging it did not help — closure
+   is measured identical, and a fitted table stays refused. The regulator's own residual
+   is a new tripwire: ``open_season`` peaks at 86 % of the threshold.
 
 The candidate flows live in this module, not in ``src/``: nothing here is built, and
 ``git diff src/simcore`` stays empty. They are the same ones the read-only probes ran.
@@ -48,7 +71,7 @@ import pytest
 
 from domains.biosphere import scenario as sc
 from domains.biosphere.allocation import Senescence, senescence_flux
-from domains.biosphere.canopy import leaf_area_index
+from domains.biosphere.canopy import CanopyParams, leaf_area_index
 from domains.biosphere.loader import (
     load_canopy_params,
     load_nitrogen_params,
@@ -95,6 +118,21 @@ LISTING5_STEM = ((0.0, 0.0),)
 # record quoted for five citation rounds.
 T10_LEAF = ((0.0, 0.0), (1.0, 0.0), (1.5, 0.03), (2.0, 0.15))
 
+# --- the canopy regulator: [A] p. 101, quoting Van Keulen & Seligman (1987) -----------
+# "Van Keulen & Seligman (1987) calculated the rate of leaf area loss in wheat
+#  independently of leaf weight loss. They put it at 5 % d-1 once the leaf area exceeds
+#  the value of 6 m2 m-2 to account for mutual shading."
+# Read off the rendered page image, not off extraction: the same page's Table 20 comes
+# out of pdftotext visibly mangled, so the digits at issue are exactly the ones the
+# mechanical channel cannot be trusted for (the round-6 discipline).
+# ⚠ FLAT above the threshold ("once ... exceeds"), NOT proportional to the excess. The
+# SUCROS/WOFOST (LAI-LAIcrit)/LAIcrit shape is a different lineage and is not imported.
+# ⚠ This is [A] QUOTING V-K&S 1987, which is NOT on the shelf: first-hand [A], not
+# first-hand V-K&S, so the transmission and locus legs are unverified (Dunn 2011 is why
+# that distinction is kept).
+VKS_SHADE_RATE = 0.05  # 1/day
+VKS_LAI_THRESHOLD = 6.0  # m2 m-2
+
 
 def _weather(years: int = 1) -> list[dict[str, float | str]]:
     return json.loads(_WEATHER.read_text(encoding="utf-8"))["weather"] * years
@@ -126,6 +164,14 @@ class _DvsSenescence:
     leaf_table: tuple[tuple[float, float], ...]
     stem_table: tuple[tuple[float, float], ...]
     root_table: tuple[tuple[float, float], ...]
+    # The Van Keulen & Seligman mutual-shading regulator (finding 1 of the canopy plan).
+    # ``shade_rate = 0`` recovers the bare DVS form exactly, so one class covers all
+    # four cells of {frozen, Listing 5} x {no regulator, regulator} and the N leg below
+    # cannot drift from the carbon leg.
+    shade_rate: float = 0.0
+    lai_threshold: float = VKS_LAI_THRESHOLD
+    sla_per_mol_c: float = 0.0
+    ground_area: float = 1.0
 
     def dvs(self, snapshot: State) -> float:
         return development_stage(
@@ -134,21 +180,37 @@ class _DvsSenescence:
             tsum_maturity=self.pheno.tsum_maturity,
         )
 
+    def leaf_rate(self, snapshot: State) -> float:
+        """The DVS-keyed base rate plus the shading term, if the canopy has closed."""
+        base = _rdr_at(self.dvs(snapshot), self.leaf_table)
+        if not self.shade_rate:
+            return base
+        lai = leaf_area_index(
+            snapshot.stocks[self.leaf_c].amount,
+            sla_per_mol_c=self.sla_per_mol_c,
+            ground_area=self.ground_area,
+        )
+        return base + self.shade_rate if lai > self.lai_threshold else base
+
+    def rates(self, snapshot: State) -> tuple[float, float, float]:
+        d = self.dvs(snapshot)
+        return (
+            self.leaf_rate(snapshot),
+            _rdr_at(d, self.stem_table),
+            _rdr_at(d, self.root_table),
+        )
+
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         del env
-        d = self.dvs(snapshot)
         legs = []
         total = 0.0
-        for stock, table in (
-            (self.leaf_c, self.leaf_table),
-            (self.stem_c, self.stem_table),
-            (self.root_c, self.root_table),
+        for stock, rate in zip(
+            (self.leaf_c, self.stem_c, self.root_c),
+            self.rates(snapshot),
+            strict=True,
         ):
             lost = (
-                senescence_flux(
-                    snapshot.stocks[stock].amount,
-                    relative_death_rate=_rdr_at(d, table),
-                )
+                senescence_flux(snapshot.stocks[stock].amount, relative_death_rate=rate)
                 * dt
             )
             legs.append(Leg(stock, -lost))
@@ -183,17 +245,13 @@ class _DvsNitrogenSenescence:
         leaf = stocks[self.leaf_c].amount
         stem = stocks[self.stem_c].amount
         root = stocks[self.root_c].amount
-        d = self.carbon.dvs(snapshot)
+        # ⚠ Through ``rates()``, NOT a second interpolation off the tables — otherwise a
+        # shading term added to the carbon leg would silently not apply to the N leg.
+        r_leaf, r_stem, r_root = self.carbon.rates(snapshot)
         shed_carbon = (
-            senescence_flux(
-                leaf, relative_death_rate=_rdr_at(d, self.carbon.leaf_table)
-            )
-            + senescence_flux(
-                stem, relative_death_rate=_rdr_at(d, self.carbon.stem_table)
-            )
-            + senescence_flux(
-                root, relative_death_rate=_rdr_at(d, self.carbon.root_table)
-            )
+            senescence_flux(leaf, relative_death_rate=r_leaf)
+            + senescence_flux(stem, relative_death_rate=r_stem)
+            + senescence_flux(root, relative_death_rate=r_root)
         )
         shed = (
             nitrogen_shedding_flux(
@@ -211,7 +269,14 @@ _Knots = tuple[tuple[float, float], ...]
 
 
 def _candidate(
-    registry: Registry, state: State, *, leaf: _Knots, stem: _Knots, root: _Knots
+    registry: Registry,
+    state: State,
+    *,
+    leaf: _Knots,
+    stem: _Knots,
+    root: _Knots,
+    shade: float = 0.0,
+    ground_area: float = 1.0,
 ) -> Registry:
     pheno = load_phenology_params()
     old = next(f for f in registry.flows if isinstance(f, Senescence))
@@ -226,6 +291,9 @@ def _candidate(
         leaf_table=leaf,
         stem_table=stem,
         root_table=root,
+        shade_rate=shade,
+        sla_per_mol_c=load_canopy_params().sla_per_mol_c,
+        ground_area=ground_area,
     )
     flows: list[object] = []
     for f in registry.flows:
@@ -264,11 +332,18 @@ def _run(
     tables: dict[str, _Knots] | None = None,
     resets: bool = False,
     integrator: type[EulerIntegrator] | type[Rk4Integrator] = EulerIntegrator,
+    shade: float = 0.0,
 ):
     w = _weather(years)
     state, registry = build_season(scenario)
-    if tables is not None:
-        registry = _candidate(registry, state, **tables)
+    if tables is not None or shade:
+        registry = _candidate(
+            registry,
+            state,
+            **(tables or _FROZEN_AS_TABLES()),
+            shade=shade,
+            ground_area=scenario.ground_area,
+        )
     resolver = weather_resolver(w, scenario)
     if resets:
         return run_perennial(
@@ -285,6 +360,21 @@ def _run(
 
 _LISTING5 = {"leaf": LISTING5_LEAF, "stem": LISTING5_STEM, "root": LISTING5_ROOT}
 _T10 = {"leaf": T10_LEAF, "stem": LISTING5_STEM, "root": LISTING5_ROOT}
+
+
+def _FROZEN_AS_TABLES() -> dict[str, _Knots]:
+    """The frozen flat rates as one-knot tables — the degenerate case of the DVS form.
+
+    Lets the regulator be run on top of the FROZEN form without a second candidate
+    class. ``_rdr_at`` returns the single knot's value at every DVS, so this reproduces
+    ``allocation.Senescence`` exactly (asserted below, at ``to_bits()``).
+    """
+    p = load_senescence_params()
+    return {
+        "leaf": ((0.0, p.rdr_leaf),),
+        "stem": ((0.0, p.rdr_stem),),
+        "root": ((0.0, p.rdr_root),),
+    }
 
 
 def _peak_lai(states, scenario) -> tuple[float, float]:
@@ -518,3 +608,234 @@ def test_the_exercise_table_breaks_the_re_sow_outright() -> None:
             tables=_T10,
             resets=True,
         )
+
+
+# --- 6. THE CANOPY REGULATOR (docs/plans/post-roadmap-canopy-regulator.md) ------------
+# The successor this module named. It exists, it is sourced, it fixes the canopy — and
+# it does NOT unblock (C). These pin the whole shape, because "we looked and there was
+# nothing" is the claim that rotted here in the first place.
+
+_ROSTER = [
+    ("open_season", sc.DEFAULT_SCENARIO, 1, False),
+    ("sealed_chamber", sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, False),
+    (
+        "perennial_chamber",
+        sc.PERENNIAL_CHAMBER_SCENARIO,
+        sc.PERENNIAL_CHAMBER_YEARS,
+        True,
+    ),
+    ("consumer_chamber", sc.CONSUMER_CHAMBER_SCENARIO, sc.CONSUMER_CHAMBER_YEARS, True),
+    ("n_limited", sc.N_LIMITED_SCENARIO, sc.N_LIMITED_YEARS, False),
+    ("water_biting", sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, False),
+]
+
+
+def test_the_area_rule_transfers_because_lai_is_LINEAR_in_leaf_carbon() -> None:
+    """⚠ THE LICENSING STEP for a rule stated on AREA in a tree with no area state.
+
+    V-K&S give a rate of leaf AREA loss, "independently of leaf weight loss"; P2 says
+    "LAI is derived, not stored". The transfer is legitimate only because
+    ``specific_leaf_area`` is a single constant with no DVS keying, so LAI is linear in
+    leaf carbon and a RELATIVE area rate IS a relative carbon rate, exactly. This
+    asserts the linearity rather than the constancy, because linearity is what the
+    identity needs and it is checkable — and it is [A]'s OWN default, stated one
+    sentence before the quote ("computed in direct relation to the rate of leaf weight
+    loss, assuming that the average value of the specific leaf weight applies").
+
+    ⚠ THE LIMITATION, pinned so it cannot be dropped: V-K&S separated area from weight
+    BECAUSE specific leaf weight varies by leaf cohort — [A]'s Figure 40, on the very
+    same page, plots it from ~230 to ~530 kg/ha over a season. Our single constant
+    cannot express that, so we would inherit their rule under an assumption they
+    explicitly declined to make.
+    """
+    cp = load_canopy_params()
+    assert [f for f in CanopyParams.__dataclass_fields__] == [
+        "sla_per_mol_c",
+        "extinction_coef",
+    ], "CanopyParams grew a field — is SLA still a single constant?"
+    one = leaf_area_index(1.0, sla_per_mol_c=cp.sla_per_mol_c, ground_area=3.0)
+    for x in (0.5, 2.0, 7.5, 1e3):
+        # ⚠ Not bit-exact, and the reason is arithmetic rather than modelling:
+        # ``(x*sla)/A`` and ``x*((1*sla)/A)`` associate differently and can land 1 ULP
+        # apart. The IDENTITY is exact; its float evaluation is not, so the tolerance is
+        # a few ULP rather than zero. Stated instead of quietly loosened.
+        assert leaf_area_index(
+            x, sla_per_mol_c=cp.sla_per_mol_c, ground_area=3.0
+        ) == pytest.approx(x * one, rel=1e-15), x
+
+
+def test_the_regulator_brings_the_primarys_form_back_into_the_realistic_band() -> None:
+    """FINDING 3 — Q1 answered YES, with a sourced threshold and a sourced rate.
+
+    C-finding 5's unphysical 16.4 lands at 6.2, inside real wheat's ~5-8. Nothing is
+    fitted: both numbers come off page 101.
+    """
+    bare, _r, _ = _run(sc.DEFAULT_SCENARIO, 1, tables=_LISTING5)
+    reg, _r2, _ = _run(sc.DEFAULT_SCENARIO, 1, tables=_LISTING5, shade=VKS_SHADE_RATE)
+    peak_bare, _ = _peak_lai(bare, sc.DEFAULT_SCENARIO)
+    peak_reg, _ = _peak_lai(reg, sc.DEFAULT_SCENARIO)
+    assert peak_bare > 15.0, peak_bare  # 16.397
+    assert 5.0 < peak_reg < 8.0, peak_reg  # 6.244 — the band
+
+
+@pytest.mark.parametrize(
+    "label,scenario,years,resets", _ROSTER, ids=[r[0] for r in _ROSTER]
+)
+def test_the_regulator_is_BIT_IDENTICALLY_inert_on_the_frozen_form(
+    label, scenario, years, resets
+) -> None:
+    """⚠ FINDING 4, first half. Added to the FROZEN tree the regulator changes nothing.
+
+    At ``to_bits()`` over every stock at every step, not "the same to three decimals" —
+    the inertness claim is only worth making at that precision. It holds because the
+    threshold (LAI 6) is above every frozen peak: ``open_season`` 5.191, and every
+    chamber between 0.068 and 0.632, i.e. 9-88x below it.
+
+    This also pins that the one-knot-table path reproduces ``allocation.Senescence``
+    exactly, which is what lets the regulator be run on the frozen form at all.
+    """
+
+    def run(shade):
+        states, rationed, _ = _run(
+            scenario, years, resets=resets, tables=None, shade=shade
+        )
+        assert rationed == 0
+        return [
+            tuple(
+                (str(sid), st.amount.hex())
+                for sid, st in sorted(s.stocks.items(), key=lambda kv: str(kv[0]))
+            )
+            for s in states
+        ]
+
+    assert run(0.0) == run(VKS_SHADE_RATE), label
+
+
+def test_frozen_peak_lai_is_below_the_threshold_and_open_season_is_CLOSE() -> None:
+    """⚠ FINDING 5 — the new tripwire, in the style of the 14.4248 t/ha Greenwood one.
+
+    The chambers are 9-88x below the LAI-6 threshold and will never reach it; they are
+    CARBON-limited by design (the (A) diagnosis measured their plant at 52 g DM/m2).
+    ``open_season`` is different: it peaks at 5.191, **86 % of the way to the
+    threshold**. So a calibration growing the open-field canopy ~16 % would start a
+    sourced, non-fitted mechanism firing in a frozen scenario. A margin that lives only
+    in prose is the "freeze's prose half is ungated" shape, so it is asserted.
+    """
+    peaks = {}
+    for label, scenario, years, resets in _ROSTER:
+        states, _r, _ = _run(scenario, years, resets=resets)
+        peaks[label], _ = _peak_lai(states, scenario)
+    for label, peak in peaks.items():
+        assert peak < VKS_LAI_THRESHOLD, (label, peak)
+    chambers = [v for k, v in peaks.items() if k != "open_season"]
+    assert max(chambers) < 1.0, peaks  # 0.632 — an order below, not a near miss
+    open_peak = peaks["open_season"]
+    assert 0.80 < open_peak / VKS_LAI_THRESHOLD < 0.92, open_peak  # 0.865
+
+
+def test_the_regulator_does_NOT_rescue_perennial_under_rk4() -> None:
+    """⚠ FINDING 4, the headline: the regulator and (C)'s blocker are DISJOINT.
+
+    ``perennial`` is where (C) died, and it dies identically with the regulator in
+    place, because its peak LAI is ~0.56 under RK4 — the regulator never fires on the
+    failing trajectory. The two scale factors agree to all sixteen digits, which is a
+    stronger statement than "it still fails": it is the SAME failure.
+
+    A mutual-shading rule is a canopy-CLOSURE mechanism. A canopy that never closes
+    cannot be regulated by one. That is scope (A)'s finding 11 on the other side of the
+    plant — "making N faithful does not make the CHAMBER faithful".
+    """
+    scale = []
+    for shade in (0.0, VKS_SHADE_RATE):
+        with pytest.raises(Exception, match="over-draw") as exc:
+            _run(
+                sc.PERENNIAL_CHAMBER_SCENARIO,
+                sc.PERENNIAL_CHAMBER_YEARS,
+                tables=_LISTING5,
+                resets=True,
+                integrator=Rk4Integrator,
+                shade=shade,
+            )
+        scale.append(str(exc.value))
+    assert scale[0] == scale[1], scale
+    assert "0.9527733243688737" in scale[0], scale[0]
+
+
+def test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting() -> None:
+    """⚠ FINDING 6 — a counterexample to a causal claim in ``test_nitrogen_form.py``.
+
+    Its docstring says any calibration growing the open-field crop ~15 % "pushes the
+    target below n_critical AND moves a frozen golden". Listing 5 + the regulator grows
+    it **+24.5 %** (12.633 -> 15.725) and DOES push the target under n_critical — and
+    ``f_N`` stays exactly 1.0 for all 306 steps. The first conjunct does not imply the
+    second: ``f_N`` reads the plant's ACTUAL concentration, and demand-deficit uptake
+    clamps at zero deficit, so past the crossing the plant sits 15-30 % ABOVE its target
+    with no route back down.
+
+    ⚠ The PIN is sound and conservative and is NOT touched — 14.4248 fires before the
+    earliest measured bite (Listing 5 first crosses n_critical at W = 15.068 t/ha). It
+    is the causal SENTENCE that overstates. "The value may stand" and "its justification
+    is falsified" are both true, and the first does not rescue the second (round 4's
+    self_discharge).
+
+    And peak mass does not even ORDER the bite: the regulated run reaches a HIGHER peak
+    than nothing-bites would suggest and never crosses, while the bare run crosses at a
+    LOWER mass. The bite is trajectory-dependent.
+    """
+    nitro = load_nitrogen_params()
+
+    def f_n_profile(shade: float) -> tuple[float, int, float]:
+        states, _r, _ = _run(sc.DEFAULT_SCENARIO, 1, tables=_LISTING5, shade=shade)
+        fns, ws = [], []
+        for s in states:
+            veg = (
+                s.stocks[LEAF_C].amount
+                + s.stocks[STEM_C].amount
+                + s.stocks[ROOT_C].amount
+            )
+            fns.append(
+                nitrogen_stress_factor(
+                    s.stocks[PLANT_N].amount,
+                    veg,
+                    n_residual_per_mol_c=nitro.n_residual_per_mol_c,
+                    n_critical_per_mol_c=nitro.n_critical_per_mol_c,
+                )
+            )
+            ws.append(
+                _t_per_ha(
+                    s.stocks[LEAF_C].amount
+                    + s.stocks[STEM_C].amount
+                    + s.stocks[STORAGE_C].amount,
+                    sc.DEFAULT_SCENARIO.ground_area,
+                )
+            )
+        return min(fns), sum(1 for v in fns if v < 1.0), max(ws)
+
+    bare_min, bare_n, bare_w = f_n_profile(0.0)
+    reg_min, reg_n, reg_w = f_n_profile(VKS_SHADE_RATE)
+    # the bare (C) form: over the crossing AND biting — test_nitrogen_form's expectation
+    assert bare_w > _CROSSING_T_HA and bare_min < 1.0 and bare_n == 6
+    # the regulated form: over the crossing by +9 %, crop +24.5 %, and NOT biting
+    assert reg_w > _CROSSING_T_HA, reg_w  # 15.725
+    assert reg_w / 12.633 > 1.20, reg_w  # +24.5 %, well past the "~15 %" of the claim
+    assert reg_min == 1.0 and reg_n == 0, (reg_min, reg_n)
+
+
+def test_the_frozen_concentration_margin_is_wider_than_the_frozen_mass_margin() -> None:
+    """Why the mass pin is the right guard to have: it is the tighter of the two.
+
+    ``open_season``'s mass margin to the crossing is ~12 %; its actual N concentration
+    never comes within ~28 % of ``n_critical``. Recorded because finding 6's mechanism
+    (f_N reads concentration, the pin watches mass) is only reassuring if the pin is
+    known to fire first.
+    """
+    nitro = load_nitrogen_params()
+    states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1)
+    assert rationed == 0
+    concs = [
+        s.stocks[PLANT_N].amount
+        / (s.stocks[LEAF_C].amount + s.stocks[STEM_C].amount + s.stocks[ROOT_C].amount)
+        for s in states
+        if s.stocks[LEAF_C].amount > 0
+    ]
+    assert min(concs) / nitro.n_critical_per_mol_c > 1.28, min(concs)

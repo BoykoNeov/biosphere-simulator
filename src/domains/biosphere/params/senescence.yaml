@@ -67,6 +67,32 @@
 #       the 14.4248 t/ha Greenwood point tests/test_nitrogen_form.py pins: f_N drops to
 #       0.995213 for 6/306 steps -- the FIRST time f_N bites in a frozen scenario.
 #
+#   ⚠ THE "MISSING CANOPY REGULATOR" WAS FOUND THE NEXT DAY, IN THIS SAME BOOK, AND IT
+#   DOES NOT CHANGE THE VERDICT (2026-07-27; docs/plans/post-roadmap-canopy-regulator.md).
+#   [A] p. 101 -- six pages after the sec. 3.2.6 quoted above, in the LEAF AREA section
+#   rather than the SENESCENCE one -- reports:
+#       "Van Keulen & Seligman (1987) calculated the rate of leaf area loss in wheat
+#        independently of leaf weight loss. They put it at 5 % d-1 once the leaf area
+#        exceeds the value of 6 m2 m-2 to account for mutual shading."
+#   (Read off the page image; FLAT above the threshold, not proportional to the excess;
+#   WHEAT, so no crop transfer; and it is [A] QUOTING V-K&S 1987, which is not on the
+#   shelf -- first-hand [A], not first-hand V-K&S.) Our tree has no leaf-AREA state, but
+#   specific_leaf_area is a single constant with no DVS keying, so LAI is linear in leaf
+#   carbon and a relative area rate IS a relative carbon rate -- which is [A]'s own
+#   stated default one sentence earlier. Limitation: V-K&S separated the two BECAUSE
+#   specific leaf weight varies by cohort ([A] Figure 40, same page, ~230->530 kg/ha).
+#
+#   MEASURED: it takes open_season's peak LAI from 16.40 to 6.244 (inside real wheat's
+#   ~5-8) with nothing fitted -- so the canopy half of the blocker is DISCHARGED. It
+#   changes NOTHING else: it fires in exactly 1 of 8 scenarios, is BIT-IDENTICALLY inert
+#   added to the frozen form, and `perennial` still hard-errors under RK4 at the
+#   IDENTICAL scale_f 0.9527733243688737 (its peak LAI is ~0.56, 10x below the
+#   threshold). The chambers are carbon-limited by design, so a mutual-shading rule --
+#   a canopy-CLOSURE mechanism -- can never reach them. So the sentence in rdr_leaf's
+#   tag below, "Blocked on a missing canopy regulator, not on retrieval", is HALF wrong
+#   and is annotated in place rather than rewritten: the regulator was not missing, it
+#   was unsearched-for; what actually blocks (C) is `perennial`'s CLOSURE, alone.
+#
 #   [A] permits calibrating the values ("These numbers can be used as default values, but
 #   should be calibrated to mimick specific situations"). ⚠ REFUSED HERE: our only
 #   available calibration target is closure of an artificial chamber and our own frozen
@@ -91,7 +117,7 @@ parameters:
   rdr_leaf:
     value: 0.02
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, and as of 2026-07-27 it carries the heaviest finding in this file. [A]'s cited table (Listing 5, rice IR36, p. 212) is LLVT = 0.0/day at DS 0-1.0, 0.007 at DS 1.3, 0.012 at DS 1.8+ — so our 0.02/day flat is non-zero over the ENTIRE vegetative phase where the source is exactly zero, and ~1.7x the source's terminal rate where the source is fastest. FORM gap and VALUE gap, and the form is the load-bearing half. ⚠ BUT THE FLAT RATE IS DOING WORK THE SOURCE'S FORM DOES NOT REPLACE, which is why it is NOT moved: running the DS-keyed form end-to-end takes open_season's peak LAI from 5.19 to 16.40 (real wheat ~5-8), because the tree has no self-shading leaf death, no leaf-age cohorts and no SLA aging — this constant has been the canopy's only regulator on the way up. Measured on BOTH source tables, which give the same peak (16.40 / 16.16) since both are zero below DS 1.0, so it is not a reading question. Corroborating, and against the source's own table: [A] p. 95 says the descriptive form 'usually results in a loss of 40-60 % of leaf area at harvest time', and in our tree the FROZEN flat form gives 38.5 % while Listing 5 gives 30.0 % — the flat rate was implicitly sized to the right INTEGRATED loss with the timing entirely wrong. ⚠ AMPLIFIED BY CROP TRANSFER: rice IR36's whole season is 102-135 days, our winter wheat reaches anthesis at day ~251, so 'zero below DS 1.0' removes ~250 days of shedding rather than ~60 (e^-(0.02*250) ~ 0.0067). Changing it is a CARBON change: open_season peak biomass 12.633 -> 18.678 t/ha, crossing the 14.4248 t/ha Greenwood point pinned in tests/test_nitrogen_form.py (f_N 0.995213 for 6/306 steps — the first f_N bite in a frozen scenario), and `perennial` HARD-ERRORS under RK4 while reporting rationed == 0 under Euler. Blocked on a missing canopy regulator, not on retrieval. See docs/plans/post-roadmap-nitrogen-cycle-form.md, 'THE (C) DIAGNOSIS'."
+    source: "TODO(cite) — STILL OPEN, and as of 2026-07-27 it carries the heaviest finding in this file. [A]'s cited table (Listing 5, rice IR36, p. 212) is LLVT = 0.0/day at DS 0-1.0, 0.007 at DS 1.3, 0.012 at DS 1.8+ — so our 0.02/day flat is non-zero over the ENTIRE vegetative phase where the source is exactly zero, and ~1.7x the source's terminal rate where the source is fastest. FORM gap and VALUE gap, and the form is the load-bearing half. ⚠ BUT THE FLAT RATE IS DOING WORK THE SOURCE'S FORM DOES NOT REPLACE, which is why it is NOT moved: running the DS-keyed form end-to-end takes open_season's peak LAI from 5.19 to 16.40 (real wheat ~5-8), because the tree has no self-shading leaf death, no leaf-age cohorts and no SLA aging — this constant has been the canopy's only regulator on the way up. Measured on BOTH source tables, which give the same peak (16.40 / 16.16) since both are zero below DS 1.0, so it is not a reading question. Corroborating, and against the source's own table: [A] p. 95 says the descriptive form 'usually results in a loss of 40-60 % of leaf area at harvest time', and in our tree the FROZEN flat form gives 38.5 % while Listing 5 gives 30.0 % — the flat rate was implicitly sized to the right INTEGRATED loss with the timing entirely wrong. ⚠ AMPLIFIED BY CROP TRANSFER: rice IR36's whole season is 102-135 days, our winter wheat reaches anthesis at day ~251, so 'zero below DS 1.0' removes ~250 days of shedding rather than ~60 (e^-(0.02*250) ~ 0.0067). Changing it is a CARBON change: open_season peak biomass 12.633 -> 18.678 t/ha, crossing the 14.4248 t/ha Greenwood point pinned in tests/test_nitrogen_form.py (f_N 0.995213 for 6/306 steps — the first f_N bite in a frozen scenario), and `perennial` HARD-ERRORS under RK4 while reporting rationed == 0 under Euler. Blocked on a missing canopy regulator, not on retrieval. See docs/plans/post-roadmap-nitrogen-cycle-form.md, 'THE (C) DIAGNOSIS'. ⚠ CORRECTED 2026-07-27, the very next day: 'a missing canopy regulator' was FALSE — the regulator is in the SAME BOOK at p. 101 (Van Keulen & Seligman 1987 via [A]: 5 %/day of leaf area once LAI exceeds 6, for WHEAT), it was simply filed under LEAF AREA rather than SENESCENCE, and it takes the peak LAI from 16.40 to 6.244 with nothing fitted. It does NOT change this parameter's verdict, because it is BIT-IDENTICALLY inert on the frozen form and `perennial` hard-errors under RK4 at the IDENTICAL scale_f with it in place — the chambers peak at LAI 0.07-0.63 against a threshold of 6, so a mutual-shading rule cannot reach them. The blocker is `perennial`'s CLOSURE, alone. See the file header and docs/plans/post-roadmap-canopy-regulator.md."
   rdr_stem:
     value: 0.005
     unit: "1/day"
