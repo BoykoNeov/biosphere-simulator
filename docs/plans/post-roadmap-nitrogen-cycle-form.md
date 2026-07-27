@@ -148,7 +148,20 @@ drives the tissue concentration to a **target**, and coupled shedding removes th
 inherited — it is decided by where the target sits relative to `n_critical` = 1.5 % DM.
 **So invariance had to be measured, not footnoted.**
 
-### Finding 6 — invariance MEASURED: it holds for a flat coherent target, in all 7 scenarios; the target FORM is load-bearing
+### Finding 6 — invariance MEASURED: it holds for a flat coherent target, in the 7 scenarios probed; the target FORM is load-bearing
+
+> ⚠ **SCOPE CORRECTION (finding 9): "all 7 scenarios" below is NOT the frozen seven.**
+> The set probed here — sealed / perennial / consumer / `n_limited` / `water_biting` /
+> `day_neutral` / `drought` — overlaps the manifest's frozen seven in **3 rows**. It omits
+> `open_season`, `perennial_long_horizon`, `consumer_long_horizon` and `drift_summary`, and
+> includes four scenarios that are not frozen at all. `open_season` is the omission that
+> mattered: it is the only frozen scenario that reaches field scale, and therefore the only
+> one that lands **inside** Greenwood's stated domain of validity. The *conclusion* survives
+> finding 9 and comes out stronger — which is exactly what makes this easy to soft-pedal, so
+> it is corrected here rather than footnoted. Meta-finding, **12th instance, mine**: the tell
+> is that **the numeral matched by coincidence** — "7 scenarios" and "the frozen 7" were
+> different sevens, and the number hid the gap. Check a scenario list against the *manifest*,
+> never against its own length.
 
 `probe_fn_under_A.py` / `probe_fn_all_scenarios.py` integrate the (A) plant-N ODE
 (demand-deficit uptake + N:C-coupled shedding, ± 50 % resorption) on the **recorded**
@@ -239,6 +252,116 @@ point, on four grep hits.
    (`soil_n0 = 100` vs `sn_critical = 50`), and `n_limited` runs with uptake **off**. This
    is the one place the offline integration is not self-contained.
 
+### Finding 9 — the target form is decided by READING Greenwood, and the answer is neither of the two forks
+
+The user's criterion — *"I want what represents reality more faithfully"* — turned the
+fork from a preference into a **retrieval question**, and `sources/greenwood1990.pdf` was
+**already on the shelf**. Both candidate forms were invented; the primary gives a third.
+
+Read first-hand (Greenwood et al. 1990, Ann. Bot. 66:425–436):
+
+* eqn (6): **`%N = a·W^-b` for `W > 1.0 t ha⁻¹`**, with **`a = 5.697` (C3)**, **`b = 0.5`**.
+  (The abstract rounds `a` to 5.7; eqn (6) prints 5.697.)
+* *"Data obtained with W less than 1 t ha⁻¹ were **always omitted**"* — below 1 t/ha the
+  paper deliberately has **no data**.
+* **The paper says what happens there, with a mechanism and a citation**: *"The value of `a`
+  is the %N in the crop when W = 1 t ha⁻¹. At this weight the growth rate gradually changes
+  from being almost exponential to linear. **When growth is exponential plant %N remains
+  constant and the critical concentration does not change with increase in plant mass**
+  (Ågren, 1985). The value of a = 5.7 % is therefore the best estimate of %N needed in the
+  dry matter of **young tissue** to permit the maximum growth rate of C3 crops."*
+* *"Both %N and W refer to the dry matter in the whole plant (**excluding fibrous roots**)"*
+  ⇒ Greenwood's `W` is `leaf + stem + storage`, **not** `f_N`'s own denominator
+  (`leaf + stem + root`).
+
+So the faithful form is **piecewise**: constant **5.697 % DM** below 1 t/ha, `5.697·W^-0.5`
+above. The plateau is **the primary's own statement**, not our interpolation — which means
+the "flat vs declining" fork was a false dichotomy. Measured on the **manifest's** scenario
+set (`probe_greenwood_primary.py`), `f_N` minimum under (A):
+
+| scenario | frozen? | peak `W` (t/ha) | in domain | **GW primary** | GW *incl. roots* | DVS-extrapolated |
+|---|---|---|---|---|---|---|
+| `open_season` | ✅ | **12.633** | **YES** (89 d) | **1.0000** | 0.9750 ⚠ | 1.0000 |
+| `sealed_chamber` | ✅ | 0.351 | no | **1.0000** | 1.0000 | 1.0000 |
+| `perennial_chamber` | ✅ | 0.364 | no | **1.0000** | 1.0000 | 1.0000 |
+| `perennial_long_horizon` | ✅ | 0.364 | no | **1.0000** | 1.0000 | 1.0000 |
+| `consumer_chamber` | ✅ | 0.430 | no | **1.0000** | 1.0000 | 1.0000 |
+| `consumer_long_horizon` | ✅ | 0.430 | no | **1.0000** | 1.0000 | 1.0000 |
+| `water_biting` | golden | 0.441 | no | **1.0000** | 1.0000 | 1.0000 |
+| `day_neutral` | authored | 0.093 | no | **1.0000** | 1.0000 | **0.713** ⚠ |
+| `n_limited` | golden | 0.071 | no | 0.0 | 0.0 | 0.0 |
+
+Three consequences:
+
+1. **`day_neutral`'s 0.713 was an artifact of extrapolating the curve outside its stated
+   domain.** `day_neutral` peaks at 0.093 t/ha — an order of magnitude *below* the bound —
+   so the declining ramp I was about to recommend as "the literature-shaped form" was using
+   Greenwood exactly where Greenwood says he has no data. **The form I called faithful was
+   the least faithful of the three.**
+2. **Invariance comes out as a consequence of fidelity, not as a reason for choosing** — which
+   dissolves the backfitting trap of open question 2 outright. Nothing was picked *because*
+   carbon stayed byte-identical; the paper was read and invariance fell out.
+3. ⚠ **But do not oversell that** (advisor). It holds on a **12 % margin against a
+   denominator definition**, not a robust separation. Greenwood crosses `n_critical` at
+   `W = (5.697/1.5)² = ` **14.42 t/ha**; `open_season` peaks at **12.633** — 88 % of the way
+   there. And the *wrong* denominator (`W` including fibrous roots, which is `f_N`'s own
+   denominator and therefore the tempting choice) **does bite**: 0.9750, 3 steps, in
+   `open_season`. Two forms both defensible as "Greenwood", one moves a frozen golden. Both
+   facts belong in the record, adjacent, not merged into "fidelity produced invariance".
+   ⇒ **the 14.42 t/ha crossing point is a PIN, not a footnote** (the `test_oracle_gap.py`
+   precedent): a weather-fixture change, a canopy improvement, or any calibration that grows
+   the open-field crop ~15 % flips `open_season`.
+
+### Finding 10 — (A) DELETES the knob `n_limited` is built on
+
+The advisor blocked on `n_limited` → exactly 0.0. Resolved, and it is a **design requirement
+on (A)**, discovered before building rather than after.
+
+⚠ **First, the number is not licensed.** Finding 2's zero-feedback license holds *only where
+`f_N ≡ 1`*. In `n_limited`, `f_N` already bites in the frozen run, so the recorded carbon
+trajectory is **not** the (A) trajectory and every `n_limited` cell in findings 6 and 9 is a
+**screen, not a measurement**. It is a screen with a known **sign** of error: `f_N` throttles
+assimilation ⇒ less growth ⇒ less growth-dilution ⇒ higher concentration, a *negative*
+feedback the open-loop probe suppresses by construction. So 0.0 is an **upper bound on the
+severity**. *(A crude closed-loop screen still reaches 0 and drives the plant to zero carbon
+— direction only; scaling net organ increments by `f_N` is not the model.)*
+
+⚠ **Second — the probe's own baseline was wrong, and the golden caught it.** An earlier
+version reconstructed the frozen `plant_n` as `plant_n0·(1−k_sen)ⁿ` and reported `f_N` min
+0.0000 / 305 steps against the recorded **0.176 / 186**. The disagreement is the tell that
+the *reconstruction* was wrong, not the run; reading the recorded stock reproduces
+0.1759 / 186 / final 0.3754 exactly. **Reconstruct a frozen quantity only to check it against
+the recorded one — never to replace it.**
+
+**What the screen does establish, and it is structural:**
+
+* the frozen scenario **recovers** (min 0.176, final 0.3754) — it is a *modulation* scenario;
+* under (A) `f_N` hits 0 at step 195 and is **absorbing** (max after = 0.0), tissue
+  concentration falling 5.463 % → 0.111 % DM;
+* **the cause is that (A) makes `plant_n0` inert.** (A) seeds `plant_n` from the tissue-N
+  *target*, so `N_LIMITED_SCENARIO`'s `plant_n0 = 6e-5` — a *tiny reserve* deliberately placed
+  inside the `f_N` band — is simply overwritten by the Greenwood plateau (5.46 %). The
+  scenario's stated purpose ("owns the `f_N` concentration ramp + the uptake-shutoff path")
+  is not preserved by accident.
+
+⇒ **(A) must expose a seedling-N knob** (seedling N as a fraction of target, or an explicit
+initial concentration) for `n_limited` to keep testing what it was built to test. Re-sizing a
+**non-frozen, non-manifest** scenario's IC to preserve its documented purpose under a new form
+is legitimate scenario authoring, not backfitting — but it is *work (A) owes*, alongside
+finding 8's re-sow seam.
+
+### Finding 11 — the criterion reaches further than the available work
+
+Applied consistently, "represents reality more faithfully" does not stop at (A): it reaches
+**(D)**, the N→C throttle, because real soils *do* decay high-C:N residue more slowly. (D)
+collides head-on with the decomposer calibration's **measured** requirement for the fast decay
+edge, so the honest statement to make **before** building, not after:
+
+> The faithful sub-chain that is *available* is (A) [+ (B)]. The fully faithful chain includes
+> (D), and (D) is measured to fight closure in every sealed scenario. The obstacle is that the
+> chamber is **carbon**-limited by design — a 52 g/m² plant against field-sized N params — not
+> the N form. **Making N faithful does not make the chamber faithful.**
+
 ## The scope options (NOT yet decided — needs advisor review + a user call)
 
 Ordered by dependency. Each is carbon-invariant except (D).
@@ -289,8 +412,21 @@ manifest-named items, so it is a biosphere **unfreeze**, not Rust-first content.
 1. **Which option(s)?** (A) is the coherent minimum and the one that discharges the
    uncitable param. (B) needs (A). (D) is the only one with a carbon effect and is
    expected to conflict with the decomposer calibration.
-2. **Which tissue-N target form — and therefore, is the deliverable inert or not?**
-   Finding 6 makes this the *real* question, and it is a fork, not a footnote:
+2. ✅ **RESOLVED BY FINDING 9 — and neither branch of this fork was the answer.** The user's
+   criterion ("what represents reality more faithfully") turned the fork into a **retrieval
+   question**, and the paper was already in `sources/`. Greenwood's published equation carries
+   its own domain bound (`W > 1 t/ha`), its own below-domain behaviour (**constant** 5.697 %,
+   with a mechanism and an Ågren 1985 citation), and its own denominator (**excluding fibrous
+   roots**). That form gives `f_N ≡ 1.0000` in **all seven frozen scenarios**, `water_biting`
+   and `day_neutral`. So: **flat *was* right, at 5.697 % not my invented 3.0 %, and for the
+   opposite reason** — not because a constant is convenient, but because our crops sit below
+   the curve's domain, where the primary states %N *is* constant. The declining ramp was
+   Greenwood extrapolated into the region he excluded, and `day_neutral`'s 0.713 was that
+   extrapolation, not physics. **Both forks were invented; reading the source dissolved the
+   choice.** The residual honest caveats are in finding 9 (the 14.42 t/ha crossing point, 12 %
+   margin, and the roots-in-denominator variant that *does* bite). Kept below for the record:
+
+   ~~Finding 6 makes this the *real* question, and it is a fork, not a footnote:~~
    * **flat target ≥ ~2× `n_critical`** (e.g. 3.0 % DM) → `f_N ≡ 1` in all 7 scenarios,
      **carbon byte-identical**, N stocks move. A fidelity-and-citation deliverable, the
      same honest shape as the original Step-6 one ("nitrogen mass cycles internally and is
