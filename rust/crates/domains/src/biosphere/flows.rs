@@ -396,12 +396,24 @@ impl Flow for Irrigation {
     }
 }
 
-/// NITROGEN `soil_n -> plant_n` (capacity-gated uptake).
+/// NITROGEN `soil_n -> plant_n` (DEMAND-DEFICIT uptake, supply-gated).
+///
+/// `flux = min(target * biomass_c - plant_n, capacity * availability) * dt`. Greenwood's `W`
+/// excludes fibrous roots (leaf+stem+storage); the deficit applies to f_N's own denominator
+/// (leaf+stem+root). See `domains.biosphere.nitrogen.NitrogenUptake` for why those differ.
 pub struct NitrogenUptake {
     pub id: String,
     pub soil_n: String,
     pub plant_n: String,
+    pub leaf_c: String,
+    pub stem_c: String,
+    pub root_c: String,
+    pub storage_c: String,
     pub max_uptake_capacity: f64,
+    pub n_target_coefficient: f64,
+    pub n_target_exponent: f64,
+    pub n_target_w_plateau: f64,
+    pub dm_kg_per_mol_c: f64,
     pub ground_area: f64,
     pub sn_residual: f64,
     pub sn_critical: f64,
@@ -417,10 +429,27 @@ impl Flow for NitrogenUptake {
         _env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let soil_n = amt(snapshot, &self.soil_n);
-        let availability = science::soil_n_availability(soil_n, self.sn_residual, self.sn_critical);
-        let daily_kg = self.max_uptake_capacity * self.ground_area * availability;
-        let flux = daily_kg * dt;
+        let leaf = amt(snapshot, &self.leaf_c);
+        let stem = amt(snapshot, &self.stem_c);
+        let w_mol_c = leaf + stem + amt(snapshot, &self.storage_c);
+        let biomass_c = leaf + stem + amt(snapshot, &self.root_c);
+        // mol C -> kg DM -> t DM/ha (1 kg/m^2 == 10 t/ha)
+        let w_t_ha = (w_mol_c * self.dm_kg_per_mol_c / self.ground_area) * 10.0;
+        let target_per_mol_c = science::target_n_concentration(
+            w_t_ha,
+            self.n_target_coefficient,
+            self.n_target_exponent,
+            self.n_target_w_plateau,
+        ) * self.dm_kg_per_mol_c;
+        let deficit = (target_per_mol_c * biomass_c - amt(snapshot, &self.plant_n)).max(0.0);
+
+        let availability = science::soil_n_availability(
+            amt(snapshot, &self.soil_n),
+            self.sn_residual,
+            self.sn_critical,
+        );
+        let capacity = self.max_uptake_capacity * self.ground_area * availability;
+        let flux = deficit.min(capacity) * dt;
         FlowResult::new(vec![leg(&self.soil_n, -flux)?, leg(&self.plant_n, flux)?])
     }
 }
@@ -515,12 +544,24 @@ impl Flow for MicrobialRespiration {
     }
 }
 
-/// NITROGEN `plant_n -> litter_n`.
+/// NITROGEN `plant_n -> litter_n`, COUPLED to the senescing carbon.
+///
+/// `shed_N = min(plant_n/biomass_c, n_residual_per_mol_c) * shed_C`, where `shed_C` is the
+/// identical per-organ flux `Senescence` sends to litter_carbon — recomputed here from the
+/// same rates, since a flow may only read the step-entry snapshot. The `min` is
+/// remobilization: a well-fed plant sheds only the residual concentration Van Hecke et al.
+/// (2020) measure in mature straw, and retains the rest.
 pub struct NitrogenSenescence {
     pub id: String,
     pub plant_n: String,
     pub litter_n: String,
-    pub n_senescence_rate: f64,
+    pub leaf_c: String,
+    pub stem_c: String,
+    pub root_c: String,
+    pub rdr_leaf: f64,
+    pub rdr_stem: f64,
+    pub rdr_root: f64,
+    pub n_residual_per_mol_c: f64,
 }
 
 impl Flow for NitrogenSenescence {
@@ -533,7 +574,22 @@ impl Flow for NitrogenSenescence {
         _env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let shed = self.n_senescence_rate * amt(snapshot, &self.plant_n) * dt;
+        let leaf = amt(snapshot, &self.leaf_c);
+        let stem = amt(snapshot, &self.stem_c);
+        let root = amt(snapshot, &self.root_c);
+        // The identical arithmetic the Senescence flow above uses (Rust inlines the rate
+        // law rather than routing it through `science`, so this mirrors the expression, not
+        // a shared helper — the drift hazard that buys is pinned Python-side by comparing
+        // this flow's shed carbon against Senescence's own litter leg).
+        let shed_carbon =
+            self.rdr_leaf * leaf + self.rdr_stem * stem + self.rdr_root * root;
+        let plant_n = amt(snapshot, &self.plant_n);
+        let biomass_c = leaf + stem + root;
+        let shed = if shed_carbon <= 0.0 || plant_n <= 0.0 || biomass_c <= 0.0 {
+            0.0
+        } else {
+            (plant_n / biomass_c).min(self.n_residual_per_mol_c) * shed_carbon * dt
+        };
         FlowResult::new(vec![leg(&self.plant_n, -shed)?, leg(&self.litter_n, shed)?])
     }
 }

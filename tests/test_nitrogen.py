@@ -128,8 +128,17 @@ _BOUNDARY = DomainId("boundary")
 _SOIL_N = StockId("biosphere.soil_n")
 _PLANT_N = StockId("biosphere.plant_n")
 _N_SOURCE = StockId("boundary.fertilizer_supply")
+_LEAF_C = StockId("biosphere.leaf_c")
+_STEM_C = StockId("biosphere.stem_c")
+_ROOT_C = StockId("biosphere.root_c")
+_STORAGE_C = StockId("biosphere.storage_c")
 
 _SN_RESID, _SN_CRIT = 0.01, 0.05
+
+
+_N_TARGET_A = 0.05697  # Greenwood 1990 eqn (6), C3
+_N_TARGET_B = 0.5
+_N_TARGET_WMIN = 1.0  # t DM/ha
 
 
 def _params() -> NitrogenParams:
@@ -138,10 +147,24 @@ def _params() -> NitrogenParams:
         max_uptake_capacity=_MAX_UPTAKE,
         n_residual_per_mol_c=_N_RESIDUAL_KG_KG * fold,
         n_critical_per_mol_c=_N_CRITICAL_KG_KG * fold,
+        n_target_coefficient=_N_TARGET_A,
+        n_target_exponent=_N_TARGET_B,
+        n_target_w_plateau=_N_TARGET_WMIN,
+        dm_kg_per_mol_c=fold,
     )
 
 
-def _state(soil_n0: float, plant_n0: float = 0.2) -> State:
+def _state(soil_n0: float, plant_n0: float = 0.0) -> State:
+    """Default: an N-STARVED plant, so the deficit is large and uptake is
+    capacity-bound.
+
+    ⚠ This default was 0.2 kg N, which was harmless under the old fixed-flux uptake law
+    but is ~130x the target concentration under demand-deficit — the deficit clamps to 0
+    and the flow returns ZERO legs. Every test below would then pass vacuously. Starting
+    from 0.0 keeps them all live: deficit = target x 2.0 mol C = 3.04e-3 kg N,
+    comfortably above the 1.5e-3 kg N/day capacity, so `min(deficit, capacity)` selects
+    CAPACITY and the original capacity-law assertions still describe the flow exactly.
+    """
     nitrogen = canonical_unit(Quantity.NITROGEN)
     soil = Stock(
         id=_SOIL_N,
@@ -168,9 +191,31 @@ def _state(soil_n0: float, plant_n0: float = 0.2) -> State:
         kind=StockKind.BOUNDARY,
         unclamped=True,
     )
+    carbon = canonical_unit(Quantity.CARBON)
+    organs = {
+        oid: Stock(
+            id=oid,
+            domain=_BIO,
+            quantity=Quantity.CARBON,
+            unit=carbon,
+            amount=amount,
+            kind=StockKind.POOL,
+        )
+        # Demand-deficit uptake reads biomass. leaf+stem+root is f_N's own
+        # denominator (2.0 mol C); leaf+stem+storage = 0.5 mol C is Greenwood's W
+        # (roots excluded), which at 1 m2 is 0.1335 t/ha -- far below the 1 t/ha domain
+        # bound, so the target sits on the plateau and the arithmetic stays
+        # hand-checkable.
+        for oid, amount in (
+            (_LEAF_C, 0.5),
+            (_STEM_C, 0.0),
+            (_ROOT_C, 1.5),  # biomass 2.0 mol C: the deficit clears capacity 2x over
+            (_STORAGE_C, 0.0),
+        )
+    }
     return State(
         n=0,
-        stocks={_SOIL_N: soil, _PLANT_N: plant, _N_SOURCE: source},
+        stocks={_SOIL_N: soil, _PLANT_N: plant, _N_SOURCE: source, **organs},
         rng_seed=0,
     )
 
@@ -186,6 +231,10 @@ def _uptake_flow(ground_area: float = 1.0) -> NitrogenUptake:
         priority=0,
         soil_n=_SOIL_N,
         plant_n=_PLANT_N,
+        leaf_c=_LEAF_C,
+        stem_c=_STEM_C,
+        root_c=_ROOT_C,
+        storage_c=_STORAGE_C,
         params=_params(),
         ground_area=ground_area,
         sn_residual=_SN_RESID,
@@ -195,6 +244,9 @@ def _uptake_flow(ground_area: float = 1.0) -> NitrogenUptake:
 
 def test_uptake_leg_is_capacity_times_availability_times_area() -> None:
     # soil_n=0.03 ⇒ availability=(0.03−0.01)/0.04=0.5; capacity=0.0015; area=1 m².
+    # Still the capacity law because the fixture's plant is N-starved: min(deficit,
+    # capacity) picks capacity whenever the shortfall exceeds what the soil can deliver.
+    # The demand-limited branch is covered by the two tests just below.
     state = _state(soil_n0=0.03)
     result = _uptake_flow(ground_area=1.0).evaluate(state, _env(state, 1.0), 1.0)
     legs = {leg.stock: leg.amount for leg in result.legs}
@@ -208,6 +260,42 @@ def test_uptake_is_nitrogen_balanced() -> None:
     state = _state(soil_n0=0.03)
     result = _uptake_flow().evaluate(state, _env(state, 1.0), 1.0)
     assert_flow_balanced(result, state.stocks)
+
+
+def test_uptake_is_demand_limited_when_the_shortfall_is_small() -> None:
+    """The other branch of ``min(deficit, capacity)`` — the whole point of the change.
+
+    Under the retired fixed-flux law uptake was ``capacity x availability`` no matter
+    what the plant already held, so a nearly-full plant kept drawing nitrogen it did not
+    need. Here the plant is just short of its target, and the draw is the SHORTFALL.
+    """
+    params = _params()
+    target_per_mol_c = params.n_target_coefficient * params.dm_kg_per_mol_c
+    biomass = 2.0  # leaf 0.5 + root 1.5, per the fixture
+    shortfall = 1e-5  # kg N — far below the 1.5e-3 kg N/day capacity
+    state = _state(soil_n0=1.0, plant_n0=target_per_mol_c * biomass - shortfall)
+    legs = {
+        leg.stock: leg.amount
+        for leg in _uptake_flow().evaluate(state, _env(state, 1.0), 1.0).legs
+    }
+    assert math.isclose(legs[_PLANT_N], shortfall, rel_tol=1e-9)
+    assert math.isclose(legs[_SOIL_N], -shortfall, rel_tol=1e-9)
+
+
+def test_uptake_stops_entirely_at_or_above_the_target_concentration() -> None:
+    """A plant at its target takes up NOTHING, however much soil N is available.
+
+    This is what makes ``plant_n`` a tracked quantity rather than a monotone
+    accumulator,
+    and it is why the old ``plant_n0 = 0.5`` initial condition could never self-correct
+    downward: above target the deficit clamps at 0 and only shedding removes nitrogen.
+    """
+    params = _params()
+    target_per_mol_c = params.n_target_coefficient * params.dm_kg_per_mol_c
+    for factor in (1.0, 1.5, 100.0):
+        state = _state(soil_n0=1.0, plant_n0=target_per_mol_c * 2.0 * factor)
+        legs = _uptake_flow().evaluate(state, _env(state, 1.0), 1.0).legs
+        assert all(leg.amount == 0.0 for leg in legs), factor
 
 
 def test_uptake_shuts_off_at_residual_soil_n() -> None:
@@ -322,6 +410,17 @@ def _valid_nitrogen() -> dict[str, Any]:
             },
             "n_residual": {"value": 0.005, "unit": "kg/kg", "source": "[A]"},
             "n_critical": {"value": 0.015, "unit": "kg/kg", "source": "[A]"},
+            "n_target_coefficient": {
+                "value": 0.05697,
+                "unit": "kg/kg",
+                "source": "[A]",
+            },
+            "n_target_exponent": {
+                "value": 0.5,
+                "unit": "dimensionless",
+                "source": "[A]",
+            },
+            "n_target_w_plateau": {"value": 1.0, "unit": "t/ha", "source": "[A]"},
             "carbon_fraction": {
                 "value": 0.45,
                 "unit": "dimensionless",

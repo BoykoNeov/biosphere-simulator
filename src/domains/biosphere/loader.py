@@ -932,6 +932,9 @@ _NITROGEN_UNITS: dict[str, str] = {
     "max_uptake_capacity": "kg/m^2/day",
     "n_residual": "kg/kg",
     "n_critical": "kg/kg",
+    "n_target_coefficient": "kg/kg",
+    "n_target_exponent": "dimensionless",
+    "n_target_w_plateau": "t/ha",
     "carbon_fraction": "dimensionless",
 }
 
@@ -952,6 +955,9 @@ class _NitrogenParameters(BaseModel):
     max_uptake_capacity: _NitrogenValueUnit
     n_residual: _NitrogenValueUnit
     n_critical: _NitrogenValueUnit
+    n_target_coefficient: _NitrogenValueUnit
+    n_target_exponent: _NitrogenValueUnit
+    n_target_w_plateau: _NitrogenValueUnit
     carbon_fraction: _NitrogenValueUnit
 
 
@@ -1010,10 +1016,27 @@ def load_nitrogen_params(
 
     # kg N/kg DM -> kg N/mol C: × (kg DM per mol C) = × M_C / carbon_fraction.
     fold = MOLAR_MASS_CARBON_KG_PER_MOL / carbon_fraction
+    if not values["n_target_w_plateau"] > 0.0:
+        raise ValueError(
+            f"n_target_w_plateau must be > 0 (t/ha), got {values['n_target_w_plateau']}"
+        )
+    if not values["n_target_coefficient"] > n_critical:
+        # The target must sit ABOVE the stress threshold, or the plant is stressed by
+        # construction at every crop mass (Greenwood's curve declines, so the plateau is
+        # its maximum; if even that is below critical, f_N < 1 always).
+        raise ValueError(
+            "n_target_coefficient must exceed n_critical (a target at or below the "
+            f"stress threshold stresses the plant by construction), got "
+            f"({values['n_target_coefficient']}, {n_critical})"
+        )
     return NitrogenParams(
         max_uptake_capacity=values["max_uptake_capacity"],
         n_residual_per_mol_c=n_residual * fold,
         n_critical_per_mol_c=n_critical * fold,
+        n_target_coefficient=values["n_target_coefficient"],
+        n_target_exponent=values["n_target_exponent"],
+        n_target_w_plateau=values["n_target_w_plateau"],
+        dm_kg_per_mol_c=fold,
     )
 
 
@@ -1187,7 +1210,6 @@ def load_microbial_respiration_params(
 
 # Expected canonical unit string per mineralization param (exact-match guard).
 _MINERALIZATION_UNITS: dict[str, str] = {
-    "n_senescence_rate": "1/day",
     "mineralization_rate": "1/day",
 }
 
@@ -1205,7 +1227,6 @@ class _MineralizationValueUnit(BaseModel):
 class _MineralizationParameters(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    n_senescence_rate: _MineralizationValueUnit
     mineralization_rate: _MineralizationValueUnit
 
 
@@ -1233,8 +1254,12 @@ def load_mineralization_params(
 ) -> MineralizationParams:
     """Load, schema- and bound-check the nitrogen-return-loop params (P2 Step 6).
 
-    Both first-order rates (the N-senescence shedding rate and the net mineralization
-    rate) carry a declared unit (exact-string guarded) and a required ``source`` tag
+    Since the post-roadmap N-cycle form change this file holds **one** rate: N shedding
+    is no longer a first-order rate on ``plant_n`` but is coupled to the senescing
+    carbon at a cited residual concentration (see ``mineralization.py``), so
+    ``n_senescence_rate`` — the project's highest clean-room risk, a 1/day rate no
+    source publishes — is gone rather than merely re-cited. The net mineralization rate
+    carries a declared unit (exact-string guarded) and a required ``source`` tag
     (clean-room discipline). Each must be non-negative (0 = off; negative would create
     nitrogen). Raises ``pydantic.ValidationError`` on a schema violation, ``ValueError``
     on a bad unit or negative value.
@@ -1250,7 +1275,6 @@ def load_mineralization_params(
             raise ValueError(f"{field} must be >= 0, got {value}")
 
     return MineralizationParams(
-        n_senescence_rate=values["n_senescence_rate"],
         mineralization_rate=values["mineralization_rate"],
     )
 

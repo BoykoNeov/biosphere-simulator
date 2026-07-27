@@ -37,7 +37,9 @@ import math
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
+from domains.biosphere.allocation import SenescenceParams
 from domains.biosphere.loader import (
     load_mineralization_params,
     load_nitrogen_params,
@@ -47,9 +49,9 @@ from domains.biosphere.mineralization import (
     MineralizationParams,
     NitrogenSenescence,
     mineralization_flux,
-    nitrogen_senescence_flux,
+    nitrogen_shedding_flux,
 )
-from domains.biosphere.nitrogen import nitrogen_stress_factor
+from domains.biosphere.nitrogen import NitrogenParams, nitrogen_stress_factor
 from domains.biosphere.season import (
     LEAF_C,
     LITTER_N,
@@ -73,6 +75,9 @@ _WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json
 _BIO = DomainId("biosphere")
 _PLANT_N = StockId("biosphere.plant_n")
 _LITTER_N = StockId("biosphere.litter_n")
+_LEAF_C = StockId("biosphere.leaf_c")
+_STEM_C = StockId("biosphere.stem_c")
+_ROOT_C = StockId("biosphere.root_c")
 _SOIL_N = StockId("biosphere.soil_n")
 
 
@@ -81,19 +86,42 @@ def _weather() -> list[dict[str, float | str]]:
 
 
 # --- rate laws ---------------------------------------------------------------
-def test_n_senescence_flux_is_first_order_in_plant_n() -> None:
-    # shed = n_senescence_rate · plant_n: a hand value + linearity in the standing N.
+def test_n_shedding_flux_is_proportional_to_the_senescing_carbon() -> None:
+    # shed_N = min(tissue_conc, residual_conc) · shed_C — linear in the CARBON flux,
+    # which is the point of the coupled form (the rate form it replaced never saw carbon
+    # at all).
     assert math.isclose(
-        nitrogen_senescence_flux(2.0, n_senescence_rate=0.01), 0.02, rel_tol=1e-12
+        nitrogen_shedding_flux(2.0, 1.0, 100.0, n_residual_per_mol_c=0.001),
+        0.002,
+        rel_tol=1e-12,
     )
     assert math.isclose(
-        nitrogen_senescence_flux(4.0, n_senescence_rate=0.01), 0.04, rel_tol=1e-12
+        nitrogen_shedding_flux(4.0, 1.0, 100.0, n_residual_per_mol_c=0.001),
+        0.004,
+        rel_tol=1e-12,
     )
 
 
-def test_n_senescence_flux_is_zero_at_zero_plant_n() -> None:
-    # Self-limiting: no standing plant N ⇒ no shedding (positivity is structural).
-    assert nitrogen_senescence_flux(0.0, n_senescence_rate=0.01) == 0.0
+def test_n_shedding_sheds_at_the_residual_concentration_when_tissue_is_richer() -> None:
+    # The remobilization story: a well-fed plant (tissue 1.0/100 = 0.01 kg N/mol C) does
+    # not shed at its live concentration — it retains the difference and sheds only what
+    # Van Hecke et al. (2020) measure as N left in mature straw (the cited n_residual).
+    rich = nitrogen_shedding_flux(2.0, 1.0, 100.0, n_residual_per_mol_c=0.001)
+    assert math.isclose(rich, 0.001 * 2.0, rel_tol=1e-12)  # residual, NOT 0.01
+
+
+def test_n_shedding_falls_back_to_tissue_conc_when_already_at_residual() -> None:
+    # Below residual there is nothing left to remobilize, so shedding runs at the ACTUAL
+    # concentration — the min's other branch. tissue = 0.05/100 = 5e-4 < residual 1e-3.
+    lean = nitrogen_shedding_flux(2.0, 0.05, 100.0, n_residual_per_mol_c=0.001)
+    assert math.isclose(lean, 5e-4 * 2.0, rel_tol=1e-12)
+
+
+def test_n_shedding_flux_is_zero_at_every_degenerate_input() -> None:
+    # Self-limiting / never a divide-by-zero: no carbon shed, no plant N, no biomass.
+    assert nitrogen_shedding_flux(0.0, 1.0, 100.0, n_residual_per_mol_c=0.001) == 0.0
+    assert nitrogen_shedding_flux(2.0, 0.0, 100.0, n_residual_per_mol_c=0.001) == 0.0
+    assert nitrogen_shedding_flux(2.0, 1.0, 0.0, n_residual_per_mol_c=0.001) == 0.0
 
 
 def test_mineralization_flux_is_first_order_in_litter_n() -> None:
@@ -123,19 +151,54 @@ def _n_pool(stock_id: StockId, amount: float) -> Stock:
     )
 
 
+def _c_pool(stock_id: StockId, amount: float) -> Stock:
+    return Stock(
+        id=stock_id,
+        domain=_BIO,
+        quantity=Quantity.CARBON,
+        unit=canonical_unit(Quantity.CARBON),
+        amount=amount,
+        kind=StockKind.POOL,
+    )
+
+
 def _state(
-    *, plant_n: float = 0.5, litter_n: float = 0.1, soil_n: float = 100.0
+    *,
+    plant_n: float = 0.5,
+    litter_n: float = 0.1,
+    soil_n: float = 100.0,
+    leaf_c: float = 1.0,
 ) -> State:
     stocks = {
         _PLANT_N: _n_pool(_PLANT_N, plant_n),
         _LITTER_N: _n_pool(_LITTER_N, litter_n),
         _SOIL_N: _n_pool(_SOIL_N, soil_n),
+        # The coupled N-shedding flow reads the organ carbon that is senescing.
+        _LEAF_C: _c_pool(_LEAF_C, leaf_c),
+        _STEM_C: _c_pool(_STEM_C, 0.0),
+        _ROOT_C: _c_pool(_ROOT_C, 0.0),
     }
     return State(n=0, stocks=stocks, rng_seed=0)
 
 
-def _params(*, n_sen: float = 0.01, mineral: float = 0.03) -> MineralizationParams:
-    return MineralizationParams(n_senescence_rate=n_sen, mineralization_rate=mineral)
+def _params(*, mineral: float = 0.03) -> MineralizationParams:
+    return MineralizationParams(mineralization_rate=mineral)
+
+
+# The coupled N-shedding flow needs the organ carbon stocks and the senescence rates
+# that
+# drive it. rdr_leaf = 0.01 on 1.0 mol C of leaf gives shed_C = 0.01 mol C/day, with the
+# stem/root rates zero so the arithmetic below stays a single hand-checkable term.
+_SEN_PARAMS = SenescenceParams(rdr_leaf=0.01, rdr_stem=0.0, rdr_root=0.0)
+_NITRO_PARAMS = NitrogenParams(
+    max_uptake_capacity=0.0015,
+    n_residual_per_mol_c=0.001,
+    n_critical_per_mol_c=0.004,
+    n_target_coefficient=0.05697,
+    n_target_exponent=0.5,
+    n_target_w_plateau=1.0,
+    dm_kg_per_mol_c=0.026691111111111113,
+)
 
 
 def _senescence() -> NitrogenSenescence:
@@ -144,7 +207,11 @@ def _senescence() -> NitrogenSenescence:
         0,
         plant_n=_PLANT_N,
         litter_n=_LITTER_N,
-        params=_params(),
+        leaf_c=_LEAF_C,
+        stem_c=_STEM_C,
+        root_c=_ROOT_C,
+        sen_params=_SEN_PARAMS,
+        nitro_params=_NITRO_PARAMS,
     )
 
 
@@ -169,7 +236,9 @@ def test_n_senescence_moves_plant_n_to_litter_n() -> None:
         leg.stock: leg.amount
         for leg in _senescence().evaluate(state, _env(state, 1.0), 1.0).legs
     }
-    shed = 0.01 * 2.0
+    # shed_C = rdr_leaf*leaf_c = 0.01*1.0; tissue conc = 2.0/1.0 = 2.0, far above the
+    # residual 0.001, so shedding runs at the residual concentration: 0.001 * 0.01.
+    shed = 0.001 * 0.01
     assert math.isclose(legs[_PLANT_N], -shed, rel_tol=1e-12)
     assert math.isclose(legs[_LITTER_N], shed, rel_tol=1e-12)
 
@@ -215,6 +284,19 @@ def test_n_senescence_self_limits_at_zero_plant_n() -> None:
     assert all(leg.amount == 0.0 for leg in legs)
 
 
+def test_n_senescence_self_limits_when_no_carbon_is_senescing() -> None:
+    """No shed carbon ⇒ no shed nitrogen — the coupling, seen from the zero end.
+
+    Under the retired rate form a standing ``plant_n`` shed nitrogen every step
+    regardless of whether any tissue was dying. That is exactly the decoupling this
+    change removes, so
+    it is pinned from both directions.
+    """
+    state = _state(plant_n=2.0, leaf_c=0.0)
+    legs = _senescence().evaluate(state, _env(state, 1.0), 1.0).legs
+    assert all(leg.amount == 0.0 for leg in legs)
+
+
 def test_mineralization_self_limits_at_zero_litter_n() -> None:
     state = _state(litter_n=0.0)
     legs = _mineralization().evaluate(state, _env(state, 1.0), 1.0).legs
@@ -224,24 +306,40 @@ def test_mineralization_self_limits_at_zero_litter_n() -> None:
 # --- loader ------------------------------------------------------------------
 def test_loader_reads_committed_rates() -> None:
     params = load_mineralization_params()
-    assert params.n_senescence_rate == 0.01
     assert params.mineralization_rate == 0.03
 
 
-@pytest.mark.parametrize("field", ["n_senescence_rate", "mineralization_rate"])
-def test_loader_rejects_negative_rate(field: str, tmp_path: Path) -> None:
-    rates = {"n_senescence_rate": "0.01", "mineralization_rate": "0.03"}
-    rates[field] = "-0.01"
+def test_loader_no_longer_accepts_the_retired_shedding_rate(tmp_path: Path) -> None:
+    """``n_senescence_rate`` is GONE, and the schema must SAY so rather than ignore it.
+
+    It was the project's highest clean-room risk: a 1/day N-shedding rate that five
+    rounds of citation work established no primary source publishes. ``extra="forbid"``
+    is what makes the removal load-bearing — a file still carrying the key is a hard
+    error, so a stale param file cannot quietly supply a value that nothing reads any
+    more.
+    """
+    stale = tmp_path / "mineralization.yaml"
+    stale.write_text(
+        "name: chamber\nprocess: mineralization\nparameters:\n"
+        '  n_senescence_rate:\n    value: 0.01\n    unit: "1/day"\n'
+        '    source: "retired"\n'
+        '  mineralization_rate:\n    value: 0.03\n    unit: "1/day"\n'
+        '    source: "test"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValidationError):
+        load_mineralization_params(stale)
+
+
+def test_loader_rejects_negative_rate(tmp_path: Path) -> None:
     bad = tmp_path / "mineralization.yaml"
     bad.write_text(
         "name: chamber\nprocess: mineralization\nparameters:\n"
-        f"  n_senescence_rate:\n    value: {rates['n_senescence_rate']}\n"
-        '    unit: "1/day"\n    source: "test"\n'
-        f"  mineralization_rate:\n    value: {rates['mineralization_rate']}\n"
+        "  mineralization_rate:\n    value: -0.01\n"
         '    unit: "1/day"\n    source: "test"\n',
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match=f"{field} must be >= 0"):
+    with pytest.raises(ValueError, match="mineralization_rate must be >= 0"):
         load_mineralization_params(bad)
 
 
@@ -249,9 +347,7 @@ def test_loader_rejects_bad_unit(tmp_path: Path) -> None:
     bad = tmp_path / "mineralization.yaml"
     bad.write_text(
         "name: chamber\nprocess: mineralization\nparameters:\n"
-        '  n_senescence_rate:\n    value: 0.01\n    unit: "1/year"\n'
-        '    source: "test"\n'
-        '  mineralization_rate:\n    value: 0.03\n    unit: "1/day"\n'
+        '  mineralization_rate:\n    value: 0.03\n    unit: "1/year"\n'
         '    source: "test"\n',
         encoding="utf-8",
     )
@@ -284,18 +380,65 @@ def test_sealed_litter_n_accumulates_then_drains(
     states, _, _ = sealed
     litter = [s.stocks[LITTER_N].amount for s in states]
     assert litter[0] == 0.0
-    assert max(litter) > 1e-3  # senescence genuinely builds standing organic N
+    # RESCALED, not relaxed (post-roadmap: the N-cycle form change). The old bound was
+    # 1e-3 kg N, which suited a plant holding 0.5 kg N and shedding 1 %/day of it —
+    # about 5e-3 kg N/day. Coupled shedding is ~2 orders smaller: it sheds the RESIDUAL
+    # concentration (1.33e-4 kg N/mol C) times the senescing carbon (~1e-2 mol C/day),
+    # i.e. ~1e-6 kg N/day, from a plant holding ~2.4e-4 kg N rather than 0.5 kg. The
+    # assertion's INTENT is unchanged and still non-vacuous: standing organic N
+    # genuinely builds, here to ~1.2e-5 kg N, an order of magnitude above this bound.
+    assert max(litter) > 1e-6  # senescence genuinely builds standing organic N
     assert any(b < a for a, b in zip(litter, litter[1:], strict=False))  # mineralized
 
 
-def test_sealed_plant_n_is_drained(sealed: tuple[list[State], int, tuple]) -> None:
-    # The consumption side the open Phase-1 N loop lacked: plant_n is now WITHDRAWN by
-    # N-senescence, so it declines from its start (it only GREW in Phase 1). The closure
-    # of soil_n → plant_n → litter_n → soil_n.
+def test_sealed_plant_n_is_withdrawn_by_shedding(
+    sealed: tuple[list[State], int, tuple],
+) -> None:
+    """N-senescence genuinely WITHDRAWS plant N — the consumption side Phase 1 lacked.
+
+    ⚠ This test used to assert ``plant_n[-1] < plant_n[0]`` — a NET DECLINE over the
+    season — and that assertion was **an artefact of the old initial condition, not a
+    property of the model**. ``plant_n0`` was 0.5 kg (2055x a seedling's target N),
+    chosen
+    only to force ``f_N == 1``, and capacity-driven uptake pulled it toward the
+    ``max_uptake_capacity / n_senescence_rate`` equilibrium of 0.15 kg; so of course it
+    fell. Under demand-deficit uptake ``plant_n`` tracks ``target x biomass``, and
+    biomass grows over a season, so a **growing crop accumulating nitrogen** is the
+    correct behaviour and the old direction is simply wrong.
+
+    What the test existed to prove is kept and made direct: nitrogen leaves the plant.
+    """
     states, _, _ = sealed
     plant_n = [s.stocks[PLANT_N].amount for s in states]
-    assert plant_n[-1] < plant_n[0]  # net drained over the season
+    litter_n = [s.stocks[LITTER_N].amount for s in states]
+
+    # 1. The withdrawal is real: N arrives in litter, which can only come from plant_n.
+    assert max(litter_n) > 0.0
+    # 2. And it bites step-by-step somewhere (not merely as a net year-end figure):
+    #    plant_n falls on some step, i.e. shedding out-runs uptake at least once.
     assert any(b < a for a, b in zip(plant_n, plant_n[1:], strict=False))
+    # 3. The NEW invariant that replaces "declines": the target is a FLOOR that
+    # demand-deficit uptake maintains. Greenwood's plateau is 5.697 % DM and the chamber
+    # crop never leaves the plateau, so the whole-plant concentration sits at the target
+    # to within the one-step uptake lag (measured min here: 0.896x).
+    #
+    #    ⚠ DELIBERATELY A FLOOR AND NOT A BAND — the upper side is unbounded BY
+    # CONSTRUCTION, and that is a recorded limitation rather than an oversight. Shedding
+    # removes N at the RESIDUAL concentration, so a senescing plant RETAINS most of its
+    # nitrogen (remobilization), while the denominator collapses as carbon translocates
+    # to storage and dies back. Concentration therefore rises without bound as
+    # biomass -> 0: measured up to ~110x target in this 3-year chamber, and ~6e6x in the
+    # perennial, where the crop cycles for 5 years. It is harmless for the carbon
+    # trajectory (f_N saturates at 1) and nitrogen is conserved exactly, but it is the
+    # one-pool model showing through: real remobilized N goes to GRAIN, and we have a
+    # single whole-plant pool that cannot represent that. See the plan doc.
+    nitro = load_nitrogen_params()
+    target = nitro.n_target_coefficient * nitro.dm_kg_per_mol_c
+    for state, pn in zip(states, plant_n, strict=True):
+        biomass = sum(state.stocks[organ].amount for organ in (LEAF_C, STEM_C, ROOT_C))
+        if biomass <= 0.0:
+            continue
+        assert pn / biomass >= 0.85 * target, (state.n, pn / biomass, target)
 
 
 def test_sealed_conserves_nitrogen_exactly(

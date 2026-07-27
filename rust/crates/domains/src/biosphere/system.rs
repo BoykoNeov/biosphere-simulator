@@ -100,7 +100,7 @@ pub const DEFAULT_SCENARIO: SeasonScenario = SeasonScenario {
     irrigation_mm_day: 2.0,
     soil_n0: 100.0,
     n_source0: 0.0,
-    plant_n0: 0.5,
+    plant_n0: 0.000243294816,
     sn_residual: 1.0,
     sn_critical: 50.0,
     fertilization_kg_m2_day: 0.0,
@@ -442,7 +442,17 @@ fn build_plants(
             id: "biosphere.nitrogen_uptake".to_string(),
             soil_n: SOIL_N.to_string(),
             plant_n: PLANT_N.to_string(),
+            // Demand-deficit uptake reads biomass: Greenwood's W excludes fibrous roots
+            // (leaf+stem+storage), the deficit applies to f_N's own denominator.
+            leaf_c: LEAF_C.to_string(),
+            stem_c: STEM_C.to_string(),
+            root_c: ROOT_C.to_string(),
+            storage_c: STORAGE_C.to_string(),
             max_uptake_capacity: p.nitro.max_uptake_capacity,
+            n_target_coefficient: p.nitro.n_target_coefficient,
+            n_target_exponent: p.nitro.n_target_exponent,
+            n_target_w_plateau: p.nitro.n_target_w_plateau,
+            dm_kg_per_mol_c: p.nitro.dm_kg_per_mol_c,
             ground_area: scenario.ground_area,
             sn_residual: scenario.sn_residual,
             sn_critical: scenario.sn_critical,
@@ -453,7 +463,15 @@ fn build_plants(
             id: "biosphere.nitrogen_senescence".to_string(),
             plant_n: PLANT_N.to_string(),
             litter_n: LITTER_N.to_string(),
-            n_senescence_rate: p.miner.n_senescence_rate,
+            // N shedding is DRIVEN by carbon senescence, so this flow carries the same
+            // rdr_* rates the Senescence flow above does — one physical event, two legs.
+            leaf_c: LEAF_C.to_string(),
+            stem_c: STEM_C.to_string(),
+            root_c: ROOT_C.to_string(),
+            rdr_leaf: p.senesc.rdr_leaf,
+            rdr_stem: p.senesc.rdr_stem,
+            rdr_root: p.senesc.rdr_root,
+            n_residual_per_mol_c: p.nitro.n_residual_per_mol_c,
         }));
     }
     // Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,
@@ -693,6 +711,23 @@ pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, S
     stocks.insert(
         LITTER_CARBON.to_string(),
         stocks[LITTER_CARBON].with_amount(new_litter)?,
+    );
+    // The NITROGEN half (post-roadmap: the N-cycle form gap). This used to be carbon-only,
+    // leaving `plant_n` as an N windfall for the seedling; with coupled shedding that is
+    // incoherent, so the seed keeps the parent's tissue concentration and the remainder dies
+    // to litter — the balancing-residual idiom, so NITROGEN is conserved exactly.
+    let old_plant_n = stocks[PLANT_N].amount;
+    let conc_old = if old_veg > 0.0 {
+        old_plant_n / old_veg
+    } else {
+        0.0
+    };
+    let seedling_n = conc_old * seedling_total;
+    stocks.insert(PLANT_N.to_string(), stocks[PLANT_N].with_amount(seedling_n)?);
+    let new_litter_n = stocks[LITTER_N].amount + (old_plant_n - seedling_n);
+    stocks.insert(
+        LITTER_N.to_string(),
+        stocks[LITTER_N].with_amount(new_litter_n)?,
     );
     let mut aux = state.aux.clone();
     aux.insert(THERMAL_TIME.to_string(), 0.0);

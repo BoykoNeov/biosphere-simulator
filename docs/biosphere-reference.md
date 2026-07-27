@@ -217,6 +217,77 @@ so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-07-27 — the nitrogen-cycle FORM change (a FORM unfreeze; one uncitable param
+  RETIRED, three cited ones added; every carbon trajectory byte-identical).**
+  `docs/plans/post-roadmap-nitrogen-cycle-form.md`. The named successor to the decomposer
+  calibration, and the one place the biosphere was **structurally** non-physical rather than
+  merely uncalibrated: **nothing tied the nitrogen leaving the plant to the carbon it was part
+  of**, so litter C:N was the unconstrained ratio of two independent first-order rates —
+  measured at **0.004** in-run (≈ 1 C : 246 N) against wheat straw's ~80.
+
+  **What changed (two halves of one change — they cannot ship apart):**
+  * `mineralization.NitrogenSenescence` is now **N:C-coupled**: `shed_N =
+    min(plant_n/biomass_c, n_residual_per_mol_c) · shed_C`, driven by the same per-organ flux
+    `allocation.Senescence` sends to litter. **`n_senescence_rate` is GONE** — a bare 1/day
+    rate that five rounds of the citation scope established *no primary source publishes*
+    (retrieval "exhausted, not blocked"), and the project's highest clean-room risk. It was
+    discharged by **changing the form, not by finding a citation**: the coupled form's
+    parameter is a tissue N concentration, and `n_residual` was *already cited* to Van Hecke
+    et al. (2020) for exactly that quantity ("N left after N remobilization to the grain").
+  * `nitrogen.NitrogenUptake` is now **demand-deficit** (`min(target·biomass − plant_n,
+    capacity·availability)`), the seam the Phase-1 docstring named. The target is **Greenwood
+    et al. (1990) eqn (6)**, read first-hand: `%N = 5.697·W^−0.5` for `W > 1 t/ha`, and
+    **constant at 5.697 % below** — the paper's own statement, with a mechanism (exponential
+    growth ⇒ constant %N) and an Ågren 1985 citation, not our interpolation. Three new cited
+    params in `nitrogen.yaml`.
+  * `season.annual_reset` now resets **nitrogen** too (it was carbon-only, leaving the
+    seedling an N *windfall* its own docstring called "harmless only while `f_N ≡ 1`"). The
+    seed keeps the parent's concentration; the remainder dies to litter as a balancing
+    residual, so NITROGEN is conserved exactly.
+  * `SeasonScenario.plant_n0` 0.5 → **2.43e-4 kg** (scenario data, no cited value moved). The
+    old IC was **2055× the target concentration** — an artefact of the fixed-flux law, where
+    nothing consumed `plant_n` against a target — and it does not self-correct downward,
+    because a plant above target has zero deficit.
+
+  **What moved, and what did not.** 10 goldens moved and **every one of them moved only in its
+  NITROGEN stocks** (`plant_n`, `soil_n`, and `litter_n` where sealed); every CARBON amount is
+  byte-identical, and `drift_summary.json` — a carbon-side stability signature — regenerated
+  **unchanged**. `n_limited` is byte-identical for a structural reason: it is open-field, so it
+  builds no N-shedding flow at all. Cascade: 6 biosphere goldens + `water_biting` + 3 station
+  goldens (`greenhouse`/`harvest`/`lighting`) + `sealed_station` ⇒ **both** manifests (2 param
+  hashes + 6 golden hashes here; golden hashes there). Rust mirrored by hand; `src/simcore/`
+  diff empty.
+
+  ⚠ **The margin behind "`f_N ≡ 1`" collapsed by ~2.5 orders even though the conclusion held.**
+  Capacity-uptake pinned `plant_n` at `max_uptake_capacity / n_senescence_rate`, ~1000×
+  critical. Demand-deficit fills to the *target*, so the plant now sits at **3.8× critical on
+  the plateau and ~1.07× at `open_season`'s peak** (12.633 t/ha, where Greenwood gives 1.60 %
+  against a 1.50 % critical). The curve crosses `n_critical` at **14.42 t/ha** — 88 % of the
+  way — so anything that grows the open-field crop ~15 % moves a frozen golden. Pinned in
+  `tests/test_nitrogen_form.py`, deliberately not left in prose. Note `nitrogen.yaml` has
+  recorded this arithmetic since the citation scope's round 2 ("ours equals the curve only at
+  W ≈ 14.44 t/ha") as a *delta*; the form change makes it a *mechanism*.
+
+  ⚠ **Two of the three reasons the decomposer calibration gave for NOT moving
+  `mineralization_rate` are now false.** It is no longer "behaviorally inert" — it sets the
+  litter pool's C:N — and N and C are no longer "uncoupled", which was the other half of the
+  argument that litter C:N was not a physical quantity. The **shed material** is now straw-like
+  (C:N **90**, from two cited concentrations), but the **litter pool** sits at ~**465** because
+  N mineralizes out ~2.7× faster than C decomposes out. Stanford & Smith's 39-soil range
+  (0.005–0.0136/day) would put the pool at **78–211**, i.e. straw-like, and their pooled mean at
+  **119**. Only the pool-identity objection survives (they measured soil N₀; ours is fresh
+  residue N). The value is **UNMOVED** — recalibrating it is scope B and a separate decision —
+  and the consequence is pinned instead.
+
+  ⚠ **A recorded limitation, not an oversight:** shedding at the residual concentration means a
+  senescing plant **retains** most of its nitrogen while its denominator collapses, so tissue
+  concentration rises without bound as biomass → 0 (measured ~110× target in the 3-year
+  chamber, ~6e6× in the 5-year perennial). Harmless for carbon (`f_N` saturates at 1) and N is
+  conserved exactly, but it is the **one-pool** model showing through: real remobilized N goes
+  to *grain*, and there is a single whole-plant pool that cannot represent that. Related: the
+  chambers seed `litter_carbon0` with **no `litter_n0` counterpart**, which inflates their pool
+  C:N further — a deferred seam, now named.
+
 - **2026-07-21 — scope (B) decomposer calibration (a VALUE unfreeze; two carbon-side
   rates moved).** The scope-C diagnosis (the decomposer cluster runs fast vs the primary
   literature) drove a calibration of the two **carbon-side** rates from above-range to

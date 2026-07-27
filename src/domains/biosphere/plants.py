@@ -28,7 +28,6 @@ from domains.biosphere.compartments import PLANTS
 from domains.biosphere.loader import (
     load_allocation_params,
     load_canopy_params,
-    load_mineralization_params,
     load_nitrogen_params,
     load_phenology_params,
     load_photoperiod_params,
@@ -122,6 +121,9 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
     nitrogen = canonical_unit(Quantity.NITROGEN)
     ctx = _carbon_context(scenario)
     nitro = ctx.nitro
+    # Loaded ONCE and shared by the carbon Senescence flow and the N-shedding flow: the
+    # two are legs of a single physical event, so they must read identical rdr_* values.
+    sen_params = load_senescence_params()
     pheno = load_phenology_params()
 
     stocks: list[Stock] = [
@@ -174,7 +176,7 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             stem_c=STEM_C,
             root_c=ROOT_C,
             litter_sink=wiring.litter_carbon_target,
-            params=load_senescence_params(),
+            params=sen_params,
         ),
         Transpiration(
             FlowId("biosphere.transpiration"),
@@ -194,6 +196,13 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             0,
             soil_n=SOIL_N,
             plant_n=PLANT_N,
+            # Demand-deficit uptake reads biomass: Greenwood's W excludes fibrous roots
+            # (leaf+stem+storage), while the deficit applies to f_N's own denominator
+            # (leaf+stem+root) — see NitrogenUptake for the measured two-pool delta.
+            leaf_c=LEAF_C,
+            stem_c=STEM_C,
+            root_c=ROOT_C,
+            storage_c=STORAGE_C,
             params=nitro,
             ground_area=scenario.ground_area,
             sn_residual=scenario.sn_residual,
@@ -210,7 +219,15 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
                 0,
                 plant_n=PLANT_N,
                 litter_n=LITTER_N,
-                params=load_mineralization_params(),
+                # N shedding is now DRIVEN by carbon senescence, so this flow needs the
+                # organ stocks and the SAME SenescenceParams object the carbon
+                # Senescence flow above was built with — one physical event, two
+                # currency legs, and they must not be able to drift apart.
+                leaf_c=LEAF_C,
+                stem_c=STEM_C,
+                root_c=ROOT_C,
+                sen_params=sen_params,
+                nitro_params=nitro,
             )
         )
     # Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,

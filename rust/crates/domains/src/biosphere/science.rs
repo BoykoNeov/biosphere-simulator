@@ -276,6 +276,23 @@ pub fn partition(dmi: f64, dvs: f64, table: &[PartitionRow]) -> (f64, f64, f64, 
 // --- nitrogen ---------------------------------------------------------------
 
 /// Soil-N availability factor `∈ [0, 1]` (uptake supply side).
+/// Greenwood's target whole-crop N concentration (kg N / kg DM) at crop mass `W` (t/ha).
+///
+/// Greenwood et al. (1990) eqn (6): `%N = a * W^-b` for `W > 1.0 t/ha`, with a = 5.697 for
+/// C3 crops and b = 0.5; CONSTANT at `a` below the bound. The plateau is the primary's own
+/// statement, not an interpolation — below 1 t/ha growth is exponential and %N stays
+/// constant (Agren 1985), and the paper omits all data there. Mirrors
+/// `domains.biosphere.nitrogen.target_n_concentration`.
+///
+/// A non-positive `w_plateau` is a param-file error, caught at load in Python; here the
+/// guard degenerates to the plateau branch rather than panicking mid-step.
+pub fn target_n_concentration(w_t_ha: f64, coefficient: f64, exponent: f64, w_plateau: f64) -> f64 {
+    if w_plateau <= 0.0 || w_t_ha <= w_plateau {
+        return coefficient;
+    }
+    coefficient * w_t_ha.powf(-exponent)
+}
+
 pub fn soil_n_availability(soil_n: f64, sn_residual: f64, sn_critical: f64) -> f64 {
     if soil_n <= sn_residual {
         return 0.0;

@@ -363,9 +363,35 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
     **Grain → 0 every year is what keeps the cycle sustained** (a seed bank that only
     shed ``seedling_total`` would grow unboundedly and drain the active cycle — the
     damped-cascade trap); the dumped grain decomposes (litter → microbial → CO₂) to
-    refuel next year's photosynthesis. **Carbon-only** — ``plant_n`` persists across the
-    death (an N *windfall* for the small seedling), harmless only while ``f_N ≡ 1``; a
-    full N-reset is a deferred refinement. **Sealed-chamber only:** it sheds to the
+    refuel next year's photosynthesis.
+
+    **NITROGEN resets too, at the parent's own concentration (post-roadmap: the N-cycle
+    form gap).** This used to be **carbon-only**, and the docstring named the
+    consequence: ``plant_n`` persisted across the death as "an N *windfall* for the
+    small seedling, harmless only while ``f_N ≡ 1``". Once N shedding is coupled to
+    carbon, leaving that would be incoherent — the point of the coupled form is that
+    nitrogen goes where the carbon it was in goes, so a plant that dies to litter cannot
+    keep its N. So:
+
+    * ``plant_n`` := ``conc_old · seedling_total``, where ``conc_old`` is the dying
+      plant's whole-plant N concentration (kg N per mol C). The seed carries its
+      parent's tissue concentration — which needs **no new parameter and no target curve
+      in this module**, and is the right physical story (the seedling's N comes from the
+      grain, which was filled by remobilization out of that same plant).
+    * ``litter_n`` += the **balancing residual** ``old_plant_n − seedling_n`` — exactly
+      the carbon idiom above, balance by construction rather than an independent
+      formula, so NITROGEN is conserved exactly and the loss-sink is never touched.
+
+    ``conc_old`` is taken over ``leaf + stem + root`` (``f_N``'s own denominator, the
+    pool ``plant_n`` is the N of), and ``seedling_total`` is that same trio, so the
+    seedling starts at *exactly* the parent's concentration and ``f_N`` is continuous
+    across the re-sow. Because ``seedling_total < old_veg`` whenever a season grew at
+    all, the residual cannot go negative, so the N side needs no seed-bank-style guard
+    (carbon needs one only
+    because its seedling is drawn from *grain*, a different pool than the one it
+    measures).
+
+    **Sealed-chamber only:** it sheds to the
     in-system ``litter_carbon`` POOL and re-sows from the in-system grain (the open
     field has no closed loop to re-sow into).
 
@@ -394,6 +420,17 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
     litter_gain = old_veg + grain - seedling_total  # the balancing residual
     stocks[LITTER_CARBON] = replace(
         stocks[LITTER_CARBON], amount=stocks[LITTER_CARBON].amount + litter_gain
+    )
+    # The NITROGEN half: the seed keeps the parent's tissue concentration, the rest dies
+    # to litter. `old_veg` is f_N's denominator (leaf+stem+root), which is the pool
+    # `plant_n` is the nitrogen OF, so conc_old·seedling_total makes f_N continuous
+    # across the re-sow.
+    old_plant_n = stocks[PLANT_N].amount
+    conc_old = (old_plant_n / old_veg) if old_veg > 0.0 else 0.0
+    seedling_n = conc_old * seedling_total
+    stocks[PLANT_N] = replace(stocks[PLANT_N], amount=seedling_n)
+    stocks[LITTER_N] = replace(
+        stocks[LITTER_N], amount=stocks[LITTER_N].amount + (old_plant_n - seedling_n)
     )
     aux = dict(state.aux)
     aux[THERMAL_TIME] = 0.0

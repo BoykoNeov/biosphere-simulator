@@ -60,7 +60,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.0088ef6b836c1p-5",
+      "amount": "0x1.d8ca6fa4367fap-20",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -99,7 +99,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.e7a6f7ef64bedp-2",
+      "amount": "0x1.21b01889e9207p-12",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -125,7 +125,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.8ff847ea232afp+6",
+      "amount": "0x1.8ffff6e5045e5p+6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },

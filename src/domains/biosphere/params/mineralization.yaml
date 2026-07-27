@@ -371,11 +371,38 @@
 name: chamber
 process: mineralization
 
+# WARNING RETIRED PARAM - n_senescence_rate (removed post-roadmap: the N-cycle FORM gap).
+#   This file used to carry a second rate, a bare first-order plant-N shedding rate
+#   (0.01/day). It is GONE, not merely re-cited, and the reason is the point of the
+#   change: five rounds of the citation scope established first-hand that NO PRIMARY
+#   SOURCE PUBLISHES A 1/day N-SHEDDING RATE - the N-resorption literature reports
+#   resorption EFFICIENCY (a percentage), and Penning de Vries 1989 (retrieved and read)
+#   gives leaf-BIOMASS death rates plus a remark that N remobilization is "difficult to
+#   quantify". Retrieval was recorded as EXHAUSTED, not blocked: a fact about the
+#   literature, so no further reading could have fixed it. It was the project's highest
+#   clean-room risk.
+#
+#   CHANGING THE FORM IS WHAT DISCHARGED IT. N shedding is now coupled to the senescing
+#   carbon at a concentration the literature DOES publish - see mineralization.py and
+#   nitrogen.yaml's n_residual (Van Hecke et al. 2020, measured as N left in mature straw
+#   after remobilization). So the param that replaced it was already cited, in a sibling
+#   file, for exactly this quantity. The lesson, recorded because it generalizes beyond
+#   nitrogen: a citation dead end can be a property of the MODEL FORM rather than of the
+#   literature, and changing the form changes which citation SHAPE is needed.
+#
+#   WARNING ONE FINDING IT CARRIED IS *NOT* DISCHARGED and outlived the param: Penning de
+#   Vries's relative loss rate is a FUNCTION of development stage (0/day before anthesis,
+#   ramping to 0.15/day by DS 2.0) while our shedding - now driven by the carbon rdr_*
+#   rates - is still a bare CONSTANT. That DS-dependence gap MOVED TO THE CARBON SIDE,
+#   where senescence.yaml's flat rdr_* now own it; it did not go away. It is option (C) in
+#   docs/plans/post-roadmap-nitrogen-cycle-form.md and remains OPEN.
+#
+#   Its retired provenance note is preserved verbatim below so five rounds of negative
+#   results are not lost (a stale negative result suppresses the next search - round 4's
+#   lesson - so this is kept readable rather than deleted):
+#   RETIRED_SOURCE: TODO(cite) — STILL OPEN, no primary support EXISTS in the shape this parameter needs — which round 2 established first-hand rather than by assumption (2026-07-16). [B] WAS RETRIEVED AND READ, and it does NOT settle this param: the plan doc predicted it was 'the only clean-room-safe route' to a number, but the book has no N-shedding rate at all — its senescence treatment is LEAF BIOMASS death (§3.2.6, p. 95), and it names N remobilization as a distinct process that is 'difficult to quantify'. That CORROBORATES the round-1 diagnosis from the horse's mouth: the N-resorption literature reports resorption EFFICIENCY (a %, ~50 % typical), not a 1/day rate, so no delta is computable and retrieval cannot fix it. NEW STRUCTURAL FINDING from opening [B]: its relative loss rate is a FUNCTION of development stage (0/day before anthesis, ramping to 0.15/day by DS 2.0), whereas ours is a bare CONSTANT — so ours is the degenerate case of the cited form, non-zero exactly where the source is zero. That is a FORM gap, not just a value gap, and it makes this param a scope-B structural candidate alongside the canopy and the decomposer rates rather than a mere citation debt. ⚠ CLEAN-ROOM HAZARD (unchanged): the rdr tradition flows into WOFOST/PCSE, so numeric RDR sources found by search are almost all WOFOST-lineage and legally unusable — do NOT backfill from them. [B]'s printed pages are literature and safe; PCSE's params are not. ⚠ ROUND 5 (2026-07-20) CORRECTED A STALE POINTER attached to this param's finding: it used to end 'retrieving the [B] monograph is the only clean path', but [B] had ALREADY been retrieved and read in round 2 and had ALREADY failed to settle this. The only named path had been walked three rounds earlier; the sentence survived because later rounds arrived here following the OTHER param (mineralization_rate), which had the live retrieval question. HONEST STATUS: retrieval for this param is EXHAUSTED, not blocked — nothing in the accessible literature carries a 1/day N-shedding rate, which is a fact about the literature rather than about access, so no further reading will change it. Changing the value/form is scope B, and the specific move available is to adopt the DS-dependent FORM [B] actually gives (zero before anthesis) rather than hunt another citation. See docs/plans/post-roadmap-citation.md.
+
 parameters:
-  n_senescence_rate:
-    value: 0.01
-    unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, no primary support EXISTS in the shape this parameter needs — which round 2 established first-hand rather than by assumption (2026-07-16). [B] WAS RETRIEVED AND READ, and it does NOT settle this param: the plan doc predicted it was 'the only clean-room-safe route' to a number, but the book has no N-shedding rate at all — its senescence treatment is LEAF BIOMASS death (§3.2.6, p. 95), and it names N remobilization as a distinct process that is 'difficult to quantify'. That CORROBORATES the round-1 diagnosis from the horse's mouth: the N-resorption literature reports resorption EFFICIENCY (a %, ~50 % typical), not a 1/day rate, so no delta is computable and retrieval cannot fix it. NEW STRUCTURAL FINDING from opening [B]: its relative loss rate is a FUNCTION of development stage (0/day before anthesis, ramping to 0.15/day by DS 2.0), whereas ours is a bare CONSTANT — so ours is the degenerate case of the cited form, non-zero exactly where the source is zero. That is a FORM gap, not just a value gap, and it makes this param a scope-B structural candidate alongside the canopy and the decomposer rates rather than a mere citation debt. ⚠ CLEAN-ROOM HAZARD (unchanged): the rdr tradition flows into WOFOST/PCSE, so numeric RDR sources found by search are almost all WOFOST-lineage and legally unusable — do NOT backfill from them. [B]'s printed pages are literature and safe; PCSE's params are not. ⚠ ROUND 5 (2026-07-20) CORRECTED A STALE POINTER attached to this param's finding: it used to end 'retrieving the [B] monograph is the only clean path', but [B] had ALREADY been retrieved and read in round 2 and had ALREADY failed to settle this. The only named path had been walked three rounds earlier; the sentence survived because later rounds arrived here following the OTHER param (mineralization_rate), which had the live retrieval question. HONEST STATUS: retrieval for this param is EXHAUSTED, not blocked — nothing in the accessible literature carries a 1/day N-shedding rate, which is a fact about the literature rather than about access, so no further reading will change it. Changing the value/form is scope B, and the specific move available is to adopt the DS-dependent FORM [B] actually gives (zero before anthesis) rather than hunt another citation. See docs/plans/post-roadmap-citation.md."
   mineralization_rate:
     value: 0.03
     unit: "1/day"

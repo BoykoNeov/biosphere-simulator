@@ -99,6 +99,10 @@ pub struct NitrogenParams {
     pub max_uptake_capacity: f64,
     pub n_residual_per_mol_c: f64,
     pub n_critical_per_mol_c: f64,
+    pub n_target_coefficient: f64,
+    pub n_target_exponent: f64,
+    pub n_target_w_plateau: f64,
+    pub dm_kg_per_mol_c: f64,
 }
 
 /// First-order litter-decay param.
@@ -117,7 +121,6 @@ pub struct MicrobialRespirationParams {
 /// Nitrogen-return-loop params (N-senescence shedding + net mineralization).
 #[derive(Debug, Clone, Copy)]
 pub struct MineralizationParams {
-    pub n_senescence_rate: f64,
     pub mineralization_rate: f64,
 }
 
@@ -273,6 +276,10 @@ pub fn biosphere() -> BiosphereParams {
             max_uptake_capacity: get(&t, "nitro.max_uptake_capacity"),
             n_residual_per_mol_c: get(&t, "nitro.n_residual_per_mol_c"),
             n_critical_per_mol_c: get(&t, "nitro.n_critical_per_mol_c"),
+            n_target_coefficient: get(&t, "nitro.n_target_coefficient"),
+            n_target_exponent: get(&t, "nitro.n_target_exponent"),
+            n_target_w_plateau: get(&t, "nitro.n_target_w_plateau"),
+            dm_kg_per_mol_c: get(&t, "nitro.dm_kg_per_mol_c"),
         },
         decomp: DecompositionParams {
             decomposition_rate: get(&t, "decomp.decomposition_rate"),
@@ -282,7 +289,6 @@ pub fn biosphere() -> BiosphereParams {
             o2_half_saturation: get(&t, "micro.o2_half_saturation"),
         },
         miner: MineralizationParams {
-            n_senescence_rate: get(&t, "miner.n_senescence_rate"),
             mineralization_rate: get(&t, "miner.mineralization_rate"),
         },
         water: WaterCycleParams {

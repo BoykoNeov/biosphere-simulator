@@ -97,7 +97,25 @@ class SeasonScenario:
     # nitrogen (PP, non-limiting): a generous plant-N reserve + ample soil supply
     soil_n0: float = 100.0  # kg N (>> sn_critical ⇒ availability = 1 all season)
     n_source0: float = 0.0  # kg N (unclamped supply; tracks cumulative fertilization)
-    plant_n0: float = 0.5  # kg N — high conc ⇒ f_N = 1 all season (plant_n only grows)
+    # kg N — the seedling AT ITS TARGET CONCENTRATION (Greenwood's plateau, 5.697 % DM ×
+    # 0.16 mol C of seedling ≈ 2.43e-4 kg N), so the deficit is ~0 at sowing and uptake
+    # starts in balance rather than catching up.
+    #
+    # ⚠ THIS WAS 0.5 kg, AND THAT VALUE WAS AN ARTEFACT OF THE OLD UPTAKE FORM. Its old
+    # comment read "high conc ⇒ f_N = 1 all season (plant_n only grows)": with capacity
+    # uptake nothing consumed plant_n against a target, so the IC was simply set far
+    # above anything that could bite. Under demand-deficit uptake that is **2055× the
+    # target concentration** — a 52 g plant holding half a kilo of nitrogen — and it
+    # does not self-correct downward, because a plant already above target has zero
+    # deficit and only sheds (slowly, at the residual concentration). So the old IC
+    # would have left every sealed chamber permanently N-saturated and made the new form
+    # untestable.
+    #
+    # This is a SCENARIO-DATA change, not a calibration: it moves no cited value and no
+    # rate. n_limited overrides it deliberately (a tiny reserve inside the f_N band) and
+    # that scenario is unaffected — it is open-field, so it has no N-shedding flow at
+    # all.
+    plant_n0: float = 0.000243294816
     sn_residual: float = 1.0  # kg N (soil-N availability band, scenario/soil data)
     sn_critical: float = 50.0  # kg N
     fertilization_kg_m2_day: float = 0.0  # kg N m⁻² day⁻¹ (soil store already ample)

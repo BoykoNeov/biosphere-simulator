@@ -1,7 +1,18 @@
 # Post-roadmap — the nitrogen-cycle FORM gap
 
-**Status: DIAGNOSIS COMPLETE (2026-07-27), advisor-reviewed. Scope NOT yet decided —
-a user call. No frozen file touched; `git diff src/` empty.**
+**Status: OPTION (A) COMPLETE (2026-07-27) — biosphere unfrozen + re-frozen, both ports.
+Diagnosis advisor-reviewed at every hinge. `git diff src/simcore/` empty.
+(B) immobilization, (C) the DS-dependent form and (D) the N→C throttle remain OPEN.**
+
+**The one-line result: the form changed, the uncitable param is gone, and every carbon
+trajectory is byte-identical** — 10 goldens moved and each moved *only* in its NITROGEN
+stocks. See "THE IMPLEMENTATION" below, and `docs/biosphere-reference.md`'s unfreeze log
+for the canonical record.
+
+⚠ **The quote below is the premise this work started from, and the build falsified two of
+its three clauses**: `mineralization_rate` is no longer behaviorally inert (it now sets
+litter pool C:N) and N is no longer uncoupled from C. Only "wrong pool" survives. Kept
+verbatim because the correction is the finding.
 
 The chosen successor to the scope-(B) decomposer calibration
 (`post-roadmap-decomposer-calibration.md`), which closed the **carbon** return side and
@@ -362,7 +373,85 @@ edge, so the honest statement to make **before** building, not after:
 > chamber is **carbon**-limited by design — a 52 g/m² plant against field-sized N params — not
 > the N form. **Making N faithful does not make the chamber faithful.**
 
-## The scope options (NOT yet decided — needs advisor review + a user call)
+## THE IMPLEMENTATION — option (A), built 2026-07-27 (user: "go with it")
+
+Scope as authorized: **(A) only** — N:C-coupled shedding **+** demand-deficit uptake, with the
+target read off Greenwood. (B) immobilization, (C) the DS-dependent form and (D) the N→C
+throttle stay open. The unfreeze followed `docs/biosphere-reference.md`'s discipline; that
+file's unfreeze log carries the canonical record.
+
+### What shipped
+
+| | before | after |
+|---|---|---|
+| shedding | `n_senescence_rate · plant_n` (uncitable 1/day rate) | `min(tissue_conc, n_residual) · shed_C`, driven by `Senescence`'s own flux |
+| uptake | `capacity · availability` (ignored demand) | `min(target·biomass − plant_n, capacity·availability)` |
+| target | *(none)* | Greenwood eqn (6), piecewise, 3 cited params |
+| `annual_reset` | carbon-only (N *windfall*) | N reset at the parent's concentration, balancing residual to litter |
+| `plant_n0` | 0.5 kg (2055× target) | 2.43e-4 kg (the seedling at target) |
+| params | 1 uncitable + 4 | **0 uncitable** + 7 |
+
+### The results, measured
+
+1. **Carbon invariance CONFIRMED IN-TREE, at golden level.** 10 goldens moved and **every one
+   moved only in its NITROGEN stocks**; every carbon amount is byte-identical, and
+   `drift_summary.json` (a carbon-side stability signature) regenerated **byte-unchanged**.
+   `f_N ≡ 1.0000` with zero steps below 1 in all seven frozen scenarios. Finding 9's offline
+   prediction held exactly — which is what the zero-feedback license promised.
+2. **`n_limited` is byte-identical, for a reason finding 10 missed.** It is **open-field**, so
+   `NitrogenSenescence` (sealed-only) is never built and the shedding form cannot reach it;
+   `plant_n` is constant and `f_N` falls purely by growth dilution, exactly as before —
+   min **0.1759**, 187/306 steps, unchanged. ⚠ **This falsifies finding 10's premise.** That
+   finding said "(A) deletes the knob `n_limited` is built on" because the probe *re-seeded*
+   `plant_n` from the target each cycle; **in-tree `plant_n0` is still the initial condition**,
+   so the tiny reserve survives. No seedling-N knob is owed, and the pin needed no change.
+   The lesson: **a probe's convenience choice can look like a property of the design.**
+3. **The litter C:N deliverable splits in two, and the split is the finding.**
+   * the **shed material** is straw-like: C:N = `carbon_fraction / n_residual` = **90** (both
+     terms cited), against wheat straw's ~80. This is the quantity the form change was for.
+   * the **litter pool** sits at ~**465** (sealed chamber), because
+     `pool C:N ≈ (shed C:N) × (k_min/k_decomp) × 1.894` and mineralization drains N 2.7×
+     faster than decomposition drains C. From **0.004** to 465 is 4 orders better and still
+     ~5× straw; the residual is now attributable to a *named param*, not to the form.
+4. ⚠ **Two of the three reasons for not recalibrating `mineralization_rate` are now FALSE.**
+   The decomposer calibration declined to move it because (1) wrong pool, (2) N/C uncoupled so
+   litter C:N is not physical, (3) behaviorally inert. (2) and (3) are dead: N and C *are*
+   coupled now, and the rate *does* set an observable. Only (1) survives. And the numbers
+   converge from two independent directions: Stanford & Smith's 39-soil range
+   (0.005–0.0136/day) puts the pool at **78–211** and their pooled mean at **119** — straw-like
+   — while our uncited 0.03/day gives 465. **Value UNMOVED** (scope B, a user decision); the
+   consequence is pinned in `tests/test_nitrogen_form.py` instead.
+5. ⚠ **A recorded limitation: the one-pool model shows through.** Shedding at the residual
+   concentration means a senescing plant *retains* most of its N while its denominator
+   collapses, so tissue concentration rises without bound as biomass → 0 — ~110× target in the
+   3-year chamber, ~**6e6×** in the 5-year perennial. Harmless for carbon (`f_N` saturates) and
+   N conserved exactly, but real remobilized N goes to **grain** and we have one whole-plant
+   pool. Related deferred seam, now named: the chambers seed `litter_carbon0` with **no
+   `litter_n0` counterpart**, which inflates their pool C:N further (and explains why perennial
+   and consumer read far above the sealed chamber's 465).
+6. **The `f_N ≡ 1` margin fell ~2.5 orders while the conclusion held** — 1000× (the old
+   `uptake/k_sen` equilibrium) → 3.8× on the plateau → **~1.07×** at `open_season`'s peak. The
+   crossing is 14.42 t/ha vs a 12.633 peak. `mineralization.py`'s "~1000× above critical"
+   sentence was updated rather than left to rot.
+
+### Tests
+
+`tests/test_nitrogen_form.py` (12 pins): the curve's plateau/decline/continuity and its param
+values; the **14.42 t/ha crossing** and `open_season`'s 88 % margin; that only `open_season`
+enters the declining branch; that the shed-N flow's recomputed carbon flux equals
+`Senescence`'s own litter leg (the drift hazard of recomputation); shed C:N 90; pool C:N against
+the predicted formula to 2 %; and N conservation across `annual_reset` to 1e-12.
+
+Rewritten rather than weakened, with the reason recorded in each: `test_mineralization.py`'s
+rate-law tests (now coupling tests, both `min` branches), and — the one that mattered —
+`test_sealed_plant_n_is_drained`, whose "plant_n declines over the season" was **true only
+because of the absurd IC**; a growing crop accumulating N is correct, so it now pins the
+withdrawal directly plus the target-as-floor invariant. In `test_nitrogen.py` the default
+fixture held `plant_n0 = 0.2` kg, which under demand-deficit is 130× target ⇒ zero deficit ⇒
+**every uptake test would have passed vacuously on zero legs**; the default is now an N-starved
+plant and the demand-limited branch got its own tests.
+
+## The scope options — (A) TAKEN; (B)/(C)/(D) still open
 
 Ordered by dependency. Each is carbon-invariant except (D).
 

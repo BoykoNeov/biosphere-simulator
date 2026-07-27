@@ -120,6 +120,13 @@ def _nitro() -> NitrogenParams:
         max_uptake_capacity=1.0,  # unused by f_N (it gates uptake, not photosynthesis)
         n_residual_per_mol_c=_N_RESIDUAL,
         n_critical_per_mol_c=_N_CRITICAL,
+        # The Greenwood target curve gates UPTAKE, not f_N, so these are inert here —
+        # but they are real values rather than zeros so a future test that does exercise
+        # the curve through this fixture gets sane numbers instead of a plateau at 0.
+        n_target_coefficient=0.05697,
+        n_target_exponent=0.5,
+        n_target_w_plateau=1.0,
+        dm_kg_per_mol_c=0.026691111111111113,
     )
 
 
