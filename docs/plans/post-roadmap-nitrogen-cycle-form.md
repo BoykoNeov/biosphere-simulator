@@ -201,6 +201,44 @@ conc → 0 unopposed. The regime pin holds; the value moves a lot. It is not one
 `litter_n` / `soil_n` values change under (A) in every case. The cascade is the same size
 either way; what the target choice decides is whether the **science** (carbon) changes too.
 
+### Finding 7 — `f_N` is STRUCTURALLY the only N→C channel (the fixed point is a proof, not evidence)
+
+The exactness argument needs `f_N` to be the *only* path by which an N stock can affect a
+carbon leg. Finding 2 established that empirically (carbon byte-identical over four soil
+scalings); it is also structural. Every read of an N stock in the entire biosphere:
+
+| site | flow | legs |
+|---|---|---|
+| `carbon_budget.py:206` | `Photosynthesis` (`f_N`) | **carbon** ← the only channel |
+| `nitrogen.py:166` | `NitrogenUptake` | N only |
+| `mineralization.py:139` | `NitrogenSenescence` | N only |
+| `mineralization.py:176` | `Mineralization` | N only |
+
+So `f_N ≡ 1` ⇒ **no** N value can reach a carbon leg ⇒ the recorded carbon trajectory is
+unchanged ⇒ the trajectory the probe integrated on *is* the (A) trajectory. Proof by fixed
+point, on four grep hits.
+
+### Finding 8 — two probe→in-tree gaps, and the reset one is a THIRD documented seam
+
+1. **The annual reset is carbon-only, and the frozen tree says so with the condition
+   attached.** `season.py`'s `annual_reset` docstring: "**Carbon-only** — `plant_n`
+   persists across the death (an N *windfall* for the small seedling), **harmless only
+   while `f_N ≡ 1`**; a full N-reset is a deferred refinement." Two consequences:
+   * The probe *re-seeded* `plant_n = target × biomass` at each re-sow, which is the
+     **harsher** assumption (conc = target exactly, vs the in-tree windfall's conc ≫
+     target). Invariance therefore holds *a fortiori* in-tree — the probe did not flatter
+     itself here.
+   * ⚠ But (A) cannot inherit the windfall: coupled shedding means death dumps `plant_n`
+     **to `litter_n`**, and the seedling's N must then come *from* a stock (seed bank /
+     boundary) because the conservation gate asserts every step. That is unbuilt work (A)'s
+     estimate must carry, it is a **third** deferred seam the frozen tree already names,
+     and it sets the re-sown crop's starting C:N — the very quantity finding 3 measures.
+2. **Uptake availability was read from the frozen `soil_n` trajectory**, which (A) would
+   evolve differently (less draw, different mineralization inflow). Benign here for a
+   stated reason, not by luck: availability **saturates at 1.0** in every frozen scenario
+   (`soil_n0 = 100` vs `sn_critical = 50`), and `n_limited` runs with uptake **off**. This
+   is the one place the offline integration is not self-contained.
+
 ## The scope options (NOT yet decided — needs advisor review + a user call)
 
 Ordered by dependency. Each is carbon-invariant except (D).
@@ -263,5 +301,28 @@ manifest-named items, so it is a biosphere **unfreeze**, not Rust-first content.
      (`f_N` → 0.713). A science change, with the authored crop as the thing that moves.
 
    Either way the goldens' N stocks move, so the cascade cost is the same.
+
+   ⚠ **This fork is NOT neutral, and presenting it as neutral is itself the trap**
+   (advisor catch). **The declining form is the literature-shaped one** — Greenwood et al.
+   1990, *already cited in `nitrogen.py`*, is titled "Decline in percentage N of C3 and C4
+   crops with increasing plant mass": a declining dilution curve *is* what that paper is
+   about. Flat 3.0 % is the **invariance**-shaped one. So picking flat *because* `f_N ≡ 1`
+   keeps carbon byte-identical is **choosing a model form for its effect on frozen
+   output** — the co-adaptation/backfitting shape this repo has caught itself in
+   repeatedly (the consumer-chamber 2×, the DPM/RPM labile re-read this project *refused*,
+   ruling B's "the oracle is a diagnostic, never a fit target"). An earlier draft of this
+   section listed "carbon byte-identical" as flat's **advantage**, which is exactly how the
+   trap reads from the inside.
+
+   Three honest ways out — the user should see which one they are picking:
+   * justify flat **on its own merits** (a carbon-limited 52 g plant with a vegetative pool
+     that collapses ×0.008 may genuinely not dilute much — arguable, and *measurable* from
+     the recorded concentration trajectory);
+   * take the **declining** form and accept that `day_neutral` moves;
+   * present both with the trap named.
+
+   ⚠ **And the cost asymmetry is smaller than it looks**: `day_neutral` is **authored
+   content** — "authored ≠ validated", runtime-only, *not frozen*. A form that moves only
+   `day_neutral` is **not a freeze event**. That materially weakens the case for flat.
 3. **(D) as a separate, explicitly-priced decision?** It is where the science is, and it
    is also where the closure constraint bites hardest.
