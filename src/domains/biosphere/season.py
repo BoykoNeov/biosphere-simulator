@@ -382,14 +382,22 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
       the carbon idiom above, balance by construction rather than an independent
       formula, so NITROGEN is conserved exactly and the loss-sink is never touched.
 
-    ``conc_old`` is taken over ``leaf + stem + root`` (``f_N``'s own denominator, the
-    pool ``plant_n`` is the N of), and ``seedling_total`` is that same trio, so the
-    seedling starts at *exactly* the parent's concentration and ``f_N`` is continuous
-    across the re-sow. Because ``seedling_total < old_veg`` whenever a season grew at
-    all, the residual cannot go negative, so the N side needs no seed-bank-style guard
-    (carbon needs one only
-    because its seedling is drawn from *grain*, a different pool than the one it
-    measures).
+    ``conc_old`` is taken over ``leaf + stem + root`` — **``f_N``'s own denominator** —
+    and ``seedling_total`` is that same trio, so the seedling starts at exactly the
+    concentration ``f_N`` was reading and the limiter is **continuous across the
+    re-sow**. ⚠ That is the whole justification, and a tempting stronger claim is false:
+    this is
+    **not** the parent's *whole-plant* concentration, because ``plant_n`` includes the
+    grain's nitrogen while this denominator excludes ``storage_c`` — the largest organ
+    at reset. So ``conc_old`` is inflated relative to whole-plant and the seedling is
+    correspondingly N-rich. Conservation is unaffected (the litter leg is a balancing
+    residual either way). The direction is physically sensible — real seeds *are* N-rich
+    relative to straw — but that is a **consequence, not the design**, and it is the
+    one-pool limitation showing through: with a single whole-plant N pool there is no
+    separate grain N to draw the seed from. Because ``seedling_total < old_veg``
+    whenever a season grew at all, the residual cannot go negative, so the N side needs
+    no seed-bank-style guard (carbon needs one only because its seedling is drawn from
+    *grain*, a different pool than the one it measures).
 
     **Sealed-chamber only:** it sheds to the
     in-system ``litter_carbon`` POOL and re-sows from the in-system grain (the open

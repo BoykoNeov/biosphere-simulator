@@ -105,8 +105,14 @@ it reproduces what the in-tree coupled model would produce. Measured litter C:N 
 | coupled @ 1.5 % tissue N (= the model's own `n_critical`) | 154.9 (155–214) | ~80 : 1 |
 | coupled @ 0.6 % tissue N (mature straw) | 387 (387–536) | ~80 : 1 |
 
-The scaling law is exact — all rows are 1.894× `(tissue C:N) × (k_min/k_decomp)`, the
-constant being the litter pool's distance from `I_c/k_decomp` equilibrium:
+The **proportionality** is exact — every row is the same multiple of
+`(tissue C:N) × (k_min/k_decomp)` — and that is what the finding rests on. ⚠ **But the
+multiple itself (1.894 here) is NOT a constant of the model**: it is this scenario at this
+horizon. Rows vary only in tissue N, so they share it by construction; measured across
+scenarios and horizons the end-of-run multiple spans **0.855 → 48.4**, because litter input
+is a pulse and the end-of-season pool is a drained tail. The implementation section's
+correction note has the measurement. Read the law as a proportionality, never with a number
+attached:
 
 ```
 litter C:N  ∝  (tissue C:N) × (mineralization_rate / decomposition_rate)
@@ -409,18 +415,20 @@ file's unfreeze log carries the canonical record.
 3. **The litter C:N deliverable splits in two, and the split is the finding.**
    * the **shed material** is straw-like: C:N = `carbon_fraction / n_residual` = **90** (both
      terms cited), against wheat straw's ~80. This is the quantity the form change was for.
-   * the **litter pool** sits at ~**465** (sealed chamber), because
-     `pool C:N ≈ (shed C:N) × (k_min/k_decomp) × 1.894` and mineralization drains N 2.7×
-     faster than decomposition drains C. From **0.004** to 465 is 4 orders better and still
-     ~5× straw; the residual is now attributable to a *named param*, not to the form.
+   * the **litter pool** sits at **173–192**, measured at peak `litter_n` across all four
+     sealed scenarios, because mineralization drains N 2.7× faster than decomposition drains
+     C. From **0.004** to ~180 is 4 orders better and ~2.2× straw; the residual is now
+     attributable to a *named param*, not to the form.
+
+   ⚠ **CORRECTED 2026-07-27 (advisor catch, then measurement): the litter POOL C:N figures first recorded here were WRONG, and the error was the meta-finding's shape again — a number fitted to ONE scenario at ONE horizon, written as a law.** The original text asserted `pool C:N ≈ (shed C:N)·(k_min/k_decomp)·**1.894**` ≈ 465, with 1.894 called a "measured geometry factor". It was fitted to `sealed_chamber`'s **final** state after 3 years, and the end-of-run value is horizon-dependent across more than an order of magnitude: **210** (1 yr, `water_biting`), **465** (3 yr, `sealed_chamber`), **9076** and **11877** (5 yr, `perennial`/`consumer`). My first explanation for the outliers — seeded `litter_carbon0` with no N counterpart — was **also false**: all four scenarios seed `litter_carbon0 = 3.0`. **The real mechanism:** litter input is a *pulse* (the annual dump), not a continuous feed, and between pulses both currencies drain — carbon with a ~63-day half-life, nitrogen with a ~23-day one — so the end-of-season snapshot is a **tail**, and by year 5 it is the ratio of two vanishing numbers (`litter_n` = **1.3e-11 kg**). Quoting that as "the litter C:N" is quoting numerical dust. **What is actually true, measured at peak `litter_n` across all four sealed scenarios: pool C:N = 173–192**, a tight band sitting *below* the quasi-steady law `90 × 2.727 = 245.5` (0.71–0.78× it) because the pulsed pool never converges upward. That is **~2.2× wheat straw's ~80**, not ~5×. **And the scope-B projection shrinks with it**: applying Stanford & Smith's 39-soil range to the measured relationship gives **31–83 (pooled mean 47)**, not the "78–211, mean 119" this row first carried — every cited value lands at or below real residue, against **~184** for our uncited 0.03/day. **The DIRECTION is unchanged and is the point** (two independent lines still say `mineralization_rate` is too fast); only the magnitude was inflated. Pinned now — including an explicit anti-regression assertion that the end-of-run ratio spans >10× with horizon, so no constant factor may be written down again — in `tests/test_nitrogen_form.py`.
 4. ⚠ **Two of the three reasons for not recalibrating `mineralization_rate` are now FALSE.**
    The decomposer calibration declined to move it because (1) wrong pool, (2) N/C uncoupled so
    litter C:N is not physical, (3) behaviorally inert. (2) and (3) are dead: N and C *are*
    coupled now, and the rate *does* set an observable. Only (1) survives. And the numbers
    converge from two independent directions: Stanford & Smith's 39-soil range
-   (0.005–0.0136/day) puts the pool at **78–211** and their pooled mean at **119** — straw-like
-   — while our uncited 0.03/day gives 465. **Value UNMOVED** (scope B, a user decision); the
-   consequence is pinned in `tests/test_nitrogen_form.py` instead.
+   (0.005–0.0136/day) puts the pool at **31–83** and their pooled mean at **47** — at or below
+   real residue — while our uncited 0.03/day gives **~184**. **Value UNMOVED** (scope B, a user
+   decision); the consequence is pinned in `tests/test_nitrogen_form.py` instead.
 5. ⚠ **A recorded limitation: the one-pool model shows through.** Shedding at the residual
    concentration means a senescing plant *retains* most of its N while its denominator
    collapses, so tissue concentration rises without bound as biomass → 0 — ~110× target in the

@@ -272,10 +272,14 @@ so the discipline is enforced, not merely requested.
   `mineralization_rate` are now false.** It is no longer "behaviorally inert" — it sets the
   litter pool's C:N — and N and C are no longer "uncoupled", which was the other half of the
   argument that litter C:N was not a physical quantity. The **shed material** is now straw-like
-  (C:N **90**, from two cited concentrations), but the **litter pool** sits at ~**465** because
-  N mineralizes out ~2.7× faster than C decomposes out. Stanford & Smith's 39-soil range
-  (0.005–0.0136/day) would put the pool at **78–211**, i.e. straw-like, and their pooled mean at
-  **119**. Only the pool-identity objection survives (they measured soil N₀; ours is fresh
+  (C:N **90**, from two cited concentrations), but the **litter pool** sits at **173–192**
+  (measured at peak `litter_n` across all four sealed scenarios) because N mineralizes out
+  ~2.7× faster than C decomposes out — a band sitting *below* the quasi-steady law
+  `90 × 2.727 = 245.5`, because litter input is a *pulse* and the pool never converges upward.
+  Stanford & Smith's 39-soil range (0.005–0.0136/day) would put the pool at **31–83**, at or
+  below real residue, with their pooled mean at **47**.
+  ⚠ **CORRECTED 2026-07-27 (advisor catch, then measurement): the litter POOL C:N figures first recorded here were WRONG, and the error was the meta-finding's shape again — a number fitted to ONE scenario at ONE horizon, written as a law.** The original text asserted `pool C:N ≈ (shed C:N)·(k_min/k_decomp)·**1.894**` ≈ 465, with 1.894 called a "measured geometry factor". It was fitted to `sealed_chamber`'s **final** state after 3 years, and the end-of-run value is horizon-dependent across more than an order of magnitude: **210** (1 yr, `water_biting`), **465** (3 yr, `sealed_chamber`), **9076** and **11877** (5 yr, `perennial`/`consumer`). My first explanation for the outliers — seeded `litter_carbon0` with no N counterpart — was **also false**: all four scenarios seed `litter_carbon0 = 3.0`. **The real mechanism:** litter input is a *pulse* (the annual dump), not a continuous feed, and between pulses both currencies drain — carbon with a ~63-day half-life, nitrogen with a ~23-day one — so the end-of-season snapshot is a **tail**, and by year 5 it is the ratio of two vanishing numbers (`litter_n` = **1.3e-11 kg**). Quoting that as "the litter C:N" is quoting numerical dust. **What is actually true, measured at peak `litter_n` across all four sealed scenarios: pool C:N = 173–192**, a tight band sitting *below* the quasi-steady law `90 × 2.727 = 245.5` (0.71–0.78× it) because the pulsed pool never converges upward. That is **~2.2× wheat straw's ~80**, not ~5×. **And the scope-B projection shrinks with it**: applying Stanford & Smith's 39-soil range to the measured relationship gives **31–83 (pooled mean 47)**, not the "78–211, mean 119" this row first carried — every cited value lands at or below real residue, against **~184** for our uncited 0.03/day. **The DIRECTION is unchanged and is the point** (two independent lines still say `mineralization_rate` is too fast); only the magnitude was inflated. Pinned now — including an explicit anti-regression assertion that the end-of-run ratio spans >10× with horizon, so no constant factor may be written down again — in `tests/test_nitrogen_form.py`.
+   Only the pool-identity objection survives (they measured soil N₀; ours is fresh
   residue N). The value is **UNMOVED** — recalibrating it is scope B and a separate decision —
   and the consequence is pinned instead.
 

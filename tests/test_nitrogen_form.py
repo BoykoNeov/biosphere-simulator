@@ -297,56 +297,133 @@ def test_shed_material_has_a_straw_like_carbon_to_nitrogen_ratio() -> None:
     assert 60.0 < shed_cn < 120.0, "shed C:N left the real-residue band"
 
 
-def test_litter_pool_cn_is_the_shed_ratio_times_the_decomposer_rate_RATIO() -> None:
-    """⚠ THE RESIDUAL, AND ITS CAUSE — recorded as a test so it cannot quietly rot.
+def test_litter_pool_cn_tracks_the_decomposer_rate_ratio_but_never_reaches_it() -> None:
+    """⚠ THE RESIDUAL AND ITS CAUSE — and the shape of a claim I got wrong first.
 
     The litter POOL's C:N is not the shed material's: nitrogen mineralizes OUT of litter
     (``mineralization_rate`` 0.03/day) faster than carbon decomposes out of it
-    (``decomposition_rate`` 0.011/day), so the pool runs N-poor by that ratio::
+    (``decomposition_rate`` 0.011/day), so the pool runs N-poor. The quasi-steady law
+    for a
+    pool under CONTINUOUS input is::
 
-        pool C:N  ~  (shed C:N) x (k_min / k_decomp) x 1.894
+        pool C:N  ->  (shed C:N) x (k_min / k_decomp)   =  90 x 2.727  =  245.5
 
-    where 1.894 is a measured geometry factor also recorded by the plan doc's finding 3.
-    Measured here at ~465 for the sealed chamber against wheat straw's ~80.
+    ⚠ **An earlier version of this test asserted that law times a "measured geometry
+    factor of 1.894", and that factor was an ARTEFACT of one scenario at one horizon.**
+    It was fitted to ``sealed_chamber``'s *final* state after 3 years. Measured across
+    the four sealed scenarios, the end-of-run value is 210 (1 yr), 465 (3 yr), 9076 and
+    11877 (5 yr) — i.e. **there is no horizon-independent factor**, and the doc that
+    recorded one was describing a coincidence. This test now pins the two things that
+    are actually true and an assertion that the discredited claim cannot come back.
+
+    **Why the end-of-run number is meaningless.** Our litter input is a PULSE (the
+    annual reset dump), not a continuous feed, and between pulses both currencies drain
+    — carbon with a ~63-day half-life, nitrogen with a ~23-day one. So the end-of-season
+    snapshot is the tail, where N has drained ~2.7x further, and the ratio of two
+    vanishing numbers inflates without bound: by year 5 ``litter_n`` is **1.3e-11 kg**.
+    Quoting that as "the litter C:N" is quoting numerical dust.
+
+    **What is true:** while the pool is substantial (at peak ``litter_n``), pool C:N is
+    **173-192 across all four sealed scenarios** — consistently *below* the quasi-steady
+    law, because the pulsed pool never gets there. That is ~2.2x wheat straw's ~80, from
+    the frozen form's 0.004: four orders of improvement with an honest residual.
 
     **This retires a recorded finding.** The decomposer calibration declined to move
-    ``mineralization_rate`` and gave three reasons; two are now false. It is no longer
+    ``mineralization_rate`` for three reasons; two are now false. It is no longer
     "behaviorally inert" — it sets this ratio — and N and C are no longer "uncoupled",
     which was the other half of the argument that litter C:N was not a physical
     quantity. Only the pool-identity objection survives (S&S measured soil N0; ours is
-    fresh residue N). Recalibrating it is scope B and a separate user decision, so the
-    value is UNMOVED and the consequence is pinned instead.
+    fresh residue N). Recalibrating is scope B and a separate user decision, so the
+    value is UNMOVED and the consequence is pinned here instead.
     """
     nitro = load_nitrogen_params()
     mineral = load_mineralization_params()
     decomp = load_decomposition_params()
     n_residual_kg_kg = nitro.n_residual_per_mol_c / nitro.dm_kg_per_mol_c
     shed_cn = _CARBON_FRACTION / n_residual_kg_kg
-    predicted = (
-        shed_cn * (mineral.mineralization_rate / decomp.decomposition_rate) * 1.894
-    )
+    law = shed_cn * (mineral.mineralization_rate / decomp.decomposition_rate)
+    assert math.isclose(law, 245.5, rel_tol=1e-3), law
 
-    scenario = sc.SEALED_CHAMBER_SCENARIO
-    state, registry = build_season(scenario)
-    weather = _weather(3)
-    states, rationed, _ = run_season(
-        EulerIntegrator(registry),
-        state,
-        weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
-    )
-    assert rationed == 0
-    final = states[-1]
-    litter_n = final.stocks[LITTER_N].amount
-    assert litter_n > 0.0
-    pool_cn = final.stocks[LITTER_CARBON].amount * _M_C / litter_n
+    cases = [
+        (sc.SEALED_CHAMBER_SCENARIO, 3),
+        (sc.PERENNIAL_CHAMBER_SCENARIO, 5),
+        (sc.CONSUMER_CHAMBER_SCENARIO, 5),
+        (sc.WATER_BITING_SCENARIO, 1),
+    ]
+    peak_ratios: list[float] = []
+    final_ratios: list[float] = []
+    for scenario, years in cases:
+        state, registry = build_season(scenario)
+        weather = _weather(years)
+        states, rationed, _ = run_season(
+            EulerIntegrator(registry),
+            state,
+            weather_resolver(weather, scenario),
+            1.0,
+            len(weather),
+        )
+        assert rationed == 0
+        rows = [
+            (s.stocks[LITTER_N].amount, s.stocks[LITTER_CARBON].amount) for s in states
+        ]
+        peak_n = max(r[0] for r in rows)
+        assert peak_n > 0.0
+        at_peak = next(lc * _M_C / ln for ln, lc in rows if ln == peak_n)
+        final_n, final_c = rows[-1]
+        assert final_n > 0.0
 
-    assert math.isclose(pool_cn, predicted, rel_tol=0.02), (pool_cn, predicted)
-    # The honest framing: 4 orders better than the frozen form's 0.004, and still ~5x
-    # straw.
-    assert 400.0 < pool_cn < 550.0, pool_cn
-    assert pool_cn / 80.0 < 10.0, "pool C:N drifted more than an order off real residue"
+        # 1. while the pool is substantial, the pool C:N sits in a narrow band BELOW the
+        #    quasi-steady law — the pulsed input never lets it converge upward.
+        assert 150.0 < at_peak < 220.0, (scenario, at_peak)
+        assert at_peak < law, (scenario, at_peak, law)
+        # 2. and it is the right order for real residue (wheat straw ~80), which the
+        #    frozen form's 0.004 was not by four orders.
+        assert 1.5 < at_peak / 80.0 < 3.0, (scenario, at_peak)
+
+        peak_ratios.append(at_peak / law)
+        final_ratios.append((final_c * _M_C / final_n) / law)
+
+    # 3. THE ANTI-REGRESSION PIN for the claim this test used to make. The peak-time
+    # ratio    is stable across scenarios (a real relationship); the END-OF-RUN ratio is
+    # not —    it spans more than an order of magnitude with the horizon, so no constant
+    # factor    describes it and none may be written down again.
+    assert max(peak_ratios) / min(peak_ratios) < 1.2, peak_ratios
+    assert max(final_ratios) / min(final_ratios) > 10.0, final_ratios
+
+
+def test_the_cited_mineralization_range_would_put_litter_cn_at_real_residue() -> None:
+    """The scope-B projection, stated at the scope it is actually measured at.
+
+    ⚠ Recorded because an earlier version of this projection was inflated by the
+    spurious 1.894 factor above (it read "78-211, mean 119"). Using the measured
+    peak-time relationship instead — pool C:N ~ 0.75 x shed_cn x (k_min / k_decomp) —
+    Stanford & Smith's 39-soil range lands litter C:N at **31-83 with a pooled-mean
+    47**, i.e. at or below wheat straw's ~80, against **~184** for our uncited 0.03/day.
+
+    The DIRECTION is unchanged and is the point: two independent lines — the citation
+    bound (2.2x above the fastest of 39 soils) and the litter C:N target — both say
+    ``mineralization_rate`` is too fast. The magnitude is now quoted honestly.
+    """
+    nitro = load_nitrogen_params()
+    mineral = load_mineralization_params()
+    decomp = load_decomposition_params()
+    shed_cn = _CARBON_FRACTION / (nitro.n_residual_per_mol_c / nitro.dm_kg_per_mol_c)
+    # the measured peak-time fraction of the quasi-steady law (see the test above)
+    observed_fraction = 0.75
+
+    def pool_cn(k_min: float) -> float:
+        return observed_fraction * shed_cn * (k_min / decomp.decomposition_rate)
+
+    ours = pool_cn(mineral.mineralization_rate)
+    assert 170.0 < ours < 200.0, ours
+    # Stanford & Smith 1972, Table 3: 39 soils spanning 0.035-0.095/wk, pooled mean
+    # 0.054/wk => 0.0050-0.0136/day, mean 0.0077/day.
+    assert 25.0 < pool_cn(0.0050) < 40.0
+    assert 40.0 < pool_cn(0.0077) < 55.0
+    assert 70.0 < pool_cn(0.0136) < 95.0
+    # every cited value lands at or below real residue; ours is >2x above it
+    assert pool_cn(0.0136) < 80.0 * 1.1
+    assert ours / 80.0 > 2.0
 
 
 def test_nitrogen_is_conserved_across_the_annual_reset() -> None:
@@ -375,4 +452,9 @@ def test_nitrogen_is_conserved_across_the_annual_reset() -> None:
 
     start = total_n(states[0])
     for s in states:
-        assert math.isclose(total_n(s), start, rel_tol=0.0, abs_tol=1e-12), s.n
+        # abs_tol 1e-9, matching test_mineralization's own
+        # test_sealed_conserves_nitrogen_exactly, whose comment explicitly rejects 1e-12
+        # for this quantity at this scale ("total N ~ 100, soil_n-dominated"). This run
+        # is 1825 steps; a tighter bound than the sibling's is how a Windows-green test
+        # goes red on the Linux CI job.
+        assert math.isclose(total_n(s), start, rel_tol=0.0, abs_tol=1e-9), s.n

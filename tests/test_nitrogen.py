@@ -282,6 +282,47 @@ def test_uptake_is_demand_limited_when_the_shortfall_is_small() -> None:
     assert math.isclose(legs[_SOIL_N], -shortfall, rel_tol=1e-9)
 
 
+def test_demand_limited_uptake_is_dt_linear_and_deadbeat_at_dt_1() -> None:
+    """dt behaviour in the DEMAND-limited branch — the branch the docstring reasons
+    about.
+
+    ``test_uptake_scales_linearly_with_dt`` runs the starved fixture, so it only ever
+    exercises the CAPACITY branch. The deficit branch is where the documented ``k*dt =
+    1`` deadbeat claim lives: the deficit is a stock read as a per-day rate, so at the
+    frozen ``dt = 1`` it closes exactly in one step, and there is no restoring force to
+    overshoot against (the deficit clamps at 0) — unlike the demand-controlled
+    ``eclss.o2_makeup`` of bucket 2's export-fidelity finding, whose error is SIGNED and
+    can oscillate.
+    """
+    params = _params()
+    target_per_mol_c = params.n_target_coefficient * params.dm_kg_per_mol_c
+    biomass = 2.0
+    shortfall = 1e-5
+    plant_n0 = target_per_mol_c * biomass - shortfall
+    state = _state(soil_n0=1.0, plant_n0=plant_n0)
+    flow = _uptake_flow()
+
+    # dt-linear: the RATE comes from the snapshot alone, never from dt.
+    half = {
+        leg.stock: leg.amount
+        for leg in flow.evaluate(state, _env(state, 0.5), 0.5).legs
+    }
+    full = {
+        leg.stock: leg.amount
+        for leg in flow.evaluate(state, _env(state, 1.0), 1.0).legs
+    }
+    assert math.isclose(full[_PLANT_N], 2.0 * half[_PLANT_N], rel_tol=1e-12)
+
+    # DEADBEAT at dt = 1: the whole shortfall closes in one step...
+    assert math.isclose(full[_PLANT_N], shortfall, rel_tol=1e-9)
+    # ...and the step after that draws NOTHING (no overshoot, no oscillation).
+    settled = _state(soil_n0=1.0, plant_n0=plant_n0 + full[_PLANT_N])
+    assert all(
+        leg.amount == 0.0
+        for leg in flow.evaluate(settled, _env(settled, 1.0), 1.0).legs
+    )
+
+
 def test_uptake_stops_entirely_at_or_above_the_target_concentration() -> None:
     """A plant at its target takes up NOTHING, however much soil N is available.
 
