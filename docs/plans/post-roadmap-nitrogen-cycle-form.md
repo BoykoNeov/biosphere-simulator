@@ -879,6 +879,17 @@ digits satisfy both halves simultaneously: DS 1.0→1.5 at mean 0.015/day gives
 * **There is no stem function at all**, in either the listing or the text: *"except for
   their reserves, stems do not lose weight."* Our `rdr_stem = 0.005/day` is unsupported
   by this source in **existence**, not merely in value.
+  ⚠ **STEM-ONLY WAS NOT MEASURED, and that gap is stated so nobody infers it was priced
+  and rejected with the rest.** Everything below runs the *combined* form (leaf + stem +
+  root keyed together). Zeroing `rdr_stem` alone is the one piece of (C) that is
+  plausibly **separable from the canopy problem** — it shrinks the plant rather than
+  blowing up LAI, so C-finding 5's blocker may simply not apply to it. It would still be
+  a carbon change moving every golden, and it is still not built; but "(C) is refused"
+  must not be read as "stem-only was evaluated and refused". It was not evaluated.
+  ⚠ Also scope the quote itself: [A] says it while describing the **mechanistic**
+  variant, and *"except for their reserves"* concedes stem reserve mobilization, which
+  our single `stem_c` pool cannot express separately. The honest reading is "no
+  structural stem death", not "no stem carbon ever leaves".
 * The worked example is **rice IR36**, not wheat. Same lineage caveat as the day-neutral
   crop work: the *shape* is transferable, the *numbers* are another crop's.
 * The source states its own expected outcome — *"Description such as this usually
@@ -952,6 +963,16 @@ primary's own table**: [A] says the descriptive form *"usually results in a loss
 That does not vindicate the flat form *as a form*: it says the flat rate was
 (implicitly) sized to produce roughly the right *integrated* loss while getting the
 *timing* entirely wrong — shedding hardest when the source says zero.
+
+⚠ **And this comparison is INDICATIVE, not a like-for-like read of the source's
+sentence.** Three mismatches, stated rather than buried: our run ends at the end of the
+weather fixture, **not at "harvest time"**; the loss is measured **off peak LAI**, not
+off anthesis or off a harvest date; and [A]'s statement is about **rice** under its own
+phenology, where the whole season is 102–135 days. The usable content is the *ordering
+and rough magnitude* — none of the three is inside the band, and the frozen form misses
+it by least — **not** "38.5 % is our answer to a 40-60 % question". No "distance to the
+midpoint" comparison is drawn, in the prose or in the pins: a nearness metric invented
+to rank two misses would be the fitted comparison this section exists to refuse.
 
 ### C-finding 6 — closure: Listing 5 breaks `perennial`; T10 breaks re-sow everywhere
 

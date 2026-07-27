@@ -45,7 +45,17 @@
 #       FROZEN flat form lands at 38.5 %, Listing 5 at 30.0 %, the exercise table at
 #       97.9 %. The flat rate was implicitly sized to give roughly the right INTEGRATED
 #       loss while getting the TIMING entirely wrong -- shedding hardest where the source
-#       says zero.
+#       says zero. ⚠ THAT COMPARISON IS INDICATIVE, NOT LIKE-FOR-LIKE: our run ends at
+#       the end of the weather fixture rather than at "harvest time", the loss is
+#       measured off PEAK LAI, and [A]'s sentence describes rice under a 102-135 day
+#       season. It supports the ORDERING and rough magnitude -- none of the three is
+#       inside the band -- not "38.5 % is our answer to a 40-60 % question", and no
+#       distance-to-the-midpoint comparison is drawn.
+#     * ⚠ STEM-ONLY WAS NOT MEASURED. Everything above runs the COMBINED form (leaf +
+#       stem + root keyed together). Zeroing rdr_stem alone is the one piece of (C)
+#       plausibly SEPARABLE from the canopy problem -- it shrinks the plant rather than
+#       blowing up LAI -- so "(C) is refused" must NOT be read as "stem-only was
+#       evaluated and refused". It was not evaluated.
 #     * CLOSURE BREAKS IN `perennial`. Euler reports rationed == 0 in all 8 scenarios
 #       (the trap); under RK4 `perennial` HARD-ERRORS (ArbitrationError, scale_f
 #       0.95277), and its decade per-year CO2 minimum falls from a settled 0.05484
@@ -85,7 +95,7 @@ parameters:
   rdr_stem:
     value: 0.005
     unit: "1/day"
-    source: "TODO(cite) — STILL OPEN, and 2026-07-27 sharpened it from a value gap to an EXISTENCE gap: [A] p. 95 states 'except for their reserves, stems do not lose weight', and Listing 5 (the crop file sec. 3.2.6 cites) carries LLVT and LRTT but NO stem death function at all. So this parameter is not merely uncited at 0.005/day — the source we cite for the senescence form says the quantity is zero. NOT set to zero, because that is a value change to a frozen param with a carbon effect, i.e. scope (C)/(D) work, and it cannot be taken in isolation from rdr_leaf (see its tag: removing pre-anthesis shedding takes peak LAI to 16.4). Recorded, not fitted. ⚠ Note the scope of the quote: [A] says it while describing the MECHANISTIC variant, and 'except for their reserves' concedes stem reserve mobilization, which our single stem_c pool cannot express separately — so the honest reading is 'no structural stem death', not 'no stem carbon ever leaves'. See docs/plans/post-roadmap-nitrogen-cycle-form.md, 'THE (C) DIAGNOSIS' (C-finding 2)."
+    source: "TODO(cite) — STILL OPEN, and 2026-07-27 sharpened it from a value gap to an EXISTENCE gap: [A] p. 95 states 'except for their reserves, stems do not lose weight', and Listing 5 (the crop file sec. 3.2.6 cites) carries LLVT and LRTT but NO stem death function at all. So this parameter is not merely uncited at 0.005/day — the source we cite for the senescence form says the quantity is zero. NOT set to zero, because that is a value change to a frozen param with a carbon effect, i.e. scope (C)/(D) work. ⚠ BUT DO NOT INHERIT rdr_leaf's BLOCKER HERE: the (C) diagnosis measured the COMBINED form, and stem-only is the one piece plausibly SEPARABLE from the canopy problem (zeroing stem death shrinks the plant rather than blowing up LAI). STEM-ONLY WAS NOT MEASURED, so this is unpriced, not priced-and-rejected. Recorded, not fitted. ⚠ Note the scope of the quote: [A] says it while describing the MECHANISTIC variant, and 'except for their reserves' concedes stem reserve mobilization, which our single stem_c pool cannot express separately — so the honest reading is 'no structural stem death', not 'no stem carbon ever leaves'. See docs/plans/post-roadmap-nitrogen-cycle-form.md, 'THE (C) DIAGNOSIS' (C-finding 2)."
   rdr_root:
     value: 0.01
     unit: "1/day"

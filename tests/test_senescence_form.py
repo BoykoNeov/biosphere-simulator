@@ -227,9 +227,9 @@ def _candidate(
         stem_table=stem,
         root_table=root,
     )
-    flows = []
+    flows: list[object] = []
     for f in registry.flows:
-        if str(f.id) == "biosphere.senescence":
+        if isinstance(f, Senescence):
             flows.append(new)
         elif isinstance(f, NitrogenSenescence):
             flows.append(
@@ -250,7 +250,11 @@ def _candidate(
     # ⚠ The aux processes MUST be carried over. Dropping them freezes ``thermal_time``
     # at 0, so DVS never advances and a DVS-keyed flow silently becomes a zero flow —
     # probe B2's first bug, which a clean control did not catch.
-    return Registry(flows, state.stocks, registry.aux_processes)
+    return Registry(flows, state.stocks, registry.aux_processes)  # type: ignore[arg-type]
+
+
+def _n_legs(registry: Registry) -> int:
+    return sum(1 for f in registry.flows if isinstance(f, _DvsNitrogenSenescence))
 
 
 def _run(
@@ -391,7 +395,29 @@ def test_frozen_form_is_nearer_the_primarys_stated_outcome_than_its_table() -> N
     assert 0.35 < frozen < 0.45, frozen  # 38.5 % — just under the band
     assert 0.25 < listing5 < 0.35, listing5  # 30.0 % — below it
     assert t10 > 0.9, t10  # 97.9 % — the crop is stripped
-    assert abs(frozen - 0.50) < abs(listing5 - 0.50)  # nearer the band's midpoint
+    # ⚠ No "which is nearer the midpoint" assertion. NONE of the three is IN the band,
+    # and a nearness metric invented to rank two misses is a fitted comparison — in a
+    # module whose subject is refusing fitted comparisons. The three bounds above are
+    # the whole claim.
+
+
+def test_the_n_leg_is_actually_swapped_and_it_is_SEALED_ONLY() -> None:
+    """⚠ Otherwise ``_DvsNitrogenSenescence`` is dead code documenting a live hazard.
+
+    Step 6b's lesson: when the argument for carrying something is "otherwise the two
+    halves drift", the test that settles it is the one that RUNS it. Most pins in this
+    module drive ``open_season``, which builds **no** ``NitrogenSenescence`` at all —
+    ``litter_n`` is sealed-only, the structural fact (B) established. So the N branch is
+    exercised by the ``perennial`` pins and nowhere else, and that is asserted here
+    rather than assumed.
+    """
+    for scenario, expected in (
+        (sc.DEFAULT_SCENARIO, 0),  # open field: no litter_n, so no shed-N flow exists
+        (sc.SEALED_CHAMBER_SCENARIO, 1),
+        (sc.PERENNIAL_CHAMBER_SCENARIO, 1),
+    ):
+        state, registry = build_season(scenario)
+        assert _n_legs(_candidate(registry, state, **_LISTING5)) == expected, scenario
 
 
 # --- 4. the tripwire ------------------------------------------------------------------
