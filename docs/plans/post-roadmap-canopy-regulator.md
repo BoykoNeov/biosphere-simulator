@@ -269,3 +269,14 @@ so the price is not re-derived:
 shelf, is wheat-specific, needs no fitting, and takes the unphysical canopy from LAI 16.4
 to 6.2 — and it changes nothing that matters, because the seven scenarios that block (C)
 never grow a canopy big enough to shade itself.**
+
+> **Corroborated from a third direction, 2026-07-28** — `post-roadmap-nitrogen-cycle-form.md`,
+> C-finding 8. Finding 4 above left `perennial`'s closure as (C)'s sole surviving blocker;
+> the **stem-only** branch — (C)'s smallest separable piece, and the one that shrinks the
+> canopy instead of blowing it up — was then measured and **hits that same blocker**
+> (`rationed 0 → 1` under Euler; the decade CO₂ attractor 0.05484 → 0.01619 against its
+> 0.05 floor). Its mechanism is finding 4's own reason restated as a law: **a sealed
+> chamber's carbon inventory is fixed, so any change that parks carbon in a standing pool
+> is paid for out of the CO₂ trough** — which is why the field-scale and chamber-scale
+> problems keep failing to reach each other. All three branches of (C)'s refusal are now
+> examined rather than assumed.

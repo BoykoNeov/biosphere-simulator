@@ -62,6 +62,7 @@ The candidate flows live in this module, not in ``src/``: nothing here is built,
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import math
 from dataclasses import dataclass
@@ -72,6 +73,12 @@ import pytest
 from domains.biosphere import scenario as sc
 from domains.biosphere.allocation import Senescence, senescence_flux
 from domains.biosphere.canopy import CanopyParams, leaf_area_index
+from domains.biosphere.drift import (
+    is_stationary,
+    non_collapsing,
+    same_phase_diffs,
+    year_summaries,
+)
 from domains.biosphere.loader import (
     load_canopy_params,
     load_nitrogen_params,
@@ -85,7 +92,9 @@ from domains.biosphere.mineralization import (
 from domains.biosphere.nitrogen import NitrogenParams, nitrogen_stress_factor
 from domains.biosphere.phenology import PhenologyParams, development_stage
 from domains.biosphere.season import (
+    CARBON_POOL,
     LEAF_C,
+    LONG_HORIZON_YEARS,
     PLANT_N,
     ROOT_C,
     STEM_C,
@@ -325,6 +334,46 @@ def _n_legs(registry: Registry) -> int:
     return sum(1 for f in registry.flows if isinstance(f, _DvsNitrogenSenescence))
 
 
+def _stem_zero(registry: Registry, state: State) -> Registry:
+    """``rdr_stem -> 0.0`` on BOTH senescence flows, carrying the aux processes.
+
+    Section 7's candidate, and it is a change to exactly ONE number — leaf and root keep
+    their frozen flat rates. This is (C)'s **existence** claim in isolation ([A] p. 95:
+    "except for their reserves, stems do not lose weight"; Listing 5 carries LLVT and
+    LRTT and no stem function at all), not the DVS-keyed form.
+
+    ⚠ The swap MUST hit ``mineralization.NitrogenSenescence`` too. That flow
+    **recomputes** the identical per-organ carbon flux from its own ``SenescenceParams``
+    (a flow may read only the step-entry snapshot, so recomputation is the only pure
+    form), which is precisely the drift hazard its own docstring names: a one-sided swap
+    would keep shedding N at the old stem rate and silently decouple the two legs of one
+    physical event. The committed pin guarding that does not run inside a hand-built
+    registry, so the invariant is asserted here instead.
+    """
+    flows: list[object] = []
+    hits = 0
+    for f in registry.flows:
+        if isinstance(f, Senescence):
+            flows.append(
+                dataclasses.replace(
+                    f, params=dataclasses.replace(f.params, rdr_stem=0.0)
+                )
+            )
+            hits += 1
+        elif isinstance(f, NitrogenSenescence):
+            flows.append(
+                dataclasses.replace(
+                    f, sen_params=dataclasses.replace(f.sen_params, rdr_stem=0.0)
+                )
+            )
+            hits += 1
+        else:
+            flows.append(f)
+    assert hits >= 1, "no senescence flow was swapped — the candidate is a no-op"
+    # The aux processes MUST be carried over (probe B2's bug, ``_candidate`` above).
+    return Registry(flows, state.stocks, registry.aux_processes)  # type: ignore[arg-type]
+
+
 def _run(
     scenario,
     years: int,
@@ -333,10 +382,14 @@ def _run(
     resets: bool = False,
     integrator: type[EulerIntegrator] | type[Rk4Integrator] = EulerIntegrator,
     shade: float = 0.0,
+    stem_zero: bool = False,
 ):
     w = _weather(years)
     state, registry = build_season(scenario)
-    if tables is not None or shade:
+    if stem_zero:
+        assert tables is None and not shade, "stem-only is measured ALONE, by design"
+        registry = _stem_zero(registry, state)
+    elif tables is not None or shade:
         registry = _candidate(
             registry,
             state,
@@ -860,3 +913,405 @@ def test_the_frozen_concentration_margin_is_wider_than_the_frozen_mass_margin() 
         if s.stocks[LEAF_C].amount > 0
     ]
     assert min(concs) / nitro.n_critical_per_mol_c > 1.28, min(concs)
+
+
+# --- 7. STEM-ONLY: the branch this module recorded as UNPRICED, now priced ------------
+# ``params/senescence.yaml``'s rdr_stem tag said, and this module inherited:
+#     "the (C) diagnosis measured the COMBINED form, and stem-only is the one piece
+#      plausibly SEPARABLE from the canopy problem (zeroing stem death shrinks the plant
+#      rather than blowing up LAI). STEM-ONLY WAS NOT MEASURED, so this is unpriced,
+#      not priced-and-rejected."
+# Measured 2026-07-28. BOTH halves of that parenthesis are false, and the branch is
+# separable from the CANOPY problem but not from the CLOSURE one — which, after the
+# canopy-regulator work, is the only thing still blocking (C). Each pin below is named
+# for the claim it settles.
+_STEM_RATIONED_YEAR_1_DAY = 197  # where the single Euler firing lands (year-1 trough)
+
+
+def test_the_stem_swap_is_real_and_the_N_LEG_IS_SEALED_ONLY() -> None:
+    """The candidate is not a no-op, and it reaches the flow that RECOMPUTES the flux.
+
+    ``NitrogenSenescence`` is built only in a sealed chamber (an open field has no
+    ``litter_n`` to shed into), so the count is 0 in ``open_season`` and 1 in the
+    chambers. Asserted before any measurement below is believed: that flow recomputes
+    the identical per-organ carbon flux from its *own* ``SenescenceParams``, so a swap
+    that missed it would leave the two legs of one physical event on different stem
+    rates — the drift hazard its own docstring names, whose committed guard does not run
+    inside a hand-built registry.
+    """
+    seen = {}
+    frozen = load_senescence_params()
+    for label, scenario in (
+        ("open_season", sc.DEFAULT_SCENARIO),
+        ("sealed_chamber", sc.SEALED_CHAMBER_SCENARIO),
+        ("perennial", sc.PERENNIAL_CHAMBER_SCENARIO),
+    ):
+        state, registry = build_season(scenario)
+        swapped = _stem_zero(registry, state)
+        carbon = [f for f in swapped.flows if isinstance(f, Senescence)]
+        nitro = [f for f in swapped.flows if isinstance(f, NitrogenSenescence)]
+        assert len(carbon) == 1 and carbon[0].params.rdr_stem == 0.0, label
+        assert all(f.sen_params.rdr_stem == 0.0 for f in nitro), label
+        # …and the two organs NOT under test really are untouched.
+        assert carbon[0].params.rdr_leaf == frozen.rdr_leaf
+        assert carbon[0].params.rdr_root == frozen.rdr_root
+        seen[label] = len(nitro)
+    assert seen == {"open_season": 0, "sealed_chamber": 1, "perennial": 1}, seen
+
+
+def test_zeroing_stem_death_GROWS_the_plant_and_our_own_file_predicted_SHRINKS() -> (
+    None
+):
+    """⚠ Claim 1 FALSIFIED — a prediction written as a fact, in a param file.
+
+    ``rdr_stem`` is a LOSS term, so removing it retains stem carbon and W (Greenwood's
+    basis: leaf + stem + storage) goes **UP** +7.96 % on ``open_season``. The
+    parenthesis in ``senescence.yaml`` — "zeroing stem death shrinks the plant" — reads
+    as a recorded measurement and was never run.
+
+    It was not baseless, and the next pin is why: three of the four organs really do
+    shrink. What the sentence did was name the whole plant for the behaviour of the
+    majority of its organs, when the one dissenting term is the largest.
+    """
+    frozen, _r0, _ = _run(sc.DEFAULT_SCENARIO, 1)
+    stem0, _r1, _ = _run(sc.DEFAULT_SCENARIO, 1, stem_zero=True)
+
+    def peak_w(states) -> float:
+        return max(
+            _t_per_ha(
+                s.stocks[LEAF_C].amount
+                + s.stocks[STEM_C].amount
+                + s.stocks[STORAGE_C].amount,
+                sc.DEFAULT_SCENARIO.ground_area,
+            )
+            for s in states
+        )
+
+    assert peak_w(frozen) == pytest.approx(12.633, rel=1e-3)
+    assert peak_w(stem0) == pytest.approx(13.639, rel=1e-3)
+    assert peak_w(stem0) > peak_w(frozen)  # THE point: up, not down
+    assert peak_w(stem0) / peak_w(frozen) == pytest.approx(1.0796, rel=1e-3)
+
+
+def test_the_stem_grows_and_the_OTHER_THREE_organs_take_ONE_haircut() -> None:
+    """The per-organ split a scalar W hides — and the common haircut names the cause.
+
+    Stem peak **+23.4 %**; leaf **-3.96 %**, root **-3.91 %**, storage **-3.97 %**. That
+    three organs on three different DVS-keyed partition fractions fall by the same
+    fraction to a tenth of a percentage point is not coincidence: the partition table is
+    untouched, so a uniform haircut says the stream being partitioned — net assimilate —
+    shrank. Measured cause: a bigger STANDING stem costs more to maintain
+    (``maintenance_coef`` 0.02/day, charged on live tissue). On ``open_season`` the
+    integral of standing live tissue rises 3.08 %, i.e. ~1.49 mol C of extra maintenance
+    respiration against a 0.89 mol C fall in final storage.
+
+    ⚠ The honest one-line reading is **"stem up, grain down"** — the plant is bigger and
+    worse. And the branch would introduce a form gap rather than close one: our single
+    ``stem_c`` pool cannot express [A]'s own "except for their **reserves**", so zeroing
+    the death rate makes the stem a strictly one-way pool.
+    """
+    frozen, _r0, _ = _run(sc.DEFAULT_SCENARIO, 1)
+    stem0, _r1, _ = _run(sc.DEFAULT_SCENARIO, 1, stem_zero=True)
+
+    def peak(states, stock) -> float:
+        return max(s.stocks[stock].amount for s in states)
+
+    ratios = {
+        name: peak(stem0, stock) / peak(frozen, stock)
+        for name, stock in (
+            ("leaf", LEAF_C),
+            ("stem", STEM_C),
+            ("root", ROOT_C),
+            ("storage", STORAGE_C),
+        )
+    }
+    assert ratios["stem"] == pytest.approx(1.2336, rel=1e-3), ratios
+    for organ in ("leaf", "root", "storage"):
+        assert ratios[organ] < 1.0, ratios
+    haircuts = [ratios[o] for o in ("leaf", "root", "storage")]
+    assert max(haircuts) - min(haircuts) < 1e-3, ratios
+    assert min(haircuts) == pytest.approx(0.9603, rel=1e-3), ratios
+
+
+def test_stem_only_shrinks_the_greenwood_margin_WITHOUT_crossing_it() -> None:
+    """The mass tripwire is approached, not tripped: 13.639 vs the 14.4248 crossing.
+
+    The margin more than halves (12.4 % -> 5.4 %), leaving ``open_season`` one small
+    calibration short of the first ``f_N`` bite in a frozen scenario. Recorded as a near
+    miss, not as a pass: finding 6 established that crossing the mass pin does not by
+    itself move a golden, and "staying under it is not safety" is that same distinction
+    from the other side.
+    """
+    stem0, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1, stem_zero=True)
+    assert rationed == 0
+    peak_w = max(
+        _t_per_ha(
+            s.stocks[LEAF_C].amount
+            + s.stocks[STEM_C].amount
+            + s.stocks[STORAGE_C].amount,
+            sc.DEFAULT_SCENARIO.ground_area,
+        )
+        for s in stem0
+    )
+    assert peak_w < _CROSSING_T_HA, peak_w
+    assert peak_w / _CROSSING_T_HA == pytest.approx(0.9455, rel=1e-3), peak_w
+
+
+def test_the_two_tripwires_move_in_OPPOSITE_directions() -> None:
+    """⚠ The clearest demonstration yet that mass and area margins are not one thing.
+
+    Stem-only moves W **toward** the Greenwood crossing (0.876 -> 0.946 of it) and peak
+    LAI **away** from the V-K&S threshold (0.865 -> 0.831 of it), because leaf carbon is
+    downstream of the assimilate stream the bigger stem is taxing. The canopy-regulator
+    work flagged that conflating a *mass* margin with a *leaf-area* one is an ambiguity
+    that has bitten this repo twice; here one single-number change pushes them in
+    opposite directions at once, so no scalar "how close are we" exists.
+    """
+    cp = load_canopy_params()
+    out = {}
+    for label, kw in (("frozen", {}), ("stem0", {"stem_zero": True})):
+        states, _r, _ = _run(sc.DEFAULT_SCENARIO, 1, **kw)  # type: ignore[arg-type]
+        out[label] = (
+            max(
+                _t_per_ha(
+                    s.stocks[LEAF_C].amount
+                    + s.stocks[STEM_C].amount
+                    + s.stocks[STORAGE_C].amount,
+                    sc.DEFAULT_SCENARIO.ground_area,
+                )
+                for s in states
+            )
+            / _CROSSING_T_HA,
+            max(
+                leaf_area_index(
+                    s.stocks[LEAF_C].amount,
+                    sla_per_mol_c=cp.sla_per_mol_c,
+                    ground_area=sc.DEFAULT_SCENARIO.ground_area,
+                )
+                for s in states
+            )
+            / VKS_LAI_THRESHOLD,
+        )
+    assert out["stem0"][0] > out["frozen"][0], out  # the mass margin CLOSES
+    assert out["stem0"][1] < out["frozen"][1], out  # the area margin OPENS
+    assert out["frozen"] == pytest.approx((0.8758, 0.8651), rel=1e-3)
+    assert out["stem0"] == pytest.approx((0.9455, 0.8309), rel=1e-3)
+
+
+def test_stem_only_RATIONS_the_perennial_chamber_UNDER_EULER() -> None:
+    """⚠ THE BLOCKING FINDING, and it is independent of any tuned guard.
+
+    ``perennial`` goes ``rationed 0 -> 1`` under **Euler at dt=1**, the frozen reference
+    configuration. One firing is a hard break rather than a drift, and the site is
+    specific: ``test_regression_perennial_season.py:77`` asserts ``rationed == 0`` as
+    that golden's pre-capture closure gate. So stem-only dies on ``perennial``'s
+    CLOSURE — the same wall the combined (C) form hit, reached by a different road.
+
+    This is what settles "separable". Stem-only IS separable from the canopy problem
+    (the tripwire pin above: peak LAI *falls*), and is NOT separable from the closure
+    problem — which, after the canopy regulator discharged branch 2, is the only branch
+    of (C)'s refusal still standing.
+
+    ⚠ **WHERE it fires is MEASURED, not read off the CO2 argmin.** My first version of
+    this pin asserted the location of the **CO2 minimum** under a constant named for the
+    **rationing** step and a docstring claiming they were the same event. They are two
+    different quantities and nothing had measured that they coincide — while the claim
+    was load-bearing, since "within-season" is exactly what distinguishes this from the
+    beyond-horizon tiling/reset artefact the decomposer calibration documents. Measured
+    here by **horizon truncation**, which needs no internal API: the run is
+    deterministic, so the smallest horizon that rations IS the firing step. They do
+    coincide — and the reason is worth having: at step 502 the pool is in free fall
+    (0.727 -> 0.504 -> 0.222 -> 0.009 over four steps), so **the trough is the value the
+    backstop CLAMPED to**, not one the dynamics reached on their own. The argmin is
+    downstream of the firing, which is why reading the firing off it was circular.
+    """
+    frozen, r_frozen, _ = _run(
+        sc.PERENNIAL_CHAMBER_SCENARIO, sc.PERENNIAL_CHAMBER_YEARS, resets=True
+    )
+    stem0, r_stem0, _ = _run(
+        sc.PERENNIAL_CHAMBER_SCENARIO,
+        sc.PERENNIAL_CHAMBER_YEARS,
+        resets=True,
+        stem_zero=True,
+    )
+    assert r_frozen == 0
+    assert r_stem0 == 1, r_stem0
+
+    year_len = len(_weather())
+    fires_at = year_len * 1 + _STEM_RATIONED_YEAR_1_DAY  # year 1, day 197 => step 502
+
+    def rationed_within(n_steps: int) -> int:
+        w = _weather(sc.PERENNIAL_CHAMBER_YEARS)
+        state, registry = build_season(sc.PERENNIAL_CHAMBER_SCENARIO)
+        registry = _stem_zero(registry, state)
+        return run_perennial(
+            EulerIntegrator(registry),
+            state,
+            sc.PERENNIAL_CHAMBER_SCENARIO,
+            weather_resolver(w, sc.PERENNIAL_CHAMBER_SCENARIO),
+            1.0,
+            n_steps,
+            year=year_len,
+        )[1]
+
+    # The firing step, bracketed directly: clean one step earlier, rationed at it.
+    assert rationed_within(fires_at - 1) == 0, fires_at
+    assert rationed_within(fires_at) == 1, fires_at
+    # …and it is a WITHIN-SEASON event, nowhere near the 1525-step horizon edge.
+    assert fires_at == 502 and fires_at < 0.4 * (year_len * sc.PERENNIAL_CHAMBER_YEARS)
+
+    # Only now is it licensed to say the CO2 trough and the firing are the same event.
+    co2 = [s.stocks[CARBON_POOL].amount for s in stem0]
+    assert min(range(len(co2)), key=lambda i: co2[i]) == fires_at
+    assert co2[fires_at] == pytest.approx(0.008674, rel=1e-3)
+    # The clamp, not a soft landing: the pool is in free fall entering that step.
+    assert co2[fires_at - 3] > 0.7 and co2[fires_at - 1] < 0.23
+    assert co2[fires_at + 1] > co2[fires_at]  # and it recovers immediately after
+    assert min(s.stocks[CARBON_POOL].amount for s in frozen) == pytest.approx(
+        0.038734, rel=1e-3
+    )
+
+
+def test_stem_only_collapses_the_decade_co2_attractor_below_its_floor() -> None:
+    """The second, independent closure failure: the settled attractor, not a transient.
+
+    ``test_decade_stability.test_decade_min_carbon_pool_stationary`` pins the per-year
+    CO2 minimum past the sow-in transient above a 0.05 floor. The frozen tree settles at
+    **0.05484** (min past the transient 0.054208 — reproduced here, and validated
+    against that test's own comment, "dips to ~0.039 … settling to ~0.055", before it
+    was trusted: finding 10's rule). Stem-only settles at **0.01619**, missing the floor
+    by 3.4x.
+
+    ⚠ And it does so while STAYING STATIONARY — a clean attractor in the wrong place.
+    That is a different failure mode from the combined (C) form, which lost stationarity
+    and wandered 0.006-0.027. A stationarity check alone would have passed this; the
+    level check is what catches it, which is precisely the "alive" guard
+    ``is_stationary`` is documented to be blind to. Both halves are asserted, so a
+    future change that swapped which guard fires would go red.
+    """
+    year_len = len(_weather())
+    out = {}
+    for label, kw in (("frozen", {}), ("stem0", {"stem_zero": True})):
+        states, _r, _ = _run(
+            sc.PERENNIAL_CHAMBER_SCENARIO,
+            LONG_HORIZON_YEARS,
+            resets=True,
+            **kw,  # type: ignore[arg-type]
+        )
+        summaries = year_summaries(
+            states, year_len, lambda seg: min(s.stocks[CARBON_POOL].amount for s in seg)
+        )
+        scale = max(summaries)
+        out[label] = (
+            summaries,
+            non_collapsing(summaries[2:], floor=0.05),
+            is_stationary(
+                same_phase_diffs(summaries, period=2),
+                bound=0.2 * scale,
+                slope_tol=0.02 * scale,
+                transient=2,
+            ),
+        )
+    # The frozen baseline reproduces the committed test's own numbers AND its comment.
+    assert out["frozen"][0][1] == pytest.approx(0.03873, rel=1e-3)  # "dips to ~0.039"
+    assert out["frozen"][0][-1] == pytest.approx(0.05484, rel=1e-3)  # "…to ~0.055"
+    assert out["frozen"][1] is True and out["frozen"][2] is True
+    # …and stem-only settles 3.4x too low while remaining perfectly stationary.
+    assert out["stem0"][0][-1] == pytest.approx(0.01619, rel=1e-3)
+    assert min(out["stem0"][0][2:]) == pytest.approx(0.015607, rel=1e-3)
+    assert out["stem0"][1] is False, "the floor guard must be what catches this"
+    assert out["stem0"][2] is True, "…and stationarity must NOT be what catches it"
+
+
+def test_RK4_survives_stem_only_which_INVERTS_the_pattern_C_established() -> None:
+    """⚠ The mirror of section 5: a single-integrator screen is never enough.
+
+    (C): Euler reported ``rationed == 0`` and RK4 hard-errored — "Euler reading clean is
+    the trap". Stem-only is the **opposite**: Euler rations, RK4 is clean to a 15-year
+    horizon with its CO2 minimum essentially unmoved (0.075815 -> 0.075893). So RK4
+    reading clean is equally a trap, and here the frozen reference integrator is the one
+    that catches the problem.
+
+    The generalisation: the two integrators disagree about which forms are safe **in
+    both directions**, so neither screens for the other. What makes Euler decisive here
+    is not that it is stricter — it is that the biosphere is FROZEN at Euler/dt=1, so
+    Euler is the configuration the contract is about.
+    """
+    for years in (sc.PERENNIAL_CHAMBER_YEARS, LONG_HORIZON_YEARS):
+        for kw in ({}, {"stem_zero": True}):
+            states, rationed, _ = _run(
+                sc.PERENNIAL_CHAMBER_SCENARIO,
+                years,
+                resets=True,
+                integrator=Rk4Integrator,
+                **kw,  # type: ignore[arg-type]
+            )
+            assert rationed == 0, (years, kw)
+            if years == LONG_HORIZON_YEARS:
+                lo = min(s.stocks[CARBON_POOL].amount for s in states)
+                assert lo == pytest.approx(0.0758, rel=1e-2), (kw, lo)
+
+
+def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went() -> (
+    None
+):
+    """⚠ THE MECHANISM — and my first hypothesis was wrong, which is why it is here.
+
+    I predicted LITTER STARVATION: stem carbon that never sheds never reaches
+    ``litter_carbon``, so less CO2 is returned. The pools refute it — the litter pool's
+    mean falls ~13 % and peak ``microbial_carbon`` 0.5 %, against a 55 % fall in the CO2
+    minimum. The recycling is not starved.
+
+    What actually happens is a STANDING STOCK. A sealed chamber's carbon inventory is
+    fixed (measured: identical to <1e-9 between the two runs), so the CO2 trough is
+    whatever the other pools are not holding; and a pool's equilibrium size scales as
+    1/(loss rate), so zeroing that rate makes the stem a one-way sink within a season
+    and every other pool funds it. At ``sealed_chamber``'s trough, standing tissue is
+    **+0.1179 mol C**, drawn ~67 % from the soil pools (litter -0.0627, microbial
+    -0.0160) and ~33 % from the atmosphere (-0.0392).
+
+    That is why ``open_season`` grows while the chambers choke on the same change: the
+    open field draws on an unbounded CO2 reservoir and the chamber pays immediately.
+    Scope (A)'s finding 11 from the other direction — a field-scale improvement is not a
+    chamber-scale one.
+    """
+    soil_pools = ("litter_carbon", "microbial_carbon")
+    snaps = {}
+    for label, kw in (("frozen", {}), ("stem0", {"stem_zero": True})):
+        states, _r, _ = _run(
+            sc.SEALED_CHAMBER_SCENARIO,
+            sc.SEALED_CHAMBER_YEARS,
+            **kw,  # type: ignore[arg-type]
+        )
+        co2 = [s.stocks[CARBON_POOL].amount for s in states]
+        lo = min(range(len(co2)), key=lambda i: co2[i])
+        st = states[lo]
+        by_short = {
+            str(sid).rsplit(".", 1)[-1]: s.amount for sid, s in st.stocks.items()
+        }
+        snaps[label] = {
+            "step": lo,
+            "co2": co2[lo],
+            "tissue": st.stocks[LEAF_C].amount
+            + st.stocks[STEM_C].amount
+            + st.stocks[ROOT_C].amount
+            + st.stocks[STORAGE_C].amount,
+            "soil": sum(by_short.get(p, 0.0) for p in soil_pools),
+        }
+    b, n = snaps["frozen"], snaps["stem0"]
+    assert b["step"] == n["step"] == 196, (b["step"], n["step"])
+    # The inventory is closed: what one group gained, the others lost, exactly.
+    total_b = b["co2"] + b["tissue"] + b["soil"]
+    total_n = n["co2"] + n["tissue"] + n["soil"]
+    assert abs(total_n - total_b) < 1e-9, (total_b, total_n)
+    assert total_b == pytest.approx(3.517, rel=1e-6)
+    d_tissue = n["tissue"] - b["tissue"]
+    d_soil = n["soil"] - b["soil"]
+    d_co2 = n["co2"] - b["co2"]
+    assert d_tissue == pytest.approx(0.11790, rel=2e-3), d_tissue
+    assert d_soil == pytest.approx(-0.07868, rel=2e-3), d_soil
+    assert d_co2 == pytest.approx(-0.03922, rel=2e-3), d_co2
+    assert abs(d_tissue + d_soil + d_co2) < 1e-9
+    # …and it is NOT a starvation story: the return-side pools move far less than CO2.
+    assert abs(d_soil) / b["soil"] < 0.06, d_soil  # ~5 % off the soil pools
+    assert abs(d_co2) / b["co2"] > 0.50, d_co2  # >50 % off the CO2 trough

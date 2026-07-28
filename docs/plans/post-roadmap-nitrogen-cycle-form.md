@@ -886,6 +886,11 @@ digits satisfy both halves simultaneously: DS 1.0→1.5 at mean 0.015/day gives
   blowing up LAI, so C-finding 5's blocker may simply not apply to it. It would still be
   a carbon change moving every golden, and it is still not built; but "(C) is refused"
   must not be read as "stem-only was evaluated and refused". It was not evaluated.
+  ⚠⚠ **EVALUATED 2026-07-28 — see C-finding 8. Both halves of "it shrinks the plant
+  rather than blowing up LAI" are false**, and the branch is now priced and refused on a
+  measurement rather than left open. The paragraph above is kept as written because the
+  way it is wrong is the finding: it is a *prediction* in the grammar of a measurement,
+  in the same file family as every other instance of that shape.
   ⚠ Also scope the quote itself: [A] says it while describing the **mechanistic**
   variant, and *"except for their reserves"* concedes stem reserve mobilization, which
   our single `stem_c` pool cannot express separately. The honest reading is "no
@@ -1026,6 +1031,107 @@ frozen output is the consumer-chamber-2× / DPM-RPM-labile / ruling-B shape. If 
 ever built, its table must come from a source, and the chambers must be shown to
 survive it — not the other way round.
 
+### C-finding 8 — STEM-ONLY, measured 2026-07-28: the last unpriced branch, now priced and REFUSED
+
+C-finding 2 recorded stem-only as **unpriced, not priced-and-rejected**, and left a
+prediction behind: *"it shrinks the plant rather than blowing up LAI, so C-finding 5's
+blocker may simply not apply to it."* Measured end-to-end (read-only probes in
+`M:/claud_projects/temp/stem_only/`; 9 pins in `tests/test_senescence_form.py` §7).
+The change is exactly one number — `rdr_stem` 0.005 → 0.0/day, leaf and root keeping
+their frozen flat rates — i.e. (C)'s **existence** claim in isolation, not the DVS form.
+
+**⚠ Both halves of the prediction are false, and the branch dies on the one blocker that
+was still standing.**
+
+**1. It GROWS the plant.** `rdr_stem` is a loss term; removing it retains stem carbon.
+`open_season` peak W (Greenwood's basis) **12.633 → 13.639 t/ha, +7.96 %**. The
+prediction was not baseless — three of the four organs really do shrink — but it named
+the whole plant for the behaviour of the majority of its organs while the one dissenting
+term dominates.
+
+**2. The per-organ split names the mechanism, and it is "stem up, grain down".** Stem
+peak **+23.4 %**; leaf **−3.96 %**, root **−3.91 %**, storage **−3.97 %**. Three organs
+on three different DVS-keyed partition fractions falling by the same fraction to a tenth
+of a percentage point is not coincidence: the partition table is untouched, so a uniform
+haircut says the *stream being partitioned* shrank. Measured cause: a bigger **standing**
+stem costs more to maintain (`maintenance_coef` 0.02/day on live tissue) — the integral
+of standing live tissue rises 3.08 % on `open_season`, ~+1.49 mol C of maintenance
+respiration against a 0.89 mol C fall in final storage. So the plant ends up **bigger and
+worse**. ⚠ And the branch would **open** a form gap rather than close one: our single
+`stem_c` pool cannot express [A]'s own *"except for their **reserves**"*, so a zero death
+rate makes the stem strictly one-way — the scope caveat C-finding 2 already attached to
+the quote, now with a cost attached to it.
+
+**3. The two tripwires move in OPPOSITE directions.** W moves **toward** the Greenwood
+crossing (0.876 → **0.946** of 14.4248 t/ha — the margin more than halves, 12.4 % → 5.4 %,
+without crossing) while peak LAI moves **away** from the V-K&S threshold (5.191 → 4.985,
+0.865 → **0.831** of 6). One single-number change pushes a *mass* margin and a *leaf-area*
+margin in opposite directions at once, so there is no scalar "how close are we". The
+canopy-regulator work flagged conflating those two as an ambiguity that has bitten this
+repo twice; this is the sharpest available demonstration that they are different
+quantities.
+
+**4. ⚠ THE BLOCKING RESULT: `perennial` rations under EULER.** `rationed 0 → 1` at
+`dt = 1`, the **frozen reference configuration**, firing at **step 502 (year 1, day
+197)** — a *within-season* effect, not a horizon artefact — where the CO₂ pool bottoms at
+**0.008674** against the frozen **0.038734**. One firing is a hard break,
+not a drift: the goldens assert `rationed == 0`, `authoring.run_scenario` raises
+`RationedError`, and the biosphere is frozen at Euler. **Independently**, the decade
+per-year CO₂ attractor collapses **0.05484 → 0.01619** against the committed 0.05 floor
+(3.4× too low) — and does so **while remaining perfectly stationary**, a clean attractor
+in the wrong place, so the *level* guard catches it and a stationarity check alone would
+have passed it.
+
+> ⚠ **The firing step is MEASURED, and the first version of this finding inferred it.**
+> My draft read the location off the **CO₂ argmin** and reported it as the rationing
+> location — two different quantities, with nothing measuring that they coincide, under a
+> constant *named* for the rationing step. Advisor catch. It was load-bearing:
+> "within-season" is precisely what separates this from the beyond-horizon tiling/reset
+> artefact the decomposer calibration documents, so the one word carrying the argument
+> rested on an unchecked identification. Re-measured by **horizon truncation** (the run
+> is deterministic, so the smallest horizon that rations *is* the firing step): they do
+> coincide, at step 502. **And the reason makes the inference circular rather than merely
+> unverified** — entering step 502 the pool is in free fall (0.727 → 0.504 → 0.222 →
+> 0.009 over four steps), so the trough is *the value the backstop clamped to*. The
+> argmin is **downstream of** the firing; reading one off the other could not have failed,
+> which is exactly why it was no evidence. Both are now asserted separately.
+
+⇒ **So stem-only IS separable from the canopy problem and is NOT separable from the
+closure problem** — and after the canopy regulator discharged branch 2, closure is the
+only branch of (C)'s refusal still standing. Separating from a discharged blocker buys
+nothing.
+
+**5. ⚠ THE INTEGRATOR PATTERN INVERTS.** C-finding 6's lesson was *"Euler reads clean and
+that is the trap"* — the combined form reported `rationed == 0` under Euler and
+hard-errored under RK4. Stem-only is the **mirror**: Euler rations, and **RK4 survives to
+a 15-year horizon** with its CO₂ minimum essentially unmoved (0.075815 → 0.075893). So
+**RK4 reading clean is equally a trap**, and here the frozen reference integrator is the
+one that catches the problem. The generalisation: the two integrators disagree about
+which forms are safe **in both directions**, so neither screens for the other. What makes
+Euler decisive is not that it is stricter — it is that the contract is *about* Euler.
+
+**6. THE MECHANISM is a STANDING STOCK, and my first hypothesis for it was wrong.** I
+predicted **litter starvation**: stem carbon that never sheds never reaches
+`litter_carbon`, so less CO₂ is returned. The pools refute it — the litter pool's mean
+falls ~13 % and peak `microbial_carbon` 0.5 %, against a **55 %** fall in the CO₂ minimum.
+The recycling is not starved. What actually happens: a sealed chamber's carbon inventory
+is **fixed** (measured identical to <1e-9 between the two runs, 3.517000 mol C), so the
+CO₂ trough is whatever the other pools are not holding; a pool's equilibrium size scales
+as **1/(loss rate)**, so zeroing that rate makes the stem a one-way sink within a season
+and every other pool funds it. At `sealed_chamber`'s trough, standing tissue is
+**+0.1179 mol C**, drawn **~67 % from the soil pools** (litter −0.0627, microbial −0.0160)
+and **~33 % from the atmosphere** (−0.0392).
+
+**That is why the open field grows on the same change the chamber chokes on**: the field
+draws on an unbounded CO₂ reservoir and the chamber pays immediately. Scope (A)'s finding
+11 from the other side — *making the plant more faithful does not make the CHAMBER
+faithful* — and the third independent arrival at the same wall.
+
+**Not measured, and stated rather than assumed:** `sealed_station` (the station contract)
+was not run, because the biosphere gate fails first and the cascade is moot. That is an
+**unmeasured** leg, not a clean one — the precise shape of the debt this finding exists to
+discharge, so it is not created again silently.
+
 ### THE PRICE, and why (C) is blocked on a missing science rather than on effort
 
 (C) is a full biosphere **and** station unfreeze — a carbon change moves *every* golden,
@@ -1078,6 +1184,25 @@ without a fitted table. Left as a user call; nothing here is built.
 > measured *identical* with the regulator in place, and "requires a fitted calibration"
 > stays refused. The escape route is now closed **by measurement rather than by
 > absence**, which is a strictly better place to be blocked.
+
+> ⚠ **AND THE LAST UNPRICED BRANCH WAS PRICED 2026-07-28 — C-finding 8.** The bullet list
+> above says (C) as specified "breaks `perennial`", and C-finding 2 had carved out
+> stem-only as possibly exempt. It is not: zeroing `rdr_stem` alone takes `perennial` to
+> `rationed = 1` **under Euler** — the frozen configuration — and collapses the decade CO₂
+> attractor 0.05484 → 0.01619 against its 0.05 floor. It **is** exempt from the canopy
+> blocker (peak LAI *falls*), which is exactly the branch the regulator had already
+> discharged, so the exemption is worth nothing.
+>
+> With that, **all three branches of the refusal have been examined rather than assumed**:
+> branch 2 discharged by measurement (the regulator exists and works), branch 3 still
+> refused on principle (a calibration targeting only our own goldens), and branch 1 —
+> `perennial`'s closure — **now measured to catch the full form, the regulator-assisted
+> form, AND the smallest separable piece**. (C) is refused on evidence in every part.
+>
+> The residual is a *positive* one and it is C-finding 8's mechanism: closure fails
+> because a sealed chamber's carbon inventory is fixed and any change that parks carbon in
+> a standing pool is paid for out of the CO₂ trough. That is a statement about the
+> **chamber**, not about senescence — which is where a successor would have to start.
 
 ## Cost of the cascade (any of A–D)
 
