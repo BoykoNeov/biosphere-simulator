@@ -9,7 +9,7 @@ suite takes and how much of the machine it takes while doing it. The sibling doc
 ```
 uv run pytest                 # everything (slow tier included — `slow` is opt-OUT)
 uv run pytest -m "not slow"   # the fast loop
-uv run pytest -n 12           # parallel; --dist loadgroup is turned on for you
+uv run pytest -n 12           # parallel (xdist's default --dist load)
 uv run pytest -n auto         # one worker per logical core (16 here)
 SIMTEST_PRIORITY=normal uv run pytest    # run at normal priority
 SIMTEST_PRIORITY=idle   uv run pytest    # yield harder than below-normal
@@ -50,29 +50,54 @@ marshalled the pointer-sized pseudo-handle as a 32-bit `int` — and the suite r
 normal priority with every test green. That is why the mechanism has pins rather than
 a comment.
 
-## Why `--dist loadgroup`, and the two groups
+## Worker distribution: `load`, and a negative result worth keeping
 
-`-n` without a `--dist` flag selects `loadgroup` (an explicit `--dist` is always
-honoured). Two groups exist, both about **cost**, neither about balance:
+`-n` uses xdist's own default, `--dist load` (per-test balance). Nothing in this repo
+overrides it, and the reason is a **design that was built, measured, and removed**.
 
-| Group | Members | Why |
-|---|---|---|
-| `crossport` | everything under `tests/crossport/` | each test shells out to `cargo run --example`, and cargo takes an **exclusive** lock on `target/`. Spreading them across workers does not corrupt anything, it *blocks* — measured 41.6 s pinned to one worker against 51.3 s at `-n 8`. Pinned is both faster and the only arrangement that does not burn eight cores waiting on a lock. |
-| `sealed_tier2` | the two consumers of the session-scoped `sealed_tier2_run` fixture | session scope under xdist is **per worker**, and the two consumers live in *different files* — so file affinity would not be enough either. Without the group the ~3-minute Tier-2 run is computed twice. |
+The removed design forced `--dist loadgroup` under `-n` and assigned `xdist_group`
+markers from `pytest_collection_modifyitems`, to pin two things to single workers:
+`tests/crossport/` (cargo's `target/` lock is exclusive — 41.6 s pinned against 51.3 s
+at `-n 8`, so spreading them out is *slower*, not merely wasteful) and the six
+consumers of the session-scoped `sealed_tier2_run` fixture (session scope is **per
+worker** under xdist, so the ~5-minute Tier-2 run is otherwise recomputed).
 
-Everything else is left unmarked, and that is free rather than a compromise:
-`LoadGroupScheduling._split_scope` collapses a scope only for nodeids carrying an
-`@group` suffix and returns the **full nodeid** otherwise, so an unmarked test is its
-own scope and `loadgroup` balances it per-test exactly as `load` would.
+Both halves are false, and neither is visible from a green suite:
 
-A third group — every remaining item grouped by its file, i.e. `--dist loadfile`
-semantics, so this suite's ~30 module-scoped scenario fixtures are not recomputed on
-each worker receiving one of their tests — is **rejected**: it would demote ~1900
-tests from per-test to per-file balance to save fixture work in the tail.
+1. **A group assigned by a collection hook is silently dropped.** xdist stamps the
+   `@group` suffix onto the nodeid — the thing its scheduler actually reads
+   (`xdist/remote.py`) — *before* this suite's `pytest_collection_modifyitems` runs.
+   Measured on a synthetic 4-file suite sharing one session fixture: with the marker
+   assigned by a hook the fixture was computed in **4 processes**; with the documented
+   in-file `pytestmark = pytest.mark.xdist_group("g")` it collapsed to **1**.
+2. **`loadgroup` is the wrong mode for a mostly-ungrouped suite.** It is
+   `LoadScopeScheduling`, dispatching one *scope* at a time; with most tests ungrouped
+   every test becomes its own scope. Same 8-test probe: **10.0 s** against `load`'s
+   **1.07 s**, and on this suite's fast loop **~202 s against ~94 s**.
+
+The measurement that exposed (1) is worth repeating on any future attempt: give a
+session-scoped fixture a side effect keyed by `os.getpid()`, and **count the
+processes**. "The suite passed" and "the grouping worked" are unrelated statements.
+
+### What `load` therefore leaves on the table
+
+* `tests/crossport/` self-serializes on cargo's lock — correct, just with workers idle
+  against it. It is the floor under any parallel run of the fast loop.
+* **`sealed_tier2_run` is recomputed per worker**, because session scope is per
+  process. Measured at `-n 12`: **two** setups of ~240 s under the shipped `load`
+  default, and **four** of ~305 s under the removed `loadgroup` one. So the slow tier
+  gains less than the fast loop does — parallelism cannot amortize a per-process
+  fixture, it can only stop making it worse.
+
+Fixing that properly means either declaring the group in-file (`pytestmark` in both
+`test_sealed_station_stability.py` and `test_regression_sealed_station.py`) and paying
+`loadgroup`'s scheduling cost for the whole suite, or caching the Tier-2 trajectory to
+disk — which introduces a stale-artifact hazard into the one run that gates a frozen
+golden. Neither is taken here; both are recorded rather than rediscovered.
 
 ## Hypothesis deadlines are off
 
-Parallelising the suite turned a latent flake into a reproducible failure:
+Parallelising the suite produced a failure that has nothing to do with the code:
 
 ```
 test_biosphere_demo.py::test_demo_run_is_registration_order_independent[Rk4Integrator]
@@ -87,26 +112,42 @@ This is not weakening a gate. No property in this repo is about *speed* — they
 conservation, non-negativity and order-independence laws; performance is tracked
 separately and non-gatingly by `bench/perf.py`. A per-example timer measures the
 machine's spare capacity, which is exactly the quantity the parallel loop and the
-priority drop deliberately vary. It was also already near the edge serially: the RK4
-examples sit within ~2x of the default, so this was a flake waiting for a busy
-afternoon.
+priority drop deliberately vary.
 
-## Measurements, and why only two of them are quoted
+⚠ **A first draft of this section added "and it was already near the edge serially —
+the RK4 examples sit within ~2x of the default". That is false, and it was an
+inference, not a measurement.** 441 ms is a *loaded-machine* number; scaling it by an
+assumed contention factor to land near 200 ms is the shape this repo keeps catching —
+a figure from one condition written as a property of the code. Measured instead:
+serially at normal priority, that test's entire call (every example) takes **0.10 s**,
+~17 ms per example, **over 10x clear** of the deadline.
 
-Machine: 16 logical cores, Windows 11, Python 3.13.
+The correction strengthens the decision rather than undermining it: the deadline fires
+on *contention alone*, so it was never measuring the test. The default is kept
+available under a name so this stays checkable rather than becoming folklore:
+
+```
+uv run pytest --hypothesis-profile=strict-deadline
+```
+
+## Measurements
+
+Machine: 16 logical cores, Windows 11, Python 3.13. Rows are only comparable **within**
+a matched pair — see the warning below.
 
 | Run | Wall clock | Speed-up |
 |---|---|---|
-| `-m "not slow"`, serial — quiet machine | 270.4 s | — |
-| `-m "not slow"`, `-n 12` — quiet machine | 94.1 s | **2.9x** |
-| `-m "not slow"`, serial — contended machine | 530.3 s | — |
-| `-m "not slow"`, `-n 12` — contended machine | 178.0 s | **3.0x** |
+| fast loop (`-m "not slow"`), serial | 167.6 s | — |
+| fast loop, `-n 12` | **51.1 s** | **3.3x** |
+| full suite (slow tier included), `-n 12` | **273.4 s** | vs `~9 min` serial as documented |
+| full suite, `-n 12`, under the *removed* `loadgroup` design | 613.7 s | — |
 | `tests/crossport` alone, serial (rust pre-built) | 41.6 s (96 tests) | — |
 | `tests/crossport` alone, `-n 8` | 51.3 s | **0.8x** |
+| earlier matched pair, before `loadgroup` was removed | 270.4 s → 94.1 s | 2.9x |
 
-The two pairs are each **back-to-back on the same machine state**, which is the only
-reason they can be compared at all — the absolute numbers differ by ~2x between the
-pairs while the ratio does not.
+The full-suite rows are the ones that justify having chased the distribution mode:
+dropping `loadgroup` **halved** the full run, and took the Tier-2 fixture from four
+recomputations to two.
 
 ⚠ **Wall-clock numbers taken across different machine states are discarded, not
 reported.** Re-runs of identical commands came back at 197 s, 202 s and 310 s —
@@ -114,28 +155,26 @@ including one *slower than serial* — and the cause was found rather than assum
 unrelated jobs (another project's `pytest -n 4`, whose orphaned workers each held
 ~620 s of CPU, plus a long-running census script and Windows Defender at ~2600 s) were
 saturating the box. A wall-clock number from a contended machine measures the
-contention.
-
-So the honest statement is **~3x at `-n 12` on a 16-core box, reproduced across two
-machine states** — not a scaling law, and well short of 12x, because the `crossport`
-group is a serial floor under any parallel run.
+contention. Two separate matched pairs give 3.3x and 2.9x while their absolute numbers
+differ by ~1.6x — quote the ratio, and only from a back-to-back pair.
 
 ## Serial and parallel agree on outcomes, not just on colour
 
 "Both runs were green" is not the check this repo needs — the goldens are the point.
-Verified on the fast loop, serial vs `-n 12`, JUnit XML from each compared by test id:
+Verified on the fast loop as a matched pair, serial vs `-n 12`, JUnit XML from each
+compared by test id:
 
-* **2005 test ids in both**, identical sets, **zero outcome differences**;
+* **2003 test ids in both**, identical sets, **zero outcome differences**;
 * `git status --porcelain` identical before and after both runs — nothing regenerated
   a committed artifact into an order-dependent value.
 
-Worth re-running after any change to the grouping or worker count.
+Worth re-running after any change to the distribution mode or worker count.
 
 ## The remaining lever, priced but not taken
 
 `tests/crossport/` spends ~0.43 s per test, most of it `cargo run` overhead re-checking
-freshness on an already-built workspace, and it is the critical path of any parallel
-run. Invoking the pre-built example binaries directly
+freshness on an already-built workspace, and it is the floor under any parallel fast
+loop. Invoking the pre-built example binaries directly
 (`rust/target/debug/examples/*.exe`) would remove both the overhead and the lock — but
 it means changing how ~12 files in the cross-port *contract's* harness invoke the port,
 and it trades cargo's freshness check for a stale-binary hazard that nothing would

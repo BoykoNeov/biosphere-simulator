@@ -17,17 +17,16 @@ Three concerns live here:
    by ``bench/perf.py``, a separate script, and is explicitly NON-GATING), so this
    cannot change a result. Opt out with ``SIMTEST_PRIORITY=normal``.
 
-3. **xdist work grouping.** The parallel loop needs ``--dist loadgroup`` to be correct,
-   not merely fast — see :func:`pytest_collection_modifyitems` for the two groups that
-   are about correctness/cost rather than balance.
+3. **A recorded negative result about xdist grouping**, in :func:`pytest_configure`:
+   worker affinity via ``xdist_group`` cannot be assigned from a collection hook, and
+   ``--dist loadgroup`` is the wrong mode for a suite that is mostly ungrouped. Kept
+   as a comment because both halves look obviously right and were measured false.
 """
 
 from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
-from typing import Protocol
 
 import pytest
 from hypothesis import HealthCheck, settings
@@ -38,10 +37,17 @@ from hypothesis import HealthCheck, settings
 
 # Hypothesis's default `deadline=200ms` is a **wall-clock** assertion, and this
 # suite's property tests each build and run a whole scenario — `test_biosphere_demo
-# ::test_demo_run_is_registration_order_independent[Rk4Integrator]` measures ~440ms
-# per example on a machine running 12 test workers. It is a latent flake serially
-# too (the RK4 examples already sit within ~2x of the default), and it became a
-# reproducible failure the moment the suite was parallelized.
+# ::test_demo_run_is_registration_order_independent[Rk4Integrator]` measured ~440ms
+# for a single example on a machine running 12 test workers, and failed.
+#
+# ⚠ The margin is NOT thin, and an earlier draft of this comment claimed it was
+# ("a latent flake serially too, within ~2x of the default") — an inference from
+# the 440ms, which is a *loaded-machine* number, dressed as a property of the test.
+# Measured serially at normal priority, that test's whole call — every example —
+# takes **0.10s**, i.e. ~17ms per example, over 10x clear of the deadline. So the
+# deadline fires on *contention alone*, which does not weaken the case for
+# deselecting it — it is the case. Re-check with
+# `pytest --hypothesis-profile=strict-deadline`.
 #
 # Deselecting the deadline is not weakening a gate: no property in this repo is
 # about *speed* — they are conservation, non-negativity and order-independence laws,
@@ -58,6 +64,10 @@ settings.register_profile(
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow],
 )
+# The default kept available under a name, so the claim "these tests would trip the
+# 200ms deadline" stays *checkable* instead of becoming folklore once the profile
+# above hides it: `uv run pytest --hypothesis-profile=strict-deadline`.
+settings.register_profile("strict-deadline", deadline=200)
 settings.load_profile("simsuite")
 
 # --------------------------------------------------------------------------- #
@@ -128,22 +138,24 @@ def pytest_configure(config: pytest.Config) -> None:
     if not hasattr(config, "workerinput"):
         config.stash[_PRIORITY_STASH] = status
 
-    # `--dist loadgroup` is what makes the xdist_group markers assigned below take
-    # effect. Without it, `-n auto` silently (a) scatters tests/crossport/ across
-    # workers, where they contend on cargo's exclusive `target/` lock and run
-    # *slower* than serial (measured: 96 tests, 41.6s serial vs 51.3s at -n 8), and
-    # (b) splits the two `sealed_tier2_run` consumers across workers, paying that
-    # ~3-minute run twice. So default it on whenever the user asks for workers, but
-    # never override an explicitly-passed --dist.
-    explicit_dist = any(
-        arg == "-d" or arg.startswith("--dist") for arg in config.invocation_params.args
-    )
-    if (
-        getattr(config.option, "numprocesses", None)
-        and not explicit_dist
-        and getattr(config.option, "dist", "no") in ("no", "load")
-    ):
-        config.option.dist = "loadgroup"
+    # NOTE: `--dist` is deliberately NOT overridden here. An earlier version of this
+    # file forced `loadgroup` under `-n` so that xdist_group markers assigned in
+    # `pytest_collection_modifyitems` would pin `tests/crossport/` and the
+    # `sealed_tier2_run` consumers to single workers. Both halves were measured false:
+    #
+    #  * A marker added by a *collection hook* never takes effect. xdist applies the
+    #    `@group` nodeid suffix its scheduler reads in `xdist/remote.py`, and that runs
+    #    before this conftest's hook — so the group is silently dropped. Verified with
+    #    a synthetic 4-file suite sharing one session fixture: hook-assigned markers
+    #    left the fixture computed in **4 processes**, the documented in-file
+    #    `pytestmark = pytest.mark.xdist_group(...)` collapsed it to **1**.
+    #  * `loadgroup` is `LoadScopeScheduling`, which dispatches per *scope*. With most
+    #    of a suite ungrouped every test is its own scope, and the scheduler is far
+    #    slower than `load`'s per-test dispatch — 10.0s vs 1.07s on that same 8-test
+    #    probe, and ~202s vs ~94s on this suite's fast loop.
+    #
+    # xdist's own default under `-n` is `load`, which is the right one here. See
+    # docs/test-suite-runtime.md for what that leaves on the table.
 
 
 def pytest_report_header(config: pytest.Config) -> list[str]:
@@ -155,68 +167,10 @@ def pytest_report_header(config: pytest.Config) -> list[str]:
 # Collection hooks                                                            #
 # --------------------------------------------------------------------------- #
 
-_CROSSPORT_DIR = Path(__file__).parent / "crossport"
-
-
-class _Groupable(Protocol):
-    """The two attributes :func:`_xdist_group` reads off a collected item.
-
-    Narrower than ``pytest.Item`` on purpose: ``fixturenames`` lives on ``Function``,
-    not ``Item``, and typing the parameter by what is actually read lets the pins in
-    ``tests/test_suite_runtime.py`` call it with a stub instead of constructing a real
-    collection node.
-    """
-
-    @property
-    def path(self) -> Path: ...
-
-
-def _xdist_group(item: _Groupable) -> str | None:
-    """The xdist worker-affinity group for ``item``, or ``None`` to load-balance it.
-
-    Exactly two groups exist, and both are about **correctness or cost, never
-    balance** — the rest of the suite is left free to load-balance:
-
-    * ``crossport`` — every test under ``tests/crossport/`` shells out to
-      ``cargo run --example``, and cargo takes an exclusive lock on ``target/``.
-      Spreading them across workers does not corrupt anything, it *blocks*: measured
-      41.6s pinned to one worker vs 51.3s at ``-n 8``. Pinned is both faster and the
-      only arrangement that does not burn 8 cores on a lock.
-    * ``sealed_tier2`` — the session-scoped ``sealed_tier2_run`` fixture (~3 min) is
-      shared by two *different files*, so file affinity would not be enough anyway.
-      Session scope is per-worker under xdist, so without this the run is paid twice.
-
-    Returning ``None`` is not a gap — it is the whole point, and it rests on a
-    *structural* fact about xdist rather than on a timing: ``LoadGroupScheduling``
-    only collapses a scope when the nodeid carries an ``@group`` suffix, and returns
-    the **full nodeid** otherwise (``xdist/scheduler/loadgroup.py``). So an unmarked
-    test is its own scope, i.e. ``--dist loadgroup`` load-balances per test exactly
-    like ``--dist load``, and marking the two special cases costs the rest of the
-    suite nothing.
-
-    A third, tempting group is therefore **rejected without needing a benchmark**:
-    grouping every remaining item by its file (reproducing ``--dist loadfile``, so
-    this suite's ~30 module-scoped scenario fixtures are not recomputed on each
-    worker that receives one of their tests) would replace per-test balance with
-    per-file balance for ~1900 tests, to save fixture work in the tail. It was tried
-    and read ~2x slower, but that measurement was taken while unrelated jobs were
-    saturating the machine and is **not** quoted as the reason.
-    """
-    if _CROSSPORT_DIR in Path(str(item.path)).parents:
-        return "crossport"
-    if "sealed_tier2_run" in getattr(item, "fixturenames", ()):
-        return "sealed_tier2"
-    return None
-
 
 def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> None:
-    for item in items:
-        group = _xdist_group(item)
-        if group is not None:
-            item.add_marker(pytest.mark.xdist_group(group))
-
     markexpr = config.getoption("markexpr") or ""
     # If the user named `oracle` in their expression at all, respect it verbatim
     # (`-m oracle` runs; `-m "not oracle"` deselects). Otherwise, opt-out by default.
@@ -244,9 +198,12 @@ def sealed_tier2_run():
     ``-m "not slow"`` loop never triggers it). Returns a
     :class:`sealed_tier2_helper.Tier2Run` (the day-boundary states + rationed + events).
 
-    Under xdist, session scope is **per worker** — the ``sealed_tier2`` xdist group in
-    :func:`_xdist_group` is what keeps both consumers on one worker so this stays a
-    single run.
+    ⚠ **Under xdist, "once per session" means once per WORKER.** Its six consumers
+    (four in the stability gate, two in the regression golden) load-balance across
+    workers, so a parallel run of the slow tier recomputes this several times —
+    measured as four ~305s setups in one ``-n 12`` full run. That is why parallelism
+    buys the slow tier much less than it buys the fast loop, and it is not fixable by
+    a marker: see the negative result in :func:`pytest_configure`.
     """
     from sealed_tier2_helper import run_tier2
 
