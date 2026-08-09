@@ -1,0 +1,969 @@
+"""Soil carbon pool fractionation (2026-08-10) — pinned as measurements, not a design.
+
+`docs/plans/post-roadmap-soil-fractionation.md`. The chamber-scale diagnosis's named
+seam, measured and turned down. Read-only: no scenario, param, golden or manifest is
+touched, and nothing here is imported by `src/`.
+
+The fractionated form does not exist in the tree, so it is assembled here the way
+`season.build_season` assembles the frozen one — including the aux processes, because
+the option-(B) probe's `Registry(flows, stocks)` dropped them and froze `thermal_time`
+at 0 with a clean control saying nothing.
+
+⚠ The RothC equilibrium table was read off a PAGE RENDER: `pdftotext -layout` detaches
+its label column and shifts the values three rows, filing `HUM 0.1533 / IOM 4.4852`.
+Test 1 is the arithmetic that authenticates the reading.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, replace
+from pathlib import Path
+
+import pytest
+
+from domains.biosphere.allocation import Senescence, senescence_flux
+from domains.biosphere.compartments import SOIL
+from domains.biosphere.decomposition import (
+    Decomposition,
+    DecompositionParams,
+    decomposition_flux,
+)
+from domains.biosphere.loader import (
+    MOLAR_MASS_CARBON_KG_PER_MOL,
+    load_nitrogen_params,
+    load_phenology_params,
+    load_senescence_params,
+)
+from domains.biosphere.mineralization import (
+    LitterNitrogenTransfer,
+    NitrogenSenescence,
+    carried_nitrogen,
+)
+from domains.biosphere.phenology import development_stage
+from domains.biosphere.scenario import (
+    CONSUMER_CHAMBER_SCENARIO,
+    DEFAULT_SCENARIO,
+    LONG_HORIZON_YEARS,
+    PERENNIAL_CHAMBER_SCENARIO,
+    PERENNIAL_CHAMBER_YEARS,
+    SEALED_CHAMBER_SCENARIO,
+    SEALED_CHAMBER_YEARS,
+    SeasonScenario,
+)
+from domains.biosphere.season import (
+    CARBON_POOL,
+    LEAF_C,
+    LITTER_CARBON,
+    LITTER_N,
+    MICROBIAL_CARBON,
+    PLANT_N,
+    ROOT_C,
+    STEM_C,
+    STORAGE_C,
+    THERMAL_TIME,
+    VERNALIZATION_DAYS,
+    build_season,
+    run_season,
+    weather_resolver,
+)
+from domains.biosphere.stocks import pool_stock
+from simcore.environment import Environment
+from simcore.flow import Flow, FlowResult, Leg
+from simcore.ids import FlowId, StockId
+from simcore.integrator import EulerIntegrator
+from simcore.quantities import Quantity, canonical_unit
+from simcore.registry import Registry
+from simcore.state import State, Stock
+
+# --- [RothC] Coleman & Jenkinson, RothC-26.3 guide, sources/RothC_guide_WIN.pdf -------
+#
+# section 1.5, p. 9 — "The decomposition rate constants (k), in years-1, for each
+# compartment are set at: DPM: 10.0 / RPM: 0.3 / BIO: 0.66 / HUM: 0.02".
+K_DPM_YR = 10.0
+K_RPM_YR = 0.3
+K_BIO_YR = 0.66
+K_HUM_YR = 0.02
+
+# section 1.3, p. 8 — "for most agricultural crops and improved grassland, we use a
+# DPM/RPM ratio of 1.44, i.e. 59% of the plant material is DPM and 41% is RPM".
+DPM_RPM_INPUT_RATIO = 1.44
+DPM_INPUT_FRACTION = DPM_RPM_INPUT_RATIO / (1.0 + DPM_RPM_INPUT_RATIO)
+
+# section 3.2, p. 40 — the Hoosfield unmanured-plot equilibrium state, 31 Dec 1851,
+# after 10,000 years at a 1.70 t C/ha/yr input. READ OFF THE PAGE RENDER.
+HOOSFIELD_T_C_HA = {
+    "DPM": 0.1533,
+    "RPM": 4.4852,
+    "BIO": 0.6671,
+    "HUM": 25.8576,
+    "IOM": 2.7000,
+}
+HOOSFIELD_STATED_TOTAL = 33.8632
+
+# 1 t C/ha = 1000 kg / 10000 m2 = 0.1 kg C/m2.
+T_C_HA_TO_MOL_M2 = 0.1 / MOLAR_MASS_CARBON_KG_PER_MOL
+
+# --- ours -----------------------------------------------------------------------------
+FROZEN_K_DAY = 0.011  # decomposition_rate
+FROZEN_K_YR = FROZEN_K_DAY * 365.0
+FROZEN_LITTER_SEED = 3.0  # litter_carbon0 in every sealed scenario
+
+K_DPM_DAY = K_DPM_YR / 365.0
+K_RPM_DAY = K_RPM_YR / 365.0
+K_HUM_DAY = K_HUM_YR / 365.0
+
+LITTER_RPM: StockId = StockId("biosphere.litter_rpm")
+LITTER_HUM: StockId = StockId("biosphere.litter_hum")
+
+_EQ_DPM = HOOSFIELD_T_C_HA["DPM"]
+_EQ_RPM = HOOSFIELD_T_C_HA["RPM"]
+EQ_DPM_STANDING_FRACTION = _EQ_DPM / (_EQ_DPM + _EQ_RPM)
+K_AGGREGATE_YR = (
+    EQ_DPM_STANDING_FRACTION * K_DPM_YR + (1.0 - EQ_DPM_STANDING_FRACTION) * K_RPM_YR
+)
+
+# The 0.05 decade CO2 liveness floor the biosphere manifest names for
+# `perennial_long_horizon`
+# (test_decade_stability.py::test_decade_min_carbon_pool_stationary).
+DECADE_CO2_FLOOR = 0.05
+
+_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+
+
+def _weather() -> list[dict[str, float | str]]:
+    return json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
+
+
+# --- the three flows a build would add or change --------------------------------------
+
+
+@dataclass(frozen=True)
+class SplitSenescence:
+    """`Senescence` with its single litter leg split DPM/RPM at the cited input ratio.
+
+    Delegates to the frozen flow, so the per-organ carbon is bit-identical and only the
+    litter leg's *destination* changes. Test 12 pins that it re-targets without
+    re-scaling — had it changed the total, every measurement in this module would be
+    wrong in a way nothing else here would catch.
+    """
+
+    inner: Senescence
+    litter_rpm: StockId
+    dpm_fraction: float
+
+    @property
+    def id(self) -> FlowId:
+        return self.inner.id
+
+    @property
+    def priority(self) -> int:
+        return self.inner.priority
+
+    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        legs: list[Leg] = []
+        for leg in self.inner.evaluate(snapshot, env, dt).legs:
+            if leg.stock == self.inner.litter_sink:
+                dpm = leg.amount * self.dpm_fraction
+                legs.append(Leg(leg.stock, dpm))
+                legs.append(Leg(self.litter_rpm, leg.amount - dpm))
+            else:
+                legs.append(leg)
+        return FlowResult(legs=tuple(legs))
+
+
+@dataclass(frozen=True)
+class AggregateLitterNitrogenTransfer:
+    """`LitterNitrogenTransfer` carried by the TOTAL decomposed C over the TOTAL litter
+    C.
+
+    What keeps option (B)'s identity alive under fractionation. With one N pool against
+    two carbon pools, N must leave on the aggregate flux:
+
+        d(C)/dt = -(k_d*C_d + k_r*C_r)     d(N)/dt = -N*(k_d*C_d + k_r*C_r)/C
+
+    so d(N/C)/dt = 0 exactly. Carrying it on one pool's flux instead would break it.
+    Test 10 measures that, rather than resting on the algebra.
+    """
+
+    id: FlowId
+    priority: int
+    litter_n: StockId
+    microbial_n: StockId
+    litter_dpm: StockId
+    litter_rpm: StockId
+    dpm_params: DecompositionParams
+    rpm_params: DecompositionParams
+
+    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        stocks = snapshot.stocks
+        c_d = stocks[self.litter_dpm].amount
+        c_r = stocks[self.litter_rpm].amount
+        decomposed = (
+            decomposition_flux(
+                c_d, decomposition_rate=self.dpm_params.decomposition_rate
+            )
+            + decomposition_flux(
+                c_r, decomposition_rate=self.rpm_params.decomposition_rate
+            )
+        ) * dt
+        moved = carried_nitrogen(decomposed, stocks[self.litter_n].amount, c_d + c_r)
+        return FlowResult(
+            legs=(Leg(self.litter_n, -moved), Leg(self.microbial_n, moved))
+        )
+
+
+# --- the offline build ----------------------------------------------------------------
+
+
+def build_variant(
+    scenario: SeasonScenario,
+    *,
+    total_seed: float,
+    fractionate: bool,
+    rdr_stem_zero: bool = False,
+    hum_seed: float = 0.0,
+) -> tuple[State, Registry]:
+    """`build_season` with the litter pool optionally split DPM/RPM (+ an inert-ish
+    HUM).
+
+    `fractionate=False` reproduces the frozen tree with `total_seed` as
+    `litter_carbon0`,
+    so control and subject differ in exactly one thing.
+    """
+    # Start from what `build_season` itself produces and modify that, rather than
+    # re-implementing the assembly: the stocks, flows and aux processes are read back
+    # off its own State and Registry through their public surface. Carrying the aux
+    # across is load-bearing — the option-(B) probe's `Registry(flows, stocks)` dropped
+    # them and froze `thermal_time` at 0 while its control stayed clean.
+    base_state, base_registry = build_season(
+        replace(scenario, litter_carbon0=total_seed)
+    )
+    stocks: dict[StockId, Stock] = dict(base_state.stocks)
+    flows: list[Flow] = list(base_registry.flows)
+    aux_processes = list(base_registry.aux_processes)
+
+    if rdr_stem_zero:
+        # Both legs of one physical event carry the rates, so both must be swapped:
+        # `NitrogenSenescence` independently recomputes `Senescence`'s per-organ carbon.
+        swapped: list[Flow] = []
+        for flow in flows:
+            if isinstance(flow, Senescence):
+                swapped.append(replace(flow, params=replace(flow.params, rdr_stem=0.0)))
+            elif isinstance(flow, NitrogenSenescence):
+                swapped.append(
+                    replace(flow, sen_params=replace(flow.sen_params, rdr_stem=0.0))
+                )
+            else:
+                swapped.append(flow)
+        flows = swapped
+
+    if fractionate:
+        dpm0 = total_seed * EQ_DPM_STANDING_FRACTION
+        stocks[LITTER_CARBON] = replace(stocks[LITTER_CARBON], amount=dpm0)
+        stocks[LITTER_RPM] = pool_stock(
+            LITTER_RPM,
+            SOIL,
+            Quantity.CARBON,
+            canonical_unit(Quantity.CARBON),
+            total_seed - dpm0,
+        )
+        dpm_params = DecompositionParams(decomposition_rate=K_DPM_DAY)
+        rpm_params = DecompositionParams(decomposition_rate=K_RPM_DAY)
+        rebuilt: list[Flow] = []
+        for flow in flows:
+            if isinstance(flow, Decomposition):
+                rebuilt.append(replace(flow, params=dpm_params))
+                rebuilt.append(
+                    Decomposition(
+                        FlowId("biosphere.decomposition_rpm"),
+                        flow.priority,
+                        litter_carbon=LITTER_RPM,
+                        microbial_carbon=MICROBIAL_CARBON,
+                        params=rpm_params,
+                    )
+                )
+            elif isinstance(flow, Senescence):
+                rebuilt.append(SplitSenescence(flow, LITTER_RPM, DPM_INPUT_FRACTION))
+            elif isinstance(flow, LitterNitrogenTransfer):
+                rebuilt.append(
+                    AggregateLitterNitrogenTransfer(
+                        flow.id,
+                        flow.priority,
+                        litter_n=flow.litter_n,
+                        microbial_n=flow.microbial_n,
+                        litter_dpm=LITTER_CARBON,
+                        litter_rpm=LITTER_RPM,
+                        dpm_params=dpm_params,
+                        rpm_params=rpm_params,
+                    )
+                )
+            else:
+                rebuilt.append(flow)
+        flows = rebuilt
+
+    if hum_seed > 0.0:
+        stocks[LITTER_HUM] = pool_stock(
+            LITTER_HUM,
+            SOIL,
+            Quantity.CARBON,
+            canonical_unit(Quantity.CARBON),
+            hum_seed,
+        )
+        flows.append(
+            Decomposition(
+                FlowId("biosphere.decomposition_hum"),
+                0,
+                litter_carbon=LITTER_HUM,
+                microbial_carbon=MICROBIAL_CARBON,
+                params=DecompositionParams(decomposition_rate=K_HUM_DAY),
+            )
+        )
+
+    state = State(
+        n=0,
+        stocks=stocks,
+        rng_seed=0,
+        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0},
+    )
+    return state, Registry(flows, stocks, aux_processes=aux_processes)
+
+
+def reset_variant(
+    state: State, scenario: SeasonScenario, *, fractionate: bool
+) -> State:
+    """`season.annual_reset` with the litter residual split at the cited input ratio."""
+    seedling = {
+        LEAF_C: scenario.leaf_c0,
+        STEM_C: scenario.stem_c0,
+        ROOT_C: scenario.root_c0,
+    }
+    seedling_total = scenario.leaf_c0 + scenario.stem_c0 + scenario.root_c0
+    stocks = dict(state.stocks)
+    grain = stocks[STORAGE_C].amount
+    if grain < seedling_total:
+        raise ValueError(f"annual_reset: seed bank too small to re-sow — {grain!r}")
+    old_veg = sum(stocks[oid].amount for oid in seedling)
+    for organ_id, amount in seedling.items():
+        stocks[organ_id] = replace(stocks[organ_id], amount=amount)
+    stocks[STORAGE_C] = replace(stocks[STORAGE_C], amount=0.0)
+    gain = old_veg + grain - seedling_total
+    if fractionate:
+        dpm = gain * DPM_INPUT_FRACTION
+        stocks[LITTER_CARBON] = replace(
+            stocks[LITTER_CARBON], amount=stocks[LITTER_CARBON].amount + dpm
+        )
+        stocks[LITTER_RPM] = replace(
+            stocks[LITTER_RPM], amount=stocks[LITTER_RPM].amount + (gain - dpm)
+        )
+    else:
+        stocks[LITTER_CARBON] = replace(
+            stocks[LITTER_CARBON], amount=stocks[LITTER_CARBON].amount + gain
+        )
+    old_plant_n = stocks[PLANT_N].amount
+    conc_old = (old_plant_n / old_veg) if old_veg > 0.0 else 0.0
+    seedling_n = conc_old * seedling_total
+    stocks[PLANT_N] = replace(stocks[PLANT_N], amount=seedling_n)
+    stocks[LITTER_N] = replace(
+        stocks[LITTER_N], amount=stocks[LITTER_N].amount + (old_plant_n - seedling_n)
+    )
+    aux = dict(state.aux)
+    aux[THERMAL_TIME] = 0.0
+    aux[VERNALIZATION_DAYS] = 0.0
+    return replace(state, stocks=stocks, aux=aux)
+
+
+def drive(
+    scenario: SeasonScenario,
+    years: int,
+    *,
+    perennial: bool,
+    total_seed: float,
+    fractionate: bool,
+    rdr_stem_zero: bool = False,
+    hum_seed: float = 0.0,
+) -> tuple[list[State], int]:
+    """Run `scenario` the way its own golden drives it. `run_season` asserts
+    conservation
+    across the reset, which is what makes a re-sow failure real starvation."""
+    rows = _weather() * years
+    year_steps = len(_weather())
+    state, registry = build_variant(
+        scenario,
+        total_seed=total_seed,
+        fractionate=fractionate,
+        rdr_stem_zero=rdr_stem_zero,
+        hum_seed=hum_seed,
+    )
+    resolver = weather_resolver(rows, scenario)
+
+    def reset(n: int, current: State) -> State:
+        if n > 0 and n % year_steps == 0:
+            return reset_variant(current, scenario, fractionate=fractionate)
+        return current
+
+    states, rationed, _ = run_season(
+        EulerIntegrator(registry),
+        state,
+        resolver,
+        1.0,
+        len(rows),
+        reset=reset if perennial else None,
+    )
+    # The option-(B) probe guard: a dropped aux freezes thermal_time and every
+    # DVS-keyed quantity silently reads as a seedling's.
+    ph = load_phenology_params()
+    peak_dvs = max(
+        development_stage(
+            s.aux[THERMAL_TIME],
+            tsum_anthesis=ph.tsum_anthesis,
+            tsum_maturity=ph.tsum_maturity,
+        )
+        for s in states
+    )
+    assert peak_dvs == pytest.approx(2.0), f"aux frozen? peak DVS = {peak_dvs}"
+    return states, rationed
+
+
+def per_year_min_co2(states: list[State], years: int) -> list[float]:
+    ys = len(_weather())
+    co2 = [s.stocks[CARBON_POOL].amount for s in states]
+    return [min(co2[i * ys : (i + 1) * ys + 1]) for i in range(years)]
+
+
+# --- 1. the source, and the arithmetic that authenticates a scrambled table -----------
+
+
+def test_the_hoosfield_pools_sum_exactly_to_the_stated_total() -> None:
+    """The reading of a table `pdftotext` scrambles, checked by its own arithmetic.
+
+    Extraction detaches the label column and shifts the values three rows, so the naive
+    read is `HUM 0.1533 / IOM 4.4852 / Total 0.6671`. Round 5's rule — a quote check
+    verifies characters, only arithmetic verifies numbers — is what recovers it: the
+    five
+    pools as read sum to the printed total exactly, which the shifted reading does not.
+    """
+    assert sum(HOOSFIELD_T_C_HA.values()) == pytest.approx(
+        HOOSFIELD_STATED_TOTAL, abs=1e-12
+    )
+    # ...and the shifted reading does not, which is what makes the check discriminating.
+    shifted = [
+        0.1533,
+        4.4852,
+        0.6671,
+    ]  # what the naive extraction files as HUM/IOM/Total
+    assert sum(shifted) != pytest.approx(HOOSFIELD_STATED_TOTAL, abs=1e-6)
+
+
+def test_our_rate_sits_between_the_two_plant_material_rates() -> None:
+    """`decomposition_rate` is a DPM-ish rate: below DPM, far above RPM."""
+    assert K_RPM_YR < FROZEN_K_YR < K_DPM_YR
+    assert pytest.approx(4.015) == FROZEN_K_YR
+
+
+def test_every_rothc_rate_is_safe_at_the_frozen_timestep() -> None:
+    """`k*dt < 1` at the frozen `dt = 1 day` for every rate a build would adopt."""
+    for k_yr in (K_DPM_YR, K_RPM_YR, K_BIO_YR, K_HUM_YR):
+        assert 0.0 < k_yr / 365.0 < 1.0
+
+
+# --- 2/3. what fractionation buys, and the tautology it does not ----------------------
+
+
+def test_the_cited_partition_gives_one_aggregate_rate_and_a_647x_gain() -> None:
+    """FINDING 1/2 — 6.47x, and it is ONE quantity with two readings, not two
+    measurements.
+
+    `stock = flux/k` means the inventory ratio at constant flux and the rate ratio are
+    the same number. Pinned together and in one assertion chain so neither can later be
+    quoted as corroborating the other.
+    """
+    assert pytest.approx(0.033049, abs=1e-6) == EQ_DPM_STANDING_FRACTION
+    assert pytest.approx(0.620580, abs=1e-6) == K_AGGREGATE_YR
+
+    rate_ratio = FROZEN_K_YR / K_AGGREGATE_YR
+    flux0 = FROZEN_K_YR * FROZEN_LITTER_SEED
+    stock_at_same_flux = flux0 / K_AGGREGATE_YR
+    inventory_ratio = stock_at_same_flux / FROZEN_LITTER_SEED
+
+    assert rate_ratio == pytest.approx(6.4698, abs=1e-4)
+    assert inventory_ratio == pytest.approx(rate_ratio, rel=1e-12)  # the SAME number
+    assert stock_at_same_flux == pytest.approx(19.4093, abs=1e-4)
+
+
+def test_the_aggregate_rate_is_NOT_constant_and_that_decay_is_the_payoff() -> None:
+    """FINDING 1's qualifier — "one effective k" is false as an identity.
+
+    DPM and RPM drain at 33x different rates, so the aggregate decays from 0.6206 toward
+    RPM's 0.3. Pinned because the tempting flat statement would erase the tail that is
+    the whole mechanism.
+    """
+    import math
+
+    dpm0 = 19.4093 * EQ_DPM_STANDING_FRACTION
+    rpm0 = 19.4093 - dpm0
+
+    def aggregate_k(years: float) -> float:
+        d = dpm0 * math.exp(-K_DPM_YR * years)
+        r = rpm0 * math.exp(-K_RPM_YR * years)
+        return (K_DPM_YR * d + K_RPM_YR * r) / (d + r)
+
+    assert aggregate_k(0.0) == pytest.approx(K_AGGREGATE_YR, rel=1e-12)
+    assert aggregate_k(2.0) < 0.32
+    assert aggregate_k(5.0) == pytest.approx(K_RPM_YR, abs=1e-3)
+    # ...and the tail it produces is what the one-pool form cannot: at 2 years the
+    # one-pool seed has returned essentially everything and stopped.
+    one_pool_flux_at_2yr = FROZEN_K_YR * FROZEN_LITTER_SEED * math.exp(-FROZEN_K_YR * 2)
+    assert one_pool_flux_at_2yr < 0.005
+
+
+def test_cited_and_fitted_partitions_agree_BY_CONSTRUCTION_so_it_is_no_evidence() -> (
+    None
+):
+    """FINDING 1 — a corroboration that cannot fail is not one.
+
+    "Does the cited partition match a partition fitted to hold our own flux?" was the
+    check. The two constructions intersect at EXACTLY ONE total, so agreement there is
+    guaranteed. Pinned as a non-result so it cannot later be quoted as support.
+    """
+
+    def fitted_dpm_fraction(total: float) -> float:
+        dpm = (FROZEN_K_YR * FROZEN_LITTER_SEED - K_RPM_YR * total) / (
+            K_DPM_YR - K_RPM_YR
+        )
+        return dpm / total
+
+    at_the_intersection = FROZEN_K_YR * FROZEN_LITTER_SEED / K_AGGREGATE_YR
+    assert fitted_dpm_fraction(at_the_intersection) == pytest.approx(
+        EQ_DPM_STANDING_FRACTION, rel=1e-12
+    )
+    # Anywhere else they disagree, which is what makes the agreement above vacuous.
+    assert fitted_dpm_fraction(10.0) != pytest.approx(
+        EQ_DPM_STANDING_FRACTION, rel=1e-3
+    )
+    assert fitted_dpm_fraction(30.0) != pytest.approx(
+        EQ_DPM_STANDING_FRACTION, rel=1e-3
+    )
+
+
+def test_the_remaining_gap_after_fractionation_is_still_over_an_order() -> None:
+    """FINDING 2 — 6.47x of a 94x census gap leaves ~14.5x, which finding 3 puts out of
+    reach."""
+    hoosfield_total_mol = HOOSFIELD_STATED_TOTAL * T_C_HA_TO_MOL_M2
+    census_gap = hoosfield_total_mol / FROZEN_LITTER_SEED
+    assert census_gap == pytest.approx(94.0, abs=0.5)
+    assert census_gap / (FROZEN_K_YR / K_AGGREGATE_YR) == pytest.approx(14.5, abs=0.5)
+
+
+# --- 4. both principled sizings fail --------------------------------------------------
+
+
+def test_the_constant_inventory_sizing_starves_the_re_sow() -> None:
+    """Holding the census total (3.0) fixed: the chamber cannot re-sow.
+
+    The fractionated pool returns carbon at the aggregate 0.62/yr instead of 4.015/yr,
+    so year 1 never fills enough grain to seed year 2. A hard error, not a soft one.
+    """
+    with pytest.raises(ValueError, match="seed bank too small"):
+        drive(
+            PERENNIAL_CHAMBER_SCENARIO,
+            PERENNIAL_CHAMBER_YEARS,
+            perennial=True,
+            total_seed=FROZEN_LITTER_SEED,
+            fractionate=True,
+        )
+
+
+def test_the_constant_flux_sizing_rations() -> None:
+    """Holding the t=0 CO2 return fixed (seed 19.409): `rationed` fires 11 times."""
+    _, rationed = drive(
+        PERENNIAL_CHAMBER_SCENARIO,
+        PERENNIAL_CHAMBER_YEARS,
+        perennial=True,
+        total_seed=19.4093,
+        fractionate=True,
+    )
+    assert rationed == 11
+
+
+# --- 5. the structural finding --------------------------------------------------------
+
+
+@pytest.mark.slow
+def test_a_seeded_slow_pool_only_ever_DRAINS() -> None:
+    """FINDING 3 — the structural ceiling, measured rather than read off Figure 1.
+
+    RothC's HUM is FORMED by the humification split of decomposed material; only DPM and
+    RPM take fresh input. Our `Decomposition` moves 100 % of decayed litter C into
+    `microbial_carbon` (CUE = 1.0, the deliberate Step-4/5 split), so there is no
+    humification flux and a seeded slow pool can never refill. Pinned at EVERY step, not
+    at year boundaries — a pool that dipped and recovered would still pass a yearly
+    check.
+    """
+    hum_seed = HOOSFIELD_T_C_HA["HUM"] * T_C_HA_TO_MOL_M2 * (6.0 / 38.6188)
+    states, rationed = drive(
+        PERENNIAL_CHAMBER_SCENARIO,
+        LONG_HORIZON_YEARS,
+        perennial=True,
+        total_seed=6.0,
+        fractionate=True,
+        hum_seed=hum_seed,
+    )
+    hum = [s.stocks[LITTER_HUM].amount for s in states]
+    assert hum[0] == pytest.approx(33.4473, abs=1e-3)
+    for earlier, later in zip(hum, hum[1:], strict=False):
+        assert later <= earlier, "a seeded slow pool must have no refill pathway"
+    # It is a one-time boost that decays away — and it breaks closure while doing it.
+    assert hum[-1] / hum[0] == pytest.approx(0.7783, abs=1e-3)
+    assert rationed == 5
+
+
+# --- 6. the window: why the one passing sizing is a FITTED one ------------------------
+
+
+@pytest.mark.slow
+def test_the_frozen_consumer_chamber_carries_stem_only_CLEANLY() -> None:
+    """The baseline that makes the next test a regression rather than a quirk.
+
+    Stem-only's frozen refusal is `perennial`-only: `consumer` passes both gates.
+    """
+    states, rationed = drive(
+        CONSUMER_CHAMBER_SCENARIO,
+        LONG_HORIZON_YEARS,
+        perennial=True,
+        total_seed=FROZEN_LITTER_SEED,
+        fractionate=False,
+        rdr_stem_zero=True,
+    )
+    assert rationed == 0
+    assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:]) == pytest.approx(
+        0.148009, abs=1e-5
+    )
+
+
+@pytest.mark.slow
+def test_fractionation_MOVES_the_stem_only_failure_rather_than_removing_it() -> None:
+    """FINDING 4 — at seed 6.0 the rescue of `perennial` costs `consumer` outright.
+
+    `perennial` + stem-only closes (it hard-errors in the frozen tree at `rationed =
+    1`),
+    and in the same breath `consumer` — which the frozen tree carries cleanly, above —
+    can no longer re-sow. That is not progress against the gate; it is a different
+    collision with it.
+    """
+    states, rationed = drive(
+        PERENNIAL_CHAMBER_SCENARIO,
+        LONG_HORIZON_YEARS,
+        perennial=True,
+        total_seed=6.0,
+        fractionate=True,
+        rdr_stem_zero=True,
+    )
+    assert rationed == 0
+    assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:]) > DECADE_CO2_FLOOR
+
+    with pytest.raises(ValueError, match="seed bank too small"):
+        drive(
+            CONSUMER_CHAMBER_SCENARIO,
+            LONG_HORIZON_YEARS,
+            perennial=True,
+            total_seed=6.0,
+            fractionate=True,
+            rdr_stem_zero=True,
+        )
+
+
+@pytest.mark.slow
+def test_half_a_mol_higher_and_perennial_fails_the_liveness_floor() -> None:
+    """FINDING 4 — the upper bound of the window, 0.5 mol C above the passing value.
+
+    Together with the hard error 0.5 below it, this is what makes the single passing
+    sizing a value found by sweeping the gate green rather than one derived from an
+    invariant — the consumer-chamber-2x / DPM-RPM-labile / ruling-B shape, refused.
+    """
+    states, rationed = drive(
+        PERENNIAL_CHAMBER_SCENARIO,
+        LONG_HORIZON_YEARS,
+        perennial=True,
+        total_seed=7.0,
+        fractionate=True,
+        rdr_stem_zero=True,
+    )
+    assert rationed == 0  # gate A passes...
+    tail = min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:])
+    assert tail == pytest.approx(0.038341, abs=1e-5)
+    assert tail < DECADE_CO2_FLOOR  # ...and gate B does not
+
+
+# --- 7. the (B) identity, and what the seed does to it -------------------------------
+
+
+def test_the_option_b_identity_is_EXACT_under_fractionation_without_the_seed() -> None:
+    """FINDING 5 — the aggregate-flux N transfer is the right design, measured.
+
+    With the N-free seed removed (`litter_carbon0 = 0`), the litter pool's C:N equals
+    the
+    C:N of the material that fell in, at every step, fractionated or not. This is what
+    makes fractionating NITROGEN into `dpm_n`/`rpm_n` unnecessary: it would cost two
+    stocks for the same result, and the two pools' C:N can only diverge under a
+    differentiated input C:N for which there is no source.
+    """
+    shed_cn = MOLAR_MASS_CARBON_KG_PER_MOL / load_nitrogen_params().n_residual_per_mol_c
+    assert shed_cn == pytest.approx(90.0, abs=1e-9)
+
+    for fractionate in (False, True):
+        states, _ = drive(
+            SEALED_CHAMBER_SCENARIO,
+            SEALED_CHAMBER_YEARS,
+            perennial=False,
+            total_seed=0.0,
+            fractionate=fractionate,
+        )
+        checked = 0
+        for s in states:
+            carbon = s.stocks[LITTER_CARBON].amount
+            if fractionate:
+                carbon += s.stocks[LITTER_RPM].amount
+            nitrogen = s.stocks[LITTER_N].amount
+            if nitrogen <= 1e-18 or carbon <= 1e-18:
+                continue
+            checked += 1
+            assert (carbon / nitrogen) * MOLAR_MASS_CARBON_KG_PER_MOL == pytest.approx(
+                shed_cn, rel=1e-12
+            )
+        assert checked > 800
+
+
+def test_the_seed_artefact_becomes_PERMANENT_under_fractionation() -> None:
+    """FINDING 5 — the payoff read on the N side, and it is a SCENARIO fact.
+
+    The one-pool form drains the N-free seed at 4.015/yr, so it is gone within a year
+    and
+    the pool converges on 90. Under fractionation 96.7 % of that seed lands in RPM at
+    0.3/yr and lingers — the very tail-persistence that is the seam's benefit is what
+    preserves the artefact. So the seam owes `litter_n0`, and option (B)'s committed
+    result quietly depends on the seed washing out fast.
+
+    ⚠ These are the COMMITTED scenario's numbers, not model constants — the identity
+    above is the model fact.
+    """
+    shed_cn = MOLAR_MASS_CARBON_KG_PER_MOL / load_nitrogen_params().n_residual_per_mol_c
+
+    def peak_pool_cn(*, fractionate: bool, total_seed: float) -> float:
+        states, _ = drive(
+            SEALED_CHAMBER_SCENARIO,
+            SEALED_CHAMBER_YEARS,
+            perennial=False,
+            total_seed=total_seed,
+            fractionate=fractionate,
+        )
+        litter_n = [s.stocks[LITTER_N].amount for s in states]
+        peak = max(range(len(litter_n)), key=lambda i: litter_n[i])
+        carbon = states[peak].stocks[LITTER_CARBON].amount
+        if fractionate:
+            carbon += states[peak].stocks[LITTER_RPM].amount
+        return (carbon / litter_n[peak]) * MOLAR_MASS_CARBON_KG_PER_MOL
+
+    frozen = peak_pool_cn(fractionate=False, total_seed=FROZEN_LITTER_SEED)
+    same_seed = peak_pool_cn(fractionate=True, total_seed=FROZEN_LITTER_SEED)
+    doubled = peak_pool_cn(fractionate=True, total_seed=6.0)
+
+    assert frozen == pytest.approx(100.552, abs=1e-2)
+    assert frozen / shed_cn < 1.2  # the one-pool form washes the seed out
+    assert same_seed == pytest.approx(271.696, abs=1e-2)
+    assert doubled == pytest.approx(334.024, abs=1e-2)
+    assert doubled / shed_cn > 3.5  # ...and the slow pool does not
+
+
+def test_peak_litter_n_names_a_DIFFERENT_EVENT_in_a_reset_driven_chamber() -> None:
+    """FINDING 6 — the error this module's own probe committed, pinned so it is not
+    re-made.
+
+    In a shedding-fed chamber `peak litter_n` is the senescence maximum and the
+    shed-ratio
+    identity governs it. In a RESET-driven one it is the annual dump, whose C:N is set
+    by
+    the dying plant — measured N-RICH relative to the shed ratio, i.e. on the opposite
+    side from the seed artefact. Comparing it to the shed ratio is a category error
+    (this repo's correction 2, committed again one option later).
+    """
+    states, _ = drive(
+        PERENNIAL_CHAMBER_SCENARIO,
+        PERENNIAL_CHAMBER_YEARS,
+        perennial=True,
+        total_seed=6.0,
+        fractionate=True,
+    )
+    litter_n = [s.stocks[LITTER_N].amount for s in states]
+    peak = max(range(len(litter_n)), key=lambda i: litter_n[i])
+    year_steps = len(_weather())
+    # The peak lands just past a year boundary — it IS the dump, not the season.
+    assert peak % year_steps <= 2
+    carbon = (
+        states[peak].stocks[LITTER_CARBON].amount
+        + states[peak].stocks[LITTER_RPM].amount
+    )
+    shed_cn = MOLAR_MASS_CARBON_KG_PER_MOL / load_nitrogen_params().n_residual_per_mol_c
+    dump_cn = (carbon / litter_n[peak]) * MOLAR_MASS_CARBON_KG_PER_MOL
+    assert dump_cn < shed_cn  # N-RICH: the opposite side from the seed artefact
+
+
+# --- 8. the two structural / verification claims everything else rests on -------------
+
+
+def test_the_split_re_targets_the_litter_leg_without_re_scaling_it() -> None:
+    """FINDING 6 — option (B) pins that `NitrogenSenescence` recomputes `Senescence`'s
+    leg.
+
+    `SplitSenescence` must therefore preserve the TOTAL exactly, or the two legs of one
+    physical event drift apart and every measurement in this module is wrong. Bit-exact,
+    not approximate.
+    """
+    scenario = PERENNIAL_CHAMBER_SCENARIO
+    state, registry = build_variant(scenario, total_seed=6.0, fractionate=True)
+    split = next(f for f in registry.flows if isinstance(f, SplitSenescence))
+    sen_params = load_senescence_params()
+    rows = _weather()
+    resolver = weather_resolver(rows, scenario)
+    states, _, _ = run_season(EulerIntegrator(registry), state, resolver, 1.0, 300)
+    sampled = 0
+    for s in states[::10]:
+        env = resolver.bind(s, 1.0)
+        legs = split.evaluate(s, env, 1.0).legs
+        to_dpm = sum(leg.amount for leg in legs if leg.stock == LITTER_CARBON)
+        to_rpm = sum(leg.amount for leg in legs if leg.stock == LITTER_RPM)
+        recomputed = (
+            senescence_flux(
+                s.stocks[LEAF_C].amount, relative_death_rate=sen_params.rdr_leaf
+            )
+            + senescence_flux(
+                s.stocks[STEM_C].amount, relative_death_rate=sen_params.rdr_stem
+            )
+            + senescence_flux(
+                s.stocks[ROOT_C].amount, relative_death_rate=sen_params.rdr_root
+            )
+        )
+        assert to_dpm + to_rpm == recomputed  # bit-exact, deliberately not approx
+        sampled += 1
+    assert sampled >= 30
+
+
+def test_the_open_field_builds_no_litter_pools_so_it_is_structurally_untouched() -> (
+    None
+):
+    """FINDING 2's roster caveat, asserted rather than assumed.
+
+    `soil.py` builds the litter/microbial pools only when `scenario.sealed`, so
+    `open_season` — the one frozen scenario at field scale — cannot see any of this.
+    """
+    state, _ = build_season(DEFAULT_SCENARIO)
+    live = [
+        sid
+        for sid in state.stocks
+        if ("litter" in sid or "microbial" in sid) and not sid.startswith("boundary.")
+    ]
+    assert live == []
+    sealed, _ = build_season(SEALED_CHAMBER_SCENARIO)
+    assert LITTER_CARBON in sealed.stocks
+
+
+# --- 9. the two claims the prose rested on, pinned --------------------------------
+
+
+@pytest.mark.slow
+def test_exactly_one_swept_sizing_clears_both_gates_on_both_scenarios() -> None:
+    """FINDING 4's headline — the passing value itself, not only its two boundaries.
+
+    The refusal rests on the WIDTH: 6.5 clears `rationed == 0` and the 0.05 decade
+    floor on both perennial scenarios, while 6.0 (hard error on `consumer`) and 7.0
+    (floor failure on `perennial`) do not. Without this the window is prose and the
+    reader sees two failures with no demonstrated window.
+    """
+    for scenario in (PERENNIAL_CHAMBER_SCENARIO, CONSUMER_CHAMBER_SCENARIO):
+        states, rationed = drive(
+            scenario,
+            LONG_HORIZON_YEARS,
+            perennial=True,
+            total_seed=6.5,
+            fractionate=True,
+            rdr_stem_zero=True,
+        )
+        assert rationed == 0
+        assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:]) > DECADE_CO2_FLOOR
+
+    # ...and it is a WINDOW, not a threshold: half a mol either side fails. Both
+    # neighbours are pinned in their own tests; asserted here as the width claim.
+    assert 7.0 - 6.0 < 1.0 + 1e-12
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("name", "scenario", "years", "perennial", "frozen_tail", "fractionated_tail"),
+    [
+        ("sealed_chamber", SEALED_CHAMBER_SCENARIO, 3, False, 0.115998, 0.122192),
+        ("perennial", PERENNIAL_CHAMBER_SCENARIO, 5, True, 0.038734, 0.063384),
+        (
+            "perennial_long",
+            PERENNIAL_CHAMBER_SCENARIO,
+            LONG_HORIZON_YEARS,
+            True,
+            0.038734,
+            0.062892,
+        ),
+        ("consumer", CONSUMER_CHAMBER_SCENARIO, 5, True, 0.144698, 0.148887),
+    ],
+)
+def test_the_form_alone_is_benign_across_the_sealed_roster(
+    name: str,
+    scenario: SeasonScenario,
+    years: int,
+    perennial: bool,
+    frozen_tail: float,
+    fractionated_tail: float,
+) -> None:
+    """FINDING 2 — recorded as a PRICE, so it is pinned rather than left as prose.
+
+    At seed 6.0 the form closes everywhere with the CO2 tail IMPROVING everywhere, at 2x
+    the inventory — where the one-pool form already rations at 6.0. That headroom is
+    genuinely the form's doing, and it is still not a reason to build: no beneficiary
+    (finding 4), against a full carbon cascade.
+    """
+    tail_slice = slice(1, None) if years > 1 else slice(0, None)
+
+    frozen_states, frozen_rationed = drive(
+        scenario,
+        years,
+        perennial=perennial,
+        total_seed=FROZEN_LITTER_SEED,
+        fractionate=False,
+    )
+    assert frozen_rationed == 0
+    assert min(per_year_min_co2(frozen_states, years)[tail_slice]) == pytest.approx(
+        frozen_tail, abs=1e-5
+    )
+
+    states, rationed = drive(
+        scenario, years, perennial=perennial, total_seed=6.0, fractionate=True
+    )
+    assert rationed == 0
+    tail = min(per_year_min_co2(states, years)[tail_slice])
+    assert tail == pytest.approx(fractionated_tail, abs=1e-5)
+    assert tail > frozen_tail, f"{name}: the form must not degrade the CO2 tail"
+
+
+@pytest.mark.slow
+def test_the_one_pool_form_cannot_take_the_same_inventory() -> None:
+    """FINDING 2's other half — the 2x headroom is the FORM's, not the seed's.
+
+    Doubling `litter_carbon0` on the frozen single pool doubles the FLUX with it
+    (`stock = flux/k`, one knob), and it rations. That is what makes the fractionated
+    roster result above attributable to the partition rather than to more carbon.
+    """
+    _, rationed = drive(
+        PERENNIAL_CHAMBER_SCENARIO,
+        PERENNIAL_CHAMBER_YEARS,
+        perennial=True,
+        total_seed=6.0,
+        fractionate=False,
+    )
+    assert rationed == 6

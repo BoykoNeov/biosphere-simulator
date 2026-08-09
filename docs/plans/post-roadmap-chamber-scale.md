@@ -230,6 +230,21 @@ approaching from different sides.
 
 ## The seam, with a measured obstacle (NOT a recommendation)
 
+⚠⚠ **TAKEN 2026-08-10, MEASURED, AND TURNED DOWN — and two of this paragraph's
+load-bearing claims are now false. Original kept below; see
+`docs/plans/post-roadmap-soil-fractionation.md`.** (1) *"`C* = flux/k` decouples once
+there is more than one `k`"* is **false at a cited partition**: with the partition fixed
+by RothC's own Hoosfield equilibrium the t=0 stock is `flux₀/k_agg` with
+`k_agg = 0.6206/yr` — **one number, not a free choice**, worth **6.47×** against the 94×
+gap this document measures. Decoupling requires choosing the partition, which is the
+fitted thing. (2) *"or any subset with at least one slow pool"* is **structurally
+unavailable**: only DPM and RPM take fresh plant input; BIO and HUM are **formed** by the
+humification split of decomposed material, and our CUE = 1.0 has no such flux — a seeded
+HUM pool was **measured strictly non-increasing at every one of 4,575 steps** and never
+refills. So the seam is blocked by the obstacle **option (B)** already hit (a literature
+CUE moves carbon), not by effort — and the successor is the humification split, priced as
+option (D), not as this.
+
 **Soil carbon pool fractionation** — DPM/RPM/BIO/HUM/IOM, or any subset with at least
 one slow pool — is the shape of what would let a chamber hold a realistic carbon
 inventory *without* a proportionally huge CO₂ flux, because `C* = flux/k` decouples once
