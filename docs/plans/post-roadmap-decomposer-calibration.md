@@ -53,6 +53,20 @@ Read-only probes (`M:/claud_projects/temp/decomposer_*.py`), no frozen file touc
    is the chamber's O₂ headroom, not the litter size.** RothC-BIO is measured infeasible
    at any chamber size.
 
+   ⚠ **ANNOTATED 2026-08-09 by the chamber-scale diagnosis** (`post-roadmap-chamber-scale.md`)
+   — the measurement stands; the bolded conclusion named the **symptom**. O₂ headroom is
+   what clamps, but "**not the litter size**" is the misleading half: with **one** pool at
+   a fixed `k`, the standing stock and the respiration flux are **the same knob**
+   (`stock = flux / k`), so there is no litter size that raises the inventory without
+   raising the draw. The tell is that this paragraph writes the identity down
+   (`flux = k·C_litter`) two sentences before concluding against it — the steady-state
+   reasoning that opens it ("annual CO₂ return is k-independent") is correct for a pool
+   fed by a fixed input, and a **seeded** pile is an initial condition draining at
+   `k·C`, not that steady state. The cause is that the tree has no **slow** pool to park
+   carbon in: RothC keeps most soil carbon at 0.3/0.02/inert against our 4.015/yr, so
+   matching a real soil's stock at our `k` would return **~80×** real soil respiration.
+   Original kept — the way it is wrong is the finding.
+
 ## The resolution (why "just calibrate to real science" has a real answer)
 
 "Real science" hands you a **range**, not a point (microbial 0.66–7.3/yr, an 11× spread
