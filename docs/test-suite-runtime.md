@@ -23,6 +23,13 @@ that invariant is about what `src/simcore` imports and is enforced by
 would change the CI jobs and single-test debugging as a side effect of a local
 ergonomics choice.
 
+**CI is deliberately left serial** — `.github/workflows/ci.yml` still runs
+`uv run pytest -m "not slow"` and `pytest tests/crossport/` without `-n`. Parallelising
+the runners is a separate decision with its own trade-offs (hosted runners have few
+cores, and the `crossport` job is cargo-lock-bound anyway), not an oversight. Note that
+the priority drop **is** live in CI, since `pytest_configure` is unconditional; on a
+dedicated runner with nothing competing that is a no-op, which is why it is not gated.
+
 ## Below-normal priority (on by default)
 
 `tests/conftest.py::pytest_configure` drops the process priority. On Windows it sets
@@ -73,11 +80,22 @@ Both halves are false, and neither is visible from a green suite:
 2. **`loadgroup` is the wrong mode for a mostly-ungrouped suite.** It is
    `LoadScopeScheduling`, dispatching one *scope* at a time; with most tests ungrouped
    every test becomes its own scope. Same 8-test probe: **10.0 s** against `load`'s
-   **1.07 s**, and on this suite's fast loop **~202 s against ~94 s**.
+   **1.07 s**. On this suite, back-to-back in one session: the full run took
+   **613.7 s under `loadgroup` against 273.4 s under `load`**.
+
+⚠ An earlier draft of this section argued (2) from "~202 s against ~94 s on the fast
+loop" — two numbers taken in **different machine states**, which is exactly the
+comparison the Measurements section below discards. Those two runs were the *signal I
+dismissed as contention* on the way to this finding; they are not evidence for it. The
+613.7/273.4 pair is, because it is a pair.
 
 The measurement that exposed (1) is worth repeating on any future attempt: give a
 session-scoped fixture a side effect keyed by `os.getpid()`, and **count the
-processes**. "The suite passed" and "the grouping worked" are unrelated statements.
+processes**. "The suite passed" and "the grouping worked" are unrelated statements —
+and the probe works because it observes the *mechanism* rather than the *outcome*. The
+two residuals recorded below (the Tier-2 recomputation count, cargo's lock
+serialization) are claimed in prose with nothing that would go red if they changed; the
+PID-count probe generalizes directly to the first of them.
 
 ### What `load` therefore leaves on the table
 
