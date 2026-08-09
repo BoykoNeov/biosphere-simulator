@@ -117,6 +117,13 @@ def test_tier1_energy_conserved_no_drift(energy_states) -> None:
     )
 
 
+@pytest.mark.science_gate(
+    scenario="sealed_station",
+    field="liveness_floors",
+    quantity="annual peak thermal-node temperature (K)",
+    bound="non_collapsing(floor=100.0)",
+    source="self — the node must not collapse toward T_space",
+)
 def test_tier1_node_is_period_1_fixed_point(energy_states) -> None:
     # The node/T reaches a real emergent equilibrium (an attractor, not a construction):
     # every year's peak node temperature is identical (a period-1 fixed point — no

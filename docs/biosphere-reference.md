@@ -197,6 +197,22 @@ hashes), the forcing (+ hash), and each scenario → golden (+ hash).
   horizon against its constant — and a teeth test confirms it actually fails on an unfrozen
   file. A new-but-unfrozen param/flow/aux fails the gate; that is the signal to either freeze it
   (an unfreeze) or remove it.
+- **`science_bands` + `liveness_floors` own the *science*** — added 2026-08-09, and the reason
+  they exist is that until then **nothing did**. The frozen acceptance set was {golden bytes,
+  `rationed == 0`, no extinction, conservation, determinism}: every one a property of the RUN.
+  Assertions about the *science* — that `open_season`'s canopy is a real wheat canopy, that the
+  closed chamber's CO₂ attractor has not collapsed — sat in test files reachable from no
+  manifest, so none could fail an unfreeze ceremony. Both fields are **derived** from
+  `science_gate` markers in the test tree (`tests/science_gates.py`, statically via `ast`), so
+  they carry the same completeness teeth as the flow set.
+
+  **The two are deliberately separate names, because they are claims of different strength.** A
+  `science_bands` bound comes from **outside this repo** (real wheat's ~5–8 LAI, Van Keulen &
+  Seligman's 6.0 shading threshold, Greenwood's 14.4248 t/ha crossing, BVAD's RQ). A
+  `liveness_floors` bound was **tuned to our own calibration** — the perennial plant floor moved
+  `> 1.0` → `> 0.9` when the decomposer calibration shrank the plant ~19 % — so it guards
+  *continuity with the current calibration*, **not** physical plausibility. Freezing a floor
+  under the bands' name would say "the frozen tree passes a bound the frozen tree set".
 
 ## The unfreeze discipline
 
@@ -216,15 +232,49 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
 4. **Regenerate the manifest** (`uv run python tests/test_freeze_manifest.py`) and review its
    diff — the changed hashes / flow set / param set are the git-visible record of exactly what
    was unfrozen.
-5. **Record provenance.** Update this file and the Phase-4 plan with what changed and why (a
+5. **Report the science gates.** State the change's readings against the scenario's
+   `science_bands` and `liveness_floors`. A band failure is a **blocking finding** that must be
+   argued past in writing, not a number to re-tune — retuning a bound so a change fits is the
+   co-adaptation shape this project has refused (the consumer-chamber 2×, the DPM/RPM labile
+   re-read, ruling B). ⚠ And the converse is not licensed either: a band **passing** is not an
+   endorsement. `open_season` sits **3.8 %** above the LAI lower bound and **12 %** below the
+   Greenwood crossing — these are tight margins, not comfort.
+6. **Record provenance.** Update this file and the Phase-4 plan with what changed and why (a
    calibration cites its primary source per `docs/param-file-conventions.md`).
-6. **Re-run the gates:** full suite (incl. `-m slow` for the stress), `ruff`, `pyright`; commit
+7. **Re-run the gates:** full suite (incl. `-m slow` for the stress), `ruff`, `pyright`; commit
    with a Conventional Commit that names the unfreeze.
 
 An undocumented unfreeze fails CI by construction (a moved golden, or the completeness gate),
 so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-09 — the science assertions get contract standing (a SCHEMA unfreeze; two new
+  manifest fields, NO value, golden, param or `src/` change).**
+  `docs/plans/post-roadmap-acceptance-gate-standing.md`. The adjudication of the acceptance-gate
+  diagnosis's finding 6, which that work deliberately left to the user. Added `science_bands` +
+  `liveness_floors`, derived from `science_gate` markers via `ast`.
+
+  **The reframe that unblocked it:** finding 6 read as "the two gates disagree". Read off the
+  *pins*, they never overlap — closure binds on the chambers and is **structurally empty** for
+  carbon on `open_season`; the bands exist on `open_season` and cannot exist on a 52 g DM/m²
+  carbon-limited rig. Every "disagreement" was two verdicts on **different scenarios**,
+  aggregated by the reader. So promoting a band on `open_season` cannot reverse a measured
+  closure refusal — the co-adaptation objection needs a verdict to overrule, and the cell is
+  empty.
+
+  **Three exclusions, each measured rather than argued.** (1) *Margin-ratio and doc-staleness
+  pins* — `peak_w / 14.4248 > 0.85` fails when prose drifts, and `0.80 < peak/6.0 < 0.92` fails
+  when the margin **improves**; two committed tests were **split** so a marked test carries only
+  its gate. (2) *Diagnosis pins about refused forms* (`peak > 15.0` for (C)) — not the tree as
+  frozen. (3) *Calibration identities* — most of `test_bvad_validation.py` asserts quantities
+  the crew params were fitted to, which its own docstring already calls true "**by
+  construction**"; only the RQ structural prediction survives.
+
+  ⚠ **A correction found while deriving this:** a draft argued the field was vacuous because the
+  golden already freezes peak LAI. It does not — `season_euler_state.json` is a single
+  **endpoint** (`n = 305`). The goldens constrain a trajectory only at its last step, so every
+  mid-run quantity was unfrozen.
 
 - **2026-07-27 — the nitrogen-cycle FORM change (a FORM unfreeze; one uncitable param
   RETIRED, three cited ones added; every carbon trajectory byte-identical).**

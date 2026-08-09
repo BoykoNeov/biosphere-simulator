@@ -22,6 +22,28 @@
   ],
   "frozen_at_phase": 6,
   "integrator": "EulerIntegrator",
+  "liveness_floors": {
+    "cabin_gas": [],
+    "crew_mission": [],
+    "eclss_steady_state": [],
+    "greenhouse": [],
+    "harvest": [],
+    "lighting": [],
+    "power_bounded_soc": [],
+    "power_self_discharge": [],
+    "sealed_energy_drift": [],
+    "sealed_station": [
+      {
+        "bound": "non_collapsing(floor=100.0)",
+        "locus": "tests/test_sealed_station_stability.py::test_tier1_node_is_period_1_fixed_point",
+        "quantity": "annual peak thermal-node temperature (K)",
+        "source": "self \u2014 the node must not collapse toward T_space"
+      }
+    ],
+    "station_heat_closure": [],
+    "thermal_equilibrium": [],
+    "water_recovery": []
+  },
   "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1 day + everything-fast dt=60 s; Tier-1 energy single-rate dt=3600 s.",
   "param_files": {
     "charge.yaml": "e82def3cdf9420921952a5c960eacd636e41b74a7b378a04e3a25d7602e622a2",
@@ -100,6 +122,28 @@
       "golden_sha256": "37b53c3dadf38ee5e2c6156cd38e408d4757032084b70cfaf59cec73962bf1d8",
       "scenario": "WATER_RECOVERY_SCENARIO (P6.4 crew water loop)"
     }
+  },
+  "science_bands": {
+    "cabin_gas": [],
+    "crew_mission": [
+      {
+        "bound": "CO2/O2 == approx(0.8814)",
+        "locus": "tests/test_bvad_validation.py::test_rq_structural_prediction",
+        "quantity": "daily-effective molar respiratory quotient",
+        "source": "NASA BVAD Table 3-31 (Rev 2, 2022, p. 58)"
+      }
+    ],
+    "eclss_steady_state": [],
+    "greenhouse": [],
+    "harvest": [],
+    "lighting": [],
+    "power_bounded_soc": [],
+    "power_self_discharge": [],
+    "sealed_energy_drift": [],
+    "sealed_station": [],
+    "station_heat_closure": [],
+    "thermal_equilibrium": [],
+    "water_recovery": []
   },
   "sealed_energy_years": 15,
   "sealed_station_years": 4

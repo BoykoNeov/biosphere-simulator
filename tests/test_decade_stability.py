@@ -174,6 +174,20 @@ def test_decade_conservation_detector(runs, scenario, quantity) -> None:
 # --- axis (b): limit-cycle stationarity --------------------------------------
 
 
+@pytest.mark.science_gate(
+    scenario="perennial_long_horizon",
+    field="liveness_floors",
+    quantity="annual peak leaf carbon (mol C)",
+    bound="non_collapsing(floor=0.05)",
+    source="self — the calibrated attractor, not a cited value",
+)
+@pytest.mark.science_gate(
+    scenario="consumer_long_horizon",
+    field="liveness_floors",
+    quantity="annual peak leaf carbon (mol C)",
+    bound="non_collapsing(floor=0.05)",
+    source="self — the calibrated attractor, not a cited value",
+)
 @pytest.mark.parametrize("scenario", ["perennial", "consumer"])
 def test_decade_leaf_cycle_is_stationary(runs, scenario) -> None:
     # Peak leaf carbon per year: bounded + non-amplifying past the transient (not
@@ -190,6 +204,13 @@ def test_decade_leaf_cycle_is_stationary(runs, scenario) -> None:
     assert non_collapsing(summaries, floor=0.05)  # peak leaf never collapses to ~0
 
 
+@pytest.mark.science_gate(
+    scenario="perennial_long_horizon",
+    field="liveness_floors",
+    quantity="converged peak-leaf fixed point (mol C)",
+    bound="max(tail) > 0.9",
+    source="self — re-tuned from >1.0 when the decomposer calibration shrank the plant",
+)
 def test_perennial_leaf_cycle_is_a_fixed_point(runs) -> None:
     # CHANGED by post-roadmap scope (B) increment 1 (vernalization + photoperiod). This
     # asserted a period-2 limit cycle ("gap ~0.07, ~28% of scale") until 2026-07-20.
@@ -230,6 +251,13 @@ def test_consumer_leaf_converges_to_a_fixed_point(runs) -> None:
     assert gap < 1e-3 * max(tail)  # a fixed point: the branches have merged
 
 
+@pytest.mark.science_gate(
+    scenario="consumer_long_horizon",
+    field="liveness_floors",
+    quantity="year-end consumer carbon (mol C)",
+    bound="non_collapsing(floor=5e-4)",
+    source="self — the calibrated attractor, not a cited value",
+)
 def test_decade_consumer_biomass_is_stationary_and_alive(runs) -> None:
     # The consumer trophic level persists and its standing biomass reaches a stationary,
     # non-collapsing attractor over the decade — neither blowing up nor starving.
@@ -243,6 +271,13 @@ def test_decade_consumer_biomass_is_stationary_and_alive(runs) -> None:
     assert non_collapsing(summaries, floor=5e-4)  # consumer carbon stays well above 0
 
 
+@pytest.mark.science_gate(
+    scenario="perennial_long_horizon",
+    field="liveness_floors",
+    quantity="annual minimum chamber CO2 pool (mol C)",
+    bound="non_collapsing(floor=0.05) past the sow-in transient",
+    source="self — the guard stem-only tripped at 0.01619 WHILE STAYING STATIONARY",
+)
 def test_decade_min_carbon_pool_stationary(runs) -> None:
     # Chamber CO2 pool (the producer's only carbon source when sealed) never runs dry
     # and its per-year minimum reaches a stationary attractor — closure is not slowly

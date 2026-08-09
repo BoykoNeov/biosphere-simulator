@@ -57,6 +57,13 @@ from domains.biosphere.season import (
     SEALED_CHAMBER_YEARS,
     build_season,
 )
+from science_gates import (
+    FIELDS,
+    REQUIRED_KEYS,
+    gates_for,
+    non_decorator_marker_sites,
+    unknown_scenarios,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = _REPO_ROOT / "docs" / "biosphere-reference.manifest.json"
@@ -107,6 +114,11 @@ _SCENARIOS: dict[str, tuple[str, int, str]] = {
         "drift_summary.json",
     ),
 }
+
+
+#: This manifest's scenario roster — the filter for the science-gate fields, so
+#: a gate naming a station scenario cannot silently land in the biosphere manifest.
+_ROSTER = frozenset(_SCENARIOS)
 
 
 def _normalized_sha256(path: Path) -> str:
@@ -218,6 +230,8 @@ def _build_manifest() -> dict[str, object]:
             name: _normalized_sha256(PARAMS_DIR / name)
             for name in _frozen_param_files()
         },
+        "science_bands": gates_for(_ROSTER, "science_bands"),
+        "liveness_floors": gates_for(_ROSTER, "liveness_floors"),
         "scenarios": scenarios,
     }
 
@@ -263,6 +277,87 @@ def test_frozen_aux_set_is_complete() -> None:
     # alongside flows + params. Catches an added-but-unfrozen aux process.
     manifest = _load_manifest()
     assert set(manifest["aux_set"]) == set(_aux_set())
+
+
+def test_frozen_science_gates_are_complete() -> None:
+    """The science half of the contract: bands and floors, derived from the tree.
+
+    Before this field the frozen acceptance set was {golden bytes, ``rationed == 0``, no
+    extinction, conservation, determinism} — every one a property of the RUN, not the
+    SCIENCE (``post-roadmap-acceptance-gate.md`` finding 5). A committed band could be
+    deleted with every gate green. Now it cannot: the manifest is compared against the
+    live marker set, so adding, editing or dropping a gate turns this red.
+    """
+    manifest = _load_manifest()
+    for field in FIELDS:
+        assert manifest[field] == gates_for(_ROSTER, field), field
+
+
+def test_every_roster_scenario_has_an_explicit_science_gate_entry() -> None:
+    """An absent key and a deliberately-empty one are different claims.
+
+    ``drift_summary`` is the case that forces this: it is a derived stability signature
+    over two scenarios that are themselves in the roster, so it carries no gate of its
+    own. Recording that as an empty list says "measured, none"; omitting the key would
+    say nothing, and a reader using ``.get(name, [])`` could not tell them apart.
+    """
+    manifest = _load_manifest()
+    for field in FIELDS:
+        assert set(manifest[field]) == _ROSTER, field
+    assert manifest["science_bands"]["drift_summary"] == []
+    assert manifest["liveness_floors"]["drift_summary"] == []
+
+
+def test_no_science_gate_names_a_scenario_outside_both_manifests() -> None:
+    """A gate on an unfrozen scenario is claiming standing it cannot have.
+
+    Both rosters are read, not just this one: the fields filter by scenario, so a typo
+    a gate on authored content would otherwise be dropped by BOTH manifests in silence —
+    the filter looking exactly like a clean result.
+    """
+    station = json.loads(
+        (MANIFEST_PATH.parent / "station-reference.manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    known = _ROSTER | frozenset(station["scenarios"])
+    assert unknown_scenarios(known) == ()
+
+
+def test_science_gate_is_decorator_form_only() -> None:
+    """The convention that makes static enumeration sound, pinned rather than trusted.
+
+    ``ast`` cannot see a marker applied through ``pytestmark``, a fixture or a
+    parametrized indirection. Rather than leave that a silent hole, the decorator
+    form is *required*, enforced structurally: every ``mark.science_gate`` attribute
+    access in the test tree must sit in a decorator position.
+
+    ⚠ The first version counted the string and failed at 13 vs 10 — **its own docstring
+    and code literal were three of the occurrences**. Matching
+    ``@pytest.mark.science_gate`` would have silenced that while missing the case worth
+    catching (``pytestmark = [...]`` has no ``@``), so the check reads the AST instead.
+    """
+    assert non_decorator_marker_sites() == (), (
+        "a science_gate marker is not in decorator form — the science fields "
+        "are enumerated statically and would silently miss it"
+    )
+
+
+def test_science_gate_entries_record_the_claim_not_just_a_test_id() -> None:
+    """Each entry carries quantity + bound + source + locus.
+
+    A manifest naming only a test id would freeze *that a test exists*, not *what it
+    asserts* — so a bound could be loosened in place with the gate still green. The
+    entry is the claim; the locus is where to go read it.
+    """
+    manifest = _load_manifest()
+    for field in FIELDS:
+        for entries in manifest[field].values():
+            for entry in entries:
+                assert set(entry) == set(REQUIRED_KEYS) - {"scenario", "field"} | {
+                    "locus"
+                }
+                assert all(str(v).strip() for v in entry.values())
 
 
 def test_completeness_gate_detects_an_unfrozen_param(monkeypatch, tmp_path) -> None:

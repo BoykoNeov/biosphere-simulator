@@ -79,6 +79,7 @@ from domains.power.loader import load_charge_params, load_self_discharge_params
 from domains.power.system import build_power
 from domains.thermal.loader import load_thermal_params
 from domains.thermal.system import build_thermal
+from science_gates import FIELDS, gates_for
 from station.loader import (
     load_harvest_params,
     load_lamp_params,
@@ -153,6 +154,10 @@ _SCENARIOS: dict[str, tuple[str, str]] = {
         "sealed_energy_drift_summary.json",
     ),
 }
+
+
+#: This manifest's scenario roster, as a set — the filter for the science-gate fields.
+_ROSTER = frozenset(_SCENARIOS)
 
 
 def _normalized_sha256(path: Path) -> str:
@@ -290,6 +295,8 @@ def _build_manifest() -> dict[str, object]:
         "param_files": {
             name: _normalized_sha256(param_paths[name]) for name in sorted(param_paths)
         },
+        "science_bands": gates_for(_ROSTER, "science_bands"),
+        "liveness_floors": gates_for(_ROSTER, "liveness_floors"),
         "scenarios": scenarios,
     }
 
@@ -337,6 +344,24 @@ def test_frozen_station_aux_set_is_complete() -> None:
     # registries (empty today — the biosphere aux is delegated). Catches a new aux.
     manifest = _load_manifest()
     assert set(manifest["aux_set"]) == set(_aux_set())
+
+
+def test_frozen_station_science_gates_are_complete() -> None:
+    """The station half of the science contract — derived from the tree, as everywhere.
+
+    ⚠ The measured result is mostly EMPTY, and that is the finding rather than a gap:
+    11 of the 13 station scenarios carry no outside-sourced bound at all. Established
+    mechanically — no station run-test defines a module-level sourced constant. Only
+    ``crew_mission`` (BVAD Table 3-31) and ``sealed_station`` (a thermal-node floor)
+    have one. Freezing the emptiness is the point: a band cannot be added silently, and
+    the absence is now a recorded claim instead of an unexamined assumption.
+    """
+    manifest = _load_manifest()
+    for field in FIELDS:
+        assert manifest[field] == gates_for(_ROSTER, field), field
+        assert set(manifest[field]) == _ROSTER, field
+    assert manifest["science_bands"]["crew_mission"], "the BVAD RQ band went missing"
+    assert manifest["liveness_floors"]["sealed_station"], "the node floor went missing"
 
 
 def test_completeness_gate_detects_an_unfrozen_param(monkeypatch, tmp_path) -> None:

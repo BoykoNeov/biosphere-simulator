@@ -206,6 +206,18 @@ the derived flow set + aux set, the eight param files (+ provenance hashes), eac
   The gate asserts the frozen *sets* against the live tree (and a teeth test confirms it
   fails on an unfrozen file). A new-but-unfrozen param/flow/aux fails the gate; that is the
   signal to either freeze it (an unfreeze) or remove it.
+- **`science_bands` + `liveness_floors` own the *science*** — added 2026-08-09; see
+  `docs/biosphere-reference.md` for what the two names mean and why they are kept apart, and
+  `docs/plans/post-roadmap-acceptance-gate-standing.md` for the inclusion rule.
+
+  ⚠ **On the station side the measured result is mostly EMPTY, and that is the finding rather
+  than a gap.** **11 of the 13** station scenarios carry no outside-sourced bound at all —
+  established mechanically, by there being no module-level sourced constant in any station
+  run-test. Only `crew_mission` has a band (BVAD Table 3-31's RQ) and only `sealed_station` has
+  a floor (the thermal node must not collapse toward `T_space`). Freezing the emptiness is the
+  point: the absence is now a recorded claim that a future band cannot be added around silently,
+  instead of an unexamined assumption. Every roster scenario gets an **explicit empty list** —
+  an absent key and a deliberately-empty one are different claims.
 
 ## The unfreeze discipline
 
@@ -232,6 +244,12 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-09 — the science assertions get contract standing (a SCHEMA unfreeze; NO value,
+  golden, param or `src/` change).** `docs/plans/post-roadmap-acceptance-gate-standing.md`.
+  Added `science_bands` + `liveness_floors`, derived from `science_gate` markers. Station-side
+  content is `crew_mission`'s BVAD RQ band and `sealed_station`'s node floor; the other 11
+  scenarios are explicitly empty, which is a measured result — see the manifest section above.
 
 - **2026-07-21 — scope (B) decomposer-calibration cascade (biosphere-delegated values +
   a sealed horizon).** The biosphere unfreeze (decomposer rates 0.02→0.011 / 0.05→0.016;

@@ -173,6 +173,39 @@ def test_the_target_meets_n_critical_at_14_42_t_per_ha() -> None:
     assert target_n_concentration(crossing * 1.01, **kw) < n_critical_kg_kg
 
 
+def _open_season_peak_w() -> float:
+    """``open_season``'s peak W on Greenwood's basis — whole plant EXCLUDING fibrous
+    roots. Shared by the gate and the margin pin, which were one test until the
+    science-gate work split them.
+    """
+    scenario = sc.DEFAULT_SCENARIO
+    state, registry = build_season(scenario)
+    states, rationed, _ = run_season(
+        EulerIntegrator(registry),
+        state,
+        weather_resolver(_weather(), scenario),
+        1.0,
+        len(_weather()),
+    )
+    assert rationed == 0
+    return max(
+        _t_per_ha(
+            s.stocks[LEAF_C].amount
+            + s.stocks[STEM_C].amount
+            + s.stocks[STORAGE_C].amount,
+            scenario.ground_area,
+        )
+        for s in states
+    )
+
+
+@pytest.mark.science_gate(
+    scenario="open_season",
+    field="science_bands",
+    quantity="peak W excl. fibrous roots (t/ha)",
+    bound="peak_w < 14.4248",
+    source="Greenwood 1990 eqn (6) a=5.697 meets n_critical=1.5",
+)
 def test_open_season_peaks_below_the_crossing_with_the_margin_pinned() -> None:
     """⚠ THE LOAD-BEARING MARGIN. ``open_season`` is the only frozen scenario that
     enters Greenwood's declining branch at all, and it peaks at 88 % of the crossing
@@ -191,28 +224,21 @@ def test_open_season_peaks_below_the_crossing_with_the_margin_pinned() -> None:
     below are unchanged**: as a guard, 14.4248 fires *before* the earliest measured bite
     (15.068 t/ha), which is the right direction for a tripwire to err in.
     """
-    scenario = sc.DEFAULT_SCENARIO
-    state, registry = build_season(scenario)
-    states, rationed, _ = run_season(
-        EulerIntegrator(registry),
-        state,
-        weather_resolver(_weather(), scenario),
-        1.0,
-        len(_weather()),
-    )
-    assert rationed == 0
-    # Greenwood's W: whole plant EXCLUDING fibrous roots.
-    peak_w = max(
-        _t_per_ha(
-            s.stocks[LEAF_C].amount
-            + s.stocks[STEM_C].amount
-            + s.stocks[STORAGE_C].amount,
-            scenario.ground_area,
-        )
-        for s in states
-    )
-    assert 12.0 < peak_w < 13.0, peak_w
+    peak_w = _open_season_peak_w()
     assert peak_w < 14.4248, "open_season entered the stressed branch — f_N moved"
+
+
+def test_open_season_peak_w_margin_to_the_crossing() -> None:
+    """The margin narrative and the recorded value — NOT gates, deliberately unmarked.
+
+    ``12.0 < peak_w < 13.0`` characterizes our own number, and the ratio pin's
+    own failure message says what it is for: detecting that *prose* went stale. Neither
+    bounds the science against an outside source, and freezing the second would let an
+    unfreeze ceremony fail because a doc sentence drifted. The sourced half — 14.4248
+    crossing — is the gate above.
+    """
+    peak_w = _open_season_peak_w()
+    assert 12.0 < peak_w < 13.0, peak_w
     assert peak_w / 14.4248 > 0.85, "the margin narrative is stale; re-measure it"
 
 

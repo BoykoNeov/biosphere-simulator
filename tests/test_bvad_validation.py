@@ -223,6 +223,13 @@ def test_calibration_humidity_and_urine() -> None:
 # --- The structural prediction (THE payload — can genuinely fail) ---------------------
 
 
+@pytest.mark.science_gate(
+    scenario="crew_mission",
+    field="science_bands",
+    quantity="daily-effective molar respiratory quotient",
+    bound="CO2/O2 == approx(0.8814)",
+    source="NASA BVAD Table 3-31 (Rev 2, 2022, p. 58)",
+)
 def test_rq_structural_prediction() -> None:
     """THE headline result. ``CrewRespiration`` fixes RQ = 1.0 (PQ = 1), so with CO₂
     calibrated to BVAD the model's O₂ comes out at the *daily-effective molar

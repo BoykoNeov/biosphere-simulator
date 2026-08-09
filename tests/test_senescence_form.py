@@ -495,6 +495,13 @@ def test_rdr_root_is_the_closest_of_the_three_to_its_source() -> None:
 
 
 # --- 2/3. the canopy: what the flat rate has actually been doing ----------------------
+@pytest.mark.science_gate(
+    scenario="open_season",
+    field="science_bands",
+    quantity="peak LAI (m2 m-2)",
+    bound="5.0 < peak < 8.0",
+    source="real wheat peaks at ~5-8 LAI",
+)
 def test_frozen_open_season_canopy_is_physical() -> None:
     """The baseline half of the finding, so the comparison below has a floor."""
     states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1)
@@ -785,25 +792,55 @@ def test_the_regulator_is_BIT_IDENTICALLY_inert_on_the_frozen_form(
     assert rebuilt == regulated, f"{label}: the regulator is NOT inert"
 
 
-def test_frozen_peak_lai_is_below_the_threshold_and_open_season_is_CLOSE() -> None:
-    """⚠ FINDING 5 — the new tripwire, in the style of the 14.4248 t/ha Greenwood one.
+def _roster_peak_lai() -> dict[str, float]:
+    """Peak LAI per frozen scenario — shared by the gate and the margin pin below.
 
-    The chambers are 9-88x below the LAI-6 threshold and will never reach it; they are
-    CARBON-limited by design (the (A) diagnosis measured their plant at 52 g DM/m2).
-    ``open_season`` is different: it peaks at 5.191, **86 % of the way to the
-    threshold**. So a calibration growing the open-field canopy ~16 % would start a
-    sourced, non-fitted mechanism firing in a frozen scenario. A margin that lives only
-    in prose is the "freeze's prose half is ungated" shape, so it is asserted.
+    They were one test until the science-gate work; see the split note on the gate.
     """
     peaks = {}
     for label, scenario, years, resets in _ROSTER:
         states, _r, _ = _run(scenario, years, resets=resets)
         peaks[label], _ = _peak_lai(states, scenario)
+    return peaks
+
+
+@pytest.mark.science_gate(
+    scenario="open_season",
+    field="science_bands",
+    quantity="peak LAI (m2 m-2)",
+    bound="peak < 6.0",
+    source="Van Keulen & Seligman 1987 mutual-shading threshold, via [A] p. 101",
+)
+def test_frozen_peak_lai_is_below_the_vks_threshold() -> None:
+    """⚠ FINDING 5 — the tripwire, in the style of the 14.4248 t/ha Greenwood one.
+
+    The chambers are 9-88x below the LAI-6 threshold and will never reach it; they are
+    CARBON-limited by design (the (A) diagnosis measured their plant at 52 g DM/m2).
+    ``open_season`` is different: it peaks at 5.191, and a calibration growing the
+    open-field canopy ~16 % would start a sourced, non-fitted mechanism firing in a
+    frozen scenario.
+
+    ⚠ **Split note.** This function also carried
+    ``0.80 < open_peak / VKS_LAI_THRESHOLD < 0.92`` until the science-gate work. That
+    assertion is a *margin* pin — a change IMPROVING the margin fails its upper side —
+    so it is not a gate under the inclusion rule and now lives in its own unmarked test
+    below. The bound frozen here is the threshold itself, which is sourced.
+    """
+    peaks = _roster_peak_lai()
     for label, peak in peaks.items():
         assert peak < VKS_LAI_THRESHOLD, (label, peak)
     chambers = [v for k, v in peaks.items() if k != "open_season"]
     assert max(chambers) < 1.0, peaks  # 0.632 — an order below, not a near miss
-    open_peak = peaks["open_season"]
+
+
+def test_open_season_lai_margin_to_the_threshold_is_86_percent() -> None:
+    """The margin narrative, asserted so it cannot rot — NOT a gate.
+
+    Deliberately unmarked: this is two-sided on a *ratio to our own peak*, so a change
+    that moves the canopy further from the threshold fails it. Freezing that as contract
+    would let an unfreeze ceremony fail for an improvement.
+    """
+    open_peak = _roster_peak_lai()["open_season"]
     assert 0.80 < open_peak / VKS_LAI_THRESHOLD < 0.92, open_peak  # 0.865
 
 

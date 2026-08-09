@@ -841,9 +841,17 @@ def test_a_manifest_scenario_entry_carries_no_plausibility_criterion() -> None:
     """What a frozen scenario is contractually required to satisfy, structurally.
 
     A manifest entry names a golden and its hash (plus, for the biosphere, a year
-    count). There is no field for "the crop must be physical" — so the acceptance set
-    is {golden bytes, ``rationed == 0``, no extinction, conservation, determinism}, all
-    of which are properties of the *run*, none of which is a property of the *science*.
+    count). There is no field for "the crop must be physical".
+
+    ⚠ **Still true, and no longer the whole story — read it with the test below.** When
+    this was written it carried the conclusion "so the acceptance set is {golden bytes,
+    ``rationed == 0``, no extinction, conservation, determinism}, all properties of the
+    *run*". Since 2026-08-09 the science *does* have standing, via top-level
+    ``science_bands`` / ``liveness_floors`` fields keyed by scenario rather than via a
+    column inside the entry. So the structural claim below is unchanged — the entry's
+    key set really is untouched — while the conclusion drawn from it in the original
+    docstring is now false. Kept, because the entry shape is still worth pinning; the
+    conclusion moved to where it can be checked.
     """
     rosters = ((BIOSPHERE_MANIFEST, {"years"}), (STATION_MANIFEST, set()))
     for manifest_path, extra in rosters:
@@ -852,21 +860,29 @@ def test_a_manifest_scenario_entry_carries_no_plausibility_criterion() -> None:
             assert set(entry) == {"golden", "golden_sha256", "scenario"} | extra, key
 
 
-def test_the_plausibility_bands_that_exist_are_named_by_no_manifest() -> None:
-    """The bands are records, not gates — and they were written after the science.
+def test_the_plausibility_bands_are_now_named_by_a_manifest() -> None:
+    """⚠ **THE INVERSE of the pin this replaced, and the replaced pin was not wrong.**
 
-    ``test_senescence_form.py`` pins ``5 < peak LAI < 8`` for ``open_season`` and
-    ``test_nitrogen_form.py`` pins the 14.4248 t/ha Greenwood crossing. Both are real
-    literature-backed readings; neither is reachable from a manifest, so neither can
-    fail an unfreeze ceremony. Checked by grep rather than asserted in prose (the
-    round-5 ``grep -l`` discipline).
+    Until 2026-08-09 this asserted the opposite — that no manifest names
+    ``test_senescence_form`` or ``test_nitrogen_form``, so the bands were *records, not
+    gates*. That was a true measurement of the contract as it then stood, and it is the
+    measurement the adjudication acted on (finding 5 → ``science_bands``). It is
+    **resolved, not corrected**: the mechanism it described was removed on purpose.
+
+    It is replaced by its inverse rather than deleted or relaxed, on the option-(B)
+    precedent — *a pin guarding a mechanism you removed is decoration*. What must not
+    silently regress now is the standing itself: both loci must be reachable from a
+    manifest, and the band must still be where this says it is.
     """
-    diagnostics = ("test_senescence_form", "test_nitrogen_form", "test_chamber_scale")
-    for manifest_path in (BIOSPHERE_MANIFEST, STATION_MANIFEST):
-        text = manifest_path.read_text("utf-8")
-        for name in diagnostics:
-            assert name not in text, (manifest_path.name, name)
-    # ...and the band itself is where this says it is.
+    named = ("test_senescence_form", "test_nitrogen_form")
+    text = BIOSPHERE_MANIFEST.read_text("utf-8")
+    for name in named:
+        assert name in text, name
+    # ``test_chamber_scale`` stays OUT: its BVAD comparisons are characterizations, not
+    # gates — a chamber resized *toward* the flight spec fails them. See the inclusion
+    # rule in docs/plans/post-roadmap-acceptance-gate-standing.md.
+    assert "test_chamber_scale" not in text
+    # ...and the band itself is still where this says it is.
     band_src = (_REPO_ROOT / "tests" / "test_senescence_form.py").read_text("utf-8")
     assert "assert 5.0 < peak < 8.0" in band_src
 

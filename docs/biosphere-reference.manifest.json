@@ -31,6 +31,47 @@
   },
   "frozen_at_phase": 4,
   "integrator": "EulerIntegrator",
+  "liveness_floors": {
+    "consumer_chamber": [],
+    "consumer_long_horizon": [
+      {
+        "bound": "non_collapsing(floor=0.05)",
+        "locus": "tests/test_decade_stability.py::test_decade_leaf_cycle_is_stationary",
+        "quantity": "annual peak leaf carbon (mol C)",
+        "source": "self \u2014 the calibrated attractor, not a cited value"
+      },
+      {
+        "bound": "non_collapsing(floor=5e-4)",
+        "locus": "tests/test_decade_stability.py::test_decade_consumer_biomass_is_stationary_and_alive",
+        "quantity": "year-end consumer carbon (mol C)",
+        "source": "self \u2014 the calibrated attractor, not a cited value"
+      }
+    ],
+    "drift_summary": [],
+    "open_season": [],
+    "perennial_chamber": [],
+    "perennial_long_horizon": [
+      {
+        "bound": "non_collapsing(floor=0.05) past the sow-in transient",
+        "locus": "tests/test_decade_stability.py::test_decade_min_carbon_pool_stationary",
+        "quantity": "annual minimum chamber CO2 pool (mol C)",
+        "source": "self \u2014 the guard stem-only tripped at 0.01619 WHILE STAYING STATIONARY"
+      },
+      {
+        "bound": "non_collapsing(floor=0.05)",
+        "locus": "tests/test_decade_stability.py::test_decade_leaf_cycle_is_stationary",
+        "quantity": "annual peak leaf carbon (mol C)",
+        "source": "self \u2014 the calibrated attractor, not a cited value"
+      },
+      {
+        "bound": "max(tail) > 0.9",
+        "locus": "tests/test_decade_stability.py::test_perennial_leaf_cycle_is_a_fixed_point",
+        "quantity": "converged peak-leaf fixed point (mol C)",
+        "source": "self \u2014 re-tuned from >1.0 when the decomposer calibration shrank the plant"
+      }
+    ],
+    "sealed_chamber": []
+  },
   "long_horizon_years": 15,
   "param_files": {
     "allocation.yaml": "db32b1b1663cb800704b2a5d32609c1af66c62301dc7035ba847424540d4ebda",
@@ -90,5 +131,33 @@
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }
+  },
+  "science_bands": {
+    "consumer_chamber": [],
+    "consumer_long_horizon": [],
+    "drift_summary": [],
+    "open_season": [
+      {
+        "bound": "5.0 < peak < 8.0",
+        "locus": "tests/test_senescence_form.py::test_frozen_open_season_canopy_is_physical",
+        "quantity": "peak LAI (m2 m-2)",
+        "source": "real wheat peaks at ~5-8 LAI"
+      },
+      {
+        "bound": "peak < 6.0",
+        "locus": "tests/test_senescence_form.py::test_frozen_peak_lai_is_below_the_vks_threshold",
+        "quantity": "peak LAI (m2 m-2)",
+        "source": "Van Keulen & Seligman 1987 mutual-shading threshold, via [A] p. 101"
+      },
+      {
+        "bound": "peak_w < 14.4248",
+        "locus": "tests/test_nitrogen_form.py::test_open_season_peaks_below_the_crossing_with_the_margin_pinned",
+        "quantity": "peak W excl. fibrous roots (t/ha)",
+        "source": "Greenwood 1990 eqn (6) a=5.697 meets n_critical=1.5"
+      }
+    ],
+    "perennial_chamber": [],
+    "perennial_long_horizon": [],
+    "sealed_chamber": []
   }
 }

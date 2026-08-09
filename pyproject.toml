@@ -71,6 +71,7 @@ addopts = "-ra"
 markers = [
     "slow: long-running gates (e.g. the 100k-step stability run); deselect with -m 'not slow'",
     "oracle: PCSE/WOFOST oracle regeneration (needs the `oracle` dep group + network); skipped cleanly when pcse is absent (importorskip). Run with -m oracle.",
+    "science_gate(scenario, field, quantity, bound, source): this test asserts the SCIENCE of a frozen scenario, not a property of its run. Enumerated statically by tests/science_gates.py and frozen in the manifests' science_bands / liveness_floors fields, so it cannot be dropped without an unfreeze. Decorator form with string literals only — see docs/plans/post-roadmap-acceptance-gate-standing.md.",
 ]
 
 [tool.pyright]
