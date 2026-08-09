@@ -42,6 +42,7 @@ review the manifest diff. Zero ``simcore`` change (docs + tests only).
 
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,7 @@ from domains.biosphere.season import (
 from science_gates import (
     FIELDS,
     REQUIRED_KEYS,
+    collect_science_gates,
     gates_for,
     non_decorator_marker_sites,
     unknown_scenarios,
@@ -358,6 +360,44 @@ def test_science_gate_entries_record_the_claim_not_just_a_test_id() -> None:
                     "locus"
                 }
                 assert all(str(v).strip() for v in entry.values())
+
+
+def test_science_gate_bounds_name_a_literal_present_at_their_locus() -> None:
+    """Tie the recorded ``bound`` to the executed one — the retune-in-silence path.
+
+    ⚠ Without this the ``bound`` field is **documentation, not an assertion**: it is
+    prose *describing* it, so ``non_collapsing(floor=0.05)`` could be retuned to 0.02 in
+    ``test_decade_stability.py`` with the manifest text left stale and every gate green.
+    That is exactly what ``liveness_floors`` exists to prevent, and the floors are the
+    family that **has already been retuned once** (``> 1.0`` → ``> 0.9``, when the
+    decomposer calibration shrank the plant ~19 %).
+
+    Deliberately crude — every numeric literal in ``bound`` must appear textually in the
+    file the entry points at. It does not parse the expression, so it cannot prove the
+    literal is *the* threshold; it does close the path where the number moves and the
+    record does not. The `science_bands` are better protected anyway, because their
+    constants are named (``VKS_LAI_THRESHOLD``, ``14.4248``); a floor is a bare literal
+    in a call, which is why the weaker family sets the requirement.
+    """
+    numeric = re.compile(r"\d+\.\d+(?:[eE]-?\d+)?|\d+[eE]-\d+")
+    manifests = (
+        MANIFEST_PATH,
+        MANIFEST_PATH.parent / "station-reference.manifest.json",
+    )
+    checked = 0
+    for manifest_path in manifests:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for field in FIELDS:
+            for entries in manifest[field].values():
+                for entry in entries:
+                    filename = entry["locus"].split("::")[0]
+                    src = (_REPO_ROOT / filename).read_text(encoding="utf-8")
+                    literals = numeric.findall(entry["bound"])
+                    assert literals, entry  # a bound with no number is not a bound
+                    for literal in literals:
+                        assert literal in src, (entry["locus"], literal)
+                    checked += 1
+    assert checked == len(collect_science_gates()), checked
 
 
 def test_completeness_gate_detects_an_unfrozen_param(monkeypatch, tmp_path) -> None:

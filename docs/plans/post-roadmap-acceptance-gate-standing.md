@@ -191,6 +191,27 @@ all run-properties") is now false while its assertion is untouched. Annotated in
 rather than rewritten, because that gap — a sound assertion under a stale conclusion — is
 the shape this repo keeps logging.
 
+**The schema unfreeze is Python-only — checked, not assumed.** The manifests are consumed
+by more than Python, and the port-mirror record is that a fact true in one port can
+silently become load-bearing in the other. Measured: **no Rust code reads either
+manifest** (the four `rust/` hits for "manifest" are all comments), and `tests/crossport/`
+reads them for `manifest["scenarios"]` only — the golden filenames — which is a
+*different key* from the two added here. So the addition is genuinely inert across the
+port boundary. Cheap to check, and unstated it would have been an assumption.
+
+**The `bound` field ties to the executed number, but only crudely — the limitation is
+named because the gate is weaker than it looks.** `bound` is prose *describing* the
+assertion, so on its own it would freeze the sentence rather than the number, and a floor
+could be retuned in place with the manifest text stale. That is precisely what
+`liveness_floors` exists to prevent, and the floors are the family that **has already been
+retuned once**. So `test_science_gate_bounds_name_a_literal_present_at_their_locus`
+requires every numeric literal in `bound` to appear textually in the file the entry points
+at. ⚠ It does **not** parse the expression, so it cannot prove the literal is *the*
+threshold — it closes the number-moves-and-the-record-does-not path, nothing more. The
+bands are better protected incidentally (their constants are named — `VKS_LAI_THRESHOLD`,
+`14.4248`); a floor is a bare literal in a call, which is why the weaker family set the
+requirement.
+
 ---
 
 ## 6. What this does NOT claim
