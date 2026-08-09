@@ -20,6 +20,7 @@ dev = [
     "pytest>=8",
     "hypothesis>=6",
     "pyright>=1.1",
+    "pytest-xdist>=3",
 ]
 # PCSE (EUPL) is an OFFLINE validation oracle only (Phase 1, Step 3). It drags
 # numpy + a large tree, so it stays a dev/test-only extra — never imported by the

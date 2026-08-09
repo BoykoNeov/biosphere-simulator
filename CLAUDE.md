@@ -151,6 +151,7 @@ added a consumer and changed no science).
 ```
 uv sync                 # install/lock deps
 uv run pytest           # tests (pytest + hypothesis)
+uv run pytest -n 12     # ...in parallel (xdist); grouping is handled in conftest
 uv run ruff check .     # lint
 uv run ruff format .    # format
 uv run pyright          # types
@@ -158,6 +159,15 @@ uv run pyright          # types
 
 `cargo test` + `cargo clippy --all-targets -D warnings` in `rust/`.
 Markers: `-m slow` (opt-out, ~9 min), `-m oracle` (opt-in).
+
+**Suite runtime** (`docs/test-suite-runtime.md`): the pytest process runs at
+**below-normal priority** by default so it yields to interactive work on the same
+machine — a priority *class*, so the xdist workers and the `cargo` children
+`tests/crossport/` spawns inherit it. Opt out with `SIMTEST_PRIORITY=normal`
+(`idle` is the aggressive setting). `-n` turns on `--dist loadgroup` automatically;
+the two groups that exist are about cost, not balance. Hypothesis's default
+200 ms **per-example deadline is disabled** — it is a wall-clock assertion, and no
+property here is about speed.
 
 ## Testing
 
