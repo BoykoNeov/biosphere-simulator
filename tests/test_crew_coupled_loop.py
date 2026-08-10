@@ -24,12 +24,15 @@ from domains.biosphere.scenario import (
     SeasonScenario,
 )
 from domains.biosphere.season import build_season, run_season, weather_resolver
-from domains.biosphere.stocks import CARBON_POOL, LEAF_C, STORAGE_C
+from domains.biosphere.stocks import CARBON_POOL, LEAF_C, O2_POOL, STORAGE_C
 from domains.crew.loader import load_crew_params
 from domains.eclss.loader import load_eclss_params
 from domains.power.loader import load_charge_params
 from domains.thermal.loader import load_thermal_params
 from sealed_tier2_helper import total_organic_c, weather
+from simcore import arbitration
+from simcore.conservation import assert_conserved
+from simcore.ids import StockId
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
 from station.driver import run_master_day
@@ -249,6 +252,34 @@ def test_area_scaling_is_an_EXACT_similarity_transform() -> None:
     assert worst_lai < 1e-14, worst_lai
 
 
+def _area_scaled_station(area: float) -> SealedStationScenario:
+    """The sealed station with the growing area scaled to `area`, and everything the
+    area drags with it: the plant/soil ICs (PIN 3's similarity transform), the lamp
+    (PAR is inverse in the area, PIN 4) and the microgrid (a bigger lamp draws more).
+
+    The CABIN gas pools deliberately do NOT scale -- the cabin is the crew's, and that
+    asymmetry is the coupling under test.
+    """
+    bio0 = SEALED_STATION_SCENARIO.bio
+    a = area / bio0.ground_area
+    bio = replace(
+        bio0,
+        ground_area=area,
+        **{f: getattr(bio0, f) * a for f in _PLANT_SOIL_ICS},
+    )
+    pw0 = SEALED_STATION_SCENARIO.power
+    return replace(
+        SEALED_STATION_SCENARIO,
+        years=1,
+        bio=bio,
+        lamp_power_w=SEALED_STATION_SCENARIO.lamp_power_w * a,
+        power=replace(
+            pw0, battery0=pw0.battery0 * a, solar_peak_w=pw0.solar_peak_w * a
+        ),
+        battery0=SEALED_STATION_SCENARIO.battery0 * a,
+    )
+
+
 # --- 3. the light is inverse in the area (why the BVAD-sized plot goes dark) ----------
 
 
@@ -350,6 +381,120 @@ def test_the_coupled_season_is_field_scale_open_loop_and_carbon_capped() -> None
     one_cm_area = BVAD_CREW_C_PER_DAY / BVAD_WHEAT_C_PER_M2_DAY
     assert peak_daily_gain * one_cm_area / pool > 2.0, (
         "the shared cabin no longer fails to supply one crewmember's worth of crop"
+    )
+
+
+@pytest.mark.slow
+def test_the_per_day_ceiling_binds_on_CARBON_POOL_in_the_SLOW_registry() -> None:
+    """PIN 11. The mechanism behind PIN 9, ISOLATED rather than argued.
+
+    PIN 9's arithmetic only PREDICTS the cap. The measurement at 187.45 m2 is a single
+    `rationed` integer, and `run_master_day` sums the slow and fast reports into it --
+    in a run that also has a power bus under load. Reading that sum as "the biosphere
+    rationed" is the (C)-branch error this repo logs: a location reported under a
+    constant it was never measured into.
+
+    So: drive the two registries by hand (the driver's own order, slow-first) to count
+    them apart, and record the binding stock through `arbitration.min_scaling`'s own
+    demand accumulation. `o2_pool` is checked BY NAME because it was a live candidate --
+    the other cabin gas pool the area scaling leaves alone, drawn by decomposers that
+    DID scale with the litter.
+    """
+    area = (
+        _crew_carbon_per_day(SEALED_STATION_SCENARIO)
+        / BVAD_CREW_C_PER_DAY
+        * (BVAD_CREW_C_PER_DAY / BVAD_WHEAT_C_PER_M2_DAY)
+    )
+    scenario = _area_scaled_station(area)
+    days = scenario.season_days
+
+    charge = load_charge_params()
+    lamp = load_lamp_params()
+    state, bio_reg, fast_reg = build_sealed_station(
+        charge,
+        load_thermal_params(),
+        load_crew_params(),
+        load_eclss_params(),
+        load_water_recovery_params(),
+        lamp,
+        load_harvest_params(),
+        scenario,
+        with_harvest=True,
+        close_feces=False,
+    )
+    bio_int, fast_int = EulerIntegrator(bio_reg), EulerIntegrator(fast_reg)
+    bio_res = sealed_bio_resolver(weather(scenario.years), lamp, scenario)
+    fast_res = sealed_fast_resolver(charge, scenario)
+    reset = sealed_reset(scenario)
+
+    slow_rationed = fast_rationed = 0
+    binding: dict[str, int] = {}
+    below_one: dict[str, int] = {}
+    worst: dict[str, float] = {}
+
+    def record(results: object, stocks: dict[StockId, object]) -> None:
+        """`_scale_factors`' own accumulation, verbatim: withdrawals only, unclamped
+        skipped (decision #13)."""
+        demand: dict[StockId, float] = {}
+        for result in results:  # type: ignore[attr-defined]
+            for leg in result.legs:
+                if leg.amount < 0.0 and not stocks[leg.stock].unclamped:  # type: ignore[attr-defined]
+                    demand[leg.stock] = demand.get(leg.stock, 0.0) - leg.amount
+        margins = {
+            str(sid): stocks[sid].amount / d  # type: ignore[attr-defined]
+            for sid, d in demand.items()
+            if d > 0.0
+        }
+        if not margins:
+            return
+        arg = min(margins, key=lambda k: margins[k])
+        binding[arg] = binding.get(arg, 0) + 1
+        for k, m in margins.items():
+            worst[k] = min(worst.get(k, float("inf")), m)
+            if m < 1.0:
+                below_one[k] = below_one.get(k, 0) + 1
+
+    real = arbitration.min_scaling
+
+    def wrapped(results: object, stocks: dict[StockId, object]) -> object:
+        record(results, stocks)
+        return real(results, stocks)  # type: ignore[arg-type]
+
+    for _day in range(days):
+        rs = reset(state.n, state)
+        if rs is not state:
+            assert_conserved(state, rs)
+            state = rs
+        # The slow (biosphere) step, and ONLY it, with its arbitration call recorded.
+        arbitration.min_scaling = wrapped  # type: ignore[assignment]
+        try:
+            rep = bio_int.step_report(state, bio_res, scenario.bio_dt)
+        finally:
+            arbitration.min_scaling = real  # type: ignore[assignment]
+        state = rep.state
+        slow_rationed += rep.rationed
+        for _ in range(scenario.steps_per_day):
+            before = state
+            frep = fast_int.substep(state, fast_res, scenario.cabin_dt)
+            state = frep.state
+            assert_conserved(before, state)
+            fast_rationed += frep.rationed
+
+    # The ceiling is entirely in the SLOW registry -- the power bus is fine.
+    assert slow_rationed > 0, "the per-day ceiling stopped binding"
+    assert fast_rationed == 0, (
+        f"the fast registry now rations too ({fast_rationed}); the slow-side "
+        "attribution of PIN 9 is no longer clean"
+    )
+    # ...and the stock it binds on is CARBON, on essentially every growing day.
+    assert below_one == {str(CARBON_POOL): slow_rationed}, (
+        f"the binding stock is no longer carbon_pool alone: {below_one}"
+    )
+    assert binding[str(CARBON_POOL)] > 0.9 * days
+    assert worst[str(CARBON_POOL)] < 0.25, worst[str(CARBON_POOL)]
+    # o2_pool was a LIVE candidate (unscaled, and drawn by the scaled decomposers).
+    assert str(O2_POOL) not in below_one, (
+        "o2_pool now binds too -- re-read the mechanism"
     )
 
 

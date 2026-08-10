@@ -80,9 +80,17 @@ Against the *standalone* chambers the same tree grows **52–70 g DM/m², LAI 0.
 
 **The mechanism, measured:** `biosphere.carbon_pool` reads **3.796000 mol at every one of
 the 306 day boundaries**. The crew produce CO₂ at a constant `f_resp·food_intake` and the
-scrubber removes it at `k_scrub·pool`, so the pool sits at its equilibrium
-`P/k_scrub = 3.796e-3/1e-3` and **`ci` is a regulated constant** (ambient 399.6 ppm,
-`ci` = 0.7 × that ≈ 280 µmol mol⁻¹). Functionally that is the *same unclamped supply*
+scrubber removes it at `k_scrub·pool`, so the equilibrium is `P/k_scrub = 3.796e-3/1e-3`
+and **`ci` is a regulated constant** (ambient 399.6 ppm, `ci` = 0.7 × that ≈ 280 µmol
+mol⁻¹).
+
+⚠ **The flatness is partly by construction and that should not read as emergent:**
+`chamber_co2_mol0` **is** that equilibrium — the scenario is filled *at* its fixed point
+(asserted in PIN 5, `production / co2_scrub_rate ≈ chamber_co2_mol0`), so the pool starts
+there and the regulator keeps it there. What is *not* by construction is that a
+field-scale crop's daily draw never moves it: at 1 m² the plant is a **0.6 mol/day**
+perturbation on a 3.796 mol pool refilled at 328 mol/day, which §9 measures as the very
+headroom that hides the ceiling. Functionally that is the *same unclamped supply*
 `open_season` has — the acceptance-gate diagnosis measured `open_season`'s carbon source
 as an unclamped boundary stock holding 0.0.
 
@@ -200,9 +208,15 @@ configurations, same harness, year by year:
 **The collapse is pre-existing and essentially harvest-independent.** The rationing
 counts at year 5 differ by **0.36 %** (112,264 vs 112,667), and **112,667 is the exact
 count `CLAUDE.md` already records** for the biosphere `perennial` scenario's year-5
-rationing, documented there as *"a beyond-horizon tiling/reset artifact"*. Harvest ON
-does not cause the collapse; it dies a year earlier because it holds a **115× smaller
-grain reserve** (0.2118 vs 24.3576 mol), so it has less buffer when the collapse arrives.
+rationing, documented there as *"a beyond-horizon tiling/reset artifact"*. Harvest ON does
+not cause the collapse.
+
+⚠ It also **dies a year earlier** (6 vs 7) **and** holds a **115× smaller grain reserve**
+(0.2118 vs 24.3576 mol) when the collapse arrives. Those two facts are recorded **side by
+side and not joined**: the reserve is the obvious candidate mechanism, but it was **not
+isolated** — no run varied the reserve independently — and writing *"it dies earlier
+**because** the reserve is smaller"* would be a causal sentence resting on a correlation,
+which is exactly what the paragraph above refuses for the 112,667 match.
 
 ⚠ The two counts matching to six digits across *different* scenarios (a 9,500-mol cabin
 chamber here vs a 1,000-mol standalone jar there) is **recorded as an observation, not an
@@ -291,14 +305,55 @@ crop starves worse than before. The ECLSS regulator holds an **amount**; the pla
 The biosphere is the **slow** registry: it steps once per master day and takes its whole
 day's carbon in **one Euler step, out of the standing pool** — the crew's 327.974 mol C/d
 is delivered by the **fast** registry across 1440 sub-steps *after* the plant has had its
-one shot. So the crop's per-day carbon is capped at the standing pool no matter how much
-area is added, and:
+one shot.
+
+⚠ **That is a mechanism, so it was ISOLATED rather than argued** (`probe9_split_counter.py`,
+`probe10_which_stock.py`). The arithmetic above only *predicts* the cap; the measurement at
+187.45 m² was a single `rationed = 282`, and `run_master_day` sums the slow and fast
+reports into **one integer** — in a run that also had a power bus under load. Reading that
+sum as "the biosphere rationed" would have been the (C)-branch error this repo already
+logs (*"a location reported under a constant it was never measured into"*). Split, and
+with the binding stock recorded through `arbitration.min_scaling`'s own accumulation:
+
+| | measured |
+|---|---|
+| slow-side (biosphere) firings | **282** |
+| fast-side (cabin / power) firings | **0** — and `power.battery` never falls below 3.09e12 J |
+| days the slow step rationed | **282 of 305** |
+| binding stock (argmin `available/demand`) | **`biosphere.carbon_pool`**, 296 of 305 days |
+| stock whose margin actually went below 1.0 | `carbon_pool`, on **exactly 282** days |
+| its worst margin | **0.182976** — demand **5.5×** the pool |
+| `biosphere.o2_pool` (also unscaled, also drawn by the ×187 decomposers) | **never binds** |
+
+⚠ `o2_pool` is named explicitly because it was a **live** candidate, not a straw one: it is
+the *other* cabin gas pool the area scaling deliberately leaves alone, and decomposition
+and microbial respiration draw O₂ and did scale with the litter. It does not bind, and
+that had to be measured.
+
+Free corroboration: the runner-up argmin is `biosphere.water_vapor` at a margin of exactly
+**2.000000 = 1/(k·dt)** — the acceptance-gate diagnosis's *rate-determined* margin (*"on
+donor-controlled stocks the gate is a `dt` CHECK, not a scarcity check"*), turning up in a
+measurement that was not looking for it.
+
+So the crop's per-day carbon is capped by the standing pool no matter how much area is
+added, and:
 
 > **the shared cabin cannot supply even ONE BVAD crewmember's worth of crop** — it is
 > exceeded 2.23× at 14.091 m², before any question of *closure* arises.
 
 Net gain is a **lower bound** on gross uptake (respiration and senescence are already
 netted out), so the true cap binds sooner than these ratios say.
+
+⚠ **AND A SECOND PREDICTION OF MINE WAS REFUTED BY THE SAME PROBE, WHICH IS WHY IT IS
+RECORDED.** I predicted the 187 m² crop would *pin at* the standing pool — take
+~3.796 mol C/d, the whole thing, every day. It does not: its peak single-day net gain is
+**1.238150 mol C/d = 0.326× the pool**, only **2.06×** the 1 m² plant's 0.601205. The cap
+is on **demand**, not on delivery: the backstop clips *gross* assimilation to what the
+pool holds, and what survives into standing carbon is that clipped gross **minus**
+maintenance respiration and senescence — which scale with the ×187 biomass and do **not**
+scale with the clipped supply. A bigger crop on a fixed carbon ration keeps more mouths on
+the same food. **"Demand exceeds the pool" and "the plant receives the pool" are different
+statements and only the first is measured.**
 
 ⚠ **This is the chamber-scale diagnosis reached independently for the fifth time**, and
 it sharpens it: *"the atmosphere is a buffer of hours"* becomes, under the two-rate split,
