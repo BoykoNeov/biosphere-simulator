@@ -106,6 +106,17 @@ PID-count probe generalizes directly to the first of them.
   default, and **four** of ~305 s under the removed `loadgroup` one. So the slow tier
   gains less than the fast loop does — parallelism cannot amortize a per-process
   fixture, it can only stop making it worse.
+  ⚠ **2026-08-10: the count is set by the SELECTION, not only by the mode, and the
+  sentence above reads as though the mode determined it.** Under the shipped `load`
+  default on the same box within one hour: the **full suite** paid **two** setups
+  (379.6 s, 374.3 s) while **`-m slow` alone** paid **four** (318.7/316.7/315.8/262.2 s).
+  Consequence, and it is the counterintuitive part: **running only the slow tier is
+  SLOWER than running the whole suite** — 504.47 s against 425.49 s, i.e. adding 2080
+  fast tests made the run finish sooner. Why is **not measured**: the plausible reading
+  is that with more items in the queue the six consumers land on fewer distinct workers,
+  but that is a claim about xdist's scheduler and the probe that would settle it is the
+  PID count already prescribed above. Recorded as a measured *count* with an unmeasured
+  *cause*.
 
 Fixing that properly means either declaring the group in-file (`pytestmark` in both
 `test_sealed_station_stability.py` and `test_regression_sealed_station.py`) and paying
@@ -162,6 +173,32 @@ a matched pair — see the warning below.
 | `tests/crossport` alone, serial (rust pre-built) | 41.6 s (96 tests) | — |
 | `tests/crossport` alone, `-n 8` | 51.3 s | **0.8x** |
 | earlier matched pair, before `loadgroup` was removed | 270.4 s → 94.1 s | 2.9x |
+
+Re-measured **2026-08-10**, all three inside one hour on the same box, `-n 12`:
+
+| Run | Wall | Tests |
+|---|---|---|
+| fast loop (`-m "not slow"`) | **49.58 s** | 2080 |
+| slow tier (`-m slow`) | **504.47 s** | 82 |
+| full suite | **425.49 s** | 2162 |
+
+The fast-loop row is the **control**: it reproduces the 51.1 s above to within 3 %, which
+is what licenses the other two as readings of the box rather than of its load. No growth
+*ratio* is quoted against the 273.4 s row — the suite gained ~160 tests in between,
+several of them minute-scale, so that comparison would conflate suite size with machine
+state. The absolute figure, dated, is the honest form.
+
+⚠ **A 2197 s (36 m 37 s) reading of the full suite was taken the same day and is
+DISCARDED — and the error was not the reading, it was what I did with it.** It was
+reported as fact and then used to conclude this document was "~8x stale", which is an
+inference from one measurement in an unverified machine state — the exact shape the
+warning below exists for, committed one screen after quoting that warning. The cause was
+**not isolated**: a concurrent run of the same suite is the leading candidate (an earlier
+background invocation whose completion could not be confirmed — its output file is empty
+and its timestamps neither establish nor rule out overlap), but that was never proven, so
+it is recorded as unexplained rather than as self-inflicted contention. What the reading
+*does* license: nothing. The pass count from that run (2161) is unaffected and was never
+in doubt — **a run's verdict and its wall clock fail independently.**
 
 The full-suite rows are the ones that justify having chased the distribution mode:
 dropping `loadgroup` **halved** the full run, and took the Tier-2 fixture from four

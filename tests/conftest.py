@@ -204,6 +204,15 @@ def sealed_tier2_run():
     measured as four ~305s setups in one ``-n 12`` full run. That is why parallelism
     buys the slow tier much less than it buys the fast loop, and it is not fixable by
     a marker: see the negative result in :func:`pytest_configure`.
+
+    ⚠ **2026-08-10: "four ... in one full run" no longer reproduces, and the count is
+    not a constant.** Re-measured under the shipped ``load`` default: the **full suite**
+    pays **two** setups (379.6s, 374.3s) and ``-m slow`` **alone** pays **four**. So the
+    recomputation count tracks the SELECTION, not the distribution mode — and the
+    consequence is that running only the slow tier is *slower* than running everything
+    (504.47s vs 425.49s). The sentence above is kept because the way it is wrong is the
+    finding: a count measured once, under a mode since removed, written as a property of
+    "a full run". See docs/test-suite-runtime.md.
     """
     from sealed_tier2_helper import run_tier2
 

@@ -1468,11 +1468,47 @@ def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went(
 # fixed indices 2 and 3, so ``is_stationary`` returns False at 15 AND at 50 years even
 # though the series is flat to eight decimals across its last five years.
 
-_DECADE_CO2_FLOOR = 0.05  # test_decade_stability.test_decade_min_carbon_pool_stationary
-_LIVENESS_FLOOR = 0.55  # the MANIFEST bound (perennial_long_horizon/liveness_floors)
+
+def _manifest_floor(quantity_fragment: str, bound_prefix: str) -> float:
+    """Read a ``perennial_long_horizon`` liveness floor out of the biosphere manifest.
+
+    ⚠ Hand-copied, these drift silently: the leaf floor has already moved TWICE
+    (``> 1.0`` at the decomposer calibration, ``> 0.9``, then ``> 0.55`` at the
+    humification split), and a stale copy would keep asserting the old bound under a
+    comment still claiming it is *"the manifest bound"* — the ungated-prose shape, one
+    level inside a test. Reading it costs a line and removes the drift.
+    """
+    manifest_path = (
+        Path(__file__).parent.parent / "docs" / "biosphere-reference.manifest.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entries = [
+        e
+        for e in manifest["liveness_floors"]["perennial_long_horizon"]
+        if quantity_fragment in e["quantity"] and e["bound"].startswith(bound_prefix)
+    ]
+    assert len(entries) == 1, f"expected exactly one {quantity_fragment!r} floor"
+    tail = entries[0]["bound"][len(bound_prefix) :]
+    return float(tail.split(")")[0].split()[0])
+
+
+_DECADE_CO2_FLOOR = _manifest_floor("chamber CO2 pool", "non_collapsing(floor=")
+_LIVENESS_FLOOR = _manifest_floor("peak-leaf fixed point", "max(tail) > ")
 _DEAD_BASELINE = 0.253  # what that floor exists to separate a live plant from
 _LIVENESS_TRANSIENT = 8  # test_decade_stability._PERIOD_TRANSIENT
 _REPRICE_YEARS = 50  # the horizon the humification split anchored its own floor on
+
+
+def test_the_two_floors_this_section_asserts_against_come_FROM_the_manifest() -> None:
+    """Both bounds are contractual, so they are read, not typed — and pinned by value.
+
+    The read is only worth having if it is also checked: a parser that silently
+    returned the wrong number would be worse than the hand-copy it replaced. So the
+    values are asserted here (the drift shows up as ONE red test naming the change),
+    and the section below consumes the constants.
+    """
+    assert _DECADE_CO2_FLOOR == 0.05
+    assert _LIVENESS_FLOOR == 0.55
 
 
 def _peak_leaf_of(segment) -> float:
