@@ -4,6 +4,12 @@
 Diagnosis advisor-reviewed at every hinge. `git diff src/simcore/` empty.
 (B) immobilization, (C) the DS-dependent form and (D) the N→C throttle remain OPEN.**
 
+⚠ **That last line is superseded (2026-08-10).** (B) was BUILT; (C) was diagnosed,
+priced and refused, and its stem-only branch has now been RE-PRICED at 50 years with the
+verdict left open as a contract question; (D) has been RE-PRICED and is **not buildable
+as recorded**. See "THE (C)/STEM-ONLY RE-PRICE" and "THE (D) RE-PRICE" at the end of
+this document. **No option of the four is still simply "open".**
+
 **The one-line result: the form changed, the uncitable param is gone, and every carbon
 trajectory is byte-identical** — 10 goldens moved and each moved *only* in its NITROGEN
 stocks. See "THE IMPLEMENTATION" below, and `docs/biosphere-reference.md`'s unfreeze log
@@ -747,7 +753,14 @@ not deepen it. `f_N` stays exactly 1.0 in every sealed scenario; `n_limited` rep
 recorded 0.175851 / 187 steps unchanged.
 
 
-## The scope options — (A) and (B) TAKEN; (C) DIAGNOSED + PRICED; (D) still open
+## The scope options — (A) and (B) TAKEN; (C) DIAGNOSED + PRICED; (D) RE-PRICED, NOT BUILT
+
+⚠ **This heading read "(D) still open" until 2026-08-10.** (D) was re-priced on the
+post-(A)/(B)/CUE tree and the verdict changed KIND — see "THE (D) RE-PRICE" at the end
+of this document. It is **not buildable as recorded** (no cited form on this shelf; the
+one primary that models the phenomenon implements it as the refused soil-fractionation
+seam, keyed on a lignin state the tree lacks), and its recorded closure conflict is
+recorded as **unmeasured**, not discharged.
 
 Ordered by dependency.
 
@@ -798,8 +811,22 @@ subset-claim-written-flat shape again — this time about our own option list.
   fails by ~an order and loses its fixed point), and it takes `open_season`'s peak
   canopy to **LAI 16.4** against real wheat's 5–8, because our flat `rdr_leaf` has been
   standing in for canopy-regulation science the tree does not have.
-* **(D) ⚠ The N→C throttle — the only option that makes the N cycle load-bearing, and it
-  fights last week's calibration.** Real soils decompose high-C:N residue *slower*
+* **(D) ⚠ The N→C throttle — RE-PRICED 2026-08-10, NOT BUILT.** ⚠⚠ **The bullet below is
+  kept verbatim because the way it is wrong is the finding, and it is wrong in a
+  specific way: its closure prediction was written about a tree where the mechanism
+  COULD NOT HAVE FIRED.** Pre-(A) litter carried 0.004 C per N (~250 N per carbon), and
+  a throttle reduces decay when N is *scarce* relative to C, so every such factor sat at
+  1 — inert, not closure-breaking. Post-(A)+(B) the shed ratio is a cited parameter
+  identity (exactly 90), so the quantity such a factor would read is finally physical.
+  The re-price's verdict is **structural, not behavioural**: neither decomposer primary
+  this tree holds first-hand carries an N throttle (RothC has no nitrogen at all;
+  CENTURY keys decay on **lignin**), and CENTURY *does* model "high-C:N residue decays
+  slower" — as the **metabolic/structural pool partition** (eq [2], `FM = 0.85 −
+  0.018·L/N`), i.e. **the input half of the soil-fractionation seam this project has
+  refused twice**. So (D) and fractionation are ONE mechanism in the cited primary. See
+  "THE (D) RE-PRICE" at the end of this document. Original bullet follows.
+
+  Real soils decompose high-C:N residue *slower*
   because microbes are N-starved. Adding that factor is what would give N a carbon
   effect — but the decomposer calibration measured that closure **requires the fast
   edge** (central literature rates starve the recycled-CO₂ loop and crash annual re-sow;
@@ -1283,3 +1310,257 @@ manifest-named items, so it is a biosphere **unfreeze**, not Rust-first content.
    `day_neutral` is **not a freeze event**. That materially weakens the case for flat.
 3. **(D) as a separate, explicitly-priced decision?** It is where the science is, and it
    is also where the closure constraint bites hardest.
+
+
+---
+
+# THE (C)/STEM-ONLY RE-PRICE — measured 2026-08-10, read-only, verdict LEFT OPEN
+
+Probes: `M:/claud_projects/temp/c_reprice/`. Pins: `tests/test_senescence_form.py` §8
+(2 tests, 1 slow). No value, golden, param or manifest moved; `git diff src/` empty.
+
+The humification split discharged stem-only's rationing leg and deliberately parked the
+rest:
+
+> "Whether that still justifies refusing the branch is a question for whoever revisits
+> (C) with the measurement in hand; it is **not** settled here, and re-deciding it
+> inside the commit that changed the tree underneath it would be exactly the
+> co-adaptation shape this project refuses."
+
+This is that measurement. **It answers what a run can answer and stops**, because the
+remaining question is a contract question, not an empirical one.
+
+## ⚠ Finding 1 — the surviving leg's framing was half wrong, and BOTH guards are WINDOW questions
+
+The leg reads as *"the series has not settled inside the frozen horizon"*, which invites
+*"then run it longer"*. That is unavailable, and for the floor guard it is unavailable
+**structurally** — the committed pins already record that the failing year is index 2
+and that `argmin == 2`, i.e. the failing year **is the first year `transient=2` lets the
+guard see**. `non_collapsing(summaries[2:], floor=0.05)` therefore contains 0.046065 at
+*every* horizon. Only `transient` can move it.
+
+The part that was **not** obvious, and that I got wrong before measuring: the same is
+true of **stationarity**. Its offending same-phase diffs are
+
+| diff | value | = | bound (`0.2 · max`) |
+|---|---|---|---|
+| `diffs[2]` | **+0.029145** | `series[4] − series[2]` = 0.075210 − 0.046065 | 0.015208 |
+| `diffs[3]` | **+0.016837** | `series[5] − series[3]` = 0.070759 − 0.053922 | 0.015208 |
+
+Both at **fixed indices inside the establishment dip**. Appending years cannot remove
+them, and `is_stationary` returns False at 15 **and** at 50 years — while the series is
+flat to eight decimals over its last five years. The frozen control has **no** diff
+exceeding its bound.
+
+⚠ **Scoped honestly**: the invariance is **measured at two horizons, not proved**.
+`bound = 0.2 · max(series)` and the max lands in year 0 in both runs, so a change
+raising the series' maximum could in principle loosen the bound. What is asserted is
+what was run.
+
+## Finding 2 — stem-only reaches an attractor, and it is ABOVE the frozen tree's own
+
+Fifty years, Euler at `dt=1`, subject and control on the same harness, each driven the
+way `perennial`'s own golden drives it. `rationed == 0` for **both** — the discharge is
+not horizon-bound, checked because this family already documents a beyond-horizon
+tiling/reset artefact.
+
+| | frozen | stem-only | ratio |
+|---|---|---|---|
+| CO₂ min, attractor (yr 49) | 0.073291 | **0.075339** | 1.0279 |
+| CO₂ min, worst year | 0.055175 (yr 1) | **0.046065** (yr 2) | 0.8349 |
+| years below the 0.05 floor, of 50 | **0** | **1** | |
+| peak leaf, equilibrium | 0.594984 | 0.606763 | 1.0198 |
+| peak stem, equilibrium | 0.394689 | **0.599306** | **1.518** |
+| peak storage (grain) | 0.204128 | **0.180076** | **0.882** |
+
+**The contrast with the soil-fractionation re-refusal is the point.** That work asked
+the identical 50-year question of a change it was about to refuse, and got
+**0.031741 — 1.58× BELOW the floor**, i.e. the failure was the attractor. Here the same
+question returns **1.51× ABOVE** it. *Same test, opposite answer* — which is exactly why
+it had to be asked rather than assumed, in both directions.
+
+Free corroboration: the frozen control's asymptote **0.073291** reproduces
+`test_soil_fractionation.py`'s independently-pinned value to the digit, and the frozen
+peak-leaf equilibrium **0.594984** reproduces `test_decade_stability.py`'s. Two
+harnesses, same tree.
+
+## Finding 3 — the manifest-named gate CLEARS, so there is no third leg
+
+`perennial`'s liveness floor is a **manifest** entry — `biosphere-reference.manifest.json`,
+scenario `perennial_long_horizon`, field `liveness_floors`, bound `max(tail) > 0.55`,
+anchored on the measured equilibrium 0.594984 — where the decade-CO₂ pin is only a
+committed test. It had never been checked for stem-only.
+
+**stem-only: `max(tail) = 0.643676` vs frozen's 0.634352.** It clears, and by more than
+the reference does. The contractually-named gate does not refuse this branch.
+
+## ⚠ Finding 4 — and the plant is NOT free: the CO₂ gain has a cost, in the same table
+
+Quoting the improved trough alone is what the CUE row forbids (*"it is partly a ~40 %
+smaller plant, and the two numbers travel together in every table"*). Measured **in this
+scenario** rather than inherited from `open_season`:
+
+* peak stem **+51.8 %**, peak **grain −11.8 %** ⇒ (C)-finding 8's *"stem up, grain
+  down"* holds here and **harder** than on `open_season` (+23.4 % / −3.97 %). Grain is
+  also the seed bank the annual re-sow draws on.
+* peak leaf **+1.98 %**, where `open_season` gave **−3.96 %** ⇒ **the leaf sign does not
+  transfer between scenarios**, which is why it was measured here.
+
+## ⚠ Finding 5 — a counterfactual REFUTED MY OWN HYPOTHESIS, and the committed pin was right
+
+Both guards fire inside years 2–5, so the natural hypothesis is that they are two
+readings of **one event** — which would have made the committed test's *"both halves are
+asserted, so a future change that swapped which guard fires would go red"* an
+overstatement.
+
+Splice the control's year 2 into the subject and change nothing else: **the floor guard
+flips True, stationarity stays False.** `diffs[3] = series[5] − series[3]` does not
+involve year 2 at all. The committed claim stands; mine did not.
+
+⚠ **Stated precisely, because the flattering overstatement is available in both
+directions**: this does **not** make them causally separate events. Year 3 (0.053922) is
+itself inside the same establishment dip. The accurate statement is that *the
+stationarity failure does not **depend on** the single sub-floor year, and both guards
+fire exclusively within years 2–5.*
+
+## THE VERDICT — the measurement is delivered; the decision is NOT this work's
+
+**What is now known.** Stem-only's surviving refusal rests on **one establishment year
+of fifty**, 7.87 % below the floor, in a run whose attractor sits 1.51× above it and
+above the reference's; the manifest-named liveness gate clears; and the plant pays for
+it in grain.
+
+**What is deliberately not decided.** Whether `transient=2` is the right window for a
+tree whose settling transient the humification split measured at ~35 years. Moving it to
+**3** clears the floor and to **5** clears stationarity; the frozen control passes at
+**0**. Picking a window because the subject goes green is the consumer-chamber-2× /
+DPM-RPM-labile / ruling-B / fractionation-seed-sweep shape, refused four times — and
+the current window is not tuned to the reference either, so there is no "restore the
+symmetric choice" move available. **This is a contract question and it is the user's.**
+
+⚠ **This re-price is about STEM-ONLY, not about (C).** (C)'s full form remains refused
+on branch 3 (a calibration whose only target is our own goldens) and takes `open_season`
+to LAI 16.40 against real wheat's 5–8. Nothing here touches that.
+
+---
+
+# THE (D) RE-PRICE — measured 2026-08-10, read-only; NOT BUILT, and the verdict changed KIND
+
+Probes: `M:/claud_projects/temp/c_reprice/`. Pins: `tests/test_nitrogen_throttle.py`
+(7 tests). No value, golden, param or manifest moved; `git diff src/` empty.
+
+The recorded price — *"expect it to break closure in every sealed scenario … a genuine
+scientific conflict … priced before being attempted"* — was written while (A) and (B)
+were still live options. Both then shipped, and the humification split changed the
+decomposer chain. So it was re-derived rather than inherited.
+
+**The verdict is not "refused on closure". It is "not buildable as recorded", for two
+independent reasons, and the closure conflict was never testable on the tree the
+prediction was written about.**
+
+## Finding 1 — the recorded prediction described a mechanism that could not have fired
+
+Before (A), litter carried **0.004** C per N — the plan's own line 102, *"1 C : 246 N"*.
+An N→C throttle is by construction a factor that reduces decay when N is **scarce
+relative to C**. At ~250 nitrogen per carbon, N is not scarce under any definition, so
+**every such factor, whatever its form, evaluates to 1**. This leg is the *N-rich limit*
+and needs no curve, no threshold and no citation — which is why the headline rests on
+it.
+
+Post-(A)+(B) the shed ratio is a **parameter identity**, `M_C / n_residual_per_mol_c` =
+**exactly 90**, both constants cited. The quantity a throttle would read went from *the
+unconstrained ratio of two unrelated rate constants* to *the composition of the material
+that fell in* — which is what (A) and (B) were for.
+
+⚠ **The "and now it would bite" half is deliberately weaker than the "was inert" half.**
+It needs a threshold, and the ~25–30 C:N figure usually quoted for microbial N demand is
+**not on this shelf**. What Parton *does* give first-hand is *"Uptake of N from the soil
+does not occur if the C/N ratio is < 10 (Pinck et al., 1950)"* — a **different quantity**
+(immobilisation onset, not decay throttling), recorded with that caveat rather than
+promoted into a decay threshold. The headline does not need it.
+
+## Finding 2 — and it would not bite uniformly: the two-regime split, third appearance
+
+Measured with each scenario driven the way its own golden drives it (the correction-2
+rule, because the annual reset is what makes a perennial chamber perennial):
+
+| scenario | driver | litter pool C:N at peak `litter_n` |
+|---|---|---|
+| `sealed_chamber` | `run_season` | **102.7** |
+| `water_biting` | `run_season` | **98.9** |
+| `perennial` | `run_perennial` | **10.9** |
+| `consumer` | `run_perennial` | **9.8** |
+
+The reset-driven chambers sit **N-rich** right after each annual dump, because the dump's
+C:N is set by the dying plant. A litter-C:N throttle would be near-saturated there — in
+exactly the two scenarios where closure is tightest. *"Expect it to break closure in
+every sealed scenario"* could not have been read off a single number even post-(A).
+
+## Finding 3 — neither decomposer primary this tree holds first-hand carries an N throttle
+
+Both established by **extraction, not skimming** (round 4's rule: an absence claim is the
+one kind a skim structurally cannot make).
+
+* **RothC** — "nitrogen" occurs **twice in the whole guide, both in the bibliography**.
+  It is a carbon-only model. It cannot license an N→C throttle and cannot be cited
+  against one.
+* **CENTURY (Parton 1987)** — already first-hand here, as the humification split's own
+  source. Its decay-rate controls are **lignin** and **texture**:
+  `K1 = Ks · exp(−3.0 × Ls)` (eq [3]). Nitrogen enters in two places, neither a rate
+  throttle: the metabolic/structural **partition**, and the
+  mineralisation/immobilisation bookkeeping that **follows the carbon flows** — *"N flows
+  … stoichiometrically related to C flows … the product of the C flow rate and the fixed
+  N/C ratio of the state variables receiving the C"*, which is precisely what option (B)
+  built.
+
+## ⚠⚠ Finding 4 — THE STRUCTURAL ONE: in the cited primary, (D) and SOIL FRACTIONATION are ONE MECHANISM
+
+CENTURY *does* model "high-C:N residue decays slower". It does it as a **pool partition**:
+
+> `FM = 0.85 − 0.018 × (L/N)`  [eq 2]
+
+— the metabolic (fast) fraction of fresh residue falls as the **lignin:nitrogen** ratio
+rises, cited to Melillo et al. 1984. **That is the input half of the soil-fractionation
+seam**, which this project has now measured and refused twice; its re-opening found both
+principled sizings failing on `perennial` (constant-flux rations at step 807,
+constant-inventory hard-errors in `annual_reset`).
+
+So (D) as recorded — a multiplier on the single `decomposition_rate` — is a **form the
+cited primary does not use**, and the form it *does* use is **blocked by a measurement
+this repo already holds**. Two independent reasons, and neither is "we ran it and
+closure broke".
+
+⚠ **The keying quantity differs too: L/N, not C:N.** (D) as recorded would read a
+quantity CENTURY does not key on, using a state the tree does not have — and **the CUE
+build had already written that obstacle down**, in `humification.yaml`'s own comments:
+*"CENTURY's LIGNIN route … is not expressible: this model has ONE litter pool with no
+lignin fraction."* Half of (D)'s blocker was recorded one build earlier and nothing
+routed attention to it.
+
+## ⚠ Finding 5 — a self-correction, and it is the reason this section is trustworthy
+
+My first reading of Parton was that it carried the **opposite sign**, because the text
+says immobilised mineral N *"can stimulate the decomposition of low-N plant residue"*.
+**Low-N residue IS high-C:N residue**, so that sentence *states* (D)'s premise rather
+than contradicting it. Refusing (D) on *"the primary contradicts it"* would have been a
+refusal on a **false premise** — the shape this work exists to avoid, caught before it
+was written down.
+
+What differs is the **form** (partition vs multiplier) and the **keying quantity** (L/N
+vs C:N). That is a *stronger* claim than "opposite sign", not a weaker one.
+
+## THE VERDICT, and the leg left explicitly UNMEASURED
+
+**(D) is not buildable as recorded**, on retrieval and structure rather than on closure:
+no cited throttle form exists on this shelf, the one primary that models the phenomenon
+implements it as the refused fractionation seam, and it keys on a state the tree lacks.
+
+⚠ **No invented throttle was run, and that is deliberate.** Writing a plausible `f(C:N)`
+and testing closure would choose a curve by its effect on our own goldens. So the
+recorded closure conflict is **neither confirmed nor discharged**: it is *untestable as
+recorded* (finding 1) and *unmeasured on the current tree* (here). Recorded as an
+**unmeasured leg**, not a clean one — the `sealed_station` precedent.
+
+⚠ **Retrieval is EXHAUSTED FOR THIS SHELF, dated 2026-08-10** — not *"the science does
+not exist"*. The canopy regulator expired that exact inference in one day, and any
+"every source says X" is a statement about your own shelf.

@@ -449,6 +449,21 @@ rather than on a settled collapse. Whether that still justifies refusing the bra
 whoever revisits (C) with the measurement in hand — re-deciding it inside the commit that
 moved the tree underneath it is the co-adaptation shape this project refuses.
 
+⚠ **TAKEN UP 2026-08-10 — see `docs/plans/post-roadmap-nitrogen-cycle-form.md`, "THE
+(C)/STEM-ONLY RE-PRICE", and `tests/test_senescence_form.py` §8.** Two corrections to the
+paragraph above, both from measurement. (1) **"A longer transient" is not what the guards
+are measuring.** Both are horizon-INVARIANT: the floor guard's failing year IS index 2 —
+the first year `transient=2` lets it see — and stationarity's offending same-phase diffs
+sit at fixed indices 2 and 3, so both verdicts are identical at 15 and at 50 years. They
+are **window** questions, not horizon questions. (2) **Run to 50 years, stem-only settles
+at 0.075339 — 1.51× the floor and ABOVE the frozen control's own attractor (0.073291)**,
+`rationed == 0` on both, and it **clears the manifest-named liveness floor** (0.643676 vs
+0.55). Exactly one year of fifty is below the floor. The refusal is therefore a
+single-establishment-year one — and the branch still costs **11.8 % of the grain**, so it
+is not free. **The verdict stays open and is a contract question** (whether `transient=2`
+fits a tree whose transient the split measured at ~35 years); it was deliberately not
+decided there either.
+
 ## FINDING 9 — fractionation's structural blocker is discharged
 
 Soil fractionation's finding 3 measured that a seeded slow pool is *strictly

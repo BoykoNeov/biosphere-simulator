@@ -1442,3 +1442,229 @@ def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went(
     assert d_soil / d_tissue == pytest.approx(-1.0, abs=0.02)
     assert d_co2 > 0.0, "the atmosphere no longer funds the standing stem"
     assert abs(d_co2) / b["co2"] < 0.01, d_co2  # <1 % off the CO2 trough, and upward
+
+
+# =====================================================================================
+# 8. THE (C)/STEM-ONLY RE-PRICE (2026-08-10) — the parked question, measured
+# =====================================================================================
+#
+# The humification split discharged stem-only's rationing leg and deliberately did NOT
+# re-decide the branch inside the commit that moved the tree underneath it, leaving:
+#
+#   "Whether that still justifies refusing the branch is a question for whoever
+#    revisits (C) with the measurement in hand."
+#
+# This section is that measurement. It settles what a run can settle and stops there:
+# the acceptability call is a CONTRACT question (which window the guards use), and
+# picking a window because the subject goes green is the shape this project has refused
+# four times (the consumer-chamber 2x, the DPM/RPM labile re-read, ruling B, the
+# fractionation seed sweep).
+#
+# ⚠ THE FRAMING I STARTED FROM WAS HALF WRONG AND THE MEASUREMENT CORRECTED IT. The
+# surviving leg was expected to split into a HORIZON question (stationarity — "the
+# series is still rising at 15 years") and a WINDOW question (the floor — the failing
+# year IS index 2, the first year ``transient=2`` lets the guard see, so no horizon
+# moves it). Measured: BOTH are window questions. The offending same-phase diffs sit at
+# fixed indices 2 and 3, so ``is_stationary`` returns False at 15 AND at 50 years even
+# though the series is flat to eight decimals across its last five years.
+
+_DECADE_CO2_FLOOR = 0.05  # test_decade_stability.test_decade_min_carbon_pool_stationary
+_LIVENESS_FLOOR = 0.55  # the MANIFEST bound (perennial_long_horizon/liveness_floors)
+_DEAD_BASELINE = 0.253  # what that floor exists to separate a live plant from
+_LIVENESS_TRANSIENT = 8  # test_decade_stability._PERIOD_TRANSIENT
+_REPRICE_YEARS = 50  # the horizon the humification split anchored its own floor on
+
+
+def _peak_leaf_of(segment) -> float:
+    """``test_decade_stability._peak_leaf``, reproduced (not imported across modules).
+
+    Validated against that gate's own committed 15-year reading before use, per the
+    (A)-diagnosis finding-10 rule: reconstruct a frozen quantity only to CHECK it
+    against the recorded one, never to replace it.
+    """
+    return max(s.stocks[LEAF_C].amount for s in segment)
+
+
+def _co2_min_of(segment) -> float:
+    return min(s.stocks[CARBON_POOL].amount for s in segment)
+
+
+def _reprice_series(years: int, stem_zero: bool):
+    states, rationed, _ = _run(
+        sc.PERENNIAL_CHAMBER_SCENARIO, years, resets=True, stem_zero=stem_zero
+    )
+    year_len = len(_weather())
+    return (
+        year_summaries(states, year_len, _co2_min_of),
+        year_summaries(states, year_len, _peak_leaf_of),
+        year_summaries(
+            states, year_len, lambda s: max(x.stocks[STEM_C].amount for x in s)
+        ),
+        year_summaries(
+            states, year_len, lambda s: max(x.stocks[STORAGE_C].amount for x in s)
+        ),
+        rationed,
+    )
+
+
+def _stationary_verdict(series: list[float]) -> bool:
+    """Exactly the committed decade-CO2 test's stationarity call, same constants."""
+    scale = max(series)
+    return is_stationary(
+        same_phase_diffs(series, period=2),
+        bound=0.2 * scale,
+        slope_tol=0.02 * scale,
+        transient=2,
+    )
+
+
+def test_the_stem_only_guards_are_BOTH_window_questions_not_horizon_questions() -> None:
+    """⚠ THE FRAMING CORRECTION, and it is cheap enough to pin without a 50-year run.
+
+    The parked question read as "the series has not settled inside the frozen horizon",
+    which invites the answer "then run it longer". For the FLOOR guard that answer is
+    structurally unavailable: the committed pins already say the failing year IS index
+    2 and that ``argmin == 2``, so ``non_collapsing(summaries[2:], floor=0.05)``
+    contains 0.046065 at EVERY horizon. Only ``transient`` can move it.
+
+    The same turns out to be true of the STATIONARITY guard, which is the part that was
+    not obvious: its offending same-phase diffs are ``diffs[2] = series[4] - series[2]``
+    and ``diffs[3] = series[5] - series[3]``, both at fixed indices inside the
+    establishment dip. Appending years cannot remove them.
+
+    ⚠ Scope this honestly: the invariance is MEASURED AT TWO HORIZONS (15 and 50), not
+    proved. ``bound = 0.2 * max(series)`` and the max lands in year 0 in both runs, so a
+    change that raised the series' maximum could in principle loosen the bound enough to
+    matter. What is asserted is what was run.
+    """
+    co2, _leaf, _stem, _store, rationed = _reprice_series(LONG_HORIZON_YEARS, True)
+    assert rationed == 0
+
+    # the committed 15-year readings, reproduced before anything is built on them
+    assert min(co2[2:]) == pytest.approx(0.046065, rel=1e-3)
+    assert co2.index(min(co2)) == 2, "the failing year is the FIRST the guard sees"
+    assert co2[-1] == pytest.approx(0.074891, rel=1e-3)
+
+    # the floor guard's verdict is decided by a year no horizon can remove
+    assert non_collapsing(co2[2:], floor=_DECADE_CO2_FLOOR) is False
+
+    # and so is stationarity's — locate the offenders rather than assert the verdict
+    scale = max(co2)
+    diffs = same_phase_diffs(co2, period=2)
+    offenders = [i for i, d in enumerate(diffs) if i >= 2 and abs(d) > 0.2 * scale]
+    assert offenders == [2, 3], offenders
+    assert _stationary_verdict(co2) is False
+
+
+@pytest.mark.slow
+def test_the_stem_only_refusal_at_FIFTY_years_with_its_control() -> None:
+    """⚠⚠ THE RE-PRICE. Every claim from ONE pair of 50-year runs, labelled per claim.
+
+    Consolidated into a single function on the acceptance-gate diagnosis's precedent: a
+    50-year ``perennial`` pair is expensive, a session cache is a PER-WORKER cache under
+    xdist, and the lever that actually works is fewer tests that need the computation.
+
+    ⚠ THE HORIZON IS THE FAIRNESS REQUIREMENT, NOT A SEARCH. The humification split
+    lengthened this chamber's settling transient from ~3 years to ~35 and anchored its
+    OWN liveness floor on a measured equilibrium at ~yr 45 rather than on the 15-year
+    reading. The soil-fractionation re-refusal then asked the same question of a change
+    it was about to refuse, BEFORE writing the refusal. Asking it here is that
+    discipline applied to a change already refused — and the answer comes out the other
+    way, which is precisely why it had to be asked.
+
+    WHAT IS MEASURED:
+
+    1. **stem-only reaches an attractor, and it is ABOVE the frozen tree's own.**
+       0.075339 vs the control's 0.073291 — 1.0279x the reference and **1.51x the 0.05
+       floor**. Contrast the soil-fractionation re-refusal, where the same 50-year
+       question returned 0.031741, **1.58x BELOW** the floor. Same test, opposite
+       answer: there the failure was the attractor, here it is not.
+    2. **Both guards fire exclusively inside years 2-5**, the establishment transient.
+       Exactly ONE year of fifty sits below the floor (year 2, 0.046065 — 7.87 % below);
+       the frozen control has none, its own worst year being 0.055175 at year 1.
+    3. **The manifest-named gate CLEARS.** ``perennial_long_horizon``'s
+       ``liveness_floors`` bound ``max(tail) > 0.55`` — contractually named, where the
+       decade-CO2 pin is only a committed test — gives 0.643676 for stem-only against
+       0.634352 frozen. There is no third leg.
+    4. ⚠ **AND THE PLANT IS NOT FREE.** Reading the CO2 improvement alone is the thing
+       the CUE row forbids. Peak stem +51.8 %, peak **storage (grain) -11.8 %** — so
+       (C)-finding 8's "stem up, grain down" holds here and HARDER than on
+       ``open_season`` (+23.4 % / -3.97 %). Peak leaf goes the other way (+1.98 % where
+       ``open_season`` gave -3.96 %), so the leaf sign does NOT transfer between
+       scenarios and is measured here rather than inherited.
+
+    WHAT IS **NOT** SETTLED, DELIBERATELY: whether ``transient=2`` is the right window.
+    Moving it to 3 clears the floor and to 5 clears stationarity; the frozen control
+    passes at ``transient=0``. Choosing a window because the subject goes green is the
+    refused shape, and the current window is not tuned to the reference either. That is
+    a contract question and it is left open.
+    """
+    f_co2, f_leaf, f_stem, f_store, f_r = _reprice_series(_REPRICE_YEARS, False)
+    s_co2, s_leaf, s_stem, s_store, s_r = _reprice_series(_REPRICE_YEARS, True)
+
+    # --- the discharged leg must not un-discharge at 3.3x the frozen horizon ---------
+    assert f_r == 0, "frozen control rations at 50 yr — the comparison would be void"
+    assert s_r == 0, "stem-only rations at 50 yr — the discharge was horizon-bound"
+
+    # --- 1. the attractor, subject AND control on the same harness ------------------
+    assert s_co2[-1] == pytest.approx(0.075339, abs=1e-5), "stem-only CO2 attractor"
+    assert f_co2[-1] == pytest.approx(0.073291, abs=1e-5), "frozen CO2 attractor"
+    # the control's asymptote is independently pinned by test_soil_fractionation.py at
+    # 0.073291 — a free cross-harness agreement, and the reason these numbers are usable
+    assert s_co2[-1] > _DECADE_CO2_FLOOR and f_co2[-1] > _DECADE_CO2_FLOOR
+    assert s_co2[-1] / _DECADE_CO2_FLOOR == pytest.approx(1.5068, abs=1e-3)
+    assert s_co2[-1] > f_co2[-1], "stem-only settles ABOVE the reference, not below"
+    assert max(s_co2[-5:]) - min(s_co2[-5:]) < 1e-6, "and it is genuinely settled"
+
+    # --- 2. the failure is one establishment year, not the attractor ----------------
+    below = [i for i, v in enumerate(s_co2) if v < _DECADE_CO2_FLOOR]
+    assert below == [2], below
+    assert [i for i, v in enumerate(f_co2) if v < _DECADE_CO2_FLOOR] == []
+    assert s_co2[2] / _DECADE_CO2_FLOOR == pytest.approx(0.9213, abs=1e-3)
+    assert min(f_co2) == pytest.approx(0.055175, abs=1e-5), "the control's own trough"
+    # both guards still refuse, at fifty years exactly as at fifteen
+    assert non_collapsing(s_co2[2:], floor=_DECADE_CO2_FLOOR) is False
+    assert _stationary_verdict(s_co2) is False
+    assert non_collapsing(f_co2[2:], floor=_DECADE_CO2_FLOOR) is True
+    assert _stationary_verdict(f_co2) is True
+    # ⚠ THE COUNTERFACTUAL, and it REFUTED MY OWN HYPOTHESIS. I expected the two guards
+    # to be two readings of ONE event (the year-2 trough), which would have made the
+    # committed test's "both halves are asserted" independence claim wrong. Splice the
+    # control's year 2 into the subject and change nothing else: the floor guard flips
+    # True, stationarity stays False, because diffs[3] = series[5] - series[3] does not
+    # involve year 2 at all. The committed claim stands and mine did not.
+    #
+    # ⚠ State it precisely, though: this does NOT make them causally separate events.
+    # Year 3 (0.053922) is itself inside the same establishment dip. The accurate
+    # statement is that the stationarity failure does not DEPEND on the single sub-floor
+    # year, and that both guards fire exclusively within years 2-5.
+    spliced = list(s_co2)
+    spliced[2] = f_co2[2]
+    assert non_collapsing(spliced[2:], floor=_DECADE_CO2_FLOOR) is True
+    assert _stationary_verdict(spliced) is False
+    assert all(v > _DECADE_CO2_FLOOR for v in s_co2[6:]), "clean from year 6 on"
+
+    # --- 3. the MANIFEST-named liveness gate -----------------------------------------
+    f_tail = f_leaf[_LIVENESS_TRANSIENT:]
+    s_tail = s_leaf[_LIVENESS_TRANSIENT:]
+    # validate the reconstruction against the gate's own committed 15-yr reading first.
+    # ⚠ That committed 0.634352 is ``max(tail)``, NOT ``tail[-1]``: the tail declines
+    # monotonically, so max(tail) == tail[0] == year 8. My first version of this check
+    # compared the wrong element and went red on a correct reconstruction.
+    f15_leaf = _reprice_series(LONG_HORIZON_YEARS, False)[1]
+    assert max(f15_leaf[_LIVENESS_TRANSIENT:]) == pytest.approx(0.634352, abs=1e-5)
+    assert f_leaf[-1] == pytest.approx(0.594984, abs=1e-5), "the anchored equilibrium"
+    assert max(f_tail) > _LIVENESS_FLOOR, "control clears its own floor"
+    assert max(s_tail) > _LIVENESS_FLOOR, "⚠ stem-only CLEARS it too — no third leg"
+    assert max(s_tail) == pytest.approx(0.643676, abs=1e-5)
+    assert s_leaf[-1] / _DEAD_BASELINE > 2.0, "and it is nowhere near the dead baseline"
+
+    # --- 4. the plant is NOT free: read the CO2 gain WITH its cost -------------------
+    assert s_stem[-1] / f_stem[-1] == pytest.approx(1.518, rel=2e-3), "stem UP"
+    assert s_store[-1] / f_store[-1] == pytest.approx(0.882, rel=2e-3), "grain DOWN"
+    assert s_store[-1] < f_store[-1], (
+        "(C)-finding 8's 'stem up, grain down' holds in THIS scenario too"
+    )
+    # ⚠ the leaf sign does NOT transfer from open_season (-3.96 % there, +1.98 % here)
+    assert s_leaf[-1] > f_leaf[-1]
+    assert s_leaf[-1] / f_leaf[-1] == pytest.approx(1.0198, rel=2e-3)
