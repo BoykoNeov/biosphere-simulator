@@ -1,8 +1,16 @@
-# Post-roadmap: soil carbon pool fractionation — DIAGNOSED, NOT BUILT
+# Post-roadmap: soil carbon pool fractionation — DIAGNOSED, NOT BUILT; then RE-OPENED
 
 **DIAGNOSED 2026-08-10. Read-only. No value, golden, param or manifest moved;
 `git diff src/` empty; nothing unfrozen.** Probes in `M:/claud_projects/temp/soil_frac/`;
 pins in `tests/test_soil_fractionation.py`.
+
+> ⚠⚠ **EVERY NUMBER BELOW THIS LINE WAS MEASURED ON THE CUE = 1.0 TREE, one commit
+> before the humification split landed (79bece4).** The split discharged finding 3 — the
+> structural blocker that was *this document's stated reason for turning the seam down* —
+> and superseded finding 4's window evidence. The re-opening, its prediction written
+> before the first probe, and what the re-measurement found are in
+> **"THE RE-OPENING (2026-08-10)"** at the end of this document. Read the old findings as
+> a record of the tree they were measured on, not as the live price.
 
 The chamber-scale diagnosis's named seam, taken as its own item. That document priced it
 and deliberately did **not** recommend it:
@@ -334,12 +342,13 @@ taking it prices it as (D), not as this.
 
 ## Pins
 
-`tests/test_soil_fractionation.py` — **21 test functions, 24 collected tests** (the
-roster pin is parametrized ×4), of which **10 are `slow`**. Read-only, no fixture, no
-unfreeze. ⚠ Both numbers are given because they are different quantities: the first draft
-of this line said "24 test **functions**", a count lifted from pytest's output and
-relabelled — this repo's most-repeated shape, caught here before it shipped. The claims
-they carry:
+`tests/test_soil_fractionation.py` — originally **21 test functions, 24 collected tests**
+(the roster pin is parametrized ×4), of which **10 were `slow`**; the re-opening added 5
+functions, so the file now stands at **26 functions / 29 collected / 15 slow**.
+Read-only, no fixture, no unfreeze. ⚠ Both numbers are given because they are different
+quantities: the first draft of this line said "24 test **functions**", a count lifted
+from pytest's output and relabelled — this repo's most-repeated shape, caught here before
+it shipped. The claims they carry:
 
 1. the RothC constants and the arithmetic that authenticates the scrambled table
    (five pools sum exactly to the stated total);
@@ -366,3 +375,245 @@ they carry:
 **Teeth verified by MUTATION, not by a green bar**: flipping `EQ_DPM_STANDING_FRACTION`
 from Hoosfield's *standing* partition to RothC's *input* ratio (0.59 — the plausible
 wrong reading, since it is the number §1.3 prints in bold) takes **12 of the 24** red.
+
+---
+
+# THE RE-OPENING (2026-08-10)
+
+The humification split landed the same day this was written, in the commit immediately
+after it, and it discharged **finding 3 — the structural blocker that was this
+document's stated reason for the refusal.** The split's own row records that, and records
+that finding 4's window evidence is superseded too (*"at seed 7.0 both gates now pass, so
+a window narrower than 1.0 mol C no longer holds and must be re-derived before being
+quoted"*). So the refusal above rests on two legs, and both moved.
+
+## What is actually left to build, and it is NOT what the findings above priced
+
+RothC's structure is **DPM/RPM** (the two pools that take fresh plant input) feeding
+**BIO/HUM** (the two that are *formed* by humification), plus inert IOM. The tree now
+has the formed half — `microbial_carbon` (CENTURY active SOM) and `humus_carbon`
+(slow SOM), with the humification flux that fills them. **What fractionation still adds
+is only the input half: splitting `litter_carbon` into DPM (10.0 /yr) and RPM
+(0.3 /yr), fed at RothC's cited 1.44 input ratio.**
+
+⇒ **The value proposition is different from the one this document turned down**, and
+saying so plainly is the point of re-opening rather than re-reading:
+
+* the old headline was **inventory** — 6.47× against a 94× census gap, with the
+  remaining 14.5× structurally unreachable. That framing is dead: the unreachable part
+  is now reachable, so "6.47× of 94×" is not the live number;
+* the live headline is **the last uncited decomposer carbon rate.** `decomposition_rate`
+  = 0.011 /day = 4.015 /yr is calibrated to Olson's *fastest measured ecosystem* and is
+  there **because closure requires the fast edge**, not because the science put it there
+  — its own param file says so in the value's `source:` string, and the humification
+  split's "WHAT THIS DOES NOT CLAIM" says it again. Fractionation would **replace it with
+  two cited rates and a cited input ratio**, discharging it by *changing the form* rather
+  than by finding a citation — the move that retired `n_senescence_rate` in option (A)
+  and `mineralization_rate` in option (B).
+
+That reframing is also what kills this document's own dismissal of it (*"the one
+genuinely attractive by-product here, and is not on its own worth the cascade"*): it was
+written when the by-product sat next to a structural ceiling. With the ceiling gone, the
+by-product is the whole case.
+
+## THE PREDICTION, on the record before the first probe runs
+
+1. **Closure holds, and the CO₂ trough improves.** The decomposer calibration measured
+   that the chambers close *only* at the fast edge, and RPM's 0.3 /yr is almost exactly
+   the Zhang median (0.30 /yr) that crashed re-sow — so the naive read is that
+   fractionation starves the loop. I predict it does **not**, because 59 % of every
+   fresh input decays at **10.0 /yr — 2.5× faster than the calibrated bulk rate** — so
+   the immediate return goes *up* and only the 41 % remainder makes the tail.
+2. **The plant shrinks again**, the way it did under the split, and the trough and the
+   plant size must therefore travel together in every table.
+3. **The constant-inventory sizing (3.0) may now survive** where it hard-errored before,
+   because the formed pools now return carbon instead of being a dead end.
+4. **Finding 5's N identity survives, and `litter_n0` is still owed** — more so, since
+   96.7 % of the N-free seed lands in RPM at 0.3 /yr and lingers.
+
+⚠⚠ **PREDICTION 1 WAS WRITTEN FLAT AND COVERS ONLY ONE OF THE TWO REGIMES — caught on
+review, before the first probe, and it changes what gets measured.** "59 % of every fresh
+input decays at 10.0 /yr" is a claim about *fresh input*, and only `sealed_chamber` /
+`water_biting` are fed that way. `perennial` / `consumer` and both long-horizons are
+**reset-driven**: the annual dump is the dominant input, so the governing question is not
+how fast fresh litter decays but **what the standing pool looks like a year after a
+dump** — and there the comparison inverts. A year on, fractionation's DPM share is gone
+(10.0 /yr ⇒ ~5-week half-life) and what remains is **41 % of the dump at 0.3 /yr**,
+against the frozen bulk pool's `e^(−4.015)` ≈ **1.8 %**. Whether that is more or less
+carbon *in the atmosphere at the trough* depends on where in the year the trough falls —
+and (C)'s stem-only branch measured `perennial` firing at step 502, **day 197,
+mid-drain**. This is the shedding-fed/reset-driven split that correction 2 and (B)'s
+finding 5 already logged twice; writing a single prediction over both is its next
+instance, mine, and the tell was again a phrase doing unearned work ("every fresh
+input").
+
+⇒ **The discriminator, run first because it is cheapest and decides whether there is a
+build at all:** both principled sizings on `perennial` under **Euler at 15 years**,
+reporting the **per-year CO₂ minimum series** rather than the run minimum — the 0.05
+decade floor is the gate that survived stem-only's rescue, and it is the one that kills
+things here.
+
+⚠ **Finding 4's window is deliberately NOT re-derived.** The split superseded its
+evidence, and the instinct is to re-sweep for the new window — but that sweep is the
+refused shape itself, and the refusal on that leg (*a window located by sweeping until
+the gate went green, with no independent invariant to size it on*) never depended on the
+CUE. Both principled sizings get measured; if both fail, that is the answer, not a prompt
+to sweep.
+
+⚠ **Held loosely, for a stated reason: my last closure prediction was wrong, and so was
+the repo-wide law behind it.** The humification split's row records it — *"any change
+parking carbon in a standing pool is paid out of the CO₂ trough"* was measured false; it
+was true of a soil with one fast pool, not of soils. Prediction 1 is the same shape of
+reasoning about the same jar.
+
+---
+
+## THE VERDICT: STILL REFUSED, on a leg that is now measured rather than structural
+
+**Both principled sizings still fail on `perennial`, and the failure survives past the
+transient.** Probes `M:/claud_projects/temp/soil_frac2/`, each scenario driven the way
+its own golden drives it, Euler at `dt = 1`.
+
+| sizing | seed | `perennial` `rationed` | settled CO₂ min | verdict |
+|---|---|---|---|---|
+| CONTROL frozen (1 pool) | 3.000 | **0** | **0.073291** | passes |
+| 1 — constant initial flux | 19.409 | **1** @ step 807 | **0.031741** | fails both gates |
+| 2 — constant inventory | 3.000 | — | — | `annual_reset` **hard-errors** (re-sow starves) |
+
+The sizings' *arithmetic* is unchanged by the split (both are properties of the litter
+pool's own decay flux and of RothC's standing partition; neither reads a humification
+fraction — and holding the decay flux fixed also holds the t=0 CO₂ return fixed, since
+`litter_respired_fraction` applies to frozen and fractionated alike). What changed is the
+tree they run on, so both were re-measured rather than inherited.
+
+⚠ **The floor failure is NOT a transient, and it was checked rather than assumed.** The
+split lengthened the settling transient to ~35 years and anchored its own liveness floor
+on a measured equilibrium at ~yr 45 — so fairness required asking the same question here
+before calling 0.019267 a failure of the form. Run to **50 years**, sizing 1's per-year
+CO₂ minimum rises monotonically and **asymptotes at 0.031741**, still **1.58× below the
+0.05 floor** (the frozen control settles at 0.073291). The failure is the attractor, not
+the approach to it.
+
+⚠ **Finding 4's window was not re-derived**, and `0.59` was not tried as a seed
+partition: the seed is a *standing* pool, so Hoosfield's 3.305 % is the right reading and
+0.59 is the input ratio this document's own mutation test uses as the plausible wrong
+one.
+
+## FINDING A — the two regimes diverge, and only ONE scenario refuses it
+
+| scenario | regime | sizing 1 | sizing 2 |
+|---|---|---|---|
+| `sealed_chamber` (3 yr) | shedding-fed | `rationed 0`, CO₂ 0.076380 → **0.078065** | `rationed 0`, CO₂ → **0.080342** |
+| `water_biting` (1 yr) | shedding-fed | `rationed 0`, CO₂ 0.085006 → **0.085055** | `rationed 0`, CO₂ → **0.101867** |
+| `consumer` (5/15 yr) | reset-driven | `rationed 0`, floor **PASS** | **hard error** |
+| `perennial` (5/15 yr) | reset-driven | `rationed 1`, floor **FAIL** | **hard error** |
+
+The shedding-fed pair is benign at **both** sizings and its CO₂ tail improves — but ⚠
+sizing 2's improvement comes with a **3.5× smaller plant** (peak vegetative carbon 0.5202
+against the frozen 1.8445), so those two numbers travel together here exactly as they do
+in the humification row. The binding scenario is **`perennial` alone** (with its
+long-horizon twin, which reuses the same scenario object).
+
+⚠ **The firing step was measured by horizon truncation, not read off the CO₂ argmin** —
+the (C) stem-only branch recorded that inference as *circular*, since entering the firing
+step the pool is already in free fall and the trough is the value the backstop clamped
+to. Measured: **step 807 = year 3, day 197.** Stem-only fired at step 502 = year 1,
+**day 197** — the identical within-season day, from an unrelated change. That the
+seasonal draw peaks at one point and the backstop bites there is a property of the
+chamber, not of either mechanism.
+
+## FINDING B — the mechanism, and MY HYPOTHESIS WAS REFUTED BY THE PROBE
+
+The census at each run's own trough showed a *deeper* trough beside a *bigger* plant and
+5.7× the inventory. Two mechanisms fit that, and they are different claims: the slow pool
+returns carbon too slowly, or the plant's demand grew faster than the supply. I predicted
+the first — RPM at 0.3 /yr is almost exactly the Zhang median the decomposer calibration
+measured as starving the loop. **Measured, it is false.**
+
+| quantity, at each run's own trough | frozen | fractionated, sizing 1 | ratio |
+|---|---|---|---|
+| litter return flux | 2.8558 mol C/yr | **8.1112 mol C/yr** | **2.84×** |
+| return per unit standing tissue | 1.4765 /yr | **2.3128 /yr** | 1.57× |
+| standing tissue | 1.934197 mol C | 3.507145 mol C | 1.81× |
+| system carbon inventory | 3.517000 mol C | 19.926256 mol C | 5.67× |
+| **the atmosphere they transact through** | **0.055175** | **0.019267** | **0.35×** |
+| plant's share of all carbon | 55.0 % | 17.6 % | |
+| air's share of all carbon | 1.6 % | **0.1 %** | |
+
+**The loop is not starved — it is running 2.84× faster on both sides of a buffer that
+did not grow at all.** The seed grew 6.47×, the return flux 2.84×, the plant 1.81×, and
+the atmosphere those three transact through grew **1.00×**: `chamber_air_mol` and the
+initial CO₂ are untouched by a litter change. The trough is a *flow-balance* moment in
+the season, not a supply shortage, and at 0.1 % of the inventory the atmosphere records
+any instantaneous mismatch in full.
+
+⇒ **This is the chamber-scale diagnosis reached independently for the fifth time**, and
+in its own words: the atmosphere is a buffer of *hours*, so a change that enlarges the
+plant and the soil while leaving the jar alone is paid for in the jar. Recording the
+census alone and calling it "the slow pool starved the loop" would have been asserting a
+mechanism I had not measured — the humification split's finding 6 shape, one option on.
+
+## What this changes about the case for building it
+
+**The re-opening's own headline does not survive.** The live case was retiring
+`decomposition_rate` — the last uncited decomposer carbon rate, sitting at Olson's fast
+edge *because closure requires it* — by replacing it with RothC's two cited rates and
+cited input ratio. That is precisely what cannot be done: **at every principled sizing,
+adopting the cited rates breaks the chamber that the fast edge exists to keep alive.**
+The 2026-07-21 calibration's finding is confirmed from a new direction — it measured that
+central literature values starve the loop; this measures that *splitting* the pool at
+cited rates does not evade that, because the binding constraint was never the pool's
+aggregate rate.
+
+⇒ **`decomposition_rate` is now measured UN-RETIRABLE by the only cited alternative on
+the shelf**, and that is the durable statement rather than "the seam is refused". RothC's
+DPM/RPM pair *is* the two-pool option — it is the lineage the param file's own counter-
+reading names, and the one this project refused to reach by relabelling — and it breaks
+the binding scenario at every principled sizing. So the fast edge is not a placeholder
+awaiting the right citation; it is where the chamber puts the value, and a future reader
+reaching for RothC to discharge that TODO can read this instead of re-deriving it.
+
+⇒ the seam stays **refused**, and the refusal is now **better grounded than the one it
+replaces**: the old one rested on a structural ceiling (finding 3) that the humification
+split has since removed, plus a fitted-window objection. This one rests on a measured
+equilibrium beyond the transient, on the one scenario that binds, with the mechanism
+established rather than inferred. ⚠ **And it is a fact about the chamber, not about
+RothC** — the shedding-fed chambers take the same change without complaint.
+
+⚠ **THE NITROGEN SIDE WAS NOT RE-MEASURED, and that is recorded rather than left to be
+inferred from the section's silence** (the (C) diagnosis's `sealed_station` precedent).
+Finding 5 — the N-free seed becoming *permanent* because 96.7 % of it parks in RPM at
+0.3 /yr, so the seam **owes `litter_n0`** — rests on a mechanism the humification split
+does not touch, and nothing in the re-opening's pins measures nitrogen. The harness's own
+(B)-identity self-check *was* re-run and holds exactly (litter pool C:N constant to the
+last digit across all 916 steps with the seed removed, one-pool and fractionated alike),
+which is what licenses the carbon numbers above — but that is a check on the harness, not
+a re-measurement of finding 5. Whoever takes this up re-measures the N side; it is an
+**unmeasured** leg, not a clean one.
+
+## The pins the re-opening added (section 10 of the test file)
+
+Five, all `slow`, taking the file to **26 functions / 29 collected / 15 slow**:
+
+1. **the floor failure is the ATTRACTOR** — 50 years, sizing 1 asymptotes at 0.031741
+   against the 0.05 floor, with the frozen control asserted alongside at 0.073291,
+   because "the subject converges below the floor" is a verdict only if the control
+   converges above it on the same horizon and harness;
+2. **the mechanism, as a refutation** — the return flux is 2.84× *higher*, and the
+   `chamber_air_mol == 1000.0` invariance is asserted, because without it the ratio table
+   is three numbers with nothing to compare them to;
+3. **the regime split** — both shedding-fed chambers close at both sizings, with the
+   plant-size cost asserted *in the same test* as the improved tail;
+4. **the firing step by truncation**, and the day-197 coincidence with stem-only;
+5. **`consumer` is not what refuses it** — pinned because *"fractionation breaks the
+   reset-driven chambers"* is the paraphrase this result will collapse into, and it is
+   false.
+
+The sizings' immediate results were already pinned (sections 4 and 6) and the
+humification split had re-measured both in place, so they are not duplicated here.
+
+⚠ **The horizon is a live constraint, not a footnote.** The split lengthened the
+chamber's settling transient from ~3 years to **~35**, past the frozen 15-year horizon.
+RPM's half-life is 2.3 years, so fractionation will lengthen it further. **Every number
+measured at 15 years is measured inside a transient** and must be labelled as such —
+four committed guards had to be restated for exactly this reason.

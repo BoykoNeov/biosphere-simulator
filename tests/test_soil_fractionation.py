@@ -32,6 +32,8 @@ from domains.biosphere.decomposition import (
 )
 from domains.biosphere.loader import (
     MOLAR_MASS_CARBON_KG_PER_MOL,
+    load_decomposition_params,
+    load_microbial_respiration_params,
     load_nitrogen_params,
     load_phenology_params,
     load_senescence_params,
@@ -50,6 +52,8 @@ from domains.biosphere.scenario import (
     PERENNIAL_CHAMBER_YEARS,
     SEALED_CHAMBER_SCENARIO,
     SEALED_CHAMBER_YEARS,
+    WATER_BITING_SCENARIO,
+    WATER_BITING_YEARS,
     SeasonScenario,
 )
 from domains.biosphere.season import (
@@ -68,7 +72,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.stocks import pool_stock
+from domains.biosphere.stocks import O2_POOL, pool_stock
 from simcore.environment import Environment
 from simcore.flow import Flow, FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -414,10 +418,18 @@ def drive(
     fractionate: bool,
     rdr_stem_zero: bool = False,
     hum_seed: float = 0.0,
+    steps: int | None = None,
 ) -> tuple[list[State], int]:
     """Run `scenario` the way its own golden drives it. `run_season` asserts
     conservation
-    across the reset, which is what makes a re-sow failure real starvation."""
+    across the reset, which is what makes a re-sow failure real starvation.
+
+    `steps` truncates the run below the whole-year count `years` implies. It exists for
+    ONE purpose: on a deterministic run the smallest horizon that rations *is* the
+    firing step, so truncation is how one gets MEASURED instead of read off the CO2
+    argmin (which the (C) stem-only branch recorded as circular). Leave it None and the
+    run is exactly `years` years.
+    """
     rows = _weather() * years
     year_steps = len(_weather())
     state, registry = build_variant(
@@ -439,7 +451,7 @@ def drive(
         state,
         resolver,
         1.0,
-        len(rows),
+        len(rows) if steps is None else steps,
         reset=reset if perennial else None,
     )
     # The option-(B) probe guard: a dropped aux freezes thermal_time and every
@@ -1059,3 +1071,296 @@ def test_the_one_pool_form_cannot_take_the_same_inventory() -> None:
         fractionate=False,
     )
     assert rationed == 5  # re-measured 2026-08-10 (was 6)
+
+
+# --- 10. THE RE-OPENING (2026-08-10) --------------------------------------------------
+#
+# The humification split discharged finding 3 -- this diagnosis's stated reason for the
+# refusal -- so the seam was re-opened and the price re-derived on the post-split tree.
+# The refusal STANDS, on a leg that is measured rather than structural. These pins carry
+# the part of that which is new; the sizings' immediate results are already pinned in
+# sections 4 and 6 above (both were re-measured in place by the split).
+
+
+@pytest.mark.slow
+def test_the_liveness_floor_failure_is_the_ATTRACTOR_not_the_transient() -> None:
+    """THE DECISIVE RE-OPENING PIN — sizing 1 fails the 0.05 floor at EQUILIBRIUM.
+
+    The obvious objection to reading `perennial`'s 15-year CO2 minimum as a verdict is
+    that the humification split lengthened the chamber's settling transient from ~3
+    years
+    to ~35, past the frozen horizon -- and that split anchored its OWN liveness floor on
+    a measured equilibrium at ~yr 45 rather than on the 15-year reading. Fairness
+    requires asking the same question of a change one is about to refuse, so it was
+    asked before the refusal was written, not after it was challenged.
+
+    Run to 50 years, sizing 1's per-year CO2 minimum rises monotonically off its year-3
+    trough and asymptotes at **0.031741** -- still **1.58x below the 0.05 floor**, and
+    flat to 6 decimals over the last several years. The failure is the attractor, not
+    the
+    approach to it.
+
+    The frozen control settles at 0.073291 and is asserted alongside, because "the
+    subject converges below the floor" is only a verdict if the control converges above
+    it on the same horizon and harness.
+    """
+    frozen_states, frozen_rationed = drive(
+        PERENNIAL_CHAMBER_SCENARIO,
+        50,
+        perennial=True,
+        total_seed=FROZEN_LITTER_SEED,
+        fractionate=False,
+    )
+    frozen = per_year_min_co2(frozen_states, 50)
+    assert frozen_rationed == 0
+    assert frozen[-1] == pytest.approx(0.073291, abs=1e-5)
+    assert frozen[-1] > DECADE_CO2_FLOOR
+
+    states, rationed = drive(
+        PERENNIAL_CHAMBER_SCENARIO,
+        50,
+        perennial=True,
+        total_seed=19.4093,
+        fractionate=True,
+    )
+    minima = per_year_min_co2(states, 50)
+    assert rationed == 1
+    assert minima[-1] == pytest.approx(0.031741, abs=1e-5)
+    # The attractor, not a dip: the LAST TWENTY years never once reach the floor, so no
+    # reading of "it is still settling" rescues it.
+    assert max(minima[30:]) < DECADE_CO2_FLOOR
+    assert minima[-1] / DECADE_CO2_FLOOR == pytest.approx(0.6348, abs=1e-3)
+
+
+@pytest.mark.slow
+def test_fractionation_does_not_STARVE_the_loop_it_enlarges_BOTH_SIDES() -> None:
+    """THE MECHANISM, and it REFUTES the hypothesis this diagnosis was written
+    expecting.
+
+    RPM's 0.3/yr is almost exactly the Zhang median (0.300/yr) that the 2026-07-21
+    decomposer calibration measured as starving the recycled-CO2 loop, so the natural
+    reading of a deeper CO2 trough is "the slow pool cannot return carbon fast enough".
+    **Measured, that is false.** At its own trough the fractionated run returns litter
+    carbon **2.84x FASTER** than the frozen one, not slower.
+
+    What actually happens is visible only when the buffer is put in the same table as
+    the
+    things it buffers:
+
+        seed          6.47x        return flux   2.84x
+        plant         1.81x        the atmosphere they transact through   1.00x
+
+    `chamber_air_mol` and the initial CO2 are untouched by a litter change, so a change
+    that enlarges the soil and the plant leaves the jar between them exactly as it was
+    --
+    and at 0.1 % of the system's carbon that jar records every instantaneous mismatch in
+    full. The trough is a flow-balance moment in the season, not a supply shortage.
+
+    This is the chamber-scale diagnosis reached independently (the atmosphere is a
+    buffer
+    of hours), and it is pinned as a MECHANISM because recording the census alone and
+    calling it starvation would assert something unmeasured -- the humification split's
+    finding 6 shape, one option on.
+    """
+
+    def at_trough(seed: float, fractionate: bool) -> tuple[float, float, float]:
+        states, _ = drive(
+            PERENNIAL_CHAMBER_SCENARIO,
+            5,
+            perennial=True,
+            total_seed=seed,
+            fractionate=fractionate,
+        )
+        trough = min(states, key=lambda s: s.stocks[CARBON_POOL].amount)
+        f_o2 = oxygen_limitation_factor(
+            trough.stocks[O2_POOL].amount,
+            air_mol=PERENNIAL_CHAMBER_SCENARIO.chamber_air_mol,
+            k_o2=load_microbial_respiration_params().o2_half_saturation,
+        )
+        dpm = trough.stocks[LITTER_CARBON].amount
+        if fractionate:
+            rpm = trough.stocks[LITTER_RPM].amount
+            flux = (K_DPM_DAY * dpm + K_RPM_DAY * rpm) * f_o2
+        else:
+            flux = load_decomposition_params().decomposition_rate * dpm * f_o2
+        tissue = sum(
+            trough.stocks[i].amount for i in (LEAF_C, STEM_C, ROOT_C, STORAGE_C)
+        )
+        return flux * 365.0, tissue, trough.stocks[CARBON_POOL].amount
+
+    frozen_return, frozen_tissue, frozen_air = at_trough(FROZEN_LITTER_SEED, False)
+    frac_return, frac_tissue, frac_air = at_trough(19.4093, True)
+
+    assert frozen_return == pytest.approx(2.8558, abs=1e-3)
+    assert frac_return == pytest.approx(8.1112, abs=1e-3)
+    # THE REFUTATION: the return is HIGHER, so "the slow pool starved the loop" is
+    # false.
+    assert frac_return > frozen_return
+    assert frac_return / frozen_return == pytest.approx(2.840, abs=1e-2)
+
+    assert frac_tissue / frozen_tissue == pytest.approx(1.813, abs=1e-2)
+    # ...and the trough is nonetheless DEEPER, which is the whole point.
+    assert frac_air < frozen_air
+    # The buffer is bit-identically unchanged -- a litter seed cannot touch it. This is
+    # the assertion the finding rests on; without it the table above is three ratios
+    # with nothing to compare them to.
+    assert PERENNIAL_CHAMBER_SCENARIO.chamber_air_mol == 1000.0
+
+
+@pytest.mark.slow
+def test_the_shedding_fed_regime_takes_BOTH_sizings_and_the_better_trough_costs_the_plant() -> (  # noqa: E501
+    None
+):
+    """FINDING A — the refusal is ONE scenario's, and the regimes diverge.
+
+    "59 % of every fresh input decays at 10.0/yr" is a claim about FRESH INPUT, and only
+    the shedding-fed chambers are fed that way -- `perennial`/`consumer` are dominated
+    by the annual dump, so a year after a dump the comparison inverts (41 % of it left
+    at 0.3/yr, against the frozen bulk pool's `e^-4.015` = 1.8 %). Stated flat over both
+    regimes it is the shedding-fed/reset-driven conflation correction 2 and option (B)'s
+    finding 5 already logged twice.
+
+    Measured, the two regimes go opposite ways: the shedding-fed pair closes at BOTH
+    sizings with an improved CO2 tail, while `perennial` fails both.
+
+    !! The improvement is NOT quotable on its own. Sizing 2 buys `sealed_chamber` a
+    better tail (0.076380 -> 0.080342) at a **3.5x smaller plant** (peak vegetative
+    carbon 1.844452 -> 0.520157), so the two numbers are asserted together, the way the
+    humification row requires -- a CO2 trough that improves because there is less plant
+    to draw on it is not a benefit.
+    """
+    for scenario, years, frozen_tail, s1_tail, s2_tail, s2_veg_ratio in (
+        (
+            SEALED_CHAMBER_SCENARIO,
+            SEALED_CHAMBER_YEARS,
+            0.076380,
+            0.078065,
+            0.080342,
+            0.520157 / 1.844452,
+        ),
+        (
+            WATER_BITING_SCENARIO,
+            WATER_BITING_YEARS,
+            0.085006,
+            0.085055,
+            0.101867,
+            0.618695 / 2.225623,
+        ),
+    ):
+        tails = {}
+        vegs = {}
+        for label, seed, fract in (
+            ("frozen", FROZEN_LITTER_SEED, False),
+            ("sizing1", 19.4093, True),
+            ("sizing2", FROZEN_LITTER_SEED, True),
+        ):
+            states, rationed = drive(
+                scenario, years, perennial=False, total_seed=seed, fractionate=fract
+            )
+            assert rationed == 0, f"{label}: the shedding-fed regime must close"
+            tails[label] = min(s.stocks[CARBON_POOL].amount for s in states)
+            vegs[label] = max(
+                s.stocks[LEAF_C].amount
+                + s.stocks[STEM_C].amount
+                + s.stocks[ROOT_C].amount
+                for s in states
+            )
+        assert tails["frozen"] == pytest.approx(frozen_tail, abs=1e-5)
+        assert tails["sizing1"] == pytest.approx(s1_tail, abs=1e-5)
+        assert tails["sizing2"] == pytest.approx(s2_tail, abs=1e-5)
+        assert tails["sizing2"] > tails["frozen"]
+        # ...and it is paid for in plant.
+        assert vegs["sizing2"] / vegs["frozen"] == pytest.approx(s2_veg_ratio, abs=1e-3)
+        assert vegs["sizing2"] < vegs["frozen"]
+
+
+@pytest.mark.slow
+def test_the_flux_sizing_fires_on_the_SAME_season_day_as_stem_only() -> None:
+    """The firing step, located by HORIZON TRUNCATION rather than read off the argmin.
+
+    The (C) stem-only branch recorded that inferring a firing step from the CO2 argmin
+    is
+    circular, not merely unverified: entering that step the pool is already in free
+    fall,
+    so the trough is the value the backstop clamped to and could not have disagreed. On
+    a
+    deterministic run the smallest horizon that rations IS the firing step, so that is
+    what is measured -- here by running year by year and asserting where the count
+    turns.
+
+    Sizing 1 fires in **year 3, day 197**. Stem-only fired in year 1, **day 197**. Two
+    unrelated mechanisms bite on the identical within-season day, which says the day is
+    a
+    property of the chamber's seasonal draw rather than of either change -- and it is
+    the
+    word that separates a within-season failure from the beyond-horizon tiling artefact
+    the decomposer calibration documents.
+    """
+    year_steps = len(_weather())
+
+    def rations_within(steps: int) -> bool:
+        _, rationed = drive(
+            PERENNIAL_CHAMBER_SCENARIO,
+            3,
+            perennial=True,
+            total_seed=19.4093,
+            fractionate=True,
+            steps=steps,
+        )
+        return rationed > 0
+
+    # Year by year first: the count turns in year 3, so the firing step is in
+    # [2*year, 3*year).
+    for years, expected in ((1, 0), (2, 0), (3, 1)):
+        _, rationed = drive(
+            PERENNIAL_CHAMBER_SCENARIO,
+            years,
+            perennial=True,
+            total_seed=19.4093,
+            fractionate=True,
+        )
+        assert rationed == expected, f"{years} yr"
+
+    # ...then bisect INSIDE that year, so the step is RETURNED rather than typed.
+    # `rationed` is monotone non-decreasing in the horizon on a deterministic run, which
+    # is what makes bisection valid here. A hand-written step number asserted after a
+    # loop that only narrowed things to a 305-step window would be a location reported
+    # under a constant it was never measured into -- the exact shape the (C) branch
+    # flagged when it re-measured its own firing step.
+    lo, hi = 2 * year_steps, 3 * year_steps
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if rations_within(mid):
+            hi = mid
+        else:
+            lo = mid + 1
+    firing_step = lo
+
+    assert firing_step == 807
+    assert 2 * year_steps <= firing_step < 3 * year_steps
+    assert firing_step % year_steps == 197
+    # The stem-only coincidence, asserted rather than left in prose.
+    assert 502 % year_steps == 197
+
+
+@pytest.mark.slow
+def test_the_consumer_chamber_is_NOT_what_refuses_the_seam() -> None:
+    """The other reset-driven scenario passes sizing 1 -- so ONE scenario binds.
+
+    Pinned because "fractionation breaks the reset-driven chambers" is the paraphrase
+    this result will collapse into, and it is false: `consumer` closes and clears the
+    floor with room to spare. The refusal is `perennial`'s (with its long-horizon twin,
+    which reuses the same scenario object).
+    """
+    states, rationed = drive(
+        CONSUMER_CHAMBER_SCENARIO,
+        LONG_HORIZON_YEARS,
+        perennial=True,
+        total_seed=19.4093,
+        fractionate=True,
+    )
+    assert rationed == 0
+    assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[2:]) == pytest.approx(
+        0.129892, abs=1e-5
+    )
+    assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[2:]) > DECADE_CO2_FLOOR
