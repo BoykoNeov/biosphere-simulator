@@ -1,0 +1,137 @@
+# chamber — the humification split (a carbon-use efficiency) decomposer params
+# Currency/units: CARBON + OXYGEN (mol). These four dimensionless/rate constants
+#   partition every decomposer carbon flux between CO₂ (respired, drawing O₂ at PQ=1)
+#   and the organic pool the remainder is stabilised into. They carry no flux of their
+#   own: each is applied to a flux whose RATE is already a cited param
+#   (decomposition.yaml, microbial_respiration.yaml) — except slow_decomposition_rate,
+#   which is the new pool's own first-order rate.
+#
+# THE STRUCTURE (CENTURY — Parton et al. 1987, [A]; sources/parton1987.pdf):
+#
+#     litter_carbon --(k_decomp)--> CO₂ · 0.45   + microbial_carbon · 0.55
+#     microbial_carbon --(k_mresp)--> CO₂ · 0.85 + humus_carbon     · 0.15
+#     humus_carbon --(k_slow)------> CO₂ · 0.55  + microbial_carbon · 0.45
+#
+#   `microbial_carbon` is CENTURY's ACTIVE SOM ("live microbes and microbial products",
+#   [A] p. 1173) — the pool `microbial_respiration_rate` is already anchored to (K5).
+#   `humus_carbon` is CENTURY's SLOW SOM. The lineage is deliberate and it is the SAME
+#   one the 2026-07-21 decomposer calibration chose openly (active-SOM over RothC's
+#   "Microbial Biomass"); importing RothC's CO₂/(BIO+HUM) partition onto a CENTURY-rated
+#   pool would be the pool-identity re-anchoring this project has refused three times.
+#
+# WHY THIS FILE EXISTS — the frozen form asserted values OFF THE END of [A]'s own
+#   functions, and the partition was invisible because it was never a parameter:
+#     * the litter step implicitly asserted a CO₂ fraction of 0.0, against [A]'s
+#       measured 0.45 (surface) / 0.55 (soil);
+#     * the microbial step implicitly asserted Es = 1.0, and eq. [6] Es = 0.85 − 0.68·T
+#       CANNOT REACH 1.0 AT ANY TEXTURE — its range over T ∈ [0, 1] is [0.17, 0.85].
+#   That is the same shape bucket-3 scope C found for the decomposer RATES (a value
+#   outside the whole range of its nominal source), one level down: the citation covered
+#   the rate and never covered where the decayed carbon goes. `microbial_respiration_
+#   rate` is anchored to K5, and K5 IS a DECAY rate ([A] eq. [5], "the decay rate of
+#   active SOM"); Es is what partitions the flow it drives.
+#
+# ⚠ NO TEXTURE PARAMETER IS SHIPPED, AND THAT IS A DESIGN DECISION, NOT AN OMISSION.
+#   eq. [6] is a function of T (the soil silt+clay fraction). This chamber has no mineral
+#   soil at all — there is no silt, clay or mineral-matrix quantity anywhere in the stock
+#   set — so T is not a state this model has, and `active_stabilization_co2_fraction` is
+#   shipped as the CONSTANT eq. [6] takes at T = 0. Shipping T as a knob would be
+#   shipping a parameter whose viable range was found by sweeping, which is the
+#   fitted-window shape this project refused for soil fractionation. A cited constant and
+#   a fitted one differ by whether the knob exists.
+#   ⚠⚠ AND THE MEASURED CONTEXT IS RECORDED RATHER THAN LEFT FOR A READER TO REDISCOVER:
+#   the sealed chambers survive this split only for T ≤ ~0.10 (at T = 0.15 the perennial
+#   chamber cannot fill enough grain to re-sow and `annual_reset` hard-errors), while
+#   real agricultural soils run T ≈ 0.3–0.7. "No mineral soil" argues that T is SMALL,
+#   not that it is ZERO, so the structural reading lands near the EDGE of the survivable
+#   band, not clear of it. That is a fact about the 1 m² / 3.5 mol C jar, not about the
+#   science (the chamber-scale diagnosis's fourth independent witness) — see
+#   docs/plans/post-roadmap-cue-humification.md finding 4.
+#
+# Units discipline (P4 / config/units.py): the three fractions are dimensionless
+#   ("mol/mol", exact-string guarded) and bound-checked to [0, 1] — a fraction outside
+#   it would create or destroy carbon in a leg. `slow_decomposition_rate` is a 1/day
+#   first-order rate like its two siblings. Zero is valid for every one of them
+#   (a zero CO₂ fraction is the frozen pre-2026-08-10 behaviour at that step; a zero
+#   slow rate makes humus a permanent sink).
+#
+# Deferred seams, named rather than silently dropped:
+#   * CENTURY's PASSIVE SOM pool (K7, 800–1600 yr) and its two formation flows (0.4 % of
+#     the flow out of active, 3 % of the flow out of slow, [A] p. 1176) are NOT built.
+#     Omitting them is conservative for this chamber: a passive pool locks MORE carbon.
+#   * CENTURY's LIGNIN route (structural litter → slow SOM at a 30 % CO₂ loss) is not
+#     expressible: this model has ONE litter pool with no lignin fraction, so only the
+#     nonlignin litter → active path is built. Same one-pool honesty as
+#     decomposition.yaml's refusal to relabel its pool a "labile fraction".
+#   * `litter_respired_fraction` uses the SURFACE end (0.45) of a 0.45–0.55 band our
+#     single litter pool cannot resolve — it aggregates [A]'s structural AND metabolic
+#     litter, and metabolic sits at 0.55. Both ends were measured and both close (see the
+#     plan doc); 0.45 is chosen because senescence sheds SURFACE residue, a structural
+#     reading, not an outcome-based pick.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#
+# Sources:
+#   [A] Parton, W.J., Schimel, D.S., Cole, C.V. & Ojima, D.S. (1987), "Analysis of factors
+#       controlling soil organic matter levels in Great Plains grasslands", Soil Sci. Soc.
+#       Am. J. 51:1173–1179 — the CENTURY model description. PRIMARY, OPENED AND READ
+#       first-hand (round 2 of bucket-3 scope C, 2026-07-16, for K5; re-read 2026-08-10
+#       for the partition). Already the VALUE source for
+#       microbial_respiration_rate.
+#       p. 1174: "The model assumes that all C decomposition flows are a result of
+#       microbial activity and that microbial respiration is associated with each of
+#       these flows. The model assumes (see Fig. 1) that 55% of the C decomposition flow
+#       for soil nonlignin structural C, metabolic C, and slow and passive soil SOM is
+#       lost as microbial respiration. Nonlignin surface structural litter has a low
+#       respiration loss (45%), since fungi are the primary decomposers of surface litter
+#       and more efficiently stabilize C into microbial biomass (Holland and Coleman, in
+#       press). Stabilizing lignin into slow SOM is a fairly efficient process with only
+#       30% lost as respiration loss (Stott et al., 1983)."
+#       p. 1176, eq. [6]: "Es = (0.85 - 0.68 T)", defined p. 1176 as "the efficiency of
+#       stabilizing active SOM into slow SOM (Es = fraction of C lost as CO2 when active
+#       SOM is decomposed and stabilized into slow SOM)", with T "the soil silt plus clay
+#       fraction". Fitted to Sorensen (1981) laboratory incubations across textures.
+#       p. 1176: "The decay rate for the slow SOM pool (K6 = 0.0038 week⁻¹) was assumed
+#       to be equal to the decay rate at the end of (day 360 to day 1600) Sorenson's
+#       (1981) long-term cellulose incubation. His data also show that the decay rate at
+#       the end of the incubation is the same for different soil textures in spite of the
+#       fact that the C level in the sandy soil was 50% lower than the C level in the
+#       high-clay soil."
+#       ⚠ K6 IS NOT A NEW RETRIEVAL — microbial_respiration.yaml's [A] entry has quoted
+#       that sentence first-hand since 2026-07-16. This file binds it to a pool.
+#       ⚠ K6's own texture-independence (the second half of the quote) is worth keeping
+#       adjacent to the T caveat above: [A] states the SLOW pool's rate does not vary
+#       with texture, so the texture sensitivity this chamber is near the edge of enters
+#       through Es alone, not through k_slow.
+#   [B] Coleman, K. & Jenkinson, D.S., "RothC — A model for the turnover of carbon in
+#       soil" (Windows version, June 2014), sources/RothC_guide_WIN.pdf. CONTRAST, NOT
+#       the source: RothC's §1.3/p. 41 gives its own humification split (CO₂ vs BIO+HUM
+#       = 3.51/4.51 at Hoosfield, BIO:HUM = 46:54, via a clay function). Recorded because
+#       it is the obvious alternative and because REFUSING it is a decision: our
+#       microbial pool is rated to CENTURY's K5, and RothC's BIO runs 0.66/yr — the 8.8×
+#       residual the decomposer calibration recorded rather than fitted away. Taking
+#       RothC's partition onto a CENTURY-rated pool would re-anchor the pool's meaning to
+#       make a constant fit. Its numbers are close enough to be worth stating: RothC
+#       retains 1/4.51 = 22.2 % of decomposed C against our 15 % at the microbial step.
+
+name: chamber
+process: humification
+
+parameters:
+  litter_respired_fraction:
+    value: 0.45
+    unit: "mol/mol"
+    source: "[A] Parton 1987 p. 1174, first-hand: 'Nonlignin surface structural litter has a low respiration loss (45%), since fungi are the primary decomposers of surface litter and more efficiently stabilize C into microbial biomass.' Our litter_carbon is senescence-shed material lying in the chamber — SURFACE residue, not incorporated soil residue — so the surface figure is the structural reading. ⚠ SCOPE: our single litter pool aggregates [A]'s structural AND metabolic litter, and metabolic sits at 0.55, so 0.45 is the surface-structural END of a 0.45–0.55 band this one-pool model cannot resolve. The soil end was MEASURED and also closes the whole sealed roster (perennial 15 yr tail 0.057074 vs 0.055175 at 0.45); it is not chosen by outcome. ⚠ The frozen tree implicitly asserted 0.0 here — below the whole band."
+  active_stabilization_co2_fraction:
+    value: 0.85
+    unit: "mol/mol"
+    source: "[A] Parton 1987 eq. [6] p. 1176, first-hand: 'Es = (0.85 - 0.68 T)', where Es is 'the fraction of C lost as CO2 when active SOM is decomposed and stabilized into slow SOM' and T is the soil silt+clay fraction. Shipped as the CONSTANT eq. [6] takes at T = 0, because this chamber has NO MINERAL SOIL — no silt, clay or mineral-matrix quantity exists in the stock set — so T is not a state this model has. ⚠ NO TEXTURE KNOB IS SHIPPED, DELIBERATELY: a T parameter would be a knob whose viable range was found by sweeping (the soil-fractionation fitted-window shape). ⚠⚠ MEASURED CONTEXT, recorded not buried: the sealed chambers survive only for T <= ~0.10 (T = 0.15 hard-errors on re-sow) while real agricultural soils run T ~ 0.3-0.7, and 'no mineral soil' argues T is SMALL rather than ZERO — so this lands near the EDGE of the survivable band. That is a property of a 1 m2 / 3.5 mol C jar, not of the science (chamber-scale, fourth witness). ⚠ The frozen tree implicitly asserted Es = 1.0, which eq. [6] CANNOT REACH AT ANY TEXTURE (range [0.17, 0.85])."
+  slow_respired_fraction:
+    value: 0.55
+    unit: "mol/mol"
+    source: "[A] Parton 1987 p. 1174, first-hand: '55% of the C decomposition flow for soil nonlignin structural C, metabolic C, and slow and passive soil SOM is lost as microbial respiration.' humus_carbon IS CENTURY's slow SOM, so this is its own row of that sentence. The remaining 45 % returns to active SOM (microbial_carbon); in [A] a further 3 % of the flow out of slow forms PASSIVE SOM, a pool this model does not build — omitting it is conservative for a closed chamber (a passive pool locks MORE carbon)."
+  slow_decomposition_rate:
+    value: 0.000542857142857142857
+    unit: "1/day"
+    source: "[A] Parton 1987 p. 1176, first-hand: 'The decay rate for the slow SOM pool (K6 = 0.0038 week-1) was assumed to be equal to the decay rate at the end of (day 360 to day 1600) Sorenson's (1981) long-term cellulose incubation.' 0.0038/week / 7 = 5.428571e-4 /day = 0.19821/yr (turnover ~5.0 yr; [A] p. 1173 describes slow SOM's turnover as 20-50 yr under field temperature/moisture modifiers, which multiply k DOWNWARD — the unmodified maximum is what this model uses, exactly as microbial_respiration_rate uses K5's unmodified maximum). ⚠ NOT a new retrieval: microbial_respiration.yaml's [A] entry has quoted this sentence first-hand since 2026-07-16 — this file is the first to BIND it to a pool. ⚠ [A] states in the same breath that this rate is texture-INDEPENDENT ('the decay rate at the end of the incubation is the same for different soil textures'), so the texture sensitivity recorded on active_stabilization_co2_fraction enters through Es alone."

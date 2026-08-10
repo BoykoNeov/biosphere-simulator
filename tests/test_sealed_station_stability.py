@@ -224,8 +224,19 @@ def test_tier2_biomass_bounded_and_converging(sealed_tier2_run) -> None:
     # 0.012); bound stays 1.0 << the Tier-3 landmine's ~1e4 ramp -- the run must be
     # non-amplifying past year 1. Skipping a documented spin-up is NOT relaxing the
     # bound.
-    assert is_stationary(diffs, bound=1.0, slope_tol=1e-2, transient=1), (
-        f"coupled biomass must be bounded/non-amplifying past spin-up, diffs={diffs}"
+    # ⚠ RESTATED 2026-08-10 (the humification split) — the same restatement as the
+    # pre-golden gate in ``test_regression_sealed_station``, which is this assertion's
+    # twin. Slow SOM fills on its own ~5-yr turnover (K6 = 0.0038/wk) while this
+    # scenario
+    # runs 4 years, so total organic carbon is still CLIMBING at the end of the run (the
+    # humus pool reaches ~23.8 mol C). An amplitude bound of 1.0 mol C/yr asserts that a
+    # pool is full before it has finished filling.
+    #
+    # What ``is_stationary`` protects against is AMPLIFICATION — a run whose year-over-
+    # year change grows — and that is asserted directly, without a magic amplitude:
+    assert all(d > 0.0 for d in diffs), diffs
+    assert all(diffs[k + 1] < diffs[k] for k in range(len(diffs) - 1)), (
+        f"coupled biomass must be DECELERATING (converging), diffs={diffs}"
     )
     # Converging, not ramping: the later same-phase diff is strictly smaller (the
     # decomposer pool + soil establishment approach steady state -- the year-1->2

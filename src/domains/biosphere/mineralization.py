@@ -138,6 +138,10 @@ from dataclasses import dataclass
 from domains.biosphere.allocation import SenescenceParams, senescence_flux
 from domains.biosphere.chamber import oxygen_limitation_factor
 from domains.biosphere.decomposition import DecompositionParams, decomposition_flux
+from domains.biosphere.humification import (
+    HumificationParams,
+    respired_and_stabilized,
+)
 from domains.biosphere.microbial_respiration import (
     MicrobialRespirationParams,
     microbial_respiration_flux,
@@ -294,24 +298,46 @@ class LitterNitrogenTransfer:
     priority: int
     litter_n: StockId
     microbial_n: StockId
+    soil_n: StockId
     litter_carbon: StockId
+    o2_pool: StockId
     params: DecompositionParams
+    humification: HumificationParams
+    o2_half_saturation: float
+    air_mol: float
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         stocks = snapshot.stocks
         litter_c = stocks[self.litter_carbon].amount
-        # The identical flux Decomposition sends litter_carbon → microbial_carbon.
+        # The identical flux Decomposition decays out of litter_carbon — f_O2 included,
+        # which the carbon side gained with its CO₂ leg (the humification split).
+        f_o2 = oxygen_limitation_factor(
+            stocks[self.o2_pool].amount,
+            air_mol=self.air_mol,
+            k_o2=self.o2_half_saturation,
+        )
         decomposed = (
             decomposition_flux(
                 litter_c, decomposition_rate=self.params.decomposition_rate
             )
+            * f_o2
             * dt
         )
         moved = carried_nitrogen(decomposed, stocks[self.litter_n].amount, litter_c)
+        # N follows the CARBON partition in the same fractions: the share of the carbon
+        # that left as CO₂ releases its nitrogen as mineral N to ``soil_n``, and the
+        # share stabilised into microbial biomass carries its nitrogen with it. The
+        # TOTAL withdrawal is unchanged by the split, which is what preserves option
+        # (B)'s identity — litter's C and N still leave on the same flux, so the pool's
+        # C:N stays the C:N of the material that fell in.
+        mineralized, transferred = respired_and_stabilized(
+            moved, self.humification.litter_respired_fraction
+        )
         return FlowResult(
             legs=(
                 Leg(self.litter_n, -moved),
-                Leg(self.microbial_n, moved),
+                Leg(self.microbial_n, transferred),
+                Leg(self.soil_n, mineralized),
             )
         )
 
@@ -344,7 +370,9 @@ class MicrobialNitrogenRelease:
     soil_n: StockId
     microbial_carbon: StockId
     o2_pool: StockId
+    humus_n: StockId
     params: MicrobialRespirationParams
+    humification: HumificationParams
     # Total chamber air (mol) — the intensive basis for the ``f_O2`` O₂ mole fraction,
     # exactly as MicrobialRespiration takes it (from ``scenario.chamber_air_mol``).
     air_mol: float
@@ -358,7 +386,7 @@ class MicrobialNitrogenRelease:
             air_mol=self.air_mol,
             k_o2=self.params.o2_half_saturation,
         )
-        respired = (
+        turned = (
             microbial_respiration_flux(
                 microbial_c,
                 microbial_respiration_rate=self.params.microbial_respiration_rate,
@@ -366,10 +394,71 @@ class MicrobialNitrogenRelease:
             * f_o2
             * dt
         )
-        moved = carried_nitrogen(respired, stocks[self.microbial_n].amount, microbial_c)
+        moved = carried_nitrogen(turned, stocks[self.microbial_n].amount, microbial_c)
+        # N follows the carbon partition: the respired share (``Es``) mineralizes to
+        # ``soil_n``, the stabilised share rides its carbon into humus.
+        mineralized, stabilized = respired_and_stabilized(
+            moved, self.humification.active_stabilization_co2_fraction
+        )
         return FlowResult(
             legs=(
                 Leg(self.microbial_n, -moved),
-                Leg(self.soil_n, moved),
+                Leg(self.soil_n, mineralized),
+                Leg(self.humus_n, stabilized),
+            )
+        )
+
+
+@dataclass(frozen=True)
+class HumusNitrogenRelease:
+    """NITROGEN flow ``humus_n -> soil_n + microbial_n``, carried by the decayed carbon.
+
+    The nitrogen leg of :class:`humification.HumusDecomposition`, and the third and last
+    member of the carried-nitrogen family (post-roadmap, the humification split). Slow
+    SOM decomposes; the share of its carbon lost as CO₂ releases its nitrogen as mineral
+    N, and the share returning to active SOM carries its nitrogen back with it.
+
+    Every leg of the N cycle now rides the carbon flux its sibling carbon flow already
+    moves — ``f_O2`` included — so no nitrogen rate of its own exists anywhere in the
+    decomposer chain. That is what makes each organic pool's C:N a function of the
+    **composition of the material that fell into it** rather than of an independent rate
+    constant, which is the result option (B) established and this flow extends to a
+    third pool.
+
+    Single-currency NITROGEN. Self-limiting in the substrate (∝ the humus N pool) and in
+    O₂ (the ``f_O2`` Monod factor → 0 as O₂ → 0), so ``rationed == 0`` is structural.
+    Sealed-chamber only. ``flux = daily · f_O2 · dt`` — dt-linear.
+    """
+
+    id: FlowId
+    priority: int
+    humus_n: StockId
+    soil_n: StockId
+    microbial_n: StockId
+    humus_carbon: StockId
+    o2_pool: StockId
+    humification: HumificationParams
+    o2_half_saturation: float
+    air_mol: float
+
+    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        stocks = snapshot.stocks
+        humus_c = stocks[self.humus_carbon].amount
+        # The identical flux HumusDecomposition decays out of humus_carbon.
+        f_o2 = oxygen_limitation_factor(
+            stocks[self.o2_pool].amount,
+            air_mol=self.air_mol,
+            k_o2=self.o2_half_saturation,
+        )
+        decayed = humus_c * self.humification.slow_decomposition_rate * f_o2 * dt
+        moved = carried_nitrogen(decayed, stocks[self.humus_n].amount, humus_c)
+        mineralized, returned = respired_and_stabilized(
+            moved, self.humification.slow_respired_fraction
+        )
+        return FlowResult(
+            legs=(
+                Leg(self.humus_n, -moved),
+                Leg(self.soil_n, mineralized),
+                Leg(self.microbial_n, returned),
             )
         )

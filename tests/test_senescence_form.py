@@ -869,7 +869,11 @@ def test_the_regulator_does_NOT_rescue_perennial_under_rk4() -> None:
             )
         scale.append(str(exc.value))
     assert scale[0] == scale[1], scale
-    assert "0.9527733243688737" in scale[0], scale[0]
+    # re-measured 2026-08-10 (the humification split): 0.9527733243688737 -> this. The
+    # claim is unchanged and is the point — the regulator still does not rescue
+    # `perennial` under RK4, and the two shade settings still produce the IDENTICAL
+    # sixteen digits, i.e. the regulator never fires on the failing trajectory.
+    assert "0.9363926204726938" in scale[0], scale[0]
 
 
 def test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting() -> None:
@@ -1135,8 +1139,39 @@ def test_the_two_tripwires_move_in_OPPOSITE_directions() -> None:
     assert out["stem0"] == pytest.approx((0.9455, 0.8309), rel=1e-3)
 
 
-def test_stem_only_RATIONS_the_perennial_chamber_UNDER_EULER() -> None:
-    """⚠ THE BLOCKING FINDING, and it is independent of any tuned guard.
+def test_stem_only_NO_LONGER_rations_the_perennial_chamber_UNDER_EULER() -> None:
+    """⚠⚠ **RESOLVED 2026-08-10 — THIS FINDING IS DISCHARGED, AND IT WAS THE (C)
+    DIAGNOSIS'S LAST STANDING BRANCH.** Everything below the line was a true measurement
+    of the pre-humification tree and is kept because the way it was reached is the
+    value;
+    what it measured is gone.
+
+    Under the humification split (``docs/plans/post-roadmap-cue-humification.md``)
+    stem-only runs ``rationed == 0`` on ``perennial`` under Euler at dt=1 — the frozen
+    reference configuration — at BOTH the 5-year and 15-year horizons. The mechanism is
+    the one the inventory test below identifies: the split returns 45 % of decayed
+    litter
+    carbon to the atmosphere immediately instead of routing all of it through a
+    microbial
+    pool with a ~62-day residence time, so the CO2 trough that the growing stem was
+    drawing down is simply higher. Measured: the 15-yr minimum goes 0.008674 ->
+    0.046065.
+
+    ⚠⚠ **THIS DOES NOT RE-OPEN (C), AND SAYING SO PRECISELY MATTERS.** Stem-only's
+    refusal had two closure legs. This one is discharged. The other — the decade CO2
+    liveness floor — **survives, and narrowly**: see the next test, where the settled
+    attractor is now comfortably above the floor but a single post-transient year dips
+    to 0.046065 against 0.05. The refusal therefore now rests on an 8 % miss in one year
+    rather than on a hard break plus a 3.4x collapse. Whether that still justifies
+    refusing the branch is a question for whoever revisits (C) with the measurement in
+    hand; it is **not** settled here, and re-deciding it inside the commit that changed
+    the tree underneath it would be exactly the co-adaptation shape this project
+    refuses.
+
+    ---- the original finding, as measured before the split
+    -----------------------------
+
+    ⚠ THE BLOCKING FINDING, and it is independent of any tuned guard.
 
     ``perennial`` goes ``rationed 0 -> 1`` under **Euler at dt=1**, the frozen reference
     configuration. One firing is a hard break rather than a drift, and the site is
@@ -1172,41 +1207,21 @@ def test_stem_only_RATIONS_the_perennial_chamber_UNDER_EULER() -> None:
         stem_zero=True,
     )
     assert r_frozen == 0
-    assert r_stem0 == 1, r_stem0
+    assert r_stem0 == 0, r_stem0  # ⚠ was 1 — the discharge, and it is the whole point
 
-    year_len = len(_weather())
-    fires_at = year_len * 1 + _STEM_RATIONED_YEAR_1_DAY  # year 1, day 197 => step 502
-
-    def rationed_within(n_steps: int) -> int:
-        w = _weather(sc.PERENNIAL_CHAMBER_YEARS)
-        state, registry = build_season(sc.PERENNIAL_CHAMBER_SCENARIO)
-        registry = _stem_zero(registry, state)
-        return run_perennial(
-            EulerIntegrator(registry),
-            state,
-            sc.PERENNIAL_CHAMBER_SCENARIO,
-            weather_resolver(w, sc.PERENNIAL_CHAMBER_SCENARIO),
-            1.0,
-            n_steps,
-            year=year_len,
-        )[1]
-
-    # The firing step, bracketed directly: clean one step earlier, rationed at it.
-    assert rationed_within(fires_at - 1) == 0, fires_at
-    assert rationed_within(fires_at) == 1, fires_at
-    # …and it is a WITHIN-SEASON event, nowhere near the 1525-step horizon edge.
-    assert fires_at == 502 and fires_at < 0.4 * (year_len * sc.PERENNIAL_CHAMBER_YEARS)
-
-    # Only now is it licensed to say the CO2 trough and the firing are the same event.
+    # The trough that used to be a backstop CLAMP (0.008674, reached in free fall) is
+    # now
+    # a value the dynamics actually reach, and it is 5.3x higher.
     co2 = [s.stocks[CARBON_POOL].amount for s in stem0]
-    assert min(range(len(co2)), key=lambda i: co2[i]) == fires_at
-    assert co2[fires_at] == pytest.approx(0.008674, rel=1e-3)
-    # The clamp, not a soft landing: the pool is in free fall entering that step.
-    assert co2[fires_at - 3] > 0.7 and co2[fires_at - 1] < 0.23
-    assert co2[fires_at + 1] > co2[fires_at]  # and it recovers immediately after
+    assert min(co2) == pytest.approx(0.046065, rel=1e-3)
     assert min(s.stocks[CARBON_POOL].amount for s in frozen) == pytest.approx(
-        0.038734, rel=1e-3
+        0.055175, rel=1e-3
     )
+    # The discharge is not a horizon artefact: it holds at the long horizon too.
+    _, r_stem_long, _ = _run(
+        sc.PERENNIAL_CHAMBER_SCENARIO, LONG_HORIZON_YEARS, resets=True, stem_zero=True
+    )
+    assert r_stem_long == 0
 
 
 def test_stem_only_collapses_the_decade_co2_attractor_below_its_floor() -> None:
@@ -1249,30 +1264,65 @@ def test_stem_only_collapses_the_decade_co2_attractor_below_its_floor() -> None:
                 transient=2,
             ),
         )
-    # The frozen baseline reproduces the committed test's own numbers AND its comment.
-    assert out["frozen"][0][1] == pytest.approx(0.03873, rel=1e-3)  # "dips to ~0.039"
-    assert out["frozen"][0][-1] == pytest.approx(0.05484, rel=1e-3)  # "…to ~0.055"
+    # ⚠⚠ RE-MEASURED 2026-08-10 (the humification split). The VERDICT holds — stem-only
+    # still fails this floor — but the failure MODE changed twice over, and my first
+    # rewrite of this block got it wrong in the direction that flattered the change.
+    #
+    # Before: a clean, stationary attractor at 0.01619, missing the floor by 3.4x. The
+    # docstring above calls that "a different failure mode from the combined (C) form,
+    # which lost stationarity"; that contrast no longer holds.
+    #
+    # ⚠ I first wrote that the attractor is now "0.074891, comfortably above the floor"
+    # with only a single year dipping — i.e. that the refusal had thinned to an 8 %
+    # miss.
+    # THE STATIONARITY ASSERTION BELOW CAUGHT IT: the series is NOT settled at 15 years.
+    # Per-year minima run [0.0760, 0.0626, 0.0461, 0.0539, 0.0752, 0.0708, 0.0678,
+    # 0.0673, 0.0680, 0.0693, 0.0707, 0.0720, 0.0731, 0.0741, 0.0749] — a deep early
+    # swing, then a slow monotone climb still rising at the horizon. So 0.074891 is the
+    # LAST value, not the attractor, and both guards fire.
+    #
+    # The honest reading is the same one that restated the two decade-stability pins and
+    # the station biomass gate: the humification split lengthens the settling transient
+    # past the horizon these guards assume (their ``transient=2`` skips two years; this
+    # transient runs about five). Stem-only's refusal on this leg therefore stands, and
+    # stands on a longer transient rather than on a settled collapse.
+    assert out["frozen"][0][1] == pytest.approx(0.055175, rel=1e-3)
+    assert out["frozen"][0][-1] == pytest.approx(0.073367, rel=1e-3)
     assert out["frozen"][1] is True and out["frozen"][2] is True
-    # …and stem-only settles 3.4x too low while remaining perfectly stationary.
-    assert out["stem0"][0][-1] == pytest.approx(0.01619, rel=1e-3)
-    assert min(out["stem0"][0][2:]) == pytest.approx(0.015607, rel=1e-3)
-    assert out["stem0"][1] is False, "the floor guard must be what catches this"
-    assert out["stem0"][2] is True, "…and stationarity must NOT be what catches it"
+    assert out["stem0"][0][-1] == pytest.approx(0.074891, rel=1e-3)
+    assert min(out["stem0"][0][2:]) == pytest.approx(0.046065, rel=1e-3)
+    assert out["stem0"][1] is False, "the floor guard catches it"
+    assert out["stem0"][2] is False, "…and so, now, does stationarity"
+    # The shape, pinned so "stem-only collapses" cannot be quoted off this test: the
+    # tail
+    # is RISING and ends above the floor, and the miss is in the early transient.
+    assert out["stem0"][0][-1] > out["stem0"][0][-2] > out["stem0"][0][-3]
+    assert out["stem0"][0][-1] > 0.05
+    assert out["stem0"][0].index(min(out["stem0"][0])) == 2
 
 
 def test_RK4_survives_stem_only_which_INVERTS_the_pattern_C_established() -> None:
-    """⚠ The mirror of section 5: a single-integrator screen is never enough.
+    """⚠⚠ **THE INVERSION IS GONE (2026-08-10) — because its Euler half was
+    discharged.**
 
-    (C): Euler reported ``rationed == 0`` and RK4 hard-errored — "Euler reading clean is
-    the trap". Stem-only is the **opposite**: Euler rations, RK4 is clean to a 15-year
-    horizon with its CO2 minimum essentially unmoved (0.075815 -> 0.075893). So RK4
-    reading clean is equally a trap, and here the frozen reference integrator is the one
-    that catches the problem.
+    As measured before the humification split: (C) had Euler report ``rationed == 0``
+    while RK4 hard-errored ("Euler reading clean is the trap"), and stem-only was the
+    **opposite** — Euler rationed, RK4 was clean. Two cases pointing opposite ways was
+    the evidence that neither integrator screens for the other.
 
-    The generalisation: the two integrators disagree about which forms are safe **in
-    both directions**, so neither screens for the other. What makes Euler decisive here
-    is not that it is stricter — it is that the biosphere is FROZEN at Euler/dt=1, so
-    Euler is the configuration the contract is about.
+    Stem-only no longer rations under Euler (see the test above), so this is no longer a
+    counter-example: both integrators now agree that stem-only's rationing gate passes.
+    **The generalisation it supported survives on (C) alone plus this history**, and is
+    weaker for it — recorded rather than quietly kept at full strength, because "neither
+    integrator screens for the other" was a two-case claim and it is now a one-case
+    claim
+    with a retired second case.
+
+    What this test still measures, and is worth keeping: RK4 completes cleanly on both
+    forms at both horizons with the CO2 minimum essentially unmoved between them — so
+    RK4 is insensitive to a change that Euler's own liveness floor still refuses. That
+    is
+    the same lesson from the surviving direction.
     """
     for years in (sc.PERENNIAL_CHAMBER_YEARS, LONG_HORIZON_YEARS):
         for kw in ({}, {"stem_zero": True}):
@@ -1286,7 +1336,13 @@ def test_RK4_survives_stem_only_which_INVERTS_the_pattern_C_established() -> Non
             assert rationed == 0, (years, kw)
             if years == LONG_HORIZON_YEARS:
                 lo = min(s.stocks[CARBON_POOL].amount for s in states)
-                assert lo == pytest.approx(0.0758, rel=1e-2), (kw, lo)
+                # re-measured 2026-08-10: 0.075815/0.075893 -> 0.076829/0.076990
+                assert lo == pytest.approx(0.0769, rel=1e-2), (kw, lo)
+
+
+# The frozen `sealed_chamber` run's CO2-trough step; both runs are sampled here so
+# the deltas are taken at one instant (they trough one step apart since 2026-08-10).
+_COMMON_TROUGH_STEP = 195
 
 
 def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went() -> (
@@ -1312,7 +1368,14 @@ def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went(
     Scope (A)'s finding 11 from the other direction — a field-scale improvement is not a
     chamber-scale one.
     """
-    soil_pools = ("litter_carbon", "microbial_carbon")
+    # ⚠ ``humus_carbon`` joined this list with the humification split (2026-08-10).
+    # Omitting it would break the closed-inventory identity below by exactly the humus
+    # amount — the third site in this repo where a "sum the organic pools" tuple had to
+    # learn about a new pool, and the reason
+    # ``test_decomposition`` ::
+    # ``test_every_organic_carbon_pool_is_named_by_the_summary_tuples``
+    # now guards the set structurally.
+    soil_pools = ("litter_carbon", "microbial_carbon", "humus_carbon")
     snaps = {}
     for label, kw in (("frozen", {}), ("stem0", {"stem_zero": True})):
         states, _r, _ = _run(
@@ -1321,13 +1384,21 @@ def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went(
             **kw,  # type: ignore[arg-type]
         )
         co2 = [s.stocks[CARBON_POOL].amount for s in states]
-        lo = min(range(len(co2)), key=lambda i: co2[i])
+        own_lo = min(range(len(co2)), key=lambda i: co2[i])
+        # ⚠ The two runs used to trough at the SAME step (196), and this test compared
+        # each at its own. Since the humification split they trough one step apart (195
+        # frozen, 194 stem-only), so every delta below is taken at a COMMON step — the
+        # frozen run's trough — rather than silently differencing two different
+        # instants.
+        # The one-step offset is asserted rather than absorbed.
+        lo = _COMMON_TROUGH_STEP
         st = states[lo]
         by_short = {
             str(sid).rsplit(".", 1)[-1]: s.amount for sid, s in st.stocks.items()
         }
         snaps[label] = {
             "step": lo,
+            "own_step": own_lo,
             "co2": co2[lo],
             "tissue": st.stocks[LEAF_C].amount
             + st.stocks[STEM_C].amount
@@ -1336,7 +1407,8 @@ def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went(
             "soil": sum(by_short.get(p, 0.0) for p in soil_pools),
         }
     b, n = snaps["frozen"], snaps["stem0"]
-    assert b["step"] == n["step"] == 196, (b["step"], n["step"])
+    assert (b["own_step"], n["own_step"]) == (195, 194), (b["own_step"], n["own_step"])
+    assert b["step"] == n["step"] == _COMMON_TROUGH_STEP
     # The inventory is closed: what one group gained, the others lost, exactly.
     total_b = b["co2"] + b["tissue"] + b["soil"]
     total_n = n["co2"] + n["tissue"] + n["soil"]
@@ -1345,10 +1417,28 @@ def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went(
     d_tissue = n["tissue"] - b["tissue"]
     d_soil = n["soil"] - b["soil"]
     d_co2 = n["co2"] - b["co2"]
-    assert d_tissue == pytest.approx(0.11790, rel=2e-3), d_tissue
-    assert d_soil == pytest.approx(-0.07868, rel=2e-3), d_soil
-    assert d_co2 == pytest.approx(-0.03922, rel=2e-3), d_co2
+    # re-measured 2026-08-10 (humification split). The MECHANISM is unchanged and is
+    # what this test exists for: the extra standing stem is funded by the other pools,
+    # mostly the soil. The split moves the split of the funding, not the story.
+    assert d_tissue == pytest.approx(0.084649, rel=2e-3), d_tissue
+    assert d_soil == pytest.approx(-0.085210, rel=2e-3), d_soil
+    assert d_co2 == pytest.approx(0.000562, rel=2e-2), d_co2
     assert abs(d_tissue + d_soil + d_co2) < 1e-9
-    # …and it is NOT a starvation story: the return-side pools move far less than CO2.
-    assert abs(d_soil) / b["soil"] < 0.06, d_soil  # ~5 % off the soil pools
-    assert abs(d_co2) / b["co2"] > 0.50, d_co2  # >50 % off the CO2 trough
+    # ⚠⚠ **WHERE THE FUNDING COMES FROM IS THE FINDING, AND IT INVERTED (2026-08-10).**
+    # Before the humification split the extra standing stem was drawn ~67 % from the
+    # soil
+    # pools and ~33 % from the atmosphere, and the atmospheric third is what pushed the
+    # CO2 trough into the backstop — the measured reason stem-only was refused on
+    # `perennial`'s closure. Under the split the soil funds essentially ALL of it
+    # (d_soil/d_tissue ≈ -1.007) and the CO2 pool at the trough is **very slightly UP**.
+    #
+    # That is the mechanism behind the discharge two tests above, and it is worth having
+    # explicitly: the split gives the soil a third pool with a ~5-yr residence time, so
+    # the soil can fund a standing sink out of its own inventory instead of out of the
+    # atmosphere. The generalisation this file recorded — "any change parking carbon in
+    # a
+    # standing pool is paid out of the CO2 trough" — is therefore FALSE as a law; it was
+    # true of a soil with one fast pool.
+    assert d_soil / d_tissue == pytest.approx(-1.0, abs=0.02)
+    assert d_co2 > 0.0, "the atmosphere no longer funds the standing stem"
+    assert abs(d_co2) / b["co2"] < 0.01, d_co2  # <1 % off the CO2 trough, and upward

@@ -33,12 +33,15 @@ Pure stdlib + ``simcore`` + ``domains``; param values come from ``loader.py``.
 
 from domains.biosphere.compartments import SOIL
 from domains.biosphere.decomposition import Decomposition
+from domains.biosphere.humification import HumusDecomposition
 from domains.biosphere.loader import (
     load_decomposition_params,
+    load_humification_params,
     load_microbial_respiration_params,
 )
 from domains.biosphere.microbial_respiration import MicrobialRespiration
 from domains.biosphere.mineralization import (
+    HumusNitrogenRelease,
     LitterNitrogenTransfer,
     MicrobialNitrogenRelease,
 )
@@ -47,6 +50,8 @@ from domains.biosphere.scenario import SeasonScenario
 from domains.biosphere.stocks import (
     CARBON_POOL,
     FERTILIZATION_VAR,
+    HUMUS_CARBON,
+    HUMUS_N,
     IRRIGATION_VAR,
     LITTER_CARBON,
     LITTER_N,
@@ -126,14 +131,29 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
         # pool the return leg now routes through. A POOL, not a POPULATION like its
         # carbon sibling: see the asymmetry note in ``stocks.py``.
         stocks.append(pool_stock(MICROBIAL_N, SOIL, Quantity.NITROGEN, nitrogen, 0.0))
-        # The decomposer (Step 4): first-order decay litter_carbon → microbial_carbon.
+        # CENTURY's SLOW SOM and its N counterpart (post-roadmap, the humification
+        # split). Both POOLs, both start empty: humus takes no fresh plant input, it is
+        # FORMED by the share of every microbial turnover that is stabilised rather than
+        # respired. Seeding it would be authoring a soil the chamber never grew.
+        stocks.append(pool_stock(HUMUS_CARBON, SOIL, Quantity.CARBON, carbon, 0.0))
+        stocks.append(pool_stock(HUMUS_N, SOIL, Quantity.NITROGEN, nitrogen, 0.0))
+        decomp_params = load_decomposition_params()
+        micro_params = load_microbial_respiration_params()
+        humi_params = load_humification_params()
+        # The decomposer (Step 4, + the humification split): first-order decay out of
+        # litter_carbon, partitioned into CO₂ (drawing O₂) and microbial biomass.
         flows.append(
             Decomposition(
                 FlowId("biosphere.decomposition"),
                 0,
                 litter_carbon=LITTER_CARBON,
                 microbial_carbon=MICROBIAL_CARBON,
-                params=load_decomposition_params(),
+                co2_pool=CARBON_POOL,
+                o2_pool=O2_POOL,
+                params=decomp_params,
+                humification=humi_params,
+                o2_half_saturation=micro_params.o2_half_saturation,
+                air_mol=scenario.chamber_air_mol,
             )
         )
         # Microbial respiration (Step 5): microbial_C + O₂ → CO₂ — the cross-compartment
@@ -144,9 +164,28 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
                 FlowId("biosphere.microbial_respiration"),
                 0,
                 microbial_carbon=MICROBIAL_CARBON,
+                humus_carbon=HUMUS_CARBON,
                 co2_pool=CARBON_POOL,
                 o2_pool=O2_POOL,
-                params=load_microbial_respiration_params(),
+                params=micro_params,
+                humification=humi_params,
+                air_mol=scenario.chamber_air_mol,
+            )
+        )
+        # Slow-SOM decomposition: the humus pool's own first-order return, partitioned
+        # into CO₂ and active SOM. This is the flow that makes humus a POOL THAT CYCLES
+        # rather than a sink — the thing the soil-fractionation diagnosis measured as
+        # structurally unreachable at CUE = 1.0.
+        flows.append(
+            HumusDecomposition(
+                FlowId("biosphere.humus_decomposition"),
+                0,
+                humus_carbon=HUMUS_CARBON,
+                microbial_carbon=MICROBIAL_CARBON,
+                co2_pool=CARBON_POOL,
+                o2_pool=O2_POOL,
+                params=humi_params,
+                o2_half_saturation=micro_params.o2_half_saturation,
                 air_mol=scenario.chamber_air_mol,
             )
         )
@@ -162,8 +201,13 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
                 0,
                 litter_n=LITTER_N,
                 microbial_n=MICROBIAL_N,
+                soil_n=SOIL_N,
                 litter_carbon=LITTER_CARBON,
-                params=load_decomposition_params(),
+                o2_pool=O2_POOL,
+                params=decomp_params,
+                humification=humi_params,
+                o2_half_saturation=micro_params.o2_half_saturation,
+                air_mol=scenario.chamber_air_mol,
             )
         )
         flows.append(
@@ -174,7 +218,23 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
                 soil_n=SOIL_N,
                 microbial_carbon=MICROBIAL_CARBON,
                 o2_pool=O2_POOL,
-                params=load_microbial_respiration_params(),
+                humus_n=HUMUS_N,
+                params=micro_params,
+                humification=humi_params,
+                air_mol=scenario.chamber_air_mol,
+            )
+        )
+        flows.append(
+            HumusNitrogenRelease(
+                FlowId("biosphere.humus_n_release"),
+                0,
+                humus_n=HUMUS_N,
+                soil_n=SOIL_N,
+                microbial_n=MICROBIAL_N,
+                humus_carbon=HUMUS_CARBON,
+                o2_pool=O2_POOL,
+                humification=humi_params,
+                o2_half_saturation=micro_params.o2_half_saturation,
                 air_mol=scenario.chamber_air_mol,
             )
         )

@@ -79,6 +79,19 @@ MICROBIAL_CARBON: StockId = StockId("biosphere.microbial_carbon")
 # extinction invariant), so the emergent C:N cannot be broken that way.
 LITTER_N: StockId = StockId("biosphere.litter_n")
 MICROBIAL_N: StockId = StockId("biosphere.microbial_n")
+# Sealed chamber SLOW soil organic matter (post-roadmap, the humification split /
+# CUE, 2026-08-10 — ``humification.py``). CENTURY's slow-SOM pool: it takes no fresh
+# plant input and is **formed**, by the ``1 − Es`` share of every microbial turnover
+# that is stabilised rather than respired, and it decays back to active SOM + CO₂ at
+# ``K6``. Before this the tree had no humification flux at all, so a slow pool could be
+# seeded but never refilled (the soil-fractionation diagnosis's structural finding).
+#
+# Both are **POOLs** — ``humus_n`` for the ``microbial_n`` reason above, and
+# ``humus_carbon`` for the same reason even though its sibling ``microbial_carbon`` is a
+# POPULATION: a pool holding decade-residence carbon must never be zeroed-with-loss, and
+# an extinction pass on the carbon side would orphan the N counterpart with it.
+HUMUS_CARBON: StockId = StockId("biosphere.humus_carbon")
+HUMUS_N: StockId = StockId("biosphere.humus_n")
 # Sealed chamber water cycle (P3.3/Step 3): the two stocks that close the one cycle
 # still open. ``water_vapor`` (in ATMOSPHERE) receives transpired water (the canopy
 # flux that drained to the ``vapor_sink`` BOUNDARY in Phase 1/2); first-order
@@ -120,6 +133,8 @@ STOCK_DOMAIN: dict[StockId, DomainId] = {
     LITTER_N: SOIL,
     MICROBIAL_CARBON: SOIL,  # decomposer biomass lives in the soil compartment
     MICROBIAL_N: SOIL,  # its nitrogen counterpart (the microbe-mediated N transit pool)
+    HUMUS_CARBON: SOIL,  # CENTURY slow SOM — formed by the humification split
+    HUMUS_N: SOIL,  # its nitrogen counterpart (N follows the carbon partition)
     CARBON_POOL: ATMOSPHERE,
     O2_POOL: ATMOSPHERE,
     WATER_VAPOR: ATMOSPHERE,  # transpired vapor (the water cycle's atmosphere leg)

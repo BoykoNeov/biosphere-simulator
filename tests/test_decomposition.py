@@ -38,13 +38,19 @@ from domains.biosphere.decomposition import (
     DecompositionParams,
     decomposition_flux,
 )
-from domains.biosphere.loader import load_decomposition_params
+from domains.biosphere.humification import HumificationParams
+from domains.biosphere.loader import load_decomposition_params, load_humification_params
 from domains.biosphere.season import (
     CARBON_POOL,
+    HUMUS_CARBON,
+    LEAF_C,
     LITTER_CARBON,
     LITTER_SINK,
     MICROBIAL_CARBON,
     O2_POOL,
+    ROOT_C,
+    STEM_C,
+    STORAGE_C,
     SeasonScenario,
     build_season,
     run_season,
@@ -85,8 +91,11 @@ def test_flux_is_zero_at_zero_litter() -> None:
 
 
 # --- flow level --------------------------------------------------------------
-def _state(*, litter: float, microbial: float = 0.0) -> State:
+def _state(
+    *, litter: float, microbial: float = 0.0, co2: float = 0.357, o2: float = 210.0
+) -> State:
     carbon = canonical_unit(Quantity.CARBON)
+    oxygen = canonical_unit(Quantity.OXYGEN)
     stocks = {
         _LITTER: Stock(
             id=_LITTER,
@@ -105,17 +114,55 @@ def _state(*, litter: float, microbial: float = 0.0) -> State:
             kind=StockKind.POPULATION,
             extinction_threshold=0.0,
         ),
+        # The CO₂ pool: a true molecular stock — 1 mol C + 2 mol O per mol CO₂. Present
+        # since the humification split gave this flow a CO₂ leg (2026-08-10).
+        CARBON_POOL: Stock(
+            id=CARBON_POOL,
+            domain=_BIO,
+            quantity=Quantity.CARBON,
+            unit=carbon,
+            amount=co2,
+            kind=StockKind.POOL,
+            composition={Quantity.CARBON: 1.0, Quantity.OXYGEN: 2.0},
+        ),
+        O2_POOL: Stock(
+            id=O2_POOL,
+            domain=_BIO,
+            quantity=Quantity.OXYGEN,
+            unit=oxygen,
+            amount=o2,
+            kind=StockKind.POOL,
+            composition={Quantity.OXYGEN: 2.0},
+        ),
     }
     return State(n=0, stocks=stocks, rng_seed=0)
 
 
-def _decomposition(rate: float = 0.02) -> Decomposition:
+# The unit tests below drive the partition explicitly so the arithmetic is checkable by
+# hand; the committed value is asserted separately in ``test_loader_reads_the_cited_
+# partition``. ``o2_half_saturation=0`` makes f_O2 ≡ 1 for O₂ > 0, isolating the base
+# flux exactly as ``test_microbial_respiration``'s helpers do.
+def _humi(co2_fraction: float = 0.45) -> HumificationParams:
+    return HumificationParams(
+        litter_respired_fraction=co2_fraction,
+        active_stabilization_co2_fraction=0.85,
+        slow_respired_fraction=0.55,
+        slow_decomposition_rate=0.0,
+    )
+
+
+def _decomposition(rate: float = 0.02, *, co2_fraction: float = 0.45) -> Decomposition:
     return Decomposition(
         FlowId("biosphere.decomposition"),
         0,
         litter_carbon=_LITTER,
         microbial_carbon=_MICROBIAL,
+        co2_pool=CARBON_POOL,
+        o2_pool=O2_POOL,
         params=DecompositionParams(decomposition_rate=rate),
+        humification=_humi(co2_fraction),
+        o2_half_saturation=0.0,
+        air_mol=1000.0,
     )
 
 
@@ -124,9 +171,13 @@ def _env(state: State, dt: float):
     return SourceResolver(forcings={}).bind(state, dt)
 
 
-def test_decomposition_transfers_litter_to_microbial() -> None:
-    # The decayed carbon leaves litter and lands in microbial biomass — the SAME amount,
-    # so the transfer is conservative by construction.
+def test_decomposition_PARTITIONS_the_decayed_litter_into_co2_and_microbes() -> None:
+    # ⚠ REWRITTEN by the humification split (2026-08-10), not weakened. This asserted
+    # that the decayed carbon lands in microbial biomass as the SAME amount — true of a
+    # form with a carbon-use efficiency of 1.0, which is precisely what CENTURY's eq.
+    # [6]
+    # cannot express (its Es tops out at 0.85). The withdrawal is unchanged; what is now
+    # pinned is where it GOES.
     state = _state(litter=2.0)
     legs = {
         leg.stock: leg.amount
@@ -134,17 +185,53 @@ def test_decomposition_transfers_litter_to_microbial() -> None:
     }
     decayed = 0.02 * 2.0
     assert math.isclose(legs[_LITTER], -decayed, rel_tol=1e-12)  # withdrawn from litter
-    assert math.isclose(legs[_MICROBIAL], decayed, rel_tol=1e-12)  # into microbes
+    assert math.isclose(legs[CARBON_POOL], 0.45 * decayed, rel_tol=1e-12)  # respired
+    assert math.isclose(legs[_MICROBIAL], 0.55 * decayed, rel_tol=1e-12)  # stabilised
+    # The two destinations sum back to the withdrawal EXACTLY in floating point, because
+    # the complement is computed by subtraction rather than as ``decayed·(1−f)`` — so no
+    # partition round-off can reach the conservation gate.
+    assert legs[CARBON_POOL] + legs[_MICROBIAL] == -legs[_LITTER]
 
 
-def test_decomposition_balances_carbon_only() -> None:
-    # Single-currency CARBON: the flow balances CARBON and touches no other quantity
-    # (both pools are pure carbon — no oxygen, the Step-4/Step-5 split).
+def test_decomposition_balances_carbon_AND_oxygen() -> None:
+    # ⚠ REWRITTEN, and the rename carries the finding: this flow was single-currency
+    # CARBON until the humification split gave it a CO₂ leg. The P2.1 composition gate
+    # FORCES the O₂ draw that comes with it — CO₂ entering a {CARBON:1, OXYGEN:2} pool
+    # drags two oxygens pure-carbon litter cannot supply — so OXYGEN now appears and
+    # must
+    # net to zero (the CO₂ pool's +2·respired against the O₂ pool's −2·respired).
     state = _state(litter=2.0)
     result = _decomposition().evaluate(state, _env(state, 1.0), 1.0)
     assert_flow_balanced(result, state.stocks)
     residual = per_quantity_residual(result, state.stocks)
-    assert set(residual) == {Quantity.CARBON}  # OXYGEN/WATER/NITROGEN untouched
+    assert set(residual) == {
+        Quantity.CARBON,
+        Quantity.OXYGEN,
+    }  # WATER/NITROGEN untouched
+
+
+def test_a_zero_respired_fraction_reproduces_the_pre_split_transfer() -> None:
+    # The frozen pre-2026-08-10 form is the ``litter_respired_fraction = 0`` member of
+    # this family: 100 % of the decayed carbon reaches microbial biomass and the CO₂/O₂
+    # legs are zero. Pinned so the change is legible as a GENERALISATION rather than a
+    # replacement — and so the claim "the old tree asserted a CUE of 1.0" is checkable
+    # rather than prose.
+    state = _state(litter=2.0)
+    legs = {
+        leg.stock: leg.amount
+        for leg in _decomposition(co2_fraction=0.0)
+        .evaluate(state, _env(state, 1.0), 1.0)
+        .legs
+    }
+    decayed = 0.02 * 2.0
+    assert math.isclose(legs[_MICROBIAL], decayed, rel_tol=1e-12)
+    assert legs[CARBON_POOL] == 0.0
+    assert legs[O2_POOL] == 0.0
+
+
+def test_loader_reads_the_cited_partition() -> None:
+    # [A] Parton 1987 p. 1174 — nonlignin SURFACE structural litter loses 45 % as CO₂.
+    assert load_humification_params().litter_respired_fraction == 0.45
 
 
 def test_decomposition_is_dt_linear() -> None:
@@ -306,3 +393,46 @@ def test_open_field_has_no_decomposer_stocks() -> None:
     assert MICROBIAL_CARBON not in state.stocks
     assert CARBON_POOL not in state.stocks
     assert O2_POOL not in state.stocks
+
+
+# --- the structural guard the humification split needed
+# --------------------------------
+def test_every_organic_carbon_pool_is_named_by_the_summary_tuples() -> None:
+    """A new soil pool must not be able to slip out of a "total organic C" summary.
+
+    Five test modules each carry their own ``(LEAF_C, ..., MICROBIAL_CARBON)`` tuple for
+    "the biosphere's organic carbon", and the humification split added a pool to every
+    one of them. Four were caught only by moved goldens; ONE was caught by a live
+    identity (``test_greenhouse_run::test_offload_conservation_identity`` failed by
+    exactly the humus amount, 8.2e-7 mol). The dangerous case is the fifth kind —
+    ``sealed_tier2_helper.BIO_ORGANIC_C`` feeds a *stationarity watch*, which would have
+    gone on passing while summing the wrong total.
+
+    So the duplication is guarded structurally rather than by memory: this asserts the
+    full set of organic (non-gas, non-boundary) CARBON stocks a sealed build creates, so
+    adding a pool without updating the summaries fails HERE, with the sites named.
+    """
+    state, _ = build_season(SeasonScenario(sealed=True))
+    organic = {
+        sid
+        for sid, stock in state.stocks.items()
+        if stock.quantity is Quantity.CARBON
+        and not sid.startswith("boundary.")
+        # the gas pools are not organic matter; carbon_pool is CO₂, and it is the only
+        # CARBON stock carrying oxygen in its composition
+        and stock.composition.get(Quantity.OXYGEN, 0.0) == 0.0
+    }
+    assert organic == {
+        LEAF_C,
+        STEM_C,
+        ROOT_C,
+        STORAGE_C,
+        LITTER_CARBON,
+        MICROBIAL_CARBON,
+        HUMUS_CARBON,
+    }, (
+        "the organic-carbon stock set changed — update the BIO_ORGANIC_C / _BIO_C "
+        "tuples in sealed_tier2_helper.py, test_greenhouse_run.py, "
+        "test_lighting_run.py, test_regression_greenhouse.py and "
+        "test_regression_lighting.py"
+    )

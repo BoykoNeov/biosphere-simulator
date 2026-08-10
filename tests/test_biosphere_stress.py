@@ -305,8 +305,32 @@ def test_stress_perennial_fixed_point_sustained(runs) -> None:
     summaries = runs["perennial"].peak_leaf
     assert not is_period_2(summaries, transient=_PERIOD_TRANSIENT)
     tail = summaries[_PERIOD_TRANSIENT:]
-    gap = max(abs(tail[k + 1] - tail[k]) for k in range(len(tail) - 1))
-    assert gap < 1e-3 * max(tail)  # the branches have merged → a fixed point
+    # ⚠ RESTATED 2026-08-10 (the humification split), exactly as its sibling in
+    # ``test_decade_stability`` was: the split lengthens the chamber's settling
+    # transient
+    # from ~3 years to ~35 (the humus pool fills on its own ~5-yr turnover), so at the
+    # default 15-year horizon this is still converging rather than converged. The
+    # attractor is real and is pinned at 0.594984 by
+    # ``test_decade_stability`` ::
+    # ``test_the_perennial_decline_has_a_floor_beyond_the_frozen_horizon``.
+    # Monotone + decelerating holds at BOTH this module's horizons, including the 328-yr
+    # stress run where the gap test would also pass — so this is the weaker-looking
+    # assertion that is actually true at every horizon, rather than one true only at the
+    # long one.
+    # The tolerance is settling noise, not slack: this module's default horizon is 328
+    # years, so the tail is mostly a REACHED fixed point whose successive differences
+    # are
+    # at round-off and carry arbitrary sign. The claim is "monotone decline,
+    # decelerating,
+    # to a floor" -- which at this horizon is a statement about the first ~35 years and
+    # a
+    # statement about round-off thereafter.
+    _NOISE = 1e-12
+    diffs = [tail[k + 1] - tail[k] for k in range(len(tail) - 1)]
+    assert all(d <= _NOISE for d in diffs)
+    assert all(
+        abs(diffs[k + 1]) <= abs(diffs[k]) + _NOISE for k in range(len(diffs) - 1)
+    )
     # ...and it converged UP, not by collapsing: the plant is ~3.9x healthier than the
     # oscillating baseline (0.253 -> 0.9942). It was 1.2215 with the pre-calibration
     # fast decomposers; the scope-B decomposer calibration (decomp 0.02->0.011, micro
@@ -314,9 +338,13 @@ def test_stress_perennial_fixed_point_sustained(runs) -> None:
     # recycled-CO2 loop and shrinks the closed-chamber plant ~19%, so the sustained
     # fixed point drops to 0.9942 -- still a robustly-alive plant (CO2min 0.039, storage
     # 0.308 >> 0.16 seed), ~3.9x the 0.253 dead baseline. A degenerate "fixed point" at
-    # a dead plant would pass the two assertions above; this one cannot. Floor 0.9 keeps
-    # the alive-not-dead guard with margin over 0.253.
-    assert max(tail) > 0.9
+    # a dead plant would pass the two assertions above; this one cannot.
+    # ⚠ The floor moved 0.9 -> 0.55 with the humification split, anchored on the
+    # MEASURED
+    # equilibrium (0.594984) rather than on the horizon's reading, and kept 2.2x above
+    # the 0.253 dead baseline. Same reasoning, same number, as the manifest-named floor
+    # in ``test_decade_stability`` — the two must not drift apart.
+    assert max(tail) > 0.55
 
 
 @pytest.mark.skipif(_YEARS < _DECADE_YEARS, reason="period check needs >= decade scale")
@@ -328,8 +356,24 @@ def test_stress_consumer_fixed_point_sustained(runs) -> None:
     summaries = runs["consumer"].peak_leaf
     assert not is_period_2(summaries, transient=_PERIOD_TRANSIENT)
     tail = summaries[_PERIOD_TRANSIENT:]
-    gap = max(abs(tail[k + 1] - tail[k]) for k in range(len(tail) - 1))
-    assert gap < 1e-3 * max(tail)  # the branches have merged → a fixed point
+    # ⚠ RESTATED alongside the perennial pin above and for the same reason (the
+    # humification split lengthens the settling transient past this horizon). The
+    # NEGATIVE claim this test exists for — no late re-emergence of a 2-cycle — is
+    # untouched and is asserted on the line above.
+    # The tolerance is settling noise, not slack: this module's default horizon is 328
+    # years, so the tail is mostly a REACHED fixed point whose successive differences
+    # are
+    # at round-off and carry arbitrary sign. The claim is "monotone decline,
+    # decelerating,
+    # to a floor" -- which at this horizon is a statement about the first ~35 years and
+    # a
+    # statement about round-off thereafter.
+    _NOISE = 1e-12
+    diffs = [tail[k + 1] - tail[k] for k in range(len(tail) - 1)]
+    assert all(d <= _NOISE for d in diffs)
+    assert all(
+        abs(diffs[k + 1]) <= abs(diffs[k]) + _NOISE for k in range(len(diffs) - 1)
+    )
 
 
 @pytest.mark.skipif(

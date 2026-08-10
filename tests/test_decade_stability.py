@@ -208,8 +208,10 @@ def test_decade_leaf_cycle_is_stationary(runs, scenario) -> None:
     scenario="perennial_long_horizon",
     field="liveness_floors",
     quantity="converged peak-leaf fixed point (mol C)",
-    bound="max(tail) > 0.9",
-    source="self — re-tuned from >1.0 when the decomposer calibration shrank the plant",
+    bound="max(tail) > 0.55",
+    source="self — anchored on the MEASURED equilibrium 0.594984 (reached ~yr 45), not "
+    "on the 15-yr reading; 2.2x the 0.253 dead baseline. Second move: >1.0 -> >0.9 "
+    "(decomposer calibration) -> >0.55 (humification split)",
 )
 def test_perennial_leaf_cycle_is_a_fixed_point(runs) -> None:
     # CHANGED by post-roadmap scope (B) increment 1 (vernalization + photoperiod). This
@@ -228,12 +230,37 @@ def test_perennial_leaf_cycle_is_a_fixed_point(runs) -> None:
     summaries = year_summaries(states, _YEAR, _peak_leaf)
     assert not is_period_2(summaries, transient=_PERIOD_TRANSIENT)
     tail = summaries[_PERIOD_TRANSIENT:]
-    gap = max(abs(tail[k + 1] - tail[k]) for k in range(len(tail) - 1))
-    assert gap < 1e-3 * max(tail)  # branches merged → a fixed point
-    # Liveness floor 0.9: the scope-B decomposer calibration shrinks the closed-chamber
-    # plant ~19% (fixed point 1.22 -> 0.994; docs/plans/post-roadmap-decomposer-
-    # calibration.md), still ~3.9x the 0.253 dead baseline -- converged UP, not dead.
-    assert max(tail) > 0.9
+    # ⚠ RESTATED by the humification split (2026-08-10), and the restatement is the
+    # finding. This asserted ``gap < 1e-3 * max(tail)`` -- "the branches have merged
+    # into
+    # a fixed point" -- which was true while the chamber settled in ~3 years. The
+    # humification split does NOT destabilise the chamber; it lengthens the settling
+    # transient by an order of magnitude, from ~3 years to ~35, because the humus pool
+    # fills on its own ~5-yr turnover. The attractor is still there and is still
+    # period-1 -- it is measured at 0.594984 by year ~45 in
+    # ``test_the_perennial_decline_has_a_floor_beyond_the_frozen_horizon`` below -- but
+    # it is NOT REACHED inside the frozen 15-year horizon, so an equality-shaped pin
+    # here would be asserting something false.
+    #
+    # What is true at 15 years, and is what a still-converging monotone approach means:
+    diffs = [tail[k + 1] - tail[k] for k in range(len(tail) - 1)]
+    assert all(d < 0.0 for d in diffs)  # monotone decline, no oscillation
+    assert all(
+        abs(diffs[k + 1]) < abs(diffs[k]) for k in range(len(diffs) - 1)
+    )  # and DECELERATING -- converging, not running away
+    assert abs(diffs[-1]) < 1e-2 * max(tail)  # the approach is already slow
+    # Liveness floor. ⚠ This is the SECOND time this floor has moved to accommodate a
+    # smaller plant (1.0 -> 0.9 when the scope-B decomposer calibration shrank it ~19%;
+    # now 0.9 -> 0.55), and saying so plainly is the point -- a floor whose manifest
+    # entry
+    # reads "self -- the calibrated attractor, not a cited value" guards CONTINUITY with
+    # the current calibration, not plausibility, so a deliberate recalibration is
+    # supposed to move it. What must NOT happen is moving it to just below whatever the
+    # run produced. It is anchored instead on the MEASURED EQUILIBRIUM (0.594984) rather
+    # than on the 15-yr reading (0.634352), so the bound does not depend on the horizon,
+    # and 0.55 sits below the equilibrium while staying 2.2x the 0.253 DEAD baseline --
+    # which is the quantity a liveness floor exists to separate the plant from.
+    assert max(tail) > 0.55
 
 
 def test_consumer_leaf_converges_to_a_fixed_point(runs) -> None:
@@ -247,8 +274,15 @@ def test_consumer_leaf_converges_to_a_fixed_point(runs) -> None:
     summaries = year_summaries(states, _YEAR, _peak_leaf)
     assert not is_period_2(summaries, transient=_PERIOD_TRANSIENT)
     tail = summaries[_PERIOD_TRANSIENT:]
-    gap = max(abs(tail[k + 1] - tail[k]) for k in range(len(tail) - 1))
-    assert gap < 1e-3 * max(tail)  # a fixed point: the branches have merged
+    # ⚠ RESTATED alongside the perennial pin (the humification split, 2026-08-10) and
+    # for the same reason: the settling transient now outruns the frozen horizon, so at
+    # year 15 this chamber is still converging rather than converged. The NEGATIVE claim
+    # this test exists for -- that the herbivore damps the producer oscillation, so the
+    # attractor is period-1 and not period-2 -- is untouched and is asserted above.
+    diffs = [tail[k + 1] - tail[k] for k in range(len(tail) - 1)]
+    assert all(d < 0.0 for d in diffs)
+    assert all(abs(diffs[k + 1]) < abs(diffs[k]) for k in range(len(diffs) - 1))
+    assert abs(diffs[-1]) < 1e-2 * max(tail)
 
 
 @pytest.mark.science_gate(
@@ -364,3 +398,41 @@ def test_decade_run_is_deterministic(runs) -> None:
     states2, rationed2, events2 = _run(PERENNIAL_CHAMBER_SCENARIO, EulerIntegrator)
     assert states2[-1] == states[-1]
     assert (rationed2, events2) == (rationed, events)
+
+
+@pytest.mark.slow
+def test_the_perennial_decline_has_a_floor_beyond_the_frozen_horizon() -> None:
+    """The claim the two restated pins above rest on, measured rather than asserted.
+
+    The humification split leaves the perennial chamber still declining at the frozen
+    15-year horizon, which is why those pins had to be restated. The restatement is only
+    honest if the decline actually *converges* — a plant walking to zero would also be
+    "monotone and decelerating" over a short enough window. So the beyond-horizon run is
+    a test, not a paragraph.
+
+    Beyond-horizon is DIAGNOSTIC, never a gate: nothing here is frozen, and the frozen
+    contract's horizon is unchanged at 15 years. What this pins is that the attractor
+    the 15-yr window is approaching exists, is positive, and is where the liveness floor
+    was anchored.
+    """
+    years = 50
+    weather = _weather() * years
+    state, registry = build_season(PERENNIAL_CHAMBER_SCENARIO)
+    resolver = weather_resolver(weather, PERENNIAL_CHAMBER_SCENARIO)
+    states, rationed, events = run_perennial(
+        EulerIntegrator(registry),
+        state,
+        PERENNIAL_CHAMBER_SCENARIO,
+        resolver,
+        1.0,
+        len(weather),
+        year=_YEAR,
+    )
+    assert rationed == 0 and events == ()  # closure holds the whole way there
+    summaries = year_summaries(states, _YEAR, _peak_leaf)
+    settled = summaries[-5:]
+    # Converged: the last five years are the same number to 1e-6.
+    assert max(settled) - min(settled) < 1e-6
+    assert settled[-1] == pytest.approx(0.594984, abs=1e-5)
+    # And that equilibrium is what the 0.55 liveness floor is anchored below.
+    assert settled[-1] > 0.55

@@ -24,6 +24,7 @@ from pathlib import Path
 
 from domains.biosphere.drift import drift_slope, mass_drift_trace, max_abs
 from domains.biosphere.stocks import (
+    HUMUS_CARBON,
     LEAF_C,
     LITTER_CARBON,
     MICROBIAL_CARBON,
@@ -86,7 +87,18 @@ REL_SLOPE_BOUND: float = 1e-12
 # the honest bounded-ness metric (peak leaf_c would hide the decomposer's approach to
 # its
 # steady state; advisor-flagged).
-BIO_ORGANIC_C = (LEAF_C, STEM_C, ROOT_C, STORAGE_C, LITTER_CARBON, MICROBIAL_CARBON)
+BIO_ORGANIC_C = (
+    LEAF_C,
+    STEM_C,
+    ROOT_C,
+    STORAGE_C,
+    LITTER_CARBON,
+    MICROBIAL_CARBON,
+    # CENTURY's slow SOM, added by the humification split (2026-08-10). Omitting it
+    # would make this summary read a WRONG TOTAL rather than a moved value — the
+    # greenhouse offload identity caught exactly that, off by the humus amount.
+    HUMUS_CARBON,
+)
 
 
 def total_organic_c(state: State) -> float:

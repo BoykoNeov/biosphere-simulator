@@ -34,6 +34,32 @@
       "unit": "kg"
     },
     {
+      "amount": "0x1.b6c10b606bb7ep-21",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.humus_carbon",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.dfacfe5e74350p-34",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.humus_n",
+      "kind": "pool",
+      "quantity": "nitrogen",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
       "amount": "0x1.3974e7da9bcbep-4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
@@ -47,7 +73,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.f8dc328337c00p-7",
+      "amount": "0x1.fa7f9bed6e70ap-7",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -60,7 +86,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.13f9444db5978p-19",
+      "amount": "0x1.14de88124f541p-19",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -73,7 +99,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.eff3ca47b2ce0p-12",
+      "amount": "0x1.e93467bd3c4fep-13",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -86,7 +112,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.0f1ab804f4324p-24",
+      "amount": "0x1.0b6a78b8e289ep-25",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -138,7 +164,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.8ffff04386705p+6",
+      "amount": "0x1.8ffff0453784ap+6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -203,7 +229,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.1ef8380390eb5p+11",
+      "amount": "0x1.1ef8398fb2fd0p+11",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -269,7 +295,7 @@
       "unit": "kg"
     },
     {
-      "amount": "-0x1.1ebb7b9911f21p+11",
+      "amount": "-0x1.1ebb7d2534034p+11",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },

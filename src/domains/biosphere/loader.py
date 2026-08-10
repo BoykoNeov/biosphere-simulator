@@ -27,6 +27,7 @@ from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.decomposition import DecompositionParams
 from domains.biosphere.demo import DemoParams
 from domains.biosphere.herbivory import HerbivoryParams
+from domains.biosphere.humification import HumificationParams
 from domains.biosphere.microbial_respiration import MicrobialRespirationParams
 from domains.biosphere.nitrogen import NitrogenParams
 from domains.biosphere.phenology import (
@@ -70,6 +71,10 @@ DECOMPOSITION_PARAMS_PATH: Path = (
 MICROBIAL_RESPIRATION_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "microbial_respiration.yaml"
 )
+# The committed chamber humification-split (CUE) params: the three CO₂ fractions that
+# partition every decomposer flux + the slow-SOM pool's own rate (post-roadmap,
+# 2026-08-10; CENTURY / Parton et al. 1987).
+HUMIFICATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "humification.yaml"
 # The committed chamber water-cycle params (P3 Step 3): the two first-order rates
 # (condensation + recycling) that close the water loop.
 WATER_CYCLE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "water_cycle.yaml"
@@ -1158,6 +1163,95 @@ def _microbial_respiration_value(
             f"{field} must be declared in {expected!r}, got {entry.unit!r}"
         )
     return entry.value
+
+
+# --- humification (the CUE split) params (post-roadmap, 2026-08-10) ------------------
+# Three dimensionless CO2 fractions + the slow-SOM first-order rate. The fractions are
+# bound-checked to [0, 1]: outside that range a partitioned leg would create or destroy
+# carbon, which is a stronger requirement than the >= 0 the sibling rates carry.
+_HUMIFICATION_UNITS: dict[str, str] = {
+    "litter_respired_fraction": "mol/mol",
+    "active_stabilization_co2_fraction": "mol/mol",
+    "slow_respired_fraction": "mol/mol",
+    "slow_decomposition_rate": "1/day",
+}
+_HUMIFICATION_FRACTIONS: tuple[str, ...] = (
+    "litter_respired_fraction",
+    "active_stabilization_co2_fraction",
+    "slow_respired_fraction",
+)
+
+
+class _HumificationValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _HumificationParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    litter_respired_fraction: _HumificationValueUnit
+    active_stabilization_co2_fraction: _HumificationValueUnit
+    slow_respired_fraction: _HumificationValueUnit
+    slow_decomposition_rate: _HumificationValueUnit
+
+
+class _HumificationSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _HumificationParameters
+
+
+def _humification_value(params: _HumificationParameters, field: str) -> float:
+    """Read a humification param's value, exact-string guarding its declared unit."""
+    entry: _HumificationValueUnit = getattr(params, field)
+    expected = _HUMIFICATION_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_humification_params(
+    path: str | Path = HUMIFICATION_PARAMS_PATH,
+) -> HumificationParams:
+    """Load, schema- and bound-check the humification params.
+
+    Each param carries a declared unit (exact-string guarded) and a required ``source``
+    tag (clean-room discipline). The three CO2 fractions must lie in ``[0, 1]`` — a
+    fraction outside it would make a partitioned flow create or destroy carbon — and the
+    slow-SOM rate must be non-negative. Raises ``pydantic.ValidationError`` on a schema
+    violation, ``ValueError`` on a bad unit or an out-of-range value.
+    """
+    schema = _HumificationSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {
+        field: _humification_value(params, field) for field in _HUMIFICATION_UNITS
+    }
+
+    for field in _HUMIFICATION_FRACTIONS:
+        if not 0.0 <= values[field] <= 1.0:
+            raise ValueError(f"{field} must be in [0, 1], got {values[field]}")
+    if values["slow_decomposition_rate"] < 0.0:
+        raise ValueError(
+            "slow_decomposition_rate must be >= 0, got "
+            f"{values['slow_decomposition_rate']}"
+        )
+
+    return HumificationParams(
+        litter_respired_fraction=values["litter_respired_fraction"],
+        active_stabilization_co2_fraction=values["active_stabilization_co2_fraction"],
+        slow_respired_fraction=values["slow_respired_fraction"],
+        slow_decomposition_rate=values["slow_decomposition_rate"],
+    )
 
 
 def load_microbial_respiration_params(

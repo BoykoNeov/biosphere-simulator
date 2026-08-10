@@ -131,9 +131,29 @@ def _gate(states: list[State], rationed: int, events: tuple[object, ...]) -> Non
     # past year 1.
     peaks = year_summaries(states, SEALED_STATION_SCENARIO.season_days, peak_organic_c)
     diffs = same_phase_diffs(peaks, period=1)
-    assert is_stationary(diffs, bound=1.0, slope_tol=1e-2, transient=1), (
-        f"golden sealed biomass must be bounded past the year-1 spin-up, diffs={diffs}"
+    # ⚠ RESTATED by the humification split (2026-08-10), the station-side instance of
+    # the same fact that restated the two decade-stability pins: the split does not
+    # destabilise anything, it lengthens the SETTLING TRANSIENT past the frozen horizon.
+    # Slow SOM fills on its own ~5-yr turnover (K6 = 0.0038/wk) while this scenario runs
+    # 4 years, so total organic carbon is still CLIMBING at the end of the run -- the
+    # humus pool reaches ~23.8 mol C here -- and an amplitude bound of 1.0 mol C/yr is
+    # asserting that a pool is full before it has finished filling.
+    #
+    # What ``is_stationary`` was protecting against is AMPLIFICATION -- a run whose
+    # year-over-year change grows, i.e. a blow-up -- and that is asserted directly and
+    # without a magic amplitude:
+    assert all(d > 0.0 for d in diffs)  # accumulating soil, not losing it
+    assert all(diffs[k + 1] < diffs[k] for k in range(len(diffs) - 1)), (
+        f"golden sealed biomass must be DECELERATING (converging), diffs={diffs}"
     )
+    # ⚠ Deliberately NOT re-tuned to a larger amplitude bound. A widened bound would
+    # keep the shape of a claim ("the biomass is settled") that is no longer true at
+    # this
+    # horizon, which is the weaker move; asserting the trend directly says something
+    # that
+    # IS true and still fails on the failure mode the bound existed for. The horizon
+    # itself is unchanged -- extending it was considered and is a contract change, not a
+    # test fix (docs/plans/post-roadmap-cue-humification.md).
     # Feces boundary OPEN (Tier-2 scope, close_feces=False): the FECAL_WASTE sink exists
     # and
     # carried the crew's egested carbon (the litter loop is deliberately not closed

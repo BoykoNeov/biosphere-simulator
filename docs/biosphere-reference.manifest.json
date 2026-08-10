@@ -14,6 +14,8 @@
     "Fertilization",
     "Grazing",
     "GrowthRespiration",
+    "HumusDecomposition",
+    "HumusNitrogenRelease",
     "Irrigation",
     "LitterNitrogenTransfer",
     "MaintenanceRespiration",
@@ -64,10 +66,10 @@
         "source": "self \u2014 the calibrated attractor, not a cited value"
       },
       {
-        "bound": "max(tail) > 0.9",
+        "bound": "max(tail) > 0.55",
         "locus": "tests/test_decade_stability.py::test_perennial_leaf_cycle_is_a_fixed_point",
         "quantity": "converged peak-leaf fixed point (mol C)",
-        "source": "self \u2014 re-tuned from >1.0 when the decomposer calibration shrank the plant"
+        "source": "self \u2014 anchored on the MEASURED equilibrium 0.594984 (reached ~yr 45), not on the 15-yr reading; 2.2x the 0.253 dead baseline. Second move: >1.0 -> >0.9 (decomposer calibration) -> >0.55 (humification split)"
       }
     ],
     "sealed_chamber": []
@@ -78,6 +80,7 @@
     "canopy.yaml": "7686da08e9a8f0a6d2643866a849df744dded40ad86443689cd5896b4d42bc65",
     "decomposition.yaml": "491f196483f5d131131369b0c15c5dc6f368e60d38be185067484f4c0f34af13",
     "herbivory.yaml": "33903c12acd162cc377a9fe4536a971cc3d2f4943a959a69aeebc5a989198c1b",
+    "humification.yaml": "327cd89ee455cf0cf20767e4081dbe1344287f2e132760b668cae5a20d6f4b09",
     "microbial_respiration.yaml": "de5a01c81a5c9ab20229259369511e8e8a9e42b0ef932b99a6bd3d1f1e8f6d8a",
     "nitrogen.yaml": "f012a5cfad4d40efa29ab917c05c0e9c8d831426cb39415f990a44950abf240a",
     "phenology.yaml": "534aff0b9a7557a16cbcafc61d87279dd61b96fc5df17b7837fc67e225201d38",
@@ -91,19 +94,19 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "d30a45d3c4cf9fe0c6d02b2fed7def5dd8c46f5278527425d40c17da6d376a17",
+      "golden_sha256": "b938d03ce65c531253db652d288e9bfbb75f901ff674c679d528d9f24018ce51",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "120fc81e08064ec5755c8d3f911d533b41a0327f8ab00571902a7bc229f9a005",
+      "golden_sha256": "ac47dd12c34e87535e006f231292ee035bb8646b6a608878a908873997ec6161",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
     "drift_summary": {
       "golden": "drift_summary.json",
-      "golden_sha256": "33e28275f6a6b490578d8e9bf56d80a0149bfb2765fe7189acb74e3816b31673",
+      "golden_sha256": "c0604ea9e9d65b05041ca69fa0537b9e562f91999b6f4e545080263b7709396d",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
       "years": 15
     },
@@ -115,19 +118,19 @@
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "1c6b8a472b2aad6b24d2cf7e70fd94c9bfbf88066c636f93f95c0e8a06da9ed3",
+      "golden_sha256": "267694d0cf143f67944b89b20ef38a889ff82ed059ad0a7dfeb98ac4cb039688",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "25a7ec4b4e9d806870185a5ab19d58d8b8f1c15b80e84e28f19081e457a2f0e3",
+      "golden_sha256": "d6127be74831cd60f6daaf4aa6943bd5e80a2dab060a4113a97a23e87ee23cfe",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "5ab2557ef6e1ddf78d2656567ee762f8f616c7fca66c04e2574e5938368071fe",
+      "golden_sha256": "708201fd6545a299c46f92f6737f6a0ad7424644cabd078490fa6d0be432eb29",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

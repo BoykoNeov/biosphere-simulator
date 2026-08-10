@@ -31,7 +31,11 @@ from pathlib import Path
 
 import pytest
 
-from domains.biosphere.loader import load_microbial_respiration_params
+from domains.biosphere.humification import HumificationParams
+from domains.biosphere.loader import (
+    load_humification_params,
+    load_microbial_respiration_params,
+)
 from domains.biosphere.microbial_respiration import (
     MicrobialRespiration,
     MicrobialRespirationParams,
@@ -58,6 +62,7 @@ _BIO = DomainId("biosphere")
 _MICROBIAL = StockId("biosphere.microbial_carbon")
 _CO2_POOL = StockId("biosphere.carbon_pool")
 _O2_POOL = StockId("biosphere.o2_pool")
+_HUMUS = StockId("biosphere.humus_carbon")
 
 
 def _weather() -> list[dict[str, float | str]]:
@@ -108,6 +113,16 @@ def _state(*, microbial: float, co2: float = 0.357, o2: float = 210.0) -> State:
             kind=StockKind.POOL,
             composition={Quantity.CARBON: 1.0, Quantity.OXYGEN: 2.0},
         ),
+        # CENTURY's slow SOM — where the stabilised (non-respired) share of the
+        # microbial turnover lands since the humification split (2026-08-10). A POOL.
+        _HUMUS: Stock(
+            id=_HUMUS,
+            domain=_BIO,
+            quantity=Quantity.CARBON,
+            unit=carbon,
+            amount=0.0,
+            kind=StockKind.POOL,
+        ),
         # The O₂ counterpart: 2 mol OXYGEN per mol O₂.
         _O2_POOL: Stock(
             id=_O2_POOL,
@@ -122,8 +137,19 @@ def _state(*, microbial: float, co2: float = 0.357, o2: float = 210.0) -> State:
     return State(n=0, stocks=stocks, rng_seed=0)
 
 
+def _humi(es: float = 0.85) -> HumificationParams:
+    # Es driven explicitly so the partition arithmetic is checkable by hand; the
+    # committed value is asserted separately against the loader.
+    return HumificationParams(
+        litter_respired_fraction=0.45,
+        active_stabilization_co2_fraction=es,
+        slow_respired_fraction=0.55,
+        slow_decomposition_rate=0.0,
+    )
+
+
 def _respiration(
-    rate: float = 0.05, *, o2_half_saturation: float = 0.0
+    rate: float = 0.05, *, o2_half_saturation: float = 0.0, es: float = 0.85
 ) -> MicrobialRespiration:
     # o2_half_saturation defaults to 0 (f_O2 ≡ 1 for O₂ > 0) so the rate-law/balance
     # unit tests isolate the base flux; f_O2 gets its own dedicated tests.
@@ -131,11 +157,13 @@ def _respiration(
         FlowId("biosphere.microbial_respiration"),
         0,
         microbial_carbon=_MICROBIAL,
+        humus_carbon=_HUMUS,
         co2_pool=_CO2_POOL,
         o2_pool=_O2_POOL,
         params=MicrobialRespirationParams(
             microbial_respiration_rate=rate, o2_half_saturation=o2_half_saturation
         ),
+        humification=_humi(es),
         air_mol=1000.0,
     )
 
@@ -146,21 +174,52 @@ def _env(state: State, dt: float):
 
 
 def test_respiration_burns_microbial_to_co2_consuming_o2() -> None:
-    # PQ=1: each mol C respired leaves microbial biomass, returns to the pool as CO₂,
-    # and consumes 1 mol O₂ — all the SAME ``respired`` magnitude.
+    # PQ=1 on the RESPIRED leg: the carbon that returns to the pool as CO₂ consumes an
+    # equal amount of O₂ — the same magnitude, which is what keeps OXYGEN balanced.
+    # ⚠ REWRITTEN by the humification split (2026-08-10), not weakened. The turnover
+    # WITHDRAWAL is unchanged (``rate · microbial``, still CENTURY's K5); what changed
+    # is
+    # that only ``Es`` of it is respired. The old form sent all of it to CO₂, i.e. it
+    # asserted ``Es = 1.0`` — a value eq. [6] cannot reach at any texture (its range is
+    # [0.17, 0.85]). The rest is stabilised into slow SOM and carries no oxygen.
     state = _state(microbial=2.0)
     legs = {
         leg.stock: leg.amount
         for leg in _respiration().evaluate(state, _env(state, 1.0), 1.0).legs
     }
-    respired = 0.05 * 2.0
-    assert math.isclose(legs[_MICROBIAL], -respired, rel_tol=1e-12)  # burned biomass
+    turned = 0.05 * 2.0
+    respired = 0.85 * turned
+    assert math.isclose(legs[_MICROBIAL], -turned, rel_tol=1e-12)  # whole turnover out
     assert math.isclose(
         legs[_CO2_POOL], respired, rel_tol=1e-12
-    )  # CO₂ returned to pool
+    )  # only Es returns as CO₂
     assert math.isclose(
         legs[_O2_POOL], -respired, rel_tol=1e-12
-    )  # O₂ consumed = C burned
+    )  # O₂ consumed = C burned, NOT C turned over
+    assert math.isclose(
+        legs[_HUMUS], turned - respired, rel_tol=1e-12
+    )  # 1 − Es stabilised into slow SOM
+    assert legs[_CO2_POOL] + legs[_HUMUS] == -legs[_MICROBIAL]  # exact, by subtraction
+
+
+def test_es_of_one_reproduces_the_pre_split_respiration() -> None:
+    # The frozen pre-2026-08-10 form is the ``Es = 1`` member of this family: the whole
+    # turnover becomes CO₂ and nothing is stabilised. Pinned so "the old tree asserted
+    # Es = 1.0" is a checkable claim rather than prose — and note that this member is
+    # NOT reachable through the loader, because eq. [6] tops out at 0.85.
+    state = _state(microbial=2.0)
+    legs = {
+        leg.stock: leg.amount
+        for leg in _respiration(es=1.0).evaluate(state, _env(state, 1.0), 1.0).legs
+    }
+    turned = 0.05 * 2.0
+    assert math.isclose(legs[_CO2_POOL], turned, rel_tol=1e-12)
+    assert legs[_HUMUS] == 0.0
+
+
+def test_loader_reads_the_cited_stabilization_efficiency() -> None:
+    # [A] Parton 1987 eq. [6] at T = 0 (no mineral soil in this chamber).
+    assert load_humification_params().active_stabilization_co2_fraction == 0.85
 
 
 def test_respiration_balances_carbon_and_oxygen() -> None:

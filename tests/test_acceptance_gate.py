@@ -569,8 +569,6 @@ def test_open_seasons_other_currencies_are_slack_not_absent() -> None:
 @pytest.mark.parametrize(
     "scenario,stock,rate,label",
     [
-        ("perennial_chamber", "biosphere.litter_carbon", 0.011, "decomposition_rate"),
-        ("perennial_chamber", "biosphere.litter_n", 0.011, "decomposition_rate (B)"),
         ("perennial_chamber", "biosphere.water_vapor", 0.5, "condensation_rate"),
         ("perennial_chamber", "biosphere.condensate", 0.5, "recycling_rate"),
         # eclss.yaml names both products itself: "k_scrub*dt = 0.06" and "(here 0.03)".
@@ -595,9 +593,18 @@ def test_a_first_order_stocks_margin_is_one_over_k_dt(
     only check of that inequality — the quantity checked is still the timestep, but it
     is not a redundancy here.
 
-    ⚠ ``litter_n`` is here because option (B) put both litter currencies on the *same*
-    flux, so it inherits the carbon rate and holds no rate of its own — that param file
-    was deleted. Its presence here is the (B) build's identity, not a duplicate row.
+    ⚠ **The litter pair used to be here and no longer is (2026-08-10).** Option (B) put
+    both litter currencies on the same flux, so ``litter_n`` inherited the carbon rate
+    and
+    the pair sat at exactly ``1/0.011 = 90.909``. The humification split gave
+    ``Decomposition`` a CO₂ leg, an O₂ draw comes with it, and an O₂-drawing flow must
+    self-throttle — so the pair now carries ``f_O2`` and is **live** (90.952, varying in
+    the last digits with the O₂ pool) rather than rate-determined. They moved into
+    exactly
+    the category the microbial pair already occupied, and for exactly the reason the
+    next
+    test's docstring already gave for it. Pinned in
+    :func:`test_the_litter_pair_became_live_when_it_gained_an_o2_draw`.
     """
     entry = census(scenario)[stock]
     assert entry.gate == "rate-determined", (entry.min_margin, entry.max_margin)
@@ -612,15 +619,67 @@ def test_the_microbial_pair_shares_a_flux_and_the_census_sees_it() -> None:
     draw. Their gate margins are therefore bit-identical — not approximately, exactly —
     and likewise for the litter pair. Neither is ``rate-determined`` here only because
     ``f_O2`` modulates the microbial draw.
+
+    ⚠ **The humus pair (2026-08-10) is the same identity on a third pool**, and it is
+    free corroboration a second time: nothing about the humification split was designed
+    to
+    make this test pass, yet ``HumusNitrogenRelease`` rides ``HumusDecomposition``'s
+    flux
+    and the census sees it without being told. It is pinned at 1 ULP rather than
+    bit-exactly, for the same reason the litter pair is: the two flows reach the same
+    algebraic quantity by different float paths (``humus_c/decayed`` versus
+    ``humus_n/(decayed*humus_n/humus_c)``), and an exact-equality pin here would be
+    asserting an association order, not an identity.
     """
     for scenario in ("sealed_chamber", "perennial_chamber", "consumer_chamber"):
         rows = census(scenario)
-        assert rows["biosphere.microbial_n"].min_margin == (
-            rows["biosphere.microbial_carbon"].min_margin
+        # ⚠ Was bit-exact until 2026-08-10; now 1 ULP, like its two siblings. The
+        # exactness was a property of the NUMBERS, not of the design: both flows compute
+        # ``pool/(flux)`` by different float paths (``c/turned`` versus
+        # ``n/(turned*n/c)``) and happened to round identically while each had a single
+        # destination leg. The humification split gave both a second leg, the demand
+        # fold
+        # associates differently, and the last bit parts company. Asserting ``==`` here
+        # was therefore asserting an association order; 1 ULP is the identity.
+        assert rows["biosphere.microbial_n"].min_margin == pytest.approx(
+            rows["biosphere.microbial_carbon"].min_margin, rel=1e-12
         )
         assert rows["biosphere.litter_n"].min_margin == pytest.approx(
             rows["biosphere.litter_carbon"].min_margin, rel=1e-12
         )
+        assert rows["biosphere.humus_n"].min_margin == pytest.approx(
+            rows["biosphere.humus_carbon"].min_margin, rel=1e-12
+        )
+
+
+def test_the_litter_pair_became_live_when_it_gained_an_o2_draw() -> None:
+    """The one census row the humification split moved between CATEGORIES.
+
+    Before 2026-08-10 ``litter_carbon``/``litter_n`` were ``rate-determined`` at exactly
+    ``1/(k*dt) = 90.909``: a pure timestep check, flat over the whole run. The split
+    gave
+    ``Decomposition`` a CO2 leg; the composition gate forces an O2 draw with it; an
+    O2-drawing flow must self-throttle or ``rationed == 0`` stops being structural. So
+    the
+    draw now carries ``f_O2``, the margin varies with the O2 pool, and the row is live.
+
+    The size of the effect is the point: ``f_O2`` is ~0.9995 at the chamber's fill, so
+    the
+    margin moved from 90.909 to ~90.952 and *varies in the last digits*. This is not a
+    scarcity gate appearing — it is a timestep check that stopped being exactly flat.
+    The
+    diagnosis's own warning applies in reverse here: filing this as "live" on a 4e-4
+    relative wobble would overstate it just as ``min == max`` overstated flatness.
+    """
+    rows = census("perennial_chamber")
+    for sid in ("biosphere.litter_carbon", "biosphere.litter_n"):
+        entry = rows[sid]
+        assert entry.gate == "live"
+        margin = entry.min_margin
+        assert margin is not None
+        assert margin == pytest.approx(90.95231882247269, rel=1e-9)
+        # still within 0.05 % of the bare 1/(k*dt) it used to sit on exactly
+        assert abs(margin - 1.0 / 0.011) / (1.0 / 0.011) < 5e-4
 
 
 # --------------------------------------------------------------------------- #
@@ -631,18 +690,37 @@ def test_the_microbial_pair_shares_a_flux_and_the_census_sees_it() -> None:
 @pytest.mark.parametrize(
     "scenario,expected",
     [
-        ("sealed_chamber", 1.4914109879410478),
-        ("perennial_chamber", 1.1260232712494462),
-        ("consumer_chamber", 1.8016106868650505),
+        ("sealed_chamber", 2.3404741281202655),
+        ("perennial_chamber", 1.5124880369468734),
+        ("consumer_chamber", 2.112066494173573),
     ],
 )
 def test_the_jars_carbon_pool_is_the_only_binding_gate(
     scenario: str, expected: float
 ) -> None:
-    """The chamber-scale collision as a number: 11-80 % headroom, on one stock.
+    """The chamber-scale collision as a number: 51-134 % headroom, on one stock.
 
     This is what a *live* gate looks like — and it is the acceptance test every
     biosphere science change has actually been judged by.
+
+    ⚠ **RE-MEASURED 2026-08-10 (the humification split), and the headroom LOOSENED**:
+    1.126/1.491/1.802 -> 1.512/2.340/2.112, so the docstring's "11-80 %" became "51-134
+    %"
+    and the ``margin < 2.0`` bound became false for two of the three. The cause is
+    mechanical and is worth stating rather than absorbing: the split returns 45 % of
+    decayed litter carbon to the atmosphere immediately instead of routing all of it
+    through a microbial pool with a ~62-day residence time, so the CO2 trough is higher.
+    ⚠ That is NOT a benefit to quote on its own — the trough is also higher because the
+    plant is ~40 % smaller (see the liveness floor in ``test_decade_stability``). The
+    two
+    facts travel together.
+
+    The ``< 2.0`` bound is REPLACED BY A RANK rather than re-tuned upward: an amplitude
+    cut chosen after seeing the measurement is the fitted comparison this file already
+    refuses once (the "every margin below 9.0" draft, off by one). What makes this stock
+    the binding gate is that it is the tightest in its scenario by a wide factor, and
+    that
+    is what is asserted below.
     """
     rows = census(scenario)
     pool = rows["biosphere.carbon_pool"]
@@ -650,20 +728,21 @@ def test_the_jars_carbon_pool_is_the_only_binding_gate(
     margin = pool.min_margin
     assert margin is not None
     assert margin == pytest.approx(expected, rel=1e-9)
-    assert margin < 2.0
     # and it is that scenario's tightest, by a wide margin
     others = sorted(v for k, v in _live(rows).items() if k != "biosphere.carbon_pool")
     assert others[0] > 4 * margin, (margin, others[:3])
 
 
 # The census table: scenario -> (tightest live stock, its minimum margin). Measured
-# 2026-08-09 on the committed goldens. This IS the census — pinned as exact values
+# 2026-08-09 on the committed goldens; the six sealed-chamber rows and `lighting`
+# RE-MEASURED 2026-08-10 after the humification split. This IS the census — pinned as
+# exact values
 # because a drift here means either a golden moved or the gate's reach changed.
 TIGHTEST: dict[str, tuple[str, float]] = {
     "open_season": ("biosphere.leaf_c", 42.50662430453055),
-    "sealed_chamber": ("biosphere.carbon_pool", 1.4914109879410478),
-    "perennial_chamber": ("biosphere.carbon_pool", 1.1260232712494462),
-    "consumer_chamber": ("biosphere.carbon_pool", 1.8016106868650505),
+    "sealed_chamber": ("biosphere.carbon_pool", 2.3404741281202655),
+    "perennial_chamber": ("biosphere.carbon_pool", 1.5124880369468734),
+    "consumer_chamber": ("biosphere.carbon_pool", 2.112066494173573),
     "power_bounded_soc": ("power.battery", 11.295323690100386),
     "power_self_discharge": ("power.battery", 11.085836827155921),
     "thermal_equilibrium": ("thermal.node", 257.68121326080376),
@@ -673,10 +752,10 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     "cabin_gas": ("eclss.cabin_o2", 35.57253249034074),
     "greenhouse": ("biosphere.carbon_pool", 16.666666666666664),
     "water_recovery": ("eclss.cabin_o2", 35.57253249034074),
-    "lighting": ("biosphere.carbon_pool", 14.442998559750455),
+    "lighting": ("biosphere.carbon_pool", 14.44461256264056),
     "harvest": ("biosphere.carbon_pool", 16.666666666666664),
-    "perennial_long_horizon": ("biosphere.carbon_pool", 1.1260232712494462),
-    "consumer_long_horizon": ("biosphere.carbon_pool", 1.8016106868650505),
+    "perennial_long_horizon": ("biosphere.carbon_pool", 1.5004031863217981),
+    "consumer_long_horizon": ("biosphere.carbon_pool", 2.112066494173573),
     "sealed_energy_drift": ("power.battery", 11.295323690100386),
     "sealed_station": ("biosphere.carbon_pool", 5.218197631830118),
 }
@@ -754,11 +833,22 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     ]
     # What the rate-determined exclusion removes, pinned rather than assumed.
     raw = sorted(all_margins)
-    assert [sid for _m, _s, sid, _g in raw[:5]] == ["biosphere.carbon_pool"] * 5
-    margin6, _s6, sid6, gate6 = raw[5]
-    # the water-cycle pair ties at exactly 2.0; which of the two sorts 6th is incidental
-    assert sid6 in {"biosphere.condensate", "biosphere.water_vapor"}, raw[5]
-    assert gate6 == "rate-determined" and margin6 == 2.0, raw[5]
+    # ⚠⚠ RE-MEASURED 2026-08-10, and the QUALIFIER GOT MORE LOAD-BEARING, not less.
+    # On 2026-08-09 the raw ranking led with FIVE ``carbon_pool`` entries before the
+    # water-cycle pair's rate-determined 2.0 appeared. The humification split loosened
+    # the carbon-pool margins (1.126/1.491/1.802 -> 1.500/1.512/2.112/2.340), so only
+    # TWO now sort below 2.0 and the rate-determined ties come next. The live ranking
+    # below is unchanged in shape — still six ``carbon_pool`` entries, still the same
+    # six
+    # scenarios — which is exactly the point this test's name carries: the ordering
+    # claim is about LIVE gates, and the raw ranking is asserted alongside it so the
+    # exclusion stays a measured fact rather than an invisible filter.
+    assert [sid for _m, _s, sid, _g in raw[:2]] == ["biosphere.carbon_pool"] * 2
+    margin3, _s3, sid3, gate3 = raw[2]
+    # the water-cycle pair ties at exactly 2.0; which of the two sorts next is
+    # incidental
+    assert sid3 in {"biosphere.condensate", "biosphere.water_vapor"}, raw[2]
+    assert gate3 == "rate-determined" and margin3 == 2.0, raw[2]
 
     ranked = sorted(
         (margin, scenario, sid)
@@ -776,9 +866,21 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
         "consumer_long_horizon",
         "sealed_station",
     }
+    # ⚠⚠ THE RUNNER-UP CHANGED IDENTITY, and the diagnosis's sentence about it does not
+    # survive. It used to be ``sealed_chamber``'s ``o2_pool`` at 8.944, which licensed
+    # "even the runner-up is a chamber property". The humification split moved O2 around
+    # — ``Decomposition`` gained an O2 draw while ``MicrobialRespiration`` lost 15 % of
+    # its own — and that row is no longer 7th. The first non-``carbon_pool`` margin in
+    # the roster is now ``power.battery`` at 11.086, outside the biosphere entirely.
+    # The MAIN claim is unaffected and is in fact wider: the gap between the binding
+    # gate
+    # (1.500) and the first margin on any other stock is now 7.4x rather than 7.9x... on
+    # a different stock. The "even the runner-up is a chamber property" corollary is
+    # RETIRED, not restated.
     margin, scenario, sid = ranked[6]
-    assert (scenario, sid) == ("sealed_chamber", "biosphere.o2_pool"), "runner-up"
-    assert margin == pytest.approx(8.944335455310334, rel=1e-9), "runner-up value"
+    assert (scenario, sid) == ("power_self_discharge", "power.battery"), "runner-up"
+    assert margin == pytest.approx(11.085836827155921, rel=1e-9), "runner-up value"
+    assert margin / ranked[0][0] > 7.0, "…and the binding gate is still far tighter"
 
     # --- claim 2: sealed_station's census row (folded in; see the note above) --------
     stock, expected = TIGHTEST[_TIER2]
@@ -814,22 +916,42 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
 
 
 @pytest.mark.slow
-def test_tripling_the_horizon_does_not_tighten_the_gate() -> None:
-    """The gate's minimum is reached inside the first 5 years, bit-for-bit.
+def test_tripling_the_horizon_now_TIGHTENS_the_perennial_gate() -> None:
+    """⚠⚠ **RESOLVED 2026-08-10 — this test was named for a fact that stopped being
+    true,
+    and the way it stopped is the humification split's signature.**
 
-    ``test_chamber_scale.py`` pinned that the long-horizon goldens reuse the same
-    scenario objects, so the *inventory* is bit-identical at 5 and 15 years. The gate's
-    *margin* is not a t=0 property and had to be run — and it comes back identical too:
-    the horizon lengthens the run, not the jar.
+    As measured on 2026-08-09: the gate's minimum was reached inside the first 5 years
+    and the 5-yr and 15-yr runs returned a **bit-identical** margin, so "the horizon
+    lengthens the run, not the jar". ``test_chamber_scale.py`` had pinned the companion
+    fact that the long-horizon goldens reuse the same scenario objects, making the
+    *inventory* a t=0 property; the *margin* was measured, not inherited, and came back
+    identical.
+
+    It no longer does, for ``perennial``: 1.5124880369468734 at 5 years against
+    **1.5004031863217981** at 15. The humus pool is still filling at year 5 (it reaches
+    equilibrium around year 45), so the chamber's tightest moment now lies **outside**
+    the 5-year window. This is the same single fact that restated the two
+    decade-stability pins, the station biomass gate and the stem-only attractor: the
+    settling transient outgrew the horizons the frozen contract was measured on.
+
+    ``consumer`` is **unchanged and bit-identical**, which is what makes this a finding
+    rather than a wobble — the herbivore chamber's tightest moment still falls inside
+    five years. Both are asserted, so the asymmetry cannot be lost.
     """
-    for short, long_ in (
-        ("perennial_chamber", "perennial_long_horizon"),
-        ("consumer_chamber", "consumer_long_horizon"),
-    ):
-        a = census(short)["biosphere.carbon_pool"].min_margin
-        b = census(long_)["biosphere.carbon_pool"].min_margin
-        assert a is not None and b is not None
-        assert a.hex() == b.hex(), (short, long_, a, b)
+    a = census("perennial_chamber")["biosphere.carbon_pool"].min_margin
+    b = census("perennial_long_horizon")["biosphere.carbon_pool"].min_margin
+    assert a is not None and b is not None
+    assert b < a, (a, b)  # the longer run finds a TIGHTER minimum
+    assert a == pytest.approx(1.5124880369468734, rel=1e-9)
+    assert b == pytest.approx(1.5004031863217981, rel=1e-9)
+    # small: 0.8 %. The claim is that it moved AT ALL, not that it moved far.
+    assert 0.99 < b / a < 1.0
+
+    c = census("consumer_chamber")["biosphere.carbon_pool"].min_margin
+    d = census("consumer_long_horizon")["biosphere.carbon_pool"].min_margin
+    assert c is not None and d is not None
+    assert c.hex() == d.hex(), ("consumer is still a 5-year property", c, d)
 
 
 # --------------------------------------------------------------------------- #

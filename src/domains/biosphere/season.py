@@ -128,6 +128,12 @@ from domains.biosphere.stocks import (
     CONSUMER_CARBON as CONSUMER_CARBON,
 )
 from domains.biosphere.stocks import (
+    HUMUS_CARBON as HUMUS_CARBON,
+)
+from domains.biosphere.stocks import (
+    HUMUS_N as HUMUS_N,
+)
+from domains.biosphere.stocks import (
     LEAF_C as LEAF_C,
 )
 from domains.biosphere.stocks import (

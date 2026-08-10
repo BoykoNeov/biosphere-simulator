@@ -45,6 +45,11 @@ litter-decay / single-exponential decomposition model; clean-room).
 
 from dataclasses import dataclass
 
+from domains.biosphere.chamber import oxygen_limitation_factor
+from domains.biosphere.humification import (
+    HumificationParams,
+    respired_and_stabilized,
+)
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -76,33 +81,69 @@ def decomposition_flux(litter_c: float, *, decomposition_rate: float) -> float:
 
 @dataclass(frozen=True)
 class Decomposition:
-    """CARBON decay flow ``litter_carbon -> microbial_carbon`` (balanced, P2 Step 4).
+    """CARBON+OXYGEN flow ``litter_carbon + o2_pool → carbon_pool + microbial_carbon``.
 
-    Transfers ``decomposition_flux(litter_carbon, k)·dt`` of carbon from the litter POOL
-    into microbial biomass each step. Single-currency CARBON (both pools are
-    ``{CARBON: 1}``), so the every-step conservation gate folds it identically to P1 and
-    no O₂ is involved (Step 5 adds the O₂-consuming microbial respiration). The draw
-    is self-limiting (∝ the litter pool's amount), so ``rationed == 0`` is structural
-    (``k·dt < 1``). ``flux = daily·dt`` — dt-linear.
+    Decays ``decomposition_flux(litter_carbon, k)·f_O2·dt`` of carbon out of the litter
+    POOL each step and **partitions it**: ``litter_respired_fraction`` is lost as CO₂
+    (drawing an equal amount of O₂ at PQ=1) and the remainder is stabilised into
+    microbial biomass. The draw self-limits two ways, so ``rationed == 0`` is
+    structural:
+    in the substrate (∝ the litter pool's own start-of-step amount, ``k·dt < 1``) and in
+    O₂ (the ``f_O2`` Monod factor → 0 as O₂ → 0). ``flux = daily · f_O2 · dt`` —
+    dt-linear.
+
+    ⚠ **This flow was single-currency CARBON until 2026-08-10** — the deliberate
+    Phase-2 Step-4/Step-5 split, whose reasoning is preserved in this module's header.
+    The humification split gives it a CO₂ leg, and the P2.1 composition gate *forces*
+    the
+    O₂ draw that comes with it: CO₂ entering a ``{CARBON:1, OXYGEN:2}`` pool drags two
+    oxygens pure-carbon litter cannot supply. What the Step-4/5 split got right was that
+    a CO₂ leg is inseparable from an O₂ leg; what it left unstated was that a litter
+    pool
+    decaying with **no** CO₂ leg asserts a carbon-use efficiency of 1.0 — see
+    ``humification.py``.
     """
 
     id: FlowId
     priority: int
     litter_carbon: StockId
     microbial_carbon: StockId
+    co2_pool: StockId
+    o2_pool: StockId
     params: DecompositionParams
+    humification: HumificationParams
+    # The decomposer community's whole-cell respiratory O₂ affinity. Read from
+    # ``microbial_respiration.yaml`` rather than duplicated here: it is the SAME
+    # microbial
+    # population respiring, one flow over. (Contrast the scope-C cross-KINGDOM copy
+    # finding — herbivory's ``o2_half_saturation`` mirrored from the microbial file —
+    # which is a different organism and is flagged there as a defect.)
+    o2_half_saturation: float
+    # Total chamber air (mol) — the intensive basis for the ``f_O2`` mole fraction.
+    air_mol: float
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        f_o2 = oxygen_limitation_factor(
+            snapshot.stocks[self.o2_pool].amount,
+            air_mol=self.air_mol,
+            k_o2=self.o2_half_saturation,
+        )
         decayed = (
             decomposition_flux(
                 snapshot.stocks[self.litter_carbon].amount,
                 decomposition_rate=self.params.decomposition_rate,
             )
+            * f_o2
             * dt
+        )
+        respired, stabilized = respired_and_stabilized(
+            decayed, self.humification.litter_respired_fraction
         )
         return FlowResult(
             legs=(
                 Leg(self.litter_carbon, -decayed),
-                Leg(self.microbial_carbon, decayed),
+                Leg(self.microbial_carbon, stabilized),
+                Leg(self.co2_pool, respired),
+                Leg(self.o2_pool, -respired),
             )
         )

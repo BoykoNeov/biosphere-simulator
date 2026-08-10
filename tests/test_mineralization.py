@@ -49,6 +49,7 @@ from domains.biosphere.decomposition import (
     DecompositionParams,
     decomposition_flux,
 )
+from domains.biosphere.humification import HumificationParams
 from domains.biosphere.loader import load_nitrogen_params
 from domains.biosphere.microbial_respiration import (
     MicrobialRespiration,
@@ -93,6 +94,9 @@ _MICROBIAL_N = StockId("biosphere.microbial_n")
 _LITTER_C = StockId("biosphere.litter_carbon")
 _MICROBIAL_C = StockId("biosphere.microbial_carbon")
 _O2 = StockId("biosphere.o2_pool")
+_HUMUS_C = StockId("biosphere.humus_carbon")
+_HUMUS_N = StockId("biosphere.humus_n")
+_CO2 = StockId("biosphere.carbon_pool")
 
 
 def _weather() -> list[dict[str, float | str]]:
@@ -207,6 +211,8 @@ def _state(
     microbial_n: float = 0.02,
     litter_c: float = 4.0,
     microbial_c: float = 1.0,
+    humus_n: float = 0.005,
+    humus_c: float = 0.5,
     o2: float = 210.0,
 ) -> State:
     stocks = {
@@ -221,6 +227,9 @@ def _state(
         _MICROBIAL_N: _n_pool(_MICROBIAL_N, microbial_n),
         _LITTER_C: _c_pool(_LITTER_C, litter_c),
         _MICROBIAL_C: _c_pool(_MICROBIAL_C, microbial_c),
+        # CENTURY's slow SOM and its N counterpart (the humification split, 2026-08-10).
+        _HUMUS_N: _n_pool(_HUMUS_N, humus_n),
+        _HUMUS_C: _c_pool(_HUMUS_C, humus_c),
         _O2: _c_pool(_O2, o2),
     }
     return State(n=0, stocks=stocks, rng_seed=0)
@@ -235,6 +244,15 @@ _MRESP_PARAMS = MicrobialRespirationParams(
     microbial_respiration_rate=0.016, o2_half_saturation=0.0
 )
 _AIR_MOL = 1000.0
+# The humification partition, driven explicitly so each N leg stays a single
+# hand-checkable term. The committed values are asserted against the loader in
+# test_decomposition / test_microbial_respiration; here they are arithmetic.
+_HUMI_PARAMS = HumificationParams(
+    litter_respired_fraction=0.45,
+    active_stabilization_co2_fraction=0.85,
+    slow_respired_fraction=0.55,
+    slow_decomposition_rate=0.0005428571428571428,
+)
 
 
 # The coupled N-shedding flow needs the organ carbon stocks and the senescence rates
@@ -273,8 +291,13 @@ def _litter_transfer() -> LitterNitrogenTransfer:
         0,
         litter_n=_LITTER_N,
         microbial_n=_MICROBIAL_N,
+        soil_n=_SOIL_N,
         litter_carbon=_LITTER_C,
+        o2_pool=_O2,
         params=_DECOMP_PARAMS,
+        humification=_HUMI_PARAMS,
+        o2_half_saturation=0.0,
+        air_mol=_AIR_MOL,
     )
 
 
@@ -288,7 +311,9 @@ def _microbial_release(
         soil_n=_SOIL_N,
         microbial_carbon=_MICROBIAL_C,
         o2_pool=_O2,
+        humus_n=_HUMUS_N,
         params=params,
+        humification=_HUMI_PARAMS,
         air_mol=_AIR_MOL,
     )
 
@@ -311,8 +336,12 @@ def test_n_senescence_moves_plant_n_to_litter_n() -> None:
     assert math.isclose(legs[_LITTER_N], shed, rel_tol=1e-12)
 
 
-def test_litter_transfer_moves_litter_n_to_microbial_n() -> None:
-    # The N riding the decomposing carbon: k·litter_C · (litter_N/litter_C).
+def test_litter_transfer_splits_its_nitrogen_the_way_the_carbon_split() -> None:
+    # ⚠ REWRITTEN by the humification split (2026-08-10), not weakened. The WITHDRAWAL
+    # is
+    # unchanged — still k·litter_C · (litter_N/litter_C), which is what preserves option
+    # (B)'s identity that litter's C and N leave on the same flux. What is new is that
+    # the carbon no longer all goes one place, so neither does the nitrogen.
     state = _state(litter_n=2.0, litter_c=4.0)
     legs = {
         leg.stock: leg.amount
@@ -320,11 +349,14 @@ def test_litter_transfer_moves_litter_n_to_microbial_n() -> None:
     }
     moved = 0.011 * 4.0 * (2.0 / 4.0)
     assert math.isclose(legs[_LITTER_N], -moved, rel_tol=1e-12)
-    assert math.isclose(legs[_MICROBIAL_N], moved, rel_tol=1e-12)
+    assert math.isclose(legs[_MICROBIAL_N], 0.55 * moved, rel_tol=1e-12)
+    assert math.isclose(legs[_SOIL_N], 0.45 * moved, rel_tol=1e-12)
+    assert legs[_MICROBIAL_N] + legs[_SOIL_N] == -legs[_LITTER_N]  # exact
 
 
-def test_microbial_release_moves_microbial_n_to_soil_n() -> None:
-    # The N riding the respired carbon: m_resp·microbial_C · (microbial_N/microbial_C).
+def test_microbial_release_splits_its_nitrogen_the_way_the_carbon_split() -> None:
+    # The N riding the microbial turnover: the respired share (Es) mineralizes to soil,
+    # the stabilised share rides its carbon into slow SOM.
     state = _state(microbial_n=0.05, microbial_c=2.0)
     legs = {
         leg.stock: leg.amount
@@ -332,24 +364,72 @@ def test_microbial_release_moves_microbial_n_to_soil_n() -> None:
     }
     moved = 0.016 * 2.0 * (0.05 / 2.0)
     assert math.isclose(legs[_MICROBIAL_N], -moved, rel_tol=1e-12)
-    assert math.isclose(legs[_SOIL_N], moved, rel_tol=1e-12)
+    assert math.isclose(legs[_SOIL_N], 0.85 * moved, rel_tol=1e-12)
+    assert math.isclose(legs[_HUMUS_N], 0.15 * moved, rel_tol=1e-12)
+    assert legs[_SOIL_N] + legs[_HUMUS_N] == -legs[_MICROBIAL_N]  # exact
 
 
-def test_the_return_leg_is_a_TRANSIT_not_a_jump_to_soil() -> None:
-    """litter_n never reaches soil_n in one step — the form change, seen structurally.
+def test_mineralization_is_the_nitrogen_of_the_carbon_that_LEFT_AS_CO2() -> None:
+    """Why "N follows the carbon partition" is the right law here, not a convenience.
 
-    Under the retired direct ``Mineralization`` a single flow carried litter_n → soil_n.
-    Now the nitrogen must pass through ``microbial_n``, so no flow touches both
-    ``litter_n`` and ``soil_n``. This is what "microbe-MEDIATED" means operationally,
-    and
-    it is pinned so that collapsing the two legs back into one goes red.
+    The textbook mineralization/immobilization balance computes the N released as the
+    difference between the N in the decomposing substrate and the N the receiving pool
+    needs at *its own* C:N. In the limit where the receiving pool carries the SAME C:N
+    as the donor — exactly our case, because this tree deliberately imposes no
+    homeostatic microbial C:N (option (B) measured that doing so would demand 90-152x
+    the litter N present, and refused it) — that difference collapses to *the nitrogen
+    of the carbon that left as CO2*.
+
+    So the partition is not an approximation chosen for tidiness: it is what the
+    standard
+    balance reduces to under this tree's own stoichiometry. The gap to a real soil is
+    the
+    homeostasis, recorded as a limitation rather than fitted.
     """
-    for flow in (_litter_transfer(), _microbial_release()):
-        state = _state()
-        touched = {
-            leg.stock for leg in flow.evaluate(state, _env(state, 1.0), 1.0).legs
-        }
-        assert not {_LITTER_N, _SOIL_N} <= touched
+    state = _state(litter_n=2.0, litter_c=4.0)
+    legs = {
+        leg.stock: leg.amount
+        for leg in _litter_transfer().evaluate(state, _env(state, 1.0), 1.0).legs
+    }
+    decayed_c = 0.011 * 4.0
+    respired_c = 0.45 * decayed_c
+    n_per_c = 2.0 / 4.0  # the litter pool's own N:C
+    assert math.isclose(legs[_SOIL_N], respired_c * n_per_c, rel_tol=1e-12)
+
+
+def test_only_the_RESPIRED_share_reaches_soil_n_the_rest_still_transits() -> None:
+    """⚠ RESOLVED, NOT CORRECTED — and replaced by its INVERSE.
+
+    This asserted that ``litter_n`` NEVER reaches ``soil_n`` in one step, on the ground
+    that "microbe-mediated" means all of it must transit ``microbial_n``. That was a
+    true
+    measurement of the option-(B) form, and it was true *because* carbon-use efficiency
+    was 1.0: when 100 % of the decayed litter carbon went to microbes, 100 % of its
+    nitrogen went with it.
+
+    With the humification split, part of the litter carbon leaves as CO2 at the litter
+    step, so the nitrogen it carried is mineralized there. The mediation claim survives
+    in
+    the form that is still true and is the one worth guarding: **no nitrogen reaches the
+    soil except in proportion to carbon respired in the same step**. A collapsed
+    ``litter_n -> soil_n`` jump at a free rate — the retired ``Mineralization`` — still
+    goes red here, because it would move N with no respired carbon to carry it.
+
+    *A pin guarding a mechanism you removed is decoration* (the option-(B) precedent).
+    """
+    # Nothing decomposing at the litter step ==> no nitrogen may reach the soil from it.
+    state = _state(litter_n=5.0, litter_c=0.0)
+    legs = _litter_transfer().evaluate(state, _env(state, 1.0), 1.0).legs
+    assert all(leg.amount == 0.0 for leg in legs)
+    # With carbon moving, the soil leg is exactly the respired share — never the whole
+    # withdrawal, which is what a re-collapsed direct mineralization would give.
+    state = _state(litter_n=2.0, litter_c=4.0)
+    legs = {
+        leg.stock: leg.amount
+        for leg in _litter_transfer().evaluate(state, _env(state, 1.0), 1.0).legs
+    }
+    assert 0.0 < legs[_SOIL_N] < -legs[_LITTER_N]
+    assert legs[_MICROBIAL_N] > 0.0  # the stabilised share still transits
 
 
 def test_flows_balance_nitrogen_only() -> None:
@@ -501,7 +581,12 @@ def test_transfer_leg_recomputes_EXACTLY_the_carbon_Decomposition_moves() -> Non
             0,
             litter_carbon=_LITTER_C,
             microbial_carbon=_MICROBIAL_C,
+            co2_pool=_CO2,
+            o2_pool=_O2,
             params=_DECOMP_PARAMS,
+            humification=_HUMI_PARAMS,
+            o2_half_saturation=0.0,
+            air_mol=_AIR_MOL,
         )
         .evaluate(state, _env(state, 1.0), 1.0)
         .legs
@@ -533,10 +618,12 @@ def test_release_leg_recomputes_EXACTLY_the_carbon_MicrobialRespiration_burns() 
             FlowId("biosphere.microbial_respiration"),
             0,
             microbial_carbon=_MICROBIAL_C,
+            humus_carbon=_HUMUS_C,
             # Any distinct carbon pool: only the microbial leg is read here.
             co2_pool=_LITTER_C,
             o2_pool=_O2,
             params=params,
+            humification=_HUMI_PARAMS,
             air_mol=_AIR_MOL,
         )
         .evaluate(state, _env(state, 1.0), 1.0)

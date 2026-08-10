@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 from domains.biosphere.allocation import Senescence, senescence_flux
+from domains.biosphere.chamber import oxygen_limitation_factor
 from domains.biosphere.compartments import SOIL
 from domains.biosphere.decomposition import (
     Decomposition,
@@ -194,19 +195,36 @@ class AggregateLitterNitrogenTransfer:
     litter_rpm: StockId
     dpm_params: DecompositionParams
     rpm_params: DecompositionParams
+    # f_O2 arrived on the carbon side with the humification split (2026-08-10): the
+    # litter flow gained a CO2 leg, and an O2-drawing flow must self-throttle. If this N
+    # leg did not carry the same factor, C and N would stop leaving on the same flux and
+    # the identity below would read 90.035 instead of 90 — a HARNESS artefact that would
+    # have been very easy to quote as "the identity is only approximate now".
+    o2_pool: StockId
+    o2_half_saturation: float
+    air_mol: float
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         stocks = snapshot.stocks
         c_d = stocks[self.litter_dpm].amount
         c_r = stocks[self.litter_rpm].amount
+        f_o2 = oxygen_limitation_factor(
+            stocks[self.o2_pool].amount,
+            air_mol=self.air_mol,
+            k_o2=self.o2_half_saturation,
+        )
         decomposed = (
-            decomposition_flux(
-                c_d, decomposition_rate=self.dpm_params.decomposition_rate
+            (
+                decomposition_flux(
+                    c_d, decomposition_rate=self.dpm_params.decomposition_rate
+                )
+                + decomposition_flux(
+                    c_r, decomposition_rate=self.rpm_params.decomposition_rate
+                )
             )
-            + decomposition_flux(
-                c_r, decomposition_rate=self.rpm_params.decomposition_rate
-            )
-        ) * dt
+            * f_o2
+            * dt
+        )
         moved = carried_nitrogen(decomposed, stocks[self.litter_n].amount, c_d + c_r)
         return FlowResult(
             legs=(Leg(self.litter_n, -moved), Leg(self.microbial_n, moved))
@@ -280,7 +298,12 @@ def build_variant(
                         flow.priority,
                         litter_carbon=LITTER_RPM,
                         microbial_carbon=MICROBIAL_CARBON,
+                        co2_pool=flow.co2_pool,
+                        o2_pool=flow.o2_pool,
                         params=rpm_params,
+                        humification=flow.humification,
+                        o2_half_saturation=flow.o2_half_saturation,
+                        air_mol=flow.air_mol,
                     )
                 )
             elif isinstance(flow, Senescence):
@@ -296,6 +319,9 @@ def build_variant(
                         litter_rpm=LITTER_RPM,
                         dpm_params=dpm_params,
                         rpm_params=rpm_params,
+                        o2_pool=flow.o2_pool,
+                        o2_half_saturation=flow.o2_half_saturation,
+                        air_mol=flow.air_mol,
                     )
                 )
             else:
@@ -310,13 +336,19 @@ def build_variant(
             canonical_unit(Quantity.CARBON),
             hum_seed,
         )
+        template = next(f for f in flows if isinstance(f, Decomposition))
         flows.append(
             Decomposition(
                 FlowId("biosphere.decomposition_hum"),
                 0,
                 litter_carbon=LITTER_HUM,
                 microbial_carbon=MICROBIAL_CARBON,
+                co2_pool=template.co2_pool,
+                o2_pool=template.o2_pool,
                 params=DecompositionParams(decomposition_rate=K_HUM_DAY),
+                humification=template.humification,
+                o2_half_saturation=template.o2_half_saturation,
+                air_mol=template.air_mol,
             )
         )
 
@@ -575,7 +607,19 @@ def test_the_constant_inventory_sizing_starves_the_re_sow() -> None:
 
 
 def test_the_constant_flux_sizing_rations() -> None:
-    """Holding the t=0 CO2 return fixed (seed 19.409): `rationed` fires 11 times."""
+    """Holding the t=0 CO2 return fixed (seed 19.409): `rationed` fires.
+
+    ⚠ RE-MEASURED 2026-08-10 after the humification split: 11 firings -> 1. The
+    conclusion is unchanged and is what this test is for -- that sizing is still not
+    viable, because ONE firing is a hard break (the goldens assert `rationed == 0` and
+    `run_scenario` raises). The count moved because the split returns 45 % of decayed
+    litter carbon to the atmosphere immediately instead of routing all of it through the
+    microbial pool, so the chamber has more CO2 headroom at the same inventory.
+
+    The count is asserted exactly rather than as `> 0` because a drop from 11 to 1 is
+    the sort of change worth going red for and reading, and because "it still fails" is
+    a weaker claim than "it fails by this much".
+    """
     _, rationed = drive(
         PERENNIAL_CHAMBER_SCENARIO,
         PERENNIAL_CHAMBER_YEARS,
@@ -583,7 +627,7 @@ def test_the_constant_flux_sizing_rations() -> None:
         total_seed=19.4093,
         fractionate=True,
     )
-    assert rationed == 11
+    assert rationed == 1
 
 
 # --- 5. the structural finding --------------------------------------------------------
@@ -594,11 +638,32 @@ def test_a_seeded_slow_pool_only_ever_DRAINS() -> None:
     """FINDING 3 — the structural ceiling, measured rather than read off Figure 1.
 
     RothC's HUM is FORMED by the humification split of decomposed material; only DPM and
-    RPM take fresh input. Our `Decomposition` moves 100 % of decayed litter C into
-    `microbial_carbon` (CUE = 1.0, the deliberate Step-4/5 split), so there is no
-    humification flux and a seeded slow pool can never refill. Pinned at EVERY step, not
-    at year boundaries — a pool that dipped and recovered would still pass a yearly
-    check.
+    RPM take fresh input. This module's *variant* seeds a slow pool and gives it no
+    inflow, so it can only drain — pinned at EVERY step, not at year boundaries, since a
+    pool that dipped and recovered would still pass a yearly check.
+
+    ⚠⚠ **THE ASSERTIONS BELOW ARE SOUND AND THIS DOCSTRING'S ORIGINAL CONCLUSION IS
+    FALSE — annotated in place rather than rewritten, because the way it was right is
+    the finding.** It used to read: *"Our `Decomposition` moves 100 % of decayed litter
+    C
+    into `microbial_carbon` (CUE = 1.0, the deliberate Step-4/5 split), so there is no
+    humification flux and a seeded slow pool can never refill."* That was a true
+    measurement of the tree as it stood on 2026-08-10, and it was **this diagnosis's
+    reason for turning the seam down**: the remaining 14.5x of the census gap was
+    "structurally out of reach".
+
+    It is out of date by one day. The humification split (`humification.py`,
+    `docs/plans/post-roadmap-cue-humification.md`) gave the tree exactly the flux this
+    finding said it lacked, so **the tree now has a slow pool that refills** — measured
+    at 0 -> 1.36691 mol C equilibrium, pinned in
+    `test_decade_stability.py::test_the_perennial_decline_has_a_floor_beyond_the_frozen_horizon`.
+
+    What this test still measures is narrower and still worth keeping: a pool with **no
+    inflow** drains monotonically. That is a property of *this module's variant*, which
+    seeds `LITTER_HUM` and wires nothing into it — not of the tree. **Resolved, not
+    corrected**: the mechanism named in the original conclusion is gone, and the
+    fractionation seam's structural blocker is discharged with it. Whether the seam is
+    now worth taking is a fresh question, not one this module's numbers answer.
     """
     hum_seed = HOOSFIELD_T_C_HA["HUM"] * T_C_HA_TO_MOL_M2 * (6.0 / 38.6188)
     states, rationed = drive(
@@ -615,7 +680,13 @@ def test_a_seeded_slow_pool_only_ever_DRAINS() -> None:
         assert later <= earlier, "a seeded slow pool must have no refill pathway"
     # It is a one-time boost that decays away — and it breaks closure while doing it.
     assert hum[-1] / hum[0] == pytest.approx(0.7783, abs=1e-3)
-    assert rationed == 5
+    # ⚠ RE-MEASURED 2026-08-10: was 5. The humification split gives the chamber enough
+    # CO2 headroom that the seeded pool's ~0.5 mol C/yr drip no longer trips the
+    # backstop.
+    # The "it breaks closure while doing it" half of finding 3 is therefore gone too —
+    # only the monotone-drain half, which is a property of this module's inflow-less
+    # variant, survives.
+    assert rationed == 0
 
 
 # --- 6. the window: why the one passing sizing is a FITTED one ------------------------
@@ -637,7 +708,7 @@ def test_the_frozen_consumer_chamber_carries_stem_only_CLEANLY() -> None:
     )
     assert rationed == 0
     assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:]) == pytest.approx(
-        0.148009, abs=1e-5
+        0.148321, abs=1e-5
     )
 
 
@@ -689,10 +760,26 @@ def test_half_a_mol_higher_and_perennial_fails_the_liveness_floor() -> None:
         fractionate=True,
         rdr_stem_zero=True,
     )
-    assert rationed == 0  # gate A passes...
+    # ⚠⚠ **RESOLVED 2026-08-10 — THIS BOUND IS GONE, AND IT WAS HALF THE WINDOW.**
+    # As measured before the humification split: at seed 7.0 gate A passed and gate B
+    # failed (tail 0.038341 < 0.05), which — with the hard error 0.5 below — is what
+    # made
+    # the single passing sizing "a window narrower than 1.0 mol C, found by sweeping the
+    # gate green". On the humified tree the tail at 7.0 is **0.072378** and gate B
+    # passes
+    # too, so the window is no longer bounded above here.
+    #
+    # ⚠ What follows is a LIMIT on what may be quoted, not a new verdict: the
+    # "narrower than 1.0 mol C" characterisation no longer holds on this tree, and the
+    # fractionation refusal's *window* evidence must be re-derived before being cited
+    # again. Re-deriving it is a fresh diagnosis, not something this commit — which
+    # changed the tree underneath it — is entitled to settle. The refusal's other legs
+    # (both principled sizings fail; the seam moves the failure rather than removing it)
+    # are pinned separately and were not measured here.
+    assert rationed == 0  # gate A still passes...
     tail = min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:])
-    assert tail == pytest.approx(0.038341, abs=1e-5)
-    assert tail < DECADE_CO2_FLOOR  # ...and gate B does not
+    assert tail == pytest.approx(0.072378, abs=1e-5)
+    assert tail > DECADE_CO2_FLOOR  # ...and gate B now passes too
 
 
 # --- 7. the (B) identity, and what the seed does to it -------------------------------
@@ -768,10 +855,15 @@ def test_the_seed_artefact_becomes_PERMANENT_under_fractionation() -> None:
     same_seed = peak_pool_cn(fractionate=True, total_seed=FROZEN_LITTER_SEED)
     doubled = peak_pool_cn(fractionate=True, total_seed=6.0)
 
-    assert frozen == pytest.approx(100.552, abs=1e-2)
+    # ⚠ RE-MEASURED 2026-08-10 (humification split): 100.552 -> 102.749. The identity
+    # is untouched -- litter's C and N still leave on the same flux, both now carrying
+    # f_O2 -- so the pool still converges on the shed ratio from its N-free seed. What
+    # moved is WHERE THE PEAK LANDS: `peak litter_n` is a point on a trajectory, and the
+    # trajectory changed. A number attached to an event, not to a law.
+    assert frozen == pytest.approx(102.749, abs=1e-2)
     assert frozen / shed_cn < 1.2  # the one-pool form washes the seed out
-    assert same_seed == pytest.approx(271.696, abs=1e-2)
-    assert doubled == pytest.approx(334.024, abs=1e-2)
+    assert same_seed == pytest.approx(264.067, abs=1e-2)  # re-measured 2026-08-10
+    assert doubled == pytest.approx(322.171, abs=1e-2)  # re-measured 2026-08-10
     assert doubled / shed_cn > 3.5  # ...and the slow pool does not
 
 
@@ -900,17 +992,17 @@ def test_exactly_one_swept_sizing_clears_both_gates_on_both_scenarios() -> None:
 @pytest.mark.parametrize(
     ("name", "scenario", "years", "perennial", "frozen_tail", "fractionated_tail"),
     [
-        ("sealed_chamber", SEALED_CHAMBER_SCENARIO, 3, False, 0.115998, 0.122192),
-        ("perennial", PERENNIAL_CHAMBER_SCENARIO, 5, True, 0.038734, 0.063384),
+        ("sealed_chamber", SEALED_CHAMBER_SCENARIO, 3, False, 0.116830, 0.119886),
+        ("perennial", PERENNIAL_CHAMBER_SCENARIO, 5, True, 0.055175, 0.076583),
         (
             "perennial_long",
             PERENNIAL_CHAMBER_SCENARIO,
             LONG_HORIZON_YEARS,
             True,
-            0.038734,
-            0.062892,
+            0.055175,
+            0.076572,
         ),
-        ("consumer", CONSUMER_CHAMBER_SCENARIO, 5, True, 0.144698, 0.148887),
+        ("consumer", CONSUMER_CHAMBER_SCENARIO, 5, True, 0.148486, 0.152906),
     ],
 )
 def test_the_form_alone_is_benign_across_the_sealed_roster(
@@ -966,4 +1058,4 @@ def test_the_one_pool_form_cannot_take_the_same_inventory() -> None:
         total_seed=6.0,
         fractionate=False,
     )
-    assert rationed == 6
+    assert rationed == 5  # re-measured 2026-08-10 (was 6)

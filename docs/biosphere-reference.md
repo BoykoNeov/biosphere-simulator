@@ -69,11 +69,20 @@ moves every committed golden.
 The flow classes assembled across the canonical scenarios — the frozen flow taxonomy. The
 manifest's `flow_set` is **derived from freshly assembled registries** (the union over the open
 field + the three chambers), never hand-listed, so a flow added to any compartment builder is
-caught by the completeness gate even if no golden exercises it. As frozen, the set is the 17
+caught by the completeness gate even if no golden exercises it. As frozen, the set is the 20
 classes spanning the producer (allocation, the two respirations, senescence, transpiration,
 nitrogen uptake/senescence, the forcing-driven irrigation/fertilization), the decomposer
-(decomposition, microbial respiration, mineralization), the water cycle (condensation,
-recycling), and the consumer (grazing, consumer respiration, consumer mortality).
+(decomposition, microbial respiration, humus decomposition, and the three carried-nitrogen
+legs), the water cycle (condensation, recycling), and the consumer (grazing, consumer
+respiration, consumer mortality).
+
+⚠ **20, and the decomposer's shape is the reason** (post-roadmap, the humification split,
+2026-08-10 — `docs/plans/post-roadmap-cue-humification.md`). Two classes were *added*
+(`HumusDecomposition`, `HumusNitrogenRelease`) and two existing ones changed **currency**:
+`Decomposition` was single-currency CARBON since Phase-2 Step 4 and is now CARBON+OXYGEN,
+because the split gives it a CO₂ leg and the composition gate forces the O₂ draw that comes
+with it. A currency change is invisible to `flow_set` — it freezes class *names* — which is
+why it is written down here.
 
 **Gross carbon assimilation is not a flow** (and not an aux): it is a recomputed *quantity*
 inside the shared `CarbonContext` budget — the `GrossAssimilation` flow was *dissolved* in the
@@ -86,9 +95,19 @@ allocation, and (since post-roadmap scope (B) increment 1) the **vernalization-d
 accumulator that gates it — so a future aux process added but wired into no golden is caught
 too. (See `flow_set` / `aux_set` in the manifest for the exact lists.)
 
-### The param files — 12 clean-room biosphere param files
+### The param files — 13 clean-room biosphere param files
 
-⚠ **12, not 13: `mineralization.yaml` was RETIRED**, and it is the first param *file* this
+⚠ **13 since 2026-08-10: `humification.yaml` was ADDED** by the humification split
+(`docs/plans/post-roadmap-cue-humification.md`) — three CO₂ fractions that partition every
+decomposer carbon flux, plus the slow-SOM pool's own rate, all four first-hand from CENTURY
+(Parton et al. 1987). It is the first param file added since the freeze, and it exists
+because the frozen form was asserting values **off the end of the source's own functions**:
+a litter CO₂ fraction of 0.0 against a measured 0.45–0.55, and `Es = 1.0` where eq. [6]
+`Es = 0.85 − 0.68·T` cannot exceed 0.85 at any texture. That is the shape bucket-3 scope C
+found for the decomposer *rates*, one level down — the citation covered the **rate** and
+never covered **where the decayed carbon goes**.
+
+⚠ **It was 12, not 13, before that: `mineralization.yaml` was RETIRED**, and it is the first param *file* this
 project has removed rather than re-valued. Both rates it ever held were discharged by
 **form** changes rather than by finding citations — `n_senescence_rate` when N shedding
 became coupled to the senescing carbon (option (A)), and `mineralization_rate` when the
@@ -248,6 +267,42 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-10 — the humification split (a CUE): +1 param file, +2 flows, +2 stocks, 6
+  biosphere goldens, and 4 restated guards.** `docs/plans/post-roadmap-cue-humification.md`.
+  The seam the soil-fractionation diagnosis named as its own replacement. Every decomposer
+  carbon flux is now partitioned between CO₂ and the pool the remainder stabilises into,
+  at CENTURY's own constants (Parton et al. 1987, first-hand): litter → CO₂ 0.45 + active
+  SOM; active SOM → CO₂ 0.85 (`Es` at `T = 0`) + slow SOM; slow SOM → CO₂ 0.55 + active
+  SOM, with `K6 = 0.0038/week`. Nitrogen follows the same partition, so no N rate enters
+  anywhere.
+
+  **Why it was an unfreeze rather than a refinement:** the frozen form was asserting values
+  **off the end of the source's own functions** — a litter CO₂ fraction of 0.0 against a
+  measured 0.45–0.55, and `Es = 1.0` where eq. [6] cannot exceed 0.85 at any texture. The
+  citation covered the decomposer **rates** and never covered **where the decayed carbon
+  goes**, because the partition was not a parameter.
+
+  **Science gates, as step 5 requires.** `open_season`'s three `science_bands` are
+  **untouched** — an open-field build carries no litter, microbial or humus stock, and its
+  golden hash did not move. Of the `liveness_floors`: the two `non_collapsing` floors and
+  the consumer floor pass; the **converged peak-leaf floor FAILED** at 0.634 against
+  `> 0.9`, and this is the blocking finding, argued rather than re-tuned. The split does
+  not destabilise the chamber — it lengthens the settling transient from ~3 years to ~35,
+  past the frozen 15-year horizon. The attractor is real and was **measured** (0.594984 at
+  ~year 45, now its own test). The floor is therefore re-anchored on that equilibrium
+  rather than on the horizon's reading, at **0.55** — 2.2× the recorded 0.253 dead
+  baseline. ⚠ This is the **second** time that floor has moved for a smaller plant
+  (1.0 → 0.9 at the decomposer calibration); its manifest `source` records the whole chain
+  so the pattern is visible rather than buried.
+
+  Three structural pins were restated for the same reason and **none was re-tuned to a
+  looser amplitude**: each was replaced by the claim still true at the frozen horizon
+  (monotone + decelerating), which still fails on the failure mode the original guarded.
+
+  **Cascade:** biosphere manifest (`flow_set` 18 → 20, `param_files` 12 → 13, 6 golden
+  hashes, 1 liveness bound); station manifest (4 golden hashes); 10 goldens; the Rust
+  mirror and the crossport tier.
 
 - **2026-08-09 — the science assertions get contract standing (a SCHEMA unfreeze; two new
   manifest fields, NO value, golden, param or `src/` change).**

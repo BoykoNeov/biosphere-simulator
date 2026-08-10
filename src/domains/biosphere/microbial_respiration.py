@@ -55,6 +55,10 @@ Phase-2 validation gate (see ``params/microbial_respiration.yaml``), clean-room.
 from dataclasses import dataclass
 
 from domains.biosphere.chamber import oxygen_limitation_factor
+from domains.biosphere.humification import (
+    HumificationParams,
+    respired_and_stabilized,
+)
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -113,9 +117,11 @@ class MicrobialRespiration:
     id: FlowId
     priority: int
     microbial_carbon: StockId
+    humus_carbon: StockId
     co2_pool: StockId
     o2_pool: StockId
     params: MicrobialRespirationParams
+    humification: HumificationParams
     # Total chamber air (mol) — the intensive basis for the ``f_O2`` O₂ mole fraction
     # (Step 7). Chamber/scenario data (P4), passed from ``scenario.chamber_air_mol``.
     air_mol: float
@@ -130,7 +136,7 @@ class MicrobialRespiration:
             air_mol=self.air_mol,
             k_o2=self.params.o2_half_saturation,
         )
-        respired = (
+        turned = (
             microbial_respiration_flux(
                 snapshot.stocks[self.microbial_carbon].amount,
                 microbial_respiration_rate=self.params.microbial_respiration_rate,
@@ -138,13 +144,25 @@ class MicrobialRespiration:
             * f_o2
             * dt
         )
+        # The humification split (2026-08-10): CENTURY's K5 is the pool's DECAY rate,
+        # and
+        # ``Es`` is the share of the flow it drives that leaves as CO₂ — the rest is
+        # stabilised into slow SOM (``humus_carbon``). Before this, the whole turnover
+        # went to CO₂, i.e. the tree asserted ``Es = 1.0``, which eq. [6] cannot reach
+        # at
+        # any texture (see ``humification.py``).
+        respired, stabilized = respired_and_stabilized(
+            turned, self.humification.active_stabilization_co2_fraction
+        )
         # CO₂ returned to the pool = carbon respired; O₂ consumed = carbon respired
-        # (PQ=1). All three legs use the same ``respired`` magnitude, so CARBON (−b + b)
-        # and OXYGEN (the pool's +2b vs the O₂ pool's −2b, via the composition fold)
-        # balance exactly.
+        # (PQ=1). Only the respired legs carry oxygen, so CARBON
+        # (−turned + stabilized + respired) and OXYGEN (the CO₂ pool's +2·respired vs
+        # the
+        # O₂ pool's −2·respired, via the composition fold) both balance exactly.
         return FlowResult(
             legs=(
-                Leg(self.microbial_carbon, -respired),
+                Leg(self.microbial_carbon, -turned),
+                Leg(self.humus_carbon, stabilized),
                 Leg(self.co2_pool, respired),
                 Leg(self.o2_pool, -respired),
             )

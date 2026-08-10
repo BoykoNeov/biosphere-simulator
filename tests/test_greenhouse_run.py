@@ -39,6 +39,7 @@ from pathlib import Path
 from domains.biosphere.stocks import (
     CARBON_POOL,
     CONDENSATE,
+    HUMUS_CARBON,
     LEAF_C,
     LITTER_CARBON,
     MICROBIAL_CARBON,
@@ -70,7 +71,18 @@ _ECLSS = load_eclss_params()
 _SC = GREENHOUSE_SCENARIO
 
 # The biosphere organic-carbon pools (the plant's cumulative sink lives here).
-_BIO_C = (LEAF_C, STEM_C, ROOT_C, STORAGE_C, LITTER_CARBON, MICROBIAL_CARBON)
+_BIO_C = (
+    LEAF_C,
+    STEM_C,
+    ROOT_C,
+    STORAGE_C,
+    LITTER_CARBON,
+    MICROBIAL_CARBON,
+    # CENTURY's slow SOM, added by the humification split (2026-08-10). Omitting it
+    # would make this summary read a WRONG TOTAL rather than a moved value — the
+    # greenhouse offload identity caught exactly that, off by the humus amount.
+    HUMUS_CARBON,
+)
 # The offload identity's catastrophic-cancellation floor (co2_removed ~2056 mol over
 # ~10080 additions ⇒ ~1e-10 absolute round-off); the 0.06 mol signal sits far above
 # it.

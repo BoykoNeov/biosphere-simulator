@@ -203,12 +203,26 @@ def test_the_plant_holds_most_of_the_systems_carbon_at_peak(name: str) -> None:
     This is the quantitative content of "a sealed chamber's carbon inventory is fixed,
     so any change that parks carbon in a standing pool is paid for out of the CO2
     trough" ((C) finding 8). There is no slack: the plant is already holding most of it.
+
+    ⚠⚠ **RE-MEASURED 2026-08-10 (the humification split), and the SENTENCE ABOVE IS THE
+    PART THAT MOVED.** The inventory is still fixed and the plant still holds the
+    majority — but the fraction fell (0.558/0.639/0.649/0.670 -> ~0.52-0.55) because
+    there is now a third soil pool holding ~10 % of the chamber's carbon at a ~5-yr
+    residence time. And the quoted conclusion is measured FALSE as a law: with a slow
+    pool present the soil funds a standing sink out of its own inventory rather than out
+    of the atmosphere (``test_senescence_form``'s inventory pin measures the CO2 trough
+    moving +0.0006 mol C where it used to move -0.0392). The claim was true of a soil
+    with one fast pool.
+
+    The bound is widened DOWNWARD only, to the measured range, and the reading it
+    supports is the one that survives: at peak the crop is still the single largest
+    holder of the chamber's carbon.
     """
     scenario, years, driver = _CHAMBERS[name]
     states = _run(scenario, years, driver)
     inventory = _carbon_total(states[0])
     peak_plant = max(sum(s.stocks[o].amount for o in _ORGANS) for s in states)
-    assert 0.55 < peak_plant / inventory < 0.70
+    assert 0.50 < peak_plant / inventory < 0.70
 
 
 @pytest.mark.slow
@@ -265,10 +279,16 @@ def test_the_chamber_crop_is_an_order_of_magnitude_below_the_field_crop() -> Non
         for s in chamber
     )
 
-    # ~24x in mass, ~9x in leaf area. NOT the same ratio -- mass and leaf area are
+    # ~24x in mass, ~10x in leaf area. NOT the same ratio -- mass and leaf area are
     # different quantities (the canopy-regulator row's finding 5 caveat).
+    # ⚠ The leaf-area ratio was 8-10x and is now 10.4x: the humification split shrinks
+    # the CHAMBER crop (the soil holds ~10 % of the inventory) while leaving the OPEN
+    # FIELD untouched -- an open-field build carries no litter, microbial or humus stock
+    # at all, which is asserted in this module's structural pin. So the gap widened from
+    # the chamber side only. The band is re-measured, not re-centred: it still says the
+    # two crops differ by about an order of magnitude in leaf area.
     assert 20.0 < field_peak / chamber_peak < 30.0
-    assert 8.0 < field_lai / chamber_lai < 10.0
+    assert 9.0 < field_lai / chamber_lai < 11.0
 
 
 def test_making_the_chamber_bigger_cannot_be_the_fix() -> None:
