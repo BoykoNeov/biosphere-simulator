@@ -1265,6 +1265,48 @@ settled.** The clause that still bites is the middle one — we are defensible a
 pre-answered here: changing the value is calibration = **scope (B)**, moving power goldens and
 cascading to station goldens, which is a user decision.
 
+### ✅ ANSWERED 2026-08-10 — leave the value, fix the note
+
+The user's call, on the restated question above: **the value stays; the tag becomes `DESIGN`.**
+`self_discharge_rate` is now recorded as an **uncited sizing value of ours** rather than as an
+open citation debt. No value, golden or code moved — `src/domains/power/params/self_discharge.yaml`
+is a comment/`source:` edit only, so this is the **fourth** honor-system provenance unfreeze
+(rounds 4, 5, 6, now this), station manifest only.
+
+**The reasoning, in the order it was put to the user:**
+
+1. **The number is not load-bearing.** The SOC attractor this flow exists for is proved
+   *magnitude-independently* by the two-run contraction test, so nothing in the tree depends on
+   2.592 rather than 1 or 5.
+2. **Its error is in the safe direction.** Pessimistic shelf-loss only tightens the power
+   margin; it cannot flatter a scenario into surviving.
+3. **And the deciding one — recalibration had no target to aim at.** The two sources that
+   *tabulate* this constant give **1** and **5** %/month, disagree **5× with each other**, and
+   neither measured anything (three bare URLs; a reprinted conference table). Moving to either
+   trades *"an uncited value"* for *"one of two guesses, arbitrarily picked"* — and pays a
+   power→station golden cascade for the privilege. **That is not a citation.** Picking the
+   nearer of two non-measurements because it is nearer would be the fitted-comparison shape this
+   project refuses elsewhere.
+
+⚠ **Two things this does NOT discharge, kept explicit so the next reader inherits no larger
+claim than was made:**
+
+- **The measured-literature clause survives as a RESIDUAL, not as a discharged objection.** The
+  value still sits above both sources that actually *measured* the quantity ([C], [D]). What
+  changed is who owns it: a recorded design choice instead of an open debt. **A source that
+  MEASURES a Li-ion %/month figure is grounds to revisit** — retrieval was exhausted *as of
+  2026-07-20*, and by this document's own rule that is a fact about the shelf, dated.
+- **The miscitation.** Relabelling records where the number came from; it does not make four
+  phases of a false attribution ([A] Dunn 2011) harmless. That record stays.
+
+⚠ **Scope (B) is not closed, only not taken** — recalibration remains available at the same
+price, and remains a user decision.
+
+⚠ **The whole negative retrieval record is KEPT, not trimmed**, for `docs/retired/mineralization.yaml`'s
+stated reason: a stale negative result suppresses the next search, and six rounds of it is the
+difference between *"nobody looked"* and *"the quantity is not reported this way."* `DESIGN` here
+means **"no source binds the value"**, never **"no source was sought."**
+
 ## Status after round 6
 
 - **Retrieval: EXHAUSTED for this param, not blocked** — the distinction round 5 drew on
@@ -1274,6 +1316,10 @@ cascading to station goldens, which is a user decision.
 - **Residual risk: unchanged in kind, reduced in force.** `self_discharge_rate` remains *"a
   param correctly attributed to nothing"* — [A] and [B] still do not support it. But it is no
   longer *"a param every accessible source contradicts"*, which is what round 4 recorded.
+  ⚠ **2026-08-10: still true, and no longer OPEN.** The value is now tagged `DESIGN` rather
+  than `TODO(cite)` (see the answered question above), so the residual is an **owned design
+  choice**, not an unfinished errand. The *risk* is unchanged — what changed is that the file
+  now says where the number came from.
 - The ~15 other unopened corpus sources remain **out of scope** (round 3's scope-substitution
   ruling, reaffirmed by rounds 4 and 5). Round 6 discharges the *named exception* to that
   ruling and creates no new one — **there is now no increment left on the table.**
