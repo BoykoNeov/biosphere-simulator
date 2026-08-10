@@ -1563,7 +1563,7 @@ def _stationary_verdict(series: list[float]) -> bool:
     )
 
 
-def test_the_stem_only_guards_are_BOTH_window_questions_not_horizon_questions() -> None:
+def test_neither_stem_only_guard_is_a_horizon_question() -> None:
     """⚠ THE FRAMING CORRECTION, and it is cheap enough to pin without a 50-year run.
 
     The parked question read as "the series has not settled inside the frozen horizon",
@@ -1571,6 +1571,18 @@ def test_the_stem_only_guards_are_BOTH_window_questions_not_horizon_questions() 
     structurally unavailable: the committed pins already say the failing year IS index
     2 and that ``argmin == 2``, so ``non_collapsing(summaries[2:], floor=0.05)``
     contains 0.046065 at EVERY horizon. Only ``transient`` can move it.
+
+    ⚠ THAT LAST SENTENCE — and this test's original name, "…are BOTH WINDOW questions"
+    — WERE TRUE OF A GUARD THAT NO LONGER EXISTS, and the correction runs in the
+    STRENGTHENING direction. On 2026-08-10 the floor's ``[_TRANSIENT:]`` window was
+    measured **inert on the frozen tree** (whole-run min 0.055175 = 1.103x the floor,
+    nothing below it, ``non_collapsing`` True sliced *and* whole) and removed, so the
+    committed guard is now ``non_collapsing(summaries, floor=0.05)``: **not even
+    ``transient`` can move the floor verdict, because there is no window left to move.**
+    Kept rather than rewritten, because what it measured was true of the guard it was
+    measuring — resolved, not corrected. The STATIONARITY half is untouched: its
+    ``transient=2`` stays, its binding diff sitting at index 2 and not dropped by the
+    window anyway. ``docs/plans/post-roadmap-co2-guard-reanchor.md``.
 
     The same turns out to be true of the STATIONARITY guard, which is the part that was
     not obvious: its offending same-phase diffs are ``diffs[2] = series[4] - series[2]``
@@ -1590,8 +1602,12 @@ def test_the_stem_only_guards_are_BOTH_window_questions_not_horizon_questions() 
     assert co2.index(min(co2)) == 2, "the failing year is the FIRST the guard sees"
     assert co2[-1] == pytest.approx(0.074891, rel=1e-3)
 
-    # the floor guard's verdict is decided by a year no horizon can remove
+    # the floor guard's verdict is decided by a year no horizon can remove...
     assert non_collapsing(co2[2:], floor=_DECADE_CO2_FLOOR) is False
+    # ...and, since 2026-08-10, no WINDOW can remove it either: the committed guard
+    # dropped the slice, and the same year decides the whole-run form. Both are pinned
+    # because the pair is the claim — the verdict is window-independent, not re-tuned.
+    assert non_collapsing(co2, floor=_DECADE_CO2_FLOOR) is False
 
     # and so is stationarity's — locate the offenders rather than assert the verdict
     scale = max(co2)
@@ -1643,6 +1659,20 @@ def test_the_stem_only_refusal_at_FIFTY_years_with_its_control() -> None:
     passes at ``transient=0``. Choosing a window because the subject goes green is the
     refused shape, and the current window is not tuned to the reference either. That is
     a contract question and it is left open.
+
+    ⚠ THE WINDOW QUESTION WAS ANSWERED ON 2026-08-10 AND NOT BY CHOOSING A WINDOW: the
+    floor's slice was measured **inert on the frozen tree** and removed (a strict
+    tightening, since ``non_collapsing(whole)`` implies ``non_collapsing(sliced)``),
+    while stationarity's ``transient=2`` stays on a measurement of its own. The
+    paragraph above is kept as the question that was open, not as one that is.
+
+    ⚠ WHAT IS STILL OPEN IS A DIFFERENT QUESTION, and this test is what sharpened it:
+    is a **deeper sow-in transient with a healthier attractor** a failure? The frozen
+    tree's own worst year sits at 1.103x the floor and stem-only's at 0.921x, while
+    stem-only settles ABOVE the reference. That is a contract call and it is the user's
+    — re-deciding it inside the commit that moved its guard is the refused shape, so
+    the guard moved without this verdict moving. ``non_collapsing`` is asserted here in
+    BOTH forms for that reason: the refusal does not depend on the removed window.
     """
     f_co2, f_leaf, f_stem, f_store, f_r = _reprice_series(_REPRICE_YEARS, False)
     s_co2, s_leaf, s_stem, s_store, s_r = _reprice_series(_REPRICE_YEARS, True)
@@ -1672,6 +1702,11 @@ def test_the_stem_only_refusal_at_FIFTY_years_with_its_control() -> None:
     assert _stationary_verdict(s_co2) is False
     assert non_collapsing(f_co2[2:], floor=_DECADE_CO2_FLOOR) is True
     assert _stationary_verdict(f_co2) is True
+    # ...and under the guard AS COMMITTED SINCE 2026-08-10 (no window), unchanged both
+    # ways — which is the point: the re-anchor did not decide this verdict, and the
+    # control clears the whole-run form too, so the removal cost the reference nothing.
+    assert non_collapsing(s_co2, floor=_DECADE_CO2_FLOOR) is False
+    assert non_collapsing(f_co2, floor=_DECADE_CO2_FLOOR) is True
     # ⚠ THE COUNTERFACTUAL, and it REFUTED MY OWN HYPOTHESIS. I expected the two guards
     # to be two readings of ONE event (the year-2 trough), which would have made the
     # committed test's "both halves are asserted" independence claim wrong. Splice the

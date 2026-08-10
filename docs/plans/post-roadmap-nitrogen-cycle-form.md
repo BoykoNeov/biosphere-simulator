@@ -1438,6 +1438,19 @@ DPM-RPM-labile / ruling-B / fractionation-seed-sweep shape, refused four times �
 the current window is not tuned to the reference either, so there is no "restore the
 symmetric choice" move available. **This is a contract question and it is the user's.**
 
+⚠ **ANSWERED 2026-08-10, AND NOT BY CHOOSING A WINDOW** —
+`docs/plans/post-roadmap-co2-guard-reanchor.md`. The floor's `[_TRANSIENT:]` slice was
+measured **inert on the frozen tree** (whole-run min 0.055175 = 1.103× the floor, no year
+below it, `non_collapsing` True sliced *and* whole) and **removed**, which is a strict
+tightening since `non_collapsing(whole)` implies `non_collapsing(sliced)`; stationarity's
+`transient=2` **stays**, because its binding same-phase diff sits at index 2 and the
+window does not drop it anyway. ⇒ the paragraph above is the question **as it stood**.
+Stem-only's verdict is untouched (0.046065 fails inside *and* outside the removed slice)
+and was deliberately **not** re-decided in the commit that moved its guard. What remains
+the user's is the sharper, different question: **is a deeper sow-in transient with a
+healthier attractor a failure?** — frozen 1.103× the floor, stem-only 0.921×, settling
+*above* the control.
+
 ⚠ **This re-price is about STEM-ONLY, not about (C).** (C)'s full form remains refused
 on branch 3 (a calibration whose only target is our own goldens) and takes `open_season`
 to LAI 16.40 against real wheat's 5–8. Nothing here touches that.

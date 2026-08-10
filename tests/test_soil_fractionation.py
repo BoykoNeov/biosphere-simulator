@@ -1364,3 +1364,8 @@ def test_the_consumer_chamber_is_NOT_what_refuses_the_seam() -> None:
         0.129892, abs=1e-5
     )
     assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[2:]) > DECADE_CO2_FLOOR
+    # ⚠ The ``[2:]`` above mirrored the decade guard's ``[_TRANSIENT:]`` window, which
+    # was measured inert on the frozen tree and REMOVED on 2026-08-10. Asserted in the
+    # committed form too, so this result does not quietly depend on a window that is
+    # gone — "clears the floor with room to spare" has to hold over the whole run.
+    assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)) > DECADE_CO2_FLOOR
