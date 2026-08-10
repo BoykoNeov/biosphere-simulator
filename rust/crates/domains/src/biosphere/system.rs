@@ -23,10 +23,10 @@ use simcore::state::{State, Stock};
 
 use super::flows::{
     Allocation, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration, Decomposition,
-    Fertilization, Grazing, GrowthRespiration, Irrigation, LitterNitrogenTransfer,
-    MaintenanceRespiration, MicrobialNitrogenRelease, MicrobialRespiration, NitrogenSenescence,
-    NitrogenUptake, Recycling, Senescence, ThermalTimeAccumulation, Transpiration,
-    VernalizationAccumulation,
+    Fertilization, Grazing, GrowthRespiration, HumusDecomposition, HumusNitrogenRelease,
+    Irrigation, LitterNitrogenTransfer, MaintenanceRespiration, MicrobialNitrogenRelease,
+    MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling, Senescence,
+    ThermalTimeAccumulation, Transpiration, VernalizationAccumulation,
 };
 use super::params;
 use super::stocks::*;
@@ -334,18 +334,40 @@ fn build_soil(
         stocks.push(organ_stock(MICROBIAL_CARBON, SOIL, 0.0)?);
         stocks.push(pool_stock(LITTER_N, SOIL, Quantity::Nitrogen, 0.0)?);
         stocks.push(pool_stock(MICROBIAL_N, SOIL, Quantity::Nitrogen, 0.0)?);
+        // CENTURY slow SOM + its N counterpart (the humification split). Both POOLs,
+        // both start empty: humus takes no fresh plant input, it is FORMED.
+        stocks.push(pool_stock(HUMUS_CARBON, SOIL, Quantity::Carbon, 0.0)?);
+        stocks.push(pool_stock(HUMUS_N, SOIL, Quantity::Nitrogen, 0.0)?);
         flows.push(Box::new(Decomposition {
             id: "biosphere.decomposition".to_string(),
             litter_carbon: LITTER_CARBON.to_string(),
             microbial_carbon: MICROBIAL_CARBON.to_string(),
+            co2_pool: CARBON_POOL.to_string(),
+            o2_pool: O2_POOL.to_string(),
             decomposition_rate: p.decomp.decomposition_rate,
+            litter_respired_fraction: p.humi.litter_respired_fraction,
+            o2_half_saturation: p.micro.o2_half_saturation,
+            air_mol: scenario.chamber_air_mol,
         }));
         flows.push(Box::new(MicrobialRespiration {
             id: "biosphere.microbial_respiration".to_string(),
             microbial_carbon: MICROBIAL_CARBON.to_string(),
+            humus_carbon: HUMUS_CARBON.to_string(),
             co2_pool: CARBON_POOL.to_string(),
             o2_pool: O2_POOL.to_string(),
             microbial_respiration_rate: p.micro.microbial_respiration_rate,
+            active_stabilization_co2_fraction: p.humi.active_stabilization_co2_fraction,
+            o2_half_saturation: p.micro.o2_half_saturation,
+            air_mol: scenario.chamber_air_mol,
+        }));
+        flows.push(Box::new(HumusDecomposition {
+            id: "biosphere.humus_decomposition".to_string(),
+            humus_carbon: HUMUS_CARBON.to_string(),
+            microbial_carbon: MICROBIAL_CARBON.to_string(),
+            co2_pool: CARBON_POOL.to_string(),
+            o2_pool: O2_POOL.to_string(),
+            slow_decomposition_rate: p.humi.slow_decomposition_rate,
+            slow_respired_fraction: p.humi.slow_respired_fraction,
             o2_half_saturation: p.micro.o2_half_saturation,
             air_mol: scenario.chamber_air_mol,
         }));
@@ -355,16 +377,35 @@ fn build_soil(
             id: "biosphere.litter_n_transfer".to_string(),
             litter_n: LITTER_N.to_string(),
             microbial_n: MICROBIAL_N.to_string(),
+            soil_n: SOIL_N.to_string(),
             litter_carbon: LITTER_CARBON.to_string(),
+            o2_pool: O2_POOL.to_string(),
             decomposition_rate: p.decomp.decomposition_rate,
+            litter_respired_fraction: p.humi.litter_respired_fraction,
+            o2_half_saturation: p.micro.o2_half_saturation,
+            air_mol: scenario.chamber_air_mol,
         }));
         flows.push(Box::new(MicrobialNitrogenRelease {
             id: "biosphere.microbial_n_release".to_string(),
             microbial_n: MICROBIAL_N.to_string(),
             soil_n: SOIL_N.to_string(),
+            humus_n: HUMUS_N.to_string(),
             microbial_carbon: MICROBIAL_CARBON.to_string(),
             o2_pool: O2_POOL.to_string(),
             microbial_respiration_rate: p.micro.microbial_respiration_rate,
+            active_stabilization_co2_fraction: p.humi.active_stabilization_co2_fraction,
+            o2_half_saturation: p.micro.o2_half_saturation,
+            air_mol: scenario.chamber_air_mol,
+        }));
+        flows.push(Box::new(HumusNitrogenRelease {
+            id: "biosphere.humus_n_release".to_string(),
+            humus_n: HUMUS_N.to_string(),
+            soil_n: SOIL_N.to_string(),
+            microbial_n: MICROBIAL_N.to_string(),
+            humus_carbon: HUMUS_CARBON.to_string(),
+            o2_pool: O2_POOL.to_string(),
+            slow_decomposition_rate: p.humi.slow_decomposition_rate,
+            slow_respired_fraction: p.humi.slow_respired_fraction,
             o2_half_saturation: p.micro.o2_half_saturation,
             air_mol: scenario.chamber_air_mol,
         }));

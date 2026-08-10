@@ -118,6 +118,20 @@ pub struct MicrobialRespirationParams {
     pub o2_half_saturation: f64,
 }
 
+/// The humification split (a carbon-use efficiency) -- CENTURY / Parton et al. 1987.
+///
+/// Three CO2 fractions that partition every decomposer carbon flux between CO2 and the
+/// pool the remainder stabilises into, plus the slow-SOM pool's own first-order rate.
+/// The frozen pre-2026-08-10 form implied a litter CO2 fraction of 0.0 and `Es = 1.0`,
+/// both outside eq. [6]'s range -- see `params/humification.yaml`.
+#[derive(Debug, Clone, Copy)]
+pub struct HumificationParams {
+    pub litter_respired_fraction: f64,
+    pub active_stabilization_co2_fraction: f64,
+    pub slow_respired_fraction: f64,
+    pub slow_decomposition_rate: f64,
+}
+
 // The nitrogen return loop has NO params struct: both rates it ever held were retired
 // by FORM changes. `n_senescence_rate` went when shedding became coupled to the senescing
 // carbon at a cited residual concentration; `mineralization_rate` went when the return leg
@@ -171,6 +185,7 @@ pub struct BiosphereParams {
     pub nitro: NitrogenParams,
     pub decomp: DecompositionParams,
     pub micro: MicrobialRespirationParams,
+    pub humi: HumificationParams,
     pub water: WaterCycleParams,
     pub herb: HerbivoryParams,
     pub alloc: AllocationParams,
@@ -287,6 +302,12 @@ pub fn biosphere() -> BiosphereParams {
         micro: MicrobialRespirationParams {
             microbial_respiration_rate: get(&t, "micro.microbial_respiration_rate"),
             o2_half_saturation: get(&t, "micro.o2_half_saturation"),
+        },
+        humi: HumificationParams {
+            litter_respired_fraction: get(&t, "humi.litter_respired_fraction"),
+            active_stabilization_co2_fraction: get(&t, "humi.active_stabilization_co2_fraction"),
+            slow_respired_fraction: get(&t, "humi.slow_respired_fraction"),
+            slow_decomposition_rate: get(&t, "humi.slow_decomposition_rate"),
         },
         water: WaterCycleParams {
             condensation_rate: get(&t, "water.condensation_rate"),

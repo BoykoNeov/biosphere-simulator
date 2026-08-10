@@ -26,6 +26,10 @@ pub const LITTER_N: &str = "biosphere.litter_n";
 /// return leg routes through. A POOL, not a POPULATION like its carbon sibling: an
 /// extinction pass on a POPULATION would orphan the nitrogen the carbon side holds.
 pub const MICROBIAL_N: &str = "biosphere.microbial_n";
+/// CENTURY slow SOM and its N counterpart -- FORMED by the humification split
+/// (2026-08-10), never seeded and never fed fresh plant input. Both POOLs.
+pub const HUMUS_CARBON: &str = "biosphere.humus_carbon";
+pub const HUMUS_N: &str = "biosphere.humus_n";
 pub const WATER_VAPOR: &str = "biosphere.water_vapor";
 pub const CONDENSATE: &str = "biosphere.condensate";
 pub const CONSUMER_CARBON: &str = "biosphere.consumer_carbon";

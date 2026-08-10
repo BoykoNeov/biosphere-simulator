@@ -32,6 +32,7 @@ from domains.biosphere.loader import (
     load_canopy_params,
     load_decomposition_params,
     load_herbivory_params,
+    load_humification_params,
     load_microbial_respiration_params,
     load_nitrogen_params,
     load_phenology_params,
@@ -73,6 +74,7 @@ def _scalars() -> list[tuple[str, float]]:
     nitro = load_nitrogen_params()
     decomp = load_decomposition_params()
     micro = load_microbial_respiration_params()
+    humi = load_humification_params()
     water = load_water_cycle_params()
     herb = load_herbivory_params()
     return [
@@ -122,6 +124,13 @@ def _scalars() -> list[tuple[str, float]]:
         ("decomp.decomposition_rate", decomp.decomposition_rate),
         ("micro.microbial_respiration_rate", micro.microbial_respiration_rate),
         ("micro.o2_half_saturation", micro.o2_half_saturation),
+        ("humi.litter_respired_fraction", humi.litter_respired_fraction),
+        (
+            "humi.active_stabilization_co2_fraction",
+            humi.active_stabilization_co2_fraction,
+        ),
+        ("humi.slow_respired_fraction", humi.slow_respired_fraction),
+        ("humi.slow_decomposition_rate", humi.slow_decomposition_rate),
         ("water.condensation_rate", water.condensation_rate),
         ("water.recycling_rate", water.recycling_rate),
         ("herb.grazing_rate", herb.grazing_rate),

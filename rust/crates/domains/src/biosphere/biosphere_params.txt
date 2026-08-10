@@ -53,6 +53,10 @@ nitro.dm_kg_per_mol_c	0x1.b54ea2543b621p-6
 decomp.decomposition_rate	0x1.6872b020c49bap-7
 micro.microbial_respiration_rate	0x1.0624dd2f1a9fcp-6
 micro.o2_half_saturation	0x1.a36e2eb1c432dp-14
+humi.litter_respired_fraction	0x1.ccccccccccccdp-2
+humi.active_stabilization_co2_fraction	0x1.b333333333333p-1
+humi.slow_respired_fraction	0x1.199999999999ap-1
+humi.slow_decomposition_rate	0x1.1c9d0d66576bap-11
 water.condensation_rate	0x1.0000000000000p-1
 water.recycling_rate	0x1.0000000000000p-1
 herb.grazing_rate	0x1.0624dd2f1a9fcp-8

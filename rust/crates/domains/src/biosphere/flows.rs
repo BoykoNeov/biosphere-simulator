@@ -482,12 +482,33 @@ impl Flow for Fertilization {
 
 // --- decomposer / nitrogen return / water cycle / consumer ------------------
 
-/// CARBON decay `litter_carbon -> microbial_carbon`.
+/// Split a decomposer carbon flux into `(respired, stabilized)` (mol C).
+///
+/// The single kernel all three humified flows share. The complement is computed by
+/// SUBTRACTION, never as `moved * (1 - f)`, so the two destination legs sum back to the
+/// withdrawal exactly in floating point and no partition round-off reaches the
+/// conservation gate.
+pub fn respired_and_stabilized(moved_c: f64, co2_fraction: f64) -> (f64, f64) {
+    let respired = moved_c * co2_fraction;
+    (respired, moved_c - respired)
+}
+
+/// CARBON+OXYGEN `litter_carbon + o2_pool -> carbon_pool + microbial_carbon`.
+///
+/// Single-currency CARBON until 2026-08-10 (the deliberate Phase-2 Step-4/5 split). The
+/// humification split gives it a CO2 leg and the composition gate forces the O2 draw that
+/// comes with it; the whole flux is `f_O2`-throttled, as `MicrobialRespiration` already
+/// was, because aerobic decomposition IS the O2-consuming process.
 pub struct Decomposition {
     pub id: String,
     pub litter_carbon: String,
     pub microbial_carbon: String,
+    pub co2_pool: String,
+    pub o2_pool: String,
     pub decomposition_rate: f64,
+    pub litter_respired_fraction: f64,
+    pub o2_half_saturation: f64,
+    pub air_mol: f64,
 }
 
 impl Flow for Decomposition {
@@ -500,10 +521,60 @@ impl Flow for Decomposition {
         _env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let decayed = self.decomposition_rate * amt(snapshot, &self.litter_carbon) * dt;
+        let f_o2 = science::oxygen_limitation_factor(
+            amt(snapshot, &self.o2_pool),
+            self.air_mol,
+            self.o2_half_saturation,
+        );
+        let decayed = self.decomposition_rate * amt(snapshot, &self.litter_carbon) * f_o2 * dt;
+        let (respired, stabilized) =
+            respired_and_stabilized(decayed, self.litter_respired_fraction);
         FlowResult::new(vec![
             leg(&self.litter_carbon, -decayed)?,
-            leg(&self.microbial_carbon, decayed)?,
+            leg(&self.microbial_carbon, stabilized)?,
+            leg(&self.co2_pool, respired)?,
+            leg(&self.o2_pool, -respired)?,
+        ])
+    }
+}
+
+/// CARBON+OXYGEN `humus_carbon + o2_pool -> carbon_pool + microbial_carbon`.
+///
+/// CENTURY's slow-SOM decomposition at `K6`, partitioned by `slow_respired_fraction`.
+pub struct HumusDecomposition {
+    pub id: String,
+    pub humus_carbon: String,
+    pub microbial_carbon: String,
+    pub co2_pool: String,
+    pub o2_pool: String,
+    pub slow_decomposition_rate: f64,
+    pub slow_respired_fraction: f64,
+    pub o2_half_saturation: f64,
+    pub air_mol: f64,
+}
+
+impl Flow for HumusDecomposition {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let f_o2 = science::oxygen_limitation_factor(
+            amt(snapshot, &self.o2_pool),
+            self.air_mol,
+            self.o2_half_saturation,
+        );
+        let decayed = amt(snapshot, &self.humus_carbon) * self.slow_decomposition_rate * f_o2 * dt;
+        let (respired, stabilized) = respired_and_stabilized(decayed, self.slow_respired_fraction);
+        FlowResult::new(vec![
+            leg(&self.humus_carbon, -decayed)?,
+            leg(&self.microbial_carbon, stabilized)?,
+            leg(&self.co2_pool, respired)?,
+            leg(&self.o2_pool, -respired)?,
         ])
     }
 }
@@ -512,9 +583,11 @@ impl Flow for Decomposition {
 pub struct MicrobialRespiration {
     pub id: String,
     pub microbial_carbon: String,
+    pub humus_carbon: String,
     pub co2_pool: String,
     pub o2_pool: String,
     pub microbial_respiration_rate: f64,
+    pub active_stabilization_co2_fraction: f64,
     pub o2_half_saturation: f64,
     pub air_mol: f64,
 }
@@ -534,10 +607,14 @@ impl Flow for MicrobialRespiration {
             self.air_mol,
             self.o2_half_saturation,
         );
-        let respired =
+        let turned =
             self.microbial_respiration_rate * amt(snapshot, &self.microbial_carbon) * f_o2 * dt;
+        // `Es` of the turnover leaves as CO2; the rest is stabilised into slow SOM.
+        let (respired, stabilized) =
+            respired_and_stabilized(turned, self.active_stabilization_co2_fraction);
         FlowResult::new(vec![
-            leg(&self.microbial_carbon, -respired)?,
+            leg(&self.microbial_carbon, -turned)?,
+            leg(&self.humus_carbon, stabilized)?,
             leg(&self.co2_pool, respired)?,
             leg(&self.o2_pool, -respired)?,
         ])
@@ -615,8 +692,13 @@ pub struct LitterNitrogenTransfer {
     pub id: String,
     pub litter_n: String,
     pub microbial_n: String,
+    pub soil_n: String,
     pub litter_carbon: String,
+    pub o2_pool: String,
     pub decomposition_rate: f64,
+    pub litter_respired_fraction: f64,
+    pub o2_half_saturation: f64,
+    pub air_mol: f64,
 }
 
 impl Flow for LitterNitrogenTransfer {
@@ -630,12 +712,23 @@ impl Flow for LitterNitrogenTransfer {
         dt: f64,
     ) -> Result<FlowResult, SimError> {
         let litter_c = amt(snapshot, &self.litter_carbon);
-        // The identical flux Decomposition sends litter_carbon -> microbial_carbon.
-        let decomposed = self.decomposition_rate * litter_c * dt;
+        // The identical flux Decomposition decays out of litter_carbon -- f_O2 included,
+        // which the carbon side gained with its CO2 leg (the humification split).
+        let f_o2 = science::oxygen_limitation_factor(
+            amt(snapshot, &self.o2_pool),
+            self.air_mol,
+            self.o2_half_saturation,
+        );
+        let decomposed = self.decomposition_rate * litter_c * f_o2 * dt;
         let moved = carried_nitrogen(decomposed, amt(snapshot, &self.litter_n), litter_c);
+        // N follows the CARBON partition: the respired share mineralizes to soil_n, the
+        // stabilised share carries its nitrogen into microbial biomass.
+        let (mineralized, transferred) =
+            respired_and_stabilized(moved, self.litter_respired_fraction);
         FlowResult::new(vec![
             leg(&self.litter_n, -moved)?,
-            leg(&self.microbial_n, moved)?,
+            leg(&self.microbial_n, transferred)?,
+            leg(&self.soil_n, mineralized)?,
         ])
     }
 }
@@ -649,9 +742,11 @@ pub struct MicrobialNitrogenRelease {
     pub id: String,
     pub microbial_n: String,
     pub soil_n: String,
+    pub humus_n: String,
     pub microbial_carbon: String,
     pub o2_pool: String,
     pub microbial_respiration_rate: f64,
+    pub active_stabilization_co2_fraction: f64,
     pub o2_half_saturation: f64,
     pub air_mol: f64,
 }
@@ -673,11 +768,58 @@ impl Flow for MicrobialNitrogenRelease {
             self.air_mol,
             self.o2_half_saturation,
         );
-        let respired = self.microbial_respiration_rate * microbial_c * f_o2 * dt;
-        let moved = carried_nitrogen(respired, amt(snapshot, &self.microbial_n), microbial_c);
+        let turned = self.microbial_respiration_rate * microbial_c * f_o2 * dt;
+        let moved = carried_nitrogen(turned, amt(snapshot, &self.microbial_n), microbial_c);
+        let (mineralized, stabilized) =
+            respired_and_stabilized(moved, self.active_stabilization_co2_fraction);
         FlowResult::new(vec![
             leg(&self.microbial_n, -moved)?,
-            leg(&self.soil_n, moved)?,
+            leg(&self.soil_n, mineralized)?,
+            leg(&self.humus_n, stabilized)?,
+        ])
+    }
+}
+
+/// NITROGEN `humus_n -> soil_n + microbial_n`, carried by the decayed slow-SOM carbon.
+///
+/// The N leg of `HumusDecomposition`, and the third member of the carried-nitrogen
+/// family: no nitrogen rate exists anywhere in the decomposer chain.
+pub struct HumusNitrogenRelease {
+    pub id: String,
+    pub humus_n: String,
+    pub soil_n: String,
+    pub microbial_n: String,
+    pub humus_carbon: String,
+    pub o2_pool: String,
+    pub slow_decomposition_rate: f64,
+    pub slow_respired_fraction: f64,
+    pub o2_half_saturation: f64,
+    pub air_mol: f64,
+}
+
+impl Flow for HumusNitrogenRelease {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let humus_c = amt(snapshot, &self.humus_carbon);
+        let f_o2 = science::oxygen_limitation_factor(
+            amt(snapshot, &self.o2_pool),
+            self.air_mol,
+            self.o2_half_saturation,
+        );
+        let decayed = humus_c * self.slow_decomposition_rate * f_o2 * dt;
+        let moved = carried_nitrogen(decayed, amt(snapshot, &self.humus_n), humus_c);
+        let (mineralized, returned) = respired_and_stabilized(moved, self.slow_respired_fraction);
+        FlowResult::new(vec![
+            leg(&self.humus_n, -moved)?,
+            leg(&self.soil_n, mineralized)?,
+            leg(&self.microbial_n, returned)?,
         ])
     }
 }
