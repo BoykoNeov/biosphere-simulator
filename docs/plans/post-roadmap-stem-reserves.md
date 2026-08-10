@@ -34,6 +34,13 @@ at any single mid-season step only **two** do, because the maintenance draw is
 CONDITIONAL — it opens only on days when assimilation does not cover upkeep. The pin
 measures all three over the whole trajectory and asserts them apart.
 
+⚠ And the frequency of that conditional door is **scenario-dependent, so it too is
+measured on two scenarios rather than stated flat off the one in hand** (an advisor
+catch): it is open on **9.5 %** of `open_season`'s days and **63.7 %** of
+`sealed_chamber`'s — a factor of ~7. A one-snapshot count is therefore not merely wrong,
+it is *unstably* wrong: in the sealed chamber a random snapshot would usually have said
+three. In neither scenario is it always open, which is the part that does generalise.
+
 The consequence is visible against the committed oracle fixture (`allocation.py`'s own
 docstring: TWSO ≈ 11.5 of TAGP ≈ 20.4 t/ha ⇒ harvest index ≈ 0.564). The frozen crop's
 grain **fraction** is **0.84×** that, and its grain **mass** is **0.52×**. ⚠ Those are two

@@ -538,7 +538,14 @@ def test_the_frozen_stem_never_stops_growing_and_has_no_door_to_the_grain() -> N
     flows reference `stem_c`; only **three** emit a leg on it. Growth respiration and
     nitrogen uptake read it — for the shared carbon budget and for the nitrogen demand's
     denominator — and move none of its carbon. The doors are MEASURED, by evaluating
-    every flow against a real mid-season snapshot, not read off the type declarations.
+    every flow against every step of a real trajectory, not read off the declarations.
+
+    ⚠ And the maintenance door is CONDITIONAL — it opens only on days when assimilation
+    does not cover upkeep — so a **one-snapshot** reading counts two. That is not just
+    wrong, it is *unstably* wrong: the door is open on **9.5 %** of `open_season`'s days
+    and **63.7 %** of `sealed_chamber`'s, so which answer a single snapshot gives
+    depends on the scenario. Both are measured below, rather than the frequency being
+    stated flat off the one scenario that happened to be in hand.
     """
     states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1)
     assert rationed == 0
@@ -564,39 +571,58 @@ def test_the_frozen_stem_never_stops_growing_and_has_no_door_to_the_grain() -> N
         "biosphere.nitrogen_uptake",
     }
 
-    # ⚠ Measured over the WHOLE trajectory, not at one snapshot. A single mid-season
-    # step reports only TWO doors, because maintenance draws on the stem only on days
-    # when assimilation does not cover it — a CONDITIONAL door. Reading the count off
-    # one step would have made "three doors" look wrong; reading it off the type
-    # declarations would have made it look like five. Neither is the quantity.
-    resolver = weather_resolver(_weather(1), sc.DEFAULT_SCENARIO)
-    doors: set[str] = set()
-    always_open: set[str] = set()
-    both_legs = 0
-    for i, snap in enumerate(states[:-1]):
-        env = resolver.bind(snap, 1.0)
-        here = set()
-        for f in registry.flows:
-            legs = f.evaluate(snap, env, 1.0).legs
-            stem_leg = next((leg for leg in legs if leg.stock == STEM_C), None)
-            if stem_leg is None:
-                continue
-            here.add(str(f.id))
-            grain_leg = next((leg for leg in legs if leg.stock == STORAGE_C), None)
-            if grain_leg is not None:
-                # Allocation names both stocks — but it DEPOSITS into each from the
-                # atmosphere. No flow withdraws from the stem and deposits into grain.
-                assert stem_leg.amount >= 0.0 and grain_leg.amount >= 0.0
-                both_legs += 1
-        doors |= here
-        always_open = here if i == 0 else (always_open & here)
-    assert doors == {
-        "biosphere.allocation",
-        "biosphere.maintenance_respiration",
-        "biosphere.senescence",
-    }
-    assert always_open == {"biosphere.allocation", "biosphere.senescence"}
-    assert both_legs > 0  # the "deposits into both" case really does occur
+    # ⚠ Measured over the WHOLE trajectory, not at one snapshot, and on TWO scenarios,
+    # because how often the conditional door is open is scenario-dependent.
+    def _door_census(scenario, years, traj):
+        _s, reg = build_season(scenario)
+        res = weather_resolver(_weather(years), scenario)
+        ever: set[str] = set()
+        always: set[str] | None = None
+        maint_days = 0
+        both_legs = 0
+        for snap in traj[:-1]:
+            env = res.bind(snap, 1.0)
+            here: set[str] = set()
+            for f in reg.flows:
+                legs = f.evaluate(snap, env, 1.0).legs
+                stem_leg = next((leg for leg in legs if leg.stock == STEM_C), None)
+                if stem_leg is None:
+                    continue
+                here.add(str(f.id))
+                grain_leg = next((leg for leg in legs if leg.stock == STORAGE_C), None)
+                if grain_leg is not None:
+                    # Allocation names both stocks — but it DEPOSITS into each from the
+                    # atmosphere. No flow moves stem carbon into the grain.
+                    assert stem_leg.amount >= 0.0 and grain_leg.amount >= 0.0
+                    both_legs += 1
+            if "biosphere.maintenance_respiration" in here:
+                maint_days += 1
+            ever |= here
+            always = here if always is None else (always & here)
+        return ever, (always or set()), maint_days / (len(traj) - 1), both_legs
+
+    sealed, _r, _e = _run(sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS)
+    for scenario, years, traj, expected_rate in (
+        (sc.DEFAULT_SCENARIO, 1, states, 0.0951),
+        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, sealed, 0.6371),
+    ):
+        ever, always, rate, both_legs = _door_census(scenario, years, traj)
+        assert ever == {
+            "biosphere.allocation",
+            "biosphere.maintenance_respiration",
+            "biosphere.senescence",
+        }
+        # The maintenance door is never ALWAYS open in either scenario…
+        assert always == {"biosphere.allocation", "biosphere.senescence"}
+        # …but how often it IS open swings by a factor of ~7 between them, which is why
+        # a one-snapshot count is unstably wrong rather than merely wrong.
+        assert rate == pytest.approx(expected_rate, rel=1e-2)
+        assert both_legs > 0  # the "deposits into both" case really does occur
+    _open_rate = _door_census(sc.DEFAULT_SCENARIO, 1, states)[2]
+    _sealed_rate = _door_census(
+        sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, sealed
+    )[2]
+    assert _sealed_rate / _open_rate > 6.0
 
 
 # =====================================================================================
@@ -864,7 +890,11 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
             (sc.CONSUMER_CHAMBER_SCENARIO, sc.CONSUMER_CHAMBER_YEARS, True),
         ):
             _s, rationed, events = _run(
-                scen, years, resets=resets, reserve=True, **form
+                scen,
+                years,
+                resets=resets,
+                reserve=True,
+                **form,  # type: ignore[arg-type]
             )
             assert rationed == 0 and events == ()
         # RK4 is the integrator that killed the full (C) form on this same chamber.
