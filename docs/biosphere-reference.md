@@ -268,6 +268,32 @@ so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-08-10 — the decade CO₂ guard re-anchored: one `liveness_floors` entry's `bound` and
+  `source`, and nothing else.** `docs/plans/post-roadmap-co2-guard-reanchor.md`. No value, no
+  golden, no param hash, no `flow_set`/`param_files` change — the smallest unfreeze this
+  contract has taken, and it is a **tightening**.
+
+  The floor on `perennial_long_horizon`'s annual minimum CO₂ pool skipped the first
+  `_TRANSIENT = 2` years. Measured on the current tree, that window is **inert**: the
+  whole-run minimum is 0.055175 (year 1) = **1.103×** the 0.05 floor and no year dips below
+  it, so the slice constrained nothing on the reference and constrained only candidate
+  changes. It is removed; `non_collapsing(whole)` implies `non_collapsing(sliced)`, so the
+  teeth cannot decrease.
+
+  The bound's justification moved from a 15-year reading to the trough's **measured
+  attractor** (0.0732912, 1.47× the floor, converged; the CUE build's own idiom for the
+  `> 0.55` floor), with the deepest year of a 50-year run pinned as lying **inside** the
+  frozen horizon. The comment the window carried — *"dips to ~0.039 … before settling to
+  ~0.055"* — was pre-split prose the CUE build's four-guard restatement missed; it and two
+  further sites that quoted pre-split CO₂ numbers are corrected.
+
+  ⚠ The guard was also measured **not** to detect what it claimed: slowing the recycling loop
+  — the drain mechanism itself — moves the trough the *wrong way* (0.055175 → 0.057797 at
+  half the microbial rate), as does starting the chamber CO₂-poor. It is a **buffer**-vs-peak-
+  demand guard, and the lever that trips it is jar size at fixed composition. That negative
+  result is committed as a test, and it is what gives the "the level check catches what
+  `is_stationary` is blind to" claim a witness that is not a candidate science change.
+
 - **2026-08-10 — the humification split (a CUE): +1 param file, +2 flows, +2 stocks, 6
   biosphere goldens, and 4 restated guards.** `docs/plans/post-roadmap-cue-humification.md`.
   The seam the soil-fractionation diagnosis named as its own replacement. Every decomposer

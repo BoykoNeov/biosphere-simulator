@@ -44,6 +44,7 @@ change: ``drift.py`` is a domain module, the RK4 run instantiates the already-sh
 JSON weather; no PCSE).
 """
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -61,6 +62,7 @@ from domains.biosphere.drift import (
     same_phase_diffs,
     year_summaries,
 )
+from domains.biosphere.microbial_respiration import MicrobialRespiration
 from domains.biosphere.season import (
     CARBON_POOL,
     CONSUMER_CARBON,
@@ -75,6 +77,7 @@ from domains.biosphere.season import (
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.quantities import BALANCE_ATOL, Quantity
+from simcore.registry import Registry
 from simcore.state import State
 
 _WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
@@ -309,13 +312,44 @@ def test_decade_consumer_biomass_is_stationary_and_alive(runs) -> None:
     scenario="perennial_long_horizon",
     field="liveness_floors",
     quantity="annual minimum chamber CO2 pool (mol C)",
-    bound="non_collapsing(floor=0.05) past the sow-in transient",
-    source="self — the guard stem-only tripped at 0.01619 WHILE STAYING STATIONARY",
+    bound="non_collapsing(floor=0.05)",
+    source="self — anchored on the MEASURED trough attractor 0.0732912 "
+    "(converged well before yr 50, 1.47x the floor), not on a 15-yr reading; "
+    "teeth witnessed by a mutation independent of any candidate science change "
+    "(the jar shrunk 0.8x at fixed composition trips it at 0.044941). "
+    "Window removed: floor[2:] -> floor",
 )
 def test_decade_min_carbon_pool_stationary(runs) -> None:
-    # Chamber CO2 pool (the producer's only carbon source when sealed) never runs dry
-    # and its per-year minimum reaches a stationary attractor — closure is not slowly
-    # draining the atmosphere into biomass.
+    # Chamber CO2 pool (the producer's only carbon source when sealed): its per-year
+    # minimum stays bounded + non-amplifying, and never approaches exhaustion.
+    #
+    # ⚠ WHAT THIS GUARD ACTUALLY DETECTS — measured, not inherited (2026-08-10). This
+    # comment used to say "closure is not slowly draining the atmosphere into biomass".
+    # That is false as a description of what the floor catches: the drain mechanism is
+    # the recycling loop, and slowing it moves this trough the WRONG WAY — see
+    # ``test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply``, which pins
+    # that negative result so the next reader does not conclude the guard is toothless
+    # from a green bar. What the floor tracks is the chamber's BUFFER against the crop's
+    # peak demand: the same ``biosphere.carbon_pool`` the acceptance-gate census found
+    # binding in all six sealed scenarios.
+    #
+    # ⚠ THE ``[_TRANSIENT:]`` WINDOW WAS REMOVED FROM THE FLOOR (2026-08-10), and
+    # this is a TIGHTENING: ``non_collapsing(whole)`` implies
+    # ``non_collapsing(sliced)``, so the teeth cannot decrease. It was added by the
+    # scope-B decomposer calibration under the comment "the year-2 CO2 minimum dips
+    # to ~0.039 during soil establishment before settling to ~0.055" — both numbers
+    # belong to the PRE-humification-split tree. Measured on the current tree: the
+    # whole-run minimum is 0.055175 (year 1) = 1.103x the floor and NO year dips
+    # below it, so the slice constrained nothing on the frozen tree. A window that is
+    # inert on the reference and load-bearing only on candidates is the one shape a
+    # frozen contract's guard must not have.
+    #
+    # ``transient=_TRANSIENT`` STAYS in the stationarity call, deliberately: its
+    # binding same-phase diff (0.013618, 90 % of bound) sits at index 2 and is NOT
+    # dropped by the window, so removing it there buys an identical constraint at
+    # the cost of the
+    # remaining headroom. Inertness justified removing a slice that was hiding a
+    # candidate's failure; nothing is hidden behind this one.
     states, _, _ = runs[("perennial", "euler")]
     summaries = year_summaries(states, _YEAR, _min_carbon_pool)
     diffs = same_phase_diffs(summaries, period=2)
@@ -323,11 +357,11 @@ def test_decade_min_carbon_pool_stationary(runs) -> None:
     assert is_stationary(
         diffs, bound=0.2 * scale, slope_tol=0.02 * scale, transient=_TRANSIENT
     )
-    # Floor past the ``_TRANSIENT`` sow-in years (as the paired is_stationary): the
-    # scope-B decomposer calibration slows carbon recycling, so the year-2 CO2 minimum
-    # dips to ~0.039 during soil establishment before settling to ~0.055 (> 0.05) — the
-    # settled attractor still clears the floor; only the sow-in transient dips below it.
-    assert non_collapsing(summaries[_TRANSIENT:], floor=0.05)
+    # The floor is anchored on the trough's MEASURED attractor (0.0732912, 1.47x it),
+    # not on this horizon's reading — see the beyond-horizon test below, which also
+    # pins that the deepest year of a 50-year run lies INSIDE the frozen 15, so this
+    # window sees the worst case rather than assuming it.
+    assert non_collapsing(summaries, floor=0.05)
 
 
 # --- axis (c): closure carried over the full horizon, BOTH integrators -------
@@ -436,3 +470,166 @@ def test_the_perennial_decline_has_a_floor_beyond_the_frozen_horizon() -> None:
     assert settled[-1] == pytest.approx(0.594984, abs=1e-5)
     # And that equilibrium is what the 0.55 liveness floor is anchored below.
     assert settled[-1] > 0.55
+
+
+@pytest.mark.slow
+def test_the_chamber_co2_trough_has_an_attractor_beyond_the_frozen_horizon() -> None:
+    """The anchor under the 0.05 floor — measured, not read off the frozen horizon.
+
+    The sibling of ``test_the_perennial_decline_has_a_floor_beyond_the_frozen_horizon``,
+    written for the same reason and against the same hazard: the humification split
+    lengthened the chamber's settling transient to ~35 years, so a bound justified by
+    a 15-year reading is a bound justified by a number the tree has not finished
+    producing. ``test_decade_min_carbon_pool_stationary``'s floor is anchored here.
+
+    Beyond-horizon is DIAGNOSTIC, never a gate: nothing here is frozen and the frozen
+    contract's horizon is unchanged at 15 years.
+
+    Two claims, and the second is the one that licenses the in-horizon guard:
+
+    * the per-year CO2 trough **converges**, to 0.0732912 — 1.47x the floor, so the
+      floor is anchored below a measured attractor rather than beside a passing reading;
+    * the deepest year of a 50-year run lies **inside** the frozen 15, so the frozen
+      window sees the worst case instead of assuming it. Without this the removed
+      ``[_TRANSIENT:]`` slice could have been trading one blind spot for another.
+    """
+    years = 50
+    weather = _weather() * years
+    state, registry = build_season(PERENNIAL_CHAMBER_SCENARIO)
+    resolver = weather_resolver(weather, PERENNIAL_CHAMBER_SCENARIO)
+    states, rationed, events = run_perennial(
+        EulerIntegrator(registry),
+        state,
+        PERENNIAL_CHAMBER_SCENARIO,
+        resolver,
+        1.0,
+        len(weather),
+        year=_YEAR,
+    )
+    assert rationed == 0 and events == ()
+    summaries = year_summaries(states, _YEAR, _min_carbon_pool)
+    settled = summaries[-5:]
+    assert max(settled) - min(settled) < 1e-6  # converged
+    assert settled[-1] == pytest.approx(0.0732912, abs=1e-6)
+    assert settled[-1] / 0.05 > 1.4  # and the floor sits well below the attractor
+
+    # The worst year of the fifty is the sow-in year, INSIDE the frozen horizon. This is
+    # what makes the 15-year floor a check on the deepest draw rather than on whichever
+    # part of the trajectory the horizon happens to include.
+    worst = min(range(len(summaries)), key=lambda i: summaries[i])
+    assert worst < DECADE_YEARS
+    assert summaries[worst] == pytest.approx(0.055175, rel=1e-3)
+
+
+@pytest.mark.slow
+def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
+    """A committed NEGATIVE result: the two obvious ways to starve the loop fail.
+
+    ``test_decade_min_carbon_pool_stationary``'s floor reads like a carbon-supply
+    guard, so the natural way to check its teeth is to cut the supply — start the
+    chamber with less CO2, or slow the microbial return that recycles litter back
+    into it. **Both make the trough SHALLOWER**, because everything downstream
+    self-limits: less carbon reaching the plant grows a smaller plant, which draws
+    less. A reader who tried either lever would get a green bar and conclude the
+    guard is toothless.
+
+    That is worth a test rather than a paragraph for the reason ``docs/retired/
+    mineralization.yaml`` exists: a stale negative result suppresses the next search,
+    and a counterintuitive one suppresses it hardest.
+
+    What DOES move the trough is the buffer against peak demand — shrink the jar at
+    fixed composition (the consumer-chamber idiom run backwards, so Ci0 and x_O2 are
+    invariant and it is a smaller chamber holding the same atmosphere) and the floor
+    fires. The
+    0.7x case fires **while stationarity passes**, which is the "the level check catches
+    what ``is_stationary`` is blind to" claim witnessed by a mutation that is not a
+    candidate science change — so the guard's teeth do not rest on the one change its
+    verdict is being used to refuse.
+    """
+
+    def trough(
+        scenario, *, micro_factor: float = 1.0
+    ) -> tuple[list[float], bool, bool]:
+        weather = _weather() * DECADE_YEARS
+        state, registry = build_season(scenario)
+        if micro_factor != 1.0:
+            flows, hits = [], 0
+            for f in registry.flows:
+                if isinstance(f, MicrobialRespiration):
+                    rate = f.params.microbial_respiration_rate * micro_factor
+                    flows.append(
+                        dataclasses.replace(
+                            f,
+                            params=dataclasses.replace(
+                                f.params, microbial_respiration_rate=rate
+                            ),
+                        )
+                    )
+                    hits += 1
+                else:
+                    flows.append(f)
+            assert hits == 1, "the mutation is a no-op — the probe proves nothing"
+            registry = Registry(flows, state.stocks, registry.aux_processes)  # type: ignore[arg-type]
+        resolver = weather_resolver(weather, scenario)
+        states, _, _ = run_perennial(
+            EulerIntegrator(registry),
+            state,
+            scenario,
+            resolver,
+            1.0,
+            len(weather),
+            year=_YEAR,
+        )
+        summaries = year_summaries(states, _YEAR, _min_carbon_pool)
+        scale = max(summaries)
+        return (
+            summaries,
+            non_collapsing(summaries, floor=0.05),
+            is_stationary(
+                same_phase_diffs(summaries, period=2),
+                bound=0.2 * scale,
+                slope_tol=0.02 * scale,
+                transient=_TRANSIENT,
+            ),
+        )
+
+    def shrink(factor: float):
+        p = PERENNIAL_CHAMBER_SCENARIO
+        return dataclasses.replace(
+            p,
+            chamber_air_mol=p.chamber_air_mol * factor,
+            chamber_co2_mol0=p.chamber_co2_mol0 * factor,
+            chamber_o2_mol0=p.chamber_o2_mol0 * factor,
+        )
+
+    frozen, frozen_floor, _ = trough(PERENNIAL_CHAMBER_SCENARIO)
+    assert min(frozen) == pytest.approx(0.055175, rel=1e-3) and frozen_floor
+
+    # (1) Halve the microbial CO2 return — the actual drain mechanism. The trough RISES.
+    slow_return, slow_floor, _ = trough(PERENNIAL_CHAMBER_SCENARIO, micro_factor=0.5)
+    assert min(slow_return) > min(frozen)
+    assert min(slow_return) == pytest.approx(0.057797, rel=1e-3)
+    assert slow_floor, "slowing the recycling loop does NOT trip the floor"
+
+    # (2) Start with 20 % less CO2 in the same jar. The trough RISES here too.
+    lean = dataclasses.replace(
+        PERENNIAL_CHAMBER_SCENARIO,
+        chamber_co2_mol0=PERENNIAL_CHAMBER_SCENARIO.chamber_co2_mol0 * 0.8,
+    )
+    less_co2, less_floor, _ = trough(lean)
+    assert min(less_co2) > min(frozen)
+    assert min(less_co2) == pytest.approx(0.058757, rel=1e-3)
+    assert less_floor, "starting the chamber CO2-poor does NOT trip the floor"
+
+    # (3) The buffer. A 0.8x jar at the same composition trips it...
+    small, small_floor, _ = trough(shrink(0.8))
+    assert min(small) == pytest.approx(0.044941, rel=1e-3)
+    assert not small_floor
+
+    # ...and at 0.7x it trips WHILE STATIONARITY PASSES — a clean attractor in the
+    # wrong place, which is exactly the failure ``is_stationary`` cannot see.
+    # Witnessed by a jar-size mutation, so the claim is independent of any candidate.
+    smaller, smaller_floor, smaller_stationary = trough(shrink(0.7))
+    assert min(smaller) == pytest.approx(0.045871, rel=1e-3)
+    assert not smaller_floor
+    assert smaller_stationary

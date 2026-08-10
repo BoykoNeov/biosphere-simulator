@@ -1228,11 +1228,20 @@ def test_stem_only_collapses_the_decade_co2_attractor_below_its_floor() -> None:
     """The second, independent closure failure: the settled attractor, not a transient.
 
     ``test_decade_stability.test_decade_min_carbon_pool_stationary`` pins the per-year
-    CO2 minimum past the sow-in transient above a 0.05 floor. The frozen tree settles at
-    **0.05484** (min past the transient 0.054208 — reproduced here, and validated
-    against that test's own comment, "dips to ~0.039 … settling to ~0.055", before it
-    was trusted: finding 10's rule). Stem-only settles at **0.01619**, missing the floor
-    by 3.4x.
+    CO2 minimum above a 0.05 floor. The frozen tree settled at **0.05484** (min past the
+    transient 0.054208 — reproduced here, and validated against that test's own comment,
+    "dips to ~0.039 … settling to ~0.055", before it was trusted: finding 10's rule).
+    Stem-only settled at **0.01619**, missing the floor by 3.4x.
+
+    ⚠ EVERY NUMBER IN THE PARAGRAPH ABOVE BELONGS TO THE PRE-HUMIFICATION-SPLIT TREE,
+    and so does the comment it validated against — which no longer exists, being the
+    stale prose the guard's 2026-08-10 re-anchor removed. Kept rather than deleted
+    because the *method* is the point (reconstruct a frozen quantity only to CHECK it
+    against the recorded one). The current readings are in the assertions below and in
+    the re-measurement note after them. The guard also no longer skips the sow-in years:
+    its window was measured inert on the frozen tree and removed, which is a tightening,
+    so the ``[2:]`` slice this test used to mirror is gone here too. Stem-only's verdict
+    is unchanged either way — it misses at year 2, inside and outside the window.
 
     ⚠ And it does so while STAYING STATIONARY — a clean attractor in the wrong place.
     That is a different failure mode from the combined (C) form, which lost stationarity
@@ -1256,7 +1265,7 @@ def test_stem_only_collapses_the_decade_co2_attractor_below_its_floor() -> None:
         scale = max(summaries)
         out[label] = (
             summaries,
-            non_collapsing(summaries[2:], floor=0.05),
+            non_collapsing(summaries, floor=0.05),
             is_stationary(
                 same_phase_diffs(summaries, period=2),
                 bound=0.2 * scale,

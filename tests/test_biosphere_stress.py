@@ -344,6 +344,12 @@ def test_stress_perennial_fixed_point_sustained(runs) -> None:
     # equilibrium (0.594984) rather than on the horizon's reading, and kept 2.2x above
     # the 0.253 dead baseline. Same reasoning, same number, as the manifest-named floor
     # in ``test_decade_stability`` — the two must not drift apart.
+    # ⚠ The parenthetical "CO2min 0.039" above is pre-split too, and is left in place
+    # because the sentence it sits in is about what the decomposer calibration did. On
+    # the current tree the perennial chamber's deepest per-year CO2 minimum is 0.055175
+    # and its trough converges to 0.0732912 — measured in
+    # ``test_decade_stability::test_the_chamber_co2_trough_has_an_attractor_beyond_the_
+    # frozen_horizon``, which is where that floor is now anchored.
     assert max(tail) > 0.55
 
 

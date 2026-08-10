@@ -54,10 +54,10 @@
     "perennial_chamber": [],
     "perennial_long_horizon": [
       {
-        "bound": "non_collapsing(floor=0.05) past the sow-in transient",
+        "bound": "non_collapsing(floor=0.05)",
         "locus": "tests/test_decade_stability.py::test_decade_min_carbon_pool_stationary",
         "quantity": "annual minimum chamber CO2 pool (mol C)",
-        "source": "self \u2014 the guard stem-only tripped at 0.01619 WHILE STAYING STATIONARY"
+        "source": "self \u2014 anchored on the MEASURED trough attractor 0.0732912 (converged well before yr 50, 1.47x the floor), not on a 15-yr reading; teeth witnessed by a mutation independent of any candidate science change (the jar shrunk 0.8x at fixed composition trips it at 0.044941). Window removed: floor[2:] -> floor"
       },
       {
         "bound": "non_collapsing(floor=0.05)",
