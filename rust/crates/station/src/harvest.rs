@@ -10,7 +10,9 @@
 
 use std::collections::BTreeMap;
 
-use domains::biosphere::stocks::{CARBON_POOL, LITTER_CARBON, O2_POOL, STORAGE_C, THERMAL_TIME};
+use domains::biosphere::stocks::{
+    CARBON_POOL, LITTER_CARBON, O2_POOL, ROOTED_DEPTH, STORAGE_C, THERMAL_TIME,
+};
 use domains::crew::{CrewParams, FECAL_WASTE, FOOD_STORE};
 use domains::eclss::EclssParams;
 use simcore::environment::SourceResolver;
@@ -55,7 +57,11 @@ pub fn build_harvest(
         gh_state.n,
         gh_state.stocks.clone(),
         gh_state.rng_seed,
-        BTreeMap::from([(THERMAL_TIME.to_string(), scenario.thermal_time0)]),
+        BTreeMap::from([
+            (THERMAL_TIME.to_string(), scenario.thermal_time0),
+            // Goes with thermal_time0: a crop started past anthesis has finished rooting.
+            (ROOTED_DEPTH.to_string(), scenario.rooted_depth0),
+        ]),
     )?;
 
     // (2) Rebuild the cabin flows (the Rust Registry does not lend out owned flows) and

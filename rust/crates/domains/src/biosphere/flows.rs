@@ -415,6 +415,11 @@ pub struct NitrogenUptake {
     pub n_target_w_plateau: f64,
     pub dm_kg_per_mol_c: f64,
     pub ground_area: f64,
+    /// The root-functional-coupling gate: the accumulator naming rooted depth, and the
+    /// reference layer it is measured against (scenario/soil data). Measured
+    /// bit-identically inert on the frozen roster - see the Python root_depth.py.
+    pub rooted_depth_aux: String,
+    pub soil_layer_depth: f64,
     pub sn_residual: f64,
     pub sn_critical: f64,
 }
@@ -448,7 +453,15 @@ impl Flow for NitrogenUptake {
             self.sn_residual,
             self.sn_critical,
         );
-        let capacity = self.max_uptake_capacity * self.ground_area * availability;
+        let root_access = science::root_zone_fraction(
+            snapshot
+                .aux
+                .get(&self.rooted_depth_aux)
+                .copied()
+                .unwrap_or(0.0),
+            self.soil_layer_depth,
+        );
+        let capacity = self.max_uptake_capacity * self.ground_area * availability * root_access;
         let flux = deficit.min(capacity) * dt;
         FlowResult::new(vec![leg(&self.soil_n, -flux)?, leg(&self.plant_n, flux)?])
     }
@@ -1029,6 +1042,58 @@ impl AuxProcess for ThermalTimeAccumulation {
 /// prescribes crown temperature but notes the two differ only under snow cover, and no
 /// snow forcing exists. De-vernalization (Eqn 8.5) needs daily MAXIMUM temperature, which
 /// the forcing does not carry, so it is unimplementable rather than omitted.
+pub struct RootDepthExtension {
+    pub id: String,
+    pub accumulator: String,
+    pub thermal_time_aux: String,
+    pub temp_var: String,
+    pub soil_water: String,
+    pub params: params::RootDepthParams,
+    pub photo: params::PhotosynthesisParams,
+    pub pheno: params::PhenologyParams,
+    pub sw_wilting: f64,
+    pub sw_critical: f64,
+}
+
+impl AuxProcess for RootDepthExtension {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<BTreeMap<String, f64>, SimError> {
+        let depth = snapshot.aux.get(&self.accumulator).copied().unwrap_or(0.0);
+        // The cap is a RATE cut-off, not an increment clamp: the aux contract wants a
+        // dt-independent rate. Carried from Python deliberately - the port does not
+        // re-decide it (port-mirror-carries-rule-not-rationale).
+        if depth >= self.params.max_rooted_depth {
+            return Ok(BTreeMap::from([(self.accumulator.clone(), 0.0)]));
+        }
+        let tt = snapshot
+            .aux
+            .get(&self.thermal_time_aux)
+            .copied()
+            .unwrap_or(0.0);
+        let dvs =
+            science::development_stage(tt, self.pheno.tsum_anthesis, self.pheno.tsum_maturity);
+        // [E] p. 136: "Root growth generally stops around flowering".
+        if dvs >= 1.0 {
+            return Ok(BTreeMap::from([(self.accumulator.clone(), 0.0)]));
+        }
+        let f_temp = science::temperature_factor(env.get(&self.temp_var)?, &self.photo);
+        let f_water = science::water_stress_factor(
+            amt(snapshot, &self.soil_water),
+            self.sw_wilting,
+            self.sw_critical,
+        );
+        let rate = self.params.max_extension_rate * f_water * f_temp;
+        Ok(BTreeMap::from([(self.accumulator.clone(), rate * dt)]))
+    }
+}
+
 pub struct VernalizationAccumulation {
     pub id: String,
     pub accumulator: String,

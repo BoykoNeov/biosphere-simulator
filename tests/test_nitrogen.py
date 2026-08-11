@@ -34,6 +34,7 @@ from domains.biosphere.nitrogen import (
     nitrogen_stress_factor,
     soil_n_availability,
 )
+from domains.biosphere.stocks import ROOTED_DEPTH
 from simcore.environment import SourceResolver, constant
 from simcore.flow import assert_flow_balanced
 from simcore.ids import DomainId, FlowId, StockId
@@ -217,6 +218,12 @@ def _state(soil_n0: float, plant_n0: float = 0.0) -> State:
         n=0,
         stocks={_SOIL_N: soil, _PLANT_N: plant, _N_SOURCE: source, **organs},
         rng_seed=0,
+        # An established root system, so the root-zone gate is fully open (FROOT1 == 1)
+        # and every assertion below stays about the uptake law itself. Paired with the
+        # flow fixture's 1e-9 m reference layer. Leaving this out would set FROOT1 == 0
+        # and make every test here vacuous in the WORST way — a zero flow satisfies a
+        # surprising number of "the leg is X" assertions only because X computes to 0.
+        aux={ROOTED_DEPTH: 1.0},
     )
 
 
@@ -239,6 +246,13 @@ def _uptake_flow(ground_area: float = 1.0) -> NitrogenUptake:
         ground_area=ground_area,
         sn_residual=_SN_RESID,
         sn_critical=_SN_CRIT,
+        # The root-zone access gate (post-roadmap root functional coupling). These tests
+        # are about the UPTAKE law, so the gate is held fully open — a soil layer this
+        # thin is reached by any nonzero rooted depth, making FROOT1 == 1 and leaving
+        # every assertion below about exactly what it was about before the gate existed.
+        # The gate's own behaviour is pinned in tests/test_root_depth.py.
+        rooted_depth_aux=ROOTED_DEPTH,
+        soil_layer_depth=1e-9,
     )
 
 

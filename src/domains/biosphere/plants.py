@@ -34,6 +34,7 @@ from domains.biosphere.loader import (
     load_photoperiod_params,
     load_photosynthesis_params,
     load_respiration_params,
+    load_root_depth_params,
     load_senescence_params,
     load_transpiration_params,
     load_vernalization_params,
@@ -44,6 +45,7 @@ from domains.biosphere.phenology import (
     ThermalTimeAccumulation,
     VernalizationAccumulation,
 )
+from domains.biosphere.root_depth import RootDepthExtension
 from domains.biosphere.scenario import SeasonScenario
 from domains.biosphere.stocks import (
     CI_VAR,
@@ -56,6 +58,7 @@ from domains.biosphere.stocks import (
     PLANT_N,
     RN_VAR,
     ROOT_C,
+    ROOTED_DEPTH,
     SOIL_N,
     SOIL_WATER,
     SOIL_WATER_VAR,
@@ -212,6 +215,8 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             ground_area=scenario.ground_area,
             sn_residual=scenario.sn_residual,
             sn_critical=scenario.sn_critical,
+            rooted_depth_aux=ROOTED_DEPTH,
+            soil_layer_depth=scenario.soil_layer_depth,
         ),
     ]
     if scenario.sealed:
@@ -266,11 +271,31 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
         ),
         daylength_var=DAYLENGTH_VAR if scenario.photoperiod else None,
     )
-    aux: tuple[AuxProcess, ...] = (thermal_time,)
+    # The THIRD accumulator (post-roadmap root functional coupling): rooted depth,
+    # which gates NitrogenUptake's supply term. Unconditional — unlike
+    # vernalization/photoperiod
+    # it is not a crop-optional modifier; every crop roots. ⚠ It is bit-identically
+    # inert
+    # on every frozen scenario (see root_depth.py), so its presence here is what its
+    # unit-level pins protect, not any golden.
+    root_depth = RootDepthExtension(
+        id=AuxId("biosphere.rooted_depth"),
+        accumulator=ROOTED_DEPTH,
+        thermal_time_aux=THERMAL_TIME,
+        temp_var=TEMP_VAR,
+        soil_water=SOIL_WATER,
+        params=load_root_depth_params(crop.paths["root_depth"]),
+        photo=ctx.photo,
+        pheno=pheno,
+        sw_wilting=scenario.sw_wilting,
+        sw_critical=scenario.sw_critical,
+    )
+    aux: tuple[AuxProcess, ...] = (thermal_time, root_depth)
     if scenario.vernalization:
         assert vern is not None  # loaded just above when the flag is set
         aux = (
             thermal_time,
+            root_depth,
             VernalizationAccumulation(
                 id=AuxId("biosphere.vernalization_days"),
                 accumulator=VERNALIZATION_DAYS,

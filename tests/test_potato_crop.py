@@ -147,17 +147,27 @@ def _peak(series: list[float]) -> tuple[int, float]:
 # --- the crop is what it says it is -----------------------------------------
 
 
-def test_potato_overrides_exactly_three_files_and_shares_five() -> None:
+def test_potato_overrides_exactly_four_files_and_shares_five() -> None:
     # The honest-reuse claim, asserted rather than asserted-in-a-comment. Potato's own
-    # science is phenology, allocation and canopy; the other five fall back to the
-    # reference crop. The FvCB block in particular is SHARED, and that is defensible
-    # only because those twelve params were never wheat-specific — they are TODO(cite)
-    # placeholders tagged "literature-typical C3", and potato is a C3 plant. If someone
-    # later gives potato its own photosynthesis file, this test must be updated
-    # deliberately, which is the point.
+    # science is phenology, allocation, canopy and rooted depth; the other five fall
+    # back to the reference crop. The FvCB block in particular is SHARED, and that is
+    # defensible only because those twelve params were never wheat-specific — they are
+    # TODO(cite) placeholders tagged "literature-typical C3", and potato is a C3 plant.
+    # If someone later gives potato its own photosynthesis file, this test must be
+    # updated deliberately, which is the point.
+    #
+    # ⚠ UPDATED 2026-08-11 (root functional coupling), and updated deliberately — this
+    # is exactly the "must be updated deliberately" case the comment above anticipated.
+    # `root_depth` joined the crop vocabulary and potato OVERRIDES it, because [E]
+    # Table 25 carries a potato row from a potato-specific reference (Vos & Groenwold,
+    # 1986) differing from winter wheat in both values: shallower (0.8-1.0 vs 1.3 m) and
+    # slower (0.014 vs 0.018 m/day). Sharing wheat's file would have asserted a rooting
+    # habit the source contradicts. The count in the test NAME moved 3 -> 4; the shared
+    # five are unchanged, which is the part worth checking — nothing quietly became
+    # shared to make a number work.
     crop = crop_param_set("potato")
     assert crop.name == "potato"
-    assert crop.overridden == ("allocation", "canopy", "phenology")
+    assert crop.overridden == ("allocation", "canopy", "phenology", "root_depth")
     assert crop.shared == (
         "nitrogen",
         "photosynthesis",

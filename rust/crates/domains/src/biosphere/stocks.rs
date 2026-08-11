@@ -60,6 +60,9 @@ pub const CO2_POOL_VAR: &str = "co2_pool";
 pub const THERMAL_TIME: &str = "thermal_time";
 /// The SECOND aux accumulator (scope (B) inc. 1): cumulative vernalization days.
 pub const VERNALIZATION_DAYS: &str = "vernalization_days";
+/// The third aux accumulator: rooted depth (m). Deliberately NOT derived from root
+/// carbon - see the Python `root_depth.py` header for the primary's own statement.
+pub const ROOTED_DEPTH: &str = "rooted_depth";
 
 /// The handful of stock ids whose identity depends on `sealed`, computed once.
 #[derive(Debug, Clone)]

@@ -87,6 +87,13 @@ pub struct PhotoperiodParams {
 
 /// Per-organ relative senescence (death) rates.
 #[derive(Debug, Clone, Copy)]
+pub struct RootDepthParams {
+    pub max_extension_rate: f64,
+    pub max_rooted_depth: f64,
+}
+
+/// Biomass senescence (relative organ death rates).
+#[derive(Debug, Clone, Copy)]
 pub struct SenescenceParams {
     pub rdr_leaf: f64,
     pub rdr_stem: f64,
@@ -182,6 +189,7 @@ pub struct BiosphereParams {
     pub vern: VernalizationParams,
     pub photoperiod: PhotoperiodParams,
     pub senesc: SenescenceParams,
+    pub rootd: RootDepthParams,
     pub nitro: NitrogenParams,
     pub decomp: DecompositionParams,
     pub micro: MicrobialRespirationParams,
@@ -281,6 +289,10 @@ pub fn biosphere() -> BiosphereParams {
         photoperiod: PhotoperiodParams {
             cpp: get(&t, "photo.cpp"),
             ppsen: get(&t, "photo.ppsen"),
+        },
+        rootd: RootDepthParams {
+            max_extension_rate: get(&t, "rootd.max_extension_rate"),
+            max_rooted_depth: get(&t, "rootd.max_rooted_depth"),
         },
         senesc: SenescenceParams {
             rdr_leaf: get(&t, "senesc.rdr_leaf"),

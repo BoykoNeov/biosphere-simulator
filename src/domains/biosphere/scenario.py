@@ -118,6 +118,22 @@ class SeasonScenario:
     plant_n0: float = 0.000243294816
     sn_residual: float = 1.0  # kg N (soil-N availability band, scenario/soil data)
     sn_critical: float = 50.0  # kg N
+    # The reference soil layer the soil-N POOL is DECLARED to be, for the root-zone
+    # access gate (post-roadmap root functional coupling). Scenario/soil data, exactly
+    # like sn_residual/sn_critical/ground_area above: a rooting depth is only
+    # meaningful
+    # against a depth of soil, and our soil N is one undifferentiated pool with no
+    # geometry of its own, so the pool's depth has to be asserted somewhere.
+    #
+    # ⚠ DESIGN, not cited, and the honest reason is that no source can supply it: [F]
+    # Soltani & Sinclair's DEP1 is the soil-EVAPORATION layer of a layered soil model we
+    # do not have, so there is no corresponding measured quantity in our tree to cite.
+    # 0.30 m is the low end of the 0.2-0.3 m that model's top layer typically spans.
+    # MEASURED consequence: the gate is bit-identically inert at 0.2, 0.5 and 1.0 m, so
+    # this value is not load-bearing on any frozen scenario — but it WOULD be if the
+    # uptake flow ever became supply-bound, which is the condition to re-open it
+    # under.
+    soil_layer_depth: float = 0.30  # m
     fertilization_kg_m2_day: float = 0.0  # kg N m⁻² day⁻¹ (soil store already ample)
     # location (for the astronomical daylength); matches the oracle plot
     latitude: float = 52.0

@@ -38,6 +38,7 @@ from domains.biosphere.phenology import (
 )
 from domains.biosphere.photosynthesis import PhotosynthesisParams
 from domains.biosphere.respiration import RespirationParams
+from domains.biosphere.root_depth import RootDepthParams
 from domains.biosphere.transpiration import TranspirationParams
 from domains.biosphere.water_cycle import WaterCycleParams
 from simcore.quantities import Quantity
@@ -64,6 +65,8 @@ ALLOCATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "allocation.ya
 SENESCENCE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "senescence.yaml"
 # The committed winter-wheat nitrogen uptake + limitation params (Phase-1 Step 10).
 NITROGEN_PARAMS_PATH: Path = Path(__file__).parent / "params" / "nitrogen.yaml"
+#: The rooted-depth extension params (the third aux accumulator).
+ROOT_DEPTH_PARAMS_PATH: Path = Path(__file__).parent / "params" / "root_depth.yaml"
 # The committed chamber litter-decomposition (first-order decay) params (P2 Step 4).
 DECOMPOSITION_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "decomposition.yaml"
@@ -118,6 +121,7 @@ _CROP_PARAM_DEFAULTS: dict[str, Path] = {
     "phenology": PHENOLOGY_PARAMS_PATH,
     "photosynthesis": PHOTOSYNTHESIS_PARAMS_PATH,
     "respiration": RESPIRATION_PARAMS_PATH,
+    "root_depth": ROOT_DEPTH_PARAMS_PATH,
     "senescence": SENESCENCE_PARAMS_PATH,
     "transpiration": TRANSPIRATION_PARAMS_PATH,
 }
@@ -125,7 +129,7 @@ _CROP_PARAM_DEFAULTS: dict[str, Path] = {
 
 @dataclass(frozen=True)
 class CropParamSet:
-    """The eight plant-side param files for ONE crop, plus which of them are its own.
+    """The nine plant-side param files for ONE crop, plus which of them are its own.
 
     ``paths`` maps each :data:`_CROP_PARAM_DEFAULTS` key to the file the loaders should
     read. ``overridden`` names the files that came from the crop's own directory and
@@ -1035,6 +1039,83 @@ def load_senescence_params(
         rdr_leaf=values["rdr_leaf"],
         rdr_stem=values["rdr_stem"],
         rdr_root=values["rdr_root"],
+    )
+
+
+# --- rooted-depth extension (post-roadmap: root functional coupling) --------
+# Same structured value/unit/source format as senescence. Neither m/day nor m is a
+# conserved-Quantity canonical unit (rooted depth is an AUX accumulator, not a
+# stock), so both are schema-validated, bound-checked floats whose declared ``unit``
+# is exact-string
+# guarded. See params/root_depth.yaml for why this is not a function of root carbon.
+_ROOT_DEPTH_UNITS: dict[str, str] = {
+    "max_extension_rate": "m/day",
+    "max_rooted_depth": "m",
+}
+
+
+class _RootDepthValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _RootDepthParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    max_extension_rate: _RootDepthValueUnit
+    max_rooted_depth: _RootDepthValueUnit
+
+
+class _RootDepthSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _RootDepthParameters
+
+
+def _root_depth_value(params: _RootDepthParameters, field: str) -> float:
+    """Read a root-depth param's value, exact-string guarding its declared unit."""
+    entry: _RootDepthValueUnit = getattr(params, field)
+    expected = _ROOT_DEPTH_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_root_depth_params(
+    path: str | Path = ROOT_DEPTH_PARAMS_PATH,
+) -> RootDepthParams:
+    """Load, schema- and bound-check the root-depth params into ``RootDepthParams``.
+
+    Both values must be **strictly positive**, and that is a modelling bound rather than
+    a tidiness one. A zero ``max_rooted_depth`` would divide the root-zone fraction by a
+    crop that cannot root at all, and a zero ``max_extension_rate`` would freeze the
+    accumulator at its initial 0.0 so ``FROOT1 == 0`` forever — i.e. a crop that can
+    never take up nitrogen. Both are silent, plausible-looking ways to disable a
+    mechanism the goldens cannot see (it is bit-identically inert), so they are
+    rejected at the boundary. Raises ``pydantic.ValidationError`` on a schema
+    violation, ``ValueError`` on a bad unit
+    or non-positive value.
+    """
+    schema = _RootDepthSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _root_depth_value(params, field) for field in _ROOT_DEPTH_UNITS}
+
+    for field in _ROOT_DEPTH_UNITS:
+        if not values[field] > 0.0:
+            raise ValueError(f"{field} must be > 0, got {values[field]}")
+
+    return RootDepthParams(
+        max_extension_rate=values["max_extension_rate"],
+        max_rooted_depth=values["max_rooted_depth"],
     )
 
 

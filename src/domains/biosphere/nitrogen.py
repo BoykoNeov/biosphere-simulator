@@ -64,6 +64,7 @@ of Botany 66:425–436; the soil-supply-gated uptake idiom — the WOFOST N-bala
 
 from dataclasses import dataclass
 
+from domains.biosphere.root_depth import root_zone_fraction
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -246,6 +247,12 @@ class NitrogenUptake:
     ground_area: float
     sn_residual: float
     sn_critical: float
+    # The root-functional-coupling gate (post-roadmap 2026-08-11): the supply term is
+    # multiplied by the fraction of the reference soil layer the roots have reached.
+    # ``rooted_depth_aux`` names the accumulator; ``soil_layer_depth`` is scenario/soil
+    # data, like ``ground_area`` and the ``sn_*`` thresholds.
+    rooted_depth_aux: str
+    soil_layer_depth: float
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         stocks = snapshot.stocks
@@ -273,7 +280,20 @@ class NitrogenUptake:
             sn_residual=self.sn_residual,
             sn_critical=self.sn_critical,
         )
-        capacity = self.params.max_uptake_capacity * self.ground_area * availability
+        # ⚠ MEASURED INERT ON EVERY FROZEN SCENARIO, and shipped knowing it: uptake is
+        # demand-bound on every step of every scenario, so shrinking supply changes
+        # nothing bit-for-bit. See root_depth.py and the plan doc — no golden can catch
+        # this factor's removal, which is why tests/test_root_depth.py pins it directly.
+        root_access = root_zone_fraction(
+            snapshot.aux.get(self.rooted_depth_aux, 0.0),
+            soil_layer_depth=self.soil_layer_depth,
+        )
+        capacity = (
+            self.params.max_uptake_capacity
+            * self.ground_area
+            * availability
+            * root_access
+        )
         flux = min(deficit, capacity) * dt
         return FlowResult(legs=(Leg(self.soil_n, -flux), Leg(self.plant_n, flux)))
 

@@ -74,17 +74,17 @@
     },
     "greenhouse": {
       "golden": "greenhouse_state.json",
-      "golden_sha256": "76fd9297e280e8ff1f2460db8fcf3bd727c000ee0cb46790b13233c5f2f63479",
+      "golden_sha256": "0dfe7fa761c02bfccc514f5a70fd7e7e5174a290b1f23a030b40ecbbd4fba5a9",
       "scenario": "GREENHOUSE_SCENARIO (P6.3 biosphere\u2194cabin)"
     },
     "harvest": {
       "golden": "harvest_state.json",
-      "golden_sha256": "f73da5b30075f19f8e99ce608c8ed3e3eee9ce916cf8b11e3d654b599e241e11",
+      "golden_sha256": "83c2318571c6d819b892b1c6b547b6e8c56ab64e487059ec16d41f472189f5fc",
       "scenario": "HARVEST_SCENARIO (P6.6 biomass\u2192food)"
     },
     "lighting": {
       "golden": "lighting_state.json",
-      "golden_sha256": "c717596d2c7ed70ca0de87516d1511c8a6b8a8299b26c351e95f41d9b0a45ab6",
+      "golden_sha256": "4b0cdfc6586629d3bc15822e8fc77b679d2e8bb6836e614ef5115d2a4dc706bd",
       "scenario": "LIGHTING_SCENARIO (P6.5 Power\u2192biosphere lamp)"
     },
     "power_bounded_soc": {
@@ -104,7 +104,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "f6d643c4273b88e885081474bc7d534ae855cd88c1bbc1b0f497bdaab58319ff",
+      "golden_sha256": "76cb6a17e306b2648bbfa1e6df8a01e636aa1fe26ea78a6eb33bff66f94fffcb",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

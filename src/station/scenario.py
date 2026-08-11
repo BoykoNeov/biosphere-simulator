@@ -454,6 +454,28 @@ class HarvestScenario:
     # class docstring — NOT a ``SeasonScenario`` field), injected at ``State``
     # construction.
     thermal_time0: float = 1300.0
+    # ⚠ THE ROOT SYSTEM OF A PLANT STARTED PAST ANTHESIS (post-roadmap root functional
+    # coupling, 2026-08-11). ``thermal_time0`` fast-forwards this crop past flowering,
+    # and the rooted-depth law stops root extension at flowering ([E] p. 136, "Root
+    # growth generally stops around flowering"). Leaving the rooted-depth accumulator at
+    # its sowing value of 0 would therefore assert a GRAIN-FILLING PLANT THAT NEVER GREW
+    # ROOTS and can never grow any — internally inconsistent with the very rule that
+    # stops it, and it shows up as the crop taking up no nitrogen at all for the whole
+    # 7-day run.
+    #
+    # So this is the same class of initial condition as ``thermal_time0`` itself, and it
+    # is set for the same reason: a scenario that starts a crop mid-life must state the
+    # crop's mid-life state. The value is the crop maximum because the model's own
+    # extension law has necessarily finished by anthesis (the 1.3 m cap is reached near
+    # day 140; anthesis falls near day 255).
+    #
+    # ⚠ IT ALSO HAPPENS TO RESTORE THE GOLDEN TO A PURELY ADDITIVE DIFF, and that is
+    # named as a COINCIDENCE rather than leaned on as a justification (the
+    # nitrogen.yaml "the faithful reading is also the invariant one" precedent). The
+    # argument above is botanical and internal-consistency; it would stand if the golden
+    # had moved. What is NOT acceptable, and was explicitly not done, is picking this
+    # value because it makes a golden quiet.
+    rooted_depth0: float = 1.3  # m — the winter-wheat max_rooted_depth ([E] Table 25)
 
 
 # Module-level default (immutable) — the canonical Step-6 harvest scenario.

@@ -60,6 +60,7 @@ flow + the phenology injection.
 
 from domains.biosphere.stocks import (
     LITTER_CARBON,
+    ROOTED_DEPTH,
     STORAGE_C,
     THERMAL_TIME,
     VERNALIZATION_DAYS,
@@ -155,7 +156,14 @@ def build_harvest(
         # thermal_time0 starts the crop PAST anthesis (DVS > 1), where the
         # vernalization factor is fixed at 1 — so a zero cold accumulator here is
         # inert by construction, not an omission.
-        aux={THERMAL_TIME: scenario.thermal_time0, VERNALIZATION_DAYS: 0.0},
+        # rooted_depth0 goes with thermal_time0: a crop started past anthesis has
+        # finished rooting, and the extension law cannot grow it roots after flowering.
+        # See HarvestScenario.rooted_depth0 for why 0 here would be incoherent.
+        aux={
+            THERMAL_TIME: scenario.thermal_time0,
+            VERNALIZATION_DAYS: 0.0,
+            ROOTED_DEPTH: scenario.rooted_depth0,
+        },
     )
 
     # (2) Append the Harvest flow to the cabin / fast registry (drained across the day's

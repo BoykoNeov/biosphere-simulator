@@ -161,6 +161,12 @@ THERMAL_TIME = "thermal_time"
 # The SECOND aux accumulator (post-roadmap scope (B) inc. 1): cumulative vernalization
 # days (CUMVER), which gate thermal-time accrual through the vegetative phase.
 VERNALIZATION_DAYS = "vernalization_days"
+# The THIRD aux accumulator (post-roadmap root functional coupling): rooted depth (m),
+# the depth from which the crop effectively extracts. It is an accumulator and not a
+# stock because depth is not a conserved quantity — and it is deliberately NOT derived
+# from ROOT_C: see root_depth.py for the primary's own statement that rooted depth is
+# simulated independently of root mass.
+ROOTED_DEPTH = "rooted_depth"
 
 
 # --- compartment-composition types ------------------------------------------

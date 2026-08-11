@@ -40,6 +40,8 @@ vern.vsen	0x1.0e5604189374cp-5
 vern.vdsat	0x1.9000000000000p+5
 photo.cpp	0x1.0000000000000p+4
 photo.ppsen	0x1.70a3d70a3d70ap-4
+rootd.max_extension_rate	0x1.26e978d4fdf3bp-6
+rootd.max_rooted_depth	0x1.4cccccccccccdp+0
 senesc.rdr_leaf	0x1.47ae147ae147bp-6
 senesc.rdr_stem	0x1.47ae147ae147bp-8
 senesc.rdr_root	0x1.47ae147ae147bp-7

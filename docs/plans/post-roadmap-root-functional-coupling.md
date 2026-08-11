@@ -1,13 +1,26 @@
-# Root functional coupling — the NITROGEN half REFUSED 2026-08-11, NOT BUILT
+# Root functional coupling — REFUSED on the measurement, then BUILT on the user's call
 
-⚠ **Scope of this verdict.** What is refused is **rooting depth gating NITROGEN**, measured
-inert. The **water** coupling is a different shape and is **NOT refuted** — it was never
-run, because it cannot be run without splitting the soil pool into layers. Do not read the
-refusal as covering it; see "What is NOT refuted" below.
+**Outcome, in order, because the order is the point:**
 
-Read-only so far. No `src/`, param, golden or manifest change; `git diff src/` empty.
-Probe scripts live outside the tree (`M:/claud_projects/temp/root-coupling/`); every
-number below is reproducible from them.
+1. The charge as written (*make root **carbon** buy something*) is **REFUSED** — and the
+   refusal comes from the primary, not from us: [E] p. 136 states that rooted depth is
+   simulated independently of root mass, on purpose, with a physical reason.
+2. The fallback (*rooting depth gating **nitrogen***) was measured **bit-identically
+   inert on the entire frozen roster** and recorded as NOT BUILT, on
+   `post-roadmap-canopy-regulator.md`'s precedent.
+3. **The user overruled that refusal and directed the build.** It shipped: a third aux
+   accumulator, two cited params, both ports, a biosphere unfreeze that **moved no
+   value** — 12 goldens differ by exactly one added `aux` key and not one stock amount.
+
+⚠ **Read (2) and (3) together.** The mechanism is inert on every frozen scenario, that
+was known before a line was written, and it was built anyway as a deliberate decision.
+Anyone who later discovers the inertness has not found an oversight — they have found a
+documented choice. What the build buys is a cited mechanism the model lacked and a
+place for the water coupling to attach; what it does not buy is a changed answer today.
+
+The diagnosis below is read-only and was written before the build; the build is recorded
+in "What was actually built" at the end. Probe scripts live outside the tree
+(`M:/claud_projects/temp/root-coupling/`); every number below is reproducible from them.
 
 ## Why this was taken
 
@@ -284,6 +297,8 @@ that of water uptake at the root tips.
 
 ## The fork that remains
 
+### ⚠ The fork below was presented to the user, who chose (b). See "What was actually built".
+
 **(a) Cite the uptake ceiling and move it into the band.** Retires `nitrogen.yaml`'s last
 `TODO(cite)`; measured scientifically inert (7 of 8 scenarios bit-identical, one stock at
 1–2 ULPs); costs a full biosphere unfreeze ceremony for a zero-science change; does
@@ -312,3 +327,104 @@ rather than assumed, and the price of the one live successor is written down.
   and extracted cleanly.
 * **[D]** Meng et al. (2013), PLoS ONE 8(7):e68783 — already cited in `nitrogen.yaml`; the
   2.44 kg N/ha/day peak period-average that first flagged the ceiling as ~6× high.
+
+---
+
+## What was actually built (2026-08-11, on the user's direction over the refusal above)
+
+The user was shown the measurement, the refusal, and the four-way fork, and chose **(b)
+build rooting depth**. This section records what shipped.
+
+### The mechanism
+
+A third aux accumulator, `rooted_depth` (`src/domains/biosphere/root_depth.py`), advanced
+by [E]'s own law and read by `NitrogenUptake` as a multiplicative gate on its supply term:
+
+```
+d(depth)/dt = max_extension_rate · f_water · f_temp     ([E] p.137, GZRT = GZRTC·WSERT·TERT)
+              → 0 at DVS ≥ 1 ("root growth generally stops around flowering", p.136)
+              → 0 once max_rooted_depth is reached
+FROOT1      = min(depth / soil_layer_depth, 1)          ([F] Soltani & Sinclair)
+capacity    = max_uptake_capacity · ground_area · availability · FROOT1
+```
+
+`f_temp` and `f_water` are **the tree's existing functions**, not new curves — [E] says
+outright to reuse the photosynthesis temperature response and the water-uptake stress
+response, so no response curve was invented.
+
+### The parameters — both cited, read off the page image
+
+[E] Table 25 p. 137 column-collapses in the text layer (18 rate values against 15 species
+labels; the depth column renders `ies) 1.8 1.8 1.0 OM …`), so it was read from the
+rendered page — the third table in this project to need that method.
+
+| crop | rate (m/day) | max depth (m) | reference |
+|---|---|---|---|
+| **winter wheat** (the frozen crop) | **0.018** | **1.3** | Gregory et al., 1978 |
+| spring wheat (contrast — *not* interchangeable) | 0.012 | 1.8 | van Keulen & Seligman, 1987 |
+| **potato** (overrides) | **0.014** | **0.8–1.0 → 0.9** | Vos & Groenwold, 1986 |
+
+⚠ Table 25 flags two rows `*  estimate` — **Sugar-beet and Tulip, not wheat**, so the
+headline parameter is data rather than the source's own guess. Potato's depth cell is a
+**range**, and 0.9 is recorded in the file as a *midpoint-of-range* reading, not a
+transcription.
+
+`soil_layer_depth = 0.30 m` is **DESIGN, not cited**, and the file says why no citation is
+possible: [F]'s `DEP1` is the soil-evaporation layer of a layered soil model we do not
+have. Measured inert at 0.2 / 0.5 / 1.0 m, so it is not load-bearing — the condition to
+re-open it under is "the uptake flow became supply-bound".
+
+### THE ONE PLACE THE BUILD FOUND A REAL BUG — and it was in the build, not the model
+
+Regenerating the goldens moved **two amounts** in `harvest_state.json`: `plant_n` −12.3 %
+and `soil_n` correspondingly up. Cause: `HARVEST_SCENARIO` deliberately fast-forwards the
+phenology accumulator so the crop starts **past anthesis** (that is how it gets a
+grain-filling plant in a 7-day run) — and the new law stops root extension at flowering.
+So the harvest crop was a **grain-filling plant that had never grown roots and could never
+grow any**, taking up no nitrogen at all.
+
+That is incoherent with the very rule that produced it, so the fix is an initial
+condition, not a tolerance: `HarvestScenario.rooted_depth0`, the exact sibling of the
+`thermal_time0` that creates the situation. A scenario that starts a crop mid-life must
+state the crop's mid-life state.
+
+⚠ **The fix also restores a purely additive golden diff, and that is named as a
+coincidence rather than leaned on.** The argument is botanical and internal-consistency —
+it would stand if the golden had stayed moved. Picking an initial condition *because* it
+quiets a golden is the shape this project refuses; that is not what happened, and the
+reasoning is recorded in the field's own comment so the claim can be audited.
+
+⚠ **It is also the second coverage lesson of this same piece of work.** `harvest` is a
+*station* golden, outside the biosphere manifest's seven, so the probe roster never
+touched it — after the roster had *already* been corrected once for using the wrong
+horizons. Twice in one exercise, the answer to "did you measure everything?" was "no, and
+the thing I missed is where the effect was."
+
+### The exit state
+
+* **12 goldens changed, purely additively**: one new `aux` key each, **no stock amount
+  moved anywhere**, at any horizon, on any scenario.
+* **Biosphere manifest unfrozen**: `aux_set` 2 → 3 (`RootDepthExtension`), `param_files`
+  gains `root_depth.yaml`, golden hashes refreshed. Station manifest refreshed.
+* **Crop vocabulary 8 → 9**; potato overrides `root_depth`. Both the vocabulary pin and
+  the potato partition pin went red and were updated **deliberately, with the reasoning
+  in the test** — which is what those pins exist for.
+* **Both ports**: the Rust mirror carries the same law, the same cap form (a *rate*
+  cut-off, not an increment clamp — chosen so the aux channel's `dt`-independence
+  contract holds, and carried to the port as a rule rather than re-decided there), and
+  the same harvest initial condition. `cargo test` green, `cargo clippy` clean.
+* **15 new pins** in `tests/test_root_depth.py`, **all mutation-verified** — deleting the
+  gate factor, ignoring the flowering stop, flattening the rate, dropping the re-sow
+  reset, and removing the aux process each turn exactly one test (or the freeze gate) red.
+  They exist because **no golden can catch any of those mutations**.
+* Full suite **2248 passed, 5 skipped**; `ruff` and `pyright` clean.
+
+### What this does and does not discharge
+
+It does **not** discharge the wheat doc's successor — `ROOT_C` still buys nothing, and by
+[E] p. 136 it should not. That question is closed by citation, not deferred.
+
+What is now genuinely available, and was not before, is the **water** coupling: `TTSW =
+DEPORT · EXTR` attaches to the accumulator this build added. It remains unbuilt and needs
+the single soil-water pool split into layers — a structural change, priced above, not
+attempted.

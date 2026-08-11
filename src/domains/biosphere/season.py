@@ -108,6 +108,7 @@ from domains.biosphere.stocks import (
     IRRIGATION_VAR,
     PAR_VAR,
     RN_VAR,
+    ROOTED_DEPTH,
     TEMP_VAR,
     THERMAL_TIME,
     VERNALIZATION_DAYS,
@@ -234,7 +235,7 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         n=0,
         stocks=stocks,
         rng_seed=0,
-        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0},
+        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0, ROOTED_DEPTH: 0.0},
     )
     return state, Registry(flows, stocks, aux_processes=aux_processes)
 
@@ -451,6 +452,14 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
     # A re-sown crop must re-vernalize: the cold requirement is per-cycle, so the
     # second accumulator resets alongside the first (both are outside the gate).
     aux[VERNALIZATION_DAYS] = 0.0
+    # A re-sown crop also starts with NO ROOT SYSTEM: rooted depth is a property of the
+    # standing crop, not of the soil, so it resets with the other per-cycle
+    # accumulators.
+    # ⚠ Measured bit-identical WITH this reset on every frozen scenario (the chambers
+    # re-sow many times over 3-15 years), so the reset is a modelling choice the
+    # goldens
+    # cannot check — the pin is in tests/test_root_depth.py.
+    aux[ROOTED_DEPTH] = 0.0
     return replace(state, stocks=stocks, aux=aux)
 
 

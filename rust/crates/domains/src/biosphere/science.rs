@@ -229,6 +229,24 @@ pub fn photoperiod_factor(daylength_h: f64, cpp: f64, ppsen: f64) -> f64 {
 }
 
 /// Development stage `DVS ∈ [0, 2]` from thermal time (TSUM1/TSUM2).
+/// `FROOT1 = min(depth / layer, 1)` - the fraction of the reference soil layer the
+/// roots have reached ([F] Soltani & Sinclair). A multiplicative gate on a supply term,
+/// so it can only reduce a flow, never reverse it.
+///
+/// Mirrors `domains.biosphere.root_depth.root_zone_fraction`. NOT a function of root
+/// carbon: [E] p. 136 states rooted depth is simulated independently of root mass.
+pub fn root_zone_fraction(rooted_depth: f64, soil_layer_depth: f64) -> f64 {
+    if rooted_depth <= 0.0 {
+        return 0.0;
+    }
+    let fraction = rooted_depth / soil_layer_depth;
+    if fraction < 1.0 {
+        fraction
+    } else {
+        1.0
+    }
+}
+
 pub fn development_stage(thermal_time: f64, tsum_anthesis: f64, tsum_maturity: f64) -> f64 {
     if thermal_time <= 0.0 {
         return 0.0;

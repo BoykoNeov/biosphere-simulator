@@ -91,11 +91,41 @@ Phase-1 Step-11 buffer rewiring — entering the system through the `Allocation`
 `flow_set`; that science is frozen via `Allocation`. The manifest also freezes the
 **`aux_set`** (the registries' non-conserved accumulators, derived symmetrically from the
 public `registry.aux_processes`) — the thermal-time / DVS accumulator that drives
-allocation, and (since post-roadmap scope (B) increment 1) the **vernalization-days**
-accumulator that gates it — so a future aux process added but wired into no golden is caught
-too. (See `flow_set` / `aux_set` in the manifest for the exact lists.)
+allocation, (since post-roadmap scope (B) increment 1) the **vernalization-days**
+accumulator that gates it, and (since 2026-08-11) the **rooted-depth** accumulator — so a
+future aux process added but wired into no golden is caught too. (See `flow_set` /
+`aux_set` in the manifest for the exact lists.)
 
-### The param files — 13 clean-room biosphere param files
+⚠ **`aux_set` GREW 2 → 3 on 2026-08-11: `RootDepthExtension` was ADDED** by the root
+functional coupling (`docs/plans/post-roadmap-root-functional-coupling.md`). It advances
+rooted depth by [E]'s own law and gates `NitrogenUptake`'s supply term by the fraction of
+the reference soil layer the roots have reached.
+
+**Three things about this unfreeze are unusual enough to state here rather than only in
+the plan doc:**
+
+1. **It changed no value.** All 12 affected goldens differ by exactly one added `aux` key;
+   not one stock amount moved, on any scenario, at any horizon. The manifest's golden
+   hashes moved because the files gained a key, not because the science did.
+2. **It was BUILT OVER A MEASURED REFUSAL, at the user's explicit direction.** The
+   mechanism is bit-identically inert on the entire frozen roster — nitrogen uptake is
+   demand-bound on every step of every scenario, and this gate shrinks supply. That was
+   measured *before* the build, the work was recorded as refused on the
+   canopy-regulator precedent, and the user overruled the refusal. The record says so in
+   both directions; nobody should later discover the inertness and conclude it was missed.
+3. **No golden can catch its removal.** Deleting the aux process or the gate factor leaves
+   every golden green. `aux_set` catches the process disappearing; everything else is
+   pinned in `tests/test_root_depth.py`, whose assertions are mutation-verified for
+   exactly that reason.
+
+### The param files — 14 clean-room biosphere param files
+
+⚠ **14 since 2026-08-11: `root_depth.yaml` was ADDED** by the root functional coupling —
+two values, both first-hand from [E] Table 25 p. 137's "Wheat winter" row (Gregory et al.,
+1978), read off the page image because that table's text layer column-collapses. It is
+plant-side, so it joined the **crop-param-set vocabulary** (8 → 9 names) and potato
+**overrides** it from Table 25's own potato row (Vos & Groenwold, 1986). Neither wheat
+value is one of the table's flagged estimates.
 
 ⚠ **13 since 2026-08-10: `humification.yaml` was ADDED** by the humification split
 (`docs/plans/post-roadmap-cue-humification.md`) — three CO₂ fractions that partition every

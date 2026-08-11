@@ -1,0 +1,32 @@
+# potato — rooted-depth extension crop params (OVERRIDES the winter-wheat reference)
+# Sibling of ../../root_depth.yaml; read that file's header for the model, the units
+# discipline, and the two ⚠ notes (rooted depth is NOT a function of root carbon, by [E]'s
+# own instruction; and the mechanism is bit-identically inert on the frozen roster).
+#
+# WHY POTATO OVERRIDES RATHER THAN SHARES: [E] Table 25 carries a potato row of its own,
+#   from a potato-specific reference (Vos & Groenwold, 1986), and it differs from winter
+#   wheat in BOTH values — slower (0.014 vs 0.018 m/d) and much shallower (0.8-1.0 vs
+#   1.3 m). Sharing wheat's file would assert a rooting habit the source contradicts. The
+#   crop-param-set seam makes "potato overrides root_depth" a PINNED ASSERTION rather than
+#   a comment (see loader.crop_param_set's overridden/shared partition), which is the
+#   flattering-direction failure that pin exists to catch.
+#
+# Clean-room: read OFF THE PAGE IMAGE ([E]'s text layer column-collapses Table 25), same
+#   method and same page as the winter-wheat file. Never from PCSE or the unlicensed
+#   WOFOST_crop_parameters YAML.
+#
+# Source [E]: Penning de Vries et al. (1989), Simulation Monographs 29, PUDOC/IRRI,
+#   Table 25, p. 137, row "Potato" (Vos & Groenwold, 1986).
+
+name: potato
+process: root_depth
+
+parameters:
+  max_extension_rate:
+    value: 0.014
+    unit: "m/day"
+    source: "[E] Table 25, p. 137, row 'Potato' (Vos & Groenwold, 1986), read off the page image: 0.014 m d-1. NOT one of the table's flagged estimates (the '*' marks Sugar-beet and Tulip only). Slower than winter wheat's 0.018 and well below the body text's cross-species 3-5 cm/d general range (p. 136) — consistent with potato's reputation as a shallow, slow-rooting crop, and the same direction of caution as the wheat file. ⚠ CONSISTENCY NOTE with the potato work: docs/plans/post-roadmap-potato-crop.md records potato's extinction coefficient as plausibly biased LOW because our value was carried over from wheat; this parameter is the opposite case — it is potato-specific from the outset, so no carry-over bias applies to it."
+  max_rooted_depth:
+    value: 0.9
+    unit: "m"
+    source: "[E] Table 25, p. 137, row 'Potato' (Vos & Groenwold, 1986), read off the page image. ⚠ THE SOURCE GIVES A RANGE, NOT A POINT: the cell reads '0.8-1.0', and 0.9 is its midpoint. Recorded as a MIDPOINT-OF-RANGE reading rather than a transcription, because the project's standing rule is that a value which is really a range must say so (the decomposer-calibration lesson: real science gives a RANGE, not a point). The choice of midpoint is ours; either endpoint is equally cited, and the difference is inert here (both are far above the reference layer depth, so FROOT1 saturates identically). If this ever becomes load-bearing, the honest move is to carry the range and test both ends, not to defend 0.9. Compare winter wheat's 1.3 m single value and spring wheat's 1.8 m — potato is the shallowest of the three, which is the qualitative fact this parameter is really asserting. [E] p. 137 notes the whole column is approximate ('Table 25 gives some approximate values ... little is known about it in field crops') and that the species range is 0.5-1.5 m or more; 0.8-1.0 sits low inside it."

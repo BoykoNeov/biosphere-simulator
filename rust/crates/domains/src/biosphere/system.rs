@@ -25,8 +25,8 @@ use super::flows::{
     Allocation, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration, Decomposition,
     Fertilization, Grazing, GrowthRespiration, HumusDecomposition, HumusNitrogenRelease,
     Irrigation, LitterNitrogenTransfer, MaintenanceRespiration, MicrobialNitrogenRelease,
-    MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling, Senescence,
-    ThermalTimeAccumulation, Transpiration, VernalizationAccumulation,
+    MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling, RootDepthExtension,
+    Senescence, ThermalTimeAccumulation, Transpiration, VernalizationAccumulation,
 };
 use super::params;
 use super::stocks::*;
@@ -61,6 +61,10 @@ pub struct SeasonScenario {
     pub plant_n0: f64,
     pub sn_residual: f64,
     pub sn_critical: f64,
+    /// The reference soil layer the soil-N pool is DECLARED to be, for the root-zone
+    /// access gate. Scenario/soil data, like `sn_residual`/`sn_critical`. DESIGN, not
+    /// cited - see the Python `SeasonScenario.soil_layer_depth`.
+    pub soil_layer_depth: f64,
     pub fertilization_kg_m2_day: f64,
     pub latitude: f64,
     /// Whether the crop requires vernalization (a cold cue) to leave the vegetative phase
@@ -104,6 +108,7 @@ pub const DEFAULT_SCENARIO: SeasonScenario = SeasonScenario {
     plant_n0: 0.000243294816,
     sn_residual: 1.0,
     sn_critical: 50.0,
+    soil_layer_depth: 0.30,
     fertilization_kg_m2_day: 0.0,
     latitude: 52.0,
     vernalization: true,
@@ -512,6 +517,8 @@ fn build_plants(
             ground_area: scenario.ground_area,
             sn_residual: scenario.sn_residual,
             sn_critical: scenario.sn_critical,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_layer_depth: scenario.soil_layer_depth,
         }),
     ];
     if scenario.sealed {
@@ -540,6 +547,21 @@ fn build_plants(
     // `VernalizationAccumulation` is built, and `ThermalTimeAccumulation` carries neither
     // modifier, so thermal time advances at the plain degree-day rate (byte-for-byte, per
     // `plants.py`).
+    // The THIRD accumulator (post-roadmap root functional coupling): rooted depth, which
+    // gates NitrogenUptake's supply term. Unconditional - every crop roots. Mirrors the
+    // Python build order so the aux reduction sees the same canonical id sort.
+    let root_depth = RootDepthExtension {
+        id: "biosphere.rooted_depth".to_string(),
+        accumulator: ROOTED_DEPTH.to_string(),
+        thermal_time_aux: THERMAL_TIME.to_string(),
+        temp_var: TEMP_VAR.to_string(),
+        soil_water: SOIL_WATER.to_string(),
+        params: p.rootd,
+        photo: p.photo,
+        pheno: p.pheno,
+        sw_wilting: scenario.sw_wilting,
+        sw_critical: scenario.sw_critical,
+    };
     let mut aux: Vec<Box<dyn AuxProcess>> = vec![Box::new(ThermalTimeAccumulation {
         id: "biosphere.thermal_time".to_string(),
         accumulator: THERMAL_TIME.to_string(),
@@ -555,6 +577,7 @@ fn build_plants(
         photoperiod: scenario.photoperiod.then_some(p.photoperiod),
         daylength_var: scenario.photoperiod.then(|| DAYLENGTH_VAR.to_string()),
     })];
+    aux.push(Box::new(root_depth));
     if scenario.vernalization {
         aux.push(Box::new(VernalizationAccumulation {
             id: "biosphere.vernalization_days".to_string(),
@@ -674,6 +697,7 @@ pub fn build_season(scenario: &SeasonScenario) -> Result<(State, Registry), SimE
         BTreeMap::from([
             (THERMAL_TIME.to_string(), 0.0),
             (VERNALIZATION_DAYS.to_string(), 0.0),
+            (ROOTED_DEPTH.to_string(), 0.0),
         ]),
     )?;
     let registry = Registry::new(flows, &stocks, aux)?;
@@ -793,6 +817,9 @@ pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, S
     // A re-sown crop must re-vernalize: the cold requirement is per-cycle, so the second
     // accumulator resets alongside the first (both are outside the conservation gate).
     aux.insert(VERNALIZATION_DAYS.to_string(), 0.0);
+    // A re-sown crop also starts with NO ROOT SYSTEM: rooted depth is a property of the
+    // standing crop, not of the soil, so it resets with the other per-cycle accumulators.
+    aux.insert(ROOTED_DEPTH.to_string(), 0.0);
     State::new(state.n, stocks, state.rng_seed, aux)
 }
 

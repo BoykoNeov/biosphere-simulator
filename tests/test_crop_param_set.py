@@ -16,7 +16,7 @@ This file pins the two properties the seam has to have:
    file pins the *path* level, so a future edit that redirects the default fails here
    with a readable message instead of as an opaque golden diff.
 2. **What a crop claims as its own is explicit and testable.** ``overridden`` /
-   ``shared`` partition the eight param names, so "potato shares wheat's photosynthesis"
+   ``shared`` partition the nine param names, so "potato shares wheat's photosynthesis"
    is an assertion rather than a comment. That claim is load-bearing and easy to get
    wrong in the flattering direction, which is exactly why it is pinned.
 
@@ -44,9 +44,19 @@ from domains.biosphere.scenario import (
     SEALED_CHAMBER_SCENARIO,
 )
 
-# The eight plant-side param names a crop may override. Spelled out rather than
-# derived from the module so that *adding* a ninth is a deliberate edit here too — the
-# set is the crop vocabulary, and silently growing it is what this pin exists to notice.
+# The nine plant-side param names a crop may override. Spelled out rather than derived
+# from the module so that *adding* a tenth is a deliberate edit here too — the set
+# is the crop vocabulary, and silently growing it is what this pin exists to notice.
+#
+# ⚠ GREW 8 -> 9 on 2026-08-11 (root functional coupling); this pin is how that
+# was
+# noticed: `root_depth` was added to the vocabulary in the loader and the suite went
+# red
+# here, exactly as the sentence above promised it would. Recorded rather than quietly
+# re-listed. Rooted depth is plant-side (it is a crop property — [E] Table 25 tabulates
+# it per species, and potato's row differs from wheat's in both values), so it belongs
+# in
+# the vocabulary rather than alongside the soil/scenario data.
 EXPECTED_PARAM_NAMES = frozenset(
     {
         "allocation",
@@ -55,13 +65,14 @@ EXPECTED_PARAM_NAMES = frozenset(
         "phenology",
         "photosynthesis",
         "respiration",
+        "root_depth",
         "senescence",
         "transpiration",
     }
 )
 
 
-def test_crop_vocabulary_is_the_eight_plant_side_files() -> None:
+def test_crop_vocabulary_is_the_nine_plant_side_files() -> None:
     assert set(_CROP_PARAM_DEFAULTS) == EXPECTED_PARAM_NAMES
 
 
@@ -80,6 +91,7 @@ def test_none_resolves_to_the_frozen_reference_files() -> None:
         "phenology": loader.PHENOLOGY_PARAMS_PATH,
         "photosynthesis": loader.PHOTOSYNTHESIS_PARAMS_PATH,
         "respiration": loader.RESPIRATION_PARAMS_PATH,
+        "root_depth": loader.ROOT_DEPTH_PARAMS_PATH,
         "senescence": loader.SENESCENCE_PARAMS_PATH,
         "transpiration": loader.TRANSPIRATION_PARAMS_PATH,
     }

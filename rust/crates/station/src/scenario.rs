@@ -226,6 +226,12 @@ pub struct HarvestScenario {
     pub greenhouse: GreenhouseScenario,
     /// The biosphere `thermal_time` accumulator at t=0 (°C·day), past anthesis.
     pub thermal_time0: f64,
+    /// The root system of a plant started past anthesis. `thermal_time0` fast-forwards
+    /// the crop past flowering, and the rooted-depth law stops root extension there
+    /// ([E] p. 136), so leaving this at 0 would assert a grain-filling plant that never
+    /// grew roots and can never grow any. Mirrors Python `HarvestScenario.rooted_depth0`
+    /// - the port carries the rule, not a re-derivation of it.
+    pub rooted_depth0: f64,
 }
 
 /// `HARVEST_SCENARIO`: the reproductive greenhouse plant filling grain the harvest drains.
@@ -236,6 +242,7 @@ pub fn harvest_scenario() -> HarvestScenario {
             ..greenhouse_scenario()
         },
         thermal_time0: 1300.0,
+        rooted_depth0: 1.3,
     }
 }
 
