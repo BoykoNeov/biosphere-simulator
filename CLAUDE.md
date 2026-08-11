@@ -64,6 +64,7 @@ line each, newest concerns last. Add detail to the log, never to this table.
 | Stem-reserve remobilization | DIAGNOSED + PRICED 2026-08-10, **NOT BUILT** — the stem cannot feed the seed; blocked on the uncited partition table, which is the real successor | `post-roadmap-stem-reserves.md` |
 | Test-suite runtime (tooling, not science) | COMPLETE 2026-08-09 — `-n 12`, below-normal priority class; whole suite 7m05s | `docs/test-suite-runtime.md` |
 | The first authored habitat | COMPLETE | `post-roadmap-authored-habitat.md` |
+| The second authored habitat (`bioregenerative_station`) | COMPLETE 2026-08-11 — a frozen flow's "boundary" wiring field is a **name, not a constraint**, so the calibrated equipment recycles | `post-roadmap-bioregenerative-station.md` |
 | Tier 1: grow the flow registry | COMPLETE — authoring platform unfrozen (`flow_types` 3→12, `param_loaders` 2→5) | `post-roadmap-flow-registry-growth.md` |
 | Tier 2: the grammar — `monod` | COMPLETE — grammar unfrozen (`expr_nodes` 7→8); saturation is now sayable | `post-roadmap-grammar-monod.md` |
 | Bucket 3 (A): diagnose + pin the oracle gap | COMPLETE — the gap is **structural**, so the deferred quantitative match is not a calibration task | `post-roadmap-validation.md` |

@@ -1,0 +1,532 @@
+# bioregenerative_station — the second authored habitat (post-roadmap, 2026-08-11).
+#
+# A bioregenerative life-support station: CARBON, OXYGEN and WATER each close with **zero
+# boundary stocks**, while ENERGY is deliberately OPEN (4000 W in from the sun, 4000 W out
+# to space) because a station is a heat engine and any other claim would be wrong.
+#
+# WHAT MAKES THIS FILE DIFFERENT FROM scenarios/algae_habitat.yaml. That one invented all
+# six of its flow laws, and closed with a finding:
+#
+#     "The flow registry is crew-only ... an authored ecosystem must invent its kinetics
+#      rather than compose frozen, calibrated laws. This is the biggest gap between the
+#      roadmap's promise ('a scenario can define a habitat with its power budget, thermal
+#      limits, crew size, and ecosystem') and the platform as built."
+#
+# The registry has since grown 3 -> 12, the grammar gained `monod`, and authoring gained a
+# coupling cadence. Nothing under scenarios/ had used any of it. This habitat uses all
+# three and is the first authored file with a power budget, thermal limits, a crew and an
+# ecosystem in one graph. SEVEN of its seventeen flows are frozen types.
+#
+# THE LOOP. The crew exhales CO2 into the cabin; the FROZEN CDRA-style scrubber captures it
+# and concentrates it into a bioreactor feed tank; a photobioreactor fixes that carbon into
+# algal biomass and releases O2 into a buffer tank; the FROZEN proportional regulator meters
+# that tank back into the cabin at its setpoint; harvest feeds the crew. The FROZEN
+# condenser captures cabin humidity; condensate and urine are recovered to the potable
+# store. A solar array charges a battery through the FROZEN charge-efficiency split, a
+# constant load dissipates it, and every joule of waste heat lands on the FROZEN radiator
+# node, which rejects it to space.
+#
+# THE ONE STRUCTURAL FACT THIS RESTS ON: a frozen flow's "boundary" wiring field is a NAME,
+# not a constraint. `interpreter._build_flow` validates only that the wiring KEY NAMES match
+# the flow type's declared fields and passes each value through as a plain StockId — there
+# is no `kind` check anywhere on the path. So `co2_removed` may point at an interior pool,
+# and the calibrated equipment stops discarding and starts RECYCLING. Nothing in the engine
+# changed; this is a capability the platform already had and had never been asked for.
+#
+# AND THE COLLISION IT HAD TO RESOLVE. algae_habitat.yaml closes oxygen only because
+# cabin.co2 carries {carbon: 1, oxygen: 2}; the three ECLSS fixtures all warn that an
+# authored cabin must NOT annotate composition, because frozen `type` flows get no
+# build-time stoichiometry check. Read together those look mutually exclusive. They are not
+# — the discriminator is LEG SHAPE, not frozen-vs-authored. A two-leg, one-magnitude
+# transfer (-R here, +R there) balances every quantity automatically whatever composition
+# its two ends share; a flow whose legs cross composition classes with INDEPENDENT
+# magnitudes does not. So eclss.co2_scrubber / condenser / o2_makeup compose freely with
+# annotated pools, while eclss.crew_metabolism and crew.food_metabolism cannot — which is
+# why the physiology below is authored and the equipment is frozen. Design, the full
+# steady-state/Jacobian arithmetic, and the findings:
+# docs/plans/post-roadmap-bioregenerative-station.md.
+#
+# AUTHORED != VALIDATED (Phase-9 decision B). The ten `kinetics` laws and their seven inline
+# constants are INVENTED — plausible forms placed to put the fixed point somewhere
+# physically sensible — so has_authored_kinetics = True and Godot banners this UNCALIBRATED.
+# FROZEN != CALIBRATED either, and this file leans on that hard: of everything it reads from
+# a frozen loader, only respired_carbon_fraction (0.949) and insensible_water_fraction
+# (0.675) are calibrated (NASA BVAD Table 3-31). Every ECLSS / power / thermal value is a
+# DESIGN placeholder whose own param file says no source CAN fix it (o2_setpoint is
+# "permanently un-bindable as written"; co2_scrub_rate is recorded as ~1-1.5 orders of
+# magnitude fast against the real ISS CDRA cadence). Composing a frozen type buys frozen
+# FORM, not endorsement — flow_registry.py: "Registered != calibrated".
+#
+# THE RATE-CLASS PARTITION IS PHYSICS, NOT A FIXTURE DEVICE. eclss_multirate_cabin.yaml is
+# candid that its own partition is "a fixture device, not a sizing claim" — ECLSS's four
+# flows are all the same order, so it had to manufacture one cross-boundary stock. Here the
+# separation is real (cabin air 500-2000 s; biology weeks; radiator 52 h; battery 3.2 yr)
+# and SEVEN stocks are shared across the rate-class boundary, so Strang's operators
+# genuinely do not commute. The crew's forced flows are FAST on purpose: sub-stepping a
+# forced flow is exact and free, whereas classing crew.respiration slow would inject
+# 4.745e-4 * 1800 = 0.854 mol of CO2 per half-step into a cabin pool holding 0.4745 mol —
+# a 180 % kick into a pool whose own time constant (1000 s) is SHORTER than the slow step.
+# It would not error; it would export a sawtooth. Which class a flow is in is a MODELLING
+# decision, not a performance knob.
+#
+# NUMERICS. Every rate is strictly positive by construction (one flow per physical process,
+# never a sign-flipping net term). Fast set h = dt/n_sub = 300 s; slow set h = dt/2 = 1800 s
+# (Strang — NOT dt/n_sub). Every k*h << 1: the tightest is the regulator at k*h = 0.60, and
+# n_sub = 12 is set by it (n_sub = 8 would be legal at 0.90, i.e. 90 % of the bound, for no
+# gain). The (biomass, feed) Jacobian has trace -1.13e-6 < 0, det 2.67e-13 > 0 and
+# discriminant +2.18e-13 > 0: stable, REAL eigenvalues, non-oscillatory, slowest tau ~34.7 d
+# — so a one-year run is ~10.5 tau.
+#
+# The run starts deliberately OFF the fixed point in every book at once: the culture blooms
+# 5x, the feed tank fills 4.5x while its monod factor slides 0.250 -> 0.600, the O2 buffer
+# drains 3.4x into it, the regulator lifts cabin O2 from 8.0 to 9.76 mol, the water loop
+# charges from empty, and the thermal node warms from 102.7 K to 301.8 K. A habitat that
+# "closes" because nothing moves would prove nothing.
+#
+# All floats carry an explicit decimal point (the YAML-1.1 dotless-exponent hazard: under
+# the 1.1 float resolver yaml.safe_load parses `2e-5` as a *string*).
+
+name: bioregenerative_station
+integrator: euler
+dt: 3600.0        # THE COUPLING CADENCE (1 h) — the export step, not what ECLSS solves at
+n_sub: 12         # fast set sub-steps at dt/n_sub = 300 s; set by the O2 regulator's k*h
+steps: 8760       # one sealed year ~ 10.5 tau of the slowest matter mode
+rng_seed: 0
+
+stocks:
+  # ===========================================================================
+  # THE CABIN AIR — three single-species pools, all on the FAST side.
+  #
+  # cabin.co2 and cabin.o2 carry `composition`, and that annotation is the ONLY reason
+  # OXYGEN closes: it is what ties the crew's respiration legs together across two
+  # quantities (station/cabin.py's finding — the ledger REFUSES a decoupled pure-carbon
+  # CO2). cabin.humidity does NOT: WATER is its own conserved book here, deliberately not
+  # folded into the oxygen one, because this model has no metabolic-water machinery and
+  # annotating {hydrogen: 2, oxygen: 1} would demand oxygen atoms respiration does not
+  # supply. An honest omission, not an oversight.
+  # ===========================================================================
+  - id: cabin.co2
+    domain: cabin
+    quantity: carbon
+    kind: pool
+    amount: 0.0             # a clean cabin; the scrubber holds it at f*q/k_scrub = 0.4745
+    composition:
+      carbon: 1.0
+      oxygen: 2.0
+  - id: cabin.o2
+    domain: cabin
+    quantity: oxygen
+    kind: pool
+    amount: 8.0             # BELOW the frozen o2_setpoint (10.0) — see the direction note
+    composition:
+      oxygen: 2.0
+  - id: cabin.humidity
+    domain: cabin
+    quantity: water
+    kind: pool
+    amount: 0.0
+
+  # ===========================================================================
+  # THE BIOREACTOR — the scrubber's product tank and the algal culture.
+  #
+  # bioreactor.co2_feed is where the whole design turns: it is the stock the FROZEN
+  # eclss.co2_scrubber's `co2_removed` field is wired to. In every fixture that field names
+  # a monotonic boundary sink; here it is an interior pool that the algae eat out of, so
+  # every mole of carbon the crew exhales reaches the culture ONLY by passing through the
+  # frozen, calibrated-form scrubber. It carries the same {carbon: 1, oxygen: 2}
+  # composition as cabin.co2, which is what makes that two-leg transfer oxygen-neutral.
+  # ===========================================================================
+  - id: bioreactor.co2_feed
+    domain: bioreactor
+    quantity: carbon
+    kind: pool
+    amount: 100.0           # monod factor 100/(100+300) = 0.250 — starts on the knee
+    composition:
+      carbon: 1.0
+      oxygen: 2.0
+
+  # The algal culture. A POOL, not a POPULATION: bulk biomass, and POPULATION would pull in
+  # extinction -> loss-sink routing that needs a declared loss sink.
+  - id: bioreactor.biomass
+    domain: bioreactor
+    quantity: carbon
+    kind: pool
+    amount: 200.0           # a fifth of its steady state — the culture establishes
+
+  # ===========================================================================
+  # THE BUFFER STORES
+  # ===========================================================================
+
+  # The O2 buffer. Wired as the FROZEN regulator's `o2_supply` — in every fixture an
+  # unclamped boundary tank draining to nowhere; here an interior pool that photosynthesis
+  # refills. That substitution is what closes OXYGEN across a frozen control loop.
+  #
+  # NOT `unclamped`, because it is a real finite inventory rather than a ledger entry.
+  # ⚠ State that honestly: the CONSEQUENCE (arbitration would scale the regulator's draw
+  # if this tank ran low) is STRUCTURAL REASONING, NOT EXERCISED — the tank drains
+  # monotonically 500 -> 148.2 and never approaches zero, so `rationed == 0` here says
+  # nothing about the clamped path. Sizing a run that actually empties it would be a
+  # different scenario, and is not attempted.
+  - id: store.o2_tank
+    domain: store
+    quantity: oxygen
+    kind: pool
+    amount: 500.0
+    composition:
+      oxygen: 2.0
+
+  - id: crew.food_store
+    domain: crew
+    quantity: carbon
+    kind: pool
+    amount: 1900.0
+
+  - id: crew.water_store
+    domain: crew
+    quantity: water
+    kind: pool
+    amount: 60.0            # the frozen CrewScenario default, kg
+
+  # ===========================================================================
+  # THE WASTE / RECOVERY COMPARTMENTS — all POOLs, none a sink. Every one of these being
+  # an interior pool rather than a boundary is what makes the three matter books close.
+  # ===========================================================================
+  - id: waste.feces
+    domain: waste
+    quantity: carbon
+    kind: pool
+    amount: 0.0
+  - id: waste.urine
+    domain: waste
+    quantity: water
+    kind: pool
+    amount: 0.0
+  # The FROZEN condenser's `humidity_condensate` field — a monotonic boundary sink in every
+  # fixture, an interior pool feeding the water processor here.
+  - id: water.condensate
+    domain: water
+    quantity: water
+    kind: pool
+    amount: 0.0
+
+  # ===========================================================================
+  # THE ENERGY HALF — and the only two boundary stocks in the file, both ENERGY.
+  #
+  # Matter closes; energy CANNOT, and claiming otherwise would be wrong: a station runs on
+  # the temperature difference between a 5800 K source and a 2.7 K sink. 4000 W enters from
+  # boundary.solar_source and 4000 W leaves to boundary.space, every step.
+  # ===========================================================================
+  - id: power.battery
+    domain: power
+    quantity: energy
+    kind: pool
+    amount: 1.0e+9         # J — exactly its fixed point; see load_power below
+
+  # The sensible-heat node, referenced to T_space: Q = C*(T - T_space) >= 0, so temperature
+  # is the DERIVED readout T = T_space + Q/C. Starts far below equilibrium and warms.
+  - id: thermal.node
+    domain: thermal
+    quantity: energy
+    kind: pool
+    amount: 1.0e+9         # J — T = 102.7 K, well below T_eq ~ 301.8 K
+
+  # The sun: a boundary SOURCE, so `unclamped: true` — arbitration must never throttle it,
+  # and its negative-going amount is pure ledger bookkeeping (it is the integral of the
+  # energy this station has taken in).
+  - id: boundary.solar_source
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+    unclamped: true
+
+  # Deep space — the one boundary that cannot be moved inward. Never withdrawn from =>
+  # monotonic => a free heat-rejected diagnostic.
+  - id: boundary.space
+    domain: boundary
+    quantity: energy
+    kind: boundary
+    amount: 0.0
+
+forcings:
+  # The crew, at one crew member — both the frozen CrewScenario defaults.
+  crew_food_intake:
+    const: 5.0e-4     # mol C/s
+  crew_water_intake:
+    const: 3.0e-5     # kg/s
+
+  # The power budget. Hardcoded frozen module names (power/stocks.py): renaming one makes
+  # the flow raise at step 1.
+  solar_power:
+    const: 4000.0     # W — array output
+  # Sized so the battery sits EXACTLY at its fixed point: eta_c*P_solar - P_load - k_sd*B
+  # = 0.95*4000 - 3790 - 1.0e-8*1.0e+9 = 3800 - 3790 - 10 = 0. This is a SIZING claim, not
+  # an attractor: the battery's tau = 1/k_sd = 3.2 yr, far longer than the run, so within
+  # one year it is an accumulator. The thermal node is the live half of the energy story.
+  load_power:
+    const: 3790.0     # W
+
+flows:
+  # =========================================================================================
+  # THE FAST SET (h = dt/n_sub = 300 s) — everything touching the cabin air.
+  # `rate_class` is omitted throughout: `fast` is the default, and leaving it implicit is
+  # deliberate (the fixtures' convention) — the default is what makes every pre-multi-rate
+  # file lower to its old trajectory by construction, so spelling it would suggest a choice.
+  # =========================================================================================
+
+  # --- the crew's physiology: AUTHORED, and here is why it has to be ----------------------
+  # The registry's crew flows are single-quantity by construction: crew.food_metabolism is
+  # CARBON-only (food -> exhaled_co2 + fecal_waste, no O2 leg) and crew.oxygen_consumption
+  # OXYGEN-only. Wiring either into a {carbon: 1, oxygen: 2} pool FABRICATES oxygen and the
+  # ledger refuses it — exactly what Phase 6 hand-coded around, and exactly the seam the
+  # registry has no atom-coupled flow for. So respiration is authored. A real, honest
+  # platform limitation, recorded in the plan doc rather than worked around.
+  #
+  # Each metabolic fate is its own flow rather than one merged multi-leg flow, because
+  # stoichiometry takes LITERAL FLOATS ONLY: a merged flow would hardcode 0.949/0.051 as
+  # coefficients, duplicating a BVAD-calibrated frozen value and drifting if it is ever
+  # recalibrated. Carrying the fraction in the RATE instead keeps every coefficient an exact
+  # integer AND sources it from the frozen `crew` loader through param() — the
+  # self_discharge_dsl precedent ("the authored rate constant is the frozen one").
+
+  # food_store + cabin_o2 -> cabin_co2, at RQ = 1 (one O2 consumed per CO2 produced).
+  # CARBON: -1 +1 = 0.  OXYGEN: +1*2 -1*2 = 0 (via the composition fold).
+  - id: crew.respiration
+    kinetics:
+      rate: 'param("respired_carbon_fraction") * forcing("crew_food_intake")'
+      stoichiometry:
+        crew.food_store: -1
+        cabin.co2: 1
+        cabin.o2: -1
+    params: crew
+
+  # The egested remainder, (1 - f_resp) * intake. Strictly positive: f_resp is bounded to
+  # [0, 1] by the frozen loader. Egested carbon is NOT oxidised, so it draws no O2.
+  - id: crew.egestion
+    kinetics:
+      rate: 'forcing("crew_food_intake") - param("respired_carbon_fraction") * forcing("crew_food_intake")'
+      stoichiometry:
+        crew.food_store: -1
+        waste.feces: 1
+    params: crew
+
+  # Insensible + respiratory water loss, f_insensible * intake, into the cabin air. The
+  # water half of the same idiom, on the second frozen BVAD-calibrated fraction.
+  - id: crew.perspiration
+    kinetics:
+      rate: 'param("insensible_water_fraction") * forcing("crew_water_intake")'
+      stoichiometry:
+        crew.water_store: -1
+        cabin.humidity: 1
+    params: crew
+
+  # The remainder, (1 - f_insensible) * intake, as urine.
+  - id: crew.urination
+    kinetics:
+      rate: 'forcing("crew_water_intake") - param("insensible_water_fraction") * forcing("crew_water_intake")'
+      stoichiometry:
+        crew.water_store: -1
+        waste.urine: 1
+    params: crew
+
+  # --- the frozen cabin-air equipment, RECYCLING instead of discarding --------------------
+
+  # FROZEN, DONOR-CONTROLLED: R = k_scrub * cabin_co2 * dt, k_scrub = 1.0e-3 (k*h = 0.30).
+  # `co2_removed` is wired to an INTERIOR POOL, so this is a two-leg one-magnitude transfer
+  # between two stocks that fold identically: CARBON -R +R = 0 and OXYGEN -2R +2R = 0, both
+  # automatic. It is the throat of the whole carbon loop, and its frozen k is what sets the
+  # cabin's standing CO2 inventory: Cc* = f*q/k_scrub = 0.4745 mol.
+  - id: eclss.co2_scrubber
+    type: eclss.co2_scrubber
+    priority: 0
+    wiring:
+      cabin_co2: cabin.co2
+      co2_removed: bioreactor.co2_feed
+    params: eclss
+
+  # FROZEN, DONOR-CONTROLLED: R = k_cond * cabin_h2o * dt, k_cond = 5.0e-4 (k*h = 0.15).
+  # `humidity_condensate` wired to an interior pool -> the water loop closes.
+  - id: eclss.condenser
+    type: eclss.condenser
+    priority: 0
+    wiring:
+      cabin_h2o: cabin.humidity
+      humidity_condensate: water.condensate
+    params: eclss
+
+  # FROZEN, DEMAND-CONTROLLED: S = k_makeup * (o2_setpoint - cabin_o2) * dt, k = 2.0e-3,
+  # setpoint 10.0 mol (k*h = 0.60 — the constraint that fixes n_sub = 12).
+  #
+  # THE DIRECTION GATE, REASONED (run_scenario raises ReversedFlowError if cabin_o2 is ever
+  # found ABOVE the setpoint — the one check rationing structurally cannot perform, because
+  # this draw is proportional to the ERROR and so never over-draws anything):
+  #   * the equilibrium is BELOW the setpoint by construction — Oc* = S* - f*q/k_makeup =
+  #     10.0 - 0.23725 = 9.76275 — and the offset is strictly positive because the crew
+  #     always breathes;
+  #   * cabin_o2 starts at 8.0, i.e. below it, and the per-sub-step map Oc <- Oc +
+  #     0.6*(10 - Oc) - 0.14235 is a contraction with factor 1 - k*h = 0.4 > 0, so it
+  #     approaches 9.76275 MONOTONICALLY FROM BELOW and cannot overshoot;
+  #   * nothing else adds O2 to the cabin — photosynthesis fills the TANK, and this
+  #     regulator is the only path from tank to cabin.
+  # `o2_supply` is wired to store.o2_tank, an interior finite pool, so unlike every fixture
+  # this regulator is drawing on a real inventory that the culture has to refill.
+  - id: eclss.o2_makeup
+    type: eclss.o2_makeup
+    priority: 0
+    wiring:
+      o2_supply: store.o2_tank
+      cabin_o2: cabin.o2
+    params: eclss
+
+  # =========================================================================================
+  # THE SLOW SET (h = dt/2 = 1800 s by Strang, NOT dt/n_sub) — the biology, the water
+  # processors, and the whole energy half. Every time constant here is hours to years.
+  # =========================================================================================
+
+  # --- the photobioreactor ----------------------------------------------------------------
+  # co2_feed -> biomass + o2_tank. LIGHT-LIMITED, and this is the flow `monod` exists for.
+  #
+  # A photobioreactor's productivity at any useful cell density is set by the illuminated
+  # area, not by the biomass behind it, so the faithful law is ZEROTH-order: P = V_max. And
+  # zeroth-order is exactly the shape that cannot be made positivity-safe, because the draw
+  # does not know how much substrate is left. monod fixes precisely that:
+  #
+  #     P = V_max * S/(S + K)      S >> K -> V_max        (light-limited: the physics)
+  #                                S << K -> (V_max/K)*S  (first-order: self-limiting at 0)
+  #
+  # so the effective rate constant at depletion is V_max/K = 3.333e-6 /s and k_eff*h =
+  # 6.0e-3 << 1. THE SATURATING FORM RESTORES STRUCTURAL POSITIVITY TO A LAW THAT HAS NONE.
+  # algae_habitat.yaml had to trade the physics for the safety (it dropped the biomass factor
+  # because k*light*biomass*dt reached ~18); this file does not have to.
+  #
+  # K = 300.0 is a BARE INLINE LITERAL, and that is a finding rather than laziness: no
+  # registered param loader exposes a half-saturation (charge/crew/eclss/self_discharge/
+  # thermal between them offer an efficiency, two fractions, four ECLSS gains, a leak rate
+  # and four radiator properties), and the frozen K_O2 that motivated monod lives in the
+  # biosphere, whose loaders are unregistered. Measured in monod_dsl.yaml in July; unchanged.
+  #
+  # The factor genuinely traverses its curve, 0.250 -> 0.600 (a dead anchor is trivially
+  # conserved). CARBON: -1 +1 = 0.  OXYGEN: -1*2 +1*2 = 0.
+  - id: bioreactor.photosynthesis
+    kinetics:
+      rate: '1.0e-3 * monod(stock("bioreactor.co2_feed"), 300.0)'
+      stoichiometry:
+        bioreactor.co2_feed: -1
+        bioreactor.biomass: 1
+        store.o2_tank: 1
+    rate_class: slow
+
+  # The culture's own maintenance respiration, back into the REACTOR's gas loop rather than
+  # the cabin (a photobioreactor's headspace is not the cabin atmosphere). Donor-controlled,
+  # so it self-limits as the culture thins. CARBON: -1 +1 = 0.  OXYGEN: +1*2 -1*2 = 0.
+  - id: bioreactor.respiration
+    kinetics:
+      rate: '1.0e-7 * stock("bioreactor.biomass")'
+      stoichiometry:
+        bioreactor.biomass: -1
+        bioreactor.co2_feed: 1
+        store.o2_tank: -1
+    rate_class: slow
+
+  # Harvest: biomass -> the crew's larder. This closes the FOOD loop, and k_harv is set by
+  # the closure condition k_harv * B* = crew_food_intake (5.0e-7 * 1000 = 5.0e-4): the crew
+  # draw is FORCED, not donor-controlled, so its positivity is by SIZING, not structure —
+  # the culture must sustain a biomass that feeds it.
+  - id: bioreactor.harvest
+    kinetics:
+      rate: '5.0e-7 * stock("bioreactor.biomass")'
+      stoichiometry:
+        bioreactor.biomass: -1
+        crew.food_store: 1
+    rate_class: slow
+
+  # --- closing the last carbon branch -----------------------------------------------------
+  # Remineralization: feces + O2 -> CO2, into the reactor feed (the liquefying compartment
+  # vents into the loop, not the cabin). Without it the egested branch is a dead-end sink and
+  # the habitat slowly starves. tau = 1/k = 5.8 d. CARBON: -1 +1 = 0.  OXYGEN: +2 -2 = 0.
+  - id: waste.remineralization
+    kinetics:
+      rate: '2.0e-6 * stock("waste.feces")'
+      stoichiometry:
+        waste.feces: -1
+        bioreactor.co2_feed: 1
+        store.o2_tank: -1
+    rate_class: slow
+
+  # --- the water processors ---------------------------------------------------------------
+  # Condensate -> potable (tau = 27.8 h) and urine -> potable (tau = 5.8 d, a batch-residence
+  # urine processor). RECOVERY IS 100 % HERE, and that is an idealisation stated plainly:
+  # real processors recover ~85-93 % and reject a brine, which would be an open leg. Full
+  # recovery is chosen so WATER makes the same strict-closure claim as carbon and oxygen.
+  - id: water.recovery
+    kinetics:
+      rate: '1.0e-5 * stock("water.condensate")'
+      stoichiometry:
+        water.condensate: -1
+        crew.water_store: 1
+    rate_class: slow
+
+  - id: water.urine_processing
+    kinetics:
+      rate: '2.0e-6 * stock("waste.urine")'
+      stoichiometry:
+        waste.urine: -1
+        crew.water_store: 1
+    rate_class: slow
+
+  # --- the energy half: four frozen flows, and the Power<->Thermal seam wired by hand ------
+  # All three power flows point `waste_heat` at thermal.node rather than at a boundary sink,
+  # so the station's dissipation lands on the radiator instead of vanishing. That wiring IS
+  # the Phase-6 Power<->Thermal seam, authored. thermal.heat_input is deliberately NOT used:
+  # with the seam wired, a forced heat load would double-count.
+
+  # FROZEN, FORCED on `solar_power`. Three legs: the eta_c split names the charge-conversion
+  # loss as heat — 0.95*4000 = 3800 W into the battery, 200 W straight to the node.
+  - id: power.solar_charge
+    type: power.solar_charge
+    priority: 0
+    rate_class: slow
+    wiring:
+      solar_source: boundary.solar_source
+      battery: power.battery
+      waste_heat: thermal.node
+    params: charge
+
+  # FROZEN, FORCED on `load_power`. 100 % dissipative — the whole station load (including
+  # the reactor's lamps) becomes heat. Positivity by well-fed sizing: a constant load CAN
+  # over-draw an empty battery, and here it does not because the battery is at its balance
+  # point. This flow type takes no params.
+  - id: power.load_draw
+    type: power.load_draw
+    priority: 0
+    rate_class: slow
+    wiring:
+      battery: power.battery
+      waste_heat: thermal.node
+
+  # FROZEN, DONOR-CONTROLLED leak, k = 1.0e-8 /s (k*h = 1.8e-5). 10 W at the sized charge —
+  # the third of the three heat streams, and the term that closes the battery's balance.
+  - id: power.self_discharge
+    type: power.self_discharge
+    priority: 0
+    rate_class: slow
+    wiring:
+      battery: power.battery
+      waste_heat: thermal.node
+    params: self_discharge
+
+  # FROZEN, DONOR-CONTROLLED and NONLINEAR: R = eps*sigma*A*(T^4 - T_space^4)*dt, with T read
+  # off the node's own amount. The station's only heat rejection path, and the domain's
+  # restoring force: 200 + 3790 + 10 = 4000 W in gives T_eq = 301.8 K (Q_eq = 2.99127e+9 J),
+  # reached with tau = C/(4*eps*sigma*A*T_eq^3) = 1.886e+5 s ~ 52 h, i.e. tau/h = 105.
+  # Positivity is STRUCTURAL ONLY AT THE FLOOR (R -> 0 as Q -> 0); near equilibrium it is by
+  # SIZING — the T^4 law has no k*dt < 1 guarantee to lean on, which is why the run's
+  # rationed == 0 is MEASURED for this flow and not reasoned.
+  - id: thermal.radiator_reject
+    type: thermal.radiator_reject
+    priority: 0
+    rate_class: slow
+    wiring:
+      node: thermal.node
+      space: boundary.space
+    params: thermal
