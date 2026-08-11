@@ -324,6 +324,21 @@ between two independent sources**, which no amount of calibration would have sur
   and available — but it is scenario data tied to the sealed chamber's sizing. Noted, not
   taken.
 * **The model-form gap above 18 °C** (finding 7.4) is not closed by any value.
+* **The oracle's cultivar is recorded but not fully separable.** The fixture now pins
+  `variety_no = 2830` (the demo DB's `crop_calendar` row for this run), so a reader can
+  see *which* potato WOFOST grew. But variety 2830's parameter values are PCSE's and are
+  deliberately never read (clean-room), so we know which cultivar without knowing how its
+  partition curve is shaped. Finding 1 therefore stands as **"two cited
+  parameterizations disagree"** and does **not** claim the disagreement is purely
+  structural rather than partly cultivar. Stated, not papered over.
+* **A lint autofix silently disabled the runner cross-check, and only the `assert
+  deltas` guard caught it.** Rewriting `variable not in reference.keys()` to `variable
+  not in reference` looks equivalent, but `sqlite3.Row` is a **sequence**, so `in` tests
+  its VALUES — every variable was skipped and `benchmark_deltas` returned `{}`, which
+  reads as "the cross-check passed" while checking nothing. Ruff's SIM118 is wrong on
+  `sqlite3.Row`; the call now carries a `noqa` and the reason. **A check that can pass
+  vacuously needs a test that it did something** — that assertion was written before the
+  bug existed and is the only reason this was not shipped green-and-empty.
 
 ## Stage 2 — deferred, and what it is
 

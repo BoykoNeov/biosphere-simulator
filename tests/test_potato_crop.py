@@ -229,6 +229,19 @@ def test_oracle_fixture_is_the_run_we_think_it_is() -> None:
     assert provenance["crop_name"] == "potato"
     assert provenance["mode"] == "pp"  # potential production, like our own PP plot
     assert provenance["grid_no"] == 31031
+    # The oracle's CULTIVAR, pinned because it is load-bearing on the headline finding
+    # below. We name our own cultivar explicitly (cv Mara — [E] carries two potato
+    # cultivars whose vegetative rates differ by 1.6x), so the oracle's has to be on the
+    # record too: otherwise a reader cannot tell whether the tuber-onset disagreement is
+    # cross-MODEL or merely cross-CULTIVAR, which is precisely the distinction this file
+    # is careful about everywhere else. The demo DB holds 46 potato varieties.
+    #
+    # ⚠ AND THE HONEST READING IS THAT WE CANNOT FULLY SEPARATE THEM. Variety 2830's
+    # parameter values are PCSE's and are deliberately never read (clean-room), so we
+    # know WHICH cultivar the oracle ran but not how its partition curve is shaped. The
+    # finding therefore stands as "two cited parameterizations disagree", and does NOT
+    # claim the disagreement is purely structural. Recorded rather than papered over.
+    assert provenance["variety_no"] == 2830
     assert provenance["milestones_days_since_emergence"] == {
         "DOE": 0,
         "DOA": 44,

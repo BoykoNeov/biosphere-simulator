@@ -63,6 +63,7 @@
       "TWSO": 7249.782544362626,
       "TWST": 1817.0426519076295
     },
+    "variety_no": 2830,
     "weather_source": "GridWeatherDataProvider(31031) \u2014 bundled demo DB",
     "year": 2000
   },

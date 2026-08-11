@@ -113,6 +113,31 @@ OUTPUT_VARIABLES = (
 SUMMARY_DATES = ("DOE", "DOA", "DOM")
 
 
+def variety_no() -> int | None:
+    """The demo DB's ``crop_calendar`` variety for this (grid, crop, year).
+
+    Recorded in the fixture provenance because it is **load-bearing on the headline
+    finding**. That finding is "two independent parameterizations of the same organ of
+    the same crop disagree about when tuber filling begins", and our side names its
+    cultivar explicitly (cv Mara, chosen on source-internal grounds — [E] carries two
+    potato cultivars whose vegetative rates differ by 1.6×). Without the oracle's
+    variety on the record a reader cannot tell whether the disagreement is
+    cross-MODEL or merely cross-CULTIVAR, which is exactly the distinction the rest of
+    this exercise is careful about. The demo DB holds 46 potato varieties, so the
+    question is not academic.
+    """
+    con = sqlite3.connect(_demo_db_path())
+    try:
+        row = con.execute(
+            "SELECT variety_no FROM crop_calendar "
+            "WHERE grid_no=? AND crop_no=? AND year=?",
+            (GRID_NO, CROP_NO, YEAR),
+        ).fetchone()
+    finally:
+        con.close()
+    return None if row is None else int(row[0])
+
+
 def _demo_db_path() -> str:
     """The demo SQLite DB PCSE builds from its bundled dump at first ``import pcse``."""
     from pcse.settings import settings
@@ -155,7 +180,13 @@ def benchmark_deltas(trajectory: list[dict[str, Any]]) -> dict[str, float]:
         if reference is None:
             continue
         for variable in OUTPUT_VARIABLES:
-            if variable not in reference:
+            # NOT ``variable not in reference``: ``sqlite3.Row`` is a SEQUENCE, so
+            # ``in`` tests its VALUES, not its column names — the membership test
+            # silently fails for every variable and this function returns {}, which
+            # reads as "the cross-check passed" while checking nothing. Ruff's SIM118
+            # ("use `key not in dict`") is wrong here for exactly that reason. Caught
+            # by test_our_run_matches_pcses_own_shipped_expectation's `assert deltas`.
+            if variable not in reference.keys():  # noqa: SIM118
                 continue
             ours, theirs = entry[variable], reference[variable]
             if ours is None or theirs is None:
@@ -206,6 +237,7 @@ def run_potato() -> dict[str, Any]:
         "crop_no": CROP_NO,
         "grid_no": GRID_NO,
         "year": YEAR,
+        "variety_no": variety_no(),
         "mode": MODE,
         "site": {
             "latitude": LATITUDE,
