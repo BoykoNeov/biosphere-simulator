@@ -1,4 +1,9 @@
-# Root functional coupling — DIAGNOSED and REFUSED 2026-08-11, NOT BUILT
+# Root functional coupling — the NITROGEN half REFUSED 2026-08-11, NOT BUILT
+
+⚠ **Scope of this verdict.** What is refused is **rooting depth gating NITROGEN**, measured
+inert. The **water** coupling is a different shape and is **NOT refuted** — it was never
+run, because it cannot be run without splitting the soil pool into layers. Do not read the
+refusal as covering it; see "What is NOT refuted" below.
 
 Read-only so far. No `src/`, param, golden or manifest change; `git diff src/` empty.
 Probe scripts live outside the tree (`M:/claud_projects/temp/root-coupling/`); every
@@ -194,6 +199,40 @@ stock-by-stock, hex-float:
 
 **Zero effect, at every layer depth, alone or combined.** The two supply-side reductions do
 not compound into a bite.
+
+⚠ **COVERAGE CORRECTION — the first pass measured the wrong roster, and this is recorded
+rather than quietly fixed.** Measurements 3 and 4 were first run on the eight scenario
+*constants*, at horizons picked by hand (3 years for the chambers). The manifest freezes
+something different: **seven scenario→golden pairs at specific horizons** — `open_season`
+1 yr, `sealed_chamber` 3 yr, `perennial_chamber` **5**, `consumer_chamber` **5**,
+`perennial_long_horizon` **15**, `consumer_long_horizon` **15**, plus `drift_summary` (a
+stability signature over the two 15-year runs). So the original "bit-identical on all eight
+scenarios" was a **coverage claim about a roster that is not the frozen one** — four of the
+seven were run at the wrong horizon and the two 15-year runs not at all. Exactly the
+`multirate-crossport-anchor-partition-parity` shape (*"the suite was measurably blind"*).
+
+Re-run against the manifest's own roster and horizons, and comparing the **aux channel** as
+well as the stocks:
+
+| frozen scenario | horizon | `FROOT1` gate (0.5 m / 1.0 m, ± anthesis stop) | ceiling 0.0006 | ceiling 0.0003 | both |
+|---|---|---|---|---|---|
+| `open_season` | 1 yr | BIT-IDENTICAL | `soil_n` 1.4e-16 | `soil_n` 2.1e-15 | `soil_n` 2.1e-15 |
+| `sealed_chamber` | 3 yr | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL |
+| `perennial_chamber` | 5 yr | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL |
+| `consumer_chamber` | 5 yr | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL |
+| `perennial_long_horizon` | **15 yr** | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL |
+| `consumer_long_horizon` | **15 yr** | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL | BIT-IDENTICAL |
+
+`drift_summary` follows: it is a signature over the two 15-year runs, both bit-identical.
+**The verdict survives the correction** — but it is now a measurement of the frozen roster
+rather than of a roster that resembled it. The long horizons were the place it could have
+failed, since the doc's own inertness argument is that the run is long relative to the
+delay.
+
+⚠ The first pass also declared an anthesis stop for the depth trajectory and **never applied
+it** — `[E]`'s *"root growth generally stops around flowering"* was in the comment, not in
+the code. The re-run applies it (depth frozen from day 150) and also runs the un-gated
+control: **all three variants bit-identical**, so the verdict does not rest on which one ran.
 
 **Why — and this is the structural finding of the whole exercise.** Measurement 1 showed
 uptake is **demand-bound on every step of every scenario**. `FROOT1` and the ceiling both
