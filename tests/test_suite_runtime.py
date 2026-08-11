@@ -46,7 +46,10 @@ pytestmark = pytest.mark.skipif(
 def _win_priority_class(pid: int | None = None) -> int:
     import ctypes
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    # ``WinDLL``/``get_last_error`` exist only on Windows, and every caller of this
+    # helper is gated on ``sys.platform == "win32"``. Pyright checks this file on the
+    # CI runner (Linux), where the ctypes stub does not carry them.
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
     kernel32.GetPriorityClass.restype = ctypes.c_uint32
     kernel32.GetPriorityClass.argtypes = [ctypes.c_void_p]
     if pid is None:
@@ -57,7 +60,7 @@ def _win_priority_class(pid: int | None = None) -> int:
     kernel32.OpenProcess.restype = ctypes.c_void_p
     kernel32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
     handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid)
-    assert handle, f"OpenProcess failed: {ctypes.get_last_error()}"
+    assert handle, f"OpenProcess failed: {ctypes.get_last_error()}"  # type: ignore[attr-defined]
     try:
         return kernel32.GetPriorityClass(ctypes.c_void_p(handle))
     finally:
