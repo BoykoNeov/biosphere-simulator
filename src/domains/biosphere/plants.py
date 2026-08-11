@@ -26,6 +26,7 @@ from domains.biosphere.carbon_budget import (
 )
 from domains.biosphere.compartments import PLANTS
 from domains.biosphere.loader import (
+    crop_param_set,
     load_allocation_params,
     load_canopy_params,
     load_nitrogen_params,
@@ -87,6 +88,7 @@ def _carbon_context(scenario: SeasonScenario) -> CarbonContext:
     as the shared ``co2_pool`` var, #16) — the draw-down feedback. Plant-internal: the
     carbon-budget flows share it, and ``NitrogenUptake`` reuses its ``nitro`` params.
     """
+    crop = crop_param_set(scenario.crop)
     return CarbonContext(
         leaf_c=LEAF_C,
         stem_c=STEM_C,
@@ -99,10 +101,10 @@ def _carbon_context(scenario: SeasonScenario) -> CarbonContext:
         sw_wilting=scenario.sw_wilting,
         sw_critical=scenario.sw_critical,
         plant_n=PLANT_N,
-        photo=load_photosynthesis_params(),
-        canopy=load_canopy_params(),
-        resp=load_respiration_params(),
-        nitro=load_nitrogen_params(),
+        photo=load_photosynthesis_params(crop.paths["photosynthesis"]),
+        canopy=load_canopy_params(crop.paths["canopy"]),
+        resp=load_respiration_params(crop.paths["respiration"]),
+        nitro=load_nitrogen_params(crop.paths["nitrogen"]),
         ground_area=scenario.ground_area,
         co2_pool_var=CO2_POOL_VAR if scenario.sealed else None,
         chamber_air_mol=scenario.chamber_air_mol if scenario.sealed else None,
@@ -121,10 +123,13 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
     nitrogen = canonical_unit(Quantity.NITROGEN)
     ctx = _carbon_context(scenario)
     nitro = ctx.nitro
+    # The crop's param files (``None`` → the frozen winter-wheat reference, so every
+    # frozen scenario reads exactly the files it always did).
+    crop = crop_param_set(scenario.crop)
     # Loaded ONCE and shared by the carbon Senescence flow and the N-shedding flow: the
     # two are legs of a single physical event, so they must read identical rdr_* values.
-    sen_params = load_senescence_params()
-    pheno = load_phenology_params()
+    sen_params = load_senescence_params(crop.paths["senescence"])
+    pheno = load_phenology_params(crop.paths["phenology"])
 
     stocks: list[Stock] = [
         organ_stock(LEAF_C, PLANTS, scenario.leaf_c0),
@@ -150,7 +155,7 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             storage_c=STORAGE_C,
             thermal_time_aux=THERMAL_TIME,
             pheno=pheno,
-            alloc=load_allocation_params(),
+            alloc=load_allocation_params(crop.paths["allocation"]),
             o2_pool=wiring.o2_pool,
         ),
         GrowthRespiration(
@@ -186,7 +191,7 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             rn_var=RN_VAR,
             vpd_var=VPD_VAR,
             temp_var=TEMP_VAR,
-            params=load_transpiration_params(),
+            params=load_transpiration_params(crop.paths["transpiration"]),
             ground_area=scenario.ground_area,
             sw_wilting=scenario.sw_wilting,
             sw_critical=scenario.sw_critical,
@@ -240,7 +245,11 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
     # ulation is built, and ThermalTimeAccumulation carries neither modifier, so thermal
     # time advances at the plain degree-day rate (byte-for-byte, per phenology.py). The
     # vern params load only when needed.
-    vern = load_vernalization_params() if scenario.vernalization else None
+    vern = (
+        load_vernalization_params(crop.paths["phenology"])
+        if scenario.vernalization
+        else None
+    )
     thermal_time = ThermalTimeAccumulation(
         id=AuxId("biosphere.thermal_time"),
         accumulator=THERMAL_TIME,
@@ -250,7 +259,11 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
         vernalization_accumulator=(
             VERNALIZATION_DAYS if scenario.vernalization else None
         ),
-        photoperiod=load_photoperiod_params() if scenario.photoperiod else None,
+        photoperiod=(
+            load_photoperiod_params(crop.paths["phenology"])
+            if scenario.photoperiod
+            else None
+        ),
         daylength_var=DAYLENGTH_VAR if scenario.photoperiod else None,
     )
     aux: tuple[AuxProcess, ...] = (thermal_time,)

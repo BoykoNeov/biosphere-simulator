@@ -136,6 +136,22 @@ class SeasonScenario:
     # new param file. See docs/plans/post-roadmap-day-neutral-crop.md.
     vernalization: bool = True
     photoperiod: bool = True
+    # The CROP (post-roadmap: potato, the first genuine second species). ``None`` —
+    # the default on every frozen scenario — is the winter-wheat reference: the plant
+    # builders read the committed ``params/*.yaml`` files exactly as they did before
+    # this field existed, so all 7 biosphere goldens stay byte-identical. A string
+    # names a directory under ``params/crops/``, whose files override the same-stem
+    # reference file and whose absences fall back to it (``loader.crop_param_set``).
+    #
+    # This is the FOURTH additive, default-preserving scenario flag of its kind
+    # (N_LIMITED / WATER_BITING / vernalization+photoperiod), and it is deliberately a
+    # plain ``str | None`` rather than a resolved path set: ``scenario.py`` is pure
+    # scenario DATA with no biosphere imports, and resolution is a boundary concern
+    # that belongs in ``loader.py`` (importing it here would cycle through ``plants``).
+    #
+    # ⚠ A crop is NOT frozen, and being runnable does not validate it — "authored ≠
+    # validated" applies in full. See docs/plans/post-roadmap-potato-crop.md.
+    crop: str | None = None
 
 
 # Module-level default (immutable, frozen dataclass) — used as the param default so the

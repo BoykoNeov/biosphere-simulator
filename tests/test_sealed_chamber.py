@@ -86,8 +86,13 @@ def _run_canonical(*, k_o2: float | None = None) -> tuple[list[State], int, tupl
         resp = replace(load_respiration_params(), o2_half_saturation=k_o2)
         mic = replace(load_microbial_respiration_params(), o2_half_saturation=k_o2)
         with (
-            patch.object(plants, "load_respiration_params", lambda: resp),
-            patch.object(soil, "load_microbial_respiration_params", lambda: mic),
+            # The stubs take (and ignore) the path the builders now pass: since the
+            # crop param-set seam, ``build_plants``/``build_soil`` call every loader
+            # with an explicit path (``crop.paths[...]``) rather than argument-free.
+            # Accepting *_ keeps the substitution honest — the override is still "this
+            # param object, whatever file was asked for", which is what the test means.
+            patch.object(plants, "load_respiration_params", lambda *_: resp),
+            patch.object(soil, "load_microbial_respiration_params", lambda *_: mic),
         ):
             state, registry = build_season(SEALED_CHAMBER_SCENARIO)
     resolver = weather_resolver(weather, SEALED_CHAMBER_SCENARIO)

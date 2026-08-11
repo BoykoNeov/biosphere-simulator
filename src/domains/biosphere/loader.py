@@ -13,6 +13,7 @@ project's "parameters are data" invariant).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -81,6 +82,130 @@ WATER_CYCLE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "water_cycle.
 # The committed chamber minimal-consumer params (P3 Step 7): the three first-order rates
 # (grazing + consumer respiration + mortality) + the f_O2 O₂ half-saturation.
 HERBIVORY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "herbivory.yaml"
+
+# --- the crop param-set seam (post-roadmap: potato, the first SECOND species) ---------
+# Everything above is the FROZEN winter-wheat reference. Until this seam existed the
+# tree could hold exactly one crop: ``_carbon_context``/``build_plants`` called every
+# loader argument-free, so the module-level defaults *were* the crop. (The "day-neutral
+# crop" is not a counterexample — it is the same winter-wheat files with the cold and
+# daylength gates switched off, deliberately "not a new param file".)
+#
+# A crop is therefore the EIGHT plant-side param files below, resolved as a set. A
+# second species lives in ``params/crops/<name>/`` and overrides the subset the
+# literature can actually distinguish; every file it does NOT carry falls back to the
+# reference file — explicitly, and recorded in ``CropParamSet.shared`` so the fallback
+# is *testable* rather than a silent default. See
+# docs/plans/post-roadmap-potato-crop.md.
+#
+# ⚠ WHY A SUBDIRECTORY, not ``params/potato_phenology.yaml`` — a DELIBERATE decision,
+# not a consequence of where a file landed. ``test_freeze_manifest.py`` globs
+# ``params/*.yaml`` NON-recursively, so a sibling file would trip the completeness gate
+# and a subdirectory does not. That gate's stated job is catching "a new file wired into
+# no committed golden"; a second species is *deliberately* wired into no golden
+# ("authored ≠ validated"), and the frozen surface is the winter-wheat reference — not
+# "every crop". Enlarging ``param_files`` to freeze a set we simultaneously declare
+# unvalidated would be incoherent. The trade-off is written up in the plan doc; it is
+# not hidden here.
+CROPS_DIR: Path = Path(__file__).parent / "params" / "crops"
+
+# name -> the FROZEN reference file that name falls back to. The keys are the crop-set
+# vocabulary: a file in a crop directory whose stem is not a key is a typo, not a new
+# capability, and is rejected.
+_CROP_PARAM_DEFAULTS: dict[str, Path] = {
+    "allocation": ALLOCATION_PARAMS_PATH,
+    "canopy": CANOPY_PARAMS_PATH,
+    "nitrogen": NITROGEN_PARAMS_PATH,
+    "phenology": PHENOLOGY_PARAMS_PATH,
+    "photosynthesis": PHOTOSYNTHESIS_PARAMS_PATH,
+    "respiration": RESPIRATION_PARAMS_PATH,
+    "senescence": SENESCENCE_PARAMS_PATH,
+    "transpiration": TRANSPIRATION_PARAMS_PATH,
+}
+
+
+@dataclass(frozen=True)
+class CropParamSet:
+    """The eight plant-side param files for ONE crop, plus which of them are its own.
+
+    ``paths`` maps each :data:`_CROP_PARAM_DEFAULTS` key to the file the loaders should
+    read. ``overridden`` names the files that came from the crop's own directory and
+    ``shared`` the files that fell back to the frozen winter-wheat reference; the two
+    partition the key set, so a test can assert *exactly* which science a crop claims
+    as its own. That matters here: potato's twelve FvCB photosynthesis params are
+    shared, and the honest reason is that they were never wheat-specific — they are
+    ``TODO(cite)`` placeholders tagged "literature-typical C3", and potato is a C3
+    plant. A claim like that is worth pinning rather than leaving in a comment.
+    """
+
+    name: str
+    paths: dict[str, Path]
+    overridden: tuple[str, ...]
+    shared: tuple[str, ...]
+
+
+#: The frozen winter-wheat reference set — every file the committed default, nothing
+#: overridden. ``crop_param_set(None)`` returns it, so an unmodified scenario reads
+#: exactly the files it read before this seam existed (the goldens' safety property).
+REFERENCE_CROP: CropParamSet = CropParamSet(
+    name="winter_wheat",
+    paths=dict(_CROP_PARAM_DEFAULTS),
+    overridden=(),
+    shared=tuple(sorted(_CROP_PARAM_DEFAULTS)),
+)
+
+
+def crop_param_set(name: str | None = None) -> CropParamSet:
+    """Resolve a crop's param files: ``None`` → the frozen reference, else a crop dir.
+
+    ``name`` is a directory under :data:`CROPS_DIR`. Every ``*.yaml`` in it overrides
+    the same-stem reference file; every reference file it lacks is shared. Raises
+    ``ValueError`` if the directory is missing, holds no ``*.yaml`` at all (a crop that
+    overrides nothing is a mis-staged directory, not a species), or holds a file whose
+    stem is not one of the eight known param names (a typo would otherwise be silently
+    ignored — the failure mode this check exists for).
+
+    Note the resolved files are still read by the **frozen loaders**, so a crop's
+    values pass the same pydantic schema, unit guards and bound checks as the
+    reference. This is the authoring platform's "param pack" discipline (a pack is a
+    param file, not a way around the guards), reused as a concept — deliberately
+    *without* registering biosphere flows in ``authoring.flow_registry.FLOW_TYPES``,
+    which the authoring manifest names and which would make this an authoring-platform
+    unfreeze.
+    """
+    if name is None:
+        return REFERENCE_CROP
+    directory = CROPS_DIR / name
+    if not directory.is_dir():
+        known = (
+            sorted(p.name for p in CROPS_DIR.iterdir() if p.is_dir())
+            if CROPS_DIR.is_dir()
+            else []
+        )
+        raise ValueError(
+            f"unknown crop {name!r}: no directory {directory}. Known crops: {known}"
+        )
+    found = {p.stem: p for p in sorted(directory.glob("*.yaml"))}
+    unknown = sorted(set(found) - set(_CROP_PARAM_DEFAULTS))
+    if unknown:
+        raise ValueError(
+            f"crop {name!r} carries unknown param file(s) {unknown}; known param names "
+            f"are {sorted(_CROP_PARAM_DEFAULTS)}"
+        )
+    if not found:
+        raise ValueError(
+            f"crop {name!r} overrides no param file ({directory} holds no *.yaml); a "
+            "crop that overrides nothing is the reference crop — pass None instead"
+        )
+    paths = {
+        key: found.get(key, default) for key, default in _CROP_PARAM_DEFAULTS.items()
+    }
+    return CropParamSet(
+        name=name,
+        paths=paths,
+        overridden=tuple(sorted(found)),
+        shared=tuple(sorted(set(_CROP_PARAM_DEFAULTS) - set(found))),
+    )
+
 
 # --- kg dry-matter <-> mol carbon boundary conversion (Phase-1 Step 1) -------
 # Crop biomass is conventionally reported in kg dry matter, but our CARBON currency
