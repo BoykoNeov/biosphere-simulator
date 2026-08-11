@@ -1,8 +1,11 @@
 # Post-roadmap: potato — the first *second species*, validated against an offline WOFOST oracle
 
-**Status: PLANNED (2026-08-11). User decision: "both, staged" + "potato only" — the
-validated Python crop first, the Rust habitat mirror after. Stage 2 (Rust) is explicitly
-deferred, not dropped.**
+**Status: STAGE 1 COMPLETE (2026-08-11). Steps 1–6 landed; see "OUTCOME" at the foot.
+Stage 2 (the Rust habitat mirror) is DEFERRED by the user's own "both, staged" decision —
+stated, not dropped. NO frozen golden or manifest moved; 2146 tests green.**
+
+User decision: "both, staged" + "potato only" — the validated Python crop first, the Rust
+habitat mirror after.
 
 Everything the biosphere has ever grown is **one crop**: winter wheat. The "day-neutral
 crop" ([`post-roadmap-day-neutral-crop.md`](post-roadmap-day-neutral-crop.md)) is *not* a
@@ -216,3 +219,116 @@ was.
 * **The oracle (facts only, never params)**: WOFOST 7.2 potential production via
   `pcse.start_wofost(grid=31031, crop=7, year=2000, mode='pp')`, PCSE 6.0.13, bundled
   demo DB.
+
+---
+
+# OUTCOME (2026-08-11) — stage 1 landed, and what the diagnostic actually says
+
+**The framing held.** This establishes *a literature-cited, physically-sane potato,
+runnable as habitat content, with its gaps to WOFOST measured* — **not** "we validated our
+model against an oracle". The single most valuable thing it produced is a **disagreement
+between two independent sources**, which no amount of calibration would have surfaced.
+
+## What shipped
+
+* **The seam** (commit 1): `SeasonScenario.crop` + `loader.crop_param_set` — a crop is the
+  **eight plant-side param files**, resolved as a set, with `overridden`/`shared`
+  partitioning the vocabulary so a reuse claim is *testable*. `tests/test_crop_param_set.py`
+  (8 pins). Additive and default-preserving, proven: 7 goldens + both manifests
+  byte-identical.
+* **The oracle**: `tests/oracle/wofost_potato_runner.py` + `potato_reference.json` (97 d) +
+  `potato_weather.json` (201 d). Offline, licence-clean, plus a **runner cross-check**
+  against PCSE's own shipped `wofost_unittest_benchmarks` (max |Δ| ≈ 1e-3, i.e. SQL text
+  round-trip noise). `tests/oracle/test_potato_regeneration.py` (2, oracle-marked).
+* **The crop**: `params/crops/potato/{phenology,allocation,canopy}.yaml`, cited to [E] off
+  page images; `POTATO_SCENARIO`.
+* **The diagnostic**: `tests/test_potato_crop.py` (13 pins).
+
+## The measured diagnostic (emergence = day 0, aligned day-for-day)
+
+| metric | ours | WOFOST potato | read |
+|---|---|---|---|
+| DVS 1.0 (anthesis) | day **33** | day 44 | veg ~25 % fast |
+| DVS 2.0 (maturity) | day **108** | day 96 | fill long (75 d vs 52 d) |
+| **first tuber carbon** | **day 7** (DVS 0.19) | **day 46** (DVS 1.03) | **the headline** |
+| peak LAI | **3.18** @ day 34 | **8.88** @ day 51 | **2.79× low** |
+| tuber @ day 96 | ~14 260 kg ha⁻¹ | 7 250 kg ha⁻¹ | **1.97× high** |
+| root fraction @ DVS 0.5 | 0.360 | 0.200 | we are root-heavy |
+
+## The findings
+
+1. **THE HEADLINE — two sources disagree *qualitatively* about the same organ of the same
+   crop.** [E] Table 18's van Heemst curve starts filling the tuber essentially at
+   emergence (a positive share the moment development passes 0.15); WOFOST's potato holds
+   tuber weight at **exactly 0** until flowering. Both are "potato", both are cited, and
+   they differ by ~39 days of a 96-day season. This is **cultivar/parameterization
+   variation recorded, not a defect calibrated away** (ruling B) — the same shape as the
+   winter-wheat `tsum` finding, but sharper because it is qualitative rather than a
+   magnitude.
+
+2. **One cause, two symptoms — so "fix the canopy" and "fix the yield" are one question.**
+   The starved canopy (2.79× low) and the over-filled tuber (1.97× high) are *both*
+   downstream of finding 1: assimilate diverted into the tuber from day 7 is assimilate the
+   leaves never got. Recorded explicitly because treating them as two independent defects
+   would invite two independent (and wrong) calibrations.
+
+3. **A canopy agreement is not a property of our canopy.** The day-neutral crop matched its
+   oracle's peak LAI within 2 % and the write-up was careful to call that "both are sane",
+   not cross-validation. This crop is 2.79× low against a different oracle. **Both facts
+   survive together only because neither was fitted** — which is the strongest evidence
+   yet that ruling B is doing real work rather than being a slogan.
+
+4. **The FvCB "gap" was a false alarm, and finding that out was worth the audit.** The
+   advisor flagged the risk of inventing `Vcmax` for a new species. The per-parameter audit
+   showed all twelve FvCB params are `TODO(cite)` placeholders tagged *"literature-typical
+   C3"* — they were **never wheat-specific**. Sharing them with a second C3 crop is exactly
+   as justified as their current use. The general lesson: **before deciding a shared
+   parameter is a compromise, check whether it was ever specific to anything.**
+
+5. **A new crop can be BETTER cited than the frozen reference.** Potato's partition table
+   and specific leaf area are cited first-hand to [E]; wheat's are still `TODO(cite)`, and
+   [`post-roadmap-stem-reserves.md`](post-roadmap-stem-reserves.md) named the uncited
+   partition table *"the real successor"* — the gap blocking a piece of science. Note what
+   this does **not** license: backfilling wheat's table from the same source is an
+   **unfreeze** with its own ceremony, deliberately not done here.
+
+6. **Where reuse is weak, the DIRECTION of the error is written down.** Potato's extinction
+   coefficient is the reference crop's own placeholder, and a broad-leaved planophile canopy
+   plausibly extinguishes light *more* strongly than an erectophile cereal (~0.8–1.0 vs
+   0.6). So it is not merely uncited — it is probably biased **low**, and the next session
+   inherits the finding rather than just the number.
+
+7. **All four designed-for traps behaved, and none was a discovery.** (1) `carbon_fraction`
+   agreement now spans a *crop boundary* (potato overrides canopy but not nitrogen) and is
+   pinned across every crop set. (2) The seed-bank guard never fired — potato's tuber is
+   ~430× the seedling. (3) The sealed chamber does **not** over-draw on the larger crop:
+   FvCB's Ci-shutoff self-limits before the arbitration backstop is needed, under **both**
+   integrators. (4) The `t_base ≠ 0` caveat was restated with potato's own numbers and came
+   out **sharper and reversed in sign** — our cap sits *at* the optimum, so above 18 °C we
+   accumulate development where [E]'s response is declining. That is a live warm-window
+   over-run on the Andalusian season, not a cold-window softness.
+
+## Honest residuals (documented, not fixed)
+
+* **van Heemst (1986) was not opened.** [E] attributes every potato row to it; [E] is a
+  printed primary presenting the values in its own tables, but the LOCUS check that caught
+  Dunn 2011 has **not** been run on van Heemst. Dated residual risk, same standing as the
+  reference crop's [E]-sourced `tsum`.
+* **[E] Table 19's potato row carries no per-row reference**, which its footnote makes a
+  CABO *personal communication* — weaker than a published measurement.
+* **The partition derivation approximates.** [E] interpolates then multiplies; we multiply
+  at the knots then interpolate. Using the union of all three curves' own knots bounds the
+  deviation, and conservation is exact by linearity, but it is an approximation and is
+  stated in the file.
+* **`ci_ratio` was left at the frozen 0.7.** [E] Table 22 offers potato 0.67–0.69 — close,
+  and available — but it is scenario data tied to the sealed chamber's sizing. Noted, not
+  taken.
+* **The model-form gap above 18 °C** (finding 7.4) is not closed by any value.
+
+## Stage 2 — deferred, and what it is
+
+The **Rust habitat mirror**. Under the pivot, authored habitat content is Rust-first, but
+the *validation* lives in the Python laboratory (the oracle is Python and never portable).
+The day-neutral crop's lamp-lit wiring was deferred the same way and landed later; this
+follows that precedent. Nothing in stage 1 owes Rust anything — no golden moved, no
+cross-port tier touched.

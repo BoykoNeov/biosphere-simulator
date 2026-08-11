@@ -76,6 +76,7 @@ line each, newest concerns last. Add detail to the log, never to this table.
 | The O₂ regulator's reversal | DIAGNOSED + CORRECTED 2026-08-11 — the clamp was already refused; the reversal is **not** author-only — it fires in 3 frozen runs the goldens are blind to. A sentence true when written, falsified by a seam three phases later | `post-roadmap-o2-makeup-reversal.md` |
 | The direction gate (`ReversedFlowError`) | **BUILT 2026-08-11** — a third run-time verdict, `RationedError`'s sibling not its variant; authoring platform unfrozen (`flow_types` gains `demand_controlled`), both ports | `post-roadmap-o2-makeup-reversal.md` |
 | Tooling: the PDF-backed citation pins (not science) | FIXED 2026-08-11 — a poppler upgrade re-wrapped quoted phrases; `sources/` is gitignored, so **CI green means nothing was checked** there | `docs/post-roadmap-log.md` (last row) |
+| **Potato — the first SECOND species** | Stage 1 COMPLETE 2026-08-11 (stage 2, the Rust habitat mirror, deferred) — a crop is now a param SET; PCSE's bundled demo DB ships 6 offline oracles, so "new species = authored-only" was a stale reading. Two sources disagree qualitatively about when a tuber starts filling | `post-roadmap-potato-crop.md` |
 
 ## The freeze contracts (four; each has an unfreeze discipline — follow it)
 
