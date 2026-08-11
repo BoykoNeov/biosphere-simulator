@@ -739,10 +739,10 @@ def test_the_jars_carbon_pool_is_the_only_binding_gate(
 # exact values
 # because a drift here means either a golden moved or the gate's reach changed.
 TIGHTEST: dict[str, tuple[str, float]] = {
-    # ⚠ CHANGED 2026-08-11 (soil layers): `open_season`'s tightest live gate is no longer
-    # `leaf_c` (42.50662430453055) but the NEW `subsoil_water` store, at 30.49. This is
-    # the "the gate's reach changed" case this table's own comment anticipates, not a
-    # golden drifting: `RootZoneCapture` withdraws ~2.3 kg/day from a store that falls
+    # ⚠ CHANGED 2026-08-11 (soil layers): `open_season`'s tightest live gate is no
+    # longer `leaf_c` (42.50662430453055) but the NEW `subsoil_water` store, at 30.49.
+    # This is the "gate's reach changed" case this table's own comment anticipates, not
+    # a golden drifting: `RootZoneCapture` withdraws ~2.3 kg/day from a store that falls
     # from 195 kg to 45 kg over the season, so at its tightest the store still covers
     # ~30x one step's demand. It is the tightest row in the open field and still an
     # enormous margin — the ranking moved, the safety did not. Recorded rather than

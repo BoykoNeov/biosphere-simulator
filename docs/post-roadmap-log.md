@@ -31,7 +31,9 @@ line to the index, one pointer row, and one file in `docs/log/` — and adds not
 
 ⚠ Prose elsewhere in the tree still points at "the CLAUDE.md status row" (the
 compose-gap discipline: *re-read the status row for the bucket you closed*). That rule
-survives the move; its target is now this file. `src/domains/power/params/self_discharge.yaml`
+survives both moves; **its target is now the item's file in `docs/log/`** — the index line
+and the pointer row here are navigation, not the record.
+`src/domains/power/params/self_discharge.yaml`
 also refers to something "CLAUDE.md left on the table" — deliberately **not** edited,
 because a comment-only edit to a param file moves its manifest hash and is an unfreeze
 event; a pointer fix is not worth a freeze ceremony.
