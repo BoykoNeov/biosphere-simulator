@@ -65,6 +65,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -868,12 +869,28 @@ def test_the_regulator_does_NOT_rescue_perennial_under_rk4() -> None:
                 shade=shade,
             )
         scale.append(str(exc.value))
+    # THE claim, and it is asserted exactly: the two shade settings produce the
+    # byte-identical failure message, i.e. the regulator never fires on the failing
+    # trajectory. This is `bit-identical within a build`, which the engine DOES promise,
+    # and it holds on every platform.
     assert scale[0] == scale[1], scale
-    # re-measured 2026-08-10 (the humification split): 0.9527733243688737 -> this. The
-    # claim is unchanged and is the point — the regulator still does not rescue
-    # `perennial` under RK4, and the two shade settings still produce the IDENTICAL
-    # sixteen digits, i.e. the regulator never fires on the failing trajectory.
-    assert "0.9363926204726938" in scale[0], scale[0]
+    # re-measured 2026-08-10 (the humification split): 0.9527733243688737 -> this.
+    #
+    # ⚠ The absolute value is compared with a TOLERANCE, and the reason is a measured
+    # platform difference, not a convenience: this repo promises bit-identity *within a
+    # build* and tolerance-gates the Rust port, but it never promised bit-identity
+    # ACROSS PLATFORMS — `exp`/`pow` differ by ULPs between Windows UCRT and glibc.
+    # Pinned as 16 literal digits this read 0.9363926204726938 on Windows and
+    # 0.9363926204726942 on the Linux CI runner (4e-16 apart), so the anchor was
+    # asserting a property nobody guaranteed and CI went red on arithmetic noise.
+    #
+    # The window is sized on two independent measurements, NOT swept until green: the
+    # platform floor is 4e-16, and the smallest real movement this anchor exists to
+    # catch is the humification split's own 1.6e-2. 1e-12 sits ~4 orders above the noise
+    # and ~10 below the signal, so the teeth are unchanged — any science that moves this
+    # trajectory still turns it red.
+    measured = float(re.search(r"scale_f=([0-9.eE+-]+)", scale[0]).group(1))  # type: ignore[union-attr]
+    assert abs(measured - 0.9363926204726938) < 1e-12, scale[0]
 
 
 def test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting() -> None:
