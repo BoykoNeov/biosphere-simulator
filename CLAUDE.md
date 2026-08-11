@@ -16,71 +16,26 @@ phase.** The simulator "is not really about plants; it is about closure of matte
   advisor calls, what was deferred and why). **This is the source of truth for
   what happened.**
 - **`docs/post-roadmap-log.md`** — the same, for everything after Phase 9, plus
-  its own `docs/plans/post-roadmap-*.md` per entry. The table below indexes it.
+  its own `docs/plans/post-roadmap-*.md` per entry. It carries **its own index**;
+  this file does not duplicate it.
 - **`docs/*-reference.md` (+ `.manifest.json`)** — the freeze contracts.
 - **`roadmap_extracted.txt`** — the original charge.
+- **`docs/context-budget.md`** — why this file is small and what keeps it small.
 - Reference material: `docs/bvad-reference.md` (NASA BVAD Table 3-31 — the
   primary source behind the crew params), `docs/param-file-conventions.md`,
   `docs/perf-baseline.md`, `docs/reuse-and-licenses.md`.
 - Do not restate any of it here. See "Working style".
 
-## Phase status
+## Status — all COMPLETE; the detail is not loaded here
 
-| Phase | Topic | Status |
-|---|---|---|
-| 0 | Engine skeleton | COMPLETE |
-| 0.5 | Numerical foundations | COMPLETE |
-| 1 | Single producer | COMPLETE — quantitative oracle match DEFERRED (user decision) |
-| 2 | Closed chamber (producer + decomposer) | COMPLETE |
-| 3 | Modular biosphere / consumers | COMPLETE |
-| 4 | Closed biosphere | COMPLETE — **biosphere FROZEN as the reference** |
-| 5 | Sibling domains (power/thermal/eclss/crew) | COMPLETE |
-| 6 | Station integration (cross-domain coupling) | COMPLETE — **station FROZEN as the multi-domain reference** |
-| 7 | Native core (the Rust port) | COMPLETE |
-| 8 | Godot front-end | COMPLETE |
-| 9 | Scenario authoring & modding | COMPLETE — **the author-facing platform FROZEN** |
+Roadmap Phases 0–9 are all **COMPLETE** (`docs/phase-index.md`; per-phase detail in
+`docs/plans/phase-<n>-*.md`). The roadmap has no Phase 10, so work past it is chosen,
+not scheduled — its record **and its index** are both in `docs/post-roadmap-log.md`,
+one row per piece of work, newest concerns last, each naming its
+`docs/plans/post-roadmap-*.md`.
 
-Each row's detail is in `docs/plans/phase-<n>-*.md`.
-
-**Post-roadmap** (the roadmap has no Phase 10 — work past it is chosen, not scheduled).
-**The record is `docs/post-roadmap-log.md`** — one row per piece of work, with the
-findings, the advisor calls, what was refused and why. Below is the index only: one
-line each, newest concerns last. Add detail to the log, never to this table.
-
-| Work | Status | Detail |
-|---|---|---|
-| Development posture — the Rust-primary pivot | **DECIDED 2026-07-20: Option A** — new content is Rust-first; Python stays frozen-canonical and green for validated science | `post-roadmap-rust-primary-pivot.md` |
-| Scope (B): the day-neutral habitat crop | COMPLETE 2026-07-20 — diagnosed against an offline LINTUL3 oracle; authored, not validated; no golden moved | `post-roadmap-day-neutral-crop.md` |
-| Scope (B): decomposer calibration | COMPLETE 2026-07-21 — the carbon rates moved above-range → top-of-range; biosphere re-frozen. Closure requires the fast edge | `post-roadmap-decomposer-calibration.md` |
-| The nitrogen-cycle FORM gap | (A)+(B) **BUILT** 2026-07-27; (C) **REFUSED**; (D) **not buildable as recorded**. Two weakly-sourced params retired by changing the form, not by finding a citation | `post-roadmap-nitrogen-cycle-form.md` |
-| The canopy regulator | DIAGNOSED 2026-07-27, **NOT BUILT** — fixes the canopy and is bit-identically inert on every frozen scenario | `post-roadmap-canopy-regulator.md` |
-| The chamber-scale diagnosis | DIAGNOSED 2026-08-09 — the sealed jar holds ~2 days of one crop's carbon; enlarging it is refuted by BVAD. The defect is the gate, not the chamber | `post-roadmap-chamber-scale.md` |
-| The acceptance gate | DIAGNOSED 2026-08-09 — the six tightest margins in the whole roster are one stock in one rig; `open_season`'s carbon source is unclamped and holds 0.0. **Its finding 6 ("the decision is the user's") was ADJUDICATED the same day — see the next row** | `post-roadmap-acceptance-gate.md` |
-| The science assertions get contract standing | COMPLETE 2026-08-09 — `science_bands` + `liveness_floors` in both manifests; a schema unfreeze, no value moved | `post-roadmap-acceptance-gate-standing.md` |
-| The humification split (a CUE) | **BUILT 2026-08-10** — CENTURY's partition; the settling transient grew ~3 yr → ~35, past the frozen horizon | `post-roadmap-cue-humification.md` |
-| Soil carbon pool fractionation | **REFUSED TWICE** (2026-08-10) — `decomposition_rate` measured un-retirable by the only cited alternative on the shelf | `post-roadmap-soil-fractionation.md` |
-| The crew-coupled loop | TAKEN and **REFUSED** 2026-08-10 — a chamber is carbon-limited by *isolation*, not volume; the two-rate split caps the crop at the standing pool | `post-roadmap-crew-coupled-loop.md` |
-| The decade CO₂ guard, re-anchored | COMPLETE 2026-08-10 — the window was measured inert on the frozen tree and removed; a tightening, not a re-tune | `post-roadmap-co2-guard-reanchor.md` |
-| Stem-reserve remobilization | DIAGNOSED + PRICED 2026-08-10, **NOT BUILT** — the stem cannot feed the seed; blocked on the uncited partition table, which is the real successor | `post-roadmap-stem-reserves.md` |
-| Test-suite runtime (tooling, not science) | COMPLETE 2026-08-09 — `-n 12`, below-normal priority class; whole suite 7m05s | `docs/test-suite-runtime.md` |
-| The first authored habitat | COMPLETE | `post-roadmap-authored-habitat.md` |
-| The second authored habitat (`bioregenerative_station`) | COMPLETE 2026-08-11 — a frozen flow's "boundary" wiring field is a **name, not a constraint**, so the calibrated equipment recycles | `post-roadmap-bioregenerative-station.md` |
-| Tier 1: grow the flow registry | COMPLETE — authoring platform unfrozen (`flow_types` 3→12, `param_loaders` 2→5) | `post-roadmap-flow-registry-growth.md` |
-| Tier 2: the grammar — `monod` | COMPLETE — grammar unfrozen (`expr_nodes` 7→8); saturation is now sayable | `post-roadmap-grammar-monod.md` |
-| Bucket 3 (A): diagnose + pin the oracle gap | COMPLETE — the gap is **structural**, so the deferred quantitative match is not a calibration task | `post-roadmap-validation.md` |
-| Bucket 3 (B): the full oracle match | INCREMENT 1 + CEREMONY 2 COMPLETE 2026-07-20 — vernalization + photoperiod shipped. **The oracle is a diagnostic, never a fit target** | `post-roadmap-oracle-match.md` |
-| Bucket 2: the export-fidelity hazard | COMPLETE — `rationed == 0` is not "the export is right"; closed by multi-rate Step 5's build-time `k·h < 1` precondition | `tests/test_authoring_export_fidelity.py` |
-| Bucket 2: multi-rate authoring | COMPLETE — all 7 steps; the authoring platform re-frozen with the multi-rate surface in it, both ports | `post-roadmap-multirate-authoring.md` |
-| Bucket 2: the rationing gate | COMPLETE — `run_scenario` now raises on rationing; conservation is not survival | `post-roadmap-rationing-gate.md` |
-| Bucket 3 (C): cite the no-oracle params | CLOSED after 7 rounds — 8 cited, 14 design, 7 unciteable; blocked on retrieval, not effort, with the residual risk documented | `post-roadmap-citation.md` |
-| The O₂ regulator's reversal | DIAGNOSED + CORRECTED 2026-08-11 — the clamp was already refused; the reversal is **not** author-only — it fires in 3 frozen runs the goldens are blind to. A sentence true when written, falsified by a seam three phases later | `post-roadmap-o2-makeup-reversal.md` |
-| The direction gate (`ReversedFlowError`) | **BUILT 2026-08-11** — a third run-time verdict, `RationedError`'s sibling not its variant; authoring platform unfrozen (`flow_types` gains `demand_controlled`), both ports | `post-roadmap-o2-makeup-reversal.md` |
-| Tooling: the PDF-backed citation pins (not science) | FIXED 2026-08-11 — a poppler upgrade re-wrapped quoted phrases; `sources/` is gitignored, so **CI green means nothing was checked** there | `docs/post-roadmap-log.md` (last row) |
-| **Potato — the first SECOND species** | Stage 1 COMPLETE 2026-08-11 (stage 2, the Rust habitat mirror, deferred) — a crop is now a param SET; PCSE's bundled demo DB ships 6 offline oracles, so "new species = authored-only" was a stale reading. Two sources disagree qualitatively about when a tuber starts filling. **Its "one cause, two symptoms" canopy attribution was CORRECTED 2026-08-11 (measured at 39 %, not all)** | `post-roadmap-potato-crop.md` |
-| The winter-wheat partition backfill | TAKEN and **REFUSED 2026-08-11** — the cited table misses the peak-LAI band 2.36×; cause isolated to root share over DVS 0–0.33. Neither table dominates the oracle: the frozen one passes because it was **fitted**. Successor named as root functional coupling — **that successor was TAKEN and its nitrogen half REFUSED the same day; see the next-but-one row** | `post-roadmap-wheat-partition-backfill.md` |
-| Stem reserves: the model FORM found | LEAD 2026-08-11, **NOT STARTED** — [E] p. 93 §3.2.4 + Table 7 + Listings 3/4 carry the form the earlier refusal lacked; a partition table provably cannot substitute for it | `post-roadmap-wheat-partition-backfill.md` |
-| Root functional coupling (the wheat refusal's successor) | **REFUSED on the measurement, then BUILT on the user's call 2026-08-11** — [E] p. 136 decouples rooted depth from root mass **on purpose**, so root CARBON stays refused *by citation*. The depth gate is bit-identically inert (uptake is demand-bound everywhere), was recorded NOT BUILT, and the user overruled: shipped as `aux_set` 2→3 + `root_depth.yaml`, both ports, **no value moved**. Successor is soil layers, for water | `post-roadmap-root-functional-coupling.md` |
-| Soil layers — the water side of root depth | **BUILT 2026-08-11** — the price ("the largest single piece considered") assumed N layers; [F] endorses **two stores**, so the design was refuted by one more sentence of a source already on the shelf. `flow_set` 20→21; the golden diff was **predicted before regeneration and held** — no C/N/O amount moved anywhere. Depth now buys a 2.5× canopy where the topsoil runs out | `post-roadmap-soil-layers.md` |
+**Do not re-index either one here.** A finished piece of work earns a line in the log's
+index and a memory file — not a row in this file. See "Working style".
 
 ## The freeze contracts (four; each has an unfreeze discipline — follow it)
 
@@ -197,12 +152,12 @@ restores it). Pytest runs at below-normal priority *class* so the xdist workers 
 ## Working style
 
 - Plan before non-trivial work; keep `docs/plans/*` updated as living docs.
-- **Keep this file lean — it is loaded into every session, so bytes here are a tax on
-  every task.** It is a map: phase status, invariants, layout, commands. Findings,
-  measurements and rationale go in `docs/post-roadmap-log.md` and the plan docs. On
-  finishing a piece of work, append a row to the **log** and *one line* to the index
-  table above. If an entry needs a paragraph here, it belongs in the log.
-  (This rule was added after the index grew to 206 KB of record — ~50k tokens per
-  session — under a heading that already called itself "a map, not a record".)
+- **This file carries only what you need BEFORE you know what you are working on** —
+  invariants, layout, commands, contract names, pointers. It is loaded unconditionally,
+  so a byte here is a tax on every task, including the ones it cannot help.
+- **On finishing a piece of work: a line in the log's index, a row in the log's record,
+  a memory file. Nothing here.** A finished item is retired from the always-loaded map
+  the moment its lesson is written down elsewhere. Rationale + the paired ceiling test:
+  `docs/context-budget.md`, `tests/test_context_budget.py`.
 - Repo etiquette: branch before committing; Conventional Commits.
   (Commits keep the harness-required `Co-Authored-By: Claude` trailer.)
