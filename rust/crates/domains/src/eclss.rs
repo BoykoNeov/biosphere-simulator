@@ -112,6 +112,14 @@ fn condense_flux(cabin_h2o: f64, condense_rate: f64) -> f64 {
 
 /// Instantaneous O₂-makeup rate `k_makeup · (o2_setpoint − cabin_o2)` (mol/s). The
 /// `(setpoint − cabin_o2)` demand term is bit-exact-load-bearing (Tier-1).
+///
+/// Deliberately **unclamped**, mirroring Python: above the setpoint this goes negative
+/// and the flow reverses (cabin → tank). `docs/authoring-reference.md` refuses a clamp —
+/// the attractor is two-sided only while the controller stays linear — and this is not
+/// hypothetical: the plant-coupled frozen scenarios cross it, because they wire the
+/// regulator to the biosphere O₂ pool and the crop out-produces the crew
+/// (`docs/plans/post-roadmap-o2-makeup-reversal.md`, measured 2026-08-11). A clamp here
+/// would be a silent cross-port divergence AND a science change.
 fn makeup_flux(cabin_o2: f64, o2_makeup_gain: f64, o2_setpoint: f64) -> f64 {
     o2_makeup_gain * (o2_setpoint - cabin_o2)
 }

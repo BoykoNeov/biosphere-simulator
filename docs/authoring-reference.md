@@ -521,12 +521,29 @@ mild; measuring it (`tests/test_authoring_export_fidelity.py`) showed otherwise,
 reason it is worse is the reason it is *invisible*.
 
 **The reversal is real, and it is the harmless half.** `eclss.o2_makeup` is a *linear,
-unclamped* proportional controller. Its frozen docstring notes an above-setpoint venting
-clamp is "a deferred seam that never arises here" — true of every frozen scenario, but an
-author can wire `cabin_o2` above the `10.0 mol` setpoint, at which point the rate goes
-negative and the flow **reverses**, venting cabin O₂ back into the supply tank (measured:
-wired at `20.0`, step 1 moves `−1.2 mol` cabin → tank). It conserves, it does not ration;
-it is simply not what "makeup" suggests. **Do not "fix" this with a clamp**: the symmetry
+unclamped* proportional controller. An author can wire `cabin_o2` above the `10.0 mol`
+setpoint, at which point the rate goes negative and the flow **reverses**, venting cabin
+O₂ back into the supply tank (measured: wired at `20.0`, step 1 moves `−1.2 mol` cabin →
+tank). It conserves, it does not ration; it is simply not what "makeup" suggests.
+
+⚠ **This is not an authored-content-only boundary — corrected 2026-08-11, measured.**
+This section, `domains/eclss/flows.py` and `authoring/flow_registry.py` all used to scope
+the reversal to authors, quoting the flow's own "a deferred seam that never arises here"
+and glossing it "true of every frozen scenario". It is true of the three **standalone**
+cabins and false of the roster: `greenhouse`, `harvest` and `sealed_station` wire the
+regulator to the **biosphere** `O2_POOL`, the crop out-produces the crew, and each pushes
+the pool past the setpoint — `greenhouse`/`harvest` by **0.081 %** (peak 10.008081),
+`sealed_station` by **0.0030 %** (peak 10.000304), a **27× spread** that is stated as two
+numbers rather than one because collapsing them would be this section's own thesis
+committed inside its correction. So frozen runs have carried reversed steps all along
+(`tests/test_o2_makeup_reversal.py`), *though the goldens cannot see them* — a clamp is
+**bit-identically inert** on the `greenhouse` and `harvest` golden bytes (measured).
+Nothing below changes: the decision not to clamp is unaffected, and on these magnitudes
+the behaviour is the controller working. What was wrong was the scope, and it is the
+standing shape — a careful sentence about one subject travelling into a claim about
+another.
+
+**Do not "fix" this with a clamp**: the symmetry
 IS the restoring force — `o2_eq = o2_setpoint − Con_o2/k_makeup` is an attractor from both
 sides only because the controller is linear, and clamping would trade a clean geometric
 contraction for a piecewise nonlinearity. The reversal is correct P-control.

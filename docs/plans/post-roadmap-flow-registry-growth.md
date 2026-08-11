@@ -327,6 +327,14 @@ any single flow's documentation.
   frozen flow's safety argument is scoped to the frozen scenario data, and authoring is
   what escapes that scope.** That generalization is the most transferable thing Tier 1
   learned, and Tier 2 / bucket 3 should expect more of it.
+  > ⚠ **The "true of every *frozen* scenario" half is FALSE — measured 2026-08-11**
+  > (`docs/plans/post-roadmap-o2-makeup-reversal.md`, `tests/test_o2_makeup_reversal.py`).
+  > It is true of the three standalone cabins only. `greenhouse` / `harvest` /
+  > `sealed_station` wire the regulator to the **biosphere** `O2_POOL`, and the crop
+  > out-produces the crew, so the frozen goldens carry reversed steps. Left in place
+  > rather than rewritten, because the *generalization above survives with its own
+  > example inverted*: authoring is not the only thing that escapes a frozen flow's
+  > safety scope — **a cross-domain seam does it too, inside the freeze.**
 * **Nothing owned "the declared `wiring_fields` match the frozen constructor".** The
   registry's docstring argues its duplication is "a stable, deliberately-curated public
   surface … not incidental drift" — but nothing checked the copy was *accurate*. The

@@ -31,10 +31,29 @@ would leave ``cabin_o2`` a restoring-force-free accumulator — Power's derived-
 situation, bounded only by exact balance. The proportional controller makes O₂ a
 **restoring force** (``−k_makeup·cabin_o2`` term) with no readout needed, so **all three
 species share one "restoring force → attractor" story**. The controller is linear (a
-proportional gain, not clamped): in every standalone scenario ``cabin_o2 ≤ o2_setpoint``
-(the consuming crew keeps it below), so makeup only ever *adds* (``S ≥ 0``); an
-above-setpoint venting clamp is a deferred seam that never arises here and would break
-the clean linearity.
+proportional gain, not clamped): in every **standalone** scenario ``cabin_o2 ≤
+o2_setpoint`` (the consuming crew keeps it below), so makeup only ever *adds*
+(``S ≥ 0``).
+
+⚠ **Above the setpoint the law goes negative and the flow reverses — and that is not
+hypothetical: it fires inside the frozen goldens** (measured 2026-08-11,
+``tests/test_o2_makeup_reversal.py``). The coupled station builds wire this regulator to
+the **biosphere's** ``O2_POOL`` rather than a cabin stock (``station/greenhouse.py``,
+``station/sealed.py``), and a photosynthesising crop out-produces the crew, so
+``greenhouse`` / ``harvest`` (by **0.081 %**) and ``sealed_station`` (by **0.0030 %** —
+27× smaller, stated separately on purpose) push the pool past the setpoint, and the
+regulator pushes the excess back into ``boundary.o2_supply``.
+
+⚠ **The goldens are blind to it, they do not pin it** (measured, not inferred): clamping
+``makeup_flux`` leaves every plant-coupled golden **byte-identical**. So a clamp would
+cost no golden cascade anywhere in the roster, and the refusal below rests entirely on
+the physical argument, not on a price.
+
+An earlier version of this paragraph called the venting clamp "a deferred seam that
+never arises here". The *clamp* is still deliberately deferred —
+``docs/authoring-reference.md`` refuses it, because the attractor is two-sided only
+while the controller stays linear — but "never arises here" was a claim about the
+standalone cabins that travelled into a claim about the roster.
 
 **Linear ⇒ geometric, NOT the T⁴ nonlinear attractor (honest framing).** Every control
 law is first-order in the stock amount (or demand-controlled in it), so contraction is
@@ -121,11 +140,17 @@ def condense_flux(cabin_h2o: float, *, condense_rate: float) -> float:
 def makeup_flux(cabin_o2: float, *, o2_makeup_gain: float, o2_setpoint: float) -> float:
     """Instantaneous O₂-makeup rate ``k_makeup · (o2_setpoint − cabin_o2)`` (mol/s).
 
-    A **proportional** controller (demand-controlled toward the setpoint): positive when
-    ``cabin_o2 < o2_setpoint`` (adds O₂), 0 at the setpoint. It supplies the ``−k_makeup
-    · cabin_o2`` restoring force that gives O₂ an attractor with no readout. Not clamped
-    — in every standalone scenario ``cabin_o2 ≤ o2_setpoint`` (the consuming crew keeps
-    it below), so it only ever adds; an above-setpoint venting clamp is a deferred seam.
+    A **proportional** controller (demand-controlled toward the setpoint): positive
+    when ``cabin_o2 < o2_setpoint`` (adds O₂), 0 at the setpoint, **negative above
+    it**. It supplies the ``−k_makeup · cabin_o2`` restoring force that gives O₂ an
+    attractor with no readout, and that attractor is two-sided *because* the law is
+    unclamped.
+
+    Deliberately not clamped (``docs/authoring-reference.md`` decides this and
+    refuses a
+    clamp). In every **standalone** scenario ``cabin_o2 ≤ o2_setpoint``, so it only ever
+    adds; in the **plant-coupled** ones it is wired to the biosphere O₂ pool and does
+    reverse — see the module docstring and ``tests/test_o2_makeup_reversal.py``.
     """
     return o2_makeup_gain * (o2_setpoint - cabin_o2)
 

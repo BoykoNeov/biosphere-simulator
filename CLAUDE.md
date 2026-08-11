@@ -55,7 +55,7 @@ line each, newest concerns last. Add detail to the log, never to this table.
 | The nitrogen-cycle FORM gap | (A)+(B) **BUILT** 2026-07-27; (C) **REFUSED**; (D) **not buildable as recorded**. Two weakly-sourced params retired by changing the form, not by finding a citation | `post-roadmap-nitrogen-cycle-form.md` |
 | The canopy regulator | DIAGNOSED 2026-07-27, **NOT BUILT** — fixes the canopy and is bit-identically inert on every frozen scenario | `post-roadmap-canopy-regulator.md` |
 | The chamber-scale diagnosis | DIAGNOSED 2026-08-09 — the sealed jar holds ~2 days of one crop's carbon; enlarging it is refuted by BVAD. The defect is the gate, not the chamber | `post-roadmap-chamber-scale.md` |
-| The acceptance gate | DIAGNOSED 2026-08-09 — the six tightest margins in the whole roster are one stock in one rig; `open_season`'s carbon source is unclamped and holds 0.0 | `post-roadmap-acceptance-gate.md` |
+| The acceptance gate | DIAGNOSED 2026-08-09 — the six tightest margins in the whole roster are one stock in one rig; `open_season`'s carbon source is unclamped and holds 0.0. **Its finding 6 ("the decision is the user's") was ADJUDICATED the same day — see the next row** | `post-roadmap-acceptance-gate.md` |
 | The science assertions get contract standing | COMPLETE 2026-08-09 — `science_bands` + `liveness_floors` in both manifests; a schema unfreeze, no value moved | `post-roadmap-acceptance-gate-standing.md` |
 | The humification split (a CUE) | **BUILT 2026-08-10** — CENTURY's partition; the settling transient grew ~3 yr → ~35, past the frozen horizon | `post-roadmap-cue-humification.md` |
 | Soil carbon pool fractionation | **REFUSED TWICE** (2026-08-10) — `decomposition_rate` measured un-retirable by the only cited alternative on the shelf | `post-roadmap-soil-fractionation.md` |
@@ -72,6 +72,7 @@ line each, newest concerns last. Add detail to the log, never to this table.
 | Bucket 2: multi-rate authoring | COMPLETE — all 7 steps; the authoring platform re-frozen with the multi-rate surface in it, both ports | `post-roadmap-multirate-authoring.md` |
 | Bucket 2: the rationing gate | COMPLETE — `run_scenario` now raises on rationing; conservation is not survival | `post-roadmap-rationing-gate.md` |
 | Bucket 3 (C): cite the no-oracle params | CLOSED after 7 rounds — 8 cited, 14 design, 7 unciteable; blocked on retrieval, not effort, with the residual risk documented | `post-roadmap-citation.md` |
+| The O₂ regulator's reversal | DIAGNOSED + CORRECTED 2026-08-11 — the clamp was already refused; the reversal is **not** author-only — it fires in 3 frozen runs the goldens are blind to. A sentence true when written, falsified by a seam three phases later | `post-roadmap-o2-makeup-reversal.md` |
 
 ## The freeze contracts (four; each has an unfreeze discipline — follow it)
 

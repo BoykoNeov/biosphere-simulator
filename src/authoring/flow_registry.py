@@ -222,8 +222,12 @@ FLOW_TYPES: dict[str, FlowTypeSpec] = {
     ),
     # DEMAND-CONTROLLED toward o2_setpoint (the one flow of this shape). Not clamped:
     # above the setpoint the frozen law goes NEGATIVE, reversing the flow's direction —
-    # the frozen "above-setpoint venting clamp is a deferred seam" boundary, reachable
-    # by an author who wires cabin_o2 above the frozen 10.0 mol setpoint.
+    # the deliberately-deferred "above-setpoint venting clamp" boundary, reachable by an
+    # author who wires cabin_o2 above the frozen 10.0 mol setpoint. ⚠ NOT an
+    # authored-content-only boundary, though this comment used to imply it was: the
+    # frozen plant-coupled scenarios cross it too, because they wire the regulator to
+    # the biosphere O₂ pool and the crop out-produces the crew
+    # (tests/test_o2_makeup_reversal.py, measured 2026-08-11).
     "eclss.o2_makeup": FlowTypeSpec(
         cls=O2Makeup,
         wiring_fields=("o2_supply", "cabin_o2"),
