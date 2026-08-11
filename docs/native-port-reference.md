@@ -43,6 +43,16 @@ snapshot-visible set (`tiers.json._tier0`):
   set** (structure never drifts mid-run);
 - per-stock `domain` / `quantity` / `unit` / `kind` / `unclamped` and the **composition key
   set** (which quantities a stock carries);
+- the **aux-accumulator key set** — the non-conserved accumulators a run carries
+  (`thermal_time`, `vernalization_days`, and since 2026-08-11 `rooted_depth`). An
+  accumulator present in one port and absent in the other is reported by the comparator as
+  a **structural** diff, not a numeric one, so it is a tier-0 failure at every tier. ⚠ This
+  bullet was ADDED 2026-08-11: the aux channel had been inside the comparison since the
+  accumulators existed, but this list — the fourth freeze contract's prose, the one with
+  **no manifest to gate it** — never said so. Found only because adding a third accumulator
+  made the comparator print `$.aux.rooted_depth: present in reference, missing in candidate`
+  before the Rust mirror landed. Exactly the `freeze-prose-half-is-ungated` shape;
+  the *values* of those accumulators are then compared at the scenario's own float tier;
 - the **stability-signature booleans** — `is_period_2` / `is_stationary` in the drift-summary
   goldens (the period class: since scope (B) increment 1, **perennial and consumer are both
   period-1** — the perennial's former period-2 cycle was a broken-canopy artifact that

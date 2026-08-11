@@ -270,3 +270,22 @@ def test_the_gate_is_inert_on_the_frozen_reference_and_that_is_recorded() -> Non
         default_states[-1].stocks[PLANT_N].amount.hex()
         == wide_states[-1].stocks[PLANT_N].amount.hex()
     )
+
+
+def test_the_harvest_scenarios_root_system_tracks_the_crop_maximum() -> None:
+    # ⚠ A CONSISTENCY REQUIREMENT ACROSS TWO FILES, enforced here because nothing else
+    # can. `HarvestScenario.rooted_depth0` exists because that scenario starts its crop
+    # past anthesis, and its justification is precisely that the value IS the crop
+    # maximum — the extension law has necessarily finished by flowering. That is a
+    # claim
+    # relating two numbers in two different files, asserted only in a comment.
+    #
+    # The harvest golden cannot check it: the golden records whatever
+    # `rooted_depth0` says, so if `root_depth.yaml`'s cap ever moved the golden would
+    # stay green and the stated relationship would quietly become false — the
+    # `asserted-attributions-rot`
+    # shape. Same enforcement precedent as nitrogen.yaml's "carbon_fraction MUST equal
+    # canopy.yaml's value", which is likewise checked in a test rather than trusted.
+    from station.scenario import HARVEST_SCENARIO
+
+    assert HARVEST_SCENARIO.rooted_depth0 == _ROOTD.max_rooted_depth
