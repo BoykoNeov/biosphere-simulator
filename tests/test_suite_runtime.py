@@ -31,12 +31,22 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 from conftest import _PRIORITY_ENV, _WIN_PRIORITY_CLASSES  # noqa: E402
 
-_OPTED_OUT = os.environ.get(_PRIORITY_ENV, "below").strip().lower() in (
+_LEVEL = os.environ.get(_PRIORITY_ENV, "below").strip().lower()
+_OPTED_OUT = _LEVEL in (
     "normal",
     "off",
     "0",
     "no",
 )
+# The class these pins expect. Derived from the CONFIGURED level rather than hard-coded
+# to ``below``, because ``idle`` is a documented, supported level
+# (docs/test-suite-runtime.md) and a machine that selects it was failing pins that meant
+# to guard the *mechanism*, not the default. The invariant these tests exist for is "the
+# drop actually happened, and children inherit it" — pinning the default instead made
+# them fail on a supported configuration while still not catching anything extra.
+# An unknown level falls back to ``below``, matching conftest's own behaviour (it
+# refuses to drop at all, and these pins then fail loudly rather than adapting).
+_EXPECTED_CLASS = _WIN_PRIORITY_CLASSES.get(_LEVEL, _WIN_PRIORITY_CLASSES["below"])
 
 pytestmark = pytest.mark.skipif(
     _OPTED_OUT, reason=f"{_PRIORITY_ENV} opts out of the priority drop"
@@ -69,13 +79,15 @@ def _win_priority_class(pid: int | None = None) -> int:
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows priority classes")
-def test_this_process_runs_below_normal() -> None:
+def test_this_process_runs_at_the_configured_lowered_priority() -> None:
     """The conftest hook actually took effect in *this* process.
 
     ``pytest_configure`` runs in the master and in every xdist worker, so this holds
-    whichever process the test lands in.
+    whichever process the test lands in. Asserted against the CONFIGURED level
+    (``below`` by default, ``idle`` when selected), not against ``below`` alone — the
+    mechanism is what is being pinned, and both levels are supported.
     """
-    assert _win_priority_class() == _WIN_PRIORITY_CLASSES["below"]
+    assert _win_priority_class() == _EXPECTED_CLASS
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows priority classes")
@@ -90,7 +102,7 @@ def test_the_priority_class_is_inherited_by_child_processes() -> None:
     """
     proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(5)"])
     try:
-        assert _win_priority_class(proc.pid) == _WIN_PRIORITY_CLASSES["below"]
+        assert _win_priority_class(proc.pid) == _EXPECTED_CLASS
     finally:
         proc.kill()
         proc.wait()
