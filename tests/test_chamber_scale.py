@@ -232,8 +232,9 @@ def test_the_chamber_crop_is_an_order_of_magnitude_below_the_field_crop() -> Non
     Same crop, same params, same weather; the only difference is a finite carbon pool.
 
     The two W denominators are asserted TOGETHER and never bare: 14.954 t/ha includes
-    fibrous roots, 12.633 t/ha excludes them (Greenwood's basis, the figure CLAUDE.md
-    quotes). This repo has twice been bitten by conflating quantities that differ only
+    fibrous roots, 12.633 t/ha excludes them (Greenwood's basis, the figure
+    `docs/post-roadmap-log.md` quotes — it was CLAUDE.md's until the record moved).
+    This repo has twice been bitten by conflating quantities that differ only
     in their denominator, so the reconciliation is a pin rather than a comment.
     """
     canopy = load_canopy_params()
