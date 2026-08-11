@@ -301,6 +301,16 @@ def test_gap_3_the_canopy_is_starved_downstream_of_gap_2() -> None:
     # runs fast on top of that, so the leaf tap shuts early. Our canopy peaks at 3.18 on
     # day 34; the oracle's reaches 8.88 on day 51 — a 2.8x shortfall.
     #
+    # ⚠ CORRECTED 2026-08-11: that attribution was asserted, not measured, and it is
+    # OVERSTATED. Measured on this harness (see docs/plans/
+    # post-roadmap-wheat-partition-backfill.md), holding the tuber to anthesis lifts the
+    # peak 3.184 -> 5.406 — 39 % of the gap, not all of it. Winter wheat reproduces a
+    # shortfall of the same magnitude class from ROOT share alone, with a storage organ
+    # that opens at DVS 0.77. The statement that survives both crops: peak canopy is set
+    # by assimilate diverted during the COMPOUNDING phase (~DVS < 0.6), whichever organ
+    # does the diverting. The 39 % is not pinned here — a stated deferral, not an
+    # oversight; pinning it needs the four-way harness lifted into tests/.
+    #
     # Worth contrasting with the day-neutral crop, where our peak leaf area landed
     # within 2 % of its oracle: that agreement was NOT a general property of our canopy,
     # and this is the case that shows it. Both facts survive together only because

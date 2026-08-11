@@ -272,6 +272,23 @@ between two independent sources**, which no amount of calibration would have sur
    leaves never got. Recorded explicitly because treating them as two independent defects
    would invite two independent (and wrong) calibrations.
 
+   ⚠ **CORRECTED 2026-08-11 — supported in direction, OVERSTATED in strength.** This
+   claim was asserted, never measured. The wheat partition backfill
+   ([`post-roadmap-wheat-partition-backfill.md`](post-roadmap-wheat-partition-backfill.md))
+   reproduced a canopy shortfall of the same magnitude class on **winter wheat**, whose
+   storage organ opens at DVS 0.77 rather than 0.15, and traced it entirely to **root
+   share** — which made this attribution worth testing rather than assuming. Measured on
+   the same harness, patching only the partition table: holding the tuber to anthesis
+   lifts peak LAI 3.184 → 5.406, closing **39 %** of the gap to the oracle's 8.885 (taking
+   the root share from the fitted wheat table closes 5 %; removing roots outright, an
+   extreme control, closes 86 %). So the early tuber onset is real and is the larger of
+   the two terms **for potato** — but it is not the whole cause, and "one cause" is too
+   strong. The **unifying** statement that survives both crops is not "the tuber" and not
+   "the roots": **peak canopy is set by assimilate diverted during the compounding phase
+   (roughly DVS < 0.6), whatever organ diverts it** — wheat's diverter is roots, potato's
+   is the tuber. The practical advice in the last sentence above is unchanged and if
+   anything strengthened: these are still not two independent defects.
+
 3. **A canopy agreement is not a property of our canopy.** The day-neutral crop matched its
    oracle's peak LAI within 2 % and the write-up was careful to call that "both are sane",
    not cross-validation. This crop is 2.79× low against a different oracle. **Both facts
