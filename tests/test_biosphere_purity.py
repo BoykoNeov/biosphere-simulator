@@ -1,6 +1,7 @@
 """Gate: the biosphere **simulation spine** is stdlib-pure (no config/pint/pydantic).
 
-The biosphere domain is split (CLAUDE.md, Phase-1 carried invariant #11): the
+The biosphere domain is split (``docs/plans/phase-1-single-producer.md``, "Core purity
+(#11)"; CLAUDE.md carries the rule itself under "Core is pure"): the
 flows / aux-rates / scenario assembly stay **stdlib-pure** so the simulation runs
 headless, while the **loader** is the sole config boundary that imports the outer
 stack (pydantic + pint via ``config``). The ``simcore`` AST purity gate

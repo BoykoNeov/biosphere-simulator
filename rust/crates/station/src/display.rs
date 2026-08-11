@@ -14,7 +14,8 @@
 //! **Why the derived readouts need a context (advisor).** Temperature `T = T_space + Q/C`
 //! and SOC% need constants that are deliberately *not* in `State`: the node's heat capacity
 //! and space-reference temperature are radiator params, and the battery's full-charge
-//! reference is sizing/scenario data (CLAUDE.md: "capacity is NOT a param"). The
+//! reference is sizing/scenario data (`docs/plans/phase-5-sibling-domains.md`, Step 2:
+//! "**Capacity is NOT a param** (POOL stocks have no upper clamp)"). The
 //! **shared-stock** highlight is likewise a *construction-time fact of the assembly* — the
 //! station layer explicitly wires specific stocks to be cross-domain (the cabin CO₂/O₂
 //! pools; the coupled `thermal.node`) — not something recoverable from a `Stock` (each
