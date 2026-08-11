@@ -90,6 +90,26 @@ def _pdf_text(name: str) -> str:
     return out.stdout
 
 
+def _flat(text: str) -> str:
+    """Collapse every run of whitespace to one space, for PHRASE checks.
+
+    ⚠ **Why this exists, because it looks like a convenience and is not.** A quoted
+    phrase from a paper is *hard-wrapped* by ``pdftotext``, at a column that depends on
+    the poppler version — so ``"stimulate the decomposition of low-N plant residue" in
+    text`` is really an assertion about **where the extractor broke the line**, not
+    about what the paper says. Three assertions here were written against one layout
+    and silently falsified by a poppler upgrade (2026-08-11, poppler 25.09.1), and
+    **nothing anywhere could notice**: ``sources/`` is gitignored, so on CI every test
+    here ``skip``s. Green-by-skip on CI, rot-only-locally — the mirror image of
+    ``memory/ci-python-job-red-on-linux.md``.
+
+    Flattening preserves the assertion's *subject* exactly (the phrase is in the primary
+    source, and it is). It is not available to the two **absence** claims, which need
+    line structure to tell a bibliography entry from a body sentence.
+    """
+    return " ".join(text.split())
+
+
 def _drive(scenario, years: int, perennial: bool):
     w = _weather(years)
     state, registry = build_season(scenario)
@@ -190,12 +210,22 @@ def test_RothC_carries_no_nitrogen_at_all() -> None:
     """
     text = _pdf_text("RothC_guide_WIN.pdf")
     assert len(text) > 20_000, "extraction failed — the absence claim would be void"
-    lines = [ln for ln in text.splitlines() if "nitrogen" in ln.lower()]
-    assert len(lines) == 2, lines
-    # both are reference-list entries: author, year, title, journal
-    for ln in lines:
-        assert "(" in ln and ")" in ln, ln
-        assert any(tok in ln for tok in ("thesis", "Philosophical transactions")), ln
+    lines = text.splitlines()
+    hits = [i for i, ln in enumerate(lines) if "nitrogen" in ln.lower()]
+    # THE ABSENCE CLAIM: exactly two occurrences in the whole guide. Deliberately an
+    # exact count and deliberately line-based — `_flat` is unavailable here, because
+    # telling a bibliography entry from a body sentence needs the line structure.
+    assert len(hits) == 2, [lines[i] for i in hits]
+    # both are reference-list entries: author, year, title, journal. ⚠ Read with ONE
+    # line of lookahead: pdftotext wraps a reference entry across two physical lines, so
+    # the entry's own tokens ("PhD thesis", "transactions of the Royal Society") land on
+    # the continuation line. One line is enough for both entries in this guide — if a
+    # future extractor wraps one to three, this fails rather than being widened until it
+    # passes, which is the point.
+    for i in hits:
+        entry = _flat(" ".join(lines[i : i + 2]))
+        assert "(" in entry and ")" in entry, entry
+        assert any(tok in entry for tok in ("thesis", "transactions")), entry
 
 
 def test_CENTURY_has_NO_nitrogen_limitation_on_the_DECAY_RATE() -> None:
@@ -210,7 +240,7 @@ def test_CENTURY_has_NO_nitrogen_limitation_on_the_DECAY_RATE() -> None:
     (eq 2, below) and the mineralisation/immobilisation bookkeeping that follows the
     carbon flows — which is precisely what option (B) already built.
     """
-    text = _pdf_text("parton1987.pdf")
+    text = _flat(_pdf_text("parton1987.pdf"))
     assert len(text) > 20_000, "extraction failed — the absence claim would be void"
     # the decay rate is keyed on lignin, first-hand
     assert "exp(-3.0 X Ls)" in text or "exp(-3.0" in text
@@ -272,7 +302,11 @@ def test_in_the_cited_primary_D_and_SOIL_FRACTIONATION_are_ONE_MECHANISM() -> No
     ⚠ The keying quantity differs too: **L/N, not C:N**. (D) as recorded would read a
     quantity CENTURY does not key on, using a state the tree does not have.
     """
-    text = _pdf_text("parton1987.pdf")
+    text = _flat(_pdf_text("parton1987.pdf"))
+    # the length floor the other two extraction tests carry, added for their reason:
+    # `_pdf_text` skips only on a nonzero exit, so a pdftotext that "succeeds" with a
+    # short or empty read would turn every assertion below into a vacuous pass.
+    assert len(text) > 20_000, "extraction failed — the quotations below would be void"
     assert "0.85 - 0.018" in text, "eq [2], the metabolic/structural partition"
     assert "L/N ratio gets larger" in text
     assert "Melillo et al. (1984)" in text
