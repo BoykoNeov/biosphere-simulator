@@ -77,7 +77,7 @@ preamble warns is how a finding gets silently dropped. A retirement criterion ma
 removal routine and mechanical instead of exceptional and lossy.
 
 Applied on 2026-08-12 this retired the entire Phase 0–9 table (11 rows) and all 32
-post-roadmap rows — **both moved verbatim, nothing rewritten:**
+post-roadmap rows — **both moved content-verbatim, nothing rewritten:**
 
 - the phase table → `docs/phase-index.md`
 - the post-roadmap index → the top of `docs/post-roadmap-log.md`, above the record it
