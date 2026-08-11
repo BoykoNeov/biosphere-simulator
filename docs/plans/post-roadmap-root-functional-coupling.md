@@ -1,4 +1,4 @@
-# Root functional coupling — DIAGNOSED 2026-08-11, NOT BUILT (fork open)
+# Root functional coupling — DIAGNOSED and REFUSED 2026-08-11, NOT BUILT
 
 Read-only so far. No `src/`, param, golden or manifest change; `git diff src/` empty.
 Probe scripts live outside the tree (`M:/claud_projects/temp/root-coupling/`); every
@@ -156,33 +156,107 @@ direction — Brouwer's functional equilibrium, p. (§ water relations):
 > … At higher stress levels during the vegetative phase, the share that goes to the roots
 > increases by up to 50 % of the amount that otherwise would go to the shoot."
 
-⇒ **In the cited literature, root carbon is a CONSEQUENCE of stress, not a CAUSE of uptake.**
-"Make root carbon buy something" is not a form the shelf offers. What the shelf offers is a
-*rooting-depth state* that does real work on both water and nitrogen, plus a *stress →
-allocation* rule that grows roots. Those two close a loop only if depth is tied to root
-mass — and **that link is exactly the uncited one**, in both sources.
+⇒ **Root carbon is decoupled from root FUNCTION on purpose, and `[E]` says so outright.**
+This is not an omission either source made; it is a stated modelling principle with a
+physical reason (p. 136):
 
-This is the same shape the project has now hit three times (the canopy regulator, stem
-reserves, this): **the mechanism we want rests on a state variable we do not have.** The
-difference here is that the missing state is cited, buildable, and does work — it just is
-not the state the charge names.
+> "The length of fibrous roots can vary enormously without much impact on root weight.
+> Hence, **simulation of rooted depth occurs independently of the growth of root mass.**"
 
-## The fork — the user's call, not settled here
+That single sentence is the answer to the charge. The wheat doc's finding — root carbon is
+dead weight in our model — is **true**, but the remedy it implied (make root carbon buy
+something) is **contradicted by the primary**: the quantity that does the work is root
+*length/depth*, and length is not a function of weight. Care with the scope of this claim:
+`[E]` decouples depth from mass, which is not the same as saying root carbon has no
+function at all — the "consequence, not cause" reading above holds specifically along the
+*depth* chain.
+
+⚠ And root carbon is not merely useless, it is **costly**: `respiration.py` charges
+maintenance on `Σ(leaf + stem + root)`, and senescence bleeds roots at `rdr_root =
+0.01/day`. So allocation below ground is a pure sink — which is exactly the bias that let a
+*fitted* root share pass the canopy band in the wheat backfill.
+
+## Measurement 4 — THE VERDICT: a rooting-depth gate on nitrogen is INERT too
+
+Before designing the build, the gate was measured rather than assumed. `NitrogenUptake`'s
+availability was multiplied by `FROOT1 = min(rooted_depth / soil_layer_depth, 1)` with depth
+on `[E]`'s trajectory (0.15 m at sowing, +0.02 m/day, capped), swept over layer depths of
+0.2 / 0.5 / 1.0 m, alone and combined with the cited uptake ceiling. Full final state,
+stock-by-stock, hex-float:
+
+| case | result across all 8 scenarios |
+|---|---|
+| `FROOT1` gate only, layer 0.2 m | **BIT-IDENTICAL** |
+| `FROOT1` gate only, layer 0.5 m | **BIT-IDENTICAL** |
+| `FROOT1` gate only, layer 1.0 m | **BIT-IDENTICAL** |
+| `FROOT1` + ceiling 0.0003 | identical to the ceiling acting alone — the gate adds **nothing** |
+| `FROOT1` + ceiling 0.0002 | identical to the ceiling acting alone — the gate adds **nothing** |
+
+**Zero effect, at every layer depth, alone or combined.** The two supply-side reductions do
+not compound into a bite.
+
+**Why — and this is the structural finding of the whole exercise.** Measurement 1 showed
+uptake is **demand-bound on every step of every scenario**. `FROOT1` and the ceiling both
+shrink *supply*, and supply has ≥1.9× headroom at its tightest and ≥7.6× nearly everywhere.
+Worse, the gate is anti-correlated with the need for it: **rooting depth and nitrogen demand
+grow together** — depth is smallest when the plant is a seedling demanding almost nothing,
+and has saturated (`FROOT1 = 1`) long before demand peaks around day 210. A depth gate can
+never catch up with a demand that outruns it.
+
+⇒ **No supply-side root coupling can bite in this model.** That is not a fact about our
+scenarios; it is a fact about the flow's form.
+
+## The verdict, against the project's own precedent
+
+`post-roadmap-canopy-regulator.md` priced exactly this position and refused it:
+
+> **Benefit on the frozen tree: exactly zero, bit-for-bit.** Adopting it alone would move
+> nothing and cost a full cascade — its only value is as a *precondition* for a form the
+> tree refuses.
+
+This build is in the same position, and the same verdict follows: **rooting depth gating
+nitrogen is NOT BUILT.** It would cost a new aux accumulator (`aux_set` 2 → 3, a biosphere
+unfreeze), a new param file, both ports and the cross-port tier, to change **nothing,
+bit-for-bit**. That is the fourth measurably-inert mechanism in this series (canopy
+regulator, stem reserves' trigger, the uptake ceiling, this).
+
+## What is NOT refuted — the water side, and its real price
+
+Depth was measured inert **on nitrogen only**. The water coupling is a different shape and
+is untested: `TTSW = DEPORT · EXTR` changes the *size of the accessible pool*, not the rate
+of a demand-bound flow — and water stress genuinely bites in `water_biting` and `drought`.
+
+But it cannot be done additively. Our soil water is a **single pool** with fixed
+wilting/critical thresholds; deeper roots reach water that is physically present but
+currently unreachable, so representing that needs the pool split into reachable and
+unreachable parts — i.e. **soil layers**. That is a structural change to the frozen
+biosphere reference, not a new mechanism alongside it, and both sources assume layers
+throughout (`ZRTL`, `ATSW1`, the L2SS/L2SU modules).
+
+⚠ Also still owed if that is ever taken: `[E]` Table 25 carries per-species rates and
+maximum depths, but its text layer **column-collapses** (18 rate values against 15 species
+labels; the maximum-depth column reads `ies) 1.8 1.8 1.0 OM …`) — the same failure mode as
+`[E]` Table 18 and `[F]` Table 17.1, needing the page-image method. Two of the rate values
+are flagged `*` = the source's own **estimate**, and the wheat rows may be among them.
+Clean from body text, and enough to have run measurement 4: *"Rooted depth can increase at a
+rate of 3–5 cm d⁻¹"*, *"Root growth generally stops around flowering"*, and that the
+temperature effect is taken equal to photosynthesis's and the water-stress effect equal to
+that of water uptake at the root tips.
+
+## The fork that remains
 
 **(a) Cite the uptake ceiling and move it into the band.** Retires `nitrogen.yaml`'s last
 `TODO(cite)`; measured scientifically inert (7 of 8 scenarios bit-identical, one stock at
 1–2 ULPs); costs a full biosphere unfreeze ceremony for a zero-science change; does
 **nothing** for roots. Small, clean, and honest about what it is.
 
-**(b) Build rooting depth as a state.** Genuinely cited twice over, gates both water
-(`TTSW`) and nitrogen (`SNAVL`), and makes depth-limited growth a real mechanism the model
-currently lacks. Bigger: a new state variable, a new param file, both ports, a full
-unfreeze. But it leaves `ROOT_C` **exactly as inert as it is today** — so it does not
-discharge the wheat doc's successor, it replaces it.
+**(b) Soil layers, so depth can gate water.** The only remaining way to make roots do work.
+A structural change to a frozen reference — the largest single piece of work the
+post-roadmap record has considered — and its parameters need the page-image read.
 
-**(c) Refuse, and record why.** The charge as written — make root *carbon* productive —
-has no cited form on this shelf; building one would be inventing the link both primaries
-decline to make. That is the move this project normally refuses.
+**(c) Stop here.** The diagnosis is the deliverable: the charge is answered (root *carbon*
+has no cited function, by the primary's own statement), the supply-side dead end is measured
+rather than assumed, and the price of the one live successor is written down.
 
 ## Sources
 
