@@ -15,9 +15,9 @@ phase.** The simulator "is not really about plants; it is about closure of matte
   design *and* per-step `COMPLETE`/`RESOLVED` outcome blocks (findings, the
   advisor calls, what was deferred and why). **This is the source of truth for
   what happened.**
-- **`docs/post-roadmap-log.md`** — the same, for everything after Phase 9, plus
-  its own `docs/plans/post-roadmap-*.md` per entry. It carries **its own index**;
-  this file does not duplicate it.
+- **`docs/post-roadmap-log.md`** — the same, for everything after Phase 9. It carries
+  **its own index**, and this file does not duplicate it; the record itself is one file
+  per work item in `docs/log/`, each naming its `docs/plans/post-roadmap-*.md`.
 - **`docs/*-reference.md` (+ `.manifest.json`)** — the freeze contracts.
 - **`roadmap_extracted.txt`** — the original charge.
 - **`docs/context-budget.md`** — why this file is small and what keeps it small.
@@ -30,12 +30,12 @@ phase.** The simulator "is not really about plants; it is about closure of matte
 
 Roadmap Phases 0–9 are all **COMPLETE** (`docs/phase-index.md`; per-phase detail in
 `docs/plans/phase-<n>-*.md`). The roadmap has no Phase 10, so work past it is chosen,
-not scheduled — its record **and its index** are both in `docs/post-roadmap-log.md`,
-one row per piece of work, newest concerns last, each naming its
-`docs/plans/post-roadmap-*.md`.
+not scheduled — its index is in `docs/post-roadmap-log.md` (newest concerns last) and its
+record is one file per work item in `docs/log/`.
 
 **Do not re-index either one here.** A finished piece of work earns a line in the log's
-index and a memory file — not a row in this file. See "Working style".
+index, a pointer row, a file in `docs/log/`, and a memory file — not a row in this file.
+See "Working style".
 
 ## The freeze contracts (four; each has an unfreeze discipline — follow it)
 
@@ -155,8 +155,8 @@ restores it). Pytest runs at below-normal priority *class* so the xdist workers 
 - **This file carries only what you need BEFORE you know what you are working on** —
   invariants, layout, commands, contract names, pointers. It is loaded unconditionally,
   so a byte here is a tax on every task, including the ones it cannot help.
-- **On finishing a piece of work: a line in the log's index, a row in the log's record,
-  a memory file. Nothing here.** A finished item is retired from the always-loaded map
+- **On finishing a piece of work: a line in the log's index, a pointer row, a file in
+  `docs/log/`, a memory file. Nothing here.** A finished item leaves the always-loaded map
   the moment its lesson is written down elsewhere. Rationale + the paired ceiling test:
   `docs/context-budget.md`, `tests/test_context_budget.py`.
 - Repo etiquette: branch before committing; Conventional Commits.

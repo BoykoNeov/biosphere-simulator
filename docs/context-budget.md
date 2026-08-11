@@ -1,8 +1,9 @@
 # The context budget — why `CLAUDE.md` is small, and what keeps it small
 
-**Status: rules 1–3 BUILT 2026-08-12** (rule 3's gate shipped with a vacuous assertion,
-caught on advisor review the same day and fixed — see rule 3). **Rule 4 (splitting the
-record file) is diagnosed, priced, and NOT BUILT — the user deferred it deliberately.**
+**Status: all four rules BUILT 2026-08-12.** Rules 1–3 first (rule 3's gate shipped with
+a vacuous assertion, caught on advisor review the same day and fixed — see rule 3); rule 4
+was deferred by the user at that point and taken later the same day as its own piece of
+work.
 
 Every other contract in this repo has a paired test. This one did not, and it failed
 inside 24 hours. That is the whole reason this document exists.
@@ -122,6 +123,9 @@ does no work at load time loses it.**
    and the log names no plan doc that does not exist.
 5. **The moved phase table is content-pinned** by sha-256, so "moved verbatim" stays a
    measured fact rather than a sentence.
+6. **Three more, added by rule 4** once the record moved out to `docs/log/`: pointer↔file
+   parity against the disk, each file's heading being its row's Work cell verbatim, and a
+   line-length cap. See rule 4.
 
 > **Rule 3 shipped broken, and the bug is worth keeping on the record.** Its first
 > version compared the *plan docs each table names*. That is vacuous for any row naming
@@ -174,24 +178,79 @@ actually captures the lesson. It bounds the blast radius; it does not supply jud
 This is the same standing the freeze manifests have: they own **completeness**, the
 goldens own **values**, and neither owns "is this science right".
 
-## Rule 4, diagnosed and not built
+### 4. The record is one file per work item, not one *line* per work item
 
-`docs/post-roadmap-log.md` is **255 KB in 52 physical lines** — one giant markdown table
-where a single work item is one line. The nitrogen row is **55,289 characters on line
-30**.
+The first three rules are about *size*. This one is about **shape**, and the shape was the
+worse defect. `docs/post-roadmap-log.md` held **255,567 bytes of record in 32 physical
+lines** — one markdown table row per work item — and the nitrogen row alone was **54,343
+characters on one line**.
 
-This defeats every tool that reads it: `Grep` returns a 55 KB line as "one match", `Read`
-cannot page into a row, and `git diff` rewrites the whole line for a one-word edit. **The
-record being unusable is a worse defect than the index being big.**
+That defeats every tool that reads the file: `Grep` returns a 54 KB line as "one match",
+`Read` cannot page into a row, and `git diff` rewrites the whole line for a one-word edit.
+**A record nobody can read is a worse defect than an index nobody needs.**
 
-The fix is a **mechanical split that preserves bytes exactly** — one file (or one
-multi-line block) per work item, moved verbatim, with the table reduced to pointers.
-Any version of this that reads as "condense the record" must be refused: the log's own
-preamble already establishes that hand-condensing rows is how findings get dropped, and
-it is right. **Relocate and point; never summarise.**
+> **Two numbers here were wrong before this was built, in the same way twice.** It said
+> "55,289 **characters** on line 30". That is a *byte* count — `awk length()` in the C
+> locale counts bytes, and Python's `len()` gives 54,343 for the same row; the 946-byte
+> gap is the em-dashes and `₂`/`→`/`⚠`. And "line 30" was stale by one commit: the row
+> moved to line 82 when the index landed above it. Both numbers were carried in three
+> documents. **A number quoted in three places is a number nobody re-measures** — the
+> same failure as the 30-vs-32 row count above, which is why it is recorded rather than
+> quietly corrected.
 
-Deferred by the user on 2026-08-12 as its own piece of work, since it touches 255 KB and
-is independent of the rules above.
+**The fix is a mechanical split that preserves the content exactly**, and "exactly" is
+enforced by construction rather than by care. A table cell is one physical line, so the
+*only* transformation applied is choosing which of its separator spaces become newlines:
+
+```
+"\n".join(body_lines).replace("\n", " ") == the original cell        # character-for-character
+```
+
+The generator asserts that per file before writing anything. It never breaks at the two
+double-space sites in the record, and never where the next word would read as a markdown
+list, heading, quote or rule at the start of a line.
+
+**Measured, not asserted.** The sha-256 of the 32 original cells and of the 32
+reconstructions are both
+`96bffdcb896cceafb7985f326b0d9fc186c8617320d3d3d6106e7aabd8c5e658`. The first was computed
+by a separate script reading the pre-split file, so those are not the same arithmetic done
+twice; the second was recomputed a third time from the files on disk, in the pointer
+table's order, after the falsification pass had finished mutating and restoring them. The
+log's index half is byte-identical across the change
+(`7afb080f431557b349ed5fee33cadf88c57be47b70d60acd2b6ae64e73cb65b2` before and after), and
+`git diff --numstat` on the log reads **41 insertions / 33 deletions** — the record
+section and nothing else.
+
+**Not one word of record prose was rewritten.** Any version of this that reads as
+"condense the record" must be refused: the log's own preamble already establishes that
+hand-condensing rows is how findings get dropped, and it is right. **Relocate and point;
+never summarise.** The only editorial content added is a four-line back-pointer at the top
+of each file.
+
+The record table became a pointer table, and the index was left alone. That is not the
+tidiest possible design — merging the two tables would drop a duplicate — but the index
+rows are *the ones moved verbatim from `CLAUDE.md`*, and rewriting them to add a column
+would make the "moved verbatim, verified line-by-line against `d86d9c8`" claim above false
+as written. Rule 2's argument against two indexes turns on *unconditional* load; the log
+is not unconditionally loaded, so 32 short pointer rows cost nothing.
+
+> **The gate got the assertion that matters only because the design was reviewed.** The
+> plan was to pin a sha-256 of the reconstructed record in the standing test, mirroring
+> the phase table. That is right for the phase table, which is frozen forever, and
+> **wrong for a living record**: it goes red on the next legitimate append, and the fix
+> becomes "bump the hash" — training precisely the reflex this whole document exists to
+> prevent. So the digests above are a **one-shot migration proof**, and the standing test
+> is structural only. In their place the gate gained **a maximum line length on
+> `docs/log/*.md`**, which was missing: without it, a split that moves 54 KB into its own
+> file and leaves it on one line is **a relocation, not a discipline** — this document's
+> own headline finding, applied to the fix for it.
+
+Going forward, a finished piece of work adds **one index line, one pointer row, and one
+file in `docs/log/`**. Four of the gate's assertions hold that together: row-count parity,
+pointer↔file parity against the disk, the file's heading being its row's Work cell
+verbatim, and the line cap. Each was falsified before being believed — a deleted record
+file, an unpointed one, a drifted heading, a file re-joined to one line, and a plan doc
+named on only one side each turn it red.
 
 ## Result
 
@@ -200,12 +259,16 @@ is independent of the rules above.
 | `CLAUDE.md` | 17,715 B | 9,520 B (ceiling 12,000) |
 | Share that was a status ledger | 50.2 % | 0 % |
 | Indexes over the post-roadmap ledger, loaded unconditionally | 2 | 1 |
-| Enforcement | honour system (failed in 24 h) | `tests/test_context_budget.py` |
+| Longest physical line in the record | 54,343 chars | 94 chars (cap 120) |
+| Files the record occupies | 1 | 33 (`docs/log/`) |
+| Enforcement | honour system (failed in 24 h) | `tests/test_context_budget.py`, 10 tests |
 
 **No record was condensed, summarised, or dropped.** Both tables moved content-verbatim,
-verified line-by-line against `d86d9c8`; the phase table is content-pinned from here on.
+verified line-by-line against `d86d9c8`; the phase table is content-pinned from here on;
+the split record's 32 cells reconstruct to the same sha-256 as the originals.
 
 Every assertion in the gate was **falsified before being believed** — a re-added status
-row, a blown ceiling, an index row deleted from one table only, and an edited phase row
-each turn it red. That mattered: the first version of the parity check passed all of it
-while testing nothing (see rule 3 above).
+row, a blown ceiling, an index row deleted from one table only, an edited phase row, a
+deleted record file, an unpointed one, a drifted heading, and a record file put back on
+one line each turn it red. That mattered: the first version of the parity check passed all
+of it while testing nothing (see rule 3 above).

@@ -28,12 +28,28 @@ The assertions:
    discipline was such a row: deleting it from the index alone was measured green. Row
    counting is blind to what a row names, which is the property that check lacked. Both
    are kept — the set comparison is sharper where it applies.
-4. **Completeness:** every ``docs/plans/post-roadmap-*.md`` on disk is named in the log.
+4. **Pointer ↔ file parity**, since rule 4 moved the record out to one file per work
+   item in ``docs/log/``: every pointer row names a file that exists, and every file is
+   named by a row. Same job as (3), now spanning the table and the disk.
+5. **No record file is one giant line.** The defect rule 4 fixed was *shape*: one work
+   item was one physical line of a markdown table, up to 54,343 characters, which
+   defeats ``Grep``, ``Read`` and ``git diff`` alike. Without this cap, a split that
+   moves the bytes and leaves them on one line is a **relocation, not a discipline** —
+   this module's own headline finding, applied to the fix for it.
+6. **Completeness:** every ``docs/plans/post-roadmap-*.md`` on disk is named in the log.
    Aimed where the ceiling is blind: a plan doc written and then never indexed is
    invisible to a byte count.
-5. **The moved Phase 0-9 table is content-pinned**, because "moved verbatim" is a claim
+7. **The moved Phase 0-9 table is content-pinned**, because "moved verbatim" is a claim
    about bytes and this repo has been bitten before by claims that were only ever
    re-read, never measured.
+
+**What is deliberately NOT pinned here: the content of the record.** The 32 migrated
+files were verified character-for-character against the table they came out of, and both
+sha-256 digests are recorded in ``docs/context-budget.md`` and the migration commit —
+but as a **one-shot proof**, not an assertion. A content pin is right for the phase
+table, which is frozen forever, and wrong for a living record that every work item
+appends to: it would go red on the next legitimate row, and the fix would be "bump it",
+which trains precisely the reflex this module exists to prevent.
 
 Byte counts are **newline-normalized** (the house convention, see
 ``test_freeze_manifest.py``): the repo is developed on Windows and CI runs Linux, so a
@@ -60,6 +76,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 CLAUDE_MD = REPO_ROOT / "CLAUDE.md"
 LOG = REPO_ROOT / "docs" / "post-roadmap-log.md"
+RECORDS = REPO_ROOT / "docs" / "log"
 PLANS = REPO_ROOT / "docs" / "plans"
 PHASE_INDEX = REPO_ROOT / "docs" / "phase-index.md"
 
@@ -99,9 +116,23 @@ INDEX_SURPLUS_ROWS = 1
 _PLAN_DOC = re.compile(r"(?<!memory/)\b(post-roadmap-[a-z0-9-]+\.md)")
 _LOG_SELF = "post-roadmap-log.md"
 
+# A pointer row in the record table: ``| <work> | [the record](log/<slug>.md) |``.
+_RECORD_LINK = re.compile(r"\[the record\]\(log/([a-z0-9-]+\.md)\)")
+
+# Measured 2026-08-12 on the 33 files the split produced: the longest wrapped line is 94
+# characters (the wrapper targets 92 and overshoots only when a single unbreakable token
+# is longer — the longest in the record is an 84-character test name). The cap is NOT a
+# style rule and must not be read as one; it exists so that "one work item is one
+# physical line" — a 54,343-character row — cannot come back.
+MAX_RECORD_LINE_CHARS = 120
+
 
 def _plan_docs(text: str) -> set[str]:
     return {m for m in _PLAN_DOC.findall(text) if m != _LOG_SELF}
+
+
+def _record_files() -> list[Path]:
+    return sorted(RECORDS.glob("*.md"))
 
 
 def _normalized_bytes(path: Path) -> int:
@@ -185,25 +216,113 @@ def test_log_index_and_record_have_the_same_row_count() -> None:
     )
 
 
+def test_every_pointer_row_names_a_record_file_and_vice_versa() -> None:
+    """Rule 4 moved the record to one file per work item; the table is now pointers.
+
+    Same job as the row count above, but spanning the table and the disk — a record file
+    deleted, renamed, or written and never pointed at is invisible to a row count.
+    """
+    _, record = _log_sections()
+    rows = _data_rows(record)
+    pointed = [_RECORD_LINK.search(row) for row in rows]
+    unlinked = [row[:80] for row, m in zip(rows, pointed, strict=True) if m is None]
+    assert not unlinked, (
+        f"record-table rows in {LOG.name} with no `[the record](log/...)` link:\n  "
+        + "\n  ".join(unlinked)
+    )
+    named = {m.group(1) for m in pointed if m is not None}
+    on_disk = {p.name for p in _record_files()}
+    assert named == on_disk, (
+        f"the record table and docs/log/ disagree:\n"
+        f"  pointed at but missing: {sorted(named - on_disk)}\n"
+        f"  on disk but pointed at by nothing: {sorted(on_disk - named)}\n"
+        "New work adds one index line, one pointer row, AND one file in docs/log/."
+    )
+
+
+def test_each_record_file_is_headed_by_its_own_row() -> None:
+    """The file's ``##`` heading is the pointer row's Work cell, verbatim.
+
+    Two jobs. It keeps a file and its row from drifting into describing different work —
+    a pointer table whose labels no longer match what they point at is worse than no
+    table. And it is what licenses the heading's exemption from the line cap below: a
+    heading cannot be wrapped, so it is only safe to exempt because it is a *copy of a
+    bounded cell* rather than free prose.
+    """
+    _, record = _log_sections()
+    mismatches: list[str] = []
+    for row in _data_rows(record):
+        m = _RECORD_LINK.search(row)
+        if m is None:
+            continue
+        work = row[2:].split(" | ")[0]
+        path = RECORDS / m.group(1)
+        head = path.read_text(encoding="utf-8").split("\n", 1)[0].rstrip()
+        if head != f"## {work}":
+            mismatches.append(f"{path.name}\n    row:  {work}\n    head: {head}")
+    assert not mismatches, (
+        "record file headings that are not their row's Work cell:\n  "
+        + "\n  ".join(mismatches)
+    )
+
+
+def test_no_record_file_is_one_giant_line() -> None:
+    """The shape defect rule 4 fixed, kept fixed.
+
+    The record used to be 32 rows of a markdown table — one work item per *physical
+    line*, the longest 54,343 characters. `Grep` returns such a line as "one match",
+    `Read` cannot page into it, and `git diff` rewrites the whole line for a one-word
+    edit. Moving those bytes into their own files without breaking the lines would have
+    been a **relocation, not a discipline**: the same failure this module documents, in
+    the fix for it. So the cap is asserted, not assumed.
+    """
+    offenders: list[str] = []
+    for path in _record_files():
+        lines = path.read_text(encoding="utf-8").replace("\r\n", "\n").split("\n")
+        # Line 1 is the ``##`` heading — unwrappable by construction, and pinned to its
+        # pointer row by ``test_each_record_file_is_headed_by_its_own_row``, which is
+        # what makes skipping it safe rather than a hole.
+        for n, line in enumerate(lines[1:], 2):
+            if len(line) > MAX_RECORD_LINE_CHARS:
+                offenders.append(f"{path.name}:{n} is {len(line)} chars")
+    assert not offenders, (
+        f"record files over the {MAX_RECORD_LINE_CHARS}-char line cap:\n  "
+        + "\n  ".join(offenders)
+        + "\nThis is not a style rule. One work item per physical line is the defect "
+        "rule 4 removed; wrap the prose instead of raising the cap."
+    )
+
+
 def test_log_index_and_record_name_the_same_plan_docs() -> None:
-    """The sharper half of parity, for the rows that do name a plan doc."""
-    index, record = _log_sections()
+    """The sharper half of parity, for the rows that do name a plan doc.
+
+    Re-pointed by rule 4: the record side is now the union of the files in ``docs/log/``
+    rather than a column of the table.
+    """
+    index, _ = _log_sections()
     in_index = _plan_docs(index)
-    in_record = _plan_docs(record)
+    in_record = _plan_docs(
+        "\n".join(p.read_text(encoding="utf-8") for p in _record_files())
+    )
     assert in_index, "the log's index table names no plan docs at all"
     assert in_index == in_record, (
-        f"index/record disagree in {LOG.name}:\n"
+        f"the log's index and docs/log/ disagree:\n"
         f"  indexed but not recorded: {sorted(in_index - in_record)}\n"
         f"  recorded but not indexed: {sorted(in_record - in_index)}\n"
-        "New work appends to BOTH tables — one line to the index, the full row to the "
-        "record."
+        "New work adds one index line naming its plan doc AND one record file naming "
+        "the same one."
     )
 
 
 def test_every_plan_doc_is_indexed() -> None:
     """Completeness — the gap a byte ceiling is structurally blind to."""
     on_disk = {p.name for p in PLANS.glob("post-roadmap-*.md")}
-    named = _plan_docs(LOG.read_text(encoding="utf-8"))
+    named = _plan_docs(
+        "\n".join(
+            [LOG.read_text(encoding="utf-8")]
+            + [p.read_text(encoding="utf-8") for p in _record_files()]
+        )
+    )
     assert on_disk <= named, (
         f"plan docs on disk but named nowhere in {LOG.name}: {sorted(on_disk - named)}"
     )
