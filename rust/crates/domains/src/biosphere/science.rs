@@ -10,6 +10,7 @@
 //! rate laws; the *behavioral* clamps (`lai == 0 → 0`, `max(0, …)`, piecewise cutoffs)
 //! are kept exactly.
 
+use super::params;
 use super::params::{CanopyParams, PartitionRow, PhotosynthesisParams, RespirationParams};
 use super::weather::{saturation_vapor_pressure, SVP_B, SVP_C};
 
@@ -247,6 +248,56 @@ pub fn root_zone_fraction(rooted_depth: f64, soil_layer_depth: f64) -> f64 {
     }
 }
 
+/// Water density, kg m^-3 — the constant `soil_layers.py::WATER_DENSITY` mirrors.
+pub const WATER_DENSITY: f64 = 1000.0;
+
+/// The water a newly explored soil column of thickness `depth_increment` (m) holds, kg.
+///
+/// `m * (m^3/m^3) * kg/m^3 * m^2 = kg`. Mirrors `soil_layers.captured_water`; shared by
+/// the capture flow and the re-sow return so a season is an exactly closed cycle.
+pub fn captured_water(depth_increment: f64, soil_extractable_water: f64, ground_area: f64) -> f64 {
+    depth_increment * soil_extractable_water * WATER_DENSITY * ground_area
+}
+
+/// `GRTD` — the gated rooted-depth extension rate (m/day). **The single source**, called
+/// by both `RootDepthExtension` (which integrates it) and `RootZoneCapture` (which turns
+/// it into water). They must not be able to disagree: a capture computed from an ungated
+/// rate would move water for depth the roots did not gain.
+///
+/// Mirrors `root_depth.extension_rate`. Four cited stops, each cutting the RATE to zero
+/// (not clamping an increment — the aux channel's dt-independence contract):
+/// crop cap ([E] Table 25), soil cap ([F] Box 14.1 `DEPORT >= SOLDEP`; [E] Listing 7
+/// L33), flowering ([E] p. 136), and a dry subsoil ([F] Box 14.1 `If WSTORG = 0 Then
+/// GRTD = 0` — roots do not extend into dry soil).
+#[allow(clippy::too_many_arguments)]
+pub fn extension_rate(
+    depth: f64,
+    thermal_time: f64,
+    temp_c: f64,
+    soil_water: f64,
+    subsoil_water: f64,
+    params: &params::RootDepthParams,
+    photo: &params::PhotosynthesisParams,
+    pheno: &params::PhenologyParams,
+    sw_wilting: f64,
+    sw_critical: f64,
+    soil_depth: f64,
+) -> f64 {
+    if depth >= params.max_rooted_depth || depth >= soil_depth {
+        return 0.0;
+    }
+    if subsoil_water <= 0.0 {
+        return 0.0;
+    }
+    let dvs = development_stage(thermal_time, pheno.tsum_anthesis, pheno.tsum_maturity);
+    if dvs >= 1.0 {
+        return 0.0;
+    }
+    let f_temp = temperature_factor(temp_c, photo);
+    let f_water = water_stress_factor(soil_water, sw_wilting, sw_critical);
+    params.max_extension_rate * f_water * f_temp
+}
+
 pub fn development_stage(thermal_time: f64, tsum_anthesis: f64, tsum_maturity: f64) -> f64 {
     if thermal_time <= 0.0 {
         return 0.0;
@@ -357,4 +408,111 @@ pub fn oxygen_limitation_factor(o2_mol: f64, air_mol: f64, k_o2: f64) -> f64 {
         return 0.0;
     }
     x_o2 / denom
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The column arithmetic, as a hand value: `m * (m^3/m^3) * kg/m^3 * m^2 = kg`.
+    ///
+    /// ⚠ It does NOT pin argument order, and the reason is worth recording so nobody
+    /// adds a test for it: `soil_extractable_water` and `ground_area` are symmetric
+    /// FACTORS OF A PRODUCT, so transposing them is arithmetically identical for every
+    /// input, in both ports. It is not a bug that testing could catch — it is not a bug.
+    /// (This was checked by mutation, after being flagged as a plausible hazard.) What
+    /// callers CAN get wrong is dropping a factor; that is pinned on a non-unit plot in
+    /// `system.rs::capture_scales_with_ground_area_at_its_call_sites`.
+    /// Mirrors `tests/test_soil_layers.py::test_captured_water_is_the_column_arithmetic`.
+    #[test]
+    fn captured_water_is_the_column_arithmetic() {
+        // 1 m of soil at EXTR 0.13 over 2 m2 holds 260 kg of extractable water.
+        assert_eq!(captured_water(1.0, 0.13, 2.0), 260.0);
+        assert_eq!(captured_water(0.0, 0.13, 1.0), 0.0);
+        assert_eq!(WATER_DENSITY, 1000.0);
+    }
+
+    /// The dry-subsoil stop ([F] Box 14.1 `If WSTORG = 0 Then GRTD = 0`), which no
+    /// golden and no parity run can catch: it is a branch, not a value.
+    #[test]
+    fn a_dry_subsoil_stops_extension() {
+        let params = params::RootDepthParams {
+            max_extension_rate: 0.018,
+            max_rooted_depth: 1.3,
+        };
+        // Only the four cardinals matter to `extension_rate` (via `temperature_factor`);
+        // the FvCB fields are inert here, so they carry literature-typical placeholders.
+        let photo = params::PhotosynthesisParams {
+            vcmax: 100.0,
+            jmax: 180.0,
+            quantum_yield: 0.385,
+            theta: 0.7,
+            gamma_star: 42.75,
+            kc: 404.9,
+            ko: 278400.0,
+            o2: 210000.0,
+            t_min: 0.0,
+            t_opt_lo: 15.0,
+            t_opt_hi: 25.0,
+            t_max: 40.0,
+        };
+        let pheno = params::PhenologyParams {
+            t_base: 0.0,
+            t_cap: 30.0,
+            tsum_anthesis: 1100.0,
+            tsum_maturity: 900.0,
+        };
+        let call = |subsoil: f64| {
+            extension_rate(
+                0.15, 0.0, 20.0, 1000.0, subsoil, &params, &photo, &pheno, 20.0, 60.0, 1.5,
+            )
+        };
+        assert_eq!(call(0.0), 0.0);
+        assert_eq!(call(-1.0), 0.0); // `<= 0`, so round-off past zero still stops
+        assert!(call(195.0) > 0.0); // non-vacuous: it does run with water below
+    }
+
+    /// The SOIL's rooting cap ([F] Box 14.1 `If DEPORT >= SOLDEP Then GRTD = 0`; [E]
+    /// Listing 7 L33 takes "the shallowest of the rooted depths set by the soil and by
+    /// the crop"). No Rust scenario declares a soil shallower than the crop's own cap,
+    /// so this branch is unreachable from any run here — measured: dropping it left the
+    /// rest of the suite green. The Python side pins it as a whole-season behaviour.
+    #[test]
+    fn a_shallow_soil_caps_rooting_before_the_crop_does() {
+        let params = params::RootDepthParams {
+            max_extension_rate: 0.018,
+            max_rooted_depth: 1.3,
+        };
+        let photo = params::PhotosynthesisParams {
+            vcmax: 100.0,
+            jmax: 180.0,
+            quantum_yield: 0.385,
+            theta: 0.7,
+            gamma_star: 42.75,
+            kc: 404.9,
+            ko: 278400.0,
+            o2: 210000.0,
+            t_min: 0.0,
+            t_opt_lo: 15.0,
+            t_opt_hi: 25.0,
+            t_max: 40.0,
+        };
+        let pheno = params::PhenologyParams {
+            t_base: 0.0,
+            t_cap: 30.0,
+            tsum_anthesis: 1100.0,
+            tsum_maturity: 900.0,
+        };
+        let at = |depth: f64, soil_depth: f64| {
+            extension_rate(
+                depth, 0.0, 20.0, 1000.0, 195.0, &params, &photo, &pheno, 20.0, 60.0, soil_depth,
+            )
+        };
+        // Below both caps it runs; at the SOIL cap it stops even though the crop's own
+        // 1.3 m cap is far away.
+        assert!(at(0.4, 1.5) > 0.0);
+        assert_eq!(at(0.5, 0.5), 0.0);
+        assert_eq!(at(0.6, 0.5), 0.0);
+        assert!(at(0.6, 1.5) > 0.0); // ...and it is the SOIL cap doing it, not the depth
+    }
 }

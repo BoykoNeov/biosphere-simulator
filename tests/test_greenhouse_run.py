@@ -47,6 +47,7 @@ from domains.biosphere.stocks import (
     SOIL_WATER,
     STEM_C,
     STORAGE_C,
+    SUBSOIL_WATER,
     WATER_VAPOR,
 )
 from domains.crew.loader import load_crew_params
@@ -207,7 +208,11 @@ def test_biosphere_internal_water_loop_closed() -> None:
     # the two humid-air stocks (biosphere transpiration ⇄ cabin humidity) is a fidelity
     # refinement deferred to the sealed-station step, NOT a closure requirement.
     states, _, _ = _run()
-    loop = (SOIL_WATER, WATER_VAPOR, CONDENSATE)
+    # SUBSOIL_WATER is part of the total: the below-root store (post-roadmap soil
+    # layers) is in-system soil water that RootZoneCapture moves into soil_water as the
+    # roots reach it. It crosses no boundary, so leaving it out would read a conserved
+    # transfer as a leak.
+    loop = (SOIL_WATER, SUBSOIL_WATER, WATER_VAPOR, CONDENSATE)
     total0 = sum(_amt(states[0], s) for s in loop)
     totalf = sum(_amt(states[-1], s) for s in loop)
     assert abs(totalf - total0) <= 1e-9, (

@@ -64,6 +64,7 @@ from domains.biosphere.stocks import (
     SOIL_WATER_VAR,
     STEM_C,
     STORAGE_C,
+    SUBSOIL_WATER,
     TEMP_VAR,
     THERMAL_TIME,
     VAPOR_SINK,
@@ -284,11 +285,13 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
         thermal_time_aux=THERMAL_TIME,
         temp_var=TEMP_VAR,
         soil_water=SOIL_WATER,
+        subsoil_water=SUBSOIL_WATER,
         params=load_root_depth_params(crop.paths["root_depth"]),
         photo=ctx.photo,
         pheno=pheno,
         sw_wilting=scenario.sw_wilting,
         sw_critical=scenario.sw_critical,
+        soil_depth=scenario.soil_depth,
     )
     aux: tuple[AuxProcess, ...] = (thermal_time, root_depth)
     if scenario.vernalization:

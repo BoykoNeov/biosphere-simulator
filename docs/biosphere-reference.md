@@ -69,12 +69,21 @@ moves every committed golden.
 The flow classes assembled across the canonical scenarios — the frozen flow taxonomy. The
 manifest's `flow_set` is **derived from freshly assembled registries** (the union over the open
 field + the three chambers), never hand-listed, so a flow added to any compartment builder is
-caught by the completeness gate even if no golden exercises it. As frozen, the set is the 20
+caught by the completeness gate even if no golden exercises it. As frozen, the set is the 21
 classes spanning the producer (allocation, the two respirations, senescence, transpiration,
 nitrogen uptake/senescence, the forcing-driven irrigation/fertilization), the decomposer
 (decomposition, microbial respiration, humus decomposition, and the three carried-nitrogen
-legs), the water cycle (condensation, recycling), and the consumer (grazing, consumer
-respiration, consumer mortality).
+legs), the water cycle (condensation, recycling, root-zone capture), and the consumer
+(grazing, consumer respiration, consumer mortality).
+
+⚠ **21 since 2026-08-11: `RootZoneCapture` was ADDED** by the soil-layers build
+(`docs/plans/post-roadmap-soil-layers.md`), together with **one new stock**,
+`subsoil_water`. It is the water side of rooted depth — [F] Soltani & Sinclair's `EWAT`
+(Eqn 14.10), the transfer that makes water the roots have just reached available to them.
+Unlike the depth gate on nitrogen, **this one is not inert**: it moved `soil_water` on 10
+of the 12 goldens it touched (`harvest` and `water_biting` gained the stock but moved no
+amount). What it did *not* move is any carbon, nitrogen or oxygen amount, anywhere, at any
+horizon — a prediction written down before regeneration and checked against the diff.
 
 ⚠ **20, and the decomposer's shape is the reason** (post-roadmap, the humification split,
 2026-08-10 — `docs/plans/post-roadmap-cue-humification.md`). Two classes were *added*
@@ -297,6 +306,69 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-11 — soil layers: the below-root store (+1 flow, +1 stock, 12 goldens, both
+  manifests).** `docs/plans/post-roadmap-soil-layers.md`. The successor the root-depth
+  build named, and the first unfreeze in this series that **moves a value**.
+
+  `subsoil_water` (`WSTORG`) holds extractable water that is physically present below the
+  rooted depth and currently unreachable; `RootZoneCapture` (`EWAT`, [F] Eqn 14.10) moves
+  it into `soil_water` as the roots arrive. Three cited additions came with it: the soil's
+  own rooting cap (`SOLDEP` — **discharging a ceiling `root_depth.yaml` had recorded as
+  deferred**), the extractable-water fraction `EXTR` = 0.13 ([F] Ch. 13), and a **cited
+  sowing rooting depth** replacing an uncited `0.0` ([F] Ch. 14: *"normally between 150 to
+  400 mm"*).
+
+  **The resolution was a citation, not a compromise.** This work had been priced as "the
+  largest single piece the post-roadmap record has considered" on the assumption that
+  layers meant an N-layer discretization. [F] opens its soil-water chapter by settling
+  that: *"a two-layered soil or even a one-layer soil seems satisfactory (Robertson and
+  Fukai, 1994)"*, and specifies the two stores as the root zone and the water below it.
+
+  **The diff was PREDICTED BEFORE REGENERATION and the prediction held.** Written down:
+  `soil_water` up by the season's capture, `subsoil_water` down by the same, `f_water`
+  exactly `1.0` throughout, therefore **every carbon / nitrogen / oxygen stock
+  bit-identical at every horizon**. Measured after: 12 goldens changed and the only things
+  that moved anywhere were `soil_water`, the new `subsoil_water`, and `rooted_depth`. Both
+  drift-stability summaries are **byte-identical**.
+
+  ⚠ **Two scenarios declare a DRY subsoil, deliberately.** `water_biting` and `drought`
+  are *defined* as water-lean, so a hidden reservoir would contradict their construction —
+  and the measurement is the reason it matters: with the default profile the drought
+  perturbation's cascade is not weakened but **abolished** (`f_water` never leaves 1.0;
+  end vegetative carbon 33.61 → 33.28 instead of 33.61 → 12.68). That is the mechanism
+  working, not an artefact: a crop that can root into wet subsoil is drought-defended.
+
+  ⚠ **The re-sow water return is OURS**, not [F]'s (it is single-season and silent).
+  Without it, one-way capture would ratchet the profile into the root zone over a 15-year
+  chamber run. Pinned as a five-cycle identity, not as a single number.
+
+  **What was deliberately NOT built, each a named successor:** the `FTSW = ATSW/TTSW`
+  stress conversion, drainage/runoff/soil evaporation, and — the real finding —
+  **re-deriving `soil_water0` from geometry.** Our root-zone bucket is not dimensionally a
+  soil profile: 1000 kg over 1 m² is 1000 mm of extractable water, which at `EXTR = 0.13`
+  needs a 7.7 m column. Deriving it would collapse the store to ~19.5 kg at sowing, below
+  `sw_critical`, and make **every frozen scenario water-stressed**. That is a re-basing of
+  the whole water regime and the verdict is the user's.
+
+  **Cascade:** biosphere manifest (`flow_set` 20 → 21, 7 golden hashes); station manifest
+  (golden hashes); 12 goldens; the Rust mirror; `tests/test_soil_layers.py` (14 pins, all
+  mutation-verified against 7 deliberately broken variants).
+
+- **2026-08-11 — rooted depth: a third aux accumulator (+1 param file, `aux_set` 2 → 3, 12
+  goldens).** `docs/plans/post-roadmap-root-functional-coupling.md`. ⚠ **This entry was
+  written retroactively on 2026-08-11** — the build shipped without one, which is the
+  `freeze-prose-half-is-ungated` failure mode showing up in the log itself: the manifest
+  gate compares manifest against tree and has no opinion about this file.
+
+  `RootDepthExtension` advances rooted depth by [E]'s law and gates `NitrogenUptake`'s
+  supply by the fraction of the reference soil layer the roots have reached. It changed
+  **no value** (12 goldens differ by exactly one added `aux` key), it is bit-identically
+  inert on the entire frozen roster, and **that was measured before a line was written**:
+  the work was recorded as REFUSED on the canopy-regulator precedent and the user
+  overruled the refusal. Nobody should later find the inertness and conclude it was
+  missed. Its pins are unit-level and mutation-verified because no golden can catch its
+  removal.
 
 - **2026-08-10 — the decade CO₂ guard re-anchored: one `liveness_floors` entry's `bound` and
   `source`, and nothing else.** `docs/plans/post-roadmap-co2-guard-reanchor.md`. No value, no

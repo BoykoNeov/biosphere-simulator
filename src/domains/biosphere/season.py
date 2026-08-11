@@ -98,6 +98,7 @@ from domains.biosphere.scenario import (
     SEALED_CHAMBER_YEARS as SEALED_CHAMBER_YEARS,
 )
 from domains.biosphere.soil import build_soil
+from domains.biosphere.soil_layers import captured_water
 from domains.biosphere.stocks import (
     CARBON_POOL as CARBON_POOL,
 )
@@ -109,6 +110,7 @@ from domains.biosphere.stocks import (
     PAR_VAR,
     RN_VAR,
     ROOTED_DEPTH,
+    SUBSOIL_WATER,
     TEMP_VAR,
     THERMAL_TIME,
     VERNALIZATION_DAYS,
@@ -235,7 +237,15 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
         n=0,
         stocks=stocks,
         rng_seed=0,
-        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0, ROOTED_DEPTH: 0.0},
+        # ⚠ ``rooted_depth`` starts at the scenario's SOWING DEPTH, not at 0. The 0 this
+        # replaced was uncited; [F] Soltani & Sinclair Ch. 14 states the quantity is an
+        # input ("The value of DEPORT at crop emergence must be provided to the model.
+        # It is normally between 150 to 400 mm"). See SeasonScenario.rooted_depth0.
+        aux={
+            THERMAL_TIME: 0.0,
+            VERNALIZATION_DAYS: 0.0,
+            ROOTED_DEPTH: scenario.rooted_depth0,
+        },
     )
     return state, Registry(flows, stocks, aux_processes=aux_processes)
 
@@ -459,7 +469,41 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
     # re-sow many times over 3-15 years), so the reset is a modelling choice the
     # goldens
     # cannot check — the pin is in tests/test_root_depth.py.
-    aux[ROOTED_DEPTH] = 0.0
+    #
+    # It resets to the scenario's SOWING depth, not to 0: a re-sown crop starts with the
+    # root system a sown crop has (see SeasonScenario.rooted_depth0, cited).
+    old_depth = aux.get(ROOTED_DEPTH, 0.0)
+    aux[ROOTED_DEPTH] = scenario.rooted_depth0
+    # --- THE WATER HALF OF THE RE-SOW (post-roadmap soil layers) ---------------------
+    # The root zone just shrank from ``old_depth`` back to the sowing depth. Water in
+    # soil does not move when a plant dies, so the abandoned column's extractable water
+    # is once again BELOW the root zone: it returns to ``subsoil_water``.
+    #
+    # ⚠ THIS RULE IS OURS. [F] Soltani & Sinclair is single-season and says nothing
+    # about it. It is derived from conservation-plus-geometry, and it exists because
+    # ``RootZoneCapture`` is one-way within a season (we do not model the drainage that
+    # is WSTORG's only input in [F]): without a return leg, every re-sow would ratchet
+    # more of the profile permanently into the root zone, and a 15-year chamber would
+    # end with the whole soil column pumped up into it — a monotone drift with no
+    # physical referent.
+    #
+    # It uses ``soil_layers.captured_water`` — the SAME formula the capture flow uses —
+    # so an unclamped season is an exactly closed cycle. Clamped to what is actually
+    # there: the root zone may hold less than its geometry allows (it is drawn down by
+    # transpiration), and returning more would drive ``soil_water`` negative.
+    abandoned = old_depth - scenario.rooted_depth0
+    if abandoned > 0.0:
+        returnable = captured_water(
+            abandoned,
+            soil_extractable_water=scenario.soil_extractable_water,
+            ground_area=scenario.ground_area,
+        )
+        held = stocks[SOIL_WATER].amount
+        returned = returnable if returnable < held else held
+        stocks[SOIL_WATER] = replace(stocks[SOIL_WATER], amount=held - returned)
+        stocks[SUBSOIL_WATER] = replace(
+            stocks[SUBSOIL_WATER], amount=stocks[SUBSOIL_WATER].amount + returned
+        )
     return replace(state, stocks=stocks, aux=aux)
 
 

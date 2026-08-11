@@ -37,6 +37,7 @@ from domains.biosphere.stocks import (
     PLANT_N,
     ROOTED_DEPTH,
     SOIL_WATER,
+    SUBSOIL_WATER,
     TEMP_VAR,
     THERMAL_TIME,
 )
@@ -134,7 +135,12 @@ def test_depth_follows_es_law_and_stops_at_the_cited_cap() -> None:
     states, _, _ = _run()
     depths = [s.aux[ROOTED_DEPTH] for s in states]
 
-    assert depths[0] == 0.0  # a sown seed has no root system
+    # A sown crop starts at the scenario's CITED emergence depth, not at 0. [F] Soltani
+    # & Sinclair Ch. 14: "The value of DEPORT at crop emergence must be provided to the
+    # model. It is normally between 150 to 400 mm." The 0.0 this replaced was ours and
+    # uncited; it only ever passed because the depth gate was inert everywhere.
+    assert depths[0] == DEFAULT_SCENARIO.rooted_depth0
+    assert 0.15 <= DEFAULT_SCENARIO.rooted_depth0 <= 0.40  # inside [F]'s stated range
     assert all(
         b >= a for a, b in zip(depths, depths[1:], strict=False)
     )  # monotone: roots only deepen
@@ -174,11 +180,13 @@ def test_root_growth_stops_at_flowering() -> None:
         thermal_time_aux=THERMAL_TIME,
         temp_var=TEMP_VAR,
         soil_water=SOIL_WATER,
+        subsoil_water=SUBSOIL_WATER,
         params=RootDepthParams(max_extension_rate=0.018, max_rooted_depth=99.0),
         photo=photo,
         pheno=pheno,
         sw_wilting=DEFAULT_SCENARIO.sw_wilting,
         sw_critical=DEFAULT_SCENARIO.sw_critical,
+        soil_depth=99.0,  # the SOIL cap lifted too, so only the flowering stop can bind
     )
     state, _ = build_season()
 
@@ -203,12 +211,15 @@ def test_root_growth_stops_at_flowering() -> None:
     assert proc.evaluate(flowering, _Env(), 1.0)[ROOTED_DEPTH] == 0.0
 
 
-def test_a_resown_crop_starts_with_no_root_system() -> None:
+def test_a_resown_crop_starts_with_the_sowing_root_system() -> None:
     # Rooted depth is a property of the standing crop, not of the soil, so it resets
     # with
     # the other per-cycle accumulators. Pinned because the chambers re-sow many times
     # and
     # the goldens cannot see it (measured bit-identical either way).
+    #
+    # ⚠ It resets to the SOWING depth, not to 0 — a re-sown crop starts with the root
+    # system a sown crop has (`SeasonScenario.rooted_depth0`, cited to [F] Ch. 14).
     from domains.biosphere.scenario import PERENNIAL_CHAMBER_SCENARIO
     from domains.biosphere.season import run_perennial
 
@@ -232,10 +243,11 @@ def test_a_resown_crop_starts_with_no_root_system() -> None:
     # The recorded value just after a reset is not exactly 0: annual_reset zeroes the
     # accumulator and the SAME step then applies one extension increment before the
     # state is snapshotted. So the post-reset depth must be within one unstressed step
-    # of zero — which still pins "the new crop starts from bare soil", while pinning 0.0
-    # exactly would be pinning the reset's position within the step instead.
+    # of zero — which still pins "the new crop starts from the sowing depth", while
+    # pinning the value exactly would be pinning the reset's position within the step.
+    sown = scenario.rooted_depth0
     for i in drops:
-        assert 0.0 <= depths[i + 1] <= _ROOTD.max_extension_rate
+        assert sown <= depths[i + 1] <= sown + _ROOTD.max_extension_rate
         # and it must be a genuine reset, not a small dip
         assert depths[i + 1] < depths[i] / 2.0
 

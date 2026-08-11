@@ -245,6 +245,22 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-08-11 — the soil-layers cascade (biosphere-delegated; 4 station goldens, no
+  station-side science).** `docs/plans/post-roadmap-soil-layers.md`. The biosphere gained a
+  `subsoil_water` stock and a `RootZoneCapture` flow (its own manifest carries them); the
+  four station scenarios that embed a biosphere — `greenhouse`, `harvest`, `lighting`,
+  `sealed_station` — regenerated. The biosphere-free goldens
+  (crew/eclss/cabin/water_recovery/power/thermal/station/sealed_energy) are
+  **byte-identical**, and so is `sealed_energy_drift_summary`.
+
+  ⚠ **The station-side check that mattered is the WATER LOOP.** Three tests summed the
+  biosphere's internal ring as `soil_water + water_vapor + condensate`; the below-root
+  store is in-system soil water crossing no boundary, so leaving it out reads a conserved
+  transfer as a leak. All three (Python `greenhouse`/`lighting`, Rust
+  `day_neutral_lighting`) now sum four stocks. **`harvest` moved no amount at all** — its
+  crop starts past anthesis at the rooting cap, so the extension rate and therefore the
+  capture are zero. `delegates_to` biosphere.
+
 - **2026-08-09 — the science assertions get contract standing (a SCHEMA unfreeze; NO value,
   golden, param or `src/` change).** `docs/plans/post-roadmap-acceptance-gate-standing.md`.
   Added `science_bands` + `liveness_floors`, derived from `science_gate` markers. Station-side

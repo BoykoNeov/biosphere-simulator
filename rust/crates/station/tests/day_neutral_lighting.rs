@@ -17,7 +17,7 @@
 use domains::biosphere::science::development_stage;
 use domains::biosphere::stocks::{
     CONDENSATE, LEAF_C, LITTER_CARBON, MICROBIAL_CARBON, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C,
-    THERMAL_TIME, WATER_VAPOR,
+    SUBSOIL_WATER, THERMAL_TIME, WATER_VAPOR,
 };
 use domains::biosphere::{SeasonScenario, DEFAULT_SCENARIO};
 use domains::power::{BATTERY, WASTE_HEAT};
@@ -210,7 +210,11 @@ fn biosphere_internal_water_loop_closed() {
     // The lamp couples Power to the biosphere's PAR only — the internal water ring
     // (soil_water -> water_vapor -> condensate -> soil_water) stays closed across the run.
     let (states, _) = run(&day_neutral_lighting_scenario(), true);
-    let loop_ids = [SOIL_WATER, WATER_VAPOR, CONDENSATE];
+    // SUBSOIL_WATER is a term: the below-root store (post-roadmap soil layers) is
+    // in-system soil water that `RootZoneCapture` moves into `soil_water` as the roots
+    // reach it. It crosses no boundary, so omitting it would read a conserved transfer
+    // as a leak.
+    let loop_ids = [SOIL_WATER, SUBSOIL_WATER, WATER_VAPOR, CONDENSATE];
     let total = |s: &State| loop_ids.iter().map(|id| amt(s, id)).sum::<f64>();
     let drift = total(states.last().unwrap()) - total(states.first().unwrap());
     assert!(

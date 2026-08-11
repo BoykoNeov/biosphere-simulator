@@ -1,6 +1,6 @@
 {
   "aux": {
-    "rooted_depth": "0x1.4d636f4bffecap+0",
+    "rooted_depth": "0x1.3333333333333p-3",
     "thermal_time": "0x1.faee95997478fp+10",
     "vernalization_days": "0x1.1ebeb851eb852p+7"
   },
@@ -215,6 +215,19 @@
       "quantity": "carbon",
       "unclamped": false,
       "unit": "mol"
+    },
+    {
+      "amount": "0x0.0p+0",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.subsoil_water",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
     },
     {
       "amount": "0x1.31baeff986ab7p+2",

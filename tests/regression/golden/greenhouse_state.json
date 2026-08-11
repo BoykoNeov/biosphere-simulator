@@ -178,7 +178,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.f0e22cd526938p+9",
+      "amount": "0x1.f873deae52136p+9",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -215,6 +215,19 @@
       "quantity": "carbon",
       "unclamped": false,
       "unit": "mol"
+    },
+    {
+      "amount": "0x1.67b9389b52007p+7",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.subsoil_water",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
     },
     {
       "amount": "0x1.bab450c2893fep+1",

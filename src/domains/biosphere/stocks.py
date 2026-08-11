@@ -43,6 +43,13 @@ STEM_C: StockId = StockId("biosphere.stem_c")
 ROOT_C: StockId = StockId("biosphere.root_c")
 STORAGE_C: StockId = StockId("biosphere.storage_c")
 SOIL_WATER: StockId = StockId("biosphere.soil_water")
+# The below-root store (post-roadmap soil layers): [F] Soltani & Sinclair's ``WSTORG``,
+# "the soil water stored below rooting zone" (Fig. 14.2). Water that is physically
+# present and currently UNREACHABLE; ``RootZoneCapture`` (EWAT) moves it into
+# ``soil_water`` as the rooted depth grows. A POOL like its sibling — in-system soil
+# water, never a boundary, so the capture is an internal transfer the conservation gate
+# sees on both legs.
+SUBSOIL_WATER: StockId = StockId("biosphere.subsoil_water")
 SOIL_N: StockId = StockId("biosphere.soil_n")
 PLANT_N: StockId = StockId("biosphere.plant_n")
 CO2_ATMOS: StockId = StockId("boundary.co2_atmos")
@@ -128,6 +135,7 @@ STOCK_DOMAIN: dict[StockId, DomainId] = {
     STORAGE_C: PLANTS,
     PLANT_N: PLANTS,
     SOIL_WATER: SOIL,
+    SUBSOIL_WATER: SOIL,  # the below-root store; soil water the roots have not reached
     SOIL_N: SOIL,
     LITTER_CARBON: SOIL,
     LITTER_N: SOIL,

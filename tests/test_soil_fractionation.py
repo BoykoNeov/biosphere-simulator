@@ -72,7 +72,14 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.stocks import O2_POOL, pool_stock
+from domains.biosphere.soil_layers import captured_water
+from domains.biosphere.stocks import (
+    O2_POOL,
+    ROOTED_DEPTH,
+    SOIL_WATER,
+    SUBSOIL_WATER,
+    pool_stock,
+)
 from simcore.environment import Environment
 from simcore.flow import Flow, FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -360,7 +367,15 @@ def build_variant(
         n=0,
         stocks=stocks,
         rng_seed=0,
-        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0},
+        # ⚠ The aux dict is COPIED from what `build_season` made, not re-listed here.
+        # It used to be the literal `{THERMAL_TIME: 0, VERNALIZATION_DAYS: 0}`, which
+        # silently omitted `rooted_depth` — harmless while that accumulator began at 0
+        # anyway, and a real divergence the moment the soil-layers build gave it a cited
+        # nonzero sowing depth (a variant starting at depth 0 with a dry subsoil is
+        # frozen there by `WSTORG = 0 ⇒ GRTD = 0`, so FROOT1 = 0 and it takes up no
+        # nitrogen at all). This file's own docstring already warned that "carrying the
+        # aux across is load-bearing"; re-listing the keys was that bug one level up.
+        aux=dict(base_state.aux),
     )
     return state, Registry(flows, stocks, aux_processes=aux_processes)
 
@@ -406,6 +421,23 @@ def reset_variant(
     aux = dict(state.aux)
     aux[THERMAL_TIME] = 0.0
     aux[VERNALIZATION_DAYS] = 0.0
+    # Mirrors `season.annual_reset`: a re-sown crop starts with the sowing root system,
+    # and the abandoned root zone's water goes back below the (now shallow) root zone.
+    old_depth = aux.get(ROOTED_DEPTH, 0.0)
+    aux[ROOTED_DEPTH] = scenario.rooted_depth0
+    abandoned = old_depth - scenario.rooted_depth0
+    if abandoned > 0.0:
+        returnable = captured_water(
+            abandoned,
+            soil_extractable_water=scenario.soil_extractable_water,
+            ground_area=scenario.ground_area,
+        )
+        held = stocks[SOIL_WATER].amount
+        returned = returnable if returnable < held else held
+        stocks[SOIL_WATER] = replace(stocks[SOIL_WATER], amount=held - returned)
+        stocks[SUBSOIL_WATER] = replace(
+            stocks[SUBSOIL_WATER], amount=stocks[SUBSOIL_WATER].amount + returned
+        )
     return replace(state, stocks=stocks, aux=aux)
 
 

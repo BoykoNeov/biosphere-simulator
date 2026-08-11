@@ -217,6 +217,19 @@
       "unit": "mol"
     },
     {
+      "amount": "0x1.8600000000000p+7",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.subsoil_water",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
       "amount": "0x1.bab450c2893fep+1",
       "composition": {
         "water": "0x1.0000000000000p+0"

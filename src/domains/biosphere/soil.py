@@ -35,9 +35,13 @@ from domains.biosphere.compartments import SOIL
 from domains.biosphere.decomposition import Decomposition
 from domains.biosphere.humification import HumusDecomposition
 from domains.biosphere.loader import (
+    crop_param_set,
     load_decomposition_params,
     load_humification_params,
     load_microbial_respiration_params,
+    load_phenology_params,
+    load_photosynthesis_params,
+    load_root_depth_params,
 )
 from domains.biosphere.microbial_respiration import MicrobialRespiration
 from domains.biosphere.mineralization import (
@@ -47,6 +51,7 @@ from domains.biosphere.mineralization import (
 )
 from domains.biosphere.nitrogen import Fertilization
 from domains.biosphere.scenario import SeasonScenario
+from domains.biosphere.soil_layers import RootZoneCapture
 from domains.biosphere.stocks import (
     CARBON_POOL,
     FERTILIZATION_VAR,
@@ -59,9 +64,13 @@ from domains.biosphere.stocks import (
     MICROBIAL_N,
     N_SOURCE,
     O2_POOL,
+    ROOTED_DEPTH,
     SOIL_N,
     SOIL_WATER,
     SOIL_WATER_VAR,
+    SUBSOIL_WATER,
+    TEMP_VAR,
+    THERMAL_TIME,
     WATER_SOURCE,
     ChamberWiring,
     CompartmentBuild,
@@ -79,12 +88,18 @@ from simcore.state import Stock
 def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBuild:
     """Build the soil compartment (``wiring`` unused — soil owns its litter ids)."""
     del wiring  # senescence's litter target (the wiring) is consumed by `plants`
+    crop = crop_param_set(scenario.crop)
     water = canonical_unit(Quantity.WATER)
     nitrogen = canonical_unit(Quantity.NITROGEN)
     carbon = canonical_unit(Quantity.CARBON)
 
     stocks: list[Stock] = [
         pool_stock(SOIL_WATER, SOIL, Quantity.WATER, water, scenario.soil_water0),
+        # The below-root store (post-roadmap soil layers): water present in the profile
+        # but out of the roots' reach. Unconditional — open field and sealed chamber
+        # alike have soil under the root zone, and in the sealed chamber it joins the
+        # closed water loop's conserved total rather than crossing a boundary.
+        pool_stock(SUBSOIL_WATER, SOIL, Quantity.WATER, water, scenario.subsoil_water0),
         pool_stock(SOIL_N, SOIL, Quantity.NITROGEN, nitrogen, scenario.soil_n0),
         boundary.source(N_SOURCE, Quantity.NITROGEN, scenario.n_source0),
     ]
@@ -95,6 +110,27 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
             n_source=N_SOURCE,
             soil_n=SOIL_N,
             fertilization_var=FERTILIZATION_VAR,
+            ground_area=scenario.ground_area,
+        ),
+        # EWAT ([F] Eqn 14.10): the deepening root zone captures the water of the soil
+        # it has just explored. Soil-owned because both its stocks are the soil's; it
+        # reads the plants-owned ``rooted_depth`` accumulator through the aux channel,
+        # which is a snapshot read, not a builder import (P3.3).
+        RootZoneCapture(
+            FlowId("biosphere.root_zone_capture"),
+            0,
+            subsoil_water=SUBSOIL_WATER,
+            soil_water=SOIL_WATER,
+            rooted_depth_aux=ROOTED_DEPTH,
+            thermal_time_aux=THERMAL_TIME,
+            temp_var=TEMP_VAR,
+            params=load_root_depth_params(crop.paths["root_depth"]),
+            photo=load_photosynthesis_params(crop.paths["photosynthesis"]),
+            pheno=load_phenology_params(crop.paths["phenology"]),
+            sw_wilting=scenario.sw_wilting,
+            sw_critical=scenario.sw_critical,
+            soil_depth=scenario.soil_depth,
+            soil_extractable_water=scenario.soil_extractable_water,
             ground_area=scenario.ground_area,
         ),
     ]

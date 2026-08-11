@@ -26,9 +26,10 @@ use super::flows::{
     Fertilization, Grazing, GrowthRespiration, HumusDecomposition, HumusNitrogenRelease,
     Irrigation, LitterNitrogenTransfer, MaintenanceRespiration, MicrobialNitrogenRelease,
     MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling, RootDepthExtension,
-    Senescence, ThermalTimeAccumulation, Transpiration, VernalizationAccumulation,
+    RootZoneCapture, Senescence, ThermalTimeAccumulation, Transpiration, VernalizationAccumulation,
 };
 use super::params;
+use super::science;
 use super::stocks::*;
 
 /// Scenario data (not crop params): plot, initial amounts, soil/atmosphere/chamber knobs.
@@ -65,6 +66,21 @@ pub struct SeasonScenario {
     /// access gate. Scenario/soil data, like `sn_residual`/`sn_critical`. DESIGN, not
     /// cited - see the Python `SeasonScenario.soil_layer_depth`.
     pub soil_layer_depth: f64,
+    /// `WSTORG` - extractable water present BELOW the current rooted depth (kg). The
+    /// default is `soil_depth * soil_extractable_water * 1000 * ground_area`, i.e. the
+    /// profile at the drained upper limit. Must be > 0 for roots to grow ([F] Box 14.1
+    /// `If WSTORG = 0 Then GRTD = 0`). See the Python `SeasonScenario.subsoil_water0`.
+    pub subsoil_water0: f64,
+    /// `EXTR` - volumetric extractable soil water (m^3/m^3). [F] Ch. 13: "approximately
+    /// 0.13 mm mm-1 (Ratliff et al., 1983; Ritchie et al., 1999)". Soil data, not a crop
+    /// param.
+    pub soil_extractable_water: f64,
+    /// `SOLDEP` - physical soil depth (m); caps rooted depth alongside the crop's own
+    /// `max_rooted_depth` ([F] Box 14.1; [E] Listing 7 L33 takes the shallowest).
+    pub soil_depth: f64,
+    /// `DEPORT` at emergence (m). [F] Ch. 14: "normally between 150 to 400 mm"; 0.15 is
+    /// the cautious bottom of that range. Replaces an uncited 0.0.
+    pub rooted_depth0: f64,
     pub fertilization_kg_m2_day: f64,
     pub latitude: f64,
     /// Whether the crop requires vernalization (a cold cue) to leave the vegetative phase
@@ -109,6 +125,10 @@ pub const DEFAULT_SCENARIO: SeasonScenario = SeasonScenario {
     sn_residual: 1.0,
     sn_critical: 50.0,
     soil_layer_depth: 0.30,
+    subsoil_water0: 195.0,
+    soil_extractable_water: 0.13,
+    soil_depth: 1.5,
+    rooted_depth0: 0.15,
     fertilization_kg_m2_day: 0.0,
     latitude: 52.0,
     vernalization: true,
@@ -299,6 +319,15 @@ fn build_soil(
 ) -> Result<CompartmentBuild, SimError> {
     let mut stocks = vec![
         pool_stock(SOIL_WATER, SOIL, Quantity::Water, scenario.soil_water0)?,
+        // The below-root store: water present in the profile but out of the roots'
+        // reach. Unconditional (open field and sealed chamber alike); in the sealed
+        // chamber it joins the closed water loop's conserved total, crossing no boundary.
+        pool_stock(
+            SUBSOIL_WATER,
+            SOIL,
+            Quantity::Water,
+            scenario.subsoil_water0,
+        )?,
         pool_stock(SOIL_N, SOIL, Quantity::Nitrogen, scenario.soil_n0)?,
         boundary::source(
             N_SOURCE.to_string(),
@@ -307,13 +336,33 @@ fn build_soil(
             true,
         )?,
     ];
-    let mut flows: Vec<Box<dyn Flow>> = vec![Box::new(Fertilization {
-        id: "biosphere.fertilization".to_string(),
-        n_source: N_SOURCE.to_string(),
-        soil_n: SOIL_N.to_string(),
-        fertilization_var: FERTILIZATION_VAR.to_string(),
-        ground_area: scenario.ground_area,
-    })];
+    let mut flows: Vec<Box<dyn Flow>> = vec![
+        Box::new(Fertilization {
+            id: "biosphere.fertilization".to_string(),
+            n_source: N_SOURCE.to_string(),
+            soil_n: SOIL_N.to_string(),
+            fertilization_var: FERTILIZATION_VAR.to_string(),
+            ground_area: scenario.ground_area,
+        }),
+        // EWAT ([F] Eqn 14.10): the deepening root zone captures the water of the soil
+        // it has just explored.
+        Box::new(RootZoneCapture {
+            id: "biosphere.root_zone_capture".to_string(),
+            subsoil_water: SUBSOIL_WATER.to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            temp_var: TEMP_VAR.to_string(),
+            params: p.rootd,
+            photo: p.photo,
+            pheno: p.pheno,
+            sw_wilting: scenario.sw_wilting,
+            sw_critical: scenario.sw_critical,
+            soil_depth: scenario.soil_depth,
+            soil_extractable_water: scenario.soil_extractable_water,
+            ground_area: scenario.ground_area,
+        }),
+    ];
     if !scenario.sealed {
         stocks.push(boundary::source(
             WATER_SOURCE.to_string(),
@@ -556,11 +605,13 @@ fn build_plants(
         thermal_time_aux: THERMAL_TIME.to_string(),
         temp_var: TEMP_VAR.to_string(),
         soil_water: SOIL_WATER.to_string(),
+        subsoil_water: SUBSOIL_WATER.to_string(),
         params: p.rootd,
         photo: p.photo,
         pheno: p.pheno,
         sw_wilting: scenario.sw_wilting,
         sw_critical: scenario.sw_critical,
+        soil_depth: scenario.soil_depth,
     };
     let mut aux: Vec<Box<dyn AuxProcess>> = vec![Box::new(ThermalTimeAccumulation {
         id: "biosphere.thermal_time".to_string(),
@@ -697,7 +748,9 @@ pub fn build_season(scenario: &SeasonScenario) -> Result<(State, Registry), SimE
         BTreeMap::from([
             (THERMAL_TIME.to_string(), 0.0),
             (VERNALIZATION_DAYS.to_string(), 0.0),
-            (ROOTED_DEPTH.to_string(), 0.0),
+            // The CITED sowing depth, not 0 ([F] Ch. 14 makes DEPORT-at-emergence an
+            // input); mirrors the Python `season.build_season`.
+            (ROOTED_DEPTH.to_string(), scenario.rooted_depth0),
         ]),
     )?;
     let registry = Registry::new(flows, &stocks, aux)?;
@@ -817,9 +870,37 @@ pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, S
     // A re-sown crop must re-vernalize: the cold requirement is per-cycle, so the second
     // accumulator resets alongside the first (both are outside the conservation gate).
     aux.insert(VERNALIZATION_DAYS.to_string(), 0.0);
-    // A re-sown crop also starts with NO ROOT SYSTEM: rooted depth is a property of the
-    // standing crop, not of the soil, so it resets with the other per-cycle accumulators.
-    aux.insert(ROOTED_DEPTH.to_string(), 0.0);
+    // A re-sown crop starts with the SOWING root system: rooted depth is a property of
+    // the standing crop, not of the soil, so it resets with the other per-cycle
+    // accumulators - to `rooted_depth0`, which [F] Ch. 14 makes an input.
+    let old_depth = aux.get(ROOTED_DEPTH).copied().unwrap_or(0.0);
+    aux.insert(ROOTED_DEPTH.to_string(), scenario.rooted_depth0);
+    // THE WATER HALF OF THE RE-SOW. The root zone just shrank, so the abandoned column's
+    // extractable water is once again BELOW the root zone and returns to `subsoil_water`.
+    // ⚠ THIS RULE IS OURS - [F] is single-season and silent. It exists because
+    // `RootZoneCapture` is one-way within a season (we do not model [F]'s drainage, which
+    // is WSTORG's only input), so without it every re-sow would ratchet more of the
+    // profile permanently into the root zone. Uses `science::captured_water`, the SAME
+    // formula the capture flow uses, so an unclamped season is an exactly closed cycle.
+    let abandoned = old_depth - scenario.rooted_depth0;
+    if abandoned > 0.0 {
+        let returnable = science::captured_water(
+            abandoned,
+            scenario.soil_extractable_water,
+            scenario.ground_area,
+        );
+        let held = stocks[SOIL_WATER].amount;
+        let returned = if returnable < held { returnable } else { held };
+        stocks.insert(
+            SOIL_WATER.to_string(),
+            stocks[SOIL_WATER].with_amount(held - returned)?,
+        );
+        let below = stocks[SUBSOIL_WATER].amount + returned;
+        stocks.insert(
+            SUBSOIL_WATER.to_string(),
+            stocks[SUBSOIL_WATER].with_amount(below)?,
+        );
+    }
     State::new(state.n, stocks, state.rng_seed, aux)
 }
 
@@ -895,6 +976,159 @@ pub fn run_perennial(
 mod tests {
     use super::super::{run_perennial_final, run_season_final, SEASON_DAYS};
     use super::*;
+
+    /// THE CAPTURE'S GEOMETRY AT ITS CALL SITE, on a NON-UNIT ground area.
+    ///
+    /// Every frozen scenario has `ground_area = 1.0`, so a caller that drops the area
+    /// factor entirely computes the identical number and is invisible to every golden,
+    /// to the rest of `cargo test`, and to the cross-port comparison. Measured: that
+    /// mutant left the whole Rust suite green before this test existed. Mirrors the
+    /// Python anti-drift pin
+    /// `test_soil_layers.py::test_capture_and_depth_use_the_same_gated_rate`.
+    #[test]
+    fn capture_scales_with_ground_area_at_its_call_sites() {
+        let scenario = SeasonScenario {
+            ground_area: 2.0,
+            // Everything extensive scales with the plot, or this is a different soil.
+            soil_water0: 2000.0,
+            subsoil_water0: 390.0,
+            soil_n0: 200.0,
+            plant_n0: 2.0 * DEFAULT_SCENARIO.plant_n0,
+            leaf_c0: 0.10,
+            stem_c0: 0.06,
+            root_c0: 0.16,
+            ..DEFAULT_SCENARIO
+        };
+        let (state, integrator, resolver) = super::super::season_setup(&scenario, 1).unwrap();
+        let mut seen: Vec<(f64, f64)> = Vec::new();
+        let mut observe = |s: &State| {
+            seen.push((s.aux[ROOTED_DEPTH], s.stocks[SUBSOIL_WATER].amount));
+        };
+        let steps = super::super::steps_for(1);
+        run_season(
+            &integrator,
+            state,
+            &resolver,
+            1.0,
+            steps,
+            None,
+            &mut observe,
+        )
+        .expect("deep-rooting season");
+        let mut checked = 0usize;
+        for pair in seen.windows(2) {
+            let (d0, w0) = pair[0];
+            let (d1, w1) = pair[1];
+            let gained = d1 - d0;
+            if gained <= 0.0 {
+                continue;
+            }
+            let want = science::captured_water(
+                gained,
+                scenario.soil_extractable_water,
+                scenario.ground_area,
+            );
+            let got = w0 - w1;
+            assert!(
+                (got - want).abs() <= 1e-9 * want.abs(),
+                "capture {got} != geometry {want}"
+            );
+            checked += 1;
+        }
+        assert!(
+            checked > 30,
+            "the capture must actually run ({checked} steps)"
+        );
+    }
+
+    /// The donor clamp ([F] Eqn 14.10's `min`) and the re-sow return, on a plot whose
+    /// below-root store RUNS OUT.
+    ///
+    /// Neither is reachable from a frozen scenario: the default store (195 kg) never
+    /// empties, and the frozen plots are all 1 m2 so the re-sow return's area factor is
+    /// invisible. Both mutants (dropping the clamp; using a unit area in the return)
+    /// left the Rust suite green before this test existed. The Python side reaches the
+    /// clamp through its own near-empty-store pin.
+    #[test]
+    fn the_clamp_and_the_resow_return_hold_on_an_emptying_store() {
+        let scenario = SeasonScenario {
+            ground_area: 2.0,
+            soil_water0: 2000.0,
+            // Far less than the ~299 kg a 2 m2 plot's roots would capture, so the store
+            // empties mid-season and the clamp is the only thing standing between the
+            // flow and an overdraw.
+            subsoil_water0: 40.0,
+            soil_n0: 200.0,
+            plant_n0: 2.0 * DEFAULT_SCENARIO.plant_n0,
+            leaf_c0: 0.10,
+            stem_c0: 0.06,
+            root_c0: 0.16,
+            litter_carbon0: 6.0,
+            sealed: true,
+            ..DEFAULT_SCENARIO
+        };
+        let (state, integrator, resolver) = super::super::season_setup(&scenario, 2).unwrap();
+        let mut lowest = f64::INFINITY;
+        let mut returned_at_reset: Vec<f64> = Vec::new();
+        let mut abandoned_at_reset: Vec<f64> = Vec::new();
+        let mut prev: Option<(f64, f64)> = None;
+        let mut observe = |s: &State| {
+            let below = s.stocks[SUBSOIL_WATER].amount;
+            let depth = s.aux[ROOTED_DEPTH];
+            if below < lowest {
+                lowest = below;
+            }
+            if let Some((prev_depth, prev_below)) = prev {
+                // A reset is the only place depth falls; the store must jump by exactly
+                // the abandoned column's geometry (or by what the root zone could give).
+                if depth < prev_depth {
+                    returned_at_reset.push(below - prev_below);
+                    abandoned_at_reset.push(prev_depth - depth);
+                }
+            }
+            prev = Some((depth, below));
+        };
+        let steps = super::super::steps_for(2);
+        let (_, rationed, _) = run_perennial(
+            &integrator,
+            state,
+            &scenario,
+            &resolver,
+            1.0,
+            steps,
+            SEASON_DAYS,
+            &mut observe,
+        )
+        .expect("emptying-store chamber");
+        // THE CLAMP: the store is drained to exactly empty, never past it, and the
+        // arbitration backstop never has to rescue the overdraw.
+        assert_eq!(rationed, 0, "the clamp must keep the backstop out of it");
+        assert!(lowest >= 0.0, "the store went negative: {lowest}");
+        assert!(lowest < 1e-12, "the store must actually empty: {lowest}");
+        // THE RETURN, with its area factor: one re-sow, giving back the abandoned
+        // column. ⚠ Note WHICH depth that is — the store empties mid-season, so the
+        // `WSTORG = 0` gate stalls the roots at ~0.30 m rather than the 1.3 m cap, and
+        // the return is correspondingly ~40 kg rather than ~299. The cycle closes on
+        // what was actually captured, which is the property that matters.
+        assert_eq!(returned_at_reset.len(), 1);
+        let abandoned = abandoned_at_reset[0];
+        let want = science::captured_water(
+            abandoned,
+            scenario.soil_extractable_water,
+            scenario.ground_area,
+        );
+        let got = returned_at_reset[0];
+        assert!(
+            (got - want).abs() <= 1e-9 * want,
+            "returned {got}, geometry {want}"
+        );
+        // ...and it is the AREA-SCALED figure, not the 1 m2 one — the factor a caller
+        // can drop invisibly on every frozen (1 m2) scenario.
+        assert!(
+            got > 1.5 * science::captured_water(abandoned, scenario.soil_extractable_water, 1.0),
+            "the return ignored ground_area: {got}"
+        );
+    }
 
     /// The open season runs the whole hard core to completion under the every-step
     /// conservation gate (a completed run is the proof), with the Tier-0 invariants.

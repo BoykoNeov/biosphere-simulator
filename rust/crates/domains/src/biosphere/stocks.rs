@@ -14,6 +14,10 @@ pub const STEM_C: &str = "biosphere.stem_c";
 pub const ROOT_C: &str = "biosphere.root_c";
 pub const STORAGE_C: &str = "biosphere.storage_c";
 pub const SOIL_WATER: &str = "biosphere.soil_water";
+/// The below-root store ([F] Soltani & Sinclair's `WSTORG`): in-system soil water the
+/// roots have not reached. `RootZoneCapture` (EWAT) moves it into `soil_water` as the
+/// rooted depth grows. See the Python `soil_layers.py`.
+pub const SUBSOIL_WATER: &str = "biosphere.subsoil_water";
 pub const SOIL_N: &str = "biosphere.soil_n";
 pub const PLANT_N: &str = "biosphere.plant_n";
 pub const CO2_ATMOS: &str = "boundary.co2_atmos";

@@ -94,6 +94,47 @@ class SeasonScenario:
     sw_wilting: float = 20.0  # kg
     sw_critical: float = 60.0  # kg
     irrigation_mm_day: float = 2.0  # mm day⁻¹
+    # --- the below-root store (post-roadmap soil layers; [F] Soltani & Sinclair Ch. 14)
+    # ``subsoil_water`` (WSTORG) is the extractable water PHYSICALLY PRESENT in the soil
+    # below the current rooted depth — there, but unreachable until the roots arrive.
+    # ``RootZoneCapture`` (EWAT, Eqn 14.10) moves it into ``soil_water`` as depth grows.
+    #
+    # The default is NOT a free number: 1.5 m × 0.13 × 1000 kg m⁻³ × 1 m² = 195 kg is
+    # ``soil_depth · soil_extractable_water · ρ_water · ground_area``, i.e. the profile
+    # at the DRAINED UPPER LIMIT — the potential-production condition every frozen
+    # scenario is already built on, and the user's own station framing ("the soil will
+    # be artificially watered so … water will be available in all layers"). The identity
+    # is pinned in tests/test_soil_layers.py, so changing one side alone goes red.
+    #
+    # ⚠ It must be > 0 for any scenario whose roots are meant to grow: [F]'s Box 14.1
+    # carries ``If WSTORG = 0 Then GRTD = 0`` (roots do not extend into dry soil), so a
+    # zero here freezes rooted depth. ``water_biting`` sets 0 deliberately — see its
+    # scenario comment.
+    subsoil_water0: float = 195.0  # kg
+    # EXTR, the volumetric extractable soil water (drained upper limit − lower limit).
+    # SCENARIO/SOIL data like sw_wilting/ground_area, not a crop param — it is a
+    # property of the soil. [F] Ch. 13: "It has been shown that EXTR is conservative for
+    # many agricultural soils except sandy soils, and has a value of approximately 0.13
+    # mm mm-1 (Ratliff et al., 1983; Ritchie et al., 1999)."
+    soil_extractable_water: float = 0.13  # m³ m⁻³ (≡ mm mm⁻¹)
+    # SOLDEP, the physical soil depth. Caps rooted depth alongside the crop's own
+    # ``max_rooted_depth`` — [F] Box 14.1 ``If DEPORT >= SOLDEP Then GRTD = 0``, and [E]
+    # Listing 7 L33 "uses the shallowest of the rooted depths set by the soil and by the
+    # crop". ⚠ This DISCHARGES the deferral ``root_depth.yaml`` names in its own
+    # ``max_rooted_depth`` source note ("We carry only the CROP cap — the soil cap would
+    # be scenario/soil data, and adding it is deferred, not overlooked").
+    # 1.5 m > the frozen winter wheat's 1.3 m cap, so the CROP cap stays the binding one
+    # and this addition moves nothing on the frozen roster; it exists so a shallow bed
+    # is sayable.
+    soil_depth: float = 1.5  # m
+    # DEPORT at emergence. ⚠ This replaces an UNCITED 0.0 with cited data: [F] Ch. 14,
+    # "The value of DEPORT at crop emergence must be provided to the model. It is
+    # normally between 150 to 400 mm depending on crop species and soil conditions."
+    # 0.15 m is the BOTTOM of that range — the cautious end, since a shallower start
+    # makes the root-zone access gate tighter, not looser. Applies at sowing and at
+    # every re-sow (``annual_reset``): a re-sown crop starts with the root system a sown
+    # crop has, which is what made ``water_biting``'s dry-throughout profile survivable.
+    rooted_depth0: float = 0.15  # m
     # nitrogen (PP, non-limiting): a generous plant-N reserve + ample soil supply
     soil_n0: float = 100.0  # kg N (>> sn_critical ⇒ availability = 1 all season)
     n_source0: float = 0.0  # kg N (unclamped supply; tracks cumulative fertilization)
@@ -317,6 +358,22 @@ WATER_BITING_SCENARIO: SeasonScenario = SeasonScenario(
     sealed=True,
     litter_carbon0=3.0,
     soil_water0=50.0,  # kg — inside (sw_wilting, sw_critical) ⇒ f_water < 1 all season
+    # ⚠ THE ONE SCENARIO THAT DECLARES A DRY SUBSOIL, and it is a deliberate decision
+    # with a stated reason, not the default falling through (post-roadmap soil layers).
+    # This is the only scenario whose soil water sits INSIDE the stress band, so it is
+    # the only place ``RootZoneCapture`` would feed back on itself: capture raises
+    # ``soil_water`` → raises ``f_water`` → raises the extension rate → captures more.
+    # The default 195 kg subsoil would pump ~2.3 kg/day into a 50 kg chamber and ABOLISH
+    # the water stress this scenario exists to exercise. A chamber that is water-lean is
+    # lean throughout — there is no hidden reservoir under the bed — so 0.0 is also the
+    # honest reading, not merely the convenient one.
+    #
+    # It is survivable ONLY because ``rooted_depth0`` is now a cited nonzero (see
+    # SeasonScenario). Under the old uncited 0.0, [F]'s ``If WSTORG = 0 Then GRTD = 0``
+    # would have frozen depth at 0, made FROOT1 = 0, and driven nitrogen uptake to
+    # identically zero — turning a deliberately water-only scenario into an N-limited
+    # one. With a sowing root system the dry subsoil only stops FURTHER extension.
+    subsoil_water0=0.0,  # kg
 )
 WATER_BITING_YEARS: int = 1
 
@@ -388,4 +445,72 @@ POTATO_YEARS: int = 1
 # drought cascade, emergent with no cascade code. Open field (``sealed=False``) is the
 # only scenario with irrigation to cut (the sealed chamber dropped it in Step 3 for
 # genuine water closure), so drought necessarily lives here. All other fields default.
-DROUGHT_SCENARIO: SeasonScenario = SeasonScenario(soil_water0=70.0)
+#
+# ⚠ It declares a DRY SUBSOIL for the same reason ``water_biting`` does, and the number
+# that forced the decision is recorded rather than the decision merely asserted
+# (post-roadmap soil layers). A plot defined as *water-lean* cannot have a hidden
+# reservoir under it — but the measurement is the point, because the default profile
+# does not weaken this scenario, it **abolishes** it:
+#
+#   | subsoil | min f_water in window | min soil_water | end veg C, base → cut |
+#   |---------|-----------------------|----------------|-----------------------|
+#   | 195 kg  | **1.0000** (no stress) | 149.4 kg      | 33.61 → 33.28         |
+#   | 0 kg    | 0.5011                | 40.0 kg       | 33.61 → **12.68**     |
+#
+# The deepening root zone captures ~149 kg over the season, which more than replaces the
+# 2 mm/day the perturbation cuts. That is not an artefact to be tuned away — it is the
+# mechanism working: a crop that can root into wet subsoil is drought-defended, which is
+# exactly why [F] models the store. This scenario exists to exercise the *cascade*, so
+# it declares the profile that leaves the cascade reachable, and the other reading is
+# written down here rather than lost.
+DROUGHT_SCENARIO: SeasonScenario = SeasonScenario(
+    soil_water0=70.0,
+    subsoil_water0=0.0,
+)
+
+
+# The post-roadmap **deep-water** scenario: the one place where rooting depth decides
+# whether the crop lives. Every other scenario in this file is either watered from a
+# boundary or holds its water where the roots already are; here the profile is
+# **stratified** — a root zone that runs out, over a subsoil the crop can only reach by
+# growing into it. It is the diagnostic the soil-layers build exists for, and without it
+# ``RootZoneCapture`` would be another mechanism nothing exercises.
+#
+#   * ``irrigation_mm_day = 0`` — the supply is cut at sowing, so the season is fed by
+#     what the soil already holds. (The DROUGHT scenario cuts irrigation over a *window*
+#     to test the cascade; this one never has it.)
+#   * ``soil_water0 = 350`` kg — enough to carry the crop through winter unstressed, and
+#     short of what the spring canopy needs. The stress therefore arrives when demand
+#     peaks, which is when a deep root system is worth something.
+#   * ``subsoil_water0`` stays at the default 195 kg — the profile's own water at the
+#     drained upper limit. Nothing is added to make the point; the water was always in
+#     the profile, it was just out of reach.
+#
+# **MEASURED, with the confounder removed** (probe, ``docs/plans/post-roadmap-soil-
+# layers.md``). Against a control that turns off ONLY the water transfer
+# (``soil_extractable_water = 0``, so rooted depth still grows exactly as it does here
+# and the nitrogen gate is untouched):
+#
+#   | run                    | peak leaf C | grain C |
+#   |------------------------|-------------|---------|
+#   | capture on (this one)  | **8.8398**  | 3.6927  |
+#   | control (EXTR = 0)     | 3.5345      | 0.0000  |
+#
+# — a 2.5x canopy and the difference between setting grain and setting none. The peak
+# canopy matches the fully-irrigated reference season's 8.8398 to all printed figures:
+# reaching the subsoil is worth as much here as a boundary supply.
+#
+# ⚠ The naive control (``subsoil_water0 = 0``) gives the same numbers, but it is NOT the
+# control that licenses the claim — it removes the water AND freezes rooted depth (the
+# ``WSTORG = 0 ⇒ GRTD = 0`` gate), so it changes the nitrogen gate too. The two controls
+# agree stock-for-stock except ``soil_n`` at **1 ULP** (rel. 1.4e-16), which is the
+# measurement that says the effect is water and not nitrogen — asserted attributions in
+# this project have been wrong before.
+#
+# **Additive scenario data + its own diagnostic, NOT a frozen reference** (the
+# N_LIMITED / WATER_BITING / DAY_NEUTRAL / POTATO precedent).
+DEEP_WATER_SCENARIO: SeasonScenario = SeasonScenario(
+    soil_water0=350.0,
+    irrigation_mm_day=0.0,
+)
+DEEP_WATER_YEARS: int = 1

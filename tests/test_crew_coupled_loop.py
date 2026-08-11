@@ -181,6 +181,11 @@ _PLANT_SOIL_ICS = (
     "root_c0",
     "litter_carbon0",
     "soil_water0",
+    # The below-root store is EXTENSIVE (kg over the plot), so it scales with area like
+    # its sibling. This pin caught its omission the first time it was added — which is
+    # what the pin is for: `subsoil_water0`'s default is derived from `ground_area`, and
+    # a scenario that scales the area without scaling the store is not the same soil.
+    "subsoil_water0",
     "soil_n0",
     "plant_n0",
 )

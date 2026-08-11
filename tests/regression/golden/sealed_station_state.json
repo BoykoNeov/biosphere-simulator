@@ -1,6 +1,6 @@
 {
   "aux": {
-    "rooted_depth": "0x1.4d6c2efd438d2p+0",
+    "rooted_depth": "0x1.4cf56eac86052p+0",
     "thermal_time": "0x1.3700bf7ced917p+11",
     "vernalization_days": "0x1.1ebeb851eb852p+7"
   },
@@ -178,7 +178,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.ec0c7a2d40e6ap+9",
+      "amount": "0x1.204b65a38778cp+10",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -215,6 +215,19 @@
       "quantity": "carbon",
       "unclamped": false,
       "unit": "mol"
+    },
+    {
+      "amount": "0x1.9eb5dcc63f0b8p+4",
+      "composition": {
+        "water": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.soil",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.subsoil_water",
+      "kind": "pool",
+      "quantity": "water",
+      "unclamped": false,
+      "unit": "kg"
     },
     {
       "amount": "0x1.14dec55379ccep+3",

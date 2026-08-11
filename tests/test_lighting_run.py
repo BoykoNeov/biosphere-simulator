@@ -56,6 +56,7 @@ from domains.biosphere.stocks import (
     SOIL_WATER,
     STEM_C,
     STORAGE_C,
+    SUBSOIL_WATER,
     WATER_VAPOR,
 )
 from domains.power.stocks import BATTERY, WASTE_HEAT, battery_stock
@@ -397,7 +398,11 @@ def test_biosphere_internal_water_loop_closed() -> None:
     # conserved to round-off across the whole run) — the biosphere's own closure
     # survives the lighting coupling untouched.
     states, _, _ = _run()
-    loop = (SOIL_WATER, WATER_VAPOR, CONDENSATE)
+    # SUBSOIL_WATER is part of the total: the below-root store (post-roadmap soil
+    # layers) is in-system soil water that RootZoneCapture moves into soil_water as the
+    # roots reach it. It crosses no boundary, so leaving it out would read a conserved
+    # transfer as a leak.
+    loop = (SOIL_WATER, SUBSOIL_WATER, WATER_VAPOR, CONDENSATE)
     total0 = sum(_amt(states[0], s) for s in loop)
     totalf = sum(_amt(states[-1], s) for s in loop)
     assert abs(totalf - total0) <= 1e-9, (

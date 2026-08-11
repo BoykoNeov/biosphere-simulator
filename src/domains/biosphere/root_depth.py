@@ -19,6 +19,14 @@ citation**, and anyone arriving to "finally make root carbon do work" should rea
 and refused, and this module is what was built instead — at the user's explicit
 direction, over that refusal, with the inertness below known in advance.
 
+**⚠ THE STATEMENT BELOW IS ABOUT THE NITROGEN GATE ONLY, AND IT IS NOW DATED.** Depth
+acquired a **second** consumer in the post-roadmap soil-layers build:
+``soil_layers.RootZoneCapture`` turns the same extension rate into the water the newly
+explored soil gives up (``EWAT``, [F] Eqn 14.10). That one is **not** inert — it moves
+``soil_water`` on every frozen scenario, and on a dry-topped profile it decides whether
+the crop lives. So "no golden can catch this mechanism's removal" is true of ``FROOT1``
+and false of the capture flow. See ``docs/plans/post-roadmap-soil-layers.md``.
+
 **⚠ THIS MECHANISM IS BIT-IDENTICALLY INERT ON EVERY FROZEN SCENARIO.** Measured, not
 assumed: across the manifest's whole roster at its own horizons (including both 15-year
 runs), for initial depths 0.0 and 0.15 m, with and without the re-sow reset, and
@@ -110,14 +118,77 @@ def root_zone_fraction(rooted_depth: float, *, soil_layer_depth: float) -> float
     return fraction if fraction < 1.0 else 1.0
 
 
+def extension_rate(
+    depth: float,
+    thermal_time: float,
+    temp_c: float,
+    soil_water: float,
+    subsoil_water: float,
+    *,
+    params: RootDepthParams,
+    photo: PhotosynthesisParams,
+    pheno: PhenologyParams,
+    sw_wilting: float,
+    sw_critical: float,
+    soil_depth: float,
+) -> float:
+    """``GRTD`` — the gated rooted-depth extension rate (m/day). **The single source.**
+
+    ``rate = max_extension_rate · f_water · f_temp``, cut to **exactly zero** by any of
+    the four stop conditions below. Both consumers call this one function:
+    :class:`RootDepthExtension` (which integrates it into the accumulator) and
+    ``soil_layers.RootZoneCapture`` (which converts it into the water the newly
+    explored soil gives up). ⚠ **They must not be able to disagree** — a capture that
+    used an ungated rate would move water for depth the roots did not gain, so the gates
+    live here and nowhere else.
+
+    The stops, each cited:
+
+    * ``depth >= max_rooted_depth`` — the crop's own effective extraction depth
+      ([E] Table 25). A **rate** cut-off rather than an increment clamp, to keep the aux
+      channel's ``dt``-independence contract (see the module docstring).
+    * ``depth >= soil_depth`` — the SOIL's cap. [F] Box 14.1 ``If DEPORT >= SOLDEP Then
+      GRTD = 0``; [E] Listing 7 L33 takes "the shallowest of the rooted depths set by
+      the soil and by the crop". This is the ceiling ``root_depth.yaml`` recorded as
+      deferred.
+    * ``DVS >= 1`` — [E] p. 136, "Root growth generally stops around flowering".
+    * ``subsoil_water <= 0`` — [F] Box 14.1 ``If WSTORG = 0 Then GRTD = 0``: "if there
+      is no available soil water below the root depth, GRTD is set equal to 0". Roots do
+      not extend into dry soil. ⚠ This is the gate that makes a scenario's
+      ``subsoil_water0`` load-bearing rather than decorative.
+    """
+    if depth >= params.max_rooted_depth or depth >= soil_depth:
+        return 0.0
+    if subsoil_water <= 0.0:
+        return 0.0
+    dvs = development_stage(
+        thermal_time,
+        tsum_anthesis=pheno.tsum_anthesis,
+        tsum_maturity=pheno.tsum_maturity,
+    )
+    if dvs >= 1.0:  # [E]: "Root growth generally stops around flowering"
+        return 0.0
+    f_temp = temperature_factor(
+        temp_c,
+        t_min=photo.t_min,
+        t_opt_lo=photo.t_opt_lo,
+        t_opt_hi=photo.t_opt_hi,
+        t_max=photo.t_max,
+    )
+    f_water = water_stress_factor(
+        soil_water, sw_wilting=sw_wilting, sw_critical=sw_critical
+    )
+    return params.max_extension_rate * f_water * f_temp
+
+
 @dataclass(frozen=True)
 class RootDepthExtension:
     """``AuxProcess`` advancing the ``rooted_depth`` accumulator (the third one).
 
     Returns the per-step increment ``{accumulator: rate · dt}`` in the same increment
-    form as ``ThermalTimeAccumulation``, where ``rate = max_extension_rate · f_water ·
-    f_temp``, zero at/after flowering and zero once the cap is reached (see the module
-    docstring for why the cap is a rate cut-off rather than an increment clamp).
+    form as ``ThermalTimeAccumulation``, where ``rate`` is :func:`extension_rate` —
+    **the same function** ``RootZoneCapture`` calls, so the depth the roots gain and the
+    water the newly explored soil releases can never be computed from different gates.
 
     Reads DVS from the ``thermal_time`` accumulator on the snapshot — the same
     derived-not-stored idiom :func:`phenology.development_stage` exists for, so no
@@ -129,36 +200,28 @@ class RootDepthExtension:
     thermal_time_aux: str
     temp_var: str
     soil_water: StockId
+    subsoil_water: StockId
     params: RootDepthParams
     photo: PhotosynthesisParams
     pheno: PhenologyParams
     sw_wilting: float
     sw_critical: float
+    soil_depth: float
 
     def evaluate(
         self, snapshot: State, env: Environment, dt: float
     ) -> Mapping[str, float]:
-        depth = snapshot.aux.get(self.accumulator, 0.0)
-        if depth >= self.params.max_rooted_depth:
-            return {self.accumulator: 0.0}
-        dvs = development_stage(
+        rate = extension_rate(
+            snapshot.aux.get(self.accumulator, 0.0),
             snapshot.aux.get(self.thermal_time_aux, 0.0),
-            tsum_anthesis=self.pheno.tsum_anthesis,
-            tsum_maturity=self.pheno.tsum_maturity,
-        )
-        if dvs >= 1.0:  # [E]: "Root growth generally stops around flowering"
-            return {self.accumulator: 0.0}
-        f_temp = temperature_factor(
             env.get(self.temp_var),
-            t_min=self.photo.t_min,
-            t_opt_lo=self.photo.t_opt_lo,
-            t_opt_hi=self.photo.t_opt_hi,
-            t_max=self.photo.t_max,
-        )
-        f_water = water_stress_factor(
             snapshot.stocks[self.soil_water].amount,
+            snapshot.stocks[self.subsoil_water].amount,
+            params=self.params,
+            photo=self.photo,
+            pheno=self.pheno,
             sw_wilting=self.sw_wilting,
             sw_critical=self.sw_critical,
+            soil_depth=self.soil_depth,
         )
-        rate = self.params.max_extension_rate * f_water * f_temp
         return {self.accumulator: rate * dt}

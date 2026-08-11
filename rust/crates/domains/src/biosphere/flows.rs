@@ -1048,11 +1048,13 @@ pub struct RootDepthExtension {
     pub thermal_time_aux: String,
     pub temp_var: String,
     pub soil_water: String,
+    pub subsoil_water: String,
     pub params: params::RootDepthParams,
     pub photo: params::PhotosynthesisParams,
     pub pheno: params::PhenologyParams,
     pub sw_wilting: f64,
     pub sw_critical: f64,
+    pub soil_depth: f64,
 }
 
 impl AuxProcess for RootDepthExtension {
@@ -1065,32 +1067,99 @@ impl AuxProcess for RootDepthExtension {
         env: &dyn Environment,
         dt: f64,
     ) -> Result<BTreeMap<String, f64>, SimError> {
-        let depth = snapshot.aux.get(&self.accumulator).copied().unwrap_or(0.0);
-        // The cap is a RATE cut-off, not an increment clamp: the aux contract wants a
+        // All four stops (crop cap, soil cap, flowering, dry subsoil) live in
+        // `science::extension_rate` - the SAME function `RootZoneCapture` calls, so the
+        // depth gained and the water released cannot be computed from different gates.
+        // The caps are RATE cut-offs, not increment clamps: the aux contract wants a
         // dt-independent rate. Carried from Python deliberately - the port does not
         // re-decide it (port-mirror-carries-rule-not-rationale).
-        if depth >= self.params.max_rooted_depth {
-            return Ok(BTreeMap::from([(self.accumulator.clone(), 0.0)]));
-        }
-        let tt = snapshot
-            .aux
-            .get(&self.thermal_time_aux)
-            .copied()
-            .unwrap_or(0.0);
-        let dvs =
-            science::development_stage(tt, self.pheno.tsum_anthesis, self.pheno.tsum_maturity);
-        // [E] p. 136: "Root growth generally stops around flowering".
-        if dvs >= 1.0 {
-            return Ok(BTreeMap::from([(self.accumulator.clone(), 0.0)]));
-        }
-        let f_temp = science::temperature_factor(env.get(&self.temp_var)?, &self.photo);
-        let f_water = science::water_stress_factor(
+        let rate = science::extension_rate(
+            snapshot.aux.get(&self.accumulator).copied().unwrap_or(0.0),
+            snapshot
+                .aux
+                .get(&self.thermal_time_aux)
+                .copied()
+                .unwrap_or(0.0),
+            env.get(&self.temp_var)?,
             amt(snapshot, &self.soil_water),
+            amt(snapshot, &self.subsoil_water),
+            &self.params,
+            &self.photo,
+            &self.pheno,
             self.sw_wilting,
             self.sw_critical,
+            self.soil_depth,
         );
-        let rate = self.params.max_extension_rate * f_water * f_temp;
         Ok(BTreeMap::from([(self.accumulator.clone(), rate * dt)]))
+    }
+}
+
+/// WATER flow `subsoil_water -> soil_water` (`EWAT`, [F] Eqn 14.10) - the water side of
+/// rooted depth. An internal transfer between two in-system soil stocks: it crosses no
+/// boundary and only re-labels which water the crop can reach.
+///
+/// Mirrors `soil_layers.RootZoneCapture`, including the donor `min` clamp, which [F] Box
+/// 14.1 writes as `If EWAT > WSTORG Then EWAT = WSTORG`.
+pub struct RootZoneCapture {
+    pub id: String,
+    pub subsoil_water: String,
+    pub soil_water: String,
+    pub rooted_depth_aux: String,
+    pub thermal_time_aux: String,
+    pub temp_var: String,
+    pub params: params::RootDepthParams,
+    pub photo: params::PhotosynthesisParams,
+    pub pheno: params::PhenologyParams,
+    pub sw_wilting: f64,
+    pub sw_critical: f64,
+    pub soil_depth: f64,
+    pub soil_extractable_water: f64,
+    pub ground_area: f64,
+}
+
+impl Flow for RootZoneCapture {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let available = amt(snapshot, &self.subsoil_water);
+        let rate = science::extension_rate(
+            snapshot
+                .aux
+                .get(&self.rooted_depth_aux)
+                .copied()
+                .unwrap_or(0.0),
+            snapshot
+                .aux
+                .get(&self.thermal_time_aux)
+                .copied()
+                .unwrap_or(0.0),
+            env.get(&self.temp_var)?,
+            amt(snapshot, &self.soil_water),
+            available,
+            &self.params,
+            &self.photo,
+            &self.pheno,
+            self.sw_wilting,
+            self.sw_critical,
+            self.soil_depth,
+        );
+        let demand =
+            science::captured_water(rate * dt, self.soil_extractable_water, self.ground_area);
+        let flux = if demand < available {
+            demand
+        } else {
+            available
+        };
+        FlowResult::new(vec![
+            leg(&self.subsoil_water, -flux)?,
+            leg(&self.soil_water, flux)?,
+        ])
     }
 }
 

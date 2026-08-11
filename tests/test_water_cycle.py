@@ -53,6 +53,7 @@ from domains.biosphere.season import (
     SEALED_CHAMBER_SCENARIO,
     SEALED_CHAMBER_YEARS,
     SOIL_WATER,
+    SUBSOIL_WATER,
     WATER_VAPOR,
     build_season,
     run_season,
@@ -348,9 +349,17 @@ def sealed() -> tuple[list[State], Registry, SourceResolver, int, tuple]:
 
 
 def _water_total(s: State) -> float:
-    """Total water around the closed ring (the only WATER stocks when sealed)."""
+    """Total water around the closed ring (the only WATER stocks when sealed).
+
+    ⚠ ``subsoil_water`` is a term here, and NOT because the ring grew a fourth leg. The
+    below-root store (post-roadmap soil layers) is in-system soil water that
+    ``RootZoneCapture`` moves into ``soil_water`` as the roots reach it; it crosses no
+    boundary, so a sealed chamber's water is conserved over FOUR stocks rather than
+    three. Omitting it here would make a conserved transfer look like a leak.
+    """
     return (
         s.stocks[SOIL_WATER].amount
+        + s.stocks[SUBSOIL_WATER].amount
         + s.stocks[WATER_VAPOR].amount
         + s.stocks[CONDENSATE].amount
     )
