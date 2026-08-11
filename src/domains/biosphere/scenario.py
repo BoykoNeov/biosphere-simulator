@@ -327,6 +327,39 @@ DAY_NEUTRAL_SCENARIO: SeasonScenario = SeasonScenario(
 DAY_NEUTRAL_YEARS: int = 1
 
 
+# The post-roadmap **potato** — the biosphere's first genuine SECOND SPECIES. Unlike the
+# day-neutral crop above (which is the same winter-wheat files with the gates switched
+# off), this one carries its **own cited param files** (``params/crops/potato/``:
+# phenology, allocation, canopy), so it is the first scenario for which ``crop`` is not
+# ``None``. Open field, matching the WOFOST potato oracle's own plot:
+#
+#   * ``crop="potato"`` — the three overridden files; the other five fall back to the
+#     reference (``loader.crop_param_set``), which is honest rather than hidden: our
+#     FvCB kinetics were never wheat-specific (they are TODO(cite) placeholders tagged
+#     "literature-typical C3"), and potato is a C3 plant.
+#   * **day-neutral, and not by analogy** — [E] Table 12 marks potato's daylength column
+#     "–", which the table's own legend defines as "daylength not relevant". So both
+#     modifiers are off because the SOURCE says so, not because it is convenient.
+#   * ``latitude=37.64`` — grid 31031 (Andalusia), the oracle's own site, so the
+#     astronomical daylength driving PAR is the forcing the oracle ran under. This is
+#     the ONLY field besides ``crop`` and the two gates that moves off the default.
+#
+# **Additive scenario data + its own diagnostic, NOT a frozen reference and NOT an
+# unfreeze** (the N_LIMITED / WATER_BITING / DAY_NEUTRAL precedent): every frozen
+# scenario keeps ``crop=None``, so all 7 biosphere goldens are byte-identical.
+# "Authored ≠ validated" still applies — being runnable is not endorsement. Diagnosed
+# against the bundled WOFOST potato oracle (an AMAX/light-response model, a different
+# family from our FvCB core — a diagnostic, never a fit target, ruling B); see
+# ``docs/plans/post-roadmap-potato-crop.md`` and ``tests/test_potato_crop.py``.
+POTATO_SCENARIO: SeasonScenario = SeasonScenario(
+    crop="potato",
+    vernalization=False,
+    photoperiod=False,
+    latitude=37.64,
+)
+POTATO_YEARS: int = 1
+
+
 # The Phase-3 Step-6 (P3.5) drought scenario: an **open-field** plot deliberately sized
 # **water-lean** so the irrigation-cut perturbation actually bites. The default open
 # field starts ``soil_water0 = 1000`` kg — a store so far above the stress band

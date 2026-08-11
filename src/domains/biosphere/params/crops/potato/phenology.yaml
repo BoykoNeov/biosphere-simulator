@@ -1,0 +1,171 @@
+# potato (cv Mara, late) — thermal-time phenology (degree-day) crop params
+#
+# THE SECOND SPECIES. Everything the biosphere had grown until this file was winter
+# wheat; even the "day-neutral crop" is the same wheat files with the cold/daylength
+# gates switched off ("not a new param file", by its own record). Plan of record:
+# docs/plans/post-roadmap-potato-crop.md.
+#
+# Read this file alongside ../../phenology.yaml (the FROZEN winter-wheat reference): the
+# model FORM, the units discipline, and the DVS definition are identical and are
+# documented there, not restated here. What differs is the values, and — importantly —
+# their PROVENANCE: every value below is CITED first-hand to [E], where the reference
+# crop's own t_base/t_cap are still TODO(cite) placeholders.
+#
+# ⚠ READ OFF PAGE IMAGES, NOT THE TEXT LAYER. pdftotext garbles exactly the digits in
+#   [E]'s tables (the scope-(C) round-6 hazard the reference file also records). Every
+#   number below was transcribed from the rendered pages 96/97/102 of the PDF (printed
+#   pages 76/77/82). The method was self-checked on the same pages: [E]'s winter-wheat
+#   rows read back as 0.015 (Arminda) / 0.0195 (UQ189) at 20 °C in Table 12 and 0.0255 /
+#   0.0275 in Table 15 — exactly the values ../../phenology.yaml already carries.
+#
+# ⚠ CLEAN-ROOM. The oracle for this crop is WOFOST potato out of PCSE's bundled demo
+#   database, and NOT ONE of its parameter values is used here. [E] is an independent
+#   printed primary source. The oracle is a DIAGNOSTIC, never a fit target (ruling B);
+#   the cultivar below was chosen on source-internal grounds *before* any comparison was
+#   run (see "Why cv Mara").
+#
+# --- Why cv Mara (late) --------------------------------------------------------------
+# [E] carries TWO potato cultivars complete across Tables 12, 15 and 18 (partitioning),
+# both from van Heemst (1986), so consistency is available either way. The tie is broken
+# on two source-internal facts, neither of which is about matching an oracle:
+#   1. Mara's Table-18 CALVT and CASTT share IDENTICAL development-stage knots
+#      (0, 0.15, 0.46, 0.76, 1.03, 1.17); Favorita's do not (its CASTT carries a 1.57
+#      knot CALVT lacks). Our partition table is a single shared-breakpoint table, so
+#      Mara converts into it without inventing knots.
+#   2. At emergence Mara's leaf+stem fractions sum to exactly 1.00 — nothing goes to the
+#      tuber before the plant exists. Favorita's sum to 0.93, implying 7 % of shoot
+#      assimilate enters the tuber at emergence, which reads as a curve-fitting artefact
+#      rather than physiology.
+# Favorita's values are recorded per-param below as the sanctioned second cultivar, so a
+# later session has the alternative in hand and moving to it is a documented switch, not
+# a re-derivation.
+#
+# --- The derivation: [E]'s rate constant -> our thermal sum ---------------------------
+# [E] uses a development-RATE-constant formalism (1/day at a reference temperature), not
+# a °C·day thermal sum, so the conversion is a documented derivation:
+#
+#     TSUM = (T_ref − t_base) / r
+#
+# because r is the inverse of the phase duration at a constant T_ref, and our degree-day
+# form accumulates (T_ref − t_base) per day at that temperature. With T_ref = 18 °C and
+# t_base = 7 °C (both from [E], below), the derivation is exactly "match [E]'s phase
+# duration at a constant 18 °C".
+#
+# ⚠ THE CAVEAT, RESTATED WITH POTATO'S OWN NUMBERS — it is NOT the wheat sentence copied.
+#   This is a SINGLE-POINT anchor at the reference temperature; [E]'s own temperature
+#   response (Table 13) is non-linear, so the two formalisms agree only NEAR 18 °C. For
+#   winter wheat that mattered asymmetrically (a cold vegetative window, a reproductive
+#   window beside the 20 °C anchor). For POTATO it is SHARPER and in the other
+#   direction, because our anchor IS the optimum: [E]'s multiplier falls away on BOTH
+#   sides of 18 °C, while our form rises to 18 and then holds flat. So above 18 °C we
+#   accumulate development the source says should be SLOWING, and the gap grows with
+#   temperature — it is not a cold-window softness but a warm-window over-run. On the
+#   Andalusian oracle season (daily means reaching the low 20s by May) this is live, not
+#   hypothetical. It is a MODEL-FORM gap, recorded here and measured in the diagnostic
+#   test; it is not closed by moving a value.
+#
+# --- What potato does NOT have -------------------------------------------------------
+# No vernalization and no photoperiod block. This is not an omission: [E] Table 12's
+# daylength column for BOTH potato rows is "–", which the table's own legend defines as
+# "daylength not relevant". Potato is therefore day-neutral BY THE SOURCE'S OWN MARKING,
+# and the scenario runs it with both modifiers off (SeasonScenario.vernalization =
+# photoperiod = False), which is exactly the seam the day-neutral crop already built.
+# The six vernalization and two photoperiod entries the reference file carries are
+# absent from this file's schema-visible parameters ONLY because the loader requires
+# them — see the note at the foot of this header.
+#
+# ⚠ SCHEMA NOTE (an honest wart, not a hidden default). ``_PhenologySchema`` requires all
+#   twelve entries, including the vernalization and photoperiod ones, because one schema
+#   serves three loaders. A day-neutral crop never builds either modifier, so those
+#   values are NEVER READ for potato. They are carried below at the reference file's
+#   values, tagged INERT, rather than being invented for potato — inventing plausible
+#   potato cold cardinals would be worse: it would look like science where none exists.
+#   If potato is ever run with a modifier switched on, those tags become live and each
+#   must be sourced first.
+#
+# Sources:
+#   [A] McMaster, G.S. & Wilhelm, W.W. (1997), "Growing degree-days: one equation, two
+#       interpretations", Agricultural and Forest Meteorology 87:291–300. The
+#       cardinal-cap GDD FORM (shared with the reference crop).
+#   [E] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
+#       Simulation Monographs 29, PUDOC, Wageningen / IRRI, Los Baños.
+#       ISBN 90-220-0937-2. Table 12 (p. 76 — vegetative development-rate constants),
+#       Table 13 (p. 77 — the temperature response), Table 15 (p. 82 — post-flowering
+#       rate constants). All three potato rows attribute to van Heemst (1986).
+#       ⚠ van Heemst (1986) itself is NOT in sources/ and was NOT opened, so the LOCUS
+#       check has not been run on it. [E] is a printed primary presenting the values in
+#       its own tables; the residual risk is recorded, dated 2026-08-11, not glossed —
+#       the same standing the reference crop's [E]-sourced tsum values carry.
+
+name: potato
+process: phenology
+
+parameters:
+  # [E] Table 13's potato row is a CSMP FUNCTION: 7.,0.01, 18.,1.0, 29.,0.01 — the
+  # development-rate multiplier is 0.01 (i.e. ~zero) at 7 °C, peaks at 1.0 at 18 °C, and
+  # is back to 0.01 at 29 °C. Our form takes the lower zero as the base temperature and
+  # the OPTIMUM as the cap. Capping at 18 rather than at the 29 °C upper zero is the
+  # only defensible reading inside our form: a cap at 29 would have us accumulate
+  # 22 °C·day/day at 29 °C, where the source says development has stopped.
+  t_base:
+    value: 7.0
+    unit: "degC"
+    source: "Penning de Vries et al. (1989) Table 13 [E], potato row (van Heemst 1986), read off the page image: '7.,0.01, 18.,1.0, 29.,0.01' — 7 °C is the lower knot at which the development-rate multiplier is 0.01, i.e. the base temperature. CITED, where the reference crop's own t_base is still TODO(cite). Form: McMaster & Wilhelm (1997) [A]"
+  t_cap:
+    value: 18.0
+    unit: "degC"
+    source: "Penning de Vries et al. (1989) Table 13 [E], potato row: the multiplier reaches its maximum 1.0 at 18 °C — which is also Table 12's reference temperature for both potato cultivars, so the cap and the rate anchor are the same point (a consistency the source supplies, not one we imposed). ⚠ [E]'s response DECLINES above 18 °C while our cardinal-cap form holds flat, so we over-accumulate development in warm weather; recorded as a model-form gap in the header, measured in the diagnostic test, never closed by moving this value"
+  # DERIVATION (see header): TSUM = (T_ref − t_base)/r = (18 − 7)/r.
+  tsum_anthesis:
+    value: 314.29
+    unit: "degC*day"
+    source: "Penning de Vries et al. (1989) Table 12 [E], row 'Potato cv Mara (late)' (verified off the page image): r = 0.035 /d at an 18 °C reference, daylength column '–' (not relevant). TSUM1 = (18 − 7)/0.035 = 314.29 °C·day = 28.6 d to anthesis at a constant 18 °C, which is 1/r by construction. The sanctioned second cultivar is cv Favorita (early), r = 0.0555 /d → 198.20 °C·day (18.0 d) — a genuine early/late cultivar spread of ~1.6×, recorded as the source's own range, NOT averaged away. Concept: van Keulen & Wolf (1986); form: McMaster & Wilhelm (1997) [A]"
+  tsum_maturity:
+    value: 733.33
+    unit: "degC*day"
+    source: "Penning de Vries et al. (1989) Table 15 [E], row 'Potato cv Mara (late)' (verified off the page image): r = 0.015 /d at an 18 °C reference. TSUM2 = (18 − 7)/0.015 = 733.33 °C·day = 66.7 d of tuber filling at a constant 18 °C. Second cultivar cv Favorita (early), r = 0.0225 /d → 488.89 °C·day (44.4 d). NOTE the shape this gives potato: a SHORT vegetative phase and a LONG filling phase (28.6 d then 66.7 d, ratio 0.43), the mirror image of our winter wheat (55 d then 37.5 d, ratio 1.47) — a real physiological difference between a grain crop and a tuber crop, carried by the source, not by us"
+
+  # --- vernalization: INERT for potato -------------------------------------------------
+  # NEVER READ. Potato is day-neutral ([E] Table 12's '–' legend) and the scenario builds
+  # no VernalizationAccumulation, so these six exist only to satisfy the shared schema.
+  # Carried at the reference crop's values rather than invented for potato: a plausible
+  # potato cold cardinal would look like science where none exists. If potato is ever run
+  # with vernalization ON, every one of these must be sourced first.
+  t_base_v:
+    value: -1.0
+    unit: "degC"
+    source: "INERT for potato — never read (day-neutral: no VernalizationAccumulation is built). Carried at the winter-wheat reference value; NOT a potato citation. See the header's schema note"
+  t_opt_lower_v:
+    value: 0.0
+    unit: "degC"
+    source: "INERT for potato — never read. Carried at the winter-wheat reference value; NOT a potato citation"
+  t_opt_upper_v:
+    value: 8.0
+    unit: "degC"
+    source: "INERT for potato — never read. Carried at the winter-wheat reference value; NOT a potato citation"
+  t_ceiling_v:
+    value: 12.0
+    unit: "degC"
+    source: "INERT for potato — never read. Carried at the winter-wheat reference value; NOT a potato citation"
+  vsen:
+    value: 0.033
+    unit: "1/day"
+    source: "INERT for potato — never read. Carried at the winter-wheat reference value; NOT a potato citation"
+  vdsat:
+    value: 50.0
+    unit: "day"
+    source: "INERT for potato — never read. Carried at the winter-wheat reference value; NOT a potato citation"
+
+  # --- photoperiod: INERT for potato ---------------------------------------------------
+  # NEVER READ, and for potato the reason is stronger than "the flag is off": [E] Table 12
+  # marks potato's daylength column '–' = "daylength not relevant", so a critical
+  # photoperiod is not merely unsourced for this crop, it is the wrong kind of parameter.
+  cpp:
+    value: 16.0
+    unit: "h"
+    source: "INERT for potato — never read (day-neutral by [E] Table 12's own '–' legend). Carried at the winter-wheat reference value; NOT a potato citation"
+  ppsen:
+    value: 0.09
+    unit: "1/h"
+    source: "INERT for potato — never read (day-neutral by [E] Table 12's own '–' legend). Carried at the winter-wheat reference value; NOT a potato citation"

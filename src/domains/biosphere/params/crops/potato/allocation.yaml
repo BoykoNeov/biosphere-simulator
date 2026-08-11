@@ -1,0 +1,129 @@
+# potato (cv Mara, late) — leaf/stem/root/TUBER allocation (DVS-keyed partitioning)
+#
+# Read alongside ../../allocation.yaml (the FROZEN winter-wheat reference): the schema
+# shape, the single-shared-breakpoint-table rule, and the sum-to-1 requirement are
+# documented there and not restated here. Plan of record:
+# docs/plans/post-roadmap-potato-crop.md.
+#
+# THIS IS THE ROW WHERE POTATO IS BETTER CITED THAN THE FROZEN REFERENCE. The winter
+# wheat's partition table is a single ``TODO(cite) — provisional, literature-typical``
+# line covering all three of its rows, and docs/plans/post-roadmap-stem-reserves.md
+# named that uncited table "the real successor" — the blocking gap behind a piece of
+# science we could not build. [E] Table 18 carries a cited, per-cultivar, DVS-keyed
+# partition curve for potato, so this crop gets what the reference crop still lacks.
+# That is a genuine result of the exercise; it is NOT a licence to backfill wheat's
+# table from the same source, which would be an unfreeze with its own ceremony.
+#
+# ⚠ READ OFF A PAGE IMAGE (PDF page 110 = printed page 90), never the text layer, for
+#   the reason ./phenology.yaml records. Cultivar choice (cv Mara, late) is justified
+#   there too, on source-internal grounds and before any oracle comparison.
+#
+# --- The derivation: [E]'s three CSMP curves -> our four fractions --------------------
+# [E] does not tabulate (leaf, stem, root, storage) directly. It gives three functions of
+# development stage, in CSMP FUNCTION style (stage first, value second):
+#
+#   CASST — the fraction of new assimilate going to the ENTIRE SHOOT (leaves + stems +
+#           storage organs), the remainder going to roots;
+#   CALVT — the fraction of the SHOOT's share going to leaves;
+#   CASTT — the fraction of the SHOOT's share going to stems.
+#
+# [E] Table 18, "Potato, cv Mara (late)", verbatim off the page image:
+#   CALVT = 0.,0.80, 0.15,0.80, 0.46,0.65, 0.76,0.38, 1.03,0.05, 1.17,0.0, 2.1,0.
+#   CASTT = 0.,0.20, 0.15,0.20, 0.46,0.23, 0.76,0.22, 1.03,0.22, 1.17,0.0, 2.1,0.
+#   CASST = 0.,0.5, 1.,1.0, 2.1,1.0
+#
+# Our four fractions follow by definition, with the tuber taking whatever share of the
+# shoot the leaves and stems do not:
+#
+#   fr = 1 − CASST
+#   fl = CASST · CALVT
+#   fs = CASST · CASTT
+#   fo = CASST · (1 − CALVT − CASTT)
+#
+# The rows below are that arithmetic evaluated at the UNION of the three source curves'
+# own knots — {0, 0.15, 0.46, 0.76, 1.0, 1.03, 1.17} — so every knot in this table is a
+# knot [E] itself placed. No knot was invented to improve any fit.
+#
+# ⚠ ONE APPROXIMATION, STATED. [E] interpolates its three curves and then multiplies; we
+#   multiply at the knots and then interpolate. A product of two linear functions is
+#   quadratic, so between knots our fractions differ slightly from [E]'s. Taking the
+#   UNION of all three knot sets (rather than one curve's) keeps the deviation small and
+#   confines it to the interior of each interval. Conservation is unaffected and that is
+#   not a coincidence: fl+fs+fr+fo = 1 exactly at every knot below, and a linear
+#   interpolation between two rows that each sum to 1 also sums to 1 — the reference
+#   file's own linearity argument, which is why the every-step conservation gate cannot
+#   be tripped by this derivation.
+#
+# ⚠ THE LAST ROW. [E]'s tables end at development stage 2.1; our DVS is capped at 2.0
+#   (maturity), so a 2.1 knot would be unreachable. The final row below carries [E]'s
+#   constant post-1.17 values at 2.0 instead. Fractions are flat-extrapolated outside
+#   the table, so this is a relabelling of an unreachable knot, not a change of value.
+#
+# --- What this curve says about potato, and why it matters to a habitat ---------------
+# Read the fo column, and read it precisely — the knots understate how early the tuber
+# starts. fo is 0 at stages 0 and 0.15, and 0.0876 at 0.46; because the table is
+# interpolated, the tuber's share becomes POSITIVE the moment development passes 0.15,
+# not at 0.46. (0.46 is merely the first knot at which [E]'s CALVT + CASTT drop below 1.)
+# In the open-field run this puts the first tuber carbon on the plant around day 7 of the
+# season. From stage 1.17 onward the tuber takes EVERYTHING, and roots are done by
+# anthesis (fr = 0 at stage 1.0).
+#
+# Set that beside the reference crop's wheat table — grain strictly zero until anthesis,
+# 80 % at maturity — and the physiological difference between a tuber crop and a grain
+# crop is carried by the source, not by us: potato commits to the harvested organ far
+# earlier and far harder.
+#
+# ⚠ AND THIS IS THE EXERCISE'S HEADLINE FINDING, so read it here as well as in the test.
+#   The WOFOST potato oracle does NOT agree: its tuber weight stays at exactly 0 until
+#   day 46 (development stage 1.027) — i.e. it holds tuber filling until flowering, where
+#   [E]/van Heemst starts it almost immediately. Two independent parameterizations of the
+#   same crop's same organ differ QUALITATIVELY about when filling begins. That is a
+#   cross-source difference, recorded, NOT a defect on our side to be calibrated away
+#   (ruling B: the oracle is a diagnostic, never a fit target). It is also the single
+#   cause behind both measured downstream gaps — a starved early canopy and an over-filled
+#   tuber — which is why "fix the canopy" and "fix the yield" are one question here, not
+#   two. Measured in tests/test_potato_crop.py.
+#
+# Clean-room: values derived from cited primary literature ONLY, never from the WOFOST
+#   potato oracle's parameters (which are not read at all — see ./phenology.yaml).
+#
+# Sources:
+#   [E] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
+#       Simulation Monographs 29, PUDOC, Wageningen / IRRI, Los Baños.
+#       ISBN 90-220-0937-2. Table 18, p. 90, "Potato, cv Mara (late)". [E] attributes its
+#       potato patterns to van Heemst (1986); ⚠ van Heemst was NOT opened first-hand, so
+#       the LOCUS check has not been run on it (residual risk, dated 2026-08-11, the same
+#       standing as ./phenology.yaml's).
+#   [B] van Keulen, H. & Wolf, J., eds. (1986), "Modelling of Agricultural Production:
+#       Weather, Soils and Crops", Simulation Monographs, PUDOC, Wageningen — the
+#       DVS-keyed dry-matter partitioning concept.
+
+name: potato
+process: allocation
+
+parameters:
+  partition_table:
+    source: "Penning de Vries et al. (1989) Table 18 [E], 'Potato, cv Mara (late)' (van Heemst 1986), read off the page image: CALVT/CASTT/CASST as quoted in this file's header, converted by fr = 1 − CASST, fl = CASST·CALVT, fs = CASST·CASTT, fo = CASST·(1 − CALVT − CASTT), evaluated at the union of the three curves' OWN knots. CITED — unlike the frozen winter-wheat table, which remains TODO(cite). The knot-order approximation (multiply-then-interpolate vs [E]'s interpolate-then-multiply) is stated in the header; conservation is exact by linearity"
+    rows:
+      # dvs 0.00 — emergence. Half the assimilate to roots, the rest split 80/20
+      # leaf/stem exactly as [E] has it. No tuber yet, which is why fo is a hard 0.
+      - {dvs: 0.00, fl: 0.400000, fs: 0.100000, fr: 0.500000, fo: 0.000000}
+      # dvs 0.15 — [E]'s CALVT/CASTT plateau ends here; the shoot share has grown.
+      - {dvs: 0.15, fl: 0.460000, fs: 0.115000, fr: 0.425000, fo: 0.000000}
+      # dvs 0.46 — the first KNOT at which [E]'s CALVT + CASTT drop below 1, so the
+      # tuber has an explicit share here. Note the interpolated share is already
+      # positive anywhere past 0.15 (see the header) — tuber filling begins well
+      # before anthesis in this curve, which is the finding, not a rounding detail.
+      - {dvs: 0.46, fl: 0.474500, fs: 0.167900, fr: 0.270000, fo: 0.087600}
+      # dvs 0.76 — the crossover: the tuber (0.352) now outweighs the leaves (0.334).
+      - {dvs: 0.76, fl: 0.334400, fs: 0.193600, fr: 0.120000, fo: 0.352000}
+      # dvs 1.00 — anthesis. CASST reaches 1.0, so root growth STOPS (fr = 0).
+      - {dvs: 1.00, fl: 0.086667, fs: 0.220000, fr: 0.000000, fo: 0.693333}
+      # dvs 1.03 — [E]'s own knot, just past anthesis.
+      - {dvs: 1.03, fl: 0.050000, fs: 0.220000, fr: 0.000000, fo: 0.730000}
+      # dvs 1.17 — leaf and stem growth cease entirely; everything goes to the tuber.
+      - {dvs: 1.17, fl: 0.000000, fs: 0.000000, fr: 0.000000, fo: 1.000000}
+      # dvs 2.00 — maturity. [E]'s constant post-1.17 values, relabelled from its
+      # unreachable 2.1 knot to our DVS cap (see the header).
+      - {dvs: 2.00, fl: 0.000000, fs: 0.000000, fr: 0.000000, fo: 1.000000}

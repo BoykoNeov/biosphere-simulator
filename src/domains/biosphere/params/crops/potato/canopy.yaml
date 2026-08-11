@@ -1,0 +1,93 @@
+# potato — canopy light interception (Beer–Lambert) parameters
+#
+# Read alongside ../../canopy.yaml (the FROZEN winter-wheat reference): the currency,
+# the units discipline, and the interception law (Monsi & Saeki 1953) are documented
+# there. Plan of record: docs/plans/post-roadmap-potato-crop.md.
+#
+# ONE of the three parameters below is potato's own and CITED; the other two are the
+# reference crop's values, carried deliberately and labelled as such. This file is the
+# clearest illustration of the honest position this whole crop takes: a species is only
+# as species-specific as the literature on the shelf can make it, and pretending
+# otherwise by inventing the rest would be worse than saying which is which.
+#
+# --- specific_leaf_area: CITED, and a real 1.5x difference ---------------------------
+# [E] Table 19 tabulates SPECIFIC LEAF WEIGHT — the inverse quantity, in kg of leaf dry
+# matter per hectare of leaf area. The conversion is a unit inversion, not a model:
+#
+#     SLA [m²/kg DM] = 10 000 [m²/ha] / SLW [kg/ha]
+#
+# Potato's row is 300 kg/ha → SLA = 33.33 m²/kg. The reference crop's own row in the
+# SAME table (winter wheat, 425 kg/ha → 23.53 m²/kg) is a useful check in two
+# directions: it corroborates the frozen file's uncited placeholder of 22.0 (within
+# 7 %), and it confirms that potato's thinner, broader leaf really is a ~1.5x difference
+# in the source, not an artefact of our conversion. Potato intercepts more light per
+# unit of leaf carbon invested — which, in a habitat where carbon is the scarce thing,
+# is exactly the sort of difference between crops that is worth being able to express.
+#
+# ⚠ READ OFF A PAGE IMAGE (PDF page 120 = printed page 100), never the text layer, for
+#   the reason ./phenology.yaml records.
+#
+# --- extinction_coef and carbon_fraction: SHARED, and honestly so --------------------
+# Neither is potato-specific, and neither is invented here. Both are the reference
+# crop's committed values, carried unchanged. They are NOT equally justified, and the
+# difference is stated rather than averaged:
+#
+#   extinction_coef — the reference value is itself a TODO(cite) placeholder tagged
+#     "literature-typical (wheat k≈0.4–0.7)". Reusing it for potato is therefore reusing
+#     a placeholder, not borrowing a wheat measurement. It is a WEAKER position than
+#     ./phenology.yaml's shared FvCB block (which is at least tagged generic-C3),
+#     because a broad-leaved determinate canopy and an erectophile cereal canopy really
+#     do differ in extinction — planophile canopies typically sit HIGHER, nearer 0.8–1.0.
+#     So this value is not merely uncited for potato, it is plausibly biased LOW, and
+#     the direction of the bias is recorded here so nobody has to rediscover it. [E]
+#     Table 19 carries no extinction column; a source that does is the successor.
+#
+#   carbon_fraction — the reference value 0.45 IS cited, but to a measurement of WHEAT
+#     grain and straw. It is carried here because it MUST equal the value in the
+#     nitrogen params (see below), and because the carbon fraction of plant dry matter
+#     is genuinely narrow across species (~0.40–0.48). That makes reuse defensible, but
+#     it is still a wheat number standing in for a potato one. NOT a potato citation.
+#
+# ⚠ THE CROSS-FILE CONSTRAINT, and why it is not a coincidence that it holds. The
+#   reference nitrogen.yaml says carbon_fraction "MUST equal canopy.yaml's value" —
+#   both files fold it (SLA → m²/mol C here; N thresholds → kg N/mol C there), and
+#   divergent values would model a silently inconsistent plant. Potato overrides THIS
+#   file but NOT nitrogen.yaml, so the constraint spans a crop boundary: potato's canopy
+#   carbon fraction must equal the REFERENCE crop's nitrogen carbon fraction. It does,
+#   because this file carries 0.45 unchanged — and that is pinned across every crop set
+#   by tests/test_potato_crop.py, not left to this comment.
+#
+# Clean-room: values from cited primary literature ONLY, never from the WOFOST potato
+#   oracle's parameters (which are not read at all — see ./phenology.yaml).
+#
+# Sources:
+#   [A] Monsi, M. & Saeki, T. (1953), "Über den Lichtfaktor in den
+#       Pflanzengesellschaften und seine Bedeutung für die Stoffproduktion", Japanese
+#       Journal of Botany 14:22–52 — the canopy extinction law (the FORM).
+#   [E] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
+#       Simulation Monographs 29, PUDOC, Wageningen / IRRI, Los Baños.
+#       ISBN 90-220-0937-2. Table 19, p. 100 — specific leaf weight by crop. The potato
+#       row carries no per-row reference, which the table's own footnote defines as
+#       "obtained from colleagues at CABO, Wageningen" — i.e. a PERSONAL COMMUNICATION,
+#       weaker than a published measurement. Recorded, dated 2026-08-11, not glossed.
+#   [F] Vos, J. — the reference our carbon_fraction would need to become potato-specific
+#       is a potato dry-matter composition measurement; none is in sources/. Named here
+#       as the shape of the missing source, NOT cited as if it had been read.
+
+name: potato
+process: canopy_light_interception
+
+parameters:
+  extinction_coef:
+    value: 0.6
+    unit: "dimensionless"
+    source: "SHARED, not potato — the winter-wheat reference's own TODO(cite) placeholder ('literature-typical, wheat k≈0.4–0.7'), carried unchanged. ⚠ Plausibly biased LOW for potato: a broad-leaved planophile canopy typically extinguishes light more strongly than an erectophile cereal (nearer 0.8–1.0). [E] Table 19 carries no extinction column. The direction of the bias is recorded so a later session inherits the finding, not just the number"
+  specific_leaf_area:
+    value: 33.33
+    unit: "m^2/kg"
+    source: "Penning de Vries et al. (1989) Table 19 [E], potato row (verified off the page image): specific leaf WEIGHT 300 kg ha⁻¹, inverted to SLA = 10000/300 = 33.33 m² kg⁻¹ DM. CITED — where the reference crop's SLA remains TODO(cite). Corroboration in the same table: winter wheat's row (425 kg/ha → 23.53 m²/kg) sits within 7 % of the frozen file's placeholder 22.0, so the conversion is sound and potato's ~1.5× thinner leaf is the source's, not ours. ⚠ The potato row carries no per-row reference — the table footnote makes it a CABO personal communication, weaker than a published measurement"
+  carbon_fraction:
+    value: 0.45
+    unit: "dimensionless"
+    source: "SHARED, not potato — the reference value, which IS cited but to a measurement of WHEAT grain/straw (45.05 %/45.66 %). Carried unchanged for two reasons: the carbon fraction of plant dry matter is genuinely narrow across species (~0.40–0.48), and it MUST equal the carbon_fraction in the nitrogen params, which potato does NOT override — so a different value here would model a silently inconsistent plant across a crop boundary. Pinned in tests/test_potato_crop.py. NOT a potato citation"
