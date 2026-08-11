@@ -118,15 +118,29 @@ def _build_at(dt: float, steps: int) -> Any:
 
 
 def _run_at(
-    dt: float, steps: int, *, allow_rationing: bool = False
+    dt: float,
+    steps: int,
+    *,
+    allow_rationing: bool = False,
+    allow_reversal: bool = False,
 ) -> tuple[list, int, tuple]:
-    """Build at ``dt`` and run; ``allow_rationing`` opts back in to pre-fix behavior.
+    """Build at ``dt`` and run; the two flags opt back in to pre-gate behavior.
 
-    The default is the *author's* path (raises on rationing); the tests that inspect the
-    asphyxiated trajectory pass ``allow_rationing=True`` deliberately — that is the
-    escape hatch doing its one job, and using it here is not a workaround but the point.
+    The default is the *author's* path (raises on both); the tests that inspect the
+    wrecked trajectory pass the flags deliberately — that is the escape hatch doing its
+    one job, and using it here is not a workaround but the point.
+
+    ⚠ **Both flags, and separately.** At ``UNSAFE_DT`` this scenario trips *three*
+    gates, not two: ``k_makeup·dt = 7.2`` puts the demand-controlled regulator past its
+    stability bound, so ``cabin_o2`` oscillates **above** its 10.0 setpoint (72.0 mol at
+    step 2) and ``ReversedFlowError`` fires as well. Neither hatch implies the other on
+    purpose — studying a run that trips both means saying so twice.
     """
-    return run_scenario(_build_at(dt, steps), allow_rationing=allow_rationing)
+    return run_scenario(
+        _build_at(dt, steps),
+        allow_rationing=allow_rationing,
+        allow_reversal=allow_reversal,
+    )
 
 
 def test_the_frozen_rates_are_sized_for_the_frozen_dt() -> None:
@@ -206,7 +220,9 @@ def test_the_underlying_hazard_is_UNCHANGED_only_its_silence_was_fixed() -> None
     # Keep this test. If a future dt-guard, recalibration, or kinetics change makes the
     # cabin survive at dt=3600, THIS is the test that should turn red and be rewritten
     # with new numbers — not quietly deleted because "the hazard is fixed now".
-    states, rationed, events = _run_at(UNSAFE_DT, 15, allow_rationing=True)
+    states, rationed, events = _run_at(
+        UNSAFE_DT, 15, allow_rationing=True, allow_reversal=True
+    )
 
     # Still conserves every step (the ledger gate lives in step_report, so completing
     # proves it) and still emits no events. Conservation was never the problem.
@@ -237,7 +253,7 @@ def test_the_escape_hatch_is_the_only_way_to_get_a_rationed_trajectory() -> None
     with pytest.raises(RationedError):
         run_scenario(_build_at(UNSAFE_DT, 15))
     _states, rationed, _events = run_scenario(
-        _build_at(UNSAFE_DT, 15), allow_rationing=True
+        _build_at(UNSAFE_DT, 15), allow_rationing=True, allow_reversal=True
     )
     assert rationed == 37
 

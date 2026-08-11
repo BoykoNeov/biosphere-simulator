@@ -31,6 +31,18 @@ pub enum ErrorKind {
     /// `authoring.errors.RationedError`; see that class for why a conserving, completed,
     /// non-raising run can still have asphyxiated its crew.
     Rationed,
+    /// A **demand-controlled** flow ran backwards during the run — its regulated stock
+    /// sat above the setpoint, so `k · (setpoint − stock)` went negative and the flow
+    /// drained the stock it is named for, back into its source.
+    ///
+    /// **Not a variant of [`ErrorKind::Rationed`] — its sibling.** The two catch
+    /// *disjoint* failures: a rationed run over-drew a stock; a reversed run never
+    /// over-draws anything, which is precisely why the backstop cannot see it.
+    /// Conservation cannot see it either — the flow's two legs share one magnitude
+    /// whichever way it points. Mirrors Python `authoring.errors.ReversedFlowError`; see
+    /// that class for why the frozen scenarios that reverse *legitimately* (a crop
+    /// out-producing the crew) are out of this gate's reach.
+    Reversed,
 }
 
 /// An authoring failure surfaced by the authoring boundary. Usually decidable at
@@ -62,6 +74,14 @@ impl AuthoringError {
         AuthoringError {
             message: message.into(),
             kind: ErrorKind::Rationed,
+        }
+    }
+
+    /// An [`ErrorKind::Reversed`] failure — a demand-controlled flow pointed backwards.
+    pub fn reversed(message: impl Into<String>) -> AuthoringError {
+        AuthoringError {
+            message: message.into(),
+            kind: ErrorKind::Reversed,
         }
     }
 }

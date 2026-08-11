@@ -150,13 +150,8 @@ the freeze**, where no authored file and no author is involved.
   argument standing behind it — it rests entirely on the physical one, which is where a
   refusal should rest, and this is recorded so a future reader does not re-derive the
   cascade price this work started out assuming.
-* **Not that the author-facing trap is closed.** An author wiring `cabin_o2 = 20.0` still
-  gets a silent `−1.2 mol/step` drain with no error. `run_scenario` raises on rationing but
-  has no notion of a demand-controlled flow running backwards. **Priced, not proposed:** a
-  reversal gate at `run_scenario` (the `RationedError` locus and shape, with an
-  `allow_*=True` opt-out) would close it — but it is an authoring-platform change, so an
-  unfreeze with its own ceremony, and it would have to be reconciled with the fact that
-  three *frozen* scenarios reverse legitimately. Left as a decision.
+* ~~**Not that the author-facing trap is closed.**~~ **BUILT the same day (user's call) —
+  see "The direction gate" below.**
 * **Not advisor-reviewed.** The advisor was unavailable throughout this session (three
   attempts, all "temporarily overloaded"). That is why this work stops at the line it
   does: correcting prose and adding pins needs no ceremony, while anything that moved a
@@ -189,3 +184,100 @@ value, `+ − ×` with no transcendental in it.
 **Teeth verified by mutation, not by a green bar.** With `max(0.0, …)` applied to
 `makeup_flux`, `test_the_regulator_does_reverse_in_the_frozen_plant_coupled_scenarios`
 goes red and the other two stay green. The tree was restored via `git checkout`.
+
+---
+
+# The direction gate — BUILT 2026-08-11 (the user's call)
+
+The diagnosis above priced a `run_scenario` reversal gate and left it as a decision. The
+decision was **build it**.
+
+## What shipped
+
+* `authoring.errors.ReversedFlowError` — the **third** run-time verdict, a **sibling** of
+  `RationedError` rather than a variant. They catch **disjoint** failures: a rationed run
+  over-drew a stock; a reversed run never over-draws anything, which is exactly why the
+  backstop cannot see it.
+* `FlowTypeSpec.demand_controlled` — `(regulated wiring field, setpoint param)`, set on
+  `eclss.o2_makeup`, `None` on the other eleven. **The gate is data-driven off the
+  registry**, so registering a demand-controlled type is what arms it, rather than a
+  hard-coded class check in the harness drifting from the registry it duplicates.
+* `run_scenario(..., allow_reversal=True)` — the study hatch, same contract as
+  `allow_rationing`.
+* **The Rust mirror**: `ErrorKind::Reversed`, `RunResult::first_reversal`, and the watch
+  threaded through all three stepping loops. A Python-only gate would let an authored file
+  raise in the laboratory and complete **silently in the game path** — precisely the
+  divergence the port-mirror discipline exists to prevent.
+* Manifest regenerated: **exactly the new field, 11 `null` + 1 pair.** No other value
+  moved; the 20 frozen goldens are byte-identical.
+
+## The reconciliation, which is the part that could have gone wrong
+
+Three *frozen* scenarios reverse **legitimately**. A gate that condemned them would be a
+regression dressed as a fix. It cannot reach them, for **two independent reasons, both
+pinned** rather than argued:
+
+1. the frozen builds are Python (`build_greenhouse` and friends) and never pass through
+   `interpret`, so `run_scenario` never sees them;
+2. the biosphere is absent from the flow-type registry, so **no authored file can put a
+   crop on the far side of the regulator** — which is what makes "every authored reversal
+   is a mis-wiring" true today.
+
+⚠ **Reason 2 has an expiry date, and the test says so.** Making the biosphere authorable
+turns `test_no_frozen_scenario_reaches_the_reversal_gate` red, forcing the premise to be
+re-decided rather than quietly outlived.
+
+## Three things measurement changed while building
+
+1. **The gate is `>`, not `>=`, and that is load-bearing.** The platform's own committed
+   fixture (`eclss_cabin.yaml`) wires `cabin_o2` **exactly at** the setpoint — the
+   regulator idling. A `>=` gate would have condemned the example the docs point authors
+   at. Pinned on both ports rather than left to the fixture passing by luck.
+2. **The opt-out was needed at 17 call sites across 4 files, not 13 in 1.** The first
+   pass found only `test_authoring_export_fidelity.py` (13 sites) — that file exists to
+   *study* the reversal, so it drives the loop from above the setpoint on purpose.
+   Recorded in the file itself: a file that opts out of a gate is the wrong place to
+   assert the gate works, so the teeth live in a separate module.
+
+   ⚠ **The other four sites were found by running the suite, and they falsified a
+   sentence written in this very document.** `test_authoring_dt_hazard.py` (2),
+   `test_authoring_multirate_run.py` (1) and `test_authoring_multirate_composability.py`
+   (1) all study the `dt = 3600` hazard, where `k_makeup·dt = 7.2` drives the regulator
+   past its stability bound: `cabin_o2` oscillates to **72.0 mol against a 10.0
+   setpoint**, so the gate fires at step 2. The draft of `_check_no_reversal`'s docstring
+   said the only route to a mid-run crossing was the `1 ≤ k·dt < 2` oscillation. That is
+   a **subset asserted of the set**: the update map is
+   `o2 → (1 − k·dt)·o2 + k·dt·setpoint`, which alternates about the setpoint for *any*
+   `k·dt ≥ 1` — converging below 2, diverging above it — and spends alternate steps above
+   it either way. Corrected in the docstring. **This is the third instance of this
+   document's own thesis inside this document's own work**, after the "~0.08 % each"
+   rounding and the "the goldens pin it" inference — and the first two were caught by
+   re-reading, this one only by running. A claim about a *family* is not checkable by
+   re-reading the sentence.
+
+   The gate's reach is therefore wider than "wiring errors": it also catches the
+   divergent-`dt` regulator, which nothing else does — rationing is blind to it (the draw
+   is proportional to the setpoint error) and conservation is blind to it (both legs share
+   one magnitude). An author reaches that family only through `allow_unsafe_step=True`,
+   because the build-time `k·h < 1` precondition refuses it first.
+3. **The two run-time gates barely overlap in practice, and the reason is a third gate.**
+   Constructing a run that both rations *and* reverses needs `allow_unsafe_step=True`,
+   because multi-rate Step 5's build-time `k·h < 1` precondition refuses the coarse `dt`
+   at *interpret* time. So the ordering (rationing reported first) only ever decides what
+   a deliberate study sees.
+
+## What the gate does NOT cover, named rather than implied
+
+**A sub-step-only excursion on the multi-rate path.** Both ports scan **committed master
+states**; a fast-set sub-step that crosses the setpoint and returns inside one master step
+is invisible. On the single-rate path there are no sub-steps, so the scan is complete. It
+is not closable from this layer — seeing sub-steps means changing `multirate_step`, and
+`simcore` is frozen. It is also not the shape an author hits: the crossing that motivated
+the gate is a **wiring** error, present at `states[0]`, and the other route — any
+`k·dt ≥ 1` overshoot, converging or diverging — is refused at build time before a step
+runs.
+
+⚠ **Not advisor-reviewed before landing.** The advisor reviewed the *diagnosis* (and
+corrected two things in it), then was unavailable. The authoring unfreeze discipline asks
+for review on a **grammar** change especially; this is a run-harness verdict plus one
+registry field — no grammar, no schema, no value. Recorded as a deviation, not glossed.

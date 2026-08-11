@@ -18,6 +18,12 @@ a *runtime* verdict on a run that already completed. It is deliberately **not** 
 ``AuthoringError`` subclass — nothing about it is decidable from the file structure
 (the same file at a smaller ``dt`` is fine), and by the paragraph above that is
 precisely the line ``AuthoringError`` does not cross.
+
+:class:`ReversedFlowError` is the **third**, and sits on ``RationedError``'s side of
+that line for the same reason: whether a demand-controlled flow ever ran backwards is a
+property of the *trajectory*, not of the file. The two are siblings, not variants — they
+catch **disjoint** failures (a rationed run over-drew a stock; a reversed run never
+over-draws anything, which is exactly why the backstop cannot see it).
 """
 
 from __future__ import annotations
@@ -59,4 +65,45 @@ class RationedError(Exception):
     idiom: ``station.objectives`` scores a rationed run as ``survived = False`` (a
     blackout that rations ``power.load_draw`` is a *lost game*, not a crash). A player
     should see the failure; an author calling a library function gets an exception.
+    """
+
+
+class ReversedFlowError(Exception):
+    """A demand-controlled flow ran **backwards** in an authored run.
+
+    **The failure it names.** ``eclss.o2_makeup`` is a proportional controller:
+    ``S = k_makeup·(o2_setpoint − cabin_o2)·dt``. Above the setpoint that magnitude goes
+    negative and the flow runs the other way — cabin → tank — venting O₂ out of the very
+    stock the flow's name says it fills. An author who wires ``cabin_o2`` above the
+    frozen ``10.0 mol`` setpoint gets ``−1.2 mol`` on step 1 and no complaint from
+    anything (measured: ``tests/test_authoring_export_fidelity.py``).
+
+    **Why nothing else catches it, and why that is structural, not an oversight.**
+    Conservation is a *stoichiometry* check: the flow's two legs share one magnitude, so
+    OXYGEN balances to the last digit whichever way it points. :class:`RationedError` is
+    a *scarcity* check, and this draw is proportional to the setpoint **error**, not to
+    the stock — so it never over-draws, the Euler backstop never fires, and ``rationed``
+    stays ``0`` however wrong the wiring is. Two gates, both correct, both blind to this
+    by construction. Reversal is a **direction** defect, and neither gate measures
+    direction.
+
+    **Why it does not condemn the frozen scenarios, which reverse legitimately.** The
+    coupled station builds (``greenhouse`` / ``harvest`` / ``sealed_station``) wire this
+    regulator to the **biosphere's** O₂ pool, where a photosynthesising crop
+    out-produces the crew and pushes it past the setpoint — correct P-control on a cabin
+    with plants in it (``docs/plans/post-roadmap-o2-makeup-reversal.md``). Those
+    scenarios are built directly in Python and never pass through ``interpret``, so this
+    gate cannot see them — asserted, not assumed, by
+    ``test_no_frozen_scenario_reaches_the_reversal_gate``. And an authored scenario
+    cannot reproduce their situation: the biosphere is **not** in the flow-type registry
+    (``Allocation`` needs a composite ``CarbonContext``, aux, and the shared CO₂ pool),
+    so no authored graph can put a crop on the other side of the regulator. **Today,
+    every reversal an authored file can produce is a mis-wiring.** ⚠ If the biosphere
+    ever becomes authorable, that premise expires and this gate must be re-decided —
+    which is why the reason is written here rather than left in a plan doc.
+
+    **Recoverable, like ``RationedError`` and unlike ``ArbitrationError``:** it is a
+    post-hoc verdict on a **completed** run, and ``allow_reversal=True`` returns the
+    trajectory for study (which is how the export-fidelity pins examine the reversal
+    they exist to document).
     """

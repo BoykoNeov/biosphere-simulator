@@ -30,9 +30,12 @@ Pinned by ``test_a_single_rate_scenario_never_touches_the_driver``.
 
 from __future__ import annotations
 
-from authoring.errors import AuthoringError, RationedError
+from authoring.errors import AuthoringError, RationedError, ReversedFlowError
+from authoring.flow_registry import FLOW_TYPES
 from authoring.interpreter import BuiltScenario
 from simcore.events import Event
+from simcore.flow import Flow
+from simcore.ids import StockId
 from simcore.integrator import EulerIntegrator, Rk4Integrator, Substepper
 from simcore.multirate import Split, multirate_step
 from simcore.state import State
@@ -173,10 +176,123 @@ def _rationed_message(built: BuiltScenario, total_rationed: int) -> str:
     )
 
 
+def _demand_controlled_by_class() -> dict[type, tuple[str, str]]:
+    """Flow class -> ``(regulated wiring field, setpoint param)``, from the registry.
+
+    Derived from :data:`FLOW_TYPES` rather than listed here, so registering a new
+    demand-controlled type is what arms the check for it — the duplication this module
+    would otherwise own is exactly the "declared copy drifted from the constructor"
+    failure ``test_authoring_frozen_flows.py`` was written for.
+    """
+    return {
+        spec.cls: spec.demand_controlled  # type: ignore[misc]
+        for spec in FLOW_TYPES.values()
+        if spec.demand_controlled is not None
+    }
+
+
+def _check_no_reversal(built: BuiltScenario, states: list[State]) -> None:
+    """Refuse a run in which a demand-controlled flow pointed backwards.
+
+    A demand-controlled magnitude is ``k·(setpoint − stock)``, so its **sign** is
+    decided by which side of the setpoint the stock is on. Scanning the trajectory for
+    ``stock > setpoint`` is therefore exactly equivalent to scanning for a negative
+    magnitude, and needs no per-flow instrumentation — which matters because
+    ``simcore.integrator.StepReport`` is frozen and reports no per-flow legs.
+
+    ⚠ **What this cannot see, stated rather than implied: a sub-step-only excursion on
+    the multi-rate path.** ``states`` holds one entry per **master** step; a fast-set
+    sub-step that crosses the setpoint and comes back within the same master step is
+    invisible here. On the single-rate path there are no sub-steps, so the scan is
+    complete. The gap is not closable from this layer — seeing sub-steps means changing
+    ``multirate_step``, and ``simcore`` is frozen (``git diff src/simcore/`` must come
+    back empty). It is also not the shape an author hits: the crossing that motivated
+    this gate is a **wiring** error, which is present at ``states[0]``.
+
+    The other route to a crossing is **overshoot past the stability bound**: the update
+    map is ``o2 → (1 − k·dt)·o2 + k·dt·setpoint``, so any ``k·dt ≥ 1`` alternates about
+    the setpoint (converging below 2, diverging above it) and spends alternate steps
+    *above* it. Multi-rate Step 5's build-time ``k·h < 1`` precondition refuses that
+    whole family before any step runs, so an author reaches it only through
+    ``allow_unsafe_step=True``.
+
+    ⚠ **An earlier draft of this docstring named ``1 ≤ k·dt < 2`` as "the one route",
+    which is a subset asserted of the set** — the divergent half is just as reachable,
+    and four committed study tests hit it at ``k_makeup·dt = 7.2`` (they now pass
+    ``allow_reversal=True``). Named because this whole piece of work is about that
+    failure shape; see ``docs/plans/post-roadmap-o2-makeup-reversal.md``.
+
+    The initial state is included in the scan on purpose: the common error is wiring a
+    stock above the setpoint, which is wrong at ``t = 0`` and should not need a step to
+    be reported.
+    """
+    regulated = _demand_controlled_by_class()
+    if not regulated:  # pragma: no cover - defensive; the registry has one today
+        return
+    for flow in built.registry.flows:
+        pair = regulated.get(type(flow))
+        if pair is None:
+            continue
+        stock_field, setpoint_param = pair
+        # `params` is not on the `Flow` protocol (it is a per-dataclass field), and a
+        # param-free flow cannot be demand-controlled — a setpoint has to live
+        # somewhere. Read defensively rather than asserting the registry and the
+        # constructor agree; `test_authoring_frozen_flows.py` owns that agreement.
+        params = getattr(flow, "params", None)
+        if params is None:  # pragma: no cover - unreachable via FLOW_TYPES today
+            continue
+        stock_id = getattr(flow, stock_field)
+        setpoint = getattr(params, setpoint_param)
+        for n, state in enumerate(states):
+            amount = state.stocks[stock_id].amount
+            if amount > setpoint:
+                raise ReversedFlowError(
+                    _reversal_message(built, flow, stock_id, n, amount, setpoint)
+                )
+
+
+def _reversal_message(
+    built: BuiltScenario,
+    flow: Flow,
+    stock_id: StockId,
+    step: int,
+    amount: float,
+    setpoint: float,
+) -> str:
+    """The ``ReversedFlowError`` text — names the step, because *when* is the diagnosis.
+
+    A crossing at step 0 is a wiring error (the author put the stock above the
+    setpoint); a crossing later means something else is filling it faster than the
+    regulator's target allows. Those are different fixes, and the step number is what
+    distinguishes them, so it is never omitted.
+    """
+    when = (
+        "at the INITIAL state, so this is a wiring error: the scenario file starts "
+        "this stock above the setpoint"
+        if step == 0
+        else f"first at step {step} of {built.steps}, so some other flow in the "
+        f"graph is filling this stock past the regulator's target"
+    )
+    return (
+        f"flow {flow.id!s} is demand-controlled toward {setpoint!r}, and "
+        f"{stock_id!s} reached {amount!r} — above it, {when}. A demand-controlled "
+        f"magnitude is k*(setpoint - stock), so above the setpoint it goes NEGATIVE "
+        f"and the flow runs backwards: it drains the stock it is named for, back "
+        f"into its source. Nothing else in this stack objects — the two legs share "
+        f"one magnitude so the run still conserves exactly, and the draw is "
+        f"proportional to the setpoint ERROR rather than to the stock, so it never "
+        f"over-draws and the arbitration backstop never fires (rationed stays 0). "
+        f"Wire the stock at or below the setpoint, or drop the regulator and let the "
+        f"stock float. To inspect the reversed run instead of failing, pass "
+        f"allow_reversal=True."
+    )
+
+
 def run_scenario(
     built: BuiltScenario,
     *,
     allow_rationing: bool = False,
+    allow_reversal: bool = False,
 ) -> tuple[list[State], int, tuple[Event, ...]]:
     """Step ``built`` to completion; return ``(states, total_rationed, events)``.
 
@@ -194,6 +310,14 @@ def run_scenario(
     otherwise silent). Pass ``allow_rationing=True`` to opt back in to the old
     return-and-trust-the-caller behavior — for deliberately studying a rationed run
     (``tests/test_authoring_dt_hazard.py``), not for making a scenario "work".
+
+    **Raises ``ReversedFlowError`` if a demand-controlled flow pointed backwards** —
+    a *direction* defect the rationing gate structurally cannot see, because a
+    demand-controlled draw never over-draws. ``allow_reversal=True`` opts out, for
+    studying the reversal rather than fixing it
+    (``tests/test_authoring_export_fidelity.py``). The two gates are checked in that
+    order deliberately: a rationed run's trajectory is already suspect, so reporting the
+    ``dt`` fault first avoids blaming a wiring the backstop's own clamping produced.
 
     Multi-rate does **not** make a coarse ``dt`` safe: it splits the master step into
     ``dt/n_sub``, so too small an ``n_sub`` is the identical hazard one level down
@@ -213,4 +337,6 @@ def run_scenario(
         states, total_rationed, events = _run_single_rate(built, integrator_cls)
     if total_rationed > 0 and not allow_rationing:
         raise RationedError(_rationed_message(built, total_rationed))
+    if not allow_reversal:
+        _check_no_reversal(built, states)
     return states, total_rationed, tuple(events)

@@ -249,9 +249,16 @@ renders a `Const` via `repr`, Rust via `f64::Display`; both round-trip on their 
 ### The author-selectable flow-type registry
 
 `FLOW_TYPES` (`src/authoring/flow_registry.py`) maps an authoring type name → the frozen
-class + its **exact `wiring` field set** + its param set + its `rate_params`. The manifest
-freezes all four per entry: **the wiring names are as much the contract as the type name** —
-renaming one breaks every scenario file that names it.
+class + its **exact `wiring` field set** + its param set + its `rate_params` + its
+`demand_controlled` pair. The manifest freezes all five per entry: **the wiring names are
+as much the contract as the type name** — renaming one breaks every scenario file that
+names it.
+
+`demand_controlled` (post-roadmap, 2026-08-11) is `(regulated wiring field, setpoint
+param)` on the one type whose magnitude is `k·(setpoint − stock)` rather than `k·stock`,
+and `None` on the other eleven. It is the **direction gate**'s input — see
+`eclss.o2_makeup` below. It is frozen for `rate_params`' reason: clearing it silently
+un-arms the check for that type, so a file that used to raise starts completing quietly.
 
 The registry is **explicit, not introspected, by design**: a `StockId` is a `str` alias at
 runtime, so field-type introspection cannot tell a wiring field from any other string
@@ -543,6 +550,19 @@ the behaviour is the controller working. What was wrong was the scope, and it is
 standing shape — a careful sentence about one subject travelling into a claim about
 another.
 
+**Since 2026-08-11 `run_scenario` REFUSES a reversed run** (`ReversedFlowError`,
+`tests/test_authoring_reversal_gate.py`), because "documented" turned out not to be
+enough: the reversal is invisible to *both* existing gates, for two different structural
+reasons, so an author's only warning was this paragraph. It is a **direction** check —
+the third gate, not a widening of either existing one — and it is deliberately a
+*run-time* verdict rather than a build-time refusal, because whether a stock crosses its
+setpoint is a property of the trajectory. `allow_reversal=True` opts out, for studying a
+reversal rather than fixing it. ⚠ Its premise is that **every reversal an authored file
+can produce is a mis-wiring** — true only while the biosphere stays out of the registry,
+since the frozen scenarios that reverse legitimately do so by putting a *crop* on the far
+side of the regulator. Making the biosphere authorable expires that premise, and the test
+above goes red rather than quiet.
+
 **Do not "fix" this with a clamp**: the symmetry
 IS the restoring force — `o2_eq = o2_setpoint − Con_o2/k_makeup` is an attractor from both
 sides only because the controller is linear, and clamping would trade a clean geometric
@@ -597,6 +617,17 @@ rationing" would have been wrong about the only row that needed it.
 `allow_unsafe_step=True`.** `tests/test_authoring_export_fidelity.py` — the file that
 *measured* them — passes it deliberately, and that is the precondition working: the only
 remaining way into this band is to say so out loud.
+
+**And since 2026-08-11, saying it out loud is no longer enough on its own: the direction
+gate then fires at run time.** Every row at `k·dt ≥ 1` spends alternate steps *above* the
+setpoint — that is what "oscillates about it" means — so `ReversedFlowError` catches the
+whole family, quiet band and divergent rows alike, where rationing catches only the
+violent end of it. This is the one place the direction gate does work the build check
+does not merely repeat: it reports the **excursion that was actually exported**, at the
+step it happened, rather than a predicate on `k·dt`. Four committed study tests across
+`test_authoring_dt_hazard.py`, `test_authoring_multirate_run.py` and
+`test_authoring_multirate_composability.py` therefore pass `allow_reversal=True` as well
+as `allow_unsafe_step=True` — three hatches for three gates, none implying another.
 
 **None of this is a bug in the frozen flow.** The continuous law `dx/dt = k(S − x)` is
 unconditionally stable — it decays to `S` from anywhere and cannot oscillate. The
@@ -955,3 +986,24 @@ type or its wiring names, a param loader, or the composition semantics — is an
 
 An undocumented unfreeze fails CI by construction (the completeness gate, or a moved
 vector/anchor), so the discipline is enforced, not merely requested.
+
+### Unfreeze log
+
+- **2026-08-11 — the direction gate (`ReversedFlowError`).** A `demand_controlled` field
+  on `FlowTypeSpec` (set on `eclss.o2_makeup`, `None` on the other eleven), a third
+  run-time verdict in `run_scenario`, and its `allow_reversal=True` study hatch — mirrored
+  on both ports (`ErrorKind::Reversed`, `RunResult::first_reversal`). Closes the hazard
+  this document had only *described*: a demand-controlled flow above its setpoint drains
+  the stock it is named for, and neither conservation (a stoichiometry check) nor
+  rationing (a scarcity check on a draw that never over-draws) can see it. **Manifest
+  diff is exactly the new field — 11 `null`, 1 pair; no other value moved, and the 20
+  frozen goldens are byte-identical.** The decision *not* to clamp the physics is
+  untouched and was re-confirmed: the reversal is correct P-control, and three frozen
+  scenarios rely on it. Prompted by
+  `docs/plans/post-roadmap-o2-makeup-reversal.md`, which measured that the "authors only"
+  scoping in three committed loci was false.
+  ⚠ **Not advisor-reviewed before landing** — the advisor was unavailable for most of the
+  session (it did review the diagnosis that preceded this). Step 1 of the discipline above
+  asks for review on a *grammar* change especially; this is a run-harness verdict plus one
+  registry field, with no grammar, schema, or value moved. Recorded as a deviation rather
+  than glossed.

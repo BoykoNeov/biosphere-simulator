@@ -287,7 +287,10 @@ fn a_multirate_run_reproduces_the_single_rate_trajectory_bitwise() {
     )
     .expect("the single-rate reference run is clean");
 
-    assert_eq!(multi.total_rationed, 0, "the point is a CLEAN coarse export");
+    assert_eq!(
+        multi.total_rationed, 0,
+        "the point is a CLEAN coarse export"
+    );
     for id in ["eclss.cabin_co2", "eclss.cabin_h2o", "eclss.co2_removed"] {
         let m = multi.final_state.stocks[id].amount;
         let s = single.final_state.stocks[id].amount;
@@ -317,7 +320,11 @@ fn a_non_empty_slow_set_is_driven_at_dt_over_2() {
     // stepped. With the condenser slow at dt=3600 (legal: 5e-4 * 1800 = 0.9 < 1), Strang
     // runs it as two dt/2 half-steps around the fast block.
     let built = build(&cabin_yaml("3600.0", "60", "fast", "slow")).expect("builds");
-    assert_eq!(built.slow_registry.flows().len(), 1, "the condenser is slow");
+    assert_eq!(
+        built.slow_registry.flows().len(),
+        1,
+        "the condenser is slow"
+    );
     let result = run_scenario(built).expect("the partitioned run is clean");
 
     assert_eq!(result.total_rationed, 0, "0.9 < 1 ⇒ no over-draw");
@@ -498,6 +505,9 @@ fn aux_scenario(n_sub: u32) -> BuiltScenario {
         steps: 3,
         n_sub,
         has_authored_kinetics: false,
+        // No demand-controlled flow in this hand-built graph (Trickle is forced), so the
+        // direction gate has nothing to watch — stated rather than defaulted.
+        demand_controlled: Vec::new(),
     }
 }
 

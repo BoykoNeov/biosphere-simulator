@@ -11,6 +11,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use authoring::errors::ErrorKind;
 use authoring::interpreter::{interpret, interpret_allowing_unsafe_step};
 use authoring::schema::ScenarioSpec;
 use authoring::yaml::parse_document;
@@ -38,7 +39,9 @@ fn interpret_str(yaml: &str) -> Result<BuiltScenario, authoring::AuthoringError>
 
 /// [`interpret_str`] with the build-time rate precondition disabled — for fixtures whose
 /// whole subject is the unsafe step (the `dt`-hazard block below).
-fn interpret_str_allowing_unsafe_step(yaml: &str) -> Result<BuiltScenario, authoring::AuthoringError> {
+fn interpret_str_allowing_unsafe_step(
+    yaml: &str,
+) -> Result<BuiltScenario, authoring::AuthoringError> {
     let doc = parse_document(yaml)?;
     let spec = ScenarioSpec::from_yaml(&doc)?;
     interpret_allowing_unsafe_step(&spec, Path::new("."), &no_overrides())
@@ -75,7 +78,10 @@ fn self_discharge_dsl_builds_an_authored_flow() {
         &no_overrides(),
     )
     .expect("load self_discharge_dsl");
-    assert!(built.has_authored_kinetics, "kinetics flow marks the scenario");
+    assert!(
+        built.has_authored_kinetics,
+        "kinetics flow marks the scenario"
+    );
     let result = run_scenario(built).expect("run self_discharge_dsl");
     assert_eq!(result.total_rationed, 0);
     assert!(result.events.is_empty());
@@ -638,7 +644,10 @@ fn nested_include_in_bundle_is_schema_rejected() {
         "bundle_nested",
         &[
             ("inner.yaml", MINI_BUNDLE),
-            ("b.yaml", &format!("{MINI_BUNDLE}includes:\n  - inner.yaml\n")),
+            (
+                "b.yaml",
+                &format!("{MINI_BUNDLE}includes:\n  - inner.yaml\n"),
+            ),
             ("s.yaml", &format!("{SCENARIO_HEAD}includes:\n  - b.yaml\n")),
         ],
     );
@@ -649,7 +658,10 @@ fn nested_include_in_bundle_is_schema_rejected() {
 fn missing_include_raises() {
     let dir = compose_tmp(
         "missing",
-        &[("s.yaml", &format!("{SCENARIO_HEAD}includes:\n  - nope.yaml\n"))],
+        &[(
+            "s.yaml",
+            &format!("{SCENARIO_HEAD}includes:\n  - nope.yaml\n"),
+        )],
     );
     let err = load_scenario(&dir.join("s.yaml"), &no_overrides());
     assert!(err.err().unwrap().message.contains("could not be read"));
@@ -861,8 +873,16 @@ fn at_an_unsafe_dt_the_run_is_rejected_not_returned() {
     // failure is not decidable from the file's structure. Matching the kind (rather than
     // sniffing the message) is the point of ErrorKind existing.
     assert_eq!(err.kind, authoring::ErrorKind::Rationed);
-    assert!(err.message.contains("37"), "count must be named: {}", err.message);
-    assert!(err.message.contains("3600"), "dt must be named: {}", err.message);
+    assert!(
+        err.message.contains("37"),
+        "count must be named: {}",
+        err.message
+    );
+    assert!(
+        err.message.contains("3600"),
+        "dt must be named: {}",
+        err.message
+    );
 }
 
 #[test]
@@ -872,12 +892,83 @@ fn the_underlying_hazard_is_unchanged_only_its_silence_was_fixed() {
     // physics is untouched: we made the failure loud, we did not make the scenario work.
     let result = run_scenario_allowing_rationing(eclss_anchor_at("3600.0", "15"))
         .expect("the escape hatch returns the rationed run");
-    assert_eq!(result.total_rationed, 37, "the hazard's mechanism moved — docs are stale");
+    assert_eq!(
+        result.total_rationed, 37,
+        "the hazard's mechanism moved — docs are stale"
+    );
     assert!(result.events.is_empty());
 
     // The cabin is airless: clamped at zero by the backstop (hence ~0 from below by
     // roundoff, never properly negative — which is exactly why nothing raised before,
     // and why the every-step conservation gate could never have caught this).
     let cabin_o2 = result.final_state.stocks["eclss.cabin_o2"].amount;
-    assert!(cabin_o2.abs() < 1e-9, "expected an emptied cabin, got {cabin_o2}");
+    assert!(
+        cabin_o2.abs() < 1e-9,
+        "expected an emptied cabin, got {cabin_o2}"
+    );
+}
+
+// ---------------------------------------------------------------------------------
+// The direction gate (2026-08-11) — the port mirror of Python's `ReversedFlowError`.
+//
+// `eclss.o2_makeup` is demand-controlled: its magnitude is `k · (setpoint − stock)`, so
+// above the setpoint it reverses and drains the stock it is named for. Neither existing
+// gate can see that — conservation is a stoichiometry check (two legs, one magnitude,
+// balanced either way) and rationing is a scarcity check (the draw is proportional to
+// the setpoint *error*, so it never over-draws). A gate present in Python and absent
+// here would let an authored file raise in the laboratory and complete silently in the
+// game path, which is exactly the divergence the port-mirror discipline exists to stop.
+// ---------------------------------------------------------------------------------
+
+/// The anchor's YAML with `cabin_o2` wired ABOVE the frozen 10.0 mol setpoint.
+fn eclss_anchor_above_setpoint(amount: &str) -> String {
+    let text = eclss_anchor_yaml_at("60.0", "4");
+    let retargeted = text.replace("amount: 10.0", &format!("amount: {amount}"));
+    assert!(
+        retargeted.contains(&format!("amount: {amount}")),
+        "the anchor's `amount: 10.0` line moved — this helper is silently a no-op now"
+    );
+    retargeted
+}
+
+#[test]
+fn a_reversed_run_is_refused_and_the_message_names_the_step() {
+    let built = interpret_str(&eclss_anchor_above_setpoint("20.0"))
+        .expect("a scenario above the setpoint still BUILDS — reversal is a run verdict");
+    let err = match run_scenario(built) {
+        Err(e) => e,
+        Ok(_) => panic!("the direction gate must refuse this run"),
+    };
+    assert_eq!(err.kind, ErrorKind::Reversed, "{}", err.message);
+    assert!(
+        err.message.contains("INITIAL state"),
+        "a crossing at t=0 is a wiring error and must be reported as one: {}",
+        err.message
+    );
+}
+
+#[test]
+fn the_reversed_run_is_still_returned_for_study() {
+    // The `allow_reversal=True` analogue: the permissive entry point hands back the
+    // trajectory AND the evidence, so a reversal can be examined rather than only
+    // refused. Asserting the reversal is genuinely present is what makes this different
+    // from asserting the permissive path merely fails to raise.
+    let built = interpret_str(&eclss_anchor_above_setpoint("20.0")).expect("interpret");
+    let result = run_scenario_allowing_rationing(built).expect("study path must return");
+    let reversal = result
+        .first_reversal
+        .expect("the permissive path must still RECORD the reversal it declined to raise");
+    assert_eq!(reversal.step, 0);
+    assert_eq!(reversal.setpoint, 10.0);
+    assert_eq!(reversal.amount, 20.0);
+    assert_eq!(result.total_rationed, 0, "and nothing else objected");
+}
+
+#[test]
+fn at_the_setpoint_the_gate_is_silent_because_the_flow_does_not_reverse() {
+    // Exactly AT the setpoint the magnitude is 0, not negative — so the gate is `>`.
+    // This is the boundary the committed `eclss_cabin.yaml` fixture sits on, so a `>=`
+    // gate would have condemned the platform's own example. Pinned, not left to luck.
+    let result = run_scenario(eclss_anchor_at("60.0", "4")).expect("the fixture must run");
+    assert_eq!(result.total_rationed, 0);
 }

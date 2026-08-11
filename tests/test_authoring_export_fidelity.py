@@ -32,6 +32,16 @@ OPERATIVE one and must not be relaxed to the textbook stability bound ``k·dt < 
 bound for *"is the exported trajectory monotone and therefore usable by a neighbour"*.
 This project couples domains, so ``< 1`` governs. See that doc's ``dt`` table.
 
+**Every run below passes ``allow_reversal=True``, and that is the subject, not a
+workaround.** This file drives the makeup loop from *above* its setpoint on purpose —
+that is how you observe a demand-controlled flow at all. Since 2026-08-11
+``run_scenario`` raises ``ReversedFlowError`` on exactly that, so studying the hazard
+now requires opting out of the gate that closed it. The flag is doing here what
+``allow_rationing=True`` does in ``test_authoring_dt_hazard.py``: *this test is about
+the failure, so do not fail on it.* The gate's own teeth are pinned in
+``test_authoring_reversal_gate.py``, not here — a file that opts out of a gate is the
+wrong place to assert the gate works.
+
 **Transcendental discipline** (the cross-libm trap, ``test_oracle_gap.py``): every pin
 below asserts on the **Euler recurrence**, which is ``+ − ×`` only and therefore
 bit-identical across ports and platforms. The closed-form ``exp`` solution appears
@@ -155,7 +165,9 @@ def test_above_the_setpoint_the_flow_reverses_exactly_as_documented() -> None:
     and ``docs/authoring-reference.md`` ("the flow silently reverses") all claim this.
     None of them measured it. It reverses, it conserves, and it does not ration.
     """
-    states, rationed, _events = run_scenario(_makeup_only(DT_MONOTONE, 4, 20.0))
+    states, rationed, _events = run_scenario(
+        _makeup_only(DT_MONOTONE, 4, 20.0), allow_reversal=True
+    )
     o2, supply = _o2(states), _supply(states)
 
     # Step 1: S = k·dt·(setpoint − cabin_o2) = 0.12 · (10 − 20) = −1.2 mol. Exact
@@ -178,7 +190,9 @@ def test_the_reversal_conserves_which_is_why_no_gate_sees_it() -> None:
     distinguish "the regulator supplied O2" from "the regulator took O2 back" — both
     balance. Conservation is a *stoichiometry* check, never a *plausibility* one.
     """
-    states, rationed, _events = run_scenario(_makeup_only(DT_MONOTONE, 20, 20.0))
+    states, rationed, _events = run_scenario(
+        _makeup_only(DT_MONOTONE, 20, 20.0), allow_reversal=True
+    )
     o2, supply = _o2(states), _supply(states)
     total_0 = o2[0] + supply[0]
     for i in range(len(o2)):
@@ -201,7 +215,9 @@ def test_the_equilibrium_is_dt_independent_across_a_500x_span() -> None:
     duration = 3600.0 * 20  # 20 h — long enough for every dt below to converge
     for dt in (1.0, 10.0, 60.0, 120.0, 300.0):
         steps = int(duration / dt)
-        states, rationed, _events = run_scenario(_full_cabin(dt, steps, 20.0))
+        states, rationed, _events = run_scenario(
+            _full_cabin(dt, steps, 20.0), allow_reversal=True
+        )
         assert rationed == 0
         # Converged to o2_eq = 8.0 regardless of dt, to within 1e-9 mol.
         assert _o2(states)[-1] == pytest.approx(O2_EQ, abs=1e-9), f"dt={dt}"
@@ -219,7 +235,7 @@ def test_a_forced_flow_is_exactly_dt_invariant() -> None:
     expected = CON_O2 * duration  # 288.0 mol — pure arithmetic
     for dt in (1.0, 60.0, 300.0):
         steps = int(duration / dt)
-        states, _r, _e = run_scenario(_full_cabin(dt, steps, 20.0))
+        states, _r, _e = run_scenario(_full_cabin(dt, steps, 20.0), allow_reversal=True)
         sink = states[-1].stocks[StockId("boundary.metabolic_o2_sink")].amount
         assert sink == pytest.approx(expected, rel=1e-9), f"dt={dt}"
 
@@ -232,7 +248,9 @@ def test_a_forced_flow_is_exactly_dt_invariant() -> None:
 def test_below_the_monotonicity_bound_the_export_is_monotone() -> None:
     """``k·dt < 1``: the exported trajectory falls smoothly. This is the safe regime."""
     assert K_MAKEUP * DT_MONOTONE < 1.0
-    states, rationed, _events = run_scenario(_makeup_only(DT_MONOTONE, 40, 20.0))
+    states, rationed, _events = run_scenario(
+        _makeup_only(DT_MONOTONE, 40, 20.0), allow_reversal=True
+    )
     o2 = _o2(states)
     assert rationed == 0
     # Strictly decreasing, every step, all the way down. Nothing to corrupt a neighbour.
@@ -249,7 +267,9 @@ def test_the_oscillating_band_exports_NON_monotone_intermediates() -> None:
     exported intermediates oscillate across the setpoint every single step.
     """
     assert 1.0 <= K_MAKEUP * DT_OSCILLATING < 2.0
-    states, rationed, _events = run_scenario(_makeup_only(DT_OSCILLATING, 12, 12.0))
+    states, rationed, _events = run_scenario(
+        _makeup_only(DT_OSCILLATING, 12, 12.0), allow_reversal=True
+    )
     o2 = _o2(states)
 
     # Nothing complains.
@@ -275,7 +295,9 @@ def test_the_oscillating_band_still_converges_which_is_why_it_hides() -> None:
     Endpoint correct + conserving + ``rationed == 0``. Only the intermediates are wrong,
     and no gate in the project reads intermediates.
     """
-    states, rationed, _events = run_scenario(_makeup_only(DT_OSCILLATING, 200, 12.0))
+    states, rationed, _events = run_scenario(
+        _makeup_only(DT_OSCILLATING, 200, 12.0), allow_reversal=True
+    )
     o2 = _o2(states)
     assert rationed == 0
     assert o2[-1] == pytest.approx(SETPOINT, abs=1e-6), "endpoint is RIGHT"
@@ -288,7 +310,9 @@ def test_at_exactly_two_the_oscillation_never_decays() -> None:
     wave about the setpoint, conserving, unrationed, and reported as a clean run.
     """
     assert K_MAKEUP * DT_PERPETUAL == 2.0
-    states, rationed, _events = run_scenario(_makeup_only(DT_PERPETUAL, 200, 12.0))
+    states, rationed, _events = run_scenario(
+        _makeup_only(DT_PERPETUAL, 200, 12.0), allow_reversal=True
+    )
     o2 = _o2(states)
     assert rationed == 0
     # Still swinging at full amplitude after 200 steps — 12 ↔ 8, exactly.
@@ -308,7 +332,7 @@ def test_the_divergent_band_eventually_over_draws_and_IS_caught() -> None:
     """
     assert K_MAKEUP * DT_DIVERGENT > 2.0
     with pytest.raises(RationedError):
-        run_scenario(_makeup_only(DT_DIVERGENT, 8, 12.0))
+        run_scenario(_makeup_only(DT_DIVERGENT, 8, 12.0), allow_reversal=True)
 
 
 # --------------------------------------------------------------------------------------
@@ -328,12 +352,14 @@ def test_donor_controlled_over_draws_and_is_caught_demand_controlled_is_not() ->
     dt_scrub_unsafe = 1200.0
     assert K_SCRUB * dt_scrub_unsafe > 1.0
     with pytest.raises(RationedError):
-        run_scenario(_full_cabin(dt_scrub_unsafe, 8, 10.0))
+        run_scenario(_full_cabin(dt_scrub_unsafe, 8, 10.0), allow_reversal=True)
 
     # Demand-controlled (the makeup) past ITS monotonicity bound, at a dt where the
     # scrubber is still SAFE (k_scrub·dt = 0.9 < 1): NOT caught.
     assert K_SCRUB * DT_OSCILLATING < 1.0 < K_MAKEUP * DT_OSCILLATING
-    _states, rationed, _events = run_scenario(_makeup_only(DT_OSCILLATING, 12, 12.0))
+    _states, rationed, _events = run_scenario(
+        _makeup_only(DT_OSCILLATING, 12, 12.0), allow_reversal=True
+    )
     assert rationed == 0, "the oscillation is invisible to the gate"
 
 
@@ -349,7 +375,9 @@ def test_the_full_cabin_is_protected_only_by_coincidence() -> None:
     assert K_SCRUB * DT_PERPETUAL == 1.0
     assert K_MAKEUP * DT_PERPETUAL == 2.0
 
-    states, rationed, _events = run_scenario(_full_cabin(DT_PERPETUAL, 200, 12.0))
+    states, rationed, _events = run_scenario(
+        _full_cabin(DT_PERPETUAL, 200, 12.0), allow_reversal=True
+    )
     o2 = _o2(states)
     assert rationed == 0, "the full cabin does NOT raise at dt = 1000"
     # An 8 mol square wave against a 10 mol setpoint, forever, reported as a clean run.
@@ -377,7 +405,9 @@ def test_convergence_is_first_order_in_dt_which_is_what_correct_looks_like() -> 
     t_probe = 1800.0
     errors = {}
     for dt in (10.0, 20.0, 40.0):
-        states, _r, _e = run_scenario(_full_cabin(dt, int(t_probe / dt), 20.0))
+        states, _r, _e = run_scenario(
+            _full_cabin(dt, int(t_probe / dt), 20.0), allow_reversal=True
+        )
         errors[dt] = abs(_o2(states)[-1] - analytic(t_probe))
 
     # First-order ⇒ error roughly doubles as dt doubles. Loose (transcendental ref).

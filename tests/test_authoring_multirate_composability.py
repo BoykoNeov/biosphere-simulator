@@ -340,8 +340,15 @@ def test_the_unsafe_shared_dt_wrecks_the_cabin_not_merely_rations() -> None:
     # rate the plan's Step-3 table measured on the bare ECLSS anchor (60 firings / 24
     # steps). Adding the Thermal half changed neither the firing rate nor the endpoint,
     # which is itself evidence the two rate classes do not interact here.
+    #
+    # allow_reversal=True because 72.0 mol against a 10.0 setpoint IS the direction
+    # defect ReversedFlowError was built for: the same divergent map, read as a sign
+    # rather than as a magnitude. This test asserts the number, so it opts out and lets
+    # tests/test_authoring_reversal_gate.py own the verdict.
     states, rationed, _events = run_scenario(
-        _build(single_rate=True, allow_unsafe_step=True), allow_rationing=True
+        _build(single_rate=True, allow_unsafe_step=True),
+        allow_rationing=True,
+        allow_reversal=True,
     )
     assert rationed == 840
     assert states[-1].stocks[CABIN_O2].amount == pytest.approx(72.0, abs=1e-6)

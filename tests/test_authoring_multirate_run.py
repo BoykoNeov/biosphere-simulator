@@ -194,12 +194,20 @@ def test_the_escape_hatch_works_on_the_multirate_path_too() -> None:
     # quietly become the one path where the hatch is unavailable — the n_sub=2 run above
     # is exactly the kind of run worth inspecting rather than only failing.
     #
-    # BOTH hatches are needed now, and they are not redundant: allow_unsafe_step opens
-    # the BUILD, allow_rationing opens the RUN. Two independent gates at two stages, so
-    # studying a hazard that trips both means saying so twice. That verbosity is the
-    # feature — neither hatch silently implies the other.
+    # ALL THREE hatches are needed now, and they are not redundant: allow_unsafe_step
+    # opens the BUILD, allow_rationing and allow_reversal open the RUN by two different
+    # verdicts. Three independent gates, so studying a hazard that trips all three means
+    # saying so three times. That verbosity is the feature — no hatch silently implies
+    # another.
+    #
+    # allow_reversal is here because k_makeup*dt = 7.2 is past the demand-controlled
+    # regulator's stability bound, so cabin_o2 oscillates ABOVE its setpoint — a
+    # direction defect the backstop structurally cannot see, which is the whole reason
+    # ReversedFlowError is RationedError's sibling and not its variant.
     states, rationed, _events = run_scenario(
-        _build(n_sub=2, dt=UNSAFE_DT, allow_unsafe_step=True), allow_rationing=True
+        _build(n_sub=2, dt=UNSAFE_DT, allow_unsafe_step=True),
+        allow_rationing=True,
+        allow_reversal=True,
     )
     assert rationed > 0  # summed across sub-operations by multirate_step's own contract
     assert states[-1].stocks[CABIN_O2].amount != pytest.approx(O2_EQ, abs=1e-6)

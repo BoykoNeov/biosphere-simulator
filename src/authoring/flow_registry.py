@@ -86,6 +86,23 @@ class FlowTypeSpec:
     cls: Callable[..., Flow]
     wiring_fields: tuple[str, ...]
     param_set: str | None
+    demand_controlled: tuple[str, str] | None = None
+    """``(regulated wiring field, setpoint param)`` if this type is DEMAND-controlled.
+
+    A demand-controlled flow's magnitude is proportional to ``(setpoint − stock)``
+    rather than to the stock, so it **reverses** above the setpoint instead of merely
+    slowing — and neither conservation nor the rationing gate can see that (see
+    ``errors.ReversedFlowError``). This pair names the two things a direction check
+    needs: which wired stock is regulated, and which param on ``param_set`` holds its
+    target.
+
+    ``None`` for every donor-controlled and forced type, which is all the rest — a
+    donor-controlled draw ``k·x`` is self-limiting at 0 and cannot change sign, and a
+    forced flow has no setpoint to be on the wrong side of. Declared here rather than
+    hard-coded in the run harness so that **adding** a demand-controlled type is what
+    registers it, and so the manifest freezes which types claim the shape.
+    """
+
     rate_params: tuple[str, ...] = ()
     """The params on this type's ``param_set`` that are FIRST-ORDER RATE CONSTANTS.
 
@@ -232,6 +249,11 @@ FLOW_TYPES: dict[str, FlowTypeSpec] = {
         cls=O2Makeup,
         wiring_fields=("o2_supply", "cabin_o2"),
         param_set="eclss",
+        # The ONLY demand-controlled type in the registry, hence the only one that can
+        # reverse. `run.run_scenario` raises `ReversedFlowError` when `cabin_o2` is
+        # found above `o2_setpoint` — the direction check the backstop structurally
+        # cannot perform, because this draw never over-draws anything.
+        demand_controlled=("cabin_o2", "o2_setpoint"),
         # `o2_makeup_gain` ONLY — `o2_setpoint` sits on the same params object and is a
         # target inventory (mol), not a rate. THE ONE RATIONING CANNOT SEE, so this row
         # is the precondition's whole reason for existing: the draw is proportional to

@@ -163,6 +163,12 @@ def _flow_types() -> dict[str, dict[str, Any]]:
     one level up. Emitting it from *this* derivation is what freezes it: the gate
     compares the manifest against this function, so a field the function omits is a
     field the manifest cannot pin, however faithfully ``FlowTypeSpec`` records it.
+
+    **``demand_controlled`` belongs here for the identical reason** (the reversal gate,
+    2026-08-11): it decides which scenarios ``run_scenario`` *refuses to return*.
+    Clearing it on a type silently un-arms the direction check for that type — a
+    committed file that used to raise ``ReversedFlowError`` starts completing quietly,
+    the same hole in the same shape. Recorded as ``[field, param]``, or ``None``.
     """
     return {
         name: {
@@ -170,6 +176,9 @@ def _flow_types() -> dict[str, dict[str, Any]]:
             "wiring_fields": sorted(spec.wiring_fields),
             "param_set": spec.param_set,
             "rate_params": sorted(spec.rate_params),
+            "demand_controlled": (
+                list(spec.demand_controlled) if spec.demand_controlled else None
+            ),
         }
         for name, spec in FLOW_TYPES.items()
     }

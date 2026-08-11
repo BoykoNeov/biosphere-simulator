@@ -73,6 +73,7 @@ line each, newest concerns last. Add detail to the log, never to this table.
 | Bucket 2: the rationing gate | COMPLETE — `run_scenario` now raises on rationing; conservation is not survival | `post-roadmap-rationing-gate.md` |
 | Bucket 3 (C): cite the no-oracle params | CLOSED after 7 rounds — 8 cited, 14 design, 7 unciteable; blocked on retrieval, not effort, with the residual risk documented | `post-roadmap-citation.md` |
 | The O₂ regulator's reversal | DIAGNOSED + CORRECTED 2026-08-11 — the clamp was already refused; the reversal is **not** author-only — it fires in 3 frozen runs the goldens are blind to. A sentence true when written, falsified by a seam three phases later | `post-roadmap-o2-makeup-reversal.md` |
+| The direction gate (`ReversedFlowError`) | **BUILT 2026-08-11** — a third run-time verdict, `RationedError`'s sibling not its variant; authoring platform unfrozen (`flow_types` gains `demand_controlled`), both ports | `post-roadmap-o2-makeup-reversal.md` |
 
 ## The freeze contracts (four; each has an unfreeze discipline — follow it)
 

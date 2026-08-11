@@ -63,6 +63,22 @@ pub struct FlowTypeSpec {
     /// construction*). So the claim is "the platform catches the `k·dt` family", never
     /// "your dt is safe".
     pub rate_params: &'static [&'static str],
+    /// `(regulated wiring field, setpoint param)` if this type is **demand-controlled**.
+    ///
+    /// A demand-controlled magnitude is `k · (setpoint − stock)`, so above the setpoint
+    /// it goes NEGATIVE and the flow reverses — draining the stock it is named for, back
+    /// into its source. Neither existing gate sees that: conservation is a stoichiometry
+    /// check (the two legs share one magnitude either way), and the rationing backstop is
+    /// a scarcity check (this draw is proportional to the setpoint *error*, so it never
+    /// over-draws). `run_scenario` uses this pair for the direction check. Mirrors Python
+    /// `flow_registry.FlowTypeSpec.demand_controlled`; see
+    /// `authoring.errors.ReversedFlowError` for why the frozen scenarios that reverse
+    /// legitimately are out of its reach.
+    ///
+    /// `None` for every donor-controlled and forced type — a donor-controlled draw `k·x`
+    /// is self-limiting at 0 and cannot change sign, and a forced flow has no setpoint to
+    /// be on the wrong side of.
+    pub demand_controlled: Option<(&'static str, &'static str)>,
 }
 
 /// Look up a frozen flow type by its authoring name (the `FLOW_TYPES` dict analogue).
@@ -71,43 +87,51 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
         "crew.oxygen_consumption" => Some(FlowTypeSpec {
             wiring_fields: &["o2_store", "o2_consumed"],
             param_set: None,
+            demand_controlled: None,
             rate_params: &[],
         }),
         "crew.food_metabolism" => Some(FlowTypeSpec {
             wiring_fields: &["food_store", "exhaled_co2", "fecal_waste"],
             param_set: Some("crew"),
+            demand_controlled: None,
             rate_params: &[],
         }),
         "crew.water_balance" => Some(FlowTypeSpec {
             wiring_fields: &["water_store", "crew_humidity", "urine"],
             param_set: Some("crew"),
+            demand_controlled: None,
             rate_params: &[],
         }),
         // --- Tier 1: Power ---
         "power.solar_charge" => Some(FlowTypeSpec {
             wiring_fields: &["solar_source", "battery", "waste_heat"],
             param_set: Some("charge"),
+            demand_controlled: None,
             rate_params: &[],
         }),
         "power.load_draw" => Some(FlowTypeSpec {
             wiring_fields: &["battery", "waste_heat"],
             param_set: None,
+            demand_controlled: None,
             rate_params: &[],
         }),
         "power.self_discharge" => Some(FlowTypeSpec {
             wiring_fields: &["battery", "waste_heat"],
             param_set: Some("self_discharge"),
+            demand_controlled: None,
             rate_params: &["self_discharge_rate"],
         }),
         // --- Tier 1: Thermal ---
         "thermal.heat_input" => Some(FlowTypeSpec {
             wiring_fields: &["heat_source", "node"],
             param_set: None,
+            demand_controlled: None,
             rate_params: &[],
         }),
         "thermal.radiator_reject" => Some(FlowTypeSpec {
             wiring_fields: &["node", "space"],
             param_set: Some("thermal"),
+            demand_controlled: None,
             rate_params: &[],
         }),
         // --- Tier 1: ECLSS ---
@@ -121,21 +145,27 @@ pub fn flow_type(name: &str) -> Option<FlowTypeSpec> {
                 "metabolic_h2o_source",
             ],
             param_set: None,
+            demand_controlled: None,
             rate_params: &[],
         }),
         "eclss.co2_scrubber" => Some(FlowTypeSpec {
             wiring_fields: &["cabin_co2", "co2_removed"],
             param_set: Some("eclss"),
+            demand_controlled: None,
             rate_params: &["co2_scrub_rate"],
         }),
         "eclss.condenser" => Some(FlowTypeSpec {
             wiring_fields: &["cabin_h2o", "humidity_condensate"],
             param_set: Some("eclss"),
+            demand_controlled: None,
             rate_params: &["condense_rate"],
         }),
         "eclss.o2_makeup" => Some(FlowTypeSpec {
             wiring_fields: &["o2_supply", "cabin_o2"],
             param_set: Some("eclss"),
+            // The ONLY demand-controlled type in the registry, hence the only one that
+            // can reverse. See `run_scenario`'s direction check.
+            demand_controlled: Some(("cabin_o2", "o2_setpoint")),
             rate_params: &["o2_makeup_gain"],
         }),
         _ => None,
@@ -387,6 +417,24 @@ pub fn frozen_rate_value(param_set: &str, param: &str) -> Result<f64, AuthoringE
     })
 }
 
+/// Read a frozen **setpoint** (not a rate) out of a named param set — the direction
+/// gate's input.
+///
+/// Deliberately a sibling of [`frozen_rate_value`] rather than a reuse of it: the two
+/// read the same flattened map, but a function named `..._rate_value` returning a mol
+/// inventory is the kind of name-vs-meaning drift this repo has logged more than once.
+/// Same failure mode on a miss — loud, because an unreadable setpoint must never degrade
+/// to "assume it points the right way".
+pub fn frozen_setpoint_value(param_set: &str, param: &str) -> Result<f64, AuthoringError> {
+    let map = kinetics_param_map(param_set)?;
+    map.get(param).copied().ok_or_else(|| {
+        AuthoringError::new(format!(
+            "flow-type registry is inconsistent: setpoint param {param:?} is not in              frozen param set {param_set:?} (available: {:?})",
+            map.keys().collect::<Vec<_>>()
+        ))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,7 +470,10 @@ mod tests {
         assert_eq!(sets, PARAM_SET_NAMES.to_vec());
         for name in FLOW_TYPE_NAMES {
             if let Some(set) = flow_type(name).and_then(|s| s.param_set) {
-                assert!(PARAM_SET_NAMES.contains(&set), "{name} names unknown set {set}");
+                assert!(
+                    PARAM_SET_NAMES.contains(&set),
+                    "{name} names unknown set {set}"
+                );
             }
         }
     }
@@ -432,7 +483,10 @@ mod tests {
         // Each named set must flatten to a non-empty map — the authored-`kinetics`
         // `param("…")` path. An unknown set is an error, not a silent empty map.
         for set in PARAM_SET_NAMES {
-            assert!(!kinetics_param_map(set).expect("known set").is_empty(), "{set}");
+            assert!(
+                !kinetics_param_map(set).expect("known set").is_empty(),
+                "{set}"
+            );
         }
         assert!(kinetics_param_map("nope").is_err());
     }
@@ -472,8 +526,8 @@ mod tests {
         ]
         .into_iter()
         .collect();
-        let authored = build_frozen_flow("thermal.radiator_reject", "thermal.r", 0, &wiring)
-            .expect("builds");
+        let authored =
+            build_frozen_flow("thermal.radiator_reject", "thermal.r", 0, &wiring).expect("builds");
         let reference = RadiatorReject::new(
             "thermal.r".to_string(),
             "thermal.node".to_string(),
@@ -491,7 +545,11 @@ mod tests {
                 .amount
         };
         let got = rejected(authored.as_ref());
-        assert_eq!(got, rejected(&reference), "authored radiator must use params::thermal()");
+        assert_eq!(
+            got,
+            rejected(&reference),
+            "authored radiator must use params::thermal()"
+        );
 
         // Teeth: the comparison is actually sensitive to the params — a different
         // emissivity gives a different answer, so the equality above is not vacuous.
@@ -505,6 +563,9 @@ mod tests {
             },
         );
         assert_ne!(got, rejected(&wrong));
-        assert!(got != 0.0, "the node must be off the floor or this proves nothing");
+        assert!(
+            got != 0.0,
+            "the node must be off the floor or this proves nothing"
+        );
     }
 }

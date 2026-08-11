@@ -28,7 +28,8 @@ use crate::compose::apply_includes;
 use crate::errors::AuthoringError;
 use crate::expr_parser::parse_rate_expr;
 use crate::flow_registry::{
-    build_frozen_flow, flow_type, frozen_rate_value, kinetics_param_map, FLOW_TYPE_NAMES,
+    build_frozen_flow, flow_type, frozen_rate_value, frozen_setpoint_value, kinetics_param_map,
+    FLOW_TYPE_NAMES,
 };
 use crate::schema::{FlowSpec, ParamsSpec, ScenarioSpec, StockSpec};
 use crate::template::{eval_numeric_field, resolve_parameters};
@@ -119,6 +120,20 @@ pub struct BuiltScenario {
     /// validated"** marker (decision B): conservation + determinism are guaranteed for
     /// such a run, scientific validity is not.
     pub has_authored_kinetics: bool,
+    /// `(regulated stock id, setpoint)` for every DEMAND-controlled flow in the graph —
+    /// the direction gate's input ([`crate::run::run_scenario`]).
+    ///
+    /// **Resolved here rather than at run time, and that is the one real divergence from
+    /// Python.** Python's `run_scenario` reads the pair back off the built flow objects
+    /// with `getattr`; Rust's flows own their fields privately and a `Box<dyn Flow>`
+    /// cannot be interrogated, so the pair is resolved while the wiring map and the
+    /// frozen params are both still in hand. Same states are judged either way (the gate
+    /// scans committed master steps in both ports), so the *rule* mirrors exactly even
+    /// though the plumbing does not — the [`frozen_rate_value`] precedent, recorded for
+    /// the same reason: **a mirror carries the rule, not the rationale.**
+    ///
+    /// Empty for every graph with no demand-controlled flow, which is most of them.
+    pub demand_controlled: Vec<(String, f64)>,
 }
 
 impl BuiltScenario {
@@ -255,6 +270,7 @@ fn interpret_inner(
     let resolver = SourceResolver::new(forcings, HashMap::new())?;
 
     let has_authored_kinetics = spec.flows.iter().any(|f| f.kinetics.is_some());
+    let demand_controlled = resolve_demand_controlled(&spec)?;
 
     Ok(BuiltScenario {
         name: spec.name.clone(),
@@ -268,6 +284,7 @@ fn interpret_inner(
         steps: spec.steps,
         n_sub: spec.n_sub,
         has_authored_kinetics,
+        demand_controlled,
     })
 }
 
@@ -415,6 +432,52 @@ fn rate_precondition_message(v: &RateViolation<'_>) -> String {
          load_scenario_allowing_unsafe_step.",
         k * h
     )
+}
+
+/// Resolve `(regulated stock id, setpoint)` for every demand-controlled flow in `spec`.
+///
+/// The direction gate's input, resolved at build time — see
+/// [`BuiltScenario::demand_controlled` ] for why here rather than in `run`. A flow type
+/// declaring the shape but no param set is a **registry bug, not authored input**, and is
+/// raised loudly for [`check_rate_preconditions`]'s reason: a pair that cannot be read
+/// must never degrade to "assume it points the right way".
+fn resolve_demand_controlled(spec: &ScenarioSpec) -> Result<Vec<(String, f64)>, AuthoringError> {
+    let mut pairs = Vec::new();
+    for flow_spec in &spec.flows {
+        let Some(type_name) = flow_spec.type_.as_deref() else {
+            // An authored `kinetics` flow has no FlowTypeSpec, so it declares no
+            // setpoint and skips this by construction (decision B: the author wrote the
+            // rate law, and we do not infer a target for it).
+            continue;
+        };
+        let Some(type_spec) = flow_type(type_name) else {
+            continue;
+        };
+        let Some((stock_field, setpoint_param)) = type_spec.demand_controlled else {
+            continue;
+        };
+        let Some(param_set) = type_spec.param_set else {
+            return Err(AuthoringError::new(format!(
+                "flow {:?} ({type_name}): declares demand_controlled {:?} but no param                  set; the flow-type registry is inconsistent",
+                flow_spec.id,
+                (stock_field, setpoint_param)
+            )));
+        };
+        let wired = flow_spec
+            .wiring
+            .iter()
+            .find(|(field, _)| field == stock_field)
+            .map(|(_, stock)| stock);
+        let Some(stock_id) = wired else {
+            return Err(AuthoringError::new(format!(
+                "flow {:?} ({type_name}): declares demand_controlled on wiring field                  {stock_field:?}, which this flow does not wire; the flow-type registry                  is inconsistent",
+                flow_spec.id
+            )));
+        };
+        let setpoint = frozen_setpoint_value(param_set, setpoint_param)?;
+        pairs.push((stock_id.clone(), setpoint));
+    }
+    Ok(pairs)
 }
 
 /// Refuse a scenario whose step is too large for a declared first-order rate — the
@@ -637,9 +700,8 @@ fn build_declarative_flow(
     // The authored-kinetics param map (packs deferred; None → empty).
     let param_map = match &spec.params {
         None => BTreeMap::new(),
-        Some(ParamsSpec::Named(set)) => kinetics_param_map(set).map_err(|e| {
-            AuthoringError::new(format!("flow {:?}: {}", spec.id, e.message))
-        })?,
+        Some(ParamsSpec::Named(set)) => kinetics_param_map(set)
+            .map_err(|e| AuthoringError::new(format!("flow {:?}: {}", spec.id, e.message)))?,
         Some(ParamsSpec::Pack(_)) => {
             return Err(AuthoringError::new(format!(
                 "flow {:?}: parameter packs for authored 'kinetics' flows are deferred; \

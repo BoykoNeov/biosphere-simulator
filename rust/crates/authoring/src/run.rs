@@ -68,6 +68,11 @@ pub struct RunResult {
     pub final_state: State,
     pub total_rationed: u64,
     pub events: Vec<Event>,
+    /// The first committed state at which a demand-controlled flow was found pointing
+    /// backwards, if any — the direction gate's evidence, carried on the *permissive*
+    /// result so `run_scenario_allowing_rationing` can hand a reversed run back for
+    /// study (Python's `allow_reversal=True`).
+    pub first_reversal: Option<Reversal>,
 }
 
 /// Step `built` to completion under its requested integrator. An unknown integrator
@@ -84,6 +89,9 @@ pub fn run_scenario(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
     let n_sub = built.n_sub;
     let multirate = built.is_multirate();
     let result = run_scenario_allowing_rationing(built)?;
+    // Rationing is reported FIRST, deliberately: a rationed trajectory is already
+    // suspect, so blaming the wiring would send an author to edit a file whose real
+    // problem is the step size. Mirrors Python's ordering in `run_scenario`.
     if result.total_rationed > 0 {
         return Err(AuthoringError::rationed(rationed_message(
             result.total_rationed,
@@ -93,7 +101,72 @@ pub fn run_scenario(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
             multirate,
         )));
     }
+    if let Some(violation) = result.first_reversal.as_ref() {
+        return Err(AuthoringError::reversed(reversal_message(violation, steps)));
+    }
     Ok(result)
+}
+
+/// The first place a demand-controlled flow's regulated stock was found above its
+/// setpoint — the direction gate's evidence.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Reversal {
+    /// The regulated stock's id.
+    pub stock_id: String,
+    /// The setpoint it exceeded.
+    pub setpoint: f64,
+    /// The amount observed.
+    pub amount: f64,
+    /// Which committed step it was observed at — `0` is the initial state.
+    pub step: u64,
+}
+
+/// The `ErrorKind::Reversed` text — names the step, because *when* is the diagnosis.
+///
+/// A crossing at step 0 is a wiring error (the file starts the stock above the
+/// setpoint); a crossing later means something else in the graph is filling it past the
+/// regulator's target. Different fixes, so the step is never omitted. Not parity-pinned
+/// (no error text is), but it carries the same two facts Python's does.
+fn reversal_message(v: &Reversal, steps: u64) -> String {
+    let when = if v.step == 0 {
+        "at the INITIAL state, so this is a wiring error: the scenario file starts this          stock above the setpoint"
+            .to_string()
+    } else {
+        format!(
+            "first at step {} of {steps}, so some other flow in the graph is filling              this stock past the regulator's target",
+            v.step
+        )
+    };
+    format!(
+        "a demand-controlled flow regulates {:?} toward {}, and it reached {} — above          it, {when}. A demand-controlled magnitude is k*(setpoint - stock), so above the          setpoint it goes NEGATIVE and the flow runs backwards: it drains the stock it          is named for, back into its source. Nothing else in this stack objects — the          two legs share one magnitude so the run still conserves exactly, and the draw          is proportional to the setpoint ERROR rather than to the stock, so it never          over-draws and the arbitration backstop never fires (rationed stays 0). Wire          the stock at or below the setpoint, or drop the regulator and let the stock          float. To inspect the reversed run instead of failing, use          run_scenario_allowing_rationing.",
+        v.stock_id, v.setpoint, v.amount
+    )
+}
+
+/// Record a reversal if this committed state has one, keeping only the FIRST.
+///
+/// ⚠ **What this cannot see, stated rather than implied: a sub-step-only excursion on
+/// the multi-rate path.** Only committed master states are examined — a fast-set
+/// sub-step that crosses the setpoint and returns within one master step is invisible.
+/// The single-rate path has no sub-steps, so there the scan is complete. Identical
+/// coverage to Python's, which is the point: the two ports judge the same states.
+fn watch_state(watch: &[(String, f64)], state: &State, step: u64, found: &mut Option<Reversal>) {
+    if watch.is_empty() || found.is_some() {
+        return;
+    }
+    for (stock_id, setpoint) in watch {
+        if let Some(stock) = state.stocks.get(stock_id) {
+            if stock.amount > *setpoint {
+                *found = Some(Reversal {
+                    stock_id: stock_id.clone(),
+                    setpoint: *setpoint,
+                    amount: stock.amount,
+                    step,
+                });
+                return;
+            }
+        }
+    }
 }
 
 /// The `ErrorKind::Rationed` text — **the remedy is conditional on the rate class**, and
@@ -147,9 +220,7 @@ fn rationed_message(rationed: u64, dt: f64, steps: u64, n_sub: u32, multirate: b
 /// For **deliberately studying** a rationed run, not for making a scenario "work": a
 /// rationed authored run is one whose `dt` is wrong, and the stocks it clamped at zero
 /// are stocks it emptied.
-pub fn run_scenario_allowing_rationing(
-    built: BuiltScenario,
-) -> Result<RunResult, AuthoringError> {
+pub fn run_scenario_allowing_rationing(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
     // The branch, not the identity, is what preserves the goldens. A declared cadence
     // goes to `multirate_step`; **everything else takes the pre-multi-rate loop over the
     // whole `registry`, verbatim**. That is not an optimization: `n_sub=1` with an empty
@@ -164,9 +235,24 @@ pub fn run_scenario_allowing_rationing(
     let dt = built.dt;
     let resolver = built.resolver;
     let state = built.state;
+    let watch = built.demand_controlled;
     let result = match built.integrator.as_str() {
-        "euler" => step_euler(EulerIntegrator::new(built.registry), state, &resolver, dt, steps),
-        "rk4" => step_rk4(Rk4Integrator::new(built.registry), state, &resolver, dt, steps),
+        "euler" => step_euler(
+            EulerIntegrator::new(built.registry),
+            state,
+            &resolver,
+            dt,
+            steps,
+            &watch,
+        ),
+        "rk4" => step_rk4(
+            Rk4Integrator::new(built.registry),
+            state,
+            &resolver,
+            dt,
+            steps,
+            &watch,
+        ),
         other => {
             return Err(AuthoringError::new(format!(
                 "unknown integrator {other:?} (known: [\"euler\", \"rk4\"])"
@@ -242,9 +328,12 @@ fn run_multirate(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
         }
     };
 
+    let watch = built.demand_controlled;
     let mut total_rationed = 0u64;
     let mut events: Vec<Event> = Vec::new();
-    for _ in 0..steps {
+    let mut first_reversal = None;
+    watch_state(&watch, &state, 0, &mut first_reversal);
+    for n in 0..steps {
         let report = multirate_step(
             slow.as_ref(),
             fast.as_ref(),
@@ -258,11 +347,13 @@ fn run_multirate(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
         state = report.state;
         total_rationed += report.rationed;
         events.extend(report.events);
+        watch_state(&watch, &state, n + 1, &mut first_reversal);
     }
     Ok(RunResult {
         final_state: state,
         total_rationed,
         events,
+        first_reversal,
     })
 }
 
@@ -272,20 +363,25 @@ fn step_euler(
     resolver: &simcore::environment::SourceResolver,
     dt: f64,
     steps: u64,
+    watch: &[(String, f64)],
 ) -> Result<RunResult, SimError> {
     let mut state = initial;
     let mut total_rationed = 0u64;
     let mut events: Vec<Event> = Vec::new();
-    for _ in 0..steps {
+    let mut first_reversal = None;
+    watch_state(watch, &state, 0, &mut first_reversal);
+    for n in 0..steps {
         let report = integrator.step_report(&state, resolver, dt)?;
         state = report.state;
         total_rationed += report.rationed;
         events.extend(report.events);
+        watch_state(watch, &state, n + 1, &mut first_reversal);
     }
     Ok(RunResult {
         final_state: state,
         total_rationed,
         events,
+        first_reversal,
     })
 }
 
@@ -295,19 +391,24 @@ fn step_rk4(
     resolver: &simcore::environment::SourceResolver,
     dt: f64,
     steps: u64,
+    watch: &[(String, f64)],
 ) -> Result<RunResult, SimError> {
     let mut state = initial;
     let mut total_rationed = 0u64;
     let mut events: Vec<Event> = Vec::new();
-    for _ in 0..steps {
+    let mut first_reversal = None;
+    watch_state(watch, &state, 0, &mut first_reversal);
+    for n in 0..steps {
         let report = integrator.step_report(&state, resolver, dt)?;
         state = report.state;
         total_rationed += report.rationed;
         events.extend(report.events);
+        watch_state(watch, &state, n + 1, &mut first_reversal);
     }
     Ok(RunResult {
         final_state: state,
         total_rationed,
         events,
+        first_reversal,
     })
 }
