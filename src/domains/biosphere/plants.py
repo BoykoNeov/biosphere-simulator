@@ -25,10 +25,12 @@ from domains.biosphere.carbon_budget import (
     MaintenanceRespiration,
 )
 from domains.biosphere.compartments import PLANTS
+from domains.biosphere.leaf_area import LeafAreaExpansion
 from domains.biosphere.loader import (
     crop_param_set,
     load_allocation_params,
     load_canopy_params,
+    load_leaf_area_params,
     load_nitrogen_params,
     load_phenology_params,
     load_photoperiod_params,
@@ -54,6 +56,7 @@ from domains.biosphere.stocks import (
     CI_VAR,
     CO2_POOL_VAR,
     DAYLENGTH_VAR,
+    LEAF_AREA_INDEX,
     LEAF_C,
     LITTER_N,
     LITTER_SINK,
@@ -118,6 +121,12 @@ def _carbon_context(scenario: SeasonScenario) -> CarbonContext:
         co2_pool_var=CO2_POOL_VAR if scenario.sealed else None,
         chamber_air_mol=scenario.chamber_air_mol if scenario.sealed else None,
         ci_ratio=scenario.ci_ratio if scenario.sealed else None,
+        # Sink-limited leaf expansion: when the scenario names a plant density, LAI is
+        # READ from the fourth accumulator instead of derived from leaf carbon. The
+        # SAME condition builds the aux process in ``build_plants`` — if the two ever
+        # disagreed, the budget would read an accumulator nothing advances (LAI frozen
+        # at its seed) or an aux process would advance a value nothing reads.
+        leaf_area_aux=LEAF_AREA_INDEX if scenario.plant_density is not None else None,
     )
 
 
@@ -383,6 +392,36 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
                 accumulator=VERNALIZATION_DAYS,
                 temp_var=TEMP_VAR,
                 params=vern,
+            ),
+        )
+    # The FOURTH accumulator (post-roadmap sink-limited leaf expansion): leaf area
+    # itself. ⚠ Conditional, unlike rooted depth — a crop with no leaf-area
+    # parameterization in [F] Table 9.1 (potato) keeps the derived-LAI form, and the
+    # switch is the SCENARIO's plant density rather than a crop file, because the file
+    # would fall back to wheat's and hand a second species wheat's phyllochron in
+    # silence. It takes ``thermal_time`` as a collaborator rather than re-deriving the
+    # day's temperature unit, so the node clock and the development clock cannot
+    # disagree; that also fixes its position AFTER ``thermal_time`` in construction
+    # order, though not in evaluation order (the integrator sorts by ``AuxId``).
+    if scenario.plant_density is not None:
+        aux = (
+            *aux,
+            LeafAreaExpansion(
+                id=AuxId("biosphere.leaf_area_index"),
+                accumulator=LEAF_AREA_INDEX,
+                ctx=ctx,
+                thermal_time_aux=THERMAL_TIME,
+                params=load_leaf_area_params(crop.paths["leaf_area"]),
+                pheno=pheno,
+                alloc=load_allocation_params(crop.paths["allocation"]),
+                # The SAME rdr_leaf the Senescence flow sheds carbon at, read from the
+                # same params object: the area that dies and the mass that dies are two
+                # legs of one event and must not be able to disagree.
+                rdr_leaf=sen_params.rdr_leaf,
+                plant_density=scenario.plant_density,
+                soil_water=SOIL_WATER,
+                rooted_depth_aux=ROOTED_DEPTH,
+                thermal_time_rate=thermal_time,
             ),
         )
     return CompartmentBuild(

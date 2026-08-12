@@ -1,0 +1,121 @@
+# winter_wheat — sink-limited leaf expansion (the fourth aux accumulator) crop params
+# Currency/units: NONE — leaf area index is a dimensionless AREA RATIO (m² leaf per m²
+#   ground), a non-conserved auxiliary accumulator, not a stock. It has no counterparty
+#   and is invisible to the conservation gate by construction (simcore.auxiliary).
+#
+# Units discipline (P4 / config/units.py): degC/node, cm², a bare exponent and a bare
+#   fraction are not conserved-Quantity canonical units, so all five are
+#   schema-validated, bound-checked floats carrying a declared unit, exact-string
+#   guarded at the loader (the senescence / respiration / root_depth precedent).
+#
+# Model ([F] Ch. 9, Box 9.2 — the authoritative order of operations):
+#   MSNN = 1 + CTU / PHYL                             (Eqns 9.1-9.2, derived not stored)
+#   PLA  = PLACON · MSNN^PLAPOW                       (Eqn 9.3)
+#   GLAI = d(PLA)/dt · PDEN / 10000 · WSFL            (Eqn 9.5 × Eqn 15.7)   [CTU < tuTLM]
+#   GLAI = GLF · SLA                                  (Eqn 9.6)              [CTU >= tuTLM]
+#   LAI  = LAI + GLAI − DLAI                          (Eqn 9.8)
+#
+# ...AND THE ENVELOPE THAT MAKES IT USABLE OUTSIDE POTENTIAL PRODUCTION ([E] Table 20):
+#   LAI  = min(max(LAI, leaf_C·SLA/A / SLW_MAX), leaf_C·SLA/A / SLW_MIN)
+#
+#   ⚠ [F] Ch. 9 is scoped, in its own opening sentence, to leaf area "under non-limiting
+#   water and nutrients", and Ch. 12 — which these values come from — is titled "A Model
+#   for POTENTIAL Production". [F] has NO mechanism by which the atmosphere runs out of
+#   carbon, because in its world it cannot. Six of our eleven scenarios are
+#   growth-limited, and there the node branch makes AREA WITHOUT CARBON: measured 2-15x
+#   the nominal leaf thinness, with three scenarios rationing (27/41/83 firings). The
+#   envelope is what the SECOND source supplies to bound it. See §7 of
+#   docs/plans/post-roadmap-leaf-expansion.md for the full measurement.
+#
+#   ⚠ THE FRACTIONS INVERT. SLW is specific leaf WEIGHT (mass per area), so the SMALL
+#   fraction is the THIN leaf and therefore the UPPER bound on area. Getting this
+#   backwards silently swaps a floor for a ceiling, so leaf_area.py names them
+#   `slw_fraction_min -> area ceiling` at the point of use.
+#
+#   PDEN (plant density) is SCENARIO/MANAGEMENT data — see SeasonScenario.plant_density —
+#   exactly as ground_area and soil_layer_depth are. It is not a crop constant, and [F]
+#   agrees: its own model reads it from the "Run" sheet's MANAGEMENT INPUTS block
+#   (Sheet1.[b9]), not from the "Crops" sheet.
+#
+# ⚠ THIS FILE REVERSES THE P2 LOCK, "LAI IS DERIVED, NOT STORED". WSFL scales an
+#   EXPANSION RATE, so area a drought withholds must stay withheld; applying it to the
+#   standing LAI instead would make the canopy shrink and re-grow with the soil water,
+#   which is wilting/rolling — a different, real mechanism and NOT this citation. Leaf
+#   area therefore decouples from leaf carbon and the conventional specific leaf area
+#   becomes an EMERGENT ratio rather than an input to the canopy. See leaf_area.py.
+#
+# ⚠ EVERY VALUE BELOW IS TAKEN FROM ONE PARAMETERIZATION AND THAT IS DELIBERATE.
+#   [F] states these numbers in TWO places that DISAGREE, and mixing them would be the
+#   locus error this project has logged three times:
+#     * Table 9.1 (printed p. 109) — GENERIC wheat, caption citing six sources:
+#         PHYL 120, PLACON 1, PLAPOW 2.464, SLA 0.021
+#     * Fig. 12.5 (printed p. 152) — the book's OWN WORKING MODEL, wheat cv. Tajan:
+#         phyl 112, PLACON 1, PLAPOW 2.464, SLA 0.021
+#   They differ on PHYL ALONE (112 vs 120). We take the Fig. 12.5 set, because
+#   plant_density = 300 comes from the Run sheet of that SAME model (Fig. 12.4) and the
+#   pair (PLAPOW, PDEN) is jointly identified — [F] Fig. 9.2b makes PLAPOW an explicit
+#   function of density for chickpea, and printed p. 107 says a higher density is
+#   simulated "by decreasing PLAPOW". Taking Table 9.1's PHYL with the Run sheet's PDEN
+#   would be one number from each of two parameterizations.
+#   ⚠ MEASURED CONSEQUENCE, so the choice is not free: at PDEN 300, PHYL 112 gives
+#   open_season a peak LAI of 5.9129 and PHYL 120 gives 5.6431 — a 4.8 % spread on a
+#   quantity with a contract-standing band.
+#
+# ⚠ THE CROP IS NOT cv. TAJAN AND WE DO NOT PRETEND IT IS. Our winter wheat carries [E]'s
+#   phenology (tsum 1100/750), vernalization and photoperiod; Tajan's leaf-area
+#   parameterization is imported into it the same way every other crop param in this tree
+#   is imported from whichever primary carries it. What is NOT imported is Tajan's
+#   phenology block — tu_tlm below is the one number from it we take, and the reason is
+#   in that parameter's own source field.
+#
+# Clean-room: values from cited primary literature ONLY, read OFF PAGE IMAGES (pdftoppm
+#   -r 170/200) — [F]'s text layer column-scrambles Table 9.1 exactly as it does Tables
+#   6.4, 15.1 and 17.1. NOT from the unlicensed WOFOST_crop_parameters YAML or PCSE
+#   source. See docs/param-file-conventions.md.
+#
+# Sources:
+#   [F] Soltani, A. & Sinclair, T.R., *Modeling Physiology of Crop Development, Growth
+#       and Yield*, CABI. Ch. 9 (Eqns 9.1-9.5, 9.8; Box 9.1; Box 9.2), Ch. 15 (Eqn 15.5,
+#       Eqns 15.6/15.7, Table 15.1), Ch. 6 (Table 6.3 cardinals, Table 6.4 temperature-
+#       unit requirements, Box 6.2 the DTU form), Ch. 12 (Fig. 12.4 "Run" sheet,
+#       Fig. 12.5 "Crops" sheet).
+#   [E] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       *Simulation of Ecophysiological Processes of Growth in Several Annual Crops*,
+#       Simulation Monographs 29, Pudoc/IRRI. Table 19 (printed p. 100, the specific
+#       leaf weight constants) and Table 20 (printed p. 102, SLT — the fraction of that
+#       constant as a function of development stage), both read off 200-dpi page
+#       renders. Already this tree's source for phenology, the partition table, root
+#       depth and stem reserves, and it carries a WINTER WHEAT row of its own.
+
+name: winter_wheat
+process: leaf_area_expansion
+
+parameters:
+  phyllochron:
+    value: 112.0
+    unit: "degC"
+    source: "[F] Fig. 12.5 (printed p. 152), 'Crops' sheet of the book's own working model, column 'Wheat / Tajan', row 17: phyl = 112 degC/leaf, read off the page render. DEFINITION, [F] printed p. 104: 'the temperature unit between appearance of two consecutive leaves (PHYL, degC per node)'; printed p. 105 gives the estimation method — the inverse of the slope of main-stem node number against cumulative temperature unit (Fig. 9.1). ⚠ CONFLICTS WITH Table 9.1 (printed p. 109), which gives generic wheat 120 degC/node under a caption citing Penning de Vries et al. 1989, Chapman et al. 1993, Hammer et al. 1993, Keating et al. 2003, Wahbi & Sinclair 2005, Yin & van Laar 2005 and 'A. Soltani, unpublished data'. We take 112 because plant_density = 300 comes from the Run sheet of the SAME model (Fig. 12.4) and PLAPOW is density-dependent (Fig. 9.2b), so the three numbers must come from one parameterization or none. MEASURED: 112 -> peak LAI 5.9129, 120 -> 5.6431 on open_season. ⚠ [F] itself flags this parameter as the one most likely to be non-constant — 'Non-constant phyllochron' (printed p. 111): 'it was assumed that the value of the phyllochron is constant throughout the leaf production phase. However, there is some [evidence otherwise]'. A DVS-keyed phyllochron is a named deferral, not an oversight."
+  pla_constant:
+    value: 1.0
+    unit: "cm^2"
+    source: "[F] Table 9.1 (printed p. 109) and Fig. 12.5 row 18, which AGREE at PLACON = 1 for wheat — and for nine of the table's eleven crops, because [F] p. 106 states it as a modelling convention rather than a measurement: 'Equation 9.3 is further simplified if we assume PLACON = 1 cm2, which means a small value of 1 cm2 for PLA when there is one node or leaf on the main stem. This assumption allows Eqn 9.3 to be simplified to PLA = MSNN^PLAPOW' (Eqn 9.4). So this is a CONVENTION the source names as one, carried explicitly rather than folded away, so that the exponent it pairs with is read against the equation it was fitted to. ⚠ ITS UNIT IS LOAD-BEARING: PLA is cm2 per plant, and Eqn 9.5's /10000 is what turns it into m2 — the conversion lives in leaf_area.py beside the equation rather than being folded into this value, because folding would silently re-scale a cited number."
+  pla_exponent:
+    value: 2.464
+    unit: "dimensionless"
+    source: "[F] Table 9.1 (printed p. 109) row 'Wheat' AND Fig. 12.5 row 19, which agree exactly: PLAPOW = 2.464. Both read off page renders; [F]'s text layer scrambles the table into a bare digit stream. DEFINITION, [F] Eqn 9.3 (printed p. 106): 'PLA = PLACON x MSNN^PLAPOW ... where PLACON and PLAPOW are constants for each particular crop species, and, if available, each genotype within a species.' ⚠ IT IS DENSITY-DEPENDENT AND THE SOURCE SAYS SO: printed p. 107, 'At high plant densities in particular, smaller and/or fewer leaves and branches or tillers might be produced on the plant. In this case, the effect of plant density can be simulated by decreasing PLAPOW. That is, PLAPOW is defined as a function of plant density (Fig. 9.2b)' — Fig. 9.2b fits PLAPOW = -0.0044 PDEN + 2.29 for chickpea. NO DENSITY IS STATED FOR THE WHEAT ROW, which is why this file pairs it with the Run sheet's own 300 plants m-2 rather than a density of ours; see SeasonScenario.plant_density. THE EXPOSURE THAT REMAINS, STATED NOT SETTLED: we cannot verify that the Table 9.1 row and the Fig. 12.4 Run sheet were the same experiment, only that they are the same book's wheat and the same model file (6 SSM_ppm.xls)."
+  tu_tlm:
+    value: 724.0
+    unit: "degC*day"
+    source: "[F] tuEMRTLM for wheat — 'temperature unit from emergence to termination leaf growth on main stem'. TWO INDEPENDENT LOCI IN THE SAME BOOK AGREE: Table 6.4 (printed p. 67) row 'Wheat' = 724, and Fig. 12.5 row 12 (the working model, cv. Tajan) = 724. WHAT TLM IS, published rather than unpublished: [F] Table 6.1 (printed p. 61) defines it off the Feekes/Zadoks keys (Large 1954; Zadoks et al. 1974) as 'Ligule of flag leaf visible', and printed p. 63 repeats 'TLM coincides with ligule appearance of the flag leaf in wheat'. ⚠ THE NUMBER'S OWN PROVENANCE IS WEAK AND IS NOT LAUNDERED HERE: Table 6.4's caption reads 'Rough estimates ... in important crops in north east of Iran (A. Soltani, unpublished data)', and the body text (printed p. 68) says 'temperature unit values of Table 6.4 are given only as a guide and should not be considered constants'. That is the same provenance class as the fstr = 0.40 that got stem reserves refused in 2026-08-10 — recorded so the comparison is on the record, not buried. WHY IT IS USABLE ON OUR SCALE AT ALL: [F]'s DTU = (TP1D - TBD) * tempfun with wheat TBD = 0 (Table 6.3) reduces to DTU = TMP for every temperature between base and first optimum, i.e. plain base-0 degree-days — the same scale our thermal_time accumulator uses, so no conversion is needed. ⚠ CORROBORATION OF THE SEASON, NOT OF THIS BOUNDARY: [F] p. 63 puts BSG 'about 120 degC temperature units after anthesis in wheat', so its implied emergence-to-anthesis is 724 + 446 - 120 = 1050 against our tsum_anthesis of 1100 (4.5 % apart, two independent sources). That validates the DENOMINATOR — the length of the season — and says nothing about where TLM falls inside it. On our scale 724 puts TLM at DVS 0.658."
+  wssl:
+    value: 0.40
+    unit: "dimensionless"
+    source: "[F] Table 15.1 (printed p. 195, read off the page render) row 'Wheat', column WSSL = 0.40. The caption defines the column: 'Threshold FTSW for leaf area development (WSSL) and growth (WSSG), and a coefficient of phenological development response to drought (WSSD)'. Eqn 15.5 (printed p. 196): 'WSFL = 1 if FTSW >= WSSL; WSFL = FTSW / WSSL if FTSW < WSSL' — the same shape as the WSFG this tree already computes against wssg = 0.30. ⚠ THE GAP BETWEEN THE TWO IS THE POINT: 0.40 > 0.30 means LEAF EXPANSION STOPS BEFORE PHOTOSYNTHESIS DOES, which is the standard drought response and is why [F] gives leaf area a factor of its own instead of reusing WSFG. The caption's sources are published work (Sinclair 1986; Amir and Sinclair 1991; Hammer et al. 1995; Sadras and Milroy 1996; Soltani et al. 1999), unlike Tables 6.4 and 9.1. WHERE IT ATTACHES: [F] offers Eqn 15.6 (INODE x WSFL, slower leaf appearance) and Eqn 15.7 (GLAI x WSFL, constant appearance and smaller leaves) and says the choice is a species question (printed p. 197). Box 16.2 — the authoritative listing — programs 15.7, so that is what leaf_area.py does, and it is also what lets MSNN stay a derived quantity instead of a second accumulator."
+  slw_fraction_min:
+    value: 0.85
+    unit: "dimensionless"
+    source: "[E] Table 20 (printed p. 102, read off a 200-dpi page render), row 'Wheat, winter': FUNCTION SLT = 0.,1., 0.33,1.1, 0.36,1.06, 0.43,1.5, 0.53,1.05, 0.62,1., 0.77,0.85, 0.95,1.07, 1.14,1., 2.1,1. — pairs of (development stage, specific leaf weight as a FRACTION of the Table 19 constant). The MINIMUM over the whole winter-wheat trajectory is 0.85, at DVS 0.77. Specific leaf weight is mass per area, so the minimum fraction is the THINNEST leaf [E] measures for this crop, and therefore the CEILING on leaf area: LAI <= leaf_C·SLA/A / 0.85 = 1.176x the carbon-derived value. THE CENTRE IS CORROBORATED THREE WAYS: [E] Table 19 gives winter wheat 425 kg/ha = 23.5 m2/kg, [F] Table 9.1 and Fig. 12.5 both give 0.021 m2/g = 21 m2/kg, and our own frozen canopy.specific_leaf_area is 22 — a 12 % spread across two books. ⚠ PROVENANCE, STATED NOT LAUNDERED: Table 19's winter-wheat row shows NO reference, and its footnote reads 'Values without reference were obtained from colleagues at CABO, Wageningen'; Table 20's source line is 'see Table 19'; and [E] p. 99 says of these relations 'Insufficient data were found in the literature to derive more than a few of these crop specific relations' and 'Descriptive functions such as these should be used carefully and checked whenever possible'. That is the SAME PROVENANCE CLASS as tu_tlm above and as the fstr = 0.40 that got stem reserves refused. ⚠ WHY IT IS NEVERTHELESS TAKEN, AND THE ARGUMENT IS MEASURED RATHER THAN ASSERTED: this pair does not SET a canopy, it BOUNDS one, and where it binds the model reduces to the frozen carbon-derived form — the reference science already in this tree — so a wrong envelope fails TOWARD the shipped model, not toward a wrong number. Measured across envelopes from (1.00,1.00) to (0.75,2.00): open_season peak LAI moves 4.91-5.58 and peak W 13.07-14.01, every one of them clearing the 14.4248 t/ha Greenwood crossing with zero rationing, against the UNBOUNDED form's 2.9068 peak LAI on six scenarios, 14.5554 t/ha and 110 rationing firings. The numbers pick a point inside a flat region; removing them does not. ⚠ LOCUS: [E] applies SLT to the specific weight of NEW leaf area (SLN, Listing 3 Line 91); we apply it to the CANOPY AVERAGE. ⚠⚠ THIS WAS RECORDED AS AN EXPOSURE — 'a mixture varies less than its newest component, so this envelope is WIDER than [E]'s own; the honest envelope would clip more' — AND THAT WAS REFUTED 2026-08-12 BY DERIVING IT. [E] Listing 3 lines 88-92 give new area as GLV/SLN, area LOSS at the canopy average (LLA = LLV/SLA, and the prose on printed p. 101 says so in words), and the canopy average as EMERGENT (SLA = WLV/ALV). Writing S = W/A those four lines reduce to dS/dt = (GLV/A)(1 - S/SLN), in which every senescence term CANCELS. Since GLV >= 0 always here, S is pushed UP whenever S < min(SLN) and DOWN whenever S > max(SLN): the interval SLC*[0.85, 1.50] is FORWARD-INVARIANT under [E]'s own dynamics, for ANY growth history. So this pair is not a loose stand-in for a mixture calculation — IT IS THE MIXTURE CALCULATION'S ANSWER, and it is tight (dS -> 0 only as S -> SLN, so sustained leaf growth at DS 0.77 drives S -> 0.85*SLC asymptotically). The error was conflating the range the average VISITS with the range it can REACH; a bound is about the second. THE ONE NARROWING THAT WOULD HAVE BEEN LEGITIMATE, AND WHY IT IS UNAVAILABLE: the invariant interval is the hull of SLT over the stages at which leaf mass is actually CREATED, so a crop that grew no leaf at DS 0.77 would have a genuinely narrower bound with no free parameters — but allocation.yaml's partition table gives leaf a nonzero share across the whole of DS [0, 2.0), which contains both DS 0.43 (SLT 1.50) and DS 0.77 (SLT 0.85). ⚠ AND DO NOT SUBSTITUTE THE TRAJECTORY FOR THE BOUND: measured on nine scenarios, the mixture VISITS f in [0.9449, 1.2987] and its lower extreme is strongly scenario-dependent (0.9449 open field, exactly 1.0000 on all four carbon-limited runs). Fitting a ceiling to open_season's 0.9449 would give 1.058x instead of 1.176x — and 0.95 is measured to clear the RK4 blocker, so that fit would be indistinguishable from the retune refused in §8.4(a) of the plan doc. See §9 of docs/plans/post-roadmap-leaf-expansion.md."
+  slw_fraction_max:
+    value: 1.50
+    unit: "dimensionless"
+    source: "[E] Table 20 (printed p. 102), row 'Wheat, winter' — the MAXIMUM of the same SLT trajectory, 1.5 at DVS 0.43. The thickest leaf [E] measures for this crop, and therefore the FLOOR on leaf area: LAI >= leaf_C·SLA/A / 1.50 = 0.667x the carbon-derived value. ⚠ THE FLOOR IS NOT DECORATION — IT IS WHAT STOPS A DEATH SPIRAL, AND THAT WAS MEASURED. [F]'s node curve starts at PLACON·1^PLAPOW = 1 cm2/plant, which is SMALLER than the seedling's carbon-derived area, so a ceiling-only bound lets min() pull LAI BELOW what the standing leaf mass already supports; that cuts interception, which cuts carbon, which lowers the ceiling. Measured: ceiling-only at 1.176x gives open_season peak LAI 4.4300 against the frozen form's own 5.4624 — the combined model coming out WORSE than the model it was meant to improve. With the floor in place it is 5.2533. The same spiral, in its acute form, is what refuted the rate-level hybrid min(node_rate, carbon_rate) (open_season 5.4624 -> 1.2682); a state-level bound is a different object from a rate-level one, and this pair of measurements is the difference. ⚠ WHAT THIS PAIR DECIDES, SAID PLAINLY BECAUSE IT IS A CHOICE BETWEEN TWO SHELVED SOURCES AND NOT A DETAIL: [F] Table 15.1 makes leaf expansion MORE drought-sensitive than growth (WSSL 0.40 > WSSG 0.30), i.e. drought thickens leaves; [E] p. 100 says 'Different growing conditions, such as those caused by different plant densities or fertilization level in maize (Sibma, 1987), and by irrigation in potato (Ng & Loomis, 1984), have little effect on specific leaf weight.' Those disagree, and this envelope makes [E] win: measured on water_biting — the ONLY scenario where WSFL fires hard (below 1 on 100 % of days, minimum 0.1250) — switching WSFL off moves peak LAI by +215.0 % under [F] alone and by +0.5 % under the envelope. ⚠ AND THE CORROBORATING SENTENCE IS WEAKER THAN IT LOOKS: its loci are POTATO irrigation and MAIZE density, not wheat, and [E] itself flags the generalization as an assumption of convenience — 'The influence of these environmental factors MAY ALSO be small in other crops; they are disregarded here.' What is wheat, and measured, is Table 20's row itself."

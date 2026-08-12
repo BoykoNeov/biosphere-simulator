@@ -198,6 +198,13 @@ VERNALIZATION_DAYS = "vernalization_days"
 # from ROOT_C: see root_depth.py for the primary's own statement that rooted depth is
 # simulated independently of root mass.
 ROOTED_DEPTH = "rooted_depth"
+# The FOURTH aux accumulator (post-roadmap sink-limited leaf expansion): leaf area
+# index (m² leaf per m² ground). ⚠ IT REVERSES THE P2 LOCK "LAI is derived, not
+# stored", and deliberately: [F] Ch. 9's WSFL scales an expansion RATE, so area a
+# drought withholds must stay withheld — a quantity that cannot be recovered from the
+# current leaf carbon. Present only when the scenario names a plant density; without
+# one, LAI stays the derived ``canopy.leaf_area_index``. See leaf_area.py.
+LEAF_AREA_INDEX = "leaf_area_index"
 
 
 # --- compartment-composition types ------------------------------------------
