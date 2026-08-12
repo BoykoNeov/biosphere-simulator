@@ -240,6 +240,25 @@ table is not a model form"*; this is the form.
 **Not folded into this exercise.** Recorded as the potato lesson repeating itself: **a
 recorded blocker is dated — re-check the artifact.** It has now caught us twice.
 
+> ⚠⚠ **RETRACTED 2026-08-12 — the two paragraphs above are wrong, and dated rather than
+> deleted because the error is the finding.** §3.2.4 was **not** a discovery: the
+> stem-reserve exercise of 2026-08-10 had already quoted this exact passage
+> (`post-roadmap-stem-reserves.md` §"§3.2.4 'Formation of shielded reserves' (p. 93)"),
+> **implemented** the form it programs, and **measured** it — its own comparison table
+> lists *"§3.2.4 growth fraction — what [A] programs (Listing 3 Lines 17, 35)"* at stem
+> shape **0.985×** and harvest index **1.151×** the oracle. `[A]` there and `[E]` here are
+> the same book. So *"a data table is not a model form"* was a statement about **Table 7**,
+> never a claim that the form was missing; this section read it as the latter and filed a
+> re-discovery as a discharged blocker. **The lesson inverts:** the artifact re-checked was
+> the *source*, and the thing that was stale was **our own record of what we had already
+> done**. Re-read the predecessor's measurement table before believing a successor's
+> framing of it. What genuinely blocks stem reserves is unchanged and is in that document:
+> the book's programmed form **overshoots** the reference harvest index by 15 %, the form
+> that hits it is one **we constructed** with no listing line in the source, and the one
+> number that moves anything (`fstr` = 0.40, Table 7's wheat row) is **CABO unpublished**.
+> Neither is a missing-form problem, so nothing here unblocks it — it is a provenance
+> judgement, and the verdict is the user's.
+
 ## Sources
 
 * **[E]** Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),

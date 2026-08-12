@@ -62,4 +62,15 @@ fraction of the increase in stem weight will be available for redistribution aft
 flowering"* + **Table 7** magnitudes + Listings 3/4 — a model FORM, on the shelf, in a
 source already first-hand for four other rows. Logged as a separate work item: **a recorded
 blocker is dated — re-check the artifact.** That lesson has now caught us twice.
+⚠⚠ **THAT LEAD IS RETRACTED 2026-08-12, and the retraction is the finding.** §3.2.4 was
+never a discovery: the 2026-08-10 stem-reserve exercise had already quoted the same passage,
+**implemented** the form it programs and **measured** it — its own table lists *"§3.2.4
+growth fraction — what [A] programs"* at stem shape 0.985× and harvest index 1.151× the
+oracle ([A] and [E] are the same book). *"A data table is not a model form"* was about
+**Table 7**, never a claim the form was missing. **The lesson inverts:** the stale artifact
+was **our own record of work already done**, not the shelf — read the predecessor's
+measurement table before believing a successor's framing of it. Stem reserves is unblocked
+by nothing here; what stands is a provenance judgement (the programmed form overshoots the
+reference harvest index 15 %, the form that hits it is **ours**, and `fstr = 0.40` is CABO
+unpublished), and that verdict is the user's.
 `docs/plans/post-roadmap-wheat-partition-backfill.md`
