@@ -47,8 +47,9 @@ pub struct CarbonContext {
     pub temp_var: String,
     pub daylength_var: String,
     pub soil_water_var: String,
-    pub sw_wilting: f64,
-    pub sw_critical: f64,
+    pub wssg: f64,
+    pub rooted_depth_aux: String,
+    pub soil_extractable_water: f64,
     pub plant_n: String,
     pub photo: PhotosynthesisParams,
     pub canopy: CanopyParams,
@@ -82,7 +83,21 @@ impl CarbonContext {
 
     fn limitation(&self, snapshot: &State, env: &dyn Environment) -> Result<f64, SimError> {
         let soil_water = env.get(&self.soil_water_var)?;
-        let f_water = science::water_stress_factor(soil_water, self.sw_wilting, self.sw_critical);
+        // ⚠ The depth comes off the SNAPSHOT aux and must be the same step-entry depth
+        // `Transpiration` and `extension_rate` read — this consumer reaches soil_water
+        // through `env.get` while `Transpiration` reads the stock directly, so the two
+        // could silently disagree about FTSW inside one step.
+        let f_water = science::soil_water_stress(
+            soil_water,
+            snapshot
+                .aux
+                .get(&self.rooted_depth_aux)
+                .copied()
+                .unwrap_or(0.0),
+            self.soil_extractable_water,
+            self.ground_area,
+            self.wssg,
+        );
         let (_, biomass) = self.leaf_and_biomass(snapshot);
         let plant_n = amt(snapshot, &self.plant_n);
         let f_n = science::nitrogen_stress_factor(
@@ -332,8 +347,9 @@ pub struct Transpiration {
     pub aerodynamic_resistance: f64,
     pub surface_resistance: f64,
     pub ground_area: f64,
-    pub sw_wilting: f64,
-    pub sw_critical: f64,
+    pub rooted_depth_aux: String,
+    pub soil_extractable_water: f64,
+    pub wssg: f64,
 }
 
 impl Flow for Transpiration {
@@ -357,7 +373,17 @@ impl Flow for Transpiration {
             self.aerodynamic_resistance,
             self.surface_resistance,
         );
-        let f_water = science::water_stress_factor(soil_water, self.sw_wilting, self.sw_critical);
+        let f_water = science::soil_water_stress(
+            soil_water,
+            snapshot
+                .aux
+                .get(&self.rooted_depth_aux)
+                .copied()
+                .unwrap_or(0.0),
+            self.soil_extractable_water,
+            self.ground_area,
+            self.wssg,
+        );
         let daily_kg = potential * f_water * self.ground_area;
         let flux = daily_kg * dt;
         FlowResult::new(vec![
@@ -367,13 +393,20 @@ impl Flow for Transpiration {
     }
 }
 
-/// WATER `water_source -> soil_water` (scheduled irrigation).
+/// WATER `water_source -> soil_water` — **demand-driven, capacity-capped**.
+///
+/// `IRGW = min(capacity · ground_area · dt, max(0, TTSW − ATSW))` — [F] Eqn 14.8
+/// composed with [F]'s own "a fixed amount ... defined by the capacity of the irrigation
+/// system". ⚠ The forcing changed meaning on 2026-08-12: mm/day **applied** → mm/day
+/// **available**. A zero is still a hard off, so an irrigation-cut window is unaffected.
 pub struct Irrigation {
     pub id: String,
     pub water_source: String,
     pub soil_water: String,
     pub irrigation_var: String,
     pub ground_area: f64,
+    pub rooted_depth_aux: String,
+    pub soil_extractable_water: f64,
 }
 
 impl Flow for Irrigation {
@@ -382,16 +415,92 @@ impl Flow for Irrigation {
     }
     fn evaluate(
         &self,
-        _snapshot: &State,
+        snapshot: &State,
         env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let rate_mm_day = env.get(&self.irrigation_var)?;
-        let daily_kg = rate_mm_day * self.ground_area;
-        let flux = daily_kg * dt;
+        let capacity_kg = env.get(&self.irrigation_var)? * self.ground_area * dt;
+        let deficit = science::transpirable_capacity(
+            snapshot
+                .aux
+                .get(&self.rooted_depth_aux)
+                .copied()
+                .unwrap_or(0.0),
+            self.soil_extractable_water,
+            self.ground_area,
+        ) - amt(snapshot, &self.soil_water);
+        let flux = if deficit <= 0.0 {
+            0.0
+        } else if capacity_kg < deficit {
+            capacity_kg
+        } else {
+            deficit
+        };
         FlowResult::new(vec![
             leg(&self.water_source, -flux)?,
             leg(&self.soil_water, flux)?,
+        ])
+    }
+}
+
+/// WATER `soil_water -> subsoil_water` (`DRAIN`; [F] Eqns 14.11 + 14.12).
+///
+/// The inverse of `RootZoneCapture`, and the mechanism that gives the root zone a
+/// bottom. `DRAIN = (ATSW − TTSW) · DRAINF` when `ATSW > TTSW`, else 0, and the
+/// destination is `WSTORG` — **not** a boundary: [F] 14.12 is
+/// `WSTORG = WSTORG + DRAIN − EWAT`, so no boundary is crossed and conservation is
+/// structural. `drainage_factor = 0.0` shuts it off exactly (the valve).
+///
+/// ⚠ **Bit-identically inert on every frozen scenario** — with irrigation demand-driven
+/// the zone is never over-filled, so no golden protects this flow. Its Rust pins have to
+/// CONSTRUCT an over-filled zone; `cargo test` passing is not parity.
+pub struct Drainage {
+    pub id: String,
+    pub soil_water: String,
+    pub subsoil_water: String,
+    pub drainage_factor: f64,
+    pub rooted_depth_aux: String,
+    pub soil_extractable_water: f64,
+    pub ground_area: f64,
+}
+
+impl Flow for Drainage {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let available = amt(snapshot, &self.soil_water);
+        let excess = available
+            - science::transpirable_capacity(
+                snapshot
+                    .aux
+                    .get(&self.rooted_depth_aux)
+                    .copied()
+                    .unwrap_or(0.0),
+                self.soil_extractable_water,
+                self.ground_area,
+            );
+        if excess <= 0.0 {
+            return FlowResult::new(vec![
+                leg(&self.soil_water, -0.0)?,
+                leg(&self.subsoil_water, 0.0)?,
+            ]);
+        }
+        let mut flux = excess * self.drainage_factor * dt;
+        // Donor clamp, the sibling of Eqn 14.10's. It cannot bite while DRAINF <= 1, but
+        // a scenario is free to declare more, and the arbitration backstop must not be
+        // what catches it — every golden asserts that backstop fires zero times.
+        if flux > available {
+            flux = available;
+        }
+        FlowResult::new(vec![
+            leg(&self.soil_water, -flux)?,
+            leg(&self.subsoil_water, flux)?,
         ])
     }
 }
@@ -1052,9 +1161,10 @@ pub struct RootDepthExtension {
     pub params: params::RootDepthParams,
     pub photo: params::PhotosynthesisParams,
     pub pheno: params::PhenologyParams,
-    pub sw_wilting: f64,
-    pub sw_critical: f64,
+    pub wssg: f64,
     pub soil_depth: f64,
+    pub soil_extractable_water: f64,
+    pub ground_area: f64,
 }
 
 impl AuxProcess for RootDepthExtension {
@@ -1086,9 +1196,10 @@ impl AuxProcess for RootDepthExtension {
             &self.params,
             &self.photo,
             &self.pheno,
-            self.sw_wilting,
-            self.sw_critical,
+            self.wssg,
             self.soil_depth,
+            self.soil_extractable_water,
+            self.ground_area,
         );
         Ok(BTreeMap::from([(self.accumulator.clone(), rate * dt)]))
     }
@@ -1110,8 +1221,7 @@ pub struct RootZoneCapture {
     pub params: params::RootDepthParams,
     pub photo: params::PhotosynthesisParams,
     pub pheno: params::PhenologyParams,
-    pub sw_wilting: f64,
-    pub sw_critical: f64,
+    pub wssg: f64,
     pub soil_depth: f64,
     pub soil_extractable_water: f64,
     pub ground_area: f64,
@@ -1145,9 +1255,10 @@ impl Flow for RootZoneCapture {
             &self.params,
             &self.photo,
             &self.pheno,
-            self.sw_wilting,
-            self.sw_critical,
+            self.wssg,
             self.soil_depth,
+            self.soil_extractable_water,
+            self.ground_area,
         );
         let demand =
             science::captured_water(rate * dt, self.soil_extractable_water, self.ground_area);

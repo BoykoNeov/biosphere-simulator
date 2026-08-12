@@ -148,15 +148,84 @@ pub fn penman_monteith_transpiration(
     (latent_flux / LATENT_HEAT_VAPORIZATION * SECONDS_PER_DAY).max(0.0)
 }
 
-/// Soil-water stress factor `f_water ∈ [0, 1]`.
-pub fn water_stress_factor(soil_water: f64, sw_wilting: f64, sw_critical: f64) -> f64 {
-    if soil_water <= sw_wilting {
+/// The water a shrinking root zone leaves behind at a re-sow, in kg.
+///
+/// `returned = soil_water * (old_depth - rooted_depth0) / old_depth` — the abandoned
+/// FRACTION of the water, from the declared-uniform distribution through the zone. It
+/// preserves `FTSW` exactly across the re-sow, needs no clamp (the fraction is < 1), and
+/// at the drained upper limit equals `captured_water(old_depth - rooted_depth0)`, the
+/// cited-geometry form it generalises.
+///
+/// ⚠ **This replaced `min(captured_water(abandoned), soil_water)` on 2026-08-12.** That
+/// form returned the abandoned column at the drained upper limit — a rounding error
+/// against a 1150 kg store, and more than the whole store once the store is geometric,
+/// at which point its clamp fired every re-sow and handed the entire root zone to the
+/// subsoil. The port carries the rule, not the rationale.
+pub fn resow_water_return(soil_water: f64, old_depth: f64, rooted_depth0: f64) -> f64 {
+    if old_depth <= 0.0 {
         return 0.0;
     }
-    if soil_water >= sw_critical {
+    let fraction = (old_depth - rooted_depth0) / old_depth;
+    if fraction > 0.0 {
+        soil_water * fraction
+    } else {
+        0.0
+    }
+}
+
+/// `TTSW = DEPORT · EXTR` ([F] Eqn 14.6), in kg over `ground_area`.
+///
+/// Recomputed every step because the root zone grows. Identical arithmetic to
+/// `captured_water`; the two must agree or a season stops being a closed cycle.
+pub fn transpirable_capacity(
+    rooted_depth: f64,
+    soil_extractable_water: f64,
+    ground_area: f64,
+) -> f64 {
+    rooted_depth * soil_extractable_water * WATER_DENSITY * ground_area
+}
+
+/// `FTSW = ATSW / TTSW` ([F] Eqn 14.7). Zero capacity ⇒ 0.0 (maximally stressed), and
+/// **not** clamped above 1: an over-filled zone is a real state, the one `Drainage`
+/// relieves.
+pub fn fraction_transpirable(soil_water: f64, capacity: f64) -> f64 {
+    if capacity <= 0.0 {
+        return 0.0;
+    }
+    soil_water / capacity
+}
+
+/// `WSFG = min(1, FTSW/WSSG)` — the deficit factor ([F] Eqn 15.3, Box 14.1).
+///
+/// ⚠ **This replaced an absolute-kg ramp on 2026-08-12** (`sw_wilting`/`sw_critical`,
+/// 20/60 kg). Those thresholds were only meaningful against a 1000 kg store — which was
+/// 1000 mm of extractable water over 1 m², a 7.7 m soil column. See
+/// `docs/plans/post-roadmap-soil-water-rebasing.md`. There is **no wilting floor**: the
+/// response is linear to zero at `FTSW = 0`, so the shutoff is asymptotic rather than
+/// hard. The port carries the rule, not the rationale — the Python reference measured
+/// that the arbitration backstop still never fires.
+pub fn water_stress_factor(ftsw: f64, threshold: f64) -> f64 {
+    if ftsw >= threshold {
         return 1.0;
     }
-    (soil_water - sw_wilting) / (sw_critical - sw_wilting)
+    if ftsw > 0.0 {
+        ftsw / threshold
+    } else {
+        0.0
+    }
+}
+
+/// `WSFG` from the two raw state reads — the single path all three consumers take, so
+/// they cannot disagree about `FTSW` within a step.
+pub fn soil_water_stress(
+    soil_water: f64,
+    rooted_depth: f64,
+    soil_extractable_water: f64,
+    ground_area: f64,
+    threshold: f64,
+) -> f64 {
+    let capacity = transpirable_capacity(rooted_depth, soil_extractable_water, ground_area);
+    water_stress_factor(fraction_transpirable(soil_water, capacity), threshold)
 }
 
 // --- phenology --------------------------------------------------------------
@@ -279,9 +348,10 @@ pub fn extension_rate(
     params: &params::RootDepthParams,
     photo: &params::PhotosynthesisParams,
     pheno: &params::PhenologyParams,
-    sw_wilting: f64,
-    sw_critical: f64,
+    wssg: f64,
     soil_depth: f64,
+    soil_extractable_water: f64,
+    ground_area: f64,
 ) -> f64 {
     if depth >= params.max_rooted_depth || depth >= soil_depth {
         return 0.0;
@@ -294,7 +364,7 @@ pub fn extension_rate(
         return 0.0;
     }
     let f_temp = temperature_factor(temp_c, photo);
-    let f_water = water_stress_factor(soil_water, sw_wilting, sw_critical);
+    let f_water = soil_water_stress(soil_water, depth, soil_extractable_water, ground_area, wssg);
     params.max_extension_rate * f_water * f_temp
 }
 
@@ -464,7 +534,7 @@ mod tests {
         };
         let call = |subsoil: f64| {
             extension_rate(
-                0.15, 0.0, 20.0, 1000.0, subsoil, &params, &photo, &pheno, 20.0, 60.0, 1.5,
+                0.15, 0.0, 20.0, 1000.0, subsoil, &params, &photo, &pheno, 0.30, 1.5, 0.13, 1.0,
             )
         };
         assert_eq!(call(0.0), 0.0);
@@ -505,7 +575,8 @@ mod tests {
         };
         let at = |depth: f64, soil_depth: f64| {
             extension_rate(
-                depth, 0.0, 20.0, 1000.0, 195.0, &params, &photo, &pheno, 20.0, 60.0, soil_depth,
+                depth, 0.0, 20.0, 1000.0, 195.0, &params, &photo, &pheno, 0.30, soil_depth, 0.13,
+                1.0,
             )
         };
         // Below both caps it runs; at the SOIL cap it stops even though the crop's own

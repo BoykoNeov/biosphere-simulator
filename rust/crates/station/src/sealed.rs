@@ -12,7 +12,8 @@
 use std::collections::BTreeMap;
 
 use domains::biosphere::stocks::{
-    CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, STORAGE_C, THERMAL_TIME,
+    CARBON_POOL, DAYLENGTH_VAR, LITTER_CARBON, O2_POOL, PAR_VAR, ROOTED_DEPTH, STORAGE_C,
+    THERMAL_TIME,
 };
 use domains::biosphere::system::{annual_reset, build_season, weather_forcings, weather_shared};
 use domains::crew::{
@@ -167,7 +168,16 @@ pub fn build_sealed_station(
         0,
         stocks.clone(),
         0,
-        BTreeMap::from([(THERMAL_TIME.to_string(), 0.0)]),
+        BTreeMap::from([
+            (THERMAL_TIME.to_string(), 0.0),
+            // ⚠ ROOTED_DEPTH is LOAD-BEARING and was MISSING from all three station
+            // assemblies (both ports) until 2026-08-12. `build_season` has seeded it
+            // with the cited sowing depth since the root-depth build; the station
+            // builders assembled their own aux and silently started the crop at depth 0.
+            // Invisible while the depth gate was inert; fatal once stress divides by
+            // `TTSW = depth * EXTR * rho * A`.
+            (ROOTED_DEPTH.to_string(), scenario.bio.rooted_depth0),
+        ]),
     )?;
 
     // --- fast flows ---

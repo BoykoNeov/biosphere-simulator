@@ -487,7 +487,105 @@ manifest's 7 (that roster error has bitten twice):
    `water_recovery`): **untouched**. The blast radius was measured and contains no
    `src/station/`, `src/authoring/` or sibling-domain code.
 
-## Outcome
+## Outcome — BUILT 2026-08-12
 
-*(In progress. Diagnosis committed 2026-08-12 as `2ace967`; nothing built at that commit,
-`git diff src/` empty. The build followed in the same session.)*
+### The prediction held, and the one place it failed was the one it named
+
+Checked over **all 25 goldens on disk**. Predictions 1, 2, 5 and 6 held exactly; prediction
+3 (the multi-year re-sowing runs) is the one that carried the caveat *"if a carbon amount
+moves on any of these, the re-sow/drainage interaction is the suspect and the prediction
+has failed"* — and it did fail, twice, for two different reasons, both of which the caveat
+pointed straight at. Fixing both restored it:
+
+* the **re-sow water return** was `min(captured_water(abandoned), soil_water)`, i.e. the
+  abandoned column at the drained upper limit (149.58 kg). Against a 1150 kg store that was
+  a rounding error; against a 19.5–169 kg store it exceeds the whole store, so its clamp
+  fired on **every** re-sow and handed the entire root zone to the subsoil. Measured
+  consequence: the 4-year sealed station made **no grain at all**. Re-derived as the
+  abandoned **fraction** of the held water — preserves `FTSW` exactly across a re-sow, needs
+  no clamp, and equals the old form at the drained upper limit, so it *generalises* the
+  cited geometry rather than departing from it.
+* `test_soil_fractionation.reset_variant` **hand-copied** that rule under a comment reading
+  "Mirrors `season.annual_reset`". When the rule changed the copy did not, so every variant
+  run was a control against a tree that no longer existed. The durable fix is
+  `season.resow_water_return`: one function, two callers.
+
+Final golden diff, after both: **only `soil_water`, `subsoil_water` and `water_source`
+move, on every scenario except `water_biting`** — which was deliberately re-declared. Not
+one carbon, nitrogen or oxygen amount, at any horizon. Prediction 5 was wrong in the safe
+direction: both drift summaries came back **byte-identical**, not moved.
+
+### Three defects the change exposed rather than caused
+
+1. **All three station builders seeded their aux without `rooted_depth`** (both ports), so
+   the station's crop silently started at depth 0. Invisible while the depth gate was inert;
+   fatal once stress divides by `TTSW = depth · EXTR · ρ · A` (crop dead on day 1, root zone
+   drained into the subsoil). `build_season` had seeded it correctly since the root-depth
+   build — the station assembly simply never mirrored that.
+2. **`harvest` injects a 1.3 m root system but inherited the 0.15 m zone's water**, i.e.
+   `FTSW = 0.115` on day 0 for a grain-filling crop. Grain ended 79 % low before the fix.
+   The depth and the water are two halves of one declaration and are now derived together.
+3. **`DEEP_WATER` was not viable at zero irrigation** — and the reason is the sharpest
+   single consequence of sizing the soil honestly: a crop that roots to 1.3 m over 1 m² can
+   ever reach `1.3 × 0.13 × 1000 = 169 kg`, against a measured **582 kg** season demand. No
+   soil depth fixes that. Its old `soil_water0 = 350` hid it — 350 kg in a 0.15 m root zone
+   is 2.7 m of extractable water in a 15 cm layer. It now declares a *limited* supply
+   (1 mm day⁻¹) and the mechanism it exists to show comes out **stronger**: 15× the canopy
+   against the control, where the old declaration gave 2.5×.
+
+⚠ **That control had to be rebuilt too, and silently.** It was `soil_extractable_water = 0`,
+justified as removing the water transfer while leaving depth to grow. `EXTR` now appears in
+**two** places — the transfer *and* `TTSW` — so zeroing it kills the crop outright rather
+than isolating the transfer. The control is now "drop the `RootZoneCapture` flow from the
+registry". A control that changes more than it claims is worse than none, and this one would
+have kept passing while measuring something else.
+
+### Two acceptance-gate claims died and were replaced by rank + exact values
+
+Not by looser thresholds — `test_acceptance_gate.py` refuses fitted cuts in its own words,
+and both of these would have been exactly that:
+
+* **water's slack in `open_season` fell 189.24 → 9.31.** A margin of 189× was never a fact
+  about safety; it was a fact about a bucket that could not exist. `soil_water` is now the
+  tightest live gate in `open_season`, `greenhouse` and `lighting`.
+* **`carbon_pool > 4 × runner-up` became 3.98×** on two chambers. Dropped in favour of the
+  rank plus an **exactly pinned** runner-up — strictly stronger, since a threshold only
+  catches changes bigger than its slack. The roster-wide runner-up has now changed identity
+  twice (`o2_pool` → `power.battery` → `soil_water`); the retired "even the runner-up is a
+  chamber property" corollary was **not** restored just because it drifted back to being
+  true.
+
+### The exit state
+
+* **12 goldens changed**; both drift summaries byte-identical; `rationed == 0` and
+  `events == ()` everywhere, so neither drainage nor the softer stress shutoff ever reaches
+  the arbitration backstop.
+* **Biosphere manifest**: `flow_set` 21 → 22 (`Drainage`), golden hashes. Station manifest
+  refreshed. `param_files` **unchanged** — `wssg`, `MAI` and `DRAINF` are scenario/soil data,
+  like `EXTR` and `ground_area` before them.
+* **Both ports**, and the port carries the rule not the rationale: the same `WSFG` form, the
+  same demand-driven irrigation, the same drainage destination, the same fractional re-sow
+  return (via a shared `resow_water_return` on each side, because the hand-copy hazard is
+  what bit here).
+* **Rust pins for `Drainage`, mutation-verified**, because the flow is bit-identically inert
+  on every scenario and `cargo test` green would otherwise prove nothing about it. Four
+  mutations — drain a share of the whole store instead of the excess, drop `DRAINF`, drop
+  `ground_area` from the capacity, drop the donor clamp — each turn a pin red. Its pins
+  construct a non-unit plot and an over-filled zone, neither of which any scenario provides.
+* **2290 Python tests, the full Rust suite, and all 101 cross-port parity checks green.**
+
+### What this does and does not discharge
+
+It discharges the geometry re-basing, the `FTSW` conversion and drainage — the three
+successors the soil-layers build named, two of which turned out to be one mechanism. It does
+**not** discharge, and each is a named successor:
+
+* **`WSSL` (leaf-area expansion, 0.40) and `WSSD` (phenology, 0.40)** — [F] applies the
+  deficit factor to four processes with different thresholds; we carry one, because we have
+  no water-gated leaf-expansion or drought-accelerated development term for the others to
+  attach to. That is a real gap, not a simplification.
+* **Runoff and soil evaporation** — the remainder of [F] Ch. 14's removals.
+* **Making `DROUGHT` actually bite.** It still does not (`FTSW` bottoms at 0.7039 against
+  `wssg = 0.30`), which is not new — the soil-layers build already recorded that the
+  reachable subsoil *abolishes* that cascade. It is now a one-field change, but it would
+  move a golden's science for a reason outside this charge.

@@ -23,7 +23,7 @@ use simcore::state::{State, Stock};
 
 use super::flows::{
     Allocation, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration, Decomposition,
-    Fertilization, Grazing, GrowthRespiration, HumusDecomposition, HumusNitrogenRelease,
+    Drainage, Fertilization, Grazing, GrowthRespiration, HumusDecomposition, HumusNitrogenRelease,
     Irrigation, LitterNitrogenTransfer, MaintenanceRespiration, MicrobialNitrogenRelease,
     MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling, RootDepthExtension,
     RootZoneCapture, Senescence, ThermalTimeAccumulation, Transpiration, VernalizationAccumulation,
@@ -54,8 +54,13 @@ pub struct SeasonScenario {
     pub water_vapor0: f64,
     pub condensate0: f64,
     pub water_source0: f64,
-    pub sw_wilting: f64,
-    pub sw_critical: f64,
+    /// WSSG — the threshold FRACTION of transpirable soil water below which growth
+    /// and transpiration decline ([F] Table 15.1, wheat 0.30). ⚠ Replaced the absolute
+    /// `sw_wilting`/`sw_critical` kg band on 2026-08-12: see the Python
+    /// `SeasonScenario.wssg` and docs/plans/post-roadmap-soil-water-rebasing.md.
+    pub wssg: f64,
+    /// mm/day **AVAILABLE** — a capacity, not a rate (the flow is demand-driven,
+    /// [F] Eqn 14.8). A zero is still a hard off.
     pub irrigation_mm_day: f64,
     pub soil_n0: f64,
     pub n_source0: f64,
@@ -71,6 +76,12 @@ pub struct SeasonScenario {
     /// profile at the drained upper limit. Must be > 0 for roots to grow ([F] Box 14.1
     /// `If WSTORG = 0 Then GRTD = 0`). See the Python `SeasonScenario.subsoil_water0`.
     pub subsoil_water0: f64,
+    /// MAI, the moisture availability index ([F] 14.25-14.28), 0..1. Both stores are
+    /// `depth * EXTR * rho * A * MAI`; the port carries it as data exactly as Python
+    /// does, with the identities pinned rather than computed.
+    pub soil_moisture_index: f64,
+    /// DRAINF ([F] Eqn 14.11 + Table 14.2). **The valve**: 0.0 shuts drainage off.
+    pub drainage_factor: f64,
     /// `EXTR` - volumetric extractable soil water (m^3/m^3). [F] Ch. 13: "approximately
     /// 0.13 mm mm-1 (Ratliff et al., 1983; Ritchie et al., 1999)". Soil data, not a crop
     /// param.
@@ -112,20 +123,21 @@ pub const DEFAULT_SCENARIO: SeasonScenario = SeasonScenario {
     litter_carbon0: 0.0,
     consumer: false,
     consumer_c0: 0.01,
-    soil_water0: 1000.0,
+    soil_water0: 19.5,
     water_vapor0: 0.0,
     condensate0: 0.0,
     water_source0: 0.0,
-    sw_wilting: 20.0,
-    sw_critical: 60.0,
-    irrigation_mm_day: 2.0,
+    wssg: 0.30,
+    irrigation_mm_day: 8.0,
     soil_n0: 100.0,
     n_source0: 0.0,
     plant_n0: 0.000243294816,
     sn_residual: 1.0,
     sn_critical: 50.0,
     soil_layer_depth: 0.30,
-    subsoil_water0: 195.0,
+    subsoil_water0: 175.5,
+    soil_moisture_index: 1.0,
+    drainage_factor: 0.3,
     soil_extractable_water: 0.13,
     soil_depth: 1.5,
     rooted_depth0: 0.15,
@@ -231,8 +243,9 @@ fn carbon_context(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Car
         temp_var: TEMP_VAR.to_string(),
         daylength_var: DAYLENGTH_VAR.to_string(),
         soil_water_var: SOIL_WATER_VAR.to_string(),
-        sw_wilting: scenario.sw_wilting,
-        sw_critical: scenario.sw_critical,
+        wssg: scenario.wssg,
+        rooted_depth_aux: ROOTED_DEPTH.to_string(),
+        soil_extractable_water: scenario.soil_extractable_water,
         plant_n: PLANT_N.to_string(),
         photo: p.photo,
         canopy: p.canopy,
@@ -344,6 +357,20 @@ fn build_soil(
             fertilization_var: FERTILIZATION_VAR.to_string(),
             ground_area: scenario.ground_area,
         }),
+        // DRAIN ([F] Eqns 14.11 + 14.12): water above what the current root zone can
+        // transpire drains BELOW it, into `subsoil_water` - not out of the system, which
+        // is [F]'s own destination. ⚠ Inert on every frozen scenario (demand-driven
+        // irrigation never over-fills), so no golden protects it; its pins construct an
+        // over-filled zone on purpose.
+        Box::new(Drainage {
+            id: "biosphere.drainage".to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            subsoil_water: SUBSOIL_WATER.to_string(),
+            drainage_factor: scenario.drainage_factor,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: scenario.soil_extractable_water,
+            ground_area: scenario.ground_area,
+        }),
         // EWAT ([F] Eqn 14.10): the deepening root zone captures the water of the soil
         // it has just explored.
         Box::new(RootZoneCapture {
@@ -356,8 +383,7 @@ fn build_soil(
             params: p.rootd,
             photo: p.photo,
             pheno: p.pheno,
-            sw_wilting: scenario.sw_wilting,
-            sw_critical: scenario.sw_critical,
+            wssg: scenario.wssg,
             soil_depth: scenario.soil_depth,
             soil_extractable_water: scenario.soil_extractable_water,
             ground_area: scenario.ground_area,
@@ -376,6 +402,8 @@ fn build_soil(
             soil_water: SOIL_WATER.to_string(),
             irrigation_var: IRRIGATION_VAR.to_string(),
             ground_area: scenario.ground_area,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: scenario.soil_extractable_water,
         }));
     }
     if scenario.sealed {
@@ -545,8 +573,9 @@ fn build_plants(
             aerodynamic_resistance: p.transp.aerodynamic_resistance,
             surface_resistance: p.transp.surface_resistance,
             ground_area: scenario.ground_area,
-            sw_wilting: scenario.sw_wilting,
-            sw_critical: scenario.sw_critical,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: scenario.soil_extractable_water,
+            wssg: scenario.wssg,
         }),
         Box::new(NitrogenUptake {
             id: "biosphere.nitrogen_uptake".to_string(),
@@ -609,8 +638,9 @@ fn build_plants(
         params: p.rootd,
         photo: p.photo,
         pheno: p.pheno,
-        sw_wilting: scenario.sw_wilting,
-        sw_critical: scenario.sw_critical,
+        wssg: scenario.wssg,
+        soil_extractable_water: scenario.soil_extractable_water,
+        ground_area: scenario.ground_area,
         soil_depth: scenario.soil_depth,
     };
     let mut aux: Vec<Box<dyn AuxProcess>> = vec![Box::new(ThermalTimeAccumulation {
@@ -875,22 +905,17 @@ pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, S
     // accumulators - to `rooted_depth0`, which [F] Ch. 14 makes an input.
     let old_depth = aux.get(ROOTED_DEPTH).copied().unwrap_or(0.0);
     aux.insert(ROOTED_DEPTH.to_string(), scenario.rooted_depth0);
-    // THE WATER HALF OF THE RE-SOW. The root zone just shrank, so the abandoned column's
-    // extractable water is once again BELOW the root zone and returns to `subsoil_water`.
-    // ⚠ THIS RULE IS OURS - [F] is single-season and silent. It exists because
-    // `RootZoneCapture` is one-way within a season (we do not model [F]'s drainage, which
-    // is WSTORG's only input), so without it every re-sow would ratchet more of the
-    // profile permanently into the root zone. Uses `science::captured_water`, the SAME
-    // formula the capture flow uses, so an unclamped season is an exactly closed cycle.
-    let abandoned = old_depth - scenario.rooted_depth0;
-    if abandoned > 0.0 {
-        let returnable = science::captured_water(
-            abandoned,
-            scenario.soil_extractable_water,
-            scenario.ground_area,
-        );
+    // THE WATER HALF OF THE RE-SOW. The root zone just shrank, so the abandoned share of
+    // its water is once again BELOW the root zone and returns to `subsoil_water`.
+    // ⚠ THIS RULE IS OURS - [F] is single-season and silent. Without it every re-sow
+    // would ratchet more of the profile permanently into the root zone. It calls
+    // `science::resow_water_return` rather than restating the arithmetic: a Python test
+    // helper hand-copied this block once and kept the old rule when it changed, which is
+    // the same hazard a port has by construction.
+    let returned =
+        science::resow_water_return(stocks[SOIL_WATER].amount, old_depth, scenario.rooted_depth0);
+    if returned > 0.0 {
         let held = stocks[SOIL_WATER].amount;
-        let returned = if returnable < held { returnable } else { held };
         stocks.insert(
             SOIL_WATER.to_string(),
             stocks[SOIL_WATER].with_amount(held - returned)?,
@@ -977,6 +1002,150 @@ mod tests {
     use super::super::{run_perennial_final, run_season_final, SEASON_DAYS};
     use super::*;
 
+    /// `Drainage` reads no forcing at all (state only), so its pins need no resolver.
+    struct NoEnv;
+    impl simcore::environment::Environment for NoEnv {
+        fn get(&self, var: &str) -> Result<f64, SimError> {
+            panic!("Drainage must read no forcing, but asked for {var:?}")
+        }
+    }
+
+    /// A minimal two-stock water State at a given rooted depth, for the flow-level pins.
+    fn water_state(soil: f64, subsoil: f64, depth: f64) -> State {
+        let mut stocks = std::collections::BTreeMap::new();
+        stocks.insert(
+            SOIL_WATER.to_string(),
+            pool_stock(SOIL_WATER, SOIL, Quantity::Water, soil).unwrap(),
+        );
+        stocks.insert(
+            SUBSOIL_WATER.to_string(),
+            pool_stock(SUBSOIL_WATER, SOIL, Quantity::Water, subsoil).unwrap(),
+        );
+        State::new(
+            0,
+            stocks,
+            0,
+            std::collections::BTreeMap::from([(ROOTED_DEPTH.to_string(), depth)]),
+        )
+        .unwrap()
+    }
+
+    fn leg_amount(result: &simcore::flow::FlowResult, stock: &str) -> f64 {
+        result
+            .legs
+            .iter()
+            .find(|l| l.stock == stock)
+            .map(|l| l.amount)
+            .unwrap_or(0.0)
+    }
+
+    /// DRAINAGE, WHICH NO GOLDEN AND NO SCENARIO CAN SEE.
+    ///
+    /// ⚠ `Drainage` is **bit-identically inert on the entire frozen roster** — with
+    /// irrigation demand-driven ([F] Eqn 14.8) the root zone is never over-filled, so
+    /// `DRAINF` 0.3 and 0.0 produce identical states everywhere. That is physically
+    /// correct and it means deleting the flow outright would leave every golden, the
+    /// cross-port comparison and the rest of `cargo test` green. The last build measured
+    /// FIVE separate mutations of the capture that the Rust suite could not see; the
+    /// lesson taken then was that a port's pins have to CONSTRUCT the conditions its
+    /// scenarios never reach, so these do.
+    #[test]
+    fn drainage_relieves_an_overfilled_zone_and_only_an_overfilled_one() {
+        let extr = 0.13;
+        let area = 2.0; // non-unit on purpose: a dropped area factor is invisible at 1.0
+        let depth = 0.5;
+        let capacity = science::transpirable_capacity(depth, extr, area);
+        let flow = Drainage {
+            id: "biosphere.drainage".to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            subsoil_water: SUBSOIL_WATER.to_string(),
+            drainage_factor: 0.3,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: extr,
+            ground_area: area,
+        };
+        let env = NoEnv;
+
+        // (a) At or below capacity: nothing moves. This is the branch every frozen
+        // scenario takes, which is exactly why it proves nothing on its own.
+        for held in [0.0, capacity * 0.5, capacity] {
+            let st = water_state(held, 0.0, depth);
+            let legs = flow.evaluate(&st, &env, 1.0).unwrap();
+            assert_eq!(leg_amount(&legs, SOIL_WATER), 0.0, "drained below capacity");
+            assert_eq!(leg_amount(&legs, SUBSOIL_WATER), 0.0);
+        }
+
+        // (b) Over capacity: a DRAINF share of the EXCESS, not of the whole store —
+        // the mutation a "drain 30 % of the water" misreading would produce.
+        let held = capacity + 50.0;
+        let st = water_state(held, 7.0, depth);
+        let legs = flow.evaluate(&st, &env, 1.0).unwrap();
+        let moved = leg_amount(&legs, SUBSOIL_WATER);
+        assert!((moved - 50.0 * 0.3).abs() < 1e-12, "moved {moved}, want 15");
+        assert!(
+            (leg_amount(&legs, SOIL_WATER) + moved).abs() < 1e-12,
+            "unbalanced"
+        );
+        // ...and it is genuinely different from draining a share of the whole store.
+        assert!(
+            moved < 0.3 * held * 0.5,
+            "the excess subtraction was dropped"
+        );
+
+        // (c) The AREA factor is load-bearing: the same water in the same depth over a
+        // 1 m2 plot is NOT over capacity at all, so the flow must do nothing there.
+        let unit = Drainage {
+            ground_area: 1.0,
+            ..flow
+        };
+        let legs_unit = unit.evaluate(&st, &env, 1.0).unwrap();
+        assert!(
+            leg_amount(&legs_unit, SUBSOIL_WATER) > moved,
+            "the area factor is being ignored"
+        );
+
+        // (d) The VALVE: DRAINF = 0 is a hard off on the same over-filled state.
+        let shut = Drainage {
+            drainage_factor: 0.0,
+            ground_area: area,
+            ..unit
+        };
+        assert_eq!(
+            leg_amount(&shut.evaluate(&st, &env, 1.0).unwrap(), SUBSOIL_WATER),
+            0.0,
+            "DRAINF = 0 must shut the valve exactly"
+        );
+    }
+
+    /// The donor clamp, on the only input that can reach it: `DRAINF > 1`.
+    ///
+    /// Unreachable from any scenario (all declare 0..1), and the arbitration backstop
+    /// must not be what catches it — every golden asserts that backstop fires zero times.
+    #[test]
+    fn drainage_never_overdraws_its_donor() {
+        let extr = 0.13;
+        let flow = Drainage {
+            id: "biosphere.drainage".to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            subsoil_water: SUBSOIL_WATER.to_string(),
+            drainage_factor: 5.0,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: extr,
+            ground_area: 1.0,
+        };
+        let env = NoEnv;
+        // A near-zero root zone makes almost the whole store "excess", and 5x that
+        // exceeds the store — the clamp is the only thing standing in the way.
+        let st = water_state(40.0, 0.0, 1e-6);
+        let legs = flow.evaluate(&st, &env, 1.0).unwrap();
+        let moved = leg_amount(&legs, SUBSOIL_WATER);
+        assert!(moved <= 40.0, "overdrew the donor: {moved}");
+        assert!(
+            (moved - 40.0).abs() < 1e-9,
+            "the clamp should bind here: {moved}"
+        );
+    }
+
     /// THE CAPTURE'S GEOMETRY AT ITS CALL SITE, on a NON-UNIT ground area.
     ///
     /// Every frozen scenario has `ground_area = 1.0`, so a caller that drops the area
@@ -990,8 +1159,8 @@ mod tests {
         let scenario = SeasonScenario {
             ground_area: 2.0,
             // Everything extensive scales with the plot, or this is a different soil.
-            soil_water0: 2000.0,
-            subsoil_water0: 390.0,
+            soil_water0: 39.0,
+            subsoil_water0: 351.0,
             soil_n0: 200.0,
             plant_n0: 2.0 * DEFAULT_SCENARIO.plant_n0,
             leaf_c0: 0.10,
@@ -1058,6 +1227,14 @@ mod tests {
             // empties mid-season and the clamp is the only thing standing between the
             // flow and an overdraw.
             subsoil_water0: 40.0,
+            // ⚠ THE VALVE IS SHUT HERE, DELIBERATELY (2026-08-12). This test's subject
+            // is the CAPTURE donor clamp and the re-sow return; its 2000 kg root zone is
+            // an over-fill on purpose, and with drainage live that over-fill would pour
+            // straight into `subsoil_water` and the store would never empty (measured:
+            // it holds at its initial 40). `drainage_factor = 0.0` is [F]'s own way to
+            // say "no drainage" — a parameter, not a test-only branch — so the isolation
+            // costs no special-casing.
+            drainage_factor: 0.0,
             soil_n0: 200.0,
             plant_n0: 2.0 * DEFAULT_SCENARIO.plant_n0,
             leaf_c0: 0.10,
@@ -1070,23 +1247,25 @@ mod tests {
         let (state, integrator, resolver) = super::super::season_setup(&scenario, 2).unwrap();
         let mut lowest = f64::INFINITY;
         let mut returned_at_reset: Vec<f64> = Vec::new();
-        let mut abandoned_at_reset: Vec<f64> = Vec::new();
-        let mut prev: Option<(f64, f64)> = None;
+        let mut fraction_at_reset: Vec<(f64, f64, f64, f64)> = Vec::new();
+        let mut prev: Option<(f64, f64, f64)> = None;
         let mut observe = |s: &State| {
             let below = s.stocks[SUBSOIL_WATER].amount;
+            let held = s.stocks[SOIL_WATER].amount;
             let depth = s.aux[ROOTED_DEPTH];
             if below < lowest {
                 lowest = below;
             }
-            if let Some((prev_depth, prev_below)) = prev {
-                // A reset is the only place depth falls; the store must jump by exactly
-                // the abandoned column's geometry (or by what the root zone could give).
+            if let Some((prev_depth, prev_below, prev_held)) = prev {
+                // A reset is the only place depth falls. Record BOTH sides of it: the
+                // rule is a redistribution, so what is checked is that nothing is lost
+                // and that FTSW comes through unchanged.
                 if depth < prev_depth {
                     returned_at_reset.push(below - prev_below);
-                    abandoned_at_reset.push(prev_depth - depth);
+                    fraction_at_reset.push((prev_held, prev_depth, held, depth));
                 }
             }
-            prev = Some((depth, below));
+            prev = Some((depth, below, held));
         };
         let steps = super::super::steps_for(2);
         let (_, rationed, _) = run_perennial(
@@ -1110,23 +1289,103 @@ mod tests {
         // `WSTORG = 0` gate stalls the roots at ~0.30 m rather than the 1.3 m cap, and
         // the return is correspondingly ~40 kg rather than ~299. The cycle closes on
         // what was actually captured, which is the property that matters.
+        // The driver's trace cannot isolate the reset: `run_perennial` emits the state
+        // AFTER the step that follows a reset, so a day of flows is already folded in
+        // (measured: the two sides differ by ~3 kg, which is one day's transpiration and
+        // capture, not a leak). So the reset's water rule is pinned by calling
+        // `annual_reset` DIRECTLY below, and the driver run keeps the properties it can
+        // actually see: the clamp, the emptying store, and `rationed == 0`.
         assert_eq!(returned_at_reset.len(), 1);
-        let abandoned = abandoned_at_reset[0];
-        let want = science::captured_water(
-            abandoned,
+        assert!(returned_at_reset[0] > 0.0, "the re-sow returned nothing");
+        assert!(!fraction_at_reset.is_empty());
+    }
+
+    /// The re-sow water rule, called directly — the abandoned FRACTION of what the root
+    /// zone held ([F] is silent here; the rule is ours).
+    ///
+    /// ⚠ **THIS REPLACED A PIN ON `captured_water(abandoned)`** — the abandoned column at
+    /// the DRAINED UPPER LIMIT — on 2026-08-12. That form is right only for a full zone
+    /// and exceeds the whole store once the store is geometric, at which point its clamp
+    /// fired on every re-sow and handed the entire root zone to the subsoil (measured:
+    /// the 4-year sealed station then made no grain at all). Two properties are asserted
+    /// rather than the formula restated, because restating a formula in a second place is
+    /// exactly how the Python side's test helper kept the old rule after it changed.
+    #[test]
+    fn the_resow_returns_the_abandoned_fraction_and_preserves_ftsw() {
+        let scenario = SeasonScenario {
+            ground_area: 2.0,
+            sealed: true,
+            ..DEFAULT_SCENARIO
+        };
+        let (state, _integrator, _resolver) = super::super::season_setup(&scenario, 1).unwrap();
+        // A grown-in root zone, drawn down to a fraction of what it can hold.
+        let grown_depth = 1.3;
+        let capacity = science::transpirable_capacity(
+            grown_depth,
             scenario.soil_extractable_water,
             scenario.ground_area,
         );
-        let got = returned_at_reset[0];
-        assert!(
-            (got - want).abs() <= 1e-9 * want,
-            "returned {got}, geometry {want}"
+        let held = capacity * 0.6;
+        let mut stocks = state.stocks.clone();
+        stocks.insert(
+            SOIL_WATER.to_string(),
+            stocks[SOIL_WATER].with_amount(held).unwrap(),
         );
-        // ...and it is the AREA-SCALED figure, not the 1 m2 one — the factor a caller
-        // can drop invisibly on every frozen (1 m2) scenario.
+        // Enough grain to satisfy the seed-bank precondition.
+        let seed = scenario.leaf_c0 + scenario.stem_c0 + scenario.root_c0 + 1.0;
+        stocks.insert(
+            STORAGE_C.to_string(),
+            stocks[STORAGE_C].with_amount(seed).unwrap(),
+        );
+        let below0 = stocks[SUBSOIL_WATER].amount;
+        let mut aux = state.aux.clone();
+        aux.insert(ROOTED_DEPTH.to_string(), grown_depth);
+        let before = State::new(state.n, stocks, state.rng_seed, aux).unwrap();
+
+        let after = annual_reset(&before, &scenario).expect("re-sow");
+        let returned = after.stocks[SUBSOIL_WATER].amount - below0;
+        let lost = held - after.stocks[SOIL_WATER].amount;
+
+        // (a) A REDISTRIBUTION: what the root zone lost, the subsoil gained, exactly.
         assert!(
-            got > 1.5 * science::captured_water(abandoned, scenario.soil_extractable_water, 1.0),
-            "the return ignored ground_area: {got}"
+            (lost - returned).abs() <= 1e-12 * lost,
+            "leaked: {lost} vs {returned}"
+        );
+        // (b) The FRACTION rule, against the shared helper the reset must be calling.
+        let want = science::resow_water_return(held, grown_depth, scenario.rooted_depth0);
+        assert!(
+            (returned - want).abs() <= 1e-12 * want,
+            "returned {returned}, fraction rule {want}"
+        );
+        // (c) FTSW comes through UNCHANGED — the property the fraction rule exists for,
+        // and the one the column-at-DUL form did not have.
+        let ftsw_before = science::fraction_transpirable(held, capacity);
+        let ftsw_after = science::fraction_transpirable(
+            after.stocks[SOIL_WATER].amount,
+            science::transpirable_capacity(
+                after.aux[ROOTED_DEPTH],
+                scenario.soil_extractable_water,
+                scenario.ground_area,
+            ),
+        );
+        assert!(
+            (ftsw_before - ftsw_after).abs() <= 1e-12,
+            "FTSW moved across the re-sow: {ftsw_before} -> {ftsw_after}"
+        );
+        assert!(
+            (ftsw_before - 0.6).abs() < 1e-12,
+            "the fixture is not 0.6 FTSW"
+        );
+        // (d) MUTATION GUARD: the old column-at-DUL form would have returned MORE than
+        // the zone held here, so the two rules are not merely different in principle.
+        let old_form = science::captured_water(
+            grown_depth - scenario.rooted_depth0,
+            scenario.soil_extractable_water,
+            scenario.ground_area,
+        );
+        assert!(
+            old_form > held,
+            "the fixture does not distinguish the two rules"
         );
     }
 

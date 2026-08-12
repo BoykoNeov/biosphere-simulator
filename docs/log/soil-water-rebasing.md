@@ -1,4 +1,4 @@
-## **Re-deriving the soil water store from geometry** (the soil-layers build's own named finding, taken)
+## **Re-deriving the soil water store from geometry** (the soil-layers build's own named finding, taken and BUILT)
 
 > One row of the record table in [`../post-roadmap-log.md`](../post-roadmap-log.md),
 > written under rule 4 of [`../context-budget.md`](../context-budget.md) — one file per
@@ -6,8 +6,8 @@
 
 <!-- record-body: rejoin the lines below on single spaces for the original cell -->
 
-**DIAGNOSED 2026-08-12, NOT BUILT — the recorded price was wrong in BOTH directions, and
-only running it showed that.** `docs/plans/post-roadmap-soil-water-rebasing.md`; probes
+**BUILT 2026-08-12 — the recorded price was wrong in BOTH directions, and only running it
+showed that.** `docs/plans/post-roadmap-soil-water-rebasing.md`; probes
 `M:/claud_projects/temp/soil-rebasing/`. The soil-layers build named this successor and
 priced it as *"every frozen scenario water-stressed"*, verdict left to the user; the user
 took it on that description. **Measured on the frozen tree before any design work, that
@@ -87,3 +87,102 @@ src/` empty** — the whole of the above is measurement on the frozen tree. The 
 decision is scope (geometry + `FTSW` + Eqn 14.8, versus additionally building drainage), and
 it is the **user's**, because every branch is a full unfreeze of the biosphere reference: it
 moves goldens, both manifests, and the Rust mirror.
+ **THE BUILD, on the user's call for the widest
+scope ("yes, the station can have a water reservoir, of course. the drainage can be turned
+on or off with at least a valve").** ⚠ **[F] AGREES WITH THE USER, WITH A CITATION, AND IT
+MADE THE BUILD SMALLER.** Drainage was priced as "a new flow, a new boundary sink and a new
+param"; the sink is wrong — [F] Eqn 14.12 is `WSTORG = WSTORG + DRAIN − EWAT`, and p. 176
+spells out why (*"not all the drained water below the root layer may be considered a water
+loss. All or part of the drained water to deeper soil may be exploited later by the crop due
+to root growth"*). So drainage is `soil_water → subsoil_water`, the exact inverse of
+`RootZoneCapture`, entirely in-system, crossing no boundary: conservation is **structural**
+rather than asserted, the user's reservoir is the store the previous build already added,
+and the below-root store — one-way within a season until now — becomes the two-way store
+[F] always had. **The valve is `DRAINF`**, [F]'s own parameter: `drainage_factor = 0.0` is a
+shut valve exactly, with no boolean and no branch of ours. **SHIPPED:** `soil_water0`
+1000 → **19.5** kg (14.26), `subsoil_water0` 195 → **175.5** kg (14.27/14.28),
+`sw_wilting`/`sw_critical` → **`wssg = 0.30`** (14.6/14.7/15.3, Table 15.1 wheat off a page
+render), a new `Drainage` flow (`flow_set` 21 → 22), `Irrigation` demand-driven
+(`IRGW = min(capacity, TTSW − ATSW)`, 14.8), and two new scenario fields
+(`soil_moisture_index`, `drainage_factor`). **THE HEADLINE: ONLY WATER MOVED.** Predicted
+before regeneration over all 25 goldens and confirmed — every scenario moves `soil_water` /
+`subsoil_water` / `water_source` and **nothing else**; not one carbon, nitrogen or oxygen
+amount at any horizon; both drift summaries **byte-identical**; `rationed == 0` and
+`events == ()` everywhere. Only `water_biting` moves its science, and it is the one scenario
+deliberately re-declared (`soil_moisture_index = 0.05`, chosen against its **own written
+contract** — sustained bite, never fully wilted, crop alive, loop conserved — then swept
+0.10 → 0.02, not fitted to a golden; leaf C 0.8299 → 0.7621). **FINDING 7 — drainage does
+NOT let irrigation alone, and the first draft of the design said it did.** With the store
+physically sized and `DRAINF = 0.3`, a flat 2 mm/day leaves the reference season at
+`FTSW` 0.17 and costs **38 % of the yield**, with 204 kg draining below the root zone —
+because the flat schedule was never sized against demand (peak **5.7744 kg/day**) and only
+looked adequate against a 7.7 m bucket. Demand-driven irrigation restores the frozen science
+exactly and **uses less water in total** (610 → 582.44 kg). ⚠ Consequence recorded because
+nothing else will catch it: once irrigation is demand-driven, **`Drainage` is
+bit-identically inert on the entire frozen roster** — `DRAINF` 0.3 and 0.0 give identical
+states — so no golden protects it, exactly the position `root_depth` is in. Its pins are
+unit-level and **mutation-verified on BOTH ports**; the four Rust mutations (drain a share
+of the whole store instead of the excess, drop `DRAINF`, drop `ground_area` from the
+capacity, drop the donor clamp) each turn a pin red, and the pins have to *construct* a
+non-unit plot and an over-filled zone because no scenario provides either. **FINDING 8 — the
+re-sow return was written against a store that could not run out.** It returned the
+abandoned column *at the drained upper limit* (149.58 kg) clamped to what was held: a
+rounding error against 1150 kg, more than the entire store at 19.5–169 kg, so its clamp
+fired on **every** re-sow and handed the whole root zone to the subsoil. Measured: the
+4-year sealed station made **no grain at all** and `annual_reset` raised "seed bank too
+small to re-sow". Re-derived as the abandoned **fraction** of the held water — preserves
+`FTSW` exactly across a re-sow, needs no clamp, and equals the old form at the drained upper
+limit, so it generalises the cited geometry rather than departing from it. Measured over
+eight cycles: one transient year, then a fixed point held to round-off (7e-14). ⚠ The old
+comment had already *anticipated* the shortfall ("the root zone may hold less than its
+geometry allows") and **clamped instead of re-deriving** — a clamp that turns a wrong amount
+into a survivable one hides the wrongness until the store shrinks. **FINDING 9 — a test
+helper had hand-copied that rule under a comment claiming it mirrored the tree.**
+`test_soil_fractionation.reset_variant` kept the old water return when the rule changed, so
+every variant run was a control against a tree that no longer existed — caught only because
+a pinned CO₂ trough moved 1.2 %. This is the same shape that file's own docstring warns
+about, one level up again; the durable fix is `season.resow_water_return`, **one function
+with two callers**, mirrored on the Rust side for the same reason. **FINDING 10 — three
+defects the change EXPOSED rather than caused.** (a) All three station builders, **on both
+ports**, seeded their aux without `rooted_depth`, silently starting the station's crop at
+depth 0 — invisible while the depth gate was inert, fatal once stress divides by
+`TTSW = depth · EXTR · ρ · A`. (b) `harvest` injects a 1.3 m root system but inherited the
+0.15 m zone's water, i.e. `FTSW = 0.115` on day 0 for a grain-filling crop; grain ended 79 %
+low. The depth and the water are two halves of one declaration and are now derived together.
+(c) `DEEP_WATER` is not viable at zero irrigation, and the reason is the sharpest single
+consequence of sizing the soil honestly: **a crop rooting to 1.3 m over 1 m² can ever reach
+169 kg of extractable water against a 582 kg season demand.** No soil depth fixes that (the
+CROP cap binds). Its old `soil_water0 = 350` hid it — 2.7 m of extractable water in a 15 cm
+layer. It now declares a limited supply and the mechanism it exists to show comes out
+**stronger**: 15× the canopy against the control, where the old declaration gave 2.5×.
+⚠ **And that control had to be rebuilt, silently:** `soil_extractable_water = 0` was the
+"clean" control, but `EXTR` now appears in **two** places — the transfer *and* `TTSW` — so
+zeroing it kills the crop outright instead of isolating the transfer. It is now "drop the
+`RootZoneCapture` flow from the registry". A control that changes more than it claims is
+worse than none, and this one would have kept passing while measuring something else.
+**FINDING 11 — two acceptance-gate claims died and were replaced by RANK PLUS EXACT VALUES,
+not by looser thresholds.** Water's slack in `open_season` fell **189.24 → 9.31** (a margin
+of 189× was never a fact about safety, it was a fact about a bucket that could not exist),
+and `carbon_pool > 4 × runner-up` became **3.98×** on two chambers. `test_acceptance_gate.py`
+refuses fitted cuts in its own words, so both bounds were dropped for the rank plus an
+exactly-pinned runner-up — strictly stronger, since a threshold only catches changes bigger
+than its slack. The roster-wide runner-up has now changed identity twice (`o2_pool` →
+`power.battery` → `soil_water`), and the retired "even the runner-up is a chamber property"
+corollary was **not** restored just because it drifted back to being true. **A UNITS DEFECT
+IN THE SOURCE, recorded rather than worked around:** [F] Table 14.2's `SOLDEP` column
+(210/150/60, captioned **mm**) cannot be a profile depth in millimetres — the same book puts
+`DEPORT` at emergence at 150–400 mm and wheat's `MEED` at 1200 mm, and Box 14.1 stops root
+growth at `DEPORT >= SOLDEP`, so a 60 mm soil would stop a crop before it emerged. Read as
+cm the column is 2.1/1.5/0.6 m and our 1.5 m is the middle row exactly → silty loam →
+`DRAINF = 0.3`. (Possibly horizon thicknesses rather than a typo; the pick is unaffected
+either way. What is *proven* is that the mm reading is impossible, not that the caption is
+wrong.) **EXIT:** `flow_set` 21 → 22, `param_files` **unchanged** (`wssg`/`MAI`/`DRAINF` are
+scenario/soil data), 12 goldens, both manifests, both ports, **2290 Python tests + the full
+Rust suite + all 101 cross-port parity checks green**. **NOT built, each a named successor:**
+`WSSL` (leaf-area expansion, 0.40) and `WSSD` (phenology, 0.40) — [F] applies the deficit
+factor to **four** processes with different thresholds and we carry one, because there is no
+water-gated leaf-expansion or drought-accelerated development term for the others to attach
+to; runoff and soil evaporation; and making `DROUGHT` actually bite (`FTSW` bottoms at 0.7039
+— not new, the soil-layers build already recorded that the reachable subsoil *abolishes* that
+cascade; now a one-field change, but it would move a golden's science for a reason outside
+this charge).

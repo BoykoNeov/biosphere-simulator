@@ -10,8 +10,10 @@
 
 use std::collections::BTreeMap;
 
+use domains::biosphere::science;
 use domains::biosphere::stocks::{
-    CARBON_POOL, LITTER_CARBON, O2_POOL, ROOTED_DEPTH, STORAGE_C, THERMAL_TIME,
+    CARBON_POOL, LITTER_CARBON, O2_POOL, ROOTED_DEPTH, SOIL_WATER, STORAGE_C, SUBSOIL_WATER,
+    THERMAL_TIME,
 };
 use domains::crew::{CrewParams, FECAL_WASTE, FOOD_STORE};
 use domains::eclss::EclssParams;
@@ -53,9 +55,31 @@ pub fn build_harvest(
 
     // (1) Start the biosphere phenology past anthesis (a grain-filling plant) — a
     // station-level aux injection over the greenhouse State's stocks.
+    // ⚠ THE INJECTED DEPTH DRAGS THE WATER STORES WITH IT (2026-08-12). Injecting a
+    // 1.3 m root system while the stocks still hold the SOWING zone's water is incoherent
+    // once the store is geometric: the biosphere seeds `soil_water0` for a 0.15 m zone,
+    // and that inside a 1.3 m zone is `FTSW = 0.115` — a grain-filling crop declared at a
+    // third of its growth threshold on day 0. Re-derived here from the same [F] Eqns
+    // 14.26-14.28 the scenario defaults use, exactly as Python does.
+    let bio = &scenario.greenhouse.bio;
+    let atsw = science::captured_water(
+        scenario.rooted_depth0,
+        bio.soil_extractable_water,
+        bio.ground_area,
+    ) * bio.soil_moisture_index;
+    let wstorg = science::captured_water(
+        bio.soil_depth - scenario.rooted_depth0,
+        bio.soil_extractable_water,
+        bio.ground_area,
+    ) * bio.soil_moisture_index;
+    let mut stocks = gh_state.stocks.clone();
+    let sw = stocks[SOIL_WATER].with_amount(atsw)?;
+    stocks.insert(SOIL_WATER.to_string(), sw);
+    let sub = stocks[SUBSOIL_WATER].with_amount(wstorg)?;
+    stocks.insert(SUBSOIL_WATER.to_string(), sub);
     let state = State::new(
         gh_state.n,
-        gh_state.stocks.clone(),
+        stocks,
         gh_state.rng_seed,
         BTreeMap::from([
             (THERMAL_TIME.to_string(), scenario.thermal_time0),
