@@ -79,6 +79,12 @@ AIR_DENSITY: float = 1.205  # ρ_a, kg m⁻³ (~20 °C)
 AIR_SPECIFIC_HEAT: float = 1013.0  # c_p, J kg⁻¹ °C⁻¹ (FAO-56)
 LATENT_HEAT_VAPORIZATION: float = 2.45e6  # λ_vap, J kg⁻¹ (~20 °C, FAO-56)
 SECONDS_PER_DAY: float = 86400.0
+# ρ_water, kg m⁻³ — the identity this module already states in words ("1 mm of depth
+# over 1 m² is exactly 1 kg"), needed as a number here because the soil-water functions
+# multiply a *soil depth in metres* by a volumetric water content, so the metres do not
+# cancel to millimetres on their own. ``soil_layers`` imports it from here rather than
+# keeping a second copy: two constants for one physical fact is one that can drift.
+WATER_DENSITY: float = 1000.0
 
 # Area-conversion identity: at water density 1000 kg m⁻³, 1 mm of depth over 1 m² is
 # exactly 1 kg, so mm day⁻¹ · ground_area[m²] = kg day⁻¹ with no scaling factor.
@@ -162,27 +168,99 @@ def penman_monteith_transpiration(
     return max(0.0, latent_flux / LATENT_HEAT_VAPORIZATION * SECONDS_PER_DAY)
 
 
-def water_stress_factor(
-    soil_water: float, *, sw_wilting: float, sw_critical: float
+def transpirable_capacity(
+    rooted_depth: float, *, soil_extractable_water: float, ground_area: float
 ) -> float:
-    """Soil-water stress factor ``f_water ∈ [0, 1]`` (available-water fraction).
+    """``TTSW = DEPORT · EXTR`` ([F] Eqn 14.6), in kg over ``ground_area``.
 
-    Linear between the wilting point and a critical point: 0 at/below ``sw_wilting``,
-    a ramp to 1 over ``[sw_wilting, sw_critical]``, and 1 at/above ``sw_critical``. As
-    ``soil_water → sw_wilting`` transpiration shuts off (structural positivity, P3).
-    The thresholds are scenario/soil data (rooting depth + soil type), passed as call
-    args like ``ground_area`` — not crop params. Raises ``ValueError`` if the band is
-    not strictly positive (``sw_wilting < sw_critical``).
+    The water the CURRENT root zone can hold between the drained upper limit and the
+    lower limit — i.e. the denominator every stress reading divides by. It is
+    **recomputed every step** because the root zone grows: [F] says so in as many words
+    ("Total transpirable soil water in the root zone (TTSW, mm) each day is recomputed
+    each day as the product of current crop root depth (DEPORT, mm) and EXTR").
+
+    Identical arithmetic to :func:`soil_layers.captured_water` — deliberately, and the
+    two are pinned equal. ``captured_water`` answers "how much water does a newly
+    explored *slab* hold"; this answers "how much does the whole *column* hold". Same
+    product, different question, and a season is only a closed cycle if they agree.
     """
-    if not sw_wilting < sw_critical:
-        raise ValueError(
-            f"require sw_wilting < sw_critical, got ({sw_wilting!r}, {sw_critical!r})"
-        )
-    if soil_water <= sw_wilting:
+    return rooted_depth * soil_extractable_water * WATER_DENSITY * ground_area
+
+
+def fraction_transpirable(soil_water: float, capacity: float) -> float:
+    """``FTSW = ATSW / TTSW`` ([F] Eqn 14.7) — the stress *state*, dimensionless.
+
+    ⚠ **Zero capacity returns 0.0 rather than raising.** A root zone of zero depth holds
+    no transpirable water, so a crop in it is maximally stressed; that is the physically
+    right answer and it keeps the caller branch-free. It is reachable only before
+    emergence, since ``rooted_depth0`` is a cited positive depth.
+
+    Not clamped to ``[0, 1]``: ``FTSW > 1`` means the root zone is holding more than it
+    can transpire, which is a real state (over-irrigation, or a shrinking root zone at
+    re-sow) and the one :class:`soil_layers.Drainage` exists to relieve. Clamping here
+    would hide it. :func:`water_stress_factor` clamps at the point of *use*.
+    """
+    if capacity <= 0.0:
         return 0.0
-    if soil_water >= sw_critical:
+    return soil_water / capacity
+
+
+def water_stress_factor(ftsw: float, *, threshold: float) -> float:
+    """``WSFG = min(1, FTSW/WSSG)`` — the deficit factor ([F] Eqn 15.3, Box 14.1).
+
+    ⚠ **THIS REPLACED AN ABSOLUTE-KG RAMP, AND THE REPLACEMENT IS THE WHOLE POINT.**
+    Until 2026-08-12 this was a ramp between ``sw_wilting = 20`` and ``sw_critical =
+    60`` **kilograms** — thresholds that are only meaningful against a store of one
+    particular size, and which had been chosen against a ``soil_water0`` of 1000 kg.
+    When the store was re-derived from geometry (19.5 kg at sowing) that band read a
+    *full* root zone as *below wilting*, and since a sealed chamber's only water inflow
+    is water the plant itself transpired, ``f_water = 0`` became an absorbing state that
+    killed every sealed chamber. A fraction has no such calibration: a full root zone
+    reads as full at any depth. See ``docs/plans/post-roadmap-soil-water-rebasing.md``.
+
+    [F] Box 14.1: ``If FTSW > WSSG Then WSFG = 1 Else WSFG = FTSW / WSSG``. Below the
+    threshold the response is linear to zero at ``FTSW = 0`` — there is **no wilting
+    floor**, so the shutoff is asymptotic rather than hard. That removes the structural
+    positivity the old ramp gave, so it was measured rather than assumed: across 15
+    probe
+    runs, including ``MAI`` low enough to kill the crop and with ``Drainage`` competing
+    for the same donor in the same step, the arbitration backstop fired **zero** times.
+
+    ``threshold`` is ``WSSG`` = 0.30 for wheat ([F] Table 15.1, read off a page render —
+    ``pdftotext`` scrambles that table's columns). Raises ``ValueError`` for a
+    non-positive threshold (it is a divisor).
+    """
+    if not threshold > 0.0:
+        raise ValueError(f"require threshold > 0, got {threshold!r}")
+    if ftsw >= threshold:
         return 1.0
-    return (soil_water - sw_wilting) / (sw_critical - sw_wilting)
+    return ftsw / threshold if ftsw > 0.0 else 0.0
+
+
+def soil_water_stress(
+    soil_water: float,
+    rooted_depth: float,
+    *,
+    soil_extractable_water: float,
+    ground_area: float,
+    threshold: float,
+) -> float:
+    """``WSFG`` from the two raw state reads — the **one** path all consumers take.
+
+    Assimilation, transpiration and root extension each need this factor and each reach
+    ``soil_water`` differently (``Transpiration`` off ``snapshot.stocks``,
+    ``carbon_budget.limitation`` through ``env.get``). Routing all three through one
+    function is what makes them agree on ``FTSW`` within a step; a pin steps once and
+    asserts the three agree, because the disagreement would otherwise be silent.
+    """
+    capacity = transpirable_capacity(
+        rooted_depth,
+        soil_extractable_water=soil_extractable_water,
+        ground_area=ground_area,
+    )
+    return water_stress_factor(
+        fraction_transpirable(soil_water, capacity), threshold=threshold
+    )
 
 
 @dataclass(frozen=True)
@@ -191,11 +269,19 @@ class Transpiration:
 
     Reads net radiation, VPD, and air temperature as scalar drivers through ``env.get``
     (forcing or shared stock — the flow cannot tell, #16). The potential PM rate is made
-    actual by :func:`water_stress_factor` on the step-entry ``soil_water`` amount, so
-    the flow self-limits as the pool depletes. ``flux = potential · f_water ·
-    ground_area · dt`` (mm day⁻¹ · m² = kg day⁻¹ via the density identity) — dt-linear
-    (the daily rate is dt-independent), so the RK4 increment-form contract holds. The
-    ``sw_wilting``/``sw_critical`` thresholds and ``ground_area`` are scenario data.
+    actual by :func:`soil_water_stress` on the step-entry ``soil_water`` amount and the
+    step-entry rooted depth, so the flow self-limits as the pool depletes. ``flux =
+    potential · WSFG · ground_area · dt`` (mm day⁻¹ · m² = kg day⁻¹ via the density
+    identity) — dt-linear (the daily rate is dt-independent), so the RK4 increment-form
+    contract holds. ``EXTR``, ``WSSG`` and ``ground_area`` are scenario/soil data.
+
+    ⚠ **Multiplying a Penman–Monteith potential by ``WSFG`` is OURS, not [F]'s**, and it
+    predates the 2026-08-12 re-basing rather than arriving with it. [F] never scales a
+    potential rate: its Box 14.1 computes ``TR = DDMP · VPD / TEC``, deriving
+    transpiration *from* dry-matter production, which already carries ``WSFG``. Our
+    demand side is Penman–Monteith, so there is no ``DDMP`` to inherit the factor from
+    and the analogy is applied directly. The re-basing changed the factor's **shape**
+    (an absolute-kg ramp became a fraction); it did not introduce the multiplication.
     """
 
     id: FlowId
@@ -207,8 +293,9 @@ class Transpiration:
     temp_var: str
     params: TranspirationParams
     ground_area: float
-    sw_wilting: float
-    sw_critical: float
+    rooted_depth_aux: str
+    soil_extractable_water: float
+    wssg: float
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         net_radiation = env.get(self.rn_var)
@@ -222,8 +309,12 @@ class Transpiration:
             aerodynamic_resistance=self.params.aerodynamic_resistance,
             surface_resistance=self.params.surface_resistance,
         )
-        f_water = water_stress_factor(
-            soil_water, sw_wilting=self.sw_wilting, sw_critical=self.sw_critical
+        f_water = soil_water_stress(
+            soil_water,
+            snapshot.aux.get(self.rooted_depth_aux, 0.0),
+            soil_extractable_water=self.soil_extractable_water,
+            ground_area=self.ground_area,
+            threshold=self.wssg,
         )
         daily_kg = potential * f_water * self.ground_area
         flux = daily_kg * dt
@@ -234,12 +325,44 @@ class Transpiration:
 
 @dataclass(frozen=True)
 class Irrigation:
-    """WATER flow ``water_source -> soil_water`` (scheduled supply; balanced, P1).
+    """WATER flow ``water_source -> soil_water`` — **demand-driven, capacity-capped**.
 
-    Reads an irrigation depth rate (mm day⁻¹) as a scalar driver through ``env.get``
-    (a forcing schedule). ``flux = rate · ground_area · dt`` (mm day⁻¹ · m² = kg day⁻¹
-    via the density identity) — dt-linear. Refills the depleting ``soil_water`` POOL
-    from an unclamped boundary supply, so the season's water balance closes (#13).
+    ``IRGW = min(capacity · ground_area · dt,  max(0, TTSW − ATSW))``
+
+    This composes the two options [F] Ch. 14 states for scheduling irrigation, and is
+    not a shape of ours:
+
+        "One possibility is a fixed amount of water at each irrigation, **which may be
+        defined by the capacity of the irrigation system**. Another possibility is to
+        add sufficient water to return the root layer to a specific level, e.g. the
+        drained upper limit. … ``IRGW = TTSW − ATSW``"      ([F] **Eqn 14.8**)
+
+    ⚠ **THE FORCING CHANGED MEANING ON 2026-08-12: mm day⁻¹ APPLIED → mm day⁻¹
+    AVAILABLE.** Until then this flow pushed the scheduled rate into the soil
+    unconditionally, and that only looked adequate because ``soil_water0`` was 1000 kg —
+    a store implying a 7.7 m soil column. Once the root zone was sized from real
+    geometry, a flat 2 mm day⁻¹ against a measured **5.7744 kg day⁻¹** peak demand left
+    the reference season at ``FTSW`` 0.17 and cost **38 % of the yield**, while 204 kg
+    of the season's water drained below the root zone. The scenario comment calls that
+    run "water (PP, non-limiting)"; demand-driven supply is what keeps that declaration
+    true against a physical bucket. Season use actually *falls* (610 → 582.44 kg): more
+    frugal in total, higher at the peak.
+
+    Consequences worth stating because they are easy to misread:
+
+    * **A zero forcing is still a hard off**, so every scenario that cuts irrigation
+      over
+      a window (``DROUGHT``) keeps working unchanged — the cut is a zero *capacity*.
+    * **The cap is declared, not fitted**, and a pin asserts it never binds on the
+      frozen
+      roster (8.0 available against 5.7744 used at peak, 1.39× headroom). "Potential
+      production" becomes a checkable claim instead of a label.
+    * **It never overfills**, so :class:`soil_layers.Drainage` is bit-identically inert
+      on the frozen roster. That is physically correct — you cannot drain what was never
+      over-applied — and it is why drainage's pins are unit-level, not golden-level.
+
+    Still dt-linear in the capacity limb; the deficit limb is a ``min`` against a
+    step-entry quantity, the same shape as ``RootZoneCapture``'s cited donor clamp.
     """
 
     id: FlowId
@@ -248,11 +371,23 @@ class Irrigation:
     soil_water: StockId
     irrigation_var: str
     ground_area: float
+    rooted_depth_aux: str
+    soil_extractable_water: float
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
-        rate_mm_day = env.get(self.irrigation_var)
-        daily_kg = rate_mm_day * self.ground_area
-        flux = daily_kg * dt
+        capacity_kg = env.get(self.irrigation_var) * self.ground_area * dt
+        deficit = (
+            transpirable_capacity(
+                snapshot.aux.get(self.rooted_depth_aux, 0.0),
+                soil_extractable_water=self.soil_extractable_water,
+                ground_area=self.ground_area,
+            )
+            - snapshot.stocks[self.soil_water].amount
+        )
+        if deficit <= 0.0:
+            flux = 0.0
+        else:
+            flux = capacity_kg if capacity_kg < deficit else deficit
         return FlowResult(
             legs=(Leg(self.water_source, -flux), Leg(self.soil_water, flux))
         )

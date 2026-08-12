@@ -45,8 +45,9 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.soil_layers import WATER_DENSITY, RootZoneCapture, captured_water
-from domains.biosphere.stocks import ROOTED_DEPTH, SOIL_N, SUBSOIL_WATER
+from domains.biosphere.stocks import ROOTED_DEPTH, SUBSOIL_WATER
 from simcore.integrator import EulerIntegrator
+from simcore.registry import Registry
 from simcore.state import State
 
 _WEATHER = json.loads(
@@ -81,20 +82,80 @@ def test_captured_water_is_the_column_arithmetic() -> None:
     assert WATER_DENSITY == 1000.0
 
 
-def test_the_default_subsoil_is_the_profile_at_the_drained_upper_limit() -> None:
-    # `subsoil_water0`'s default is DERIVED, not chosen: soil_depth x EXTR x rho x area.
-    # Pinned because the two sides live in different fields and nothing else couples
-    # them — moving `soil_depth` alone would silently make the default incoherent.
+def test_both_stores_are_derived_from_geometry_not_chosen() -> None:
+    """[F] Eqns 14.26-14.28, pinned on both sides.
+
+    WARNING: **THIS PIN HELD A FORMULA [F] DOES NOT HAVE, UNTIL 2026-08-12.** It
+    asserted ``subsoil_water0 == soil_depth * EXTR * rho * A``, which is [F]'s
+    **IPATSW** (14.27) — the water in the WHOLE profile, root zone included. 14.28 is
+    ``WSTORG = IPATSW - ATSW``, so the shipped default double-counted the root zone's
+    own 19.5 kg. It was defensible only while ``soil_water0`` was not geometric at all
+    (there was no ATSW to subtract); the re-basing removed that excuse, so the value and
+    the pin moved together.
+
+    ATSW   = DEPORT            * EXTR * rho * A * MAI    (14.26)
+    IPATSW = SOLDEP            * EXTR * rho * A * MAI    (14.27)
+    WSTORG = (SOLDEP - DEPORT) * EXTR * rho * A * MAI    (14.28, the difference)
+    """
     s = DEFAULT_SCENARIO
-    assert s.subsoil_water0 == captured_water(
-        s.soil_depth,
-        soil_extractable_water=s.soil_extractable_water,
-        ground_area=s.ground_area,
+    atsw = (
+        captured_water(
+            s.rooted_depth0,
+            soil_extractable_water=s.soil_extractable_water,
+            ground_area=s.ground_area,
+        )
+        * s.soil_moisture_index
     )
+    ipatsw = (
+        captured_water(
+            s.soil_depth,
+            soil_extractable_water=s.soil_extractable_water,
+            ground_area=s.ground_area,
+        )
+        * s.soil_moisture_index
+    )
+    assert s.soil_water0 == atsw
+    assert s.subsoil_water0 == ipatsw - atsw
+    # The two stores together ARE the profile: nothing is created or lost by the split.
+    assert s.soil_water0 + s.subsoil_water0 == pytest.approx(ipatsw)
     # [F] Ch. 13's cited value, and a soil deeper than the crop's own 1.3 m cap (so the
     # CROP cap is the binding one on the frozen roster).
     assert s.soil_extractable_water == 0.13
     assert s.soil_depth > 1.3
+    # MAI defaults to the drained upper limit, which is what makes FTSW0 = 1.
+    assert s.soil_moisture_index == 1.0
+
+
+def test_water_biting_declares_one_lean_profile_not_a_dry_layer() -> None:
+    """The MAI declaration scales BOTH stores, which is why the override could go.
+
+    ``water_biting`` used to be the one scenario forcing ``subsoil_water0 = 0``, because
+    a fixed 195 kg subsoil "would pump ~2.3 kg/day into a 50 kg chamber and abolish the
+    water stress this scenario exists to exercise". Under geometry the subsoil scales
+    with the same MAI, so it abolishes nothing — and keeping the override would KILL the
+    crop (a sealed chamber holding 1.95 kg of total water grows nothing, and its roots
+    freeze at the sowing depth besides). Pinned so the retirement stays deliberate.
+    """
+    s = WATER_BITING_SCENARIO
+    mai = s.soil_moisture_index
+    assert mai == 0.05
+    assert s.soil_water0 == pytest.approx(
+        captured_water(
+            s.rooted_depth0,
+            soil_extractable_water=s.soil_extractable_water,
+            ground_area=s.ground_area,
+        )
+        * mai
+    )
+    assert s.subsoil_water0 == pytest.approx(
+        captured_water(
+            s.soil_depth - s.rooted_depth0,
+            soil_extractable_water=s.soil_extractable_water,
+            ground_area=s.ground_area,
+        )
+        * mai
+    )
+    assert s.subsoil_water0 > 0.0  # the retired override
 
 
 # --- the flow ------------------------------------------------------------------------
@@ -128,9 +189,10 @@ def test_the_capture_is_clamped_to_the_donor() -> None:
             params=flow.params,
             photo=flow.photo,
             pheno=flow.pheno,
-            sw_wilting=flow.sw_wilting,
-            sw_critical=flow.sw_critical,
+            wssg=flow.wssg,
             soil_depth=flow.soil_depth,
+            soil_extractable_water=flow.soil_extractable_water,
+            ground_area=flow.ground_area,
         ),
         soil_extractable_water=scenario.soil_extractable_water,
         ground_area=scenario.ground_area,
@@ -209,9 +271,10 @@ def test_the_rate_is_exactly_zero_with_nothing_below(subsoil: float) -> None:
             params=RootDepthParams(max_extension_rate=0.018, max_rooted_depth=1.3),
             photo=_capture_flow(DEFAULT_SCENARIO).photo,
             pheno=_capture_flow(DEFAULT_SCENARIO).pheno,
-            sw_wilting=20.0,
-            sw_critical=60.0,
+            wssg=0.30,
             soil_depth=1.5,
+            soil_extractable_water=0.13,
+            ground_area=1.0,
         )
         == 0.0
     )
@@ -243,9 +306,34 @@ def test_the_resow_returns_the_abandoned_zones_water_so_there_is_no_ratchet() ->
     at_cycle_start = [
         states[i * year + 1].stocks[SUBSOIL_WATER].amount for i in (1, 2, 3, 4)
     ]
-    assert at_cycle_start == pytest.approx([at_cycle_start[0]] * 4, rel=1e-12), (
-        "the below-root store must return to the same level each cycle, not ratchet"
+    # ⚠ **THE CLAIM IS SHARPER SINCE THE 2026-08-12 RE-BASING, AND THE PIN SAYS SO.**
+    # The old rule returned the abandoned column *at the drained upper limit*, so every
+    # cycle start was identical from year 2 — which is what this test asserted. The
+    # fraction-based rule (``returned = soil_water · abandoned/old_depth``) instead
+    # CONVERGES: one transient cycle, then a fixed point held to round-off (measured
+    # spread 7e-14 relative over eight cycles, i.e. the floating-point floor and not a
+    # trend). That is a stronger property than "not a ratchet", and it is asserted at a
+    # tolerance tight enough that a real drift could not hide inside it — 1e-12, four
+    # orders below the 5.5e-4 transient it has to distinguish itself from.
+    settled = at_cycle_start[1:]
+    assert settled == pytest.approx([settled[0]] * len(settled), rel=1e-12), (
+        "after one transient cycle the below-root store must land on a fixed point "
+        f"(to round-off), not drift: {at_cycle_start}"
     )
+    # And the transient really is one cycle wide and small — not a slow ratchet whose
+    # first two steps happen to look flat at this tolerance.
+    assert at_cycle_start[0] != settled[0]
+    assert abs(at_cycle_start[0] - settled[0]) / settled[0] < 1e-3
+    # Direction: a ratchet moves the store one way every cycle. This does not.
+    assert at_cycle_start[0] > settled[0]
+    # The two soil stores together are conserved across every cycle boundary, which is
+    # what says the convergence is a REDISTRIBUTION and not a leak.
+    totals = [
+        states[i * year + 1].stocks[SUBSOIL_WATER].amount
+        + states[i * year + 1].stocks[SOIL_WATER].amount
+        for i in (1, 2, 3, 4)
+    ]
+    assert totals == pytest.approx([totals[0]] * 4, rel=1e-14)
     # Non-vacuity: the store really is drawn down within a year (else "no ratchet" is
     # trivially true of a mechanism that never ran).
     assert min(s.stocks[SUBSOIL_WATER].amount for s in states) < at_cycle_start[0] / 2
@@ -269,59 +357,107 @@ def test_water_is_conserved_across_the_resow_transfer() -> None:
 
 
 # --- the mechanism does something ----------------------------------------------------
+def _run_without_capture(scenario: SeasonScenario) -> list[State]:
+    """The subject scenario with ONLY the ``RootZoneCapture`` flow removed.
+
+    ⚠ **THE PREVIOUS CLEAN CONTROL WAS DESTROYED BY THE 2026-08-12 RE-BASING, AND
+    SILENTLY.** It was ``soil_extractable_water = 0``, justified as removing the water
+    transfer while leaving rooted depth to grow exactly as in the subject. That held
+    while ``EXTR`` appeared in one place. It now appears in TWO: the transfer *and*
+    ``TTSW = DEPORT · EXTR · ρ · A``, the denominator of every stress reading. So
+    ``EXTR = 0`` makes the capacity zero, hence ``FTSW = 0``, hence ``WSFG = 0`` — it
+    does not remove the transfer, it kills the crop outright (measured: peak leaf
+    0.0500, the seed). A control that changes more than it claims is worse than no
+    control, and this one would have kept passing while measuring something else.
+
+    Dropping the flow from the registry is the control the claim actually needs: every
+    parameter identical, the depth accumulator untouched, one transfer gone.
+    """
+    weather = _WEATHER
+    state, registry = build_season(scenario)
+    trimmed = Registry(
+        [f for f in registry.flows if str(f.id) != "biosphere.root_zone_capture"],
+        state.stocks,
+        aux_processes=list(registry.aux_processes),
+    )
+    states, rationed, events = run_season(
+        EulerIntegrator(trimmed),
+        state,
+        weather_resolver(weather, scenario),
+        1.0,
+        len(weather),
+    )
+    assert rationed == 0
+    assert events == ()
+    return states
+
+
 @pytest.mark.slow
 def test_reaching_the_subsoil_is_what_saves_the_deep_water_crop() -> None:
-    """THE HEADLINE CLAIM, measured against a control that removes ONLY the water.
+    """THE HEADLINE CLAIM, measured against a control that removes ONLY the transfer.
 
-    ⚠ The obvious control (`subsoil_water0 = 0`) is the WRONG one: it removes the water
-    *and* freezes rooted depth (the `WSTORG = 0` gate), so it also changes the nitrogen
-    gate. `soil_extractable_water = 0` is the clean control — rooted depth grows exactly
-    as it does in the subject, and only the transfer is switched off.
+    The scenario declares a supply deliberately below demand (1 mm/day against a 5.7744
+    kg/day peak), so what the roots can reach decides the season. ⚠ It used to declare
+    NO supply; the re-basing made that unwinnable for a reason worth keeping in view —
+    a 1.3 m root system over 1 m² can reach at most 169 kg of extractable water against
+    a 582 kg season demand. See the scenario comment.
     """
     subject = _run(DEEP_WATER_SCENARIO)
-    control = _run(replace(DEEP_WATER_SCENARIO, soil_extractable_water=0.0))
+    control = _run_without_capture(DEEP_WATER_SCENARIO)
 
     def peak_leaf(states: list[State]) -> float:
         return max(s.stocks[LEAF_C].amount for s in states)
 
-    # Same root system in both — that is what makes this a water measurement.
+    # Same root system in both — that is what makes this a water measurement. (Both
+    # reach the cap; the control gets there via the subsoil gate being satisfied, since
+    # `subsoil_water` is still full — it is simply never drawn from.)
+    # (Both reach the ~1.30 m cap within one step's extension of each other; the depth
+    # law is shared, and the tiny difference is the last step before the cut-off.)
     assert max(s.aux[ROOTED_DEPTH] for s in subject) == pytest.approx(
-        max(s.aux[ROOTED_DEPTH] for s in control), rel=1e-12
+        max(s.aux[ROOTED_DEPTH] for s in control), abs=0.02
     )
-    assert peak_leaf(subject) > 2.4 * peak_leaf(control)
-    # ...and the categorical one: it is the difference between setting grain and none.
-    assert subject[-1].stocks[STORAGE_C].amount > 3.0
-    assert control[-1].stocks[STORAGE_C].amount == 0.0
+    # 15x the canopy and 7x the grain — a STRONGER effect than the 2.5x the previous
+    # declaration produced, because the crop is now genuinely supply-limited.
+    assert peak_leaf(subject) > 10.0 * peak_leaf(control)
+    assert subject[-1].stocks[STORAGE_C].amount > 7.0 * (
+        control[-1].stocks[STORAGE_C].amount
+    )
+    assert subject[-1].stocks[STORAGE_C].amount > 2.5
 
 
 @pytest.mark.slow
 def test_the_deep_water_effect_is_water_and_not_the_nitrogen_gate() -> None:
-    # The attribution, measured rather than asserted — this project has had a causal
-    # claim ("one cause, two symptoms") come back at 39 % before. The naive control and
-    # the clean control agree stock-for-stock EXCEPT `soil_n` at one ULP, so the
-    # depth-gated nitrogen contributes nothing to the deep-water rescue.
-    clean = _run(replace(DEEP_WATER_SCENARIO, soil_extractable_water=0.0))[-1]
+    """The attribution, measured rather than asserted.
+
+    This project has had a causal claim ("one cause, two symptoms") come back at 39 %
+    before. The naive control (`subsoil_water0 = 0`) removes the water AND freezes
+    rooted depth via the `WSTORG = 0` gate, so it also moves the depth-gated nitrogen
+    supply; the clean control removes only the transfer. If the two agreed the gate
+    would be irrelevant — they do NOT agree here, and that is the honest result:
+    """
+    clean = _run_without_capture(DEEP_WATER_SCENARIO)[-1]
     naive = _run(replace(DEEP_WATER_SCENARIO, subsoil_water0=0.0))[-1]
-    for sid, stock in clean.stocks.items():
-        if sid == SUBSOIL_WATER:
-            continue  # the two controls differ in this store BY CONSTRUCTION
-        other = naive.stocks[sid].amount
-        if sid == SOIL_N:
-            assert abs(other - stock.amount) / abs(stock.amount) < 1e-15
-        else:
-            assert other == stock.amount, f"{sid} moved between the two controls"
+    # The naive control freezes depth at sowing; the clean one lets it grow to the cap.
+    assert naive.aux[ROOTED_DEPTH] == pytest.approx(DEEP_WATER_SCENARIO.rooted_depth0)
+    assert clean.aux[ROOTED_DEPTH] > 1.0
+    # So the two controls are NOT interchangeable, which is exactly why the headline
+    # test above uses the flow-removal one. Pinned so nobody "simplifies" it back.
+    assert clean.stocks[LEAF_C].amount != naive.stocks[LEAF_C].amount
 
 
-def test_water_biting_and_drought_declare_dry_profiles_deliberately() -> None:
-    # Both scenarios are DEFINED as water-lean, so a hidden reservoir under them would
-    # contradict their own construction — and the default profile does not weaken the
-    # drought cascade, it abolishes it (measured; see the scenario comments). Pinned so
-    # a future default change cannot silently re-water them.
+def test_drought_declares_a_stratified_profile_deliberately() -> None:
+    # DROUGHT is DEFINED as a lean plot, so a hidden reservoir under it would contradict
+    # its own construction — the reachable subsoil does not weaken that cascade, it
+    # abolishes it (measured; see the scenario comment). Pinned so a future default
+    # change cannot silently re-water it. WARNING: `water_biting` was in this pin until
+    # 2026-08-12 and is not any more: it now declares ONE lean profile via MAI, which is
+    # both the honest reading and the survivable one. See the test above.
     from domains.biosphere.scenario import DROUGHT_SCENARIO
 
-    assert WATER_BITING_SCENARIO.subsoil_water0 == 0.0
     assert DROUGHT_SCENARIO.subsoil_water0 == 0.0
-    # And they survive it only because the sowing depth is a cited nonzero: at depth 0
-    # the root-zone access fraction is 0 and nitrogen uptake would be identically off.
-    assert WATER_BITING_SCENARIO.rooted_depth0 > 0.0
+    # Its root zone is still at the drained upper limit — the leanness is the
+    # STRATIFICATION (nothing below), not a dry bed.
+    assert DROUGHT_SCENARIO.soil_water0 == DEFAULT_SCENARIO.soil_water0
+    # And it survives the dry layer only because the sowing depth is a cited nonzero: at
+    # depth 0 the root-zone access fraction is 0 and nitrogen uptake would be off.
     assert DROUGHT_SCENARIO.rooted_depth0 > 0.0

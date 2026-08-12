@@ -61,7 +61,6 @@ _TSUM_ANTHESIS, _TSUM_MATURITY = 1100.0, 750.0
 _T_BASE, _T_CAP = 0.0, 30.0
 # Nitrogen f_N thresholds (loader-folded kg N / mol C) + a soil-water band (scenario).
 _N_RESIDUAL, _N_CRITICAL = 0.001, 0.002
-_SW_WILTING, _SW_CRITICAL = 10.0, 30.0
 
 _TABLE = (
     PartitionRow(dvs=0.0, fl=0.55, fs=0.10, fr=0.35, fo=0.00),
@@ -139,6 +138,18 @@ def _pheno() -> PhenologyParams:
     )
 
 
+# Soil-water geometry for the fixtures (the 2026-08-12 re-basing: stress is FTSW =
+# ATSW/TTSW against a threshold FRACTION, not an absolute-kg band). A 1.0 m root zone
+# over 1 m2 at EXTR 0.13 holds 130 kg, so the 100 kg default below is FTSW 0.77 —
+# unstressed, exactly as the band it replaced was meant to be.
+_ROOTED_DEPTH = "biosphere.rooted_depth"
+# The store that makes WSFG exactly 0.5: FTSW = 0.5 x wssg = 0.15, and 0.15 x 130 kg.
+_HALF_STRESS_WATER = 19.5
+_TEST_DEPTH = 1.0
+_EXTR = 0.13
+_WSSG = 0.30
+
+
 def _ctx() -> CarbonContext:
     return CarbonContext(
         leaf_c=_LEAF_C,
@@ -149,8 +160,9 @@ def _ctx() -> CarbonContext:
         temp_var=_TEMP,
         daylength_var=_DAYLEN,
         soil_water_var=_SW,
-        sw_wilting=_SW_WILTING,
-        sw_critical=_SW_CRITICAL,
+        wssg=_WSSG,
+        rooted_depth_aux=_ROOTED_DEPTH,
+        soil_extractable_water=_EXTR,
         plant_n=_PLANT_N,
         photo=_photo(),
         canopy=_canopy(),
@@ -166,7 +178,8 @@ def _state(
     stem_c: float = 0.0,
     root_c: float = 0.0,
     storage_c: float = 0.0,
-    soil_water: float = 100.0,  # >> sw_critical ⇒ f_water = 1 (non-limiting)
+    # 100 kg in a 1.0 m root zone is FTSW 0.77, far above wssg 0.30 ⇒ WSFG = 1.
+    soil_water: float = 100.0,
     plant_n: float = 1.0,  # high conc ⇒ f_N = 1 (non-limiting)
     thermal_time: float = 0.0,  # DVS = 0 (emergence); set per-test
 ) -> State:
@@ -218,7 +231,12 @@ def _state(
         _CO2_ATMOS: boundary(_CO2_ATMOS, 1.0e9, unclamped=True),
         _CO2_RESP: boundary(_CO2_RESP, 0.0),
     }
-    return State(n=0, stocks=stocks, rng_seed=0, aux={_THERMAL_TIME: thermal_time})
+    return State(
+        n=0,
+        stocks=stocks,
+        rng_seed=0,
+        aux={_THERMAL_TIME: thermal_time, _ROOTED_DEPTH: _TEST_DEPTH},
+    )
 
 
 def _env(snapshot: State, dt: float, *, par: float = 800.0, temp: float = 20.0):  # noqa: ANN202
@@ -270,8 +288,8 @@ def test_context_limitation_is_one_at_the_non_limiting_point() -> None:
 
 
 def test_context_limitation_is_f_water_times_f_n() -> None:
-    # soil_water at the band midpoint ⇒ f_water = 0.5; plant_n high ⇒ f_N = 1.
-    state = _state(soil_water=(_SW_WILTING + _SW_CRITICAL) / 2.0)
+    # soil_water at half the wssg ramp ⇒ f_water = 0.5; plant_n high ⇒ f_N = 1.
+    state = _state(soil_water=_HALF_STRESS_WATER)
     assert math.isclose(_ctx().limitation(state, _env(state, 1.0)), 0.5, rel_tol=1e-12)
 
 
@@ -538,7 +556,7 @@ def test_three_flows_share_one_budget() -> None:
 
 
 def test_limitation_scales_growth_and_allocation_identically() -> None:
-    # f_water = 0.5 (soil_water at the band midpoint) must halve BOTH GRES and DMI —
+    # f_water = 0.5 (soil_water at half the wssg ramp) must halve BOTH GRES and DMI —
     # the same factor hits every gross-assimilation recompute (no per-flow drift).
     full = _state(leaf_c=3.0, stem_c=1.0, root_c=1.0, thermal_time=550.0)
     half = _state(
@@ -546,7 +564,7 @@ def test_limitation_scales_growth_and_allocation_identically() -> None:
         stem_c=1.0,
         root_c=1.0,
         thermal_time=550.0,
-        soil_water=(_SW_WILTING + _SW_CRITICAL) / 2.0,
+        soil_water=_HALF_STRESS_WATER,
     )
     for flow, stock in ((_growth_flow(), _CO2_RESP), (_allocation_flow(), _LEAF_C)):
         f = next(

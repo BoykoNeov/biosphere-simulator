@@ -59,7 +59,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.stocks import RN_VAR, TEMP_VAR, VPD_VAR
+from domains.biosphere.stocks import RN_VAR, ROOTED_DEPTH, TEMP_VAR, VPD_VAR
 from domains.biosphere.water_cycle import (
     Condensation,
     Recycling,
@@ -277,11 +277,18 @@ def _ring_state() -> State:
     return State(
         n=0,
         stocks={
-            SOIL_WATER: pool(SOIL_WATER, SOIL, 1000.0),  # ≫ sw_critical ⇒ f_water = 1
+            # 1000 kg in the 1.3 m root zone declared below is FTSW 4.7, far above
+            # wssg 0.30 ⇒ f_water = 1. ⚠ The rooted-depth aux is LOAD-BEARING here since
+            # the 2026-08-12 re-basing: stress divides by TTSW = depth · EXTR · ρ · A,
+            # so a synthetic state without it has zero capacity, zero FTSW, and a
+            # transpiration flow that returns nothing at all — which is a silent pass
+            # for a test whose whole subject is that the ring flows carry water.
+            SOIL_WATER: pool(SOIL_WATER, SOIL, 1000.0),
             WATER_VAPOR: pool(WATER_VAPOR, ATMOSPHERE, 5.0),
             CONDENSATE: pool(CONDENSATE, WATER, 5.0),
         },
         rng_seed=0,
+        aux={ROOTED_DEPTH: 1.3},
     )
 
 

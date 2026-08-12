@@ -102,8 +102,9 @@ def _carbon_context(scenario: SeasonScenario) -> CarbonContext:
         temp_var=TEMP_VAR,
         daylength_var=DAYLENGTH_VAR,
         soil_water_var=SOIL_WATER_VAR,
-        sw_wilting=scenario.sw_wilting,
-        sw_critical=scenario.sw_critical,
+        wssg=scenario.wssg,
+        rooted_depth_aux=ROOTED_DEPTH,
+        soil_extractable_water=scenario.soil_extractable_water,
         plant_n=PLANT_N,
         photo=load_photosynthesis_params(crop.paths["photosynthesis"]),
         canopy=load_canopy_params(crop.paths["canopy"]),
@@ -197,8 +198,9 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             temp_var=TEMP_VAR,
             params=load_transpiration_params(crop.paths["transpiration"]),
             ground_area=scenario.ground_area,
-            sw_wilting=scenario.sw_wilting,
-            sw_critical=scenario.sw_critical,
+            rooted_depth_aux=ROOTED_DEPTH,
+            soil_extractable_water=scenario.soil_extractable_water,
+            wssg=scenario.wssg,
         ),
         NitrogenUptake(
             FlowId("biosphere.nitrogen_uptake"),
@@ -289,9 +291,10 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
         params=load_root_depth_params(crop.paths["root_depth"]),
         photo=ctx.photo,
         pheno=pheno,
-        sw_wilting=scenario.sw_wilting,
-        sw_critical=scenario.sw_critical,
+        wssg=scenario.wssg,
         soil_depth=scenario.soil_depth,
+        soil_extractable_water=scenario.soil_extractable_water,
+        ground_area=scenario.ground_area,
     )
     aux: tuple[AuxProcess, ...] = (thermal_time, root_depth)
     if scenario.vernalization:

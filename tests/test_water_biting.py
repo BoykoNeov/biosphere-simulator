@@ -49,7 +49,8 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.transpiration import water_stress_factor
+from domains.biosphere.stocks import ROOTED_DEPTH, SUBSOIL_WATER
+from domains.biosphere.transpiration import soil_water_stress
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -92,10 +93,13 @@ def _vegetative(state: State) -> float:
 
 
 def _f_water(state: State) -> float:
-    return water_stress_factor(
+    """WSFG from the same two state reads the flows use ([F] 14.6/14.7/15.3)."""
+    return soil_water_stress(
         state.stocks[SOIL_WATER].amount,
-        sw_wilting=WATER_BITING_SCENARIO.sw_wilting,
-        sw_critical=WATER_BITING_SCENARIO.sw_critical,
+        state.aux.get(ROOTED_DEPTH, 0.0),
+        soil_extractable_water=WATER_BITING_SCENARIO.soil_extractable_water,
+        ground_area=WATER_BITING_SCENARIO.ground_area,
+        threshold=WATER_BITING_SCENARIO.wssg,
     )
 
 
@@ -113,37 +117,50 @@ def test_water_biting_f_water_bites(
     assert sum(1 for f in f_ws if f < _BITE_CEILING) > 30  # sustained
 
 
-def test_water_biting_stays_above_wilting(
+def test_water_biting_never_empties_the_root_zone(
     water_biting: tuple[list[State], int, tuple],
 ) -> None:
-    # The closed loop settles to a stable fixed point ABOVE the wilting point — the
-    # bite is sustained water stress, not progressive drainage to a dead plant.
-    # (soil_water never reaching sw_wilting is what keeps f_water > 0.)
+    """The bite is sustained stress, not progressive drainage to a dead plant.
+
+    ⚠ The claim had to be RESTATED for the 2026-08-12 re-basing, not just re-pointed.
+    It used to be "soil_water stays above ``sw_wilting``", which is what kept
+    ``f_water > 0`` under an absolute-kg ramp. ``WSFG = FTSW/WSSG`` has no wilting
+    floor at all — it reaches zero only at an EMPTY root zone — so the property that
+    actually protects the crop is that the store never reaches 0, and that is what is
+    pinned. A positive lower bound is asserted too, so "approaches zero asymptotically"
+    could not pass as "stays alive".
+    """
     states, _, _ = water_biting
-    assert all(
-        s.stocks[SOIL_WATER].amount > WATER_BITING_SCENARIO.sw_wilting for s in states
-    )
+    assert all(s.stocks[SOIL_WATER].amount > 0.0 for s in states)
+    assert min(s.stocks[SOIL_WATER].amount for s in states) > 0.5
 
 
 def test_water_biting_loop_stays_closed(
     water_biting: tuple[list[State], int, tuple],
 ) -> None:
-    # Lowering the operating point does NOT break closure: the water-loop total
-    # (soil_water + water_vapor + condensate) is conserved to round-off all season —
-    # the cycle still recovers every drop of transpired water, it just runs leaner.
+    # Lowering the operating point does NOT break closure: the water-loop total is
+    # conserved to round-off all season — the cycle still recovers every drop of
+    # transpired water, it just runs leaner.
+    #
+    # WARNING: FOUR stocks, not three. ``subsoil_water`` joined the loop when this
+    # scenario's dry-subsoil override was retired (2026-08-12). It is an in-system
+    # store, so water crossing the root-zone boundary by capture or drainage never
+    # leaves the chamber and MUST be counted — otherwise the "closure" being asserted is
+    # only partial, and a leak between the two soil stores would pass.
     states, _, _ = water_biting
 
     def loop_total(s: State) -> float:
         return (
             s.stocks[SOIL_WATER].amount
+            + s.stocks[SUBSOIL_WATER].amount
             + s.stocks[WATER_VAPOR].amount
             + s.stocks[CONDENSATE].amount
         )
 
     total0 = loop_total(states[0])
-    assert total0 == pytest.approx(
-        WATER_BITING_SCENARIO.soil_water0
-    )  # vapor/cond start 0
+    assert total0 == pytest.approx(  # vapor/cond start 0
+        WATER_BITING_SCENARIO.soil_water0 + WATER_BITING_SCENARIO.subsoil_water0
+    )
     for s in states:
         assert math.isclose(loop_total(s), total0, rel_tol=0.0, abs_tol=1e-9)
 

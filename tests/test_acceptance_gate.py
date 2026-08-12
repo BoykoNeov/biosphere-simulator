@@ -543,13 +543,22 @@ def test_open_seasons_other_currencies_are_slack_not_absent() -> None:
     """⚠ KEEP THE QUALIFIER. The committed sentence says no *carbon*-scarcity gate.
 
     Water and nitrogen are live gates in ``open_season`` — they exist — they are simply
-    slack by 2 and 5 orders of magnitude. That is a *different* reason from carbon's,
-    and running the two together is how "no carbon gate" would silently widen into "no
-    gate", this repo's most-repeated failure shape. Both reasons are recorded, apart.
+    slack. That is a *different* reason from carbon's, and running the two together is
+    how "no carbon gate" would silently widen into "no gate", this repo's most-repeated
+    failure shape. Both reasons are recorded, apart.
 
     Note also that scarcity in this model is *designed* to act through the limitation
     factors (``f_water``, ``f_N``, ``f_O2``), not through the backstop — so a biting
     drought would throttle assimilation without ever moving ``rationed``.
+
+    ⚠ **RE-MEASURED 2026-08-12 (the soil-water re-basing), and WATER'S SLACK FELL BY
+    20x: 189.24 -> 9.31.** The docstring used to say "slack by 2 and 5 orders of
+    magnitude"; water is now slack by *one*. Nothing about the gate changed — the store
+    did. ``soil_water`` used to hold 1000 kg over 1 m2, which is 1000 mm of extractable
+    water, i.e. a 7.7 m soil column; it now holds what the root zone can physically
+    hold. A margin of 189x was never a fact about safety, it was a fact about a bucket
+    that could not exist. This is the honest number, and it is still an order of
+    magnitude of headroom.
     """
     rows = census("open_season")
     water = rows["biosphere.soil_water"]
@@ -557,7 +566,7 @@ def test_open_seasons_other_currencies_are_slack_not_absent() -> None:
     assert water.gate == "live" and nitrogen.gate == "live"
     water_margin, n_margin = water.min_margin, nitrogen.min_margin
     assert water_margin is not None and n_margin is not None
-    assert 100.0 < water_margin < 1_000.0, water_margin  # 189.24
+    assert 9.0 < water_margin < 10.0, water_margin  # 9.31 (was 189.24 pre-re-basing)
     assert 1e5 < n_margin < 1e6, n_margin  # 126_238.75
 
 
@@ -688,15 +697,15 @@ def test_the_litter_pair_became_live_when_it_gained_an_o2_draw() -> None:
 
 
 @pytest.mark.parametrize(
-    "scenario,expected",
+    "scenario,expected,runner_up",
     [
-        ("sealed_chamber", 2.3404741281202655),
-        ("perennial_chamber", 1.5124880369468734),
-        ("consumer_chamber", 2.112066494173573),
+        ("sealed_chamber", 2.3404741281202655, 9.313939636232975),
+        ("perennial_chamber", 1.5124880369468734, 8.437936564620642),
+        ("consumer_chamber", 2.112066494173573, 8.437936564620642),
     ],
 )
 def test_the_jars_carbon_pool_is_the_only_binding_gate(
-    scenario: str, expected: float
+    scenario: str, expected: float, runner_up: float
 ) -> None:
     """The chamber-scale collision as a number: 51-134 % headroom, on one stock.
 
@@ -718,9 +727,17 @@ def test_the_jars_carbon_pool_is_the_only_binding_gate(
     The ``< 2.0`` bound is REPLACED BY A RANK rather than re-tuned upward: an amplitude
     cut chosen after seeing the measurement is the fitted comparison this file already
     refuses once (the "every margin below 9.0" draft, off by one). What makes this stock
-    the binding gate is that it is the tightest in its scenario by a wide factor, and
-    that
-    is what is asserted below.
+    the binding gate is that it is the tightest in its scenario, and that is what is
+    asserted below.
+
+    ⚠ **THE "BY A WIDE FACTOR" HALF DIED ON 2026-08-12, AND IS NOT BEING RE-TUNED.**
+    It asserted ``runner_up > 4 * margin``. After the soil-water re-basing the runner-up
+    is ``soil_water``/``subsoil_water`` at 9.31/8.44 instead of ~30, so the ratio is
+    3.98 on ``sealed_chamber`` and 4.00 on ``consumer_chamber`` — it fails, barely.
+    Loosening 4 to 3.5 would be exactly the fitted cut the paragraph above refuses, so
+    the factor is dropped and replaced by something strictly stronger: the RANK (this
+    stock is the minimum) plus the runner-up pinned as an EXACT value. A threshold can
+    only catch a change bigger than its slack; an exact pin catches every change.
     """
     rows = census(scenario)
     pool = rows["biosphere.carbon_pool"]
@@ -728,9 +745,12 @@ def test_the_jars_carbon_pool_is_the_only_binding_gate(
     margin = pool.min_margin
     assert margin is not None
     assert margin == pytest.approx(expected, rel=1e-9)
-    # and it is that scenario's tightest, by a wide margin
+    # It is that scenario's tightest — the claim the test is named for.
     others = sorted(v for k, v in _live(rows).items() if k != "biosphere.carbon_pool")
-    assert others[0] > 4 * margin, (margin, others[:3])
+    assert others[0] > margin, (margin, others[:3])
+    # ...and the runner-up is pinned exactly, so the GAP is a measurement rather than a
+    # threshold. Post-re-basing this is soil_water (open-fed) or subsoil_water (sealed).
+    assert others[0] == pytest.approx(runner_up, rel=1e-9), (margin, others[:3])
 
 
 # The census table: scenario -> (tightest live stock, its minimum margin). Measured
@@ -748,7 +768,15 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     # enormous margin — the ranking moved, the safety did not. Recorded rather than
     # quietly re-pointed, because a new stock displacing an established gate is exactly
     # the kind of change this census exists to surface.
-    "open_season": ("biosphere.subsoil_water", 30.491707317073107),
+    # ⚠ CHANGED 2026-08-12 (the soil-water re-basing): `soil_water` displaces
+    # `subsoil_water` here and `carbon_pool` in `greenhouse`/`lighting`, at 9.3139 in
+    # all three. This is the "gate's reach changed" case again, and this time the cause
+    # is the STORE rather than a new flow: the root zone used to be declared at 1000 kg
+    # over 1 m2 — 1000 mm of extractable water, a 7.7 m soil column — and is now
+    # `rooted_depth x EXTR x rho x area`. A physically sized bucket has a physically
+    # sized margin. The ranking moved; the safety is an order of magnitude, not a
+    # threshold breach.
+    "open_season": ("biosphere.soil_water", 9.313939636232975),
     "sealed_chamber": ("biosphere.carbon_pool", 2.3404741281202655),
     "perennial_chamber": ("biosphere.carbon_pool", 1.5124880369468734),
     "consumer_chamber": ("biosphere.carbon_pool", 2.112066494173573),
@@ -759,9 +787,9 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     "crew_mission": ("crew.food_store", 388.55555555555975),
     "station_heat_closure": ("power.battery", 11.295323690100386),
     "cabin_gas": ("eclss.cabin_o2", 35.57253249034074),
-    "greenhouse": ("biosphere.carbon_pool", 16.666666666666664),
+    "greenhouse": ("biosphere.soil_water", 9.313939636232975),
     "water_recovery": ("eclss.cabin_o2", 35.57253249034074),
-    "lighting": ("biosphere.carbon_pool", 14.44461256264056),
+    "lighting": ("biosphere.soil_water", 9.313939636232975),
     "harvest": ("biosphere.carbon_pool", 16.666666666666664),
     "perennial_long_horizon": ("biosphere.carbon_pool", 1.5004031863217981),
     "consumer_long_horizon": ("biosphere.carbon_pool", 2.112066494173573),
@@ -875,21 +903,35 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
         "consumer_long_horizon",
         "sealed_station",
     }
-    # ⚠⚠ THE RUNNER-UP CHANGED IDENTITY, and the diagnosis's sentence about it does not
-    # survive. It used to be ``sealed_chamber``'s ``o2_pool`` at 8.944, which licensed
-    # "even the runner-up is a chamber property". The humification split moved O2 around
-    # — ``Decomposition`` gained an O2 draw while ``MicrobialRespiration`` lost 15 % of
-    # its own — and that row is no longer 7th. The first non-``carbon_pool`` margin in
-    # the roster is now ``power.battery`` at 11.086, outside the biosphere entirely.
-    # The MAIN claim is unaffected and is in fact wider: the gap between the binding
-    # gate
-    # (1.500) and the first margin on any other stock is now 7.4x rather than 7.9x... on
-    # a different stock. The "even the runner-up is a chamber property" corollary is
-    # RETIRED, not restated.
-    margin, scenario, sid = ranked[6]
-    assert (scenario, sid) == ("power_self_discharge", "power.battery"), "runner-up"
-    assert margin == pytest.approx(11.085836827155921, rel=1e-9), "runner-up value"
-    assert margin / ranked[0][0] > 7.0, "…and the binding gate is still far tighter"
+    # ⚠⚠ THE RUNNER-UP HAS NOW CHANGED IDENTITY TWICE, AND THE SECOND TIME IT CAME
+    # BACK. History, because the churn is the finding:
+    #
+    #   2026-08-09  ``sealed_chamber``'s ``o2_pool`` at 8.944  — licensed the corollary
+    #               "even the runner-up is a chamber property".
+    #   2026-08-10  the humification split moved O2 around, and the 7th row became
+    #               ``power.battery`` at 11.086 — outside the biosphere entirely, so
+    #               that corollary was RETIRED rather than restated.
+    #   2026-08-12  the soil-water re-basing sized the root zone from geometry, and the
+    #               7th row is ``biosphere.soil_water`` at 8.4379 — a chamber property
+    #               again, on a stock that was never in contention before because it
+    #               used to hold 1000 kg in a bucket that could physically hold 19.5.
+    #
+    # ⚠ The corollary is STILL NOT restored. It was retired on the evidence that the
+    # ranking does not respect it, and a claim that has been false once is not made true
+    # by drifting back — it is a coincidence of the current roster, and saying so is the
+    # whole reason this comment keeps its history.
+    #
+    # ⚠ The ``> 7.0`` ratio bound is DROPPED, not re-tuned. The gap is now 5.62x
+    # (8.4379 / 1.5004) where it was 7.4x, so the bound fails; lowering it to 5.0 is the
+    # fitted cut this file refuses elsewhere in exactly these words. Rank plus exact
+    # values say strictly more than any threshold would.
+    margin, _scenario, sid = ranked[6]
+    assert sid == "biosphere.soil_water", ("runner-up", ranked[6:10])
+    # Four scenarios tie at this value, so the SCENARIO of row 6 is sort-incidental and
+    # is deliberately not asserted; the tie itself is.
+    assert {r[2] for r in ranked[6:10]} == {"biosphere.soil_water"}, ranked[6:10]
+    assert margin == pytest.approx(8.437936564620642, rel=1e-9), "runner-up value"
+    assert margin > ranked[0][0], "…and the binding gate is still the tighter one"
 
     # --- claim 2: sealed_station's census row (folded in; see the note above) --------
     stock, expected = TIGHTEST[_TIER2]

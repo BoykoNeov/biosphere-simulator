@@ -57,7 +57,8 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.transpiration import water_stress_factor
+from domains.biosphere.stocks import ROOTED_DEPTH
+from domains.biosphere.transpiration import soil_water_stress
 from simcore.integrator import EulerIntegrator
 from simcore.registry import Registry
 from simcore.state import State
@@ -165,10 +166,12 @@ def test_season_is_potential_production(season: tuple[list[State], int, tuple]) 
     states, _, _ = season
     np_ = load_nitrogen_params()
     for s in states:
-        f_water = water_stress_factor(
+        f_water = soil_water_stress(
             s.stocks[SOIL_WATER].amount,
-            sw_wilting=_SCENARIO.sw_wilting,
-            sw_critical=_SCENARIO.sw_critical,
+            s.aux.get(ROOTED_DEPTH, 0.0),
+            soil_extractable_water=_SCENARIO.soil_extractable_water,
+            ground_area=_SCENARIO.ground_area,
+            threshold=_SCENARIO.wssg,
         )
         biomass = (
             s.stocks[LEAF_C].amount + s.stocks[STEM_C].amount + s.stocks[ROOT_C].amount

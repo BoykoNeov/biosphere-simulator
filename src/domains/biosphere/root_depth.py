@@ -49,7 +49,17 @@ mutation-verified rather than regression-level.
     is supposed to equal that of water uptake"
 
 — hence ``f_temp`` is :func:`photosynthesis.temperature_factor` and ``f_water`` is
-:func:`transpiration.water_stress_factor`, the same two the rest of the tree uses. And
+:func:`transpiration.soil_water_stress`, the same two the rest of the tree uses.
+
+⚠ **[E]'s "equal to that of water uptake" is what pins WHICH factor this takes**, and
+that sentence is why the 2026-08-12 re-basing did not quietly change this law's meaning.
+The factor's shape moved (an absolute-kg ramp became ``WSFG = min(1, FTSW/WSSG)``), but
+[E] ties root extension to the *transpiration* factor rather than naming a curve of its
+own, so it moves with it by citation. Note [F] would not license this term at all: its
+own ``GRTD`` (Box 14.1) carries **no** continuous water factor, only the discrete stops
+``CTU < tuBRG``, ``CTU > tuTRG``, ``DDMP = 0``, ``DEPORT >= SOLDEP``, ``DEPORT >=
+MEED``,
+``WSTORG = 0``. Two sources, deliberately kept apart. And
 ([E] p. 136) *"Root growth generally stops around flowering"*, so the rate is zero at
 ``DVS >= 1``.
 
@@ -86,7 +96,7 @@ from dataclasses import dataclass
 
 from domains.biosphere.phenology import PhenologyParams, development_stage
 from domains.biosphere.photosynthesis import PhotosynthesisParams, temperature_factor
-from domains.biosphere.transpiration import water_stress_factor
+from domains.biosphere.transpiration import soil_water_stress
 from simcore.auxiliary import AuxId
 from simcore.environment import Environment
 from simcore.ids import StockId
@@ -128,9 +138,10 @@ def extension_rate(
     params: RootDepthParams,
     photo: PhotosynthesisParams,
     pheno: PhenologyParams,
-    sw_wilting: float,
-    sw_critical: float,
+    wssg: float,
     soil_depth: float,
+    soil_extractable_water: float,
+    ground_area: float,
 ) -> float:
     """``GRTD`` — the gated rooted-depth extension rate (m/day). **The single source.**
 
@@ -175,8 +186,12 @@ def extension_rate(
         t_opt_hi=photo.t_opt_hi,
         t_max=photo.t_max,
     )
-    f_water = water_stress_factor(
-        soil_water, sw_wilting=sw_wilting, sw_critical=sw_critical
+    f_water = soil_water_stress(
+        soil_water,
+        depth,
+        soil_extractable_water=soil_extractable_water,
+        ground_area=ground_area,
+        threshold=wssg,
     )
     return params.max_extension_rate * f_water * f_temp
 
@@ -204,9 +219,10 @@ class RootDepthExtension:
     params: RootDepthParams
     photo: PhotosynthesisParams
     pheno: PhenologyParams
-    sw_wilting: float
-    sw_critical: float
+    wssg: float
     soil_depth: float
+    soil_extractable_water: float
+    ground_area: float
 
     def evaluate(
         self, snapshot: State, env: Environment, dt: float
@@ -220,8 +236,9 @@ class RootDepthExtension:
             params=self.params,
             photo=self.photo,
             pheno=self.pheno,
-            sw_wilting=self.sw_wilting,
-            sw_critical=self.sw_critical,
+            wssg=self.wssg,
             soil_depth=self.soil_depth,
+            soil_extractable_water=self.soil_extractable_water,
+            ground_area=self.ground_area,
         )
         return {self.accumulator: rate * dt}

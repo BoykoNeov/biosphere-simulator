@@ -178,7 +178,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.1b6b65a387783p+10",
+      "amount": "0x1.325b2d1c3bb73p+7",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -217,7 +217,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.6b5aee631f892p+5",
+      "amount": "0x1.9eb5dcc63f130p+4",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },

@@ -74,7 +74,8 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.transpiration import water_stress_factor
+from domains.biosphere.stocks import ROOTED_DEPTH
+from domains.biosphere.transpiration import soil_water_stress
 from simcore.boundary import BOUNDARY_DOMAIN, loss_sink
 from simcore.environment import Environment, SourceResolver
 from simcore.flow import FlowResult, Leg
@@ -212,10 +213,13 @@ def drought() -> tuple[list[State], list[State]]:
 
 
 def _fwater(state: State) -> float:
-    return water_stress_factor(
+    """WSFG from the same two state reads the flows use ([F] 14.6/14.7/15.3)."""
+    return soil_water_stress(
         state.stocks[SOIL_WATER].amount,
-        sw_wilting=DROUGHT_SCENARIO.sw_wilting,
-        sw_critical=DROUGHT_SCENARIO.sw_critical,
+        state.aux.get(ROOTED_DEPTH, 0.0),
+        soil_extractable_water=DROUGHT_SCENARIO.soil_extractable_water,
+        ground_area=DROUGHT_SCENARIO.ground_area,
+        threshold=DROUGHT_SCENARIO.wssg,
     )
 
 

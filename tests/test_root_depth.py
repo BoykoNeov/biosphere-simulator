@@ -184,9 +184,10 @@ def test_root_growth_stops_at_flowering() -> None:
         params=RootDepthParams(max_extension_rate=0.018, max_rooted_depth=99.0),
         photo=photo,
         pheno=pheno,
-        sw_wilting=DEFAULT_SCENARIO.sw_wilting,
-        sw_critical=DEFAULT_SCENARIO.sw_critical,
+        wssg=DEFAULT_SCENARIO.wssg,
         soil_depth=99.0,  # the SOIL cap lifted too, so only the flowering stop can bind
+        soil_extractable_water=DEFAULT_SCENARIO.soil_extractable_water,
+        ground_area=DEFAULT_SCENARIO.ground_area,
     )
     state, _ = build_season()
 

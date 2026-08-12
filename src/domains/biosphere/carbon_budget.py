@@ -88,7 +88,7 @@ from domains.biosphere.respiration import (
     available_for_growth,
     maintenance_respiration_flux,
 )
-from domains.biosphere.transpiration import water_stress_factor
+from domains.biosphere.transpiration import soil_water_stress
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -117,11 +117,19 @@ class CarbonContext:
     ci_var: str
     temp_var: str
     daylength_var: str
-    # f_water: soil water read as a sibling stock via env.get (#16); the band is soil /
-    # scenario data (rooting depth + soil type), like ground_area — not a crop param.
+    # f_water: soil water read as a sibling stock via env.get (#16), now divided by the
+    # root zone's own capacity (TTSW = rooted_depth · EXTR · ρ · A) rather than compared
+    # against an absolute-kg band. ⚠ The depth comes off the SNAPSHOT aux, and it must
+    # be
+    # the same step-entry depth Transpiration and extension_rate read — this consumer
+    # reaches soil_water through env.get while Transpiration reads snapshot.stocks, so
+    # the two could silently disagree about FTSW inside one step. They are pinned equal.
+    # EXTR/WSSG/ground_area are soil/scenario data, like the band they replace.
     soil_water_var: str
-    sw_wilting: float
-    sw_critical: float
+    wssg: float
+    rooted_depth_aux: str
+    soil_extractable_water: float
+    ground_area: float
     # f_N: the plant's own N pool (a direct snapshot read, #16); the concentration
     # thresholds live in the (loader-folded) nitrogen params.
     plant_n: StockId
@@ -199,8 +207,12 @@ class CarbonContext:
         own factor — the structural-agreement win).
         """
         soil_water = env.get(self.soil_water_var)
-        f_water = water_stress_factor(
-            soil_water, sw_wilting=self.sw_wilting, sw_critical=self.sw_critical
+        f_water = soil_water_stress(
+            soil_water,
+            snapshot.aux.get(self.rooted_depth_aux, 0.0),
+            soil_extractable_water=self.soil_extractable_water,
+            ground_area=self.ground_area,
+            threshold=self.wssg,
         )
         _, biomass = self._leaf_and_biomass(snapshot)
         plant_n = snapshot.stocks[self.plant_n].amount

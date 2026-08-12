@@ -98,7 +98,6 @@ from domains.biosphere.scenario import (
     SEALED_CHAMBER_YEARS as SEALED_CHAMBER_YEARS,
 )
 from domains.biosphere.soil import build_soil
-from domains.biosphere.soil_layers import captured_water
 from domains.biosphere.stocks import (
     CARBON_POOL as CARBON_POOL,
 )
@@ -362,6 +361,32 @@ def run_season(
     return states, total_rationed, tuple(events)
 
 
+def resow_water_return(
+    soil_water: float, old_depth: float, rooted_depth0: float
+) -> float:
+    """The water a shrinking root zone leaves behind at a re-sow, in kg.
+
+    **A MODULE-LEVEL FUNCTION SO IT CANNOT BE RE-IMPLEMENTED.** It was inline in
+    :func:`annual_reset`, and a test helper (``test_soil_fractionation.reset_variant``)
+    hand-copied it under a comment reading "Mirrors ``season.annual_reset``". When the
+    rule changed on 2026-08-12 the copy did not, so the variant runs silently kept the
+    old water rule and diverged from the tree they were meant to be a control for —
+    caught only because a pinned CO2 trough moved. That file's own docstring already
+    warned about a helper diverging from the assembly it mirrors; the durable fix is one
+    function with two callers, not a sharper comment.
+
+    ``returned = soil_water · (old_depth − rooted_depth0) / old_depth`` — the abandoned
+    FRACTION of the water, from the declared-uniform distribution through the zone. It
+    preserves ``FTSW`` exactly across the re-sow, needs no clamp (the fraction is < 1),
+    and at the drained upper limit equals ``captured_water(old_depth − rooted_depth0)``,
+    the cited-geometry form it generalises. Returns 0.0 for a zone that did not shrink.
+    """
+    if old_depth <= 0.0:
+        return 0.0
+    fraction = (old_depth - rooted_depth0) / old_depth
+    return soil_water * fraction if fraction > 0.0 else 0.0
+
+
 def annual_reset(state: State, scenario: SeasonScenario) -> State:
     """The annual phenology reset / re-sow (P3.4) — a pure, carbon-conserving transform.
 
@@ -487,20 +512,42 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
     # end with the whole soil column pumped up into it — a monotone drift with no
     # physical referent.
     #
-    # It uses ``soil_layers.captured_water`` — the SAME formula the capture flow uses —
-    # so an unclamped season is an exactly closed cycle. Clamped to what is actually
-    # there: the root zone may hold less than its geometry allows (it is drawn down by
-    # transpiration), and returning more would drive ``soil_water`` negative.
-    abandoned = old_depth - scenario.rooted_depth0
-    if abandoned > 0.0:
-        returnable = captured_water(
-            abandoned,
-            soil_extractable_water=scenario.soil_extractable_water,
-            ground_area=scenario.ground_area,
+    # **The rule is the abandoned FRACTION of the water, not the abandoned column at the
+    # drained upper limit.** Water is (declared) uniformly distributed through the root
+    # zone, so shrinking the zone from ``old_depth`` to ``rooted_depth0`` leaves behind
+    # exactly the depth fraction that is no longer rooted:
+    #
+    #     returned = soil_water · (old_depth − rooted_depth0) / old_depth
+    #
+    # which preserves ``FTSW`` **exactly** across the re-sow (both ATSW and TTSW get
+    # scaled by ``rooted_depth0/old_depth``) — the right invariant for a uniformly wet
+    # profile, and the reason no clamp is needed: the fraction is < 1 by construction,
+    # so this can never overdraw.
+    #
+    # ⚠ **THE PREVIOUS FORM WAS ``min(captured_water(abandoned), soil_water)`` AND IT
+    # SURVIVED ONLY BECAUSE THE STORE COULD NOT RUN OUT.** It returned the abandoned
+    # column *at the drained upper limit* — 149.58 kg for a 1.3 m zone — which was a
+    # rounding error against a 1150 kg store and is more than the whole store once the
+    # store is 19.5–169 kg. Its ``min`` then fired every re-sow and handed the *entire*
+    # root zone to the subsoil, leaving the new seedling in a bone-dry bed. Measured
+    # consequence: the 4-year sealed station made **no grain at all** and
+    # ``annual_reset`` raised "seed bank too small to re-sow — storage_c 0.0". The old
+    # comment even anticipated the shortfall ("the root zone may hold less than its
+    # geometry allows") and clamped instead of re-deriving — a clamp that turns a wrong
+    # amount into a survivable one hides the wrongness until the store shrinks.
+    #
+    # At the drained upper limit the two forms AGREE exactly (``soil_water = old_depth ·
+    # EXTR · ρ · A`` makes the fraction equal ``captured_water(abandoned)``), so this is
+    # a generalisation of the cited-geometry case, not a departure from it — and a
+    # season ending full is still an exactly closed cycle with the capture that
+    # filled it.
+    returned = resow_water_return(
+        stocks[SOIL_WATER].amount, old_depth, scenario.rooted_depth0
+    )
+    if returned > 0.0:
+        stocks[SOIL_WATER] = replace(
+            stocks[SOIL_WATER], amount=stocks[SOIL_WATER].amount - returned
         )
-        held = stocks[SOIL_WATER].amount
-        returned = returnable if returnable < held else held
-        stocks[SOIL_WATER] = replace(stocks[SOIL_WATER], amount=held - returned)
         stocks[SUBSOIL_WATER] = replace(
             stocks[SUBSOIL_WATER], amount=stocks[SUBSOIL_WATER].amount + returned
         )

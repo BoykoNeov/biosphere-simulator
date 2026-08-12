@@ -227,7 +227,267 @@ suffices before reaching for it.
 
 ---
 
+# The build — scope chosen 2026-08-12: **branch 3 + drainage**
+
+The user took the widest branch and supplied the design constraint that settles it:
+
+> *"yes, the station can have a water reservoir, of course. the drainage can be turned on
+> or off with at least a valve."*
+
+**[F] agrees, and it is cited — so the reservoir needs no new stock.** The plan above
+priced drainage as "a new flow, a new boundary sink and a new param". The boundary sink is
+wrong: [F] does **not** drain to a sink.
+
+> "For the root layer, not all the drained water (DRAIN) below the root layer may be
+> considered a water loss. All or part of the drained water to deeper soil may be exploited
+> later by the crop due to root growth." — [F] Ch. 14, p. 176
+>
+> `WSTORGᵢ = WSTORGᵢ₋₁ + DRAIN − EWAT` — **Eqn 14.12**
+>
+> "Final total drainage will be the amount of WSTORG at the end of simulation (growing
+> season). That is, unused, drained water below the root zone."
+
+Drainage's destination is `WSTORG` — **our existing `subsoil_water` POOL.** So the flow is
+`soil_water → subsoil_water`, the exact inverse of `RootZoneCapture`, entirely in-system,
+crossing no boundary: conservation is structural rather than asserted, and the user's
+reservoir is the store the previous build already added. It also closes something the
+soil-layers build recorded as a known one-way-ness: *"`DRAIN` is `WSTORG`'s only input in
+[F], so omitting it makes the below-root store one-way within a season."* The store becomes
+two-way, which is what [F] always had.
+
+**The valve is `DRAINF`.** [F] Eqn 14.11 is `DRAIN = (ATSW − TTSW) · DRAINF` when
+`ATSW > TTSW`, else 0 — so `drainage_factor = 0.0` **is** a shut valve, exactly, with no
+branch of our own invention. No `bool`, no scenario flag: the parameter the source already
+has does the job.
+
+### ⚠ Drainage does NOT let irrigation alone — the first draft of this section was wrong
+
+It said drainage "removes the need to touch irrigation at all", reasoning that excess
+irrigation would simply drain. **Measured, that is false and expensive:** with the store
+physically sized and `DRAINF = 0.3`, the flat 2 mm day⁻¹ leaves the reference open season
+at `FTSW` **0.17** at its worst and costs **38 % of the yield** (storage C 22.4135 →
+13.8450), with 204 kg of the season's irrigation ending up below the root zone.
+
+The cause is not drainage misbehaving; it is that the flat schedule was **never sized
+against demand**. It only looked adequate because the old bucket held 1000 kg — a
+seven-metre soil column's worth of buffer. Peak measured demand is **5.7744 kg day⁻¹**
+against a 2 kg day⁻¹ supply. Our own scenario comment calls this run *"water (PP,
+non-limiting)"*; with a real bucket, that declaration is simply no longer true.
+
+So irrigation becomes **demand-driven, capped by a declared system capacity** — which is
+[F]'s two stated options composed, not an invention of ours:
+
+> "One possibility is a fixed amount of water at each irrigation, **which may be defined by
+> the capacity of the irrigation system**. Another possibility is to add sufficient water to
+> return the root layer to a specific level, e.g. the drained upper limit. … `IRGW = TTSW −
+> ATSW`" — [F] Ch. 14, **Eqn 14.8**
+
+```
+IRGW = min( irrigation_mm_day · area · dt ,  max(0, TTSW − ATSW) )
+```
+
+`irrigation_mm_day` stops being a *rate applied* and becomes a **capacity available**, so
+the frozen default rises **2.0 → 8.0 mm day⁻¹** — chosen as a round number above the
+measured 5.7744 peak (1.39× headroom), and **pinned to never bind on the reference season**,
+which is what makes "potential production" a checkable declaration rather than a label.
+Season water use actually *falls*, 610 → **582.44 kg**: demand-driven irrigation is more
+frugal in total while needing a higher peak.
+
+⚠ **Consequence to record now, because no golden will catch it later: once irrigation is
+demand-driven, drainage is bit-identically INERT on the entire frozen roster.** `DRAINF`
+0.3 and 0.0 give identical states everywhere. That is physically correct — you cannot drain
+water you never over-applied — and it puts drainage in the same category as the root-depth
+gate: a real mechanism that **no regression test can see**. Its pins must therefore be
+unit-level and mutation-verified, and at least one scenario must actually over-water, or
+the flow is decoration. Same for the Rust mirror, which was measured blind to five separate
+mutations last build.
+
+## `DRAINF` — the value, and a units defect in the source's own table
+
+Table 14.2 (page render, PDF p. 192 = printed p. 177) gives `DRAINF` by soil texture and
+depth: silty clay 0.3/0.2/0.1, silty loam 0.4/0.3/0.2, sandy loam 0.5/0.5/0.4, sand
+0.6/0.5/0.4 — at `SOLDEP` **210 / 150 / 60**, captioned **mm**.
+
+⚠ **That column cannot be a profile depth in millimetres, and [F] itself is the witness.**
+(Stated that way deliberately: what is proven is that the *mm reading is impossible*, not
+that the caption is a typo — DSSAT profiles are often specified per **horizon**, and
+210/150/60 could be horizon thicknesses, which would make the caption right and only the
+"profile depth" reading wrong. Either way the `DRAINF` pick below is unaffected.) As
+millimetres
+those soils are 6–21 cm deep, while the same chapter puts `DEPORT` at emergence at
+**150–400 mm** and wheat's maximum extraction depth `MEED` at **1200 mm** (Table 14.1), and
+Box 14.1 carries `If DEPORT >= SOLDEP Then GRTD = 0`. A 60 mm soil would stop a crop before
+it emerged, and a 210 mm soil would make `MEED = 1200` unreachable on every crop in the
+book. Read as **centimetres** the column is 2.1 m / 1.5 m / 0.6 m — ordinary profile depths,
+all consistent with `MEED`. So the values are cm.
+
+Our `soil_depth = 1.5 m` **is the middle row exactly**. Texture is fixed by a choice already
+made: `EXTR = 0.13` is [F] Ch. 13's value "for many agricultural soils **except sandy
+soils**", so we are a non-sandy agricultural soil → **silty loam at 1.5 m → `DRAINF = 0.3`**.
+
+This is recorded rather than quietly worked around, because it is a **locus** defect of
+exactly the kind `bucket3-scope-c-citation` warns about: the number is right, the unit
+printed beside it is not, and only reading a *second* place in the same book shows it.
+
+## The stress form: one factor, threshold 0.30, three consumers each justified separately
+
+[F] p. 195 applies a deficit factor to four processes with different thresholds. Our tree
+has three consumers of one `f_water`, and the mapping is **not** a free choice:
+
+| our consumer | [F]'s process | factor | threshold |
+|---|---|---|---|
+| assimilation (`carbon_budget.limitation`) | "Growth, or specifically transpiration/dry matter accumulation" | `WSFG` | `WSSG` = **0.30** |
+| transpiration (`Transpiration.evaluate`) | ⚠ **ours by analogy, NOT [F]'s** — see below | `WSFG` | 0.30 |
+| root extension (`root_depth.extension_rate`) | not [F]'s at all — **[E] p. 137**: *"The effect of water stress on the rate of increase in rooted depth is supposed to equal that of water uptake"* | `WSFG`, **because [E] says "equal to"** | 0.30 |
+
+So all three take `WSFG = min(1, FTSW/0.30)` ([F] Eqn 15.3), and the third does so *because*
+[E]'s sentence pins it to the transpiration factor — the citation is preserved rather than
+silently rescaled, which was check 2's hazard.
+
+⚠ **The transpiration arm is ours, and the earlier draft of this table overstated its
+warrant.** [F] p. 195's "Growth, or specifically transpiration/dry matter accumulation
+(WSFG)" is *not* an endorsement of multiplying a potential rate by `WSFG`: in Box 14.1 [F]
+computes `TR = DDMP · VPD / TEC`, i.e. transpiration is derived **from** dry-matter
+production, which already carries `WSFG` — [F] never multiplies a Penman–Monteith potential
+by a stress factor. Ours does (`transpiration.py`, `daily_kg = potential · f_water ·
+ground_area`), and has since Phase 1. That predates this work and is not changed by it; what
+changes is only the *shape* of the factor. Recorded as **ours by analogy** so a later reader
+does not mistake it for a transcription.
+
+**Also pinned, because the measurement harness papered over it:** the three consumers read
+`soil_water` from two different places — `Transpiration` from `snapshot.stocks`,
+`carbon_budget.limitation` through `env.get` — and must divide by a `TTSW` built from the
+**same** step-entry rooted depth, or they silently disagree about `FTSW` inside one step.
+The prototype used one shared depth cell and so could not have caught a disagreement. One
+pin steps once and asserts all three agree.
+
+**`WSFL` (leaf area, 0.40) and `WSFD` (phenology, 0.40) are NOT built**, and that is a real
+gap rather than a simplification: we have no water-gated leaf-expansion or
+phenology-slowdown term for them to attach to. Named successors, not oversights.
+
+## What changes, piece by piece
+
+| piece | source | shape |
+|---|---|---|
+| `soil_moisture_index` (`MAI`) ∈ [0,1] | [F] 14.25–14.28 | new scenario field, default **1.0** (drained upper limit — the potential-production condition the frozen roster is already built on) |
+| `soil_water0` default 1000 → **19.5** | `ATSW = DEPORT · EXTR · ρ · A · MAI` (14.26) | value change + a pin holding the identity |
+| `subsoil_water0` default 195 → **175.5** | `WSTORG = IPATSW − ATSW = (SOLDEP − DEPORT) · EXTR · ρ · A · MAI` (14.27/14.28) | fixes finding 5's double-count; **rewrites the pin at `test_soil_layers.py:89`**, which currently holds `IPATSW` |
+| `TTSW`, `FTSW`, `WSFG` | 14.6, 14.7, 15.3 | `transpiration.water_stress_factor` changes signature; three call sites gain the rooted-depth aux + `EXTR`/`ground_area` |
+| `sw_wilting` / `sw_critical` **retired** | — | they are the miscalibrated absolute band; replaced by `wssg` = 0.30 |
+| `Drainage` flow | 14.11 + 14.12 | `soil_water → subsoil_water`, `(ATSW − TTSW)·DRAINF`, donor-clamped; `flow_set` **21 → 22** |
+| `drainage_factor` (`DRAINF`) | Table 14.2, read as cm | new scenario field, default **0.3**; `0.0` is the shut valve |
+| `Irrigation` becomes demand-driven | 14.8 + [F]'s "capacity of the irrigation system" | `IRGW = min(cap·A·dt, max(0, TTSW − ATSW))`; `irrigation_mm_day` **2.0 → 8.0**, reinterpreted rate → capacity, pinned non-binding |
+
+## The whole design, measured end-to-end before a line of it was written
+
+Geometry + `FTSW` + demand-driven irrigation + drainage, against the shipped tree, full
+end-state stock-by-stock comparison:
+
+| scenario | stocks that move | `rationed` |
+|---|---|---|
+| `DEFAULT` | `soil_water` 1172.2936 → 164.2348, `subsoil_water` 45.4194 → 25.9194, `water_source` −610.0 → −582.4413 | 0 |
+| `SEALED_CHAMBER` | `soil_water` 1133.6781 → 153.1781, `subsoil_water` 45.4194 → 25.9194 | 0 |
+| `N_LIMITED` | the same three as `DEFAULT`, the same amounts | 0 |
+| `DROUGHT` | `soil_water` 92.7130 → 14.6542, `water_source` −610.0 → −582.4413 | 0 |
+
+**Only water moves. Not one carbon, nitrogen or oxygen amount, on any of them.** A complete
+dimensional re-basing of the water regime that leaves the frozen biology bit-identical.
+
+**The arbitration backstop never fires** — `rationed == 0` across 15 probe runs including
+`MAI` values low enough to kill the crop. That was the one blocking question (the old
+absolute band shut transpiration off *hard* at 20 kg, which was the structural positivity
+guarantee; `WSFG = FTSW/WSSG` only reaches zero at `FTSW = 0`, so the shutoff becomes
+asymptotic and could in principle let a step overdraw with drainage competing for the same
+donor). Measured, it does not. Checked, not reasoned.
+
+## Hazards to measure, not assume (each has bitten this project before)
+
+1. **`DROUGHT` and `WATER_BITING` declare `subsoil_water0 = 0.0` on purpose**, to freeze
+   rooted depth via `WSTORG = 0 ⇒ GRTD = 0`. **MEASURED, and it fires:** with flat
+   irrigation + drainage, `DROUGHT`'s rooted depth goes 0.1500 → **1.3072** — drainage
+   fills the subsoil the scenario declared empty and un-freezes the depth. ⚠ It is
+   **demand-driven irrigation, not drainage, that resolves this**: there is then no excess
+   to drain, the subsoil stays at 0.0000, and depth stays at 0.1500 exactly as declared. So
+   the two changes are load-bearing *for each other*, which is a third argument that this
+   was never separable into small pieces.
+2. **`WATER_BITING`'s bite is declared as `soil_water0 = 50` inside a (20, 60) kg band that
+   is being deleted**, so it must be re-declared. **Target written before the number was
+   picked**, from the scenario's own existing contract (`tests/test_water_biting.py`): a
+   sustained bite (`min f < 0.5`, >30 days below it), **never fully wilted** (`0 < f ≤ 1`
+   throughout), the crop alive, and the closed water loop still conserved. Swept `MAI` from
+   0.10 down to 0.02 against that target: **`MAI = 0.05`** — `FTSW` 0.0500–0.3190, so
+   `WSFG` bottoms at 0.167, leaf C peak 0.7621 and storage C 0.2452 against the shipped
+   0.8299 / 0.2610, total loop water conserved 9.7500 → 9.750000 exactly, `rationed = 0`.
+   ⚠ **And its dry-subsoil special case is retired, on a measurement.** That override
+   existed because *"a default 195 kg subsoil would pump 2.34 kg/day into a 50 kg chamber
+   and abolish the water stress"*. Under geometry the subsoil scales with the same `MAI`
+   (8.775 kg, not 195), so it no longer abolishes anything — measured `FTSW` stays ≤ 0.319
+   with the subsoil present. Keeping `subsoil_water0 = 0` would instead **kill** the crop at
+   every `MAI` tried (leaf C 0.0500, storage C 0.0000): a sealed chamber holding 1.95 kg of
+   total water grows nothing. So the special case goes, and with it the depth-freezing trap
+   the soil-layers build had to work around.
+3. **`DROUGHT` is left exactly as declared, and it still does not bite** — `FTSW` bottoms at
+   0.7039, well above `WSSG = 0.30`, so storage C stays 22.4135. That is **not new**: the
+   soil-layers build already recorded that the default profile *abolishes* the drought
+   cascade rather than weakening it. The re-basing neither fixes nor worsens it. Making the
+   scenario live up to its name is now a one-field change (a low `MAI`) but it would move a
+   golden's *science* for a reason outside this charge — **named successor, not taken
+   here.**
+4. **The re-sow return and the 15-year closed cycle.** The soil-layers build's strongest
+   result was that 15-year and 5-year runs land on the same `soil_water` — capture and
+   re-sow return cancel exactly. Drainage adds a second downward path; re-measure that
+   identity rather than trusting it.
+5. **Predict the golden diff before regenerating** (`soil-layers-built`). The measured
+   prediction is: on `DEFAULT`/`SEALED_CHAMBER`/`N_LIMITED`/`DROUGHT`, only `soil_water` and
+   `subsoil_water` move under the geometry+`FTSW` half — drainage's additional effect is
+   *not* yet measured and must be predicted separately.
+6. **The Rust mirror is blind to its own transcription** unless the pins construct the
+   conditions (measured last build: five separate mutations left the entire Rust suite
+   green). Drainage's donor clamp and the `ATSW > TTSW` branch both need Rust pins that
+   actually reach them.
+
+## Sequencing
+
+Python is the reference and this moves goldens and manifests, so **Python first, Rust
+mirrors** (`rust-primary-pivot`: *"Moves a golden/manifest? Yes → Python"*). Blast radius is
+measured and contained: `sw_wilting`/`sw_critical`/`soil_water0` appear **only** in the
+biosphere domain and its tests plus three Rust biosphere files — no `src/station/`, no
+`src/authoring/`, no authored `scenarios/*.yaml`, no `godot/`.
+
+## The predicted golden diff — WRITTEN BEFORE REGENERATION
+
+`soil-layers-built` earned this discipline the hard way, so the prediction goes in first
+and the actual goes in the Outcome. Predicted over **all 25 goldens on disk**, not the
+manifest's 7 (that roster error has bitten twice):
+
+1. **`season_euler`, `n_limited`** (open, 1 yr): exactly three stocks move —
+   `soil_water` 1172.2936 → **164.2348**, `subsoil_water` 45.4194 → **25.9194**,
+   `water_source` −610.0 → **−582.4413**. Every carbon, nitrogen and oxygen amount
+   **bit-identical**.
+2. **`sealed_chamber`** (3 yr): two stocks — `soil_water` 1133.6781 → **153.1781**,
+   `subsoil_water` 45.4194 → **25.9194**. No `water_source` (sealed has none). C/N/O
+   bit-identical.
+3. **`perennial_chamber`, `consumer_chamber`, `perennial_long_horizon`,
+   `consumer_long_horizon`, `sealed_station`, `greenhouse`, `lighting`, `harvest`**:
+   water stocks only, C/N/O bit-identical. ⚠ **Predicted, not measured** — the
+   measurements above are single-season; the multi-year runs re-sow, and the re-sow
+   return now shares the root-zone boundary with drainage. If a carbon amount moves on
+   any of these, the re-sow/drainage interaction is the suspect and the prediction has
+   failed, which is the point of writing it down.
+4. **`water_biting`**: many stocks move — it is the one scenario re-declared
+   (`soil_moisture_index = 0.05`). Leaf C peak 0.8299 → **0.7621**, storage C 0.2610 →
+   **0.2452**.
+5. **`drift_summary`, `sealed_energy_drift_summary`**: ⚠ **expected to MOVE**, unlike
+   the soil-layers build where they stayed byte-identical. They summarise conservation
+   drift, and the water totals themselves changed (1195 → 195 kg in the sealed chamber),
+   so the round-off floor moves with them. A drift summary that came back *identical*
+   would be the surprising result here.
+6. Non-biosphere goldens (`power`, `thermal`, `eclss`, `crew`, `cabin_gas`,
+   `power_self_discharge`, `demo_euler`, `demo_rk4`, `state_snapshot`,
+   `water_recovery`): **untouched**. The blast radius was measured and contains no
+   `src/station/`, `src/authoring/` or sibling-domain code.
+
 ## Outcome
 
-*(Pending the user's scope decision — see "The coupling" above. Nothing built yet; the
-whole of the above is measurement on the frozen tree, `git diff src/` empty.)*
+*(In progress. Diagnosis committed 2026-08-12 as `2ace967`; nothing built at that commit,
+`git diff src/` empty. The build followed in the same session.)*

@@ -12,6 +12,7 @@
     "ConsumerMortality",
     "ConsumerRespiration",
     "Decomposition",
+    "Drainage",
     "Fertilization",
     "Grazing",
     "GrowthRespiration",
@@ -42,13 +43,13 @@
         "bound": "non_collapsing(floor=0.05)",
         "locus": "tests/test_decade_stability.py::test_decade_leaf_cycle_is_stationary",
         "quantity": "annual peak leaf carbon (mol C)",
-        "source": "self \u2014 the calibrated attractor, not a cited value"
+        "source": "self — the calibrated attractor, not a cited value"
       },
       {
         "bound": "non_collapsing(floor=5e-4)",
         "locus": "tests/test_decade_stability.py::test_decade_consumer_biomass_is_stationary_and_alive",
         "quantity": "year-end consumer carbon (mol C)",
-        "source": "self \u2014 the calibrated attractor, not a cited value"
+        "source": "self — the calibrated attractor, not a cited value"
       }
     ],
     "drift_summary": [],
@@ -59,19 +60,19 @@
         "bound": "non_collapsing(floor=0.05)",
         "locus": "tests/test_decade_stability.py::test_decade_min_carbon_pool_stationary",
         "quantity": "annual minimum chamber CO2 pool (mol C)",
-        "source": "self \u2014 anchored on the MEASURED trough attractor 0.0732912 (converged well before yr 50, 1.47x the floor), not on a 15-yr reading; teeth witnessed by a mutation independent of any candidate science change (the jar shrunk 0.8x at fixed composition trips it at 0.044941). Window removed: floor[2:] -> floor"
+        "source": "self — anchored on the MEASURED trough attractor 0.0732912 (converged well before yr 50, 1.47x the floor), not on a 15-yr reading; teeth witnessed by a mutation independent of any candidate science change (the jar shrunk 0.8x at fixed composition trips it at 0.044941). Window removed: floor[2:] -> floor"
       },
       {
         "bound": "non_collapsing(floor=0.05)",
         "locus": "tests/test_decade_stability.py::test_decade_leaf_cycle_is_stationary",
         "quantity": "annual peak leaf carbon (mol C)",
-        "source": "self \u2014 the calibrated attractor, not a cited value"
+        "source": "self — the calibrated attractor, not a cited value"
       },
       {
         "bound": "max(tail) > 0.55",
         "locus": "tests/test_decade_stability.py::test_perennial_leaf_cycle_is_a_fixed_point",
         "quantity": "converged peak-leaf fixed point (mol C)",
-        "source": "self \u2014 anchored on the MEASURED equilibrium 0.594984 (reached ~yr 45), not on the 15-yr reading; 2.2x the 0.253 dead baseline. Second move: >1.0 -> >0.9 (decomposer calibration) -> >0.55 (humification split)"
+        "source": "self — anchored on the MEASURED equilibrium 0.594984 (reached ~yr 45), not on the 15-yr reading; 2.2x the 0.253 dead baseline. Second move: >1.0 -> >0.9 (decomposer calibration) -> >0.55 (humification split)"
       }
     ],
     "sealed_chamber": []

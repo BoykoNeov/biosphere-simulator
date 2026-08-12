@@ -90,6 +90,16 @@ def _weather() -> list[dict[str, float | str]]:
 # An open Ci-forcing context is enough for the *leg structure / balance* (the sealed Ci
 # seam is tested in test_chamber.py); what makes a flow multi-quantity here is the
 # CO₂-composition carbon pool + the O₂ pool it is wired to, not where Ci came from.
+# Soil-water geometry for the fixtures (the 2026-08-12 re-basing: stress is FTSW =
+# ATSW/TTSW against a threshold FRACTION, not an absolute-kg band). A 1.0 m root zone
+# over 1 m2 at EXTR 0.13 holds 130 kg, so the 100 kg default below is FTSW 0.77 —
+# unstressed, exactly as the band it replaced was meant to be.
+_ROOTED_DEPTH = "biosphere.rooted_depth"
+_TEST_DEPTH = 1.0
+_EXTR = 0.13
+_WSSG = 0.30
+
+
 def _ctx() -> CarbonContext:
     return CarbonContext(
         leaf_c=_LEAF_C,
@@ -100,8 +110,9 @@ def _ctx() -> CarbonContext:
         temp_var=_TEMP,
         daylength_var=_DAYLEN,
         soil_water_var=_SW,
-        sw_wilting=10.0,
-        sw_critical=30.0,
+        wssg=_WSSG,
+        rooted_depth_aux=_ROOTED_DEPTH,
+        soil_extractable_water=_EXTR,
         plant_n=_PLANT_N,
         photo=load_photosynthesis_params(),
         canopy=load_canopy_params(),
@@ -119,7 +130,8 @@ def _state(
     storage_c: float = 0.0,
     co2: float = 0.357,
     o2: float = 210.0,
-    soil_water: float = 100.0,  # >> sw_critical ⇒ f_water = 1 (non-limiting)
+    # 100 kg in a 1.0 m root zone is FTSW 0.77, far above wssg 0.30 ⇒ WSFG = 1.
+    soil_water: float = 100.0,
     plant_n: float = 1.0,  # high conc ⇒ f_N = 1 (non-limiting)
     thermal_time: float = 0.0,
 ) -> State:
@@ -179,7 +191,12 @@ def _state(
             composition={Quantity.OXYGEN: 2.0},
         ),
     }
-    return State(n=0, stocks=stocks, rng_seed=0, aux={_THERMAL_TIME: thermal_time})
+    return State(
+        n=0,
+        stocks=stocks,
+        rng_seed=0,
+        aux={_THERMAL_TIME: thermal_time, _ROOTED_DEPTH: _TEST_DEPTH},
+    )
 
 
 def _env(

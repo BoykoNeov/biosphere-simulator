@@ -307,6 +307,104 @@ so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-08-12 — the soil water regime re-based on geometry (+1 flow, `flow_set` 21 → 22,
+  12 goldens, both manifests, both ports).**
+  `docs/plans/post-roadmap-soil-water-rebasing.md`. The successor the soil-layers build
+  named as "the real finding", taken on the user's call. **The largest unfreeze in this
+  series, and the only one so far that changes what a frozen number MEANS rather than what
+  it is.**
+
+  **The defect.** `soil_water0 = 1000` kg over 1 m² is 1000 mm of extractable water, which
+  at `EXTR = 0.13` requires a **7.7 m soil column**. The root-zone bucket was not
+  dimensionally a soil profile, and the stress thresholds beside it (`sw_wilting = 20`,
+  `sw_critical = 60` **kg**) were absolute masses calibrated against that impossible
+  bucket.
+
+  **What replaced it, all from [F] Soltani & Sinclair Ch. 13–15:**
+
+  | piece | equation |
+  |---|---|
+  | `soil_water0` 1000 → **19.5** kg | `ATSW = DEPORT · EXTR · ρ · A · MAI` (14.26) |
+  | `subsoil_water0` 195 → **175.5** kg | `WSTORG = IPATSW − ATSW` (14.27/14.28) |
+  | `sw_wilting`/`sw_critical` → **`wssg = 0.30`** | `FTSW = ATSW/TTSW` (14.6/14.7), `WSFG = min(1, FTSW/WSSG)` (15.3), Table 15.1 wheat |
+  | new `Drainage` flow | `DRAIN = (ATSW − TTSW)·DRAINF` (14.11) into `subsoil_water` (14.12) |
+  | `Irrigation` demand-driven | `IRGW = min(capacity, TTSW − ATSW)` (14.8) |
+  | `soil_moisture_index` (MAI), `drainage_factor` (DRAINF) | new scenario fields |
+
+  ⚠ **`subsoil_water0 = 195` was WRONG, and its pin held the wrong identity.** 195 kg is
+  [F]'s `IPATSW` — the *whole* profile — where 14.28 makes `WSTORG` the profile **minus**
+  the root zone. The shipped default double-counted the root zone's 19.5 kg, and
+  `tests/test_soil_layers.py` pinned that formula. Defensible only while `soil_water0` was
+  not geometric; the re-basing removed the excuse, so value and pin moved together.
+
+  **The measured result: only water moved.** Predicted before regeneration and confirmed
+  over **all 25 goldens on disk** — `season_euler`, `sealed_chamber`, `n_limited`,
+  `drought`, `perennial_chamber`, `consumer_chamber`, both long horizons, `greenhouse`,
+  `lighting`, `harvest` and `sealed_station` move `soil_water` / `subsoil_water` /
+  `water_source` and **nothing else**. Not one carbon, nitrogen or oxygen amount, at any
+  horizon. The reason is structural: every frozen scenario is a *potential production*
+  scenario, so `FTSW` never falls below 0.79 and `WSFG ≡ 1` exactly as `f_water ≡ 1` did.
+  The two forms agree wherever water does not limit, which is everywhere the freeze looks.
+
+  ⚠ **`water_biting` is the exception, and it was re-declared rather than preserved.** Its
+  bite was `soil_water0 = 50` kg "inside the (20, 60) band" — a band that no longer exists.
+  It now declares `soil_moisture_index = 0.05`, chosen against its own written contract (a
+  sustained bite, never fully wilted, crop alive, loop conserved) and swept, not fitted to
+  a golden. Leaf C peak 0.8299 → 0.7621, storage C 0.2610 → 0.2452. **Its dry-subsoil
+  override is retired** — under geometry the subsoil scales with the same MAI, so it no
+  longer abolishes the stress it was protecting, and keeping it would kill the crop.
+
+  ⚠ **The geometry re-basing and the `FTSW` conversion were filed as two successors and
+  are ONE mechanism.** Geometry alone kills every sealed chamber outright: a sealed chamber
+  has no water inlet, so `soil_water ≤ sw_wilting` is an **absorbing state** (no
+  transpiration → no vapour → no condensate → no recycling → no change), and the geometric
+  19.5 kg misses the 20 kg escape by 0.5 kg. Measured, not reasoned.
+
+  ⚠ **Three defects surfaced that the change did not cause, only exposed:**
+  (1) all three station builders (`greenhouse`/`lighting`/`sealed.py`) seeded their aux
+  **without** `rooted_depth`, silently starting the crop at depth 0 — invisible while the
+  depth gate was inert, fatal once stress divides by `TTSW = depth · EXTR · ρ · A`;
+  (2) `harvest` injects a 1.3 m root system but inherited the 0.15 m zone's water, i.e.
+  `FTSW = 0.115` on day 0 for a grain-filling crop — the depth and the water are two halves
+  of one declaration and are now derived together;
+  (3) `test_soil_fractionation.reset_variant` hand-copied the re-sow rule under a comment
+  claiming it mirrored `season.annual_reset`, so when the rule changed the copy did not —
+  the durable fix is `season.resow_water_return`, one function with two callers.
+
+  ⚠ **The re-sow return was re-derived, not re-tuned.** It returned the abandoned column
+  *at the drained upper limit* (149.58 kg) clamped to what was held — fine against a 1150 kg
+  store, more than the entire store once the store is 19.5–169 kg, at which point its clamp
+  fired every re-sow and handed the whole root zone to the subsoil. It is now the abandoned
+  **fraction** of the water, which preserves `FTSW` exactly across a re-sow, needs no clamp,
+  and equals the old form at the drained upper limit. Measured: one transient cycle, then a
+  fixed point held to round-off over eight years.
+
+  ⚠ **`Drainage` is bit-identically inert on the entire frozen roster** — with irrigation
+  demand-driven the zone is never over-filled, so `DRAINF` 0.3 and 0.0 give identical
+  states. That is physically correct (you cannot drain what was never over-applied) and it
+  means **no golden can catch this flow's removal**; its pins are unit-level and
+  mutation-verified, like `root_depth`'s.
+
+  **What was deliberately NOT built, each a named successor:** `WSSL` (leaf-area expansion,
+  0.40) and `WSSD` (phenology, 0.40) — we have no water-gated leaf-expansion or
+  drought-accelerated development term for them to attach to; runoff and soil evaporation;
+  and making `DROUGHT` actually bite (now a one-field change, but it would move a golden's
+  science for a reason outside this charge).
+
+  **Cascade:** biosphere manifest (`flow_set` 21 → 22, golden hashes); station manifest
+  (golden hashes); 12 goldens; `src/station/{greenhouse,lighting,sealed,harvest}.py`; the
+  Rust mirror; the acceptance-gate census (three rows change tightest stock to
+  `soil_water`, and two threshold-shaped claims were **dropped rather than re-tuned** —
+  see below).
+
+  ⚠ **Two acceptance-gate claims died and were replaced by rank + exact values, not by
+  looser thresholds.** `water`'s slack in `open_season` fell 189.24 → **9.31** (a margin of
+  189× was never a fact about safety, it was a fact about a bucket that could not exist);
+  and `carbon_pool > 4 × runner-up` became 3.98× on two chambers. Loosening either bound
+  after seeing the measurement is the fitted comparison `test_acceptance_gate.py` refuses
+  in its own words, so both were replaced by the rank plus an exactly-pinned runner-up —
+  strictly stronger, since a threshold only catches changes bigger than its slack.
+
 - **2026-08-11 — soil layers: the below-root store (+1 flow, +1 stock, 12 goldens, both
   manifests).** `docs/plans/post-roadmap-soil-layers.md`. The successor the root-depth
   build named, and the first unfreeze in this series that **moves a value**.
@@ -332,8 +430,9 @@ so the discipline is enforced, not merely requested.
   that moved anywhere were `soil_water`, the new `subsoil_water`, and `rooted_depth`. Both
   drift-stability summaries are **byte-identical**.
 
-  ⚠ **Two scenarios declare a DRY subsoil, deliberately.** `water_biting` and `drought`
-  are *defined* as water-lean, so a hidden reservoir would contradict their construction —
+  ⚠ **Two scenarios declare a DRY subsoil, deliberately.** (⚠ **One, since 2026-08-12** —
+  `water_biting`'s override was retired by the re-basing; see the entry at the top.)
+  `water_biting` and `drought` are *defined* as water-lean, so a hidden reservoir would contradict their construction —
   and the measurement is the reason it matters: with the default profile the drought
   perturbation's cascade is not weakened but **abolished** (`f_water` never leaves 1.0;
   end vegetative carbon 33.61 → 33.28 instead of 33.61 → 12.68). That is the mechanism
@@ -350,6 +449,12 @@ so the discipline is enforced, not merely requested.
   needs a 7.7 m column. Deriving it would collapse the store to ~19.5 kg at sowing, below
   `sw_critical`, and make **every frozen scenario water-stressed**. That is a re-basing of
   the whole water regime and the verdict is the user's.
+
+  ⚠ **ALL THREE WERE TAKEN ON 2026-08-12 — see the entry at the top of this log.** Two of
+  the three turned out to be **one mechanism**, and the price recorded here was wrong in
+  both directions: the open field costs ~2 % of yield, and every *sealed* chamber dies
+  outright. Also corrected there: the `subsoil_water0` default above is [F]'s `IPATSW`,
+  not `WSTORG`, so it double-counted the root zone.
 
   **Cascade:** biosphere manifest (`flow_set` 20 → 21, 7 golden hashes); station manifest
   (golden hashes); 12 goldens; the Rust mirror; `tests/test_soil_layers.py` (14 pins, all

@@ -34,7 +34,8 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.transpiration import water_stress_factor
+from domains.biosphere.stocks import ROOTED_DEPTH
+from domains.biosphere.transpiration import soil_water_stress
 from golden_platform import windows_golden_only
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
@@ -80,10 +81,12 @@ def _final_state() -> State:
         "golden water-biting run must keep the carbon loss-sink 0.0 (stress not a kill)"
     )
     f_water_min = min(
-        water_stress_factor(
+        soil_water_stress(
             s.stocks[SOIL_WATER].amount,
-            sw_wilting=WATER_BITING_SCENARIO.sw_wilting,
-            sw_critical=WATER_BITING_SCENARIO.sw_critical,
+            s.aux.get(ROOTED_DEPTH, 0.0),
+            soil_extractable_water=WATER_BITING_SCENARIO.soil_extractable_water,
+            ground_area=WATER_BITING_SCENARIO.ground_area,
+            threshold=WATER_BITING_SCENARIO.wssg,
         )
         for s in states
     )

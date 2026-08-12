@@ -69,10 +69,10 @@ from domains.biosphere.season import (
     THERMAL_TIME,
     VERNALIZATION_DAYS,
     build_season,
+    resow_water_return,
     run_season,
     weather_resolver,
 )
-from domains.biosphere.soil_layers import captured_water
 from domains.biosphere.stocks import (
     O2_POOL,
     ROOTED_DEPTH,
@@ -425,16 +425,18 @@ def reset_variant(
     # and the abandoned root zone's water goes back below the (now shallow) root zone.
     old_depth = aux.get(ROOTED_DEPTH, 0.0)
     aux[ROOTED_DEPTH] = scenario.rooted_depth0
-    abandoned = old_depth - scenario.rooted_depth0
-    if abandoned > 0.0:
-        returnable = captured_water(
-            abandoned,
-            soil_extractable_water=scenario.soil_extractable_water,
-            ground_area=scenario.ground_area,
+    # ⚠ CALLS the tree's own rule rather than restating it. This block used to be a
+    # hand-copy under a comment claiming it mirrored `season.annual_reset`; when the
+    # rule changed (2026-08-12) the copy did not, and these variant runs quietly kept
+    # the old water return — so every "control" here was controlling against a tree
+    # that no longer existed. One function, two callers.
+    returned = resow_water_return(
+        stocks[SOIL_WATER].amount, old_depth, scenario.rooted_depth0
+    )
+    if returned > 0.0:
+        stocks[SOIL_WATER] = replace(
+            stocks[SOIL_WATER], amount=stocks[SOIL_WATER].amount - returned
         )
-        held = stocks[SOIL_WATER].amount
-        returned = returnable if returnable < held else held
-        stocks[SOIL_WATER] = replace(stocks[SOIL_WATER], amount=held - returned)
         stocks[SUBSOIL_WATER] = replace(
             stocks[SUBSOIL_WATER], amount=stocks[SUBSOIL_WATER].amount + returned
         )
@@ -1273,10 +1275,15 @@ def test_the_shedding_fed_regime_takes_BOTH_sizings_and_the_better_trough_costs_
         (
             WATER_BITING_SCENARIO,
             WATER_BITING_YEARS,
-            0.085006,
-            0.085055,
-            0.101867,
-            0.618695 / 2.225623,
+            # ⚠ 0.085006 until 2026-08-12. Not a mechanism change: `water_biting` was
+            # RE-DECLARED by the soil-water re-basing (its bite used to be
+            # `soil_water0 = 50` kg inside an absolute-kg band that no longer exists;
+            # it is now `soil_moisture_index = 0.05`). A probe value of the scenario,
+            # so it moves when the scenario does.
+            0.088509,
+            0.085405,
+            0.124293,
+            0.587767 / 2.171468,
         ),
     ):
         tails = {}

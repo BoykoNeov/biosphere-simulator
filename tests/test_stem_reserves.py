@@ -913,7 +913,11 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
     # single fill event ever fires.
     for scen, years, frozen_min in (
         (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, 0.076380),
-        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, 0.085006),
+        # ⚠ 0.085006 until 2026-08-12 — `water_biting` was re-declared by the
+        # soil-water re-basing (see its scenario comment), so this probe value moved
+        # with the scenario. The MECHANISM claim below (the trough is bit-identical
+        # with and without the reserve) is unchanged and is what the test is for.
+        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, 0.088509),
     ):
         base, _, _ = _run(scen, years)
         snap, _, _ = _run(scen, years, reserve=True, snapshot_fill=True)

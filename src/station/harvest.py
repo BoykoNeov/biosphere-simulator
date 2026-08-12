@@ -58,10 +58,15 @@ Pure stdlib only in the spine; the harvest rate loads via ``station.loader``. Re
 flow + the phenology injection.
 """
 
+from dataclasses import replace
+
+from domains.biosphere.soil_layers import captured_water
 from domains.biosphere.stocks import (
     LITTER_CARBON,
     ROOTED_DEPTH,
+    SOIL_WATER,
     STORAGE_C,
+    SUBSOIL_WATER,
     THERMAL_TIME,
     VERNALIZATION_DAYS,
 )
@@ -149,9 +154,46 @@ def build_harvest(
     # (1) Start the biosphere phenology past anthesis (a grain-filling plant). The
     # station owns the greenhouse State's aux dict, so this is a station-level injection
     # — no SeasonScenario / domain change.
+    #
+    # ⚠ **THE INJECTED DEPTH DRAGS THE WATER STORES WITH IT (2026-08-12).** Injecting a
+    # 1.3 m root system while the stocks still hold the *sowing* zone's water is
+    # incoherent once the store is geometric: the biosphere seeds ``soil_water0`` for a
+    # 0.15 m zone (19.5 kg), and 19.5 kg inside a 1.3 m zone whose capacity is 169 kg is
+    # ``FTSW = 0.115``, i.e. a grain-filling crop declared at a THIRD of its growth
+    # threshold on day 0. Measured before this correction: grain ended **79 % low** and
+    # every organ moved. The depth and the water are two halves of one declaration, so
+    # they are re-derived here together, from the same [F] Eqns 14.26-14.28 the scenario
+    # defaults use:
+    #
+    #     ATSW   = DEPORT            * EXTR * rho * A * MAI
+    #     WSTORG = (SOLDEP - DEPORT) * EXTR * rho * A * MAI
+    #
+    # This is a station-level injection like the phenology one above — it changes no
+    # domain code and no SeasonScenario field.
+    bio = scenario.greenhouse.bio
+    _rooted = scenario.rooted_depth0
+    _atsw = (
+        captured_water(
+            _rooted,
+            soil_extractable_water=bio.soil_extractable_water,
+            ground_area=bio.ground_area,
+        )
+        * bio.soil_moisture_index
+    )
+    _wstorg = (
+        captured_water(
+            bio.soil_depth - _rooted,
+            soil_extractable_water=bio.soil_extractable_water,
+            ground_area=bio.ground_area,
+        )
+        * bio.soil_moisture_index
+    )
+    stocks = dict(state.stocks)
+    stocks[SOIL_WATER] = replace(stocks[SOIL_WATER], amount=_atsw)
+    stocks[SUBSOIL_WATER] = replace(stocks[SUBSOIL_WATER], amount=_wstorg)
     state = State(
         n=state.n,
-        stocks=state.stocks,
+        stocks=stocks,
         rng_seed=state.rng_seed,
         # thermal_time0 starts the crop PAST anthesis (DVS > 1), where the
         # vernalization factor is fixed at 1 — so a zero cold accumulator here is

@@ -54,16 +54,19 @@ from dataclasses import dataclass
 from domains.biosphere.phenology import PhenologyParams
 from domains.biosphere.photosynthesis import PhotosynthesisParams
 from domains.biosphere.root_depth import RootDepthParams, extension_rate
+from domains.biosphere.transpiration import WATER_DENSITY as _WATER_DENSITY
+from domains.biosphere.transpiration import transpirable_capacity
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
 from simcore.state import State
 
-# Water density, kg m⁻³. The same identity ``transpiration.py`` states in words ("at
-# water density 1000 kg m⁻³, 1 mm of depth over 1 m² is exactly 1 kg"), written as a
-# constant here because this flow multiplies a *soil* depth by a volumetric water
-# content, so the metres do not cancel to millimetres on their own.
-WATER_DENSITY: float = 1000.0
+# Re-exported, not redefined: ``transpiration`` owns ρ_water now that the stress form
+# needs it too (``TTSW = DEPORT · EXTR · ρ · A``). Two constants for one physical fact
+# is one that can drift, and these two MUST agree — ``captured_water`` and
+# ``transpirable_capacity`` are the same product, and a season is a closed cycle only
+# while they are. The name stays here because callers and pins already import it.
+WATER_DENSITY = _WATER_DENSITY
 
 
 def captured_water(
@@ -101,8 +104,7 @@ class RootZoneCapture:
     params: RootDepthParams
     photo: PhotosynthesisParams
     pheno: PhenologyParams
-    sw_wilting: float
-    sw_critical: float
+    wssg: float
     soil_depth: float
     soil_extractable_water: float
     ground_area: float
@@ -118,9 +120,10 @@ class RootZoneCapture:
             params=self.params,
             photo=self.photo,
             pheno=self.pheno,
-            sw_wilting=self.sw_wilting,
-            sw_critical=self.sw_critical,
+            wssg=self.wssg,
             soil_depth=self.soil_depth,
+            soil_extractable_water=self.soil_extractable_water,
+            ground_area=self.ground_area,
         )
         demand = captured_water(
             rate * dt,
@@ -130,4 +133,83 @@ class RootZoneCapture:
         flux = demand if demand < available else available  # [F] Eqn 14.10's min
         return FlowResult(
             legs=(Leg(self.subsoil_water, -flux), Leg(self.soil_water, flux))
+        )
+
+
+@dataclass(frozen=True)
+class Drainage:
+    """WATER flow ``soil_water -> subsoil_water`` (``DRAIN``; balanced in water).
+
+    **The inverse of :class:`RootZoneCapture`, and the mechanism that makes the root
+    zone a bucket with a bottom.** Once ``soil_water`` is sized from geometry it has a
+    finite capacity ``TTSW``; without a relief path an inflow can push it past that, and
+    ``FTSW > 1`` was measured at **11.5** before this flow existed — a root zone holding
+    eleven times the water it can transpire, i.e. ``soil_water`` no longer meaning
+    ``ATSW`` at all.
+
+    [F] Ch. 14, **Eqn 14.11**::
+
+        DRAIN = 0                            if ATSW <= TTSW
+        DRAIN = (ATSW - TTSW) * DRAINF       if ATSW  > TTSW
+
+    **The destination is the point, and it is cited.** Drainage does NOT leave the
+    system: [F] Eqn 14.12 is ``WSTORG = WSTORG + DRAIN - EWAT``, with the reasoning
+    spelled out — *"not all the drained water below the root layer may be considered a
+    water loss. All or part of the drained water to deeper soil may be exploited later
+    by
+    the crop due to root growth"* (p. 176), and *"Final total drainage will be the
+    amount
+    of WSTORG at the end of simulation"* (p. 177). So the destination is our existing
+    ``subsoil_water`` POOL, no boundary is crossed, conservation is **structural**
+    rather
+    than asserted, and the below-root store — one-way within a season until now —
+    becomes
+    the two-way store [F] always had. It is also, in station terms, the reservoir: water
+    that drained out of the bed is still aboard and still reachable, by roots or by
+    whatever the station wires to it.
+
+    **``DRAINF`` is the valve.** ``drainage_factor = 0.0`` shuts drainage off exactly,
+    through [F]'s own parameter rather than a branch of ours — no boolean, no flag.
+    ``1.0`` drains the whole excess in one day; the default 0.3 is Table 14.2's silty
+    loam at our 1.5 m profile (see the plan doc on that table's unit).
+
+    ⚠ **BIT-IDENTICALLY INERT ON EVERY FROZEN SCENARIO, AND THAT IS CORRECT.** With
+    irrigation demand-driven ([F] Eqn 14.8) the root zone is never over-filled, so there
+    is nothing to drain: ``DRAINF`` 0.3 and 0.0 give identical states across the whole
+    roster. **No golden can catch this flow's removal** — exactly the position
+    ``root_depth`` is in — so its pins are unit-level and mutation-verified, and the
+    scenario that exercises it has to *construct* an over-filled zone rather than hope
+    to
+    find one.
+    """
+
+    id: FlowId
+    priority: int
+    soil_water: StockId
+    subsoil_water: StockId
+    drainage_factor: float
+    rooted_depth_aux: str
+    soil_extractable_water: float
+    ground_area: float
+
+    def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        del env  # drainage reads state only: no forcing, no sibling stock
+        available = snapshot.stocks[self.soil_water].amount
+        excess = available - transpirable_capacity(
+            snapshot.aux.get(self.rooted_depth_aux, 0.0),
+            soil_extractable_water=self.soil_extractable_water,
+            ground_area=self.ground_area,
+        )
+        if excess <= 0.0:
+            return FlowResult(
+                legs=(Leg(self.soil_water, -0.0), Leg(self.subsoil_water, 0.0))
+            )
+        flux = excess * self.drainage_factor * dt
+        # Donor clamp, the sibling of Eqn 14.10's. It cannot bite while DRAINF <= 1 and
+        # ATSW > 0 (the excess is at most the whole stock), but a scenario is free to
+        # declare DRAINF > 1 and the arbitration backstop must not be the thing that
+        # catches it — every golden asserts that backstop fires zero times.
+        flux = flux if flux < available else available
+        return FlowResult(
+            legs=(Leg(self.soil_water, -flux), Leg(self.subsoil_water, flux))
         )

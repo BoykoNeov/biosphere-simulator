@@ -74,6 +74,7 @@ from domains.biosphere.season import build_season, weather_resolver
 from domains.biosphere.stocks import (
     DAYLENGTH_VAR,
     PAR_VAR,
+    ROOTED_DEPTH,
     THERMAL_TIME,
     VERNALIZATION_DAYS,
 )
@@ -186,7 +187,21 @@ def build_lighting(
         n=0,
         stocks=stocks,
         rng_seed=0,
-        aux={THERMAL_TIME: 0.0, VERNALIZATION_DAYS: 0.0},
+        # ROOTED_DEPTH is LOAD-BEARING and was MISSING from all three station
+        # assemblies until 2026-08-12. ``build_season`` has seeded it with the
+        # scenario's cited sowing depth since the root-depth build; the station
+        # builders assembled their own initial aux and silently started the crop at
+        # depth 0. That was invisible while the depth gate was bit-identically inert.
+        # It is not invisible now: the re-based stress divides by
+        # ``TTSW = depth · EXTR · ρ · A``, so depth 0 means zero capacity, zero FTSW,
+        # a crop that never grows, and a root zone that drains itself into the subsoil
+        # on day 1 (measured: the 4-year sealed station made no grain at all and
+        # ``annual_reset`` raised "seed bank too small to re-sow").
+        aux={
+            THERMAL_TIME: 0.0,
+            VERNALIZATION_DAYS: 0.0,
+            ROOTED_DEPTH: scenario.bio.rooted_depth0,
+        },
     )
 
     power_flows: list[Flow] = (

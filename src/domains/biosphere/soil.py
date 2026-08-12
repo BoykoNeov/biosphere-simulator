@@ -51,7 +51,7 @@ from domains.biosphere.mineralization import (
 )
 from domains.biosphere.nitrogen import Fertilization
 from domains.biosphere.scenario import SeasonScenario
-from domains.biosphere.soil_layers import RootZoneCapture
+from domains.biosphere.soil_layers import Drainage, RootZoneCapture
 from domains.biosphere.stocks import (
     CARBON_POOL,
     FERTILIZATION_VAR,
@@ -127,9 +127,24 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
             params=load_root_depth_params(crop.paths["root_depth"]),
             photo=load_photosynthesis_params(crop.paths["photosynthesis"]),
             pheno=load_phenology_params(crop.paths["phenology"]),
-            sw_wilting=scenario.sw_wilting,
-            sw_critical=scenario.sw_critical,
+            wssg=scenario.wssg,
             soil_depth=scenario.soil_depth,
+            soil_extractable_water=scenario.soil_extractable_water,
+            ground_area=scenario.ground_area,
+        ),
+        # DRAIN ([F] Eqn 14.11 + 14.12): the inverse leg. Water above what the current
+        # root zone can transpire drains BELOW it — into ``subsoil_water``, not out of
+        # the system, which is [F]'s own destination and is what makes the store two-way
+        # within a season. Soil-owned for the same reason ``RootZoneCapture`` is: both
+        # its stocks are the soil's. ⚠ Inert on every frozen scenario (demand-driven
+        # irrigation never over-fills), so no golden protects it — see its docstring.
+        Drainage(
+            FlowId("biosphere.drainage"),
+            0,
+            soil_water=SOIL_WATER,
+            subsoil_water=SUBSOIL_WATER,
+            drainage_factor=scenario.drainage_factor,
+            rooted_depth_aux=ROOTED_DEPTH,
             soil_extractable_water=scenario.soil_extractable_water,
             ground_area=scenario.ground_area,
         ),
@@ -149,6 +164,8 @@ def build_soil(scenario: SeasonScenario, wiring: ChamberWiring) -> CompartmentBu
                 soil_water=SOIL_WATER,
                 irrigation_var=IRRIGATION_VAR,
                 ground_area=scenario.ground_area,
+                rooted_depth_aux=ROOTED_DEPTH,
+                soil_extractable_water=scenario.soil_extractable_water,
             )
         )
     if scenario.sealed:
