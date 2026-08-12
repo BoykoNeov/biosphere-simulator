@@ -461,3 +461,135 @@ def test_drought_declares_a_stratified_profile_deliberately() -> None:
     # And it survives the dry layer only because the sowing depth is a cited nonzero: at
     # depth 0 the root-zone access fraction is 0 and nitrogen uptake would be off.
     assert DROUGHT_SCENARIO.rooted_depth0 > 0.0
+
+
+# --- every scenario, not just the three that happened to have a pin -------------------
+# ⚠ WHY THIS IS PARAMETRIZED OVER THE WHOLE ROSTER. The two identities below held on the
+# frozen tree by INHERITANCE — most scenarios take the defaults — so the pins that
+# existed covered `DEFAULT`, `water_biting` and `drought` and nothing else. That is
+# precisely the gap `harvest` demonstrated on 2026-08-12: it overrode `rooted_depth0`
+# (a 1.3 m root system, injected past anthesis) while inheriting the 0.15 m zone's
+# water,
+# giving `FTSW = 0.115` on day 0 for a grain-filling crop and a 79 %-low grain — and
+# nothing went red until a golden moved. Correct-by-inheritance is not covered; it is
+# untested. Any scenario overriding `rooted_depth0`, `soil_depth`, `ground_area` or
+# `soil_moisture_index` without moving the stores now goes red here.
+_STRATIFIED = {
+    # DROUGHT declares an EMPTY subsoil on purpose (its root zone is at the upper limit
+    # and there is nothing below) — see its scenario comment. Its `soil_water0` is still
+    # checked; only the subsoil identity is exempted, and the exemption is named.
+    "DROUGHT_SCENARIO": ("subsoil",),
+    # DEEP_WATER is the diagnostic for reachability, so both stores are geometric; it
+    # differs only in its irrigation capacity. Listed to record that it was checked.
+}
+
+
+def _named_scenarios() -> list[tuple[str, SeasonScenario]]:
+    """Every module-level `SeasonScenario` in `scenario.py`, plus the station's four.
+
+    Enumerated from the MODULES, not hand-listed — the roster-vs-manifest lesson
+    (`coverage-roster-is-not-the-manifest`): a hand-listed roster silently omits the
+    scenario added after it was written.
+    """
+    import domains.biosphere.scenario as bio
+    import station.scenario as st
+
+    out: list[tuple[str, SeasonScenario]] = []
+    for mod in (bio, st):
+        for name in sorted(dir(mod)):
+            value = getattr(mod, name)
+            if isinstance(value, SeasonScenario):
+                out.append((f"{mod.__name__.split('.')[0]}:{name}", value))
+    return out
+
+
+@pytest.mark.parametrize("name,scenario", _named_scenarios())
+def test_every_scenarios_water_stores_are_geometric(
+    name: str, scenario: SeasonScenario
+) -> None:
+    """`ATSW` and `WSTORG` from the declared geometry, on EVERY scenario.
+
+    [F] Eqns 14.26-14.28.
+    """
+    mai = scenario.soil_moisture_index
+    assert 0.0 <= mai <= 1.0, f"{name}: MAI is a fraction of the drained upper limit"
+    atsw = (
+        captured_water(
+            scenario.rooted_depth0,
+            soil_extractable_water=scenario.soil_extractable_water,
+            ground_area=scenario.ground_area,
+        )
+        * mai
+    )
+    assert scenario.soil_water0 == pytest.approx(atsw, rel=1e-12), (
+        f"{name}: soil_water0 is not DEPORT x EXTR x rho x A x MAI"
+    )
+    exempt = _STRATIFIED.get(name.split(":")[-1], ())
+    if "subsoil" in exempt:
+        assert scenario.subsoil_water0 == 0.0, f"{name}: named stratified, but not dry"
+        return
+    wstorg = (
+        captured_water(
+            scenario.soil_depth - scenario.rooted_depth0,
+            soil_extractable_water=scenario.soil_extractable_water,
+            ground_area=scenario.ground_area,
+        )
+        * mai
+    )
+    assert scenario.subsoil_water0 == pytest.approx(wstorg, rel=1e-12), (
+        f"{name}: subsoil_water0 is not (SOLDEP - DEPORT) x EXTR x rho x A x MAI"
+    )
+
+
+def test_the_roster_this_covers_is_not_empty_and_includes_the_station() -> None:
+    """Non-vacuity for the enumeration above — an empty roster would pass silently."""
+    names = [n for n, _ in _named_scenarios()]
+    assert len(names) >= 8, names
+    assert any(n.startswith("station:") for n in names), names
+    assert any(n.endswith("WATER_BITING_SCENARIO") for n in names), names
+
+
+def test_the_harvest_injection_keeps_depth_and_water_together() -> None:
+    """The station's past-anthesis injection, which is where this gap actually bit.
+
+    `build_harvest_station` overrides `rooted_depth0` to 1.3 m on top of a greenhouse
+    built for the 0.15 m sowing zone. Before 2026-08-12 it inherited that zone's water:
+    19.5 kg inside a 169 kg capacity, `FTSW = 0.115`, grain 79 % low. Both stores
+    are now
+    re-derived from the injected depth, and this asserts the resulting state — not the
+    code path — so a future refactor cannot quietly drop it.
+    """
+    from domains.crew.loader import load_crew_params
+    from domains.eclss.loader import load_eclss_params
+    from station.harvest import build_harvest
+    from station.loader import load_harvest_params
+    from station.scenario import HARVEST_SCENARIO
+
+    state, _, _ = build_harvest(
+        load_crew_params(),
+        load_eclss_params(),
+        load_harvest_params(),
+        HARVEST_SCENARIO,
+    )
+    bio = HARVEST_SCENARIO.greenhouse.bio
+    depth = state.aux[ROOTED_DEPTH]
+    assert depth == pytest.approx(HARVEST_SCENARIO.rooted_depth0)
+    capacity = captured_water(
+        depth,
+        soil_extractable_water=bio.soil_extractable_water,
+        ground_area=bio.ground_area,
+    )
+    held = state.stocks[SOIL_WATER].amount
+    assert held == pytest.approx(capacity * bio.soil_moisture_index, rel=1e-12)
+    # ...which is to say the injected crop starts at its declared FTSW, not at 0.115.
+    assert held / capacity == pytest.approx(bio.soil_moisture_index, rel=1e-12)
+    below = state.stocks[SUBSOIL_WATER].amount
+    assert below == pytest.approx(
+        captured_water(
+            bio.soil_depth - depth,
+            soil_extractable_water=bio.soil_extractable_water,
+            ground_area=bio.ground_area,
+        )
+        * bio.soil_moisture_index,
+        rel=1e-12,
+    )

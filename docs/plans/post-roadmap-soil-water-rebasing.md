@@ -512,8 +512,17 @@ pointed straight at. Fixing both restored it:
 
 Final golden diff, after both: **only `soil_water`, `subsoil_water` and `water_source`
 move, on every scenario except `water_biting`** — which was deliberately re-declared. Not
-one carbon, nitrogen or oxygen amount, at any horizon. Prediction 5 was wrong in the safe
-direction: both drift summaries came back **byte-identical**, not moved.
+one carbon, nitrogen or oxygen amount, at any horizon.
+
+⚠ **Prediction 5 was simply FALSE, and "false in our favour" is still a miss.** It said the
+drift summaries would move, reasoning that they "summarise conservation drift, and the water
+totals themselves changed". They came back **byte-identical**, and the reason is that the
+premise was wrong about what those files contain: `drift_summary` holds `peak_leaf`,
+`consumer_carbon` and `is_period_2`; `sealed_energy_drift_summary` holds `node_peak_temp_k`
+and `is_stationary`. **There is no water in either.** So their byte-identity is not
+independent confirmation of anything — it is the *same* statement as "no carbon moved",
+restated. Recorded because the temptation is to bank a surprise-free result as extra
+evidence, and here it was a duplicate of evidence already counted.
 
 ### Three defects the change exposed rather than caused
 
@@ -532,6 +541,17 @@ direction: both drift summaries came back **byte-identical**, not moved.
    is 2.7 m of extractable water in a 15 cm layer. It now declares a *limited* supply
    (1 mm day⁻¹) and the mechanism it exists to show comes out **stronger**: 15× the canopy
    against the control, where the old declaration gave 2.5×.
+
+   ⚠ **That 1 mm day⁻¹ was CHOSEN AFTER a sweep (0 → 4), and the asymmetry with the two
+   acceptance-gate bounds refused on the same day is deliberate, not an inconsistency.** An
+   acceptance *bound* asserts the tree is safe; picking it after seeing the measurement
+   makes it assert only that the tree passes a bound the tree set, which is why both were
+   dropped for rank-plus-exact-value. A *diagnostic scenario* has the opposite job — it
+   exists to put a mechanism where it can be seen — so choosing the operating point that
+   exposes it is the point, provided the sweep is recorded (it is: capacity 2 mm day⁻¹ and
+   above makes the subsoil irrelevant, 0 makes the season unwinnable, and the whole range
+   is in the plan). What would be illegitimate is quoting the 15× as a property of the
+   *model* rather than of this scenario at this capacity.
 
 ⚠ **That control had to be rebuilt too, and silently.** It was `soil_extractable_water = 0`,
 justified as removing the water transfer while leaving depth to grow. `EXTR` now appears in
@@ -567,12 +587,32 @@ and both of these would have been exactly that:
   same demand-driven irrigation, the same drainage destination, the same fractional re-sow
   return (via a shared `resow_water_return` on each side, because the hand-copy hazard is
   what bit here).
+
+  ⚠ **And that fix re-creates the same hazard across the port boundary, which is accepted
+  rather than solved.** `resow_water_return` now exists twice — once in Python, once in
+  Rust — which is exactly the two-copies-of-one-rule shape that caused finding 9. It is
+  unavoidable in a port and it is not fully covered: cross-port parity would catch a
+  divergence that moves a golden, but **not** one that only shows on a scenario neither
+  port runs. Each side pins the rule behaviourally (redistribution + `FTSW` preserved), and
+  that is the mitigation, not a proof. Named here so the residual is visible rather than
+  looking closed.
 * **Rust pins for `Drainage`, mutation-verified**, because the flow is bit-identically inert
   on every scenario and `cargo test` green would otherwise prove nothing about it. Four
   mutations — drain a share of the whole store instead of the excess, drop `DRAINF`, drop
   `ground_area` from the capacity, drop the donor clamp — each turn a pin red. Its pins
   construct a non-unit plot and an over-filled zone, neither of which any scenario provides.
-* **2290 Python tests, the full Rust suite, and all 101 cross-port parity checks green.**
+* **A ROSTER-WIDE geometry pin, added because the existing ones were correct-by-
+  inheritance.** The two identities held on every scenario, but only three had a pin —
+  `DEFAULT`, `water_biting`, `drought`. Everything else inherited the defaults, and
+  *correct by inheritance is not covered, it is untested*: the moment a scenario overrode
+  `rooted_depth0` or `soil_depth` without moving its stores, nothing went red. That is not
+  hypothetical — it is precisely what `harvest` did. The new pin enumerates every
+  `SeasonScenario` from the **modules** rather than a hand-list
+  (`coverage-roster-is-not-the-manifest`), covers the station's four as well as the
+  biosphere's, and names `DROUGHT` as the one stratified exemption. Mutation-verified:
+  overriding `rooted_depth0` on `potato`, or `soil_depth` on `day_neutral`, each turns it
+  red.
+* **2290+ Python tests, the full Rust suite, and all 101 cross-port parity checks green.**
 
 ### What this does and does not discharge
 

@@ -643,6 +643,20 @@ DEEP_WATER_SCENARIO: SeasonScenario = SeasonScenario(
     # whole piece of work exists to remove. So the scenario now declares a *limited*
     # supply instead of none, and the mechanism it exists to show comes out STRONGER
     # for it (15× the canopy against the control, where the old declaration gave 2.5×).
+    #
+    # ⚠ 1.0 was CHOSEN after a sweep (0 → 4 mm/day), and that is legitimate HERE for a
+    # reason worth stating, because the same session refused two acceptance bounds
+    # picked
+    # the same way. An acceptance bound asserts the tree is safe, so choosing it after
+    # seeing the measurement makes it assert only that the tree passes a bound the tree
+    # set. A DIAGNOSTIC scenario has the opposite job — it exists to put a mechanism
+    # where
+    # it can be seen — so choosing the operating point that exposes it is the point,
+    # provided the sweep is recorded. It is: at 2 mm/day and above the subsoil is
+    # irrelevant (irrigation alone suffices), at 0 the season is unwinnable. What would
+    # NOT be legitimate is quoting the 15× as a property of the model rather than of
+    # this
+    # scenario at this capacity.
     irrigation_mm_day=1.0,
 )
 DEEP_WATER_YEARS: int = 1
