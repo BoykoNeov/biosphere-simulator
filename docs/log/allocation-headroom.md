@@ -108,8 +108,13 @@ measured route to green is a forbidden retune"; that premise is falsified. It su
 as a scope decision. **(B) A finer biosphere step** — measured, works, moves nothing
 scientific, and is the most expensive item here: `Euler / dt = 1` is the *first* item in the
 biosphere freeze, the station freeze **delegates** biosphere scenarios so they move with it,
-and `native-port-reference.md` freezes tolerance bands **measured at `dt = 1`** — **three
-contracts, not one**, plus a Rust parity re-measure and 2–4× the step count. ⚠ And the
+and `native-port-reference.md` freezes **measured** cross-port tolerance bands — **three
+contracts, not one**, plus a Rust parity re-measure and 2–4× the step count. ⚠ That third
+one is the interesting entry: the doc **never names a step**, so its dependence on `dt = 1`
+is entirely implicit (the bands are measurements taken on goldens that run at `dt = 1`
+because the *biosphere* contract says so). Nothing in it would go red. **A contract whose
+dependence on the thing being unfrozen is unstated is the one left out of the price** — and
+the first draft of this record asserted the doc said so, which it does not. ⚠ And the
 existing multi-rate machinery is **NOT** a cheap version of it: `simcore.multirate` **freezes
 aux by design** (`station/greenhouse.py` says so in its own docstring, which is why the
 station driver hand-rolls an operator split), so phenology would stop advancing, and

@@ -263,7 +263,17 @@ this document**, and the price is understated by anyone who says "it moves the g
 |---|---|
 | **Biosphere freeze** | `Euler / dt = 1` is the *first item* in `docs/biosphere-reference.md`; 7 scenarios → goldens |
 | **Station freeze** | biosphere scenarios are *delegated* to the biosphere contract, so they move with it; 13 scenarios → goldens |
-| **Native-port freeze** | `docs/native-port-reference.md` freezes measured **tolerance bands**, and those bands were measured at `dt = 1`; 20 goldens carry the cross-port tier contract |
+| **Native-port freeze** | `docs/native-port-reference.md` freezes **measured** Tier-2 tolerance bands per golden (`1e-11` biosphere, `1e-12` station); 20 goldens carry the cross-port tier contract |
+
+⚠ **The native-port row is weaker than the first draft of this table claimed, and the
+weakness is itself the point.** That doc **never names a step** — it tabulates bands per
+golden and points at `tiers.json`. The dependence on `dt = 1` is entirely *implicit*: the
+bands are measurements taken on runs of the frozen goldens, and those goldens run at
+`dt = 1` because the biosphere contract says so. So the bands would have to be re-measured,
+but nothing in that document would go red to tell you, and nothing in it says why. **A third
+contract whose dependence on the thing being unfrozen is unstated is exactly the contract
+that gets left out of an unfreeze price.** (The first draft here asserted "bands measured at
+`dt = 1`" as though the doc said it. It does not; checked.)
 
 **Three contracts, not one**, plus a re-measure of the Rust parity tiers and a performance
 cost (2× or 4× the biosphere step count) that
@@ -337,9 +347,15 @@ identified, evidence base pending re-measurement"** — not "unblocked, ships as
 1. **The `dt = 1` contract for a sealed chamber** (route B's decision). The measurement is
    done; what remains is a contract decision with a three-freeze price. ⚠ Independent of the
    leaf question — §6's control is entirely on frozen `main`.
-2. **Route C's shelf search**: does [E] or [F] carry a supply-limited assimilation form with
-   a *cited* half-saturation on ambient/intercellular CO₂? If yes, route C is cheaper than B
-   and more physical. If no, route C is refused on provenance and B is the only route.
+2. **Route C's shelf search**, with the discriminator stated so the successor knows what a
+   "yes" looks like: **does [E] or [F] give assimilation as a function of *ambient / pool*
+   CO₂ with a cited half-saturation — as opposed to the Farquhar `A`–`Ci` curve we already
+   have?** That distinction is the whole question. Our curve *is* saturating in `Ci`, but
+   `Ci` is **linear** in the pool (`ci_from_co2_pool`), so the composition is near-linear at
+   low pool and that is precisely why it is not steep enough. A form that saturates in the
+   *pool* is a different object. If neither source separates them, **route C is refused on
+   provenance and route B is the only route**, which materially simplifies the decision in
+   (1) — so this search should run *before* (1) is decided, not after.
 3. ⚠ **The Euler CO₂ fragility (§3.1), on its own.** Nothing to do with leaves: the shipped
    configuration at 4× chamber CO₂ sits at margin 1.044. Any work item that raises chamber
    CO₂ must measure this first. This is the successor most likely to be needed soonest,
