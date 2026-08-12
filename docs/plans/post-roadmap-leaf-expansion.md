@@ -949,3 +949,34 @@ value to all ten recorded digits.
 a verdict, not a build, and it is the user's: this is the third time in this record that a
 piece of science has been priced and handed back rather than settled by me
 (`root-coupling-refused`'s lesson — *my own refusal is a recommendation, not a verdict*).
+
+---
+
+## 10. ⚠ §9.5(3) IS FALSIFIED — "no route on the shelf" was never measured
+
+**2026-08-12, the same day.** §9.5(3) reads *"The RK4 blocker stands, with NO route on the
+shelf"*, and that sentence is doing the work of the refuse-and-revert recommendation. It is
+a claim about the space of routes, and **the only thing ever measured was one knob**
+(`slw_fraction_min`, §8.4(a)). No sweep of the space was run.
+
+Asked as a question about the **tree** rather than about leaves — *does the frozen tree pass
+RK4 by margin or by construction?* — it answers on frozen `main` alone, and it answers
+against §9.5. The full record is
+[`post-roadmap-allocation-headroom.md`](post-roadmap-allocation-headroom.md); its record row
+is [`../log/allocation-headroom.md`](../log/allocation-headroom.md). In one line: **the
+blocker is a step-size bound, not a science defect** — the parked branch runs clean at
+`dt = 1/2` with no parameter moved and no form changed, and a crop far larger than this
+mechanism ever grew runs clean at `dt = 1`.
+
+⚠ **Two things that document establishes which this one must not be read as claiming:**
+
+1. **The reversal is not an endorsement.** What cleared at the finer step is the **guard**.
+   §8's own lesson — a guard blind by construction cannot be evidence a mechanism is safe —
+   applies identically to shrinking `dt` until `check_no_overdraw` goes quiet. Everything in
+   §7.4–§7.7 is **still Euler-only at `dt = 1`** and has to be re-measured at whatever step
+   would ship, before this mechanism is called ready.
+2. **The successor is not a leaf successor.** It is the `dt = 1` contract for a sealed
+   chamber (three freeze contracts, not one), or a *cited* supply-limited assimilation form
+   that keeps `dt = 1`. Neither belongs in this plan doc.
+
+**Nothing in `src/` changed for finding 11, and the parked branch was never merged.**

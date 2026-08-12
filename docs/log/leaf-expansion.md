@@ -194,3 +194,31 @@ closing sentence welded them together via an argument that holds only if a narro
 is derivable. **The mechanism is complete, correct, fully measured and unshippable, and the
 only measured route to green remains the retune this project refuses.** The verdict is the
 user's, not mine.
+
+**FINDING 11 — ⚠⚠ THE VERDICT WAS HANDED BACK ON A PREMISE THAT IS FALSE, AND THE
+MEASUREMENT THAT FALSIFIED IT IS ENTIRELY ON THE FROZEN TREE.** Finding 10 closed with *"the
+RK4 blocker stands, with NO route on the shelf"* — meaning the only measured way to green was
+the bound retune step 5 forbids, so refuse-and-revert was the recommendation. **The premise
+was never measured; it was inferred from the one knob that had been swept.** Asked instead as
+a question about the *tree* rather than about leaves — does the frozen tree pass RK4 by
+margin or by construction? — it answers on frozen `main` in one afternoon of probes, and it
+answers against the recommendation. The record is
+[`allocation-headroom.md`](allocation-headroom.md) and its plan doc; the headline: **the
+blocker is a step-size bound, not a science defect.** A crop far larger than this mechanism
+ever grew runs clean; the parked branch runs clean at a finer step with **no parameter moved
+and no form changed**; and the wall is the sealed jar's carbon turnover time falling below
+one day, on the one withdrawal in this tree whose rate constant is emergent and therefore has
+no `k·h < 1` precondition — the bound three other places in the tree enforce. **So `refuse
+and revert` is no longer supported by its own argument.** ⚠ It survives as a *scope*
+judgement, and that is a different claim needing a different case. ⚠⚠ **AND THE REVERSAL IS
+NOT AN ENDORSEMENT — READ FINDING 9 IN THE MIRROR.** Finding 9's durable lesson is that a
+guard blind by construction cannot be evidence a mechanism is safe; shrinking `dt` until
+`check_no_overdraw` goes quiet is **the same error with the sign flipped**. What cleared at
+the finer step is the *guard*. Every measurement that got this mechanism accepted — the
+Greenwood gate, the leaf thickness, the node branch's day share, the zero rationing, the
+`WSFL` leverage cut — is **still Euler-only at `dt = 1`**, exactly the defect finding 9
+named, and the frozen tree's own trajectory moves measurably under that refinement. **The
+standing is: not refuted, route identified, evidence base pending re-measurement at the step
+that would ship it.** The successor is not a leaf successor at all — it is the `dt = 1`
+contract for a sealed chamber, which prices out at **three** freeze contracts, and a shelf
+search for a cited supply-limited assimilation form that would keep `dt = 1` instead.
