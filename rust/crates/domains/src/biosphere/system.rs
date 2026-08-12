@@ -104,6 +104,13 @@ pub struct SeasonScenario {
     /// companion modifier. `true` for the frozen winter wheat; a DAY-NEUTRAL crop sets it
     /// `false` so flowering ignores daylength.
     pub photoperiod: bool,
+    /// `WSSD` — the drought development-response COEFFICIENT ([F] Eqn 15.8, Table 15.1
+    /// wheat row = 0.40). `None` means "[F] gives no coefficient for this crop", which is
+    /// POTATO's case: Table 15.1 has no potato row and populates `WSSD` for only two of
+    /// its ten crops. Switched by a VALUE rather than a bool (unlike the two modifiers
+    /// above) for exactly that reason. See `SeasonScenario.wssd` and
+    /// docs/plans/post-roadmap-water-stress-curves.md.
+    pub wssd: Option<f64>,
 }
 
 /// The Phase-1 winter-wheat PP plot defaults (open field, N/water non-limiting).
@@ -128,6 +135,7 @@ pub const DEFAULT_SCENARIO: SeasonScenario = SeasonScenario {
     condensate0: 0.0,
     water_source0: 0.0,
     wssg: 0.30,
+    wssd: Some(0.40),
     irrigation_mm_day: 8.0,
     soil_n0: 100.0,
     n_source0: 0.0,
@@ -657,6 +665,15 @@ fn build_plants(
             .then(|| VERNALIZATION_DAYS.to_string()),
         photoperiod: scenario.photoperiod.then_some(p.photoperiod),
         daylength_var: scenario.photoperiod.then(|| DAYLENGTH_VAR.to_string()),
+        // The THIRD modifier. Same optionality, driven by a value rather than a bool.
+        drought: scenario.wssd.map(|wssd| params::DroughtDevelopmentParams {
+            wssd,
+            wssg: scenario.wssg,
+            soil_extractable_water: scenario.soil_extractable_water,
+            ground_area: scenario.ground_area,
+        }),
+        drought_soil_water: scenario.wssd.map(|_| SOIL_WATER.to_string()),
+        drought_rooted_depth_aux: scenario.wssd.map(|_| ROOTED_DEPTH.to_string()),
     })];
     aux.push(Box::new(root_depth));
     if scenario.vernalization {
@@ -1298,6 +1315,147 @@ mod tests {
         assert_eq!(returned_at_reset.len(), 1);
         assert!(returned_at_reset[0] > 0.0, "the re-sow returned nothing");
         assert!(!fraction_at_reset.is_empty());
+    }
+
+    /// `WSFD` at the ACCUMULATOR, on a hand-built stressed state with an EXACT expected
+    /// value — the two things the whole-season pin below provably cannot see.
+    ///
+    /// ⚠ Found by mutation, and worth the second test: the season-level pin asserts only
+    /// DIRECTION (accelerated > off) and a bound, so it stays green when `WSFD` is given
+    /// the wrong threshold (0.4 instead of `wssg` = 0.30 — still accelerates, just by the
+    /// wrong amount) and when the multiply is moved inside the `DVS < 1` branch (most of
+    /// a stressed season is vegetative, so the season still accelerates). A direction
+    /// assertion is not a value assertion, and neither is a bound.
+    ///
+    /// Mirrors `tests/test_phenology.py::test_thermal_time_aux_drought_is_NOT_gated_off
+    /// _at_anthesis` and `..._reads_the_same_ftsw_as_the_other_consumers`.
+    #[test]
+    fn wsfd_uses_wssg_and_is_not_gated_off_at_anthesis() {
+        let extr = 0.13;
+        let area = 3.0; // non-unit: a dropped/hardcoded area factor is invisible at 1.0
+        let depth = 0.15;
+        let wssg = 0.30;
+        let ttsw = science::transpirable_capacity(depth, extr, area);
+        let pheno = params::PhenologyParams {
+            t_base: 0.0,
+            t_cap: 30.0,
+            tsum_anthesis: 1100.0,
+            tsum_maturity: 750.0,
+        };
+        let proc = ThermalTimeAccumulation {
+            id: "test.thermal_time".to_string(),
+            accumulator: THERMAL_TIME.to_string(),
+            temp_var: TEMP_VAR.to_string(),
+            t_base: pheno.t_base,
+            t_cap: pheno.t_cap,
+            tsum_anthesis: pheno.tsum_anthesis,
+            tsum_maturity: pheno.tsum_maturity,
+            vernalization: None,
+            vernalization_accumulator: None,
+            photoperiod: None,
+            daylength_var: None,
+            drought: Some(params::DroughtDevelopmentParams {
+                wssd: 0.40,
+                wssg,
+                soil_extractable_water: extr,
+                ground_area: area,
+            }),
+            drought_soil_water: Some(SOIL_WATER.to_string()),
+            drought_rooted_depth_aux: Some(ROOTED_DEPTH.to_string()),
+        };
+        struct WarmEnv;
+        impl simcore::environment::Environment for WarmEnv {
+            fn get(&self, _var: &str) -> Result<f64, SimError> {
+                Ok(18.0)
+            }
+        }
+        // FTSW = 0.15 = half of wssg, so WSFG = 0.5 and WSFD = (1 - 0.5)*0.4 + 1 = 1.2.
+        // With a WRONG threshold of 0.4 this would read WSFG = 0.375 and WSFD = 1.25.
+        let at = |thermal_time: f64| -> f64 {
+            let mut stocks = std::collections::BTreeMap::new();
+            stocks.insert(
+                SOIL_WATER.to_string(),
+                pool_stock(SOIL_WATER, SOIL, Quantity::Water, 0.15 * ttsw).unwrap(),
+            );
+            let state = State::new(
+                0,
+                stocks,
+                0,
+                std::collections::BTreeMap::from([
+                    (ROOTED_DEPTH.to_string(), depth),
+                    (THERMAL_TIME.to_string(), thermal_time),
+                ]),
+            )
+            .unwrap();
+            proc.evaluate(&state, &WarmEnv, 1.0).unwrap()[THERMAL_TIME]
+        };
+        // Vegetative...
+        assert_eq!(at(0.0), 18.0 * 1.2);
+        // ...and PAST ANTHESIS, where its two neighbours are gated off but [F] Box 16.2
+        // keeps applying this one (it gates on `CTU > tuEMR` only).
+        assert_eq!(at(pheno.tsum_anthesis + 1.0), 18.0 * 1.2);
+    }
+
+    /// `WSFD`'s WIRING, on a CONSTRUCTED water-limited run — the pin the pure-function
+    /// tests in `science.rs` cannot make.
+    ///
+    /// ⚠ **Every scenario in the Rust roster holds `WSFG == 1`**, so drought acceleration
+    /// is bit-identically inert across the whole suite: dropping the `rate *=
+    /// self.drought_factor(..)` multiply, or moving it inside the vegetative branch,
+    /// leaves every golden, every parity run and every session test green. Measured, not
+    /// assumed. This test manufactures the missing condition with a low
+    /// `soil_moisture_index` (the same field `water_biting` uses on the Python side) and
+    /// asserts the run's thermal time actually MOVES with `wssd`, in both directions.
+    #[test]
+    fn drought_acceleration_is_wired_into_the_accumulator_and_no_scenario_shows_it() {
+        // The Python `WATER_BITING_SCENARIO` declaration, which the Rust roster has no
+        // equivalent of — the whole reason this condition has to be manufactured here.
+        // FTSW starts at MAI and stays far below wssg = 0.30 all season.
+        let dry = SeasonScenario {
+            sealed: true,
+            litter_carbon0: 3.0,
+            soil_moisture_index: 0.05,
+            soil_water0: 0.975,
+            subsoil_water0: 8.775,
+            ..DEFAULT_SCENARIO
+        };
+        let thermal_time_after = |wssd: Option<f64>| -> f64 {
+            let scenario = SeasonScenario { wssd, ..dry };
+            let (last, rationed, _) =
+                super::super::run_season_final(&scenario, 1).expect("dry run");
+            assert_eq!(rationed, 0);
+            last.aux[THERMAL_TIME]
+        };
+        let off = thermal_time_after(None);
+        let accelerated = thermal_time_after(Some(0.40));
+        let delayed = thermal_time_after(Some(-0.40));
+        // Drought HASTENS development (Table 15.2), so the season accumulates MORE
+        // thermal time; a negative coefficient is [F]'s provision for the species it
+        // delays, and must move the other way.
+        assert!(
+            accelerated > off,
+            "wssd = 0.40 must accelerate: {accelerated} vs {off}"
+        );
+        assert!(delayed < off, "wssd = -0.40 must delay: {delayed} vs {off}");
+        // ...and the effect is bounded by 1 + wssd, never runaway.
+        assert!(
+            accelerated <= off * 1.40,
+            "WSFD exceeded its 1 + WSSD bound"
+        );
+        // The identity, on a WET run: unstressed, the coefficient changes nothing at all.
+        let wet = |wssd: Option<f64>| -> f64 {
+            let scenario = SeasonScenario {
+                wssd,
+                ..DEFAULT_SCENARIO
+            };
+            let (last, _, _) = super::super::run_season_final(&scenario, 1).expect("wet run");
+            last.aux[THERMAL_TIME]
+        };
+        assert_eq!(
+            wet(Some(0.40)),
+            wet(None),
+            "WSFD must be BIT-identical where water does not limit"
+        );
     }
 
     /// The re-sow water rule, called directly — the abandoned FRACTION of what the root

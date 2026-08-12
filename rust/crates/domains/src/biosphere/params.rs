@@ -85,6 +85,22 @@ pub struct PhotoperiodParams {
     pub ppsen: f64,
 }
 
+/// Drought-acceleration params — Soltani & Sinclair (2012) Ch. 15, Eqn 15.8.
+///
+/// ⚠ `wssd` is a COEFFICIENT, not a threshold — Table 15.1's caption names it "a
+/// coefficient of phenological development response to drought", and it scales an
+/// already-computed `WSFG` rather than being compared against `FTSW`. The soil geometry
+/// rides along because `WSFD` is defined THROUGH `WSFG`, which is defined on
+/// `FTSW = ATSW/TTSW`; using anything but the same three values the other consumers use
+/// would let phenology and growth disagree about the stress state inside one step.
+#[derive(Debug, Clone, Copy)]
+pub struct DroughtDevelopmentParams {
+    pub wssd: f64,
+    pub wssg: f64,
+    pub soil_extractable_water: f64,
+    pub ground_area: f64,
+}
+
 /// Per-organ relative senescence (death) rates.
 #[derive(Debug, Clone, Copy)]
 pub struct RootDepthParams {

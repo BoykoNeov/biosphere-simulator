@@ -298,6 +298,23 @@ pub fn photoperiod_factor(daylength_h: f64, cpp: f64, ppsen: f64) -> f64 {
     (1.0 - ppsen * (cpp - daylength_h)).clamp(0.0, 1.0)
 }
 
+/// Development-rate multiplier `WSFD` — Soltani & Sinclair (2012) Eqn 15.8.
+///
+/// `WSFD = (1 − WSFG)·WSSD + 1`, where `WSFG` is the growth/transpiration deficit factor
+/// (`water_stress_factor`, Eqn 15.3). Drought HASTENS development in most species
+/// (Table 15.2), so unlike `verfun`/`ppfun` this is **not** a `[0, 1]` limitation factor —
+/// it is a ratio on `[0, 1 + WSSD]`. Unstressed (`WSFG = 1`) it is EXACTLY 1.0, which is
+/// what keeps every non-water-limited scenario bit-identical on both ports.
+///
+/// Mirrors `domains.biosphere.phenology.drought_development_factor`. ⚠ The Python side
+/// REJECTS `wssd < -1` (below it development would run backwards, which the source rules
+/// out); the port carries the rule, not the rationale — but Rust has no constructor to
+/// raise from, so the bound is enforced where scenarios are declared rather than here.
+/// Negative `WSSD` down to −1 is [F]'s own provision for species drought delays.
+pub fn drought_development_factor(wsfg: f64, wssd: f64) -> f64 {
+    (1.0 - wsfg) * wssd + 1.0
+}
+
 /// Development stage `DVS ∈ [0, 2]` from thermal time (TSUM1/TSUM2).
 /// `FROOT1 = min(depth / layer, 1)` - the fraction of the reference soil layer the
 /// roots have reached ([F] Soltani & Sinclair). A multiplicative gate on a supply term,
@@ -500,6 +517,38 @@ mod tests {
         assert_eq!(captured_water(1.0, 0.13, 2.0), 260.0);
         assert_eq!(captured_water(0.0, 0.13, 1.0), 0.0);
         assert_eq!(WATER_DENSITY, 1000.0);
+    }
+
+    /// `WSFD` ([F] Eqn 15.8) against the source's own two worked examples.
+    ///
+    /// ⚠ NOTHING ELSE IN THE RUST SUITE CAN CATCH THIS. `WSFD` is bit-identically
+    /// inert on every Rust scenario — all of them hold `WSFG == 1` — so no golden, no
+    /// parity run and no session test changes if the factor is wrong, dropped, or
+    /// inverted. Measured, not assumed: with the whole function replaced by `1.0` the
+    /// entire suite stayed green. That is the same position `Drainage` and `root_depth`
+    /// are in, and the reason these pins have to CONSTRUCT the stressed state.
+    /// Mirrors `tests/test_phenology.py` (the `drought_development_factor` block).
+    #[test]
+    fn drought_development_factor_reproduces_the_sources_worked_examples() {
+        // "if WSSD is 0.4, the maximum value of WSFD at WSFG = 0 is equal to 1.4".
+        assert_eq!(drought_development_factor(0.0, 0.4), 1.4);
+        // "if WSSD is -0.4, then WSFD will be 0.6 when FTSW and hence WSFG reach 0".
+        assert_eq!(drought_development_factor(0.0, -0.4), 0.6);
+        // Linear in between (Table 15.3's shape).
+        assert_eq!(drought_development_factor(0.5, 0.4), 1.2);
+        // -1 arrests development entirely; it is the floor of the form.
+        assert_eq!(drought_development_factor(0.0, -1.0), 0.0);
+    }
+
+    /// The EXACT identity the whole freeze rests on, on both ports: unstressed must be
+    /// 1.0 to the bit, not approximately 1.0. A form that returned `1.0 + 1e-16` here
+    /// would move every golden's last ULP on the Python side while the Rust suite,
+    /// having no stressed scenario, stayed green.
+    #[test]
+    fn wsfd_is_exactly_one_when_unstressed() {
+        for wssd in [0.4, -0.4, 1.5, -1.0, 0.0] {
+            assert_eq!(drought_development_factor(1.0, wssd), 1.0);
+        }
     }
 
     /// The dry-subsoil stop ([F] Box 14.1 `If WSTORG = 0 Then GRTD = 0`), which no

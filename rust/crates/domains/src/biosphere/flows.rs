@@ -1106,13 +1106,44 @@ pub struct ThermalTimeAccumulation {
     pub vernalization_accumulator: Option<String>,
     pub photoperiod: Option<params::PhotoperiodParams>,
     pub daylength_var: Option<String>,
+    /// Drought acceleration ([F] Eqn 15.8) — the THIRD modifier. `None` leaves the rate
+    /// byte-for-byte what it was, which is potato's case ([F] Table 15.1 has no potato
+    /// row and populates `WSSD` for only two of its ten crops).
+    pub drought: Option<params::DroughtDevelopmentParams>,
+    pub drought_soil_water: Option<String>,
+    pub drought_rooted_depth_aux: Option<String>,
 }
 
 impl ThermalTimeAccumulation {
-    /// `DVS < 1` — the gate both modifiers share.
+    /// `DVS < 1` — the gate the two VEGETATIVE modifiers share. ⚠ `WSFD` is NOT gated by
+    /// it: [F] Box 16.2 gates that one on `CTU > tuEMR` only, and this accumulator starts
+    /// at emergence, so it runs through grain filling too.
     fn is_vegetative(&self, snapshot: &State) -> bool {
         let tt = snapshot.aux.get(&self.accumulator).copied().unwrap_or(0.0);
         science::development_stage(tt, self.tsum_anthesis, self.tsum_maturity) < 1.0
+    }
+
+    /// The Eqn-15.8 multiplier — 1 when drought acceleration is not configured.
+    ///
+    /// Routed through the same `science::soil_water_stress` the three other consumers
+    /// use, on the same step-entry reads, so the fourth consumer cannot disagree with
+    /// them about `FTSW` inside one step.
+    fn drought_factor(&self, snapshot: &State) -> f64 {
+        let (Some(d), Some(sw), Some(depth_aux)) = (
+            self.drought,
+            self.drought_soil_water.as_ref(),
+            self.drought_rooted_depth_aux.as_ref(),
+        ) else {
+            return 1.0;
+        };
+        let wsfg = science::soil_water_stress(
+            amt(snapshot, sw),
+            snapshot.aux.get(depth_aux).copied().unwrap_or(0.0),
+            d.soil_extractable_water,
+            d.ground_area,
+            d.wssg,
+        );
+        science::drought_development_factor(wsfg, d.wssd)
     }
 }
 
@@ -1141,6 +1172,9 @@ impl AuxProcess for ThermalTimeAccumulation {
                 rate *= science::photoperiod_factor(env.get(var)? / 3600.0, pp.cpp, pp.ppsen);
             }
         }
+        // OUTSIDE the vegetative branch and LAST — [F] Box 16.2 gates WSFD on emergence
+        // only and applies it to the already-modified DTU.
+        rate *= self.drought_factor(snapshot);
         Ok(BTreeMap::from([(self.accumulator.clone(), rate * dt)]))
     }
 }

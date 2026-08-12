@@ -42,6 +42,7 @@ from domains.biosphere.loader import (
 from domains.biosphere.mineralization import NitrogenSenescence
 from domains.biosphere.nitrogen import NitrogenUptake
 from domains.biosphere.phenology import (
+    DroughtDevelopmentParams,
     ThermalTimeAccumulation,
     VernalizationAccumulation,
 )
@@ -273,6 +274,23 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             else None
         ),
         daylength_var=DAYLENGTH_VAR if scenario.photoperiod else None,
+        # The THIRD modifier: drought acceleration ([F] Eqn 15.8). Optional on the same
+        # pattern — absent ⇒ the rate is byte-for-byte what it was. ⚠ Unlike the other
+        # two it is switched by a VALUE (``wssd``) rather than a boolean, because the
+        # source publishes the coefficient for only some crops; ``None`` means "[F] does
+        # not give one for this crop", which is potato's case.
+        drought=(
+            DroughtDevelopmentParams(
+                wssd=scenario.wssd,
+                wssg=scenario.wssg,
+                soil_extractable_water=scenario.soil_extractable_water,
+                ground_area=scenario.ground_area,
+            )
+            if scenario.wssd is not None
+            else None
+        ),
+        soil_water=SOIL_WATER if scenario.wssd is not None else None,
+        rooted_depth_aux=ROOTED_DEPTH if scenario.wssd is not None else None,
     )
     # The THIRD accumulator (post-roadmap root functional coupling): rooted depth,
     # which gates NitrogenUptake's supply term. Unconditional — unlike

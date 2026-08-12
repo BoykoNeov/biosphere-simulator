@@ -1275,15 +1275,21 @@ def test_the_shedding_fed_regime_takes_BOTH_sizings_and_the_better_trough_costs_
         (
             WATER_BITING_SCENARIO,
             WATER_BITING_YEARS,
-            # ⚠ 0.085006 until 2026-08-12. Not a mechanism change: `water_biting` was
-            # RE-DECLARED by the soil-water re-basing (its bite used to be
+            # ⚠ 0.085006 until 2026-08-12, then 0.088509 the same day. Neither move was
+            # a mechanism change, and they had DIFFERENT causes. (1) The soil-water
+            # re-basing RE-DECLARED the scenario (its bite used to be
             # `soil_water0 = 50` kg inside an absolute-kg band that no longer exists;
-            # it is now `soil_moisture_index = 0.05`). A probe value of the scenario,
-            # so it moves when the scenario does.
-            0.088509,
-            0.085405,
-            0.124293,
-            0.587767 / 2.171468,
+            # it is now `soil_moisture_index = 0.05`). (2) `WSFD` ([F] Eqn 15.8,
+            # docs/plans/post-roadmap-water-stress-curves.md) made drought accelerate
+            # development, and `water_biting` is one of only two runs in the tree where
+            # water actually limits — so its whole carbon trajectory moved while every
+            # frozen scenario stayed bit-identical. Probe values of the scenario; they
+            # move when it does. The four CLAIMS below (sizing2 beats frozen, and pays
+            # for it in plant) were re-measured and all still hold.
+            0.093346,
+            0.118940,
+            0.143329,
+            0.535004 / 2.143987,
         ),
     ):
         tails = {}

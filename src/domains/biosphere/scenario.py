@@ -111,10 +111,41 @@ class SeasonScenario:
     # does not limit, so the whole frozen roster is bit-identical in C/N/O across the
     # change.
     #
-    # Only WSSG is carried. WSSL (leaf-area expansion, 0.40) and WSSD (phenology, 0.40)
-    # have nothing to attach to — we have no water-gated leaf-expansion term and no
-    # drought-accelerated development. Named successors, not simplifications.
+    # WSSL (leaf-area expansion, 0.40) is still NOT carried, and the reason got stronger
+    # rather than weaker: it is now a fact about [F], not about us. [F] Box 16.2 applies
+    # WSFL to the NODE-DRIVEN leaf-area branch (GLAI from main-stem node number,
+    # Eqn 9.5) and deliberately NOT to the CARBON-DRIVEN one (GLAI = GLF·SLA), whose
+    # dry matter already carries WSFG. Our canopy is only ever that second branch —
+    # LAI is derived from leaf carbon — so WSFL would double-count the deficit on the
+    # branch the source leaves unscaled. See docs/plans/post-roadmap-water-stress-
+    # curves.md; the successor is a sink-limited leaf-expansion phase, not a multiply.
     wssg: float = 0.30  # dimensionless
+    # WSSD — the phenology curve, the second of the two successors the re-basing named
+    # (docs/plans/post-roadmap-water-stress-curves.md). ⚠ NOT a threshold: Table 15.1's
+    # caption is "Threshold FTSW for leaf area development (WSSL) and growth (WSSG), AND
+    # A COEFFICIENT of phenological development response to drought (WSSD)". It scales
+    # the already-computed WSFG (Eqn 15.8, WSFD = (1 − WSFG)·WSSD + 1), so it needs no
+    # FTSW comparison of its own — the record that named it priced it as a threshold and
+    # was wrong in the expensive direction.
+    #
+    # 0.40 is [F] Table 15.1's WHEAT row (same page render as wssg above). Optional
+    # because the source makes it optional: the coefficient is populated for only TWO of
+    # the table's ten crops (wheat 0.40, chickpea 0.40) and [F] says why in its own
+    # words — "the scientific basis and a procedure to measure WSSD need to be sought".
+    # There is no potato row at all, so POTATO_SCENARIO sets this to None. That is an
+    # ABSENCE IN THE SOURCE, not a modelling preference.
+    #
+    # ⚠ Bit-identically inert on all 7 frozen scenarios and MEASURED so, not assumed:
+    # every one of them holds WSFG ≡ 1 (min FTSW 0.7039 on drought, against wssg 0.30),
+    # and WSFD(1) = 1 exactly. Only `water_biting` (min WSFG 0.1667) and `deep_water`
+    # (0.2677) move. Consequence: this unfreeze moves NOTHING in the manifest — no aux,
+    # no flow, no param file, no frozen golden — so `water_biting_state.json`, which is
+    # not in the manifest, is the only automatic gate there is.
+    #
+    # ⚠ Sits here rather than in params/crops/*/phenology.yaml only because `wssg` — the
+    # SAME ROW of the same table — already does; in [F] both are indexed by crop.
+    # Splitting one table row across two homes would be worse than either choice.
+    wssd: float | None = 0.40  # dimensionless; None ⇒ no drought development response
     # ⚠ MEANING CHANGED 2026-08-12: mm day⁻¹ **applied** → mm day⁻¹ **available**. The
     # Irrigation flow is now demand-driven ([F] Eqn 14.8, IRGW = TTSW − ATSW) capped by
     # this capacity, which is [F]'s own other option ("a fixed amount of water at each
@@ -519,6 +550,13 @@ POTATO_SCENARIO: SeasonScenario = SeasonScenario(
     vernalization=False,
     photoperiod=False,
     latitude=37.64,
+    # ⚠ The one field this scenario turns OFF for a reason that is not about potato's
+    # physiology but about the SOURCE: [F] Table 15.1 has no potato row, and populates
+    # WSSD for only two of the ten crops it does list. Inheriting wheat's 0.40 would be
+    # inventing a coefficient the source declines to give. (Measured inert either way —
+    # potato's min FTSW is 0.9018, so WSFG ≡ 1 — which is exactly why an inherited value
+    # would have looked harmless and gone unnoticed.)
+    wssd=None,
 )
 POTATO_YEARS: int = 1
 

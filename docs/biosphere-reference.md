@@ -105,6 +105,12 @@ accumulator that gates it, and (since 2026-08-11) the **rooted-depth** accumulat
 future aux process added but wired into no golden is caught too. (See `flow_set` /
 `aux_set` in the manifest for the exact lists.)
 
+⚠ **What `aux_set` does NOT catch: a change to what an existing accumulator DOES.** It
+freezes the set of accumulator *classes*, so adding a third rate multiplier inside
+`ThermalTimeAccumulation` (`WSFD`, 2026-08-12) leaves it untouched. That build changed the
+frozen phenology science and moved nothing in this manifest at all — see the warning above
+the unfreeze log.
+
 ⚠ **`aux_set` GREW 2 → 3 on 2026-08-11: `RootDepthExtension` was ADDED** by the root
 functional coupling (`docs/plans/post-roadmap-root-functional-coupling.md`). It advances
 rooted depth by [E]'s own law and gates `NitrogenUptake`'s supply term by the fraction of
@@ -302,10 +308,74 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
 7. **Re-run the gates:** full suite (incl. `-m slow` for the stress), `ruff`, `pyright`; commit
    with a Conventional Commit that names the unfreeze.
 
-An undocumented unfreeze fails CI by construction (a moved golden, or the completeness gate),
-so the discipline is enforced, not merely requested.
+⚠ **"An undocumented unfreeze fails CI by construction" is NOT true in general, and the
+2026-08-12 `WSFD` build is the counter-example.** The claim used to read that way here. It
+holds for an unfreeze that moves a frozen golden or changes a frozen *set* — but a **form**
+change can do neither: `WSFD` added a third multiplier to the thermal-time rate, and because
+it is the exact multiplicative identity wherever water does not limit, it moved no frozen
+golden, no `flow_set`, no `aux_set`, no `param_files` entry, and therefore **not one byte of
+the manifest**. Both automatic gates were blind to it. This joins the provenance-only edit
+CLAUDE.md already warns about as a second door into the same room: the ceremony below is
+honor-system for such a change, so follow it deliberately rather than waiting for a red test.
 
 ### Unfreeze log
+
+- **2026-08-12 — `WSFD`, drought-accelerated phenology ([F] Eqn 15.8; NO manifest movement,
+  NO frozen golden movement, one non-frozen golden).**
+  `docs/plans/post-roadmap-water-stress-curves.md`. The second of the two successors the
+  soil-water re-basing named. **The first unfreeze in this series that NOTHING AUTOMATIC
+  CATCHES** — see the warning above.
+
+  **What changed.** `ThermalTimeAccumulation` gained a third optional rate multiplier,
+  `WSFD = (1 − WSFG)·WSSD + 1`, applied to the daily temperature unit. Drought hastens
+  development, so unlike its two neighbours (`verfun`, `ppfun`) it is **not** a `[0, 1]`
+  limitation factor, and unlike them it is **not phase-gated** — [F] Box 16.2 gates it on
+  `CTU > tuEMR` only, and our accumulator starts at emergence, so it runs through grain
+  filling. `SeasonScenario` gained `wssd: float | None = 0.40` ([F] Table 15.1, wheat, off
+  the same page render `wssg` came from); `POTATO_SCENARIO` sets it `None` because
+  **Table 15.1 has no potato row** and populates the coefficient for only two of its ten
+  crops — an absence in the source, not a modelling preference.
+
+  ⚠ **The record that named this successor mis-filed it as a threshold** ("`WSSD`
+  (phenology, 0.40)", under a heading about "different **thresholds**"). Table 15.1's caption
+  calls it "a **coefficient** of phenological development response to drought", and Eqn 15.8
+  is driven by `WSFG` — which the tree already computes. So the build needed no new `FTSW`
+  call site and no second threshold, and was materially smaller than its recorded price.
+
+  **Why the frozen roster does not move, measured rather than argued.** `WSFD(1) = 1`
+  exactly, and every one of the 7 frozen scenarios holds `WSFG ≡ 1` — the driest,
+  `drought`, bottoms at `FTSW = 0.7039` against `wssg = 0.30`. Instrumenting
+  `water_stress_factor` across every golden-bearing run on the frozen tree found exactly
+  **two** runs where water limits at all: `water_biting` (min `WSFG` 0.1667) and
+  `deep_water` (0.2677). Re-run with the coefficient live, every frozen scenario is
+  **bit-identical in every stock and every aux**.
+
+  **Science gates (step 5).** Unchanged by construction: no frozen scenario's trajectory
+  moved a bit, so every `science_bands` reading and every `liveness_floors` reading is
+  exactly what it was, including `open_season`'s tight 3.8 % / 12 % margins.
+
+  **The one golden that moved** is `water_biting_state.json`, which is **not** in this
+  manifest. 14 stocks moved, 6 are bit-identical, and the split is the finding: **every
+  WATER stock and `rooted_depth` came through untouched**, because potential transpiration
+  is a Penman–Monteith function of weather (not of leaf area) and the roots had already
+  stopped on the dry-subsoil gate by day 12. Carbon: leaf −13.6 %, root −7.9 %, stem
+  +4.2 %, **grain +33.2 %** — faster development means anthesis arrives sooner, so less of
+  a water-limited season goes into canopy and more into filling grain. Drought escape is
+  what `WSSD > 0` encodes. `rationed == 0`, `events == ()`, loss-sink empty.
+
+  **The feedback loop was measured, not reasoned away.** `WSFD` speeds DVS → root extension
+  hits its `DVS ≥ 1` stop earlier → shallower zone → lower `FTSW` → larger `WSFD`. Bounded
+  by `1 + WSSD`, and measured inert on both live runs even at an absurd `WSSD = 1.50`,
+  because root growth has already stopped for a *different* cited reason long before
+  anthesis (day 12 vs 251 on `water_biting`; day 107 vs 251 on `deep_water`). That is a
+  fact about these two scenarios, not a general safety property.
+
+  **`WSSL` was REFUSED, and the refusal got stronger.** See the plan doc: [F] Box 16.2
+  applies `WSFL` to its node-driven leaf-area branch and deliberately **not** to the
+  carbon-driven `GLAI = GLF·SLA`, whose dry matter already carries `WSFG`. Our canopy is
+  only ever that second branch, so the factor would double-count. The successor is a
+  sink-limited leaf-expansion phase (which would require LAI as a state variable, reversing
+  the "LAI is derived, not stored" lock), not a missing multiply.
 
 - **2026-08-12 — the soil water regime re-based on geometry (+1 flow, `flow_set` 21 → 22,
   12 goldens, both manifests, both ports).**

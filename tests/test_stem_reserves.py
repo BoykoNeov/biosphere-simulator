@@ -913,11 +913,14 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
     # single fill event ever fires.
     for scen, years, frozen_min in (
         (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, 0.076380),
-        # ⚠ 0.085006 until 2026-08-12 — `water_biting` was re-declared by the
-        # soil-water re-basing (see its scenario comment), so this probe value moved
-        # with the scenario. The MECHANISM claim below (the trough is bit-identical
-        # with and without the reserve) is unchanged and is what the test is for.
-        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, 0.088509),
+        # ⚠ 0.085006 → 0.088509 → 0.093346, all on 2026-08-12 and for two different
+        # reasons: the soil-water re-basing re-declared the scenario, then `WSFD`
+        # ([F] Eqn 15.8) made drought accelerate development. `water_biting` is one of
+        # only two runs where water limits at all, so it absorbs both while the frozen
+        # roster stays bit-identical. The MECHANISM claim below (the trough is
+        # bit-identical with and without the reserve) is unchanged and is what the test
+        # is for. Note `sealed_chamber` above did NOT move on either occasion.
+        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, 0.093346),
     ):
         base, _, _ = _run(scen, years)
         snap, _, _ = _run(scen, years, reserve=True, snapshot_fill=True)

@@ -18,6 +18,7 @@ Steps 5/6/7):
 """
 
 import math
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from domains.biosphere.compartments import SOIL
 from domains.biosphere.loader import (
     PHENOLOGY_PARAMS_PATH,
     load_phenology_params,
@@ -32,6 +34,7 @@ from domains.biosphere.loader import (
     load_vernalization_params,
 )
 from domains.biosphere.phenology import (
+    DroughtDevelopmentParams,
     PhenologyParams,
     PhotoperiodParams,
     ThermalTimeAccumulation,
@@ -39,13 +42,23 @@ from domains.biosphere.phenology import (
     VernalizationParams,
     daily_thermal_time,
     development_stage,
+    drought_development_factor,
     photoperiod_factor,
     vernalization_day,
     vernalization_factor,
 )
+from domains.biosphere.scenario import (
+    DAY_NEUTRAL_SCENARIO,
+    DEFAULT_SCENARIO,
+    POTATO_SCENARIO,
+)
+from domains.biosphere.season import build_season
+from domains.biosphere.stocks import ROOTED_DEPTH, SOIL_WATER, pool_stock
+from domains.biosphere.transpiration import soil_water_stress
 from simcore.auxiliary import AuxId, AuxProcess
 from simcore.environment import SourceResolver, constant
 from simcore.integrator import EulerIntegrator, Rk4Integrator
+from simcore.quantities import Quantity, canonical_unit
 from simcore.registry import Registry
 from simcore.state import State
 
@@ -641,3 +654,251 @@ def test_committed_file_loads_the_cited_winter_europe_values() -> None:
     assert (vern.t_opt_upper_v, vern.t_ceiling_v) == (8.0, 12.0)
     assert (vern.vsen, vern.vdsat) == (0.033, 50.0)
     assert (photo.cpp, photo.ppsen) == (16.0, 0.09)
+
+
+# --- WSFD: drought acceleration ([F] Ch. 15, Eqn 15.8) ----------------------
+# The THIRD development-rate modifier, and the one that breaks both patterns the other
+# two set: it may exceed 1, and it is not phase-gated. See
+# docs/plans/post-roadmap-water-stress-curves.md.
+
+_WSSG = DEFAULT_SCENARIO.wssg  # 0.30, [F] Table 15.1 wheat
+_EXTR = DEFAULT_SCENARIO.soil_extractable_water
+_AREA = DEFAULT_SCENARIO.ground_area
+
+
+def _drought(wssd: float) -> DroughtDevelopmentParams:
+    return DroughtDevelopmentParams(
+        wssd=wssd,
+        wssg=_WSSG,
+        soil_extractable_water=_EXTR,
+        ground_area=_AREA,
+    )
+
+
+def _wet_or_dry(held: float, depth: float, **aux: float) -> State:
+    """A constructed root-zone state — no scenario supplies one at a clean FTSW."""
+    return State(
+        n=0,
+        stocks={
+            SOIL_WATER: pool_stock(
+                SOIL_WATER, SOIL, Quantity.WATER, canonical_unit(Quantity.WATER), held
+            )
+        },
+        rng_seed=0,
+        aux={"thermal_time": 0.0, ROOTED_DEPTH: depth, **aux},
+    )
+
+
+@pytest.mark.parametrize(
+    ("wsfg", "wssd", "expected"),
+    [
+        # [F]'s own worked example, verbatim: "if WSSD is 0.4, the maximum value of WSFD
+        # at WSFG = 0 is equal to 1.4 (= 1 x 0.4 + 1)".
+        (0.0, 0.4, 1.4),
+        # ...and its negative counterpart, also verbatim: "if WSSD is -0.4, then WSFD
+        # will be 0.6 when FTSW and hence WSFG reach 0".
+        (0.0, -0.4, 0.6),
+        # The identity that makes every unstressed scenario byte-for-byte unchanged.
+        (1.0, 0.4, 1.0),
+        (1.0, -0.4, 1.0),
+        (1.0, 1.5, 1.0),
+        # Linear in between (Table 15.3's shape).
+        (0.5, 0.4, 1.2),
+        (0.25, 0.4, 1.3),
+    ],
+)
+def test_drought_development_factor_reproduces_the_sources_worked_examples(
+    wsfg: float, wssd: float, expected: float
+) -> None:
+    assert drought_development_factor(wsfg, wssd=wssd) == pytest.approx(expected)
+
+
+def test_wsfd_is_exactly_one_when_unstressed_not_merely_close() -> None:
+    """The whole freeze rests on this being EXACT, not approximate: 7 frozen goldens are
+    bit-identical across this build only because WSFD(1) is the multiplicative identity.
+    ``pytest.approx`` would pass on a value that moved every golden's last ULP."""
+    for wssd in (0.4, -0.4, 1.5, -1.0, 0.0):
+        assert drought_development_factor(1.0, wssd=wssd) == 1.0
+
+
+def test_wsfd_may_exceed_one_unlike_its_two_neighbours() -> None:
+    """verfun and ppfun are limitation factors on [0, 1]; WSFD is a RATIO on
+    [0, 1 + WSSD]. Table 15.2: "acceleration of development rates is more common"."""
+    assert drought_development_factor(0.0, wssd=0.4) > 1.0
+    assert vernalization_factor(0.0, vsen=0.01, vdsat=50.0) <= 1.0
+    assert photoperiod_factor(0.0, cpp=_CPP, ppsen=_PPSEN) <= 1.0
+
+
+def test_wsfd_arrests_development_at_wssd_minus_one_and_never_reverses() -> None:
+    """-1 is the physical floor of the form, not an arbitrary bound: it is where a
+    fully-stressed crop stops developing. Below it WSFD goes negative and the crop would
+    develop BACKWARDS, which the source rules out in the same words it uses for
+    photoperiod ("development is only a forward process and cannot be negative")."""
+    assert drought_development_factor(0.0, wssd=-1.0) == 0.0
+    for wsfg in (0.0, 0.25, 0.5, 1.0):
+        assert drought_development_factor(wsfg, wssd=-1.0) >= 0.0
+    with pytest.raises(ValueError, match="forward-only"):
+        drought_development_factor(0.0, wssd=-1.0000001)
+
+
+def test_wsfd_is_monotone_increasing_as_water_runs_out() -> None:
+    factors = [
+        drought_development_factor(w / 10.0, wssd=0.4) for w in range(10, -1, -1)
+    ]
+    assert factors == sorted(factors)
+
+
+def test_thermal_time_aux_without_drought_is_the_plain_rate() -> None:
+    """The byte-for-byte guarantee, at the aux-process level: a crop with no cited WSSD
+    (potato — [F] Table 15.1 has no potato row) gets exactly the pre-existing rate."""
+    plain = ThermalTimeAccumulation(
+        id=AuxId("biosphere.thermal_time"),
+        accumulator="thermal_time",
+        temp_var="temp",
+        params=_params(),
+    )
+    # A bone-dry root zone: if the modifier were wired unconditionally this would fire.
+    dry = _wet_or_dry(0.0, 0.15)
+    resolver = SourceResolver(forcings={"temp": constant(18.0)})
+    assert dict(plain.evaluate(dry, resolver.bind(dry, 1.0), 1.0)) == {
+        "thermal_time": 18.0
+    }
+
+
+def test_thermal_time_aux_accelerates_under_drought_by_the_cited_factor() -> None:
+    """The mechanism, on a CONSTRUCTED stressed state — no scenario in the tree supplies
+    one at an arithmetically clean FTSW, so the test builds it. A root zone at 0.15 m
+    gives TTSW = 0.15 * 0.13 * 1000 * 1 = 19.5 kg; holding 15 % of that is FTSW = 0.15,
+    i.e. half the wssg = 0.30 threshold, so WSFG = 0.5 and
+    WSFD = (1 - 0.5) * 0.4 + 1 = 1.2."""
+    proc = ThermalTimeAccumulation(
+        id=AuxId("biosphere.thermal_time"),
+        accumulator="thermal_time",
+        temp_var="temp",
+        params=_params(),
+        drought=_drought(0.4),
+        soil_water=SOIL_WATER,
+        rooted_depth_aux=ROOTED_DEPTH,
+    )
+    ttsw = 0.15 * _EXTR * 1000.0 * _AREA
+    stressed = _wet_or_dry(0.15 * ttsw, 0.15)
+    resolver = SourceResolver(forcings={"temp": constant(18.0)})
+    got = proc.evaluate(stressed, resolver.bind(stressed, 1.0), 1.0)
+    assert got["thermal_time"] == pytest.approx(18.0 * 1.2)
+
+
+def test_thermal_time_aux_drought_is_NOT_gated_off_at_anthesis() -> None:
+    """The difference from its two neighbours, pinned because it is easy to "fix" into
+    consistency: verfun/ppfun are gated to DVS < 1 (wheat is insensitive to cold and
+    daylength past anthesis), but [F] Box 16.2 gates WSFD on ``CTU > tuEMR`` ONLY, so it
+    runs through grain filling. Moving the multiply inside the vegetative branch turns
+    this red and nothing else in the suite would notice."""
+    proc = ThermalTimeAccumulation(
+        id=AuxId("biosphere.thermal_time"),
+        accumulator="thermal_time",
+        temp_var="temp",
+        params=_params(),
+        vernalization=_vern_params(),
+        vernalization_accumulator="vernalization_days",
+        drought=_drought(0.4),
+        soil_water=SOIL_WATER,
+        rooted_depth_aux=ROOTED_DEPTH,
+    )
+    ttsw = 0.15 * _EXTR * 1000.0 * _AREA
+    resolver = SourceResolver(forcings={"temp": constant(18.0)})
+    # Past anthesis: verfun is gated OFF (so zero cold does not arrest), WSFD is NOT.
+    reproductive = _wet_or_dry(0.15 * ttsw, 0.15, **{"vernalization_days": 0.0})
+    reproductive = State(
+        n=0,
+        stocks=reproductive.stocks,
+        rng_seed=0,
+        aux={**reproductive.aux, "thermal_time": _TSUM_ANTHESIS + 1.0},
+    )
+    got = proc.evaluate(reproductive, resolver.bind(reproductive, 1.0), 1.0)
+    assert got["thermal_time"] == pytest.approx(18.0 * 1.2)
+
+
+def test_thermal_time_drought_reads_the_same_ftsw_as_the_other_consumers() -> None:
+    """The disagreement ``soil_water_stress`` exists to prevent, extended to the FOURTH
+    consumer. WSFD is defined THROUGH WSFG, so a second independently-parameterized FTSW
+    here would let phenology and growth disagree about the stress state inside one step
+    — silently, since each would still be internally consistent."""
+    proc = ThermalTimeAccumulation(
+        id=AuxId("biosphere.thermal_time"),
+        accumulator="thermal_time",
+        temp_var="temp",
+        params=_params(),
+        drought=_drought(0.4),
+        soil_water=SOIL_WATER,
+        rooted_depth_aux=ROOTED_DEPTH,
+    )
+    resolver = SourceResolver(forcings={"temp": constant(18.0)})
+    for held, depth in ((2.0, 0.15), (0.5, 0.4), (17.0, 0.2), (0.0, 0.15)):
+        snap = _wet_or_dry(held, depth)
+        wsfg = soil_water_stress(
+            held,
+            depth,
+            soil_extractable_water=_EXTR,
+            ground_area=_AREA,
+            threshold=_WSSG,
+        )
+        got = proc.evaluate(snap, resolver.bind(snap, 1.0), 1.0)["thermal_time"]
+        assert got == 18.0 * ((1.0 - wsfg) * 0.4 + 1.0)
+
+
+def test_potato_declines_wssd_because_the_source_has_no_potato_row() -> None:
+    """An ABSENCE IN THE SOURCE, pinned so nobody "completes" the roster later. [F]
+    Table 15.1 lists ten crops and populates WSSD for exactly two of them (wheat 0.40,
+    chickpea 0.40); there is no potato row at all. Measured inert either way (potato's
+    min FTSW is 0.9018, so WSFG == 1) — which is precisely why an inherited value would
+    have looked harmless."""
+    assert POTATO_SCENARIO.wssd is None
+    assert DEFAULT_SCENARIO.wssd == 0.40
+    # The day-neutral crop IS the winter-wheat param files with the two phenology gates
+    # switched off, so it keeps wheat's coefficient.
+    assert DAY_NEUTRAL_SCENARIO.wssd == 0.40
+
+
+def _built_thermal_time(scenario: object) -> ThermalTimeAccumulation:
+    """The accumulator as `build_season` actually wires it — not as a test builds it."""
+    _state, registry = build_season(scenario)  # type: ignore[arg-type]
+    (proc,) = [
+        p for p in registry.aux_processes if isinstance(p, ThermalTimeAccumulation)
+    ]
+    return proc
+
+
+def test_the_wiring_declines_wssd_for_potato_not_just_the_scenario_field() -> None:
+    """⚠ The pin the scenario-field assertion above CANNOT make. Every other WSFD test
+    constructs the aux process directly, so all of them stay green if `build_plants`
+    wires the modifier unconditionally and potato silently inherits wheat's 0.40. Found
+    by mutation: that exact break passed the whole file. This walks the registry
+    `build_season` produced instead."""
+    assert _built_thermal_time(POTATO_SCENARIO).drought is None
+    assert _built_thermal_time(POTATO_SCENARIO).soil_water is None
+    assert _built_thermal_time(POTATO_SCENARIO).rooted_depth_aux is None
+
+    wheat = _built_thermal_time(DEFAULT_SCENARIO)
+    assert wheat.drought is not None
+    assert wheat.drought.wssd == 0.40
+    assert (wheat.soil_water, wheat.rooted_depth_aux) == (SOIL_WATER, ROOTED_DEPTH)
+
+    # ...and it reads the SAME threshold and geometry the other three consumers do.
+    # ⚠ Asserted against a CONSTRUCTED off-default plot, not against DEFAULT_SCENARIO:
+    # every scenario in the tree has ground_area == 1.0 and the reference EXTR, so
+    # `x == DEFAULT_SCENARIO.x` is tautological and a hardcoded 1.0 in the wiring passes
+    # it. Found by mutation — the same blindness the soil-layers build recorded on the
+    # Rust side ("no scenario has a plot other than 1 m²").
+    odd = replace(
+        DEFAULT_SCENARIO,
+        ground_area=3.5,
+        soil_extractable_water=0.09,
+        wssg=0.42,
+        wssd=0.17,
+    )
+    built = _built_thermal_time(odd)
+    assert built.drought is not None
+    assert built.drought.wssd == 0.17
+    assert built.drought.wssg == 0.42
+    assert built.drought.soil_extractable_water == 0.09
+    assert built.drought.ground_area == 3.5

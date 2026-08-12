@@ -81,6 +81,7 @@ it was 7.3 KB loaded into *every* session, to index a file most sessions never o
 | Tooling: the context budget (not science) | COMPLETE 2026-08-12 — the 2026-08-11 cut was a **relocation, not a discipline**: the index regrew 14.4→17.7 KB *the same day*, ~239 B per finished item. Retirement rule + one unconditional index + a paired ceiling test; `CLAUDE.md` 17,715→9,520 B, nothing condensed | `docs/context-budget.md` |
 | Re-deriving the soil water store from geometry | **BUILT 2026-08-12** — the recorded price was wrong both ways (the open field costs −2 % yield; every sealed chamber **dies and locks**, missing the escape by 0.5 kg), and two of the three named successors were **one mechanism**. Geometry + `FTSW` + demand-driven irrigation + drainage: **only water moved**, on every golden. `flow_set` 21→22, both ports | `post-roadmap-soil-water-rebasing.md` |
 | Tooling: the record split (that rule set's own rule 4, built) | COMPLETE 2026-08-12 — the record table was 255,567 B in 32 physical *lines*, the longest 54,343 characters, which defeats `Grep`/`Read`/`git diff` alike. One file per item in `docs/log/`, **moved verbatim** — both sha-256 digests measured and recorded. The gate now caps line length, so a relocation cannot pass as the fix | `docs/context-budget.md` |
+| The remaining water-stress curves (the re-basing's two named successors) | **`WSFD` BUILT + `WSFL` REFUSED 2026-08-12** — the successor list called `WSSD` a *threshold*; Table 15.1's caption calls it a **coefficient**, so the build needed no `FTSW` site at all and was smaller than its recorded price. `WSFL` refused on [F] itself: Box 16.2 applies it to the node-driven leaf-area branch and **not** to the carbon-driven one, which is the only branch we have. The first unfreeze here that **moves nothing in the manifest** — both automatic gates are blind to it | `post-roadmap-water-stress-curves.md` |
 
 ## The record
 
@@ -128,3 +129,4 @@ with why the table could not stay: 255,567 bytes in 32 physical lines defeats `G
 | **Tooling: the context budget** (the 2026-08-11 CLAUDE.md cut, re-opened because it did not hold) | [the record](log/context-budget.md) |
 | **Re-deriving the soil water store from geometry** (the soil-layers build's own named finding, taken and BUILT) | [the record](log/soil-water-rebasing.md) |
 | **Tooling: the record split** (that rule set's own rule 4, taken as its own piece of work) | [the record](log/record-split.md) |
+| **The remaining water-stress curves** — `WSFD` BUILT, `WSFL` REFUSED | [the record](log/water-stress-curves.md) |

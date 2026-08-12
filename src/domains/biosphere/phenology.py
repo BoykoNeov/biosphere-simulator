@@ -55,6 +55,18 @@ development through a mild winter — but they are *structurally different* defe
   DVS, and gate ``VERNFAC`` to the vegetative phase with no API change — the seam exists
   structurally even though the plain rate here does not read ``snapshot``.
 
+**Drought acceleration (Soltani & Sinclair Ch. 15, Eqn 15.8 — the THIRD modifier, and
+the odd one out).** ``WSFD = (1 − WSFG)·WSSD + 1`` speeds development up under water
+deficit. It joined the other two once the soil water regime was re-based on ``FTSW``
+(``docs/plans/post-roadmap-soil-water-rebasing.md``), which is what gave it a ``WSFG``
+to be defined through — before that there was no fraction to compute it from. ⚠ It is
+**not** a ``[0, 1]`` limitation factor and **not** phase-gated; see
+:func:`drought_development_factor` and :class:`ThermalTimeAccumulation`. ⚠ The successor
+list that named it called it *"`WSSD` (phenology, 0.40)"* under a heading about
+"different **thresholds**" — ``WSSD`` is a **coefficient**, and mis-reading it as a
+threshold prices the mechanism as a second ``FTSW`` comparison it does not need
+(``docs/plans/post-roadmap-water-stress-curves.md``).
+
 Pure stdlib only. Citations: McMaster, G.S. & Wilhelm, W.W. (1997), "Growing
 degree-days: one equation, two interpretations", Agricultural and Forest Meteorology
 87:291–300 (the degree-day rate); van Keulen, H. & Wolf, J., eds. (1986), *Modelling of
@@ -65,8 +77,10 @@ development-stage / thermal-sum (DVS/TSUM) concept).
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from domains.biosphere.transpiration import soil_water_stress
 from simcore.auxiliary import AuxId
 from simcore.environment import Environment
+from simcore.ids import StockId
 from simcore.state import State
 
 
@@ -116,6 +130,38 @@ class PhotoperiodParams:
 
     cpp: float  # CPP, critical photoperiod (h); at/above it there is no slowdown
     ppsen: float  # photoperiod sensitivity coefficient (1/h)
+
+
+@dataclass(frozen=True)
+class DroughtDevelopmentParams:
+    """Drought-acceleration parameters — Soltani & Sinclair (2012) Ch. 15, Eqn 15.8.
+
+    The third optional development-rate modifier, alongside
+    :class:`VernalizationParams` and :class:`PhotoperiodParams`. A crop with no cited
+    ``WSSD`` carries none and gets the unmodified rate byte-for-byte.
+
+    ⚠ **Why soil geometry rides along in a phenology dataclass.** ``WSFD`` is not
+    defined on ``FTSW`` directly — it is defined on ``WSFG`` (Eqn 15.8), which is
+    :func:`transpiration.water_stress_factor` on ``FTSW = ATSW/TTSW``. So the modifier
+    cannot be evaluated without the same root-zone geometry the three existing ``WSFG``
+    consumers use, and it must use *identical* values or it silently disagrees with them
+    about the stress state inside one step. The alternative — a second, independently
+    parameterized ``FTSW`` — is precisely the disagreement
+    :func:`transpiration.soil_water_stress` exists to prevent. ``RootDepthExtension``
+    carries the same three fields flat for the same reason.
+
+    ⚠ **``wssd`` is a COEFFICIENT, not a threshold**, and the distinction is easy to
+    lose because its two table-mates are thresholds. Table 15.1's caption: "Threshold
+    FTSW for leaf area development (WSSL) and growth (WSSG), **and a coefficient of
+    phenological development response to drought (WSSD)**". There is no ``FTSW``
+    comparison against
+    ``wssd``; it scales an already-computed ``WSFG``.
+    """
+
+    wssd: float  # WSSD, the drought development-response coefficient (dimensionless)
+    wssg: float  # WSSG, the growth FTSW threshold WSFD is defined through (Eqn 15.3)
+    soil_extractable_water: float  # EXTR (mm mm⁻¹), for TTSW = DEPORT · EXTR
+    ground_area: float  # m², the scenario footprint TTSW is expressed over
 
 
 def daily_thermal_time(temp_c: float, *, t_base: float, t_cap: float) -> float:
@@ -238,6 +284,40 @@ def photoperiod_factor(daylength_h: float, *, cpp: float, ppsen: float) -> float
     return max(0.0, min(1.0, 1.0 - ppsen * (cpp - daylength_h)))
 
 
+def drought_development_factor(wsfg: float, *, wssd: float) -> float:
+    """Development-rate multiplier ``WSFD`` — Soltani & Sinclair Eqn 15.8.
+
+    ``WSFD = (1 − WSFG)·WSSD + 1``, where ``WSFG`` is the growth/transpiration deficit
+    factor (:func:`transpiration.water_stress_factor`, Eqn 15.3). Unstressed
+    (``WSFG = 1``) gives **exactly 1.0** — the identity that keeps every
+    non-water-limited scenario byte-for-byte unchanged. Fully stressed (``WSFG = 0``)
+    gives ``1 + WSSD``, so ``WSSD`` reads directly as the maximum fractional change in
+    development rate: [F]'s own worked example is "if WSSD is 0.4, the maximum value of
+    WSFD at WSFG = 0 is equal to 1.4".
+
+    ⚠ **This is the first modifier in this module that may exceed 1**, and that is the
+    citation, not a slip: drought *hastens* development in most species (Table 15.2 —
+    "acceleration of development rates is more common"). ``verfun`` and ``ppfun`` are
+    limitation factors on ``[0, 1]``; this one is a ratio on ``[0, 1 + WSSD]``.
+
+    **Negative ``WSSD`` is [F]'s own provision** for species drought *delays*: "Eqn 15.8
+    can still be used with negative values for WSSD. For example, if WSSD is −0.4, then
+    WSFD will be 0.6 when FTSW and hence WSFG reach 0." At ``WSSD = −1`` development is
+    fully arrested under maximum stress.
+
+    Raises ``ValueError`` unless ``wssd >= -1`` — below that ``WSFD`` goes negative and
+    development would run *backwards*, which the source rules out in the same words it
+    uses for photoperiod ("phenological development is only a forward process and cannot
+    be negative"). A cited bound, not a defensive clamp: the arrest at ``−1`` is the
+    physical limit of the form.
+    """
+    if wssd < -1.0:
+        raise ValueError(
+            f"wssd must be >= -1 (development is forward-only), got {wssd!r}"
+        )
+    return (1.0 - wsfg) * wssd + 1.0
+
+
 def development_stage(
     thermal_time: float, *, tsum_anthesis: float, tsum_maturity: float
 ) -> float:
@@ -289,6 +369,26 @@ class ThermalTimeAccumulation:
     the increment scales DVS's rate of advance identically. That is a faithful
     re-expression of the source's Eqn 8.2, recorded because the two forms are not
     obviously the same.
+
+    **Drought acceleration (optional; the THIRD modifier).** When ``drought``,
+    ``soil_water`` and ``rooted_depth_aux`` are all supplied, the rate is additionally
+    scaled by :func:`drought_development_factor` ([F] Eqn 15.8), evaluated on the
+    ``WSFG`` the rest of the tree computes from the step-entry ``soil_water`` amount and
+    step-entry rooted depth. ⚠ **It differs from its two neighbours in both directions,
+    and both differences are the source's:**
+
+    * **It is NOT phase-gated.** ``verfun``/``ppfun`` sit inside the ``DVS < 1`` branch
+      because wheat is insensitive to cold and daylength past anthesis. [F] Box 16.2
+      gates ``WSFD`` on ``CTU > tuEMR`` *only* — after emergence, all the way to
+      maturity — and this accumulator **starts** at emergence
+      (``thermal_time = 0 ⇒ DVS = 0``), so the gate is satisfied by construction and the
+      factor must run through grain filling too.
+    * **It may exceed 1.** Drought hastens development; see
+      :func:`drought_development_factor`.
+
+    It is applied **last**, after both vegetative modifiers, mirroring Box 16.2's
+    ``DTU = (TP1D - TBD) * tempfun`` … ``DTU = DTU * WSFD`` — ``WSFD`` scales the
+    fully-modified daily temperature unit, not the bare degree-day rate.
     """
 
     id: AuxId
@@ -299,6 +399,11 @@ class ThermalTimeAccumulation:
     vernalization_accumulator: str | None = None  # the aux name read, e.g. "vern_days"
     photoperiod: PhotoperiodParams | None = None
     daylength_var: str | None = None  # forcing var name read, e.g. "daylength_s"
+    drought: DroughtDevelopmentParams | None = None
+    soil_water: StockId | None = None  # the sibling stock read for ATSW
+    rooted_depth_aux: str | None = (
+        None  # the aux name read for DEPORT, e.g. "rooted_depth"
+    )
 
     def evaluate(
         self, snapshot: State, env: Environment, dt: float
@@ -313,6 +418,9 @@ class ThermalTimeAccumulation:
             # Either may be absent; each contributes 1 when it is.
             rate *= self._vernalization_factor(snapshot)
             rate *= self._photoperiod_factor(env)
+        # Applied OUTSIDE the vegetative branch and LAST — [F] gates WSFD on emergence
+        # only (Box 16.2) and applies it to the already-modified DTU.
+        rate *= self._drought_factor(snapshot)
         return {self.accumulator: rate * dt}
 
     def _is_vegetative(self, snapshot: State) -> bool:
@@ -351,6 +459,30 @@ class ThermalTimeAccumulation:
             cpp=self.photoperiod.cpp,
             ppsen=self.photoperiod.ppsen,
         )
+
+    def _drought_factor(self, snapshot: State) -> float:
+        """The Eqn-15.8 multiplier — 1 when drought acceleration is not configured.
+
+        Reads ``soil_water`` off ``snapshot.stocks`` and the rooted depth off
+        ``snapshot.aux`` — the same two step-entry reads ``RootDepthExtension`` makes,
+        routed through the same :func:`transpiration.soil_water_stress` the three
+        existing consumers use. Sharing that one function is what stops this fourth
+        consumer from disagreeing with the other three about ``FTSW`` inside a step.
+        """
+        if (
+            self.drought is None
+            or self.soil_water is None
+            or self.rooted_depth_aux is None
+        ):
+            return 1.0
+        wsfg = soil_water_stress(
+            snapshot.stocks[self.soil_water].amount,
+            snapshot.aux.get(self.rooted_depth_aux, 0.0),
+            soil_extractable_water=self.drought.soil_extractable_water,
+            ground_area=self.drought.ground_area,
+            threshold=self.drought.wssg,
+        )
+        return drought_development_factor(wsfg, wssd=self.drought.wssd)
 
 
 @dataclass(frozen=True)
