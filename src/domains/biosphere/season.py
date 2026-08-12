@@ -69,7 +69,9 @@ from dataclasses import replace
 from datetime import date
 
 from domains.biosphere.atmosphere import build_atmosphere
+from domains.biosphere.canopy import leaf_area_index
 from domains.biosphere.consumers import build_consumers
+from domains.biosphere.loader import crop_param_set, load_canopy_params
 from domains.biosphere.plants import _carbon_context as _carbon_context
 from domains.biosphere.plants import build_plants
 from domains.biosphere.scenario import (
@@ -106,6 +108,7 @@ from domains.biosphere.stocks import (
     DAYLENGTH_VAR,
     FERTILIZATION_VAR,
     IRRIGATION_VAR,
+    LEAF_AREA_INDEX,
     PAR_VAR,
     RN_VAR,
     ROOTED_DEPTH,
@@ -247,6 +250,25 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
             THERMAL_TIME: 0.0,
             VERNALIZATION_DAYS: 0.0,
             ROOTED_DEPTH: scenario.rooted_depth0,
+            # ⚠ Leaf area starts at exactly the value the DERIVED form would have given
+            # for the seedling, so wiring the mechanism does not move step 0 — the whole
+            # difference between the two is how it EVOLVES, and seeding it any other way
+            # would smuggle a second change into the golden diff. There is deliberately
+            # no ``leaf_area0`` scenario field: a seedling's area is its leaf carbon
+            # times the crop's specific leaf area, and a settable initial LAI would let
+            # a scenario contradict its own ``leaf_c0``.
+            #
+            # Always present, even when the mechanism is off (potato), so the aux dict's
+            # KEY SET does not depend on the switch — a state whose shape varies with a
+            # scenario flag is the kind of thing a cross-port comparison trips over.
+            # Nothing reads it when ``plant_density is None``.
+            LEAF_AREA_INDEX: leaf_area_index(
+                scenario.leaf_c0,
+                sla_per_mol_c=load_canopy_params(
+                    crop_param_set(scenario.crop).paths["canopy"]
+                ).sla_per_mol_c,
+                ground_area=scenario.ground_area,
+            ),
         },
     )
     return state, Registry(flows, stocks, aux_processes=aux_processes)
@@ -516,6 +538,30 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
     # root system a sown crop has (see SeasonScenario.rooted_depth0, cited).
     old_depth = aux.get(ROOTED_DEPTH, 0.0)
     aux[ROOTED_DEPTH] = scenario.rooted_depth0
+    # ⚠⚠ AND SO DOES LEAF AREA — and unlike the three resets above, THIS ONE IS NOT A
+    # MODELLING CHOICE THE GOLDENS CANNOT CHECK. Omitting it handed each new seedling
+    # the DEAD crop's canopy while its leaf carbon reset to a seed, so a chamber
+    # assimilated at full canopy from day 0 of every cycle, emptied its finite CO₂ pool
+    # and **rationed 85 times** on `consumer_long_horizon`. That is how the defect was
+    # found: not as a wrong number, but as the rationing gate going off — which is
+    # exactly what `post-roadmap-rationing-gate.md` made it loud for.
+    #
+    # ⚠ **THE QUESTION ONLY EXISTS BECAUSE THIS BUILD MADE LEAF AREA A STATE.** While
+    # LAI was DERIVED from leaf carbon it re-sowed itself for free — resetting the organ
+    # pools reset the canopy, with nothing to remember or forget. A state variable has
+    # to be told how each cycle ends, and every accumulator added from here owes the
+    # same answer. That is the standing price of reversing the "LAI is derived, not
+    # stored" lock, and it is written here rather than left to be re-discovered.
+    #
+    # It resets to the SEEDLING'S OWN derived area — the identical expression
+    # ``build_season`` seeds — so a re-sown crop starts precisely where a sown one does.
+    aux[LEAF_AREA_INDEX] = leaf_area_index(
+        scenario.leaf_c0,
+        sla_per_mol_c=load_canopy_params(
+            crop_param_set(scenario.crop).paths["canopy"]
+        ).sla_per_mol_c,
+        ground_area=scenario.ground_area,
+    )
     # --- THE WATER HALF OF THE RE-SOW (post-roadmap soil layers) ---------------------
     # The root zone just shrank from ``old_depth`` back to the sowing depth. Water in
     # soil does not move when a plant dies, so the abandoned column's extractable water

@@ -149,6 +149,15 @@ class CarbonContext:
     co2_pool_var: str | None = None
     chamber_air_mol: float | None = None
     ci_ratio: float | None = None
+    # Sink-limited leaf expansion (post-roadmap 2026-08-12). When set, LAI is READ from
+    # this aux accumulator instead of being derived from ``leaf_c`` — [F] Ch. 9 Eqn 9.8
+    # makes leaf area a state variable, because ``WSFL`` scales an expansion *rate* and
+    # the area a drought withholds must stay withheld. ``None`` keeps the P2 derived
+    # form, which is what a crop with no leaf-area parameterization (potato) gets.
+    # See ``leaf_area.py`` for the science and the reversal of the "LAI is derived, not
+    # stored" lock; the accumulator is seeded from this same derived expression, so the
+    # two agree at ``n = 0`` by construction.
+    leaf_area_aux: str | None = None
 
     def __post_init__(self) -> None:
         # The chamber Ci-source fields are all-or-nothing: either the full sealed triple
@@ -224,6 +233,30 @@ class CarbonContext:
         )
         return f_water * f_n
 
+    def _lai(self, snapshot: State, leaf: float) -> float:
+        """Leaf area index — the state accumulator when wired, else derived (P2).
+
+        ⚠ **The two branches are not interchangeable and the difference is the whole
+        of the leaf-expansion build.** Derived, ``LAI = leaf_c·sla/A``, is
+        source-limited and cannot hold withheld area. Read from the accumulator, it
+        is [F] Eqn 9.8's state variable, and the conventional specific leaf area is an
+        *emergent*
+        ratio rather than an input here. The accumulator is seeded from the derived
+        expression, so a scenario that wires it starts at exactly the same LAI it would
+        have had — the difference is entirely in how it *evolves*.
+
+        The ``max(0, ·)`` is not a clamp hiding an amount: ``DLAI = rdr_leaf·LAI`` is
+        relative, so the state cannot go negative through senescence, and this guards
+        only against a caller seeding a negative accumulator.
+        """
+        if self.leaf_area_aux is None:
+            return leaf_area_index(
+                leaf,
+                sla_per_mol_c=self.canopy.sla_per_mol_c,
+                ground_area=self.ground_area,
+            )
+        return max(0.0, snapshot.aux.get(self.leaf_area_aux, 0.0))
+
     def budget(self, snapshot: State, env: Environment) -> tuple[float, float, float]:
         """Daily ``(GASS, MRES, available)`` at the step-entry snapshot (mol C/day).
 
@@ -235,9 +268,7 @@ class CarbonContext:
         gross assimilation carries the ``Π fᵢ`` factor.
         """
         leaf, biomass = self._leaf_and_biomass(snapshot)
-        lai = leaf_area_index(
-            leaf, sla_per_mol_c=self.canopy.sla_per_mol_c, ground_area=self.ground_area
-        )
+        lai = self._lai(snapshot, leaf)
         gass = daily_canopy_assimilation(
             env.get(self.par_var),
             lai,

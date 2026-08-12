@@ -16,7 +16,7 @@ This file pins the two properties the seam has to have:
    file pins the *path* level, so a future edit that redirects the default fails here
    with a readable message instead of as an opaque golden diff.
 2. **What a crop claims as its own is explicit and testable.** ``overridden`` /
-   ``shared`` partition the ten param names, so "potato shares wheat's photosynthesis"
+   ``shared`` partition the eleven param names, so "potato shares wheat's photosynthesis"
    is an assertion rather than a comment. That claim is load-bearing and easy to get
    wrong in the flattering direction, which is exactly why it is pinned.
 
@@ -44,8 +44,8 @@ from domains.biosphere.scenario import (
     SEALED_CHAMBER_SCENARIO,
 )
 
-# The ten plant-side param names a crop may override. Spelled out rather than derived
-# from the module so that *adding* an eleventh is a deliberate edit here too — the set
+# The eleven plant-side param names a crop may override. Spelled out rather than derived
+# from the module so that *adding* a twelfth is a deliberate edit here too — the set
 # is the crop vocabulary, and silently growing it is what this pin exists to notice.
 #
 # ⚠ GREW 8 -> 9 on 2026-08-11 (root functional coupling); this pin is how that
@@ -67,10 +67,21 @@ from domains.biosphere.scenario import (
 # boolean `SeasonScenario.stem_reserves` is what actually decides whether the crop has
 # the mechanism, and potato turns it off — [E] gives potato a RANGE (0.2-0.4), not a
 # point.
+# ⚠ GREW 10 -> 11 on 2026-08-12 (sink-limited leaf expansion), and the pin caught it a
+# THIRD time. `leaf_area` is plant-side because [F] Table 9.1 tabulates the phyllochron
+# and the leaf-area allometry PER SPECIES and the rows differ widely (wheat PHYL 120,
+# sunflower 40). ⚠ Same fallback hazard as `stem_reserves`, and the same answer: a crop
+# with no `leaf_area.yaml` falls back to WHEAT's file, so the mechanism is switched by
+# `SeasonScenario.plant_density` instead — and potato sets it None, because
+# [F] Table 9.1 HAS NO POTATO ROW at all (eleven crops, and potato is not one of them).
+# An absence in the source, not a preference. Note the switch is a VALUE (a density)
+# rather than a bool, the `wssd` precedent: plant density is management data a scenario
+# genuinely has to state, so there is no sensible default to inherit.
 EXPECTED_PARAM_NAMES = frozenset(
     {
         "allocation",
         "canopy",
+        "leaf_area",
         "nitrogen",
         "phenology",
         "photosynthesis",
@@ -83,7 +94,7 @@ EXPECTED_PARAM_NAMES = frozenset(
 )
 
 
-def test_crop_vocabulary_is_the_ten_plant_side_files() -> None:
+def test_crop_vocabulary_is_the_eleven_plant_side_files() -> None:
     assert set(_CROP_PARAM_DEFAULTS) == EXPECTED_PARAM_NAMES
 
 
@@ -98,6 +109,7 @@ def test_none_resolves_to_the_frozen_reference_files() -> None:
     assert resolved.paths == {
         "allocation": loader.ALLOCATION_PARAMS_PATH,
         "canopy": loader.CANOPY_PARAMS_PATH,
+        "leaf_area": loader.LEAF_AREA_PARAMS_PATH,
         "nitrogen": loader.NITROGEN_PARAMS_PATH,
         "phenology": loader.PHENOLOGY_PARAMS_PATH,
         "photosynthesis": loader.PHOTOSYNTHESIS_PARAMS_PATH,

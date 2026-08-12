@@ -29,6 +29,7 @@ from domains.biosphere.decomposition import DecompositionParams
 from domains.biosphere.demo import DemoParams
 from domains.biosphere.herbivory import HerbivoryParams
 from domains.biosphere.humification import HumificationParams
+from domains.biosphere.leaf_area import LeafAreaParams
 from domains.biosphere.microbial_respiration import MicrobialRespirationParams
 from domains.biosphere.nitrogen import NitrogenParams
 from domains.biosphere.phenology import (
@@ -70,6 +71,8 @@ NITROGEN_PARAMS_PATH: Path = Path(__file__).parent / "params" / "nitrogen.yaml"
 ROOT_DEPTH_PARAMS_PATH: Path = Path(__file__).parent / "params" / "root_depth.yaml"
 #: The stem-reserve remobilization params (post-roadmap: the stem feeding the grain).
 STEM_RESERVE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "stem_reserves.yaml"
+#: The sink-limited leaf-expansion params (post-roadmap: leaf area becomes a state).
+LEAF_AREA_PARAMS_PATH: Path = Path(__file__).parent / "params" / "leaf_area.yaml"
 # The committed chamber litter-decomposition (first-order decay) params (P2 Step 4).
 DECOMPOSITION_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "decomposition.yaml"
@@ -120,6 +123,7 @@ CROPS_DIR: Path = Path(__file__).parent / "params" / "crops"
 _CROP_PARAM_DEFAULTS: dict[str, Path] = {
     "allocation": ALLOCATION_PARAMS_PATH,
     "canopy": CANOPY_PARAMS_PATH,
+    "leaf_area": LEAF_AREA_PARAMS_PATH,
     "nitrogen": NITROGEN_PARAMS_PATH,
     "phenology": PHENOLOGY_PARAMS_PATH,
     "photosynthesis": PHOTOSYNTHESIS_PARAMS_PATH,
@@ -133,7 +137,7 @@ _CROP_PARAM_DEFAULTS: dict[str, Path] = {
 
 @dataclass(frozen=True)
 class CropParamSet:
-    """The ten plant-side param files for ONE crop, plus which of them are its own.
+    """The eleven plant-side param files for ONE crop, plus which of them are its own.
 
     ``paths`` maps each :data:`_CROP_PARAM_DEFAULTS` key to the file the loaders should
     read. ``overridden`` names the files that came from the crop's own directory and
@@ -169,7 +173,7 @@ def crop_param_set(name: str | None = None) -> CropParamSet:
     the same-stem reference file; every reference file it lacks is shared. Raises
     ``ValueError`` if the directory is missing, holds no ``*.yaml`` at all (a crop that
     overrides nothing is a mis-staged directory, not a species), or holds a file whose
-    stem is not one of the ten known param names (a typo would otherwise be silently
+    stem is not one of the eleven known param names (a typo would otherwise be silently
     ignored — the failure mode this check exists for).
 
     Note the resolved files are still read by the **frozen loaders**, so a crop's
@@ -1236,6 +1240,156 @@ def load_stem_reserve_params(
         remobilization_rate=rate,
         trigger_dvs=trigger,
         cessation_dvs=cessation,
+    )
+
+
+# --- sink-limited leaf expansion (post-roadmap: leaf area becomes a state) ---
+# Same structured value/unit/source format as root_depth and stem_reserves. None of the
+# five is a conserved-Quantity canonical unit (a temperature unit per node, an area, a
+# bare exponent, a thermal-time requirement, a threshold fraction), so all five are
+# schema-validated, bound-checked floats whose declared ``unit`` is exact-string
+# guarded. See params/leaf_area.yaml — the five are NOT equally sourced, and the file
+# says which is which (``wssl`` cites published work; ``tu_tlm`` is the book's own
+# unpublished estimate, stated rather than laundered).
+_LEAF_AREA_UNITS: dict[str, str] = {
+    "phyllochron": "degC",
+    "pla_constant": "cm^2",
+    "pla_exponent": "dimensionless",
+    "tu_tlm": "degC*day",
+    "wssl": "dimensionless",
+    "slw_fraction_min": "dimensionless",
+    "slw_fraction_max": "dimensionless",
+}
+
+
+class _LeafAreaValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _LeafAreaParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    phyllochron: _LeafAreaValueUnit
+    pla_constant: _LeafAreaValueUnit
+    pla_exponent: _LeafAreaValueUnit
+    tu_tlm: _LeafAreaValueUnit
+    wssl: _LeafAreaValueUnit
+    slw_fraction_min: _LeafAreaValueUnit
+    slw_fraction_max: _LeafAreaValueUnit
+
+
+class _LeafAreaSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _LeafAreaParameters
+
+
+def _leaf_area_value(params: _LeafAreaParameters, field: str) -> float:
+    """Read a leaf-area param's value, exact-string guarding its declared unit."""
+    entry: _LeafAreaValueUnit = getattr(params, field)
+    expected = _LEAF_AREA_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_leaf_area_params(
+    path: str | Path = LEAF_AREA_PARAMS_PATH,
+) -> LeafAreaParams:
+    """Load, schema- and bound-check the leaf-expansion params.
+
+    Every bound is a **modelling** bound, not a tidiness one:
+
+    * ``phyllochron > 0`` °C/node — it is a divisor twice over (the node rate
+      ``DTU/PHYL`` and the allometry's derivative), so zero is a division by zero and a
+      negative one runs the canopy backwards through the winter.
+    * ``pla_constant > 0`` cm² — a zero constant makes ``PLA ≡ 0`` and the whole
+      node-driven branch silently inert while fully wired, which is the shape that lets
+      a disabled science look enabled (the ``fstr`` bound rules out the same thing).
+    * ``pla_exponent > 1`` — [F]'s tabulated values run 2.158 (chickpea) to 3.325 (dry
+      bean) and the relationship is called *allometric*: area rises faster than node
+      number, so the curve must be convex. At exactly 1 the canopy would be linear in
+      node number, which is a different model, and below 1 it would be concave —
+      neither is the form Eqn 9.3 describes. The bound is one-sided on purpose: an
+      upper limit would be ours, not the source's.
+    * ``tu_tlm > 0`` °C·day — at zero the node-driven branch never runs at all and the
+      mechanism is off while wired. ⚠ There is deliberately **NO** upper bound tying it
+      to ``tsum_anthesis``: TLM *can* legitimately fall after anthesis for a crop with a
+      short reproductive phase, and a cross-file bound would need this loader to read
+      ``phenology.yaml``, which would couple two crop files that the crop-set seam
+      keeps independently overridable.
+    * ``wssl`` in ``(0, 1]`` — an FTSW threshold, and FTSW is a *fraction* of
+      transpirable soil water by construction. Zero would make ``WSFL`` a division by
+      zero at the one moment it matters (a fully dry root zone).
+    * ``0 < slw_fraction_min <= slw_fraction_max`` — [E] Table 20's fractions of the
+      specific-leaf-weight constant. Both are divisors (area bound =
+      ``leaf_C·SLA/A / fraction``), so zero is a division by zero, and the ordering is
+      checked because **the pair inverts**: the *min* fraction is the *thinnest* leaf
+      and therefore the *upper* bound on area. Swapping them would turn the ceiling
+      into a floor and vice versa, and the model would still run — it would simply pin
+      the canopy to the wrong side of the envelope. There is deliberately **no** upper
+      limit on ``slw_fraction_max``: [E] tabulates fractions above 1.5 for other crops
+      (sunflower 1.53, cotton 1.27), so a cap would be ours rather than the source's.
+      Equality is allowed because ``(1.0, 1.0)`` is the degenerate envelope that
+      collapses this mechanism onto the frozen carbon-derived form — a control worth
+      being able to construct rather than a configuration worth forbidding.
+
+    Raises ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad
+    unit or an out-of-range value.
+    """
+    schema = _LeafAreaSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {field: _leaf_area_value(params, field) for field in _LEAF_AREA_UNITS}
+
+    phyl = values["phyllochron"]
+    if not phyl > 0.0:
+        raise ValueError(f"phyllochron must be > 0 degC/node, got {phyl}")
+    placon = values["pla_constant"]
+    if not placon > 0.0:
+        raise ValueError(f"pla_constant must be > 0 cm^2, got {placon}")
+    plapow = values["pla_exponent"]
+    if not plapow > 1.0:
+        raise ValueError(
+            f"pla_exponent must be > 1 (Eqn 9.3 is allometric — area rises faster "
+            f"than node number), got {plapow}"
+        )
+    tu_tlm = values["tu_tlm"]
+    if not tu_tlm > 0.0:
+        raise ValueError(f"tu_tlm must be > 0 degC.day, got {tu_tlm}")
+    wssl = values["wssl"]
+    if not 0.0 < wssl <= 1.0:
+        raise ValueError(f"wssl must be in (0, 1] (it is an FTSW fraction), got {wssl}")
+    slw_min = values["slw_fraction_min"]
+    slw_max = values["slw_fraction_max"]
+    if not slw_min > 0.0:
+        raise ValueError(
+            f"slw_fraction_min must be > 0 (it divides the carbon-derived area), "
+            f"got {slw_min}"
+        )
+    if not slw_min <= slw_max:
+        raise ValueError(
+            f"slw_fraction_min must be <= slw_fraction_max — the fractions INVERT, so "
+            f"the minimum specific leaf weight is the thinnest leaf and therefore the "
+            f"AREA CEILING; got min={slw_min}, max={slw_max}"
+        )
+    return LeafAreaParams(
+        phyllochron=phyl,
+        pla_constant=placon,
+        pla_exponent=plapow,
+        tu_tlm=tu_tlm,
+        wssl=wssl,
+        slw_fraction_min=slw_min,
+        slw_fraction_max=slw_max,
     )
 
 

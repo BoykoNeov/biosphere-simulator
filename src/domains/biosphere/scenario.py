@@ -146,6 +146,32 @@ class SeasonScenario:
     # SAME ROW of the same table — already does; in [F] both are indexed by crop.
     # Splitting one table row across two homes would be worse than either choice.
     wssd: float | None = 0.40  # dimensionless; None ⇒ no drought development response
+    # PDEN — plant density, and the switch for sink-limited leaf expansion
+    # ([F] Ch. 9; docs/plans/post-roadmap-leaf-expansion.md). ⚠ IT IS MANAGEMENT DATA,
+    # NOT A CROP PARAM, and that is [F]'s own filing: its model reads PDEN from the
+    # "Run" sheet's MANAGEMENT INPUTS block (Fig. 12.4, Sheet1.[b9]) alongside sowing
+    # year and sowing day, while every leaf-area constant lives on the "Crops" sheet.
+    # It sits here for the same reason ``ground_area`` and ``soil_layer_depth`` do.
+    #
+    # 300 plants m⁻² is [F] Fig. 12.4's own value, and taking it whole is the POINT
+    # rather than a convenience: ``pla_exponent`` is density-dependent by [F]'s own
+    # statement (Fig. 9.2b), so a density of ours paired with the source's exponent
+    # would be one number from each of two parameterizations — the locus error. The Run
+    # sheet and the Crops sheet are the same model file (6 SSM_ppm.xls).
+    #
+    # ⚠ ``None`` DISABLES THE MECHANISM ENTIRELY and leaf area goes back to being
+    # derived from leaf carbon. POTATO_SCENARIO sets None because [F] Table 9.1 lists
+    # ELEVEN crops and potato is not one of them — an absence in the source, the
+    # ``wssd`` shape exactly. A value rather than a bool for the same reason ``wssd``
+    # is: a crop with no ``leaf_area.yaml`` of its own falls back to WHEAT's file, so a
+    # bool would hand a second species wheat's phyllochron in silence.
+    #
+    # ⚠ MEASURED, NOT ASSUMED: peak LAI on ``open_season`` is LINEAR-ish in this and
+    # crosses the contract-standing 5.0 band floor at PDEN 170.9. The number was taken
+    # from the source BEFORE the band was consulted, and the sweep is recorded in the
+    # plan doc — choosing a density that lands inside the band would be the
+    # wheat-partition-backfill error with a new mechanism.
+    plant_density: float | None = 300.0  # plants m⁻²; None ⇒ LAI stays derived
     # ⚠ MEANING CHANGED 2026-08-12: mm day⁻¹ **applied** → mm day⁻¹ **available**. The
     # Irrigation flow is now demand-driven ([F] Eqn 14.8, IRGW = TTSW − ATSW) capped by
     # this capacity, which is [F]'s own other option ("a fixed amount of water at each
@@ -630,6 +656,16 @@ POTATO_SCENARIO: SeasonScenario = SeasonScenario(
     # picking the top of someone else's range and calling it cited; picking 0.3 would be
     # our number wearing [E]'s name. See ``SeasonScenario.stem_reserves``.
     stem_reserves=False,
+    # ⚠ The THIRD field turned off for a reason about the source rather than the crop,
+    # and the plainest of the three: [F] Table 9.1 tabulates the phyllochron and the
+    # leaf-area allometry for ELEVEN crops — wheat, barley, rice, maize, sorghum,
+    # soybean, peanut, canola, sunflower, dry bean, chickpea — and **potato is not one
+    # of them**. Neither is it on the "Crops" sheet of [F]'s own model (Fig. 12.5:
+    # wheat, wheat, chickpea, soybean). So potato keeps the derived-LAI form, and its
+    # goldens are bit-identical across this build. Inheriting wheat's PHYL 112 would be
+    # inventing a leaf-appearance rate for a crop whose leaves are not even borne on a
+    # main stem in the same way. See ``SeasonScenario.plant_density``.
+    plant_density=None,
 )
 POTATO_YEARS: int = 1
 
