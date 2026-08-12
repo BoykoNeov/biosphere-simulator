@@ -108,6 +108,22 @@ pub struct RootDepthParams {
     pub max_rooted_depth: f64,
 }
 
+/// Stem-reserve remobilization (the stem feeding the grain).
+///
+/// Mirrors `domains.biosphere.stem_reserves.StemReserveParams`. `cessation_dvs` closes
+/// BOTH halves of the mechanism at maturity - [E]'s Listing 3 Line 114 is
+/// `FINISH DS = 2., CELVN = 3.`, i.e. its program has no state past maturity, so running
+/// the form there would extrapolate it outside the program that defines it. See the
+/// Python module for the quotes and for why that is a DOMAIN BOUNDARY rather than a
+/// cited cessation rule.
+#[derive(Debug, Clone, Copy)]
+pub struct StemReserveParams {
+    pub remobilizable_fraction: f64,
+    pub remobilization_rate: f64,
+    pub trigger_dvs: f64,
+    pub cessation_dvs: f64,
+}
+
 /// Biomass senescence (relative organ death rates).
 #[derive(Debug, Clone, Copy)]
 pub struct SenescenceParams {
@@ -205,6 +221,7 @@ pub struct BiosphereParams {
     pub vern: VernalizationParams,
     pub photoperiod: PhotoperiodParams,
     pub senesc: SenescenceParams,
+    pub stem_reserve: StemReserveParams,
     pub rootd: RootDepthParams,
     pub nitro: NitrogenParams,
     pub decomp: DecompositionParams,
@@ -309,6 +326,12 @@ pub fn biosphere() -> BiosphereParams {
         rootd: RootDepthParams {
             max_extension_rate: get(&t, "rootd.max_extension_rate"),
             max_rooted_depth: get(&t, "rootd.max_rooted_depth"),
+        },
+        stem_reserve: StemReserveParams {
+            remobilizable_fraction: get(&t, "stemres.remobilizable_fraction"),
+            remobilization_rate: get(&t, "stemres.remobilization_rate"),
+            trigger_dvs: get(&t, "stemres.trigger_dvs"),
+            cessation_dvs: get(&t, "stemres.cessation_dvs"),
         },
         senesc: SenescenceParams {
             rdr_leaf: get(&t, "senesc.rdr_leaf"),

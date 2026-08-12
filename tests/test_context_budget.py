@@ -102,8 +102,8 @@ PHASE_TABLE_SHA256 = "5551a414e790ca0cbc7c5f80ad59cd5ac763ecbdfa3a41509b5cb683c8
 
 # The index legitimately carries MORE rows than the record, because an index line may
 # point into a record row it shares. Exactly one such pair exists (measured 2026-08-12,
-# on this gate's first real run): ``Stem reserves: the "model FORM found" lead`` — a lead
-# retracted later the same day — is an index line whose record lives inside "The
+# on this gate's first real run): ``Stem reserves: the "model FORM found" lead`` — a
+# lead retracted later the same day — is an index line whose record lives inside "The
 # winter-wheat partition backfill", one plan doc
 # (``post-roadmap-wheat-partition-backfill.md``) with two index lines. The delta is
 # asserted exactly rather than as an inequality, so drift in EITHER direction is red.

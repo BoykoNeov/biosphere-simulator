@@ -36,6 +36,7 @@ from domains.biosphere.loader import (
     load_respiration_params,
     load_root_depth_params,
     load_senescence_params,
+    load_stem_reserve_params,
     load_transpiration_params,
     load_vernalization_params,
 )
@@ -48,6 +49,7 @@ from domains.biosphere.phenology import (
 )
 from domains.biosphere.root_depth import RootDepthExtension
 from domains.biosphere.scenario import SeasonScenario
+from domains.biosphere.stem_reserves import StemRemobilization
 from domains.biosphere.stocks import (
     CI_VAR,
     CO2_POOL_VAR,
@@ -64,6 +66,7 @@ from domains.biosphere.stocks import (
     SOIL_WATER,
     SOIL_WATER_VAR,
     STEM_C,
+    STEM_RESERVE_C,
     STORAGE_C,
     SUBSOIL_WATER,
     TEMP_VAR,
@@ -136,6 +139,15 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
     # two are legs of a single physical event, so they must read identical rdr_* values.
     sen_params = load_senescence_params(crop.paths["senescence"])
     pheno = load_phenology_params(crop.paths["phenology"])
+    # The stem-reserve params load ONLY when the crop has the mechanism, so a crop that
+    # turns it off never even reads the file it would have fallen back to (the
+    # ``vernalization`` precedent). ``None`` then threads through as the inert default
+    # on ``Allocation`` and as "build no drain flow" below.
+    reserve_params = (
+        load_stem_reserve_params(crop.paths["stem_reserves"])
+        if scenario.stem_reserves
+        else None
+    )
 
     stocks: list[Stock] = [
         organ_stock(LEAF_C, PLANTS, scenario.leaf_c0),
@@ -144,6 +156,19 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
         organ_stock(STORAGE_C, PLANTS, scenario.storage_c0),
         pool_stock(PLANT_N, PLANTS, Quantity.NITROGEN, nitrogen, scenario.plant_n0),
     ]
+    if reserve_params is not None:
+        # ⚠ Starts EMPTY, and there is no scenario field for it. A seedling carries no
+        # shielded starch — the reserve is formed from stem growth, so at sowing there
+        # has been none. A settable initial amount would be a number no source gives.
+        stocks.append(
+            pool_stock(
+                STEM_RESERVE_C,
+                PLANTS,
+                Quantity.CARBON,
+                canonical_unit(Quantity.CARBON),
+                0.0,
+            )
+        )
     if not scenario.sealed:
         # Open field: transpiration drains to the vapor BOUNDARY and senescence sheds
         # organ carbon to a boundary sink (both loops are open). Sealed closes them —
@@ -163,6 +188,23 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             pheno=pheno,
             alloc=load_allocation_params(crop.paths["allocation"]),
             o2_pool=wiring.o2_pool,
+            # The FORMATION half of stem reserves: a share of this flow's own stem leg
+            # is deposited as shielded starch instead ([E] §3.2.4). Both fields are the
+            # inert defaults when the crop has no reserve, so its legs are byte-for-byte
+            # what they were.
+            stem_reserve_c=STEM_RESERVE_C if reserve_params is not None else None,
+            fstr=(
+                reserve_params.remobilizable_fraction
+                if reserve_params is not None
+                else 0.0
+            ),
+            # The split's upper end — the SAME number the drain flow below stops
+            # on, read from the same params object so the two halves cannot disagree
+            # about where the mechanism ends ([E]'s ``FINISH DS = 2.``; the science
+            # and the quotes are in stem_reserves.py).
+            reserve_cessation_dvs=(
+                reserve_params.cessation_dvs if reserve_params is not None else 0.0
+            ),
         ),
         GrowthRespiration(
             FlowId("biosphere.growth_respiration"),
@@ -223,6 +265,22 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             soil_layer_depth=scenario.soil_layer_depth,
         ),
     ]
+    if reserve_params is not None:
+        # The DRAIN half: the shielded starch moves into the grain between anthesis and
+        # maturity (the fill above shares that upper bound, from the same params).
+        # Unconditional on ``sealed`` — this is plant-internal, so it needs no chamber
+        # wiring and behaves identically in the open field and in a closed chamber.
+        flows.append(
+            StemRemobilization(
+                FlowId("biosphere.stem_remobilization"),
+                0,
+                stem_reserve_c=STEM_RESERVE_C,
+                storage_c=STORAGE_C,
+                thermal_time_aux=THERMAL_TIME,
+                pheno=pheno,
+                params=reserve_params,
+            )
+        )
     if scenario.sealed:
         # The nitrogen return loop's plant side (Step 6): plant_n → litter_n (in soil).
         # The soil side (Mineralization: litter_n → soil_n) is the soil builder's;

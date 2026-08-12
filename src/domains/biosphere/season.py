@@ -166,6 +166,9 @@ from domains.biosphere.stocks import (
     STEM_C as STEM_C,
 )
 from domains.biosphere.stocks import (
+    STEM_RESERVE_C as STEM_RESERVE_C,
+)
+from domains.biosphere.stocks import (
     STOCK_DOMAIN as STOCK_DOMAIN,
 )
 from domains.biosphere.stocks import (
@@ -396,6 +399,10 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
 
     * new ``leaf_c``/``stem_c``/``root_c`` := the scenario sowing amounts;
     * ``storage_c`` (grain) := 0 (all of it is either re-sown or shed to litter);
+    * ``stem_reserve_c`` := 0 — the stem's shielded starch dies with the stem, and it is
+      **not** part of the seedling (the reserve is formed out of stem *growth*, so a
+      newly sown crop has had none). Whatever the season did not remobilize into grain
+      is real residue, and it goes to litter with everything else;
     * ``litter_carbon`` += the **balancing residual**
       ``old_veg + grain − seedling_total`` (the senescence/maintenance idiom — balance
       by construction, not an independent formula), so CARBON is conserved exactly and
@@ -464,10 +471,20 @@ def annual_reset(state: State, scenario: SeasonScenario) -> State:
             "in-system grain (closure caveat P3.4)"
         )
     old_veg = sum(stocks[oid].amount for oid in seedling)
+    # The stem's shielded starch dies with the stem that held it (post-roadmap stem
+    # reserves). It is NOT part of the seedling: the reserve is formed out of stem
+    # growth, so a newly sown crop has had none. Absent for a crop without the
+    # mechanism — the stock is not built at all, so ``.get`` rather than ``[]``.
+    reserve_stock = stocks.get(STEM_RESERVE_C)
+    held_reserve = reserve_stock.amount if reserve_stock is not None else 0.0
+    if reserve_stock is not None:
+        stocks[STEM_RESERVE_C] = replace(reserve_stock, amount=0.0)
     for organ_id, amount in seedling.items():
         stocks[organ_id] = replace(stocks[organ_id], amount=amount)
     stocks[STORAGE_C] = replace(stocks[STORAGE_C], amount=0.0)
-    litter_gain = old_veg + grain - seedling_total  # the balancing residual
+    # The balancing residual — carbon in, carbon out, computed rather than formulated
+    # (the senescence/maintenance idiom), so the reserve's inclusion cannot leak.
+    litter_gain = old_veg + grain + held_reserve - seedling_total
     stocks[LITTER_CARBON] = replace(
         stocks[LITTER_CARBON], amount=stocks[LITTER_CARBON].amount + litter_gain
     )

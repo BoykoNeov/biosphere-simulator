@@ -30,6 +30,7 @@ from domains.biosphere.stocks import (
     MICROBIAL_CARBON,
     ROOT_C,
     STEM_C,
+    STEM_RESERVE_C,
     STORAGE_C,
 )
 from domains.crew.loader import load_crew_params
@@ -92,6 +93,10 @@ BIO_ORGANIC_C = (
     STEM_C,
     ROOT_C,
     STORAGE_C,
+    # The stem's shielded starch, added by the stem-reserve build (2026-08-12). It is
+    # plant carbon held apart from the stem, so a summary that misses it under-reads the
+    # standing crop by up to ~5.5 mol C on the reference season.
+    STEM_RESERVE_C,
     LITTER_CARBON,
     MICROBIAL_CARBON,
     # CENTURY's slow SOM, added by the humification split (2026-08-10). Omitting it

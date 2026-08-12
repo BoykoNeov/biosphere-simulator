@@ -49,6 +49,7 @@ from typing import Any
 import pytest
 
 from domains.biosphere.canopy import leaf_area_index
+from domains.biosphere.carbon_budget import Allocation
 from domains.biosphere.loader import (
     crop_param_set,
     load_canopy_params,
@@ -66,11 +67,13 @@ from domains.biosphere.season import (
     LITTER_CARBON,
     ROOT_C,
     STEM_C,
+    STEM_RESERVE_C,
     STORAGE_C,
     build_season,
     run_season,
     weather_resolver,
 )
+from domains.biosphere.stem_reserves import StemRemobilization
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.state import State
 
@@ -147,7 +150,7 @@ def _peak(series: list[float]) -> tuple[int, float]:
 # --- the crop is what it says it is -----------------------------------------
 
 
-def test_potato_overrides_exactly_four_files_and_shares_five() -> None:
+def test_potato_overrides_exactly_four_files_and_shares_six() -> None:
     # The honest-reuse claim, asserted rather than asserted-in-a-comment. Potato's own
     # science is phenology, allocation, canopy and rooted depth; the other five fall
     # back to the reference crop. The FvCB block in particular is SHARED, and that is
@@ -158,6 +161,16 @@ def test_potato_overrides_exactly_four_files_and_shares_five() -> None:
     #
     # ⚠ UPDATED 2026-08-11 (root functional coupling), and updated deliberately — this
     # is exactly the "must be updated deliberately" case the comment above anticipated.
+    #
+    # ⚠ UPDATED AGAIN 2026-08-12 (stem reserves), and this time potato SHARES the new
+    # file while NOT getting the mechanism — which is a case the `shared`/`overridden`
+    # partition alone cannot express, and the reason is worth reading before trusting
+    # the tuple below. `crop_param_set` falls a missing file back to the reference, so
+    # potato "shares" `stem_reserves.yaml` in the path sense; whether it HAS the
+    # mechanism is decided one level up by `SeasonScenario.stem_reserves`, which sets
+    # False. [E] Table 7 gives potato a RANGE (0.2-0.4) where it gives wheat a point
+    # (0.4), so inheriting 0.40 would be picking the top of someone else's range and
+    # calling it cited. The pin for the behaviour, not the path, is below.
     # `root_depth` joined the crop vocabulary and potato OVERRIDES it, because [E]
     # Table 25 carries a potato row from a potato-specific reference (Vos & Groenwold,
     # 1986) differing from winter wheat in both values: shallower (0.8-1.0 vs 1.3 m) and
@@ -173,8 +186,40 @@ def test_potato_overrides_exactly_four_files_and_shares_five() -> None:
         "photosynthesis",
         "respiration",
         "senescence",
+        "stem_reserves",
         "transpiration",
     )
+
+
+def test_potato_has_NO_stem_reserve_because_the_source_gives_it_a_RANGE() -> None:
+    """The behaviour pin the path-level ``shared`` tuple cannot make.
+
+    ⚠ **This is the break that a path-level assertion passes.** ``crop_param_set`` falls
+    a missing crop file back to the frozen reference, so potato "shares"
+    ``stem_reserves.yaml`` — and if the mechanism were switched by that file alone,
+    potato would silently carry WHEAT's tabulated 0.40. It is switched by
+    ``SeasonScenario.stem_reserves`` instead, and this asserts the consequence rather
+    than the intent: no reserve stock, no drain flow, and an ``Allocation`` whose stem
+    leg is not split.
+
+    The reason is the source and not the crop. [E] Table 7 **does** have a potato row —
+    it reads ``0.2-0.4``, a range, where wheat reads a single ``0.4``. Picking a point
+    inside someone else's range is our number wearing [E]'s name, which is the exact
+    move this build exists not to make. Same shape as ``wssd=None`` one step weaker: not
+    an absence in the source, an under-determination.
+    """
+    state, registry = build_season(POTATO_SCENARIO)
+    assert STEM_RESERVE_C not in state.stocks
+    assert not [f for f in registry.flows if isinstance(f, StemRemobilization)]
+    allocation = next(f for f in registry.flows if str(f.id) == "biosphere.allocation")
+    assert isinstance(allocation, Allocation)
+    assert allocation.stem_reserve_c is None
+    assert allocation.fstr == 0.0
+    # …and the frozen wheat reference DOES carry it, so this pin cannot pass by the
+    # mechanism being absent everywhere.
+    wheat_state, wheat = build_season(SeasonScenario())
+    assert STEM_RESERVE_C in wheat_state.stocks
+    assert len([f for f in wheat.flows if isinstance(f, StemRemobilization)]) == 1
 
 
 def test_potato_params_pass_the_frozen_loaders_and_carry_the_cited_values() -> None:

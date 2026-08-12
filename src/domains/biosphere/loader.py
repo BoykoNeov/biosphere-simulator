@@ -39,6 +39,7 @@ from domains.biosphere.phenology import (
 from domains.biosphere.photosynthesis import PhotosynthesisParams
 from domains.biosphere.respiration import RespirationParams
 from domains.biosphere.root_depth import RootDepthParams
+from domains.biosphere.stem_reserves import StemReserveParams
 from domains.biosphere.transpiration import TranspirationParams
 from domains.biosphere.water_cycle import WaterCycleParams
 from simcore.quantities import Quantity
@@ -67,6 +68,8 @@ SENESCENCE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "senescence.ya
 NITROGEN_PARAMS_PATH: Path = Path(__file__).parent / "params" / "nitrogen.yaml"
 #: The rooted-depth extension params (the third aux accumulator).
 ROOT_DEPTH_PARAMS_PATH: Path = Path(__file__).parent / "params" / "root_depth.yaml"
+#: The stem-reserve remobilization params (post-roadmap: the stem feeding the grain).
+STEM_RESERVE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "stem_reserves.yaml"
 # The committed chamber litter-decomposition (first-order decay) params (P2 Step 4).
 DECOMPOSITION_PARAMS_PATH: Path = (
     Path(__file__).parent / "params" / "decomposition.yaml"
@@ -93,7 +96,7 @@ HERBIVORY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "herbivory.yaml
 # crop" is not a counterexample — it is the same winter-wheat files with the cold and
 # daylength gates switched off, deliberately "not a new param file".)
 #
-# A crop is therefore the EIGHT plant-side param files below, resolved as a set. A
+# A crop is therefore the TEN plant-side param files below, resolved as a set. A
 # second species lives in ``params/crops/<name>/`` and overrides the subset the
 # literature can actually distinguish; every file it does NOT carry falls back to the
 # reference file — explicitly, and recorded in ``CropParamSet.shared`` so the fallback
@@ -123,13 +126,14 @@ _CROP_PARAM_DEFAULTS: dict[str, Path] = {
     "respiration": RESPIRATION_PARAMS_PATH,
     "root_depth": ROOT_DEPTH_PARAMS_PATH,
     "senescence": SENESCENCE_PARAMS_PATH,
+    "stem_reserves": STEM_RESERVE_PARAMS_PATH,
     "transpiration": TRANSPIRATION_PARAMS_PATH,
 }
 
 
 @dataclass(frozen=True)
 class CropParamSet:
-    """The nine plant-side param files for ONE crop, plus which of them are its own.
+    """The ten plant-side param files for ONE crop, plus which of them are its own.
 
     ``paths`` maps each :data:`_CROP_PARAM_DEFAULTS` key to the file the loaders should
     read. ``overridden`` names the files that came from the crop's own directory and
@@ -165,7 +169,7 @@ def crop_param_set(name: str | None = None) -> CropParamSet:
     the same-stem reference file; every reference file it lacks is shared. Raises
     ``ValueError`` if the directory is missing, holds no ``*.yaml`` at all (a crop that
     overrides nothing is a mis-staged directory, not a species), or holds a file whose
-    stem is not one of the eight known param names (a typo would otherwise be silently
+    stem is not one of the ten known param names (a typo would otherwise be silently
     ignored — the failure mode this check exists for).
 
     Note the resolved files are still read by the **frozen loaders**, so a crop's
@@ -1116,6 +1120,122 @@ def load_root_depth_params(
     return RootDepthParams(
         max_extension_rate=values["max_extension_rate"],
         max_rooted_depth=values["max_rooted_depth"],
+    )
+
+
+# --- stem-reserve remobilization (post-roadmap: the stem feeding the grain) --
+# Same structured value/unit/source format as root_depth. None of the four is a
+# conserved-Quantity canonical unit (a fraction, a first-order rate, a development
+# stage), so all three are schema-validated, bound-checked floats whose declared
+# ``unit`` is exact-string guarded. See params/stem_reserves.yaml for the provenance of
+# each — they are NOT equally sourced, and the file says which is which.
+_STEM_RESERVE_UNITS: dict[str, str] = {
+    "remobilizable_fraction": "dimensionless",
+    "remobilization_rate": "1/day",
+    "trigger_dvs": "dimensionless",
+    "cessation_dvs": "dimensionless",
+}
+
+
+class _StemReserveValueUnit(BaseModel):
+    """A single ``{value, unit, source}`` parameter entry (the Step-3 template)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    value: float
+    unit: str
+    source: str
+
+
+class _StemReserveParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    remobilizable_fraction: _StemReserveValueUnit
+    remobilization_rate: _StemReserveValueUnit
+    trigger_dvs: _StemReserveValueUnit
+    cessation_dvs: _StemReserveValueUnit
+
+
+class _StemReserveSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    process: str
+    parameters: _StemReserveParameters
+
+
+def _stem_reserve_value(params: _StemReserveParameters, field: str) -> float:
+    """Read a stem-reserve param's value, exact-string guarding its declared unit."""
+    entry: _StemReserveValueUnit = getattr(params, field)
+    expected = _STEM_RESERVE_UNITS[field]
+    if entry.unit != expected:
+        raise ValueError(
+            f"{field} must be declared in {expected!r}, got {entry.unit!r}"
+        )
+    return entry.value
+
+
+def load_stem_reserve_params(
+    path: str | Path = STEM_RESERVE_PARAMS_PATH,
+) -> StemReserveParams:
+    """Load, schema- and bound-check the stem-reserve params.
+
+    Every bound here is a **modelling** bound, not a tidiness one:
+
+    * ``remobilizable_fraction`` in ``(0, 1)``. At 1 the whole day's stem allocation
+      becomes starch and the crop grows no structural stem at all; at 0 the mechanism is
+      silently off while still wired, which is the shape that lets a disabled science
+      look enabled. A crop that genuinely has no reserve says so by turning the
+      scenario flag off, not by writing a zero here. (For scale: [E] Table 7's whole
+      range is 0.1–0.5.)
+    * ``remobilization_rate`` in ``(0, 1]`` day⁻¹. At ``dt = 1`` day a rate above 1
+      would withdraw more than the reserve holds in a single Euler step — the
+      ``k·h < 1`` precondition the multi-rate authoring work made a build-time check
+      elsewhere in this tree. At exactly 1 the reserve empties in one step, which is
+      degenerate but not unsound. Zero would make the reserve a one-way trap: starch
+      accumulates, never reaches the grain, and is dumped to litter at the re-sow — a
+      mechanism that *reduces* yield while looking present.
+    * ``trigger_dvs`` in ``[0, 2]`` — the development stage's own range (0 emergence,
+      1 anthesis, 2 maturity). Above 2 the drain can never fire.
+    * ``cessation_dvs`` in ``(trigger_dvs, 2]`` — the window's upper end, and the only
+      **cross-field** bound here. At or below the trigger the window is empty and
+      the mechanism is silently off while fully wired (the shape the ``fstr`` bound
+      rules out for the same reason). Above 2 it can never be reached, because
+      :func:`phenology.development_stage` **caps** DVS at 2.0 — so a value of, say, 2.5
+      would not merely postpone the cessation, it would silently restore the unbounded
+      behaviour this parameter exists to end. That trap is why the bound is ``<= 2``
+      rather than merely positive.
+
+    Raises ``pydantic.ValidationError`` on a schema violation, ``ValueError`` on a bad
+    unit or an out-of-range value.
+    """
+    schema = _StemReserveSchema.model_validate(load_yaml(path))
+    params = schema.parameters
+    values = {
+        field: _stem_reserve_value(params, field) for field in _STEM_RESERVE_UNITS
+    }
+
+    fstr = values["remobilizable_fraction"]
+    if not 0.0 < fstr < 1.0:
+        raise ValueError(f"remobilizable_fraction must be in (0, 1), got {fstr}")
+    rate = values["remobilization_rate"]
+    if not 0.0 < rate <= 1.0:
+        raise ValueError(f"remobilization_rate must be in (0, 1] /day, got {rate}")
+    trigger = values["trigger_dvs"]
+    if not 0.0 <= trigger <= 2.0:
+        raise ValueError(f"trigger_dvs must be in [0, 2], got {trigger}")
+    cessation = values["cessation_dvs"]
+    if not trigger < cessation <= 2.0:
+        raise ValueError(
+            f"cessation_dvs must be in (trigger_dvs, 2], got {cessation} "
+            f"with trigger_dvs {trigger}"
+        )
+
+    return StemReserveParams(
+        remobilizable_fraction=fstr,
+        remobilization_rate=rate,
+        trigger_dvs=trigger,
+        cessation_dvs=cessation,
     )
 
 

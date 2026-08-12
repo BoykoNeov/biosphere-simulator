@@ -186,11 +186,35 @@ def test_the_litter_pool_a_throttle_would_read_is_TWO_REGIMES_not_one_number() -
         seen[label] = _pool_cn(states[peak])
 
     # shedding-fed: within ~15 % of the shed ratio, and ABOVE it (the N-free seed)
+    # ⚠ 2026-08-12 (stem reserves): 103.303768 -> 104.972745 and 99.281016 ->
+    # 100.678502.
+    # Both still inside the band, but ``sealed_chamber`` now sits 0.03 under its
+    # ceiling.
+    # Left AS IS rather than widened — the band states a claim ("within ~15 % of the
+    # shed
+    # ratio") and re-cutting it to buy headroom would be fitting the bound to the tree.
+    # Flagged instead: the next carbon-side change here is expected to break this, and
+    # when it does the question is whether the CLAIM still holds, not where to move 105.
     for label in ("sealed_chamber", "water_biting"):
         assert 90.0 < seen[label] < 105.0, (label, seen[label])
     # reset-driven: an order of magnitude lower — the dying plant, not the shed ratio
+    # ⚠ RE-MEASURED 2026-08-12 (stem reserves): the band was 9.0-12.0 and the values
+    # were
+    # 10.889961 / 9.787107; they are now 12.799056 / 11.687868. The MECHANISM is the
+    # build working as designed: ``annual_reset`` dumps the standing reserve into
+    # litter,
+    # and reserve starch carries NO nitrogen, so each reset now seeds the pool with
+    # carbon the old tree did not have. A C:N ratio rising when N-free carbon is added
+    # is
+    # the arithmetic, not a surprise.
+    #
+    # The band is re-cut around the new pair rather than merely stretched, and it keeps
+    # its width (3.0) so it is no looser than the one it replaces.
     for label in ("perennial", "consumer"):
-        assert 9.0 < seen[label] < 12.0, (label, seen[label])
+        assert 11.0 < seen[label] < 14.0, (label, seen[label])
+    # ⚠ THE CLAIM this test is named for is the SEPARATION, and it is re-measured, not
+    # inherited: the two regimes are still an order of magnitude apart (8.20x), so a
+    # throttle keyed on litter C:N would still be near-saturated after each reset.
     assert seen["sealed_chamber"] / seen["perennial"] > 8.0
 
 

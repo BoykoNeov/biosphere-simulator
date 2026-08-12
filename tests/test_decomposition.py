@@ -50,6 +50,7 @@ from domains.biosphere.season import (
     O2_POOL,
     ROOT_C,
     STEM_C,
+    STEM_RESERVE_C,
     STORAGE_C,
     SeasonScenario,
     build_season,
@@ -425,6 +426,7 @@ def test_every_organic_carbon_pool_is_named_by_the_summary_tuples() -> None:
     assert organic == {
         LEAF_C,
         STEM_C,
+        STEM_RESERVE_C,
         ROOT_C,
         STORAGE_C,
         LITTER_CARBON,

@@ -58,7 +58,7 @@ it was 7.3 KB loaded into *every* session, to index a file most sessions never o
 | Soil carbon pool fractionation | **REFUSED TWICE** (2026-08-10) — `decomposition_rate` measured un-retirable by the only cited alternative on the shelf | `post-roadmap-soil-fractionation.md` |
 | The crew-coupled loop | TAKEN and **REFUSED** 2026-08-10 — a chamber is carbon-limited by *isolation*, not volume; the two-rate split caps the crop at the standing pool | `post-roadmap-crew-coupled-loop.md` |
 | The decade CO₂ guard, re-anchored | COMPLETE 2026-08-10 — the window was measured inert on the frozen tree and removed; a tightening, not a re-tune | `post-roadmap-co2-guard-reanchor.md` |
-| Stem-reserve remobilization | DIAGNOSED + PRICED 2026-08-10, **NOT BUILT** — the stem cannot feed the seed; blocked on the uncited partition table, which is the real successor | `post-roadmap-stem-reserves.md` |
+| Stem-reserve remobilization | REFUSED 2026-08-10 (provenance), **BUILT 2026-08-12 on the user's call** — the stem feeds the seed, and **stops at maturity**: [E]'s own `FINISH DS = 2.` is a *domain boundary*, not a cessation rule. The native mirror caught a **scenario constant** the Python suite could not see | `post-roadmap-stem-reserves.md` |
 | Test-suite runtime (tooling, not science) | COMPLETE 2026-08-09 — `-n 12`, below-normal priority class; whole suite 7m05s | `docs/test-suite-runtime.md` |
 | The first authored habitat | COMPLETE | `post-roadmap-authored-habitat.md` |
 | The second authored habitat (`bioregenerative_station`) | COMPLETE 2026-08-11 — a frozen flow's "boundary" wiring field is a **name, not a constraint**, so the calibrated equipment recycles | `post-roadmap-bioregenerative-station.md` |

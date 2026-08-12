@@ -238,7 +238,16 @@ def test_open_season_peak_w_margin_to_the_crossing() -> None:
     crossing — is the gate above.
     """
     peak_w = _open_season_peak_w()
-    assert 12.0 < peak_w < 13.0, peak_w
+    # ⚠ RE-MEASURED TWICE ON 2026-08-12: 12.633098 -> 14.019448 (the stem-reserve
+    # build) -> 13.939142 (its cessation window), so the original 12.0-13.0 band no
+    # longer holds. THE MARGIN THIS TEST GUARDS HAS NARROWED SHARPLY — from 12.4 % under
+    # the 14.4248 crossing to 3.4 % — and that is the finding, not the new number. The
+    # window gave a little of it back (2.8 % -> 3.4 %), which is worth seeing and is
+    # not a reason to like the window. ``test_senescence_form`` carries the paired pin,
+    # the reserve-off control that attributes the move, and — since the reserve exists —
+    # the SAME quantity measured on BOTH W definitions, because `W` here is
+    # leaf+stem+storage and reserve starch is defensibly dry matter too.
+    assert 13.9 < peak_w < 14.4248, peak_w
     assert peak_w / 14.4248 > 0.85, "the margin narrative is stale; re-measure it"
 
 

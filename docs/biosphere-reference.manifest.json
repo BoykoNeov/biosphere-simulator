@@ -28,6 +28,7 @@
     "Recycling",
     "RootZoneCapture",
     "Senescence",
+    "StemRemobilization",
     "Transpiration"
   ],
   "forcing": {
@@ -43,13 +44,13 @@
         "bound": "non_collapsing(floor=0.05)",
         "locus": "tests/test_decade_stability.py::test_decade_leaf_cycle_is_stationary",
         "quantity": "annual peak leaf carbon (mol C)",
-        "source": "self — the calibrated attractor, not a cited value"
+        "source": "self \u2014 the calibrated attractor, not a cited value"
       },
       {
         "bound": "non_collapsing(floor=5e-4)",
         "locus": "tests/test_decade_stability.py::test_decade_consumer_biomass_is_stationary_and_alive",
         "quantity": "year-end consumer carbon (mol C)",
-        "source": "self — the calibrated attractor, not a cited value"
+        "source": "self \u2014 the calibrated attractor, not a cited value"
       }
     ],
     "drift_summary": [],
@@ -60,19 +61,19 @@
         "bound": "non_collapsing(floor=0.05)",
         "locus": "tests/test_decade_stability.py::test_decade_min_carbon_pool_stationary",
         "quantity": "annual minimum chamber CO2 pool (mol C)",
-        "source": "self — anchored on the MEASURED trough attractor 0.0732912 (converged well before yr 50, 1.47x the floor), not on a 15-yr reading; teeth witnessed by a mutation independent of any candidate science change (the jar shrunk 0.8x at fixed composition trips it at 0.044941). Window removed: floor[2:] -> floor"
+        "source": "self \u2014 anchored on the MEASURED trough attractor 0.0736681 (converged well before yr 50, 1.47x the floor), not on a 15-yr reading; teeth witnessed by a mutation independent of any candidate science change (the jar shrunk 0.8x at fixed composition trips it at 0.0481100). Window removed: floor[2:] -> floor"
       },
       {
         "bound": "non_collapsing(floor=0.05)",
         "locus": "tests/test_decade_stability.py::test_decade_leaf_cycle_is_stationary",
         "quantity": "annual peak leaf carbon (mol C)",
-        "source": "self — the calibrated attractor, not a cited value"
+        "source": "self \u2014 the calibrated attractor, not a cited value"
       },
       {
         "bound": "max(tail) > 0.55",
         "locus": "tests/test_decade_stability.py::test_perennial_leaf_cycle_is_a_fixed_point",
         "quantity": "converged peak-leaf fixed point (mol C)",
-        "source": "self — anchored on the MEASURED equilibrium 0.594984 (reached ~yr 45), not on the 15-yr reading; 2.2x the 0.253 dead baseline. Second move: >1.0 -> >0.9 (decomposer calibration) -> >0.55 (humification split)"
+        "source": "self \u2014 anchored on the MEASURED equilibrium 0.594984 (reached ~yr 45), not on the 15-yr reading; 2.2x the 0.253 dead baseline. Second move: >1.0 -> >0.9 (decomposer calibration) -> >0.55 (humification split)"
       }
     ],
     "sealed_chamber": []
@@ -91,6 +92,7 @@
     "respiration.yaml": "b6ec929a0129f41cb48e6b02b2ab7298eb7a590a6493e40feb57b73375d8e638",
     "root_depth.yaml": "fefdbcc39e3e5cb1ef88368a30afe467b7be6ac3dd825657574bcdc020b358e7",
     "senescence.yaml": "3fe7cbae9b12f3acbb26dd8caf96bd4808fe47d7a2d677a55568a74f23ebcdb3",
+    "stem_reserves.yaml": "65ae25bf8ec5ad213763c41282221837b3d0e6e8de14a70d2c5ed53ed9cbe39e",
     "transpiration.yaml": "8859b2a8612372f9ae7d4468754d3b2d5a3e4530941281fb81327fc2daf303eb",
     "water_cycle.yaml": "b38bc1dc390dce0cc5c89562977ecb38e241560e7e3f794330d2438b7a4bfadf"
   },
@@ -98,43 +100,43 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "9c2c4c7e713661f76ccf7e86397f8fcf90b80dee1be52e94a87154574ccdf1c7",
+      "golden_sha256": "e264f34dd0c766d42986a3fda39b47c82d711891458f776804824b5e5171457e",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "ef957380c91e4ab3067a7fded531d4f9abf4e779ea8f1f9c4d2858a1b4a34284",
+      "golden_sha256": "de18808d092856139a96e362e00bf9e0a646a2099ee1333d5eeba588ccdd4395",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
     "drift_summary": {
       "golden": "drift_summary.json",
-      "golden_sha256": "c0604ea9e9d65b05041ca69fa0537b9e562f91999b6f4e545080263b7709396d",
+      "golden_sha256": "e27b6fc44977bd9671f9f7511df6ecb72bdf2d7b7bc80ca9edce2de66b85b201",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
       "years": 15
     },
     "open_season": {
       "golden": "season_euler_state.json",
-      "golden_sha256": "810663903d3e01451dae401a5a3ec21978632bb1f59b1159f2d0710b5e7983ad",
+      "golden_sha256": "1b62629d916da4905b003eaedd0bb7b583a98303d95ad2783dadb44b210c2974",
       "scenario": "DEFAULT_SCENARIO (open field)",
       "years": 1
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "028d8133ab836b2af73c042ac2d3ca1dc5f3255e7a7ea2e17365d7dc0001c469",
+      "golden_sha256": "20ee93d0eebda45b6ca766d352e878a0bc051c58509d32559a8d7f17ca0aa4f3",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "15dcaf28fd0720f24087cbfb245bcd075c8124247ed83c0a11321769c919cb63",
+      "golden_sha256": "3559f105f617fce8e20033dbb940fae971f60dd660ff032406a27fd0a72395d2",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "128b94b4062795895e6df82f3cefc1729eeaa679f51f9fff5e7cb1f0b3cd5813",
+      "golden_sha256": "88a5a7bffa4c00e233bea83d78fc8ab6519978dcaafc6d3ef89e47cd20ba1066",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

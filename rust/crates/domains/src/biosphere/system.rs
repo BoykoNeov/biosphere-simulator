@@ -26,7 +26,8 @@ use super::flows::{
     Drainage, Fertilization, Grazing, GrowthRespiration, HumusDecomposition, HumusNitrogenRelease,
     Irrigation, LitterNitrogenTransfer, MaintenanceRespiration, MicrobialNitrogenRelease,
     MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling, RootDepthExtension,
-    RootZoneCapture, Senescence, ThermalTimeAccumulation, Transpiration, VernalizationAccumulation,
+    RootZoneCapture, Senescence, StemRemobilization, ThermalTimeAccumulation, Transpiration,
+    VernalizationAccumulation,
 };
 use super::params;
 use super::science;
@@ -111,6 +112,16 @@ pub struct SeasonScenario {
     /// above) for exactly that reason. See `SeasonScenario.wssd` and
     /// docs/plans/post-roadmap-water-stress-curves.md.
     pub wssd: Option<f64>,
+    /// Whether the crop holds a share of its stem growth apart as shielded starch and
+    /// remobilizes it into the grain between anthesis and maturity. `true` for the frozen
+    /// winter wheat — the first flag here whose default MOVES the goldens rather than
+    /// preserving them, because the mechanism is the reference science and not an option
+    /// bolted beside it. A BOOL and not a value (unlike `wssd`): the three numbers are
+    /// crop params, and a value-only switch would hand every second species wheat's
+    /// tabulated 0.40 by default. POTATO sets it `false` — [E] Table 7 gives potato a
+    /// RANGE ("0.2-0.4") where wheat gets a single 0.4, and picking inside someone else's
+    /// range is our number wearing their name. See the Python `SeasonScenario`.
+    pub stem_reserves: bool,
 }
 
 /// The Phase-1 winter-wheat PP plot defaults (open field, N/water non-limiting).
@@ -153,6 +164,7 @@ pub const DEFAULT_SCENARIO: SeasonScenario = SeasonScenario {
     latitude: 52.0,
     vernalization: true,
     photoperiod: true,
+    stem_reserves: true,
 };
 
 /// The O₂-poor sealed chamber (Phase-2 capstone). Run 3 years via `run_season`.
@@ -165,11 +177,18 @@ pub const CONSUMER_CHAMBER_YEARS: usize = 5;
 pub const LONG_HORIZON_YEARS: usize = 15;
 
 /// The O₂-poor sealed chamber scenario (`SEALED_CHAMBER_SCENARIO`).
+///
+/// ⚠ `litter_carbon0` RE-SIZED 3.0 → 3.5 (2026-08-12) because the stem-reserve build
+/// abolished the phenomenon this scenario exists to show: the crop fixes more carbon, so
+/// it releases more O₂ (PQ = 1) exactly where the trough forms, and the pool bottomed at
+/// 5.08 % of its fill against a ≥ 95 %-depletion contract. Mirrors the Python
+/// `SEALED_CHAMBER_SCENARIO`, which carries the sweep behind the value; the port has NO
+/// reference authority and this is a mirroring of that decision, not a re-taking of it.
 pub fn sealed_chamber_scenario() -> SeasonScenario {
     SeasonScenario {
         sealed: true,
         chamber_o2_mol0: 2.0,
-        litter_carbon0: 3.0,
+        litter_carbon0: 3.5,
         ..DEFAULT_SCENARIO
     }
 }
@@ -520,6 +539,12 @@ fn build_plants(
         organ_stock(STORAGE_C, PLANTS, scenario.storage_c0)?,
         pool_stock(PLANT_N, PLANTS, Quantity::Nitrogen, scenario.plant_n0)?,
     ];
+    if scenario.stem_reserves {
+        // Starts EMPTY, with no scenario field: the reserve is formed out of stem
+        // GROWTH, so a newly sown crop has had none, and a settable initial amount would
+        // be a number no source gives.
+        stocks.push(pool_stock(STEM_RESERVE_C, PLANTS, Quantity::Carbon, 0.0)?);
+    }
     if !scenario.sealed {
         stocks.push(boundary::sink(
             VAPOR_SINK.to_string(),
@@ -542,6 +567,25 @@ fn build_plants(
             pheno: p.pheno,
             table: p.alloc.table.clone(),
             o2_pool: wiring.o2_pool.clone(),
+            // The FORMATION half of stem reserves. Inert (`None` / 0.0 / 0.0) when the
+            // crop has no reserve, so its legs are byte-for-byte what they were.
+            stem_reserve_c: if scenario.stem_reserves {
+                Some(STEM_RESERVE_C.to_string())
+            } else {
+                None
+            },
+            fstr: if scenario.stem_reserves {
+                p.stem_reserve.remobilizable_fraction
+            } else {
+                0.0
+            },
+            // The SAME number the drain below stops on, read from the same params, so the
+            // two halves cannot disagree about where the mechanism ends.
+            reserve_cessation_dvs: if scenario.stem_reserves {
+                p.stem_reserve.cessation_dvs
+            } else {
+                0.0
+            },
         }),
         Box::new(GrowthRespiration {
             id: "biosphere.growth_respiration".to_string(),
@@ -607,6 +651,20 @@ fn build_plants(
             soil_layer_depth: scenario.soil_layer_depth,
         }),
     ];
+    if scenario.stem_reserves {
+        // The DRAIN half: the shielded starch moves into the grain between anthesis and
+        // maturity (the fill above shares that upper bound, from the same params).
+        // Unconditional on `sealed` — this is plant-internal, so it needs no chamber
+        // wiring and behaves identically in the open field and in a closed chamber.
+        flows.push(Box::new(StemRemobilization {
+            id: "biosphere.stem_remobilization".to_string(),
+            stem_reserve_c: STEM_RESERVE_C.to_string(),
+            storage_c: STORAGE_C.to_string(),
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: p.pheno,
+            params: p.stem_reserve,
+        }));
+    }
     if scenario.sealed {
         flows.push(Box::new(NitrogenSenescence {
             id: "biosphere.nitrogen_senescence".to_string(),
@@ -873,6 +931,17 @@ pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, S
         )));
     }
     let old_veg = stocks[LEAF_C].amount + stocks[STEM_C].amount + stocks[ROOT_C].amount;
+    // The stem's shielded starch dies with the stem that held it. It is NOT part of the
+    // seedling: the reserve is formed out of stem growth, so a newly sown crop has had
+    // none. Absent for a crop without the mechanism — the stock is not built at all.
+    let held_reserve = stocks
+        .get(STEM_RESERVE_C)
+        .map(|st| st.amount)
+        .unwrap_or(0.0);
+    if let Some(st) = stocks.get(STEM_RESERVE_C) {
+        let zeroed = st.with_amount(0.0)?;
+        stocks.insert(STEM_RESERVE_C.to_string(), zeroed);
+    }
     stocks.insert(
         LEAF_C.to_string(),
         stocks[LEAF_C].with_amount(scenario.leaf_c0)?,
@@ -886,7 +955,9 @@ pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, S
         stocks[ROOT_C].with_amount(scenario.root_c0)?,
     );
     stocks.insert(STORAGE_C.to_string(), stocks[STORAGE_C].with_amount(0.0)?);
-    let litter_gain = old_veg + grain - seedling_total; // the balancing residual
+    // The balancing residual — carbon in, carbon out, computed rather than formulated
+    // (the senescence/maintenance idiom), so the reserve's inclusion cannot leak.
+    let litter_gain = old_veg + grain + held_reserve - seedling_total;
     let new_litter = stocks[LITTER_CARBON].amount + litter_gain;
     stocks.insert(
         LITTER_CARBON.to_string(),

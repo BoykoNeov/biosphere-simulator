@@ -51,6 +51,7 @@ from domains.biosphere.season import (
     LEAF_C,
     ROOT_C,
     STEM_C,
+    STEM_RESERVE_C,
     STORAGE_C,
     build_season,
     run_season,
@@ -123,9 +124,23 @@ def _first_day_at(series: list[float], threshold: float) -> int | None:
 
 
 def _our_root_fraction(state: State) -> float:
+    """Root share of total plant carbon, on **LINTUL3's organ basis**.
+
+    ⚠ ``stem`` INCLUDES ``stem_reserve_c`` (added 2026-08-12 with the stem-reserve
+    build), and that is a comparability requirement rather than a preference: LINTUL3
+    has no separate reserve pool, so the reserve carbohydrate this model holds apart is
+    inside the oracle's own ``WST``. Omitting it here would shrink OUR denominator only
+    and inflate every fraction on our side of a matched-DVS comparison — an artefact of
+    a pool the oracle does not have, read as a partition difference.
+
+    Measured, because the size is not marginal: at DVS 0.5 the root fraction reads
+    0.343190 without the reserve and 0.304458 with it, and at DVS 1.0 it reads 0.302849
+    without and **0.245533** with — against the oracle's 0.246191. The convergence this
+    module reports at anthesis is only visible on the matched basis.
+    """
     organs = {
         "leaf": state.stocks[LEAF_C].amount,
-        "stem": state.stocks[STEM_C].amount,
+        "stem": state.stocks[STEM_C].amount + state.stocks[STEM_RESERVE_C].amount,
         "root": state.stocks[ROOT_C].amount,
         "storage": state.stocks[STORAGE_C].amount,
     }
@@ -272,11 +287,20 @@ def test_gap_lai_peaks_after_anthesis_not_before() -> None:
 def test_gap_oracle_allocates_more_to_root_early() -> None:
     """A partition-model difference — LINTUL3 is far more root-heavy early.
 
-    At matched DVS 0.5 the oracle's root fraction is **0.55 vs our 0.31** — the
+    At matched DVS 0.5 the oracle's root fraction is **0.55 vs our 0.30** — the
     *opposite* sign of the winter-wheat oracle finding (there WE were root-heavy),
     because LINTUL3's own ``FRTTB`` front-loads roots (60 % at emergence). By anthesis
-    (DVS 1.0) the two converge (**0.25 vs 0.25**). A model-partition difference recorded
-    at matched DVS (never matched day), not a defect to fit.
+    (DVS 1.0) the two converge (**0.246 vs 0.246**). A model-partition difference
+    recorded at matched DVS (never matched day), not a defect to fit.
+
+    ⚠ 2026-08-12: our DVS-0.5 reading moved 0.31 -> 0.304458 with the stem-reserve
+    build, and the convergence at anthesis sharpened from "0.25 vs 0.25 inside a ±0.03
+    band" to 0.245533 vs 0.246191 — agreement to 7e-4, two orders inside the band. That
+    is NOT a fit and must not be read as one: nothing was tuned toward the oracle, and
+    the oracle is a diagnostic here rather than a target. The tightening comes from
+    ``_our_root_fraction`` being put on LINTUL3's organ basis (see its docstring); on
+    the
+    unmatched basis the same run reads 0.302849 at anthesis and would MISS the band.
     """
     oracle = _oracle()
     n = len(oracle)
@@ -289,7 +313,7 @@ def test_gap_oracle_allocates_more_to_root_early() -> None:
     our_i = _first_day_at(our_dvs, 0.5)
     oracle_i = _first_day_at(oracle_dvs, 0.5)
     assert our_i is not None and oracle_i is not None
-    assert _our_root_fraction(states[our_i]) == pytest.approx(0.31, abs=3e-2)
+    assert _our_root_fraction(states[our_i]) == pytest.approx(0.304, abs=3e-2)
     assert _oracle_root_fraction(oracle[oracle_i]) == pytest.approx(0.548, abs=1e-3)
     assert _oracle_root_fraction(oracle[oracle_i]) > _our_root_fraction(states[our_i])
 
@@ -299,3 +323,11 @@ def test_gap_oracle_allocates_more_to_root_early() -> None:
     assert our_j is not None and oracle_j is not None
     assert _our_root_fraction(states[our_j]) == pytest.approx(0.25, abs=3e-2)
     assert _oracle_root_fraction(oracle[oracle_j]) == pytest.approx(0.246, abs=1e-3)
+    # ⚠ the ±0.03 band stays as the CONTRACT (our side is FvCB-derived and libm-
+    # sensitive, so a tight band would be a cross-platform trap — the winter precedent).
+    # The measured closeness is recorded SEPARATELY, one-sided and loose enough to be a
+    # statement about agreement rather than a second pin on the same number.
+    assert (
+        abs(_our_root_fraction(states[our_j]) - _oracle_root_fraction(oracle[oracle_j]))
+        < 5e-3
+    ), "the convergence at anthesis, on LINTUL3's organ basis"

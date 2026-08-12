@@ -22,6 +22,12 @@ FALSIFIED**:
   symmetric);
 * the matched-day storage confound **dissolved** — with timing near-correct, both the
   matched-day and matched-DVS reads now agree (see ``test_method_*``).
+  ⚠ **2026-08-12: it came BACK, from an unrelated cause** — the stem reserve keeps
+  feeding grain past DVS 2.0, so matched-day now reads "we over-allocate" while
+  matched-DVS still reads "we under-allocate". The method verdict is unchanged and
+  strengthened (matched-day is invalid; it was only ever incidentally harmless), and it
+  raises an undecided design question: should remobilization stop at maturity? Both are
+  recorded in ``test_method_matched_day_confound_dissolved_with_the_phenology_fix``.
 
 The residual is the ``tsum`` phase partition: our reproductive phase is ~43 days vs the
 oracle's 75. **Scope-B ceremony 2 (2026-07-20) investigated it and moved NO value** —
@@ -46,6 +52,7 @@ double-modulation finding". Plan of record: ``docs/plans/post-roadmap-oracle-mat
 PCSE-free: both fixtures are read as JSON; ``lab.oracle_match`` is stdlib.
 """
 
+import dataclasses
 import json
 import math
 from pathlib import Path
@@ -58,10 +65,12 @@ from domains.biosphere.loader import (
     load_phenology_params,
 )
 from domains.biosphere.phenology import development_stage
+from domains.biosphere.scenario import DEFAULT_SCENARIO
 from domains.biosphere.season import (
     LEAF_C,
     ROOT_C,
     STEM_C,
+    STEM_RESERVE_C,
     STORAGE_C,
     build_season,
     run_season,
@@ -132,6 +141,39 @@ def _first_day_at(series: list[float], threshold: float) -> int | None:
 
 
 def _organ_fractions(state: State) -> dict[str, float]:
+    """Organ shares of total plant carbon, on **WOFOST's organ basis**.
+
+    ⚠ ``stem`` INCLUDES ``stem_reserve_c`` (2026-08-12, the stem-reserve build) for the
+    same comparability reason as the spring-wheat module: WOFOST has no separate reserve
+    pool, so the carbohydrate this model holds apart is inside the oracle's own
+    ``TWST``.
+    Leaving it out would shrink OUR denominator only and inflate every fraction on our
+    side of a matched-DVS comparison — a pool the oracle does not have, read as a
+    partition difference.
+    """
+    organs = {
+        "leaf": state.stocks[LEAF_C].amount,
+        "stem": state.stocks[STEM_C].amount + state.stocks[STEM_RESERVE_C].amount,
+        "root": state.stocks[ROOT_C].amount,
+        "storage": state.stocks[STORAGE_C].amount,
+    }
+    total = sum(organs.values())
+    return {k: v / total for k, v in organs.items()}
+
+
+def _season_states_without_reserve() -> list[State]:
+    """The pre-stem-reserve tree, for attributing the 2026-08-12 re-pins."""
+    scenario = dataclasses.replace(DEFAULT_SCENARIO, stem_reserves=False)
+    state, registry = build_season(scenario)
+    resolver = weather_resolver(_weather(), scenario)
+    states, _, _ = run_season(
+        EulerIntegrator(registry), state, resolver, 1.0, len(_weather())
+    )
+    return states
+
+
+def _organ_fractions_bare(state: State) -> dict[str, float]:
+    """``_organ_fractions`` for a tree with NO reserve stock (the control only)."""
     organs = {
         "leaf": state.stocks[LEAF_C].amount,
         "stem": state.stocks[STEM_C].amount,
@@ -340,6 +382,36 @@ def test_method_matched_day_confound_dissolved_with_the_phenology_fix() -> None:
     *consequence* of the phenology overrun, and fixing phenology dissolved it.
     Matched-DVS remains the correct method on principle; this pins that the two now
     agree in sign.
+
+    ⚠⚠ **2026-08-12: THE SIGN DISAGREEMENT IS BACK, AND ITS CAUSE IS A DIFFERENT ONE.**
+    The stem-reserve build gives the plant a carbon source that keeps delivering to
+    grain
+    *after* anthesis, and ``StemRemobilization`` has a lower DVS trigger with **no upper
+    bound** — so it keeps draining past DVS 2.0, all the way to the end of the fixture.
+    Measured:
+
+        matched-DAY  ours 0.544437  vs oracle 0.520755  -> we now OVER-allocate
+        matched-DVS  ours 0.465762  vs oracle 0.520755  -> we still UNDER-allocate
+
+    With ``stem_reserves=False`` both reads return to under-allocating (0.390068 /
+    0.302037), so the reserve is the cause and not a coincidence.
+
+    ⚠ **THE CONCLUSION THIS TEST DREW IS STILL RIGHT; ITS PIN WAS NEVER THE
+    CONCLUSION.**
+    The finding was never "the two reads agree" — it was *"matched-day is invalid as a
+    method, and it happened to be harmless once phenology was fixed"*. That the two can
+    disagree again, from a completely unrelated mechanism, is the **stronger** form of
+    the original argument, not a refutation of it. So the sign assertions below are
+    re-pointed at what is now true and the method verdict is unchanged.
+
+    ⚠ **AND IT SURFACES AN OPEN DESIGN QUESTION I AM NOT DECIDING HERE:** should
+    remobilization stop at maturity? [E] §3.2.4 describes it as a grain-FILL process
+    (DVS 1 → 2), and our flow has no upper gate. The frozen ``open_season`` run
+    continues
+    past DVS 2.0, so the difference is reachable. Deciding it would change goldens
+    inside
+    the build that raised it — the refused shape — so it is recorded and named as a
+    successor. It is written down in the plan doc, not only here.
     """
     states = _season_states()
     ref = _reference()
@@ -355,14 +427,29 @@ def test_method_matched_day_confound_dissolved_with_the_phenology_fix() -> None:
     matched_dvs_ours = _organ_fractions(states[oi])["storage"]
     matched_dvs_oracle = _oracle_fractions(ref[ri])["storage"]
 
-    # Both reads now say the SAME thing (was opposite signs): we under-allocate.
-    assert matched_day_ours < matched_day_oracle
-    assert matched_dvs_ours < matched_dvs_oracle
+    # ⚠ THE SIGNS DISAGREE AGAIN (2026-08-12). Asserted as the disagreement it is,
+    # rather than left as the agreement it was: matched-day says we over-allocate,
+    # matched-DVS says we under-allocate, and matched-DVS is the one to believe.
+    assert matched_day_ours > matched_day_oracle, "matched-day: we OVER-allocate"
+    assert matched_dvs_ours < matched_dvs_oracle, "matched-DVS: we UNDER-allocate"
 
-    # The numbers, so the agreement is legible and not just asserted.
-    assert matched_day_ours == pytest.approx(0.39, abs=0.03)
-    assert matched_dvs_ours == pytest.approx(0.30, abs=0.03)
+    # The numbers, so the disagreement is legible and not just asserted.
+    # Was 0.39 / 0.30 (both under) before the reserve.
+    assert matched_day_ours == pytest.approx(0.544, abs=0.03)
+    assert matched_dvs_ours == pytest.approx(0.466, abs=0.03)
     assert matched_dvs_oracle == pytest.approx(0.52, abs=0.02)
+
+    # ⚠ THE CONTROL, so the cause is named and not inferred: with the reserve off, both
+    # reads go back to under-allocating at the values this test was written around.
+    off = _season_states_without_reserve()
+    n_off = min(len(ref), len(off))
+    off_day = _organ_fractions_bare(off[n_off - 1])["storage"]
+    off_dvs_i = _first_day_at(_our_dvs(off, n_off), 2.0)
+    assert off_dvs_i is not None
+    off_dvs = _organ_fractions_bare(off[off_dvs_i])["storage"]
+    assert off_day == pytest.approx(0.390, abs=0.005)
+    assert off_dvs == pytest.approx(0.302, abs=0.005)
+    assert off_day < matched_day_oracle and off_dvs < matched_dvs_oracle
 
 
 def test_method_the_death_spiral_is_gone() -> None:

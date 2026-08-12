@@ -16,7 +16,7 @@ This file pins the two properties the seam has to have:
    file pins the *path* level, so a future edit that redirects the default fails here
    with a readable message instead of as an opaque golden diff.
 2. **What a crop claims as its own is explicit and testable.** ``overridden`` /
-   ``shared`` partition the nine param names, so "potato shares wheat's photosynthesis"
+   ``shared`` partition the ten param names, so "potato shares wheat's photosynthesis"
    is an assertion rather than a comment. That claim is load-bearing and easy to get
    wrong in the flattering direction, which is exactly why it is pinned.
 
@@ -44,8 +44,8 @@ from domains.biosphere.scenario import (
     SEALED_CHAMBER_SCENARIO,
 )
 
-# The nine plant-side param names a crop may override. Spelled out rather than derived
-# from the module so that *adding* a tenth is a deliberate edit here too — the set
+# The ten plant-side param names a crop may override. Spelled out rather than derived
+# from the module so that *adding* an eleventh is a deliberate edit here too — the set
 # is the crop vocabulary, and silently growing it is what this pin exists to notice.
 #
 # ⚠ GREW 8 -> 9 on 2026-08-11 (root functional coupling); this pin is how that
@@ -57,6 +57,16 @@ from domains.biosphere.scenario import (
 # it per species, and potato's row differs from wheat's in both values), so it belongs
 # in
 # the vocabulary rather than alongside the soil/scenario data.
+#
+# ⚠ GREW 9 -> 10 on 2026-08-12 (stem reserves), and the pin did its job a second time.
+# `stem_reserves` is plant-side for the same reason: [E] Table 7 tabulates the
+# remobilizable fraction PER SPECIES, and the rows genuinely differ (wheat 0.4, barley
+# 0.3, sugar-cane 0.5). ⚠ Note what the fallback means here and why the mechanism ALSO
+# has a scenario flag: a crop with no `stem_reserves.yaml` falls back to WHEAT's file,
+# so a value-only switch would hand every second species wheat's 0.40 in silence. The
+# boolean `SeasonScenario.stem_reserves` is what actually decides whether the crop has
+# the mechanism, and potato turns it off — [E] gives potato a RANGE (0.2-0.4), not a
+# point.
 EXPECTED_PARAM_NAMES = frozenset(
     {
         "allocation",
@@ -67,12 +77,13 @@ EXPECTED_PARAM_NAMES = frozenset(
         "respiration",
         "root_depth",
         "senescence",
+        "stem_reserves",
         "transpiration",
     }
 )
 
 
-def test_crop_vocabulary_is_the_nine_plant_side_files() -> None:
+def test_crop_vocabulary_is_the_ten_plant_side_files() -> None:
     assert set(_CROP_PARAM_DEFAULTS) == EXPECTED_PARAM_NAMES
 
 
@@ -93,6 +104,7 @@ def test_none_resolves_to_the_frozen_reference_files() -> None:
         "respiration": loader.RESPIRATION_PARAMS_PATH,
         "root_depth": loader.ROOT_DEPTH_PARAMS_PATH,
         "senescence": loader.SENESCENCE_PARAMS_PATH,
+        "stem_reserves": loader.STEM_RESERVE_PARAMS_PATH,
         "transpiration": loader.TRANSPIRATION_PARAMS_PATH,
     }
     # Every reference file is a real committed file directly under ``params/`` — i.e.

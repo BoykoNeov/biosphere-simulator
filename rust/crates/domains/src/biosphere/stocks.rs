@@ -13,6 +13,12 @@ pub const LEAF_C: &str = "biosphere.leaf_c";
 pub const STEM_C: &str = "biosphere.stem_c";
 pub const ROOT_C: &str = "biosphere.root_c";
 pub const STORAGE_C: &str = "biosphere.storage_c";
+/// The stem's shielded carbohydrate reserve (the stem feeding the grain). A POOL,
+/// not a POPULATION: a carbohydrate store is not a population that can go extinct, and
+/// `organ_stock`'s extinction pass zeroes-with-loss. It sits OUTSIDE the
+/// leaf+stem+root maintenance / f_N biomass, exactly as `storage_c` does and for the
+/// same reason. See the Python `stem_reserves.py`.
+pub const STEM_RESERVE_C: &str = "biosphere.stem_reserve_c";
 pub const SOIL_WATER: &str = "biosphere.soil_water";
 /// The below-root store ([F] Soltani & Sinclair's `WSTORG`): in-system soil water the
 /// roots have not reached. `RootZoneCapture` (EWAT) moves it into `soil_water` as the

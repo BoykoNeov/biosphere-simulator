@@ -1,7 +1,17 @@
-# Stem-reserve remobilization — DIAGNOSED AND PRICED (2026-08-10), NOT BUILT
+# Stem-reserve remobilization — REFUSED (2026-08-10), then BUILT (2026-08-12)
 
-Read-only. No `src/`, param, golden or manifest change; `git diff src/` empty; nothing
-unfrozen. Probes in `M:/claud_projects/temp/stem_reserves/`; **18 pins** in
+> **Status: BUILT.** The refusal below stands as written and was *overruled by the user*,
+> which is what it asked for: its blocker was a **provenance judgement** (`fstr` is CABO
+> unpublished; the trigger is ours), and this project's standing rule is that my own
+> refusal is a recommendation, not a verdict. Everything from "The question" to "The
+> verdict" is the 2026-08-10 record, unedited. What was built, and the **cessation window**
+> the user asked for afterwards, are in the two sections after it.
+>
+> Sections 7–8 (the build) carry the current state; **23 pins** in
+> `tests/test_stem_reserves.py`, 13 goldens, the biosphere manifest.
+
+Read-only *as of 2026-08-10*: no `src/`, param, golden or manifest change; `git diff src/`
+empty; nothing unfrozen. Probes in `M:/claud_projects/temp/stem_reserves/`; **18 pins** in
 `tests/test_stem_reserves.py` (2 slow). Teeth verified by **mutation**: changing the one
 load-bearing number from Table 7's wheat row (0.40) to barley's (0.30) takes **12 of 18**
 red.
@@ -301,3 +311,185 @@ Also standing, unmeasured and named as such: whether a partition table whose `fs
 zero *by itself* — with no reserve at all — fixes the stem shape. It would shrink the stem
 without giving its carbon to the grain, so it is a different change with a different sign
 on the harvest index, and no run here measures it.
+
+---
+
+# 7. THE BUILD (2026-08-12) — what shipped, and the one scenario it re-sized
+
+The candidate above, built as described, with `git diff src/` no longer empty because that
+purity rule is a *port/consumer* rule and this is reference science.
+
+* **`stem_reserve_c`** — a new POOL stock (not a POPULATION: `organ_stock`'s extinction
+  pass zeroes-with-loss, and a carbohydrate store is not a population that can go extinct).
+  Starts **empty**, with no scenario field: a seedling has had no stem growth, so a
+  settable initial amount would be a number no source gives.
+* **The fill lives inside `Allocation`**, as a split of its own stem leg, and that is a
+  **correctness choice rather than a tidy one**. A separate flow would have to *withdraw*
+  from `stem_c`, and `simcore.arbitration` scales withdrawals against the **start-of-step**
+  amount — at emergence the day's stem growth can exceed the whole seedling stem, so such a
+  flow would ration. Splitting the deposit cannot: `organ_total` is unchanged, so the CO₂
+  and O₂ legs never move.
+* **`StemRemobilization`** — the drain, first-order and therefore donor-controlled, so the
+  Euler backstop is structurally unreachable on it.
+* **`annual_reset`** dumps the standing reserve to litter with the rest of the dead plant,
+  through the **balancing residual** (computed, not formulated), so it cannot leak.
+* **`SeasonScenario.stem_reserves`** — a boolean, not a value, and the distinction is
+  load-bearing: `crop_param_set` falls a missing file back to the reference, so a
+  value-only switch would hand **every** second species wheat's tabulated 0.40 by default.
+  **Potato turns it off** — [E] Table 7 gives potato **"0.2-0.4"** where wheat gets a
+  single 0.4, and picking inside someone else's range is our number wearing their name.
+
+⚠ **`SEALED_CHAMBER_SCENARIO.litter_carbon0` 3.0 → 3.5, because the build ABOLISHED the
+phenomenon that scenario exists to show.** More carbon fixed ⇒ more O₂ released (PQ = 1)
+exactly where the trough forms, and the pool bottomed at **5.08 %** of its fill against a
+**≥ 95 % depletion** contract — which also made `f_O2` stop being load-bearing (the
+`k_O2 = 0` control no longer rationed at all, so the test that proves the self-limit does
+the work would have been asserting nothing). Peak litter and peak microbial biomass are
+**unchanged to four figures**, so this is not "less decomposition" — measured, because the
+obvious explanation was the wrong one. The sweep, and why the *litter seed* moved rather
+than the O₂ fill, are recorded in `scenario.py` beside the value.
+
+# 8. THE CESSATION WINDOW (2026-08-12) — "the stem should stop feeding the seed"
+
+The user's second question about this mechanism, and the answer is smaller and sharper than
+the question sounds.
+
+## 8.1 What was actually wrong
+
+As first built, **neither half ever stopped**. The drain fired at every step from anthesis
+onward; the fill kept diverting starch for as long as `allocation.yaml` fed the stem, which
+is forever (finding 2). Measured before ranking anything:
+
+| | `open_season` | `sealed_chamber` | `perennial_long_horizon` |
+|---|---|---|---|
+| anthesis / maturity | step 251 / **294** of 305 | 251 / 294 | 251 / 294 |
+| reserve, anthesis → year end | 5.490 → **0.495** | 0.317 → ~0 | 0.286 → 0.007 |
+| remobilized **after maturity** | **6.6 %** | 7.0 % | 3.0 % |
+
+⚠ **The "perpetual conveyor" the advisor predicted does not exist**, and the arithmetic
+that predicted it (`R* ≈ 0.4·DMI`) is wrong because post-anthesis `DMI` collapses while the
+0.1/day draw does not: the reserve peaks at anthesis and **drains 91 %** by season's end.
+The defect is therefore *not* "it never stops" — it is that **the rule** never stops, and
+3–7 % of the transfer happens **after the crop is physiologically dead**. `sealed_chamber`
+is the sharp case: it never re-sows, so it spends **two full years** past maturity.
+
+## 8.2 Four candidates, measured on `open_season`
+
+| variant | grain | HI ÷ oracle | stem+starch shape | peak LAI | `W` |
+|---|---|---|---|---|---|
+| as built (no stop) | 34.396 | 1.151 | 0.985 | 5.4624 | 14.1516 |
+| (a) drain stops at maturity | 33.726 | 1.128 | 1.037 | 5.4624 | 14.1516 |
+| (b) fill stops at anthesis | 28.866 | **1.002** | **1.267** | 5.4509 | 13.6444 |
+| (c) (b) + (a) | 28.825 | **1.000** | 1.270 | 5.4509 | 13.6444 |
+| **(d) BOTH stop at maturity** | **33.714** | 1.128 | 1.036 | 5.4624 | 14.1457 |
+
+**(b) and (c) are refused, on two independent grounds.** They hand the stem back its
+post-flowering growth and so **reinstate the defect this mechanism exists to fix** (shape
+0.985 → 1.267 against a frozen 1.618); and they land the harvest index **on the oracle**,
+which is the refused shape by the standing ruling — the same trap `fstr = 0.20` set
+earlier. ⚠ Worth stating plainly: they are *also* physically worse, so the oracle
+coincidence is not even a consolation. Recorded, with [E]'s own §2.2.1 p. 46 sentence
+("glucose formed **before flowering** and stored as polysaccharides") that makes (b) a
+readable interpretation — in [E]'s tree the two readings **cannot be told apart**, because
+its stem fraction reaches zero and no stem growth survives flowering anyway.
+
+**(a) vs (d) is decided by 0.03 % of grain**, i.e. not by numbers. It is a coherence
+question — (a) leaves the dead plant stashing starch it can never withdraw — and it was
+**put to the user, who chose (d)**.
+
+## 8.3 The bound is [E]'s, and its exact strength
+
+Extraction of the shelf copy, not a skim. **Listing 3 Line 114** — the run-control line of
+module L1D, the module whose Lines 17 and 35 *are* this mechanism:
+
+    114  FINISH DS = 2., CELVN = 3.
+
+and twice in the prose:
+
+> §3.1.4 p. 81: "This simulation of the development process contains no explanatory
+> mechanism for the crop ripening. **Simulation is halted by imposing an end when the
+> development stage reaches the value of 2.0**, by including the statement FINISH DS = 2.0,
+> or FINISH DS = 0.95 for sugar crops and for sweet potato that are harvested before
+> flowering."
+
+> §3.4.2 p. 105: "The FINish TIMe of 1000. is never reached: **simulation always stops when
+> either the FINISH conditions of maturity (DS = 2.0)**, or that of severe carbohydrate
+> shortage (CELVN = 3.0) is reached."
+
+⚠⚠ **READ AT ITS EXACT STRENGTH — this is the locus error this record has logged three
+times, and it would have been easy to commit here.** `FINISH` is a **run-control**
+statement. [E] does **not** say "remobilization ceases at maturity"; it says **its program
+has no state there**. So `cessation_dvs` is the source's **domain boundary**, and adopting
+it is a decision *not to extrapolate a form outside the program that defines it* — not a
+cited cessation rule. The question only arises in our tree because we have no `FINISH`: DVS
+merely **caps** at 2.0 and the season keeps stepping.
+
+That cap is also why the loader refuses `cessation_dvs > 2`: such a value would not
+postpone the cessation, it would **silently restore the unbounded behaviour** while reading
+like a deliberate choice, and no golden could tell the difference.
+
+## 8.4 What it cost, honestly
+
+* **Grain −2.0 %** on `open_season` (34.396 → 33.714).
+* ⚠ **One claim got WEAKER and is re-pinned rather than restated.** The build's headline
+  was *"the stem stops gaining"* (shape 0.985). It now **gains 3.6 %** (1.036), because the
+  fill stops at maturity while the partition table goes on handing the stem 10 % of every
+  day's growth for the 11 remaining steps. Against a frozen stem that gains **61.8 %** the
+  headline survives — "+62 % → essentially flat" — but the literal sentence does not, and
+  `test_NEITHER_form_fixes_both_halves` now asserts the **ordering against the frozen
+  control** instead of `shape < 1.0`. The residual is the partition table again, not this
+  mechanism.
+* ⚠ **The trigger got MORE load-bearing**, which is the sort of thing a window does and is
+  worth having measured: with no end, the drain ran to the last step whatever the trigger,
+  so the DVS 0.0–1.5 sweep moved grain **0.7 %**; with an end, the trigger sets the
+  window's *length* and the same sweep moves it **2.3 %**. Still near-inert, still
+  bit-identical on peak LAI, and the loss is **one-sided** — only the late trigger that
+  eats into its own window costs anything.
+* Every frozen band and closure gate holds; the two 50-year diagnostic attractors moved in
+  their last digits (trough 0.0736507 → 0.0736681, fixed point 0.593864 → 0.593883) and
+  were re-measured rather than re-toleranced.
+* ⚠ **§7's gate readings are SUPERSEDED by these, and are kept as the build's own
+  measurement rather than silently rewritten.** The window moves every one of them a little:
+  `perennial_long_horizon`'s CO₂ trough 0.055977 → **0.056030** and its liveness floor
+  0.637424 → **0.637504** (both still clear 0.05 and 0.55); stem-only's trough in finding 6
+  0.053127 → **0.053177** (still above the floor, so finding 6's claim is unchanged); and
+  `open_season`'s Greenwood `W` 14.1516 → **14.1457 t/ha**, which is §8.2's row (d) and the
+  one figure of the four that a reader could mistake for a band value rather than a
+  diagnostic. Peak LAI is **bit-identical** at 5.4624, so the LAI band is untouched. No
+  verdict in §7 turns on any of the differences — which is the point of checking rather
+  than assuming. ⚠ `W`'s "98.1 % of the crossing" survives the move, which is exactly why
+  nothing went red and why the sweep had to be done by hand.
+
+## 8.5 The prediction, written before regenerating
+
+Predicted: the 13 goldens the build had already moved would move again, **no fourteenth**,
+nothing non-wheat. Measured: **10** moved; `greenhouse`, `lighting` and `harvest` did not —
+and the reason is structural rather than lucky, since those are **7-day** station runs that
+end 287 days short of maturity, so the window provably cannot reach them. Potato is
+bit-identical (its reserve is off), which is the leak check.
+
+# 9. THE NATIVE MIRROR (2026-08-12) — and the stale scenario it caught
+
+The Rust port of the *whole* mechanism, done after the window so it was mirrored once
+against the final form: `STEM_RESERVE_C`, `StemReserveParams` (four values, read from the
+generated `biosphere_params.txt`), `Allocation`'s three reserve fields and its split,
+`StemRemobilization`, the `stem_reserves` scenario flag, and the `annual_reset` leg —
+**203 lines across 5 files**, none of them `simcore`. `cargo test` 38+ suites green,
+`cargo clippy --all-targets -D warnings` clean, and only the four touched files were
+formatted (never a bare `cargo fmt`, which would reformat the frozen core).
+
+⚠ **THE MIRROR CAUGHT SOMETHING THE PYTHON SIDE COULD NOT.** With every flow ported, one
+cross-port test still failed — `sealed_chamber`'s O₂, Rust 0.0910 against Python
+0.00021982, a factor of **413**. The cause was not the new code: the Rust
+`sealed_chamber_scenario()` still carried `litter_carbon0 = 3.0`, because the build's
+**scenario re-size to 3.5 was never mirrored**. The Python-side suite cannot see that —
+its goldens are generated from the Python scenario — so the discrepancy was invisible
+until the two ports were compared. That is precisely the job the cross-port tier exists to
+do, and it is the second time this record has watched a *scenario constant* rather than a
+*science change* be the thing that drifted.
+
+Handled under the discipline the contract prescribes: the port has **no reference
+authority**, so this was a mirroring of the Python decision, not a re-taking of it, and
+the Rust comment says so and points at the file that carries the sweep. All **101**
+cross-port tests pass, including the tier-2 band re-measurement (each band is asserted
+above its own ±1-ULP sensitivity, so no tolerance was loosened to fit).

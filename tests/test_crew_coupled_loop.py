@@ -69,7 +69,11 @@ BVAD_WHEAT_C_PER_M2_DAY: float = 77.00 / 44.009
 
 # `open_season`, the only frozen scenario at field scale -- the pinned peaks the coupled
 # chamber is compared against (`test_senescence_form.py` / `test_nitrogen_form.py`).
-OPEN_SEASON_PEAK_LAI: float = 5.191
+# ⚠ 5.191 -> 5.462364 on 2026-08-12 (the stem-reserve build grows the open-field
+# crop). Re-measured rather than left stale: this constant is the DENOMINATOR of the
+# "still field-scale" ratio below, so a stale value would silently flatter the
+# comparison — the ratio would read 1.01x against a crop that no longer exists.
+OPEN_SEASON_PEAK_LAI: float = 5.462364
 OPEN_SEASON_PEAK_W_EXCL_ROOTS: float = 12.633
 
 # The V-K&S mutual-shading threshold the canopy regulator is built on (Penning de Vries
@@ -346,7 +350,8 @@ def test_the_coupled_season_is_field_scale_open_loop_and_carbon_capped() -> None
     # SEALED chamber. Every prior chamber measurement in this repo is of the STANDALONE
     # chambers (52-70 g DM/m2, LAI 0.51-0.63).
     peak_lai = _peak_lai(states, scenario.bio.ground_area)
-    assert 5.03 < peak_lai < 5.05, f"coupled peak LAI moved: {peak_lai}"
+    # ⚠ 5.03-5.05 -> this (2026-08-12, stem reserves). The band keeps its width.
+    assert 5.23 < peak_lai < 5.25, f"coupled peak LAI moved: {peak_lai}"
     assert peak_lai / OPEN_SEASON_PEAK_LAI > 0.95, "no longer field-scale"
 
     # PIN 7: the MECHANISM -- `carbon_pool` is a regulated CONSTANT, so `ci` is
@@ -373,7 +378,8 @@ def test_the_coupled_season_is_field_scale_open_loop_and_carbon_capped() -> None
     # the pool however much area is added.
     organic = [total_organic_c(s) for s in states]
     peak_daily_gain = max(b - a for a, b in pairwise(organic))
-    assert 0.59 < peak_daily_gain < 0.61, peak_daily_gain
+    # ⚠ 0.59-0.61 -> this (2026-08-12, stem reserves). Band width preserved.
+    assert 0.62 < peak_daily_gain < 0.64, peak_daily_gain
     pool = pools[0]
     assert pool / peak_daily_gain > 6.0, "the 1 m2 headroom that hides the ceiling"
 
@@ -530,6 +536,10 @@ def test_harvest_clears_the_seed_bank_on_the_FROZEN_horizon() -> None:
     assert boundary_grain > seedling, (
         f"harvest starves the re-sow after all: {boundary_grain} < {seedling}"
     )
-    # The margin is 1.32x, not an order -- stated as a number so it cannot be quoted as
-    # comfortable.
-    assert 1.25 < boundary_grain / seedling < 1.40, boundary_grain / seedling
+    # The margin is 1.54x, not an order -- stated as a number so it cannot be quoted as
+    # comfortable. ⚠ 1.32x -> 1.64x -> 1.54x on 2026-08-12 (the stem-reserve build, then
+    # its cessation window): the reserve feeds grain, so the seed bank the re-sow draws
+    # on is larger, and the window gives a little of that back. The STALENESS finding
+    # this test exists for is unaffected -- the recorded "~0.01 mol, below the 0.16 seed
+    # bank" reason is now wrong by a wider margin, not a narrower one.
+    assert 1.45 < boundary_grain / seedling < 1.65, boundary_grain / seedling

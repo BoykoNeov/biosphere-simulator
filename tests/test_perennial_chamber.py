@@ -43,6 +43,7 @@ from domains.biosphere.season import (
     PLANT_N,
     ROOT_C,
     STEM_C,
+    STEM_RESERVE_C,
     STORAGE_C,
     THERMAL_TIME,
     annual_reset,
@@ -252,12 +253,18 @@ def test_annual_reset_state_shape(
     assert after.aux[THERMAL_TIME] == 0.0
     assert after.n == before.n
     assert all(st.amount >= 0.0 for st in after.stocks.values())
-    # litter grew by exactly the residual old_veg + grain − seedling_total
+    # litter grew by exactly the residual old_veg + grain + reserve − seedling_total.
+    # ⚠ The reserve term joined on 2026-08-12 (stem reserves): whatever shielded starch
+    # the season did not remobilize into grain is real residue and dies with the stem.
+    # It is NOT part of the seedling — the reserve is formed out of stem GROWTH, so a
+    # newly sown crop has had none — which is why it appears on this side only.
+    assert after.stocks[STEM_RESERVE_C].amount == 0.0
     seedling_total = sc.leaf_c0 + sc.stem_c0 + sc.root_c0
     expected_litter = (
         before.stocks[LITTER_CARBON].amount
         + _vegetative(before)
         + before.stocks[STORAGE_C].amount
+        + before.stocks[STEM_RESERVE_C].amount
         - seedling_total
     )
     assert math.isclose(

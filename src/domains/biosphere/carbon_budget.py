@@ -264,6 +264,15 @@ class Allocation:
     ``DVS`` derived from the ``thermal_time`` aux accumulator). The ``co2_atmos`` leg is
     ``−DMI = −Σ(organ legs)`` so the flow balances by construction; the loader's per-row
     sum-to-1 check enforces ``Σ(organ legs) == DMI``. ``flux = daily·dt`` — dt-linear.
+
+    **The stem leg splits when stem reserves are wired** (post-roadmap, 2026-08-12): a
+    fraction ``fstr`` of it lands in ``stem_reserve_c`` as shielded starch instead of in
+    ``stem_c`` — [E] §3.2.4's "a certain fraction of the increase in stem weight" — up
+    to ``reserve_cessation_dvs`` (maturity), after which the whole stem leg goes back
+    to ``stem_c``. The total is untouched either way, so this is a 5-way split of one
+    ``DMI``, not a 5th sink.
+    See ``stem_reserves.py`` for the science and the two fields below for why the
+    formation lives here rather than in a flow of its own.
     """
 
     id: FlowId
@@ -280,6 +289,38 @@ class Allocation:
     # so the O₂ leg supplies exactly the 2 oxygens the CO₂ pool gave up. None (open
     # field) keeps the single-currency Phase-1 legs byte-identical.
     o2_pool: StockId | None = None
+    # Stem-reserve FORMATION (post-roadmap stem reserves, 2026-08-12) — [E] §3.2.4
+    # p. 93: "a certain fraction of the increase in stem weight will be available for
+    # redistribution after flowering ... assumed to consist only of starch."
+    #
+    # ⚠ IT LIVES HERE, INSIDE THE PARTITION SPLIT, RATHER THAN IN ITS OWN FLOW, AND THAT
+    # IS A CORRECTNESS CHOICE, NOT A TIDINESS ONE. The reserve is a share of the day's
+    # stem *growth*, so this deposits ``(1−fstr)`` of the stem leg into ``stem_c`` and
+    # ``fstr`` into the reserve — it never WITHDRAWS from ``stem_c``. A separate flow
+    # would have to take its share out of the stem pool, and ``simcore.arbitration``
+    # scales withdrawals against the **start-of-step** amount ("withdrawals never draw
+    # against same-step inflows"), so at emergence — where the day's stem growth can
+    # exceed the whole seedling stem — that flow would ration. Splitting the deposit
+    # cannot: ``organ_total`` is unchanged, so the ``co2_atmos`` and O₂ legs are
+    # untouched and the flow still balances by construction.
+    #
+    # ⚠ THE SPLIT STOPS AT ``reserve_cessation_dvs`` (= maturity), and the reason is the
+    # SOURCE'S DOMAIN, not a claim about dead stems: [E]'s Listing 3 — the module that
+    # programs this mechanism — ends at Line 114 with ``FINISH DS = 2., CELVN = 3.``, so
+    # there is no post-maturity form to run. Our tree has no ``FINISH`` (it runs a fixed
+    # number of days and DVS merely caps at 2.0), so without this the dead crop would go
+    # on stashing starch it can never withdraw. It shares the bound with the DRAIN in
+    # ``stem_reserves.py``: they must stop on the same step, or the reserve fills with
+    # nothing draining it. See that module for the quotes and the measurement.
+    #
+    # All three fields default to the inert values (``None`` / 0.0 / 0.0), so a crop or
+    # scenario without stem reserves gets byte-for-byte the pre-2026-08-12 legs — and
+    # note 0.0 is inert for the cessation too, since ``DVS >= 0`` always, so a wiring
+    # that supplies a stock and a fraction but forgets the bound gets NO split at all
+    # rather than an unbounded one (fail-closed; pinned in tests/test_stem_reserves.py).
+    stem_reserve_c: StockId | None = None
+    fstr: float = 0.0
+    reserve_cessation_dvs: float = 0.0
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         _, _, available = self.ctx.budget(snapshot, env)
@@ -295,14 +336,27 @@ class Allocation:
         stem_leg = stem * dt
         root_leg = root * dt
         storage_leg = storage * dt
+        # ``organ_total`` is formed from the WHOLE stem leg, before any reserve split:
+        # the diverted starch is still carbon fixed out of the atmosphere into the
+        # plant, so the CO₂ source leg and the O₂ release must not move. The split below
+        # only decides which of the plant's own stocks holds it.
         organ_total = leaf_leg + stem_leg + root_leg + storage_leg
         legs = [
             Leg(self.co2_atmos, -organ_total),
             Leg(self.ctx.leaf_c, leaf_leg),
-            Leg(self.ctx.stem_c, stem_leg),
-            Leg(self.ctx.root_c, root_leg),
-            Leg(self.storage_c, storage_leg),
         ]
+        if (
+            self.stem_reserve_c is not None
+            and self.fstr != 0.0
+            and dvs < self.reserve_cessation_dvs
+        ):
+            diverted = self.fstr * stem_leg
+            legs.append(Leg(self.ctx.stem_c, stem_leg - diverted))
+            legs.append(Leg(self.stem_reserve_c, diverted))
+        else:
+            legs.append(Leg(self.ctx.stem_c, stem_leg))
+        legs.append(Leg(self.ctx.root_c, root_leg))
+        legs.append(Leg(self.storage_c, storage_leg))
         if self.o2_pool is not None:
             # O₂ released = carbon fixed into biomass (PQ=1). Uses the same
             # ``organ_total`` sum that sources the CO₂ leg, so OXYGEN balances exactly

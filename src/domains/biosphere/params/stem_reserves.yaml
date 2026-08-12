@@ -1,0 +1,96 @@
+# winter_wheat — stem-reserve remobilization (the stem feeding the grain) crop params
+# Currency/units: CARBON for the pool the mechanism fills, but NONE of the four numbers
+#   below is itself a conserved quantity — a FRACTION, a first-order RATE (day^-1) and
+#   TWO DEVELOPMENT STAGES. None is a canonical unit, so all four are schema-validated,
+#   bound-checked floats carrying a declared unit, exact-string guarded at the loader
+#   (the senescence/respiration/root_depth precedent).
+#
+# Model ([E] §3.2.4 p. 93 + §2.2.2 pp. 46-47):
+#   formation:  d(reserve)/dt = fstr * (the day's stem allocation)      [Listing 3 L17]
+#                                                  while DVS <  cessation
+#   drain:      d(reserve)/dt = -rate * reserve,   once  DVS >= trigger [Listing 3 L35]
+#                                                  and   DVS <  cessation
+#   the drained carbon goes to storage_c (the grain).
+#
+# ⚠ THE FORMATION IS A SHARE OF STEM *GROWTH*, NOT A SNAPSHOT OF THE STEM. [E] does not
+#   take 40 % of the standing stem at flowering; the reserve accumulates continuously and
+#   the stem's dry weight is structural + starch throughout. Both forms were built and
+#   measured (docs/plans/post-roadmap-stem-reserves.md, finding 1): the growth-fraction
+#   form is what the book PROGRAMS, and the one-shot snapshot is a model WE constructed
+#   with no listing line behind it. The programmed form is what ships.
+#
+# ⚠ CONSEQUENCE, RECORDED RATHER THAN TUNED AWAY: the programmed form OVERSHOOTS the
+#   committed oracle fixture's harvest index by 15 % (1.151x), while our constructed
+#   one-shot lands on it exactly (1.000x). The oracle is a DIAGNOSTIC, NEVER A FIT TARGET
+#   (the standing ruling, docs/plans/post-roadmap-oracle-match.md), so the form was NOT
+#   chosen by which number it lands on, and `remobilizable_fraction` was NOT moved to
+#   close the gap. At 0.20 the sourced form also lands on the oracle -- and 0.20 is
+#   SORGHUM'S row, which is exactly what fitting to the oracle would have produced.
+#
+# ⚠ ONE OF THE THREE NUMBERS IS OURS, AND IT IS THE TRIGGER. [E]'s own induction
+#   condition is "redistribution starts once stems stop growing", which CAN NEVER FIRE IN
+#   THIS TREE: allocation.yaml's stem fraction is 0.10 at DVS 2.0 with flat
+#   extrapolation, so our stem grows for as long as there is assimilate. [E]'s trigger is
+#   really a statement about [E]'s OWN partition table, in which the stem fraction reaches
+#   zero. Backfilling ours from [E] Table 18 to make it fireable was TAKEN AND REFUSED --
+#   the cited table drives peak LAI to 2.201 against a contract band of 5.0-8.0 (see
+#   docs/plans/post-roadmap-wheat-partition-backfill.md). So the substitute is the weaker
+#   AVAILABILITY condition [E] states in its own words in the same section, "available for
+#   redistribution after flowering", i.e. DVS >= 1.0. Measured near-inert (sweeping the
+#   trigger over DVS 0.0-1.5 moves final grain 0.7 % and leaves peak LAI BIT-IDENTICAL).
+#
+# ⚠ THE UPPER END OF THE WINDOW IS [E]'S, AND IT CLOSES BOTH HALVES (added 2026-08-12 on
+#   the user's call: "the stem should stop feeding the seed at some point"). Listing 3 --
+#   the module whose Lines 17 and 35 ARE this mechanism -- ends at Line 114 with
+#   `FINISH DS = 2., CELVN = 3.`, so [E]'s program has NO STATE past maturity. Ours has no
+#   FINISH: it runs a fixed number of days and DVS merely CAPS at 2.0, so open_season
+#   spends 11 steps past maturity and sealed_chamber -- which never re-sows -- spends TWO
+#   YEARS there, stashing and draining starch in a crop [E] would have stopped simulating.
+#   Read at its exact strength: FINISH is a RUN-CONTROL statement, so this is the source's
+#   DOMAIN BOUNDARY, not a cited "remobilization ceases" rule. Declining to extrapolate a
+#   form outside the program that defines it is the choice; it is labelled as such.
+#
+# Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
+#   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
+#
+# PROVENANCE, stated at its weakest reading: the one number that MOVES anything
+#   (`remobilizable_fraction`) is tabulated by [E] for wheat, and Table 7's own caption
+#   says the data are CABO **unpublished** results; the same page says "there is little
+#   data published on stem reserve contents around flowering". That is the honest ceiling
+#   on this file and it is not hidden -- it is why this mechanism was refused once and
+#   shipped only on the user's explicit call. Of the other three, two are weaker still
+#   (`remobilization_rate` uncited, `trigger_dvs` ours) and both were MEASURED near-inert;
+#   `cessation_dvs` is the source's own program boundary rather than a value chosen inside
+#   it. So the provenance ranking is inverted against what the numbers actually do.
+#
+# Sources:
+#   [E] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       *Simulation of Ecophysiological Processes of Growth in Several Annual Crops*,
+#       Simulation Monographs 29, PUDOC/IRRI. ISBN 90-220-0937-2. **Table 7, p. 46**
+#       ("The fraction of stem weight at flowering consisting of remobilizable
+#       carbohydrates (starch, sucrose plus glucose)"), row "Wheat"; **§2.2.2 pp. 46-47**
+#       for the redistribution rate and the induction condition; **§3.2.4 p. 93**
+#       ("Formation of shielded reserves") for the formation form; **§3.2.6 p. 95**
+#       ("except for their reserves, stems do not lose weight"). The book allocation.py
+#       already cites.
+
+name: winter_wheat
+process: stem_reserves
+
+parameters:
+  remobilizable_fraction:
+    value: 0.40
+    unit: "dimensionless"
+    source: "[E] Table 7, p. 46, row 'Wheat': 0.4. The table's caption defines the quantity precisely -- 'The fraction of stem weight at flowering consisting of remobilizable carbohydrates (starch, sucrose plus glucose)' -- and states its provenance in the same breath: 'Data are unpublished results provided by scientists at the Centre for Agrobiological Research, (CABO), Wageningen, unless indicated otherwise.' The wheat row carries NO 'Source estimate' annotation, so it is the CABO unpublished column rather than one of the table's attributed rows (Maize/Hodges et al. 1979, Millet/Hanway & Weber 1971, Rice/Hahn & Hozyo 1983, Sorghum/Benschop 1986) and not one of its flagged estimates (Cotton). ⚠ A PROVENANCE DISTINCTION WORTH KEEPING STRAIGHT: the book's explicit 'This level and rate are chosen without an experimental basis' disclaimer attaches to the OTHER (L1Q) hypothesis on the same page, not to this table -- uncited is not the same as self-disclaimed, and writing the stronger claim would be a locus error. CONTEXT for how tight this is: p. 46 says 'At flowering, 20 % or more of the weight of vegetative organs may consist of mobilizable starch, particularly in cereals', and 'There is little data published on stem reserve contents around flowering, but Table 7 shows some indicative values.' RANGE ACROSS THE TABLE, so the spread is on the record rather than implied: 0.1 (cotton, millet, sunflower, tulip) to 0.5 (sugar-cane); barley, the nearest cereal neighbour, is 0.3. MEASURED SENSITIVITY: this is the ONLY one of the three parameters that moves anything, and at the table's TOP row (0.50) open_season crosses the Greenwood nitrogen-target tripwire, so the spread is not academic."
+  remobilization_rate:
+    value: 0.1
+    unit: "1/day"
+    source: "[E] §2.2.2 p. 46, the 'simple view' (Listing 3 Line 35): 'A simple view is that redistribution starts once stems stop growing, and then continues at a rate of 0.1 d-1 of the redistributable starch.' Stated bare, with a code-line pointer and NO citation -- so this value is UNCITED, and that is written here rather than dressed up. ⚠ It is NOT, however, self-disclaimed: the book's 'chosen without an experimental basis' sentence attaches to the alternative L1Q hypothesis, which happens to carry the same numeral 0.1. MEASURED CONSEQUENCE, which is why an uncited number is tolerable here: the rate is BIT-INERT ON CARBON. Checked at to_bits() over every stock at every step across rates 0.05, 0.2 and 1.0, the only stocks that differ from the 0.1/day run are the reserve itself and the grain -- once carbon is in the reserve it is already outside maintenance AND outside senescence, and the grain is too, so moving it between them is a rename. (At rate 0 exactly -- a degenerate form, not a candidate -- nitrogen does move, because the grain sits inside the nitrogen target's denominator.)"
+  cessation_dvs:
+    value: 2.0
+    unit: "dimensionless"
+    source: "[E] **Listing 3 Line 114**, the run-control line of the very module (L1D) whose Lines 17 and 35 program this mechanism: 'FINISH DS = 2., CELVN = 3.' Stated twice in the book's own prose as well -- §3.1.4 p. 81: 'This simulation of the development process contains no explanatory mechanism for the crop ripening. Simulation is halted by imposing an end when the development stage reaches the value of 2.0, by including the statement FINISH DS = 2.0, or FINISH DS = 0.95 for sugar crops and for sweet potato that are harvested before flowering.'; and §3.4.2 p. 105: 'The FINish TIMe of 1000. is never reached: simulation always stops when either the FINISH conditions of maturity (DS = 2.0), or that of severe carbohydrate shortage (CELVN = 3.0) is reached.' ⚠ READ AT ITS EXACT STRENGTH, because over-claiming here would be the locus error this repo has logged three times: FINISH is a RUN-CONTROL statement, so [E] does NOT say 'remobilization ceases at maturity' -- it says its model DOES NOT EXIST there. This value is therefore the SOURCE'S DOMAIN BOUNDARY, and using it is a decision to stop extrapolating the form outside the program that defines it, rather than a cited cessation rule. ⚠ WHY IT IS NEEDED HERE AND NOT IN [E]: [E]'s run ENDS at DS = 2.0; ours does not -- DVS caps at 2.0 and the season keeps stepping, so open_season spends 11 steps past maturity and sealed_chamber (which never re-sows) spends TWO YEARS there. MEASURED CONSEQUENCE: final grain -2.0 % on open_season (34.396 -> 33.714 mol C), while peak LAI is BIT-IDENTICAL (5.4624) and Greenwood's W moves 14.1516 -> 14.1457 -- both frozen bands hold with unchanged margins. The chambers' closure gates move in the last digits only (perennial_long_horizon CO2 trough 0.055977 -> 0.056030, sealed_chamber min O2 0.00036388 -> 0.00021982, still 0.011 % of fill against a >= 95 %-depletion contract), so litter_carbon0 = 3.5 stands. It bounds BOTH halves: the fill shares this number (Allocation.reserve_cessation_dvs) so the two stop on the same step -- a drain that stopped alone would leave the dead stem stashing starch forever."
+  trigger_dvs:
+    value: 1.0
+    unit: "dimensionless"
+    source: "⚠ OURS, NOT [E]'S, and labelled so at every level (this file, stem_reserves.py, the reference doc). [E]'s own induction condition is 'redistribution starts once stems stop growing' (§2.2.2 p. 46), which is UNFIREABLE in this tree -- allocation.yaml's stem fraction is 0.10 at DVS 2.0 and the table flat-extrapolates, so our stem grows while there is assimilate. That condition is really a statement about [E]'s OWN partition table, whose stem fraction reaches zero; backfilling ours from [E] Table 18 to make it fireable was taken and refused on a measurement (peak LAI 2.201 against a 5.0-8.0 contract band -- docs/plans/post-roadmap-wheat-partition-backfill.md). The substitute is the weaker AVAILABILITY condition [E] states in its own words in §3.2.4 p. 93 -- reserves are 'available for redistribution after flowering' -- i.e. anthesis, DVS = 1.0, which is the definition of the development stage. MEASURED NEAR-INERT: sweeping this over DVS 0.0-1.5 moves final grain by 0.7 % and leaves peak LAI BIT-IDENTICAL, while the standing starch at its maximum varies 4.8x. So the one parameter whose provenance is ours is also one of the two that barely matter -- the provenance ranking is inverted against the sensitivity ranking, which is measured rather than asserted."

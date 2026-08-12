@@ -302,6 +302,27 @@ class SeasonScenario:
     # new param file. See docs/plans/post-roadmap-day-neutral-crop.md.
     vernalization: bool = True
     photoperiod: bool = True
+    # Stem reserves (post-roadmap, 2026-08-12) — whether the crop holds a share of its
+    # stem growth apart as shielded starch and remobilizes it into the grain after
+    # anthesis. Default True: the frozen winter wheat carries it, so this is the flag
+    # whose default MOVES the goldens rather than preserving them — the first such flag
+    # in this dataclass, and it is deliberate. The mechanism is the reference science
+    # here, not an option bolted beside it.
+    #
+    # ⚠ A BOOLEAN AND NOT A VALUE, unlike ``wssd`` which switches the same way. The
+    # three numbers are crop params in ``params/stem_reserves.yaml`` (a crop can
+    # override it); this flag says only whether the crop HAS the mechanism. Splitting
+    # them that way is what keeps a crop from silently inheriting wheat's tabulated
+    # fraction: ``crop_param_set`` falls a missing file back to the reference, so a
+    # value-only switch would hand every second species 0.40 by default.
+    #
+    # ⚠ POTATO TURNS IT OFF, and the reason is the SOURCE rather than potato's
+    # physiology. [E] Table 7 does have a potato row — but it reads **"0.2-0.4"**, a
+    # range, where wheat reads a single 0.4. Picking a point inside someone else's range
+    # is our number, not theirs, and this build exists precisely to stop that. Same
+    # shape as ``wssd=None`` (an absence in the source) one step weaker: not an absence,
+    # an under-determination. Re-open it if a primary gives potato a point value.
+    stem_reserves: bool = True
     # The CROP (post-roadmap: potato, the first genuine second species). ``None`` —
     # the default on every frozen scenario — is the winter-wheat reference: the plant
     # builders read the committed ``params/*.yaml`` files exactly as they did before
@@ -338,7 +359,50 @@ DEFAULT_SCENARIO: SeasonScenario = SeasonScenario()
 SEALED_CHAMBER_SCENARIO: SeasonScenario = SeasonScenario(
     sealed=True,
     chamber_o2_mol0=2.0,
-    litter_carbon0=3.0,
+    # ⚠ **RE-SIZED 3.0 → 3.5 on 2026-08-12, because the stem-reserve build ABOLISHED the
+    # phenomenon this scenario exists to show.** With the reserve the crop fixes more
+    # carbon overall, so it releases more O₂ (PQ=1) exactly where the trough forms, and
+    # the pool bottomed at **5.08 %** of its fill instead of the ~0.01 % this scenario
+    # is
+    # for — one twentieth of a percent past the ≥95 %-depletion contract, which also
+    # made
+    # `f_O2` stop being load-bearing (the k_O2 = 0 control no longer rationed at all, so
+    # the one test that proves the self-limit does the work would have been asserting
+    # nothing). ⚠ Peak litter and peak microbial biomass are UNCHANGED to four figures
+    # (3.0000 / 0.5520 vs 0.5524), so this is not "less decomposition" — measured,
+    # because
+    # the obvious explanation was the wrong one.
+    #
+    # **Why the LITTER seed and not the O₂ fill**, both being declared scale choices:
+    # the
+    # litter is "the soil organic matter" whose respiration IS the Biosphere-2 mechanism
+    # this scenario models, and moving it keeps the declared 0.2 % atmosphere intact. It
+    # also lands nearest the trough the old golden recorded (0.000364 vs 0.000119; the
+    # O₂-side alternative at 1.5 mol gives 0.00000022, a deeper hole than either).
+    #
+    # **The contract was written down BEFORE the sweep** — it is this scenario's own
+    # existing test (`test_sealed_chamber.py`): O₂ strictly positive, depleted ≥ 95 %,
+    # `rationed == 0` with `f_O2` on, and `rationed > 0` with `k_O2 = 0`. Sweep,
+    # recorded
+    # so the operating point is not merely asserted:
+    #
+    #   | litter0 | min O₂     | % of fill | rationed | rationed (k_O2 = 0) |
+    #   |---------|------------|-----------|----------|---------------------|
+    #   | 3.0     | 0.10160347 | 5.080 %   | 0        | **0** (contract dead)|
+    #   | **3.5** | 0.00036388 | 0.018 %   | 0        | 4                   |
+    #   | 4.0     | 0.00000001 | 0.000 %   | 0        | 4                   |
+    #   | 5.0     | 0.0        | 0.000 %   | 0        | 86                  |
+    #
+    # 3.5 is the SMALLEST value that meets all four. ⚠ This is legitimate here for the
+    # reason `DEEP_WATER_SCENARIO` states in full: an *acceptance bound* chosen after
+    # seeing the measurement asserts only that the tree passes a bound the tree set,
+    # but a
+    # DIAGNOSTIC scenario exists to put a mechanism where it can be seen, so choosing
+    # the
+    # operating point that exposes it is the point — provided the sweep is recorded. The
+    # `CONSUMER_CHAMBER_SCENARIO` enlargement (a bigger plant over-drew a fixed chamber)
+    # is the same move, one science earlier.
+    litter_carbon0=3.5,
 )
 SEALED_CHAMBER_YEARS: int = 3
 
@@ -530,7 +594,7 @@ DAY_NEUTRAL_YEARS: int = 1
 # phenology, allocation, canopy), so it is the first scenario for which ``crop`` is not
 # ``None``. Open field, matching the WOFOST potato oracle's own plot:
 #
-#   * ``crop="potato"`` — the three overridden files; the other five fall back to the
+#   * ``crop="potato"`` — the four overridden files; the other six fall back to the
 #     reference (``loader.crop_param_set``), which is honest rather than hidden: our
 #     FvCB kinetics were never wheat-specific (they are TODO(cite) placeholders tagged
 #     "literature-typical C3"), and potato is a C3 plant.
@@ -560,6 +624,12 @@ POTATO_SCENARIO: SeasonScenario = SeasonScenario(
     # potato's min FTSW is 0.9018, so WSFG ≡ 1 — which is exactly why an inherited value
     # would have looked harmless and gone unnoticed.)
     wssd=None,
+    # ⚠ The SECOND field turned off for a reason about the source rather than the crop —
+    # and here the source is not silent, it is UNDER-DETERMINED. [E] Table 7 gives
+    # potato **"0.2-0.4"** where it gives wheat a single 0.4. Inheriting 0.40 would be
+    # picking the top of someone else's range and calling it cited; picking 0.3 would be
+    # our number wearing [E]'s name. See ``SeasonScenario.stem_reserves``.
+    stem_reserves=False,
 )
 POTATO_YEARS: int = 1
 

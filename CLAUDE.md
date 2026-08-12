@@ -52,7 +52,7 @@ deliberately: advisor review → regenerate the manifest as the git-visible reco
 
 | Contract | Freezes | Doc |
 |---|---|---|
-| Biosphere | the reference science: Euler/`dt=1`, 18 flows, aux, 12 params, 7 scenarios→goldens | `docs/biosphere-reference.md` + manifest |
+| Biosphere | the reference science: Euler/`dt=1`, the flow/aux/param sets, 7 scenarios→goldens | `docs/biosphere-reference.md` + manifest |
 | Station | the multi-domain assembly: sibling flows/params, the 4 seams, 13 scenarios→goldens (biosphere **delegated**) | `docs/station-reference.md` + manifest |
 | Native port | the cross-port **tolerance** contract (not code): the 3 tiers + measured bands | `docs/native-port-reference.md` |
 | Authoring | the author-facing **platform**: grammar, file schema, VM node/op set, flow-type registry | `docs/authoring-reference.md` + manifest |

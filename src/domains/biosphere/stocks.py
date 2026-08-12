@@ -42,6 +42,28 @@ LEAF_C: StockId = StockId("biosphere.leaf_c")
 STEM_C: StockId = StockId("biosphere.stem_c")
 ROOT_C: StockId = StockId("biosphere.root_c")
 STORAGE_C: StockId = StockId("biosphere.storage_c")
+# The stem's shielded carbohydrate reserve (post-roadmap stem reserves, 2026-08-12).
+# [E] §3.2.4 p. 93: "a certain fraction of the increase in stem weight will be available
+# for redistribution after flowering. This fraction is assumed to consist only of
+# starch." It is therefore NOT a fifth organ but a **fraction of the stem's own dry
+# weight held apart** — the stem's weight is structural + starch throughout, and the
+# stem's post-anthesis weight LOSS is this reserve draining ([E] §3.2.6 p. 95: "except
+# for their reserves, stems do not lose weight").
+#
+# A **POOL**, not a POPULATION, for the ``litter_n``/``humus_carbon`` reason:
+# ``organ_stock`` carries an extinction pass that zeroes the stock and routes the
+# residual to the loss-sink, and a carbohydrate store is not a population that can go
+# extinct. A POOL is
+# never zeroed-with-loss (the project's extinction invariant).
+#
+# It sits OUTSIDE the ``leaf + stem + root`` maintenance / ``f_N`` biomass, exactly as
+# ``storage_c`` does and for the same stated reason — a storage carbohydrate is not
+# respiring tissue and carries no nitrogen. ⚠ That treatment is a MODELLING CHOICE the
+# source does not settle; it was measured as its own variant (the alternative fails CO₂
+# stationarity on ``perennial_long_horizon``) and chosen on the independent
+# ``storage_c`` argument that predates this work, NOT because it goes green. See
+# docs/plans/post-roadmap-stem-reserves.md, finding 5.
+STEM_RESERVE_C: StockId = StockId("biosphere.stem_reserve_c")
 SOIL_WATER: StockId = StockId("biosphere.soil_water")
 # The below-root store (post-roadmap soil layers): [F] Soltani & Sinclair's ``WSTORG``,
 # "the soil water stored below rooting zone" (Fig. 14.2). Water that is physically
@@ -133,6 +155,7 @@ STOCK_DOMAIN: dict[StockId, DomainId] = {
     STEM_C: PLANTS,
     ROOT_C: PLANTS,
     STORAGE_C: PLANTS,
+    STEM_RESERVE_C: PLANTS,  # the stem's shielded starch — held apart, not an organ
     PLANT_N: PLANTS,
     SOIL_WATER: SOIL,
     SUBSOIL_WATER: SOIL,  # the below-root store; soil water the roots have not reached

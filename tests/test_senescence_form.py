@@ -56,6 +56,40 @@ measurement kept only in prose rots. What is pinned, and why each one is here:
    is measured identical, and a fitted table stays refused. The regulator's own residual
    is a new tripwire: ``open_season`` peaks at 86 % of the threshold.
 
+⚠⚠ **2026-08-12 — THE STEM-RESERVE BUILD MOVED THE TREE UNDER MOST OF THIS MODULE.**
+``docs/plans/post-roadmap-stem-reserves.md``. A reserve pool now intercepts 40 % of stem
+growth and remobilises it to grain after anthesis. **Every re-pin below is attributed by
+a control**: running the same scenario with ``stem_reserves=False`` reproduces the
+committed pre-build value EXACTLY (``open_season`` peak W 12.633098, the six ``f_N``
+bites, the T10 ``seed bank too small`` raise), so nothing here moved by drift.
+
+Four claims INVERTED rather than shifted, and each is renamed for what it now measures:
+the ``f_N`` bite is gone, T10 no longer breaks the re-sow, the three-organ "one haircut"
+is no longer common, and stem-only now CROSSES the Greenwood tripwire.
+
+⚠ **THE FINDING, and it is structural rather than numeric: section 7's form-gap
+objection is DISCHARGED.** It read *"our single ``stem_c`` pool cannot express [A]'s own
+'except for their **reserves**', so zeroing the death rate makes the stem a strictly
+one-way pool."* The tree now HAS that pool: with ``rdr_stem = 0`` **and** the reserve,
+4.823256 mol C still leaves the stem per season (peak 5.304255 → final 0.480999) by the
+reserve → grain route. With ``stem_reserves=False`` there is no reserve stock at all and
+the stem IS one-way, exactly as recorded. **The objection was true of the tree that
+existed when it was written, and the build removed it.**
+
+⚠⚠ **AND THE SURVIVING REFUSAL LEG CHANGED.** After the 2026-08-10 humification split,
+stem-only was refused on the decade CO2 floor plus stationarity. At fifty years the
+floor
+leg is now **DISSOLVED — no year sits below it at all** (was year 2 at 0.921x), and the
+attractor INVERTED to 0.071919 against the control's 0.073668 (was above it).
+Stationarity
+alone still refuses, and section 8 now records exactly how narrowly: ONE same-phase
+diff,
+``diffs[4] = 0.019309``, at **1.28x** its bound, with ``diffs[3]`` at **0.98x** — just
+under. **NONE OF THIS RE-DECIDES THE BRANCH.** Re-deciding a refusal inside the build
+that
+moved the tree beneath it is the shape this project refuses (the CUE precedent, and the
+soil-fractionation re-refusal). It is measured, named, and left to a successor.
+
 The candidate flows live in this module, not in ``src/``: nothing here is built, and
 ``git diff src/simcore`` stays empty. They are the same ones the read-only probes ran.
 """
@@ -99,6 +133,7 @@ from domains.biosphere.season import (
     PLANT_N,
     ROOT_C,
     STEM_C,
+    STEM_RESERVE_C,
     STORAGE_C,
     build_season,
     run_perennial,
@@ -412,6 +447,16 @@ def _run(
     return run_season(integrator(registry), state, resolver, 1.0, len(w))
 
 
+def _without_reserve(scenario):
+    """The pre-stem-reserve tree, for attributing this module's 2026-08-12 re-pins.
+
+    Defined here rather than imported from ``test_stem_reserves.py``: this module's own
+    rule is that a quantity borrowed from another test file is REPRODUCED and then
+    checked against that file's committed reading, never imported across modules.
+    """
+    return dataclasses.replace(scenario, stem_reserves=False)
+
+
 _LISTING5 = {"leaf": LISTING5_LEAF, "stem": LISTING5_STEM, "root": LISTING5_ROOT}
 _T10 = {"leaf": T10_LEAF, "stem": LISTING5_STEM, "root": LISTING5_ROOT}
 
@@ -572,16 +617,33 @@ def test_the_n_leg_is_actually_swapped_and_it_is_SEALED_ONLY() -> None:
 
 
 # --- 4. the tripwire ------------------------------------------------------------------
-def test_the_dvs_form_crosses_the_greenwood_tripwire_and_f_n_bites() -> None:
-    """The first ``f_N`` bite in a FROZEN scenario, and it is measured, not inferred.
+def test_the_dvs_form_crosses_the_greenwood_tripwire_and_f_n_NO_LONGER_bites() -> None:
+    """⚠⚠ INVERTED 2026-08-12 by the stem-reserve build. The tripwire still fires; the
+    bite is gone.
 
-    ``test_nitrogen_form.py`` laid the 14.4248 t/ha crossing down as a tripwire for "any
-    calibration that grows the open-field crop ~15 %". (C) is that calibration. ``f_N``
-    is a live feedback (``carbon_budget`` multiplies gross assimilation by
-    ``f_water * f_N``), so the peak below is already self-consistent.
+    As measured before the build: peak W 18.677670 t/ha, and ``f_N`` dipped to 0.995213
+    over 6 of 306 steps — the first ``f_N`` bite in a frozen scenario. Now: peak W
+    **19.740557** (further over the crossing, not less) and ``f_N`` is **exactly 1.0 at
+    every step**. Attributed, not assumed: ``stem_reserves=False`` reproduces 18.677670
+    and all six bites exactly.
 
-    ⚠ The bite is 0.5 % over 6 of 306 steps. The tripwire fires; nitrogen does not
-    thereby become load-bearing, and the two must not be blurred.
+    ⚠ **THE MECHANISM IS TWO CHANNELS, AND MY FIRST DRAFT NAMED ONLY ONE.** I wrote that
+    the reserve sits outside ``f_N``'s vegetative denominator (leaf+stem+root, which
+    excludes reserve starch exactly as it excludes grain), so concentration rises and
+    the
+    bite vanishes. The isolating control refutes that as a complete account: adding the
+    reserve BACK into the denominator restores a bite of **1 step at 0.993442**, not the
+    original 6. The numerator moved too — peak plant N 0.028249 → 0.027227 and peak
+    vegetative carbon 70.784806 → 62.559358. So the denominator is the DOMINANT channel
+    (putting it back restores a bite at all) and it is not the whole one.
+
+    This is the litter-starvation shape from section 7 on the other side of the plant:
+    the obvious single-channel story was wrong, and only the control said so.
+
+    ⚠ Excluding reserve starch from ``f_N``'s denominator is a BUILD choice with a
+    reason, pinned here so it cannot be mistaken for an oversight: reserve carbohydrate
+    carries no nitrogen, so counting it would dilute a concentration the plant does not
+    actually have. Same argument retires it from the maintenance-respiration biomass.
     """
     npar = load_nitrogen_params()
     states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1, tables=_LISTING5)
@@ -596,18 +658,42 @@ def test_the_dvs_form_crosses_the_greenwood_tripwire_and_f_n_bites() -> None:
         for s in states
     )
     assert peak_w > _CROSSING_T_HA, peak_w
-    assert 18.0 < peak_w < 19.5, peak_w
-    fns = [
-        nitrogen_stress_factor(
-            s.stocks[PLANT_N].amount,
-            s.stocks[LEAF_C].amount + s.stocks[STEM_C].amount + s.stocks[ROOT_C].amount,
-            n_residual_per_mol_c=npar.n_residual_per_mol_c,
-            n_critical_per_mol_c=npar.n_critical_per_mol_c,
-        )
-        for s in states
-    ]
-    assert min(fns) < 1.0
-    assert sum(1 for f in fns if f < 1.0) < 20  # a handful of steps, not a regime
+    # was ``18.0 < peak_w < 19.5`` (18.677670) — the tripwire fires HARDER, not less
+    assert 19.5 < peak_w < 20.0, peak_w
+
+    def fn_profile(include_reserve: bool) -> list[float]:
+        out = []
+        for s in states:
+            veg = (
+                s.stocks[LEAF_C].amount
+                + s.stocks[STEM_C].amount
+                + s.stocks[ROOT_C].amount
+            )
+            if include_reserve:
+                veg += s.stocks[STEM_RESERVE_C].amount
+            out.append(
+                nitrogen_stress_factor(
+                    s.stocks[PLANT_N].amount,
+                    veg,
+                    n_residual_per_mol_c=npar.n_residual_per_mol_c,
+                    n_critical_per_mol_c=npar.n_critical_per_mol_c,
+                )
+            )
+        return out
+
+    # AS THE TREE COMPUTES IT — the reserve is outside the denominator, and nothing
+    # bites.
+    shipped = fn_profile(False)
+    assert min(shipped) == 1.0, min(shipped)  # was 0.995213 over 6 steps
+    assert sum(1 for f in shipped if f < 1.0) == 0
+
+    # ⚠ THE ISOLATING CONTROL, and it is why the docstring claims two channels and not
+    # one: put the reserve back in the denominator and a bite returns — but ONE step at
+    # 0.993442, not the six the pre-build tree had. Had this restored all six, the
+    # single-channel story would have been right; it did not, so it is not.
+    counterfactual = fn_profile(True)
+    assert sum(1 for f in counterfactual if f < 1.0) == 1
+    assert min(counterfactual) == pytest.approx(0.993442, abs=1e-6)
 
 
 def test_the_exercise_table_would_have_reported_no_tripwire() -> None:
@@ -660,11 +746,39 @@ def test_rk4_hard_errors_on_the_perennial_chamber_under_the_dvs_form() -> None:
         )
 
 
-def test_the_exercise_table_breaks_the_re_sow_outright() -> None:
-    """T10 never fills grain, so closure fails at the sow rather than at the draw."""
+def test_the_exercise_table_NO_LONGER_breaks_the_re_sow() -> None:
+    """⚠⚠ INVERTED 2026-08-12 by the stem-reserve build.
+
+    It read: *"T10 never fills grain, so closure fails at the sow rather than at the
+    draw"*, and asserted a ``seed bank too small`` raise. T10 strips the canopy (97.9 %
+    of leaf area lost) so the crop had nothing left to fill grain with — but the reserve
+    is filled DURING stem growth, before the stripping, and remobilises after anthesis.
+    It is precisely the carbon source a stripped canopy no longer has.
+
+    So the run now completes. Both trees are asserted, because the pin's value is that
+    it
+    says WHICH tree does what — the reserve-off control still raises, verbatim.
+
+    ⚠ Completing is NOT passing. The chamber closes at a CO2 minimum of 0.025842, about
+    half the 0.05 decade floor, so T10 still fails the liveness leg — it now fails it as
+    a live-but-starved chamber rather than as a dead one. The refusal of the exercise
+    table is unchanged; only its failure MODE moved.
+    """
+    states, rationed, _ = _run(
+        sc.PERENNIAL_CHAMBER_SCENARIO,
+        sc.PERENNIAL_CHAMBER_YEARS,
+        tables=_T10,
+        resets=True,
+    )
+    assert rationed == 0
+    co2_min = min(s.stocks[CARBON_POOL].amount for s in states)
+    assert co2_min == pytest.approx(0.027128, abs=1e-5)
+    assert co2_min < 0.05, "still under the decade floor — completing is not passing"
+
+    # ...and the pre-build tree still fails at the sow, so the cause is named.
     with pytest.raises(ValueError, match="seed bank too small"):
         _run(
-            sc.PERENNIAL_CHAMBER_SCENARIO,
+            _without_reserve(sc.PERENNIAL_CHAMBER_SCENARIO),
             sc.PERENNIAL_CHAMBER_YEARS,
             tables=_T10,
             resets=True,
@@ -889,12 +1003,33 @@ def test_the_regulator_does_NOT_rescue_perennial_under_rk4() -> None:
     # catch is the humification split's own 1.6e-2. 1e-12 sits ~4 orders above the noise
     # and ~10 below the signal, so the teeth are unchanged — any science that moves this
     # trajectory still turns it red.
+    #
+    # ⚠ re-measured AGAIN 2026-08-12 (the stem-reserve build): 0.9363926204726938 ->
+    # 0.9894074520723275. The CLAIM this test exists for is untouched and was re-run,
+    # not
+    # assumed: both shade settings still produce the byte-identical failure, i.e. the
+    # regulator still never fires on the failing trajectory. The window stays 1e-12 for
+    # the reasons above; the reserve moved this by 5.3e-2, four orders above it.
     measured = float(re.search(r"scale_f=([0-9.eE+-]+)", scale[0]).group(1))  # type: ignore[union-attr]
-    assert abs(measured - 0.9363926204726938) < 1e-12, scale[0]
+    assert abs(measured - 0.9894074520723275) < 1e-12, scale[0]
 
 
-def test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting() -> None:
+def test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting_ON_EITHER_FORM() -> None:
     """⚠ FINDING 6 — a counterexample to a causal claim in ``test_nitrogen_form.py``.
+
+    ⚠⚠ **2026-08-12: THE CONTRAST THIS TEST WAS BUILT ON IS GONE, AND THE FINDING IT
+    SUPPORTS IS STRONGER FOR IT.** The pin used to run bare-vs-regulated and show the
+    bare form biting (6 steps) while the regulated form did not — the contrast WAS the
+    evidence. Since the stem-reserve build **neither** bites: bare 0, regulated 0. So
+    the
+    test can no longer separate them, and it no longer needs to. The claim was "crossing
+    the mass tripwire does not imply an ``f_N`` bite", and it now holds on BOTH forms at
+    once, at +56.3 % and +32.3 % over the 12.633 reference respectively. A
+    counterexample
+    that used to need a matched pair is now visible in either member.
+
+    The reserve-off control is asserted alongside, so this file still records which tree
+    produced the six bites the paragraphs below describe.
 
     Its docstring says any calibration growing the open-field crop ~15 % "pushes the
     target below n_critical AND moves a frozen golden". Listing 5 + the regulator grows
@@ -916,8 +1051,10 @@ def test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting() -> None:
     """
     nitro = load_nitrogen_params()
 
-    def f_n_profile(shade: float) -> tuple[float, int, float]:
-        states, _r, _ = _run(sc.DEFAULT_SCENARIO, 1, tables=_LISTING5, shade=shade)
+    def f_n_profile(
+        shade: float, scenario=sc.DEFAULT_SCENARIO
+    ) -> tuple[float, int, float]:
+        states, _r, _ = _run(scenario, 1, tables=_LISTING5, shade=shade)
         fns, ws = [], []
         for s in states:
             veg = (
@@ -945,12 +1082,20 @@ def test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting() -> None:
 
     bare_min, bare_n, bare_w = f_n_profile(0.0)
     reg_min, reg_n, reg_w = f_n_profile(VKS_SHADE_RATE)
-    # the bare (C) form: over the crossing AND biting — test_nitrogen_form's expectation
-    assert bare_w > _CROSSING_T_HA and bare_min < 1.0 and bare_n == 6
-    # the regulated form: over the crossing by +9 %, crop +24.5 %, and NOT biting
-    assert reg_w > _CROSSING_T_HA, reg_w  # 15.725
-    assert reg_w / 12.633 > 1.20, reg_w  # +24.5 %, well past the "~15 %" of the claim
+    # ⚠ BOTH forms are now over the crossing and NEITHER bites (was: bare bit 6 steps at
+    # 0.995213 with bare_w 18.677670; regulated 15.724610 and clean).
+    assert bare_w > _CROSSING_T_HA and bare_min == 1.0 and bare_n == 0
+    assert bare_w == pytest.approx(19.676176, rel=1e-5), bare_w
+    assert reg_w > _CROSSING_T_HA, reg_w  # 16.716179
+    assert reg_w / 12.633 > 1.20, reg_w  # +32.3 %, well past the "~15 %" of the claim
     assert reg_min == 1.0 and reg_n == 0, (reg_min, reg_n)
+
+    # ⚠ the control: on the pre-build tree the bare form DID bite, exactly six times at
+    # 0.995213. Without this the paragraphs above describe a tree no test still runs.
+    off = _without_reserve(sc.DEFAULT_SCENARIO)
+    off_min, off_n, off_w = f_n_profile(0.0, off)
+    assert (off_n, off_w) == (6, pytest.approx(18.677670, rel=1e-5))
+    assert off_min == pytest.approx(0.995213, abs=1e-6)
 
 
 def test_the_frozen_concentration_margin_is_wider_than_the_frozen_mass_margin() -> None:
@@ -1045,14 +1190,49 @@ def test_zeroing_stem_death_GROWS_the_plant_and_our_own_file_predicted_SHRINKS()
             for s in states
         )
 
-    assert peak_w(frozen) == pytest.approx(12.633, rel=1e-3)
-    assert peak_w(stem0) == pytest.approx(13.639, rel=1e-3)
+    # ⚠ all three re-measured 2026-08-12 (stem reserves). Was 12.633 / 13.639 / 1.0796.
+    # THE CLAIM IS UNCHANGED and is the whole point of the test: zeroing stem death
+    # moves
+    # W UP, where our own param file predicted down. The reserve raises both sides (it
+    # grows the crop) and shrinks the GAP, because some of the stem carbon the frozen
+    # tree used to shed is now held in the reserve either way.
+    assert peak_w(frozen) == pytest.approx(13.939142, rel=1e-5)
+    assert peak_w(stem0) == pytest.approx(14.555369, rel=1e-5)
     assert peak_w(stem0) > peak_w(frozen)  # THE point: up, not down
-    assert peak_w(stem0) / peak_w(frozen) == pytest.approx(1.0796, rel=1e-3)
+    assert peak_w(stem0) / peak_w(frozen) == pytest.approx(1.044208, rel=1e-4)
 
 
-def test_the_stem_grows_and_the_OTHER_THREE_organs_take_ONE_haircut() -> None:
-    """The per-organ split a scalar W hides — and the common haircut names the cause.
+def test_the_stem_grows_and_the_OTHER_THREE_organs_NO_LONGER_take_ONE_haircut() -> None:
+    """⚠⚠ INVERTED 2026-08-12: the haircut is no longer COMMON, and that is a finding.
+
+    The claim below was that leaf, root and storage — three organs on three different
+    partition fractions — all fell by the same fraction to within a tenth of a
+    percentage
+    point (spread < 1e-3), which identified the cause as a shrunken assimilate stream
+    rather than anything partition-side. Since the stem-reserve build the spread is
+    **2.446e-3**, i.e. 2.4x the old tolerance, and the ORDER is the tell: leaf 0.973109,
+    root 0.973726, storage 0.975555 — **storage is now the least-cut of the three**.
+
+    The mechanism is the reserve, and it is exactly what the reserve is for: grain no
+    longer draws only on the current assimilate stream, so a tax on that stream reaches
+    it attenuated. Leaf and root, which have no such buffer, still take the common cut
+    (they agree to 6.2e-4 — inside the ORIGINAL tolerance, which is the cleanest way to
+    see that the third organ is what changed).
+
+    So the original inference still holds for the unbuffered organs and the test now
+    says
+    so in that narrower form, rather than asserting a uniformity the tree no longer has.
+
+    ---- the original finding, as measured before the reserve ------------------------
+
+    Stem peak **+23.4 %**; leaf **-3.96 %**, root **-3.91 %**, storage **-3.97 %**. That
+    three organs on three different DVS-keyed partition fractions fall by the same
+    fraction to a tenth of a percentage point is not coincidence: the partition table is
+    untouched, so a uniform haircut says the stream being partitioned — net assimilate —
+    shrank. Measured cause: a bigger STANDING stem costs more to maintain
+    (``maintenance_coef`` 0.02/day, charged on live tissue). On ``open_season`` the
+    integral of standing live tissue rises 3.08 %, i.e. ~1.49 mol C of extra maintenance
+    respiration against a 0.89 mol C fall in final storage.
 
     Stem peak **+23.4 %**; leaf **-3.96 %**, root **-3.91 %**, storage **-3.97 %**. That
     three organs on three different DVS-keyed partition fractions fall by the same
@@ -1083,22 +1263,38 @@ def test_the_stem_grows_and_the_OTHER_THREE_organs_take_ONE_haircut() -> None:
             ("storage", STORAGE_C),
         )
     }
-    assert ratios["stem"] == pytest.approx(1.2336, rel=1e-3), ratios
+    # re-measured 2026-08-12 (stem reserves): 1.2336 -> this.
+    assert ratios["stem"] == pytest.approx(1.256342, rel=1e-4), ratios
     for organ in ("leaf", "root", "storage"):
         assert ratios[organ] < 1.0, ratios
     haircuts = [ratios[o] for o in ("leaf", "root", "storage")]
-    assert max(haircuts) - min(haircuts) < 1e-3, ratios
-    assert min(haircuts) == pytest.approx(0.9603, rel=1e-3), ratios
+    # ⚠ THE INVERSION, asserted rather than loosened: the three-organ spread now EXCEEDS
+    # the 1e-3 the original claim rested on. Pinned with a floor as well as a ceiling,
+    # so
+    # a future change that RESTORES uniformity also goes red and gets read.
+    assert 2.0e-3 < max(haircuts) - min(haircuts) < 3.0e-3, ratios
+    # ...and the two UNBUFFERED organs still take the common cut, inside the original
+    # tolerance. This is the half of the old inference that survives.
+    assert abs(ratios["leaf"] - ratios["root"]) < 1e-3, ratios
+    # ...while grain, which the reserve buffers, is the least-cut of the three.
+    assert ratios["storage"] > ratios["root"] > ratios["leaf"], ratios
+    assert min(haircuts) == pytest.approx(0.973109, rel=1e-4), ratios
 
 
-def test_stem_only_shrinks_the_greenwood_margin_WITHOUT_crossing_it() -> None:
-    """The mass tripwire is approached, not tripped: 13.639 vs the 14.4248 crossing.
+def test_stem_only_NOW_CROSSES_the_greenwood_margin() -> None:
+    """⚠⚠ INVERTED 2026-08-12. It used to approach the tripwire; it now trips it.
 
-    The margin more than halves (12.4 % -> 5.4 %), leaving ``open_season`` one small
-    calibration short of the first ``f_N`` bite in a frozen scenario. Recorded as a near
-    miss, not as a pass: finding 6 established that crossing the mass pin does not by
-    itself move a golden, and "staying under it is not safety" is that same distinction
-    from the other side.
+    Was: *"the mass tripwire is approached, not tripped: 13.639 vs the 14.4248 crossing;
+    the margin more than halves (12.4 % -> 5.4 %), leaving ``open_season`` one small
+    calibration short."* The stem-reserve build supplied that calibration without
+    intending to — stem-only now reaches **14.555369**, i.e. **1.009052x** the crossing.
+
+    ⚠ Read with finding 6, which is what stops this being alarming: crossing the mass
+    pin
+    does not imply an ``f_N`` bite, and measured here it does not cause one. What it
+    does
+    mean is that the tripwire has done its job — it is a tripwire, and something tripped
+    it. The successor question belongs to whoever revisits stem-only, not here.
     """
     stem0, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1, stem_zero=True)
     assert rationed == 0
@@ -1111,16 +1307,76 @@ def test_stem_only_shrinks_the_greenwood_margin_WITHOUT_crossing_it() -> None:
         )
         for s in stem0
     )
-    assert peak_w < _CROSSING_T_HA, peak_w
-    assert peak_w / _CROSSING_T_HA == pytest.approx(0.9455, rel=1e-3), peak_w
+    assert peak_w > _CROSSING_T_HA, peak_w  # ⚠ was `<` — the inversion
+    assert peak_w / _CROSSING_T_HA == pytest.approx(1.009052, rel=1e-4), peak_w
+
+
+def test_the_FROZEN_open_season_margin_to_greenwood_is_now_THIN() -> None:
+    """⚠ A NEW pin, and it is about the REFERENCE scenario rather than any candidate.
+
+    The stem-reserve build moved frozen ``open_season`` from 0.8758 of the 14.4248 t/ha
+    Greenwood crossing to **0.966332** — a 12.4 % margin down to 3.4 %. No test guarded
+    that, because every margin pin in this module is written about a *candidate* form;
+    the reference's own clearance was only ever implied by them. It is the kind of
+    number
+    that otherwise gets found later as "when did this get so close?".
+
+    ⚠ **THE W DEFINITION IS A CHOICE AND IS PINNED BOTH WAYS.** ``W`` here is
+    leaf + stem + storage, matching ``test_nitrogen_form.py``, which owns the 14.4248
+    crossing — a borrowed threshold must be read on its owner's basis. But Greenwood's
+    curve is stated against above-ground DRY MATTER, and reserve starch is dry matter,
+    so
+    there is a defensible reading that counts it: that gives **0.980651**. Both are
+    asserted because the verdict is the same either way (still under), and pinning only
+    the flattering one would hide that the choice exists.
+    """
+    states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1)
+    assert rationed == 0
+
+    def peak(include_reserve: bool) -> float:
+        return max(
+            _t_per_ha(
+                s.stocks[LEAF_C].amount
+                + s.stocks[STEM_C].amount
+                + s.stocks[STORAGE_C].amount
+                + (s.stocks[STEM_RESERVE_C].amount if include_reserve else 0.0),
+                sc.DEFAULT_SCENARIO.ground_area,
+            )
+            for s in states
+        )
+
+    on_owners_basis = peak(False) / _CROSSING_T_HA
+    counting_reserve = peak(True) / _CROSSING_T_HA
+    assert on_owners_basis == pytest.approx(0.966332, rel=1e-4)
+    assert counting_reserve == pytest.approx(0.980651, rel=1e-4)
+    assert on_owners_basis < 1.0 and counting_reserve < 1.0, "still under, both ways"
+    # the margin, stated as the thing a reader wants — and the two bases straddle 3 %,
+    # so each is asserted on its own number rather than under one rounded claim:
+    # 3.4 % on the owner's basis, 1.9 % counting the reserve.
+    assert 0.03 < 1.0 - on_owners_basis < 0.04
+    assert 1.0 - counting_reserve < 0.02
+
+    # ...and it was 0.8758 before the build, so the move is attributed, not just noted.
+    off, _r, _ = _run(_without_reserve(sc.DEFAULT_SCENARIO), 1)
+    off_peak = max(
+        _t_per_ha(
+            s.stocks[LEAF_C].amount
+            + s.stocks[STEM_C].amount
+            + s.stocks[STORAGE_C].amount,
+            sc.DEFAULT_SCENARIO.ground_area,
+        )
+        for s in off
+    )
+    assert off_peak / _CROSSING_T_HA == pytest.approx(0.875790, rel=1e-4)
 
 
 def test_the_two_tripwires_move_in_OPPOSITE_directions() -> None:
     """⚠ The clearest demonstration yet that mass and area margins are not one thing.
 
-    Stem-only moves W **toward** the Greenwood crossing (0.876 -> 0.946 of it) and peak
-    LAI **away** from the V-K&S threshold (0.865 -> 0.831 of it), because leaf carbon is
-    downstream of the assimilate stream the bigger stem is taxing. The canopy-regulator
+    Stem-only moves W **toward** the Greenwood crossing (0.966 -> 1.009 of it, i.e. past
+    it) and peak LAI **away** from the V-K&S threshold (0.910 -> 0.886), because leaf
+    carbon is downstream of the assimilate stream the bigger stem is taxing. The
+    canopy-regulator
     work flagged that conflating a *mass* margin with a *leaf-area* one is an ambiguity
     that has bitten this repo twice; here one single-number change pushes them in
     opposite directions at once, so no scalar "how close are we" exists.
@@ -1152,8 +1408,12 @@ def test_the_two_tripwires_move_in_OPPOSITE_directions() -> None:
         )
     assert out["stem0"][0] > out["frozen"][0], out  # the mass margin CLOSES
     assert out["stem0"][1] < out["frozen"][1], out  # the area margin OPENS
-    assert out["frozen"] == pytest.approx((0.8758, 0.8651), rel=1e-3)
-    assert out["stem0"] == pytest.approx((0.9455, 0.8309), rel=1e-3)
+    # ⚠ all four re-measured 2026-08-12 (stem reserves). Was (0.8758, 0.8651) /
+    # (0.9455, 0.8309). THE CLAIM — one single-number change pushes the two margins in
+    # OPPOSITE directions, so no scalar "how close are we" exists — is re-run and holds;
+    # the mass side now crosses 1.0, which makes it sharper rather than different.
+    assert out["frozen"] == pytest.approx((0.966332, 0.910394), rel=1e-4)
+    assert out["stem0"] == pytest.approx((1.009052, 0.885913), rel=1e-4)
 
 
 def test_stem_only_NO_LONGER_rations_the_perennial_chamber_UNDER_EULER() -> None:
@@ -1229,10 +1489,14 @@ def test_stem_only_NO_LONGER_rations_the_perennial_chamber_UNDER_EULER() -> None
     # The trough that used to be a backstop CLAMP (0.008674, reached in free fall) is
     # now
     # a value the dynamics actually reach, and it is 5.3x higher.
+    # re-measured 2026-08-12 (stem reserves + the cessation window): 0.046065 ->
+    # 0.053177, 0.055175 -> 0.056030.
+    # The discharge is unchanged; the trough rose another 15 % and now clears the 0.05
+    # decade floor on its own, which is the next test's subject.
     co2 = [s.stocks[CARBON_POOL].amount for s in stem0]
-    assert min(co2) == pytest.approx(0.046065, rel=1e-3)
+    assert min(co2) == pytest.approx(0.053177, rel=1e-4)
     assert min(s.stocks[CARBON_POOL].amount for s in frozen) == pytest.approx(
-        0.055175, rel=1e-3
+        0.056030, rel=1e-4
     )
     # The discharge is not a horizon artefact: it holds at the long horizon too.
     _, r_stem_long, _ = _run(
@@ -1241,8 +1505,35 @@ def test_stem_only_NO_LONGER_rations_the_perennial_chamber_UNDER_EULER() -> None
     assert r_stem_long == 0
 
 
-def test_stem_only_collapses_the_decade_co2_attractor_below_its_floor() -> None:
-    """The second, independent closure failure: the settled attractor, not a transient.
+def test_stem_only_NO_LONGER_collapses_the_decade_co2_attractor_below_its_floor() -> (
+    None
+):
+    """⚠⚠ **INVERTED 2026-08-12 — THE FLOOR LEG IS DISSOLVED. READ THIS CAREFULLY.**
+
+    This was the SURVIVING leg of the stem-only refusal: the 2026-08-10 humification
+    split discharged the arbitration leg and left the decade CO2 floor plus
+    stationarity.
+    Since the stem-reserve build **no year sits below the floor at all** — at fifteen
+    years and, per section 8, at fifty. ``non_collapsing`` returns True in both the
+    windowed and whole-run forms. Its worst year rose 0.046065 -> **0.053177**.
+
+    **Stationarity is now the only leg left, and section 8 measures exactly how narrowly
+    it stands: ONE same-phase diff at 1.28x its bound, with the next at 0.98x.**
+
+    ⚠⚠ **THIS DOES NOT RE-OPEN THE BRANCH, AND THE RESTRAINT IS THE POINT.** Every
+    number here was moved BY the change being evaluated against them. Re-deciding a
+    refusal inside the commit that moved the tree beneath it is the co-adaptation shape
+    this project has refused repeatedly (the CUE row, the fractionation seed sweep, the
+    consumer chamber twice). Measured, named, left to a successor with the numbers in
+    hand — the same disposal the humification split gave the arbitration leg.
+
+    ⚠ The stationarity FAILURE MODE also changed and is not the one the text below
+    describes: the offending same-phase diffs moved from ``[2, 3]`` to a single ``[4]``,
+    and the series now dips at year 3 rather than year 2 (``argmin`` 2 -> 3).
+
+    ---- what this test measured before the reserve --------------------------------
+
+    The second, independent closure failure: the settled attractor, not a transient.
 
     ``test_decade_stability.test_decade_min_carbon_pool_stationary`` pins the per-year
     CO2 minimum above a 0.05 floor. The frozen tree settled at **0.05484** (min past the
@@ -1312,19 +1603,39 @@ def test_stem_only_collapses_the_decade_co2_attractor_below_its_floor() -> None:
     # past the horizon these guards assume (their ``transient=2`` skips two years; this
     # transient runs about five). Stem-only's refusal on this leg therefore stands, and
     # stands on a longer transient rather than on a settled collapse.
-    assert out["frozen"][0][1] == pytest.approx(0.055175, rel=1e-3)
-    assert out["frozen"][0][-1] == pytest.approx(0.073367, rel=1e-3)
+    # ⚠⚠ RE-MEASURED 2026-08-12 (stem reserves). Was 0.055175 / 0.073367 / 0.074891 /
+    # 0.046065, with the floor guard False. The control still passes both guards.
+    assert out["frozen"][0][1] == pytest.approx(0.056030, rel=1e-4)
+    assert out["frozen"][0][-1] == pytest.approx(0.074271, rel=1e-4)
     assert out["frozen"][1] is True and out["frozen"][2] is True
-    assert out["stem0"][0][-1] == pytest.approx(0.074891, rel=1e-3)
-    assert min(out["stem0"][0][2:]) == pytest.approx(0.046065, rel=1e-3)
-    assert out["stem0"][1] is False, "the floor guard catches it"
-    assert out["stem0"][2] is False, "…and so, now, does stationarity"
+    assert out["stem0"][0][-1] == pytest.approx(0.070617, rel=1e-4)
+    assert min(out["stem0"][0][2:]) == pytest.approx(0.053177, rel=1e-4)
+    # ⚠ THE INVERSION: True where this test's own name said False.
+    assert out["stem0"][1] is True, "the floor guard NO LONGER catches it"
+    assert out["stem0"][2] is False, "stationarity is the only leg still refusing"
+    # ...and no year is below the floor, which is the strong form of the same statement.
+    assert min(out["stem0"][0]) > 0.05, out["stem0"][0]
     # The shape, pinned so "stem-only collapses" cannot be quoted off this test: the
     # tail
-    # is RISING and ends above the floor, and the miss is in the early transient.
+    # is RISING and ends above the floor, and the dip is in the early transient.
     assert out["stem0"][0][-1] > out["stem0"][0][-2] > out["stem0"][0][-3]
-    assert out["stem0"][0][-1] > 0.05
-    assert out["stem0"][0].index(min(out["stem0"][0])) == 2
+    assert out["stem0"][0].index(min(out["stem0"][0])) == 3  # ⚠ was 2
+
+    # ⚠ THE CONTROL. Without it this test asserts a green tree and no longer records
+    # that
+    # the leg it is named for ever refused anything. The pre-build tree still fails the
+    # floor at 0.046065, exactly as committed.
+    off_states, _r, _ = _run(
+        _without_reserve(sc.PERENNIAL_CHAMBER_SCENARIO),
+        LONG_HORIZON_YEARS,
+        resets=True,
+        stem_zero=True,
+    )
+    off = year_summaries(
+        off_states, year_len, lambda seg: min(s.stocks[CARBON_POOL].amount for s in seg)
+    )
+    assert min(off[2:]) == pytest.approx(0.046065, rel=1e-3)
+    assert non_collapsing(off, floor=0.05) is False, "the pre-build tree DID collapse"
 
 
 def test_RK4_survives_stem_only_which_INVERTS_the_pattern_C_established() -> None:
@@ -1362,8 +1673,17 @@ def test_RK4_survives_stem_only_which_INVERTS_the_pattern_C_established() -> Non
             assert rationed == 0, (years, kw)
             if years == LONG_HORIZON_YEARS:
                 lo = min(s.stocks[CARBON_POOL].amount for s in states)
-                # re-measured 2026-08-10: 0.075815/0.075893 -> 0.076829/0.076990
-                assert lo == pytest.approx(0.0769, rel=1e-2), (kw, lo)
+                # re-measured 2026-08-10: 0.075815/0.075893 -> 0.076829/0.076990;
+                # again 2026-08-12 (stem reserves) -> 0.075872/0.076000. Pinned per-case
+                # rather than under one loose band: the pair is only interesting because
+                # the two forms sit ESSENTIALLY TOGETHER, and a shared tolerance wide
+                # enough to hold both is exactly what would stop saying so.
+                expected = 0.076000 if kw else 0.075872
+                assert lo == pytest.approx(expected, abs=1e-6), (kw, lo)
+    # ⚠ the claim the loop exists for, stated as its own assertion: RK4 is insensitive
+    # to
+    # a change Euler's own liveness guards still argue about. 0.17 % apart.
+    assert abs(0.076000 - 0.075872) / 0.075872 < 2e-3
 
 
 # The frozen `sealed_chamber` run's CO2-trough step; both runs are sampled here so
@@ -1401,6 +1721,14 @@ def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went(
     # ``test_decomposition`` ::
     # ``test_every_organic_carbon_pool_is_named_by_the_summary_tuples``
     # now guards the set structurally.
+    #
+    # ⚠⚠ **AND IT HAPPENED A FOURTH TIME, 2026-08-12 — ON THE OTHER TUPLE.** The stem
+    # reserve is PLANT carbon, so the structural guard above (which owns the SOIL set)
+    # could not see it, and the ``tissue`` sum below is local to this test and ungated.
+    # The identity broke by 4.243e-04 and read like a conservation bug in the engine; it
+    # was this tuple. Folding ``stem_reserve_c`` in closes it to 1.776e-15 and gives a
+    # sealed total of exactly 4.017000000. **The lesson is not "remember the pool" — it
+    # is that an ungated local tuple reports a test's own omission as a MODEL failure.**
     soil_pools = ("litter_carbon", "microbial_carbon", "humus_carbon")
     snaps = {}
     for label, kw in (("frozen", {}), ("stem0", {"stem_zero": True})):
@@ -1429,26 +1757,38 @@ def test_the_sealed_carbon_inventory_is_CONSERVED_and_the_stem_is_where_it_went(
             "tissue": st.stocks[LEAF_C].amount
             + st.stocks[STEM_C].amount
             + st.stocks[ROOT_C].amount
-            + st.stocks[STORAGE_C].amount,
+            + st.stocks[STORAGE_C].amount
+            + st.stocks[STEM_RESERVE_C].amount,  # ⚠ 2026-08-12, see the note above
             "soil": sum(by_short.get(p, 0.0) for p in soil_pools),
         }
     b, n = snaps["frozen"], snaps["stem0"]
-    assert (b["own_step"], n["own_step"]) == (195, 194), (b["own_step"], n["own_step"])
+    # ⚠ the one-step offset the humification split introduced is GONE (2026-08-12): both
+    # runs trough at 195 again. Kept as an equality on the pair rather than deleted,
+    # because "they trough together" is what licenses the common-step differencing below
+    # and it has now been false once.
+    assert (b["own_step"], n["own_step"]) == (195, 195), (b["own_step"], n["own_step"])
     assert b["step"] == n["step"] == _COMMON_TROUGH_STEP
     # The inventory is closed: what one group gained, the others lost, exactly.
     total_b = b["co2"] + b["tissue"] + b["soil"]
     total_n = n["co2"] + n["tissue"] + n["soil"]
     assert abs(total_n - total_b) < 1e-9, (total_b, total_n)
-    assert total_b == pytest.approx(3.517, rel=1e-6)
+    # re-measured 2026-08-12: 3.517 -> 4.017, and it is EXACT to fifteen digits because
+    # a
+    # sealed chamber's carbon inventory is a constant of the scenario, not a result.
+    assert total_b == pytest.approx(4.017, rel=1e-9)
     d_tissue = n["tissue"] - b["tissue"]
     d_soil = n["soil"] - b["soil"]
     d_co2 = n["co2"] - b["co2"]
     # re-measured 2026-08-10 (humification split). The MECHANISM is unchanged and is
     # what this test exists for: the extra standing stem is funded by the other pools,
     # mostly the soil. The split moves the split of the funding, not the story.
-    assert d_tissue == pytest.approx(0.084649, rel=2e-3), d_tissue
-    assert d_soil == pytest.approx(-0.085210, rel=2e-3), d_soil
-    assert d_co2 == pytest.approx(0.000562, rel=2e-2), d_co2
+    # ...and re-measured again 2026-08-12 (stem reserves), with ``stem_reserve_c`` now
+    # inside ``tissue``. Was 0.084649 / -0.085210 / 0.000562. The MECHANISM is unchanged
+    # a second time, which is the point of keeping this test: the extra standing stem is
+    # still funded almost entirely by the soil.
+    assert d_tissue == pytest.approx(0.063564, rel=2e-3), d_tissue
+    assert d_soil == pytest.approx(-0.063603, rel=2e-3), d_soil
+    assert d_co2 == pytest.approx(0.0000384, rel=2e-2), d_co2
     assert abs(d_tissue + d_soil + d_co2) < 1e-9
     # ⚠⚠ **WHERE THE FUNDING COMES FROM IS THE FINDING, AND IT INVERTED (2026-08-10).**
     # Before the humification split the extra standing stem was drawn ~67 % from the
@@ -1552,6 +1892,15 @@ def _co2_min_of(segment) -> float:
 
 
 def _reprice_series(years: int, stem_zero: bool):
+    """Per-year summaries for the re-price. Returns (co2, leaf, stem, stem+reserve,
+    storage, rationed).
+
+    ⚠ ``stem`` and ``stem_plus_reserve`` are BOTH returned, and section 4 asserts on
+    both, because since 2026-08-12 they are different quantities and the choice changes
+    the headline number a lot: "peak stem +56.6 %" counts ``stem_c`` alone, while
+    counting the reserve as part of the stem — which is what it physically is, starch
+    inside stem tissue — gives +21.6 %. Returning only one would silently pick a side.
+    """
     states, rationed, _ = _run(
         sc.PERENNIAL_CHAMBER_SCENARIO, years, resets=True, stem_zero=stem_zero
     )
@@ -1561,6 +1910,13 @@ def _reprice_series(years: int, stem_zero: bool):
         year_summaries(states, year_len, _peak_leaf_of),
         year_summaries(
             states, year_len, lambda s: max(x.stocks[STEM_C].amount for x in s)
+        ),
+        year_summaries(
+            states,
+            year_len,
+            lambda s: max(
+                x.stocks[STEM_C].amount + x.stocks[STEM_RESERVE_C].amount for x in s
+            ),
         ),
         year_summaries(
             states, year_len, lambda s: max(x.stocks[STORAGE_C].amount for x in s)
@@ -1580,8 +1936,38 @@ def _stationary_verdict(series: list[float]) -> bool:
     )
 
 
-def test_neither_stem_only_guard_is_a_horizon_question() -> None:
-    """⚠ THE FRAMING CORRECTION, and it is cheap enough to pin without a 50-year run.
+def test_the_ONE_REMAINING_stem_only_guard_is_not_a_horizon_question() -> None:
+    """⚠⚠ **2026-08-12: THERE IS ONLY ONE GUARD LEFT TO ASK THIS OF.**
+
+    The stem-reserve build dissolved the FLOOR leg entirely — ``non_collapsing`` is now
+    True in both the windowed and whole-run forms, at fifteen years and at fifty. The
+    question "is the floor verdict a horizon question?" is therefore moot rather than
+    answered: there is no floor verdict left to move. Kept, because what it measured was
+    true of the tree it measured, and because the STATIONARITY half is untouched and is
+    now the whole refusal.
+
+    ⚠ **AND THE STATIONARITY LEG IS NARROW — measured, because "it fails stationarity"
+    and "it fails on one diff at 1.28x its bound" are very different records to hand a
+    successor.** The offending same-phase diff is a single index (was two), and:
+
+        diffs[4] = 0.019309   1.2843x the bound
+        diffs[3] = 0.014731   0.9798x the bound   <- just under
+        diffs[2] = -0.005649  0.3757x the bound
+
+    So the last leg of the stem-only refusal rests on one diff 28 % over a threshold,
+    with the next one 2.0 % under it. The bound is ``0.2 * max(series)`` and the max
+    sits
+    in year 0, which the reserve also moved — so the threshold this is measured against
+    is itself downstream of the change being measured. Stated rather than resolved: the
+    verdict is not this build's to re-decide.
+
+    ⚠ The horizon-invariance claim is now measured with a STRONGER control than before:
+    the offender indices AND ``diffs[4]`` itself are bit-identical at 15 and 50 years,
+    because the series maximum lands in year 0 in both. Appending years cannot move it.
+
+    ---- the framing correction, as written for the two-guard tree -------------------
+
+    ⚠ THE FRAMING CORRECTION, and it is cheap enough to pin without a 50-year run.
 
     The parked question read as "the series has not settled inside the frozen horizon",
     which invites the answer "then run it longer". For the FLOOR guard that answer is
@@ -1611,27 +1997,48 @@ def test_neither_stem_only_guard_is_a_horizon_question() -> None:
     change that raised the series' maximum could in principle loosen the bound enough to
     matter. What is asserted is what was run.
     """
-    co2, _leaf, _stem, _store, rationed = _reprice_series(LONG_HORIZON_YEARS, True)
+    co2, _leaf, _stem, _stemres, _store, rationed = _reprice_series(
+        LONG_HORIZON_YEARS, True
+    )
     assert rationed == 0
 
-    # the committed 15-year readings, reproduced before anything is built on them
-    assert min(co2[2:]) == pytest.approx(0.046065, rel=1e-3)
-    assert co2.index(min(co2)) == 2, "the failing year is the FIRST the guard sees"
-    assert co2[-1] == pytest.approx(0.074891, rel=1e-3)
+    # the 15-year readings, re-measured 2026-08-12 (was 0.046065 / argmin 2 / 0.074891)
+    assert min(co2[2:]) == pytest.approx(0.053177, rel=1e-4)
+    assert co2.index(min(co2)) == 3, "the dip moved a year later"
+    assert co2[-1] == pytest.approx(0.070617, rel=1e-4)
 
-    # the floor guard's verdict is decided by a year no horizon can remove...
-    assert non_collapsing(co2[2:], floor=_DECADE_CO2_FLOOR) is False
-    # ...and, since 2026-08-10, no WINDOW can remove it either: the committed guard
-    # dropped the slice, and the same year decides the whole-run form. Both are pinned
-    # because the pair is the claim — the verdict is window-independent, not re-tuned.
-    assert non_collapsing(co2, floor=_DECADE_CO2_FLOOR) is False
+    # ⚠ THE FLOOR LEG IS GONE — both forms, where both used to be False.
+    assert non_collapsing(co2[2:], floor=_DECADE_CO2_FLOOR) is True
+    assert non_collapsing(co2, floor=_DECADE_CO2_FLOOR) is True
 
-    # and so is stationarity's — locate the offenders rather than assert the verdict
+    # ...and stationarity is what is left. Locate the offender rather than assert the
+    # verdict, and pin HOW FAR OVER it is — a leg carrying a refusal on its own should
+    # not be recorded as a bare boolean.
     scale = max(co2)
+    bound = 0.2 * scale
     diffs = same_phase_diffs(co2, period=2)
-    offenders = [i for i, d in enumerate(diffs) if i >= 2 and abs(d) > 0.2 * scale]
-    assert offenders == [2, 3], offenders
+    offenders = [i for i, d in enumerate(diffs) if i >= 2 and abs(d) > bound]
+    assert offenders == [4], offenders  # ⚠ was [2, 3]
+    assert diffs[4] == pytest.approx(0.019309, abs=1e-6)
+    assert abs(diffs[4]) / bound == pytest.approx(1.2843, abs=1e-3)
+    # the runner-up sits JUST under — the margin the successor needs to see
+    assert abs(diffs[3]) / bound == pytest.approx(0.9800, abs=1e-3)
     assert _stationary_verdict(co2) is False
+
+    # ⚠ the control, so this test still records a tree in which the floor leg refused.
+    off_states, _r2, _ = _run(
+        _without_reserve(sc.PERENNIAL_CHAMBER_SCENARIO),
+        LONG_HORIZON_YEARS,
+        resets=True,
+        stem_zero=True,
+    )
+    off = year_summaries(
+        off_states,
+        len(_weather()),
+        lambda seg: min(s.stocks[CARBON_POOL].amount for s in seg),
+    )
+    assert non_collapsing(off, floor=_DECADE_CO2_FLOOR) is False
+    assert off.index(min(off)) == 2
 
 
 @pytest.mark.slow
@@ -1690,40 +2097,84 @@ def test_the_stem_only_refusal_at_FIFTY_years_with_its_control() -> None:
     — re-deciding it inside the commit that moved its guard is the refused shape, so
     the guard moved without this verdict moving. ``non_collapsing`` is asserted here in
     BOTH forms for that reason: the refusal does not depend on the removed window.
+
+    =================================================================================
+    ⚠⚠ RE-PRICED AGAIN 2026-08-12 (the stem-reserve build), AND THE VERDICT CHANGED.
+    =================================================================================
+
+    Everything above belongs to the pre-reserve tree. What fifty years now say:
+
+    1. **THE FLOOR LEG IS GONE.** ``below == []`` — not one year of fifty sits under
+       0.05, where the pre-reserve tree had year 2 at 0.921x. Its worst year rose
+       0.046065 -> 0.053177. ``non_collapsing`` is True in BOTH forms.
+    2. **THE ATTRACTOR COMPARISON INVERTED.** Stem-only settles at 0.071919 against the
+       control's 0.073668 — **below** the reference, where it used to sit above it
+       (0.075339 vs 0.073291). Claim 1 of the old re-price is now false, and in the
+       direction UNFAVOURABLE to the branch. Recorded plainly: the build did not simply
+       make stem-only look better, it moved both sides and swapped their order.
+    3. **STATIONARITY IS THE WHOLE REFUSAL NOW**, and it rests on ONE same-phase diff at
+       1.28x its bound with the runner-up at 0.99x (measured in the test above, at both
+       horizons). A refusal carried by a single marginal diff is a different object from
+       one carried by two independent guards, and a successor must be handed that.
+    4. **The liveness gate still clears** (0.637504 against the 0.55 bound) and the
+    plant
+       is still not free — but that claim's SIZE now depends on a choice:
+
+    ⚠ **"STEM UP, GRAIN DOWN" MUST SAY WHICH POOLS IT COUNTS.** With the reserve
+    intercepting 40 % of stem growth, ``stem_c`` alone no longer means what it meant:
+    peak stem reads **+57.9 %** counting ``stem_c``, and **+21.6 %** counting
+    ``stem_c + stem_reserve_c``, which is what the stem physically holds. Both are
+    asserted below. The DIRECTION is robust to the choice and the MAGNITUDE is not, so
+    quoting the big number without its basis would be the flattering half of a fork.
+
+    ⚠⚠ **AND THE BRANCH IS NOT RE-DECIDED HERE.** Two of its three legs have now
+    dissolved under changes made for other reasons, and its form-gap objection was
+    removed by this very build (see the module docstring). That is a strong case for
+    revisiting it — and revisiting it *inside the commit that moved every one of its
+    numbers* is exactly the co-adaptation this project refuses. Named as a successor.
     """
-    f_co2, f_leaf, f_stem, f_store, f_r = _reprice_series(_REPRICE_YEARS, False)
-    s_co2, s_leaf, s_stem, s_store, s_r = _reprice_series(_REPRICE_YEARS, True)
+    f_co2, f_leaf, f_stem, f_stemres, f_store, f_r = _reprice_series(
+        _REPRICE_YEARS, False
+    )
+    s_co2, s_leaf, s_stem, s_stemres, s_store, s_r = _reprice_series(
+        _REPRICE_YEARS, True
+    )
 
     # --- the discharged leg must not un-discharge at 3.3x the frozen horizon ---------
     assert f_r == 0, "frozen control rations at 50 yr — the comparison would be void"
     assert s_r == 0, "stem-only rations at 50 yr — the discharge was horizon-bound"
 
     # --- 1. the attractor, subject AND control on the same harness ------------------
-    assert s_co2[-1] == pytest.approx(0.075339, abs=1e-5), "stem-only CO2 attractor"
-    assert f_co2[-1] == pytest.approx(0.073291, abs=1e-5), "frozen CO2 attractor"
-    # the control's asymptote is independently pinned by test_soil_fractionation.py at
-    # 0.073291 — a free cross-harness agreement, and the reason these numbers are usable
+    # ⚠ re-measured 2026-08-12. Was 0.075339 / 0.073291 / 1.5068, with s ABOVE f.
+    assert s_co2[-1] == pytest.approx(0.071919, abs=1e-5), "stem-only CO2 attractor"
+    assert f_co2[-1] == pytest.approx(0.073668, abs=1e-5), "frozen CO2 attractor"
     assert s_co2[-1] > _DECADE_CO2_FLOOR and f_co2[-1] > _DECADE_CO2_FLOOR
-    assert s_co2[-1] / _DECADE_CO2_FLOOR == pytest.approx(1.5068, abs=1e-3)
-    assert s_co2[-1] > f_co2[-1], "stem-only settles ABOVE the reference, not below"
+    assert s_co2[-1] / _DECADE_CO2_FLOOR == pytest.approx(1.4384, abs=1e-3)
+    # ⚠⚠ THE INVERSION, and the assertion is flipped rather than dropped: stem-only now
+    # settles BELOW the reference. The old line read "…ABOVE the reference, not below".
+    assert s_co2[-1] < f_co2[-1], "stem-only now settles BELOW the reference"
     assert max(s_co2[-5:]) - min(s_co2[-5:]) < 1e-6, "and it is genuinely settled"
 
-    # --- 2. the failure is one establishment year, not the attractor ----------------
+    # --- 2. the floor leg has DISSOLVED; stationarity carries the refusal alone ------
     below = [i for i, v in enumerate(s_co2) if v < _DECADE_CO2_FLOOR]
-    assert below == [2], below
+    assert below == [], below  # ⚠ was [2]
     assert [i for i, v in enumerate(f_co2) if v < _DECADE_CO2_FLOOR] == []
-    assert s_co2[2] / _DECADE_CO2_FLOOR == pytest.approx(0.9213, abs=1e-3)
-    assert min(f_co2) == pytest.approx(0.055175, abs=1e-5), "the control's own trough"
-    # both guards still refuse, at fifty years exactly as at fifteen
-    assert non_collapsing(s_co2[2:], floor=_DECADE_CO2_FLOOR) is False
-    assert _stationary_verdict(s_co2) is False
+    # re-measured: the subject's worst year 0.046065 -> 0.053177, now ABOVE the floor;
+    # the control's own trough 0.055175 -> 0.056030.
+    assert min(s_co2) == pytest.approx(0.053177, abs=1e-5), "the subject's worst year"
+    assert min(s_co2) / _DECADE_CO2_FLOOR == pytest.approx(1.0635, abs=1e-3)
+    assert min(f_co2) == pytest.approx(0.056030, abs=1e-5), "the control's own trough"
+    # ⚠ the floor now returns True in BOTH forms, for BOTH runs — four assertions where
+    # three used to be False. Kept in full rather than collapsed: the pair of forms is
+    # what shows the verdict is window-independent, and that is still worth saying when
+    # the verdict is a pass.
+    assert non_collapsing(s_co2[2:], floor=_DECADE_CO2_FLOOR) is True
+    assert non_collapsing(s_co2, floor=_DECADE_CO2_FLOOR) is True
     assert non_collapsing(f_co2[2:], floor=_DECADE_CO2_FLOOR) is True
-    assert _stationary_verdict(f_co2) is True
-    # ...and under the guard AS COMMITTED SINCE 2026-08-10 (no window), unchanged both
-    # ways — which is the point: the re-anchor did not decide this verdict, and the
-    # control clears the whole-run form too, so the removal cost the reference nothing.
-    assert non_collapsing(s_co2, floor=_DECADE_CO2_FLOOR) is False
     assert non_collapsing(f_co2, floor=_DECADE_CO2_FLOOR) is True
+    # ...and stationarity is the one leg still separating subject from control.
+    assert _stationary_verdict(s_co2) is False
+    assert _stationary_verdict(f_co2) is True
     # ⚠ THE COUNTERFACTUAL, and it REFUTED MY OWN HYPOTHESIS. I expected the two guards
     # to be two readings of ONE event (the year-2 trough), which would have made the
     # committed test's "both halves are asserted" independence claim wrong. Splice the
@@ -1735,10 +2186,18 @@ def test_the_stem_only_refusal_at_FIFTY_years_with_its_control() -> None:
     # Year 3 (0.053922) is itself inside the same establishment dip. The accurate
     # statement is that the stationarity failure does not DEPEND on the single sub-floor
     # year, and that both guards fire exclusively within years 2-5.
+    #
+    # ⚠⚠ 2026-08-12: THE COUNTERFACTUAL IS NOW HALF VACUOUS, and saying so is the honest
+    # move. There is no sub-floor year left to splice out, so the floor half asserts
+    # True-from-True and proves nothing. It is KEPT — the stationarity half still
+    # carries
+    # the independence claim the paragraph above is about, and deleting the pair would
+    # quietly retire a refuted hypothesis's own record. The vacuity is named, not
+    # hidden.
     spliced = list(s_co2)
     spliced[2] = f_co2[2]
-    assert non_collapsing(spliced[2:], floor=_DECADE_CO2_FLOOR) is True
-    assert _stationary_verdict(spliced) is False
+    assert non_collapsing(spliced[2:], floor=_DECADE_CO2_FLOOR) is True  # vacuous now
+    assert _stationary_verdict(spliced) is False  # ...this half is not
     assert all(v > _DECADE_CO2_FLOOR for v in s_co2[6:]), "clean from year 6 on"
 
     # --- 3. the MANIFEST-named liveness gate -----------------------------------------
@@ -1748,20 +2207,36 @@ def test_the_stem_only_refusal_at_FIFTY_years_with_its_control() -> None:
     # ⚠ That committed 0.634352 is ``max(tail)``, NOT ``tail[-1]``: the tail declines
     # monotonically, so max(tail) == tail[0] == year 8. My first version of this check
     # compared the wrong element and went red on a correct reconstruction.
+    # ⚠ all four re-measured 2026-08-12: 0.634352 -> 0.637384, 0.594984 -> 0.593883,
+    # 0.643676 -> 0.637504. The gate's VERDICT is unchanged — both clear 0.55 — and the
+    # two runs are now much closer together (0.02 % apart, was 1.5 %).
     f15_leaf = _reprice_series(LONG_HORIZON_YEARS, False)[1]
-    assert max(f15_leaf[_LIVENESS_TRANSIENT:]) == pytest.approx(0.634352, abs=1e-5)
-    assert f_leaf[-1] == pytest.approx(0.594984, abs=1e-5), "the anchored equilibrium"
+    assert max(f15_leaf[_LIVENESS_TRANSIENT:]) == pytest.approx(0.637384, abs=1e-5)
+    assert f_leaf[-1] == pytest.approx(0.593883, abs=1e-5), "the anchored equilibrium"
     assert max(f_tail) > _LIVENESS_FLOOR, "control clears its own floor"
     assert max(s_tail) > _LIVENESS_FLOOR, "⚠ stem-only CLEARS it too — no third leg"
-    assert max(s_tail) == pytest.approx(0.643676, abs=1e-5)
+    assert max(s_tail) == pytest.approx(0.637504, abs=1e-5)
     assert s_leaf[-1] / _DEAD_BASELINE > 2.0, "and it is nowhere near the dead baseline"
 
     # --- 4. the plant is NOT free: read the CO2 gain WITH its cost -------------------
-    assert s_stem[-1] / f_stem[-1] == pytest.approx(1.518, rel=2e-3), "stem UP"
-    assert s_store[-1] / f_store[-1] == pytest.approx(0.882, rel=2e-3), "grain DOWN"
+    # ⚠ THE POOL CHOICE IS LOAD-BEARING HERE, so BOTH readings are asserted. Counting
+    # ``stem_c`` alone the stem is +57.9 %; counting the reserve as the stem carbon it
+    # physically is, +21.6 %. Was 1.518 on a tree with no reserve to argue about.
+    assert s_stem[-1] / f_stem[-1] == pytest.approx(1.5791, rel=2e-3), (
+        "stem UP (stem_c)"
+    )
+    assert s_stemres[-1] / f_stemres[-1] == pytest.approx(1.2164, rel=2e-3), (
+        "stem UP (stem_c + reserve) — same sign, less than half the magnitude"
+    )
+    assert s_stem[-1] / f_stem[-1] > s_stemres[-1] / f_stemres[-1] > 1.0, (
+        "the direction is robust to the pool choice; the magnitude is not"
+    )
+    # grain: -4.5 %, was -11.8 %. The reserve feeds grain in BOTH runs, so the penalty
+    # stem-only imposes on it is smaller than it was — but it is still a penalty.
+    assert s_store[-1] / f_store[-1] == pytest.approx(0.9547, rel=2e-3), "grain DOWN"
     assert s_store[-1] < f_store[-1], (
         "(C)-finding 8's 'stem up, grain down' holds in THIS scenario too"
     )
-    # ⚠ the leaf sign does NOT transfer from open_season (-3.96 % there, +1.98 % here)
+    # ⚠ the leaf sign does NOT transfer from open_season (-2.69 % there, +1.82 % here)
     assert s_leaf[-1] > f_leaf[-1]
-    assert s_leaf[-1] / f_leaf[-1] == pytest.approx(1.0198, rel=2e-3)
+    assert s_leaf[-1] / f_leaf[-1] == pytest.approx(1.0182, rel=2e-3)

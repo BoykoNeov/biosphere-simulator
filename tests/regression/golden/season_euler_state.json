@@ -8,7 +8,7 @@
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.5bfac2608115bp+2",
+      "amount": "0x1.6fdfca7de6d2bp+2",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -21,7 +21,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.308ebf1b0fa5ap-6",
+      "amount": "0x1.147a2d36650cfp-6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -34,7 +34,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.1645a7733b399p+3",
+      "amount": "0x1.27cc43fbf5da7p+3",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -47,7 +47,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.8fed36db4b6bcp+6",
+      "amount": "0x1.8feef82469b68p+6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -73,7 +73,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.37ae63bb79d62p+4",
+      "amount": "0x1.985fe94f69c1bp+3",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -86,7 +86,20 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.669d96e450ac1p+4",
+      "amount": "0x1.8c37ec264f2d9p-1",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.stem_reserve_c",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.0db69ee4d0ce8p+5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -112,7 +125,7 @@
       "unit": "kg"
     },
     {
-      "amount": "-0x1.0b936aabfd447p+7",
+      "amount": "-0x1.113ef94fba452p+7",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -125,7 +138,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.abfb298de3cb5p+5",
+      "amount": "0x1.998bba1b5a612p+5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -138,7 +151,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.86c6df7b8feb2p+4",
+      "amount": "0x1.7592ac0015908p+4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },

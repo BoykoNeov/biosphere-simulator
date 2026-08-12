@@ -41,6 +41,7 @@ from domains.biosphere.loader import (
     load_respiration_params,
     load_root_depth_params,
     load_senescence_params,
+    load_stem_reserve_params,
     load_transpiration_params,
     load_vernalization_params,
     load_water_cycle_params,
@@ -73,6 +74,7 @@ def _scalars() -> list[tuple[str, float]]:
     photoperiod = load_photoperiod_params()
     senesc = load_senescence_params()
     rootd = load_root_depth_params()
+    stemres = load_stem_reserve_params()
     nitro = load_nitrogen_params()
     decomp = load_decomposition_params()
     micro = load_microbial_respiration_params()
@@ -115,6 +117,10 @@ def _scalars() -> list[tuple[str, float]]:
         ("photo.ppsen", photoperiod.ppsen),
         ("rootd.max_extension_rate", rootd.max_extension_rate),
         ("rootd.max_rooted_depth", rootd.max_rooted_depth),
+        ("stemres.remobilizable_fraction", stemres.remobilizable_fraction),
+        ("stemres.remobilization_rate", stemres.remobilization_rate),
+        ("stemres.trigger_dvs", stemres.trigger_dvs),
+        ("stemres.cessation_dvs", stemres.cessation_dvs),
         ("senesc.rdr_leaf", senesc.rdr_leaf),
         ("senesc.rdr_stem", senesc.rdr_stem),
         ("senesc.rdr_root", senesc.rdr_root),

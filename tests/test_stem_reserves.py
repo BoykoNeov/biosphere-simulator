@@ -1,4 +1,20 @@
-"""Stem-reserve remobilization — DIAGNOSED AND PRICED (2026-08-10), NOT built.
+"""Stem-reserve remobilization — DIAGNOSED 2026-08-10, **BUILT 2026-08-12**.
+
+⚠ **THIS FILE WAS WRITTEN FOR A REFUSAL AND NOW GUARDS A BUILD, so read the word
+"frozen" below with care: it means "the tree WITHOUT the reserve", which this file now
+constructs (`_without_reserve`) rather than gets for free from `build_season`.** The
+refusal was never "it does not work" — it was "what it rests on is uncited" — and the
+user overruled it on 2026-08-12 after the retraction of a lead that claimed to unblock
+it (see `docs/plans/post-roadmap-wheat-partition-backfill.md`). So the science below is
+unchanged and every measurement still holds; what moved is which side of the comparison
+is the committed tree.
+
+The consequence for these pins is the one the water-stress build learned by mutation:
+**the candidate must be read out of `src/`, not rebuilt here.** `_build(reserve=True)`
+at the committed parameter values now returns `build_season(scenario)` untouched, so a
+broken wiring fails these tests. The two alternative forms (the constructed one-shot
+fill, the shed-and-pay-maintenance control) are still assembled in this module, because
+they are deliberately NOT in `src/`.
 
 `docs/plans/post-roadmap-stem-reserves.md`. The user's question was the plain one:
 real wheat stems grow, then the plant sheds its seed and the stems die and decompose —
@@ -40,8 +56,9 @@ lands on the grain is ONE WE CONSTRUCTED.**
   reconstruction of ours. (The Greenwood precedent: reading the primary dissolved the
   fork instead of balancing it.)
 
-**Because the real defect is one level up: the DVS-keyed partition table keeps sending
-10 % of every day's growth to the stem right through grain fill.** [A]'s own trigger
+**The real defect one level up is UNCHANGED BY THIS BUILD and is why the trigger is
+ours: the DVS-keyed partition table keeps sending 10 % of every day's growth to the stem
+right through grain fill.** [A]'s own trigger
 for remobilization is "once stems stop growing" — which is not merely unfireable here,
 it is *a statement about [A]'s partition table*, in which the stem fraction reaches
 zero. Ours is `fs = 0.10` at DVS 2.0 with flat extrapolation, and `allocation.yaml`
@@ -50,11 +67,12 @@ the stem; it cannot stop the allocation putting it back. (And [A]'s *other* prog
 form is out of reach for a sibling reason: an overflow fill needs a grain sink that can
 be full, and ours is `fo * DMI` with no capacity at all.)
 
-That is the (C) / canopy-regulator shape a third time — a real, sourced mechanism
-blocked by a *different* missing piece — with one difference that matters: this
-mechanism is **not inert**. It passes every gate the frozen tree passes, on both
+That was the (C) / canopy-regulator shape a third time — a real, sourced mechanism
+blocked by a *different* missing piece — with one difference that decided it: this
+mechanism is **not inert**. It passes every gate the pre-build tree passes, on both
 integrators, on the whole manifest roster and on `sealed_station`, and it moves grain by
-half. So the refusal is "the science underneath it is uncited", not "it does not work".
+half. The refusal was "the science underneath it is uncited", not "it does not work" —
+and a provenance verdict is the user's to make, which is how it came to ship.
 
 ⚠ **The oracle harvest index is NOT a target and is not used as one here.** Two sampled
 variants land within a few parts in ten thousand of it. That is a coincidence of where
@@ -65,8 +83,9 @@ Both forms close every sealed chamber on both integrators — the constructed on
 measured too rather than left as an unmeasured leg, and its discrete one-shot switch was
 the specific reason not to assume RK4 would be fine with it.
 
-Read-only: no `src/`, param, golden or manifest change. The candidate flows live in
-this module.
+No longer read-only: the shipped mechanism is `src/domains/biosphere/stem_reserves.py`
+plus the stem-leg split in `carbon_budget.Allocation`, with its three numbers in
+`params/stem_reserves.yaml`. Only the ALTERNATIVES live in this module.
 """
 
 from __future__ import annotations
@@ -94,6 +113,7 @@ from domains.biosphere.loader import (
     load_canopy_params,
     load_nitrogen_params,
     load_phenology_params,
+    load_stem_reserve_params,
 )
 from domains.biosphere.mineralization import NitrogenSenescence
 from domains.biosphere.nitrogen import nitrogen_stress_factor
@@ -112,6 +132,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.stem_reserves import StemRemobilization
 from domains.biosphere.stocks import pool_stock
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
@@ -160,6 +181,16 @@ REMOB_RATE = 0.1
 # fire in this tree. §3.2.4 states the weaker availability condition — reserves are
 # "available for redistribution AFTER FLOWERING" — and that is what is substituted.
 TRIGGER_DVS = 1.0
+# The window's UPPER end (added 2026-08-12 on the user's call). [A]'s **Listing 3 Line
+# 114** — the run-control line of the very module whose Lines 17, 35 program this
+# mechanism — reads ``FINISH DS = 2., CELVN = 3.``, and the prose says it twice (§3.1.4
+# p. 81, §3.4.2 p. 105). ⚠ Read at its exact strength: ``FINISH`` is RUN CONTROL, so the
+# book does not say "remobilization ceases at maturity" — it says its model DOES NOT
+# EXIST past maturity. Our tree has no ``FINISH``: DVS merely CAPS at 2.0 and the season
+# keeps stepping, so `open_season` spends 11 steps and `sealed_chamber` TWO YEARS past
+# maturity. The number is the source's DOMAIN BOUNDARY, and using it is a decision
+# not to extrapolate the form outside the program that defines it.
+CESSATION_DVS = 2.0
 
 # The committed oracle fixture, quoted in `allocation.py`'s own docstring: "TWSO ~ 11.5
 # of TAGP ~ 20.4 t/ha (grain is ~half the biomass)". A DIAGNOSTIC, never a fit target.
@@ -189,11 +220,16 @@ class _GrowthFractionFill:
     A post-process of the frozen flow's own legs, so the partition maths cannot drift
     from the frozen one (the recomputation hazard `NitrogenSenescence` documents,
     avoided by construction rather than by care).
+
+    ⚠ It carries the SAME `cessation_dvs` window the shipped fill does, so every
+    variant this file compares differs only in the FORM being tested. Gating one side
+    and not the other makes every comparison below a measurement of the window instead.
     """
 
     inner: Allocation
     reserve: StockId
     fstr: float
+    cessation_dvs: float = CESSATION_DVS
 
     @property
     def id(self) -> FlowId:
@@ -205,6 +241,15 @@ class _GrowthFractionFill:
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         res = self.inner.evaluate(snapshot, env, dt)
+        if (
+            development_stage(
+                snapshot.aux.get(self.inner.thermal_time_aux, 0.0),
+                tsum_anthesis=self.inner.pheno.tsum_anthesis,
+                tsum_maturity=self.inner.pheno.tsum_maturity,
+            )
+            >= self.cessation_dvs
+        ):
+            return res  # past maturity the whole stem leg stays in the stem
         legs: list[Leg] = []
         diverted = 0.0
         for leg in res.legs:
@@ -275,6 +320,7 @@ class _Remobilization:
     pheno: PhenologyParams
     rate: float
     trigger_dvs: float
+    cessation_dvs: float = CESSATION_DVS
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         dvs = development_stage(
@@ -282,7 +328,7 @@ class _Remobilization:
             tsum_anthesis=self.pheno.tsum_anthesis,
             tsum_maturity=self.pheno.tsum_maturity,
         )
-        if dvs < self.trigger_dvs:
+        if not self.trigger_dvs <= dvs < self.cessation_dvs:
             return FlowResult(legs=())
         flux = self.rate * snapshot.stocks[self.reserve].amount * dt
         if flux == 0.0:
@@ -337,6 +383,20 @@ def _stem_zero(flows: list[object]) -> list[object]:
     return out
 
 
+def _without_reserve(scenario):
+    """The tree as it stood before 2026-08-12 — the control every claim here is against.
+
+    ⚠ **This used to be plain ``build_season(scenario)``, and the change is the whole
+    point of this file's rewrite.** When the mechanism was NOT BUILT, the committed tree
+    *was* the control and every candidate was assembled here in the test. Now the
+    mechanism ships, so the control has to be constructed instead — and the candidate
+    must be **read out of ``src/``** rather than rebuilt beside it. A test that builds
+    its own copy of the science it is checking passes whatever the wiring does, which is
+    exactly the tautology the water-stress build caught in its own pins by mutation.
+    """
+    return dataclasses.replace(scenario, stem_reserves=False)
+
+
 def _build(
     scenario,
     *,
@@ -347,8 +407,44 @@ def _build(
     fstr: float = FSTR_WHEAT,
     rate: float = REMOB_RATE,
     trigger: float = TRIGGER_DVS,
+    cessation: float = CESSATION_DVS,
 ) -> tuple[State, Registry]:
-    state, registry = build_season(scenario)
+    # ``reserve=True`` with every parameter at its committed value IS the shipped tree —
+    # taken from ``build_season`` untouched, so these pins break when the wiring breaks.
+    # Off-default parameters and the two alternative forms still have to be assembled
+    # here, because they are deliberately NOT in ``src/``; those are built on the
+    # reserve-off base so the shipped mechanism cannot double up with them.
+    shipped_params = (
+        fstr == FSTR_WHEAT
+        and rate == REMOB_RATE
+        and trigger == TRIGGER_DVS
+        and cessation == CESSATION_DVS
+    )
+    if reserve and not snapshot_fill and not reserve_is_shed:
+        state, registry = build_season(scenario)
+        flows = list(registry.flows)
+        if not shipped_params:
+            flows = [
+                dataclasses.replace(f, fstr=fstr, reserve_cessation_dvs=cessation)
+                if isinstance(f, Allocation)
+                else dataclasses.replace(
+                    f,
+                    params=dataclasses.replace(
+                        f.params,
+                        remobilization_rate=rate,
+                        trigger_dvs=trigger,
+                        cessation_dvs=cessation,
+                    ),
+                )
+                if isinstance(f, StemRemobilization)
+                else f
+                for f in flows
+            ]
+        if stem_zero:
+            flows = _stem_zero(flows)
+        return state, Registry(flows, state.stocks, registry.aux_processes)  # type: ignore[arg-type]
+
+    state, registry = build_season(_without_reserve(scenario))
     flows: list[object] = list(registry.flows)
     if reserve:
         stocks = dict(state.stocks)
@@ -358,7 +454,7 @@ def _build(
         pheno = load_phenology_params()
         if not snapshot_fill:
             flows = [
-                _GrowthFractionFill(f, RESERVE_C, fstr)
+                _GrowthFractionFill(f, RESERVE_C, fstr, cessation)
                 if isinstance(f, Allocation)
                 else f
                 for f in flows
@@ -386,6 +482,7 @@ def _build(
                 pheno=pheno,
                 rate=rate,
                 trigger_dvs=trigger,
+                cessation_dvs=cessation,
             )
         )
         if reserve_is_shed:
@@ -420,17 +517,13 @@ def _run(
     resolver = weather_resolver(w, scenario)
 
     def reset(n: int, current: State) -> State:
+        # ⚠ The reserve's dump-to-litter used to be re-implemented here, because
+        # ``annual_reset`` knew nothing about a stock this file invented. It is now part
+        # of the reset itself, so the copy is DELETED rather than left to agree by
+        # coincidence — the ``resow_water_return`` lesson (a mirrored helper that
+        # stopped mirroring and was caught only by a moved trough).
         if n > 0 and n % _YEAR == 0:
-            out = annual_reset(current, scenario)
-            if RESERVE_C in out.stocks and out.stocks[RESERVE_C].amount != 0.0:
-                st = dict(out.stocks)
-                held = st[RESERVE_C].amount
-                st[RESERVE_C] = dataclasses.replace(st[RESERVE_C], amount=0.0)
-                st[LITTER_CARBON] = dataclasses.replace(
-                    st[LITTER_CARBON], amount=st[LITTER_CARBON].amount + held
-                )
-                out = dataclasses.replace(out, stocks=st)
-            return out
+            return annual_reset(current, scenario)
         return current
 
     return run_season(
@@ -556,7 +649,7 @@ def test_the_frozen_stem_never_stops_growing_and_has_no_door_to_the_grain() -> N
     # …and it is still gaining within days of the end of the run.
     assert total.index(max(total)) >= len(total) - 15
 
-    _state, registry = build_season(sc.DEFAULT_SCENARIO)
+    _state, registry = build_season(_without_reserve(sc.DEFAULT_SCENARIO))
     references = set()
     for f in registry.flows:
         if getattr(f, "stem_c", None) == STEM_C:
@@ -574,7 +667,7 @@ def test_the_frozen_stem_never_stops_growing_and_has_no_door_to_the_grain() -> N
     # ⚠ Measured over the WHOLE trajectory, not at one snapshot, and on TWO scenarios,
     # because how often the conditional door is open is scenario-dependent.
     def _door_census(scenario, years, traj):
-        _s, reg = build_season(scenario)
+        _s, reg = build_season(_without_reserve(scenario))
         res = weather_resolver(_weather(years), scenario)
         ever: set[str] = set()
         always: set[str] | None = None
@@ -624,6 +717,44 @@ def test_the_frozen_stem_never_stops_growing_and_has_no_door_to_the_grain() -> N
     )[2]
     assert _sealed_rate / _open_rate > 6.0
 
+    # --- AND THE DOOR THE BUILD ADDED, asserted on the SHIPPED tree ------------------
+    # Everything above is the historical control: it is what the tree did until
+    # 2026-08-12, kept because "the stem never stops growing" is the fact the mechanism
+    # exists to fix and a build that stopped measuring it could not tell you whether it
+    # still did. This half checks the fix is actually wired, which is the assertion the
+    # NOT-BUILT version of this file could not make.
+    _shipped_state, shipped = build_season(sc.DEFAULT_SCENARIO)
+    assert RESERVE_C in _shipped_state.stocks
+    assert _shipped_state.stocks[RESERVE_C].amount == 0.0  # a seedling has no reserve
+    drains = [
+        f
+        for f in shipped.flows
+        if isinstance(f, StemRemobilization) and f.storage_c == STORAGE_C
+    ]
+    assert len(drains) == 1, "exactly one door from the reserve to the grain"
+    assert drains[0].stem_reserve_c == RESERVE_C
+    # ⚠ The property `test_acceptance_gate` leans on by name: the reserve is a clamped,
+    # withdrawn, non-POPULATION carbon stock, and what makes that safe is that its only
+    # withdrawal is FIRST-ORDER IN ITSELF. Asserted by measurement — halve the stock and
+    # the draw halves — rather than by reading the source of the flow.
+    env = weather_resolver(_weather(1), sc.DEFAULT_SCENARIO).bind(states[-1], 1.0)
+    ripe = dataclasses.replace(
+        states[-1],
+        aux={**states[-1].aux, THERMAL_TIME: 10_000.0},
+    )
+    draws = []
+    for held in (2.0, 1.0, 0.0):
+        st = dict(ripe.stocks)
+        st[RESERVE_C] = pool_stock(
+            RESERVE_C, PLANTS, Quantity.CARBON, canonical_unit(Quantity.CARBON), held
+        )
+        legs = drains[0].evaluate(dataclasses.replace(ripe, stocks=st), env, 1.0).legs
+        draws.append(
+            -next(leg.amount for leg in legs if leg.stock == RESERVE_C) if legs else 0.0
+        )
+    assert draws[0] == pytest.approx(2.0 * draws[1], rel=1e-12)
+    assert draws[2] == 0.0  # an empty reserve is drawn on for exactly nothing
+
 
 # =====================================================================================
 # 2. the SOURCED form, OUR reconstruction, and the trade between them
@@ -636,6 +767,17 @@ def test_the_SOURCED_form_fixes_the_STEM_and_overshoots_the_grain() -> None:
     imposed. ⚠ That is near-tautological (fill at 0.40, stand at ~0.40) and is pinned as
     a consistency check on the reading, not as a validation of it: the two coincide only
     while the stem's losses are small.
+
+    ⚠⚠ **RE-MEASURED 2026-08-12 WHEN THE CESSATION WINDOW LANDED, AND ONE CLAIM GOT
+    WEAKER — recorded, not smoothed over.** Before the window the stem+starch *shrank*
+    after flowering (0.9853, "it stops gaining"). It now **gains 3.6 %** (1.0358),
+    because the fill stops at maturity while `allocation.yaml` goes on handing the stem
+    10 % of every day's growth for the 11 post-maturity steps of this season. The
+    headline is intact — the frozen stem gains **61.8 %** over the same span, so the
+    mechanism still takes the shape from "+62 %" to "essentially flat" — but "it stops
+    gaining" is no longer literally true, and pretending otherwise would be the
+    stem-shape half of the same over-claim this file's history is made of. The residual
+    is the partition table again (finding 2), not the reserve.
     """
     states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True)
     assert rationed == 0
@@ -643,10 +785,10 @@ def test_the_SOURCED_form_fixes_the_STEM_and_overshoots_the_grain() -> None:
     a = _anthesis(states)
     starch = _series(states, RESERVE_C)
     assert starch[a] / total[a] == pytest.approx(0.4201, rel=1e-3)
-    assert total[-1] / total[a] == pytest.approx(0.9853, rel=1e-3)  # it STOPS gaining
+    assert total[-1] / total[a] == pytest.approx(1.0358, rel=1e-3)  # 0.9853 un-gated
     hi = _harvest_index(states)
-    assert hi == pytest.approx(0.6487, rel=1e-3)
-    assert hi / ORACLE_HI == pytest.approx(1.1508, rel=1e-3)  # 15 % PAST the reference
+    assert hi == pytest.approx(0.6361, rel=1e-3)
+    assert hi / ORACLE_HI == pytest.approx(1.1285, rel=1e-3)  # 13 % PAST the reference
 
 
 def test_OUR_reconstruction_lands_on_the_grain_and_leaves_the_STEM_growing() -> None:
@@ -658,18 +800,22 @@ def test_OUR_reconstruction_lands_on_the_grain_and_leaves_the_STEM_growing() -> 
     lands on the reference is a reconstruction — which is what makes the refusal
     stronger.
 
-    ⚠ The harvest index landing within 0.04 % of the oracle fixture is a COINCIDENCE OF
+    ⚠ The harvest index landing within 0.2 % of the oracle fixture is a COINCIDENCE OF
     WHERE THIS VARIANT WAS SAMPLED, not a match, and is pinned here with that label so
     it cannot later be quoted as one. The oracle is a diagnostic and never a fit target
     (the standing ruling); the sourced form at `fstr = 0.20` lands on it too, and
     0.20 is Sorghum's row, not Wheat's.
+
+    ⚠ Re-measured 2026-08-12 with the cessation window, which this variant carries too —
+    the fork under test is the FORM, so gating one side only would have turned every
+    comparison in this section into a measurement of the window instead.
     """
     states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True, snapshot_fill=True)
     assert rationed == 0
     total = _stem_total(states)
     a = _anthesis(states)
-    assert total[-1] / total[a] == pytest.approx(1.3494, rel=1e-3)  # still +35 %
-    assert _harvest_index(states) == pytest.approx(0.5635, rel=1e-3)
+    assert total[-1] / total[a] == pytest.approx(1.3527, rel=1e-3)  # still +35 %
+    assert _harvest_index(states) == pytest.approx(0.5627, rel=1e-3)
     # the fill is a genuine one-shot: exactly one step where the reserve rose
     starch = _series(states, RESERVE_C)
     assert sum(1 for i in range(1, len(starch)) if starch[i] > starch[i - 1]) == 1
@@ -681,11 +827,21 @@ def test_OUR_reconstruction_lands_on_the_grain_and_leaves_the_STEM_growing() -> 
 def test_NEITHER_form_fixes_both_halves_and_that_is_the_refusal() -> None:
     """The trade, asserted as one claim so it cannot be quoted half at a time.
 
-    [A]'s own form:      stem shape good (0.985), harvest index 15 % over.
+    [A]'s own form:      stem shape nearly flat (1.036), harvest index 13 % over.
     our reconstruction:  harvest index on the reference, stem shape still +35 %.
+
+    ⚠⚠ **The shape half is now stated against the FROZEN CONTROL rather than against
+    1.0, and that is a re-derivation, not a loosened bound.** Un-gated, the sourced form
+    shrank the stem (0.985) and `growth_shape < 1.0 < snap_shape` said everything in one
+    line. With the cessation window the stem gains 3.6 % after flowering instead of
+    losing 1.5 %, so that line would now be false — and the honest claim it was
+    standing in for is the *ordering*: against a frozen stem that gains 61.8 %, [A]'s
+    form removes almost all of the gain and ours removes about half. Both halves of
+    the trade are asserted here, plus the control, so no number can be quoted alone.
     """
     rows = {}
     for label, kw in (
+        ("frozen", {}),
         ("growth", {"reserve": True}),
         ("snapshot", {"reserve": True, "snapshot_fill": True}),
     ):
@@ -695,9 +851,14 @@ def test_NEITHER_form_fixes_both_halves_and_that_is_the_refusal() -> None:
             total[-1] / total[_anthesis(states)],
             _harvest_index(states) / ORACLE_HI,
         )
+    frozen_shape, _ = rows["frozen"]
     growth_shape, growth_hi = rows["growth"]
     snap_shape, snap_hi = rows["snapshot"]
-    assert growth_shape < 1.0 < snap_shape  # only one of them stops the stem growing
+    # the control first: the untreated stem is the thing both forms are shrinking
+    assert frozen_shape == pytest.approx(1.6184, rel=1e-3)
+    # …and only [A]'s form gets it near flat; ours leaves half the excess growth
+    assert growth_shape < snap_shape < frozen_shape
+    assert abs(growth_shape - 1.0) < 0.05 < abs(snap_shape - 1.0)
     assert abs(snap_hi - 1.0) < abs(growth_hi - 1.0)  # …and it is the other one on HI
     assert growth_hi > 1.10
 
@@ -774,8 +935,20 @@ def test_a_reserve_that_never_drains_moves_NITROGEN_and_the_reason_is_the_target
 def test_the_trigger_is_OURS_and_it_is_near_inert() -> None:
     """The one number [A] does not give us barely matters — peak LAI is IDENTICAL.
 
-    Sweeping DVS 0.0 ... 1.5 moves final grain by 0.7 % and leaves the canopy bit-alike.
-    All the trigger decides is how much starch is standing at its maximum.
+    Sweeping DVS 0.0 ... 1.5 leaves the canopy bit-alike. All the trigger decides is how
+    much starch is standing at its maximum (4.8x across the sweep) and — since
+    2026-08-12 — how long the window is.
+
+    ⚠⚠ **THE CESSATION WINDOW MADE THIS NUMBER MATTER MORE, AND BY HOW MUCH IS THE POINT
+    OF RE-PINNING IT.** Un-gated, the drain ran to the last step of the season whatever
+    the trigger, so an early start only meant a longer thin tail: final grain moved
+    **0.7 %** across the sweep. With an end at maturity the trigger now sets the
+    window's **length**, so the same sweep moves grain **2.3 %** — still small, still
+    the second weakest number in the file by effect, but no longer "0.7 %". The bound is
+    therefore re-derived from the measurement rather than kept at `< 0.01` and the claim
+    quietly restated; and the *shape* of the dependence is asserted too, because it is
+    new: the loss is one-sided, concentrated at the LATE trigger that truncates its
+    own window (DVS 0.0/0.5/1.0 are within 0.12 % of each other, 1.5 is 2.2 % below).
     """
     lais, grains, peaks = [], [], []
     for trig in (0.0, 0.5, 1.0, 1.5):
@@ -785,15 +958,19 @@ def test_the_trigger_is_OURS_and_it_is_near_inert() -> None:
         grains.append(_series(states, STORAGE_C)[-1])
         peaks.append(max(_series(states, RESERVE_C)))
     assert len({_bits(v) for v in lais}) == 1  # the canopy does not notice at all
-    assert (max(grains) - min(grains)) / max(grains) < 0.01
+    assert (max(grains) - min(grains)) / max(grains) == pytest.approx(0.0234, rel=2e-2)
+    # one-sided: only the trigger that eats into its own window costs anything
+    assert (grains[0] - grains[2]) / grains[0] < 0.002
+    assert (grains[0] - grains[3]) / grains[0] > 0.02
     assert max(peaks) / min(peaks) > 4.0  # …while the standing starch varies 4.8x
 
 
 def test_the_fill_fraction_is_the_only_number_that_moves_anything() -> None:
     """And it is the one [A] tabulates — the provenance ranking, inverted.
 
-    Across Table 7's own spread the harvest index runs 0.52 -> 0.69 and Greenwood's `W`
-    runs 13.00 -> 14.55 t/ha, i.e. the tripwire clearance goes from 90 % to past 100 %.
+    Across Table 7's own spread the harvest index runs 0.52 -> 0.67 and Greenwood's `W`
+    runs 13.00 -> 14.54 t/ha, i.e. the tripwire clearance goes from 90 % to past 100 %.
+    (Re-measured 2026-08-12 under the cessation window; the top row still crosses.)
     """
     his, ws = {}, {}
     for fstr in (0.1, 0.2, 0.3, 0.4, 0.5):
@@ -801,34 +978,169 @@ def test_the_fill_fraction_is_the_only_number_that_moves_anything() -> None:
         assert r == 0
         his[fstr] = _harvest_index(states)
         ws[fstr] = _peak_w(states, sc.DEFAULT_SCENARIO)
-    assert his[0.1] == pytest.approx(0.5193, rel=1e-3)
-    assert his[0.5] == pytest.approx(0.6895, rel=1e-3)
+    assert his[0.1] == pytest.approx(0.5160, rel=1e-3)
+    assert his[0.5] == pytest.approx(0.6739, rel=1e-3)
     ordered = [his[k] for k in sorted(his)]
     assert all(a < b for a, b in zip(ordered, ordered[1:], strict=False))  # monotone
-    assert ws[0.4] == pytest.approx(14.1516, rel=1e-3)
+    assert ws[0.4] == pytest.approx(14.1457, rel=1e-3)
     assert (
         ws[0.5] > 14.4248 > ws[0.4]
     )  # Table 7's TOP row crosses the Greenwood tripwire
 
 
 # =====================================================================================
+# 3b. the CESSATION WINDOW — the stem stops feeding the seed (2026-08-12)
+#
+# The user's second question about this mechanism: "the stem should stop feeding the
+# seed at some point — that is closer to reality." It does now, at maturity, and the
+# bound is [A]'s **Listing 3 Line 114** (`FINISH DS = 2., CELVN = 3.`) — the run-control
+# line of the module whose Lines 17/35 ARE this mechanism.
+#
+# ⚠ Read at its exact strength: `FINISH` is RUN CONTROL. [A] does not say remobilization
+# ceases at maturity; it says its program HAS NO STATE there. So what is pinned below is
+# a decision not to extrapolate a form past the program that defines it — never a cited
+# cessation rule. The un-gated control is `cessation=99.0`, which is reachable only from
+# a test (the loader rejects anything above 2), and it reproduces the values this file
+# recorded before the window — that reproduction is what makes the pins below readable
+# as a measurement of the window rather than of a rebuild.
+# =====================================================================================
+def test_the_transfer_actually_STOPS_and_the_ungated_control_reproduces() -> None:
+    """The claim in one line: after maturity, no carbon moves stem <-> reserve at all.
+
+    Both halves are checked at `to_bits()` over the post-maturity tail, because "it
+    stops" is a statement about EVERY step past maturity, not about the last one. The
+    reserve is asserted to be non-zero there — a stopped flow and an empty pool look the
+    same on a trajectory, and only one of them is the mechanism under test.
+    """
+    states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True)
+    assert rationed == 0
+    p = load_phenology_params()
+    dvs = [
+        development_stage(
+            s.aux.get(THERMAL_TIME, 0.0),
+            tsum_anthesis=p.tsum_anthesis,
+            tsum_maturity=p.tsum_maturity,
+        )
+        for s in states
+    ]
+    mature = next(i for i, v in enumerate(dvs) if v >= CESSATION_DVS)
+    assert 0 < mature < len(states) - 1, "the season must actually REACH maturity"
+    starch, grain = _series(states, RESERVE_C), _series(states, STORAGE_C)
+    # the reserve is frozen solid from the first mature step onwards…
+    assert len({_bits(v) for v in starch[mature:]}) == 1
+    # …and it is not merely empty: there is real carbohydrate standing in the dead stem
+    assert starch[mature] > 0.5
+    # …while the grain KEEPS filling, so the run is not simply over (the partition table
+    # still feeds `storage_c` directly — finding 2, and out of this mechanism's scope)
+    assert grain[-1] > grain[mature]
+
+
+def test_the_ungated_control_reproduces_the_values_recorded_before_it() -> None:
+    """`cessation=99` must give back the pre-2026-08-12 numbers, exactly as recorded.
+
+    ⚠ This is the control that makes every re-pinned number in this file honest. Each
+    of them is written as "X, was Y un-gated"; if Y were not reproducible those notes
+    would be unfalsifiable prose. The values below are quoted from the pins as they
+    stood before the window landed, not re-derived from the current tree.
+    """
+    states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True, cessation=99.0)
+    assert rationed == 0
+    total = _stem_total(states)
+    a = _anthesis(states)
+    assert total[-1] / total[a] == pytest.approx(0.9853, rel=1e-3)  # the old stem shape
+    assert _harvest_index(states) == pytest.approx(0.6487, rel=1e-3)  # the old HI
+    assert _series(states, STORAGE_C)[-1] == pytest.approx(34.3956, rel=1e-4)
+    # and the window's whole effect on the grain, stated once as a number
+    gated = _series(_run(sc.DEFAULT_SCENARIO, 1, reserve=True)[0], STORAGE_C)[-1]
+    assert gated / _series(states, STORAGE_C)[-1] - 1.0 == pytest.approx(
+        -0.0198, rel=1e-2
+    )
+
+
+def test_the_two_halves_share_ONE_cessation_number_in_the_shipped_wiring() -> None:
+    """The fill and the drain must stop on the same step, or the reserve is a trap.
+
+    A drain that stopped alone would leave the dead stem stashing starch forever; a fill
+    that stopped alone would just be a shorter fill. They are separate objects
+    (`Allocation` owns the split, `StemRemobilization` owns the draw), so the fact that
+    they read the SAME loaded number is wiring that can silently break — hence a pin on
+    the built tree rather than on the param file.
+    """
+    _, registry = build_season(sc.DEFAULT_SCENARIO)
+    alloc = next(f for f in registry.flows if isinstance(f, Allocation))
+    drain = next(f for f in registry.flows if isinstance(f, StemRemobilization))
+    assert alloc.reserve_cessation_dvs == drain.params.cessation_dvs == CESSATION_DVS
+    # …and the crop that has no reserve carries the inert default on all three fields
+    _, off = build_season(_without_reserve(sc.DEFAULT_SCENARIO))
+    alloc_off = next(f for f in off.flows if isinstance(f, Allocation))
+    assert alloc_off.stem_reserve_c is None
+    assert alloc_off.fstr == 0.0 and alloc_off.reserve_cessation_dvs == 0.0
+    assert not any(isinstance(f, StemRemobilization) for f in off.flows)
+
+
+def test_a_forgotten_cessation_fails_CLOSED_rather_than_running_unbounded() -> None:
+    """The inert default is 0.0, so a half-wired reserve does NOTHING — measured.
+
+    All three of `Allocation`'s reserve fields default to "off", and the cessation's
+    "off" value has to be the one that shuts the mechanism rather than the one that
+    unbounds it. At 0.0 the whole run must come back bit-identical to the crop that has
+    no reserve at all: same stocks, same steps, same bits.
+    """
+    off, _, _ = _run(_without_reserve(sc.DEFAULT_SCENARIO), 1)
+    shut, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True, cessation=0.0)
+    assert rationed == 0
+    assert max(_series(shut, RESERVE_C)) == 0.0  # nothing was ever stashed
+    for sid in (LEAF_C, STEM_C, ROOT_C, STORAGE_C, PLANT_N):
+        assert [_bits(v) for v in _series(shut, sid)] == [
+            _bits(v) for v in _series(off, sid)
+        ], f"{sid} differs — a shut-off reserve is not inert"
+
+
+def test_the_loader_refuses_a_cessation_that_is_unreachable_or_empty(
+    tmp_path: Path,
+) -> None:
+    """⚠ The trap worth a test: DVS is **capped at 2.0**.
+
+    So `cessation_dvs = 2.5` would not postpone the cessation — it would restore exactly
+    the unbounded behaviour the parameter exists to end, while reading like a deliberate
+    choice in the file. Nothing downstream would notice: no golden distinguishes "stops
+    at 2.5" from "never stops", because the stage never gets there. The other end is the
+    mirror: at or below the trigger the window is empty and the mechanism is off while
+    fully wired. Both are rejected where the value is read.
+    """
+    src = Path("src/domains/biosphere/params/stem_reserves.yaml").read_text(
+        encoding="utf-8"
+    )
+    original = "value: 2.0"
+    assert src.count(original) == 1, "cessation is no longer the only 2.0 in the file"
+    for bad in ("2.5", "1.0", "0.5"):
+        path = tmp_path / f"cessation_{bad}.yaml"
+        path.write_text(src.replace(original, f"value: {bad}", 1), encoding="utf-8")
+        with pytest.raises(ValueError, match="cessation_dvs must be in"):
+            load_stem_reserve_params(path)
+
+
+# =====================================================================================
 # 4. where the extra grain comes from
 # =====================================================================================
 def test_the_grain_gain_is_the_TRANSFER_not_the_two_exemptions() -> None:
-    """Three mechanisms are entangled; turning both exemptions off keeps +46.6 %.
+    """Three mechanisms are entangled; turning both exemptions off keeps +46.8 %.
 
     (a) the transfer starch -> grain, (b) starch being outside the maintenance biomass,
     (c) starch not being shed at `rdr_stem`. With (b) and (c) both removed — starch
     treated exactly like stem carbon in every respect except where it eventually goes —
-    the grain is still up 46.6 % of the frozen 53.5 %. The mechanism does what it says.
+    the grain is still up 46.8 % of the full form's 50.4 %. The mechanism does what it
+    says. (Both legs re-measured 2026-08-12 under the cessation window, which costs the
+    full form ~3 points of the +53.5 % it had un-gated; the ratio between them is what
+    this test is about and it is unmoved at 0.98.)
     """
     base = _series(_run(sc.DEFAULT_SCENARIO, 1)[0], STORAGE_C)[-1]
     plain = _series(_run(sc.DEFAULT_SCENARIO, 1, reserve=True)[0], STORAGE_C)[-1]
     stripped = _series(
         _run(sc.DEFAULT_SCENARIO, 1, reserve=True, reserve_is_shed=True)[0], STORAGE_C
     )[-1]
-    assert plain / base - 1.0 == pytest.approx(0.5346, rel=1e-3)
-    assert stripped / base - 1.0 == pytest.approx(0.4957, rel=1e-3)
+    assert plain / base - 1.0 == pytest.approx(0.5042, rel=1e-3)
+    assert stripped / base - 1.0 == pytest.approx(0.4677, rel=1e-3)
     assert stripped / plain > 0.9  # the exemptions are a small part of it
 
 
@@ -836,9 +1148,11 @@ def test_the_frozen_harvest_index_is_LOW_and_the_grain_mass_is_LOWER() -> None:
     """Two different quantities, stated apart — the conflation this repo logs twice.
 
     Against the committed oracle fixture the frozen crop's grain FRACTION is 0.84x and
-    its grain MASS is 0.52x. The reserve takes the mass to 0.80x while taking the
+    its grain MASS is 0.52x. The reserve takes the mass to 0.78x while taking the
     fraction PAST 1.0 — an improvement on one and an overshoot on the other, which is
-    only visible if they are not merged.
+    only visible if they are not merged. (Mass re-measured 0.7983 -> 0.7825 under the
+    2026-08-12 cessation window; the frozen control is untouched by it, which is the
+    half of this pin that has to stay still.)
     """
     frozen, _, _ = _run(sc.DEFAULT_SCENARIO, 1)
     withres, _, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True)
@@ -851,7 +1165,7 @@ def test_the_frozen_harvest_index_is_LOW_and_the_grain_mass_is_LOWER() -> None:
     assert _harvest_index(frozen) / ORACLE_HI == pytest.approx(0.8400, rel=1e-3)
     assert twso_frozen / 11.5 == pytest.approx(0.5202, rel=1e-3)
     assert _harvest_index(withres) / ORACLE_HI > 1.0
-    assert twso_res / 11.5 == pytest.approx(0.7983, rel=1e-3)
+    assert twso_res / 11.5 == pytest.approx(0.7825, rel=1e-3)
 
 
 # =====================================================================================
@@ -912,7 +1226,15 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
     # the CO2 trough EXACTLY at the frozen value, because the trough happens before the
     # single fill event ever fires.
     for scen, years, frozen_min in (
-        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, 0.076380),
+        # ⚠ 0.076380 → 0.076482 on 2026-08-12, and NOT because of the reserve: this
+        # build
+        # re-sized `SEALED_CHAMBER_SCENARIO`'s litter seed 3.0 → 3.5, because the extra
+        # O₂ a reserve-carrying crop releases had lifted the chamber's O₂ trough from
+        # ~0.01 % of its fill to 5.08 % and killed the ≥95 %-depletion contract the
+        # scenario exists for. Recorded here rather than silently re-pinned, because a
+        # number that moves for a reason other than the mechanism under test is exactly
+        # the kind this repo has been caught by before.
+        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, 0.076482),
         # ⚠ 0.085006 → 0.088509 → 0.093346, all on 2026-08-12 and for two different
         # reasons: the soil-water re-basing re-declared the scenario, then `WSFD`
         # ([F] Eqn 15.8) made drought accelerate development. `water_biting` is one of
@@ -980,9 +1302,13 @@ def test_the_reserve_passes_every_manifest_liveness_floor_the_frozen_tree_passes
     # …and the subject passes every one of them.
     r = out["reserve"]
     assert r[0] == 0
-    assert r[1] == pytest.approx(0.055977, rel=1e-4) and r[1] > 0.05
+    # ⚠ Both subject readings moved in the LAST TWO DIGITS when the cessation window
+    # landed (2026-08-12): trough 0.055977 -> 0.056030, fixed point 0.637424 ->
+    # 0.637384. The two CONTROLS above are pinned at their original values and did not
+    # move, which is what says the shift is the window and not the harness.
+    assert r[1] == pytest.approx(0.056030, rel=1e-4) and r[1] > 0.05
     assert r[2] is True and r[3] is True and r[4] is True
-    assert r[5] == pytest.approx(0.637424, rel=1e-4) and r[5] > 0.55
+    assert r[5] == pytest.approx(0.637384, rel=1e-4) and r[5] > 0.55
 
 
 @pytest.mark.slow
@@ -1005,7 +1331,7 @@ def test_the_reserve_RESCUES_stem_onlys_co2_floor_but_not_its_stationarity() -> 
     )
     scale = max(co2)
     assert rationed == 0
-    assert min(co2) == pytest.approx(0.053127, rel=1e-4)
+    assert min(co2) == pytest.approx(0.053177, rel=1e-4)  # 0.053127 before the window
     assert non_collapsing(co2, floor=0.05) is True  # stem-only's 0.046065 leg: FIXED
     assert (
         is_stationary(
@@ -1089,15 +1415,24 @@ def test_option_Bs_litter_C_to_N_identity_survives_the_nitrogen_free_starch() ->
             sc.SEALED_CHAMBER_SCENARIO,
             sc.SEALED_CHAMBER_YEARS,
             False,
-            102.7493,
-            104.2185,
+            # ⚠ 102.7493 → 103.3038 and 104.2185 → 104.9727 on 2026-08-12, from this
+            # build's `litter_carbon0` 3.0 → 3.5 re-size of the scenario (see the CO₂
+            # trough note above), NOT from the reserve. The CLAIM — that the reserve's
+            # nitrogen-free starch leaves option (B)'s emergent litter C:N intact — is
+            # re-measured and holds: the shedding-fed chamber moves 1.6 %, because the
+            # starch drains to grain and never reaches litter at all.
+            103.3038,
+            104.9727,
         ),
         (
             sc.PERENNIAL_CHAMBER_SCENARIO,
             sc.PERENNIAL_CHAMBER_YEARS,
             True,
             10.8900,
-            12.7991,
+            # 12.7991 → 12.7822 on 2026-08-12 with the cessation window: less starch is
+            # standing when the plant dies, so slightly less nitrogen-free carbon is
+            # dumped into litter at the re-sow. The frozen control beside it is unmoved.
+            12.7822,
         ),
     ):
         for kw, expected in (({}, frozen_cn), ({"reserve": True}, res_cn)):

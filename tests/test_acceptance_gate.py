@@ -495,9 +495,31 @@ def test_open_season_has_no_carbon_source_the_gate_can_see() -> None:
     The field crop's carbon source is ``boundary.co2_atmos``: ``unclamped`` (so
     arbitration skips it, decision #13) **and holding 0.0 mol C for the whole run** — a
     BOUNDARY source is a ledger entry, not a reservoir. Every clamped CARBON stock in
-    the scenario is either the plant's own tissue or a sink. So ``assert rationed == 0``
+    the scenario is either the plant's own carbon or a sink. So ``assert rationed == 0``
     in ``test_regression_season.py`` is true by construction with respect to carbon: it
     reports that no flow out-ran a *tissue* pool, never that the crop was well fed.
+
+    ⚠ **The stem reserve (2026-08-12) is the first exception to the POPULATION shorthand
+    this test used to lean on, and it is a real one rather than a bookkeeping quibble.**
+    ``stem_reserve_c`` is clamped, is genuinely withdrawn from, and is a **POOL** — a
+    carbohydrate store is not a population that can go extinct. What licensed the
+    original predicate was never the ``StockKind`` label but the property behind it:
+    the only withdrawal is **first-order in the stock itself** (``rate · reserve``), so
+    it approaches zero as the stock does and can never out-run it. The reserve has that
+    property by construction, so it is named here explicitly instead of the predicate
+    being loosened to "any POOL", which would have let a genuine source through.
+
+    ⚠ **AND THE CENSUS SAW IT WITHOUT BEING TOLD — my first draft of this pin was wrong
+    in a way worth keeping.** I assumed the reserve would land in the ``live`` set
+    beside
+    the three tissue pools and wrote it in. It does not: the gate classifies it
+    ``rate-determined``, with a margin of **exactly 1/(k·dt) = 10**, because that is
+    what
+    a first-order self-limiting draw IS. So the structural property the paragraph above
+    argues for by hand is one the census already measures, and the assertion below reads
+    it rather than restating it. Asserting the margin equals 1/(k·dt) is the strong
+    form:
+    it would go red if the draw ever stopped being first-order in the reserve.
     """
     rows = census("open_season")
     co2 = rows["boundary.co2_atmos"]
@@ -505,18 +527,31 @@ def test_open_season_has_no_carbon_source_the_gate_can_see() -> None:
     assert co2.unclamped and co2.gate == "impossible:boundary"
     assert co2.amount0 == 0.0
 
+    # The one clamped, withdrawn, non-POPULATION carbon stock — allowed by name, with
+    # its self-limiting property asserted rather than assumed (below).
+    donor_controlled = {"biosphere.stem_reserve_c"}
+
     carbon = {sid: e for sid, e in rows.items() if e.quantity is Quantity.CARBON}
     gated = {sid: e for sid, e in carbon.items() if e.gate != "impossible:boundary"}
-    # what remains is tissue + never-withdrawn sinks; no source among them
+    # what remains is the plant's own carbon + never-withdrawn sinks; no source
     assert all(
-        e.kind is StockKind.POPULATION or e.gate == "impossible:never-withdrawn"
-        for e in gated.values()
+        e.kind is StockKind.POPULATION
+        or e.gate == "impossible:never-withdrawn"
+        or sid in donor_controlled
+        for sid, e in gated.items()
     ), gated
+    # ⚠ UNCHANGED from before the reserve: the three tissue pools, and only those.
     assert {sid for sid, e in gated.items() if e.gate == "live"} == {
         "biosphere.leaf_c",
         "biosphere.stem_c",
         "biosphere.root_c",
     }
+    # ...and the reserve is separated STRUCTURALLY rather than by the name-list above,
+    # which is only a backstop. 1/(k*dt) with k = 0.1 /day and dt = 1 day.
+    reserve = rows["biosphere.stem_reserve_c"]
+    assert reserve.kind is StockKind.POOL
+    assert reserve.gate == "rate-determined"
+    assert reserve.min_margin == pytest.approx(1.0 / 0.1, rel=1e-12)
 
 
 def test_the_obvious_fix_would_not_create_a_gate_either() -> None:
@@ -686,7 +721,11 @@ def test_the_litter_pair_became_live_when_it_gained_an_o2_draw() -> None:
         assert entry.gate == "live"
         margin = entry.min_margin
         assert margin is not None
-        assert margin == pytest.approx(90.95231882247269, rel=1e-9)
+        # ⚠ 90.95231882247269 -> this (2026-08-12, stem reserves). It moved in the
+        # SIXTEENTH digit — 1.8e-10 relative — because this margin is set by the rate
+        # constant and only perturbed by the trajectory. The assertion below is the
+        # one that carries the claim, and it did not move at all.
+        assert margin == pytest.approx(90.95231898732729, rel=1e-9)
         # still within 0.05 % of the bare 1/(k*dt) it used to sit on exactly
         assert abs(margin - 1.0 / 0.011) / (1.0 / 0.011) < 5e-4
 
@@ -699,9 +738,15 @@ def test_the_litter_pair_became_live_when_it_gained_an_o2_draw() -> None:
 @pytest.mark.parametrize(
     "scenario,expected,runner_up",
     [
-        ("sealed_chamber", 2.3404741281202655, 9.313939636232975),
-        ("perennial_chamber", 1.5124880369468734, 8.437936564620642),
-        ("consumer_chamber", 2.112066494173573, 8.437936564620642),
+        # ⚠ all three tightest-gate margins re-measured TWICE on 2026-08-12 — the
+        # stem-reserve build, then its cessation window. Was 2.3404741281202655 /
+        # 1.5124880369468734 / 2.112066494173573 before the build. The RUNNER-UP
+        # column is unchanged to the last digit in all three rows through BOTH moves,
+        # because it is a WATER margin and neither touched water — the same
+        # falsifiable half that held in the golden prediction, and it has held twice.
+        ("sealed_chamber", 1.9016721361221138, 9.313939636232975),
+        ("perennial_chamber", 1.552788483797351, 8.437936564620642),
+        ("consumer_chamber", 2.1271916795585084, 8.437936564620642),
     ],
 )
 def test_the_jars_carbon_pool_is_the_only_binding_gate(
@@ -777,9 +822,13 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     # sized margin. The ranking moved; the safety is an order of magnitude, not a
     # threshold breach.
     "open_season": ("biosphere.soil_water", 9.313939636232975),
-    "sealed_chamber": ("biosphere.carbon_pool", 2.3404741281202655),
-    "perennial_chamber": ("biosphere.carbon_pool", 1.5124880369468734),
-    "consumer_chamber": ("biosphere.carbon_pool", 2.112066494173573),
+    # ⚠ 2026-08-12, twice (the stem-reserve build, then its cessation window). Before
+    # the build: 2.3404741281202655 / 1.5124880369468734 / 2.112066494173573. The
+    # IDENTITY of the tightest gate is unchanged in every row through both moves — only
+    # the margin moved — so the ranking claim this table exists for is intact.
+    "sealed_chamber": ("biosphere.carbon_pool", 1.9016721361221138),
+    "perennial_chamber": ("biosphere.carbon_pool", 1.552788483797351),
+    "consumer_chamber": ("biosphere.carbon_pool", 2.1271916795585084),
     "power_bounded_soc": ("power.battery", 11.295323690100386),
     "power_self_discharge": ("power.battery", 11.085836827155921),
     "thermal_equilibrium": ("thermal.node", 257.68121326080376),
@@ -791,10 +840,10 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     "water_recovery": ("eclss.cabin_o2", 35.57253249034074),
     "lighting": ("biosphere.soil_water", 9.313939636232975),
     "harvest": ("biosphere.carbon_pool", 16.666666666666664),
-    "perennial_long_horizon": ("biosphere.carbon_pool", 1.5004031863217981),
-    "consumer_long_horizon": ("biosphere.carbon_pool", 2.112066494173573),
+    "perennial_long_horizon": ("biosphere.carbon_pool", 1.550637502069539),
+    "consumer_long_horizon": ("biosphere.carbon_pool", 2.1271916795585084),
     "sealed_energy_drift": ("power.battery", 11.295323690100386),
-    "sealed_station": ("biosphere.carbon_pool", 5.218197631830118),
+    "sealed_station": ("biosphere.carbon_pool", 5.023213361478883),
 }
 
 
@@ -880,12 +929,35 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     # scenarios — which is exactly the point this test's name carries: the ordering
     # claim is about LIVE gates, and the raw ranking is asserted alongside it so the
     # exclusion stays a measured fact rather than an invisible filter.
-    assert [sid for _m, _s, sid, _g in raw[:2]] == ["biosphere.carbon_pool"] * 2
-    margin3, _s3, sid3, gate3 = raw[2]
+    #
+    # ⚠⚠ RE-MEASURED AGAIN 2026-08-12 (stem reserves), and the count moved BACK: FOUR
+    # ``carbon_pool`` entries now sort below the water pair's 2.0, where the
+    # humification
+    # split had cut it to two. ``sealed_chamber`` fell 2.340 -> 1.902 and
+    # ``consumer_chamber``/``consumer_long_horizon`` sit at 2.125, so the tightest four
+    # are 1.551 / 1.552 / 1.902 and the pair at 2.0 now lands FIFTH.
+    #
+    # ⚠ The count is asserted by MEASUREMENT rather than typed as a literal 4: the
+    # number
+    # has now moved twice in three days (5 -> 2 -> 4) and is plainly an artefact of
+    # where
+    # two unrelated quantities happen to cross, not a property worth freezing. What IS
+    # asserted is the structural claim the qualifier exists for — everything below the
+    # first rate-determined entry is ``carbon_pool``, and the first rate-determined
+    # entry
+    # is the water pair at exactly 2.0.
+    first_rd = next(
+        i for i, (_m, _s, _sid, g) in enumerate(raw) if g == "rate-determined"
+    )
+    assert [sid for _m, _s, sid, _g in raw[:first_rd]] == [
+        "biosphere.carbon_pool"
+    ] * first_rd, raw[:first_rd]
+    assert first_rd >= 2, first_rd
+    margin_rd, _s3, sid_rd, gate_rd = raw[first_rd]
     # the water-cycle pair ties at exactly 2.0; which of the two sorts next is
     # incidental
-    assert sid3 in {"biosphere.condensate", "biosphere.water_vapor"}, raw[2]
-    assert gate3 == "rate-determined" and margin3 == 2.0, raw[2]
+    assert sid_rd in {"biosphere.condensate", "biosphere.water_vapor"}, raw[first_rd]
+    assert gate_rd == "rate-determined" and margin_rd == 2.0, raw[first_rd]
 
     ranked = sorted(
         (margin, scenario, sid)
@@ -949,7 +1021,13 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     fast_min, slow_min = _registry_minima(
         _recorder_for(_TIER2), "biosphere.carbon_pool"
     )
-    assert slow_min == pytest.approx(5.218197631830118, rel=1e-9), "tier2 slow registry"
+    # ⚠ 5.218197631830118 -> this (2026-08-12, stem reserves). The CLAIM is the two
+    # lines
+    # below — that the binding call is the biosphere's, not the cabin's — and the
+    # cabin's
+    # own 1/(k*dt) value did not move at all, which is what makes the comparison
+    # readable.
+    assert slow_min == pytest.approx(5.023213361478883, rel=1e-9), "tier2 slow registry"
     assert fast_min == pytest.approx(16.666666666666664, rel=1e-12), (
         "tier2 fast registry"
     )
@@ -994,10 +1072,16 @@ def test_tripling_the_horizon_now_TIGHTENS_the_perennial_gate() -> None:
     b = census("perennial_long_horizon")["biosphere.carbon_pool"].min_margin
     assert a is not None and b is not None
     assert b < a, (a, b)  # the longer run finds a TIGHTER minimum
-    assert a == pytest.approx(1.5124880369468734, rel=1e-9)
-    assert b == pytest.approx(1.5004031863217981, rel=1e-9)
-    # small: 0.8 %. The claim is that it moved AT ALL, not that it moved far.
-    assert 0.99 < b / a < 1.0
+    # ⚠ re-measured 2026-08-12 (stem reserves): 1.5124880369468734 / 1.5004031863217981.
+    # THE CLAIM SURVIVES AND NARROWED: the 15-year run still finds a tighter minimum
+    # than the 5-year one, but the gap fell from 0.8 % to 0.11 %. Recorded rather than
+    # smoothed — a shrinking gap is exactly how this pin would stop being able to catch
+    # what it was written for, so the band below is tightened to match the measurement
+    # instead of being left wide enough to pass either way.
+    assert a == pytest.approx(1.5527884837973509, rel=1e-9)
+    assert b == pytest.approx(1.5506375020695391, rel=1e-9)
+    # small: 0.11 %. The claim is that it moved AT ALL, not that it moved far.
+    assert 0.998 < b / a < 1.0
 
     c = census("consumer_chamber")["biosphere.carbon_pool"].min_margin
     d = census("consumer_long_horizon")["biosphere.carbon_pool"].min_margin

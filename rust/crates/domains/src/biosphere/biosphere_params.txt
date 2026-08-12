@@ -42,6 +42,10 @@ photo.cpp	0x1.0000000000000p+4
 photo.ppsen	0x1.70a3d70a3d70ap-4
 rootd.max_extension_rate	0x1.26e978d4fdf3bp-6
 rootd.max_rooted_depth	0x1.4cccccccccccdp+0
+stemres.remobilizable_fraction	0x1.999999999999ap-2
+stemres.remobilization_rate	0x1.999999999999ap-4
+stemres.trigger_dvs	0x1.0000000000000p+0
+stemres.cessation_dvs	0x1.0000000000000p+1
 senesc.rdr_leaf	0x1.47ae147ae147bp-6
 senesc.rdr_stem	0x1.47ae147ae147bp-8
 senesc.rdr_root	0x1.47ae147ae147bp-7

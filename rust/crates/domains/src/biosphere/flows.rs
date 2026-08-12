@@ -142,6 +142,23 @@ pub struct Allocation {
     pub pheno: PhenologyParams,
     pub table: Vec<PartitionRow>,
     pub o2_pool: Option<String>,
+    /// Stem-reserve FORMATION: `fstr` of this flow's OWN stem leg is deposited as
+    /// shielded starch instead of structural stem ([E] SS3.2.4 p. 93, Listing 3 L17).
+    ///
+    /// It lives inside the partition split rather than in a flow of its own, and that
+    /// is CORRECTNESS, not tidiness: a separate flow would have to WITHDRAW from
+    /// `stem_c`, and arbitration scales withdrawals against the START-OF-STEP amount, so
+    /// at emergence - where the day's stem growth can exceed the whole seedling stem -
+    /// it would ration. Splitting the deposit cannot: `organ_total` is unchanged, so the
+    /// CO2 and O2 legs never move.
+    ///
+    /// All three fields are the inert defaults (`None` / 0.0 / 0.0) for a crop with no
+    /// reserve, and 0.0 is inert for the cessation too (DVS >= 0 always), so a wiring
+    /// that supplies a stock and a fraction but forgets the bound gets NO split rather
+    /// than an unbounded one - fail-closed, as in the Python.
+    pub stem_reserve_c: Option<String>,
+    pub fstr: f64,
+    pub reserve_cessation_dvs: f64,
 }
 
 impl Flow for Allocation {
@@ -172,13 +189,23 @@ impl Flow for Allocation {
         let root_leg = root * dt;
         let storage_leg = storage * dt;
         let organ_total = leaf_leg + stem_leg + root_leg + storage_leg;
+        // `organ_total` is formed from the WHOLE stem leg, before any reserve split: the
+        // diverted starch is still carbon fixed out of the atmosphere into the plant, so
+        // the CO2 source leg and the O2 release must not move.
         let mut legs = vec![
             leg(&self.co2_atmos, -organ_total)?,
             leg(&self.ctx.leaf_c, leaf_leg)?,
-            leg(&self.ctx.stem_c, stem_leg)?,
-            leg(&self.ctx.root_c, root_leg)?,
-            leg(&self.storage_c, storage_leg)?,
         ];
+        match &self.stem_reserve_c {
+            Some(reserve) if self.fstr != 0.0 && dvs < self.reserve_cessation_dvs => {
+                let diverted = self.fstr * stem_leg;
+                legs.push(leg(&self.ctx.stem_c, stem_leg - diverted)?);
+                legs.push(leg(reserve, diverted)?);
+            }
+            _ => legs.push(leg(&self.ctx.stem_c, stem_leg)?),
+        }
+        legs.push(leg(&self.ctx.root_c, root_leg)?);
+        legs.push(leg(&self.storage_c, storage_leg)?);
         if let Some(o2) = &self.o2_pool {
             legs.push(leg(o2, organ_total)?);
         }
@@ -297,6 +324,72 @@ impl Flow for MaintenanceRespiration {
         }
         legs.push(leg(&self.co2_resp, respired)?);
         FlowResult::new(legs)
+    }
+}
+
+// --- stem-reserve remobilization (the stem feeding the grain) ---------------
+
+/// CARBON `stem_reserve_c -> storage_c` on `trigger <= DVS < cessation` (sum legs = 0).
+///
+/// Mirrors `domains.biosphere.stem_reserves.StemRemobilization`. First-order on the
+/// standing reserve, so the draw is donor-controlled and therefore self-limiting: the
+/// Euler arbitration backstop is structurally unreachable on it.
+///
+/// Outside the window the flow emits NO LEGS AT ALL rather than a zero one - the tree's
+/// idiom for "this flow does not act today".
+///
+/// The window is half-open at BOTH ends. The upper end is [E]'s `FINISH DS = 2.`
+/// (Listing 3 Line 114) and it is STRICT, which is load-bearing rather than stylistic:
+/// our DVS *caps* at 2.0 instead of growing past it, so `<=` would leave the drain
+/// running for the whole post-maturity tail (11 steps on `open_season`, two YEARS on
+/// `sealed_chamber`, which never re-sows) - exactly what the cessation exists to stop.
+///
+/// The window reads DVS off the step-entry snapshot's thermal-time accumulator, the same
+/// read `Allocation` makes, and shares its upper bound with `Allocation`'s
+/// `reserve_cessation_dvs` so the fill and the drain stop on the same step.
+pub struct StemRemobilization {
+    pub id: String,
+    pub stem_reserve_c: String,
+    pub storage_c: String,
+    pub thermal_time_aux: String,
+    pub pheno: params::PhenologyParams,
+    pub params: params::StemReserveParams,
+}
+
+impl Flow for StemRemobilization {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        _env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let dvs = science::development_stage(
+            snapshot
+                .aux
+                .get(&self.thermal_time_aux)
+                .copied()
+                .unwrap_or(0.0),
+            self.pheno.tsum_anthesis,
+            self.pheno.tsum_maturity,
+        );
+        if dvs < self.params.trigger_dvs || dvs >= self.params.cessation_dvs {
+            return FlowResult::new(vec![]);
+        }
+        // Association is load-bearing: float multiplication is not associative, so
+        // `(rate*reserve)*dt` and `rate*(reserve*dt)` can differ in the last bit. This is
+        // the grouping the Python reference uses and the goldens were produced from.
+        let reserve = amt(snapshot, &self.stem_reserve_c);
+        let flux = self.params.remobilization_rate * reserve * dt;
+        if flux == 0.0 {
+            return FlowResult::new(vec![]);
+        }
+        FlowResult::new(vec![
+            leg(&self.stem_reserve_c, -flux)?,
+            leg(&self.storage_c, flux)?,
+        ])
     }
 }
 

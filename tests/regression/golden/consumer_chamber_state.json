@@ -8,7 +8,7 @@
   "rng_seed": "0x0",
   "stocks": [
     {
-      "amount": "0x1.018eda082590bp-2",
+      "amount": "0x1.e19f9e61dc849p-3",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -35,7 +35,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.10119c91d6386p-5",
+      "amount": "0x1.0f25dc3a02616p-5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -48,7 +48,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.01b1a4de40eedp+0",
+      "amount": "0x1.ffc7d8601bf52p-1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -61,7 +61,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.72086473ea1afp-11",
+      "amount": "0x1.3cad5d4cce9e6p-11",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -74,7 +74,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.00851dad4d891p-3",
+      "amount": "0x1.fe5dba516c876p-4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -87,7 +87,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.031d80c6aa854p+0",
+      "amount": "0x1.e28d94f808d10p-1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -100,7 +100,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.bd9cb389c7d77p-13",
+      "amount": "0x1.8c1d7c70b92efp-13",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -113,7 +113,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.6879ad4681eaap-2",
+      "amount": "0x1.59954d7aa8db3p-2",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -126,7 +126,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.164dedd6ead32p-13",
+      "amount": "0x1.e48449426c3aap-14",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -139,7 +139,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.a47664fdb74fdp+8",
+      "amount": "0x1.a47a94c06d1bcp+8",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },
@@ -152,7 +152,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.699a93cfd60cdp-9",
+      "amount": "0x1.40fb1cfe9b94cp-9",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -165,7 +165,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.49936705ef75dp-2",
+      "amount": "0x1.486f2429c6facp-2",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -178,7 +178,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.8ffc59108f15dp+6",
+      "amount": "0x1.8ffccfae60564p+6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -204,7 +204,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.17148095ccf69p-1",
+      "amount": "0x1.53538725a3e70p-2",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -217,7 +217,20 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.e3e20693cf707p-3",
+      "amount": "0x1.358d338f70346p-7",
+      "composition": {
+        "carbon": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.plants",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.stem_reserve_c",
+      "kind": "pool",
+      "quantity": "carbon",
+      "unclamped": false,
+      "unit": "mol"
+    },
+    {
+      "amount": "0x1.199e0ab1a2b84p-1",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },

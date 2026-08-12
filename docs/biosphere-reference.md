@@ -69,12 +69,20 @@ moves every committed golden.
 The flow classes assembled across the canonical scenarios — the frozen flow taxonomy. The
 manifest's `flow_set` is **derived from freshly assembled registries** (the union over the open
 field + the three chambers), never hand-listed, so a flow added to any compartment builder is
-caught by the completeness gate even if no golden exercises it. As frozen, the set is the 21
+caught by the completeness gate even if no golden exercises it. As frozen, the set is the 23
 classes spanning the producer (allocation, the two respirations, senescence, transpiration,
-nitrogen uptake/senescence, the forcing-driven irrigation/fertilization), the decomposer
+**stem-reserve remobilization**, nitrogen uptake/senescence, the forcing-driven
+irrigation/fertilization), the decomposer
 (decomposition, microbial respiration, humus decomposition, and the three carried-nitrogen
 legs), the water cycle (condensation, recycling, root-zone capture), and the consumer
-(grazing, consumer respiration, consumer mortality).
+(grazing, consumer respiration, consumer mortality), plus the soil's `Drainage`.
+
+⚠ **23 since 2026-08-12: `StemRemobilization` was ADDED** by the stem-reserve build
+(`docs/plans/post-roadmap-stem-reserves.md`), together with **one new stock**,
+`stem_reserve_c`. ⚠ The count also absorbs a correction: this line read **21** while the
+manifest held **22**, because `Drainage` was added earlier and the prose was not updated.
+The manifest gate equates the manifest with the tree and **this document is not a side of
+that comparison** — the standing gap, hit again.
 
 ⚠ **21 since 2026-08-11: `RootZoneCapture` was ADDED** by the soil-layers build
 (`docs/plans/post-roadmap-soil-layers.md`), together with **one new stock**,
@@ -133,7 +141,17 @@ the plan doc:**
    pinned in `tests/test_root_depth.py`, whose assertions are mutation-verified for
    exactly that reason.
 
-### The param files — 14 clean-room biosphere param files
+### The param files — 15 clean-room biosphere param files
+
+⚠ **15 since 2026-08-12: `stem_reserves.yaml` was ADDED** by the stem-reserve build —
+four numbers whose provenance ranking is **inverted against what they do**. The only one
+that moves much (`remobilizable_fraction` = 0.40) is the one [E] tabulates (Table 7,
+wheat) and it is **CABO unpublished** data; the drain rate is uncited and measured
+**bit-inert on carbon**; the trigger is **ours** ([E]'s "once stems stop growing" cannot
+fire in this tree); and `cessation_dvs` is [E]'s own program boundary (`FINISH DS = 2.`)
+rather than a value chosen inside it. It is plant-side, so it joined the **crop-param-set
+vocabulary** (9 → 10 names), and **potato does not override it — it switches the mechanism
+off**, because [E] Table 7 gives potato a range where wheat gets a point value.
 
 ⚠ **14 since 2026-08-11: `root_depth.yaml` was ADDED** by the root functional coupling —
 two values, both first-hand from [E] Table 25 p. 137's "Wheat winter" row (Gregory et al.,
@@ -319,6 +337,71 @@ CLAUDE.md already warns about as a second door into the same room: the ceremony 
 honor-system for such a change, so follow it deliberately rather than waiting for a red test.
 
 ### Unfreeze log
+
+- **2026-08-12 — stem-reserve remobilization, and its CESSATION at maturity (+1 flow,
+  +1 stock, +1 param file, 13 goldens, the biosphere manifest).**
+  `docs/plans/post-roadmap-stem-reserves.md`. The mechanism was **diagnosed and refused on
+  2026-08-10** and is built here on the user's explicit call — a provenance judgement that
+  was theirs to make, the same shape as the root-coupling build.
+
+  **What changed.** A new POOL stock `stem_reserve_c` holds the stem's shielded starch.
+  `Allocation` **splits its own stem leg** — `fstr` of it is deposited as starch instead of
+  structural stem ([E] §3.2.4 p. 93, Listing 3 Line 17), which is a re-routing of one
+  deposit rather than a fifth sink, so the CO₂ and O₂ legs are untouched and the flow still
+  balances by construction. A new flow `StemRemobilization` draws the reserve into the
+  grain at `0.1 d⁻¹` (Listing 3 Line 35). `annual_reset` dumps whatever is left to litter
+  with the rest of the dead plant. `params/stem_reserves.yaml` carries the numbers;
+  `SeasonScenario.stem_reserves` switches the mechanism per crop and **potato turns it
+  off**, because [E] Table 7 gives potato a *range* ("0.2-0.4") where it gives wheat a
+  single 0.4 — picking inside someone else's range is our number wearing their name.
+
+  ⚠ **`SEALED_CHAMBER_SCENARIO.litter_carbon0` was re-sized 3.0 → 3.5**, because the extra
+  carbon fixed released enough O₂ to bottom the pool at **5.08 %** of its fill against a
+  scenario whose whole purpose is a ≥ 95 % depletion — the diagnostic it exists to show was
+  abolished. The sweep behind the new value is recorded in `scenario.py` beside it.
+
+  **The cessation (the second half, and the user's second question — "the stem should stop
+  feeding the seed at some point").** As first built, neither half of the mechanism ever
+  stopped: the drain fired at every step from anthesis onward and the fill kept diverting
+  starch for as long as the partition table fed the stem. Measured, the consequence was
+  smaller than it sounds — the reserve peaks at anthesis and **drains 91 %** by season's
+  end — but **3–7 % of the transfer happened after the crop was physiologically dead**, and
+  `sealed_chamber` (which never re-sows) ran **two whole years** past maturity doing it.
+  Both halves now stop at `cessation_dvs = 2.0`.
+
+  ⚠ **That bound is [E]'s own, and it must be read at its exact strength.** Listing 3 —
+  the module whose Lines 17/35 *are* this mechanism — ends at **Line 114** with
+  `FINISH DS = 2., CELVN = 3.`, and the prose says it twice (§3.1.4 p. 81, §3.4.2 p. 105).
+  But `FINISH` is a **run-control** statement: [E] does not say remobilization ceases at
+  maturity, it says its program **has no state there**. So this is the source's *domain
+  boundary*, and using it is a decision **not to extrapolate a form past the program that
+  defines it** — never a cited cessation rule. Our tree has no `FINISH`; its DVS merely
+  caps at 2.0 and the season keeps stepping, which is why the question arises here and not
+  in [E].
+
+  **Science gates, reported.** `open_season`'s two outside-sourced bands **hold, with
+  shrinking margins**: peak LAI **5.4624** (inside 5–8, and 91.0 % of the Van Keulen &
+  Seligman 6.0 threshold, up from 86.5 %), Greenwood's `W` **14.1457 t/ha** (98.1 % of the
+  14.4248 crossing, up from 87.6 %). ⚠ At Table 7's **top** row (sugar-cane, 0.50) `W`
+  crosses — pinned, so the clearance is a measured fact rather than an impression. All four
+  `perennial_long_horizon` liveness gates pass: CO₂ trough **0.056030** (above both the
+  0.05 floor and the frozen 0.055175), stationarity, the leaf floor, and the fixed point
+  **0.637384** > 0.55. `rationed == 0` and no extinction events on every chamber, at 5 and
+  15 years, and under RK4.
+
+  **The golden diff was PREDICTED BEFORE REGENERATION, twice, and both predictions held.**
+  For the cessation the prediction was: the 13 goldens the build already moved, **no
+  fourteenth**, and nothing non-wheat. Measured: **10** moved and 3 did not — and the three
+  that held (`greenhouse`, `lighting`, `harvest`) are the 7-day station runs, which end 287
+  days short of maturity, so the window provably cannot reach them. Potato is bit-identical
+  because its reserve is off.
+
+  ⚠ **Two counts in this document were stale BEFORE this work and are corrected here**:
+  the flow set read "21" while the manifest held **22** (`Drainage` was added by the
+  soil-water re-basing and the prose was not updated), and the param count is now **15**.
+  The manifest gate compares the manifest against the tree; **this prose is not a side of
+  that comparison**, which is exactly the gap already recorded under "the freeze's prose
+  half is ungated".
 
 - **2026-08-12 — `WSFD`, drought-accelerated phenology ([F] Eqn 15.8; NO manifest movement,
   NO frozen golden movement, one non-frozen golden).**
