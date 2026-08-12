@@ -111,7 +111,8 @@ amount at any horizon; both drift summaries **byte-identical**; `rationed == 0` 
 `events == ()` everywhere. Only `water_biting` moves its science, and it is the one scenario
 deliberately re-declared (`soil_moisture_index = 0.05`, chosen against its **own written
 contract** — sustained bite, never fully wilted, crop alive, loop conserved — then swept
-0.10 → 0.02, not fitted to a golden; leaf C 0.8299 → 0.7621). **FINDING 7 — drainage does
+0.10 → 0.02, not fitted to a golden; leaf C 0.8299 → 0.7621 — ⚠ **0.6941 since `WSFD`**,
+the same day, [`water-stress-curves.md`](water-stress-curves.md)). **FINDING 7 — drainage does
 NOT let irrigation alone, and the first draft of the design said it did.** With the store
 physically sized and `DRAINF = 0.3`, a flat 2 mm/day leaves the reference season at
 `FTSW` 0.17 and costs **38 % of the yield**, with 204 kg draining below the root zone —
@@ -155,6 +156,12 @@ consequence of sizing the soil honestly: **a crop rooting to 1.3 m over 1 m² ca
 CROP cap binds). Its old `soil_water0 = 350` hid it — 2.7 m of extractable water in a 15 cm
 layer. It now declares a limited supply and the mechanism it exists to show comes out
 **stronger**: 15× the canopy against the control, where the old declaration gave 2.5×.
+⚠ **RE-MEASURED 2026-08-12, the same day: 16.878× leaf and 8.440× grain**, after `WSFD` made
+drought accelerate development ([`water-stress-curves.md`](water-stress-curves.md)). The
+ratio GREW, and for a reason that has nothing to do with what it measures: the control is
+*more* water-limited than the subject, so the new mechanism costs the control more. **No test
+went red** — `test_soil_layers.py` asserts `> 10×` and `> 7×`, so it had slack, and
+`deep_water` has no golden. The 15× stands as what was true the day it was written.
 ⚠ **And that control had to be rebuilt, silently:** `soil_extractable_water = 0` was the
 "clean" control, but `EXTR` now appears in **two** places — the transfer *and* `TTSW` — so
 zeroing it kills the crop outright instead of isolating the transfer. It is now "drop the
@@ -182,7 +189,16 @@ Rust suite + all 101 cross-port parity checks green**. **NOT built, each a named
 `WSSL` (leaf-area expansion, 0.40) and `WSSD` (phenology, 0.40) — [F] applies the deficit
 factor to **four** processes with different thresholds and we carry one, because there is no
 water-gated leaf-expansion or drought-accelerated development term for the others to attach
-to; runoff and soil evaporation; and making `DROUGHT` actually bite (`FTSW` bottoms at 0.7039
+to ⚠ **[DISCHARGED 2026-08-12, the same day — and this clause is wrong in two ways worth
+leaving visible. (1) "with different THRESHOLDS": `WSSD` is a COEFFICIENT (Table 15.1's own
+caption), and reading it as a threshold priced the build as an `FTSW` comparison it does not
+need. (2) "no water-gated leaf-expansion term to attach to" is the WEAK half of the `WSFL`
+refusal — a claim about our tree, and so erodable by building one; the strong half is about
+[F], whose Box 16.2 applies `WSFL` to the node-driven leaf-area branch and deliberately NOT
+to the carbon-driven `GLAI = GLF·SLA`, the only branch we have. `WSFD` BUILT, `WSFL`
+REFUSED:**
+[`water-stress-curves.md`](water-stress-curves.md)**]**; runoff and soil evaporation;
+and making `DROUGHT` actually bite (`FTSW` bottoms at 0.7039
 — not new, the soil-layers build already recorded that the reachable subsoil *abolishes* that
 cascade; now a one-field change, but it would move a golden's science for a reason outside
 this charge).

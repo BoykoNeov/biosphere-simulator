@@ -455,7 +455,10 @@ N_LIMITED_YEARS: int = 1
 # 1``. Here the whole profile starts at **5 % of the upper limit**, so ``FTSW`` runs
 # 0.05-0.32 and ``f_water`` bottoms at 0.167 — water-limiting gross assimilation all
 # season while the plant survives (leaf C peak 0.7621, storage C 0.2452, against 0.8299
-# / 0.2610 under the retired declaration). Ample-O2 sibling of the perennial chamber
+# / 0.2610 under the retired declaration; ⚠ 0.6941 / 0.3266 since WSFD made drought
+# accelerate development — this is one of only TWO runs in the tree where water limits
+# at all, so it absorbs every water-side change while the frozen roster stays
+# untouched). Ample-O2 sibling of the perennial chamber
 # (``litter_carbon0 = 3``, default O2 = 210) so the carbon story is the clean perennial
 # one and the water bite is the only novelty. Single season, the water-loop total
 # conserved to round-off (measured 9.7500 -> 9.750000 exactly), ``rationed == 0`` /
@@ -681,6 +684,12 @@ DEEP_WATER_SCENARIO: SeasonScenario = SeasonScenario(
     # whole piece of work exists to remove. So the scenario now declares a *limited*
     # supply instead of none, and the mechanism it exists to show comes out STRONGER
     # for it (15× the canopy against the control, where the old declaration gave 2.5×).
+    # ⚠ RE-MEASURED 2026-08-12 after WSFD: 16.878× leaf / 8.440× grain. The ratio GREW
+    # because the CONTROL is more water-limited than the subject, so drought-accelerated
+    # development costs the control more — the number moved for a reason unrelated to
+    # what it measures. Nothing went red (the test asserts > 10× and this scenario has
+    # no golden), which is why it had to be re-measured rather than assumed. See
+    # docs/plans/post-roadmap-water-stress-curves.md.
     #
     # ⚠ 1.0 was CHOSEN after a sweep (0 → 4 mm/day), and that is legitimate HERE for a
     # reason worth stating, because the same session refused two acceptance bounds

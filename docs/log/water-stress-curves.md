@@ -108,7 +108,22 @@ two different causes on one day.** `test_soil_fractionation` and `test_stem_rese
 pin a `water_biting` CO₂ trough: 0.085006 → 0.088509 (the re-basing re-declared the
 scenario) → **0.093346** (this build). Every *claim* those tests make was re-measured and
 still holds; `sealed_chamber`'s trough moved on neither occasion, which is the control.
-**EXIT:** `flow_set` 22 (unchanged), `aux_set` 3 (unchanged), `param_files` 14 (unchanged),
+**FINDING 8 — THE PREDECESSOR'S HEADLINE NUMBER MOVED, AND THE GREEN SUITE SAID NOTHING.**
+`soil-water-rebasing.md` closes finding 10(c) with *"the mechanism it exists to show comes
+out **stronger**: 15× the canopy against the control"*. `deep_water` moved under this build,
+has **no golden**, and its control — the same scenario with `RootZoneCapture` dropped — is
+**more** water-limited than the subject, so `WSFD` costs the control more. Re-measured:
+**15.529× → 16.878× leaf, 7.762× → 8.440× grain.** The ratio GREW, for a reason that has
+nothing to do with what it measures. ⚠ **Nothing went red**: `test_soil_layers.py` asserts
+`> 10×` and `> 7×`, so it had slack, and a passing suite therefore says the *test* has room,
+never that the *number* held. Every recorded copy (the log record, the scenario comment, the
+test's own comment) is now dated rather than overwritten — the 15× was true the day it was
+written. Same shape as `asserted-attributions-rot`, one level out: **a ratio is two numbers,
+and a change that touches only the denominator moves the headline while the subject looks
+untouched.** The same pass re-dated `water_biting`'s recorded peak leaf C (0.8299 → 0.7621 →
+**0.6941**), for the same reason: it is one of only two water-limited runs, so it absorbs
+every water-side change the frozen roster is immune to. **EXIT:** `flow_set` 22 (unchanged),
+`aux_set` 3 (unchanged), `param_files` 14 (unchanged),
 **manifest unchanged**, 1 non-frozen golden, both ports, 2321 Python tests + 21 Rust test
 binaries + all 101 cross-port parity checks green, `git diff src/simcore/` empty. **NOT
 built, each a named successor:** the sink-limited leaf-expansion phase that `WSFL` attaches

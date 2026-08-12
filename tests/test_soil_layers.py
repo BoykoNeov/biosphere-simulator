@@ -418,6 +418,11 @@ def test_reaching_the_subsoil_is_what_saves_the_deep_water_crop() -> None:
     )
     # 15x the canopy and 7x the grain — a STRONGER effect than the 2.5x the previous
     # declaration produced, because the crop is now genuinely supply-limited.
+    # ⚠ 16.878x / 8.440x since WSFD (2026-08-12): the CONTROL is more water-limited than
+    # the subject, so drought-accelerated development costs it more and the ratio GREW.
+    # The bounds below did NOT go red, and that is the point — they had slack, and
+    # `deep_water` has no golden, so nothing here would have told you the headline
+    # number had moved. Re-measured, not assumed (docs/log/water-stress-curves.md).
     assert peak_leaf(subject) > 10.0 * peak_leaf(control)
     assert subject[-1].stocks[STORAGE_C].amount > 7.0 * (
         control[-1].stocks[STORAGE_C].amount
