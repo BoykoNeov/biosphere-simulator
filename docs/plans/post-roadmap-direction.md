@@ -8,6 +8,12 @@ open queue at once and puts it in one order.
 It is a *plan*, not a record. When an item here is finished it earns a line in
 `docs/post-roadmap-log.md`, a file in `docs/log/`, and a memory — and it leaves this doc.
 
+**Discharged so far (2026-08-13, same day):** the documented allowance (§4, first bullet;
+`36d0ae5`), Step 0 **axis 2** — the controller probe (§2, and it came back **negative**,
+which changed three other sections), and §7 **question 2**, the science-vs-product fork
+(answered: stay on science). Struck-through text below is kept deliberately: the reasoning
+that turned out to be wrong is the most useful part of a plan doc to leave visible.
+
 ---
 
 ## 1. Where the project stands
@@ -77,7 +83,7 @@ The freeze names one thing (`Euler / dt = 1`) that is really two: the *integrato
 | **RK4, `dt = 1`** | converged | **still blocked** (`k·h = 1.055`) | ~4× derivative evaluations |
 | **RK4, `dt = ½`** | converged | clears | ~8× |
 | **Kinetic saturation, `dt = 1`** | unmeasured | would clear by construction | needs a *cited* form |
-| **CO₂ setpoint controller, `dt = 1`** | ⚠ **unmeasured — may remove the problem entirely** | ⚠ plausibly clears (see below) | a make-up flow, no step unfreeze |
+| **CO₂ setpoint controller, `dt = 1`** | ❌ **MEASURED 2026-08-13 — fails, worse than the status quo** | ❌ cannot clear (margin 0.47 at 1200 ppm) | ~~no step unfreeze~~ — needs `dt = ¼` |
 
 ⚠ **The `dt = ½` / `dt = ¼` choice is not a runtime question, it is a *ceremony-count*
 question.** The scarce resource is the unfreeze, not the CPU. `dt = ½` clears the parked leaf
@@ -108,29 +114,44 @@ that argues for deciding once:
 - ⚠ The existing multi-rate machinery is **not** a cheap version of this: `simcore.multirate`
   freezes aux by design, so phenology would stop advancing.
 
-### ⚠⚠ The controller may dissolve this whole gate — measure it before deciding
+### ~~⚠⚠ The controller may dissolve this whole gate~~ — MEASURED 2026-08-13, IT DOES NOT
 
-`co2-enrichment-margin.md` says in passing that a chamber CO₂ *controller* "would make this
-whole fragility disappear." Taken literally, that sentence attacks **both** halves of the
-case for a finer step, and section 3 originally filed the controller *behind* this gate on
-the grounds that nothing has priced it. **Unpriced is exactly why it cannot be assumed
-downstream.**
+This subsection asked whether a chamber CO₂ *controller* — real enrichment **holds** a
+concentration rather than charging once — removes the reason to touch the step at all. It
+argued (a) a setpoint near 1000–1200 ppm never approaches the 61.07 ppm compensation point,
+so the science defect **stops existing**, and (b) `k·h = (rate · h)/stock` *falls* when
+`stock` is pinned high while assimilation saturates in `Ci`, so the numerical defect
+plausibly clears too. **Both were measured and both are wrong.** Full record:
+[`../log/co2-controller.md`](../log/co2-controller.md).
 
-- **Against the science half.** The 24 % error matters only because the trajectory dips near
-  61.07 ppm. A controller holding 1000–1200 ppm never approaches the compensation point, so
-  the crossing **stops existing** — at `dt = 1`, with no unfreeze.
-- **Against the numerical half.** `k·h = (rate · h) / stock`. A controller pins `stock` near
-  its setpoint while assimilation, **saturating in `Ci`**, rises far less than proportionally
-  (~1.3–1.5× for a ~4× pool). That drives `k·h` *down*, so the parked leaf branch's **1.055
-  plausibly clears without touching the step at all.**
-
-If both hold, the largest ceremony this project has run would be bought to fix something the
-next scheduled realism move removes anyway. This is measurable for the price of a probe (see
-Step 0) and **must be measured before question 1 in section 7 can be answered honestly**.
+- **(a) is wrong, and in the *opposite* direction.** The crossing was never about the
+  initial charge — it is a **truncation error** that a high, sustained assimilation rate
+  *amplifies*. Holding the sealed chamber at the 357 ppm it already starts from is **four
+  times worse** than letting it deplete (margin 1.3072 → 0.2977, season-low CO₂
+  57.9 → 10.6 ppm, rationing firings 0 → 270), because the uncontrolled chamber
+  **self-limits** and a controller removes that feedback. At 1000–1200 ppm the season-low
+  CO₂ is still ~75 % *below* the floor.
+- **(b) is wrong.** At 1200 ppm the margin is **0.4744** with 210 silent rationing firings.
+  The first setpoint that clears both criteria is **~3000 ppm** (2000 on the consumer
+  chamber), above the 1785 ppm cliff the enrichment record already measured — and it clears
+  by 8 %, against a bound finding 7 calls *emergent*.
+- **And the price runs the wrong way.** The discriminator is a convergence check *within*
+  the setpoint, because the case against the step is a truncation error rather than a
+  threshold crossing. Controlled `dt = 1` at 1200 ppm is **22.2 % low on peak leaf carbon
+  against its own `dt = ⅛`** — seven times the frozen tree's 3.2 %. Where the frozen tree
+  clears at `dt = ½`, the controlled tree needs **`dt = ¼`**. **The controller does not
+  cancel the step gate; it doubles the cost of clearing it.**
+- ⚠ **It also makes "RK4 at `dt = 1`" unbuildable** (hard error at every setpoint tested),
+  coupling the two knobs this section had just separated.
+- ⚠ **This generalizes past the probe.** Arbitration scales against the **start-of-step**
+  level and credits no same-step inflows (`simcore/arbitration.py:75`), so a make-up *flow*
+  is strictly worse for the margin than the dawn state-edit clamp that was measured — which
+  makes that clamp the **upper bound on what any controller can do here**.
 
 ### Recommendation
 
-**Euler at `dt = ½` — conditional on the controller probe coming back negative.** Of the
+**Euler at `dt = ½`. The condition below is DISCHARGED — the controller probe came back
+negative (2026-08-13), so this recommendation stands, and is also the cheaper branch.** Of the
 step options it is the cheapest that is both numerically clean and scientifically correct on
 everything measured; it moves the *answer* toward the converged limit rather than merely
 quieting a guard; and it does not touch the integrator contract, the arbitration backstop's
@@ -138,9 +159,11 @@ Euler-only scope, or any form. RK4 costs more and solves less. Kinetic saturatio
 attractive in principle — it keeps `dt = 1` and touches no integrator contract — but its
 half-saturation constant has to come from a source, and tuned instead it is
 `a-clamp-hides-a-wrong-amount` wearing a mechanism costume. Keep it alive as a shelf search,
-not as a plan. ⚠ If the controller probe clears both criteria at `dt = 1`, this
-recommendation is **withdrawn** and the question becomes "controller or step", which is a
-much cheaper question.
+not as a plan. ~~⚠ If the controller probe clears both criteria at `dt = 1`, this
+recommendation is **withdrawn** and the question becomes "controller or step".~~ **It did
+not clear; the question is "which step" after all.** ⚠ One thing the probe *added* to this
+recommendation: the controller path is not merely "not a substitute" — it is a **`dt = ¼`
+object**, so choosing it would buy the step ceremony *and* an unpriced make-up flow.
 
 ⚠ **The step decision is the user's call, not mine.** Three freeze contracts is the largest
 ceremony this project has run.
@@ -160,25 +183,28 @@ plus the parked `leaf-expansion-blocked` branch, plus the CO₂ enrichment sweep
 recording per run: unclamped arbitration margin, `k·h`, rationing firings, season-low chamber
 CO₂ against 61.07 ppm, peak leaf carbon drift, harvest, and wall-clock.
 
-**Axis 2 — the controller, and this is the one that can cancel axis 1.** A **probe-only
-setpoint controller**: clamp `chamber_co2_mol` to a target each step, *no flow authored, no
-schema touched, nothing that could reach a golden*. Cross it with **Euler at `dt = 1`** on
-the sealed chamber, with and without the parked leaf branch, at setpoints spanning
-1000–1200 ppm. **Two numbers decide it:** season-low chamber CO₂ against 61.07 ppm, and the
-unclamped `k·h`. ⚠ A probe clamp is *not* the controller — a real one is a make-up flow that
-must conserve mass and inherits the O₂ regulator's direction hazard. The probe answers
-*"would a controller remove the problem?"*, never *"is this how to build it?"*
+**~~Axis 2 — the controller, and this is the one that can cancel axis 1.~~ ✅ DONE
+2026-08-13 — it does not cancel axis 1.** Record: [`../log/co2-controller.md`](../log/co2-controller.md);
+design and every table: [`post-roadmap-co2-controller.md`](post-roadmap-co2-controller.md).
+Ran as specified plus two things the specification did not have and needed: an **ambient
+control** (which is what inverted the hypothesis) and a **convergence check within the
+setpoint** (because the case against the step is a truncation error, not a threshold
+crossing, so two numbers at `dt = 1` could not have settled it). Deliberate omission: the
+parked leaf branch was **not** probed — it draws more than the frozen tree, so it cannot
+rescue a margin already below 1 on the lighter tree.
 
 Deliverable: one table that makes the decision **arithmetic instead of a judgement**, and a
 measured answer to the three questions nobody can answer today:
 
-1. Is `dt = ½` enough on all 25 scenarios, or only on the three that were probed?
-2. What does the suite runtime actually become?
-3. **Does a controlled chamber clear both criteria at `dt = 1`?** — if yes, the whole
-   three-contract ceremony may be unnecessary.
+1. Is `dt = ½` enough on all 25 scenarios, or only on the three that were probed? **Open —
+   axis 1 has not run.**
+2. What does the suite runtime actually become? **Open — axis 1.**
+3. ~~**Does a controlled chamber clear both criteria at `dt = 1`?**~~ **ANSWERED 2026-08-13:
+   no, at no realistic setpoint — and the controlled tree needs `dt = ¼` where the frozen
+   tree needs `dt = ½`.**
 
-If `dt = ½` fails anywhere, or if the controller clears at `dt = 1`, the recommendation above
-is wrong and we learn that for the price of a probe.
+If `dt = ½` fails anywhere the recommendation above is wrong, and we learn that for the price
+of a probe. ⚠ **Axis 1 is now the only remaining input to the step decision.**
 
 ---
 
@@ -199,15 +225,19 @@ These should ride the *same* unfreeze, not pay for a second one:
    decision — but the **documented allowance can, and should, land immediately**; see
    section 4.
 
-**And one that has been moved OUT from behind the gate:**
+**And one that was moved out from behind the gate, measured, and moved back:**
 
 3. **The chamber CO₂ *controller*.** Real enrichment holds a concentration; `chamber_co2_mol0`
-   charges once and the crop eats it. This was filed here as *"the next realism move once the
-   step is settled"* — **that ordering was wrong.** The controller may remove the reason to
-   settle the step at all (section 2), so its *probe* runs **before** the decision, in Step 0.
-   ⚠ Building the real thing is still unpriced and still not cheap: a make-up flow is the O₂
-   regulator's shape and inherits its direction hazard, and `authored ≠ validated` applies.
-   Probe first, price second, build third.
+   charges once and the crop eats it. It was filed here as *"the next realism move once the
+   step is settled"*, then moved ahead of the gate on the grounds that it might cancel it.
+   **Measured 2026-08-13 ([`../log/co2-controller.md`](../log/co2-controller.md)): it does
+   not.** It belongs here after all — now for a *measured* reason instead of an unpriced one,
+   and with a price attached: **a controller is a `dt = ¼` object**, needing a finer step than
+   the frozen tree does, so it rides the same unfreeze rather than replacing it. ⚠ Its other
+   costs are untouched by the probe: a make-up flow is the O₂ regulator's shape and inherits
+   its direction hazard, `authored ≠ validated` applies, and a two-sided setpoint **vents**
+   (235 of 429 mol at the passing setpoint), which is an odd thing for a habitat whose purpose
+   is closing the carbon cycle.
 
 ---
 
@@ -265,22 +295,25 @@ This is a genuine fork and it belongs in the plan as one:
 No recommendation here — it depends on what the user wants the project to be, which is not
 a technical question.
 
+✅ **ANSWERED 2026-08-13: stay on biosphere science.** The product track stays dormant, but
+now **by decision rather than by default**, which was the whole point of writing this section.
+It is not closed — re-open it at a natural stop in the science thread.
+
 ---
 
 ## 6. Proposed order
 
-0. **The documented allowance** — free, no ceremony, do it now. Section 4.
-1. **Step 0, the measurement pass — both axes** — probes only, no ceremony, no risk. Makes the
-   step decision arithmetic *and* tests whether it is needed at all.
-   *Do this regardless of which way the decision goes.*
-2. **The step decision** — the user's call, informed by (1). ⚠ **Which question it even is
-   depends on (1):** if the controller probe clears at `dt = 1`, the question is "controller
-   or step", not "which step".
-3. **Then one of:**
-   - **the controller path** — price the make-up flow properly, build it, no step unfreeze; or
-   - **one ceremony**, carrying the step change + the leaf mechanism with a re-measured
-     evidence base + the chamber-CO₂ science band. Three contracts, one unfreeze, one Rust
-     parity re-measure, one CI-goldens hazard.
+0. ✅ **The documented allowance** — DONE 2026-08-13 (`36d0ae5`), free, no hash moved.
+1. **Step 0, the measurement pass — both axes.** ✅ **Axis 2 (the controller) DONE
+   2026-08-13** — negative, see section 2. **Axis 1 (the step sweep) is still open, and is
+   now the only remaining input to the decision.**
+2. **The step decision** — the user's call, informed by (1). ~~⚠ Which question it even is
+   depends on (1).~~ **Settled: it is "which step".**
+3. **Then: one ceremony**, carrying the step change + the leaf mechanism with a re-measured
+   evidence base + the chamber-CO₂ science band. Three contracts, one unfreeze, one Rust
+   parity re-measure, one CI-goldens hazard. (*The alternative branch — "the controller path,
+   no step unfreeze" — was measured out; a controller needs a finer step than the frozen tree
+   does.*)
 4. **In parallel, independent of all of the above:** `Γ*`'s citation, the two contract
    hygiene holes, the canopy regulator, potato stage 2.
 5. **Separately and explicitly: the product-track fork** in section 5.
@@ -289,11 +322,14 @@ a technical question.
 
 ## 7. The open questions for the user
 
-1. ⚠ **The step — but not yet.** This question cannot be put honestly until Step 0's
-   controller axis has run, because the controller may remove the reason to ask it. Once it
-   has: Euler `dt = ½`, Euler `dt = ¼` (more headroom for the next mechanism, one ceremony
-   instead of two), the controller at `dt = 1`, kinetic saturation, RK4, or hold and accept a
-   documented deviation with the leaf mechanism refused. ⚠ When it *is* put: quote both the
-   24 % (season minimum) and the ~3 % (headline outputs), not the 24 % alone.
-2. **The fork.** Stay on biosphere science, wake the Godot/Rust product track, or alternate?
-   ⚠ This one is answerable today — it does not depend on Step 0.
+1. **The step. Unblocked as of 2026-08-13** — the controller axis has run and does not remove
+   the reason to ask. The live options are: Euler `dt = ½`, Euler `dt = ¼` (more headroom for
+   the next mechanism, one ceremony instead of two), kinetic saturation (needs a *cited*
+   form), RK4 `dt = ½`, or hold and accept the now-documented deviation with the leaf
+   mechanism refused. ~~the controller at `dt = 1`~~ is off the menu — measured. ⚠ When it is
+   put: quote both the 24 % (season minimum) and the ~3 % (headline outputs), not the 24 %
+   alone. ⚠ And say plainly whether it is being put *before* axis 1, in which case the
+   candidate steps' **prices across all 25 scenarios are unmeasured**.
+2. ✅ **The fork — ANSWERED 2026-08-13: stay on biosphere science.** The Godot/Rust product
+   track stays dormant by decision now rather than by default. Section 5 stands as the record
+   of what is parked; re-open it when the science thread reaches a natural stop.
