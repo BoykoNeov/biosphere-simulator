@@ -29,6 +29,15 @@ So: **this file is the index, plus a pointer table into `docs/log/`.** New work 
 line to the index, one pointer row, and one file in `docs/log/` — and adds nothing to
 `CLAUDE.md`. The paired test fails if a row exists on one side and not the other.
 
+⚠ **One plan doc on disk is deliberately not in the index below: `post-roadmap-direction.md`.**
+It is the only *forward-looking* plan here — the consolidated read of the whole open queue,
+written 2026-08-13 — so it has no finished work behind it and therefore no file in
+`docs/log/`. Naming it in the index would break the index↔record pairing for the right
+reason and the wrong way, so it is named here instead. **When its items are executed they
+each earn the normal three (index line, pointer row, record file) and this paragraph goes
+with the doc.** Anything else on disk matching `post-roadmap-*.md` and missing from the
+index is a bug, and `test_every_plan_doc_is_indexed` still catches it.
+
 ⚠ Prose elsewhere in the tree still points at "the CLAUDE.md status row" (the
 compose-gap discipline: *re-read the status row for the bucket you closed*). That rule
 survives both moves; **its target is now the item's file in `docs/log/`** — the index line

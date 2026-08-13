@@ -64,6 +64,42 @@ daily canopy flux is not RK4-refinable. The integrator + dt have **no importable
 **documented** in the manifest and **enforced by the goldens** — an integrator or dt switch
 moves every committed golden.
 
+#### ⚠ KNOWN DEVIATION (recorded 2026-08-13, undecided): the shipped step crosses the CO₂ compensation point
+
+The lock above is a **choice**, and as of 2026-08-13 the price of that choice has been
+measured and is **not zero**. Recorded here rather than fixed, because fixing it is a
+three-contract unfreeze that has not been authorized. Full record and method:
+[`log/co2-enrichment-margin.md`](log/co2-enrichment-margin.md) and
+[`log/allocation-headroom.md`](log/allocation-headroom.md); the open decision is
+[`plans/post-roadmap-direction.md`](plans/post-roadmap-direction.md).
+
+- **The sealed chamber's season-low chamber CO₂ is `57.9 ppm` on the frozen tree.** FvCB
+  assimilation is `max(0, min(Ac, Aj))` and both branches carry `(Ci − Γ*)`, so with
+  `Γ* = 42.75` and `ci_ratio = 0.7` the crop **cannot** draw the chamber below
+  `Ca = 61.07 ppm`. The frozen run goes below it — **the reference fixes carbon at
+  concentrations where the reference says it fixes none.** ⚠ `Γ*` is one of
+  `photosynthesis.yaml`'s `TODO(cite)` entries, so the *crossing* is robust and the
+  *number* 61.07 is provisional.
+- **The mechanism is truncation, not biology.** The withdrawal is computed at the
+  start-of-step concentration and applied for a whole day, so a step that starts above the
+  shutoff and ends below it never re-evaluates. Under RK4 the same quantity pins at
+  ~76 ppm at every CO₂ charge; under step refinement it **converges** 57.9 → 75.1 → 75.8 →
+  76.0 ppm, both integrators approaching from opposite sides.
+- **Two numbers, of different strength, and they must be quoted together.** Season-low
+  chamber CO₂ is **24 % low** (57.9 against a converged 76.3) — a tail statistic on the
+  most sensitive observable in the run. **Headline outputs move ~3 %** (peak leaf carbon
+  3.2 %). Neither figure alone is an honest summary.
+- **It is not a guard failure.** Arbitration rations zero times, every golden gate is
+  green, and every `science_band` passes. A `science_bands` entry of the right shape
+  (*"the sealed chamber's season-low CO₂ stays above the compensation point"*) would have
+  caught this on day one — and is **red on the frozen tree today**, which is why this
+  paragraph exists instead of that assertion.
+- **Direction of the error:** it runs the wrong way for a realism claim. At 4× chamber CO₂
+  the shipped integrator **overstates** peak plant carbon by 4.3 % against RK4.
+
+Nothing in the manifest moves for this note (the freeze's prose half is ungated); it is a
+disclosure, not an unfreeze.
+
 ### The flow set + the aux processes
 
 The flow classes assembled across the canonical scenarios — the frozen flow taxonomy. The
