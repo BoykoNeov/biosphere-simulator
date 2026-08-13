@@ -129,18 +129,24 @@ plausibly clears too. **Both were measured and both are wrong.** Full record:
   *amplifies*. Holding the sealed chamber at the 357 ppm it already starts from is **four
   times worse** than letting it deplete (margin 1.3072 → 0.2977, season-low CO₂
   57.9 → 10.6 ppm, rationing firings 0 → 270), because the uncontrolled chamber
-  **self-limits** and a controller removes that feedback. At 1000–1200 ppm the season-low
-  CO₂ is still ~75 % *below* the floor.
-- **(b) is wrong.** At 1200 ppm the margin is **0.4744** with 210 silent rationing firings.
-  The first setpoint that clears both criteria is **~3000 ppm** (2000 on the consumer
-  chamber), above the 1785 ppm cliff the enrichment record already measured — and it clears
-  by 8 %, against a bound finding 7 calls *emergent*.
+  **self-limits** and a controller removes that feedback. At 1000–1200 ppm the season-low CO₂
+  is still **39–77 % below the floor** on all three chambers (−75 % on the two plant-only
+  ones; the consumer chamber, with the crew supplying carbon, is the shallow end at −39 %).
+- **(b) is wrong.** At 1200 ppm the margin is **0.4744** with 210 silent rationing firings on
+  the sealed and perennial chambers, and **0.9515** with 3 firings on the consumer chamber —
+  a fail on every one. The first setpoint that clears both criteria is **~3000 ppm** (1500 on
+  the consumer chamber), above the 1785 ppm cliff the enrichment record already measured —
+  and it clears by 8 %, against a bound finding 7 calls *emergent*.
 - **And the price runs the wrong way.** The discriminator is a convergence check *within*
   the setpoint, because the case against the step is a truncation error rather than a
-  threshold crossing. Controlled `dt = 1` at 1200 ppm is **22.2 % low on peak leaf carbon
-  against its own `dt = ⅛`** — seven times the frozen tree's 3.2 %. Where the frozen tree
-  clears at `dt = ½`, the controlled tree needs **`dt = ¼`**. **The controller does not
-  cancel the step gate; it doubles the cost of clearing it.**
+  threshold crossing. Controlled `dt = 1` at 1200 ppm is **22 % low on peak leaf carbon
+  against its own converged limit** — **6.9×** the frozen tree's 3.2 %, read at the same 4×
+  refinement (the two figures were not the same statistic as first written; the controlled run
+  is converged by `dt = ¼`, so the ratio survives the correction). Where the sealed chamber
+  clears at `dt = ½` uncontrolled, controlled at 1200 ppm it needs **`dt = ¼`**. ⚠ *"Clears at
+  `dt = ½`"* is itself a **sealed-chamber** number from the enrichment record — establishing
+  it across all 25 scenarios is what **axis 1** is for, and axis 1 has not run. **The
+  controller does not cancel the step gate; it doubles the cost of clearing it.**
 - ⚠ **It also makes "RK4 at `dt = 1`" unbuildable** (hard error at every setpoint tested),
   coupling the two knobs this section had just separated.
 - ⚠ **This generalizes past the probe.** Arbitration scales against the **start-of-step**

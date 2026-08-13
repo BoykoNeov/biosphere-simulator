@@ -109,17 +109,34 @@ pool CO₂ above the 61.07 ppm floor, and unclamped margin above 1.
 | **3000** | 319.6 | +423.3 % | **1.0797** | @845 | 0 | 21.9083 | 429.38 | 235.26 | **pass** |
 | 5000 | 2257.0 | +3595.6 % | 1.7559 | @845 | 0 | 22.6803 | 440.72 | 240.89 | pass |
 
-`perennial_chamber` is the same curve to three digits (357: 0.2978 / 8.2 ppm; 1200:
-0.4744 / 15.9; 3000: 1.0797 / 318.5, first pass). `consumer_chamber` clears earlier
-because the crew is a second carbon source (1200: 0.9515 / 37.3 ppm / 3 firings — still a
-fail; 2000: 1.4846 / 698.9 ppm — first pass).
+`perennial_chamber` is the same curve to three digits (357: 0.2978 / 8.2 ppm; 1000:
+0.4121 / 14.2; 1200: 0.4744 / 15.9; 3000: 1.0797 / 318.5, first pass).
 
-**The band the direction plan assumed a controller would run at — 1000–1200 ppm — is deep
-in the failing region on every chamber.** Margin 0.41–0.51, hundreds of silent rationing
-firings, and a season-low CO₂ that is *~75 % below the compensation point* — worse than the
-frozen run's 57.9 ppm, not better. The first setpoint that clears both criteria is
-**~3000 ppm** on two of the three chambers, above even the 1785 ppm cliff the predecessor
-record measured and far above any plausible enrichment level.
+⚠ **`consumer_chamber` fails the same band but by less, and its numbers must be quoted
+separately** rather than folded into a range — the crew is a second carbon source:
+
+| setpoint | season-low CO₂ | vs floor | margin | firings | verdict |
+|---|---|---|---|---|---|
+| 357 | 6.1 | −90.0 % | 0.5393 | 147 | fail |
+| 700 | 8.8 | −85.6 % | 0.6398 | 87 | fail |
+| 1000 | 33.2 | −45.7 % | 0.8211 | 21 | fail |
+| 1200 | 37.3 | −39.0 % | 0.9515 | 3 | fail |
+| **1500** | 237.5 | +288.8 % | **1.1502** | 0 | **pass** |
+| 2000 | 698.9 | +1044.5 % | 1.4846 | 0 | pass |
+
+⚠ **Consumer margins are censored above 2.0.** Once its carbon pool stops binding, the
+reported run-minimum is a CO₂-independent `water_vapor` event at step 2 whose ratio is
+*exactly* 2.0 (verified: `repr` is `2.0`, identical in the frozen run and at 3000/5000), so
+true carbon headroom past that is invisible in this instrument. Every **failing** row binds
+on `carbon_pool`, so nothing in the verdict rests on a censored value.
+
+**The band the direction plan assumed a controller would run at — 1000–1200 ppm — fails on
+all three chambers.** Across them: margin **0.41–0.95**, season-low CO₂ **39–77 % below** the
+compensation point, and 3–252 silent rationing firings. On the two plant-only chambers it is
+*worse* than the frozen run's 57.9 ppm and the first passing setpoint is **~3000 ppm**, above
+even the 1785 ppm cliff the predecessor record measured; the consumer chamber, with the crew
+carrying part of the supply, clears at 1500. No chamber clears anywhere in the band a real
+enrichment move would use.
 
 ## 5. FINDING 3 — the discriminator: the controller *doubles* the step price
 
@@ -143,16 +160,27 @@ At **1200 ppm** (the realistic setpoint), `sealed_chamber`:
 | RK4 | ⅛ | 901.2 | 3.0055 | 0 | 18.977047 | 103.139594 |
 
 **Controlled `dt = 1` is 22.2 % low on peak leaf carbon and 20.6 % low on peak plant carbon
-against its own `dt = ⅛` limit.** The frozen tree's equivalent error is 3.2 %. The
-controller makes the step error **seven times worse**, because holding the pool high keeps
-assimilation at a rate the day-long step cannot resolve.
+against its own `dt = ⅛` limit.** ⚠ **Like-for-like check on "seven times worse."** The
+frozen tree's 3.2 % (`allocation-headroom` finding 6(b)) is a **4×** refinement, not an 8×
+one, so the two are not the same statistic as first written. Read at 4× the controlled figure
+is **22.15 %** (14.905793 vs 19.147571) — identical to three digits, because the controlled
+run is already converged by `dt = ¼`. The ratio is **6.9×**, so the phrase survives; it is
+stated here rather than left for a reader to catch. Holding the pool high keeps assimilation
+at a rate the day-long step cannot resolve.
 
 **The price, stated the way the decision needs it:**
 
 | tree | clears both criteria at |
 |---|---|
-| frozen, no controller | `dt = ½` (75.1 ppm > floor, margin ~2.6) |
+| frozen, no controller | `dt = ½` (75.1 ppm > floor, margin ~2.6) — ⚠ **sealed chamber only** |
 | controlled at 1200 ppm | `dt = ¼` — at `dt = ½` it **still fails both** (39.0 ppm, margin 0.9478, 6 firings) |
+
+⚠ **The left row's scope.** *"The frozen tree clears at `dt = ½`"* is a **sealed-chamber**
+measurement carried from `co2-enrichment-margin.md`, quoted here as the reference point of
+the whole "doubles the price" comparison. Establishing it across all 25 scenarios is exactly
+what **axis 1** is for, and axis 1 has not run. The comparison is sound *within* the sealed
+chamber, where both halves were measured on the same rig; it inherits an unmeasured scope
+claim the moment it is read as a property of the tree.
 
 **The controller does not cancel the step gate. It doubles the cost of clearing it.**
 

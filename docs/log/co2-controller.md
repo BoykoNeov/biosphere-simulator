@@ -37,13 +37,19 @@ controller argument requires the stock to be genuinely large, not merely steady*
 Euler `dt = 1`, 3 yr. Sealed chamber: 357 → 0.2977/10.6 ppm/270 firings; 700 →
 0.3320/15.0/279; **1000 → 0.4121/15.7/252**; **1200 → 0.4744/17.4/210**; 2000 →
 0.7417/31.4/66; **3000 → 1.0797/319.6/0, the first pass**; 5000 → 1.7559/2257.0/0. The
-perennial chamber matches to three digits; the consumer chamber clears earlier (first pass
-at 2000) because the crew is a second carbon source, but 1200 still fails it
-(0.9515/37.3 ppm/3 firings). **The 1000–1200 ppm band the direction plan assumed a
-controller would run at is deep in the failing region on every chamber** — season-low CO₂
-~75 % *below* the compensation point, worse than the frozen run's 57.9 ppm, with hundreds of
-silent rationing firings. The first passing setpoint is ~3000 ppm, above even the 1785 ppm
-cliff the predecessor measured.
+perennial chamber matches to three digits (1000 → 0.4121/14.2; 1200 → 0.4744/15.9). **The
+consumer chamber fails the same band but by less, and its numbers must be quoted
+separately**: the crew is a second carbon source, so 1000 → 0.8211/33.2 ppm/21 firings and
+1200 → 0.9515/37.3 ppm/3 firings — a fail on both criteria, but −46 %/−39 % against the
+floor rather than −75 %, and its first pass is 1500 (1.1502/237.5 ppm), not 3000. **The
+1000–1200 ppm band the direction plan assumed a controller would run at fails on all three
+chambers** — margin **0.41–0.95**, season-low CO₂ **39–77 % below** the compensation point,
+3–252 silent rationing firings. On the two plant-only chambers it is *worse* than the frozen
+run's 57.9 ppm and the first passing setpoint is ~3000 ppm, above even the 1785 ppm cliff the
+predecessor measured. ⚠ **The consumer chamber's margins are censored above 2.0** in these
+tables: once its carbon pool stops binding, the reported run-minimum is a CO₂-independent
+`water_vapor` event at step 2 whose ratio is exactly 2.0, so any true carbon headroom past
+that is not visible. Every *failing* row binds on `carbon_pool`, so the verdict is unaffected.
 
 **FINDING 3 — THE DISCRIMINATOR: THE CONTROLLER *DOUBLES* THE STEP PRICE.** ⚠ Two numbers at
 `dt = 1` cannot settle this — the science case against the shipped step is a **truncation
@@ -51,12 +57,17 @@ error**, not a threshold crossing, so the controlled run needs its own convergen
 all comparisons within one setpoint. At 1200 ppm, controlled Euler runs
 17.4 → 39.0 → 586.9 → 893.6 ppm and margin 0.4744 → 0.9478 → 1.8962 → 3.7928 across
 `dt = 1, ½, ¼, ⅛`. **Controlled `dt = 1` is 22.2 % low on peak leaf carbon and 20.6 % low on
-peak plant carbon against its own `dt = ⅛` limit** — against the frozen tree's 3.2 %, seven
-times worse, because holding the pool high sustains an assimilation rate the day-long step
-cannot resolve. Stated as the decision needs it: **the frozen tree clears both criteria at
-`dt = ½`; controlled at 1200 ppm it needs `dt = ¼`**, and at `dt = ½` it still fails both
-(39.0 ppm, margin 0.9478, 6 firings). **The controller does not cancel the step gate — it
-doubles the cost of clearing it.**
+peak plant carbon against its own `dt = ⅛` limit.** ⚠ The frozen tree's comparable number,
+`allocation-headroom` finding 6(b)'s **3.2 %**, is a **4×** refinement, so it is quoted
+against the controlled run's own 4× figure, which is **22.15 %** — the same to three digits,
+so *"about seven times worse"* survives the like-for-like check. Holding the pool high
+sustains an assimilation rate the day-long step cannot resolve. Stated as the decision needs
+it: **the sealed chamber clears both criteria at `dt = ½` uncontrolled; controlled at
+1200 ppm it needs `dt = ¼`**, and at `dt = ½` it still fails both (39.0 ppm, margin 0.9478,
+6 firings). ⚠ *"Clears at `dt = ½`"* is a **sealed-chamber** measurement carried over from
+`co2-enrichment-margin.md` (57.9 → 75.1 ppm, margin 1.3072 → 2.5638) — establishing it across
+all 25 scenarios is exactly what Step 0 axis 1 is for, and axis 1 has not run. **The
+controller does not cancel the step gate — it doubles the cost of clearing it.**
 
 **FINDING 4 — THE CONTROLLER COUPLES THE TWO KNOBS THE PLAN HAD SEPARATED.** RK4 at `dt = 1`
 **hard-errors under the controller at every setpoint tested** (margin 0.7326 at 1200 ppm,
