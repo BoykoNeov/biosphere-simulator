@@ -52,18 +52,28 @@ and the **frozen ambient** run does it too (220.6 ppm held, 168.8 withdrawn). �
 **FINDING 5 — THE CONVERGENCE CHECK, WHICH IS THE HALF THAT IS *NOT* ARITHMETIC.**
 `allocation-headroom` finding 5 warned that `margin ∝ 1/dt` is near-tautological and that
 shrinking `dt` until a guard goes quiet is finding 9 with the sign flipped. That warning
-holds for the margin column here (1.3072 → 2.5638 → 5.4574, a clean doubling). **The
-season-low CO₂ does not scale — it converges:** 57.9 → 75.1 → 75.8 ppm at ×1, and 12.1 →
-74.3 → 74.8 at ×5, onto the same ~75 ppm the already-converged RK4 run reports, from every
-enrichment level. A statement about the **answer**, not the backstop: at `dt = ½` the
-shipped integrator resolves the compensation point and at `dt = 1` it does not.
+holds for the margin column here (1.3072 → 2.5638 → 5.4574 → 10.9028, a clean doubling
+through four refinements). **The season-low CO₂ does not scale — it converges:** 57.9 →
+75.1 → 75.8 → **76.0** ppm at ×1, and 19.1 → 74.4 → 74.9 → **75.1** at ×4, onto the value
+the already-converged RK4 run reports, from every enrichment level. ⚠ The `dt = ⅛` column is
+what licenses the word *converged* — two points each is not a limit — and it holds: the two
+integrators approach from **opposite sides** (Euler below, RK4 above) with the gap between
+them halving per refinement, 0.5 → 0.3 ppm out of 76. A statement about the **answer**, not
+the backstop: at `dt = ½` the shipped integrator resolves the compensation point and at
+`dt = 1` it does not.
 
 **FINDING 6 — THE FROZEN AMBIENT SCENARIO ALREADY CROSSES THE FLOOR, AND THE ERROR INFLATES
 THE PAYOFF.** At ×1 the shipped, golden-pinned run bottoms at **57.9 ppm against a converged
-75.8 — 24 % low, and below the model's own shutoff**. `allocation-headroom` finding 6(b)
-put the shipped step's truncation error at **3.2 % on peak leaf carbon**; the same error on
-the chamber's minimum CO₂ is **24 %**, and 3–6× under enrichment — same phenomenon, far more
-sensitive observable, and this one has a physical reading rather than a percentage. Not a
+76.3**, and that one number carries **two claims of different strength that must not be run
+together**. *(a)* **The trajectory is 24 % low** — `allocation-headroom` finding 6(b) put the
+shipped step's truncation error at **3.2 % on peak leaf carbon**, and the same error read on
+the chamber's minimum CO₂ is **24 %**, 3–6× under enrichment. Same phenomenon, far more
+sensitive observable; this is the solid claim and the one the step decision turns on.
+*(b)* **It crosses the shutoff — but by 5 % at ambient** (57.9 against 61.07, itself a
+provisional value). *"The frozen tree fixes carbon below the compensation point"* is true and
+is a different **kind** of error from a percentage, but at ambient it is **marginal**; the
+crossing only becomes dramatic under enrichment, reaching **3×** at ×4 (19.1 vs 61.07).
+Quoting (b) on the frozen tree alone is quoting the weakest version of this finding. Not a
 contract defect (`Euler / dt = 1` is the first item in the biosphere freeze), but not
 previously measured. ⚠ And it runs the wrong way for a realism claim: at ×4 the shipped
 integrator reports peak plant carbon **2.7649 against RK4's 2.6502 (+4.3 %)**. **The

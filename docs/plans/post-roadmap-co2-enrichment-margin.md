@@ -137,29 +137,48 @@ warning applies in full to the margin column here, and the identity is visible i
 
 **The season-low CO₂ does not behave that way, which is the whole point:**
 
-| | `dt = 1` | `dt = ½` | `dt = ¼` |
-|---|---|---|---|
-| Euler, ×1.00 | 57.9 ppm | 75.1 ppm | **75.8 ppm** |
-| Euler, ×2.80 | 25.2 ppm | 74.6 ppm | **75.1 ppm** |
-| Euler, ×4.00 | 19.1 ppm | 74.4 ppm | **74.9 ppm** |
-| Euler, ×5.00 | 12.1 ppm | 74.3 ppm | **74.8 ppm** |
-| RK4, ×1.00 | 76.4 ppm | 76.3 ppm | 76.3 ppm |
+| | `dt = 1` | `dt = ½` | `dt = ¼` | `dt = ⅛` |
+|---|---|---|---|---|
+| Euler, ×1.00 | 57.9 ppm | 75.1 ppm | 75.8 ppm | **76.0 ppm** |
+| Euler, ×2.80 | 25.2 ppm | 74.6 ppm | **75.1 ppm** | — |
+| Euler, ×4.00 | 19.1 ppm | 74.4 ppm | 74.9 ppm | **75.1 ppm** |
+| Euler, ×5.00 | 12.1 ppm | 74.3 ppm | **74.8 ppm** | — |
+| RK4, ×1.00 | 76.4 ppm | 76.3 ppm | 76.3 ppm | **76.3 ppm** |
+| RK4, ×4.00 | 76.4 ppm | 75.4 ppm | 75.3 ppm | **75.3 ppm** |
 
-It **converges** rather than scaling — onto the same ~75 ppm the already-converged RK4
-solution reports, from every enrichment level, with a step refinement that is *not* enough
-to move the guard's arithmetic anywhere near quiet. This is a statement about the
-**answer**, not about the backstop: at `dt = ½` the shipped integrator resolves the
-compensation point and at `dt = 1` it does not.
+It **converges** rather than scaling — onto the value the already-converged RK4 solution
+reports, from every enrichment level, with a step refinement that is *not* enough to move
+the guard's arithmetic anywhere near quiet (the margin's clean doubling holds through all
+four: 1.3072 → 2.5638 → 5.4574 → 10.9028).
+
+**The `dt = ⅛` row is what licenses the word "converged", and it was run precisely because
+two points each is not a limit.** The integrators approach from opposite sides — Euler from
+below, RK4 from above — and the gap between them closes 0.5 → 0.3 ppm from `¼` to `⅛` at ×1
+(0.4 → 0.2 at ×4), halving per refinement as a first-order scheme should. They agree to
+**0.3 ppm out of 76**. So "≈ 76.3 ppm at ambient, ≈ 75.3 at ×4" is a *measured* limit, not
+an inference drawn from a short sequence.
+
+This is a statement about the **answer**, not about the backstop: at `dt = ½` the shipped
+integrator resolves the compensation point and at `dt = 1` it does not.
 
 ## 6. FINDING 6 — the frozen ambient scenario already crosses the floor, and the error inflates the payoff
 
 At ×1 — the shipped, frozen, golden-pinned configuration — the sealed chamber's season low
-is **57.9 ppm against a converged 75.8**, i.e. **24 % low**, and it is below the model's own
-shutoff. `allocation-headroom` finding 6(b) recorded the shipped step's truncation error as
-**3.2 % on peak leaf carbon**; the same error on the chamber's minimum CO₂ is **24 %**, and
-under enrichment **3–6×**. Same phenomenon, a far more sensitive observable, and this one
-has a physical interpretation rather than a percentage: *the crop assimilates below the
-compensation point.*
+is **57.9 ppm against a converged 76.3**. That single number supports **two claims of very
+different strength, and they must not be run together**:
+
+- **The trajectory is substantially wrong: 24 % low.** `allocation-headroom` finding 6(b)
+  recorded the shipped step's truncation error as **3.2 % on peak leaf carbon**; the same
+  error read on the chamber's minimum CO₂ is **24 %**, and **3–6×** under enrichment. Same
+  phenomenon, a far more sensitive observable. This claim is solid and is the one that
+  matters for the step decision.
+- **It violates the shutoff — but only just, at ambient.** 57.9 against a floor of 61.07 is
+  a **5 % crossing**, and the floor's own value is provisional (§4). *"The frozen tree fixes
+  carbon below the compensation point"* is true and is a qualitatively different kind of
+  error from a percentage — but at ambient it is **marginal**, and it should be stated that
+  way. The crossing only becomes dramatic under enrichment, where it reaches **3×**
+  (19.1 ppm against 61.07 at ×4). Anyone quoting the shutoff violation on the frozen tree
+  alone is quoting the weakest version of this finding.
 
 This is **not a contract defect** — `Euler / dt = 1` is the first item in the biosphere
 freeze and the goldens are its record, not a victim of it. It is a number anyone re-opening
