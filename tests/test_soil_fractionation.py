@@ -558,7 +558,18 @@ def drive(
 
 
 def per_year_min_co2(states: list[State], years: int) -> list[float]:
-    ys = len(_weather())
+    # ⚠ In STEPS. It segments a STEP-indexed trajectory (`run_season` appends one state
+    # per step, not per day), so the season length has to be converted — this read
+    # `len(_weather())` until 2026-08-14, and at `dt = ¼` that silently covered a
+    # quarter of each year and only the first quarter of the run: a 15-year call
+    # returned 15 windows that between them spanned under four years, every one of them
+    # mislabelled. Nothing went red, because a shorter window still has a minimum.
+    #
+    # This is the by-CALLEE enumeration the step unfreeze's record says has to be
+    # repeated for every callee carrying a unit, and was not: `drive` and the reset
+    # closure above were converted on 2026-08-14 and this helper, three lines away, was
+    # not. The local is named `ys`, which no name-based sweep would ever catch.
+    ys = steps_for(len(_weather()))
     co2 = [s.stocks[CARBON_POOL].amount for s in states]
     return [min(co2[i * ys : (i + 1) * ys + 1]) for i in range(years)]
 
@@ -594,9 +605,18 @@ def test_our_rate_sits_between_the_two_plant_material_rates() -> None:
 
 
 def test_every_rothc_rate_is_safe_at_the_frozen_timestep() -> None:
-    """`k*dt < 1` at the frozen `dt = 1 day` for every rate a build would adopt."""
+    """`k*dt < 1` at the frozen step for every rate a build would adopt.
+
+    ⚠ The seventh conflation class, in the same shape the acceptance gate's
+    ``..._margin_is_one_over_k_dt`` carried it (2026-08-14): the `dt` was in this
+    docstring — *"at the frozen `dt = 1 day`"* — and missing from the expression below,
+    which divided by 365 and stopped. That was invisible while the step was a day and it
+    is still not a failure at `¼`, since a smaller step only makes `k·dt` smaller. It is
+    corrected anyway, because the assertion has to be about the step it names: a rate
+    this test blesses would otherwise be blessed against a step nothing checks.
+    """
     for k_yr in (K_DPM_YR, K_RPM_YR, K_BIO_YR, K_HUM_YR):
-        assert 0.0 < k_yr / 365.0 < 1.0
+        assert 0.0 < k_yr / 365.0 * BIO_DT < 1.0
 
 
 # --- 2/3. what fractionation buys, and the tautology it does not ----------------------
@@ -725,8 +745,30 @@ def test_the_constant_inventory_sizing_starves_the_re_sow() -> None:
     assert rationed == 0
 
 
-def test_the_constant_flux_sizing_rations() -> None:
-    """Holding the t=0 CO2 return fixed (seed 19.409): `rationed` fires.
+def test_whether_the_constant_flux_sizing_still_rations() -> None:
+    """Holding the t=0 CO2 return fixed (seed 19.409): does `rationed` fire?
+
+    ⚠⚠ **RENAMED 2026-08-14 (the quarter-day step): IT NOW FIRES ON NEITHER TREE, so the
+    old name — `..._sizing_rations` — asserted a fact that has stopped being true.** The
+    count has now moved four times: 11 (2026-08-09) -> 1 (the humification split) -> 0
+    with the stem reserve (2026-08-12) -> 0 *without* it as well, at `dt = ¼`. The last
+    step is not a re-measurement of a value but the loss of the last tree in which this
+    leg could be witnessed at all.
+
+    The direction is the expected one and is not evidence of anything new: a coarse step
+    manufactures shortfalls by charging a whole step's respiration against a
+    start-of-step assimilation rate, so quartering it removes the transient overdraft
+    the backstop was catching. The same 6×-not-4× effect was measured on the maintenance
+    door in `test_stem_reserves.py`.
+
+    ⚠ **The refusal is NOT reopened here**, for the reason already written in this
+    module: re-deciding a refusal inside the work that moved the tree underneath it is
+    the shape this project refuses, and that applies with more force when the movement
+    is in the refusal's favour. Recorded as a finding for a separate decision. Both
+    trees are still asserted below, so the test still says which one does what — it now
+    says they do the same thing.
+
+    ---- the record as it stood before 2026-08-14, kept rather than overwritten ----
 
     ⚠ RE-MEASURED 2026-08-10 after the humification split: 11 firings -> 1. The
     conclusion is unchanged and is what this test is for -- that sizing is still not
@@ -754,7 +796,11 @@ def test_the_constant_flux_sizing_rations() -> None:
         total_seed=19.4093,
         fractionate=True,
     )
-    assert rationed_off == 1  # the tree as it stood until 2026-08-12
+    # ⚠ 1 -> 0 at `dt = ¼` (2026-08-14). This was the LAST tree in which the
+    # firing could still be witnessed; with it gone, the leg is unobservable at the
+    # shipped step rather than merely absent from the shipped tree. Asserted as the
+    # measurement it is.
+    assert rationed_off == 0  # was 1 on the reserve-off tree until 2026-08-14
     _, rationed = drive(
         PERENNIAL_CHAMBER_SCENARIO,
         PERENNIAL_CHAMBER_YEARS,
@@ -842,22 +888,28 @@ def test_the_frozen_consumer_chamber_carries_stem_only_CLEANLY() -> None:
         rdr_stem_zero=True,
     )
     assert rationed == 0
-    # WARNING 0.148321 -> 0.146085 (2026-08-12, stem reserves). The claim — the frozen
-    # consumer chamber carries stem-only CLEANLY — is re-measured and holds.
+    # WARNING 0.148321 -> 0.146085 (2026-08-12, stem reserves) -> 0.148519 (2026-08-14,
+    # the quarter-day step). The claim — the frozen consumer chamber carries stem-only
+    # CLEANLY — is re-measured a second time and holds.
     assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:]) == pytest.approx(
-        0.146085, abs=1e-5
+        0.148519, abs=1e-5
     )
 
 
 @pytest.mark.slow
-def test_fractionation_MOVES_the_stem_only_failure_rather_than_removing_it() -> None:
-    """FINDING 4 — at seed 6.0 the rescue of `perennial` costs `consumer` outright.
+def test_whether_fractionation_still_MOVES_the_stem_only_failure() -> None:
+    """FINDING 4 — ⚠⚠ **and as of 2026-08-14 there is no failure left for it to move.**
 
-    `perennial` + stem-only closes (it hard-errors in the frozen tree at `rationed =
-    1`),
-    and in the same breath `consumer` — which the frozen tree carries cleanly, above —
-    can no longer re-sow. That is not progress against the gate; it is a different
-    collision with it.
+    The claim: at seed 6.0 the rescue of `perennial` costs `consumer` outright —
+    `perennial` + stem-only closes, and in the same breath `consumer`, which the frozen
+    tree carries cleanly, can no longer re-sow. Not progress against the gate; a
+    different collision with it.
+
+    Both sides of that trade are now gone. `consumer`'s starvation went with the stem
+    reserve on 2026-08-12 for the shipped tree, and at the quarter-day step it goes for
+    the reserve-off tree too (see the block below). Renamed to the question. **Finding 4
+    is not withdrawn** — it was a measurement of a tree, that tree is recorded, and
+    re-deciding it belongs to the refusal's own re-opening, not to a step ceremony.
     """
     states, rationed = drive(
         PERENNIAL_CHAMBER_SCENARIO,
@@ -873,15 +925,26 @@ def test_fractionation_MOVES_the_stem_only_failure_rather_than_removing_it() -> 
     # WARNING THIS LEG ALSO DISSOLVED ON 2026-08-12 (module note): with stem reserves
     # the consumer chamber re-sows under the same combination. Asserted against the
     # reserve-off tree, where the collision is still real, plus the new behaviour.
-    with pytest.raises(ValueError, match="seed bank too small"):
-        drive(
-            replace(CONSUMER_CHAMBER_SCENARIO, stem_reserves=False),
-            LONG_HORIZON_YEARS,
-            perennial=True,
-            total_seed=6.0,
-            fractionate=True,
-            rdr_stem_zero=True,
-        )
+    #
+    # ⚠⚠ **AND ON 2026-08-14 THE RESERVE-OFF TREE STOPPED FAILING TOO — the collision is
+    # now unobservable at the shipped step, not merely absent from the shipped tree.**
+    # This block asserted `pytest.raises(ValueError, "seed bank too small")` and the run
+    # now completes. That is the same loss `test_whether_the_constant_flux_sizing_still_
+    # rations` records: the reserve-off tree was the last place these legs could be
+    # witnessed, and quartering the step removed the starvation there as well.
+    #
+    # ⚠ **The run is still made, and its outcome still asserted** — deleting the call
+    # would leave nothing to notice a tree in which the collision returns. What replaces
+    # the `raises` is the measured truth, which is the weaker and accurate statement.
+    _off, off_rationed = drive(
+        replace(CONSUMER_CHAMBER_SCENARIO, stem_reserves=False),
+        LONG_HORIZON_YEARS,
+        perennial=True,
+        total_seed=6.0,
+        fractionate=True,
+        rdr_stem_zero=True,
+    )
+    assert off_rationed == 0, "the reserve-off collision is back — see the note above"
     _now, now_rationed = drive(
         CONSUMER_CHAMBER_SCENARIO,
         LONG_HORIZON_YEARS,
@@ -927,8 +990,9 @@ def test_half_a_mol_higher_and_perennial_fails_the_liveness_floor() -> None:
     # are pinned separately and were not measured here.
     assert rationed == 0  # gate A still passes...
     tail = min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:])
-    # WARNING 0.072378 -> 0.069947 (2026-08-12, stem reserves); still above the floor.
-    assert tail == pytest.approx(0.069984, abs=1e-5)
+    # WARNING 0.072378 -> 0.069947 (2026-08-12, stem reserves) -> 0.077264 (2026-08-14,
+    # the quarter-day step); still above the floor, and further above it than before.
+    assert tail == pytest.approx(0.077264, abs=1e-5)
     assert tail > DECADE_CO2_FLOOR  # ...and gate B now passes too
 
 
@@ -968,7 +1032,13 @@ def test_the_option_b_identity_is_EXACT_under_fractionation_without_the_seed() -
             assert (carbon / nitrogen) * MOLAR_MASS_CARBON_KG_PER_MOL == pytest.approx(
                 shed_cn, rel=1e-12
             )
-        assert checked > 800
+        # ⚠ In STEPS, and scaled with the step on 2026-08-14. This is the loop's
+        # non-vacuity control — "the identity was actually exercised, not skipped by the
+        # `continue` above" — and it was a bare `> 800` against a 915-step run, i.e.
+        # "nearly every step". At `dt = ¼` the same run is 3661 states, so the bare
+        # literal would still have passed while checking under a quarter of them: a
+        # control that silently stops controlling is worse than no control.
+        assert checked > steps_for(200)
 
 
 def test_the_seed_artefact_becomes_PERMANENT_under_fractionation() -> None:
@@ -1014,12 +1084,16 @@ def test_the_seed_artefact_becomes_PERMANENT_under_fractionation() -> None:
     # reserves). The identity is still untouched; what moves is where the peak lands on
     # a
     # changed trajectory — a number attached to an event, not to a law.
-    assert frozen == pytest.approx(104.218, abs=1e-2)
+    # WARNING ...and again to **104.506** (2026-08-14, the quarter-day step). Same
+    # reading: the peak is an EVENT on a trajectory and a finer step re-times it. The
+    # three values move by 0.3 %, 0.04 % and 0.06 % — the identity legs below are what
+    # carry the finding, and they are untouched.
+    assert frozen == pytest.approx(104.506, abs=1e-2)
     assert frozen / shed_cn < 1.2  # the one-pool form washes the seed out
-    # WARNING re-measured 2026-08-10, again 2026-08-12 (stem reserves): 277.736.
-    assert same_seed == pytest.approx(277.567, abs=1e-2)
-    # WARNING re-measured 2026-08-10, again 2026-08-12 (stem reserves): 342.450.
-    assert doubled == pytest.approx(341.830, abs=1e-2)
+    # WARNING re-measured 2026-08-10, 2026-08-12 (stem reserves, 277.736), 2026-08-14.
+    assert same_seed == pytest.approx(277.671, abs=1e-2)
+    # WARNING re-measured 2026-08-10, 2026-08-12 (stem reserves, 342.450), 2026-08-14.
+    assert doubled == pytest.approx(342.031, abs=1e-2)
     assert doubled / shed_cn > 3.5  # ...and the slow pool does not
 
 
@@ -1159,17 +1233,41 @@ def test_exactly_one_swept_sizing_clears_both_gates_on_both_scenarios() -> None:
         #   0.116830/0.119886, 0.055175/0.076583, 0.055175/0.076572, 0.148486/0.152906.
         # The frozen side moved because the reserve moves the whole tree; the
         # fractionated side moved with it.
-        ("sealed_chamber", SEALED_CHAMBER_SCENARIO, 3, False, 0.111111, 0.114283),
-        ("perennial", PERENNIAL_CHAMBER_SCENARIO, 5, True, 0.055907, 0.075717),
+        #
+        # ⚠⚠ **AND ALL EIGHT AGAIN 2026-08-14 (the quarter-day step) — but read the
+        # IMPROVEMENT column, not the values, because that is where this table changed
+        # shape.** The claim survives in every row; the MARGIN it rests on does not:
+        #
+        #     row             was              now              improvement
+        #     sealed_chamber  0.11111/0.11428  0.11144/0.11457  +2.9 %  -> +2.8 %
+        #     perennial       0.05591/0.07572  0.07549/0.07717  +35.4 % -> +2.2 %
+        #     perennial_long  0.05591/0.07570  0.07549/0.07715  +35.4 % -> +2.2 %
+        #     consumer        0.14658/0.15029  0.14884/0.15290  +2.5 %  -> +2.7 %
+        #
+        # The two perennial rows lose an ORDER OF MAGNITUDE of headroom, and only those
+        # two, because only their FROZEN side moved (+35 %) — the one-pool perennial
+        # tail was the reading a one-day step was depressing, and the fractionated tail,
+        # which sits higher, had far less truncation to lose. So the 35 % that made
+        # these rows look like the form's strongest evidence was mostly the
+        # INTEGRATOR's, and at the shipped step every row now reads within a couple of
+        # per cent of every other.
+        #
+        # This is recorded, not smoothed, and it does NOT reopen the refusal (module
+        # note ``THE REFUSAL'S EVIDENCE MOVED``) — it cuts the other way: the price this
+        # table was written to record has got smaller, so the case for building was
+        # never weaker. What it retires is quoting "the fractionated tail improves the
+        # perennial chamber by a third"; at the shipped step that is 2 %.
+        ("sealed_chamber", SEALED_CHAMBER_SCENARIO, 3, False, 0.111443, 0.114567),
+        ("perennial", PERENNIAL_CHAMBER_SCENARIO, 5, True, 0.075494, 0.077170),
         (
             "perennial_long",
             PERENNIAL_CHAMBER_SCENARIO,
             LONG_HORIZON_YEARS,
             True,
-            0.055907,
-            0.075698,
+            0.075494,
+            0.077149,
         ),
-        ("consumer", CONSUMER_CHAMBER_SCENARIO, 5, True, 0.146579, 0.150286),
+        ("consumer", CONSUMER_CHAMBER_SCENARIO, 5, True, 0.148839, 0.152898),
     ],
 )
 def test_the_form_alone_is_benign_across_the_sealed_roster(
@@ -1211,12 +1309,26 @@ def test_the_form_alone_is_benign_across_the_sealed_roster(
 
 
 @pytest.mark.slow
-def test_the_one_pool_form_cannot_take_the_same_inventory() -> None:
-    """FINDING 2's other half — the 2x headroom is the FORM's, not the seed's.
+def test_whether_the_one_pool_form_can_take_the_same_inventory() -> None:
+    """FINDING 2's other half — ⚠⚠ **AND IT INVERTED ON 2026-08-14: it now CAN.**
 
-    Doubling `litter_carbon0` on the frozen single pool doubles the FLUX with it
-    (`stock = flux/k`, one knob), and it rations. That is what makes the fractionated
-    roster result above attributable to the partition rather than to more carbon.
+    The claim was that doubling `litter_carbon0` on the frozen single pool doubles the
+    FLUX with it (`stock = flux/k`, one knob) and rations — which is what made the
+    fractionated roster result attributable to the partition rather than to more carbon.
+    At the shipped quarter-day step the firing count is **0**, having been 6 → 5
+    (humification) → 3 (stem reserves) → 0. Renamed to the question for the same reason
+    as the two other tests in this file: the old name asserted the answer.
+
+    ⚠ **Read this together with the roster table's ratio column above, because the two
+    are the same event seen twice.** That table lost most of its perennial headroom at
+    this step; this test loses the control that made the remaining headroom
+    attributable. Neither is a fractionation result — both are the arbitration
+    backstop's firings disappearing when the step stops manufacturing within-step
+    overdrafts, which is the documented reason the step moved. **A backstop firing count
+    is a step-size observable before it is a science one**, and three of this file's
+    four inversions today are firing counts.
+
+    ⚠ The refusal is not reopened here (module note ``THE REFUSAL'S EVIDENCE MOVED``).
     """
     _, rationed = drive(
         PERENNIAL_CHAMBER_SCENARIO,
@@ -1225,11 +1337,9 @@ def test_the_one_pool_form_cannot_take_the_same_inventory() -> None:
         total_seed=6.0,
         fractionate=False,
     )
-    # ⚠ 6 → 5 (2026-08-10, humification) → **3** (2026-08-12, stem reserves). The CLAIM
-    # is that the one-pool form CANNOT take the same inventory, and it still cannot;
-    # only
-    # how loudly it fails has moved, which is what a count of backstop firings measures.
-    assert rationed == 3
+    # ⚠ 6 → 5 (2026-08-10, humification) → 3 (2026-08-12, stem reserves) → **0**
+    # (2026-08-14, the quarter-day step). The claim in the old name is now false.
+    assert rationed == 0
 
 
 # --- 10. THE RE-OPENING (2026-08-10) --------------------------------------------------
@@ -1242,8 +1352,37 @@ def test_the_one_pool_form_cannot_take_the_same_inventory() -> None:
 
 
 @pytest.mark.slow
-def test_the_liveness_floor_failure_is_the_ATTRACTOR_not_the_transient() -> None:
-    """THE DECISIVE RE-OPENING PIN — sizing 1 fails the 0.05 floor at EQUILIBRIUM.
+def test_whether_sizing_1s_attractor_still_sits_below_the_liveness_floor() -> None:
+    """THE DECISIVE RE-OPENING PIN — and ⚠⚠ **IT INVERTED ON 2026-08-14.**
+
+    **At the shipped quarter-day step sizing 1's attractor is 0.075729, which is ABOVE
+    the 0.05 floor.** It was 0.032090, a 1.56× failure. So the leg this test was named
+    for — *"the liveness floor failure is the ATTRACTOR, not the transient"* — no longer
+    describes the tree: there is no liveness floor failure to attribute to anything.
+    Renamed to the question, because a name that states a contingent measurement goes
+    stale silently (the same correction `test_whether_the_perennial_gate_needs_the_LONG_
+    horizon` took on 2026-08-14).
+
+    **The cause is the integrator, and it is the same one the step unfreeze was for.** A
+    one-day Euler step was depressing this chamber's CO₂ trough — the identical
+    mechanism that had the perennial chamber fixing carbon below its own compensation
+    point — and it was depressing it *past a gate*. The subject rises 2.36× (0.032090 →
+    0.075729) while the frozen control barely moves (0.073592 → 0.075843, +3 %), so the
+    two now converge to within 0.15 % of each other. ⚠ **The control is what makes this
+    readable**: had it moved with the subject this would have been a harness artefact.
+
+    ⚠ **The refusal is NOT reopened here** — module note ``THE REFUSAL'S EVIDENCE
+    MOVED``. Re-deciding a refusal inside the work that moved the tree underneath it is
+    the shape this project refuses, and the more so when the movement favours the
+    refused option. This is the *third* leg of that refusal to dissolve (finding 3
+    structural, 2026-08-10; the arbitration half, 2026-08-12; the liveness half now).
+    ⚠ What survives untouched is the CITATION leg — the last uncited decomposer rate is
+    still not retirable by the only cited alternative — and that leg never depended on a
+    number measured here.
+
+    ---- the reading this test was written for, kept rather than overwritten ----
+
+    THE DECISIVE RE-OPENING PIN — sizing 1 fails the 0.05 floor at EQUILIBRIUM.
 
     The obvious objection to reading `perennial`'s 15-year CO2 minimum as a verdict is
     that the humification split lengthened the chamber's settling transient from ~3
@@ -1272,9 +1411,12 @@ def test_the_liveness_floor_failure_is_the_ATTRACTOR_not_the_transient() -> None
     )
     frozen = per_year_min_co2(frozen_states, 50)
     assert frozen_rationed == 0
-    # WARNING 0.073291 -> 0.073605 (2026-08-12, stem reserves); the claim (the
-    # frozen control settles ABOVE the floor at equilibrium) is re-measured and holds.
-    assert frozen[-1] == pytest.approx(0.073592, abs=1e-5)
+    # WARNING 0.073291 -> 0.073605 (2026-08-12, stem reserves) -> 0.075843 (2026-08-14,
+    # the quarter-day step); the claim (the frozen control settles ABOVE the floor at
+    # equilibrium) is re-measured twice and holds. ⚠ The control moved +3 % while the
+    # subject moved +136 %, which is the contrast that makes the inversion above a
+    # property of the SUBJECT rather than of the step or the harness.
+    assert frozen[-1] == pytest.approx(0.075843, abs=1e-5)
     assert frozen[-1] > DECADE_CO2_FLOOR
 
     states, rationed = drive(
@@ -1289,11 +1431,23 @@ def test_the_liveness_floor_failure_is_the_ATTRACTOR_not_the_transient() -> None
     # arbitration half of this result is gone. **The liveness half is not**, and that is
     # the half this test is named for: the attractor still sits below the floor.
     assert rationed == 0
-    assert minima[-1] == pytest.approx(0.032090, abs=1e-5)  # was 0.031741
-    # The attractor, not a dip: the LAST TWENTY years never once reach the floor, so no
-    # reading of "it is still settling" rescues it.
-    assert max(minima[30:]) < DECADE_CO2_FLOOR
-    assert minima[-1] / DECADE_CO2_FLOOR == pytest.approx(0.6418, abs=1e-3)
+    # WARNING 0.031741 -> 0.032090 (2026-08-12) -> **0.075729** (2026-08-14). This is
+    # the inversion, not a re-measurement: the value crossed the floor it is compared
+    # against two lines below.
+    assert minima[-1] == pytest.approx(0.075729, abs=1e-5)
+    # ⚠ ASSERTED THE OTHER WAY ROUND SINCE 2026-08-14. This read
+    # `max(minima[30:]) < DECADE_CO2_FLOOR` — "the LAST TWENTY years never once reach
+    # the floor" — and the last twenty years now never once FALL BELOW it. Kept as an
+    # equilibrium claim rather than deleted, because "the tail is flat and on one side
+    # of the floor" is what the test measures; which side is the finding.
+    assert min(minima[30:]) > DECADE_CO2_FLOOR
+    # ...and it is still an attractor and not a wander: flat to 4 decimals over the last
+    # twenty years. This is the half of the original claim that survived the inversion.
+    assert max(minima[30:]) - min(minima[30:]) < 1e-4
+    # WARNING 0.6418 -> 1.5146. Kept as a RATIO to the floor, in the same form, so the
+    # crossing is visible in the diff as a number passing through 1.0 rather than as a
+    # deleted line.
+    assert minima[-1] / DECADE_CO2_FLOOR == pytest.approx(1.5146, abs=1e-3)
 
 
 @pytest.mark.slow
@@ -1317,6 +1471,16 @@ def test_fractionation_does_not_STARVE_the_loop_it_enlarges_BOTH_SIDES() -> None
     (WARNING the two ratios were 2.84x / 1.81x until 2026-08-12; the stem-reserve build
     moved both. The MECHANISM claim is what matters and it is re-measured: the return is
     still higher, the plant still larger, the jar still bit-identically unchanged.)
+
+    ⚠⚠ **RE-MEASURED AGAIN 2026-08-14 (the quarter-day step), and the table above is now
+    2.59x / 1.88x — but the headline number in the third paragraph, "2.84x FASTER", is
+    the 2026-08-12 value and is left standing as the historical reading it is.** The
+    mechanism claim holds on both legs. What does NOT hold is the observation the
+    mechanism was invoked to explain: **the fractionated trough is no longer deeper than
+    the frozen one** (0.0756998 against 0.0754943, 0.27 % higher). See the assertion
+    block at the end, which now bounds the separation instead of pinning its sign. A
+    finer step lifted the FROZEN trough by 35 %, so the thing that needed explaining was
+    substantially the integrator.
 
     `chamber_air_mol` and the initial CO2 are untouched by a litter change, so a change
     that enlarges the soil and the plant leaves the jar between them exactly as it was
@@ -1359,20 +1523,42 @@ def test_fractionation_does_not_STARVE_the_loop_it_enlarges_BOTH_SIDES() -> None
     frozen_return, frozen_tissue, frozen_air = at_trough(FROZEN_LITTER_SEED, False)
     frac_return, frac_tissue, frac_air = at_trough(19.4093, True)
 
-    # WARNING 2.8558 -> 2.8370 (2026-08-12, stem reserves).
-    assert frozen_return == pytest.approx(2.8320, abs=1e-3)
+    # WARNING 2.8558 -> 2.8370 (2026-08-12, stem reserves) -> 2.9985 (2026-08-14).
+    assert frozen_return == pytest.approx(2.9985, abs=1e-3)
     # WARNING 8.1112 -> 9.5900 -> 9.5840 (2026-08-12: the stem-reserve build, then its
-    # cessation window). The REFUTATION below — the fractionated return is HIGHER, so
-    # 'the slow pool starved the loop' is false — is re-measured and holds, at 3.38x.
-    assert frac_return == pytest.approx(9.5840, abs=1e-3)
+    # cessation window) -> **7.7523** (2026-08-14, the quarter-day step). The REFUTATION
+    # below — the fractionated return is HIGHER, so 'the slow pool starved the loop' is
+    # false — is re-measured and holds, but at 2.59x rather than 3.38x.
+    assert frac_return == pytest.approx(7.7523, abs=1e-3)
     # THE REFUTATION: the return is HIGHER, so "the slow pool starved the loop" is
     # false.
     assert frac_return > frozen_return
-    assert frac_return / frozen_return == pytest.approx(3.380, abs=1e-2)  # was 2.840
+    # ⚠ 2.840 -> 3.380 -> **2.585** (2026-08-14). The two sides moved in OPPOSITE
+    # directions at the finer step — the frozen return up 5.9 %, the fractionated one
+    # down 19.1 % — which is why the ratio falls by more than either. It is the
+    # fractionated (slow-pool) side that a coarse step was flattering here, so a chunk
+    # of this refutation's stated margin was the integrator's. It still refutes: 2.59 is
+    # not near 1.
+    assert frac_return / frozen_return == pytest.approx(2.585, abs=1e-2)
 
-    assert frac_tissue / frozen_tissue == pytest.approx(1.637, abs=1e-2)  # was 1.813
-    # ...and the trough is nonetheless DEEPER, which is the whole point.
-    assert frac_air < frozen_air
+    assert frac_tissue / frozen_tissue == pytest.approx(1.879, abs=1e-2)  # was 1.637
+    # ⚠⚠ **INVERTED 2026-08-14 (the quarter-day step): the trough is no longer deeper.**
+    # This read `assert frac_air < frozen_air` under the comment "...and the trough is
+    # nonetheless DEEPER, which is the whole point", and the two troughs are now
+    # 0.0756998 (fractionated) against 0.0754943 (frozen) — the fractionated one sits
+    # 0.27 % HIGHER.
+    #
+    # ⚠ **What the test is named for survives, and is in fact strengthened.** The name
+    # is `..._does_not_STARVE_the_loop_it_enlarges_BOTH_SIDES`, and both halves are
+    # re-measured above: the return flux is still 2.59× higher and the plant still 1.88×
+    # larger. The deeper trough was the *puzzle* the mechanism explained, not the
+    # finding — and at a step that does not truncate the trough, it does not arise.
+    #
+    # ⚠ The 0.27 % separation is asserted as a BOUND rather than a direction, because a
+    # gap this small is not a claim either way and pinning its sign would be pinning
+    # noise — the failure mode `test_stem_reserves.py` recorded when a bit-identity
+    # turned out to be an event ordering.
+    assert abs(frac_air - frozen_air) / frozen_air < 0.01
     # The buffer is bit-identically unchanged -- a litter seed cannot touch it. This is
     # the assertion the finding rests on; without it the table above is three ratios
     # with nothing to compare them to.
@@ -1411,10 +1597,16 @@ def test_the_shedding_fed_regime_takes_BOTH_sizings_and_the_better_trough_costs_
             # 0.078065 / 0.080342 / (0.520157 / 1.844452). The two CLAIMS the row exists
             # for both hold: sizing 2 buys a better trough, and pays for it with a 3.6x
             # smaller plant.
-            0.075723,
-            0.077249,
-            0.079380,
-            0.466015 / 1.672491,
+            # WARNING and a FOURTH time 2026-08-14 (the quarter-day step). Both claims
+            # hold; the MARGIN of the first one shrinks by more than half — sizing 2's
+            # trough advantage over frozen was +4.8 % and is now +4.1 %, and the
+            # underlying spread of the three tails narrowed from 4.8 % to 4.1 % because
+            # the FROZEN tail rose fastest (+1.4 %), which is the same truncation the
+            # perennial rows lost their headroom to.
+            0.076807,
+            0.079118,
+            0.079968,
+            0.460033 / 1.643391,
         ),
         (
             WATER_BITING_SCENARIO,
@@ -1433,10 +1625,16 @@ def test_the_shedding_fed_regime_takes_BOTH_sizings_and_the_better_trough_costs_
             # WARNING and re-measured a THIRD time 2026-08-12 by the stem-reserve
             # build itself: 0.093346 -> 0.087965. Was 0.118940 / 0.143329 /
             # (0.535004 / 2.143987).
-            0.087965,
-            0.089665,
-            0.126958,
-            0.453427 / 1.811621,
+            # WARNING and a FOURTH time 2026-08-14 (the quarter-day step): 0.087965 /
+            # 0.089665 / 0.126958 / (0.453427 / 1.811621). ⚠ This row moves FURTHEST of
+            # the four scenarios — the frozen tail +8.8 %, sizing 1 +17.2 % — and that
+            # is consistent with what it is: `water_biting` is one of only two runs in
+            # the tree where water actually limits, so it has the most nonlinearity for
+            # a coarse step to truncate. It is not evidence about fractionation.
+            0.095738,
+            0.105121,
+            0.127286,
+            0.454588 / 1.780165,
         ),
     ):
         tails = {}
@@ -1553,12 +1751,18 @@ def test_the_consumer_chamber_is_NOT_what_refuses_the_seam() -> None:
         fractionate=True,
     )
     assert rationed == 0
-    # ⚠ 0.129892 → 0.104499 (2026-08-12: the stem-reserve build + its cessation window).
-    # The CLAIM — consumer clears the
-    # floor with room to spare, so ONE scenario binds — is re-measured and still holds
-    # (0.1043 against a 0.05 floor, 2.1x).
+    # ⚠ 0.129892 → 0.104499 (2026-08-12: the stem-reserve build + its cessation window)
+    # → 0.150565 (2026-08-14, the quarter-day step). The CLAIM — consumer clears the
+    # floor with room to spare, so ONE scenario binds — is re-measured and still holds,
+    # now at 3.0x the 0.05 floor rather than 2.1x.
+    #
+    # ⚠ **But the SECOND half of that claim — "so ONE scenario binds" — is the one to
+    # read now, and it is gone.** `perennial`, the scenario that did the binding,
+    # cleared the same floor at the same step (0.075729, pinned above), so this test's
+    # contrast is no longer between a chamber that passes and one that fails. It is kept
+    # as the measurement it is; the finding belongs to the refusal's own re-decision.
     assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[2:]) == pytest.approx(
-        0.104499, abs=1e-5
+        0.150565, abs=1e-5
     )
     assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[2:]) > DECADE_CO2_FLOOR
     # ⚠ The ``[2:]`` above mirrored the decade guard's ``[_TRANSIENT:]`` window, which
