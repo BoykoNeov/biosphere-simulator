@@ -39,6 +39,7 @@ Pure stdlib only (a frozen dataclass wrapping the Power scenario).
 from dataclasses import dataclass, replace
 
 from domains.biosphere.scenario import LONG_HORIZON_YEARS, SeasonScenario
+from domains.biosphere.step import BIO_DT, STEPS_PER_DAY
 from domains.power.scenario import BOUNDED_SOC_SCENARIO, PowerScenario
 
 
@@ -272,7 +273,13 @@ class GreenhouseScenario:
     # mapping; enforced in ``build``/``run``.
     steps_per_day: int = 1440
     cabin_dt: float = 60.0  # s — ECLSS's binding dt (k_scrub·dt = 0.06 < 1)
-    bio_dt: float = 1.0  # day — the frozen biosphere's structural step
+    # ⚠ Bound to the biosphere's own constants, NOT re-declared. The station embeds the
+    # frozen biosphere; it does not get a second, independently-set step. A literal here
+    # would be a fourth copy of the step, and a duplicated unit is what this whole
+    # unfreeze exists to remove. ``bio_dt · bio_steps_per_day == 1`` day is enforced by
+    # ``station.driver.run_master_day``.
+    bio_dt: float = BIO_DT  # day — the biosphere's structural step
+    bio_steps_per_day: int = STEPS_PER_DAY  # slow sub-steps per master day
 
 
 # Module-level default (immutable) — the canonical Step-3 greenhouse.
@@ -387,7 +394,13 @@ class LightingScenario:
     # top-hat over the first ``photoperiod_hours`` of the 24.
     steps_per_day: int = 24
     power_dt: float = 3600.0  # s
-    bio_dt: float = 1.0  # day — the frozen biosphere's structural step
+    # ⚠ Bound to the biosphere's own constants, NOT re-declared. The station embeds the
+    # frozen biosphere; it does not get a second, independently-set step. A literal here
+    # would be a fourth copy of the step, and a duplicated unit is what this whole
+    # unfreeze exists to remove. ``bio_dt · bio_steps_per_day == 1`` day is enforced by
+    # ``station.driver.run_master_day``.
+    bio_dt: float = BIO_DT  # day — the biosphere's structural step
+    bio_steps_per_day: int = STEPS_PER_DAY  # slow sub-steps per master day
 
 
 # Module-level default (immutable) — the canonical Step-5 lighting scenario.
@@ -631,7 +644,13 @@ class SealedStationScenario:
     # day.
     steps_per_day: int = 1440
     cabin_dt: float = 60.0  # s — ECLSS's binding dt (k_scrub·dt = 0.06 < 1)
-    bio_dt: float = 1.0  # day — the frozen biosphere's structural step
+    # ⚠ Bound to the biosphere's own constants, NOT re-declared. The station embeds the
+    # frozen biosphere; it does not get a second, independently-set step. A literal here
+    # would be a fourth copy of the step, and a duplicated unit is what this whole
+    # unfreeze exists to remove. ``bio_dt · bio_steps_per_day == 1`` day is enforced by
+    # ``station.driver.run_master_day``.
+    bio_dt: float = BIO_DT  # day — the biosphere's structural step
+    bio_steps_per_day: int = STEPS_PER_DAY  # slow sub-steps per master day
 
     @property
     def days(self) -> int:

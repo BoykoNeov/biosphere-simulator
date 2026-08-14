@@ -66,6 +66,7 @@ stdlib in the spine; every coefficient loads via the sibling / station loaders.
 from collections.abc import Callable
 
 from domains.biosphere.season import annual_reset, build_season, weather_resolver
+from domains.biosphere.step import steps_for
 from domains.biosphere.stocks import (
     CARBON_POOL,
     DAYLENGTH_VAR,
@@ -482,17 +483,27 @@ def sealed_reset(
 
     The two-rate analogue of :func:`domains.biosphere.season.run_perennial`'s reset
     closure — fires ``annual_reset`` (die-to-litter + re-sow from the grain seed bank,
-    ``thermal_time`` → 0) at each ``n % season_days == 0`` (``n > 0``). Handed to
+    ``thermal_time`` → 0) at each season boundary. Handed to
     :func:`station.driver.run_master_day`'s ``slow_reset``, which re-asserts the coupled
     conservation gate across it (``annual_reset`` is CARBON-conserving, touching no
     other
     quantity). Without it the multi-year biosphere would never re-sow — the machinery
     the
     ≤7-day station runs never exercised.
+
+    ⚠ **The period is in STEPS, not days.** ``n`` is the slow domain's step count, so
+    the season length must be converted (``steps_for``). At ``dt = 1`` the two are the
+    same integer, and at ``dt = ¼`` the unconverted form *happens* to fire on the right
+    days anyway — ``4·day ≡ 0 (mod 305)`` iff ``day ≡ 0 (mod 305)``, because 305 is odd.
+    That is an accident of this season length, not a property of the code: at
+    ``season_days = 304`` the unconverted form would re-sow **four times a year**.
+    Converted deliberately, so correctness does not rest on a coprimality nobody wrote
+    down.
     """
+    season_steps = steps_for(scenario.season_days)
 
     def reset(n: int, current: State) -> State:
-        if n > 0 and n % scenario.season_days == 0:
+        if n > 0 and n % season_steps == 0:
             return annual_reset(current, scenario.bio)
         return current
 
@@ -530,5 +541,6 @@ def run_sealed(
         steps_per_day=scenario.steps_per_day,
         slow_dt=scenario.bio_dt,
         fast_dt=scenario.cabin_dt,
+        slow_steps_per_day=scenario.bio_steps_per_day,
         slow_reset=sealed_reset(scenario),
     )

@@ -54,6 +54,18 @@ ledger assertions fail loudly and name themselves, which is a better list than o
 guess at across 34 sites, and a site that stays green is a site whose `1.0` was a genuine
 unit-test constant rather than a season's step.
 
+⚠ **"~34" is a LITERAL-SEARCH number and is wrong in both directions — advisor, 2026-08-14.**
+It came from grepping the literal `1.0`, which is the same failure mode as the name search
+that missed `year_len` in commit 1. It over-counts (most `.bind(state, 1.0)` hits are ordinary
+unit tests that construct their own env at their own `dt` and never touch a run trajectory)
+**and** it under-counts in a way a literal grep can never see: several sites already pass
+`scenario.bio_dt` rather than `1.0` (`test_lighting_run.py:313,323`,
+`test_crew_coupled_loop.py:487`, `test_greenhouse_run.py:198`, `test_harvest_run.py:268`,
+`test_station_perturbations.py:284`) and so **follow the flip automatically** — invisible to a
+`1.0` search, and correct already. Enumerate by **callee** — every `.bind(` and `.evaluate(`,
+then read the `dt` argument — exactly the rule commit 1 paid for. The count is not load-bearing
+either way: this class fails loudly, so the flip's own red list is the authority.
+
 ### ⚠ The SIXTH class — a period in DAYS used against a STEP index (fix in commit 1)
 
 Found 2026-08-14 while auditing the routing's *arguments*, and **not findable by any test
@@ -218,6 +230,66 @@ covering a quarter-year, and `is_period_2` may well still classify the 4×-resam
 So: **every array length in every regenerated golden stays identical, and `horizon_years`
 stays 15.** A length change is not a value moving — it is a missed conversion.
 
+### 4b. The STATION half — written 2026-08-14, before any constant moved
+
+⚠ **The table above is entirely biosphere observables.** Four station goldens move with this
+change and had **no written prediction at all**, which would have forfeited exactly the
+attributability commit 1 bought. Advisor finding; this subsection is the repair, and it is a
+**gate**: nothing is regenerated until it is written.
+
+**(i) The `n` pin — exact, and the sharpest test in this ceremony.** Every state golden pins
+the integer step counter. `n` counts *slow steps*, so the flip multiplies it by exactly 4 —
+no science, no truncation error, no judgement. **A wrong `n` is a missed conversion, full
+stop.** Enumerated from disk (not from the 7-scenario roster — see the "coverage roster ≠
+manifest" lesson):
+
+| golden | now | predicted | why |
+|---|---|---|---|
+| `season_euler_state` | 305 | **1220** | 305 d × 4 |
+| `n_limited_state` | 305 | **1220** | 305 d × 4 |
+| `water_biting_state` | 305 | **1220** | 305 d × 4 |
+| `sealed_chamber_state` | 915 | **3660** | 3 yr |
+| `consumer_chamber_state` | 1525 | **6100** | 5 yr |
+| `perennial_chamber_state` | 1525 | **6100** | 5 yr |
+| `consumer_long_horizon_state` | 4575 | **18300** | 15 yr |
+| `perennial_long_horizon_state` | 4575 | **18300** | 15 yr |
+| `greenhouse_state` | 7 | **28** | 7 master days × 4 slow steps |
+| `harvest_state` | 7 | **28** | 7 master days × 4 |
+| `lighting_state` | 7 | **28** | 7 master days × 4 |
+| `sealed_station_state` | 1220 | **4880** | 4 yr of master days × 4 |
+
+**(ii) The goldens that must stay BYTE-IDENTICAL.** No biosphere in them, so the step cannot
+reach them. If any of these moves, the flip leaked somewhere it had no business being:
+`cabin_gas_state`, `crew_state`, `eclss_state`, `power_state`, `power_self_discharge_state`,
+`thermal_state`, `station_state`, `water_recovery_state`, `demo_euler_state`,
+`demo_rk4_state`, `state_snapshot`, `sealed_energy_drift_summary`.
+
+**(iii) A structural prediction with teeth — the lighting seam's Power half.**
+`src/station/lighting.py` states that **Power and the biosphere share no stock**; the lamp is
+driven by a constant forcing, not by anything the plant does. So in `lighting_state.json` the
+biosphere stocks move and `power.battery`, `boundary.waste_heat` and `boundary.light_used`
+must come back **bit-identical**. If a Power stock moves, "coupled only by a forcing schedule"
+was wrong, which is a **seam finding**, not a step finding.
+
+**(iv) Values — directional, with the honest label on each.** These are *derived* from the
+biosphere anchors above, not separately measured; the derivation is stated so a miss is
+diagnosable rather than merely surprising.
+
+| observable | expectation | reasoning |
+|---|---|---|
+| greenhouse / harvest / lighting biosphere stocks | **small, < ~1 %** | 7-day runs. The compensation-point crossing is a season-scale effect; over 7 days only local Euler truncation error shows. |
+| greenhouse cabin gas (shared stocks) | small, same sign as its biosphere leg | in the greenhouse the biosphere's gas pools **are** the cabin air |
+| sealed-station biosphere CO₂ | **up**, order the biosphere rows (~+18 ppm scale) | same mechanism, same 4-yr scale as `sealed_chamber` |
+| sealed-station peak organic C | **down a few %** | tracks sealed peak leaf C, down ~3 % |
+| sealed-station crew / ECLSS / power stocks | small | coupled to the biosphere only through the gas and food seams, and buffered |
+| `rationed`, extinction `events` | **0 and `()`** | ⚠ **assertions, not predictions** |
+
+**(v) The shape assertions, restated for the station.** `states` holds one entry per **master
+day**, and `slow_steps_per_day` does not change that (`driver.py` keeps `states.append` in the
+master-day loop). So **every station trajectory length is unchanged** and every day-indexed
+slice in the station tests stays correct. A station trajectory that got 4× longer means the
+`states.append` moved inside the slow loop — a driver bug, not a step effect.
+
 ## 5. The rest of the ceremony, in order
 
 0. ✅ **The discriminating check — RUN 2026-08-14, PASSED.** `BIO_DT`/`STEPS_PER_DAY` were
@@ -275,6 +347,17 @@ stays 15.** A length change is not a value moving — it is a missed conversion.
    updated deliberately — unlike commit 1, which nothing catches. Keep that assertion a
    **literal**; rewriting it to compare against `BIO_DT` would make the contract auto-follow
    the code, which is the opposite of a freeze.
+
+   ⚠ **But the STATION half of the same statement is honor-system — checked 2026-08-14.**
+   The two contracts are asymmetric and it would be easy to assume the biosphere's loud gate
+   covers both. It does not. `docs/station-reference.manifest.json` records the step **only**
+   in `numerics_note` prose (*"biosphere-slow dt=1 day"*), and that string is a hard-coded
+   literal inside the **generator** (`tests/test_station_freeze_manifest.py:286`), so the
+   generated manifest and the on-disk manifest agree with each other whatever `bio_dt` says.
+   Flipping `bio_dt` reddens **nothing** there. The note reads *"dt per scenario (enforced by
+   goldens, no importable constant)"* — true, but goldens enforce the *values*, and the prose
+   is what a reader takes the contract to say. This is the "freeze's prose half is ungated"
+   lesson again: **edit that literal deliberately, by hand, as part of the ceremony.**
 4. **Report the science gates** — every `science_bands` and `liveness_floors` reading. ⚠ A
    band failure is a **blocking finding to be argued past in writing**, never a number to
    re-tune; and a band *passing* is not an endorsement (`open_season` sits 3.8 % above the LAI

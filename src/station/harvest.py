@@ -308,4 +308,5 @@ def run_harvest(
         steps_per_day=gh.steps_per_day,
         slow_dt=gh.bio_dt,
         fast_dt=gh.cabin_dt,
+        slow_steps_per_day=gh.bio_steps_per_day,
     )
