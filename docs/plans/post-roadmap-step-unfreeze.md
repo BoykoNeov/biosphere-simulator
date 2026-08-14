@@ -350,12 +350,44 @@ Euler run at a finite step should sit below that limit, not above it, so one of 
 numbers is measured on a different subject. The likely explanation is that the sweep's figure
 predates several mechanisms that have since landed (stem reserves, soil layers, root
 coupling), so its converged limit is a limit for a tree that no longer exists — but that is an
-*explanation*, not a measurement, and it is not being treated as one. **It does not block:**
-the authorized criterion is clearing the compensation point at 61.07 ppm, which 76.82 does by
-a wide margin in the same direction. ⚠ **The `step.py` docstring's convergence sequence and
-RK4 limit are therefore STALE and must not be re-quoted as current** until re-measured on
-today's tree. Filed as a successor, not fixed here — re-measuring an RK4 limit is a
-refinement study, not part of this ceremony.
+*explanation*, not a measurement, and it is not being treated as one.
+
+#### ⚠⚠ RESOLVED 2026-08-14 — and the explanation above was WRONG
+
+Measured, not argued (`temp/step-unfreeze-repin/probe_sequence.py`, both configurations, one
+tree, nothing touched): **the tree never changed.** The sweep's table reproduces **cell for
+cell** — sealed `57.8925 / 75.0588 / 75.8185 / 76.0339`, perennial
+`56.0299 / 74.9148 / 75.4757 / 75.6516` — on today's code.
+
+The real cause is the **run**, not the tree. `season.run_perennial` applies `annual_reset`
+**unconditionally**; it never asks whether the scenario is perennial (`season.py:609-612`).
+`sweep_biosphere.py` drove every scenario through it, while the sealed chamber's golden
+(`test_regression_sealed_season.py:60`) uses plain `run_season`. So the sweep's sealed rows
+are a **re-sown** sealed chamber — a run no golden performs — and 76.82 is the **no-re-sow**
+reading. Separated, each sequence converges monotonically from below to its own RK4 limit
+(~76.29 with re-sow, ~77.11 without): the paradox was the comparison.
+
+⚠ **The consequence is bigger than the docstring.** In its own configuration the sealed
+chamber reads **75.75 ppm at `dt = 1` — it never crossed 61.07 at all.** The chambers that did
+cross are **perennial (56.03)** and consumer, both of which genuinely re-sow. So this
+ceremony's headline named the wrong scenario, and the pair "57.9 → 76.82" compares two
+different kinds of run; the honest pairs are **56.03 → 75.48** (perennial) and
+**75.75 → 76.82** (sealed). **The step move and its authorisation stand** — the perennial
+crossing is real and is the thing the ceremony fixed.
+
+⚠ **Three lessons, and the first one is the cheap one that was skipped.** (1) The wrong
+explanation was *already refuted by evidence in hand*: sealed peak leaf agreed to 6 s.f.
+between the sweep and this ceremony, which a changed tree cannot do. A first explanation that
+fits is not a measurement. (2) A helper named for one scenario class that silently applies to
+all of them will be called on all of them; `run_perennial` should arguably assert its
+scenario. (3) The error propagated into the *recommended fix* — the successor `science_band`
+was proposed as *"the sealed chamber's season-low stays above the compensation point"*, aimed
+at the one scenario that never had the problem, where it would have passed immediately.
+**A guard inherits the locus of the diagnosis that motivated it.**
+
+⚠ **Not checked:** the `57.9 ppm` figure predates the sweep (it headlines
+`log/co2-enrichment-margin.md` and the CO₂-controller work), so whether those measured through
+the same unconditional re-sow is **unknown** and is named as an open question, not asserted.
 
 ### 4d. What the PORT caught that the reference did not (2026-08-14)
 

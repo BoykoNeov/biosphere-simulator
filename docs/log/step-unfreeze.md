@@ -10,9 +10,28 @@ sweep, which measured the axis and left the verdict open. This is the first unfr
 **numerics** item rather than a science one, and the first to move the biosphere and station
 contracts together. 13 goldens, both manifests, the native port and the Godot consumer.
 
-**Why.** At `dt = 1` the sealed chamber's season-low CO₂ was **57.9 ppm** and the crop kept
-fixing carbon there — below the **61.07 ppm** compensation point its own FvCB kinetics make a
-hard shutoff. Truncation, not biology. At `¼`: **76.82 ppm**.
+**Why.** At `dt = 1` the **perennial** chamber's season-low CO₂ was **56.03 ppm** and the crop
+kept fixing carbon there — below the **61.07 ppm** compensation point its own FvCB kinetics
+make a hard shutoff. Truncation, not biology. At `¼`: **75.48 ppm**.
+
+⚠ **CORRECTED 2026-08-14.** This read *"the sealed chamber's ... 57.9 ppm ... 76.82 ppm"*.
+Both numbers are real and neither belongs to the other: `season.run_perennial` re-sows
+**unconditionally** and the step sweep drove every scenario through it, while the sealed
+chamber's golden uses plain `run_season`. In its own configuration the sealed chamber reads
+**75.75 ppm at `dt = 1` — it never crossed**. The perennial and consumer chambers do re-sow,
+their goldens run that way, and their crossing is real, so **the step move stands and only the
+locus was wrong**. Corroborated two ways: the sweep's table reproduces cell for cell on today's
+tree, and today's `dt = 1` `run_season` reproduces the pre-unfreeze committed golden
+bit-exactly. Full detail in `src/domains/biosphere/step.py` and `docs/biosphere-reference.md`.
+
+⚠ **The generalisable part is not the arithmetic.** Every write-up of this ceremony repeated
+one scenario name, and the error travelled from the diagnosis into the *recommended fix* — the
+successor band proposed below was written as *"the sealed chamber's season-low stays above the
+compensation point"*, i.e. aimed at the only scenario that never had the problem, where it
+would have passed on day one and caught nothing. **A guard inherits the locus of the diagnosis
+that motivated it.** Also: a headline pair of before/after numbers is worth checking came from
+the same run before it is quoted a fourth time — nothing here was arithmetically wrong, and
+the pairing was wrong for three days across five files.
 
 ### The finding that shaped the whole job: the step was small, the UNIT was the work
 
@@ -118,11 +137,19 @@ the run, not a contract on it.
 
 ### Open, and deliberately not closed here
 
-* ⚠ **`step.py`'s convergence sequence and RK4 limit are STALE.** The measured 76.82 sits
-  *above* the sweep's quoted limit of 76.29, which a finite-step Euler run should not — the
-  sweep's limit was measured on a tree that has since gained stem reserves, soil layers and
-  root coupling. Re-measuring is a refinement study, not part of this ceremony. **Do not
-  re-quote those numbers as current.**
+* ~~⚠ **`step.py`'s convergence sequence and RK4 limit are STALE** — measured on a tree that
+  has since gained stem reserves, soil layers and root coupling.~~ **CLOSED 2026-08-14, and
+  the explanation was wrong.** The tree never changed: the sweep's table reproduces cell for
+  cell today. The sequence is the **re-sown** run's and the 76.82 is the **no-re-sow** run's,
+  and separated, each converges monotonically from below to its own RK4 limit — the paradox
+  was the comparison, not the numbers. Both sequences are now tabulated in `step.py`.
+  ⚠ **The instruction survives its own reason**: do not quote a convergence figure without
+  saying which run it belongs to. And a first explanation that *fits* is not a measurement —
+  this one was already contradicted by evidence in hand (peak leaf agreed to 6 s.f. across
+  the two, which a changed tree cannot do), and nobody looked.
+* ⚠ **Not checked, and named rather than assumed:** the `57.9 ppm` figure is older than the
+  sweep — it headlines `log/co2-enrichment-margin.md` and the CO₂-controller work — so whether
+  those measured the sealed chamber through the same unconditional re-sow is **unknown**.
 * `Γ*` is still a `TODO(cite)` entry, so the threshold cleared is provisional.
 * The parked leaf-expansion merge stays excluded: its whole evidence base was measured at
   `dt = 1` and must be re-measured before the question is put again.

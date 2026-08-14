@@ -76,49 +76,92 @@ imports its value from the code auto-follows the code), and the goldens enforce 
 The `dt = 1` reference **fixed carbon at concentrations where its own FvCB kinetics say it
 fixes none**: assimilation is `max(0, min(Ac, Aj))` and both branches carry `(Ci − Γ*)`, so
 with `Γ* = 42.75` and `ci_ratio = 0.7` the crop cannot draw the chamber below
-`Ca = 61.07 ppm` — and the sealed chamber's season-low sat at **57.9 ppm**. It was a
-**truncation error, not a threshold crossing**: the withdrawal was computed at the
-start-of-step concentration and applied for a whole day, so a step starting above the shutoff
-and ending below it never re-evaluated.
+`Ca = 61.07 ppm` — and the **perennial chamber's** season-low sat at **56.03 ppm**
+(consumer likewise). It was a **truncation error, not a threshold crossing**: the withdrawal
+was computed at the start-of-step concentration and applied for a whole day, so a step
+starting above the shutoff and ending below it never re-evaluated.
 
-**Measured at the shipped `dt = ¼`: the sealed chamber's season-low is `76.82 ppm`** —
-clear of the 61.07 shutoff, so the reference no longer fixes carbon below its own
+**Measured at the shipped `dt = ¼`: the perennial chamber's season-low is `75.48 ppm`**
+— clear of the 61.07 shutoff, so the reference no longer fixes carbon below its own
 compensation point. Authorized by the user (*"quarter the step"*, over `½`, which also clears
 it: `¼` leaves 4.8× headroom to the arbitration bound where `½` leaves 2.1×, so the next
 mechanism added probably does not force a second ceremony). Ceremony:
 [`plans/post-roadmap-step-unfreeze.md`](plans/post-roadmap-step-unfreeze.md).
 
+##### ⚠ CORRECTED 2026-08-14 — this entry named the SEALED chamber, and the sealed chamber never crossed
+
+This section, and every write-up of the ceremony, headlined *"the sealed chamber's season-low
+sat at 57.9 ppm"* and paired it with *"76.82 ppm at `dt = ¼`"*. **The pairing compares two
+different runs, and the 57.9 belongs to neither the sealed chamber's contract nor its
+golden.** A prose-only correction: no golden, threshold, scenario or manifest value moves.
+
+`season.run_perennial` applies `annual_reset` **unconditionally** — it never asks whether the
+scenario is a perennial one — and the 2026-08-13 step sweep drove *every* scenario through
+it. The sealed chamber's golden (`tests/test_regression_sealed_season.py`) uses plain
+`run_season` and re-sows never. Re-measured on today's tree:
+
+| scenario, in **its own golden's** configuration | `dt = 1` | `dt = ¼` | crossed at `dt = 1`? |
+|---|---|---|---|
+| `sealed_chamber` (no re-sow) | **75.75** | **76.82** | **no — never below 61.07** |
+| `perennial_chamber` (re-sows) | **56.03** | **75.48** | **yes** |
+| `consumer_chamber` (re-sows) | 73.29 | 74.42 | no (nearest, 20 % clear) |
+
+and the sweep's 57.89 is the sealed chamber's **third re-sown season**, a run no golden and
+no contract performs.
+
+⚠ **The step move stands; only the locus was wrong.** The perennial and consumer chambers
+re-sow, their goldens run that way, and the perennial crossing is real — a 8.3 % crossing of
+a hard shutoff, sustained. Two corroborations that this is a mislabelling and not model
+drift: the sweep's table reproduces **cell for cell** on today's tree, and today's `dt = 1`
+`run_season` reproduces the pre-unfreeze committed golden **bit-exactly**
+(`biosphere.carbon_pool = 2.35678018024373`).
+
 **Both figures the old note insisted be quoted together, restated:** the tail statistic that
-was **24 % low** (57.9 against a converged ~76) is the one this change fixes; the **headline
-outputs that moved ~3 %** moved as predicted (sealed peak leaf carbon 0.9215 → 0.8923, −3.2 %).
-Neither alone was an honest summary of the defect, and neither alone is an honest summary of
-the repair.
+was **26 % low** (56.03 against a converged ~75.75 on the perennial chamber) is the one this
+change fixes; the **headline outputs that moved ~3 %** moved as predicted (sealed peak leaf
+carbon 0.9215 → 0.8923, −3.2 %). Neither alone was an honest summary of the defect, and
+neither alone is an honest summary of the repair.
 
 ⚠ **Two things this does NOT claim.** (a) `Γ*` remains a `TODO(cite)` entry in
 `photosynthesis.yaml`, so the *crossing* was robust but the *number* 61.07 is still
 provisional — clearing a provisional threshold is a weaker result than clearing a cited one.
-(b) The convergence sequence and RK4 limit quoted in the 2026-08-13 sweep (`57.9 → 75.1 →
-75.8 → 76.0` against a limit of `76.29`) are **stale**: the measured 76.82 sits *above* that
-limit, which a finite-step Euler run should not, so the sweep's limit was measured on a tree
-that has since gained mechanisms (stem reserves, soil layers, root coupling). Re-measuring it
-is a refinement study and is **not** part of this ceremony — do not re-quote those numbers as
-current.
+(b) ~~The sweep's convergence sequence is stale because the tree gained mechanisms.~~
+**WITHDRAWN 2026-08-14 — that explanation was wrong.** The sequence
+(`57.9 → 75.1 → 75.8 → 76.0` against a limit of `76.29`) is arithmetically correct and
+reproduces exactly today; it is the **re-sown** sealed run's sequence, and the 76.82 it was
+compared against is the **no-re-sow** run's. Two configurations, not two trees. Separated,
+each converges monotonically from below to its own RK4 limit — which is what dissolves the
+apparent paradox. Both sequences are tabulated in `src/domains/biosphere/step.py`. What
+remains true is the *instruction*: **do not quote a convergence figure without saying which
+run it belongs to.**
 
 The historical record of the deviation while it stood — how it was found, the enrichment
 sweep, and the headroom measurement — is
 [`log/co2-enrichment-margin.md`](log/co2-enrichment-margin.md) and
-[`log/allocation-headroom.md`](log/allocation-headroom.md). ⚠ Read those as **dated**: they
-describe the `dt = 1` tree and their convergence numbers are superseded per (b) above.
+[`log/allocation-headroom.md`](log/allocation-headroom.md). ⚠ Read those as **dated**, and
+⚠ **also as unverified on this point**: they headline the same `57.9 ppm` figure and predate
+the sweep, so whether they measured the sealed chamber through the same unconditional re-sow
+has **not been checked**. Named as an open question, not asserted either way.
 
 ⚠ **The gap that let this ship for a year, worth more than the fix.** It was never a guard
 failure: arbitration rationed zero times, every golden gate was green, and every
-`science_band` passed. **A `science_bands` entry of the right shape — *"the sealed chamber's
-season-low CO₂ stays above the compensation point"* — would have caught it on day one.** The
-reason it did not exist is that the bands were written to describe what the model *does*, not
-to cross-check the model against its own kinetics. That band is now writable (it passes at
-76.82 ppm against 61.07) and adding it is the natural successor to this ceremony; it is
-deliberately **not** bundled here, because a band written in the same change that makes it
-pass is a restatement of the run, not a contract on it.
+`science_band` passed. **A `science_bands` entry of the right shape — *"every sealed
+scenario's season-low CO₂ stays above the compensation point"* — would have caught it on day
+one.** The reason it did not exist is that the bands were written to describe what the model
+*does*, not to cross-check the model against its own kinetics. That band is now writable (the
+perennial chamber passes at 75.48 ppm against 61.07, the sealed at 76.82) and adding it is the
+natural successor to this ceremony; it is deliberately **not** bundled here, because a band
+written in the same change that makes it pass is a restatement of the run, not a contract on
+it.
+
+⚠ **CORRECTED 2026-08-14, and this correction is the sharpest thing on this page.** The
+sentence above named *"the sealed chamber's season-low CO₂"* — **the one scenario that never
+crossed.** As originally written, the proposed guard would have passed on day one and caught
+nothing. The scenario-specific phrasing came from the same locus error as everything else in
+this entry, and it survived into the recommendation for the *fix*. **A guard inherits the
+locus of the diagnosis that motivated it; if the diagnosis names the wrong subject, the guard
+is aimed at it too.** Hence the band is written over the whole sealed roster rather than one
+scenario, which is also the form that does not need the diagnosis to have been right.
 
 ### The flow set + the aux processes
 
@@ -400,10 +443,13 @@ honor-system for such a change, so follow it deliberately rather than waiting fo
   This is the first unfreeze of a **numerics** item rather than a science item, and the
   first to move the station contract as well.
 
-  **Why.** The `dt = 1` reference drew the sealed chamber's CO₂ down to **57.9 ppm** and kept
-  fixing carbon there, below the `61.07 ppm` compensation point its own FvCB kinetics make a
-  hard shutoff — a truncation error, not biology. At `¼` the season-low is **76.82 ppm**.
-  See the resolved-deviation section above for both magnitudes and the two caveats.
+  **Why.** The `dt = 1` reference drew the **perennial** chamber's CO₂ down to **56.03 ppm**
+  and kept fixing carbon there, below the `61.07 ppm` compensation point its own FvCB kinetics
+  make a hard shutoff — a truncation error, not biology. At `¼` its season-low is
+  **75.48 ppm**. See the resolved-deviation section above for both magnitudes and the caveats.
+  ⚠ This entry read *"the sealed chamber ... 57.9 ppm ... 76.82 ppm"* until **2026-08-14**;
+  corrected there — the sealed chamber never crossed in its own configuration, and the pair of
+  numbers came from two different runs.
 
   **What changed.** `BIO_DT` / `STEPS_PER_DAY` in `src/domains/biosphere/step.py`, which is
   now the single place the step lives; the station's three scenarios bind `bio_dt` /
