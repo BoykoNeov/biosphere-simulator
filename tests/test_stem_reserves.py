@@ -1,4 +1,4 @@
-"""Stem-reserve remobilization — DIAGNOSED 2026-08-10, **BUILT 2026-08-12**.
+﻿"""Stem-reserve remobilization — DIAGNOSED 2026-08-10, **BUILT 2026-08-12**.
 
 ⚠ **THIS FILE WAS WRITTEN FOR A REFUSAL AND NOW GUARDS A BUILD, so read the word
 "frozen" below with care: it means "the tree WITHOUT the reserve", which this file now
@@ -133,8 +133,8 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.stem_reserves import StemRemobilization
-from domains.biosphere.step import BIO_DT, steps_for
-from domains.biosphere.stocks import pool_stock
+from domains.biosphere.step import BIO_DT, day_of, steps_for
+from domains.biosphere.stocks import SOIL_N, pool_stock
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -638,21 +638,39 @@ def test_the_frozen_stem_never_stops_growing_and_has_no_door_to_the_grain() -> N
     denominator — and move none of its carbon. The doors are MEASURED, by evaluating
     every flow against every step of a real trajectory, not read off the declarations.
 
-    ⚠ And the maintenance door is CONDITIONAL — it opens only on days when assimilation
-    does not cover upkeep — so a **one-snapshot** reading counts two. That is not just
-    wrong, it is *unstably* wrong: the door is open on **9.5 %** of `open_season`'s days
-    and **63.7 %** of `sealed_chamber`'s, so which answer a single snapshot gives
-    depends on the scenario. Both are measured below, rather than the frequency being
-    stated flat off the one scenario that happened to be in hand.
+    ⚠ And the maintenance door is CONDITIONAL — it opens only when assimilation does not
+    cover upkeep — so a **one-snapshot** reading counts two. That is not just wrong, it
+    is *unstably* wrong: the door is open on **1.6 %** of `open_season`'s steps and
+    **47.0 %** of `sealed_chamber`'s, so which answer a single snapshot gives depends on
+    the scenario. Both are measured below, rather than the frequency being stated flat
+    off the one scenario that happened to be in hand.
+
+    ⚠ **Re-measured 2026-08-14 (dt 1 → ¼): 9.5 % → 1.6 % and 63.7 % → 47.0 %.** The
+    open-season figure fell by a factor of six, far more than the 4× a per-step rate
+    would give mechanically — in absolute terms the door is open on ~4.8 days of the
+    season instead of ~29. A finer step integrates the day's assimilation against the
+    day's upkeep more closely, so fewer moments fall short; the coarse step was
+    manufacturing shortfalls by applying a whole day's respiration against a
+    start-of-day assimilation rate.
+
+    **The claim this docstring is making SURVIVES and is stronger.** It was that the
+    frequency is scenario-unstable, so a single snapshot cannot be trusted: the spread
+    was ~7× and is now ~29×. ⚠ But note what else this shows — the frequency is
+    *step*-unstable too, which the original text did not contemplate. A "measured, not
+    declared" number is only as portable as the numerics it was measured under.
     """
     states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1)
     assert rationed == 0
     total = _stem_total(states)
     a = _anthesis(states)
-    assert a == 251
-    assert total[-1] / total[a] == pytest.approx(1.6184, rel=1e-3)
-    # …and it is still gaining within days of the end of the run.
-    assert total.index(max(total)) >= len(total) - 15
+    # ⚠ `_anthesis` returns a STEP index into a step-indexed trajectory, so pin the DAY
+    # it lands on — the number that means something — not the raw index. (Was `a == 251`
+    # when a step was a day; anthesis is day 250 at `dt = ¼`, a one-day shift from the
+    # finer integration of thermal time.)
+    assert day_of(a) == 250
+    assert total[-1] / total[a] == pytest.approx(1.6106, rel=1e-3)
+    # …and it is still gaining within DAYS of the end of the run (a window in days).
+    assert total.index(max(total)) >= len(total) - steps_for(15)
 
     _state, registry = build_season(_without_reserve(sc.DEFAULT_SCENARIO))
     references = set()
@@ -701,8 +719,8 @@ def test_the_frozen_stem_never_stops_growing_and_has_no_door_to_the_grain() -> N
 
     sealed, _r, _e = _run(sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS)
     for scenario, years, traj, expected_rate in (
-        (sc.DEFAULT_SCENARIO, 1, states, 0.0951),
-        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, sealed, 0.6371),
+        (sc.DEFAULT_SCENARIO, 1, states, 0.015574),
+        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, sealed, 0.469672),
     ):
         ever, always, rate, both_legs = _door_census(scenario, years, traj)
         assert ever == {
@@ -789,10 +807,10 @@ def test_the_SOURCED_form_fixes_the_STEM_and_overshoots_the_grain() -> None:
     total = _stem_total(states)
     a = _anthesis(states)
     starch = _series(states, RESERVE_C)
-    assert starch[a] / total[a] == pytest.approx(0.4201, rel=1e-3)
-    assert total[-1] / total[a] == pytest.approx(1.0358, rel=1e-3)  # 0.9853 un-gated
+    assert starch[a] / total[a] == pytest.approx(0.420862, rel=1e-3)
+    assert total[-1] / total[a] == pytest.approx(1.029786, rel=1e-3)  # 0.9853 un-gated
     hi = _harvest_index(states)
-    assert hi == pytest.approx(0.6361, rel=1e-3)
+    assert hi == pytest.approx(0.636738, rel=1e-3)
     assert hi / ORACLE_HI == pytest.approx(1.1285, rel=1e-3)  # 13 % PAST the reference
 
 
@@ -819,7 +837,7 @@ def test_OUR_reconstruction_lands_on_the_grain_and_leaves_the_STEM_growing() -> 
     assert rationed == 0
     total = _stem_total(states)
     a = _anthesis(states)
-    assert total[-1] / total[a] == pytest.approx(1.3527, rel=1e-3)  # still +35 %
+    assert total[-1] / total[a] == pytest.approx(1.348389, rel=1e-3)  # still +35 %
     assert _harvest_index(states) == pytest.approx(0.5627, rel=1e-3)
     # the fill is a genuine one-shot: exactly one step where the reserve rose
     starch = _series(states, RESERVE_C)
@@ -860,7 +878,7 @@ def test_NEITHER_form_fixes_both_halves_and_that_is_the_refusal() -> None:
     growth_shape, growth_hi = rows["growth"]
     snap_shape, snap_hi = rows["snapshot"]
     # the control first: the untreated stem is the thing both forms are shrinking
-    assert frozen_shape == pytest.approx(1.6184, rel=1e-3)
+    assert frozen_shape == pytest.approx(1.610592, rel=1e-3)
     # …and only [A]'s form gets it near flat; ours leaves half the excess growth
     assert growth_shape < snap_shape < frozen_shape
     assert abs(growth_shape - 1.0) < 0.05 < abs(snap_shape - 1.0)
@@ -903,18 +921,49 @@ def test_the_drain_rate_is_BIT_INERT_on_carbon_and_only_relabels() -> None:
 
     ⚠ The stock that is ALLOWED to differ is asserted to actually differ, so this cannot
     pass by the two runs being identical for a trivial reason.
+
+    ⚠⚠ **SPLIT BY QUANTITY 2026-08-14 (the step unfreeze), because the flat version was
+    accidentally true.** It asserted that *no* stock outside the two carbon ones differs
+    at all, and that held at ``dt = 1`` only because the nitrogen coupling stayed below
+    the last bit. At ``dt = ¼`` — four times the steps, so four times the accumulation —
+    ``plant_n`` and ``soil_n`` cross it at **every** rate tested.
+
+    That is not a new mechanism, and it is not this test's mechanism failing: the very
+    next test, :func:`test_a_reserve_that_never_drains_moves_NITROGEN_and_the_reason_is_
+    the_target`, exists to say that grain weight sets the N target, so anything moving
+    carbon into grain moves nitrogen too. This test simply could not see it.
+
+    Measured across all three rates (``temp/step-unfreeze/probe_drain.py``): the CARBON
+    side is **exactly** the two allowed stocks at every rate — the claim in the title is
+    intact and exact — and the nitrogen side is ``plant_n`` ≤ 0.45 % and ``soil_n``
+    ≤ 1e-6. So the assertion now states the carbon claim exactly *and* bounds the
+    nitrogen coupling, which an unbounded N change would still fail. A flat set equality
+    could only have been kept by pretending the coupling is not there.
     """
     ref, _, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True, rate=0.1)
     for rate in (0.05, 0.2, 1.0):
         sub, _, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True, rate=rate)
         differ: set[str] = set()
+        worst: dict[str, float] = {}
         for a, b in zip(ref, sub, strict=True):
             for sid, st in a.stocks.items():
-                if _bits(st.amount) != _bits(b.stocks[sid].amount):
+                other = b.stocks[sid].amount
+                if _bits(st.amount) != _bits(other):
                     differ.add(str(sid))
-        assert differ == {str(RESERVE_C), str(STORAGE_C)}, (
-            f"rate={rate}: {sorted(differ)}"
+                    rel = abs(st.amount - other) / max(abs(st.amount), 1e-30)
+                    worst[str(sid)] = max(worst.get(str(sid), 0.0), rel)
+        carbon = {
+            s for s in differ if ref[0].stocks[s].quantity is Quantity.CARBON
+        }
+        assert carbon == {str(RESERVE_C), str(STORAGE_C)}, (
+            f"rate={rate}: the drain must only relabel carbon: {sorted(carbon)}"
         )
+        # The second-order N coupling, bounded rather than denied.
+        assert differ - carbon <= {str(PLANT_N), str(SOIL_N)}, (
+            f"rate={rate}: only N may follow the grain: {sorted(differ - carbon)}"
+        )
+        assert worst.get(str(PLANT_N), 0.0) < 5e-3, worst
+        assert worst.get(str(SOIL_N), 0.0) < 1e-5, worst
 
 
 def test_a_reserve_that_never_drains_moves_NITROGEN_and_the_reason_is_the_target() -> (
@@ -963,7 +1012,8 @@ def test_the_trigger_is_OURS_and_it_is_near_inert() -> None:
         grains.append(_series(states, STORAGE_C)[-1])
         peaks.append(max(_series(states, RESERVE_C)))
     assert len({_bits(v) for v in lais}) == 1  # the canopy does not notice at all
-    assert (max(grains) - min(grains)) / max(grains) == pytest.approx(0.0234, rel=2e-2)
+    spread = (max(grains) - min(grains)) / max(grains)
+    assert spread == pytest.approx(0.024505, rel=2e-2)
     # one-sided: only the trigger that eats into its own window costs anything
     assert (grains[0] - grains[2]) / grains[0] < 0.002
     assert (grains[0] - grains[3]) / grains[0] > 0.02
@@ -984,10 +1034,10 @@ def test_the_fill_fraction_is_the_only_number_that_moves_anything() -> None:
         his[fstr] = _harvest_index(states)
         ws[fstr] = _peak_w(states, sc.DEFAULT_SCENARIO)
     assert his[0.1] == pytest.approx(0.5160, rel=1e-3)
-    assert his[0.5] == pytest.approx(0.6739, rel=1e-3)
+    assert his[0.5] == pytest.approx(0.674711, rel=1e-3)
     ordered = [his[k] for k in sorted(his)]
     assert all(a < b for a, b in zip(ordered, ordered[1:], strict=False))  # monotone
-    assert ws[0.4] == pytest.approx(14.1457, rel=1e-3)
+    assert ws[0.4] == pytest.approx(14.314705, rel=1e-3)
     assert (
         ws[0.5] > 14.4248 > ws[0.4]
     )  # Table 7's TOP row crosses the Greenwood tripwire
@@ -1052,13 +1102,14 @@ def test_the_ungated_control_reproduces_the_values_recorded_before_it() -> None:
     assert rationed == 0
     total = _stem_total(states)
     a = _anthesis(states)
-    assert total[-1] / total[a] == pytest.approx(0.9853, rel=1e-3)  # the old stem shape
+    # the old stem shape
+    assert total[-1] / total[a] == pytest.approx(0.980573, rel=1e-3)
     assert _harvest_index(states) == pytest.approx(0.6487, rel=1e-3)  # the old HI
-    assert _series(states, STORAGE_C)[-1] == pytest.approx(34.3956, rel=1e-4)
+    assert _series(states, STORAGE_C)[-1] == pytest.approx(34.826488, rel=1e-4)
     # and the window's whole effect on the grain, stated once as a number
     gated = _series(_run(sc.DEFAULT_SCENARIO, 1, reserve=True)[0], STORAGE_C)[-1]
     assert gated / _series(states, STORAGE_C)[-1] - 1.0 == pytest.approx(
-        -0.0198, rel=1e-2
+        -0.019457, rel=1e-2
     )
 
 
@@ -1144,8 +1195,8 @@ def test_the_grain_gain_is_the_TRANSFER_not_the_two_exemptions() -> None:
     stripped = _series(
         _run(sc.DEFAULT_SCENARIO, 1, reserve=True, reserve_is_shed=True)[0], STORAGE_C
     )[-1]
-    assert plain / base - 1.0 == pytest.approx(0.5042, rel=1e-3)
-    assert stripped / base - 1.0 == pytest.approx(0.4677, rel=1e-3)
+    assert plain / base - 1.0 == pytest.approx(0.509562, rel=1e-3)
+    assert stripped / base - 1.0 == pytest.approx(0.472077, rel=1e-3)
     assert stripped / plain > 0.9  # the exemptions are a small part of it
 
 
@@ -1167,10 +1218,10 @@ def test_the_frozen_harvest_index_is_LOW_and_the_grain_mass_is_LOWER() -> None:
     twso_res = _t_per_ha(
         withres[-1].stocks[STORAGE_C].amount, sc.DEFAULT_SCENARIO.ground_area
     )
-    assert _harvest_index(frozen) / ORACLE_HI == pytest.approx(0.8400, rel=1e-3)
-    assert twso_frozen / 11.5 == pytest.approx(0.5202, rel=1e-3)
+    assert _harvest_index(frozen) / ORACLE_HI == pytest.approx(0.839057, rel=1e-3)
+    assert twso_frozen / 11.5 == pytest.approx(0.525043, rel=1e-3)
     assert _harvest_index(withres) / ORACLE_HI > 1.0
-    assert twso_res / 11.5 == pytest.approx(0.7825, rel=1e-3)
+    assert twso_res / 11.5 == pytest.approx(0.792584, rel=1e-3)
 
 
 # =====================================================================================
@@ -1199,7 +1250,7 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
         sc.PERENNIAL_CHAMBER_SCENARIO, sc.PERENNIAL_CHAMBER_YEARS, resets=True
     )
     assert r0 == 0
-    assert min(_series(frozen, CARBON_POOL)) == pytest.approx(0.055175, rel=1e-4)
+    assert min(_series(frozen, CARBON_POOL)) == pytest.approx(0.076461, rel=1e-4)
 
     for form in ({}, {"snapshot_fill": True}):
         for scen, years, resets in (
@@ -1230,7 +1281,7 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
     # A detail worth keeping: in the two shedding-fed chambers our reconstruction leaves
     # the CO2 trough EXACTLY at the frozen value, because the trough happens before the
     # single fill event ever fires.
-    for scen, years, frozen_min in (
+    for scen, years, frozen_min, bit_identical in (
         # ⚠ 0.076380 → 0.076482 on 2026-08-12, and NOT because of the reserve: this
         # build
         # re-sized `SEALED_CHAMBER_SCENARIO`'s litter seed 3.0 → 3.5, because the extra
@@ -1239,7 +1290,8 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
         # scenario exists for. Recorded here rather than silently re-pinned, because a
         # number that moves for a reason other than the mechanism under test is exactly
         # the kind this repo has been caught by before.
-        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, 0.076482),
+        # ⚠ 0.076482 → 0.077538 on 2026-08-14 (the step unfreeze, dt 1 → ¼).
+        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, 0.077538, True),
         # ⚠ 0.085006 → 0.088509 → 0.093346, all on 2026-08-12 and for two different
         # reasons: the soil-water re-basing re-declared the scenario, then `WSFD`
         # ([F] Eqn 15.8) made drought accelerate development. `water_biting` is one of
@@ -1247,14 +1299,29 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
         # roster stays bit-identical. The MECHANISM claim below (the trough is
         # bit-identical with and without the reserve) is unchanged and is what the test
         # is for. Note `sealed_chamber` above did NOT move on either occasion.
-        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, 0.093346),
+        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, 0.101294, False),
     ):
         base, _, _ = _run(scen, years)
         snap, _, _ = _run(scen, years, reserve=True, snapshot_fill=True)
         assert min(_series(base, CARBON_POOL)) == pytest.approx(frozen_min, rel=1e-4)
-        assert _bits(min(_series(snap, CARBON_POOL))) == _bits(
-            min(_series(base, CARBON_POOL))
-        )
+        if bit_identical:
+            assert _bits(min(_series(snap, CARBON_POOL))) == _bits(
+                min(_series(base, CARBON_POOL))
+            )
+        else:
+            # ⚠ `water_biting` STOPPED being bit-identical at `dt = ¼` (2026-08-14), and
+            # the comment above says exactly why it ever was: the trough "happens before
+            # the single fill event ever fires". That is an ORDERING of two events in
+            # time, and a finer step re-times both — for `water_biting` the trough now
+            # falls on the other side of the fill. `sealed_chamber` still clears it.
+            #
+            # So this was never a statement about the reserve being inert; it was a
+            # statement about *when* this scenario's trough happens, which the step
+            # controls. Recorded with the measured gap rather than dropped: the reserve
+            # still may not move the trough MUCH, and that bound is the surviving claim.
+            got = min(_series(snap, CARBON_POOL))
+            ref = min(_series(base, CARBON_POOL))
+            assert abs(got - ref) / ref < 0.05, (got, ref)
 
 
 @pytest.mark.slow
@@ -1300,29 +1367,61 @@ def test_the_reserve_passes_every_manifest_liveness_floor_the_frozen_tree_passes
             non_collapsing(leafs, floor=0.05),
             max(leafs[8:]),
         )
-    assert out["frozen"][1] == pytest.approx(0.055175, rel=1e-4)
-    assert out["frozen"][5] == pytest.approx(0.634352, rel=1e-4)
-    assert out["stem0"][1] == pytest.approx(0.046065, rel=1e-4)
-    assert out["stem0"][2] is False and out["stem0"][3] is False  # the harness CAN fail
-    # …and the subject passes every one of them.
+    assert out["frozen"][1] == pytest.approx(0.076461, rel=1e-4)
+    assert out["frozen"][5] == pytest.approx(0.611984, rel=1e-4)
+    assert out["stem0"][1] == pytest.approx(0.076527, rel=1e-4)
+    # ⚠⚠ **THE NON-VACUITY CONTROL DIED AT `dt = ¼` (2026-08-14), and that is a finding
+    # about this test, not a number to swap.** `stem0` sat here to show the harness CAN
+    # fail: at `dt = 1` it returned `(False, False)` on the stationarity and
+    # non-collapsing legs. It now returns `(True, True)` — the stem-only tree passes
+    # both closure gates the reserve was credited with rescuing one of.
+    #
+    # Two consequences, and the second is the one to act on:
+    #   1. Stem-only's refusal has both of its surviving closure legs discharged at the
+    #      shipped step. ⚠ NOT reopened here — see
+    #      `test_what_the_reserve_RESCUES_of_stem_onlys_two_closure_legs` for why
+    #      re-deciding a refusal inside the work that moved the tree is refused.
+    #   2. **The "…and the subject passes every one of them" claim below is now
+    #      VACUOUS.** Every arm passes, so the harness is no longer shown capable of
+    #      producing a failure, and a green bar here proves nothing. The measured truth
+    #      is asserted so the vacuity is visible rather than hidden behind a passing
+    #      control; a replacement control that genuinely fails at this step is
+    #      **outstanding work**, deliberately not invented inside this ceremony.
+    assert (out["stem0"][2], out["stem0"][3]) == (True, True)
+    # …and the subject passes every one of them — ⚠ see above: currently vacuous.
     r = out["reserve"]
     assert r[0] == 0
     # ⚠ Both subject readings moved in the LAST TWO DIGITS when the cessation window
     # landed (2026-08-12): trough 0.055977 -> 0.056030, fixed point 0.637424 ->
     # 0.637384. The two CONTROLS above are pinned at their original values and did not
     # move, which is what says the shift is the window and not the harness.
-    assert r[1] == pytest.approx(0.056030, rel=1e-4) and r[1] > 0.05
+    assert r[1] == pytest.approx(0.075476, rel=1e-4) and r[1] > 0.05
     assert r[2] is True and r[3] is True and r[4] is True
-    assert r[5] == pytest.approx(0.637384, rel=1e-4) and r[5] > 0.55
+    assert r[5] == pytest.approx(0.612211, rel=1e-4) and r[5] > 0.55
 
 
 @pytest.mark.slow
-def test_the_reserve_RESCUES_stem_onlys_co2_floor_but_not_its_stationarity() -> None:
-    """One of stem-only's two surviving closure legs is discharged; the other is not.
+def test_what_the_reserve_RESCUES_of_stem_onlys_two_closure_legs() -> None:
+    """Stem-only's refusal had two closure legs. At `dt = 1` the reserve discharged one.
+    At `dt = ¼` it discharges **both**.
 
-    ⚠ This does NOT reopen stem-only. Its refusal had two legs, the reserve fixes the
-    level and not the settledness, and re-deciding a refusal inside the work that moved
-    the tree underneath it is the shape this project refuses.
+    ⚠⚠ **CHANGED 2026-08-14 by the step unfreeze, and renamed because the old name
+    (`..._RESCUES_stem_onlys_co2_floor_but_not_its_stationarity`) stated the half-result
+    as a fact.** The CO₂ floor leg was already fixed. The stationarity leg — asserted
+    here as `is_stationary(...) is False`, i.e. still broken — now comes back **True**.
+    The non-settledness was a step artefact, not a property of the stem-only tree.
+
+    ⚠ **This still does NOT reopen stem-only, and the reason is unchanged and is the
+    one that matters more than the result.** Re-deciding a refusal inside the work that
+    moved the tree underneath it is the shape this project refuses — and that applies
+    with *more* force now, not less, because the change is in the refusal's favour. A
+    ceremony that quietly discharges a refusal it was not authorized to revisit is
+    exactly how a refusal stops meaning anything. Both legs passing is **recorded as a
+    finding and left for a separate decision**, with its own evidence, on its own terms.
+
+    (The Euler/step trap running in the third direction: `stem-only` was refused partly
+    on a stationarity reading, the reserve work re-read it, and the step re-read it
+    again. Each reading was correct about the tree it was taken on.)
     """
     states, rationed, _ = _run(
         sc.PERENNIAL_CHAMBER_SCENARIO,
@@ -1336,7 +1435,7 @@ def test_the_reserve_RESCUES_stem_onlys_co2_floor_but_not_its_stationarity() -> 
     )
     scale = max(co2)
     assert rationed == 0
-    assert min(co2) == pytest.approx(0.053177, rel=1e-4)  # 0.053127 before the window
+    assert min(co2) == pytest.approx(0.075578, rel=1e-4)  # 0.053127 before the window
     assert non_collapsing(co2, floor=0.05) is True  # stem-only's 0.046065 leg: FIXED
     assert (
         is_stationary(
@@ -1345,8 +1444,9 @@ def test_the_reserve_RESCUES_stem_onlys_co2_floor_but_not_its_stationarity() -> 
             slope_tol=0.02 * scale,
             transient=2,
         )
-        is False
-    )  # …the other leg: NOT fixed
+        is True
+    )  # ⚠ was False at dt=1 — the OTHER leg is fixed too now. See the docstring: this
+    #    is recorded, NOT taken as reopening the refusal.
 
 
 # =====================================================================================
@@ -1364,13 +1464,13 @@ def test_the_open_season_science_bands_survive_the_reserve_but_the_margin_shrink
     """
     frozen, _, _ = _run(sc.DEFAULT_SCENARIO, 1)
     res, _, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True)
-    assert _peak_lai(frozen, sc.DEFAULT_SCENARIO) == pytest.approx(5.1908, rel=1e-4)
-    assert _peak_w(frozen, sc.DEFAULT_SCENARIO) == pytest.approx(12.6331, rel=1e-4)
+    assert _peak_lai(frozen, sc.DEFAULT_SCENARIO) == pytest.approx(5.298122, rel=1e-4)
+    assert _peak_w(frozen, sc.DEFAULT_SCENARIO) == pytest.approx(12.765369, rel=1e-4)
     lai, w = _peak_lai(res, sc.DEFAULT_SCENARIO), _peak_w(res, sc.DEFAULT_SCENARIO)
     assert 5.0 < lai < 8.0 and lai < 6.0
-    assert lai / 6.0 == pytest.approx(0.9104, rel=1e-3)
+    assert lai / 6.0 == pytest.approx(0.928654, rel=1e-3)
     assert w < 14.4248
-    assert w / 14.4248 == pytest.approx(0.9810, rel=1e-3)
+    assert w / 14.4248 == pytest.approx(0.9923680, rel=1e-3)
 
 
 def test_n_limited_keeps_the_regime_it_was_built_for() -> None:
@@ -1399,10 +1499,13 @@ def test_n_limited_keeps_the_regime_it_was_built_for() -> None:
         ]
 
     a, b = fn(frozen), fn(res)
-    assert min(a) == pytest.approx(0.175851, rel=1e-5)  # the recorded value
-    assert sum(1 for v in a if v < 1.0) == 187
-    assert min(b) == pytest.approx(0.178930, rel=1e-5)
-    assert sum(1 for v in b if v < 1.0) == 186
+    assert min(a) == pytest.approx(0.177822, rel=1e-5)  # the recorded value
+    # ⚠ These count STEPS the stress bites on, over a step-indexed trajectory — 187/186
+    # while a step was a day, and 4× that now. Compared in DAYS so the number keeps
+    # meaning what it did: the stress bites on ~187 days either way, which is the claim.
+    assert day_of(sum(1 for v in a if v < 1.0)) == 187
+    assert min(b) == pytest.approx(0.180928, rel=1e-5)
+    assert day_of(sum(1 for v in b if v < 1.0)) == 186
     assert min(b) / min(a) < 1.02  # weakened by under 2 %, regime intact
 
 
@@ -1426,18 +1529,18 @@ def test_option_Bs_litter_C_to_N_identity_survives_the_nitrogen_free_starch() ->
             # nitrogen-free starch leaves option (B)'s emergent litter C:N intact — is
             # re-measured and holds: the shedding-fed chamber moves 1.6 %, because the
             # starch drains to grain and never reaches litter at all.
-            103.3038,
-            104.9727,
+            103.541580,
+            105.163270,
         ),
         (
             sc.PERENNIAL_CHAMBER_SCENARIO,
             sc.PERENNIAL_CHAMBER_YEARS,
             True,
-            10.8900,
+            11.280148,
             # 12.7991 → 12.7822 on 2026-08-12 with the cessation window: less starch is
             # standing when the plant dies, so slightly less nitrogen-free carbon is
             # dumped into litter at the re-sow. The frozen control beside it is unmoved.
-            12.7822,
+            13.218522,
         ),
     ):
         for kw, expected in (({}, frozen_cn), ({"reserve": True}, res_cn)):
