@@ -288,9 +288,28 @@ samples, one per kind:
   calls `run_master_day` with the default `slow_steps_per_day=1`. ⚠ **That is the new guard
   working**, which is the good news inside the bad: the ceremony added the guard and did not
   run the tests it catches.
-* **Value pins and oracle comparisons.** `test_chamber_scale.py` reads 16.813 against a pinned
-  16.613; `test_oracle_smoke.py::test_development_completes_for_both` has DVS at 0.0073 against
-  a required 1.9, which is not a re-pin but a run that develops almost not at all.
+* **An eighth class, and it is the biggest single group: THE CEREMONY CONVERTED THE RUN
+  LENGTHS AND MISSED THE READ-BACK INDICES.** `test_oracle_smoke.py`'s DVS reaching **0.0073**
+  against a required 1.9 looked like a run that barely develops — a science defect, not a
+  stale pin. It is not. The harness builds the trajectory correctly, with
+  `run_season(..., BIO_DT, steps_for(len(weather)))`, and then reads it back with
+  `states[i] for i in range(len(ref))` — where `len(ref)` is the oracle's **day** count. So
+  `states[304]` is **day 76** of a 305-day season. Measured: as written it ends at DVS
+  0.007334; indexed by day (`states[steps_for(i)]`) it ends at **exactly 2.0**, matching the
+  oracle's 2.0. **Bookkeeping, not biology.**
+
+  ⚠ The insidious variant is in the same files: `n = min(len(ref), len(states))`. At `dt = 1`
+  that was `min(305, 306) = 305` and correct; it is now `min(305, 1221) = 305` and **still
+  returns the day count, silently, while indexing steps**. A `min` of two quantities in
+  different units cannot announce itself.
+
+  The same shape is present in `test_oracle_gap.py` and `test_oracle_gap_spring_wheat.py`
+  (12 of the 29 between them), and probably `test_potato_crop.py` and
+  `test_day_neutral_warm_habitat.py` — so this one class plausibly accounts for **up to 18**
+  of the 29. **The generalisable rule: converting a run's LENGTH is half the job; every index
+  that reads the trajectory back carries the same unit.**
+* **Value pins.** `test_chamber_scale.py` reads 16.813 against a pinned 16.613 — an ordinary
+  re-measurement, and the kind to do last, since it moves if the classes above are fixed.
 
 ⚠ **The generalisable failure is the accounting, not the physics.** Five commits of this batch
 worked from a red list produced by running *the files being edited*, and each handoff passed

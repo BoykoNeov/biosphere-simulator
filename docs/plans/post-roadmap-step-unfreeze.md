@@ -1,6 +1,16 @@
 # The step unfreeze — the biosphere moves to `dt = ¼` (authorized 2026-08-14)
 
-**Status: PLANNED 2026-08-14, IN PROGRESS. Authorized by the user** after Step 0's two
+**Status: PLANNED 2026-08-14, STILL IN PROGRESS — the re-pinning is done and item 8's
+gate is NOT met.** ⚠ Read this before treating the ceremony as landed: `uv run pytest -n 12`
+comes back **29 failed / 2305 passed** as of 2026-08-14, in 13 files, and every red list this
+ceremony worked from was produced by running only the files being edited. The 29 are this
+ceremony's own conflation classes in files the sweep never reached — including the
+compartment-ledger class fixed in exactly one file, and this ceremony's **own new**
+`slow_dt · slow_steps_per_day == 1 day` guard firing on a caller nobody ran. They are pinned
+as pre-existing-to-the-re-pin **by name** against `0a8d921`, and enumerated in
+`docs/log/step-unfreeze.md`. Item 8's `cargo test` / `cargo clippy` half is also unrun.
+
+**Authorized by the user** after Step 0's two
 measurement axes (`docs/log/co2-controller.md`, `docs/log/step-sweep.md`). The sweep
 recommended `dt = ½`; **the user chose `dt = ¼`** — the same ceremony, with 4.8× headroom
 instead of 2.1×, so the next mechanism added to the tree probably does not force a repeat.
@@ -540,7 +550,7 @@ parity-critical stepping path. Allowed with the rationale written at the site.
    only on their generation platform. All the biosphere goldens are transcendental and
    therefore already gated, so regenerating on Windows will not redden CI. The genuinely
    cross-platform gate is the cross-port tolerance band — which item 5 re-measures anyway.
-8. **Gates**: full suite including `-m slow`, `ruff`, `pyright`, `cargo test`, `cargo clippy`.
+8. ⚠ **NOT MET as of 2026-08-14 — see the status note at the top.** **Gates**: full suite including `-m slow`, `ruff`, `pyright`, `cargo test`, `cargo clippy`. `ruff` and `pyright` are green tree-wide; the full Python suite is **29 red**; `cargo` is unrun. ⚠ The failure mode this item exists to prevent is exactly what happened: five commits reported a red count taken from a **subset**, and each handoff carried it forward as the whole-suite figure.
    ⚠ `¼` is **4× raw simulation work**, so the full-suite upper bound is ~25 min, not the
    ~12 min quoted for `½`. Use targeted regeneration during the work and one full run at the
    end.
