@@ -76,7 +76,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.step import BIO_DT, steps_for
+from domains.biosphere.step import BIO_DT, day_of, steps_for
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
 
@@ -104,7 +104,35 @@ def _season_states() -> list[State]:
     return states
 
 
-def _our_lai(states: list[State]) -> list[float]:
+def _days_in(states: list[State]) -> int:
+    """How many physical days the trajectory covers — NOT ``len(states)``."""
+    return day_of(len(states) - 1) + 1
+
+
+def _by_day(states: list[State], days: int) -> list[State]:
+    """The state at the START of each of the first ``days`` physical days.
+
+    ⚠⚠ **THE UNIT SEAM OF THIS FILE.** The oracle reference is one row per
+    **day**; the trajectory is one entry per **step**. Those were the same list index
+    while the step was a day, and stopped being it on 2026-08-14. The step unfreeze
+    converted every run's *length* here (``run_season`` is correctly given
+    ``steps_for(...)``) and left every index that *reads the trajectory back* —
+    including, invisibly, ``n = min(len(ref), len(states))``, which was
+    ``min(305, 306) = 305`` and right, and became ``min(305, 1221) = 305`` and wrong
+    **without changing value**. *A ``min`` over two quantities in different units cannot
+    announce itself.*
+
+    ``steps_for(d)`` is the documented inverse of ``day_of``
+    (``domains.biosphere.step``) and is the identity at ``dt = 1``, so every use of this
+    helper is a no-op on the old step — which is what a correct conversion looks like.
+    """
+    return [states[steps_for(d)] for d in range(days)]
+
+
+def _our_lai(states: list[State], n: int) -> list[float]:
+    # ⚠ ``n`` is a DAY count, and was not a parameter before 2026-08-14: this walked
+    # the whole trajectory, so at ``dt = ¼`` its argmax was a STEP index being
+    # compared against the oracle's day 212.
     cp = load_canopy_params()
     return [
         leaf_area_index(
@@ -112,7 +140,7 @@ def _our_lai(states: list[State]) -> list[float]:
             sla_per_mol_c=cp.sla_per_mol_c,
             ground_area=_GROUND_AREA,
         )
-        for s in states
+        for s in _by_day(states, n)
     ]
 
 
@@ -121,11 +149,11 @@ def _our_dvs(states: list[State], n: int) -> list[float]:
     pp = load_phenology_params()
     return [
         development_stage(
-            states[i].aux["thermal_time"],
+            s.aux["thermal_time"],
             tsum_anthesis=pp.tsum_anthesis,
             tsum_maturity=pp.tsum_maturity,
         )
-        for i in range(n)
+        for s in _by_day(states, n)
     ]
 
 
@@ -230,7 +258,7 @@ def test_fixed_the_canopy_now_bootstraps() -> None:
     consequence* of the phenology error (``Allocation`` reads DVS), not an independent
     missing science. A fix that re-broke phenology would re-break this — turning it red.
     """
-    our_lai = _our_lai(_season_states())
+    our_lai = _our_lai(_season_states(), len(_reference()))
     oracle_lai = [r["LAI"] for r in _reference()]
 
     # Sowing interception is unchanged (same LAI₀) — the fix is in the growth dynamics.
@@ -319,7 +347,7 @@ def test_gap_lai_peaks_slightly_after_anthesis() -> None:
     recalibration has to account for it.
     """
     states = _season_states()
-    our_lai = _our_lai(states)
+    our_lai = _our_lai(states, len(_reference()))
     oracle_lai = [r["LAI"] for r in _reference()]
     our_peak_day = our_lai.index(max(our_lai))
     oracle_peak_day = oracle_lai.index(max(oracle_lai))
@@ -344,7 +372,8 @@ def test_gap_allocation_is_root_heavy() -> None:
     """
     states = _season_states()
     ref = _reference()
-    n = min(len(ref), len(states))
+    n = min(len(ref), _days_in(states))  # was `len(states)` — a STEP count
+    days = _by_day(states, n)
     our_dvs = _our_dvs(states, n)
     oracle_dvs = [r["DVS"] for r in ref[:n]]
 
@@ -352,14 +381,12 @@ def test_gap_allocation_is_root_heavy() -> None:
         oi, ri = _first_day_at(our_dvs, target), _first_day_at(oracle_dvs, target)
         assert oi is not None and ri is not None
         # Our-side band 1.5e-2: the sample index is a DVS threshold crossing (libm).
-        assert _organ_fractions(states[oi])["root"] == pytest.approx(
-            our_root, abs=1.5e-2
-        )
+        assert _organ_fractions(days[oi])["root"] == pytest.approx(our_root, abs=1.5e-2)
         assert _oracle_fractions(ref[ri])["root"] == pytest.approx(
             oracle_root, abs=1e-3
         )
         # The bias, as the comparison that matters: we still hold more root share.
-        assert _organ_fractions(states[oi])["root"] > _oracle_fractions(ref[ri])["root"]
+        assert _organ_fractions(days[oi])["root"] > _oracle_fractions(ref[ri])["root"]
 
 
 # =====================================================================================
@@ -416,16 +443,17 @@ def test_method_matched_day_confound_dissolved_with_the_phenology_fix() -> None:
     """
     states = _season_states()
     ref = _reference()
-    n = min(len(ref), len(states))
+    n = min(len(ref), _days_in(states))  # was `len(states)` — a STEP count
+    days = _by_day(states, n)
 
-    matched_day_ours = _organ_fractions(states[n - 1])["storage"]
+    matched_day_ours = _organ_fractions(days[n - 1])["storage"]
     matched_day_oracle = _oracle_fractions(ref[n - 1])["storage"]
 
     our_dvs = _our_dvs(states, n)
     oracle_dvs = [r["DVS"] for r in ref[:n]]
     oi, ri = _first_day_at(our_dvs, 2.0), _first_day_at(oracle_dvs, 2.0)
     assert oi is not None and ri is not None
-    matched_dvs_ours = _organ_fractions(states[oi])["storage"]
+    matched_dvs_ours = _organ_fractions(days[oi])["storage"]
     matched_dvs_oracle = _oracle_fractions(ref[ri])["storage"]
 
     # ⚠ THE SIGNS DISAGREE AGAIN (2026-08-12). Asserted as the disagreement it is,
@@ -443,11 +471,12 @@ def test_method_matched_day_confound_dissolved_with_the_phenology_fix() -> None:
     # ⚠ THE CONTROL, so the cause is named and not inferred: with the reserve off, both
     # reads go back to under-allocating at the values this test was written around.
     off = _season_states_without_reserve()
-    n_off = min(len(ref), len(off))
-    off_day = _organ_fractions_bare(off[n_off - 1])["storage"]
+    n_off = min(len(ref), _days_in(off))  # was `len(off)` — a STEP count
+    off_days = _by_day(off, n_off)
+    off_day = _organ_fractions_bare(off_days[n_off - 1])["storage"]
     off_dvs_i = _first_day_at(_our_dvs(off, n_off), 2.0)
     assert off_dvs_i is not None
-    off_dvs = _organ_fractions_bare(off[off_dvs_i])["storage"]
+    off_dvs = _organ_fractions_bare(off_days[off_dvs_i])["storage"]
     assert off_day == pytest.approx(0.390, abs=0.005)
     assert off_dvs == pytest.approx(0.302, abs=0.005)
     assert off_day < matched_day_oracle and off_dvs < matched_dvs_oracle
@@ -463,7 +492,10 @@ def test_method_the_death_spiral_is_gone() -> None:
     the canopy turns this red.
     """
     states = _season_states()
-    leaf = [s.stocks[LEAF_C].amount for s in states]
+    # ⚠ day-indexed: `peak_day` is used only to index `leaf`, so a step-indexed
+    # series was self-consistent and stayed green — but the name says DAY, and this file
+    # now carries one unit throughout, so a later comparison cannot pick the wrong one.
+    leaf = [s.stocks[LEAF_C].amount for s in _by_day(states, len(_reference()))]
     peak_day = leaf.index(max(leaf))
     # No spiral: leaf ends well above the scope-(A) < 20 % collapse threshold.
     assert leaf[-1] > 0.4 * leaf[peak_day]

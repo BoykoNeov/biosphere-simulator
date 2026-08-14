@@ -72,24 +72,54 @@ def _season_states() -> list[State]:
     return states
 
 
+def _by_day(states: list[State], days: int) -> list[State]:
+    """The state at the START of each of the first ``days`` physical days.
+
+    ⚠⚠ **THE UNIT SEAM OF THIS FILE, and it was wrong from 2026-08-14 until it was
+    measured.** The oracle reference is one row per **day**; the trajectory is one entry
+    per **step**. Those were the same list index while the step was a day, and they stop
+    being it the moment it is not — which is the whole class the step unfreeze exists to
+    remove, arriving here in the one place the ceremony did not look: it converted the
+    run's *length* (``run_season`` is correctly given ``steps_for(len(weather))``) and
+    left the indices that *read the trajectory back*.
+
+    What that cost: ``_our_dvs`` took ``states[i] for i in range(len(ref))``, so
+    ``states[304]`` was **day 76** of a 305-day season and the crop's development stage
+    came back **0.0073** against the 1.9 the test requires — which reads exactly like a
+    crop that fails to develop, and is not. Read by day it ends at **2.0**, matching the
+    oracle's 2.0.
+
+    ``steps_for(d)`` is the documented inverse of ``day_of`` (see
+    ``domains.biosphere.step``), and at ``dt = 1`` it is the identity — so the helper is
+    a no-op on the old step, which is what a correct conversion looks like.
+    """
+    return [states[steps_for(d)] for d in range(days)]
+
+
 def _our_dvs(states: list[State], n: int) -> list[float]:
     return [
         development_stage(
-            states[i].aux["thermal_time"],
+            s.aux["thermal_time"],
             tsum_anthesis=_TSUM_ANTHESIS,
             tsum_maturity=_TSUM_MATURITY,
         )
-        for i in range(n)
+        for s in _by_day(states, n)
     ]
 
 
-def _our_lai(states: list[State]) -> list[float]:
+def _our_lai(states: list[State], n: int) -> list[float]:
+    # ⚠ ``n`` is a DAY count and was not a parameter before 2026-08-14: this walked the
+    # whole trajectory, which is 4x as many points as the oracle's rows at ``dt = ¼``.
+    # The shape assertions below (monotone / unimodal) are scale-invariant, so that did
+    # not go red — it just quietly compared a denser series. Day-indexed so the file
+    # has ONE unit rather than two, and so a future ``nrmse`` against the oracle cannot
+    # be written against a mismatched length.
     cp = load_canopy_params()
     return [
         leaf_area_index(
             s.stocks[LEAF_C].amount, sla_per_mol_c=cp.sla_per_mol_c, ground_area=1.0
         )
-        for s in states
+        for s in _by_day(states, n)
     ]
 
 
@@ -139,7 +169,7 @@ def test_lai_hump_forms_oracle_fully_unimodal_ours_incompletely_senesced() -> No
     # senesced at season end (~62 % of peak). That incomplete senescence is the
     # tsum-partition residual surfacing in LAI shape; a recalibration that lengthens
     # grain fill turns this red.
-    our_lai = _our_lai(_season_states())
+    our_lai = _our_lai(_season_states(), len(_reference()))
     oracle_lai = [r["LAI"] for r in _reference()]
     assert _is_unimodal(oracle_lai)  # the oracle: a clean single hump
     # Ours: a genuine interior peak, rising from a low emergence (the bootstrap).
@@ -165,7 +195,7 @@ def test_magnitude_gap_closed_to_a_small_residual() -> None:
     # science written (the gap was downstream of the phenology error). Pinned as a small
     # residual in the known direction; a recalibration that closes it further turns this
     # red.
-    our_peak = max(_our_lai(_season_states()))
+    our_peak = max(_our_lai(_season_states(), len(_reference())))
     oracle_peak = max(r["LAI"] for r in _reference())
     assert our_peak > 4.0  # the canopy now genuinely closes (was ~0.09 in scope A)
     ratio = oracle_peak / our_peak

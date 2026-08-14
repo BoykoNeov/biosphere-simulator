@@ -74,7 +74,7 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.stem_reserves import StemRemobilization
-from domains.biosphere.step import BIO_DT, steps_for
+from domains.biosphere.step import BIO_DT, day_of, steps_for
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.state import State
 
@@ -118,6 +118,26 @@ def _run(scenario: SeasonScenario, days: int = _RUN_DAYS) -> list[State]:
     return states
 
 
+def _by_day(states: list[State]) -> list[State]:
+    """The state at the START of each physical day the trajectory covers.
+
+    ⚠⚠ **THE UNIT SEAM OF THIS FILE.** Every number this file compares against — the
+    oracle's rows, and the milestone *days* written into its own assertions (anthesis
+    33, maturity 108, the day-96 tuber reading) — is in **days**. The trajectory is one
+    entry per **step**. Those were the same list index while the step was a day, and
+    stopped being it on 2026-08-14: the step unfreeze converted this file's run *length*
+    (``_run`` correctly asks for ``steps_for(days)``) and left the indices that *read
+    the trajectory back*, so ``_first_at(dvs, 1.0)`` returned **131** where the
+    assertion expects 33 — a step index against a day literal, and almost exactly 4x it.
+
+    ⚠ *Almost* is the point: 131 is not 4 x 33 = 132. A near-4x is the signature of a
+    genuine day-boundary shift riding on the rescale, and reading only the ratio would
+    have missed which it was. ``steps_for`` is the identity at ``dt = 1``, so this
+    helper is a no-op on the old step.
+    """
+    return [states[steps_for(d)] for d in range(day_of(len(states) - 1) + 1)]
+
+
 def _dvs(states: list[State]) -> list[float]:
     pheno = load_phenology_params(crop_param_set("potato").paths["phenology"])
     return [
@@ -126,7 +146,7 @@ def _dvs(states: list[State]) -> list[float]:
             tsum_anthesis=pheno.tsum_anthesis,
             tsum_maturity=pheno.tsum_maturity,
         )
-        for s in states
+        for s in _by_day(states)
     ]
 
 
@@ -138,7 +158,7 @@ def _lai(states: list[State]) -> list[float]:
             sla_per_mol_c=canopy.sla_per_mol_c,
             ground_area=_GROUND_AREA,
         )
-        for s in states
+        for s in _by_day(states)
     ]
 
 
@@ -340,9 +360,19 @@ def test_gap_2_the_headline_the_two_sources_disagree_on_tuber_onset() -> None:
     # a cross-source disagreement recorded, not a defect calibrated away.
     states = _run(POTATO_SCENARIO)
     dvs = _dvs(states)
-    ours = next(i for i, s in enumerate(states) if s.stocks[STORAGE_C].amount > 0.0)
-    assert ours == 7
-    assert dvs[ours] == pytest.approx(0.192, abs=0.01)
+    # ⚠ enumerate DAYS, not steps: `ours` is compared against the oracle's day index
+    # below and used to index `dvs`, both of which are one-per-day. Enumerating `states`
+    # returned 24 here — a step index against a day literal.
+    ours = next(
+        i for i, s in enumerate(_by_day(states)) if s.stocks[STORAGE_C].amount > 0.0
+    )
+    # ⚠ day 7 -> 6 and DVS 0.192 -> 0.158 (2026-08-14, the step unfreeze). A ONE-DAY
+    # move, and it is a re-measurement rather than the index bug fixed just above: the
+    # finer step reaches the first non-zero tuber slightly earlier in the day, so the
+    # crossing lands in the previous day's bucket. The finding is unaffected — it is
+    # that the tuber fills from essentially emergence, and a day earlier is more of it.
+    assert ours == 6
+    assert dvs[ours] == pytest.approx(0.158, abs=0.01)
 
     oracle = _oracle()
     theirs = next(i for i, r in enumerate(oracle) if (r["TWSO"] or 0.0) > 0.0)
@@ -376,14 +406,22 @@ def test_gap_3_the_canopy_is_starved_downstream_of_gap_2() -> None:
     # neither was fitted.
     lai = _lai(_run(POTATO_SCENARIO))
     our_day, our_peak = _peak(lai)
-    assert our_day == 34
-    assert our_peak == pytest.approx(3.184, rel=1e-3)
+    assert our_day == 34  # unchanged by the step unfreeze
+    # ⚠ 3.184 -> 3.474 (2026-08-14, the step unfreeze), +9.1 %. The peak DAY did not
+    # move at all, which is what makes this readable as a re-integration of the same
+    # canopy rather than a re-indexing: a step bug moves the index, and this moved the
+    # value under a fixed index.
+    assert our_peak == pytest.approx(3.474, rel=1e-3)
 
     oracle_lai = [r["LAI"] for r in _oracle()]
     their_day, their_peak = _peak(oracle_lai)
     assert their_day == 51
     assert their_peak == pytest.approx(8.885, rel=1e-3)
-    assert their_peak / our_peak == pytest.approx(2.79, rel=0.02)
+    # ⚠ 2.79 -> 2.56: our canopy rose 9.1 % and the oracle is a committed constant,
+    # so the shortfall NARROWED. The docstring's '2.8x' is now 2.6x — still the same
+    # qualitative finding (a shortfall of the same magnitude class), and the number
+    # is re-measured rather than the claim re-worded around it.
+    assert their_peak / our_peak == pytest.approx(2.56, rel=0.02)
 
 
 def test_gap_4_the_tuber_over_fills_the_other_symptom_of_gap_2() -> None:
@@ -401,11 +439,17 @@ def test_gap_4_the_tuber_over_fills_the_other_symptom_of_gap_2() -> None:
     del canopy  # (kept above to document that both loaders share the carbon fraction)
     # mol C on 1 m2 -> kg dry matter per hectare.
     kg_per_ha = nitro.dm_kg_per_mol_c * 1e4
-    ours = states[96].stocks[STORAGE_C].amount * kg_per_ha
+    # ⚠ day 96, not step 96 — see `_by_day`. The oracle row below is `[96]` on a
+    # one-row-per-day table, and the two indices must mean the same thing.
+    ours = _by_day(states)[96].stocks[STORAGE_C].amount * kg_per_ha
     theirs = _oracle()[96]["TWSO"]
-    assert ours == pytest.approx(14260.0, rel=0.01)
+    # ⚠ 14260 -> 15039 (2026-08-14, the step unfreeze), +5.5 %. `theirs` is a
+    # committed oracle constant and does not move, so the whole ratio move is ours.
+    assert ours == pytest.approx(15039.0, rel=0.01)
     assert theirs == pytest.approx(7249.8, rel=1e-4)
-    assert ours / theirs == pytest.approx(1.97, rel=0.02)
+    # ⚠ 1.97 -> 2.07. The docstring above says "about 2x"; it was 1.97 and is now 2.07,
+    # so the round number it was written around is if anything more accurate now.
+    assert ours / theirs == pytest.approx(2.07, rel=0.02)
 
 
 def test_gap_5_we_are_root_heavy_at_mid_vegetative() -> None:
@@ -415,7 +459,24 @@ def test_gap_5_we_are_root_heavy_at_mid_vegetative() -> None:
     # front-loaded roots relative to us), so this is not a standing bias of our
     # allocation — it is per-crop, per-source.
     states = _run(POTATO_SCENARIO)
-    dvs = _dvs(states)
+    # ⚠ **DELIBERATELY STEP-RESOLUTION, and this is the counter-example to the rest of
+    # the file.** Everything else here is day-indexed because it compares against the
+    # oracle's daily rows or against a milestone written in days. This test compares
+    # nothing to a day: it asks for the organ split *at development stage 0.5*, so the
+    # right sample is the first moment DVS crosses 0.5, and the step-resolution answer
+    # is strictly the better one. Converting it to days was tried on 2026-08-14 and
+    # moved the measurement 0.360 -> 0.3525 by sampling up to three steps late.
+    # *A trajectory index only has to be in days when something it is compared against
+    # is.* Both bases are self-consistent; only one is more accurate here.
+    pheno = load_phenology_params(crop_param_set("potato").paths["phenology"])
+    dvs = [
+        development_stage(
+            s.aux["thermal_time"],
+            tsum_anthesis=pheno.tsum_anthesis,
+            tsum_maturity=pheno.tsum_maturity,
+        )
+        for s in states
+    ]
     index = next(i for i, d in enumerate(dvs) if d >= 0.5)
     state = states[index]
     live = (

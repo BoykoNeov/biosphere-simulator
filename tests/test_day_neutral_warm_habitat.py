@@ -37,7 +37,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.step import BIO_DT, steps_for
+from domains.biosphere.step import BIO_DT, day_of, steps_for
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.state import State
 
@@ -73,6 +73,14 @@ def _run(scenario: SeasonScenario) -> list[State]:
 
 
 def _dvs_series(states: list[State]) -> list[float]:
+    """Development stage, one entry per physical DAY — which is what its readers assume.
+
+    Its only index consumer is :func:`_first_day_at`, whose name says DAY and whose
+    result is compared against day literals (anthesis ~55, maturity ~93). The trajectory
+    is one entry per STEP, and those were the same list index only while the step was a
+    day: at dt = 1/4 the anthesis crossing came back **220**, a step index measured
+    against a 55-day expectation, and an exact 4x it.
+    """
     pp = load_phenology_params()
     return [
         development_stage(
@@ -80,7 +88,7 @@ def _dvs_series(states: list[State]) -> list[float]:
             tsum_anthesis=pp.tsum_anthesis,
             tsum_maturity=pp.tsum_maturity,
         )
-        for s in states
+        for s in (states[steps_for(d)] for d in range(day_of(len(states) - 1) + 1))
     ]
 
 
