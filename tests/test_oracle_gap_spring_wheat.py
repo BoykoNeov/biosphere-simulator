@@ -43,6 +43,10 @@ from pathlib import Path
 
 import pytest
 
+# ⚠ The day-vs-step read-back idiom lives in ONE place, `tests/day_index.py`
+# (`by_day`, `days_in`) — it was invented five ways in five files first. See that
+# module's docstring for why, and do not re-inline it here.
+from day_index import by_day
 from domains.biosphere.canopy import leaf_area_index
 from domains.biosphere.loader import load_canopy_params, load_phenology_params
 from domains.biosphere.phenology import development_stage
@@ -93,27 +97,6 @@ def _our_states(days: int) -> list[State]:
     return states
 
 
-def _by_day(states: list[State], days: int) -> list[State]:
-    """The state at the START of each of the first ``days`` physical days.
-
-    ⚠⚠ **THE UNIT SEAM OF THIS FILE.** The oracle reference is one row per **day**;
-    the trajectory is one entry per **step**. Those were the same list index while the
-    step was a day, and stopped being it on 2026-08-14. The step unfreeze converted this
-    file's run *length* — ``_our_states`` correctly asks for ``steps_for(days)`` — and
-    left every index that *reads the trajectory back*: ``states[i] for i in range(n)``
-    walked the first ``n`` **steps** of an ``n``-day season: a quarter of it.
-
-    ``steps_for(d)`` is the documented inverse of ``day_of``
-    (``domains.biosphere.step``) and is the identity at ``dt = 1``, so this helper is a
-    no-op on the old step — which is what a correct conversion looks like.
-
-    ⚠ Every index derived from a series built here (``_first_day_at``'s return, an
-    ``argmax``) is a DAY index and must index ``_by_day(...)``, never ``states``. That
-    second half is the one the sibling file got wrong in three more places.
-    """
-    return [states[steps_for(d)] for d in range(days)]
-
-
 def _our_dvs(states: list[State], n: int) -> list[float]:
     pp = load_phenology_params()
     return [
@@ -122,7 +105,7 @@ def _our_dvs(states: list[State], n: int) -> list[float]:
             tsum_anthesis=pp.tsum_anthesis,
             tsum_maturity=pp.tsum_maturity,
         )
-        for s in _by_day(states, n)
+        for s in by_day(states, n)
     ]
 
 
@@ -134,7 +117,7 @@ def _our_lai(states: list[State], n: int) -> list[float]:
             sla_per_mol_c=cp.sla_per_mol_c,
             ground_area=_GROUND_AREA,
         )
-        for s in _by_day(states, n)
+        for s in by_day(states, n)
     ]
 
 
@@ -335,7 +318,7 @@ def test_gap_oracle_allocates_more_to_root_early() -> None:
     our_i = _first_day_at(our_dvs, 0.5)
     oracle_i = _first_day_at(oracle_dvs, 0.5)
     assert our_i is not None and oracle_i is not None
-    days = _by_day(states, n)  # ⚠ `our_i` is a DAY index — see `_by_day`
+    days = by_day(states, n)  # ⚠ `our_i` is a DAY index — see `by_day`
     assert _our_root_fraction(days[our_i]) == pytest.approx(0.304, abs=3e-2)
     assert _oracle_root_fraction(oracle[oracle_i]) == pytest.approx(0.548, abs=1e-3)
     assert _oracle_root_fraction(oracle[oracle_i]) > _our_root_fraction(days[our_i])

@@ -48,6 +48,10 @@ from typing import Any
 
 import pytest
 
+# ⚠ The day-vs-step read-back idiom lives in ONE place, `tests/day_index.py`
+# (`by_day`, `days_in`) — it was invented five ways in five files first. See that
+# module's docstring for why, and do not re-inline it here.
+from day_index import by_day
 from domains.biosphere.canopy import leaf_area_index
 from domains.biosphere.carbon_budget import Allocation
 from domains.biosphere.loader import (
@@ -74,7 +78,7 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.stem_reserves import StemRemobilization
-from domains.biosphere.step import BIO_DT, day_of, steps_for
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.state import State
 
@@ -118,26 +122,6 @@ def _run(scenario: SeasonScenario, days: int = _RUN_DAYS) -> list[State]:
     return states
 
 
-def _by_day(states: list[State]) -> list[State]:
-    """The state at the START of each physical day the trajectory covers.
-
-    ⚠⚠ **THE UNIT SEAM OF THIS FILE.** Every number this file compares against — the
-    oracle's rows, and the milestone *days* written into its own assertions (anthesis
-    33, maturity 108, the day-96 tuber reading) — is in **days**. The trajectory is one
-    entry per **step**. Those were the same list index while the step was a day, and
-    stopped being it on 2026-08-14: the step unfreeze converted this file's run *length*
-    (``_run`` correctly asks for ``steps_for(days)``) and left the indices that *read
-    the trajectory back*, so ``_first_at(dvs, 1.0)`` returned **131** where the
-    assertion expects 33 — a step index against a day literal, and almost exactly 4x it.
-
-    ⚠ *Almost* is the point: 131 is not 4 x 33 = 132. A near-4x is the signature of a
-    genuine day-boundary shift riding on the rescale, and reading only the ratio would
-    have missed which it was. ``steps_for`` is the identity at ``dt = 1``, so this
-    helper is a no-op on the old step.
-    """
-    return [states[steps_for(d)] for d in range(day_of(len(states) - 1) + 1)]
-
-
 def _dvs(states: list[State]) -> list[float]:
     pheno = load_phenology_params(crop_param_set("potato").paths["phenology"])
     return [
@@ -146,7 +130,7 @@ def _dvs(states: list[State]) -> list[float]:
             tsum_anthesis=pheno.tsum_anthesis,
             tsum_maturity=pheno.tsum_maturity,
         )
-        for s in _by_day(states)
+        for s in by_day(states)
     ]
 
 
@@ -158,7 +142,7 @@ def _lai(states: list[State]) -> list[float]:
             sla_per_mol_c=canopy.sla_per_mol_c,
             ground_area=_GROUND_AREA,
         )
-        for s in _by_day(states)
+        for s in by_day(states)
     ]
 
 
@@ -364,7 +348,7 @@ def test_gap_2_the_headline_the_two_sources_disagree_on_tuber_onset() -> None:
     # below and used to index `dvs`, both of which are one-per-day. Enumerating `states`
     # returned 24 here — a step index against a day literal.
     ours = next(
-        i for i, s in enumerate(_by_day(states)) if s.stocks[STORAGE_C].amount > 0.0
+        i for i, s in enumerate(by_day(states)) if s.stocks[STORAGE_C].amount > 0.0
     )
     # ⚠ day 7 -> 6 and DVS 0.192 -> 0.158 (2026-08-14, the step unfreeze). A ONE-DAY
     # move, and it is a re-measurement rather than the index bug fixed just above: the
@@ -439,9 +423,9 @@ def test_gap_4_the_tuber_over_fills_the_other_symptom_of_gap_2() -> None:
     del canopy  # (kept above to document that both loaders share the carbon fraction)
     # mol C on 1 m2 -> kg dry matter per hectare.
     kg_per_ha = nitro.dm_kg_per_mol_c * 1e4
-    # ⚠ day 96, not step 96 — see `_by_day`. The oracle row below is `[96]` on a
+    # ⚠ day 96, not step 96 — see `by_day`. The oracle row below is `[96]` on a
     # one-row-per-day table, and the two indices must mean the same thing.
-    ours = _by_day(states)[96].stocks[STORAGE_C].amount * kg_per_ha
+    ours = by_day(states)[96].stocks[STORAGE_C].amount * kg_per_ha
     theirs = _oracle()[96]["TWSO"]
     # ⚠ 14260 -> 15039 (2026-08-14, the step unfreeze), +5.5 %. `theirs` is a
     # committed oracle constant and does not move, so the whole ratio move is ours.

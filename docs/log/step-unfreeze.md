@@ -358,6 +358,20 @@ the first time. What the batch found, beyond the arithmetic:
   measure of orthogonality; it is a measure of how small that stock is.* Cause: the plant now
   sees the perturbed CO₂ at four levels per day instead of one — the same mechanism that
   restated `o2_leak_is_absorbed_by_makeup_effort` earlier in this ceremony.
+* **The fix re-seeded the class it removed, and that was caught in review.** Five files
+  needed to read a step-indexed trajectory by day, so five invented the helper — in three
+  shapes, one of them an inlined generator with no helper at all — and a sixth file would
+  have had nothing canonical to copy. `step.py`'s `day_of` docstring had described the idiom
+  in prose for exactly this purpose and provided no function for it. It now has one
+  implementation, `tests/day_index.py`, and `step.py` points at it. *The same batch that
+  wrote "tying it to its source fixes the class" had to be told to apply it to its own fix.*
+* **A fitted cut written INTO the commit that argues against fitted cuts.** PIN 6's
+  replacement contained `peak_lai > 8.0 * 0.63` — 5.04 against a measured 5.0879, **0.95 %
+  of slack** — under prose reading "an order of magnitude above". A latent red one small move
+  from firing, of exactly the shape the four dropped bounds had. The teeth are the exact
+  `ratio` pin beside it, so the multiplier only has to mean what the sentence says.
+  ⚠ *Replacing a threshold with a contrast does not help if the contrast's own bound is cut
+  at the measurement.*
 * **Four hand-cut bounds dropped rather than re-cut.** The chamber/field leaf-area band had
   been re-centred **three times in five days**; the nitrogen throttle's regime ratio slipped
   8.20× → 7.96× against a round 8.0; PIN 6's `> 0.95`; PIN 9's twice-moved ±0.01 window.

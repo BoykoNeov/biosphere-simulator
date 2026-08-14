@@ -34,6 +34,10 @@ from pathlib import Path
 
 import pytest
 
+# ⚠ The day-vs-step read-back idiom lives in ONE place, `tests/day_index.py`
+# (`by_day`, `days_in`) — it was invented five ways in five files first. See that
+# module's docstring for why, and do not re-inline it here.
+from day_index import by_day
 from domains.biosphere.canopy import leaf_area_index
 from domains.biosphere.loader import load_canopy_params
 from domains.biosphere.phenology import development_stage
@@ -72,30 +76,6 @@ def _season_states() -> list[State]:
     return states
 
 
-def _by_day(states: list[State], days: int) -> list[State]:
-    """The state at the START of each of the first ``days`` physical days.
-
-    ⚠⚠ **THE UNIT SEAM OF THIS FILE, and it was wrong from 2026-08-14 until it was
-    measured.** The oracle reference is one row per **day**; the trajectory is one entry
-    per **step**. Those were the same list index while the step was a day, and they stop
-    being it the moment it is not — which is the whole class the step unfreeze exists to
-    remove, arriving here in the one place the ceremony did not look: it converted the
-    run's *length* (``run_season`` is correctly given ``steps_for(len(weather))``) and
-    left the indices that *read the trajectory back*.
-
-    What that cost: ``_our_dvs`` took ``states[i] for i in range(len(ref))``, so
-    ``states[304]`` was **day 76** of a 305-day season and the crop's development stage
-    came back **0.0073** against the 1.9 the test requires — which reads exactly like a
-    crop that fails to develop, and is not. Read by day it ends at **2.0**, matching the
-    oracle's 2.0.
-
-    ``steps_for(d)`` is the documented inverse of ``day_of`` (see
-    ``domains.biosphere.step``), and at ``dt = 1`` it is the identity — so the helper is
-    a no-op on the old step, which is what a correct conversion looks like.
-    """
-    return [states[steps_for(d)] for d in range(days)]
-
-
 def _our_dvs(states: list[State], n: int) -> list[float]:
     return [
         development_stage(
@@ -103,7 +83,7 @@ def _our_dvs(states: list[State], n: int) -> list[float]:
             tsum_anthesis=_TSUM_ANTHESIS,
             tsum_maturity=_TSUM_MATURITY,
         )
-        for s in _by_day(states, n)
+        for s in by_day(states, n)
     ]
 
 
@@ -119,7 +99,7 @@ def _our_lai(states: list[State], n: int) -> list[float]:
         leaf_area_index(
             s.stocks[LEAF_C].amount, sla_per_mol_c=cp.sla_per_mol_c, ground_area=1.0
         )
-        for s in _by_day(states, n)
+        for s in by_day(states, n)
     ]
 
 

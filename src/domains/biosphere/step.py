@@ -118,5 +118,14 @@ def day_of(n: int) -> int:
     the state at the start of day ``d``, and ``day_of(n)`` says which day step ``n``
     is in.
     Matches ``season._table``'s ``int(n · dt)`` exactly, by construction.
+
+    ⚠ **That sentence is an idiom, and stating it here without providing it cost 18 red
+    tests.** When five test files needed to read a step-indexed trajectory by day, five
+    invented it, in three shapes, one of them inlined — and the ones that got it wrong
+    got it wrong in a way no value comparison could catch (``min(len(ref),
+    len(states))`` was ``min(305, 306)`` and right, and became ``min(305, 1221)`` and
+    wrong **without changing value**). The idiom now has one implementation, in
+    ``tests/day_index.py`` (``by_day`` / ``days_in``); use it rather than re-deriving
+    it. It is test-side deliberately — nothing in ``src`` reads a trajectory by day.
     """
     return n // STEPS_PER_DAY

@@ -28,6 +28,10 @@ import datetime as _dt
 
 import pytest
 
+# ⚠ The day-vs-step read-back idiom lives in ONE place, `tests/day_index.py`
+# (`by_day`, `days_in`) — it was invented five ways in five files first. See that
+# module's docstring for why, and do not re-inline it here.
+from day_index import by_day
 from domains.biosphere.loader import load_phenology_params
 from domains.biosphere.phenology import development_stage
 from domains.biosphere.scenario import DEFAULT_SCENARIO, SeasonScenario
@@ -37,7 +41,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
-from domains.biosphere.step import BIO_DT, day_of, steps_for
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.state import State
 
@@ -88,7 +92,7 @@ def _dvs_series(states: list[State]) -> list[float]:
             tsum_anthesis=pp.tsum_anthesis,
             tsum_maturity=pp.tsum_maturity,
         )
-        for s in (states[steps_for(d)] for d in range(day_of(len(states) - 1) + 1))
+        for s in by_day(states)
     ]
 
 
