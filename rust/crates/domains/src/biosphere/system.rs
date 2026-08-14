@@ -864,9 +864,19 @@ pub fn build_season(scenario: &SeasonScenario) -> Result<(State, Registry), SimE
 
 /// A forcing schedule reading a precomputed per-day table (clamped at the end) — the
 /// `season._table` analogue.
+///
+/// Indexed by **elapsed physical days**, `int(n * dt)`, not by the step count. Every
+/// other forcing in this tree is a pure function of the integer `n`, which is fine for an
+/// analytic schedule — a half-sine sampled twice as often is the same half-sine — and
+/// wrong for a *table*: indexed by `n` at `dt = 1/4` it would hand the crop the whole
+/// season in the first quarter-year and then clamp on the final day for the rest.
+///
+/// At `dt = 1.0` this is `values[min(n, last)]` exactly, so no golden moves across the
+/// change. The port mirrors the rule, not the rationale — the Python reference in
+/// `domains/biosphere/season.py::_table` is the authority.
 fn table_schedule(values: Vec<f64>) -> Schedule {
     let last = values.len() - 1;
-    Box::new(move |n, _dt| values[(n as usize).min(last)])
+    Box::new(move |n, dt| values[((n as f64 * dt) as usize).min(last)])
 }
 
 /// The weather forcing table (per-var schedules), tiling the raw facts over `years`.
