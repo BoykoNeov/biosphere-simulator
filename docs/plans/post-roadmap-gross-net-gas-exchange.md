@@ -1,8 +1,14 @@
 # Gross/net gas exchange — the plant breathes continuously
 
-**Status: stages 3 + 1 BUILT 2026-08-14, measured, NOTHING REGENERATED. Stages 0 + 2 not
-built (finding 11). See the build section at the foot of this file for what was measured
-before any golden moved — including the science gate that goes RED (finding 14).**
+**Status: stages 3 + 1 BUILT AND SHIPPED 2026-08-14 — the ceremony is COMPLETE.** 13
+goldens, both manifests, both reference docs, the Rust mirror and 99 re-pinned tests; full
+suite green (2404 passed). Stages 0 + 2 are **not built** (finding 11), so "minute by
+minute" is not delivered — a real day/night cycle at quarter-day granularity is. The build
+section at the foot of this file is the measurement record, taken **before** any golden
+moved; ⚠ its finding 14 headline was corrected once already (the band passes at the
+shipped step and fails converged), and the gate report was corrected again after shipping
+— *the liveness floors were omitted from it, and two of them narrowed*. See
+`docs/biosphere-reference.md`.
 
 ## Charge
 

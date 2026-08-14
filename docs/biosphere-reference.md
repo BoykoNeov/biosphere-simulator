@@ -422,9 +422,25 @@ regulator is a **5 %/day loss above LAI 6**, so it can only push the canopy furt
 ⇒ **This is recorded, not tuned.** Retuning the bound so the change fits is the
 co-adaptation this contract has refused three times. What the deviation says is that the
 tree is now short of a growth mechanism it was previously compensating for with a flat sun —
-the successor question, and it is not answered here. Every other gate moved *away* from
-danger: the Greenwood peak-W crossing (14.4248 t/ha) goes from 2.20 % of margin to 4.75 %,
-and all five chamber CO₂ compensation-point bands still clear their floor.
+the successor question, and it is not answered here.
+
+⚠ **The other gates do NOT all move away from danger, and an earlier draft of this section
+said they did.** Two open, two narrow:
+
+| gate | before | after | reading |
+|---|---|---|---|
+| Greenwood peak-W crossing (14.4248 t/ha) | 2.20 % margin | **4.75 %** | opens |
+| CO₂ compensation point, all five chambers | 1.219–1.258× floor | **1.154–1.209×** | narrows, all clear |
+| perennial converged peak-leaf, `max(tail) > 0.55` | 0.612211 (+11.3 %) | **0.603679 (+9.8 %)** | narrows |
+| perennial annual-min chamber CO₂, floor 0.05 | 0.075476 (+51.0 %) | **0.071036 (+42.1 %)** | narrows |
+| the two peak-leaf non-collapsing floors + consumer year-end carbon | ≫ | **+1048 % / +1195 % / +5343 %** | nowhere near |
+
+⚠ **The perennial peak-leaf series is the one to watch, and not at the bound the manifest
+states.** `max(tail)` clears 0.55 by 9.8 %, but the tail *declines* and its settled last
+value is **0.567715 — 3.2 % over the floor**, down from 4.9 % at the step change and 8.0 %
+before it. **Three consecutive moves in the same direction, from unrelated causes.** A
+liveness floor anchored on a measured equilibrium is being approached, not held; whoever
+next raises or lowers assimilation should read this line before assuming room.
 
 ### The canonical scenarios + their goldens
 
@@ -581,9 +597,14 @@ honor-system for such a change, so follow it deliberately rather than waiting fo
   gains `forcing.light_path`, the first **compared** hash in a `forcing` block that was
   otherwise provenance-only.
 
-  **The gate report.** Every CO₂ compensation-point band clears its floor (sealed 71.28 ppm,
-  perennial 70.49, consumer 73.81, against 61.07); the Greenwood peak-W crossing gets
-  *safer* (2.20 % → 4.75 % of margin); `rationed == 0` and no extinction events on every
+  **The gate report — every band AND every liveness floor, as the ceremony requires.**
+  All five CO₂ compensation-point bands clear (sealed 71.28 ppm, perennial 70.49, consumer
+  73.81, against 61.07) though every margin tightens ~4–7 %; the Greenwood peak-W crossing
+  gets *safer* (2.20 % → 4.75 %). ⚠ **All five liveness floors pass and two of them
+  narrowed**: perennial's converged peak-leaf `max(tail) > 0.55` reads 0.603679 (+9.8 %,
+  was +11.3 %) and its annual-min chamber CO₂ 0.071036 (+42.1 %, was +51.0 %), while the
+  two peak-leaf non-collapsing floors and the consumer's year-end carbon sit at +1048 %,
+  +1195 % and +5343 % — nowhere near. `rationed == 0` and no extinction events on every
   scenario at every step measured. **One deviation is recorded rather than fixed**: the
   peak-LAI band passes at the shipped step (5.3806) and its converged value (4.7132) is below
   the floor — see the known-deviation section above, with the control that attributes the

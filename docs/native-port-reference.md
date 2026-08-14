@@ -133,8 +133,19 @@ relevant `sin` / `exp` / `t**4` by one ULP and re-run to the final state.
 | power + self-discharge | `4.1e-15` | `1e-12` | ~240× |
 | thermal (`T⁴`, contracting attractor damps it) | `1.9e-16` | `1e-12` | ~5000× |
 | station energy (`sin` + `T⁴`, coupled 7-day) | `5.2e-15` | `1e-12` | ~190× |
-| biosphere (worst: `canopy.exp`, perennial 15-yr) | `6.7e-14` | `1e-11` | ~150× |
-| greenhouse (7-day `canopy.exp`) | `2.7e-15` | `1e-11` | ~3700× |
+| biosphere (worst: `canopy.exp`, perennial 15-yr) | `8.2e-15` | `1e-11` | ~1200× |
+| greenhouse (7-day `canopy.exp`) | `6.1e-15` | `1e-11` | ~1600× |
+
+⚠ **The two biosphere rows were re-measured 2026-08-14 (the within-day light path) and had
+been stale in the other direction: `6.7e-14` → `8.2e-15` and `2.7e-15` → `6.1e-15`.** The
+*gate* was never stale — `test_crossport.py` re-derives each sensitivity from the tree and
+asserts `band > sensitivity`, so it would have gone red had a band stopped covering its
+scenario — but the **recorded numbers** are prose, and prose is the ungated half of every
+contract in this repo (`freeze-prose-half-is-ungated`). A green suite proves the bands
+hold; it does not prove the table describing them is current. ⚠ Note the biosphere's
+sensitivity *improved* by an order of magnitude while its goldens all moved: adding a
+`cos` to the PAR path did not add ULP sensitivity, it changed which trajectory the
+existing `exp` sensitivity propagates along. Neither band moved.
 
 The bands absorb realistic **multi-ULP cross-libm** divergence while a real port defect still
 trips them. `test_crossport.py` re-measures each sensitivity and asserts `band > sensitivity`

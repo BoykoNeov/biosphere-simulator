@@ -367,6 +367,44 @@ It is not closed — re-open it at a natural stop in the science thread.
 
 ---
 
+## 6b. OPENED 2026-08-14 by the light path: **the canopy this tree cannot grow**
+
+The within-day light path shipped (`post-roadmap-gross-net-gas-exchange.md`), and it left
+one question behind that is now the biggest open science item in the queue.
+
+**The finding.** With an honest sun — the day's photons arriving unevenly, as the source
+says they do — `open_season`'s converged peak LAI is **4.71**, against a frozen band of
+`5.0 < peak < 8.0` sourced as *"real wheat peaks at ~5–8"*. It passes at the shipped step
+(5.38) only because the observable is still moving 15 % between `dt = ¼` and `dt = 1/32`.
+⇒ **the band was clearing against a diurnally biased assimilation**, and what the light
+path exposes is a canopy this tree cannot grow.
+
+**What is already eliminated, by measurement, so it is not re-proposed:**
+
+- **The canopy regulator.** It is a 5 %/day leaf-area **loss** above LAI 6 — it can only
+  push a canopy down, and we are now further below its threshold than before.
+- **The parked leaf mechanism** (`leaf-expansion-blocked`). Sink-limited expansion sits
+  *below* the frozen tree on both gated observables at every step
+  (`log/leaf-remeasurement.md`) — it makes this worse, not better.
+- **Re-tuning the bound.** Refused three times in this project already; the bound is
+  sourced and the model is what moved.
+
+**Candidate directions, none measured:** the *intra-canopy* half of the Jensen bias is
+still open (this work closed only the diurnal half — a sunlit/shaded or multi-layer canopy
+is the cited next step and can move canopy assimilation *up*); the specific-leaf-area
+constant has no DVS keying anywhere (`canopy-regulator-diagnosed` finding 2 measured it as
+a single constant, which makes LAI strictly linear in leaf carbon); and the partition
+table was **fitted** against the biased assimilation
+(`wheat-partition-backfill-refused`), so it is a suspect in exactly the way the band is.
+
+⚠ **Read the liveness floors before starting.** Two narrowed under the light path, and
+perennial's converged peak-leaf sits **3.2 % over its floor on its settled value** — the
+third move in the same direction from unrelated causes. A mechanism that raises canopy
+assimilation moves that number the safe way; one that lowers it may take the floor red.
+Both bands and floors are tabulated in `docs/biosphere-reference.md`.
+
+---
+
 ## 7. The open questions for the user
 
 1. **The step. Fully unblocked as of 2026-08-14** — both axes have run and neither removes the

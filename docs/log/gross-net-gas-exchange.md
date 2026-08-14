@@ -68,9 +68,16 @@ probe — they reproduce it cell for cell, but the check was the point
 **eliminated by measurement**: the canopy regulator is a 5 %/day **loss** above LAI 6, so
 it cannot fix a canopy that fell to 4.71. What remains: **the band was clearing against a
 diurnally biased assimilation, and what the light path exposes is a canopy this tree cannot
-grow.** Recorded as a KNOWN DEVIATION in `docs/biosphere-reference.md`, not tuned. Every
-other gate moved *away* from danger (Greenwood margin 2.20 % → 4.75 %; all five CO₂
-compensation-point bands clear). **The user's call, taken on the measurements: finish at
+grow.** Recorded as a KNOWN DEVIATION in `docs/biosphere-reference.md`, not tuned. ⚠ **And
+"every other gate moved away from danger" — which this record said in its first draft — is
+FALSE**: the Greenwood margin opens (2.20 % → 4.75 %), but every CO₂ band tightens ~4–7 %
+(all clear) and **two liveness floors narrow**: perennial's converged peak-leaf
+`max(tail) > 0.55` 0.612211 → 0.603679 (+11.3 % → +9.8 %) and its annual-min chamber CO₂
+0.075476 → 0.071036 (+51 % → +42 %). ⚠ That series' *settled* value is tighter still —
+**0.567715, 3.2 % over the floor, down from 4.9 % and 8.0 %: three moves in the same
+direction from unrelated causes.** The remaining three floors sit at +1048 % / +1195 % /
++5343 %. Reporting the bands and skipping the floors is exactly the half-report the
+ceremony's step 5 names, and it took an advisor to catch it. **The user's call, taken on the measurements: finish at
 the shipped step.** **FINDING 6 — THE CHARGE'S OBSERVABLE, AND IT IS ALREADY CONVERGED.**
 Sealed chamber, day 200: CO₂ climbs every dark step and falls every lit one, O₂ its exact
 negative at PQ = 1 — and the diurnal swing is **0.010690 mol at `dt = ¼` against 0.010799
