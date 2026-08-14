@@ -232,11 +232,17 @@ def test_open_season_peaks_below_the_crossing_with_the_margin_pinned() -> None:
 def test_open_season_peak_w_margin_to_the_crossing() -> None:
     """The margin narrative and the recorded value — NOT gates, deliberately unmarked.
 
-    ``12.0 < peak_w < 13.0`` characterizes our own number, and the ratio pin's
-    own failure message says what it is for: detecting that *prose* went stale. Neither
-    bounds the science against an outside source, and freezing the second would let an
-    unfreeze ceremony fail because a doc sentence drifted. The sourced half — 14.4248
-    crossing — is the gate above.
+    The band below characterizes our own number, and the ratio pin's own failure message
+    says what it is for: detecting that *prose* went stale. Neither bounds the science
+    against an outside source, and freezing the second would let an unfreeze ceremony
+    fail because a doc sentence drifted. The sourced half — 14.4248 crossing — is the
+    gate above.
+
+    ⚠ This paragraph used to quote ``12.0 < peak_w < 13.0`` as the live band. It had not
+    been that since 2026-08-12 and is now ``13.9 < peak_w < 14.4248`` — the docstring
+    was describing a band two revisions old while the comment below recorded both moves.
+    **Prose that names a number goes stale in the file that owns the number**, which is
+    this test's own subject, so it is fixed rather than left as an irony.
     """
     peak_w = _open_season_peak_w()
     # ⚠ RE-MEASURED TWICE ON 2026-08-12: 12.633098 -> 14.019448 (the stem-reserve
@@ -248,8 +254,28 @@ def test_open_season_peak_w_margin_to_the_crossing() -> None:
     # the reserve-off control that attributes the move, and — since the reserve exists —
     # the SAME quantity measured on BOTH W definitions, because `W` here is
     # leaf+stem+storage and reserve starch is defensibly dry matter too.
+    #
+    # ⚠⚠ **RE-MEASURED A THIRD TIME 2026-08-14, AND THE PARAGRAPH ABOVE WENT STALE THE
+    # WAY IT WAS WRITTEN TO CATCH.** The quarter-day step moved this to **14.107660**
+    # and the margin **3.4 % -> 2.20 %** — the narrowest it has ever been — and *nothing
+    # went red*, because the band below spans both values and the ratio guard sat at
+    # 0.85 while the quantity lives at 0.978. The step-unfreeze ceremony re-pinned every
+    # test that FAILED; this one passed, so it was never re-read.
+    #
+    # ⇒ **A characterization pin wide enough to survive the change it characterizes is
+    # not a tripwire, it is decoration.** The ratio guard is therefore tightened to 0.97
+    # — ~1 % of headroom below today's 0.978, so the next move of this size trips it.
+    # Tightening a tripwire toward the measured value is the opposite of the retune the
+    # freeze discipline forbids: nothing here bounds the science (the sourced half, the
+    # 14.4248 crossing, is the gate above and is UNCHANGED), and a guard that cannot
+    # fire protects nothing.
+    #
+    # ⚠ The cause is the STEP, not a mechanism: this is the frozen tree, and the same
+    # refinement moves peak LAI 5.4624 -> 5.5719 on the same run. Measured in
+    # `docs/plans/post-roadmap-leaf-remeasurement.md`, which found it while re-measuring
+    # something else — which is why it is committed on its own rather than folded in.
     assert 13.9 < peak_w < 14.4248, peak_w
-    assert peak_w / 14.4248 > 0.85, "the margin narrative is stale; re-measure it"
+    assert peak_w / 14.4248 > 0.97, "the margin narrative is stale; re-measure it"
 
 
 def test_only_open_season_enters_the_declining_branch() -> None:
