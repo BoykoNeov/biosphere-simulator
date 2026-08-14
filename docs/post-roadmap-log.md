@@ -43,6 +43,15 @@ plan-doc parity check reads the index *section* on one side and the union of the
 files on the other, so a record naming it puts it on the record side only and turns that
 check red. Record files refer to it as *"the direction plan"* and rely on this paragraph.
 
+⚠ **A second plan doc is deliberately not in the index, for the same reason and under the
+same rule: `post-roadmap-step-unfreeze.md`.** It is the *in-progress* ceremony that Step 0's
+two measurement axes led to — the biosphere's integration step moving to `dt = ¼`, authorized
+by the user on 2026-08-14. Work that has not finished has no record file, so indexing it would
+break the index↔record pairing exactly as the direction doc would. It is named here instead,
+which is what keeps `test_every_plan_doc_is_indexed` green (that check scans this whole file,
+while the parity check reads only the index *section*). **When the ceremony lands it earns the
+normal three — index line, pointer row, record file — and this paragraph goes with it.**
+
 ⚠ Prose elsewhere in the tree still points at "the CLAUDE.md status row" (the
 compose-gap discipline: *re-read the status row for the bucket you closed*). That rule
 survives both moves; **its target is now the item's file in `docs/log/`** — the index line

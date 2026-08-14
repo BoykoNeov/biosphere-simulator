@@ -109,23 +109,46 @@ From the sweep (`docs/plans/post-roadmap-step-sweep.md` §1–2), at Euler `dt =
 
 ## 5. The rest of the ceremony, in order
 
-1. ⚠ **`run_master_day`** must take 4 slow substeps per master day (`src/station/driver.py`)
-   — engine code, and the cost Step 0 found that the direction plan never priced. **Check
-   whether the driver or its seam is named in the station manifest**: if it is, this is a
-   *station*-contract unfreeze on top of the biosphere one.
+1. ⚠ **`run_master_day`** must take `STEPS_PER_DAY` slow substeps per master day
+   (`src/station/driver.py`) — engine code, and the cost Step 0 found that the direction
+   plan never priced. **Confirmed 2026-08-14: this IS a station-contract unfreeze too.**
+   `run_master_day` is not itself named in `docs/station-reference.manifest.json`, but the
+   manifest's `numerics_note` reads *"Sealed reference: biosphere-slow **dt=1 day** +
+   everything-fast dt=60 s"* — the step is written into the station contract in prose, so
+   it moves with this change.
+   ⚠ **The commit-1 indexing change makes this driver edit much smaller than feared.** The
+   driver's stated reason for one slow step per day was *"so `n` stays the day count the
+   day-indexed weather resolver reads"* (`driver.py:44-46`, and again at 109-112). That is
+   now obsolete: the resolver indexes `int(n · dt)`, so `n` may be four times the day count
+   and still read the right weather row. The `fast_dt · steps_per_day == 86400` guard is
+   about the **fast** domain and is untouched. Add a `slow_steps_per_day` keyword defaulting
+   to `1` so existing callers stay byte-identical, and update the two stale comments.
 2. **Regenerate the affected goldens**, each through its own explicit `__main__` action, and
    review the byte diff against §4.
 3. **Regenerate both manifests** and review the diff — the git-visible record of what moved.
+   ✅ **Good news, found 2026-08-14: the step change is NOT honor-system.**
+   `docs/biosphere-reference.manifest.json` records `dt_days: 1.0`, and
+   `tests/test_freeze_manifest.py:444` asserts it **against a hard-coded literal**
+   (`assert manifest["dt_days"] == 1.0`). So the step move fails loudly and the contract is
+   updated deliberately — unlike commit 1, which nothing catches. Keep that assertion a
+   **literal**; rewriting it to compare against `BIO_DT` would make the contract auto-follow
+   the code, which is the opposite of a freeze.
 4. **Report the science gates** — every `science_bands` and `liveness_floors` reading. ⚠ A
    band failure is a **blocking finding to be argued past in writing**, never a number to
    re-tune; and a band *passing* is not an endorsement (`open_season` sits 3.8 % above the LAI
    lower bound — a tight margin, not comfort).
 5. **Cross-port tiers** — 7 biosphere + 4 station goldens move, so `tests/crossport/tiers.json`
    bands need **re-measuring**, not just re-running.
-6. **The Rust mirror** — the port has no reference authority; it mirrors the rule.
-7. ⚠ **The CI hazard**: hex-float goldens are regenerated here on Windows/UCRT against a
-   Linux/glibc CI. Check how the last regeneration handled this *before* landing, or expect
-   red goldens on CI that are green locally.
+6. **The Rust mirror** — the port has no reference authority; it mirrors the rule. The
+   `_table` analogue is `rust/crates/domains/src/biosphere/system.rs::table_schedule`
+   (mirrored in `6861e2b`, bit-identical at `dt = 1`); the step constant needs the same
+   treatment when it moves.
+7. ~~⚠ **The CI hazard**~~ ✅ **DISCHARGED 2026-08-14 — no new work.** `tests/golden_platform.py`
+   already gates every transcendental golden behind `windows_golden_only`
+   (`skipif sys.platform != "win32"`), precisely because hex-float goldens are byte-exact
+   only on their generation platform. All the biosphere goldens are transcendental and
+   therefore already gated, so regenerating on Windows will not redden CI. The genuinely
+   cross-platform gate is the cross-port tolerance band — which item 5 re-measures anyway.
 8. **Gates**: full suite including `-m slow`, `ruff`, `pyright`, `cargo test`, `cargo clippy`.
    ⚠ `¼` is **4× raw simulation work**, so the full-suite upper bound is ~25 min, not the
    ~12 min quoted for `½`. Use targeted regeneration during the work and one full run at the
