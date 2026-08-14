@@ -48,7 +48,7 @@ use crate::flows::{
     CrewRespiration, Harvest, HarvestParams, Lamp, LampParams, WaterRecovery, WaterRecoveryParams,
     CREW_RESPIRATION, HARVEST, LAMP, LAMP_POWER_VAR, PAR_PHOTON_ENERGY_J_PER_UMOL, WATER_RECOVERY,
 };
-use crate::lighting::LIGHT_USED;
+use crate::lighting::{lamp_light_path, LIGHT_USED};
 use crate::scenario::SealedStationScenario;
 use crate::stocks::{
     cabin_h2o_stock, co2_composition, food_store_stock, gas_boundary, o2_composition,
@@ -287,14 +287,12 @@ pub fn sealed_bio_resolver(
     scenario: &SealedStationScenario,
 ) -> Result<SourceResolver, SimError> {
     let mut forcings = weather_forcings(&scenario.bio, scenario.years)?;
+    let photoperiod_s = scenario.photoperiod_hours as f64 * 3600.0;
     forcings.insert(
         PAR_VAR.to_string(),
-        constant(sealed_lamp_par(lamp, scenario))?,
+        lamp_light_path(sealed_lamp_par(lamp, scenario), photoperiod_s),
     );
-    forcings.insert(
-        DAYLENGTH_VAR.to_string(),
-        constant(scenario.photoperiod_hours as f64 * 3600.0)?,
-    );
+    forcings.insert(DAYLENGTH_VAR.to_string(), constant(photoperiod_s)?);
     SourceResolver::new(forcings, weather_shared(&scenario.bio))
 }
 

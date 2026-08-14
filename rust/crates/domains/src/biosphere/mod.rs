@@ -10,6 +10,7 @@
 //! goldens are Tier 2; the biosphere is Euler-locked by its freeze — no RK4 cross-check).
 
 pub mod flows;
+pub mod light_path;
 pub mod params;
 pub mod perturbations;
 pub mod science;

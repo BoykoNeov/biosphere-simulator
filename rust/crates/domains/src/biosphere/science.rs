@@ -80,14 +80,19 @@ pub fn temperature_factor(temp_c: f64, p: &PhotosynthesisParams) -> f64 {
     1.0
 }
 
-/// Daily gross canopy assimilation (mol C day⁻¹) — the provisional big-leaf.
+/// Gross canopy assimilation over one window (mol C) — the big-leaf.
+///
+/// ⚠ `window_s` was `daylength_s` until 2026-08-14. The photoperiod is no longer a
+/// multiplier here: the day/night structure lives in the PAR forcing (`light_path`), and
+/// the daily carbon budget passes one **day** of seconds to get a per-day rate at this
+/// step's PAR. Feeding it a photoperiod would multiply the day length in twice.
 #[allow(clippy::too_many_arguments)]
-pub fn daily_canopy_assimilation(
+pub fn canopy_assimilation(
     incident_par: f64,
     lai: f64,
     ci: f64,
     temp_c: f64,
-    daylength_s: f64,
+    window_s: f64,
     photo: &PhotosynthesisParams,
     canopy: &CanopyParams,
     ground_area: f64,
@@ -101,7 +106,7 @@ pub fn daily_canopy_assimilation(
     let leaf_rate = gross_leaf_assimilation(ci, mean_absorbed_par, photo);
     let canopy_rate = leaf_rate * lai;
     let f_temp = temperature_factor(temp_c, photo);
-    canopy_rate * daylength_s * ground_area * MICROMOL_TO_MOL * f_temp * limitation
+    canopy_rate * window_s * ground_area * MICROMOL_TO_MOL * f_temp * limitation
 }
 
 // --- respiration ------------------------------------------------------------

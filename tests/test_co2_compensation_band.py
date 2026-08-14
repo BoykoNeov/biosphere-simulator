@@ -340,11 +340,19 @@ def test_the_five_margins_are_pinned_not_merely_positive() -> None:
     """
     floor = floor_ppm()
     measured = {name: _season_low_ppm(name) / floor for name in _CASES}
+    # ⚠ RE-PINNED 2026-08-14 by the within-day light path — the first unfreeze this pin
+    # was written for, one day after it landed, and it did the job it was written for:
+    # three of the five moved past 2 % while every inequality above stayed green. Every
+    # margin TIGHTENS by ~4-7 %, and the direction is the interesting part: the chamber
+    # crop assimilates less per day (concavity) and now also RESPIRES INTO THE POOL AT
+    # NIGHT, which raises the pool — yet the net is a lower season-low, so the day-side
+    # loss dominates the night-side return. Was: sealed 1.2579, perennial 1.2359,
+    # consumer 1.2186.
     expected = {
-        "sealed_chamber": 1.2579,
-        "perennial_chamber": 1.2359,
-        "consumer_chamber": 1.2186,
-        "perennial_long_horizon": 1.2359,
-        "consumer_long_horizon": 1.2186,
+        "sealed_chamber": 1.1671,
+        "perennial_chamber": 1.1543,
+        "consumer_chamber": 1.2086,
+        "perennial_long_horizon": 1.1543,
+        "consumer_long_horizon": 1.2086,
     }
     assert measured == pytest.approx(expected, rel=0.02)

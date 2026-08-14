@@ -11,11 +11,12 @@
 
 use std::collections::BTreeMap;
 
+use domains::biosphere::light_path;
 use domains::biosphere::stocks::{DAYLENGTH_VAR, PAR_VAR, ROOTED_DEPTH, TEMP_VAR, THERMAL_TIME};
 use domains::biosphere::system::{build_season, weather_forcings, weather_shared};
 use domains::power::{battery_stock, BATTERY, WASTE_HEAT};
 use simcore::boundary;
-use simcore::environment::{constant, SourceResolver};
+use simcore::environment::{constant, Schedule, SourceResolver};
 use simcore::error::SimError;
 use simcore::events::Event;
 use simcore::flow::Flow;
@@ -105,6 +106,19 @@ pub fn build_lighting(
     Ok((state, bio_registry, power_registry))
 }
 
+/// The lamp's PAR forcing: a within-day top-hat centred on midday.
+///
+/// Mirrors `station.lighting._lamp_light_path`. Shared by this module and `sealed`, the
+/// two seams whose crop is lit by a lamp rather than by the sun. ⚠ The lamp's ENERGY half
+/// keeps drawing the daily average: Power is the *fast* operator and `substep` freezes
+/// `n`, so a within-day shape is not expressible there. The two halves differ on purpose.
+pub(crate) fn lamp_light_path(on_par: f64, photoperiod_s: f64) -> Schedule {
+    Box::new(move |n, dt| {
+        let t = n as f64 * dt;
+        light_path::top_hat_window_mean(t - t.trunc(), dt, on_par, photoperiod_s).unwrap_or(0.0)
+    })
+}
+
 /// The biosphere forcing resolver: weather-driven, with `PAR` + `daylength` from the lamp.
 ///
 /// Rebuilds the weather forcing table ([`weather_forcings`]) and overrides two entries —
@@ -123,11 +137,9 @@ pub fn lighting_bio_resolver(
     } else {
         0.0
     };
-    forcings.insert(PAR_VAR.to_string(), constant(par)?);
-    forcings.insert(
-        DAYLENGTH_VAR.to_string(),
-        constant(scenario.photoperiod_hours as f64 * 3600.0)?,
-    );
+    let photoperiod_s = scenario.photoperiod_hours as f64 * 3600.0;
+    forcings.insert(PAR_VAR.to_string(), lamp_light_path(par, photoperiod_s));
+    forcings.insert(DAYLENGTH_VAR.to_string(), constant(photoperiod_s)?);
     // A warm lamp-lit habitat overrides the weather-table temperature with a constant
     // (the lamp supplies light, the environment supplies warmth) — beside the PAR /
     // daylength overrides, in this non-frozen station module (the embedded `weather_facts`

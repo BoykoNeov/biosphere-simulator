@@ -29,6 +29,7 @@ use super::flows::{
     RootZoneCapture, Senescence, StemRemobilization, ThermalTimeAccumulation, Transpiration,
     VernalizationAccumulation,
 };
+use super::light_path;
 use super::params;
 use super::science;
 use super::stocks::*;
@@ -268,7 +269,6 @@ fn carbon_context(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Car
         par_var: PAR_VAR.to_string(),
         ci_var: CI_VAR.to_string(),
         temp_var: TEMP_VAR.to_string(),
-        daylength_var: DAYLENGTH_VAR.to_string(),
         soil_water_var: SOIL_WATER_VAR.to_string(),
         wssg: scenario.wssg,
         rooted_depth_aux: ROOTED_DEPTH.to_string(),
@@ -874,6 +874,27 @@ pub fn build_season(scenario: &SeasonScenario) -> Result<(State, Registry), SimE
 /// At `dt = 1.0` this is `values[min(n, last)]` exactly, so no golden moves across the
 /// change. The port mirrors the rule, not the rationale — the Python reference in
 /// `domains/biosphere/season.py::_table` is the authority.
+/// The within-day PAR forcing: the sinusoidal day, averaged over the step window.
+///
+/// Mirrors `season._sine_light_path`. Where `table_schedule` holds a daily observation
+/// fixed across the sub-steps within the day, this **shapes** it — and its night steps
+/// return exactly 0, which is what lets maintenance respiration's biomass-burning branch
+/// run at all.
+fn sine_light_path(daytime_mean_par: Vec<f64>, daylength_s: Vec<f64>) -> Schedule {
+    let last = daytime_mean_par.len() - 1;
+    Box::new(move |n, dt| {
+        let t = n as f64 * dt;
+        let day = ((t as usize).min(last)) as usize;
+        // The window is guaranteed inside one day by the step dividing the day; a build
+        // that broke that would surface as an error in the Python reference, and here the
+        // schedule signature has nowhere to put one, so it is clamped to 0 the same way a
+        // dark window is. (The Python side raises; the divergence is unreachable while
+        // `BIO_DT` divides the day, which its own module asserts.)
+        light_path::half_sine_window_mean(t - t.trunc(), dt, daytime_mean_par[day], daylength_s[day])
+            .unwrap_or(0.0)
+    })
+}
+
 fn table_schedule(values: Vec<f64>) -> Schedule {
     let last = values.len() - 1;
     Box::new(move |n, dt| values[((n as f64 * dt) as usize).min(last)])
@@ -894,7 +915,10 @@ pub fn weather_forcings(
     let f = super::weather::season_forcing(latitude, &rows, years);
     let mut forcings: HashMap<String, Schedule> = HashMap::new();
     forcings.insert(TEMP_VAR.to_string(), table_schedule(f.temp));
-    forcings.insert(PAR_VAR.to_string(), table_schedule(f.par));
+    forcings.insert(
+        PAR_VAR.to_string(),
+        sine_light_path(f.par.clone(), f.daylength.clone()),
+    );
     forcings.insert(DAYLENGTH_VAR.to_string(), table_schedule(f.daylength));
     forcings.insert(RN_VAR.to_string(), table_schedule(f.net_radiation));
     forcings.insert(VPD_VAR.to_string(), table_schedule(f.vpd));

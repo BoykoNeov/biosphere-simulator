@@ -274,8 +274,26 @@ def test_open_season_peak_w_margin_to_the_crossing() -> None:
     # refinement moves peak LAI 5.4624 -> 5.5719 on the same run. Measured in
     # `docs/plans/post-roadmap-leaf-remeasurement.md`, which found it while re-measuring
     # something else — which is why it is committed on its own rather than folded in.
-    assert 13.9 < peak_w < 14.4248, peak_w
-    assert peak_w / 14.4248 > 0.97, "the margin narrative is stale; re-measure it"
+    #
+    # ⚠⚠ **RE-MEASURED A FOURTH TIME 2026-08-14 — AND THIS TIME THE GUARD FIRED.** The
+    # within-day light path moved peak W to **13.740221** and the margin the *other* way,
+    # **2.20 % -> 4.75 %**: less carbon per day (the FvCB light response is concave, so
+    # the same photons delivered unevenly fix less) means a smaller crop and more room
+    # under the crossing. The 0.97 ratio guard tightened one day earlier went red on the
+    # very next change — which is what a tripwire that cannot fire was replaced to do.
+    #
+    # ⇒ The guard becomes **two-sided**. The one-sided form only ever caught the margin
+    # NARROWING, and this move widened it; a narrative pin that is blind to half the
+    # directions its subject can move is the same decoration in a different pose. The
+    # band is ~1 % either side of today's 0.95254.
+    #
+    # ⚠ Cause: the light path (`docs/plans/post-roadmap-gross-net-gas-exchange.md`), not
+    # the step, which is unchanged at ¼. The sourced half — the 14.4248 crossing — is
+    # still UNTOUCHED, and this move is *away* from it.
+    assert 13.5 < peak_w < 13.9, peak_w
+    assert 0.945 < peak_w / 14.4248 < 0.962, (
+        "the margin narrative is stale; re-measure it"
+    )
 
 
 def test_only_open_season_enters_the_declining_branch() -> None:
@@ -525,7 +543,16 @@ def test_litter_pool_cn_is_TWO_regimes_set_by_which_event_fills_the_pool() -> No
         dump_c = rows[i_peak][1] - rows[i_peak - 1][1]
         dump_n = rows[i_peak][0] - rows[i_peak - 1][0]
         assert dump_c > 0.0 and dump_n > 0.0, (scenario, dump_c, dump_n)
-        assert 4.0 < (dump_c * _M_C / dump_n) < 8.0, (scenario, dump_c * _M_C / dump_n)
+        # ⚠ RE-PINNED 2026-08-14 (was ``4.0 < x < 8.0``). The light path made the dumped
+        # material ~12 % more carbon-rich — perennial 7.866 -> 8.843, consumer
+        # 7.544 -> 7.876 — so the perennial crossed a bound the committed tree was
+        # already sitting at the top of (7.866 of 8.0). ⚠ That is worth naming: the old
+        # upper edge was never a claim about anything, it was one measurement's
+        # neighbourhood rounded up, and a band with no headroom fails on the next change
+        # whichever direction the science goes. The claim this line is *for* — the dump
+        # is N-rich, which is what pulls the pool down — is unharmed at 8.8 against the
+        # shedding-fed regime's ~100 and real straw's ~80.
+        assert 7.0 < (dump_c * _M_C / dump_n) < 9.5, (scenario, dump_c * _M_C / dump_n)
 
     # --- the ANTI-REGRESSION pins ----------------------------------------------------
     # 1. The two regimes stay an order of magnitude apart. Kept from correction 2 (in

@@ -16,6 +16,7 @@ use simcore::error::SimError;
 use simcore::flow::{Flow, FlowResult, Leg};
 use simcore::state::State;
 
+use super::light_path;
 use super::params;
 use super::params::{
     CanopyParams, NitrogenParams, PartitionRow, PhenologyParams, PhotosynthesisParams,
@@ -45,7 +46,10 @@ pub struct CarbonContext {
     pub par_var: String,
     pub ci_var: String,
     pub temp_var: String,
-    pub daylength_var: String,
+    // ⚠ No `daylength_var` since 2026-08-14: photosynthesis integrates over one day and
+    // the day/night structure lives in the PAR forcing (`light_path`). `daylength_s`
+    // survives as the phenology photoperiod signal only. Mirrors the Python field's
+    // removal.
     pub soil_water_var: String,
     pub wssg: f64,
     pub rooted_depth_aux: String,
@@ -113,12 +117,12 @@ impl CarbonContext {
     fn budget(&self, snapshot: &State, env: &dyn Environment) -> Result<(f64, f64, f64), SimError> {
         let (leaf, biomass) = self.leaf_and_biomass(snapshot);
         let lai = science::leaf_area_index(leaf, self.canopy.sla_per_mol_c, self.ground_area);
-        let gass = science::daily_canopy_assimilation(
+        let gass = science::canopy_assimilation(
             env.get(&self.par_var)?,
             lai,
             self.ci(env)?,
             env.get(&self.temp_var)?,
-            env.get(&self.daylength_var)?,
+            light_path::SECONDS_PER_DAY,
             &self.photo,
             &self.canopy,
             self.ground_area,
