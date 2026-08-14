@@ -47,9 +47,17 @@ to the stock (a cited form, [F] Eqn 14.10's `min`) and its ratio is pinned at 1.
 export-fidelity shape again — **a flow that pre-clamps is invisible to the backstop's
 arithmetic.**
 
-**FINDING 1 — `dt = ½` CLEARS THE COMPENSATION POINT EVERYWHERE TESTED.** Season-low chamber
-CO₂ against the 61.07 ppm floor: sealed **57.89 → 75.06**, perennial **56.03 → 74.91**,
-consumer 73.29 → 74.36, against RK4-converged 76.28/75.75/74.64. **One halving moves the
+**FINDING 1 — `dt = ½` CLEARS THE COMPENSATION POINT ON EVERY SEALED SCENARIO.** ⚠ Scope
+first, because the criterion **only exists where the chamber is sealed**: of the 8 scenario
+configurations swept, **4 are sealed** and all 4 clear; `open_field` and `n_limited` are open
+to a boundary reservoir, so their "season low" is the reservoir's and limits nothing; the two
+long-horizon runs re-run the perennial and consumer chambers at 15 yr and reproduce their
+5-year rows to every printed digit. Season-low chamber CO₂ against the 61.07 ppm floor:
+sealed **57.89 → 75.06**, perennial **56.03 → 74.91**, consumer 73.29 → 74.12, and
+`water_biting` **87.96 → 94.35 — it never crosses under Euler at any step**, so the headline
+does not rest on it (its RK4 column is a flat 357.00 ppm because finding 5's crop is dead and
+never draws the pool down — a *high* number that must not be read as well-converged). Against
+RK4-converged 76.29/75.75/74.64. **One halving moves the
 crossing from 5 % below the floor to 23 % above it**, and every further refinement moves it
 ~1 ppm. It holds at **every enrichment level, which `dt = 1` does not**: across ×1…×5 the
 shipped step collapses 57.89 → 33.83 → 25.18 → 19.07 → **12.13 ppm** while `dt = ½` sits at
@@ -57,11 +65,13 @@ shipped step collapses 57.89 → 33.83 → 25.18 → 19.07 → **12.13 ppm** whi
 integrator's margin is 0.975 — already below 1**, so enrichment past ×4 rations on the step
 that ships today; at `dt = ½` the same run sits at 2.65.
 
-**FINDING 2 — ⚠ BOTH NUMBERS BELONG IN THE DECISION.** Sealed chamber, Euler, against the
-converged limit: season-low CO₂ is **−24 %** at `dt = 1` and −1.6 % at `dt = ½`; peak leaf
-carbon **+4.0 %** → +1.5 %; **harvest — the headline output — only −0.7 %** → −0.3 %. The tail
-statistic that motivated the whole gate moves 24 %; the number anyone would quote as the
-result moves under 1 %. Quoting either alone misleads, in opposite directions.
+**FINDING 2 — ⚠ THREE NUMBERS BELONG IN THE DECISION, NOT TWO.** Sealed chamber, Euler,
+against the converged limit: season-low CO₂ is **−24 %** at `dt = 1` and −1.6 % at `dt = ½`;
+peak leaf carbon **+4.0 %** → +1.5 %; **harvest — the headline output — only −0.7 %** → −0.3 %.
+The direction plan's guardrail was *"quote both the 24 % and the ~3 % headline"*; the
+measurement **splits that headline** into +4.0 % on leaf and −0.7 % on harvest. Quoting the
+24 % alone oversells the ceremony; quoting the 0.7 % alone — the smallest number available —
+undersells it. **All three: 24 % / 4.0 % / 0.7 %.**
 
 **FINDING 3 — THE PARKED LEAF MECHANISM IS WORSE AT `dt = 1` THAN ITS OWN RECORD SHOWS.**
 Recorded as *silent rationing under Euler*; it is also a **much deeper compensation-point
@@ -94,9 +104,11 @@ a successor, not opened.
 
 **FINDING 6 — THE WALL CLOCK, MEASURED AND BOUNDED.** Raw simulation work scales **2.00× at
 `dt = ½`, 4.00× at `dt = ¼`**. Today's full suite (`-n 12`, tree clean at `e4f50d1`):
-**2330 passed, 5 skipped in 371.73 s = 6 m 12 s** — which **supersedes the 7 m 05 s** in
-`docs/test-suite-runtime.md`; the suite is now *faster* than its documented figure despite
-having grown, so that headline is stale. ⚠ **A subset run is not a share**: the 71 test files
+**2330 passed, 5 skipped in 371.73 s = 6 m 12 s**. ⚠ **One run on a dev box with no load
+control** — the denominator for this projection and nothing more. It is the same order as the
+7 m 05 s in `docs/test-suite-runtime.md`, and one faster sample is as consistent with load
+variance as with a real speed-up, so **that figure is NOT asserted stale here**; nothing
+downstream depends on the choice. ⚠ **A subset run is not a share**: the 71 test files
 touching the biosphere (1493 tests) took **9 m 57 s**, *longer than the whole suite*, because
 a subset defeats the conftest's xdist grouping — recorded only so nobody re-derives and quotes
 it. Under `-n 12` wall clock is set by the longest worker, not total work, so `dt = ½` is

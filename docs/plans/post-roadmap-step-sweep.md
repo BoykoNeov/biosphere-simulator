@@ -92,15 +92,31 @@ that pre-clamps is invisible to the backstop's arithmetic.**
 Season-low chamber CO₂ (ppm) against the **61.07 ppm** compensation point. `X` marks a run
 below it — i.e. the crop is fixing carbon where the model says it fixes none.
 
+⚠ **This criterion only exists for a sealed scenario, so be precise about the scope.** Of the
+8 scenario configurations swept, **4 are sealed and all 4 are in the table below**;
+`open_field` and `n_limited` are open to a boundary reservoir, so their "season low" is the
+reservoir's and nothing is limited by it. The two long-horizon runs re-run the perennial and
+consumer chambers at 15 yr and reproduce their 5-year rows **to every digit printed**, so they
+are not repeated as rows.
+
 | scenario | Euler `dt=1` | `dt=½` | `dt=¼` | `dt=⅛` | RK4 converged |
 |---|---|---|---|---|---|
-| sealed_chamber | **57.89 X** | 75.06 ✓ | 75.82 ✓ | 76.03 ✓ | 76.28 |
+| sealed_chamber | **57.89 X** | 75.06 ✓ | 75.82 ✓ | 76.03 ✓ | 76.29 |
 | perennial_chamber | **56.03 X** | 74.91 ✓ | 75.48 ✓ | 75.65 ✓ | 75.75 |
-| consumer_chamber | 73.29 ✓ | 74.36 ✓ | 74.42 ✓ | 74.54 ✓ | 74.64 |
+| consumer_chamber | 73.29 ✓ | 74.12 ✓ | 74.42 ✓ | 74.54 ✓ | 74.64 |
+| water_biting | 87.96 ✓ | 94.35 ✓ | 95.74 ✓ | 96.12 ✓ | 357.00 ⚠ (§5) |
 
 **One halving moves the crossing from 5 % below the floor to 23 % above it**, and every
 further refinement moves it about 1 ppm. This is the *converging* observable — a statement
 about the answer, not about the guard's arithmetic.
+
+⚠ **`water_biting` never crosses the floor under Euler at any step**, so the headline
+conclusion does not rest on it. Its RK4 column reads a flat 357.00 ppm because the crop is
+dead from the first step and never draws the pool down — that is §5's divergence surfacing
+here as a *high* number, and it must not be read as a well-converged answer. This row was
+missing from the first write-up of this table, which is how the `consumer_chamber` `dt = ½`
+cell (74.36, wrong) and the sealed converged value (76.28, the `dt = ½` figure rather than the
+`dt = ⅛` one) went unnoticed; both are corrected above.
 
 ### It also holds at every enrichment level — which `dt = 1` does not
 
@@ -128,9 +144,11 @@ Sealed chamber, Euler, against the converged (`dt = ⅛` RK4) value:
 | peak leaf carbon | 0.9215 | 0.8995 | 0.8923 | 0.8860 | **+4.0 %** | +1.5 % |
 | harvest (storage C) | 0.7189 | 0.7219 | 0.7234 | 0.7240 | **−0.7 %** | −0.3 % |
 
-⚠ **Both numbers belong in the decision.** The headline output — harvest — moves **0.7 %**.
-The tail statistic that motivated the whole gate moves **24 %**. Quoting either one alone
-misleads, in opposite directions.
+⚠ **Three numbers belong in the decision, not two.** The direction plan's guardrail was
+"quote both the 24 % and the ~3 % headline"; the measurement *splits* that headline into
+**peak leaf carbon +4.0 %** and **harvest −0.7 %**. Quoting only the 24 % oversells the case
+for a ceremony; quoting only the 0.7 % — the smallest number available — undersells it. All
+three: **24 % / 4.0 % / 0.7 %**.
 
 ## 3. The parked leaf mechanism: `dt = ½` clears it, and `dt = 1` is worse than recorded
 
@@ -213,17 +231,21 @@ Raw simulation time scales as the step count, measured: **2.00× at `dt = ½`, 4
 `dt = ¼`** (the biosphere Euler golden runs total ~2.5 s → ~5.1 s → ~10.2 s in-probe).
 
 **Today's full-suite baseline** (`uv run pytest -n 12 -q`, tree at `e4f50d1`, clean):
-**2330 passed, 5 skipped in 371.73 s = 6 m 12 s**, exit 0. This supersedes the 7 m 05 s in
-`docs/test-suite-runtime.md` (measured 2026-08-10 at ~160 fewer tests) — the suite is now
-**faster** than the documented figure despite having grown. That doc's headline figure is
-therefore stale; it is left alone here because updating it is not this item's business, but
-the number above is the current one.
+**2330 passed, 5 skipped in 371.73 s = 6 m 12 s**, exit 0. ⚠ **One run, on a dev box, with no
+load control** — it is the denominator for this projection and nothing more. It is the same
+order as the 7 m 05 s in `docs/test-suite-runtime.md` (measured 2026-08-10 at ~160 fewer
+tests), and a single sample coming out faster is at least as consistent with load variance as
+with a real speed-up, so **this does not assert that figure is stale**. Nothing downstream
+depends on which one is used: the projection is a ≤2× bound either way. (If it is ever
+established as a real correction, note there are **three** copies to move —
+`docs/test-suite-runtime.md`, this log's index row for that item, and `CLAUDE.md` itself,
+which is loaded into every session.)
 
 ⚠ **Probe seconds are not suite seconds, and a subset run is not a share.** The 7 biosphere
 golden test files alone run in 6.35 s at `-n 12`; the **71** test files that touch the
-biosphere (1493 tests) run in **9 m 57 s** — *longer than the whole 6 m 12 s suite*, because
-running a subset defeats the conftest's xdist grouping. That figure is **discarded**, and is
-recorded here only so nobody re-derives it and quotes it as the biosphere's share.
+biosphere (1493 tests) run in **9 m 57 s** — *longer than the whole suite*, because running a
+subset defeats the conftest's xdist grouping. That figure is **discarded**, and is recorded
+here only so nobody re-derives it and quotes it as the biosphere's share.
 
 **Honest projection:** biosphere simulation work doubles, but under `-n 12` the wall clock is
 set by the longest worker rather than by total work, so the suite at `dt = ½` is bounded
@@ -235,14 +257,18 @@ Narrowing it means actually halving the step and running the suite, which is cer
 ## The three questions Step 0 was posed to answer
 
 1. **Is `dt = ½` enough on all 25 scenarios, or only on the three that were probed?**
-   **Enough on every scenario this method can measure** — 9 biosphere scenarios (including
-   both 15-year horizons), all 5 CO₂ enrichment levels, the parked leaf branch, and 9
-   station/physics scenarios. **Four station goldens are excluded for a structural reason
-   (§2), not silently.** `water_biting`'s margin is uninformative by construction (§3), but
-   its Euler trajectory is stable across an 8× refinement.
-2. **What does the suite runtime become?** Simulation work 2×. The suite today is
-   **6 m 12 s**; at `dt = ½` it lands between that and ~12 m 24 s. Bounded, not pinned — §6
-   says why, and why the 9 m 57 s subset figure was discarded.
+   **Enough on every scenario this method can measure** — 8 biosphere scenario configurations
+   (including both 15-year horizons), all 5 CO₂ enrichment levels, the parked leaf branch, and
+   9 station/physics scenarios. ⚠ Be precise about what "enough" is measured *on*: the
+   **compensation-point criterion applies to the 4 sealed configurations**, and all 4 clear at
+   `dt = ½` (§1); the two open-field ones have no such criterion; the station/physics half has
+   no plant at all and is judged on margin and drift instead (§4). **Four station goldens are
+   excluded for a structural reason (§2), not silently.** `water_biting`'s margin is
+   uninformative by construction (§3), but it clears the floor at every step and its Euler
+   trajectory is stable across an 8× refinement.
+2. **What does the suite runtime become?** Simulation work 2×. The suite measured
+   **6 m 12 s** today, single run; at `dt = ½` it lands between that and ~12 m 24 s. Bounded,
+   not pinned — §6 says why, and why the 9 m 57 s subset figure was discarded.
 3. **Does a controlled chamber clear both criteria at `dt = 1`?** Answered 2026-08-13 by
    axis 2: **no**, and the controller is worse than the instability it was meant to fix.
 
@@ -268,7 +294,9 @@ lightly:
 * **The `water_biting` Euler/RK4 divergence** (§5) — a shipped golden whose two integrators
   disagree ~50× on harvest, with a named prime suspect and a measure that is blind to it.
   Not opened.
-* **`docs/test-suite-runtime.md`'s headline figure is stale** (§6) — 7 m 05 s against a
-  measured 6 m 12 s. A tooling fix, not science.
 * **The master-day seam** (§2) — whether `run_master_day` should carry a slow-step
   refinement at all is a design question that outlives this decision.
+
+*Deliberately NOT named as a successor:* the suite-runtime figure (§6). One sample is not
+evidence of drift, and spawning a work item off `n = 1` is how a measurement artifact becomes
+a task.

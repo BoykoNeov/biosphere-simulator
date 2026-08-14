@@ -207,8 +207,9 @@ things the specification did not have:
   harvest 0.73, RK4 0.005, both stable under 8× refinement) — a **new argument against every
   RK4 row on the menu**, and not caused by this work.
 
-Headline: `dt = ½` clears the 61.07 ppm compensation point on all 9 biosphere scenarios and
-all 5 enrichment levels; the tail statistic moves **24 %** and harvest **0.7 %**; the parked
+Headline: `dt = ½` clears the 61.07 ppm compensation point on all 4 sealed biosphere
+configurations and all 5 enrichment levels; the tail statistic moves **24 %**, peak leaf
+carbon **4.0 %** and harvest **0.7 %** — all three belong in the ask; the parked
 leaf branch is worse at `dt = 1` than its own record showed (a 2.2× crossing, not 5 %) and
 clears at 2.1× headroom; the station/physics half is nowhere near the wall and should not be
 moved at all. **The decision itself remains the user's and is untaken.**
@@ -227,15 +228,20 @@ Deliverable: one table that makes the decision **arithmetic instead of a judgeme
 measured answer to the three questions nobody can answer today:
 
 1. ~~Is `dt = ½` enough on all 25 scenarios, or only on the three that were probed?~~
-   **ANSWERED 2026-08-14: enough on every scenario the method can measure** — 9 biosphere
-   scenarios including both 15-year horizons, all 5 enrichment levels, the parked branch, and
-   9 station/physics scenarios. ⚠ **Four station goldens are excluded for a structural reason,
+   **ANSWERED 2026-08-14: enough on every scenario the method can measure** — 8 biosphere
+   scenario configurations including both 15-year horizons, all 5 enrichment levels, the parked
+   branch, and 9 station/physics scenarios. ⚠ Scope it precisely: the compensation-point
+   criterion **only exists where the chamber is sealed** — 4 of the 8, and all 4 clear at
+   `dt = ½`; the other two are open-field; the station/physics half has no plant and is judged
+   on margin and drift instead. ⚠ **Four station goldens are excluded for a structural reason,
    not silently** (`run_master_day`), and `water_biting`'s margin is uninformative by
-   construction (a self-clamping flow), though its Euler trajectory is stable under 8×.
+   construction (a self-clamping flow), though it clears the floor at every step and its Euler
+   trajectory is stable under 8×.
 2. ~~What does the suite runtime actually become?~~ **ANSWERED 2026-08-14, as a bound:**
-   simulation work 2×; the suite today measures **6 m 12 s** (superseding the documented
-   7 m 05 s) and `dt = ½` lands between that and ~12 m 24 s. Bounded, not pinned — under
-   `-n 12` the wall clock is set by the longest worker, not by total work.
+   simulation work 2×; the suite measured **6 m 12 s** today (one run — same order as the
+   documented 7 m 05 s, and not asserted as a correction to it) and `dt = ½` lands between that
+   and ~12 m 24 s. Bounded, not pinned — under `-n 12` the wall clock is set by the longest
+   worker, not by total work.
 3. ~~**Does a controlled chamber clear both criteria at `dt = 1`?**~~ **ANSWERED 2026-08-13:
    no, at no realistic setpoint — and the controlled tree needs `dt = ¼` where the frozen
    tree needs `dt = ½`.**
@@ -366,13 +372,18 @@ It is not closed — re-open it at a natural stop in the science thread.
 1. **The step. Fully unblocked as of 2026-08-14** — both axes have run and neither removes the
    reason to ask. The live options are: Euler `dt = ½`, Euler `dt = ¼` (more headroom for the
    next mechanism, one ceremony instead of two), kinetic saturation (needs a *cited* form),
-   ~~RK4 `dt = ½`~~, or hold and accept the now-documented deviation with the leaf mechanism
-   refused. ~~the controller at `dt = 1`~~ is off the menu — measured. ⚠ **RK4 is now also
-   argued against**: axis 1 found `water_biting` converging to a *qualitatively different*
-   answer under RK4 (the crop dies), stable under 8× refinement, so any RK4 row changes a
-   shipped golden's science. ⚠ When it is put: quote both the 24 % (season minimum) and the
-   ~0.7 % (headline harvest), not the 24 % alone. ⚠ And say that the ceremony includes an
-   engine-code change (`src/station/driver.py`), not three freeze contracts alone.
+   RK4 `dt = ½`, or hold and accept the now-documented deviation with the leaf mechanism
+   refused. ~~the controller at `dt = 1`~~ is off the menu — measured. ⚠ **RK4 now carries an
+   argument against it, and is deliberately NOT struck**: axis 1 found `water_biting`
+   converging to a *qualitatively different* answer under RK4 (the crop dies), stable under 8×
+   refinement, so any RK4 row would change a shipped golden's science. But the cause is a
+   **hypothesis, not a settled diagnosis**, so it is reported, not used to delete a row —
+   removing an option is part of the decision, and the decision is the user's. ⚠ When it is
+   put: quote **three** numbers, not two — **24 %** (season minimum), **4.0 %** (peak leaf
+   carbon), **0.7 %** (harvest). The "~3 % headline" written above splits into the last two,
+   and quoting the smallest alone undersells exactly as quoting the largest oversells. ⚠ And
+   say that the ceremony includes an engine-code change (`src/station/driver.py`), not three
+   freeze contracts alone.
 2. ✅ **The fork — ANSWERED 2026-08-13: stay on biosphere science.** The Godot/Rust product
    track stays dormant by decision now rather than by default. Section 5 stands as the record
    of what is parked; re-open it when the science thread reaches a natural stop.
