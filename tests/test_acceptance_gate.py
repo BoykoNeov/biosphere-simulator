@@ -1049,13 +1049,16 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     # ⚠ Both long-horizon rows are now BIT-IDENTICAL to their 5-year siblings, where
     # perennial's used to differ by 0.11 %. See
     # ``test_whether_the_perennial_gate_needs_the_LONG_horizon``.
-    "perennial_long_horizon": ("biosphere.carbon_pool", 5.575540262132649),
-    "consumer_long_horizon": ("biosphere.carbon_pool", 9.267982379565037),
+    # ⚠ 2026-08-14 (the light path), with their 5-year siblings above.
+    "perennial_long_horizon": ("biosphere.carbon_pool", 3.5343019459308773),
+    "consumer_long_horizon": ("biosphere.carbon_pool", 4.466989660058212),
     "sealed_energy_drift": ("power.battery", 11.295323690100386),
     # ⚠ RE-RANKED WITHIN THE ROW — see the header note and claim 3. The stock is the
     # same; the CALL that binds is not. The biosphere registry's minimum rose
     # 5.0232 -> 19.0209 and so crossed above the cabin's unchanged 16.667.
-    "sealed_station": ("biosphere.carbon_pool", 16.666666666666664),
+    # ⚠ 16.6667 (the ECLSS scrubber constant) -> 11.8868 on 2026-08-14: the light
+    # path made this a plant-driven number again. See the ranking test.
+    "sealed_station": ("biosphere.carbon_pool", 11.88679216141662),
 }
 
 
@@ -1218,18 +1221,26 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
         "consumer_long_horizon",
     }
     # ...and ``sealed_station`` is asserted to be OUT of the head, by name, so that its
-    # departure is a pinned fact rather than an absence nobody notices. It now ties with
-    # the two other cabin-driven scenarios at the ECLSS scrubber's 1/(k*dt).
+    # departure is a pinned fact rather than an absence nobody notices.
+    #
+    # ⚠⚠ **ITS BINDING CALL WENT BACK TO THE PLANT ON 2026-08-14 (the light path).** It
+    # left this head when the binding call changed REGISTRY, and it is
+    # ``biosphere.carbon_pool`` again at **11.8868**, for a reason on the plant's side:
+    # the crop respires into the shared cabin pool through the lamp's dark hours, so the
+    # pool's tightest moment tightens past the ECLSS scrubber's 1/(k·dt). ⚠ It sits just
+    # BELOW the five standalone chambers, so the head of the ranking — the claim this
+    # test is named for — is unchanged. What is withdrawn is the tie: it no longer
+    # shares a value with ``greenhouse``/``harvest``, so that three-way assertion is
+    # replaced by the two facts that survive (the pair still ties with each other; the
+    # station does not join them).
     station_rank = next(
         i for i, (_m, s, _sid) in enumerate(ranked) if s == "sealed_station"
     )
     assert station_rank > 5, (station_rank, ranked[:13])
-    assert ranked[station_rank][0] == pytest.approx(1.0 / 0.06, rel=1e-12)
-    assert {s for m, s, _sid in ranked if m == ranked[station_rank][0]} == {
-        "greenhouse",
-        "harvest",
-        "sealed_station",
-    }
+    assert ranked[station_rank][2] == "biosphere.carbon_pool"
+    assert ranked[station_rank][0] == pytest.approx(11.88679216141662, rel=1e-12)
+    scrubber = pytest.approx(1.0 / 0.06, rel=1e-12)
+    assert {s for m, s, _sid in ranked if m == scrubber} == {"greenhouse", "harvest"}
     #
     # ⚠⚠ THE RUNNER-UP HAS NOW CHANGED IDENTITY THREE TIMES, AND IT HAS COME BACK TO A
     # VALUE IT ALREADY HELD ONCE. History, because the churn is the finding:
@@ -1290,12 +1301,22 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     cabin_min, bio_min = _registry_minima(
         _recorder_for(_TIER2), "biosphere.carbon_pool"
     )
-    assert bio_min == pytest.approx(19.020863570770853, rel=1e-9), "tier2 bio registry"
+    #   2026-08-14b    biosphere 11.886792, cabin 16.666667. PLANT binds AGAIN.
+    #
+    # ⚠ The handover reversed the same day, and by a bigger step than it took: the
+    # light path cut the biosphere's number 19.0209 -> 11.8868 (-37 %) while the cabin
+    # constant again did not move at all. The crop now respires into the shared pool
+    # through the lamp's dark hours, so its own tightest call tightens well past the
+    # scrubber's. ⚠ Two crossings in two changes says this pair sits close enough that
+    # the DIRECTION is not a stable property — which is exactly why it is written as two
+    # exact pins plus whichever inequality currently holds, and not as a claim about
+    # which subsystem "the" binding call belongs to.
+    assert bio_min == pytest.approx(11.88679216141662, rel=1e-9), "tier2 bio registry"
     assert cabin_min == pytest.approx(16.666666666666664, rel=1e-12), (
         "tier2 cabin registry"
     )
-    assert cabin_min < bio_min, "tier2: the binding call is now the CABIN's"
-    assert census(_TIER2)["biosphere.carbon_pool"].min_margin == cabin_min
+    assert bio_min < cabin_min, "tier2: the binding call is the PLANT's again"
+    assert census(_TIER2)["biosphere.carbon_pool"].min_margin == bio_min
 
     # --- claim 4: the metric's consistency check against the gate it measures --------
     # Every frozen golden asserts `rationed == 0`, so no stock in any frozen scenario
@@ -1370,7 +1391,10 @@ def test_whether_the_perennial_gate_needs_the_LONG_horizon() -> None:
         "the perennial gate is a 5-year property again — if this splits, the tightest "
         f"moment has moved back outside the window: {(a, b)}"
     )
-    assert a == pytest.approx(5.575540262132649, rel=1e-9)
+    #   2026-08-14  a == b bit-identical AGAIN, at the light path; both 5.5755 ->
+    #               3.5343, so the 5-year/15-year identity survives a change that
+    #               moved the value by 37 %.
+    assert a == pytest.approx(3.5343019459308773, rel=1e-9)
 
     # consumer has been a 5-year property throughout, on both steps. It is asserted
     # alongside perennial so the two cannot be conflated: for three of the four dates

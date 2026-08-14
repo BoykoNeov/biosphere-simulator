@@ -1,4 +1,4 @@
-## **The within-day light path** (the user's charge: the plants must breathe)
+## **The within-day light path — the plant breathes** (the user's charge; a mechanism that was already in the tree and could not fire)
 
 > One row of the record table in [`../post-roadmap-log.md`](../post-roadmap-log.md).
 > The fuller record is the plan doc this row names:
