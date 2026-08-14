@@ -230,18 +230,52 @@ def test_no_shadow_fecal_sink() -> None:
     assert FECAL_WASTE in open_.stocks, "the open baseline keeps the FECAL_WASTE sink"
 
 
-def test_feces_routing_perturbs_food_and_grain_only_at_roundoff() -> None:
+def test_feces_routing_perturbs_food_and_grain_far_below_the_perturbation() -> None:
     # The two seams are near-orthogonal: routing feces into litter feeds microbial
     # respiration, whose CO₂ enters the shared CARBON_POOL the plant reads for Ci — but
     # the ECLSS scrubber holds CARBON_POOL at its setpoint, so the plant's carbon budget
-    # (grain fill → food_store) is unchanged except at the fp-round-off level (the
-    # Step-3 "regulators erase the pool perturbation" physics). Not bit-identical, but
-    # agreeing to ~1e-12 relative — the increments compose without material
-    # interference.
+    # (grain fill → food_store) barely moves (the Step-3 "regulators erase the pool
+    # perturbation" physics).
+    #
+    # ⚠⚠ **RESTATED 2026-08-14 BY THE STEP UNFREEZE, AND THE OLD FORM WAS FALSE — NOT
+    # MERELY STALE.** This asserted the two runs agree to `rel=1e-12` on `food_store`
+    # and `rel=1e-9` on `storage_c`, under the name `..._only_at_roundoff`. At `dt = ¼`
+    # food_store agrees to 8.9e-8 and **storage_c to 1.9e-2** — four percent shy of two
+    # percent, which is not round-off by any reading. Loosening those two numbers would
+    # have been weakening a test to make it pass, and would have kept a name that had
+    # become a false claim.
+    #
+    # **Why it moved, and it is a mechanism this batch has already recorded once.** The
+    # biosphere now takes FOUR slow sub-steps per master day before any cabin sub-step
+    # runs, so the plant sees the perturbed CO₂ at four levels within the day instead of
+    # one, and the scrubber gets its first chance to erase it later in relative terms.
+    # The same cause restated `o2_leak_is_absorbed_by_makeup_effort` in this ceremony.
+    #
+    # **What is asserted instead is the CONTRAST the sentence above is actually about**,
+    # and it is strictly stronger than what it replaces for the same reason the O₂ one
+    # was: `rel=1e-9` on `storage_c` was a bound on a stock holding **0.00198 mol** at
+    # this horizon, so it also passed if the perturbation did nothing at all. Here the
+    # perturbation is asserted to be large first, and the response is measured against
+    # it. ⚠ A relative tolerance on a near-zero stock is not a measure of orthogonality;
+    # it is a measure of how small that stock is.
     closed = _run(close_feces=True)[0][-1]
     open_ = _run(close_feces=False)[0][-1]
-    assert _amt(closed, FOOD_STORE) == pytest.approx(_amt(open_, FOOD_STORE), rel=1e-12)
-    assert _amt(closed, STORAGE_C) == pytest.approx(_amt(open_, STORAGE_C), rel=1e-9)
+
+    # The probe must actually perturb something — otherwise every ratio below is 0/0.
+    perturbation = _amt(closed, LITTER_CARBON) - _amt(open_, LITTER_CARBON)
+    assert perturbation > 100.0, ("the probe is inert", perturbation)
+
+    food_response = abs(_amt(closed, FOOD_STORE) - _amt(open_, FOOD_STORE))
+    grain_response = abs(_amt(closed, STORAGE_C) - _amt(open_, STORAGE_C))
+
+    # ~119.8 mol C of litter moves food_store by 1.4e-4 mol and grain by 3.6e-5 mol:
+    # responses of 1.2e-6 and 3.0e-7 of the perturbation. Pinned as measurements, so a
+    # change in the coupling is visible rather than absorbed by a threshold.
+    assert food_response / perturbation == pytest.approx(1.18e-6, rel=0.05)
+    assert grain_response / perturbation == pytest.approx(3.03e-7, rel=0.05)
+    # ...and the claim the test carries: both responses are orders below the cause.
+    assert food_response / perturbation < 1e-5
+    assert grain_response / perturbation < 1e-5
 
 
 def test_determinism() -> None:
@@ -267,6 +301,14 @@ def test_registration_order_independence() -> None:
             steps_per_day=_SC.greenhouse.steps_per_day,
             slow_dt=_SC.greenhouse.bio_dt,
             fast_dt=_SC.greenhouse.cabin_dt,
+            # ⚠ Was omitted, so this took the default `slow_steps_per_day=1` against a
+            # ¼-day `slow_dt` and covered a quarter of each master day. It did not go
+            # quietly wrong: `run_master_day`'s own
+            # `slow_dt · slow_steps_per_day == 1 day` guard — added by this same
+            # unfreeze — raised. The guard worked; its call sites were not run.
+            # `station.harvest.run_harvest` passes this; a test that hand-rolls the
+            # driver has to pass everything the wrapper does.
+            slow_steps_per_day=_SC.greenhouse.bio_steps_per_day,
         )
         return states[-1]
 

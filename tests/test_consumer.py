@@ -484,8 +484,11 @@ def _legs(before_step: State, registry, resolver):
     equals the applied legs (the Step-5/6 precedent). Binds the resolver to the SAME
     snapshot it evaluates against (the #16 seam).
     """
-    bound = resolver.bind(before_step, 1.0)
-    return [flow.evaluate(before_step, bound, 1.0) for flow in registry.flows]
+    # ⚠ Must use the SAME dt the engine used. A literal 1.0 here against a ¼-day
+    # engine step overstates every leg 4× and reads a conserved step as a leak — the
+    # fifth conflation class, diagnosed in `0bf224e` and fixed there in one file only.
+    bound = resolver.bind(before_step, BIO_DT)
+    return [flow.evaluate(before_step, bound, BIO_DT) for flow in registry.flows]
 
 
 def test_per_compartment_ledger_balances_every_step(consumer_run) -> None:

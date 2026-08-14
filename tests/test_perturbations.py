@@ -167,8 +167,11 @@ def _reconstruct_legs(
     ``LEAK_VAR``), or the reconstructed legs disagree with the applied legs on the
     perturbed steps (the design's flagged bug).
     """
-    bound = resolver.bind(before, 1.0)
-    return [flow.evaluate(before, bound, 1.0) for flow in registry.flows]
+    # ⚠ Must use the SAME dt the engine used. A literal 1.0 here against a ¼-day
+    # engine step overstates every leg 4× and reads a conserved step as a leak — the
+    # fifth conflation class, diagnosed in `0bf224e` and fixed there in one file only.
+    bound = resolver.bind(before, BIO_DT)
+    return [flow.evaluate(before, bound, BIO_DT) for flow in registry.flows]
 
 
 def _assert_ledger_balances_every_step(

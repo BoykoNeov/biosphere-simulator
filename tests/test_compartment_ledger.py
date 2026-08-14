@@ -146,8 +146,11 @@ def _legs(
     mirroring the engine); sound as the applied legs only when ``rationed == 0`` (no
     arbitration scaling, so ``_reduce(scaled) == _reduce(raw)``).
     """
-    bound = resolver.bind(before_step, 1.0)
-    return [flow.evaluate(before_step, bound, 1.0) for flow in registry.flows]
+    # ⚠ Must use the SAME dt the engine used. A literal 1.0 here against a ¼-day
+    # engine step overstates every leg 4× and reads a conserved step as a leak — the
+    # fifth conflation class, diagnosed in `0bf224e` and fixed there in one file only.
+    bound = resolver.bind(before_step, BIO_DT)
+    return [flow.evaluate(before_step, bound, BIO_DT) for flow in registry.flows]
 
 
 # --- headline: full per-compartment ledger, every step / quantity / domain ----------
