@@ -142,8 +142,22 @@
     }
   },
   "science_bands": {
-    "consumer_chamber": [],
-    "consumer_long_horizon": [],
+    "consumer_chamber": [
+      {
+        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "locus": "tests/test_co2_compensation_band.py::test_consumer_chamber_stays_above_the_compensation_point",
+        "quantity": "season-low chamber CO\u2082 (ppm)",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+      }
+    ],
+    "consumer_long_horizon": [
+      {
+        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "locus": "tests/test_co2_compensation_band.py::test_consumer_long_horizon_stays_above_the_compensation_point",
+        "quantity": "season-low chamber CO\u2082 (ppm)",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+      }
+    ],
     "drift_summary": [],
     "open_season": [
       {
@@ -165,8 +179,29 @@
         "source": "Greenwood 1990 eqn (6) a=5.697 meets n_critical=1.5"
       }
     ],
-    "perennial_chamber": [],
-    "perennial_long_horizon": [],
-    "sealed_chamber": []
+    "perennial_chamber": [
+      {
+        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "locus": "tests/test_co2_compensation_band.py::test_perennial_chamber_stays_above_the_compensation_point",
+        "quantity": "season-low chamber CO\u2082 (ppm)",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+      }
+    ],
+    "perennial_long_horizon": [
+      {
+        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "locus": "tests/test_co2_compensation_band.py::test_perennial_long_horizon_stays_above_the_compensation_point",
+        "quantity": "season-low chamber CO\u2082 (ppm)",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+      }
+    ],
+    "sealed_chamber": [
+      {
+        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "locus": "tests/test_co2_compensation_band.py::test_sealed_chamber_stays_above_the_compensation_point",
+        "quantity": "season-low chamber CO\u2082 (ppm)",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+      }
+    ]
   }
 }

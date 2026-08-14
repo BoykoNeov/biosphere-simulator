@@ -163,6 +163,58 @@ locus of the diagnosis that motivated it; if the diagnosis names the wrong subje
 is aimed at it too.** Hence the band is written over the whole sealed roster rather than one
 scenario, which is also the form that does not need the diagnosis to have been right.
 
+#### ✅ THE BAND LANDED 2026-08-14, one ceremony later, over all five chamber scenarios
+
+`science_bands` gains five entries — `sealed_chamber`, `perennial_chamber`,
+`consumer_chamber`, `perennial_long_horizon`, `consumer_long_horizon` — each asserting
+*season-low chamber CO₂ > `Γ*/ci_ratio`*, at
+[`tests/test_co2_compensation_band.py`](../tests/test_co2_compensation_band.py). **A
+schema-free unfreeze: five manifest entries, no value moved, no golden regenerated, no
+`src/` change** (`git diff src/` empty). Measured at the shipped step:
+
+| scenario | driver | season-low CO₂ | margin |
+|---|---|---|---|
+| `sealed_chamber` | `run_season`, 3 yr | 76.8196 ppm | 1.2579× |
+| `perennial_chamber` | `run_perennial`, 5 yr | 75.4757 | 1.2359× |
+| **`consumer_chamber`** | `run_perennial`, 5 yr | **74.4210** | **1.2186×** |
+| `perennial_long_horizon` | `run_perennial`, 15 yr | 75.4757 | 1.2359× |
+| `consumer_long_horizon` | `run_perennial`, 15 yr | 74.4210 | 1.2186× |
+
+⚠ **The tightest of the five was never measured by any of the work that argued about
+it.** Every write-up of this defect quoted the sealed chamber (75.75 / 76.82) or the
+perennial one (56.03 / 75.48). The **consumer chamber sits below both**, and no record
+carried its number until the band enumerated the roster. The probes that drove the step
+decision swept the scenarios the *argument* was about; a band is about the *roster*, and
+the two are not the same list. **Enumerate the contract's own subjects, not the ones the
+discussion happens to have named** — which is this entry's locus lesson a second time, in
+a form the correction above does not cover.
+
+⚠ **The horizon was checked rather than assumed, because it could have been false.** The
+humification split pushed the chamber settling transient to ~35 yr, past every frozen
+horizon, so "green on the golden" does not by itself mean "green at equilibrium". Run to
+50 yr, both re-sowing chambers take their **global** minimum inside the frozen horizon
+(perennial year 2, consumer year 5) and rise monotonically to a settled attractor
+(75.84 / 75.06 ppm). The band's worst case is what the golden already runs.
+
+⚠ **`Γ*`'s citation gap is discharged as a *risk*, not as a debt.** It is still
+`TODO(cite)`, and caveat (a) above stands. What is new is that the gap is measured
+harmless: the only route to the same quantity on the shelf — Teh eq. 6.19,
+`Γ* = O₂/(2·τ)` with `τ = 2600` at 25 °C (Table 6.2) — gives **57.69 ppm, *below* the
+shipped 61.07**. So the shipped floor is the conservative one and closing the citation
+can only widen every margin above. That is asserted as a test, not as a sentence
+(`test_the_shipped_floor_is_the_conservative_one_against_the_cited_route`). ⚠ It is **not**
+a licence to swap the value: Teh's companion constants (`Kc` 300, `Ko` 300 mmol/mol)
+disagree with ours (404.9 / 278.4), so the two are different parameterizations, and the
+comparison is legitimate only because it moves the bound in the harder direction.
+
+⚠ **The bound is derived at run time, never typed.** The literal `61.07` appears in the
+test file only as a *tripwire* on the params (`test_the_floor_is_where_the_frozen_params_
+put_it`), so a silent re-value of `Γ*` goes red instead of quietly moving five bounds at
+once. The band itself is one-sided (`>`) on purpose — it must survive the next
+mechanism's golden movement without being re-pinned — with the five margins pinned
+loosely and separately, because *an inequality that passes says nothing about how nearly
+it failed*.
+
 ### The flow set + the aux processes
 
 The flow classes assembled across the canonical scenarios — the frozen flow taxonomy. The
