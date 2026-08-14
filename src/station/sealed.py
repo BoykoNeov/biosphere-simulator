@@ -134,7 +134,7 @@ from station.flows import (
     WaterRecoveryParams,
 )
 from station.harvest import HARVEST
-from station.lighting import LAMP, LIGHT_USED, lamp_par
+from station.lighting import LAMP, LIGHT_USED, _lamp_light_path, lamp_par
 from station.scenario import (
     SEALED_STATION_SCENARIO,
     LightingScenario,
@@ -437,17 +437,25 @@ def sealed_bio_resolver(
     soil_water,
     CO2_POOL_VAR: carbon_pool}`` — so FvCB's Ci reads the live shared cabin CO₂, the
     greenhouse reverse seam, unchanged), then overrides two forcings from the lamp:
-    ``PAR_VAR`` → the on-window flux ``photon_efficacy·lamp_power_w/ground_area`` and
-    ``DAYLENGTH_VAR`` → ``photoperiod_hours·3600`` (the Step-5 lighting coupling — both
-    must come from the lamp together, since the daily photon dose is PAR × daylength).
+    ``PAR_VAR`` → the on-window flux ``photon_efficacy·lamp_power_w/ground_area``,
+    shaped into the lamp's within-day **top-hat** (``lighting._lamp_light_path``), and
+    ``DAYLENGTH_VAR`` → ``photoperiod_hours·3600`` for the phenology photoperiod
+    response
+    (the Step-5 lighting coupling — both still come from the lamp together; since
+    2026-08-14 the photoperiod reaches photosynthesis as the shape of the PAR day rather
+    than as a multiplier on its total, so the crew's crop respires through the lamp's
+    dark hours).
     The
     ``weather`` must be tiled to cover the full horizon (``years×`` the season) so
     ``_table`` never end-clamps.
     """
     base = weather_resolver(weather, scenario.bio)
     forcings = dict(base.forcings)
-    forcings[PAR_VAR] = constant(lamp_par(lamp_params, _lighting_view(scenario)))
-    forcings[DAYLENGTH_VAR] = constant(scenario.photoperiod_hours * 3600.0)
+    photoperiod_s = scenario.photoperiod_hours * 3600.0
+    forcings[PAR_VAR] = _lamp_light_path(
+        lamp_par(lamp_params, _lighting_view(scenario)), photoperiod_s
+    )
+    forcings[DAYLENGTH_VAR] = constant(photoperiod_s)
     return SourceResolver(forcings=forcings, shared=dict(base.shared))
 
 

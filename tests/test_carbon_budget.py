@@ -8,7 +8,7 @@ on the gross-assimilation / maintenance / limitation recompute. Layers:
 * **The shared ``CarbonContext``**: ``budget`` returns ``(GASS, MRES, available)``
   recomputed from the step-entry snapshot; ``limitation`` forms ``f_water · f_N`` and is
   applied inside ``budget`` (so all three flows are limited identically). Cross-checked
-  against the standalone rate laws (``daily_canopy_assimilation`` etc.).
+  against the standalone rate laws (``canopy_assimilation`` etc.).
 * **The three flows** (carbon-balanced ``FlowResult``s, dt-linear):
   ``Allocation`` (``co2_atmos -> {leaf, stem, root, storage}``, the DVS-split ``DMI``),
   ``GrowthRespiration`` (``co2_atmos -> co2_resp``, ``GRES``), and
@@ -37,7 +37,7 @@ from domains.biosphere.nitrogen import NitrogenParams
 from domains.biosphere.phenology import PhenologyParams, development_stage
 from domains.biosphere.photosynthesis import (
     PhotosynthesisParams,
-    daily_canopy_assimilation,
+    canopy_assimilation,
 )
 from domains.biosphere.respiration import (
     RespirationParams,
@@ -158,7 +158,6 @@ def _ctx() -> CarbonContext:
         par_var=_PAR,
         ci_var=_CI,
         temp_var=_TEMP,
-        daylength_var=_DAYLEN,
         soil_water_var=_SW,
         wssg=_WSSG,
         rooted_depth_aux=_ROOTED_DEPTH,
@@ -257,12 +256,16 @@ def _budget(
     *, leaf_c: float, biomass: float, par: float = 800.0, limitation: float = 1.0
 ):  # noqa: ANN202
     lai = leaf_c * _SLA_PER_MOL_C / 1.0
-    gass = daily_canopy_assimilation(
+    # ⚠ ONE DAY of seconds, not the 43200 photoperiod this used to pass. Since the light
+    # path (2026-08-14) the budget integrates over a full day at the step's PAR and the
+    # day/night structure lives in the PAR forcing, so the photoperiod is no longer a
+    # multiplier here — see photosynthesis.canopy_assimilation's window_s note.
+    gass = canopy_assimilation(
         par,
         lai,
         400.0,
         20.0,
-        43200.0,
+        86400.0,
         params=_photo(),
         canopy=_canopy(),
         ground_area=1.0,
@@ -326,7 +329,14 @@ def test_growth_flow_leg_is_the_composed_loss_and_pins_the_step6_literal() -> No
     assert math.isclose(legs[_CO2_ATMOS], -expected, rel_tol=1e-12)
     assert math.isclose(legs[_CO2_RESP], expected, rel_tol=1e-12)
     assert math.isclose(expected, (1.0 - _YG) * available, rel_tol=1e-12)
-    assert math.isclose(expected, 0.32678769775306143, rel_tol=1e-12)
+    # ⚠ RE-DERIVED 2026-08-14 (was 0.32678769775306143). The literal did not drift —
+    # the integration window did: the budget used to multiply by the 43200 s photoperiod
+    # this fixture supplies and now integrates one full day at the step's PAR, the light
+    # path having moved day/night into the PAR forcing. At a constant 800 PAR the two
+    # differ by exactly the window ratio, so this is the same physics re-expressed, and
+    # the re-derivation is shown above rather than asserted: `expected` is computed from
+    # the rate laws and only the last line is a literal.
+    assert math.isclose(expected, 0.6712530650357866, rel_tol=1e-12)
 
 
 def test_growth_flow_is_carbon_balanced() -> None:
@@ -485,7 +495,7 @@ def test_allocation_dmi_agrees_with_growth_resp_budget() -> None:
     result = _allocation_flow().evaluate(state, _env(state, 1.0), 1.0)
     legs = {leg.stock: leg.amount for leg in result.legs}
     assert math.isclose(-legs[_CO2_ATMOS], dmi, rel_tol=1e-12)
-    assert math.isclose(dmi, 3.0 * 0.32678769775306143, rel_tol=1e-12)
+    assert math.isclose(dmi, 3.0 * 0.6712530650357866, rel_tol=1e-12)  # re-derived, above
 
 
 def test_allocation_fills_storage_in_the_reproductive_phase() -> None:

@@ -109,7 +109,6 @@ def _ctx() -> CarbonContext:
         par_var=_PAR,
         ci_var=_CI,
         temp_var=_TEMP,
-        daylength_var=_DAYLEN,
         soil_water_var=_SW,
         wssg=_WSSG,
         rooted_depth_aux=_ROOTED_DEPTH,

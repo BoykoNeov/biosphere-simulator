@@ -1,6 +1,8 @@
 # Gross/net gas exchange — the plant breathes continuously
 
-**Status: PLANNED 2026-08-14. Nothing built. `git diff src/` empty.**
+**Status: stages 3 + 1 BUILT 2026-08-14, measured, NOTHING REGENERATED. Stages 0 + 2 not
+built (finding 11). See the build section at the foot of this file for what was measured
+before any golden moved — including the science gate that goes RED (finding 14).**
 
 ## Charge
 
@@ -498,3 +500,181 @@ refactor and only the non-Earth values are new.
 it as part of stage 0 (the time-unit refactor) — the master "day" becomes the world's
 rotation period, not the literal number 86400. **This is the deepest structural reach of the
 whole plan and must not be discovered late.**
+
+---
+
+# BUILD, 2026-08-14 — stages 3 + 1 built and MEASURED; nothing regenerated
+
+**Status: `src/` changed, every golden still the committed one.** The measurements below
+were all taken before a byte of golden was regenerated (`soil-layers-built`: predict the
+diff first). Stage 0 and stage 2 are **not** built — see finding 11 for why they are not
+preconditions of this half, and why stage 2 is a bigger object than the plan priced.
+
+## FINDING 10 — ⚠ THE SINUSOID HAS TWO RENDERINGS AND THE PLAN'S IS UNSHIPPABLE
+
+A forcing schedule is a function of the integer step and is piecewise-constant across it
+(#14), so "PAR follows a half-sine" must be handed over as **either** the instantaneous
+value at the step-entry instant (the plan's form, and what probe 1 integrated at 60 s)
+**or** the analytic mean of the sine over the step window. At the step this project ships
+they are not close. Ratio of the day's gross assimilation to today's, at peak LAI:
+
+| form | `dt=1` | `dt=¼` (shipped) | `dt=⅛` | `dt=1/96` |
+|---|---|---|---|---|
+| instantaneous, 13.3 h day | **0.0000** | 0.9160 | 0.9914 | 0.9900 |
+| instantaneous, 16.5 h day | **0.0000** | **1.0385** | 0.9934 | 0.9897 |
+| window mean, 13.3 h day | 1.0183 | 0.9965 | 0.9917 | 0.9899 |
+| window mean, 16.5 h day | 1.0129 | 0.9935 | 0.9913 | 0.9897 |
+
+The instantaneous form is **sampling luck**: an 8 % loss on one day of the year and a
+4 % *gain* on another, from the same code, and at `dt = 1` it returns exactly zero
+because the one sample lands at midnight. Its golden diff would record the grid, not the
+science. The window mean conserves the day's photon dose **exactly at any step** (the
+window means are a partition of the same integral) and converges monotonically to the
+60 s answer. ⇒ **the window mean is what shipped**, and the instantaneous form is
+recorded as measured-and-refused rather than as a road not taken.
+
+⚠ **The Jensen correction is therefore step-limited.** At `dt = ¼` about half of the
+converged pointwise loss at peak canopy is resolved. That is a fact about the step, not
+about the science, and it must not be reported as "the cited direction did not appear".
+
+## FINDING 11 — ⚠⚠ A FAST SUB-STEP CANNOT SEE A LIGHT CURVE. STAGE 2 IS GATED ON THIS.
+
+`Substepper.substep` advances amounts and **keeps `State.n`** (that is what makes the
+single `n -> n+1` commit the driver's), and `BoundEnvironment.get` resolves a forcing as
+`schedule(snapshot.n, dt)`. So **every fast sub-step inside one master step is handed an
+identical `(n, dt)` pair** and therefore an identical PAR. Moving the gas flows into the
+fast registry — stage 2, exactly as the plan describes it — would hand the light curve to
+the one operator structurally unable to see it.
+
+The fix is boundary-side and cheap in principle (build `steps_per_day` resolvers, one per
+sub-step index, and let the driver pick), and it must **not** be a `Schedule` signature
+change in `simcore/environment.py` — that is the frozen Phase-0 interface, and it would
+turn a boundary unfreeze into a core one. Advisor-confirmed 2026-08-14.
+
+⇒ **Stage 3 needs none of it**, and that is why this half shipped alone: both run paths
+already advance `n` through `step_report` (standalone `run_season`; the station's
+biosphere as the *slow* domain), so a within-day schedule reading `t = n·dt` works today.
+Hazards 6 (`run_season` has no fast path) and 7 (days-vs-seconds at the registry
+boundary) belong to stage 2, not here, and stage 0 is not a precondition of anything
+built here.
+
+⚠ **And stage 2 is not the cheap route the plan assumed.** The gas legs are produced by
+the three flows that *are* the carbon budget (`Allocation`, `GrowthRespiration`,
+`MaintenanceRespiration`, sharing one `CarbonContext.budget()`), so "gas fast, growth
+slow" is not a partition of this tree — rate-classing gas at one minute means evaluating
+the most expensive flows 1440×/day against 4 today. Measured for comparison: the whole
+biosphere at `dt = 1/32` costs **8×** (a 3-year sealed season, 0.60 s → 5.92 s). A finer
+step for everything is cheaper than a fast lane for the expensive part.
+
+## FINDING 12 — the measured before/after (Euler, committed weather, nothing regenerated)
+
+Baseline is the committed tree run from a worktree at `82d965c`; both sides use the same
+probe. `open_season` peak W is in t/ha (the Greenwood tripwire's own unit, crossing
+14.4248); `min ppm` is the CO₂ compensation-point band's own quantity (floor 61.07).
+
+| | `dt=¼` | `dt=⅛` | `dt=1/16` | `dt=1/32` |
+|---|---|---|---|---|
+| **open_season peak LAI** — baseline | 5.5719 | 5.5896 | 5.5984 | 5.6028 |
+| — light path | **5.3806** | **4.8598** | **4.7278** | **4.7132** |
+| **open_season peak W (t/ha)** — baseline | 14.1077 | 14.1350 | 14.1481 | 14.1546 |
+| — light path | 13.7402 | 13.1906 | 13.0220 | 13.0000 |
+| **sealed min CO₂ (ppm)** — baseline | 76.820 | 76.962 | 77.036 | 77.074 |
+| — light path | 71.278 | 72.615 | 74.098 | 74.674 |
+| **perennial min CO₂** — baseline / light path | 75.476 / 70.492 | 75.652 / 72.120 | 75.703 / 73.461 | 75.730 / 74.363 |
+| **consumer min CO₂** — baseline / light path | 74.421 / 73.813 | 74.536 / 74.268 | 74.593 / 74.664 | 74.619 / 74.869 |
+
+`rationed == 0` and no extinction events everywhere, at every step, on both sides.
+
+## FINDING 13 — ⚠⚠ THE CONTROL: THE CANOPY LOSS IS THE CONCAVITY, NOT THE NIGHT
+
+The light path changes two things at once and they must not be reported as one. The
+control is a **top-hat at the daytime mean** — the committed tree's own PAR value,
+confined to the daylight window — whose daily gross assimilation is the committed tree's
+and which differs from it *only* by having dark steps. `open_season` peak LAI:
+
+| | `dt=¼` | `dt=⅛` | `dt=1/32` |
+|---|---|---|---|
+| baseline (flat, no night) | 5.5719 | 5.5896 | 5.6028 |
+| **top-hat** (same daily carbon, **with** night) | 5.9878 | 5.7451 | 5.5414 |
+| sine (night **and** concavity) | 5.3806 | 4.8598 | 4.7132 |
+
+**Night respiration is very nearly inert on the canopy** — at the converged step it costs
+1.1 % of peak LAI (5.6028 → 5.5414); its apparent *gain* at coarse steps is the
+straddling-window artifact, and it shrinks as the step does, which is how you tell the
+two apart. **The concavity is the whole effect**: 5.5414 → 4.7132, **−14.9 %**, converged.
+
+⚠ This is the compounding the plan pre-registered ("a 3.6 % early loss can compound to
+more than 1.1 % at peak") and it compounds **four-fold**: a ~1 % pointwise loss at peak
+canopy and ~3.5 % early becomes ~15 % of peak LAI, because the early loss lands on the
+phase that *sets* the canopy (`wheat-partition-backfill-refused`). ⇒ **the pointwise
+multiplier of finding 6 was never a bound on the season, and quoting it as one would have
+under-priced this change by an order of magnitude.**
+
+## FINDING 14 — ⚠⚠ THE SCIENCE GATE: THE PEAK-LAI BAND HOLDS AT THE SHIPPED STEP AND FAILS AT EVERY FINER ONE
+
+⚠ **Measured with the band's OWN arithmetic, after an advisor challenge that this finding
+was about to be written from a differently-configured probe.** The band's locus
+(`tests/test_senescence_form.py::test_frozen_open_season_canopy_is_physical`) has its own
+`_run` / `_peak_lai`; those two helpers were imported and re-run at each step rather than
+trusted to agree with the probe. **They reproduce it cell for cell** — so the numbers
+below are the gate's, not a lookalike. (`acceptance-gate-diagnosed`: measure a gate with
+its own arithmetic. The check was cheap and it could have gone the other way.)
+
+`science_bands.open_season` holds `5.0 < peak LAI < 8.0` ("real wheat peaks at ~5–8 LAI")
+and `peak < 6.0` (Van Keulen & Seligman's mutual-shading threshold):
+
+| | `dt=¼` (shipped) | `dt=⅛` | `dt=1/16` | `dt=1/32` |
+|---|---|---|---|---|
+| baseline | 5.5719 PASS | 5.5896 PASS | 5.5984 PASS | 5.6028 PASS |
+| light path | **5.3806 PASS** | 4.8598 **FAIL** | 4.7278 **FAIL** | 4.7132 **FAIL** |
+
+**At the shipped step the gate is green, and the suite confirms it** (both band tests
+pass on the working tree). But the pass is worth exactly what the step is worth: the
+observable is still moving **15 %** between `¼` and `1/32`, while the baseline's moved
+0.6 %. ⇒ the honest statement is **not** "the band holds"; it is *the band holds at the
+step we ship and the converged answer is below its floor*, which is the
+documented-allowance shape (2026-08-13), not a red gate — **and not a clean bill either**.
+
+**This is the plan's own biggest live risk, arriving where it said it would.** Of the two
+pre-registered readings, one is **eliminated by measurement**: the canopy regulator
+(`canopy-regulator-diagnosed`) is a **5 %/day leaf-area LOSS above LAI 6** — it can only
+push a canopy down, and cannot be the fix for one that fell to 4.71, which is further from
+its threshold than before. What remains is the other reading: **the band was clearing
+against a diurnally biased (high) assimilation, and what the light path exposes is a
+canopy this tree cannot grow** — a missing growth mechanism, not a wrong light path.
+Retuning the bound so the change fits is the co-adaptation shape this project has refused
+three times, and it is not on the table.
+
+⚠ Note which way the other tripwires move — all of them *away* from danger. The Greenwood
+peak-W crossing (14.4248) goes from **2.20 %** of margin to **4.75 %** at `dt = ¼` and
+**9.88 %** at `dt = 1/32`; every CO₂ compensation-point band still clears its floor at
+every step. So no gate is red today, and the one that is *converging* toward red is the
+canopy floor.
+
+## FINDING 15 — THE CHARGE'S OWN OBSERVABLE, MEASURED: THE CHAMBER BREATHES
+
+Sealed chamber, day 200, `dt = 1/32` — the night branch running for the first time in
+this project's history (CO₂ mol in the shared pool, O₂ its exact mirror at PQ = 1):
+
+```
+  hour       PAR    CO2 (mol)        dCO2     O2 (mol)         dO2
+  0.00      0.00     0.085769  +0.0007469     2.271231  -0.0007469
+  3.75      0.00     0.089502  +0.0007459     2.267498  -0.0007459
+  6.00    459.05     0.090957  -0.0007004     2.266043  +0.0007004
+ 12.00   1544.85     0.084359  -0.0006651     2.272641  +0.0006651
+ 18.00    202.87     0.080158  +0.0002239     2.276842  -0.0002239
+ 23.25      0.00     0.084831  +0.0007458     2.272169  -0.0007458
+```
+
+CO₂ climbs all night and falls all day; O₂ is its exact negative. ⚠ **And the diurnal
+swing is already essentially converged at the shipped step**: 0.010690 mol at `dt = ¼`
+against 0.010799 at `dt = 1/32` (day 200). The season's *canopy* needs a finer step; the
+season's *breathing* does not.
+
+⚠ **One correction to this document's own finding-5 framing, found by measuring**: the
+night branch is gated on `shortfall = MRES − GASS > 0`, **not** on a fully dark step. Dim
+steps at dawn and dusk cross it too. So the earlier count of "fully dark steps per season"
+(55 % of night hours at `dt = ¼`, with 133 days having none at all) is a **lower** bound
+on when the mechanism runs, not a measure of it — at `dt = ¼`, day 200 has no dark step
+and still breathes. The claim "the light path is necessary but not sufficient at `¼`" was
+too strong and is withdrawn here rather than left standing in the module note.

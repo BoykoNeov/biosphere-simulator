@@ -77,11 +77,12 @@ from dataclasses import dataclass
 from domains.biosphere.allocation import AllocationParams, partition
 from domains.biosphere.canopy import CanopyParams, leaf_area_index
 from domains.biosphere.chamber import ci_from_co2_pool, oxygen_limitation_factor
+from domains.biosphere.light_path import SECONDS_PER_DAY
 from domains.biosphere.nitrogen import NitrogenParams, nitrogen_stress_factor
 from domains.biosphere.phenology import PhenologyParams, development_stage
 from domains.biosphere.photosynthesis import (
     PhotosynthesisParams,
-    daily_canopy_assimilation,
+    canopy_assimilation,
 )
 from domains.biosphere.respiration import (
     RespirationParams,
@@ -116,7 +117,14 @@ class CarbonContext:
     par_var: str
     ci_var: str
     temp_var: str
-    daylength_var: str
+    # ⚠ There is deliberately no ``daylength_var`` here any more (post-roadmap,
+    # 2026-08-14). Photosynthesis used to read the photoperiod and multiply the day's
+    # assimilation by it; the light path put that structure into the PAR forcing
+    # instead, so the integration window is now one day of seconds, unconditionally.
+    # ``daylength_s`` survives as a **pure photoperiod signal** for the phenology
+    # response (``phenology.daylength_var``, wired at ``plants.py``) — the grow-lamp
+    # still drives flowering. Two readers of one var became one, and the one that
+    # remains is the one whose name it is.
     # f_water: soil water read as a sibling stock via env.get (#16), now divided by the
     # root zone's own capacity (TTSW = rooted_depth · EXTR · ρ · A) rather than compared
     # against an absolute-kg band. ⚠ The depth comes off the SNAPSHOT aux, and it must
@@ -228,7 +236,10 @@ class CarbonContext:
         """Daily ``(GASS, MRES, available)`` at the step-entry snapshot (mol C/day).
 
         ``GASS`` is gross canopy assimilation (Step 4/5) at the ``leaf_c``-derived LAI,
-        limited by :meth:`limitation`; ``MRES`` is maintenance respiration (Step 6) on
+        limited by :meth:`limitation`, and evaluated over a **one-day window at this
+        step's PAR** — so on a night step (``par_var`` reads 0 under the light path) it
+        is exactly 0 and ``MRES`` is paid out of biomass instead of out of the air;
+        ``MRES`` is maintenance respiration (Step 6) on
         the ``Σ(leaf + stem + root)`` biomass; ``available = max(0, GASS − MRES)`` is
         the shared maintenance-first budget. All daily rates (dt-independent); the flows
         multiply by ``dt``. Maintenance is **not** limited (it is unconditional); only
@@ -238,12 +249,12 @@ class CarbonContext:
         lai = leaf_area_index(
             leaf, sla_per_mol_c=self.canopy.sla_per_mol_c, ground_area=self.ground_area
         )
-        gass = daily_canopy_assimilation(
+        gass = canopy_assimilation(
             env.get(self.par_var),
             lai,
             self._ci(env),
             env.get(self.temp_var),
-            env.get(self.daylength_var),
+            SECONDS_PER_DAY,
             params=self.photo,
             canopy=self.canopy,
             ground_area=self.ground_area,

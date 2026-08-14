@@ -104,7 +104,6 @@ def _carbon_context(scenario: SeasonScenario) -> CarbonContext:
         par_var=PAR_VAR,
         ci_var=CI_VAR,
         temp_var=TEMP_VAR,
-        daylength_var=DAYLENGTH_VAR,
         soil_water_var=SOIL_WATER_VAR,
         wssg=scenario.wssg,
         rooted_depth_aux=ROOTED_DEPTH,

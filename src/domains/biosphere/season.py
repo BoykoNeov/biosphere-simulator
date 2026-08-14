@@ -70,6 +70,7 @@ from datetime import date
 
 from domains.biosphere.atmosphere import build_atmosphere
 from domains.biosphere.consumers import build_consumers
+from domains.biosphere.light_path import half_sine_window_mean
 from domains.biosphere.plants import _carbon_context as _carbon_context
 from domains.biosphere.plants import build_plants
 from domains.biosphere.scenario import (
@@ -281,6 +282,37 @@ def _table(values: list[float]) -> Schedule:
     return schedule
 
 
+def _sine_light_path(
+    daytime_mean_par: list[float], daylength_s: list[float]
+) -> Schedule:
+    """The within-day PAR forcing: the sinusoidal day, averaged over the step window.
+
+    Where :func:`_table` holds a daily observation fixed across the sub-steps within the
+    day, this **shapes** it: the day's row supplies the daytime-mean PAR and the day's
+    length, and ``light_path.half_sine_window_mean`` returns the mean PAR over
+    ``[t, t+dt)`` of the cited sinusoidal path ([E]). The day's photon dose is unchanged
+    — only its distribution within the day is — so no radiation is created and the
+    weather fixture is untouched (``forcing.weather_sha256`` does not move).
+
+    ⚠ **The night steps of this schedule return exactly 0, and that is the mechanism the
+    whole change exists for**: at PAR = 0 gross assimilation is 0, so maintenance
+    respiration's ``shortfall`` becomes positive and the plant burns biomass and returns
+    CO₂ to the air, which in a sealed chamber is the diurnal swing the charge asks for.
+    ⚠ **Whether a season HAS a fully dark step is a property of the step size**, not of
+    this function — see ``light_path``'s module note and the step table there.
+    """
+    last = len(daytime_mean_par) - 1
+
+    def schedule(n: int, dt: float) -> float:
+        t = n * dt
+        day = min(int(t), last)
+        return half_sine_window_mean(
+            t - int(t), dt, daytime_mean_par[day], daylength_s[day]
+        )
+
+    return schedule
+
+
 def weather_resolver(
     weather: list[dict[str, float | str]], scenario: SeasonScenario = DEFAULT_SCENARIO
 ) -> SourceResolver:
@@ -316,7 +348,7 @@ def weather_resolver(
     return SourceResolver(
         forcings={
             TEMP_VAR: _table(temp),
-            PAR_VAR: _table(par),
+            PAR_VAR: _sine_light_path(par, daylen),
             DAYLENGTH_VAR: _table(daylen),
             RN_VAR: _table(rn),
             VPD_VAR: _table(vpd),

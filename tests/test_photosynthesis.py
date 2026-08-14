@@ -30,7 +30,7 @@ from domains.biosphere.loader import (
 )
 from domains.biosphere.photosynthesis import (
     PhotosynthesisParams,
-    daily_canopy_assimilation,
+    canopy_assimilation,
     electron_transport_rate,
     gross_leaf_assimilation,
     light_limited_rate,
@@ -155,10 +155,10 @@ def test_temperature_factor_cardinal_points(temp: float, expected: float) -> Non
 
 
 # --- the provisional big-leaf canopy aggregator -----------------------------
-def test_daily_canopy_assimilation_known_value() -> None:
+def test_canopy_assimilation_known_value() -> None:
     # LAI=2.936 (5 mol leaf C / 1 m², SLA fold), f_int≈0.828; daily flux composed from
     # the hand literals above. dt is applied by the flow, not the aggregator.
-    daily = daily_canopy_assimilation(
+    daily = canopy_assimilation(
         800.0,
         5.0 * _SLA_PER_MOL_C / 1.0,  # LAI
         400.0,
@@ -171,18 +171,18 @@ def test_daily_canopy_assimilation_known_value() -> None:
     assert math.isclose(daily, 1.3778614691309006, rel_tol=1e-12)
 
 
-def test_daily_canopy_assimilation_temperature_halves_at_ramp_midpoint() -> None:
+def test_canopy_assimilation_temperature_halves_at_ramp_midpoint() -> None:
     # f_temp(7.5) = 0.5 scales the whole daily flux by exactly half.
     common: dict[str, Any] = dict(params=_params(), canopy=_canopy(), ground_area=1.0)
     lai = 5.0 * _SLA_PER_MOL_C
-    warm = daily_canopy_assimilation(800.0, lai, 400.0, 20.0, 43200.0, **common)
-    cool = daily_canopy_assimilation(800.0, lai, 400.0, 7.5, 43200.0, **common)
+    warm = canopy_assimilation(800.0, lai, 400.0, 20.0, 43200.0, **common)
+    cool = canopy_assimilation(800.0, lai, 400.0, 7.5, 43200.0, **common)
     assert math.isclose(cool, warm * 0.5, rel_tol=1e-12)
 
 
-def test_daily_canopy_assimilation_zero_lai_is_zero() -> None:
+def test_canopy_assimilation_zero_lai_is_zero() -> None:
     assert (
-        daily_canopy_assimilation(
+        canopy_assimilation(
             800.0,
             0.0,
             400.0,
@@ -196,12 +196,12 @@ def test_daily_canopy_assimilation_zero_lai_is_zero() -> None:
     )
 
 
-def test_daily_canopy_assimilation_finite_in_small_lai_limit() -> None:
+def test_canopy_assimilation_finite_in_small_lai_limit() -> None:
     # The mean-absorbed-PAR-per-leaf ratio f_int/LAI → k as LAI → 0 (f_int ≈ k·LAI),
     # so the flux stays finite (no 0/0 blow-up) and vanishes smoothly toward LAI=0.
     common: dict[str, Any] = dict(params=_params(), canopy=_canopy(), ground_area=1.0)
     flux = [
-        daily_canopy_assimilation(800.0, lai, 400.0, 20.0, 43200.0, **common)
+        canopy_assimilation(800.0, lai, 400.0, 20.0, 43200.0, **common)
         for lai in (1e-3, 1e-6, 1e-9)
     ]
     assert all(math.isfinite(f) for f in flux)
@@ -210,11 +210,11 @@ def test_daily_canopy_assimilation_finite_in_small_lai_limit() -> None:
 
 
 @pytest.mark.parametrize("bad_area", [0.0, -1.0])
-def test_daily_canopy_assimilation_rejects_non_positive_ground_area(
+def test_canopy_assimilation_rejects_non_positive_ground_area(
     bad_area: float,
 ) -> None:
     with pytest.raises(ValueError, match="ground_area"):
-        daily_canopy_assimilation(
+        canopy_assimilation(
             800.0,
             2.0,
             400.0,
@@ -226,17 +226,17 @@ def test_daily_canopy_assimilation_rejects_non_positive_ground_area(
         )
 
 
-@pytest.mark.parametrize("bad_daylength", [0.0, -3600.0])
-def test_daily_canopy_assimilation_rejects_non_positive_daylength(
-    bad_daylength: float,
+@pytest.mark.parametrize("bad_window", [0.0, -3600.0])
+def test_canopy_assimilation_rejects_non_positive_window(
+    bad_window: float,
 ) -> None:
-    with pytest.raises(ValueError, match="daylength_s"):
-        daily_canopy_assimilation(
+    with pytest.raises(ValueError, match="window_s"):
+        canopy_assimilation(
             800.0,
             2.0,
             400.0,
             20.0,
-            bad_daylength,
+            bad_window,
             params=_params(),
             canopy=_canopy(),
             ground_area=1.0,

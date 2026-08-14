@@ -19,13 +19,22 @@ is an isolated, additively-extendable seam:
   ``Ag`` negative and turn the source into a withdrawal — clamp to 0 instead (P3:
   "assimilation → 0 as CO₂/light → 0").
 
-* **Provisional canopy + diurnal aggregator** ``daily_canopy_assimilation`` — a
-  **big-leaf** at daily-/canopy-mean PAR. ``Ag`` is concave in PAR (saturating ``J``,
-  then ``min``), so a mean-PAR estimate **overestimates** the true daily integral
-  (Jensen) — exactly why WOFOST does the intra-canopy/diurnal Gaussian. That Gaussian
-  is the Step-11 refinement; ``daily_canopy_assimilation`` is the seam it extends
-  *additively* (same signature). The expected high-bias is documented, not assumed
-  away.
+* **Canopy aggregator** ``canopy_assimilation`` — a **big-leaf** at the canopy-mean PAR
+  of one integration *window*. ``Ag`` is concave in PAR (saturating ``J``, then
+  ``min``), so evaluating at a mean PAR **overestimates** the true integral (Jensen) —
+  exactly why WOFOST does the intra-canopy/diurnal Gaussian.
+
+  ⚠ **The diurnal half of that bias is now closed by the forcing, not by a quadrature
+  scheme** (post-roadmap, 2026-08-14). This function used to be handed one
+  *daytime-mean* PAR and the *photoperiod* as its window, which made it the whole day's
+  assimilation in one evaluation and left it structurally unable to say that the sun
+  sets. It is now handed the PAR of a **step-sized window** by
+  ``light_path.half_sine_window_mean`` and the window's own length, so stepping the
+  season performs the diurnal integral directly, at the step's resolution, and PAR is
+  **0** at night. The deferred Step-11 diurnal Gaussian is therefore discharged by a
+  different route than the one it named — it was a fast approximation to an integral
+  this tree now takes. The **intra-canopy** half of the Jensen bias (three depths in the
+  canopy) is untouched and still open.
 
 **Temperature (the WOFOST TMPFTB idiom).** Photosynthesis is strongly temperature-
 limited; FvCB at a single reference temperature would assimilate near-max through a
@@ -36,8 +45,11 @@ response of the assimilation rate (a populated ``Π fᵢ`` factor). Full Arrheni
 
 **Area basis (P4).** Leaf-level rates are per m² *leaf*; the aggregator multiplies by
 LAI (leaf area per ground area) and by the scenario ``ground_area`` (m²) and the
-photoperiod ``daylength_s`` (s), then converts µmol → mol, to yield an **absolute**
-daily mol-C flux — the canonical per-area-rate × ground_area convention.
+integration window ``window_s`` (s), then converts µmol → mol, to yield an **absolute**
+mol-C flux over that window — the canonical per-area-rate × ground_area convention.
+Callers on the daily budget (``carbon_budget.CarbonContext.budget``) pass one **day** of
+seconds, so what comes back is the mol C day⁻¹ rate *at this step's PAR*, which the
+flows then multiply by ``dt``.
 
 Pure stdlib only. Citation: Farquhar, G.D., von Caemmerer, S. & Berry, J.A. (1980),
 "A biochemical model of photosynthetic CO₂ assimilation in leaves of C3 species",
@@ -164,21 +176,22 @@ def temperature_factor(
     return 1.0
 
 
-def daily_canopy_assimilation(
+def canopy_assimilation(
     incident_par: float,
     lai: float,
     ci: float,
     temp_c: float,
-    daylength_s: float,
+    window_s: float,
     *,
     params: PhotosynthesisParams,
     canopy: CanopyParams,
     ground_area: float,
     limitation: float = 1.0,
 ) -> float:
-    """Daily gross canopy assimilation (absolute mol C day⁻¹) — provisional big-leaf.
+    """Gross canopy assimilation over one window (absolute mol C) — big-leaf.
 
-    Aggregates the leaf-level FvCB to a daily, ground-area-absolute carbon flux:
+    Aggregates the leaf-level FvCB to a ground-area-absolute carbon flux over a window
+    of ``window_s`` seconds during which ``incident_par`` is taken as constant:
 
     1. Absorbed canopy PAR per ground area ``= incident_par · f_int`` (Beer–Lambert,
        Step 4). Mean absorbed PAR per *leaf* area ``= incident_par · f_int / LAI`` —
@@ -186,20 +199,30 @@ def daily_canopy_assimilation(
        guarded to 0 at exactly ``LAI = 0`` (no leaves intercept nothing).
     2. Gross leaf rate at that mean PAR (:func:`gross_leaf_assimilation`), scaled to a
        canopy rate per ground area by ``× LAI``.
-    3. ``× daylength_s`` (photoperiod) ``× ground_area`` (m²) ``× 1e-6`` (µmol→mol)
-       ``× f_temp(temp_c)`` ``× limitation`` (the ``f_water·f_N`` seam; 1.0 in Step 5).
+    3. ``× window_s`` ``× ground_area`` (m²) ``× 1e-6`` (µmol→mol)
+       ``× f_temp(temp_c)`` ``× limitation`` (the ``f_water·f_N`` seam).
 
-    **Provisional high-bias (Jensen).** ``Ag`` is concave in PAR, so this mean-PAR
-    big-leaf overestimates the true intra-canopy/diurnal integral. Closing that gap is
-    the Step-11 Gaussian, which extends *this* function additively.
+    ⚠ **``window_s`` was ``daylength_s`` until 2026-08-14, and the difference is the
+    whole point of the light path.** Passing the photoperiod made this the *day's*
+    assimilation, computed once from a daytime-mean PAR — a form in which the sun never
+    sets and the plant's night-time gas exchange does not exist. The window is now the
+    caller's integration window (the daily budget passes one day of seconds and gets a
+    per-day *rate* at this step's PAR), and the day/night structure lives in the PAR
+    forcing (``light_path``). ⚠ It follows that ``window_s`` must **not** be fed a
+    photoperiod any more: doing so would multiply the day-length in twice.
 
-    Raises ``ValueError`` for non-positive ``ground_area`` or ``daylength_s`` and for
+    **Residual high-bias (Jensen).** ``Ag`` is concave in PAR, so a mean-PAR big-leaf
+    still overestimates the true **intra-canopy** integral (three depths); the diurnal
+    half of that bias is now taken by stepping the light path rather than by a
+    quadrature scheme.
+
+    Raises ``ValueError`` for non-positive ``ground_area`` or ``window_s`` and for
     a negative ``lai`` (a meaningless geometry).
     """
     if not ground_area > 0.0:
         raise ValueError(f"ground_area must be > 0 m², got {ground_area!r}")
-    if not daylength_s > 0.0:
-        raise ValueError(f"daylength_s must be > 0 s, got {daylength_s!r}")
+    if not window_s > 0.0:
+        raise ValueError(f"window_s must be > 0 s, got {window_s!r}")
     if lai < 0.0:
         raise ValueError(f"lai must be >= 0, got {lai!r}")
     if lai == 0.0:
@@ -215,6 +238,4 @@ def daily_canopy_assimilation(
         t_opt_hi=params.t_opt_hi,
         t_max=params.t_max,
     )
-    return (
-        canopy_rate * daylength_s * ground_area * MICROMOL_TO_MOL * f_temp * limitation
-    )
+    return canopy_rate * window_s * ground_area * MICROMOL_TO_MOL * f_temp * limitation

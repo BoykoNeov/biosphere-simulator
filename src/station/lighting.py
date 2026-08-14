@@ -15,22 +15,42 @@ untouched**: PAR stays a forcing, merely *computed from the lamp* instead of rea
 weather table. Zero frozen / zero domain / zero core change (finding #3).
 
 **The daylength coupling (the correctness crux, advisor).** ``incident_par`` returns a
-*daytime-mean* photon flux and the FvCB aggregator re-multiplies by ``daylength_s`` for
+*daytime-mean* photon flux and the FvCB aggregator re-multiplied by ``daylength_s`` for
 the daily photon dose (dose = PAR × daylength). Overriding PAR alone would silently
-corrupt the dose. So **both** PAR and ``daylength_s`` come from the lamp. The only
-runtime consumer of ``daylength_s`` is photosynthesis (phenology / transpiration /
-net-radiation do not read it), so "day = lamp photoperiod" is consistent everywhere it
-is read. The chamber's non-light forcings (temperature, VPD, net radiation) stay
-weather-driven (reused from the winter-wheat fixture — the greenhouse precedent); a
-fully controlled-environment chamber is a deferred refinement.
+corrupt the dose. So **both** PAR and ``daylength_s`` come from the lamp.
+
+⚠ **REWRITTEN 2026-08-14 — the sentence that followed here was measured FALSE, and the
+form it justified is gone.** It read: *"The only runtime consumer of ``daylength_s`` is
+photosynthesis (phenology / transpiration / net-radiation do not read it), so 'day =
+lamp photoperiod' is consistent everywhere it is read."* ``daylength_s`` had **three**
+readers by then, not one: the photosynthesis window, and — added *after* this sentence
+was written — ``phenology``'s photoperiod response (``phenology.py``, wired at
+``plants.py`` whenever ``scenario.photoperiod`` is set). A scope claim is dated to the
+roster that existed when it was written (``o2-makeup-reversal-inside-the-freeze``), and
+this one was never re-read when the roster grew.
+
+**What is true now.** Photosynthesis no longer reads ``daylength_s`` at all: the lamp's
+photoperiod reaches the crop as a **within-day top-hat in the PAR forcing itself**
+(``light_path.top_hat_window_mean``) rather than as a multiplier on the day's total, so
+the lamp's dark hours are hours the plant actually respires through. The daily dose is
+unchanged by construction (``on_par · photoperiod_s``). ``daylength_s`` stays wired from
+the lamp for its **one remaining reader**, the phenology photoperiod response — so the
+grow-lamp still drives flowering, which is the behaviour this module intends and which
+deleting the var would have silently broken. The chamber's non-light forcings
+(temperature, VPD, net radiation) stay weather-driven (reused from the winter-wheat
+fixture — the greenhouse precedent); a fully controlled-environment chamber is a
+deferred refinement.
 
 **The lamp's daily-average draw (a consequence of the frozen-``n`` fast domain).** Under
-the two-rate driver the biosphere lumps ×``STEPS_PER_DAY`` per master day and Power
-sub-steps 24× — but
-``substep`` **keeps** ``n`` (the day count), so a within-day top-hat (lamp on
-``photoperiod_hours``, off the rest) is not expressible as an ``n``-schedule. The
-biosphere already carries the photoperiod *internally* via ``daylength_s``; Power only
-has to draw the correct **daily energy**. So the lamp flow reads a constant
+the two-rate driver Power sub-steps 24× per master day — and ``substep`` **keeps**
+``n``, so a within-day top-hat is not expressible as an ``n``-schedule **on the fast
+side**.
+⚠ That constraint is the *fast domain's*, not the lamp's: the biosphere is the **slow**
+domain here, stepping through ``step_report``, which advances ``n`` — so its PAR top-hat
+is expressible and, since 2026-08-14, is what it reads. The two halves of the same lamp
+therefore differ on purpose: the crop sees the real on/off path, while Power draws the
+day's energy at a smeared rate. Power only has to draw the correct **daily energy**, so
+the lamp flow reads a constant
 **daily-average** power ``lamp_power_w · photoperiod_hours / 24``
 (:func:`lamp_average_power`): its daily energy is ``lamp_power_w · photoperiod_hours ·
 3600`` **exactly**, and so are the daily ``light_used`` (η_lamp × that) and
@@ -71,6 +91,7 @@ Pure stdlib only in the spine; the crop params load via the biosphere loaders, t
 photon efficacy via ``station.loader``.
 """
 
+from domains.biosphere.light_path import top_hat_window_mean
 from domains.biosphere.season import build_season, weather_resolver
 from domains.biosphere.stocks import (
     DAYLENGTH_VAR,
@@ -81,7 +102,7 @@ from domains.biosphere.stocks import (
 )
 from domains.power.stocks import BATTERY, WASTE_HEAT, battery_stock
 from simcore import boundary
-from simcore.environment import SourceResolver, constant
+from simcore.environment import Schedule, SourceResolver, constant
 from simcore.events import Event
 from simcore.flow import Flow
 from simcore.ids import FlowId, StockId
@@ -223,6 +244,28 @@ def build_lighting(
     return state, bio_registry, power_registry
 
 
+def _lamp_light_path(on_par: float, photoperiod_s: float) -> Schedule:
+    """The lamp's PAR forcing: a within-day top-hat centred on midday.
+
+    The lamp analogue of ``season._sine_light_path`` — the same step-window mean, over a
+    rectangular on/off path instead of a sinusoid (a lamp on a timer has no diurnal
+    intensity curve). Shared by this module and ``station.sealed``, the two seams whose
+    crop is lit by :class:`station.flows.Lamp` rather than by the sun.
+
+    ⚠ The dark half is what makes this worth doing: ``on_par = 0`` outside the window
+    means gross assimilation is 0 there, so maintenance respiration is paid out of
+    biomass and the chamber's CO₂ rises overnight. Whether a given run *has* a step
+    wholly inside the dark window is a property of the step size — see
+    ``domains.biosphere.light_path``.
+    """
+
+    def schedule(n: int, dt: float) -> float:
+        t = n * dt
+        return top_hat_window_mean(t - int(t), dt, on_par, photoperiod_s)
+
+    return schedule
+
+
 def lighting_bio_resolver(
     weather: list[dict[str, float | str]],
     lamp_params: LampParams,
@@ -235,18 +278,23 @@ def lighting_bio_resolver(
     Starts from the frozen ``weather_resolver`` (temperature / VPD / net-radiation / Ci
     / irrigation / fertilization — and the sealed ``shared`` map ``{SOIL_WATER_VAR:
     soil_water, CO2_POOL_VAR: carbon_pool}``, so FvCB's Ci reads the live chamber CO₂
-    unchanged), then **overrides two forcings from the lamp**: ``PAR_VAR`` →
-    :func:`lamp_par` (0 when ``with_lamp=False`` — the dark baseline) and
-    ``DAYLENGTH_VAR`` → ``photoperiod_hours·3600``. Both must come from the lamp
-    together (PAR and daylength are coupled in the daily photon dose); ``daylength_s``
-    stays positive even when unlit (a valid, zero-dose integration window), so the
-    biosphere never divides by a zero day-length.
+    unchanged), then **overrides two forcings from the lamp**: ``PAR_VAR`` → the lamp's
+    within-day **top-hat** at :func:`lamp_par` intensity for ``photoperiod_hours``
+    (identically 0 when ``with_lamp=False`` — the dark baseline) and ``DAYLENGTH_VAR``
+    → ``photoperiod_hours·3600`` for the phenology photoperiod response.
+
+    ⚠ The top-hat replaces a *constant* PAR paired with a photoperiod-length integration
+    window; the day's photon dose is the same number, but it is now delivered **inside**
+    the lit hours instead of smeared over 24, so the lamp's dark hours are dark. See the
+    module note for the stale scope claim this corrects. ``daylength_s`` stays positive
+    even when unlit, so the phenology response never divides by a zero day-length.
     """
     base = weather_resolver(weather, scenario.bio)
     par = lamp_par(lamp_params, scenario) if with_lamp else 0.0
+    photoperiod_s = scenario.photoperiod_hours * 3600.0
     forcings = dict(base.forcings)
-    forcings[PAR_VAR] = constant(par)
-    forcings[DAYLENGTH_VAR] = constant(scenario.photoperiod_hours * 3600.0)
+    forcings[PAR_VAR] = _lamp_light_path(par, photoperiod_s)
+    forcings[DAYLENGTH_VAR] = constant(photoperiod_s)
     return SourceResolver(forcings=forcings, shared=dict(base.shared))
 
 
