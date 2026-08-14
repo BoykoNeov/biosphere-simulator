@@ -682,7 +682,8 @@ def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
 
     frozen, frozen_floor, _ = trough(PERENNIAL_CHAMBER_SCENARIO)
     # ⚠ 0.055175 -> 0.0559766 (2026-08-12, stem reserves) -> this (2026-08-14, dt=1/4).
-    assert min(frozen) == pytest.approx(0.0754757, rel=1e-3) and frozen_floor
+    # ⚠ and again 2026-08-14 (the light path): 0.0754757 -> 0.0704924.
+    assert min(frozen) == pytest.approx(0.0704924, rel=1e-3) and frozen_floor
 
     # (1) Halve the microbial CO2 return — the actual drain mechanism. The trough RISES.
     slow_return, slow_floor, _ = trough(PERENNIAL_CHAMBER_SCENARIO, micro_factor=0.5)
@@ -693,7 +694,9 @@ def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
     # unchanged through both moves. ⚠ Its MAGNITUDE collapsed, though: the gap was 8.7 %
     # of the trough and is now 0.7 %. Probe 1 still points the same way; it points much
     # more faintly, for the same reason probe 2 below flipped back.
-    assert min(slow_return) == pytest.approx(0.0760228, rel=1e-3)
+    assert min(slow_return) == pytest.approx(
+        0.071864, rel=1e-3
+    )  # ⚠ 2026-08-14 (light path), was 0.0760228
     assert slow_floor, "slowing the recycling loop does NOT trip the floor"
 
     # (2) Start with 20 % less CO2 in the same jar. The trough RISES here too.
@@ -721,7 +724,9 @@ def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
     # below because it is what actually got measured — but the magnitude bound is the
     # line that carries the argument, and it is tightened from 2 % to 0.5 % to match.
     assert min(less_co2) > min(frozen), "probe 2 flipped back — see the note"
-    assert min(less_co2) == pytest.approx(0.0755337, rel=1e-3)
+    assert min(less_co2) == pytest.approx(
+        0.070616, rel=1e-3
+    )  # ⚠ 2026-08-14 (light path), was 0.0755337
     assert abs(min(less_co2) - min(frozen)) / min(frozen) < 0.005, "and it is small"
     assert less_floor, "starting the chamber CO2-poor still does NOT trip the floor"
 
@@ -734,7 +739,9 @@ def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
     # and here.
     small, small_floor, small_stationary = trough(shrink(0.65))
     # was 0.044941 (2026-08-12) -> 0.0481100 (its cessation window), both at 0.8x
-    assert min(small) == pytest.approx(0.0492366, rel=1e-3)
+    assert min(small) == pytest.approx(
+        0.045217, rel=1e-3
+    )  # ⚠ 2026-08-14 (light path), was 0.0492366
     assert not small_floor
 
     # ...and clear of it at 0.60x, WHILE STATIONARITY PASSES — a clean attractor in the
@@ -742,7 +749,9 @@ def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
     # Witnessed by a jar-size mutation, so the claim is independent of any candidate.
     smaller, smaller_floor, smaller_stationary = trough(shrink(0.60))
     # was 0.045871 -> 0.0477959 (2026-08-12, stem reserves), both at 0.7x
-    assert min(smaller) == pytest.approx(0.0456069, rel=1e-3)
+    assert min(smaller) == pytest.approx(
+        0.041755, rel=1e-3
+    )  # ⚠ 2026-08-14 (light path), was 0.0456069
     assert not smaller_floor
     assert smaller_stationary
     # ⚠ STRENGTHENED 2026-08-14: stationarity is now asserted on BOTH tripping rungs,

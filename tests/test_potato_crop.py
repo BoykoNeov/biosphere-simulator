@@ -355,8 +355,12 @@ def test_gap_2_the_headline_the_two_sources_disagree_on_tuber_onset() -> None:
     # finer step reaches the first non-zero tuber slightly earlier in the day, so the
     # crossing lands in the previous day's bucket. The finding is unaffected — it is
     # that the tuber fills from essentially emergence, and a day earlier is more of it.
-    assert ours == 6
-    assert dvs[ours] == pytest.approx(0.158, abs=0.01)
+    # ⚠ and back to day 7 on 2026-08-14 (the light path): the tuber's first non-zero
+    # step lands a day later again, because less carbon arrives per day early on. The
+    # finding — the tuber fills from essentially emergence — is untouched by one day
+    # in either direction, which two moves in opposite directions now demonstrate.
+    assert ours == 7
+    assert dvs[ours] == pytest.approx(0.192, abs=0.01)
 
     oracle = _oracle()
     theirs = next(i for i, r in enumerate(oracle) if (r["TWSO"] or 0.0) > 0.0)
@@ -390,12 +394,16 @@ def test_gap_3_the_canopy_is_starved_downstream_of_gap_2() -> None:
     # neither was fitted.
     lai = _lai(_run(POTATO_SCENARIO))
     our_day, our_peak = _peak(lai)
-    assert our_day == 34  # unchanged by the step unfreeze
+    # ⚠ 34 -> 31 (2026-08-14, the light path). Unlike the step, the light path DOES
+    # move the peak day — three days earlier — because it changes how much carbon
+    # arrives per day rather than how finely the same carbon is integrated.
+    assert our_day == 31
     # ⚠ 3.184 -> 3.474 (2026-08-14, the step unfreeze), +9.1 %. The peak DAY did not
     # move at all, which is what makes this readable as a re-integration of the same
     # canopy rather than a re-indexing: a step bug moves the index, and this moved the
     # value under a fixed index.
-    assert our_peak == pytest.approx(3.474, rel=1e-3)
+    # ⚠ 3.474 -> 3.380 (2026-08-14, the light path)
+    assert our_peak == pytest.approx(3.380, rel=1e-3)
 
     oracle_lai = [r["LAI"] for r in _oracle()]
     their_day, their_peak = _peak(oracle_lai)
@@ -405,7 +413,9 @@ def test_gap_3_the_canopy_is_starved_downstream_of_gap_2() -> None:
     # so the shortfall NARROWED. The docstring's '2.8x' is now 2.6x — still the same
     # qualitative finding (a shortfall of the same magnitude class), and the number
     # is re-measured rather than the claim re-worded around it.
-    assert their_peak / our_peak == pytest.approx(2.56, rel=0.02)
+    # ⚠ 2.56 -> 2.63 (2026-08-14, the light path): our canopy fell 2.7 %, so the gap
+    # to the oracle widens again — the same direction the step had just closed.
+    assert their_peak / our_peak == pytest.approx(2.63, rel=0.02)
 
 
 def test_gap_4_the_tuber_over_fills_the_other_symptom_of_gap_2() -> None:
@@ -429,11 +439,15 @@ def test_gap_4_the_tuber_over_fills_the_other_symptom_of_gap_2() -> None:
     theirs = _oracle()[96]["TWSO"]
     # ⚠ 14260 -> 15039 (2026-08-14, the step unfreeze), +5.5 %. `theirs` is a
     # committed oracle constant and does not move, so the whole ratio move is ours.
-    assert ours == pytest.approx(15039.0, rel=0.01)
+    assert ours == pytest.approx(
+        13788.090942, rel=0.01
+    )  # ⚠ 2026-08-14 (light path), was 15039.0
     assert theirs == pytest.approx(7249.8, rel=1e-4)
     # ⚠ 1.97 -> 2.07. The docstring above says "about 2x"; it was 1.97 and is now 2.07,
     # so the round number it was written around is if anything more accurate now.
-    assert ours / theirs == pytest.approx(2.07, rel=0.02)
+    assert ours / theirs == pytest.approx(
+        1.901863, rel=0.02
+    )  # ⚠ 2026-08-14 (light path), was 2.07
 
 
 def test_gap_5_we_are_root_heavy_at_mid_vegetative() -> None:

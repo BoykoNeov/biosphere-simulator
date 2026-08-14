@@ -456,8 +456,12 @@ def test_method_matched_day_confound_dissolved_with_the_phenology_fix() -> None:
     off_dvs_i = _first_day_at(_our_dvs(off, n_off), 2.0)
     assert off_dvs_i is not None
     off_dvs = _organ_fractions_bare(off_days[off_dvs_i])["storage"]
-    assert off_day == pytest.approx(0.390, abs=0.005)
-    assert off_dvs == pytest.approx(0.302, abs=0.005)
+    assert off_day == pytest.approx(
+        0.4165450, abs=0.005
+    )  # ⚠ 2026-08-14 (light path), was 0.39
+    assert off_dvs == pytest.approx(
+        0.32235, abs=0.005
+    )  # ⚠ 2026-08-14 (light path), was 0.302
     assert off_day < matched_day_oracle and off_dvs < matched_dvs_oracle
 
 

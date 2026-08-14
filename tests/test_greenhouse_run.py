@@ -191,15 +191,26 @@ def test_intraday_cabin_co2_dip() -> None:
     # of the live cabin pool, so CARBON_POOL right after it is below the
     # day-boundary setpoint (which the scrubber later restores). Proof the plant
     # reads/writes cabin gas, not a detached pool.
+    # ⚠ **The first step of the day is no longer a drawing-down step (2026-08-14).**
+    # PAR now varies within the day, and step 0 is the window that starts at midnight —
+    # the plant is respiring there, so the pool goes UP. That is not a weaker proof of
+    # live coupling, it is a stronger one: the pool follows the plant in BOTH
+    # directions within a single day, which a detached pool cannot do. Both are asserted.
     state, bio_reg, cabin_reg = build_greenhouse(_CREW, _ECLSS, _SC, with_plants=True)
-    before = _amt(state, CARBON_POOL)
-    after = (
-        EulerIntegrator(bio_reg)
-        .step_report(state, greenhouse_bio_resolver(_weather(), _SC), _SC.bio_dt)
-        .state
+    integrator = EulerIntegrator(bio_reg)
+    resolver = greenhouse_bio_resolver(_weather(), _SC)
+    steps_per_day = int(round(1.0 / _SC.bio_dt))
+    amounts = [_amt(state, CARBON_POOL)]
+    cur = state
+    for _ in range(steps_per_day):
+        cur = integrator.step_report(cur, resolver, _SC.bio_dt).state
+        amounts.append(_amt(cur, CARBON_POOL))
+    deltas = [b - a for a, b in zip(amounts, amounts[1:], strict=False)]
+    assert min(deltas) < 0.0, (
+        "the biosphere must draw CO₂ from the live cabin pool by day (the intra-day dip)"
     )
-    assert _amt(after, CARBON_POOL) < before, (
-        "the biosphere step must draw CO₂ from the live cabin pool (an intra-day dip)"
+    assert max(deltas) > 0.0, (
+        "…and return it by night — the pool follows the plant in both directions"
     )
 
 

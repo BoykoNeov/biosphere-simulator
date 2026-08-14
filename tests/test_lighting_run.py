@@ -307,21 +307,47 @@ def test_lamp_loader_rejects_nonpositive(tmp_path: Path) -> None:
 
 # --- the reconstruct-the-factor gate -----------------------------------------
 def test_par_reconstructed_from_lamp_draw() -> None:
-    # The biosphere's PAR forcing IS photon_efficacy·lamp_power_w/ground_area (the "it
-    # bit" factor check), and daylength IS photoperiod_hours·3600 — both from the lamp.
+    """The "it bit" factor check, now read over the day rather than at one instant.
+
+    ⚠ **The PAR forcing stopped being a constant on 2026-08-14.** The lamp's photoperiod
+    became a within-day **top-hat** (``light_path.top_hat_window_mean``) instead of a
+    multiplier on the day's assimilation, so ``get(PAR_VAR)`` returns the mean over one
+    step's window — at ``n = 0`` that window straddles the lamp coming on, and the value
+    is a *fraction* of the on-window intensity, not the intensity itself.
+
+    The factor this test exists to check is unchanged, and is now checked where it
+    lives: the on-window intensity is still ``photon_efficacy·lamp_power_w/ground_area``,
+    and the DAY's photon dose is still exactly ``that × photoperiod`` — which is the
+    quantity the crop integrates and the one the old single-instant assertion was
+    standing in for.
+    """
     resolver = lighting_bio_resolver(_weather(), _LP, _SC, with_lamp=True)
-    bound = resolver.bind(State(n=0, stocks={}, rng_seed=0), _SC.bio_dt)
+    par = resolver.forcings[PAR_VAR]
     expected_par = _LP.photon_efficacy * _SC.lamp_power_w / _SC.bio.ground_area
-    assert bound.get(PAR_VAR) == expected_par
-    assert bound.get(DAYLENGTH_VAR) == _SC.photoperiod_hours * 3600.0
     assert lamp_par(_LP, _SC) == expected_par
+    # the day's dose, summed over the day's windows, is the lamp's own energy
+    dt = _SC.bio_dt
+    steps = int(round(1.0 / dt))
+    dose = sum(par(n, dt) * dt for n in range(steps))
+    photoperiod_days = _SC.photoperiod_hours / 24.0
+    assert dose == pytest.approx(expected_par * photoperiod_days, rel=1e-12)
+    # the brightest window of the day IS the on-window intensity (the lamp is a top-hat,
+    # so any window wholly inside the photoperiod reads exactly the on value)
+    assert max(par(n, dt) for n in range(steps)) == pytest.approx(
+        expected_par, rel=1e-12
+    )
+    bound = resolver.bind(State(n=0, stocks={}, rng_seed=0), dt)
+    assert bound.get(DAYLENGTH_VAR) == _SC.photoperiod_hours * 3600.0
 
 
 def test_par_zero_when_unlit() -> None:
     # Lamp off ⇒ PAR forcing is 0 (dark), but daylength stays a valid positive window.
     resolver = lighting_bio_resolver(_weather(), _LP, _SC, with_lamp=False)
     bound = resolver.bind(State(n=0, stocks={}, rng_seed=0), _SC.bio_dt)
+    # ⚠ zero at EVERY window now, not just this one — an unlit lamp has no on-window.
     assert bound.get(PAR_VAR) == 0.0
+    steps = int(round(1.0 / _SC.bio_dt))
+    assert all(resolver.forcings[PAR_VAR](n, _SC.bio_dt) == 0.0 for n in range(steps))
     assert bound.get(DAYLENGTH_VAR) > 0.0
 
 
