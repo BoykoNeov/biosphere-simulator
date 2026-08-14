@@ -1,4 +1,4 @@
-﻿"""Stem-reserve remobilization — DIAGNOSED 2026-08-10, **BUILT 2026-08-12**.
+"""Stem-reserve remobilization — DIAGNOSED 2026-08-10, **BUILT 2026-08-12**.
 
 ⚠ **THIS FILE WAS WRITTEN FOR A REFUSAL AND NOW GUARDS A BUILD, so read the word
 "frozen" below with care: it means "the tree WITHOUT the reserve", which this file now
@@ -953,7 +953,7 @@ def test_the_drain_rate_is_BIT_INERT_on_carbon_and_only_relabels() -> None:
                     rel = abs(st.amount - other) / max(abs(st.amount), 1e-30)
                     worst[str(sid)] = max(worst.get(str(sid), 0.0), rel)
         carbon = {
-            s for s in differ if ref[0].stocks[s].quantity is Quantity.CARBON
+            s for s in differ if ref[0].stocks[StockId(s)].quantity is Quantity.CARBON
         }
         assert carbon == {str(RESERVE_C), str(STORAGE_C)}, (
             f"rate={rate}: the drain must only relabel carbon: {sorted(carbon)}"

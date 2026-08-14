@@ -318,10 +318,10 @@ def test_decade_consumer_biomass_is_stationary_and_alive(runs) -> None:
     field="liveness_floors",
     quantity="annual minimum chamber CO2 pool (mol C)",
     bound="non_collapsing(floor=0.05)",
-    source="self — anchored on the MEASURED trough attractor 0.0736681 "
-    "(converged well before yr 50, 1.47x the floor), not on a 15-yr reading; "
+    source="self — anchored on the MEASURED trough attractor 0.0758448 "
+    "(converged well before yr 50, 1.52x the floor), not on a 15-yr reading; "
     "teeth witnessed by a mutation independent of any candidate science change "
-    "(the jar shrunk 0.8x at fixed composition trips it at 0.0481100). "
+    "(the jar shrunk 0.65x at fixed composition trips it at 0.0492366). "
     "Window removed: floor[2:] -> floor",
 )
 def test_decade_min_carbon_pool_stationary(runs) -> None:
@@ -344,17 +344,29 @@ def test_decade_min_carbon_pool_stationary(runs) -> None:
     # scope-B decomposer calibration under the comment "the year-2 CO2 minimum dips
     # to ~0.039 during soil establishment before settling to ~0.055" — both numbers
     # belong to the PRE-humification-split tree. Measured on the current tree: the
-    # whole-run minimum is 0.055175 (year 1) = 1.103x the floor and NO year dips
+    # whole-run minimum is 0.0754757 (year 1) = 1.510x the floor and NO year dips
     # below it, so the slice constrained nothing on the frozen tree. A window that is
     # inert on the reference and load-bearing only on candidates is the one shape a
-    # frozen contract's guard must not have.
+    # frozen contract's guard must not have. (0.055175 / 1.103x pre-step-unfreeze.)
     #
-    # ``transient=_TRANSIENT`` STAYS in the stationarity call, deliberately: its
-    # binding same-phase diff (0.013618, 90 % of bound) sits at index 2 and is NOT
-    # dropped by the window, so removing it there buys an identical constraint at
-    # the cost of the
-    # remaining headroom. Inertness justified removing a slice that was hiding a
-    # candidate's failure; nothing is hidden behind this one.
+    # ⚠⚠ **THE ARGUMENT FOR KEEPING ``transient=_TRANSIENT`` IN THE STATIONARITY CALL
+    # INVERTED ON 2026-08-14 (the step unfreeze), and the code is UNCHANGED while the
+    # reasoning is replaced.** It used to read: "its binding same-phase diff (0.013618,
+    # 90 % of bound) sits at index 2 and is NOT dropped by the window, so removing it
+    # buys an identical constraint at the cost of the remaining headroom."
+    #
+    # Re-measured at dt = 1/4, both halves of that are false. The binding diff is now
+    # -0.00072449 at **index 0** — which the window DOES drop — and it is **4.8 % of
+    # bound**, not 90 %. The largest surviving diff is 0.00024763 at index 3, 1.6 % of
+    # bound. So the window is no longer inert here, and the headroom it was protecting
+    # is no longer scarce: removing it would TIGHTEN the check and still pass with 20x
+    # to spare.
+    #
+    # It stays anyway, on its original merit rather than on the retired arithmetic: the
+    # dropped diff is the sow-in settling, which is what a transient window is for, and
+    # ``_TRANSIENT`` is shared with the two sibling stationarity gates. Recorded rather
+    # than acted on, so the next reader decides with the measurement in hand instead of
+    # inheriting a justification that stopped being true.
     states, _, _ = runs[("perennial", "euler")]
     summaries = year_summaries(states, _YEAR, _min_carbon_pool)
     diffs = same_phase_diffs(summaries, period=2)
@@ -362,10 +374,18 @@ def test_decade_min_carbon_pool_stationary(runs) -> None:
     assert is_stationary(
         diffs, bound=0.2 * scale, slope_tol=0.02 * scale, transient=_TRANSIENT
     )
-    # The floor is anchored on the trough's MEASURED attractor (0.0732912, 1.47x it),
-    # not on this horizon's reading — see the beyond-horizon test below, which also
-    # pins that the deepest year of a 50-year run lies INSIDE the frozen 15, so this
-    # window sees the worst case rather than assuming it.
+    # The floor is anchored on the trough's MEASURED attractor (0.0758448, 1.52x it —
+    # it was 0.0732912 / 1.47x), not on this horizon's reading — see the beyond-horizon
+    # test below, which also pins that the deepest year of a 50-year run lies INSIDE
+    # the frozen 15, so this window sees the worst case rather than assuming it.
+    #
+    # ⚠ 2026-08-14, the step unfreeze: the trough series rose ~35 % and the floor did
+    # NOT follow it. That is deliberate — this guard's justification prose is inside
+    # the biosphere manifest, and re-anchoring 0.05 upward every time the reference
+    # moves is how a floor becomes a restatement of the current run. It is recorded
+    # instead: the gap the floor has to cross widened from 1.10x to 1.51x of the
+    # whole-run minimum, and the mutation needed to trip it grew from a 20 % jar
+    # shrink to a 35 % one.
     assert non_collapsing(summaries, floor=0.05)
 
 
@@ -479,9 +499,17 @@ def test_the_perennial_decline_has_a_floor_beyond_the_frozen_horizon() -> None:
     # (1e-6/0.594984 = 1.7e-6) only if the level falls; it is stated so the reader can
     # see which.
     assert (max(settled) - min(settled)) / settled[-1] < 5e-6
-    # 0.594984 -> 0.593864 (the build) -> this (its cessation window)
-    assert settled[-1] == pytest.approx(0.593883, abs=1e-5)
-    # And that equilibrium is what the 0.55 liveness floor is anchored below.
+    # 0.594984 -> 0.593864 (the build) -> 0.593883 (its cessation window) -> this
+    # (2026-08-14, the step unfreeze: dt = 1/4). A 2.8 % fall, and it is a genuine
+    # re-integration of the same attractor rather than a rescaling — this summary is a
+    # STOCK LEVEL in mol C, so unlike a census margin it carries no per-step
+    # denominator and nothing about it should have moved by a factor of the step.
+    assert settled[-1] == pytest.approx(0.577062, abs=1e-5)
+    # And that equilibrium is what the 0.55 liveness floor is anchored below. ⚠ The
+    # headroom NARROWED, and by more than the level moved: 0.593883 sat 8.0 % above the
+    # floor, 0.577062 sits 4.9 % above it. Recorded, not re-anchored — moving 0.55
+    # because the level moved is the co-adaptation this project refuses. It is worth
+    # watching: two more moves of this size and the floor stops being a floor.
     assert settled[-1] > 0.55
 
 
@@ -523,11 +551,12 @@ def test_the_chamber_co2_trough_has_an_attractor_beyond_the_frozen_horizon() -> 
     summaries = year_summaries(states, _YEAR, _min_carbon_pool)
     settled = summaries[-5:]
     assert max(settled) - min(settled) < 1e-6  # converged
-    # ⚠ 0.0732912 -> 0.0736507 -> this (2026-08-12: the stem-reserve build, then its
-    # cessation window). The CLAIM — the trough reaches an attractor comfortably above
-    # the 0.05 floor — is unchanged and re-run each time; the ratio assertion below
-    # carries it and has stayed 1.47x through both moves.
-    assert settled[-1] == pytest.approx(0.0736681, abs=1e-6)
+    # ⚠ 0.0732912 -> 0.0736507 -> 0.0736681 (2026-08-12: the stem-reserve build, then
+    # its cessation window) -> this (2026-08-14, the step unfreeze). The CLAIM — the
+    # trough reaches an attractor comfortably above the 0.05 floor — is unchanged and
+    # re-run each time; the ratio assertion below carries it and has gone 1.47x ->
+    # 1.52x across the step change, i.e. the trough moved AWAY from the floor.
+    assert settled[-1] == pytest.approx(0.0758448, abs=1e-6)
     assert settled[-1] / 0.05 > 1.4  # and the floor sits well below the attractor
 
     # The worst year of the fifty is the sow-in year, INSIDE the frozen horizon. This is
@@ -535,8 +564,12 @@ def test_the_chamber_co2_trough_has_an_attractor_beyond_the_frozen_horizon() -> 
     # part of the trajectory the horizon happens to include.
     worst = min(range(len(summaries)), key=lambda i: summaries[i])
     assert worst < DECADE_YEARS
-    # ⚠ 0.055175 -> 0.0559766 (2026-08-12, stem reserves).
-    assert summaries[worst] == pytest.approx(0.0559766, rel=1e-3)
+    # ⚠ 0.055175 -> 0.0559766 (2026-08-12, stem reserves) -> this (2026-08-14, the step
+    # unfreeze). ⚠⚠ +34.9 %, the largest single move this number has made, and it is
+    # what re-priced the whole CO2-floor probe below: the entire per-year trough series
+    # rose by about a third, so the absolute 0.05 floor is a third further away than it
+    # was. Measured index of the worst year is 1 (0.0754757, vs year 0's 0.0762602).
+    assert summaries[worst] == pytest.approx(0.0754757, rel=1e-3)
 
 
 @pytest.mark.slow
@@ -558,11 +591,32 @@ def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
     What DOES move the trough is the buffer against peak demand — shrink the jar at
     fixed composition (the consumer-chamber idiom run backwards, so Ci0 and x_O2 are
     invariant and it is a smaller chamber holding the same atmosphere) and the floor
-    fires. The
-    0.7x case fires **while stationarity passes**, which is the "the level check catches
+    fires **while stationarity passes**, which is the "the level check catches
     what ``is_stationary`` is blind to" claim witnessed by a mutation that is not a
     candidate science change — so the guard's teeth do not rest on the one change its
     verdict is being used to refuse.
+
+    ⚠⚠ **RE-RUN 2026-08-14 (the step unfreeze), NOT re-tuned, and both halves moved.**
+    At ``dt = 1/4`` the whole per-year trough series sits ~35 % higher (the frozen run's
+    minimum went 0.0559766 -> 0.0754757), so the absolute 0.05 floor is a third further
+    away and the old shrink factors no longer reach it: 0.8x now lands at 0.0600926 and
+    0.7x at 0.0528486, **both passing**. The question this probe exists to answer is not
+    "what do the old factors read now" but "does any factor still trip the floor while
+    stationarity passes", so it was answered by sweeping the factor and leaving the
+    floor alone:
+
+        0.80x 0.0600926 pass   0.68x 0.0514049 pass
+        0.70x 0.0528486 pass   0.65x 0.0492366 TRIP   0.60x 0.0456069 TRIP
+                               0.62x 0.0470611 TRIP   0.55x 0.0419631 TRIP
+
+    **The guard keeps its teeth, and they are blunter.** The crossing moved from above
+    0.8x to between 0.68x and 0.65x: the jar must now be shrunk by about a third where a
+    fifth used to do it. Stationarity passes at *every* factor swept, including all four
+    that trip — so the "``is_stationary`` is blind to this" claim is now witnessed more
+    broadly than it was, not less. The two rungs below were re-chosen to bracket the
+    re-measured crossing, which is the probe's independent variable; the 0.05 floor is
+    untouched, and lowering it to keep 0.7x red would have been the fitted cut this file
+    refuses elsewhere in exactly these words.
     """
 
     def trough(
@@ -621,16 +675,19 @@ def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
         )
 
     frozen, frozen_floor, _ = trough(PERENNIAL_CHAMBER_SCENARIO)
-    # ⚠ 0.055175 -> 0.0559766 (2026-08-12, stem reserves).
-    assert min(frozen) == pytest.approx(0.0559766, rel=1e-3) and frozen_floor
+    # ⚠ 0.055175 -> 0.0559766 (2026-08-12, stem reserves) -> this (2026-08-14, dt=1/4).
+    assert min(frozen) == pytest.approx(0.0754757, rel=1e-3) and frozen_floor
 
     # (1) Halve the microbial CO2 return — the actual drain mechanism. The trough RISES.
     slow_return, slow_floor, _ = trough(PERENNIAL_CHAMBER_SCENARIO, micro_factor=0.5)
     assert min(slow_return) > min(frozen)
-    # ⚠ 0.057797 -> 0.0608579 (2026-08-12, stem reserves). The CLAIM — halving the
-    # microbial return RAISES the trough, so the floor fires on the buffer and not on
-    # the carbon supply — is asserted on the line above and is unchanged.
-    assert min(slow_return) == pytest.approx(0.0608579, rel=1e-3)
+    # ⚠ 0.057797 -> 0.0608579 (2026-08-12, stem reserves) -> this (2026-08-14, dt=1/4).
+    # The CLAIM — halving the microbial return RAISES the trough, so the floor fires on
+    # the buffer and not on the carbon supply — is asserted on the line above and is
+    # unchanged through both moves. ⚠ Its MAGNITUDE collapsed, though: the gap was 8.7 %
+    # of the trough and is now 0.7 %. Probe 1 still points the same way; it points much
+    # more faintly, for the same reason probe 2 below flipped back.
+    assert min(slow_return) == pytest.approx(0.0760228, rel=1e-3)
     assert slow_floor, "slowing the recycling loop does NOT trip the floor"
 
     # (2) Start with 20 % less CO2 in the same jar. The trough RISES here too.
@@ -639,33 +696,52 @@ def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
         chamber_co2_mol0=PERENNIAL_CHAMBER_SCENARIO.chamber_co2_mol0 * 0.8,
     )
     less_co2, less_floor, _ = trough(lean)
-    # ⚠⚠ **INVERTED 2026-08-12 (the stem-reserve build), and it is probe 2 of three.**
-    # This used to read ``min(less_co2) > min(frozen)`` at 0.058757 — starting the jar
-    # CO2-poor RAISED the trough, which was one of two independent legs behind this
-    # test's name. It now LOWERS it: 0.0552887 against the frozen 0.0559766.
+    # ⚠⚠ **PROBE 2'S SIGN HAS FLIPPED TWICE IN THREE DAYS, AND THAT IS THE FINDING.**
+    #   2026-08-11 and earlier  ``>``  0.058757 — CO2-poor RAISES the trough (+5.0 %).
+    #   2026-08-12 (stem build) ``<``  0.0552887 against 0.0559766 (-1.2 %).
+    #   2026-08-14 (dt = 1/4)   ``>``  0.0755337 against 0.0754757 (+0.077 %).
     #
-    # ⚠ THE CONCLUSION STILL HOLDS, AND THE MAGNITUDES ARE WHY — asserted, not asserted
-    # away. Probe 2's effect is **1.2 %** of the trough and does not come near the
-    # floor; probe 3 (the buffer) drives it THROUGH the floor. So carbon supply now has
-    # a small, correctly-signed influence and the buffer is still what fires the guard,
-    # which is a weaker and more accurate statement than the original 'not the carbon
-    # supply'. Probes 1 and 3 carry it; probe 2 is now a magnitude argument.
-    assert min(less_co2) < min(frozen), "probe 2 inverted — see the note"
-    assert min(less_co2) == pytest.approx(0.0552887, rel=1e-3)
-    assert abs(min(less_co2) - min(frozen)) / min(frozen) < 0.02, "and it is small"
+    # It is back to the sign it was born with, at a fifteenth of the magnitude it
+    # inverted at, under a change that is not about carbon supply at all. Read together
+    # with probe 1's collapse from 8.7 % to 0.7 %, the two supply-side probes are now
+    # both an order of magnitude fainter than they were: at a quarter-day step the
+    # chamber's CO2 trough is close to indifferent to how much carbon is in the loop.
+    #
+    # ⚠ THE CONCLUSION HOLDS AND IS STRONGER THAN IT WAS. The original claim was "the
+    # floor fires on the buffer, not on the carbon supply"; 2026-08-12 weakened it to
+    # "carbon supply has a small, correctly-signed influence". The influence has now
+    # shrunk to 0.08 % and cannot hold a sign across a step change, so it is back to
+    # being noise about a mechanism rather than a mechanism. The ORDERING is asserted
+    # below because it is what actually got measured — but the magnitude bound is the
+    # line that carries the argument, and it is tightened from 2 % to 0.5 % to match.
+    assert min(less_co2) > min(frozen), "probe 2 flipped back — see the note"
+    assert min(less_co2) == pytest.approx(0.0755337, rel=1e-3)
+    assert abs(min(less_co2) - min(frozen)) / min(frozen) < 0.005, "and it is small"
     assert less_floor, "starting the chamber CO2-poor still does NOT trip the floor"
 
-    # (3) The buffer. A 0.8x jar at the same composition trips it...
-    small, small_floor, _ = trough(shrink(0.8))
-    assert min(small) == pytest.approx(0.0481100, rel=1e-3)  # was 0.044941 (2026-08-12)
+    # (3) The buffer. ⚠ THE FACTORS ARE 0.65x / 0.60x, WERE 0.8x / 0.7x — see the
+    # docstring's sweep. They were re-chosen to bracket the crossing after it was
+    # MEASURED to have moved (0.7x and even 0.68x now pass), not adjusted until the
+    # assertions went green, and the 0.05 floor did not move.
+    #
+    # First rung: just past the crossing, which is between 0.68x (0.0514049, passes)
+    # and here.
+    small, small_floor, small_stationary = trough(shrink(0.65))
+    # was 0.044941 (2026-08-12) -> 0.0481100 (its cessation window), both at 0.8x
+    assert min(small) == pytest.approx(0.0492366, rel=1e-3)
     assert not small_floor
 
-    # ...and at 0.7x it trips WHILE STATIONARITY PASSES — a clean attractor in the
+    # ...and clear of it at 0.60x, WHILE STATIONARITY PASSES — a clean attractor in the
     # wrong place, which is exactly the failure ``is_stationary`` cannot see.
     # Witnessed by a jar-size mutation, so the claim is independent of any candidate.
-    smaller, smaller_floor, smaller_stationary = trough(shrink(0.7))
-    # ⚠ 0.045871 -> 0.0477959 (2026-08-12, stem reserves). Both mutation probes still
-    # trip the floor and 0.7x still keeps stationarity, so the pair's claim is intact.
-    assert min(smaller) == pytest.approx(0.0477959, rel=1e-3)
+    smaller, smaller_floor, smaller_stationary = trough(shrink(0.60))
+    # was 0.045871 -> 0.0477959 (2026-08-12, stem reserves), both at 0.7x
+    assert min(smaller) == pytest.approx(0.0456069, rel=1e-3)
     assert not smaller_floor
     assert smaller_stationary
+    # ⚠ STRENGTHENED 2026-08-14: stationarity is now asserted on BOTH tripping rungs,
+    # not just the deeper one. The sweep found it true at every factor it visited, so
+    # the "the level check sees what is_stationary cannot" claim is not a property of
+    # one hand-picked jar size — and pinning it twice is what would catch it becoming
+    # one.
+    assert small_stationary

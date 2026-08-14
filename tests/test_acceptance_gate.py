@@ -46,8 +46,14 @@ tie to the shipped code is pinned by
    the other currencies are measured rather than inherited: ``soil_water`` and
    ``soil_n`` are live but slack by 2 and 5 orders. Two reasons, recorded separately.
 3. Exactly one *stock* in the whole 20-scenario frozen roster is a binding gate:
-   ``biosphere.carbon_pool``. The six smallest **live** margins anywhere in the roster
-   are that stock, in the six scenarios that seal a chamber.
+   ``biosphere.carbon_pool``. The **five** smallest **live** margins anywhere in the
+   roster are that stock, in the five *standalone* chamber runs.
+   ⚠ It was **six** until 2026-08-14 — the sixth being ``sealed_station``, the one
+   sealed scenario that also runs a cabin. The step unfreeze multiplied the plant's
+   per-call draw by ~4 and left the cabin's scrubber check alone, so on the station the
+   two crossed and the binding call is now the cabin's. Same stock, different registry:
+   the station's ``rationed == 0`` no longer answers a question about the plant. Pinned
+   in ``test_the_roster_wide_claims_that_need_the_expensive_runs`` (claim 3).
 4. The contract has no plausibility column at all: a manifest scenario entry carries
    only ``scenario``/``golden``/``golden_sha256``(/``years``).
 
@@ -70,7 +76,7 @@ from pathlib import Path
 import pytest
 
 import simcore.arbitration as arbitration
-from domains.biosphere.step import BIO_DT
+from domains.biosphere.step import BIO_DT, STEPS_PER_DAY
 from simcore.flow import FlowResult, Leg
 from simcore.ids import DomainId, StockId
 from simcore.quantities import Quantity, StockKind, canonical_unit
@@ -445,11 +451,25 @@ def test_the_gate_fires_per_registry_call_not_per_simulated_step(scenario: str) 
     the backstop protects, and is **not** headroom against a day's total draw.
 
     That matters because six stocks — ``carbon_pool`` among them — are demanded by
-    *both* registries in ``greenhouse``/``harvest``, where the two registries' minima
-    happen to **coincide** (16.667 either way), so no census number is affected.
+    *both* registries in ``greenhouse``/``harvest``.
     ``lighting`` shares nothing across its registries (its fast one is Power alone) and
-    is the control. ``sealed_station`` is the case where they do **not** coincide and is
-    pinned separately below — that one matters, because finding 4 rests on it.
+    is the control. ``sealed_station`` is pinned separately below — that one matters,
+    because finding 4 rests on it.
+
+    ⚠⚠ **A RETRACTION, 2026-08-14.** This docstring used to say the two registries'
+    minima "happen to **coincide** (16.667 either way), so no census number is
+    affected". They do not coincide and never did: the biosphere registry's own
+    carbon-pool minimum is **1150.75** in ``greenhouse`` and **1483.26** in
+    ``harvest``, three orders slack, while 16.667 is the cabin's ``1/(k*dt)`` scrubber
+    check. The sentence was reading the cabin twice, because
+    :func:`_registry_minima` split the calls by frequency rather than by content — see
+    its docstring for how, and why a 4x move in one registry is what exposed it.
+
+    The conclusion the sentence was supporting **survives**: no census number is
+    affected, because the cabin's 16.667 is genuinely the smaller of the two and so is
+    genuinely what the census reports. Only the reason was wrong, and it was wrong in
+    the direction that mattered — it claimed the biosphere was *also* at 16.667, which
+    would have made ``greenhouse``'s row a plant measurement. It is not one.
     """
     rec = _recorder_for(scenario)
     fast, slow = rec.registries()
@@ -459,24 +479,94 @@ def test_the_gate_fires_per_registry_call_not_per_simulated_step(scenario: str) 
         assert shared == frozenset(), shared
         return
     assert "biosphere.carbon_pool" in shared, sorted(shared)
-    assert _registry_minima(rec, "biosphere.carbon_pool") == pytest.approx(
-        (16.666666666666664, 16.666666666666664), rel=1e-12
-    )
+    # ⚠ was `== approx((16.667, 16.667))` — see the retraction above. The two numbers
+    # are three orders apart, and pinning BOTH is what keeps them from being confused
+    # again: the cabin's is a timestep constant, the biosphere's is a trajectory.
+    cabin_min, bio_min = _registry_minima(rec, "biosphere.carbon_pool")
+    assert cabin_min == pytest.approx(16.666666666666664, rel=1e-12)
+    expected_bio = {"greenhouse": 1150.7493750945291, "harvest": 1483.26301002752}
+    assert bio_min == pytest.approx(expected_bio[scenario], rel=1e-9)
+    # ...and the census reports the tighter of the two, which is the cabin's.
+    assert cabin_min < bio_min
     assert census(scenario)["biosphere.carbon_pool"].min_margin == pytest.approx(
         16.666666666666664, rel=1e-12
     )
 
 
+@pytest.mark.parametrize(
+    "scenario,fast_per_day",
+    [("greenhouse", 1440), ("harvest", 1440), ("lighting", None)],
+)
+def test_the_two_registries_are_separated_by_what_they_demand(
+    scenario: str, fast_per_day: int | None
+) -> None:
+    """The discriminator :func:`_registry_minima` uses, asserted not assumed.
+
+    It classifies a call as the biosphere registry's when the call demands **only**
+    ``biosphere.*`` stocks. That is a claim about the roster, not a definition, so it is
+    checked here against a quantity the driver fixes independently: ``run_master_day``
+    takes ``STEPS_PER_DAY`` biosphere sub-steps and ``steps_per_day`` fast sub-steps per
+    master day, so the two groups' call counts must stand in exactly that ratio. A cabin
+    phase leaking into the biosphere group — the bug this replaced — breaks the ratio,
+    because the leaked calls are counted at the fast rate.
+
+    ``lighting`` is the control and is checked differently: its fast registry is Power
+    alone, so the two groups share no stock at all and the ratio has nothing to say.
+    """
+    rec = _recorder_for(scenario)
+    bio_calls = sum(
+        n
+        for sig, n in rec.signatures.items()
+        if sig and all(s.startswith("biosphere.") for s in sig)
+    )
+    other_calls = rec.calls - bio_calls
+    assert bio_calls and other_calls, (bio_calls, other_calls)
+    # every group member is internally consistent: no biosphere-group signature names a
+    # non-biosphere stock, by construction, so the content half is the count half below.
+    assert bio_calls % STEPS_PER_DAY == 0, bio_calls
+    days = bio_calls // STEPS_PER_DAY
+    if fast_per_day is None:
+        fast, slow = rec.registries()
+        assert fast & slow == frozenset(), sorted(fast & slow)
+        return
+    assert other_calls == days * fast_per_day, (days, other_calls)
+
+
 def _registry_minima(rec: _Recorder, sid: str) -> tuple[float, float]:
-    """(fast-registry minimum, slow-registry minimum) for ``sid``."""
-    fast, _slow = rec.registries()
-    fast_mins = [
-        m for (s, sig), m in rec.per_sig_min.items() if s == sid and sig == fast
+    """(non-biosphere-registry minimum, biosphere-registry minimum) for ``sid``.
+
+    ⚠⚠ **CORRECTED 2026-08-14, and it had been reading the same registry TWICE.** This
+    used to split the call signatures as "the most frequent one" versus "all the rest",
+    on the reasoning that the fast registry supplies the overwhelming majority of calls
+    so the dominant signature is it. The first half is true; the second does not follow.
+    A fast registry has *phases* too — before a crew store comes online its demand set
+    is a strict subset — so ``greenhouse`` has a 1-call cabin signature and ``harvest``
+    three, and those landed in "all the rest" alongside the biosphere's. Since a cabin
+    call is far tighter than a biosphere one there, ``min(rest)`` returned the cabin's
+    number and the "slow registry" reading was the fast registry wearing a hat.
+
+    The step unfreeze is what made it visible rather than merely wrong: the biosphere's
+    minima moved by 4x and the cabin's did not move at all, and the pin did not budge.
+    That is the signature of a measurement that was never looking where it said.
+
+    The split is now by what a call DEMANDS: a biosphere-registry call demands only
+    ``biosphere.*`` stocks, while every cabin/power/thermal call in the roster reaches
+    at least one of its own domain's. Verified on all four multi-registry scenarios —
+    ``greenhouse``/``harvest``/``lighting``/``sealed_station`` — by inspecting the
+    signatures directly, and it is asserted rather than assumed by
+    :func:`test_the_two_registries_are_separated_by_what_they_demand`.
+    """
+    bio = [
+        m
+        for (s, sig), m in rec.per_sig_min.items()
+        if s == sid and sig and all(x.startswith("biosphere.") for x in sig)
     ]
-    slow_mins = [
-        m for (s, sig), m in rec.per_sig_min.items() if s == sid and sig != fast
+    other = [
+        m
+        for (s, sig), m in rec.per_sig_min.items()
+        if s == sid and not (sig and all(x.startswith("biosphere.") for x in sig))
     ]
-    return min(fast_mins), min(slow_mins)
+    return min(other), min(bio)
 
 
 # ``sealed_station``'s own attribution — that its binding margin is the BIOSPHERE
@@ -514,13 +604,20 @@ def test_open_season_has_no_carbon_source_the_gate_can_see() -> None:
     in a way worth keeping.** I assumed the reserve would land in the ``live`` set
     beside
     the three tissue pools and wrote it in. It does not: the gate classifies it
-    ``rate-determined``, with a margin of **exactly 1/(k·dt) = 10**, because that is
+    ``rate-determined``, with a margin of **exactly 1/(k·dt)**, because that is
     what
     a first-order self-limiting draw IS. So the structural property the paragraph above
     argues for by hand is one the census already measures, and the assertion below reads
     it rather than restating it. Asserting the margin equals 1/(k·dt) is the strong
     form:
     it would go red if the draw ever stopped being first-order in the reserve.
+
+    ⚠ **The value used to be written here as ``= 10`` and is now ``= 40`` (2026-08-14,
+    the step unfreeze) — and the docstring no longer names either.** ``1/(k·dt)`` is the
+    claim; a number is only that claim evaluated at one step size, and this file had it
+    both in prose and in an assertion that spelled ``1.0 / 0.1`` with ``dt`` silently
+    equal to 1. That is the same shape as the ``_is_one_over_k_dt`` bug two sections
+    below: the ``dt`` was in the name and missing from the arithmetic.
     """
     rows = census("open_season")
     co2 = rows["boundary.co2_atmos"]
@@ -548,11 +645,12 @@ def test_open_season_has_no_carbon_source_the_gate_can_see() -> None:
         "biosphere.root_c",
     }
     # ...and the reserve is separated STRUCTURALLY rather than by the name-list above,
-    # which is only a backstop. 1/(k*dt) with k = 0.1 /day and dt = 1 day.
+    # which is only a backstop. 1/(k*dt), k = 0.1 /day, dt = BIO_DT — written as the
+    # formula so the step stays visible; at dt = 1/4 it reads 40, at dt = 1 it read 10.
     reserve = rows["biosphere.stem_reserve_c"]
     assert reserve.kind is StockKind.POOL
     assert reserve.gate == "rate-determined"
-    assert reserve.min_margin == pytest.approx(1.0 / 0.1, rel=1e-12)
+    assert reserve.min_margin == pytest.approx(1.0 / (0.1 * BIO_DT), rel=1e-12)
 
 
 def test_the_obvious_fix_would_not_create_a_gate_either() -> None:
@@ -595,6 +693,21 @@ def test_open_seasons_other_currencies_are_slack_not_absent() -> None:
     hold. A margin of 189x was never a fact about safety, it was a fact about a bucket
     that could not exist. This is the honest number, and it is still an order of
     magnitude of headroom.
+
+    ⚠⚠ **RE-STATED IN DAYS 2026-08-14 (the step unfreeze), and this is the correction
+    that matters most in this file.** A census margin is ``stock / demand-per-CALL``, so
+    it is denominated in **steps**, not in time. Quartering the step quartered every
+    demand and multiplied every margin by ~4 — 9.31 became 37.26 — while nothing about
+    the water moved at all. The old bound ``9.0 < margin < 10.0`` was therefore a claim
+    about the integrator's step wearing the clothes of a claim about soil.
+
+    So both bounds are multiplied by ``BIO_DT`` and read in DAYS, which is the quantity
+    the sentence was always about: **the root zone covers 9.31 days of peak draw**. That
+    number is unchanged to sixteen digits across the step change, and the pin now
+    survives the next one. Nitrogen's is not bit-stable (126 238 -> 126 574 day-units,
+    0.3 %) because its trajectory genuinely differs at the finer step; water's is,
+    because water's tightest moment is the run's first call, on the initial store — the
+    same reason the identical 9.3139 shows up in three unrelated scenarios.
     """
     rows = census("open_season")
     water = rows["biosphere.soil_water"]
@@ -602,8 +715,9 @@ def test_open_seasons_other_currencies_are_slack_not_absent() -> None:
     assert water.gate == "live" and nitrogen.gate == "live"
     water_margin, n_margin = water.min_margin, nitrogen.min_margin
     assert water_margin is not None and n_margin is not None
-    assert 9.0 < water_margin < 10.0, water_margin  # 9.31 (was 189.24 pre-re-basing)
-    assert 1e5 < n_margin < 1e6, n_margin  # 126_238.75
+    # ⚠ in DAYS of peak draw (margin * dt), not in steps — see the docstring.
+    assert 9.0 < water_margin * BIO_DT < 10.0, water_margin  # 9.31 (189.24 pre-rebase)
+    assert 1e5 < n_margin * BIO_DT < 1e6, n_margin  # 126_573.61 (was 126_238.75)
 
 
 # --------------------------------------------------------------------------- #
@@ -729,13 +843,24 @@ def test_the_litter_pair_became_live_when_it_gained_an_o2_draw() -> None:
         assert entry.gate == "live"
         margin = entry.min_margin
         assert margin is not None
-        # ⚠ 90.95231882247269 -> this (2026-08-12, stem reserves). It moved in the
-        # SIXTEENTH digit — 1.8e-10 relative — because this margin is set by the rate
-        # constant and only perturbed by the trajectory. The assertion below is the
+        # ⚠ 90.95231882247269 -> 90.95231898732729 (2026-08-12, stem reserves). It moved
+        # in the SIXTEENTH digit — 1.8e-10 relative — because this margin is set by the
+        # rate constant and only perturbed by the trajectory. The assertion below is the
         # one that carries the claim, and it did not move at all.
-        assert margin == pytest.approx(90.95231898732729, rel=1e-9)
-        # still within 0.05 % of the bare 1/(k*dt) it used to sit on exactly
-        assert abs(margin - 1.0 / 0.011) / (1.0 / 0.011) < 5e-4
+        #
+        # ⚠ 90.95231898732729 -> this (2026-08-14, the step unfreeze). The move is a
+        # near-exact 4x, as it must be for a margin whose denominator is one step's
+        # demand — but only NEAR-exact (90.95231898732729 * 4 = 363.80927594930916
+        # against the measured 363.809291983146, parting company in the 8th digit).
+        # That residue is the ``f_O2`` wobble this test is named for, and it is the
+        # reason the row is `live` rather than `rate-determined`: a pure 1/(k*dt) row
+        # would have rescaled to the last bit.
+        assert margin == pytest.approx(363.809291983146, rel=1e-9)
+        # still within 0.05 % of the bare 1/(k*dt) it used to sit on exactly — written
+        # as the formula, with dt in it, so the bound does not silently become a
+        # different claim at the next step change (it was `1.0 / 0.011`, dt implicit).
+        bare = 1.0 / (0.011 * BIO_DT)
+        assert abs(margin - bare) / bare < 5e-4
 
 
 # --------------------------------------------------------------------------- #
@@ -752,9 +877,25 @@ def test_the_litter_pair_became_live_when_it_gained_an_o2_draw() -> None:
         # column is unchanged to the last digit in all three rows through BOTH moves,
         # because it is a WATER margin and neither touched water — the same
         # falsifiable half that held in the golden prediction, and it has held twice.
-        ("sealed_chamber", 1.9016721361221138, 9.313939636232975),
-        ("perennial_chamber", 1.552788483797351, 8.437936564620642),
-        ("consumer_chamber", 2.1271916795585084, 8.437936564620642),
+        #
+        # ⚠ RE-MEASURED AGAIN 2026-08-14 (the step unfreeze). Was 1.9016721361221138 /
+        # 1.552788483797351 / 2.1271916795585084 against 9.313939636232975 /
+        # 8.437936564620642 / 8.437936564620642. THE RUNNER-UP COLUMN'S THREE-DAY RUN
+        # OF NOT MOVING ENDS HERE — every number in the table moved — and the SHAPE of
+        # how each moved is the readable part:
+        #   sealed_chamber's runner-up is EXACTLY 4x (9.313939636232975 * 4 ==
+        #     37.2557585449319, bit-exact), the open-fed soil store's signature: its
+        #     tightest moment is the run's FIRST call, so only the per-call demand
+        #     changed and the stock it divides is the declared initial amount.
+        #   perennial/consumer's runner-up is 4.0034x, not 4x (8.437936564620642 * 4 is
+        #     33.751746 against the measured 33.779983). Same stock, same currency —
+        #     but a sealed chamber recycles its water, so the tightest moment is inside
+        #     the trajectory and the trajectory genuinely re-integrated.
+        #   the carbon column moved by 4.04 / 3.59 / 4.36 — all live, none of them 4x.
+        # The stock IDENTITY is unchanged in all six cells.
+        ("sealed_chamber", 7.687738410076417, 37.2557585449319),
+        ("perennial_chamber", 5.575540262132649, 33.77998307475926),
+        ("consumer_chamber", 9.267982379565037, 33.77998307475926),
     ],
 )
 def test_the_jars_carbon_pool_is_the_only_binding_gate(
@@ -829,14 +970,34 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     # `rooted_depth x EXTR x rho x area`. A physically sized bucket has a physically
     # sized margin. The ranking moved; the safety is an order of magnitude, not a
     # threshold breach.
-    "open_season": ("biosphere.soil_water", 9.313939636232975),
+    # ⚠⚠ RE-MEASURED WHOLESALE 2026-08-14 (the step unfreeze, dt 1 -> 1/4). READ THE
+    # UNITS BEFORE READING THE NUMBERS: a margin is ``stock / demand-per-CALL``, so it
+    # is denominated in STEPS. Quartering the step quartered every per-call demand and
+    # so multiplied every BIOSPHERE margin by ~4, while every row driven by a registry
+    # this ceremony did not touch — power, thermal, ECLSS, crew — is unchanged to the
+    # last bit. Nine of the nineteen rows below did not move at all, and that split is
+    # the cleanest evidence available that the flip reached exactly what it aimed at.
+    #
+    # ⚠ TWO ROWS RE-RANKED, and in the same direction, for the same reason. Where a
+    # scenario's tightest gate used to be a biosphere stock by a small margin, the
+    # biosphere's number rose 4x past a neighbouring stock whose number did not:
+    #   greenhouse      soil_water 9.3139  ->  carbon_pool 16.667 (the CABIN's scrub)
+    #   sealed_station  carbon_pool 5.0232 ->  carbon_pool 16.667  (same stock, but now
+    #                   the cabin's call rather than the plant's — see claim 3)
+    # This is the "gate's reach changed" case this table's own comments were written to
+    # surface, and it is the third time. It is a finding, not a drift: in both rows the
+    # binding gate has passed OUT of the biosphere and into the ECLSS timestep check.
+    "open_season": ("biosphere.soil_water", 37.2557585449319),
     # ⚠ 2026-08-12, twice (the stem-reserve build, then its cessation window). Before
     # the build: 2.3404741281202655 / 1.5124880369468734 / 2.112066494173573. The
     # IDENTITY of the tightest gate is unchanged in every row through both moves — only
     # the margin moved — so the ranking claim this table exists for is intact.
-    "sealed_chamber": ("biosphere.carbon_pool", 1.9016721361221138),
-    "perennial_chamber": ("biosphere.carbon_pool", 1.552788483797351),
-    "consumer_chamber": ("biosphere.carbon_pool", 2.1271916795585084),
+    # ⚠ 2026-08-14: 1.9016721361221138 / 1.552788483797351 / 2.1271916795585084. The
+    # ratios are 4.04 / 3.59 / 4.36 — near 4x but not 4x, which is the signature of a
+    # LIVE gate re-integrated rather than a rate-determined one rescaled.
+    "sealed_chamber": ("biosphere.carbon_pool", 7.687738410076417),
+    "perennial_chamber": ("biosphere.carbon_pool", 5.575540262132649),
+    "consumer_chamber": ("biosphere.carbon_pool", 9.267982379565037),
     "power_bounded_soc": ("power.battery", 11.295323690100386),
     "power_self_discharge": ("power.battery", 11.085836827155921),
     "thermal_equilibrium": ("thermal.node", 257.68121326080376),
@@ -844,14 +1005,22 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     "crew_mission": ("crew.food_store", 388.55555555555975),
     "station_heat_closure": ("power.battery", 11.295323690100386),
     "cabin_gas": ("eclss.cabin_o2", 35.57253249034074),
-    "greenhouse": ("biosphere.soil_water", 9.313939636232975),
+    # ⚠ RE-RANKED — see the header note. Its biosphere registry's own carbon-pool
+    # minimum is 1150.7494, three orders slack; 16.667 is the cabin's 1/(k*dt).
+    "greenhouse": ("biosphere.carbon_pool", 16.666666666666664),
     "water_recovery": ("eclss.cabin_o2", 35.57253249034074),
-    "lighting": ("biosphere.soil_water", 9.313939636232975),
+    "lighting": ("biosphere.soil_water", 37.2557585449319),
     "harvest": ("biosphere.carbon_pool", 16.666666666666664),
-    "perennial_long_horizon": ("biosphere.carbon_pool", 1.550637502069539),
-    "consumer_long_horizon": ("biosphere.carbon_pool", 2.1271916795585084),
+    # ⚠ Both long-horizon rows are now BIT-IDENTICAL to their 5-year siblings, where
+    # perennial's used to differ by 0.11 %. See
+    # ``test_whether_the_perennial_gate_needs_the_LONG_horizon``.
+    "perennial_long_horizon": ("biosphere.carbon_pool", 5.575540262132649),
+    "consumer_long_horizon": ("biosphere.carbon_pool", 9.267982379565037),
     "sealed_energy_drift": ("power.battery", 11.295323690100386),
-    "sealed_station": ("biosphere.carbon_pool", 5.023213361478883),
+    # ⚠ RE-RANKED WITHIN THE ROW — see the header note and claim 3. The stock is the
+    # same; the CALL that binds is not. The biosphere registry's minimum rose
+    # 5.0232 -> 19.0209 and so crossed above the cabin's unchanged 16.667.
+    "sealed_station": ("biosphere.carbon_pool", 16.666666666666664),
 }
 
 
@@ -899,10 +1068,30 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     ``loadgroup`` doubled the full run), so the remaining lever is *fewer tests needing
     it*. The cost is diagnosability, paid down with a labelled message per claim.
 
-    Rank every **live** gate margin in the frozen roster. The six smallest are the same
-    stock, ``biosphere.carbon_pool``, in the six scenarios that seal one. The first
-    margin on any *other* stock is ``sealed_chamber``'s ``o2_pool`` — and that chamber
-    is documented as deliberately O2-poor, so even the runner-up is a chamber property.
+    Rank every **live** gate margin in the frozen roster. The smallest are the same
+    stock, ``biosphere.carbon_pool``, in the scenarios that seal one.
+
+    ⚠⚠ **"THE SIX SMALLEST" BECAME "THE FIVE SMALLEST" ON 2026-08-14, AND THIS IS THE
+    STEP UNFREEZE'S HEADLINE FINDING ABOUT THE CENSUS.** The six were the five
+    standalone chamber runs plus ``sealed_station``. At ``dt = 1`` the station's
+    binding call was the *plant's* draw on the shared CO2 pool, at 5.0232 — tighter
+    than the cabin's
+    ``1/(k*dt) = 16.667`` on the same stock, which is why it belonged beside the
+    chambers. Quartering the biosphere's step quartered that draw per call and so
+    multiplied the margin by ~3.8, to **19.0209**. The cabin's step did not change.
+    So the station's gate handed over: its census row is still ``carbon_pool``, but the
+    number is now the ECLSS scrubber's timestep check, and the row has fallen from 6th
+    to 12th, behind four ``power.battery`` entries.
+
+    **Read plainly: the sealed station no longer has a plant-limited acceptance gate.**
+    Nothing about the plant changed — the same trajectory, integrated more finely, is
+    simply never within a quarter-day of out-running the pool. That is a fact about
+    what ``rationed == 0`` can still refute on the station, and it makes the frozen
+    contract's acceptance test weaker there than it was, not stronger.
+
+    The first margin on any *other* stock is ``power.battery`` — outside the biosphere
+    entirely, so the old corollary "even the runner-up is a chamber property" stays
+    retired (it was retired once before, on 2026-08-10, and drifted back on 08-12).
 
     ⚠ **The unqualified sentence is FALSE and the counterexample is in this roster.**
     Rank *all* classes and the 6th tightest is the water-cycle pair at 2.0, sitting
@@ -954,6 +1143,9 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     # first rate-determined entry is ``carbon_pool``, and the first rate-determined
     # entry
     # is the water pair at exactly 2.0.
+    #
+    # ⚠ RE-MEASURED 2026-08-14 (the step unfreeze) and the count moved a third time,
+    # 5 -> 2 -> 4 -> 3. Still not typed as a literal, for the reason above.
     first_rd = next(
         i for i, (_m, _s, _sid, g) in enumerate(raw) if g == "rate-determined"
     )
@@ -962,29 +1154,50 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     ] * first_rd, raw[:first_rd]
     assert first_rd >= 2, first_rd
     margin_rd, _s3, sid_rd, gate_rd = raw[first_rd]
-    # the water-cycle pair ties at exactly 2.0; which of the two sorts next is
-    # incidental
+    # the water-cycle pair ties exactly; which of the two sorts next is incidental
     assert sid_rd in {"biosphere.condensate", "biosphere.water_vapor"}, raw[first_rd]
-    assert gate_rd == "rate-determined" and margin_rd == 2.0, raw[first_rd]
+    # ⚠ was the literal 2.0. It is `1/(k*dt)` with k = 0.5 /day — the SAME constant this
+    # file's `test_a_first_order_stocks_margin_is_one_over_k_dt` inverts — so it is now
+    # written that way rather than as the number it evaluates to at one step size. At
+    # dt = 1 that read 2.0; at dt = 1/4 it reads 8.0, and nothing about the water moved.
+    assert gate_rd == "rate-determined", raw[first_rd]
+    assert margin_rd == 1.0 / (0.5 * BIO_DT), raw[first_rd]
 
     ranked = sorted(
         (margin, scenario, sid)
         for scenario in _runners()
         for sid, margin in _live(census(scenario)).items()
     )
-    assert [sid for _m, _s, sid in ranked[:6]] == ["biosphere.carbon_pool"] * 6, ranked[
+    # ⚠⚠ SIX -> FIVE (2026-08-14). See the docstring: ``sealed_station`` left the head
+    # of this ranking because its binding CALL changed registry, not because anything
+    # about its plant changed. The five that remain are exactly the five STANDALONE
+    # chamber runs — the ones whose only registry is the biosphere's.
+    assert [sid for _m, _s, sid in ranked[:5]] == ["biosphere.carbon_pool"] * 5, ranked[
         :8
     ]
-    assert {s for _m, s, _sid in ranked[:6]} == {
+    assert {s for _m, s, _sid in ranked[:5]} == {
         "sealed_chamber",
         "perennial_chamber",
         "consumer_chamber",
         "perennial_long_horizon",
         "consumer_long_horizon",
+    }
+    # ...and ``sealed_station`` is asserted to be OUT of the head, by name, so that its
+    # departure is a pinned fact rather than an absence nobody notices. It now ties with
+    # the two other cabin-driven scenarios at the ECLSS scrubber's 1/(k*dt).
+    station_rank = next(
+        i for i, (_m, s, _sid) in enumerate(ranked) if s == "sealed_station"
+    )
+    assert station_rank > 5, (station_rank, ranked[:13])
+    assert ranked[station_rank][0] == pytest.approx(1.0 / 0.06, rel=1e-12)
+    assert {s for m, s, _sid in ranked if m == ranked[station_rank][0]} == {
+        "greenhouse",
+        "harvest",
         "sealed_station",
     }
-    # ⚠⚠ THE RUNNER-UP HAS NOW CHANGED IDENTITY TWICE, AND THE SECOND TIME IT CAME
-    # BACK. History, because the churn is the finding:
+    #
+    # ⚠⚠ THE RUNNER-UP HAS NOW CHANGED IDENTITY THREE TIMES, AND IT HAS COME BACK TO A
+    # VALUE IT ALREADY HELD ONCE. History, because the churn is the finding:
     #
     #   2026-08-09  ``sealed_chamber``'s ``o2_pool`` at 8.944  — licensed the corollary
     #               "even the runner-up is a chamber property".
@@ -995,22 +1208,25 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     #               7th row is ``biosphere.soil_water`` at 8.4379 — a chamber property
     #               again, on a stock that was never in contention before because it
     #               used to hold 1000 kg in a bucket that could physically hold 19.5.
+    #   2026-08-14  the step unfreeze multiplied every biosphere margin by ~4 and left
+    #               ``power.battery`` alone, so the row is ``power.battery`` at 11.086
+    #               AGAIN — the same stock and the same value as on 08-10, reached by a
+    #               completely different route.
     #
-    # ⚠ The corollary is STILL NOT restored. It was retired on the evidence that the
-    # ranking does not respect it, and a claim that has been false once is not made true
-    # by drifting back — it is a coincidence of the current roster, and saying so is the
-    # whole reason this comment keeps its history.
+    # ⚠ The corollary is STILL NOT restored, and this is now the second time it would
+    # have been wrong to restore it. It was retired on the evidence that the ranking
+    # does not respect it; a claim that has been false once is not made true by drifting
+    # back, and this row has now drifted back and forth twice in five days.
     #
-    # ⚠ The ``> 7.0`` ratio bound is DROPPED, not re-tuned. The gap is now 5.62x
-    # (8.4379 / 1.5004) where it was 7.4x, so the bound fails; lowering it to 5.0 is the
-    # fitted cut this file refuses elsewhere in exactly these words. Rank plus exact
-    # values say strictly more than any threshold would.
-    margin, _scenario, sid = ranked[6]
-    assert sid == "biosphere.soil_water", ("runner-up", ranked[6:10])
-    # Four scenarios tie at this value, so the SCENARIO of row 6 is sort-incidental and
-    # is deliberately not asserted; the tie itself is.
-    assert {r[2] for r in ranked[6:10]} == {"biosphere.soil_water"}, ranked[6:10]
-    assert margin == pytest.approx(8.437936564620642, rel=1e-9), "runner-up value"
+    # ⚠ The ``> 7.0`` ratio bound stays DROPPED. Rank plus exact values say strictly
+    # more than any threshold would.
+    margin, _scenario, sid = ranked[5]
+    assert sid == "power.battery", ("runner-up", ranked[5:9])
+    # Four rows are ``power.battery``; three of them tie at 11.2953 and one sorts first
+    # at 11.0858, so the SCENARIO of row 5 is not sort-incidental here and IS asserted.
+    assert _scenario == "power_self_discharge", ("runner-up", ranked[5:9])
+    assert {r[2] for r in ranked[5:9]} == {"power.battery"}, ranked[5:9]
+    assert margin == pytest.approx(11.085836827155921, rel=1e-9), "runner-up value"
     assert margin > ranked[0][0], "…and the binding gate is still the tighter one"
 
     # --- claim 2: sealed_station's census row (folded in; see the note above) --------
@@ -1020,27 +1236,31 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     assert got == stock, ("tier2 row", got, live[got])
     assert live[got] == pytest.approx(expected, rel=1e-9), "tier2 row value"
 
-    # --- claim 3: that row is the PLANT's draw, not the cabin's ----------------------
-    # It is a multi-registry scenario, so the row would not belong in the ordering claim
-    # above if its minimum came from the fast cabin registry. The biosphere registry's
-    # daily call produces 5.218; the cabin's minimum on the same stock is 16.667, the
-    # 1/(k*dt) value greenhouse/harvest sit at. So it measures the same quantity as the
-    # standalone chambers' 1.126/1.491/1.802.
-    fast_min, slow_min = _registry_minima(
+    # --- claim 3: WHICH registry's call binds — and it changed hands ------------------
+    # ⚠⚠ **INVERTED 2026-08-14, and this claim used to be named for its answer.** It
+    # read "that row is the PLANT's draw, not the cabin's", and asserted
+    # ``slow_min < fast_min`` with the message "the binding call must be the
+    # biosphere's". That is now false, and the assertion that carried it would have
+    # been the thing to delete if it had been written as a threshold. It was written as
+    # a comparison of two pinned values, so it caught the handover instead.
+    #
+    #   2026-08-09/12  biosphere 5.218198 -> 5.023213, cabin 16.666667. Plant binds.
+    #   2026-08-14     biosphere 19.020864, cabin 16.666667. CABIN binds.
+    #
+    # The biosphere's number rose by 3.786x — near the 4x a per-call denominator gives,
+    # and short of it by the amount the trajectory genuinely re-integrated — and crossed
+    # a cabin constant that did not move at all. Nothing here is a re-tuning: both
+    # values are pinned exactly and the INEQUALITY between them is asserted in whichever
+    # direction it currently points, with the direction named.
+    cabin_min, bio_min = _registry_minima(
         _recorder_for(_TIER2), "biosphere.carbon_pool"
     )
-    # ⚠ 5.218197631830118 -> this (2026-08-12, stem reserves). The CLAIM is the two
-    # lines
-    # below — that the binding call is the biosphere's, not the cabin's — and the
-    # cabin's
-    # own 1/(k*dt) value did not move at all, which is what makes the comparison
-    # readable.
-    assert slow_min == pytest.approx(5.023213361478883, rel=1e-9), "tier2 slow registry"
-    assert fast_min == pytest.approx(16.666666666666664, rel=1e-12), (
-        "tier2 fast registry"
+    assert bio_min == pytest.approx(19.020863570770853, rel=1e-9), "tier2 bio registry"
+    assert cabin_min == pytest.approx(16.666666666666664, rel=1e-12), (
+        "tier2 cabin registry"
     )
-    assert slow_min < fast_min, "tier2: the binding call must be the biosphere's"
-    assert census(_TIER2)["biosphere.carbon_pool"].min_margin == slow_min
+    assert cabin_min < bio_min, "tier2: the binding call is now the CABIN's"
+    assert census(_TIER2)["biosphere.carbon_pool"].min_margin == cabin_min
 
     # --- claim 4: the metric's consistency check against the gate it measures --------
     # Every frozen golden asserts `rationed == 0`, so no stock in any frozen scenario
