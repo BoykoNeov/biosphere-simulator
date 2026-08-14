@@ -1,14 +1,18 @@
 # The step unfreeze — the biosphere moves to `dt = ¼` (authorized 2026-08-14)
 
-**Status: PLANNED 2026-08-14, STILL IN PROGRESS — the re-pinning is done and item 8's
-gate is NOT met.** ⚠ Read this before treating the ceremony as landed: `uv run pytest -n 12`
-comes back **29 failed / 2305 passed** as of 2026-08-14, in 13 files, and every red list this
-ceremony worked from was produced by running only the files being edited. The 29 are this
-ceremony's own conflation classes in files the sweep never reached — including the
-compartment-ledger class fixed in exactly one file, and this ceremony's **own new**
-`slow_dt · slow_steps_per_day == 1 day` guard firing on a caller nobody ran. They are pinned
-as pre-existing-to-the-re-pin **by name** against `0a8d921`, and enumerated in
-`docs/log/step-unfreeze.md`. Item 8's `cargo test` / `cargo clippy` half is also unrun.
+**Status: COMPLETE 2026-08-14 — item 8's gate is MET.** `uv run pytest -n 12` is
+**2334 passed / 5 skipped / 0 failed** (8 m 42 s), `cargo test --workspace` is
+**315 passed / 0 failed**, and `ruff`, `ruff format`, `pyright` and
+`cargo clippy --all-targets -D warnings` are clean tree-wide.
+
+⚠ **It reached that state through a detour worth keeping.** Every red list this ceremony
+worked from was produced by running only the files being edited, so the figure carried
+forward across five commits — "8 pre-existing failures" — was an undercount by **29**.
+Running the whole suite found them in 13 files nobody had opened: this ceremony's own
+conflation classes, including the compartment-ledger one fixed in exactly one file, and its
+**own new** `slow_dt · slow_steps_per_day == 1 day` guard firing on a caller nobody ran.
+They were pinned as pre-existing **by name** against `0a8d921` before being fixed, and are
+enumerated with their lessons in `docs/log/step-unfreeze.md`.
 
 **Authorized by the user** after Step 0's two
 measurement axes (`docs/log/co2-controller.md`, `docs/log/step-sweep.md`). The sweep
@@ -550,7 +554,7 @@ parity-critical stepping path. Allowed with the rationale written at the site.
    only on their generation platform. All the biosphere goldens are transcendental and
    therefore already gated, so regenerating on Windows will not redden CI. The genuinely
    cross-platform gate is the cross-port tolerance band — which item 5 re-measures anyway.
-8. ⚠ **NOT MET as of 2026-08-14 — see the status note at the top.** **Gates**: full suite including `-m slow`, `ruff`, `pyright`, `cargo test`, `cargo clippy`. `ruff` and `pyright` are green tree-wide; the full Python suite is **29 red**; `cargo` is unrun. ⚠ The failure mode this item exists to prevent is exactly what happened: five commits reported a red count taken from a **subset**, and each handoff carried it forward as the whole-suite figure.
+8. ✅ **MET 2026-08-14 — see the status note at the top.** **Gates**: full suite including `-m slow`, `ruff`, `pyright`, `cargo test`, `cargo clippy`. All green: `ruff`, `ruff format` and `pyright` clean tree-wide, the full Python suite **2334 passed / 5 skipped / 0 failed**, `cargo test --workspace` **315 passed / 0 failed**, `cargo clippy --all-targets -D warnings` clean. ⚠ Keep the warning this item has now earned: the failure mode it exists to prevent is exactly what happened first — five commits reported a red count taken from a **subset**, and each handoff carried it forward as the whole-suite figure. *This gate is the only thing that distinguishes "the files I touched are green" from "the tree is green", and it is last on the list precisely because nothing else substitutes for it.*
    ⚠ `¼` is **4× raw simulation work**, so the full-suite upper bound is ~25 min, not the
    ~12 min quoted for `½`. Use targeted regeneration during the work and one full run at the
    end.

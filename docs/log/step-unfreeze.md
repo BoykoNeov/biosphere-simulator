@@ -257,7 +257,7 @@ had not. All corrected, prose only. `drift.py`'s provenance block keeps its `dt 
 historical record of how those bounds were derived, now saying so explicitly and noting that
 the bounds were **re-run and not re-derived**.
 
-### ⚠⚠ THE CEREMONY IS NOT FINISHED: 29 tests in 13 files are still red
+### ⚠⚠ THE RED LIST WAS AN UNDERCOUNT BY 29 — found, characterised, and fixed
 
 **Measured 2026-08-14 by running the whole suite, which this batch had not done.** The
 re-pinning was driven from a red list that named **8** pre-existing failures. The true figure
@@ -318,8 +318,56 @@ suite a run before it calls anything pre-existing** — the subset is the thing 
 tell you what you broke. See also the BOM and the missing index line above: all three defects
 have the shape *"checked something narrower than the claim, then stated the claim"*.
 
-**Not started here, deliberately.** It is a second batch of the same size as this one, and
-scoping it is the user's call.
+**All 29 fixed on the user's call to take the whole batch.** The suite is now
+**2334 passed / 5 skipped / 0 failed**, `cargo test --workspace` **315 passed / 0 failed**,
+`ruff`/`ruff format`/`pyright`/`clippy` clean — so this ceremony's own item-8 gate is met for
+the first time. What the batch found, beyond the arithmetic:
+
+* **An EIGHTH class, and the largest: the run LENGTHS were converted and the READ-BACK
+  INDICES were not.** Five files build their trajectory correctly with `steps_for(...)` and
+  then walk it with a day count. ⚠ Two variants matter more than the base case. The first
+  cannot announce itself: `n = min(len(ref), len(states))` was `min(305, 306) = 305` and
+  right, and became `min(305, 1221) = 305` and wrong **without changing value** — a `min`
+  over two units looks identical either way. The second is the half a first pass misses: an
+  index *derived* from a day-indexed series (a `_first_day_at` return, an `argmax`) is itself
+  a day index and must not be used on `states`; that was six more sites.
+* **A counter-example, kept, because "convert everything to days" is the wrong rule.**
+  Potato's gap 5 asks for the organ split *at development stage 0.5*. It compares against no
+  day at all, its step-indexed series and index were already self-consistent, and converting
+  it moved the measurement 0.360 → 0.3525 by sampling up to three steps late. It was green
+  and I broke it. *A trajectory index only has to be in days when something it is compared
+  against is; both bases are self-consistent, and only one is more accurate here.*
+* **A window sliced in the wrong unit reports an IMPOSSIBLE value, not a wrong one.**
+  `test_sealed_producer_recovers_o2_after_trough` scoped "year one" as
+  `states[: len(_weather())]` — 76 days of a 305-day season. The O₂ trough sits at the end of
+  a window that short, so `o2[trough:]` came back with **one element** and the assertion
+  reduced to `max([x]) > x + 0.1`, which nothing can satisfy.
+* **A copied constant went stale under a comment warning that it must not.**
+  `OPEN_SEASON_PEAK_LAI` carried a note saying a stale value "would silently flatter the
+  comparison". It did: the open field moved to 5.571922 and nothing noticed, because a
+  hand-copied number cannot notice. It is now **self-checking** — the test that uses it
+  re-runs `open_season` and asserts the constant against the measurement. *Re-measuring a
+  copied constant fixes one occurrence; tying it to its source fixes the class. A warning is
+  not a check.*
+* **A tolerance that was FALSE rather than stale, and was not loosened.** The feces-routing
+  test asserted the closed- and open-feces runs agree to `rel=1e-9` on `storage_c`, under the
+  name `..._only_at_roundoff`. Measured: **1.9 %**. Replaced by the contrast the docstring is
+  actually about — a 119.8 mol C perturbation moves grain by 3.0e-7 of itself — which is
+  strictly stronger, because `rel=1e-9` on a stock holding **0.00198 mol** also passed if the
+  perturbation did nothing at all. *A relative tolerance on a near-zero stock is not a
+  measure of orthogonality; it is a measure of how small that stock is.* Cause: the plant now
+  sees the perturbed CO₂ at four levels per day instead of one — the same mechanism that
+  restated `o2_leak_is_absorbed_by_makeup_effort` earlier in this ceremony.
+* **Four hand-cut bounds dropped rather than re-cut.** The chamber/field leaf-area band had
+  been re-centred **three times in five days**; the nitrogen throttle's regime ratio slipped
+  8.20× → 7.96× against a round 8.0; PIN 6's `> 0.95`; PIN 9's twice-moved ±0.01 window.
+  Each re-cut was honest alone and the sequence is not — *a band re-centred on the
+  measurement every time the measurement moves is a record of the measurement, not a check on
+  it.* Replaced by an exact pin plus the claim at the width its own words mean. The best of
+  the replacements needs no cut at all: the nitrogen regimes fall on **opposite sides of the
+  shed ratio**, which is a parameter identity (exactly 90), so it is a sign test that cannot
+  drift. ⚠ That same band's prose ("within ~15 %") and its numeric ceiling (105, i.e. 16.7 %)
+  had never agreed, and the measurement was already outside the prose before this change.
 
 ### Open, and deliberately not closed here
 
