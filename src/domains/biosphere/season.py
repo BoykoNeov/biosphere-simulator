@@ -255,13 +255,28 @@ def build_season(scenario: SeasonScenario = DEFAULT_SCENARIO) -> tuple[State, Re
 def _table(values: list[float]) -> Schedule:
     """A forcing ``Schedule`` reading a precomputed per-day table (clamped at the end).
 
-    ``schedule(n, dt) = values[min(n, last)]`` — the first genuinely ``n``-dependent
-    forcing (P3). Clamping past the last day keeps a longer-than-table run well-defined.
+    ``schedule(n, dt) = values[min(int(n · dt), last)]`` — the first genuinely
+    ``n``-dependent forcing (P3), indexed by **elapsed physical days** rather than by
+    the step count. Clamping past the last day keeps a longer run well-defined.
+
+    ⚠ **The ``· dt`` is what lets the step change without re-tiling the weather.** Every
+    other forcing in this tree is a pure function of the integer ``n`` (the #14 seam),
+    and that is fine for an analytic schedule — a half-sine sampled twice as often is
+    the same half-sine. It is *not* fine for a **table**: a table indexed by ``n`` at
+    ``dt = ¼`` would hand the crop the whole season in the first quarter-year and then
+    clamp on the final day for the remaining three quarters. Indexing ``int(n · dt)``
+    holds each weather day fixed across the sub-steps within it, which is what a daily
+    observation means physically.
+
+    At ``dt = 1.0`` this is ``values[min(n, last)]`` character-for-character — the
+    pre-2026-08-14 behaviour, and every golden stays byte-identical across the change.
+    ``n · dt`` is exact in binary for the steps in use (``dt`` a negative power of two),
+    so the truncation has no round-off edge.
     """
     last = len(values) - 1
 
     def schedule(n: int, dt: float) -> float:
-        return values[min(n, last)]
+        return values[min(int(n * dt), last)]
 
     return schedule
 
