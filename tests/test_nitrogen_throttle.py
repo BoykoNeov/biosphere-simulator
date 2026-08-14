@@ -259,7 +259,8 @@ def test_the_litter_pool_a_throttle_would_read_is_TWO_REGIMES_not_one_number() -
     # reset.
     #
     # ⚠⚠ **THE `> 8.0` CUT IS DROPPED, NOT NUDGED (2026-08-14).** The ratio went
-    # 8.20x -> 7.033943x at `dt = ¼` — the reset-driven pair rose while the shedding-fed one
+    # 8.20x -> 7.033943x at `dt = ¼` — the reset-driven pair rose while the shedding-fed
+    # one
     # barely moved — so a round 8.0 chosen when the measurement was 8.20 now fails by
     # 0.5 %. Lowering it to 7.9 would be fitting the bound to the tree, twice in one
     # function, which the note further up refuses in its own words.

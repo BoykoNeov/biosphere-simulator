@@ -316,7 +316,8 @@ def test_par_reconstructed_from_lamp_draw() -> None:
     is a *fraction* of the on-window intensity, not the intensity itself.
 
     The factor this test exists to check is unchanged, and is now checked where it
-    lives: the on-window intensity is still ``photon_efficacy·lamp_power_w/ground_area``,
+    lives: the on-window intensity is still
+    ``photon_efficacy·lamp_power_w/ground_area``,
     and the DAY's photon dose is still exactly ``that × photoperiod`` — which is the
     quantity the crop integrates and the one the old single-instant assertion was
     standing in for.

@@ -884,14 +884,19 @@ fn sine_light_path(daytime_mean_par: Vec<f64>, daylength_s: Vec<f64>) -> Schedul
     let last = daytime_mean_par.len() - 1;
     Box::new(move |n, dt| {
         let t = n as f64 * dt;
-        let day = ((t as usize).min(last)) as usize;
+        let day = (t as usize).min(last);
         // The window is guaranteed inside one day by the step dividing the day; a build
         // that broke that would surface as an error in the Python reference, and here the
         // schedule signature has nowhere to put one, so it is clamped to 0 the same way a
         // dark window is. (The Python side raises; the divergence is unreachable while
         // `BIO_DT` divides the day, which its own module asserts.)
-        light_path::half_sine_window_mean(t - t.trunc(), dt, daytime_mean_par[day], daylength_s[day])
-            .unwrap_or(0.0)
+        light_path::half_sine_window_mean(
+            t - t.trunc(),
+            dt,
+            daytime_mean_par[day],
+            daylength_s[day],
+        )
+        .unwrap_or(0.0)
     })
 }
 

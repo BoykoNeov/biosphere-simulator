@@ -36,7 +36,9 @@ fn daylight_span(daylength_s: f64) -> Result<(f64, f64), SimError> {
 /// The window must lie inside one day — the schedule's own precondition.
 fn check_window(t0: f64, dt: f64) -> Result<(), SimError> {
     if dt <= 0.0 {
-        return Err(SimError::Validation(format!("dt must be > 0 days, got {dt:?}")));
+        return Err(SimError::Validation(format!(
+            "dt must be > 0 days, got {dt:?}"
+        )));
     }
     if t0 < 0.0 || t0 + dt > 1.0 + 1e-12 {
         return Err(SimError::Validation(format!(
@@ -91,7 +93,9 @@ pub fn top_hat_window_mean(
 ) -> Result<f64, SimError> {
     check_window(t0, dt)?;
     if on_par < 0.0 {
-        return Err(SimError::Validation(format!("on_par must be >= 0, got {on_par:?}")));
+        return Err(SimError::Validation(format!(
+            "on_par must be >= 0, got {on_par:?}"
+        )));
     }
     let (sunrise, sunset) = daylight_span(photoperiod_s)?;
     let lo = t0.max(sunrise);

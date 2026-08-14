@@ -195,7 +195,8 @@ def test_intraday_cabin_co2_dip() -> None:
     # PAR now varies within the day, and step 0 is the window that starts at midnight —
     # the plant is respiring there, so the pool goes UP. That is not a weaker proof of
     # live coupling, it is a stronger one: the pool follows the plant in BOTH
-    # directions within a single day, which a detached pool cannot do. Both are asserted.
+    # directions within a single day, which a detached pool cannot do. Both are
+    # asserted.
     state, bio_reg, cabin_reg = build_greenhouse(_CREW, _ECLSS, _SC, with_plants=True)
     integrator = EulerIntegrator(bio_reg)
     resolver = greenhouse_bio_resolver(_weather(), _SC)
@@ -207,7 +208,7 @@ def test_intraday_cabin_co2_dip() -> None:
         amounts.append(_amt(cur, CARBON_POOL))
     deltas = [b - a for a, b in zip(amounts, amounts[1:], strict=False)]
     assert min(deltas) < 0.0, (
-        "the biosphere must draw CO₂ from the live cabin pool by day (the intra-day dip)"
+        "the biosphere must draw CO₂ from the live cabin pool by day (the dip)"
     )
     assert max(deltas) > 0.0, (
         "…and return it by night — the pool follows the plant in both directions"

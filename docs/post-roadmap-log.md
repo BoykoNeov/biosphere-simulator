@@ -183,3 +183,4 @@ with why the table could not stay: 255,567 bytes in 32 physical lines defeats `G
 | **The step unfreeze** — `dt = 1` → `dt = ¼` (the sweep's decision, taken; the unit was the work, not the step) | [the record](log/step-unfreeze.md) |
 | **The chamber CO₂ compensation-point band** (the guard that would have caught the step defect on day one) | [the record](log/co2-compensation-band.md) |
 | **The parked leaf mechanism, re-measured at the shipped step** (finding 11's named condition, discharged) | [the record](log/leaf-remeasurement.md) |
+| **The within-day light path — the plant breathes** (the user's charge; a mechanism that was already in the tree and could not fire) | [the record](log/gross-net-gas-exchange.md) |
