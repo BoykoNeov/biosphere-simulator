@@ -57,6 +57,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
 
@@ -78,13 +79,13 @@ def _oracle() -> list[dict[str, float]]:
     return [r for r in traj if r["DVS"] is not None]
 
 
-def _our_states(n: int) -> list[State]:
-    """Run the day-neutral crop (vern+photoperiod off) under spring weather for ``n``
-    steps — same forcing as the oracle."""
+def _our_states(days: int) -> list[State]:
+    """Run the day-neutral crop (vern+photoperiod off) under spring weather for ``days``
+    physical days — same forcing as the oracle, which has one row per day."""
     state, registry = build_season(DAY_NEUTRAL_SCENARIO)
     resolver = weather_resolver(_weather(), DAY_NEUTRAL_SCENARIO)
     states, rationed, events = run_season(
-        EulerIntegrator(registry), state, resolver, 1.0, n
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(days)
     )
     # Conservation/determinism sanity — a day-neutral crop is still a well-behaved run.
     assert rationed == 0

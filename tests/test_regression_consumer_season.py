@@ -44,6 +44,7 @@ from domains.biosphere.season import (
     run_perennial,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from golden_platform import windows_golden_only
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
@@ -80,9 +81,9 @@ def _final_state() -> State:
         state,
         CONSUMER_CHAMBER_SCENARIO,
         weather_resolver(weather, CONSUMER_CHAMBER_SCENARIO),
-        1.0,
-        len(weather),
-        year=year,
+        BIO_DT,
+        steps_for(len(weather)),
+        year=steps_for(year),
     )
     assert rationed == 0, "golden consumer run must be well-fed (no arbitration)"
     assert events == (), "golden consumer run must be extinction-free"

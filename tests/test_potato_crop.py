@@ -74,6 +74,7 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.stem_reserves import StemRemobilization
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.state import State
 
@@ -100,12 +101,15 @@ def _provenance() -> dict[str, Any]:
     return json.loads(_REFERENCE.read_text(encoding="utf-8"))["provenance"]
 
 
-def _run(scenario: SeasonScenario, steps: int = _RUN_DAYS) -> list[State]:
-    """Run ``scenario`` under the oracle's own weather; assert it is well-behaved."""
+def _run(scenario: SeasonScenario, days: int = _RUN_DAYS) -> list[State]:
+    """Run ``scenario`` under the oracle's own weather; assert it is well-behaved.
+
+    ``days`` is in physical days (it is compared against oracle rows, one per day).
+    """
     state, registry = build_season(scenario)
     resolver = weather_resolver(_weather(), scenario)
     states, rationed, events = run_season(
-        EulerIntegrator(registry), state, resolver, 1.0, steps
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(days)
     )
     # A crop that only conserves by rationing is not a crop that ran (the rationing
     # gate's rule: conservation is not survival).
@@ -452,8 +456,8 @@ def test_potato_runs_in_the_sealed_habitat_under_both_integrators() -> None:
             integrator_cls(registry),
             state,
             weather_resolver(weather, sealed),
-            1.0,
-            len(weather),
+            BIO_DT,
+            steps_for(len(weather)),
         )
         assert rationed == 0, f"{integrator_cls.__name__} needed the Euler backstop"
         assert events == ()

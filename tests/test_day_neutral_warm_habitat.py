@@ -37,6 +37,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.state import State
 
@@ -64,7 +65,7 @@ def _run(scenario: SeasonScenario) -> list[State]:
     state, registry = build_season(scenario)
     resolver = weather_resolver(_warm_weather(), scenario)
     states, rationed, events = run_season(
-        EulerIntegrator(registry), state, resolver, 1.0, _HABITAT_DAYS
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(_HABITAT_DAYS)
     )
     assert rationed == 0
     assert events == ()
@@ -156,7 +157,7 @@ def test_day_neutral_crop_runs_in_the_sealed_chamber_habitat() -> None:
         state, registry = build_season(scenario)
         resolver = weather_resolver(weather, scenario)
         states, rationed, events = run_season(
-            integrator_cls(registry), state, resolver, 1.0, len(weather)
+            integrator_cls(registry), state, resolver, BIO_DT, steps_for(len(weather))
         )
         assert rationed == 0
         assert events == ()
@@ -168,16 +169,16 @@ def test_day_neutral_crop_runs_in_the_sealed_chamber_habitat() -> None:
         EulerIntegrator(a_reg),
         a_state,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
+        BIO_DT,
+        steps_for(len(weather)),
     )
     b_state, b_reg = build_season(scenario)
     b_states, _, _ = run_season(
         EulerIntegrator(b_reg),
         b_state,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
+        BIO_DT,
+        steps_for(len(weather)),
     )
     assert a_states[-1].stocks[LEAF_C].amount.hex() == (
         b_states[-1].stocks[LEAF_C].amount.hex()

@@ -49,6 +49,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from domains.biosphere.stocks import ROOTED_DEPTH, SUBSOIL_WATER
 from domains.biosphere.transpiration import soil_water_stress
 from simcore.boundary import loss_sink_id
@@ -74,8 +75,8 @@ def _run(scenario) -> tuple[list[State], int, tuple]:
         EulerIntegrator(registry),
         state,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
+        BIO_DT,
+        steps_for(len(weather)),
     )
 
 

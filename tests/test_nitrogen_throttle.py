@@ -63,6 +63,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator
 from test_senescence_form import _weather
 
@@ -117,9 +118,15 @@ def _drive(scenario, years: int, perennial: bool):
     resolver = weather_resolver(w, scenario)
     if perennial:
         return run_perennial(
-            integ, state, scenario, resolver, 1.0, len(w), year=len(_weather())
+            integ,
+            state,
+            scenario,
+            resolver,
+            BIO_DT,
+            steps_for(len(w)),
+            year=steps_for(len(_weather())),
         )
-    return run_season(integ, state, resolver, 1.0, len(w))
+    return run_season(integ, state, resolver, BIO_DT, steps_for(len(w)))
 
 
 def _pool_cn(state) -> float | None:

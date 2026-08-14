@@ -59,6 +59,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from domains.biosphere.stocks import RN_VAR, ROOTED_DEPTH, TEMP_VAR, VPD_VAR
 from domains.biosphere.water_cycle import (
     Condensation,
@@ -346,11 +347,11 @@ def sealed() -> tuple[list[State], Registry, SourceResolver, int, tuple]:
     loss-sink.
     """
     weather = _weather() * SEALED_CHAMBER_YEARS
-    steps = len(weather)
+    days = len(weather)
     state, registry = build_season(SEALED_CHAMBER_SCENARIO)
     resolver = weather_resolver(weather, SEALED_CHAMBER_SCENARIO)
     states, rationed, events = run_season(
-        EulerIntegrator(registry), state, resolver, 1.0, steps
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(days)
     )
     return states, registry, resolver, rationed, events
 

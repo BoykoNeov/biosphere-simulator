@@ -129,6 +129,10 @@ def _gate(states: list[State], rationed: int, events: tuple[object, ...]) -> Non
     # documented spin-up year is NOT relaxing the amplitude bound (that would pass
     # amplifying drift); the bound stays 1.0 and the run must still be non-amplifying
     # past year 1.
+    # ⚠ In DAYS, and correctly so — do NOT wrap in ``steps_for``. ``run_master_day``
+    # appends one state per master DAY, so this trajectory is day-indexed, unlike the
+    # biosphere's own ``run_season`` trajectory.
+    # See `docs/plans/post-roadmap-step-unfreeze.md` §1.
     peaks = year_summaries(states, SEALED_STATION_SCENARIO.season_days, peak_organic_c)
     diffs = same_phase_diffs(peaks, period=1)
     # ⚠ RESTATED by the humification split (2026-08-10), the station-side instance of

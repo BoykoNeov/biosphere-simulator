@@ -57,6 +57,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.environment import SourceResolver
 from simcore.flow import assert_flow_balanced, per_quantity_residual
 from simcore.ids import DomainId, FlowId, StockId
@@ -293,7 +294,9 @@ def sealed() -> tuple[list[State], int, tuple]:
     scenario = SeasonScenario(sealed=True)
     state, registry = build_season(scenario)
     resolver = weather_resolver(_weather(), scenario)
-    return run_season(EulerIntegrator(registry), state, resolver, 1.0, len(_weather()))
+    return run_season(
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(len(_weather()))
+    )
 
 
 def _total_carbon(s: State) -> float:

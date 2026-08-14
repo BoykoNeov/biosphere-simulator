@@ -32,6 +32,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from golden_platform import windows_golden_only
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
@@ -60,8 +61,8 @@ def _final_state() -> State:
         EulerIntegrator(registry),
         state,
         weather_resolver(weather, SEALED_CHAMBER_SCENARIO),
-        1.0,
-        len(weather),
+        BIO_DT,
+        steps_for(len(weather)),
     )
     assert rationed == 0, "golden sealed run must be well-fed (no arbitration firing)"
     assert events == (), "golden sealed run must be extinction-free"

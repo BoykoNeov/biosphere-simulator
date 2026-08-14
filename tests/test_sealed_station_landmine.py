@@ -130,6 +130,8 @@ def test_landmine_biomass_non_stationary(landmine_run) -> None:
     # converged
     # biosphere (~0.09 diffs) clears and a ramping one (~1e4) does not.
     states, _, _, scenario = landmine_run
+    # ⚠ In DAYS, and correctly so — do NOT wrap in ``steps_for``: ``run_master_day``
+    # appends one state per master DAY, so this trajectory is day-indexed.
     peaks = year_summaries(states, scenario.season_days, peak_organic_c)
     assert len(peaks) >= 2
     diffs = same_phase_diffs(peaks, period=1)

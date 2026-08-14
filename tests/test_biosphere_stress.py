@@ -102,6 +102,7 @@ from domains.biosphere.season import (
     run_perennial,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import BALANCE_ATOL, Quantity
@@ -119,7 +120,11 @@ def _weather() -> list[dict[str, float | str]]:
     return json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
 
 
-_YEAR = len(_weather())  # season length in steps (the tiling + reset period, ~305)
+_YEAR_DAYS = len(_weather())  # season length in DAYS (the tiling period, ~305)
+# ...and in integration steps. ⚠ ``_STEPS`` below is a genuine STEP count (it scales the
+# per-step conservation ceiling ``N · BALANCE_ATOL``), and the per-chunk run length and
+# reset period are step counts too. Only the weather tiling uses days.
+_YEAR = steps_for(_YEAR_DAYS)
 # 328 whole years (328 * 305 = 100,040 steps) — "100k+" framed as WHOLE years so every
 # chunk is exactly one year-summary (100000 is not a multiple of 305 → a partial final
 # year, a spurious summary + a boundary edge case; whole years dissolve it). Env-
@@ -187,7 +192,13 @@ def _stream(scenario: SeasonScenario, *, has_consumer: bool) -> _StressResult:
     start = time.perf_counter()
     for _ in range(_YEARS):
         states, r, e = run_perennial(
-            integrator, state, scenario, resolver, 1.0, _YEAR, year=_YEAR
+            integrator,
+            state,
+            scenario,
+            resolver,
+            BIO_DT,
+            _YEAR,  # already steps
+            year=_YEAR,
         )
         # Each chunk returns YEAR+1 states (carried boundary + a full year) == exactly
         # one year_summaries segment. For the per-step total_q trace, the carried

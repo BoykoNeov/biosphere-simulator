@@ -57,6 +57,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from domains.biosphere.stocks import ROOTED_DEPTH
 from domains.biosphere.transpiration import soil_water_stress
 from simcore.integrator import EulerIntegrator
@@ -79,7 +80,9 @@ def _weather() -> list[dict[str, float | str]]:
 def _run(scenario: SeasonScenario = _SCENARIO) -> tuple[list[State], int, tuple]:
     state, registry = build_season(scenario)
     resolver = weather_resolver(_weather(), scenario)
-    return run_season(EulerIntegrator(registry), state, resolver, 1.0, len(_weather()))
+    return run_season(
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(len(_weather()))
+    )
 
 
 @pytest.fixture(scope="module")
@@ -202,7 +205,7 @@ def test_season_is_flow_registration_order_independent() -> None:
     state, registry = build_season(_SCENARIO)
     resolver = weather_resolver(_weather(), _SCENARIO)
     forward, _, _ = run_season(
-        EulerIntegrator(registry), state, resolver, 1.0, len(_weather())
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(len(_weather()))
     )
     shuffled = Registry(
         list(reversed(registry.flows)),
@@ -211,7 +214,7 @@ def test_season_is_flow_registration_order_independent() -> None:
     )
     state2, _ = build_season(_SCENARIO)
     reversed_run, _, _ = run_season(
-        EulerIntegrator(shuffled), state2, resolver, 1.0, len(_weather())
+        EulerIntegrator(shuffled), state2, resolver, BIO_DT, steps_for(len(_weather()))
     )
     for sid, stock in forward[-1].stocks.items():
         assert stock.amount == reversed_run[-1].stocks[sid].amount

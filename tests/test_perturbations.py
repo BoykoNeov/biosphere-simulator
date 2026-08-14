@@ -74,6 +74,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from domains.biosphere.stocks import ROOTED_DEPTH
 from domains.biosphere.transpiration import soil_water_stress
 from simcore.boundary import BOUNDARY_DOMAIN, loss_sink
@@ -92,17 +93,26 @@ def _weather() -> list[dict[str, float | str]]:
     return json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
 
 
-_YEAR = len(_weather())  # season length in steps (305)
+_YEAR_DAYS = len(_weather())  # season length in DAYS (305)
+_YEAR = steps_for(_YEAR_DAYS)  # ...and in integration steps
 
-# Perturbation windows (integer steps — #14 forcing seam). Lighting + leak target the
-# sealed perennial chamber, so their window stays WITHIN year 1 (the recoverable regime:
-# grain refills before the n=305 reset). Drought is open-field (no reset to starve), so
-# its window is unconstrained — widened so the irrigation cut pushes soil_water clearly
-# across the stress band for an unambiguous f_water dip (a thin graze of the threshold
-# would be fragile).
-_START = 30
-_END = 80  # lighting + leak (within year 1, recoverable)
-_DROUGHT_END = 130  # drought (open field, deeper drawdown)
+# Perturbation windows. ``window_override`` compares against the integer step ``n`` (the
+# #14 forcing seam), so a window is a **step** count — but what each window means is a
+# number of DAYS, and the two stopped coinciding when the step left 1 day (2026-08-14,
+# docs/plans/post-roadmap-step-unfreeze.md). Written in days and converted, so shrinking
+# the step refines these runs instead of silently shortening every window by 1/dt.
+#
+# Lighting + leak target the sealed perennial chamber, so their window stays WITHIN
+# year 1 (the recoverable regime: grain refills before the day-305 reset). Drought is
+# open-field (no reset to starve), so its window is unconstrained — widened so the
+# irrigation cut pushes soil_water clearly across the stress band for an unambiguous
+# f_water dip (a thin graze of the threshold would be fragile).
+_START_DAY = 30
+_END_DAY = 80  # lighting + leak (within year 1, recoverable)
+_DROUGHT_END_DAY = 130  # drought (open field, deeper drawdown)
+_START = steps_for(_START_DAY)
+_END = steps_for(_END_DAY)
+_DROUGHT_END = steps_for(_DROUGHT_END_DAY)
 _K_LEAK = 0.05  # first-order leak rate (k·dt = 0.05 < 1 ⇒ rationed == 0 structural)
 
 # The per-quantity ledger / conservation tol table Step 5 pins (a flat 1e-7 is far too
@@ -201,11 +211,11 @@ def drought() -> tuple[list[State], list[State]]:
     state, registry = build_season(DROUGHT_SCENARIO)
     base_resolver = weather_resolver(weather, DROUGHT_SCENARIO)
     base_states, base_rationed, base_events = run_season(
-        EulerIntegrator(registry), state, base_resolver, 1.0, _YEAR
+        EulerIntegrator(registry), state, base_resolver, BIO_DT, _YEAR
     )
     drought_resolver = with_drought(base_resolver, start=_START, end=_DROUGHT_END)
     drought_states, drought_rationed, drought_events = run_season(
-        EulerIntegrator(registry), state, drought_resolver, 1.0, _YEAR
+        EulerIntegrator(registry), state, drought_resolver, BIO_DT, _YEAR
     )
     assert base_rationed == 0 and drought_rationed == 0
     assert base_events == () and drought_events == ()
@@ -258,7 +268,7 @@ def test_drought_conserves_and_is_deterministic(
     resolver = with_drought(
         weather_resolver(_weather(), DROUGHT_SCENARIO), start=_START, end=_DROUGHT_END
     )
-    rerun, _, _ = run_season(EulerIntegrator(registry), state, resolver, 1.0, _YEAR)
+    rerun, _, _ = run_season(EulerIntegrator(registry), state, resolver, BIO_DT, _YEAR)
     assert rerun[-1] == drought_states[-1]
 
 
@@ -270,11 +280,11 @@ def lighting() -> tuple[list[State], list[State], Registry, SourceResolver]:
     state, registry = build_season(PERENNIAL_CHAMBER_SCENARIO)
     base_resolver = weather_resolver(weather, PERENNIAL_CHAMBER_SCENARIO)
     base_states, base_rationed, base_events = run_season(
-        EulerIntegrator(registry), state, base_resolver, 1.0, _YEAR
+        EulerIntegrator(registry), state, base_resolver, BIO_DT, _YEAR
     )
     lf_resolver = with_lighting_failure(base_resolver, start=_START, end=_END)
     lf_states, lf_rationed, lf_events = run_season(
-        EulerIntegrator(registry), state, lf_resolver, 1.0, _YEAR
+        EulerIntegrator(registry), state, lf_resolver, BIO_DT, _YEAR
     )
     assert base_rationed == 0 and lf_rationed == 0
     assert (
@@ -318,7 +328,7 @@ def test_lighting_failure_is_deterministic(
     resolver = with_lighting_failure(
         weather_resolver(_weather(), PERENNIAL_CHAMBER_SCENARIO), start=_START, end=_END
     )
-    rerun, _, _ = run_season(EulerIntegrator(registry), state, resolver, 1.0, _YEAR)
+    rerun, _, _ = run_season(EulerIntegrator(registry), state, resolver, BIO_DT, _YEAR)
     assert rerun[-1] == lf_states[-1]
 
 
@@ -330,7 +340,7 @@ def leak() -> tuple[list[State], list[State], Registry, SourceResolver]:
     state, registry = build_season(PERENNIAL_CHAMBER_SCENARIO)
     base_resolver = weather_resolver(weather, PERENNIAL_CHAMBER_SCENARIO)
     base_states, base_rationed, base_events = run_season(
-        EulerIntegrator(registry), state, base_resolver, 1.0, _YEAR
+        EulerIntegrator(registry), state, base_resolver, BIO_DT, _YEAR
     )
     leak_state, leak_registry, leak_resolver = with_atmospheric_leak(
         state,
@@ -342,7 +352,7 @@ def leak() -> tuple[list[State], list[State], Registry, SourceResolver]:
         end=_END,
     )
     leak_states, leak_rationed, leak_events = run_season(
-        EulerIntegrator(leak_registry), leak_state, leak_resolver, 1.0, _YEAR
+        EulerIntegrator(leak_registry), leak_state, leak_resolver, BIO_DT, _YEAR
     )
     assert base_rationed == 0 and leak_rationed == 0
     assert (
@@ -409,7 +419,7 @@ def test_atmospheric_leak_is_deterministic(
         end=_END,
     )
     rerun, _, _ = run_season(
-        EulerIntegrator(leak_registry), leak_state, leak_resolver, 1.0, _YEAR
+        EulerIntegrator(leak_registry), leak_state, leak_resolver, BIO_DT, _YEAR
     )
     assert rerun[-1] == leak_states[-1]
 
@@ -521,7 +531,9 @@ def test_severe_perturbation_trips_the_reset_seed_bank_guard() -> None:
     weather = _weather() * PERENNIAL_CHAMBER_YEARS
     state, registry = build_season(PERENNIAL_CHAMBER_SCENARIO)
     severe = with_lighting_failure(
-        weather_resolver(weather, PERENNIAL_CHAMBER_SCENARIO), start=10, end=_YEAR
+        weather_resolver(weather, PERENNIAL_CHAMBER_SCENARIO),
+        start=steps_for(10),  # day 10 — the window is a STEP range
+        end=_YEAR,  # already steps
     )
     with pytest.raises(ValueError, match="seed bank too small"):
         run_perennial(
@@ -529,7 +541,8 @@ def test_severe_perturbation_trips_the_reset_seed_bank_guard() -> None:
             state,
             PERENNIAL_CHAMBER_SCENARIO,
             severe,
-            1.0,
+            BIO_DT,
+            # ⚠ already steps — NOT steps_for(2 * _YEAR), which double-converts.
             2 * _YEAR,
             year=_YEAR,
         )

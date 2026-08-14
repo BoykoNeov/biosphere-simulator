@@ -51,6 +51,7 @@ from domains.biosphere.season import (
     run_perennial,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -63,14 +64,18 @@ def _weather() -> list[dict[str, float | str]]:
     return json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
 
 
-_YEAR = len(_weather())  # season length in steps (the tiling + reset period)
+_YEAR_DAYS = len(_weather())  # season length in DAYS (the weather table's row count)
+# ...and in integration steps. ⚠ Every use of ``_YEAR`` below indexes the STEP-indexed
+# trajectory (``states[y * _YEAR]``, the per-year segment slices), so it is the step
+# count that is wanted. The two coincide only while the step is a day.
+_YEAR = steps_for(_YEAR_DAYS)
 _PHENO = load_phenology_params()
 
 
 def _run_canonical() -> tuple[list[State], int, tuple]:
     """Run the canonical perennial multi-year season (the single source of truth)."""
     weather = _weather() * PERENNIAL_CHAMBER_YEARS
-    steps = len(weather)
+    days = len(weather)
     state, registry = build_season(PERENNIAL_CHAMBER_SCENARIO)
     resolver = weather_resolver(weather, PERENNIAL_CHAMBER_SCENARIO)
     return run_perennial(
@@ -78,9 +83,9 @@ def _run_canonical() -> tuple[list[State], int, tuple]:
         state,
         PERENNIAL_CHAMBER_SCENARIO,
         resolver,
-        1.0,
-        steps,
-        year=_YEAR,
+        BIO_DT,
+        steps_for(days),
+        year=_YEAR,  # already steps
     )
 
 

@@ -57,6 +57,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
@@ -79,7 +80,7 @@ def _run_canonical(*, k_o2: float | None = None) -> tuple[list[State], int, tupl
     ``_carbon_context``; ``load_microbial_respiration_params`` in ``soil``).
     """
     weather = _weather() * SEALED_CHAMBER_YEARS
-    steps = len(weather)
+    days = len(weather)
     if k_o2 is None:
         state, registry = build_season(SEALED_CHAMBER_SCENARIO)
     else:
@@ -96,7 +97,9 @@ def _run_canonical(*, k_o2: float | None = None) -> tuple[list[State], int, tupl
         ):
             state, registry = build_season(SEALED_CHAMBER_SCENARIO)
     resolver = weather_resolver(weather, SEALED_CHAMBER_SCENARIO)
-    return run_season(EulerIntegrator(registry), state, resolver, 1.0, steps)
+    return run_season(
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(days)
+    )
 
 
 @pytest.fixture(scope="module")

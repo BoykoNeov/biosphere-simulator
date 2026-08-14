@@ -24,6 +24,7 @@ from domains.biosphere.scenario import (
     SeasonScenario,
 )
 from domains.biosphere.season import build_season, run_season, weather_resolver
+from domains.biosphere.step import BIO_DT, steps_for
 from domains.biosphere.stocks import CARBON_POOL, LEAF_C, O2_POOL, STORAGE_C
 from domains.crew.loader import load_crew_params
 from domains.eclss.loader import load_eclss_params
@@ -226,7 +227,11 @@ def test_area_scaling_is_an_EXACT_similarity_transform() -> None:
         w = weather(SEALED_CHAMBER_YEARS)
         state, registry = build_season(scen)
         states, rationed, _ = run_season(
-            EulerIntegrator(registry), state, weather_resolver(w, scen), 1.0, len(w)
+            EulerIntegrator(registry),
+            state,
+            weather_resolver(w, scen),
+            BIO_DT,
+            steps_for(len(w)),
         )
         assert rationed == 0
         return states

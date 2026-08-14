@@ -44,6 +44,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from lab.oracle_match import nrmse
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
@@ -66,7 +67,7 @@ def _season_states() -> list[State]:
     state, registry = build_season()
     resolver = weather_resolver(_weather())
     states, _, _ = run_season(
-        EulerIntegrator(registry), state, resolver, 1.0, len(_weather())
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(len(_weather()))
     )
     return states
 

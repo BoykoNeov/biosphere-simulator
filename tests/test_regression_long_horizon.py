@@ -71,6 +71,7 @@ from domains.biosphere.season import (
     run_perennial,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from golden_platform import windows_golden_only
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
@@ -101,7 +102,7 @@ def _run(scenario: SeasonScenario) -> list[State]:
     "genuinely closed" holds for *these* committed knobs at the decade horizon, not just
     in the abstract.
     """
-    year = len(_weather())
+    year_days = len(_weather())
     weather = _weather() * LONG_HORIZON_YEARS
     state, registry = build_season(scenario)
     states, rationed, events = run_perennial(
@@ -109,9 +110,9 @@ def _run(scenario: SeasonScenario) -> list[State]:
         state,
         scenario,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
-        year=year,
+        BIO_DT,
+        steps_for(len(weather)),
+        year=steps_for(year_days),
     )
     assert rationed == 0, "golden long-horizon run must be well-fed (no arbitration)"
     assert events == (), "golden long-horizon run must be extinction-free"
@@ -159,10 +160,11 @@ def _drift_summary_floats(trajectories: dict[str, list[State]]) -> dict[str, obj
     as the decade probe does, so these are the same numbers ``test_decade_stability.py``
     asserts on — this file just freezes them.
     """
-    year = len(_weather())
-    p_leaf = year_summaries(trajectories["perennial"], year, _peak_leaf)
-    c_leaf = year_summaries(trajectories["consumer"], year, _peak_leaf)
-    c_biomass = year_summaries(trajectories["consumer"], year, _year_end_consumer)
+    # ⚠ ``year_summaries`` slices the STEP-indexed trajectory: its period is in steps.
+    year_steps = steps_for(len(_weather()))
+    p_leaf = year_summaries(trajectories["perennial"], year_steps, _peak_leaf)
+    c_leaf = year_summaries(trajectories["consumer"], year_steps, _peak_leaf)
+    c_biomass = year_summaries(trajectories["consumer"], year_steps, _year_end_consumer)
     return {
         "horizon_years": LONG_HORIZON_YEARS,
         "perennial": {
@@ -251,10 +253,10 @@ def test_drift_summary_golden_loads_back(trajectories) -> None:
     # Recomputes the vectors directly (not via the object-typed summary dict) so the
     # decode is checked against the live engine output.
     parsed = json.loads(DRIFT_SUMMARY_GOLDEN.read_text(encoding="utf-8"))
-    year = len(_weather())
-    p_leaf = year_summaries(trajectories["perennial"], year, _peak_leaf)
-    c_leaf = year_summaries(trajectories["consumer"], year, _peak_leaf)
-    c_bio = year_summaries(trajectories["consumer"], year, _year_end_consumer)
+    year_steps = steps_for(len(_weather()))
+    p_leaf = year_summaries(trajectories["perennial"], year_steps, _peak_leaf)
+    c_leaf = year_summaries(trajectories["consumer"], year_steps, _peak_leaf)
+    c_bio = year_summaries(trajectories["consumer"], year_steps, _year_end_consumer)
     assert parsed["horizon_years"] == LONG_HORIZON_YEARS
     assert [float.fromhex(h) for h in parsed["perennial"]["peak_leaf"]] == p_leaf
     assert [float.fromhex(h) for h in parsed["consumer"]["peak_leaf"]] == c_leaf

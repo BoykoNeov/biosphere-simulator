@@ -54,22 +54,31 @@ assert STEPS_PER_DAY * BIO_DT == 1.0, "BIO_DT and STEPS_PER_DAY disagree"
 assert STEPS_PER_DAY & (STEPS_PER_DAY - 1) == 0, "STEPS_PER_DAY must be a power of two"
 
 
-def steps(days: int) -> int:
+def steps_for(days: int) -> int:
     """Integration steps in ``days`` physical days — the call sites' unit conversion.
 
     Use this anywhere a run length, a reset period or a perturbation window is
-    expressed: ``run_perennial(..., steps=steps(len(weather)),
-    year=steps(len(one_season)))``. The point is that the call reads in **days**, which
-    is what the scenario means, and stays correct when the step moves.
+    expressed: ``run_perennial(..., steps=steps_for(len(weather)),
+    year=steps_for(len(one_season)))``. The point is that the call reads in **days**,
+    which is what the scenario means, and stays correct when the step moves.
+
+    ⚠ **Do not rename this back to ``steps``.** It was ``steps`` for one afternoon on
+    2026-08-14 and the routing pass went red in 57 places: ``steps`` is the most natural
+    local name in this suite (``steps = len(weather)``, ``def _run(..., steps: int =
+    ...)``), so at every such site the local shadowed the import and the call raised
+    ``'int' object is not callable``. The collision was loud *there* because those lines
+    run on every suite pass — but a shadowed call on a rarely-taken branch would not be,
+    so the fix is the un-collidable name, not vigilance.
     """
     return days * STEPS_PER_DAY
 
 
 def day_of(n: int) -> int:
-    """The physical day a step index falls in — the inverse of :func:`steps`.
+    """The physical day a step index falls in — the inverse of :func:`steps_for`.
 
-    For indexing a trajectory by day rather than by step: ``states[steps(d)]`` is the
-    state at the start of day ``d``, and ``day_of(n)`` says which day step ``n`` is in.
+    For indexing a trajectory by day rather than by step: ``states[steps_for(d)]`` is
+    the state at the start of day ``d``, and ``day_of(n)`` says which day step ``n``
+    is in.
     Matches ``season._table``'s ``int(n · dt)`` exactly, by construction.
     """
     return n // STEPS_PER_DAY

@@ -48,6 +48,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.registry import Registry
@@ -66,7 +67,9 @@ def _run_sealed(
 ) -> tuple[list[State], int, tuple]:
     state, registry = build_season(scenario)
     resolver = weather_resolver(_weather(), scenario)
-    return run_season(EulerIntegrator(registry), state, resolver, 1.0, len(_weather()))
+    return run_season(
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(len(_weather()))
+    )
 
 
 def _total_carbon(s: State) -> float:
@@ -343,7 +346,7 @@ def test_sealed_is_flow_registration_order_independent() -> None:
     state, registry = build_season(scenario)
     resolver = weather_resolver(_weather(), scenario)
     forward, _, _ = run_season(
-        EulerIntegrator(registry), state, resolver, 1.0, len(_weather())
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(len(_weather()))
     )
     shuffled = Registry(
         list(reversed(registry.flows)),
@@ -352,7 +355,7 @@ def test_sealed_is_flow_registration_order_independent() -> None:
     )
     state2, _ = build_season(scenario)
     reversed_run, _, _ = run_season(
-        EulerIntegrator(shuffled), state2, resolver, 1.0, len(_weather())
+        EulerIntegrator(shuffled), state2, resolver, BIO_DT, steps_for(len(_weather()))
     )
     for sid, stock in forward[-1].stocks.items():
         assert stock.amount == reversed_run[-1].stocks[sid].amount

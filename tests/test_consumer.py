@@ -77,6 +77,7 @@ from domains.biosphere.season import (
     run_perennial,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.boundary import loss_sink_id
 from simcore.environment import SourceResolver
 from simcore.flow import assert_flow_balanced, per_quantity_residual
@@ -92,7 +93,11 @@ def _weather() -> list[dict[str, float | str]]:
     return json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
 
 
-_YEAR = len(_weather())
+_YEAR_DAYS = len(_weather())  # season length in DAYS (the weather table's row count)
+# ...and in integration steps. ⚠ Every use of ``_YEAR`` below indexes the STEP-indexed
+# trajectory (``states[y * _YEAR]``, the ``i % _YEAR`` re-sow predicate), so it is the
+# step count that is wanted. The two coincide only while the step is a day.
+_YEAR = steps_for(_YEAR_DAYS)
 # A representative within-year-1 growing-season index for the direction-only cascade
 # comparison (mid-season — leaf substantial, the grazed gap clear; the Step-6 @80
 # idiom).
@@ -351,9 +356,9 @@ def _run(scenario):
         state,
         scenario,
         resolver,
-        1.0,
-        len(weather),
-        year=_YEAR,
+        BIO_DT,
+        steps_for(len(weather)),
+        year=_YEAR,  # already steps
     )
     return states, rationed, events, registry, resolver
 

@@ -572,8 +572,11 @@ def _fold_drift_summary(raw: dict) -> dict:
     `is_period_2` classifier — so no segmentation logic lives in Rust.
     """
     from domains.biosphere.drift import is_period_2
+    from domains.biosphere.step import steps_for
 
-    year = raw["season_days"]
+    # ⚠ The Rust series is per-STEP, so the segmentation period is a step count. The
+    # emitted `season_days` is physical days; the two coincide only at `dt = 1`.
+    year = steps_for(raw["season_days"])
     horizon = raw["horizon_years"]
 
     def series(name: str) -> list[float]:

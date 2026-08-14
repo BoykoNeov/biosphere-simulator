@@ -34,6 +34,7 @@ from pathlib import Path
 
 import sim_io
 from domains.biosphere.season import build_season, run_season, weather_resolver
+from domains.biosphere.step import BIO_DT, steps_for
 from golden_platform import windows_golden_only
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
@@ -59,7 +60,11 @@ def _final_state() -> State:
     weather = _weather()
     state, registry = build_season()
     states, rationed, events = run_season(
-        EulerIntegrator(registry), state, weather_resolver(weather), 1.0, len(weather)
+        EulerIntegrator(registry),
+        state,
+        weather_resolver(weather),
+        BIO_DT,
+        steps_for(len(weather)),
     )
     assert rationed == 0, "golden season must be well-fed (no arbitration firing)"
     assert events == (), "golden season must be extinction-free"

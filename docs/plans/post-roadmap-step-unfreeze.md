@@ -44,6 +44,88 @@ Four things are indexed by `n` and each needs a rule:
 | `run_perennial(..., year=)` — the annual reset | `len(weather)`, a step count | scale with the step |
 | `biosphere/perturbations.py:window_override` | `start <= n < end` | scale with the step |
 | `station/perturbations.py` | same | already writes `3 * _SPD` — the house pattern |
+| ⚠ **leg-reconstruction helpers in ~34 test sites** | `resolver.bind(before, 1.0)` / `flow.evaluate(before, bound, 1.0)` | must use the same `dt` the engine used |
+
+⚠ **That last row is a FIFTH class, found while routing on 2026-08-14 and not in the
+original audit.** Several tests re-derive a step's flow legs by hand to check the ledger,
+and they hard-code `dt = 1.0`. At `dt = ¼` a reconstruction at `1.0` disagrees with the
+engine by 4× on every leg. They are **deliberately left for the step flip to expose**: the
+ledger assertions fail loudly and name themselves, which is a better list than one I would
+guess at across 34 sites, and a site that stays green is a site whose `1.0` was a genuine
+unit-test constant rather than a season's step.
+
+### ⚠ The SIXTH class — a period in DAYS used against a STEP index (fix in commit 1)
+
+Found 2026-08-14 while auditing the routing's *arguments*, and **not findable by any test
+at `dt = 1`**: a season length is `len(_weather())` — a **day** count — and it is used to
+slice, modulo or size a **step**-indexed trajectory. Today the two numbers coincide, so
+the whole suite is blind to it by construction.
+
+**This class is more dangerous than the fifth, and must NOT be left for the flip.** The leg
+helpers hard-code a literal and fail loudly naming themselves. A re-sow period four times
+too short instead produces a *plausible* run — a crop re-sown quarterly, a 60-entry
+"per-year" summary vector where the golden holds 15 — that a loose assertion can still
+pass. It would then be regenerated into a golden and become the frozen reference. That is
+precisely the failure the two-commit split exists to prevent, so it is fixed **here**,
+where it is provably inert.
+
+⚠ **The first enumeration keyed on the NAME (`year`, `_YEAR`, `year_steps`) and was
+incomplete** — it cannot see a day count called anything else. Re-run **by use site**,
+name-blind, before trusting any inventory:
+
+```
+rg -nE "states?\[[^]]*[*%][^]]*\]" tests/ src/     # arithmetic trajectory subscripts
+rg -nE "\b[nikdy]\s*%\s*" tests/ src/              # modulo against a counter
+rg -nE "(_DAYS|_days|len\(_?[Ww]eather)" tests/ src/   # every day-ish constant
+```
+
+That is what surfaced `test_regression_sealed_station.py:132` and the cross-port fold,
+neither of which contains the string `year` as a name.
+
+⚠ **The name-blind greps were still not enough, and the reason is worth keeping.** A
+*third* pass — enumerating **callers of the function** rather than occurrences of a name —
+found `tests/test_senescence_form.py`, which the first two passes both missed: its constant
+is called `year_len`, matching neither `_YEAR` nor `year = len(`, and one of its three uses
+**inlines `len(_weather())` directly into the call** with no local to grep for at all. The
+rule that actually works: for a unit bug, enumerate **every call site of the function whose
+parameter carries the unit** (`rg "year_summaries\("`), then read each argument. A name can
+be anything; the callee cannot.
+
+| # | class | sites | fix |
+|---|---|---|---|
+| A | `year_summaries(states, Y, …)` on a **biosphere** trajectory | `test_decade_stability` ×9, `test_regression_long_horizon` ×6, `test_stem_reserves` ×3, `test_senescence_form` ×3 (found only on the third pass) | `steps_for(Y)` |
+| B | `n % Y == 0` in a hand-rolled reset closure | `test_soil_fractionation:529`, `test_stem_reserves:526` | `steps_for(Y)` |
+| C | `i % Y == 0` over a trajectory index | `test_consumer:500,534`, `test_compartment_ledger:132` | `steps_for(Y)` |
+| D | trajectory slicing `states[y*Y …]` | `test_perennial_chamber` ×5, `test_consumer:442`, `test_soil_layers` ×3, `test_compartment_ledger:213` | `steps_for(Y)` |
+| E | conservation ceiling `N · BALANCE_ATOL` | `test_biosphere_stress:130`, `test_decade_stability:96` | `steps_for(Y)·years` — the bound is genuinely per-step, so it *should* grow 4× |
+| F | the cross-port fold segmenting a Rust per-step series | `tests/crossport/test_crossport.py:576` | `steps_for(raw["season_days"])` |
+
+**⚠ Sites that look identical and must NOT be converted** — the distinction is real and
+worth stating, because converting them would be the same bug pointing the other way:
+
+* **`run_master_day` returns one state per master DAY** (`driver.py`: `states.append`
+  is outside the sub-step loop). So the station trajectory is **day-indexed** while the
+  biosphere `run_season` trajectory is **step-indexed**. `test_sealed_station_landmine:156`,
+  `test_sealed_station_stability:264` and `test_regression_sealed_station:132` index it with
+  `season_days` and are **correct as written**. ⚠ This is a **design constraint on ceremony
+  item 1**: when `slow_steps_per_day` lands, `states` must stay one entry per master day, or
+  those three tests and the sealed-station goldens change *shape*.
+* Every `_STEPS = <X>_DAYS * scenario.steps_per_day` in the power / crew / thermal tests —
+  that is the **fast** domains' own steps-per-day, which `BIO_DT` does not touch.
+* `test_soil_fractionation:1523-1524` (`assert 807 % year_steps == 197`, `502 % … == 197`)
+  are **measurement pins, not unit conversions.** Wrapping them would make them false at
+  `dt = ¼` for a reason unrelated to the science. Left alone and marked expected-red for
+  commit 2, which re-measures them.
+
+**Fixed by hand, file by file — deliberately NOT by a second rewriter.** A day count used
+as a step count is *syntactically identical* to a correct step count, so no regex can
+discriminate; and the first rewriter's failure mode was to fail open on a name collision
+and hide exactly the sites that then went red. A script that gets 28 of 30 right and
+silently wrong-converts 2 would cost commit 2 its attributability.
+
+**⚠ `dt = 1` green does not verify this class** — it only proves inertness, which is not
+the property in question. The discriminating check is a throwaway run with the constants
+flipped locally (see §5 item 0).
 
 **The chosen design:** `_table` indexes **physical time** —
 `values[min(int(n * dt), last)]`. At `dt = 1.0` that is `values[min(n, last)]`
@@ -58,6 +140,27 @@ than step counts.
 `_table` moves to physical-time indexing, the helper lands, the call sites are routed through
 it, the perturbation windows are expressed in days. The step itself does **not** move. The
 exit criterion is that the full suite passes with **no golden regenerated**.
+
+⚠ **The routing pass went red on 2026-08-14, and the cause was the helper's NAME.** The
+helper was first called `steps`, which is the most natural local name in this suite
+(`steps = len(weather)`, `def _run(..., steps: int = ...)`). At every such site the local
+shadowed the import and the call raised `'int' object is not callable` — **31 errors + 26
+failures, all one cause.** Renamed to `steps_for`; the ~30 locals were left alone, because
+renaming *them* would be churn that leaves the same trap armed for the next test written.
+Two things came out of it worth keeping:
+
+* The collision was **loud here only because those lines run on every pass.** A shadowed
+  call on a rarely-taken branch fails just as silently as any other name error waiting for
+  its branch. The fix is the un-collidable name, not vigilance — recorded in `step.py`'s
+  docstring so it is not "simplified" back.
+* The routing script had **failed open on exactly this**: in the four files with a local
+  `steps`, it saw the name already bound and skipped adding the import, so those files
+  called a helper they never imported. A tool that resolves a name collision by declining
+  to import is not being careful, it is hiding the collision — and the four sites it hid
+  were the four the suite then failed on.
+* Chasing it surfaced a real naming lie: those locals were `len(weather)`, a **day** count
+  called `steps`. Renamed to `days`, and a stale `# season length in steps` comment
+  corrected to days. That conflation is the whole reason this commit exists.
 
 ⚠ **Commit 1 is a FORM change that moves nothing in the manifest** — the `WSFD` shape that
 `docs/biosphere-reference.md` calls out explicitly as *the unfreeze nothing catches*. Both
@@ -107,7 +210,46 @@ From the sweep (`docs/plans/post-roadmap-step-sweep.md` §1–2), at Euler `dt =
 **Anything outside this table is a finding, not a nuisance.** In particular `rationed` and
 `events` are *assertions*, not predictions: if either moves, stop.
 
+⚠ **This table predicts VALUES; the sixth class would move SHAPES.**
+`tests/regression/golden/drift_summary.json` holds 15-element arrays for a 15-year horizon
+(`perennial.peak_leaf`, `consumer.peak_leaf`, `consumer.consumer_carbon`). An unconverted
+`year_summaries` caller at `dt = ¼` returns `(len(states)-1) // days` = **60** entries, each
+covering a quarter-year, and `is_period_2` may well still classify the 4×-resampled cycle.
+So: **every array length in every regenerated golden stays identical, and `horizon_years`
+stays 15.** A length change is not a value moving — it is a missed conversion.
+
 ## 5. The rest of the ceremony, in order
+
+0. ✅ **The discriminating check — RUN 2026-08-14, PASSED.** `BIO_DT`/`STEPS_PER_DAY` were
+   flipped locally and **uncommitted**, the affected files run, and the failures read for
+   *kind* rather than count. Then the constants were reverted and commit 1 landed clean.
+   This is the check the whole sixth-class fix rests on: commit 1's "provably inert"
+   claim is true and *uninformative*, because inert at the old step is not the property
+   the sixth class needs — *correct in the new unit* is, and no `dt = 1` run can show it.
+
+   **What was measured at `dt = ¼`:**
+   * A 3-year perennial run gives **3661 states** (= 3·305·4 + 1) and `year_summaries`
+     returns **3 entries, not 12** — the segmentation still means a year. `rationed = 0`,
+     `events = ()`.
+   * `test_perennial_chamber.py` passes **in full**, including the re-sow timing pins
+     (`dvs(states[y·YEAR]) ≈ 2.0` pre-reset, `< 0.1` one step after) — the annual reset
+     fires **once** per year at the right step, which is the failure this class existed
+     to prevent.
+   * Across the affected files the **only** failures were the two expected kinds:
+     the deferred **fifth class** (`test_compartment_ledger` /`test_consumer`
+     `..._ledger_balances_every_step` — a leg reconstructed at `1.0` against a `0.25`
+     engine step, residual 5.4e-3 vs a 1e-12 tolerance, failing loudly and naming
+     itself), and **value pins moving in the predicted direction**.
+   * ⚠ **A §4 prediction was hit on the nose**: the perennial decade CO₂ trough pin moved
+     `0.0559766 → 0.0754757`, i.e. 55.98 → 75.48 ppm against a predicted ~75.5.
+   * **Zero shape failures and zero unit failures.** No summaries vector was 4× long; no
+     reset fired quarterly.
+
+   ⚠ **A commit-2 finding, recorded now so it is not mistaken for a regression later:**
+   `test_decade_stability.py::test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply`
+   fails at `¼`. That is the *point* of the unfreeze — the CO₂ floor stops being reached —
+   so it is a science finding to be argued past in writing during commit 2, not a pin to
+   re-tune. Two sibling decade pins move with it.
 
 1. ⚠ **`run_master_day`** must take `STEPS_PER_DAY` slow substeps per master day
    (`src/station/driver.py`) — engine code, and the cost Step 0 found that the direction

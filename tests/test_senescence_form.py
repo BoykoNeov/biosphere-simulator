@@ -140,6 +140,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -440,11 +441,11 @@ def _run(
             state,
             scenario,
             resolver,
-            1.0,
-            len(w),
-            year=len(_weather()),
+            BIO_DT,
+            steps_for(len(w)),
+            year=steps_for(len(_weather())),
         )
-    return run_season(integrator(registry), state, resolver, 1.0, len(w))
+    return run_season(integrator(registry), state, resolver, BIO_DT, steps_for(len(w)))
 
 
 def _without_reserve(scenario):
@@ -1558,7 +1559,8 @@ def test_stem_only_NO_LONGER_collapses_the_decade_co2_attractor_below_its_floor(
     ``is_stationary`` is documented to be blind to. Both halves are asserted, so a
     future change that swapped which guard fires would go red.
     """
-    year_len = len(_weather())
+    # ⚠ In STEPS: ``year_summaries`` segments the STEP-indexed trajectory.
+    year_len = steps_for(len(_weather()))
     out = {}
     for label, kw in (("frozen", {}), ("stem0", {"stem_zero": True})):
         states, _r, _ = _run(
@@ -1904,7 +1906,8 @@ def _reprice_series(years: int, stem_zero: bool):
     states, rationed, _ = _run(
         sc.PERENNIAL_CHAMBER_SCENARIO, years, resets=True, stem_zero=stem_zero
     )
-    year_len = len(_weather())
+    # ⚠ In STEPS: ``year_summaries`` segments the STEP-indexed trajectory.
+    year_len = steps_for(len(_weather()))
     return (
         year_summaries(states, year_len, _co2_min_of),
         year_summaries(states, year_len, _peak_leaf_of),
@@ -2034,7 +2037,7 @@ def test_the_ONE_REMAINING_stem_only_guard_is_not_a_horizon_question() -> None:
     )
     off = year_summaries(
         off_states,
-        len(_weather()),
+        steps_for(len(_weather())),  # STEPS: segments a step-indexed trajectory
         lambda seg: min(s.stocks[CARBON_POOL].amount for s in seg),
     )
     assert non_collapsing(off, floor=_DECADE_CO2_FLOOR) is False

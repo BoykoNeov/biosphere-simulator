@@ -47,6 +47,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
@@ -115,10 +116,18 @@ def _run(scenario: SeasonScenario, years: int, driver: str) -> list[State]:
     integ = EulerIntegrator(registry)
     if driver == "perennial":
         states, rationed, _ = run_perennial(
-            integ, state, scenario, resolver, 1.0, len(weather), year=len(_weather())
+            integ,
+            state,
+            scenario,
+            resolver,
+            BIO_DT,
+            steps_for(len(weather)),
+            year=steps_for(len(_weather())),
         )
     else:
-        states, rationed, _ = run_season(integ, state, resolver, 1.0, len(weather))
+        states, rationed, _ = run_season(
+            integ, state, resolver, BIO_DT, steps_for(len(weather))
+        )
     assert rationed == 0, "the census is only meaningful on a non-rationing run"
     return states
 

@@ -133,6 +133,7 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.stem_reserves import StemRemobilization
+from domains.biosphere.step import BIO_DT, steps_for
 from domains.biosphere.stocks import pool_stock
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
@@ -201,7 +202,11 @@ def _weather(years: int = 1) -> list[dict[str, float | str]]:
     return json.loads(_WEATHER.read_text(encoding="utf-8"))["weather"] * years
 
 
-_YEAR = len(_weather())
+_YEAR_DAYS = len(_weather())  # season length in DAYS (the weather table's row count)
+# ...and in integration steps. ⚠ Every use of ``_YEAR`` below is against a STEP index
+# (the ``n % _YEAR`` re-sow predicate, ``year_summaries``' trajectory segmentation), so
+# it is the step count that is wanted. The two coincide only while the step is a day.
+_YEAR = steps_for(_YEAR_DAYS)
 
 
 def _bits(x: float) -> int:
@@ -530,8 +535,8 @@ def _run(
         integrator(registry),
         state,
         resolver,
-        1.0,
-        len(w),
+        BIO_DT,
+        steps_for(len(w)),
         reset=reset if resets else None,
     )
 

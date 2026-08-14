@@ -80,6 +80,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.environment import SourceResolver
 from simcore.ids import FlowId
 from simcore.integrator import EulerIntegrator
@@ -184,8 +185,8 @@ def _open_season_peak_w() -> float:
         EulerIntegrator(registry),
         state,
         weather_resolver(_weather(), scenario),
-        1.0,
-        len(_weather()),
+        BIO_DT,
+        steps_for(len(_weather())),
     )
     assert rationed == 0
     return max(
@@ -269,8 +270,8 @@ def test_only_open_season_enters_the_declining_branch() -> None:
             EulerIntegrator(registry),
             state,
             weather_resolver(weather, scenario),
-            1.0,
-            len(weather),
+            BIO_DT,
+            steps_for(len(weather)),
         )
         peak_w = max(
             _t_per_ha(
@@ -301,8 +302,8 @@ def test_shed_nitrogen_uses_the_same_carbon_flux_as_the_senescence_flow() -> Non
         EulerIntegrator(registry),
         state,
         weather_resolver(weather, scenario),
-        1.0,
-        60,
+        BIO_DT,
+        steps_for(60),
     )
     nitro = load_nitrogen_params()
     sen_flow = Senescence(
@@ -378,13 +379,13 @@ def _litter_rows(
             state,
             scenario,
             resolver,
-            1.0,
-            len(weather),
-            year=len(season),
+            BIO_DT,
+            steps_for(len(weather)),
+            year=steps_for(len(season)),
         )
     else:
         states, rationed, _ = run_season(
-            EulerIntegrator(registry), state, resolver, 1.0, len(weather)
+            EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(len(weather))
         )
     assert rationed == 0
     return [(s.stocks[LITTER_N].amount, s.stocks[LITTER_CARBON].amount) for s in states]
@@ -659,8 +660,8 @@ def test_nitrogen_is_conserved_across_the_annual_reset() -> None:
         EulerIntegrator(registry),
         state,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
+        BIO_DT,
+        steps_for(len(weather)),
     )
     assert rationed == 0
 

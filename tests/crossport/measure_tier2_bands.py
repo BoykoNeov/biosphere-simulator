@@ -182,6 +182,7 @@ BIOSPHERE_TIER2_KEYS = (
 
 def _biosphere_perennial_final(scenario, years: int) -> list[float]:
     from domains.biosphere.season import build_season, run_perennial, weather_resolver
+    from domains.biosphere.step import BIO_DT, steps_for
 
     weather = _weather() * years
     state, registry = build_season(scenario)
@@ -190,9 +191,9 @@ def _biosphere_perennial_final(scenario, years: int) -> list[float]:
         state,
         scenario,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
-        year=len(_weather()),
+        BIO_DT,
+        steps_for(len(weather)),
+        year=steps_for(len(_weather())),
     )
     return _amounts(states[-1])
 

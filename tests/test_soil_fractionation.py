@@ -73,6 +73,7 @@ from domains.biosphere.season import (
     run_season,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from domains.biosphere.stocks import (
     O2_POOL,
     ROOTED_DEPTH,
@@ -501,20 +502,24 @@ def drive(
     fractionate: bool,
     rdr_stem_zero: bool = False,
     hum_seed: float = 0.0,
-    steps: int | None = None,
+    days: int | None = None,
 ) -> tuple[list[State], int]:
     """Run `scenario` the way its own golden drives it. `run_season` asserts
     conservation
     across the reset, which is what makes a re-sow failure real starvation.
 
-    `steps` truncates the run below the whole-year count `years` implies. It exists for
+    `days` truncates the run below the whole-year count `years` implies. It exists for
     ONE purpose: on a deterministic run the smallest horizon that rations *is* the
     firing step, so truncation is how one gets MEASURED instead of read off the CO2
     argmin (which the (C) stem-only branch recorded as circular). Leave it None and the
     run is exactly `years` years.
+
+    ⚠ It is in **physical days** (it was called `steps` until 2026-08-14, when the step
+    stopped being a day) — the conversion to steps happens once, below.
     """
     rows = _weather() * years
-    year_steps = len(_weather())
+    # ⚠ In STEPS: compared against the step counter `n` in the reset closure below.
+    year_steps = steps_for(len(_weather()))
     state, registry = build_variant(
         scenario,
         total_seed=total_seed,
@@ -533,8 +538,8 @@ def drive(
         EulerIntegrator(registry),
         state,
         resolver,
-        1.0,
-        len(rows) if steps is None else steps,
+        BIO_DT,
+        steps_for(len(rows) if days is None else days),
         reset=reset if perennial else None,
     )
     # The option-(B) probe guard: a dropped aux freezes thermal_time and every
@@ -1039,9 +1044,11 @@ def test_peak_litter_n_names_a_DIFFERENT_EVENT_in_a_reset_driven_chamber() -> No
     )
     litter_n = [s.stocks[LITTER_N].amount for s in states]
     peak = max(range(len(litter_n)), key=lambda i: litter_n[i])
-    year_steps = len(_weather())
+    # ⚠ Both operands in STEPS: `peak` is an index into the step-indexed trajectory, and
+    # the tolerance is the PHYSICAL "within two days of the boundary" the claim means.
+    year_steps = steps_for(len(_weather()))
     # The peak lands just past a year boundary — it IS the dump, not the season.
-    assert peak % year_steps <= 2
+    assert peak % year_steps <= steps_for(2)
     carbon = (
         states[peak].stocks[LITTER_CARBON].amount
         + states[peak].stocks[LITTER_RPM].amount
@@ -1068,7 +1075,9 @@ def test_the_split_re_targets_the_litter_leg_without_re_scaling_it() -> None:
     sen_params = load_senescence_params()
     rows = _weather()
     resolver = weather_resolver(rows, scenario)
-    states, _, _ = run_season(EulerIntegrator(registry), state, resolver, 1.0, 300)
+    states, _, _ = run_season(
+        EulerIntegrator(registry), state, resolver, BIO_DT, steps_for(300)
+    )
     sampled = 0
     for s in states[::10]:
         env = resolver.bind(s, 1.0)
@@ -1481,16 +1490,19 @@ def test_the_flux_sizing_fires_on_the_SAME_season_day_as_stem_only() -> None:
     word that separates a within-season failure from the beyond-horizon tiling artefact
     the decomposer calibration documents.
     """
-    year_steps = len(_weather())
+    # ⚠ In DAYS, and correctly so — every use below is a physical-time quantity: `drive`
+    # takes a day count, and the two arithmetic pins at the end are day measurements.
+    # (Named `year_steps` until 2026-08-14; the name was the lie, not the value.)
+    year_days = len(_weather())
 
-    def rations_within(steps: int) -> bool:
+    def rations_within(days: int) -> bool:
         _, rationed = drive(
             PERENNIAL_CHAMBER_SCENARIO,
             3,
             perennial=True,
             total_seed=19.4093,
             fractionate=True,
-            steps=steps,
+            days=days,
         )
         return rationed > 0
 
@@ -1513,12 +1525,15 @@ def test_the_flux_sizing_fires_on_the_SAME_season_day_as_stem_only() -> None:
             fractionate=True,
         )
         assert rationed == 0, f"{years} yr — sizing 2 rationed again; see the note"
-    assert not rations_within(3 * year_steps)
+    assert not rations_within(3 * year_days)
     # The day the OLD firing landed on, kept as arithmetic so the coincidence it was
     # recorded for survives the measurement that no longer reproduces: 807 % 305 == 197,
     # the same within-season day stem-only fired on (502 % 305 == 197).
-    assert 807 % year_steps == 197
-    assert 502 % year_steps == 197
+    # ⚠ These are MEASUREMENTS in days, not unit conversions — deliberately NOT wrapped
+    # in `steps_for`. 807 and 502 are day numbers recorded off a `dt = 1` run; wrapping
+    # `year_days` here would make them false for a reason unrelated to the science.
+    assert 807 % year_days == 197
+    assert 502 % year_days == 197
 
 
 @pytest.mark.slow

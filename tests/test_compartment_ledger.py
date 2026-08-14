@@ -58,6 +58,7 @@ from domains.biosphere.season import (
     run_perennial,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.boundary import BOUNDARY_DOMAIN, loss_sink
 from simcore.environment import Environment, SourceResolver
 from simcore.events import ExtinctionEvent
@@ -92,9 +93,12 @@ def perennial() -> tuple:
     under Euler + ``rationed == 0`` one ``evaluate`` at the (reset-aware) start-of-step
     state equals the applied legs. Module-scoped so the multi-year run executes once.
     """
-    year = len(_weather())
+    # ⚠ In STEPS. It is handed to ``run_perennial`` as the reset period (compared
+    # against the step counter ``n``) and returned to the tests, which use it to slice
+    # the step-indexed trajectory. The weather tiling below is the one part in days.
+    year = steps_for(len(_weather()))
     weather = _weather() * PERENNIAL_CHAMBER_YEARS
-    steps = len(weather)
+    days = len(weather)
     state, registry = build_season(PERENNIAL_CHAMBER_SCENARIO)
     resolver = weather_resolver(weather, PERENNIAL_CHAMBER_SCENARIO)
     states, rationed, events = run_perennial(
@@ -102,9 +106,9 @@ def perennial() -> tuple:
         state,
         PERENNIAL_CHAMBER_SCENARIO,
         resolver,
-        1.0,
-        steps,
-        year=year,
+        BIO_DT,
+        steps_for(days),
+        year=year,  # already steps
     )
     return (
         states,

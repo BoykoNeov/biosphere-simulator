@@ -74,6 +74,7 @@ from domains.biosphere.season import (
     run_perennial,
     weather_resolver,
 )
+from domains.biosphere.step import BIO_DT, steps_for
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.quantities import BALANCE_ATOL, Quantity
@@ -87,7 +88,11 @@ def _weather() -> list[dict[str, float | str]]:
     return json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
 
 
-_YEAR = len(_weather())  # season length in steps (the tiling + reset period, ~305)
+_YEAR_DAYS = len(_weather())  # season length in DAYS (the tiling + reset period, ~305)
+# ...and in integration steps. ⚠ The two are separate names deliberately: the weather
+# table is one row per DAY, while ``year_summaries`` and the reset period index the
+# STEP-indexed trajectory. They coincide only while the step is a day.
+_YEAR = steps_for(_YEAR_DAYS)
 # The budgeted 15-yr working horizon (>= the decade-scale 10-yr target), shared as the
 # single source of truth with the long-horizon golden + the freeze manifest
 # (scenario.py).
@@ -107,9 +112,9 @@ def _run(scenario, integrator_cls) -> tuple[list[State], int, tuple]:
         state,
         scenario,
         resolver,
-        1.0,
-        len(weather),
-        year=_YEAR,
+        BIO_DT,
+        steps_for(len(weather)),
+        year=_YEAR,  # already steps
     )
 
 
@@ -458,9 +463,9 @@ def test_the_perennial_decline_has_a_floor_beyond_the_frozen_horizon() -> None:
         state,
         PERENNIAL_CHAMBER_SCENARIO,
         resolver,
-        1.0,
-        len(weather),
-        year=_YEAR,
+        BIO_DT,
+        steps_for(len(weather)),
+        year=_YEAR,  # already steps
     )
     assert rationed == 0 and events == ()  # closure holds the whole way there
     summaries = year_summaries(states, _YEAR, _peak_leaf)
@@ -510,9 +515,9 @@ def test_the_chamber_co2_trough_has_an_attractor_beyond_the_frozen_horizon() -> 
         state,
         PERENNIAL_CHAMBER_SCENARIO,
         resolver,
-        1.0,
-        len(weather),
-        year=_YEAR,
+        BIO_DT,
+        steps_for(len(weather)),
+        year=_YEAR,  # already steps
     )
     assert rationed == 0 and events == ()
     summaries = year_summaries(states, _YEAR, _min_carbon_pool)
@@ -589,9 +594,9 @@ def test_the_co2_floor_fires_on_the_buffer_not_on_the_carbon_supply() -> None:
             state,
             scenario,
             resolver,
-            1.0,
-            len(weather),
-            year=_YEAR,
+            BIO_DT,
+            steps_for(len(weather)),
+            year=_YEAR,  # already steps
         )
         summaries = year_summaries(states, _YEAR, _min_carbon_pool)
         scale = max(summaries)

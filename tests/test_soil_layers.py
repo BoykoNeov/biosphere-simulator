@@ -45,6 +45,7 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.soil_layers import WATER_DENSITY, RootZoneCapture, captured_water
+from domains.biosphere.step import BIO_DT, steps_for
 from domains.biosphere.stocks import ROOTED_DEPTH, SUBSOIL_WATER
 from simcore.integrator import EulerIntegrator
 from simcore.registry import Registry
@@ -64,8 +65,8 @@ def _run(scenario: SeasonScenario = DEFAULT_SCENARIO, years: int = 1) -> list[St
         EulerIntegrator(registry),
         state,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
+        BIO_DT,
+        steps_for(len(weather)),
     )
     assert rationed == 0, "the capture must never need the arbitration backstop"
     assert events == ()
@@ -296,13 +297,15 @@ def test_the_resow_returns_the_abandoned_zones_water_so_there_is_no_ratchet() ->
         state,
         scenario,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
-        year=len(_WEATHER),
+        BIO_DT,
+        steps_for(len(weather)),
+        year=steps_for(len(_WEATHER)),
     )
     assert rationed == 0
     # The subsoil at the same point in each cycle (just after the re-sow refills it).
-    year = len(_WEATHER)
+    # ⚠ In STEPS: it indexes the step-indexed trajectory, and the ``+ 1`` below means
+    # "one integration step after the reset", not "one day after".
+    year = steps_for(len(_WEATHER))
     at_cycle_start = [
         states[i * year + 1].stocks[SUBSOIL_WATER].amount for i in (1, 2, 3, 4)
     ]
@@ -384,8 +387,8 @@ def _run_without_capture(scenario: SeasonScenario) -> list[State]:
         EulerIntegrator(trimmed),
         state,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
+        BIO_DT,
+        steps_for(len(weather)),
     )
     assert rationed == 0
     assert events == ()

@@ -33,6 +33,7 @@ from domains.biosphere.root_depth import (
 )
 from domains.biosphere.scenario import DEFAULT_SCENARIO, SeasonScenario
 from domains.biosphere.season import build_season, run_season, weather_resolver
+from domains.biosphere.step import BIO_DT, steps_for
 from domains.biosphere.stocks import (
     PLANT_N,
     ROOTED_DEPTH,
@@ -60,8 +61,8 @@ def _run(scenario: SeasonScenario = DEFAULT_SCENARIO, years: int = 1):
         EulerIntegrator(registry),
         state,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
+        BIO_DT,
+        steps_for(len(weather)),
     )
 
 
@@ -232,9 +233,9 @@ def test_a_resown_crop_starts_with_the_sowing_root_system() -> None:
         state,
         scenario,
         weather_resolver(weather, scenario),
-        1.0,
-        len(weather),
-        year=len(_WEATHER),
+        BIO_DT,
+        steps_for(len(weather)),
+        year=steps_for(len(_WEATHER)),
     )
     depths = [s.aux[ROOTED_DEPTH] for s in states]
     drops = [
