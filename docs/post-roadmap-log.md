@@ -163,3 +163,4 @@ with why the table could not stay: 255,567 bytes in 32 physical lines defeats `G
 | **CO₂ enrichment** — the shipped step crosses the compensation point | [the record](log/co2-enrichment-margin.md) |
 | **The CO₂ setpoint controller, priced** (the direction plan's Step 0, axis 2) | [the record](log/co2-controller.md) |
 | **The step sweep** (the direction plan's Step 0, axis 1 — the last input to the step decision) | [the record](log/step-sweep.md) |
+| **The step unfreeze** — `dt = 1` → `dt = ¼` (the sweep's decision, taken; the unit was the work, not the step) | [the record](log/step-unfreeze.md) |
