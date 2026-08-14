@@ -257,6 +257,51 @@ had not. All corrected, prose only. `drift.py`'s provenance block keeps its `dt 
 historical record of how those bounds were derived, now saying so explicitly and noting that
 the bounds were **re-run and not re-derived**.
 
+### ⚠⚠ THE CEREMONY IS NOT FINISHED: 29 tests in 13 files are still red
+
+**Measured 2026-08-14 by running the whole suite, which this batch had not done.** The
+re-pinning was driven from a red list that named **8** pre-existing failures. The true figure
+was **37**: those 8 (all now green — 4 were the BOM, 4 were the missing index line) plus
+**29 more in 13 files nobody had run.** Established the right way this time — the same 29
+tests, **by name**, fail at the commit *before* this session's work as well, so they are
+neither caused nor fixed by it:
+
+    6  tests/test_oracle_gap_spring_wheat.py     2  tests/test_harvest_run.py
+    6  tests/test_oracle_gap.py                  2  tests/test_crew_coupled_loop.py
+    4  tests/test_potato_crop.py                 1  each: test_sealed_chamber,
+    2  tests/test_perturbations.py                  test_oracle_smoke, test_nitrogen_throttle,
+                                                    test_day_neutral_warm_habitat,
+                                                    test_consumer, test_compartment_ledger,
+                                                    test_chamber_scale
+
+**They are this ceremony's own seven classes, in files the sweep never reached.** Three
+samples, one per kind:
+
+* **The fifth class (the compartment ledger), unfixed outside `test_water_cycle.py`.**
+  `test_consumer.py::test_per_compartment_ledger_balances_every_step` reads
+  `crossing_in = 0.01504` against `stored_delta = 0.00185` and calls a conserved step a leak,
+  because the ledger rebuilds each step's legs at a literal `1.0`. `0bf224e` diagnosed exactly
+  this and fixed the one file it appeared in.
+* **The sixth class (a hand-rolled driver loop).**
+  `test_harvest_run.py::test_registration_order_independence` raises
+  `ValueError: slow_dt*slow_steps_per_day must equal one day (1.0), got 0.25*1 = 0.25` — it
+  calls `run_master_day` with the default `slow_steps_per_day=1`. ⚠ **That is the new guard
+  working**, which is the good news inside the bad: the ceremony added the guard and did not
+  run the tests it catches.
+* **Value pins and oracle comparisons.** `test_chamber_scale.py` reads 16.813 against a pinned
+  16.613; `test_oracle_smoke.py::test_development_completes_for_both` has DVS at 0.0073 against
+  a required 1.9, which is not a re-pin but a run that develops almost not at all.
+
+⚠ **The generalisable failure is the accounting, not the physics.** Five commits of this batch
+worked from a red list produced by running *the files being edited*, and each handoff passed
+the same 8-failure figure forward. **A batch that has moved a shipped constant owes the whole
+suite a run before it calls anything pre-existing** — the subset is the thing least able to
+tell you what you broke. See also the BOM and the missing index line above: all three defects
+have the shape *"checked something narrower than the claim, then stated the claim"*.
+
+**Not started here, deliberately.** It is a second batch of the same size as this one, and
+scoping it is the user's call.
+
 ### Open, and deliberately not closed here
 
 * ~~⚠ **`step.py`'s convergence sequence and RK4 limit are STALE** — measured on a tree that
