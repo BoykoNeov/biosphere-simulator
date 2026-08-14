@@ -25,7 +25,8 @@ weather-driven (reused from the winter-wheat fixture — the greenhouse preceden
 fully controlled-environment chamber is a deferred refinement.
 
 **The lamp's daily-average draw (a consequence of the frozen-``n`` fast domain).** Under
-the two-rate driver the biosphere lumps once per day and Power sub-steps 24× — but
+the two-rate driver the biosphere lumps ×``STEPS_PER_DAY`` per master day and Power
+sub-steps 24× — but
 ``substep`` **keeps** ``n`` (the day count), so a within-day top-hat (lamp on
 ``photoperiod_hours``, off the rest) is not expressible as an ``n``-schedule. The
 biosphere already carries the photoperiod *internally* via ``daylength_s``; Power only

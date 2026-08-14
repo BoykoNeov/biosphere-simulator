@@ -1,8 +1,9 @@
 """The station's two-rate master-step driver (P6.3+): one slow domain + one fast domain.
 
 The shared stepping harness for every station seam that couples a **day-scale** domain
-(the biosphere: structurally ``dt = 1`` per-day, weather indexed by the integer step
-``n``, a ``thermal_time`` phenology aux that must advance) to a **second-scale** domain
+(the biosphere: ``dt = BIO_DT`` day, ``STEPS_PER_DAY`` sub-steps per master day,
+weather indexed by physical time ``n · dt``, a ``thermal_time`` phenology aux that
+must advance) to a **second-scale** domain
 (the cabin / Power: ``dt = 60`` s / ``dt = 3600`` s, no aux). ``simcore.multirate``
 cannot bridge these — it splits ONE shared master ``dt`` (``dt/n_sub``), and no single
 master ``dt`` serves both *time units*; and it composes ``substep`` only, which by

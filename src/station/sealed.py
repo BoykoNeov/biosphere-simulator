@@ -36,7 +36,8 @@ harvest runs never exercised (sub-seasonal, so ``annual_reset`` never fired).
 is
 ``dt = 60 s`` (ECLSS's binding ``k_scrub·dt < 1``).
 :func:`station.driver.run_master_day`
-does the operator split by hand (slow once/day + fast ×1440), asserting conservation
+does the operator split by hand (slow ×``STEPS_PER_DAY`` + fast ×1440), asserting
+conservation
 after
 **every** fast sub-step over the whole shared ledger. Power runs the **constant daily-
 average** solar/load: under ``substep`` the day count ``n`` is frozen within a day, so
@@ -521,7 +522,8 @@ def run_sealed(
     """The two-rate driver over the multi-year horizon, with the annual re-sow hook.
 
     A thin wrapper over :func:`station.driver.run_master_day` with the biosphere slow
-    (once/day, advancing ``thermal_time`` + ``n``), everything else fast (``substep``
+    (×``STEPS_PER_DAY`` per master day, advancing ``thermal_time`` + ``n``), everything
+    else fast (``substep``
     ×``steps_per_day``, ``n`` kept, conservation asserted after each), and the
     :func:`sealed_reset` closure as ``slow_reset`` (re-sow each season boundary).
     ``states`` holds one entry per day boundary (length ``days + 1``; the golden pins

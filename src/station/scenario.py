@@ -247,13 +247,19 @@ class GreenhouseScenario:
     ``cabin.cabin_co2_0`` are unused here).
 
     **The two-rate driver (see ``station.greenhouse.run_greenhouse``).** The biosphere
-    is structurally ``dt = 1`` day (weather indexed by the step count) and the cabin
-    ``dt = 60 s`` (ECLSS ``k_scrub·dt < 1``) — two different *time units*, which
-    ``simcore.multirate`` (one shared master ``dt``, aux-freezing ``substep``) cannot
-    bridge. So each master step is one day: the cabin sub-steps ``steps_per_day`` times
-    at ``cabin_dt`` (keeping ``n``), then the biosphere takes one ``step_report`` at
-    ``bio_dt`` (advancing phenology aux **and** ``n``, so ``n`` stays the day count and
-    the frozen weather resolver is reused unchanged).
+    is a **day-scale** domain (``dt = BIO_DT`` day, weather indexed by physical time
+    ``n · dt``) and the cabin a second-scale one (``dt = 60 s``, ECLSS
+    ``k_scrub·dt < 1``) — two different *time units*, which ``simcore.multirate`` (one
+    shared master ``dt``, aux-freezing ``substep``) cannot bridge. So each master step
+    is one day: the cabin sub-steps ``steps_per_day`` times at ``cabin_dt`` (keeping
+    ``n``), and the biosphere takes ``bio_steps_per_day`` ``step_report`` calls at
+    ``bio_dt`` (advancing phenology aux **and** ``n``).
+
+    ⚠ **``n`` is no longer the day count** (2026-08-14, the step unfreeze) — it is
+    ``day · bio_steps_per_day``. The weather resolver was reused unchanged across that
+    move because it indexes ``int(n · dt)``, not ``n``; anything that computes a
+    calendar from ``n`` must convert through ``domains.biosphere.step.steps_for``. See
+    ``station.driver.run_master_day``.
     """
 
     # The sealed biosphere whose gas pools are the cabin air (cabin-sized fills).
@@ -452,7 +458,8 @@ class HarvestScenario:
     exit criterion).
 
     Runs under the two-rate :func:`station.driver.run_master_day` (the greenhouse
-    rhythm: biosphere slow once/day, cabin fast ×``steps_per_day``), so all
+    rhythm: biosphere slow ×``STEPS_PER_DAY`` per master day, cabin fast
+    ×``steps_per_day``), so all
     timing/horizon fields come from the embedded greenhouse scenario.
     """
 

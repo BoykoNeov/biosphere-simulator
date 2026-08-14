@@ -458,12 +458,25 @@ def test_the_gate_fires_per_registry_call_not_per_simulated_step(scenario: str) 
 
     ⚠⚠ **A RETRACTION, 2026-08-14.** This docstring used to say the two registries'
     minima "happen to **coincide** (16.667 either way), so no census number is
-    affected". They do not coincide and never did: the biosphere registry's own
-    carbon-pool minimum is **1150.75** in ``greenhouse`` and **1483.26** in
-    ``harvest``, three orders slack, while 16.667 is the cabin's ``1/(k*dt)`` scrubber
-    check. The sentence was reading the cabin twice, because
-    :func:`_registry_minima` split the calls by frequency rather than by content — see
-    its docstring for how, and why a 4x move in one registry is what exposed it.
+    affected". They do not coincide, and — measured, not inferred — they never did:
+
+        greenhouse biosphere registry   308.158 at dt = 1   1150.749 at dt = 1/4
+        harvest    biosphere registry   376.409 at dt = 1   1483.263 at dt = 1/4
+        both       cabin registry        16.667 at either
+
+    The dt = 1 column was measured by checking out the pre-unfreeze tree (``c419e14``)
+    and applying the corrected split to it, rather than by dividing the new numbers by
+    four — the arithmetic would have given the right verdict here for a reason that is
+    not always available, and this repo keeps a note about asserted attributions
+    rotting. Note the columns are not a clean 4x (308.158 * 4 = 1232.6 against the
+    measured 1150.7), so the inference really was doing work.
+
+    16.667 is the cabin's ``1/(k*dt)`` scrubber check. The sentence was reading the
+    cabin twice, because :func:`_registry_minima` split the calls by frequency rather
+    than by content — see its docstring for how. The old helper returns
+    ``(16.667, 16.667)`` on the pre-unfreeze tree too, which is the direct evidence
+    that this was wrong from the day it was written and not something the step change
+    broke.
 
     The conclusion the sentence was supporting **survives**: no census number is
     affected, because the cabin's 16.667 is genuinely the smaller of the two and so is
@@ -546,8 +559,11 @@ def _registry_minima(rec: _Recorder, sid: str) -> tuple[float, float]:
     number and the "slow registry" reading was the fast registry wearing a hat.
 
     The step unfreeze is what made it visible rather than merely wrong: the biosphere's
-    minima moved by 4x and the cabin's did not move at all, and the pin did not budge.
-    That is the signature of a measurement that was never looking where it said.
+    minima moved by ~4x and the cabin's did not move at all, and the pin did not budge.
+    That is the signature of a measurement that was never looking where it said. It is
+    confirmed directly — the old helper returns ``(16.667, 16.667)`` on the
+    pre-unfreeze tree as well, where the biosphere's true minima are 308.158 and
+    376.409.
 
     The split is now by what a call DEMANDS: a biosphere-registry call demands only
     ``biosphere.*`` stocks, while every cabin/power/thermal call in the roster reaches

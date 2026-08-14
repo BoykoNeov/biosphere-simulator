@@ -45,8 +45,9 @@ all fill and ``food_store`` depletes at the full crew rate). ``CrewRespiration``
 trajectory is identical too.
 
 **The two-rate driver + Euler-only.** Runs under the shared
-:func:`station.driver.run_master_day` (the greenhouse rhythm: biosphere slow once/day —
-refilling grain — then cabin fast ×``steps_per_day`` — draining it), so the day-boundary
+:func:`station.driver.run_master_day` (the greenhouse rhythm: biosphere slow
+×``STEPS_PER_DAY`` per master day — refilling grain — then cabin fast
+×``steps_per_day`` — draining it), so the day-boundary
 snapshot is the intra-day *minimum* ``storage_c`` (post-drain), which the harvest rate
 is sized to keep positive (a regenerative source, not a static reservoir emptied). The
 greenhouse biosphere is **Euler-locked by its freeze**, so this is an Euler-only run (no
@@ -283,8 +284,9 @@ def run_harvest(
     """The two-rate master-step driver: one day per step (biosphere-slow / cabin-fast).
 
     A thin wrapper over :func:`station.driver.run_master_day` with the biosphere as the
-    **slow** domain (once/day, advancing ``thermal_time`` — so grain refills — and
-    ``n``) and the cabin (now carrying the ``Harvest`` flow) as the **fast** domain
+    **slow** domain (×``STEPS_PER_DAY`` per master day, advancing ``thermal_time`` —
+    so grain refills — and ``n``) and the cabin (now carrying the ``Harvest`` flow) as
+    the **fast** domain
     (``substep`` ×``steps_per_day``, ``n`` kept — so grain drains across the day).
     ``states`` holds one entry per day boundary (the golden pins the final one);
     ``total_rationed`` sums the Euler-backstop firings (validation asserts ``== 0``);

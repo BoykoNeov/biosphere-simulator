@@ -17,7 +17,7 @@ flow/aux registry from declared params + a :class:`SeasonScenario`; the forcing 
 is built separately (:func:`weather_resolver`) from a daily weather table. Both route
 through the single :func:`_compartments` aggregator — ``build_season`` unions
 stocks/flows/aux, ``weather_resolver`` merges the resolver ``shared`` maps (the #16
-live-stock seam) — so shared wiring has one source of truth. Euler at ``dt = 1 day``.
+live-stock seam) — so shared wiring has one source of truth. Euler at ``dt = BIO_DT``.
 
 **Re-exports.** The stock-id catalog + ``STOCK_DOMAIN`` now live in ``stocks.py``, the
 scenario in ``scenario.py``, and ``_carbon_context`` in ``plants.py``; this module

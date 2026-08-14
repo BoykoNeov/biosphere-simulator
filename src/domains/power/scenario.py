@@ -31,7 +31,8 @@ scenario *data* stays param-free; the coupling lives in the resolver.
 
 **Time unit is seconds (SI), documented not implicit.** Energy is J, power is W = J/s,
 so Power's natural step is seconds — ``dt_seconds = 3600`` (1 h), ``steps_per_day = 24``
-(a sub-day step resolves the day/night cycle, the biosphere's ``dt = 1 day`` analogue).
+(a sub-day step resolves the day/night cycle, the biosphere's ``dt = BIO_DT``
+analogue).
 The increment-form flows keep determinism + RK4 order at any ``dt`` (multi-rate-safe).
 
 Pure stdlib only (a frozen dataclass).

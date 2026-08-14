@@ -123,6 +123,12 @@ def max_abs(trace: Sequence[float]) -> float:
 #   Procedure : run PERENNIAL_CHAMBER_SCENARIO and CONSUMER_CHAMBER_SCENARIO under BOTH
 #               EulerIntegrator and Rk4Integrator, dt = 1.0, to a 15-year horizon
 #               (steps = 15 * len(weather) = 4575), and measure per quantity
+#               ⚠ dt = 1.0 and the 4575 are the values these bounds were DERIVED at,
+#               and are left as the historical record of that derivation. The step
+#               moved to BIO_DT = 1/4 on 2026-08-14 (so the same horizon is 18300
+#               steps), and the bounds were NOT re-derived — they were re-run and
+#               still hold with orders to spare. A re-derivation would tighten them;
+#               saying so is cheaper than a bound nobody can reproduce.
 #               q in {CARBON, OXYGEN, NITROGEN, WATER}:
 #                 max|d_q| = max_abs(mass_drift_trace(states, q))
 #                 slope_q  = drift_slope(mass_drift_trace(states, q))
