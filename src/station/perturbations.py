@@ -302,7 +302,7 @@ def with_station_leak(
       disjointness guard holds;
     * the :data:`~domains.biosphere.perturbations.LEAK_VAR` activation forcing is wired
       into the **fast** resolver as a windowed override (``1`` on ``[start, end)``,
-      ``0`` else) — ``substep`` freezes ``n`` within a day, so the window still activates
+      ``0`` else) — ``substep`` freezes ``n`` in a day, so the window still activates
       on whole master-day boundaries. ⚠ **But ``start``/``end`` are in ``n``, the slow
       domain's STEP count, not days.** The two coincided only while the biosphere's step
       was one day; a caller whose window is in days must convert it with

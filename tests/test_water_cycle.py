@@ -418,8 +418,10 @@ def test_sealed_water_scoped_compartment_ledger_balances_every_step(
     for i in range(len(states) - 1):
         # Reconstruct the step's evaluated flows (Euler: one evaluation at the start-of-
         # step state, bound to that same snapshot — the #16 seam, mirroring the engine).
-        bound = resolver.bind(states[i], 1.0)
-        results = [flow.evaluate(states[i], bound, 1.0) for flow in registry.flows]
+        # ⚠ Must use the SAME dt the engine used. A literal 1.0 here against a ¼-day
+        # engine step overstates every leg 4× and reads a conserved step as a leak.
+        bound = resolver.bind(states[i], BIO_DT)
+        results = [flow.evaluate(states[i], bound, BIO_DT) for flow in registry.flows]
         ledger = compartment_boundary_ledger(states[i], states[i + 1], results)
         for entry in ledger:
             if entry.quantity is not Quantity.WATER:

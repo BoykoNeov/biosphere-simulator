@@ -110,7 +110,9 @@ def _lai(s: State) -> float:
 # --- the hard deliverable: conservation + rationed == 0 + no extinction ------
 def test_season_runs_full_length(season: tuple[list[State], int, tuple]) -> None:
     states, _, _ = season
-    assert len(states) == len(_weather()) + 1  # initial + one per day
+    # ⚠ initial + one per STEP, not per day — ``run_season`` appends per step, and the
+    # two were the same count only while the step was a day.
+    assert len(states) == steps_for(len(_weather())) + 1
 
 
 def test_season_never_rations(season: tuple[list[State], int, tuple]) -> None:
@@ -132,7 +134,7 @@ def test_season_conserves_every_step() -> None:
     # ConservationError IS the per-step assertion. (Re-run here so the assertion is
     # explicit at this test's name, independent of the module fixture.)
     states, _, _ = _run()
-    assert len(states) == len(_weather()) + 1
+    assert len(states) == steps_for(len(_weather())) + 1  # per STEP, not per day
 
 
 # --- liveness (peak-based — the plant actually grew, not a null trajectory) --

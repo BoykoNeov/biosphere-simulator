@@ -29,6 +29,8 @@ from pathlib import Path
 
 import pytest
 
+from domains.biosphere.step import steps_for
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUST_WORKSPACE_DIR = REPO_ROOT / "rust"
 GODOT_PROJECT_DIR = REPO_ROOT / "godot"
@@ -42,6 +44,11 @@ _SMOKE_END = "GODOT_SMOKE_END>>>"
 # godot/greenhouse_smoke.gd DAYS / godot/sealed_smoke.gd DAYS (SEALED_RESUME_DAYS).
 GREENHOUSE_DAYS = 7
 SEALED_RESUME_DAYS = 310
+
+# ⚠ The smoke scripts step MASTER DAYS, but the `step_count` they report is the
+# session's ``n`` — the slow domain's STEP count. Equal only while the step was a day.
+GREENHOUSE_STEPS = steps_for(GREENHOUSE_DAYS)
+SEALED_RESUME_STEPS = steps_for(SEALED_RESUME_DAYS)
 
 pytestmark = pytest.mark.skipif(
     GODOT is None or CARGO is None,
@@ -119,7 +126,7 @@ def test_godot_greenhouse_two_rate_cross_boundary() -> None:
 
     assert report["ok"] is True, f"smoke did not complete ok: {report}"
     assert report["scenario"] == "greenhouse"
-    assert report["step_count"] == GREENHOUSE_DAYS
+    assert report["step_count"] == GREENHOUSE_STEPS
     assert report["rationed"] == 0
     assert report["fp_clean"] is True, (
         f"FTZ/DAZ set on the Godot stepping thread (mxcsr={report['mxcsr']:#x})"
@@ -141,7 +148,7 @@ def test_godot_sealed_season_crossing_cross_boundary() -> None:
 
     assert report["ok"] is True, f"smoke did not complete ok: {report}"
     assert report["scenario"] == "sealed"
-    assert report["step_count"] == SEALED_RESUME_DAYS
+    assert report["step_count"] == SEALED_RESUME_STEPS
     assert report["rationed"] == 0
     assert report["fp_clean"] is True, (
         f"FTZ/DAZ set on the Godot stepping thread (mxcsr={report['mxcsr']:#x})"

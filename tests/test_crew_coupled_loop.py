@@ -482,14 +482,19 @@ def test_the_per_day_ceiling_binds_on_CARBON_POOL_in_the_SLOW_registry() -> None
         if rs is not state:
             assert_conserved(state, rs)
             state = rs
-        # The slow (biosphere) step, and ONLY it, with its arbitration call recorded.
+        # The slow (biosphere) sub-steps, and ONLY they, with their arbitration calls
+        # recorded. ⚠ This hand-rolls `run_master_day`'s body so it can instrument the
+        # slow side alone, so it must take the SAME number of slow sub-steps the driver
+        # does — one per master day was right only while the step was a day, and left
+        # this run covering a quarter of its intended span at `dt = ¼`.
         arbitration.min_scaling = wrapped  # type: ignore[assignment]
         try:
-            rep = bio_int.step_report(state, bio_res, scenario.bio_dt)
+            for _ in range(scenario.bio_steps_per_day):
+                rep = bio_int.step_report(state, bio_res, scenario.bio_dt)
+                state = rep.state
+                slow_rationed += rep.rationed
         finally:
             arbitration.min_scaling = real  # type: ignore[assignment]
-        state = rep.state
-        slow_rationed += rep.rationed
         for _ in range(scenario.steps_per_day):
             before = state
             frep = fast_int.substep(state, fast_res, scenario.cabin_dt)

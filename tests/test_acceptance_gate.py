@@ -70,6 +70,7 @@ from pathlib import Path
 import pytest
 
 import simcore.arbitration as arbitration
+from domains.biosphere.step import BIO_DT
 from simcore.flow import FlowResult, Leg
 from simcore.ids import DomainId, StockId
 from simcore.quantities import Quantity, StockKind, canonical_unit
@@ -610,18 +611,25 @@ def test_open_seasons_other_currencies_are_slack_not_absent() -> None:
 # --------------------------------------------------------------------------- #
 
 
+# ⚠ The `rate` column carries TWO different things, and conflating them is what broke
+# this test at `dt = ¼` (2026-08-14). The biosphere rows are a bare per-day `k` and need
+# the biosphere's step to become the `k·dt` the margin actually inverts; the ECLSS rows
+# are already the **product** `k·dt` (their labels say so, and eclss.yaml names them),
+# on the cabin's own dt, which this ceremony did not touch. So the step is a column, not
+# a global multiplier. The test was named `..._is_one_over_k_dt` all along — the `dt`
+# was in its title and missing from its arithmetic, invisible while `dt` was 1.
 @pytest.mark.parametrize(
-    "scenario,stock,rate,label",
+    "scenario,stock,rate,dt,label",
     [
-        ("perennial_chamber", "biosphere.water_vapor", 0.5, "condensation_rate"),
-        ("perennial_chamber", "biosphere.condensate", 0.5, "recycling_rate"),
+        ("perennial_chamber", "biosphere.water_vapor", 0.5, BIO_DT, "condensation"),
+        ("perennial_chamber", "biosphere.condensate", 0.5, BIO_DT, "recycling_rate"),
         # eclss.yaml names both products itself: "k_scrub*dt = 0.06" and "(here 0.03)".
-        ("eclss_steady_state", "eclss.cabin_co2", 0.06, "co2_scrub_rate * dt"),
-        ("eclss_steady_state", "eclss.cabin_h2o", 0.03, "condense_rate * dt"),
+        ("eclss_steady_state", "eclss.cabin_co2", 0.06, 1.0, "co2_scrub * dt"),
+        ("eclss_steady_state", "eclss.cabin_h2o", 0.03, 1.0, "condense * dt"),
     ],
 )
 def test_a_first_order_stocks_margin_is_one_over_k_dt(
-    scenario: str, stock: str, rate: float, label: str
+    scenario: str, stock: str, rate: float, dt: float, label: str
 ) -> None:
     """A donor-controlled stock's margin is ``1/(k*dt)`` — the timestep, not scarcity.
 
@@ -652,7 +660,7 @@ def test_a_first_order_stocks_margin_is_one_over_k_dt(
     """
     entry = census(scenario)[stock]
     assert entry.gate == "rate-determined", (entry.min_margin, entry.max_margin)
-    assert entry.min_margin == pytest.approx(1.0 / rate, rel=1e-12), label
+    assert entry.min_margin == pytest.approx(1.0 / (rate * dt), rel=1e-12), label
 
 
 def test_the_microbial_pair_shares_a_flux_and_the_census_sees_it() -> None:
@@ -1045,10 +1053,20 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
 
 
 @pytest.mark.slow
-def test_tripling_the_horizon_now_TIGHTENS_the_perennial_gate() -> None:
-    """⚠⚠ **RESOLVED 2026-08-10 — this test was named for a fact that stopped being
-    true,
-    and the way it stopped is the humification split's signature.**
+def test_whether_the_perennial_gate_needs_the_LONG_horizon() -> None:
+    """Does tripling the horizon find a tighter perennial gate? The answer has flipped
+    twice, so this is named for the QUESTION.
+
+    ⚠ **Renamed 2026-08-14.** It was
+    ``test_tripling_the_horizon_now_TIGHTENS_the_perennial_gate`` — named for the
+    answer, which this docstring had **already** flagged once as a fact that stopped
+    being true, and which then stopped being true a second time, in the opposite
+    direction, at ``dt = ¼``. A test whose *name* asserts a contingent measurement goes
+    stale silently; the name now survives the next flip and the body records which way
+    it currently points.
+
+    **The history it was originally written for (2026-08-10) — kept, because it is still
+    the reason this test exists.**
 
     As measured on 2026-08-09: the gate's minimum was reached inside the first 5 years
     and the 5-yr and 15-yr runs returned a **bit-identical** margin, so "the horizon
@@ -1068,21 +1086,40 @@ def test_tripling_the_horizon_now_TIGHTENS_the_perennial_gate() -> None:
     rather than a wobble — the herbivore chamber's tightest moment still falls inside
     five years. Both are asserted, so the asymmetry cannot be lost.
     """
+    # ⚠⚠ **REVERTED 2026-08-14 by the step unfreeze, and the test is named for a fact
+    # that is false again.** This test has now flipped twice, which is the whole reason
+    # it is worth keeping. The history, in one line each:
+    #   2026-08-09  a == b bit-identical — the tightest moment was inside 5 years.
+    #   2026-08-10  b < a by 0.8 % — the humification split's settling transient pushed
+    #               the tightest moment OUTSIDE the 5-year window.
+    #   2026-08-12  b < a by 0.11 % — the gap narrowed (stem reserves); recorded rather
+    #               than smoothed, precisely because a shrinking gap is how this pin
+    #               would quietly stop being able to catch what it was written for.
+    #   2026-08-14  a == b bit-identical AGAIN, at dt = ¼.
+    #
+    # The 0.11 % gap did not shrink further — it closed completely. Both margins moved
+    # (1.5527884837973509 → 5.575540262132649 and 1.5506375020695391 → the same value),
+    # so this is a genuine re-measurement, NOT the 4× rescaling a rate-determined stock
+    # would show: 1.5528 × 4 = 6.211, and the measured value is 5.5755.
+    #
+    # ⚠ Read it as a finding, not a repair. The finer step does not remove the humus
+    # settling transient — that is a decades-long process and the horizon still does not
+    # contain it. What changed is that the chamber's tightest CARBON moment is once
+    # again inside the first five years, so the 15-year run no longer finds anything
+    # the 5-year run misses. The 2026-08-10 observation was real; it was contingent on a
+    # step size, which is exactly the kind of dependency worth having on record.
     a = census("perennial_chamber")["biosphere.carbon_pool"].min_margin
     b = census("perennial_long_horizon")["biosphere.carbon_pool"].min_margin
     assert a is not None and b is not None
-    assert b < a, (a, b)  # the longer run finds a TIGHTER minimum
-    # ⚠ re-measured 2026-08-12 (stem reserves): 1.5124880369468734 / 1.5004031863217981.
-    # THE CLAIM SURVIVES AND NARROWED: the 15-year run still finds a tighter minimum
-    # than the 5-year one, but the gap fell from 0.8 % to 0.11 %. Recorded rather than
-    # smoothed — a shrinking gap is exactly how this pin would stop being able to catch
-    # what it was written for, so the band below is tightened to match the measurement
-    # instead of being left wide enough to pass either way.
-    assert a == pytest.approx(1.5527884837973509, rel=1e-9)
-    assert b == pytest.approx(1.5506375020695391, rel=1e-9)
-    # small: 0.11 %. The claim is that it moved AT ALL, not that it moved far.
-    assert 0.998 < b / a < 1.0
+    assert a.hex() == b.hex(), (
+        "the perennial gate is a 5-year property again — if this splits, the tightest "
+        f"moment has moved back outside the window: {(a, b)}"
+    )
+    assert a == pytest.approx(5.575540262132649, rel=1e-9)
 
+    # consumer has been a 5-year property throughout, on both steps. It is asserted
+    # alongside perennial so the two cannot be conflated: for three of the four dates
+    # above the pair DISAGREED, and that asymmetry was what made the finding legible.
     c = census("consumer_chamber")["biosphere.carbon_pool"].min_margin
     d = census("consumer_long_horizon")["biosphere.carbon_pool"].min_margin
     assert c is not None and d is not None
