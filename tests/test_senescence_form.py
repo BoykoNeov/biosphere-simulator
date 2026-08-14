@@ -1058,6 +1058,7 @@ def test_the_regulator_is_DISJOINT_from_cs_blocker_on_perennial_under_rk4() -> N
     # behind it. It is also the assertion the engine's own `bit-identical within a
     # build` promise covers directly, which the scraped float needed a 1e-12 window for.
     finals = []
+    trajectories: dict[float, list[State]] = {}
     for shade in (0.0, VKS_SHADE_RATE):
         states, rationed, _ = _run(
             sc.PERENNIAL_CHAMBER_SCENARIO,
@@ -1068,6 +1069,7 @@ def test_the_regulator_is_DISJOINT_from_cs_blocker_on_perennial_under_rk4() -> N
             shade=shade,
         )
         assert rationed == 0, shade  # under RK4 a needed scale is a hard error
+        trajectories[shade] = states
         finals.append(
             tuple(sorted((str(k), v.amount) for k, v in states[-1].stocks.items()))
         )
@@ -1077,6 +1079,8 @@ def test_the_regulator_is_DISJOINT_from_cs_blocker_on_perennial_under_rk4() -> N
     # regulator is a canopy-CLOSURE rule and this canopy never closes, so there is
     # nothing for it to act on. A canopy that came anywhere near the threshold would
     # make the bit-identity above a coincidence rather than a consequence.
+    # ⚠ Read from the REGULATED run by name, not from whatever `states` the loop above
+    # happened to leave bound — the claim is about the run the regulator was given.
     cp = load_canopy_params()
     peak_lai = max(
         leaf_area_index(
@@ -1084,7 +1088,7 @@ def test_the_regulator_is_DISJOINT_from_cs_blocker_on_perennial_under_rk4() -> N
             sla_per_mol_c=cp.sla_per_mol_c,
             ground_area=sc.PERENNIAL_CHAMBER_SCENARIO.ground_area,
         )
-        for s in states
+        for s in trajectories[VKS_SHADE_RATE]
     )
     # ⚠ measured 0.8689 at the shipped step, where the docstring's pre-2026-08-14 text
     # says ~0.56 under RK4 — the canopy grew with the step like everything else here.
