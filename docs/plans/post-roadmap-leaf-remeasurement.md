@@ -175,6 +175,14 @@ band record showed nobody had measured.
 That is **larger than the ceremony just run for the band**, and the leaf record does not price
 it.
 
+⚠ **And one tripwire it would land close to, checked rather than left to be discovered.**
+Finding 5 tightened `test_open_season_peak_w_margin_to_the_crossing`'s ratio guard to 0.97,
+~1 % below the *frozen* tree's 0.978. The mechanism's own ratio at the shipped step is
+`14.0581 / 14.4248 = 0.9746` — it clears, by **0.47 %**. So shipping the leaf branch does not
+trip the guard, but it halves the headroom to it, and the guard was set on the frozen tree
+one commit earlier. Recorded here because a threshold set while measuring one thing and met
+while shipping another is exactly the pairing nobody re-reads.
+
 ## The decision, stated as options rather than taken
 
 1. **Ship it.** Pay the ceremony above. Buys: the chamber canopies (1.27–1.32×), the node
