@@ -256,6 +256,32 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-08-14 — the biosphere's within-day light path (biosphere-delegated; 4 station
+  goldens, no station code).** `docs/plans/post-roadmap-gross-net-gas-exchange.md`.
+  Authorized by the user (*"the plants MUST emit oxygen at least minute by minute"*). The
+  science is entirely biosphere-side — see its reference's forcing section — and this
+  contract moves for two reasons only.
+
+  **What changed here.** The two **lamp** seams (`station/lighting.py`, `station/sealed.py`)
+  stop handing the crop a constant PAR paired with a photoperiod-length integration window,
+  and hand it the lamp's within-day **top-hat** instead. The daily photon dose is the same
+  number; what changes is that the lamp's dark hours are now hours the crop respires
+  through. ⚠ The lamp's **ENERGY** half is deliberately unchanged: the Power domain is the
+  *fast* operator and `substep` freezes `n`, so a within-day shape is not expressible there
+  and the flow keeps drawing the daily average. The two halves of one lamp differ on
+  purpose, and that asymmetry is now stated in `lighting.py` rather than implied.
+
+  **What moved.** `greenhouse`, `harvest`, `lighting`, `sealed_station` (+ its energy-drift
+  summary) — every station golden that carries a plant. The eight plant-free goldens are
+  byte-identical. No station flow, stock, seam or param changed; `station_flow_set` and
+  `params` are unmoved in the manifest diff.
+
+  ⚠ **A stale scope claim in `lighting.py` was measured false and rewritten**: *"the only
+  runtime consumer of `daylength_s` is photosynthesis"* named one reader when there were
+  three — the photoperiod-sensitive phenology path was added three phases after that
+  sentence was written. Same shape as `o2-makeup-reversal-inside-the-freeze`: **a scope
+  claim is dated to the roster that existed when it was written.**
+
 - **2026-08-14 — the biosphere's integration step moves to `¼` day (biosphere-delegated;
   4 station goldens + `numerics_note` + `run_master_day`).**
   `docs/plans/post-roadmap-step-unfreeze.md`. Authorized by the user. The science reason is

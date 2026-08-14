@@ -32,6 +32,7 @@
     "Transpiration"
   ],
   "forcing": {
+    "light_path": "a84d3aa287eb8a0760500b9c7eb7cb13ed5ba61d77c829d3f389bb419fff8d80",
     "weather_fixture": "winter_wheat_weather.json",
     "weather_sha256": "cd61457e61d2b1ccce7d2468f94355c7e9636cfaf627dd84b1c58531a9373e80"
   },
@@ -100,43 +101,43 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "4ba864aacfb21408322536960fb4a54f114a0a3b06a8f5f40712275fbb12df75",
+      "golden_sha256": "f540afa0197dc8f6fed13de7e952630b9b80e6b304757c365fe7d348b61ac555",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "7c27bf8fd5034a76b44f18883b0cc780c901ee58b21a1a270841fe480d358fb4",
+      "golden_sha256": "5c30b80c5dc03e77aa196b29e6482c7c435c73ad9278cdad30124ec8f12c6ad3",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
     "drift_summary": {
       "golden": "drift_summary.json",
-      "golden_sha256": "80ac5fbf14b65273fd8192bf9cade06b4f2c1abde4d590c7d6d70a67eac7c373",
+      "golden_sha256": "de9b2f878c79bfb969dba4e95738708dd41eecff0f009ed15c91a19588c171d2",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
       "years": 15
     },
     "open_season": {
       "golden": "season_euler_state.json",
-      "golden_sha256": "725e32fda1ca44c0a00661519df1e1c2cd958ba089f31a32571ea2e155ee68be",
+      "golden_sha256": "ea69a6dff72e2bb5db8dc18879db4855789b17087824901b45ece7f48bea4d91",
       "scenario": "DEFAULT_SCENARIO (open field)",
       "years": 1
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "c3657bb2f99181ca7c0baeb652b511b57a0c9c236807dc9113a9c57fd15004e8",
+      "golden_sha256": "8726dbc20381520b386dc0ca7e1ef13d89d062d53c01a456a865755d69db0b74",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "acddd0153dbfcd221c3d7524d1f7456ea066fba554d6626605ae4020e001ce2d",
+      "golden_sha256": "0bec866be38d86c95ae3697cfb4c7d01cb2158cdc357c6b1993cd23f04bac309",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "4b7bd8aa6e7fb804d42a9ba263dfae1c43487e6478670356e807d589df5c7004",
+      "golden_sha256": "8d0451816b4a1bcb31413dc3d19b35193366f340a329f61034d906e52198a85b",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

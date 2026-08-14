@@ -363,6 +363,69 @@ The canonical scenarios are driven by the committed raw-weather fixture
 `tests/oracle/winter_wheat_weather.json` (NASAPower facts; read as JSON, never via PCSE).
 Tiling it `Y×` gives the multi-year horizons. Recorded in the manifest under `forcing`.
 
+#### ⚠ UNFROZEN 2026-08-14: PAR varies **within** the day — the light path
+
+The fixture is unchanged and its hash has not moved, but **the shape of the day has**. Until
+now the day's radiation reached the crop as one daytime-mean PAR held flat across the whole
+day, and the only thing in the model that knew the sun sets was the factor `× daylength_s`
+inside the assimilation aggregator. Now `PAR_VAR` is a **within-day schedule**
+(`domains/biosphere/light_path.py`): the cited sinusoidal path ([E], *"The path of radiation
+intensity during the day is assumed to be sinusoidal"*), handed to the forcing seam as the
+**analytic mean over each step's window**, and the aggregator integrates over one day of
+seconds instead of over the photoperiod.
+
+- **The day's photon dose is conserved exactly, at any step size** — `peak = (π/2)·mean` is
+  the value that makes it so, and the window means are an exact partition of one integral.
+  No parameter is introduced, no radiation created, `IRRAD` untouched. This is a
+  redistribution, not a recalibration, and `tests/test_light_path.py` pins it.
+- **The manifest gains `forcing.light_path`**, a sampled fingerprint of the shape — and it is
+  the one hash in this contract that is **compared**, not merely recorded. The shape can be
+  changed without touching any file the other hashes cover, so provenance alone would have
+  left a hole the gate could not see.
+- `daylength_s` **stops** being photosynthesis's integration window and **stays** the
+  photoperiod signal phenology reads. Two readers became one.
+- Why the step-window mean rather than the instantaneous value: measured, both. Sampling the
+  sinusoid at the step-entry instant is sampling luck at this step (−8 % of the day's carbon
+  on one day of the year, **+4 %** on another, and exactly **zero** at `dt = 1`). The window
+  mean is monotone and dose-conserving. Full table:
+  [`plans/post-roadmap-gross-net-gas-exchange.md`](plans/post-roadmap-gross-net-gas-exchange.md)
+  finding 10.
+
+**What it buys, and it is the reason it was built:** at PAR = 0 gross assimilation is exactly
+0, so `MaintenanceRespiration`'s biomass-burning *shortfall* branch — built in Phase 2,
+cited, conservation-balanced, and **never once executed** in this project's history, because
+a day-averaged PAR made `GASS > MRES` at every step of every scenario — now runs. The sealed
+chamber's CO₂ rises through the night and falls through the day, with O₂ its exact mirror at
+PQ = 1. **No flow, stock or parameter was added to get it**; the gate was the forcing.
+
+#### ⚠ KNOWN DEVIATION (recorded 2026-08-14): the canopy floor is cleared by the step, not by the science
+
+`science_bands.open_season` requires `5.0 < peak LAI < 8.0` ("real wheat peaks at ~5–8").
+Under the light path the reference reads **5.3806 at the shipped `dt = ¼` — inside the band**
+— but the observable is still moving **15 %** between `¼` and `1/32`, and its converged value
+is **4.7132, below the floor**. The band's own arithmetic was used (its test's `_run` /
+`_peak_lai`, not a lookalike probe).
+
+| | `dt = ¼` (shipped) | `dt = ⅛` | `dt = 1/16` | `dt = 1/32` |
+|---|---|---|---|---|
+| before the light path | 5.5719 | 5.5896 | 5.5984 | 5.6028 |
+| after | **5.3806 PASS** | 4.8598 FAIL | 4.7278 FAIL | 4.7132 FAIL |
+
+**The honest reading is that the band was clearing against a diurnally biased (high)
+assimilation.** The loss is the concavity of the FvCB light response, not the new night
+respiration: a control at the *same daily carbon* but with dark steps (a top-hat at the
+daytime mean) costs only **1.1 %** of peak LAI, while the concavity costs **14.9 %** — a ~1 %
+pointwise loss compounding four-fold because it lands on the phase that sets the canopy.
+One candidate explanation is eliminated by measurement: the diagnosed-but-unbuilt canopy
+regulator is a **5 %/day loss above LAI 6**, so it can only push the canopy further down.
+
+⇒ **This is recorded, not tuned.** Retuning the bound so the change fits is the
+co-adaptation this contract has refused three times. What the deviation says is that the
+tree is now short of a growth mechanism it was previously compensating for with a flat sun —
+the successor question, and it is not answered here. Every other gate moved *away* from
+danger: the Greenwood peak-W crossing (14.4248 t/ha) goes from 2.20 % of margin to 4.75 %,
+and all five chamber CO₂ compensation-point bands still clear their floor.
+
 ### The canonical scenarios + their goldens
 
 Phase 4 invents **no new scenario** (P4.2 — capture, not invention). The reference is the four
@@ -488,6 +551,51 @@ CLAUDE.md already warns about as a second door into the same room: the ceremony 
 honor-system for such a change, so follow it deliberately rather than waiting for a red test.
 
 ### Unfreeze log
+
+- **2026-08-14 — THE WITHIN-DAY LIGHT PATH: the plant breathes (13 goldens, both manifests,
+  and the native port).** `docs/plans/post-roadmap-gross-net-gas-exchange.md`. Authorized by
+  the user (*"the plants MUST emit oxygen at least minute by minute and consume co2 … it is
+  imperative, it is what reality is"*), and then, on being told the within-day light curve
+  was separable, *"it should be possible for the light Input to vary within the day"*.
+
+  **Why.** The charge asks for a mechanism the tree **already had**: the sealed branch of
+  `MaintenanceRespiration` burns biomass, returns CO₂ to the shared pool and consumes O₂ at
+  PQ = 1, cited and conservation-balanced since Phase 2 — and it had **never executed**,
+  because a day-averaged PAR makes `GASS > MRES` at every step of every scenario. The defect
+  was a forcing that made an existing mechanism unreachable, so the fix is a forcing, not a
+  flow. ⚠ Third instance of that shape (`canopy-regulator-diagnosed`,
+  `stem-reserve-form-is-on-the-shelf`): **check whether the mechanism is already in the tree
+  and merely unreachable before designing a replacement.**
+
+  **What changed.** A new `domains/biosphere/light_path.py` (the two window means, sinusoid
+  and lamp top-hat); `photosynthesis.daily_canopy_assimilation` → `canopy_assimilation`, its
+  `daylength_s` argument becoming a `window_s` the daily budget passes one day of seconds to;
+  `CarbonContext` loses its `daylength_var`; `season.weather_resolver` wires the sinusoidal
+  path and the two lamp seams (`station/lighting.py`, `station/sealed.py`) the top-hat. **No
+  flow, stock or parameter was added or removed** — `flow_set`, `aux_set`, `param_files` and
+  `dt_days` are all unmoved in the manifest diff. `git diff src/simcore/` stayed empty.
+
+  **What moved.** All 7 biosphere goldens and the 4 plant-bearing station goldens (the
+  plant-free ones — cabin, crew, demo, ECLSS, power, thermal, station, water recovery — are
+  byte-identical, which is the structural check that the change did not leak). The manifest
+  gains `forcing.light_path`, the first **compared** hash in a `forcing` block that was
+  otherwise provenance-only.
+
+  **The gate report.** Every CO₂ compensation-point band clears its floor (sealed 71.28 ppm,
+  perennial 70.49, consumer 73.81, against 61.07); the Greenwood peak-W crossing gets
+  *safer* (2.20 % → 4.75 % of margin); `rationed == 0` and no extinction events on every
+  scenario at every step measured. **One deviation is recorded rather than fixed**: the
+  peak-LAI band passes at the shipped step (5.3806) and its converged value (4.7132) is below
+  the floor — see the known-deviation section above, with the control that attributes the
+  loss to the FvCB light response's concavity rather than to the new night respiration.
+
+  ⚠ **Two prose claims were measured false while doing this, both of them ungated:**
+  `lighting.py`'s *"the only runtime consumer of `daylength_s` is photosynthesis"* (there
+  were three readers; the photoperiod-sensitive phenology path was added after that sentence
+  was written) and `MaintenanceRespiration`'s *"at the PP fill `f_O2` ≈ 1"* (measured 0.854
+  — and 0.847 on the committed tree, so the dip is the provisioned O₂ fill's, not the light
+  path's). Both corrected in place. A claim about a branch that never runs is never wrong
+  where anyone can see it.
 
 - **2026-08-14 — THE INTEGRATION STEP: `dt = 1 day` → `dt = ¼ day` (13 goldens, both the
   biosphere and station manifests, and the native port).**

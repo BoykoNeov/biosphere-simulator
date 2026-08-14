@@ -431,8 +431,18 @@ class MaintenanceRespiration:
     over-run (``rationed == 0`` from kinetics — the respiratory mirror of FvCB's
     Ci-shutoff). The unburned ``(1−f_O2)·shortfall`` maintenance just stays in biomass.
     ``f_O2`` only bites on deficit days (``shortfall > 0``, where ``available`` is
-    already 0), so it never perturbs allocation / growth respiration; at the PP fill it
-    is ≈ 1. Open field (``o2_pool=None``) is byte-identical Phase-1 behaviour.
+    already 0), so it never perturbs allocation / growth respiration.
+
+    ⚠ **"at the PP fill it is ≈ 1" stood here until 2026-08-14 and is FALSE — measured
+    0.854 at the sealed chamber's worst point, a 15 % suppression of the night burn.**
+    It was written about a branch that *never executed* (the shortfall was identically
+    zero at every step of every scenario until the light path), so nothing ever measured
+    it. ⚠ The control matters: the committed tree at ``82d965c`` gives **0.847** on the
+    same measurement, so the dip is the provisioned O₂ fill's, not the light path's —
+    the
+    minimum lands at the season's START and the pool then rises (2.0 → 2.245 mol).
+    Pinned in ``tests/test_light_path.py``. Open field (``o2_pool=None``) is
+    byte-identical Phase-1 behaviour.
     """
 
     id: FlowId

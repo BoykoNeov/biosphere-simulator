@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Any
 
 import domains.biosphere
+from domains.biosphere.light_path import half_sine_window_mean
 from domains.biosphere.season import (
     CONSUMER_CHAMBER_SCENARIO,
     CONSUMER_CHAMBER_YEARS,
@@ -135,6 +136,31 @@ def _normalized_sha256(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
     normalized = "\n".join(text.splitlines())
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def _light_path_fingerprint() -> str:
+    """A value-level fingerprint of the within-day PAR **shape** (post-roadmap, 2026-08-14).
+
+    ⚠ **Without this the manifest has a hole the gate cannot see.** ``forcing`` named the
+    weather fixture and its hash, and the light path changes how a day's photons are
+    *distributed* while leaving that fixture byte-identical — so swapping the sinusoid
+    for a top-hat, or moving solar noon, or dropping the ``π/2`` peak factor would move
+    every golden while the manifest read exactly the same. That is the "field absent from
+    both sides ⇒ gate green" blindness recorded in
+    ``multirate-effective-step-is-per-rate-class``, and it is why this is a **sampled
+    fingerprint** rather than a prose name: a name records what someone meant, a
+    fingerprint records what the code does.
+
+    Sampled on a fixed grid (three day lengths × the day's quarters at the shipped step)
+    and hashed as hex-float text, so it is exact rather than tolerance-bound and moves on
+    any change to the shape — including one that preserves the daily dose.
+    """
+    samples = [
+        half_sine_window_mean(k * 0.25, 0.25, 400.0, daylength_h * 3600.0).hex()
+        for daylength_h in (8.0, 12.0, 16.0)
+        for k in range(4)
+    ]
+    return hashlib.sha256("|".join(samples).encode("utf-8")).hexdigest()
 
 
 def _canonical_registries() -> list[object]:
@@ -233,6 +259,11 @@ def _build_manifest() -> dict[str, object]:
         "forcing": {
             "weather_fixture": WEATHER_FIXTURE.name,
             "weather_sha256": _normalized_sha256(WEATHER_FIXTURE),
+            # The within-day PAR shape — see _light_path_fingerprint for why a hash of
+            # sampled values rather than a name. Unlike the two hashes above (provenance
+            # only, never compared), this one IS gated:
+            # test_manifest_pins_the_within_day_light_path.
+            "light_path": _light_path_fingerprint(),
         },
         "param_files": {
             name: _normalized_sha256(PARAMS_DIR / name)
@@ -472,6 +503,21 @@ def _regenerate() -> None:
     """
     MANIFEST_PATH.write_bytes(_manifest_dumps(_build_manifest()).encode("utf-8"))
     print(f"wrote {MANIFEST_PATH}")
+
+
+def test_manifest_pins_the_within_day_light_path() -> None:
+    """⚠ The one hash in ``forcing`` that IS compared, and why it has to be.
+
+    The other two hashes here are provenance (the goldens enforce their values). This one
+    is a gate because the thing it fingerprints — the *shape* of the day's PAR — can be
+    changed without touching a single file the manifest hashes: the weather fixture is
+    unchanged by construction, since the light path redistributes a day's photons rather
+    than adding any. A silent swap of the sinusoid would move every golden and leave the
+    manifest reading identical, which is the failure mode
+    ``multirate-effective-step-is-per-rate-class`` records.
+    """
+    manifest = _load_manifest()
+    assert manifest["forcing"]["light_path"] == _light_path_fingerprint()
 
 
 if __name__ == "__main__":
