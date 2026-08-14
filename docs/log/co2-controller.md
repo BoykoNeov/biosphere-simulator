@@ -5,6 +5,15 @@
 > work item. The fuller record, with every table, is
 > [`../plans/post-roadmap-co2-controller.md`](../plans/post-roadmap-co2-controller.md).
 
+⚠⚠ **LOCUS, MEASURED AND ADDED 2026-08-14: the `57.9 ppm` baseline in this record is the sealed
+chamber run through an ANNUAL RE-SOW its own golden does not perform**, and it is a year-3
+reading. At `dt = 1` the sealed chamber reads **75.75 ppm** in its own no-re-sow
+configuration. The controller findings are unaffected — every comparison here is *within* a
+run configuration, which is finding 3's own rule — but the baseline number should be read as
+"the re-sown sealed chamber", not "the frozen sealed run". Full measurement in
+`step-unfreeze.md`; the mechanism (`run_perennial` re-sows unconditionally) is in
+`src/domains/biosphere/step.py`.
+
 **DIAGNOSED 2026-08-13, NOTHING BUILT.** Axis 2 of Step 0 in the consolidated **direction
 plan** (the forward-looking plan doc named in this log's own header — deliberately not in
 its index, and deliberately not named by filename here, because a record file naming it

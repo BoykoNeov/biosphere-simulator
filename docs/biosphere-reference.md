@@ -475,6 +475,32 @@ honor-system for such a change, so follow it deliberately rather than waiting fo
   docstring claim that that seam is coupled by a forcing schedule only. `rationed == 0` and
   `events == ()` throughout.
 
+  **A SECOND MANIFEST EDIT, 2026-08-14, during the re-pinning that followed.** The
+  `liveness_floors` justification for `perennial_long_horizon` cites its probe **by value**,
+  and both values moved: the anchor `0.0736681` (1.47× the floor) → **`0.0758448`** (1.52×),
+  and the witness *"the jar shrunk `0.8x` at fixed composition trips it at `0.0481100`"* →
+  **`0.65x` … `0.0492366`**. ⚠ **The `0.05` floor itself did NOT move, deliberately.** The
+  chamber's whole per-year CO₂ trough series rose ~35 % at the finer step, so the floor is a
+  third further away than it was and the old `0.8x`/`0.7x` jars no longer reach it; the guard
+  was **re-run rather than re-tuned**, sweeping the shrink factor to find where the crossing
+  now is (between `0.68x` at 0.0514049, passing, and `0.65x` at 0.0492366, tripping) and
+  leaving the bound alone. Re-anchoring a floor upward every time the reference rises is how a
+  floor becomes a restatement of the current run. The guard keeps its teeth and they are
+  blunter: the jar must now be shrunk by about a third where a fifth used to do.
+
+  ⚠ **What this unfreeze did to the ACCEPTANCE GATE, recorded because it weakens it.** The
+  census in `tests/test_acceptance_gate.py` measures margins in **steps** (`stock / demand per
+  call`), so quartering the step multiplied every biosphere margin by ~4 while every row driven
+  by an untouched registry — power, thermal, ECLSS, crew, nine of nineteen — stayed
+  bit-identical. On `sealed_station` that crossed a boundary: its binding call was the plant's
+  draw on the shared CO₂ pool (5.0232), and at `¼` that rose to **19.0209**, above the ECLSS
+  scrubber's unchanged `1/(k·dt) = 16.667`. **Same stock, different registry — the station's
+  `rationed == 0` no longer answers a question about the plant**, and the census's "the six
+  smallest live margins are `carbon_pool` in the six sealed scenarios" is now five. Not
+  repaired: choosing a step to keep a gate would be backwards. The natural successor is still
+  the `science_band` named below — and it must be written for the **perennial and consumer**
+  chambers, not the sealed one.
+
 - **2026-08-12 — stem-reserve remobilization, and its CESSATION at maturity (+1 flow,
   +1 stock, +1 param file, 13 goldens, the biosphere manifest).**
   `docs/plans/post-roadmap-stem-reserves.md`. The mechanism was **diagnosed and refused on

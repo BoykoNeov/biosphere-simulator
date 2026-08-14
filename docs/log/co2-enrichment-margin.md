@@ -6,6 +6,24 @@
 > [`../plans/post-roadmap-co2-enrichment-margin.md`](../plans/post-roadmap-co2-enrichment-margin.md).
 > Written new rather than migrated, so there is no pre-split table cell behind it.
 
+⚠⚠ **LOCUS, MEASURED AND ADDED 2026-08-14 (the step unfreeze's re-pin): every `57.9 ppm` in this
+record is the sealed chamber run through an ANNUAL RE-SOW that its own golden does not
+perform.** `season.run_perennial` applies `annual_reset` unconditionally — it never checks
+whether the scenario is a perennial one — and this work drove the sealed chamber through it,
+while `tests/test_regression_sealed_season.py` uses plain `run_season` and re-sows never.
+Measured directly at `dt = 1`: **75.75 ppm without the re-sow** (minimum in year 1, step 195)
+against **57.89 ppm with it** (minimum in year **3**, step 805). Per-year under the re-sow:
+75.75 / 61.65 / 57.89 / 57.93 / 69.33 / 71.04 / 66.32 / 63.63 — it crosses in years 3–4 only.
+
+⚠ **No number here is wrong and no finding moves.** The crossing this record diagnoses is
+real, and it is real on the chambers whose goldens *do* re-sow (perennial 56.03, consumer);
+finding 6(a), the 24 %-low trajectory, is a truncation statement that does not depend on the
+re-sow at all. What changes is the label: 57.9 is a year-3 reading of a re-sown sealed
+chamber, not "the shipped, golden-pinned run" at ambient. **A figure quoted across three
+documents inherits the run configuration of whoever measured it first** — the same locus
+error this project then made a second time in `log/step-unfreeze.md`, and corrected there.
+See `step-unfreeze.md`, "Open, and deliberately not closed here".
+
 **DIAGNOSED 2026-08-13, NOTHING BUILT.** Taken as successor 3 of `allocation-headroom.md`,
 which named it *"most likely to be needed soonest, because raising CO₂ is the cheapest
 realism move on the board"* and left it with one sentence: under Euler the sealed chamber
