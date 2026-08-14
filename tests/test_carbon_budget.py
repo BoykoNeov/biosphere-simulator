@@ -495,7 +495,8 @@ def test_allocation_dmi_agrees_with_growth_resp_budget() -> None:
     result = _allocation_flow().evaluate(state, _env(state, 1.0), 1.0)
     legs = {leg.stock: leg.amount for leg in result.legs}
     assert math.isclose(-legs[_CO2_ATMOS], dmi, rel_tol=1e-12)
-    assert math.isclose(dmi, 3.0 * 0.6712530650357866, rel_tol=1e-12)  # re-derived, above
+    # re-derived above, at the one-day window
+    assert math.isclose(dmi, 3.0 * 0.6712530650357866, rel_tol=1e-12)
 
 
 def test_allocation_fills_storage_in_the_reproductive_phase() -> None:

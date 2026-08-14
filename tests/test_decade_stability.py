@@ -504,7 +504,9 @@ def test_the_perennial_decline_has_a_floor_beyond_the_frozen_horizon() -> None:
     # re-integration of the same attractor rather than a rescaling — this summary is a
     # STOCK LEVEL in mol C, so unlike a census margin it carries no per-step
     # denominator and nothing about it should have moved by a factor of the step.
-    assert settled[-1] == pytest.approx(0.577062, abs=1e-5)
+    assert settled[-1] == pytest.approx(
+        0.567715, abs=1e-5
+    )  # ⚠ 2026-08-14 (light path), was 0.577062
     # And that equilibrium is what the 0.55 liveness floor is anchored below. ⚠ The
     # headroom NARROWED, and by more than the level moved: 0.593883 sat 8.0 % above the
     # floor, 0.577062 sits 4.9 % above it. Recorded, not re-anchored — moving 0.55
@@ -556,7 +558,9 @@ def test_the_chamber_co2_trough_has_an_attractor_beyond_the_frozen_horizon() -> 
     # trough reaches an attractor comfortably above the 0.05 floor — is unchanged and
     # re-run each time; the ratio assertion below carries it and has gone 1.47x ->
     # 1.52x across the step change, i.e. the trough moved AWAY from the floor.
-    assert settled[-1] == pytest.approx(0.0758448, abs=1e-6)
+    assert settled[-1] == pytest.approx(
+        0.073326, abs=1e-6
+    )  # ⚠ 2026-08-14 (light path), was 0.0758448
     assert settled[-1] / 0.05 > 1.4  # and the floor sits well below the attractor
 
     # The worst year of the fifty is the sow-in year, INSIDE the frozen horizon. This is
@@ -569,7 +573,9 @@ def test_the_chamber_co2_trough_has_an_attractor_beyond_the_frozen_horizon() -> 
     # what re-priced the whole CO2-floor probe below: the entire per-year trough series
     # rose by about a third, so the absolute 0.05 floor is a third further away than it
     # was. Measured index of the worst year is 1 (0.0754757, vs year 0's 0.0762602).
-    assert summaries[worst] == pytest.approx(0.0754757, rel=1e-3)
+    assert summaries[worst] == pytest.approx(
+        0.070492, rel=1e-3
+    )  # ⚠ 2026-08-14 (light path), was 0.0754757
 
 
 @pytest.mark.slow

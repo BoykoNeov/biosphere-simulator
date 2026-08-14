@@ -276,7 +276,8 @@ def test_open_season_peak_w_margin_to_the_crossing() -> None:
     # something else — which is why it is committed on its own rather than folded in.
     #
     # ⚠⚠ **RE-MEASURED A FOURTH TIME 2026-08-14 — AND THIS TIME THE GUARD FIRED.** The
-    # within-day light path moved peak W to **13.740221** and the margin the *other* way,
+    # within-day light path moved peak W to **13.740221** and the margin the *other*
+    # way,
     # **2.20 % -> 4.75 %**: less carbon per day (the FvCB light response is concave, so
     # the same photons delivered unevenly fix less) means a smaller crop and more room
     # under the crossing. The 0.97 ratio guard tightened one day earlier went red on the

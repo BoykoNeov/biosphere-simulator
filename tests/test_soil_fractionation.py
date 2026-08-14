@@ -891,8 +891,10 @@ def test_the_frozen_consumer_chamber_carries_stem_only_CLEANLY() -> None:
     # WARNING 0.148321 -> 0.146085 (2026-08-12, stem reserves) -> 0.148519 (2026-08-14,
     # the quarter-day step). The claim — the frozen consumer chamber carries stem-only
     # CLEANLY — is re-measured a second time and holds.
+    # ⚠ and a THIRD time 2026-08-14 (the light path): 0.148519 -> 0.147766. The claim
+    # holds again, and the move is the smallest of the three.
     assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:]) == pytest.approx(
-        0.148519, abs=1e-5
+        0.147766, abs=1e-5
     )
 
 
@@ -992,7 +994,9 @@ def test_half_a_mol_higher_and_perennial_fails_the_liveness_floor() -> None:
     tail = min(per_year_min_co2(states, LONG_HORIZON_YEARS)[1:])
     # WARNING 0.072378 -> 0.069947 (2026-08-12, stem reserves) -> 0.077264 (2026-08-14,
     # the quarter-day step); still above the floor, and further above it than before.
-    assert tail == pytest.approx(0.077264, abs=1e-5)
+    assert tail == pytest.approx(
+        0.073835, abs=1e-5
+    )  # ⚠ 2026-08-14 (light path), was 0.077264
     assert tail > DECADE_CO2_FLOOR  # ...and gate B now passes too
 
 
@@ -1088,12 +1092,18 @@ def test_the_seed_artefact_becomes_PERMANENT_under_fractionation() -> None:
     # reading: the peak is an EVENT on a trajectory and a finer step re-times it. The
     # three values move by 0.3 %, 0.04 % and 0.06 % — the identity legs below are what
     # carry the finding, and they are untouched.
-    assert frozen == pytest.approx(104.506, abs=1e-2)
+    assert frozen == pytest.approx(
+        105.140812, abs=1e-2
+    )  # ⚠ 2026-08-14 (light path), was 104.506
     assert frozen / shed_cn < 1.2  # the one-pool form washes the seed out
     # WARNING re-measured 2026-08-10, 2026-08-12 (stem reserves, 277.736), 2026-08-14.
-    assert same_seed == pytest.approx(277.671, abs=1e-2)
+    assert same_seed == pytest.approx(
+        287.223424, abs=1e-2
+    )  # ⚠ 2026-08-14 (light path), was 277.671
     # WARNING re-measured 2026-08-10, 2026-08-12 (stem reserves, 342.450), 2026-08-14.
-    assert doubled == pytest.approx(342.031, abs=1e-2)
+    assert doubled == pytest.approx(
+        356.03777, abs=1e-2
+    )  # ⚠ 2026-08-14 (light path), was 342.031
     assert doubled / shed_cn > 3.5  # ...and the slow pool does not
 
 
@@ -1257,17 +1267,21 @@ def test_exactly_one_swept_sizing_clears_both_gates_on_both_scenarios() -> None:
         # table was written to record has got smaller, so the case for building was
         # never weaker. What it retires is quoting "the fractionated tail improves the
         # perennial chamber by a third"; at the shipped step that is 2 %.
-        ("sealed_chamber", SEALED_CHAMBER_SCENARIO, 3, False, 0.111443, 0.114567),
-        ("perennial", PERENNIAL_CHAMBER_SCENARIO, 5, True, 0.075494, 0.077170),
+        # ⚠ all eight numbers in this table re-measured 2026-08-14 (the light path).
+        # The COMPARISON the table exists for is unchanged in every row: the
+        # fractionated tail sits above the frozen one by a per cent or two, i.e. the
+        # form alone is benign. Only the levels moved.
+        ("sealed_chamber", SEALED_CHAMBER_SCENARIO, 3, False, 0.120289, 0.123654),
+        ("perennial", PERENNIAL_CHAMBER_SCENARIO, 5, True, 0.070519, 0.075000),
         (
             "perennial_long",
             PERENNIAL_CHAMBER_SCENARIO,
             LONG_HORIZON_YEARS,
             True,
-            0.075494,
-            0.077149,
+            0.070519,
+            0.075000,
         ),
-        ("consumer", CONSUMER_CHAMBER_SCENARIO, 5, True, 0.148839, 0.152898),
+        ("consumer", CONSUMER_CHAMBER_SCENARIO, 5, True, 0.147659, 0.153049),
     ],
 )
 def test_the_form_alone_is_benign_across_the_sealed_roster(
@@ -1416,7 +1430,9 @@ def test_whether_sizing_1s_attractor_still_sits_below_the_liveness_floor() -> No
     # equilibrium) is re-measured twice and holds. ⚠ The control moved +3 % while the
     # subject moved +136 %, which is the contrast that makes the inversion above a
     # property of the SUBJECT rather than of the step or the harness.
-    assert frozen[-1] == pytest.approx(0.075843, abs=1e-5)
+    assert frozen[-1] == pytest.approx(
+        0.073353, abs=1e-5
+    )  # ⚠ 2026-08-14 (light path), was 0.075843
     assert frozen[-1] > DECADE_CO2_FLOOR
 
     states, rationed = drive(
@@ -1434,7 +1450,9 @@ def test_whether_sizing_1s_attractor_still_sits_below_the_liveness_floor() -> No
     # WARNING 0.031741 -> 0.032090 (2026-08-12) -> **0.075729** (2026-08-14). This is
     # the inversion, not a re-measurement: the value crossed the floor it is compared
     # against two lines below.
-    assert minima[-1] == pytest.approx(0.075729, abs=1e-5)
+    assert minima[-1] == pytest.approx(
+        0.064945, abs=1e-5
+    )  # ⚠ 2026-08-14 (light path), was 0.075729
     # ⚠ ASSERTED THE OTHER WAY ROUND SINCE 2026-08-14. This read
     # `max(minima[30:]) < DECADE_CO2_FLOOR` — "the LAST TWENTY years never once reach
     # the floor" — and the last twenty years now never once FALL BELOW it. Kept as an
@@ -1447,7 +1465,9 @@ def test_whether_sizing_1s_attractor_still_sits_below_the_liveness_floor() -> No
     # WARNING 0.6418 -> 1.5146. Kept as a RATIO to the floor, in the same form, so the
     # crossing is visible in the diff as a number passing through 1.0 rather than as a
     # deleted line.
-    assert minima[-1] / DECADE_CO2_FLOOR == pytest.approx(1.5146, abs=1e-3)
+    assert minima[-1] / DECADE_CO2_FLOOR == pytest.approx(
+        1.298905, abs=1e-3
+    )  # ⚠ 2026-08-14 (light path), was 1.5146
 
 
 @pytest.mark.slow
@@ -1524,12 +1544,16 @@ def test_fractionation_does_not_STARVE_the_loop_it_enlarges_BOTH_SIDES() -> None
     frac_return, frac_tissue, frac_air = at_trough(19.4093, True)
 
     # WARNING 2.8558 -> 2.8370 (2026-08-12, stem reserves) -> 2.9985 (2026-08-14).
-    assert frozen_return == pytest.approx(2.9985, abs=1e-3)
+    assert frozen_return == pytest.approx(
+        3.119126, abs=1e-3
+    )  # ⚠ 2026-08-14 (light path), was 2.9985
     # WARNING 8.1112 -> 9.5900 -> 9.5840 (2026-08-12: the stem-reserve build, then its
     # cessation window) -> **7.7523** (2026-08-14, the quarter-day step). The REFUTATION
     # below — the fractionated return is HIGHER, so 'the slow pool starved the loop' is
     # false — is re-measured and holds, but at 2.59x rather than 3.38x.
-    assert frac_return == pytest.approx(7.7523, abs=1e-3)
+    assert frac_return == pytest.approx(
+        8.104153, abs=1e-3
+    )  # ⚠ 2026-08-14 (light path), was 7.7523
     # THE REFUTATION: the return is HIGHER, so "the slow pool starved the loop" is
     # false.
     assert frac_return > frozen_return
@@ -1539,7 +1563,9 @@ def test_fractionation_does_not_STARVE_the_loop_it_enlarges_BOTH_SIDES() -> None
     # fractionated (slow-pool) side that a coarse step was flattering here, so a chunk
     # of this refutation's stated margin was the integrator's. It still refutes: 2.59 is
     # not near 1.
-    assert frac_return / frozen_return == pytest.approx(2.585, abs=1e-2)
+    assert frac_return / frozen_return == pytest.approx(
+        2.598213, abs=1e-2
+    )  # ⚠ 2026-08-14 (light path), was 2.585
 
     assert frac_tissue / frozen_tissue == pytest.approx(1.879, abs=1e-2)  # was 1.637
     # ⚠⚠ **INVERTED 2026-08-14 (the quarter-day step): the trough is no longer deeper.**
@@ -1558,7 +1584,15 @@ def test_fractionation_does_not_STARVE_the_loop_it_enlarges_BOTH_SIDES() -> None
     # gap this small is not a claim either way and pinning its sign would be pinning
     # noise — the failure mode `test_stem_reserves.py` recorded when a bit-identity
     # turned out to be an event ordering.
-    assert abs(frac_air - frozen_air) / frozen_air < 0.01
+    # ⚠ **THE SEPARATION IS NO LONGER SMALL: 0.27 % -> 9.9 % (2026-08-14, the light
+    # path).** The bound is widened to 11 % and, more importantly, the reading changes:
+    # a gap this size IS a claim, so the sign is now worth stating — the fractionated
+    # run's trough sits ABOVE the frozen one, which is the same direction the roster
+    # table shows and the opposite of the "deeper trough" puzzle this test retired.
+    # ⚠ Kept as a bound rather than promoted to a direction assertion in the same edit:
+    # one measurement is not a reason to re-argue a finding, and the successor who wants
+    # the sign should re-derive it rather than inherit it from a widened tolerance.
+    assert abs(frac_air - frozen_air) / frozen_air < 0.11
     # The buffer is bit-identically unchanged -- a litter seed cannot touch it. This is
     # the assertion the finding rests on; without it the table above is three ratios
     # with nothing to compare them to.
@@ -1603,10 +1637,11 @@ def test_the_shedding_fed_regime_takes_BOTH_sizings_and_the_better_trough_costs_
             # underlying spread of the three tails narrowed from 4.8 % to 4.1 % because
             # the FROZEN tail rose fastest (+1.4 %), which is the same truncation the
             # perennial rows lost their headroom to.
-            0.076807,
-            0.079118,
-            0.079968,
-            0.460033 / 1.643391,
+            # WARNING and a FIFTH time 2026-08-14 (the light path).
+            0.072030,
+            0.072365,
+            0.080887,
+            0.276093,  # ⚠ was 0.460033 / 1.643391 (2026-08-14, the light path)
         ),
         (
             WATER_BITING_SCENARIO,
@@ -1631,10 +1666,12 @@ def test_the_shedding_fed_regime_takes_BOTH_sizings_and_the_better_trough_costs_
             # is consistent with what it is: `water_biting` is one of only two runs in
             # the tree where water actually limits, so it has the most nonlinearity for
             # a coarse step to truncate. It is not evidence about fractionation.
-            0.095738,
-            0.105121,
-            0.127286,
-            0.454588 / 1.780165,
+            # WARNING and a FIFTH time 2026-08-14 (the light path), same reading as the
+            # step: this water-limited row moves furthest again.
+            0.097275,
+            0.104499,
+            0.135077,
+            0.256814,  # ⚠ was 0.454588 / 1.780165 (2026-08-14, the light path)
         ),
     ):
         tails = {}
@@ -1761,8 +1798,10 @@ def test_the_consumer_chamber_is_NOT_what_refuses_the_seam() -> None:
     # cleared the same floor at the same step (0.075729, pinned above), so this test's
     # contrast is no longer between a chamber that passes and one that fails. It is kept
     # as the measurement it is; the finding belongs to the refusal's own re-decision.
+    # ⚠ and again 2026-08-14 (the light path): 0.150565 -> 0.141597, still 2.8x the
+    # floor.
     assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[2:]) == pytest.approx(
-        0.150565, abs=1e-5
+        0.141597, abs=1e-5
     )
     assert min(per_year_min_co2(states, LONG_HORIZON_YEARS)[2:]) > DECADE_CO2_FLOOR
     # ⚠ The ``[2:]`` above mirrored the decade guard's ``[_TRANSIENT:]`` window, which

@@ -589,7 +589,8 @@ def test_frozen_form_is_nearer_the_primarys_stated_outcome_than_its_table() -> N
 
     frozen, listing5, t10 = lost(None), lost(_LISTING5), lost(_T10)
     assert 0.35 < frozen < 0.45, frozen  # 38.5 % — just under the band
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼).
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼).
     # listing5's integrated loss 30.0 % -> 36.7 %: a smaller crop sheds a LARGER
     # FRACTION of its peak, because the flat per-day death rate is unchanged while
     # the peak it is measured against fell. The claim is unmoved — none of the three
@@ -715,9 +716,11 @@ def test_the_dvs_form_crosses_the_greenwood_tripwire_and_f_n_NO_LONGER_bites() -
     #
     # ⇒ What this control could once demonstrate, it can no longer demonstrate. The
     # margin it rested on was **0.36 %**, so "putting the reserve back restores a bite,
-    # but only one day of six" was a marginal reading before it was an inert one, and the
+    # but only one day of six" was a marginal reading before it was an inert one, and
+    # the
     # honest record is that the two-channel conclusion in the docstring above now rests
-    # on the *pre-2026-08-14* measurement rather than on a control that reproduces today.
+    # on the *pre-2026-08-14* measurement rather than on a control that reproduces
+    # today.
     # Recorded rather than deleted (a control that stops discriminating is a finding),
     # and rather than re-tuned to make something bite again.
     assert sum(1 for f in counterfactual if f < 1.0) == 0
@@ -837,7 +840,8 @@ def test_the_exercise_table_NO_LONGER_breaks_the_re_sow() -> None:
     assert rationed == 0
     co2_min = min(s.stocks[CARBON_POOL].amount for s in states)
     # ⚠ 0.025842 -> 0.027128 (2026-08-12) -> 0.068062 (2026-08-14, quarter-day step).
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). 0.068062 -> 0.063415: a
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). 0.068062 -> 0.063415: a
     # smaller chamber crop draws the pool down less deeply per day, but respires into
     # it at night — net, the trough falls 7 %. Still clears the 0.05 floor.
     assert co2_min == pytest.approx(0.063415, abs=1e-5)
@@ -850,11 +854,14 @@ def test_the_exercise_table_NO_LONGER_breaks_the_re_sow() -> None:
     # ATTRIBUTION IT CARRIED GOES WITH IT.** It read "the pre-build tree still fails at
     # the sow, so the cause is named" — the stem reserve was what let T10 re-sow at all.
     # The reserve-off tree now COMPLETES. ⚠ The direction is the surprising half: less
-    # carbon per day should leave a *smaller* seed bank, not a viable one, so this is not
-    # a size effect. It is a phenology one — the light path changes when the day's carbon
+    # carbon per day should leave a *smaller* seed bank, not a viable one, so this is
+    # not
+    # a size effect. It is a phenology one — the light path changes when the day's
+    # carbon
     # arrives, DVS-keyed partition shares therefore fill different organs at different
     # times, and the re-sow reads `storage_c` at one instant. Recorded as an open thread
-    # rather than explained: what is measured is that the control no longer discriminates.
+    # rather than explained: what is measured is that the control no longer
+    # discriminates.
     # The assertion is inverted to state what the tree does, so the next change to this
     # region is read against today rather than against a claim that stopped being true.
     _run(
@@ -1051,7 +1058,8 @@ def test_how_close_the_open_season_lai_margin_is_to_the_threshold() -> None:
     """
     open_peak = _roster_peak_lai()["open_season"]
     # ⚠ the band moves with the measurement and stays two-sided: 0.865 -> 0.929.
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). 0.929 -> 0.897: the
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). 0.929 -> 0.897: the
     # clearance to mutual shading OPENS again, undoing the step's narrowing and more.
     # ⚠ Read with the peak-LAI band's other side: the same movement takes the
     # converged canopy BELOW the 5.0 floor (see docs/biosphere-reference.md's known
@@ -1233,7 +1241,8 @@ def test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting_ON_EITHER_FORM() -> Non
     # ⚠ BOTH forms are now over the crossing and NEITHER bites (was: bare bit 6 steps at
     # 0.995213 with bare_w 18.677670; regulated 15.724610 and clean).
     assert bare_w > _CROSSING_T_HA and bare_min == 1.0 and bare_n == 0
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). 19.738556 -> 19.961667. ⚠ The
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). 19.738556 -> 19.961667. ⚠ The
     # candidate (no leaf death) goes UP where the frozen tree goes DOWN, and that is
     # not a contradiction: without the death rate the canopy runs far past mutual
     # shading, where the concavity loss is smallest (it shrinks as LAI closes), so the
@@ -1253,7 +1262,8 @@ def test_the_greenwood_tripwire_fires_WITHOUT_f_n_biting_ON_EITHER_FORM() -> Non
     # In steps that is a 4.67× jump that reads like a mechanism change; in days it is
     # one extra day, which is what it is. **Predicting the 4× first is what separated
     # the two cases**, and neither could be told apart at the old step.
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). ⚠⚠ THE BITE IS GONE:
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). ⚠⚠ THE BITE IS GONE:
     # 7 days -> **0**, and `off_min` is exactly 1.0. Same cause as the counterfactual
     # two tests up — a crop that fixes less carbon spreads the same nitrogen over less
     # biomass, so the concentration sits above critical and f_N never leaves 1. The
@@ -1366,11 +1376,13 @@ def test_zeroing_stem_death_GROWS_the_plant_and_our_own_file_predicted_SHRINKS()
     # 14.555369 / 1.044208. The claim is unchanged and the GAP barely moved (+4.42 % ->
     # +4.61 %), which is the reading that matters: this is a partition result, and a
     # partition ratio is the kind of quantity a step should leave nearly alone.
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). 14.107660 -> 13.740221.
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). 14.107660 -> 13.740221.
     assert peak_w(frozen) == pytest.approx(13.740221, rel=1e-5)
     assert peak_w(stem0) == pytest.approx(14.410755, rel=1e-5)  # was 14.758332
     assert peak_w(stem0) > peak_w(frozen)  # THE point: up, not down
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). The RATIO is nearly
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). The RATIO is nearly
     # untouched (1.046122 -> 1.048800) while both terms fell ~2.4 %, which is the
     # signature of a change acting on the whole carbon budget rather than on the stem.
     assert peak_w(stem0) / peak_w(frozen) == pytest.approx(1.048800, rel=1e-4)
@@ -1449,7 +1461,8 @@ def test_the_stem_grows_and_the_OTHER_THREE_organs_NO_LONGER_take_ONE_haircut() 
         )
     }
     # re-measured 2026-08-12 (stem reserves): 1.2336 -> 1.256342; again 2026-08-14.
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). 1.264579 -> 1.260268 — the
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). 1.264579 -> 1.260268 — the
     # RATIO barely moves (0.3 %) though both its terms fell several per cent, which is
     # what a change acting on the whole carbon budget rather than on one organ looks
     # like.
@@ -1474,7 +1487,8 @@ def test_the_stem_grows_and_the_OTHER_THREE_organs_NO_LONGER_take_ONE_haircut() 
     # either does with storage. The mechanism claim in the docstring is intact; what is
     # withdrawn is the *magnitude* claim that the spread exceeds the old tolerance.
     # Asserted two-sided again, at the new level, for the same reason as before.
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). ⚠⚠ **THE COMMON-CUT
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). ⚠⚠ **THE COMMON-CUT
     # HALF NO LONGER REPRODUCES, AND NEITHER DOES THE ORDERING.** leaf/root/storage
     # were within 1.2e-3 of one another with storage least-cut; they now read
     # 0.98675 / 0.98202 / 0.98494 — a spread of **4.7e-3**, with LEAF the least cut
@@ -1516,7 +1530,8 @@ def test_stem_only_NOW_CROSSES_the_greenwood_margin() -> None:
         )
         for s in stem0
     )
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼).
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼).
     # ⚠⚠ **THE CROSSING IS WITHDRAWN. STEM-ONLY NO LONGER CROSSES.** 1.023122 ->
     # **0.999026** — 14.410755 t/ha against the 14.4248 crossing, **0.1 % under it**.
     # The light path takes ~2.4 % off every crop in this file, and this margin was
@@ -1579,7 +1594,8 @@ def test_the_FROZEN_open_season_margin_to_greenwood_is_now_THIN() -> None:
     # REFERENCE is now within a per cent of it on one defensible reading of W. The
     # successor question is whether 14.4248 is still a useful tripwire at this margin,
     # and it belongs to whoever owns the Greenwood pin, not to a step ceremony.
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). 0.978014 -> 0.952542: the
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). 0.978014 -> 0.952542: the
     # margin OPENS for the first time in this pin's history (2.20 % -> 4.75 % under
     # the crossing). Every prior re-measurement here closed it.
     assert on_owners_basis == pytest.approx(0.952542, rel=1e-4)
@@ -1588,7 +1604,8 @@ def test_the_FROZEN_open_season_margin_to_greenwood_is_now_THIN() -> None:
     # The margins, each on its own number. ⚠ The bands moved with the measurement and
     # are deliberately kept TWO-SIDED: a lower bound is what turns a future re-widening
     # into a red test rather than a silent improvement nobody reads.
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). Both margins roughly
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). Both margins roughly
     # double as the crop shrinks: 2.20 % -> 4.75 % and 0.76 % -> 3.31 %.
     assert 0.04 < 1.0 - on_owners_basis < 0.055
     assert 0.025 < 1.0 - counting_reserve < 0.04
@@ -1664,7 +1681,8 @@ def test_the_two_tripwires_move_in_OPPOSITE_directions() -> None:
     # 0.978 of the mass tripwire and 0.910 -> 0.929 of the area one. This test compares
     # two runs and is blind to that by construction; the two margin tests above and
     # below are where it is visible.
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). (0.978014, 0.928654) ->
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). (0.978014, 0.928654) ->
     # (0.952542, 0.896774). ⚠ BOTH margins open, so this pair no longer demonstrates
     # opposition on the FROZEN tree — the opposition claim rests on the stem-only
     # comparison below, which is where it was always measured.
@@ -1755,7 +1773,8 @@ def test_stem_only_NO_LONGER_rations_the_perennial_chamber_UNDER_EULER() -> None
     # distinct trajectory on this observable is essentially gone, and the observable
     # stops discriminating — which is a fact about the observable, not about stem-only.
     co2 = [s.stocks[CARBON_POOL].amount for s in stem0]
-    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at ¼). 0.075578 -> 0.070549.
+    # ⚠ re-measured 2026-08-14 by the WITHIN-DAY LIGHT PATH (the step is unchanged at
+    # ¼). 0.075578 -> 0.070549.
     assert min(co2) == pytest.approx(0.070549, rel=1e-4)
     assert min(s.stocks[CARBON_POOL].amount for s in frozen) == pytest.approx(
         0.070492, rel=1e-4
@@ -2593,8 +2612,10 @@ def test_the_stem_only_refusal_at_FIFTY_years_with_its_control() -> None:
     # ⚠ 0.594984 -> 0.593883 -> 0.577062 -> **0.567715** (2026-08-14, the light path,
     # hours after the step took it to 0.577062). The manifest's `max(tail) > 0.55` bound
     # for `perennial_long_horizon` is anchored on this measured equilibrium, and its
-    # clearance has now fallen 8.0 % -> 4.9 % -> **3.2 %** across two changes in one day.
-    # ⚠ The bound still passes and is NOT re-tuned. But two consecutive moves in the same
+    # clearance has now fallen 8.0 % -> 4.9 % -> **3.2 %** across two changes in one
+    # day.
+    # ⚠ The bound still passes and is NOT re-tuned. But two consecutive moves in the
+    # same
     # direction, from unrelated causes, is the pattern worth naming rather than the
     # individual number: **a liveness floor anchored on a measured equilibrium is being
     # approached, not held**, and whoever next raises assimilation cost or lowers it
@@ -2622,7 +2643,8 @@ def test_the_stem_only_refusal_at_FIFTY_years_with_its_control() -> None:
     )
     # grain: **-0.21 %**, was -4.5 %, was -11.8 %. The reserve feeds grain in BOTH runs,
     # so the penalty stem-only imposes on it keeps shrinking — and after the light path
-    # it is two orders below where it started. ⚠ Read the pair of assertions as what they
+    # it is two orders below where it started. ⚠ Read the pair of assertions as what
+    # they
     # now are: the SIGN survives (the next line), the magnitude has all but dissolved.
     # A third shrink of this size would make "stem up, grain down" a claim about the
     # seventh decimal, and the successor should say so rather than re-pin again.

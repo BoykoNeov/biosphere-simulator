@@ -497,7 +497,11 @@ def test_the_gate_fires_per_registry_call_not_per_simulated_step(scenario: str) 
     # again: the cabin's is a timestep constant, the biosphere's is a trajectory.
     cabin_min, bio_min = _registry_minima(rec, "biosphere.carbon_pool")
     assert cabin_min == pytest.approx(16.666666666666664, rel=1e-12)
-    expected_bio = {"greenhouse": 1150.7493750945291, "harvest": 1483.26301002752}
+    # ⚠ both halved by the light path (2026-08-14): 1150.7494 -> 537.8638 and
+    # 1483.2630 -> 693.4340. The biosphere carbon pool now spends part of every day
+    # being drawn on by respiration with no assimilation to offset it, so its tightest
+    # moment is tighter. Three orders of slack becomes two and a half; still live.
+    expected_bio = {"greenhouse": 537.8638049097283, "harvest": 693.4339678481122}
     assert bio_min == pytest.approx(expected_bio[scenario], rel=1e-9)
     # ...and the census reports the tighter of the two, which is the cabin's.
     assert cabin_min < bio_min
@@ -871,7 +875,8 @@ def test_the_litter_pair_became_live_when_it_gained_an_o2_draw() -> None:
         # That residue is the ``f_O2`` wobble this test is named for, and it is the
         # reason the row is `live` rather than `rate-determined`: a pure 1/(k*dt) row
         # would have rescaled to the last bit.
-        assert margin == pytest.approx(363.809291983146, rel=1e-9)
+        # ⚠ 2026-08-14: parts company in the 7th digit rather than the 8th.
+        assert margin == pytest.approx(363.80928788521334, rel=1e-9)
         # still within 0.05 % of the bare 1/(k*dt) it used to sit on exactly — written
         # as the formula, with dt in it, so the bound does not silently become a
         # different claim at the next step change (it was `1.0 / 0.011`, dt implicit).
@@ -909,9 +914,15 @@ def test_the_litter_pair_became_live_when_it_gained_an_o2_draw() -> None:
         #     the trajectory and the trajectory genuinely re-integrated.
         #   the carbon column moved by 4.04 / 3.59 / 4.36 — all live, none of them 4x.
         # The stock IDENTITY is unchanged in all six cells.
-        ("sealed_chamber", 7.687738410076417, 37.2557585449319),
-        ("perennial_chamber", 5.575540262132649, 33.77998307475926),
-        ("consumer_chamber", 9.267982379565037, 33.77998307475926),
+        # ⚠ all three carbon margins roughly HALVE on 2026-08-14 (the light path):
+        # 7.6877 -> 3.7794, 5.5755 -> 3.5343, 9.2680 -> 4.4670. The night half of the
+        # day draws the pool with no assimilation against it, which is exactly what
+        # this column measures. The RANK claim the table exists for is unchanged in
+        # all three: the carbon pool is still each scenario's tightest live gate, and
+        # the runner-up columns did not move at all.
+        ("sealed_chamber", 3.7793861201161016, 37.2557585449319),
+        ("perennial_chamber", 3.5343019459308773, 33.77998307475926),
+        ("consumer_chamber", 4.466989660058212, 33.77998307475926),
     ],
 )
 def test_the_jars_carbon_pool_is_the_only_binding_gate(
@@ -1011,9 +1022,9 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     # ⚠ 2026-08-14: 1.9016721361221138 / 1.552788483797351 / 2.1271916795585084. The
     # ratios are 4.04 / 3.59 / 4.36 — near 4x but not 4x, which is the signature of a
     # LIVE gate re-integrated rather than a rate-determined one rescaled.
-    "sealed_chamber": ("biosphere.carbon_pool", 7.687738410076417),
-    "perennial_chamber": ("biosphere.carbon_pool", 5.575540262132649),
-    "consumer_chamber": ("biosphere.carbon_pool", 9.267982379565037),
+    "sealed_chamber": ("biosphere.carbon_pool", 3.7793861201161016),
+    "perennial_chamber": ("biosphere.carbon_pool", 3.5343019459308773),
+    "consumer_chamber": ("biosphere.carbon_pool", 4.466989660058212),
     "power_bounded_soc": ("power.battery", 11.295323690100386),
     "power_self_discharge": ("power.battery", 11.085836827155921),
     "thermal_equilibrium": ("thermal.node", 257.68121326080376),
@@ -1025,7 +1036,15 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     # minimum is 1150.7494, three orders slack; 16.667 is the cabin's 1/(k*dt).
     "greenhouse": ("biosphere.carbon_pool", 16.666666666666664),
     "water_recovery": ("eclss.cabin_o2", 35.57253249034074),
-    "lighting": ("biosphere.soil_water", 37.2557585449319),
+    # ⚠⚠ **THE BINDING STOCK CHANGED IDENTITY HERE (2026-08-14), the first time any
+    # row in this table has.** `lighting` was gated by `soil_water` at 37.26; it is
+    # now gated by `biosphere.carbon_pool` at 33.43. The lamp's photoperiod became a
+    # within-day top-hat, so the lit chamber has real dark hours in which the crop
+    # respires into its pool with nothing fixing carbon back — and the pool overtakes
+    # the water as the tightest gate. ⚠ This is the census doing its job: a rank
+    # change is the observation it exists to make, and it would have been invisible in
+    # any test that pinned only the value.
+    "lighting": ("biosphere.carbon_pool", 33.430399346096465),
     "harvest": ("biosphere.carbon_pool", 16.666666666666664),
     # ⚠ Both long-horizon rows are now BIT-IDENTICAL to their 5-year siblings, where
     # perennial's used to differ by 0.11 %. See
