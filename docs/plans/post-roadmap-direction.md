@@ -11,8 +11,13 @@ It is a *plan*, not a record. When an item here is finished it earns a line in
 **Discharged so far (2026-08-13, same day):** the documented allowance (§4, first bullet;
 `36d0ae5`), Step 0 **axis 2** — the controller probe (§2, and it came back **negative**,
 which changed three other sections), and §7 **question 2**, the science-vs-product fork
-(answered: stay on science). Struck-through text below is kept deliberately: the reasoning
-that turned out to be wrong is the most useful part of a plan doc to leave visible.
+(answered: stay on science). **And 2026-08-14:** Step 0 **axis 1** — the step sweep (§2;
+`dt = ½` clears everywhere measurable, and it found two costs this doc did not price).
+Struck-through text below is kept deliberately: the reasoning that turned out to be wrong is
+the most useful part of a plan doc to leave visible.
+
+⚠ **Step 0 is complete. The one open item in this doc is §7 question 1 — the step decision,
+which is the user's.**
 
 ---
 
@@ -184,10 +189,29 @@ ceremony; quoting 24 % alone hands them a surprise when harvest moves 3 %.
 Before any ceremony, and costing none of it: one probe harness, `src/` untouched, no golden
 regenerated — exactly how the last two items were run.
 
-**Axis 1 — the step.** Sweep `{Euler, RK4} × dt ∈ {1, ½, ¼}` across every scenario on disk,
-plus the parked `leaf-expansion-blocked` branch, plus the CO₂ enrichment sweep ×1…×5,
-recording per run: unclamped arbitration margin, `k·h`, rationing firings, season-low chamber
-CO₂ against 61.07 ppm, peak leaf carbon drift, harvest, and wall-clock.
+**~~Axis 1 — the step.~~ ✅ DONE 2026-08-14 — `dt = ½` clears everywhere measurable, and the
+ceremony is bigger than this doc prices.** Record: [`../log/step-sweep.md`](../log/step-sweep.md);
+design and every table: [`post-roadmap-step-sweep.md`](post-roadmap-step-sweep.md). Ran as
+specified — every scenario on disk, the parked branch (from a **worktree**, so `main` was
+never checked out of), the ×1…×5 enrichment sweep, all the named observables — plus three
+things the specification did not have:
+
+* ⚠ **The axis is a refinement factor, not an absolute `dt`.** Every forcing here is a
+  function of the integer step `n`, never `n·dt` (all five sites audited), so `dt ∈ {1, ½, ¼}`
+  is only meaningful against each scenario's own shipped step, and holding forcing fixed takes
+  a different rule per site.
+* ⚠⚠ **Four station goldens cannot take a finer biosphere step at all** without a change to
+  `src/station/driver.py` — `run_master_day` pins the biosphere to one step per master day.
+  **The ceremony is engine code plus three freeze contracts, not three freeze contracts.**
+* ⚠⚠ **`water_biting` converges to two different answers under the two integrators** (Euler
+  harvest 0.73, RK4 0.005, both stable under 8× refinement) — a **new argument against every
+  RK4 row on the menu**, and not caused by this work.
+
+Headline: `dt = ½` clears the 61.07 ppm compensation point on all 9 biosphere scenarios and
+all 5 enrichment levels; the tail statistic moves **24 %** and harvest **0.7 %**; the parked
+leaf branch is worse at `dt = 1` than its own record showed (a 2.2× crossing, not 5 %) and
+clears at 2.1× headroom; the station/physics half is nowhere near the wall and should not be
+moved at all. **The decision itself remains the user's and is untaken.**
 
 **~~Axis 2 — the controller, and this is the one that can cancel axis 1.~~ ✅ DONE
 2026-08-13 — it does not cancel axis 1.** Record: [`../log/co2-controller.md`](../log/co2-controller.md);
@@ -202,15 +226,24 @@ rescue a margin already below 1 on the lighter tree.
 Deliverable: one table that makes the decision **arithmetic instead of a judgement**, and a
 measured answer to the three questions nobody can answer today:
 
-1. Is `dt = ½` enough on all 25 scenarios, or only on the three that were probed? **Open —
-   axis 1 has not run.**
-2. What does the suite runtime actually become? **Open — axis 1.**
+1. ~~Is `dt = ½` enough on all 25 scenarios, or only on the three that were probed?~~
+   **ANSWERED 2026-08-14: enough on every scenario the method can measure** — 9 biosphere
+   scenarios including both 15-year horizons, all 5 enrichment levels, the parked branch, and
+   9 station/physics scenarios. ⚠ **Four station goldens are excluded for a structural reason,
+   not silently** (`run_master_day`), and `water_biting`'s margin is uninformative by
+   construction (a self-clamping flow), though its Euler trajectory is stable under 8×.
+2. ~~What does the suite runtime actually become?~~ **ANSWERED 2026-08-14, as a bound:**
+   simulation work 2×; the suite today measures **6 m 12 s** (superseding the documented
+   7 m 05 s) and `dt = ½` lands between that and ~12 m 24 s. Bounded, not pinned — under
+   `-n 12` the wall clock is set by the longest worker, not by total work.
 3. ~~**Does a controlled chamber clear both criteria at `dt = 1`?**~~ **ANSWERED 2026-08-13:
    no, at no realistic setpoint — and the controlled tree needs `dt = ¼` where the frozen
    tree needs `dt = ½`.**
 
-If `dt = ½` fails anywhere the recommendation above is wrong, and we learn that for the price
-of a probe. ⚠ **Axis 1 is now the only remaining input to the step decision.**
+~~If `dt = ½` fails anywhere the recommendation above is wrong, and we learn that for the price
+of a probe.~~ It did not fail anywhere measurable. ⚠ **Step 0 is now complete on both axes,
+and every input to the step decision is in. The decision itself is the user's and has not
+been taken.**
 
 ---
 
@@ -310,16 +343,18 @@ It is not closed — re-open it at a natural stop in the science thread.
 ## 6. Proposed order
 
 0. ✅ **The documented allowance** — DONE 2026-08-13 (`36d0ae5`), free, no hash moved.
-1. **Step 0, the measurement pass — both axes.** ✅ **Axis 2 (the controller) DONE
-   2026-08-13** — negative, see section 2. **Axis 1 (the step sweep) is still open, and is
-   now the only remaining input to the decision.**
+1. ✅ **Step 0, the measurement pass — COMPLETE ON BOTH AXES.** Axis 2 (the controller) DONE
+   2026-08-13, negative; **axis 1 (the step sweep) DONE 2026-08-14** — see section 2. Every
+   input to the decision is now measured.
 2. **The step decision** — the user's call, informed by (1). ~~⚠ Which question it even is
-   depends on (1).~~ **Settled: it is "which step".**
+   depends on (1).~~ **Settled: it is "which step". ← THE PROJECT IS HERE.**
 3. **Then: one ceremony**, carrying the step change + the leaf mechanism with a re-measured
    evidence base + the chamber-CO₂ science band. Three contracts, one unfreeze, one Rust
-   parity re-measure, one CI-goldens hazard. (*The alternative branch — "the controller path,
-   no step unfreeze" — was measured out; a controller needs a finer step than the frozen tree
-   does.*)
+   parity re-measure, one CI-goldens hazard — ⚠ **plus a `src/station/driver.py` change**,
+   which axis 1 found and this list did not have: `run_master_day` pins the biosphere to one
+   step per master day, so four station goldens cannot take a finer step without it. (*The
+   alternative branch — "the controller path, no step unfreeze" — was measured out; a
+   controller needs a finer step than the frozen tree does.*)
 4. **In parallel, independent of all of the above:** `Γ*`'s citation, the two contract
    hygiene holes, the canopy regulator, potato stage 2.
 5. **Separately and explicitly: the product-track fork** in section 5.
@@ -328,14 +363,16 @@ It is not closed — re-open it at a natural stop in the science thread.
 
 ## 7. The open questions for the user
 
-1. **The step. Unblocked as of 2026-08-13** — the controller axis has run and does not remove
-   the reason to ask. The live options are: Euler `dt = ½`, Euler `dt = ¼` (more headroom for
-   the next mechanism, one ceremony instead of two), kinetic saturation (needs a *cited*
-   form), RK4 `dt = ½`, or hold and accept the now-documented deviation with the leaf
-   mechanism refused. ~~the controller at `dt = 1`~~ is off the menu — measured. ⚠ When it is
-   put: quote both the 24 % (season minimum) and the ~3 % (headline outputs), not the 24 %
-   alone. ⚠ And say plainly whether it is being put *before* axis 1, in which case the
-   candidate steps' **prices across all 25 scenarios are unmeasured**.
+1. **The step. Fully unblocked as of 2026-08-14** — both axes have run and neither removes the
+   reason to ask. The live options are: Euler `dt = ½`, Euler `dt = ¼` (more headroom for the
+   next mechanism, one ceremony instead of two), kinetic saturation (needs a *cited* form),
+   ~~RK4 `dt = ½`~~, or hold and accept the now-documented deviation with the leaf mechanism
+   refused. ~~the controller at `dt = 1`~~ is off the menu — measured. ⚠ **RK4 is now also
+   argued against**: axis 1 found `water_biting` converging to a *qualitatively different*
+   answer under RK4 (the crop dies), stable under 8× refinement, so any RK4 row changes a
+   shipped golden's science. ⚠ When it is put: quote both the 24 % (season minimum) and the
+   ~0.7 % (headline harvest), not the 24 % alone. ⚠ And say that the ceremony includes an
+   engine-code change (`src/station/driver.py`), not three freeze contracts alone.
 2. ✅ **The fork — ANSWERED 2026-08-13: stay on biosphere science.** The Godot/Rust product
    track stays dormant by decision now rather than by default. Section 5 stands as the record
    of what is parked; re-open it when the science thread reaches a natural stop.
