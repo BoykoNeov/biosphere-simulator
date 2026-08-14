@@ -16,6 +16,7 @@ use domains::biosphere::stocks::{
     THERMAL_TIME,
 };
 use domains::biosphere::system::{annual_reset, build_season, weather_forcings, weather_shared};
+use domains::biosphere::STEPS_PER_DAY;
 use domains::crew::{
     CrewParams, WaterBalance, FECAL_WASTE, FOOD_INTAKE_VAR, FOOD_STORE, WATER_BALANCE,
     WATER_INTAKE_VAR, WATER_STORE,
@@ -328,15 +329,17 @@ pub fn sealed_fast_resolver(
 
 /// The sealed station's annual re-sow hook, **owned** (boxed) so a caller-driven
 /// [`crate::session::SimSession`] can hold it. `annual_reset` fires on each season
-/// boundary (Python `n > 0 && n % season_days == 0`); `run_sealed` and the two-rate
-/// session build it via this same function so both step the identical re-sow logic
-/// (the Phase-8 parity discipline).
+/// boundary; `run_sealed` and the two-rate session build it via this same function so both
+/// step the identical re-sow logic (the Phase-8 parity discipline).
+///
+/// ⚠ The period is in **steps**, not days — `n` is the slow domain's step count. Mirrors
+/// the Python `season_steps = steps_for(scenario.season_days)`.
 pub fn sealed_reset_hook(scenario: &SealedStationScenario) -> OwnedResetHook {
-    let season_days = scenario.season_days as u64;
+    let season_steps = (scenario.season_days * STEPS_PER_DAY) as u64;
     let bio = scenario.bio;
     Box::new(
         move |n: u64, current: &State| -> Result<Option<State>, SimError> {
-            if n > 0 && n.is_multiple_of(season_days) {
+            if n > 0 && n.is_multiple_of(season_steps) {
                 Ok(Some(annual_reset(current, &bio)?))
             } else {
                 Ok(None)
@@ -363,6 +366,7 @@ pub fn run_sealed(
         fast_resolver,
         scenario.days(),
         scenario.steps_per_day,
+        scenario.bio_steps_per_day,
         scenario.bio_dt,
         scenario.cabin_dt,
         Some(&*reset),

@@ -166,6 +166,7 @@ pub fn run_lighting(
         power_resolver,
         scenario.days,
         scenario.steps_per_day,
+        scenario.bio_steps_per_day,
         scenario.bio_dt,
         scenario.power_dt,
         None,

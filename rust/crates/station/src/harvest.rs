@@ -149,6 +149,7 @@ pub fn run_harvest(
         cabin_resolver,
         gh.days,
         gh.steps_per_day,
+        gh.bio_steps_per_day,
         gh.bio_dt,
         gh.cabin_dt,
         None,

@@ -38,6 +38,7 @@ from pathlib import Path
 import pytest
 
 from domains.biosphere.perturbations import LEAK_SINK
+from domains.biosphere.step import steps_for
 from domains.biosphere.stocks import (
     CARBON_POOL,
     LEAF_C,
@@ -244,7 +245,14 @@ def test_scaled_flow_scales_whole_flow_balanced() -> None:
 # season_days >> the run horizon ⇒ annual_reset never fires (window stays in year 1)
 _M_SCN = SealedStationScenario(years=1, season_days=305)
 _M_DAYS = 8
-_START, _END = 2, 7  # window (master days) — inside year 1
+# ⚠ The window is expressed in DAYS and converted, because the perturbation forcings
+# key on ``n`` — the slow domain's STEP count, not the day count. Left unconverted this
+# reads as days 0.5–1.75 rather than days 2–7 at ``dt = ¼``: a 4× shorter window in a
+# different part of the run. **Missed by the commit-1 sixth-class sweep** (which covered
+# biosphere's ``test_perturbations.py`` but not this station sibling) and caught by the
+# Rust port's ``o2_leak_is_absorbed_by_makeup_effort``, whose "the plant is UNTOUCHED"
+# claim is exactly sensitive to the window moving.
+_START, _END = steps_for(2), steps_for(7)  # window (days→steps) — inside year 1
 _K_LEAK = 1.0e-3  # k·dt = 0.06 at 60 s (the k_scrub scale; k·dt < 1 ⇒ rationed == 0)
 # Matter conserved quantities that the leak / crew / lighting cascades touch (ENERGY is
 # the disjoint energy loop — separately checked; it is inert to matter perturbations).
@@ -283,6 +291,7 @@ def _sealed_run(state, bio_reg, fast_reg, bio_res, fast_res):
         steps_per_day=_M_SCN.steps_per_day,
         slow_dt=_M_SCN.bio_dt,
         fast_dt=_M_SCN.cabin_dt,
+        slow_steps_per_day=_M_SCN.bio_steps_per_day,
     )
 
 
@@ -366,19 +375,40 @@ def o2_leak():
     return states
 
 
-def test_o2_leak_is_absorbed_by_makeup_effort(sealed_baseline, o2_leak) -> None:
+def test_o2_leak_is_absorbed_by_makeup_effort(
+    sealed_baseline, o2_leak, carbon_leak
+) -> None:
     # O2_POOL is DEFENDED (O2Makeup is demand-controlled), so — unlike CARBON — the leak
     # surfaces as makeup EFFORT, not a pool/biology change: o2_supply supplies strictly
-    # MORE (its cumulative bookkeeping runs further negative), the plant is UNTOUCHED
-    # (biomass ≈ baseline), and the leak-sink accumulates. The two pools fail
-    # differently.
+    # MORE (its cumulative bookkeeping runs further negative), the plant is essentially
+    # UNTOUCHED, and the leak-sink accumulates. The two pools fail differently.
     assert o2_leak[-1].stocks[O2_SUPPLY].amount < (
         sealed_baseline[-1].stocks[O2_SUPPLY].amount
     )  # more negative = more O₂ supplied
-    assert math.isclose(
-        _biomass(o2_leak[-1]), _biomass(sealed_baseline[-1]), rel_tol=1e-6
-    )
     assert o2_leak[-1].stocks[LEAK_SINK].amount > 0.0
+
+    # ⚠ THE "UNTOUCHED" CLAIM IS A CONTRAST, AND IS NOW ASSERTED AS ONE (2026-08-14).
+    # It used to be ``isclose(..., rel_tol=1e-6)`` — an absolute tolerance with no
+    # stated derivation, which went red at ``dt = ¼`` on a deviation of 1.5e-5. That is
+    # not the O₂ defence failing. Per master day the slow domain now takes four steps
+    # before any fast makeup runs, so the plant sees the intra-day O₂ drawdown at four
+    # progressively lower levels instead of one, and ``f_O2`` self-limitation responds
+    # slightly differently. The effect is real, explainable, and 0.0015 %.
+    #
+    # Loosening 1e-6 to 1e-4 would have been weakening a test to make it pass. Measured
+    # instead (temp/step-unfreeze/probe_leak.py): the CARBON leak moves biomass by
+    # **16.6 %** and the O₂ leak by **0.0015 %** — a contrast of **10715×**. So the
+    # claim is asserted as the ratio it always was, which is both scale-free and
+    # STRICTLY STRONGER: the old form also passed if the carbon leak did nothing at all,
+    # and this one does not.
+    base_b = _biomass(sealed_baseline[-1])
+    o2_effect = abs(_biomass(o2_leak[-1]) - base_b) / abs(base_b)
+    carbon_effect = abs(_biomass(carbon_leak[-1]) - base_b) / abs(base_b)
+    assert carbon_effect > 1000 * o2_effect, (
+        f"the defended pool must be orders quieter than the undefended one: "
+        f"carbon {carbon_effect:.3e} vs O₂ {o2_effect:.3e}"
+    )
+    assert o2_effect < 1e-3, f"and quiet in absolute terms too: {o2_effect:.3e}"
 
 
 def test_o2_leak_conserves_total_with_sink(o2_leak) -> None:

@@ -33,20 +33,20 @@ from __future__ import annotations
 
 # The integration step, in days.
 #
-# ⚠ STILL ``1`` HERE, DELIBERATELY. This module and ``season._table``'s physical-time
-# indexing land FIRST, at the shipped step, and the exit criterion of that commit is
-# that **every golden stays byte-identical** — which is only checkable while the step
-# has not moved. The step moves to ``¼`` in the next commit, and because this one is
-# bit-identical every byte of that diff is attributable to the step alone. (``¼`` over
-# ``½`` is the user's call: both clear the compensation point everywhere measured, but
-# ``¼`` leaves 4.8× of headroom to the arbitration bound where ``½`` leaves 2.1×, so the
-# next mechanism added to the tree probably does not force a second ceremony.)
-BIO_DT: float = 1.0
+# ``¼`` over ``½`` is the user's call, taken 2026-08-14: both clear the compensation
+# point everywhere measured, but ``¼`` leaves 4.8× of headroom to the arbitration bound
+# where ``½`` leaves 2.1×, so the next mechanism added to the tree probably does not
+# force a second ceremony.
+#
+# The routing and the physical-time weather indexing landed FIRST, at the old step, and
+# were proved byte-identical there. So every byte of this change's golden diff is
+# attributable to the step alone — which is the whole reason for the two-commit split.
+BIO_DT: float = 0.25
 
 # How many integration steps make one physical day. Kept as an ``int`` (not derived by
 # ``1 / BIO_DT``) because it indexes lists and sizes loops, and because the pair being
 # stated twice makes the invariant below checkable rather than assumed.
-STEPS_PER_DAY: int = 1
+STEPS_PER_DAY: int = 4
 
 # The two must agree, and ``BIO_DT`` must be a negative power of two so that ``n · dt``
 # is exact in binary and ``season._table``'s ``int()`` truncation has no round-off edge.

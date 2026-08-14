@@ -1,4 +1,4 @@
-//! Phase-8 Step-7 (P8.7) save/load parity teeth: a session **saved at step A**, its
+﻿//! Phase-8 Step-7 (P8.7) save/load parity teeth: a session **saved at step A**, its
 //! state serialized (`to_json`) and reloaded (`from_json`), and stepped **B more**,
 //! is **bit-identical** to a session that ran straight through to `A + B` without ever
 //! saving. That equivalence *is* the save/load guarantee — provable here with no Godot
@@ -17,6 +17,7 @@
 //! accrues, because thermal_time is arrested at warm sowing), and an `#[ignore]`d sealed
 //! resume that crosses a season boundary (the reset-adopt branch).
 
+use domains::biosphere::STEPS_PER_DAY;
 use domains::crew::FECAL_WASTE;
 use domains::params;
 use simcore::integrator::EulerIntegrator;
@@ -40,7 +41,16 @@ fn snap(state: &State) -> String {
 /// it straight to `total`, versus saving its state at `save_at` (through `to_json` →
 /// `from_json`), loading it into a fresh session, and stepping the remaining `total -
 /// save_at`, yields **bit-identical** final states.
-fn assert_resume_parity(build: impl Fn() -> SimSession, save_at: u64, total: u64) {
+/// ⚠ `save_at` / `total` are in whatever unit [`SimSession::step_n`] counts — **steps**
+/// single-rate, **master days** two-rate — while `n` always counts the stepping domain's
+/// steps. `steps_per_unit` converts: `1` single-rate, `STEPS_PER_DAY` two-rate. The two
+/// were the same number only while the biosphere's step was one day.
+fn assert_resume_parity(
+    build: impl Fn() -> SimSession,
+    save_at: u64,
+    total: u64,
+    steps_per_unit: u64,
+) {
     // Reference: never saved.
     let mut straight = build();
     straight.step_n(total).unwrap();
@@ -58,10 +68,18 @@ fn assert_resume_parity(build: impl Fn() -> SimSession, save_at: u64, total: u64
     // Resume: a fresh session (registries rebuilt from the recipe), load, step the rest.
     let mut resume = build();
     resume.load_state(loaded).unwrap();
-    assert_eq!(resume.n(), save_at, "loaded state carries n");
+    assert_eq!(
+        resume.n(),
+        save_at * steps_per_unit,
+        "loaded state carries n"
+    );
     resume.step_n(total - save_at).unwrap();
 
-    assert_eq!(resume.n(), total, "resumed to the full horizon");
+    assert_eq!(
+        resume.n(),
+        total * steps_per_unit,
+        "resumed to the full horizon"
+    );
     assert_eq!(
         snap(resume.state()),
         straight_final,
@@ -93,7 +111,7 @@ fn cabin_gas_resume_after_save_is_bit_identical() {
             scenario.dt_seconds,
         )
     };
-    assert_resume_parity(build, 120, 300);
+    assert_resume_parity(build, 120, 300, 1); // single-rate: one step_n unit IS one step
 }
 
 /// Two-rate `greenhouse`: save at day 2 (after `thermal_time` has accumulated), resume to
@@ -115,6 +133,7 @@ fn greenhouse_resume_after_save_preserves_aux_phenology() {
             greenhouse_bio_resolver(&scenario).unwrap(),
             greenhouse_cabin_resolver(&scenario).unwrap(),
             scenario.steps_per_day,
+            scenario.bio_steps_per_day,
             scenario.bio_dt,
             scenario.cabin_dt,
             None,
@@ -135,7 +154,7 @@ fn greenhouse_resume_after_save_preserves_aux_phenology() {
         probe.state().aux.values().any(|&v| v != 0.0),
         "greenhouse should have accumulated vernalization_days by day 16"
     );
-    assert_resume_parity(build, 16, 18);
+    assert_resume_parity(build, 16, 18, STEPS_PER_DAY as u64);
 }
 
 /// `load_state` rejects a state whose stock-id set does not match the session's registry —
@@ -196,6 +215,7 @@ fn sealed_resume_across_a_season_boundary_is_bit_identical() {
             sealed_bio_resolver(&lamp, &scenario).unwrap(),
             sealed_fast_resolver(&charge, &scenario).unwrap(),
             scenario.steps_per_day,
+            scenario.bio_steps_per_day,
             scenario.bio_dt,
             scenario.cabin_dt,
             Some(sealed_reset_hook(&scenario)),
@@ -203,5 +223,5 @@ fn sealed_resume_across_a_season_boundary_is_bit_identical() {
         .unwrap()
     };
     // Save one day before the boundary; resume two days past it (the reset fires in between).
-    assert_resume_parity(build, boundary - 1, boundary + 2);
+    assert_resume_parity(build, boundary - 1, boundary + 2, STEPS_PER_DAY as u64);
 }

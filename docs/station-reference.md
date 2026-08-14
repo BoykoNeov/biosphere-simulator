@@ -76,12 +76,23 @@ Every station/sibling scenario runs **forward-Euler** (`t = n·dt`, integer step
 The dt varies by scenario and is **not** an importable constant (each run helper selects
 it inline), so the manifest *documents* `integrator = "EulerIntegrator"` + a per-scenario
 note and the **goldens enforce** it (an integrator or dt switch moves every committed
-golden). The **sealed reference** is two-rate: biosphere-slow **`dt = 1` day** +
-everything-fast **`dt = 60 s`** (ECLSS's binding `k_scrub·dt < 1`), stepped by
-`station.driver.run_master_day`. The Tier-1 energy loop is single-rate **`dt = 3600 s`**
-(`station.system.run_station`, where `n` advances so the diurnal SOC swing + the SB
-radiator's emergent `T_eq` attractor are expressible). The biosphere carries its own
-Euler/`dt = 1` lock (its manifest).
+golden). The **sealed reference** is two-rate: biosphere-slow **`dt = ¼` day, four slow
+sub-steps per master day** + everything-fast **`dt = 60 s`** (ECLSS's binding
+`k_scrub·dt < 1`), stepped by `station.driver.run_master_day`. The Tier-1 energy loop is
+single-rate **`dt = 3600 s`** (`station.system.run_station`, where `n` advances so the
+diurnal SOC swing + the SB radiator's emergent `T_eq` attractor are expressible). The
+biosphere carries its own Euler/`dt` lock (its manifest); the station does **not** re-declare
+it — `bio_dt` / `bio_steps_per_day` bind to `domains.biosphere.step`.
+
+⚠ **Two things about `n` that were true here until 2026-08-14 and are not any more.**
+(a) **`n` is NOT the master-day count** — it is the slow domain's *step* count, so under the
+sealed reference it is 4× the day count. Any calendar computed from `n` (a re-sow period, a
+perturbation window) must be converted with `steps_for`; three call sites and two docstrings
+in this assembly asserted the old identity and were corrected. (b) **`states` is still one
+entry per master day** — `slow_steps_per_day` did not change that, so station trajectories
+stay **day-indexed** while biosphere trajectories are **step-indexed**. That asymmetry is
+load-bearing: slicing a station trajectory works in days, and "fixing" those sites to use
+steps introduces the bug it looks like it removes.
 
 ### The flow set — 16 sibling + station flow classes (derived)
 
@@ -244,6 +255,39 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-14 — the biosphere's integration step moves to `¼` day (biosphere-delegated;
+  4 station goldens + `numerics_note` + `run_master_day`).**
+  `docs/plans/post-roadmap-step-unfreeze.md`. Authorized by the user. The science reason is
+  entirely biosphere-side (see its reference's resolved-deviation section); what makes this a
+  **station** unfreeze is that the driver had to learn to sub-step the slow domain, and the
+  contract states the step in prose.
+
+  **What changed.** `run_master_day` (and its Rust mirror, and the Phase-8 session that
+  shares `advance_one_master_day` with it) takes `slow_steps_per_day`, defaulting to `1` so
+  the change was provably inert on its own — 272 station tests, including the byte-exact
+  goldens, passed before the step moved. A `slow_dt · slow_steps_per_day == 1 day` guard was
+  added, the symmetric partner of the existing `fast_dt · steps_per_day == 86400 s`. The
+  three scenarios' `bio_dt: 1.0` literals now bind to `domains.biosphere.step`, so the
+  station cannot desync from the biosphere's step. `sealed_reset`'s period converted from
+  days to steps.
+
+  ⚠ **The re-sow period was correct by ACCIDENT, not by design.** `n % season_days` with
+  `n = 4·day` still fires on the right days only because 305 is odd; at `season_days = 304`
+  the same line would re-sow **four times a year**. Converted deliberately so the
+  correctness does not rest on a coprimality nobody had written down.
+
+  ⚠ **`numerics_note` is honor-system and this is the record that it was maintained by
+  hand.** The string lives as a literal in the manifest *generator*, compared only against a
+  manifest generated from that same literal — so flipping `bio_dt` reddens nothing here. The
+  biosphere side is different (`dt_days` is asserted against a hard-coded number and failed
+  loudly, as designed). Do not assume the loud gate on that side covers this one.
+
+  **Verification.** The four station goldens' step counter went 7 → 28 (greenhouse, harvest,
+  lighting) and 1220 → 4880 (sealed station), each exactly as predicted before regenerating;
+  the eight biosphere-free station goldens are **byte-identical**, and
+  `sealed_energy_drift_summary` regenerated bit-for-bit identical. Every station trajectory
+  length is unchanged, because `states` still appends once per master day.
 
 - **2026-08-11 — the soil-layers cascade (biosphere-delegated; 4 station goldens, no
   station-side science).** `docs/plans/post-roadmap-soil-layers.md`. The biosphere gained a

@@ -158,6 +158,7 @@ pub fn run_greenhouse(
         cabin_resolver,
         scenario.days,
         scenario.steps_per_day,
+        scenario.bio_steps_per_day,
         scenario.bio_dt,
         scenario.cabin_dt,
         None,

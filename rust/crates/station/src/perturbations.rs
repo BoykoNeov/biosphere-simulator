@@ -29,7 +29,9 @@
 //! insurance. `ScaledFlow` with `health = 1` outside the window reproduces the wrapped flow
 //! **bit-identically** (`x·1.0 == x`), so a window the run never reaches is inert.
 
-use domains::biosphere::perturbations::{with_forcing, window_override, LeakFlow, LEAK_SINK, LEAK_VAR};
+use domains::biosphere::perturbations::{
+    window_override, with_forcing, LeakFlow, LEAK_SINK, LEAK_VAR,
+};
 use domains::biosphere::stocks::PAR_VAR;
 use domains::crew::FOOD_INTAKE_VAR;
 use domains::power::SOLAR_POWER_VAR;
@@ -261,8 +263,9 @@ pub fn with_radiator_failure(
 ///   the cabin flows act on the shared pool; `k_leak·dt < 1` at 60 s ⇒ `rationed == 0`).
 ///   `STATION_LEAK` is kept **out of the biosphere-slow registry** so the disjointness holds;
 /// * wires the [`LEAK_VAR`] activation forcing into the **fast** resolver as a windowed
-///   override (`1` on `[start, end)`, `0` else) — under the master-day driver `n` is the day
-///   count, so the window activates on whole master days.
+///   override (`1` on `[start, end)`, `0` else). ⚠ `start`/`end` are in **`n`**, the slow
+///   domain's STEP count — *not* master days. They coincided only while the biosphere's
+///   step was one day; a caller with a window in days must convert it (`steps_for`).
 ///
 /// The interior's closure breaks over the window (mass leaves to `LEAK_SINK`) but **total**
 /// mass (interior + sink) stays conserved. The cascade is pool-specific: a `CARBON_POOL`
@@ -281,7 +284,9 @@ pub fn with_station_leak(
     end: u64,
 ) -> Result<(State, Registry, Registry, SourceResolver), SimError> {
     let pool_stock = state.stocks.get(pool).ok_or_else(|| {
-        SimError::Reference(format!("station leak pool {pool:?} is absent from the state"))
+        SimError::Reference(format!(
+            "station leak pool {pool:?} is absent from the state"
+        ))
     })?;
     let leak_sink = Stock::new(
         LEAK_SINK.to_string(),
@@ -347,7 +352,7 @@ mod tests {
         assert_eq!(sched(1, 1.0), 4.0); // before → base
         assert_eq!(sched(3, 1.0), 2.0); // inside → factor·base
         assert_eq!(sched(5, 1.0), 4.0); // end exclusive → base
-        // factor = 1.0 is a bit-identical no-op.
+                                        // factor = 1.0 is a bit-identical no-op.
         let noop = window_scale(cst(4.0), 2, 5, 1.0);
         assert_eq!(noop(3, 1.0), 4.0);
     }
@@ -394,9 +399,7 @@ mod tests {
             assert_eq!(s.amount, 0.25 * i.amount); // exactly alpha× the wrapped leg
         }
         // The scaled flow is still per-quantity balanced (ENERGY sums to 0).
-        assert!(
-            simcore::flow::assert_flow_balanced_default(&scaled_legs, &state.stocks).is_ok()
-        );
+        assert!(simcore::flow::assert_flow_balanced_default(&scaled_legs, &state.stocks).is_ok());
 
         // alpha = 1.0 reproduces the wrapped flow bit-identically (x·1.0 == x).
         let mut ones: HashMap<String, Schedule> = HashMap::new();
@@ -422,7 +425,10 @@ mod tests {
 
         let perturbed = with_brownout(base, 10, 15, 0.5).unwrap();
         assert_eq!(
-            perturbed.bind(&midday, 3600.0).get(SOLAR_POWER_VAR).unwrap(),
+            perturbed
+                .bind(&midday, 3600.0)
+                .get(SOLAR_POWER_VAR)
+                .unwrap(),
             0.5 * base_solar
         );
         // Outside the window: unchanged (bit-identical to the base half-sine).
@@ -441,16 +447,21 @@ mod tests {
         let scenario = crate::scenario::HEAT_CLOSURE_SCENARIO;
         let (state, registry) = build_station(&charge, &thermal, &scenario, None).unwrap();
         let resolver = station_resolver(&charge, &scenario).unwrap();
-        let (reg, res) =
-            with_radiator_failure(&state, registry, resolver, 3, 9, 0.0).unwrap();
+        let (reg, res) = with_radiator_failure(&state, registry, resolver, 3, 9, 0.0).unwrap();
         // The registry keeps every flow id (the ScaledFlow delegates RADIATOR_REJECT's id).
         let ids: Vec<&str> = reg.flows().iter().map(|f| f.id()).collect();
         assert!(ids.contains(&RADIATOR_REJECT));
         assert!(ids.contains(&"power.solar_charge"));
         // The health forcing is wired: 0.0 inside the window, 1.0 outside.
         let inside = State::new(5, state.stocks.clone(), 0, BTreeMap::new()).unwrap();
-        assert_eq!(res.bind(&inside, 3600.0).get(RADIATOR_HEALTH_VAR).unwrap(), 0.0);
+        assert_eq!(
+            res.bind(&inside, 3600.0).get(RADIATOR_HEALTH_VAR).unwrap(),
+            0.0
+        );
         let outside = State::new(0, state.stocks.clone(), 0, BTreeMap::new()).unwrap();
-        assert_eq!(res.bind(&outside, 3600.0).get(RADIATOR_HEALTH_VAR).unwrap(), 1.0);
+        assert_eq!(
+            res.bind(&outside, 3600.0).get(RADIATOR_HEALTH_VAR).unwrap(),
+            1.0
+        );
     }
 }

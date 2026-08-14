@@ -52,53 +52,73 @@ reviewed, and re-captured* — not silent.
 The manifest is the authoritative, machine-checked list. This section is the human-readable
 account.
 
-### Locked integrator + dt — **Euler, `dt = 1.0 day`**
+### Locked integrator + dt — **Euler, `dt = ¼ day`**
 
-The biosphere runs the **forward-Euler** integrator at a **one-day** step (`t = n·dt`, integer
-step count). This was **locked by probe, with evidence** (P4.1, Step 1): both closed scenarios
-were run Euler *and* RK4 to 15 yr and structurally agreed (both stationary, both closed, same
-period class); the 100k-step stress (Step 3, 328 yr) confirmed no slow drift. RK4 ships in
-`simcore` but the biosphere does **not** use it — crop physiology is daily-integrated and the
-daily canopy flux is not RK4-refinable. The integrator + dt have **no importable constant**
-(each regression run helper selects `EulerIntegrator(...)` and `dt = 1.0` inline); they are
-**documented** in the manifest and **enforced by the goldens** — an integrator or dt switch
-moves every committed golden.
+The biosphere runs the **forward-Euler** integrator at a **quarter-day** step (`t = n·dt`,
+integer step count; `n` counts *steps*, so it is 4× the day count). Euler was **locked by
+probe, with evidence** (P4.1, Step 1): both closed scenarios were run Euler *and* RK4 to 15 yr
+and structurally agreed (both stationary, both closed, same period class); the 100k-step
+stress (Step 3, 328 yr) confirmed no slow drift. RK4 ships in `simcore` but the biosphere does
+**not** use it — crop physiology is daily-integrated and the daily canopy flux is not
+RK4-refinable.
 
-#### ⚠ KNOWN DEVIATION (recorded 2026-08-13, undecided): the shipped step crosses the CO₂ compensation point
+⚠ **The step and the day are now different numbers, and that is the whole point.** The step
+lives in **one** place, `src/domains/biosphere/step.py` (`BIO_DT`, `STEPS_PER_DAY`,
+`steps_for`), and every run length, reset period and perturbation window is expressed in
+**days** and converted. The weather table stays **one row per physical day** at any step —
+`season._table` indexes `int(n · dt)`, not `n` — and must never be tiled to match
+`STEPS_PER_DAY`. The manifest records `dt_days`, `tests/test_freeze_manifest.py` asserts it
+against a **hard-coded literal** (deliberately *not* against `BIO_DT` — a contract that
+imports its value from the code auto-follows the code), and the goldens enforce the values.
 
-The lock above is a **choice**, and as of 2026-08-13 the price of that choice has been
-measured and is **not zero**. Recorded here rather than fixed, because fixing it is a
-three-contract unfreeze that has not been authorized. Full record and method:
+#### ✅ RESOLVED 2026-08-14 (was a KNOWN DEVIATION recorded 2026-08-13): the CO₂ compensation-point crossing
+
+The `dt = 1` reference **fixed carbon at concentrations where its own FvCB kinetics say it
+fixes none**: assimilation is `max(0, min(Ac, Aj))` and both branches carry `(Ci − Γ*)`, so
+with `Γ* = 42.75` and `ci_ratio = 0.7` the crop cannot draw the chamber below
+`Ca = 61.07 ppm` — and the sealed chamber's season-low sat at **57.9 ppm**. It was a
+**truncation error, not a threshold crossing**: the withdrawal was computed at the
+start-of-step concentration and applied for a whole day, so a step starting above the shutoff
+and ending below it never re-evaluated.
+
+**Measured at the shipped `dt = ¼`: the sealed chamber's season-low is `76.82 ppm`** —
+clear of the 61.07 shutoff, so the reference no longer fixes carbon below its own
+compensation point. Authorized by the user (*"quarter the step"*, over `½`, which also clears
+it: `¼` leaves 4.8× headroom to the arbitration bound where `½` leaves 2.1×, so the next
+mechanism added probably does not force a second ceremony). Ceremony:
+[`plans/post-roadmap-step-unfreeze.md`](plans/post-roadmap-step-unfreeze.md).
+
+**Both figures the old note insisted be quoted together, restated:** the tail statistic that
+was **24 % low** (57.9 against a converged ~76) is the one this change fixes; the **headline
+outputs that moved ~3 %** moved as predicted (sealed peak leaf carbon 0.9215 → 0.8923, −3.2 %).
+Neither alone was an honest summary of the defect, and neither alone is an honest summary of
+the repair.
+
+⚠ **Two things this does NOT claim.** (a) `Γ*` remains a `TODO(cite)` entry in
+`photosynthesis.yaml`, so the *crossing* was robust but the *number* 61.07 is still
+provisional — clearing a provisional threshold is a weaker result than clearing a cited one.
+(b) The convergence sequence and RK4 limit quoted in the 2026-08-13 sweep (`57.9 → 75.1 →
+75.8 → 76.0` against a limit of `76.29`) are **stale**: the measured 76.82 sits *above* that
+limit, which a finite-step Euler run should not, so the sweep's limit was measured on a tree
+that has since gained mechanisms (stem reserves, soil layers, root coupling). Re-measuring it
+is a refinement study and is **not** part of this ceremony — do not re-quote those numbers as
+current.
+
+The historical record of the deviation while it stood — how it was found, the enrichment
+sweep, and the headroom measurement — is
 [`log/co2-enrichment-margin.md`](log/co2-enrichment-margin.md) and
-[`log/allocation-headroom.md`](log/allocation-headroom.md); the open decision is
-[`plans/post-roadmap-direction.md`](plans/post-roadmap-direction.md).
+[`log/allocation-headroom.md`](log/allocation-headroom.md). ⚠ Read those as **dated**: they
+describe the `dt = 1` tree and their convergence numbers are superseded per (b) above.
 
-- **The sealed chamber's season-low chamber CO₂ is `57.9 ppm` on the frozen tree.** FvCB
-  assimilation is `max(0, min(Ac, Aj))` and both branches carry `(Ci − Γ*)`, so with
-  `Γ* = 42.75` and `ci_ratio = 0.7` the crop **cannot** draw the chamber below
-  `Ca = 61.07 ppm`. The frozen run goes below it — **the reference fixes carbon at
-  concentrations where the reference says it fixes none.** ⚠ `Γ*` is one of
-  `photosynthesis.yaml`'s `TODO(cite)` entries, so the *crossing* is robust and the
-  *number* 61.07 is provisional.
-- **The mechanism is truncation, not biology.** The withdrawal is computed at the
-  start-of-step concentration and applied for a whole day, so a step that starts above the
-  shutoff and ends below it never re-evaluates. Under RK4 the same quantity pins at
-  ~76 ppm at every CO₂ charge; under step refinement it **converges** 57.9 → 75.1 → 75.8 →
-  76.0 ppm, both integrators approaching from opposite sides.
-- **Two numbers, of different strength, and they must be quoted together.** Season-low
-  chamber CO₂ is **24 % low** (57.9 against a converged 76.3) — a tail statistic on the
-  most sensitive observable in the run. **Headline outputs move ~3 %** (peak leaf carbon
-  3.2 %). Neither figure alone is an honest summary.
-- **It is not a guard failure.** Arbitration rations zero times, every golden gate is
-  green, and every `science_band` passes. A `science_bands` entry of the right shape
-  (*"the sealed chamber's season-low CO₂ stays above the compensation point"*) would have
-  caught this on day one — and is **red on the frozen tree today**, which is why this
-  paragraph exists instead of that assertion.
-- **Direction of the error:** it runs the wrong way for a realism claim. At 4× chamber CO₂
-  the shipped integrator **overstates** peak plant carbon by 4.3 % against RK4.
-
-Nothing in the manifest moves for this note (the freeze's prose half is ungated); it is a
-disclosure, not an unfreeze.
+⚠ **The gap that let this ship for a year, worth more than the fix.** It was never a guard
+failure: arbitration rationed zero times, every golden gate was green, and every
+`science_band` passed. **A `science_bands` entry of the right shape — *"the sealed chamber's
+season-low CO₂ stays above the compensation point"* — would have caught it on day one.** The
+reason it did not exist is that the bands were written to describe what the model *does*, not
+to cross-check the model against its own kinetics. That band is now writable (it passes at
+76.82 ppm against 61.07) and adding it is the natural successor to this ceremony; it is
+deliberately **not** bundled here, because a band written in the same change that makes it
+pass is a restatement of the run, not a contract on it.
 
 ### The flow set + the aux processes
 
@@ -373,6 +393,41 @@ CLAUDE.md already warns about as a second door into the same room: the ceremony 
 honor-system for such a change, so follow it deliberately rather than waiting for a red test.
 
 ### Unfreeze log
+
+- **2026-08-14 — THE INTEGRATION STEP: `dt = 1 day` → `dt = ¼ day` (13 goldens, both the
+  biosphere and station manifests, and the native port).**
+  `docs/plans/post-roadmap-step-unfreeze.md`. Authorized by the user (*"quarter the step"*).
+  This is the first unfreeze of a **numerics** item rather than a science item, and the
+  first to move the station contract as well.
+
+  **Why.** The `dt = 1` reference drew the sealed chamber's CO₂ down to **57.9 ppm** and kept
+  fixing carbon there, below the `61.07 ppm` compensation point its own FvCB kinetics make a
+  hard shutoff — a truncation error, not biology. At `¼` the season-low is **76.82 ppm**.
+  See the resolved-deviation section above for both magnitudes and the two caveats.
+
+  **What changed.** `BIO_DT` / `STEPS_PER_DAY` in `src/domains/biosphere/step.py`, which is
+  now the single place the step lives; the station's three scenarios bind `bio_dt` /
+  `bio_steps_per_day` to those constants instead of declaring their own `1.0`;
+  `run_master_day` takes `slow_steps_per_day` slow sub-steps per master day (with a new
+  `slow_dt · slow_steps_per_day == 1 day` guard mirroring the fast one). `git diff
+  src/simcore/` stayed empty throughout.
+
+  ⚠ **The step change was the small part; the UNIT change was the work.** Every run length,
+  reset period and perturbation window had to move from days to steps, and *no test at
+  `dt = 1` can tell a correct conversion from a wrong one* — the two are the same integer.
+  So it landed in two commits: the routing first, proved **byte-identical** on the full
+  suite with no golden regenerated, then the step, so every byte of the golden diff is
+  attributable to the step alone. Correctness of the routing was established by a separate
+  discriminating probe at `¼`, not by the suite.
+
+  **Verification, predicted before regenerating** (plan §4/§4b, scored in §4c): all 12
+  goldens' step counter `n` hit its predicted value exactly; the 12 goldens with no
+  biosphere in them stayed byte-identical; `git diff --stat` came back 279 insertions and
+  279 deletions, so no array anywhere changed length; and in the lighting seam every
+  biosphere stock moved while `power.battery`, `boundary.waste_heat` and
+  `boundary.light_used` came back **bit-identical** — testing, for the first time, the
+  docstring claim that that seam is coupled by a forcing schedule only. `rationed == 0` and
+  `events == ()` throughout.
 
 - **2026-08-12 — stem-reserve remobilization, and its CESSATION at maturity (+1 flow,
   +1 stock, +1 param file, 13 goldens, the biosphere manifest).**

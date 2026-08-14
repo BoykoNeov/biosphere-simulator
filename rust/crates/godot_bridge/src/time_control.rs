@@ -594,29 +594,44 @@ mod tests {
     /// worker thread == the sim on the main thread." Single-rate (`cabin_gas`, Tier-1).
     #[test]
     fn worker_fast_forward_is_bit_exact_vs_synchronous_cabin_gas() {
-        threaded_parity("cabin_gas", station::scenario::CABIN_GAS_STEPS);
+        // Single-rate: one `step_n` unit IS one step, so the two arguments coincide.
+        let steps = station::scenario::CABIN_GAS_STEPS;
+        threaded_parity("cabin_gas", steps, steps);
     }
 
     /// Same, for the **two-rate** greenhouse (the expensive 1440-substep/day path the worker
     /// thread exists to carry).
     #[test]
     fn worker_fast_forward_is_bit_exact_vs_synchronous_greenhouse() {
+        // ⚠ Two-rate: `step_n` counts MASTER DAYS but `FastForwardTo` targets a STEP
+        // count `n`, and the slow domain now takes `STEPS_PER_DAY` steps per master day.
+        // These were the same number only while the biosphere's step was one day; passing
+        // `days` to both is what this test used to do, and it silently meant two things.
         let days = station::scenario::greenhouse_scenario().days as u64;
-        threaded_parity("greenhouse", days);
+        let steps = days * domains::biosphere::STEPS_PER_DAY as u64;
+        threaded_parity("greenhouse", days, steps);
     }
 
-    fn threaded_parity(scenario_id: &str, target: u64) {
-        // Reference: synchronous session stepped `target`, hex-float snapshot.
+    /// `units` is what [`SimSession::step_n`] counts (steps single-rate, master days
+    /// two-rate); `target_n` is the step count [`Cmd::FastForwardTo`] aims at. They differ
+    /// whenever the slow domain sub-steps.
+    fn threaded_parity(scenario_id: &str, units: u64, target_n: u64) {
+        // Reference: synchronous session stepped `units`, hex-float snapshot.
         let (mut sync, _ctx) = build_session(scenario_id).unwrap();
-        sync.step_n(target).unwrap();
+        sync.step_n(units).unwrap();
+        assert_eq!(
+            sync.n(),
+            target_n,
+            "the two units must describe the same run"
+        );
         let want = from_engine(sync.state()).to_json();
 
-        // Worker: fast-forward to `target` on its own thread, read its published snapshot.
+        // Worker: fast-forward to `target_n` on its own thread, read its published snapshot.
         let w = spawn_worker(scenario_id).unwrap();
-        w.tx.send(Cmd::FastForwardTo(target)).ok();
+        w.tx.send(Cmd::FastForwardTo(target_n)).ok();
         assert!(wait_until(
             &w.shared,
-            |s| s.n == target && !s.fast_forwarding,
+            |s| s.n == target_n && !s.fast_forwarding,
             Duration::from_secs(60),
         ));
         let got = w.shared.lock().unwrap().snapshot_json.clone();

@@ -29,12 +29,44 @@ pub use system::{
     SEALED_CHAMBER_YEARS,
 };
 
-/// Steps in a `weather_years`-tiled run: `weather_years · SEASON_DAYS`.
-pub fn steps_for(weather_years: usize) -> usize {
-    SEASON_DAYS * weather_years
+/// The biosphere's integration step, in days — mirrors `domains.biosphere.step.BIO_DT`.
+///
+/// ⚠ **The port has no reference authority.** This is a mirror of the Python constant,
+/// not an independent choice; the reason it is `1/4` and not `1` lives in
+/// `src/domains/biosphere/step.py` and `docs/plans/post-roadmap-step-unfreeze.md`. If the
+/// two ever disagree, Python is right by definition.
+pub const BIO_DT: f64 = 0.25;
+
+/// Integration steps per physical day — mirrors `domains.biosphere.step.STEPS_PER_DAY`.
+pub const STEPS_PER_DAY: usize = 4;
+
+/// Integration steps in `days` physical days — the exact analogue of the Python
+/// `domains.biosphere.step.steps_for`, **taking the same unit**.
+///
+/// The weather table itself stays one row per physical **day** at any step
+/// (`table_schedule` indexes `int(n · dt)`), so it must never be tiled to match
+/// `STEPS_PER_DAY`.
+pub fn steps_for(days: usize) -> usize {
+    days * STEPS_PER_DAY
 }
 
-/// The committed weather fixture's season length (305 days).
+/// Steps in a `weather_years`-tiled run.
+///
+/// ⚠ **Takes YEARS, not days** — hence the name. This was called `steps_for` until
+/// 2026-08-14, when it took years while the Python `steps_for` took days: the same name
+/// meaning two different units across the two ports, which is exactly the conflation this
+/// step ceremony existed to remove. Renamed rather than left to the next reader who sees
+/// `steps_for` on both sides and assumes one meaning.
+pub fn steps_for_years(weather_years: usize) -> usize {
+    steps_for(SEASON_DAYS * weather_years)
+}
+
+/// The reset period for a perennial run, in **steps** (one season).
+pub fn season_steps() -> usize {
+    steps_for(SEASON_DAYS)
+}
+
+/// The committed weather fixture's season length (305 physical days).
 pub const SEASON_DAYS: usize = 305;
 
 /// Build the Euler integrator + tiled resolver for `scenario` over `weather_years`.
@@ -53,20 +85,35 @@ pub fn run_season_final(
     weather_years: usize,
 ) -> Result<(State, u64, Vec<simcore::events::Event>), SimError> {
     let (state, integrator, resolver) = season_setup(scenario, weather_years)?;
-    let steps = steps_for(weather_years);
+    let steps = steps_for_years(weather_years);
     let mut noop = |_: &State| {};
-    run_season(&integrator, state, &resolver, 1.0, steps, None, &mut noop)
+    run_season(
+        &integrator,
+        state,
+        &resolver,
+        BIO_DT,
+        steps,
+        None,
+        &mut noop,
+    )
 }
 
-/// Run `scenario` with `annual_reset` every `SEASON_DAYS`, final `State` only.
+/// Run `scenario` with `annual_reset` every season, final `State` only.
 pub fn run_perennial_final(
     scenario: &SeasonScenario,
     weather_years: usize,
 ) -> Result<(State, u64, Vec<simcore::events::Event>), SimError> {
     let (state, integrator, resolver) = season_setup(scenario, weather_years)?;
-    let steps = steps_for(weather_years);
+    let steps = steps_for_years(weather_years);
     let mut noop = |_: &State| {};
     run_perennial(
-        &integrator, state, scenario, &resolver, 1.0, steps, SEASON_DAYS, &mut noop,
+        &integrator,
+        state,
+        scenario,
+        &resolver,
+        BIO_DT,
+        steps,
+        season_steps(),
+        &mut noop,
     )
 }

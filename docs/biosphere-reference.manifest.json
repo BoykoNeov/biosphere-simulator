@@ -5,7 +5,7 @@
     "ThermalTimeAccumulation",
     "VernalizationAccumulation"
   ],
-  "dt_days": 1.0,
+  "dt_days": 0.25,
   "flow_set": [
     "Allocation",
     "Condensation",
@@ -100,43 +100,43 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "e264f34dd0c766d42986a3fda39b47c82d711891458f776804824b5e5171457e",
+      "golden_sha256": "4ba864aacfb21408322536960fb4a54f114a0a3b06a8f5f40712275fbb12df75",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "de18808d092856139a96e362e00bf9e0a646a2099ee1333d5eeba588ccdd4395",
+      "golden_sha256": "7c27bf8fd5034a76b44f18883b0cc780c901ee58b21a1a270841fe480d358fb4",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
     "drift_summary": {
       "golden": "drift_summary.json",
-      "golden_sha256": "e27b6fc44977bd9671f9f7511df6ecb72bdf2d7b7bc80ca9edce2de66b85b201",
+      "golden_sha256": "80ac5fbf14b65273fd8192bf9cade06b4f2c1abde4d590c7d6d70a67eac7c373",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
       "years": 15
     },
     "open_season": {
       "golden": "season_euler_state.json",
-      "golden_sha256": "1b62629d916da4905b003eaedd0bb7b583a98303d95ad2783dadb44b210c2974",
+      "golden_sha256": "725e32fda1ca44c0a00661519df1e1c2cd958ba089f31a32571ea2e155ee68be",
       "scenario": "DEFAULT_SCENARIO (open field)",
       "years": 1
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "20ee93d0eebda45b6ca766d352e878a0bc051c58509d32559a8d7f17ca0aa4f3",
+      "golden_sha256": "c3657bb2f99181ca7c0baeb652b511b57a0c9c236807dc9113a9c57fd15004e8",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "3559f105f617fce8e20033dbb940fae971f60dd660ff032406a27fd0a72395d2",
+      "golden_sha256": "acddd0153dbfcd221c3d7524d1f7456ea066fba554d6626605ae4020e001ce2d",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "88a5a7bffa4c00e233bea83d78fc8ab6519978dcaafc6d3ef89e47cd20ba1066",
+      "golden_sha256": "4b7bd8aa6e7fb804d42a9ba263dfae1c43487e6478670356e807d589df5c7004",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

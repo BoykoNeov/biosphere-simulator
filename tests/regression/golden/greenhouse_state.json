@@ -1,10 +1,10 @@
 {
   "aux": {
-    "rooted_depth": "0x1.10d7be9856a37p-2",
+    "rooted_depth": "0x1.10d7be9856a3ap-2",
     "thermal_time": "0x0.0p+0",
     "vernalization_days": "0x0.0p+0"
   },
-  "n": 7,
+  "n": 28,
   "rng_seed": "0x0",
   "stocks": [
     {
@@ -22,7 +22,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.631eda16e33bep+1",
+      "amount": "0x1.697d4d4c08eb7p+1",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -35,7 +35,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.b65e6c327a236p-21",
+      "amount": "0x1.46c72dc353f3ep-20",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -48,7 +48,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.df412c7013d8ep-34",
+      "amount": "0x1.654185c51470fp-33",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -61,7 +61,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.39960c9d0d8fap-4",
+      "amount": "0x1.3d538d8a3174cp-4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -74,7 +74,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.f94d8bde6af1ap-7",
+      "amount": "0x1.01466eace78d4p-6",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -87,7 +87,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.14373a2cffd66p-19",
+      "amount": "0x1.194548a7bdef9p-19",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -100,7 +100,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.e87f5c01d0404p-13",
+      "amount": "0x1.173b8a3c9cc24p-12",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -113,7 +113,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.0b07817a62adbp-25",
+      "amount": "0x1.3146a912a64d4p-25",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -139,7 +139,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.38a652a80c594p-12",
+      "amount": "0x1.3e116fc3a8cfap-12",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -152,7 +152,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.8a7abee99f164p-4",
+      "amount": "0x1.8d31e310f17cap-4",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -165,7 +165,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.8ffff11174e75p+6",
+      "amount": "0x1.8fffefb3d92fap+6",
       "composition": {
         "nitrogen": "0x1.0000000000000p+0"
       },
@@ -178,7 +178,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.c67bd5ca426c9p+4",
+      "amount": "0x1.c7a21fc681e39p+4",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -191,7 +191,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.0c495c10f05d0p-5",
+      "amount": "0x1.0d4679af4ac17p-5",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -204,7 +204,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.4fb74e52ebbecp-9",
+      "amount": "0x1.5ae1bd44651bfp-9",
       "composition": {
         "carbon": "0x1.0000000000000p+0"
       },
@@ -230,7 +230,7 @@
       "unit": "mol"
     },
     {
-      "amount": "0x1.40b9389b52007p+7",
+      "amount": "0x1.40b9389b52004p+7",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -243,7 +243,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.bab450c2893fep+1",
+      "amount": "0x1.ab238dab67d7cp+1",
       "composition": {
         "water": "0x1.0000000000000p+0"
       },
@@ -256,7 +256,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.1ef83912addd8p+11",
+      "amount": "0x1.1ef827e2fbdfap+11",
       "composition": {
         "carbon": "0x1.0000000000000p+0",
         "oxygen": "0x1.0000000000000p+1"
@@ -322,7 +322,7 @@
       "unit": "kg"
     },
     {
-      "amount": "-0x1.1ebb7ca82ee43p+11",
+      "amount": "-0x1.1ebb6b787ce64p+11",
       "composition": {
         "oxygen": "0x1.0000000000000p+1"
       },

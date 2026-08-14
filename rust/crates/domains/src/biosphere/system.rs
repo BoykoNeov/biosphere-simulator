@@ -1097,7 +1097,7 @@ pub fn run_perennial(
 
 #[cfg(test)]
 mod tests {
-    use super::super::{run_perennial_final, run_season_final, SEASON_DAYS};
+    use super::super::{run_perennial_final, run_season_final, steps_for_years};
     use super::*;
 
     /// `Drainage` reads no forcing at all (state only), so its pins need no resolver.
@@ -1271,12 +1271,12 @@ mod tests {
         let mut observe = |s: &State| {
             seen.push((s.aux[ROOTED_DEPTH], s.stocks[SUBSOIL_WATER].amount));
         };
-        let steps = super::super::steps_for(1);
+        let steps = super::super::steps_for_years(1);
         run_season(
             &integrator,
             state,
             &resolver,
-            1.0,
+            super::super::BIO_DT,
             steps,
             None,
             &mut observe,
@@ -1365,15 +1365,15 @@ mod tests {
             }
             prev = Some((depth, below, held));
         };
-        let steps = super::super::steps_for(2);
+        let steps = super::super::steps_for_years(2);
         let (_, rationed, _) = run_perennial(
             &integrator,
             state,
             &scenario,
             &resolver,
-            1.0,
+            super::super::BIO_DT,
             steps,
-            SEASON_DAYS,
+            super::super::season_steps(),
             &mut observe,
         )
         .expect("emptying-store chamber");
@@ -1634,7 +1634,7 @@ mod tests {
     fn open_season_runs_well_fed_and_conserved() {
         let (final_state, rationed, events) =
             run_season_final(&DEFAULT_SCENARIO, 1).expect("open season");
-        assert_eq!(final_state.n as usize, SEASON_DAYS);
+        assert_eq!(final_state.n as usize, steps_for_years(1));
         assert_eq!(rationed, 0, "open season must be well-fed");
         assert!(events.is_empty(), "open season must be extinction-free");
         // A live plant assimilated carbon: leaf_c stays finite and positive.
@@ -1647,7 +1647,10 @@ mod tests {
     fn sealed_chamber_runs_well_fed() {
         let (final_state, rationed, events) =
             run_season_final(&sealed_chamber_scenario(), SEALED_CHAMBER_YEARS).expect("sealed");
-        assert_eq!(final_state.n as usize, SEASON_DAYS * SEALED_CHAMBER_YEARS);
+        assert_eq!(
+            final_state.n as usize,
+            steps_for_years(SEALED_CHAMBER_YEARS)
+        );
         assert_eq!(rationed, 0);
         assert!(events.is_empty());
         // O₂ depleted well below its initial 2.0 mol fill (the depletion mechanism).
@@ -1663,7 +1666,7 @@ mod tests {
                 .expect("perennial");
         assert_eq!(
             final_state.n as usize,
-            SEASON_DAYS * PERENNIAL_CHAMBER_YEARS
+            steps_for_years(PERENNIAL_CHAMBER_YEARS)
         );
         assert_eq!(rationed, 0);
         assert!(

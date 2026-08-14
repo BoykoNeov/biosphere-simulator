@@ -49,7 +49,13 @@ pub const LEAK_SINK: &str = "boundary.leak_sink";
 /// cannot borrow-and-copy a `Box<dyn Fn>`, so the wrapper takes ownership. `dt` threads to
 /// `base` unchanged.
 pub fn window_override(base: Schedule, start: u64, end: u64, value: f64) -> Schedule {
-    Box::new(move |n, dt| if start <= n && n < end { value } else { base(n, dt) })
+    Box::new(move |n, dt| {
+        if start <= n && n < end {
+            value
+        } else {
+            base(n, dt)
+        }
+    })
 }
 
 /// Rebuild `resolver` with one forcing `var` replaced/added; the shared map preserved —

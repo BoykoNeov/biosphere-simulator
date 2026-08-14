@@ -220,7 +220,13 @@ def _build_manifest() -> dict[str, object]:
         "frozen_at_phase": 4,
         "reference_doc": "docs/biosphere-reference.md",
         "integrator": "EulerIntegrator",
-        "dt_days": 1.0,
+        # ⚠ A SECOND hand-maintained literal, and it is not the gate — the gate is the
+        # separate literal in test_manifest_declares_locked_integrator_and_dt. The two
+        # must be edited together, and the assertion is what forces you to notice: on
+        # 2026-08-14 the step moved to 1/4, this line was missed, and the regenerated
+        # manifest still read 1.0 until the assertion went red. That is the design
+        # working. Do not "simplify" either one to import BIO_DT.
+        "dt_days": 0.25,
         "long_horizon_years": LONG_HORIZON_YEARS,
         "flow_set": _flow_set(),
         "aux_set": _aux_set(),
@@ -435,13 +441,20 @@ def test_manifest_named_files_exist() -> None:
 
 
 def test_manifest_declares_locked_integrator_and_dt() -> None:
-    # The integrator + dt have no importable constant to assert against (selected inline
-    # in each regression run helper), so they live as documented strings in the file;
-    # the goldens enforce them (an RK4 / dt switch moves every golden). This pins that
-    # the manifest *records the lock* — the documentation half of "locked by end of P4".
+    # The integrator + dt live as documented values in the manifest; the goldens enforce
+    # them (an RK4 / dt switch moves every golden). This pins that the manifest *records
+    # the lock* — the documentation half of "locked by end of P4".
+    #
+    # ⚠ KEEP THESE HARD-CODED LITERALS. There is now an importable ``BIO_DT``, and
+    # comparing against it would be the natural "cleanup" — do not. A contract that
+    # imports its own value from the code auto-follows the code, which is the opposite
+    # of a freeze: this assertion's entire job is to go red when someone moves the step,
+    # so the unfreeze discipline in docs/biosphere-reference.md gets followed instead of
+    # skipped. It did exactly that on 2026-08-14, which is how the step move became a
+    # deliberate ceremony rather than a silent edit.
     manifest = _load_manifest()
     assert manifest["integrator"] == "EulerIntegrator"
-    assert manifest["dt_days"] == 1.0
+    assert manifest["dt_days"] == 0.25
 
 
 def _regenerate() -> None:

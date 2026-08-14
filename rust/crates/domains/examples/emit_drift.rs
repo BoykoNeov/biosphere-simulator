@@ -9,7 +9,7 @@
 use domains::biosphere::stocks::{CONSUMER_CARBON, LEAF_C};
 use domains::biosphere::{
     consumer_chamber_scenario, perennial_chamber_scenario, run_perennial, season_setup,
-    steps_for, LONG_HORIZON_YEARS, SEASON_DAYS,
+    season_steps, steps_for_years, BIO_DT, LONG_HORIZON_YEARS, SEASON_DAYS,
 };
 use simcore::hexfloat;
 use simcore::state::State;
@@ -27,13 +27,19 @@ fn emit_array(name: &str, values: &[f64], last: bool) {
 
 fn main() {
     let years = LONG_HORIZON_YEARS;
-    let steps = steps_for(years);
+    let steps = steps_for_years(years);
 
     let perennial = perennial_chamber_scenario();
     let (p_state, p_integ, p_res) = season_setup(&perennial, years).expect("perennial setup");
     let mut perennial_leaf: Vec<f64> = Vec::new();
     run_perennial(
-        &p_integ, p_state, &perennial, &p_res, 1.0, steps, SEASON_DAYS,
+        &p_integ,
+        p_state,
+        &perennial,
+        &p_res,
+        BIO_DT,
+        steps,
+        season_steps(),
         &mut |s: &State| perennial_leaf.push(s.stocks[LEAF_C].amount),
     )
     .expect("run perennial");
@@ -43,7 +49,13 @@ fn main() {
     let mut consumer_leaf: Vec<f64> = Vec::new();
     let mut consumer_carbon: Vec<f64> = Vec::new();
     run_perennial(
-        &c_integ, c_state, &consumer, &c_res, 1.0, steps, SEASON_DAYS,
+        &c_integ,
+        c_state,
+        &consumer,
+        &c_res,
+        BIO_DT,
+        steps,
+        season_steps(),
         &mut |s: &State| {
             consumer_leaf.push(s.stocks[LEAF_C].amount);
             consumer_carbon.push(s.stocks[CONSUMER_CARBON].amount);
@@ -53,6 +65,9 @@ fn main() {
 
     println!("{{");
     println!("  \"horizon_years\": {years},");
+    // ⚠ In physical DAYS, deliberately. The Python parity gate converts it with its own
+    // `steps_for` to segment these step-indexed trajectories; emitting steps here would
+    // double-convert and slice the 15-yr run into 60 quarter-years.
     println!("  \"season_days\": {SEASON_DAYS},");
     emit_array("perennial_leaf", &perennial_leaf, false);
     emit_array("consumer_leaf", &consumer_leaf, false);

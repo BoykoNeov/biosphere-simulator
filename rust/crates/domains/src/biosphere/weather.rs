@@ -72,7 +72,10 @@ pub fn weather_facts() -> (f64, Vec<WeatherRow>) {
             });
         }
     }
-    (latitude.expect("weather_facts.txt has a latitude line"), rows)
+    (
+        latitude.expect("weather_facts.txt has a latitude line"),
+        rows,
+    )
 }
 
 /// Astronomical daylight duration (s) from latitude + day-of-year (FAO-56). Mirrors

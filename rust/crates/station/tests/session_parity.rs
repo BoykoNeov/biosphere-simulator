@@ -73,7 +73,11 @@ fn single_rate_session_matches_run_station_bit_exact() {
     session.step_n(CABIN_GAS_STEPS).unwrap();
 
     assert_eq!(session.n(), CABIN_GAS_STEPS, "step count");
-    assert_eq!(snap(session.state()), snap(&ref_final), "state bit-identical");
+    assert_eq!(
+        snap(session.state()),
+        snap(&ref_final),
+        "state bit-identical"
+    );
     assert_eq!(session.total_rationed(), ref_rationed, "rationed");
     assert_eq!(session.events(), ref_events.as_slice(), "events");
     // Non-vacuous: the run is well-fed (else the comparison would pass trivially).
@@ -114,6 +118,7 @@ fn two_rate_greenhouse_session_matches_run_greenhouse_bit_exact() {
         greenhouse_bio_resolver(&scenario).unwrap(),
         greenhouse_cabin_resolver(&scenario).unwrap(),
         scenario.steps_per_day,
+        scenario.bio_steps_per_day,
         scenario.bio_dt,
         scenario.cabin_dt,
         None,
@@ -121,7 +126,12 @@ fn two_rate_greenhouse_session_matches_run_greenhouse_bit_exact() {
     .unwrap();
     session.step_n(scenario.days as u64).unwrap();
 
-    assert_eq!(session.n(), scenario.days as u64, "master-day count");
+    // ⚠ `step_n` counts master days; `n` counts the slow domain's STEPS.
+    assert_eq!(
+        session.n(),
+        scenario.days as u64 * domains::biosphere::STEPS_PER_DAY as u64,
+        "slow-step count after scenario.days master days"
+    );
     assert_eq!(snap(session.state()), snap(ref_last), "state bit-identical");
     assert_eq!(session.total_rationed(), ref_rationed, "rationed");
     assert_eq!(session.events(), ref_events.as_slice(), "events");
@@ -175,6 +185,7 @@ fn parity_sealed(days: u64) {
         &sealed_fast_resolver(&charge, &scenario).unwrap(),
         days as usize,
         scenario.steps_per_day,
+        scenario.bio_steps_per_day,
         scenario.bio_dt,
         scenario.cabin_dt,
         Some(&*ref_reset),
@@ -194,6 +205,7 @@ fn parity_sealed(days: u64) {
         sealed_bio_resolver(&lamp, &scenario).unwrap(),
         sealed_fast_resolver(&charge, &scenario).unwrap(),
         scenario.steps_per_day,
+        scenario.bio_steps_per_day,
         scenario.bio_dt,
         scenario.cabin_dt,
         Some(sealed_reset_hook(&scenario)),
@@ -201,7 +213,12 @@ fn parity_sealed(days: u64) {
     .unwrap();
     session.step_n(days).unwrap();
 
-    assert_eq!(session.n(), days, "master-day count");
+    // ⚠ `step_n` counts master days; `n` counts the slow domain's STEPS.
+    assert_eq!(
+        session.n(),
+        days * domains::biosphere::STEPS_PER_DAY as u64,
+        "slow-step count after `days` master days"
+    );
     assert_eq!(snap(session.state()), snap(ref_last), "state bit-identical");
     assert_eq!(session.total_rationed(), ref_rationed, "rationed");
     assert_eq!(session.events(), ref_events.as_slice(), "events");

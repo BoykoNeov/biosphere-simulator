@@ -44,7 +44,7 @@
     "thermal_equilibrium": [],
     "water_recovery": []
   },
-  "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1 day + everything-fast dt=60 s; Tier-1 energy single-rate dt=3600 s.",
+  "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/4 day, 4 slow sub-steps per master day + everything-fast dt=60 s; Tier-1 energy single-rate dt=3600 s.",
   "param_files": {
     "charge.yaml": "e82def3cdf9420921952a5c960eacd636e41b74a7b378a04e3a25d7602e622a2",
     "crew.yaml": "69f6f2ae1defacf137eb796c7042e2648e591eb3d5709e59717a48f13935ac23",
@@ -74,17 +74,17 @@
     },
     "greenhouse": {
       "golden": "greenhouse_state.json",
-      "golden_sha256": "11c7f305ca26bfed57b166500f45201cb9493f05f353d9a43656dcb37c8867d8",
+      "golden_sha256": "482395e33474e3e7c2b4725061de213166d668a171f727d733614f17fcd07d74",
       "scenario": "GREENHOUSE_SCENARIO (P6.3 biosphere\u2194cabin)"
     },
     "harvest": {
       "golden": "harvest_state.json",
-      "golden_sha256": "2ee102ec38a6a710edc59fe82cd196171fef0df50eb0569d65ee9286f4cac0cc",
+      "golden_sha256": "5f9521d66082cc5d3222314c4a62e3bcf69fa2ba79845bc5612b096154b2d886",
       "scenario": "HARVEST_SCENARIO (P6.6 biomass\u2192food)"
     },
     "lighting": {
       "golden": "lighting_state.json",
-      "golden_sha256": "20295ebec4dfe8e2b679a5e46241682b8c6c549a79e9dc2b4f7e743be70fb569",
+      "golden_sha256": "0d97c64bb2407c34210cfa41f777e5a8c933b7175025726cecb3eee6a1d5e0ce",
       "scenario": "LIGHTING_SCENARIO (P6.5 Power\u2192biosphere lamp)"
     },
     "power_bounded_soc": {
@@ -104,7 +104,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "0314720a64b79c5ef238e290ba409143ef604f9327888070fd723380c3282e0e",
+      "golden_sha256": "eba54566a424b1b1a0395e95265b574225b8580238082f9ab4247060af5bf68e",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

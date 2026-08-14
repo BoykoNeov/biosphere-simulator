@@ -96,12 +96,27 @@ fn brownout_graceful_cools_node_without_rationing() {
     assert_eq!(rationed, 0);
     assert!(events.is_empty());
 
-    let base_soc_min = base_states.iter().map(|s| s.stocks[BATTERY].amount).fold(f64::INFINITY, f64::min);
-    let soc_min = states.iter().map(|s| s.stocks[BATTERY].amount).fold(f64::INFINITY, f64::min);
-    assert!(soc_min < base_soc_min && soc_min > 0.0, "SOC dips but never empties");
+    let base_soc_min = base_states
+        .iter()
+        .map(|s| s.stocks[BATTERY].amount)
+        .fold(f64::INFINITY, f64::min);
+    let soc_min = states
+        .iter()
+        .map(|s| s.stocks[BATTERY].amount)
+        .fold(f64::INFINITY, f64::min);
+    assert!(
+        soc_min < base_soc_min && soc_min > 0.0,
+        "SOC dips but never empties"
+    );
 
-    let base_t_min = base_states.iter().map(|s| node_temp(s, &thermal)).fold(f64::INFINITY, f64::min);
-    let t_min = states.iter().map(|s| node_temp(s, &thermal)).fold(f64::INFINITY, f64::min);
+    let base_t_min = base_states
+        .iter()
+        .map(|s| node_temp(s, &thermal))
+        .fold(f64::INFINITY, f64::min);
+    let t_min = states
+        .iter()
+        .map(|s| node_temp(s, &thermal))
+        .fold(f64::INFINITY, f64::min);
     assert!(t_min < base_t_min, "node cools — the cross-domain cascade");
 }
 
@@ -126,7 +141,10 @@ fn brownout_deep_emerges_rationing_still_conserving() {
     )
     .unwrap();
     assert!(rationed > 0, "the emergent failure signature");
-    assert!(rationed < E_DAYS * e_spd(), "bounded (not every step rations)");
+    assert!(
+        rationed < E_DAYS * e_spd(),
+        "bounded (not every step rations)"
+    );
     assert!(events.is_empty());
 }
 
@@ -143,21 +161,26 @@ fn radiator_failure_heats_node_conserving_no_rationing() {
         with_radiator_failure(&state, reg, resolver, 3 * e_spd(), 9 * e_spd(), 0.0).unwrap();
     let integ = EulerIntegrator::new(preg);
     let mut states = Vec::new();
-    let (_f, rationed, events) = station::run_station(
-        &integ,
-        state,
-        &pres,
-        e_dt(),
-        E_DAYS * e_spd(),
-        &mut |s| states.push(s.clone()),
-    )
-    .unwrap();
+    let (_f, rationed, events) =
+        station::run_station(&integ, state, &pres, e_dt(), E_DAYS * e_spd(), &mut |s| {
+            states.push(s.clone())
+        })
+        .unwrap();
     assert_eq!(rationed, 0);
     assert!(events.is_empty());
 
-    let base_t_max = base_states.iter().map(|s| node_temp(s, &thermal)).fold(f64::NEG_INFINITY, f64::max);
-    let t_max = states.iter().map(|s| node_temp(s, &thermal)).fold(f64::NEG_INFINITY, f64::max);
-    assert!(t_max > base_t_max, "node overheats — the cross-domain cascade");
+    let base_t_max = base_states
+        .iter()
+        .map(|s| node_temp(s, &thermal))
+        .fold(f64::NEG_INFINITY, f64::max);
+    let t_max = states
+        .iter()
+        .map(|s| node_temp(s, &thermal))
+        .fold(f64::NEG_INFINITY, f64::max);
+    assert!(
+        t_max > base_t_max,
+        "node overheats — the cross-domain cascade"
+    );
     // The space sink is monotonic (heat never un-radiates).
     for w in states.windows(2) {
         assert!(w[1].stocks[SPACE].amount >= w[0].stocks[SPACE].amount - 1e-6);
@@ -180,9 +203,8 @@ fn inspection_is_truthful_under_deep_brownout_rationing() {
 
     let mut saw_rationing = false;
     for _ in 0..(E_DAYS * e_spd()) {
-        let insp =
-            station::inspection::inspect_flows(integ.registry(), &state, &perturbed, e_dt())
-                .unwrap();
+        let insp = station::inspection::inspect_flows(integ.registry(), &state, &perturbed, e_dt())
+            .unwrap();
         let report = integ.step_report(&state, &perturbed, e_dt()).unwrap();
         if report.rationed > 0 {
             saw_rationing = true;
@@ -200,7 +222,10 @@ fn inspection_is_truthful_under_deep_brownout_rationing() {
         }
         state = report.state;
     }
-    assert!(saw_rationing, "deep brownout should drive LoadDraw into rationing");
+    assert!(
+        saw_rationing,
+        "deep brownout should drive LoadDraw into rationing"
+    );
 }
 
 #[test]
@@ -215,23 +240,25 @@ fn radiator_failure_outside_window_is_baseline() {
     let (preg, pres) =
         with_radiator_failure(&state, reg, resolver, 100 * e_spd(), 101 * e_spd(), 0.0).unwrap();
     let integ = EulerIntegrator::new(preg);
-    let (final_state, _r, _e) = station::run_station(
-        &integ,
-        state,
-        &pres,
-        e_dt(),
-        E_DAYS * e_spd(),
-        &mut |_| {},
-    )
-    .unwrap();
+    let (final_state, _r, _e) =
+        station::run_station(&integ, state, &pres, e_dt(), E_DAYS * e_spd(), &mut |_| {}).unwrap();
     assert_eq!(&final_state, base_states.last().unwrap());
 }
 
 // ============================ MATTER: short two-rate run_master_day ===================
 
 const M_DAYS: usize = 8;
-const M_START: u64 = 2;
-const M_END: u64 = 7; // window (master days) — inside year 1
+// ⚠ In DAYS, converted below, because the perturbation forcings key on `n` — the slow
+// domain's STEP count, not the day count. Mirrors Python's `steps_for(2), steps_for(7)`.
+const M_START_DAYS: u64 = 2;
+const M_END_DAYS: u64 = 7; // window (days) — inside year 1
+
+fn m_start() -> u64 {
+    M_START_DAYS * domains::biosphere::STEPS_PER_DAY as u64
+}
+fn m_end() -> u64 {
+    M_END_DAYS * domains::biosphere::STEPS_PER_DAY as u64
+}
 const K_LEAK: f64 = 1.0e-3;
 
 // season_days >> the run horizon ⇒ the annual reset never fires (window stays in year 1).
@@ -252,7 +279,11 @@ fn biomass(state: &State) -> f64 {
 
 /// Build the sealed pieces (`false, false` — the palette `sealed` config, no harvest / open
 /// feces), matching the session-parity conventions.
-fn sealed_build() -> (State, simcore::registry::Registry, simcore::registry::Registry) {
+fn sealed_build() -> (
+    State,
+    simcore::registry::Registry,
+    simcore::registry::Registry,
+) {
     let scn = matter_scenario();
     build_sealed_station(
         &domains::params::charge(),
@@ -285,6 +316,7 @@ fn sealed_run(
         fast_res,
         M_DAYS,
         scn.steps_per_day,
+        scn.bio_steps_per_day,
         scn.bio_dt,
         scn.cabin_dt,
         None,
@@ -300,8 +332,7 @@ fn sealed_baseline() -> &'static State {
         let (state, bio_reg, fast_reg) = sealed_build();
         let bio_res = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
         let fast_res = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
-        let (states, rationed, events) =
-            sealed_run(state, bio_reg, fast_reg, &bio_res, &fast_res);
+        let (states, rationed, events) = sealed_run(state, bio_reg, fast_reg, &bio_res, &fast_res);
         assert_eq!(rationed, 0);
         assert!(events.is_empty());
         states.last().unwrap().clone()
@@ -314,7 +345,14 @@ fn run_carbon_leak(pool: &str) -> State {
     let fast_res = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
     let bio_res = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
     let (state, bio_reg, fast_reg, fast_res) = with_station_leak(
-        &state, bio_reg, fast_reg, fast_res, pool, K_LEAK, M_START, M_END,
+        &state,
+        bio_reg,
+        fast_reg,
+        fast_res,
+        pool,
+        K_LEAK,
+        m_start(),
+        m_end(),
     )
     .unwrap();
     let (states, rationed, events) = sealed_run(state, bio_reg, fast_reg, &bio_res, &fast_res);
@@ -339,14 +377,31 @@ fn carbon_leak_lowers_biomass_and_scrubber_effort() {
 fn o2_leak_is_absorbed_by_makeup_effort() {
     // O2_POOL is DEFENDED (O2Makeup is demand-controlled), so — unlike CARBON — the leak
     // surfaces as makeup EFFORT, not a pool/biology change: o2_supply supplies strictly MORE
-    // (its cumulative bookkeeping runs further negative), the plant is UNTOUCHED, and the
-    // leak-sink accumulates. The two pools fail differently.
+    // (its cumulative bookkeeping runs further negative), the plant is essentially UNTOUCHED,
+    // and the leak-sink accumulates. The two pools fail differently.
     let baseline = sealed_baseline();
     let leaked = run_carbon_leak(O2_POOL);
     assert!(leaked.stocks[O2_SUPPLY].amount < baseline.stocks[O2_SUPPLY].amount);
-    let rel = (biomass(&leaked) - biomass(baseline)).abs() / biomass(baseline).abs();
-    assert!(rel < 1e-6, "biomass ≈ baseline (rel {rel})");
     assert!(leaked.stocks[LEAK_SINK].amount > 0.0);
+
+    // ⚠ The "untouched" claim is a CONTRAST and is asserted as one — mirrors the Python
+    // reference (see its comment for the full derivation). The old absolute `rel < 1e-6`
+    // went red at dt=1/4 on a 1.5e-5 deviation, which is the operator split resolving the
+    // intra-day O₂ drawdown more finely, not the defence failing. Measured: CARBON moves
+    // biomass 16.6 %, O₂ 0.0015 % — a 10715× contrast. The ratio form is scale-free and
+    // strictly stronger (the old form also passed if the carbon leak did nothing).
+    let base_b = biomass(baseline);
+    let o2_effect = (biomass(&leaked) - base_b).abs() / base_b.abs();
+    let carbon_effect = (biomass(&run_carbon_leak(CARBON_POOL)) - base_b).abs() / base_b.abs();
+    assert!(
+        carbon_effect > 1000.0 * o2_effect,
+        "the defended pool must be orders quieter than the undefended one: \
+         carbon {carbon_effect:.3e} vs O2 {o2_effect:.3e}"
+    );
+    assert!(
+        o2_effect < 1e-3,
+        "and quiet in absolute terms too: {o2_effect:.3e}"
+    );
 }
 
 #[test]
@@ -359,7 +414,7 @@ fn crew_spike_raises_regulator_effort_and_drains_food() {
     let (state, bio_reg, fast_reg) = sealed_build();
     let bio_res = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
     let fast_res = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
-    let fast_res = with_crew_load_spike(fast_res, M_START, M_END, 2.0).unwrap();
+    let fast_res = with_crew_load_spike(fast_res, m_start(), m_end(), 2.0).unwrap();
     let (states, rationed, events) = sealed_run(state, bio_reg, fast_reg, &bio_res, &fast_res);
     assert_eq!(rationed, 0);
     assert!(events.is_empty());
@@ -386,7 +441,7 @@ fn lighting_failure_stalls_growth_and_spares_battery() {
     let (state, bio_reg, fast_reg) = sealed_build();
     let bio_res = sealed_bio_resolver(&station::params::lamp(), &scn).unwrap();
     let fast_res = sealed_fast_resolver(&domains::params::charge(), &scn).unwrap();
-    let (bio_res, fast_res) = with_lighting_failure(bio_res, fast_res, M_START, M_END).unwrap();
+    let (bio_res, fast_res) = with_lighting_failure(bio_res, fast_res, m_start(), m_end()).unwrap();
     let (states, rationed, events) = sealed_run(state, bio_reg, fast_reg, &bio_res, &fast_res);
     assert_eq!(rationed, 0);
     assert!(events.is_empty());

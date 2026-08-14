@@ -283,10 +283,18 @@ def _build_manifest() -> dict[str, object]:
         "reference_doc": "docs/station-reference.md",
         "delegates_to": BIOSPHERE_MANIFEST,
         "integrator": "EulerIntegrator",
+        # ⚠ HAND-MAINTAINED PROSE, AND NOTHING CHECKS IT. This literal is compared only
+        # against the on-disk manifest generated from this same literal, so the two
+        # agree whatever the code does — flipping bio_dt reddens nothing here. The
+        # biosphere contract is different: test_freeze_manifest.py asserts dt_days
+        # against a hard-coded number and fails loudly. Do not assume the loud gate on
+        # that side covers this one. Update this string by hand as part of any step
+        # ceremony (done 2026-08-14, dt=1 -> dt=1/4).
         "numerics_note": (
             "Euler everywhere; dt per scenario (enforced by goldens, no importable "
-            "constant). Sealed reference: biosphere-slow dt=1 day + everything-fast "
-            "dt=60 s; Tier-1 energy single-rate dt=3600 s."
+            "constant). Sealed reference: biosphere-slow dt=1/4 day, 4 slow sub-steps "
+            "per master day + everything-fast dt=60 s; Tier-1 energy single-rate "
+            "dt=3600 s."
         ),
         "sealed_station_years": SEALED_STATION_YEARS,
         "sealed_energy_years": SEALED_ENERGY_YEARS,

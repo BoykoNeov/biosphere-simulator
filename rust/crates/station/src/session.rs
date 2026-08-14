@@ -31,12 +31,19 @@ use simcore::events::Event;
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
 
-use crate::driver::{advance_one_master_day, OwnedResetHook, SECONDS_PER_DAY};
+use crate::driver::{advance_one_master_day, OwnedResetHook, DAYS_PER_MASTER_DAY, SECONDS_PER_DAY};
 
 /// The per-mode machinery a [`SimSession`] owns. A single-rate session ticks one
 /// `step_report` per [`SimSession::step`]; a two-rate (sealed / greenhouse) session ticks
 /// one **master day** — one slow biosphere step + `steps_per_day` fast sub-steps — per
 /// step (`n` is the day count under the `substep`-keeps-`n` design).
+// ⚠ Deliberate, not an oversight. Adding `slow_steps_per_day` (8 bytes) for the step
+// unfreeze pushed this over clippy's variant-size-difference threshold (376 → 384). The
+// lint guards against wasting memory across MANY instances; a process holds exactly one
+// live session (the worker thread owns it from birth), so the waste is ~200 bytes total.
+// The suggested fix — boxing a `SourceResolver` — would add indirection to the
+// parity-critical stepping path to save nothing measurable.
+#[allow(clippy::large_enum_variant)]
 enum Mode {
     SingleRate {
         integrator: EulerIntegrator,
@@ -49,6 +56,7 @@ enum Mode {
         slow_resolver: SourceResolver,
         fast_resolver: SourceResolver,
         steps_per_day: u64,
+        slow_steps_per_day: u64,
         slow_dt: f64,
         fast_dt: f64,
         reset: Option<OwnedResetHook>,
@@ -96,14 +104,14 @@ impl SimSession {
     }
 
     /// A **two-rate** session (sealed / greenhouse: one **master day** per
-    /// [`step`](SimSession::step) — one slow biosphere `step_report` + `steps_per_day`
-    /// fast sub-steps, the conservation gate re-asserted after each). Mirrors
-    /// [`crate::sealed::run_sealed`]'s setup; `step` calls the same
+    /// [`step`](SimSession::step) — `slow_steps_per_day` slow biosphere `step_report`s +
+    /// `steps_per_day` fast sub-steps, the conservation gate re-asserted after each).
+    /// Mirrors [`crate::sealed::run_sealed`]'s setup; `step` calls the same
     /// [`crate::driver::advance_one_master_day`] its loop does. Pass the re-sow hook from
     /// [`crate::sealed::sealed_reset_hook`] (or `None` for the greenhouse's no-reset seam).
     ///
-    /// Requires `fast_dt · steps_per_day == 86400` (one day), exactly like
-    /// [`crate::driver::run_master_day`] — validated once here at construction.
+    /// Requires `fast_dt · steps_per_day == 86400` s and `slow_dt · slow_steps_per_day == 1`
+    /// day, exactly like [`crate::driver::run_master_day`] — validated once at construction.
     #[allow(clippy::too_many_arguments)]
     pub fn two_rate(
         slow_integrator: EulerIntegrator,
@@ -112,15 +120,23 @@ impl SimSession {
         slow_resolver: SourceResolver,
         fast_resolver: SourceResolver,
         steps_per_day: u64,
+        slow_steps_per_day: u64,
         slow_dt: f64,
         fast_dt: f64,
         reset: Option<OwnedResetHook>,
     ) -> Result<Self, SimError> {
         if fast_dt * steps_per_day as f64 != SECONDS_PER_DAY {
             return Err(SimError::Validation(format!(
-                "fast_dt*steps_per_day must equal one day ({SECONDS_PER_DAY} s) so n stays \
-                 the day count, got {fast_dt}*{steps_per_day} = {}",
+                "fast_dt*steps_per_day must equal one day ({SECONDS_PER_DAY} s) so the fast \
+                 operator covers one master day, got {fast_dt}*{steps_per_day} = {}",
                 fast_dt * steps_per_day as f64
+            )));
+        }
+        if slow_dt * slow_steps_per_day as f64 != DAYS_PER_MASTER_DAY {
+            return Err(SimError::Validation(format!(
+                "slow_dt*slow_steps_per_day must equal one day ({DAYS_PER_MASTER_DAY}) so the \
+                 slow operator covers one master day, got {slow_dt}*{slow_steps_per_day} = {}",
+                slow_dt * slow_steps_per_day as f64
             )));
         }
         Ok(SimSession {
@@ -130,6 +146,7 @@ impl SimSession {
                 slow_resolver,
                 fast_resolver,
                 steps_per_day,
+                slow_steps_per_day,
                 slow_dt,
                 fast_dt,
                 reset,
@@ -146,8 +163,9 @@ impl SimSession {
         &self.state
     }
 
-    /// The current integer step count `n` — steps taken (single-rate) or master days
-    /// taken (two-rate; `n` is the day count).
+    /// The current integer step count `n` — steps taken by the domain that owns `n`
+    /// (single-rate: that domain; two-rate: the **slow** domain, so `n` is
+    /// `master_days · slow_steps_per_day`, not the day count).
     pub fn n(&self) -> u64 {
         self.state.n
     }
@@ -234,6 +252,7 @@ impl SimSession {
                 slow_resolver,
                 fast_resolver,
                 steps_per_day,
+                slow_steps_per_day,
                 slow_dt,
                 fast_dt,
                 reset,
@@ -245,6 +264,7 @@ impl SimSession {
                     slow_resolver,
                     fast_resolver,
                     *steps_per_day,
+                    *slow_steps_per_day,
                     *slow_dt,
                     *fast_dt,
                     reset.as_deref(),
@@ -342,7 +362,10 @@ mod tests {
         let mut session = cabin_gas_session();
         session.step_n(100).unwrap();
         let before = session.state().clone();
-        let insp = session.inspect_flows().unwrap().expect("single-rate has inspection");
+        let insp = session
+            .inspect_flows()
+            .unwrap()
+            .expect("single-rate has inspection");
         assert_eq!(insp.n, before.n);
         session.step().unwrap();
         let after = session.state();

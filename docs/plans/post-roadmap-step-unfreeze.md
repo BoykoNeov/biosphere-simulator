@@ -284,11 +284,130 @@ diagnosable rather than merely surprising.
 | sealed-station crew / ECLSS / power stocks | small | coupled to the biosphere only through the gas and food seams, and buffered |
 | `rationed`, extinction `events` | **0 and `()`** | ⚠ **assertions, not predictions** |
 
+**(iv-b) Two pre-commit checks, both discharged 2026-08-14 (advisor).**
+
+* ⚠ **Item 7's CI discharge reasoned only about the BIOSPHERE goldens.** The four station
+  goldens now carry moved transcendental biosphere values too, so the same reasoning has to
+  be *checked*, not assumed, for them. It holds: `test_regression_sealed_station.py`,
+  `test_regression_greenhouse.py`, `test_regression_lighting.py` and
+  `test_regression_harvest.py` all carry `windows_golden_only`. Regenerating on Windows
+  will not redden CI on either side.
+* **No manifest horizon is a step count.** All seven `docs/biosphere-reference.manifest.json`
+  scenario rows record `years` (1/3/5/15), so no horizon field moves with the step — only
+  `dt_days` and the per-golden `golden_sha256`s. (`n_limited` and `water_biting` are goldens
+  on disk with no manifest row at all — the "coverage roster ≠ manifest" asymmetry, which is
+  why §4b(i) is enumerated from disk.)
+
 **(v) The shape assertions, restated for the station.** `states` holds one entry per **master
 day**, and `slow_steps_per_day` does not change that (`driver.py` keeps `states.append` in the
 master-day loop). So **every station trajectory length is unchanged** and every day-indexed
 slice in the station tests stays correct. A station trajectory that got 4× longer means the
 `states.append` moved inside the slow loop — a driver bug, not a step effect.
+
+### 4c. ✅ The prediction, scored against the regeneration (2026-08-14)
+
+Written before any constant moved, scored after. **Every structural prediction held; nothing
+in (i)–(iii) or (v) needed revision.**
+
+* **(i) `n` — 12 of 12 exact.** 1220 / 1220 / 1220 / 3660 / 6100 / 6100 / 18300 / 18300 for
+  the biosphere goldens, 28 / 28 / 28 / 4880 for the station ones. No judgement was involved
+  and none was needed: a single wrong `n` would have been a missed conversion, and there was
+  none.
+* **(ii) The 12 byte-identical goldens — none moved.** `git status` over
+  `tests/regression/golden/` lists exactly the 12 expected files and no others. The step did
+  not leak into the sibling-domain goldens.
+* **(iii) The lighting seam's Power half — bit-identical, as claimed.** Comparing stock-by-stock
+  against `HEAD`: every `biosphere.*` stock moved, and `power.battery`,
+  `boundary.waste_heat` and `boundary.light_used` are **unchanged to the last bit**. This is
+  the sharpest single result in the ceremony — it independently confirms the seam really is
+  coupled by a forcing schedule only, which until now was a claim in a docstring that nothing
+  tested. (`biosphere.storage_c` is also unchanged: a 7-day seedling has not begun filling
+  storage, so it sits at its initial value in both runs.)
+* **(v) Shapes — no line added or removed anywhere.** `git diff --stat` reports
+  **279 insertions and 279 deletions** across the 12 files: every change is a value replacing
+  a value. That is an independent, whole-tree proof that no array changed length, stronger
+  than checking the three `drift_summary` arrays by hand. `horizon_years` is still 15, the
+  three arrays are still 15 long, and both `is_period_2` flags are still `false` (they were
+  `false` before — the 4×-resampling worry in §4 never arose because the segmentation was
+  converted).
+
+**The VALUE rows, measured independently of the suite** (`temp/step-unfreeze/probe_co2.py`,
+so the two assertion rows are read on their own rather than buried among suite failures):
+
+| row | predicted | measured | verdict |
+|---|---|---|---|
+| **sealed season-low CO₂** | ~75.8 ppm | **76.82 ppm** | ✅ **clears 61.07 — the point of the ceremony** |
+| sealed peak leaf C | ~0.8923 | **0.892261** | ✅ on the nose |
+| open field peak leaf C | ~9.4889 | **9.488895** | ✅ exact to 6 s.f. |
+| perennial decade CO₂ trough | ~75.5 | **75.48** | ✅ (probe, §5 item 0) |
+| `rationed` | **0** — assertion | **0** | ✅ |
+| extinction `events` | **()** — assertion | **()** | ✅ |
+
+⚠ **One discrepancy, recorded rather than smoothed.** The sealed season-low came in at
+**76.82 ppm**, about 1 ppm *above* §4's predicted 75.8 — and above the **76.29** that
+`step.py`'s docstring quotes as the *RK4 limit* the refinement sequence converges toward. A
+Euler run at a finite step should sit below that limit, not above it, so one of the two
+numbers is measured on a different subject. The likely explanation is that the sweep's figure
+predates several mechanisms that have since landed (stem reserves, soil layers, root
+coupling), so its converged limit is a limit for a tree that no longer exists — but that is an
+*explanation*, not a measurement, and it is not being treated as one. **It does not block:**
+the authorized criterion is clearing the compensation point at 61.07 ppm, which 76.82 does by
+a wide margin in the same direction. ⚠ **The `step.py` docstring's convergence sequence and
+RK4 limit are therefore STALE and must not be re-quoted as current** until re-measured on
+today's tree. Filed as a successor, not fixed here — re-measuring an RK4 limit is a
+refinement study, not part of this ceremony.
+
+### 4d. What the PORT caught that the reference did not (2026-08-14)
+
+The purity rule says the port has no reference authority — a Rust run that surfaces a Python
+bug is an unfreeze-discipline **finding**, never a native-side fix. It happened twice here,
+and both were fixed in Python first and mirrored.
+
+**(1) A sixth-class site the commit-1 sweep MISSED.** `tests/test_station_perturbations.py`
+had `_START, _END = 2, 7  # window (master days)`, and the perturbation forcings key on `n`.
+At `dt = ¼` that reads as **days 0.5–1.75 instead of days 2–7** — a 4× shorter window in a
+different part of the run. Commit 1's three-pass sweep covered the biosphere's
+`test_perturbations.py` and **not this station sibling**; the caller-of-`year_summaries`
+method that caught the last biosphere site does not generalise to a *different* callee. The
+Rust port's `o2_leak_is_absorbed_by_makeup_effort` went red on it. ⚠ **The lesson is about
+the sweep, not the site: "enumerate by callee" has to be repeated for EVERY callee that
+carries a unit** — `year_summaries`, `with_station_leak`, `with_crew_load_spike`,
+`with_lighting_failure`, `run_perennial`'s reset period — not just the one that produced the
+lesson. Both ports' `with_station_leak` docstrings also asserted *"`n` is the day count, so
+the window activates on whole master days"*; corrected.
+
+**(2) A test whose tolerance was arbitrary, kept by measuring instead of loosening.**
+`o2_leak_is_absorbed_by_makeup_effort` claims the two pools *"fail differently"*: a CARBON
+leak changes the biology, an O₂ leak is absorbed by the demand-controlled makeup and leaves
+the plant alone. "Leaves the plant alone" was pinned as `rel_tol = 1e-6`, and after the
+window fix it still failed — at `1.55e-5`, in **both ports identically**, which is itself the
+evidence that this is the reference's behaviour and not a port defect.
+
+It is a real and explainable effect: per master day the slow domain now takes four steps
+before any fast makeup runs, so the plant sees the intra-day O₂ drawdown at four
+progressively lower levels instead of one, and `f_O2` self-limitation responds slightly
+differently. Magnitude: **0.0015 %**.
+
+⚠ **Loosening `1e-6` to `1e-4` would have been weakening a test to make it pass**, which this
+project forbids. Measured the contrast instead: the CARBON leak moves biomass **16.6 %**, the
+O₂ leak **0.0015 %** — a factor of **10715**. The assertion is now that ratio, in both ports.
+That is **strictly stronger** than what it replaced: the old absolute form also passed if the
+carbon leak did nothing at all, and the new one does not. *An absolute tolerance standing in
+for a contrast is a pin waiting to break on the first scale change; write the contrast.*
+
+**(3) Six `n`-is-the-day-count assumptions in the consumer layers**, all in the Godot bridge,
+session, palette and save/load parity tests (`session.n() == master_days`). Fixed by
+converting, and the save/load helper now takes an explicit `steps_per_unit` because
+`step_n` counts **master days** while `n` counts **slow steps**. Also `FastForwardTo(n)`
+targets a step count while `step_n` takes master days — the worker-parity test passed the
+same number to both. ⚠ **The public `fast_forward_to(n)` Godot API is documented in steps and
+is unchanged; a front-end that means "day 5" must convert.** Flagged, not redesigned: the API
+semantics are a Phase-8 consumer question, not part of this ceremony.
+
+**(4) One clippy lint, allowed with a reason.** `slow_steps_per_day` pushed `session::Mode`
+from 376 to 384 bytes, crossing `large_enum_variant`. A process holds exactly one live
+session, so the waste is ~200 bytes; the suggested fix boxes a resolver on the
+parity-critical stepping path. Allowed with the rationale written at the site.
 
 ## 5. The rest of the ceremony, in order
 
@@ -367,7 +486,22 @@ slice in the station tests stays correct. A station trajectory that got 4× long
 6. **The Rust mirror** — the port has no reference authority; it mirrors the rule. The
    `_table` analogue is `rust/crates/domains/src/biosphere/system.rs::table_schedule`
    (mirrored in `6861e2b`, bit-identical at `dt = 1`); the step constant needs the same
-   treatment when it moves.
+   treatment when it moves. ⚠ **Item 6 named only the biosphere step constant and that was
+   short** (advisor): `rust/crates/station/src/scenario.rs` carried four independent
+   `bio_dt: 1.0` literals, the Rust `driver`/`session` needed the same `slow_steps_per_day`
+   split as Python (`session` shares `advance_one_master_day` with the runner by the Phase-8
+   parity discipline, so it moves with it), and `sealed_reset_hook`'s period needed the same
+   days→steps conversion. All bound to `domains::biosphere::{BIO_DT, STEPS_PER_DAY}` rather
+   than re-declared.
+
+   ⚠ **A conflation this ceremony ACCIDENTALLY CREATED, caught by advisor and fixed the same
+   day.** The Rust side already had a `steps_for`, and it took **years** where Python's takes
+   **days**. Both were arithmetically right, and mirroring the step into the Rust one left the
+   *same name meaning two different units across the two ports* — the exact defect this whole
+   ceremony exists to remove, re-introduced by the fix for it. Renamed to `steps_for_years`,
+   with a real `steps_for(days)` added alongside matching Python's unit exactly. The lesson is
+   narrow and worth keeping: **a cross-port pair must agree on the unit of a shared name, and
+   a rename in one port is not a mirror unless the unit mirrors too.**
 7. ~~⚠ **The CI hazard**~~ ✅ **DISCHARGED 2026-08-14 — no new work.** `tests/golden_platform.py`
    already gates every transcendental golden behind `windows_golden_only`
    (`skipif sys.platform != "win32"`), precisely because hex-float goldens are byte-exact

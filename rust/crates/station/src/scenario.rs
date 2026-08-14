@@ -5,7 +5,9 @@
 //! `StationScenario`-wrapping-`PowerScenario` rhythm). Only the fields the eight coupled
 //! goldens exercise are ported.
 
-use domains::biosphere::{SeasonScenario, DEFAULT_SCENARIO, LONG_HORIZON_YEARS};
+use domains::biosphere::{
+    SeasonScenario, BIO_DT, DEFAULT_SCENARIO, LONG_HORIZON_YEARS, STEPS_PER_DAY,
+};
 use domains::power::{PowerScenario, BOUNDED_SOC_SCENARIO};
 
 // --- Step 1 (P6.1): the Power → Thermal heat-closure station --------------------------
@@ -107,8 +109,10 @@ pub struct GreenhouseScenario {
     pub steps_per_day: u64,
     /// The cabin sub-step dt (s).
     pub cabin_dt: f64,
-    /// The biosphere structural step (day).
+    /// The biosphere's integration step (day) — mirrors `domains::biosphere::BIO_DT`.
     pub bio_dt: f64,
+    /// Slow (biosphere) sub-steps per master day — mirrors `STEPS_PER_DAY`.
+    pub bio_steps_per_day: u64,
 }
 
 /// `GREENHOUSE_SCENARIO`: the frozen sealed biosphere breathing the crew's cabin air.
@@ -119,7 +123,8 @@ pub fn greenhouse_scenario() -> GreenhouseScenario {
         days: 7,
         steps_per_day: 1440,
         cabin_dt: 60.0,
-        bio_dt: 1.0,
+        bio_dt: BIO_DT,
+        bio_steps_per_day: STEPS_PER_DAY as u64,
     }
 }
 
@@ -150,8 +155,10 @@ pub struct LightingScenario {
     pub steps_per_day: u64,
     /// The Power sub-step dt (s).
     pub power_dt: f64,
-    /// The biosphere structural step (day).
+    /// The biosphere's integration step (day) — mirrors `domains::biosphere::BIO_DT`.
     pub bio_dt: f64,
+    /// Slow (biosphere) sub-steps per master day — mirrors `STEPS_PER_DAY`.
+    pub bio_steps_per_day: u64,
     /// Optional constant habitat air temperature (°C). `None` (the default / frozen
     /// `lighting_scenario()`) keeps the weather-table temperature untouched — the frozen
     /// golden is byte-identical. `Some(t)` overrides `TEMP_VAR` with `constant(t)` in
@@ -188,7 +195,8 @@ pub fn lighting_scenario() -> LightingScenario {
         days: 7,
         steps_per_day: 24,
         power_dt: 3600.0,
-        bio_dt: 1.0,
+        bio_dt: BIO_DT,
+        bio_steps_per_day: STEPS_PER_DAY as u64,
         habitat_temp_c: None,
     }
 }
@@ -209,7 +217,8 @@ pub fn day_neutral_lighting_scenario() -> LightingScenario {
         days: 120,
         steps_per_day: 24,
         power_dt: 3600.0,
-        bio_dt: 1.0,
+        bio_dt: BIO_DT,
+        bio_steps_per_day: STEPS_PER_DAY as u64,
         habitat_temp_c: Some(20.0),
     }
 }
@@ -316,8 +325,10 @@ pub struct SealedStationScenario {
     pub steps_per_day: u64,
     /// The cabin sub-step dt (s).
     pub cabin_dt: f64,
-    /// The biosphere structural step (day).
+    /// The biosphere's integration step (day) — mirrors `domains::biosphere::BIO_DT`.
     pub bio_dt: f64,
+    /// Slow (biosphere) sub-steps per master day — mirrors `STEPS_PER_DAY`.
+    pub bio_steps_per_day: u64,
 }
 
 impl SealedStationScenario {
@@ -340,6 +351,7 @@ pub fn sealed_station_scenario() -> SealedStationScenario {
         season_days: SEALED_STATION_SEASON_DAYS,
         steps_per_day: 1440,
         cabin_dt: 60.0,
-        bio_dt: 1.0,
+        bio_dt: BIO_DT,
+        bio_steps_per_day: STEPS_PER_DAY as u64,
     }
 }

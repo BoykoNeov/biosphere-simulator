@@ -120,6 +120,7 @@ def _run_station(
         steps_per_day=scenario.steps_per_day,
         slow_dt=scenario.bio_dt,
         fast_dt=scenario.cabin_dt,
+        slow_steps_per_day=scenario.bio_steps_per_day,
         slow_reset=sealed_reset(scenario),
     )
 

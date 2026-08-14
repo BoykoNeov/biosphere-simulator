@@ -302,8 +302,11 @@ def with_station_leak(
       disjointness guard holds;
     * the :data:`~domains.biosphere.perturbations.LEAK_VAR` activation forcing is wired
       into the **fast** resolver as a windowed override (``1`` on ``[start, end)``,
-      ``0`` else) — under ``substep`` the day count ``n`` is frozen within a day, so the
-      window activates on whole master days (the sealed-station timing).
+      ``0`` else) — ``substep`` freezes ``n`` within a day, so the window still activates
+      on whole master-day boundaries. ⚠ **But ``start``/``end`` are in ``n``, the slow
+      domain's STEP count, not days.** The two coincided only while the biosphere's step
+      was one day; a caller whose window is in days must convert it with
+      ``domains.biosphere.step.steps_for``.
 
     The chamber interior's closure breaks over the window (mass leaves to ``LEAK_SINK``)
     but **total** mass (interior + sink) stays conserved — the leg is balanced, so a

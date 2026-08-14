@@ -135,6 +135,7 @@ fn build_greenhouse_session() -> Result<(SimSession, DisplayContext), SimError> 
         crate::greenhouse::greenhouse_bio_resolver(&scenario)?,
         crate::greenhouse::greenhouse_cabin_resolver(&scenario)?,
         scenario.steps_per_day,
+        scenario.bio_steps_per_day,
         scenario.bio_dt,
         scenario.cabin_dt,
         None,
@@ -177,6 +178,7 @@ fn build_sealed_session() -> Result<(SimSession, DisplayContext), SimError> {
         crate::sealed::sealed_bio_resolver(&lamp, &scenario)?,
         crate::sealed::sealed_fast_resolver(&charge, &scenario)?,
         scenario.steps_per_day,
+        scenario.bio_steps_per_day,
         scenario.bio_dt,
         scenario.cabin_dt,
         Some(crate::sealed::sealed_reset_hook(&scenario)),
@@ -236,10 +238,15 @@ mod tests {
     #[test]
     fn station_carries_thermal_and_battery_context() {
         let (mut session, ctx) = build_scenario("station").unwrap();
-        session.step_n(crate::scenario::HEAT_CLOSURE_DAYS * 24).unwrap();
+        session
+            .step_n(crate::scenario::HEAT_CLOSURE_DAYS * 24)
+            .unwrap();
         assert_eq!(session.total_rationed(), 0);
         assert!(ctx.thermal.is_some() && ctx.battery.is_some());
-        assert_eq!(ctx.shared_stock_ids, vec![domains::thermal::NODE.to_string()]);
+        assert_eq!(
+            ctx.shared_stock_ids,
+            vec![domains::thermal::NODE.to_string()]
+        );
     }
 
     /// The two-rate `sealed` entry builds with the real re-sow hook and steps a few master days.
@@ -247,7 +254,9 @@ mod tests {
     fn sealed_steps_a_few_master_days() {
         let (mut session, _ctx) = build_scenario("sealed").unwrap();
         session.step_n(3).unwrap();
-        assert_eq!(session.n(), 3);
+        // ⚠ `step_n` counts master days; `n` counts the SLOW DOMAIN'S STEPS. Equal only
+        // while the biosphere's step was one day.
+        assert_eq!(session.n(), 3 * domains::biosphere::STEPS_PER_DAY as u64);
         assert_eq!(session.total_rationed(), 0);
         assert!(session.events().is_empty());
     }

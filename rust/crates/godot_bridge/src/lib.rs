@@ -74,9 +74,7 @@ use save::{parse_save_record, save_record_json, Recipe};
 /// and battery SOC to show. The [`DisplayContext`] carries the per-scenario constants the
 /// display readouts need but `State` lacks (thermal params, battery reference, the declared
 /// shared-stock ids) — see [`station::display`].
-pub(crate) fn build_session(
-    scenario_id: &str,
-) -> Result<(CoreSession, DisplayContext), SimError> {
+pub(crate) fn build_session(scenario_id: &str) -> Result<(CoreSession, DisplayContext), SimError> {
     // The named-scenario dispatch lives gdext-free in `station::palette` so the headless CLI
     // (`station`'s `sim` bin) and this Godot cdylib build from the **same** shared builder —
     // the by-construction "the exact same simulation runs headless" guarantee (Phase-8 Step 8).
@@ -442,6 +440,7 @@ fn build_sealed_perturbed(
         bio_res,
         fast_res,
         scenario.steps_per_day,
+        scenario.bio_steps_per_day,
         scenario.bio_dt,
         scenario.cabin_dt,
         Some(station::sealed::sealed_reset_hook(&scenario)),
@@ -599,7 +598,11 @@ impl SimSession {
     /// bit-for-bit — the builder is a pure refactor, not new science.
     #[func]
     fn build_composed(&mut self, component_ids: PackedStringArray) -> bool {
-        let ids: Vec<String> = component_ids.to_vec().iter().map(|g| g.to_string()).collect();
+        let ids: Vec<String> = component_ids
+            .to_vec()
+            .iter()
+            .map(|g| g.to_string())
+            .collect();
         match build_composed_session(&ids) {
             Ok((session, display)) => {
                 self.inner = Some(session);
@@ -946,7 +949,10 @@ impl SimSession {
     /// Total flows scaled by the Euler backstop so far (a golden run asserts `0`).
     #[func]
     fn total_rationed(&self) -> i64 {
-        self.inner.as_ref().map(|s| s.total_rationed() as i64).unwrap_or(0)
+        self.inner
+            .as_ref()
+            .map(|s| s.total_rationed() as i64)
+            .unwrap_or(0)
     }
 
     /// The raw MXCSR control word on **this** (the stepping) thread. Diagnostic;
@@ -988,9 +994,7 @@ mod tests {
     #[test]
     fn cabin_gas_session_steps_well_fed() {
         let (mut session, _ctx) = build_session("cabin_gas").unwrap();
-        session
-            .step_n(station::scenario::CABIN_GAS_STEPS)
-            .unwrap();
+        session.step_n(station::scenario::CABIN_GAS_STEPS).unwrap();
         assert_eq!(session.n(), station::scenario::CABIN_GAS_STEPS);
         assert_eq!(session.total_rationed(), 0);
         assert!(session.events().is_empty());
@@ -1021,7 +1025,9 @@ mod tests {
         assert!(json.contains("\"eclss\":["));
 
         let (mut station, station_ctx) = build_session("station").unwrap();
-        station.step_n(station::scenario::HEAT_CLOSURE_DAYS * 24).unwrap();
+        station
+            .step_n(station::scenario::HEAT_CLOSURE_DAYS * 24)
+            .unwrap();
         let proj = project(
             station.state(),
             &station_ctx,
@@ -1033,9 +1039,13 @@ mod tests {
         // of initial after whole balanced days.
         let t = proj.temperature_k.expect("station has a node temperature");
         assert!((100.0..400.0).contains(&t), "T_eq out of range: {t}");
-        let soc = proj.soc_percent_of_initial.expect("station has a battery SOC");
+        let soc = proj
+            .soc_percent_of_initial
+            .expect("station has a battery SOC");
         assert!((80.0..120.0).contains(&soc), "SOC out of range: {soc}");
-        assert!(proj.to_json().contains("\"shared_stock_ids\":[\"thermal.node\"]"));
+        assert!(proj
+            .to_json()
+            .contains("\"shared_stock_ids\":[\"thermal.node\"]"));
     }
 
     /// The P8.6 fixed-palette composition path: `{power_plant, radiator}` builds a single-rate
@@ -1046,7 +1056,9 @@ mod tests {
     fn composed_energy_station_builds_steps_and_carries_readouts() {
         let (mut session, ctx) =
             build_composed_session(&["power_plant".into(), "radiator".into()]).unwrap();
-        session.step_n(station::scenario::HEAT_CLOSURE_DAYS * 24).unwrap();
+        session
+            .step_n(station::scenario::HEAT_CLOSURE_DAYS * 24)
+            .unwrap();
         assert_eq!(session.total_rationed(), 0);
         assert!(session.events().is_empty());
         // The display context reflects the parts: a radiator ⇒ node temperature + highlight,
@@ -1060,7 +1072,10 @@ mod tests {
         );
         let t = proj.temperature_k.expect("radiator ⇒ node temperature");
         assert!((100.0..400.0).contains(&t), "T_eq out of range: {t}");
-        assert!(proj.soc_percent_of_initial.is_some(), "power plant ⇒ battery SOC");
+        assert!(
+            proj.soc_percent_of_initial.is_some(),
+            "power plant ⇒ battery SOC"
+        );
         assert!(proj.to_json().contains("thermal.node"));
     }
 
@@ -1071,7 +1086,10 @@ mod tests {
     fn composed_power_plant_alone_has_soc_but_no_temperature() {
         let (session, ctx) = build_composed_session(&["power_plant".into()]).unwrap();
         let proj = project(session.state(), &ctx, 0, 0, session.max_residual());
-        assert!(proj.temperature_k.is_none(), "no radiator ⇒ no node temperature");
+        assert!(
+            proj.temperature_k.is_none(),
+            "no radiator ⇒ no node temperature"
+        );
         assert!(proj.soc_percent_of_initial.is_some(), "power plant ⇒ SOC");
 
         // Adding the leak keeps it single-rate and buildable.
@@ -1087,7 +1105,10 @@ mod tests {
             build_composed_session(&["no_such_part".into()]),
             Err(SimError::Validation(_))
         ));
-        assert!(matches!(build_composed_session(&[]), Err(SimError::Validation(_))));
+        assert!(matches!(
+            build_composed_session(&[]),
+            Err(SimError::Validation(_))
+        ));
         assert!(matches!(
             build_composed_session(&["self_discharge".into()]),
             Err(SimError::Validation(_))
@@ -1101,7 +1122,13 @@ mod tests {
     fn sealed_session_steps_well_fed() {
         let (mut session, _ctx) = build_session("sealed").unwrap();
         session.step_n(3).unwrap();
-        assert_eq!(session.n(), 3, "three master days");
+        // ⚠ n counts the SLOW DOMAIN'S STEPS, not master days — it was the same number
+        // only while the biosphere's step was one day. `step_n` still takes master days.
+        assert_eq!(
+            session.n(),
+            3 * domains::biosphere::STEPS_PER_DAY as u64,
+            "three master days"
+        );
         assert_eq!(session.total_rationed(), 0);
         assert!(session.events().is_empty());
     }
@@ -1126,7 +1153,9 @@ mod tests {
         // The radiator moves heat off `thermal.node` (a contributing flow for the node).
         let touching = insp.flows_touching(domains::thermal::NODE);
         assert!(
-            touching.iter().any(|(id, _)| *id == "thermal.radiator_reject"),
+            touching
+                .iter()
+                .any(|(id, _)| *id == "thermal.radiator_reject"),
             "radiator should touch the node: {touching:?}"
         );
         let json = insp.to_json();
@@ -1147,7 +1176,10 @@ mod tests {
         let (mut session, _ctx) =
             build_perturbed_session("station", "brownout", 2 * spd, 8 * spd, 0.0).unwrap();
         session.step_n(12 * spd).unwrap();
-        assert!(session.total_rationed() > 0, "the failure cascade should ration");
+        assert!(
+            session.total_rationed() > 0,
+            "the failure cascade should ration"
+        );
     }
 
     /// A perturbed `sealed` (carbon leak) builds with the augmented `LEAK_SINK` stock and steps
@@ -1229,7 +1261,13 @@ mod tests {
         let (recipe, state) = parse_save_record(&record).unwrap();
         let (mut resumed, _) = build_from_recipe(&recipe).unwrap();
         resumed.load_state(state).unwrap();
-        assert_eq!(resumed.n(), 2, "loaded two-rate state carries the master-day count");
+        // ⚠ n is the slow domain's STEP count, so two master days is 2·STEPS_PER_DAY.
+        // The claim under test is unchanged: the loaded state resumes at the right point.
+        assert_eq!(
+            resumed.n(),
+            2 * domains::biosphere::STEPS_PER_DAY as u64,
+            "loaded two-rate state carries the elapsed slow-step count"
+        );
         resumed.step_n(1).unwrap();
 
         assert_eq!(
@@ -1287,7 +1325,9 @@ mod tests {
         assert_eq!(session.n(), 168);
         assert_eq!(session.total_rationed(), 0);
         assert!(session.events().is_empty());
-        assert!(from_engine(session.state()).to_json().contains("crew.food_store"));
+        assert!(from_engine(session.state())
+            .to_json()
+            .contains("crew.food_store"));
     }
 
     /// The **"authored ≠ validated"** marker rides out of the loader (the Godot-side surfacing
@@ -1326,7 +1366,10 @@ mod tests {
             let via_authoring = authoring::load_scenario(&path, &BTreeMap::new())
                 .unwrap()
                 .has_authored_kinetics;
-            assert_eq!(via_bridge, via_authoring, "{name}: bridge must not re-derive");
+            assert_eq!(
+                via_bridge, via_authoring,
+                "{name}: bridge must not re-derive"
+            );
         }
     }
 
@@ -1376,7 +1419,12 @@ mod tests {
             display: ctx,
             ..
         } = build_session_from_file(&path, &overrides).unwrap();
-        let big_food = session.state().stocks.get("crew.food_store").unwrap().amount;
+        let big_food = session
+            .state()
+            .stocks
+            .get("crew.food_store")
+            .unwrap()
+            .amount;
         assert!(
             (big_food - 4.0 * base_food).abs() < 1e-9 * base_food.max(1.0),
             "crew_count=4.0 should ~4× the food store: base={base_food} big={big_food}"
@@ -1402,10 +1450,12 @@ mod tests {
             Err(SimError::Validation(_))
         ));
 
-        let crew =
-            std::fs::read_to_string(scenarios_dir().join("crew_mission.yaml")).unwrap();
+        let crew = std::fs::read_to_string(scenarios_dir().join("crew_mission.yaml")).unwrap();
         let rk4 = crew.replace("integrator: euler", "integrator: rk4");
-        assert!(rk4.contains("integrator: rk4"), "the integrator swap must apply");
+        assert!(
+            rk4.contains("integrator: rk4"),
+            "the integrator swap must apply"
+        );
         let tmp = std::env::temp_dir().join("godot_bridge_from_file_rk4.yaml");
         std::fs::write(&tmp, rk4).unwrap();
         let result = build_session_from_file(&tmp, &BTreeMap::new());
@@ -1474,7 +1524,10 @@ mod tests {
         // file meaning different things on the two ports. Deferred exactly as rk4 is.
         let cabin = std::fs::read_to_string(scenarios_dir().join("eclss_cabin.yaml")).unwrap();
         let multirate = cabin.replace("dt: 60.0", "dt: 3600.0\nn_sub: 60");
-        assert!(multirate.contains("n_sub: 60"), "the n_sub insert must apply");
+        assert!(
+            multirate.contains("n_sub: 60"),
+            "the n_sub insert must apply"
+        );
         with_temp_scenario("godot_bridge_multirate.yaml", multirate, |path| {
             // It must be a legal scenario for the refusal to mean anything — the library
             // path builds it fine (k_scrub * 3600/60 = 0.06 < 1).
