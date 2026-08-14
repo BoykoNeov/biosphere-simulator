@@ -43,6 +43,19 @@ plan-doc parity check reads the index *section* on one side and the union of the
 files on the other, so a record naming it puts it on the record side only and turns that
 check red. Record files refer to it as *"the direction plan"* and rely on this paragraph.
 
+⚠ **A SECOND forward-looking plan joined it on 2026-08-14: `post-roadmap-gross-net-gas-exchange.md`**
+— the continuous plant gas exchange + within-day light path work (planned, nothing built,
+`git diff src/` empty). Same shape, same exemption, same two consequences: it is named *here*
+rather than in the index, and a file in `docs/log/` must not name it by filename while it is
+exempt — call it *"the gas-exchange plan"*. **When it is built it earns the normal three and
+this paragraph goes with it**; until then it is deliberately exempt rather than missed.
+⚠ It was written on 2026-08-14 and left **untracked** for a day, which turned
+`test_every_plan_doc_is_indexed` **red on the working tree while `main` itself was green** —
+an unindexed plan doc fails the gate whether or not git is tracking it. Two lessons, and the
+second is the one that bites: a plan doc is committed *with* its exemption in the same commit,
+and **an exemption written for a temporary state is a deletion someone must remember** — which
+is exactly what the step-unfreeze paragraph two paragraphs down records going wrong.
+
 ⚠ **The step-unfreeze exemption is GONE (2026-08-14), because the ceremony landed.** A
 paragraph here used to exempt `post-roadmap-step-unfreeze.md` from the index while its work
 was in progress, ending *"when the ceremony lands it earns the normal three — index line,
