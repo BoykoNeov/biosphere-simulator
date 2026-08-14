@@ -202,8 +202,35 @@ def test_the_litter_pool_a_throttle_would_read_is_TWO_REGIMES_not_one_number() -
     # ratio") and re-cutting it to buy headroom would be fitting the bound to the tree.
     # Flagged instead: the next carbon-side change here is expected to break this, and
     # when it does the question is whether the CLAIM still holds, not where to move 105.
+    # ⚠⚠ **THE PREDICTED BREAK ARRIVED, 2026-08-14, and the comment above says what to
+    # do with it: ask whether the CLAIM holds, not where to move 105.** It broke on the
+    # step unfreeze, which is not the "next carbon-side change" the prediction named —
+    # so the flag was right about the pin and wrong about what would trip it.
+    #
+    # **The claim does not survive as written, and the reason is that its two halves
+    # never agreed.** The prose says "within ~15 % of the shed ratio"; the numeric
+    # ceiling 105 is 16.7 % of a shed ratio that is *exactly* 90 by parameter identity.
+    # Both readings were ALREADY outside ~15 % before this change (104.97 = 16.6 %), so
+    # 105 was never the prose's bound — it was a round number near the measurement.
+    # Widening it to 106 would fit the bound to the tree, which the comment above
+    # refuses in its own words.
+    #
+    # So the threshold is dropped and replaced by the two things that are actually
+    # claimed, which together say strictly more than any band: the STRUCTURAL half (the
+    # pool sits above the shed ratio, because the seed is N-free) is asserted against
+    # ``shed_cn`` itself rather than a transcribed 90, and the LEVEL is pinned exactly,
+    # so any future move is visible instead of being absorbed by slack.
+    shed_cn = _M_C / load_nitrogen_params().n_residual_per_mol_c
+    assert shed_cn == 90.0  # the parameter identity this whole band is about
     for label in ("sealed_chamber", "water_biting"):
-        assert 90.0 < seen[label] < 105.0, (label, seen[label])
+        assert seen[label] > shed_cn, (label, seen[label], shed_cn)
+    # 104.972745 -> this (+0.18 %), and 100.678502 -> this (+0.30 %). As multiples of
+    # the shed ratio: 1.1685x and 1.1220x, i.e. 16.9 % and 12.2 % above it.
+    assert seen["sealed_chamber"] == pytest.approx(105.163, rel=1e-4)
+    assert seen["water_biting"] == pytest.approx(100.985, rel=1e-4)
+    # ⚠ The load-bearing claim of this test is not the tightness of either number — it
+    # is that these are a DIFFERENT REGIME from the reset-driven pair below, which sits
+    # near 13. That separation is asserted at the end of this function.
     # reset-driven: an order of magnitude lower — the dying plant, not the shed ratio
     # ⚠ RE-MEASURED 2026-08-12 (stem reserves): the band was 9.0-12.0 and the values
     # were
@@ -220,9 +247,29 @@ def test_the_litter_pool_a_throttle_would_read_is_TWO_REGIMES_not_one_number() -
     for label in ("perennial", "consumer"):
         assert 11.0 < seen[label] < 14.0, (label, seen[label])
     # ⚠ THE CLAIM this test is named for is the SEPARATION, and it is re-measured, not
-    # inherited: the two regimes are still an order of magnitude apart (8.20x), so a
-    # throttle keyed on litter C:N would still be near-saturated after each reset.
-    assert seen["sealed_chamber"] / seen["perennial"] > 8.0
+    # inherited: a throttle keyed on litter C:N would still be near-saturated after each
+    # reset.
+    #
+    # ⚠⚠ **THE `> 8.0` CUT IS DROPPED, NOT NUDGED (2026-08-14).** The ratio went
+    # 8.20x -> 7.96x at `dt = ¼` — the reset-driven pair rose while the shedding-fed one
+    # barely moved — so a round 8.0 chosen when the measurement was 8.20 now fails by
+    # 0.5 %. Lowering it to 7.9 would be fitting the bound to the tree, twice in one
+    # function, which the note further up refuses in its own words.
+    #
+    # Replaced by the structural statement the "two regimes" name is actually about, and
+    # it needs no cut at all: **the two regimes fall on OPPOSITE SIDES of the shed
+    # ratio.** A shedding-fed pool cannot go below it (the seed carries no N, so shed
+    # material is the only N source and dilution only raises C:N); a reset-driven pool
+    # is set by the dying plant's own composition and sits far below it. That is a
+    # sign test against a parameter identity, not a threshold — it cannot drift, and it
+    # is what "a throttle would be near-saturated after each reset" depends on.
+    for label in ("sealed_chamber", "water_biting"):
+        assert seen[label] > shed_cn, (label, seen[label])
+    for label in ("perennial", "consumer"):
+        assert seen[label] < shed_cn / 4.0, (label, seen[label])
+    # ...and the ratio is pinned as the MEASUREMENT it is, so a change is visible.
+    # 8.20x -> this.
+    assert seen["sealed_chamber"] / seen["perennial"] == pytest.approx(7.96, rel=1e-3)
 
 
 # --- 2. the retrieval result — no cited form exists on this shelf ---------------------

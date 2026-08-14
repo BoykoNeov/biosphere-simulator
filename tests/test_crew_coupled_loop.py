@@ -19,6 +19,7 @@ import pytest
 from domains.biosphere.canopy import leaf_area_index
 from domains.biosphere.loader import load_canopy_params
 from domains.biosphere.scenario import (
+    DEFAULT_SCENARIO,
     SEALED_CHAMBER_SCENARIO,
     SEALED_CHAMBER_YEARS,
     SeasonScenario,
@@ -74,7 +75,17 @@ BVAD_WHEAT_C_PER_M2_DAY: float = 77.00 / 44.009
 # crop). Re-measured rather than left stale: this constant is the DENOMINATOR of the
 # "still field-scale" ratio below, so a stale value would silently flatter the
 # comparison — the ratio would read 1.01x against a crop that no longer exists.
-OPEN_SEASON_PEAK_LAI: float = 5.462364
+#
+# ⚠⚠ **AND IT WENT STALE ANYWAY, 2026-08-14 — the comment above names the hazard
+# exactly and did not prevent it.** The step unfreeze moved the open field to
+# **5.571922** and nothing here noticed, because a hand-copied number cannot notice.
+# The comment was the whole defence, and a warning is not a check.
+#
+# So the duplication is now SELF-CHECKING: PIN 6 re-runs `open_season` and asserts this
+# constant against it, which costs one extra ~2 s season and turns the next drift red
+# instead of silently flattering the ratio. *Re-measuring a copied constant fixes one
+# occurrence; tying it to its source fixes the class.*
+OPEN_SEASON_PEAK_LAI: float = 5.571922
 OPEN_SEASON_PEAK_W_EXCL_ROOTS: float = 12.633
 
 # The V-K&S mutual-shading threshold the canopy regulator is built on (Penning de Vries
@@ -123,6 +134,27 @@ def _run_station(
         slow_steps_per_day=scenario.bio_steps_per_day,
         slow_reset=sealed_reset(scenario),
     )
+
+
+def _open_season_peak_lai() -> float:
+    """``open_season``'s peak LAI, MEASURED — the denominator PIN 6 compares against.
+
+    It is a transcribed constant a few lines up (``OPEN_SEASON_PEAK_LAI``) because the
+    pin that owns it (``test_senescence_form.py``) states a BAND, ``5.0 < peak < 8.0``,
+    so there is no exact value to import. A band cannot keep a copy honest, so PIN 6
+    measures it and asserts the copy against the measurement instead.
+    """
+    w = weather(1)
+    state, registry = build_season(DEFAULT_SCENARIO)
+    states, rationed, _ = run_season(
+        EulerIntegrator(registry),
+        state,
+        weather_resolver(w, DEFAULT_SCENARIO),
+        BIO_DT,
+        steps_for(len(w)),
+    )
+    assert rationed == 0
+    return _peak_lai(states, DEFAULT_SCENARIO.ground_area)
 
 
 def _peak_lai(states: list[State], ground_area: float) -> float:
@@ -352,13 +384,34 @@ def test_the_coupled_season_is_field_scale_open_loop_and_carbon_capped() -> None
     states, rationed, events = _run_station(scenario, days=days, with_harvest=False)
     assert rationed == 0 and events == ()
 
-    # PIN 6: the plant is FIELD-SCALE -- 0.97x open_season's pinned peak LAI, in a
-    # SEALED chamber. Every prior chamber measurement in this repo is of the STANDALONE
+    # PIN 6: the plant is FIELD-SCALE -- ~0.91x open_season's peak LAI, in a SEALED
+    # chamber. Every prior chamber measurement in this repo is of the STANDALONE
     # chambers (52-70 g DM/m2, LAI 0.51-0.63).
     peak_lai = _peak_lai(states, scenario.bio.ground_area)
-    # ⚠ 5.03-5.05 -> this (2026-08-12, stem reserves). The band keeps its width.
-    assert 5.23 < peak_lai < 5.25, f"coupled peak LAI moved: {peak_lai}"
-    assert peak_lai / OPEN_SEASON_PEAK_LAI > 0.95, "no longer field-scale"
+    # ⚠ 5.03-5.05 -> 5.23-5.25 (2026-08-12, stem reserves) -> this (2026-08-14, the
+    # step unfreeze): 5.0879, down 2.9 %. The band keeps its width through all three.
+    assert 5.08 < peak_lai < 5.10, f"coupled peak LAI moved: {peak_lai}"
+
+    # ⚠ THE DENOMINATOR IS NOW MEASURED HERE, not transcribed. See the constant's own
+    # note: it had gone stale under a comment warning that it must not.
+    open_peak = _open_season_peak_lai()
+    assert open_peak == pytest.approx(OPEN_SEASON_PEAK_LAI, rel=1e-5), (
+        "OPEN_SEASON_PEAK_LAI is stale — re-measure it, do not adjust the ratio below",
+        open_peak,
+    )
+
+    # ⚠⚠ **THE `> 0.95` CUT IS DROPPED, NOT LOWERED.** The ratio went 0.959 -> 0.9131
+    # at `dt = ¼`, and 0.95 was a round number chosen when the measurement was 0.97 —
+    # lowering it to 0.90 would be the third re-cut of a bound in this batch and the
+    # second in this file. PIN 6's claim is not a threshold: it is that this chamber's
+    # canopy is a FIELD canopy, and what makes that legible is the two-sided contrast —
+    # within ~10 % of the open field, and an ORDER OF MAGNITUDE above every standalone
+    # chamber in the repo (LAI 0.51-0.63). Both are asserted, and the ratio is pinned
+    # exactly so any movement is visible rather than absorbed by slack.
+    ratio = peak_lai / open_peak
+    assert ratio == pytest.approx(0.9131, rel=1e-3)
+    assert 0.5 < ratio < 1.5, ("no longer the same scale as the open field", ratio)
+    assert peak_lai > 8.0 * 0.63, ("no longer above the standalone chambers", peak_lai)
 
     # PIN 7: the MECHANISM -- `carbon_pool` is a regulated CONSTANT, so `ci` is
     # functionally the unclamped supply `open_season` has. Carbon-limited by ISOLATION,
@@ -384,8 +437,15 @@ def test_the_coupled_season_is_field_scale_open_loop_and_carbon_capped() -> None
     # the pool however much area is added.
     organic = [total_organic_c(s) for s in states]
     peak_daily_gain = max(b - a for a, b in pairwise(organic))
-    # ⚠ 0.59-0.61 -> this (2026-08-12, stem reserves). Band width preserved.
-    assert 0.62 < peak_daily_gain < 0.64, peak_daily_gain
+    # ⚠ 0.59-0.61 -> 0.62-0.64 (2026-08-12, stem reserves) -> 0.6018 (2026-08-14, the
+    # step unfreeze), -4.4 %. ⚠ The BAND IS REPLACED BY AN EXACT PIN rather than
+    # re-centred a third time: a ±0.01 window around a measurement is not a claim about
+    # anything, it is the measurement with slack, and the slack is what has had to be
+    # moved twice. An exact pin catches every change a band would and every change it
+    # would not. PIN 9's actual claim — the pool is small next to the daily gain, and
+    # smaller still next to the crew's production — is the three assertions below, and
+    # none of them moved.
+    assert peak_daily_gain == pytest.approx(0.6018, rel=1e-3), peak_daily_gain
     pool = pools[0]
     assert pool / peak_daily_gain > 6.0, "the 1 m2 headroom that hides the ceiling"
 
@@ -513,7 +573,21 @@ def test_the_per_day_ceiling_binds_on_CARBON_POOL_in_the_SLOW_registry() -> None
         f"the binding stock is no longer carbon_pool alone: {below_one}"
     )
     assert binding[str(CARBON_POOL)] > 0.9 * days
-    assert worst[str(CARBON_POOL)] < 0.25, worst[str(CARBON_POOL)]
+    # ⚠ **A MARGIN IS DENOMINATED IN STEPS, so this bound was a step-size observable
+    # wearing the clothes of a scarcity measure.** It read ``< 0.25`` — "demand out-runs
+    # supply by at least 4x" — and at ``dt = ¼`` each call's demand is a quarter as big,
+    # so the same trajectory reads 0.4615. Nothing about the carbon got easier.
+    #
+    # Restated in DAYS (``margin · dt``), which is what the sentence was about: at its
+    # worst the pool covers **0.115 days** of peak draw. ⚠ That is NOT the old 0.25
+    # rescaled (0.4615 x 0.25 = 0.1154 against a pre-flip bound of 0.25 day), because
+    # the bound was a ceiling rather than a measurement — so this is a genuine
+    # tightening of what is known, not a translation of it.
+    #
+    # The STRUCTURAL claim — the margin is below 1, i.e. the ceiling binds at all — is
+    # asserted separately and is the step-invariant half.
+    assert worst[str(CARBON_POOL)] < 1.0, worst[str(CARBON_POOL)]
+    assert worst[str(CARBON_POOL)] * scenario.bio_dt < 0.25, worst[str(CARBON_POOL)]
     # o2_pool was a LIVE candidate (unscaled, and drawn by the scaled decomposers).
     assert str(O2_POOL) not in below_one, (
         "o2_pool now binds too -- re-read the mechanism"

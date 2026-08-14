@@ -302,13 +302,21 @@ def test_the_chamber_crop_is_an_order_of_magnitude_below_the_field_crop() -> Non
     # 12.633 -> 14.019448. The two denominators still differ by exactly the fibrous
     # roots, which is the reconciliation this pair exists to make un-forgettable.
     #
+    # ⚠ BOTH re-measured again 2026-08-14 (the step unfreeze): 16.612938 -> 16.813163
+    # (+1.21 %) and 13.939142 -> 14.107660 (+1.21 %). **They moved by the same relative
+    # amount to three figures**, which is the reconciliation holding: the finer step
+    # re-integrates the whole plant, and the two bases differ by a fixed set of organs
+    # rather than by anything the step touches. A pair that moved by *different*
+    # fractions would have meant the reserve's share had shifted, and that is the thing
+    # this pair exists to catch.
+    #
     # ⚠ THE SECOND FIGURE DELIBERATELY EXCLUDES THE RESERVE. It is Greenwood's basis,
     # owned by ``test_nitrogen_form.py``, and a borrowed threshold must be read on its
     # owner's basis or the comparison is not the one that was calibrated. The first
     # figure is total plant carbon and DOES include it (see ``_ORGANS``). The two
     # bases are different on purpose and the difference is now non-trivial.
-    assert t_per_ha(field_peak) == pytest.approx(16.612938, abs=5e-3)
-    assert t_per_ha(field_peak_excl_root) == pytest.approx(13.939142, abs=5e-3)
+    assert t_per_ha(field_peak) == pytest.approx(16.813163, abs=5e-3)
+    assert t_per_ha(field_peak_excl_root) == pytest.approx(14.107660, abs=5e-3)
 
     chamber = _run(PERENNIAL_CHAMBER_SCENARIO, PERENNIAL_CHAMBER_YEARS, "perennial")
     chamber_peak = max(sum(s.stocks[o].amount for o in _ORGANS) for s in chamber)
@@ -333,8 +341,20 @@ def test_the_chamber_crop_is_an_order_of_magnitude_below_the_field_crop() -> Non
     # order of magnitude', and 31.98x is further past it, not short of it — so the band
     # is re-cut around the measurement rather than the claim being restated.
     assert 30.0 < field_peak / chamber_peak < 35.0
-    # ⚠ 2026-08-12 (stem reserves): 10.4x -> 11.0125x, just over the old ceiling.
-    assert 10.5 < field_lai / chamber_lai < 11.5
+    # ⚠⚠ **THIS BAND HAS BEEN RE-CUT THREE TIMES IN FIVE DAYS AND IS NOW DROPPED.**
+    # 8-10x -> 10.4x (humification) -> 10.5-11.5 for 11.0125x (stem reserves) -> 11.606x
+    # (2026-08-14, the step unfreeze), over the ceiling again. Each re-cut was honest on
+    # its own and the sequence is not: a band that is re-centred on the measurement
+    # every time the measurement moves is a record of the measurement, not a check on
+    # it, and it costs a paragraph of justification each time.
+    #
+    # Replaced by the two things actually being said, which do not need re-cutting:
+    # the ratio PINNED exactly — so any change at all is visible, which is strictly
+    # more than any band caught — and the CLAIM the docstring makes, "about an order of
+    # magnitude", stated once at the width those words mean.
+    ratio = field_lai / chamber_lai
+    assert ratio == pytest.approx(11.6065, rel=1e-4)
+    assert 3.0 < ratio < 30.0, ("no longer 'about an order of magnitude'", ratio)
 
 
 def test_making_the_chamber_bigger_cannot_be_the_fix() -> None:

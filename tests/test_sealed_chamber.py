@@ -202,7 +202,14 @@ def test_sealed_producer_recovers_o2_after_trough(
     # window is the fix, not weakening the assertion: the refill claim is unchanged,
     # only measured where the producer is alive.
     states, _, _ = sealed
-    year_one = states[: len(_weather())]  # the only year with a living producer
+    # ⚠ `steps_for`, not `len(_weather())` (2026-08-14, the step unfreeze). This sliced
+    # a STEP-indexed trajectory by a DAY count, so "year one" was the first 305 steps —
+    # 76 days — of a 305-day season. The failure was structural rather than numeric and
+    # so read like nonsense: the O₂ trough sits at the very end of a window that short,
+    # `o2[trough:]` came back with ONE element, and the assertion below reduced to
+    # `max([x]) > x + 0.1`, which nothing can satisfy. *A window sliced in the wrong
+    # unit does not report a wrong value; it reports an impossible one.*
+    year_one = states[: steps_for(len(_weather())) + 1]  # the only year with a producer
     o2 = [s.stocks[O2_POOL].amount for s in year_one]
     trough = min(range(len(o2)), key=lambda i: o2[i])
     assert (
