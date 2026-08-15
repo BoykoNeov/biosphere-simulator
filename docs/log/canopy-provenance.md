@@ -52,21 +52,31 @@ but the chamber crop doing **less**: more interception per unit leaf is a faster
 precisely why its CO₂ minimum rises. Meanwhile the perennial **liveness floor** clears by
 **0.40 %** where it cleared by 5.12 % (`max(tail)` 0.578137 → 0.552202 against 0.55), and
 it clears *only because* the statistic is a maximum over the tail — the trajectory declines
-monotonically and its **final year, 0.525448, is already below the bound**. The gate is
-green, in CI too, and is one small mechanism from red. `test_decade_stability.py` at
+monotonically and its **final year, 0.525448, is already below the bound**. It is one small
+mechanism from red — ⚠ and "green" means green **locally**: this was measured on Windows in
+a worktree, CI is Linux, and 0.40 % is inside the band where the libm ULP difference has
+taken locally-minted results red before. An argument against 0.65 that no other option
+carries, and a risk rather than a measurement (nothing has run on CI at `k = 0.65`). `test_decade_stability.py` at
 `k = 0.65`: **31 passed, 3 failed**, all three exact-value characterization pins that any
 value move breaks; no floor and no band red. Three options priced (bind 0.60 at the
 provenance-only price / bind 0.65 for the full 13-golden ceremony / bind 0.60 and record
-the disagreement as a measured risk — ⚠ with the asymmetry running the *unsafe* way, since
-both alternatives sit **above** ours, so the honest risk statement is *"our canopy may
-intercept ~8 % less light than the crop-specific literature says"*); 0.68 is not
+the disagreement as a measured risk — ⚠ **NOT the `Γ*` asymmetry, and the difference is the
+decision**: there the cited alternative sits *below* ours and one direction is conservative
+on every count, whereas here the two risks are **opposed** — on provenance 0.60 may be ~8 %
+low against the crop-specific literature, while on the gates 0.60 is the **conservative**
+side, because it is the alternatives that spend the liveness floor down to 0.40 %. **No
+direction is safe on both axes**); 0.68 is not
 recommended, because unpublished data cannot retire a `TODO(cite)` in a tree whose rule is
 *cite the primary literature*. **The decision is the user's and is untaken.**
 ⚠ **One audit spin-off:** `extinction_coef` has exactly one production consumer
 (`photosynthesis.py:272`), which is what made the loader patch complete — and the same
 audit found **`intercepted_fraction` now has NO caller in `src/` at all**, surviving only
 in tests and the Rust mirror. It is the dead `exp` behind `cc44b41`'s vacuous cross-port
-gate, still exported from the frozen surface.
+gate, still exported from the frozen surface — ⚠⚠ **and now load-bearing as a tripwire**,
+because that fix has the ULP probe shim *both* Beer–Lambert modules and one of the two is
+this uncalled function. Deleting it as dead code would walk the probe back toward the state
+`cc44b41` repaired, so **any removal must re-check `tests/crossport/measure_tier2_bands.py`
+in the same change.**
 ⚠⚠ **AND A SPIN-OFF THAT WAS SHIPPED SEPARATELY** (`d8f5583`, a correction to the previous
 two builds rather than to this one): **five frozen values in prose had been superseded six
 commits after they were written.** The freeze doc's band table and

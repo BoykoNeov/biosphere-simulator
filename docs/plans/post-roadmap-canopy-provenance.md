@@ -88,6 +88,15 @@ where ours is a daily constant. Not a fourth reading.
 it, and it survives only in tests and the Rust mirror. It is the dead `exp` behind
 `cc44b41`'s vacuous cross-port gate, still exported from the frozen surface.
 
+⚠⚠ **That dead function is now load-bearing as a tripwire, which makes deleting it a
+regression waiting to happen.** `cc44b41`'s repair has the ULP probe shim **both** modules
+holding a Beer–Lambert `exp` — and one of the two is this function, which the carbon path no
+longer calls. Deleting it as dead code (an entirely reasonable cleanup) would take the probe
+back toward the vacuous state that fix was written for; the zero-sensitivity assertion added
+in the same commit is what would catch it, and only if the *other* shim still perturbs.
+**Any removal of `intercepted_fraction` must re-check `tests/crossport/measure_tier2_bands.py`
+in the same change.**
+
 **`open_season`** (the band's subject; band is `5.0 < peak LAI < 8.0`):
 
 | `k` | peak LAI, `dt = ¼` shipped | peak LAI, `dt = 1/32` converged | LAI peak at DVS | harvest | rationed |
@@ -130,8 +139,13 @@ a safety margin improving, it is the chamber crop doing **less**.
 ⚠⚠ **This is the finding that decides the item.** At `k = 0.65` the perennial liveness floor
 clears by **0.40 %**, down from 5.12 %, and it clears *only because* `max(tail)` takes the
 maximum over the tail window — the trajectory is monotonically declining and its final year
-is already **below** the bound. The gate is green and would be green in CI. It is also, on
-this evidence, one small mechanism away from red.
+is already **below** the bound. It is, on this evidence, one small mechanism away from red.
+
+⚠ **And "green" here means green *locally*.** This was measured on Windows in a worktree; CI
+is Linux, and `ci-python-job-red-on-linux` records goldens minted on this box going red there
+on libm ULP differences. **0.40 % is inside the band where that has bitten before** — which
+is an argument against 0.65 that none of the other options carries, and it is a *risk*, not a
+measurement: nothing has been run on CI at `k = 0.65`.
 
 **And the two tables have one cause.** A larger `k` intercepts more light per unit leaf; in
 the open field that is more carbon and a bigger canopy, and in a **sealed** chamber it is a
@@ -155,11 +169,15 @@ band goes red.**
    converged canopy 7.3 % nearer the middle of its band and a **development-stage peak
    moving from after anthesis to before it**, which is a second pinned defect improving. ⚠
    Costs the perennial liveness floor almost all its clearance (5.12 % → 0.40 %).
-3. **Bind to 0.60 and record the disagreement as a measured risk** — the shape used for `Γ*`,
-   where the cited alternative is *below* the shipped value and so cannot widen the exposure.
-   ⚠ Here the asymmetry runs the other way: the alternatives are **above** ours, so the
-   honest statement of the risk is *"our canopy may be intercepting ~8 % less light than the
-   crop-specific literature says"*, and that is not a conservative direction.
+3. **Bind to 0.60 and record the disagreement as a measured risk** — the shape used for `Γ*`.
+   ⚠ **But not the same asymmetry, and the difference matters.** For `Γ*` the cited
+   alternative sits *below* the shipped value, so one direction is conservative on every
+   count. Here the two risks are **opposed**: on *provenance*, 0.60 may be ~8 % low against
+   the crop-specific literature (our canopy intercepting less light than published wheat
+   does); on *the gates*, 0.60 is the **conservative** side, because the alternatives are the
+   ones that spend the perennial liveness floor's clearance down to 0.40 %. **There is no
+   direction here that is safe on both axes**, which is precisely why this is a decision and
+   not a lookup.
 
 **Not recommended: 0.68.** Unpublished data cannot retire a `TODO(cite)` in a tree whose
 rule is *cite the primary literature*; it belongs in the record as corroboration that the
