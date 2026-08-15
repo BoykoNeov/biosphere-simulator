@@ -101,10 +101,17 @@ Costs, stated rather than discovered later:
 ### Option C — add a narrow injection seam in `src/`
 
 Let the scenario or `build_season` accept pre-loaded params. Cleaner and immune to both
-costs above, **but it changes the frozen reference surface**: an added public argument is
-something the freeze manifests' completeness half has standing over ("something added but
-exercised by nothing"), so it is an unfreeze question, not a refactor. **Not recommended
-first** — take it only if A proves fragile in practice, and then as its own ceremony.
+costs above, but it changes shared code under `src/`.
+
+⚠ **Its price is NOT established — this was asserted while drafting and is unverified.**
+The claim was that an added public argument falls under the freeze manifests' completeness
+half ("something added but exercised by nothing"), making it an unfreeze question rather
+than a refactor. **That half is defined over the params/flows/aux the manifest names**, and
+whether an optional keyword argument on `build_season` is in that set at all was never
+checked. **Verify before choosing C; do not inherit this paragraph as a finding.** (The
+shape it would otherwise repeat is `memory/asserted-attributions-rot`.)
+
+**Still not recommended first** — take it only if A proves fragile in practice.
 
 *(Option B — writing temporary crop directories to disk — is rejected: `CROPS_DIR` is a
 module constant under `src/`, so this would write into the repo tree, losing §3.)*
