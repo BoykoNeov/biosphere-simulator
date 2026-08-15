@@ -8,19 +8,37 @@
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
 #   The intercepted-fraction LAW (1 − exp(−k·LAI)) is Monsi & Saeki [A]. Of the three
-#   numeric VALUES, specific_leaf_area is now bound to a primary source [B]; the other
-#   two remain provisional, literature-typical placeholders pending the Step-11
-#   validation gate — flagged TODO(cite) until bound (per the convention doc's
+#   numeric VALUES, specific_leaf_area is bound to [B] and carbon_fraction to [C];
+#   extinction_coef remains a provisional, literature-typical placeholder pending the
+#   Step-11 validation gate — flagged TODO(cite) until bound (per the convention doc's
 #   provisional path; never backfilled from WOFOST).
-#   ⚠ Both survivors sit under a ~3.5× amplifier: peak LAI compounds a uniform error in
-#   any of them through light interception, so a ±2 % disagreement about k is roughly
-#   the whole margin of the peak-LAI science band. They are the live provenance queue.
+#   ⚠ The one survivor sits under a ~3.5× amplifier: peak LAI compounds a uniform error
+#   through light interception, so a ±2 % disagreement about k is roughly the whole
+#   margin of the peak-LAI science band. It is the live provenance queue, alone.
+#
+# ⚠ carbon_fraction WAS THE SECOND SURVIVOR UNTIL 2026-08-15, AND IT WAS NEVER MISSING.
+#   ../nitrogen.yaml has carried the IDENTICAL 0.45 bound to [C] since the 2026-07-16
+#   citation round, under a documented MUST-EQUAL constraint with this file (both fold
+#   it: sla → m²/mol C here, N thresholds → kg N/mol C there). ./crops/potato/canopy.yaml
+#   has said so in as many words since 2026-08-11 — "the reference value IS cited, but to
+#   a measurement of WHEAT grain/straw" — while this file, the reference the potato file
+#   was describing, still said TODO(cite). The citation was one file away, and a crop
+#   OVERRIDE was the record of it. Fourth instance of the shape (canopy-regulator,
+#   stem-reserve-form, the SLA anchor in test_potato_crop.py): CHECK YOUR OWN SHELF
+#   BEFORE TREATING A VALUE AS UNSOURCED. ⚠ Provenance-only — the value does not move,
+#   which is exactly why nothing could have gone red and why the manifest regeneration
+#   in this commit is the only git-visible record that an unfreeze happened.
 #
 # Sources:
 #   [A] Monsi, M. & Saeki, T. (1953), "Über den Lichtfaktor in den
 #       Pflanzengesellschaften und seine Bedeutung für die Stoffproduktion",
 #       Japanese Journal of Botany 14:22–52. (English translation: Ann. Bot.
 #       95:549–567, 2005.) — the canopy extinction law.
+#   [C] Raimanova, I., Svoboda, P., Moulik, M., Wollnerova, J., Haberle, J. (2024), "The
+#       Effect of Water Availability on the Carbon Content of Grain and Above- and
+#       Belowground Residues in Common and Einkorn Wheat", Plants 13(2):181.
+#       https://doi.org/10.3390/plants13020181 (open access; verified 2026-07-16 in
+#       ../nitrogen.yaml, which cites the same paper for the same quantity).
 #   [B] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
 #       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
 #       Simulation Monographs 29, PUDOC, Wageningen. ISBN 90-220-0937-8. Table 19
@@ -47,7 +65,15 @@ parameters:
     value: 23.53
     unit: "m^2/kg"
     source: "[B], Table 19 p.100, 'Wheat, winter' (425 kg/ha per unit LAI → 10000/425)"
+  # ⚠ THE BASIS MATTERS HERE AND DIFFERS FROM ../nitrogen.yaml's USE OF THE SAME NUMBER.
+  # This file applies the fraction to LEAF BLADE carbon, to fold specific_leaf_area into
+  # m²/mol C; nitrogen.yaml applies it to the whole plant, and records a root delta ([C]
+  # measures roots at 34.9 %, ~10 points below shoots, so a whole-plant use overstates
+  # root C by ~29 %). That delta is NOT inherited here: the quantity this file converts
+  # is leaf, and [C]'s straw figure (45.66 %, the above-ground vegetative fraction) is
+  # the nearer of its two shoot measurements to a leaf blade. So the same citation binds
+  # more tightly here than where it was first written down.
   carbon_fraction:
     value: 0.45
     unit: "dimensionless"
-    source: "TODO(cite) — provisional, literature-typical (~0.45 kg C/kg DM); primary citation pending Step 11"
+    source: "[C] Raimanova et al. (2024), Discussion: measured wheat C content 45.05 % (±0.81) in grain and 45.66 % (±1.09) in straw, which the paper itself calls 'near to the value of 45% used for the calculation of C content in plant dry mass'. Applied here to LEAF BLADE carbon, for which the straw (above-ground vegetative) figure is the nearer measurement; [C]'s root reading of 34.9 % is ~10 points lower, so this fraction is a SHOOT value and must not be read as a whole-plant one. ⚠ NOT a new retrieval: ../nitrogen.yaml has carried this exact citation for this exact value since 2026-07-16, under the MUST-EQUAL constraint between the two files, and ./crops/potato/canopy.yaml has described the reference value as 'cited' since 2026-08-11. The TODO(cite) here was stale, not open. Value unchanged at 0.45 — a provenance-only unfreeze, which the manifest records and no test can see"

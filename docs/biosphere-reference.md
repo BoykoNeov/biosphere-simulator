@@ -639,6 +639,39 @@ honor-system for such a change, so follow it deliberately rather than waiting fo
 
 ### Unfreeze log
 
+- **2026-08-15 — `canopy.carbon_fraction` BOUND TO A CITATION (provenance only; one hash, no
+  value, no golden).** The honour-system ceremony from `CLAUDE.md`: advisor review →
+  regenerate the manifest as the git-visible record → this entry. **Nothing could go red, by
+  construction** — the per-file sha-256 is recorded and never compared, and 0.45 did not move.
+
+  **Why it is an unfreeze at all.** `carbon_fraction` was one of two `TODO(cite)` literals the
+  layered-canopy build named as *"the highest-leverage provenance work left on this
+  observable"*. It is now cited to Raimanova et al. (2024) — measured wheat C at 45.05 % in
+  grain and 45.66 % in straw, the paper's own words being that these are *"near to the value
+  of 45 % used for the calculation of C content in plant dry mass"*.
+
+  ⚠ **It was never missing.** `nitrogen.yaml` has carried that citation, for the identical
+  value, since the 2026-07-16 citation round — under a **MUST-EQUAL** constraint with
+  `canopy.yaml` that both files document. And `crops/potato/canopy.yaml` has stated since
+  2026-08-11 that *"the reference value IS cited, but to a measurement of wheat grain/straw"*
+  — describing this file, which still said `TODO(cite)`. **A crop override was the record that
+  the reference was sourced.** Fourth instance of the shape (`canopy-regulator-diagnosed`,
+  `stem-reserve-form-is-on-the-shelf`, and the SLA anchor in `test_potato_crop.py` one day
+  ago): *check your own shelf before treating a value as unsourced.*
+
+  ⚠ **What is genuinely new here, and is not a copy:** the *basis*. `nitrogen.yaml` applies the
+  fraction whole-plant and records a root delta ([C] measures roots at 34.9 %, ~10 points below
+  shoots, overstating root C by ~29 %). This file applies it to **leaf blade**, so the straw
+  figure — the above-ground vegetative measurement — is the nearer of the paper's two shoot
+  readings and the root delta does **not** transfer. The same citation binds *more* tightly
+  here than where it was first written down, and copying the source string verbatim would have
+  imported a caveat that does not apply.
+
+  **Left open, deliberately:** `extinction_coef` is now the file's only `TODO(cite)`, and the
+  shelf holds **three disagreeing readings** of it (0.60 / 0.65 / 0.68), which is a value
+  question rather than a retrieval one. Measured, priced and left for the user in
+  [`plans/post-roadmap-canopy-provenance.md`](plans/post-roadmap-canopy-provenance.md).
+
 - **2026-08-15 — THE LAYERED CANOPY + THE LEAF-THICKNESS ANCHOR (11 goldens, both manifests,
   one science band RESTATED, and the native port).**
   `docs/plans/post-roadmap-canopy-magnitude.md` §7b; full record `docs/log/layered-canopy.md`.
