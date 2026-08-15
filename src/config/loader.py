@@ -14,6 +14,7 @@ from typing import Any
 import yaml
 
 from config.errors import ConfigError
+from config.overrides import apply_overrides
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -36,4 +37,10 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
             f"param file {str(p)!r} must contain a top-level mapping, got "
             f"{type(data).__name__}"
         )
-    return data
+    # The experiment seam. Inert (one dict lookup, the same object back) unless a
+    # ``config.overrides.param_overrides`` block is active, which no frozen run opens —
+    # so goldens, manifests and the port are untouched by its presence. It sits HERE,
+    # before schema validation, so a substituted value goes through pydantic, the pint
+    # unit guards, the bound checks and any folding a loader does, exactly as if the
+    # file had said it. See docs/plans/post-roadmap-value-switch-harness.md.
+    return apply_overrides(p, data)
