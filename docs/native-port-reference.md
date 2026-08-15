@@ -133,8 +133,8 @@ relevant `sin` / `exp` / `t**4` by one ULP and re-run to the final state.
 | power + self-discharge | `4.1e-15` | `1e-12` | ~240× |
 | thermal (`T⁴`, contracting attractor damps it) | `1.9e-16` | `1e-12` | ~5000× |
 | station energy (`sin` + `T⁴`, coupled 7-day) | `5.2e-15` | `1e-12` | ~190× |
-| biosphere (worst: `canopy.exp`, perennial 15-yr) | `8.2e-15` | `1e-11` | ~1200× |
-| greenhouse (7-day `canopy.exp`) | `6.1e-15` | `1e-11` | ~1600× |
+| biosphere (worst: Beer–Lambert `exp`, perennial 15-yr) | `3.5e-15` | `1e-11` | ~2800× |
+| greenhouse (7-day Beer–Lambert `exp`) | `2.8e-16` | `1e-11` | ~36000× |
 
 ⚠ **The two biosphere rows were re-measured 2026-08-14 (the within-day light path) and had
 been stale in the other direction: `6.7e-14` → `8.2e-15` and `2.7e-15` → `6.1e-15`.** The
@@ -146,6 +146,25 @@ hold; it does not prove the table describing them is current. ⚠ Note the biosp
 sensitivity *improved* by an order of magnitude while its goldens all moved: adding a
 `cos` to the PAR path did not add ULP sensitivity, it changed which trajectory the
 existing `exp` sensitivity propagates along. Neither band moved.
+
+⚠⚠ **RE-MEASURED AGAIN 2026-08-15 (the layered canopy) — and this time the sentence above
+("the *gate* was never stale") stopped being true, in a way it did not anticipate.** The
+probe shimmed `domains.biosphere.canopy`'s `math`, because `intercepted_fraction`'s `exp`
+was the assimilation path's only transcendental. The layered canopy moved that `exp` into
+`photosynthesis.canopy_assimilation` — one call per Gaussian depth point — so the shim was
+perturbing a function the carbon path **no longer calls**, and both biosphere rows measured
+**exactly `0.0`**. `band > sensitivity` then held **vacuously, against zero**, which is the
+precise failure the band contract's own rule was written against: a reading of `0.0` is
+named three paragraphs above as *"a same-libm artifact, not a cross-libm measurement"*, and
+the gate accepted one as proof.
+
+⇒ Two repairs, both shipped. The probe now shims **both** modules that hold a Beer–Lambert
+`exp` on the carbon path, giving `3.5e-15` (15-yr chambers) and `2.8e-16` (7-day
+greenhouse); and both band tests now **reject a zero sensitivity outright**, so a probe that
+stops perturbing the trajectory goes red instead of quiet. ⚠ The generalisation is the same
+one the layered canopy's own record carries: **a probe is validated by what it perturbs, not
+by what it is named after.** A gate that re-derives its input from the tree is only as live
+as its handle on the tree.
 
 The bands absorb realistic **multi-ULP cross-libm** divergence while a real port defect still
 trips them. `test_crossport.py` re-measures each sensitivity and asserts `band > sensitivity`

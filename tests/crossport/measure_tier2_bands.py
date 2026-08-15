@@ -211,13 +211,39 @@ def _weather() -> list[dict]:
     return json.loads(fixture.read_text(encoding="utf-8"))["weather"]
 
 
-def measured_biosphere_sensitivity() -> float:
-    """Worst propagated 1-ULP `canopy.exp` sensitivity over the two 15-yr runs.
+# ⚠⚠ **RETARGETED 2026-08-15 (the layered canopy), AND THE MEASUREMENT HAD GONE
+# VACUOUS.** Both probes below shimmed only ``domains.biosphere.canopy``'s ``math``,
+# because ``intercepted_fraction``'s ``exp`` was the assimilation path's only
+# transcendental. The layered canopy moved that ``exp`` into
+# ``photosynthesis.canopy_assimilation`` (one call per Gaussian depth point), so the old
+# shim perturbed a function the carbon path no longer calls and both rows measured
+# **exactly 0.0**. The cross-port test asserts ``band > sensitivity`` and so kept
+# passing — **vacuously**, against zero. Both modules are shimmed now, and a hard check
+# on a non-zero result makes the vacuity impossible to repeat silently.
 
-    The representative dominant transcendental; only `domains.biosphere.canopy`'s `math`
-    reference is shimmed (restored in `finally`), so no other code is affected.
+
+def _shim_exp(up: bool):
+    """A ``math`` stand-in whose ``exp`` is nudged one ULP; the rest passes through."""
+    return types.SimpleNamespace(
+        exp=lambda x: _nudge(math.exp(x), up),
+        sqrt=math.sqrt,
+        log=math.log,
+        pow=math.pow,
+        e=math.e,
+        inf=math.inf,
+    )
+
+
+def measured_biosphere_sensitivity() -> float:
+    """Worst propagated 1-ULP light-extinction ``exp`` sensitivity, two 15-yr runs.
+
+    The representative dominant transcendental. Both modules that hold a Beer-Lambert
+    ``exp`` on the carbon path are shimmed — ``domains.biosphere.canopy``
+    (``intercepted_fraction``) and ``domains.biosphere.photosynthesis`` (the Gaussian
+    depth integral) — and each ``math`` reference is restored in ``finally``.
     """
     import domains.biosphere.canopy as canopy
+    import domains.biosphere.photosynthesis as photo
     from domains.biosphere.scenario import (
         CONSUMER_CHAMBER_SCENARIO,
         PERENNIAL_CHAMBER_SCENARIO,
@@ -226,15 +252,15 @@ def measured_biosphere_sensitivity() -> float:
     worst = 0.0
     for scenario in (PERENNIAL_CHAMBER_SCENARIO, CONSUMER_CHAMBER_SCENARIO):
         base = _biosphere_perennial_final(scenario, 15)
-        original = canopy.math
+        canopy_math, photo_math = canopy.math, photo.math
         for up in (True, False):
             try:
-                canopy.math = types.SimpleNamespace(
-                    exp=lambda x, _up=up: _nudge(math.exp(x), _up)
-                )
+                canopy.math = _shim_exp(up)
+                photo.math = _shim_exp(up)
                 perturbed = _biosphere_perennial_final(scenario, 15)
             finally:
-                canopy.math = original
+                canopy.math = canopy_math
+                photo.math = photo_math
             worst = max(worst, max_abs_relative_deviation(base, perturbed, floor=FLOOR))
     return worst
 
@@ -378,21 +404,22 @@ def measured_greenhouse_sensitivity() -> float:
     ``finally``).
     """
     import domains.biosphere.canopy as canopy
+    import domains.biosphere.photosynthesis as photo
 
     base = _greenhouse_final()
     worst = 0.0
-    original = canopy.math
+    canopy_math, photo_math = canopy.math, photo.math
     for up in (True, False):
         try:
-            canopy.math = types.SimpleNamespace(
-                exp=lambda x, _up=up: _nudge(math.exp(x), _up)
-            )
+            canopy.math = _shim_exp(up)
+            photo.math = _shim_exp(up)
             worst = max(
                 worst,
                 max_abs_relative_deviation(base, _greenhouse_final(), floor=FLOOR),
             )
         finally:
-            canopy.math = original
+            canopy.math = canopy_math
+            photo.math = photo_math
     return worst
 
 
@@ -400,8 +427,8 @@ if __name__ == "__main__":
     for k in STEP3_TIER2_KEYS:
         print(f"{k:28s} sensitivity = {measured_sensitivity(k):.6e}")
     bio = measured_biosphere_sensitivity()
-    print(f"{'biosphere (canopy.exp)':28s} sensitivity = {bio:.6e}")
+    print(f"{'biosphere (Beer-Lambert exp)':28s} sensitivity = {bio:.6e}")
     station = measured_station_energy_sensitivity()
     print(f"{'station (sin+t**4)':28s} sensitivity = {station:.6e}")
     greenhouse = measured_greenhouse_sensitivity()
-    print(f"{'greenhouse (canopy.exp)':28s} sensitivity = {greenhouse:.6e}")
+    print(f"{'greenhouse (Beer-Lambert exp)':28s} sensitivity = {greenhouse:.6e}")

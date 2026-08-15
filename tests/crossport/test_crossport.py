@@ -652,6 +652,15 @@ def test_biosphere_tier2_band_sits_above_measured_sensitivity() -> None:
     """
     by_key = {g["key"]: g for g in _tiers()}
     sensitivity = measure_tier2_bands.measured_biosphere_sensitivity()
+    # ⚠⚠ A ZERO SENSITIVITY IS A DEAD PROBE, NOT A PERFECT PORT. On 2026-08-15 the
+    # layered canopy moved the Beer-Lambert ``exp`` out of the module this probe shims,
+    # and the measurement fell to exactly 0.0 — whereupon ``sensitivity < band`` kept
+    # passing against nothing. The band contract says bands must sit ABOVE measured
+    # noise; a measurement of zero cannot establish that, so it is rejected outright.
+    assert sensitivity > 0.0, (
+        "the 1-ULP probe measured exactly zero — it is no longer perturbing anything "
+        "the trajectory reads; re-target it (see measure_tier2_bands.py)"
+    )
     for key in measure_tier2_bands.BIOSPHERE_TIER2_KEYS:
         entry = by_key[key]
         assert entry["float_tier"] == 2, key
@@ -836,6 +845,15 @@ def test_station_biosphere_tier2_bands_sit_above_measured_sensitivity() -> None:
     `-m slow` (the 7-day greenhouse FvCB run); pins the band tight (<= 1e-9)."""
     by_key = {g["key"]: g for g in _tiers()}
     sensitivity = measure_tier2_bands.measured_greenhouse_sensitivity()
+    # ⚠⚠ A ZERO SENSITIVITY IS A DEAD PROBE, NOT A PERFECT PORT. On 2026-08-15 the
+    # layered canopy moved the Beer-Lambert ``exp`` out of the module this probe shims,
+    # and the measurement fell to exactly 0.0 — whereupon ``sensitivity < band`` kept
+    # passing against nothing. The band contract says bands must sit ABOVE measured
+    # noise; a measurement of zero cannot establish that, so it is rejected outright.
+    assert sensitivity > 0.0, (
+        "the 1-ULP probe measured exactly zero — it is no longer perturbing anything "
+        "the trajectory reads; re-target it (see measure_tier2_bands.py)"
+    )
     for key in measure_tier2_bands.STATION_BIOSPHERE_TIER2_KEYS:
         entry = by_key[key]
         assert entry["float_tier"] == 2, key

@@ -86,6 +86,26 @@ chamber's tightest carbon moment is inside five years" from coincidence toward p
 BELOW the 0.55 figure** the manifest floor is anchored on. That figure is a *probe*, not a
 manifest bound — the four frozen 15-year floors all still pass — so the number is recorded
 and the assertion inverted with its reasoning, rather than the floor being moved to fit.
+⚠⚠ **AND A SECOND, INDEPENDENT INSTANCE OF THE SAME SHAPE, FOUND ON REVIEW: THE CROSS-
+PORT TOLERANCE GATE HAD GONE VACUOUS.** The native-port contract requires each Tier-2
+band to sit above a *measured* ±1-ULP sensitivity, re-derived from the tree by
+`test_crossport.py` on every run — a design chosen precisely so the number could not go
+stale. The probe shimmed `domains.biosphere.canopy`'s `math`, because
+`intercepted_fraction`'s `exp` was the assimilation path's only transcendental; this
+build moved that `exp` into `photosynthesis.canopy_assimilation`, so the shim perturbed
+a function the carbon path no longer calls and **both biosphere rows measured exactly
+0.0**. `band > sensitivity` then held **against zero** — and the same document names a
+reading of 0.0, three paragraphs earlier, as *"a same-libm artifact, not a cross-libm
+measurement"*. The gate accepted as proof the very thing its own rule forbids. Repaired
+both ways: the probe shims **both** modules holding a Beer-Lambert `exp` (3.5e-15 on the
+15-yr chambers, 2.8e-16 on the 7-day greenhouse, both re-recorded in `docs/native-port-
+reference.md`), and both band tests now **reject a zero sensitivity outright**, so a
+probe that stops perturbing the trajectory goes red rather than quiet. ⚠ Same lesson as
+the retraction above, reached from the opposite direction: **a probe is validated by
+what it PERTURBS, not by what it is named after — and a gate that re-derives its own
+input is only as live as its handle on the tree.** Two of the four freeze contracts'
+prose halves were touched by this build; the third (`docs/station-reference.md`) was
+checked and carries none of the moved numbers.
 **NOT DONE**: the partition table (still a live suspect, still fitted against the biased
 assimilation), and the two surviving `TODO(cite)` literals under the 3.5× amplifier
 (`extinction_coef`, `carbon_fraction`) — now flagged in `canopy.yaml`'s header as the

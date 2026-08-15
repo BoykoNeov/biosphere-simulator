@@ -228,9 +228,15 @@ def test_decade_leaf_cycle_is_stationary(runs, scenario) -> None:
     field="liveness_floors",
     quantity="converged peak-leaf fixed point (mol C)",
     bound="max(tail) > 0.55",
-    source="self — anchored on the MEASURED equilibrium 0.594984 (reached ~yr 45), not "
-    "on the 15-yr reading; 2.2x the 0.253 dead baseline. Second move: >1.0 -> >0.9 "
-    "(decomposer calibration) -> >0.55 (humification split)",
+    source="self — originally anchored BELOW the measured 50-yr equilibrium (0.594984, "
+    "reached ~yr 45), not on the 15-yr reading; 2.2x the 0.253 dead baseline. Moves: "
+    ">1.0 -> >0.9 (decomposer calibration) -> >0.55 (humification split). ⚠⚠ THAT "
+    "RATIONALE INVERTED 2026-08-15 (the layered canopy): the 50-yr equilibrium now "
+    "settles at 0.543748, BELOW the floor. The bound is NOT re-anchored and is NOT "
+    "red — it reads max(tail) on the 15-YEAR run, which is 0.578137 and clears by "
+    "5.1 %. So what this floor now checks is the 15-yr trajectory, not the "
+    "attractor it was named for; both numbers are asserted in the tests so the gap "
+    "is visible. Moving 0.55 to fit would be the refused co-adaptation",
 )
 def test_perennial_leaf_cycle_is_a_fixed_point(runs) -> None:
     # CHANGED by post-roadmap scope (B) increment 1 (vernalization + photoperiod). This
@@ -329,8 +335,11 @@ def test_decade_consumer_biomass_is_stationary_and_alive(runs) -> None:
     field="liveness_floors",
     quantity="annual minimum chamber CO2 pool (mol C)",
     bound="non_collapsing(floor=0.05)",
-    source="self — anchored on the MEASURED trough attractor 0.0758448 "
-    "(converged well before yr 50, 1.52x the floor), not on a 15-yr reading; "
+    source="self — anchored on the MEASURED trough attractor, converged well before "
+    "yr 50, not on a 15-yr reading. ⚠ The attractor has moved and the CLEARANCE with "
+    "it: 0.0758448 / 1.52x (2026-08-14, the light path) -> 0.072238 / 1.44x "
+    "(2026-08-15, the layered canopy). The floor is not re-anchored; the ratio is "
+    "asserted separately so a shrinking clearance cannot pass unread; "
     "teeth witnessed by a mutation independent of any candidate science change "
     "(the jar shrunk 0.65x at fixed composition trips it at 0.0492366). "
     "Window removed: floor[2:] -> floor",
