@@ -81,9 +81,12 @@ with `Γ* = 42.75` and `ci_ratio = 0.7` the crop cannot draw the chamber below
 was computed at the start-of-step concentration and applied for a whole day, so a step
 starting above the shutoff and ending below it never re-evaluated.
 
-**Measured at the shipped `dt = ¼`: the perennial chamber's season-low is `75.48 ppm`**
+**Measured at the shipped `dt = ¼`: the perennial chamber's season-low was `75.48 ppm`**
 — clear of the 61.07 shutoff, so the reference no longer fixes carbon below its own
-compensation point. Authorized by the user (*"quarter the step"*, over `½`, which also clears
+compensation point. (⚠ That reading is the step ceremony's, 2026-08-14. Two later
+unfreezes moved it to **70.25 ppm**, still clear; the current five are tabulated in the
+band section below. The verdict this sentence records is unchanged — the margin it was
+measured with is not.) Authorized by the user (*"quarter the step"*, over `½`, which also clears
 it: `¼` leaves 4.8× headroom to the arbitration bound where `½` leaves 2.1×, so the next
 mechanism added probably does not force a second ceremony). Ceremony:
 [`plans/post-roadmap-step-unfreeze.md`](plans/post-roadmap-step-unfreeze.md).
@@ -188,6 +191,56 @@ decision swept the scenarios the *argument* was about; a band is about the *rost
 the two are not the same list. **Enumerate the contract's own subjects, not the ones the
 discussion happens to have named** — which is this entry's locus lesson a second time, in
 a form the correction above does not cover.
+
+##### ⚠⚠ EVERY NUMBER IN THE TABLE ABOVE WENT STALE THE SAME DAY IT WAS WRITTEN — including which row is the tightest
+
+The table and the docstrings that quote it landed in `4d7fdfd`. **Six commits later the
+same day**, the within-day light path (`a0ef98b`) moved all five values 4–7 %
+**downward**, and the layered canopy moved them a little further the next day. Re-measured
+on `cc44b41`, with the band's own helper, each scenario driven the way its own golden
+drives it:
+
+| scenario | driver | season-low CO₂ | margin | vs the table above |
+|---|---|---|---|---|
+| `sealed_chamber` | `run_season`, 3 yr | 71.4358 ppm | 1.1697× | −7.0 % |
+| **`perennial_chamber`** | `run_perennial`, 5 yr | **70.2526** | **1.1503×** | −6.9 % |
+| `consumer_chamber` | `run_perennial`, 5 yr | 73.3386 | 1.2009× | −1.5 % |
+| **`perennial_long_horizon`** | `run_perennial`, 15 yr | **70.2526** | **1.1503×** | −6.9 % |
+| `consumer_long_horizon` | `run_perennial`, 15 yr | 73.3386 | 1.2009× | −1.5 % |
+
+⚠ **The ranking inverted, which makes the paragraph above true in its lesson and wrong in
+its subject.** *"The consumer chamber sits below both"* held for six commits: the consumer
+chamber is now the **loosest** of the five and the **perennial** chamber is the tightest.
+The two builds that moved it both act through canopy *closure* — a diurnal light curve and
+then a depth-resolved canopy — and the consumer chamber is the one whose crop the crew's
+CO₂ keeps furthest from closing, so it lost the least. The instruction — *enumerate the
+roster, not the discussion* — is unaffected, and is why this re-measurement enumerated all
+five rather than the two that had been argued about.
+
+⚠⚠ **The sharpest part: the pin written for exactly this event DID fire, in the same file,
+and the prose beside it was left standing anyway.**
+`test_the_five_margins_are_pinned_not_merely_positive` exists because *"an inequality that
+passes tells you nothing about how nearly it failed"*; the light path took it red and
+`a0ef98b` re-pinned it (1.2579 → 1.1671, 1.2359 → 1.1543, 1.2186 → 1.2086) **and updated
+its own comment to say so**. The docstrings four lines above it, and this document's table,
+quote the superseded values to this day. So the gap is not that the tree lacked a guard —
+the guard worked, on the first unfreeze after it was written. **A number in prose is not
+guarded by a pin on the same quantity ten lines away**; re-pinning is a mechanical
+consequence of a red test, and re-reading the prose is not.
+
+⚠ **And the 15-year rows still equal the 5-year rows exactly**, so the property those two
+entries were added to check ("the long horizon adds no new low") survived a change that
+moved every value. That is worth more than the values: it is the *shape* of the run, and
+it reproduced across an unfreeze that touched the canopy's whole light path.
+
+⚠ **This is the third instance in two days**, and the third is the one that shows it is
+structural: `cc44b41` fixed two `liveness_floors` source strings describing a superseded
+equilibrium, and in the same commit a cross-port sensitivity probe that had gone vacuous.
+All three passed while being false, because **the manifest gate compares marker ↔ manifest,
+never marker ↔ reality**, and the freeze's prose half is ungated by design. The common
+shape is not "a missing test" — in this instance the test existed and fired. It is that
+**a value written into prose acquires no owner**, while a value written into an assertion
+acquires one the moment it goes red.
 
 ⚠ **The horizon was checked rather than assumed, because it could have been false.** The
 humification split pushed the chamber settling transient to ~35 yr, past every frozen
@@ -693,8 +746,11 @@ honor-system for such a change, so follow it deliberately rather than waiting fo
 
   **Why.** The `dt = 1` reference drew the **perennial** chamber's CO₂ down to **56.03 ppm**
   and kept fixing carbon there, below the `61.07 ppm` compensation point its own FvCB kinetics
-  make a hard shutoff — a truncation error, not biology. At `¼` its season-low is
-  **75.48 ppm**. See the resolved-deviation section above for both magnitudes and the caveats.
+  make a hard shutoff — a truncation error, not biology. At `¼` its season-low **was
+  75.48 ppm on the day of this ceremony, and reads 70.25 ppm on today's tree** (the light
+  path and the layered canopy both moved it; the band section above tabulates all five and
+  says why the prose lagged). See the resolved-deviation section above for both magnitudes
+  and the caveats.
   ⚠ This entry read *"the sealed chamber ... 57.9 ppm ... 76.82 ppm"* until **2026-08-14**;
   corrected there — the sealed chamber never crossed in its own configuration, and the pair of
   numbers came from two different runs.

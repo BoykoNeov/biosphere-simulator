@@ -227,7 +227,13 @@ def test_the_shipped_floor_is_the_conservative_one_against_the_cited_route() -> 
     "conservative_one_against_the_cited_route",
 )
 def test_sealed_chamber_stays_above_the_compensation_point() -> None:
-    """75.82 ppm — and ⚠ this chamber **never crossed**, at any shipped step.
+    """71.44 ppm — and ⚠ this chamber **never crossed**, at any shipped step.
+
+    ⚠ Said **75.82** until 2026-08-15, which was this scenario's reading in `4d7fdfd`, the
+    commit that wrote this file. The light path (`a0ef98b`, six commits later the same day)
+    and then the layered canopy moved it; ``test_the_five_margins_are_pinned_not_merely_
+    positive`` went red at the first of those and was re-pinned, and these docstrings were
+    not. See ``docs/biosphere-reference.md`` — a value in prose acquires no owner.
 
     It is gated anyway. The scenario spent three days named as the crossing's locus, so
     a gate here is worth more than its margin: it pins the configuration
@@ -249,10 +255,15 @@ def test_sealed_chamber_stays_above_the_compensation_point() -> None:
     "conservative_one_against_the_cited_route",
 )
 def test_perennial_chamber_stays_above_the_compensation_point() -> None:
-    """⚠ **THE ONE THAT WAS RED.** 56.03 ppm at ``dt = 1``; 75.48 at the shipped step.
+    """⚠ **THE ONE THAT WAS RED.** 56.03 ppm at ``dt = 1``; 70.25 at the shipped step.
 
     This is the scenario the whole step unfreeze was authorised on, and the gate that
-    should have existed before it. The margin is 1.24×.
+    should have existed before it.
+
+    ⚠ **It is now also the TIGHTEST of the five (1.1503×)**, which it was not when this
+    file was written — see ``test_consumer_chamber_stays_above_the_compensation_point``,
+    whose docstring made the opposite claim and was right for six commits. Said "75.48 at
+    the shipped step / the margin is 1.24×" until 2026-08-15.
     """
     assert _season_low_ppm("perennial_chamber") > floor_ppm()
 
@@ -268,14 +279,19 @@ def test_perennial_chamber_stays_above_the_compensation_point() -> None:
     "conservative_one_against_the_cited_route",
 )
 def test_consumer_chamber_stays_above_the_compensation_point() -> None:
-    """⚠ **THE TIGHTEST OF THE FIVE, and a number no record carried before this file.**
+    """⚠ **WAS the tightest of the five; as of 2026-08-15 it is the LOOSEST.**
 
-    74.42 ppm, margin **1.2186×** — below both chambers that were quoted in the step
-    write-ups. Every discussion of this defect cited the sealed chamber (75.75/76.82) or
-    the perennial one (56.03/75.48); the chamber actually closest to the floor at the
-    shipped step was never measured, because the probes that drove the decision swept
-    the scenarios the *argument* was about rather than the roster the *band* is about.
-    Enumerate the roster, not the discussion.
+    73.34 ppm, margin **1.2009×**. This docstring read *"THE TIGHTEST OF THE FIVE, and a
+    number no record carried before this file — 74.42 ppm, margin 1.2186×, below both
+    chambers that were quoted in the step write-ups"*, and that was true when written
+    (`4d7fdfd`) and false six commits later. The light path and the layered canopy both
+    act through canopy **closure**, and this chamber's crop is the one the crew's CO₂
+    keeps furthest from closing — so it lost the least (−1.5 % against −7 %) and the
+    ranking inverted around it. ``perennial_chamber`` is now the tightest at 1.1503×.
+
+    ⚠ **The lesson the old text carried is untouched and is why this was found**:
+    enumerate the roster, not the discussion. What it did not say, and this does, is that
+    a *ranking* is a claim about a moment — re-derive it, never quote it.
     """
     assert _season_low_ppm("consumer_chamber") > floor_ppm()
 
@@ -292,11 +308,18 @@ def test_consumer_chamber_stays_above_the_compensation_point() -> None:
     "conservative_one_against_the_cited_route",
 )
 def test_perennial_long_horizon_stays_above_the_compensation_point() -> None:
-    """15 yr: 75.4757 ppm — the *same* minimum as the 5-yr run, taken in year 2.
+    """15 yr: 70.2526 ppm — the *same* minimum as the 5-yr run, taken in year 2.
 
-    The long horizon adds no new low. Measured to 50 yr the per-year minima climb
-    monotonically off that year-2 trough to 75.84 and flatten, so the band's worst case
-    sits inside the frozen horizon rather than beyond it.
+    The long horizon adds no new low. ⚠ **That identity is the durable half and it
+    survived two unfreezes**: the value said 75.4757 until 2026-08-15, and through both
+    moves the 15-yr reading has stayed bit-equal to the 5-yr one. A *shape* outlives the
+    values it is measured on, which is the argument for pinning shapes.
+
+    ⚠ The 50-yr statement below is **dated 2026-08-14 and has NOT been re-measured** since
+    the light path or the layered canopy: *"the per-year minima climb monotonically off
+    that year-2 trough to 75.84 and flatten, so the band's worst case sits inside the
+    frozen horizon"*. Its two inputs both moved, so it is carried as an open question, not
+    restated with new digits it has not earned.
     """
     assert _season_low_ppm("perennial_long_horizon") > floor_ppm()
 
@@ -313,10 +336,12 @@ def test_perennial_long_horizon_stays_above_the_compensation_point() -> None:
     "conservative_one_against_the_cited_route",
 )
 def test_consumer_long_horizon_stays_above_the_compensation_point() -> None:
-    """15 yr: 74.4210 ppm, taken in year 5 — again the same minimum as the 5-yr run.
+    """15 yr: 73.3386 ppm, taken in year 5 — again the same minimum as the 5-yr run.
 
-    Same reading as the perennial long horizon: to 50 yr the minima rise off year 5 and
-    settle at 75.06, so the frozen horizon contains the worst case.
+    Same reading as the perennial long horizon, including the caveat: the value said
+    74.4210 until 2026-08-15, the 15-yr/5-yr identity held through both moves, and the
+    50-yr claim (*"the minima rise off year 5 and settle at 75.06"*) is dated 2026-08-14
+    and has not been re-measured.
     """
     assert _season_low_ppm("consumer_long_horizon") > floor_ppm()
 
