@@ -424,7 +424,9 @@ candidate that works through leaf *area* rather than through shading.
 
 ⚠ **And one thing this section cannot do, found the same day:** peak LAI compounds through
 interception at **~3.5×** (a 5 % nudge to leaf-area-per-carbon or to assimilation buys 18 %
-of peak LAI), while three of its inputs are `TODO(cite)` provisional literals. A band whose
+of peak LAI) — ⚠ that being the elasticity to a **uniform** perturbation; a closure-weighted
+one amplifies only ~1.14× — while three of its inputs are `TODO(cite)` provisional
+literals. A band whose
 subject amplifies every parameter error 3.5× can say the tree is in the right decade and
 **cannot arbitrate between mechanisms** — so "the canopy this tree cannot grow" is a
 provenance finding before it is a mechanism finding.

@@ -143,6 +143,16 @@ completely different direction. **The damage is confined to `open_season`'s band
 carbon, which grows more leaf. Clearing the 6.1 % gap therefore costs about **+1.8 %** of
 either quantity.
 
+⚠ **Both figures are the elasticity to a UNIFORM perturbation, and that scope is
+load-bearing.** These knobs were scaled at every step of the season. A **closure-weighted**
+perturbation amplifies far less: the layered canopy removes 5.7 % of season-integrated
+assimilation and costs 6.5 % of peak LAI — an amplification of **~1.14×**, not 3.5×,
+because its correction is near-zero while the canopy is open and only reaches −8 % at
+closure, i.e. it is small exactly where the compounding would have multiplied it. Both
+numbers are right and they answer different questions. So "+1.8 % clears the gap" is a
+statement about a *uniform* constant (which `specific_leaf_area` is), **not** a general
+budget any mechanism can be held to.
+
 ⚠ **This is the finding that reframes the whole item.** Three of the inputs that set peak
 LAI are `TODO(cite)` provisional literals — `specific_leaf_area: 22.0`,
 `extinction_coef: 0.6`, and the FvCB `vcmax`/`jmax` pair. At 3.5× amplification, a ±2 %

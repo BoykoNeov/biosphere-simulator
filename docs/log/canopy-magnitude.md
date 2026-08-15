@@ -42,7 +42,13 @@ unrelated direction; the damage is confined to `open_season`'s band. ⚠⚠ **TH
 REFRAMES THE ITEM: the band's subject is a 3.5× AMPLIFIER.** Closed-loop at the converged
 step, ×1.05 on specific leaf area gives **+18.0 %** of peak LAI and ×1.05 on gross
 assimilation **+17.1 %** — the canopy compounds through interception, so clearing the 6.1 %
-gap to the floor costs about **+1.8 %** of either quantity. Three of the inputs that set
+gap to the floor costs about **+1.8 %** of either quantity. ⚠ **Both are the elasticity to a
+UNIFORM perturbation and the scope is load-bearing**: a *closure-weighted* one amplifies far
+less — the layered canopy's 5.7 % of season assimilation costs 6.5 % of peak LAI, i.e.
+**~1.14×**, because its correction is near-zero while the canopy is open and only reaches
+−8 % at closure, small exactly where the compounding would have multiplied it. So "+1.8 %
+clears the gap" is a statement about a *uniform constant* (which `specific_leaf_area` is),
+not a budget any mechanism can be held to. Three of the inputs that set
 peak LAI are `TODO(cite)` provisional literals (`specific_leaf_area: 22.0`,
 `extinction_coef: 0.6`, `vcmax`/`jmax`), so **a ±2 % provenance disagreement about any one
 of them is the entire distance to the bound**: a band whose subject amplifies every
