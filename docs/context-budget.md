@@ -171,6 +171,39 @@ twelve more memories, a few weeks at this project's pace. When it fires:
   lines) in the same commit. Raising it without that is how the ceiling stops meaning
   anything — which is the whole failure documented at the top of this file.
 
+#### It fired on 2026-08-15, and the remedy was a raise — here is why, measured
+
+The prediction above was accurate: it arrived at **11,925 B over 70 lines (~170 B/line)**.
+Decomposing the 1,856 B of growth against the 10,069 B / 62-line / 162 B-per-line baseline:
+
+| cause | growth | share |
+|---|---|---|
+| **count** — 62 → 70 index lines at the old 162 B/line | +1,271 B | **69 %** |
+| **length** — 162 → 170 B/line across 70 lines | +585 B | 31 % |
+
+**Two-thirds of it is more distinct lessons**, which is a long project working as
+intended. Merging to satisfy a count would have destroyed distinct findings to buy bytes
+— the exact inversion of what the merge remedy is for. So the ceiling went **12,000 →
+16,000 B** (~94 lines at budget, ~24 memories of headroom).
+
+⚠ **But the raise shipped with a NEW assertion, not just a restated sentence.** A byte
+ceiling cannot tell "the project learned eight new things" from "the hooks grew into
+paragraphs" — it fires identically on both, and this document opens with a story about
+exactly the second one hiding behind a quiet byte count. So
+`MAX_MEMORY_BYTES_PER_LINE = 170` is now **asserted** in
+`tests/test_context_budget.py::test_memory_index_ceiling`, and the two bounds have
+opposite remedies on purpose:
+
+- the **ceiling** fires on *more memories* → merge related files;
+- the **per-line budget** fires on *fatter hooks* → shorten the hooks, pushing detail
+  into the memory files.
+
+Raising the ceiling buys more memories; raising the per-line budget buys longer lines,
+and only the first is growth. **A restated budget that is only prose owns nothing** —
+the same week's other finding (`d8f5583`) is five frozen values in prose superseded six
+commits after they were written, while the assertion four lines below them fired on
+schedule and was re-pinned.
+
 ### What the gate deliberately does NOT check
 
 It cannot tell whether a row *should* have been retired, or whether a memory file

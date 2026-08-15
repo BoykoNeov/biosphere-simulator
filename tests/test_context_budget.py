@@ -94,7 +94,30 @@ MEMORY_INDEX = (
 # without a same-commit ceiling bump — it is NOT budget for status rows (see
 # ``test_no_status_ledger_in_claude_md``, which is the assertion that says so).
 MAX_CLAUDE_MD_BYTES = 12_000
-MAX_MEMORY_INDEX_BYTES = 12_000
+
+# ⚠ RAISED 2026-08-15, 12_000 -> 16_000, with the per-line budget restated in the same
+# commit as ``docs/context-budget.md`` ("the memory side") requires. The raise is
+# git-visible and reasoned rather than silent, which is the whole point of the ceiling.
+#
+# MEASURED, and the decomposition is why a raise is the right remedy here rather than a
+# merge. The doc predicted this fire precisely ("10,069 B over 62 lines, ~162 B/line ...
+# roughly twelve more memories"); it arrived at **11,925 B over 70 lines, ~170 B/line**.
+# Splitting the 1,856 B of growth:
+#
+#   * COUNT   62 -> 70 lines at the old 162 B/line ... +1,271 B  (69 %)
+#   * LENGTH  162 -> 170 B/line across 70 lines ...... +  585 B  (31 %)
+#
+# Two-thirds of the growth is more distinct lessons, which is a long project working as
+# intended — merging to satisfy a count would destroy distinct findings to buy bytes,
+# the exact inversion the merge remedy exists to avoid. The remaining third is line
+# drift, and THAT is the half the discipline owns.
+#
+# So: the per-line budget is restated at **<= 170 B/line** (today's measured value), and
+# the ceiling is set to 16_000 B = ~94 lines at that budget, ~24 memories of headroom.
+# The merge remedy is NOT retired — it is now aimed at its actual subject: it fires when
+# B/line drifts past 170, not when the project simply learns more things.
+MAX_MEMORY_INDEX_BYTES = 16_000
+MAX_MEMORY_BYTES_PER_LINE = 170
 
 # The Phase 0-9 table as it stood in ``d86d9c8:CLAUDE.md``, verified character-for-
 # character after the move (see ``test_phase_table_survived_its_move``).
@@ -388,4 +411,23 @@ def test_memory_index_ceiling() -> None:
         f"same move as the docs side, not a condense. Raising the ceiling is allowed "
         f"but must come with a restated per-line budget. See docs/context-budget.md, "
         f"'the memory side'."
+    )
+    # ⚠ THE HALF THE DISCIPLINE ACTUALLY OWNS, asserted 2026-08-15 alongside the
+    # 12_000 -> 16_000 raise. The ceiling alone cannot tell "the project learned 8 new
+    # things" (legitimate) from "the hooks grew into paragraphs" (the documented failure
+    # mode) — it fires identically on both, and the 2026-08-12 measurement at the top of
+    # docs/context-budget.md is precisely a story about rows silently becoming
+    # paragraphs while a byte count stayed quiet. So the raise ships WITH a bound on
+    # bytes-per-line, or the restated budget is prose that owns nothing — which is this
+    # week's other finding (d8f5583: five values in prose superseded six commits after
+    # they were written, while the assertion four lines away fired and was re-pinned).
+    per_line = size / max(len(lines), 1)
+    assert per_line <= MAX_MEMORY_BYTES_PER_LINE, (
+        f"MEMORY.md averages {per_line:.1f} B over {len(lines)} index lines, past the "
+        f"{MAX_MEMORY_BYTES_PER_LINE} B/line budget — the hooks are growing into "
+        f"paragraphs, which is the failure the byte ceiling is blind to (it cannot "
+        f"separate more memories from fatter ones). The remedy here is the opposite of "
+        f"the ceiling's: SHORTEN the hooks, pushing the detail into the memory files "
+        f"where it belongs. Do NOT raise this to make room — raising the ceiling buys "
+        f"more memories, raising this buys longer lines, and only the first is growth."
     )
