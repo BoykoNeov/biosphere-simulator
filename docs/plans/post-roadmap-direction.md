@@ -389,19 +389,45 @@ path exposes is a canopy this tree cannot grow.
 - **Re-tuning the bound.** Refused three times in this project already; the bound is
   sourced and the model is what moved.
 
-**Candidate directions, none measured:** the *intra-canopy* half of the Jensen bias is
+**Candidate directions, none measured:** ~~the *intra-canopy* half of the Jensen bias is
 still open (this work closed only the diurnal half — a sunlit/shaded or multi-layer canopy
-is the cited next step and can move canopy assimilation *up*); the specific-leaf-area
+is the cited next step and can move canopy assimilation *up*)~~ — ⚠ **STRUCK 2026-08-15:
+MEASURED, AND THE SIGN IS BACKWARDS** (`post-roadmap-canopy-magnitude.md`). `Ag` is
+**concave** in PAR — `photosynthesis.py` has said so since Step 5 — so resolving the canopy
+into depths redistributes the same photons onto a concave response and can only *lower* the
+sum. Measured: **0 of 2598 lit calls** above 1.0, and closed-loop peak LAI **5.3806 →
+5.0314** at the shipped step, **4.7132 → 4.4169** converged. The clause above was written
+without reading the function it was about, and it is left struck rather than deleted because
+the way it was wrong is the finding. Refused as a *fix*; not refused as science. The
+specific-leaf-area
 constant has no DVS keying anywhere (`canopy-regulator-diagnosed` finding 2 measured it as
 a single constant, which makes LAI strictly linear in leaf carbon); and the partition
 table was **fitted** against the biased assimilation
 (`wheat-partition-backfill-refused`), so it is a suspect in exactly the way the band is.
+⚠ **The SLA candidate was measured 2026-08-15 and is not one direction but two.** Keying the
+constant to development spans peak LAI **3.0446 (−35 %)** to **8.2391 (+75 %)** depending on
+whether the frozen 22.0 m²/kg is read as the *young*-leaf or the *mature*-leaf value —
+which `canopy.yaml` does not say. So it is a **citation** question, not a modelling one, and
+the late-anchored reading also moves the independently-pinned "LAI peaks after anthesis" gap
+the right way (DVS 1.373 → 0.958). The partition table remains **unmeasured**.
 
 ⚠ **Read the liveness floors before starting.** Two narrowed under the light path, and
 perennial's converged peak-leaf sits **3.2 % over its floor on its settled value** — the
 third move in the same direction from unrelated causes. A mechanism that raises canopy
 assimilation moves that number the safe way; one that lowers it may take the floor red.
-Both bands and floors are tabulated in `docs/biosphere-reference.md`.
+Both bands and floors are tabulated in `docs/biosphere-reference.md`. ⚠ **That warning was
+discharged for the layered candidate on 2026-08-15 and the answer was "inert"**: perennial's
+`max(tail)` moves 0.603679 → 0.603540 under it, because the correction scales with canopy
+**closure** and the chambers' canopies never close — the canopy regulator's inertness
+finding, reached again from an unrelated mechanism. Do not assume it generalises to a
+candidate that works through leaf *area* rather than through shading.
+
+⚠ **And one thing this section cannot do, found the same day:** peak LAI compounds through
+interception at **~3.5×** (a 5 % nudge to leaf-area-per-carbon or to assimilation buys 18 %
+of peak LAI), while three of its inputs are `TODO(cite)` provisional literals. A band whose
+subject amplifies every parameter error 3.5× can say the tree is in the right decade and
+**cannot arbitrate between mechanisms** — so "the canopy this tree cannot grow" is a
+provenance finding before it is a mechanism finding.
 
 ---
 
