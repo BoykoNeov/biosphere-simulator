@@ -18,10 +18,16 @@ thrown away:
 | `probe2_chamber_bands.py` | drove the CO₂ band's own `_season_low_ppm` helper at each `k`, with cache clearing |
 | `probe3_floor_margins.py` | read the liveness floors and their clearances at each `k` |
 
-Three instances of one tool in one sitting. Earlier work did the same
-(`post-roadmap-co2-controller.md` names `probe_controller.py`; the step sweep, the leaf
-remeasurement and the canopy magnitude work each hand-rolled their own). The tool is being
-rebuilt every time a question is asked, and deleted every time it is answered.
+Three instances of one tool in one sitting — and that is the small number. ⚠ **Counted
+across the tree rather than asserted: 42 distinct probe scripts are named in 16 plan
+docs**, from `phase-2-closed-chamber.md`'s `bench/probe_multiyear.py` through
+`probe1_sizing.py … probe10_which_stock.py` (crew-coupled loop), `probe.py … probe7.py`
+(allocation headroom), and the three above. Nearly all live under
+`M:/claud_projects/temp/`, outside the repo, and are gone.
+
+**The tool is rebuilt every time a question is asked and deleted every time it is
+answered** — 42 times. This plan was first drafted claiming "at least three more times";
+measuring it moved the number by an order of magnitude, which is itself the argument.
 
 **The gap this fills is specific.** The tree already has:
 
