@@ -1,6 +1,40 @@
 # A value-switch harness — "source A vs source B, what changes?" as a command
 
-**PLANNED 2026-08-15, nothing built, `git diff src/` empty.** Forward-looking; exempt from
+> ## ⚠ STATUS 2026-08-15 — THE SEAM IS BUILT; THE HARNESS IS NOT. Read this before §5.
+>
+> The user chose **Option C (the clean seam)** over Option A. It shipped in `666670a` as
+> `src/config/overrides.py` + the one-line hook in `config.loader.load_yaml`, with 19
+> tests (`tests/test_param_overrides.py`). Full suite **2425 passed / 5 skipped**, up
+> exactly the 19 new tests; every golden, both manifests and every science gate green.
+>
+> ⚠ **§5's price for C was wrong and is now measured.** It claimed an unfreeze question
+> via the manifests' completeness half; that half is defined over the param-file set, the
+> flow-class set, the horizon constant and file existence, and a boundary hook is in none
+> of them. **Nothing in either manifest moved.** The paragraph is kept below as written
+> because the correction is the point — see also `memory/asserted-attributions-rot`.
+>
+> ⚠ **§5's recommendation ("A first, C only if A proves fragile") is SUPERSEDED.** Do not
+> follow it. C is the shipped route.
+>
+> **What is still to build (the actual remaining scope):** §8's runner and comparison
+> mode — take a set of substitutions and a scenario, run, and report the readouts with
+> §6's five requirements honoured. The seam is the foundation; the reporting layer is the
+> deliverable. §9's first target is unchanged.
+>
+> **⚠ The `extinction_coef` decision is STILL OPEN AND UNTAKEN.** The user delegated the
+> choice ("go with the extinction coefficient of your choosing") and the analysis favours
+> **0.65** — crop-specific, our exact equation, canopy peak toward mid-band, LAI peak
+> moving before anthesis, and the liveness-floor objection dissolved on examination (that
+> floor is a self-calibrated continuity tripwire whose own 50-yr subject already sits
+> below it at 0.60). **Nothing was changed**: the ceremony did not start, `canopy.yaml`
+> still reads 0.6 with its `TODO(cite)`. ⚠ Before shipping 0.65, settle the one live
+> operational risk — the perennial liveness floor clears by **0.40 %** and that was
+> measured on Windows while CI is Linux, inside the band where libm ULP differences have
+> taken locally-green results red. Name that exposure in the commit *before* pushing, and
+> do **not** re-anchor the floor in the same batch (that would be indistinguishable from
+> the co-adaptation this tree has refused four times).
+
+**PLANNED 2026-08-15, the seam BUILT (see status above), the harness not.** Forward-looking; exempt from
 the log index per the paragraph in `docs/post-roadmap-log.md` (call it *"the value-switch
 plan"* in any record file — naming it by filename there turns the parity check red).
 
