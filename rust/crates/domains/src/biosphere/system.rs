@@ -614,6 +614,10 @@ fn build_plants(
             rdr_leaf: p.senesc.rdr_leaf,
             rdr_stem: p.senesc.rdr_stem,
             rdr_root: p.senesc.rdr_root,
+            shade_rate: p.senesc.shade_rate,
+            lai_threshold: p.senesc.lai_threshold,
+            sla_per_mol_c: p.canopy.sla_per_mol_c,
+            ground_area: scenario.ground_area,
         }),
         Box::new(Transpiration {
             id: "biosphere.transpiration".to_string(),
@@ -679,6 +683,10 @@ fn build_plants(
             rdr_stem: p.senesc.rdr_stem,
             rdr_root: p.senesc.rdr_root,
             n_residual_per_mol_c: p.nitro.n_residual_per_mol_c,
+            shade_rate: p.senesc.shade_rate,
+            lai_threshold: p.senesc.lai_threshold,
+            sla_per_mol_c: p.canopy.sla_per_mol_c,
+            ground_area: scenario.ground_area,
         }));
     }
     // Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,

@@ -980,6 +980,8 @@ _SENESCENCE_UNITS: dict[str, str] = {
     "rdr_leaf": "1/day",
     "rdr_stem": "1/day",
     "rdr_root": "1/day",
+    "shade_rate": "1/day",
+    "lai_threshold": "dimensionless",
 }
 
 
@@ -999,6 +1001,8 @@ class _SenescenceParameters(BaseModel):
     rdr_leaf: _SenescenceValueUnit
     rdr_stem: _SenescenceValueUnit
     rdr_root: _SenescenceValueUnit
+    shade_rate: _SenescenceValueUnit
+    lai_threshold: _SenescenceValueUnit
 
 
 class _SenescenceSchema(BaseModel):
@@ -1043,6 +1047,8 @@ def load_senescence_params(
         rdr_leaf=values["rdr_leaf"],
         rdr_stem=values["rdr_stem"],
         rdr_root=values["rdr_root"],
+        shade_rate=values["shade_rate"],
+        lai_threshold=values["lai_threshold"],
     )
 
 

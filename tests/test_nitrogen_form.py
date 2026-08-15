@@ -62,6 +62,7 @@ import pytest
 from domains.biosphere import scenario as sc
 from domains.biosphere.allocation import Senescence
 from domains.biosphere.loader import (
+    load_canopy_params,
     load_nitrogen_params,
     load_senescence_params,
 )
@@ -291,8 +292,13 @@ def test_open_season_peak_w_margin_to_the_crossing() -> None:
     # ⚠ Cause: the light path (`docs/plans/post-roadmap-gross-net-gas-exchange.md`), not
     # the step, which is unchanged at ¼. The sourced half — the 14.4248 crossing — is
     # still UNTOUCHED, and this move is *away* from it.
-    assert 13.5 < peak_w < 13.9, peak_w
-    assert 0.945 < peak_w / 14.4248 < 0.962, (
+    # ⚠ 2026-08-15 (the depth-resolved canopy + the sourced SLA anchor): 13.740221 ->
+    # 13.406590, and the margin opens a SECOND time (4.75 % -> 7.08 % under the
+    # crossing). ⚠ Note the pairing: the same change took peak LAI UP through the
+    # mutual-shading threshold while taking peak MASS further from the Greenwood one.
+    # More leaf AREA per unit leaf CARBON is not more crop.
+    assert 13.2 < peak_w < 13.6, peak_w
+    assert 0.920 < peak_w / 14.4248 < 0.939, (
         "the margin narrative is stale; re-measure it"
     )
 
@@ -359,6 +365,8 @@ def test_shed_nitrogen_uses_the_same_carbon_flux_as_the_senescence_flow() -> Non
         root_c=ROOT_C,
         litter_sink=LITTER_SINK,
         params=load_senescence_params(),
+        canopy=load_canopy_params(),
+        ground_area=scenario.ground_area,
     )
     n_flow = next(
         f for f in registry.flows if str(f.id) == "biosphere.nitrogen_senescence"

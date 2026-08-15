@@ -82,7 +82,7 @@
   "long_horizon_years": 15,
   "param_files": {
     "allocation.yaml": "db32b1b1663cb800704b2a5d32609c1af66c62301dc7035ba847424540d4ebda",
-    "canopy.yaml": "7686da08e9a8f0a6d2643866a849df744dded40ad86443689cd5896b4d42bc65",
+    "canopy.yaml": "26d0989d79df011b5f505943489bb3af2195132bdc4a9da687c111005915b248",
     "decomposition.yaml": "491f196483f5d131131369b0c15c5dc6f368e60d38be185067484f4c0f34af13",
     "herbivory.yaml": "33903c12acd162cc377a9fe4536a971cc3d2f4943a959a69aeebc5a989198c1b",
     "humification.yaml": "327cd89ee455cf0cf20767e4081dbe1344287f2e132760b668cae5a20d6f4b09",
@@ -92,7 +92,7 @@
     "photosynthesis.yaml": "51bb4fe98ab6176fcd1308c4b51d84b961ef3472eaa789c531ccec2114fc1e3c",
     "respiration.yaml": "b6ec929a0129f41cb48e6b02b2ab7298eb7a590a6493e40feb57b73375d8e638",
     "root_depth.yaml": "fefdbcc39e3e5cb1ef88368a30afe467b7be6ac3dd825657574bcdc020b358e7",
-    "senescence.yaml": "3fe7cbae9b12f3acbb26dd8caf96bd4808fe47d7a2d677a55568a74f23ebcdb3",
+    "senescence.yaml": "21163d3c54c958655b0e39d1613610e1264bdecb85e7432576a6cc471c3b669b",
     "stem_reserves.yaml": "65ae25bf8ec5ad213763c41282221837b3d0e6e8de14a70d2c5ed53ed9cbe39e",
     "transpiration.yaml": "8859b2a8612372f9ae7d4468754d3b2d5a3e4530941281fb81327fc2daf303eb",
     "water_cycle.yaml": "b38bc1dc390dce0cc5c89562977ecb38e241560e7e3f794330d2438b7a4bfadf"
@@ -101,43 +101,43 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "f540afa0197dc8f6fed13de7e952630b9b80e6b304757c365fe7d348b61ac555",
+      "golden_sha256": "5bfdfcc989810a099704d7b91b79c70cca5008b3c3f01fec6d0f9708bf9cd883",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "5c30b80c5dc03e77aa196b29e6482c7c435c73ad9278cdad30124ec8f12c6ad3",
+      "golden_sha256": "155d633053d779d7b5092c13cc74d933f6fd62e62b3b931176fdc37988b44846",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
     "drift_summary": {
       "golden": "drift_summary.json",
-      "golden_sha256": "de9b2f878c79bfb969dba4e95738708dd41eecff0f009ed15c91a19588c171d2",
+      "golden_sha256": "74eeaab57ab4ee0c9853bf429abd9eb8c38cc29745601de676c0d1048165180d",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
       "years": 15
     },
     "open_season": {
       "golden": "season_euler_state.json",
-      "golden_sha256": "ea69a6dff72e2bb5db8dc18879db4855789b17087824901b45ece7f48bea4d91",
+      "golden_sha256": "f4b3f454ae9672a2eae8fb1b40bf5273d2d5c668c8832468f8022c9202a5b21f",
       "scenario": "DEFAULT_SCENARIO (open field)",
       "years": 1
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "8726dbc20381520b386dc0ca7e1ef13d89d062d53c01a456a865755d69db0b74",
+      "golden_sha256": "23034da7685e3339905d70b8c329e9b032974083c4da2425f20139d034748b75",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "0bec866be38d86c95ae3697cfb4c7d01cb2158cdc357c6b1993cd23f04bac309",
+      "golden_sha256": "f3eaa8bc61f1b96beffb3d72a73b55984052be69151d0526581f717b036e6d5e",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "8d0451816b4a1bcb31413dc3d19b35193366f340a329f61034d906e52198a85b",
+      "golden_sha256": "82aec11874eef6d5b6b7a0f582f39a9a50c4a5f035d45466cc5e2a612ae5aab0",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }
@@ -168,9 +168,9 @@
         "source": "real wheat peaks at ~5-8 LAI"
       },
       {
-        "bound": "peak < 6.0",
-        "locus": "tests/test_senescence_form.py::test_frozen_peak_lai_is_below_the_vks_threshold",
-        "quantity": "peak LAI (m2 m-2)",
+        "bound": "peak < 6.0 OR the 5%/day mutual-shading loss is MODELLED",
+        "locus": "tests/test_senescence_form.py::test_the_vks_mutual_shading_regime_is_MODELLED_not_merely_avoided",
+        "quantity": "peak LAI (m2 m-2) vs the mutual-shading threshold",
         "source": "Van Keulen & Seligman 1987 mutual-shading threshold, via [A] p. 101"
       },
       {

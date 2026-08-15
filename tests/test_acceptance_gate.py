@@ -501,7 +501,10 @@ def test_the_gate_fires_per_registry_call_not_per_simulated_step(scenario: str) 
     # 1483.2630 -> 693.4340. The biosphere carbon pool now spends part of every day
     # being drawn on by respiration with no assimilation to offset it, so its tightest
     # moment is tighter. Three orders of slack becomes two and a half; still live.
-    expected_bio = {"greenhouse": 537.8638049097283, "harvest": 693.4339678481122}
+    # ⚠ 2026-08-15 (the depth-resolved canopy + the sourced SLA anchor): 537.86/693.43
+    # -> 481.54/641.61. Both fall ~8-10 %: fewer registry calls reach the gate because
+    # the crop is smaller in CARBON even though its canopy is larger in AREA.
+    expected_bio = {"greenhouse": 481.5384065492337, "harvest": 641.6103673422488}
     assert bio_min == pytest.approx(expected_bio[scenario], rel=1e-9)
     # ...and the census reports the tighter of the two, which is the cabin's.
     assert cabin_min < bio_min
@@ -920,9 +923,10 @@ def test_the_litter_pair_became_live_when_it_gained_an_o2_draw() -> None:
         # this column measures. The RANK claim the table exists for is unchanged in
         # all three: the carbon pool is still each scenario's tightest live gate, and
         # the runner-up columns did not move at all.
-        ("sealed_chamber", 3.7793861201161016, 37.2557585449319),
-        ("perennial_chamber", 3.5343019459308773, 33.77998307475926),
-        ("consumer_chamber", 4.466989660058212, 33.77998307475926),
+        # ⚠ all three carbon-pool figures re-measured 2026-08-15 (the canopy work).
+        ("sealed_chamber", 3.526102440870126, 37.2557585449319),
+        ("perennial_chamber", 3.830112222494444, 33.77998307475926),
+        ("consumer_chamber", 4.338856848334594, 33.77998307475926),
     ],
 )
 def test_the_jars_carbon_pool_is_the_only_binding_gate(
@@ -1022,9 +1026,9 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     # ⚠ 2026-08-14: 1.9016721361221138 / 1.552788483797351 / 2.1271916795585084. The
     # ratios are 4.04 / 3.59 / 4.36 — near 4x but not 4x, which is the signature of a
     # LIVE gate re-integrated rather than a rate-determined one rescaled.
-    "sealed_chamber": ("biosphere.carbon_pool", 3.7793861201161016),
-    "perennial_chamber": ("biosphere.carbon_pool", 3.5343019459308773),
-    "consumer_chamber": ("biosphere.carbon_pool", 4.466989660058212),
+    "sealed_chamber": ("biosphere.carbon_pool", 3.526102440870126),
+    "perennial_chamber": ("biosphere.carbon_pool", 3.830112222494444),
+    "consumer_chamber": ("biosphere.carbon_pool", 4.338856848334594),
     "power_bounded_soc": ("power.battery", 11.295323690100386),
     "power_self_discharge": ("power.battery", 11.085836827155921),
     "thermal_equilibrium": ("thermal.node", 257.68121326080376),
@@ -1044,21 +1048,22 @@ TIGHTEST: dict[str, tuple[str, float]] = {
     # the water as the tightest gate. ⚠ This is the census doing its job: a rank
     # change is the observation it exists to make, and it would have been invisible in
     # any test that pinned only the value.
-    "lighting": ("biosphere.carbon_pool", 33.430399346096465),
+    "lighting": ("biosphere.carbon_pool", 29.390756475717257),
     "harvest": ("biosphere.carbon_pool", 16.666666666666664),
     # ⚠ Both long-horizon rows are now BIT-IDENTICAL to their 5-year siblings, where
     # perennial's used to differ by 0.11 %. See
     # ``test_whether_the_perennial_gate_needs_the_LONG_horizon``.
     # ⚠ 2026-08-14 (the light path), with their 5-year siblings above.
-    "perennial_long_horizon": ("biosphere.carbon_pool", 3.5343019459308773),
-    "consumer_long_horizon": ("biosphere.carbon_pool", 4.466989660058212),
+    "perennial_long_horizon": ("biosphere.carbon_pool", 3.830112222494444),
+    "consumer_long_horizon": ("biosphere.carbon_pool", 4.338856848334594),
     "sealed_energy_drift": ("power.battery", 11.295323690100386),
     # ⚠ RE-RANKED WITHIN THE ROW — see the header note and claim 3. The stock is the
     # same; the CALL that binds is not. The biosphere registry's minimum rose
     # 5.0232 -> 19.0209 and so crossed above the cabin's unchanged 16.667.
     # ⚠ 16.6667 (the ECLSS scrubber constant) -> 11.8868 on 2026-08-14: the light
     # path made this a plant-driven number again. See the ranking test.
-    "sealed_station": ("biosphere.carbon_pool", 11.88679216141662),
+    # ⚠ 2026-08-15 canopy 11.88679216141662 -> 12.289433638826605
+    "sealed_station": ("biosphere.carbon_pool", 12.289433638826605),
 }
 
 
@@ -1238,7 +1243,15 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     )
     assert station_rank > 5, (station_rank, ranked[:13])
     assert ranked[station_rank][2] == "biosphere.carbon_pool"
-    assert ranked[station_rank][0] == pytest.approx(11.88679216141662, rel=1e-12)
+    # ⚠ 2026-08-15 (the layered canopy + leaf-thickness unfreeze): 11.88679216141662 ->
+    # 12.289433638826605, i.e. the station's plant-side gate LOOSENED by 3.4 %. The
+    # depth-resolved canopy assimilates less than the big-leaf form did at the same mean
+    # light (Jensen), so the crop's tightest draw on the shared pool is a little
+    # smaller.
+    # ⚠ The direction claim of claim 3 below is UNCHANGED — the plant still binds — but
+    # the gap to the cabin's 16.6667 has narrowed, and this pair has already crossed
+    # twice in two days. Read the pins, not the sentence.
+    assert ranked[station_rank][0] == pytest.approx(12.289433638826605, rel=1e-12)
     scrubber = pytest.approx(1.0 / 0.06, rel=1e-12)
     assert {s for m, s, _sid in ranked if m == scrubber} == {"greenhouse", "harvest"}
     #
@@ -1311,7 +1324,10 @@ def test_the_roster_wide_claims_that_need_the_expensive_runs() -> None:
     # the DIRECTION is not a stable property — which is exactly why it is written as two
     # exact pins plus whichever inequality currently holds, and not as a claim about
     # which subsystem "the" binding call belongs to.
-    assert bio_min == pytest.approx(11.88679216141662, rel=1e-9), "tier2 bio registry"
+    #   2026-08-15     biosphere 12.289434, cabin 16.666667. PLANT still binds — but the
+    # gap narrowed by 3.4 % when the layered canopy replaced the big-leaf
+    #                  form. A third crossing is one ordinary change away.
+    assert bio_min == pytest.approx(12.289433638826605, rel=1e-9), "tier2 bio registry"
     assert cabin_min == pytest.approx(16.666666666666664, rel=1e-12), (
         "tier2 cabin registry"
     )
@@ -1394,7 +1410,13 @@ def test_whether_the_perennial_gate_needs_the_LONG_horizon() -> None:
     #   2026-08-14  a == b bit-identical AGAIN, at the light path; both 5.5755 ->
     #               3.5343, so the 5-year/15-year identity survives a change that
     #               moved the value by 37 %.
-    assert a == pytest.approx(3.5343019459308773, rel=1e-9)
+    #   2026-08-15  a == b bit-identical a THIRD time, at the layered canopy; both
+    #               3.5343019459308773 -> 3.830112222494444, a +8.4 % move. The 5-year /
+    #               15-year identity has now survived two consecutive changes that moved
+    #               the value by tens of percent, which is what makes "the perennial
+    #               chamber's tightest carbon moment is inside five years" look like a
+    # property of the chamber rather than a coincidence of one parameter set.
+    assert a == pytest.approx(3.830112222494444, rel=1e-9)
 
     # consumer has been a 5-year property throughout, on both steps. It is asserted
     # alongside perennial so the two cannot be conflated: for three of the four dates

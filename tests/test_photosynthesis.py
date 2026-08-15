@@ -154,10 +154,17 @@ def test_temperature_factor_cardinal_points(temp: float, expected: float) -> Non
     assert math.isclose(f, expected, abs_tol=1e-12)
 
 
-# --- the provisional big-leaf canopy aggregator -----------------------------
+# --- the depth-resolved canopy aggregator -----------------------------------
 def test_canopy_assimilation_known_value() -> None:
-    # LAI=2.936 (5 mol leaf C / 1 m², SLA fold), f_int≈0.828; daily flux composed from
-    # the hand literals above. dt is applied by the flow, not the aggregator.
+    # LAI=2.936 (5 mol leaf C / 1 m², SLA fold); daily flux composed from the hand
+    # literals above. dt is applied by the flow, not the aggregator.
+    # ⚠ RE-DERIVED 2026-08-15: the aggregator stopped being a big leaf at the mean PAR
+    # and became the cited 3-point Gaussian depth integral, so this known value moved
+    # 1.3778614691309006 -> 1.3219831112621092, i.e. **4.05 % LOWER**. The sign is the
+    # whole point: `Ag` is concave in PAR, so resolving the canopy into depths can only
+    # lower the sum. `_SLA_PER_MOL_C` here is a FIXTURE literal, deliberately left at
+    # the old 0.5872 fold so that LAI stays 2.936 and this pin isolates the aggregator
+    # change from the parameter change that shipped the same day.
     daily = canopy_assimilation(
         800.0,
         5.0 * _SLA_PER_MOL_C / 1.0,  # LAI
@@ -168,7 +175,7 @@ def test_canopy_assimilation_known_value() -> None:
         canopy=_canopy(),
         ground_area=1.0,
     )
-    assert math.isclose(daily, 1.3778614691309006, rel_tol=1e-12)
+    assert math.isclose(daily, 1.3219831112621092, rel_tol=1e-12)
 
 
 def test_canopy_assimilation_temperature_halves_at_ramp_midpoint() -> None:

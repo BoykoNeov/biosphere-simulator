@@ -227,10 +227,12 @@ def test_the_litter_pool_a_throttle_would_read_is_TWO_REGIMES_not_one_number() -
     # 104.972745 -> this (+0.18 %), and 100.678502 -> this (+0.30 %). As multiples of
     # the shed ratio: 1.1685x and 1.1220x, i.e. 16.9 % and 12.2 % above it.
     assert seen["sealed_chamber"] == pytest.approx(
-        105.827924, rel=1e-4
+        105.926531,
+        rel=1e-4,  # ⚠ 2026-08-15 canopy 105.827924 -> 105.926531
     )  # ⚠ 2026-08-14 (light path), was 105.163
     assert seen["water_biting"] == pytest.approx(
-        102.17372, rel=1e-4
+        102.475804,
+        rel=1e-4,  # ⚠ 2026-08-15 canopy 102.17372 -> 102.475804
     )  # ⚠ 2026-08-14 (light path), was 100.985
     # ⚠ The load-bearing claim of this test is not the tightness of either number — it
     # is that these are a DIFFERENT REGIME from the reset-driven pair below, which sits
@@ -278,8 +280,9 @@ def test_the_litter_pool_a_throttle_would_read_is_TWO_REGIMES_not_one_number() -
         assert seen[label] < shed_cn / 4.0, (label, seen[label])
     # ...and the ratio is pinned as the MEASUREMENT it is, so a change is visible.
     # 8.20x -> this.
+    # ⚠ 8.20x -> 7.033943 -> 7.427568 (2026-08-15, the canopy work).
     assert seen["sealed_chamber"] / seen["perennial"] == pytest.approx(
-        7.033943, rel=1e-3
+        7.427568, rel=1e-3
     )
 
 

@@ -270,7 +270,10 @@ def test_the_f_O2_throttle_bites_and_that_is_NOT_the_light_paths_doing() -> None
         )
         for s in states
     )
-    assert 0.84 < worst < 0.87, worst  # measured 0.8541 (committed tree: 0.8466)
+    # ⚠ 2026-08-15 (the depth-resolved canopy + the sourced SLA anchor): 0.8541 ->
+    # 0.8776. The worst oxygen limitation EASES — a smaller-mass crop respires less at
+    # the fill, so the O2 pool is drawn down less hard. Moving AWAY from shutoff.
+    assert 0.86 < worst < 0.89, worst  # measured 0.8776 (was 0.8541 / 0.8466)
     # far from shutoff, and rising: the fill is the worst point, not the season's end
     final = oxygen_limitation_factor(
         states[-1].stocks[O2_POOL].amount, air_mol=air_mol, k_o2=resp.o2_half_saturation

@@ -426,10 +426,20 @@ def test_reaching_the_subsoil_is_what_saves_the_deep_water_crop() -> None:
     # The bounds below did NOT go red, and that is the point — they had slack, and
     # `deep_water` has no golden, so nothing here would have told you the headline
     # number had moved. Re-measured, not assumed (docs/log/water-stress-curves.md).
-    assert peak_leaf(subject) > 10.0 * peak_leaf(control)
-    assert subject[-1].stocks[STORAGE_C].amount > 7.0 * (
-        control[-1].stocks[STORAGE_C].amount
+    # ⚠ 2026-08-15 (the depth-resolved canopy + the sourced SLA anchor): the ratio falls
+    # to 9.58x, so the 10x bound goes red for the first time. The EFFECT is unchanged in
+    # kind — an order of magnitude, in the same direction, for the same reason — and the
+    # ratio moved because the depth integral costs the water-rich SUBJECT more than the
+    # water-starved control (its canopy is the one that closes). Re-pinned to the
+    # measured value, two-sided, so a further slide is caught rather than absorbed.
+    assert 9.0 < peak_leaf(subject) / peak_leaf(control) < 10.5
+    # ⚠ 2026-08-15: the grain ratio falls 8.44x -> 5.83x, so the 7x bound goes red with
+    # the 10x one above and for the same reason. Still an order-of-magnitude rescue, and
+    # re-pinned two-sided rather than merely lowered.
+    grain_ratio = (
+        subject[-1].stocks[STORAGE_C].amount / control[-1].stocks[STORAGE_C].amount
     )
+    assert 5.5 < grain_ratio < 6.2, grain_ratio
     assert subject[-1].stocks[STORAGE_C].amount > 2.5
 
 

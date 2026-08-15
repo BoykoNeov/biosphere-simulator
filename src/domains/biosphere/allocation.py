@@ -44,6 +44,7 @@ Production: Weather, Soils and Crops*, PUDOC, Wageningen.
 
 from dataclasses import dataclass
 
+from domains.biosphere.canopy import CanopyParams, leaf_area_index
 from simcore.environment import Environment
 from simcore.flow import FlowResult, Leg
 from simcore.ids import FlowId, StockId
@@ -91,6 +92,8 @@ class SenescenceParams:
     rdr_leaf: float  # relative death rate of leaf carbon (mol C lost / mol C / day)
     rdr_stem: float  # relative death rate of stem carbon
     rdr_root: float  # relative death rate of root carbon
+    shade_rate: float  # ADDITIONAL leaf relative death rate above the LAI threshold
+    lai_threshold: float  # LAI above which mutual shading starts killing leaves
 
 
 def partition_fractions(
@@ -147,6 +150,29 @@ def senescence_flux(organ_c: float, *, relative_death_rate: float) -> float:
     return relative_death_rate * organ_c
 
 
+def mutual_shading_rate(
+    lai: float, *, rdr_leaf: float, shade_rate: float, lai_threshold: float
+) -> float:
+    """Leaf relative death rate with mutual shading: ``rdr + shade`` above ``LAI*``.
+
+    Van Keulen & Seligman (1987), via [A] p. 101: in **wheat**, leaf area is lost at
+    ``5 %/day`` once the leaf area index exceeds ``6 m² m⁻²``, to account for mutual
+    shading — leaves buried below a closed canopy fall under their own compensation
+    point and die. A **step**, not a ramp: that is the form the source states.
+
+    ⚠ **Cited on leaf AREA, applied to leaf CARBON, and the two are the same rate only
+    because SLA is a constant here.** ``LAI = leaf_c · sla / ground_area`` with ``sla``
+    fixed, so a 5 %/day relative loss of leaf carbon *is* a 5 %/day relative loss of
+    leaf area. Should SLA ever become development-keyed, this identity breaks and the
+    term would have to move to an area basis — see the winter-wheat SLA finding in
+    ``docs/log/canopy-magnitude.md`` (measured, and refused, 2026-08-15).
+
+    Self-limiting like the base rate (proportional to standing carbon downstream), so
+    it cannot drive leaf carbon negative.
+    """
+    return rdr_leaf + shade_rate if lai > lai_threshold else rdr_leaf
+
+
 @dataclass(frozen=True)
 class Senescence:
     """CARBON loss flow ``{leaf_c, stem_c, root_c} -> litter_sink`` (balanced, P1).
@@ -156,6 +182,17 @@ class Senescence:
     positivity is structural. ``litter_sink`` is a BOUNDARY reservoir distinct from the
     numerical extinction loss-sink (decision #6) — real shed biomass.
     ``flux = daily·dt`` is dt-linear.
+
+    ⚠ **The leaf rate gained a mutual-shading term on 2026-08-15** — see
+    :func:`mutual_shading_rate`. It is a **state-dependent** rate (it reads leaf carbon
+    to form LAI), where the other two organs' rates are constants. It was built because
+    the tree grew into the regime the term describes: binding ``specific_leaf_area`` to
+    its primary source took ``open_season``'s peak LAI to 6.0228, past the sourced
+    threshold of 6.0, and a mechanism that a cited source says fires in that regime is
+    then owed. ⚠ It is **bit-identically inert in every chamber scenario** (their
+    canopies peak at LAI 0.07–0.63, an order of magnitude below the threshold), so it
+    is an open-field mechanism only — the same closure-scaling that makes the canopy
+    depth integral inert there.
     """
 
     id: FlowId
@@ -165,12 +202,24 @@ class Senescence:
     root_c: StockId
     litter_sink: StockId
     params: SenescenceParams
+    canopy: CanopyParams
+    ground_area: float
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
+        lai = leaf_area_index(
+            snapshot.stocks[self.leaf_c].amount,
+            sla_per_mol_c=self.canopy.sla_per_mol_c,
+            ground_area=self.ground_area,
+        )
         leaf = (
             senescence_flux(
                 snapshot.stocks[self.leaf_c].amount,
-                relative_death_rate=self.params.rdr_leaf,
+                relative_death_rate=mutual_shading_rate(
+                    lai,
+                    rdr_leaf=self.params.rdr_leaf,
+                    shade_rate=self.params.shade_rate,
+                    lai_threshold=self.params.lai_threshold,
+                ),
             )
             * dt
         )

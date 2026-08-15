@@ -257,7 +257,14 @@ def test_potato_leaf_is_thinner_than_wheats_by_the_factor_the_source_gives() -> 
     wheat = load_canopy_params()
     assert potato.sla_per_mol_c > wheat.sla_per_mol_c
     ratio = potato.sla_per_mol_c / wheat.sla_per_mol_c
-    assert ratio == pytest.approx(33.33 / 22.0, rel=1e-3)
+    # ⚠ 2026-08-15: the wheat side of this ratio was an UNCITED 22.0 until now, even
+    # though this very test cited [E] Table 19 for the potato side. The wheat entry sat
+    # one row below the potato one in the same table, and the ratio was being taken
+    # against a placeholder. Binding it (425 kg/ha -> 23.53) makes both halves the
+    # source's, so the ratio is now 33.33/23.53 = 300/425 inverted — the table's own.
+    assert ratio == pytest.approx(33.33 / 23.53, rel=1e-3)
+    # ...and that is exactly the reciprocal of the source's two leaf weights.
+    assert ratio == pytest.approx(425.0 / 300.0, rel=1e-3)
 
 
 def test_carbon_fraction_agrees_across_every_crop_set() -> None:
@@ -276,7 +283,7 @@ def test_carbon_fraction_agrees_across_every_crop_set() -> None:
         crop = crop_param_set(name)
         canopy = load_canopy_params(crop.paths["canopy"])
         nitro = load_nitrogen_params(crop.paths["nitrogen"])
-        declared_sla = {None: 22.0, "potato": 33.33}[name]
+        declared_sla = {None: 23.53, "potato": 33.33}[name]
         assert canopy.sla_per_mol_c / nitro.dm_kg_per_mol_c == pytest.approx(
             declared_sla, rel=1e-12
         ), f"carbon_fraction disagrees between canopy and nitrogen for crop {name!r}"
@@ -403,7 +410,9 @@ def test_gap_3_the_canopy_is_starved_downstream_of_gap_2() -> None:
     # canopy rather than a re-indexing: a step bug moves the index, and this moved the
     # value under a fixed index.
     # ⚠ 3.474 -> 3.380 (2026-08-14, the light path)
-    assert our_peak == pytest.approx(3.380, rel=1e-3)
+    assert our_peak == pytest.approx(
+        3.235154, rel=1e-3
+    )  # ⚠ 2026-08-15 canopy 3.380 -> 3.235154
 
     oracle_lai = [r["LAI"] for r in _oracle()]
     their_day, their_peak = _peak(oracle_lai)
@@ -415,7 +424,9 @@ def test_gap_3_the_canopy_is_starved_downstream_of_gap_2() -> None:
     # is re-measured rather than the claim re-worded around it.
     # ⚠ 2.56 -> 2.63 (2026-08-14, the light path): our canopy fell 2.7 %, so the gap
     # to the oracle widens again — the same direction the step had just closed.
-    assert their_peak / our_peak == pytest.approx(2.63, rel=0.02)
+    assert their_peak / our_peak == pytest.approx(
+        2.746305, rel=0.02
+    )  # ⚠ 2026-08-15 canopy 2.63 -> 2.746305
 
 
 def test_gap_4_the_tuber_over_fills_the_other_symptom_of_gap_2() -> None:
@@ -440,13 +451,15 @@ def test_gap_4_the_tuber_over_fills_the_other_symptom_of_gap_2() -> None:
     # ⚠ 14260 -> 15039 (2026-08-14, the step unfreeze), +5.5 %. `theirs` is a
     # committed oracle constant and does not move, so the whole ratio move is ours.
     assert ours == pytest.approx(
-        13788.090942, rel=0.01
+        12943.161771,
+        rel=0.01,  # ⚠ 2026-08-15 canopy 13788.090942 -> 12943.161771
     )  # ⚠ 2026-08-14 (light path), was 15039.0
     assert theirs == pytest.approx(7249.8, rel=1e-4)
     # ⚠ 1.97 -> 2.07. The docstring above says "about 2x"; it was 1.97 and is now 2.07,
     # so the round number it was written around is if anything more accurate now.
     assert ours / theirs == pytest.approx(
-        1.901863, rel=0.02
+        1.785317,
+        rel=0.02,  # ⚠ 2026-08-15 canopy 1.901863 -> 1.785317
     )  # ⚠ 2026-08-14 (light path), was 2.07
 
 

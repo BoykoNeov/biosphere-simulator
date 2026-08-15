@@ -82,17 +82,31 @@ on.
 more faithful than a big leaf, and the tree's own docstring has called the big leaf a
 known high-bias for nine phases. What is refuted is the plan's claim about its **sign**.
 
-## 3. Finding 2 — the cited cheap scheme is worse than the expensive one
+## 3. Finding 2 — ~~the cited cheap scheme is worse than the expensive one~~ **RETRACTED 2026-08-15**
 
-The 3-point Gaussian is not a stand-in the project invented; it is what WOFOST and [A]
+> ⚠⚠ **THIS FINDING IS WITHDRAWN. IT WAS AN ARTEFACT OF THE PROBE, NOT A PROPERTY OF THE
+> SCHEME.** `probe2` was labelled "cited 3-point Gaussian" and was in fact a **midpoint
+> rectangle rule** — three equally-weighted samples at equally-spaced depths. That is not
+> Goudriaan's scheme and it is not what WOFOST does. Re-measured against the real thing
+> (abscissae `0.5 ± 0.5·√0.6`, weights `5/18, 8/18, 5/18`), the Gaussian tracks the
+> 100-layer reference to **better than 0.2 %** across the whole LAI range, where the
+> midpoint rule sat **−5.2 %** low. The two errors do **not** point the same way; there is
+> effectively no quadrature error to point anywhere.
+>
+> **The generalisable lesson is the opposite of the one originally drawn.** It is not
+> "cited cheap schemes are less conservative than they look". It is: **a probe that names
+> a scheme is not evidence that it implemented that scheme.** The name was in the
+> docstring; the arithmetic was three lines below it and disagreed. Nothing checked them
+> against each other, and the resulting number was carried into a plan and used to argue
+> about a mechanism.
+>
+> The retracted text is kept below, struck through, so the claim that travelled is
+> visible next to its refutation.
+
+~~The 3-point Gaussian is not a stand-in the project invented; it is what WOFOST and [A]
 actually do, and it is the scheme §6b was pointing at. It comes in **below** the 100-layer
 integral at both steps (4.9634 vs 5.0314; 4.3757 vs 4.4169) and below it open-loop
-(0.9300 vs 0.9433).
-
-So the quadrature error and the physics error **point the same way**. A reader who assumed
-the cheap scheme was the conservative choice — the usual reason to reach for it — would
-have been wrong by about a fifth of the total correction. Worth writing down because the
-project reaches for cited cheap schemes routinely.
+(0.9300 vs 0.9433). So the quadrature error and the physics error point the same way.~~
 
 ## 4. Finding 3 — it would NOT have taken a liveness floor red, and the reason generalises
 
@@ -238,6 +252,72 @@ the two live options are not both "improvements":
 SLA anchor can move it ±35–75 %, so building both is coherent — the honest physics plus a
 sourced leaf-area constant — and is the only combination in which the layered canopy does
 not eat the band's margin. It is also the largest.
+
+---
+
+## 7b. OUTCOME — **BUILT 2026-08-15: options 1 + 2 together, plus a third the pair forced**
+
+The user took the largest branch: *"build the layered canopy anyway as honest physics (it's
+coherent alongside the thickness fix, and that combination is the only one where it doesn't
+eat the margin)"*. Two further calls followed as the work uncovered what it cost.
+
+**What shipped.**
+
+1. **The depth-resolved canopy** (`domains/biosphere/photosynthesis.py`). Goudriaan's
+   3-point Gaussian over canopy depth — abscissae `0.5 ± 0.5·√0.6`, weights
+   `5/18, 8/18, 5/18` — with absorbed PAR at depth `L` taken as `k·I₀·exp(−k·L)`. The
+   big-leaf aggregator (one call at the layer-mean light, scaled by intercepted fraction)
+   is gone. Both halves of the Jensen bias are now closed: the within-day half by the light
+   path on 08-14, the within-canopy half here.
+2. **`specific_leaf_area` 22.0 → 23.53 m²/kg**, bound to Penning de Vries et al. (1989)
+   Table 19 p. 100, "Wheat, winter" (425 kg/ha per unit LAI ⇒ 10000/425). This retired a
+   `TODO(cite)` **and moved the value +7.0 %** — a calibration, not a provenance-only edit,
+   so it is inside the goldens rather than honour-system.
+3. **The Van Keulen & Seligman mutual-shading loss** (`domains/biosphere/allocation.py`,
+   `mutual_shading_rate`) — leaf area is shed at an extra 5 %/day once LAI exceeds 6, per
+   [B] p. 101. This was **not** in either option; it was forced by what they did together,
+   see below.
+
+**The measured result, against §7's own price list.** §7 predicted the layered canopy would
+take `open_season`'s peak LAI from 5.3806 to 5.0314 — a 0.6 % margin over the sourced 5.0
+floor. **That prediction was wrong in magnitude, because it was computed with the retracted
+midpoint rule** (§3). With the real Gaussian *and* the sourced leaf-area constant, the peak
+went **up**, to **6.0228**: the SLA anchor's +7 % outweighed the layering's −6.5 %. The
+"5.0 < peak < 8.0" band is now comfortably mid-range instead of marginal, which is the
+outcome §7 was reaching for — reached by a different arithmetic than the one it wrote down.
+
+**The third band, and why the third mechanism was built.** 6.0228 tripped a *second*,
+independently sourced check: `peak LAI < 6.0`, the Van Keulen & Seligman mutual-shading
+threshold. Re-tuning 6.0 to fit 6.0228 is the co-adaptation this project has refused three
+times in this same file, so it was not done. Instead the mechanism the threshold was
+standing in for was **built**, and the check restated as *"peak below 6.0 **or** the 5 %/day
+mutual-shading loss is modelled"*. ⚠ Honest reading: the loss is currently **inert on this
+trajectory** — the peak is 6.0228 either way, bit-identically, because the crossing lasts
+too briefly at the shipped step for a 5 %/day rate to bite. What changed is that the regime
+is now *represented* rather than merely *avoided*, and the restatement says exactly that.
+
+**Independent corroboration, not sought and worth recording.** The gap between our peak LAI
+and the LINTUL3 validation oracle closed from **22 % to 6.4 %** — nothing here was fitted to
+that oracle, and the oracle was not consulted while choosing. Separately, the anchor was
+already on our own shelf: `tests/test_potato_crop.py` cites the *same* Table 19 for potato
+(300 kg/ha ⇒ 33.33 m²/kg). Wheat's row was one line away and had been sitting under a
+`TODO(cite)`.
+
+**A finding the plan's premise got wrong.** §6 asserted that "every SLA table declines with
+development", which drove the ±35–75 % swing estimate. That is **false for winter wheat**:
+Table 19's specific-leaf-weight column is non-monotonic and returns to its start. The probe's
+"+74.8 % late-anchored ramp" was effectively *spring* wheat's table. ⚠ And the shipped
+constant is deliberately a **scalar**, not a DVS-keyed ramp: the frozen tree applies leaf
+area at state level, and a rate-level table applied at state level is a form error this
+project has made before.
+
+**What it cost elsewhere.** All 7 biosphere goldens and the plant-bearing station goldens
+moved; both manifests regenerated; ~20 descriptive pins re-measured with dated notes. The
+station's plant-side acceptance margin loosened 11.8868 → 12.2894 (the layered canopy draws
+a little less carbon), so the plant still binds but the gap to the cabin's 16.6667 narrowed.
+The 50-year perennial attractor now sits **below** the 0.55 anchor (0.5437) — recorded, not
+re-anchored; all four frozen 15-year liveness floors still pass, and that 50-year figure is
+a probe, not a manifest bound. Every one of the 15 science gates is green.
 
 ## 8. What is NOT claimed
 

@@ -31,10 +31,12 @@ from domains.biosphere.allocation import (
     PartitionRow,
     Senescence,
     SenescenceParams,
+    mutual_shading_rate,
     partition,
     partition_fractions,
     senescence_flux,
 )
+from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.loader import (
     ALLOCATION_PARAMS_PATH,
     SENESCENCE_PARAMS_PATH,
@@ -170,7 +172,16 @@ def _env(snapshot: State, dt: float):  # noqa: ANN202 - Senescence ignores env (
 
 
 def _senescence_params() -> SenescenceParams:
-    return SenescenceParams(rdr_leaf=_RDR_LEAF, rdr_stem=_RDR_STEM, rdr_root=_RDR_ROOT)
+    # ⚠ shade_rate is the CITED 0.05 and the threshold the cited 6.0, but every state
+    # in this file sits well below LAI 6, so the mutual-shading term is inert here by
+    # construction. Its own behaviour is tested separately, below.
+    return SenescenceParams(
+        rdr_leaf=_RDR_LEAF,
+        rdr_stem=_RDR_STEM,
+        rdr_root=_RDR_ROOT,
+        shade_rate=0.05,
+        lai_threshold=6.0,
+    )
 
 
 def _senescence_flow() -> Senescence:
@@ -182,7 +193,56 @@ def _senescence_flow() -> Senescence:
         root_c=_ROOT_C,
         litter_sink=_LITTER,
         params=_senescence_params(),
+        canopy=CanopyParams(sla_per_mol_c=0.6, extinction_coef=0.6),
+        ground_area=1.0,
     )
+
+
+def test_mutual_shading_is_a_STEP_at_the_cited_threshold() -> None:
+    """The VKS mutual-shading term: rate law, boundary, and the strictness of `>`.
+
+    ⚠ The boundary case is the point. The source says the loss applies once leaf area
+    *exceeds* 6, so the comparison is strict and LAI exactly 6.0 is INERT. A `>=` here
+    would fire the mechanism on the threshold itself, which is both un-sourced and
+    the kind of off-by-one that a golden would absorb silently.
+    """
+    kw = {"rdr_leaf": 0.02, "shade_rate": 0.05, "lai_threshold": 6.0}
+    assert mutual_shading_rate(0.0, **kw) == 0.02
+    assert mutual_shading_rate(5.999, **kw) == 0.02
+    assert mutual_shading_rate(6.0, **kw) == 0.02  # strict `>` — inert AT the threshold
+    assert mutual_shading_rate(6.001, **kw) == pytest.approx(0.07)
+    assert mutual_shading_rate(50.0, **kw) == pytest.approx(0.07)  # a step, not a ramp
+
+
+def test_senescence_sheds_FASTER_once_the_canopy_closes() -> None:
+    """The term reaches the flow, and it moves the leaf leg ONLY.
+
+    Two states either side of the threshold on the same flow. ⚠ Asserted as a ratio of
+    leaf legs rather than an absolute, because the leg is also proportional to leaf
+    carbon, which necessarily differs between the two states.
+    """
+    flow = _senescence_flow()  # sla 0.6 m²/mol C, ground_area 1.0 → LAI = 0.6·leaf_c
+    below = _state(leaf_c=9.0, stem_c=1.0, root_c=1.0)  # LAI 5.4
+    above = _state(leaf_c=11.0, stem_c=1.0, root_c=1.0)  # LAI 6.6
+    leg_below = next(
+        leg
+        for leg in flow.evaluate(below, _env(below, 1.0), 1.0).legs
+        if leg.stock == _LEAF_C
+    )
+    leg_above = next(
+        leg
+        for leg in flow.evaluate(above, _env(above, 1.0), 1.0).legs
+        if leg.stock == _LEAF_C
+    )
+    assert leg_below.amount == pytest.approx(-9.0 * _RDR_LEAF)
+    assert leg_above.amount == pytest.approx(-11.0 * (_RDR_LEAF + 0.05))
+    # the stem leg is untouched by a canopy-closure term
+    stem_above = next(
+        leg
+        for leg in flow.evaluate(above, _env(above, 1.0), 1.0).legs
+        if leg.stock == _STEM_C
+    )
+    assert stem_above.amount == pytest.approx(-1.0 * _RDR_STEM)
 
 
 def test_senescence_legs_are_the_hand_computed_losses() -> None:
@@ -325,6 +385,12 @@ def _valid_senescence() -> dict[str, Any]:
             "rdr_leaf": {"value": 0.02, "unit": "1/day", "source": "[A]"},
             "rdr_stem": {"value": 0.005, "unit": "1/day", "source": "[A]"},
             "rdr_root": {"value": 0.01, "unit": "1/day", "source": "[A]"},
+            "shade_rate": {"value": 0.05, "unit": "1/day", "source": "[B]"},
+            "lai_threshold": {
+                "value": 6.0,
+                "unit": "dimensionless",
+                "source": "[B]",
+            },
         },
     }
 

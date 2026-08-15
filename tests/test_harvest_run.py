@@ -271,8 +271,11 @@ def test_feces_routing_perturbs_food_and_grain_far_below_the_perturbation() -> N
     # ~119.8 mol C of litter moves food_store by 1.4e-4 mol and grain by 3.6e-5 mol:
     # responses of 1.2e-6 and 3.0e-7 of the perturbation. Pinned as measurements, so a
     # change in the coupling is visible rather than absorbed by a threshold.
-    assert food_response / perturbation == pytest.approx(1.18e-6, rel=0.05)
-    assert grain_response / perturbation == pytest.approx(3.03e-7, rel=0.05)
+    # ⚠ 2026-08-15 (the depth-resolved canopy + the sourced SLA anchor): 1.18e-6 ->
+    # 1.30e-6. The coupling strengthens ~10 % while staying three orders below its
+    # cause, which is the claim the two bounds below carry and it is untouched.
+    assert food_response / perturbation == pytest.approx(1.304e-6, rel=0.05)
+    assert grain_response / perturbation == pytest.approx(3.379e-7, rel=0.05)
     # ...and the claim the test carries: both responses are orders below the cause.
     assert food_response / perturbation < 1e-5
     assert grain_response / perturbation < 1e-5

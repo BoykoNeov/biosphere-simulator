@@ -19,10 +19,12 @@ is an isolated, additively-extendable seam:
   ``Ag`` negative and turn the source into a withdrawal — clamp to 0 instead (P3:
   "assimilation → 0 as CO₂/light → 0").
 
-* **Canopy aggregator** ``canopy_assimilation`` — a **big-leaf** at the canopy-mean PAR
-  of one integration *window*. ``Ag`` is concave in PAR (saturating ``J``, then
-  ``min``), so evaluating at a mean PAR **overestimates** the true integral (Jensen) —
-  exactly why WOFOST does the intra-canopy/diurnal Gaussian.
+* **Canopy aggregator** ``canopy_assimilation`` — a **three-point Gaussian depth
+  integral** (Goudriaan 1986) over the Beer–Lambert light profile, evaluated on one
+  integration *window*. ``Ag`` is concave in PAR (saturating ``J``, then ``min``), so
+  evaluating at a mean PAR **overestimates** the true integral (Jensen) — exactly why
+  WOFOST does the intra-canopy/diurnal Gaussian, and why this function no longer
+  evaluates at a mean.
 
   ⚠ **The diurnal half of that bias is now closed by the forcing, not by a quadrature
   scheme** (post-roadmap, 2026-08-14). This function used to be handed one
@@ -33,8 +35,14 @@ is an isolated, additively-extendable seam:
   season performs the diurnal integral directly, at the step's resolution, and PAR is
   **0** at night. The deferred Step-11 diurnal Gaussian is therefore discharged by a
   different route than the one it named — it was a fast approximation to an integral
-  this tree now takes. The **intra-canopy** half of the Jensen bias (three depths in the
-  canopy) is untouched and still open.
+  this tree now takes.
+
+  ⚠ **The intra-canopy half closed 2026-08-15, and by the route it named** (the
+  quadrature above). ⚠ Its sign was the trap: the direction plan booked a layered
+  canopy as something that could move canopy assimilation **up**, and this docstring
+  had said the opposite since Step 5. Concavity runs one way — resolving depth
+  redistributes the same photons onto a concave response and can only **lower** the
+  sum. Measured on the real season: 0 of 2598 lit calls came back above the big leaf.
 
 **Temperature (the WOFOST TMPFTB idiom).** Photosynthesis is strongly temperature-
 limited; FvCB at a single reference temperature would assimilate near-max through a
@@ -59,11 +67,31 @@ Planta 149:78–90.
 import math
 from dataclasses import dataclass
 
-from domains.biosphere.canopy import CanopyParams, intercepted_fraction
+from domains.biosphere.canopy import CanopyParams
 
 # µmol → mol (the leaf-level FvCB convention is µmol CO₂; the canonical CARBON unit is
 # mol). 1 mol CO₂ assimilated == 1 mol C fixed.
 MICROMOL_TO_MOL: float = 1.0e-6
+
+# **Three-point Gaussian integration over canopy depth** (Goudriaan 1986) — the cited
+# scheme for the intra-canopy integral, and the one WOFOST uses. The abscissae are the
+# standard Gauss–Legendre nodes mapped to [0, 1] (``0.5 ± 0.5·√0.6``, i.e. ≈ 0.1127,
+# 0.5, 0.8873) and the weights are ``5/18, 8/18, 5/18``; together they integrate a
+# 5th-degree polynomial exactly, which is why three evaluations track the exact depth
+# integral of the Beer–Lambert profile to < 0.2 % over the whole (LAI, PAR) range this
+# tree visits.
+#
+# ⚠ These are **derived, not transcribed**: ``0.5 - 0.5*sqrt(0.6)`` is computed the same
+# way in the Rust mirror so the two ports agree bit-for-bit on correctly-rounded IEEE
+# ``sqrt``, where a hand-typed decimal (the literature prints 0.1127016654) would not.
+# ⚠ The tuple order is **canonical and load-bearing**: it is the reduction order of the
+# depth sum, and reductions are ordered by contract in this project (determinism).
+_GAUSS_DEPTHS: tuple[float, float, float] = (
+    0.5 - 0.5 * math.sqrt(0.6),
+    0.5,
+    0.5 + 0.5 * math.sqrt(0.6),
+)
+_GAUSS_WEIGHTS: tuple[float, float, float] = (5.0 / 18.0, 8.0 / 18.0, 5.0 / 18.0)
 
 
 @dataclass(frozen=True)
@@ -188,19 +216,31 @@ def canopy_assimilation(
     ground_area: float,
     limitation: float = 1.0,
 ) -> float:
-    """Gross canopy assimilation over one window (absolute mol C) — big-leaf.
+    """Gross canopy assimilation over one window (absolute mol C) — depth-resolved.
 
     Aggregates the leaf-level FvCB to a ground-area-absolute carbon flux over a window
     of ``window_s`` seconds during which ``incident_par`` is taken as constant:
 
-    1. Absorbed canopy PAR per ground area ``= incident_par · f_int`` (Beer–Lambert,
-       Step 4). Mean absorbed PAR per *leaf* area ``= incident_par · f_int / LAI`` —
-       well-defined as LAI→0 (``f_int ≈ k·LAI``, so the ratio → ``k·incident_par``);
-       guarded to 0 at exactly ``LAI = 0`` (no leaves intercept nothing).
-    2. Gross leaf rate at that mean PAR (:func:`gross_leaf_assimilation`), scaled to a
-       canopy rate per ground area by ``× LAI``.
+    1. PAR absorbed **per unit leaf area at cumulative canopy depth** ``L`` is
+       ``k·incident_par·exp(−k·L)`` — the derivative of the Beer–Lambert profile
+       (Step 4) with respect to depth, so integrating it over ``L ∈ [0, LAI]`` returns
+       exactly ``incident_par·(1 − exp(−k·LAI)) = incident_par · f_int``, the total the
+       canopy absorbs. **The depth resolution redistributes photons; it creates and
+       destroys none.**
+    2. Gross leaf rate at each of three Gaussian depths
+       (:func:`gross_leaf_assimilation`), combined by ``LAI · Σ wᵢ·Ag(Lᵢ)`` into a
+       canopy rate per ground area.
     3. ``× window_s`` ``× ground_area`` (m²) ``× 1e-6`` (µmol→mol)
        ``× f_temp(temp_c)`` ``× limitation`` (the ``f_water·f_N`` seam).
+
+    ⚠ **This was a big leaf at the canopy-mean PAR until 2026-08-15**, i.e. one
+    evaluation of ``Ag`` at ``incident_par · f_int / LAI``. Because ``Ag`` is *concave*
+    in PAR, that form is a **Jensen high-bias**: it reads the whole canopy at a light
+    level the sunlit top actually exceeds and the shaded base never sees, and a concave
+    response evaluated at the mean exceeds the mean of the response. The bias is
+    near-zero in an open canopy and reaches **+13.7 %** at ``LAI 6`` under full sun —
+    it scales with canopy *closure*, which is why it was invisible in every chamber
+    scenario (whose canopies peak at ``LAI 0.07–0.63``) and confined to the field.
 
     ⚠ **``window_s`` was ``daylength_s`` until 2026-08-14, and the difference is the
     whole point of the light path.** Passing the photoperiod made this the *day's*
@@ -211,10 +251,12 @@ def canopy_assimilation(
     forcing (``light_path``). ⚠ It follows that ``window_s`` must **not** be fed a
     photoperiod any more: doing so would multiply the day-length in twice.
 
-    **Residual high-bias (Jensen).** ``Ag`` is concave in PAR, so a mean-PAR big-leaf
-    still overestimates the true **intra-canopy** integral (three depths); the diurnal
-    half of that bias is now taken by stepping the light path rather than by a
-    quadrature scheme.
+    **Both halves of the Jensen bias are now closed, by different routes.** The
+    *diurnal* half is taken by the forcing — ``light_path`` hands this function the PAR
+    of a step-sized window, so stepping the season performs the within-day integral at
+    the step's resolution. The *intra-canopy* half is taken here, by the quadrature the
+    Step-11 note always named. What remains unresolved is the sunlit/shaded split
+    *within* a depth (direct-beam vs diffuse), which Beer–Lambert does not represent.
 
     Raises ``ValueError`` for non-positive ``ground_area`` or ``window_s`` and for
     a negative ``lai`` (a meaningless geometry).
@@ -227,10 +269,15 @@ def canopy_assimilation(
         raise ValueError(f"lai must be >= 0, got {lai!r}")
     if lai == 0.0:
         return 0.0
-    f_int = intercepted_fraction(lai, extinction_coef=canopy.extinction_coef)
-    mean_absorbed_par = incident_par * f_int / lai
-    leaf_rate = gross_leaf_assimilation(ci, mean_absorbed_par, params=params)
-    canopy_rate = leaf_rate * lai  # µmol CO₂ m⁻²(ground) s⁻¹
+    k = canopy.extinction_coef
+    # Canonical (fixed-tuple) reduction order — see ``_GAUSS_DEPTHS``.
+    weighted_leaf_rate = 0.0
+    for depth, weight in zip(_GAUSS_DEPTHS, _GAUSS_WEIGHTS, strict=True):
+        absorbed_par = k * incident_par * math.exp(-k * depth * lai)
+        weighted_leaf_rate += weight * gross_leaf_assimilation(
+            ci, absorbed_par, params=params
+        )
+    canopy_rate = weighted_leaf_rate * lai  # µmol CO₂ m⁻²(ground) s⁻¹
     f_temp = temperature_factor(
         temp_c,
         t_min=params.t_min,

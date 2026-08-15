@@ -140,9 +140,12 @@ def test_load_canopy_params_folds_sla_to_per_mol_c() -> None:
     params = load_canopy_params()
     assert isinstance(params, CanopyParams)
     assert params.extinction_coef == 0.6
-    # Independent hand-computed fold: SLA 22 m²/kg · M_C 0.012011 kg/mol / f_C 0.45
-    # = 0.587204444... m²/mol C. Does not reference the loader's arithmetic.
-    assert math.isclose(params.sla_per_mol_c, 0.5872044444444445, rel_tol=1e-12)
+    # Independent hand-computed fold: SLA 23.53 m²/kg · M_C 0.012011 kg/mol / f_C 0.45
+    # = 0.628041844... m²/mol C. Does not reference the loader's arithmetic.
+    # ⚠ 2026-08-15: was 22 m²/kg → 0.5872044444444445. The 22.0 was a `TODO(cite)`
+    # placeholder; 23.53 is [B] Penning de Vries Table 19's winter-wheat entry
+    # (425 kg/ha of leaf per unit LAI, inverted). See docs/log/canopy-magnitude.md.
+    assert math.isclose(params.sla_per_mol_c, 0.6280418444444446, rel_tol=1e-12)
     # And the molar mass it folds in is the pinned IUPAC value.
     assert MOLAR_MASS_CARBON_KG_PER_MOL == 0.012011
 

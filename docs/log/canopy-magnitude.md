@@ -24,12 +24,15 @@ calls** came back above 1.0 (the pre-registered prediction, held exactly), seaso
 4.4169** converged, i.e. **~6.5 % the wrong way at both steps**, eating four fifths of the
 margin the band is currently passing on. Refused **as a fix**, explicitly not as science —
 the big leaf is a known high-bias and a depth-resolved canopy is the more faithful physics;
-what is refuted is the plan's claim about which way it moves. ⚠ **The cited CHEAP scheme is
-worse than the expensive one**: the 3-point Gaussian ([A]'s and WOFOST's actual scheme, and
-the one §6b was pointing at) comes in *below* the 100-layer integral both open-loop (0.9300
-vs 0.9433) and closed-loop (4.9634 vs 5.0314; 4.3757 vs 4.4169), so quadrature error and
-physics error point the same way and a reader assuming the cheap scheme is the conservative
-choice is wrong by a fifth of the correction. ⚠ **It would NOT have taken a liveness floor
+what is refuted is the plan's claim about which way it moves. ⚠⚠ **RETRACTED 2026-08-15 — "the cited CHEAP scheme is
+worse than the expensive one" was an artefact of the probe, not a property of the scheme.**
+The probe labelled "3-point Gaussian" implemented a **midpoint rectangle rule**; the real
+Goudriaan scheme (abscissae `0.5 ± 0.5·√0.6`, weights `5/18, 8/18, 5/18`) tracks the
+100-layer integral to better than **0.2 %**, where the midpoint rule sat 5.2 % low. The
+withdrawn numbers were 0.9300 vs 0.9433 open-loop and 4.9634 vs 5.0314 closed-loop. The
+lesson is the inverse of the one drawn: **a probe that names a scheme is not evidence that
+it implemented that scheme** — the name was in the docstring, the arithmetic disagreed three
+lines below, nothing compared them, and the number reached a plan. ⚠ **It would NOT have taken a liveness floor
 red, and the reason is the canopy regulator's reason verbatim**: §6b warned that a
 mechanism lowering assimilation might red perennial's peak-leaf floor (3.2 % over its bound
 on its settled value), so it was run rather than assumed — `perennial_long_horizon` 15 yr
@@ -84,3 +87,6 @@ layered canopy does not eat the band's margin, and it is also the largest. **NOT
 the partition table (§6b's third candidate, a live suspect because it was fitted against the
 biased assimilation), and `open_season`'s other gates under either candidate — only the two
 perennial liveness floors were run, because nothing is proposed for shipping.
+⚠⚠ **DECISION TAKEN 2026-08-15: the user chose (1)+(2), and the build is
+[`layered-canopy.md`](layered-canopy.md).** Read that row for what actually happened; §7b of
+the plan doc records how far this diagnosis's own price list was from the measured outcome.

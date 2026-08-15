@@ -87,7 +87,9 @@ BVAD_WHEAT_C_PER_M2_DAY: float = 77.00 / 44.009
 # occurrence; tying it to its source fixes the class.*
 # ⚠ 5.571922 -> 5.380646 (2026-08-14, the light path). The self-check below is what
 # caught it — the mechanism this constant's note describes, doing its job.
-OPEN_SEASON_PEAK_LAI: float = 5.380646
+# ⚠ 5.380646 -> 6.022837 (2026-08-15, the depth-resolved canopy + the sourced SLA
+# anchor). The self-check below is what catches this, and it did.
+OPEN_SEASON_PEAK_LAI: float = 6.022837
 OPEN_SEASON_PEAK_W_EXCL_ROOTS: float = 12.633
 
 # The V-K&S mutual-shading threshold the canopy regulator is built on (Penning de Vries
@@ -404,7 +406,13 @@ def test_the_coupled_season_is_field_scale_open_loop_and_carbon_capped() -> None
     # crop that fixes less carbon per unit light leaves more CO₂ in the shared cabin
     # air for the rest of the season — and the canopy ends up bigger. Recorded because
     # it is the one place in the tree where this change helps the plant.
-    assert 5.16 < peak_lai < 5.19, f"coupled peak LAI moved: {peak_lai}"
+    # ⚠ and again 2026-08-15 (the depth-resolved canopy + the sourced SLA anchor):
+    # 5.1769 -> **5.4463, UP 5.2 %**. Up again, and for the same reason as last time —
+    # this chamber is CO₂-limited by the crew loop, not light-limited, so it is the one
+    # scenario where a change that costs every standalone crop carbon still helps. Note
+    # the SLA half pushes the same way here for a different reason (more area per unit
+    # leaf carbon is free when carbon, not light, is the binding constraint).
+    assert 5.43 < peak_lai < 5.46, f"coupled peak LAI moved: {peak_lai}"
 
     # ⚠ THE DENOMINATOR IS NOW MEASURED HERE, not transcribed. See the constant's own
     # note: it had gone stale under a comment warning that it must not.
@@ -426,7 +434,9 @@ def test_the_coupled_season_is_field_scale_open_loop_and_carbon_capped() -> None
     # ⚠ 0.9131 -> 0.9622 (2026-08-14). The two-sided contrast is what PIN 6 claims
     # and it is stronger, not weaker: the coupled canopy rose while the open field
     # fell, so this chamber is now within 4 % of the field rather than 9 %.
-    assert ratio == pytest.approx(0.9622, rel=1e-3)
+    assert ratio == pytest.approx(
+        0.904268, rel=1e-3
+    )  # ⚠ 2026-08-15 canopy 0.9622 -> 0.904268
     assert 0.5 < ratio < 1.5, ("no longer the same scale as the open field", ratio)
     # ⚠ The multiplier states the CLAIM ("an order of magnitude above"), and is
     # deliberately not cut near the measurement: 8.0 x 0.63 = 5.04 against a measured
@@ -449,7 +459,15 @@ def test_the_coupled_season_is_field_scale_open_loop_and_carbon_capped() -> None
     # "every chamber between 0.068 and 0.632, i.e. 9-88x below it" is true of its own
     # SIX-scenario biosphere roster; the COUPLED chamber sits at 0.84x. A scope
     # finding, not a falsification -- pinned so the scope cannot be lost.
-    assert 0.80 < peak_lai / VKS_LAI_THRESHOLD < 0.88, (
+    # ⚠ 2026-08-15: 0.84x -> **0.9077x**. Two things about that. (i) The scope finding
+    # this pin exists for is now sharper, not weaker: the six-scenario roster's chambers
+    # sit at 0.087-0.585 LAI while THIS chamber is at 5.45, within 9 % of a threshold
+    # the
+    # standalone chambers are 10-69x below. (ii) `open_season` itself CROSSED the
+    # threshold on the same day and the mutual-shading loss is now MODELLED, so the next
+    # move of this size stops being a scope note and starts firing a real mechanism in a
+    # crew-coupled scenario. Pinned two-sided so that move is visible.
+    assert 0.88 < peak_lai / VKS_LAI_THRESHOLD < 0.93, (
         "the coupled chamber's distance to the mutual-shading threshold moved"
     )
 
@@ -467,8 +485,9 @@ def test_the_coupled_season_is_field_scale_open_loop_and_carbon_capped() -> None
     # would not. PIN 9's actual claim — the pool is small next to the daily gain, and
     # smaller still next to the crew's production — is the three assertions below, and
     # none of them moved.
-    # ⚠ 0.6018 -> 0.609054 (2026-08-14, the light path)
-    assert peak_daily_gain == pytest.approx(0.609054, rel=1e-3), peak_daily_gain
+    # ⚠ 0.6018 -> 0.609054 (2026-08-14, the light path) -> 0.611842 (2026-08-15, the
+    # layered canopy), +0.46 %. The three claims below are unmoved.
+    assert peak_daily_gain == pytest.approx(0.611842, rel=1e-3), peak_daily_gain
     pool = pools[0]
     assert pool / peak_daily_gain > 6.0, "the 1 m2 headroom that hides the ceiling"
 

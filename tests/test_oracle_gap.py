@@ -241,13 +241,25 @@ def test_fixed_the_canopy_now_bootstraps() -> None:
     oracle_lai = [r["LAI"] for r in _reference()]
 
     # Sowing interception is unchanged (same LAI₀) — the fix is in the growth dynamics.
-    assert _light_intercepted(our_lai[0]) == pytest.approx(0.0175, abs=5e-4)
+    assert _light_intercepted(our_lai[0]) == pytest.approx(
+        0.018665, abs=5e-4
+    )  # ⚠ 2026-08-15 canopy 0.0175 -> 0.018665
     # Peak interception now CLOSES the canopy (was < 0.10 in scope A).
-    assert _light_intercepted(max(our_lai)) == pytest.approx(0.956, abs=1e-2)
+    assert _light_intercepted(max(our_lai)) == pytest.approx(
+        0.971949, abs=1e-2
+    )  # ⚠ 2026-08-15 canopy 0.956 -> 0.971949
     assert _light_intercepted(max(our_lai)) > 0.90
     assert _light_intercepted(max(oracle_lai)) == pytest.approx(0.978, abs=5e-3)
     # The residual peak-LAI ratio, pinned as a number (was ~43x).
-    assert max(oracle_lai) / max(our_lai) == pytest.approx(1.22, abs=0.1)
+    # ⚠⚠ 2026-08-15 (the depth-resolved canopy + the sourced SLA anchor): 1.22 ->
+    # **1.064**. The residual gap to the oracle's peak LAI closes from 22 % to 6.4 %.
+    # ⚠ This is CORROBORATION, not a target: nothing in this pass was fitted to the
+    # oracle, and the SLA anchor was chosen by reading [B] Table 19's winter-wheat row,
+    # which knows nothing about LINTUL3. An independent model of a different family
+    # moving into agreement is the same shape as the DVS-at-peak corroboration recorded
+    # in docs/log/canopy-magnitude.md, and the opposite of the fitted-table shape in
+    # docs/log/wheat-partition-backfill.md.
+    assert max(oracle_lai) / max(our_lai) == pytest.approx(1.064, abs=0.05)
 
 
 def test_maturity_lands_within_two_days_but_it_is_two_errors_cancelling() -> None:
@@ -457,10 +469,12 @@ def test_method_matched_day_confound_dissolved_with_the_phenology_fix() -> None:
     assert off_dvs_i is not None
     off_dvs = _organ_fractions_bare(off_days[off_dvs_i])["storage"]
     assert off_day == pytest.approx(
-        0.4165450, abs=0.005
+        0.400569,
+        abs=0.005,  # ⚠ 2026-08-15 canopy 0.4165450 -> 0.400569
     )  # ⚠ 2026-08-14 (light path), was 0.39
     assert off_dvs == pytest.approx(
-        0.32235, abs=0.005
+        0.305256,
+        abs=0.005,  # ⚠ 2026-08-15 canopy 0.32235 -> 0.305256
     )  # ⚠ 2026-08-14 (light path), was 0.302
     assert off_day < matched_day_oracle and off_dvs < matched_dvs_oracle
 

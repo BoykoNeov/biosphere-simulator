@@ -44,6 +44,7 @@ from pathlib import Path
 import pytest
 
 from domains.biosphere.allocation import SenescenceParams
+from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.decomposition import (
     Decomposition,
     DecompositionParams,
@@ -260,7 +261,9 @@ _HUMI_PARAMS = HumificationParams(
 # that
 # drive it. rdr_leaf = 0.01 on 1.0 mol C of leaf gives shed_C = 0.01 mol C/day, with the
 # stem/root rates zero so the arithmetic below stays a single hand-checkable term.
-_SEN_PARAMS = SenescenceParams(rdr_leaf=0.01, rdr_stem=0.0, rdr_root=0.0)
+_SEN_PARAMS = SenescenceParams(
+    rdr_leaf=0.01, rdr_stem=0.0, rdr_root=0.0, shade_rate=0.05, lai_threshold=6.0
+)
 _NITRO_PARAMS = NitrogenParams(
     max_uptake_capacity=0.0015,
     n_residual_per_mol_c=0.001,
@@ -283,6 +286,9 @@ def _senescence() -> NitrogenSenescence:
         root_c=_ROOT_C,
         sen_params=_SEN_PARAMS,
         nitro_params=_NITRO_PARAMS,
+        # inert at these leaf amounts — see the note in test_allocation.py
+        canopy=CanopyParams(sla_per_mol_c=0.6, extinction_coef=0.6),
+        ground_area=1.0,
     )
 
 

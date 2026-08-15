@@ -409,6 +409,11 @@ pub struct Senescence {
     pub rdr_leaf: f64,
     pub rdr_stem: f64,
     pub rdr_root: f64,
+    /// Mutual shading (Van Keulen & Seligman via Penning de Vries p. 101).
+    pub shade_rate: f64,
+    pub lai_threshold: f64,
+    pub sla_per_mol_c: f64,
+    pub ground_area: f64,
 }
 
 impl Flow for Senescence {
@@ -421,7 +426,15 @@ impl Flow for Senescence {
         _env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let leaf = self.rdr_leaf * amt(snapshot, &self.leaf_c) * dt;
+        let leaf_c = amt(snapshot, &self.leaf_c);
+        let lai = leaf_c * self.sla_per_mol_c / self.ground_area;
+        let rdr_leaf = crate::biosphere::science::mutual_shading_rate(
+            lai,
+            self.rdr_leaf,
+            self.shade_rate,
+            self.lai_threshold,
+        );
+        let leaf = rdr_leaf * leaf_c * dt;
         let stem = self.rdr_stem * amt(snapshot, &self.stem_c) * dt;
         let root = self.rdr_root * amt(snapshot, &self.root_c) * dt;
         FlowResult::new(vec![
@@ -858,6 +871,10 @@ pub struct NitrogenSenescence {
     pub rdr_stem: f64,
     pub rdr_root: f64,
     pub n_residual_per_mol_c: f64,
+    pub shade_rate: f64,
+    pub lai_threshold: f64,
+    pub sla_per_mol_c: f64,
+    pub ground_area: f64,
 }
 
 impl Flow for NitrogenSenescence {
@@ -877,7 +894,14 @@ impl Flow for NitrogenSenescence {
         // law rather than routing it through `science`, so this mirrors the expression, not
         // a shared helper — the drift hazard that buys is pinned Python-side by comparing
         // this flow's shed carbon against Senescence's own litter leg).
-        let shed_carbon = self.rdr_leaf * leaf + self.rdr_stem * stem + self.rdr_root * root;
+        let lai = leaf * self.sla_per_mol_c / self.ground_area;
+        let rdr_leaf = crate::biosphere::science::mutual_shading_rate(
+            lai,
+            self.rdr_leaf,
+            self.shade_rate,
+            self.lai_threshold,
+        );
+        let shed_carbon = rdr_leaf * leaf + self.rdr_stem * stem + self.rdr_root * root;
         let plant_n = amt(snapshot, &self.plant_n);
         let biomass_c = leaf + stem + root;
         let shed = if shed_carbon <= 0.0 || plant_n <= 0.0 || biomass_c <= 0.0 {

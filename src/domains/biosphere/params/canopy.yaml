@@ -7,16 +7,25 @@
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
-#   The intercepted-fraction LAW (1 − exp(−k·LAI)) is Monsi & Saeki [A]. The numeric
-#   parameter VALUES are provisional, literature-typical placeholders pending the
-#   Step-11 validation gate — flagged TODO(cite) until each is bound to a primary
-#   source (per the convention doc's provisional path; never backfilled from WOFOST).
+#   The intercepted-fraction LAW (1 − exp(−k·LAI)) is Monsi & Saeki [A]. Of the three
+#   numeric VALUES, specific_leaf_area is now bound to a primary source [B]; the other
+#   two remain provisional, literature-typical placeholders pending the Step-11
+#   validation gate — flagged TODO(cite) until bound (per the convention doc's
+#   provisional path; never backfilled from WOFOST).
+#   ⚠ Both survivors sit under a ~3.5× amplifier: peak LAI compounds a uniform error in
+#   any of them through light interception, so a ±2 % disagreement about k is roughly
+#   the whole margin of the peak-LAI science band. They are the live provenance queue.
 #
 # Sources:
 #   [A] Monsi, M. & Saeki, T. (1953), "Über den Lichtfaktor in den
 #       Pflanzengesellschaften und seine Bedeutung für die Stoffproduktion",
 #       Japanese Journal of Botany 14:22–52. (English translation: Ann. Bot.
 #       95:549–567, 2005.) — the canopy extinction law.
+#   [B] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
+#       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
+#       Simulation Monographs 29, PUDOC, Wageningen. ISBN 90-220-0937-8. Table 19
+#       (p. 100), "Wheat, winter" — read off the page render, not the text layer
+#       (the OCR of this book is mangled; see docs/log/canopy-magnitude.md).
 
 name: winter_wheat
 process: canopy_light_interception
@@ -26,10 +35,18 @@ parameters:
     value: 0.6
     unit: "dimensionless"
     source: "TODO(cite) — provisional, literature-typical (wheat k≈0.4–0.7); primary citation pending Step 11"
+  # [B] Table 19 tabulates the RECIPROCAL — specific leaf WEIGHT, 425 kg/ha of leaf per
+  # unit LAI for winter wheat (spring wheat is 500) — so the SLA here is 10000 m²/ha ÷
+  # 425 kg/ha = 23.53 m²/kg. Basis matches ours: leaf blades, ONE surface, excluding
+  # petioles and leaf sheaths (the sheaths are booked to the stem in the same table,
+  # which is also the compartment convention allocation.yaml already cites to [B]).
+  # ⚠ This RETIRED a `TODO(cite)` placeholder of 22.0 and MOVED THE VALUE +7.0 %, which
+  # is a calibration, not a provenance-only edit — it moved goldens. See the unfreeze
+  # log in docs/biosphere-reference.md (2026-08-15).
   specific_leaf_area:
-    value: 22.0
+    value: 23.53
     unit: "m^2/kg"
-    source: "TODO(cite) — provisional, literature-typical; primary citation pending Step 11"
+    source: "[B], Table 19 p.100, 'Wheat, winter' (425 kg/ha per unit LAI → 10000/425)"
   carbon_fraction:
     value: 0.45
     unit: "dimensionless"

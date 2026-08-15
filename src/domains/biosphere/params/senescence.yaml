@@ -119,6 +119,18 @@
 #   [A] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
 #       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
 #       Simulation Monographs, PUDOC, Wageningen (relative death-rate senescence).
+#   [B] The same monograph, p. 101, quoting Van Keulen, H. & Seligman, N.G. (1987),
+#       "Simulation of water use, nitrogen nutrition and growth of a spring wheat crop",
+#       PUDOC, Wageningen — the mutual-shading leaf-area loss. Kept as its own tag
+#       because it is a DIFFERENT primary source that [A] transmits; the locus is
+#       [A]'s page, the claim is Van Keulen & Seligman's.
+#       ⚠ PROVENANCE CAVEAT, stated because this project's citations fail on LOCUS
+#       rather than on transmission: the underlying monograph is a **SPRING** wheat
+#       crop, and [A] p. 101 generalises it to "the rate of leaf area loss in wheat".
+#       We are winter wheat. The threshold is transmitted as a wheat-wide value by a
+#       source we already rely on, and it is NOT re-fitted here — but a reader chasing
+#       this number to its origin lands on a different cultivar type, and that is a
+#       real (small) gap rather than a clean binding.
 
 name: winter_wheat
 process: senescence
@@ -132,6 +144,27 @@ parameters:
     value: 0.005
     unit: "1/day"
     source: "TODO(cite) — STILL OPEN, and 2026-07-27 sharpened it from a value gap to an EXISTENCE gap: [A] p. 95 states 'except for their reserves, stems do not lose weight', and Listing 5 (the crop file sec. 3.2.6 cites) carries LLVT and LRTT but NO stem death function at all. So this parameter is not merely uncited at 0.005/day — the source we cite for the senescence form says the quantity is zero. NOT set to zero, because that is a value change to a frozen param with a carbon effect, i.e. scope (C)/(D) work. ⚠ BUT DO NOT INHERIT rdr_leaf's BLOCKER HERE: the (C) diagnosis measured the COMBINED form, and stem-only is the one piece plausibly SEPARABLE from the canopy problem (zeroing stem death shrinks the plant rather than blowing up LAI). STEM-ONLY WAS NOT MEASURED, so this is unpriced, not priced-and-rejected. Recorded, not fitted. ⚠⚠ MEASURED 2026-07-28 — IT IS NOW PRICED, AND REFUSED, AND THE SENTENCE JUST ABOVE WAS WRONG TWICE. (i) 'shrinks the plant' is FALSE: rdr_stem is a LOSS term, so zeroing it retains stem carbon and open_season's peak W rises 12.633 -> 13.639 t/ha (+7.96 %), closing more than half the margin to the 14.4248 t/ha Greenwood crossing. It was a PREDICTION written in the grammar of a measurement — and it was not baseless, because three of the four organs really do shrink (leaf -3.96 %, root -3.91 %, storage -3.97 %, a common haircut whose measured cause is the extra maintenance respiration of a bigger standing stem, ~+1.49 mol C on open_season); what it did was name the whole plant for the behaviour of the majority of its organs while the one dissenting term (stem, +23.4 %) dominates. The honest reading is 'stem up, grain down' — the plant is bigger and worse. (ii) 'separable' is HALF false, and the surviving half is worthless: it IS separable from the canopy problem — peak LAI FALLS 5.191 -> 4.985, the two tripwires moving in OPPOSITE directions from one single-number change — but the canopy branch was already discharged by the regulator, so the only branch left is `perennial`'s CLOSURE, and stem-only hits it. MEASURED: `perennial` goes rationed 0 -> 1 UNDER EULER at dt=1, the frozen reference configuration (one firing is a hard break — the goldens assert rationed == 0 and run_scenario raises), and the decade per-year CO2 attractor collapses 0.05484 -> 0.01619 against the committed 0.05 floor, 3.4x too low WHILE STAYING STATIONARY (so the level guard catches it and a stationarity check alone would not). ⚠ AND THE INTEGRATOR PATTERN INVERTS: RK4 survives stem-only to a 15-year horizon with its CO2 minimum unmoved (0.075815 -> 0.075893), where the combined form hard-errored under RK4 and read clean under Euler. Neither integrator screens for the other; Euler is decisive here only because the biosphere is FROZEN at Euler. THE MECHANISM is a STANDING STOCK, not the litter starvation first hypothesised (the litter pool's mean falls ~13 % and microbial 0.5 %, against a 55 % fall in the CO2 trough): a sealed chamber's carbon inventory is fixed, a pool's equilibrium size goes as 1/(loss rate), so zeroing the rate makes the stem a one-way sink within a season and every other pool funds it — at sealed_chamber's trough, standing tissue +0.1179 mol C drawn ~67 % from the soil pools and ~33 % from the atmosphere. That is why the open field grows on the same change the chamber chokes on, and it is scope (A)'s finding 11 from the other side: a field-scale improvement is not a chamber-scale one. ⚠ Note also that the branch would OPEN a form gap rather than close one — see the scope note below: our single stem_c pool cannot express 'except for their reserves', so a zero death rate makes the stem strictly one-way. Refused on a MEASUREMENT, not on absence. tests/test_senescence_form.py section 7 (9 pins). ⚠ Note the scope of the quote: [A] says it while describing the MECHANISTIC variant, and 'except for their reserves' concedes stem reserve mobilization, which our single stem_c pool cannot express separately — so the honest reading is 'no structural stem death', not 'no stem carbon ever leaves'. See docs/plans/post-roadmap-nitrogen-cycle-form.md, 'THE (C) DIAGNOSIS' (C-finding 2)."
+  # ⚠ THE CANOPY REGULATOR, BUILT 2026-08-15 — and note WHY it was built, because the
+  # reason is not the one it was refused for. It sat measured-but-unbuilt since
+  # 2026-07-27 because it is a LOSS: it could not fix a canopy that was too SMALL, which
+  # is what it kept being proposed for (docs/plans/post-roadmap-canopy-regulator.md, and
+  # again as a candidate in the direction plan's §6b). Binding specific_leaf_area to its
+  # primary source inverted that: open_season's peak LAI reached 6.0228, crossing the
+  # very threshold below, so the mechanism stopped being an unwanted loss and became a
+  # mechanism the tree OWES — a cited source says leaves die in the regime the tree now
+  # occupies. A recorded refusal is dated to the state that produced it.
+  # ⚠ It does NOT pull the peak back under 6.0 (measured: the peak is bit-identically
+  # unchanged), because the loss fires at/after the crossing and the crossing IS the
+  # peak. It shapes the post-peak canopy, not the summit. The `peak < 6.0` band was
+  # therefore restated rather than re-satisfied — see docs/biosphere-reference.md.
+  shade_rate:
+    value: 0.05
+    unit: "1/day"
+    source: "[B] p.101 (Van Keulen & Seligman 1987, for WHEAT): leaf area is lost at 5%/day once LAI exceeds 6, to account for mutual shading. A STEP, not a ramp — the source's own form. Cited on leaf AREA and applied to leaf CARBON; identical while SLA is a constant (see allocation.mutual_shading_rate)."
+  lai_threshold:
+    value: 6.0
+    unit: "dimensionless"
+    source: "[B] p.101 (Van Keulen & Seligman 1987): the 6 m^2/m^2 mutual-shading threshold. ⚠ Also the bound of a frozen science band, which is why crossing it is an event and not a number."
   rdr_root:
     value: 0.01
     unit: "1/day"

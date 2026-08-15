@@ -135,7 +135,12 @@ decomposer-carried rates now come from ``params/decomposition.yaml`` and
 
 from dataclasses import dataclass
 
-from domains.biosphere.allocation import SenescenceParams, senescence_flux
+from domains.biosphere.allocation import (
+    SenescenceParams,
+    mutual_shading_rate,
+    senescence_flux,
+)
+from domains.biosphere.canopy import CanopyParams, leaf_area_index
 from domains.biosphere.chamber import oxygen_limitation_factor
 from domains.biosphere.decomposition import DecompositionParams, decomposition_flux
 from domains.biosphere.humification import (
@@ -244,6 +249,8 @@ class NitrogenSenescence:
     root_c: StockId
     sen_params: SenescenceParams
     nitro_params: NitrogenParams
+    canopy: CanopyParams
+    ground_area: float
 
     def evaluate(self, snapshot: State, env: Environment, dt: float) -> FlowResult:
         stocks = snapshot.stocks
@@ -251,8 +258,26 @@ class NitrogenSenescence:
         stem = stocks[self.stem_c].amount
         root = stocks[self.root_c].amount
         # The identical per-organ flux allocation.Senescence sends to litter_carbon.
+        # ⚠ INCLUDING the mutual-shading term (2026-08-15). The hazard this class's
+        # docstring names — "the two drifting if someone changes one organ's rate
+        # handling and not the other" — is exactly what adding that term would have
+        # caused: above LAI 6 the carbon leg sheds at `rdr_leaf + shade_rate` while this
+        # leg would have shed nitrogen for `rdr_leaf` alone, silently lowering the C:N
+        # of litter in the one scenario that reaches the regime. The pinned test caught
+        # it, which is what it was written for.
+        lai = leaf_area_index(
+            leaf, sla_per_mol_c=self.canopy.sla_per_mol_c, ground_area=self.ground_area
+        )
         shed_carbon = (
-            senescence_flux(leaf, relative_death_rate=self.sen_params.rdr_leaf)
+            senescence_flux(
+                leaf,
+                relative_death_rate=mutual_shading_rate(
+                    lai,
+                    rdr_leaf=self.sen_params.rdr_leaf,
+                    shade_rate=self.sen_params.shade_rate,
+                    lai_threshold=self.sen_params.lai_threshold,
+                ),
+            )
             + senescence_flux(stem, relative_death_rate=self.sen_params.rdr_stem)
             + senescence_flux(root, relative_death_rate=self.sen_params.rdr_root)
         )

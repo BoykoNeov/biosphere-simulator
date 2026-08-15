@@ -336,7 +336,12 @@ def test_growth_flow_leg_is_the_composed_loss_and_pins_the_step6_literal() -> No
     # differ by exactly the window ratio, so this is the same physics re-expressed, and
     # the re-derivation is shown above rather than asserted: `expected` is computed from
     # the rate laws and only the last line is a literal.
-    assert math.isclose(expected, 0.6712530650357866, rel_tol=1e-12)
+    # ⚠ RE-DERIVED 2026-08-15 (was 0.6712530650357866). Again the literal did not
+    # drift — the CANOPY did: `canopy_assimilation` stopped evaluating one big leaf at
+    # the mean PAR and started taking the 3-point Gaussian depth integral, which at
+    # this fixture's LAI is 4.2 % lower. Everything above this line is still computed
+    # from the rate laws; only this line is a literal.
+    assert math.isclose(expected, 0.643313886101391, rel_tol=1e-12)
 
 
 def test_growth_flow_is_carbon_balanced() -> None:
@@ -496,7 +501,7 @@ def test_allocation_dmi_agrees_with_growth_resp_budget() -> None:
     legs = {leg.stock: leg.amount for leg in result.legs}
     assert math.isclose(-legs[_CO2_ATMOS], dmi, rel_tol=1e-12)
     # re-derived above, at the one-day window
-    assert math.isclose(dmi, 3.0 * 0.6712530650357866, rel_tol=1e-12)
+    assert math.isclose(dmi, 3.0 * 0.643313886101391, rel_tol=1e-12)
 
 
 def test_allocation_fills_storage_in_the_reproductive_phase() -> None:

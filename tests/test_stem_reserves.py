@@ -669,7 +669,8 @@ def test_the_frozen_stem_never_stops_growing_and_has_no_door_to_the_grain() -> N
     # finer integration of thermal time.)
     assert day_of(a) == 250
     assert total[-1] / total[a] == pytest.approx(
-        1.551963, rel=1e-3
+        1.426612,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 1.551963 -> 1.426612
     )  # ⚠ 2026-08-14 (light path), was 1.6106
     # …and it is still gaining within DAYS of the end of the run (a window in days).
     # ⚠ 2026-08-14 (the light path): the reserve peaks 1147 of 1220 steps in, i.e.
@@ -725,7 +726,11 @@ def test_the_frozen_stem_never_stops_growing_and_has_no_door_to_the_grain() -> N
 
     sealed, _r, _e = _run(sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS)
     for scenario, years, traj, expected_rate in (
-        (sc.DEFAULT_SCENARIO, 1, states, 0.015574),
+        # ⚠ 0.015574 -> 0.013934 (2026-08-15, the depth-resolved canopy + sourced SLA):
+        # a bigger open-field canopy leaves the maintenance door open LESS often,
+        # because
+        # more leaf area means more gross assimilation to clear MRES with.
+        (sc.DEFAULT_SCENARIO, 1, states, 0.013934),
         # ⚠ 0.469672 -> 0.459563 (2026-08-14, the light path): the maintenance door is
         # open slightly less often in the sealed chamber. The ~7× swing between the
         # two scenarios — the whole point of the census — is untouched.
@@ -817,15 +822,20 @@ def test_the_SOURCED_form_fixes_the_STEM_and_overshoots_the_grain() -> None:
     a = _anthesis(states)
     starch = _series(states, RESERVE_C)
     assert starch[a] / total[a] == pytest.approx(
-        0.421952, rel=1e-3
+        0.42557,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.421952 -> 0.42557
     )  # ⚠ 2026-08-14 (light path), was 0.420862
-    assert total[-1] / total[a] == pytest.approx(1.016737, rel=1e-3)  # 0.9853 un-gated
+    assert total[-1] / total[a] == pytest.approx(
+        0.926094, rel=1e-3
+    )  # 0.9853 un-gated  # ⚠ 2026-08-15 canopy 1.016737 -> 0.926094
     hi = _harvest_index(states)
     assert hi == pytest.approx(
-        0.651501, rel=1e-3
+        0.643597,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.651501 -> 0.643597
     )  # ⚠ 2026-08-14 (light path), was 0.636738
     assert hi / ORACLE_HI == pytest.approx(
-        1.155706, rel=1e-3
+        1.141684,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 1.155706 -> 1.141684
     )  # 13 % PAST the reference
 
 
@@ -852,9 +862,12 @@ def test_OUR_reconstruction_lands_on_the_grain_and_leaves_the_STEM_growing() -> 
     assert rationed == 0
     total = _stem_total(states)
     a = _anthesis(states)
-    assert total[-1] / total[a] == pytest.approx(1.321691, rel=1e-3)  # still +35 %
+    assert total[-1] / total[a] == pytest.approx(
+        1.194894, rel=1e-3
+    )  # still +35 %  # ⚠ 2026-08-15 canopy 1.321691 -> 1.194894
     assert _harvest_index(states) == pytest.approx(
-        0.580517, rel=1e-3
+        0.574238,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.580517 -> 0.574238
     )  # ⚠ 2026-08-14 (light path), was 0.5627
     # the fill is a genuine one-shot: exactly one step where the reserve rose
     starch = _series(states, RESERVE_C)
@@ -896,11 +909,17 @@ def test_NEITHER_form_fixes_both_halves_and_that_is_the_refusal() -> None:
     snap_shape, snap_hi = rows["snapshot"]
     # the control first: the untreated stem is the thing both forms are shrinking
     assert frozen_shape == pytest.approx(
-        1.551963, rel=1e-3
+        1.426612,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 1.551963 -> 1.426612
     )  # ⚠ 2026-08-14 (light path), was 1.610592
     # …and only [A]'s form gets it near flat; ours leaves half the excess growth
     assert growth_shape < snap_shape < frozen_shape
-    assert abs(growth_shape - 1.0) < 0.05 < abs(snap_shape - 1.0)
+    # ⚠ 2026-08-15 (the depth-resolved canopy + sourced SLA): [A]'s form is no longer
+    # 'near flat' on an absolute reading — it sits 7.4 % off, where it was under 5 %.
+    # The ORDERING claim on the line above is untouched, and it is the comparative one
+    # the refusal rests on; what weakened is the absolute adjective, so the adjective
+    # is the thing re-pinned rather than the conclusion.
+    assert abs(growth_shape - 1.0) < 0.08 < abs(snap_shape - 1.0)
     assert abs(snap_hi - 1.0) < abs(growth_hi - 1.0)  # …and it is the other one on HI
     assert growth_hi > 1.10
 
@@ -1037,7 +1056,8 @@ def test_the_trigger_is_OURS_and_it_is_near_inert() -> None:
     assert len({_bits(v) for v in lais}) == 1  # the canopy does not notice at all
     spread = (max(grains) - min(grains)) / max(grains)
     assert spread == pytest.approx(
-        0.023904, rel=2e-2
+        0.026225,
+        rel=2e-2,  # ⚠ 2026-08-15 canopy 0.023904 -> 0.026225
     )  # ⚠ 2026-08-14 (light path), was 0.024505
     # one-sided: only the trigger that eats into its own window costs anything
     assert (grains[0] - grains[2]) / grains[0] < 0.002
@@ -1059,15 +1079,18 @@ def test_the_fill_fraction_is_the_only_number_that_moves_anything() -> None:
         his[fstr] = _harvest_index(states)
         ws[fstr] = _peak_w(states, sc.DEFAULT_SCENARIO)
     assert his[0.1] == pytest.approx(
-        0.5409610, rel=1e-3
+        0.527575,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.5409610 -> 0.527575
     )  # ⚠ 2026-08-14 (light path), was 0.516
     assert his[0.5] == pytest.approx(
-        0.686197, rel=1e-3
+        0.68011,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.686197 -> 0.68011
     )  # ⚠ 2026-08-14 (light path), was 0.674711
     ordered = [his[k] for k in sorted(his)]
     assert all(a < b for a, b in zip(ordered, ordered[1:], strict=False))  # monotone
     assert ws[0.4] == pytest.approx(
-        13.947964, rel=1e-3
+        13.574762,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 13.947964 -> 13.574762
     )  # ⚠ 2026-08-14 (light path), was 14.314705
     # ⚠⚠ 2026-08-14 (the light path): **Table 7's top row NO LONGER crosses.** ws[0.5]
     # is 14.3467 against the 14.4248 tripwire — 0.5 % under, where it was 1.4 % over.
@@ -1076,7 +1099,9 @@ def test_the_fill_fraction_is_the_only_number_that_moves_anything() -> None:
     # ORDERING (0.5 above 0.4) is what the sweep is about and is untouched; the
     # crossing claim is not, and is recorded as withdrawn rather than re-tuned.
     assert ws[0.5] > ws[0.4]
-    assert ws[0.5] == pytest.approx(14.346729, rel=1e-3), "no longer crosses 14.4248"
+    assert ws[0.5] == pytest.approx(13.941309, rel=1e-3), (
+        "no longer crosses 14.4248"
+    )  # ⚠ 2026-08-15 canopy 14.346729 -> 13.941309
 
 
 # =====================================================================================
@@ -1140,16 +1165,21 @@ def test_the_ungated_control_reproduces_the_values_recorded_before_it() -> None:
     a = _anthesis(states)
     # the old stem shape
     assert total[-1] / total[a] == pytest.approx(
-        0.965073, rel=1e-3
+        0.881291,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.965073 -> 0.881291
     )  # ⚠ 2026-08-14 (light path), was 0.980573
-    assert _harvest_index(states) == pytest.approx(0.664113, rel=1e-3)  # the old HI
+    assert _harvest_index(states) == pytest.approx(
+        0.655853, rel=1e-3
+    )  # the old HI  # ⚠ 2026-08-15 canopy 0.664113 -> 0.655853
     assert _series(states, STORAGE_C)[-1] == pytest.approx(
-        34.686483, rel=1e-4
+        33.337707,
+        rel=1e-4,  # ⚠ 2026-08-15 canopy 34.686483 -> 33.337707
     )  # ⚠ 2026-08-14 (light path), was 34.826488
     # and the window's whole effect on the grain, stated once as a number
     gated = _series(_run(sc.DEFAULT_SCENARIO, 1, reserve=True)[0], STORAGE_C)[-1]
     assert gated / _series(states, STORAGE_C)[-1] - 1.0 == pytest.approx(
-        -0.019457, rel=1e-2
+        -0.019144,
+        rel=1e-2,  # ⚠ 2026-08-15 canopy -0.019457 -> -0.019144
     )
 
 
@@ -1236,10 +1266,12 @@ def test_the_grain_gain_is_the_TRANSFER_not_the_two_exemptions() -> None:
         _run(sc.DEFAULT_SCENARIO, 1, reserve=True, reserve_is_shed=True)[0], STORAGE_C
     )[-1]
     assert plain / base - 1.0 == pytest.approx(
-        0.46162, rel=1e-3
+        0.488354,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.46162 -> 0.488354
     )  # ⚠ 2026-08-14 (light path), was 0.509562
     assert stripped / base - 1.0 == pytest.approx(
-        0.426251, rel=1e-3
+        0.445701,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.426251 -> 0.445701
     )  # ⚠ 2026-08-14 (light path), was 0.472077
     assert stripped / plain > 0.9  # the exemptions are a small part of it
 
@@ -1263,14 +1295,17 @@ def test_the_frozen_harvest_index_is_LOW_and_the_grain_mass_is_LOWER() -> None:
         withres[-1].stocks[STORAGE_C].amount, sc.DEFAULT_SCENARIO.ground_area
     )
     assert _harvest_index(frozen) / ORACLE_HI == pytest.approx(
-        0.889826, rel=1e-3
+        0.862357,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.889826 -> 0.862357
     )  # ⚠ 2026-08-14 (light path), was 0.839057
     assert twso_frozen / 11.5 == pytest.approx(
-        0.540083, rel=1e-3
+        0.509922,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.540083 -> 0.509922
     )  # ⚠ 2026-08-14 (light path), was 0.525043
     assert _harvest_index(withres) / ORACLE_HI > 1.0
     assert twso_res / 11.5 == pytest.approx(
-        0.789397, rel=1e-3
+        0.758944,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.789397 -> 0.758944
     )  # ⚠ 2026-08-14 (light path), was 0.792584
 
 
@@ -1301,7 +1336,8 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
     )
     assert r0 == 0
     assert min(_series(frozen, CARBON_POOL)) == pytest.approx(
-        0.07106, rel=1e-4
+        0.070735,
+        rel=1e-4,  # ⚠ 2026-08-15 canopy 0.07106 -> 0.070735
     )  # ⚠ 2026-08-14 (light path), was 0.076461
 
     for form in ({}, {"snapshot_fill": True}):
@@ -1344,7 +1380,9 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
         # the kind this repo has been caught by before.
         # ⚠ 0.076482 → 0.077538 on 2026-08-14 (the step unfreeze, dt 1 → ¼).
         # ⚠ 0.077538 -> 0.071668 on 2026-08-14 (the light path).
-        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, 0.071668, True),
+        # ⚠ 0.071668 -> 0.071782 (2026-08-15): the chamber trough barely moves, as the
+        # depth integral is inert at LAI 0.54 and only the SLA anchor reaches it.
+        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, 0.071782, True),
         # ⚠ 0.085006 → 0.088509 → 0.093346, all on 2026-08-12 and for two different
         # reasons: the soil-water re-basing re-declared the scenario, then `WSFD`
         # ([F] Eqn 15.8) made drought accelerate development. `water_biting` is one of
@@ -1353,7 +1391,8 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
         # bit-identical with and without the reserve) is unchanged and is what the test
         # is for. Note `sealed_chamber` above did NOT move on either occasion.
         # ⚠ 0.101294 -> 0.103004 (2026-08-14, the light path).
-        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, 0.103004, False),
+        # ⚠ 0.103004 -> 0.095854 (2026-08-15, the depth-resolved canopy + sourced SLA).
+        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, 0.095854, False),
     ):
         base, _, _ = _run(scen, years)
         snap, _, _ = _run(scen, years, reserve=True, snapshot_fill=True)
@@ -1422,13 +1461,16 @@ def test_the_reserve_passes_every_manifest_liveness_floor_the_frozen_tree_passes
             max(leafs[8:]),
         )
     assert out["frozen"][1] == pytest.approx(
-        0.07106, rel=1e-4
+        0.070735,
+        rel=1e-4,  # ⚠ 2026-08-15 canopy 0.07106 -> 0.070735
     )  # ⚠ 2026-08-14 (light path), was 0.076461
     assert out["frozen"][5] == pytest.approx(
-        0.603855, rel=1e-4
+        0.578626,
+        rel=1e-4,  # ⚠ 2026-08-15 canopy 0.603855 -> 0.578626
     )  # ⚠ 2026-08-14 (light path), was 0.611984
     assert out["stem0"][1] == pytest.approx(
-        0.071147, rel=1e-4
+        0.070776,
+        rel=1e-4,  # ⚠ 2026-08-15 canopy 0.071147 -> 0.070776
     )  # ⚠ 2026-08-14 (light path), was 0.076527
     # ⚠⚠ **THE NON-VACUITY CONTROL DIED AT `dt = ¼` (2026-08-14), and that is a finding
     # about this test, not a number to swap.** `stem0` sat here to show the harness CAN
@@ -1456,10 +1498,14 @@ def test_the_reserve_passes_every_manifest_liveness_floor_the_frozen_tree_passes
     # 0.637384. The two CONTROLS above are pinned at their original values and did not
     # move, which is what says the shift is the window and not the harness.
     # ⚠ 0.075476 -> 0.070492 (2026-08-14, the light path); still clears 0.05.
-    assert r[1] == pytest.approx(0.070492, rel=1e-4) and r[1] > 0.05
+    assert (
+        r[1] == pytest.approx(0.070253, rel=1e-4) and r[1] > 0.05
+    )  # ⚠ 2026-08-15 canopy 0.070492 -> 0.070253
     assert r[2] is True and r[3] is True and r[4] is True
     # ⚠ 0.612211 -> 0.603679 (2026-08-14); the 0.55 floor's clearance narrows again.
-    assert r[5] == pytest.approx(0.603679, rel=1e-4) and r[5] > 0.55
+    assert (
+        r[5] == pytest.approx(0.578137, rel=1e-4) and r[5] > 0.55
+    )  # ⚠ 2026-08-15 canopy 0.603679 -> 0.578137
 
 
 @pytest.mark.slow
@@ -1497,7 +1543,9 @@ def test_what_the_reserve_RESCUES_of_stem_onlys_two_closure_legs() -> None:
     )
     scale = max(co2)
     assert rationed == 0
-    assert min(co2) == pytest.approx(0.070549, rel=1e-4)  # 0.053127 before the window
+    assert min(co2) == pytest.approx(
+        0.07028, rel=1e-4
+    )  # 0.053127 before the window  # ⚠ 2026-08-15 canopy 0.070549 -> 0.07028
     assert non_collapsing(co2, floor=0.05) is True  # stem-only's 0.046065 leg: FIXED
     assert (
         is_stationary(
@@ -1527,19 +1575,29 @@ def test_the_open_season_science_bands_survive_the_reserve_but_the_margin_shrink
     frozen, _, _ = _run(sc.DEFAULT_SCENARIO, 1)
     res, _, _ = _run(sc.DEFAULT_SCENARIO, 1, reserve=True)
     assert _peak_lai(frozen, sc.DEFAULT_SCENARIO) == pytest.approx(
-        5.137266, rel=1e-4
+        5.778138,
+        rel=1e-4,  # ⚠ 2026-08-15 canopy 5.137266 -> 5.778138
     )  # ⚠ 2026-08-14 (light path), was 5.298122
     assert _peak_w(frozen, sc.DEFAULT_SCENARIO) == pytest.approx(
-        12.400672, rel=1e-4
+        12.081495,
+        rel=1e-4,  # ⚠ 2026-08-15 canopy 12.400672 -> 12.081495
     )  # ⚠ 2026-08-14 (light path), was 12.765369
     lai, w = _peak_lai(res, sc.DEFAULT_SCENARIO), _peak_w(res, sc.DEFAULT_SCENARIO)
-    assert 5.0 < lai < 8.0 and lai < 6.0
+    # ⚠ 2026-08-15: the reserve form's canopy now CROSSES the mutual-shading threshold
+    # (6.0228 > 6.0), exactly as the frozen tree does. That is no longer a band failure
+    # — the loss above the threshold is MODELLED as of the same date — so the surviving
+    # claim is the sourced wheat band, plus the fact that the reserve does not carry the
+    # canopy anywhere the frozen tree does not already go.
+    assert 5.0 < lai < 8.0
+    assert lai > 6.0, "the reserve form is in the mutual-shading regime too"
     assert lai / 6.0 == pytest.approx(
-        0.896774, rel=1e-3
+        1.003806,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.896774 -> 1.003806
     )  # ⚠ 2026-08-14 (light path), was 0.928654
     assert w < 14.4248
     assert w / 14.4248 == pytest.approx(
-        0.9669430, rel=1e-3
+        0.941071,
+        rel=1e-3,  # ⚠ 2026-08-15 canopy 0.9669430 -> 0.941071
     )  # ⚠ 2026-08-14 (light path), was 0.992368
 
 
@@ -1569,17 +1627,25 @@ def test_n_limited_keeps_the_regime_it_was_built_for() -> None:
         ]
 
     a, b = fn(frozen), fn(res)
-    assert min(a) == pytest.approx(0.182361, rel=1e-5)  # the recorded value
+    assert min(a) == pytest.approx(
+        0.168814, rel=1e-5
+    )  # the recorded value  # ⚠ 2026-08-15 canopy 0.182361 -> 0.168814
     # ⚠ These count STEPS the stress bites on, over a step-indexed trajectory — 187/186
     # while a step was a day, and 4× that now. Compared in DAYS so the number keeps
     # meaning what it did: the stress bites on ~187 days either way, which is the claim.
     # ⚠ 187 -> 192 days (2026-08-14, the light path): the stress bites five days
     # longer. Same direction on both runs, so the comparison the test makes is intact.
-    assert day_of(sum(1 for v in a if v < 1.0)) == 192
+    # ⚠ 192 -> 199 days (2026-08-15, the depth-resolved canopy + sourced SLA): the
+    # stress bites a further seven days. Same direction on both runs again.
+    assert day_of(sum(1 for v in a if v < 1.0)) == 199
     assert min(b) == pytest.approx(
-        0.186791, rel=1e-5
+        0.173012,
+        rel=1e-5,  # ⚠ 2026-08-15 canopy 0.186791 -> 0.173012
     )  # ⚠ 2026-08-14 (light path), was 0.180928
-    assert day_of(sum(1 for v in b if v < 1.0)) == 190  # ⚠ 186 -> 190, see above
+    # ⚠ 190 -> 198 days (2026-08-15, the depth-resolved canopy + sourced SLA), the
+    # same eight-day direction as its sibling above — which is the comparison the
+    # test defends: both forms lengthen together, so the reserve's regime is intact.
+    assert day_of(sum(1 for v in b if v < 1.0)) == 198  # ⚠ 186 -> 190, see above
     # ⚠ 1.0243 on 2026-08-14 (was under 1.02): the reserve now weakens the nitrogen
     # stress minimum by 2.4 % rather than under 2. The regime claim — the stress is
     # still deep and still bites for ~190 days either way — is what the surrounding
@@ -1620,11 +1686,11 @@ def test_option_Bs_litter_C_to_N_identity_survives_the_nitrogen_free_starch() ->
             # reset-dump regime, where the shedding-fed one above moved 0.3 %. The two
             # regimes are still an order of magnitude apart, which is the identity this
             # test defends.
-            12.653988,
+            12.001178,  # ⚠ 2026-08-15 canopy 12.653988 -> 12.001178
             # 12.7991 → 12.7822 on 2026-08-12 with the cessation window: less starch is
             # standing when the plant dies, so slightly less nitrogen-free carbon is
             # dumped into litter at the re-sow. ⚠ 13.218522 -> 14.286147 (2026-08-14).
-            15.045320,
+            14.261267,  # ⚠ 2026-08-15 canopy 15.045320 -> 14.261267
         ),
     ):
         for kw, expected in (({}, frozen_cn), ({"reserve": True}, res_cn)):

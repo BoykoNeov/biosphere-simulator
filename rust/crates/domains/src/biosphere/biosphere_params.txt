@@ -7,7 +7,7 @@
 # Regenerate: uv run python tests/crossport/gen_biosphere_params.py
 #
 # name	hexfloat
-canopy.sla_per_mol_c	0x1.2ca60f99e8d37p-1
+canopy.sla_per_mol_c	0x1.418eb35cd11afp-1
 canopy.extinction_coef	0x1.3333333333333p-1
 photo.vcmax	0x1.9000000000000p+6
 photo.jmax	0x1.6800000000000p+7
@@ -49,6 +49,8 @@ stemres.cessation_dvs	0x1.0000000000000p+1
 senesc.rdr_leaf	0x1.47ae147ae147bp-6
 senesc.rdr_stem	0x1.47ae147ae147bp-8
 senesc.rdr_root	0x1.47ae147ae147bp-7
+senesc.shade_rate	0x1.999999999999ap-5
+senesc.lai_threshold	0x1.8000000000000p+2
 nitro.max_uptake_capacity	0x1.89374bc6a7efap-10
 nitro.n_residual_per_mol_c	0x1.17e067e3fd0b9p-13
 nitro.n_critical_per_mol_c	0x1.a3d09bd5fb915p-12

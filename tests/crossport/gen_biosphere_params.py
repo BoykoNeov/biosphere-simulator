@@ -124,6 +124,11 @@ def _scalars() -> list[tuple[str, float]]:
         ("senesc.rdr_leaf", senesc.rdr_leaf),
         ("senesc.rdr_stem", senesc.rdr_stem),
         ("senesc.rdr_root", senesc.rdr_root),
+        # ⚠ The mutual-shading term (2026-08-15). `lai_threshold` is a THRESHOLD, not a
+        # rate, and it crosses the port as a hex-float like every other scalar so the
+        # two ports compare LAI against bit-identical 6.0.
+        ("senesc.shade_rate", senesc.shade_rate),
+        ("senesc.lai_threshold", senesc.lai_threshold),
         ("nitro.max_uptake_capacity", nitro.max_uptake_capacity),
         ("nitro.n_residual_per_mol_c", nitro.n_residual_per_mol_c),
         ("nitro.n_critical_per_mol_c", nitro.n_critical_per_mol_c),

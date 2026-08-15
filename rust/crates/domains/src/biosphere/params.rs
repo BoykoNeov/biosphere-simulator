@@ -130,6 +130,9 @@ pub struct SenescenceParams {
     pub rdr_leaf: f64,
     pub rdr_stem: f64,
     pub rdr_root: f64,
+    /// Additional leaf relative death rate above `lai_threshold` (mutual shading).
+    pub shade_rate: f64,
+    pub lai_threshold: f64,
 }
 
 /// Nitrogen uptake + limitation params (core-ready — thresholds pre-folded to kg N/mol C).
@@ -335,6 +338,8 @@ pub fn biosphere() -> BiosphereParams {
         },
         senesc: SenescenceParams {
             rdr_leaf: get(&t, "senesc.rdr_leaf"),
+            shade_rate: get(&t, "senesc.shade_rate"),
+            lai_threshold: get(&t, "senesc.lai_threshold"),
             rdr_stem: get(&t, "senesc.rdr_stem"),
             rdr_root: get(&t, "senesc.rdr_root"),
         },

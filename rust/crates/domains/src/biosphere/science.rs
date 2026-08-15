@@ -101,12 +101,36 @@ pub fn canopy_assimilation(
     if lai == 0.0 {
         return 0.0;
     }
-    let f_int = intercepted_fraction(lai, canopy.extinction_coef);
-    let mean_absorbed_par = incident_par * f_int / lai;
-    let leaf_rate = gross_leaf_assimilation(ci, mean_absorbed_par, photo);
-    let canopy_rate = leaf_rate * lai;
+    let k = canopy.extinction_coef;
+    // Canonical (fixed-array) reduction order — the mirror of the Python tuple. The
+    // abscissae are DERIVED from `sqrt(0.6)` in both ports rather than transcribed as
+    // decimals, so the two agree on a correctly-rounded IEEE `sqrt` instead of on how
+    // many digits someone copied out of the literature.
+    let half_spread = 0.5 * 0.6_f64.sqrt();
+    let depths = [0.5 - half_spread, 0.5, 0.5 + half_spread];
+    let weights = [5.0 / 18.0, 8.0 / 18.0, 5.0 / 18.0];
+    let mut weighted_leaf_rate = 0.0;
+    for (depth, weight) in depths.iter().zip(weights.iter()) {
+        let absorbed_par = k * incident_par * (-k * depth * lai).exp();
+        weighted_leaf_rate += weight * gross_leaf_assimilation(ci, absorbed_par, photo);
+    }
+    let canopy_rate = weighted_leaf_rate * lai;
     let f_temp = temperature_factor(temp_c, photo);
     canopy_rate * window_s * ground_area * MICROMOL_TO_MOL * f_temp * limitation
+}
+
+/// Leaf relative death rate including mutual shading: `rdr + shade` above `LAI*`.
+///
+/// Van Keulen & Seligman (1987), via Penning de Vries et al. (1989) p. 101: in wheat,
+/// leaf area is lost at 5 %/day once LAI exceeds 6, to account for mutual shading. A
+/// **step**, not a ramp — the source's own form. The comparison is strict (`>`), so the
+/// term is inert exactly AT the threshold.
+pub fn mutual_shading_rate(lai: f64, rdr_leaf: f64, shade_rate: f64, lai_threshold: f64) -> f64 {
+    if lai > lai_threshold {
+        rdr_leaf + shade_rate
+    } else {
+        rdr_leaf
+    }
 }
 
 // --- respiration ------------------------------------------------------------

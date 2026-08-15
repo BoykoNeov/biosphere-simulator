@@ -304,7 +304,13 @@ def test_sealed_assimilation_rises_then_declines(
     # collapse → closed-loop recovery); only its depth moved, because a starved plant
     # crashed harder than a closing canopy does. Re-pinned to the measured depth, still
     # a real collapse.
-    assert min(gass[peak_idx:]) < 0.15 * peak
+    # ⚠ RE-PINNED AGAIN 2026-08-15 (the depth-resolved canopy + the sourced SLA anchor):
+    # the collapse is MILDER still — GASS falls to ~15.8 % of peak, not ~8 %. Same
+    # direction and same reason as the last re-pin: a healthier canopy crashes less.
+    # The SHAPE the test is about (peak -> clear collapse -> closed-loop recovery) is
+    # unchanged, and the recovery leg below is what makes it a loop rather than a
+    # decline.
+    assert min(gass[peak_idx:]) < 0.25 * peak
     # ... and the closed carbon loop refills the pool, so GASS recovers above the trough
     # by season's end (the closed-loop signature — an open-loop decline never would).
     assert gass[-1] > 1e-2 * peak

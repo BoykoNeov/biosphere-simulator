@@ -229,6 +229,8 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
             root_c=ROOT_C,
             litter_sink=wiring.litter_carbon_target,
             params=sen_params,
+            canopy=load_canopy_params(crop.paths["canopy"]),
+            ground_area=scenario.ground_area,
         ),
         Transpiration(
             FlowId("biosphere.transpiration"),
@@ -299,6 +301,10 @@ def build_plants(scenario: SeasonScenario, wiring: ChamberWiring) -> Compartment
                 root_c=ROOT_C,
                 sen_params=sen_params,
                 nitro_params=nitro,
+                # ...and the SAME canopy/footprint the carbon Senescence flow got, so
+                # the mutual-shading term enters both legs of the one physical event.
+                canopy=load_canopy_params(crop.paths["canopy"]),
+                ground_area=scenario.ground_area,
             )
         )
     # Two accumulators (scope (B) inc. 1): vernalization days accrue from temperature,
