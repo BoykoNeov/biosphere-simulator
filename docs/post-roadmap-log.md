@@ -56,6 +56,15 @@ second is the one that bites: a plan doc is committed *with* its exemption in th
 and **an exemption written for a temporary state is a deletion someone must remember** — which
 is exactly what the step-unfreeze paragraph two paragraphs down records going wrong.
 
+⚠ **A THIRD forward-looking plan joined them on 2026-08-15: `post-roadmap-value-switch-harness.md`**
+— a `src/lab/` harness that substitutes param values **in memory** so an "A's number vs B's
+number" comparison is a reproducible command rather than a probe script written and thrown
+away (planned, nothing built, `git diff src/` empty). Same shape, same exemption, same two
+consequences: named *here* rather than in the index, and a file in `docs/log/` must not name it
+by filename while it is exempt — call it *"the value-switch plan"*. **When it is built it earns
+the normal three and this paragraph goes with it.** ⚠ Written and committed *with* this
+paragraph, per the lesson recorded directly above.
+
 ⚠ **The step-unfreeze exemption is GONE (2026-08-14), because the ceremony landed.** A
 paragraph here used to exempt `post-roadmap-step-unfreeze.md` from the index while its work
 was in progress, ending *"when the ceremony lands it earns the normal three — index line,
