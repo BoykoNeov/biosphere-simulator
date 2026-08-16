@@ -1,19 +1,31 @@
-"""Reference flip, slice 3: the Rust port's own inventory vs. the frozen manifests.
+"""Reference flip: the Rust tree's own inventory vs. the frozen manifests.
 
-The pilot with zero blast radius. A Rust program builds the canonical registries and
-dumps the flow set / aux set it derives from them; this gate asserts that dump equals
-the **existing, still-Python-anchored** manifest. Nothing is re-anchored, no golden
-moves, no band is touched — the point is to establish that the port can *express* the
-completeness contract before slice 4 moves the reference onto it, because completeness
-is the axis the flip is riskiest for
-(`docs/plans/post-roadmap-reference-flip.md` §2b).
+⚠⚠ **THE TWO CASES IN THIS FILE NO LONGER MEAN THE SAME THING, AND THAT IS THE FIRST
+THING TO KNOW BEFORE READING A FAILURE.** Slice 3 built both as *parity* checks with two
+independent origins. Slice 6 re-anchored the **biosphere** manifest to the Rust tree, so
+for that case:
 
-**Why this is a real comparison and not a mirror.** The three sets involved have three
-independent origins: Rust's names are hand-written `type_name()` literals (slice 2 chose
-required-and-hand-written *over* the zero-cost automatic derivation, precisely so a
-rename would show up here); Python's come from `type(flow).__name__` over its own
-registries; the manifest is the committed artifact regenerated from Python. So a
-Rust-vs-manifest disagreement is a genuine finding, not a round trip.
+* **biosphere — a STALENESS check.** The manifest is now generated *from* this dump
+  (`tests/test_freeze_manifest.py::_build_manifest` shells the same example), so a
+  disagreement no longer means "the ports differ" — it means **the committed manifest is
+  out of date with the reference tree**, i.e. something was added to the reference and
+  never frozen. That is the completeness axis, re-homed to the side that now owns it.
+  Python's conformance to the same set is checked separately and cargo-free, in
+  `tests/test_freeze_manifest.py`.
+* **station — still a PARITY check**, with the two independent origins intact, until
+  slice 7 does for that manifest what slice 6 did for this one.
+
+**Why the biosphere case is still worth running, and is not a round trip.** It compares
+the *committed artifact* against a *freshly built tree* — the same relationship the
+Python completeness gate always had, on the other side. What it can no longer do is
+arbitrate between the ports.
+
+**Why the station case is a real comparison and not a mirror.** The three sets involved
+have three independent origins: Rust's names are hand-written `type_name()` literals
+(slice 2 chose required-and-hand-written *over* the zero-cost automatic derivation,
+precisely so a rename would show up here); Python's come from `type(flow).__name__` over
+its own registries; the manifest is the committed artifact regenerated from Python. So a
+Rust-vs-manifest disagreement there is a genuine finding.
 
 ⚠⚠ **The manifests' third axis, `param_files`, is deliberately NOT compared, and the
 exclusion is a finding rather than a simplification.** The slice was planned as "flow
@@ -28,11 +40,11 @@ files carry no prefix at all. Anything Rust printed under that key would be the 
 list travelling through Rust and back, so the gate would compare Python against Python:
 the self-referential shape this repo already had to dissolve once, for the RNG vectors.
 
-⚠ **The knock-on is slice 6's, and is recorded in the plan rather than resolved here:**
-`param_files` cannot be re-anchored to Rust until Rust is the thing that loads the YAML,
-which is **slice 9's** decision. So slice 6 must either declare that axis explicitly
-Python-retained with a stated reason, or wait for slice 9 — which inverts the plan's
-`9 depends on 6` ordering.
+⚠ **Slice 6's answer to that, taken 2026-08-16:** `param_files` is declared
+**Python-retained**, with the reason written into the manifest's own `_authority` block,
+because it cannot re-anchor until **slice 9** decides who loads the YAML — the arrow the
+plan's dependency table has pointing the other way. It is one of several: by content
+most of that manifest is still Python's.
 
 ⚠ **Authoring is out of scope, on slice 2's evidence rather than by category.** The
 authoring manifest's inventory is a different surface (grammar, VM node/op set,
@@ -44,6 +56,7 @@ the same distinction at the same point. Slice 8 owns that manifest.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -56,28 +69,36 @@ DOCS_DIR = REPO_ROOT / "docs"
 RUST_DOMAINS_DIR = REPO_ROOT / "rust" / "crates" / "domains"
 RUST_STATION_DIR = REPO_ROOT / "rust" / "crates" / "station"
 
-# The axes the port can independently express, and therefore the ones compared. ⚠ This
-# is asserted as the dump's *exact* key set, not read as a filter: adding `param_files`
-# (or anything else) to a dump program turns this gate red until whoever did it has read
-# the module docstring explaining why that key cannot be a parity axis. A filter would
-# have let the tautology in silently.
+# The set-valued axes compared straight across, per case. ⚠ The dump's *exact* key set
+# is asserted too (`_DUMP_KEYS`), not read as a filter: adding `param_files` (or
+# anything else) to a dump program turns this gate red until whoever did it has read the
+# module docstring explaining why that key cannot be an axis. A filter would have let
+# the tautology in silently.
 _COMPARED_AXES = frozenset({"flow_set", "aux_set"})
 
-# (label, crate dir, example, manifest). One per manifest that carries a
+# (label, crate dir, example, manifest, dump keys). One per manifest that carries a
 # registry-derived inventory; the biosphere is delegated out of the station manifest, so
-# the two sets are disjoint by contract and each is checked against its own file.
+# the two sets are disjoint by contract and each is checked against its own file. ⚠ The
+# biosphere dump grew in slice 6 — it now emits everything the manifest sources from the
+# reference tree, plus `locked_dt_days`, which is emitted to be CHECKED and never
+# spliced (see `test_the_locked_dt_matches_the_reference_tree`).
+_BIOSPHERE_DUMP_KEYS = frozenset(
+    {"flow_set", "aux_set", "horizons", "light_path_samples", "locked_dt_days"}
+)
 _CASES = [
     (
         "biosphere",
         RUST_DOMAINS_DIR,
         "dump_biosphere_inventory",
         "biosphere-reference.manifest.json",
+        _BIOSPHERE_DUMP_KEYS,
     ),
     (
         "station",
         RUST_STATION_DIR,
         "dump_station_inventory",
         "station-reference.manifest.json",
+        _COMPARED_AXES,
     ),
 ]
 
@@ -95,9 +116,9 @@ def _rust_inventory(crate_dir: Path, example: str) -> dict:
 
 
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
-@pytest.mark.parametrize("label,crate_dir,example,manifest_name", _CASES)
+@pytest.mark.parametrize("label,crate_dir,example,manifest_name,dump_keys", _CASES)
 def test_rust_inventory_equals_the_frozen_manifest(
-    label: str, crate_dir: Path, example: str, manifest_name: str
+    label: str, crate_dir: Path, example: str, manifest_name: str, dump_keys: frozenset
 ) -> None:
     """Rust's derived flow/aux inventory equals the committed manifest's, set for set.
 
@@ -109,8 +130,8 @@ def test_rust_inventory_equals_the_frozen_manifest(
     manifest = json.loads((DOCS_DIR / manifest_name).read_text(encoding="utf-8"))
     dump = _rust_inventory(crate_dir, example)
 
-    assert set(dump) == _COMPARED_AXES, (
-        f"{example} dumps {sorted(dump)}, not {sorted(_COMPARED_AXES)} — see this "
+    assert set(dump) == dump_keys, (
+        f"{example} dumps {sorted(dump)}, not {sorted(dump_keys)} — see this "
         f"module's docstring before adding an axis (a param-file list would make this "
         f"gate compare Python against Python)"
     )
@@ -122,18 +143,107 @@ def test_rust_inventory_equals_the_frozen_manifest(
     # than letting `[] == []` pass as evidence.)
     assert manifest["flow_set"], f"{manifest_name} freezes no flows — nothing compared"
 
+    # ⚠ The advice depends on which case failed, and the assertion cannot tell them
+    # apart. For the re-anchored biosphere manifest a disagreement means the *committed
+    # file is stale*; for the still-parity station manifest it means the two ports
+    # genuinely differ, and regenerating would paper over a finding. A single message
+    # would be right for one case and actively misleading for the other — the "correct
+    # assertion giving wrong advice" defect slice 5 was caught on.
+    if manifest_name.startswith("biosphere"):
+        advice = (
+            "⚠ This manifest is generated FROM this dump (slice 6), so this is NOT a "
+            "port-vs-port divergence: the reference tree has changed and the committed "
+            "manifest has not been regenerated. That is an unfreeze — follow the "
+            "ceremony in docs/biosphere-reference.md, then `uv run python "
+            "tests/test_freeze_manifest.py`. If you did not mean to change the frozen "
+            "surface, the finding is whatever added or removed the name."
+        )
+    else:
+        advice = (
+            "⚠ Before treating this as a port bug, check the registry SELECTION in the "
+            "dump example against the Python gate's `_station_registries()` — a "
+            "mis-mirrored build option (self-discharge, with_harvest, the fast-vs-slow "
+            "registry index) reads exactly like a divergence and is not one. If the "
+            "selection is right, this manifest is still Python-anchored (slice 7 has "
+            "not been taken), so this is a genuine two-port disagreement: a finding to "
+            "hunt, and do NOT adjust either side to agree."
+        )
     for axis in sorted(_COMPARED_AXES):
         assert dump[axis] == manifest[axis], (
-            f"{label} {axis} diverges between the Rust port and {manifest_name}:\n"
+            f"{label} {axis} diverges between the Rust tree and {manifest_name}:\n"
             f"  only in Rust:     {sorted(set(dump[axis]) - set(manifest[axis]))}\n"
             f"  only in manifest: {sorted(set(manifest[axis]) - set(dump[axis]))}\n"
-            f"⚠ Before treating this as a port bug, check the registry SELECTION in "
-            f"the dump example against the Python gate's `_canonical_registries()` / "
-            f"`_station_registries()` — a mis-mirrored build option (self-discharge, "
-            f"with_harvest, the fast-vs-slow registry index) reads exactly like a "
-            f"divergence and is not one. If the selection is right, this is a finding "
-            f"to hunt and it STOPS the slice; do not adjust either side to agree."
+            f"{advice}"
         )
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_the_frozen_biosphere_manifest_is_not_stale() -> None:
+    """Every biosphere key sourced from the reference tree still reads what it emits.
+
+    The set axes are covered above; this is the rest of what slice 6 re-anchored — the
+    horizons and the light-path fingerprint — so a reference-side change to any of them
+    is red rather than a manifest quietly describing a tree that has moved on.
+
+    ⚠ The fingerprint is hashed here rather than compared sample by sample, because the
+    hash is what the manifest stores and hashing is the one step the Rust side does not
+    do (that crate carries no digest dependency). The samples themselves are exact
+    hex-float text, so this is an exact comparison, not a tolerance.
+    """
+    manifest = json.loads(
+        (DOCS_DIR / "biosphere-reference.manifest.json").read_text(encoding="utf-8")
+    )
+    dump = _rust_inventory(RUST_DOMAINS_DIR, "dump_biosphere_inventory")
+
+    fingerprint = hashlib.sha256(
+        "|".join(dump["light_path_samples"]).encode("utf-8")
+    ).hexdigest()
+    assert manifest["forcing"]["light_path"] == fingerprint, (
+        "the reference tree's within-day PAR shape has moved and the manifest still "
+        "pins the old fingerprint — an unfreeze, not a diff to accept"
+    )
+    assert dump["light_path_samples"], "no samples compared"
+
+    assert manifest["long_horizon_years"] == dump["horizons"]["long_horizon_years"]
+    frozen_years = {
+        name: entry["years"] for name, entry in manifest["scenarios"].items()
+    }
+    for key, years in dump["horizons"].items():
+        assert years in frozen_years.values(), (
+            f"the reference tree's {key} = {years} appears in no frozen scenario: "
+            f"{frozen_years}"
+        )
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_the_locked_dt_matches_the_reference_tree() -> None:
+    """The anti-derived literal gets the half it was missing.
+
+    ⚠ `dt_days` is **deliberately** a hand-written literal in the manifest and a second
+    hand-written literal in the Python gate — a contract field that imports its own
+    value auto-follows the code, and the 2026-08-14 step move became a deliberate
+    ceremony only because that literal went red. Slice 6 does not touch that. What it
+    adds is the check that never existed: the frozen literal against the **reference
+    tree's** `BIO_DT`. So moving Rust's step now turns something red at once,
+    instead of surfacing later as
+    "every golden moved".
+
+    ⚠ Deliberately NOT extended to `integrator`. There is no importable scheme name on
+    either side — each run helper selects it inline — so the only way to write this pair
+    symmetrically would be to type `"EulerIntegrator"` into the Rust dump and compare it
+    to the manifest's copy: two hand-written literals checked against each other, which
+    reads like a gate and is none. The integrator stays enforced by the goldens.
+    """
+    manifest = json.loads(
+        (DOCS_DIR / "biosphere-reference.manifest.json").read_text(encoding="utf-8")
+    )
+    dump = _rust_inventory(RUST_DOMAINS_DIR, "dump_biosphere_inventory")
+    assert manifest["dt_days"] == dump["locked_dt_days"], (
+        f"the reference tree runs the biosphere at dt = {dump['locked_dt_days']}, but "
+        f"the frozen manifest declares {manifest['dt_days']}. Moving the step is an "
+        "unfreeze (docs/biosphere-reference.md) — the literal is hand-written so that "
+        "this is a ceremony rather than a silent follow."
+    )
 
 
 def test_the_station_aux_axis_is_empty_by_delegation() -> None:

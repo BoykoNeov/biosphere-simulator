@@ -567,6 +567,55 @@ Phase-3 scenario regression tests.
 integrator + dt, the horizon, the derived flow set + aux set, the param files (+ provenance
 hashes), the forcing (+ hash), and each scenario → golden (+ hash).
 
+### ⚠⚠ Who produces it — MIXED AUTHORITY since 2026-08-16 (reference-flip slice 6)
+
+The keys the **Rust reference tree** can produce are now read from it, by shelling
+`cargo run --example dump_biosphere_inventory`; the rest are still the checker's. **The file
+says which is which, per key, in its own `_authority` block** — so a reader cannot mistake a
+Python-retained field for a Rust-derived one. Two consequences:
+
+- **Regeneration needs `cargo`.** The gates do not: nothing in `test_freeze_manifest.py`
+  shells cargo, and the base suite stays offline-clean. The cargo-side gates (is the manifest
+  *stale* against the reference tree; does the frozen `dt_days` literal still match the
+  reference's `BIO_DT`) live in `tests/crossport/test_inventory_parity.py`.
+- **The completeness gates changed meaning without changing their arithmetic.**
+  `set(manifest["flow_set"]) == set(_flow_set())` used to say *the manifest froze everything
+  Python has*; it now says *Python still matches the reference*. A failure there is a **Python**
+  drift and is **not** fixed by regenerating.
+
+⚠ **"The manifest is Rust-anchored" is the wrong summary.** By content most of it is still
+Python's — `science_bands` + `liveness_floors` alone are about half the file and are a static
+census of pytest markers, with no Rust referent while the science gates are pytest-side.
+
+| Key | Producer | Why |
+|---|---|---|
+| `flow_set`, `aux_set` | **Rust** | the union of `type_name()` over the four canonical builds |
+| `forcing.light_path` | **Rust** | its samples; **measured** byte-identical to Python's before re-anchoring, because this key is gated exactly rather than tolerance-bound |
+| `long_horizon_years`, `scenarios.*.years` | **Rust** | the reference tree's horizon constants |
+| `scenarios.*.golden_sha256` | **Rust** (6 of 7) | the golden is the reference's own output |
+| `scenarios.drift_summary.golden_sha256` | **Python** | ⚠ one run, two authors: `drift.py`'s fold of the *same* 15-yr trajectory whose final state Rust authors. The fold is the artifact |
+| `param_files` | **Python, until slice 9** | Rust reads no YAML; it reads a Python-generated hexfloat file whose names are not filenames |
+| `forcing.weather_fixture` / `weather_sha256` | **Python** | a Python-side oracle fixture; the port reads a file generated *from* it — same shape as `param_files` |
+| `science_bands`, `liveness_floors` | **Python** | a static AST census of `science_gate` markers on pytest functions |
+| `integrator`, `dt_days` | **hand** | the two deliberate anti-derived literals (below) |
+| `scenarios.*.scenario` / `.golden` | **hand** | a human label; a filename |
+
+⚠ **`golden_sha256` is now the one hash class that IS compared** against the files on disk.
+Slice 5 measured the hole it closes: regenerating a frozen golden desynchronised this manifest
+with **every manifest gate green**. Deliberately *goldens only* — the param and weather hashes
+stay provenance, because they are hand-edited files whose values the goldens already enforce,
+while a golden is machine-generated and **is** the value.
+
+⚠ **The two anti-derived literals are unchanged, and `dt_days` gained the half it was
+missing.** Neither is imported from the code — a contract field that imports its own value
+auto-follows the code, and the 2026-08-14 step move became a ceremony only because that
+literal went red. What slice 6 added is the *other* direction: the frozen `dt_days` is now
+checked against the **reference tree's** `BIO_DT`, so moving Rust's step without the ceremony
+is red rather than silent. `integrator` did **not** get the same treatment: there is no
+importable scheme name on either side, so a `"EulerIntegrator"` string typed into the Rust
+dump would be a second hand-written literal checked against the first — which reads like a
+gate and is none. It stays enforced by the goldens.
+
 **What the manifest gate checks vs. what the goldens check** — the division is deliberate:
 - **The scenario goldens own *values*.** Any value change to a frozen param file, a flow law,
   the integrator/dt, or the weather fixture already moves a committed golden and fails its
@@ -609,12 +658,18 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
 2. **Make the change** boundary-side. `git diff src/simcore/` **must stay empty** —
    unconditionally. (Even an RK4 escalation is a domain-side instantiation choice; there is no
    unfreeze path that edits `simcore/`.)
-3. **Regenerate the affected goldens**, each via its own explicit `__main__` action
-   (`tests/test_regression_*.py`, `tests/test_regression_long_horizon.py`), and **review the
-   byte diff** — a change there means the trajectory moved, which is the point.
+3. **Regenerate the affected goldens** and **review the byte diff** — a change there means the
+   trajectory moved, which is the point. ⚠ **Six of this contract's seven goldens are the Rust
+   port's output** since the reference flip, and the blessed path for them is
+   `uv run python tests/crossport/regen_goldens_from_rust.py --write`; the per-module
+   `__main__` in `tests/test_regression_*.py` **refuses** to write one (`golden_platform.
+   write_python_golden`). `drift_summary.json` is the exception — it is Python's fold and its
+   own `__main__` is still right.
 4. **Regenerate the manifest** (`uv run python tests/test_freeze_manifest.py`) and review its
    diff — the changed hashes / flow set / param set are the git-visible record of exactly what
-   was unfrozen.
+   was unfrozen. ⚠ **This step now needs `cargo`**: since 2026-08-16 the manifest reads the
+   Rust reference tree for every key its `_authority` block marks `rust`. So regenerating on a
+   box without a Rust toolchain fails loudly rather than writing a Python-derived manifest.
 5. **Report the science gates.** State the change's readings against the scenario's
    `science_bands` and `liveness_floors`. A band failure is a **blocking finding** that must be
    argued past in writing, not a number to re-tune — retuning a bound so a change fits is the
@@ -638,6 +693,30 @@ CLAUDE.md already warns about as a second door into the same room: the ceremony 
 honor-system for such a change, so follow it deliberately rather than waiting for a red test.
 
 ### Unfreeze log
+
+- **2026-08-16 — the manifest is RE-ANCHORED to the Rust reference (a PRODUCER unfreeze; no
+  frozen value moved).** Reference-flip slice 6. This is the first entry in this log that
+  changes **who writes the contract** rather than what it says: `flow_set`, `aux_set`,
+  `forcing.light_path`, `long_horizon_years` and every `scenarios.*.years` are now read from
+  the Rust tree, and the file carries an `_authority` block naming the producer of every key
+  (table above). **The diff was predicted before regenerating and held exactly: the only
+  changes are the new `_authority` block and the `_comment`.** Not one frozen value moved —
+  the sets were already identical (slice 3), and the light-path fingerprint was *measured*
+  identical, sample for sample, **before** re-anchoring, because that key is gated exactly and
+  a prediction would not have been evidence.
+
+  **What makes this an unfreeze rather than a refactor**, since nothing scientific moved: the
+  contract's *source of authority* changed, and a future reader who assumed the whole file was
+  Python-derived would draw wrong conclusions from it. Also landed with it: `golden_sha256` is
+  now compared against the files on disk (closing the hole slice 5 measured, where regenerating
+  a frozen golden desynchronised this manifest with every manifest gate green), and the frozen
+  `dt_days` literal is now checked against the reference tree's `BIO_DT`.
+
+  ⚠ **The re-anchoring is partial by content, and that is stated rather than glossed:**
+  `param_files` (until slice 9 decides who loads the YAML), the weather fixture + its hash, the
+  `drift_summary` golden's hash, and the whole `science_bands` / `liveness_floors` census —
+  roughly half the file — remain Python's, each with its reason written beside it in the
+  manifest itself.
 
 - **2026-08-15 — `canopy.carbon_fraction` BOUND TO A CITATION (provenance only; one hash, no
   value, no golden).** The honour-system ceremony from `CLAUDE.md`: advisor review →

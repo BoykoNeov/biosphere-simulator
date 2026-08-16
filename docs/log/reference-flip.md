@@ -1,11 +1,11 @@
-## **The reference flip — Rust becomes canonical** (target state B; eleven slices, five landed)
+## **The reference flip — Rust becomes canonical** (target state B; eleven slices, six landed)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
-different slices. Don't bundle the whole work into one slice"*). **Slices 1, 2, 3 and 4 landed
-the same day**, slice 4 partially — its two divergent goldens are held for slice 5. Nothing
-else is built: **no golden regenerated**, no manifest re-anchored, no band moved, `git diff
-src/` empty.
+different slices. Don't bundle the whole work into one slice"*). **Slices 1–6 landed the same day.** The reference has
+moved: two goldens are Rust's bytes, the cross-port contract is inverted, and the biosphere
+manifest is re-anchored — with **mixed** authority, stated per key in the file itself. `git
+diff src/` stays empty throughout.
 
 ### The decision
 
@@ -526,6 +526,89 @@ exists to refuse. ⚠ **Pre-existing, untouched:** `tests/test_co2_compensation_
 7 `E501` errors at `HEAD`, verified against a clean checkout — `uv run ruff check .` was
 already red before this slice and was not folded into its diff.
 
+### Slice 6 — the biosphere manifest is re-anchored — COMPLETE 2026-08-16
+
+**Built.** `dump_biosphere_inventory` widened from a *witness* into the **producer** of the
+biosphere manifest's Rust half; `_build_manifest()` shells it and splices `flow_set`,
+`aux_set`, `forcing.light_path`, `long_horizon_years` and every `scenarios.*.years`; the
+manifest gained an `_authority` block naming the producer of **every** key, with the reason
+written beside it. Four new Python gates, two new cargo-side gates. `git diff src/` empty;
+ruff / ruff-format / pyright clean; `cargo clippy --all-targets -D warnings` and the whole
+`cargo test` suite green.
+
+**⚠⚠ The prediction was written down first and held exactly: the only changes to the manifest
+are the `_authority` block and the `_comment`.** No hash, no set, no horizon moved.
+
+**⚠⚠ And that is precisely why a green suite proved nothing — the third acceptance criterion
+in a row that a relabel would have passed (advisor).** Slice 2 had already measured Rust's
+names as exactly the manifest's 23/3, so re-anchoring produces a byte-identical file:
+*nothing* in the diff or the suite separates "the manifest now reads Rust" from "the comment
+now says it does". The criterion became a **measured pair**:
+
+| Control | Manifest | Python conformance gate |
+|---|---|---|
+| rename a flow's `type_name()` in **Rust**, regenerate | **MOVED**, one leaf | RED |
+| rename the **Python** class, regenerate | **byte-identical** | RED |
+
+Either alone is worthless — the first passes for any file that happens to change, the second
+for a manifest nobody regenerated. ⚠ *An interface slice's criterion must name a call site
+(slice 2); a re-anchoring slice's must name a **direction**.*
+
+**⚠ The one key that could have failed was measured, not predicted (advisor).**
+`forcing.light_path` is the only hash in `forcing` that is **gated exactly** — CI recomputes
+it in glibc-CPython and compares strings — so re-anchoring it created a UCRT-Rust vs
+glibc-CPython pair nothing had ever measured, where one ULP of `cos` or one character between
+the two hex-float writers turns CI red for a formatting reason. Measured before touching
+anything: Rust reproduces **all twelve samples byte for byte**. Had it not, the key would have
+been declared Python-retained — inventing a normalization is what this contract refuses.
+
+**⚠ The classification is keyed by PATH, because two keys split (advisor).** `forcing` has
+three children with two answers; `scenarios` splits *inside one scenario* — slice 5's handoff,
+where `perennial_long_horizon_state.json` is Rust's and `drift_summary.json` is Python's fold
+of that same run. A top-level block would have hidden exactly what slice 5 handed over. The
+golden rows are **checked against** `golden_platform.RUST_AUTHORED`, never restated: that
+roster already has two copies held equal by a gate, and a third is the stale-copy hazard.
+
+**⚠⚠ The honest headline is MIXED AUTHORITY, not "the manifest is Rust-anchored" — and the
+qualifier is the part that would have been dropped.** By content most of the file is still
+Python's: `science_bands` + `liveness_floors` are ~104 of 208 lines, a static AST census of
+pytest markers with no Rust referent while the science gates are pytest-side; `param_files`
+is Python-retained **until slice 9**; so are the weather fixture, its hash, and
+`drift_summary`'s golden hash. The `_authority` block exists so the next reader cannot lose
+that.
+
+**⚠ Two anti-derived literals, one new check.** `dt_days` is now compared against the
+reference tree's `BIO_DT` — the frozen literal still forces the ceremony, and the reference
+can no longer move under it in silence. `integrator` deliberately did not get the same:
+neither side has an importable scheme name, so the symmetric version would be two hand
+literals checked against each other, which reads like a gate and is none.
+
+**Also landed:** `golden_sha256` is now compared against the files on disk, closing the hole
+slice 5 measured. Scoped to goldens only — a golden is machine-generated and *is* the value,
+while the param/weather hashes are hand-edited files the goldens already enforce.
+
+**⚠ Two gates in one file stopped meaning the same thing, and the failure message had to
+branch.** `test_inventory_parity.py`'s biosphere case is now a **staleness** check (the
+manifest is generated from that dump); the station case is still a genuine two-port **parity**
+check until slice 7. The assertion fires identically, and its advice — *"a finding to hunt; do
+NOT adjust either side to agree"* — is right for one and actively wrong for the other. Slice
+5's lesson, applied without waiting to be caught by it again.
+
+**Eight negative controls, each turning exactly one gate red on its intended assertion:** the
+rename pair; a golden tampered; an unclassified field; an `_authority` pattern matching
+nothing; `drift_summary` reclassified as Rust-authored; the reference's `BIO_DT` → 0.5; its
+light-path peak factor → π/2.1; its `LONG_HORIZON_YEARS` → 16; and a frozen chamber horizon
+tampered, which only the new Python horizon-conformance gate sees. ⚠ **One control run was
+invalid and re-run**: a stray command corrupted the manifest's JSON, so sixteen tests failed on
+a *parse error* rather than the assertion under test. *A control that turns the whole file red
+has measured nothing* — slice 5's "check the control's own exit code", one layer up.
+
+**⚠ A process failure worth recording because it cost real work:** reverting a control with
+`git checkout <file>` discarded the **entire uncommitted slice** in that file, not just the
+control. The work was recoverable only because every edit was still in the session transcript.
+*Snapshot the working files before running controls on them; `git checkout` is not an undo for
+a change that was never committed.*
+
 ### The state of the arc
 
 Slices 6–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
@@ -536,12 +619,13 @@ that it barely had to**: sixteen of eighteen goldens were already byte-identical
 ports, so what 4 could land alone was the *path* and the *census*, not a diff. **Slice 5 wrote
 the other two, and with them the inversion**: the golden is now Rust's artifact, the Rust
 byte census is unconditional, Python is the tolerance-gated side, and Python can no longer
-author any of the eighteen. **6–8 are the three unfreeze ceremonies, biosphere first** — and
-slice 5 already discharged the biosphere manifest's `golden_sha256` half, because
-regenerating a frozen golden desynchronised it with every gate green. Slice 3 handed 6 an
-open per-key decision and slice 4 answered it on the golden axis (18 yes, 2 folded). Until
-6–8 land, new reference science is still Python-canonical — and a science item must never
-share a batch with a re-anchor slice.
+author any of the eighteen. **6–8 are the three unfreeze ceremonies, biosphere
+first; 6 has landed.** Its lasting finding is that a freeze contract does not re-anchor as a
+unit: roughly half the biosphere manifest has no Rust referent and is now declared
+Python-retained *in the file*, so **slices 7 and 8 should expect to classify, not to
+convert**. Until they land, the station and authoring contracts are still Python-anchored, new
+reference science outside the biosphere is still Python-canonical, and a science item must
+never share a batch with a re-anchor slice.
 
 ⚠ **This item's log exemption was deleted with slice 1, one day after it was written.** It was
 written on the premise *"forward-looking, no finished work behind it"*; the first slice ended
