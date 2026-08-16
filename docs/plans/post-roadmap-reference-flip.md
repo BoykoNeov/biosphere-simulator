@@ -212,7 +212,7 @@ takes them one at a time.
 
 | # | Slice | Depends on | Blast radius | Reversible? |
 |---|---|---|---|---|
-| 1 | **Rust per-step trajectory export** | — | additive; no contract | yes |
+| 1 | **Rust per-step trajectory export** — **COMPLETE 2026-08-16** | — | additive; no contract | yes |
 | 2 | **`type_name()` on `Flow`/`Aux`** | — | frozen Rust core (small unfreeze) | yes |
 | 3 | **Rust dumps its own inventory, checked against the *existing* manifest** | 2 | additive test only | yes |
 | 4 | **Find the 25th emitter; regenerate the goldens from Rust** | **3** | **25 goldens** | yes (git) |
@@ -232,6 +232,73 @@ Tier-2 band. ⚠ Design question to settle **inside** this slice, not before: wh
 quantities, and at what step granularity (the step is now `dt = ¼`, so a "day" is four
 rows — and `docs/log/step-unfreeze.md` records seven distinct days-vs-steps conflations
 found the last time this distinction was assumed rather than checked).
+
+### Slice 1 — COMPLETE 2026-08-16
+
+**Built.** `simcore::snapshot::TrajectoryWriter` (+ `TRAJECTORY_VERSION`), the
+`emit_trajectory` example in `crates/domains/examples/`, and one new parametrized gate,
+`test_rust_trajectory_matches_python_step_for_step` in `tests/crossport/test_crossport.py`.
+`git diff src/` empty. No golden regenerated, no manifest touched, no existing example's
+bytes changed. Ruff / pyright / `cargo clippy --all-targets -D warnings` / the full
+`cargo test` suite all green.
+
+**The two design questions the slice was told to settle, settled:**
+
+* **Which quantities → all of them, as a full snapshot per row**, in the frozen
+  `SCHEMA_VERSION` shape `State::to_json` already emits for a final state. Repeating each
+  stock's metadata on every row costs ~3/4 of the payload (6.75 MB for the season, 17.8 MB
+  for the perennial case) and is the right trade anyway: **the export inherits the
+  cross-port interchange contract instead of opening a second one.** Python `sim_io.loads`
+  validates every row and the comparator needed no new code. Choosing a subset would have
+  meant guessing what the eventual consumers need.
+* **Granularity → every step, and deliberately no stride knob.** Down-sampling to days is a
+  *consumer* concern with exactly one blessed implementation (`tests/day_index.py`, which
+  exists because the idiom was invented five ways in five files first); a stride argument on
+  the emitter would put a second one on the far side of the port, out of that module's
+  reach — the days-vs-steps hazard this slice was warned about, re-introduced by hand.
+  Every row carries its own `n`, so a consumer that down-samples can prove which steps it
+  kept.
+
+**⚠ The acceptance criterion as written would have left the reset path unproven, and it was
+widened (advisor).** `emit_season` runs `run_season` with **no reset**, so a season-only
+slice never exercises the reset hook — and the reset path is the one place the two ports'
+observer semantics could genuinely differ, because *both* drivers record the **pre-reset**
+state and never the reset instant itself (verified by reading both, then measured). So the
+example takes a scenario argument and the gate has two rows: `season` (open field, 1 yr,
+1221 rows) and `perennial` (`run_perennial`, reset armed, 2441 rows).
+
+**⚠ 2 years, not the golden's 5, and the number is load-bearing:** the driver consults the
+reset hook with the *pre-step* `n`, so a 1-year run checks `n = 0 ..= season_steps - 1` and
+the boundary is never reached. Two years is the smallest horizon that fires it. That case
+is therefore compared to Python only, never to `perennial_chamber_state.json`; the season
+case additionally anchors its last row to `season_euler_state.json`, which is what proves
+the trajectory comes from *that* run and not a differently-configured one.
+
+**Two things keep the gate from being inert, and both were checked by measurement rather
+than assumed:**
+
+1. **`compare.py` matches list elements positionally and only checks list *length*** — two
+   equal-length series shifted the same way (a missing initial state, an off-by-one
+   observer) compare clean. Each row is self-identifying via `n`, so the gate asserts the
+   sequence is `0..steps` on **both** sides. Measured: deleting the initial row is caught;
+   without the assertion it would not be.
+2. **The perennial case asserts the reset actually fired inside the exported window**, by
+   the one signature the reset leaves in the data — `thermal_time` is non-decreasing within
+   a season and only the reset lowers it. Measured: exactly one drop, at row 1220, in both
+   ports. A perennial case whose reset never fired would be an expensive duplicate of the
+   season case.
+
+**What it bought, measured.** The season comparison walks **62,272 numeric leaves**, against
+~51 for the existing final-state test on the same scenario. Negative control: a **1-part-per-
+million** perturbation of a single stock in a single middle row fails the Tier-2 band. Every
+cross-port biosphere comparison until now was on a **final** `State` — two ports could in
+principle have reached the same endpoint along different paths and nothing would have said
+so. Marked `slow` (≈2.4 s per case against a ~24 ms fast-loop average).
+
+**Not done here, on purpose: the oracle is not wired to it.** 2c's consumer — feeding
+Rust's trajectory to `oracle_match` — needs the matched-DVS / organ-basis plumbing, which is
+real judgement work and a later slice's. Slice 1 is the interface only, and nothing consumes
+it yet.
 
 **Slice 2 — `type_name()` on the traits.** Small, and the first frozen-Rust unfreeze. Add
 `fn type_name(&self) -> &'static str` to `Flow` and the aux trait, implemented so it
@@ -295,9 +362,14 @@ exactly what that file says it carries and is why §6 step 1 of the A plan calle
 there the single most important step. Whoever takes this slice will read the retirement rule
 first; without this paragraph they will correctly conclude the section does not belong, and
 B's posture will end up as undiscoverable as A's was.
-⚠ **This paragraph's own exemption in `post-roadmap-log.md` is deleted as part of this
-slice** — an exemption written for a temporary state is a deletion someone must remember,
-and the log records that forgetting it left three checks red for five commits.
+⚠ **The log exemption is already gone — deleted with slice 1, not left for this slice.**
+It was written on the premise that this doc was *forward-looking with no finished work
+behind it*; slice 1 ended that premise the day after, so the doc took the normal three
+(index line, pointer row, `docs/log/reference-flip.md`) then rather than carrying a
+now-false exemption through ten more slices. The log's own hardest lesson is that an
+exemption written for a temporary state is a deletion someone must remember, and forgetting
+it left three checks red for five commits. **What this slice still owes the record is the
+closing update to that file, plus the memory file** — not its creation.
 
 ## §6 Open questions — none blocking, all answerable when their slice is taken
 
@@ -309,3 +381,38 @@ and the log records that forgetting it left three checks red for five commits.
    in the *reference*, not in the copy — so it changes category.
 3. **Does the Godot consumer notice?** It consumes Rust and should not, but slice 4 moves
    the goldens it is indirectly pinned against. Check, do not assume.
+
+## §7 What follows B — the user's stated next subject (recorded, not planned)
+
+**Recorded 2026-08-16, in the same breath as "begin slice 1", so the sequencing is explicit
+and not inferred.** The user's words: after the switch to Rust, *"work will continue on the
+universal harness, that permits easy toggle of parameters and science, and will ease the
+need to run tests and constant verification."*
+
+This is a **direction note, not a plan** — nothing here is designed, priced or scheduled,
+and it changes nothing about the eleven slices. Its purpose is to keep the ordering visible:
+**the harness comes after the flip, so a slice must not be re-scoped to serve it.**
+
+Two things it connects to, both already on the books:
+
+* The harness already has a plan and a built foundation:
+  `post-roadmap-value-switch-harness.md`. Its seam — scoped in-memory parameter overrides
+  in `src/config/overrides.py` — shipped 2026-08-15; **its reporting layer, which is the
+  actual deliverable, is still open**, and so is the extinction-coefficient value the seam
+  was built to settle. "Toggle the science, not just the numbers" is a widening of that
+  doc's scope, not a new subject.
+* ⚠ **The seam is Python-side, in `src/config/`.** Under B that is the *checker's* half of
+  the tree. Whether the harness is rebuilt against the Rust loader, or stays Python and
+  drives Rust, is a real design question — and it is the same question as slice 9's unit
+  validation (§2e), which is about the same file set for the same reason: after the flip,
+  Rust is what loads the params. **Take them together or take slice 9 first.**
+
+⚠ **One phrase is recorded as the user's goal and not adopted as a design property:
+"ease the need to run tests and constant verification."** Read as *"experiments must be
+cheap enough that you don't hand-write a probe script for each one"* — the measured
+motivation behind the existing plan, 42 throwaway probe scripts across 16 plan docs — it is
+exactly right and is what the harness is for. Read as *"the harness stands in for
+verification"* it inverts this repo's whole posture, and every mechanism named in this
+document (the goldens, the three manifests, the tolerance contract) exists because that
+substitution is not available. The distinction is not a quibble about wording: it decides
+whether the harness's output is *a finding you then gate*, or *a gate*. It is the first.

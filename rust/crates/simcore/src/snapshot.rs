@@ -152,6 +152,100 @@ pub fn from_engine(state: &engine::State) -> State {
     }
 }
 
+/// The **trajectory envelope's** own schema version — distinct from [`SCHEMA_VERSION`],
+/// which versions each row *inside* it. The two move independently: adding a field to a
+/// snapshot is a row-schema change, adding one to the envelope is not.
+pub const TRAJECTORY_VERSION: u32 = 1;
+
+/// Streaming writer for a **per-step trajectory** — the whole sequence of states a run
+/// passes through, not just its final one (the reference-flip plan, slice 1).
+///
+/// Feed it from a `run_season` / `run_perennial` observer; it serializes each state as it
+/// arrives rather than holding the run's `State`s in memory. [`finish`](Self::finish)
+/// wraps the rows in
+///
+/// ```text
+/// { "trajectory_version": 1, "dt": <hex-float>, "steps": <rows - 1>, "trajectory": [ <row>, ... ] }
+/// ```
+///
+/// **Each row is a full snapshot in the frozen [`SCHEMA_VERSION`] shape** — the same bytes
+/// [`State::to_json`] already emits for a final state. That repeats every stock's
+/// metadata on every row (~3/4 of the payload), and it is the right trade anyway: the
+/// export inherits the cross-port interchange contract instead of opening a second one.
+/// Python `sim_io.loads` validates every row and the parity comparator needs no new code.
+///
+/// ⚠ **There is deliberately no stride / down-sampling knob.** Down-sampling a trajectory
+/// to days is a *consumer* concern with exactly one blessed implementation
+/// (`tests/day_index.py`, which exists because the idiom was invented five ways in five
+/// files first); a knob here would put a second one on the far side of the port, out of
+/// that module's reach. Every row carries its own `n`, so a consumer that down-samples can
+/// always prove which steps it kept — the days-vs-steps confusion is detectable, not silent.
+pub struct TrajectoryWriter {
+    rows: String,
+    count: usize,
+}
+
+impl Default for TrajectoryWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TrajectoryWriter {
+    pub fn new() -> Self {
+        TrajectoryWriter {
+            rows: String::new(),
+            count: 0,
+        }
+    }
+
+    /// Append one state. Call from the run driver's observer, which fires on the initial
+    /// state and after each step — so the row count is `steps + 1` and row `i` is `n == i`.
+    pub fn push(&mut self, state: &engine::State) {
+        if self.count > 0 {
+            self.rows.push_str(",\n");
+        }
+        self.rows.push_str(from_engine(state).to_json().trim_end());
+        self.count += 1;
+    }
+
+    /// Rows pushed so far (`steps + 1` for a completed run).
+    pub fn len(&self) -> usize {
+        self.count
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    /// Close the envelope. `dt` is the run's step size, recorded so a reader never has to
+    /// infer the meaning of `n` from the row count.
+    ///
+    /// # Panics
+    /// If nothing was pushed — an empty trajectory has no initial state, which means the
+    /// observer was never wired, and a silently-empty export is exactly the inert artifact
+    /// this slice exists to avoid.
+    pub fn finish(self, dt: f64) -> String {
+        assert!(
+            self.count > 0,
+            "empty trajectory: the observer was never called (a run always emits its \
+             initial state)"
+        );
+        let mut out = String::new();
+        out.push_str("{\n");
+        out.push_str("  \"dt\": ");
+        push_json_string(&mut out, &hexfloat::format(dt));
+        out.push_str(",\n");
+        out.push_str(&format!("  \"steps\": {},\n", self.count - 1));
+        out.push_str("  \"trajectory\": [\n");
+        out.push_str(&self.rows);
+        out.push_str("\n  ],\n");
+        out.push_str(&format!("  \"trajectory_version\": {TRAJECTORY_VERSION}\n"));
+        out.push_str("}\n");
+        out
+    }
+}
+
 /// Parse `sim_io` snapshot JSON text into a computed engine [`engine::State`] — the
 /// **load** half of the codec (P8.7, work item #3), the inverse of
 /// [`from_engine`] → [`State::to_json`]. Convenience wrapper over [`json::parse`] +
@@ -398,6 +492,76 @@ mod tests {
         assert!(snap.to_json().contains("\"quantity\": \"carbon\""));
     }
 
+    /// The trajectory envelope parses, carries one row per pushed state in order, and
+    /// every row is a snapshot the codec reads back — so the export inherits the
+    /// interchange contract rather than opening a second one (reference-flip slice 1).
+    #[test]
+    fn trajectory_writer_emits_ordered_readable_rows() {
+        use crate::quantities::{Quantity, StockKind};
+        use crate::state::{State as EngineState, Stock as EngineStock};
+
+        let at = |n: u64, amount: f64| {
+            let stock = EngineStock::new(
+                "biosphere.leaf_c".to_string(),
+                "biosphere.plants".to_string(),
+                Quantity::Carbon,
+                "mol".to_string(),
+                amount,
+                StockKind::Population,
+                0.0,
+                false,
+                BTreeMap::from([(Quantity::Carbon, 1.0)]),
+            )
+            .unwrap();
+            EngineState::new(
+                n,
+                BTreeMap::from([(stock.id.clone(), stock)]),
+                0,
+                BTreeMap::from([("thermal_time".to_string(), n as f64)]),
+            )
+            .unwrap()
+        };
+
+        let mut writer = TrajectoryWriter::new();
+        assert!(writer.is_empty());
+        for n in 0..3u64 {
+            writer.push(&at(n, 1.0 + n as f64));
+        }
+        assert_eq!(writer.len(), 3);
+        let text = writer.finish(0.25);
+
+        let value = json::parse(&text).expect("trajectory envelope must parse");
+        assert_eq!(
+            value.get("trajectory_version").and_then(JsonValue::as_i64),
+            Some(TRAJECTORY_VERSION as i64)
+        );
+        // `steps` is the run's step count, one less than the row count (row 0 is the
+        // initial state) — the distinction the whole days-vs-steps discipline rests on.
+        assert_eq!(value.get("steps").and_then(JsonValue::as_i64), Some(2));
+        assert_eq!(
+            value.get("dt").and_then(JsonValue::as_str),
+            Some(hexfloat::format(0.25).as_str())
+        );
+
+        let rows = value
+            .get("trajectory")
+            .and_then(JsonValue::as_array)
+            .expect("trajectory must be an array");
+        assert_eq!(rows.len(), 3);
+        for (i, row) in rows.iter().enumerate() {
+            // Row `i` is step `i`, and it reads back through the ordinary snapshot codec.
+            let state = from_json_value(row).expect("each row is a readable snapshot");
+            assert_eq!(state.n, i as u64);
+            assert_eq!(state.stocks["biosphere.leaf_c"].amount, 1.0 + i as f64);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "empty trajectory")]
+    fn trajectory_writer_rejects_an_empty_run() {
+        TrajectoryWriter::new().finish(0.25);
+    }
+
     /// A representative engine state (nasty floats, POPULATION with extinction, an
     /// unclamped BOUNDARY source, a multi-key composition, aux, a >2^53 seed) round-
     /// trips through `to_json` → `from_json` bit-for-bit. Bit-exactness is asserted by
@@ -500,7 +664,7 @@ mod tests {
 
         assert_eq!(state.n, 42);
         assert_eq!(state.rng_seed, 0x0123_4567_89AB_CDEF); // >2^53, survives exactly
-        // Exact bits via .hex()-equivalent (compare raw f64 bits — distinguishes -0.0).
+                                                           // Exact bits via .hex()-equivalent (compare raw f64 bits — distinguishes -0.0).
         assert_eq!(
             state.stocks["bio.atmo_c"].amount.to_bits(),
             std::f64::consts::PI.to_bits()
@@ -512,7 +676,10 @@ mod tests {
         ));
         assert_eq!(state.stocks["bio.water"].amount, 5e-324);
         // The loss-sink's -0.0 keeps its sign bit (value equality would miss it).
-        assert_eq!(state.stocks["boundary.loss.carbon"].amount.to_bits(), (-0.0_f64).to_bits());
+        assert_eq!(
+            state.stocks["boundary.loss.carbon"].amount.to_bits(),
+            (-0.0_f64).to_bits()
+        );
         assert!(state.stocks["boundary.solar"].unclamped);
         assert_eq!(state.aux["neg_zero"].to_bits(), (-0.0_f64).to_bits());
 
@@ -539,7 +706,10 @@ mod tests {
             {"amount":"0x1.0p+0","composition":{"carbon":"0x1.0p+0"},"domain":"d",
              "extinction_threshold":"0x0.0p+0","id":"x","kind":"pool",
              "quantity":"carbon","unclamped":true,"unit":"mol"}]}"#;
-        assert!(matches!(from_json(unclamped_pool), Err(SimError::Validation(_))));
+        assert!(matches!(
+            from_json(unclamped_pool),
+            Err(SimError::Validation(_))
+        ));
 
         // An unknown quantity value fails at from_value.
         let bad_q = r#"{"aux":{},"n":0,"rng_seed":"0x0","version":3,"stocks":[
@@ -552,7 +722,10 @@ mod tests {
     #[test]
     fn parse_seed_accepts_hex_and_decimal() {
         assert_eq!(super::parse_seed("0x0").unwrap(), 0);
-        assert_eq!(super::parse_seed("0x123456789abcdef").unwrap(), 0x0123_4567_89AB_CDEF);
+        assert_eq!(
+            super::parse_seed("0x123456789abcdef").unwrap(),
+            0x0123_4567_89AB_CDEF
+        );
         assert_eq!(super::parse_seed("42").unwrap(), 42);
         assert!(super::parse_seed("0xnope").is_err());
     }

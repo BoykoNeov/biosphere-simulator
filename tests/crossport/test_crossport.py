@@ -562,6 +562,184 @@ def test_rust_biosphere_states_match_tier2(
     assert result.numeric_pairs, "expected numeric leaves to be compared"
 
 
+# --------------------------------------------------------------------------- #
+# 3d. Reference flip, slice 1: the Rust per-step trajectory matches Python     #
+# --------------------------------------------------------------------------- #
+
+# The weather fixture both ports tile (Rust embeds it; Python reads it here), same file
+# the season/perennial regression goldens use.
+_WEATHER_FIXTURE = REPO_ROOT / "tests" / "oracle" / "winter_wheat_weather.json"
+
+# The perennial trajectory horizon, in years. ⚠ Must equal
+# `PERENNIAL_TRAJECTORY_YEARS` in `rust/crates/domains/examples/emit_trajectory.rs`
+# — a mismatch surfaces as a `steps` structural diff, not a silent pass. **2 is the
+# smallest horizon that fires the annual reset** (the driver consults the hook with
+# the pre-step `n`, so a 1-year run never reaches the boundary), and the reset path
+# is the whole reason this case exists.
+_PERENNIAL_TRAJECTORY_YEARS = 2
+
+# The trajectory envelope's own version (`simcore::snapshot::TRAJECTORY_VERSION`),
+# distinct from the per-row snapshot `SCHEMA_VERSION`.
+_TRAJECTORY_VERSION = 1
+
+
+def _python_trajectory(case: str) -> dict:
+    """Build the SAME envelope the Rust `emit_trajectory` example emits, in-process.
+
+    Python's `run_season` / `run_perennial` have always returned the whole `states`
+    list (`states[0]` is the initial state, so `len(states) == steps + 1`); this just
+    wraps it in the envelope shape. No golden and no file: the reference is a live
+    Python run, so the test states exactly the thing slice 1 has to establish — *the
+    ported driver walks the same trajectory, not merely to the same endpoint.*
+    """
+    from domains.biosphere.season import (
+        PERENNIAL_CHAMBER_SCENARIO,
+        build_season,
+        run_perennial,
+        run_season,
+        weather_resolver,
+    )
+    from domains.biosphere.step import BIO_DT, steps_for
+    from sim_io.snapshot import state_to_dict
+    from simcore.integrator import EulerIntegrator
+
+    weather = json.loads(_WEATHER_FIXTURE.read_text(encoding="utf-8"))["weather"]
+    if case == "perennial":
+        tiled = weather * _PERENNIAL_TRAJECTORY_YEARS
+        state, registry = build_season(PERENNIAL_CHAMBER_SCENARIO)
+        states, rationed, events = run_perennial(
+            EulerIntegrator(registry),
+            state,
+            PERENNIAL_CHAMBER_SCENARIO,
+            weather_resolver(tiled, PERENNIAL_CHAMBER_SCENARIO),
+            BIO_DT,
+            steps_for(len(tiled)),
+            year=steps_for(len(weather)),
+        )
+    else:
+        state, registry = build_season()
+        states, rationed, events = run_season(
+            EulerIntegrator(registry),
+            state,
+            weather_resolver(weather),
+            BIO_DT,
+            steps_for(len(weather)),
+        )
+    # The same Tier-0 structural invariants the Rust example asserts — a trajectory
+    # taken from an arbitrating or extinction-hit run compares two different regimes.
+    assert rationed == 0, f"{case} trajectory run must be well-fed (no arbitration)"
+    assert events == (), f"{case} trajectory run must be extinction-free"
+    return {
+        "dt": BIO_DT.hex(),
+        "steps": len(states) - 1,
+        "trajectory": [state_to_dict(s) for s in states],
+        "trajectory_version": _TRAJECTORY_VERSION,
+    }
+
+
+def _assert_step_indices(label: str, envelope: dict) -> None:
+    """Every row's `n` is its own position, `0 .. steps`.
+
+    ⚠ **`compare.py` matches list elements positionally and only checks list
+    *length*.** Two equal-length series both shifted the same way — a missing initial
+    state, an off-by-one observer — compare clean. Each row is self-identifying via
+    `n`, so asserting the sequence is what makes that failure visible, not silent.
+    """
+    indices = [row["n"] for row in envelope["trajectory"]]
+    assert indices == list(range(envelope["steps"] + 1)), (
+        f"{label} trajectory rows are not the step sequence 0..{envelope['steps']} "
+        f"(first divergence at position "
+        f"{next(i for i, n in enumerate(indices) if n != i)})"
+    )
+
+
+def _reset_boundaries(envelope: dict) -> list[int]:
+    """Row positions where `thermal_time` fell — i.e. where an annual reset landed.
+
+    `thermal_time` accumulates `max(0, T - T_base)`, so it is non-decreasing *within*
+    a season and the only thing that lowers it is the reset. This is the probe that
+    keeps the perennial case from being inert: it asserts the reset **actually fired
+    inside the exported window**, rather than trusting the horizon arithmetic that put
+    it there.
+    """
+    rows = envelope["trajectory"]
+    series = [float.fromhex(row["aux"]["thermal_time"]) for row in rows]
+    return [i for i in range(len(series) - 1) if series[i + 1] < series[i]]
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+@pytest.mark.parametrize(
+    "case,key,golden",
+    [
+        ("season", "open_season", "season_euler_state.json"),
+        ("perennial", "perennial_chamber", None),
+    ],
+)
+def test_rust_trajectory_matches_python_step_for_step(
+    case: str, key: str, golden: str | None
+) -> None:
+    """The Rust per-step trajectory export reproduces the live Python series, row by
+    row, inside the scenario's own Tier-2 band (reference-flip plan, slice 1).
+
+    Until now every cross-port biosphere comparison was on a **final** `State`: two
+    ports could in principle reach the same endpoint along different paths, and
+    nothing would say so. This walks all 1221 (season) / 2441 (perennial) rows.
+
+    The two cases split by driver, not by scenario. `season` runs `run_season` with no
+    reset. `perennial` runs `run_perennial` with the reset armed — the one place the
+    two ports' observer semantics could genuinely differ, because both drivers record
+    the **pre-reset** state and never the reset instant itself. Its horizon is 2 years,
+    not the 5 of `perennial_chamber_state.json`, so it is compared to Python only; the
+    season case additionally anchors its last row to the frozen golden.
+
+    Marked `slow`: two full Rust runs plus two full Python runs, and ~25 MB of JSON.
+    """
+    reference = _python_trajectory(case)
+    candidate = _run_example("emit_trajectory", [case])
+
+    entry = {g["key"]: g for g in _tiers()}[key]
+
+    # Structural, before any float comparison: the row sequence itself (see the
+    # helper — positional matching cannot see a uniformly shifted series).
+    _assert_step_indices("python", reference)
+    _assert_step_indices("rust", candidate)
+    assert candidate["trajectory_version"] == _TRAJECTORY_VERSION
+
+    if case == "perennial":
+        # The reset fired, once, at the season boundary — in BOTH ports. A perennial
+        # case whose reset never fired would be an expensive duplicate of `season`.
+        boundary = reference["steps"] // _PERENNIAL_TRAJECTORY_YEARS
+        assert _reset_boundaries(reference) == [boundary], "python reset fired once"
+        assert _reset_boundaries(candidate) == [boundary], "rust reset fired once"
+
+    result = compare.compare(
+        reference,
+        candidate,
+        tier=entry["float_tier"],
+        band=entry["band"],
+        floor=entry["floor"],
+    )
+    assert result.ok, (
+        f"emit_trajectory {case} vs the live Python series:\n{result.report()}"
+    )
+    assert result.numeric_pairs, "expected numeric leaves to be compared"
+
+    if golden is not None:
+        # The export's last row is the state the frozen golden already pins — so the
+        # trajectory comes from *that* run, not a differently-configured one.
+        last = compare.compare(
+            compare.load_json(GOLDEN_DIR / golden),
+            candidate["trajectory"][-1],
+            tier=entry["float_tier"],
+            band=entry["band"],
+            floor=entry["floor"],
+        )
+        assert last.ok, (
+            f"emit_trajectory {case} final row vs {golden}:\n{last.report()}"
+        )
+
+
 def _fold_drift_summary(raw: dict) -> dict:
     """Fold the Rust raw per-step series into the `drift_summary` shape, Python-side.
 
