@@ -138,11 +138,29 @@ def test_the_emitter_map_points_at_real_programs() -> None:
 
     Catches a typo in the map without paying for a cargo run — and, because the map is
     keyed by crate, it is also what makes the `-p` disambiguation checkable at all.
+
+    ⚠ **The crate key is doing two jobs, and they are not the same name.** It locates a
+    *directory* here and it is passed to ``cargo run -p`` as a *package*. Those agree
+    across all four crates today, and nothing but this assertion says they must: if they
+    ever diverged, this test would pass while every regeneration failed at runtime. Loud
+    rather than silent, but there is no reason to leave the map checkable only by
+    running it.
     """
     for name, emitter in regen.RUST_EMITTERS.items():
         assert emitter.source.is_file(), (
             f"{name} maps to {emitter.crate}/examples/{emitter.example}.rs, "
             f"which does not exist"
+        )
+        cargo_toml = emitter.source.parents[1] / "Cargo.toml"
+        declared = [
+            line.split("=", 1)[1].strip().strip('"')
+            for line in cargo_toml.read_text(encoding="utf-8").splitlines()
+            if line.startswith("name")
+        ]
+        assert declared[:1] == [emitter.crate], (
+            f"{name} maps to the directory `crates/{emitter.crate}/`, but that crate's "
+            f"Cargo.toml declares the package name {declared[:1]} — `cargo run -p "
+            f"{emitter.crate}` would not resolve"
         )
 
 

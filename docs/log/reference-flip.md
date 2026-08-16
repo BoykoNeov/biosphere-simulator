@@ -394,12 +394,12 @@ golden **from itself**. Every invocation is `-p <crate> --example`, and a test p
 ⚠ *Slice 3 recorded that collision as an unrelated curiosity; one slice later it was a live
 hazard on the exact path being built.*
 
-**Nine negative controls, each turning exactly one test red on the intended assertion**, green
+**Ten negative controls, each turning exactly one test red on the intended assertion**, green
 again after every revert, and checked for *which* assertion fired: an unclassified golden on
 disk; one classified twice; a **frozen** golden parked in the no-referent group; a folded
 golden's reason gutted; a typo'd example name; `crew` re-pointed at the echoing emitter; a
 known-divergent golden dropped from the roster; an **agreeing** golden added to it; the
-last-bit ceiling lowered below the measured divergence.
+last-bit ceiling lowered below the measured divergence; and a crate whose *directory* name stops matching its declared *package* name. ⚠ That last one is an advisor catch and a small instance of a recurring shape: the map's crate key silently does **two jobs** — it locates a directory in Python and it is handed to `cargo run -p` as a package. They agree across all four crates and nothing but that assertion said they must.
 
 ### The state of the arc
 
