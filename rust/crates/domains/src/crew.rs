@@ -134,6 +134,9 @@ impl OxygenConsumption {
 }
 
 impl Flow for OxygenConsumption {
+    fn type_name(&self) -> &'static str {
+        "OxygenConsumption"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -181,6 +184,9 @@ impl FoodMetabolism {
 }
 
 impl Flow for FoodMetabolism {
+    fn type_name(&self) -> &'static str {
+        "FoodMetabolism"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -230,6 +236,9 @@ impl WaterBalance {
 }
 
 impl Flow for WaterBalance {
+    fn type_name(&self) -> &'static str {
+        "WaterBalance"
+    }
     fn id(&self) -> &str {
         &self.id
     }

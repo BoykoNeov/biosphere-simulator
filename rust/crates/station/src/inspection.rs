@@ -230,6 +230,9 @@ mod tests {
     /// minus the loss leg): a boundary source is drawn, the pool deposited.
     struct ForcedInflow;
     impl Flow for ForcedInflow {
+        fn type_name(&self) -> &'static str {
+            "ForcedInflow"
+        }
         fn id(&self) -> &str {
             "test.inflow"
         }
@@ -253,6 +256,9 @@ mod tests {
     /// sums two legs on one stock.
     struct Leak;
     impl Flow for Leak {
+        fn type_name(&self) -> &'static str {
+            "Leak"
+        }
         fn id(&self) -> &str {
             "test.leak"
         }
@@ -275,6 +281,9 @@ mod tests {
     /// force the Euler backstop to ration (two of these over a pool of 10).
     struct BigDraw(&'static str);
     impl Flow for BigDraw {
+        fn type_name(&self) -> &'static str {
+            "BigDraw"
+        }
         fn id(&self) -> &str {
             self.0
         }

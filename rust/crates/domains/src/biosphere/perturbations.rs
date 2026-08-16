@@ -119,6 +119,9 @@ impl LeakFlow {
 }
 
 impl Flow for LeakFlow {
+    fn type_name(&self) -> &'static str {
+        "LeakFlow"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -166,6 +169,33 @@ mod tests {
             BTreeMap::new(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn type_name_is_per_type_not_per_instance() {
+        // The property that makes a *class*-name manifest checkable against a port whose
+        // registry holds *instances*: two `LeakFlow`s wired to different stocks are two
+        // ids and one type name. No canonical biosphere build wires a type twice today,
+        // so this is stated directly rather than fished out of a registry.
+        let a = LeakFlow::new(
+            "bio.leak.co2".to_string(),
+            0,
+            "bio.co2".to_string(),
+            "bio.sink".to_string(),
+            "leak".to_string(),
+            1e-6,
+        );
+        let b = LeakFlow::new(
+            "bio.leak.o2".to_string(),
+            0,
+            "bio.o2".to_string(),
+            "bio.sink".to_string(),
+            "leak".to_string(),
+            2e-6,
+        );
+        assert_ne!(a.id(), b.id());
+        assert_eq!(a.type_name(), b.type_name());
+        assert_eq!(a.type_name(), "LeakFlow");
     }
 
     #[test]

@@ -1,8 +1,12 @@
 # Post-roadmap: the reference flip — Rust becomes canonical
 
-**Status: PLANNED 2026-08-16, NOTHING BUILT.** `git diff src/` empty, `git diff rust/`
-empty, no golden regenerated, no manifest touched. Everything below §3 is a proposal;
-everything in §2 is a measurement taken today on frozen `main`.
+**Status: SLICES 1–2 COMPLETE (2026-08-16); 3–11 are an unexecuted menu.** ⚠ **Read the
+status column of the §5 table, not this line — that table is the one place slice state is
+recorded, and this header was already false within a day of being written** (it said
+*"NOTHING BUILT / `git diff rust/` empty"* through the whole of slice 1). The invariants
+that still hold, and are the ones worth restating: **`git diff src/` empty, no golden
+regenerated, no manifest touched, no band moved.** Everything in §2 is a measurement taken
+on frozen `main` on 2026-08-16 and is *not* re-taken as slices land.
 
 **The decision.** The user re-opened the Rust question on 2026-08-16 ("let's discuss again
 the complete switch to Rust") and, given the fork below, chose **target state B of
@@ -213,7 +217,7 @@ takes them one at a time.
 | # | Slice | Depends on | Blast radius | Reversible? |
 |---|---|---|---|---|
 | 1 | **Rust per-step trajectory export** — **COMPLETE 2026-08-16** | — | additive; no contract | yes |
-| 2 | **`type_name()` on `Flow`/`Aux`** | — | frozen Rust core (small unfreeze) | yes |
+| 2 | **`type_name()` on `Flow`/`Aux`** — **COMPLETE 2026-08-16** | — | frozen Rust core (small unfreeze) | yes |
 | 3 | **Rust dumps its own inventory, checked against the *existing* manifest** | 2 | additive test only | yes |
 | 4 | **Find the 25th emitter; regenerate the goldens from Rust** | **3** | **25 goldens** | yes (git) |
 | 5 | **Invert the cross-port contract** | 4 | `tiers.json` + comparator | yes |
@@ -317,6 +321,103 @@ it yet.
 matches the Python class name exactly. Acceptance: no golden moves (it is a pure addition),
 `cargo clippy --all-targets -D warnings` clean. ⚠ Use `rustfmt <file>`, **never bare
 `cargo fmt`** — it reformats the frozen simcore tree.
+
+### Slice 2 — COMPLETE 2026-08-16
+
+**Built.** `Flow::type_name` (`crates/simcore/src/flow.rs`) and `AuxProcess::type_name`
+(`auxiliary.rs`), **required, no default body**, implemented across **58 impl sites** in 11
+files. Three new tests in `crates/domains/tests/type_identity.rs`, one in the station
+perturbation tests, one in the biosphere perturbation tests. `git diff src/` empty; nothing
+outside `rust/` touched; the diff is **246 insertions, 0 deletions**. `cargo clippy
+--all-targets -D warnings` clean, the whole `cargo test` suite green, and the 138 Python
+cross-port + three-manifest gates green — **no golden moved, no manifest touched.**
+
+**⚠ The acceptance criterion as written was passable by a no-op, and was widened
+(advisor).** *"No golden moves, clippy clean"* is satisfied by a method **nobody ever
+calls** — the same defect shape slice 1 recorded one day earlier (a gate that borrows a
+band it never exercises) and the same shape as the sensitivity probe that read `0.0` for
+weeks. So the slice's real criterion became: `type_name()` is exercised **through
+`Box<dyn Flow>` out of a built canonical registry** — the only path that matters, because
+that is how Python derives `flow_set` — and every assertion has a **measured negative
+control**. ⚠ Generalize: *an interface slice's acceptance criterion must name a call site,
+or it accepts an interface nobody has run.*
+
+**⚠ The design decision, and it went AGAINST the cheap option: required, not defaulted.**
+A default body of `std::any::type_name::<Self>()` (path-stripped) compiles, keeps the trait
+object-safe, dispatches correctly through `Box<dyn Flow>`, and would have cost **zero** per-
+impl lines. It was rejected on one asymmetry:
+
+* **Rename drift under hand-written literals is caught by slice 3** — the manifest says the
+  old name, Rust reports the new one, red. The auto-derive's whole advantage expires one
+  slice from now.
+* **Compiler-version dependence is caught by nothing.** `std::any::type_name`'s own docs
+  disclaim any guaranteed output format, and from slice 6 this string is a value a **freeze
+  manifest is anchored to**. A toolchain bump turning a manifest gate red for a non-science
+  reason is a failure mode this repo has no mechanism for.
+* A **required** method makes a new `impl Flow` a **compile error** until its author states
+  the contract identity. Under B, adding a flow to the reference *is* an unfreeze event, so
+  putting the author in front of that is worth more than the 58 saved lines.
+
+**⚠ The required method immediately paid for itself: it found impls the grep did not.** The
+anchored search found 54 sites; the compiler found **4 more** nested inside `mod tests`
+blocks (`registry.rs`, `inspection.rs` ×3). A defaulted method would have silently given
+those four whatever `std::any::type_name` returned. ⚠ Also: my own hand-count of the Flow
+impls was **48**; the actual figure is 49 + 5 aux + 4 nested = 58. *A count taken by eye off
+a grep is a guess; the compiler is the census.*
+
+**Measured, and it settles a question slice 3 would otherwise have to ask.** The union of
+`type_name()` over the four canonical biosphere builds is **exactly 23 flows / 3 aux, name
+for name identical to the frozen Python manifest** — so Rust can already express the
+completeness contract, before slice 3 builds the gate that asserts it. Per scenario:
+11 / 19 / 19 / 22 flows, **each type instantiated exactly once** (no canonical biosphere
+build wires a type twice).
+
+**What is deliberately NOT here: the roster.** No list of the 23 names appears in Rust. That
+comparison is **slice 3's**, in Python, against the manifest file itself; a second copy here
+is precisely the *"a rule with two copies has one that is stale"* hazard. The union
+cardinality is left out for the same reason — it would be a third place to edit when a flow
+is added. What the Rust tests own is what slice 3 *cannot* check: that the values are
+well-formed, are a function of the **type** rather than the instance, and do not collapse.
+
+**The four assertions and their measured negative controls** — each control turned **exactly
+one** test red and left the others green, so the assertions are independent, and none is
+inert:
+
+| Assertion | Control applied | Result |
+|---|---|---|
+| every name is a bare ASCII class name | `Senescence` returns `"domains::biosphere::flows::Senescence"` | `every_canonical_type_name_is_a_bare_class_name` RED |
+| no two flows in one build share a name | `Senescence` returns `"Transpiration"` | `distinct_flows_report_distinct_type_names` RED |
+| `type_name` ≠ `id` (class vs instance) | `Senescence::id()` returns `"Senescence"` | `type_name_is_not_the_instance_id` RED |
+| a wrapper reports **itself** | `ScaledFlow::type_name` delegates to `inner` | `scaled_flow_type_name_does_not_delegate…` RED |
+
+**⚠ `ScaledFlow` is where the two axes genuinely disagree, and it is the sharpest statement
+of §2f's irony.** It delegates `id()` to the wrapped flow **on purpose** (so the registry
+sorts it into the wrapped flow's slot and order-independence is preserved) — but Python's
+`type(flow).__name__` sees the **wrapper**. So `type_name()` must *not* delegate while
+`id()` must. A later refactor "helpfully" making them consistent would desynchronise the
+port's reported inventory from the reference for any wrapped scenario, and that test is the
+only thing that would say so.
+
+**⚠ Checked and CLEARED — the divergence I expected and did not find.** Python has both
+`simcore.expr.DeclarativeFlow` *and* an authoring registry whose entries name real domain
+classes, so Rust wrapping everything in `DeclarativeFlow` would have been a genuine slice-3
+finding. It does not: both ports lower a `kinetics` spec to `DeclarativeFlow`
+(`interpreter.py:445` / `interpreter.rs:746`) and instantiate the real frozen class for a
+typed spec (`type_spec.cls(...)`). Recorded because a *cleared* suspicion is worth as much
+to slice 3 as a found one.
+
+**⚠ Formatting: the Rust tree is NOT `rustfmt`-clean today, and slice 2 did not make it so.**
+`rustfmt --check` reports pre-existing drift in six files (`crew.rs`, `eclss.rs`, `expr.rs`,
+`registry.rs`, `engine_vectors.rs`, `inspection.rs`) at lines this slice never touched, and
+**CI has no `cargo fmt` gate**. Every one of the 58 inserted blocks is already canonical (no
+insertion site drew a diff), so only the **new file** was formatted. Reformatting the other
+six would have produced a large diff, unrelated to this slice, inside frozen `simcore` —
+which is the same hazard the *never bare `cargo fmt`* rule exists for, reached one file at a
+time.
+
+**Not done here, and it is slice 3's, not an oversight:** nothing yet compares Rust's
+inventory to the manifest, and no Rust program *dumps* that inventory. `type_name()` is the
+mechanism only; the gate is next.
 
 **Slice 3 — Rust dumps its inventory, checked against the *existing* Python manifest.** The
 pilot with zero blast radius: a Rust program builds the canonical registries and dumps the

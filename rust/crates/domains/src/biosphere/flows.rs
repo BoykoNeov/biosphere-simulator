@@ -166,6 +166,9 @@ pub struct Allocation {
 }
 
 impl Flow for Allocation {
+    fn type_name(&self) -> &'static str {
+        "Allocation"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -226,6 +229,9 @@ pub struct GrowthRespiration {
 }
 
 impl Flow for GrowthRespiration {
+    fn type_name(&self) -> &'static str {
+        "GrowthRespiration"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -259,6 +265,9 @@ pub struct MaintenanceRespiration {
 }
 
 impl Flow for MaintenanceRespiration {
+    fn type_name(&self) -> &'static str {
+        "MaintenanceRespiration"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -361,6 +370,9 @@ pub struct StemRemobilization {
 }
 
 impl Flow for StemRemobilization {
+    fn type_name(&self) -> &'static str {
+        "StemRemobilization"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -417,6 +429,9 @@ pub struct Senescence {
 }
 
 impl Flow for Senescence {
+    fn type_name(&self) -> &'static str {
+        "Senescence"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -463,6 +478,9 @@ pub struct Transpiration {
 }
 
 impl Flow for Transpiration {
+    fn type_name(&self) -> &'static str {
+        "Transpiration"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -520,6 +538,9 @@ pub struct Irrigation {
 }
 
 impl Flow for Irrigation {
+    fn type_name(&self) -> &'static str {
+        "Irrigation"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -575,6 +596,9 @@ pub struct Drainage {
 }
 
 impl Flow for Drainage {
+    fn type_name(&self) -> &'static str {
+        "Drainage"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -644,6 +668,9 @@ pub struct NitrogenUptake {
 }
 
 impl Flow for NitrogenUptake {
+    fn type_name(&self) -> &'static str {
+        "NitrogenUptake"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -696,6 +723,9 @@ pub struct Fertilization {
 }
 
 impl Flow for Fertilization {
+    fn type_name(&self) -> &'static str {
+        "Fertilization"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -744,6 +774,9 @@ pub struct Decomposition {
 }
 
 impl Flow for Decomposition {
+    fn type_name(&self) -> &'static str {
+        "Decomposition"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -786,6 +819,9 @@ pub struct HumusDecomposition {
 }
 
 impl Flow for HumusDecomposition {
+    fn type_name(&self) -> &'static str {
+        "HumusDecomposition"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -825,6 +861,9 @@ pub struct MicrobialRespiration {
 }
 
 impl Flow for MicrobialRespiration {
+    fn type_name(&self) -> &'static str {
+        "MicrobialRespiration"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -878,6 +917,9 @@ pub struct NitrogenSenescence {
 }
 
 impl Flow for NitrogenSenescence {
+    fn type_name(&self) -> &'static str {
+        "NitrogenSenescence"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -945,6 +987,9 @@ pub struct LitterNitrogenTransfer {
 }
 
 impl Flow for LitterNitrogenTransfer {
+    fn type_name(&self) -> &'static str {
+        "LitterNitrogenTransfer"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -995,6 +1040,9 @@ pub struct MicrobialNitrogenRelease {
 }
 
 impl Flow for MicrobialNitrogenRelease {
+    fn type_name(&self) -> &'static str {
+        "MicrobialNitrogenRelease"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1041,6 +1089,9 @@ pub struct HumusNitrogenRelease {
 }
 
 impl Flow for HumusNitrogenRelease {
+    fn type_name(&self) -> &'static str {
+        "HumusNitrogenRelease"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1076,6 +1127,9 @@ pub struct Condensation {
 }
 
 impl Flow for Condensation {
+    fn type_name(&self) -> &'static str {
+        "Condensation"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1102,6 +1156,9 @@ pub struct Recycling {
 }
 
 impl Flow for Recycling {
+    fn type_name(&self) -> &'static str {
+        "Recycling"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1128,6 +1185,9 @@ pub struct Grazing {
 }
 
 impl Flow for Grazing {
+    fn type_name(&self) -> &'static str {
+        "Grazing"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1157,6 +1217,9 @@ pub struct ConsumerRespiration {
 }
 
 impl Flow for ConsumerRespiration {
+    fn type_name(&self) -> &'static str {
+        "ConsumerRespiration"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1189,6 +1252,9 @@ pub struct ConsumerMortality {
 }
 
 impl Flow for ConsumerMortality {
+    fn type_name(&self) -> &'static str {
+        "ConsumerMortality"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1269,6 +1335,9 @@ impl ThermalTimeAccumulation {
 }
 
 impl AuxProcess for ThermalTimeAccumulation {
+    fn type_name(&self) -> &'static str {
+        "ThermalTimeAccumulation"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1323,6 +1392,9 @@ pub struct RootDepthExtension {
 }
 
 impl AuxProcess for RootDepthExtension {
+    fn type_name(&self) -> &'static str {
+        "RootDepthExtension"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1383,6 +1455,9 @@ pub struct RootZoneCapture {
 }
 
 impl Flow for RootZoneCapture {
+    fn type_name(&self) -> &'static str {
+        "RootZoneCapture"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -1437,6 +1512,9 @@ pub struct VernalizationAccumulation {
 }
 
 impl AuxProcess for VernalizationAccumulation {
+    fn type_name(&self) -> &'static str {
+        "VernalizationAccumulation"
+    }
     fn id(&self) -> &str {
         &self.id
     }

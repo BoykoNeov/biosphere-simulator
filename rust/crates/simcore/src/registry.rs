@@ -137,6 +137,9 @@ mod tests {
 
     struct NoopFlow(&'static str);
     impl Flow for NoopFlow {
+        fn type_name(&self) -> &'static str {
+            "NoopFlow"
+        }
         fn id(&self) -> &str {
             self.0
         }

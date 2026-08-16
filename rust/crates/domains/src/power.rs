@@ -138,6 +138,9 @@ impl SolarCharge {
 }
 
 impl Flow for SolarCharge {
+    fn type_name(&self) -> &'static str {
+        "SolarCharge"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -177,6 +180,9 @@ impl LoadDraw {
 }
 
 impl Flow for LoadDraw {
+    fn type_name(&self) -> &'static str {
+        "LoadDraw"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -223,6 +229,9 @@ impl SelfDischarge {
 }
 
 impl Flow for SelfDischarge {
+    fn type_name(&self) -> &'static str {
+        "SelfDischarge"
+    }
     fn id(&self) -> &str {
         &self.id
     }

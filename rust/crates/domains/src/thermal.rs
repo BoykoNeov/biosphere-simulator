@@ -138,6 +138,9 @@ impl HeatInput {
 }
 
 impl Flow for HeatInput {
+    fn type_name(&self) -> &'static str {
+        "HeatInput"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -177,6 +180,9 @@ impl RadiatorReject {
 }
 
 impl Flow for RadiatorReject {
+    fn type_name(&self) -> &'static str {
+        "RadiatorReject"
+    }
     fn id(&self) -> &str {
         &self.id
     }

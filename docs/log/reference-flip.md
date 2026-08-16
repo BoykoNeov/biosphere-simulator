@@ -1,9 +1,10 @@
-## **The reference flip — Rust becomes canonical** (target state B; eleven slices, the first landed)
+## **The reference flip — Rust becomes canonical** (target state B; eleven slices, the first two landed)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
-different slices. Don't bundle the whole work into one slice"*). Slice 1 landed the same day.
-Nothing else is built: no golden regenerated, no manifest re-anchored, `git diff src/` empty.
+different slices. Don't bundle the whole work into one slice"*). **Slices 1 and 2 landed the
+same day.** Nothing else is built: no golden regenerated, no manifest re-anchored, no band
+moved, `git diff src/` empty.
 
 ### The decision
 
@@ -126,9 +127,89 @@ not a green-by-skip — checked, because this repo has been bitten by that twice
 That needs matched-stage / organ-basis plumbing, which is real judgement work for a later
 slice. Slice 1 is the interface only, and nothing consumes it yet.
 
+### Slice 2 — `type_name()` on the traits — COMPLETE 2026-08-16
+
+The first unfreeze of the Rust core, and the mechanical half of the class-vs-instance irony
+above. A required `type_name()` on the flow trait and the aux trait, across **58 impl sites**
+in 11 files, plus five tests. **246 insertions, 0 deletions**; no golden moved, no manifest
+touched, `git diff src/` empty.
+
+⚠ **The acceptance criterion as written was passable by a no-op, and was widened (advisor).**
+*"No golden moves, clippy clean"* is satisfied by a method **nobody ever calls** — the same
+defect shape slice 1 had recorded one day earlier, and the same shape as the probe that
+measured `0.0` for weeks against nothing. The real criterion became: exercise the method
+**through the trait object, out of a built canonical registry** — the only path that matters,
+because that is how the reference derives its frozen set — and give every assertion a measured
+negative control. ⚠ **Generalize: an interface slice's acceptance criterion must name a call
+site, or it accepts an interface nobody has run.**
+
+⚠ **The design went AGAINST the cheap option, on an asymmetry between two failure modes.**
+Rust can derive a type's name automatically at zero cost per site, and that was rejected. Not
+because it is wrong today — it produces the right answer today — but because **its output
+format is disclaimed by its own documentation as unstable across compiler versions**, and from
+slice 6 this string is a value a freeze manifest is anchored to. The hand-written alternative's
+weakness (someone renames a type and leaves the literal stale) **is caught by slice 3, one
+slice from now**; the automatic version's weakness (a toolchain upgrade turns a freeze gate red
+for a non-science reason) **is caught by nothing this repo has**. ⚠ *Choose between two
+imperfect options by asking which failure your gates can already see — not which is cheaper to
+write.* The secondary benefit is a forcing function: a new flow is now a **compile error**
+until its author states the contract identity, which under B is exactly when they should be
+thinking about it.
+
+⚠ **That choice paid for itself within the hour: the compiler found 4 impls the grep did not.**
+An anchored search found 54 sites; the build failed on **4 more, nested inside test modules**.
+The automatic version would have silently handed those four whatever the compiler produced. ⚠
+And my own eye-count off the grep output was **48** against an actual 58. *A count read off a
+grep is a guess; the thing that must compile is the census.*
+
+**Measured, and it answers slice 3's question before slice 3 asks it:** the names Rust reports
+across the four canonical builds are **exactly the 23 flows and 3 aux processes of the frozen
+Python manifest, name for name**. So the port can already express the completeness contract —
+which is the single thing the flip is riskiest for — before anything is built that depends on
+it.
+
+**What is deliberately absent: the roster.** No list of those 23 names appears anywhere in
+Rust, and neither does their count. That comparison belongs to slice 3, against the manifest
+file itself; a copy here would be the *"a rule with two copies has one that is stale"* hazard,
+and the count would be a third place to edit whenever a flow is added. What the Rust tests own
+is what slice 3 **cannot** check: that the values are well-formed, that they are a function of
+the **type** and not the instance, and that they do not collapse onto each other.
+
+**Four assertions, four negative controls, each turning exactly one test red and leaving the
+others green** — so they are independent and none is inert: a path-qualified name; two flows
+reporting the same name; the type name colliding with the instance id; and a wrapper
+delegating.
+
+⚠ **The wrapper case is the sharpest statement of the whole class-vs-instance irony, and it
+runs the two axes in opposite directions.** The scaling wrapper delegates its *instance id* to
+the flow it wraps **on purpose**, so the registry sorts it into that flow's slot and
+order-independence survives. But the reference's class name sees the **wrapper**. So one
+accessor must delegate and the other must not. A later refactor making them consistent — which
+is exactly what "tidying" looks like — would desynchronise the port's inventory from the
+reference for any wrapped scenario, and that test is the only thing that would say so.
+
+⚠ **A suspicion CHECKED and CLEARED, recorded because a cleared one is worth as much as a found
+one.** The authoring platform was the place a genuine divergence was expected: the reference
+instantiates real domain classes for typed entries but a generic declarative flow for authored
+kinetics, and a port that wrapped *everything* in the generic one would report a wrong
+inventory. It does not — both ports make the same distinction at the same point. Slice 3 does
+not need to hunt there.
+
+⚠ **Found in passing: the Rust tree is not `rustfmt`-clean, and CI has no formatting gate.**
+Six files carry pre-existing drift at lines this slice never touched. All 58 inserted blocks
+were already canonical, so only the new file was formatted. Reformatting the rest would have
+produced a large diff, unrelated to this slice, inside the frozen core — **the same hazard the
+*never bare `cargo fmt`* rule exists for, reached one file at a time instead of all at once.**
+
+⚠ **The plan doc's own status header was already false within a day of being written** — it
+still read *"NOTHING BUILT"* and *"`git diff rust/` empty"* right through slice 1, which had
+updated the slice table but not the header above it. Fixed to point at the table as the single
+place slice state lives. *A summary line beside a structured record is a second copy, and it is
+the one that rots.*
+
 ### The state of the arc
 
-Slices 2–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
+Slices 3–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
 The ordering that matters: **1–3 build nothing the reference depends on** (they de-risk the
 export and prove Rust can express the completeness contract *before* anything re-anchors);
 **slice 4 is where the reference actually moves** and must not be taken before slice 3 passes;

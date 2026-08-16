@@ -185,6 +185,9 @@ impl ScaledFlow {
 }
 
 impl Flow for ScaledFlow {
+    fn type_name(&self) -> &'static str {
+        "ScaledFlow"
+    }
     fn id(&self) -> &str {
         self.inner.id()
     }
@@ -355,6 +358,28 @@ mod tests {
                                         // factor = 1.0 is a bit-identical no-op.
         let noop = window_scale(cst(4.0), 2, 5, 1.0);
         assert_eq!(noop(3, 1.0), 4.0);
+    }
+
+    #[test]
+    fn scaled_flow_type_name_does_not_delegate_although_id_does() {
+        // The sharpest statement of the class/instance split, on the one flow in the tree
+        // where the two axes genuinely disagree: `ScaledFlow` delegates `id()` to the
+        // wrapped flow *on purpose* (so the Registry sorts it into the wrapped flow's
+        // slot), but Python's `type(flow).__name__` sees the **wrapper**. A later
+        // refactor that "helpfully" delegates `type_name()` too would make the port's
+        // reported inventory disagree with the reference for a wrapped scenario, and this
+        // is the only thing that would say so.
+        let inner = RadiatorReject::new(
+            RADIATOR_REJECT.to_string(),
+            NODE.to_string(),
+            SPACE.to_string(),
+            domains::params::thermal(),
+        );
+        let inner_type_name = inner.type_name();
+        let scaled = ScaledFlow::new(Box::new(inner), RADIATOR_HEALTH_VAR.to_string());
+        assert_eq!(scaled.id(), RADIATOR_REJECT); // the id delegates …
+        assert_eq!(scaled.type_name(), "ScaledFlow"); // … the type name must not.
+        assert_ne!(scaled.type_name(), inner_type_name);
     }
 
     #[test]

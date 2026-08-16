@@ -56,6 +56,9 @@ fn amt(state: &State, id: &str) -> Result<f64, SimError> {
 // --------------------------------------------------------------------------- //
 struct ForcedIn;
 impl Flow for ForcedIn {
+    fn type_name(&self) -> &'static str {
+        "ForcedIn"
+    }
     fn id(&self) -> &str {
         "sim.forced_in"
     }
@@ -71,6 +74,9 @@ impl Flow for ForcedIn {
 
 struct Leak;
 impl Flow for Leak {
+    fn type_name(&self) -> &'static str {
+        "Leak"
+    }
     fn id(&self) -> &str {
         "sim.leak"
     }
@@ -86,6 +92,9 @@ impl Flow for Leak {
 
 struct Transfer;
 impl Flow for Transfer {
+    fn type_name(&self) -> &'static str {
+        "Transfer"
+    }
     fn id(&self) -> &str {
         "sim.transfer"
     }
@@ -101,6 +110,9 @@ impl Flow for Transfer {
 
 struct DrainP;
 impl Flow for DrainP {
+    fn type_name(&self) -> &'static str {
+        "DrainP"
+    }
     fn id(&self) -> &str {
         "sim.drain_p"
     }
@@ -116,6 +128,9 @@ impl Flow for DrainP {
 
 struct AuxThermal;
 impl AuxProcess for AuxThermal {
+    fn type_name(&self) -> &'static str {
+        "AuxThermal"
+    }
     fn id(&self) -> &str {
         "sim.thermal"
     }
@@ -209,6 +224,9 @@ fn reg_full() -> Registry {
 // --------------------------------------------------------------------------- //
 struct DrainForced(&'static str);
 impl Flow for DrainForced {
+    fn type_name(&self) -> &'static str {
+        "DrainForced"
+    }
     fn id(&self) -> &str {
         self.0
     }
@@ -484,6 +502,9 @@ fn engine_synthetic_trajectory_is_bit_exact() {
 /// A deliberately imbalanced flow trips the every-step conservation gate.
 struct Imbalanced;
 impl Flow for Imbalanced {
+    fn type_name(&self) -> &'static str {
+        "Imbalanced"
+    }
     fn id(&self) -> &str {
         "sim.imbalanced"
     }

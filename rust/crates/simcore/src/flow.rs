@@ -79,6 +79,23 @@ impl FlowResult {
 /// declared-controller policies but is unused under the proportional default;
 /// canonical order is always id-sorted, never priority-sorted.
 pub trait Flow {
+    /// The **type-level** identity: the name of the implementing type, matching the
+    /// Python class name exactly.
+    ///
+    /// Distinct from [`Flow::id`], which identifies an *instance* — one type is
+    /// instantiated once per compartment with distinct ids, so the two form different
+    /// sets. This is the axis the freeze manifests' `flow_set` is expressed on (Python
+    /// derives it as `type(flow).__name__`), which is why it exists.
+    ///
+    /// **Required, and deliberately not defaulted from [`std::any::type_name`]**: that
+    /// function's output format is not guaranteed by its own documentation, and this
+    /// string is a value a freeze contract is anchored to. A new `impl Flow` is a
+    /// compile error until its author states the contract identity by hand.
+    ///
+    /// A wrapper (`ScaledFlow`, `LeakFlow`) returns **its own** name, never the wrapped
+    /// flow's — Python's `type(flow).__name__` sees the wrapper.
+    fn type_name(&self) -> &'static str;
+
     /// The canonical flow id (ASCII — its sort order is the reduction order).
     fn id(&self) -> &str;
 

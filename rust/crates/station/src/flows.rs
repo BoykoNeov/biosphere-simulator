@@ -84,6 +84,9 @@ impl CrewRespiration {
 }
 
 impl Flow for CrewRespiration {
+    fn type_name(&self) -> &'static str {
+        "CrewRespiration"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -155,6 +158,9 @@ impl WaterRecovery {
 }
 
 impl Flow for WaterRecovery {
+    fn type_name(&self) -> &'static str {
+        "WaterRecovery"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -226,6 +232,9 @@ impl Lamp {
 }
 
 impl Flow for Lamp {
+    fn type_name(&self) -> &'static str {
+        "Lamp"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -277,6 +286,9 @@ impl Harvest {
 }
 
 impl Flow for Harvest {
+    fn type_name(&self) -> &'static str {
+        "Harvest"
+    }
     fn id(&self) -> &str {
         &self.id
     }

@@ -175,6 +175,9 @@ impl CrewMetabolism {
 }
 
 impl Flow for CrewMetabolism {
+    fn type_name(&self) -> &'static str {
+        "CrewMetabolism"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -223,6 +226,9 @@ impl CO2Scrubber {
 }
 
 impl Flow for CO2Scrubber {
+    fn type_name(&self) -> &'static str {
+        "CO2Scrubber"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -271,6 +277,9 @@ impl Condenser {
 }
 
 impl Flow for Condenser {
+    fn type_name(&self) -> &'static str {
+        "Condenser"
+    }
     fn id(&self) -> &str {
         &self.id
     }
@@ -313,6 +322,9 @@ impl O2Makeup {
 }
 
 impl Flow for O2Makeup {
+    fn type_name(&self) -> &'static str {
+        "O2Makeup"
+    }
     fn id(&self) -> &str {
         &self.id
     }

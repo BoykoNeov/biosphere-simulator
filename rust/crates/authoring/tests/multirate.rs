@@ -423,6 +423,9 @@ const AUX_INC: f64 = 0.5;
 /// A trivial forced flow (no rate constant ⇒ nothing for the precondition to judge).
 struct Trickle;
 impl Flow for Trickle {
+    fn type_name(&self) -> &'static str {
+        "Trickle"
+    }
     fn id(&self) -> &str {
         "sim.trickle"
     }
@@ -443,6 +446,9 @@ impl Flow for Trickle {
 /// An accumulator: the thing `multirate_step` deliberately never advances.
 struct Ticker;
 impl AuxProcess for Ticker {
+    fn type_name(&self) -> &'static str {
+        "Ticker"
+    }
     fn id(&self) -> &str {
         "sim.ticker"
     }

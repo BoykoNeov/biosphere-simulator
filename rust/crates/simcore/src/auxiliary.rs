@@ -25,6 +25,12 @@ use crate::state::State;
 /// accumulator name (a process may write several names, and several processes may
 /// write one shared name — the integrator sums those contributions).
 pub trait AuxProcess {
+    /// The **type-level** identity: the name of the implementing type, matching the
+    /// Python class name exactly. The aux mirror of [`crate::flow::Flow::type_name`]
+    /// (Python derives the manifests' `aux_set` as `type(proc).__name__`), with the
+    /// same required-not-defaulted rationale — see that method's doc.
+    fn type_name(&self) -> &'static str;
+
     /// The canonical process id (ASCII — its sort order is the reduction order).
     fn id(&self) -> &str;
 

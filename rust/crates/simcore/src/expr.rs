@@ -250,6 +250,9 @@ impl DeclarativeFlow {
 }
 
 impl Flow for DeclarativeFlow {
+    fn type_name(&self) -> &'static str {
+        "DeclarativeFlow"
+    }
     fn id(&self) -> &str {
         &self.id
     }
