@@ -68,8 +68,6 @@ from pathlib import Path
 
 import pytest
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
-
 windows_golden_only = pytest.mark.skipif(
     sys.platform != "win32",
     reason=(
@@ -205,13 +203,29 @@ def assert_matches_golden(path: Path, produced: str) -> None:
         )
         return
 
+    # ⚠ Which side is the reference depends on the golden, and so does the advice. The
+    # message below is the *only* place a reader is told which way to look, and no test
+    # can catch it being backwards — the assertion fires identically either way.
+    if path.name in RUST_AUTHORED:
+        whose = (
+            "⚠ This golden is the Rust port's output — the reference. So this is a "
+            "*Python* regression, or a reference move Python has not followed yet. It "
+            "is NOT a golden to regenerate from Python; "
+            "`tests/crossport/regen_goldens_from_rust.py` owns it. Do not widen the "
+            "roster to silence this."
+        )
+    else:
+        whose = (
+            "⚠ This golden is **Python-authored** — the reference flip does not reach "
+            "it (no Rust program produces this artifact; see the census in "
+            "`tests/crossport/regen_goldens_from_rust.py`). So Python *is* the "
+            "reference here, and if the move is intended the regeneration main in this "
+            "module is the right path. The divergence roster does not apply to it: a "
+            "Python-authored golden cannot disagree with Python."
+        )
     assert path.name in PYTHON_DIVERGES, (
         f"{path.name}: Python's output no longer matches the committed golden, "
-        "and it is "
-        "not on the divergence roster.\n"
-        "⚠ The golden is the Rust port's output (the reference). This is therefore a "
-        "*Python* regression, or a reference move that Python has not followed yet — "
-        "not a golden to regenerate from Python. Do not widen the roster to silence it."
+        f"and it is not on the divergence roster.\n{whose}"
     )
 
     # Rostered: pin *how much*. Imported lazily so the base regression suite does not

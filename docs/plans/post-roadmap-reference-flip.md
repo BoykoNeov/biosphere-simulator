@@ -772,13 +772,13 @@ already existed and already reject a zero sensitivity — I had read one test, f
 covered three keys, and generalised. The gates were live throughout and no band moved; what
 rotted was only the *record* of why each band sits where it does.
 
-**Ten negative controls, each turning exactly one gate red on the intended assertion.**
+**Twelve negative controls, each turning exactly one gate red on the intended assertion.**
 Roster entry dropped; an agreeing golden added (the heal direction); a golden Rust does not
 author rostered; a scenario's last byte-gated sibling rostered; a name dropped from
 `RUST_AUTHORED`; the noise ceiling lowered below the measured divergence; a Python
 regeneration main run against a Rust-authored golden (refuses) and against a
 Python-authored one (still writes); a Rust golden perturbed (census red, no roster escape);
-plus the two tamper probes above. ⚠ Two early control runs reported false greens from a
+plus the two tamper probes above, and one for each branch of the authorship-dependent failure message (a tampered `drift_summary.json` must be told Python is its reference; a tampered `thermal_state.json` must be told Rust is). ⚠ That last pair exists because the message is the **only** place a reader is told which side to look at, and the assertion fires identically whether the advice is right or backwards — the first draft told all seven Python-authored goldens to go look at Rust. *No test catches a correct assertion giving wrong advice; the only defence is to read the message under a real failure.* ⚠ Two early control runs reported false greens from a
 broken harness (`sys.executable` outside `uv run` → pytest exit 4, read as "passed"); both
 were re-run directly. *Check a control's own exit code before believing what it says about
 the subject.*
@@ -820,6 +820,16 @@ manifest the answer is: *a minority of it, by content.* Classified:
 | `param_files` (~17 lines) | **no** | Rust reads no YAML; only a Python-generated hexfloat file whose names are not filenames |
 | `forcing.weather_fixture` / `weather_sha256` | **no** | a hash of the Python-side oracle fixture; Rust reads `weather_facts.txt`, generated from it — **identical shape to `param_files`** |
 | `science_bands`, `liveness_floors` (~104 lines of 208) | **no** | `gates_for()` is a static **AST census of `science_gate` markers on pytest functions** (`tests/science_gates.py`) — there is no Rust referent and there cannot be one while the science gates are pytest-side |
+
+⚠⚠ **And slice 5 added one more, on the axis this table calls settled.** The biosphere
+manifest now freezes **two artifacts of one run with two different authors**:
+`perennial_long_horizon_state.json` is Rust's final state of the 15-yr perennial run, while
+`drift_summary.json` is `drift.py`'s Python-side fold of that *same* trajectory — and the
+two engines differ by 1 ULP on it. Nothing is red and nothing should be (the fold is
+compared against Python's own output, which is its correct reference). But the golden axis
+is therefore not "18 Rust, 2 folded" scenario-by-scenario: **one scenario appears on both
+sides of the authorship line.** Decide that explicitly, not with a manifest
+half-regenerated.
 
 ⚠ **So slice 9 resolves only the param half.** "Who loads the params" says nothing about
 the science-gate census, which is the single largest block of the file. **Slice 6 must
@@ -872,8 +882,11 @@ closing update to that file, plus the memory file** — not its creation.
 2. **What happens to the deferred mirrors already on the books?** Potato stage 2 (the Rust
    habitat mirror) is deferred. Under B a Python-side item with no Rust mirror is now a gap
    in the *reference*, not in the copy — so it changes category.
-3. **Does the Godot consumer notice?** It consumes Rust and should not, but slice 4 moves
-   the goldens it is indirectly pinned against. Check, do not assume.
+3. **Does the Godot consumer notice?** — **ANSWERED 2026-08-16 (slice 5): no.** Checked
+   rather than assumed: no test under `tests/crossport/test_godot_*.py` references either
+   moved golden, and the only two goldens any of the nine name at all are
+   `cabin_gas_state.json` and `crew_state.json` — both byte-identical between the ports
+   and untouched. Nothing under `godot/` references them either.
 
 ## §7 What follows B — the user's stated next subject (recorded, not planned)
 

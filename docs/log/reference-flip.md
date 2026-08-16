@@ -484,7 +484,35 @@ existed and already reject a zero sensitivity. I had read one test, seen it cove
 keys, and generalised. The tests were deleted before landing. ⚠ *The gates were live the whole
 time and no band moved — what rotted was only the record of why each band sits where it does.*
 
-**Ten negative controls, each turning exactly one gate red on the intended assertion.** ⚠ Two
+**⚠⚠ A finding for slice 6, noticed while regenerating and easy to lose: the biosphere
+manifest now freezes two artifacts of ONE run with two different authors.**
+`perennial_long_horizon_state.json` is the Rust port's final state of the 15-yr perennial
+run; `drift_summary.json` is `drift.py`'s Python-side fold of the *same* trajectory (Rust
+streams the raw series — *the fold is the artifact*). The two engines differ by 1 ULP on
+that run, so the manifest's two entries for it are separated by a last bit and by an
+authorship boundary. **Nothing goes red and nothing should**: the drift summary is still
+compared against Python's own output, which is the correct reference for a Python-authored
+artifact. But slice 6's per-key classification meets it directly — the golden axis is not
+"18 Rust, 2 folded" scenario-by-scenario, it is *18 Rust and 2 folded, with one scenario
+appearing on both sides of the line*. ⚠ Whoever takes slice 6 should decide explicitly
+whether that is acceptable as a permanent state or whether the fold gets ported, rather than
+discovering it with a manifest half-regenerated.
+
+**⚠ The plan's open question 3 is answered: the Godot consumer does not notice.** §6
+asked *"does the Godot consumer notice? It consumes Rust and should not, but slice 4 moves
+the goldens it is indirectly pinned against. Check, do not assume."* Checked rather than
+assumed: **no test under `tests/crossport/test_godot_*.py` references either moved golden**,
+and the only two goldens any of the nine name at all are `cabin_gas_state.json` and
+`crew_state.json` — both byte-identical between the ports and untouched by this slice.
+Nothing under `godot/` references them either. The question is closed.
+
+**Twelve negative controls, each turning exactly one gate red on the intended assertion**,
+including one per branch of the authorship-dependent failure message: a tampered
+`drift_summary.json` must be told **Python** is its reference, a tampered
+`thermal_state.json` that **Rust** is. ⚠ *No test catches a correct assertion giving wrong
+advice* — the assertion fires identically either way, and the first draft sent all seven
+Python-authored goldens to look at Rust. The only defence is to read the message under a
+real failure. ⚠ Two
 early runs reported **false greens from a broken harness** — `sys.executable` outside
 `uv run` gives a python with no pytest, exit code 4, which the probe read as "passed". Both
 were re-run directly against the real interpreter. *Check a control's own exit code before
