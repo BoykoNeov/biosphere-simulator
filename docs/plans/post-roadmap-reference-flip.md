@@ -874,14 +874,24 @@ change, the second by a manifest nobody regenerated. Together they say the produ
 and the checker is Python. ⚠ *An interface slice's criterion must name a call site (slice 2);
 a re-anchoring slice's must name a **direction**.*
 
-**⚠ `forcing.light_path` was the key most likely to be wrong, and it was MEASURED, not
-predicted (advisor).** Unlike every hash beside it this one is **gated exactly** — CI
-recomputes the fingerprint in glibc-CPython and compares strings — so re-anchoring it creates
-a UCRT-Rust-vs-glibc-CPython pair that had never been measured, where one ULP in `cos` or one
-character of difference between the two hex-float writers turns CI red for a non-science
-reason (the failure mode slice 2 rejected `std::any::type_name` over). Measured first: Rust
-reproduces **all twelve samples byte for byte**, hash unchanged. Had it not, the key would
-have been declared Python-retained; inventing a normalization is the move this contract
+**⚠ `forcing.light_path` was the key most likely to be wrong, and it was measured before
+being touched — but state precisely WHICH pair was measured (advisor).** Unlike every hash
+beside it this one is **gated exactly**: CI recomputes the fingerprint in glibc-CPython and
+compares strings. What was measured is **UCRT-Rust against UCRT-CPython on this box: all
+twelve samples byte for byte identical.** That is *not* the CI pair, and the claim must not be
+written as if it were.
+
+**It is, however, what closes the question — by making the CI pair not arise.** Because the two
+writers agree byte for byte, **the manifest's stored value did not change at all**
+(`a84d3aa2…` before and after). So the CI gate compares the *identical string* it compared
+before slice 6, and that comparison has been green throughout — which is itself the standing
+evidence that these twelve samples are cross-libm stable in CPython. Re-anchoring introduced
+**no new cross-libm exposure**, rather than introducing one that was then measured away.
+
+⚠ Had the two writers disagreed even in the last nibble — and **two of the twelve samples sit
+one ULP apart from their neighbours**, which is exactly where such a disagreement lands — the
+hash *would* have moved, the CI pair *would* have been new and unmeasured, and the key would
+have been declared Python-retained. Inventing a normalization is the move this contract
 refuses.
 
 **⚠ The classification is keyed by PATH, not by top-level key, because two keys split
@@ -922,13 +932,16 @@ hunt; do NOT adjust either side to agree"* — is right for the station and acti
 the biosphere, where the fix is the regeneration ceremony. Branched, per slice 5's lesson that
 *no test catches a correct assertion giving wrong advice*.
 
-**Eight negative controls, each turning exactly one gate red on the intended assertion**, green
+**Nine negative controls, each turning exactly one gate red on the intended assertion**, green
 again after every revert: the two-direction rename pair above; a golden's bytes tampered
 (hash gate); an unclassified field added to the manifest; an `_authority` pattern matching no
 field; `drift_summary` reclassified as Rust-authored (caught against the roster); the reference
 tree's `BIO_DT` moved to 0.5; its light-path peak factor moved to π/2.1; its
 `LONG_HORIZON_YEARS` moved to 16 (which reached both the gate and three regenerated leaves);
-and a frozen chamber horizon tampered, which only the new Python horizon-conformance gate sees.
+a frozen chamber horizon tampered, which only the new Python horizon-conformance gate sees;
+and two `_authority` patterns of **equal** specificity matching one path — added after the
+closing review, because "most specific wins" decides nothing on a tie and the field would
+read as classified either way (advisor).
 ⚠ One control run was **invalid and was re-run**: a stray command had corrupted the manifest's
 JSON, so sixteen tests failed on a parse error rather than on the assertion under test —
 *a control that turns the whole file red has measured nothing* (slice 5's "check the control's

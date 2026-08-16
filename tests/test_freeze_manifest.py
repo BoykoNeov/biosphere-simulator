@@ -767,21 +767,27 @@ def _leaf_paths(node: Any, prefix: str = "") -> list[str]:
     return [prefix.rstrip("/")]
 
 
-def _authority_for(path: str) -> tuple[str, dict[str, str]] | None:
-    """Resolve a leaf path against :data:`_AUTHORITY`, most specific wins."""
+def _authority_matches(path: str) -> list[tuple[int, str, dict[str, str]]]:
+    """Every ``_AUTHORITY`` pattern matching ``path``, with its specificity score."""
     segments = path.split("/")
-    best: tuple[str, dict[str, str]] | None = None
-    best_score = -1
+    matches = []
     for pattern, entry in _AUTHORITY.items():
         parts = pattern.split("/")
         if len(parts) != len(segments):
             continue
         if any(p not in ("*", s) for p, s in zip(parts, segments, strict=True)):
             continue
-        score = sum(p != "*" for p in parts)
-        if score > best_score:
-            best, best_score = (pattern, entry), score
-    return best
+        matches.append((sum(p != "*" for p in parts), pattern, entry))
+    return matches
+
+
+def _authority_for(path: str) -> tuple[str, dict[str, str]] | None:
+    """Resolve a leaf path against :data:`_AUTHORITY`, most specific wins."""
+    matches = _authority_matches(path)
+    if not matches:
+        return None
+    score, pattern, entry = max(matches, key=lambda m: m[0])
+    return pattern, entry
 
 
 def test_every_frozen_field_declares_who_produced_it() -> None:
@@ -802,6 +808,20 @@ def test_every_frozen_field_declares_who_produced_it() -> None:
         "contract has to say which side produces it — see _AUTHORITY in "
         "tests/test_freeze_manifest.py."
     )
+
+    # ⚠ "Most specific wins" only decides anything while no two patterns TIE. Two of
+    # equal specificity matching one path would resolve by dict order — a silent answer
+    # to a question nobody asked, and the field would read as classified either way.
+    # There is no such pair today (`scenarios/drift_summary/golden_sha256` beats
+    # `scenarios/*/golden_sha256` 3-2); this keeps it that way (advisor).
+    for path in paths:
+        top = max(s for s, _, _ in _authority_matches(path))
+        tied = sorted(p for s, p, _ in _authority_matches(path) if s == top)
+        assert len(tied) == 1, (
+            f"{path} is matched by {len(tied)} _authority patterns of equal "
+            f"specificity: {tied}. Which one applies would be decided by dict order — "
+            "make one of them strictly more specific."
+        )
 
     matched = {_authority_for(p)[0] for p in paths}  # type: ignore[index]
     stale = sorted(set(manifest["_authority"]) - matched)

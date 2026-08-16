@@ -554,13 +554,21 @@ Either alone is worthless — the first passes for any file that happens to chan
 for a manifest nobody regenerated. ⚠ *An interface slice's criterion must name a call site
 (slice 2); a re-anchoring slice's must name a **direction**.*
 
-**⚠ The one key that could have failed was measured, not predicted (advisor).**
-`forcing.light_path` is the only hash in `forcing` that is **gated exactly** — CI recomputes
-it in glibc-CPython and compares strings — so re-anchoring it created a UCRT-Rust vs
-glibc-CPython pair nothing had ever measured, where one ULP of `cos` or one character between
-the two hex-float writers turns CI red for a formatting reason. Measured before touching
-anything: Rust reproduces **all twelve samples byte for byte**. Had it not, the key would have
-been declared Python-retained — inventing a normalization is what this contract refuses.
+**⚠⚠ The one key that could have failed was measured before being touched — and the
+measured pair is NOT the pair the gate runs (advisor).** `forcing.light_path` is the only hash
+in `forcing` that is **gated exactly**: CI recomputes it in glibc-CPython and compares
+strings. What was measured is **UCRT-Rust against UCRT-CPython, on this box — all twelve
+samples byte for byte**. Writing that up as "the cross-libm pair is measured" would have been
+a claim nobody made.
+
+**What actually closes it is that the pair never arises**: because the two writers agree byte
+for byte, **the manifest's stored value did not move at all**, so the CI gate compares the
+identical string it compared before the slice — a comparison that has been green throughout,
+which is the standing evidence that these samples are cross-libm stable in CPython.
+Re-anchoring added **no new exposure**; it did not add one and then clear it. ⚠ Had the writers
+differed in the last nibble — and **two of the twelve samples sit one ULP from their
+neighbours**, exactly where that lands — the hash would have moved, the CI pair would have been
+new and unmeasured, and the key would have been declared Python-retained.
 
 **⚠ The classification is keyed by PATH, because two keys split (advisor).** `forcing` has
 three children with two answers; `scenarios` splits *inside one scenario* — slice 5's handoff,
@@ -594,11 +602,13 @@ check until slice 7. The assertion fires identically, and its advice — *"a fin
 NOT adjust either side to agree"* — is right for one and actively wrong for the other. Slice
 5's lesson, applied without waiting to be caught by it again.
 
-**Eight negative controls, each turning exactly one gate red on its intended assertion:** the
+**Nine negative controls, each turning exactly one gate red on its intended assertion:** the
 rename pair; a golden tampered; an unclassified field; an `_authority` pattern matching
 nothing; `drift_summary` reclassified as Rust-authored; the reference's `BIO_DT` → 0.5; its
-light-path peak factor → π/2.1; its `LONG_HORIZON_YEARS` → 16; and a frozen chamber horizon
-tampered, which only the new Python horizon-conformance gate sees. ⚠ **One control run was
+light-path peak factor → π/2.1; its `LONG_HORIZON_YEARS` → 16; a frozen chamber horizon
+tampered, which only the new Python horizon-conformance gate sees; and two `_authority`
+patterns of **equal** specificity matching one path — "most specific wins" decides nothing on
+a tie, and the field reads as classified either way (advisor, on the closing review). ⚠ **One control run was
 invalid and re-run**: a stray command corrupted the manifest's JSON, so sixteen tests failed on
 a *parse error* rather than the assertion under test. *A control that turns the whole file red
 has measured nothing* — slice 5's "check the control's own exit code", one layer up.
