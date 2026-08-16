@@ -330,7 +330,12 @@ files. Three new tests in `crates/domains/tests/type_identity.rs`, one in the st
 perturbation tests, one in the biosphere perturbation tests. `git diff src/` empty; nothing
 outside `rust/` touched; the diff is **246 insertions, 0 deletions**. `cargo clippy
 --all-targets -D warnings` clean, the whole `cargo test` suite green, and the 138 Python
-cross-port + three-manifest gates green — **no golden moved, no manifest touched.**
+cross-port + three-manifest gates green. ⚠ **Stated precisely, because the two claims are
+not the same evidence:** what was established is that **no file under
+`tests/regression/golden/` changed on disk** (`git status`), which is the direct check. The
+138 passing gates *compare against* those goldens, so a pass is consistent with a
+comparison path that never ran — the weaker of the two facts, and the one it would be easy
+to quote as if it were the stronger.
 
 **⚠ The acceptance criterion as written was passable by a no-op, and was widened
 (advisor).** *"No golden moves, clippy clean"* is satisfied by a method **nobody ever
@@ -389,6 +394,18 @@ inert:
 | no two flows in one build share a name | `Senescence` returns `"Transpiration"` | `distinct_flows_report_distinct_type_names` RED |
 | `type_name` ≠ `id` (class vs instance) | `Senescence::id()` returns `"Senescence"` | `type_name_is_not_the_instance_id` RED |
 | a wrapper reports **itself** | `ScaledFlow::type_name` delegates to `inner` | `scaled_flow_type_name_does_not_delegate…` RED |
+| *(aux axis)* no two aux processes share a name | `ThermalTimeAccumulation` returns `"RootDepthExtension"` | `distinct_flows_report_distinct_type_names` RED |
+| *(aux axis)* every aux name is a bare class name | `ThermalTimeAccumulation` returns a module path | `every_canonical_type_name_is_a_bare_class_name` RED |
+
+**⚠ The first four controls were all on the FLOW side — the aux trait was read but never
+proven to bite, and the advisor caught it.** The three registry tests iterate
+`aux_processes()` through the same chain, so aux values *were* being compared; what was
+missing was any demonstration that an aux-side defect turns something red — which is
+exactly the standard this slice set for itself and had applied rigorously one trait over.
+It matters because `aux_set` is half of what slice 6 re-anchors. Two more controls were run
+(rows 5–6 above): both bite, each turning exactly one test red. ⚠ **The gap was in the
+evidence, not in the code — and that is the kind you only find by asking which rows of your
+own control table are missing, not by re-reading the code.**
 
 **⚠ `ScaledFlow` is where the two axes genuinely disagree, and it is the sharpest statement
 of §2f's irony.** It delegates `id()` to the wrapped flow **on purpose** (so the registry

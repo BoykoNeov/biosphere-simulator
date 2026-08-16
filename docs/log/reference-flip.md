@@ -175,10 +175,23 @@ and the count would be a third place to edit whenever a flow is added. What the 
 is what slice 3 **cannot** check: that the values are well-formed, that they are a function of
 the **type** and not the instance, and that they do not collapse onto each other.
 
-**Four assertions, four negative controls, each turning exactly one test red and leaving the
-others green** — so they are independent and none is inert: a path-qualified name; two flows
+**Six assertions-and-controls, each turning exactly one test red and leaving the others
+green** — so they are independent and none is inert: a path-qualified name; two flows
 reporting the same name; the type name colliding with the instance id; and a wrapper
 delegating.
+
+⚠ **The last two exist because the first four were all on ONE of the two traits.** The
+non-conserved side was being read by the same tests, but nothing had shown that a defect
+*there* turns anything red — the exact standard this slice had set for itself and applied
+rigorously one trait over. It matters because that side is half of what slice 6 re-anchors.
+Both added controls bite. **The gap was in the evidence, not in the code, and it was found
+by asking which rows of my own control table were missing — not by re-reading the code.**
+
+⚠ **Two claims that are not the same evidence, separated after the advisor pushed on it.**
+"No golden moved" was established by **no file under the golden directory changing on
+disk** — the direct check. The 138 passing gates *compare against* those goldens, so a pass
+is also consistent with a comparison that never ran; quoting it as proof would be leaning on
+the weaker fact. Both are true here; only one is the reason.
 
 ⚠ **The wrapper case is the sharpest statement of the whole class-vs-instance irony, and it
 runs the two axes in opposite directions.** The scaling wrapper delegates its *instance id* to

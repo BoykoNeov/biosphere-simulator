@@ -101,11 +101,13 @@ fn type_name_is_not_the_instance_id() {
 /// distinct count, derived entirely from the tree.
 ///
 /// ⚠ **Assumption, true today and asserted rather than assumed:** no canonical biosphere
-/// build instantiates one flow type twice — each is a single compartment, measured at
-/// 11 / 19 / 19 / 22 flows with an equal number of distinct types. A build that
-/// *legitimately* wires a second compartment turns this red; the fix is then to scope the
-/// assertion to the new wiring, never to delete it. Note the union across all four is
-/// deliberately **not** counted here — that cardinality is the manifest's, and slice 3's.
+/// build instantiates one type twice — **on either axis**. Flows: measured at
+/// 11 / 19 / 19 / 22 with an equal number of distinct types, each a single compartment.
+/// Aux: 3 processes and 3 distinct types in all four builds. The count below pools the
+/// two, so the assumption has to hold for both. A build that *legitimately* wires a second
+/// compartment turns this red; the fix is then to scope the assertion to the new wiring,
+/// never to delete it. Note the union across all four is deliberately **not** counted here
+/// — that cardinality is the manifest's, and slice 3's.
 #[test]
 fn distinct_flows_report_distinct_type_names() {
     for (label, scenario) in canonical() {
