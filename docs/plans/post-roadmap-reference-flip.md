@@ -215,7 +215,7 @@ takes them one at a time.
 | 1 | **Rust per-step trajectory export** | — | additive; no contract | yes |
 | 2 | **`type_name()` on `Flow`/`Aux`** | — | frozen Rust core (small unfreeze) | yes |
 | 3 | **Rust dumps its own inventory, checked against the *existing* manifest** | 2 | additive test only | yes |
-| 4 | **Find the 25th emitter; regenerate the goldens from Rust** | — | **25 goldens** | yes (git) |
+| 4 | **Find the 25th emitter; regenerate the goldens from Rust** | **3** | **25 goldens** | yes (git) |
 | 5 | **Invert the cross-port contract** | 4 | `tiers.json` + comparator | yes |
 | 6 | **Re-anchor the biosphere manifest to Rust** | 3, 5 | freeze contract 1 | ceremony |
 | 7 | **Re-anchor the station manifest** | 6 | freeze contract 2 | ceremony |
@@ -247,8 +247,12 @@ manifest disagree, that is a finding to hunt before any re-anchoring** — the c
 contract is the thing the flip is riskiest for, and this proves Rust can express it before
 anything depends on it.
 
-**Slice 4 — regenerate the goldens from Rust.** First identify which of the 25 golden files
-has no `emit_*` program (24 exist). ⚠ **Predict the diff before regenerating** — the
+**Slice 4 — regenerate the goldens from Rust.** ⚠⚠ **Must not be taken before slice 3
+passes.** This is the moment the reference actually moves, and slice 3 is what establishes
+that the Rust tree's *completeness* matches the manifest at all. Taking 4 first regenerates
+the goldens from a tree nothing has checked — the table above enforces this as a dependency
+because prose ordering does not. First identify which of the 25 golden files has no `emit_*`
+program (24 exist). ⚠ **Predict the diff before regenerating** — the
 prediction is `< 1e-11` relative on every value and *no* structural field moving at all
 (Tier 0 is exact at every tier). A structural diff, or any value beyond band, is a port
 bug to hunt and **stops this slice**.
@@ -282,6 +286,15 @@ order-independence natively. Independent of every other slice; can be taken at a
 A's rule and becomes wrong under B — the replacement governs *Python* as the consumer), add
 the development-posture section `CLAUDE.md` has never had (§1), and close this doc out with
 the normal three: index line, pointer row, record file in `docs/log/`, plus a memory file.
+⚠⚠ **The posture section is a deliberate exception to `CLAUDE.md`'s own working-style rule,
+and the argument must be made here rather than looked up** — that rule says a finished piece
+of work earns an index line, a pointer row, a `docs/log/` file and a memory file, and
+**"Nothing here."** It is about *finished-work records*. A standing posture rule is the
+opposite category: it is *"what you need BEFORE you know what you are working on"*, which is
+exactly what that file says it carries and is why §6 step 1 of the A plan called landing it
+there the single most important step. Whoever takes this slice will read the retirement rule
+first; without this paragraph they will correctly conclude the section does not belong, and
+B's posture will end up as undiscoverable as A's was.
 ⚠ **This paragraph's own exemption in `post-roadmap-log.md` is deleted as part of this
 slice** — an exemption written for a temporary state is a deletion someone must remember,
 and the log records that forgetting it left three checks red for five commits.
