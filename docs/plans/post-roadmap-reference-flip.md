@@ -581,17 +581,32 @@ reference doc: advisor review → regenerate the manifest as the git-visible rec
 document. ⚠ The two hard-coded `BIO_DT`-adjacent literals are **re-authored, not ported** —
 each one is a decision about what it guards.
 
-⚠⚠ **Slice 3's finding lands here, and it inverts the dependency table for one axis: the
-`param_files` axis cannot be re-anchored to Rust at all yet.** Rust reads no YAML — it
-reads a Python-*generated* hexfloat file whose names are not filenames — so there is
-nothing on the reference side that produces a param-file list. **Slice 6 must make an
-explicit choice and state it in the manifest**: either (a) declare `param_files`
-**Python-retained** with the reason recorded beside it, so a future reader cannot mistake
-it for a Rust-derived field, or (b) **wait for slice 9**, which is where "who loads the
-params" is actually decided. What slice 6 must **not** do is regenerate a Rust-anchored
-manifest that silently carries a Python-derived param list — a frozen contract with a
-field nothing on the reference side produces is exactly the §2e trap in a second location.
-Slices 7 and 8 inherit the same question for their own param sets.
+⚠⚠ **Slice 3's finding lands here, and the real question is bigger than the field that
+surfaced it (advisor, on the closing review — my first write-up of this paragraph named
+only `param_files` and was under-generalized).** The question slice 6 actually faces is
+**which of the manifest's keys the Rust tree can produce at all**, and on the biosphere
+manifest the answer is: *a minority of it, by content.* Classified:
+
+| Key | Rust referent? | Why |
+|---|---|---|
+| `flow_set`, `aux_set` | **yes** | proved by slice 3 |
+| `forcing.light_path` | **yes** | `light_path.rs` can recompute the sampled fingerprint |
+| `long_horizon_years`, `scenarios.*` | yes, mechanically | constants + file hashes |
+| `integrator`, `dt_days` | n/a | the two deliberate hand-written literals (§2b) — re-authored either way |
+| `param_files` (~17 lines) | **no** | Rust reads no YAML; only a Python-generated hexfloat file whose names are not filenames |
+| `forcing.weather_fixture` / `weather_sha256` | **no** | a hash of the Python-side oracle fixture; Rust reads `weather_facts.txt`, generated from it — **identical shape to `param_files`** |
+| `science_bands`, `liveness_floors` (~104 lines of 208) | **no** | `gates_for()` is a static **AST census of `science_gate` markers on pytest functions** (`tests/science_gates.py`) — there is no Rust referent and there cannot be one while the science gates are pytest-side |
+
+⚠ **So slice 9 resolves only the param half.** "Who loads the params" says nothing about
+the science-gate census, which is the single largest block of the file. **Slice 6 must
+make an explicit, recorded choice per key** — either (a) declare the key **Python-retained**
+with the reason written beside it in the manifest, so a future reader cannot mistake it for
+a Rust-derived field, or (b) wait for whatever would give it a referent. What slice 6 must
+**not** do is regenerate a "Rust-anchored" manifest that silently carries Python-derived
+fields — a frozen contract with fields nothing on the reference side produces is exactly the
+§2e trap, in several locations at once. ⚠ Doing this classification *before* the ceremony is
+cheap; discovering it mid-ceremony with a manifest half-regenerated is not. Slices 7 and 8
+inherit the same exercise for their own manifests.
 
 **Slice 9 — unit validation.** The §2e trap. Two candidate answers, to be priced when
 taken, not now: (a) reimplement the dimensional check in Rust's loader, so the validated

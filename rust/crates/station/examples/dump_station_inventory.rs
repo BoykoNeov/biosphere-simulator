@@ -52,8 +52,12 @@ fn json_array(names: &BTreeSet<&str>) -> String {
 ///    biosphere is delegated to its own manifest, and including it would leak all 23
 ///    biosphere flows into this set.
 ///
-/// `close_feces` is left at `false` to match the Python selection; it retargets a leg and
-/// adds a stock, and wires no flow either way.
+/// `close_feces` is left at `false`, which is the Python builder's own default and so
+/// matches the selection. ⚠ **It wires no flow either way — measured, not read**: flipping
+/// it to `true` and re-running this program produces byte-identical output. That matters
+/// because the claim is one the gate cannot check: if `close_feces` *did* wire a flow, the
+/// resulting divergence would read as a mistake in one of the five calls above, and the
+/// hunt would start in the wrong place.
 fn canonical() -> Vec<Registry> {
     let charge = params::charge();
     let self_discharge = params::self_discharge();

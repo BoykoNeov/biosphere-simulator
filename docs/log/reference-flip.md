@@ -243,13 +243,33 @@ self-referential shape this repo already had to dissolve once, for the RNG vecto
 asserts the dump's **exact key set**, so putting the axis back is a red test rather than a
 silent tautology: the same forcing-function move as slice 2's required trait method.
 
-⚠⚠ **The knock-on inverts the plan's own dependency table for that one axis.** The param
-list cannot be re-anchored until the port is the thing that loads the params — which is a
-*later* slice's decision, while the table has that slice depending on this one. So the
-re-anchoring slice must either declare that axis explicitly reference-retained with the
-reason recorded beside it, or wait. What it must not do is regenerate a re-anchored contract
-that silently carries a field nothing on the new reference side produces. **Recorded in the
-plan, not resolved here** — it is that slice's call, not this one's.
+⚠⚠ **The knock-on inverts the plan's own dependency table for that one axis** — the param
+list cannot be re-anchored until the port is the thing that loads the params, which is a
+*later* slice's decision, while the table has that slice depending on this one.
+
+⚠⚠ **And the class is bigger than the instance — my first write-up named only the param
+list and the advisor caught the understatement.** Classifying *every* key of the frozen
+contract by whether the port can produce it at all: the two inventories can, the light-path
+fingerprint can, and **three groups cannot** — the param list, the weather-fixture hash
+(the same shape: a hash of a reference-side file the port only sees a generated projection
+of), and, largest by far, the **science bands and liveness floors**, which are a static
+census of markers on *test functions* — roughly half the file, with no port referent and no
+prospect of one while the science gates live in the test suite. The later slice about param
+loading resolves only one of the three. So the re-anchoring slice must make an explicit,
+recorded choice **per key** — declare it reference-retained with the reason written beside
+it, or wait for something that would give it a referent — and must not regenerate a
+"re-anchored" contract that silently carries fields nothing on the new reference side
+produces. ⚠ *Doing this classification before the ceremony is cheap; discovering it
+mid-ceremony with the contract half-regenerated is not.* **Recorded in the plan, not
+resolved here.**
+
+⚠ **One claim in the shipped program was reasoning rather than measurement, and was
+measured on review.** A doc comment said a sixth build flag "wires no flow either way" — true,
+but read off the source rather than run, and it is a claim the gate *cannot* check: if it
+were false, the divergence would read as a mistake in one of the five selection calls and
+the hunt would start in the wrong place. Flipping it and re-running produced byte-identical
+output. *An unmeasured factual claim in a file the next person will trust is the "asserted
+attributions rot" lesson in a new location.*
 
 ⚠ **Why the second manifest was included, and it is the whole discovery value of the
 slice.** The first one had already been measured in slice 2 and was therefore **known in
