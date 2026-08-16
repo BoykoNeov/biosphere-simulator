@@ -45,7 +45,11 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.step import BIO_DT, steps_for
-from golden_platform import windows_golden_only
+from golden_platform import (
+    assert_matches_golden,
+    windows_golden_only,
+    write_python_golden,
+)
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -96,32 +100,64 @@ def _final_state() -> State:
 
 
 @windows_golden_only
-def test_consumer_golden_bytes_match() -> None:
-    # Byte-exact compare against the committed golden — any bit change in the consumer
-    # output fails here (within-build; see the transcendental caveat in the module doc).
-    expected = sim_io.dumps(_final_state()).encode("utf-8")
-    assert expected == GOLDEN_PATH.read_bytes()
+def test_consumer_golden_matches_the_reference() -> None:
+    """Python's consumer output against the **Rust-authored** golden.
+
+    ⚠ This assertion used to be ``==`` on the bytes. It is one of the two the reference
+    flip loosened (``golden_platform.PYTHON_DIVERGES``): Python's 5-yr consumer chamber
+    differs from Rust's at 7 of 205 leaves, worst ~2 ULP. The comparison is still Tier-0
+    exact on structure and every discrete field, and the numeric ceiling is 1000x
+    tighter
+    than this scenario's own Tier-2 band — but it can no longer see a reduction-order
+    change. ⚠ That coverage did not vanish, it moved: the 15-yr horizon of *this same
+    scenario* (``consumer_long_horizon_state.json``) is still byte-gated, and
+    ``test_golden_provenance.py`` asserts it stays that way.
+    """
+    assert_matches_golden(GOLDEN_PATH, sim_io.dumps(_final_state()))
 
 
 @windows_golden_only
 def test_consumer_golden_loads_back() -> None:
-    # The committed golden round-trips back to the exact final State (it routes through
-    # the core constructors, so a tampered golden fails to load).
+    """The golden decodes through the core constructors and round-trips **byte-stably**.
+
+    ⚠ Kept EXACT on purpose: both ends of a codec round trip are Python, so which engine
+    wrote the bytes is irrelevant and the flip does not reach this assertion. Its other
+    half — "…and equals what the live engine produces" — is
+    :func:`test_consumer_golden_matches_the_reference`'s job, gated there under
+    tolerance and deliberately not repeated here.
+
+    ⚠⚠ **What that costs, measured rather than asserted.** The old form
+    (``loads(text) == _final_state()``) caught *any* tampered value; this one catches
+    only what fails to round-trip — a malformed literal, a non-canonical spelling, a
+    moved key.
+    A changed-but-valid hex float survives it. Negative controls on this pair:
+
+    * gross value tamper → red at :func:`test_consumer_golden_matches_the_reference`;
+    * **last-nibble tamper (~1.4e-15 relative) → GREEN on both.** Under the 1e-14
+      ceiling
+      it is by construction indistinguishable from the divergence the roster permits.
+
+    That last row is the honest price of tolerance-gating this file, and it is **not** a
+    hole in the suite: the byte-exact backstop moved to the side that now owns the
+    bytes.
+    ``tests/crossport/test_golden_provenance.py`` asserts Rust reproduces this golden
+    exactly, with no exemptions — so a last-nibble edit is still red, on the reference
+    side. ⚠ That census is Windows + ``cargo`` + ``slow``, i.e. local, not the CI job.
+    """
     text = GOLDEN_PATH.read_text(encoding="utf-8")
-    assert sim_io.loads(text) == _final_state()
+    loaded = sim_io.loads(text)  # a tampered golden fails to load at all
+    assert sim_io.dumps(loaded).encode("utf-8") == GOLDEN_PATH.read_bytes()
 
 
 def _regenerate() -> None:
-    """Rewrite the committed consumer golden from the current engine output.
+    """⚠ **Refuses.** This golden is authored by the Rust port, not by Python.
 
-    A deliberately separate, explicit action — NOT reachable from a test run. Run via::
-
-        uv run python tests/test_regression_consumer_season.py
-
-    Review the diff before committing: a change here means the consumer output moved.
+    Kept as a signpost rather than deleted: ``write_python_golden`` raises with the
+    blessed path (``tests/crossport/regen_goldens_from_rust.py --write``), so someone
+    reaching for the habitual ``uv run python tests/test_regression_consumer_season.py``
+    is told where the reference lives instead of silently reverting it to the checker.
     """
-    GOLDEN_PATH.write_bytes(sim_io.dumps(_final_state()).encode("utf-8"))
-    print(f"wrote {GOLDEN_PATH}")
+    write_python_golden(GOLDEN_PATH, sim_io.dumps(_final_state()).encode("utf-8"))
 
 
 if __name__ == "__main__":

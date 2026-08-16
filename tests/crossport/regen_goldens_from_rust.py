@@ -1,12 +1,12 @@
-"""Reference flip, slice 4: regenerate the regression goldens **from the Rust port**.
+"""Regenerate the regression goldens **from the Rust port** — the blessed path.
 
-This is the committed, reviewable entry point for the act slice 4 names — *the goldens
-are generated from Rust* (`docs/plans/post-roadmap-reference-flip.md` §3). Until now the
-only blessed way to rewrite a golden was the per-scenario ``_regenerate()`` ``__main__``
-in each ``tests/test_regression_*.py``, i.e. **Python**. Whatever the goldens' bytes
-turn
-out to be, "the reference moved" is not a true statement while the only committed
-regeneration path runs the checker.
+Built in slice 4 as the committed, reviewable entry point for the act the plan names —
+*the goldens are generated from Rust* (`docs/plans/post-roadmap-reference-flip.md` §3).
+**Slice 5 made it the only one.** Until then the per-scenario ``_regenerate()``
+``__main__`` in each ``tests/test_regression_*.py`` could also rewrite these files, i.e.
+**Python** could author the reference; those mains now route through
+``golden_platform.write_python_golden``, which refuses the 18 files listed below.
+"The reference moved" is not a true statement while a committed path runs the checker.
 
 Run it::
 
@@ -15,7 +15,11 @@ Run it::
 
 **Reporting is the default and ``--write`` is explicit**, matching the discipline every
 Python regeneration main already follows: rewriting a golden is a deliberate act whose
-diff is reviewed, never a side effect of running something.
+diff is reviewed, never a side effect of running something. ⚠ Two of these eighteen are
+in the **biosphere freeze manifest** and its ``golden_sha256`` is recorded but never
+compared, so a ``--write`` that moves a frozen golden desynchronises the manifest and
+turns *nothing* red. Re-run ``uv run python tests/test_freeze_manifest.py`` as part of
+the unfreeze ceremony — see ``docs/biosphere-reference.md``.
 
 ⚠ **What this tool can and cannot establish, stated plainly.** While the two ports emit
 identical bytes, *no* byte-level check can tell which side produced a golden —
@@ -44,11 +48,11 @@ The three groups are the classification slice 3's finding demands be done *befor
 ceremony rather than during one: for every artifact, ask where each side's copy came
 from, because if one side's came from the other the comparison is a round trip.
 
-## ⚠ The two goldens the two ports do not agree on, measured 2026-08-16
+## ⚠ The two goldens the two ports did not agree on — measured 2026-08-16, now written
 
-Sixteen of the eighteen are **byte-identical** between the ports on this
-Windows/UCRT box
-— Rust's stdout equals the committed file exactly. Two are not:
+Sixteen of the eighteen were already **byte-identical** between the ports on this
+Windows/UCRT box when slice 4 measured them — Rust's stdout equalled the committed file
+exactly. Two were not:
 
 | golden | leaves differing | worst deviation |
 |---|---|---|
@@ -58,13 +62,14 @@ Windows/UCRT box
 Diagnosed as **accumulated last-bit noise, not an op-level port difference**: slice 1's
 trajectory export walks 2440 steps of the perennial scenario with *zero* bitwise
 divergence, and the ~1.3M-substep sealed station is byte-identical, so there is no
-systematic disagreement to hunt. Both sit ~5 orders inside their Tier-2 band (1e-11), so
+systematic disagreement to hunt. Both sat ~5 orders inside their Tier-2 band (1e-11), so
 the plan's stop-rule ("a value beyond band is a port bug") did not fire.
 
-⚠ **Their tiers.json evidence strings still claim ``max_rel_dev 0.0``.** That was true
-when P7.4 measured it and is now stale — the prose half of a contract that no gate reads
-(`docs/log/freeze-prose-half-is-ungated.md`). Recorded here; ``tiers.json`` is slice
-5's.
+**Slice 5 wrote both** (8 changed hex-float leaves across the two files, exactly as
+predicted; no structural field moved). So all eighteen are now Rust's bytes, and the
+divergence moved to the other side of the comparison: it is *Python* that differs from
+the reference by those amounts. The roster followed its meaning to
+``golden_platform.PYTHON_DIVERGES`` — see the note there on why it was renamed.
 
 ⚠ **Profile is byte-neutral.** All 18 were run under both ``--release`` and debug and
 every output matched across profiles, so the ``release`` flag below is a speed choice
@@ -170,15 +175,6 @@ RUST_EMITTERS: dict[str, Emitter] = {
     ),
 }
 
-# ⚠ The two Group-1 goldens whose bytes the ports do NOT agree on today. Recorded as an
-# explicit roster, not a tolerance: the point is that the set is *small and named*, so a
-# third golden joining it — or one of these leaving — is a change somebody looks at. The
-# measurement and the diagnosis are in the module docstring.
-PORTS_DISAGREE = {
-    "consumer_chamber_state.json": "7 of 205 leaves, worst 4.6e-16 (~2 ULP)",
-    "perennial_long_horizon_state.json": "1 of 196 leaves, worst 1.6e-16 (~1 ULP)",
-}
-
 # --------------------------------------------------------------------------- #
 # Group 2 — Rust emits a raw series; the golden is folded Python-side (2)      #
 # --------------------------------------------------------------------------- #
@@ -260,8 +256,10 @@ def regenerate(*, write: bool) -> int:
             print(f"  identical  {name}")
             continue
         changed += 1
-        note = PORTS_DISAGREE.get(name, "⚠ NOT in the recorded disagreement roster")
-        print(f"  CHANGED    {name}  [{note}]")
+        # ⚠ Since slice 5 the golden IS Rust's output, so *any* line here is the
+        # reference itself moving — never "the ports have drifted". Review the diff as a
+        # science change, and re-run the freeze-manifest ceremony if it is frozen.
+        print(f"  CHANGED    {name}  [the reference has moved — review the diff]")
         if write:
             (GOLDEN_DIR / name).write_bytes(produced)
     verb = "rewritten" if write else "would change"

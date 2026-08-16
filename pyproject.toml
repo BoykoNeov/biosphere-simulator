@@ -84,6 +84,12 @@ include = ["src", "tests"]
 # external lib; excluding it from type-checking keeps CI green without vendoring pcse. The
 # default excludes are re-listed because setting `exclude` overrides them.
 exclude = ["**/node_modules", "**/__pycache__", "**/.*", "tests/oracle"]
+# `tests/crossport/` modules (`compare`, `regen_goldens_from_rust`, …) are imported by
+# sibling directories through a runtime `sys.path.insert`, which pyright cannot follow.
+# Naming the directory here type-checks those imports properly instead of silencing them
+# per call site — the reference flip put one such import in `tests/golden_platform.py`,
+# which is in `tests/`, not beside them.
+extraPaths = ["tests/crossport"]
 # Check against the supported floor (matches requires-python and ruff target),
 # even though the dev interpreter is pinned to 3.13 via .python-version.
 pythonVersion = "3.12"

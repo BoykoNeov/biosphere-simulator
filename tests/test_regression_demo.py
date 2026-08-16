@@ -45,6 +45,7 @@ import pytest
 import sim_io
 from domains.biosphere.demo import build_demo, coupled_resolver, run
 from domains.biosphere.loader import load_demo_params
+from golden_platform import assert_matches_golden, write_python_golden
 from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.state import State
 
@@ -85,8 +86,9 @@ def _final_state(integrator_cls: type) -> State:
 def test_demo_golden_bytes_match(integrator_cls: type, filename: str) -> None:
     # Byte-exact (not text-mode) compare against the committed golden — the cross-run /
     # cross-port conformance target. Any bit change in the demo output fails here.
-    expected = sim_io.dumps(_final_state(integrator_cls)).encode("utf-8")
-    assert expected == (GOLDEN_DIR / filename).read_bytes()
+    assert_matches_golden(
+        GOLDEN_DIR / filename, sim_io.dumps(_final_state(integrator_cls))
+    )
 
 
 @pytest.mark.parametrize("integrator_cls,filename", _GOLDENS)
@@ -107,10 +109,15 @@ def _regenerate() -> None:
 
     Review the diff before committing: a change here means the engine output moved.
     """
+    # Both demo goldens stay Python-authored — `build_demo` exists nowhere under
+    # `rust/crates/`, so the reference flip does not reach this teaching scaffold. The
+    # write still routes through the choke point, which is the point of having one: the
+    # rule lives in `golden_platform`, not in each main's memory of which side owns it.
     for integrator_cls, filename in _GOLDENS:
-        path = GOLDEN_DIR / filename
-        path.write_bytes(sim_io.dumps(_final_state(integrator_cls)).encode("utf-8"))
-        print(f"wrote {path}")
+        write_python_golden(
+            GOLDEN_DIR / filename,
+            sim_io.dumps(_final_state(integrator_cls)).encode("utf-8"),
+        )
 
 
 if __name__ == "__main__":

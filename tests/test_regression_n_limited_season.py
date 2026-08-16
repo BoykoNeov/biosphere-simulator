@@ -43,7 +43,11 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.step import BIO_DT, steps_for
-from golden_platform import windows_golden_only
+from golden_platform import (
+    assert_matches_golden,
+    windows_golden_only,
+    write_python_golden,
+)
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -109,8 +113,7 @@ def _final_state() -> State:
 def test_n_limited_golden_bytes_match() -> None:
     # Byte-exact compare against the committed golden — any bit change in the N-limited
     # output fails here (within-build; see the transcendental caveat in the module doc).
-    expected = sim_io.dumps(_final_state()).encode("utf-8")
-    assert expected == GOLDEN_PATH.read_bytes()
+    assert_matches_golden(GOLDEN_PATH, sim_io.dumps(_final_state()))
 
 
 @windows_golden_only
@@ -129,8 +132,7 @@ def _regenerate() -> None:
 
     Review the diff before committing: a change here means the N-limited output moved.
     """
-    GOLDEN_PATH.write_bytes(sim_io.dumps(_final_state()).encode("utf-8"))
-    print(f"wrote {GOLDEN_PATH}")
+    write_python_golden(GOLDEN_PATH, sim_io.dumps(_final_state()).encode("utf-8"))
 
 
 if __name__ == "__main__":

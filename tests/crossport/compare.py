@@ -1,10 +1,18 @@
 """Port-agnostic cross-port snapshot comparator (Phase-7 Step 0, P7.0).
 
-Compares a Python reference golden against *any* port's JSON snapshot (Rust today,
-C# at Phase 8) by **parsed f64 values**, never JSON bytes — so a port need only
-emit valid JSON `sim_io.loads` accepts, not match `json.dumps`'s string spelling
-(advisor #5). It applies the 3-tier parity contract, reading each scenario's tier
-from `tiers.json`:
+Compares a **reference** snapshot against a **candidate** one by *parsed f64 values*,
+never JSON bytes — so neither side need match `json.dumps`'s string spelling, only emit
+valid JSON `sim_io.loads` accepts (advisor #5). It applies the 3-tier parity contract,
+reading each scenario's tier from `tiers.json`:
+
+⚠ **Which side is which changed, and this module did not have to.** Through Phase 7 the
+reference was a *Python* golden and the candidate was the port's output. Since the
+reference flip (slice 5) the 18 goldens Rust emits **are** the port's output, so the
+reference argument now carries Rust's bytes and the candidate is whoever is being
+checked — including Python itself (`tests/golden_platform.assert_matches_golden`). The
+comparator is symmetric in everything but the relative-deviation denominator, which is
+the reference; at the deviations in play (≤ 2 ULP) the choice is immaterial, but the
+argument order is where the contract's direction is actually written down.
 
 * **Tier 0 (always, EXACT):** the structural/discrete skeleton — schema `version`,
   the integer `n`, `rng_seed`, the stock-id set, each stock's discrete fields

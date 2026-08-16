@@ -55,7 +55,11 @@ from domains.crew.stocks import FECAL_WASTE
 from domains.power.loader import load_charge_params
 from domains.thermal.loader import load_thermal_params
 from domains.thermal.stocks import NODE
-from golden_platform import windows_golden_only
+from golden_platform import (
+    assert_matches_golden,
+    windows_golden_only,
+    write_python_golden,
+)
 from sealed_tier2_helper import (
     QUANTITIES,
     REL_DRIFT_BOUND,
@@ -170,8 +174,7 @@ def _gate(states: list[State], rationed: int, events: tuple[object, ...]) -> Non
 @windows_golden_only
 def test_sealed_station_golden_bytes_match(sealed_tier2_run) -> None:
     _gate(sealed_tier2_run.states, sealed_tier2_run.rationed, sealed_tier2_run.events)
-    expected = sim_io.dumps(sealed_tier2_run.states[-1]).encode("utf-8")
-    assert expected == STATE_GOLDEN.read_bytes()
+    assert_matches_golden(STATE_GOLDEN, sim_io.dumps(sealed_tier2_run.states[-1]))
 
 
 @windows_golden_only
@@ -239,9 +242,7 @@ def _energy_summary_dumps(states: list[State]) -> str:
 
 @windows_golden_only
 def test_energy_drift_summary_bytes_match(energy_states) -> None:
-    assert _energy_summary_dumps(energy_states).encode("utf-8") == (
-        ENERGY_SUMMARY_GOLDEN.read_bytes()
-    )
+    assert_matches_golden(ENERGY_SUMMARY_GOLDEN, _energy_summary_dumps(energy_states))
 
 
 @windows_golden_only
@@ -270,11 +271,15 @@ def _regenerate() -> None:
     (Tier 2)
     or the energy stability signature (Tier 1) moved.
     """
-    tier2 = run_tier2()
-    _gate(tier2.states, tier2.rationed, tier2.events)
-    STATE_GOLDEN.write_bytes(sim_io.dumps(tier2.states[-1]).encode("utf-8"))
-    print(f"wrote {STATE_GOLDEN}")
-
+    # ⚠ The energy summary goes FIRST, and the order is load-bearing rather than
+    # stylistic. The two goldens here have **different authors** since the reference
+    # flip: `sealed_energy_drift_summary.json` is folded Python-side from a raw Rust
+    # series (*the fold is the artifact*), so this main is still its blessed path, while
+    # `sealed_station_state.json` is Rust's and `write_python_golden` refuses it.
+    # Written
+    # in the old order the refusal would fire first and leave the legitimate half of
+    # this
+    # main permanently unreachable.
     charge = load_charge_params()
     thermal = load_thermal_params()
     state, registry = build_station(charge, thermal, HEAT_CLOSURE_SCENARIO)
@@ -285,8 +290,13 @@ def _regenerate() -> None:
         HEAT_CLOSURE_SCENARIO.power.dt_seconds,
         SEALED_ENERGY_DAYS * HEAT_CLOSURE_SCENARIO.power.steps_per_day,
     )
-    ENERGY_SUMMARY_GOLDEN.write_bytes(_energy_summary_dumps(states).encode("utf-8"))
-    print(f"wrote {ENERGY_SUMMARY_GOLDEN}")
+    write_python_golden(
+        ENERGY_SUMMARY_GOLDEN, _energy_summary_dumps(states).encode("utf-8")
+    )
+
+    tier2 = run_tier2()
+    _gate(tier2.states, tier2.rationed, tier2.events)
+    write_python_golden(STATE_GOLDEN, sim_io.dumps(tier2.states[-1]).encode("utf-8"))
 
 
 if __name__ == "__main__":

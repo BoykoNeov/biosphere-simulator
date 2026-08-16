@@ -101,7 +101,7 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "5bfdfcc989810a099704d7b91b79c70cca5008b3c3f01fec6d0f9708bf9cd883",
+      "golden_sha256": "cc5f79f089f1b6ea5ed746fb265ce92007a7e903d0fb8dd88ac3bc7fcaa40433",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
@@ -131,7 +131,7 @@
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "f3eaa8bc61f1b96beffb3d72a73b55984052be69151d0526581f717b036e6d5e",
+      "golden_sha256": "096624e05e13f65c74bf6a323ee78f15aa15eed58a7c694c3360169a31958e29",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },

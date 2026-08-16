@@ -72,7 +72,11 @@ from domains.biosphere.season import (
     weather_resolver,
 )
 from domains.biosphere.step import BIO_DT, steps_for
-from golden_platform import windows_golden_only
+from golden_platform import (
+    assert_matches_golden,
+    windows_golden_only,
+    write_python_golden,
+)
 from simcore.boundary import loss_sink_id
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -205,25 +209,45 @@ def _drift_summary_dumps(trajectories: dict[str, list[State]]) -> str:
 
 
 @windows_golden_only
-def test_perennial_long_horizon_golden_bytes_match(trajectories) -> None:
-    # Byte-exact: any bit change in the 15-yr perennial output fails here (within-build;
-    # see the transcendental caveat in the module doc).
-    expected = sim_io.dumps(trajectories["perennial"][-1]).encode("utf-8")
-    assert expected == PERENNIAL_GOLDEN.read_bytes()
+def test_perennial_long_horizon_golden_matches_the_reference(trajectories) -> None:
+    """Python's 15-yr perennial output against the **Rust-authored** golden.
+
+    ⚠ The second of the two assertions the reference flip loosened
+    (``golden_platform.PYTHON_DIVERGES``): Python differs from Rust at 1 of 196 leaves,
+    worst ~1 ULP. Structure and every discrete field stay Tier-0 exact and the numeric
+    ceiling is 1000x tighter than this scenario's own Tier-2 band. ⚠ The 5-yr horizon of
+    the same scenario (``perennial_chamber_state.json``) is still byte-gated, so the
+    reduction-order coverage this test can no longer provide has not left the suite —
+    ``test_golden_provenance.py`` asserts that sibling stays byte-gated.
+    """
+    assert_matches_golden(PERENNIAL_GOLDEN, sim_io.dumps(trajectories["perennial"][-1]))
 
 
 @windows_golden_only
-def test_perennial_long_horizon_golden_loads_back(trajectories) -> None:
-    # The committed golden round-trips back to the exact final State (it routes through
-    # the core constructors, so a tampered golden fails to load).
+def test_perennial_long_horizon_golden_loads_back() -> None:
+    """The golden decodes through the core constructors and round-trips byte-stably.
+
+    ⚠ Still EXACT, and it no longer needs the 15-yr trajectory at all — both ends of a
+    codec round trip are Python, so which engine authored the bytes does not reach this
+    assertion. The "equals the live engine" half is
+    :func:`test_perennial_long_horizon_golden_matches_the_reference`'s job, gated there
+    under tolerance rather than silently duplicated here.
+
+    ⚠⚠ It therefore no longer catches a *value* tamper, only a malformed or
+    non-canonical one — and below the 1e-14 ceiling its sibling cannot either. The
+    byte-exact backstop
+    for this file is now ``tests/crossport/test_golden_provenance.py``, which asserts
+    Rust reproduces it exactly with no exemptions; see the measured controls in
+    ``test_regression_consumer_season.py``'s matching docstring.
+    """
     text = PERENNIAL_GOLDEN.read_text(encoding="utf-8")
-    assert sim_io.loads(text) == trajectories["perennial"][-1]
+    loaded = sim_io.loads(text)  # a tampered golden fails to load at all
+    assert sim_io.dumps(loaded).encode("utf-8") == PERENNIAL_GOLDEN.read_bytes()
 
 
 @windows_golden_only
 def test_consumer_long_horizon_golden_bytes_match(trajectories) -> None:
-    expected = sim_io.dumps(trajectories["consumer"][-1]).encode("utf-8")
-    assert expected == CONSUMER_GOLDEN.read_bytes()
+    assert_matches_golden(CONSUMER_GOLDEN, sim_io.dumps(trajectories["consumer"][-1]))
 
 
 @windows_golden_only
@@ -240,10 +264,7 @@ def test_drift_summary_golden_bytes_match(trajectories) -> None:
     # Byte-exact: a regression in the limit-cycle *shape* (per-year peak_leaf /
     # consumer_carbon) or the period class fails here — the stability regression
     # catcher a single final-state snapshot cannot provide.
-    assert (
-        _drift_summary_dumps(trajectories).encode("utf-8")
-        == DRIFT_SUMMARY_GOLDEN.read_bytes()
-    )
+    assert_matches_golden(DRIFT_SUMMARY_GOLDEN, _drift_summary_dumps(trajectories))
 
 
 @windows_golden_only
@@ -283,24 +304,33 @@ def test_drift_summary_period_class_is_pinned() -> None:
 
 
 def _regenerate() -> None:
-    """Rewrite all three committed long-horizon goldens from the current engine output.
+    """Rewrite the committed long-horizon goldens — ⚠ **only one of the three is ours**.
+
+    ``drift_summary.json`` is genuinely Python-authored: Rust streams the raw 15-yr
+    series and ``drift.py`` folds the per-year summaries and the period class, so *the
+    fold is the artifact* and this main is its blessed regeneration path. The two State
+    snapshots beside it are Rust's, and ``write_python_golden`` refuses them — pointing
+    at ``tests/crossport/regen_goldens_from_rust.py --write``.
+
+    ⚠ The refusal fires on the first snapshot, so the drift summary is not rewritten
+    either. That is deliberate rather than an ordering accident: all three come from one
+    pair of trajectories, and half-regenerating a set whose members must agree is worse
+    than regenerating none of it.
 
     A deliberately separate, explicit action — NOT reachable from a test run. Run via::
 
         uv run python tests/test_regression_long_horizon.py
-
-    Review the diff before committing: a change means the decade-scale output moved.
     """
     trajectories = _trajectories()
-    PERENNIAL_GOLDEN.write_bytes(
-        sim_io.dumps(trajectories["perennial"][-1]).encode("utf-8")
+    write_python_golden(
+        PERENNIAL_GOLDEN, sim_io.dumps(trajectories["perennial"][-1]).encode("utf-8")
     )
-    CONSUMER_GOLDEN.write_bytes(
-        sim_io.dumps(trajectories["consumer"][-1]).encode("utf-8")
+    write_python_golden(
+        CONSUMER_GOLDEN, sim_io.dumps(trajectories["consumer"][-1]).encode("utf-8")
     )
-    DRIFT_SUMMARY_GOLDEN.write_bytes(_drift_summary_dumps(trajectories).encode("utf-8"))
-    for path in (PERENNIAL_GOLDEN, CONSUMER_GOLDEN, DRIFT_SUMMARY_GOLDEN):
-        print(f"wrote {path}")
+    write_python_golden(
+        DRIFT_SUMMARY_GOLDEN, _drift_summary_dumps(trajectories).encode("utf-8")
+    )
 
 
 if __name__ == "__main__":

@@ -43,7 +43,11 @@ from domains.power.loader import load_charge_params, load_self_discharge_params
 from domains.power.scenario import BOUNDED_SOC_SCENARIO, SELF_DISCHARGE_DAYS
 from domains.power.stocks import BATTERY
 from domains.power.system import build_power, power_resolver, run_power
-from golden_platform import windows_golden_only
+from golden_platform import (
+    assert_matches_golden,
+    windows_golden_only,
+    write_python_golden,
+)
 from simcore.conservation import compute_ledger
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
@@ -105,8 +109,7 @@ def _final_state() -> State:
 def test_power_self_discharge_golden_bytes_match() -> None:
     # Byte-exact compare against the committed golden — any bit change fails here
     # (within-build; see the transcendental caveat in the module doc).
-    expected = sim_io.dumps(_final_state()).encode("utf-8")
-    assert expected == GOLDEN_PATH.read_bytes()
+    assert_matches_golden(GOLDEN_PATH, sim_io.dumps(_final_state()))
 
 
 @windows_golden_only
@@ -124,9 +127,14 @@ def _regenerate() -> None:
         uv run python tests/test_regression_power_self_discharge.py
 
     Review the diff before committing: a change here means the Power output moved.
+
+    ⚠ **Since the reference flip this REFUSES.** The Rust port authors this
+    golden; ``write_python_golden`` raises and points at
+    ``tests/crossport/regen_goldens_from_rust.py --write``. The main is kept as a
+    signpost rather than deleted, so the habitual command answers the question
+    instead of silently reverting the reference to the checker.
     """
-    GOLDEN_PATH.write_bytes(sim_io.dumps(_final_state()).encode("utf-8"))
-    print(f"wrote {GOLDEN_PATH}")
+    write_python_golden(GOLDEN_PATH, sim_io.dumps(_final_state()).encode("utf-8"))
 
 
 if __name__ == "__main__":

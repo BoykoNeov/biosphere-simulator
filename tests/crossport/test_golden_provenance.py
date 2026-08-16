@@ -12,14 +12,23 @@ a filter that lets an unclassified artifact through silently.
 
 **2. Rust's bytes are pinned tighter than the tolerance band.** The Tier-2 comparison
 next door passes anything inside ``1e-11``; two goldens drifted to ~2 ULP under it
-without a single test noticing, and ``tiers.json`` still describes them as
-``max_rel_dev 0.0``. The byte census below is ~5 orders tighter, so the *next* pair to
-drift apart is a red test rather than a stale sentence.
+without a single test noticing. The byte census below is ~5 orders tighter, so the
+next
+pair to drift apart is a red test rather than a stale sentence.
+
+⚠ **Slice 5 made that census unconditional, and that is the inversion.** Slice 4's
+version consulted a two-entry exemption roster, because the golden was Python's output
+and the two ports genuinely disagreed on two of them. The goldens are now Rust's own
+bytes, so ``Rust == golden`` has exactly one allowed answer and there is no roster on
+this side any more. The exemptions moved to the *checker*
+(``golden_platform.PYTHON_DIVERGES``), which is what "Python becomes the tolerance-gated
+side" means in practice.
 
 ⚠ **What none of this can establish.** While the two ports emit identical bytes, no
 byte-level check can say which side produced a golden — provenance does not survive in
 the artifact. What slice 4 makes structural is the **path**
-(``regen_goldens_from_rust.py``), not a property of the files.
+(``regen_goldens_from_rust.py``), and what slice 5 adds is that the *Python* paths now
+refuse (``golden_platform.write_python_golden``). Neither is a property of the files.
 
 ⚠ **The byte census is Windows-gated and that is not a green-by-skip.** The goldens are
 UCRT-generated (``tests/golden_platform.py``); on the Ubuntu ``crossport`` job
@@ -42,19 +51,13 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import compare  # noqa: E402
 import regen_goldens_from_rust as regen  # noqa: E402
 
+import golden_platform  # noqa: E402
 from golden_platform import windows_golden_only  # noqa: E402
 
 DOCS_DIR = regen.REPO_ROOT / "docs"
 MANIFESTS = ("biosphere-reference.manifest.json", "station-reference.manifest.json")
-
-# The ceiling the two known-divergent goldens must stay under. ⚠ This is a *last-bit
-# noise* ceiling, not a science band: the measured worst is 4.6e-16, this is ~20x above
-# it and **1000x tighter than the Tier-2 band** those scenarios are otherwise gated at.
-# A real defect in either scenario blows through it long before `tiers.json` would care.
-DISAGREEMENT_CEILING = 1e-14
 
 
 def _frozen_goldens() -> set[str]:
@@ -194,51 +197,87 @@ def test_the_crew_golden_maps_to_the_emitter_that_computes_it() -> None:
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
 @pytest.mark.parametrize("golden", sorted(regen.RUST_EMITTERS))
 def test_rust_reproduces_the_committed_golden_bytes(golden: str) -> None:
-    """Rust's stdout equals the committed golden, byte for byte — bar a named roster.
+    """Rust's stdout equals the committed golden, byte for byte. **No exemptions.**
 
-    Sixteen of the eighteen are byte-identical on this UCRT box. The two that are not
-    are listed in ``regen.PORTS_DISAGREE`` with their measured size, and this test
-    checks that roster **in both directions**: a golden joining it is red, and a golden
-    *leaving* it is red too, so the roster cannot quietly become a stale exemption
-    nobody re-measures. (An exemption written for a temporary state, left in place after
-    the state passed, is this log's own hardest lesson.)
+    ⚠ Slice 4's version of this test carried a two-entry roster, because the golden was
+    Python's output and two of the eighteen genuinely differed. Slice 5 regenerated
+    those
+    two from Rust, so the golden *is* this program's output and an inequality here has
+    only one meaning: **the reference moved**. Either the Rust engine changed and the
+    goldens have not been regenerated, or something wrote them from elsewhere.
+
+    The remedy is never to widen this test. Run ``uv run python
+    tests/crossport/regen_goldens_from_rust.py`` to see the diff, decide whether the
+    change to the reference is intended, and if so ``--write`` it *and* re-run the
+    freeze-manifest ceremony for whichever contract names it.
     """
-    emitter = regen.RUST_EMITTERS[golden]
-    produced = emitter.run()
-    current = (regen.GOLDEN_DIR / golden).read_bytes()
-    expected_to_differ = golden in regen.PORTS_DISAGREE
+    produced = regen.RUST_EMITTERS[golden].run()
+    assert produced == (regen.GOLDEN_DIR / golden).read_bytes(), (
+        f"{golden}: the committed golden is no longer this Rust emitter's output.\n"
+        "⚠ Since the reference flip the golden IS Rust's bytes, so this is the "
+        "reference moving, not a port disagreement. See the docstring."
+    )
 
-    if produced == current:
-        assert not expected_to_differ, (
-            f"{golden} is recorded in PORTS_DISAGREE as "
-            f"{regen.PORTS_DISAGREE[golden]!r}, but the ports now agree byte for byte. "
-            "Drop it from the roster — a divergence that healed must not be left "
-            "standing as an exemption."
+
+def test_the_two_authorship_rosters_name_the_same_files() -> None:
+    """The names in ``golden_platform`` and the commands here describe one set.
+
+    ⚠ The duplication is deliberate and this is the gate that makes it safe. The base
+    regression suite needs to know *which* goldens Rust authors (to refuse writing
+    them);
+    it must not need ``tests/crossport`` on its import path to find out. So the names
+    live in ``golden_platform.RUST_AUTHORED`` and the ``cargo`` invocations live in
+    ``regen.RUST_EMITTERS``, one direction only — and they are asserted equal here
+    rather
+    than trusted to stay in step.
+    """
+    authored = set(golden_platform.RUST_AUTHORED)
+    emitters = set(regen.RUST_EMITTERS)
+    assert emitters == authored, (
+        "the two authorship rosters have diverged:\n"
+        f"  emitter map only: {sorted(emitters - authored)}\n"
+        f"  name roster only: {sorted(authored - emitters)}"
+    )
+
+
+def test_the_divergence_roster_is_a_subset_of_what_rust_authors() -> None:
+    """Python can only *diverge from the reference* for a golden Rust actually wrote."""
+    stray = set(golden_platform.PYTHON_DIVERGES) - golden_platform.RUST_AUTHORED
+    assert not stray, (
+        f"goldens on PYTHON_DIVERGES that Rust does not author: {sorted(stray)}. "
+        "A Python-authored golden cannot disagree with itself; if one of these is "
+        "genuinely unstable, that is a determinism bug, not a tolerance."
+    )
+
+
+def test_every_diverging_scenario_keeps_a_byte_gated_sibling() -> None:
+    """⚠ No scenario may lose its **last** byte-exact Python gate to the roster.
+
+    A tolerance-gated golden cannot see a reduction-order change: canonical flow-id
+    order
+    on every reduction is a non-negotiable invariant, and reordering moves values by a
+    ULP or two — inside any band. Today both rostered goldens are safe by luck of the
+    census: ``emit_consumer`` and ``emit_perennial`` each serve **two** goldens (a 5-yr
+    and a 15-yr horizon), and in both cases the sibling is still byte-gated.
+
+    That is an observation, so it is asserted rather than written down. A third entry
+    landing on the roster — or a second entry for the same scenario — is red here, which
+    is the only way "coverage survives" stays true instead of becoming a stale sentence.
+    The emitter program is the scenario key: same ``(crate, example)``, same scenario,
+    different argument.
+    """
+    for golden in sorted(golden_platform.PYTHON_DIVERGES):
+        emitter = regen.RUST_EMITTERS[golden]
+        siblings = {
+            name
+            for name, other in regen.RUST_EMITTERS.items()
+            if (other.crate, other.example) == (emitter.crate, emitter.example)
+            and name != golden
+        }
+        byte_gated = siblings - set(golden_platform.PYTHON_DIVERGES)
+        assert byte_gated, (
+            f"{golden} is tolerance-gated on the Python side and no other golden from "
+            f"`{emitter.crate}/{emitter.example}` is still byte-gated. That scenario "
+            "now has NO Python-side gate that can see a reduction-order change. "
+            "Diagnose the divergence instead of adding it to the roster."
         )
-        return
-
-    assert expected_to_differ, (
-        f"{golden}: Rust's bytes no longer equal the committed golden, and it is not "
-        "in the recorded disagreement roster.\n"
-        "⚠ This is ~5 orders tighter than the Tier-2 band next door, so it is a "
-        "*finding*, not necessarily a failure: the ports have drifted apart at the "
-        "last bit somewhere. Measure it (uv run python "
-        "tests/crossport/regen_goldens_from_rust.py), decide whether it is accumulated "
-        "noise or a real op-level difference, and record it — do not widen the band."
-    )
-
-    # It differs, and it is allowed to. Pin *how much*: structure exact, deviation under
-    # a last-bit-noise ceiling far below the scenario's own Tier-2 band.
-    result = compare.compare(
-        compare.load_json(regen.GOLDEN_DIR / golden),
-        json.loads(produced.decode("utf-8")),
-        tier=2,
-        band=DISAGREEMENT_CEILING,
-        floor=1e-12,
-    )
-    assert result.ok, (
-        f"{golden} is a known last-bit disagreement "
-        f"({regen.PORTS_DISAGREE[golden]}), but the divergence has grown past "
-        f"{DISAGREEMENT_CEILING:g}:\n{result.report()}"
-    )
-    assert result.numeric_pairs, "expected numeric leaves to be compared"

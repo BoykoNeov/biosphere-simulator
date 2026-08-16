@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B; eleven slices, four landed)
+## **The reference flip — Rust becomes canonical** (target state B; eleven slices, five landed)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -314,7 +314,9 @@ collision** warning — one example name is used in two crates, and the toolchai
 "may become a hard error in the future". Unrelated to this slice, but the repo runs examples
 by name.
 
-### Slice 4 — the golden census + the Rust-side regeneration path — LANDED 2026-08-16 (partial)
+### Slice 4 — the golden census + the Rust-side regeneration path — COMPLETE
+
+(⚠ heading split for the 120-char record-line cap; its two stragglers landed in slice 5.)
 
 **Built.** `tests/crossport/regen_goldens_from_rust.py` — the committed, reviewable
 **Rust-side** regeneration entry point (report by default, `--write` explicit), carrying the
@@ -399,22 +401,119 @@ again after every revert, and checked for *which* assertion fired: an unclassifi
 disk; one classified twice; a **frozen** golden parked in the no-referent group; a folded
 golden's reason gutted; a typo'd example name; `crew` re-pointed at the echoing emitter; a
 known-divergent golden dropped from the roster; an **agreeing** golden added to it; the
-last-bit ceiling lowered below the measured divergence; and a crate whose *directory* name stops matching its declared *package* name. ⚠ That last one is an advisor catch and a small instance of a recurring shape: the map's crate key silently does **two jobs** — it locates a directory in Python and it is handed to `cargo run -p` as a package. They agree across all four crates and nothing but that assertion said they must.
+last-bit ceiling lowered below the measured divergence; and a crate whose *directory* name
+stops matching its declared *package* name. ⚠ That last one is an advisor catch and a
+small instance of a recurring shape: the map's crate key silently does **two jobs** — it
+locates a directory in Python and it is handed to `cargo run -p` as a package. They agree
+across all four crates and nothing but that assertion said they must.
+
+### Slice 5 — the contract inverts; the two stragglers land — COMPLETE 2026-08-16
+
+**Built.** The two divergent goldens regenerated from Rust; the biosphere freeze manifest
+re-anchored to them; the divergence roster moved from the Rust census to the Python gates and
+renamed; two choke points in `tests/golden_platform.py` (`assert_matches_golden`,
+`write_python_golden`); three new gates in `test_golden_provenance.py`; every regression
+module's compare **and** write routed through the choke points. Ruff / pyright clean, 113
+targeted gates green, all three manifest gates green, `git diff src/` empty, no Rust touched.
+
+**The diff was predicted before it was written, and held exactly:** 8 changed hex-float
+leaves across two files, 0 added, 0 removed, no structural field moving. Then exactly two
+`golden_sha256` values in the biosphere manifest and nothing else.
+
+**⚠ The blocking hazard was real and was measured, not reasoned about.** Both divergent
+goldens sit in the biosphere manifest, whose `golden_sha256` is assembled inside
+`_regenerate()` and **never compared**. Before the write all 20 hashes matched disk; the
+write turned four Python gates red and **both freeze-manifest gates stayed green while the
+manifest pinned bytes that no longer existed**. The ceremony ran here rather than deferring to
+slice 6 — slice 6 re-anchors which *keys* derive from Rust; keeping the hash honest about the
+bytes on disk was this slice's debt. ⚠ *The "provenance-only edit nothing catches" is not a
+quirk of params: it covers a frozen golden's VALUES, and the only thing that surfaced it was
+swapping the file in and running everything.*
+
+**⚠ The roster was re-homed, not emptied — and a symmetric name outlives its contract by
+exactly one slice.** The first instinct was `PORTS_DISAGREE = {}`, which discards what slice 4
+built. The set is still true; what changed is *who consults it*. Before, the golden was
+Python's and the question was whether Rust matched. Now the golden **is** Rust's, so
+`Rust == golden` has one allowed answer — the census became unconditional, no exemptions — and
+the entire open question is about the checker. Same two entries, same measured sizes, opposite
+consumer, both-directions non-decay preserved: `golden_platform.PYTHON_DIVERGES`.
+
+**⚠⚠ Two, not eighteen — because a tolerance cannot see a reduction-order change.** Canonical
+flow-id order on every reduction is a non-negotiable invariant, and reordering moves values by
+a ULP or two, i.e. *inside* any band this repo would write. The byte compare is the only
+Python-side gate that sees that class at all. ⚠ And for these two it is surrendered only at
+*this horizon*: `emit_consumer` and `emit_perennial` each serve two goldens and the sibling
+horizon stays byte-gated in both cases — so the coverage moved rather than vanished. That is
+an **observation, so it is asserted**; a third roster entry that would take the last byte gate
+off a scenario is red.
+
+**⚠⚠ A negative control killed the first design, and the fix was to generalise it.** Draft 1
+converted only the two rostered modules. Control 2 — *put an agreeing golden on the roster,
+expect the heal direction to fire* — came back **green**: the heal check is only live where a
+module consults the roster, so a third entry landing on an unconverted module would sit inert
+forever. Every regression module now routes through both choke points, the seven
+Python-authored goldens included. ⚠ *A policy with two implementations has one that is stale —
+and it was the control, not the review, that said which.*
+
+**⚠⚠ `loads_back` was reformulated and the price was measured, not argued.** Its codec half
+(parse through the core constructors, re-emit byte-stably) is engine-independent, so it stays
+**exact** and the flip does not reach it; its equality half is the other test's assertion and
+is not duplicated. Measured on the two rostered goldens: a **gross** value tamper is red at
+`matches_the_reference` and green at `loads_back`; a **last-nibble** tamper (~1.4e-15
+relative) is **green on both**. So a sub-`1e-14` tamper on those two files is invisible to
+Python — unavoidable, since it is by construction indistinguishable from the divergence the
+roster permits. ⚠ Not a hole: the byte-exact backstop moved to the side that owns the bytes
+(`test_rust_reproduces_the_committed_golden_bytes`, unconditional) — which is Windows +
+`cargo` + `slow`, i.e. local, not CI.
+
+**⚠⚠ The plan's stated reason to re-measure the bands was false; re-measuring found something
+else.** The plan says the bands were measured "through the **Rust-side** transcendentals";
+`measure_tier2_bands.py` is pure Python and shims CPython's own `math`. The basis was always
+Python-side, and what it measures — how far a one-ULP libm disagreement moves a *trajectory* —
+is a property of the scenario's dynamics, not the language. Re-measured anyway: **every figure
+in `docs/native-port-reference.md` reproduced exactly.** ⚠ **But `tiers.json` — the file that
+calls itself authoritative — was two corrections behind**, still carrying `6.7e-14` and
+`2.7e-15` against `3.5e-15` and `2.8e-16`. The doc had been fixed on 2026-08-14 and again on
+2026-08-15 and neither fix reached the JSON, *while both files say the doc must not contradict
+the JSON*. ⚠ *Two prose halves of one contract can disagree, and the one declared
+authoritative is the one nobody re-reads.*
+
+**⚠ And my first write-up of that was wrong.** I called it an ungated band and added three new
+gates; `test_biosphere_tier2_band_sits_above_measured_sensitivity` and two siblings already
+existed and already reject a zero sensitivity. I had read one test, seen it covered three
+keys, and generalised. The tests were deleted before landing. ⚠ *The gates were live the whole
+time and no band moved — what rotted was only the record of why each band sits where it does.*
+
+**Ten negative controls, each turning exactly one gate red on the intended assertion.** ⚠ Two
+early runs reported **false greens from a broken harness** — `sys.executable` outside
+`uv run` gives a python with no pytest, exit code 4, which the probe read as "passed". Both
+were re-run directly against the real interpreter. *Check a control's own exit code before
+believing what it says about its subject.*
+
+⚠ **Left standing, deliberately:** the `windows_golden_only` marker on the two converted
+gates. Their original rationale (byte-exactness is platform-bound) no longer applies now that
+they are tolerance comparisons — but the band for glibc-CPython against a UCRT-Rust golden has
+never been measured, and inventing one is the "derived, not measured" move this contract
+exists to refuse. ⚠ **Pre-existing, untouched:** `tests/test_co2_compensation_band.py` carries
+7 `E501` errors at `HEAD`, verified against a clean checkout — `uv run ruff check .` was
+already red before this slice and was not folded into its diff.
 
 ### The state of the arc
 
-Slices 5–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
+Slices 6–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
 The ordering that matters: **1–3 built nothing the reference depends on** (they de-risked the
 export and proved the port can express the completeness contract *before* anything
-re-anchors). **Slice 4 was to be where the reference actually moves — and the measurement is
-that it barely has to**: sixteen of eighteen goldens are already byte-identical between the
-ports, so what slice 4 could land was the *path* and the *census*, not a diff. **The two
-goldens the ports disagree on now belong to slice 5**, because byte-pinning both ports to one
-file is what the cross-port gate's meaning rests on. **6–8 are the three unfreeze ceremonies,
-biosphere first**; slice 3 handed 6 an open per-key decision, and slice 4 has now answered it
-on the golden axis (18 yes, 2 folded, and a `golden_sha256` that no gate compares). Until 6–8
-land, new reference science is still Python-canonical — and a science item must never share a
-batch with a re-anchor slice.
+re-anchors). **Slice 4 was to be where the reference actually moves — and the measurement was
+that it barely had to**: sixteen of eighteen goldens were already byte-identical between the
+ports, so what 4 could land alone was the *path* and the *census*, not a diff. **Slice 5 wrote
+the other two, and with them the inversion**: the golden is now Rust's artifact, the Rust
+byte census is unconditional, Python is the tolerance-gated side, and Python can no longer
+author any of the eighteen. **6–8 are the three unfreeze ceremonies, biosphere first** — and
+slice 5 already discharged the biosphere manifest's `golden_sha256` half, because
+regenerating a frozen golden desynchronised it with every gate green. Slice 3 handed 6 an
+open per-key decision and slice 4 answered it on the golden axis (18 yes, 2 folded). Until
+6–8 land, new reference science is still Python-canonical — and a science item must never
+share a batch with a re-anchor slice.
 
 ⚠ **This item's log exemption was deleted with slice 1, one day after it was written.** It was
 written on the premise *"forward-looking, no finished work behind it"*; the first slice ended

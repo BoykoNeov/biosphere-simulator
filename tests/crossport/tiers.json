@@ -1,5 +1,23 @@
 {
   "_comment": "Cross-port parity classification for the 20 frozen goldens (7 biosphere + 13 station). Authored in Phase-7 Step 0 (P7.0) by inspecting each scenario's reachable evaluation graph (flows + resolver + schedule + scenario data) for transcendental ops. The `float_tier` is the tier for FLOAT TRAJECTORIES; the Tier-0 structural gate (see `_tier0`) is EXACT for every scenario regardless. Rule (advisor): classify by the ops the simulator EXECUTES, not the closed-form solution — a geometric contraction d_n=d0*(1-k*dt)^n is n sequential multiplies (IEEE basic ops, bit-identical across ports), NOT a pow() call, so it is Tier 1. Only a `math.{sin,cos,exp,log,pow,sqrt,tan}` / `**` in the per-step graph drops a scenario to Tier 2. `band`/`floor` are null until MEASURED (Tier-2 tolerances are measured, never derived). Step-3 (P7.3) measured the three standalone-sibling Tier-2 bands (power / power_self_discharge / thermal) via the propagated ±1-ULP transcendental SENSITIVITY (`measure_tier2_bands.py`), NOT the direct Rust-vs-Python deviation — which reads 0.0 on one machine because both call the same system libm (a same-libm artifact, not a cross-libm measurement). The band sits above that sensitivity; `test_crossport.py` re-measures and asserts band > sensitivity. Step-6 (P7.6) wired the whole parity suite into CI: the dedicated `crossport` job (Ubuntu, both toolchains) runs every `skipif cargo` comparison, so the bands are now enforced against glibc-Rust vs the UCRT-generated goldens — the repo's first real cross-libm gate (locally the deviation is 0.0 because Rust and CPython share one system libm; on the Linux runner the UCRT goldens make it a genuine cross-libm measurement). All 20 goldens pass their tier on that job. See docs/native-port-reference.md.",
+  "_reference_flip": {
+    "_comment": "⚠ The roles in every `evidence` string below were INVERTED by the reference flip, slice 5 (2026-08-16, docs/plans/post-roadmap-reference-flip.md). Those strings were written in Phase 7, when the golden was PYTHON's output and Rust was the candidate being checked against it; the 18 goldens Rust can emit are now Rust's own bytes, so the golden IS the reference and Python is the checker. Read every 'Rust-vs-Python bit-exact locally' below as a statement about the two ports agreeing, which is still true and was re-measured on 2026-08-16 — not as a claim about which side wrote the file. The comparator's argument order says the same thing: `compare.compare(reference=golden, candidate=port)` now has Rust on the reference side.",
+    "python_diverges": {
+      "_comment": "⚠ The two goldens Python does NOT reproduce byte-for-byte since they were regenerated from Rust. Their Python-side gates are tolerance comparisons at a 1e-14 last-bit-noise ceiling (1000x tighter than the Tier-2 band here), NOT at the band below. The roster lives in `tests/golden_platform.PYTHON_DIVERGES` and is checked in both directions.",
+      "consumer_chamber_state.json": "7 of 205 leaves, worst 4.6e-16 (~2 ULP)",
+      "perennial_long_horizon_state.json": "1 of 196 leaves, worst 1.6e-16 (~1 ULP)"
+    },
+    "bands_unchanged": "⚠ The bands themselves are NOT re-derived by the flip, and the plan's stated reason for re-measuring them was factually wrong. `post-roadmap-reference-flip.md` §5 says the bands were 'measured as ±1-ULP sensitivity propagated through the Rust-side transcendentals'; `measure_tier2_bands.py` is pure Python and shims CPython's own `math`, so the basis was always Python-side. What it measures is how far a one-ULP libm disagreement moves a TRAJECTORY — a property of the scenario's dynamics, not of the language — and the two engines are demonstrably running the same arithmetic (16/18 goldens byte-identical, 18/18 within 2 ULP, and slice 1's per-step export walks 2440 steps of the perennial scenario with zero bitwise divergence). So the basis survives the inversion and the numbers were re-measured rather than re-derived; see `measured_2026_08_16`.",
+    "measured_2026_08_16": {
+      "power_bounded_soc": "5.215e-15 (recorded 5.2e-15 — unchanged)",
+      "power_self_discharge": "4.146e-15 (recorded 4.1e-15 — unchanged)",
+      "thermal_equilibrium": "1.909e-16 (recorded 1.9e-16 — unchanged)",
+      "station_energy": "5.215e-15 (recorded 5.2e-15 — unchanged)",
+      "greenhouse": "2.815e-16 against the 2.7e-15 recorded HERE — but docs/native-port-reference.md already carries 2.8e-16, corrected 2026-08-15.",
+      "biosphere_perennial_15yr": "3.520e-15 against the 6.7e-14 recorded HERE — the same doc already carries 3.5e-15.",
+      "_the_finding": "⚠⚠ The stale half was THIS FILE, and it is the half that calls itself authoritative. Both figures had been re-measured and corrected in docs/native-port-reference.md (2026-08-14, the light path; 2026-08-15, the layered canopy) and neither correction reached the `evidence` strings here — while this file's own `_comment` and that doc both say tiers.json is the authoritative source and the doc's prose must not contradict it. So the two prose halves of one contract disagreed for two days, in the direction nobody would check. ⚠ The GATES were never stale: test_crossport.py re-derives every sensitivity from the tree and asserts `band > sensitivity` (and, since the layered canopy made one read exactly 0.0, that it is non-zero) — for the Step-3 keys, the biosphere set, the station-energy set and the greenhouse-borrowing set alike. Nothing was unguarded and no band moved; what rotted was the record of why each band is where it is. Third stale-prose finding on this file in two slices, and the first where a CORRECTED copy already existed elsewhere in the repo."
+    }
+  },
   "_tier0": {
     "_comment": "Universal structural/discrete gate — EXACT for EVERY scenario, all tiers. Enforced by compare.py independent of float_tier. This is the primary parity gate (the plan: 'Tier 0 is the primary gate'). The per-step-in-Rust conservation assertion and the events==()/rationed==0/period-class invariants are Rust-run-side and land with the engine in Steps 2+; the snapshot-visible subset is listed here.",
     "exact_fields": [
@@ -83,7 +101,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)", "biosphere/weather.py:43-48 (trig)"],
-      "evidence": "FvCB photosynthesis (exp/sqrt) + transpiration (exp) run every step for the plant/consumer chamber; weather trig for daylength. Frozen Euler. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 6.7e-14, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~150x above).",
+      "evidence": "FvCB photosynthesis (exp/sqrt) + transpiration (exp) run every step for the plant/consumer chamber; weather trig for daylength. Frozen Euler. ⚠ SLICE 5: this golden was REGENERATED FROM RUST, so `Rust-vs-Python bit-exact` below is history, not a current fact about this file — Rust reproduces it exactly by construction and PYTHON is the side that differs, by 7 of 205 leaves, worst 4.6e-16 (~2 ULP). Python is gated against it at a 1e-14 last-bit-noise ceiling (tests/golden_platform.PYTHON_DIVERGES), 1000x tighter than the band below; the band below still governs the cross-libm comparison on CI. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 3.520e-15; the 6.7e-14 here is P7.4's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~2800x above the re-measured value, ~150x above the original).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -96,7 +114,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)", "biosphere/weather.py:43-48 (trig)"],
-      "evidence": "Same FvCB graph as consumer_chamber over a 15-yr horizon; divergence accumulates so the whole trajectory is Tier 2. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 6.7e-14, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~150x above).",
+      "evidence": "Same FvCB graph as consumer_chamber over a 15-yr horizon; divergence accumulates so the whole trajectory is Tier 2. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 3.520e-15; the 6.7e-14 here is P7.4's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~2800x above the re-measured value, ~150x above the original).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -109,7 +127,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)", "biosphere/weather.py:43-48 (trig)"],
-      "evidence": "FvCB photosynthesis/transpiration + weather trig every step; period-2 stability signature is Tier-0 (exact), the amounts are Tier 2. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 6.7e-14, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~150x above).",
+      "evidence": "FvCB photosynthesis/transpiration + weather trig every step; period-2 stability signature is Tier-0 (exact), the amounts are Tier 2. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 3.520e-15; the 6.7e-14 here is P7.4's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~2800x above the re-measured value, ~150x above the original).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -122,7 +140,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)", "biosphere/weather.py:43-48 (trig)"],
-      "evidence": "Same FvCB graph as perennial_chamber over 15 yr; Tier 2. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 6.7e-14, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~150x above).",
+      "evidence": "Same FvCB graph as perennial_chamber over 15 yr; Tier 2. ⚠ SLICE 5: this golden was REGENERATED FROM RUST, so `Rust-vs-Python bit-exact` below is history, not a current fact about this file — Rust reproduces it exactly by construction and PYTHON is the side that differs, by 1 of 196 leaves, worst 1.6e-16 (~1 ULP). Python is gated against it at a 1e-14 last-bit-noise ceiling (tests/golden_platform.PYTHON_DIVERGES), 1000x tighter than the band below; the band below still governs the cross-libm comparison on CI. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 3.520e-15; the 6.7e-14 here is P7.4's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~2800x above the re-measured value, ~150x above the original).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -135,7 +153,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)", "biosphere/weather.py:43-48 (trig)"],
-      "evidence": "Closed biosphere chamber; FvCB exp/sqrt + transpiration exp every step. Tier 2. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 6.7e-14, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~150x above).",
+      "evidence": "Closed biosphere chamber; FvCB exp/sqrt + transpiration exp every step. Tier 2. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 3.520e-15; the 6.7e-14 here is P7.4's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~2800x above the re-measured value, ~150x above the original).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -148,7 +166,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)", "biosphere/weather.py:43-48 (trig)"],
-      "evidence": "Open-field single season; the same FvCB/transpiration/weather transcendentals. Tier 2. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 6.7e-14, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~150x above).",
+      "evidence": "Open-field single season; the same FvCB/transpiration/weather transcendentals. Tier 2. Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 3.520e-15; the 6.7e-14 here is P7.4's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~2800x above the re-measured value, ~150x above the original).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -161,7 +179,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)"],
-      "evidence": "Per-year peak-leaf / consumer-carbon series derived from the FvCB biosphere runs — numeric leaves are Tier 2. The is_period_2 booleans are the Tier-0 stability signature (exact). Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 6.7e-14, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~150x above).",
+      "evidence": "Per-year peak-leaf / consumer-carbon series derived from the FvCB biosphere runs — numeric leaves are Tier 2. The is_period_2 booleans are the Tier-0 stability signature (exact). Step-4 (P7.4): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0); band measured via propagated ±1-ULP transcendental sensitivity (worst 3.520e-15; the 6.7e-14 here is P7.4's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16, canopy.exp/perennial-15yr — the contracting attractor barely amplifies), set to 1e-11 (~2800x above the re-measured value, ~150x above the original).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -226,7 +244,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["thermal/flows.py:130 (t**4)", "biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)"],
-      "evidence": "The full sealed assembly: biosphere FvCB + Thermal T^4 + all seams over a multi-year horizon. Tier 2 (the plan already calls this the 'Tier-2 combined-ledger' run). Step-5 (P7.5): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0 over the full ~1.3M-substep run); shares BIOSPHERE_BAND 1e-11 (biosphere FvCB in the graph), justified by the cheap 7-day greenhouse canopy.exp measurement (2.7e-15) + the regulator-erasure argument (the scrubber/makeup hold the shared gas pools at setpoint between the once-daily biosphere lumps, so a 1-ULP nudge cannot amplify across master days). NOT swept on the sealed run itself (deliberate cost choice).",
+      "evidence": "The full sealed assembly: biosphere FvCB + Thermal T^4 + all seams over a multi-year horizon. Tier 2 (the plan already calls this the 'Tier-2 combined-ledger' run). Step-5 (P7.5): Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0 over the full ~1.3M-substep run); shares BIOSPHERE_BAND 1e-11 (biosphere FvCB in the graph), justified by the cheap 7-day greenhouse canopy.exp measurement (2.815e-16; the 2.7e-15 here is P7.5's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16) + the regulator-erasure argument (the scrubber/makeup hold the shared gas pools at setpoint between the once-daily biosphere lumps, so a 1-ULP nudge cannot amplify across master days). NOT swept on the sealed run itself (deliberate cost choice).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -252,7 +270,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)"],
-      "evidence": "Couples the FvCB biosphere into the cabin; the plant's exp/sqrt are in the per-master-day graph. Tier 2 (transcendental-free cabin + transcendental biosphere = Tier 2, since divergence propagates). Step-5 (P7.5): Rust-vs-Python bit-exact locally (max_rel_dev 0.0); shares BIOSPHERE_BAND 1e-11, measured via the 7-day greenhouse canopy.exp sensitivity (2.7e-15, measure_tier2_bands.measured_greenhouse_sensitivity).",
+      "evidence": "Couples the FvCB biosphere into the cabin; the plant's exp/sqrt are in the per-master-day graph. Tier 2 (transcendental-free cabin + transcendental biosphere = Tier 2, since divergence propagates). Step-5 (P7.5): Rust-vs-Python bit-exact locally (max_rel_dev 0.0); shares BIOSPHERE_BAND 1e-11, measured via the 7-day greenhouse canopy.exp sensitivity (2.815e-16; the 2.7e-15 here is P7.5's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16, measure_tier2_bands.measured_greenhouse_sensitivity).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -265,7 +283,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)"],
-      "evidence": "Built on the greenhouse (biosphere in the graph); the Harvest flow itself is linear but the FvCB biosphere makes the scenario Tier 2. Step-5 (P7.5): Rust-vs-Python bit-exact locally (max_rel_dev 0.0); shares BIOSPHERE_BAND 1e-11 (the 7-day greenhouse canopy.exp measurement, 2.7e-15).",
+      "evidence": "Built on the greenhouse (biosphere in the graph); the Harvest flow itself is linear but the FvCB biosphere makes the scenario Tier 2. Step-5 (P7.5): Rust-vs-Python bit-exact locally (max_rel_dev 0.0); shares BIOSPHERE_BAND 1e-11 (the 7-day greenhouse canopy.exp measurement, 2.815e-16; the 2.7e-15 here is P7.5's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16).",
       "band": 1e-11,
       "floor": 1e-12
     },
@@ -278,7 +296,7 @@
       "transcendental_free": false,
       "float_tier": 2,
       "transcendentals": ["biosphere/canopy.py:77 (exp)", "biosphere/photosynthesis.py:106 (sqrt)", "biosphere/transpiration.py:108 (exp)"],
-      "evidence": "The lamp forces the biosphere's PAR; the FvCB biosphere runs every master day. The Lamp/Power flows are forced-linear, but the biosphere transcendentals make it Tier 2. Step-5 (P7.5): Rust-vs-Python bit-exact locally (max_rel_dev 0.0); shares BIOSPHERE_BAND 1e-11 (the 7-day greenhouse canopy.exp measurement, 2.7e-15).",
+      "evidence": "The lamp forces the biosphere's PAR; the FvCB biosphere runs every master day. The Lamp/Power flows are forced-linear, but the biosphere transcendentals make it Tier 2. Step-5 (P7.5): Rust-vs-Python bit-exact locally (max_rel_dev 0.0); shares BIOSPHERE_BAND 1e-11 (the 7-day greenhouse canopy.exp measurement, 2.815e-16; the 2.7e-15 here is P7.5's figure, superseded 2026-08-15 in docs/native-port-reference.md and re-measured 2026-08-16).",
       "band": 1e-11,
       "floor": 1e-12
     }
