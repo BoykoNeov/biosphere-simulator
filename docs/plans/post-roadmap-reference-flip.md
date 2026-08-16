@@ -1044,7 +1044,19 @@ not less. The shared half is one string; the selection warning stays station-onl
 contract the hole slice 5 measured on the other (regenerating a frozen golden desynchronised
 the manifest with every manifest gate green). Scoped to goldens only, for slice 6's reason.
 
-**Eleven negative controls, each turning exactly one gate red on the intended assertion**,
+**⚠ Closing review found a duplicate this slice inherited and then doubled (advisor).** The
+dump's exact key set is declared **twice per contract** — once in the generator, where it
+stops a regeneration from splicing an unclassified key, and once in the crossport gate. Slice
+6 introduced the biosphere pair; slice 7 wrote the station one. Both copies are correct and
+control 10 proved each bites, but the failure is **one-sided**: widen the generator's copy and
+forget the gate's, and regeneration accepts the new key while the crossport gate reddens with
+a message blaming the *dump* — the wrong place to look. Measured: doing exactly that leaves
+the crossport key-set assertion **green**. Closed the way slice 6 closed `RUST_AUTHORED` —
+the generators own the definition and one new gate asserts agreement, rather than a third
+copy. ⚠ *A duplicate that a control reddens today is still a duplicate; what a control shows
+is that both copies are right now, not that they must stay equal.*
+
+**Twelve negative controls, each turning exactly one gate red on the intended assertion**,
 green again after every revert: the two-direction rename pair; the aux-wiring pair (manifest
 gains the name / gate reddens); the horizon pair (crossport staleness reddens *without*
 regenerating, and the regenerated manifest follows Rust while Python's gate reddens); an
@@ -1052,7 +1064,15 @@ unclassified field added to the manifest; an `_authority` pattern matching no fi
 patterns of **equal** specificity matching one path; a golden's bytes tampered; the folded
 `sealed_energy_drift` reclassified as Rust-authored (caught against the roster); and a
 `param_files` key added to the dump, which **refused regeneration with exit 1** and reddened
-the crossport key-set assertion.
+the crossport key-set assertion; and the two dump-key copies made to disagree, which reddens
+the new tie gate while every other row stays green.
+
+**⚠ Both failure branches of the staleness message were read under a REAL failure**, not
+reviewed — slice 5's rule that no test catches a correct assertion giving wrong advice. The
+station branch leads with the registry-selection paragraph and points at
+`docs/station-reference.md` + `tests/test_station_freeze_manifest.py`; the biosphere branch
+carries no selection paragraph and points at its own two. Both correct, both read off a
+genuine red run.
 
 ⚠ **One control had to be re-run because it fired on the wrong assertion, and that is slice
 3's lesson arriving on schedule.** The stale-pattern control was first run by editing

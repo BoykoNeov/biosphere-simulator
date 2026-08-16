@@ -288,6 +288,46 @@ def test_the_frozen_station_manifest_is_not_stale() -> None:
     assert dump["horizons"], "no horizons compared"
 
 
+def test_the_dump_key_sets_are_the_ones_the_generators_consume() -> None:
+    """⚠ The dump key set exists TWICE per contract — tie the copies, don't restate.
+
+    Each manifest generator asserts the dump's exact key set before splicing (a forcing
+    function: a new key stops regeneration until someone classifies it), and this module
+    asserts the same set again for the staleness gate. Both copies are correct today and
+    a negative control proved each bites — but the failure is **one-sided**: widen the
+    generator's copy and forget this one, and regeneration accepts the new key while
+    this gate reddens with a message blaming the *dump*, the wrong place to look.
+
+    ⚠ That is the *"a rule with two copies has one that is stale"* hazard this repo
+    keeps re-learning, and slice 6 answered it once already — `RUST_AUTHORED` is not
+    restated in the manifest's `_authority` block, it is **checked against** it. Same
+    move here: the generators own the definition, this asserts agreement, and nobody
+    writes a third copy.
+
+    Imported inside the test (with ``tests/`` put on the path the way this directory
+    already reaches ``golden_platform``) so importing the generators is not a collection
+    -time cost for the rest of the file.
+    """
+    import sys  # noqa: PLC0415
+
+    sys.path.insert(0, str(REPO_ROOT / "tests"))
+    import test_freeze_manifest  # noqa: PLC0415
+    import test_station_freeze_manifest  # noqa: PLC0415
+
+    for label, mine, theirs in (
+        ("biosphere", _BIOSPHERE_DUMP_KEYS, test_freeze_manifest._RUST_DUMP_KEYS),
+        ("station", _STATION_DUMP_KEYS, test_station_freeze_manifest._RUST_DUMP_KEYS),
+    ):
+        assert mine == theirs, (
+            f"the {label} dump's key set is declared twice and the copies disagree:\n"
+            f"  this gate expects:     {sorted(mine)}\n"
+            f"  the generator expects: {sorted(theirs)}\n"
+            "The generator's copy is the definition — it is what stops a regeneration "
+            "from splicing an unclassified key. Fix this module to match it, and read "
+            "that module's _AUTHORITY before concluding the new key belongs at all."
+        )
+
+
 def test_the_station_aux_axis_is_empty_by_delegation() -> None:
     """The station `aux_set` is empty, so its parity row proves nothing on its own.
 

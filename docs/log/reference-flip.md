@@ -687,7 +687,18 @@ contract the desync hole slice 5 measured on the other. And the classification i
 is a Python-side *fold* of a raw Rust series. The station's copy of the one-run-two-authors
 case, found by classifying rather than by being caught by it.
 
-**Eleven negative controls, each turning exactly one gate red on the intended assertion**,
+**⚠ The closing review found a duplicate this slice inherited and then doubled.** The dump's
+exact key set is declared **twice per contract** — once in the generator, where it stops a
+regeneration from splicing an unclassified key, and once in the staleness gate. Both copies
+were correct and a control proved each bites, but the failure is **one-sided**: widen the
+generator's and forget the gate's, and regeneration accepts the new key while the gate
+reddens blaming the *dump* — the wrong place to look. Measured: doing exactly that leaves the
+gate's own key-set assertion **green**. Closed the way the previous slice closed its roster —
+the generators own the definition, one gate asserts agreement, nobody writes a third copy.
+⚠ *A duplicate that a control reddens today is still a duplicate: the control shows both
+copies are right now, not that they must stay equal.*
+
+**Twelve negative controls, each turning exactly one gate red on the intended assertion**,
 green again after every revert. ⚠ **One had to be re-run because it fired on the wrong
 assertion.** The stale-classification control was first run by editing the generator *without*
 regenerating: the gate went red, but on "the committed block is not what this module would
