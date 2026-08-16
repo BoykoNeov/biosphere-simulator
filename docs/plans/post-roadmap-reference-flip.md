@@ -1,6 +1,7 @@
 # Post-roadmap: the reference flip — Rust becomes canonical
 
-**Status: SLICES 1–3 COMPLETE (2026-08-16); 4–11 are an unexecuted menu.** ⚠ **Read the
+**Status: SLICES 1–3 COMPLETE, 4 LANDED-BUT-PARTIAL (2026-08-16); 5–11 are an unexecuted
+menu.** ⚠ **Read the
 status column of the §5 table, not this line — that table is the one place slice state is
 recorded, and this header was already false within a day of being written** (it said
 *"NOTHING BUILT / `git diff rust/` empty"* through the whole of slice 1). The invariants
@@ -219,8 +220,8 @@ takes them one at a time.
 | 1 | **Rust per-step trajectory export** — **COMPLETE 2026-08-16** | — | additive; no contract | yes |
 | 2 | **`type_name()` on `Flow`/`Aux`** — **COMPLETE 2026-08-16** | — | frozen Rust core (small unfreeze) | yes |
 | 3 | **Rust dumps its own inventory, checked against the *existing* manifest** — **COMPLETE 2026-08-16** | 2 | additive test only | yes |
-| 4 | **Find the 25th emitter; regenerate the goldens from Rust** | **3** | **25 goldens** | yes (git) |
-| 5 | **Invert the cross-port contract** | 4 | `tiers.json` + comparator | yes |
+| 4 | **The golden census + the Rust-side regeneration path** — **LANDED 2026-08-16**; ⚠ the **2 divergent goldens are NOT regenerated** (see below) | **3** | 2 new test files; **no golden moved** | yes (git) |
+| 5 | **Invert the cross-port contract** — ⚠ **now also owns the 2 stragglers slice 4 could not take alone** | 4 | `tiers.json` + comparator + 4 byte-exact Python gates | yes |
 | 6 | **Re-anchor the biosphere manifest to Rust** | 3, 5 | freeze contract 1 | ceremony |
 | 7 | **Re-anchor the station manifest** | 6 | freeze contract 2 | ceremony |
 | 8 | **Re-anchor the authoring manifest** | 6 | freeze contract 3 | ceremony |
@@ -565,6 +566,114 @@ program (24 exist). ⚠ **Predict the diff before regenerating** — the
 prediction is `< 1e-11` relative on every value and *no* structural field moving at all
 (Tier 0 is exact at every tier). A structural diff, or any value beyond band, is a port
 bug to hunt and **stops this slice**.
+
+### Slice 4 — the census + the Rust-side regeneration path — LANDED 2026-08-16; the two stragglers are OPEN
+
+**Built.** Two new files, nothing else touched (`git diff` empty outside them):
+`tests/crossport/regen_goldens_from_rust.py` — the committed, reviewable **Rust-side**
+regeneration entry point, carrying the golden census as data — and
+`tests/crossport/test_golden_provenance.py` (6 tests, 23 cases) gating that census and
+pinning Rust's bytes. Ruff / ruff-format / pyright clean; the whole `tests/crossport/`
+directory and all three manifest gates green.
+
+**⚠ The prediction held, and then some: 16 of the 18 goldens Rust can emit are
+*byte-identical* to the committed file on this UCRT box.** Not "inside the band" —
+identical. The plan predicted `< 1e-11` relative with no structural field moving; measured,
+the deviation is **zero** on sixteen of eighteen, including the ~1.3 M-substep sealed
+station. **Two are not**, and both are biosphere:
+
+| golden | leaves differing | worst deviation |
+|---|---|---|
+| `consumer_chamber_state.json` | 7 of 205 | 4.6e-16 (~2 ULP) |
+| `perennial_long_horizon_state.json` | 1 of 196 | 1.6e-16 (~1 ULP) |
+
+Both are ~5 orders **inside** their own Tier-2 band (`1e-11`), structure exact at Tier 0,
+so the stop-rule did not fire. Diagnosed as **accumulated last-bit noise, not an op-level
+port difference**: slice 1's trajectory export walks 2440 steps of the perennial scenario
+with *zero* bitwise divergence, so there is no systematic disagreement to hunt.
+
+**⚠ The profile confound, caught by the advisor before it became a false finding.** The
+first measurement was taken under `--release`; `test_crossport.py` runs the biosphere
+family in **debug**, and both divergent cases are biosphere. Re-measured: **all 18 agree
+across profiles**, so the flag is a speed choice only. Had it not, *"regenerate from
+Rust"* would have been under-specified until the build profile joined the reference
+definition — a manifest gate turning red for a toolchain reason, which is precisely the
+failure mode slice 2 rejected `std::any::type_name` over.
+
+**⚠⚠ The plan's own arithmetic in §2f is wrong, and the gap is 7, not 1.** §2f says *"24
+`emit_*` programs against 25 golden files. One is missing or one program emits two."*
+Measured, all three clauses are off: two programs each serve two goldens
+(`emit_perennial` / `emit_consumer`, by a `long` argument); **four** `emit_*` programs
+serve no golden in that directory at all (`emit_authored`, `emit_perturbed_brownout`,
+`emit_sealed_resume`, `emit_composite`); and **seven** goldens have no program that emits
+their bytes. The census that replaces it, now gated:
+
+| Group | Count | What it means |
+|---|---|---|
+| Rust emits the artifact | **18** | 16 byte-identical, 2 as above |
+| Rust emits a raw series, **Python folds it** | **2** | `drift_summary`, `sealed_energy_drift_summary` — `drift.py` is Python-side by a deliberate Phase-7 decision (advisor #3). *The fold is the artifact.* Same shape as slice 3's `param_files` |
+| **no Rust referent at all** | **5** | `n_limited` / `water_biting` (no such scenario in the Rust roster — the port says so in its own words at `biosphere/system.rs`), `demo_euler` / `demo_rk4` (no `build_demo` in Rust), `state_snapshot` (⚠ not a run at all — a `sim_io` fixture that Rust **reads**, so it is an *input* to the port) |
+
+⚠ None of the five is in either manifest; all 20 frozen goldens are in the first two
+groups. **So slice 6's per-key classification gains a clean answer on the golden axis: 18
+yes, 2 folded** — and the two folded ones are `param_files`' shape again, a key whose Rust
+program exists but does not produce the artifact.
+
+**⚠⚠ The blast radius this table understated, measured rather than reasoned.** Slice 4 is
+listed as *"25 goldens, reversible (git)"*. Swapping the two divergent files in and running
+every gate that touches them:
+
+* **Both freeze-manifest gates stay GREEN.** `golden_sha256` is assembled only inside
+  `_regenerate()` and is **never compared** — so regenerating a frozen golden silently
+  desynchronises the manifest from the file it pins. This is the *provenance-only edit that
+  nothing catches* CLAUDE.md warns about, and it turns out to cover the **goldens**, not
+  just the params.
+* **Four Python gates go red** — `test_regression_consumer_season` and
+  `test_regression_long_horizon`, each a byte-exact compare *and* an exact-`State`
+  `loads_back`. ⚠ All four are `@windows_golden_only`, so the change would be **green on
+  CI and red only on the developer's box** — the [[pdf-pins-green-by-skip-on-ci]] arrow,
+  reversed.
+
+**⚠⚠ And slices 4 and 5 are not independently landable in the stated order.** What gives
+the cross-port comparison its meaning is not *who wrote* the golden — provenance does not
+survive in the bytes — it is that **both ports are byte-pinned to the same file**. That
+holds today for all 18. It cannot hold for a golden the ports disagree on: one side has to
+become tolerance-gated, and moving that pinning to the Python side **is slice 5**. Take 5
+first, or take 4 and 5 together; taking 4 alone leaves the two stragglers with a red
+Windows gate and a Rust-vs-Rust comparison standing in for a cross-port one.
+
+**⚠ `tiers.json`'s evidence prose is now measurably stale.** Both divergent scenarios still
+read *"Rust-vs-Python bit-exact locally (same UCRT libm, max_rel_dev 0.0)"*. True when P7.4
+measured it; false now. Not corrected here — `tiers.json` is slice 5's file, and this is
+the ungated prose half of a contract again (`docs/log/freeze-prose-half-is-ungated.md`).
+
+**What the new gate buys, and what it cannot.** The byte census is **~5 orders tighter than
+the Tier-2 comparison beside it**: those two goldens drifted from 0 ULP to 2 ULP with
+nothing in the tree noticing, which is exactly how the stale evidence string survived. The
+`PORTS_DISAGREE` roster is checked **in both directions** — a golden joining it is red, and
+a golden *leaving* it is red too, so it cannot decay into an unre-measured exemption. ⚠
+What no byte-level check can do, stated in the module rather than implied: **while the two
+ports emit identical bytes, nothing in the artifact says which side produced it.** Slice 4
+makes the *path* structural, not a property of the files.
+
+**⚠ The tautology the map had to be built to avoid.** `emit_crew` exists in **two** crates,
+and `simcore`'s **parses `crew_state.json`'s own hex-floats and re-emits them** — a codec
+fixture since Phase-7 Step 0. It is also the pre-existing cargo output-filename collision
+slice 3 found, so a regeneration script that shelled `target/*/examples/emit_crew.exe`
+would get whichever crate built last and could write the golden **from itself**. Every
+invocation is `-p <crate> --example`, and one test pins the crate.
+
+**Nine negative controls, each turning exactly one test red on the intended assertion**,
+green again after every revert (checked for *which* assertion fired, per slice 3):
+an unclassified golden appearing on disk; a golden classified into two groups; a *frozen*
+golden parked in the no-referent group; a frozen folded golden whose reason is gutted; a
+typo'd example name; `crew` re-pointed at the echoing `simcore` emitter; a known-divergent
+golden dropped from the roster; an *agreeing* golden added to it; and the last-bit ceiling
+lowered below the measured divergence.
+
+**⚠ Not done, and it is the user's ordering call, not mine:** the two divergent goldens are
+**not** regenerated. Doing so bundles slice 5 (the four byte-exact gates must become
+tolerance comparisons) and touches slice 6's ceremony (the desynchronised `golden_sha256`).
 
 **Slice 5 — invert the cross-port contract.** Python now the tolerance-gated side, Rust the
 exact one. ⚠ The Tier-2 bands were measured as **±1-ULP sensitivity propagated through the

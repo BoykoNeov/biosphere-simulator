@@ -1,10 +1,11 @@
-## **The reference flip — Rust becomes canonical** (target state B; eleven slices, the first three landed)
+## **The reference flip — Rust becomes canonical** (target state B; eleven slices, four landed)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
-different slices. Don't bundle the whole work into one slice"*). **Slices 1, 2 and 3 landed
-the same day.** Nothing else is built: no golden regenerated, no manifest re-anchored, no band
-moved, `git diff src/` empty.
+different slices. Don't bundle the whole work into one slice"*). **Slices 1, 2, 3 and 4 landed
+the same day**, slice 4 partially — its two divergent goldens are held for slice 5. Nothing
+else is built: **no golden regenerated**, no manifest re-anchored, no band moved, `git diff
+src/` empty.
 
 ### The decision
 
@@ -313,16 +314,107 @@ collision** warning — one example name is used in two crates, and the toolchai
 "may become a hard error in the future". Unrelated to this slice, but the repo runs examples
 by name.
 
+### Slice 4 — the golden census + the Rust-side regeneration path — LANDED 2026-08-16 (partial)
+
+**Built.** `tests/crossport/regen_goldens_from_rust.py` — the committed, reviewable
+**Rust-side** regeneration entry point (report by default, `--write` explicit), carrying the
+golden census as data — and `tests/crossport/test_golden_provenance.py`, 6 tests / 23 cases,
+gating that census and pinning Rust's bytes. Two new files, nothing else touched; ruff /
+ruff-format / pyright clean, the whole `tests/crossport/` directory and all three manifest
+gates green.
+
+**⚠ The headline is that the reference barely has to move at all. Sixteen of the eighteen
+goldens Rust can emit are *byte-identical* to the committed file** — not "inside the band",
+identical, including the ~1.3 M-substep sealed station. The plan predicted `< 1e-11`
+relative; measured, it is **zero** on sixteen of eighteen. Two are not, both biosphere:
+`consumer_chamber_state.json` (7 of 205 leaves, worst 4.6e-16 ≈ 2 ULP) and
+`perennial_long_horizon_state.json` (1 of 196, 1.6e-16 ≈ 1 ULP) — five orders **inside**
+their own Tier-2 band, structure exact, so the stop-rule did not fire. **Accumulated last-bit
+noise, not an op-level difference:** slice 1's trajectory export walks 2440 steps of the
+perennial scenario with *zero* bitwise divergence, so there is nothing systematic to hunt.
+⚠ *Slice 1 was built as an interface with no consumer; its first real use was diagnosing a
+divergence three slices later. The value of a per-step view is that it turns "the endpoints
+differ" into "they never differ along the way."*
+
+**⚠ A confound was baked into the first measurement and the advisor caught it before it
+became a finding.** It was taken under `--release`; `test_crossport.py` runs the biosphere
+family in **debug**, and both divergent cases are biosphere. Re-measured across both
+profiles: **all 18 agree**, so the flag is a speed choice. Had it not been, *"regenerate from
+Rust"* would have been under-specified until the build profile joined the reference
+definition — a frozen hash moving for a toolchain reason, the exact failure mode slice 2
+rejected the automatic `type_name` derivation over. ⚠ **Generalize: when you measure a port
+against a committed artifact, measure it the way the suite invokes it.**
+
+**⚠⚠ The plan's own arithmetic was wrong and the gap is 7, not 1.** §2f named identifying
+"the 25th emitter" as slice 4's first act, on *"24 programs against 25 goldens; one is missing
+or one emits two."* All three clauses are off: two programs each serve two goldens, **four**
+programs serve no golden at all, and **seven** goldens have no program that emits their bytes.
+The replacement census is now gated: **18** Rust emits the artifact; **2** Rust emits a raw
+series that `drift.py` folds Python-side (*the fold is the artifact* — slice 3's `param_files`
+shape exactly); **5** have no Rust referent at all. ⚠ The sharpest of the five is
+`state_snapshot.json`: not a run, a `sim_io` fixture that **Rust reads**, so it is an *input*
+to the port and "regenerating it from Rust" is the round trip in its purest form.
+
+**⚠⚠ The blast radius the plan's table understated, measured by swapping the files in and
+running every gate that touches them.** Slice 4 was listed as *"25 goldens, reversible
+(git)"*. In fact:
+
+* **Both freeze-manifest gates stay GREEN.** `golden_sha256` is assembled only inside
+  `_regenerate()` and **never compared** — regenerating a frozen golden silently
+  desynchronises the manifest from the file it pins. The *provenance-only edit that nothing
+  catches* covers the **goldens**, not just the params.
+* **Four Python gates go red**, and all four are `@windows_golden_only` — so the change is
+  **green on CI, red only on the developer's box**. [[pdf-pins-green-by-skip-on-ci]] with the
+  arrow reversed again.
+
+**⚠⚠ Slices 4 and 5 are not independently landable in the stated order, and this is the
+finding worth carrying.** What gives the cross-port comparison its meaning is **not who wrote
+the golden** — provenance does not survive in the bytes — it is that **both ports are
+byte-pinned to the same file**. That holds for all 18 today. It cannot hold for a golden the
+ports disagree on: one side must become tolerance-gated, and moving that pinning to the Python
+side *is* slice 5. So the two divergent goldens are **held**, and slice 5 inherits them. ⚠
+*"Independently landable" was a property of the plan, not of the tree; the coupling only
+appeared once the artifacts were measured.*
+
+**What the new gate buys, and the limit stated rather than implied.** The byte census is **~5
+orders tighter than the Tier-2 comparison beside it** — those two goldens drifted from 0 to 2
+ULP with nothing noticing, which is how `tiers.json` still carries a measurably false
+*"max_rel_dev 0.0"* for both (its file is slice 5's; the ungated prose half again). The
+`PORTS_DISAGREE` roster is checked **in both directions**, so a divergence that heals is as
+red as one that appears and the roster cannot decay into an unre-measured exemption. ⚠ But
+**no byte-level check can say which side produced a golden** while the ports agree; slice 4
+makes the *path* structural, not a property of the files. That sentence is in the module, not
+just here.
+
+**⚠ The tautology the map exists to make unreachable.** `emit_crew` lives in **two** crates
+and `simcore`'s **parses `crew_state.json`'s own hex-floats and re-emits them** — a codec
+fixture. It is also the output-filename collision slice 3 found in passing, so a script that
+shelled `target/*/examples/emit_crew.exe` would take whichever built last and could write the
+golden **from itself**. Every invocation is `-p <crate> --example`, and a test pins the crate.
+⚠ *Slice 3 recorded that collision as an unrelated curiosity; one slice later it was a live
+hazard on the exact path being built.*
+
+**Nine negative controls, each turning exactly one test red on the intended assertion**, green
+again after every revert, and checked for *which* assertion fired: an unclassified golden on
+disk; one classified twice; a **frozen** golden parked in the no-referent group; a folded
+golden's reason gutted; a typo'd example name; `crew` re-pointed at the echoing emitter; a
+known-divergent golden dropped from the roster; an **agreeing** golden added to it; the
+last-bit ceiling lowered below the measured divergence.
+
 ### The state of the arc
 
-Slices 4–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
+Slices 5–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
 The ordering that matters: **1–3 built nothing the reference depends on** (they de-risked the
 export and proved the port can express the completeness contract *before* anything
-re-anchors) — **and that de-risking is now done and came back clean, so the gate in front of
-slice 4 is discharged**. **Slice 4 is where the reference actually moves.** **6–8 are the
-three unfreeze ceremonies, biosphere first**, and slice 3 handed 6 an open decision about the
-one axis the port cannot express. Until 6–8 land, new reference science is still
-Python-canonical — and a science item must never share a batch with a re-anchor slice.
+re-anchors). **Slice 4 was to be where the reference actually moves — and the measurement is
+that it barely has to**: sixteen of eighteen goldens are already byte-identical between the
+ports, so what slice 4 could land was the *path* and the *census*, not a diff. **The two
+goldens the ports disagree on now belong to slice 5**, because byte-pinning both ports to one
+file is what the cross-port gate's meaning rests on. **6–8 are the three unfreeze ceremonies,
+biosphere first**; slice 3 handed 6 an open per-key decision, and slice 4 has now answered it
+on the golden axis (18 yes, 2 folded, and a `golden_sha256` that no gate compares). Until 6–8
+land, new reference science is still Python-canonical — and a science item must never share a
+batch with a re-anchor slice.
 
 ⚠ **This item's log exemption was deleted with slice 1, one day after it was written.** It was
 written on the premise *"forward-looking, no finished work behind it"*; the first slice ended
