@@ -1,11 +1,11 @@
-## **The reference flip — Rust becomes canonical** (target state B; eleven slices, six landed)
+## **The reference flip — Rust becomes canonical** (target state B; eleven slices, seven landed)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
-different slices. Don't bundle the whole work into one slice"*). **Slices 1–6 landed the same day.** The reference has
-moved: two goldens are Rust's bytes, the cross-port contract is inverted, and the biosphere
-manifest is re-anchored — with **mixed** authority, stated per key in the file itself. `git
-diff src/` stays empty throughout.
+different slices. Don't bundle the whole work into one slice"*). **Slices 1–7 landed the same
+day.** The reference has moved: two goldens are Rust's bytes, the cross-port contract is
+inverted, and **two of the three freeze manifests are re-anchored** — each with **mixed**
+authority, stated per key in the file itself. `git diff src/` stays empty throughout.
 
 ### The decision
 
@@ -629,9 +629,76 @@ control. The work was recoverable only because every edit was still in the sessi
 *Snapshot the working files before running controls on them; `git checkout` is not an undo for
 a change that was never committed.*
 
+### Slice 7 — the station manifest is re-anchored — COMPLETE 2026-08-16
+
+**Built.** The station dump widened from a *witness* into the **producer** of that manifest's
+Rust half (it gained the two sealed horizons); the generator shells it and splices the flow
+set, the aux set and both horizons; the manifest gained an `_authority` block naming the
+producer of **every** key. Four new Python gates, one new cargo-side gate. `git diff src/`
+empty; ruff / ruff-format / pyright clean; clippy and the whole `cargo test` suite green.
+
+**⚠⚠ The prediction was written down first and held exactly: the only changes are the
+`_authority` block and the `_comment`.** Not one frozen value moved — same 16 names, same
+empty aux set, same horizons, not one hash. Same outcome as slice 6 and for the same reason:
+slice 3 had already proved the sets identical, so the ceremony was always going to be a
+relabel unless something was wrong. **So the criterion was again a measured pair** — renaming
+a flow in **Rust** moves the manifest and reddens the Python gate; renaming the **Python**
+class leaves the manifest byte-identical and reddens the same gate. ⚠ The **horizon** axis got
+its own pair rather than inheriting the flow axis's: *a re-anchoring slice's criterion must
+name a direction per axis, not once per slice.*
+
+**⚠⚠ The blocking item was an axis whose value is EMPTY, and it needed a control shape the
+previous slice never had to invent (advisor, before the build).** The station has no aux
+process, so every assertion about that set is `[] == []` — and this slice **escalates** it
+from "compared" to "written into the frozen contract by a regeneration". The rename control
+is *unrunnable* there: there is nothing to rename. The substitute is to **wire a throwaway
+one in** and drive the regeneration path — the manifest then *gains* the name and exactly one
+gate reddens. ⚠ *When the value under test is empty, the control has to change the value, not
+the name.*
+
+**⚠ A gate that was buildable was PRICED AND REFUSED, and the refusal is the finding.** The
+station's integration steps live inside a prose string that nothing checks — recorded as such
+in that module for two days — and the reference tree *does* carry the constants behind those
+numbers, so the previous slice's treatment (keep the literal hand-written, add the missing
+comparison against the reference) would work. It was not built, on one asymmetry: **slice 6
+added zero new frozen values.** The classification block is metadata about the contract, and
+the step gate covered a key that already existed; this one would need a **new structured key**,
+i.e. a *widening of the frozen surface* — its own unfreeze with its own ceremony, not a rider
+on a re-anchoring. ⚠ *"The gate is buildable" and "the gate belongs in this slice" are
+different claims.* Recorded in the key's own classification entry, in the dump, and in the
+reference doc, so the hole is a stated claim rather than an omission.
+
+**⚠ Found while classifying, and nobody had written it down: the two contracts now share a
+reference-side constant.** The station's 15-year energy horizon *is* the biosphere's decade
+horizon constant in the Rust tree. After this slice both manifests are anchored to it, so
+moving it is **one edit and two ceremonies**. A reader who assumes the contracts are
+independent will predict the wrong diff — which is exactly the failure this slice's own
+predict-first rule exists to prevent.
+
+**⚠ The failure advice branched rather than collapsed (advisor).** Both cases of the staleness
+gate mean the same thing now, so the obvious move was one message. But the station dump mirrors
+five registry-selection judgement calls **by hand**, and after this slice a mis-mirrored one is
+*written into the frozen contract* by the very regeneration the message sends you to. So
+"check the selection first" is **more** load-bearing than before, not less.
+
+**Also landed:** the golden hashes are now compared against the files on disk, closing on this
+contract the desync hole slice 5 measured on the other. And the classification is keyed by
+**path** here too — twelve of the thirteen goldens are Rust's, while the energy-drift summary
+is a Python-side *fold* of a raw Rust series. The station's copy of the one-run-two-authors
+case, found by classifying rather than by being caught by it.
+
+**Eleven negative controls, each turning exactly one gate red on the intended assertion**,
+green again after every revert. ⚠ **One had to be re-run because it fired on the wrong
+assertion.** The stale-classification control was first run by editing the generator *without*
+regenerating: the gate went red, but on "the committed block is not what this module would
+write" rather than on the stale-pattern check it was aimed at. The ghost has to reach the file
+before the check that hunts ghosts in the file can see it. *A control that reddens the target
+test has still measured nothing until you check WHICH line failed* — slice 3's lesson,
+arriving on schedule.
+
 ### The state of the arc
 
-Slices 6–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
+Slices 8–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
 The ordering that matters: **1–3 built nothing the reference depends on** (they de-risked the
 export and proved the port can express the completeness contract *before* anything
 re-anchors). **Slice 4 was to be where the reference actually moves — and the measurement was
@@ -639,13 +706,15 @@ that it barely had to**: sixteen of eighteen goldens were already byte-identical
 ports, so what 4 could land alone was the *path* and the *census*, not a diff. **Slice 5 wrote
 the other two, and with them the inversion**: the golden is now Rust's artifact, the Rust
 byte census is unconditional, Python is the tolerance-gated side, and Python can no longer
-author any of the eighteen. **6–8 are the three unfreeze ceremonies, biosphere
-first; 6 has landed.** Its lasting finding is that a freeze contract does not re-anchor as a
-unit: roughly half the biosphere manifest has no Rust referent and is now declared
-Python-retained *in the file*, so **slices 7 and 8 should expect to classify, not to
-convert**. Until they land, the station and authoring contracts are still Python-anchored, new
-reference science outside the biosphere is still Python-canonical, and a science item must
-never share a batch with a re-anchor slice.
+author any of the eighteen. **6–8 are the three unfreeze ceremonies, biosphere first; 6 and 7
+have landed.** Their lasting finding is that a freeze contract does not re-anchor as a unit:
+roughly half of each manifest has no Rust referent and is now declared Python-retained *in
+the file*, so **slice 8 should expect to classify, not to convert** — and its surface is
+different in kind again (grammar, VM node/op set, flow-type registry, with no flow/aux
+registry axis), so it will not look like either of the two that landed. Until it does, the
+authoring contract is still Python-anchored, new reference science outside the biosphere and
+the station assembly is still Python-canonical, and a science item must never share a batch
+with a re-anchor slice.
 
 ⚠ **This item's log exemption was deleted with slice 1, one day after it was written.** It was
 written on the premise *"forward-looking, no finished work behind it"*; the first slice ended

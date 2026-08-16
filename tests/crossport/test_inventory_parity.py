@@ -1,31 +1,30 @@
 """Reference flip: the Rust tree's own inventory vs. the frozen manifests.
 
-⚠⚠ **THE TWO CASES IN THIS FILE NO LONGER MEAN THE SAME THING, AND THAT IS THE FIRST
-THING TO KNOW BEFORE READING A FAILURE.** Slice 3 built both as *parity* checks with two
-independent origins. Slice 6 re-anchored the **biosphere** manifest to the Rust tree, so
-for that case:
+⚠⚠ **BOTH CASES ARE NOW STALENESS CHECKS, AND THAT IS THE FIRST THING TO KNOW BEFORE
+READING A FAILURE.** Slice 3 built both as *parity* checks with two independent origins.
+Slice 6 re-anchored the **biosphere** manifest to the Rust tree and slice 7 the
+**station** one, so for both:
 
-* **biosphere — a STALENESS check.** The manifest is now generated *from* this dump
-  (`tests/test_freeze_manifest.py::_build_manifest` shells the same example), so a
-  disagreement no longer means "the ports differ" — it means **the committed manifest is
-  out of date with the reference tree**, i.e. something was added to the reference and
-  never frozen. That is the completeness axis, re-homed to the side that now owns it.
-  Python's conformance to the same set is checked separately and cargo-free, in
-  `tests/test_freeze_manifest.py`.
-* **station — still a PARITY check**, with the two independent origins intact, until
-  slice 7 does for that manifest what slice 6 did for this one.
+* **a STALENESS check.** The manifest is generated *from* this dump (each contract's
+  `_build_manifest` shells the same example), so a disagreement no longer means "the
+  ports differ" — it means **the committed manifest is out of date with the reference
+  tree**, i.e. something was added to the reference and never frozen. That is the
+  completeness axis, re-homed to the side that now owns it. Python's conformance to the
+  same sets is checked separately and cargo-free, in `tests/test_freeze_manifest.py` and
+  `tests/test_station_freeze_manifest.py`.
 
-**Why the biosphere case is still worth running, and is not a round trip.** It compares
-the *committed artifact* against a *freshly built tree* — the same relationship the
-Python completeness gate always had, on the other side. What it can no longer do is
-arbitrate between the ports.
+**Why these are still worth running, and are not round trips.** Each compares the
+*committed artifact* against a *freshly built tree* — the same relationship the Python
+completeness gates always had, on the other side. What they can no longer do is
+arbitrate between the ports; that authority went with the flip.
 
-**Why the station case is a real comparison and not a mirror.** The three sets involved
-have three independent origins: Rust's names are hand-written `type_name()` literals
-(slice 2 chose required-and-hand-written *over* the zero-cost automatic derivation,
-precisely so a rename would show up here); Python's come from `type(flow).__name__` over
-its own registries; the manifest is the committed artifact regenerated from Python. So a
-Rust-vs-manifest disagreement there is a genuine finding.
+⚠ **The station's failure advice keeps its own paragraph, and it matters MORE now, not
+less.** The dump's registry selection is five hand-mirrored judgement calls
+(`dump_station_inventory.rs` lists them), and after slice 7 a mis-mirrored one is
+**written into the frozen manifest** by a regeneration rather than merely reported as a
+mismatch. So the first question on a station failure is still "is the selection right?",
+though the second changed from "which port is wrong?" to "what moved in the reference,
+and was it meant to?".
 
 ⚠⚠ **The manifests' third axis, `param_files`, is deliberately NOT compared, and the
 exclusion is a finding rather than a simplification.** The slice was planned as "flow
@@ -40,11 +39,11 @@ files carry no prefix at all. Anything Rust printed under that key would be the 
 list travelling through Rust and back, so the gate would compare Python against Python:
 the self-referential shape this repo already had to dissolve once, for the RNG vectors.
 
-⚠ **Slice 6's answer to that, taken 2026-08-16:** `param_files` is declared
-**Python-retained**, with the reason written into the manifest's own `_authority` block,
-because it cannot re-anchor until **slice 9** decides who loads the YAML — the arrow the
-plan's dependency table has pointing the other way. It is one of several: by content
-most of that manifest is still Python's.
+⚠ **Slices 6 and 7's answer to that, taken 2026-08-16:** `param_files` is declared
+**Python-retained** in *both* manifests, with the reason written into each one's own
+`_authority` block, because it cannot re-anchor until **slice 9** decides who loads the
+YAML — the arrow the plan's dependency table has pointing the other way. It is one of
+several: by content most of both manifests is still Python's.
 
 ⚠ **Authoring is out of scope, on slice 2's evidence rather than by category.** The
 authoring manifest's inventory is a different surface (grammar, VM node/op set,
@@ -81,10 +80,14 @@ _COMPARED_AXES = frozenset({"flow_set", "aux_set"})
 # the two sets are disjoint by contract and each is checked against its own file. ⚠ The
 # biosphere dump grew in slice 6 — it now emits everything the manifest sources from the
 # reference tree, plus `locked_dt_days`, which is emitted to be CHECKED and never
-# spliced (see `test_the_locked_dt_matches_the_reference_tree`).
+# spliced (see `test_the_locked_dt_matches_the_reference_tree`). ⚠ The station dump grew
+# in slice 7, by its two sealed horizons only: that contract has no structured dt key to
+# check a `locked_dt` against, and slice 7 declined to add one (widening the frozen
+# surface is its own unfreeze) — see the `numerics_note` entry in that manifest.
 _BIOSPHERE_DUMP_KEYS = frozenset(
     {"flow_set", "aux_set", "horizons", "light_path_samples", "locked_dt_days"}
 )
+_STATION_DUMP_KEYS = frozenset({"flow_set", "aux_set", "horizons"})
 _CASES = [
     (
         "biosphere",
@@ -98,7 +101,7 @@ _CASES = [
         RUST_STATION_DIR,
         "dump_station_inventory",
         "station-reference.manifest.json",
-        _COMPARED_AXES,
+        _STATION_DUMP_KEYS,
     ),
 ]
 
@@ -143,31 +146,42 @@ def test_rust_inventory_equals_the_frozen_manifest(
     # than letting `[] == []` pass as evidence.)
     assert manifest["flow_set"], f"{manifest_name} freezes no flows — nothing compared"
 
-    # ⚠ The advice depends on which case failed, and the assertion cannot tell them
-    # apart. For the re-anchored biosphere manifest a disagreement means the *committed
-    # file is stale*; for the still-parity station manifest it means the two ports
-    # genuinely differ, and regenerating would paper over a finding. A single message
-    # would be right for one case and actively misleading for the other — the "correct
-    # assertion giving wrong advice" defect slice 5 was caught on.
-    if manifest_name.startswith("biosphere"):
-        advice = (
-            "⚠ This manifest is generated FROM this dump (slice 6), so this is NOT a "
-            "port-vs-port divergence: the reference tree has changed and the committed "
-            "manifest has not been regenerated. That is an unfreeze — follow the "
-            "ceremony in docs/biosphere-reference.md, then `uv run python "
-            "tests/test_freeze_manifest.py`. If you did not mean to change the frozen "
-            "surface, the finding is whatever added or removed the name."
+    # ⚠ The advice still branches, and the reason changed rather than went away. Both
+    # cases are staleness now (slices 6 and 7), so the shared half is one message — but
+    # the station's dump mirrors five registry-selection judgement calls by hand, and a
+    # mis-mirrored one reads exactly like a reference move while being neither. That
+    # question has to be asked FIRST on this case and is meaningless on the other, and
+    # after slice 7 a wrong answer to it gets *written into* the frozen manifest by the
+    # regeneration this message sends you to. Kept per slice 5's lesson that no test
+    # catches a correct assertion giving wrong advice.
+    biosphere = manifest_name.startswith("biosphere")
+    ceremony = (
+        "docs/biosphere-reference.md" if biosphere else "docs/station-reference.md"
+    )
+    regen = (
+        "tests/test_freeze_manifest.py"
+        if biosphere
+        else "tests/test_station_freeze_manifest.py"
+    )
+    selection = (
+        ""
+        if biosphere
+        else (
+            "⚠ FIRST, before reading this as a reference move at all: check the "
+            "registry SELECTION in the dump example against the Python gate's "
+            "`_station_registries()`. A mis-mirrored build option (self-discharge, "
+            "with_harvest, the fast-vs-slow registry index) reads exactly like a "
+            "reference change and is not one — and since slice 7 regenerating would "
+            "write it into the frozen manifest. Only if the selection is right:\n"
         )
-    else:
-        advice = (
-            "⚠ Before treating this as a port bug, check the registry SELECTION in the "
-            "dump example against the Python gate's `_station_registries()` — a "
-            "mis-mirrored build option (self-discharge, with_harvest, the fast-vs-slow "
-            "registry index) reads exactly like a divergence and is not one. If the "
-            "selection is right, this manifest is still Python-anchored (slice 7 has "
-            "not been taken), so this is a genuine two-port disagreement: a finding to "
-            "hunt, and do NOT adjust either side to agree."
-        )
+    )
+    advice = (
+        f"{selection}⚠ This manifest is generated FROM this dump, so this is NOT a "
+        "port-vs-port divergence: the reference tree has changed and the committed "
+        f"manifest has not been regenerated. That is an unfreeze — follow the ceremony "
+        f"in {ceremony}, then `uv run python {regen}`. If you did not mean to change "
+        "the frozen surface, the finding is whatever added or removed the name."
+    )
     for axis in sorted(_COMPARED_AXES):
         assert dump[axis] == manifest[axis], (
             f"{label} {axis} diverges between the Rust tree and {manifest_name}:\n"
@@ -246,6 +260,34 @@ def test_the_locked_dt_matches_the_reference_tree() -> None:
     )
 
 
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_the_frozen_station_manifest_is_not_stale() -> None:
+    """Every station key sourced from the reference tree still reads what it emits.
+
+    The set axes are covered above; this is the rest of what slice 7 re-anchored — the
+    two sealed horizons — so a reference-side change to either is red rather than a
+    manifest quietly describing a tree that has moved on.
+
+    ⚠ `sealed_energy_years` is `LONG_HORIZON_YEARS` in the reference tree, the same
+    constant the biosphere manifest freezes as `long_horizon_years`. Moving it is one
+    reference-side edit that turns **both** contracts stale, and this is one of the two
+    places that says so.
+    """
+    manifest = json.loads(
+        (DOCS_DIR / "station-reference.manifest.json").read_text(encoding="utf-8")
+    )
+    dump = _rust_inventory(RUST_STATION_DIR, "dump_station_inventory")
+
+    for key, years in dump["horizons"].items():
+        assert manifest[key] == years, (
+            f"the reference tree runs {key} = {years}, but the frozen manifest "
+            f"declares {manifest[key]}. Moving a sealed horizon is an unfreeze "
+            "(docs/station-reference.md) — regenerate the manifest as its record, and "
+            "note that sealed_energy_years is shared with the biosphere contract."
+        )
+    assert dump["horizons"], "no horizons compared"
+
+
 def test_the_station_aux_axis_is_empty_by_delegation() -> None:
     """The station `aux_set` is empty, so its parity row proves nothing on its own.
 
@@ -256,9 +298,17 @@ def test_the_station_aux_axis_is_empty_by_delegation() -> None:
 
     * the **biosphere** case exercises the identical code path non-trivially — the same
       `registry.aux_processes()` walk, against three frozen names;
-    * a **measured negative control** on the station side, run when the slice landed:
+    * a **measured negative control** on the station side, run when slice 3 landed:
       wiring one aux process into a canonical station build turns the station row red,
       on the `aux_set` assertion specifically.
+
+    ⚠⚠ **Slice 7 raised the stakes here, and the control was re-run against the new
+    path.** The frozen `aux_set` is no longer Python's derivation — it is spliced in
+    from this dump, so an empty list is *written into* the manifest rather than merely
+    compared against one. Slice 6's two-direction rename control is unrunnable on this
+    axis (there is no station aux process to rename), so the substitute is the wiring
+    control above, re-measured through the regeneration path: the manifest gains the
+    name and `test_frozen_station_aux_set_is_complete` goes red.
 
     What this test owns is the *reason* the set is empty — the siblings and seams are
     all conserved-quantity flows, and the biosphere's accumulators live in the slow

@@ -1,22 +1,46 @@
-//! Dump the **station** port's own completeness inventory as JSON — slice 3 of the
+//! Dump the **station** port's half of the freeze manifest as JSON — slices 3 and 7 of the
 //! reference flip (`docs/plans/post-roadmap-reference-flip.md`).
 //!
-//! The union of `Flow::type_name()` / `AuxProcess::type_name()` over the canonical station
-//! registries, which is what `tests/test_station_freeze_manifest.py::_flow_set()` /
-//! `_aux_set()` derive on the Python side.
-//! `tests/crossport/test_inventory_parity.py` asserts this output equals
-//! `docs/station-reference.manifest.json`.
+//! ⚠⚠ **This program's standing changed in slice 7, exactly as the biosphere dump's did in
+//! slice 6.** In slice 3 it was a *witness*: it dumped the inventory and a Python gate
+//! checked it against a manifest Python had generated, so the two sides had independent
+//! origins and a disagreement was a finding. Since slice 7 the manifest is **generated from
+//! this output** — `tests/test_station_freeze_manifest.py::_build_manifest()` shells this
+//! example and splices the keys below in. The Python-side helpers that used to produce them
+//! (`_flow_set()`, `_aux_set()`, the two sealed-horizon constants) have become **conformance
+//! checks on the checker**.
 //!
-//! ⚠ **This is the half of slice 3 nobody had measured.** Slice 2 measured the biosphere
+//! ⚠ **This was the half of slice 3 nobody had measured.** Slice 2 measured the biosphere
 //! names against the manifest and found them identical; the station set had only ever been
 //! counted **by eye off a grep** (12 sibling `type_name` impls + 4 station ones = the
 //! manifest's 16), and this repo has already priced that exact evidence as a guess — the
 //! compiler found four impls the same grep missed, one slice ago.
 //!
-//! ⚠⚠ **`param_files` is deliberately ABSENT** — same reason as the biosphere dump: this
-//! port reads no YAML, only the Python-generated `station_params.txt` / `sibling_params.txt`,
-//! whose names carry no file prefix at all. Printing a list here would make the gate compare
-//! Python against Python. See `dump_biosphere_inventory.rs` for the full statement.
+//! ## What is emitted, and what is deliberately NOT
+//!
+//! * `flow_set` / `aux_set` — the union of `Flow::type_name()` / `AuxProcess::type_name()`
+//!   over the canonical registries selected by [`canonical`].
+//! * `horizons` — the two sealed run lengths, as the port's own constants. ⚠ Note that
+//!   `SEALED_ENERGY_YEARS = LONG_HORIZON_YEARS` in `scenario.rs`: after slice 7 the station
+//!   and biosphere manifests are anchored to the **same** reference-side constant, so
+//!   moving the decade horizon is one edit that unfreezes two contracts. A reader who
+//!   assumes they are independent will predict the wrong diff.
+//! * ⚠ **`integrator` is deliberately NOT emitted**, for the reason the biosphere dump gives
+//!   at length: the scheme is selected inline by each run helper and has no importable name
+//!   on *either* side, so a `"EulerIntegrator"` literal typed in here would be a second hand
+//!   literal checked against the first — which reads like a gate and is none.
+//! * ⚠ **No dt is emitted, and unlike the biosphere there is no `locked_dt_days` to check
+//!   against.** The station's steps live in the manifest's `numerics_note` **prose**, which
+//!   that module's own comment records as hand-maintained and ungated. The reference tree
+//!   *does* have referents (`sealed_station_scenario()`'s `bio_dt` / `cabin_dt`, the energy
+//!   scenario's `power_dt`), so the gate is buildable — but it needs a structured manifest
+//!   key that does not exist, and adding one widens the frozen surface. That is its own
+//!   unfreeze with its own ceremony, not a rider on this one. Recorded in the manifest's
+//!   `_authority` entry for `numerics_note`.
+//! * ⚠⚠ **`param_files` is deliberately ABSENT** — same reason as the biosphere dump: this
+//!   port reads no YAML, only the Python-generated `station_params.txt` / `sibling_params.txt`,
+//!   whose names carry no file prefix at all. Printing a list here would make the gate compare
+//!   Python against Python. See `dump_biosphere_inventory.rs` for the full statement.
 
 use domains::crew::{build_crew, MISSION_SCENARIO};
 use domains::eclss::{build_eclss, STEADY_STATE_SCENARIO};
@@ -25,7 +49,7 @@ use domains::power::{build_power, BOUNDED_SOC_SCENARIO};
 use domains::thermal::{build_thermal, EQUILIBRIUM_SCENARIO};
 use simcore::registry::Registry;
 use station::params as station_params;
-use station::scenario::sealed_station_scenario;
+use station::scenario::{sealed_station_scenario, SEALED_ENERGY_YEARS, SEALED_STATION_YEARS};
 use station::sealed::build_sealed_station;
 use std::collections::BTreeSet;
 
@@ -102,10 +126,23 @@ fn main() {
     // conserved-quantity flows; the biosphere's accumulators live in the delegated slow
     // registry), so `!aux.is_empty()` would be a false assertion, and `[] == []` is why
     // the gate's aux row needs a measured negative control rather than a green run.
+    //
+    // ⚠⚠ Since slice 7 that empty list is no longer merely *compared* — it is **written
+    // into the frozen manifest** by a regeneration run, which is the escalation the
+    // biosphere dump records for itself ("an empty set here would be written into the
+    // manifest, not merely compared against it"). The two-direction rename control slice 6
+    // used cannot be run on this axis: there is no station aux process to rename. The
+    // substitute, run when slice 7 landed, is to *wire one in* temporarily and confirm the
+    // regenerated manifest gains the name and the Python gate goes red — the only evidence
+    // that this walk reaches `aux_processes()` at all.
     assert!(!flows.is_empty(), "canonical station builds wired no flows");
 
     println!("{{");
     println!("  \"aux_set\": {},", json_array(&aux));
-    println!("  \"flow_set\": {}", json_array(&flows));
+    println!("  \"flow_set\": {},", json_array(&flows));
+    println!("  \"horizons\": {{");
+    println!("    \"sealed_energy_years\": {SEALED_ENERGY_YEARS},");
+    println!("    \"sealed_station_years\": {SEALED_STATION_YEARS}");
+    println!("  }}");
     println!("}}");
 }

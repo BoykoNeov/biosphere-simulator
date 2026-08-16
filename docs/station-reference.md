@@ -206,6 +206,36 @@ tests/test_station_freeze_manifest.py`). It names the integrator, the two sealed
 the derived flow set + aux set, the eight param files (+ provenance hashes), each scenario
 → golden (+ hash), and the `delegates_to` pointer to the biosphere manifest.
 
+⚠⚠ **Since 2026-08-16 (slice 7 of the reference flip) this file has MIXED AUTHORITY, and
+regenerating it needs `cargo`.** The keys the Rust reference tree can produce — `flow_set`,
+`aux_set`, `sealed_station_years`, `sealed_energy_years` — are read out of it by shelling
+`cargo run --example dump_station_inventory`; the rest is still the checker's or
+hand-written. **The manifest states this itself**, per key, in its own `_authority` block,
+which is the thing to read before assuming any field is Rust-derived. By content most of
+the file is not: `science_bands` + `liveness_floors` are a static census of pytest markers
+with no Rust referent, `param_files` is Python-retained until the flip's slice 9 decides
+who loads the YAML, and `sealed_energy_drift`'s golden hash is a Python-side fold of a raw
+Rust series. Two consequences a reader will otherwise miss:
+
+- **The completeness gates changed meaning without changing their arithmetic.** They used
+  to say *the manifest froze everything Python has*; they now say *Python still matches the
+  reference*, and a failure is a **checker** drift. The completeness question itself moved
+  to `tests/crossport/test_inventory_parity.py`, which compares the committed manifest
+  against a freshly built Rust tree.
+- **`sealed_energy_years` is `LONG_HORIZON_YEARS` in the reference tree** — the same
+  constant the biosphere manifest freezes. Moving the decade horizon is one reference-side
+  edit that unfreezes *two* contracts.
+
+⚠ **What slice 7 deliberately did NOT close: the `numerics_note` steps are still ungated
+prose.** That string carries the station's dt values as hand-maintained English, and
+nothing compares it to anything (the manifest generator's own literal is the only thing it
+is checked against, so the two agree whatever the code does). The reference tree *does*
+have referents for those numbers — the sealed scenario's `bio_dt`/`cabin_dt` and the energy
+scenario's `power_dt` — so the biosphere's `dt_days` treatment is buildable here. It needs
+a structured manifest key that does not exist, and adding one **widens the frozen surface**,
+which is its own unfreeze with its own ceremony rather than a rider on a re-anchoring. The
+hole is recorded in that key's `_authority` entry rather than left implicit.
+
 **What the manifest gate checks vs. what the goldens check** — the division is deliberate
 (the biosphere manifest's exact split):
 - **The scenario goldens own *values*.** Any value change to a frozen param, a flow law, or
@@ -245,7 +275,11 @@ biosphere change follows *its* discipline instead.) The procedure:
    **review the byte diff** — a change there means the trajectory moved, which is the point.
 4. **Regenerate the manifest** (`uv run python tests/test_station_freeze_manifest.py`) and
    review its diff — the changed hashes / flow set / param set are the git-visible record of
-   exactly what was unfrozen.
+   exactly what was unfrozen. ⚠ This step needs a working **Rust toolchain** since
+   2026-08-16: the manifest's `_authority`-marked `rust` keys are read out of the reference
+   tree, and a toolchain-less run exits loudly rather than writing the checker's values into
+   the reference's slots. **Predict the diff before running it** — a re-anchored key that
+   moves when you expected it not to is a finding, not a diff to accept.
 5. **Record provenance.** Update this file and the Phase-6 plan with what changed and why (a
    calibration cites its primary source per `docs/param-file-conventions.md`).
 6. **Re-run the gates:** full suite (incl. `-m slow` for the sealed stability), `ruff`,
@@ -255,6 +289,21 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-16 — the reference flip's slice 7: this manifest is now produced from the Rust
+  tree, and NO frozen value moved.** `docs/plans/post-roadmap-reference-flip.md`. Authorized
+  by the user (target state B: Rust canonical, Python the checker). The whole diff is the new
+  `_authority` block and the `_comment`; the flow set is the same 16 names, `aux_set` the
+  same `[]`, the horizons the same 15/4, every hash unmoved — measured by running the dump
+  *before* regenerating, and predicted in writing first.
+
+  **What actually changed is the producer, not the contents**, which is why the evidence is
+  a *pair* of controls rather than a green suite: renaming a flow in **Rust** moves the
+  manifest and reddens the Python gate; renaming the **Python** class leaves the manifest
+  byte-identical and reddens the same gate. Either alone proves nothing. Also landed:
+  `golden_sha256` is now compared against the files on disk (the desync hole slice 5
+  measured), the two sealed horizons are checked for staleness against the reference tree,
+  and every field of the file declares its own producer.
 
 - **2026-08-14 — the biosphere's within-day light path (biosphere-delegated; 4 station
   goldens, no station code).** `docs/plans/post-roadmap-gross-net-gas-exchange.md`.
