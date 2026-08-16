@@ -229,11 +229,12 @@ def test_the_shipped_floor_is_the_conservative_one_against_the_cited_route() -> 
 def test_sealed_chamber_stays_above_the_compensation_point() -> None:
     """71.44 ppm — and ⚠ this chamber **never crossed**, at any shipped step.
 
-    ⚠ Said **75.82** until 2026-08-15, which was this scenario's reading in `4d7fdfd`, the
-    commit that wrote this file. The light path (`a0ef98b`, six commits later the same day)
-    and then the layered canopy moved it; ``test_the_five_margins_are_pinned_not_merely_
-    positive`` went red at the first of those and was re-pinned, and these docstrings were
-    not. See ``docs/biosphere-reference.md`` — a value in prose acquires no owner.
+    ⚠ Said **75.82** until 2026-08-15, which was this scenario's reading in `4d7fdfd`,
+    the commit that wrote this file. The light path (`a0ef98b`, six commits later the
+    same day) and then the layered canopy moved it; ``test_the_five_margins_are_pinned_
+    not_merely_positive`` went red at the first of those and was re-pinned, and these
+    docstrings were not. See ``docs/biosphere-reference.md`` — a value in prose
+    acquires no owner.
 
     It is gated anyway. The scenario spent three days named as the crossing's locus, so
     a gate here is worth more than its margin: it pins the configuration
@@ -261,8 +262,9 @@ def test_perennial_chamber_stays_above_the_compensation_point() -> None:
     should have existed before it.
 
     ⚠ **It is now also the TIGHTEST of the five (1.1503×)**, which it was not when this
-    file was written — see ``test_consumer_chamber_stays_above_the_compensation_point``,
-    whose docstring made the opposite claim and was right for six commits. Said "75.48 at
+    file was written — see
+    ``test_consumer_chamber_stays_above_the_compensation_point``, whose docstring made
+    the opposite claim and was right for six commits. Said "75.48 at
     the shipped step / the margin is 1.24×" until 2026-08-15.
     """
     assert _season_low_ppm("perennial_chamber") > floor_ppm()
@@ -290,8 +292,8 @@ def test_consumer_chamber_stays_above_the_compensation_point() -> None:
     ranking inverted around it. ``perennial_chamber`` is now the tightest at 1.1503×.
 
     ⚠ **The lesson the old text carried is untouched and is why this was found**:
-    enumerate the roster, not the discussion. What it did not say, and this does, is that
-    a *ranking* is a claim about a moment — re-derive it, never quote it.
+    enumerate the roster, not the discussion. What it did not say, and this does, is
+    that a *ranking* is a claim about a moment — re-derive it, never quote it.
     """
     assert _season_low_ppm("consumer_chamber") > floor_ppm()
 
@@ -315,11 +317,11 @@ def test_perennial_long_horizon_stays_above_the_compensation_point() -> None:
     moves the 15-yr reading has stayed bit-equal to the 5-yr one. A *shape* outlives the
     values it is measured on, which is the argument for pinning shapes.
 
-    ⚠ The 50-yr statement below is **dated 2026-08-14 and has NOT been re-measured** since
-    the light path or the layered canopy: *"the per-year minima climb monotonically off
-    that year-2 trough to 75.84 and flatten, so the band's worst case sits inside the
-    frozen horizon"*. Its two inputs both moved, so it is carried as an open question, not
-    restated with new digits it has not earned.
+    ⚠ The 50-yr statement below is **dated 2026-08-14 and has NOT been re-measured**
+    since the light path or the layered canopy: *"the per-year minima climb
+    monotonically off that year-2 trough to 75.84 and flatten, so the band's worst case
+    sits inside the frozen horizon"*. Its two inputs both moved, so it is an open
+    question, not restated with new digits it has not earned.
     """
     assert _season_low_ppm("perennial_long_horizon") > floor_ppm()
 
