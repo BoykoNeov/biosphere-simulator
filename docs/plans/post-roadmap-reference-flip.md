@@ -295,6 +295,18 @@ cross-port biosphere comparison until now was on a **final** `State` — two por
 principle have reached the same endpoint along different paths and nothing would have said
 so. Marked `slow` (≈2.4 s per case against a ~24 ms fast-loop average).
 
+**⚠⚠ What this gate is NOT, recorded so nobody counts it twice.** It **borrows** the Tier-2
+band rather than exercising it, and it is **not cross-libm coverage**. Every golden
+comparison beside it is genuinely cross-libm on CI — glibc-Rust against UCRT-*generated*
+goldens — whereas this one compares glibc-Rust against glibc-CPython **in the same
+environment**, so both sides call one libm and the deviation is ~0.0 by construction on
+either platform. That is correct for what it tests (the *shape of the path*, not the last
+ULP), but a pass says nothing about whether the band is wide enough. The repo's own
+precedent is the reason this is written down: a Tier-2 sensitivity probe measured exactly
+`0.0` for weeks after the code moved out from under it and kept passing against nothing.
+⚠ It does run on CI — the `crossport` job runs the whole directory with no `-m` filter, by
+design — so the `slow` marker here is not a green-by-skip.
+
 **Not done here, on purpose: the oracle is not wired to it.** 2c's consumer — feeding
 Rust's trajectory to `oracle_match` — needs the matched-DVS / organ-basis plumbing, which is
 real judgement work and a later slice's. Slice 1 is the interface only, and nothing consumes

@@ -693,7 +693,21 @@ def test_rust_trajectory_matches_python_step_for_step(
     not the 5 of `perennial_chamber_state.json`, so it is compared to Python only; the
     season case additionally anchors its last row to the frozen golden.
 
+    ⚠⚠ **This test BORROWS the Tier-2 band; it does not exercise it, and it is NOT
+    cross-libm coverage.** Every golden comparison beside it is genuinely cross-libm on
+    CI — glibc-Rust against UCRT-*generated* goldens. This one compares glibc-Rust
+    against glibc-CPython **in the same environment**, so both sides call one libm and
+    the deviation is ~0.0 by construction, on Windows and on Linux alike. That is
+    correct for what this test is *for* — driver and observer parity, the shape of the
+    path rather than the last ULP — but a pass here says nothing about whether the band
+    is wide enough, and a zero deviation here is not evidence about anything. (The
+    repo's own precedent: a Tier-2 sensitivity probe measured exactly 0.0 for weeks
+    after the code moved out from under it, and kept passing against nothing.) The band
+    is used only so the comparison has a tolerance at all.
+
     Marked `slow`: two full Rust runs plus two full Python runs, and ~25 MB of JSON.
+    The `crossport` CI job runs the whole directory with no `-m` filter, so this is
+    **not** slow-marked into a green-by-skip.
     """
     reference = _python_trajectory(case)
     candidate = _run_example("emit_trajectory", [case])
