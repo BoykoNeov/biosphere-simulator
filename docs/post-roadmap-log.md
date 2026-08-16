@@ -65,6 +65,18 @@ by filename while it is exempt — call it *"the value-switch plan"*. **When it 
 the normal three and this paragraph goes with it.** ⚠ Written and committed *with* this
 paragraph, per the lesson recorded directly above.
 
+⚠ **A FOURTH forward-looking plan joined them on 2026-08-16: `post-roadmap-reference-flip.md`**
+— the user re-opened the Rust question and chose **target state B** of the Rust-primary pivot:
+flip the reference so Rust becomes canonical and Python becomes the checker. Planned in eleven
+independently-landable slices on the user's explicit instruction (*"only plan now, work in
+different slices"*); nothing built, `git diff src/` and `git diff rust/` both empty, no golden
+regenerated, no manifest touched. Same shape, same exemption, same two consequences: it is named
+*here* rather than in the index, and a file in `docs/log/` must not name it by filename while it
+is exempt — call it *"the reference-flip plan"*. **When its slices land it earns the normal three
+(index line, pointer row, record file) and this paragraph goes with it** — and that deletion is
+slice 11's own listed work, per the lesson recorded directly below. ⚠ Written and committed
+*with* this paragraph.
+
 ⚠ **The step-unfreeze exemption is GONE (2026-08-14), because the ceremony landed.** A
 paragraph here used to exempt `post-roadmap-step-unfreeze.md` from the index while its work
 was in progress, ending *"when the ceremony lands it earns the normal three — index line,
