@@ -570,6 +570,16 @@ differed in the last nibble — and **two of the twelve samples sit one ULP from
 neighbours**, exactly where that lands — the hash would have moved, the CI pair would have been
 new and unmeasured, and the key would have been declared Python-retained.
 
+**⚠⚠ CONFIRMED ON CI — after finding that CI had not been running the Python suite at all.**
+The glibc-CPython recomputation passed on `626bd7d`, which is the direct evidence. Reaching
+it meant discovering that the Python job (`ruff · pyright · pytest`) had been red at the
+**lint** step for 12+ commits, and ruff runs *before* pytest — so **no Python test had
+executed on CI** that entire time, including this very gate. Two earlier records called those
+lint errors pre-existing and deliberately unfolded; neither followed the consequence.
+⚠ *A job's failure at step 1 makes every later step's "greenness" a statement nobody made.*
+Fixed in `626bd7d` (line wrapping only): all four CI jobs green for the first time in 12+
+commits.
+
 **⚠ The classification is keyed by PATH, because two keys split (advisor).** `forcing` has
 three children with two answers; `scenarios` splits *inside one scenario* — slice 5's handoff,
 where `perennial_long_horizon_state.json` is Rust's and `drift_summary.json` is Python's fold

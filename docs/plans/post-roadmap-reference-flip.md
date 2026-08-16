@@ -894,6 +894,16 @@ hash *would* have moved, the CI pair *would* have been new and unmeasured, and t
 have been declared Python-retained. Inventing a normalization is the move this contract
 refuses.
 
+**⚠ CONFIRMED ON CI 2026-08-16, and only after a second defect was cleared.** The
+glibc-CPython recomputation (`test_manifest_pins_the_within_day_light_path`) **passed on
+`626bd7d`** — the direct evidence, now on the record rather than argued. Getting it required
+noticing that the Python CI job had been failing at the **lint** step for 12+ commits, and
+that ruff runs *before* pytest: **no Python test had executed on CI that whole time.** Two
+earlier records noted those lint errors as pre-existing and deliberately unfolded; neither
+noted the consequence. ⚠ *"It is green on CI" is worth nothing until you check that the job
+reached the step that runs it* — the green-by-skip family, one level up from the two this
+repo already had.
+
 **⚠ The classification is keyed by PATH, not by top-level key, because two keys split
 (advisor).** `forcing` has three children with two answers, and `scenarios` splits *inside one
 scenario* — slice 5's handoff, `perennial_long_horizon_state.json` being Rust's while
