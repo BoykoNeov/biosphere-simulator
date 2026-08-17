@@ -1303,7 +1303,9 @@ the slice numbering of §5 is superseded by C1–C7 plus Stage 3.
 | `src/lab/oracle_match.py` (the comparison arithmetic) | 103 lines | kept | **→ Rust** — ours, not third-party; it never imports PCSE |
 | `src/lab/rk45.py`, `convergence.py` | 409 lines | kept | **→ Rust** (decided 2026-08-17) — our own study tools, so the carve-out does not cover them |
 | `tests/` minus crossport and oracle | 145 files, 51,315 lines, ~2,300 tests | kept green | **port or retire, test by test** |
-| `tests/crossport` | 25 files, 6,552 lines | the whole point | ⚠ **DELETED, not ported** — with one port there is nothing to compare |
+| `tests/crossport` — **the comparison half** (`test_crossport.py`, `compare.py`, `measure_tier2_bands.py`, `tiers.json`) | ~2,000 lines | the whole point | **DELETED, not ported** — with one port there is nothing to compare |
+| `tests/crossport` — **the generator half** (9 × `gen_*.py`, `regen_goldens_from_rust.py`) | ~1,400 lines | inputs | ⚠ **NOT the same row** — see the correction below. Each needs a **named successor** |
+| `tests/crossport/test_godot_*.py` | 9 files, 1,668 lines | consumer parity | ⚠ **unclassified** — these exercise the Godot bridge, not port-vs-port. Needs a per-file pass before anything is deleted |
 | the three manifest generators | inside `tests/` | Python writes the contracts | **must move**, or the frozen contracts stay Python-authored forever |
 | the science-gate census | 15 markers → ~104 of 208 manifest lines | Python-retained | **needs a Rust home or an end date** |
 | `drift.py` folds | 2 goldens, 2 manifests | "one run, two authors" | **must move** to end the split |
@@ -1334,8 +1336,33 @@ classified `python` and would otherwise stay that way forever.
 
 **Stage 3 — the suite.** ~2,300 tests, 51k lines. Not one slice; a classification pass first,
 then batches by kind: the laws (C2 has 12), the regression/golden gates (mostly exist in Rust
-already), the science gates (C4), and the rest. ⚠ **`tests/crossport` is deleted rather than
-ported** — 6,552 lines whose entire subject is the two ports agreeing.
+already), the science gates (C4), and the rest.
+
+### ⚠ CORRECTION 2026-08-17 — "delete `tests/crossport`" was wrong for a third of it
+
+The row above originally read *"25 files, 6,552 lines, DELETED — their entire subject is the
+two ports agreeing."* **That is true of the comparison tests and false of the generators**,
+and the mistake was structural: the directory was priced as one thing because it has one name.
+
+`tests/crossport/` also holds the **current path from source data into Rust** —
+`gen_biosphere_params.py` → `biosphere_params.txt` via `include_str!`,
+`gen_biosphere_weather.py` → a Rust source file, six more vector/param generators, and
+`regen_goldens_from_rust.py`, **which is the Rust→golden path slice 4 built.** Deleting the
+directory wholesale would have deleted the mechanism the flip runs on.
+
+⚠ **And the deletion would redden nothing.** The generated files are checked in and consumed
+by `include_str!`, so removing their generator leaves a green suite and **unregenerable data** —
+[[authoring-manifest-reanchored]]'s lesson exactly: *a control with no test to turn red IS the
+finding.*
+
+**Each generator needs a named successor before it is touched:**
+
+| Generator | Successor |
+|---|---|
+| `gen_biosphere_params.py`, `gen_sibling_params.py`, `gen_station_params.py` | **C1** (the Rust param loader) supersedes all three |
+| `gen_biosphere_weather.py` | ⚠ **NONE — a real gap in C1–C7.** See the weather note below; schedule it in Stage 1 |
+| `gen_engine_vectors.py`, `gen_rng_vectors.py`, `gen_vectors.py`, `gen_authoring_vectors.py` | die **with** the comparison they feed — but confirm per file; a vector that anchors something other than port-parity outlives its reason |
+| `regen_goldens_from_rust.py` | **must move to Rust, not die** — it is how a golden is regenerated at all |
 
 ### The three things that need the user — ✅ ANSWERED 2026-08-17
 
@@ -1363,12 +1390,20 @@ the `oracle` name — it is **who imports PCSE**.
 | `src/lab/oracle_match.py` | 103 | no — pure stdlib arithmetic | **→ Rust** (decision 1's rule: ours, not theirs) |
 | `tests/test_oracle_{gap,gap_spring_wheat,smoke,match}.py` | 947 | no — they read the JSON | **→ Rust**, with the Stage-3 suite |
 | the 3 `@pytest.mark.oracle` regeneration tests | 164 | yes | **STAY** with their runners |
+| ⚠ `tests/oracle/test_{reference,lintul3}_fixture.py` | 135 | **no** — and **not marked `oracle`** | **→ Rust.** These run in *every normal build*; they are the fixtures' only routine validation |
+
+⚠ **Do not read `tests/oracle/` as "the carve-out".** Two of its seven test files are unmarked
+and PCSE-free — they validate the committed JSON on every run. Miss them and the JSON becomes
+**unchecked input to 47 Rust tests**: a concrete mechanism for the silent-rot risk below,
+not a hypothetical one. *The folder name is not the dependency.*
 
 ⚠ **The sleeper, and it is not in the oracle at all.** `tests/oracle/winter_wheat_weather.json`
-is raw NASAPower *weather*, not model output — and **20+ test files across the biosphere and
-station suites read it**, plus `tests/crossport/gen_biosphere_weather.py`, which compiles it
-into a Rust source file. So the fixture is load-bearing for the whole suite port, while the
-*plumbing that reads it* is Python that must be rebuilt. Schedule the reader early — it is a
+is raw NASAPower *weather*, not model output — and **47 test files across the biosphere and
+station suites read it** (counted 2026-08-17; an earlier draft of this section said "20+",
+which was a truncated `head -20`, not a count), plus `tests/crossport/gen_biosphere_weather.py`,
+which compiles it into a Rust source file. So the fixture is load-bearing for the whole suite
+port, while the *plumbing that reads it* is Python that must be rebuilt — and that generator
+is the one with **no successor anywhere in C1–C7**. Schedule the reader in Stage 1: it is a
 Stage-3 blocker wearing an oracle's name.
 
 ⚠ **What the carve-out becomes: a hand-run laboratory, not a build step.** Those 3 tests are
