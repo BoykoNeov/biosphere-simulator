@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B; eleven slices, eight landed — ⚠ target moved to C 2026-08-17)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1 of the C re-plan — the param load moved into the reference 2026-08-17)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -777,6 +777,109 @@ independent, so a disagreement is resolved in Rust's favour; **C's price is that
 disagreement stops being detectable at all.** Every mechanism the project leans on that lives
 in Python now needs an owner or an end date, and the manifest keys currently marked
 "Python-retained" stop being a classification and become a **queue**.
+
+### C1 — the params move into the reference — COMPLETE 2026-08-17
+
+**The first slice of the C re-plan, and the first that removes Python from the canonical
+run rather than re-labelling who owns a contract.** Until now the port read hex-float
+tables that `tests/crossport/gen_*_params.py` produced by running the *Python* loaders:
+the schema, the unit guard, the bound check and both core-ready folds all executed on the
+Python side and the "reference" consumed the answer. All **23** frozen param files — 15
+biosphere, 5 sibling, 3 station — are now loaded by Rust itself.
+
+**Built:** a zero-dep `config` crate mirroring Python's `src/config`, sitting *below*
+`domains` in the layering. The closed-subset YAML reader **moved** into it from
+`authoring` (not reimplemented — a second reader is slice 5's lesson repeated), and
+`authoring` re-exports it at its original path, so that crate's public surface is
+unchanged and its ~39 call sites compiled **untouched**, carried by a single
+`From<ConfigError>` impl.
+
+⚠⚠ **The slice was priced by a measurement taken before a line of Rust was written, and
+that is why it stayed cheap.** The hazard was concrete: if Rust re-derived the folded
+values from the decimal YAML and one bit moved, C1 would stop being a re-anchoring and
+become an unfreeze with **18 Rust-authored goldens** behind it, because slice 5 made the
+Rust byte census *unconditional*. The prediction was written down first and then measured
+in Python with no Rust at all: **pint contributes zero bits at all six live call sites**
+(every one is an identity — `convert` is called with the unit the file already declares),
+**75 of 80** generated scalars reproduce a declared YAML literal bit-for-bit, and the four
+folded values reproduce exactly. **Bit-neutral, and the Rust gate then passed on its first
+run.** *A slice whose risk is a numerical claim can have that claim settled in the language
+you are leaving.*
+
+⚠ **The dimensional check turned out not to be a units library, and that re-prices §2e's
+trap.** Every declared unit in the frozen tree — 18 `dimensionless`, 17 `degC`, 16 `1/day`,
+… — is validated by **exact string comparison**; only two Python functions genuinely
+convert, and their six callers are all identities. What C1 had to build was a string
+compare plus a correctly-rounded decimal parse.
+
+⚠ **Two things the prediction did not anticipate, both found before code.** (1)
+`radiator.yaml`'s `heat_capacity: 1.0e7` is resolved by pyyaml as a **string** (YAML 1.1
+wants a signed exponent; `1.0e+7` is a float, `1.0e7`/`1e7`/`1.0E7` are not) and coerced by
+pydantic — **the `1.0e7` hazard `yaml.rs` cites as its own reason for existing, live in the
+frozen tree rather than hypothetical.** Handled by parsing the scalar's *text*, which is
+what pydantic does and what keeps the bits identical. (2) **The reader could not parse our
+own param files at all**: both allocation tables were written in YAML **flow style**, which
+the closed subset excludes by design. **The subset this project froze for *authored* files
+never covered the project's own *param* files.**
+
+**Resolved by reformatting the two files, not by widening the grammar** — the deciding
+measurement is that flow style appears in **exactly those two files and zero authored
+scenarios**. No value moved (`gen_biosphere_params.py` reproduces its file byte-for-byte)
+and **the manifest diff was predicted before regenerating and held exactly**: one line,
+`param_files["allocation.yaml"]`'s sha-256. Since those hashes are recorded and **never
+compared**, the provenance ceremony was run deliberately. ⚠ Checked before choosing, because
+it decides which contract is touched: **the authoring manifest does not name the YAML subset
+at all**, and the reference doc never mentions it — the grammar is documented **only in a
+Rust source docstring**, outside the frozen contract.
+
+⚠⚠ **A negative control found a live defect in the frozen reader — it shipped as its own
+commit, and it is the finding of the slice.** The check asserting *"flow style is rejected,
+not silently mis-parsed"* **failed**. The guard lived only in `parse_scalar`, so flow style
+was rejected in the mapping-**value** position (`a: {b: 1}` — the only form the test named
+`flow_style_is_rejected` had ever covered) and **silently mis-parsed** in the
+sequence-**item** position: `- {dvs: 0.0, fl: 0.55}` has a `key:` head, so the mapping path
+returned the key `"{dvs"` with the value `"0.0, fl: 0.55}"` and **no error at all**. That is
+the exact form this repository's own param files had been written in for years, and any
+author writing a flow-style list entry in a scenario file got a silent mis-parse instead of
+the documented rejection. Fixed on the key side with one shared excluded-leader constant so
+the guards cannot drift, the regression case added **to that test** rather than a crate
+away, and measured inert on every existing file. ***A test that names a behaviour is not
+evidence it covers the case that matters*** — the same shape as the layered canopy's *"a
+probe that NAMES a scheme is not evidence it IMPLEMENTED it"*, one level up: here it is the
+*test* that named without covering.
+
+⚠ **The gate is two-directional on purpose.** `every_value_matches_the_generated_table`
+compares `to_bits()` for all 66 biosphere scalars, the partition table, and the 12+4 sibling
+and station values — **and** asserts the two *name sets* match, because a scalar the control
+names and the loader never reads would otherwise pass unnoticed. The generators and their
+three `.txt` files are **retained as that control**, per §5c's rule that a generator is not
+touched before its successor is green.
+
+**Asserted for the first time:** the MUST-EQUAL constraint between `canopy.yaml`'s and
+`nitrogen.yaml`'s `carbon_fraction` — documented in Python since Phase 1 and enforced
+nowhere. A divergence models a plant whose leaf area and nitrogen thresholds disagree about
+what a mol of carbon weighs.
+
+⚠ **A process failure worth recording: clippy was not run before the first two commits**
+and failed on the new crate. Three of the four fixes were cosmetic; **one was not, and
+taking the obvious suggestion would have been a silent regression.** `require_positive` was
+written `if !(value > 0.0)`; clippy proposes `value <= 0.0`, which **accepts NaN** where the
+original rejects it — and the Python loaders are written `if not value > 0.0` for exactly
+that reason. Rewritten with `partial_cmp` so the incomparable case is explicit. *A lint
+suggestion about float comparison is a semantic proposal, not a formatting one.*
+
+**Deferred with reasons, not missed:** `param_files` stays classified `python` in both
+manifests. Re-anchoring it needs **sha-256 in Rust** (there is none in the tree, and every
+engine crate is zero-dep by charter), a **newline-normalization rule** (the box is Windows,
+CI is Linux, and `golden_sha256` is normalized — an unstated rule diverges by *platform*,
+not by content), and the **census rule**: the manifest names **15** files where the directory
+holds **20**, and the five excluded — four potato overrides plus `demo.yaml` — are excluded
+for **two different reasons**. *"A directory is not a category"*, one commit after it was
+written down. Also deferred: the weather path, and the relocation of the YAML out of `src/`,
+which the `include_str!` paths now reaching out of the Rust tree will force.
+
+**Verification:** Python **2471 passed, 5 skipped, 0 failed**; Rust **347 passed, 0 failed**;
+`clippy --all-targets -D warnings` exit 0; `ruff` and `pyright` clean.
 
 ### The state of the arc
 
