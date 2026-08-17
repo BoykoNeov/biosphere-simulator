@@ -1,10 +1,30 @@
 //! Emit the RAW per-step biosphere series the drift-summary golden derives from
-//! (Phase-7 P7.4). The plan (advisor #3) keeps `drift.py` **Python-side**: Rust emits the
-//! per-step `leaf_c` (perennial + consumer) and `consumer_carbon` (consumer) trajectories
-//! over the 15-yr runs; the Python parity gate folds them into per-year summaries
-//! (`year_summaries`) and the period class (`is_period_2`) and compares to
-//! `drift_summary.json`. So this example reproduces NO segmentation — it only runs the two
-//! `run_perennial` trajectories and streams the raw stock amounts.
+//! (Phase-7 P7.4). Rust emits the per-step `leaf_c` (perennial + consumer) and
+//! `consumer_carbon` (consumer) trajectories over the 15-yr runs; the Python parity gate
+//! folds them into per-year summaries (`year_summaries`) and the period class
+//! (`is_period_2`) and compares to `drift_summary.json`. So this example reproduces NO
+//! segmentation — it only runs the two `run_perennial` trajectories and streams the raw
+//! stock amounts.
+//!
+//! ⚠ **The REASON for that changed in slice C5, even though the behaviour did not.** This
+//! file used to say the plan (advisor #3) keeps `drift.py` **Python-side**. That is no
+//! longer true: `domains::biosphere::drift` now carries the whole fold kit, and the
+//! station's `emit_sealed_energy_drift` was converted to emit its summary directly.
+//!
+//! What blocks the same conversion HERE is not the absence of a Rust fold — it is a
+//! measurement. Folding the Rust series moves **4 of `drift_summary.json`'s 45 values**
+//! (≤7 ULP: the consumer trajectory diverges by 1 ULP at step 4095 and the contracting
+//! attractor damps it back to a bit-identical final state by year 15). Python would then
+//! need tolerance-gating, i.e. an entry on `golden_platform.PYTHON_DIVERGES` — and
+//! `test_every_diverging_scenario_keeps_a_byte_gated_sibling` goes red, because this
+//! example serves exactly one golden and so has no byte-gated sibling under that gate's
+//! emitter-program key. Widening that key from inside the slice that needs it widened is
+//! the co-adaptation this repo refuses, so the authorship move is **deferred to its own
+//! ceremony**. See §5h of `docs/plans/post-roadmap-reference-flip.md`.
+//!
+//! ⚠ So the raw-series shape below is now a **deliberate holdover with a named blocker**,
+//! not the plan's standing design. Do not "finish the job" by converting it without
+//! resolving the gate first.
 
 use domains::biosphere::stocks::{CONSUMER_CARBON, LEAF_C};
 use domains::biosphere::{

@@ -234,3 +234,30 @@ fn is_period_2_rejects_damped_oscillation_to_a_fixed_point() {
     let sustained = [1.0, 3.0, 1.6, 2.6, 1.9, 2.3, 1.0, 3.0, 1.0, 3.0, 1.0, 3.0];
     assert!(is_period_2(&sustained, 6, 1e-3));
 }
+
+// --- the transient boundary, gated on BOTH classifiers ------------------------
+//
+// ⚠ Neither port had a case for `transient >= len` before slice C5, and C4's gates call
+// both of these with non-zero transients (`_TRANSIENT = 3`, `_PERIOD_TRANSIENT = 8`), so
+// the boundary is on a live path. Python and Rust reach the same answers by different
+// routes — Python slices to an empty tail and falls through, Rust returns early — which is
+// exactly the shape that hides a divergence until something calls it.
+
+#[test]
+fn is_stationary_is_vacuously_true_past_the_transient() {
+    // Python: `diffs[transient:]` is `[]` and `if not tail: return True`.
+    assert!(is_stationary(&[1.0, 2.0], 0.0, 0.0, 2));
+    assert!(is_stationary(&[1.0, 2.0], 0.0, 0.0, 5));
+    assert!(is_stationary(&[], 0.0, 0.0, 0));
+}
+
+#[test]
+fn is_period_2_is_false_past_the_transient() {
+    // Python: the empty/short tail fails `len(tail) < 3` and returns False. ⚠ Note the
+    // asymmetry with `is_stationary` above — "no data" means TRUE for the amplitude
+    // detector and FALSE for the structural one, because one asserts an absence of drift
+    // and the other asserts the presence of a cycle.
+    assert!(!is_period_2(&[1.0, 2.0, 1.0], 3, 1e-3));
+    assert!(!is_period_2(&[1.0, 2.0, 1.0], 9, 1e-3));
+    assert!(!is_period_2(&[], 0, 1e-3));
+}

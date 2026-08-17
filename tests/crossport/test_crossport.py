@@ -751,11 +751,21 @@ def test_rust_trajectory_matches_python_step_for_step(
 def _fold_drift_summary(raw: dict) -> dict:
     """Fold the Rust raw per-step series into the `drift_summary` shape, Python-side.
 
-    The plan (advisor #3) keeps ALL of `drift.py` Python-side: Rust emits the raw
-    `leaf_c` / `consumer_carbon` trajectories; here we apply the same per-year
-    segmentation the golden used (`year_summaries`: peak over each
+    Rust emits the raw `leaf_c` / `consumer_carbon` trajectories; here we apply the same
+    per-year segmentation the golden used (`year_summaries`: peak over each
     `[y*year:(y+1)*year+1]` segment; year-end = the segment's last state) and the same
-    `is_period_2` classifier — so no segmentation logic lives in Rust.
+    `is_period_2` classifier.
+
+    ⚠ **"No segmentation logic lives in Rust" was this helper's stated reason and slice
+    C5 made it false.** `domains::biosphere::drift` now carries the whole kit, and the
+    station's equivalent helper was deleted when `emit_sealed_energy_drift` began
+    emitting its summary directly. This one survives because `drift_summary.json` is
+    still Python-authored — and that is a *measured blocker*, not the old design:
+    folding the Rust series moves 4 of its 45 values, which needs an entry on
+    `PYTHON_DIVERGES` that
+    `test_every_diverging_scenario_keeps_a_byte_gated_sibling` refuses. See §5h of
+    docs/plans/post-roadmap-reference-flip.md. So this fold is a holdover with a named
+    end condition, not a standing choice.
     """
     from domains.biosphere.drift import is_period_2
     from domains.biosphere.step import steps_for
