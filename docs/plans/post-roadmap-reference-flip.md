@@ -1430,6 +1430,128 @@ year-2 vernalization reset bug, the multi-rate phase's zero-coverage driver, and
 five days before this decision — a scenario constant the entire Python suite could not see.
 Recorded as information. The user has taken the decision; this is what it costs.
 
+## §5d C1 designed and gated — measured 2026-08-17, BEFORE any Rust was written
+
+The re-plan says C1 *"unblocks `param_files` in both other manifests"*. This section takes
+that literally and **narrows C1 to the loader**: build the Rust param load, gate it against
+the artefact Python already produces, and leave the manifest re-anchoring to a successor with
+its own control — the shape slices 6–8 each got. Every number below was measured on frozen
+`main` (`git diff` empty, nothing regenerated) before the design was fixed.
+
+### ⚠⚠ The gating measurement: C1 is BIT-NEUTRAL, so it is a re-anchoring slice, not an unfreeze
+
+The hazard was concrete. Rust today consumes **post-fold** values as hex-floats that *Python*
+computed; if Rust re-derives them from the decimal YAML and a single bit moves, C1 stops being
+a loader change and becomes an unfreeze with 18 Rust-authored goldens behind it — slice 5 made
+the Rust byte census **unconditional**, so a 1-ULP shift is not "inside a band". **The
+prediction was written down first** (`PREDICTION.md`, per the discipline the last four slices
+graded themselves on) and then measured, in Python, with no Rust written:
+
+| Check | Result |
+|---|---|
+| pint's contribution at all **6** live call sites | **exact identity, bit-for-bit** |
+| **75 of 80** generated scalars | reproduce a declared YAML literal bit-for-bit — a plain decimal parse is all Rust needs (`float()` and `str::parse::<f64>()` are both correctly-rounded by spec) |
+| the **4** folded values | reproduce exactly in the recorded op order |
+| the 3 committed `.txt` files | current, not stale — `render()` reproduces each byte-for-byte |
+
+**So nothing moves, and no golden is expected to.** ⚠ The pint result is worth stating
+plainly because it re-prices the slice: the whole dimensional surface on the canonical path is
+**two functions with six callers**, and every one of them is currently an **identity** (`convert`
+is called with the unit the file already declares, wheat and potato alike). Every *other*
+`unit:` in the tree — 18 `dimensionless`, 17 `degC`, 16 `1/day`, … — is **exact-string
+compared**, never converted. §5c's surviving answer to §2e ("reimplement the dimensional check
+in the Rust loader") is therefore a string compare plus a decimal parse, not a units library.
+
+⚠ **The op-order trap named in the prediction turned out inert on today's values** — canopy's
+`(sla·M_C)/cf` and `sla·(M_C/cf)` give identical bits, as do both nitrogen orders. That is a
+fact about these four numbers, **not** a licence to re-associate: a value change could split
+them. Copy the op order.
+
+### ⚠ Two things the prediction did not anticipate, both found before writing code
+
+**A. `heat_capacity: 1.0e7` is parsed by pyyaml as a `str`, and pydantic coerces it.**
+`thermal/params/radiator.yaml`. YAML 1.1's resolver wants a signed exponent, so `1.0e7`,
+`1e7` and `1.0E7` all resolve as **strings** while `1.0e+7` resolves as a float. This is
+**exactly the hazard `rust/crates/authoring/src/yaml.rs` cites in its own docstring** as the
+reason the reader was hand-rolled — and it is **live in the frozen param tree**, not
+hypothetical. Bit-neutral (parsing the text as `f64` gives the same bits), but the Rust schema
+layer must coerce a string-typed scalar where a float is expected or one param file fails to
+load. The Rust reader's "numeric typing is deferred to the schema" design is already the right
+shape for this; the rule just has to be written down.
+
+**B. ⚠⚠ The Rust YAML reader CANNOT PARSE THE PARAM FILES AS THEY STAND.** `allocation.yaml`
+and `crops/potato/allocation.yaml` write their partition tables in **flow style** —
+`- {dvs: 0.0, fl: 0.55, …}` — and `yaml.rs` **actively rejects** it (verified in the code, not
+read off the docstring: line 394 rejects any scalar opening with `{}[]&*!|>`, and
+`flow_style_is_rejected()` is a test). **The closed subset the authoring platform froze does
+not cover this project's own param files.**
+
+Resolved by **reformatting the two tables to block style**, not by widening the grammar, and
+the deciding measurement is that **flow style appears in exactly those two files** — zero
+authored scenarios under `scenarios/` or `tests/authoring/scenarios/` use it. Widening a
+frozen grammar to accommodate two data files it was never asked about is the larger change and
+the wrong one. ⚠ Checked before choosing, because it decides which contract is touched: **the
+authoring manifest does not name the YAML subset at all** (no such key; `grammar_note` is
+about the *kinetics expression* grammar, `schema_fields` about the scenario schema) and
+`docs/authoring-reference.md` never mentions it — the subset is documented **only in a Rust
+source docstring**, outside the frozen contract. So widening would not have been an unfreeze
+by the letter, and the reformat **is** a provenance edit against a pinned hash. ⚠ One note for
+whoever revisits this: the subset's stated rationale is *"reconciling two independent YAML-1.1
+implementations"*. **Under C there is only one**, so "the subset is closed for parse parity"
+stops being a permanent argument.
+
+⚠ **The reformat is the provenance-only unfreeze that NOTHING CATCHES, and it was checked
+rather than assumed.** `test_frozen_param_set_is_complete` compares the param_files **key
+set**; the recorded sha-256 **values are never compared** (`test_manifest_named_files_exist`
+only asserts the files exist). So `allocation.yaml`'s hash moves and no test goes red — the
+honour-system ceremony applies deliberately: advisor review, regenerate the manifest as the
+git-visible record, document here. The **value** side is not honour-system:
+`test_biosphere_params_in_sync` reddens if any number moves, which is the gate that makes
+"provenance-only" a checkable claim rather than an intention.
+
+### The design
+
+1. **A new zero-dep `config` crate**, mirroring Python's `src/config/` — the boundary layer,
+   below `domains`. `yaml.rs` **moves** into it and `authoring` depends on `config` and
+   **re-exports `yaml` at its existing public path**, so no caller changes and the authoring
+   surface is byte-identical. ⚠ **Not a second reader** — slice 5's negative-control lesson
+   verbatim: *a policy with two implementations has one that is stale*.
+2. **`domains` and `station` load the YAML themselves**, producing the same structs
+   `params.rs` produces today, folds included, **in the recorded op order**. Bytes arrive via
+   `include_str!` at the files' existing paths.
+3. **The gate: every loaded value equals the committed `.txt` entry bit-for-bit.** ⚠ **The
+   generators and their three generated files are RETAINED as the control** — they are what
+   proves the Rust load is byte-equal, and §5c's own correction says a generator is not touched
+   before its successor is green.
+4. Split across two commits, because the halves have different risk: **(a)** the `config`
+   crate + the sibling/station loaders (8 files, no folds, no flow style); **(b)** the
+   biosphere loaders (15 files, both folds, the partition table, the reformat).
+
+### ⚠ Explicitly NOT in C1 — named so they are deferred, not missed
+
+* **The `param_files` re-anchor itself.** It needs three things C1 does not: **sha-256 in
+  Rust** (there is none anywhere in the Rust tree, and all four engine crates are zero-dep by
+  charter), a **newline-normalization rule** (`golden_sha256` is normalized; the box is
+  Windows and CI is Linux, so an unstated rule diverges by platform, not by content), and the
+  **census rule**. ⚠ The census is *not* a directory walk: the manifest names **15** files and
+  the biosphere params directory holds **20** — the four `crops/potato/*.yaml` (the port has no
+  potato; stage 2 is deferred) and `demo.yaml` (a skeleton, feeding two scenarios C6 retires).
+  **The five are excluded for two different reasons**, which is *"a directory is not a
+  category"* arriving one commit after it was written down. Python's own rule — a
+  **non-recursive** glob minus `demo.yaml` — is in `_frozen_param_files()` and is what the
+  successor mirrors. The station side is 8 files, 8 entries, no exclusions, so the rule is
+  biosphere-only.
+* **The weather path** (`gen_biosphere_weather.py`, the generator §5c found with no successor
+  anywhere in C1–C7). It needs a JSON reader over a closed subset **and** ISO-date →
+  day-of-year, and its fixture has to find a new home because `tests/` is being deleted, with
+  **47** test files reading it. Params first, weather second: blended, a moved bit would have
+  two candidate causes.
+* **Relocating the param YAML out of `src/`.** Under C the files cannot stay in a deleted
+  Python package. ⚠ The manifest keys are **basenames**, so the move would shift neither a key
+  nor a hash — but **no slice in C1–C7 owns it**, and until it happens C1's `include_str!`
+  paths reach out of the Rust tree into the Python one. That ugliness is the successor's
+  trigger, recorded here so it is not mistaken for an oversight.
+
 ## §6 Open questions — none blocking, all answerable when their slice is taken
 
 1. **Does new *reference science* wait for the flip?** B makes Rust the place science is
