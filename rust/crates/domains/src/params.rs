@@ -1,95 +1,186 @@
-//! The sibling coefficients, read from the generated hex-float file (Phase-7 P7.3).
+//! The sibling coefficients, **loaded from the frozen param YAML** (reference flip,
+//! slice C1).
 //!
-//! [`SIBLING_PARAMS`] is `tests/crossport/gen_sibling_params.py`'s output — each of the
-//! 12 Phase-5 coefficients loaded through its frozen Python loader (pydantic schema, the
-//! exact-string unit guard, and the bound check) and emitted as a C99 hex-float. We
-//! `include_str!` it and parse with the [`simcore::hexfloat`] codec, so the crate links
-//! no YAML parser (no `serde_yaml`) and re-parses nothing at runtime beyond a 12-line
-//! table.
+//! # What changed, and what did not
 //!
-//! Decimal param values round-trip bit-identically across correctly-rounding parsers,
-//! so this pins the exact loader-produced bits. `test_crossport.py::
-//! test_sibling_params_in_sync` guards the file against generator drift.
+//! Until slice C1 this module read `sibling_params.txt` — a hex-float table that
+//! `tests/crossport/gen_sibling_params.py` produced by running the *Python* loaders.
+//! That made Python the loader for the canonical run, which is the hole in the middle of
+//! "Rust is the reference": the schema, the unit guard and the bound check all executed
+//! on the Python side and the port consumed the result.
+//!
+//! Now this module does that work itself, through the [`config`] boundary crate: the
+//! same five files, the same exact-string unit guards, the same documented bounds.
+//!
+//! **Nothing about the numbers changed, and that was measured before it was built.**
+//! Every one of these twelve values is a plain decimal in its YAML file, and `f64`
+//! parsing is correctly rounded on both sides, so the loaded bits are the bits the
+//! generated table pinned. `sibling_params.txt` is **retained as the control**, not as
+//! the source: [`tests::every_value_matches_the_generated_table`] asserts bit equality
+//! against it, which is what makes "bit-neutral" a checked claim rather than an
+//! intention. The generator is retired only once that gate has been green — the rule
+//! `docs/plans/post-roadmap-reference-flip.md` §5c sets for every generator.
+//!
+//! ⚠ The `include_str!` paths reach out of the Rust tree into `src/`, the Python
+//! package. That is deliberate and temporary: under target state C the param files
+//! cannot stay in a deleted package, and the relocation is named in §5d as this slice's
+//! successor. The manifests key on **basenames**, so that move will shift neither a key
+//! nor a hash.
 
-use std::collections::BTreeMap;
-
-use simcore::hexfloat;
+use config::{require_closed, require_half_open, require_non_negative, require_positive};
+use config::{ConfigError, ParamFile};
 
 use crate::crew::CrewParams;
 use crate::eclss::EclssParams;
 use crate::power::{ChargeParams, SelfDischargeParams};
 use crate::thermal::ThermalParams;
 
-/// The committed, generated param table (see `gen_sibling_params.py`).
-const SIBLING_PARAMS: &str = include_str!("sibling_params.txt");
+const CHARGE_YAML: &str = include_str!("../../../../src/domains/power/params/charge.yaml");
+const SELF_DISCHARGE_YAML: &str =
+    include_str!("../../../../src/domains/power/params/self_discharge.yaml");
+const RADIATOR_YAML: &str =
+    include_str!("../../../../src/domains/thermal/params/radiator.yaml");
+const ECLSS_YAML: &str = include_str!("../../../../src/domains/eclss/params/eclss.yaml");
+const CREW_YAML: &str = include_str!("../../../../src/domains/crew/params/crew.yaml");
 
-/// Parse the embedded file into a `name → value` table (comment/blank lines skipped).
-fn table() -> BTreeMap<&'static str, f64> {
-    let mut out: BTreeMap<&'static str, f64> = BTreeMap::new();
-    for line in SIBLING_PARAMS.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let mut fields = line.split_whitespace();
-        let name = fields.next().expect("sibling param line has a name");
-        let hex = fields.next().expect("sibling param line has a hex-float value");
-        let value = hexfloat::parse(hex).expect("sibling param hex-float parses");
-        out.insert(name, value);
-    }
-    out
+/// Load a param file, panicking on a malformed one.
+///
+/// These five files are **frozen and embedded at compile time**, so a failure here is a
+/// broken build artefact, not a runtime input error — the same standing the previous
+/// `expect("sibling param hex-float parses")` had. Authored files, which *are* runtime
+/// input, go through `authoring` and surface a `Result`.
+fn file(text: &str, name: &'static str) -> ParamFile {
+    ParamFile::parse(text, name).unwrap_or_else(|e| panic!("{name} is malformed: {e}"))
 }
 
-/// Look up a required param, panicking with the missing key (a generation bug).
-fn get(t: &BTreeMap<&'static str, f64>, key: &str) -> f64 {
-    *t.get(key)
-        .unwrap_or_else(|| panic!("missing sibling param {key:?} in sibling_params.txt"))
+fn checked<T>(result: Result<T, ConfigError>, name: &'static str) -> T {
+    result.unwrap_or_else(|e| panic!("{name} failed its frozen bound/unit check: {e}"))
 }
 
 /// The Power one-way charge efficiency η_c (`charge.yaml`).
+///
+/// η ∈ (0, 1]: 1 is lossless charging (the heat leg collapses to 0); 0 would be a
+/// battery that stores nothing.
 pub fn charge() -> ChargeParams {
-    let t = table();
+    let f = file(CHARGE_YAML, "charge.yaml");
+    let v = checked(
+        f.guarded_set(&[("charge_efficiency", "dimensionless")], "charge.yaml"),
+        "charge.yaml",
+    );
     ChargeParams {
-        charge_efficiency: get(&t, "charge_efficiency"),
+        charge_efficiency: checked(
+            require_half_open(v[0], 0.0, 1.0, "charge_efficiency", "charge.yaml"),
+            "charge.yaml",
+        ),
     }
 }
 
 /// The Power first-order self-discharge rate k (`self_discharge.yaml`).
+///
+/// `k >= 0`: zero is valid (an ideal leak-free cell — inert, the herbivory "a zero rate
+/// is valid" precedent), negative is not.
 pub fn self_discharge() -> SelfDischargeParams {
-    let t = table();
+    let f = file(SELF_DISCHARGE_YAML, "self_discharge.yaml");
+    let v = checked(
+        f.guarded_set(&[("self_discharge_rate", "1/s")], "self_discharge.yaml"),
+        "self_discharge.yaml",
+    );
     SelfDischargeParams {
-        self_discharge_rate: get(&t, "self_discharge_rate"),
+        self_discharge_rate: checked(
+            require_non_negative(v[0], "self_discharge_rate", "self_discharge.yaml"),
+            "self_discharge.yaml",
+        ),
     }
 }
 
 /// The Thermal radiator properties (`radiator.yaml`).
+///
+/// ⚠ This is the file carrying `heat_capacity: 1.0e7` — the unsigned-exponent scalar
+/// YAML 1.1 resolves as a *string*. See [`config::params`] for why parsing the text is
+/// both faithful to pydantic and bit-neutral.
 pub fn thermal() -> ThermalParams {
-    let t = table();
+    let f = file(RADIATOR_YAML, "radiator.yaml");
+    let v = checked(
+        f.guarded_set(
+            &[
+                ("emissivity", "dimensionless"),
+                ("radiator_area", "m^2"),
+                ("heat_capacity", "J/K"),
+                ("space_temperature", "K"),
+            ],
+            "radiator.yaml",
+        ),
+        "radiator.yaml",
+    );
     ThermalParams {
-        emissivity: get(&t, "emissivity"),
-        radiator_area: get(&t, "radiator_area"),
-        heat_capacity: get(&t, "heat_capacity"),
-        space_temperature: get(&t, "space_temperature"),
+        emissivity: checked(
+            require_half_open(v[0], 0.0, 1.0, "emissivity", "radiator.yaml"),
+            "radiator.yaml",
+        ),
+        radiator_area: checked(
+            require_positive(v[1], "radiator_area", "radiator.yaml"),
+            "radiator.yaml",
+        ),
+        heat_capacity: checked(
+            require_positive(v[2], "heat_capacity", "radiator.yaml"),
+            "radiator.yaml",
+        ),
+        space_temperature: checked(
+            require_non_negative(v[3], "space_temperature", "radiator.yaml"),
+            "radiator.yaml",
+        ),
     }
 }
 
-/// The ECLSS control-loop coefficients (`eclss.yaml`).
+/// The ECLSS control-loop coefficients (`eclss.yaml`). All four are strictly positive.
 pub fn eclss() -> EclssParams {
-    let t = table();
+    let f = file(ECLSS_YAML, "eclss.yaml");
+    let v = checked(
+        f.guarded_set(
+            &[
+                ("co2_scrub_rate", "1/s"),
+                ("condense_rate", "1/s"),
+                ("o2_makeup_gain", "1/s"),
+                ("o2_setpoint", "mol"),
+            ],
+            "eclss.yaml",
+        ),
+        "eclss.yaml",
+    );
+    let names = ["co2_scrub_rate", "condense_rate", "o2_makeup_gain", "o2_setpoint"];
+    for (value, name) in v.iter().zip(names) {
+        checked(require_positive(*value, name, "eclss.yaml"), "eclss.yaml");
+    }
     EclssParams {
-        co2_scrub_rate: get(&t, "co2_scrub_rate"),
-        condense_rate: get(&t, "condense_rate"),
-        o2_makeup_gain: get(&t, "o2_makeup_gain"),
-        o2_setpoint: get(&t, "o2_setpoint"),
+        co2_scrub_rate: v[0],
+        condense_rate: v[1],
+        o2_makeup_gain: v[2],
+        o2_setpoint: v[3],
     }
 }
 
-/// The Crew metabolic-split fractions (`crew.yaml`).
+/// The Crew metabolic-split fractions (`crew.yaml`). Both are fractions in [0, 1].
 pub fn crew() -> CrewParams {
-    let t = table();
+    let f = file(CREW_YAML, "crew.yaml");
+    let v = checked(
+        f.guarded_set(
+            &[
+                ("respired_carbon_fraction", "dimensionless"),
+                ("insensible_water_fraction", "dimensionless"),
+            ],
+            "crew.yaml",
+        ),
+        "crew.yaml",
+    );
     CrewParams {
-        respired_carbon_fraction: get(&t, "respired_carbon_fraction"),
-        insensible_water_fraction: get(&t, "insensible_water_fraction"),
+        respired_carbon_fraction: checked(
+            require_closed(v[0], 0.0, 1.0, "respired_carbon_fraction", "crew.yaml"),
+            "crew.yaml",
+        ),
+        insensible_water_fraction: checked(
+            require_closed(v[1], 0.0, 1.0, "insensible_water_fraction", "crew.yaml"),
+            "crew.yaml",
+        ),
     }
 }
 
@@ -97,19 +188,96 @@ pub fn crew() -> CrewParams {
 mod tests {
     use super::*;
 
-    #[test]
-    fn all_twelve_params_present_and_finite() {
-        let t = table();
-        assert_eq!(t.len(), 12, "expected 12 sibling params");
-        for v in t.values() {
-            assert!(v.is_finite());
+    /// The retained control (see the module header): the hex-float table the Python
+    /// loaders produced, kept **only** so this file's load can be checked against it.
+    const GENERATED_TABLE: &str = include_str!("sibling_params.txt");
+
+    fn generated() -> std::collections::BTreeMap<&'static str, f64> {
+        let mut out = std::collections::BTreeMap::new();
+        for line in GENERATED_TABLE.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let mut fields = line.split_whitespace();
+            let name = fields.next().expect("a name");
+            let hex = fields.next().expect("a hex-float");
+            out.insert(name, simcore::hexfloat::parse(hex).expect("parses"));
         }
+        out
+    }
+
+    /// ⚠⚠ **The slice's gate.** Every value this module now loads out of the YAML is
+    /// bit-identical to what the Python loaders produced. Not "within a band" — the
+    /// same `f64`. A single moved bit here means C1 stopped being a re-anchoring and
+    /// became an unfreeze with the goldens behind it.
+    #[test]
+    fn every_value_matches_the_generated_table() {
+        let t = generated();
+        let ch = charge();
+        let sd = self_discharge();
+        let th = thermal();
+        let ec = eclss();
+        let cr = crew();
+        let pairs: [(&str, f64); 12] = [
+            ("charge_efficiency", ch.charge_efficiency),
+            ("self_discharge_rate", sd.self_discharge_rate),
+            ("emissivity", th.emissivity),
+            ("radiator_area", th.radiator_area),
+            ("heat_capacity", th.heat_capacity),
+            ("space_temperature", th.space_temperature),
+            ("co2_scrub_rate", ec.co2_scrub_rate),
+            ("condense_rate", ec.condense_rate),
+            ("o2_makeup_gain", ec.o2_makeup_gain),
+            ("o2_setpoint", ec.o2_setpoint),
+            ("respired_carbon_fraction", cr.respired_carbon_fraction),
+            ("insensible_water_fraction", cr.insensible_water_fraction),
+        ];
+        for (name, loaded) in pairs {
+            let want = t[name];
+            assert_eq!(
+                loaded.to_bits(),
+                want.to_bits(),
+                "{name}: loaded {loaded:?} ({:x}) != generated {want:?} ({:x})",
+                loaded.to_bits(),
+                want.to_bits()
+            );
+        }
+        assert_eq!(t.len(), 12, "the control table still names exactly 12 params");
+    }
+
+    /// ⚠ The control's own completeness: a param added to a YAML file and wired to
+    /// nothing must fail the load, not be silently dropped. `guarded_set` rejects an
+    /// unexpected key, so this asserts the mechanism rather than trusting it.
+    #[test]
+    fn an_extra_param_in_a_file_is_rejected() {
+        let extra = CREW_YAML.replace(
+            "parameters:\n",
+            "parameters:\n  bogus:\n    value: 1.0\n    unit: \"dimensionless\"\n    source: \"x\"\n",
+        );
+        let f = ParamFile::parse(&extra, "crew.yaml").expect("still parses");
+        assert!(f
+            .guarded_set(
+                &[
+                    ("respired_carbon_fraction", "dimensionless"),
+                    ("insensible_water_fraction", "dimensionless"),
+                ],
+                "crew.yaml",
+            )
+            .is_err());
+    }
+
+    /// ⚠ The unit guard is load-bearing, not decoration: re-declaring a rate in the
+    /// wrong unit must fail even though the number is untouched.
+    #[test]
+    fn a_re_declared_unit_is_rejected() {
+        let wrong = ECLSS_YAML.replacen("unit: \"1/s\"", "unit: \"1/day\"", 1);
+        let f = ParamFile::parse(&wrong, "eclss.yaml").expect("still parses");
+        assert!(f.guarded("co2_scrub_rate", "1/s", "eclss.yaml").is_err());
     }
 
     #[test]
     fn bounds_match_the_loaders() {
-        // Sanity: the loaded values sit in the loaders' documented ranges (a decimal
-        // round-trip check, not a re-derivation).
         let c = charge();
         assert!(0.0 < c.charge_efficiency && c.charge_efficiency <= 1.0);
         let th = thermal();

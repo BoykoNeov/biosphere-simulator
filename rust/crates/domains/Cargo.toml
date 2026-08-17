@@ -14,4 +14,8 @@ path = "src/lib.rs"
 # (`src/sibling_params.txt`, read with include_str!), NOT a YAML parser — mirroring
 # the Python core's stdlib-only discipline and avoiding the deprecated serde_yaml.
 [dependencies]
+# The param-file boundary (slice C1): the YAML reader, the `{value, unit, source}`
+# schema and the unit guard. Zero-dep and BELOW this crate, mirroring Python's
+# `domains.*.loader` importing `config` and never the reverse.
+config = { path = "../config" }
 simcore = { path = "../simcore" }

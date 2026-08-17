@@ -15,5 +15,9 @@ path = "src/lib.rs"
 # closed subset (`src/yaml.rs`, decision E USER-CONFIRMED): no YAML crate — one grammar
 # owned on both ports, mirroring the Phase-7 Option-C / hex-float zero-dep ethos.
 [dependencies]
+# The param/file boundary: the closed-subset YAML reader lives here now (slice C1),
+# because `domains` needs it too and may not depend on `authoring`. Re-exported below
+# at its original path, so this crate's public surface is unchanged.
+config = { path = "../config" }
 simcore = { path = "../simcore" }
 domains = { path = "../domains" }

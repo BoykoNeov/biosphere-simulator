@@ -28,7 +28,7 @@
 //! * **Indentation** — spaces only (a tab in indentation is an error, as in YAML); a
 //!   nested block must be *strictly* more indented than its parent key/dash.
 //!
-//! # Deliberately excluded (a file using these is an [`AuthoringError`], not silently
+//! # Deliberately excluded (a file using these is an [`ConfigError`], not silently
 //! mis-parsed)
 //!
 //! Anchors/aliases (`&`/`*`), tags (`!!…`), flow style (`{a: 1}` / `[1, 2]`),
@@ -37,7 +37,7 @@
 //! a bool field is expected), and merge keys (`<<`). The scenario files use none of
 //! these; excluding them keeps the grammar finite and the parse-parity risk zero.
 
-use crate::errors::AuthoringError;
+use crate::errors::ConfigError;
 
 /// A parsed YAML value in the closed subset: a scalar, a block mapping, or a block
 /// sequence. Mappings preserve source order (the schema checks key uniqueness /
@@ -57,27 +57,27 @@ pub enum YamlValue {
 
 impl YamlValue {
     /// The mapping entries, or an error naming `context` if this is not a mapping.
-    pub fn as_mapping(&self, context: &str) -> Result<&[(String, YamlValue)], AuthoringError> {
+    pub fn as_mapping(&self, context: &str) -> Result<&[(String, YamlValue)], ConfigError> {
         match self {
             YamlValue::Mapping(entries) => Ok(entries),
-            _ => Err(AuthoringError::new(format!("{context}: expected a mapping"))),
+            _ => Err(ConfigError::new(format!("{context}: expected a mapping"))),
         }
     }
 
     /// The sequence items, or an error naming `context` if this is not a sequence.
-    pub fn as_sequence(&self, context: &str) -> Result<&[YamlValue], AuthoringError> {
+    pub fn as_sequence(&self, context: &str) -> Result<&[YamlValue], ConfigError> {
         match self {
             YamlValue::Sequence(items) => Ok(items),
-            _ => Err(AuthoringError::new(format!("{context}: expected a sequence"))),
+            _ => Err(ConfigError::new(format!("{context}: expected a sequence"))),
         }
     }
 
     /// The scalar `(text, quoted)`, or an error naming `context` if this is not a
     /// scalar.
-    pub fn as_scalar(&self, context: &str) -> Result<(&str, bool), AuthoringError> {
+    pub fn as_scalar(&self, context: &str) -> Result<(&str, bool), ConfigError> {
         match self {
             YamlValue::Scalar { text, quoted } => Ok((text.as_str(), *quoted)),
-            _ => Err(AuthoringError::new(format!("{context}: expected a scalar"))),
+            _ => Err(ConfigError::new(format!("{context}: expected a scalar"))),
         }
     }
 }
@@ -102,26 +102,26 @@ struct Line {
 
 /// Parse a whole scenario-file text into a [`YamlValue`] (a top-level mapping).
 ///
-/// The reader is total over the closed subset and returns an [`AuthoringError`] on
+/// The reader is total over the closed subset and returns an [`ConfigError`] on
 /// anything outside it (a tab in indentation, a bad `- `/`key:` shape, an unterminated
 /// quote, trailing junk after a dedent). An empty document is an error (a scenario
 /// needs at least `name`/`stocks`/`flows`).
-pub fn parse_document(text: &str) -> Result<YamlValue, AuthoringError> {
+pub fn parse_document(text: &str) -> Result<YamlValue, ConfigError> {
     let lines = tokenize(text)?;
     if lines.is_empty() {
-        return Err(AuthoringError::new("empty scenario document"));
+        return Err(ConfigError::new("empty scenario document"));
     }
     let mut cursor = 0usize;
     let root_indent = lines[0].indent;
     if lines[0].dash {
-        return Err(AuthoringError::new(
+        return Err(ConfigError::new(
             "scenario document must be a mapping (top-level '-' sequence not allowed)",
         ));
     }
     let value = parse_mapping(&lines, &mut cursor, root_indent)?;
     if cursor != lines.len() {
         let line = &lines[cursor];
-        return Err(AuthoringError::new(format!(
+        return Err(ConfigError::new(format!(
             "line {}: unexpected indentation / trailing content {:?}",
             line.lineno, line.content
         )));
@@ -131,7 +131,7 @@ pub fn parse_document(text: &str) -> Result<YamlValue, AuthoringError> {
 
 /// Split the source into [`Line`]s, dropping blank and comment-only lines and
 /// resolving each `- ` dash prefix into `(dash, dash_indent, content-indent)`.
-fn tokenize(text: &str) -> Result<Vec<Line>, AuthoringError> {
+fn tokenize(text: &str) -> Result<Vec<Line>, ConfigError> {
     let mut lines = Vec::new();
     for (i, raw) in text.lines().enumerate() {
         let lineno = i + 1;
@@ -143,7 +143,7 @@ fn tokenize(text: &str) -> Result<Vec<Line>, AuthoringError> {
             // A tab anywhere in the indentation is an error (YAML forbids it).
             let indent_part = &stripped[..stripped.len() - stripped.trim_start().len()];
             if indent_part.contains('\t') {
-                return Err(AuthoringError::new(format!(
+                return Err(ConfigError::new(format!(
                     "line {lineno}: tab in indentation is not allowed (use spaces)"
                 )));
             }
@@ -177,7 +177,7 @@ fn tokenize(text: &str) -> Result<Vec<Line>, AuthoringError> {
 /// Truncate a raw line at its comment, honouring quotes and the "whitespace before
 /// `#`" YAML rule. A `#` inside a single- or double-quoted scalar, or one glued to a
 /// non-space token (`a#b`), is *not* a comment.
-fn strip_comment(raw: &str, lineno: usize) -> Result<String, AuthoringError> {
+fn strip_comment(raw: &str, lineno: usize) -> Result<String, ConfigError> {
     let mut in_single = false;
     let mut in_double = false;
     let mut prev_ws = true; // start-of-line counts as "whitespace before"
@@ -194,7 +194,7 @@ fn strip_comment(raw: &str, lineno: usize) -> Result<String, AuthoringError> {
     }
     // A quote left open at end-of-line is malformed (multi-line scalars are excluded).
     if in_single || in_double {
-        return Err(AuthoringError::new(format!(
+        return Err(ConfigError::new(format!(
             "line {lineno}: unterminated quoted scalar"
         )));
     }
@@ -208,7 +208,7 @@ fn parse_mapping(
     lines: &[Line],
     cursor: &mut usize,
     indent: usize,
-) -> Result<YamlValue, AuthoringError> {
+) -> Result<YamlValue, ConfigError> {
     let mut entries: Vec<(String, YamlValue)> = Vec::new();
     let first = *cursor;
     while *cursor < lines.len() {
@@ -224,7 +224,7 @@ fn parse_mapping(
         }
         let (key, value) = parse_entry(lines, cursor, indent)?;
         if entries.iter().any(|(k, _)| *k == key) {
-            return Err(AuthoringError::new(format!(
+            return Err(ConfigError::new(format!(
                 "line {}: duplicate key {key:?}",
                 line.lineno
             )));
@@ -240,7 +240,7 @@ fn parse_entry(
     lines: &[Line],
     cursor: &mut usize,
     indent: usize,
-) -> Result<(String, YamlValue), AuthoringError> {
+) -> Result<(String, YamlValue), ConfigError> {
     let line = &lines[*cursor];
     let lineno = line.lineno;
     let (key, rest) = split_key(&line.content, lineno)?;
@@ -253,7 +253,7 @@ fn parse_entry(
     // `key:` with an empty value → a nested block strictly deeper, else it is an error
     // (the closed subset has no implicit-null value; every key carries a value).
     if *cursor >= lines.len() || lines[*cursor].indent <= indent {
-        return Err(AuthoringError::new(format!(
+        return Err(ConfigError::new(format!(
             "line {lineno}: key {key:?} has no value (a nested block must be indented \
              deeper, an inline scalar must follow the ':')"
         )));
@@ -265,7 +265,7 @@ fn parse_entry(
 /// Parse a nested block (mapping or sequence) starting at `cursor`, dispatching on
 /// whether the first line is a dash line. The block's indent is taken from that first
 /// line.
-fn parse_block(lines: &[Line], cursor: &mut usize) -> Result<YamlValue, AuthoringError> {
+fn parse_block(lines: &[Line], cursor: &mut usize) -> Result<YamlValue, ConfigError> {
     let line = &lines[*cursor];
     if line.dash {
         parse_sequence(lines, cursor, line.dash_indent)
@@ -282,7 +282,7 @@ fn parse_sequence(
     lines: &[Line],
     cursor: &mut usize,
     dash_indent: usize,
-) -> Result<YamlValue, AuthoringError> {
+) -> Result<YamlValue, ConfigError> {
     let mut items: Vec<YamlValue> = Vec::new();
     while *cursor < lines.len() {
         let line = &lines[*cursor];
@@ -294,7 +294,7 @@ fn parse_sequence(
             // `-` alone: the item is a nested block on the following deeper lines.
             *cursor += 1;
             if *cursor >= lines.len() || lines[*cursor].indent <= dash_indent {
-                return Err(AuthoringError::new(format!(
+                return Err(ConfigError::new(format!(
                     "line {}: empty sequence item (a nested block must follow, indented \
                      deeper than the '-')",
                     line.lineno
@@ -325,7 +325,7 @@ fn is_entry(content: &str) -> bool {
 /// Split `content` into `(key, rest)` at the first `:` that is followed by a space or
 /// end-of-line and is not inside a quoted scalar. `rest` is trimmed; empty means the
 /// value is a nested block.
-fn split_key(content: &str, lineno: usize) -> Result<(String, String), AuthoringError> {
+fn split_key(content: &str, lineno: usize) -> Result<(String, String), ConfigError> {
     let mut in_single = false;
     let mut in_double = false;
     let bytes = content.as_bytes();
@@ -339,7 +339,7 @@ fn split_key(content: &str, lineno: usize) -> Result<(String, String), Authoring
                     let key = content[..idx].trim();
                     let rest = content[idx + 1..].trim();
                     if key.is_empty() {
-                        return Err(AuthoringError::new(format!(
+                        return Err(ConfigError::new(format!(
                             "line {lineno}: empty mapping key in {content:?}"
                         )));
                     }
@@ -349,7 +349,7 @@ fn split_key(content: &str, lineno: usize) -> Result<(String, String), Authoring
             _ => {}
         }
     }
-    Err(AuthoringError::new(format!(
+    Err(ConfigError::new(format!(
         "line {lineno}: expected 'key: value' or 'key:' in {content:?}"
     )))
 }
@@ -369,7 +369,7 @@ fn unquote_key(key: &str) -> String {
 /// Parse a scalar token into a [`YamlValue::Scalar`], stripping a surrounding quote
 /// pair and recording whether it was quoted (the schema's `number|expr` union needs
 /// it). A `#`-comment has already been removed by [`strip_comment`].
-fn parse_scalar(token: &str, lineno: usize) -> Result<YamlValue, AuthoringError> {
+fn parse_scalar(token: &str, lineno: usize) -> Result<YamlValue, ConfigError> {
     let token = token.trim();
     if token.len() >= 2 && token.starts_with('"') && token.ends_with('"') {
         return Ok(YamlValue::Scalar {
@@ -384,7 +384,7 @@ fn parse_scalar(token: &str, lineno: usize) -> Result<YamlValue, AuthoringError>
         });
     }
     if token.starts_with('"') || token.starts_with('\'') {
-        return Err(AuthoringError::new(format!(
+        return Err(ConfigError::new(format!(
             "line {lineno}: unterminated / malformed quoted scalar {token:?}"
         )));
     }
@@ -392,7 +392,7 @@ fn parse_scalar(token: &str, lineno: usize) -> Result<YamlValue, AuthoringError>
     // treating them as bare strings (they would silently mis-parse otherwise).
     if let Some(first) = token.chars().next() {
         if "{}[]&*!|>".contains(first) {
-            return Err(AuthoringError::new(format!(
+            return Err(ConfigError::new(format!(
                 "line {lineno}: scalar {token:?} uses an excluded YAML feature \
                  (flow-style / anchor / tag / block-scalar are not in the subset)"
             )));

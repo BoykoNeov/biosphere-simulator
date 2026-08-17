@@ -102,6 +102,16 @@ impl From<ParseError> for AuthoringError {
     }
 }
 
+impl From<config::ConfigError> for AuthoringError {
+    /// A param-boundary failure — a malformed YAML line, a key the schema forbids — is
+    /// an authoring failure when it comes up while reading an authored file. (Slice C1
+    /// moved the YAML reader to `config`; this conversion is what keeps the ~39
+    /// `?`-sites in this crate reading exactly as they did.)
+    fn from(err: config::ConfigError) -> AuthoringError {
+        AuthoringError::new(err.to_string())
+    }
+}
+
 impl From<simcore::error::SimError> for AuthoringError {
     /// A frozen-constructor validation failure (an impossible stock, an unknown
     /// quantity/kind) surfaces during interpretation as an authoring failure — the

@@ -6,14 +6,20 @@ version = 4
 name = "authoring"
 version = "0.1.0"
 dependencies = [
+ "config",
  "domains",
  "simcore",
 ]
 
 [[package]]
+name = "config"
+version = "0.1.0"
+
+[[package]]
 name = "domains"
 version = "0.1.0"
 dependencies = [
+ "config",
  "simcore",
 ]
 
@@ -167,6 +173,7 @@ version = "0.1.0"
 name = "station"
 version = "0.1.0"
 dependencies = [
+ "config",
  "domains",
  "simcore",
 ]

@@ -30,7 +30,16 @@ pub mod schema;
 pub mod sexpr;
 pub mod surface;
 pub mod template;
-pub mod yaml;
+
+/// The closed-subset YAML reader.
+///
+/// ⚠ **Re-export, not a module here** (reference flip, slice C1): the reader moved to
+/// the `config` crate because `domains` and `station` load param files too and may not
+/// depend on `authoring` (that would invert the boundary layering). The path
+/// `authoring::yaml::…` is unchanged, and there is deliberately **one** reader —
+/// a second would be slice 5's lesson repeated (*a policy with two implementations has
+/// one that is stale*).
+pub use config::yaml;
 
 pub use compose::apply_includes;
 pub use errors::{AuthoringError, ErrorKind};

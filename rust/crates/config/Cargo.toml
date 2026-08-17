@@ -1,0 +1,19 @@
+[package]
+name = "config"
+version = "0.1.0"
+edition = "2021"
+description = "Native Rust port of the Python `src/config` boundary (reference flip, slice C1). The param-file boundary: the closed-subset YAML reader, the `{value, unit, source}` entry schema, and the unit guard. Below `domains` in the layering, exactly as Python's `config` package is below `domains.*`."
+publish = false
+
+[lib]
+name = "config"
+path = "src/lib.rs"
+
+# Zero third-party dependencies, and zero PATH dependencies too — this crate sits at
+# the very bottom of the boundary layering (below `domains`), so it may not reach up
+# into the engine. The YAML reader is hand-rolled (moved here from `authoring`, NOT
+# reimplemented: two readers would mean one stale), and the "dimensional check" the
+# param files actually need is an exact-string unit guard plus a decimal parse — see
+# the slice-C1 measurement in docs/plans/post-roadmap-reference-flip.md §5d, which
+# found every live pint conversion in the Python reference to be an identity.
+[dependencies]
