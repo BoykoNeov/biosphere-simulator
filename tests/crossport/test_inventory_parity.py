@@ -45,12 +45,14 @@ the self-referential shape this repo already had to dissolve once, for the RNG v
 YAML — the arrow the plan's dependency table has pointing the other way. It is one of
 several: by content most of both manifests is still Python's.
 
-⚠ **Authoring is out of scope, on slice 2's evidence rather than by category.** The
-authoring manifest's inventory is a different surface (grammar, VM node/op set,
-flow-type registry) with no flow/aux registry axis, and the divergence that *would* have
-made it urgent — a port that lowered every authored flow to the generic declarative one
-and so reported a wrong inventory — was checked and cleared in slice 2: both ports make
-the same distinction at the same point. Slice 8 owns that manifest.
+⚠ **The authoring contract joined in slice 8, and it is a THIRD kind of case.** Its
+surface is the author-facing *platform* (grammar, VM node/op set, file schema, flow-type
+registry), which has no built registry to walk — so unlike the two above, the reference
+side cannot enumerate it at runtime and every axis is part derived, part hand-maintained
+roster. `authoring::surface`'s module docs and that manifest's `_authority` block say
+which is which per key. The staleness check is the same in shape and weaker in evidence,
+and it is written down here so nobody reads a green authoring row as the station row's
+equal.
 """
 
 from __future__ import annotations
@@ -67,6 +69,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCS_DIR = REPO_ROOT / "docs"
 RUST_DOMAINS_DIR = REPO_ROOT / "rust" / "crates" / "domains"
 RUST_STATION_DIR = REPO_ROOT / "rust" / "crates" / "station"
+RUST_AUTHORING_DIR = REPO_ROOT / "rust" / "crates" / "authoring"
 
 # The set-valued axes compared straight across, per case. ⚠ The dump's *exact* key set
 # is asserted too (`_DUMP_KEYS`), not read as a filter: adding `param_files` (or
@@ -88,6 +91,23 @@ _BIOSPHERE_DUMP_KEYS = frozenset(
     {"flow_set", "aux_set", "horizons", "light_path_samples", "locked_dt_days"}
 )
 _STATION_DUMP_KEYS = frozenset({"flow_set", "aux_set", "horizons"})
+#: ⚠ The authoring dump (slice 8) has NO axis in common with the two above — the
+# platform : contract freezes a grammar, a file schema and a flow-type registry, not a
+# wired : inventory — so it gets its own gate below rather than a row in `_CASES`. Every
+# key it : emits is spliced into the manifest, so the whole set is compared.
+_AUTHORING_DUMP_KEYS = frozenset(
+    {
+        "binary_ops",
+        "expr_nodes",
+        "flow_types",
+        "integrator_names",
+        "param_loaders",
+        "rate_classes",
+        "ref_keywords",
+        "schema_fields",
+        "step_token",
+    }
+)
 _CASES = [
     (
         "biosphere",
@@ -288,6 +308,55 @@ def test_the_frozen_station_manifest_is_not_stale() -> None:
     assert dump["horizons"], "no horizons compared"
 
 
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_the_frozen_authoring_manifest_is_not_stale() -> None:
+    """Every authoring key sourced from the reference tree still reads what it emits.
+
+    ⚠ **Compared whole, key for key, because every key this dump emits is spliced.** The
+    two gates above compare named axes out of a larger dump; here the dump *is* the
+    manifest's platform half, so anything it emits that the committed file does not
+    carry is a stale contract.
+
+    ⚠⚠ **A green row here is weaker evidence than a green station row, and the reason is
+    structural rather than incidental.** The station dump asks a *built registry* which
+    flows it wired; this one reads an `enum`, a `match` and a set of `const`s, because
+    the platform has no runtime object to interrogate. So this gate catches a
+    reference-side change that reaches one of those rosters, and cannot catch a
+    reference-side change that should have reached one and did not — a new `Expr`
+    variant left out of `sample_nodes`, a new `reject_unknown_keys` const nobody added
+    to `schema_fields`. Python's introspective derivation still covers exactly that gap
+    for the *checker's* tree (`test_authoring_freeze_manifest.py`), which is why the
+    flip kept it rather than deleting it.
+    """
+    manifest = json.loads(
+        (DOCS_DIR / "authoring-reference.manifest.json").read_text(encoding="utf-8")
+    )
+    dump = _rust_inventory(RUST_AUTHORING_DIR, "dump_authoring_inventory")
+
+    assert set(dump) == _AUTHORING_DUMP_KEYS, (
+        f"dump_authoring_inventory dumps {sorted(dump)}, not "
+        f"{sorted(_AUTHORING_DUMP_KEYS)} — a new key has to be classified in that "
+        f"manifest's _authority block before it can be frozen, and one the reference "
+        f"cannot honestly produce (a hash of a Python-generated vector file) must not "
+        f"enter at all."
+    )
+    assert dump["flow_types"], "no flow types compared"
+
+    for key in sorted(dump):
+        assert dump[key] == manifest[key], (
+            f"authoring {key} diverges between the Rust tree and the frozen manifest:\n"
+            f"  reference: {json.dumps(dump[key])[:300]}\n"
+            f"  manifest:  {json.dumps(manifest[key])[:300]}\n"
+            "⚠ This manifest is generated FROM this dump (slice 8), so this is NOT a "
+            "port-vs-port divergence: the reference tree's author-facing surface has "
+            "changed and the committed manifest has not been regenerated. Moving the "
+            "grammar, the file schema, the flow-type registry or the loader vocabulary "
+            "is an unfreeze — follow the ceremony in docs/authoring-reference.md, then "
+            "`uv run python tests/test_authoring_freeze_manifest.py`. If you did not "
+            "mean to change what authors write against, the finding is whatever moved."
+        )
+
+
 def test_the_dump_key_sets_are_the_ones_the_generators_consume() -> None:
     """⚠ The dump key set exists TWICE per contract — tie the copies, don't restate.
 
@@ -311,12 +380,18 @@ def test_the_dump_key_sets_are_the_ones_the_generators_consume() -> None:
     import sys  # noqa: PLC0415
 
     sys.path.insert(0, str(REPO_ROOT / "tests"))
+    import test_authoring_freeze_manifest  # noqa: PLC0415
     import test_freeze_manifest  # noqa: PLC0415
     import test_station_freeze_manifest  # noqa: PLC0415
 
     for label, mine, theirs in (
         ("biosphere", _BIOSPHERE_DUMP_KEYS, test_freeze_manifest._RUST_DUMP_KEYS),
         ("station", _STATION_DUMP_KEYS, test_station_freeze_manifest._RUST_DUMP_KEYS),
+        (
+            "authoring",
+            _AUTHORING_DUMP_KEYS,
+            test_authoring_freeze_manifest._RUST_DUMP_KEYS,
+        ),
     ):
         assert mine == theirs, (
             f"the {label} dump's key set is declared twice and the copies disagree:\n"

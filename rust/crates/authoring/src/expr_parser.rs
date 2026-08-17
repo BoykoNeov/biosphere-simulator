@@ -83,8 +83,20 @@ struct Token {
     pos: usize,
 }
 
-/// The three reference forms — the closed keyword set (`n` is handled separately).
-const REF_KEYWORDS: [&str; 3] = ["stock", "param", "forcing"];
+/// The three reference forms — the closed keyword set ([`STEP_TOKEN`] is handled
+/// separately).
+///
+/// ⚠ `pub` since slice 8 of the reference flip: this table is what the parser actually
+/// consults, so the authoring freeze manifest's `ref_keywords` is spliced from **here**
+/// rather than transcribed. Widening it widens the grammar and is an unfreeze.
+pub const REF_KEYWORDS: [&str; 3] = ["stock", "param", "forcing"];
+
+/// The bare identifier that lowers to [`Expr::StepN`] — the integer step count.
+///
+/// ⚠ Hoisted out of the `ident` match in slice 8 for the reason above: the manifest's
+/// `step_token` is now spliced from the token the parser tests against, so the two
+/// cannot drift. There is deliberately no `dt` token (RK4-order safety is structural).
+pub const STEP_TOKEN: &str = "n";
 
 /// The sole function form (Tier 2). Kept distinct from [`REF_KEYWORDS`] because it takes
 /// full sub-expressions, not a quoted string.
@@ -310,7 +322,7 @@ impl Parser {
 
     fn ident(&mut self, tok: &Token) -> Result<Expr, ParseError> {
         self.advance();
-        if tok.value == "n" {
+        if tok.value == STEP_TOKEN {
             return Ok(Expr::StepN);
         }
         if REF_KEYWORDS.contains(&tok.value.as_str()) {

@@ -62,6 +62,21 @@ use crate::interpreter::BuiltScenario;
 /// about the harness that the precondition depends on, not an implementation detail.
 pub const SPLIT: Split = Split::Strang;
 
+/// The legal `integrator:` values an authored scenario may name — the Rust analogue of
+/// Python's `run._INTEGRATORS` keys, and the authoring manifest's `integrator_names`.
+///
+/// ⚠ **Hand-maintained, and honestly so.** Python's copy is the *dispatch table itself*
+/// (a dict, enumerated), whereas here the dispatch is a `match` on `built.integrator`
+/// and a Rust `match` cannot be enumerated — the same limitation
+/// [`crate::flow_registry::FLOW_TYPE_NAMES`] records for itself. Two things close the
+/// gap: both `match` sites below build their "unknown integrator" message **from this
+/// slice**, so the error a user sees can never advertise a name the list omits; and
+/// `integrator_names_all_dispatch` runs a real scenario under every name here, so a name
+/// listed but not implemented is a compile-or-run failure rather than a frozen lie. What
+/// nothing on this side catches is a `match` arm added and *not* listed — see the
+/// `integrator_names` entry in the authoring manifest's `_authority` block.
+pub const INTEGRATOR_NAMES: &[&str] = &["euler", "rk4"];
+
 /// The result of a run: the final `State`, the total arbitration-backstop firings, and
 /// any extinction events.
 pub struct RunResult {
@@ -255,7 +270,7 @@ pub fn run_scenario_allowing_rationing(built: BuiltScenario) -> Result<RunResult
         ),
         other => {
             return Err(AuthoringError::new(format!(
-                "unknown integrator {other:?} (known: [\"euler\", \"rk4\"])"
+                "unknown integrator {other:?} (known: {INTEGRATOR_NAMES:?})"
             )))
         }
     };
@@ -323,7 +338,7 @@ fn run_multirate(built: BuiltScenario) -> Result<RunResult, AuthoringError> {
         ),
         other => {
             return Err(AuthoringError::new(format!(
-                "unknown integrator {other:?} (known: [\"euler\", \"rk4\"])"
+                "unknown integrator {other:?} (known: {INTEGRATOR_NAMES:?})"
             )))
         }
     };

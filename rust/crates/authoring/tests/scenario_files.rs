@@ -159,6 +159,22 @@ fn unknown_integrator_is_rejected() {
     assert!(run_scenario(built).is_err());
 }
 
+#[test]
+fn integrator_names_all_dispatch() {
+    // ⚠ Slice 8: `run::INTEGRATOR_NAMES` is spliced into the authoring freeze manifest, so
+    // a name listed there is a promise to an author. Python's copy is the dispatch dict
+    // itself and cannot lie; this one is a hand-maintained slice beside a `match`, so the
+    // promise is checked by *running* every name. (The reverse direction — an arm added and
+    // not listed — is not checkable here; the manifest's `_authority` entry says so.)
+    for name in authoring::run::INTEGRATOR_NAMES {
+        let built = interpret_str(&self_discharge_inline(name)).unwrap_or_else(|e| {
+            panic!("INTEGRATOR_NAMES lists {name:?} but it will not build: {e}")
+        });
+        run_scenario(built)
+            .unwrap_or_else(|e| panic!("INTEGRATOR_NAMES lists {name:?} but it will not run: {e}"));
+    }
+}
+
 // --- Step 6b: file composition (`includes` / bundles) ------------------------
 //
 // The cross-port byte-identity / graph-dump / run-match parity for the composition

@@ -878,10 +878,42 @@ and mirrors the biosphere's:
   flow registry and another on the schema scan confirm the gate actually fails on a
   phantom.
 
-**Cross-port boundary, stated honestly.** The manifest freezes the **Python** surface of
-record. The Rust mirror is gated by the parse/traj vectors + the anchors, not by this gate
-— a Python schema field added with no Rust mirror is caught only once an anchor exercises
-it. Parity surfaces own cross-port fidelity; this gate owns single-port completeness.
+**⚠⚠ Cross-port boundary — REVERSED by slice 8 of the reference flip (2026-08-17), and
+the old text is quoted because it is now false.** It read: *"The manifest freezes the
+**Python** surface of record. The Rust mirror is gated by the parse/traj vectors + the
+anchors, not by this gate — a Python schema field added with no Rust mirror is caught only
+once an anchor exercises it."*
+
+Since slice 8 the manifest's platform half is **generated from the Rust tree**
+(`cargo run --example dump_authoring_inventory`, spliced by `_build_manifest`), and every
+key says which side produced it in the manifest's own `_authority` block. The Python
+derivations still run and still derive from the live package — they have become
+**conformance checks on the checker**, answering *"has Python drifted from the contract?"*
+rather than *"what is the contract?"*. A **Rust-only** addition now widens the frozen
+surface at the next regeneration; a **Python-only** one fails immediately.
+
+**⚠ What that cost, on this contract specifically.** The biosphere and station manifests
+re-anchored to a *runtime enumeration of a built registry*, which Rust does identically.
+This contract has no such object — it freezes a platform, not a wiring — and Python's
+derivations use language introspection Rust does not have (`typing.get_args` over a closed
+union, a scan of `vars(authoring.schema)`, pydantic `model_fields`, a dict). On the
+reference side an `enum`, a `match` and a set of `const`s stand in their place, so **the
+completeness census is weaker there than it was here**, per key:
+
+| Axis | On the reference side | What it cannot catch |
+|---|---|---|
+| `ref_keywords`, `step_token`, `rate_classes`, `schema_fields` | **load-bearing** — the very tables the parser/interpreter reject against | nothing on the values; a whole *new* spec model is not forced into the dump |
+| `expr_nodes` | names come from an exhaustive `match` (a new `Expr` variant is a **compile error**) | the emitted list is a hand roster — a new variant can be named and still omitted |
+| `binary_ops` | symbols come from `BinaryOp::symbol()`; `/` is absent from the **type** | the three-variant roster is hand-maintained |
+| `flow_types` | every entry derived from `FlowTypeSpec`, `cls` read off a **constructed** flow | the roster is `FLOW_TYPE_NAMES`, hand-maintained (a Rust `match` cannot be enumerated) |
+| `integrator_names` | both dispatch arms build their error from the slice; every listed name is **run** | a `match` arm added and not listed |
+
+"Load-bearing" there is measured, not asserted: dropping `forcing` from `REF_KEYWORDS`
+reddens `parse_parity_accept_and_reject` and `trajectory_parity_all_scenarios`; dropping
+`n_sub` from `SCENARIO_KEYS` reddens fourteen tests across five targets; changing
+`STEP_TOKEN` reddens the parser suite; dropping `slow` from `RATE_CLASSES` reddens the
+multi-rate suite. Keeping the Python derivation is what still covers the checker's own
+tree, which is why the flip kept it rather than deleting it.
 
 ## Documented boundaries (deferred, by name — not omissions)
 
@@ -976,7 +1008,12 @@ type or its wiring names, a param loader, or the composition semantics — is an
    anchor that pins the new surface.
 4. **Regenerate the manifest** (`uv run python tests/test_authoring_freeze_manifest.py`)
    and review its diff — the changed sets are the git-visible record of exactly what was
-   unfrozen.
+   unfrozen. ⚠ **Since slice 8 this step needs `cargo`**: the `_authority` `rust` keys are
+   read out of the reference tree, so regeneration shells
+   `cargo run --example dump_authoring_inventory`. Predict the diff *before* running it —
+   and note that step 3's "land it on both ports" now has a direction: the reference side
+   is what the manifest will record, so landing Rust first and Python second is the order
+   that keeps the ceremony honest.
 5. **Record provenance.** Update this file and the Phase-9 plan with what changed and why
    (a deferred op joining moves it out of the *deliberately incomplete* table above).
 6. **Re-run the gates:** the full suite (incl. `-m slow`), `ruff`, `pyright`, `cargo test`,
@@ -988,6 +1025,19 @@ An undocumented unfreeze fails CI by construction (the completeness gate, or a m
 vector/anchor), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-17 — the contract re-anchored to Rust (reference flip, slice 8).** No frozen
+  *value* moved: the manifest gained an `_authority` block and a re-worded `_comment`, and
+  nothing else. The producer changed, which a diff cannot show — so the evidence is a
+  **measured two-direction pair**: renaming a wiring field in *Rust* moves the manifest and
+  reddens the checker; renaming the same field in *Python* leaves the manifest
+  byte-identical and reddens the checker. Either control alone proves nothing. Seventeen
+  negative controls in all, each turning exactly one gate red on the intended assertion.
+  ⚠ Not advisor-reviewed *before* the ceremony in the grammar sense of step 1 — no grammar
+  node, op or semantic moved; the advisor did review the approach before the slice began,
+  and flagged the blocking item (measure every axis and write the prediction down before
+  regenerating), which is what the "no value moved" line above records the outcome of.
+  See `docs/plans/post-roadmap-reference-flip.md` §5 slice 8.
 
 - **2026-08-11 — the direction gate (`ReversedFlowError`).** A `demand_controlled` field
   on `FlowTypeSpec` (set on `eclss.o2_makeup`, `None` on the other eleven), a third

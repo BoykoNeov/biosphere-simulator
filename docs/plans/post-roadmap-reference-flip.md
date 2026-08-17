@@ -1088,6 +1088,171 @@ no route to the reference at all; and slice 8 inherits this same per-key exercis
 authoring manifest, whose surface has no flow/aux registry axis and so will not look like
 either of these two.
 
+### Slice 8 — COMPLETE 2026-08-17
+
+**Built.** A new `authoring::surface` module (the platform census), a new
+`dump_authoring_inventory` example, and the manifest's platform half re-anchored to it:
+`_build_manifest()` now shells the dump and splices **all nine** platform keys, the manifest
+gained an `_authority` block naming the producer of every key, and four consts were hoisted
+in the reference tree so the dump reads what the parser enforces. Three new Python gates,
+one new crossport staleness gate, six new cargo-side tests. `git diff src/` empty. Ruff /
+ruff-format / pyright clean, `cargo clippy --all-targets -D warnings` clean, the whole
+`cargo test` suite green, 151 authoring + crossport gates green.
+
+**⚠⚠ The prediction was written down before regenerating and held exactly: the only changes
+to the manifest are the new `_authority` block and the `_comment`.** Not one frozen value
+moved — same grammar, same 8 spec models, same 12 flow types, same loaders. Measured
+axis-by-axis against the committed file **before** any regeneration (the advisor's blocking
+item), and the first comparison run was itself a control: it came back with **one**
+divergence, `ref_keywords` in declaration order against the manifest's sorted order. The
+*content* was right and only the order was not — fixed in `surface::sorted` rather than at
+the printer, because a printer-side sort leaves every future axis one forgotten `sort()`
+away from a false divergence, and a false alarm on this gate reads as a port bug to hunt.
+
+**⚠⚠ This contract is where the flip is NOT free, and that is the slice's real finding.**
+Slices 6 and 7 were relabels because slice 3 had already proved the sets identical *through
+the same mechanism on both sides* — a runtime walk of a **built registry**. §2b's retraction
+("the gates don't introspect the namespace, they read `registry.flows`, and Rust does that
+identically") is what made those cheap. **It does not transfer here.** This manifest freezes
+the *platform*, which has no runtime object to interrogate: Python derives it by language
+introspection Rust does not have (`typing.get_args` over the closed `Expr` union, a scan of
+`vars(authoring.schema)`, pydantic `model_fields`, a dict), and the reference side offers an
+`enum`, a `match` and a set of `const`s instead. **Re-anchoring therefore traded a derived
+census for a partly hand-maintained one**, per axis:
+
+| Axis | Reference side | What nothing on that side catches |
+|---|---|---|
+| `ref_keywords`, `step_token`, `rate_classes`, `schema_fields` | **load-bearing** — the tables the parser/interpreter reject against | a whole new spec model (Python's module scan catches it; a new const is forced into nothing) |
+| `expr_nodes` | names from an exhaustive `match` — a new variant is a **compile error** | the emitted list is a hand roster: a variant can be named and still omitted |
+| `binary_ops` | symbols from `BinaryOp::symbol()`; `/` absent from the **type** | the three-variant roster |
+| `flow_types` | entries fully derived; `cls` read off a **constructed** flow | the roster is `FLOW_TYPE_NAMES`, hand-maintained |
+| `integrator_names` | both dispatch arms build their error from the slice; every listed name is **run** | a `match` arm added and not listed |
+
+⚠ **"Load-bearing" is measured, not asserted** — and the first measurement was wrong for a
+harness reason. `cargo test` stops at the first failing target, so the initial run reported
+that dropping `n_sub` from `SCENARIO_KEYS` reddened **only** the new surface test, which
+would have been a real coverage finding. Re-run with `--no-fail-fast`: it reddens **14 tests
+across 5 targets**, the whole multi-rate suite included. Dropping `forcing` from
+`REF_KEYWORDS` reddens `parse_parity_accept_and_reject` **and**
+`trajectory_parity_all_scenarios` — the cross-port vector gates themselves; changing
+`STEP_TOKEN` reddens the parser suite; dropping `slow` from `RATE_CLASSES` reddens the
+multi-rate suite. *Slice 5's "check the control's own exit code" has a sibling: check that
+the control's runner reached every target it was supposed to.*
+
+**⚠ Because of that asymmetry the Python derivations were KEPT, and their meaning inverted
+in place.** `manifest["expr_nodes"] == _expr_nodes()` is the identical assertion it was
+yesterday and now asks the opposite question — *has the checker drifted from the contract?*
+rather than *is the manifest a faithful record of Python?*. A silent reversal of exactly this
+shape is already in the log (`o2-makeup-reversal-inside-the-freeze`), so a new test
+(`test_the_python_derivations_are_conformance_checks_now`) pins the direction and asserts the
+set of conformance-checked axes **equals** the spliced set — an axis spliced from Rust with
+no Python derivation beside it would leave the checker unchecked there, which is allowed but
+must be a decision.
+
+**⚠ The acceptance criterion was a measured PAIR for the third re-anchoring running:**
+
+| Control | Manifest | Python conformance gate |
+|---|---|---|
+| rename a wiring field in **Rust** (`co2_removed`), regenerate | **MOVED** | RED |
+| rename the same field in **Python**, regenerate | **byte-identical** | RED |
+
+**Seventeen negative controls, each turning exactly one gate red on the intended
+assertion**, green again after every revert: the two-direction pair; one per axis
+(`expr_nodes`, `binary_ops`, `ref_keywords`, `schema_fields`, `step_token`,
+`integrator_names`, `rate_classes`, `param_loaders`); an unclassified manifest field; a
+stale `_authority` pattern; two patterns of **equal** specificity; `_AUTHORITY` and the
+splice list made to disagree; a new key added to the dump (**regeneration refused, exit 1**);
+the two dump-key copies made to disagree; and a reference-side rename left un-regenerated
+(the crossport staleness gate). ⚠ Controls 12 and 13 redden the *same test*, so which line
+fired was read off a real failure — the stale-pattern assertion and the tie assertion
+respectively (slice 7's lesson, arriving on schedule).
+
+**⚠ Found by a control, not by review: `step_token` was a frozen value that NOTHING
+checked.** It was written into `_build_manifest` as the literal `"n"` and no gate compared
+it — so changing the reference's token moves the manifest and, before this slice, would have
+reddened nothing at all. The new conformance gate is what closes it, and control 7 is the
+measurement. *An ungated field does not announce itself; it turns up when you build a control
+for it and find no test to redden.*
+
+**⚠ The third anti-derived literal, found where §2b's census never looked.**
+`test_manifest_records_the_grammar_is_incomplete` asserts `binary_ops == {"+","-","*"}` by
+hand. §2b counted 23 derived assertions against 2 hard-coded literals and surveyed only the
+biosphere gate's `BIO_DT` pair, so this one was never on the list. Control 4 confirms it is
+live: dropping `Mul` reddens both it *and* the completeness gate. Kept as-is — it guards the
+deliberate incompleteness of the grammar (that `/` is deferred), which is a decision, not a
+value the tree should be able to move on its own.
+
+**⚠ `parity_vectors` is PYTHON-RETAINED, and it is `param_files`' finding reached by a
+different road.** `parse_vectors.txt` / `traj_vectors.txt` live in the *Rust* crate's
+`tests/data`, which makes hashing them from the reference side look natural — but they are
+**generated by `tests/crossport/gen_authoring_vectors.py`** and merely re-derived in Rust as
+the parity check, so a Rust-side hash would compare the checker's output with itself. Slice
+3's key-set forcing function is what makes adding it a loud refusal rather than a silent
+tautology (control 15).
+
+**⚠ The `SpecKind` forcing function was priced and DEFERRED, on slice 7's precedent.** The
+one hole with a clean fix is `schema_fields`' completeness: threading a `SpecKind` enum
+through `reject_unknown_keys` and matching it exhaustively in the dump would make a new spec
+model a **compile error** until it is classified. It restructures eight parser call sites to
+serve a manifest key, which is its own change rather than a rider on a re-anchoring — exactly
+why slice 7 declined `locked_dt`. Recorded in `schema.rs`, in `surface.rs` and in the
+manifest's `_authority` entry. ⚠⚠ **The 2026-08-17 target-state change raises its priority**:
+under B the Python module scan backstops this hole, and under C that backstop is scheduled
+for deletion.
+
+**Also landed:** the two prose halves this slice makes false were moved with it, both quoted
+rather than silently edited — `flow_registry.rs`'s *"the authoring manifest freezes the
+Python surface, so nothing here fails until an anchor exercises the missing arm"* (the
+exposure has swapped ends: a **Rust-only** registration now widens the frozen contract at the
+next regeneration) and `docs/authoring-reference.md`'s *"Cross-port boundary, stated
+honestly"* paragraph, which gains the per-axis table above and a new unfreeze-log entry.
+The ceremony itself gained a step-4 note: regeneration now needs `cargo`, and step 3's "land
+it on both ports" now has a **direction**.
+
+**Not done, and named rather than left implicit:** `parity_vectors` waits for whatever
+retires its Python generator; the `SpecKind` census is its own change; and the manifest's
+`grammar_note` stays hand-written prose by design — it records which ops are deferred and
+why, which is a decision rather than tree state.
+
+---
+
+## §5b ⚠⚠ The target state changed on 2026-08-17, mid-slice — B is now C
+
+**The user's words, received while slice 8 was in flight:** *"the whole project should
+become rust based, python can be used only when using external software as a reference, or
+in the process of rewriting."*
+
+This doc executes **B** (§3): *"Is not: a retirement of Python (that is C, and 2d keeps it
+off the table while the laboratory can still mint traces)."* The instruction above **is C**,
+with one carve-out that §2d already identified as the hinge: Python survives (a) as the
+laboratory that talks to external software — the WOFOST/PCSE crop-model oracle — and (b) as
+scaffolding during the rewrite. Everything else is scheduled for retirement rather than for
+permanent checker duty.
+
+**Recorded here, not acted on, and slice 8 was finished under B's design deliberately** —
+slice 8 is required under both targets (the authoring contract re-anchors either way), and
+re-scoping a ceremony mid-flight is how a manifest ends up half-regenerated. What changes:
+
+* **§4's cost is partly obsolete.** B's price was "the two implementations stop being
+  independent". C's is larger and different: the checker goes away, so the *disagreement*
+  itself stops being detectable — not merely un-arbitrable. Every mechanism this doc leans on
+  that lives in Python (the conformance gates, the three manifest generators, the science-gate
+  census, `drift.py`'s folds, the vector generators) needs an owner or an end date.
+* **Slice 9 loses one of its two candidate answers.** "(b) keep pint in Python but make the
+  check provably read what Rust loaded" is a permanent-checker design. Under C only (a) —
+  reimplement the dimensional check in the Rust loader — survives.
+* **Slice 11's posture section is now C's posture, not B's.**
+* **The three keys currently marked `python` in the manifests** (`param_files`, the weather
+  fixture, the science-gate census) stop being "retained" and become "not yet ported" —
+  a queue, not a classification. `parity_vectors` joins them.
+* **New work with no slice yet:** the science gates are pytest markers (~104 of the biosphere
+  manifest's 208 lines), the goldens' folds, and the oracle harness. None of these has a Rust
+  home, and the science-gate census in particular is the single largest Python-authored block
+  of any manifest.
+
+⚠ **This is a re-plan, and it is the user's to approve before anything is re-scoped.** The
+eleven slices stay as written until then; what is above is the delta, not a new plan.
+
 **Slice 9 — unit validation.** The §2e trap. Two candidate answers, to be priced when
 taken, not now: (a) reimplement the dimensional check in Rust's loader, so the validated
 path is the executed path; (b) keep pint in Python but make the Python check provably read

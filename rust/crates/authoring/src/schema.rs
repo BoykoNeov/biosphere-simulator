@@ -16,6 +16,79 @@
 use crate::errors::AuthoringError;
 use crate::yaml::{is_yaml_number, YamlValue};
 
+// --------------------------------------------------------------------------- #
+// The `extra="forbid"` key sets — the file grammar, named.                     #
+// --------------------------------------------------------------------------- #
+//
+// ⚠ **Hoisted out of the `reject_unknown_keys` call sites in slice 8 of the reference
+// flip, and the point is that they are not a second copy.** Each const IS the argument
+// the parser rejects against, so the authoring freeze manifest's `schema_fields` is
+// spliced from the very list that decides whether a committed scenario file loads.
+// Transcribing them into the dump instead would have frozen a description of the parser
+// rather than the parser.
+//
+// ⚠ What this does NOT give, stated rather than implied: Python derives the same surface
+// by *scanning* `authoring.schema` for pydantic models, so a whole new spec model is
+// caught there automatically. Here a new spec means a new `reject_unknown_keys` call
+// with a fresh const, and nothing forces it into [`crate::surface::schema_fields`]. The
+// compile-forced version — a `SpecKind` enum threaded through `reject_unknown_keys` and
+// matched exhaustively by the dump — was priced in slice 8 and deferred: it restructures
+// eight parser call sites to serve a manifest key, which is its own change rather than a
+// rider on a re-anchoring (the precedent is slice 7 declining `locked_dt`).
+
+/// `BundleSpec` — an includable fragment. No run config, no nested `includes`.
+pub const BUNDLE_KEYS: &[&str] = &["parameters", "stocks", "flows", "forcings"];
+
+/// `ScenarioSpec` — the top-level scenario document.
+pub const SCENARIO_KEYS: &[&str] = &[
+    "name",
+    "integrator",
+    "dt",
+    "steps",
+    "rng_seed",
+    "includes",
+    "parameters",
+    "stocks",
+    "flows",
+    "forcings",
+    "n_sub",
+];
+
+/// `IncludeSpec` — the `{bundle, prefix}` mapping form of an include.
+pub const INCLUDE_KEYS: &[&str] = &["bundle", "prefix"];
+
+/// `StockSpec` — one declared stock.
+pub const STOCK_KEYS: &[&str] = &[
+    "id",
+    "domain",
+    "quantity",
+    "kind",
+    "amount",
+    "composition",
+    "unclamped",
+    "extinction_threshold",
+];
+
+/// `FlowSpec` — one declared flow (`type` xor `kinetics`).
+pub const FLOW_KEYS: &[&str] = &[
+    "id",
+    "type",
+    "priority",
+    "wiring",
+    "kinetics",
+    "params",
+    "rate_class",
+];
+
+/// `KineticsSpec` — an authored rate law.
+pub const KINETICS_KEYS: &[&str] = &["rate", "stoichiometry"];
+
+/// `ParamPackRef` — the `{pack: …}` mapping form of a flow's `params`.
+pub const PARAM_PACK_KEYS: &[&str] = &["pack"];
+
+/// `ForcingSpec` — one declared forcing.
+pub const FORCING_KEYS: &[&str] = &["const"];
+
 /// A numeric scenario field (`StockSpec.amount`, `ForcingSpec.const`): a literal
 /// number, or a template expression over the scenario's `parameters` (Step 3).
 #[derive(Debug, Clone, PartialEq)]
@@ -116,11 +189,7 @@ impl BundleSpec {
     /// bundle-schema-reject cases.
     pub fn from_yaml(doc: &YamlValue) -> Result<BundleSpec, AuthoringError> {
         let entries = doc.as_mapping("bundle")?;
-        reject_unknown_keys(
-            entries,
-            &["parameters", "stocks", "flows", "forcings"],
-            "bundle",
-        )?;
+        reject_unknown_keys(entries, BUNDLE_KEYS, "bundle")?;
         let parameters = match field(entries, "parameters") {
             None => Vec::new(),
             Some(value) => parse_parameters(value)?,
@@ -191,23 +260,7 @@ impl ScenarioSpec {
     /// `ScenarioSpec.model_validate` analogue).
     pub fn from_yaml(doc: &YamlValue) -> Result<ScenarioSpec, AuthoringError> {
         let entries = doc.as_mapping("scenario")?;
-        reject_unknown_keys(
-            entries,
-            &[
-                "name",
-                "integrator",
-                "dt",
-                "steps",
-                "rng_seed",
-                "includes",
-                "parameters",
-                "stocks",
-                "flows",
-                "forcings",
-                "n_sub",
-            ],
-            "scenario",
-        )?;
+        reject_unknown_keys(entries, SCENARIO_KEYS, "scenario")?;
         let name = require_str(entries, "name", "scenario")?;
         let integrator = require_str(entries, "integrator", "scenario")?;
         let dt = require_f64(entries, "dt", "scenario")?;
@@ -312,7 +365,7 @@ fn parse_include(value: &YamlValue) -> Result<IncludeSpec, AuthoringError> {
         }
         YamlValue::Mapping(_) => {
             let entries = value.as_mapping("scenario.includes item")?;
-            reject_unknown_keys(entries, &["bundle", "prefix"], "include")?;
+            reject_unknown_keys(entries, INCLUDE_KEYS, "include")?;
             let bundle = require_str(entries, "bundle", "include")?;
             let prefix = require_str(entries, "prefix", "include")?;
             if prefix.is_empty() {
@@ -339,20 +392,7 @@ fn parse_parameters(value: &YamlValue) -> Result<Vec<(String, f64)>, AuthoringEr
 
 fn parse_stock(value: &YamlValue) -> Result<StockSpec, AuthoringError> {
     let entries = value.as_mapping("stock")?;
-    reject_unknown_keys(
-        entries,
-        &[
-            "id",
-            "domain",
-            "quantity",
-            "kind",
-            "amount",
-            "composition",
-            "unclamped",
-            "extinction_threshold",
-        ],
-        "stock",
-    )?;
+    reject_unknown_keys(entries, STOCK_KEYS, "stock")?;
     let id = require_str(entries, "id", "stock")?;
     let ctx = format!("stock {id:?}");
     let composition = match field(entries, "composition") {
@@ -379,19 +419,7 @@ fn parse_stock(value: &YamlValue) -> Result<StockSpec, AuthoringError> {
 
 fn parse_flow(value: &YamlValue) -> Result<FlowSpec, AuthoringError> {
     let entries = value.as_mapping("flow")?;
-    reject_unknown_keys(
-        entries,
-        &[
-            "id",
-            "type",
-            "priority",
-            "wiring",
-            "kinetics",
-            "params",
-            "rate_class",
-        ],
-        "flow",
-    )?;
+    reject_unknown_keys(entries, FLOW_KEYS, "flow")?;
     let id = require_str(entries, "id", "flow")?;
     let ctx = format!("flow {id:?}");
     let type_ = opt_str(entries, "type", &ctx)?;
@@ -446,7 +474,7 @@ fn parse_flow(value: &YamlValue) -> Result<FlowSpec, AuthoringError> {
 
 fn parse_kinetics(value: &YamlValue, ctx: &str) -> Result<KineticsSpec, AuthoringError> {
     let entries = value.as_mapping(&format!("{ctx} kinetics"))?;
-    reject_unknown_keys(entries, &["rate", "stoichiometry"], &format!("{ctx} kinetics"))?;
+    reject_unknown_keys(entries, KINETICS_KEYS, &format!("{ctx} kinetics"))?;
     let rate = require_str(entries, "rate", &format!("{ctx} kinetics"))?;
     let mut stoichiometry = Vec::new();
     for (stock, coeff) in require_field(entries, "stoichiometry", &format!("{ctx} kinetics"))?
@@ -465,7 +493,7 @@ fn parse_params(value: &YamlValue, ctx: &str) -> Result<ParamsSpec, AuthoringErr
         YamlValue::Scalar { text, .. } => Ok(ParamsSpec::Named(text.clone())),
         YamlValue::Mapping(_) => {
             let entries = value.as_mapping(&format!("{ctx} params"))?;
-            reject_unknown_keys(entries, &["pack"], &format!("{ctx} params"))?;
+            reject_unknown_keys(entries, PARAM_PACK_KEYS, &format!("{ctx} params"))?;
             let pack = require_str(entries, "pack", &format!("{ctx} params"))?;
             Ok(ParamsSpec::Pack(pack))
         }
@@ -479,7 +507,7 @@ fn parse_forcings(value: &YamlValue) -> Result<Vec<(String, ForcingSpec)>, Autho
     let mut out = Vec::new();
     for (name, v) in value.as_mapping("scenario.forcings")? {
         let entries = v.as_mapping(&format!("forcing {name:?}"))?;
-        reject_unknown_keys(entries, &["const"], &format!("forcing {name:?}"))?;
+        reject_unknown_keys(entries, FORCING_KEYS, &format!("forcing {name:?}"))?;
         let const_ = require_numeric(entries, "const", &format!("forcing {name:?}"))?;
         out.push((name.clone(), ForcingSpec { const_ }));
     }

@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B; eleven slices, seven landed)
+## **The reference flip — Rust becomes canonical** (target state B; eleven slices, eight landed — ⚠ target moved to C 2026-08-17)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -707,6 +707,77 @@ before the check that hunts ghosts in the file can see it. *A control that redde
 test has still measured nothing until you check WHICH line failed* — slice 3's lesson,
 arriving on schedule.
 
+### Slice 8 — the authoring manifest is re-anchored — COMPLETE 2026-08-17
+
+The platform contract's half is now generated from `cargo run --example
+dump_authoring_inventory` (a new `authoring::surface` census module). **The prediction was
+written down before regenerating and held exactly: the only changes are the `_authority`
+block and the header comment; no frozen value moved** — same grammar, same eight spec
+models, same twelve flow types, same loaders. The criterion was a measured **pair** for the
+third re-anchoring running: renaming a wiring field in *Rust* moves the manifest and reddens
+the checker, renaming the same field in *Python* leaves the manifest byte-identical and
+reddens the checker. **Seventeen negative controls**, each turning exactly one gate red on
+the intended assertion; for the two that redden the *same* test, which line fired was read
+off a real failure.
+
+⚠⚠ **This is the contract where the flip is NOT free, and that is the slice's finding.**
+Slices 6 and 7 were relabels because both ports enumerate a **built registry** the same way —
+that is what the plan's §2b retraction ("the gates don't introspect the namespace, they read
+`registry.flows`") actually bought. **It does not transfer here.** This manifest freezes a
+*platform*, which has no runtime object to interrogate: Python derives it by **language
+introspection** (`typing.get_args` over the closed node union, a scan of the schema module,
+pydantic field lists, a dict), and the reference offers an `enum`, a `match` and a set of
+`const`s instead. Re-anchoring therefore **traded a derived census for a partly
+hand-maintained one**, and the manifest now says per key which half is which. *"The reference
+can express this contract" is a claim about the MECHANISM, not about the language — check
+whether the mechanism that made the last one cheap is even present.*
+
+The mitigation is that several rosters are **load-bearing** rather than descriptive: they are
+the tables the parser and interpreter reject against, so dropping a name changes what the
+platform *accepts*. ⚠ That was **measured, and the first measurement was wrong for a harness
+reason** — `cargo test` stops at the first failing target, so it reported one red test where
+`--no-fail-fast` reports **fourteen across five targets**. *Slice 5's "check the control's own
+exit code" has a sibling: check that its runner reached every target it was supposed to.* The
+same class of error bit twice the same day — a backgrounded suite inherited a `cd` into the
+Rust tree and reported **exit 0 / "no tests ran"**.
+
+⚠ **A frozen field that NOTHING checked, found only by building a control for it.** The
+grammar's step token was written into the generator as a literal and compared by no gate at
+all; changing it moved the manifest and reddened nothing. *An ungated field does not announce
+itself — a control with no test to turn red IS the finding.*
+
+⚠ **A third anti-derived literal, where the plan's own census never looked.** The plan counted
+"23 derived assertions vs 2 hard-coded" across the three gates, but surveyed only the
+biosphere gate's step-size pair; the authoring gate hard-codes the operator set as well. Kept:
+it guards a *decision* (that division is deliberately deferred), not a value the tree may move
+on its own.
+
+**Because the reference side is weaker here, the Python derivations were kept and their
+meaning inverted in place** — the identical assertion now asks *"has the checker drifted from
+the contract?"*. A silent reversal of exactly that shape is already in this log, so a new test
+pins the direction and asserts the conformance-checked set **equals** the spliced set. And one
+buildable forcing function was **priced and deferred** on slice 7's precedent: making a new
+spec model a compile error would restructure eight parser call sites to serve a manifest key —
+its own change, not a rider on a re-anchoring.
+
+### ⚠⚠ The target state changed mid-slice — B became C (2026-08-17)
+
+The user, while slice 8 was in flight: *"the whole project should become rust based, python
+can be used only when using external software as a reference, or in the process of
+rewriting."* The plan on disk executes **B** and says explicitly that it *"is not a retirement
+of Python (that is C)"*. This is C, with the carve-out the plan had already identified as the
+hinge: the crop-model laboratory, which can still mint oracle traces from external software
+and has no Rust equivalent.
+
+Slice 8 was **finished under B's design rather than re-scoped mid-flight** — it is required
+under both targets, and re-scoping a freeze ceremony halfway is how a manifest ends up
+half-regenerated. The delta is written into the plan as §5b and is **a re-plan awaiting the
+user**, not a new plan. What changes in kind: B's price was that the two ports stop being
+independent, so a disagreement is resolved in Rust's favour; **C's price is that the
+disagreement stops being detectable at all.** Every mechanism the project leans on that lives
+in Python now needs an owner or an end date, and the manifest keys currently marked
+"Python-retained" stop being a classification and become a **queue**.
+
 ### The state of the arc
 
 Slices 8–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
@@ -717,7 +788,7 @@ that it barely had to**: sixteen of eighteen goldens were already byte-identical
 ports, so what 4 could land alone was the *path* and the *census*, not a diff. **Slice 5 wrote
 the other two, and with them the inversion**: the golden is now Rust's artifact, the Rust
 byte census is unconditional, Python is the tolerance-gated side, and Python can no longer
-author any of the eighteen. **6–8 are the three unfreeze ceremonies, biosphere first; 6 and 7
+author any of the eighteen. **6–8 are the three unfreeze ceremonies, biosphere first; all three
 have landed.** Their lasting finding is that a freeze contract does not re-anchor as a unit:
 roughly half of each manifest has no Rust referent and is now declared Python-retained *in
 the file*, so **slice 8 should expect to classify, not to convert** — and its surface is

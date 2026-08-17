@@ -17,12 +17,21 @@
 //! an arbitrary file, which no anchor exercises and Step 5's Godot payoff does not need —
 //! see [`crate::interpreter`]); a `params: {pack: …}` reference is an interpret-time error.
 //!
-//! **This mirror must stay in lockstep with Python `authoring.flow_registry`.** A
-//! Python-only registration is a broken contract, not a half-done one: the authoring
-//! manifest freezes the *Python* surface, so nothing here fails until an anchor exercises
-//! the missing arm (`test_crossport.py`). The three surfaces below that must move together
-//! for every added type are the [`flow_type`] match, the [`build_frozen_flow`] match, and
-//! the hand-maintained [`FLOW_TYPE_NAMES`] list.
+//! ⚠⚠ **SLICE 8 OF THE REFERENCE FLIP REVERSED THIS PARAGRAPH (2026-08-17).** It used to
+//! read: *"A Python-only registration is a broken contract … the authoring manifest freezes
+//! the **Python** surface, so nothing here fails until an anchor exercises the missing
+//! arm."* The manifest's `flow_types` is now generated **from this module** —
+//! `crate::surface::flow_types` walks [`FLOW_TYPE_NAMES`], reads each [`FlowTypeSpec`] and
+//! constructs the flow to read its `Flow::type_name()`. So the exposure has swapped ends: a
+//! **Rust-only** registration silently *widens the frozen contract* the next time anyone
+//! regenerates, and a **Python-only** one now fails immediately, in
+//! `test_authoring_freeze_manifest.py`, as the checker having drifted from the contract.
+//!
+//! The three surfaces that must still move together for every added type are the
+//! [`flow_type`] match, the [`build_frozen_flow`] match, and the hand-maintained
+//! [`FLOW_TYPE_NAMES`] list — and since slice 8 that third one is not merely an error
+//! message's vocabulary, it is **the roster a freeze manifest is anchored to**. A type
+//! implemented and not listed there is invisible to the contract.
 //!
 //! **Registered ≠ calibrated**: selecting a frozen type means the *rate law* is frozen,
 //! not that its numbers are validated — every param reachable here except `crew`'s two is

@@ -28,6 +28,7 @@ pub mod interpreter;
 pub mod run;
 pub mod schema;
 pub mod sexpr;
+pub mod surface;
 pub mod template;
 pub mod yaml;
 
