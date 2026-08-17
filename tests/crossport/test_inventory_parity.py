@@ -110,6 +110,8 @@ _COMPARED_MAPPINGS = frozenset({"param_files"})
 # in slice 7, by its two sealed horizons only: that contract has no structured dt key to
 # check a `locked_dt` against, and slice 7 declined to add one (widening the frozen
 # surface is its own unfreeze) — see the `numerics_note` entry in that manifest.
+#: ⚠ `weather_sha256` joined in slice C9 — the second checked-never-spliced key, see
+#: `test_the_weather_hash_matches_the_reference_tree`.
 _BIOSPHERE_DUMP_KEYS = frozenset(
     {
         "flow_set",
@@ -118,6 +120,7 @@ _BIOSPHERE_DUMP_KEYS = frozenset(
         "light_path_samples",
         "locked_dt_days",
         "param_files",
+        "weather_sha256",
     }
 )
 _STATION_DUMP_KEYS = frozenset({"flow_set", "aux_set", "horizons", "param_files"})
@@ -341,6 +344,36 @@ def test_the_locked_dt_matches_the_reference_tree() -> None:
         f"the frozen manifest declares {manifest['dt_days']}. Moving the step is an "
         "unfreeze (docs/biosphere-reference.md) — the literal is hand-written so that "
         "this is a ceremony rather than a silent follow."
+    )
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_the_weather_hash_matches_the_reference_tree() -> None:
+    """The two sides read the same weather bytes — slice C9's half of the forcing hash.
+
+    ⚠ **This is the gate that keeps a reach-out `include_str!` honest.** Since C9 the
+    reference reads `tests/oracle/winter_wheat_weather.json` directly, embedding it at
+    compile time from a path that climbs out of the Rust tree into the Python one. The
+    checker reads the same file from disk. Nothing else in the suite would notice if
+    those two stopped being the same file — and they are *scheduled* to be disturbed:
+    the relocation slice moves this fixture out of `tests/`, and a move that updates one
+    side's path and not the other's would otherwise leave a stale copy driving one side
+    with a green suite.
+
+    ⚠ The manifest value itself stays Python-authored, deliberately; the reasoning is in
+    `_AUTHORITY["forcing/weather_sha256"]`. This is the `locked_dt_days` pattern — the
+    reference emits a value to be *checked*, not to be spliced.
+    """
+    manifest = json.loads(
+        (DOCS_DIR / "biosphere-reference.manifest.json").read_text(encoding="utf-8")
+    )
+    dump = _rust_inventory(RUST_DOMAINS_DIR, "dump_biosphere_inventory")
+    assert manifest["forcing"]["weather_sha256"] == dump["weather_sha256"], (
+        "the weather fixture the reference COMPILED IN hashes to "
+        f"{dump['weather_sha256']}, but the manifest records "
+        f"{manifest['forcing']['weather_sha256']} for the file on disk. Either the "
+        "fixture moved on one side only, or it was edited without the unfreeze "
+        "ceremony in docs/biosphere-reference.md."
     )
 
 

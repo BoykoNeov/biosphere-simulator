@@ -2,7 +2,7 @@
 name = "config"
 version = "0.1.0"
 edition = "2021"
-description = "Native Rust port of the Python `src/config` boundary (reference flip, slice C1). The param-file boundary: the closed-subset YAML reader, the `{value, unit, source}` entry schema, and the unit guard. Below `domains` in the layering, exactly as Python's `config` package is below `domains.*`."
+description = "Native Rust port of the Python `src/config` boundary (reference flip, slices C1 and C9). The file boundary: the closed-subset YAML reader, the `{value, unit, source}` entry schema and the unit guard (C1), plus the closed-subset JSON reader and the ISO-date calendar computation the raw-weather fixture needs (C9). Below `domains` in the layering, exactly as Python's `config` package is below `domains.*`."
 publish = false
 
 [lib]

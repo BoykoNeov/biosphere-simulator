@@ -194,6 +194,10 @@ _RUST_DUMP_EXAMPLE = "dump_biosphere_inventory"
 #: The forcing function is what made the change deliberate rather than quiet — adding
 #: the key
 #: to the dump broke regeneration and the parity gate before anything was regenerated.
+#: ⚠ ``weather_sha256`` joined in **slice C9** and is the second key here that is
+#: emitted to be CHECKED and never spliced (``locked_dt_days`` is the first). The
+#: forcing hash stays Python-authored — see :data:`_AUTHORITY` — while the reference
+#: hashes what it compiled in, so the two can be compared.
 _RUST_DUMP_KEYS = frozenset(
     {
         "flow_set",
@@ -202,6 +206,7 @@ _RUST_DUMP_KEYS = frozenset(
         "light_path_samples",
         "locked_dt_days",
         "param_files",
+        "weather_sha256",
     }
 )
 
@@ -429,13 +434,31 @@ _AUTHORITY: dict[str, dict[str, str]] = {
     "forcing/weather_fixture": {
         "side": "python",
         "why": (
-            "the driving weather is a Python-side oracle fixture; the port reads "
-            "weather_facts.txt, generated FROM it — the same shape as param_files"
+            "⚠ THE REASON CHANGED IN SLICE C9, THOUGH THE SIDE DID NOT. Until C9 the "
+            "port read weather_facts.txt, a Python-generated copy — so it had no "
+            "referent for the fixture at all. It now reads the fixture JSON directly. "
+            "The side stays python because the reference embeds it with a compile-time "
+            "include_str!, so it knows the BYTES and not the NAME: a Rust-authored "
+            "filename would be a hand-typed duplicate of the include path, a literal "
+            "dressed as a derivation. The condition under which this changes is named "
+            "and scheduled — the relocation slice moves the fixture out of tests/ to a "
+            "data home the reference can read at runtime, as C8's param census already "
+            "does, and then the name is derivable and this key re-anchors WITH "
+            "weather_sha256 rather than splitting the pair"
         ),
     },
     "forcing/weather_sha256": {
         "side": "python",
-        "why": "provenance hash of that Python-side fixture; not compared",
+        "why": (
+            "⚠ NO LONGER 'not compared' — that clause died in slice C9. The hash is "
+            "still the checker's, computed over the file it finds on disk, and it does "
+            "not re-anchor alone for the reason given under weather_fixture. What C9 "
+            "adds is the missing half, exactly as slice 6 did for dt_days: the "
+            "reference now emits a sha-256 of the fixture text it COMPILED IN "
+            "(dump_biosphere_inventory's weather_sha256, emitted for checking and "
+            "never spliced), and test_the_weather_hash_matches_the_reference_tree "
+            "fails if the two sides ever stop reading the same bytes"
+        ),
     },
     "param_files/*": {
         "side": "rust",

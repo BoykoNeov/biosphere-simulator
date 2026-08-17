@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2 and C8 of the C re-plan — the param load, the twelve laws and the param-file list all moved into the reference 2026-08-17)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C8 and C9 of the C re-plan — the param load, the twelve laws, the param-file list and the weather path all moved into the reference 2026-08-17)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -1085,6 +1085,62 @@ walk joining the compile-time `include_str!`, which sharpens the trigger; retiri
 light-path fingerprint's hashing, whose dump docstring says it is left to Python *"because …
 this crate has no digest dependency"* — **C8 falsifies that premise** but moving it is a second
 re-anchoring with its own control.
+
+### C9 — the weather path: the reference reads its own forcing data — COMPLETE 2026-08-17
+
+The generator the C re-plan found with **no successor anywhere in C1–C7**, and the last piece
+of the reference's own *input* arriving through a Python script. `biosphere::weather` now
+reads the committed raw-weather fixture (`tests/oracle/winter_wheat_weather.json`) directly,
+via a closed-subset JSON reader and an ISO-date → day-of-year computation added to the
+`config` crate. `gen_biosphere_weather.py`, the `weather_facts.txt` table it wrote, and the
+Python gate that kept the two in sync are all **deleted**.
+
+**Bit-neutral, and measured before a line of Rust was written** — C1's and C8's discipline.
+All **916** values (latitude + 3 × 305 observations) parse from the fixture's decimal literals
+to exactly the bits the port was reading out of the hex-float table. Both conversions are
+correctly rounded so they must agree; "must" is measured here. No golden moved; the only diff
+in any contract is prose. ⚠ The measurement needed the *literal text*, which `json.loads`
+throws away — `parse_float=str` hands it back, and that turned a 916-value comparison into a
+five-line script plus a throwaway `rustc` program.
+
+⚠⚠ **The only genuinely new logic is the one piece no golden can check, and the data is why.**
+The fixture runs 2006-10-01 → 2007-08-01: no leap year, no 29 February. So the leap rule is
+**unreachable from the fixture** — and this was measured, not argued: with the rule broken to
+the naive `year % 4 == 0`, `cargo test -p domains` is **48 passed / 0 failed**, including the
+bit-for-bit control against the generated table and every season run. Only the hand-computed
+calendar tests redden, which is exactly why they are hand-computed against 1900 and 2000
+rather than against the fixture. *The float parse was the safe part and the calendar was the
+risk; the two have opposite test-ability, and the plan's own summary had it the other way
+round.* The other two controls do bite — reversing row order fails five tests, two of them
+season runs.
+
+⚠ **A rationale inside the frozen contract was falsified verbatim by this slice.** The
+manifest said the weather keys were Python's *"because the port reads `weather_facts.txt`,
+generated FROM it"*; after C9 that file does not exist. The *side* did not change and the
+*reason* did — the case the authority map's own header anticipates. ⚠ And the pair did **not**
+re-anchor to Rust despite being buildable: `include_str!` takes a literal, not a `const`, so
+the reference knows the fixture's **bytes** and not its **name**, and a Rust-authored filename
+would be *a literal dressed as a derivation*; re-anchoring the hash alone would manufacture
+the split authority slice 6 exists to record. Named condition: the relocation slice gives the
+fixture a runtime-readable home, and then both keys move together.
+
+**What was built instead is the check that did not exist** — the `locked_dt_days` pattern, a
+value emitted **to be checked and never spliced**: the checker hashes the file on disk, the
+reference hashes what it *compiled in*, and a new gate fails if they diverge. Not
+hypothetical — C9's `include_str!` climbs out of the Rust tree into the Python one, and the
+relocation slice is scheduled to disturb that exact path.
+
+⚠ **C1's expiry condition does not apply here, and saying so is part of the work**: the three
+`gen_*_params.py` generators are what keep pint on a live path, and this one imported only
+`json`/`datetime`/`pathlib`. Deleting it is not a down-payment on §2e.
+
+⚠ A process note, since "never bare `cargo fmt`" has a sibling: **`rustfmt lib.rs` is not
+file-scoped either** — it follows `mod` declarations and reformatted two untouched files in
+the same crate. Caught in the diff and reverted.
+
+**Deferred, named:** the fixture's new home (the *same* move as the param YAML out of `src/`,
+and doing it here would have touched 47 Python test files for a slice that otherwise touches
+none), the other five oracle fixtures, and C8's light-path hashing.
 
 ### The state of the arc
 

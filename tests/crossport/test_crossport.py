@@ -41,7 +41,6 @@ import authoring_files  # noqa: E402
 import compare  # noqa: E402
 import gen_authoring_vectors  # noqa: E402
 import gen_biosphere_params  # noqa: E402
-import gen_biosphere_weather  # noqa: E402
 import gen_engine_vectors  # noqa: E402
 import gen_rng_vectors  # noqa: E402
 import gen_sibling_params  # noqa: E402
@@ -164,18 +163,13 @@ def test_biosphere_params_in_sync() -> None:
     )
 
 
-def test_biosphere_weather_facts_in_sync() -> None:
-    """The committed raw-weather-facts file equals `gen_biosphere_weather.render()`
-    (Step 4, P7.4 — the Rust `biosphere::weather` reads it and runs the clean-room
-    conversions ITSELF, exercising the daylength sin/tan/acos + vpd exp cross-port).
-    Source of truth: the committed oracle fixture."""
-    on_disk = gen_biosphere_weather.FACTS_PATH.read_text(encoding="utf-8").replace(
-        "\r\n", "\n"
-    )
-    assert on_disk == gen_biosphere_weather.render(), (
-        "biosphere weather facts are stale — regenerate with "
-        "`uv run python tests/crossport/gen_biosphere_weather.py`"
-    )
+# ⚠ ``test_biosphere_weather_facts_in_sync`` lived here until **slice C9**, and it is
+# gone rather than moved. It gated a Python-generated hex-float copy of the weather
+# fixture (``weather_facts.txt``) against its generator; the reference now reads the
+# fixture JSON directly (``config::json`` + ``config::date``), so there is no copy to
+# keep in sync and no generator to run. The values were measured bit-identical across
+# the change — all 916 of them — before the table was deleted; the record is
+# ``docs/log/reference-flip.md``.
 
 
 def test_rng_vectors_anchor_to_published_known_answers() -> None:

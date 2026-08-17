@@ -45,6 +45,20 @@
 //!   into this file would be a second hand-written literal checked against the first,
 //!   which reads like a gate and is not one. It stays what it has always been: documented
 //!   in the manifest, enforced by the goldens (an RK4 switch moves every one).
+//! * `weather_sha256` — ⚠ **emitted for CHECKING and never spliced, like
+//!   `locked_dt_days`. New in slice C9.** The manifest's `forcing/weather_sha256` stays
+//!   Python-authored, and the reason is not inertia: since C9 the reference reads the
+//!   weather fixture directly (`biosphere::weather`), but it reads it through a
+//!   compile-time `include_str!`, so it knows the *bytes* and not the *name*. Authority
+//!   over `forcing/weather_fixture` would therefore be a hand-typed duplicate of the
+//!   include path — a literal dressed as a derivation — and splitting the pair (hash
+//!   re-anchored, name not) would manufacture exactly the mixed authority slice 6 exists
+//!   to record. What this key buys instead is the check that did not exist: the checker
+//!   hashes the file it finds **on disk**, this hashes what the reference **compiled
+//!   in**, and `test_the_weather_hash_matches_the_reference_tree` fails if they ever
+//!   stop being the same bytes. That is the real hazard, and it is scheduled: the
+//!   relocation slice moves this fixture out of `tests/`, and a move that updates one
+//!   side's path and not the other's is now red instead of silent.
 //! * `param_files` — the frozen param-file census, `filename -> newline-normalized
 //!   sha-256`, from [`domains::biosphere::params::param_files`]. **New in slice C8, and it
 //!   inverts what this file said for three slices.**
@@ -169,6 +183,10 @@ fn main() {
         println!("    \"{name}\": \"{}\"{comma}", normalized_sha256(text));
     }
     println!("  }},");
-    println!("  \"locked_dt_days\": {BIO_DT:?}");
+    println!("  \"locked_dt_days\": {BIO_DT:?},");
+    println!(
+        "  \"weather_sha256\": \"{}\"",
+        normalized_sha256(domains::biosphere::weather::WEATHER_FIXTURE)
+    );
     println!("}}");
 }

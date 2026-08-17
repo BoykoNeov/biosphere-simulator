@@ -1360,7 +1360,7 @@ finding.*
 | Generator | Successor |
 |---|---|
 | `gen_biosphere_params.py`, `gen_sibling_params.py`, `gen_station_params.py` | **C1** (the Rust param loader) supersedes all three |
-| `gen_biosphere_weather.py` | ⚠ **NONE — a real gap in C1–C7.** See the weather note below; schedule it in Stage 1 |
+| `gen_biosphere_weather.py` | ⚠ was **NONE — a real gap in C1–C7**; scheduled into Stage 1 and **built as C9** (§5g). The reference reads the fixture JSON itself now, and the generator and its table are deleted |
 | `gen_engine_vectors.py`, `gen_rng_vectors.py`, `gen_vectors.py`, `gen_authoring_vectors.py` | die **with** the comparison they feed — but confirm per file; a vector that anchors something other than port-parity outlives its reason |
 | `regen_goldens_from_rust.py` | **must move to Rust, not die** — it is how a golden is regenerated at all |
 
@@ -1872,9 +1872,9 @@ before running controls" has now failed twice.
 
 ### ⚠ Still NOT done, with reasons
 
-* **The weather path** (`gen_biosphere_weather.py`) — still the generator with no successor
-  anywhere in C1–C8. Needs a JSON reader over a closed subset and ISO-date → day-of-year, and
-  its fixture needs a new home (47 test files read it).
+* ~~**The weather path** (`gen_biosphere_weather.py`) — still the generator with no successor
+  anywhere in C1–C8.~~ **DONE in C9** (§5g), except the fixture's new home, which moved to the
+  relocation item below where it belongs (it is the same move as the param YAML).
 * **Relocating the param YAML out of `src/`** — C8 makes the reach-out **worse**, not better: a
   runtime directory walk now joins the compile-time `include_str!`. That sharpens the trigger.
 * **Retiring `gen_*_params.py`** — still C1's control, still carrying §2e's expiry condition.
@@ -1882,6 +1882,93 @@ before running controls" has now failed twice.
   Python "because … this crate has no digest dependency". **C8 falsifies that clause's
   premise.** Not acted on — moving it is a second re-anchoring with its own control, and this
   slice already had two contracts open.
+
+## §5g C9 — the weather path, COMPLETE 2026-08-17
+
+The generator §5c found with **no successor anywhere in C1–C7**, scheduled into Stage 1 and
+built. The reference now reads `tests/oracle/winter_wheat_weather.json` itself, through a
+closed-subset JSON reader and an ISO-date → day-of-year computation added to the `config`
+crate; `tests/crossport/gen_biosphere_weather.py` and the `weather_facts.txt` table it wrote
+are **deleted**, and so is the Python gate that kept them in sync.
+
+### The gating measurement, taken before any Rust was written
+
+Same discipline as C1 and C8: predict the diff, measure it, *then* build. The question was
+whether Rust's `f64::from_str` on the fixture's decimal literals reproduces the bits the port
+was reading out of the Python-generated hex-float table. **All 916 values** (latitude + 3 ×
+305 observations) came back **bit-identical** — both conversions are correctly rounded, so
+they must, but this repo's rule is that "must" is measured. So C9 is a **re-anchoring**, not
+an unfreeze: no golden moved, and the only diff in any contract is prose.
+
+⚠ The measurement was run through a throwaway `rustc` program over the literal text, *not* by
+reading the two files by eye — the literal is what `f64::from_str` sees, and `json.loads`
+discards it. `json.loads(..., parse_float=str)` hands it back, which is what made a
+916-value comparison a five-line script.
+
+### ⚠⚠ The one piece of C9 no golden can check, and it is the only new logic
+
+The fixture runs **2006-10-01 → 2007-08-01**: neither year is a leap year and the span holds
+no 29 February. So the leap rule in the new `iso_day_of_year` is **unreachable from the
+data** — the naive `year % 4 == 0` produces byte-identical output on every row.
+
+**Measured, not reasoned:** with the leap rule broken to the naive form, `cargo test -p
+domains` is **48 passed / 0 failed**, including the bit-for-bit control against the generated
+table and every season run. Only the hand-computed calendar tests in `config::date` go red,
+and they exist *because* of this — they carry 1900 and 2000, which the fixture cannot reach.
+*The float parse was the safe part; the calendar was the risk, and the two have opposite
+test-ability.*
+
+The other two controls did redden: reversing the row order fails **five** tests, two of them
+season runs (so order is genuinely gated, not merely asserted), and the JSON number scan is
+covered by the forms Rust accepts and JSON does not (`inf`, `NaN`, `+1`, `007`, `1.`).
+
+### ⚠ A rationale in the frozen contract was falsified by this slice, verbatim
+
+`_AUTHORITY["forcing/weather_fixture"]` said the key was Python's *"because the port reads
+`weather_facts.txt`, generated FROM it"*. After C9 there is no such file. The **side** is
+unchanged and the **reason** is now a different one, which is exactly the case the authority
+map's own header anticipates ("with the reason stated and, where one exists, the condition
+under which that could change"). Both `why` strings were rewritten and the manifest
+regenerated; **the entire diff is those two strings.**
+
+⚠ Why the pair did **not** re-anchor to Rust, having been measured buildable: the reference
+embeds the fixture with a compile-time `include_str!`, so it knows the **bytes** and not the
+**name** — `include_str!` takes a literal, not a `const`, so a Rust-authored `weather_fixture`
+would be a hand-typed duplicate of the include path, *a literal dressed as a derivation*. And
+re-anchoring the hash alone would manufacture the split authority slice 6 exists to record.
+The condition is named: **the relocation slice** gives the fixture a data home the reference
+can read at runtime (as C8's param census already does), and then both keys move together.
+
+### What C9 built instead of that re-anchor — and it guards the reach-out
+
+The `locked_dt_days` pattern: the dump emits `weather_sha256` **to be checked, never
+spliced**. The checker hashes the file it finds on disk; the reference hashes what it
+*compiled in*; `test_the_weather_hash_matches_the_reference_tree` fails if they stop being
+the same bytes. They agree today (`cd61457e…`, the value already frozen).
+
+⚠ This is not a hypothetical guard. C9's `include_str!` **climbs out of the Rust tree into
+the Python one** — the same ugliness C1's param loads have — and the relocation slice is
+*scheduled* to disturb exactly that path. Without this gate, a move that updated one side and
+not the other would leave a stale copy driving one side with a green suite.
+
+### ⚠ C1's expiry condition does NOT apply here, and the reason is worth writing down
+
+§5d warns that retiring `gen_biosphere_params.py` and its siblings turns `config/units.py`
+into §2e's defect, because those generators are the last thing keeping pint on a live path.
+**`gen_biosphere_weather.py` is not one of them**: it imported `json`, `datetime` and
+`pathlib` and never touched a Python loader, so deleting it moves nothing about pint. The
+warning stands, undischarged, for the three param generators — this deletion is not a
+down-payment on it.
+
+### Deliberately NOT in C9
+
+* **The fixture's new home.** Named in §5c as part of this work and moved out on purpose: it
+  is the *same* move as relocating the param YAML out of `src/`, which no slice owns yet, and
+  splitting it would put the reference's data in two places for one slice's convenience.
+  Doing it here would also have moved **47 Python test files** for a slice that otherwise
+  touches none.
+* **The other five oracle fixtures.** They travel with the carve-out, not with this.
+* **The light-path fingerprint's hashing** — still open from C8, still its own re-anchoring.
 
 ## §6 Open questions — none blocking, all answerable when their slice is taken
 
