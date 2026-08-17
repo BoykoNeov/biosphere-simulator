@@ -1285,11 +1285,13 @@ exemption written for a temporary state is a deletion someone must remember, and
 it left three checks red for five commits. **What this slice still owes the record is the
 closing update to that file, plus the memory file** — not its creation.
 
-## §5c The C re-plan — measured 2026-08-17, AWAITING APPROVAL
+## §5c The C re-plan — measured 2026-08-17; its three decisions ANSWERED the same day
 
-⚠ **Nothing here is executed. The eleven slices of §5 stand until the user approves this.**
 The user asked for a re-plan rather than an absorb-as-you-go, so this section re-prices the
-remaining work against C. Every number below was measured today, not estimated.
+remaining work against C. Every number below was measured today, not estimated. **The three
+questions it opened are answered** (see below): rewrite the study tools, retire the orphan
+scenarios, delete Python. ⚠ **Nothing here is executed yet** — C1 has not been started, and
+the slice numbering of §5 is superseded by C1–C7 plus Stage 3.
 
 ### What C actually costs, measured
 
@@ -1297,8 +1299,9 @@ remaining work against C. Every number below was measured today, not estimated.
 |---|---|---|---|
 | `src/simcore` + `domains` + `station` + `authoring` | 23,158 lines | the checker | **retired** once its gates move |
 | `src/config` (param YAML loader, pint units, the override seam) | 369 lines, 28 YAML files | slice 9 decides | **must move** — Rust is the loader |
-| `src/lab/oracle_match.py` + `tests/oracle/` | 521 + 1,148 lines | kept | **KEPT — this is the user's carve-out** (it talks to PCSE) |
-| `src/lab/rk45.py`, `convergence.py` | in the 521 | kept | ⚠ **undecided** — our own study tools, not external software |
+| `tests/oracle/` PCSE runners + the 6 JSON fixtures | 840 lines + 306 KB | kept | **KEPT — the user's carve-out, and the ONLY Python that survives** (see the boundary section) |
+| `src/lab/oracle_match.py` (the comparison arithmetic) | 103 lines | kept | **→ Rust** — ours, not third-party; it never imports PCSE |
+| `src/lab/rk45.py`, `convergence.py` | 409 lines | kept | **→ Rust** (decided 2026-08-17) — our own study tools, so the carve-out does not cover them |
 | `tests/` minus crossport and oracle | 145 files, 51,315 lines, ~2,300 tests | kept green | **port or retire, test by test** |
 | `tests/crossport` | 25 files, 6,552 lines | the whole point | ⚠ **DELETED, not ported** — with one port there is nothing to compare |
 | the three manifest generators | inside `tests/` | Python writes the contracts | **must move**, or the frozen contracts stay Python-authored forever |
@@ -1326,7 +1329,7 @@ classified `python` and would otherwise stay that way forever.
 |---|---|---|
 | C4 | **The science-gate census** | 15 pytest markers produce ~104 of the biosphere manifest's 208 lines. It is the **single largest Python-authored block of any contract**, and it has no Rust route at all while the gates are pytest functions |
 | C5 | **`drift.py`'s folds** | ends the "one run, two authors" split slice 5 created and slice 7 inherited — two goldens in two manifests |
-| C6 | **The 4 Python-only scenarios** | ⚠ a **decision, not a port**: `demo_*` is a skeleton, `n_limited`/`water_biting` are science the Rust roster never carried. Retiring them is legitimate; doing it silently is not |
+| C6 | **The 4 Python-only scenarios — RETIRE** (decided 2026-08-17) | now a **deletion with a written reason per scenario**, not a port. `demo_*` is a skeleton; `n_limited`/`water_biting` are science the Rust roster never carried. The record is the whole slice — a silent retirement is what it exists to prevent |
 | C7 | **The manifest generators** | they are Python scripts that *write* the three frozen contracts. Until they move, "Rust is the reference" has a Python-shaped hole in the middle of it |
 
 **Stage 3 — the suite.** ~2,300 tests, 51k lines. Not one slice; a classification pass first,
@@ -1334,15 +1337,54 @@ then batches by kind: the laws (C2 has 12), the regression/golden gates (mostly 
 already), the science gates (C4), and the rest. ⚠ **`tests/crossport` is deleted rather than
 ported** — 6,552 lines whose entire subject is the two ports agreeing.
 
-### The three things that need the user, not me
+### The three things that need the user — ✅ ANSWERED 2026-08-17
 
-1. **Do `rk45.py` / `convergence.py` count as "external software as a reference"?** They are
-   *our* study tools (an independent integrator used to check convergence), not third-party.
-   Reading the instruction strictly, they move or go.
-2. **C6: retire or port the four orphan scenarios?**
-3. **Is the end state "Python deleted" or "Python left in place, unmaintained"?** The plan
-   above assumes deleted-except-the-oracle. Frozen-in-place is cheaper and keeps a read-only
-   second opinion, at the cost of a tree that rots silently.
+1. **`rk45.py` / `convergence.py`** → **rewrite to Rust.** They are *our* study tools, not
+   third-party software, so the carve-out does not cover them. ⚠ This settles
+   `oracle_match.py` by the same argument (see the boundary below): the comparison arithmetic
+   is ours; only the thing that *talks to PCSE* is external.
+2. **C6, the four orphan scenarios** → **retire.** Not ported. C6 stops being a port and
+   becomes a deletion with a written reason per scenario (the record is the point — a silent
+   retirement is what the slice exists to prevent).
+3. **End state** → **Python deleted**, except the carve-out below. Not frozen-in-place. So
+   every row of the cost table above that says "port or retire" has a *terminal* state, and
+   `tests/` does not survive as a read-only second opinion.
+
+### Where exactly the carve-out line falls — measured 2026-08-17
+
+The user's words were *"python can be used only when using external software as a reference."*
+Measured against the tree, that names **~840 lines out of ~2,800**, and the boundary is not
+the `oracle` name — it is **who imports PCSE**.
+
+| Piece | Lines | Needs PCSE? | Fate |
+|---|---|---|---|
+| `tests/oracle/{runner,lintul3_runner,wofost_potato_runner}.py` | 840 | **yes** — `importorskip("pcse")` | **STAYS PYTHON, permanently.** No Rust route exists and porting PCSE would breach EUPL |
+| the 6 committed JSON fixtures | 306 KB | no — they are its *output* | **STAY** (data). ⚠ Need a new home: `tests/` is being deleted |
+| `src/lab/oracle_match.py` | 103 | no — pure stdlib arithmetic | **→ Rust** (decision 1's rule: ours, not theirs) |
+| `tests/test_oracle_{gap,gap_spring_wheat,smoke,match}.py` | 947 | no — they read the JSON | **→ Rust**, with the Stage-3 suite |
+| the 3 `@pytest.mark.oracle` regeneration tests | 164 | yes | **STAY** with their runners |
+
+⚠ **The sleeper, and it is not in the oracle at all.** `tests/oracle/winter_wheat_weather.json`
+is raw NASAPower *weather*, not model output — and **20+ test files across the biosphere and
+station suites read it**, plus `tests/crossport/gen_biosphere_weather.py`, which compiles it
+into a Rust source file. So the fixture is load-bearing for the whole suite port, while the
+*plumbing that reads it* is Python that must be rebuilt. Schedule the reader early — it is a
+Stage-3 blocker wearing an oracle's name.
+
+⚠ **What the carve-out becomes: a hand-run laboratory, not a build step.** Those 3 tests are
+already opt-in (`-m oracle`, enforced override-proof in `conftest.py`) and need network +
+a heavyweight install, so they effectively never run today. Under C they become **the last
+Python in the tree**, with nothing importing them and no build touching them — the failure
+mode is silent rot, not breakage. The mitigation is the provenance record each fixture already
+carries: regeneration must stay a documented manual ceremony with an owner. See
+[[pcse-oracle-licensing]] for the rule that keeps it clean (commit output + provenance, never
+the parameter YAML).
+
+⚠ **And it is not a gate.** The user's own ruling (scope B, 2026-07-20) is *literature-ranges
+only; the oracle is a **diagnostic**, never a fit target*. `test_oracle_gap.py` pins
+**known-wrong behaviour as numbers** — green means "still wrong in exactly the documented
+way". Porting it to Rust must carry that inversion across, or a rewritten gap test will be
+read as a pass.
 
 ### ⚠ The price, restated because §4's version is now too small
 
