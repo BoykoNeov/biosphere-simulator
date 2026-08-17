@@ -16,10 +16,19 @@
 //!
 //! * **Gained.** The reference law shuffles a **three-flow skeleton** for 30 steps. This
 //!   one shuffles the **whole default biosphere build** — every flow the open-field
-//!   scenario wires — through a multi-step run against the real weather forcing. If
-//!   canonical order were ever lost in a full assembly, the skeleton would not show it.
+//!   scenario wires — through a multi-step run against the real weather forcing.
 //! * **Lost.** `demo`'s own parameters and topology are no longer exercised by any law.
 //!   Nothing else in this tree exercises them either, which is C6's whole point.
+//! * ⚠⚠ **Lost, and MEASURED rather than guessed: the real assembly is not a
+//!   discriminator.** The first version of this law asserted only that the run's final
+//!   state is identical under every permutation. A negative control — delete the flow sort
+//!   in `Registry::new` — left it **green**. At the season's real physical magnitudes every
+//!   per-stock leg sum is of comparable size, so re-associating the additions moves no
+//!   bits, and a run-invariance assertion here passes against a registry that never sorted.
+//!   *Realism cost the discriminator*, which is exactly what the reference's synthetic
+//!   skeletons are for. The law therefore also asserts the **iteration order** of the
+//!   rebuilt registry, which the same control does redden; #15 itself stays pinned by the
+//!   engine-level laws in `crates/simcore/tests/laws.rs`.
 //! * **Also lost, and named because the reference law had it: the RK4 arm.** The reference
 //!   runs its demo under *both* integrators. The frozen biosphere is Euler-only — the
 //!   arbitration backstop is Euler-only by charter and a needed scale is a **hard error**
@@ -125,11 +134,12 @@ fn amounts(state: &State) -> Vec<(String, u64)> {
 /// `Box<dyn Flow>` out of a `&Registry`), so the flows come back **owned** and can be
 /// re-registered in any order. What comes back is already canonical, which is precisely
 /// what makes any permutation of it an arbitrary registration order.
-fn run_with_order(perm: &[usize], steps: u32) -> Vec<(String, u64)> {
+fn run_with_order(perm: &[usize], steps: u32) -> (Vec<(String, u64)>, Vec<String>) {
     let (state, registry) = build_season(&DEFAULT_SCENARIO).expect("season build");
     let resolver = weather_resolver(&DEFAULT_SCENARIO, 1).expect("weather resolver");
     let (flows, aux) = registry.into_parts();
     let reg = Registry::new(permute(flows, perm), &state.stocks, aux).expect("registry");
+    let order: Vec<String> = reg.flows().iter().map(|f| f.id().to_string()).collect();
     let integrator = EulerIntegrator::new(reg);
     let mut current = state;
     for _ in 0..steps {
@@ -137,7 +147,7 @@ fn run_with_order(perm: &[usize], steps: u32) -> Vec<(String, u64)> {
             .step(&current, &resolver, BIO_DT)
             .expect("season step");
     }
-    amounts(&current)
+    (amounts(&current), order)
 }
 
 /// `(flows, aux processes, stocks)` the default build wires — the subject's size.
@@ -172,7 +182,9 @@ fn law_a_multi_step_season_run_is_registration_order_independent() {
         "the default season build wired {n_stocks} stocks"
     );
 
-    let canonical = run_with_order(&identity, STEPS);
+    let (canonical, canonical_order) = run_with_order(&identity, STEPS);
+    let mut sorted_order = canonical_order.clone();
+    sorted_order.sort();
     let family = structural_permutations(n_flows);
     assert!(
         family.len() >= n_flows,
@@ -180,7 +192,20 @@ fn law_a_multi_step_season_run_is_registration_order_independent() {
         family.len()
     );
     for perm in &family {
-        let other = run_with_order(perm, STEPS);
+        let (other, order) = run_with_order(perm, STEPS);
+        // ⚠⚠ THE SECOND ASSERTION EXISTS BECAUSE A CONTROL FOUND THE FIRST ONE INERT.
+        // Deleting the flow sort in `Registry::new` left the run comparison below **green**:
+        // at the season's real physical magnitudes the per-stock leg sums are all of
+        // comparable size, so re-associating them moves nothing — the whole assembly is
+        // simply not a discriminator for the canonical-order invariant (#15). That is what
+        // the reference's synthetic skeleton fixtures are for, and the engine-level laws in
+        // `simcore/tests/laws.rs` are where #15 is actually pinned. What IS falsifiable on
+        // the real assembly is the *order itself*: the rebuilt registry must iterate
+        // canonically whatever it was handed.
+        assert_eq!(
+            order, sorted_order,
+            "registration order {perm:?} survived into the registry's iteration order"
+        );
         assert_eq!(
             other, canonical,
             "registration order {perm:?} changed a {STEPS}-step season run"

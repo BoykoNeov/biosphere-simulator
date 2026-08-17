@@ -389,6 +389,24 @@ fn fold(values: &[f64]) -> f64 {
     acc
 }
 
+/// The per-stock deltas the ledger actually folds, in canonical (id-sorted) order.
+///
+/// ⚠⚠ **Read off the two states rather than restated as an array, because a control
+/// found the restated version inert.** `after - before` is not the nominal delta the
+/// fixture was written with: `(1e8 + 0.1) - 1e8` is `0.09999999403953552`, not `0.1`. Law
+/// 5's first version asserted order-sensitivity on the *nominal* array while the ledger
+/// folded the *recovered* one, and the recovered one cancels exactly in both directions —
+/// so reversing the fold in the reference left the law green. ⚠ The reference's own fixture
+/// has the same shape, and its comment claims the opposite (*"a naive (unsorted) sum would
+/// differ by ULPs under reordering"*); measured, both directions give exactly `0.0`.
+fn recovered_deltas(before: &State, after: &State) -> Vec<f64> {
+    before
+        .stocks
+        .iter()
+        .map(|(id, b)| after.stocks[id].amount - b.amount)
+        .collect()
+}
+
 /// Assert `values` is order-**sensitive**: the left fold and its reverse differ in bits.
 ///
 /// ⚠ This is the assertion that keeps an order-independence law from being satisfied by
@@ -556,35 +574,37 @@ fn law_aux_accumulator_sum_is_registration_order_independent() {
 fn law_composition_fold_accumulates_in_canonical_stock_order() {
     // Multi-quantity stocks with mixed magnitudes. The OXYGEN residual is the sum of
     // `delta · coeff` over the stocks in id order; the coefficients differ, so the
-    // per-stock oxygen contributions do too, and the fold order decides the last bits:
-    // `(1e16 + 1) + 1` is `1e16`, while `(1 + 1) + 1e16` is `1e16 + 2`.
+    // per-stock oxygen contributions do too, and the fold order decides the last bits.
     //
-    // ⚠ The CARBON residual over the same three stocks is order-*insensitive*
-    // (`1e16 + 2 + 0.5` rounds the same either way), which is why only the oxygen fold
-    // carries the discriminator. Carbon is still asserted — it just is not the axis that
-    // proves the sort ran, and saying so is the difference between a check and a claim.
-    let deltas = [1e16_f64, 2.0, 0.5]; // a, b, c in id order
+    // ⚠ The CARBON residual over the same three stocks is order-*insensitive*, which is
+    // why only the oxygen fold carries the discriminator. Carbon is still asserted — it
+    // just is not the axis that proves the sort ran, and saying so is the difference
+    // between a check and a claim.
     let coeffs = [1.0_f64, 0.5, 2.0];
-    let oxygen: Vec<f64> = deltas.iter().zip(coeffs).map(|(d, c)| d * c).collect();
-    assert_order_sensitive(&oxygen, "law 4 oxygen residual");
+    // Exactly-representable before/after, so `after - before` is the delta it looks like.
+    let before_amounts = [0.0_f64, 0.0, 0.0];
+    let after_amounts = [1e16_f64, 2.0, 0.5];
 
-    let base = [1e8_f64, 3.0, 7.0];
-    let before = state_of(
-        0,
-        vec![
-            composite_pool("law.a", base[0], coeffs[0]),
-            composite_pool("law.b", base[1], coeffs[1]),
-            composite_pool("law.c", base[2], coeffs[2]),
-        ],
-    );
-    let after = state_of(
-        1,
-        vec![
-            composite_pool("law.a", base[0] + deltas[0], coeffs[0]),
-            composite_pool("law.b", base[1] + deltas[1], coeffs[1]),
-            composite_pool("law.c", base[2] + deltas[2], coeffs[2]),
-        ],
-    );
+    let build = |n: u64, amounts: [f64; 3]| -> State {
+        state_of(
+            n,
+            vec![
+                composite_pool("law.a", amounts[0], coeffs[0]),
+                composite_pool("law.b", amounts[1], coeffs[1]),
+                composite_pool("law.c", amounts[2], coeffs[2]),
+            ],
+        )
+    };
+    let before = build(0, before_amounts);
+    let after = build(1, after_amounts);
+
+    let carbon_deltas = recovered_deltas(&before, &after);
+    let oxygen: Vec<f64> = carbon_deltas
+        .iter()
+        .zip(coeffs)
+        .map(|(d, c)| d * c)
+        .collect();
+    assert_order_sensitive(&oxygen, "law 4 oxygen residual");
 
     let ledger = compute_ledger(&before, &after).expect("ledger");
     let by_quantity: BTreeMap<Quantity, f64> =
@@ -599,7 +619,7 @@ fn law_composition_fold_accumulates_in_canonical_stock_order() {
     );
     assert_eq!(
         by_quantity[&Quantity::Carbon].to_bits(),
-        fold(&deltas).to_bits()
+        fold(&carbon_deltas).to_bits()
     );
 }
 
@@ -611,28 +631,25 @@ fn law_composition_fold_accumulates_in_canonical_stock_order() {
 
 #[test]
 fn law_ledger_residual_accumulates_in_canonical_stock_order() {
-    // The reference's own fixture, whose deltas cancel to exactly 0.0 in id order and to
-    // 2.78e-17 reversed — so the sorted fold is observably the one that ran.
-    let deltas = [0.1_f64, -1.0, -0.1, 1.0];
-    assert_order_sensitive(&deltas, "law 5 carbon residual");
-    assert_eq!(fold(&deltas).to_bits(), 0.0_f64.to_bits());
-
+    // Four plain POOL stocks. The amounts are exactly representable, so the deltas the
+    // ledger recovers ARE `[1, 1, 1e16, 1]`: `((1 + 1) + 1e16) + 1` is `1e16 + 4` in id
+    // order and `1e16` reversed. ⚠ The reference's fixture (1e8-scale bases with ±0.1
+    // deltas) does NOT have this property — see `recovered_deltas`.
     let ids = ["law.a", "law.b", "law.c", "law.d"];
-    let before_amounts = [1e8_f64, 3.0, 1e8, 7.0];
-    let before = state_of(
-        0,
-        ids.iter()
-            .zip(before_amounts)
-            .map(|(id, a)| pool(id, a))
-            .collect(),
-    );
-    let after = state_of(
-        1,
-        ids.iter()
-            .zip(before_amounts.iter().zip(deltas))
-            .map(|(id, (a, d))| pool(id, a + d))
-            .collect(),
-    );
+    let before_amounts = [0.0_f64, 0.0, 0.0, 0.0];
+    let after_amounts = [1.0_f64, 1.0, 1e16, 1.0];
+
+    let build = |n: u64, amounts: [f64; 4]| -> State {
+        state_of(
+            n,
+            ids.iter().zip(amounts).map(|(id, a)| pool(id, a)).collect(),
+        )
+    };
+    let before = build(0, before_amounts);
+    let after = build(1, after_amounts);
+
+    let deltas = recovered_deltas(&before, &after);
+    assert_order_sensitive(&deltas, "law 5 carbon residual");
 
     let ledger = compute_ledger(&before, &after).expect("ledger");
     let carbon = ledger
