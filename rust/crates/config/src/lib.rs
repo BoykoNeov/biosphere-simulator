@@ -27,6 +27,7 @@
 
 pub mod errors;
 pub mod params;
+pub mod provenance;
 pub mod yaml;
 
 pub use errors::ConfigError;
@@ -34,4 +35,5 @@ pub use params::{
     require_closed, require_half_open, require_non_negative, require_positive, Entry,
     ParamFile,
 };
+pub use provenance::{normalize_newlines, normalized_sha256};
 pub use yaml::{parse_document, YamlValue};

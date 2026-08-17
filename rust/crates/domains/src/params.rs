@@ -38,8 +38,7 @@ use crate::thermal::ThermalParams;
 const CHARGE_YAML: &str = include_str!("../../../../src/domains/power/params/charge.yaml");
 const SELF_DISCHARGE_YAML: &str =
     include_str!("../../../../src/domains/power/params/self_discharge.yaml");
-const RADIATOR_YAML: &str =
-    include_str!("../../../../src/domains/thermal/params/radiator.yaml");
+const RADIATOR_YAML: &str = include_str!("../../../../src/domains/thermal/params/radiator.yaml");
 const ECLSS_YAML: &str = include_str!("../../../../src/domains/eclss/params/eclss.yaml");
 const CREW_YAML: &str = include_str!("../../../../src/domains/crew/params/crew.yaml");
 
@@ -147,7 +146,12 @@ pub fn eclss() -> EclssParams {
         ),
         "eclss.yaml",
     );
-    let names = ["co2_scrub_rate", "condense_rate", "o2_makeup_gain", "o2_setpoint"];
+    let names = [
+        "co2_scrub_rate",
+        "condense_rate",
+        "o2_makeup_gain",
+        "o2_setpoint",
+    ];
     for (value, name) in v.iter().zip(names) {
         checked(require_positive(*value, name, "eclss.yaml"), "eclss.yaml");
     }
@@ -183,6 +187,67 @@ pub fn crew() -> CrewParams {
         ),
     }
 }
+
+/// The **frozen sibling param-file census**: `(filename, embedded text)` for the five files
+/// this module loads, in filename order (slice C8 of the reference flip).
+///
+/// The station manifest's `param_files` is these five plus the three
+/// [`station::params::param_files`](../../station/params/fn.param_files.html) owns — eight
+/// entries, every basename unique across the six directories, which is why the manifest can
+/// key on basenames at all.
+///
+/// ⚠ **No exclusion rule here, and that asymmetry is the point.** The biosphere census has
+/// two (non-recursion for the potato overrides, `demo.yaml` by name); these five directories
+/// hold nothing but frozen files, so the rule is biosphere-only. Stating it per side keeps a
+/// reader from generalising the harder rule to a place it does not apply.
+pub fn param_files() -> Vec<(&'static str, &'static str)> {
+    let mut files = vec![
+        ("charge.yaml", CHARGE_YAML),
+        ("crew.yaml", CREW_YAML),
+        ("eclss.yaml", ECLSS_YAML),
+        ("radiator.yaml", RADIATOR_YAML),
+        ("self_discharge.yaml", SELF_DISCHARGE_YAML),
+    ];
+    files.sort_by_key(|(name, _)| *name);
+    files
+}
+
+/// The five directories the sibling census is a census **of**, `(directory, expected count)`.
+///
+/// Resolved at compile time, the same reach-out `include_str!` above makes. ⚠ Under target
+/// state C these paths point into a Python package scheduled for deletion; the census makes
+/// that a runtime dependency too, which sharpens the relocation trigger recorded in
+/// `docs/plans/post-roadmap-reference-flip.md` §5d rather than resolving it.
+pub const PARAM_DIRS: [(&str, usize); 4] = [
+    (
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../src/domains/power/params"
+        ),
+        2,
+    ),
+    (
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../src/domains/thermal/params"
+        ),
+        1,
+    ),
+    (
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../src/domains/eclss/params"
+        ),
+        1,
+    ),
+    (
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../src/domains/crew/params"
+        ),
+        1,
+    ),
+];
 
 #[cfg(test)]
 mod tests {
@@ -243,7 +308,11 @@ mod tests {
                 want.to_bits()
             );
         }
-        assert_eq!(t.len(), 12, "the control table still names exactly 12 params");
+        assert_eq!(
+            t.len(),
+            12,
+            "the control table still names exactly 12 params"
+        );
     }
 
     /// ⚠ The control's own completeness: a param added to a YAML file and wired to
@@ -286,5 +355,54 @@ mod tests {
         let cr = crew();
         assert!((0.0..=1.0).contains(&cr.respired_carbon_fraction));
         assert!((0.0..=1.0).contains(&cr.insensible_water_fraction));
+    }
+
+    /// The census equals what the five sibling directories hold.
+    ///
+    /// ⚠⚠ The completeness half of `param_files`, on the side where the digests cannot show
+    /// a problem: both ports hash the same file, so the only thing that can go wrong with
+    /// this key is the **roster** — a param file added and wired into no loader, or a loader
+    /// dropped with its file left behind.
+    #[test]
+    fn the_census_matches_the_directories_on_disk() {
+        let mut on_disk: Vec<String> = Vec::new();
+        for (dir, expected) in PARAM_DIRS {
+            let names: Vec<String> = std::fs::read_dir(dir)
+                .unwrap_or_else(|e| panic!("{dir} is readable: {e}"))
+                .map(|entry| entry.expect("a readable dir entry"))
+                .filter(|entry| entry.path().is_file())
+                .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                .filter(|name| name.ends_with(".yaml"))
+                .collect();
+            assert_eq!(
+                names.len(),
+                expected,
+                "{dir} holds {names:?}, not {expected} file(s) — the census's per-directory                  count is stale"
+            );
+            on_disk.extend(names);
+        }
+        on_disk.sort();
+
+        let census: Vec<String> = param_files()
+            .iter()
+            .map(|(name, _)| (*name).to_string())
+            .collect();
+        assert_eq!(
+            census, on_disk,
+            "the loaded sibling param-file census and the directories disagree. A ROSTER              finding, not a value one: do NOT 'fix' it by editing whichever list is shorter."
+        );
+        assert_eq!(census.len(), 5, "the frozen sibling param set is 5 files");
+    }
+
+    /// No frozen sibling param file carries a separator Python's `splitlines` breaks on.
+    #[test]
+    fn no_frozen_param_file_carries_an_exotic_line_separator() {
+        for (name, text) in param_files() {
+            assert_eq!(
+                config::provenance::contains_exotic_line_separator(text),
+                None,
+                "{name} contains a character Python's splitlines treats as a line break but                  the reference's normalization does not — the two hash rules would diverge"
+            );
+        }
     }
 }

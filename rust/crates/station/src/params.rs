@@ -93,6 +93,25 @@ pub fn harvest() -> HarvestParams {
     }
 }
 
+/// The **frozen station param-file census**: `(filename, embedded text)` for the three files
+/// this module loads, in filename order (slice C8 of the reference flip).
+///
+/// The station manifest's `param_files` is these three plus the five
+/// [`domains::params::param_files`] owns. No exclusion rule — `src/station/params/` holds
+/// nothing but frozen files.
+pub fn param_files() -> Vec<(&'static str, &'static str)> {
+    let mut files = vec![
+        ("harvest.yaml", HARVEST_YAML),
+        ("lamp.yaml", LAMP_YAML),
+        ("water_recovery.yaml", WATER_RECOVERY_YAML),
+    ];
+    files.sort_by_key(|(name, _)| *name);
+    files
+}
+
+/// The directory the station census is a census **of**, and its expected file count.
+pub const PARAMS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../src/station/params");
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,5 +184,68 @@ mod tests {
         assert!((0.0..=1.0).contains(&wr.recovery_efficiency));
         assert!(lamp().photon_efficacy > 0.0);
         assert!(harvest().harvest_rate >= 0.0);
+    }
+
+    /// The census equals what `src/station/params/` holds.
+    ///
+    /// ⚠⚠ The completeness half of `param_files` — see the sibling twin in
+    /// `crates/domains/src/params.rs`. The digests are author-neutral; the roster is not.
+    #[test]
+    fn the_census_matches_the_directory_on_disk() {
+        let mut on_disk: Vec<String> = std::fs::read_dir(PARAMS_DIR)
+            .expect("the station params directory is readable")
+            .map(|entry| entry.expect("a readable dir entry"))
+            .filter(|entry| entry.path().is_file())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.ends_with(".yaml"))
+            .collect();
+        on_disk.sort();
+
+        let census: Vec<String> = param_files()
+            .iter()
+            .map(|(name, _)| (*name).to_string())
+            .collect();
+        assert_eq!(
+            census, on_disk,
+            "the loaded station param-file census and the directory disagree. A ROSTER              finding, not a value one: do NOT 'fix' it by editing whichever list is shorter."
+        );
+        assert_eq!(census.len(), 3, "the frozen station param set is 3 files");
+    }
+
+    /// Every basename is unique across the SIX directories the station manifest spans.
+    ///
+    /// ⚠ The manifest keys `param_files` on basenames, so a name appearing in two of the six
+    /// directories would silently collapse two files into one entry. Nothing asserted this
+    /// before; Python's `_param_paths()` doc *claims* uniqueness and its dict would quietly
+    /// keep whichever directory came last.
+    #[test]
+    fn every_basename_is_unique_across_the_station_and_sibling_directories() {
+        let mut all: Vec<&str> = param_files().iter().map(|(n, _)| *n).collect();
+        all.extend(domains::params::param_files().iter().map(|(n, _)| *n));
+        let mut sorted = all.clone();
+        sorted.sort_unstable();
+        let mut deduped = sorted.clone();
+        deduped.dedup();
+        assert_eq!(
+            sorted, deduped,
+            "a param-file basename appears twice across the six directories the station              manifest spans; a basename-keyed `param_files` would collapse them"
+        );
+        assert_eq!(
+            all.len(),
+            8,
+            "the frozen station contract names 8 param files"
+        );
+    }
+
+    /// No frozen station param file carries a separator Python's `splitlines` breaks on.
+    #[test]
+    fn no_frozen_param_file_carries_an_exotic_line_separator() {
+        for (name, text) in param_files() {
+            assert_eq!(
+                config::provenance::contains_exotic_line_separator(text),
+                None,
+                "{name} contains a character Python's splitlines treats as a line break but                  the reference's normalization does not — the two hash rules would diverge"
+            );
+        }
     }
 }

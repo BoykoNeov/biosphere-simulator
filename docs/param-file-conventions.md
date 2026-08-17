@@ -117,6 +117,42 @@ pyyaml as a **string** and coerced to a float by the schema; only `1.0e+7` resol
 number. Both load identically on both ports — the boundary parses the scalar's text — so
 this is recorded as a hazard to recognise, not a rule to obey.
 
+## ⚠ A param file's LINE ENDINGS are contract-relevant (since 2026-08-17)
+
+**Both manifests record a `param_files` sha-256 per file, and since reference-flip slice C8
+the reference produces it** (`rust/crates/config/src/provenance.rs`). The digest is taken
+over **newline-normalized** text — `
+` and lone `` fold to `
+`, then one trailing
+newline is dropped — so a file's recorded hash is a record of its *content*, not of how git
+materialized it.
+
+> **Keep param files LF. Never use a character other than newline as a line break.**
+
+Two reasons, both measured rather than assumed:
+
+1. **A CRLF working-tree copy is not hypothetical here.** `git ls-files --eol` over the 24
+   param files shows the index is LF on **all** of them and `.gitattributes` declares
+   `eol=lf`, yet one working-tree copy (`senescence.yaml`, on the development box) is CRLF.
+   The Rust reference embeds files with `include_str!`, which reads the **working tree** — so
+   without normalization the reference would emit a different digest on that box than on
+   Linux CI, and the regenerated manifest would be red on the other machine. Normalization
+   is what makes the hash portable; it is not a licence to mix line endings.
+2. **The two hashing rules are only equal on a restricted alphabet.** Python's rule is
+   `hashlib.sha256("
+".join(path.read_text().splitlines()))`, and `str.splitlines` breaks on
+   **eight further characters** the reference's narrow rule does not: vertical tab, form feed,
+   the three ASCII separators, NEL, LS and PS. A param file containing any of them would hash
+   differently on the two sides. Rather than reimplement a Python method, the reference makes
+   the divergence **unreachable**: `config::provenance::EXOTIC_LINE_SEPARATORS` enumerates
+   them and a test asserts no frozen param file contains one.
+
+⚠ A digest change with no value change is still an **unfreeze** — and it is the one nothing
+catches, because the recorded `param_files` hashes are never compared to enforce a value (the
+goldens do that). So a whitespace-only or line-ending-only edit needs the honour-system
+ceremony from `CLAUDE.md`: advisor review → regenerate the manifest as the git-visible record
+→ an entry in the reference doc's unfreeze log.
+
 ## Param-file header template
 
 Every param file opens with a provenance header citing the source of each value:
@@ -160,6 +196,11 @@ they feed a deferred per-leg `Flow` dimensional check.
 - [ ] Header present with a `Sources:` block and the clean-room notice.
 - [ ] **Inside the closed YAML subset** — block-style tables, no flow style / anchors /
       tags / block scalars. The Rust reference rejects them; see the section above.
+- [ ] **LF line endings, and no exotic line-break character.** The file's recorded
+      `param_files` sha-256 is taken over newline-normalized text; the two ports' rules are
+      only equal on that alphabet. See "line endings are contract-relevant" above.
+- [ ] **A whitespace-only edit is still an unfreeze.** It moves a recorded hash and reddens
+      nothing — run the honour-system ceremony rather than committing it as a tidy-up.
 - [ ] **Every** value has a `source:` tag resolving to a `Sources:` entry — **or** a
       `DESIGN` tag carrying its rationale (see "Two provenance classes").
 - [ ] **Every cited locus was actually opened.** No page/table/figure reference is

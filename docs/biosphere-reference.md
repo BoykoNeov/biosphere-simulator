@@ -594,8 +594,8 @@ census of pytest markers, with no Rust referent while the science gates are pyte
 | `long_horizon_years`, `scenarios.*.years` | **Rust** | the reference tree's horizon constants |
 | `scenarios.*.golden_sha256` | **Rust** (6 of 7) | the golden is the reference's own output |
 | `scenarios.drift_summary.golden_sha256` | **Python** | ⚠ one run, two authors: `drift.py`'s fold of the *same* 15-yr trajectory whose final state Rust authors. The fold is the artifact |
-| `param_files` | **Python, until slice 9** | Rust reads no YAML; it reads a Python-generated hexfloat file whose names are not filenames |
-| `forcing.weather_fixture` / `weather_sha256` | **Python** | a Python-side oracle fixture; the port reads a file generated *from* it — same shape as `param_files` |
+| `param_files` | **Rust** (since slice C8) | ⚠ the *rules* re-anchored, not the digits: the census is now the set the reference LOADS (a compile-time `include_str!` list) and the digest is `config::provenance`. The 15 values are **author-neutral** — both sides hash the same file the same way — so the ceremony moved none of them |
+| `forcing.weather_fixture` / `weather_sha256` | **Python** | a Python-side oracle fixture; the port reads a file generated *from* it — the shape `param_files` had **until slice C8**, and now the only key still in it |
 | `science_bands`, `liveness_floors` | **Python** | a static AST census of `science_gate` markers on pytest functions |
 | `integrator`, `dt_days` | **hand** | the two deliberate anti-derived literals (below) |
 | `scenarios.*.scenario` / `.golden` | **hand** | a human label; a filename |
@@ -753,7 +753,40 @@ honor-system for such a change, so follow it deliberately rather than waiting fo
   `param_files` (until slice 9 decides who loads the YAML), the weather fixture + its hash, the
   `drift_summary` golden's hash, and the whole `science_bands` / `liveness_floors` census —
   roughly half the file — remain Python's, each with its reason written beside it in the
-  manifest itself.
+  manifest itself. *(`param_files` left that list on 2026-08-17; see the C8 entry below.)*
+
+- **2026-08-17 — `param_files` RE-ANCHORED TO THE REFERENCE (slice C8 of the flip). Not one
+  hash moved, and the reason is the finding.** The key's 15 digits are **author-neutral by
+  construction**: both trees compute a newline-normalized sha-256 of the same file under the
+  same rule, so *"`param_files` is now Rust's"* is the wrong summary and the ceremony was
+  predicted to be value-free before it was run (it was). What re-anchored is a pair of
+  **rules**:
+
+  1. **The census** — the manifest now names the files the reference *loads*
+     (`domains::biosphere::params::param_files`, a compile-time `include_str!` list) instead of
+     the files a **glob of a Python package directory** finds. The difference is directional and
+     it is the point: a param file added to the tree and wired into no loader used to *enter*
+     the frozen surface; now it drops out of it and the gate says so. The 15-of-20 rule survives
+     with both of its exclusion reasons intact (four `crops/potato/*.yaml` by **non-recursion**,
+     `demo.yaml` by **name**), asserted Rust-side against the directory — and a free negative
+     control ships with it, because a recursive walk picks the potato overrides up and **two of
+     them share a basename with a frozen file**.
+  2. **The normalization** — `config::provenance`, a hand-rolled sha-256 (every engine crate is
+     zero-dep by charter) over LF-normalized text. ⚠ That rule is load-bearing **today**, and
+     not for the reason one would guess: `git ls-files --eol` shows the index is LF on **all 24**
+     param files, but the working-tree copy of `senescence.yaml` on the development box is
+     **CRLF** — and `include_str!` embeds the working tree. Measured: the un-normalized digest
+     for that one file differs from the frozen value, so without normalization the reference
+     would emit different hashes on that box and on Linux CI. "autocrlf converts on checkout"
+     would have been the wrong story; it would have hit all 24.
+
+  Python's `_frozen_param_files()` and `_normalized_sha256()` are **retained with their meaning
+  inverted** — the identical assertions now ask *has the checker drifted from the contract?* —
+  which is the treatment slices 6 and 8 gave the flow set and the authoring rosters. Deleting
+  them would have thrown away the only thing that says the two rules still agree.
+
+  ⚠ Prerequisite: **slice C1**, which moved the YAML loaders into the reference. Before C1 this
+  key genuinely had no referent, and the three slices that recorded so were right for their day.
 
 - **2026-08-15 — `canopy.carbon_fraction` BOUND TO A CITATION (provenance only; one hash, no
   value, no golden).** The honour-system ceremony from `CLAUDE.md`: advisor review →

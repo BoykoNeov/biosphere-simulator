@@ -213,9 +213,12 @@ regenerating it needs `cargo`.** The keys the Rust reference tree can produce �
 hand-written. **The manifest states this itself**, per key, in its own `_authority` block,
 which is the thing to read before assuming any field is Rust-derived. By content most of
 the file is not: `science_bands` + `liveness_floors` are a static census of pytest markers
-with no Rust referent, `param_files` is Python-retained until the flip's slice 9 decides
-who loads the YAML, and `sealed_energy_drift`'s golden hash is a Python-side fold of a raw
-Rust series. Two consequences a reader will otherwise miss:
+with no Rust referent, and `sealed_energy_drift`'s golden hash is a Python-side fold of a raw
+Rust series. ⚠ **`param_files` joined the Rust half on 2026-08-17 (slice C8)** — what
+re-anchored there is the *census* rule (the eight files the reference **loads**, not a glob
+over six Python package directories) and the *normalization* rule, since the eight digits are
+author-neutral either way; the log entry below carries the detail and the two things it
+newly asserts. Two consequences a reader will otherwise miss:
 
 - **The completeness gates changed meaning without changing their arithmetic.** They used
   to say *the manifest froze everything Python has*; they now say *Python still matches the
@@ -289,6 +292,30 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-17 — `param_files` RE-ANCHORED TO THE REFERENCE (slice C8 of the flip). Not one
+  hash moved, and that is the finding, not a relief.** The eight digits are **author-neutral
+  by construction** — both trees compute a newline-normalized sha-256 of the same file under
+  the same rule — so *"`param_files` is now Rust's"* is the wrong summary and the diff was
+  predicted value-free before the ceremony was run. What re-anchored is the **census** (the
+  eight files the reference *loads*: `domains::params::param_files` for power × 2, thermal,
+  eclss and crew, plus `station::params::param_files` for `water_recovery` / `lamp` /
+  `harvest` — compile-time `include_str!` entries, not a glob over six Python package
+  directories) and the **normalization** (`config::provenance`; a hand-rolled sha-256, because
+  every engine crate is zero-dep by charter).
+
+  ⚠ **No exclusion rule on this side, and the asymmetry with the biosphere's 15-of-20 is
+  stated per side deliberately.** These six directories hold nothing but frozen files. A reader
+  who generalises the harder rule here will look for exclusions that do not exist.
+
+  ⚠ **Newly asserted, and nothing had checked it before: every basename is unique across the
+  six directories.** This key is basename-**keyed**, so a name appearing in two of them would
+  silently collapse two files into one entry — Python's `_param_paths()` *documents*
+  uniqueness and its dict would quietly keep whichever directory it read last.
+
+  Python's `_param_paths()` and `_normalized_sha256()` are **retained with their meaning
+  inverted**, as conformance checks on the checker — the treatment slice 7 gave the flow set.
+  Prerequisite: **slice C1**, which moved the YAML loaders into the reference.
 
 - **2026-08-16 — the reference flip's slice 7: this manifest is now produced from the Rust
   tree, and NO frozen value moved.** `docs/plans/post-roadmap-reference-flip.md`. Authorized

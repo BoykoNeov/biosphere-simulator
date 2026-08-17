@@ -72,11 +72,37 @@ RUST_STATION_DIR = REPO_ROOT / "rust" / "crates" / "station"
 RUST_AUTHORING_DIR = REPO_ROOT / "rust" / "crates" / "authoring"
 
 # The set-valued axes compared straight across, per case. ⚠ The dump's *exact* key set
-# is asserted too (`_DUMP_KEYS`), not read as a filter: adding `param_files` (or
-# anything else) to a dump program turns this gate red until whoever did it has read the
-# module docstring explaining why that key cannot be an axis. A filter would have let
-# the tautology in silently.
+# is asserted too (`_DUMP_KEYS`), not read as a filter: adding a key to a dump program
+# turns this gate red until whoever did it has classified it in the manifest's
+# `_AUTHORITY`. A filter would have let a tautology in silently.
+#
+# ⚠⚠ **That forcing function did its job and then the answer changed.** Until slice C8
+# this
+# comment named `param_files` as the example of a key that *could not* be an axis,
+# because
+# the port read no YAML — only a table Python generated from the Python loaders, so
+# anything
+# it printed would have been this list travelling out and back. Slice **C1** gave the
+# reference the YAML loaders and slice **C8** the census + digest, so the key has a
+# referent
+# now and IS compared. The forcing function is what made the change deliberate: adding
+# the
+# key reddened this gate first.
 _COMPARED_AXES = frozenset({"flow_set", "aux_set"})
+
+#: The mapping-valued axes compared key-by-key rather than as sets (slice C8).
+#:
+#: ⚠ `param_files` is `filename -> newline-normalized sha-256`. Its **values** are
+#: author-neutral — both sides digest the same file, which is why re-anchoring it moved
+#: not
+#: one of the 23 hashes — so what this comparison actually watches is the **roster**: a
+#: param
+#: file the reference stopped loading, or one added and wired into no loader. Compared
+#: here
+#: as a whole mapping so a changed digest is red too, which is what catches an *edited*
+#: param
+#: file whose manifest entry was never regenerated (the desync slice 5 measured).
+_COMPARED_MAPPINGS = frozenset({"param_files"})
 
 # (label, crate dir, example, manifest, dump keys). One per manifest that carries a
 # registry-derived inventory; the biosphere is delegated out of the station manifest, so
@@ -88,9 +114,16 @@ _COMPARED_AXES = frozenset({"flow_set", "aux_set"})
 # check a `locked_dt` against, and slice 7 declined to add one (widening the frozen
 # surface is its own unfreeze) — see the `numerics_note` entry in that manifest.
 _BIOSPHERE_DUMP_KEYS = frozenset(
-    {"flow_set", "aux_set", "horizons", "light_path_samples", "locked_dt_days"}
+    {
+        "flow_set",
+        "aux_set",
+        "horizons",
+        "light_path_samples",
+        "locked_dt_days",
+        "param_files",
+    }
 )
-_STATION_DUMP_KEYS = frozenset({"flow_set", "aux_set", "horizons"})
+_STATION_DUMP_KEYS = frozenset({"flow_set", "aux_set", "horizons", "param_files"})
 #: ⚠ The authoring dump (slice 8) has NO axis in common with the two above — the
 # platform : contract freezes a grammar, a file schema and a flow-type registry, not a
 # wired : inventory — so it gets its own gate below rather than a row in `_CASES`. Every
@@ -155,8 +188,10 @@ def test_rust_inventory_equals_the_frozen_manifest(
 
     assert set(dump) == dump_keys, (
         f"{example} dumps {sorted(dump)}, not {sorted(dump_keys)} — see this "
-        f"module's docstring before adding an axis (a param-file list would make this "
-        f"gate compare Python against Python)"
+        f"module's docstring before adding an axis. A new key must be classified in "
+        f"the manifest's `_AUTHORITY` and must be something the reference can "
+        f"honestly produce: a key whose value is really the checker's own list "
+        f"travelling out and back makes this gate compare Python against Python."
     )
 
     # ⚠ Guard the comparison itself, not just its result. An equality against an empty

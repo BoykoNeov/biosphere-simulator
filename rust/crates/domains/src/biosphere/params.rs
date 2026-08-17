@@ -412,8 +412,7 @@ pub fn photosynthesis() -> PhotosynthesisParams {
     for field in ["quantum_yield", "theta"] {
         checked(require_half_open(v[field], 0.0, 1.0, field, NAME), NAME);
     }
-    let (t_min, t_opt_lo, t_opt_hi, t_max) =
-        (v["t_min"], v["t_opt_lo"], v["t_opt_hi"], v["t_max"]);
+    let (t_min, t_opt_lo, t_opt_hi, t_max) = (v["t_min"], v["t_opt_lo"], v["t_opt_hi"], v["t_max"]);
     // Well-ordered cardinals: the two strict pairs are divisors in the response curve.
     assert!(
         t_min < t_opt_lo && t_opt_lo <= t_opt_hi && t_opt_hi < t_max,
@@ -744,7 +743,11 @@ pub fn humification() -> HumificationParams {
         checked(require_closed(v[field], 0.0, 1.0, field, NAME), NAME);
     }
     checked(
-        require_non_negative(v["slow_decomposition_rate"], "slow_decomposition_rate", NAME),
+        require_non_negative(
+            v["slow_decomposition_rate"],
+            "slow_decomposition_rate",
+            NAME,
+        ),
         NAME,
     );
     HumificationParams {
@@ -853,7 +856,12 @@ pub fn allocation_from(text: &str, name: &'static str) -> AllocationParams {
                 row.dvs
             );
         }
-        for (label, frac) in [("fl", row.fl), ("fs", row.fs), ("fr", row.fr), ("fo", row.fo)] {
+        for (label, frac) in [
+            ("fl", row.fl),
+            ("fs", row.fs),
+            ("fr", row.fr),
+            ("fo", row.fo),
+        ] {
             assert!(
                 (0.0..=1.0).contains(&frac),
                 "{name}: row {i} {label} must be in [0, 1], got {frac}"
@@ -896,6 +904,67 @@ pub fn biosphere() -> BiosphereParams {
     }
 }
 
+/// The **frozen biosphere param-file census**: `(filename, embedded text)` for every YAML
+/// file this module loads, in filename order (slice C8 of the reference flip).
+///
+/// # ⚠⚠ This is the set the reference LOADS, which is what re-anchors `param_files`
+///
+/// The recorded sha-256 values are author-neutral — both sides digest the same bytes — so
+/// what actually moves to the reference is the **census rule**. Python's rule is a
+/// non-recursive glob of a package directory minus `demo.yaml`; this is the list of files
+/// the compiled reference actually reads. A file that stopped being loaded would drop out of
+/// the manifest here, where under the glob rule it would stay in it.
+///
+/// # ⚠ The 15-of-20 rule, and why the five are excluded for TWO different reasons
+///
+/// `src/domains/biosphere/params/` holds **20** `*.yaml` files and the manifest names
+/// **15**. The excluded five split:
+///
+/// * **four `crops/potato/*.yaml`** — excluded because the census is **non-recursive**. The
+///   port has no potato build (its stage 2 is deferred), so it loads none of them.
+/// * **`demo.yaml`** — excluded **by name**. It is a skeleton feeding two Python-only
+///   scenarios that slice C6 retires.
+///
+/// *A directory is not a category*: a recursive walk would pick the potato files up and the
+/// census gate would go red looking like a port bug.
+/// `tests::the_census_matches_the_directory_on_disk` drives exactly that case.
+pub fn param_files() -> Vec<(&'static str, &'static str)> {
+    let mut files = vec![
+        ("allocation.yaml", ALLOCATION_YAML),
+        ("canopy.yaml", CANOPY_YAML),
+        ("decomposition.yaml", DECOMPOSITION_YAML),
+        ("herbivory.yaml", HERBIVORY_YAML),
+        ("humification.yaml", HUMIFICATION_YAML),
+        ("microbial_respiration.yaml", MICROBIAL_RESPIRATION_YAML),
+        ("nitrogen.yaml", NITROGEN_YAML),
+        ("phenology.yaml", PHENOLOGY_YAML),
+        ("photosynthesis.yaml", PHOTOSYNTHESIS_YAML),
+        ("respiration.yaml", RESPIRATION_YAML),
+        ("root_depth.yaml", ROOT_DEPTH_YAML),
+        ("senescence.yaml", SENESCENCE_YAML),
+        ("stem_reserves.yaml", STEM_RESERVES_YAML),
+        ("transpiration.yaml", TRANSPIRATION_YAML),
+        ("water_cycle.yaml", WATER_CYCLE_YAML),
+    ];
+    files.sort_by_key(|(name, _)| *name);
+    files
+}
+
+/// The directory the census is a census **of** — resolved at compile time, the same
+/// reach-out `include_str!` above makes.
+///
+/// ⚠ Under target state C the param YAML cannot stay inside a deleted Python package, and
+/// this constant makes the reach-out a **runtime** dependency as well as a compile-time one.
+/// That sharpens the relocation trigger recorded in
+/// `docs/plans/post-roadmap-reference-flip.md` §5d rather than resolving it.
+pub const PARAMS_DIR: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../src/domains/biosphere/params"
+);
+
+/// The census's own exclusion: the skeleton file the frozen set leaves out **by name**.
+pub const EXCLUDED_PARAM_FILE: &str = "demo.yaml";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -916,9 +985,8 @@ mod tests {
             let mut fields = line.split('\t');
             let head = fields.next().expect("a leading field");
             if head == "partition_row" {
-                let mut next = || {
-                    simcore::hexfloat::parse(fields.next().expect("a field")).expect("parses")
-                };
+                let mut next =
+                    || simcore::hexfloat::parse(fields.next().expect("a field")).expect("parses");
                 rows.push(PartitionRow {
                     dvs: next(),
                     fl: next(),
@@ -957,7 +1025,10 @@ mod tests {
             ("resp.t_ref", p.resp.t_ref),
             ("resp.growth_efficiency", p.resp.growth_efficiency),
             ("resp.o2_half_saturation", p.resp.o2_half_saturation),
-            ("transp.aerodynamic_resistance", p.transp.aerodynamic_resistance),
+            (
+                "transp.aerodynamic_resistance",
+                p.transp.aerodynamic_resistance,
+            ),
             ("transp.surface_resistance", p.transp.surface_resistance),
             ("pheno.t_base", p.pheno.t_base),
             ("pheno.t_cap", p.pheno.t_cap),
@@ -973,8 +1044,14 @@ mod tests {
             ("photo.ppsen", p.photoperiod.ppsen),
             ("rootd.max_extension_rate", p.rootd.max_extension_rate),
             ("rootd.max_rooted_depth", p.rootd.max_rooted_depth),
-            ("stemres.remobilizable_fraction", p.stem_reserve.remobilizable_fraction),
-            ("stemres.remobilization_rate", p.stem_reserve.remobilization_rate),
+            (
+                "stemres.remobilizable_fraction",
+                p.stem_reserve.remobilizable_fraction,
+            ),
+            (
+                "stemres.remobilization_rate",
+                p.stem_reserve.remobilization_rate,
+            ),
             ("stemres.trigger_dvs", p.stem_reserve.trigger_dvs),
             ("stemres.cessation_dvs", p.stem_reserve.cessation_dvs),
             ("senesc.rdr_leaf", p.senesc.rdr_leaf),
@@ -990,15 +1067,24 @@ mod tests {
             ("nitro.n_target_w_plateau", p.nitro.n_target_w_plateau),
             ("nitro.dm_kg_per_mol_c", p.nitro.dm_kg_per_mol_c),
             ("decomp.decomposition_rate", p.decomp.decomposition_rate),
-            ("micro.microbial_respiration_rate", p.micro.microbial_respiration_rate),
+            (
+                "micro.microbial_respiration_rate",
+                p.micro.microbial_respiration_rate,
+            ),
             ("micro.o2_half_saturation", p.micro.o2_half_saturation),
-            ("humi.litter_respired_fraction", p.humi.litter_respired_fraction),
+            (
+                "humi.litter_respired_fraction",
+                p.humi.litter_respired_fraction,
+            ),
             (
                 "humi.active_stabilization_co2_fraction",
                 p.humi.active_stabilization_co2_fraction,
             ),
             ("humi.slow_respired_fraction", p.humi.slow_respired_fraction),
-            ("humi.slow_decomposition_rate", p.humi.slow_decomposition_rate),
+            (
+                "humi.slow_decomposition_rate",
+                p.humi.slow_decomposition_rate,
+            ),
             ("water.condensation_rate", p.water.condensation_rate),
             ("water.recycling_rate", p.water.recycling_rate),
             ("herb.grazing_rate", p.herb.grazing_rate),
@@ -1028,8 +1114,7 @@ mod tests {
         }
         // ⚠ Both directions: a scalar the control names and this module never loads
         // would otherwise pass unnoticed — the completeness half of the gate.
-        let loaded_names: std::collections::BTreeSet<&str> =
-            got.iter().map(|(n, _)| *n).collect();
+        let loaded_names: std::collections::BTreeSet<&str> = got.iter().map(|(n, _)| *n).collect();
         let control_names: std::collections::BTreeSet<&str> = want.keys().copied().collect();
         assert_eq!(loaded_names, control_names, "the two name sets must match");
 
@@ -1054,10 +1139,11 @@ mod tests {
     /// about what a mol of carbon weighs), so it is asserted here rather than trusted.
     #[test]
     fn the_two_carbon_fractions_agree() {
-        let canopy_cf = MOLAR_MASS_CARBON_KG_PER_MOL / (canopy().sla_per_mol_c
-            / file(CANOPY_YAML, "canopy.yaml")
-                .guarded("specific_leaf_area", "m^2/kg", "canopy.yaml")
-                .unwrap());
+        let canopy_cf = MOLAR_MASS_CARBON_KG_PER_MOL
+            / (canopy().sla_per_mol_c
+                / file(CANOPY_YAML, "canopy.yaml")
+                    .guarded("specific_leaf_area", "m^2/kg", "canopy.yaml")
+                    .unwrap());
         let nitro_cf = MOLAR_MASS_CARBON_KG_PER_MOL / nitrogen().dm_kg_per_mol_c;
         assert!(
             (canopy_cf - nitro_cf).abs() < 1e-12,
@@ -1112,6 +1198,99 @@ parameters:
         for row in &p.alloc.table {
             let total = row.fl + row.fs + row.fr + row.fo;
             assert!((total - 1.0).abs() < 1e-9, "row sums to {total}");
+        }
+    }
+
+    /// The census equals the directory, under the **non-recursive minus `demo.yaml`** rule.
+    ///
+    /// ⚠⚠ **The completeness half of `param_files`, and the direction that matters is the
+    /// one a value comparison cannot see.** The digests are author-neutral (both sides hash
+    /// the same file), so the only thing that can go wrong with this key is the *roster*: a
+    /// param file added to the tree and wired into no loader, or a loader dropped while its
+    /// file stays. The first is exactly what `param_files` under the glob rule would have
+    /// hidden — the manifest would have gained a hash for a file the reference never reads.
+    #[test]
+    fn the_census_matches_the_directory_on_disk() {
+        let mut on_disk: Vec<String> = std::fs::read_dir(PARAMS_DIR)
+            .expect("the frozen params directory is readable")
+            .map(|entry| entry.expect("a readable dir entry"))
+            // NON-RECURSIVE: `read_dir` does not descend, which is what leaves the four
+            // `crops/potato/*.yaml` out. `is_file()` makes that explicit rather than
+            // incidental — the `crops/` directory entry is skipped here by name, not by luck.
+            .filter(|entry| entry.path().is_file())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.ends_with(".yaml") && name != EXCLUDED_PARAM_FILE)
+            .collect();
+        on_disk.sort();
+
+        let census: Vec<String> = param_files()
+            .iter()
+            .map(|(name, _)| (*name).to_string())
+            .collect();
+        assert_eq!(
+            census, on_disk,
+            "the loaded param-file census and the directory disagree. This is a ROSTER \
+             finding, not a value one: either a param file was added and wired into no \
+             loader, or a loader was dropped and its file left behind. Do NOT 'fix' it by \
+             editing whichever list is shorter."
+        );
+        assert_eq!(
+            census.len(),
+            15,
+            "the frozen biosphere param set is 15 files"
+        );
+    }
+
+    /// The four potato overrides exist, and the census does **not** see them.
+    ///
+    /// ⚠ A free negative control, because the subject is already on disk: swap `read_dir`
+    /// above for a recursive walk and the census gains four names, the manifest gains four
+    /// hashes, and the failure reads like a port bug. *A directory is not a category.*
+    #[test]
+    fn the_recursive_walk_would_see_four_more_and_the_census_does_not() {
+        let nested = std::path::Path::new(PARAMS_DIR).join("crops/potato");
+        let mut overrides: Vec<String> = std::fs::read_dir(&nested)
+            .expect("the potato override directory is readable")
+            .map(|entry| entry.expect("a readable dir entry"))
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.ends_with(".yaml"))
+            .collect();
+        overrides.sort();
+        assert_eq!(
+            overrides.len(),
+            4,
+            "expected four potato overrides, found {overrides:?} — if this changed, the \
+             15-of-20 rule in `param_files`'s doc comment is stale"
+        );
+        // Two of the four share a BASENAME with a frozen file (`allocation.yaml`,
+        // `canopy.yaml`), so a recursive walk would not merely add names — it would collide
+        // with the frozen ones and could overwrite a hash in place.
+        let census: Vec<&str> = param_files().iter().map(|(n, _)| *n).collect();
+        let colliding: Vec<&String> = overrides
+            .iter()
+            .filter(|n| census.contains(&n.as_str()))
+            .collect();
+        assert!(
+            !colliding.is_empty(),
+            "the basename collision this test documents has gone away; the recursive-walk \
+             hazard is now milder than the comment claims"
+        );
+    }
+
+    /// No frozen param file contains a separator Python's `splitlines` would break on.
+    ///
+    /// ⚠ This is what makes the reference's narrow newline rule and Python's broader one
+    /// unable to disagree, rather than merely observed not to. Without it the two hash rules
+    /// differ on a file nobody has written yet.
+    #[test]
+    fn no_frozen_param_file_carries_an_exotic_line_separator() {
+        for (name, text) in param_files() {
+            assert_eq!(
+                config::provenance::contains_exotic_line_separator(text),
+                None,
+                "{name} contains a character Python's splitlines treats as a line break but \
+                 the reference's normalization does not — the two hash rules would diverge"
+            );
         }
     }
 }

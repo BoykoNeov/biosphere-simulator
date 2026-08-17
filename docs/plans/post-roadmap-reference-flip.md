@@ -1631,6 +1631,202 @@ of `src/` stand where §5d left them. ⚠ The `include_str!` paths now reach out
 tree into the Python package; that is the relocation's trigger, recorded so it is not read
 as an oversight.
 
+## §5e C2 — the twelve mathematical laws, COMPLETE 2026-08-17
+
+Taken together with C8 on the user's instruction (*"do both"*), as separate commits.
+
+### ⚠⚠ The plan's instrument was wrong for two thirds of the set, and the alternative is STRONGER
+
+§5c said C2 was *"unchanged; `proptest`; independent of everything"*. The independence held.
+The instrument did not. Measured against the actual sites: **eight of the twelve reference
+laws are permutations of three or four elements.** Hypothesis samples ~100 draws from a space
+of **6** or **24**; Rust enumerates **all** of it. That is a measured improvement over the
+reference law, not a workaround. ⚠ And it is a *choice*, not a constraint — `proptest 1.11.0`
+and its whole dependency tree are already in the local registry cache. The choice is that a
+fifteen-crate dev-dependency, in a workspace whose engine crates are zero-dep by charter, is
+the wrong price for the four laws that genuinely need generated values. Those four get a
+deterministic LCG, **deliberately not `simcore::rng::mix64`**, because `CounterRng` is the
+subject of two of them and seeding its case set from its own mixer is the self-referential
+shape this project had to dissolve once already for the cross-port RNG vectors.
+
+**What is given up is stated rather than implied:** shrinking. An exhaustive permutation
+failure is already minimal; a generated failure is deterministic and reproducible from its
+seed, but nothing narrows it.
+
+### ⚠⚠ Three reference laws are UNFALSIFIABLE in Rust, and one such test was already here
+
+The composition-fold, ledger-residual and `observe` laws shuffle the **insertion order of a
+Python `dict`**. `State.stocks` is a `BTreeMap`: "insertion order" is not expressible, so a
+shuffled build and a canonical build **are the same map**. `observation.rs`'s own
+`insertion_order_independent` is exactly that shape today — its `forward` and `backward` maps
+are identical before `observe` is ever called. The three are re-expressed on the axis that *is*
+falsifiable here: the **value** of the fold, with fixtures whose sorted and reversed
+accumulations differ in bits, plus a discriminator assertion so the claim cannot decay into a
+tautology. ⚠ *A language feature can make a ported law inert without changing a word of it.*
+
+### ⚠⚠ Nine controls; THREE came back green, and all three were defects in the new tests
+
+This is the slice's real content. Each control mutates the reference and names the law that
+must redden.
+
+| Control | Reddens |
+|---|---|
+| the **flow** sort deleted in `Registry::new` | laws 1, 3, 7, 8, 10 |
+| the **aux** sort deleted (a separate function) | law 2 only |
+| the ledger fold walks the stocks in reverse | laws 4, 5 |
+| `observe` emits in reverse | law 9 |
+| `draw` shifts 10 instead of 11 | law 11 |
+| a forcing read leaks the snapshot's stock | law 6 |
+| `permutations()` returns only the identity | the enumerator meta-test |
+| `Lcg::shuffle` becomes a no-op | laws 10, 12 (their spread meta-assertions) |
+| `CounterRng` given sequential state | laws 11, 12 |
+
+The three that came back green first time:
+
+1. **The multirate law had no discriminator at all** — an order-independence law passing
+   against a registry that never sorted. Its fast set now drains one stock with three flows
+   spanning sixteen orders, and `dt / n_sub` is pinned to exactly `1.0` so the asserted
+   magnitudes are the ones that reach the reduction.
+2. ⚠⚠ **The ledger-residual law asserted sensitivity on the NOMINAL deltas while the ledger
+   folds the RECOVERED ones.** `(1e8 + 0.1) - 1e8` is `0.09999999403953552`, and the recovered
+   set cancels to exactly `0.0` in **both** directions. The discriminator is now read off the
+   two states so it cannot drift from what is folded. ⚠ **The reference's own fixture has the
+   same shape and its comment claims the opposite** (*"a naive (unsorted) sum would differ by
+   ULPs under reordering"*); measured, both directions give `0.0`.
+3. ⚠⚠ **The season law is inert by NATURE, not by fixture.** At the season's real physical
+   magnitudes every per-stock leg sum is of comparable size, so re-associating them moves no
+   bits — **realism cost the discriminator**, which is exactly what the reference's synthetic
+   skeletons are for. It now also asserts the rebuilt registry's *iteration order*, which the
+   same control does redden, and says in the file that #15 stays pinned by the engine-level
+   laws. ⚠ *Re-homing a law onto a bigger, more realistic subject can make it weaker. Measure;
+   do not assume the bigger subject dominates.*
+
+⚠ And a fourth, caught earlier by the same mechanism: the discriminator helper rejected **three
+of my own fixtures** as order-insensitive before they could ship green, including one that
+cannot be sensitive at all — **a two-element float sum is commutative, and the reference's
+integrator fixture drains its source with exactly two flows.**
+
+### Law 3 had no Rust subject, and was re-homed rather than recorded as a gap
+
+Checked, not assumed: there is no `demo` scenario anywhere in `rust/`, and **C6 retires the
+Python one**, so porting the law onto it would mean porting a scenario scheduled for deletion.
+`Registry::into_parts()` is public and its own docstring names rebuild-through as its purpose,
+so the law lands on the **real season registry** instead. What that loses is named in the file:
+`demo`'s topology (which nothing else exercises either — C6's whole point), the **RK4 arm** (the
+frozen biosphere is Euler-only by charter, so an RK4 arm would test an unsupported
+configuration; that arm survives on the engine-level subject), and the discriminator above.
+
+**Additive throughout:** two new test files, `git diff src/` empty, no golden, no manifest, no
+contract. Rust **348 → 363** tests.
+
+## §5f C8 — `param_files` re-anchors, COMPLETE 2026-08-17
+
+The successor C1 named, with its three stated blockers resolved: sha-256 in Rust, a
+newline-normalization rule, the 15-of-20 census rule.
+
+### ⚠⚠ The 23 digits are AUTHOR-NEUTRAL, so "param_files is now Rust's" is the wrong summary
+
+Both trees compute a newline-normalized sha-256 of the same file under the same rule.
+**Measured before a line of Rust was written:** all 15 biosphere + 8 station recorded hashes
+reproduce under Python's rule *and* under the narrow rule Rust would implement. So the ceremony
+was predicted value-free and **was** value-free — the entire diff across two contracts is the
+`_authority["param_files/*"]` entry in each. What re-anchored is a pair of **rules**:
+
+1. **The census** — the manifest now names the files the reference *loads* (a compile-time
+   `include_str!` list) instead of the files a **glob of a Python package directory** finds. The
+   difference is directional and it is the point: a param file added to the tree and wired into
+   no loader used to *enter* the frozen surface; now it drops out and the gate says so.
+2. **The normalization** — `config::provenance`, hand-rolled sha-256 (zero-dep charter) over
+   LF-normalized text.
+
+⚠ That is what the `_authority` `why:` says, in both manifests. Anything stronger would be a
+claim nobody made.
+
+### ⚠⚠ The newline rule is load-bearing TODAY — and the obvious explanation is FALSE
+
+`git ls-files --eol` over the 24 param files: the index is **LF on every one** and
+`.gitattributes` declares `eol=lf`, yet the **working-tree** copy of `senescence.yaml` on this
+box is **CRLF**. So "autocrlf converts on checkout" — the story one would write — is wrong; it
+would have hit all 24. What is true is narrower and worse: **`include_str!` embeds the working
+tree**, so the reference's own compiled-in bytes for one frozen param file differ between this
+box and Linux CI right now. Measured: the un-normalized digest for that file is `a7c55528…`
+against the frozen `21163d3c…`. Without normalization the regenerated manifest would be red on
+the other machine. ⚠ *A right conclusion reached by a wrong mechanism is still a rotten record
+— run `git ls-files --eol` before writing a line-endings rationale.*
+
+### ⚠⚠ The control pair exists; it is on the "who does the generator ASK" axis, not "whose bytes"
+
+The naive reading — *both sides hash the same file, so there is no direction* — is wrong, and
+was corrected by the advisor before the build. Slices 6–8's rule (a re-anchoring criterion must
+name a **direction** per axis) is satisfied:
+
+| Control | Manifest | Python conformance gate |
+|---|---|---|
+| a param file's **content** edited, not regenerated | pins bytes that no longer exist | **RED** |
+| **Python**'s census rule changed (stop excluding `demo.yaml`), regenerated | **byte-identical** | **RED** |
+
+### The other findings
+
+⚠ **A free negative control was already on disk.** The 15-of-20 rule has **two** exclusion
+mechanisms — four `crops/potato/*.yaml` by **non-recursion**, `demo.yaml` by **name**. A
+recursive walk picks the potato files up, and **two of the four share a basename with a frozen
+file**, so it would not merely add names, it could overwrite a frozen hash in place. Asserted
+both ways.
+
+⚠ **An in-crate test that looked stronger than it was, replaced.** The first sha-256 padding
+coverage asserted the padded length's invariants — by **re-deriving the padding with a copy of
+the implementation's own loop**. Two copies of the code under test are not an oracle: if the
+loop were wrong both would be wrong together and the test would be green. *A policy with two
+implementations has one that is stale*, in its sharper form — they were **guaranteed** to agree.
+Replaced by 201 digests minted from CPython's `hashlib` (OpenSSL, no shared ancestry) plus the
+four published FIPS 180-4 strings. ⚠ Those vectors are a **published-standard** artifact with
+an external authority, not the kind of Python-generated file §5c schedules for retirement.
+
+⚠ **And the frozen param files are not that coverage.** Measured: only **two** of the 24
+normalized lengths (`phenology.yaml` at 58, `radiator.yaml` at exactly **56**) land in the
+`len % 64 >= 56` window where the length field spills into a second block; **no** file is a
+single block and none is empty. That coverage is *incidental* — a one-character content edit
+removes it and nothing would say so.
+
+⚠ **Newly asserted, and nothing had checked it: basename uniqueness across the station's six
+directories.** `param_files` is basename-**keyed**, so a name in two directories would collapse
+two files into one entry. Python's `_param_paths()` *documents* uniqueness and its dict would
+quietly keep whichever directory it read last.
+
+⚠ **A forcing function fired exactly as designed, and its own message was the thing to fix.**
+Adding the key to the dumps reddened the parity gate first, whose failure text read *"a
+param-file list would make this gate compare Python against Python"* — the claim C8 refutes.
+Three separate places said that (both generators' `_RUST_DUMP_KEYS` comments and the gate's
+message) and all three were rewritten to record *why it was true until C1 and is not now*,
+rather than deleted. ⚠ *A forcing function that was right for three slices is not wrong when it
+fires; it is asking whether its premise still holds.*
+
+**Retained with meaning inverted, not deleted:** `_frozen_param_files()`, `_param_paths()` and
+`_normalized_sha256()` stay as **conformance checks on the checker** — the treatment slices 6
+and 8 gave the flow set and the authoring rosters. Deleting them would have thrown away the
+only thing that says the two hash rules still agree. And `EXOTIC_LINE_SEPARATORS` makes the one
+place the rules *could* differ **unreachable** rather than merely unobserved: Python's
+`splitlines` breaks on eight characters the narrow rule does not, and a gate asserts no frozen
+param file carries one.
+
+**Prose half updated in the same pass** (*the freeze's prose half is ungated*): both reference
+docs' authority tables and unfreeze logs, and `docs/param-file-conventions.md`, which gains a
+line-endings section and two checklist items — including that a whitespace-only edit is an
+unfreeze that reddens nothing.
+
+### ⚠ Still NOT done, with reasons
+
+* **The weather path** (`gen_biosphere_weather.py`) — still the generator with no successor
+  anywhere in C1–C8. Needs a JSON reader over a closed subset and ISO-date → day-of-year, and
+  its fixture needs a new home (47 test files read it).
+* **Relocating the param YAML out of `src/`** — C8 makes the reach-out **worse**, not better: a
+  runtime directory walk now joins the compile-time `include_str!`. That sharpens the trigger.
+* **Retiring `gen_*_params.py`** — still C1's control, still carrying §2e's expiry condition.
+* **The light-path fingerprint's hashing.** Its dump docstring says the hashing is left to
+  Python "because … this crate has no digest dependency". **C8 falsifies that clause's
+  premise.** Not acted on — moving it is a second re-anchoring with its own control, and this
+  slice already had two contracts open.
+
 ## §6 Open questions — none blocking, all answerable when their slice is taken
 
 1. **Does new *reference science* wait for the flip?** B makes Rust the place science is

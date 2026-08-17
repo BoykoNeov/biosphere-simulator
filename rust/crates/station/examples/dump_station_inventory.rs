@@ -37,11 +37,28 @@
 //!   key that does not exist, and adding one widens the frozen surface. That is its own
 //!   unfreeze with its own ceremony, not a rider on this one. Recorded in the manifest's
 //!   `_authority` entry for `numerics_note`.
-//! * ⚠⚠ **`param_files` is deliberately ABSENT** — same reason as the biosphere dump: this
-//!   port reads no YAML, only the Python-generated `station_params.txt` / `sibling_params.txt`,
-//!   whose names carry no file prefix at all. Printing a list here would make the gate compare
-//!   Python against Python. See `dump_biosphere_inventory.rs` for the full statement.
+//! * `param_files` — the frozen param-file census, `filename -> newline-normalized sha-256`,
+//!   over the **eight** files this contract spans: five from `domains::params` (power × 2,
+//!   thermal, eclss, crew) and three from `station::params`. **New in slice C8**, which
+//!   reverses what this file said for two slices.
+//!
+//!   ⚠⚠ **What re-anchored is the RULE, not the number.** Both sides digest the same bytes,
+//!   so all eight recorded hashes are author-neutral by construction and the re-anchoring
+//!   moved none of them (measured before it was done). What moved is the **census** — this is
+//!   the set the reference *loads* rather than a glob of Python package directories — and the
+//!   **normalization**, in `config::provenance`.
+//!
+//!   ⚠ **No exclusion rule on this side, and the asymmetry is deliberate.** The biosphere
+//!   census has two (non-recursion for four potato overrides, `demo.yaml` by name); these six
+//!   directories hold nothing but frozen files. Saying so per side keeps a reader from
+//!   generalising the harder rule to a place it does not apply.
+//!
+//!   ⚠ What this file said before C8 was true for its day: the port read
+//!   `station_params.txt` / `sibling_params.txt`, Python-generated tables whose names carry no
+//!   file prefix at all, so anything printed here would have compared Python against Python.
+//!   Slice C1 gave the reference the YAML loaders, which is what created a referent.
 
+use config::provenance::normalized_sha256;
 use domains::crew::{build_crew, MISSION_SCENARIO};
 use domains::eclss::{build_eclss, STEADY_STATE_SCENARIO};
 use domains::params;
@@ -143,6 +160,27 @@ fn main() {
     println!("  \"horizons\": {{");
     println!("    \"sealed_energy_years\": {SEALED_ENERGY_YEARS},");
     println!("    \"sealed_station_years\": {SEALED_STATION_YEARS}");
+    println!("  }},");
+    println!("  \"param_files\": {{");
+    // The eight the station contract spans, sorted by basename. Every basename is unique
+    // across the six directories (asserted in `station::params`'s tests, because the manifest
+    // keys on basenames and a collision would silently collapse two files into one entry).
+    let mut files: Vec<(&str, &str)> = params::param_files();
+    files.extend(station_params::param_files());
+    files.sort_by_key(|(name, _)| *name);
+    // Tier-0 sanity on the program itself — since slice 7 this output is *written into* the
+    // frozen manifest by a regeneration run, so an empty or short census would be frozen
+    // rather than merely compared.
+    assert_eq!(
+        files.len(),
+        8,
+        "the frozen station param census is 8 files, got {}",
+        files.len()
+    );
+    for (i, (name, text)) in files.iter().enumerate() {
+        let comma = if i + 1 == files.len() { "" } else { "," };
+        println!("    \"{name}\": \"{}\"{comma}", normalized_sha256(text));
+    }
     println!("  }}");
     println!("}}");
 }
