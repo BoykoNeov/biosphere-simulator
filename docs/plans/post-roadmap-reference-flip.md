@@ -1552,6 +1552,66 @@ git-visible record, document here. The **value** side is not honour-system:
   paths reach out of the Rust tree into the Python one. That ugliness is the successor's
   trigger, recorded here so it is not mistaken for an oversight.
 
+### C1 — COMPLETE 2026-08-17, in two commits plus a third for a defect it uncovered
+
+**Built.** A zero-dep `config` crate (Python's `src/config`, ported): the closed-subset
+YAML reader **moved** into it from `authoring`, the `{value, unit, source}` entry schema,
+the exact-string unit guard, and the bound helpers. `authoring` re-exports `yaml` at its
+original path and its ~39 call sites compile **untouched**, carried by one
+`From<ConfigError>` impl. `domains` and `station` now load all **23** frozen param files
+themselves — 15 biosphere, 5 sibling, 3 station — schema, units, bounds and **both
+core-ready folds** included.
+
+**The gate is bit equality, in both directions.** `every_value_matches_the_generated_table`
+(one per crate) compares `to_bits()` for all 66 biosphere scalars + the partition table,
+12 sibling and 4 station values against the retained generated tables, **and** asserts the
+two name sets match — a scalar the control names and the loader never reads would
+otherwise pass unnoticed. **It passed on the first run**, which is what §5d's measurement
+predicted. Python: **2471 passed, 5 skipped, 0 failed**. Rust: green, `ruff`/`pyright`
+clean. ⚠ **The generators and their three `.txt` files are RETAINED as that control** —
+§5c's rule that a generator is not touched before its successor is green, applied at the
+moment it bites.
+
+⚠ **The format-only unfreeze, and it is the one nothing catches.** `allocation.yaml` (and
+the potato override) were reformatted out of YAML flow style. **No value moved** —
+`gen_biosphere_params.py` reproduces its file byte-for-byte — and the manifest diff was
+**predicted before regenerating and held exactly**: one line, `param_files["allocation.yaml"]`'s
+sha-256, no golden hash. Ceremony run deliberately, since those hashes are recorded and
+never compared. Full entry in `docs/biosphere-reference.md`'s unfreeze log.
+
+⚠⚠ **A negative control found a live defect in the frozen reader, and it shipped as its
+own commit.** The check asserting *"flow style is rejected, not silently mis-parsed"*
+**failed**: the reader rejected flow style as a mapping **value** (`a: {b: 1}`, the only
+form its `flow_style_is_rejected` test ever covered) and **silently mis-parsed** it as a
+**sequence item** — `- {dvs: 0.0, fl: 0.55}` has a `key:` head, so the mapping path
+returned the key `"{dvs"` and the value `"0.0, fl: 0.55}"` with **no error at all**. That
+is the exact form this repository's own param files had been written in for years, so
+**the one case the test missed is the one that mattered**, and any author writing a
+flow-style list entry got a silent mis-parse instead of the documented rejection. Fixed on
+the key side with one shared excluded-leader constant, the case added **to that test**
+rather than a crate away, and measured inert on every existing file. *A test that names a
+behaviour is not evidence it covers the case that matters.*
+
+⚠ **Two §5d predictions were confirmed by construction rather than by luck.** `radiator.yaml`'s
+`heat_capacity: 1.0e7` — the scalar YAML 1.1 resolves as a **string** — loads correctly
+because the entry schema parses the scalar's *text* rather than trusting a resolver's
+verdict, which is exactly what pydantic does; it has its own test over all four spellings.
+And the two folds' **differing association** was copied rather than tidied.
+
+**Asserted here for the first time:** the MUST-EQUAL constraint between `canopy.yaml`'s and
+`nitrogen.yaml`'s `carbon_fraction`. Python has *documented* it since Phase 1 and enforces
+it nowhere; a divergence models a plant whose leaf area and nitrogen thresholds disagree
+about what a mol of carbon weighs.
+
+⚠ **What C1 did NOT do, unchanged from §5d and now with a landed reason:** `param_files`
+is still classified `python` in both manifests. Re-anchoring it needs **sha-256 in Rust**
+(there is none in the tree, and every engine crate is zero-dep by charter), a
+**newline-normalization rule**, and the **15-of-20 census rule** — three things that are
+its own slice, not a rider on this one. The weather path and the relocation of the YAML out
+of `src/` stand where §5d left them. ⚠ The `include_str!` paths now reach out of the Rust
+tree into the Python package; that is the relocation's trigger, recorded so it is not read
+as an oversight.
+
 ## §6 Open questions — none blocking, all answerable when their slice is taken
 
 1. **Does new *reference science* wait for the flip?** B makes Rust the place science is

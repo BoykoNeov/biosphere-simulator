@@ -819,7 +819,7 @@ pub fn allocation_from(text: &str, name: &'static str) -> AllocationParams {
     for (i, item) in items.iter().enumerate() {
         let where_ = format!("{name}: row {i}");
         let map = checked(item.as_mapping(&where_), name);
-        let mut read = |key: &str| -> f64 {
+        let read = |key: &str| -> f64 {
             let node = map
                 .iter()
                 .find(|(k, _)| k == key)

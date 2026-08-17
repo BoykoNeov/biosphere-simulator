@@ -3,12 +3,13 @@
 //!
 //! # What this replaces, and what it deliberately is not
 //!
-//! Python's boundary is `config/loader.py` (a safe YAML read) + `config/units.py` (pint)
-//! + a hand-written pydantic schema per process in each `domains.*.loader`. This module
-//! is the first two, plus the parts of the third that every param file shares.
+//! Python's boundary is three things: `config/loader.py` (a safe YAML read),
+//! `config/units.py` (pint), and a hand-written pydantic schema per process inside each
+//! `domains.*.loader`. This module is the first two, plus the parts of the third that
+//! every param file shares.
 //!
 //! **It is not a units library, and that is a measurement rather than a shortcut.** The
-//! slice-C1 census (docs/plans/post-raodmap-reference-flip.md §5d) found that of the ~80
+//! slice-C1 census (docs/plans/post-roadmap-reference-flip.md §5d) found that of the ~80
 //! frozen coefficients, *every* declared unit is checked by **exact string comparison** —
 //! `dimensionless`, `degC`, `1/day`, `J/K`, … — and the only two Python functions that
 //! genuinely convert (`config.units.convert` / `to_canonical`) have six live callers
@@ -203,9 +204,15 @@ fn scalar_text<'a>(
 // The loaders' documented ranges, as named checks rather than open-coded `if`s, so a
 // bound reads the same in every domain. Each mirrors a Python `raise ValueError`.
 
-/// `value > 0`.
+/// `value > 0` — **and not NaN**.
+///
+/// ⚠ Written as "is it Greater?" rather than `value <= 0.0` on purpose: the two differ on
+/// NaN, which the second form would silently accept. That mirrors Python's
+/// `if not value > 0.0`, which rejects NaN for the same reason. [`ParamFile::entry`]
+/// already refuses a non-finite value, so this is belt-and-braces at the boundary — but
+/// these helpers are public, and a bound that lets NaN through is not a bound.
 pub fn require_positive(value: f64, field: &str, context: &str) -> Result<f64, ConfigError> {
-    if !(value > 0.0) {
+    if value.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
         return Err(ConfigError::new(format!(
             "{context}: {field} must be > 0, got {value}"
         )));
@@ -220,7 +227,10 @@ pub fn require_non_negative(
     field: &str,
     context: &str,
 ) -> Result<f64, ConfigError> {
-    if !(value >= 0.0) {
+    if !matches!(
+        value.partial_cmp(&0.0),
+        Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+    ) {
         return Err(ConfigError::new(format!(
             "{context}: {field} must be >= 0, got {value}"
         )));
