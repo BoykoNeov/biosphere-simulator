@@ -409,7 +409,10 @@ result:**
   (herbivory) → multi-year (`annual_reset`/`run_perennial`) → drift. Each layer came out bit-exact
   on the first correct build.
 
-* **Weather (the heaviest libm surface) exercised IN RUST** (`gen_biosphere_weather.py` →
+* **Weather (the heaviest libm surface) exercised IN RUST** — ⚠ *the delivery path described in
+  this bullet was replaced on 2026-08-17 by **slice C9** of the reference flip; the generator and
+  its table no longer exist, and the reference reads `tests/oracle/winter_wheat_weather.json`
+  directly. What the bullet says about the libm surface still holds.* (`gen_biosphere_weather.py` →
   committed `weather_facts.txt` of raw NASAPower facts + day-of-year; the Rust `weather` module
   runs the clean-room `daylength_seconds` (sin/tan/acos), `incident_par`, `net_radiation`,
   `vapor_pressure_deficit` (exp) conversions itself). A cheap cross-port de-risk on the 305 fixture
@@ -439,7 +442,9 @@ result:**
 
 * **Parity gate LOCAL-ONLY** (`skipif cargo`; the Python CI job has no Rust — the Step-0/3
   precedent): 6 `test_rust_biosphere_states_match_tier2` cases + `test_rust_biosphere_drift_summary_matches`
-  + the two in-sync gates (`weather_facts`/`biosphere_params`) + the slow band gate. Rust
+  + the two in-sync gates (`weather_facts`/`biosphere_params` — ⚠ *both retired since: the
+  params one by slice C1, the weather one by slice C9 on 2026-08-17, each because the
+  reference stopped reading a Python-generated copy*) + the slow band gate. Rust
   `cargo test` gains 4 biosphere integration tests (open/sealed/perennial runs + the annual_reset
   seed-bank guard). **`git diff src/` empty** (all changes under `rust/` + `tests/crossport/`) +
   **zero domain-code change**; `cargo test` + `clippy -D warnings` green; the full Python suite

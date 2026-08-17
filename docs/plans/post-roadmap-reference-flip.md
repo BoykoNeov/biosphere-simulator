@@ -818,7 +818,7 @@ manifest the answer is: *a minority of it, by content.* Classified:
 | `long_horizon_years`, `scenarios.*` | yes, mechanically | constants + file hashes |
 | `integrator`, `dt_days` | n/a | the two deliberate hand-written literals (§2b) — re-authored either way |
 | `param_files` (~17 lines) | **no** | Rust reads no YAML; only a Python-generated hexfloat file whose names are not filenames |
-| `forcing.weather_fixture` / `weather_sha256` | **no** | a hash of the Python-side oracle fixture; Rust reads `weather_facts.txt`, generated from it — **identical shape to `param_files`** |
+| `forcing.weather_fixture` / `weather_sha256` | **no** | a hash of the Python-side oracle fixture; Rust reads `weather_facts.txt`, generated from it — **identical shape to `param_files`** ⚠ *the second clause died in **C9** (§5g): there is no such file, Rust `include_str!`s the fixture itself. The verdict stands but the reason changed — `include_str!` takes a literal, so the reference knows the bytes and not the name* |
 | `science_bands`, `liveness_floors` (~104 lines of 208) | **no** | `gates_for()` is a static **AST census of `science_gate` markers on pytest functions** (`tests/science_gates.py`) — there is no Rust referent and there cannot be one while the science gates are pytest-side |
 
 ⚠⚠ **And slice 5 added one more, on the axis this table calls settled.** The biosphere

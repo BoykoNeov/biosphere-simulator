@@ -595,16 +595,26 @@ census of pytest markers, with no Rust referent while the science gates are pyte
 | `scenarios.*.golden_sha256` | **Rust** (6 of 7) | the golden is the reference's own output |
 | `scenarios.drift_summary.golden_sha256` | **Python** | ⚠ one run, two authors: `drift.py`'s fold of the *same* 15-yr trajectory whose final state Rust authors. The fold is the artifact |
 | `param_files` | **Rust** (since slice C8) | ⚠ the *rules* re-anchored, not the digits: the census is now the set the reference LOADS (a compile-time `include_str!` list) and the digest is `config::provenance`. The 15 values are **author-neutral** — both sides hash the same file the same way — so the ceremony moved none of them |
-| `forcing.weather_fixture` / `weather_sha256` | **Python** | a Python-side oracle fixture; the port reads a file generated *from* it — the shape `param_files` had **until slice C8**, and now the only key still in it |
+| `forcing.weather_fixture` / `weather_sha256` | **Python** | ⚠ the reason changed in slice C9 (2026-08-17) and the old one is now false: the port no longer reads a file *generated from* this fixture — it reads **this fixture**, with a compile-time `include_str!`. It stays Python's because `include_str!` takes a literal, so the reference knows the fixture's **bytes and not its name**; a Rust-authored filename would be a hand-typed duplicate of the include path, a literal dressed as a derivation. The *bytes* half is now cross-checked anyway — see the `weather_sha256` note below |
 | `science_bands`, `liveness_floors` | **Python** | a static AST census of `science_gate` markers on pytest functions |
 | `integrator`, `dt_days` | **hand** | the two deliberate anti-derived literals (below) |
 | `scenarios.*.scenario` / `.golden` | **hand** | a human label; a filename |
 
 ⚠ **`golden_sha256` is now the one hash class that IS compared** against the files on disk.
 Slice 5 measured the hole it closes: regenerating a frozen golden desynchronised this manifest
-with **every manifest gate green**. Deliberately *goldens only* — the param and weather hashes
-stay provenance, because they are hand-edited files whose values the goldens already enforce,
+with **every manifest gate green**. Deliberately *goldens only* — the param hashes stay
+provenance, because they are hand-edited files whose values the goldens already enforce,
 while a golden is machine-generated and **is** the value.
+
+⚠ **`weather_sha256` left that provenance-only class in slice C9** (2026-08-17), because C9
+gave it a second side to be compared *against*. The reference now embeds the fixture with
+`include_str!`, so it can hash the text it **compiled in**; the checker hashes the file it
+finds **on disk**; `test_the_weather_hash_matches_the_reference_tree` fails if the two ever
+stop being the same bytes. This is the `locked_dt_days` shape — the reference emits the value
+**to be checked and never spliced**, so the key does not re-anchor. It guards a scheduled
+hazard rather than a hypothetical one: C9's `include_str!` reaches out of the Rust tree into
+the Python one, and the relocation slice will move that file. A control confirmed the teeth —
+one digit changed in one `TEMP` value reddens exactly this test.
 
 ⚠ **The two anti-derived literals are unchanged, and `dt_days` gained the half it was
 missing.** Neither is imported from the code — a contract field that imports its own value
@@ -753,7 +763,8 @@ honor-system for such a change, so follow it deliberately rather than waiting fo
   `param_files` (until slice 9 decides who loads the YAML), the weather fixture + its hash, the
   `drift_summary` golden's hash, and the whole `science_bands` / `liveness_floors` census —
   roughly half the file — remain Python's, each with its reason written beside it in the
-  manifest itself. *(`param_files` left that list on 2026-08-17; see the C8 entry below.)*
+  manifest itself. *(`param_files` left that list on 2026-08-17; see the C8 entry below.
+  The weather fixture is still on it, but its **reason** was replaced the same day — see C9.)*
 
 - **2026-08-17 — `param_files` RE-ANCHORED TO THE REFERENCE (slice C8 of the flip). Not one
   hash moved, and the reason is the finding.** The key's 15 digits are **author-neutral by
@@ -787,6 +798,29 @@ honor-system for such a change, so follow it deliberately rather than waiting fo
 
   ⚠ Prerequisite: **slice C1**, which moved the YAML loaders into the reference. Before C1 this
   key genuinely had no referent, and the three slices that recorded so were right for their day.
+
+- **2026-08-17 — the weather path moved into the reference (slice C9 of the flip). NOT an
+  unfreeze: no key re-anchored and no value moved; this entry exists because two sentences
+  elsewhere in this document became false.** The reference used to read
+  `weather_facts.txt`, a hex-float table that `tests/crossport/gen_biosphere_weather.py`
+  lowered out of the JSON fixture. It now reads `tests/oracle/winter_wheat_weather.json`
+  itself, through a closed-subset JSON reader and an ISO-date→day-of-year helper in the
+  `config` crate; the generator, the table and the Python sync gate are deleted.
+
+  **Bit-neutral, and measured before any Rust was written**: all 916 values parse to identical
+  bit patterns, because `f64::from_str` and CPython's `float()` both round correctly. The two
+  sentences repaired are the authority-table row for `forcing.weather_fixture` (which said the
+  port reads a file *generated from* the fixture) and the "goldens only" note above (which
+  listed the weather hash as never compared). Both are corrected in place.
+
+  ⚠ **The half this contract cannot check is the calendar, not the floats — and that is a fact
+  about the committed data, not about the code.** The fixture runs 2006-10-01 → 2007-08-01:
+  neither year is a leap year and the span contains no 29 February, so a wrong leap rule
+  produces byte-identical output on **every row of the fixture and every golden in the tree**.
+  Measured with the rule broken to the naive `year % 4 == 0`: the whole `domains` suite came
+  back **48 passed / 0 failed**, including the bit-for-bit control against the old table and
+  every season run. Only hand-computed unit tests carrying 1900 and 2000 — dates the fixture
+  cannot reach — catch it, and `config::date` carries them with that reason in its header.
 
 - **2026-08-15 — `canopy.carbon_fraction` BOUND TO A CITATION (provenance only; one hash, no
   value, no golden).** The honour-system ceremony from `CLAUDE.md`: advisor review →

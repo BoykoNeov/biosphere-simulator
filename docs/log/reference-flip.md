@@ -1142,6 +1142,46 @@ the same crate. Caught in the diff and reverted.
 and doing it here would have touched 47 Python test files for a slice that otherwise touches
 none), the other five oracle fixtures, and C8's light-path hashing.
 
+#### The post-commit pass — the gate got its control, and the prose sweep found three defects
+
+C9 was committed and pushed before this pass; advisor review afterwards named three things the
+green suite could not have caught, and all three were real.
+
+**1. The one NEW gate had no control** — the exact failure C8 recorded ("a control found my
+gate had no assertion"), repeated one slice later. Controlled properly: one digit changed in
+one `TEMP` value, `test_the_weather_hash_matches_the_reference_tree` reddens with the intended
+message, and the **dump hash moves too**, which proves the compiled-in side genuinely rebuilt
+rather than the checker comparing a stale constant against itself. A whitespace perturbation
+would have been the wrong control — both sides normalize newlines by design, so it cannot
+discriminate a working gate from an inert one.
+
+**2. Two sentences in the frozen contract doc became false, and nothing gates prose.** This is
+the hazard already on the shelf as *"the freeze's prose half is ungated"*, and C9 walked into
+it. `docs/biosphere-reference.md` said the port *"reads a file generated from"* the fixture —
+after C9 there is no such file — and its "goldens only" note listed the weather hash among the
+ones **never compared**, which C9 is precisely the end of. Both repaired in place, plus a C9
+entry in the ceremony history marked **not an unfreeze**: the entry exists *because two
+sentences went false*, not because a value moved. Stale delivery-path prose in the phase-7 plan
+and the C-plan's own re-anchoring table got dated supersede markers rather than rewrites —
+those are records of what happened, and what happened does not change.
+
+**3. `include_str!` silently promoted a test fixture to shipped content.** The licensing doc's
+whole EUPL argument turns on *distribution of a derivative work*, and it had settled the oracle
+question with "running PCSE to produce fixtures is mere **use**." C9 moved this one file to the
+other side of that sentence — it is now inside the binary. The answer is clean, and for a
+reason worth having in writing: the rows are **NASA POWER observations**, public domain on the
+same footing this repo already grants NASA BVAD, and `NASAPowerWeatherDataProvider` names the
+client that *fetched* them, not an author. A derivative of PCSE would have to derive from
+PCSE, which a temperature reading does not. `docs/reuse-and-licenses.md` gained the analysis
+and the forward rule: check the provenance block before embedding — facts and our own output
+may ship, PCSE model output and WOFOST parameter values may not.
+
+⚠ **And the sweep turned up a defect that has nothing to do with C9**: the same licensing doc
+claimed the project is **Apache-2.0** and cited `/LICENSE` for it, while `/LICENSE` has been
+**BNCL-1.0** since commit `c205560` on 2026-06-28. Wrong for ~7 weeks, by the identical
+mechanism — no gate reads prose. Corrected, with the Apache history preserved and the
+clean-room conclusion re-derived under the license that actually applies.
+
 ### The state of the arc
 
 Slices 8–11 are an unexecuted menu; the user takes them one at a time and none is scheduled.
