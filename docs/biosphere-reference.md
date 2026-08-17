@@ -694,6 +694,43 @@ honor-system for such a change, so follow it deliberately rather than waiting fo
 
 ### Unfreeze log
 
+- **2026-08-17 — `allocation.yaml` is REFORMATTED out of YAML flow style (a FORMAT-only
+  unfreeze; no value moved, and nothing could have caught it).** Reference-flip slice C1, the
+  slice that moves param loading into the Rust reference. The partition table was written as
+  `- {dvs: 0.0, fl: 0.55, …}`; it is now block style, one key per line. **Only whitespace and
+  line breaks changed — every number is character-for-character what it was.**
+
+  **Why a data file had to change at all.** The reference's YAML reader (`crates/config/src/yaml.rs`,
+  hand-rolled over a documented closed subset since Phase 9) **excludes flow style by design**.
+  So the closed subset this project froze for *authored* files did not cover **this project's own
+  param files** — measured before the slice was designed, and the deciding number is that flow
+  style appears in **exactly two files** (`allocation.yaml` and the potato override) and in **zero**
+  authored scenarios. Widening a frozen grammar to accommodate two data files it was never asked
+  about was the larger change and the wrong one.
+
+  **The value gate, which is what makes "format-only" checkable:** `gen_biosphere_params.py`
+  reproduces `biosphere_params.txt` **byte-for-byte** after the reformat, so no frozen number
+  moved anywhere. **The manifest diff was predicted before regenerating and held exactly:** one
+  line, `param_files["allocation.yaml"]`'s sha-256. No golden hash moved; no golden was re-run.
+  `crops/potato/allocation.yaml` was reformatted the same way and is **invisible to this
+  contract** — `_frozen_param_files()` is a non-recursive glob minus `demo.yaml`.
+
+  ⚠ **This is the provenance-only shape again, so the ceremony was run deliberately** (advisor
+  review → regenerate the manifest as the git-visible record → this entry): the `param_files`
+  hashes are **recorded and never compared**, so the reformat turns nothing red.
+
+  ⚠⚠ **The control found a real defect in the frozen reader, and it is worth reading twice.**
+  A negative control asserting *"flow style is rejected, not silently mis-parsed"* **failed** —
+  the reader rejected flow style as a mapping **value** (`a: {b: 1}`) and silently mis-parsed it
+  as a **sequence item**: `- {dvs: 0.0, fl: 0.55}` has a `key:` head, so the mapping path yielded
+  the key `"{dvs"` with the value `"0.0, fl: 0.55}"` and **no error at all**. The test named
+  `flow_style_is_rejected` had covered only the value form for its whole life — i.e. it missed the
+  one form this repository's own param files were written in. Fixed on the key side with the
+  excluded-leader set shared between both guards, the regression case added **to that test**
+  rather than a crate away, and confirmed inert on every existing file (all three authoring
+  integration binaries green). *A test that names a behaviour is not evidence it covers the case
+  that matters.*
+
 - **2026-08-16 — the manifest is RE-ANCHORED to the Rust reference (a PRODUCER unfreeze; no
   frozen value moved).** Reference-flip slice 6. This is the first entry in this log that
   changes **who writes the contract** rather than what it says: `flow_set`, `aux_set`,

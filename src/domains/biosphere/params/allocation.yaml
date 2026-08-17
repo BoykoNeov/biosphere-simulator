@@ -40,6 +40,18 @@ parameters:
   partition_table:
     source: "TODO(cite) — provisional, literature-typical winter-wheat leaf/stem/root/storage partition fractions [A][B]; primary citation pending the Step-11 validation gate"
     rows:
-      - {dvs: 0.0, fl: 0.55, fs: 0.10, fr: 0.35, fo: 0.00}
-      - {dvs: 1.0, fl: 0.30, fs: 0.50, fr: 0.20, fo: 0.00}
-      - {dvs: 2.0, fl: 0.00, fs: 0.10, fr: 0.10, fo: 0.80}
+      - dvs: 0.0
+        fl: 0.55
+        fs: 0.10
+        fr: 0.35
+        fo: 0.00
+      - dvs: 1.0
+        fl: 0.30
+        fs: 0.50
+        fr: 0.20
+        fo: 0.00
+      - dvs: 2.0
+        fl: 0.00
+        fs: 0.10
+        fr: 0.10
+        fo: 0.80

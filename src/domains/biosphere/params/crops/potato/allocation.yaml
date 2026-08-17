@@ -108,22 +108,54 @@ parameters:
     rows:
       # dvs 0.00 — emergence. Half the assimilate to roots, the rest split 80/20
       # leaf/stem exactly as [E] has it. No tuber yet, which is why fo is a hard 0.
-      - {dvs: 0.00, fl: 0.400000, fs: 0.100000, fr: 0.500000, fo: 0.000000}
+      - dvs: 0.00
+        fl: 0.400000
+        fs: 0.100000
+        fr: 0.500000
+        fo: 0.000000
       # dvs 0.15 — [E]'s CALVT/CASTT plateau ends here; the shoot share has grown.
-      - {dvs: 0.15, fl: 0.460000, fs: 0.115000, fr: 0.425000, fo: 0.000000}
+      - dvs: 0.15
+        fl: 0.460000
+        fs: 0.115000
+        fr: 0.425000
+        fo: 0.000000
       # dvs 0.46 — the first KNOT at which [E]'s CALVT + CASTT drop below 1, so the
       # tuber has an explicit share here. Note the interpolated share is already
       # positive anywhere past 0.15 (see the header) — tuber filling begins well
       # before anthesis in this curve, which is the finding, not a rounding detail.
-      - {dvs: 0.46, fl: 0.474500, fs: 0.167900, fr: 0.270000, fo: 0.087600}
+      - dvs: 0.46
+        fl: 0.474500
+        fs: 0.167900
+        fr: 0.270000
+        fo: 0.087600
       # dvs 0.76 — the crossover: the tuber (0.352) now outweighs the leaves (0.334).
-      - {dvs: 0.76, fl: 0.334400, fs: 0.193600, fr: 0.120000, fo: 0.352000}
+      - dvs: 0.76
+        fl: 0.334400
+        fs: 0.193600
+        fr: 0.120000
+        fo: 0.352000
       # dvs 1.00 — anthesis. CASST reaches 1.0, so root growth STOPS (fr = 0).
-      - {dvs: 1.00, fl: 0.086667, fs: 0.220000, fr: 0.000000, fo: 0.693333}
+      - dvs: 1.00
+        fl: 0.086667
+        fs: 0.220000
+        fr: 0.000000
+        fo: 0.693333
       # dvs 1.03 — [E]'s own knot, just past anthesis.
-      - {dvs: 1.03, fl: 0.050000, fs: 0.220000, fr: 0.000000, fo: 0.730000}
+      - dvs: 1.03
+        fl: 0.050000
+        fs: 0.220000
+        fr: 0.000000
+        fo: 0.730000
       # dvs 1.17 — leaf and stem growth cease entirely; everything goes to the tuber.
-      - {dvs: 1.17, fl: 0.000000, fs: 0.000000, fr: 0.000000, fo: 1.000000}
+      - dvs: 1.17
+        fl: 0.000000
+        fs: 0.000000
+        fr: 0.000000
+        fo: 1.000000
       # dvs 2.00 — maturity. [E]'s constant post-1.17 values, relabelled from its
       # unreachable 2.1 knot to our DVS cap (see the header).
-      - {dvs: 2.00, fl: 0.000000, fs: 0.000000, fr: 0.000000, fo: 1.000000}
+      - dvs: 2.00
+        fl: 0.000000
+        fs: 0.000000
+        fr: 0.000000
+        fo: 1.000000
