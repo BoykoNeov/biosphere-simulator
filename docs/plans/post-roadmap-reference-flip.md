@@ -2047,7 +2047,7 @@ C4 and C5 as independent items in the same stage; they are not. Had C4 been take
 the folds would have been written inside it and C5 would have become a duplicate or a
 no-op — which is how a plan silently loses a slice's subject.
 
-### ⚠⚠ The gating measurement: C5 is an UNFREEZE for one golden and BIT-NEUTRAL for the other
+### ⚠⚠ The gating measurement: C5 SPLITS — bit-neutral for one golden, blocked for the other
 
 Same discipline as C1/C8/C9 — predict the diff, measure it, *then* build. The question here
 is **not** a locus question (that is C4's) but a floating-point one: do the two goldens come
@@ -2061,7 +2061,7 @@ committed goldens.
 | golden | result |
 |---|---|
 | `sealed_energy_drift_summary.json` | ✅ **byte-identical** — bit-neutral, no unfreeze |
-| `drift_summary.json` | ❌ **4 of 45 values move**, ≤7 ULP |
+| `drift_summary.json` | ❌ **4 of 45 values move**, ≤7 ULP → **authorship DEFERRED**, see below |
 
 The four, all in the **consumer** scenario and all in years 3–4 (the perennial is identical
 throughout, and both `is_period_2` booleans are unchanged):
@@ -2145,3 +2145,99 @@ so the 4-ULP prediction above is also the check: any other diff is a porting def
   string in the tolerance contract, whose own unfreeze discipline is
   `docs/native-port-reference.md`. Naming it here is the record; changing it is its own
   ceremony.
+
+### C5 — COMPLETE 2026-08-17, with one half deferred for a measured reason
+
+**Built.** `rust/crates/domains/src/biosphere/drift.rs` — the trace builders
+(`total_quantity`, `mass_drift_trace`, `drift_slope`, `max_abs`), the shared OLS
+primitive, the four folds C4 needs, `is_period_2`, and the two derived bounds **carried
+over with their whole provenance block**. 16 integration tests in
+`rust/crates/domains/tests/drift.rs`. `emit_sealed_energy_drift` now emits the summary
+rather than a raw series; `_fold_energy_drift_summary` deleted from
+`tests/crossport/test_crossport.py`. Rosters, census counts and the station manifest's
+`_authority` updated. Ruff / ruff-format / pyright clean, clippy `-D warnings` clean, 47
+targeted Python gates green.
+
+#### ⚠⚠ The diagnosis the guard demanded, and it is what split the slice
+
+The first design was: regenerate `drift_summary.json` from Rust, add it to
+`golden_platform.PYTHON_DIVERGES` (Python becomes tolerance-gated, exactly as slice 5 did
+for its two stragglers), done. That is **red by construction**, and the thing that says so
+is a gate written two slices ago:
+`test_golden_provenance.py::test_every_diverging_scenario_keeps_a_byte_gated_sibling`.
+`emit_drift` serves **exactly one** golden, so under that gate's key — the emitter program
+— the entry has no byte-gated sibling. Its own error message is the instruction:
+*"Diagnose the divergence instead of adding it to the roster."*
+
+So it was diagnosed rather than routed around. Comparing Python's per-step consumer
+trajectory against Rust's:
+
+* the first difference is at **step 4095 (year 3), 1 ULP**;
+* **1750 of 18301** steps then differ;
+* and the **final state is byte-identical again**.
+
+That is the whole asymmetry in one line: a 1-ULP transcendental divergence appears
+mid-run and the **contracting attractor damps it back to exactly zero** by year 15. The
+final-state golden (`consumer_long_horizon_state.json`) is byte-gated and stays green
+*because* the attractor contracts; the per-year peaks are the only artifact that samples
+the trajectory **while the difference is still alive**. Not a port defect, and not
+fixable.
+
+#### ⚠⚠ Why the gate was NOT widened, when widening it is defensible on the merits
+
+The gate's key is the **emitter program**, used as a proxy for "the scenario". The proxy
+under-approximates: `emit_drift` runs the same two scenarios `emit_consumer` and
+`emit_perennial` run, and both of those keep a byte-gated Python golden. So adding
+`drift_summary.json` would remove **no** byte coverage that exists today, and the gate
+would be firing a false positive.
+
+It was still left alone, and the reason is the one this repo keeps re-learning: *that
+argument was constructed while trying to add the entry it licenses.* The gate exists
+precisely because "coverage survives" was once a sentence someone wrote down, and slice 5
+converted it into an assertion so it could not be re-argued. Re-arguing it from inside the
+slice that needs it relaxed is the co-adaptation refused at
+[`post-roadmap-stem-only-branch`] and at the canopy floors. If the key really is too
+narrow — and it may be — that is **its own ceremony with its own control**, and the
+control has to be written by someone not holding an entry they want admitted.
+
+⚠ **The contract-preserving alternative was priced and does not hold.** Have `emit_drift`
+also emit the two final states, so it serves goldens with byte-gated siblings and the gate
+passes unwidened. `Emitter.run()` returns a program's **entire stdout** as one golden's
+bytes — one program, one artifact — so `emit_drift` cannot serve a second golden without
+re-pointing an existing one away from `emit_consumer`. That manufactures the sibling
+rather than discovering it, which is the same move wearing a different hat.
+
+**So `drift_summary.json` stays Python-folded, and `PYTHON_FOLDED` now carries the
+measurement and the blocker instead of the old "the fold has no Rust referent" reason —
+which C5 made false.** The kit exists; only the authorship move is outstanding.
+
+#### ⚠ A port defect the code review would not have found, and the test that did
+
+`year_summaries`'s `n_years = (len(states) - 1) // year` is `-1` on an empty trajectory in
+Python, and `range(-1)` is empty, so it returns `[]`. The literal Rust transcription
+**underflows `usize`** — a debug panic, and in release a near-`usize::MAX` year count. It
+was found by porting `test_drift.py`'s own `test_year_summaries_handles_short_trajectories`
+rather than by reading the code, and the guard has a **measured control**: reverting
+`saturating_sub` reddens exactly that test and nothing else.
+
+*Generalize: port the reference's edge-case tests before its happy path — the edge cases
+are where two languages' arithmetic disagrees about what an expression even means.*
+
+#### ⚠ What C5 changed about a dated figure, without touching it
+
+`tests/crossport/tiers.json`'s `drift_summary` evidence still reads *"Step-4 (P7.4):
+Rust-vs-Python bit-exact locally (max_rel_dev **0.0**)"*. Measured 2026-08-17 it is
+**9.955e-16** — inside the `1e-11` band by ~4 orders, and the string is explicitly dated,
+so nothing is wrong and nothing is red. It is recorded here because **C5 is what would
+change its status**: while Python authors the golden the four ULPs are a *tolerated
+deviation*; the moment Rust authors it they are *the reference value*. Re-anchoring that
+string belongs to `docs/native-port-reference.md`'s own discipline, not to this slice.
+
+#### What this leaves for C4
+
+The kit is in place and reachable from both crates, which was the blocker. C4's five
+fold-dependent gates (`test_decade_stability.py` ×4, `test_sealed_station_stability.py` ×1)
+now have Rust referents for every helper they call. ⚠ C4's own gating measurement — the
+15 `locus` strings, and whether each `bound`'s numeric literals still appear textually in
+the **Rust** file the locus will point at — is still unmeasured and still blocks C4's
+ceremony, not its start.

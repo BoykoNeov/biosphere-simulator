@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C8 and C9 of the C re-plan — the param load, the twelve laws, the param-file list and the weather path all moved into the reference 2026-08-17)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8 and C9 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -1181,6 +1181,69 @@ claimed the project is **Apache-2.0** and cited `/LICENSE` for it, while `/LICEN
 **BNCL-1.0** since commit `c205560` on 2026-06-28. Wrong for ~7 weeks, by the identical
 mechanism — no gate reads prose. Corrected, with the Apache history preserved and the
 clean-room conclusion re-derived under the license that actually applies.
+
+### C5 — the drift folds, and the slice that measured its own successor's blocker — COMPLETE 2026-08-17
+
+**Taken out of order, because C4 turned out to depend on it.** The user chose C4 (the
+science-gate census) next. Measuring C4's surface first showed **5 of its 15 gates cannot be
+written in Rust until `drift.py`'s folds exist there** — and the evidence was not inference:
+`emit_drift.rs` and `emit_sealed_energy_drift.rs` **say so in their own comments**, and a grep
+for the fold names across `rust/crates` returned only those two comments. §5c lists C4 and C5
+as independent items in the same stage. ⚠ *A slice's prerequisites are not in its own row of
+the plan table* — had C4 gone first, the folds would have been written inside it and C5 would
+have quietly become a duplicate.
+
+**Built.** `domains::biosphere::drift` — the trace builders, the shared OLS primitive, the
+four folds, the period-2 check, and the two derived bounds **with their whole provenance
+block** (a bound nobody can reproduce is what that block exists to prevent). 16 integration
+tests that deliberately **share `test_drift.py`'s own fixtures**, so a behavioural divergence
+from the reference shows up as a failing assertion rather than a passing test that checks
+something else. `emit_sealed_energy_drift` emits the summary; the checker's copy of the fold
+is deleted rather than kept as a second opinion.
+
+**⚠⚠ The gating measurement split the slice in two, and only one half could land.** Predicted,
+measured, then built — C1/C8/C9's discipline. `sealed_energy_drift_summary.json` came out
+**byte-identical**: authorship re-anchored, the hash unmoved, so *the rule moved and the digits
+did not* — C8's finding again. `drift_summary.json` moved **4 of its 45 values** (≤7 ULP).
+
+**⚠⚠ The gate that blocked it was written two slices ago, and its error message was the
+instruction.** The obvious next step — regenerate, then add the file to `PYTHON_DIVERGES` as
+slice 5 did for its two stragglers — is **red by construction**:
+`test_every_diverging_scenario_keeps_a_byte_gated_sibling` finds that `emit_drift` serves
+exactly one golden. It says *"Diagnose the divergence instead of adding it to the roster."* So
+it was diagnosed: the consumer trajectory first differs by **1 ULP at step 4095**, 1750 of
+18301 steps then differ, and **the final state is byte-identical again**. A contracting
+attractor damps the difference back to zero — which is why the final-state golden stays
+byte-gated and green, and why the per-year peaks are the *only* artifact that samples the
+difference while it is alive.
+
+**⚠⚠ The gate was left alone even though widening it is defensible on the merits.** Its key is
+the emitter *program*, a proxy for "the scenario", and the proxy under-approximates: the two
+scenarios `emit_drift` runs each keep a byte-gated golden elsewhere, so admitting the entry
+would remove no coverage. The argument is sound and it was still refused, because **it was
+constructed while trying to add the entry it licenses**. Slice 5 turned "coverage survives"
+from a sentence into an assertion precisely so it could not be re-argued; re-arguing it from
+inside the slice that needs it relaxed is the co-adaptation refused for the stem-only branch
+and for the canopy floors. ⚠ The contract-preserving alternative was priced and does **not**
+hold: `Emitter.run()` returns a program's entire stdout as one golden's bytes, so `emit_drift`
+cannot serve a second golden without re-pointing one away from `emit_consumer` — manufacturing
+the sibling rather than discovering it. **The authorship move is deferred to its own ceremony,
+and `PYTHON_FOLDED` now carries the measurement and the blocker in place of the old reason,
+which C5 itself made false.**
+
+**⚠ A port defect found by porting the reference's EDGE CASES first.** `(len - 1) // year` is
+`-1` in Python and `range(-1)` is empty; the literal Rust transcription **underflows `usize`**.
+Found by porting `test_year_summaries_handles_short_trajectories`, not by reading the code, and
+the guard carries a measured control — reverting it reddens exactly that test. *Generalize:
+port the edge-case tests before the happy path; that is where two languages disagree about what
+an expression means.*
+
+**⚠ A dated figure in the tolerance contract is no longer true, and C5 is what makes it
+matter.** `tiers.json` records `drift_summary` as *"bit-exact locally, max_rel_dev 0.0"* at
+P7.4; measured now it is 9.955e-16 — 4 orders inside the band, explicitly dated, nothing red.
+Recorded because **a tolerance band hides a difference until the flip makes one side the
+author**: today those ULPs are a tolerated deviation; the moment Rust authors the golden they
+are the reference value.
 
 ### The state of the arc
 
