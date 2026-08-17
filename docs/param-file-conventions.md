@@ -121,8 +121,10 @@ this is recorded as a hazard to recognise, not a rule to obey.
 
 **Both manifests record a `param_files` sha-256 per file, and since reference-flip slice C8
 the reference produces it** (`rust/crates/config/src/provenance.rs`). The digest is taken
-over **newline-normalized** text — `
-` and lone `` fold to `
+over **newline-normalized** text — `
+
+` and lone `
+` fold to `
 `, then one trailing
 newline is dropped — so a file's recorded hash is a record of its *content*, not of how git
 materialized it.
@@ -138,6 +140,24 @@ Two reasons, both measured rather than assumed:
    without normalization the reference would emit a different digest on that box than on
    Linux CI, and the regenerated manifest would be red on the other machine. Normalization
    is what makes the hash portable; it is not a licence to mix line endings.
+⚠ **How the state arises — measured, and deliberately stopping where the measurement
+stops.** A Python `Path.write_text` on Windows translates `\n` to `\r\n` unless told
+otherwise, so *any* tooling that rewrites a file in place leaves a CRLF working-tree copy.
+Landing slice C8 produced about **190** of them across this repo without anybody choosing
+it. The reason that matters here rather than being cosmetic: **`git status` does not show
+it** — git normalizes on read, so a CRLF working-tree copy of an LF-indexed file is
+*clean* — while `include_str!` reads the working tree verbatim. So the divergence is
+invisible to the tool you would check with and visible to the one that builds the
+reference.
+
+⚠⚠ **What is NOT claimed, because measuring it produced a near-miss instead.** An attempt
+to "just normalize the working tree" rewrote 191 files and git then reported all 191 as
+**modified** — the opposite of the clean-by-normalization behaviour above, for a reason
+this document does not pretend to explain. It was reverted (`git diff --ignore-cr-at-eol`
+was empty for every one, so the change really was line endings alone). The lesson is the
+practical one: **the fix for a stray CRLF file is that one file, not a sweep**, because a
+sweep here is a 191-file diff that reaches into `src/` and the purity invariant.
+
 2. **The two hashing rules are only equal on a restricted alphabet.** Python's rule is
    `hashlib.sha256("
 ".join(path.read_text().splitlines()))`, and `str.splitlines` breaks on

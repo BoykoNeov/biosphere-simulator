@@ -1814,6 +1814,62 @@ docs' authority tables and unfreeze logs, and `docs/param-file-conventions.md`, 
 line-endings section and two checklist items — including that a whitespace-only edit is an
 unfreeze that reddens nothing.
 
+### ⚠⚠ Two controls caught a roster with no consumer — in this slice's own new gate
+
+C8's first draft added `_COMPARED_MAPPINGS = frozenset({"param_files"})` to
+`tests/crossport/test_inventory_parity.py` and **the loop that consumes it never landed**: a
+string replacement matched nothing and I did not assert that it had. The constant read exactly
+like coverage, and **nothing in the tree disagreed** — the dump's key-set forcing function was
+green (it checks key *sets*, not comparisons), `ruff` does not flag an unused module-level name,
+and the full 2473-test suite was green.
+
+**What found it was running the negative controls.** Both of the two that should have reddened
+the parity gate — a param file edited without regenerating, and newline normalization removed
+from the reference — left it **passing**. Fixed; both now redden it, and the comment above the
+loop records why it exists.
+
+⚠ *This is slice 8's lesson with the roles swapped.* There, a control had no test to redden and
+that absence WAS the finding. Here the control had a test and the test had no assertion — the
+same class of hole, reachable only by actually running the control rather than by reading the
+diff.
+
+⚠ **A useful split fell out of it:** control D reddens the **parity** gate on both contracts and
+correctly leaves the **checker's** digest gate green, because the checker still agrees with the
+frozen value and it is the *reference* that moved. The two gates answer different questions, and
+the control is what demonstrates which.
+
+### ⚠⚠ The closing pass: two prose-only claims, and a near-miss on scope
+
+The advisor's closing review found two assertions that existed only as prose. Both are now
+measured, and one of the measurements is better evidence than the claim it was written for.
+
+* **"A recursive walk reddens the census"** appeared in the manifest's `_authority`, in
+  `docs/biosphere-reference.md` and in this plan, and **nothing had run it**. Flipping the
+  real walk to descend reddens `the_census_matches_the_directory_on_disk` on its roster
+  assertion — and the failure output shows the sharp half concretely: the recursive listing
+  contains `allocation.yaml`, `canopy.yaml`, `phenology.yaml` and `root_depth.yaml` **twice**,
+  so a basename-keyed manifest could *overwrite* frozen entries rather than merely gain them.
+  A permanent test now reproduces the mistake rather than the fix.
+* **Basename uniqueness had no control.** The control that looked like one planted a duplicate
+  file *on disk*, which reddens the **census**, not uniqueness — the assertion is over the two
+  **compile-time include lists** and is unreachable from disk. The real control adds a
+  duplicate to a *list*. ⚠ And the directory-level claim both manifests advertise is
+  **composed** from two gates (list uniqueness + per-directory census), which is now said
+  rather than implied.
+
+⚠⚠ **The near-miss is the more useful finding.** Having measured that the *param files'*
+index is LF everywhere, I generalised that to the repo and normalized every CRLF working-tree
+file. git reported **191 files modified** — including files under `src/`, where the purity
+invariant requires an empty diff — and it was reverted in full. *A measurement's scope is part
+of the measurement:* "the index is LF" was true of the 24 files checked and false of the 681 in
+the repo. The conventions page records the practical rule (fix the one file, never sweep) and
+deliberately stops short of a mechanism it cannot reproduce.
+
+⚠ **Slice 6's recorded mistake repeated:** reverting a control with `git checkout <file>`
+discarded the uncommitted edits in that same file. It cost nothing only because the edit was a
+**script**, not hand-typing — which is the mitigation worth generalising, given that "snapshot
+before running controls" has now failed twice.
+
 ### ⚠ Still NOT done, with reasons
 
 * **The weather path** (`gen_biosphere_weather.py`) — still the generator with no successor

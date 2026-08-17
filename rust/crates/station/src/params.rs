@@ -218,6 +218,14 @@ mod tests {
     /// directories would silently collapse two files into one entry. Nothing asserted this
     /// before; Python's `_param_paths()` doc *claims* uniqueness and its dict would quietly
     /// keep whichever directory came last.
+    ///
+    /// ⚠⚠ **The directory-level claim is COMPOSED from two gates, not asserted by one**,
+    /// and saying so is the difference between a check and a claim. This test covers the two
+    /// **compile-time include lists**; that those lists match what the six directories hold
+    /// is the separate per-directory census (`the_census_matches_the_directory_on_disk` here
+    /// and in `domains::params`). A duplicate *file on disk* cannot reach this assertion at
+    /// all — it reddens the census instead — which is why the control below adds a duplicate
+    /// to a **list**.
     #[test]
     fn every_basename_is_unique_across_the_station_and_sibling_directories() {
         let mut all: Vec<&str> = param_files().iter().map(|(n, _)| *n).collect();
@@ -235,6 +243,30 @@ mod tests {
             8,
             "the frozen station contract names 8 param files"
         );
+    }
+
+    /// The uniqueness assertion above has teeth: a duplicated list entry reddens it.
+    ///
+    /// ⚠ Built because the assertion was the newest in slice C8 and the one both manifests'
+    /// `_authority` text advertises, and it had **no control** — control G planted a
+    /// duplicate `lamp.yaml` on disk and reddened the *census* instead, proving a different
+    /// thing. The subject here is the two compile-time lists, so the control has to be a
+    /// list, not a file.
+    #[test]
+    fn a_duplicated_basename_across_the_two_lists_is_detected() {
+        let mut all: Vec<&str> = param_files().iter().map(|(n, _)| *n).collect();
+        all.extend(domains::params::param_files().iter().map(|(n, _)| *n));
+        // The control: a name that already exists on the sibling side, added again here.
+        all.push("crew.yaml");
+        let mut sorted = all.clone();
+        sorted.sort_unstable();
+        let mut deduped = sorted.clone();
+        deduped.dedup();
+        assert_ne!(
+            sorted, deduped,
+            "a duplicated basename went undetected — the uniqueness check above is inert"
+        );
+        assert_eq!(sorted.len(), deduped.len() + 1, "exactly one duplicate");
     }
 
     /// No frozen station param file carries a separator Python's `splitlines` breaks on.

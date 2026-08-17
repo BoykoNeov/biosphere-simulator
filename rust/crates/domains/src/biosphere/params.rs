@@ -925,9 +925,25 @@ pub fn biosphere() -> BiosphereParams {
 /// * **`demo.yaml`** — excluded **by name**. It is a skeleton feeding two Python-only
 ///   scenarios that slice C6 retires.
 ///
-/// *A directory is not a category*: a recursive walk would pick the potato files up and the
-/// census gate would go red looking like a port bug.
-/// `tests::the_census_matches_the_directory_on_disk` drives exactly that case.
+/// *A directory is not a category*: a recursive walk picks the potato files up and the
+/// census gate goes red looking like a port bug — **measured, not asserted**:
+/// `tests::a_recursive_walk_reddens_the_census`, plus a control run that flipped this very
+/// walk to descend and confirmed `the_census_matches_the_directory_on_disk` fires on its
+/// roster assertion. ⚠ That control also showed the collision concretely: the recursive
+/// listing contains `allocation.yaml`, `canopy.yaml`, `phenology.yaml` and `root_depth.yaml`
+/// **twice**, so a basename-keyed manifest would not merely gain entries, it could overwrite
+/// frozen ones.
+///
+/// # ⚠ Adding a param file is a THREE-place edit, deliberately
+///
+/// The list here, `dump_biosphere_inventory`'s `assert_eq!(files.len(), 15)`, and
+/// `tests::the_census_matches_the_directory_on_disk`'s own count. This repo's standing
+/// lesson is *a rule with two copies has one that is stale*, so the choice is stated rather
+/// than left to be discovered: these are a **forcing function**, not a duplicated rule. The
+/// list is the definition; the two literals exist so that adding a param file cannot happen
+/// quietly — and the dump's fires **loudly during regeneration** rather than as a test
+/// failure (measured: it panics with *"the frozen biosphere param census is 15 files, got
+/// 14"*). The station side has the same shape with `8` / `5` / `3`.
 pub fn param_files() -> Vec<(&'static str, &'static str)> {
     let mut files = vec![
         ("allocation.yaml", ALLOCATION_YAML),
@@ -1215,8 +1231,9 @@ parameters:
             .expect("the frozen params directory is readable")
             .map(|entry| entry.expect("a readable dir entry"))
             // NON-RECURSIVE: `read_dir` does not descend, which is what leaves the four
-            // `crops/potato/*.yaml` out. `is_file()` makes that explicit rather than
-            // incidental — the `crops/` directory entry is skipped here by name, not by luck.
+            // `crops/potato/*.yaml` out. The `crops/` entry itself is dropped by
+            // `is_file()` (and again by the `.yaml` suffix filter) — stated because the
+            // exclusion is a property of these two filters, not of the directory's name.
             .filter(|entry| entry.path().is_file())
             .map(|entry| entry.file_name().to_string_lossy().into_owned())
             .filter(|name| name.ends_with(".yaml") && name != EXCLUDED_PARAM_FILE)
@@ -1238,6 +1255,67 @@ parameters:
             census.len(),
             15,
             "the frozen biosphere param set is 15 files"
+        );
+    }
+
+    /// A recursive walk DOES pick the potato overrides up, and the census would redden.
+    ///
+    /// ⚠⚠ This exists because the claim was **prose in three places** — the manifest's
+    /// `_authority`, `docs/biosphere-reference.md` and the plan — before it was measured
+    /// anywhere. It reproduces the *mistake*, not the fix: a recursive walk is what a
+    /// reasonable person writes, and it silently adds four names to a **frozen contract**.
+    #[test]
+    fn a_recursive_walk_reddens_the_census() {
+        // The walk the census must NOT be: descend one level into `crops/<crop>/`.
+        let mut recursive: Vec<String> = Vec::new();
+        for entry in std::fs::read_dir(PARAMS_DIR).expect("params dir") {
+            let path = entry.expect("dir entry").path();
+            if path.is_dir() {
+                for crop in std::fs::read_dir(&path).expect("crops dir") {
+                    for f in std::fs::read_dir(crop.expect("dir entry").path()).expect("crop") {
+                        let name = f
+                            .expect("dir entry")
+                            .file_name()
+                            .to_string_lossy()
+                            .into_owned();
+                        if name.ends_with(".yaml") {
+                            recursive.push(name);
+                        }
+                    }
+                }
+            } else {
+                let name = path
+                    .file_name()
+                    .expect("a file name")
+                    .to_string_lossy()
+                    .into_owned();
+                if name.ends_with(".yaml") && name != EXCLUDED_PARAM_FILE {
+                    recursive.push(name);
+                }
+            }
+        }
+        recursive.sort();
+        let census: Vec<String> = param_files()
+            .iter()
+            .map(|(name, _)| (*name).to_string())
+            .collect();
+        assert_ne!(
+            recursive, census,
+            "a recursive walk no longer differs from the census — the hazard this test \
+             documents has gone away, and three prose claims about it are now stale"
+        );
+        assert_eq!(
+            recursive.len(),
+            census.len() + 4,
+            "expected exactly four extra names from crops/potato, got {recursive:?}"
+        );
+        // ⚠ And the sharp half: the extras are not new names, they are DUPLICATES of frozen
+        // ones, so a basename-keyed manifest could overwrite a frozen hash rather than grow.
+        let mut deduped = recursive.clone();
+        deduped.dedup();
+        assert!(
+            deduped.len() < recursive.len(),
+            "the potato overrides no longer collide with frozen basenames"
         );
     }
 
