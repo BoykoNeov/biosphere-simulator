@@ -28,7 +28,7 @@
 //! * **Indentation** — spaces only (a tab in indentation is an error, as in YAML); a
 //!   nested block must be *strictly* more indented than its parent key/dash.
 //!
-//! # Deliberately excluded (a file using these is an [`ConfigError`], not silently
+//! # Deliberately excluded (a file using these is a [`ConfigError`], not silently
 //! mis-parsed)
 //!
 //! Anchors/aliases (`&`/`*`), tags (`!!…`), flow style (`{a: 1}` / `[1, 2]`),
@@ -38,6 +38,12 @@
 //! these; excluding them keeps the grammar finite and the parse-parity risk zero.
 
 use crate::errors::ConfigError;
+
+/// The leading characters of every YAML form the closed subset excludes: flow style
+/// (`{`/`[` and their closers), anchors/aliases (`&`/`*`), tags (`!`) and block scalars
+/// (`|`/`>`). Checked on **both** the value side and the mapping-key side — see the note
+/// at the key-side guard for the sequence-item hole that made the second one necessary.
+const EXCLUDED_LEADERS: &str = "{}[]&*!|>";
 
 /// A parsed YAML value in the closed subset: a scalar, a block mapping, or a block
 /// sequence. Mappings preserve source order (the schema checks key uniqueness /
@@ -100,9 +106,10 @@ struct Line {
     lineno: usize,
 }
 
-/// Parse a whole scenario-file text into a [`YamlValue`] (a top-level mapping).
+/// Parse a whole param- or scenario-file text into a [`YamlValue`] (a top-level
+/// mapping).
 ///
-/// The reader is total over the closed subset and returns an [`ConfigError`] on
+/// The reader is total over the closed subset and returns a [`ConfigError`] on
 /// anything outside it (a tab in indentation, a bad `- `/`key:` shape, an unterminated
 /// quote, trailing junk after a dedent). An empty document is an error (a scenario
 /// needs at least `name`/`stocks`/`flows`).
@@ -343,6 +350,24 @@ fn split_key(content: &str, lineno: usize) -> Result<(String, String), ConfigErr
                             "line {lineno}: empty mapping key in {content:?}"
                         )));
                     }
+                    // ⚠ The excluded-form guard belongs HERE as well as on the value
+                    // side. Until slice C1 it existed only in `parse_scalar`, so
+                    // `a: {b: 1}` was rejected while a flow-style **sequence item** —
+                    // `- {dvs: 0.0, fl: 0.55}` — sailed past: `is_entry` sees a `key:`
+                    // head, and the mapping path yields the key `"{dvs"` with the value
+                    // `"0.0, fl: 0.55}"`. A **silent mis-parse of the exact form this
+                    // project's own `allocation.yaml` was written in**, under a test
+                    // named `flow_style_is_rejected` that only ever covered the value
+                    // case. Found by a control, not by review.
+                    if let Some(first) = key.chars().next() {
+                        if EXCLUDED_LEADERS.contains(first) {
+                            return Err(ConfigError::new(format!(
+                                "line {lineno}: mapping key {key:?} uses an excluded YAML \
+                                 feature (flow-style / anchor / tag / block-scalar are not \
+                                 in the subset)"
+                            )));
+                        }
+                    }
                     return Ok((unquote_key(key), rest.to_string()));
                 }
             }
@@ -391,7 +416,7 @@ fn parse_scalar(token: &str, lineno: usize) -> Result<YamlValue, ConfigError> {
     // Reject the excluded flow-style / anchor / tag forms explicitly rather than
     // treating them as bare strings (they would silently mis-parse otherwise).
     if let Some(first) = token.chars().next() {
-        if "{}[]&*!|>".contains(first) {
+        if EXCLUDED_LEADERS.contains(first) {
             return Err(ConfigError::new(format!(
                 "line {lineno}: scalar {token:?} uses an excluded YAML feature \
                  (flow-style / anchor / tag / block-scalar are not in the subset)"
@@ -553,6 +578,14 @@ mod tests {
     fn flow_style_is_rejected() {
         assert!(parse_document("a: {b: 1}\n").is_err());
         assert!(parse_document("a: [1, 2]\n").is_err());
+        // ⚠⚠ The SEQUENCE-ITEM form, which this test did not cover until slice C1 and
+        // which therefore SILENTLY MIS-PARSED rather than erroring: `is_entry` sees a
+        // `key:` head in `{dvs: 0.0, fl: 0.55}`, so the mapping path yielded the key
+        // `"{dvs"` with the value `"0.0, fl: 0.55}"` and no error at all. It is the exact
+        // form this project's own `allocation.yaml` was written in for years. *A test
+        // that names a behaviour is not evidence it covers the case that matters.*
+        assert!(parse_document("rows:\n  - {dvs: 0.0, fl: 0.55}\n").is_err());
+        assert!(parse_document("rows:\n  - [1, 2]\n").is_err());
     }
 
     #[test]
