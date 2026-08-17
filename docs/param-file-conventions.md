@@ -84,6 +84,39 @@ validate the model, and neither class asserts correctness (`docs/authoring-refer
 disagreement is recorded as a **finding** — **changing the number is calibration**, a
 separate act with its own unfreeze discipline and moved goldens.
 
+## ⚠ The YAML a param file may use is a CLOSED SUBSET (since 2026-08-17)
+
+**A param file is read by the Rust reference, whose YAML reader is hand-rolled over a
+deliberately bounded grammar** (`rust/crates/config/src/yaml.rs`, whose docstring is the
+normative list). In practice one rule bites, and it bit us:
+
+> **Write tables in block style. Flow style — `- {dvs: 0.0, fl: 0.55, …}` or `[1, 2]` —
+> is rejected, not accepted-and-ignored.**
+
+```yaml
+    rows:
+      - dvs: 0.0        # ✅ block style: one key per line
+        fl: 0.55
+      - {dvs: 1.0, fl: 0.30}   # ❌ rejected by the reader
+```
+
+Also excluded: anchors/aliases (`&`/`*`), tags (`!!…`), block scalars (`|`/`>`), document
+markers (`---`), the YAML-1.1 bool aliases (`yes`/`no`/`on`/`off`), and merge keys (`<<`).
+
+**Why this is written down here.** Until 2026-08-17 the param files were read only by
+pyyaml, which accepts all of the above, and `allocation.yaml` **was** in flow style — so the
+project's own param files sat outside the grammar the project had frozen for authored files.
+Moving the param load into the Rust reference (reference-flip slice C1) made that a build
+failure rather than a latent inconsistency, and the two tables were reformatted. The
+constraint is now real, is enforced by a test in `crates/domains/src/biosphere/params.rs`,
+and was **not** discoverable from this document — which is the *"the freeze's prose half is
+ungated"* lesson landing on the one page that governs param-file shape.
+
+⚠ One number that is *not* a style question: an unsigned exponent (`1.0e7`) is resolved by
+pyyaml as a **string** and coerced to a float by the schema; only `1.0e+7` resolves as a
+number. Both load identically on both ports — the boundary parses the scalar's text — so
+this is recorded as a hazard to recognise, not a rule to obey.
+
 ## Param-file header template
 
 Every param file opens with a provenance header citing the source of each value:
@@ -125,6 +158,8 @@ they feed a deferred per-leg `Flow` dimensional check.
 ## Review checklist (per param file / PR)
 
 - [ ] Header present with a `Sources:` block and the clean-room notice.
+- [ ] **Inside the closed YAML subset** — block-style tables, no flow style / anchors /
+      tags / block scalars. The Rust reference rejects them; see the section above.
 - [ ] **Every** value has a `source:` tag resolving to a `Sources:` entry — **or** a
       `DESIGN` tag carrying its rationale (see "Two provenance classes").
 - [ ] **Every cited locus was actually opened.** No page/table/figure reference is

@@ -1552,6 +1552,25 @@ git-visible record, document here. The **value** side is not honour-system:
   paths reach out of the Rust tree into the Python one. That ugliness is the successor's
   trigger, recorded here so it is not mistaken for an oversight.
 
+⚠⚠ **AN EXPIRY CONDITION, because this slice creates one and this repo's own record says an
+expiry condition is what gets forgotten.** §5b's acceptance criterion for this slice was
+*"removing the check must turn something red — a lint whose deletion changes nothing is the
+defect this slice exists to avoid."* On the **Rust** side that is discharged
+(`a_re_declared_unit_is_rejected` / `a_wrong_declared_unit_is_rejected` redden if the guard
+goes). On the **Python** side it is discharged **only by accident, and only for now**: §2e's
+trap is that `config/units.py` becomes a green test guarding a path that no longer executes,
+and the single reason it has not happened is that **the retained generators still run the
+Python loaders, so pint is still on a live path.** Those generators are retained *as C1's
+control*, which means two of this slice's own decisions are load-bearing for each other.
+
+**So: the moment `gen_biosphere_params.py` and its two siblings retire, `config/units.py` IS
+the defect §2e named** — and retiring them is exactly what the "generator is retired once the
+gate is green" rule sets up. Whoever takes that step owns §2e's Python half in the same
+commit: either delete the check with its loaders, or give it a caller that provably executes.
+⚠ It is written here rather than left to be noticed because *"an exemption written for a
+temporary state is a deletion someone must remember"* — the lesson that left three checks red
+for five commits.
+
 ### C1 — COMPLETE 2026-08-17, in two commits plus a third for a defect it uncovered
 
 **Built.** A zero-dep `config` crate (Python's `src/config`, ported): the closed-subset

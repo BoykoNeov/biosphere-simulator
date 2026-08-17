@@ -868,6 +868,27 @@ original rejects it — and the Python loaders are written `if not value > 0.0` 
 that reason. Rewritten with `partial_cmp` so the incomparable case is explicit. *A lint
 suggestion about float comparison is a semantic proposal, not a formatting one.*
 
+⚠⚠ **The slice's own acceptance criterion is HALF discharged, and the other half now has an
+expiry date rather than a fix.** C1 *is* the old slice 9, whose criterion was written in
+advance: *"removing the check must turn something red."* Rust-side, done — two tests redden
+if the unit guard goes. **Python-side it holds only by accident**: §2e's trap is that
+`config/units.py` becomes a green test guarding a path that no longer executes, and the sole
+reason that has not happened is that **the retained generators still run the Python loaders,
+so pint is still on a live path.** Those generators are retained *as C1's control* — so two
+of this slice's own decisions are load-bearing for each other. **The moment
+`gen_biosphere_params.py` and its siblings retire, `config/units.py` IS the defect §2e
+named**, and retiring them is exactly what "a generator goes once its successor is green"
+sets up. Written into the plan's deferred list as an owned expiry condition, because *an
+exemption written for a temporary state is a deletion someone must remember* — the lesson
+that once left three checks red for five commits.
+
+⚠ **Two prose-only claims were given owners in the same pass.** The NaN rationale on the
+bound helpers was a doc comment asserting behaviour nothing checked (`every_bound_rejects_nan`
+now does), and the closed-YAML-subset rule the reformat created was enforced by one test in
+a domain crate and documented **nowhere** — `docs/param-file-conventions.md`, the page that
+governs param-file shape, was silent on it. *The freeze's prose half is ungated*, landing on
+the one page that needed the sentence.
+
 **Deferred with reasons, not missed:** `param_files` stays classified `python` in both
 manifests. Re-anchoring it needs **sha-256 in Rust** (there is none in the tree, and every
 engine crate is zero-dep by charter), a **newline-normalization rule** (the box is Windows,

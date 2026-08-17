@@ -238,7 +238,12 @@ pub fn require_non_negative(
     Ok(value)
 }
 
-/// `lo <= value <= hi`.
+/// `lo <= value <= hi` — **and not NaN**.
+///
+/// ⚠ Like [`require_positive`], the negation wraps the comparison rather than inverting
+/// it: `value < lo || value > hi` would **accept NaN**. Clippy does not flag this one only
+/// because the negation covers a compound expression — do not "simplify" it into the
+/// inverted form.
 pub fn require_closed(
     value: f64,
     lo: f64,
@@ -255,7 +260,10 @@ pub fn require_closed(
 }
 
 /// `lo < value <= hi` — the fraction/efficiency shape (zero is a degenerate model, one
-/// is lossless and legitimate).
+/// is lossless and legitimate) — **and not NaN**.
+///
+/// ⚠ Same as [`require_closed`]: the negation wraps the comparison deliberately, and the
+/// inverted form would admit NaN. Clippy is silent here for the same structural reason.
 pub fn require_half_open(
     value: f64,
     lo: f64,
@@ -354,6 +362,21 @@ parameters:
             .entry("a_rate", "demo.yaml")
             .unwrap_err();
         assert!(err.to_string().contains("is not a number"), "{err}");
+    }
+
+    /// ⚠ **All four bounds reject NaN, and this is the test that makes that a fact rather
+    /// than a doc comment.** Each is written with the negation *wrapping* the comparison
+    /// (`!(value > 0.0)`, not `value <= 0.0`) precisely because the inverted form admits
+    /// NaN — and clippy actively suggests the inverted form for two of them. Without this
+    /// test, taking that suggestion would widen every bound in the tree and turn nothing
+    /// red.
+    #[test]
+    fn every_bound_rejects_nan() {
+        let nan = f64::NAN;
+        assert!(require_positive(nan, "k", "f").is_err());
+        assert!(require_non_negative(nan, "k", "f").is_err());
+        assert!(require_closed(nan, 0.0, 1.0, "f", "f").is_err());
+        assert!(require_half_open(nan, 0.0, 1.0, "eta", "f").is_err());
     }
 
     #[test]
