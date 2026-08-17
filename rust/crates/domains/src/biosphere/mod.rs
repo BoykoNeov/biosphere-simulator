@@ -9,6 +9,7 @@
 //! the cross-port deviation is bounded by last-ULP libm differences (all 7 biosphere
 //! goldens are Tier 2; the biosphere is Euler-locked by its freeze — no RK4 cross-check).
 
+pub mod drift;
 pub mod flows;
 pub mod light_path;
 pub mod params;

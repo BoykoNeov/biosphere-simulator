@@ -373,11 +373,17 @@ def _aux_set() -> list[str]:
 #: mixed provenance to whoever opens it — slice 7 of the reference flip, mirroring what
 #: slice 6 did for the biosphere.
 #:
-#: ⚠ **Keyed by path, not top-level key, because ``scenarios`` splits *inside itself*.**
-#: Twelve of the thirteen goldens are the reference tree's own output; the thirteenth,
-#: ``sealed_energy_drift_summary.json``, is ``drift.py``'s Python-side **fold** of a raw
-#: Rust series — the same one-run-two-authors shape the biosphere manifest carries for
-#: ``drift_summary``. A top-level classification would hide exactly that.
+#: ⚠ **Keyed by path, not top-level key, because ``scenarios`` split *inside itself*.**
+#: Through slice 7 twelve of the thirteen goldens were the reference tree's own output
+#: and the thirteenth, ``sealed_energy_drift_summary.json``, was ``drift.py``'s
+#: Python-side **fold** of a raw Rust series — the one-run-two-authors shape the
+#: biosphere manifest still carries for ``drift_summary``. A top-level classification
+#: would have hidden exactly that.
+#:
+#: ⚠ **Slice C5 closed that split and the per-path keying is KEPT anyway.** All thirteen
+#: are now Rust's, so ``scenarios/*/golden_sha256`` has no exception left; the structure
+#: stays because the reason it was introduced — a contract axis that is not uniform — is
+#: a property this file must be able to express, not one it happens not to need today.
 #:
 #: ⚠ The three sides are claims of different kinds. ``rust`` — produced by the reference
 #: tree and spliced in by :func:`_build_manifest`. ``python`` — produced by the checker
@@ -514,17 +520,17 @@ _AUTHORITY: dict[str, dict[str, str]] = {
             "a golden is machine-generated and its hash is newline-normalized, so 'the "
             "manifest "
             "pins bytes that exist' is a completeness claim, not the value "
-            "re-assertion that param_files declines."
-        ),
-    },
-    "scenarios/sealed_energy_drift/golden_sha256": {
-        "side": "python",
-        "why": (
-            "⚠ ONE RUN, TWO AUTHORS — the station's copy of the biosphere's "
-            "drift_summary case. This is drift.py's Python-side fold of the 15-yr "
-            "sealed energy series; the fold IS the artifact, and its correct reference "
-            "is Python's own output. So the golden axis here is not '13 Rust' scenario "
-            "by scenario."
+            "re-assertion that param_files declines. "
+            "⚠ SLICE C5 removed this key's ONE exception and that is why the axis is "
+            "now uniform. `scenarios/sealed_energy_drift/golden_sha256` used to be "
+            "carved out as `python` — 'ONE RUN, TWO AUTHORS: drift.py's Python-side "
+            "fold of the 15-yr sealed energy series; the fold IS the artifact, so its "
+            "correct reference is Python's own output.' That stopped being true when "
+            "`domains::biosphere::drift` gained the fold kit and "
+            "`emit_sealed_energy_drift` began emitting the summary itself. ⚠ The HASH "
+            "did not move (measured byte-identical before the change), so this is an "
+            "authorship re-anchoring, not a value unfreeze — the same shape C8 found "
+            "for param_files, where the digits were author-neutral and the RULE moved."
         ),
     },
 }
@@ -827,8 +833,11 @@ def test_every_frozen_field_declares_who_produced_it() -> None:
     # ⚠ "Most specific wins" only decides anything while no two patterns TIE. Two of
     # equal specificity matching one path would resolve by dict order — a silent answer
     # to a question nobody asked, and the field would read as classified either way.
-    # (`scenarios/sealed_energy_drift/golden_sha256` beats `scenarios/*/golden_sha256`
-    # 3-2; this keeps it that way.)
+    # (Until slice C5 `scenarios/sealed_energy_drift/golden_sha256` beat
+    # `scenarios/*/golden_sha256` 3-2. That override is gone — the goldens axis is
+    # uniform again — so this currently guards a tie that no pair produces. It is kept
+    # deliberately: cheap, and the next per-scenario carve-out re-creates exactly the
+    # situation it exists for.)
     for path in paths:
         top = max(s for s, _, _ in _authority_matches(path))
         tied = sorted(p for s, p, _ in _authority_matches(path) if s == top)
@@ -853,8 +862,13 @@ def test_golden_authority_agrees_with_the_rust_authored_roster() -> None:
     ⚠ ``golden_platform.RUST_AUTHORED`` and ``regen_goldens_from_rust.RUST_EMITTERS``
     are already two copies held equal by a gate; writing the names a third time here is
     the hazard this repo keeps re-learning. So the block names sides and *this* test
-    ties them to the one roster — including the case that makes the tie worth having:
-    ``sealed_energy_drift``, whose golden is a Python fold of a raw Rust series.
+    ties them to the one roster.
+
+    ⚠ Until slice C5 the case that made this tie worth having was
+    ``sealed_energy_drift``, whose golden was a Python fold of a raw Rust series. It is
+    Rust's now, so this test currently confirms a uniform axis — and it is exactly what
+    FORCED the ``_authority`` update when the roster moved, instead of leaving the block
+    stating a classification that had quietly stopped being true.
     """
     from golden_platform import RUST_AUTHORED  # noqa: PLC0415
 

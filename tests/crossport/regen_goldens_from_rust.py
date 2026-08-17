@@ -5,7 +5,7 @@ Built in slice 4 as the committed, reviewable entry point for the act the plan n
 **Slice 5 made it the only one.** Until then the per-scenario ``_regenerate()``
 ``__main__`` in each ``tests/test_regression_*.py`` could also rewrite these files, i.e.
 **Python** could author the reference; those mains now route through
-``golden_platform.write_python_golden``, which refuses the 18 files listed below.
+``golden_platform.write_python_golden``, which refuses the 19 files listed below.
 "The reference moved" is not a true statement while a committed path runs the checker.
 
 Run it::
@@ -15,8 +15,9 @@ Run it::
 
 **Reporting is the default and ``--write`` is explicit**, matching the discipline every
 Python regeneration main already follows: rewriting a golden is a deliberate act whose
-diff is reviewed, never a side effect of running something. ⚠ Two of these eighteen are
-in the **biosphere freeze manifest** and its ``golden_sha256`` is recorded but never
+diff is reviewed, never a side effect of running something. ⚠ Three of these are in a
+**freeze manifest** (two biosphere, plus ``sealed_energy_drift_summary`` in the station
+manifest since slice C5) and its ``golden_sha256`` is recorded but never
 compared, so a ``--write`` that moves a frozen golden desynchronises the manifest and
 turns *nothing* red. Re-run ``uv run python tests/test_freeze_manifest.py`` as part of
 the unfreeze ceremony — see ``docs/biosphere-reference.md``.
@@ -30,7 +31,7 @@ the Rust-side one, and it carries the mapping as data so the mapping itself can 
 
 ---
 
-## The census — 25 goldens, and Rust can produce 18 of them
+## The census — 25 goldens, and Rust can produce 19 of them
 
 ⚠ **This corrects the plan's own arithmetic.** §2f reads *"24 `emit_*` programs against
 25 golden files. One is missing or one program emits two; identifying which is slice 4's
@@ -41,8 +42,9 @@ first act."* Measured, that is wrong on three counts, and the gap is **7, not 1*
 * four ``emit_*`` programs serve no golden in ``tests/regression/golden/`` at all
   (``emit_authored``, ``emit_perturbed_brownout``, ``emit_sealed_resume``,
   ``emit_composite`` — authoring fixtures and Godot cross-boundary references);
-* **seven** goldens have no Rust program that emits their bytes — the two folded
-  summaries and the five below.
+* **six** goldens have no Rust program that emits their bytes — one folded summary
+  (``drift_summary``; ``sealed_energy_drift_summary`` moved to Group 1 in slice C5)
+  and the five below.
 
 The three groups are the classification slice 3's finding demands be done *before* a
 ceremony rather than during one: for every artifact, ask where each side's copy came
@@ -141,7 +143,7 @@ class Emitter:
 
 
 # --------------------------------------------------------------------------- #
-# Group 1 — Rust emits the golden's exact artifact (18)                        #
+# Group 1 — Rust emits the golden's exact artifact (19 since C5)               #
 # --------------------------------------------------------------------------- #
 # The profile mirrors what `test_crossport.py` uses per case (debug, except the two
 # sealed multi-year runs, which are `--release` for speed there and here). Bytes do not
@@ -173,10 +175,19 @@ RUST_EMITTERS: dict[str, Emitter] = {
     "sealed_station_state.json": Emitter(
         "station", "emit_sealed_station", release=True
     ),
+    # ⚠ Moved out of `PYTHON_FOLDED` by slice C5, and it is the *only* one of the
+    # two that could move: `domains::biosphere::drift` now carries the fold kit, so
+    # `emit_sealed_energy_drift` emits the summary rather than the raw node-heat
+    # series. Measured byte-identical to the committed golden BEFORE the change, so
+    # this re-anchors AUTHORSHIP with no value moving — the `golden_sha256` in the
+    # station manifest does not change, only its `_authority` side. Plan §5h.
+    "sealed_energy_drift_summary.json": Emitter(
+        "station", "emit_sealed_energy_drift", release=True
+    ),
 }
 
 # --------------------------------------------------------------------------- #
-# Group 2 — Rust emits a raw series; the golden is folded Python-side (2)      #
+# Group 2 — Rust emits a raw series; the golden is folded Python-side (1)      #
 # --------------------------------------------------------------------------- #
 # ⚠ Same shape as slice 3's `param_files` finding: there IS a Rust program, but what it
 # emits is not the artifact. Regenerating these "from Rust" would still route the bytes
@@ -185,17 +196,22 @@ RUST_EMITTERS: dict[str, Emitter] = {
 # Phase-7 deliberately declined (advisor #3). Slice 6/7's classification inherits this.
 PYTHON_FOLDED: dict[str, str] = {
     "drift_summary.json": (
-        "Rust `emit_drift` streams the raw 15-yr leaf_c / consumer_carbon series; "
-        "`drift.py` folds per-year summaries and the period class Python-side "
-        "(Phase-7 P7.4, advisor #3). The fold is the artifact, and it has no Rust "
-        "referent until it is ported."
-    ),
-    "sealed_energy_drift_summary.json": (
-        "Rust `emit_sealed_energy_drift` streams the raw 15-yr thermal.node heat "
-        "series; Python folds temp / year-peaks / is_stationary (Phase-7 P7.5, same "
-        "discipline). Same shape as `drift_summary.json`."
+        "⚠ SLICE C5 ported the fold to Rust (`domains::biosphere::drift`) and "
+        "this file still did NOT move. The reason is measured, not a deferral of "
+        "convenience: folding the Rust series moves 4 of its 45 values (<=7 ULP, "
+        "consumer years 3-4 — a 1-ULP divergence at step 4095 that the "
+        "contracting attractor damps back to a bit-identical final state by year 15). "
+        "Python would therefore need tolerance-gating, i.e. an entry on "
+        "`golden_platform.PYTHON_DIVERGES` — and "
+        "`test_every_diverging_scenario_keeps_a_byte_gated_sibling` goes RED, because "
+        "`emit_drift` serves exactly one golden and so has no byte-gated sibling under "
+        "that gate's emitter-program key. Widening that key from inside the slice that "
+        "needs it widened is the co-adaptation this repo refuses, so the authorship "
+        "move is DEFERRED to its own ceremony. See §5h of "
+        "docs/plans/post-roadmap-reference-flip.md."
     ),
 }
+
 
 # --------------------------------------------------------------------------- #
 # Group 3 — no Rust referent at all (5)                                        #

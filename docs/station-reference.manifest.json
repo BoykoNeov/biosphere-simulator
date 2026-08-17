@@ -46,15 +46,11 @@
     },
     "scenarios/*/golden_sha256": {
       "side": "rust",
-      "why": "the golden is the reference tree's own output (golden_platform.RUST_AUTHORED, which this block is checked against, not restating). Unlike the param hashes here this one IS gated against the file on disk: a golden is machine-generated and its hash is newline-normalized, so 'the manifest pins bytes that exist' is a completeness claim, not the value re-assertion that param_files declines."
+      "why": "the golden is the reference tree's own output (golden_platform.RUST_AUTHORED, which this block is checked against, not restating). Unlike the param hashes here this one IS gated against the file on disk: a golden is machine-generated and its hash is newline-normalized, so 'the manifest pins bytes that exist' is a completeness claim, not the value re-assertion that param_files declines. \u26a0 SLICE C5 removed this key's ONE exception and that is why the axis is now uniform. `scenarios/sealed_energy_drift/golden_sha256` used to be carved out as `python` \u2014 'ONE RUN, TWO AUTHORS: drift.py's Python-side fold of the 15-yr sealed energy series; the fold IS the artifact, so its correct reference is Python's own output.' That stopped being true when `domains::biosphere::drift` gained the fold kit and `emit_sealed_energy_drift` began emitting the summary itself. \u26a0 The HASH did not move (measured byte-identical before the change), so this is an authorship re-anchoring, not a value unfreeze \u2014 the same shape C8 found for param_files, where the digits were author-neutral and the RULE moved."
     },
     "scenarios/*/scenario": {
       "side": "hand",
       "why": "a human label for the scenario, not an identifier anything resolves"
-    },
-    "scenarios/sealed_energy_drift/golden_sha256": {
-      "side": "python",
-      "why": "\u26a0 ONE RUN, TWO AUTHORS \u2014 the station's copy of the biosphere's drift_summary case. This is drift.py's Python-side fold of the 15-yr sealed energy series; the fold IS the artifact, and its correct reference is Python's own output. So the golden axis here is not '13 Rust' scenario by scenario."
     },
     "science_bands/*": {
       "side": "python",

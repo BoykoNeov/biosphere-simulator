@@ -2018,3 +2018,130 @@ verification"* it inverts this repo's whole posture, and every mechanism named i
 document (the goldens, the three manifests, the tolerance contract) exists because that
 substitution is not available. The distinction is not a quibble about wording: it decides
 whether the harness's output is *a finding you then gate*, or *a gate*. It is the first.
+
+---
+
+## §5h C5 — `drift.py`'s folds move to Rust; measured 2026-08-17, BEFORE any Rust was written
+
+### ⚠⚠ The order changed: C5 comes BEFORE C4, and the dependency was measured, not guessed
+
+The user picked C4 (the science-gate census) next, on my recommendation. Measuring C4's
+surface first surfaced a hard prerequisite that neither §5c nor my own recommendation saw:
+**5 of the 15 science gates cannot be written in Rust until `drift.py`'s folds exist there.**
+
+| gate locus | folds it needs |
+|---|---|
+| `test_decade_stability.py::test_decade_leaf_cycle_is_stationary` (×2 — perennial + consumer) | `year_summaries`, `same_phase_diffs`, `is_stationary`, `non_collapsing` |
+| `test_decade_stability.py::test_decade_consumer_biomass_is_stationary_and_alive` | same |
+| `test_decade_stability.py::test_decade_min_carbon_pool_stationary` | same + `drift_slope` |
+| `test_sealed_station_stability.py::test_tier1_node_is_period_1_fixed_point` | `year_summaries`, `same_phase_diffs`, `is_stationary`, `non_collapsing` |
+
+The evidence is not inference — **both Rust emitters say so in their own comments**:
+`emit_drift.rs:5` (*"the Python parity gate folds them … so this example reproduces NO
+segmentation"*) and `emit_sealed_energy_drift.rs:6-7`. And `grep` for
+`stationar|period_2|non_collapsing|year_summaries|least_squares` over `rust/crates`
+returns **only those two comments** — Rust has zero fold functions.
+
+*Generalize: a slice's prerequisites are not in its own row of the plan table.* §5c lists
+C4 and C5 as independent items in the same stage; they are not. Had C4 been taken first,
+the folds would have been written inside it and C5 would have become a duplicate or a
+no-op — which is how a plan silently loses a slice's subject.
+
+### ⚠⚠ The gating measurement: C5 is an UNFREEZE for one golden and BIT-NEUTRAL for the other
+
+Same discipline as C1/C8/C9 — predict the diff, measure it, *then* build. The question here
+is **not** a locus question (that is C4's) but a floating-point one: do the two goldens come
+out byte-identical when Rust folds instead of Python?
+
+The measurement runs the two Rust emitters, folds their raw series in Python with the
+*existing* fold code (`_fold_drift_summary` in `tests/crossport/test_crossport.py` does
+exactly this, so the comparison is apples-to-apples), and byte-compares against the
+committed goldens.
+
+| golden | result |
+|---|---|
+| `sealed_energy_drift_summary.json` | ✅ **byte-identical** — bit-neutral, no unfreeze |
+| `drift_summary.json` | ❌ **4 of 45 values move**, ≤7 ULP |
+
+The four, all in the **consumer** scenario and all in years 3–4 (the perennial is identical
+throughout, and both `is_period_2` booleans are unchanged):
+
+```
+consumer.peak_leaf        yr 3   ulp=7   rel=9.955e-16
+consumer.peak_leaf        yr 4   ulp=1   rel=1.493e-16
+consumer.consumer_carbon  yr 3   ulp=2   rel=4.389e-16
+consumer.consumer_carbon  yr 4   ulp=2   rel=2.289e-16
+```
+
+**The control that makes this a statement about the ports and not about my fold:** the
+Python fold of the *Python* trajectory still reproduces the committed golden **exactly**
+(`uv run pytest tests/test_regression_long_horizon.py -k drift_summary` — 3 passed), and my
+Rust-fed fold reproduces **41 of 45** values bit-for-bit across three different summary
+functions. So the fold arithmetic is exact and the difference is in the trajectories: the
+two ports' 15-year *consumer* runs differ at ~1e-15.
+
+### ⚠ A dated figure in the tolerance contract is no longer true, and C5 is what makes it matter
+
+`tests/crossport/tiers.json`'s `drift_summary` evidence reads *"Step-4 (P7.4): Rust-vs-Python
+bit-exact locally (same UCRT libm, **max_rel_dev 0.0**)"*. Measured 2026-08-17 that is
+**9.955e-16**, not 0.0. Nothing is red — the band is `1e-11`, ~4 orders looser — and the
+string is explicitly dated `P7.4`, so this is a stale figure rather than a false claim.
+
+What makes it worth writing down is that **C5 changes its status**. Today those four ULPs are
+a *tolerated deviation* absorbed by a band. Once Rust folds, they become **the golden's own
+bytes** — the deviation stops being tolerated and becomes the reference value. That is
+precisely what the reference flip means, and it is why this slice is an unfreeze and not the
+re-anchoring C1/C8/C9 were.
+
+*Generalize: a tolerance band hides a difference until the flip makes one side the author —
+then the same number is a value, not a deviation.*
+
+### Where the Rust fold goes, and why it mirrors Python
+
+`domains::biosphere::drift` — `rust/crates/domains/src/biosphere/drift.rs`. Python puts the
+kit in `domains/biosphere/drift.py` and the *station* tests import it from there; `station`
+already depends on `domains` in its `Cargo.toml`, so the mirror reproduces the layering
+rather than inventing one. The module is an **instrument**, not science: it is generic over
+`State` (the caller supplies the per-year `summary_fn`), so it imports no stock-id catalog.
+
+### Classify per function before porting — some of this is not a fold
+
+Advisor's note, applied: `drift.py` is 265 lines and the folds are only part of it.
+
+| function | kind | port? |
+|---|---|---|
+| `total_quantity`, `mass_drift_trace`, `drift_slope`, `max_abs` | trace **builders** over a trajectory | yes — no Rust equivalent exists (`grep` for `fn total_quantity` returns nothing) |
+| `least_squares_slope` | the shared primitive both axes use | yes |
+| `year_summaries`, `same_phase_diffs`, `is_stationary`, `non_collapsing` | the **folds** C4 needs | yes — the point of the slice |
+| `is_period_2` | the discrete structural check | yes — it decides two booleans *in* the golden |
+| `MASS_DRIFT_ABS_BOUND`, `MASS_DRIFT_SLOPE_BOUND` | derived constants with a provenance block | yes, **with the provenance comment** — a bound nobody can reproduce is the thing the block exists to prevent |
+
+⚠ `relative_drift` is **not** in `drift.py` — it is in `tests/sealed_tier2_helper.py`. It is a
+test helper, so it travels with Stage 3, not with C5.
+
+### ⚠ The segmentation convention is the real porting risk, and it is off-by-one shaped
+
+The arithmetic cannot drift — every float in both goldens is a *selected* value (`max` over a
+segment, or the segment's last element), not a computed one, and the only computed outputs
+are booleans. What *can* break is the segmentation:
+
+* `year_summaries` slices `states[y*year : (y+1)*year + 1]` — **inclusive of the next year's
+  boundary state** — and takes `n_years = (len(states) - 1) // year`.
+* Both emitters stream `steps + 1` states (measured: `emit_drift` → 18301 = 15×305×4 + 1;
+  `emit_sealed_energy_drift` → 109801 = 15×305×24 + 1), so the `+1`/`-1` pair is load-bearing.
+* ⚠ The period is in **steps** for the biosphere (`steps_for(305)` = 1220 at `dt = ¼`) and in
+  **days** for the sealed station's organic-carbon fold (`run_master_day` appends one state
+  per master day). The two are different units in the same function; this is the trap
+  `docs/plans/post-roadmap-step-unfreeze.md` §1 already records once.
+
+A Rust fold that gets the inclusive boundary wrong changes **values**, not bytes-by-a-ULP —
+so the 4-ULP prediction above is also the check: any other diff is a porting defect.
+
+### Deliberately NOT in C5
+
+* **The science gates themselves** — that is C4, and it starts the moment the kit lands.
+* **`relative_drift` and the other `tests/` helpers** — Stage 3.
+* **Re-anchoring `tiers.json`'s stale `max_rel_dev` figure** — it is a *dated* evidence
+  string in the tolerance contract, whose own unfreeze discipline is
+  `docs/native-port-reference.md`. Naming it here is the record; changing it is its own
+  ceremony.

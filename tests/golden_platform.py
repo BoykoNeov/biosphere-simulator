@@ -85,11 +85,20 @@ windows_golden_only = pytest.mark.skipif(
 # two rosters name exactly the same files — the duplication is the gate, not an
 # oversight.
 #
-# The seven NOT here stay Python-authored, and each for a stated reason (the census in
-# `regen_goldens_from_rust.py`): `drift_summary` / `sealed_energy_drift_summary` are
-# folded Python-side from a raw Rust series (*the fold is the artifact*); `n_limited` /
-# `water_biting` / `demo_euler` / `demo_rk4` have no Rust scenario at all; and
-# `state_snapshot` is a hand-authored `sim_io` fixture that Rust *reads*.
+# The six NOT here stay Python-authored, and each for a stated reason (the census in
+# `regen_goldens_from_rust.py`): `drift_summary` is folded Python-side from a raw Rust
+# series (*the fold is the artifact*); `n_limited` / `water_biting` / `demo_euler` /
+# `demo_rk4` have no Rust scenario at all; and `state_snapshot` is a hand-authored
+# `sim_io` fixture that Rust *reads*.
+#
+# ⚠ **Nineteen since slice C5, and only one of the two folded summaries could move.**
+# `domains::biosphere::drift` now carries the fold kit, so `emit_sealed_energy_drift`
+# emits its summary directly (measured byte-identical to the committed golden — an
+# authorship re-anchoring with no value moving). `drift_summary` did NOT move, and the
+# reason is a measurement, not a preference: folding the Rust series moves 4 of its 45
+# values, which would put it on `PYTHON_DIVERGES` below and turn
+# `test_every_diverging_scenario_keeps_a_byte_gated_sibling` red. See §5h of
+# docs/plans/post-roadmap-reference-flip.md.
 RUST_AUTHORED = frozenset(
     {
         # biosphere (7 frozen, minus the folded drift summary)
@@ -113,6 +122,8 @@ RUST_AUTHORED = frozenset(
         "lighting_state.json",
         "harvest_state.json",
         "sealed_station_state.json",
+        # the station's 15-yr energy stability signature — folded in Rust since C5
+        "sealed_energy_drift_summary.json",
     }
 )
 

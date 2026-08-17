@@ -945,41 +945,23 @@ def test_rust_sealed_station_matches_tier2() -> None:
     assert result.numeric_pairs
 
 
-def _fold_energy_drift_summary(raw: dict) -> dict:
-    """Fold the Rust raw per-step node-heat series into the drift-summary
-    shape, Python-side (advisor #3 — all of `drift.py` stays Python-side). Rust emits
-    only the raw `thermal.node` heat trajectory; here we apply `temp = space_temp +
-    node/C`, the per-year peak segmentation (`year_summaries`' `[y*year:(y+1)*year+1]`
-    slice), and the `is_stationary` classifier — no segmentation logic lives in Rust."""
-    from domains.biosphere.drift import is_stationary, same_phase_diffs
-    from domains.thermal.loader import load_thermal_params
-    from station.scenario import SEALED_STATION_SEASON_DAYS
-
-    thermal = load_thermal_params()
-    node = [float.fromhex(h) for h in raw["node_heat"]]
-    temps = [thermal.space_temperature + q / thermal.heat_capacity for q in node]
-    year = raw["steps_per_day"] * SEALED_STATION_SEASON_DAYS
-    n = (len(temps) - 1) // year
-    peaks = [max(temps[y * year : (y + 1) * year + 1]) for y in range(n)]
-    return {
-        "horizon_years": raw["horizon_years"],
-        "node_peak_temp_k": [v.hex() for v in peaks],
-        "is_stationary": is_stationary(
-            same_phase_diffs(peaks, period=1), bound=0.1, slope_tol=1e-3
-        ),
-    }
-
-
 @pytest.mark.slow
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
 def test_rust_sealed_energy_drift_summary_matches() -> None:
     """The Rust 15-yr Power→Thermal run reproduces the `sealed_energy_drift_summary`
     golden: the per-year `node_peak_temp_k` vector within the station Tier-2 band,
     and the `is_stationary` signature (the node's period-1 fixed point) EXACTLY
-    (Tier 0 — a flipped classification is a real port bug). Rust emits only the raw
-    per-step node-heat series; `_fold_energy_drift_summary` folds it Python-side."""
-    raw = json.loads(_run_station_example("emit_sealed_energy_drift", release=True))
-    derived = _fold_energy_drift_summary(raw)
+    (Tier 0 — a flipped classification is a real port bug).
+
+    ⚠ **Slice C5 removed this test's own fold.** Through Phase-7 Step 5 Rust emitted
+    only the raw per-step node-heat series and a local `_fold_energy_drift_summary`
+    built the comparison subject here — so the artifact being compared was assembled
+    by the *checker* out of the reference's numbers. `domains::biosphere::drift` now
+    carries the kit and the emitter emits the summary itself, so this reads Rust's own
+    artifact. The Python fold was deleted rather than kept as a second opinion: two
+    folds is the "one run, two authors" split this slice exists to end.
+    """
+    derived = json.loads(_run_station_example("emit_sealed_energy_drift", release=True))
     golden = compare.load_json(GOLDEN_DIR / "sealed_energy_drift_summary.json")
     entry = _station_entry("sealed_energy_drift")
     result = compare.compare(
