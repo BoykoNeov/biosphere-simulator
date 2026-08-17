@@ -1285,6 +1285,74 @@ exemption written for a temporary state is a deletion someone must remember, and
 it left three checks red for five commits. **What this slice still owes the record is the
 closing update to that file, plus the memory file** — not its creation.
 
+## §5c The C re-plan — measured 2026-08-17, AWAITING APPROVAL
+
+⚠ **Nothing here is executed. The eleven slices of §5 stand until the user approves this.**
+The user asked for a re-plan rather than an absorb-as-you-go, so this section re-prices the
+remaining work against C. Every number below was measured today, not estimated.
+
+### What C actually costs, measured
+
+| Python surface | Size | Under B | Under C |
+|---|---|---|---|
+| `src/simcore` + `domains` + `station` + `authoring` | 23,158 lines | the checker | **retired** once its gates move |
+| `src/config` (param YAML loader, pint units, the override seam) | 369 lines, 28 YAML files | slice 9 decides | **must move** — Rust is the loader |
+| `src/lab/oracle_match.py` + `tests/oracle/` | 521 + 1,148 lines | kept | **KEPT — this is the user's carve-out** (it talks to PCSE) |
+| `src/lab/rk45.py`, `convergence.py` | in the 521 | kept | ⚠ **undecided** — our own study tools, not external software |
+| `tests/` minus crossport and oracle | 145 files, 51,315 lines, ~2,300 tests | kept green | **port or retire, test by test** |
+| `tests/crossport` | 25 files, 6,552 lines | the whole point | ⚠ **DELETED, not ported** — with one port there is nothing to compare |
+| the three manifest generators | inside `tests/` | Python writes the contracts | **must move**, or the frozen contracts stay Python-authored forever |
+| the science-gate census | 15 markers → ~104 of 208 manifest lines | Python-retained | **needs a Rust home or an end date** |
+| `drift.py` folds | 2 goldens, 2 manifests | "one run, two authors" | **must move** to end the split |
+| 4 Python-only scenarios | `demo_euler`, `demo_rk4`, `n_limited`, `water_biting` | out of scope | **port or retire** — they have no Rust referent at all |
+
+**Rust today: 334 tests. Python today: 2,471.** That ratio is the plan's real shape — everything
+else is bookkeeping beside it.
+
+### The revised slices
+
+**Stage 1 — finish the flip (needed under B and C alike; two of these are already written).**
+
+| # | Slice | Note |
+|---|---|---|
+| C1 | **Params + units move to Rust** (was slice 9) | ⚠ C **removes one of its two candidate answers**: "keep pint in Python and make it read what Rust loaded" was a permanent-checker design. Only "reimplement the dimensional check in the Rust loader" survives. Unblocks `param_files` in **both** other manifests **and** the weather fixture. ⚠ **Take the user's harness with it** — `config/overrides.py` is the same file set (§7) |
+| C2 | **The 12 laws in Rust** (was slice 10) | unchanged; `proptest`; independent of everything |
+| C3 | **Posture + purity invariant** (was slice 11) | ⚠ now C's posture, not B's. `git diff src/` empty **inverts**: under C, `src/` is what shrinks |
+
+**Stage 2 — the pieces only Python can do today.** Each is a contract key that is currently
+classified `python` and would otherwise stay that way forever.
+
+| # | Slice | Why it is not optional |
+|---|---|---|
+| C4 | **The science-gate census** | 15 pytest markers produce ~104 of the biosphere manifest's 208 lines. It is the **single largest Python-authored block of any contract**, and it has no Rust route at all while the gates are pytest functions |
+| C5 | **`drift.py`'s folds** | ends the "one run, two authors" split slice 5 created and slice 7 inherited — two goldens in two manifests |
+| C6 | **The 4 Python-only scenarios** | ⚠ a **decision, not a port**: `demo_*` is a skeleton, `n_limited`/`water_biting` are science the Rust roster never carried. Retiring them is legitimate; doing it silently is not |
+| C7 | **The manifest generators** | they are Python scripts that *write* the three frozen contracts. Until they move, "Rust is the reference" has a Python-shaped hole in the middle of it |
+
+**Stage 3 — the suite.** ~2,300 tests, 51k lines. Not one slice; a classification pass first,
+then batches by kind: the laws (C2 has 12), the regression/golden gates (mostly exist in Rust
+already), the science gates (C4), and the rest. ⚠ **`tests/crossport` is deleted rather than
+ported** — 6,552 lines whose entire subject is the two ports agreeing.
+
+### The three things that need the user, not me
+
+1. **Do `rk45.py` / `convergence.py` count as "external software as a reference"?** They are
+   *our* study tools (an independent integrator used to check convergence), not third-party.
+   Reading the instruction strictly, they move or go.
+2. **C6: retire or port the four orphan scenarios?**
+3. **Is the end state "Python deleted" or "Python left in place, unmaintained"?** The plan
+   above assumes deleted-except-the-oracle. Frozen-in-place is cheaper and keeps a read-only
+   second opinion, at the cost of a tree that rots silently.
+
+### ⚠ The price, restated because §4's version is now too small
+
+§4 recorded B's cost: *the two implementations stop being independent, so a disagreement is
+resolved in Rust's favour by definition.* **C's cost is one step further: with one
+implementation there is no disagreement to resolve.** The mechanism being given up caught a
+year-2 vernalization reset bug, the multi-rate phase's zero-coverage driver, and — 2026-08-12,
+five days before this decision — a scenario constant the entire Python suite could not see.
+Recorded as information. The user has taken the decision; this is what it costs.
+
 ## §6 Open questions — none blocking, all answerable when their slice is taken
 
 1. **Does new *reference science* wait for the flip?** B makes Rust the place science is
