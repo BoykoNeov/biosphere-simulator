@@ -169,6 +169,14 @@ _PYTHON_HORIZONS: dict[str, int] = {
 }
 
 
+#: How many science gates the REFERENCE declares (slice C4). ⚠ A literal, on purpose:
+#: this module never shells cargo, so it cannot count them, and the point of the number
+#: is to be an INDEPENDENT one the manifest is measured against rather than one derived
+#: from the manifest it is checking. The derived comparison against the live Rust tree
+#: is cargo-gated, in tests/crossport/test_inventory_parity.py.
+_REFERENCE_GATE_COUNT = 13
+
+
 #: This manifest's scenario roster — the filter for the science-gate fields, so
 #: a gate naming a station scenario cannot silently land in the biosphere manifest.
 _ROSTER = frozenset(_SCENARIOS)
@@ -814,7 +822,7 @@ def test_the_frozen_science_gates_are_the_references() -> None:
     """
     manifest = _load_manifest()
     entries = [e for field in FIELDS for v in manifest[field].values() for e in v]
-    assert len(entries) == 13, len(entries)
+    assert len(entries) == _REFERENCE_GATE_COUNT, len(entries)
     for entry in entries:
         assert entry["locus"].startswith("rust/crates/domains/"), entry
 
@@ -979,11 +987,12 @@ def test_science_gate_bounds_name_a_literal_present_at_their_locus() -> None:
     #
     # The reference's half — every Rust gate is in a manifest and vice versa — needs
     # cargo and lives in tests/crossport/test_inventory_parity.py.
-    total = 0
-    for manifest_path in manifests:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        total += sum(len(v) for field in FIELDS for v in manifest[field].values())
-    assert checked == total, (checked, total)
+    # ⚠ The count is compared against the two CENSUSES, not against a re-walk of
+    # the same manifests. A first draft summed the entries again and asserted
+    # `checked == total` — the same nested walk on both sides of an equals sign,
+    # which cannot fail: `[] == []` in a passing test's clothes, slice 7's lesson
+    # landing in the very gate that exists to stop a claim going unchecked.
+    assert checked == _REFERENCE_GATE_COUNT + len(collect_science_gates()), checked
     for gate in collect_science_gates():
         frozen = [
             entry

@@ -2616,8 +2616,11 @@ different failures, two different mechanisms, and only one of them is structural
 ### Runtime, measured rather than assumed
 
 §5j took its numbers in `--release` and said out loud that the permanent gates would run in
-`cargo test`'s debug profile. Measured: the 13 gates add **~3.4 s** to `cargo test` (65 lib
-tests in `domains`, from 52), against a 27 s baseline. The six trajectories are shared
+`cargo test`'s debug profile. Measured: the 13 gates add **~3.4 s** to `cargo test`, against
+a 27 s baseline. The `domains` lib goes **45 → 65** tests: the 13 gates plus 7 the census
+carries about itself (the field set, the claim fields, locus uniqueness, the bound-literal
+check and its hand-transcribed scanner's own pinned negatives, the `61.07` tripwire, and the
+`Γ*`-provenance robustness argument the frozen `source` strings cite). The six trajectories are shared
 through `OnceLock` — Python has a `scope="module"` fixture and Rust has no fixtures, so
 without it the two 15-year chambers would be re-run several times each. Every value matches
 the release probe to 17 significant digits, so the profile is byte-neutral for this family
