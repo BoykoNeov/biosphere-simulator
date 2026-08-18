@@ -1608,6 +1608,15 @@ forcing function named — the dump's key-set assertion in the parity gate, plus
 byte comparison. ⚠ The row does not come back when the other writers land; those two rows
 *leave* with them.
 
+⚠ Checked afterwards rather than assumed, because the loose version of that reasoning is
+wrong: what the surviving assertion forces is that a new dump key be **declared**, not
+that it be *classified* — and a control confirms a dump-only key still reddens it.
+Classification was never the dump's job in the first place: three of its keys
+(`locked_dt_days`, `horizons`, `light_path_samples`) have never reached the manifest and
+so have never carried an `_authority` row, because they are emitted to be checked against
+rather than frozen. `_authority` coverage is over **manifest** keys, and C7 does not touch
+it.
+
 Also worth recording as a repeat: running `rustfmt` on `crates/config/src/lib.rs`
 reformatted `params.rs` and `yaml.rs` too, because rustfmt follows `mod` declarations. That
 is [[dev-env-never-bare-cargo-fmt]] in a shape the memory does not name — the hazard is not
