@@ -2241,3 +2241,77 @@ now have Rust referents for every helper they call. ⚠ C4's own gating measurem
 15 `locus` strings, and whether each `bound`'s numeric literals still appear textually in
 the **Rust** file the locus will point at — is still unmeasured and still blocks C4's
 ceremony, not its start.
+
+## §5i C3 — the posture lands in `CLAUDE.md`, COMPLETE 2026-08-18
+
+The slice §5's table numbered 11 and the C re-plan renumbered C3: rewrite the purity
+invariant, add the development-posture section `CLAUDE.md` has never had, adjudicate the
+`windows_golden_only` marker §5's slice-5 block left here, and close the record out.
+
+**Nothing executable changed.** `git diff src/`, `git diff rust/`,
+`tests/regression/golden/` and all three `.manifest.json` came back empty, as predicted
+in `M:/claud_projects/temp/c3-posture/PREDICTION.md` before the first edit. This slice
+authors no science and re-anchors no key; it *describes* the re-anchoring that slices 6–8
+and C1/C5/C8/C9 already did.
+
+### ⚠ Three statements in the always-loaded file were false, and only two were the flip's
+
+The two the slice was chartered for (`Python is the canonical reference`; the port has no
+reference authority / `git diff src/` empty) were known. The third was not: the
+freeze-contract table still read **`Euler/dt=1`** — stale since the step unfreeze of
+2026-08-14, four days before this slice and *nothing to do with the flip*. It survived a
+step change that was itself run as a ceremony with a plan doc, a manifest regeneration
+and a re-pinned literal.
+
+⚠ *Generalize: a file that is loaded unconditionally is read constantly and audited
+never. The ceiling test bounds its SIZE and the parity tests bound its INDEX; no gate in
+this repo compares a sentence in it against the tree. Every unfreeze should re-grep it —
+`dt` went red in the manifest, in a test literal, and in five prose figures, and this
+line was in none of those places.*
+
+### The marker decision, refused on a number rather than on caution
+
+§5's slice-5 block left this: `windows_golden_only` still skips the two
+tolerance-converted gates on Linux, and its stated rationale (byte-exactness is
+platform-bound) no longer reaches a comparison that is no longer byte-exact. The tempting
+move is to unskip them and let `DISAGREEMENT_CEILING = 1e-14` do the work.
+
+**Refused, and the reason is arithmetic.** The worst propagated ±1-ULP transcendental
+sensitivity in this scenario group is **3.520e-15** (`tiers.json`, canopy `exp`, perennial
+15-yr, re-measured 2026-08-16) — under **3×** of headroom below the ceiling for a *single*
+perturbed site, while glibc-vs-UCRT perturbs all four sites `tiers.json` lists for these
+scenarios at once and by more than one ULP at some. The evidence available argues
+*against* the assumption that a glibc run fits, so unskipping would ship a band nobody
+measured — the derived-not-measured move this contract exists to refuse.
+
+The comment landed at the marker definition (`tests/golden_platform.py`) with an
+**expiry condition** naming the one thing that retires it: a Linux run of the two
+`*_matches_the_reference` tests reporting their max observed deviation. ⚠ Written as an
+expiry condition on purpose — this doc's own hardest lesson is that *an exemption written
+for a temporary state is a deletion someone must remember*.
+
+### The byte budget: the prediction was right about the direction and 6 B short on size
+
+Predicted 10,200–10,900 B newline-normalized against a 12,000 B ceiling; the first draft
+landed at **11,452** (548 B of headroom) — inside the ceiling but past the band, and past
+this slice's own written trigger (*"if it lands over 11,500, cut; do NOT raise the
+ceiling"*). Cut by **retirement, not by trimming adjectives**, which is rule 1 of
+`docs/context-budget.md`:
+
+* the whole `## Status` section — it duplicated the header's "roadmap COMPLETE through
+  Phase 9", the detail list's log pointer, and Working style's retirement rule. Replaced
+  by one `docs/phase-index.md` line in the pointer list. **A section whose every sentence
+  is a second copy is the exact shape this file warns about.**
+* the suite-runtime paragraph, compressed to its two operative rules.
+
+Final: **10,906 B, 1,094 B of headroom**, all 10 context-budget assertions green.
+
+### What C3 deliberately did NOT do
+
+* **Delete anything.** The posture now says `src/` shrinks; acting on that is C4/C6/C7 and
+  Stage 3, each with its own control.
+* **Touch the `Native port` contract row.** The cross-port tolerance contract dies with
+  the second implementation, not with the sentence describing it.
+* **Re-word `config/units.py`'s expiry into an assertion.** C1 recorded that the Python
+  unit check stays live only while the retained param generators call it; `CLAUDE.md` now
+  carries the warning, but the gate that would make it red is still C7's to build.

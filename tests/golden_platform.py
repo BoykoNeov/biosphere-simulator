@@ -77,6 +77,26 @@ windows_golden_only = pytest.mark.skipif(
     ),
 )
 
+# ⚠ **THE MARKER STAYS ON THE TWO TOLERANCE-CONVERTED GATES, AND THE REASON IS NOT THE
+# ORIGINAL ONE.** Adjudicated in slice C3 (2026-08-18), which the reference-flip plan
+# left this decision to. For the two goldens on `PYTHON_DIVERGES` below the compare is
+# no longer byte-exact, so the rationale above ("byte-exactness is platform-bound") no
+# longer reaches them — the obvious move is to unskip them on Linux and let the
+# `DISAGREEMENT_CEILING` do the work. It was refused **on a number**, not on caution:
+# the worst propagated +/-1-ULP transcendental sensitivity in this scenario group is
+# 3.520e-15 (`tiers.json`; canopy `exp`, the perennial 15-yr, re-measured 2026-08-16)
+# against a 1e-14 ceiling — under 3x of headroom for a *single* perturbed site, while
+# glibc-vs-UCRT differs at all four sites `tiers.json` lists for these scenarios at
+# once, and by more than one ULP at some of them. So the assumption "it will
+# fit" is the one the evidence argues against, and writing a band nobody measured is
+# the derived-not-measured move this contract exists to refuse.
+#
+# EXPIRY CONDITION — what retires this comment: one Linux run of the two
+# `*_matches_the_reference` tests reporting their **max observed** deviation against the
+# UCRT-authored goldens. With that number in hand, either drop the marker (if it sits
+# under the ceiling) or restate the ceiling *with the measurement attached*. Nothing
+# else unblocks it; re-reading this file cannot.
+
 # --------------------------------------------------------------------------- #
 # Authorship — the 18 goldens the Rust port writes                            #
 # --------------------------------------------------------------------------- #

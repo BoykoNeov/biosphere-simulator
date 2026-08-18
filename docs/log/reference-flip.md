@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8 and C9 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9 and C3 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, and the posture itself into CLAUDE.md 2026-08-18)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -1289,3 +1289,38 @@ what the harness is for. Read as *"the harness stands in for verification"* it i
 repo's posture, and every mechanism this flip touches exists because that substitution is not
 available. The distinction decides whether the harness's output is *a finding you then gate*
 or *a gate*. It is the first.
+
+### C3 — the posture lands in `CLAUDE.md` (2026-08-18)
+
+**COMPLETE, and the whole slice is a docs edit: `git diff src/`, `git diff rust/`, the 25
+goldens and all three manifests came back empty**, exactly as `PREDICTION.md` said before the
+first character was typed. Plan A had called landing its rules in `CLAUDE.md` *"the single most
+important step; the rest is tooling"* and never did it; the posture then lived only in a plan
+doc and a memory file, which is why it never became a default. That is now closed for C: the
+always-loaded file states that Rust is the reference, that Python has no reference authority,
+that `git diff src/` empty has **inverted** (`src/` is what shrinks), and that the only Python
+surviving the plan is the hand-run PCSE oracle carve-out.
+
+⚠⚠ **THE SLICE FOUND A THIRD FALSE STATEMENT, AND IT WAS NOT THE FLIP'S.** The freeze-contract
+table still read **`Euler/dt=1`** — stale since the step unfreeze four days earlier, a change
+that ran as a full ceremony with a plan doc, a regenerated manifest and a re-pinned literal.
+*A file loaded unconditionally is read constantly and audited never: the ceiling test bounds
+its size and the parity tests bound its index, but no gate in this repo compares a sentence in
+it against the tree. Every unfreeze should re-grep it.*
+
+**The `windows_golden_only` marker, left to this slice by slice 5, was refused on a number.**
+Its rationale (byte-exactness is platform-bound) no longer reaches the two gates that are now
+tolerance comparisons, so the tempting move was to unskip them on Linux under the 1e-14
+last-bit-noise ceiling. But the worst propagated ±1-ULP transcendental sensitivity in that
+scenario group is **3.520e-15** — under **3×** of headroom for *one* perturbed site, while
+glibc-vs-UCRT perturbs all four sites at once. The evidence argues against the assumption, so
+the marker stays, with an **expiry condition** at its definition naming the only thing that
+retires it: one Linux run reporting the max observed deviation.
+
+**The byte budget was the slice's own control.** Predicted 10,200–10,900 B against a 12,000 B
+ceiling; the first draft came in at 11,452 — inside the ceiling, past the band, and past this
+slice's own written trigger to cut. Cut by **retiring**, not by trimming: the entire `Status`
+section went, because every sentence in it was a second copy of the header, the pointer list or
+Working style. Final 10,906 B with 1,094 B spare. ⚠ *When an always-loaded file must grow, the
+budget is paid by finding the duplicate — a section that only restates other sections is the
+cheapest thing in the file and the hardest to notice.*
