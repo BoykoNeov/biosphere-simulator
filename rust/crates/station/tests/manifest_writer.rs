@@ -216,14 +216,28 @@ fn the_committed_manifest_is_what_the_reference_writes() {
     );
 }
 
-/// ⚠ The control on the gate above: it must be comparing something.
+/// ⚠ The control on the gate above: it must be comparing **this** contract, not
+/// nothing and not a sibling.
 ///
-/// A `COMMITTED` that resolved to an empty or truncated file would make the assertion
-/// meaningful-looking and vacuous. The Python original could not make this mistake (it read
-/// the file at runtime and would have failed loudly); `include_str!` of a wrong-but-present
-/// path is the new failure mode this move introduces, so it gets its own assertion.
+/// ⚠⚠ **Narrowed after review, because the first version's prose overstated it.** It
+/// claimed to guard "an `include_str!` of a wrong-but-present path", which the byte gate
+/// already catches loudly, and it discriminated on `"_authority"` — a string ALL THREE
+/// manifests carry, so it could not tell them apart at all. Same species as the "nothing
+/// inside the suite can guard this line" claim S2's first half had to retract: **a doc
+/// comment asserting a property nobody tested.** It now claims only what it owns — the
+/// file is not truncated, and it is the station contract rather than a sibling.
+///
+/// It still earns its keep because `include_str!` embeds at **compile time**: unlike the
+/// Python original, which read the file at runtime and would have thrown, a
+/// stale-but-present path here is silent.
+///
+/// ⚠ And this gate depends on `.gitattributes` (`* text=auto eol=lf`). `include_str!`
+/// does **not** normalize line endings while `dumps` always emits LF, so a checkout
+/// producing CRLF manifests would redden the byte gate with the WRONG diagnosis ("edited
+/// by hand"). Checked rather than assumed: all three committed manifests carry zero CR
+/// bytes and the attribute pins `eol=lf`.
 #[test]
-fn the_committed_manifest_is_actually_loaded() {
+fn the_committed_manifest_is_this_contract_and_is_not_truncated() {
     assert!(
         COMMITTED.len() > 1_000,
         "the committed station manifest read as {} bytes — the include path is wrong \
@@ -231,9 +245,10 @@ fn the_committed_manifest_is_actually_loaded() {
         COMMITTED.len()
     );
     assert!(
-        COMMITTED.contains("\"_authority\""),
-        "the committed station manifest has no _authority block — this is not the file \
-         the gate is supposed to be comparing"
+        COMMITTED.contains("docs/station-reference.md"),
+        "the loaded manifest does not name docs/station-reference.md as its contract \
+         doc, so this gate is pointed at a DIFFERENT freeze contract. Every manifest \
+         carries an _authority block, which is why that is not the thing to check here."
     );
 }
 

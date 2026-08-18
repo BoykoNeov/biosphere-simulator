@@ -72,6 +72,27 @@ fn every_cheap_station_golden_is_still_this_reference_s_output() {
 /// So no build knob buys this back and the choice was between paying it on every
 /// `cargo test` and paying it in CI. CI runs it (`cargo test -- --ignored`); the control
 /// below is what stops `#[ignore]` from spreading quietly to anything else.
+///
+/// ⚠⚠⚠ **KNOWN CONSEQUENCE, and it is an INTERACTION neither decision names on its own:
+/// this golden's BYTE-exactness is checked by nothing automatic.** Trace it:
+///
+/// * on Windows — the generation platform, the only place its bytes are meaningful — it is
+///   `#[ignore]`d, so `cargo test` skips it;
+/// * on CI it runs, but CI is Linux, so `compare` finds unequal bytes and routes to the
+///   **structural** branch, which passes.
+///
+/// So byte-exactness for the largest assembly in the repo happens only when a human types
+/// `cargo test -- --ignored` **on Windows**. Structural equality is checked automatically,
+/// and the Tier-2 cross-port bands still gate it next door — but they are not the byte
+/// compare, and this is the green-by-skip family even though every individual decision was
+/// deliberate.
+///
+/// ⚠ It is also a small step DOWN from the Python original this replaces:
+/// `test_rust_reproduces_the_committed_golden_bytes` is `slow`, which in this repo is
+/// **opt-out** (it runs by default locally), while `#[ignore]` is opt-in. Recorded in plan
+/// §5u's standing work so S6 cannot retire the Python byte census believing this is a
+/// like-for-like successor. The remedies, neither taken here: un-ignore and pay ~100 s on
+/// every `cargo test`, or add a Windows CI runner.
 #[test]
 #[ignore = "~100s: 1.3M sub-steps over five domains. CI runs it via `cargo test -- --ignored`"]
 fn the_sealed_station_golden_is_still_this_reference_s_output() {

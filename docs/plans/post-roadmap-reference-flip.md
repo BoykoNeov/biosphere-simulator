@@ -4491,3 +4491,53 @@ finding, not a gap to fill.*
   malformed workflow does not fail, it silently does not run.
 * The `#[ignore]` census read only the station test file, so a skip added on the `domains`
   side was invisible to the control written to make skipping visible. It now reads both.
+
+### ⚠⚠ Standing work S2 leaves behind — three items, none of them blocking
+
+Written down because each is an *interaction* rather than a defect in any single decision,
+and interactions are what a slice's own record usually misses.
+
+**1. The sealed station's byte-exactness is checked by nothing automatic.** The two
+decisions are each right and their combination has a hole:
+
+| where | what happens |
+|---|---|
+| Windows (the generation platform — the only place its bytes mean anything) | `#[ignore]`d, so `cargo test` skips it |
+| Linux CI (`cargo test -- --ignored`) | runs, but `compare` routes a transcendental golden off-platform to the **structural** branch, which passes |
+
+So the byte compare for the largest assembly in the repo happens only when a human types
+`cargo test -- --ignored` on Windows. ⚠ And it is a step **down** from the Python original:
+`test_rust_reproduces_the_committed_golden_bytes` is `slow`, which in this repo is *opt-out*
+(it runs by default locally), while `#[ignore]` is *opt-in*. **S6 must not retire the Python
+byte census believing this is a like-for-like successor.** The two remedies, neither taken:
+un-ignore and pay ~100 s on every `cargo test`, or add a Windows CI runner. Structural
+equality *is* checked automatically, and `tiers.json`'s Tier-2 band still gates the scenario
+next door — but neither is the byte compare.
+
+**2. The byte gate now depends on `.gitattributes`.** `include_str!` does not normalize line
+endings; `dumps` always emits LF. A checkout producing CRLF manifests would redden the gate
+with the **wrong diagnosis** — its message says "the manifest was edited by hand". Checked
+rather than assumed: `.gitattributes` pins `* text=auto eol=lf`, `git check-attr` confirms
+`eol: lf` on the manifests, and all three carry zero CR bytes. The dependency is real and
+newly created by this slice (the Python original read at runtime), so it is written down in
+each gate's doc comment rather than left to be rediscovered.
+
+**3. `repo_root()` is `pub` on three crate libraries** purely so the examples can compute a
+default `--write-manifest` path. `pub(crate)` plus the example spelling its own default would
+keep the new public surface at zero. Cosmetic; noted so it is a choice rather than drift.
+
+### ⚠ And one correction to this section's own first draft
+
+`the_committed_manifest_is_actually_loaded` shipped with prose claiming it guarded *"an
+`include_str!` of a wrong-but-present path"* — which the byte gate already catches loudly —
+and it discriminated on `"_authority"`, **a string all three manifests carry**, so it could
+not tell the contracts apart at all. Renamed to
+`the_committed_manifest_is_this_contract_and_is_not_truncated`, given an assertion that
+actually discriminates (each manifest names its own `docs/*-reference.md`), and its doc
+narrowed to what it owns.
+
+⚠ That is the *second* claim this slice had to retract for the same reason — after "nothing
+inside the suite can guard this line". Both were **doc comments asserting a property nobody
+tested**, in a slice whose entire subject is gates that assert what they claim. Recorded as a
+pattern rather than twice as an incident: in this repo a `///` block is read as a finding, so
+writing one costs the same care as writing the assertion under it.

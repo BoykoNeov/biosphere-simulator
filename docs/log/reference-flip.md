@@ -2362,3 +2362,27 @@ wrong-but-present path is *silent*, where a runtime read throws — so
 census forcing literal). The fifth entry — `tiers.json`, which no Rust program reads — does
 not, by decision. The Python originals are all still green and still running; S6 retires
 them, and only once S3–S5 have theirs.
+
+#### ⚠⚠ What S2 leaves standing (found on review, none of it blocking)
+
+* **The sealed station's BYTE-exactness is checked by nothing automatic** — an interaction,
+  not a defect in either decision. It is `#[ignore]`d on Windows (where its bytes are the
+  only meaningful comparison) and CI runs it on Linux, where a transcendental golden takes
+  the *structural* branch. So the byte compare happens only when a human runs
+  `cargo test -- --ignored` on Windows. ⚠ That is a step DOWN from the Python original,
+  which is `slow` — **opt-out** in this repo, i.e. it runs by default — while `#[ignore]`
+  is opt-in. **S6 must not retire the Python byte census believing this is like-for-like.**
+* **The byte gate now depends on `.gitattributes`.** `include_str!` does not normalize line
+  endings and `dumps` emits LF, so a CRLF checkout would redden it with the *wrong*
+  diagnosis ("edited by hand"). Verified rather than assumed: `eol=lf` is pinned and all
+  three manifests carry zero CR bytes. New dependency, created by this slice.
+* `repo_root()` went `pub` on three crates only so the examples can spell a default path.
+
+#### ⚠ The pattern this slice had to retract twice
+
+Two doc comments asserted properties nobody tested — *"nothing inside the suite can guard
+this line"* (false; the repo guards its neighbour that way three files over) and a control
+claiming to discriminate between contracts while checking a string **all three manifests
+carry**. Both were caught by review, not by a test, in a slice whose entire subject is gates
+that assert what they claim. In this repo a `///` block is read as a finding, so writing one
+costs the same care as writing the assertion under it.
