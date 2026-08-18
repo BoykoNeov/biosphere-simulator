@@ -17,10 +17,18 @@ Run it::
 Python regeneration main already follows: rewriting a golden is a deliberate act whose
 diff is reviewed, never a side effect of running something. ⚠ Three of these are in a
 **freeze manifest** (two biosphere, plus ``sealed_energy_drift_summary`` in the station
-manifest since slice C5) and its ``golden_sha256`` is recorded but never
-compared, so a ``--write`` that moves a frozen golden desynchronises the manifest and
-turns *nothing* red. Re-run ``uv run python tests/test_freeze_manifest.py`` as part of
-the unfreeze ceremony — see ``docs/biosphere-reference.md``.
+manifest since slice C5), so a ``--write`` that moves a frozen golden desynchronises the
+manifest. Re-run the manifest writer as part of the unfreeze ceremony — from ``rust/``,
+``cargo run --example dump_biosphere_inventory -- --write-manifest``; see
+``docs/biosphere-reference.md``.
+
+⚠ **The half of that warning that said "turns *nothing* red" was true until slice C7 and
+is now false for the biosphere** (measured, not assumed: a moved golden was fed to the
+gate and it went red). ``tests/crossport/test_manifest_writer.py`` regenerates the
+manifest and compares the committed file byte for byte, and the writer hashes the
+goldens from disk — so a desynchronised hash is red rather than silent. **It is still
+true for the station**, whose manifest Python still writes and whose
+``golden_sha256`` is recorded and not compared.
 
 ⚠ **What this tool can and cannot establish, stated plainly.** While the two ports emit
 identical bytes, *no* byte-level check can tell which side produced a golden —

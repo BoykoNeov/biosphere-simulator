@@ -35,9 +35,19 @@ The integrator (Euler) and dt (1.0 day) have **no importable constant** — each
 regression run helper selects them inline — so they are *documented* in the manifest and
 *enforced* by the goldens (an RK4 or dt switch moves every golden), not asserted here.
 
-Regeneration is a deliberate, separate ``__main__`` action (the golden discipline): on
-an advisor-reviewed unfreeze, run ``uv run python tests/test_freeze_manifest.py`` and
-review the manifest diff. Zero ``simcore`` change (docs + tests only).
+⚠⚠ **SLICE C7 (2026-08-18) TOOK THE WRITER AWAY FROM THIS MODULE.** It used to own
+both halves: the completeness gate below *and* a ``__main__`` regeneration action that
+assembled and serialized the manifest. The manifest was therefore authored by the
+reference (slices 6, C4, C8, C9 moved key after key) and *written* by the checker —
+which is the Python-shaped hole C7 closes. Regeneration is now, from ``rust/``::
+
+    cargo run --example dump_biosphere_inventory -- --write-manifest
+
+and the committed file is held to it byte for byte by
+``tests/crossport/test_manifest_writer.py`` (cargo-gated, so this module stays offline).
+What is left here is a **checker**: the completeness gates, and the conformance checks
+that say the checker's own copies of the roster, the horizons, the flow/aux sets and the
+param census still agree with the reference's.
 
 ⚠⚠ **SLICE 6 OF THE REFERENCE FLIP (2026-08-16) CHANGED WHO PRODUCES THIS MANIFEST, AND
 THE HEADLINE IS *MIXED AUTHORITY*, NOT "IT IS RUST-ANCHORED NOW."** The keys the Rust
@@ -68,9 +78,7 @@ Two consequences worth stating where they will be read:
 import hashlib
 import json
 import re
-import subprocess
 import sys
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -157,10 +165,10 @@ _SCENARIOS: dict[str, tuple[str, str | int, str]] = {
 }
 
 #: The **checker's** horizon constants, under the reference's names. Used only by the
-#: conformance gate (:func:`test_python_horizons_match_the_reference`) — never by
-#: :func:`_build_manifest`, which reads the reference. The two must agree, and a gate
-#: says so; the point of keeping both is that a disagreement is visible rather than
-#: resolved by whichever side happened to be imported.
+#: conformance gate (:func:`test_python_horizons_match_the_reference`) — the manifest's
+#: numbers come from the reference's own constants, written by its writer. The two must
+#: agree, and a gate says so; the point of keeping both is that a disagreement is
+#: visible rather than resolved by whichever side happened to be imported.
 _PYTHON_HORIZONS: dict[str, int] = {
     "sealed_chamber_years": SEALED_CHAMBER_YEARS,
     "perennial_chamber_years": PERENNIAL_CHAMBER_YEARS,
@@ -180,105 +188,6 @@ _REFERENCE_GATE_COUNT = 13
 #: This manifest's scenario roster — the filter for the science-gate fields, so
 #: a gate naming a station scenario cannot silently land in the biosphere manifest.
 _ROSTER = frozenset(_SCENARIOS)
-
-
-#: The reference tree's own dump of the keys it can author — the producer half of this
-#: manifest since slice 6. Its doc comment is the authority on what it emits and why.
-_RUST_CRATE_DIR = _REPO_ROOT / "rust" / "crates" / "domains"
-_RUST_DUMP_EXAMPLE = "dump_biosphere_inventory"
-
-#: The keys :func:`_build_manifest` consumes out of that dump, asserted as its **exact**
-#: key set. ⚠ A forcing function, not a filter (slice 3's move, kept): a key added to
-# the : dump program turns regeneration into a loud error rather than silently entering
-# — or : silently *not* entering — the frozen surface. ``locked_dt_days`` is in the
-# dump and : deliberately not spliced; see :data:`_AUTHORITY` for ``dt_days``.
-#: The keys :func:`_build_manifest` consumes out of that dump, asserted as its **exact**
-#: key set. ⚠ A forcing function, not a filter (slice 3's move, kept through slices 6, 7
-#: and C8): a key added to the dump turns regeneration into a loud error rather than
-#: silently entering — or silently *not* entering — the frozen surface.
-#:
-#: ⚠⚠ ``param_files`` joined in **slice C8**, and until then this constant's own comment
-#: named it as the example of a key that must *never* arrive this way. That was right
-#: for its
-#: day and is now wrong: the reference read no YAML, so any list it printed was this one
-#: travelling out and back. Slice **C1** moved the loaders and **C8** the census +
-#: digest.
-#: The forcing function is what made the change deliberate rather than quiet — adding
-#: the key
-#: to the dump broke regeneration and the parity gate before anything was regenerated.
-#: ⚠ ``weather_sha256`` joined in **slice C9** and is the second key here that is
-#: emitted to be CHECKED and never spliced (``locked_dt_days`` is the first). The
-#: forcing hash stays Python-authored — see :data:`_AUTHORITY` — while the reference
-#: hashes what it compiled in, so the two can be compared.
-#: ⚠⚠ ``science_bands`` and ``liveness_floors`` joined in **slice C4**, and this
-#: constant's own comment named the science-gate census as the example of a key that
-#: "cannot honestly come from the reference" — see the raise below, which still says so
-#: and is now wrong about which census it means. It was right while the gates were
-#: pytest markers; the reference now declares them, one macro row per gate, and the row
-#: is the test. The forcing function is what made the change deliberate rather than
-#: quiet: adding the keys to the dump broke regeneration before anything was
-#: regenerated.
-_RUST_DUMP_KEYS = frozenset(
-    {
-        "flow_set",
-        "aux_set",
-        "horizons",
-        "light_path_samples",
-        "liveness_floors",
-        "locked_dt_days",
-        "param_files",
-        "science_bands",
-        "weather_sha256",
-    }
-)
-
-
-@lru_cache(maxsize=1)
-def _rust_reference() -> dict[str, Any]:
-    """Run the reference tree's inventory dump and parse its JSON.
-
-    ⚠ **Called only from :func:`_build_manifest`, i.e. only from the regeneration
-    ``__main__``.** No test in this module reaches it, so the base suite neither needs
-    ``cargo`` nor pays for a build. The gates that *do* compare this manifest against a
-    live Rust tree are cargo-gated and live in
-    ``tests/crossport/test_inventory_parity.py``.
-    """
-    # ⚠⚠ `encoding="utf-8"`, and it is NOT boilerplate. `text=True` alone decodes
-    # the pipe with `locale.getpreferredencoding()` — cp1252 on the Windows dev box
-    # — and every byte this program emitted was ASCII (names, hex floats, sha-256
-    # digests) until slice C4, so the pipe's encoding had never mattered. The
-    # science census is the first non-ASCII key: it carries `—`, `⚠`, `Γ` and `CO₂`
-    # inside frozen claim text. Without this the first regeneration wrote mojibake
-    # (`—` -> `â€”`) INTO the frozen contract, and nothing was red — the manifest
-    # and the checker agreed, because the corruption happened on the way in. It was
-    # caught by predicting the diff before regenerating, which is the only reason it
-    # is a note here instead of a committed contract.
-    proc = subprocess.run(
-        ["cargo", "run", "-q", "--example", _RUST_DUMP_EXAMPLE],
-        cwd=_RUST_CRATE_DIR,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        check=False,
-    )
-    if proc.returncode != 0:
-        raise SystemExit(
-            f"cargo run --example {_RUST_DUMP_EXAMPLE} failed — the manifest is "
-            f"regenerated FROM the Rust reference since slice 6 of the reference flip, "
-            f"so regeneration needs a working Rust toolchain:\n{proc.stderr}"
-        )
-    dump: dict[str, Any] = json.loads(proc.stdout)
-    if set(dump) != _RUST_DUMP_KEYS:
-        raise SystemExit(
-            f"{_RUST_DUMP_EXAMPLE} emitted {sorted(dump)}, expected "
-            f"{sorted(_RUST_DUMP_KEYS)}. Read _AUTHORITY before widening this: a new "
-            "key has to be classified, and one that cannot honestly come from the "
-            "reference must not enter the manifest through here. ⚠ This sentence used "
-            "to name 'a pytest-marker census' as that example; slice C4 moved exactly "
-            "that census, so the test to apply is whether the reference DERIVES the "
-            "key, not which language used to hold it."
-        )
-    return dump
 
 
 def _normalized_sha256(path: Path) -> str:
@@ -408,313 +317,11 @@ def _frozen_param_files() -> list[str]:
 #: fold is the artifact). A top-level classification would hide exactly that.
 #:
 #: ⚠ The three sides are claims of different kinds. ``rust`` — produced by the reference
-#: tree and spliced in by :func:`_build_manifest`. ``python`` — produced by the checker
+#: tree, which since slice C7 also writes the file. ``python`` — produced by the checker
 #: because the reference has no referent for it, with the reason stated and, where one
 #: exists, the condition under which that could change. ``hand`` — a literal or a label
 #: deliberately derived from neither, because a contract field that imports its own
 # value : auto-follows the code.
-_AUTHORITY: dict[str, dict[str, str]] = {
-    "_comment": {"side": "hand", "why": "prose header"},
-    "frozen_at_phase": {"side": "hand", "why": "the phase this surface froze at"},
-    "reference_doc": {
-        "side": "hand",
-        "why": "pointer to the prose half of the contract",
-    },
-    "integrator": {
-        "side": "hand",
-        "why": (
-            "one of the two deliberate anti-derived literals. Unlike dt_days it has no "
-            "importable constant on EITHER side — each run helper selects the scheme "
-            "inline — so it is documented here and enforced by the goldens (an RK4 "
-            "switch moves every one). A literal typed into the Rust dump to make the "
-            "pair symmetric would read like a gate and be none."
-        ),
-    },
-    "dt_days": {
-        "side": "hand",
-        "why": (
-            "the second anti-derived literal: a manifest that imported BIO_DT would "
-            "auto-follow a step change, which is the opposite of a freeze — the "
-            "2026-08-14 step move became a ceremony only because this literal went red."
-            "Slice 6 added the missing half instead: the crossport gate checks it "
-            "against the REFERENCE tree's BIO_DT, so moving Rust's step without the "
-            "ceremony is red rather than silent."
-        ),
-    },
-    "long_horizon_years": {
-        "side": "rust",
-        "why": "the reference tree's LONG_HORIZON_YEARS",
-    },
-    "flow_set": {
-        "side": "rust",
-        "why": (
-            "the union of Flow::type_name() over the four canonical builds in the "
-            "reference tree — derived from built registries, never hand-listed"
-        ),
-    },
-    "aux_set": {
-        "side": "rust",
-        "why": "the same walk over AuxProcess::type_name()",
-    },
-    "forcing/light_path": {
-        "side": "rust",
-        "why": (
-            "sha-256 of the reference tree's own light-path samples. Measured on "
-            "2026-08-16 before re-anchoring: Rust reproduces all twelve hex-float "
-            "samples byte for byte, so the hash did not move — this key is gated "
-            "exactly, not tolerance-bound, and could not have been re-anchored on a "
-            "prediction."
-        ),
-    },
-    "forcing/weather_fixture": {
-        "side": "python",
-        "why": (
-            "⚠ THE REASON CHANGED IN SLICE C9, THOUGH THE SIDE DID NOT. Until C9 the "
-            "port read weather_facts.txt, a Python-generated copy — so it had no "
-            "referent for the fixture at all. It now reads the fixture JSON directly. "
-            "The side stays python because the reference embeds it with a compile-time "
-            "include_str!, so it knows the BYTES and not the NAME: a Rust-authored "
-            "filename would be a hand-typed duplicate of the include path, a literal "
-            "dressed as a derivation. The condition under which this changes is named "
-            "and scheduled — the relocation slice moves the fixture out of tests/ to a "
-            "data home the reference can read at runtime, as C8's param census already "
-            "does, and then the name is derivable and this key re-anchors WITH "
-            "weather_sha256 rather than splitting the pair"
-        ),
-    },
-    "forcing/weather_sha256": {
-        "side": "python",
-        "why": (
-            "⚠ NO LONGER 'not compared' — that clause died in slice C9. The hash is "
-            "still the checker's, computed over the file it finds on disk, and it does "
-            "not re-anchor alone for the reason given under weather_fixture. What C9 "
-            "adds is the missing half, exactly as slice 6 did for dt_days: the "
-            "reference now emits a sha-256 of the fixture text it COMPILED IN "
-            "(dump_biosphere_inventory's weather_sha256, emitted for checking and "
-            "never spliced), and test_the_weather_hash_matches_the_reference_tree "
-            "fails if the two sides ever stop reading the same bytes"
-        ),
-    },
-    "param_files/*": {
-        "side": "rust",
-        "why": (
-            "⚠ RE-ANCHORED IN SLICE C8, AND WHAT MOVED IS THE RULE, NOT THE NUMBER. The"
-            " "
-            "23 digits across the two manifests are author-neutral by construction — "
-            "both "
-            "sides hash the same file with the same rule, which is why re-anchoring "
-            "moved "
-            "not one of them (measured first, then done). Two rules did move to the "
-            "reference. (1) The CENSUS: this is now the set the reference actually "
-            "LOADS "
-            "(domains::biosphere::params::param_files, a compile-time include_str! "
-            "list) "
-            "rather than a non-recursive glob of a Python package directory minus "
-            "demo.yaml — so a file wired into no loader drops OUT of the manifest "
-            "instead "
-            "of staying in it. The 15-of-20 rule survives with its two different "
-            "exclusion reasons (four crops/potato overrides by non-recursion, demo.yaml"
-            " "
-            "by name), asserted Rust-side against the directory. (2) The NORMALIZATION:"
-            " "
-            "config::provenance, a hand-rolled sha-256 (every engine crate is zero-dep "
-            "by "
-            "charter) over LF-normalized text. That rule is load-bearing TODAY, not in "
-            "principle: include_str! embeds the WORKING TREE, and one frozen file "
-            "(senescence.yaml) is CRLF on the dev box while the git index is LF "
-            "everywhere — so the un-normalized hash would differ between that box and "
-            "Linux CI. Python's helpers are retained as conformance checks on the "
-            "checker. Prerequisite: slice C1, which gave the reference the loaders."
-        ),
-    },
-    "science_bands/*": {
-        "side": "rust",
-        "why": (
-            "⚠⚠ RE-ANCHORED IN SLICE C4, AND THIS ENTRY USED TO SAY IT COULD NOT "
-            "BE. Its own text read 'a static AST census of science_gate markers on "
-            "pytest functions. There is no Rust referent and there cannot be one while "
-            "the science gates are pytest-side' — true of pytest markers, false of the "
-            "claim it appeared to make. The census's requirement is that it be DERIVED "
-            "from the tree rather than hand-listed; Python met it by parsing "
-            "decorators with ast, and the reference meets it by making the declaration "
-            "and the #[test] ONE THING (the science_gates! macro in "
-            "rust/crates/domains/src/biosphere/science_gates.rs emits both the roster "
-            "row and the test that executes it), so an unexercised entry is a compile "
-            "error rather than something a meta-test hunts textually. Together with "
-            "liveness_floors this is about half the manifest by content — the single "
-            "largest block of any contract to change hands. ⚠ What moved is the CLAIMS "
-            "and their LOCI, not the values: the 13 quantity/bound/source strings are "
-            "byte-identical to the Python census's and every gate's verdict was "
-            "measured identical on both ports BEFORE the port was written (§5j). ⚠ The "
-            "KEY SET is still the checker's: which scenarios get an entry, and which "
-            "get an explicitly empty list meaning 'measured, none', is this manifest's "
-            "own hand roster, and a Rust gate naming a scenario outside it RAISES "
-            "during regeneration rather than being filtered away. ⚠ Two markers did "
-            "NOT move: crew_mission and sealed_station are station-manifest keys whose "
-            "referents the reference does not carry yet, and they are slice C4b."
-        ),
-    },
-    "liveness_floors/*": {
-        "side": "rust",
-        "why": (
-            "the same census, for the bounds tuned to our own calibration rather than "
-            "to an outside source — re-anchored with it in slice C4. ⚠ This is the "
-            "family that has already been retuned twice, so it is the one the "
-            "bound-literal check was written for: every numeric literal in a recorded "
-            "bound must appear textually in the file its locus names, and that check "
-            "now runs on BOTH sides (Rust's the_bound_literals_appear_at_their_locus "
-            "and the checker's "
-            "test_science_gate_bounds_name_a_literal_present_at_their_locus). ⚠ One "
-            "Python test carried TWO markers through a parametrization; in the "
-            "reference the row IS the test, so it became two tests with two loci. Same "
-            "claims, same numbers, one more locus string."
-        ),
-    },
-    "scenarios/*/scenario": {
-        "side": "hand",
-        "why": "a human label for the scenario, not an identifier anything resolves",
-    },
-    "scenarios/*/years": {
-        "side": "rust",
-        "why": "the reference tree's horizon constant",
-    },
-    "scenarios/*/golden": {"side": "hand", "why": "the artifact's filename"},
-    "scenarios/*/golden_sha256": {
-        "side": "rust",
-        "why": (
-            "the golden is the reference tree's own output (golden_platform."
-            "RUST_AUTHORED, which this block is checked against, not restating). "
-            "Unlike "
-            "the other hashes here this one IS gated against the file on disk: a "
-            "golden is machine-generated and its hash is newline-normalized, so 'the "
-            "manifest pins bytes that exist' is a completeness claim, not the value "
-            "re-assertion that param_files declines."
-        ),
-    },
-    "scenarios/drift_summary/golden_sha256": {
-        "side": "python",
-        "why": (
-            "⚠ ONE RUN, TWO AUTHORS. This is drift.py's Python-side fold of the same "
-            "15-yr perennial trajectory whose final state Rust authors next door, and "
-            "the two engines differ by 1 ULP on it. The fold is the artifact, and its "
-            "correct reference is Python's own output — so the golden axis is not '6 "
-            "Rust, 1 folded' scenario by scenario."
-        ),
-    },
-}
-
-
-def _science_census(reference: dict[str, Any], field: str) -> dict[str, list[dict]]:
-    """The reference's science-gate claims, filed under **this** manifest's roster.
-
-    ⚠ The skeleton is built first and every roster scenario gets a key, because an
-    absent key and a deliberately-empty one are different claims: an empty list says
-    "measured, none" and a missing one says nothing, and a reader using
-    ``.get(name, [])`` cannot tell them apart. ``drift_summary`` is the case that forces
-    it — a derived stability signature over two scenarios that are themselves in the
-    roster, carrying no gate of its own.
-
-    ⚠ A gate naming a scenario outside the roster **raises**. That is the whole reason
-    this is not a ``setdefault``-shaped merge: the biosphere and station manifests both
-    filter by scenario, so a typo or a gate on authored content would otherwise be
-    dropped by both in silence — the filter looking exactly like a clean result. The
-    Python census has had ``unknown_scenarios`` for this since the fields existed; the
-    splice needs its own, because the roster it filters against lives here.
-    """
-    out: dict[str, list[dict]] = {name: [] for name in sorted(_ROSTER)}
-    for scenario, entries in reference[field].items():
-        if scenario not in out:
-            raise SystemExit(
-                f"{_RUST_DUMP_EXAMPLE} emitted a {field} gate on {scenario!r}, "
-                f"which is not in this manifest's roster {sorted(_ROSTER)}. "
-                "Either the roster "
-                "moved or the gate names the wrong scenario — both are decisions, and "
-                "neither may be resolved by dropping the claim."
-            )
-        out[scenario] = list(entries)
-    return out
-
-
-def _build_manifest() -> dict[str, object]:
-    """Assemble the manifest — the reference tree's keys spliced into the checker's.
-
-    ⚠ Since slice 6 this reads the **Rust** tree for everything :data:`_AUTHORITY` marks
-    ``rust``, so it needs ``cargo``. It is reachable only from :func:`_regenerate`.
-    """
-    reference = _rust_reference()
-    horizons = reference["horizons"]
-    scenarios: dict[str, object] = {}
-    for name, (label, horizon, golden) in _SCENARIOS.items():
-        scenarios[name] = {
-            "scenario": label,
-            "years": horizon if isinstance(horizon, int) else horizons[horizon],
-            "golden": golden,
-            "golden_sha256": _normalized_sha256(GOLDEN_DIR / golden),
-        }
-    return {
-        "_authority": _AUTHORITY,
-        "_comment": (
-            "Phase-4 freeze manifest (P4.3). Names the frozen biosphere reference "
-            "surface. See docs/biosphere-reference.md for the freeze contract + the "
-            "unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE "
-            "(value enforcement is the scenario goldens). Each key's producer and why "
-            "is in _authority: this file has MIXED authority since slice 6 of the "
-            "reference flip. Regenerate on a deliberate unfreeze: uv run python "
-            "tests/test_freeze_manifest.py — which now shells cargo, because the "
-            "_authority 'rust' keys are read from the reference tree."
-        ),
-        "frozen_at_phase": 4,
-        "reference_doc": "docs/biosphere-reference.md",
-        "integrator": "EulerIntegrator",
-        # ⚠ A SECOND hand-maintained literal, and it is not the gate — the gate is the
-        # separate literal in test_manifest_declares_locked_integrator_and_dt. The two
-        # must be edited together, and the assertion is what forces you to notice: on
-        # 2026-08-14 the step moved to 1/4, this line was missed, and the regenerated
-        # manifest still read 1.0 until the assertion went red. That is the design
-        # working. Do not "simplify" either one to import BIO_DT.
-        "dt_days": 0.25,
-        "long_horizon_years": horizons["long_horizon_years"],
-        "flow_set": reference["flow_set"],
-        "aux_set": reference["aux_set"],
-        "forcing": {
-            "weather_fixture": WEATHER_FIXTURE.name,
-            "weather_sha256": _normalized_sha256(WEATHER_FIXTURE),
-            # The within-day PAR shape — see _light_path_fingerprint for why a hash of
-            # sampled values rather than a name. Unlike the two hashes above (provenance
-            # only, never compared), this one IS gated:
-            # test_manifest_pins_the_within_day_light_path. ⚠ Since slice 6 the samples
-            # are the REFERENCE tree's; only the hashing is done here, because that is
-            # pure formatting and the Rust crate carries no digest dependency.
-            "light_path": _fingerprint(reference["light_path_samples"]),
-        },
-        # ⚠⚠ SLICE C8: spliced from the REFERENCE, not derived here. The Python
-        # helpers that used to build this (`_frozen_param_files` +
-        # `_normalized_sha256` over PARAMS_DIR) are retained as **conformance
-        # checks** on the checker — see
-        # test_the_frozen_param_set_matches_the_reference_census. The values are
-        # author-neutral either way (both sides digest the same file); what moved is
-        # the CENSUS rule and the NORMALIZATION rule. See _AUTHORITY.
-        "param_files": reference["param_files"],
-        # ⚠⚠ SLICE C4: the science-gate census is spliced from the REFERENCE.
-        # ``gates_for`` is retained as a conformance check on the checker (see
-        # test_the_python_science_census_is_only_the_station_pair) — it now returns the
-        # two station markers and nothing of this manifest's.
-        "science_bands": _science_census(reference, "science_bands"),
-        "liveness_floors": _science_census(reference, "liveness_floors"),
-        "scenarios": scenarios,
-    }
-
-
-def _manifest_dumps(manifest: dict[str, object]) -> str:
-    """Serialize the manifest to canonical JSON — the project golden discipline.
-
-    ``indent=2, sort_keys=True`` + a trailing newline, matching ``sim_io.dumps`` and the
-    drift-summary golden, so the manifest reads and diffs like every other committed
-    snapshot in the repo.
-    """
-    return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
-
-
 def _load_manifest() -> dict[str, Any]:
     # The committed manifest as parsed JSON (values are Any — the gate reads the frozen
     # sets out of it; pyright would otherwise type every value as ``object``).
@@ -1039,6 +646,30 @@ def test_python_horizons_match_the_reference() -> None:
         assert manifest["scenarios"][name]["years"] == expected, name
 
 
+def test_the_frozen_roster_is_the_references() -> None:
+    """The scenario table, checker's copy against the file the reference writes.
+
+    ⚠ **New in slice C7, and it closes a hole the slice opened.** The roster —
+    ``name -> (label, horizon, golden)`` — used to live here *and* be written from here,
+    so no gate was needed: the manifest could not disagree with its own source. C7 moved
+    the writer, and the table went with it. What is left in this module is a second copy
+    with nothing holding it to the first, which is the shape the repo keeps re-learning
+    (*a rule with two copies has one that is stale*).
+
+    ⚠ Names alone were already compared (:func:`test_every_roster_scenario_has_an_
+    explicit_science_gate_entry`) and the run lengths separately
+    (:func:`test_python_horizons_match_the_reference`). Unchecked were the two fields
+    ``_authority`` marks ``hand`` — the human label and the golden's filename — and a
+    hand field is exactly the one a gate cannot re-derive if it drifts.
+    """
+    manifest = _load_manifest()
+    assert set(manifest["scenarios"]) == set(_SCENARIOS)
+    for name, (label, _horizon, golden) in _SCENARIOS.items():
+        entry = manifest["scenarios"][name]
+        assert entry["scenario"] == label, name
+        assert entry["golden"] == golden, name
+
+
 def test_manifest_named_files_exist() -> None:
     # Every golden, param, and forcing file the manifest names is present on disk — a
     # renamed or deleted frozen artifact fails here, not as a mysterious load error
@@ -1064,11 +695,19 @@ def _leaf_paths(node: Any, prefix: str = "") -> list[str]:
     return [prefix.rstrip("/")]
 
 
-def _authority_matches(path: str) -> list[tuple[int, str, dict[str, str]]]:
-    """Every ``_AUTHORITY`` pattern matching ``path``, with its specificity score."""
+def _authority_matches(
+    path: str, authority: dict[str, dict[str, str]]
+) -> list[tuple[int, str, dict[str, str]]]:
+    """Every ``_authority`` pattern matching ``path``, with its specificity score.
+
+    ⚠ Takes the block as an argument since slice C7. It used to read a module-level
+    ``_AUTHORITY`` literal that the writer spliced into the manifest and a test then
+    compared back — with the writer gone there is no second copy, and a checker that
+    kept one would be asserting a duplicate against the file it duplicates.
+    """
     segments = path.split("/")
     matches = []
-    for pattern, entry in _AUTHORITY.items():
+    for pattern, entry in authority.items():
         parts = pattern.split("/")
         if len(parts) != len(segments):
             continue
@@ -1078,9 +717,11 @@ def _authority_matches(path: str) -> list[tuple[int, str, dict[str, str]]]:
     return matches
 
 
-def _authority_for(path: str) -> tuple[str, dict[str, str]] | None:
-    """Resolve a leaf path against :data:`_AUTHORITY`, most specific wins."""
-    matches = _authority_matches(path)
+def _authority_for(
+    path: str, authority: dict[str, dict[str, str]]
+) -> tuple[str, dict[str, str]] | None:
+    """Resolve a leaf path against the manifest's ``_authority``, most specific wins."""
+    matches = _authority_matches(path, authority)
     if not matches:
         return None
     score, pattern, entry = max(matches, key=lambda m: m[0])
@@ -1097,13 +738,14 @@ def test_every_frozen_field_declares_who_produced_it() -> None:
     not.
     """
     manifest = _load_manifest()
+    authority = manifest["_authority"]
     classified = {k: v for k, v in manifest.items() if k != "_authority"}
     paths = _leaf_paths(classified)
-    unclassified = [p for p in paths if _authority_for(p) is None]
+    unclassified = [p for p in paths if _authority_for(p, authority) is None]
     assert not unclassified, (
         f"frozen fields with no _authority entry: {unclassified}. Every field of this "
-        "contract has to say which side produces it — see _AUTHORITY in "
-        "tests/test_freeze_manifest.py."
+        "contract has to say which side produces it — see the AUTHORITY table in "
+        "rust/crates/domains/examples/dump_biosphere_inventory.rs, which writes it."
     )
 
     # ⚠ "Most specific wins" only decides anything while no two patterns TIE. Two of
@@ -1112,21 +754,31 @@ def test_every_frozen_field_declares_who_produced_it() -> None:
     # There is no such pair today (`scenarios/drift_summary/golden_sha256` beats
     # `scenarios/*/golden_sha256` 3-2); this keeps it that way (advisor).
     for path in paths:
-        top = max(s for s, _, _ in _authority_matches(path))
-        tied = sorted(p for s, p, _ in _authority_matches(path) if s == top)
+        top = max(s for s, _, _ in _authority_matches(path, authority))
+        tied = sorted(p for s, p, _ in _authority_matches(path, authority) if s == top)
         assert len(tied) == 1, (
             f"{path} is matched by {len(tied)} _authority patterns of equal "
             f"specificity: {tied}. Which one applies would be decided by dict order — "
             "make one of them strictly more specific."
         )
 
-    matched = {_authority_for(p)[0] for p in paths}  # type: ignore[index]
-    stale = sorted(set(manifest["_authority"]) - matched)
+    matched = {_authority_for(p, authority)[0] for p in paths}  # type: ignore[index]
+    stale = sorted(set(authority) - matched)
     assert not stale, f"_authority patterns matching no field: {stale}"
-    assert manifest["_authority"] == _AUTHORITY, (
-        "the committed _authority block is not the one this module would write — "
-        "regenerate the manifest"
-    )
+
+    # ⚠ What replaced the fourth check, and why it is not a weakening. Until slice C7
+    # this ended with ``manifest["_authority"] == _AUTHORITY`` — the committed block
+    # against the module's own literal. C7 deleted the literal with the rest of the
+    # writer, and keeping a copy purely to assert against would be the stale second copy
+    # this repo has been bitten by. What is checkable from here is the block's SHAPE,
+    # and
+    # a malformed row is the failure the equality never caught either: a row is
+    # ``{side, why}``, ``side`` is one of the three the contract defines, and ``why`` is
+    # prose someone wrote rather than an empty string standing in for a reason.
+    for pattern, entry in sorted(authority.items()):
+        assert set(entry) == {"side", "why"}, (pattern, sorted(entry))
+        assert entry["side"] in {"rust", "python", "hand"}, (pattern, entry["side"])
+        assert len(entry["why"]) > 10, (pattern, entry["why"])
 
 
 def test_golden_authority_agrees_with_the_rust_authored_roster() -> None:
@@ -1143,7 +795,9 @@ def test_golden_authority_agrees_with_the_rust_authored_roster() -> None:
 
     manifest = _load_manifest()
     for name, entry in manifest["scenarios"].items():
-        side = _authority_for(f"scenarios/{name}/golden_sha256")[1]["side"]  # type: ignore[index]
+        side = _authority_for(  # type: ignore[index]
+            f"scenarios/{name}/golden_sha256", manifest["_authority"]
+        )[1]["side"]
         expected = "rust" if entry["golden"] in RUST_AUTHORED else "python"
         assert side == expected, (
             f"scenarios/{name}/golden_sha256 is classified {side!r}, but "
@@ -1196,23 +850,6 @@ def test_manifest_declares_locked_integrator_and_dt() -> None:
     assert manifest["dt_days"] == 0.25
 
 
-def _regenerate() -> None:
-    """Rewrite the committed manifest from the current live tree.
-
-    A deliberately separate, explicit action — NOT reachable from a test run. Run via::
-
-        uv run python tests/test_freeze_manifest.py
-
-    Review the diff before committing: a change means the frozen surface moved (a new
-    flow / param / scenario, a moved horizon, or a frozen file's content) — i.e. an
-    **unfreeze**, which the discipline in docs/biosphere-reference.md governs. Written
-    via ``write_bytes`` (explicit LF, like the goldens) so the manifest is byte-stable
-    across platforms.
-    """
-    MANIFEST_PATH.write_bytes(_manifest_dumps(_build_manifest()).encode("utf-8"))
-    print(f"wrote {MANIFEST_PATH}")
-
-
 def test_manifest_pins_the_within_day_light_path() -> None:
     """⚠ The one hash in ``forcing`` that IS compared, and why it has to be.
 
@@ -1228,6 +865,3 @@ def test_manifest_pins_the_within_day_light_path() -> None:
     manifest = _load_manifest()
     assert manifest["forcing"]["light_path"] == _light_path_fingerprint()
 
-
-if __name__ == "__main__":
-    _regenerate()

@@ -5,8 +5,9 @@ READING A FAILURE.** Slice 3 built both as *parity* checks with two independent 
 Slice 6 re-anchored the **biosphere** manifest to the Rust tree and slice 7 the
 **station** one, so for both:
 
-* **a STALENESS check.** The manifest is generated *from* this dump (each contract's
-  `_build_manifest` shells the same example), so a disagreement no longer means "the
+* **a STALENESS check.** The manifest is generated from the same derivations this dump
+  prints — since slice C7 the biosphere's is written by the reference itself, the
+  station's still by the checker — so a disagreement no longer means "the
   ports differ" — it means **the committed manifest is out of date with the reference
   tree**, i.e. something was added to the reference and never frozen. That is the
   completeness axis, re-homed to the side that now owns it. Python's conformance to the
@@ -243,10 +244,15 @@ def test_rust_inventory_equals_the_frozen_manifest(
     ceremony = (
         "docs/biosphere-reference.md" if biosphere else "docs/station-reference.md"
     )
+    # ⚠ The two contracts regenerate differently since slice C7, and the branch is the
+    # slice's own progress showing through: the biosphere manifest is written by the
+    # reference, the station's is still written by the checker. When the station writer
+    # lands this collapses back to one string — and until it does, printing the wrong
+    # command is exactly the "correct assertion, wrong advice" failure slice 5 recorded.
     regen = (
-        "tests/test_freeze_manifest.py"
+        "cd rust && cargo run --example dump_biosphere_inventory -- --write-manifest"
         if biosphere
-        else "tests/test_station_freeze_manifest.py"
+        else "uv run python tests/test_station_freeze_manifest.py"
     )
     selection = (
         ""
@@ -264,7 +270,7 @@ def test_rust_inventory_equals_the_frozen_manifest(
         f"{selection}⚠ This manifest is generated FROM this dump, so this is NOT a "
         "port-vs-port divergence: the reference tree has changed and the committed "
         f"manifest has not been regenerated. That is an unfreeze — follow the ceremony "
-        f"in {ceremony}, then `uv run python {regen}`. If you did not mean to change "
+        f"in {ceremony}, then `{regen}`. If you did not mean to change "
         "the frozen surface, the finding is whatever added or removed the name."
     )
     for axis in sorted(_COMPARED_AXES):
@@ -524,6 +530,18 @@ def test_the_dump_key_sets_are_the_ones_the_generators_consume() -> None:
     move here: the generators own the definition, this asserts agreement, and nobody
     writes a third copy.
 
+    ⚠⚠ **THE BIOSPHERE ROW LEFT IN SLICE C7, AND ITS ABSENCE IS THE POINT.** That
+    contract has no generator to tie to any more: the reference writes the manifest
+    itself, so nothing *consumes* the dump, so there is no second copy of its key set
+    and a row here would be comparing this module against itself. What replaced the
+    forcing function is not this test — it is ``set(dump) == dump_keys`` in
+    :func:`test_rust_inventory_equals_the_frozen_manifest` (a new dump key still stops
+    the gate until someone classifies it) and, for the manifest side,
+    ``tests/crossport/test_manifest_writer.py``, which compares the whole committed file
+    against a regeneration. ⚠ This row does **not** come back when the station and
+    authoring writers land; those two rows *leave* with them, and this test goes with
+    the last one.
+
     Imported inside the test (with ``tests/`` put on the path the way this directory
     already reaches ``golden_platform``) so importing the generators is not a collection
     -time cost for the rest of the file.
@@ -532,11 +550,9 @@ def test_the_dump_key_sets_are_the_ones_the_generators_consume() -> None:
 
     sys.path.insert(0, str(REPO_ROOT / "tests"))
     import test_authoring_freeze_manifest  # noqa: PLC0415
-    import test_freeze_manifest  # noqa: PLC0415
     import test_station_freeze_manifest  # noqa: PLC0415
 
     for label, mine, theirs in (
-        ("biosphere", _BIOSPHERE_DUMP_KEYS, test_freeze_manifest._RUST_DUMP_KEYS),
         ("station", _STATION_DUMP_KEYS, test_station_freeze_manifest._RUST_DUMP_KEYS),
         (
             "authoring",

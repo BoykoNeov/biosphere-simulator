@@ -94,6 +94,17 @@ pub fn normalized_sha256(text: &str) -> String {
     hex(&sha256(normalize_newlines(text).as_bytes()))
 }
 
+/// sha-256 of `message` as lowercase hex, with **no** newline normalization.
+///
+/// The normalized form above is for *files*, whose line endings are a checkout artifact.
+/// This is for text the reference itself assembled — the light-path fingerprint, which is
+/// hex-float samples joined by `|` and therefore has no line endings to normalize. Added
+/// in slice C7, so the manifest writer does not have to route a newline-free string
+/// through a rule about newlines to say what it means.
+pub fn sha256_hex(message: &[u8]) -> String {
+    hex(&sha256(message))
+}
+
 fn hex(digest: &[u8; 32]) -> String {
     let mut out = String::with_capacity(64);
     for byte in digest {

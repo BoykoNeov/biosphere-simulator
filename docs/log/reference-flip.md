@@ -1474,3 +1474,148 @@ edited, because that would be a value change rather than a locus re-anchoring.
 
 Full detail, including the five negative controls: `docs/plans/post-roadmap-reference-flip.md`
 §5l.
+
+### C7 — the manifest writer moves to the reference; the biosphere half (2026-08-18)
+
+The last Stage-2 slice, and the one whose absence made the flip's own headline false. The
+three frozen contracts were *authored* by the reference key by key — slices 6, C4, C8, C9
+each moved a block — and **written** by the checker:
+`tests/test_freeze_manifest.py::_build_manifest()` shelled the reference's dump, spliced
+its keys into its own, serialized, and wrote the file. A contract whose first line says
+Rust is the reference had a Python program in the middle of it.
+
+Biosphere only. The order — biosphere → authoring → C4b → station — was set before any
+code, and the station half has a **measured prerequisite**: its two science claims (the
+respiratory-quotient comparison and the thermal node's non-collapse floor) have no Rust
+referent, and a writer that cannot derive them must not hand-carry them. **C4b is a
+prerequisite of C7's station half, not a follow-up** — the C5-before-C4 shape again.
+
+#### The objection that dissolved: does moving the writer make everything Rust-authored?
+
+It looked like the blocker and the tree had already answered it. `_authority` records **who
+produced the value**, not who ran the digest and not who wrote the file — and the
+precedent was sitting inside the block being worried about:
+`scenarios/*/golden_sha256` has read **`rust`** since slice 4 while *Python* computed the
+digest, because the golden is the reference's own output. The mirror image now holds: this
+program hashes `drift_summary.json` without becoming its author, exactly as Python hashed
+six Rust-authored goldens without becoming theirs.
+
+So the move is authority-neutral by construction. No schema change, and the two rows that
+*did* change side changed for their own stated reasons, not as a side effect.
+
+#### The gating measurement, and it came back free
+
+The question was whether Rust can reproduce `json.dumps(indent=2, sort_keys=True) + "\n"`
+byte for byte. Measured across all three manifests before designing anything: **no
+character above the basic plane** (so no surrogate-pair logic — the writer panics on one
+rather than carrying code no test could exercise), 232 `\uXXXX` escapes in lowercase hex,
+39 empty containers, 15 `null`s, and **exactly one number that is not an integer** — the
+frozen step `0.25`, itself a hand literal. That last one is why the float-formatting risk
+(`repr` vs `{}` on values like `1e-05`) never arises.
+
+**Byte-identical on the first run.** The writer move moved no byte of the contract.
+
+#### ⚠⚠ The finding: the trap this slice sets is invisible to the gate that guards it
+
+`dt_days` is frozen by hand on purpose — a manifest that read `BIO_DT` would auto-follow a
+step change, which is the opposite of a freeze, and the 2026-08-14 step move became a
+ceremony only because that literal went red. C7 moves the writer **into the crate that owns
+`BIO_DT`**, where splicing it in is a one-character edit.
+
+Measured, not argued: replacing `Json::num("0.25")` with `Json::num(format!("{BIO_DT}"))`
+produces a **byte-identical manifest**. So C7's own gate — regenerate and compare — is
+blind to it, and so is the cross-port check that compares the frozen literal against
+`BIO_DT`, which compares equal either way. What that check protects is the *ceremony*, and
+the ceremony exists only while the literal is typed.
+
+This is the step unfreeze's lesson recurring in a new place: *no test at `dt = 1` can tell
+a correct conversion from a wrong one, because the two are the same integer.* Two guards,
+because neither alone is enough — the serializer's `Number` is constructed only from
+**text** (`Json::num` takes no `f64`, so splicing is a visible `format!` rather than a
+silent coercion), and `rust/crates/domains/tests/manifest_writer.rs` reads the writer's own
+source and asserts the emission site is a quoted literal that does not mention `BIO_DT`.
+⚠ That test's own control earned its keep immediately: the first anchor was the bare key
+`"dt_days"`, which matches **two** lines — the emission site and the `_authority` row that
+classifies it — so the check would have read whichever came first.
+
+#### Deleting the Python writer reddened nothing — and the deletion opened a hole
+
+Asked before deleting, per the authoring slice's lesson: `_build_manifest` is reachable
+only from `_regenerate`, reachable only from `__main__`, invoked by no test. **A control
+with no test to turn red IS the finding**, recorded rather than quietly fixed.
+
+But the deletion did more than remove dead code. The **scenario roster** (`name -> label,
+horizon, golden`) lived in the Python module *and was written from it*, so it needed no
+gate: the manifest could not disagree with its own source. Moving the writer turned one
+source into **two copies with nothing holding them together** — and the two fields at risk
+are exactly the ones `_authority` marks `hand`, the human label and the golden's filename,
+which no gate can re-derive if they drift. Names were already compared; run lengths were
+already compared; those two were not. `test_the_frozen_roster_is_the_references` closes it,
+and a control confirms it reddens.
+
+A second duplication was caught and removed rather than gated: the first draft had the
+writer re-walk the registries, putting two derivations of the same flow/aux sets in one
+file. Sharing one walk makes the drift impossible instead of merely detectable, and costs
+the parity gate nothing — its subject is staleness, the live tree against the frozen file,
+not one code path against another.
+
+#### The deliberate diff: five lines, and no value
+
+Two reclassifications were taken as a visible, stated diff rather than smuggled into the
+re-anchoring. `forcing/weather_fixture` moves `python` → **`hand`**: C9's finding stands
+(the reference `include_str!`s the fixture, so it knows the bytes and not the name), and
+while the checker wrote the file `python` fairly described who typed the name — once it
+does not touch the file, `python` names a producer that is not there. `forcing/weather_sha256`
+moves `python` → **`rust`**, and it is free *now* precisely because C9 declined to do it:
+C9 would have had to split the pair while the name had no Rust referent, and a gate has
+held the two sides' bytes equal ever since. `_comment` changed because it names the
+regeneration command, which was about to become false.
+
+`git diff --stat`: 5 insertions, 5 deletions. No hash, set, claim or bound moved.
+
+#### What the new gate catches that nothing did before
+
+`tests/crossport/test_manifest_writer.py` regenerates into a temp file and compares
+**bytes**. The existing parity gate compares derived sets axis by axis and says nothing
+about the hand-authored half, the serialization, or the keys the checker still authors. So
+three failures became visible, and one of them is not new but was never watched: **a hand
+edit to the committed manifest.** It is a generated artifact, and before C7 a typo in
+`_comment` or a hand-patched hash simply stood.
+
+⚠ Measured while checking it: a warning in `regen_goldens_from_rust.py` that a `--write`
+moving a frozen golden *"turns nothing red"* is now **false for the biosphere** — the
+writer hashes the goldens from disk, so the regenerated manifest differs and the gate is
+red. It remains true for the station. Corrected there rather than left standing.
+
+#### And the pipe is gone
+
+The file is written with `std::fs::write`, not printed for the checker to capture. C4's
+first regeneration froze cp1252-mangled prose into this contract **with every gate green**,
+because a `subprocess` pipe decoded UTF-8 with the Windows locale and both sides were
+mangled identically. C7 deletes the class rather than inheriting it. ⚠ The *dump* path is
+deliberately unchanged — it still emits raw UTF-8 through a pipe, because the parity gate
+reads it and the encoding pin it grew after C4 is a control that only has teeth while there
+is non-ASCII to mangle.
+
+#### Two things the full run found that the targeted runs did not
+
+The crossport suite (12 minutes) went red on
+`test_the_dump_key_sets_are_the_ones_the_generators_consume`, which tied the crossport
+copy of each dump's key set to the generator's copy. **The biosphere row lost its second
+side**: with no generator, nothing consumes the dump, and a row there would compare the
+module against itself. Retired with the reason written down, and with what replaced the
+forcing function named — the dump's key-set assertion in the parity gate, plus the new
+byte comparison. ⚠ The row does not come back when the other writers land; those two rows
+*leave* with them.
+
+Also worth recording as a repeat: running `rustfmt` on `crates/config/src/lib.rs`
+reformatted `params.rs` and `yaml.rs` too, because rustfmt follows `mod` declarations. That
+is [[dev-env-never-bare-cargo-fmt]] in a shape the memory does not name — the hazard is not
+the `cargo fmt` wrapper, it is formatting any file that is a module root. Reverted.
+
+#### Verification
+
+`cargo test` (all green) + `cargo clippy --all-targets -D warnings` clean; `ruff`, `pyright`
+and the Python suite green. Controls: escaping removed → red; empty-container layout changed
+→ red; hand-edited manifest → red; drifted roster label → red; moved golden → red; the step
+constant spliced → **green, which is the finding**. Probes: `M:/claud_projects/temp/c7-build/`.

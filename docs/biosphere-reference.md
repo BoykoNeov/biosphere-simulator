@@ -575,10 +575,22 @@ Phase-3 scenario regression tests.
 
 ## The manifest
 
-`docs/biosphere-reference.manifest.json` is the machine-readable surface, **generated** by
-`tests/test_freeze_manifest.py` (`uv run python tests/test_freeze_manifest.py`). It names the
-integrator + dt, the horizon, the derived flow set + aux set, the param files (+ provenance
-hashes), the forcing (+ hash), and each scenario → golden (+ hash).
+`docs/biosphere-reference.manifest.json` is the machine-readable surface, **written by the
+reference** since 2026-08-18 (reference-flip slice C7) — from `rust/`:
+
+```
+cargo run --example dump_biosphere_inventory -- --write-manifest
+```
+
+It names the integrator + dt, the horizon, the derived flow set + aux set, the param files
+(+ provenance hashes), the forcing (+ hash), and each scenario → golden (+ hash).
+
+⚠ **`tests/test_freeze_manifest.py` no longer writes it.** Until C7 that module assembled and
+serialized the file — so the contract was *authored* by the reference (slices 6, C4, C8, C9)
+and *written* by the checker. It is now a checker only, and the committed file is held to the
+writer byte for byte by `tests/crossport/test_manifest_writer.py`. One consequence to know
+before editing: **the manifest is a generated artifact, so a hand edit to it is red.** The
+edit belongs in the writer.
 
 ### ⚠⚠ Who produces it — MIXED AUTHORITY since 2026-08-16 (reference-flip slice 6)
 
@@ -705,11 +717,13 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
    `__main__` in `tests/test_regression_*.py` **refuses** to write one (`golden_platform.
    write_python_golden`). `drift_summary.json` is the exception — it is Python's fold and its
    own `__main__` is still right.
-4. **Regenerate the manifest** (`uv run python tests/test_freeze_manifest.py`) and review its
-   diff — the changed hashes / flow set / param set are the git-visible record of exactly what
-   was unfrozen. ⚠ **This step now needs `cargo`**: since 2026-08-16 the manifest reads the
-   Rust reference tree for every key its `_authority` block marks `rust`. So regenerating on a
-   box without a Rust toolchain fails loudly rather than writing a Python-derived manifest.
+4. **Regenerate the manifest** — from `rust/`, `cargo run --example dump_biosphere_inventory
+   -- --write-manifest` — and review its diff: the changed hashes / flow set / param set are
+   the git-visible record of exactly what was unfrozen. ⚠ **The reference writes this file
+   since 2026-08-18 (slice C7)**, so the step needs `cargo` and nothing else; a box without a
+   Rust toolchain cannot produce the contract at all, which is the point. ⚠ Predict the diff
+   *before* running it — C4's regeneration wrote corrupted prose into this contract with every
+   gate green, and what caught it was the prediction not matching.
 5. **Report the science gates.** State the change's readings against the scenario's
    `science_bands` and `liveness_floors`. A band failure is a **blocking finding** that must be
    argued past in writing, not a number to re-tune — retuning a bound so a change fits is the
