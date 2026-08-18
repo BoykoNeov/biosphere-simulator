@@ -32,6 +32,12 @@ splicing `BIO_DT` into the writer instead produces a **byte-identical manifest**
 is a source-text one and lives with the writer,
 `rust/crates/domains/tests/manifest_writer.rs`.
 
+⚠ The authoring contract was measured for the same trap and has none: its hand-authored
+keys are a phase number, two repo paths and two blocks of prose, and the `authoring`
+crate owns no constant any of them could be spliced from. Recorded as "none" rather than
+answered with a guard invented to match the biosphere's — a control with no test to
+redden is the finding, not a gap to fill.
+
 # ⚠ No pipe
 
 The reference writes the file itself. Slice C4 froze cp1252-mangled prose into a
@@ -51,14 +57,23 @@ _RUST_DIR = _REPO_ROOT / "rust"
 _DOCS_DIR = _REPO_ROOT / "docs"
 
 #: `(label, crate, example, manifest filename)` — one row per contract with a Rust
-#: writer. ⚠ The station and authoring manifests join as their writers land; a row
-#: absent here is a contract Python still writes, which is a gap and not a policy.
+#: writer. ⚠ The **station** manifest is still written by Python and is deliberately
+#: absent: its writer waits on slice C4b, which gives the reference a referent for the
+#: two station science claims (`science_bands`, `liveness_floors`) a Rust writer would
+#: otherwise have to hand-carry. A row absent here is a contract Python still writes,
+#: which is a gap and not a policy.
 _WRITERS = [
     (
         "biosphere",
         "domains",
         "dump_biosphere_inventory",
         "biosphere-reference.manifest.json",
+    ),
+    (
+        "authoring",
+        "authoring",
+        "dump_authoring_inventory",
+        "authoring-reference.manifest.json",
     ),
 ]
 
@@ -117,7 +132,10 @@ def test_the_committed_manifest_is_what_the_reference_writes(
 
 
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
-def test_the_writer_refuses_an_unknown_argument() -> None:
+@pytest.mark.parametrize("label,crate,example,manifest_name", _WRITERS)
+def test_the_writer_refuses_an_unknown_argument(
+    label: str, crate: str, example: str, manifest_name: str
+) -> None:
     """⚠ The control on the gate above, and it is not pedantry.
 
     The test passes `--write-manifest <path>`. A writer that ignored its arguments and
@@ -126,6 +144,12 @@ def test_the_writer_refuses_an_unknown_argument() -> None:
     the comparison pass while proving the wrong thing. So the argument handling is
     asserted to be real: an unknown flag exits non-zero rather than falling through to
     the dump or to a default write.
+
+    ⚠ **Parametrized over `_WRITERS` since the authoring writer landed.** It was
+    hardcoded to the biosphere example while that was the only row, which would have
+    left every later writer's argument handling unasserted — and by this test's own
+    reasoning that is exactly the state in which the byte comparison passes while
+    proving the wrong thing.
     """
     proc = subprocess.run(
         [
@@ -133,9 +157,9 @@ def test_the_writer_refuses_an_unknown_argument() -> None:
             "run",
             "-q",
             "--example",
-            "dump_biosphere_inventory",
+            example,
             "-p",
-            "domains",
+            crate,
             "--",
             "--nonsense",
         ],

@@ -57,11 +57,25 @@ the op set — is the part an author writes against, so that is what the manifes
 QUOTING BECAUSE IT IS NOW FALSE.** It read: *"The manifest freezes the **Python**
 surface of record. The Rust mirror is gated by the parse/traj vectors + the anchors, not
 by this gate."* Since 2026-08-17 the manifest's whole platform half is **generated from
-the Rust tree** — ``_build_manifest`` shells ``cargo run --example
-dump_authoring_inventory`` and splices in every key :data:`_AUTHORITY` marks ``rust`` —
-and the derivations below have become **conformance checks on the checker**: they still
-run, still derive from the live Python package, and now answer *"has Python drifted from
-the frozen contract?"* rather than *"what is the contract?"*.
+the Rust tree**, and the derivations below have become **conformance checks on the
+checker**: they still run, still derive from the live Python package, and now answer
+*"has Python drifted from the frozen contract?"* rather than *"what is the contract?"*.
+
+**⚠⚠ SLICE C7 TOOK THE REST: THIS MODULE HAS NO WRITER.** Slice 8 left the contract
+*authored* by the reference and *written* here — ``_build_manifest`` shelled the dump,
+spliced its keys into the checker's own, serialized and wrote the file. Since 2026-08-18
+the reference writes it (``cd rust && cargo run --example dump_authoring_inventory --
+--write-manifest``), and everything the writer needed left with it: the ``_AUTHORITY``
+literal, the prose, the vector-file roster, the splice-key set and the ``__main__``.
+What is left here is a **checker**, and two consequences follow that a reader must not
+miss:
+
+* the gates below now read ``_authority`` **out of the committed file** instead of
+  comparing it to a module-level copy. A copy kept purely to assert against would be the
+  stale second source this repo keeps being bitten by;
+* the manifest is a **generated artifact** again, so a hand edit to it is red —
+  ``tests/crossport/test_manifest_writer.py`` regenerates and compares bytes. Before C7
+  a typo in ``_comment`` or a hand-patched hash simply stood.
 
 **⚠⚠ What that trade actually cost, stated plainly, because this contract is the one
 where the flip is NOT free.** The biosphere and station manifests re-anchored to a
@@ -81,14 +95,12 @@ what the platform *accepts* and reddens the parse vectors and the crossport anch
 Where even that is unavailable (``expr_nodes``, ``binary_ops``, the ``flow_types``
 roster, ``integrator_names``) the residue is written down rather than implied.
 
-Regeneration is a deliberate, separate ``__main__`` action (the golden discipline): on
-an advisor-reviewed unfreeze, run ``uv run python
-tests/test_authoring_freeze_manifest.py`` and review the manifest diff. ⚠ **Since slice
-8 it needs ``cargo``**, because it reads the reference. The tests do not: nothing in
-this module shells cargo, and the base suite stays offline-clean. The cargo-side
-staleness gate lives in ``tests/crossport/test_inventory_parity.py``. Zero ``simcore``
-change, zero ``domains`` change on the Python side (``git diff src/`` is empty for
-this slice).
+Regeneration is a deliberate, separate action (the golden discipline): on an
+advisor-reviewed unfreeze, run ``cd rust && cargo run --example
+dump_authoring_inventory -- --write-manifest`` and review the manifest diff. The tests
+here do not shell cargo, and the base suite stays offline-clean; the cargo-side gates
+live in ``tests/crossport/`` (``test_inventory_parity.py`` for staleness of the derived
+axes, ``test_manifest_writer.py`` for the whole file byte for byte).
 """
 
 from __future__ import annotations
@@ -96,9 +108,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
-import subprocess
 import sys
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, get_args
 
@@ -115,75 +125,13 @@ from simcore.expr import _BINARY_OPS
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = _REPO_ROOT / "docs" / "authoring-reference.manifest.json"
 
-#: The reference tree's own dump of the platform surface — the producer half of this
-#: manifest since slice 8. Its doc comment is the authority on what it emits and why.
-_RUST_CRATE_DIR = _REPO_ROOT / "rust" / "crates" / "authoring"
-_RUST_DUMP_EXAMPLE = "dump_authoring_inventory"
-
-#: The keys :func:`_build_manifest` consumes out of that dump, asserted as its **exact**
-#: key set. ⚠ A forcing function, not a filter (slice 3's move, kept through 6, 7 and
-# 8): : a key added to the dump turns regeneration into a loud error rather than
-# silently : entering — or silently *not* entering — the frozen surface. In particular a
-#: ``parity_vectors`` key must not reach the manifest this way; see :data:`_AUTHORITY`.
-_RUST_DUMP_KEYS = frozenset(
-    {
-        "binary_ops",
-        "expr_nodes",
-        "flow_types",
-        "integrator_names",
-        "param_loaders",
-        "rate_classes",
-        "ref_keywords",
-        "schema_fields",
-        "step_token",
-    }
-)
-
-
-@lru_cache(maxsize=1)
-def _rust_reference() -> dict[str, Any]:
-    """Run the reference tree's platform dump and parse its JSON.
-
-    ⚠ **Called only from :func:`_build_manifest`, i.e. only from the regeneration
-    ``__main__``.** No test in this module reaches it, so the base suite neither needs
-    ``cargo`` nor pays for a build.
-    """
-    proc = subprocess.run(
-        ["cargo", "run", "-q", "--example", _RUST_DUMP_EXAMPLE],
-        cwd=_RUST_CRATE_DIR,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        raise SystemExit(
-            f"cargo run --example {_RUST_DUMP_EXAMPLE} failed — this manifest is "
-            f"regenerated FROM the Rust reference since slice 8 of the reference flip, "
-            f"so regeneration needs a working Rust toolchain:\n{proc.stderr}"
-        )
-    dump: dict[str, Any] = json.loads(proc.stdout)
-    if set(dump) != _RUST_DUMP_KEYS:
-        raise SystemExit(
-            f"{_RUST_DUMP_EXAMPLE} emitted {sorted(dump)}, expected "
-            f"{sorted(_RUST_DUMP_KEYS)}. Read _AUTHORITY before widening this: a new "
-            "key has to be classified, and one that cannot honestly come from the "
-            "reference (a hash of a Python-generated vector file) must not enter the "
-            "manifest through here."
-        )
-    return dump
-
-
-# The station manifest owns the frozen param VALUES an authored scenario reaches through
-# the named loaders (`crew.yaml`, `self_discharge.yaml`). Delegated, never re-hashed —
-# the same pointer discipline by which the station manifest delegates the biosphere.
-STATION_MANIFEST = "docs/station-reference.manifest.json"
-
-# The two committed cross-port vector files that own the grammar's SEMANTICS (parse) and
-# the VM's ARITHMETIC (traj). Recorded here as provenance — a re-derivable record of
-# which cases were frozen — not asserted (their content is gated by the crossport
-# in-sync guards + the Rust vector tests).
+# The two committed cross-port vector files whose provenance hashes the manifest
+# records. ⚠ The ROSTER is not here any more — the reference writes it (slice C7,
+# `rust/crates/authoring/examples/dump_authoring_inventory.rs::VECTOR_FILES`), and a
+# copy kept here would be the stale second source. What this module owns instead is the
+# tie: :func:`test_the_frozen_vector_roster_is_the_generators` reads the roster out of
+# the committed file and checks it against the paths the generator actually writes.
 VECTOR_DIR = _REPO_ROOT / "rust" / "crates" / "authoring" / "tests" / "data"
-VECTOR_FILES: tuple[str, ...] = ("parse_vectors.txt", "traj_vectors.txt")
 
 
 def _normalized_sha256(path: Path) -> str:
@@ -191,7 +139,16 @@ def _normalized_sha256(path: Path) -> str:
 
     Hashing raw bytes would make the value depend on the checkout's line endings
     (``autocrlf`` on Windows vs. LF on Linux). Normalizing to LF first makes the hash a
-    stable record of *content*. Provenance, not a gate (see the module docstring).
+    stable record of *content*.
+
+    ⚠ **Its standing changed in slice C7 and it is worth stating.** Until then this was
+    the *writer's* hashing rule and nothing compared its output to anything — the two
+    ``parity_vectors`` digits were provenance that no test ever recomputed. The
+    reference writes them now, under the narrower rule in ``config::provenance``, so
+    this function has become the checker's independent second opinion: the roster gate
+    below recomputes both hashes here and demands agreement. That is the same
+    two-rules-held-equal tie slice C8 established for ``param_files``, reached on this
+    contract by C7 rather than by C8.
     """
     text = path.read_text(encoding="utf-8")
     normalized = "\n".join(text.splitlines())
@@ -268,239 +225,6 @@ def _flow_types() -> dict[str, dict[str, Any]]:
         }
         for name, spec in FLOW_TYPES.items()
     }
-
-
-#: Who produces each frozen field, keyed by ``/``-joined leaf **path** — the slice-6/7
-#: classification, applied to the platform contract.
-#:
-#: ⚠ The three sides are claims of different kinds. ``rust`` — produced by the reference
-#: tree and spliced in by :func:`_build_manifest`. ``python`` — produced by the checker
-#: because the reference has no honest referent, with the reason and the condition under
-#: which that could change. ``hand`` — a literal, a label or prose deliberately derived
-#: from neither.
-#:
-#: ⚠⚠ **``rust`` means something weaker on this contract than on the other two, and
-# every : entry below says how.** There is no built registry to walk here (see the
-# module : docstring), so each Rust-side axis is part derived and part hand-maintained
-# roster. : Recorded per key rather than once, because the halves differ per key:
-# ``schema_fields`` : is load-bearing on the parser, ``expr_nodes`` is compiler-forced
-# but roster-listed, and : ``flow_types`` is roster-listed with fully derived entries.
-_AUTHORITY: dict[str, dict[str, str]] = {
-    "_comment": {"side": "hand", "why": "prose header"},
-    "frozen_at_phase": {"side": "hand", "why": "the phase this surface froze at"},
-    "reference_doc": {
-        "side": "hand",
-        "why": "pointer to the prose half of the contract",
-    },
-    "delegates_to": {
-        "side": "hand",
-        "why": (
-            "pointer to the station manifest, which owns the param VALUES an authored "
-            "file reaches through the named loaders. A path, not a derived value — its "
-            "target's existence is checked by test_manifest_named_files_exist"
-        ),
-    },
-    "grammar_note": {
-        "side": "hand",
-        "why": (
-            "prose, and the one sentence a reader must not misread: the frozen grammar "
-            "is DELIBERATELY INCOMPLETE. Neither port derives it and neither should — "
-            "it records decisions (which ops are deferred and why), not state"
-        ),
-    },
-    "expr_nodes": {
-        "side": "rust",
-        "why": (
-            "the node names of simcore::expr::Expr, via surface::expr_node_name's "
-            "exhaustive match. ⚠ HALF-DERIVED: adding a variant is a COMPILE ERROR "
-            "until someone names it, but the emitted list comes from "
-            "surface::sample_nodes, a hand-maintained roster of one inhabitant per "
-            "variant. Python's side is typing.get_args(Expr) and is genuinely derived "
-            "— that is the checker's advantage on this axis, and it is why the "
-            "conformance gate below still matters after the flip"
-        ),
-    },
-    "binary_ops": {
-        "side": "rust",
-        "why": (
-            "BinaryOp::symbol() — the parser's and the S-expr renderer's own spelling. "
-            "⚠ Same half-derived shape as expr_nodes: the SYMBOLS are derived, the "
-            "roster of three variants is hand-maintained. '/' is absent from the TYPE, "
-            "not merely from the list, so an unsupported op is unrepresentable"
-        ),
-    },
-    "ref_keywords": {
-        "side": "rust",
-        "why": (
-            "expr_parser::REF_KEYWORDS. ⚠ LOAD-BEARING, and the strongest tie on this "
-            "contract: this is the table the parser tests an identifier against, so a "
-            "name dropped here is not a mis-description, it is a form the grammar "
-            "stops accepting — the parse vectors and the anchors go red"
-        ),
-    },
-    "step_token": {
-        "side": "rust",
-        "why": (
-            "expr_parser::STEP_TOKEN, hoisted out of the lexer's ident match in slice "
-            "8 for the reason above: the token spliced here is the token that lowers "
-            "to StepN. ⚠ NOT the integrator's treatment — that one stayed 'hand' on "
-            "both other contracts because neither side had an importable name; this "
-            "one does"
-        ),
-    },
-    "integrator_names": {
-        "side": "rust",
-        "why": (
-            "run::INTEGRATOR_NAMES. ⚠ The WEAKEST axis here: Python's copy is the "
-            "dispatch dict itself and cannot lie, while Rust's dispatch is a match and "
-            "this is a hand-maintained slice beside it. Two partial closes — both "
-            "match arms build their error message from the slice, and "
-            "integrator_names_all_ dispatch RUNS a scenario under every listed name. A "
-            "match arm added and not listed is caught by nothing on the reference side"
-        ),
-    },
-    "rate_classes": {
-        "side": "rust",
-        "why": (
-            "interpreter::RATE_CLASSES, the list the interpreter validates a flow's "
-            "rate_class against — load-bearing like ref_keywords. Closed at two by "
-            "multirate_step's signature (it takes exactly two Substeppers), so a third "
-            "cannot appear without a simcore change"
-        ),
-    },
-    "schema_fields/*": {
-        "side": "rust",
-        "why": (
-            "the eight schema::*_KEYS consts. ⚠ LOAD-BEARING on the values: each list "
-            "IS the argument reject_unknown_keys refuses against, so it decides "
-            "whether a committed scenario file loads at all. ⚠ The LABELS "
-            "(ScenarioSpec, ParamPackRef, …) are Python class names typed by hand, and "
-            "two name no Rust type at all (this port binds params: and includes: "
-            "through enums) — they are contract names, the way crew.food_metabolism "
-            "is. std::any::type_name was refused for slice 2's reason: its format is "
-            "unspecified and a toolchain bump must not move a frozen manifest. ⚠ And "
-            "the completeness half does NOT port: Python catches a whole new spec "
-            "model by scanning its module; here a new spec is a new const nothing "
-            "forces into the dump. The compile-forced version (a SpecKind enum "
-            "threaded through reject_unknown_keys) was priced in slice 8 and deferred "
-            "as its own change, per slice 7 declining locked_dt"
-        ),
-    },
-    "flow_types/*/*": {
-        "side": "rust",
-        "why": (
-            "⚠ ROSTER hand-maintained, ENTRIES fully derived. The names come from "
-            "flow_registry::FLOW_TYPE_NAMES, which that module already documents as "
-            "hand-maintained because a Rust match cannot be enumerated. Everything "
-            "about each type is read off its FlowTypeSpec, and `cls` off a flow the "
-            "dump actually CONSTRUCTS through build_frozen_flow — the same path an "
-            "authored scenario takes, and the one place slice 2's Flow::type_name() "
-            "pays out on this contract. So a renamed wiring field, a moved param set, "
-            "a dropped rate param or a cleared demand-control pair all move the "
-            "manifest"
-        ),
-    },
-    "param_loaders": {
-        "side": "rust",
-        "why": (
-            'flow_registry::PARAM_SET_NAMES — the sets a kinetics rate\'s param("…") '
-            "may read. ⚠ Do NOT confuse this with the param_files key the other two "
-            "manifests keep Python-retained until slice 9: that one is a list of YAML "
-            "FILES with their hashes, and this is the loader-name vocabulary. The "
-            "values behind these names are delegated to the station manifest, not "
-            "frozen here"
-        ),
-    },
-    "parity_vectors/*": {
-        "side": "python",
-        "why": (
-            "PYTHON-RETAINED, and it is the param_files finding reached by a different "
-            "road. parse_vectors.txt / traj_vectors.txt live in the RUST crate's "
-            "tests/data, which makes hashing them from the reference side look natural "
-            "— but they are GENERATED by tests/crossport/gen_authoring_vectors.py and "
-            "merely re-derived in Rust as the parity check. A Rust-side hash would "
-            "compare the checker's own output with itself. ⚠ Under the 2026-08-17 "
-            "target state (Rust is the project; Python survives as the "
-            "external-software oracle and as rewrite scaffolding) these generators are "
-            "scaffolding, so this key moves when they do — a successor item, not a "
-            "rider on this ceremony"
-        ),
-    },
-}
-
-
-def _build_manifest() -> dict[str, object]:
-    """Assemble the manifest — the reference tree's keys spliced into the checker's.
-
-    ⚠ Since slice 8 this reads the **Rust** tree for everything :data:`_AUTHORITY` marks
-    ``rust``, so it needs ``cargo``. It is reachable only from :func:`_regenerate`.
-    """
-    reference = _rust_reference()
-    return {
-        "_authority": _AUTHORITY,
-        "_comment": (
-            "Phase-9 Step-7 authoring freeze manifest (P9.7). Names the frozen "
-            "AUTHOR-FACING platform surface: the bounded kinetics grammar + VM node/op "
-            "set, the scenario file schema, the author-selectable flow-type registry, "
-            "and the named param loaders. Param VALUES are delegated to "
-            "docs/station-reference.manifest.json (see delegates_to). See "
-            "docs/authoring-reference.md for the freeze contract + the unfreeze "
-            "discipline. Hashes are newline-normalized sha-256 PROVENANCE (grammar "
-            "semantics are enforced by parse_vectors.txt, the VM's arithmetic by "
-            "traj_vectors.txt, and the interpreter by the crossport anchors). "
-            "Each key's producer and why is in _authority: this file has MIXED "
-            "authority since slice 8 of the reference flip, and 'rust' means something "
-            "weaker here than on the other two manifests (there is no built registry "
-            "to walk — see authoring::surface). Regenerate on a deliberate unfreeze: "
-            "uv run python tests/test_authoring_freeze_manifest.py — which now shells "
-            "cargo, because the _authority 'rust' keys are read from the reference "
-            "tree."
-        ),
-        "frozen_at_phase": 9,
-        "reference_doc": "docs/authoring-reference.md",
-        "delegates_to": STATION_MANIFEST,
-        "grammar_note": (
-            "The grammar is bounded and closed, and DELIBERATELY INCOMPLETE "
-            "(decision D): bare division, the rest of the function set (exp ln pow "
-            "sqrt abs min max clamp), bounded conditionals and a named-constant "
-            "surface are all deferred until a real frozen flow forces each semantic "
-            "choice. Freezing this subset does NOT imply completeness; adding an op is "
-            "a deliberate unfreeze. 'monod' (S/(S+K)) landed post-roadmap as exactly "
-            "such an unfreeze — forced by the frozen "
-            "biosphere.chamber.oxygen_limitation_factor, whose kernel it mirrors "
-            "(including denom<=0 -> 0, which makes it total). It guards its own "
-            "denominator, so it resolved x/0 INTERNALLY and bare '/' stays deferred. "
-            "There is no 'dt' token by construction (RK4-order-safety is structural). "
-            "Precedence + associativity are enforced by parse_vectors.txt, not "
-            "recorded here."
-        ),
-        # ⚠ Every line below used to call the derivation directly above it. Since slice
-        # 8 they come from the reference tree, and those derivations have become the
-        # conformance gates further down — the checker is checked against the contract
-        # instead of writing it.
-        "expr_nodes": reference["expr_nodes"],
-        "binary_ops": reference["binary_ops"],
-        "ref_keywords": reference["ref_keywords"],
-        "step_token": reference["step_token"],
-        "integrator_names": reference["integrator_names"],
-        "rate_classes": reference["rate_classes"],
-        "schema_fields": reference["schema_fields"],
-        "flow_types": reference["flow_types"],
-        "param_loaders": reference["param_loaders"],
-        "parity_vectors": {
-            name: _normalized_sha256(VECTOR_DIR / name) for name in sorted(VECTOR_FILES)
-        },
-    }
-
-
-def _manifest_dumps(manifest: dict[str, object]) -> str:
-    """Serialize the manifest to canonical JSON — the project golden discipline.
-
-    ``indent=2, sort_keys=True`` + a trailing newline, matching ``sim_io.dumps`` and the
-    biosphere/station manifests, so it reads and diffs like every other committed
-    snapshot.
-    """
-    return json.dumps(manifest, indent=2, sort_keys=True) + "\n"
 
 
 def _load_manifest() -> dict[str, Any]:
@@ -613,12 +337,88 @@ def test_completeness_gate_detects_an_unfrozen_spec_model(monkeypatch) -> None:
 
 
 def test_manifest_delegates_param_values_to_the_station() -> None:
-    # An authored file reaches frozen param VALUES through the named loaders; those
-    # files are frozen by the station manifest. Pin the delegation pointer (and that it
-    # exists) so this manifest never grows a duplicate, drifting copy of those hashes.
+    """An authored file reaches frozen param VALUES through the named loaders, and those
+    files are frozen elsewhere — so this contract must point at a manifest that really
+    freezes them, and must never grow a duplicate, drifting copy of those hashes.
+
+    ⚠ **What this asserts changed in slice C7.** It used to compare ``delegates_to``
+    against ``STATION_MANIFEST``, a path literal in this module — and once the reference
+    writes the pointer, that is a Python literal checked against a Rust literal, which
+    is the duplicate-asserted-against-its-own-duplicate shape the biosphere half
+    deleted.
+    What is checkable from the checker's side is the property the pointer exists FOR:
+    the target is a real manifest, and it carries the ``param_files`` census this one
+    declines to re-hash. A pointer at the wrong file, or at a manifest that froze no
+    params, now fails; a renamed station manifest fails too, where the literal
+    comparison would merely have to be updated in two places.
+    """
     manifest = _load_manifest()
-    assert manifest["delegates_to"] == STATION_MANIFEST
-    assert (_REPO_ROOT / manifest["delegates_to"]).is_file()
+    target = _REPO_ROOT / manifest["delegates_to"]
+    assert target.is_file(), manifest["delegates_to"]
+    delegate = json.loads(target.read_text(encoding="utf-8"))
+    assert delegate.get("param_files"), (
+        f"{manifest['delegates_to']} freezes no param_files, so delegating param "
+        "VALUES to it is a promise nothing keeps"
+    )
+    for loader in manifest["param_loaders"]:
+        assert loader, "an empty param-loader name cannot be delegated"
+
+
+def test_the_frozen_vector_roster_is_the_generators() -> None:
+    """The two hashed vector files are the two the generator writes, and the hashes are
+    of those files.
+
+    ⚠⚠ **New in slice C7, and it closes a hole the slice opened.** The roster — which
+    files ``parity_vectors`` records — lived in this module *and was written from it*,
+    so it needed no gate: the manifest could not disagree with its own source. Moving
+    the writer to the reference turned one source into two copies with nothing holding
+    them together, and the copy at risk is exactly the one ``_authority`` marks
+    ``python``:
+    a file dropped from the reference's ``VECTOR_FILES`` would simply stop being hashed,
+    and every other gate would stay green.
+
+    ⚠ The tie is to ``gen_authoring_vectors``' own output paths rather than to a list
+    retyped here, because that generator is what *produces* these files — it is the
+    roster's single source of truth, the same way ``golden_platform.RUST_AUTHORED`` is
+    for the biosphere goldens.
+
+    ⚠ The value half never existed before this slice. The two digits were provenance
+    that nothing recomputed; now the reference writes them under
+    ``config::provenance``'s narrow newline rule and this recomputes them under
+    Python's broader ``splitlines`` one, which is the same two-rules-held-equal tie
+    slice C8 built for ``param_files``.
+
+    The generator is imported inside the test (its directory pushed onto the path the
+    way ``tests/crossport/`` already reaches its own helpers) so it is not a
+    collection-time cost for the rest of the base suite. It pulls in ``authoring`` and
+    ``simcore`` only — no ``cargo``, so this stays offline-clean.
+    """
+    sys.path.insert(0, str(_REPO_ROOT / "tests" / "crossport"))
+    import gen_authoring_vectors  # noqa: PLC0415
+
+    manifest = _load_manifest()
+    written = {
+        gen_authoring_vectors.PARSE_PATH.name: gen_authoring_vectors.PARSE_PATH,
+        gen_authoring_vectors.TRAJ_PATH.name: gen_authoring_vectors.TRAJ_PATH,
+    }
+    assert set(manifest["parity_vectors"]) == set(written), (
+        "the frozen parity-vector roster is not the set gen_authoring_vectors writes:\n"
+        f"  manifest:  {sorted(manifest['parity_vectors'])}\n"
+        f"  generator: {sorted(written)}\n"
+        "The roster lives in "
+        "rust/crates/authoring/examples/dump_authoring_inventory.rs (VECTOR_FILES) "
+        "since slice C7. A file added to the generator has to be "
+        "classified and hashed; one dropped from the writer stops being frozen "
+        "silently."
+    )
+    for name, path in written.items():
+        assert manifest["parity_vectors"][name] == _normalized_sha256(path), (
+            f"the frozen {name} hash is not this file's. Either the vectors were "
+            "regenerated without regenerating the manifest (`cd rust && cargo run "
+            "--example dump_authoring_inventory -- --write-manifest`), or the two "
+            "newline-normalization rules have stopped agreeing — see "
+            "config::provenance."
+        )
 
 
 def test_manifest_named_files_exist() -> None:
@@ -652,11 +452,19 @@ def _leaf_paths(node: Any, prefix: str = "") -> list[str]:
     return [prefix.rstrip("/")]
 
 
-def _authority_matches(path: str) -> list[tuple[int, str, dict[str, str]]]:
-    """Every ``_AUTHORITY`` pattern matching ``path``, with its specificity score."""
+def _authority_matches(
+    path: str, authority: dict[str, dict[str, str]]
+) -> list[tuple[int, str, dict[str, str]]]:
+    """Every ``_authority`` pattern matching ``path``, with its specificity score.
+
+    ⚠ Takes the block as an argument since slice C7. It used to read a module-level
+    ``_AUTHORITY`` literal that the writer here spliced into the manifest and a test
+    then compared back — with the writer gone there is no second copy, and a checker
+    that kept one would be asserting a duplicate against the file it duplicates.
+    """
     segments = path.split("/")
     matches = []
-    for pattern, entry in _AUTHORITY.items():
+    for pattern, entry in authority.items():
         parts = pattern.split("/")
         if len(parts) != len(segments):
             continue
@@ -666,9 +474,11 @@ def _authority_matches(path: str) -> list[tuple[int, str, dict[str, str]]]:
     return matches
 
 
-def _authority_for(path: str) -> tuple[str, dict[str, str]] | None:
-    """Resolve a leaf path against :data:`_AUTHORITY`, most specific wins."""
-    matches = _authority_matches(path)
+def _authority_for(
+    path: str, authority: dict[str, dict[str, str]]
+) -> tuple[str, dict[str, str]] | None:
+    """Resolve a leaf path against the manifest's ``_authority``, most specific wins."""
+    matches = _authority_matches(path, authority)
     if not matches:
         return None
     _score, pattern, entry = max(matches, key=lambda m: m[0])
@@ -684,61 +494,44 @@ def test_every_frozen_field_declares_who_produced_it() -> None:
     has been renamed or removed — which reads as coverage and is not.
     """
     manifest = _load_manifest()
+    authority = manifest["_authority"]
     classified = {k: v for k, v in manifest.items() if k != "_authority"}
     paths = _leaf_paths(classified)
-    unclassified = [p for p in paths if _authority_for(p) is None]
+    unclassified = [p for p in paths if _authority_for(p, authority) is None]
     assert not unclassified, (
         f"frozen fields with no _authority entry: {unclassified}. Every field of this "
-        "contract has to say which side produces it — see _AUTHORITY in "
-        "tests/test_authoring_freeze_manifest.py."
+        "contract has to say which side produces it — see the AUTHORITY table in "
+        "rust/crates/authoring/examples/dump_authoring_inventory.rs, which writes it."
     )
 
     # ⚠ "Most specific wins" only decides anything while no two patterns TIE. Two of
     # equal specificity matching one path would resolve by dict order — a silent answer
     # to a question nobody asked, and the field would read as classified either way.
     for path in paths:
-        top = max(s for s, _, _ in _authority_matches(path))
-        tied = sorted(p for s, p, _ in _authority_matches(path) if s == top)
+        top = max(s for s, _, _ in _authority_matches(path, authority))
+        tied = sorted(p for s, p, _ in _authority_matches(path, authority) if s == top)
         assert len(tied) == 1, (
             f"{path} is matched by {len(tied)} _authority patterns of equal "
             f"specificity: {tied}. Which one applies would be decided by dict order — "
             "make one of them strictly more specific."
         )
 
-    matched = {_authority_for(p)[0] for p in paths}  # type: ignore[index]
-    stale = sorted(set(manifest["_authority"]) - matched)
+    matched = {_authority_for(p, authority)[0] for p in paths}  # type: ignore[index]
+    stale = sorted(set(authority) - matched)
     assert not stale, f"_authority patterns matching no field: {stale}"
-    assert manifest["_authority"] == _AUTHORITY, (
-        "the committed _authority block is not the one this module would write — "
-        "regenerate the manifest"
-    )
 
-
-def test_the_reference_side_keys_are_exactly_what_the_generator_splices() -> None:
-    """The ``rust`` classification and the splice cannot drift apart.
-
-    ⚠ Two independent things say which keys come from the reference: the
-    :data:`_RUST_DUMP_KEYS` forcing function (what regeneration will accept from the
-    dump) and :data:`_AUTHORITY` (what the committed file *claims*). If they disagree,
-    one of them is a lie — either the manifest advertises a Rust-derived field that
-    regeneration writes from Python, or a spliced field goes unclassified. Neither is
-    visible from a green regeneration, because regeneration writes both.
-
-    Top-level only: ``schema_fields`` and ``flow_types`` are classified per leaf but
-    spliced whole, so the comparison is over the first path segment.
-    """
-    rust_keys = {
-        pattern.split("/")[0]
-        for pattern, entry in _AUTHORITY.items()
-        if entry["side"] == "rust"
-    }
-    assert rust_keys == set(_RUST_DUMP_KEYS), (
-        "the keys _AUTHORITY calls 'rust' are not the keys the generator splices:\n"
-        f"  classified rust: {sorted(rust_keys)}\n"
-        f"  spliced:         {sorted(_RUST_DUMP_KEYS)}\n"
-        "One of the two is wrong. _RUST_DUMP_KEYS is what regeneration enforces "
-        "against the dump; _AUTHORITY is what the frozen file tells a reader."
-    )
+    # ⚠ What replaced the fourth check, and why it is not a weakening. Until slice C7
+    # this ended with ``manifest["_authority"] == _AUTHORITY`` — the committed block
+    # against this module's own literal. C7 deleted the literal with the rest of the
+    # writer, and keeping a copy purely to assert against would be the stale second copy
+    # this repo has been bitten by. What is checkable from here is the block's SHAPE,
+    # and a malformed row is a failure the equality never caught either: a row is
+    # ``{side, why}``, ``side`` is one of the three the contract defines, and ``why`` is
+    # prose someone wrote rather than an empty string standing in for a reason.
+    for pattern, entry in sorted(authority.items()):
+        assert set(entry) == {"side", "why"}, (pattern, sorted(entry))
+        assert entry["side"] in {"rust", "python", "hand"}, (pattern, entry["side"])
+        assert len(entry["why"]) > 10, (pattern, entry["why"])
 
 
 def test_the_python_derivations_are_conformance_checks_now() -> None:
@@ -753,11 +546,27 @@ def test_the_python_derivations_are_conformance_checks_now() -> None:
     (`o2-makeup-reversal-inside-the-freeze`).
 
     This test pins the direction so the reading cannot be lost: every axis the reference
-    produces has a Python derivation that must still agree, and the set of such axes is
-    the spliced set. A future key spliced from Rust with no Python derivation beside it
-    would leave the checker silently unchecked on that axis — allowed, but it must be a
-    decision, and this makes it show up as a failure first.
+    produces has a Python derivation that must still agree. A future Rust-written key
+    with no Python derivation beside it would leave the checker silently unchecked on
+    that axis — allowed, but it must be a decision, and this makes it show up as a
+    failure first.
+
+    ⚠ **The roster it compares against moved in slice C7, and this test absorbed a
+    second one.** It used to read ``_RUST_DUMP_KEYS``, the module's own record of what
+    regeneration would splice; the writer owns that now, so the honest anchor is what
+    the committed contract *claims* — the keys its ``_authority`` block marks ``rust``.
+    ``test_the_reference_side_keys_are_exactly_what_the_generator_splices`` was retired
+    with the writer for the same reason: it tied those two module-level literals to each
+    other, and neither exists here any more. The check it performed — that the
+    classification and the reference-written set are the same set — is the first
+    assertion below, now stated against the file instead of against a copy of it.
     """
+    manifest = _load_manifest()
+    classified_rust = {
+        pattern.split("/")[0]
+        for pattern, entry in manifest["_authority"].items()
+        if entry["side"] == "rust"
+    }
     derived_here = {
         "expr_nodes": _expr_nodes(),
         "binary_ops": sorted(_BINARY_OPS),
@@ -769,39 +578,21 @@ def test_the_python_derivations_are_conformance_checks_now() -> None:
         "flow_types": _flow_types(),
         "param_loaders": sorted(PARAM_LOADERS),
     }
-    assert set(derived_here) == set(_RUST_DUMP_KEYS), (
-        "an axis is spliced from the reference with no Python derivation beside it (or "
-        "vice versa). The checker would be unchecked on that axis — decide it "
-        "deliberately and say so in _AUTHORITY."
+    assert set(derived_here) == classified_rust, (
+        "an axis the contract calls reference-produced has no Python derivation beside "
+        "it (or vice versa):\n"
+        f"  classified rust: {sorted(classified_rust)}\n"
+        f"  derived here:    {sorted(derived_here)}\n"
+        "The checker would be unchecked on that axis — decide it deliberately and say "
+        "so in the AUTHORITY table in "
+        "rust/crates/authoring/examples/dump_authoring_inventory.rs."
     )
-    manifest = _load_manifest()
     for key, value in derived_here.items():
         assert manifest[key] == value, (
             f"the checker's {key} has drifted from the frozen contract. ⚠ Since slice "
             f"8 this manifest is generated from the RUST tree, so the first question "
-            f"is 'what changed in src/authoring?', not 'is the manifest stale?'. If "
-            f"the reference moved, that is an unfreeze (docs/authoring-reference.md) "
-            f"and the ceremony ends in `uv run python "
-            f"tests/test_authoring_freeze_manifest.py`, which reads Rust."
+            f"is 'what changed in rust/crates/authoring?', not 'is the manifest "
+            f"stale?'. If the reference moved, that is an unfreeze "
+            f"(docs/authoring-reference.md) and the ceremony ends in `cd rust && cargo "
+            f"run --example dump_authoring_inventory -- --write-manifest`."
         )
-
-
-def _regenerate() -> None:
-    """Rewrite the committed authoring manifest from the current live tree.
-
-    A deliberately separate, explicit action — NOT reachable from a test run. Run via::
-
-        uv run python tests/test_authoring_freeze_manifest.py
-
-    Review the diff before committing: a change means the frozen authoring surface moved
-    (a new grammar node/op, a schema field, a flow type, a param loader), i.e. an
-    **unfreeze**, which the discipline in docs/authoring-reference.md governs. Written
-    via ``write_bytes`` (explicit LF, like the goldens) so the manifest is byte-stable
-    across platforms.
-    """
-    MANIFEST_PATH.write_bytes(_manifest_dumps(_build_manifest()).encode("utf-8"))
-    print(f"wrote {MANIFEST_PATH}")
-
-
-if __name__ == "__main__":
-    _regenerate()

@@ -147,7 +147,8 @@ _STATION_DUMP_KEYS = frozenset({"flow_set", "aux_set", "horizons", "param_files"
 #: ⚠ The authoring dump (slice 8) has NO axis in common with the two above — the
 #: platform contract freezes a grammar, a file schema and a flow-type registry, not a
 #: wired inventory — so it gets its own gate below rather than a row in `_CASES`. Every
-#: key it emits is spliced into the manifest, so the whole set is compared.
+#: key it emits is written into the manifest by that same program (slice C7), so the
+#: whole set is compared.
 _AUTHORING_DUMP_KEYS = frozenset(
     {
         "binary_ops",
@@ -509,7 +510,8 @@ def test_the_frozen_authoring_manifest_is_not_stale() -> None:
             "changed and the committed manifest has not been regenerated. Moving the "
             "grammar, the file schema, the flow-type registry or the loader vocabulary "
             "is an unfreeze — follow the ceremony in docs/authoring-reference.md, then "
-            "`uv run python tests/test_authoring_freeze_manifest.py`. If you did not "
+            "`cd rust && cargo run --example dump_authoring_inventory -- "
+            "--write-manifest` (slice C7 moved the writer here). If you did not "
             "mean to change what authors write against, the finding is whatever moved."
         )
 
@@ -530,17 +532,27 @@ def test_the_dump_key_sets_are_the_ones_the_generators_consume() -> None:
     move here: the generators own the definition, this asserts agreement, and nobody
     writes a third copy.
 
-    ⚠⚠ **THE BIOSPHERE ROW LEFT IN SLICE C7, AND ITS ABSENCE IS THE POINT.** That
-    contract has no generator to tie to any more: the reference writes the manifest
-    itself, so nothing *consumes* the dump, so there is no second copy of its key set
-    and a row here would be comparing this module against itself. What replaced the
-    forcing function is not this test — it is ``set(dump) == dump_keys`` in
-    :func:`test_rust_inventory_equals_the_frozen_manifest` (a new dump key still stops
-    the gate until someone classifies it) and, for the manifest side,
+    ⚠⚠ **THE BIOSPHERE AND AUTHORING ROWS LEFT WITH THEIR WRITERS (SLICE C7), AND
+    THEIR ABSENCE IS THE POINT.** Neither contract has a generator to tie to any more:
+    the reference writes those manifests itself, so the *second* declaration of the key
+    set — the one a generator kept in order to refuse an unclassified key — does not
+    exist, and a row here would be comparing this module against itself.
+
+    ⚠ **The reason recorded when the biosphere row left was too broad, and the
+    authoring case is what exposed it.** It read "nothing *consumes* the dump", which
+    was true there and is false here: ``dump_authoring_inventory`` is still consumed,
+    by :func:`test_rust_inventory_equals_the_frozen_manifest` in this very module. What
+    actually licenses the removal is narrower — there is no longer a *second copy* of
+    the key set to hold equal, because the copy lived in the writer. Same outcome, and
+    a docstring carrying a reason that is not the reason is the defect class this repo
+    keeps recording.
+
+    What replaced the forcing function is not this test — it is ``set(dump) ==
+    dump_keys`` in the two staleness gates (a new dump key still stops them until
+    someone classifies it) and, for the manifest side,
     ``tests/crossport/test_manifest_writer.py``, which compares the whole committed file
-    against a regeneration. ⚠ This row does **not** come back when the station and
-    authoring writers land; those two rows *leave* with them, and this test goes with
-    the last one.
+    against a regeneration. ⚠ Neither row comes back when the station writer lands;
+    that row *leaves* with it, and this test goes with it.
 
     Imported inside the test (with ``tests/`` put on the path the way this directory
     already reaches ``golden_platform``) so importing the generators is not a collection
@@ -549,16 +561,10 @@ def test_the_dump_key_sets_are_the_ones_the_generators_consume() -> None:
     import sys  # noqa: PLC0415
 
     sys.path.insert(0, str(REPO_ROOT / "tests"))
-    import test_authoring_freeze_manifest  # noqa: PLC0415
     import test_station_freeze_manifest  # noqa: PLC0415
 
     for label, mine, theirs in (
         ("station", _STATION_DUMP_KEYS, test_station_freeze_manifest._RUST_DUMP_KEYS),
-        (
-            "authoring",
-            _AUTHORING_DUMP_KEYS,
-            test_authoring_freeze_manifest._RUST_DUMP_KEYS,
-        ),
     ):
         assert mine == theirs, (
             f"the {label} dump's key set is declared twice and the copies disagree:\n"

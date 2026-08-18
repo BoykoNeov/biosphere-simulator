@@ -864,4 +864,3 @@ def test_manifest_pins_the_within_day_light_path() -> None:
     """
     manifest = _load_manifest()
     assert manifest["forcing"]["light_path"] == _light_path_fingerprint()
-

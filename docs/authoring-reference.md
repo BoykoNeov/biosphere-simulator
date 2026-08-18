@@ -857,11 +857,14 @@ Tests of record: `tests/test_authoring_{crew,param_packs,kinetics,templates,comp
 
 ## The manifest
 
-`docs/authoring-reference.manifest.json` is the machine-readable surface, **generated** by
-`tests/test_authoring_freeze_manifest.py`
-(`uv run python tests/test_authoring_freeze_manifest.py`). Every frozen set in it is
-**derived from its live single source of truth, never hand-listed** — the discipline both
-prior manifests rest on.
+`docs/authoring-reference.manifest.json` is the machine-readable surface, **written by
+the reference** since slice C7 of the reference flip (2026-08-18):
+`cd rust && cargo run --example dump_authoring_inventory -- --write-manifest`.
+`tests/test_authoring_freeze_manifest.py` keeps the completeness and conformance gates
+and has **no writer** — the manifest is a generated artifact, so a hand edit to it is
+red (`tests/crossport/test_manifest_writer.py` regenerates and compares bytes). Every
+frozen set in it is **derived from its live single source of truth, never hand-listed**
+— the discipline both prior manifests rest on.
 
 **What the gate checks vs. what the vectors + anchors check** — the division is deliberate,
 and mirrors the biosphere's:
@@ -884,9 +887,14 @@ the old text is quoted because it is now false.** It read: *"The manifest freeze
 anchors, not by this gate — a Python schema field added with no Rust mirror is caught only
 once an anchor exercises it."*
 
-Since slice 8 the manifest's platform half is **generated from the Rust tree**
-(`cargo run --example dump_authoring_inventory`, spliced by `_build_manifest`), and every
-key says which side produced it in the manifest's own `_authority` block. The Python
+Since slice 8 the manifest's platform half is **generated from the Rust tree**, and
+since C7 the reference writes the whole file (`cargo run --example
+dump_authoring_inventory -- --write-manifest`); every key says which side produced it in
+the manifest's own `_authority` block. ⚠ `parity_vectors` stays classified `python`
+although the reference now hashes those files: `_authority` records who produced the
+**value**, not who ran the digest — the biosphere contract read
+`scenarios/*/golden_sha256` as `rust` for four slices while Python hashed it. C7
+corrected that row, which had argued the opposite. The Python
 derivations still run and still derive from the live package — they have become
 **conformance checks on the checker**, answering *"has Python drifted from the contract?"*
 rather than *"what is the contract?"*. A **Rust-only** addition now widens the frozen
@@ -1006,14 +1014,15 @@ type or its wiring names, a param loader, or the composition semantics — is an
 3. **Land it on BOTH ports.** The grammar/schema is a cross-port contract: a Python-only
    change is a broken contract, not a half-done one. Add the parse/traj vectors or the
    anchor that pins the new surface.
-4. **Regenerate the manifest** (`uv run python tests/test_authoring_freeze_manifest.py`)
-   and review its diff — the changed sets are the git-visible record of exactly what was
-   unfrozen. ⚠ **Since slice 8 this step needs `cargo`**: the `_authority` `rust` keys are
-   read out of the reference tree, so regeneration shells
-   `cargo run --example dump_authoring_inventory`. Predict the diff *before* running it —
-   and note that step 3's "land it on both ports" now has a direction: the reference side
-   is what the manifest will record, so landing Rust first and Python second is the order
-   that keeps the ceremony honest.
+4. **Regenerate the manifest** — `cd rust && cargo run --example
+   dump_authoring_inventory -- --write-manifest` — and review its diff; the changed sets
+   are the git-visible record of exactly what was unfrozen. ⚠ **Since slice C7 the
+   reference writes the whole file**, so this step is a `cargo` step and nothing else;
+   editing the committed manifest by hand is red rather than merely discouraged
+   (`tests/crossport/test_manifest_writer.py` compares it byte for byte with a
+   regeneration). Predict the diff *before* running it — and note that step 3's "land it
+   on both ports" has a direction: the reference side is what the manifest records, so
+   landing Rust first and Python second is the order that keeps the ceremony honest.
 5. **Record provenance.** Update this file and the Phase-9 plan with what changed and why
    (a deferred op joining moves it out of the *deliberately incomplete* table above).
 6. **Re-run the gates:** the full suite (incl. `-m slow`), `ruff`, `pyright`, `cargo test`,
@@ -1025,6 +1034,29 @@ An undocumented unfreeze fails CI by construction (the completeness gate, or a m
 vector/anchor), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-18 — the writer moved to the reference (reference flip, slice C7).** Two
+  prose lines moved and **no frozen value did**: every derived key regenerated
+  byte-identical on the first run, which is the measurement that made the move a
+  re-anchoring rather than a change. The two lines are `_comment` (it named a
+  regeneration command that was about to become false) and the `parity_vectors/*`
+  `_authority` row, which had argued that *"a Rust-side hash would compare the checker's
+  own output with itself"* — that conflates who produces a value with who digests it,
+  and the biosphere contract has read `scenarios/*/golden_sha256` as `rust` since slice 4
+  while Python computed that digest. The `side` did not move: the vector files are still
+  generated by `tests/crossport/gen_authoring_vectors.py`, so `python` still names a
+  producer that is there.
+
+  ⚠ Moving a writer is not only a deletion. The vector-file **roster** lived in the
+  Python module *and was written from it*, so it needed no gate; splitting writer from
+  checker turned one source into two copies, and
+  `test_the_frozen_vector_roster_is_the_generators` closes that — tying the frozen roster
+  to the generator's own output paths, and recomputing both hashes, which nothing had
+  ever done. ⚠ The trap the biosphere half found (a frozen literal one character from
+  auto-following a constant in the crate the writer moved into) was **measured for here
+  and is absent**: this contract's hand keys are a phase number, two repo paths and two
+  blocks of prose. Recorded as "none" rather than answered with an invented guard.
+  See `docs/plans/post-roadmap-reference-flip.md` §5m.
 
 - **2026-08-17 — the contract re-anchored to Rust (reference flip, slice 8).** No frozen
   *value* moved: the manifest gained an `_authority` block and a re-worded `_comment`, and
