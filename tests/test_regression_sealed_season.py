@@ -25,6 +25,7 @@ import json
 from pathlib import Path
 
 import sim_io
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.season import (
     SEALED_CHAMBER_SCENARIO,
     SEALED_CHAMBER_YEARS,
@@ -44,7 +45,7 @@ from simcore.state import State
 GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
 GOLDEN_PATH = GOLDEN_DIR / "sealed_chamber_state.json"
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 
 def _weather() -> list[dict[str, float | str]]:

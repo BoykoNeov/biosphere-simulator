@@ -61,9 +61,11 @@ outbound license does **not** permit pulling copyleft source inbound.
 
 The EUPL analysis above turns on **distribution of a derivative work**, and it settled the
 oracle question with *"running PCSE to produce test fixtures is mere use."* Slice C9 changed
-which half of that sentence applies to one file: `tests/oracle/winter_wheat_weather.json` is
+which half of that sentence applies to one file: `winter_wheat_weather.json` (in
+`tests/oracle/` then; `rust/crates/domains/data/` since Stage-3 slice S1) is
 `include_str!`-embedded into the native core, so it ships **inside the binary** rather than
-sitting in `tests/` as offline oracle input. That is a distribution question, and it deserves
+sitting in `tests/` as offline oracle input. S1's relocation followed that reclassification
+to its conclusion: the file lives with the binary that ships it, not with the oracle. That is a distribution question, and it deserves
 an answer written down rather than assumed.
 
 **It is clean, and the reason is that the data never came from PCSE's model.** The rows are

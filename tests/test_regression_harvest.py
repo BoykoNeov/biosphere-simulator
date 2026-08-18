@@ -44,6 +44,7 @@ import json
 from pathlib import Path
 
 import sim_io
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.stocks import LITTER_CARBON, STORAGE_C
 from domains.crew.loader import load_crew_params
 from domains.crew.stocks import FECAL_WASTE, FOOD_STORE
@@ -68,7 +69,7 @@ from station.scenario import HARVEST_SCENARIO
 
 GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
 GOLDEN_PATH = GOLDEN_DIR / "harvest_state.json"
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 _CREW = load_crew_params()
 _ECLSS = load_eclss_params()

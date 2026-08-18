@@ -33,10 +33,10 @@ Pure-stdlib data path (reads the committed JSON weather fixture; no PCSE).
 
 import json
 import math
-from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.carbon_budget import (
     Allocation,
     CarbonContext,
@@ -67,7 +67,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.state import State, Stock
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 # stock ids / forcing-var names (mirror the season's; the unit tests are self-contained)
 _BIO = DomainId("biosphere")

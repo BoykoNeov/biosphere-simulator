@@ -48,6 +48,7 @@ import gen_station_params  # noqa: E402
 import gen_vectors  # noqa: E402
 import measure_tier2_bands  # noqa: E402
 
+from config.paths import WINTER_WHEAT_WEATHER  # noqa: E402
 from sim_io import snapshot  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -562,7 +563,7 @@ def test_rust_biosphere_states_match_tier2(
 
 # The weather fixture both ports tile (Rust embeds it; Python reads it here), same file
 # the season/perennial regression goldens use.
-_WEATHER_FIXTURE = REPO_ROOT / "tests" / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 # The perennial trajectory horizon, in years. ⚠ Must equal
 # `PERENNIAL_TRAJECTORY_YEARS` in `rust/crates/domains/examples/emit_trajectory.rs`

@@ -59,6 +59,7 @@ from pathlib import Path
 import pytest
 
 import sim_io
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.drift import is_period_2, year_summaries
 from domains.biosphere.season import (
     CONSUMER_CARBON,
@@ -87,7 +88,7 @@ PERENNIAL_GOLDEN = GOLDEN_DIR / "perennial_long_horizon_state.json"
 CONSUMER_GOLDEN = GOLDEN_DIR / "consumer_long_horizon_state.json"
 DRIFT_SUMMARY_GOLDEN = GOLDEN_DIR / "drift_summary.json"
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 _PERIOD_TRANSIENT = 8  # years to drop before the period check — reach the settled tail
 

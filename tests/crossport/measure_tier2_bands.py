@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 import types
 
+from config.paths import WINTER_WHEAT_WEATHER
 from lab.oracle_match import max_abs_relative_deviation
 from simcore.integrator import EulerIntegrator
 
@@ -200,15 +201,8 @@ def _biosphere_perennial_final(scenario, years: int) -> list[float]:
 
 def _weather() -> list[dict]:
     import json
-    from pathlib import Path
 
-    fixture = (
-        Path(__file__).resolve().parents[2]
-        / "tests"
-        / "oracle"
-        / "winter_wheat_weather.json"
-    )
-    return json.loads(fixture.read_text(encoding="utf-8"))["weather"]
+    return json.loads(WINTER_WHEAT_WEATHER.read_text(encoding="utf-8"))["weather"]
 
 
 # ⚠⚠ **RETARGETED 2026-08-15 (the layered canopy), AND THE MEASUREMENT HAD GONE

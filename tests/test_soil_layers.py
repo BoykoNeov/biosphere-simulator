@@ -23,10 +23,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.root_depth import RootDepthParams, extension_rate
 from domains.biosphere.scenario import (
     DEEP_WATER_SCENARIO,
@@ -50,11 +50,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.registry import Registry
 from simcore.state import State
 
-_WEATHER = json.loads(
-    (Path(__file__).parent / "oracle" / "winter_wheat_weather.json").read_text(
-        encoding="utf-8"
-    )
-)["weather"]
+_WEATHER = json.loads((WINTER_WHEAT_WEATHER).read_text(encoding="utf-8"))["weather"]
 
 
 def _run(scenario: SeasonScenario = DEFAULT_SCENARIO, years: int = 1) -> list[State]:

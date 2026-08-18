@@ -43,6 +43,7 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import BIOSPHERE_PARAMS_DIR, WINTER_WHEAT_WEATHER
 from domains.biosphere.allocation import SenescenceParams
 from domains.biosphere.canopy import CanopyParams
 from domains.biosphere.decomposition import (
@@ -83,7 +84,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.state import State, Stock
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 _BIO = DomainId("biosphere")
 _PLANT_N = StockId("biosphere.plant_n")
@@ -536,7 +537,14 @@ def test_there_is_no_mineralization_param_file_or_loader() -> None:
 
     assert not hasattr(loader_module, "load_mineralization_params")
     assert not hasattr(loader_module, "MINERALIZATION_PARAMS_PATH")
-    params_dir = Path(loader_module.__file__).parent / "params"
+    params_dir = BIOSPHERE_PARAMS_DIR
+    # ⚠ The positive half FIRST. This is a negative assertion about a directory, and a
+    # directory that does not exist satisfies it vacuously — which is exactly what a
+    # mis-resolved `BIOSPHERE_PARAMS_DIR` would produce after slice S1 moved the params
+    # out of the Python package. Without this line the relocation could have silently
+    # turned a real check into a green no-op.
+    assert params_dir.is_dir(), params_dir
+    assert (params_dir / "nitrogen.yaml").is_file(), params_dir
     assert not (params_dir / "mineralization.yaml").exists()
 
 

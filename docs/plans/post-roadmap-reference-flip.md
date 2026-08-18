@@ -3975,3 +3975,133 @@ its test count; **(0 tests)** means the implementation is there and nothing chec
   tests move.
 * **Deleting anything.** `git diff` is empty for `src/`, `rust/`, the goldens and all three
   manifests; the only files this slice touches are this plan, the log and the memory index.
+
+## §5r Stage 3 — S1, the reference's own ground; the COMPILE-TIME half COMPLETE 2026-08-18
+
+§5q's FINDING 1 said the reference does not stand on its own ground: `rust/` compiled **24
+files out of the tree being deleted**, so `rm -rf src/ tests/` would not fail a test — it
+would fail the **build**. S1 is the slice that fixes that, and it splits the way the
+dependency splits. This half moves the two **compile-time** reach-outs (the 23 frozen param
+YAMLs + the weather fixture); the runtime ones (26 scenario fixtures, the goldens) follow in
+the second half.
+
+### Three gating measurements, taken before a file moved, that decided the slice's category
+
+1. **The manifests are path-free.** `param_files` is basename → sha-256; each `scenarios/*`
+   entry records a golden **basename**; the authoring contract's `parity_vectors` likewise.
+   Grepped all three for `src/domains`, `src/station/params`, `tests/regression/golden`,
+   `tests/authoring/scenarios`: **zero hits.** So S1 is a **pure rename**, not an unfreeze —
+   and the byte gate is the proof rather than the plan's assertion.
+2. **`.gitattributes` has no path-scoped rule** (`* text=auto eol=lf`, globally). This
+   mattered because `include_str!` embeds the **working tree** and one frozen file
+   (`senescence.yaml`) is CRLF on this box while the index is LF — if normalization were
+   scoped by path, the new home would inherit different rules and a `git mv` that never
+   touches content would still change the embedded bytes. It is not scoped, so it cannot.
+3. **The golden count is stale in three places.** Plan, `golden_platform.py` and `CLAUDE.md`
+   all say **25**; disk holds **21**. Cause identified rather than guessed: C6 (`01bf957`)
+   deleted four Python-only goldens. Enumerate from disk —
+   [[coverage-roster-is-not-the-manifest]] again. Left for the second half, which is the one
+   that touches those files.
+
+### The home, and the rule that chose it
+
+Not tidiness: **where the dependency actually is.**
+
+| data | home | why |
+|---|---|---|
+| 15 biosphere + 5 sibling + 3 station param YAML | `rust/crates/domains/params/<domain>/`, `rust/crates/station/params/` | compiled into *those* crates specifically; `include_str!("../../params/biosphere/canopy.yaml")` and `PARAMS_DIR = concat!(CARGO_MANIFEST_DIR, "/params/biosphere")` are **not reach-outs at all**, which is what "a path the reference owns" means |
+| `winter_wheat_weather.json` | `rust/crates/domains/data/` | same rule. ⚠ The discriminator is *the reference compiles **this** one in*, **not** *the three weather series are a set* — `potato_weather.json` and `spring_wheat_weather.json` stay in the surviving `tests/oracle/` carve-out, which now reaches **into** the reference for the third. That direction is the correct one for a diagnostic |
+| scenario fixtures, goldens | the second half | read/emitted **across** crates, so neither can be crate-owned without one crate reaching into another's private tree |
+
+Per-domain subdirectories were kept: the manifests are **basename-keyed**, and C8 asserted
+basename uniqueness across the six directories precisely because a collision would silently
+collapse two frozen entries. Flattening would have re-opened that.
+
+### ⚠⚠ The whole directory moved — `demo.yaml` and `crops/potato/` included — and that is not conservatism
+
+The tempting move is to take the fifteen files the census names and leave the rest, since
+`demo.yaml` is Python-only and the four potato overrides are a deferred second species. It
+would have been wrong, and the reason is a **control**, not tidiness.
+
+`tests::a_recursive_walk_reddens_the_census` proves *"a directory is not a category"* by
+asserting `recursive.len() == census.len() + 4`. That assertion has teeth **only because the
+four potato files sit in a subdirectory of `PARAMS_DIR`** — leave them behind and it is
+measuring nothing about a hazard that no longer exists in the tree. Its sibling
+`the_recursive_walk_would_see_four_more_and_the_census_does_not` is the same shape. Both went
+green at the new home, which is positive evidence that the directory *shape* survived and not
+merely its fifteen frozen files.
+
+`demo.yaml` came for the parallel reason: it keeps the **exclusion-by-name** rule true
+verbatim, so `param_files()`, the dump's `assert_eq!(files.len(), 15)` and the census test's
+own literal all stay correct with zero value change. It dies with `demo.py` at S6, and the
+by-name exclusion dissolves **then**, deliberately, inside a retirement — not here, inside a
+slice whose entire claim is that it moves data and not science.
+
+### ⚠ A negative assertion about a directory goes vacuous when the directory moves
+
+`test_mineralization.py` asserts `not (params_dir / "mineralization.yaml").exists()` — the
+record that a retired parameter stayed retired. A directory that does not exist satisfies
+that vacuously, so a mis-resolved path would have turned a real check into a green no-op
+**silently**. The positive half now runs first (`params_dir.is_dir()`, plus a file that must
+be there). Found by asking of every re-pointed path *what does this assert if the path is
+wrong* — the only question that separates a live negative from a vacuous one.
+
+### The two-direction control: build vs test, with `src/` and `tests/` renamed away
+
+Measured, not reasoned:
+
+* **`cargo build` succeeds.** That is this half's claim, and it was false this morning.
+* **`cargo test` fails**, and the panics name `crates/authoring/tests/scenario_files.rs`
+  (plus `snapshot.rs`'s golden read) — *exactly* the runtime reach-outs the second half owes.
+  The control therefore doubles as a to-do list that cannot be padded or forgotten.
+
+### The Python side: one definition, not six
+
+Every loader spelled its own `Path(__file__).parent / "params"`, and the weather fixture was
+spelled out in **40** test modules. A repo-root climb copied into 46 places is the *a rule
+with two copies has one that is stale* shape this repo refuses, so `src/config/paths.py`
+holds it once: `REPO_ROOT`, `DOMAIN_PARAMS_ROOT`, `BIOSPHERE_PARAMS_DIR`,
+`STATION_PARAMS_DIR`, `WINTER_WHEAT_WEATHER`. Adding a module to a retiring tree is a
+deliberate call: it makes the eventual deletion **one file** instead of a hunt, and it is the
+only place that states Python is now a tenant of the reference's ground rather than its owner.
+
+⚠ **Priced consequence, stated rather than discovered later:** the Python packages no longer
+carry their own data, so a *non-editable* wheel build would ship loaders whose params are not
+in the wheel. The project installs editable (`_editable_impl_biosphere_sim.pth` → `src`) and
+the checker was already checkout-only (it reads goldens out of `tests/`), so nothing breaks
+today — but "the Python tree is installable standalone" stopped being true and is not coming
+back.
+
+### The deliberate manifest diff: two prose strings, predicted, then measured
+
+Two `_authority` `why` entries in the biosphere contract described this slice **in the future
+tense**, which is this repo's most-repeated failure mode. Both were rewritten and the manifest
+regenerated as the git-visible record; the diff is **exactly two `why` strings** — no key, no
+hash, no `side`.
+
+* `param_files` — S1 moved the ground under the key without moving the key; not one of the 23
+  hashes changed, and the 15-of-20 rule carried over *because the whole directory moved*.
+* `forcing/weather_fixture` — its own text said the name becomes derivable once *"the
+  relocation slice moves the fixture out of `tests/` to a data home the reference can read at
+  runtime."* ⚠ **S1 met that condition and deliberately did not act on it.** Deriving the name
+  flips this key's side `hand → rust`, which is a **re-anchoring**; taking it inside a slice
+  whose claim is *data moved, authority did not* would make the byte-neutrality claim
+  unfalsifiable. The successor is now named in the manifest rather than left implicit.
+
+### Verification
+
+`cargo build` / `cargo test` / `cargo clippy --all-targets` clean; `uv run pytest -n 12` →
+**2,447 passed, 5 skipped (13m08s)**; `ruff check` / `ruff format` clean. The three manifests
+and all 21 goldens are byte-identical apart from the two `why` strings above — `git status` on
+`tests/regression/` and on the other two manifests is empty, which is the byte-neutrality
+claim in its checkable form. All 28 param files and the weather fixture are recorded by git as
+100 %-similarity **renames**.
+
+### Deliberately NOT in this half
+
+* **The runtime reach-outs** — 26 scenario fixtures and 21 goldens. Named by the control above.
+* **Re-anchoring `forcing/weather_fixture`** — buildable now, and its own successor.
+* **The stale golden count** (25 vs 21) in `golden_platform.py`, `CLAUDE.md` and this plan —
+  it belongs to the half that edits those files.
+* **Deleting anything.** `demo.yaml` and `crops/potato/` moved rather than being dropped, on
+  purpose; every retirement is still S6's.

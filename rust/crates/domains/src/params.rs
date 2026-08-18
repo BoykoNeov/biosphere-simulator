@@ -21,11 +21,12 @@
 //! intention. The generator is retired only once that gate has been green — the rule
 //! `docs/plans/post-roadmap-reference-flip.md` §5c sets for every generator.
 //!
-//! ⚠ The `include_str!` paths reach out of the Rust tree into `src/`, the Python
-//! package. That is deliberate and temporary: under target state C the param files
-//! cannot stay in a deleted package, and the relocation is named in §5d as this slice's
-//! successor. The manifests key on **basenames**, so that move will shift neither a key
-//! nor a hash.
+//! ⚠ **The reach-out is gone as of Stage-3 slice S1** (2026-08-18). These files used to
+//! be `include_str!`-ed out of `src/domains/<domain>/params/` — the Python package — which
+//! meant the reference did not compile without a tree scheduled for deletion. They now live
+//! in `crates/domains/params/<domain>/`, next to the crate that reads them. The move was a
+//! pure rename: the manifests key on **basenames**, so it shifted neither a key nor a hash,
+//! and the byte gate proved it rather than the plan asserting it.
 
 use config::{require_closed, require_half_open, require_non_negative, require_positive};
 use config::{ConfigError, ParamFile};
@@ -35,12 +36,11 @@ use crate::eclss::EclssParams;
 use crate::power::{ChargeParams, SelfDischargeParams};
 use crate::thermal::ThermalParams;
 
-const CHARGE_YAML: &str = include_str!("../../../../src/domains/power/params/charge.yaml");
-const SELF_DISCHARGE_YAML: &str =
-    include_str!("../../../../src/domains/power/params/self_discharge.yaml");
-const RADIATOR_YAML: &str = include_str!("../../../../src/domains/thermal/params/radiator.yaml");
-const ECLSS_YAML: &str = include_str!("../../../../src/domains/eclss/params/eclss.yaml");
-const CREW_YAML: &str = include_str!("../../../../src/domains/crew/params/crew.yaml");
+const CHARGE_YAML: &str = include_str!("../params/power/charge.yaml");
+const SELF_DISCHARGE_YAML: &str = include_str!("../params/power/self_discharge.yaml");
+const RADIATOR_YAML: &str = include_str!("../params/thermal/radiator.yaml");
+const ECLSS_YAML: &str = include_str!("../params/eclss/eclss.yaml");
+const CREW_YAML: &str = include_str!("../params/crew/crew.yaml");
 
 /// Load a param file, panicking on a malformed one.
 ///
@@ -212,41 +212,19 @@ pub fn param_files() -> Vec<(&'static str, &'static str)> {
     files
 }
 
-/// The five directories the sibling census is a census **of**, `(directory, expected count)`.
+/// The four directories the sibling census is a census **of** (five files: Power carries
+/// two), `(directory, expected count)`.
 ///
-/// Resolved at compile time, the same reach-out `include_str!` above makes. ⚠ Under target
-/// state C these paths point into a Python package scheduled for deletion; the census makes
-/// that a runtime dependency too, which sharpens the relocation trigger recorded in
-/// `docs/plans/post-roadmap-reference-flip.md` §5d rather than resolving it.
+/// Resolved at compile time against this crate's own root, the same as the `include_str!`s
+/// above. ⚠ Before Stage-3 slice S1 these pointed into a Python package scheduled for
+/// deletion, which made the census a *runtime* dependency on the dying tree as well as a
+/// compile-time one. S1 moved the files here; the census now reads the reference's own
+/// ground.
 pub const PARAM_DIRS: [(&str, usize); 4] = [
-    (
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../../src/domains/power/params"
-        ),
-        2,
-    ),
-    (
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../../src/domains/thermal/params"
-        ),
-        1,
-    ),
-    (
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../../src/domains/eclss/params"
-        ),
-        1,
-    ),
-    (
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../../src/domains/crew/params"
-        ),
-        1,
-    ),
+    (concat!(env!("CARGO_MANIFEST_DIR"), "/params/power"), 2),
+    (concat!(env!("CARGO_MANIFEST_DIR"), "/params/thermal"), 1),
+    (concat!(env!("CARGO_MANIFEST_DIR"), "/params/eclss"), 1),
+    (concat!(env!("CARGO_MANIFEST_DIR"), "/params/crew"), 1),
 ];
 
 #[cfg(test)]

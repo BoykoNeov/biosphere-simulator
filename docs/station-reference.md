@@ -120,7 +120,7 @@ so a future aux is caught.
 
 ### The eight param files
 
-`src/domains/{power,thermal,eclss,crew}/params/*.yaml` + `src/station/params/*.yaml`:
+`rust/crates/domains/params/{power,thermal,eclss,crew}/*.yaml` + `rust/crates/station/params/*.yaml` (both moved out of the Python packages in Stage-3 slice S1, 2026-08-18; a pure rename — the manifest keys on basenames, so not one hash moved):
 `charge`, `self_discharge` (power); `radiator` (thermal); `eclss` (eclss); `crew` (crew);
 `water_recovery`, `lamp`, `harvest` (station). Each is clean-room from primary literature
 or illustrative sizing per the frozen-but-illustrative caveat above; the manifest records a

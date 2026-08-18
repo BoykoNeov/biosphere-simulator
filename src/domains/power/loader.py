@@ -19,13 +19,12 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from config import load_yaml
+from config.paths import DOMAIN_PARAMS_ROOT
 from domains.power.flows import ChargeParams, SelfDischargeParams
 
 # The committed Power param files (P5.2 charge, P5.5 self-discharge).
-CHARGE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "charge.yaml"
-SELF_DISCHARGE_PARAMS_PATH: Path = (
-    Path(__file__).parent / "params" / "self_discharge.yaml"
-)
+CHARGE_PARAMS_PATH: Path = DOMAIN_PARAMS_ROOT / "power" / "charge.yaml"
+SELF_DISCHARGE_PARAMS_PATH: Path = DOMAIN_PARAMS_ROOT / "power" / "self_discharge.yaml"
 
 # Expected canonical unit string per Power param (exact-match guard at the boundary).
 # Neither a dimensionless efficiency nor a first-order rate is a conserved-Quantity

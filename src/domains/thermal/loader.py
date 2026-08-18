@@ -20,10 +20,11 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from config import load_yaml
+from config.paths import DOMAIN_PARAMS_ROOT
 from domains.thermal.flows import ThermalParams
 
 # The committed Thermal param file (Step 5 radiator).
-RADIATOR_PARAMS_PATH: Path = Path(__file__).parent / "params" / "radiator.yaml"
+RADIATOR_PARAMS_PATH: Path = DOMAIN_PARAMS_ROOT / "thermal" / "radiator.yaml"
 
 # Expected canonical unit string per Thermal param (exact-match guard at the boundary).
 # None is a conserved-Quantity canonical unit (those are CARBON=kg, ENERGY=J, ...), so

@@ -104,6 +104,7 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere import scenario as sc
 from domains.biosphere.allocation import (
     Senescence,
@@ -151,7 +152,7 @@ from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.registry import Registry
 from simcore.state import State
 
-_WEATHER = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER = WINTER_WHEAT_WEATHER
 _M_C = 0.012011  # kg C / mol C
 _CARBON_FRACTION = 0.45  # kg C / kg DM
 _CROSSING_T_HA = 14.4248  # Greenwood target meets n_critical (test_nitrogen_form.py)

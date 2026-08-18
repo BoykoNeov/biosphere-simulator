@@ -59,6 +59,8 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
+
 # ⚠ The day-vs-step read-back idiom lives in ONE place, `tests/day_index.py`
 # (`by_day`, `days_in`) — it was invented five ways in five files first. See that
 # module's docstring for why, and do not re-inline it here.
@@ -86,7 +88,7 @@ from simcore.state import State
 
 _ORACLE_DIR = Path(__file__).parent / "oracle"
 _REFERENCE = _ORACLE_DIR / "winter_wheat_reference.json"
-_WEATHER = _ORACLE_DIR / "winter_wheat_weather.json"
+_WEATHER = WINTER_WHEAT_WEATHER
 
 _GROUND_AREA = 1.0  # m² — the Phase-1 winter-wheat PP plot (SeasonScenario default)
 

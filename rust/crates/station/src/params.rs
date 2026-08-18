@@ -17,10 +17,9 @@ use domains::biosphere::weather::PAR_UMOL_PER_J;
 
 use crate::flows::{HarvestParams, LampParams, WaterRecoveryParams};
 
-const WATER_RECOVERY_YAML: &str =
-    include_str!("../../../../src/station/params/water_recovery.yaml");
-const LAMP_YAML: &str = include_str!("../../../../src/station/params/lamp.yaml");
-const HARVEST_YAML: &str = include_str!("../../../../src/station/params/harvest.yaml");
+const WATER_RECOVERY_YAML: &str = include_str!("../params/water_recovery.yaml");
+const LAMP_YAML: &str = include_str!("../params/lamp.yaml");
+const HARVEST_YAML: &str = include_str!("../params/harvest.yaml");
 
 fn file(text: &str, name: &'static str) -> ParamFile {
     ParamFile::parse(text, name).unwrap_or_else(|e| panic!("{name} is malformed: {e}"))
@@ -97,7 +96,7 @@ pub fn harvest() -> HarvestParams {
 /// this module loads, in filename order (slice C8 of the reference flip).
 ///
 /// The station manifest's `param_files` is these three plus the five
-/// [`domains::params::param_files`] owns. No exclusion rule — `src/station/params/` holds
+/// [`domains::params::param_files`] owns. No exclusion rule — `crates/station/params/` holds
 /// nothing but frozen files.
 pub fn param_files() -> Vec<(&'static str, &'static str)> {
     let mut files = vec![
@@ -110,7 +109,7 @@ pub fn param_files() -> Vec<(&'static str, &'static str)> {
 }
 
 /// The directory the station census is a census **of**, and its expected file count.
-pub const PARAMS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../src/station/params");
+pub const PARAMS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/params");
 
 #[cfg(test)]
 mod tests {
@@ -186,7 +185,7 @@ mod tests {
         assert!(harvest().harvest_rate >= 0.0);
     }
 
-    /// The census equals what `src/station/params/` holds.
+    /// The census equals what `crates/station/params/` holds.
     ///
     /// ⚠⚠ The completeness half of `param_files` — see the sibling twin in
     /// `crates/domains/src/params.rs`. The digests are author-neutral; the roster is not.

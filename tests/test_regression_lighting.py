@@ -33,6 +33,7 @@ weather conversions + FvCB use ``math`` transcendentals, so this golden is bit-i
 from pathlib import Path
 
 import sim_io
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.stocks import (
     HUMUS_CARBON,
     LEAF_C,
@@ -65,7 +66,7 @@ from station.scenario import LIGHTING_SCENARIO
 
 GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
 GOLDEN_PATH = GOLDEN_DIR / "lighting_state.json"
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 _LP = load_lamp_params()
 _SC = LIGHTING_SCENARIO

@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import BIOSPHERE_PARAMS_DIR, WINTER_WHEAT_WEATHER
 from domains.biosphere.loader import (
     crop_param_set,
     load_phenology_params,
@@ -45,11 +46,7 @@ from domains.biosphere.stocks import (
 from simcore.auxiliary import AuxId
 from simcore.integrator import EulerIntegrator
 
-_WEATHER = json.loads(
-    (Path(__file__).parent / "oracle" / "winter_wheat_weather.json").read_text(
-        encoding="utf-8"
-    )
-)["weather"]
+_WEATHER = json.loads((WINTER_WHEAT_WEATHER).read_text(encoding="utf-8"))["weather"]
 
 _ROOTD = load_root_depth_params()
 
@@ -120,9 +117,7 @@ def test_a_non_positive_parameter_is_rejected_at_the_boundary(tmp_path: Path) ->
     # gate is shut forever; zero depth divides by a crop that cannot root), and no
     # golden
     # would notice. So they are rejected where they are read.
-    src = Path("src/domains/biosphere/params/root_depth.yaml").read_text(
-        encoding="utf-8"
-    )
+    src = (BIOSPHERE_PARAMS_DIR / "root_depth.yaml").read_text(encoding="utf-8")
     for field in ("max_extension_rate", "max_rooted_depth"):
         bad = tmp_path / f"{field}.yaml"
         original = "value: 0.018" if field == "max_extension_rate" else "value: 1.3"

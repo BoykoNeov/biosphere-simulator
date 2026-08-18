@@ -53,6 +53,7 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import BIOSPHERE_PARAMS_DIR
 from domains.biosphere import scenario as sc
 from domains.biosphere.loader import load_nitrogen_params
 from domains.biosphere.season import (
@@ -361,9 +362,7 @@ def test_the_tree_has_no_lignin_state_and_the_CUE_BUILD_ALREADY_SAID_SO() -> Non
     ).stdout.split()
     # lignin appears ONLY as prose explaining what cannot be expressed
     assert hits, "expected the CUE build's own note"
-    yaml = (root / "src/domains/biosphere/params/humification.yaml").read_text(
-        encoding="utf-8"
-    )
+    yaml = (BIOSPHERE_PARAMS_DIR / "humification.yaml").read_text(encoding="utf-8")
     assert "no lignin fraction" in yaml
     assert "is not" in yaml and "expressible" in yaml
     # and there is no lignin STOCK or PARAM anywhere

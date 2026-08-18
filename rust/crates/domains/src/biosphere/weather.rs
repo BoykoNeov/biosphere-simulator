@@ -28,16 +28,18 @@ use config::{iso_day_of_year, parse_json, ConfigError};
 
 /// The committed raw NASAPower weather fixture — the reference's forcing input.
 ///
-/// ⚠ The path reaches out of the Rust tree into the Python one, exactly as the param
-/// `include_str!`s in `params.rs` do (slice C1). It is the same ugliness with the same
-/// successor and is recorded, not overlooked: the relocation slice that moves frozen
-/// data out of `src/` and `tests/` owns both. The fixture is *raw observational facts*,
+/// ⚠ **The reach-out is gone as of Stage-3 slice S1** (2026-08-18). C9 embedded this file
+/// from `tests/oracle/`, five directories up in the tree scheduled for deletion — the same
+/// ugliness the param `include_str!`s carried, recorded rather than overlooked, with the
+/// relocation slice named as its successor. S1 is that slice: the file now sits in this
+/// crate's own `data/`, and the *surviving* oracle carve-out reads it from here instead.
+/// The discriminator for moving this one and not `tests/oracle/`'s other two weather series
+/// is that the reference compiles **this** one in. The fixture is *raw observational facts*,
 /// license-clean per `docs/reuse-and-licenses.md` — it is not PCSE output.
 ///
 /// Public so the inventory dump can hash **what the reference compiled in** against what
 /// the checker finds on disk — see that program's `weather_sha256` note.
-pub const WEATHER_FIXTURE: &str =
-    include_str!("../../../../../tests/oracle/winter_wheat_weather.json");
+pub const WEATHER_FIXTURE: &str = include_str!("../../data/winter_wheat_weather.json");
 
 const SECONDS_PER_DAY: f64 = 86400.0;
 /// PAR is ~50% of global shortwave by energy (McCree 1972; FAO uses 0.5).

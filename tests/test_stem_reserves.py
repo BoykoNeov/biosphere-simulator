@@ -98,6 +98,7 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import BIOSPHERE_PARAMS_DIR, WINTER_WHEAT_WEATHER
 from domains.biosphere import scenario as sc
 from domains.biosphere.allocation import Senescence
 from domains.biosphere.canopy import leaf_area_index
@@ -141,7 +142,7 @@ from simcore.quantities import Quantity, canonical_unit
 from simcore.registry import Registry
 from simcore.state import State
 
-_WEATHER = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER = WINTER_WHEAT_WEATHER
 _M_C = 0.012011  # kg C / mol C
 _CARBON_FRACTION = 0.45  # kg C / kg DM
 
@@ -939,9 +940,7 @@ def test_the_partition_table_is_what_blocks_it_and_it_is_UNCITED() -> None:
 
     assert partition_fractions(3.0, table)[1] == table[-1].fs
 
-    text = (
-        Path(__file__).parents[1] / "src/domains/biosphere/params/allocation.yaml"
-    ).read_text(encoding="utf-8")
+    text = (BIOSPHERE_PARAMS_DIR / "allocation.yaml").read_text(encoding="utf-8")
     assert "TODO(cite)" in text and "provisional" in text
 
 
@@ -1232,9 +1231,7 @@ def test_the_loader_refuses_a_cessation_that_is_unreachable_or_empty(
     mirror: at or below the trigger the window is empty and the mechanism is off while
     fully wired. Both are rejected where the value is read.
     """
-    src = Path("src/domains/biosphere/params/stem_reserves.yaml").read_text(
-        encoding="utf-8"
-    )
+    src = (BIOSPHERE_PARAMS_DIR / "stem_reserves.yaml").read_text(encoding="utf-8")
     original = "value: 2.0"
     assert src.count(original) == 1, "cessation is no longer the only 2.0 in the file"
     for bad in ("2.5", "1.0", "0.5"):

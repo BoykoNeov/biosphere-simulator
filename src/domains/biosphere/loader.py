@@ -19,6 +19,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from config import convert, load_yaml, to_canonical
+from config.paths import BIOSPHERE_PARAMS_DIR
 from domains.biosphere.allocation import (
     AllocationParams,
     PartitionRow,
@@ -45,49 +46,43 @@ from domains.biosphere.water_cycle import WaterCycleParams
 from simcore.quantities import Quantity
 
 # The committed canonical demo params.
-DEMO_PARAMS_PATH: Path = Path(__file__).parent / "params" / "demo.yaml"
+DEMO_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "demo.yaml"
 # The committed winter-wheat canopy (Beer–Lambert) params (Phase-1 Step 4).
-CANOPY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "canopy.yaml"
+CANOPY_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "canopy.yaml"
 # The committed winter-wheat FvCB photosynthesis params (Phase-1 Step 5).
-PHOTOSYNTHESIS_PARAMS_PATH: Path = (
-    Path(__file__).parent / "params" / "photosynthesis.yaml"
-)
+PHOTOSYNTHESIS_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "photosynthesis.yaml"
 # The committed winter-wheat respiration params (Phase-1 Step 6).
-RESPIRATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "respiration.yaml"
+RESPIRATION_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "respiration.yaml"
 # The committed winter-wheat Penman–Monteith transpiration params (Phase-1 Step 7).
-TRANSPIRATION_PARAMS_PATH: Path = (
-    Path(__file__).parent / "params" / "transpiration.yaml"
-)
+TRANSPIRATION_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "transpiration.yaml"
 # The committed winter-wheat thermal-time phenology params (Phase-1 Step 8).
-PHENOLOGY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "phenology.yaml"
+PHENOLOGY_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "phenology.yaml"
 # The committed winter-wheat allocation (DVS-keyed partition table) params (Step 9).
-ALLOCATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "allocation.yaml"
+ALLOCATION_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "allocation.yaml"
 # The committed winter-wheat senescence (relative death rate) params (Phase-1 Step 9).
-SENESCENCE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "senescence.yaml"
+SENESCENCE_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "senescence.yaml"
 # The committed winter-wheat nitrogen uptake + limitation params (Phase-1 Step 10).
-NITROGEN_PARAMS_PATH: Path = Path(__file__).parent / "params" / "nitrogen.yaml"
+NITROGEN_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "nitrogen.yaml"
 #: The rooted-depth extension params (the third aux accumulator).
-ROOT_DEPTH_PARAMS_PATH: Path = Path(__file__).parent / "params" / "root_depth.yaml"
+ROOT_DEPTH_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "root_depth.yaml"
 #: The stem-reserve remobilization params (post-roadmap: the stem feeding the grain).
-STEM_RESERVE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "stem_reserves.yaml"
+STEM_RESERVE_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "stem_reserves.yaml"
 # The committed chamber litter-decomposition (first-order decay) params (P2 Step 4).
-DECOMPOSITION_PARAMS_PATH: Path = (
-    Path(__file__).parent / "params" / "decomposition.yaml"
-)
+DECOMPOSITION_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "decomposition.yaml"
 # The committed chamber microbial-respiration (first-order rate) params (P2 Step 5).
 MICROBIAL_RESPIRATION_PARAMS_PATH: Path = (
-    Path(__file__).parent / "params" / "microbial_respiration.yaml"
+    BIOSPHERE_PARAMS_DIR / "microbial_respiration.yaml"
 )
 # The committed chamber humification-split (CUE) params: the three CO₂ fractions that
 # partition every decomposer flux + the slow-SOM pool's own rate (post-roadmap,
 # 2026-08-10; CENTURY / Parton et al. 1987).
-HUMIFICATION_PARAMS_PATH: Path = Path(__file__).parent / "params" / "humification.yaml"
+HUMIFICATION_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "humification.yaml"
 # The committed chamber water-cycle params (P3 Step 3): the two first-order rates
 # (condensation + recycling) that close the water loop.
-WATER_CYCLE_PARAMS_PATH: Path = Path(__file__).parent / "params" / "water_cycle.yaml"
+WATER_CYCLE_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "water_cycle.yaml"
 # The committed chamber minimal-consumer params (P3 Step 7): the three first-order rates
 # (grazing + consumer respiration + mortality) + the f_O2 O₂ half-saturation.
-HERBIVORY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "herbivory.yaml"
+HERBIVORY_PARAMS_PATH: Path = BIOSPHERE_PARAMS_DIR / "herbivory.yaml"
 
 # --- the crop param-set seam (post-roadmap: potato, the first SECOND species) ---------
 # Everything above is the FROZEN winter-wheat reference. Until this seam existed the
@@ -112,7 +107,7 @@ HERBIVORY_PARAMS_PATH: Path = Path(__file__).parent / "params" / "herbivory.yaml
 # "every crop". Enlarging ``param_files`` to freeze a set we simultaneously declare
 # unvalidated would be incoherent. The trade-off is written up in the plan doc; it is
 # not hidden here.
-CROPS_DIR: Path = Path(__file__).parent / "params" / "crops"
+CROPS_DIR: Path = BIOSPHERE_PARAMS_DIR / "crops"
 
 # name -> the FROZEN reference file that name falls back to. The keys are the crop-set
 # vocabulary: a file in a crop directory whose stem is not a key is a typo, not a new

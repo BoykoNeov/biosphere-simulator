@@ -21,10 +21,11 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from config import load_yaml
+from config.paths import DOMAIN_PARAMS_ROOT
 from domains.crew.flows import CrewParams
 
 # The committed Crew param file (Step 7 metabolic-split fractions).
-CREW_PARAMS_PATH: Path = Path(__file__).parent / "params" / "crew.yaml"
+CREW_PARAMS_PATH: Path = DOMAIN_PARAMS_ROOT / "crew" / "crew.yaml"
 
 # Expected canonical unit string per Crew param (exact-match guard at the boundary).
 # Neither fraction is a conserved-Quantity canonical unit, so each is schema-validated

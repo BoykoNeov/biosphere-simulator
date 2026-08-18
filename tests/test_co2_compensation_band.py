@@ -59,10 +59,10 @@ from __future__ import annotations
 
 import json
 from functools import cache
-from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.loader import load_photosynthesis_params
 from domains.biosphere.scenario import (
     CONSUMER_CHAMBER_YEARS,
@@ -85,7 +85,7 @@ from domains.biosphere.step import BIO_DT, steps_for
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 # The tripwire literal. It is the *expected* value of a quantity read from the frozen
 # params below — never the threshold an assertion compares against. See the module note.

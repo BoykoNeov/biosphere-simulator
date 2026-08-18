@@ -50,35 +50,22 @@ use config::{
 /// rather than in [`config`].
 pub const MOLAR_MASS_CARBON_KG_PER_MOL: f64 = 0.012011;
 
-const CANOPY_YAML: &str = include_str!("../../../../../src/domains/biosphere/params/canopy.yaml");
-const PHOTOSYNTHESIS_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/photosynthesis.yaml");
-const RESPIRATION_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/respiration.yaml");
-const TRANSPIRATION_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/transpiration.yaml");
-const PHENOLOGY_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/phenology.yaml");
-const SENESCENCE_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/senescence.yaml");
-const ROOT_DEPTH_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/root_depth.yaml");
-const STEM_RESERVES_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/stem_reserves.yaml");
-const NITROGEN_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/nitrogen.yaml");
-const DECOMPOSITION_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/decomposition.yaml");
+const CANOPY_YAML: &str = include_str!("../../params/biosphere/canopy.yaml");
+const PHOTOSYNTHESIS_YAML: &str = include_str!("../../params/biosphere/photosynthesis.yaml");
+const RESPIRATION_YAML: &str = include_str!("../../params/biosphere/respiration.yaml");
+const TRANSPIRATION_YAML: &str = include_str!("../../params/biosphere/transpiration.yaml");
+const PHENOLOGY_YAML: &str = include_str!("../../params/biosphere/phenology.yaml");
+const SENESCENCE_YAML: &str = include_str!("../../params/biosphere/senescence.yaml");
+const ROOT_DEPTH_YAML: &str = include_str!("../../params/biosphere/root_depth.yaml");
+const STEM_RESERVES_YAML: &str = include_str!("../../params/biosphere/stem_reserves.yaml");
+const NITROGEN_YAML: &str = include_str!("../../params/biosphere/nitrogen.yaml");
+const DECOMPOSITION_YAML: &str = include_str!("../../params/biosphere/decomposition.yaml");
 const MICROBIAL_RESPIRATION_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/microbial_respiration.yaml");
-const HUMIFICATION_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/humification.yaml");
-const WATER_CYCLE_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/water_cycle.yaml");
-const HERBIVORY_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/herbivory.yaml");
-const ALLOCATION_YAML: &str =
-    include_str!("../../../../../src/domains/biosphere/params/allocation.yaml");
+    include_str!("../../params/biosphere/microbial_respiration.yaml");
+const HUMIFICATION_YAML: &str = include_str!("../../params/biosphere/humification.yaml");
+const WATER_CYCLE_YAML: &str = include_str!("../../params/biosphere/water_cycle.yaml");
+const HERBIVORY_YAML: &str = include_str!("../../params/biosphere/herbivory.yaml");
+const ALLOCATION_YAML: &str = include_str!("../../params/biosphere/allocation.yaml");
 
 /// The `parameters` block of `phenology.yaml`, which **three** loaders read.
 ///
@@ -917,7 +904,7 @@ pub fn biosphere() -> BiosphereParams {
 ///
 /// # ⚠ The 15-of-20 rule, and why the five are excluded for TWO different reasons
 ///
-/// `src/domains/biosphere/params/` holds **20** `*.yaml` files and the manifest names
+/// `crates/domains/params/biosphere/` holds **20** `*.yaml` files and the manifest names
 /// **15**. The excluded five split:
 ///
 /// * **four `crops/potato/*.yaml`** — excluded because the census is **non-recursive**. The
@@ -966,17 +953,15 @@ pub fn param_files() -> Vec<(&'static str, &'static str)> {
     files
 }
 
-/// The directory the census is a census **of** — resolved at compile time, the same
-/// reach-out `include_str!` above makes.
+/// The directory the census is a census **of** — resolved at compile time against this
+/// crate's own root, the same as the `include_str!`s above.
 ///
-/// ⚠ Under target state C the param YAML cannot stay inside a deleted Python package, and
-/// this constant makes the reach-out a **runtime** dependency as well as a compile-time one.
-/// That sharpens the relocation trigger recorded in
-/// `docs/plans/post-roadmap-reference-flip.md` §5d rather than resolving it.
-pub const PARAMS_DIR: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../../src/domains/biosphere/params"
-);
+/// ⚠ Until Stage-3 slice S1 this pointed into `src/domains/biosphere/params/`, a Python
+/// package scheduled for deletion, which made the census a **runtime** dependency on the
+/// dying tree as well as a compile-time one — the sharper half of the same problem. S1 moved
+/// the whole directory here, `crops/potato/` and `demo.yaml` included, so the census rule and
+/// its two different exclusions carry over verbatim.
+pub const PARAMS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/params/biosphere");
 
 /// The census's own exclusion: the skeleton file the frozen set leaves out **by name**.
 pub const EXCLUDED_PARAM_FILE: &str = "demo.yaml";

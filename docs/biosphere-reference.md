@@ -396,7 +396,7 @@ the file went with them; its provenance record — five rounds of negative retri
 is archived verbatim at `docs/retired/mineralization.yaml`, because a stale *negative* result
 suppresses the next search and is the more expensive thing to lose.
 
-`src/domains/biosphere/params/*.yaml` minus `demo.yaml`: `canopy`, `photosynthesis`,
+`rust/crates/domains/params/biosphere/*.yaml` minus `demo.yaml` (the directory moved out of the Python package in Stage-3 slice S1, 2026-08-18; a pure rename — the manifest keys on basenames, so not one hash moved): `canopy`, `photosynthesis`,
 `respiration`, `transpiration`, `phenology`, `allocation`, `senescence`, `nitrogen`
 (Phase-1 producer); `decomposition`, `microbial_respiration` (Phase-2 decomposer — and,
 since option (B), the N return loop too: its legs carry no rate of their own);
@@ -426,7 +426,10 @@ or PCSE source. The manifest records a newline-normalized sha-256 of each as **p
 ### The driving forcing
 
 The canonical scenarios are driven by the committed raw-weather fixture
-`tests/oracle/winter_wheat_weather.json` (NASAPower facts; read as JSON, never via PCSE).
+`rust/crates/domains/data/winter_wheat_weather.json` (NASAPower facts; read as JSON, never
+via PCSE). It sat in `tests/oracle/` until Stage-3 slice S1 (2026-08-18) moved it beside the
+crate that compiles it in; a pure rename, and the manifest records its **basename**, so no
+value moved.
 Tiling it `Y×` gives the multi-year horizons. Recorded in the manifest under `forcing`.
 
 #### ⚠ UNFROZEN 2026-08-14: PAR varies **within** the day — the light path
@@ -943,8 +946,8 @@ the top of this doc, which are live claims, are kept current.
   unfreeze: no key re-anchored and no value moved; this entry exists because two sentences
   elsewhere in this document became false.** The reference used to read
   `weather_facts.txt`, a hex-float table that `tests/crossport/gen_biosphere_weather.py`
-  lowered out of the JSON fixture. It now reads `tests/oracle/winter_wheat_weather.json`
-  itself, through a closed-subset JSON reader and an ISO-date→day-of-year helper in the
+  lowered out of the JSON fixture. It now reads the raw JSON fixture
+  itself (then at `tests/oracle/`, moved to `rust/crates/domains/data/` by S1), through a closed-subset JSON reader and an ISO-date→day-of-year helper in the
   `config` crate; the generator, the table and the Python sync gate are deleted.
 
   **Bit-neutral, and measured before any Rust was written**: all 916 values parse to identical

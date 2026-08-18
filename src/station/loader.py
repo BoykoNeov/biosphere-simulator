@@ -24,19 +24,18 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from config import load_yaml
+from config.paths import STATION_PARAMS_DIR
 from domains.biosphere.weather import PAR_UMOL_PER_J
 from station.flows import HarvestParams, LampParams, WaterRecoveryParams
 
 # The committed station water-recovery param file (Step 4 crew water loop).
-WATER_RECOVERY_PARAMS_PATH: Path = (
-    Path(__file__).parent / "params" / "water_recovery.yaml"
-)
+WATER_RECOVERY_PARAMS_PATH: Path = STATION_PARAMS_DIR / "water_recovery.yaml"
 
 # The committed station grow-lamp param file (Step 5 Power → biosphere lighting).
-LAMP_PARAMS_PATH: Path = Path(__file__).parent / "params" / "lamp.yaml"
+LAMP_PARAMS_PATH: Path = STATION_PARAMS_DIR / "lamp.yaml"
 
 # The committed station grain-harvest param file (Step 6 biomass/food loop).
-HARVEST_PARAMS_PATH: Path = Path(__file__).parent / "params" / "harvest.yaml"
+HARVEST_PARAMS_PATH: Path = STATION_PARAMS_DIR / "harvest.yaml"
 
 # Expected canonical unit string per param (exact-match guard at the boundary). Neither
 # is a conserved-Quantity canonical unit, so each is schema-validated and exact-string

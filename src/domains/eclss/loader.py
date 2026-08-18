@@ -21,10 +21,11 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from config import load_yaml
+from config.paths import DOMAIN_PARAMS_ROOT
 from domains.eclss.flows import EclssParams
 
 # The committed ECLSS param file (Step 6 cabin-air control loops).
-ECLSS_PARAMS_PATH: Path = Path(__file__).parent / "params" / "eclss.yaml"
+ECLSS_PARAMS_PATH: Path = DOMAIN_PARAMS_ROOT / "eclss" / "eclss.yaml"
 
 # Expected canonical unit string per ECLSS param (exact-match guard at the boundary).
 # None is a conserved-Quantity canonical unit (those are OXYGEN=mol, CARBON=mol,

@@ -29,11 +29,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+from config.paths import WINTER_WHEAT_WEATHER
+
 # Fixtures live beside this module: the reference trajectory (PCSE OUTPUT) and the raw
 # daily weather (NASAPower facts) the season is driven by — both license-clean (facts),
 # neither containing crop-parameter YAML.
 FIXTURE_PATH = Path(__file__).with_name("winter_wheat_reference.json")
-WEATHER_FIXTURE_PATH = Path(__file__).with_name("winter_wheat_weather.json")
+WEATHER_FIXTURE_PATH = WINTER_WHEAT_WEATHER
 
 # Raw NASAPower weather fields captured per day (units per PCSE WeatherDataContainer:
 # TEMP/°C daily mean, IRRAD/J m⁻² day⁻¹ shortwave, VAP/hPa vapour pressure). These

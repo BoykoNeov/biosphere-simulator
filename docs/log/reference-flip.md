@@ -2049,3 +2049,68 @@ Both controls run against a clean tree with nothing else in flight, both files r
 with `git checkout --`, workspace re-verified green afterwards — §5p's third process trap,
 observed. `git diff` is empty for `src/`, `rust/`, the goldens and all three manifests.
 Inventories: `M:/claud_projects/temp/stage3-sorting/`.
+
+### S1 — the reference's own ground; the compile-time half (2026-08-18)
+
+Plan: `docs/plans/post-roadmap-reference-flip.md` §5r.
+
+Stage 3's FINDING 1: `rm -rf src/ tests/` would not fail a *test*, it would fail the
+**build** — `rust/` compiled 24 files out of the tree being deleted. S1 splits along that
+dependency. This half moved the two compile-time reach-outs: **23 frozen param YAMLs** (plus
+`demo.yaml` and the four `crops/potato/` overrides — 28 files) into
+`rust/crates/{domains,station}/params/<domain>/`, and `winter_wheat_weather.json` into
+`rust/crates/domains/data/`. Every one is a git-recorded 100 %-similarity **rename**.
+
+**The slice's category was a measurement, not a judgement.** All three manifests were grepped
+for path fragments before anything moved: `param_files` is basename-keyed, `scenarios/*`
+records a golden basename, `parity_vectors` likewise — **zero path hits**. So the move is a
+*pure rename*, no unfreeze ceremony, and the byte gate proves it instead of the plan asserting
+it. `.gitattributes` was checked for the same reason: it is global (`* text=auto eol=lf`), so
+the new home inherits identical normalization — which matters because `include_str!` embeds
+the **working tree** and one frozen file is CRLF on this box.
+
+**⚠⚠ The whole directory moved, and that was forced by a control rather than chosen for
+tidiness.** `a_recursive_walk_reddens_the_census` proves *"a directory is not a category"* by
+asserting the recursive walk sees exactly four more files than the census. That assertion has
+teeth **only because the four potato overrides sit in a subdirectory of `PARAMS_DIR`** — take
+the fifteen frozen files and leave the rest, and the control stops measuring a hazard the tree
+no longer contains. `demo.yaml` came for the parallel reason: it keeps the exclusion-**by-
+name** rule true verbatim, so three literals (`param_files()`, the dump's `assert_eq!(15)`,
+the census test's own count) stay correct with no value change. Both die at S6, inside a
+retirement, where the rules dissolve deliberately.
+
+**⚠ A negative assertion about a directory goes vacuous when the directory moves.**
+`test_mineralization.py` asserts a retired param file does *not* exist there. A directory that
+does not exist satisfies that silently, so a mis-resolved path would have turned a real check
+into a green no-op. The positive half now runs first. The general question — *what does this
+assert if the path is wrong?* — is the only thing separating a live negative from a vacuous
+one, and it has to be asked of every re-pointed path, not just the suspicious ones.
+
+**The two-direction control:** with `src/` and `tests/` renamed away, `cargo build` **succeeds**
+(false this morning) and `cargo test` **fails**, its panics naming `scenario_files.rs` and
+`snapshot.rs` — exactly the runtime reach-outs the second half owes. The control is also a
+to-do list that cannot be padded.
+
+**Python became a tenant.** Six loaders spelled their own `Path(__file__).parent / "params"`
+and 40 test modules spelled the weather fixture; `src/config/paths.py` now holds that climb
+once. Priced consequence, stated rather than discovered: the Python packages no longer carry
+their own data, so a *non-editable* wheel would ship loaders without params. The project
+installs editable and the checker was already checkout-only, so nothing breaks — but "the
+Python tree is installable standalone" stopped being true.
+
+**The deliberate manifest diff was two prose strings, predicted then measured.** Two
+`_authority` `why` entries described this slice in the **future tense** — the repo's
+most-repeated failure mode. `forcing/weather_fixture`'s own text said its name becomes
+derivable once the relocation lands. ⚠ S1 met that condition **and deliberately did not act on
+it**: deriving the name flips the key `hand → rust`, which is a re-anchoring, and taking it
+inside a slice claiming *data moved, authority did not* would make the byte-neutrality claim
+unfalsifiable. Named as the successor in the manifest itself.
+
+**Found while measuring, left for the second half:** the golden count is stale in three places
+(plan, `golden_platform.py`, `CLAUDE.md` all say 25; disk holds 21 since C6 deleted four).
+
+#### Verification
+
+`cargo build` / `cargo test` / `cargo clippy --all-targets` clean; `uv run pytest -n 12` →
+2,447 passed, 5 skipped (13m08s). `git status` on `tests/regression/` and on the other two
+manifests is empty — byte-neutrality in its checkable form.

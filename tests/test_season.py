@@ -30,11 +30,11 @@ PCSE-free: ``runner.load_weather`` reads the committed JSON weather fixture (no 
 
 import json
 import math
-from pathlib import Path
 
 import pytest
 import yaml
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.canopy import leaf_area_index
 from domains.biosphere.loader import (
     CANOPY_PARAMS_PATH,
@@ -67,7 +67,7 @@ from simcore.state import State
 # The committed raw-weather fixture (NASAPower facts) lives beside the runner that
 # regenerates it. Read it as plain JSON by path (no PCSE, no ``tests.oracle`` import) so
 # this stays a default-suite test.
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 _SCENARIO = SeasonScenario()
 _ORGANS = (LEAF_C, STEM_C, ROOT_C, STORAGE_C)

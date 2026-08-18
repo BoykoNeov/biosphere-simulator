@@ -81,7 +81,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import domains.biosphere
+from config.paths import BIOSPHERE_PARAMS_DIR, WINTER_WHEAT_WEATHER
 from domains.biosphere.light_path import half_sine_window_mean
 from domains.biosphere.season import (
     CONSUMER_CHAMBER_SCENARIO,
@@ -105,9 +105,9 @@ from science_gates import (
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = _REPO_ROOT / "docs" / "biosphere-reference.manifest.json"
 
-PARAMS_DIR = Path(domains.biosphere.__file__).parent / "params"
+PARAMS_DIR = BIOSPHERE_PARAMS_DIR
 GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
-WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 # The Phase-0 engine-skeleton demo param file — NOT biosphere science. It feeds the demo
 # flows in ``flows.py`` (no real biology). Scoped out of the biosphere reference, by

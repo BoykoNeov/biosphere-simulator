@@ -18,10 +18,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, replace
-from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.allocation import Senescence, senescence_flux
 from domains.biosphere.chamber import oxygen_limitation_factor
 from domains.biosphere.compartments import SOIL
@@ -188,7 +188,7 @@ K_AGGREGATE_YR = (
 # (test_decade_stability.py::test_decade_min_carbon_pool_stationary).
 DECADE_CO2_FLOOR = 0.05
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 
 def _weather() -> list[dict[str, float | str]]:

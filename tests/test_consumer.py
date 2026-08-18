@@ -53,6 +53,7 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.compartments import (
     CONSUMERS,
     compartment_boundary_ledger,
@@ -86,7 +87,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.state import State, Stock
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 
 def _weather() -> list[dict[str, float | str]]:

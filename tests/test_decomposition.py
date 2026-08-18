@@ -33,6 +33,7 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.decomposition import (
     Decomposition,
     DecompositionParams,
@@ -65,7 +66,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.state import State, Stock
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 _BIO = DomainId("biosphere")
 _LITTER = StockId("biosphere.litter_carbon")

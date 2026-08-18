@@ -20,8 +20,8 @@ the unregulated one, both spike-measured; see ``station.sealed`` / the Tier-3 la
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.drift import drift_slope, mass_drift_trace, max_abs
 from domains.biosphere.stocks import (
     HUMUS_CARBON,
@@ -53,7 +53,7 @@ from station.sealed import (
     sealed_fast_resolver,
 )
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 # The five conserved quantities the combined sealed ledger spans (matter + ENERGY).
 QUANTITIES = (

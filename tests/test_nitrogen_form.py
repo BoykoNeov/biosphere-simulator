@@ -55,10 +55,10 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere import scenario as sc
 from domains.biosphere.allocation import Senescence
 from domains.biosphere.loader import (
@@ -87,7 +87,7 @@ from simcore.ids import FlowId
 from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 
-_WEATHER = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER = WINTER_WHEAT_WEATHER
 _M_C = 0.012011  # kg C / mol C
 _CARBON_FRACTION = 0.45  # kg C / kg DM (nitrogen.yaml / canopy.yaml, cited)
 

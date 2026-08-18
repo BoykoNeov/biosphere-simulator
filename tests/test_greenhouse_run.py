@@ -34,8 +34,8 @@ Euler).
 """
 
 import json
-from pathlib import Path
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.stocks import (
     CARBON_POOL,
     CONDENSATE,
@@ -67,7 +67,7 @@ from station.greenhouse import (
 )
 from station.scenario import GREENHOUSE_SCENARIO
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 _CREW = load_crew_params()
 _ECLSS = load_eclss_params()
 _SC = GREENHOUSE_SCENARIO

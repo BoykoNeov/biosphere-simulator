@@ -16,11 +16,11 @@ is deliberate: `pdftotext -layout` scrambles BVAD Table 4-91's columns and files
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
 from config import load_yaml
+from config.paths import BIOSPHERE_PARAMS_DIR, WINTER_WHEAT_WEATHER
 from domains.biosphere.canopy import leaf_area_index
 from domains.biosphere.loader import MOLAR_MASS_CARBON_KG_PER_MOL, load_canopy_params
 from domains.biosphere.scenario import (
@@ -82,7 +82,7 @@ M_CO2_G_PER_MOL = 44.009
 R_GAS = 8.314462618
 P_STD_PA = 101325.0
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 # ⚠ ``STEM_RESERVE_C`` joined this tuple 2026-08-12 (the stem-reserve build). It is the
 # plant's own carbon, so leaving it out would make "the plant holds most of the
 # chamber's
@@ -277,14 +277,9 @@ def test_the_chamber_crop_is_an_order_of_magnitude_below_the_field_crop() -> Non
     """
     canopy = load_canopy_params()
     carbon_fraction = float(
-        load_yaml(
-            Path(__file__).resolve().parents[1]
-            / "src"
-            / "domains"
-            / "biosphere"
-            / "params"
-            / "canopy.yaml"
-        )["parameters"]["carbon_fraction"]["value"]
+        load_yaml(BIOSPHERE_PARAMS_DIR / "canopy.yaml")["parameters"][
+            "carbon_fraction"
+        ]["value"]
     )
 
     def t_per_ha(mol_c: float) -> float:
@@ -442,14 +437,7 @@ def test_one_pool_pins_stock_to_flux_and_ours_is_a_fast_pool() -> None:
     again: a number fitted to one scenario written down as a constant. The 94x STOCK
     shortfall is what carries the diagnosis and it stands on its own arithmetic.
     """
-    decomposition = load_yaml(
-        Path(__file__).resolve().parents[1]
-        / "src"
-        / "domains"
-        / "biosphere"
-        / "params"
-        / "decomposition.yaml"
-    )
+    decomposition = load_yaml(BIOSPHERE_PARAMS_DIR / "decomposition.yaml")
     k_per_day = float(decomposition["parameters"]["decomposition_rate"]["value"])
     k_per_year = k_per_day * 365.0
     assert k_per_year == pytest.approx(4.015, abs=1e-3)

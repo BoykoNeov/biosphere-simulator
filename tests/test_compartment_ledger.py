@@ -37,10 +37,10 @@ Pure-stdlib data path (reads the committed JSON weather fixture; no PCSE).
 """
 
 import json
-from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.compartments import (
     ATMOSPHERE,
     PLANTS,
@@ -69,7 +69,7 @@ from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.registry import Registry
 from simcore.state import State, Stock
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 # The per-quantity tol table test_perennial already pins (a flat 1e-7 is far too loose
 # for the O(1) CARBON amounts — it would hide a real misapplication).

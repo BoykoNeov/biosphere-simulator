@@ -108,11 +108,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import domains.crew
-import domains.eclss
-import domains.power
-import domains.thermal
-import station
+from config.paths import DOMAIN_PARAMS_ROOT, STATION_PARAMS_DIR
 from domains.crew.loader import load_crew_params
 from domains.crew.system import build_crew
 from domains.eclss.loader import load_eclss_params
@@ -145,11 +141,11 @@ GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
 # manifest (see the module docstring). No exclusions are needed (no ``demo.yaml``-style
 # skeleton lives in any of these dirs).
 PARAM_DIRS: list[Path] = [
-    Path(domains.power.__file__).parent / "params",
-    Path(domains.thermal.__file__).parent / "params",
-    Path(domains.eclss.__file__).parent / "params",
-    Path(domains.crew.__file__).parent / "params",
-    Path(station.__file__).parent / "params",
+    DOMAIN_PARAMS_ROOT / "power",
+    DOMAIN_PARAMS_ROOT / "thermal",
+    DOMAIN_PARAMS_ROOT / "eclss",
+    DOMAIN_PARAMS_ROOT / "crew",
+    STATION_PARAMS_DIR,
 ]
 
 # Scenario key -> (human scenario label, golden filename). The five standalone sibling

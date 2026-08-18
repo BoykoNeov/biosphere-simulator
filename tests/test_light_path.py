@@ -28,10 +28,10 @@ Pure-stdlib data path (reads the committed JSON weather fixture; no PCSE).
 
 import json
 import math
-from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.chamber import oxygen_limitation_factor
 from domains.biosphere.light_path import (
     SECONDS_PER_DAY,
@@ -49,7 +49,7 @@ from domains.biosphere.step import BIO_DT, STEPS_PER_DAY, steps_for
 from domains.biosphere.stocks import CARBON_POOL, O2_POOL, PAR_VAR
 from simcore.integrator import EulerIntegrator
 
-_WEATHER = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER = WINTER_WHEAT_WEATHER
 
 
 def _weather() -> list[dict[str, float | str]]:

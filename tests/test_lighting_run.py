@@ -35,7 +35,7 @@ cross-check — the frozen biosphere's numerics are fixed at ``dt = 1`` Euler; t
 forced, so it would agree bit-for-bit on the battery anyway).
 
 Pure-stdlib spine; the crop params load from the biosphere YAMLs, the lamp photon
-efficacy from ``station/params/lamp.yaml``.
+efficacy from ``rust/crates/station/params/lamp.yaml``.
 """
 
 import json
@@ -44,6 +44,7 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import WINTER_WHEAT_WEATHER
 from domains.biosphere.stocks import (
     CONDENSATE,
     DAYLENGTH_VAR,
@@ -88,7 +89,7 @@ from station.lighting import (
 from station.loader import load_lamp_params
 from station.scenario import LIGHTING_SCENARIO
 
-_WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
+_WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 _LP = load_lamp_params()
 _SC = LIGHTING_SCENARIO
 
