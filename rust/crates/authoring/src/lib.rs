@@ -23,6 +23,7 @@ pub mod compose;
 pub mod errors;
 pub mod expr_parser;
 pub mod flow_registry;
+pub mod freeze_manifest;
 pub mod graph_dump;
 pub mod interpreter;
 pub mod run;

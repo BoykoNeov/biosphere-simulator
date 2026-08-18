@@ -62,7 +62,10 @@ jobs:
       # test — it silently stops checking the largest assembly in the repo, which is the
       # green-by-skip shape this project has been bitten by twice. The paired control
       # `the_ignored_set_is_exactly_the_expensive_roster` guards the other direction (a
-      # second `#[ignore]` appearing), but nothing inside the suite can guard this line.
+      # second `#[ignore]` appearing), and `ci_still_runs_the_ignored_tests` pins THIS line
+      # textually — so deleting the step below is red in `cargo test`, not silent. That
+      # guard was added on review after the first draft asserted here that no test could
+      # make it, which was false by this repo's own source-grep idiom.
       - name: Cargo test (ignored — the expensive sealed-station golden)
         run: cargo test -- --ignored
       - name: Cargo clippy (deny warnings)

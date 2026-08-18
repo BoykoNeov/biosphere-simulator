@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away; S2's first half then gave the reference its own golden comparison on 2026-08-19 — 19 runs moved out of the `examples/` binaries that made them unreachable, a platform policy that classifies rather than skips because `cargo test` runs on Linux, and a fifth entry for FINDING 2: the cross-port tolerance contract `tiers.json` is read by no program in `rust/`)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away; S2's first half then gave the reference its own golden comparison on 2026-08-19 — 19 runs moved out of the `examples/` binaries that made them unreachable, a platform policy that classifies rather than skips because `cargo test` runs on Linux, and a fifth entry for FINDING 2: the cross-port tolerance contract `tiers.json` is read by no program in `rust/`; its second half then moved the three manifest writers into their crates so every freeze contract byte-gates itself in Rust — which on its first run caught the move's own `crate::` rewrite silently re-wording three of the four contracts' frozen prose)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -2270,3 +2270,95 @@ has run *in CI* is how a gate goes missing. And `golden_platform.py`'s other two
 (`write_python_golden`, `PYTHON_DIVERGES`/`DISAGREEMENT_CEILING`) are not ported at all:
 their subject is *Python's* conformance, so they lose their referent when Python goes rather
 than needing a Rust home. Named as a decision so the omission is not read as an oversight.
+
+### S2 — the second half: the contract gates move too, and a refactor was caught rewording three contracts (2026-08-19)
+
+Plan §5u. FINDING 2's first and third entries. The first half moved the *runs* out of the
+`examples/` binaries; this moves the three **manifest writers** for exactly the same reason,
+and gives all four freeze contracts a gate that survives the checker.
+
+The three `dump_*_inventory` examples became argument parsing over
+`crates/{domains,station,authoring}/src/freeze_manifest.rs`. Each crate now byte-compares its
+own committed contract against what it writes — the successor to
+`tests/crossport/test_manifest_writer.py`, which had to shell out to `cargo run` because an
+`examples/` program is a binary target.
+
+#### ⚠⚠ The finding: a mechanical rewrite silently re-worded three freeze contracts
+
+The move rewrote `domains::` → `crate::` for self-references, and the rewrite reached into
+**contract prose** — the `why` strings inside each manifest's frozen `_authority` block,
+where a path is written from *outside* the crate as documentation:
+
+* biosphere: `domains::biosphere::params::param_files` → `crate::…`
+* station: `station::params::param_files` → `crate::…`
+* authoring: `see authoring::surface` → `see crate::surface`
+
+Three of the four freeze contracts, re-worded by a refactor that was correct everywhere else
+it landed. **What caught it was the byte gate being built in this very slice** — on its first
+run, before a single test had been written around it. That is the argument for a
+whole-artifact comparison in one incident: a rewrite that knows the difference between code
+and prose is not available, and a gate that compares every byte is. The fix was three
+targeted restorations, never a narrower blanket rule.
+
+#### The residue: the byte gate does NOT subsume inventory parity, and that was measured
+
+`test_manifest_writer.py`'s docstring claims it catches *"the same staleness
+`test_inventory_parity` catches, now for every key."* Read as subsumption it is **wrong for
+three of seven tests**, and enumerating rather than inheriting the claim is the whole point —
+otherwise this is [[multirate-crossport-anchor-partition-parity]] again, *a scope decision
+recorded as a FACT outliving its reasoning*.
+
+Four are genuinely subsumed (the set axes and the three staleness rows). Three are not, and
+each now has a Rust successor in the crate that owns its contract:
+
+* **`dt_days` vs `BIO_DT`** — the sharpest case. The source grep says the literal is *typed*;
+  the byte gate says the file is *consistent* (it regenerates from that same literal, so it
+  agrees with itself); **neither says the typed number is still true.** Only a comparison
+  against the constant does.
+* **`weather_sha256`** — emitted for checking and *never spliced*, so the byte gate copies it
+  rather than deriving it. This is what keeps C9's reach-out `include_str!` honest: the
+  reference carries a compile-time *copy* of bytes the contract names only by filename, and
+  without this the copy could drift with every other gate green.
+* **the station `aux_set`** — `[] == []` is inert ([[inventory-parity-built]]), and since C7
+  the empty list is *written into* the contract rather than compared against it. What the
+  test owns is the delegation that makes emptiness legitimate.
+
+⚠ **`test_the_writer_refuses_an_unknown_argument` gets no successor, as a named decision.**
+Its subject was a subprocess's argument handling; the Rust gate calls the function directly,
+so the CLI is no longer load-bearing *for the gate*. Porting it would gate a path nothing
+depends on.
+
+#### ⚠ Reading `docs/` is not an S1 regression
+
+Stated because it looks like one. S1's rule is that the reference must not reach into **the
+tree being deleted** (`src/`, `tests/`). `docs/` is where the freeze contracts live, outlives
+the checker, and the writers' own `repo_root()` already made this exact climb. But the move
+does introduce a failure mode the Python original could not have — an `include_str!` of a
+wrong-but-present path is *silent*, where a runtime read throws — so
+`the_committed_manifest_is_actually_loaded` pairs with it.
+
+#### Controls
+
+* Three manifests regenerated and byte-compared. **Two rounds**: round one found the prose
+  rewrite, round two came back identical on all three.
+* The re-pointed `include_str!` anchors were deliberately mis-pointed at `src/lib.rs` — all
+  three greps go red rather than finding zero lines and passing. Verified rather than argued,
+  since this slice had already caught itself getting an "it would fail" claim wrong once.
+* A hand edit to a committed contract (`"phase": 9` → `10`) reddens the byte gate.
+
+#### ⚠ Two corrections to the first half, from review
+
+* **A claim shipped false.** §5t's comment said *"nothing inside the suite can guard this
+  line"* of the CI step that runs the expensive golden. False by this repo's own idiom three
+  files away. `ci_still_runs_the_ignored_tests` now pins the step textually — with a control
+  that the match is a `run:` command and not the explanatory comment above it — and the
+  workflow was parsed to confirm it is valid YAML, because a malformed workflow does not
+  fail, it silently does not run.
+* The `#[ignore]` census read only one of the two golden-regression files, so a skip added on
+  the other side was invisible to the control written to make skipping visible.
+
+**Standing after S2:** all four of FINDING 2's original gate entries have Rust successors
+(the manifest byte gate, the golden comparison, the inventory dumps' consumer, the golden
+census forcing literal). The fifth entry — `tiers.json`, which no Rust program reads — does
+not, by decision. The Python originals are all still green and still running; S6 retires
+them, and only once S3–S5 have theirs.

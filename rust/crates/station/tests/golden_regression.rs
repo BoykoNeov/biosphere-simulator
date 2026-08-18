@@ -17,6 +17,25 @@ use station::goldens::{all, STATION};
 /// check that is red on the real mistake beats an elegant one that is green on it.
 const THIS_FILE: &str = include_str!("golden_regression.rs");
 
+/// The `domains` half of the pair, so the `#[ignore]` census below covers **both** files.
+///
+/// ⚠ Added after review caught the gap: the first draft counted `#[ignore]` in this file
+/// only, so one added to `domains/tests/golden_regression.rs` was invisible to the very
+/// control written to make skipping visible. A census that covers half its subject is the
+/// failure mode it exists to catch.
+const DOMAINS_FILE: &str = include_str!("../../domains/tests/golden_regression.rs");
+
+/// The workflow, so the CI step that runs the ignored test is itself guarded.
+///
+/// ⚠⚠ **This exists because the first draft claimed it could not.** The comment on
+/// `the_ignored_set_is_exactly_the_expensive_roster` said *"nothing inside the suite can
+/// guard this line"* — false by this repo's own idiom, three files away:
+/// `manifest_writer.rs` greps the writer's source text and `science_gates` greps a file for
+/// a recorded bound, both for exactly this reason (a check the type system cannot make).
+/// A deleted CI step does not fail anything; it silently stops running the only gate on the
+/// largest assembly in the repo. So the step is pinned textually here.
+const CI_WORKFLOW: &str = include_str!("../../../../.github/workflows/ci.yml");
+
 fn check(golden: &Golden) {
     let produced = (golden.run)();
     let expected = committed(golden.name);
@@ -74,7 +93,14 @@ fn the_sealed_station_golden_is_still_this_reference_s_output() {
 /// So the roster states the cost and this test asserts the two agree in **both**
 /// directions: exactly one golden is `Expensive`, and exactly one `#[ignore]` appears in
 /// this file. A new `#[ignore]` without a matching `Cost::Expensive` is red, and an
-/// `Expensive` golden nobody wrote a test for is red.
+/// `Expensive` golden nobody wrote a test for is red. The census reads **both**
+/// golden-regression files, so a skip added on the `domains` side is not invisible here.
+///
+/// ⚠ The companion [`ci_still_runs_the_ignored_tests`] guards the direction this comment
+/// once claimed was unguardable — *"nothing inside the suite can guard this line"*. That
+/// was false by this repo's own idiom (`manifest_writer.rs` greps the writer's source;
+/// `science_gates` greps a file for a recorded bound), and it is corrected here rather
+/// than quietly dropped: the claim was **wrong**, not merely incomplete.
 #[test]
 fn the_ignored_set_is_exactly_the_expensive_roster() {
     let expensive: Vec<&str> = all()
@@ -94,8 +120,9 @@ fn the_ignored_set_is_exactly_the_expensive_roster() {
     // eleven times. That is `manifest_writer.rs`'s recorded lesson landing again in a new
     // place: an anchor that matches prose as well as syntax checks whichever came first.
     // A doc line starts `///` or `//!`, so the attribute is the line that starts with it.
-    let ignores = THIS_FILE
-        .lines()
+    let ignores = [THIS_FILE, DOMAINS_FILE]
+        .iter()
+        .flat_map(|src| src.lines())
         .filter(|l| l.trim_start().starts_with("#[ignore"))
         .count();
     assert_eq!(
@@ -111,6 +138,45 @@ fn the_ignored_set_is_exactly_the_expensive_roster() {
         THIS_FILE.matches("#[ignore").count() > ignores,
         "the bare string was expected to be ambiguous in this file; if it is not, the \
          line-anchored count above no longer needs to be line-anchored"
+    );
+}
+
+/// ⚠⚠ The other half of the `#[ignore]` discipline: **CI must still run it.**
+///
+/// The roster control above guards one direction (a skip appearing without a measured
+/// cost). This guards the other, and it is the one that actually loses coverage: an
+/// `#[ignore]`d test that nothing runs anywhere is not a slow gate, it is **no gate**, and
+/// deleting the workflow step fails nothing. A malformed workflow is worse still — GitHub
+/// silently does not run it, which is this repo's two recorded green-by-skip incidents in
+/// their purest form.
+///
+/// Crude on purpose, and with the same standing as `manifest_writer.rs`'s source greps: it
+/// cannot check that CI is *green*, only that the step is still spelled in the file.
+#[test]
+fn ci_still_runs_the_ignored_tests() {
+    assert!(
+        CI_WORKFLOW.contains("cargo test -- --ignored"),
+        "the `cargo test -- --ignored` step is gone from .github/workflows/ci.yml. \
+         `the_sealed_station_golden_is_still_this_reference_s_output` is `#[ignore]`d, so \
+         that step is the ONLY thing that runs it — without it the largest assembly in the \
+         repo is checked nowhere. Restore the step, or un-ignore the test and accept the \
+         ~100 s on every `cargo test`."
+    );
+    // ⚠ The control on the anchor: the string must be a `run:` command, not a mention in
+    // the explanatory comment block that sits directly above it. Same lesson as the
+    // `#[ignore]` count in this file, which the first draft got wrong in exactly this way.
+    let as_command = CI_WORKFLOW
+        .lines()
+        .filter(|l| {
+            let t = l.trim_start();
+            !t.starts_with('#') && t.contains("cargo test -- --ignored")
+        })
+        .count();
+    assert_eq!(
+        as_command, 1,
+        "expected exactly one uncommented `cargo test -- --ignored` line in ci.yml, found \
+         {as_command} — a match that is only inside the comment means this test passes \
+         while nothing runs the ignored gate"
     );
 }
 
@@ -233,7 +299,8 @@ fn the_golden_census_counts_are_what_the_prose_says() {
         "the golden census moved: {authored} of {on_disk} are reference-authored, not \
          19 of 21. That is fine — but the counts are quoted as PROSE in CLAUDE.md \
          ('21 golden files (19 the reference's own bytes)'), in \
-         rust/crates/station/src/goldens.rs, and (while the checker lives) in \
+         rust/crates/station/src/goldens.rs and rust/crates/domains/src/goldens.rs \
+         ('the eleven goldens'), and (while the checker lives) in \
          tests/golden_platform.py and tests/crossport/regen_goldens_from_rust.py. \
          Nothing else checks them. Update those, then this literal, in the same commit."
     );

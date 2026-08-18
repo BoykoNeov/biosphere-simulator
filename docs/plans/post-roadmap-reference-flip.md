@@ -3773,7 +3773,7 @@ slices, not one**, and the first two are not test work:
 | # | Slice | Why here |
 |---|---|---|
 | **S1** | **The reference's own ground** — relocate the 23 param YAMLs + the weather fixture + the 26 scenario fixtures + the goldens into paths the reference owns | FINDING 1. Nothing can be deleted until this lands; it moves data, not science, so it should be byte-neutral and provable as such |
-| **S2** | **The three gates come with it** — the manifest byte gate, the golden comparison + `golden_platform.py`'s policy, the inventory dumps' consumer | FINDINGS 2 + 3. These guard the *contracts*; every later slice runs behind them. ⚠ **Splits in two, and the split is structural, not a size call** (§5t): the golden comparison stops at `station`, so `station` can own its census; the manifest gate spans `domains` + `station` + `authoring`, so it cannot. **First half COMPLETE 2026-08-19** — FINDING 3 discharged, the S1 forcing literal carried, FINDING 2 grown to five |
+| **S2** | **The three gates come with it** — the manifest byte gate, the golden comparison + `golden_platform.py`'s policy, the inventory dumps' consumer | FINDINGS 2 + 3. These guard the *contracts*; every later slice runs behind them. ⚠ **Splits in two, and the split is structural, not a size call** (§5t): the golden comparison stops at `station`, so `station` can own its census; the manifest gate spans `domains` + `station` + `authoring`, so it cannot. **COMPLETE 2026-08-19** — first half (§5t) discharged FINDING 3 and carried the S1 forcing literal; second half (§5u) moved the three manifest writers into their crates and gave each contract a byte gate, plus Rust successors for the three `test_inventory_parity` claims the byte gate does NOT subsume. FINDING 2 grew to five on the way |
 | **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison |
 | **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable |
 | **S5** | **The biosphere mechanisms** — ~600 tests over `flows.rs` | FINDING 5. The largest and the one to take last, in crop/process batches, because it is where a silent narrowing does the most damage |
@@ -4373,3 +4373,121 @@ contract, and why `tiers.json`'s absence above is a finding rather than a shrug.
   authorship) and `PYTHON_DIVERGES` / `DISAGREEMENT_CEILING` (the checker's conformance)
   have no subject on the Rust side — they measure *Python*, so they die with it at S6 rather
   than porting here. Named so the omission is a decision and not an oversight.
+
+## §5u Stage 3 — S2's second half: the contract gates come with the contracts, COMPLETE 2026-08-19
+
+FINDING 2's first and third entries. §5t moved the *runs* out of the `examples/` binaries;
+this moves the **manifest writers** for the same structural reason, and gives all three
+freeze contracts a byte gate that survives S6.
+
+### The move
+
+`manifest()` / `dumps()` / `census_json()` / `authority_json()` / `file_sha256()` /
+`repo_root()` and everything around them left `examples/dump_{biosphere,station,authoring}_inventory.rs`
+for `crates/{domains,station,authoring}/src/freeze_manifest.rs`. The examples keep their
+argument parsing and nothing else. Deliberately a **relocation, not a rewrite** — the
+emitted bytes must not move, and the way to guarantee that is to not retype the code.
+
+⚠ **Each crate gates its own contract**, which is why no new workspace member was needed
+here either. The Python original parametrized one file over three writers because it shelled
+out; in Rust the natural owner of the biosphere contract's gate is the crate that writes it.
+
+### ⚠⚠ The finding: a mechanical rewrite reached into frozen contract prose
+
+The move rewrote `domains::` → `crate::` for self-references. It hit **three** manifests'
+`_authority` text, where the path is written from *outside* the crate as documentation:
+
+| contract | the prose that moved |
+|---|---|
+| biosphere | `domains::biosphere::params::param_files` → `crate::…` |
+| station | `station::params::param_files` → `crate::…` |
+| authoring | `see authoring::surface` → `see crate::surface` |
+
+**Three of the four freeze contracts silently re-worded by a refactor**, and each is a
+`why` string inside the frozen `_authority` block — i.e. contract text, not code. ⚠ The
+striking part is *what caught it*: **the byte gate being built in this very slice**, on its
+first run, before it had a single test written around it. Nothing else in the repo would
+have — the Python byte gate would have caught it too, but only if run, and this is exactly
+the gate S6 was scheduled to delete.
+
+⚠ The fix was three targeted restorations, **not** a narrower blanket rule. A rewrite that
+knows the difference between code and prose is not available; a gate that compares the whole
+artifact is. That is the argument for the byte gate in one incident.
+
+### The residue: `test_inventory_parity.py` is NOT subsumed, measured rather than assumed
+
+`test_manifest_writer.py`'s own docstring claims it catches *"the same staleness
+`test_inventory_parity` catches, now for every key rather than the compared axes."* Read as
+subsumption that is **wrong for three of the seven tests**, and the enumeration is the point
+— the alternative was inheriting a scope claim from a docstring, which is the
+[[multirate-crossport-anchor-partition-parity]] shape (*a scope decision recorded as a FACT
+outlives its reasoning*).
+
+| test | verdict |
+|---|---|
+| `test_rust_inventory_equals_the_frozen_manifest` | **subsumed** — the sets are in the file the byte gate compares |
+| `test_the_frozen_biosphere_manifest_is_not_stale` | **subsumed** |
+| `test_the_frozen_station_manifest_is_not_stale` | **subsumed** |
+| `test_the_frozen_authoring_manifest_is_not_stale` | **subsumed** |
+| `test_the_locked_dt_matches_the_reference_tree` | ⚠ **residue** — the byte gate regenerates from the same literal, so it agrees with itself |
+| `test_the_weather_hash_matches_the_reference_tree` | ⚠ **residue** — `weather_sha256` is emitted for checking and **never spliced**, so the gate copies rather than derives it |
+| `test_the_station_aux_axis_is_empty_by_delegation` | ⚠ **residue** — `[] == []` is inert, and since C7 the empty list is *written into* the contract |
+
+All three residue claims now have Rust successors, each in the crate that owns the contract.
+The `dt` one is the sharpest illustration of why the byte gate is not enough: the source-text
+grep says the literal is *typed*, the byte gate says the file is *consistent*, and neither
+says the typed number is still **true**. Only a comparison against `BIO_DT` does.
+
+⚠ **`test_the_writer_refuses_an_unknown_argument` gets no successor, as a decision.** The
+Python gate passed `--write-manifest <path>` to a subprocess, so its argument handling had to
+be asserted or the byte comparison could pass while proving the wrong thing. The Rust gate
+calls `manifest_text()` directly; the CLI is no longer load-bearing *for the gate*, only for
+the regeneration command a human runs. Porting the check would gate a path nothing depends
+on — recorded rather than done, since the Python original stays alive until S6 anyway.
+
+### ⚠ Reading `docs/` is not an S1 regression
+
+The byte gate `include_str!`s `docs/*-reference.manifest.json`, four directories up and out
+of `rust/`. Stated explicitly because it looks like re-opening what S1 closed and is not:
+S1's rule is that the reference must not reach into **the tree being deleted** (`src/`,
+`tests/`). `docs/` is where the freeze *contracts* live, it outlives the checker, and the
+writer's own `repo_root()` already made this exact climb to resolve `--write-manifest`'s
+default. A manifest gate that could not see the committed manifest would have no subject.
+
+⚠ It does introduce one new failure mode the Python original could not have — an
+`include_str!` of a wrong-but-present path is silent, where a runtime read would have thrown.
+`the_committed_manifest_is_actually_loaded` is the paired control: size plus the presence of
+an `_authority` block.
+
+### `authoring` gets a byte gate and no source-text half
+
+New file, and the asymmetry is inherited rather than invented: C7 measured the authoring
+contract for the anti-derived-literal trap its two siblings carry and found **none** — its
+hand-authored keys are a phase number, two repo paths and two blocks of prose, and the crate
+owns no constant any of them could be spliced from. *A control with no test to redden is the
+finding, not a gap to fill.*
+
+### The controls
+
+1. **Byte-neutrality of the move** — all three manifests regenerated and compared to the
+   committed files. Two rounds: the first found the prose rewrite above, the second came back
+   identical on all three.
+2. **The re-pointed source anchors actually redden.** `manifest_writer.rs`'s `include_str!`
+   moved from the example to the module. A stale path could have found *zero* lines and
+   passed; pointed at `src/lib.rs` deliberately, all three greps go red. Verified rather than
+   argued, because "it would fail" is exactly the claim this slice caught itself getting
+   wrong once already.
+3. **A hand edit to a committed contract is red.** `"phase": 9` → `10` in the authoring
+   manifest → the byte gate fires and names both sides.
+
+### Also in this half: two review corrections to §5t
+
+* ⚠ **A claim that shipped false.** §5t's comment on the `#[ignore]` control said *"nothing
+  inside the suite can guard this line"* about the CI step that runs the expensive golden.
+  That is false by this repo's own idiom three files away — `manifest_writer.rs` greps the
+  writer's source, `science_gates` greps a file for a recorded bound. `ci_still_runs_the_ignored_tests`
+  now pins the step textually, with a control that the match is a `run:` command and not the
+  explanatory comment above it. The workflow was also parsed to confirm it is valid YAML: a
+  malformed workflow does not fail, it silently does not run.
+* The `#[ignore]` census read only the station test file, so a skip added on the `domains`
+  side was invisible to the control written to make skipping visible. It now reads both.
