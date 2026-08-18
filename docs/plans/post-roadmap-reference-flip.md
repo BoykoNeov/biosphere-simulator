@@ -2315,3 +2315,99 @@ Final: **10,906 B, 1,094 B of headroom**, all 10 context-budget assertions green
 * **Re-word `config/units.py`'s expiry into an assertion.** C1 recorded that the Python
   unit check stays live only while the retained param generators call it; `CLAUDE.md` now
   carries the warning, but the gate that would make it red is still C7's to build.
+
+## §5j C4 — the science-gate census: the gating measurement, taken 2026-08-18 BEFORE any design
+
+Same discipline as C1/C5/C8/C9: measure first. C5's closing note said C4's ceremony was
+blocked on an unmeasured question — *"the 15 `locus` strings, and whether each `bound`'s
+numeric literals still appear textually in the Rust file the locus will point at"*. This
+section takes that, and the measurement moved the slice's shape three times.
+
+**Method.** A throwaway probe (`M:/claud_projects/temp/c4-science-gates/`, a temporary
+example inside the workspace, deleted after; the tree came back clean) computes in the
+**reference** every quantity the markers assert on, and a Python script computes the same
+in the checker. Both outputs are committed to the probe directory. The Rust numbers were
+taken in `--release`; slice 4 measured the profile byte-neutral for this family, and it is
+said out loud because the permanent gates will run in `cargo test`'s debug profile.
+
+### The result: verdict-neutral, and the only movement is the one C5 already owns
+
+| | |
+|---|---|
+| keys compared | **39** |
+| byte-identical | **37** |
+| differing | **2 keys, 4 values** — `consumer.peak_leaf` yr 3–4, `consumer.year_end` yr 3–4 |
+| worst | **7 ULP**, rel 9.955e-16 |
+| verdicts (`is_stationary`, `non_collapsing`, `is_period_2`, every band) | **identical on both sides** |
+
+Those four are **the same four C5 measured** on `drift_summary.json`, arrived at
+independently through a different fold path — corroboration, not a new finding. Every
+band's margin is orders above them, so no gate's verdict is reachable from that noise.
+
+### ⚠⚠ THE MEASUREMENT COVERED 12 OF 15 GATES ON THE FIRST PASS, AND THE WRITE-UP SAID 15
+
+Caught in review before it was recorded (advisor). The claim *"the 15 gates port
+value-for-value"* was drawn from a probe that never exercised three of them, and the three
+are exactly the ones that change the slice's scope. *The same shape as "the plan's own
+arithmetic was wrong: the gap is 7 goldens, not 1" and "that census surveyed one gate" —
+a count taken from the roster you built rather than from the roster you measured.*
+
+**Gate 1 — the mutual-shading disjunct, and the probe's own arithmetic proves it is the
+load-bearing half.** `bound = "peak < 6.0 OR the 5%/day mutual-shading loss is MODELLED"`,
+and the probe measured `open_season` peak LAI = **6.0228** — *above* the threshold. So the
+gate passes today only through the MODELLED branch, which the first pass did not measure at
+all. Measured on the second pass: `shade_rate` 0.05, `lai_threshold` 6.0, `rdr_leaf` 0.02,
+and `mutual_shading_rate` reads `0.02` **at** the threshold (inert, strict `>`) and `0.07`
+just above it — all four byte-identical across the ports.
+
+**Gates 2 and 3 are not biosphere at all, and that splits the slice** (see below).
+
+### ⚠ An inert comparison, caught the same way
+
+The first pass called Rust's `is_period_2(&p_peak, 8, 1e-2)` against Python's
+`is_period_2(summaries, transient=8)` — whose `min_rel_gap` **defaults to 1e-3**. Both
+returned `false`, which looked like agreement and was two different parameterizations
+landing on the same answer. Re-run at `1e-3` on both sides: still `false`, now comparably.
+*A matching boolean from two different arguments is `[] == []` in a passing test's
+clothes* — slice 7's lesson, in a new place.
+
+### ⚠⚠ The scope decision: C4 SPLITS BY MANIFEST, biosphere 13 + station 2
+
+The 15 markers are **not one contract's**. `crew_mission` and `sealed_station` are
+**station**-manifest keys, and their referents do not exist in the reference:
+
+| gate | needs | in Rust today |
+|---|---|---|
+| `test_rq_structural_prediction` (`crew_mission`) | a crew steady-state run + the BVAD comparison constants (`0.8814` appears in **neither** tree — it is a test-side expectation) | the crew domain exists; the RQ helper does not |
+| `test_tier1_node_is_period_1_fixed_point` (`sealed_station`) | `predicted_equilibrium_temperature(charge, thermal, HEAT_CLOSURE_SCENARIO)` | `HEAT_CLOSURE_SCENARIO` **yes**; the predictor **no** |
+
+Slices 6–8 re-anchored **one manifest per slice** on purpose, and a re-anchoring
+criterion *names a direction per axis*. So C4 takes the **13 biosphere gates** and
+**C4b** takes the two station ones with the two helpers they need. Recorded as a split,
+not as a deferral: both halves are scheduled, and the station half has its own ceremony.
+
+### ⚠⚠ AND C4 HAS A C6 DEPENDENCY THE PLAN TABLE DOES NOT SHOW — the second time this has happened
+
+`test_the_vks_mutual_shading_regime_is_MODELLED_not_merely_avoided` asserts over a roster
+of **six** scenarios, and two of them — `n_limited` and `water_biting` — are precisely the
+Python-only scenarios **C6 retires**. `grep` over `rust/crates` finds them only inside
+comments *about* C6. So the gate cannot port as written: either it ships over four
+scenarios (a silent truncation of its own claim) or **C6 lands first**, after which four
+*is* the roster and nothing is truncated.
+
+*Generalize, again: a slice's prerequisites are not in its own row of the plan table.* C5
+found the same thing about C4 six hours earlier — from the other side.
+
+### What this leaves for the build
+
+* The bound literals: `61.07` is **derived** in Python (`Γ*/ci_ratio`) with the literal
+  kept only as a tripwire, and the same two params are already in Rust — so the Rust gate
+  derives it the same way. `14.4248` is a `senescence.yaml` value, which C1 put in Rust.
+  `0.8814` is test-side and belongs to C4b. The rest are liveness floors, tuned to our own
+  calibration, which the manifest already records as a different **class** of claim.
+* The census mechanism is the open design question and the one slice 8 warns about: Rust
+  has no introspection, so a table plus tests is a hand-maintained roster unless the table
+  **is** the test roster (one `#[test]` emitted per row, so an unexercised entry is a
+  compile error rather than something a meta-test hunts textually).
+* **NOTHING IS BUILT.** `git diff` is empty for `src/`, `rust/`, the goldens and all three
+  manifests; the probe lives in `M:/claud_projects/temp/c4-science-gates/`.
