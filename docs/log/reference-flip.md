@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -1937,3 +1937,104 @@ mechanical re-wrap corrupting frozen prose): **a control mutates the tree, so it
 concurrently with anything that reads the tree.** Run controls against a targeted subset, or
 wait for the full run to finish. A red suite whose cause has already been reverted is worse
 than a red suite — it invites either a false regression hunt or, worse, a shrug.
+
+---
+
+### Stage 3 — the suite classification pass (2026-08-18)
+
+A **measurement**, not a build: every one of the 174 Python test files given a verdict
+against the reference, and no test file touched. Full tables and per-file rows:
+`docs/plans/post-roadmap-reference-flip.md` §5q.
+
+**The shape.** 2,452 collected Python tests / 57,974 lines against **445** Rust tests /
+38,742 lines. The `domains` row carries the whole plan: 1,240 Python checks against 89.
+Retirable on today's evidence: **12 files, 236 tests — 9.6 % of the suite.** Work that is
+new Rust which does not exist: **92 files, 1,398 tests**, before the residue inside the 36
+partly-covered files.
+
+#### ⚠⚠ Stage 3 does not begin with tests
+
+The reference `include_str!`s **24 files out of the tree being deleted** — all 23 param
+YAMLs under `src/`, plus C9's `tests/oracle/winter_wheat_weather.json` — and reads three
+more at runtime (`tests/authoring/scenarios/`, 26 fixtures behind 40 Rust tests and
+`godot_bridge`; `tests/regression/golden/state_snapshot.json`). **`rm -rf src/ tests/` does
+not fail a test; it fails the build.** Relocating the data is the first slice, and it is
+not a test slice.
+
+#### ⚠⚠ No Rust test compares a run against a committed golden
+
+Searched exhaustively. The reference *emits* the goldens (23 `emit_*` examples) and Python
+alone compares them: 17 `test_regression_*.py`, `tests/golden_platform.py` (the policy
+choke point), `test_golden_provenance.py`. The plan's own line — *"the regression/golden
+gates mostly exist in Rust already"* — was false when written and is corrected in place.
+The same shape holds for the **manifest** byte gate (`tests/crossport/test_manifest_writer.py`),
+which is what arms C7's provenance trap: **C7 moved the writers and left every checker in
+the dying tree.**
+
+#### ⚠⚠ The checker is not a second opinion on the sibling domains — it is the gate
+
+Control B, on a clean tree: swap the two legs of `charge_split` in `domains/src/power.rs`
+so the battery stores `(1-η)` and loses `η`. Conservation still holds exactly — a pure
+science error.
+
+* `cargo test --workspace`: **2 of 445 red**, both in `godot_bridge` readout assertions
+  that happen to pin a battery number. **Nothing in `domains` or `station` noticed.**
+* `pytest tests/crossport/test_crossport.py -k power`: **3 red**, by name.
+
+`crew.rs`, `eclss.rs`, `power.rs`, `thermal.rs` carry **0** `#[test]` between 1,411 lines;
+Python carries 158. So "delete the cross-port comparison, its subject is the two ports
+agreeing" is true of its *mechanism* and false of its *effect*: for these domains it is the
+only gate there is.
+
+#### ⚠ A control corrected this entry's own draft
+
+Control A disabled the extinction branch in `integrator.rs`. The draft finding read
+*"implemented in the reference and untested there"*; **one test reddened** —
+`engine_vectors.rs::engine_synthetic_trajectory_is_bit_exact`. The corrected claim is
+narrower and more useful: extinction has no *direct* test in the reference, and is held by
+a single bit-exact vector that pins the whole state, so it reports *that* something changed
+and never *which* mechanism broke. ⚠ That vector is generated by a Python generator queued
+for deletion.
+
+#### ⚠ Name overlap is a lookup, never a verdict — and it lies in both directions
+
+74 names match across the two suites. `test_observation.py` matches 1 of 13 yet its
+subjects are all in `observation.rs` under names that dropped a prefix (false negative);
+`test_authoring_monod.py` matches 4 and expands to **216** collected cases against 6 Rust
+tests (false positive). Related: `grep -c '#[test]'` returns **455**, the parsed index
+**445** — the ten-item gap is `#[test]` written inside doc comments. *A grep of a marker is
+not a census when the marker is also prose.*
+
+#### ⚠ Things guarded by nothing, on either side
+
+*"`simcore` carries zero third-party deps"* — the Python purity tests scan Python packages
+only; no Rust test reads a `Cargo.toml`. *"`gdext` appears in `godot_bridge` and nowhere
+else"* — one matching line in the tree, and it is a doc comment. Both are `CLAUDE.md`
+non-negotiables. Retiring the Python guards costs no coverage because there is none; it
+removes the last thing that *looks* like a gate.
+
+Also named: seven Rust tests whose oracle is the dying side (`canonical_units_match_python_table`
+and friends); 725 of the 2,452 cases come from `parametrize`, so a function-for-function
+port silently narrows; the nine Godot files are Rust-vs-Rust-in-Godot and are Phase 8's
+exit criterion rather than port-parity; and C1's *"take the user's harness with it"* never
+happened — `src/config/overrides.py` has no Rust counterpart, so Stage 3 collides with the
+value-switch plan.
+
+#### The order this implies — six slices, the first two not about tests
+
+**S1** the reference's own ground (relocate the data) → **S2** the three gates that check
+the contracts (manifest bytes, goldens, dumps) → **S3** the four sibling domains → **S4**
+the engine residue (extinction, aux, environment, integrator, multirate, the two ungated
+invariants) → **S5** the ~600 biosphere mechanism tests, in batches → **S6** the
+retirements, and only then. The four **D** rows (the Godot drivers, `test_headless_cli.py`,
+`test_context_budget.py`) are decisions the user owns and S6 is blocked on them.
+⚠ `test_context_budget.py` is the one file with no home on either side: its subject is this
+repo's own documentation discipline, so "port to Rust" is a category error and deleting it
+removes the only enforcement the context budget has ever had.
+
+#### Verification
+
+Both controls run against a clean tree with nothing else in flight, both files restored
+with `git checkout --`, workspace re-verified green afterwards — §5p's third process trap,
+observed. `git diff` is empty for `src/`, `rust/`, the goldens and all three manifests.
+Inventories: `M:/claud_projects/temp/stage3-sorting/`.

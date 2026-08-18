@@ -1338,6 +1338,14 @@ classified `python` and would otherwise stay that way forever.
 then batches by kind: the laws (C2 has 12), the regression/golden gates (mostly exist in Rust
 already), the science gates (C4), and the rest.
 
+> ⚠⚠ **The classification pass is DONE (§5q, 2026-08-18) and it corrected this paragraph
+> twice.** The real figure is **2,452 collected across 174 files**, and *"the regression/golden
+> gates mostly exist in Rust already"* is **FALSE** — measured exhaustively, **no Rust test
+> compares a run against a committed golden**; the whole comparison is Python-side (§5q
+> FINDING 3). §5q also found that Stage 3 does not begin with tests at all: the reference
+> `include_str!`s 24 files out of the tree being deleted, so `rm -rf src/ tests/` fails the
+> *build* (FINDING 1). The six-slice order §5q derives supersedes "batches by kind".
+
 ### ⚠ CORRECTION 2026-08-17 — "delete `tests/crossport`" was wrong for a third of it
 
 The row above originally read *"25 files, 6,552 lines, DELETED — their entire subject is the
@@ -3474,3 +3482,469 @@ mechanical re-wrap corrupting frozen prose): **a control mutates the tree, so it
 concurrently with anything that reads the tree.** Run controls against a targeted subset, or
 wait for the full run to finish. A red suite whose cause has already been reverted is worse
 than a red suite — it invites either a false regression hunt or, worse, a shrug.
+
+---
+
+## §5q Stage 3 — the suite classification pass, COMPLETE 2026-08-18 (a measurement; no test file touched)
+
+Stage 2 ended with §5p: no Python program writes a frozen contract any more. Stage 3 is
+the last and by far the largest piece — the ~2,300-test Python suite that the C re-plan
+described in one line (*"Not one slice; a classification pass first, then batches by
+kind"*). **This is that classification pass, and it is a measurement only.** Nothing was
+ported, nothing was retired, no test file was edited. Where a file looked trivially
+portable, that is a row in the table below and not a commit.
+
+### The method, and the two ways it can lie
+
+Four inventories, all derived rather than hand-listed: `pytest --collect-only` per file
+(2,452 collected), a regex census of `#[test]` functions per Rust file (445), each Python
+test file's `src/` imports (its subsystem), and each Rust module's own test count.
+
+⚠ **Test-name overlap is a lookup index, never a verdict.** Stripping `test_` from every
+Python name and intersecting with the Rust names gives **74** — a number that is neither
+necessary nor sufficient and must not be reported as coverage. It is wrong in *both*
+directions, measured on this tree:
+
+* **False negative.** `tests/test_observation.py` matches 1 of 13 Rust names, yet
+  `observation.rs`'s seven tests carry the same subjects under names that dropped the
+  `observe_` prefix. `test_registry.py` and `test_state.py` are the same shape.
+* **False positive.** `test_authoring_monod.py` shares four names with `expr.rs` — and
+  expands to **216** collected cases against six Rust tests.
+
+⚠ **And a grep of `#[test]` is not a test census when the marker also appears in prose.**
+`grep -c` counts **455**; the parsed index finds **445**. The ten-item gap is entirely
+`#[test]` written inside `//!` doc comments in `science_gates.rs` and the two dump
+examples. 445 is the number; the reconciliation is recorded because an unexplained
+10-test gap in a measurement is exactly the kind of thing this repo's contracts exist to
+refuse.
+
+The evidence standard is therefore **asymmetric**, and that is what made 154 files
+tractable. A wrong "port it" verdict costs duplicated work. A wrong "retire it" verdict
+deletes the only check of something and **reddens nothing** —
+[[authoring-manifest-reanchored]]'s lesson exactly. So: cheap classification everywhere,
+and the falsifier for a retire verdict is a **mutation control on the reference side** —
+break what the Python test asserts, confirm a *Rust* test goes red. Two such controls were
+run in this pass (below); the rest belong to the batch that acts on them.
+
+### The shape, side by side
+
+| Subsystem | Python files | collected | lines | Reference crate | tests | lines |
+|---|---:|---:|---:|---|---:|---:|
+| engine (`simcore`) | 19 | 231 | 3,787 | `simcore` | 106 | 6,986 |
+| boundary (`sim_io`) | 1 | 32 | 334 | *(in `simcore`)* | — | — |
+| params/units | *(in domains)* | — | — | `config` | 47 | 2,542 |
+| domains | 65 | 1,240 | 28,028 | `domains` | 89 | 11,701 |
+| station | 24 | 256 | 8,921 | `station` | 87 | 8,425 |
+| authoring | 20 | 473 | 6,387 | `authoring` | 91 | 6,657 |
+| study tools (`lab`) | 5 | 46 | 1,274 | — | 0 | — |
+| oracle (carve-out) | 9 | 12 | 1,148 | — | — | — |
+| crossport | 25 | 143 | 6,805 | `godot_bridge` | 35 | 2,431 |
+| repo/tooling | 6 | 19 | 1,290 | — | 0 | — |
+| **total** | **174** | **2,452** | **57,974** | | **445** | **38,742** |
+
+The `domains` row is the whole plan in one line: **1,240 checks against 89**, over an
+implementation that is itself 11,701 lines.
+
+### The verdicts
+
+| | files | tests | meaning |
+|---|---:|---:|---|
+| **C** — covered | 3 | 52 | the reference tests the same subjects; retire after its control |
+| **C?** — partly covered | 36 | 783 | a named residue must move first |
+| **P** — port | 72 | 1,305 | the reference *implements* it and tests it nowhere |
+| **P!** — port, no implementation either | 20 | 93 | a gap in the reference, not only in its tests |
+| **R** — retire free | 9 | 184 | subject is the Python tree itself, or unfalsifiable in Rust |
+| **K** — keep | 3 | 4 | the PCSE carve-out |
+| **D** — decide | 11 | 31 | no natural Rust home; needs a call |
+
+**Retirable on today's evidence: 12 files, 236 tests — 9.6 % of the suite.** Everything
+else is work, and 92 files / 1,398 tests of it is *new Rust that does not exist*, before
+counting the residue inside the 36 partly-covered files.
+
+### ⚠⚠ FINDING 1 — the reference does not stand on its own ground
+
+`rust/` compiles **24 files out of the tree that is being deleted**, via `include_str!`
+paths that climb five directories: all 23 param YAMLs under `src/domains/**/params/` and
+`src/station/params/`, plus `tests/oracle/winter_wheat_weather.json` (C9's reach-out,
+which C9 guarded rather than removed). Three more reach-outs are runtime rather than
+compile-time: `tests/authoring/scenarios/` (26 fixture files, read by
+`scenario_files.rs`'s 40 tests **and** by `godot_bridge`), and
+`tests/regression/golden/state_snapshot.json`.
+
+**So `rm -rf src/ tests/` does not fail a test — it fails the build.** The first Stage-3
+slice is therefore not a test slice at all: the *data* must be given a home inside the
+reference (or a neutral top-level `data/`) before any deletion is possible. The plan's own
+row (§5f) called relocating the param YAML "not now"; this pass upgrades it from tidiness
+to a prerequisite.
+
+### ⚠⚠ FINDING 2 — three of the reference's own gates live in the tree being deleted
+
+C7's headline is that no Python program *writes* a frozen contract. It remains true, and it
+is not the whole picture: **the programs that check the contracts are still Python.**
+
+* `tests/crossport/test_manifest_writer.py` — the byte-for-byte comparison of all three
+  committed manifests against what the reference writes. This is the gate §5p calls "the
+  byte gate", and the trap C7 set (a provenance edit now forces a regeneration) is armed
+  *by this file*. The Rust-side `manifest_writer.rs` tests (3 + 4) check the emitted
+  literals and formatting, not equality with the committed file.
+* `tests/crossport/test_golden_provenance.py` and every `tests/test_regression_*.py` —
+  see FINDING 3.
+* `tests/crossport/test_inventory_parity.py` — the dumps' only consumer.
+
+Retiring the checker therefore disarms the traps the last four slices installed. Each
+needs its successor built **before** its Python original goes, not after.
+
+### ⚠⚠ FINDING 3 — the golden regression contract has no Rust owner at all
+
+**No Rust test compares a run against a committed golden file.** Searched exhaustively:
+the only Rust references to `tests/regression/golden/` are one `include_str!` of the
+`state_snapshot` *input* fixture and a comment in `emit_crew.rs`. The reference *emits*
+the goldens (23 `emit_*` examples) and Python alone compares them — 17
+`test_regression_*.py` files (37 tests), `tests/golden_platform.py` (the platform +
+authorship policy, and the single choke point every module routes through), and
+`test_golden_provenance.py` (27 collected).
+
+25 goldens on disk, 20 of them under the cross-port tier contract, and the whole
+comparison is in the tree scheduled for deletion. This is the single largest and
+earliest-ordered piece of Stage 3.
+
+### ⚠ FINDING 4 — four sibling domains: 1,411 lines of reference, zero reference tests
+
+`domains/src/{crew,eclss,power,thermal}.rs` carry **0** `#[test]` between them. Python
+carries 158. This was measured, not inferred — see Control B.
+
+### ⚠ FINDING 5 — `biosphere/flows.rs` is 1,537 lines with no test of its own
+
+The biosphere's mechanisms are tested in the reference only through the *frozen claims*:
+`science_gates.rs` (16), `science.rs` (7), `system.rs` (12) — bands and gates, not
+mechanisms. Python spends ~600 tests on the mechanisms themselves (photosynthesis,
+allocation, phenology, senescence, mineralization, nitrogen, transpiration, canopy, the
+soil column…). A band passing is not the mechanism being right; [[wheat-partition-backfill-refused]]
+is the recorded case of a frozen table passing a band *because it was fitted*.
+
+### ⚠ FINDING 6 — extinction, and the control that corrected this entry
+
+Extinction is a non-negotiable invariant. `integrator.rs:216` implements it; `integrator.rs`
+has two tests and neither is about it; `events.rs` has none. The draft of this entry read
+*"implemented in the reference and untested there"*.
+
+**Control A falsified that.** Disabling the extinction branch (`if false && …`) and running
+the workspace: **one test reddens** — `engine_vectors.rs::engine_synthetic_trajectory_is_bit_exact`,
+on the `boundary.loss.carbon` leaf at step 16. The corrected finding is narrower and more
+useful: extinction has **no direct test in the reference**; it is held by a single
+bit-exact trajectory vector that pins the entire state, so it reports *that something
+changed*, never *which mechanism broke*. ⚠ And that vector file is generated by
+`tests/crossport/gen_engine_vectors.py`, one of the generators whose successor the plan
+lists as "confirm per file" — so the only thing holding extinction is anchored to a
+generator queued for deletion.
+
+### ⚠⚠ FINDING 7 — the checker is not a second opinion on the sibling domains; it is the gate
+
+**Control B**, run against a clean tree: swap the two legs of `charge_split` in
+`domains/src/power.rs` so the battery stores `(1-η)` and loses `η`. Conservation still
+holds exactly — this is a pure science error, the kind a behavioural test exists to catch.
+
+* `cargo test --workspace`: **2 of 445 red**, and both are in `godot_bridge`
+  (`composed_energy_station_builds_steps_and_carries_readouts`,
+  `observation_projection_carries_the_derived_readouts`) — front-end readout assertions
+  that happen to pin a battery number. **Nothing in `domains` or `station` noticed.**
+* `pytest tests/crossport/test_crossport.py -k power`: **3 red**, immediately and by name.
+
+So for the sibling domains the cross-port comparison is not a duplicate of a Rust gate —
+**it is the gate**, and `tests/crossport/test_crossport.py` is on the delete list because
+"its entire subject is the two ports agreeing". That is true of its *mechanism* and false
+of its *effect*. Deleting it without a successor removes coverage that exists nowhere else.
+
+⚠ Both controls were run against a clean tree with nothing else in flight, and both files
+were restored with `git checkout --` and the workspace re-verified green — §5p's third
+process trap, observed.
+
+### ⚠ FINDING 8 — two invariants in `CLAUDE.md` are guarded on neither side
+
+* *"`simcore` in **both** trees carries zero third-party deps."* Python's
+  `test_simcore_purity.py` / `test_biosphere_purity.py` scan **Python packages only**. No
+  Rust test reads a `Cargo.toml`. The Rust half of that invariant has always been prose in
+  a manifest comment.
+* *"`gdext` appears in `rust/crates/godot_bridge` and nowhere else."* One matching line in
+  the whole tree, and it is a doc comment. Nothing asserts it.
+
+Retiring the Python purity tests loses no Rust coverage, because there is none — but it
+removes the last thing in the repo that *looks* like a purity gate, so the successor has
+to be written rather than assumed.
+
+### ⚠ FINDING 9 — seven Rust tests name the dying side as their oracle
+
+`quantities.rs::canonical_units_match_python_table`,
+`snapshot.rs::loads_the_python_golden_bit_exact`,
+`hexfloat_roundtrip.rs::{parse_reproduces_python_bits,format_reproduces_python_spelling}`,
+`canonical_json.rs::{matches_python_dumps_on_every_shape_the_manifests_use,escapes_the_ascii_specials_python_escapes}`,
+`science_gates.rs::the_literal_scanner_matches_the_pythons_regex_on_every_shape_it_meets`.
+
+Each is a conformance test against a side that will not exist. They do not break — the
+committed vector files and goldens survive — but each becomes a claim whose stated
+authority is gone, and the name will read as a lie. Re-anchoring them (to the spelling, to
+the vector file, to the format itself) belongs to whichever batch retires their subject.
+
+### ⚠ FINDING 10 — the parametrize axis: 725 of the 2,452
+
+1,721 test functions expand to 2,452 collected cases; **725 come from `parametrize`** and
+12 sites use `hypothesis`. A port that copies the function and drops the case table
+silently narrows the check. The worst offenders are named so the batches can price them:
+`test_authoring_monod.py` **19 → 216**, `test_light_path.py` 10 → 60,
+`test_crossport.py` 34 → 81, `test_phenology.py` 52 → 90, `test_photosynthesis.py` 25 → 50.
+
+⚠ The `hypothesis` half is already settled and should not be re-litigated: C2 (§5c) mapped
+all twelve `@given` law sites to `laws.rs` + `season_order_independence.rs` and recorded
+why **exhaustive enumeration beat `proptest` for eight of them**. There is no `proptest`
+in the workspace and that is a measured choice, not a gap.
+
+### ⚠ FINDING 11 — the Godot tests are not port-parity, and they are the exit criterion
+
+Nine files / 17 tests under `tests/crossport/` compare **Rust headless against Rust inside
+Godot** (bit-exact snapshot, FTZ/DAZ flags clean, Tier-0 discretes) through the actual
+`gdext` cdylib. Python is only the driver. Their subject outlives Python entirely — it is
+Phase 8's exit criterion, *"the exact same simulation runs headless"* — and they are
+`skipif`-ed on CI, so they are local-only today. Deleting them with the crossport
+directory would delete the only cross-boundary proof in the repo. Their new driver is a
+design question (a Rust integration test that shells out to Godot, or a script), which is
+why they are filed **D** rather than **P**.
+
+### ⚠ FINDING 12 — the value-switch seam never moved, and C1 said it would
+
+C1's row reads *"⚠ **Take the user's harness with it** — `config/overrides.py` is the same
+file set"*. It did not: there is no `override` anywhere in `rust/crates/config`, and
+`tests/test_param_overrides.py` (19 tests) is the only thing exercising the seam. So the
+user's in-memory parameter-substitution seam is Python-only, and Stage 3 collides with the
+value-switch plan rather than being independent of it. ⚠ Same shape as §5j's finding that
+*a slice's prerequisites are not in its own row of the plan table* — this one was in the
+row and still did not happen.
+
+### The batch order this implies
+
+Ordering falls out of the findings rather than out of the file counts. Stage 3 is **six
+slices, not one**, and the first two are not test work:
+
+| # | Slice | Why here |
+|---|---|---|
+| **S1** | **The reference's own ground** — relocate the 23 param YAMLs + the weather fixture + the 26 scenario fixtures + the goldens into paths the reference owns | FINDING 1. Nothing can be deleted until this lands; it moves data, not science, so it should be byte-neutral and provable as such |
+| **S2** | **The three gates come with it** — the manifest byte gate, the golden comparison + `golden_platform.py`'s policy, the inventory dumps' consumer | FINDINGS 2 + 3. These guard the *contracts*; every later slice runs behind them |
+| **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison |
+| **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable |
+| **S5** | **The biosphere mechanisms** — ~600 tests over `flows.rs` | FINDING 5. The largest and the one to take last, in crop/process batches, because it is where a silent narrowing does the most damage |
+| **S6** | **The retirements** — the cross-port comparison half, the generators (each against its named successor), the Python tree itself | Only after S1–S5 have successors standing. The **D** rows (Godot drivers, `test_context_budget.py`, `test_headless_cli.py`) need answers before this slice, not during it |
+
+⚠ **`test_context_budget.py` is the one row with no home on either side.** It guards this
+repo's own documentation discipline — `CLAUDE.md`'s byte ceiling, the log index ↔ record
+pairing, the memory index. There is no simulation subject, so "port it to Rust" is a
+category error and "delete it" removes the only enforcement the context budget has ever
+had. Named as a decision, not bucketed by reflex. `test_suite_runtime.py` is the opposite
+and needs no decision: its subject is pytest's own priority handling, so it dies with
+pytest by definition.
+
+### The per-file table
+
+Verdict codes as above. "Reference owner" names the module that owns the same subject and
+its test count; **(0 tests)** means the implementation is there and nothing checks it.
+
+
+#### **C — covered by the reference** (retire after its control) — 3 files, 52 tests
+
+| File | tests | Reference owner | Note |
+|---|---:|---|---|
+| `test_drift.py` | 19 | domains/tests/drift.rs (18) | C5 moved the folds; residue is helper-level (max_abs, same_phase_diffs) inside the same file |
+| `test_expr.py` | 18 | simcore/src/expr.rs (23) | all 18 subjects present; `unsupported_binop_raises` is unrepresentable (BinaryOp is a closed enum) |
+| `test_rng.py` | 15 | rng.rs (4) + rng_vectors.rs (3) + laws.rs (3) | residue is type-rejection tests that are unrepresentable in Rust |
+
+#### **C? — partly covered** (the residue moves first) — 36 files, 783 tests
+
+| File | tests | Reference owner | Note |
+|---|---:|---|---|
+| `test_authoring_monod.py` | 216 | simcore/src/expr.rs (6 monod tests) | FINDING 9 — 19 functions → 216 collected cases against 6 Rust tests |
+| `test_light_path.py` | 60 | domains/src/biosphere/light_path.rs (3) | residue large: 10 functions → 60 collected against 3 Rust tests |
+| `test_config.py` | 38 | config crate (47) | the pint half tests a mechanism the reference already replaced; it retires with the param generators |
+| `test_sim_io_snapshot.py` | 32 | simcore/src/snapshot.rs (8) | residue: 10 of 18; and `loads_the_python_golden_bit_exact` is FINDING 8 again |
+| `test_authoring_kinetics.py` | 31 | authoring/src/expr_parser.rs (20) |  |
+| `test_authoring_frozen_flows.py` | 30 | authoring/src/flow_registry.rs (4) + scenario_files.rs |  |
+| `test_lighting_run.py` | 24 | station/tests/day_neutral_lighting.rs (8) | residue: the whole lamp-flow and lamp-loader half (15 of 24) |
+| `test_freeze_manifest.py` | 21 | domains/tests/manifest_writer.rs (3) + science_gates.rs (16) | completeness is now largely inherited by the writer; the self-controls are not |
+| `test_authoring_compose.py` | 21 | authoring/tests/scenario_files.rs (40) | residue: the golden-bytes halves (FINDING 3 again) |
+| `test_authoring_multirate_partition.py` | 20 | authoring/tests/multirate.rs (18) |  |
+| `test_flow.py` | 18 | simcore/src/flow.rs (4) | residue: per-quantity energy diagnostic; absolute/relative balance tolerances; domains_touched |
+| `test_station_perturbations.py` | 17 | station/tests/perturbations.rs (10) | residue: the conserves-with-sink and returns-to-setpoint halves |
+| `test_state.py` | 16 | simcore/src/state.rs (5) | residue: non-finite threshold, stock defaults/replace; frozen-ness and negative-n are unfalsifiable |
+| `test_observation.py` | 16 | simcore/src/observation.rs (7) | names differ, subjects mostly match; residue: hashability, frozen-ness (unfalsifiable) |
+| `test_authoring_rate_precondition.py` | 16 | authoring/tests/multirate.rs (18) |  |
+| `test_station_freeze_manifest.py` | 15 | station/tests/manifest_writer.rs (4) + science_gates.rs (5) | same shape as the biosphere one |
+| `test_composition.py` | 14 | state.rs + flow.rs + conservation.rs | residue: composition validation rejects (non-finite coeff, non-Quantity key, own-quantity positive) |
+| `test_authoring_templates.py` | 14 | authoring/tests/scenario_files.rs (40) |  |
+| `test_authoring_freeze_manifest.py` | 14 | authoring inventory dump + the Python byte gate | FINDING 2 — the byte gate itself is Python |
+| `test_conservation.py` | 13 | simcore/src/conservation.rs (6) | residue: conservation across extinction; the relative-tolerance term; boundary/stored ledger split |
+| `test_authoring_multirate_composability.py` | 13 | authoring/tests/multirate.rs (18) |  |
+| `test_weather.py` | 12 | domains/src/biosphere/weather.rs (4) | C9 moved the path; residue: the VPD helpers |
+| `test_authoring_multirate_identity.py` | 12 | authoring/tests/multirate.rs (18) |  |
+| `test_arbitration.py` | 11 | simcore/src/arbitration.rs (4) + laws.rs + engine_vectors.rs | residue: whole-flow multi-quantity scaling; standalone check_no_overdraw; the zero-firings report |
+| `test_edge_cases.py` | 11 | arbitration.rs + engine_vectors.rs | residue: empty-registry passthrough; exact-fit withdrawal landing at zero without arbitrating |
+| `test_perturbations.py` | 11 | domains/src/biosphere/perturbations.rs (4) | residue: the conservation-with-sink halves |
+| `test_boundary.py` | 10 | simcore/src/boundary.rs (3) | residue: clamped sink accumulator; loss-sink routing conservation; boundary closing an unbalanced harvest |
+| `test_authoring_multirate_run.py` | 9 | authoring/tests/multirate.rs (18) |  |
+| `test_co2_compensation_band.py` | 8 | domains/src/biosphere/science_gates.rs (16) | C4 moved the band; residue: the probe arithmetic |
+| `test_authoring_dt_hazard.py` | 8 | authoring/tests/scenario_files.rs (40) |  |
+| `test_quantities.py` | 7 | simcore/src/quantities.rs (3) | FINDING 8 — `canonical_units_match_python_table` names the dying side as its oracle |
+| `test_authoring_crew.py` | 7 | authoring/tests/scenario_files.rs (40) |  |
+| `test_registry.py` | 5 | simcore/src/registry.rs (3) + laws.rs | residue: the domain index (matches stock domain; read-only) |
+| `test_authoring_param_packs.py` | 5 | authoring/tests/scenario_files.rs (40) |  |
+| `test_day_neutral_warm_habitat.py` | 4 | station/tests/day_neutral_lighting.rs (8) |  |
+| `test_authoring_multirate_compose.py` | 4 | authoring/tests/multirate.rs (18) |  |
+
+#### **P — port** (the reference implements it and tests it nowhere) — 72 files, 1305 tests
+
+| File | tests | Reference owner | Note |
+|---|---:|---|---|
+| `test_phenology.py` | 90 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5; 52 functions → 90 collected |
+| `test_photosynthesis.py` | 50 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5; 25 → 50 collected |
+| `test_transpiration.py` | 46 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_acceptance_gate.py` | 45 | none | the plausibility-band census |
+| `test_allocation.py` | 43 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_nitrogen.py` | 37 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_senescence_form.py` | 37 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5; 2855 lines, the largest single file |
+| `test_chamber.py` | 34 | domains/src/biosphere/system.rs (12) | scenario behaviour, not covered |
+| `test_decade_stability.py` | 34 | none | the decade / 50-yr guards |
+| `test_canopy.py` | 33 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_mineralization.py` | 32 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_power_flows.py` | 29 | domains/src/power.rs (0 tests) | FINDING 4 |
+| `test_soil_fractionation.py` | 29 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_soil_layers.py` | 27 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_respiration.py` | 25 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_biosphere_stress.py` | 24 | none |  |
+| `test_aux.py` | 23 | simcore/src/auxiliary.rs (0 tests) | only laws.rs touches aux, and only for order-independence |
+| `test_eclss_flows.py` | 23 | domains/src/eclss.rs (0 tests) | FINDING 4 |
+| `test_thermal_flows.py` | 22 | domains/src/thermal.rs (0 tests) | FINDING 4 |
+| `test_carbon_budget.py` | 22 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_stem_reserves.py` | 22 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_environment.py` | 20 | simcore/src/environment.rs (3) | 15 of 18 subjects absent: protocol conformance, rejects, rebinding, mixed dispatch, unknown-var |
+| `test_consumer.py` | 20 | none |  |
+| `test_decomposition.py` | 19 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_crew_flows.py` | 18 | domains/src/crew.rs (0 tests) | FINDING 4 |
+| `test_builders.py` | 18 | domains/src/biosphere/system.rs (12) | partial |
+| `test_bioregenerative_station.py` | 18 | none | authored content, runtime-only |
+| `test_microbial_respiration.py` | 17 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_water_cycle.py` | 17 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_multirate.py` | 17 | simcore/src/multirate.rs (0 tests) | the master-step driver has no direct Rust test |
+| `test_eclss_run.py` | 16 | domains/src/eclss.rs (0 tests) | FINDING 4 |
+| `test_root_depth.py` | 16 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_thermal_run.py` | 15 | domains/src/thermal.rs (0 tests) | FINDING 4 |
+| `test_gas_exchange.py` | 15 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_nitrogen_form.py` | 15 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_compartments.py` | 15 | domains/src/biosphere/stocks.rs (0 tests) |  |
+| `test_water_recovery_run.py` | 15 | station/src/water.rs (0 tests) |  |
+| `test_power_run.py` | 14 | domains/src/power.rs (0 tests) | FINDING 4 |
+| `test_potato_crop.py` | 14 | domains/src/biosphere/params.rs (9) | the second species: params covered, behaviour not |
+| `test_station_run.py` | 14 | station/src/system.rs (0 tests) |  |
+| `test_cabin_run.py` | 14 | station/src/cabin.rs (0 tests) |  |
+| `test_integrator.py` | 13 | simcore/src/integrator.rs (2) + laws.rs | residue: the Euler formula itself, RK4 order-of-accuracy, dt-linearity, forcing piecewise-constant in a step |
+| `test_perennial_chamber.py` | 13 | none |  |
+| `test_crew_run.py` | 12 | domains/src/crew.rs (0 tests) | FINDING 4 |
+| `test_sealed_chamber.py` | 12 | none |  |
+| `test_harvest_run.py` | 12 | station/src/harvest.rs (0 tests) |  |
+| `test_authoring_export_fidelity.py` | 12 | none |  |
+| `test_oracle_match.py` | 12 | none | src/lab/oracle_match.py; decided → Rust |
+| `test_power_self_discharge.py` | 11 | domains/src/power.rs (0 tests) | FINDING 4 |
+| `test_chamber_scale.py` | 11 | none |  |
+| `test_season.py` | 10 | none |  |
+| `test_oracle_gap.py` | 9 | none | PCSE-free (reads the committed JSON); the plan already routes it to Rust |
+| `test_greenhouse_run.py` | 9 | station/src/greenhouse.rs (0 tests) |  |
+| `test_sealed_station_stability.py` | 9 | station/src/sealed.rs (0 tests) |  |
+| `test_authored_habitat.py` | 9 | none | authored content, runtime-only |
+| `test_crop_param_set.py` | 8 | domains/src/biosphere/params.rs (9) | partial: the loader is covered, the per-crop set is not |
+| `test_bvad_validation.py` | 8 | none | the crew calibration against BVAD Table 3-31 |
+| `test_crew_coupled_loop.py` | 8 | none |  |
+| `test_extinction.py` | 7 | simcore/src/integrator.rs:216 (implemented, 0 tests) | FINDING 6 — a non-negotiable invariant whose only direct check is this file |
+| `test_nitrogen_throttle.py` | 7 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
+| `test_compartment_ledger.py` | 7 | domains/src/biosphere/stocks.rs (0 tests) |  |
+| `test_authoring_reversal_gate.py` | 7 | none |  |
+| `test_rk45.py` | 7 | none | src/lab; decided 2026-08-17 → Rust |
+| `test_oracle_gap_spring_wheat.py` | 6 | none | same |
+| `test_convergence.py` | 5 | none | src/lab; decided 2026-08-17 → Rust |
+| `test_oracle_smoke.py` | 5 | none | reads the committed JSON; PCSE-free |
+| `test_oscillator.py` | 4 | none | the RK4-vs-Euler invariant-drift study has no Rust referent |
+| `test_o2_makeup_reversal.py` | 4 | none |  |
+| `oracle/test_reference_fixture.py` | 4 | none | PCSE-free; the fixtures' only routine validation |
+| `oracle/test_lintul3_fixture.py` | 4 | none | PCSE-free; same |
+| `test_stability.py` | 3 | none | the 100k-step stability run has no Rust referent |
+| `test_sealed_station_landmine.py` | 3 | station/src/sealed.rs (0 tests) |  |
+
+#### **P! — port, and the reference does not implement it either** — 20 files, 93 tests
+
+| File | tests | Reference owner | Note |
+|---|---:|---|---|
+| `crossport/test_golden_provenance.py` | 27 | none | FINDING 3 |
+| `test_param_overrides.py` | 19 | none — src/config/overrides.py never moved | FINDING 10; collides with the value-switch plan |
+| `test_regression_long_horizon.py` | 7 | none | FINDING 3 |
+| `crossport/test_manifest_writer.py` | 6 | none | FINDING 2 — the byte gate on all three frozen contracts is Python |
+| `test_regression_sealed_station.py` | 4 | none | FINDING 3 |
+| `test_regression_consumer_season.py` | 2 | none | FINDING 3 |
+| `test_regression_crew.py` | 2 | none | FINDING 3 |
+| `test_regression_eclss.py` | 2 | none | FINDING 3 |
+| `test_regression_perennial_season.py` | 2 | none | FINDING 3 |
+| `test_regression_power.py` | 2 | none | FINDING 3 |
+| `test_regression_power_self_discharge.py` | 2 | none | FINDING 3 |
+| `test_regression_sealed_season.py` | 2 | none | FINDING 3 |
+| `test_regression_season.py` | 2 | none | FINDING 3 |
+| `test_regression_thermal.py` | 2 | none | FINDING 3 |
+| `test_regression_cabin.py` | 2 | none | FINDING 3 |
+| `test_regression_greenhouse.py` | 2 | none | FINDING 3 |
+| `test_regression_harvest.py` | 2 | none | FINDING 3 |
+| `test_regression_lighting.py` | 2 | none | FINDING 3 |
+| `test_regression_station.py` | 2 | none | FINDING 3 |
+| `test_regression_water_recovery.py` | 2 | none | FINDING 3 |
+
+#### **R — retire free** (subject is the Python tree, or unfalsifiable in Rust) — 9 files, 184 tests
+
+| File | tests | Reference owner | Note |
+|---|---:|---|---|
+| `crossport/test_crossport.py` | 81 | n/a | the comparison half: its entire subject is the two ports agreeing |
+| `test_biosphere_purity.py` | 39 | none | FINDING 7 |
+| `test_simcore_purity.py` | 20 | none | FINDING 7 — subject is the Python package; the Rust zero-dep charter is guarded by nothing |
+| `test_biosphere_demo.py` | 17 | domains/biosphere/demo.py has no Rust referent | C6 retired both demo goldens; its one engine claim (decision #16) is covered by environment.rs::forcing_and_shared_resolve |
+| `crossport/test_inventory_parity.py` | 8 | the three dump examples | port-vs-port; the dumps themselves survive as the writers' input |
+| `test_authoring_multirate_crossport_anchor.py` | 7 | authoring/tests/multirate.rs (18) | its whole subject is the two ports agreeing on the partition |
+| `test_smoke.py` | 5 | none | imports the Python packages |
+| `test_suite_runtime.py` | 4 | none | guards pytest's own priority handling; dies with pytest by definition |
+| `test_events.py` | 3 | simcore/src/events.rs (0 tests) | subject is Python dataclass frozen-ness; a Rust struct is frozen by construction — unfalsifiable |
+
+#### **K — keep** (the PCSE carve-out) — 3 files, 4 tests
+
+| File | tests | Reference owner | Note |
+|---|---:|---|---|
+| `oracle/test_potato_regeneration.py` | 2 | n/a | the carve-out |
+| `oracle/test_oracle_regeneration.py` | 1 | n/a | the carve-out |
+| `oracle/test_lintul3_regeneration.py` | 1 | n/a | the carve-out |
+
+#### **D — decide** (no natural home; the user's call) — 11 files, 31 tests
+
+| File | tests | Reference owner | Note |
+|---|---:|---|---|
+| `test_context_budget.py` | 10 | none | guards the repo's own docs; no Rust subject exists |
+| `crossport/test_headless_cli.py` | 4 | none | drives the Rust CLI from Python |
+| `crossport/test_godot_from_file.py` | 4 | godot_bridge (35 tests) | FINDING 11 |
+| `crossport/test_godot_compose.py` | 2 | godot_bridge (35 tests) | FINDING 11 — Rust-headless vs Rust-in-Godot, not port-vs-port; local-only |
+| `crossport/test_godot_flow_inspection.py` | 2 | godot_bridge (35 tests) | FINDING 11 |
+| `crossport/test_godot_save_load.py` | 2 | godot_bridge (35 tests) | FINDING 11 |
+| `crossport/test_godot_time_controls.py` | 2 | godot_bridge (35 tests) | FINDING 11 |
+| `crossport/test_godot_two_rate_parity.py` | 2 | godot_bridge (35 tests) | FINDING 11 |
+| `crossport/test_godot_objectives.py` | 1 | godot_bridge (35 tests) | FINDING 11 |
+| `crossport/test_godot_parity.py` | 1 | godot_bridge (35 tests) | FINDING 11 |
+| `crossport/test_godot_perturbations.py` | 1 | godot_bridge (35 tests) | FINDING 11 |
+
+### Deliberately NOT in this pass
+
+* **Any edit to a test file.** Including the ~15 that are one-line ports.
+* **The remaining mutation controls.** Two were run because they decided findings; the
+  other retire verdicts get theirs in the slice that acts on them, one targeted subset at
+  a time.
+* **Answering the four **D** questions.** They are the user's, and S6 is blocked on them.
+* **Re-pricing the `oracle` carve-out.** Unchanged from 2026-08-17: the three PCSE runners
+  and the three `-m oracle` regeneration tests stay Python; the four PCSE-free fixture
+  tests move.
+* **Deleting anything.** `git diff` is empty for `src/`, `rust/`, the goldens and all three
+  manifests; the only files this slice touches are this plan, the log and the memory index.
