@@ -3549,17 +3549,28 @@ implementation that is itself 11,701 lines.
 
 | | files | tests | meaning |
 |---|---:|---:|---|
-| **C** — covered | 3 | 52 | the reference tests the same subjects; retire after its control |
-| **C?** — partly covered | 36 | 783 | a named residue must move first |
-| **P** — port | 72 | 1,305 | the reference *implements* it and tests it nowhere |
-| **P!** — port, no implementation either | 20 | 93 | a gap in the reference, not only in its tests |
-| **R** — retire free | 9 | 184 | subject is the Python tree itself, or unfalsifiable in Rust |
-| **K** — keep | 3 | 4 | the PCSE carve-out |
-| **D** — decide | 11 | 31 | no natural Rust home; needs a call |
+| **C** | 3 | 52 | the reference tests the same subjects; retire after its control |
+| **C?** | 36 | 783 | a named residue must move first |
+| **P** | 62 | 1,204 | the reference *implements* it and tests it nowhere |
+| **P!** | 30 | 194 | a gap in the reference, not only in its tests |
+| **R** | 7 | 95 | subject is the Python tree itself, or unfalsifiable in Rust |
+| **R!** | 2 | 89 | ⚠ retire **only once its successor stands** — FINDING 7 |
+| **K** | 3 | 4 | the PCSE carve-out |
+| **D** | 11 | 31 | no natural Rust home; needs a call |
+| **total** | **154** | **2,452** | |
 
-**Retirable on today's evidence: 12 files, 236 tests — 9.6 % of the suite.** Everything
-else is work, and 92 files / 1,398 tests of it is *new Rust that does not exist*, before
-counting the residue inside the 36 partly-covered files.
+⚠ **`R!` exists because the first draft of this table contradicted its own FINDING 7.**
+`test_crossport.py` and `test_inventory_parity.py` were filed **R — retire free** on the
+reasoning the plan has carried since 2026-08-17: *"their entire subject is the two ports
+agreeing"*. Control B then measured that this is false for the sibling domains, where those
+cross-port assertions are the only by-name gate on a real science error. The finding was
+written up and **the rows were left saying R**, which is worse than either answer alone: a
+reader works the table, not the prose. `R!` means *retire only once its successor stands* —
+these two retire behind **S3**, never before it.
+
+**Retirable with nothing else built: 10 files, 147 tests — 6.0 % of the suite.** Everything
+else is work, and **92 files / 1,398 tests** of it is *new Rust that does not exist*, before
+counting the residue inside the partly-covered files.
 
 ### ⚠⚠ FINDING 1 — the reference does not stand on its own ground
 
@@ -3608,10 +3619,19 @@ authorship policy, and the single choke point every module routes through), and
 comparison is in the tree scheduled for deletion. This is the single largest and
 earliest-ordered piece of Stage 3.
 
-### ⚠ FINDING 4 — four sibling domains: 1,411 lines of reference, zero reference tests
+### ⚠ FINDING 4 — four sibling domains: 1,411 lines of reference, no test *in `domains`*
 
-`domains/src/{crew,eclss,power,thermal}.rs` carry **0** `#[test]` between them. Python
-carries 158. This was measured, not inferred — see Control B.
+`domains/src/{crew,eclss,power,thermal}.rs` carry **0** `#[test]` between them; Python
+carries 158.
+
+⚠ **"Zero `#[test]`" is not "unexercised", and the difference is the finding.** The code
+*is* stepped from elsewhere — `authoring/src/flow_registry.rs` builds thermal inside a
+test, `station`'s builder and palette build power, and the seven `emit_*` examples run all
+four. Control B measured exactly what that incidental exercise catches: **two front-end
+readout assertions**, and nothing that names the domain. So the accurate claim is the more
+damning one — the reference's sibling-domain science is checked only where some *other*
+crate happens to pin a number that depends on it. Same discipline as the 455-vs-445
+reconciliation above: a count of a marker is not a statement about coverage.
 
 ### ⚠ FINDING 5 — `biosphere/flows.rs` is 1,537 lines with no test of its own
 
@@ -3731,7 +3751,7 @@ slices, not one**, and the first two are not test work:
 | **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison |
 | **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable |
 | **S5** | **The biosphere mechanisms** — ~600 tests over `flows.rs` | FINDING 5. The largest and the one to take last, in crop/process batches, because it is where a silent narrowing does the most damage |
-| **S6** | **The retirements** — the cross-port comparison half, the generators (each against its named successor), the Python tree itself | Only after S1–S5 have successors standing. The **D** rows (Godot drivers, `test_context_budget.py`, `test_headless_cli.py`) need answers before this slice, not during it |
+| **S6** | **The retirements** — the two `R!` rows (only once S3's successors stand), the generators (each against its named successor), the Python tree itself | Only after S1–S5 have successors standing. ⚠ The cross-port comparison is **not** a free deletion: FINDING 7 makes it the sibling domains' only gate until S3 lands. The **D** rows (Godot drivers, `test_context_budget.py`, `test_headless_cli.py`) need answers before this slice, not during it |
 
 ⚠ **`test_context_budget.py` is the one row with no home on either side.** It guards this
 repo's own documentation discipline — `CLAUDE.md`'s byte ceiling, the log index ↔ record
@@ -3796,37 +3816,36 @@ its test count; **(0 tests)** means the implementation is there and nothing chec
 | `test_day_neutral_warm_habitat.py` | 4 | station/tests/day_neutral_lighting.rs (8) |  |
 | `test_authoring_multirate_compose.py` | 4 | authoring/tests/multirate.rs (18) |  |
 
-#### **P — port** (the reference implements it and tests it nowhere) — 72 files, 1305 tests
+#### **P — port** (the reference implements it and tests it nowhere) — 62 files, 1204 tests
 
 | File | tests | Reference owner | Note |
 |---|---:|---|---|
 | `test_phenology.py` | 90 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5; 52 functions → 90 collected |
 | `test_photosynthesis.py` | 50 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5; 25 → 50 collected |
 | `test_transpiration.py` | 46 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
-| `test_acceptance_gate.py` | 45 | none | the plausibility-band census |
 | `test_allocation.py` | 43 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_nitrogen.py` | 37 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_senescence_form.py` | 37 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5; 2855 lines, the largest single file |
 | `test_chamber.py` | 34 | domains/src/biosphere/system.rs (12) | scenario behaviour, not covered |
-| `test_decade_stability.py` | 34 | none | the decade / 50-yr guards |
+| `test_decade_stability.py` | 34 | domains/tests/drift.rs (18) | the decade / 50-yr guards; drift.rs holds the folds, not these bounds |
 | `test_canopy.py` | 33 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_mineralization.py` | 32 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_power_flows.py` | 29 | domains/src/power.rs (0 tests) | FINDING 4 |
 | `test_soil_fractionation.py` | 29 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_soil_layers.py` | 27 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_respiration.py` | 25 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
-| `test_biosphere_stress.py` | 24 | none |  |
+| `test_biosphere_stress.py` | 24 | domains/src/biosphere/system.rs (12) |  |
 | `test_aux.py` | 23 | simcore/src/auxiliary.rs (0 tests) | only laws.rs touches aux, and only for order-independence |
 | `test_eclss_flows.py` | 23 | domains/src/eclss.rs (0 tests) | FINDING 4 |
 | `test_thermal_flows.py` | 22 | domains/src/thermal.rs (0 tests) | FINDING 4 |
 | `test_carbon_budget.py` | 22 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_stem_reserves.py` | 22 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_environment.py` | 20 | simcore/src/environment.rs (3) | 15 of 18 subjects absent: protocol conformance, rejects, rebinding, mixed dispatch, unknown-var |
-| `test_consumer.py` | 20 | none |  |
+| `test_consumer.py` | 20 | domains/src/biosphere/system.rs (12) + emit_consumer.rs |  |
 | `test_decomposition.py` | 19 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_crew_flows.py` | 18 | domains/src/crew.rs (0 tests) | FINDING 4 |
 | `test_builders.py` | 18 | domains/src/biosphere/system.rs (12) | partial |
-| `test_bioregenerative_station.py` | 18 | none | authored content, runtime-only |
+| `test_bioregenerative_station.py` | 18 | authoring (the fixtures are read by scenario_files.rs) | authored content, runtime-only |
 | `test_microbial_respiration.py` | 17 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_water_cycle.py` | 17 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_multirate.py` | 17 | simcore/src/multirate.rs (0 tests) | the master-step driver has no direct Rust test |
@@ -3842,46 +3861,47 @@ its test count; **(0 tests)** means the implementation is there and nothing chec
 | `test_station_run.py` | 14 | station/src/system.rs (0 tests) |  |
 | `test_cabin_run.py` | 14 | station/src/cabin.rs (0 tests) |  |
 | `test_integrator.py` | 13 | simcore/src/integrator.rs (2) + laws.rs | residue: the Euler formula itself, RK4 order-of-accuracy, dt-linearity, forcing piecewise-constant in a step |
-| `test_perennial_chamber.py` | 13 | none |  |
+| `test_perennial_chamber.py` | 13 | domains/src/biosphere/system.rs (12) + emit_perennial.rs |  |
 | `test_crew_run.py` | 12 | domains/src/crew.rs (0 tests) | FINDING 4 |
-| `test_sealed_chamber.py` | 12 | none |  |
+| `test_sealed_chamber.py` | 12 | domains/src/biosphere/system.rs (12) |  |
 | `test_harvest_run.py` | 12 | station/src/harvest.rs (0 tests) |  |
-| `test_authoring_export_fidelity.py` | 12 | none |  |
-| `test_oracle_match.py` | 12 | none | src/lab/oracle_match.py; decided → Rust |
+| `test_authoring_export_fidelity.py` | 12 | authoring/src/run.rs (0 tests) |  |
 | `test_power_self_discharge.py` | 11 | domains/src/power.rs (0 tests) | FINDING 4 |
-| `test_chamber_scale.py` | 11 | none |  |
-| `test_season.py` | 10 | none |  |
-| `test_oracle_gap.py` | 9 | none | PCSE-free (reads the committed JSON); the plan already routes it to Rust |
+| `test_chamber_scale.py` | 11 | domains/src/biosphere/system.rs (12) | the chambers are built in the reference; the scale argument is not checked there |
+| `test_season.py` | 10 | domains/src/biosphere/system.rs (12) + emit_season.rs |  |
 | `test_greenhouse_run.py` | 9 | station/src/greenhouse.rs (0 tests) |  |
 | `test_sealed_station_stability.py` | 9 | station/src/sealed.rs (0 tests) |  |
-| `test_authored_habitat.py` | 9 | none | authored content, runtime-only |
+| `test_authored_habitat.py` | 9 | authoring (the fixtures are read by scenario_files.rs) | authored content, runtime-only |
 | `test_crop_param_set.py` | 8 | domains/src/biosphere/params.rs (9) | partial: the loader is covered, the per-crop set is not |
-| `test_bvad_validation.py` | 8 | none | the crew calibration against BVAD Table 3-31 |
-| `test_crew_coupled_loop.py` | 8 | none |  |
+| `test_bvad_validation.py` | 8 | domains/src/crew.rs (0 tests) | the crew calibration against BVAD Table 3-31; the params are in the reference, the calibration claim is not |
+| `test_crew_coupled_loop.py` | 8 | station/examples/emit_sealed_station.rs (the coupled scenario) |  |
 | `test_extinction.py` | 7 | simcore/src/integrator.rs:216 (implemented, 0 tests) | FINDING 6 — a non-negotiable invariant whose only direct check is this file |
 | `test_nitrogen_throttle.py` | 7 | domains/src/biosphere/flows.rs (0 tests) | FINDING 5 |
 | `test_compartment_ledger.py` | 7 | domains/src/biosphere/stocks.rs (0 tests) |  |
-| `test_authoring_reversal_gate.py` | 7 | none |  |
-| `test_rk45.py` | 7 | none | src/lab; decided 2026-08-17 → Rust |
-| `test_oracle_gap_spring_wheat.py` | 6 | none | same |
-| `test_convergence.py` | 5 | none | src/lab; decided 2026-08-17 → Rust |
-| `test_oracle_smoke.py` | 5 | none | reads the committed JSON; PCSE-free |
-| `test_oscillator.py` | 4 | none | the RK4-vs-Euler invariant-drift study has no Rust referent |
-| `test_o2_makeup_reversal.py` | 4 | none |  |
-| `oracle/test_reference_fixture.py` | 4 | none | PCSE-free; the fixtures' only routine validation |
-| `oracle/test_lintul3_fixture.py` | 4 | none | PCSE-free; same |
-| `test_stability.py` | 3 | none | the 100k-step stability run has no Rust referent |
+| `test_authoring_reversal_gate.py` | 7 | authoring/src/run.rs (0 tests) |  |
+| `test_o2_makeup_reversal.py` | 4 | station (the seam is built in the reference) |  |
+| `test_stability.py` | 3 | simcore (the engine; the 100k-step run is the test artifact) | no Rust referent for the run itself |
 | `test_sealed_station_landmine.py` | 3 | station/src/sealed.rs (0 tests) |  |
 
-#### **P! — port, and the reference does not implement it either** — 20 files, 93 tests
+#### **P! — port, and the reference does not implement it either** — 30 files, 194 tests
 
 | File | tests | Reference owner | Note |
 |---|---:|---|---|
+| `test_acceptance_gate.py` | 45 | none | the plausibility-band census and its margin arithmetic exist on neither side |
 | `crossport/test_golden_provenance.py` | 27 | none | FINDING 3 |
 | `test_param_overrides.py` | 19 | none — src/config/overrides.py never moved | FINDING 10; collides with the value-switch plan |
+| `test_oracle_match.py` | 12 | none | src/lab/oracle_match.py; decided → Rust, and nothing is there yet |
+| `test_oracle_gap.py` | 9 | none | PCSE-free (reads the committed JSON); the comparison arithmetic is Python-only |
 | `test_regression_long_horizon.py` | 7 | none | FINDING 3 |
+| `test_rk45.py` | 7 | none | src/lab; decided 2026-08-17 → Rust, and nothing is there yet |
+| `test_oracle_gap_spring_wheat.py` | 6 | none | same |
 | `crossport/test_manifest_writer.py` | 6 | none | FINDING 2 — the byte gate on all three frozen contracts is Python |
+| `test_convergence.py` | 5 | none | src/lab; decided 2026-08-17 → Rust, and nothing is there yet |
+| `test_oracle_smoke.py` | 5 | none | reads the committed JSON; PCSE-free; no Rust referent |
+| `test_oscillator.py` | 4 | none | the RK4-vs-Euler invariant-drift study exists on neither side |
 | `test_regression_sealed_station.py` | 4 | none | FINDING 3 |
+| `oracle/test_reference_fixture.py` | 4 | none | PCSE-free; the fixtures' only routine validation, and no Rust referent |
+| `oracle/test_lintul3_fixture.py` | 4 | none | same |
 | `test_regression_consumer_season.py` | 2 | none | FINDING 3 |
 | `test_regression_crew.py` | 2 | none | FINDING 3 |
 | `test_regression_eclss.py` | 2 | none | FINDING 3 |
@@ -3898,19 +3918,24 @@ its test count; **(0 tests)** means the implementation is there and nothing chec
 | `test_regression_station.py` | 2 | none | FINDING 3 |
 | `test_regression_water_recovery.py` | 2 | none | FINDING 3 |
 
-#### **R — retire free** (subject is the Python tree, or unfalsifiable in Rust) — 9 files, 184 tests
+#### **R — retire free** (subject is the Python tree, or unfalsifiable in Rust) — 7 files, 95 tests
 
 | File | tests | Reference owner | Note |
 |---|---:|---|---|
-| `crossport/test_crossport.py` | 81 | n/a | the comparison half: its entire subject is the two ports agreeing |
 | `test_biosphere_purity.py` | 39 | none | FINDING 7 |
 | `test_simcore_purity.py` | 20 | none | FINDING 7 — subject is the Python package; the Rust zero-dep charter is guarded by nothing |
 | `test_biosphere_demo.py` | 17 | domains/biosphere/demo.py has no Rust referent | C6 retired both demo goldens; its one engine claim (decision #16) is covered by environment.rs::forcing_and_shared_resolve |
-| `crossport/test_inventory_parity.py` | 8 | the three dump examples | port-vs-port; the dumps themselves survive as the writers' input |
 | `test_authoring_multirate_crossport_anchor.py` | 7 | authoring/tests/multirate.rs (18) | its whole subject is the two ports agreeing on the partition |
 | `test_smoke.py` | 5 | none | imports the Python packages |
 | `test_suite_runtime.py` | 4 | none | guards pytest's own priority handling; dies with pytest by definition |
 | `test_events.py` | 3 | simcore/src/events.rs (0 tests) | subject is Python dataclass frozen-ness; a Rust struct is frozen by construction — unfalsifiable |
+
+#### **R! — retire only once its successor stands** (⚠ FINDING 7 overrides the obvious reading) — 2 files, 89 tests
+
+| File | tests | Reference owner | Note |
+|---|---:|---|---|
+| `crossport/test_crossport.py` | 81 | n/a | ⚠ FINDING 7 overrides the obvious reading: its MECHANISM is port-vs-port, its EFFECT is the only by-name gate on the sibling domains. Retires behind S3, never before |
+| `crossport/test_inventory_parity.py` | 8 | the three dump examples | ⚠ same shape: the dumps survive as the writers' input, but nothing else consumes them today |
 
 #### **K — keep** (the PCSE carve-out) — 3 files, 4 tests
 
@@ -3939,9 +3964,11 @@ its test count; **(0 tests)** means the implementation is there and nothing chec
 ### Deliberately NOT in this pass
 
 * **Any edit to a test file.** Including the ~15 that are one-line ports.
-* **The remaining mutation controls.** Two were run because they decided findings; the
-  other retire verdicts get theirs in the slice that acts on them, one targeted subset at
-  a time.
+* **The remaining mutation controls.** Two were run because they decided findings — and
+  one of them (A) falsified this pass's own draft while the other (B) forced the `R!` code
+  into existence, which is the argument for running the rest rather than reasoning them.
+  Every remaining retire verdict gets its control in the slice that acts on it, one
+  targeted subset at a time.
 * **Answering the four **D** questions.** They are the user's, and S6 is blocked on them.
 * **Re-pricing the `oracle` carve-out.** Unchanged from 2026-08-17: the three PCSE runners
   and the three `-m oracle` regeneration tests stay Python; the four PCSE-free fixture

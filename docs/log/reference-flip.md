@@ -1948,9 +1948,17 @@ against the reference, and no test file touched. Full tables and per-file rows:
 
 **The shape.** 2,452 collected Python tests / 57,974 lines against **445** Rust tests /
 38,742 lines. The `domains` row carries the whole plan: 1,240 Python checks against 89.
-Retirable on today's evidence: **12 files, 236 tests — 9.6 % of the suite.** Work that is
-new Rust which does not exist: **92 files, 1,398 tests**, before the residue inside the 36
+Retirable with nothing else built: **10 files, 147 tests — 6.0 % of the suite.** Work that
+is new Rust which does not exist: **92 files, 1,398 tests**, before the residue inside the 36
 partly-covered files.
+
+⚠ **The verdict table contradicted its own finding, and the review caught it rather than a
+gate.** `test_crossport.py` and `test_inventory_parity.py` were filed *retire free* on the
+plan's standing reasoning (*"their entire subject is the two ports agreeing"*) while the
+finding directly below them said that reasoning is false for the sibling domains. A reader
+works the table, not the prose, and the contradiction pointed toward deleting coverage. A
+seventh code — **`R!`, retire only once its successor stands** — now carries those two rows.
+*A finding that does not change the row it is about has not landed.*
 
 #### ⚠⚠ Stage 3 does not begin with tests
 
@@ -1982,9 +1990,12 @@ science error.
 * `pytest tests/crossport/test_crossport.py -k power`: **3 red**, by name.
 
 `crew.rs`, `eclss.rs`, `power.rs`, `thermal.rs` carry **0** `#[test]` between 1,411 lines;
-Python carries 158. So "delete the cross-port comparison, its subject is the two ports
-agreeing" is true of its *mechanism* and false of its *effect*: for these domains it is the
-only gate there is.
+Python carries 158. ⚠ *Zero markers is not "unexercised"*: the code is stepped from
+`authoring`'s flow-registry test, from `station`'s builder and palette, and from seven
+`emit_*` examples — and Control B measured exactly what that incidental exercise catches,
+which is two front-end readouts and nothing that names the domain. So "delete the
+cross-port comparison, its subject is the two ports agreeing" is true of its *mechanism*
+and false of its *effect*: for these domains it is the only gate there is.
 
 #### ⚠ A control corrected this entry's own draft
 
