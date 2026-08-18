@@ -23,12 +23,17 @@ manifest. Re-run the manifest writer as part of the unfreeze ceremony — from `
 ``docs/biosphere-reference.md``.
 
 ⚠ **The half of that warning that said "turns *nothing* red" was true until slice C7 and
-is now false for the biosphere** (measured, not assumed: a moved golden was fed to the
-gate and it went red). ``tests/crossport/test_manifest_writer.py`` regenerates the
-manifest and compares the committed file byte for byte, and the writer hashes the
-goldens from disk — so a desynchronised hash is red rather than silent. **It is still
-true for the station**, whose manifest Python still writes and whose
-``golden_sha256`` is recorded and not compared.
+is now false for every frozen golden** (measured, not assumed: a moved golden was fed to
+the gate and it went red). ``tests/crossport/test_manifest_writer.py`` regenerates each
+manifest and compares the committed file byte for byte, and every writer hashes the
+goldens from disk — so a desynchronised hash is red rather than silent.
+
+⚠ **This sentence has now been corrected twice and both times by the slice that
+falsified it.** C7's biosphere half made it false for the biosphere and said *"it is
+still true for the station"*; C7's **station** half made that clause false in turn, by
+moving the last writer. The regeneration command above is the biosphere's — the
+station's is ``cargo run --example dump_station_inventory -- --write-manifest``, and the
+authoring contract's is ``dump_authoring_inventory``; all three take the same flag.
 
 ⚠ **What this tool can and cannot establish, stated plainly.** While the two ports emit
 identical bytes, *no* byte-level check can tell which side produced a golden —

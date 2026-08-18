@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b took the station's remaining two claims, leaving C7's station half unblocked)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -1817,3 +1817,123 @@ Controls: recorded literal's assertion deleted → bound-literal check red, gate
 both tables; a `science_gate` marker re-added in `tests/` → the census-exhausted gate red.
 Measured: the node's annual peaks sit at 160.12 K against the frozen floor of 100.0 (1.6×
 clearance). Full detail: `docs/plans/post-roadmap-reference-flip.md` §5o.
+
+### C7 — the station half: the last writer moves (2026-08-18)
+
+The third of C7's three halves, and the one that makes the flip's headline literally true:
+**no Python program writes a frozen contract any more.** Blocked on C4b, which landed
+first.
+
+**Byte-identical on the first run** — third for three. The deliberate diff is three rows
+and no value: `_comment` named the retired command; `aux_set`'s `why` said *"the splice is
+what a regeneration writes"* and there is no splice now; `numerics_note`'s `why` documents
+a hole this slice made bigger.
+
+#### ⚠⚠ The finding: the trap is PARTIAL, which is worse than the biosphere's
+
+`numerics_note` is prose naming three integration steps, and the writer now lives in the
+crate that owns all three. Measured before the guard was designed:
+
+| referent | as written | spliced | regeneration gate |
+|---|---|---|---|
+| `bio_dt` | `dt=1/4 day` | `dt=0.25 day` | **red** |
+| `cabin_dt` | `dt=60 s` | `dt=60 s` | **green** — `60.0_f64` Displays as `60` |
+| `power_dt` | `dt=3600 s` | `dt=3600 s` | **green** |
+
+Two of three would auto-follow the code invisibly. Run end to end: splicing `cabin_dt` and
+regenerating printed **`unchanged`**, and only the new source-text guard reddened.
+
+⚠ **And unlike the biosphere there is no second guard.** That contract's `dt_days` is at
+least compared against `BIO_DT` across the port boundary; this manifest has no structured
+step key, and adding one widens the frozen surface — declined for the third time rather
+than smuggled in as a rider.
+
+⚠ The step unfreeze's lesson in a third place, with a new mechanism: there the collision
+was between two *values*; here between a value and its **rendering**.
+
+⚠ The guard's own control earned its keep the way the biosphere's did — the bare key
+`numerics_note` appears **three** times in the writer (const, emission site, `_authority`
+row), so an anchor on the key alone would check the wrong line. The ambiguity is asserted,
+so the reason is a measurement rather than a claim.
+
+#### Deleting the writer reddened nothing, and opened the same hole a third time
+
+`_build_manifest` was reachable only from `_regenerate` ← `__main__`, invoked by no test.
+**A control with no test to turn red IS the finding.** And the roster (`name -> label,
+golden`) lived in the module *and was written from it*, so nothing held it once the writer
+left — with the at-risk fields being exactly the two `_authority` marks `hand`.
+`test_the_frozen_roster_is_the_references` closes it; a control confirms it reddens alone.
+
+⚠ `_filed_under_the_roster` was **one commit old** when deleted — C4b added it, and the
+Rust `census_json` does the same filling with the same panic-on-unknown-scenario.
+
+#### The `_authority` literal went too, and the equality became a shape check
+
+`manifest["_authority"] == _AUTHORITY` compared the committed block against the module's
+own literal. The literal left with the writer; keeping a copy purely to assert against is
+the stale second copy. The gates read the block out of the committed file now, and the
+fourth check became shape checks — which catch a malformed row the equality never caught
+either. The prose was moved **mechanically** (generated from the manifest and diffed),
+never retyped.
+
+#### Two sentences this slice falsified, both corrected in place
+
+* `regen_goldens_from_rust.py`'s warning has now been corrected **twice, both times by the
+  slice that falsified it**: C7's biosphere half made *"a `--write` that moves a frozen
+  golden turns nothing red"* false for the biosphere and wrote *"it is still true for the
+  station"*. Measured here — a moved station golden reddens the byte gate.
+* `test_inventory_parity.py` printed the Rust regeneration command for the biosphere and
+  the Python one for the station. **De-branched, exactly as its own comment scheduled.**
+* And the ungated prose half: `docs/station-reference.md` named the retired command inside
+  step 4 of its own unfreeze ceremony.
+
+#### Verification
+
+`cargo test` + `cargo clippy --all-targets -D warnings` clean; `ruff`, `pyright`, the
+Python suite green. Controls: hand-edited manifest → byte gate red; drifted roster label →
+roster gate alone; moved golden → byte gate red; an aux process wired in → the regenerated
+manifest **gains the name** *and* the checker's aux gate reddens (the substitute for a
+rename control this empty axis cannot run); the `numerics_note` splice → **manifest
+unchanged, source-text guard red**, which is the finding rather than a pass. Full detail:
+`docs/plans/post-roadmap-reference-flip.md` §5p.
+
+### ⚠⚠ Addendum — a standing rule in `CLAUDE.md` went false, and nothing was watching
+
+The always-loaded map has said, since the freeze contracts existed:
+
+> **A provenance-only edit is an unfreeze that NOTHING CATCHES.** The per-file sha-256 is
+> recorded but never compared, so editing just a param's `source:` moves the hash and
+> turns nothing red.
+
+**C7 falsified it and the falsification went unrecorded for two commits.** Every writer
+hashes the files it compiles in, and `tests/crossport/test_manifest_writer.py` compares
+the committed manifest byte for byte — so a `source:`-only edit leaves the manifest stale
+and **red**. Measured on **both** contracts rather than reasoned from one: a probe edit to
+`charge.yaml`'s `source:` reddens the station row, and one to `photosynthesis.yaml`'s
+reddens the biosphere row.
+
+⚠ The rule is corrected rather than deleted, because the *precise* claim it was making is
+still true and still worth carrying: the hash is not asserted as a **value**, so a
+provenance edit adds no evidence about anything. What changed is that it can no longer be
+made *silently* — the regeneration is now forced, and only the **ceremony** around it
+(advisor review, documentation) is honor-system.
+
+⚠ This is [[posture-landed-in-claude-md]]'s finding a second time, and the shape is worth
+naming: **`CLAUDE.md` is audited by nothing, so a claim in it survives exactly as long as
+nobody re-reads it.** C3 found a stale `dt=1` there; this is a stale "nothing catches
+this" — and both were load-bearing, because a reader acts on them.
+
+### ⚠ A third process trap: a mutation control run WHILE a full suite is in flight
+
+The clean suite is green, but the first run of it came back **19 failed, 4 errors** — and
+none of them was a regression. Two provenance probes (`charge.yaml`, `photosynthesis.yaml`)
+were edited and restored *while* `pytest -n 12` was executing, and the biosphere probe left
+the file briefly unparseable, so every test that loads it failed. Both files were restored
+and `git status src/` was clean by the time the run finished, which is exactly what makes
+this dangerous: **the evidence of the cause is gone before the verdict arrives.**
+
+The rule, alongside this slice's other two (`git checkout` discarding uncommitted work; a
+mechanical re-wrap corrupting frozen prose): **a control mutates the tree, so it may not run
+concurrently with anything that reads the tree.** Run controls against a targeted subset, or
+wait for the full run to finish. A red suite whose cause has already been reverted is worse
+than a red suite — it invites either a false regression hunt or, worse, a shrug.

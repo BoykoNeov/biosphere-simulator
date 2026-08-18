@@ -75,6 +75,7 @@
 //!   file prefix at all, so anything printed here would have compared Python against Python.
 //!   Slice C1 gave the reference the YAML loaders, which is what created a referent.
 
+use config::canonical_json::{dumps, Json};
 use config::provenance::normalized_sha256;
 use domains::biosphere::science_gates::{ScienceGate, LIVENESS_FLOORS, SCIENCE_BANDS};
 use domains::crew::{build_crew, MISSION_SCENARIO};
@@ -88,6 +89,7 @@ use station::scenario::{sealed_station_scenario, SEALED_ENERGY_YEARS, SEALED_STA
 use station::science_gates::GATES;
 use station::sealed::build_sealed_station;
 use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 
 fn json_array(names: &BTreeSet<&str>) -> String {
     let items: Vec<String> = names.iter().map(|n| format!("\"{n}\"")).collect();
@@ -226,30 +228,248 @@ fn census(field: &str) -> String {
     out
 }
 
-fn main() {
+/// The biosphere contract this one delegates to rather than re-hashing.
+///
+/// ⚠ A path, not a derived value — `_authority` marks it `hand`. Its target's
+/// existence is checked on the Python side (`test_manifest_named_files_exist`), and
+/// since C7 what that gate actually guards is a literal in THIS file.
+const BIOSPHERE_MANIFEST: &str = "docs/biosphere-reference.manifest.json";
+
+const AUTHORITY: [(&str, &str, &str); 16] = [
+    (
+        "_comment",
+        "hand",
+        "prose header",
+    ),
+    (
+        "aux_set",
+        "rust",
+        "the same walk over AuxProcess::type_name(). ⚠ Legitimately EMPTY (the siblings and seams are all conserved-quantity flows; the biosphere's accumulators live in the delegated slow registry), so every assertion about it is [] == [] and a regeneration WRITES that empty list rather than splicing it (C7 moved the writer here; before that the checker spliced the dump's copy). The evidence that the walk happens at all is a measured control, not a green run — see the dump example and the module docstring.",
+    ),
+    (
+        "delegates_to",
+        "hand",
+        "pointer to the biosphere manifest, which this contract delegates rather than re-hashes. A path, not a derived value — its target's existence is checked by test_manifest_named_files_exist",
+    ),
+    (
+        "flow_set",
+        "rust",
+        "the union of Flow::type_name() over the canonical station registries in the reference tree — the four standalone siblings plus the maximal sealed fast registry, derived from built registries and never hand-listed",
+    ),
+    (
+        "frozen_at_phase",
+        "hand",
+        "the phase this surface froze at",
+    ),
+    (
+        "integrator",
+        "hand",
+        "the deliberate anti-derived literal, and unlike the biosphere's dt_days it has no importable constant on EITHER side — each run helper selects the scheme inline — so it is documented here and enforced by the goldens (an RK4 switch moves every one). A literal typed into the Rust dump to make the pair symmetric would read like a gate and be none.",
+    ),
+    (
+        "liveness_floors/*",
+        "rust",
+        "the same census, for the bounds tuned to our own calibration rather than to an outside source — re-anchored with it in slice C4b. ⚠ This manifest's single floor is the thermal node's non-collapse bound, whose clearance is 1.6x (annual peaks sit at 160.12 K against a floor of 100.0); the companion stationarity and T_eq-proximity assertions are what give the gate its teeth, and they travelled with it.",
+    ),
+    (
+        "numerics_note",
+        "hand",
+        "⚠ HAND-MAINTAINED PROSE THAT NOTHING CHECKS, and slice 7 deliberately left it that way. Unlike the biosphere the station has no structured dt key: the steps live inside this English sentence, so flipping one reddens nothing here. The reference tree DOES have referents — sealed_station_scenario()'s bio_dt / cabin_dt and the energy scenario's power_dt — so slice 6's dt_days treatment is buildable. It needs a structured key that does not exist, and adding one WIDENS the frozen surface, which is its own unfreeze with its own ceremony rather than a rider on a re-anchoring. Recorded here so the hole is a stated claim. ⚠⚠ C7's STATION HALF MADE IT WORSE AND MEASURED HOW: the writer now lives in the crate that owns all three steps, and splicing them is only PARTLY visible. bio_dt would render dt=0.25 day against the written dt=1/4 day, so the regeneration gate reddens; cabin_dt and power_dt render 60 and 3600, BYTE-IDENTICAL to what this sentence already says, because Rust prints 60.0_f64 as 60. So two of the three would auto-follow the code invisibly, with no structured key to compare them against on either side. The guard is rust/crates/station/tests/manifest_writer.rs, which reads the writer's own source and requires the emission site to be a quoted literal naming none of the three.",
+    ),
+    (
+        "param_files/*",
+        "rust",
+        "⚠ RE-ANCHORED IN SLICE C8, the same finding as the biosphere's: what moved is the RULE, not the number. All 8 digests here (and all 15 there) are author-neutral — both sides hash the same file the same way — so the re-anchoring moved none of them. The CENSUS is now the set the reference LOADS: domains::params::param_files (power × 2, thermal, eclss, crew) plus station::params::param_files (water_recovery, lamp, harvest), eight compile-time include_str! entries instead of a glob over six Python package directories. ⚠ NO exclusion rule on this side, unlike the biosphere's 15-of-20 — these six directories hold nothing but frozen files, and the asymmetry is stated per side so nobody generalises the harder rule. The NORMALIZATION is config::provenance (hand-rolled sha-256 over LF-normalized text; every engine crate is zero-dep by charter). ⚠ Newly asserted with the re-anchor: every basename is unique across the six directories — this key is basename-KEYED, so a collision would silently collapse two files into one entry, and nothing had checked it. Prerequisite: slice C1.",
+    ),
+    (
+        "reference_doc",
+        "hand",
+        "pointer to the prose half of the contract",
+    ),
+    (
+        "scenarios/*/golden",
+        "hand",
+        "the artifact's filename",
+    ),
+    (
+        "scenarios/*/golden_sha256",
+        "rust",
+        "the golden is the reference tree's own output (golden_platform.RUST_AUTHORED, which this block is checked against, not restating). Unlike the param hashes here this one IS gated against the file on disk: a golden is machine-generated and its hash is newline-normalized, so 'the manifest pins bytes that exist' is a completeness claim, not the value re-assertion that param_files declines. ⚠ SLICE C5 removed this key's ONE exception and that is why the axis is now uniform. `scenarios/sealed_energy_drift/golden_sha256` used to be carved out as `python` — 'ONE RUN, TWO AUTHORS: drift.py's Python-side fold of the 15-yr sealed energy series; the fold IS the artifact, so its correct reference is Python's own output.' That stopped being true when `domains::biosphere::drift` gained the fold kit and `emit_sealed_energy_drift` began emitting the summary itself. ⚠ The HASH did not move (measured byte-identical before the change), so this is an authorship re-anchoring, not a value unfreeze — the same shape C8 found for param_files, where the digits were author-neutral and the RULE moved.",
+    ),
+    (
+        "scenarios/*/scenario",
+        "hand",
+        "a human label for the scenario, not an identifier anything resolves",
+    ),
+    (
+        "science_bands/*",
+        "rust",
+        "⚠⚠ RE-ANCHORED IN SLICE C4b, AND THIS ENTRY USED TO SAY IT COULD NOT BE. Its own text read 'a static AST census of science_gate markers on pytest functions (tests/science_gates.py). There is no Rust referent and there cannot be one while the science gates are pytest-side' — the SAME sentence the biosphere manifest carried until C4, and the third frozen 'why' in this flip to argue against the slice that arrived. It was true of pytest markers and false of the claim it appeared to make: the census's requirement is that it be DERIVED from the tree rather than hand-listed, and the reference meets it by making the declaration and the #[test] ONE THING (the science_gates! macro, exported from domains and invoked in rust/crates/station/src/science_gates.rs), so an unexercised entry is a compile error rather than something a meta-test hunts textually. ⚠ TWO tables, not one: a gate lives with the runs it reads, and these read the coupled cabin and the Power→Thermal station — station types, in a crate that depends on domains rather than the reverse. The mechanism and the transcribed bound-literal regex are shared; only the tables are split, the same way the two contracts are. ⚠ What moved is the LOCUS and nothing else — the quantity/bound/source strings are byte-identical to the pytest markers', and the Python test bodies stay as the checker's conformance half. ⚠ On this manifest the census is mostly EMPTY — 11 of 13 scenarios carry no outside-sourced bound — and the emptiness is itself the frozen claim; the ROSTER it is taken over is still this file's hand-authored scenario set, and a gate naming a scenario outside it RAISES during regeneration rather than being filtered away.",
+    ),
+    (
+        "sealed_energy_years",
+        "rust",
+        "the reference tree's SEALED_ENERGY_YEARS. ⚠ In that tree it is DEFINED as LONG_HORIZON_YEARS, so since slice 7 this contract and the biosphere's are anchored to one reference-side constant: moving the decade horizon is a single edit that unfreezes two manifests. A reader who assumes they are independent will predict the wrong diff.",
+    ),
+    (
+        "sealed_station_years",
+        "rust",
+        "the reference tree's SEALED_STATION_YEARS",
+    ),
+];
+
+const SCENARIOS: [(&str, &str, &str); 13] = [
+    (
+        "cabin_gas",
+        "CABIN_GAS_SCENARIO (P6.2 crew↔ECLSS)",
+        "cabin_gas_state.json",
+    ),
+    (
+        "crew_mission",
+        "MISSION_SCENARIO (standalone Crew)",
+        "crew_state.json",
+    ),
+    (
+        "eclss_steady_state",
+        "STEADY_STATE_SCENARIO (standalone ECLSS)",
+        "eclss_state.json",
+    ),
+    (
+        "greenhouse",
+        "GREENHOUSE_SCENARIO (P6.3 biosphere↔cabin)",
+        "greenhouse_state.json",
+    ),
+    (
+        "harvest",
+        "HARVEST_SCENARIO (P6.6 biomass→food)",
+        "harvest_state.json",
+    ),
+    (
+        "lighting",
+        "LIGHTING_SCENARIO (P6.5 Power→biosphere lamp)",
+        "lighting_state.json",
+    ),
+    (
+        "power_bounded_soc",
+        "BOUNDED_SOC_SCENARIO (standalone Power)",
+        "power_state.json",
+    ),
+    (
+        "power_self_discharge",
+        "SELF_DISCHARGE (standalone Power + SelfDischarge)",
+        "power_self_discharge_state.json",
+    ),
+    (
+        "sealed_energy_drift",
+        "HEAT_CLOSURE_SCENARIO 15-yr (P6.7 Tier-1 energy stability signature)",
+        "sealed_energy_drift_summary.json",
+    ),
+    (
+        "sealed_station",
+        "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)",
+        "sealed_station_state.json",
+    ),
+    (
+        "station_heat_closure",
+        "HEAT_CLOSURE_SCENARIO (P6.1 Power→Thermal heat closure)",
+        "station_state.json",
+    ),
+    (
+        "thermal_equilibrium",
+        "EQUILIBRIUM_SCENARIO (standalone Thermal)",
+        "thermal_state.json",
+    ),
+    (
+        "water_recovery",
+        "WATER_RECOVERY_SCENARIO (P6.4 crew water loop)",
+        "water_recovery_state.json",
+    ),
+];
+
+const COMMENT: &str = "Phase-6 Step-10 station freeze manifest (P6.10). Names the frozen WHOLE-ASSEMBLY station reference surface (Phase-5 siblings + the station seams); the biosphere is delegated to docs/biosphere-reference.manifest.json (see delegates_to). See docs/station-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Each key's producer and why is in _authority: this file has MIXED authority since slice 7 of the reference flip. Regenerate on a deliberate unfreeze, from rust/: cargo run --example dump_station_inventory -- --write-manifest. C7 moved the WRITER to the reference; tests/test_station_freeze_manifest.py has none and is now only a checker.";
+
+const NUMERICS_NOTE: &str = "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/4 day, 4 slow sub-steps per master day + everything-fast dt=60 s; Tier-1 energy single-rate dt=3600 s.";
+
+/// The flow and aux inventories, and the eight-file param census — walked ONCE and read
+/// by **both** halves of this program, the dump and the manifest writer.
+///
+/// ⚠ The biosphere half's first draft had the writer re-walk the registries, which put
+/// two derivations of the same sets in one file with only the parity gate able to notice
+/// them drifting. Sharing makes the drift impossible rather than merely detectable, and
+/// costs that gate nothing: its subject is staleness — the live tree against the frozen
+/// file — not one code path against another.
+///
+/// Tier-0 sanity here rather than at each use site, so a build that wired nothing names
+/// its own cause instead of reporting sixteen missing flows. ⚠ Only the FLOW axis can be
+/// checked this way: the station `aux_set` is legitimately empty (the siblings and seams
+/// are all conserved-quantity flows; the biosphere's accumulators live in the delegated
+/// slow registry), so `!aux.is_empty()` would be a false assertion, and `[] == []` is why
+/// that axis needs a measured negative control rather than a green run.
+///
+/// ⚠⚠ **Since C7's station half that empty list is WRITTEN by this program, not spliced
+/// by the checker.** The two-direction rename control slice 6 used is unrunnable here —
+/// there is no station aux process to rename — so the substitute, re-run when this half
+/// landed, is to wire one in temporarily and confirm the regenerated manifest **gains the
+/// name**. That is the only evidence this walk reaches `aux_processes()` at all.
+fn inventory() -> (
+    BTreeSet<&'static str>,
+    BTreeSet<&'static str>,
+    Vec<(&'static str, &'static str)>,
+) {
     let mut flows: BTreeSet<&str> = BTreeSet::new();
     let mut aux: BTreeSet<&str> = BTreeSet::new();
-    let registries = canonical();
-    for registry in &registries {
+    for registry in &canonical() {
         flows.extend(registry.flows().iter().map(|f| f.type_name()));
         aux.extend(registry.aux_processes().iter().map(|a| a.type_name()));
     }
-
-    // Tier-0 sanity on the program itself. ⚠ Only the FLOW axis can be checked this way:
-    // the station `aux_set` is legitimately empty (the siblings and seams are all
-    // conserved-quantity flows; the biosphere's accumulators live in the delegated slow
-    // registry), so `!aux.is_empty()` would be a false assertion, and `[] == []` is why
-    // the gate's aux row needs a measured negative control rather than a green run.
-    //
-    // ⚠⚠ Since slice 7 that empty list is no longer merely *compared* — it is **written
-    // into the frozen manifest** by a regeneration run, which is the escalation the
-    // biosphere dump records for itself ("an empty set here would be written into the
-    // manifest, not merely compared against it"). The two-direction rename control slice 6
-    // used cannot be run on this axis: there is no station aux process to rename. The
-    // substitute, run when slice 7 landed, is to *wire one in* temporarily and confirm the
-    // regenerated manifest gains the name and the Python gate goes red — the only evidence
-    // that this walk reaches `aux_processes()` at all.
     assert!(!flows.is_empty(), "canonical station builds wired no flows");
+
+    // The eight the station contract spans, sorted by basename. Every basename is unique
+    // across the six directories (asserted in `station::params`'s tests, because the
+    // manifest keys on basenames and a collision would silently collapse two entries).
+    let mut files: Vec<(&str, &str)> = params::param_files();
+    files.extend(station_params::param_files());
+    files.sort_by_key(|(name, _)| *name);
+    assert_eq!(
+        files.len(),
+        8,
+        "the frozen station param census is 8 files, got {}",
+        files.len()
+    );
+    (flows, aux, files)
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match args.first().map(String::as_str) {
+        None => dump(),
+        Some("--write-manifest") => {
+            let path = args.get(1).map(PathBuf::from).unwrap_or_else(|| {
+                repo_root()
+                    .join("docs")
+                    .join("station-reference.manifest.json")
+            });
+            write_manifest(&path);
+        }
+        Some(other) => {
+            eprintln!(
+                "usage: dump_station_inventory [--write-manifest [path]]
+                   (no argument dumps the reference's half of the manifest as JSON)
+                 unknown argument: {other}"
+            );
+            std::process::exit(2);
+        }
+    }
+}
+
+/// The reference's half of the manifest, as JSON on stdout — the checking surface.
+///
+/// ⚠ Deliberately still a `println!` stream of raw UTF-8, unchanged by C7's station half.
+/// `tests/crossport/test_inventory_parity.py` reads it, and the `encoding="utf-8"` pin
+/// that reader grew after C4's mojibake is a control that only has teeth while there is
+/// non-ASCII to mangle — which, since C4b put the claim text here, there is.
+fn dump() {
+    let (flows, aux, files) = inventory();
 
     println!("{{");
     println!("  \"aux_set\": {},", json_array(&aux));
@@ -260,21 +480,6 @@ fn main() {
     println!("  }},");
     println!("  \"liveness_floors\": {},", census(LIVENESS_FLOORS));
     println!("  \"param_files\": {{");
-    // The eight the station contract spans, sorted by basename. Every basename is unique
-    // across the six directories (asserted in `station::params`'s tests, because the manifest
-    // keys on basenames and a collision would silently collapse two files into one entry).
-    let mut files: Vec<(&str, &str)> = params::param_files();
-    files.extend(station_params::param_files());
-    files.sort_by_key(|(name, _)| *name);
-    // Tier-0 sanity on the program itself — since slice 7 this output is *written into* the
-    // frozen manifest by a regeneration run, so an empty or short census would be frozen
-    // rather than merely compared.
-    assert_eq!(
-        files.len(),
-        8,
-        "the frozen station param census is 8 files, got {}",
-        files.len()
-    );
     for (i, (name, text)) in files.iter().enumerate() {
         let comma = if i + 1 == files.len() { "" } else { "," };
         println!("    \"{name}\": \"{}\"{comma}", normalized_sha256(text));
@@ -282,4 +487,211 @@ fn main() {
     println!("  }},");
     println!("  \"science_bands\": {}", census(SCIENCE_BANDS));
     println!("}}");
+}
+
+// ==========================================================================
+// The manifest writer — C7's station half of the reference flip
+// ==========================================================================
+//
+// ⚠⚠ **What C7 moves is the WRITER, not the authority.** Until this slice
+// `tests/test_station_freeze_manifest.py::_build_manifest()` assembled the file: it
+// shelled the dump above, spliced the reference's keys into its own, and serialized the
+// result. So the contract was *authored* by the reference and *written* by the checker —
+// a Python-shaped hole in the middle of a file whose first line says Rust is the
+// reference. This is the last of the three.
+//
+// ⚠ **`_authority` records who produced the VALUE, not who ran the digest and not who
+// wrote the file.** The precedent predates C7 and sits in the table below:
+// `scenarios/*/golden_sha256` has read `rust` since slice 4 while *Python* computed the
+// digest, because the golden is the reference's own output. So the move is
+// authority-neutral by construction, and the rows that change side below change for
+// their own stated reasons.
+//
+// ⚠⚠ **THE TRAP, AND HERE IT IS PARTIAL — WHICH IS WORSE THAN THE BIOSPHERE'S.**
+// `numerics_note` is hand-maintained prose naming three steps, and this writer now lives
+// in the crate that owns all three (`sealed_station_scenario()`'s `bio_dt` / `cabin_dt`,
+// the energy scenario's `power_dt`). Measured, not argued:
+//
+//   * splicing `bio_dt` gives `dt=0.25 day` against the written `dt=1/4 day` — the bytes
+//     move and the regeneration gate is red;
+//   * splicing `cabin_dt` gives `dt=60 s`, and `power_dt` gives `dt=3600 s` — **both
+//     byte-identical**, because Rust's `Display` prints `60.0_f64` as `60`.
+//
+// So two of the three referents would auto-follow the code invisibly, and unlike the
+// biosphere there is **no second guard at all**: that contract's `dt_days` is at least
+// compared against `BIO_DT` across the port boundary, while the station has no structured
+// step key to compare (adding one widens the frozen surface — its own ceremony, declined
+// again here, see the `numerics_note` row in the table).
+//
+// `crates/station/tests/manifest_writer.rs` is the guard: it reads this file's own source
+// and asserts the emission site is a quoted literal naming none of the three constants.
+//
+// ⚠ **No pipe.** The file is written with `std::fs::write`. C4's first regeneration froze
+// cp1252-mangled prose into a contract with every gate green, because a `subprocess` pipe
+// decoded UTF-8 with the Windows locale and both sides were mangled identically. Writing
+// here deletes that class rather than inheriting it.
+
+/// The repository root, from this crate's own location.
+///
+/// ⚠ A third copy of the same three-hop walk (the biosphere dump and the census modules
+/// have the others), and it is unavoidable rather than sloppy: `CARGO_MANIFEST_DIR` is
+/// per-crate, so a shared helper would resolve to whichever crate compiled it. What must
+/// not happen is a *hidden* reach-out — hence one named function per crate with the hop
+/// count in one place.
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent() // rust/crates/
+        .and_then(Path::parent) // rust/
+        .and_then(Path::parent) // the repo root
+        .expect("the crate sits three levels below the repo root")
+        .to_path_buf()
+}
+
+/// sha-256 over newline-normalized file content — the provenance rule, applied to a file
+/// this program did not compile in.
+fn file_sha256(path: &Path) -> String {
+    let text = std::fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("cannot read {} for hashing: {e}", path.display()));
+    assert!(
+        config::provenance::contains_exotic_line_separator(&text).is_none(),
+        "{} carries a line separator the narrow normalization rule does not handle — \
+         see config::provenance",
+        path.display()
+    );
+    normalized_sha256(&text)
+}
+
+/// One science-gate field as `scenario -> [claim]`, filed under the roster below.
+///
+/// ⚠ Every roster scenario gets a key, including the **eleven** with no gate: an empty
+/// list says *measured, none* and an absent key says nothing, and a reader reaching for
+/// `.get(name, [])` cannot tell them apart. On this contract that is the frozen claim
+/// itself — 11 of 13 station scenarios carry no outside-sourced bound.
+///
+/// ⚠⚠ Slice C4b hit exactly this: its first regeneration handed the *dump's* shape
+/// through (the dump emits only scenarios that have a claim, deliberately) and silently
+/// deleted those eleven keys. Predicting the diff is what caught it.
+///
+/// ⚠ A gate naming a scenario outside the roster **panics** rather than being filtered
+/// away. Both manifests filter the census by scenario, so a typo or a gate filed against
+/// the wrong contract would otherwise be dropped by both in silence — the filter looking
+/// exactly like a clean result.
+fn census_json(field: &str) -> Json {
+    let mut by_scenario: Vec<(String, Vec<Json>)> = SCENARIOS
+        .iter()
+        .map(|(name, ..)| ((*name).to_string(), Vec::new()))
+        .collect();
+    let mut gates: Vec<&ScienceGate> = GATES.iter().filter(|g| g.field == field).collect();
+    gates.sort();
+    assert!(!gates.is_empty(), "no science gates for field {field}");
+    for gate in gates {
+        let slot = by_scenario
+            .iter_mut()
+            .find(|(name, _)| name == gate.scenario)
+            .unwrap_or_else(|| {
+                panic!(
+                    "a {field} gate names scenario {:?}, which is not in this manifest's \
+                     roster. Either the roster moved or the gate names the wrong \
+                     scenario — both are decisions, and neither may be resolved by \
+                     dropping the claim.",
+                    gate.scenario
+                )
+            });
+        slot.1.push(Json::obj([
+            ("bound", Json::s(gate.bound)),
+            ("locus", Json::s(gate.locus)),
+            ("quantity", Json::s(gate.quantity)),
+            ("source", Json::s(gate.source)),
+        ]));
+    }
+    Json::obj(
+        by_scenario
+            .into_iter()
+            .map(|(name, claims)| (name, Json::Array(claims))),
+    )
+}
+
+/// The `_authority` block as JSON.
+fn authority_json() -> Json {
+    Json::obj(AUTHORITY.iter().map(|(path, side, why)| {
+        (
+            *path,
+            Json::obj([("side", Json::s(*side)), ("why", Json::s(*why))]),
+        )
+    }))
+}
+
+/// The whole station freeze manifest.
+fn manifest() -> Json {
+    let root = repo_root();
+    let golden_dir = root.join("tests").join("regression").join("golden");
+    let (flows, aux, files) = inventory();
+
+    let scenarios = Json::obj(SCENARIOS.iter().map(|(name, label, golden)| {
+        (
+            *name,
+            Json::obj([
+                ("golden", Json::s(*golden)),
+                (
+                    "golden_sha256",
+                    Json::s(file_sha256(&golden_dir.join(golden))),
+                ),
+                ("scenario", Json::s(*label)),
+            ]),
+        )
+    }));
+
+    Json::obj([
+        ("_authority", authority_json()),
+        ("_comment", Json::s(COMMENT)),
+        ("aux_set", Json::strs(aux.iter().copied())),
+        ("delegates_to", Json::s(BIOSPHERE_MANIFEST)),
+        ("flow_set", Json::strs(flows.iter().copied())),
+        ("frozen_at_phase", Json::int(6)),
+        // ⚠ The anti-derived literal: the scheme is selected inline by each run helper
+        // and has no importable name on EITHER side, so a constant spliced here would be
+        // a second hand literal checked against the first. Enforced by the goldens.
+        ("integrator", Json::s("EulerIntegrator")),
+        ("liveness_floors", census_json(LIVENESS_FLOORS)),
+        // ⚠⚠ TEXT, and read the writer header before touching it. This crate owns all
+        // three steps this sentence names, and splicing two of them is byte-invisible.
+        ("numerics_note", Json::s(NUMERICS_NOTE)),
+        (
+            "param_files",
+            Json::obj(
+                files
+                    .iter()
+                    .map(|(name, text)| (*name, Json::s(normalized_sha256(text)))),
+            ),
+        ),
+        ("reference_doc", Json::s("docs/station-reference.md")),
+        ("scenarios", scenarios),
+        ("science_bands", census_json(SCIENCE_BANDS)),
+        (
+            "sealed_energy_years",
+            Json::int(i64::try_from(SEALED_ENERGY_YEARS).expect("a horizon fits in i64")),
+        ),
+        (
+            "sealed_station_years",
+            Json::int(i64::try_from(SEALED_STATION_YEARS).expect("a horizon fits in i64")),
+        ),
+    ])
+}
+
+/// Write the manifest to `path`, and report what changed.
+///
+/// ⚠ Reports rather than asserts: this is the *regeneration* entry point, run on a
+/// deliberate unfreeze, so a moved byte is the thing being reviewed. The assertion that
+/// the committed file matches lives on the checking side
+/// (`tests/crossport/test_manifest_writer.py`), where a stale manifest is red in CI.
+fn write_manifest(path: &Path) {
+    let text = dumps(&manifest());
+    let previous = std::fs::read_to_string(path).ok();
+    std::fs::write(path, text.as_bytes())
+        .unwrap_or_else(|e| panic!("cannot write {}: {e}", path.display()));
+    match previous {
+        Some(old) if old == text => eprintln!("unchanged: {}", path.display()),
+        Some(_) => eprintln!("REWRITTEN (review the diff): {}", path.display()),
+        None => eprintln!("created: {}", path.display()),
+    }
 }

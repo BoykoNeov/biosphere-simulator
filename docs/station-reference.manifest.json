@@ -6,7 +6,7 @@
     },
     "aux_set": {
       "side": "rust",
-      "why": "the same walk over AuxProcess::type_name(). \u26a0 Legitimately EMPTY (the siblings and seams are all conserved-quantity flows; the biosphere's accumulators live in the delegated slow registry), so every assertion about it is [] == [] and the splice is what a regeneration writes. The evidence that the walk happens at all is a measured control, not a green run \u2014 see the dump example and the module docstring."
+      "why": "the same walk over AuxProcess::type_name(). \u26a0 Legitimately EMPTY (the siblings and seams are all conserved-quantity flows; the biosphere's accumulators live in the delegated slow registry), so every assertion about it is [] == [] and a regeneration WRITES that empty list rather than splicing it (C7 moved the writer here; before that the checker spliced the dump's copy). The evidence that the walk happens at all is a measured control, not a green run \u2014 see the dump example and the module docstring."
     },
     "delegates_to": {
       "side": "hand",
@@ -30,7 +30,7 @@
     },
     "numerics_note": {
       "side": "hand",
-      "why": "\u26a0 HAND-MAINTAINED PROSE THAT NOTHING CHECKS, and slice 7 deliberately left it that way. Unlike the biosphere the station has no structured dt key: the steps live inside this English sentence, so flipping one reddens nothing here. The reference tree DOES have referents \u2014 sealed_station_scenario()'s bio_dt / cabin_dt and the energy scenario's power_dt \u2014 so slice 6's dt_days treatment is buildable. It needs a structured key that does not exist, and adding one WIDENS the frozen surface, which is its own unfreeze with its own ceremony rather than a rider on a re-anchoring. Recorded here so the hole is a stated claim."
+      "why": "\u26a0 HAND-MAINTAINED PROSE THAT NOTHING CHECKS, and slice 7 deliberately left it that way. Unlike the biosphere the station has no structured dt key: the steps live inside this English sentence, so flipping one reddens nothing here. The reference tree DOES have referents \u2014 sealed_station_scenario()'s bio_dt / cabin_dt and the energy scenario's power_dt \u2014 so slice 6's dt_days treatment is buildable. It needs a structured key that does not exist, and adding one WIDENS the frozen surface, which is its own unfreeze with its own ceremony rather than a rider on a re-anchoring. Recorded here so the hole is a stated claim. \u26a0\u26a0 C7's STATION HALF MADE IT WORSE AND MEASURED HOW: the writer now lives in the crate that owns all three steps, and splicing them is only PARTLY visible. bio_dt would render dt=0.25 day against the written dt=1/4 day, so the regeneration gate reddens; cabin_dt and power_dt render 60 and 3600, BYTE-IDENTICAL to what this sentence already says, because Rust prints 60.0_f64 as 60. So two of the three would auto-follow the code invisibly, with no structured key to compare them against on either side. The guard is rust/crates/station/tests/manifest_writer.rs, which reads the writer's own source and requires the emission site to be a quoted literal naming none of the three."
     },
     "param_files/*": {
       "side": "rust",
@@ -65,7 +65,7 @@
       "why": "the reference tree's SEALED_STATION_YEARS"
     }
   },
-  "_comment": "Phase-6 Step-10 station freeze manifest (P6.10). Names the frozen WHOLE-ASSEMBLY station reference surface (Phase-5 siblings + the station seams); the biosphere is delegated to docs/biosphere-reference.manifest.json (see delegates_to). See docs/station-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Each key's producer and why is in _authority: this file has MIXED authority since slice 7 of the reference flip. Regenerate on a deliberate unfreeze: uv run python tests/test_station_freeze_manifest.py \u2014 which now shells cargo, because the _authority 'rust' keys are read from the reference tree.",
+  "_comment": "Phase-6 Step-10 station freeze manifest (P6.10). Names the frozen WHOLE-ASSEMBLY station reference surface (Phase-5 siblings + the station seams); the biosphere is delegated to docs/biosphere-reference.manifest.json (see delegates_to). See docs/station-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Each key's producer and why is in _authority: this file has MIXED authority since slice 7 of the reference flip. Regenerate on a deliberate unfreeze, from rust/: cargo run --example dump_station_inventory -- --write-manifest. C7 moved the WRITER to the reference; tests/test_station_freeze_manifest.py has none and is now only a checker.",
   "aux_set": [],
   "delegates_to": "docs/biosphere-reference.manifest.json",
   "flow_set": [

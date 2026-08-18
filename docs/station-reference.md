@@ -290,12 +290,13 @@ biosphere change follows *its* discipline instead.) The procedure:
    Phase-5 domain param, not a `simcore/` change).
 3. **Regenerate the affected goldens**, each via its own explicit `__main__` action, and
    **review the byte diff** — a change there means the trajectory moved, which is the point.
-4. **Regenerate the manifest** (`uv run python tests/test_station_freeze_manifest.py`) and
-   review its diff — the changed hashes / flow set / param set are the git-visible record of
-   exactly what was unfrozen. ⚠ This step needs a working **Rust toolchain** since
-   2026-08-16: the manifest's `_authority`-marked `rust` keys are read out of the reference
-   tree, and a toolchain-less run exits loudly rather than writing the checker's values into
-   the reference's slots. **Predict the diff before running it** — a re-anchored key that
+4. **Regenerate the manifest** — from `rust/`, `cargo run --example
+   dump_station_inventory -- --write-manifest` — and review its diff: the changed hashes /
+   flow set / param set are the git-visible record of exactly what was unfrozen. ⚠ **The
+   command changed on 2026-08-18 (C7's station half)**; it was `uv run python
+   tests/test_station_freeze_manifest.py`, which now has no writer at all and is a checker
+   only. The step has needed a Rust toolchain since 2026-08-16 and now *is* the Rust
+   toolchain. **Predict the diff before running it** — a re-anchored key that
    moves when you expected it not to is a finding, not a diff to accept.
 5. **Record provenance.** Update this file and the Phase-6 plan with what changed and why (a
    calibration cites its primary source per `docs/param-file-conventions.md`).
@@ -306,6 +307,49 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-18 — the MANIFEST WRITER moves to the reference (C7's station half; a
+  PROSE-only diff — three `_authority`/`_comment` rows, no hash, set, claim or horizon).**
+  Until this slice the file was *authored* by the reference key by key (slices 3, 7, C8,
+  C4b) and **written** by `tests/test_station_freeze_manifest.py`, which shelled the
+  reference's dump, spliced its keys into its own and serialized the result. That module
+  is a **checker only** now, with no `__main__`. Regeneration is step 4 of the ceremony
+  above: from `rust/`, `cargo run --example dump_station_inventory -- --write-manifest`.
+  It reproduced this file **byte-identical on the first run**.
+
+  ⚠ Moving the writer is **authority-neutral by construction**: `_authority` records who
+  produced the *value*, not who ran the digest or wrote the file. The precedent is in the
+  block itself — `scenarios/*/golden_sha256` has read `rust` since slice 4 while *Python*
+  computed the digest.
+
+  ⚠⚠ **The trap this slice sets is only PARTLY visible, which is worse than the
+  biosphere's.** `numerics_note` is hand-maintained prose naming three integration steps,
+  and the writer now lives in the crate that owns all three. Measured: splicing `bio_dt`
+  renders `dt=0.25 day` against the written `dt=1/4 day` and the regeneration gate
+  reddens; splicing `cabin_dt` or `power_dt` renders `60` and `3600`, **byte-identical**
+  to what the sentence already says, because Rust prints `60.0_f64` as `60`. So two of
+  three would auto-follow the code with the regeneration diff seeing nothing — and this
+  contract has no structured step key to compare against, unlike the biosphere's
+  `dt_days`. Run end to end: the spliced regeneration printed *unchanged*. The guard is
+  `rust/crates/station/tests/manifest_writer.rs`, which reads the writer's own source and
+  requires the emission site to be a quoted literal naming none of the three.
+
+  ⚠ **Adding a structured `dt` key is refused for the third time**, on the same ground:
+  it widens the frozen surface and is its own ceremony, not a rider on a re-anchoring.
+
+  ⚠ **Deleting the writer opened a hole and closed one.** The scenario roster
+  (`name -> label, golden`) lived in the checker *and was written from it*, so nothing
+  held it; the two fields at risk are exactly those `_authority` marks `hand`, which no
+  gate can re-derive. `test_the_frozen_roster_is_the_references` closes it. What the move
+  *closed* is a hand edit to the committed manifest, invisible to every gate before now
+  and caught by `tests/crossport/test_manifest_writer.py`'s byte comparison.
+
+  **Verification.** `cargo test` + `cargo clippy --all-targets -D warnings`; `ruff`,
+  `pyright`, the Python suite and the crossport suite green. Controls: hand-edited
+  manifest → red; drifted roster label → red alone; moved golden → red; an aux process
+  wired into a canonical build → the regenerated manifest **gains the name** and the
+  checker's aux gate reddens (the substitute for a rename control this empty axis cannot
+  run); the `numerics_note` splice → manifest unchanged, source-text guard red.
 
 - **2026-08-18 — the two SCIENCE CLAIMS re-anchor to the reference (slice C4b of the flip; a
   LOCUS-only unfreeze — no bound, quantity, source, hash, set or golden moved).** The

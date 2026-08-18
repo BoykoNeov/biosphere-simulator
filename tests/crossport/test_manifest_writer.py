@@ -57,11 +57,14 @@ _RUST_DIR = _REPO_ROOT / "rust"
 _DOCS_DIR = _REPO_ROOT / "docs"
 
 #: `(label, crate, example, manifest filename)` — one row per contract with a Rust
-#: writer. ⚠ The **station** manifest is still written by Python and is deliberately
-#: absent: its writer waits on slice C4b, which gives the reference a referent for the
-#: two station science claims (`science_bands`, `liveness_floors`) a Rust writer would
-#: otherwise have to hand-carry. A row absent here is a contract Python still writes,
-#: which is a gap and not a policy.
+#: writer. ⚠⚠ **All three are here as of C7's station half, and the note that used to
+#: stand in this place said what a missing row meant: a contract Python still writes,
+#: which is a gap and not a policy.** The station row waited on slice C4b, which gave
+#: the reference a referent for the two station science claims a Rust writer would
+#: otherwise have had to hand-carry. There is no fourth contract —
+#: `docs/phase-8-reference.md` is deliberately a doc with no manifest — so this table is
+#: now the whole set, and a contract added without a row here is the gap the old note
+#: describes.
 _WRITERS = [
     (
         "biosphere",
@@ -74,6 +77,12 @@ _WRITERS = [
         "authoring",
         "dump_authoring_inventory",
         "authoring-reference.manifest.json",
+    ),
+    (
+        "station",
+        "station",
+        "dump_station_inventory",
+        "station-reference.manifest.json",
     ),
 ]
 

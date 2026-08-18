@@ -37,10 +37,14 @@ each doc spells out the ceremony. The three manifests have a paired gate
 `test_authoring_freeze_manifest.py`) that owns **completeness** (something added
 but exercised by nothing); the goldens own **values**.
 
-**A provenance-only edit is an unfreeze that NOTHING CATCHES.** The per-file sha-256 is
-recorded but never compared, so editing just a param's `source:` moves the hash and turns
-nothing red. It is still an unfreeze — the ceremony is simply honor-system, so follow it
-deliberately: advisor review → regenerate the manifest as the git-visible record → document.
+**A provenance-only edit is an unfreeze, and since C7 it FORCES a regeneration.** The
+per-file sha-256 is still never compared as a *value*, so editing a param's `source:`
+asserts nothing new — but the reference now writes each manifest from the files it compiles
+in, and `tests/crossport/test_manifest_writer.py` compares the committed file byte for byte.
+So a `source:`-only edit leaves the manifest **stale and red** until it is regenerated.
+⚠ This paragraph said *"NOTHING CATCHES"* until 2026-08-18; C7 falsified it and nothing was
+watching — measured, not assumed. What is still honor-system is the **ceremony**, not the
+regeneration: advisor review → regenerate as the git-visible record → document.
 
 | Contract | Freezes | Doc |
 |---|---|---|
