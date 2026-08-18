@@ -117,14 +117,12 @@ def test_tier1_energy_conserved_no_drift(energy_states) -> None:
     )
 
 
-@pytest.mark.science_gate(
-    scenario="sealed_station",
-    field="liveness_floors",
-    quantity="annual peak thermal-node temperature (K)",
-    bound="non_collapsing(floor=100.0)",
-    source="self — the node must not collapse toward T_space",
-)
 def test_tier1_node_is_period_1_fixed_point(energy_states) -> None:
+    # ⚠ The `science_gate` marker left in slice C4b: the claim is declared in
+    # `rust/crates/station/src/science_gates.rs::tier1_node_is_period_1_fixed_point`
+    # now, and the station manifest's `liveness_floors/sealed_station` entry points
+    # there. This body stays as the checker's conformance half; re-marking it would file
+    # the claim twice and is red in `test_the_python_science_census_is_exhausted`.
     # The node/T reaches a real emergent equilibrium (an attractor, not a construction):
     # every year's peak node temperature is identical (a period-1 fixed point — no
     # seasonal

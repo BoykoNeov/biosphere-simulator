@@ -143,7 +143,20 @@ _BIOSPHERE_DUMP_KEYS = frozenset(
         "weather_sha256",
     }
 )
-_STATION_DUMP_KEYS = frozenset({"flow_set", "aux_set", "horizons", "param_files"})
+#: ⚠ `science_bands` / `liveness_floors` joined in **slice C4b**, the follow-on C4
+#: scheduled: the two claims this contract carries needed `station` types, so they
+#: live in a second table (`rust/crates/station/src/science_gates.rs`) invoking the
+#: same exported macro. Both dumps carry a census from here on.
+_STATION_DUMP_KEYS = frozenset(
+    {
+        "flow_set",
+        "aux_set",
+        "horizons",
+        "liveness_floors",
+        "param_files",
+        "science_bands",
+    }
+)
 #: ⚠ The authoring dump (slice 8) has NO axis in common with the two above — the
 #: platform contract freezes a grammar, a file schema and a flow-type registry, not a
 #: wired inventory — so it gets its own gate below rather than a row in `_CASES`. Every
@@ -314,13 +327,15 @@ def test_rust_inventory_equals_the_frozen_manifest(
         # sides is a green test that has checked nothing.
         assert frozen, f"{manifest_name} freezes no {axis} — nothing compared"
 
-    # ⚠ The census axes. Only the biosphere manifest carries a Rust-authored one today;
-    # the station's two gates are still pytest markers (slice C4b), so its dump emits no
-    # census key and this loop is skipped by the `axis in dump` guard rather than by a
-    # hardcoded label — when C4b lands, the gate starts comparing without being edited.
+    # ⚠ The census axes. Written with an `axis in dump` guard while only the biosphere
+    # carried a Rust-authored census, so that C4b would start comparing the station's
+    # without this file being edited. C4b landed and the guard was REMOVED rather than
+    # left: with both dumps carrying a census it can never fire, and a `continue` that
+    # cannot fire is a `continue` that silently skips the comparison the day a dump
+    # stops emitting one. That case is not unguarded — `set(dump) == dump_keys` above
+    # reddens on a missing key — so the guard bought nothing and could only hide.
     for axis in sorted(_COMPARED_CENSUS):
-        if axis not in dump:
-            continue
+        assert axis in dump, f"{label} dump emits no {axis} to compare"
         frozen_nonempty = {k: v for k, v in manifest[axis].items() if v}
         assert frozen_nonempty, f"{manifest_name} freezes no {axis} — nothing compared"
         changed = sorted(

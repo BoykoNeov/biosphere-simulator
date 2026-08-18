@@ -28,6 +28,7 @@ pub mod palette;
 pub mod params;
 pub mod perturbations;
 pub mod scenario;
+pub mod science_gates;
 pub mod sealed;
 pub mod session;
 pub mod stocks;

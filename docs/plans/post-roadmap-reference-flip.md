@@ -1332,7 +1332,7 @@ classified `python` and would otherwise stay that way forever.
 | C4 | **The science-gate census** | 15 pytest markers produce ~104 of the biosphere manifest's 208 lines. It is the **single largest Python-authored block of any contract**, and it has no Rust route at all while the gates are pytest functions |
 | C5 | **`drift.py`'s folds** | ends the "one run, two authors" split slice 5 created and slice 7 inherited — two goldens in two manifests |
 | C6 | **The 4 Python-only scenarios — RETIRE** (decided 2026-08-17) — **COMPLETE 2026-08-18, §5k** | now a **deletion with a written reason per scenario**, not a port. `demo_*` is a skeleton; `n_limited`/`water_biting` are science the Rust roster never carried. The record is the whole slice — a silent retirement is what it exists to prevent |
-| C7 | **The manifest generators** — **BIOSPHERE HALF COMPLETE 2026-08-18, §5m** | they are Python scripts that *write* the three frozen contracts. Until they move, "Rust is the reference" has a Python-shaped hole in the middle of it. ⚠ Splits by contract: the biosphere writer landed byte-neutral; **authoring** is next; **station is BLOCKED on C4b**, whose two claims the reference cannot derive |
+| C7 | **The manifest generators** — **BIOSPHERE + AUTHORING HALVES COMPLETE 2026-08-18 (§5m, §5n); C4b LANDED (§5o), so the STATION HALF IS UNBLOCKED** | they are Python scripts that *write* the three frozen contracts. Until they move, "Rust is the reference" has a Python-shaped hole in the middle of it. ⚠ Splits by contract: the biosphere writer landed byte-neutral; **authoring** is next; **station is BLOCKED on C4b**, whose two claims the reference cannot derive |
 
 **Stage 3 — the suite.** ~2,300 tests, 51k lines. Not one slice; a classification pass first,
 then batches by kind: the laws (C2 has 12), the regression/golden gates (mostly exist in Rust
@@ -2712,6 +2712,9 @@ so only `6.0` has to be present for the mutual-shading bound.
   re-anchoring this slice is. For whichever slice retires the Python file.
 * **C4b** — the two station gates and the two helpers they need
   (the RQ comparison; `predicted_equilibrium_temperature`). Both contract docs now say so.
+  ⚠ **DONE 2026-08-18, §5o**, and one helper needed nothing:
+  `predicted_equilibrium_temperature` already existed in the reference. The line above is
+  left standing because §5o's first finding is that it was wrong.
 
 ### Verification
 
@@ -2893,6 +2896,14 @@ station**.
 out to be more than those two claims plus two helpers, that is a scope question for the
 user rather than something to absorb.
 
+> ⚠⚠ **The second sentence was FALSE when it was written, and §5o records it as the C3
+> finding recurring.** `predicted_equilibrium_temperature` was at
+> `rust/crates/station/src/system.rs:44`, with `mean_dissipated_power` and
+> `equilibrium_node_heat` beside it, and the 15-yr energy run with its per-year peak fold
+> was already in `emit_sealed_energy_drift.rs`. C4b came in **under** the estimate and the
+> escalation condition never fired. Left in place with this correction rather than edited
+> away — the point is that nothing re-reads a present-tense claim about the tree.
+
 ### Deliberately NOT in C7's biosphere half
 
 * **The station and authoring manifests.** Their writers are their own slices; the
@@ -3060,6 +3071,9 @@ mutation rather than trusting the verdict.
 
 * **The station manifest's writer.** C4b first — its two science claims have no Rust
   referent, and a writer that cannot derive them must not hand-carry them.
+  ⚠ **DONE 2026-08-18 (§5o), and the referent claim was false** —
+  `predicted_equilibrium_temperature` and the folds already existed. The station half is
+  unblocked.
 * **Deleting the Python checker.** The completeness and conformance gates stay; retiring
   them is Stage 3's call.
 * **`gen_authoring_vectors.py`.** It is scaffolding under the target state, and moving it
@@ -3098,3 +3112,190 @@ Taken in a follow-up commit; none moves a manifest byte.
 Also pinned: `test_manifest_records_the_grammar_is_incomplete` asserts on prose the
 reference now writes, so its meaning inverted the way slice 8 inverted the derivation
 gates. Stated in the test rather than left implied.
+
+## §5o C4b — the station's two science claims move to the reference, COMPLETE 2026-08-18
+
+C7's station half had a **measured prerequisite**: the station manifest's `science_bands` +
+`liveness_floors` are two real claims whose referents §5m said the reference did not carry,
+and a writer that cannot derive a claim must not hand-carry it. This is that prerequisite,
+landed as its own commit for a reason that is not just schedule — see "why the order is
+load-bearing" below.
+
+### ⚠ The correction: the prerequisite's own cost estimate was false when it was written
+
+§5m wrote *"`non_collapsing` already exists in `drift.rs`; `predicted_equilibrium_temperature`
+is Python-only in `src/station/system.py`"*, and §5l's residue line said the same. Measured
+before designing anything: **`predicted_equilibrium_temperature` is at
+`rust/crates/station/src/system.rs:44`**, `mean_dissipated_power` and `equilibrium_node_heat`
+beside it, the four drift folds in `domains::biosphere::drift`, and the whole 15-yr energy
+run *with its per-year peak fold* already written in
+`crates/station/examples/emit_sealed_energy_drift.rs`. So C4b came in **under** its estimate
+and §5m's escalation condition ("if C4b turns out to be more than those two claims plus two
+helpers, that is a scope question for the user") never fired.
+
+⚠ This is the C3 finding again, in the plan rather than in `CLAUDE.md`: **a present-tense
+claim about the tree went false and nothing re-reads it.** The claim was load-bearing — it is
+why C4 split at all — and it was still being repeated in two contract docs. Corrected in all
+four places rather than only here.
+
+### Why the order is load-bearing, not just the schedule
+
+C4b moves two `locus` strings, which is a **value** diff to the station contract. C7's
+station half is gated by *regenerate and compare bytes*, and both prior halves got their
+result from **byte-identical on the first run**. Bundling them would leave that comparison
+unable to distinguish "the writer reproduces the contract" from "the writer produced a file I
+just changed".
+
+So C4b regenerates through the **existing Python writer**, with a four-line splice that reads
+the two census keys out of the reference's dump the way `param_files` already is. Those four
+lines are deleted one commit later. Hand-editing the manifest instead is exactly what C7's
+biosphere half added a gate to catch, and the station gate does not exist yet — it would have
+stood silently.
+
+### The two claims, and what each needed
+
+| Claim | Needed | Status before C4b |
+|---|---|---|
+| `crew_mission` / `science_bands` — the BVAD respiratory quotient | the BVAD constants, the validation cabin scenario, a steady-state boundary flux | the run helpers existed; the constants and scenario are **new Rust** (test-side) |
+| `sealed_station` / `liveness_floors` — the thermal node's non-collapse floor | `year_summaries` + `same_phase_diffs` + `is_stationary` + `non_collapsing`, `predicted_equilibrium_temperature`, the 15-yr energy run | **all of it already existed** |
+
+They live in `rust/crates/station/src/science_gates.rs`, a **second census table** invoking
+the same `science_gates!` macro. The macro is `#[macro_export]`ed and takes a `source_file:`
+header, because `concat!` needs a literal for the `locus` path. Copying the macro was
+rejected on the obvious ground: two copies of the census *mechanism* is the failure mode the
+"one declaration, not a roster" design exists to prevent.
+
+⚠ The **shared** pieces are shared as ordinary `pub fn`s, not `cfg(test)` ones — a
+`cfg(test)` item in `domains` is invisible to `station`'s tests, so the choice was between
+exporting them and transcribing the numeric-literal regex twice.
+
+### ⚠⚠ Finding 1: the first regeneration silently dropped eleven keys
+
+Predicted diff: two `locus` strings plus the two `_authority` rows. Actual: that, **plus 22
+deleted lines** — the eleven `"scenario": []` entries in each census field.
+
+The cause is exact and it is a difference between the *dump* and the *writer*. The
+reference's dump emits only scenarios that carry a claim, deliberately (which scenarios get a
+key is the manifest's hand-authored roster; a program inventing keys would claim authority
+over a set it cannot see). The biosphere **writer**'s `census_json` fills the roster; the
+**dump**'s `census` does not. The Python census being replaced filled it. So splicing the
+dump's shape into the writer's slot deleted the roster.
+
+On this contract that is not cosmetic: `_authority` calls the emptiness *"itself the frozen
+claim"*, because 11 of 13 station scenarios carrying no outside-sourced bound is the measured
+result the freeze pins. `[]` says *measured, none*; an absent key says nothing.
+`_filed_under_the_roster` fills the roster around the reference's claims and **raises** on a
+claim naming a scenario outside it — the same panic the biosphere writer has, for the same
+reason (a filter that drops a mis-filed claim looks exactly like a clean result).
+
+⚠ This validates the ordering decision from the other direction: bundled with the writer,
+those 22 dropped lines would have arrived *inside* a "byte-identical" claim.
+
+### ⚠⚠ Finding 2: the bound-literal check could not fail, and had never been able to
+
+The control was "delete the assertion that carries the recorded number and confirm the
+locus check reddens". It took **three** attempts to bite, and each failure was a separate
+lesson:
+
+1. `0.8814` → `0.88140`. Green: the check is `contains`, and `0.88140` contains `0.8814`.
+   An inert control caught by checking the mutation, not by trusting the verdict.
+2. `0.8814` → `0.8815`. Green: the `bound:` record — `"CO2/O2 == approx(0.8814)"` — is a
+   literal **in the same file**, so it supplies its own number.
+3. Subtract the declared bounds' own occurrences (`in_source > from_records`). Green on the
+   biosphere for six literals: the scanner's own pin test quotes six real frozen bounds as
+   test data.
+
+So the rule as C4 ported it — *"every numeric literal in `bound` appears textually in the
+file its `locus` names"* — is **true by construction**, and the `science_gates!` design is
+what guarantees it. Worse, the Python original had the same defect and predates the flip: the
+`bound=` marker keyword sat in the file its `locus` named.
+
+The fix is `code_only`: the source with comments and string literals stripped, so the number
+must appear in **executable** text. Measured after — all 16 frozen literal instances appear
+in code, eleven exactly once, and the control now reddens on both sides. The scanner has its
+own pinned tests, including a `should_panic` on raw strings and the negative that its own
+first draft failed: `src.contains("r\"")` fires on ordinary prose ending a word in `r`
+before a quote (`not a roster" design`), so the guard rejected the tree it was written to
+protect. The language assumption is stated too — `check_bound_literals` asserts
+`file == source_file` first, which is what keeps a non-Rust locus from being silently
+mis-stripped.
+
+⚠ The **checker's** copy was retired rather than fixed, on a narrow reason: the rule needs
+the locus file's syntax, and after C4b every locus is a `.rs` file, so the checker would need
+a second Rust lexer written in Python. The broad reason ("the census is Rust's now") is the
+one that has already been recorded as too broad twice in this flip. Three replacements are
+named in place.
+
+⚠ A consequence for annotation style: quoting a bound's value in a comment beside the
+assertion used to satisfy the check and now does not. One such comment was removed from the
+station table for exactly that reason, with a note saying why.
+
+### ⚠ Finding 3: a control that only becomes necessary when the data changes
+
+`_rust_reference` shells the dump with `subprocess.run(text=True)` and **no `encoding=`** —
+the Windows locale, i.e. cp1252. That is the exact mechanism that froze mojibake into the
+biosphere contract in slice C4 with every gate green (both sides mangled identically). The
+pin was added to the crossport reader then and *not* here, and that was **correct**: nothing
+the station dump emitted was above ASCII. C4b is the first slice to put an em dash through
+this pipe (`self — the node must not collapse toward T_space`). Pinned, and recorded rather
+than fixed quietly, because a control whose necessity is created by a data change is
+invisible until the day it is needed.
+
+### Two process notes, both of which nearly reached the contract
+
+* **A mechanical text repair corrupted four prose strings and `ruff` passed on all four.**
+  Re-wrapping over-long lines split string literals; the repair that re-joined them dropped
+  the trailing spaces, producing `manifest'ssingle`, `sentencethe`, `readthe`, `split,the` —
+  inside `_AUTHORITY`, which *writes* a frozen artifact. Caught only by reading the
+  regenerated diff. A mechanical edit to a file that writes a frozen artifact needs the diff
+  read; the linter is not a substitute.
+* **`git checkout <file>` to revert a control discarded uncommitted work.** Reverting a
+  mutation in `tests/test_bvad_validation.py` that way threw away C4b's own edit to it, and
+  the only reason it was visible was a `grep -c` afterwards. The safe shape is the
+  `cp … .bak` / `cp .bak …` pattern used for the Rust files.
+
+### What left the checker, and what changed subject
+
+* the two `@pytest.mark.science_gate` decorators — **the bodies stay**, as the checker's
+  conformance half; retiring them is Stage 3's call;
+* `test_the_python_science_census_is_only_the_station_pair` →
+  `test_the_python_science_census_is_exhausted`. ⚠ Its claim **inverted**: the census that
+  was the derivation is now a forcing function, and `tests/science_gates.py` stays live for
+  that reason. It is not vacuous-on-empty, because it asserts the census *is* empty rather
+  than walking it;
+* the second half of the bound-literal gate — `for gate in collect_science_gates()` — became
+  a **zero-iteration loop** and was de-looped with its replacement named. C7's authoring
+  addendum recorded the same hazard on a one-element `for`, on this same file;
+* `test_the_frozen_science_gates_are_the_references` widened to both manifests, prefix
+  `rust/crates/`, count 15. `_REFERENCE_GATE_COUNT` now has exactly one consumer;
+* `test_frozen_station_science_gates_are_complete` got C4's substitution — it compared the
+  manifest against `gates_for(_ROSTER, field)`, which after C4b is thirteen empty lists on
+  both sides. Its two "the claim went missing" tripwires survive unchanged;
+* `gates_for` left the station module's imports with its last caller;
+* `tests/crossport/test_inventory_parity.py`: `_STATION_DUMP_KEYS` gains the two census keys,
+  and the `if axis not in dump: continue` guard was **removed**. It was written so C4b would
+  start comparing without an edit; with both dumps carrying a census it can never fire, and a
+  `continue` that cannot fire is one that silently skips the day a dump stops emitting one.
+
+### Deliberately NOT in C4b
+
+* **The station manifest's writer** — C7's station half, now unblocked.
+* **Deleting the Python test bodies or `tests/science_gates.py`.** Stage 3.
+* **A structured `dt` key on the station manifest.** The symmetry pull toward the
+  biosphere's `dt_days` treatment is real and was resisted again: the manifest's own
+  `_authority` says adding one widens the frozen surface and is its own ceremony.
+* **Sharing `json_string` / `census` between the two dump examples.** The station dump now
+  carries a second copy of the biosphere dump's — acceptable for one commit, and C7's station
+  half should share them rather than make a third.
+
+### Verification
+
+`cargo test` + `cargo clippy --all-targets -D warnings` clean; `ruff check`,
+`ruff format --check`, `pyright` and the full Python suite green; the crossport suite green.
+⚠ `rustfmt` on the two named files only — never a module root.
+
+Controls: an assertion carrying a recorded literal deleted → the reference's bound-literal
+check red on its own line, the gate itself green, on **both** tables; a `science_gate` marker
+re-added in `tests/` → the census-exhausted gate red; the roster drop → caught by predicting
+the diff. ⚠ Three of the controls were **inert on the first try**, and all three were caught
+by checking the mutation rather than trusting the green.

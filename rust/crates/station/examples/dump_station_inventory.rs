@@ -53,12 +53,30 @@
 //!   directories hold nothing but frozen files. Saying so per side keeps a reader from
 //!   generalising the harder rule to a place it does not apply.
 //!
+//! * `science_bands` / `liveness_floors` — the **science-gate census**, `scenario ->
+//!   [claim]`, from [`station::science_gates::GATES`]. **New in slice C4b.**
+//!
+//!   ⚠⚠ The `_authority` note this key used to carry said *"There is no Rust referent
+//!   and there cannot be one while the science gates are pytest-side"* — the third
+//!   frozen `why` to argue against the slice that arrived (after the biosphere's
+//!   identical sentence in C4 and `parity_vectors/*`'s in C7's authoring half). It was
+//!   true of pytest markers and false of the claim: the census's requirement is that it
+//!   be DERIVED from the tree rather than hand-listed, and the reference meets it by
+//!   making the declaration and the `#[test]` one thing.
+//!
+//!   ⚠ Only **2** claims, and the smallness is the frozen result rather than a gap: 11
+//!   of the 13 station scenarios carry no outside-sourced bound at all. The **roster** —
+//!   which scenarios get a key, and which get an explicitly empty list meaning
+//!   "measured, none" — is not emitted here; it is the manifest's own hand-authored
+//!   scenario set and the checker still owns it. What moved is the CLAIMS.
+//!
 //!   ⚠ What this file said before C8 was true for its day: the port read
 //!   `station_params.txt` / `sibling_params.txt`, Python-generated tables whose names carry no
 //!   file prefix at all, so anything printed here would have compared Python against Python.
 //!   Slice C1 gave the reference the YAML loaders, which is what created a referent.
 
 use config::provenance::normalized_sha256;
+use domains::biosphere::science_gates::{ScienceGate, LIVENESS_FLOORS, SCIENCE_BANDS};
 use domains::crew::{build_crew, MISSION_SCENARIO};
 use domains::eclss::{build_eclss, STEADY_STATE_SCENARIO};
 use domains::params;
@@ -67,6 +85,7 @@ use domains::thermal::{build_thermal, EQUILIBRIUM_SCENARIO};
 use simcore::registry::Registry;
 use station::params as station_params;
 use station::scenario::{sealed_station_scenario, SEALED_ENERGY_YEARS, SEALED_STATION_YEARS};
+use station::science_gates::GATES;
 use station::sealed::build_sealed_station;
 use std::collections::BTreeSet;
 
@@ -129,6 +148,84 @@ fn canonical() -> Vec<Registry> {
     vec![power_reg, thermal_reg, eclss_reg, crew_reg, sealed_fast_reg]
 }
 
+/// Minimal JSON string escaping — the only characters JSON requires escaped, plus the
+/// control range.
+///
+/// ⚠ **A second copy of `dump_biosphere_inventory.rs`'s, and it is deliberately temporary.**
+/// C4b needed the census emitted from here one commit before C7's station half lands, and
+/// that slice replaces both dumps' hand-rolled JSON with `config::canonical_json::Json` —
+/// so sharing it now would build a shared helper with a one-commit lifetime. Named here
+/// rather than left silent: this is the copy to delete, not the one to add a third to.
+///
+/// The frozen claim strings are prose (they carry em dashes), which JSON takes as raw
+/// UTF-8; the checker's own writer re-escapes to ASCII when it serializes the manifest,
+/// so nothing here needs to.
+fn json_string(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push('"');
+    for ch in text.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// One field of the science-gate census as `scenario -> [claim]`.
+///
+/// ⚠ Sorted by `ScienceGate`'s `Ord` — `(scenario, field, quantity, bound, source,
+/// locus)` — because that is the order the Python census produced (its dataclass is
+/// `order=True` over the same fields in the same sequence) and the manifest is a byte
+/// comparison. Rust orders `&str` by UTF-8 bytes and Python by code points, which agree.
+///
+/// ⚠ Scenarios with no gate are NOT emitted as empty lists here. The distinction between
+/// an absent key and a deliberately-empty one is the manifest's, and the roster it is
+/// taken over is hand-authored on the checker's side; inventing keys here would be this
+/// program claiming authority over a set it cannot see.
+fn census(field: &str) -> String {
+    let mut gates: Vec<&ScienceGate> = GATES.iter().filter(|g| g.field == field).collect();
+    gates.sort();
+    // Tier-0 sanity on the program itself, the same standing as the empty-inventory
+    // asserts below: since slice 7 the manifest is GENERATED from this output, so an
+    // empty census here would be written INTO the frozen contract by a regeneration run
+    // rather than merely compared against it. ⚠ It bites harder here than on the
+    // biosphere: this contract's census is two claims deep, so the gap between correct
+    // and empty is two rows.
+    assert!(!gates.is_empty(), "no science gates for field {field}");
+    let mut out = String::from("{");
+    let mut current: Option<&str> = None;
+    for gate in gates {
+        if current != Some(gate.scenario) {
+            if current.is_some() {
+                out.push_str("], ");
+            }
+            out.push_str(&format!("{}: [", json_string(gate.scenario)));
+            current = Some(gate.scenario);
+        } else {
+            out.push_str(", ");
+        }
+        out.push_str(&format!(
+            "{{\"bound\": {}, \"locus\": {}, \"quantity\": {}, \"source\": {}}}",
+            json_string(gate.bound),
+            json_string(gate.locus),
+            json_string(gate.quantity),
+            json_string(gate.source),
+        ));
+    }
+    if current.is_some() {
+        out.push(']');
+    }
+    out.push('}');
+    out
+}
+
 fn main() {
     let mut flows: BTreeSet<&str> = BTreeSet::new();
     let mut aux: BTreeSet<&str> = BTreeSet::new();
@@ -161,6 +258,7 @@ fn main() {
     println!("    \"sealed_energy_years\": {SEALED_ENERGY_YEARS},");
     println!("    \"sealed_station_years\": {SEALED_STATION_YEARS}");
     println!("  }},");
+    println!("  \"liveness_floors\": {},", census(LIVENESS_FLOORS));
     println!("  \"param_files\": {{");
     // The eight the station contract spans, sorted by basename. Every basename is unique
     // across the six directories (asserted in `station::params`'s tests, because the manifest
@@ -181,6 +279,7 @@ fn main() {
         let comma = if i + 1 == files.len() { "" } else { "," };
         println!("    \"{name}\": \"{}\"{comma}", normalized_sha256(text));
     }
-    println!("  }}");
+    println!("  }},");
+    println!("  \"science_bands\": {}", census(SCIENCE_BANDS));
     println!("}}");
 }

@@ -121,7 +121,11 @@ from domains.power.loader import load_charge_params, load_self_discharge_params
 from domains.power.system import build_power
 from domains.thermal.loader import load_thermal_params
 from domains.thermal.system import build_thermal
-from science_gates import FIELDS, gates_for
+
+# ⚠ `gates_for` left in slice C4b with the last thing that called it: the two claims
+# are the reference's now, and a helper that returns thirteen empty lists is worse
+# than absent — it reads like a derivation. `FIELDS` stays; it is the field-name pair.
+from science_gates import FIELDS
 from station.loader import (
     load_harvest_params,
     load_lamp_params,
@@ -219,7 +223,20 @@ _RUST_DUMP_EXAMPLE = "dump_station_inventory"
 #: loaders, so any list printed here would have been this one travelling out and back.
 #: Slice
 #: **C1** moved the loaders and **C8** the census + digest. See :data:`_AUTHORITY`.
-_RUST_DUMP_KEYS = frozenset({"flow_set", "aux_set", "horizons", "param_files"})
+#: ⚠ ``science_bands`` / ``liveness_floors`` joined in **slice C4b**, which moved this
+#: contract's two claims into ``rust/crates/station/src/science_gates.rs``. They arrive
+#: through the same splice ``param_files`` uses, for the four commits this writer has
+#: left: C7's station half deletes :func:`_build_manifest` outright.
+_RUST_DUMP_KEYS = frozenset(
+    {
+        "flow_set",
+        "aux_set",
+        "horizons",
+        "param_files",
+        "science_bands",
+        "liveness_floors",
+    }
+)
 
 
 @lru_cache(maxsize=1)
@@ -231,12 +248,25 @@ def _rust_reference() -> dict[str, Any]:
     ``cargo`` nor pays for a build. The gates that *do* compare this manifest against a
     live Rust tree are cargo-gated and live in
     ``tests/crossport/test_inventory_parity.py``.
+
+    ⚠⚠ **``encoding="utf-8"`` is load-bearing as of slice C4b, and it was NOT here
+    before.** ``text=True`` alone decodes with the *locale*, which on this box is cp1252
+    — the exact mechanism that froze ``â€"`` into the biosphere contract in slice C4
+    with every gate green, because the manifest and the checker were mangled
+    identically. The pin was added to the biosphere reader then and not to this one,
+    correctly: nothing the station dump emitted was above ASCII, so there was nothing
+    to mangle. C4b is what changes that — one of the two claims it splices in reads
+    ``self — the node must
+    not collapse toward T_space``, so this pipe now carries an em dash. Recorded rather
+    than fixed quietly: a control that only becomes necessary when the data changes is
+    invisible until the day it is needed.
     """
     proc = subprocess.run(
         ["cargo", "run", "-q", "--example", _RUST_DUMP_EXAMPLE],
         cwd=_RUST_CRATE_DIR,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
     if proc.returncode != 0:
@@ -492,19 +522,48 @@ _AUTHORITY: dict[str, dict[str, str]] = {
         ),
     },
     "science_bands/*": {
-        "side": "python",
+        "side": "rust",
         "why": (
-            "a static AST census of science_gate markers on pytest functions "
-            "(tests/science_gates.py). There is no Rust referent and there cannot be "
-            "one while the science gates are pytest-side. ⚠ On this manifest the "
-            "census is mostly EMPTY — 11 of 13 scenarios carry no outside-sourced "
-            "bound — and "
-            "the emptiness is itself the frozen claim."
+            "⚠⚠ RE-ANCHORED IN SLICE C4b, AND THIS ENTRY USED TO SAY IT COULD NOT BE. "
+            "Its own text read 'a static AST census of science_gate markers on pytest "
+            "functions (tests/science_gates.py). There is no Rust referent and there "
+            "cannot be one while the science gates are pytest-side' — the SAME "
+            "sentence the biosphere manifest carried until C4, and the third "
+            "frozen 'why' in "
+            "this flip to argue against the slice that arrived. It was true of pytest "
+            "markers and false of the claim it appeared to make: the census's "
+            "requirement is that it be DERIVED from the tree rather than hand-listed, "
+            "and the reference meets it by making the declaration and the #[test] ONE "
+            "THING (the science_gates! macro, exported from domains and invoked in "
+            "rust/crates/station/src/science_gates.rs), so an unexercised entry is a "
+            "compile error rather than something a meta-test hunts textually. "
+            "⚠ TWO tables, not one: a gate lives with the runs it reads, and these "
+            "read the coupled cabin and the Power→Thermal station — station "
+            "types, in a "
+            "crate that depends on domains rather than the reverse. The mechanism and "
+            "the transcribed bound-literal regex are shared; only the tables are "
+            "split, the same way the two contracts are. ⚠ What moved is the LOCUS "
+            "and nothing "
+            "else — the quantity/bound/source strings are byte-identical to the pytest "
+            "markers', and the Python test bodies stay as the checker's conformance "
+            "half. ⚠ On this manifest the census is mostly EMPTY — 11 of 13 scenarios "
+            "carry no outside-sourced bound — and the emptiness is itself the frozen "
+            "claim; the ROSTER it is taken over is still this file's hand-authored "
+            "scenario set, and a gate naming a scenario outside it RAISES during "
+            "regeneration rather than being filtered away."
         ),
     },
     "liveness_floors/*": {
-        "side": "python",
-        "why": "the same census, for the bounds tuned to our own calibration",
+        "side": "rust",
+        "why": (
+            "the same census, for the bounds tuned to our own calibration rather than "
+            "to an outside source — re-anchored with it in slice C4b. ⚠ This "
+            "manifest's single floor is the thermal node's non-collapse bound, whose "
+            "clearance is "
+            "1.6x (annual peaks sit at 160.12 K against a floor of 100.0); the "
+            "companion stationarity and T_eq-proximity assertions are what give the "
+            "gate its teeth, and they travelled with it."
+        ),
     },
     "scenarios/*/scenario": {
         "side": "hand",
@@ -534,6 +593,44 @@ _AUTHORITY: dict[str, dict[str, str]] = {
         ),
     },
 }
+
+
+def _filed_under_the_roster(
+    claims: dict[str, list[dict[str, str]]],
+) -> dict[str, list[dict[str, str]]]:
+    """The reference's claims, filed under **every** roster scenario — slice C4b.
+
+    ⚠⚠ **This function is the finding of C4b's regeneration, not a formality.** The
+    reference's dump emits only the scenarios that *have* a claim, deliberately: which
+    scenarios get a key is this manifest's own hand-authored roster, and a program that
+    invented keys would be claiming authority over a set it cannot see. The Python
+    census it replaced filled every roster key with ``[]``. So the naive splice — hand
+    the dump's dict straight through — silently **deleted eleven keys**, and the
+    predicted diff (two ``locus`` strings) came back as two loci plus twenty-two
+    dropped lines.
+
+    An absent key and a deliberately-empty one are different claims: ``[]`` says
+    *measured, none* and a missing key says nothing, and a reader reaching for
+    ``.get(name, [])`` cannot tell them apart. On this contract the emptiness is not
+    incidental — ``_AUTHORITY`` calls it "itself the frozen claim", because 11 of 13
+    station scenarios carrying no outside-sourced bound is the measured result the
+    freeze exists to pin.
+
+    ⚠ A claim naming a scenario outside the roster **raises** rather than being dropped.
+    Both manifests filter the census by scenario, so a typo or a gate on the wrong
+    contract would otherwise be discarded by both in silence — the filter looking
+    exactly like a clean result.
+    """
+    unknown = sorted(set(claims) - _ROSTER)
+    if unknown:
+        raise SystemExit(
+            f"the reference files science claims under {unknown}, which are not in "
+            "this manifest's scenario roster. Either the roster moved or the gate "
+            "names the "
+            "wrong scenario — both are decisions, and neither may be resolved by "
+            "dropping the claim."
+        )
+    return {name: claims.get(name, []) for name in sorted(_ROSTER)}
 
 
 def _build_manifest() -> dict[str, object]:
@@ -599,8 +696,13 @@ def _build_manifest() -> dict[str, object]:
         # biosphere's: the digests are author-neutral, the CENSUS and NORMALIZATION
         # rules are what moved. See _AUTHORITY.
         "param_files": reference["param_files"],
-        "science_bands": gates_for(_ROSTER, "science_bands"),
-        "liveness_floors": gates_for(_ROSTER, "liveness_floors"),
+        # ⚠⚠ SLICE C4b: spliced from the REFERENCE, not derived here. The two claims
+        # this contract carries are declared in
+        # rust/crates/station/src/science_gates.rs, and `gates_for(_ROSTER, ...)` now
+        # returns thirteen empty lists — so leaving it would have written the emptiness
+        # into the frozen contract with every gate green. See _AUTHORITY.
+        "science_bands": _filed_under_the_roster(reference["science_bands"]),
+        "liveness_floors": _filed_under_the_roster(reference["liveness_floors"]),
         "scenarios": scenarios,
     }
 
@@ -714,11 +816,29 @@ def test_frozen_station_science_gates_are_complete() -> None:
     ``crew_mission`` (BVAD Table 3-31) and ``sealed_station`` (a thermal-node floor)
     have one. Freezing the emptiness is the point: a band cannot be added silently, and
     the absence is now a recorded claim instead of an unexamined assumption.
+
+    ⚠⚠ **REPLACED IN SLICE C4b, the same substitution C4 made on the biosphere.** This
+    asserted ``manifest[field] == gates_for(_ROSTER, field)`` — the manifest against the
+    checker's own pytest markers. The two claims are declared in
+    ``rust/crates/station/src/science_gates.rs`` now and spliced in by
+    :func:`_build_manifest`, so that comparison would be the manifest against an
+    **empty** Python census: thirteen empty lists on both sides, passing while the two
+    claims had vanished. What is checkable **without cargo** is the roster's shape and
+    where each claim lives; the value comparison against the live reference tree is
+    cargo-gated, in ``tests/crossport/test_inventory_parity.py``.
     """
     manifest = _load_manifest()
     for field in FIELDS:
-        assert manifest[field] == gates_for(_ROSTER, field), field
         assert set(manifest[field]) == _ROSTER, field
+        for scenario, entries in manifest[field].items():
+            for entry in entries:
+                assert entry["locus"].startswith(
+                    "rust/crates/station/src/science_gates.rs::"
+                ), (scenario, entry)
+    # ⚠ The two tripwires that survive the substitution unchanged, and they are the half
+    # that matters: an empty census is what a silent re-anchoring failure looks like,
+    # and
+    # the roster check above is satisfied by thirteen empty lists.
     assert manifest["science_bands"]["crew_mission"], "the BVAD RQ band went missing"
     assert manifest["liveness_floors"]["sealed_station"], "the node floor went missing"
 
@@ -874,7 +994,9 @@ def test_golden_authority_agrees_with_the_rust_authored_roster() -> None:
 
     manifest = _load_manifest()
     for name, entry in manifest["scenarios"].items():
-        side = _authority_for(f"scenarios/{name}/golden_sha256")[1]["side"]  # type: ignore[index]
+        row = _authority_for(f"scenarios/{name}/golden_sha256")
+        assert row is not None, name
+        side = row[1]["side"]
         expected = "rust" if entry["golden"] in RUST_AUTHORED else "python"
         assert side == expected, (
             f"scenarios/{name}/golden_sha256 is classified {side!r}, but "

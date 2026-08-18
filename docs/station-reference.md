@@ -213,15 +213,22 @@ regenerating it needs `cargo`.** The keys the Rust reference tree can produce �
 `aux_set`, `sealed_station_years`, `sealed_energy_years` — are read out of it by shelling
 `cargo run --example dump_station_inventory`; the rest is still the checker's or
 hand-written. **The manifest states this itself**, per key, in its own `_authority` block,
-which is the thing to read before assuming any field is Rust-derived. By content most of
-the file is not: `science_bands` + `liveness_floors` are a static census of pytest markers
-with no Rust referent, and `sealed_energy_drift`'s golden hash is a Python-side fold of a raw
-Rust series. ⚠ **On the BIOSPHERE side that census re-anchored to Rust on 2026-08-18 (slice
-C4) and this contract's did not** — deliberately, not by omission. The station's two gates
-(`crew_mission`'s respiratory-quotient prediction, `sealed_station`'s thermal fixed point)
-need referents the reference does not carry: the RQ helper and
-`predicted_equilibrium_temperature`. Slice **C4b** builds those and re-anchors this half, with
-its own ceremony; until then this sentence is true of this file and false of the biosphere's. ⚠ **`param_files` joined the Rust half on 2026-08-17 (slice C8)** — what
+which is the thing to read before assuming any field is Rust-derived.
+
+⚠⚠ **`science_bands` + `liveness_floors` re-anchored to Rust on 2026-08-18 (slice C4b), and
+the paragraph that stood here said they could not.** It read *"a static census of pytest
+markers with no Rust referent"*, and named the referents the reference was missing: the RQ
+helper and `predicted_equilibrium_temperature`. **The second half of that was already
+false when it was written** — `predicted_equilibrium_temperature`, the drift folds and the
+15-yr energy run were all in `rust/crates/station` — so C4b came in under its own estimate.
+This contract's two claims are declared in `rust/crates/station/src/science_gates.rs` now
+(the same exported `science_gates!` macro the biosphere's 13 use, in a second table because
+a gate lives with the runs it reads and these read `station` types). Only the two `locus`
+strings moved; `quantity`/`bound`/`source` are byte-identical, and the Python test bodies
+stay as the checker's conformance half. ⚠ `sealed_energy_drift`'s golden hash is still a
+Python-side fold of a raw Rust series.
+
+⚠ **`param_files` joined the Rust half on 2026-08-17 (slice C8)** — what
 re-anchored there is the *census* rule (the eight files the reference **loads**, not a glob
 over six Python package directories) and the *normalization* rule, since the eight digits are
 author-neutral either way; the log entry below carries the detail and the two things it
@@ -299,6 +306,50 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-08-18 — the two SCIENCE CLAIMS re-anchor to the reference (slice C4b of the flip; a
+  LOCUS-only unfreeze — no bound, quantity, source, hash, set or golden moved).** The
+  biosphere's 13 gates moved in slice C4 and these two were split off, correctly: a gate
+  lives with the runs it reads, and the BVAD respiratory-quotient prediction reads the
+  coupled cabin while the thermal node's floor reads the 15-yr Power→Thermal decade —
+  `station` types, in a crate that depends on `domains` rather than the reverse. They are
+  declared in `rust/crates/station/src/science_gates.rs` now, a **second table** invoking the
+  same `science_gates!` macro (exported for this) with its own `source_file`.
+
+  **The diff was predicted before regenerating and came back as predicted:** two `locus`
+  strings, plus the two `_authority` rows moving `python` → `rust` with their prose. Nothing
+  else in the file changed.
+
+  ⚠ **The prose this doc carried named referents the reference was missing — and the naming
+  was already false.** `predicted_equilibrium_temperature`, the `year_summaries` /
+  `same_phase_diffs` / `is_stationary` / `non_collapsing` folds and the 15-yr energy run all
+  existed in `rust/crates/station` when the sentence was written. So C4b came in under its
+  own estimate, and the estimate's expiry condition never fired because nothing re-reads a
+  present-tense claim about the tree.
+
+  ⚠⚠ **The first regeneration silently dropped ELEVEN keys, and the prediction is what
+  caught it.** The reference's *dump* emits only scenarios that carry a claim — deliberately,
+  because which scenarios get a key is this manifest's hand-authored roster and a program
+  that invented keys would claim authority over a set it cannot see. The Python census it
+  replaced filled every roster key with `[]`. Splicing the dump's shape straight through
+  therefore deleted the eleven empty lists, which on this contract are *the frozen claim*:
+  11 of 13 station scenarios carry no outside-sourced bound, and `[]` says "measured, none"
+  where an absent key says nothing. `_filed_under_the_roster` fills the roster around the
+  reference's claims and **raises** on a claim naming a scenario outside it.
+
+  ⚠ **A control that only became necessary the day the data changed.** The checker reads the
+  reference's dump through `subprocess.run(text=True)` with no `encoding=`, i.e. the Windows
+  locale — the exact mechanism that froze cp1252 mojibake into the biosphere contract in
+  slice C4 with every gate green. The pin was added to the crossport reader then and *not*
+  here, correctly: nothing this dump emitted was above ASCII. C4b is the first slice to send
+  an em dash through it (`self — the node must not collapse toward T_space`). Pinned.
+
+  **Verification.** `cargo test` + `cargo clippy --all-targets -D warnings`; `ruff`,
+  `pyright`, the Python suite and the crossport suite green. Controls: the assertion carrying
+  a recorded literal deleted → the reference's bound-literal check red, the gate itself
+  green; a `science_gate` marker re-added in `tests/` → the census-exhausted gate red.
+  Measured: the node's annual peaks sit at 160.12 K against the frozen floor of 100.0 (1.6×
+  clearance), and the RQ gate's own numbers are unchanged from the Python body it mirrors.
 
 - **2026-08-17 — `param_files` RE-ANCHORED TO THE REFERENCE (slice C8 of the flip). Not one
   hash moved, and that is the finding, not a relief.** The eight digits are **author-neutral
@@ -419,6 +470,10 @@ gate), so the discipline is enforced, not merely requested.
   Added `science_bands` + `liveness_floors`, derived from `science_gate` markers. Station-side
   content is `crew_mission`'s BVAD RQ band and `sealed_station`'s node floor; the other 11
   scenarios are explicitly empty, which is a measured result — see the manifest section above.
+  ⚠ *"Derived from `science_gate` markers"* stopped being true on **2026-08-18 (slice C4b)**:
+  the two claims are declared in `rust/crates/station/src/science_gates.rs`, the markers are
+  gone from `tests/`, and the pytest-marker census is now asserted **empty**. The 11 empty
+  lists are unchanged and still the measured result.
 
 - **2026-07-21 — scope (B) decomposer-calibration cascade (biosphere-delegated values +
   a sealed horizon).** The biosphere unfreeze (decomposer rates 0.02→0.011 / 0.05→0.016;

@@ -25,8 +25,8 @@
       "why": "the deliberate anti-derived literal, and unlike the biosphere's dt_days it has no importable constant on EITHER side \u2014 each run helper selects the scheme inline \u2014 so it is documented here and enforced by the goldens (an RK4 switch moves every one). A literal typed into the Rust dump to make the pair symmetric would read like a gate and be none."
     },
     "liveness_floors/*": {
-      "side": "python",
-      "why": "the same census, for the bounds tuned to our own calibration"
+      "side": "rust",
+      "why": "the same census, for the bounds tuned to our own calibration rather than to an outside source \u2014 re-anchored with it in slice C4b. \u26a0 This manifest's single floor is the thermal node's non-collapse bound, whose clearance is 1.6x (annual peaks sit at 160.12 K against a floor of 100.0); the companion stationarity and T_eq-proximity assertions are what give the gate its teeth, and they travelled with it."
     },
     "numerics_note": {
       "side": "hand",
@@ -53,8 +53,8 @@
       "why": "a human label for the scenario, not an identifier anything resolves"
     },
     "science_bands/*": {
-      "side": "python",
-      "why": "a static AST census of science_gate markers on pytest functions (tests/science_gates.py). There is no Rust referent and there cannot be one while the science gates are pytest-side. \u26a0 On this manifest the census is mostly EMPTY \u2014 11 of 13 scenarios carry no outside-sourced bound \u2014 and the emptiness is itself the frozen claim."
+      "side": "rust",
+      "why": "\u26a0\u26a0 RE-ANCHORED IN SLICE C4b, AND THIS ENTRY USED TO SAY IT COULD NOT BE. Its own text read 'a static AST census of science_gate markers on pytest functions (tests/science_gates.py). There is no Rust referent and there cannot be one while the science gates are pytest-side' \u2014 the SAME sentence the biosphere manifest carried until C4, and the third frozen 'why' in this flip to argue against the slice that arrived. It was true of pytest markers and false of the claim it appeared to make: the census's requirement is that it be DERIVED from the tree rather than hand-listed, and the reference meets it by making the declaration and the #[test] ONE THING (the science_gates! macro, exported from domains and invoked in rust/crates/station/src/science_gates.rs), so an unexercised entry is a compile error rather than something a meta-test hunts textually. \u26a0 TWO tables, not one: a gate lives with the runs it reads, and these read the coupled cabin and the Power\u2192Thermal station \u2014 station types, in a crate that depends on domains rather than the reverse. The mechanism and the transcribed bound-literal regex are shared; only the tables are split, the same way the two contracts are. \u26a0 What moved is the LOCUS and nothing else \u2014 the quantity/bound/source strings are byte-identical to the pytest markers', and the Python test bodies stay as the checker's conformance half. \u26a0 On this manifest the census is mostly EMPTY \u2014 11 of 13 scenarios carry no outside-sourced bound \u2014 and the emptiness is itself the frozen claim; the ROSTER it is taken over is still this file's hand-authored scenario set, and a gate naming a scenario outside it RAISES during regeneration rather than being filtered away."
     },
     "sealed_energy_years": {
       "side": "rust",
@@ -101,7 +101,7 @@
     "sealed_station": [
       {
         "bound": "non_collapsing(floor=100.0)",
-        "locus": "tests/test_sealed_station_stability.py::test_tier1_node_is_period_1_fixed_point",
+        "locus": "rust/crates/station/src/science_gates.rs::tier1_node_is_period_1_fixed_point",
         "quantity": "annual peak thermal-node temperature (K)",
         "source": "self \u2014 the node must not collapse toward T_space"
       }
@@ -194,7 +194,7 @@
     "crew_mission": [
       {
         "bound": "CO2/O2 == approx(0.8814)",
-        "locus": "tests/test_bvad_validation.py::test_rq_structural_prediction",
+        "locus": "rust/crates/station/src/science_gates.rs::rq_structural_prediction",
         "quantity": "daily-effective molar respiratory quotient",
         "source": "NASA BVAD Table 3-31 (Rev 2, 2022, p. 58)"
       }

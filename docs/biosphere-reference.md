@@ -627,7 +627,7 @@ the checker's, per key, is in the table below — read it rather than a summary 
 | `scenarios.drift_summary.golden_sha256` | **Python** | ⚠ one run, two authors: `drift.py`'s fold of the *same* 15-yr trajectory whose final state Rust authors. The fold is the artifact |
 | `param_files` | **Rust** (since slice C8) | ⚠ the *rules* re-anchored, not the digits: the census is now the set the reference LOADS (a compile-time `include_str!` list) and the digest is `config::provenance`. The 15 values are **author-neutral** — both sides hash the same file the same way — so the ceremony moved none of them |
 | `forcing.weather_fixture` / `weather_sha256` | **Python** | ⚠ the reason changed in slice C9 (2026-08-17) and the old one is now false: the port no longer reads a file *generated from* this fixture — it reads **this fixture**, with a compile-time `include_str!`. It stays Python's because `include_str!` takes a literal, so the reference knows the fixture's **bytes and not its name**; a Rust-authored filename would be a hand-typed duplicate of the include path, a literal dressed as a derivation. The *bytes* half is now cross-checked anyway — see the `weather_sha256` note below |
-| `science_bands`, `liveness_floors` | **Rust** (since slice C4) | ⚠ the *claims* re-anchored, not the values: all 13 `quantity`/`bound`/`source` strings are byte-identical to the Python census's and every verdict was measured identical on both ports first — only the 13 `locus` strings moved. The **key set** is still this manifest's own hand roster (which scenarios get an entry, and which get an explicitly empty list meaning "measured, none"), and a Rust gate naming a scenario outside it **raises** during regeneration rather than being filtered away. ⚠ Two markers did not move: `crew_mission` and `sealed_station` are *station* keys whose referents the reference does not carry yet — slice C4b |
+| `science_bands`, `liveness_floors` | **Rust** (since slice C4) | ⚠ the *claims* re-anchored, not the values: all 13 `quantity`/`bound`/`source` strings are byte-identical to the Python census's and every verdict was measured identical on both ports first — only the 13 `locus` strings moved. The **key set** is still this manifest's own hand roster (which scenarios get an entry, and which get an explicitly empty list meaning "measured, none"), and a Rust gate naming a scenario outside it **raises** during regeneration rather than being filtered away. ⚠ Two markers did not move here because they are *station* keys: `crew_mission` and `sealed_station` moved in **slice C4b** (2026-08-18) into `rust/crates/station/src/science_gates.rs`, a second table using this same macro — "the reference does not carry their referents" was the reason given and it was already false, `predicted_equilibrium_temperature` and the folds existed |
 | `integrator`, `dt_days` | **hand** | the two deliberate anti-derived literals (below) |
 | `scenarios.*.scenario` / `.golden` | **hand** | a human label; a filename |
 
@@ -755,6 +755,35 @@ above), so a present-tense sentence naming them — "the golden that moved", "on
 runs where water limits", a golden count of 25 — describes the tree **as it was at that
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
+
+- **2026-08-18 — the census's BOUND-LITERAL CHECK gains teeth (slice C4b; NO manifest byte
+  moved — not a value change, a gate that could not fail is made able to).** The check
+  required every numeric literal in a recorded `bound` to appear textually in the file the
+  `locus` names. That is **true by construction and always was**: the record — the `bound=`
+  keyword of a `science_gate` marker before the flip, the `bound:` field of the reference's
+  table after it — lives in that same file, put there by the thing being checked. The
+  `science_gates!` design, which makes the declaration and the `#[test]` one thing, is
+  precisely what guarantees it.
+
+  Measured, not reasoned, and it took three attempts to get a control that bit: deleting
+  `0.8814` from the station's RQ assertion left it green; so did rewriting the assertion to
+  `0.8815`; and so did subtracting the declared bounds' own occurrences, because the
+  scanner's pin test quotes six of the real frozen bounds as test data. The fix is
+  `code_only` — the source with comments and string literals stripped — so the number must
+  sit in **executable** text. Measured after: all 16 frozen literal instances appear in
+  code, eleven of them exactly once, and deleting the assertion that carries one is red.
+
+  ⚠ **A consequence for how these files are annotated:** naming a bound's value in a comment
+  beside the assertion used to satisfy the check and now does not. One such comment was
+  removed from the station table for exactly that reason.
+
+  ⚠ **The checker's copy of this rule was RETIRED rather than fixed, on a narrow reason.**
+  `test_science_gate_bounds_name_a_literal_present_at_their_locus` had the identical defect
+  since it was written. Fixing it needs the locus file's *syntax*, and after C4b every locus
+  is a `.rs` file — so the checker would need a second Rust lexer, a rule with two copies in
+  the language the flip is retiring. Its replacement is named in place: the rule at the loci,
+  `test_the_frozen_science_gates_are_the_references` for the no-cargo half (count + prefix,
+  over both manifests), and the crossport census parity for drift.
 
 - **2026-08-18 — the SCIENCE-GATE CENSUS re-anchors to the reference (a LOCUS-only unfreeze;
   13 `locus` strings and two `_authority` notes moved, and not one recorded claim).**

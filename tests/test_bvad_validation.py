@@ -223,15 +223,17 @@ def test_calibration_humidity_and_urine() -> None:
 # --- The structural prediction (THE payload — can genuinely fail) ---------------------
 
 
-@pytest.mark.science_gate(
-    scenario="crew_mission",
-    field="science_bands",
-    quantity="daily-effective molar respiratory quotient",
-    bound="CO2/O2 == approx(0.8814)",
-    source="NASA BVAD Table 3-31 (Rev 2, 2022, p. 58)",
-)
 def test_rq_structural_prediction() -> None:
-    """THE headline result. ``CrewRespiration`` fixes RQ = 1.0 (PQ = 1), so with CO₂
+    """THE headline result.
+
+    ⚠ **The ``science_gate`` marker left in slice C4b** — the claim is declared in
+    ``rust/crates/station/src/science_gates.rs::rq_structural_prediction`` now, and the
+    station manifest's ``science_bands/crew_mission`` entry points there. This body
+    stays as the checker's conformance half: the two ports assert the same number, and a
+    disagreement is a finding. Re-marking it would file the claim twice and is red in
+    ``test_the_python_science_census_is_exhausted``.
+
+    ``CrewRespiration`` fixes RQ = 1.0 (PQ = 1), so with CO₂
     calibrated to BVAD the model's O₂ comes out at the *daily-effective molar
     RQ* below BVAD's O₂: ``model_O2 / bvad_O2 = 0.8814``. This is the one genuinely
     un-tuned output — it does not depend on the fraction values, and a regression that

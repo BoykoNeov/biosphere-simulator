@@ -77,7 +77,6 @@ Two consequences worth stating where they will be read:
 
 import hashlib
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -177,12 +176,17 @@ _PYTHON_HORIZONS: dict[str, int] = {
 }
 
 
-#: How many science gates the REFERENCE declares (slice C4). ⚠ A literal, on purpose:
-#: this module never shells cargo, so it cannot count them, and the point of the number
-#: is to be an INDEPENDENT one the manifest is measured against rather than one derived
-#: from the manifest it is checking. The derived comparison against the live Rust tree
-#: is cargo-gated, in tests/crossport/test_inventory_parity.py.
-_REFERENCE_GATE_COUNT = 13
+#: How many science gates the REFERENCE declares — 13 in the biosphere table (slice C4)
+#: plus the 2 the station table took in slice C4b. ⚠ A literal, on purpose: this module
+#: never shells cargo, so it cannot count them, and the point of the number is to be an
+#: INDEPENDENT one the manifest is measured against rather than one derived from the
+#: manifest it is checking. The derived comparison against the live Rust tree is
+#: cargo-gated, in tests/crossport/test_inventory_parity.py.
+_REFERENCE_GATE_COUNT = 15
+
+#: The station contract, read alongside this one wherever a claim about the whole
+#: reference is made — since slice C4b the science census spans both files.
+_STATION_MANIFEST_PATH = MANIFEST_PATH.parent / "station-reference.manifest.json"
 
 
 #: This manifest's scenario roster — the filter for the science-gate fields, so
@@ -426,12 +430,25 @@ def test_the_frozen_science_gates_are_the_references() -> None:
     back into ``tests/``, which is the concrete way this re-anchoring could be undone by
     accident. The value comparison against the live reference tree is cargo-gated, in
     ``tests/crossport/test_inventory_parity.py``.
+
+    ⚠ **Widened in slice C4b, and the widening is the point.** Until C4b this asserted
+    ``rust/crates/domains/`` on the biosphere manifest's 13 entries and the count
+    was 13. The station's two claims now live in ``rust/crates/station/`` — a second
+    table, because a gate lives with the runs it reads and those read ``station`` — so
+    the assertion is read over BOTH manifests, the prefix is ``rust/crates/`` and the
+    count is the whole reference's. Checking only this manifest would leave the station
+    pair asserted by nothing on this side, which is exactly the hole C4b closes.
     """
-    manifest = _load_manifest()
-    entries = [e for field in FIELDS for v in manifest[field].values() for e in v]
+    entries = [
+        e
+        for path in (MANIFEST_PATH, _STATION_MANIFEST_PATH)
+        for field in FIELDS
+        for v in json.loads(path.read_text(encoding="utf-8"))[field].values()
+        for e in v
+    ]
     assert len(entries) == _REFERENCE_GATE_COUNT, len(entries)
     for entry in entries:
-        assert entry["locus"].startswith("rust/crates/domains/"), entry
+        assert entry["locus"].startswith("rust/crates/"), entry
 
 
 def test_the_frozen_claim_text_survived_the_pipe() -> None:
@@ -460,22 +477,30 @@ def test_the_frozen_claim_text_survived_the_pipe() -> None:
     assert "â€" not in text, "cp1252-decoded UTF-8 is frozen in the contract"
 
 
-def test_the_python_science_census_is_only_the_station_pair() -> None:
-    """What is LEFT of the pytest-marker census after slice C4 — asserted, not assumed.
+def test_the_python_science_census_is_exhausted() -> None:
+    """The pytest-marker census is **empty** — asserted, not assumed.
 
-    Thirteen of the fifteen markers were removed from the suite when the reference took
-    the claims over. The two that remain are station-manifest keys whose referents the
-    reference does not carry yet (``crew_mission``'s respiratory-quotient prediction and
-    ``sealed_station``'s thermal fixed point) — slice C4b, with its own ceremony.
+    ⚠⚠ **This test's claim inverted in slice C4b, and the machinery below it is kept
+    for exactly that reason.** Slice C4 moved thirteen of the fifteen markers to the
+    reference and this asserted the two survivors were the station pair; C4b moved those
+    two (to ``rust/crates/station/src/science_gates.rs``), so the census that was the
+    derivation is now a **forcing function**: nothing in ``tests/`` may carry a
+    ``science_gate`` marker, because a claim filed here would be a claim the frozen
+    contracts do not name.
 
-    ⚠ Without this the split is a sentence in a doc. With it, re-marking a biosphere
-    test is red here and *also* red in
-    :func:`test_the_frozen_science_gates_are_the_references` — the two halves of "one
-    census, one language per manifest", from both directions.
+    ⚠ An empty census is exactly the shape this repo has been bitten by — a check that
+    passes against nothing. It is not inert here, and the difference is which direction
+    it looks: it does not walk the census and assert something about each member (which
+    an empty census would satisfy vacuously), it asserts the census *is* empty, so
+    re-marking any test turns it red. Its companion in the other direction is
+    :func:`test_the_frozen_science_gates_are_the_references`, which requires every
+    frozen entry's locus to be under ``rust/crates/``.
+
+    ⚠ ``tests/science_gates.py`` therefore stays live rather than being retired with its
+    last producer: it is what makes "no marker in the checker" a mechanism rather than a
+    convention. Retiring it is Stage 3's call, with the rest of the checker.
     """
-    census = collect_science_gates()
-    assert sorted({g.scenario for g in census}) == ["crew_mission", "sealed_station"]
-    assert len(census) == 2, census
+    assert collect_science_gates() == ()
     for field in FIELDS:
         assert gates_for(_ROSTER, field) == {name: [] for name in sorted(_ROSTER)}
 
@@ -547,68 +572,40 @@ def test_science_gate_entries_record_the_claim_not_just_a_test_id() -> None:
                 assert all(str(v).strip() for v in entry.values())
 
 
-def test_science_gate_bounds_name_a_literal_present_at_their_locus() -> None:
-    """Tie the recorded ``bound`` to the executed one — the retune-in-silence path.
-
-    ⚠ Without this the ``bound`` field is **documentation, not an assertion**: it is
-    prose *describing* it, so ``non_collapsing(floor=0.05)`` could be retuned to 0.02 in
-    ``test_decade_stability.py`` with the manifest text left stale and every gate green.
-    That is exactly what ``liveness_floors`` exists to prevent, and the floors are the
-    family that **has already been retuned once** (``> 1.0`` → ``> 0.9``, when the
-    decomposer calibration shrank the plant ~19 %).
-
-    Deliberately crude — every numeric literal in ``bound`` must appear textually in the
-    file the entry points at. It does not parse the expression, so it cannot prove the
-    literal is *the* threshold; it does close the path where the number moves and the
-    record does not. The `science_bands` are better protected anyway, because their
-    constants are named (``VKS_LAI_THRESHOLD``, ``14.4248``); a floor is a bare literal
-    in a call, which is why the weaker family sets the requirement.
-    """
-    numeric = re.compile(r"\d+\.\d+(?:[eE]-?\d+)?|\d+[eE]-\d+")
-    manifests = (
-        MANIFEST_PATH,
-        MANIFEST_PATH.parent / "station-reference.manifest.json",
-    )
-    checked = 0
-    for manifest_path in manifests:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        for field in FIELDS:
-            for entries in manifest[field].values():
-                for entry in entries:
-                    filename = entry["locus"].split("::")[0]
-                    src = (_REPO_ROOT / filename).read_text(encoding="utf-8")
-                    literals = numeric.findall(entry["bound"])
-                    assert literals, entry  # a bound with no number is not a bound
-                    for literal in literals:
-                        assert literal in src, (entry["locus"], literal)
-                    checked += 1
-    # ⚠⚠ THE RIGHT-HAND SIDE WAS ``len(collect_science_gates())`` UNTIL SLICE C4, and
-    # replacing it with a literal 15 would have turned a derived count into exactly the
-    # hand-maintained roster this whole census exists to prevent. The tree's gates now
-    # live in two languages, so the claim splits into the two halves that are still
-    # derivable HERE:
-    #
-    #   (1) every entry in both manifests was literal-checked — which needs the count to
-    #       come from the manifests themselves, not from a number typed here;
-    #   (2) every gate the PYTHON census still finds is actually in a manifest.
-    #
-    # The reference's half — every Rust gate is in a manifest and vice versa — needs
-    # cargo and lives in tests/crossport/test_inventory_parity.py.
-    # ⚠ The count is compared against the two CENSUSES, not against a re-walk of
-    # the same manifests. A first draft summed the entries again and asserted
-    # `checked == total` — the same nested walk on both sides of an equals sign,
-    # which cannot fail: `[] == []` in a passing test's clothes, slice 7's lesson
-    # landing in the very gate that exists to stop a claim going unchecked.
-    assert checked == _REFERENCE_GATE_COUNT + len(collect_science_gates()), checked
-    for gate in collect_science_gates():
-        frozen = [
-            entry
-            for manifest_path in manifests
-            for entry in json.loads(manifest_path.read_text(encoding="utf-8"))[
-                gate.field
-            ].get(gate.scenario, [])
-        ]
-        assert gate.entry() in frozen, gate
+# ⚠⚠ **`test_science_gate_bounds_name_a_literal_present_at_their_locus` WAS RETIRED IN
+# SLICE C4b, AND IT HAD NEVER BEEN ABLE TO FAIL.** It read every frozen `bound`'s
+# numeric literals and required each to appear textually in the file the `locus`
+# named. That is
+# true by construction and always was: the *record* lives in the file the locus names —
+# the `bound=` keyword of a `science_gate` marker before the flip, the `bound:` field of
+# the reference's table after it — so the literal was put there by the very thing being
+# checked. Measured, not reasoned: deleting `0.8814` from the RQ gate's assertion left
+# it green, and so did subtracting the records' own occurrences (the scanner's pin test
+# quotes six of the real frozen bounds as test data).
+#
+# The rule is FIXED rather than lost — `domains::biosphere::science_gates::code_only`
+# strips comments and string literals first, so the literal must appear in *executable*
+# code, and deleting an assertion that carries a recorded number is now red. What could
+# not follow is the checker's copy: the rule requires reading the locus file's SYNTAX,
+# and after C4b every locus is a `.rs` file, so expressing it here needs a second Rust
+# lexer in Python — a rule with two copies, in the language the flip is retiring. **That
+# narrow reason is what licenses the removal**, and it stops being true the day a Python
+# locus reappears. It is not "the census is Rust's now"; that broader reason has already
+# been recorded as too broad twice in this flip.
+#
+# Three things replace it, and none of them is a restatement:
+#
+#   (1) the rule itself, at the loci — `check_bound_literals` + `code_only`, run from
+#       both census tables, with their own controls and a pinned scanner;
+#   (2) the no-cargo half — `test_the_frozen_science_gates_are_the_references` below
+#       already asserts the entry count against `_REFERENCE_GATE_COUNT` and every
+#       locus's `rust/crates/` prefix, over BOTH manifests;
+#   (3) the drift half — `tests/crossport/test_inventory_parity.py` holds each committed
+#       manifest's census equal to the live Rust table, so a `bound` text that moved
+#       away from the code is red there (cargo-gated).
+#
+# ⚠ `_REFERENCE_GATE_COUNT` now has exactly one consumer, in (2). It had two while this
+# test lived, which is the shape that makes a number look derived when it is typed.
 
 
 def test_completeness_gate_detects_an_unfrozen_param(monkeypatch, tmp_path) -> None:

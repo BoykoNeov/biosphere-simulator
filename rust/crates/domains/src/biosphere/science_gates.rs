@@ -47,28 +47,38 @@
 //! ## The `locus` and the bound literals
 //!
 //! `locus` is `"<this file>::<test name>"`, built by the macro from the test's own
-//! identifier — it cannot drift from the test it names. The Python-side gate
-//! `test_science_gate_bounds_name_a_literal_present_at_their_locus` reads the file the
-//! locus points at and requires every numeric literal in `bound` to appear in it
-//! textually; [`the_bound_literals_appear_at_their_locus`] is the same check run from
-//! this side, so the crude-but-real "the number moved and the record did not" path is
-//! closed in the reference rather than only in the checker.
+//! identifier — it cannot drift from the test it names.
+//! [`the_bound_literals_appear_at_their_locus`] requires every numeric literal in a
+//! recorded `bound` to appear in the file the locus names, which closes the crude-but-real
+//! "the number moved and the record did not" path.
+//!
+//! ⚠⚠ **REWRITTEN IN SLICE C4b, and what this paragraph said before was worthless.** The
+//! rule was *"the literal appears textually in the source"* — and the record is IN that
+//! source, put there by the very design that makes the declaration and the `#[test]` one
+//! thing, so the check could not fail. Measured: deleting `0.8814` from the station's RQ
+//! assertion left it green. The rule now searches [`code_only`], the source with its
+//! comments and string literals stripped, so the number must be in **executable** text.
+//! The Python-side gate that ran the same check retired in the same commit rather than
+//! growing a Rust lexer inside the checker.
 //!
 //! ⚠ Consequences for how bounds are spelled here, learned the expensive way: a bound
-//! reading `non_collapsing(floor=5e-4)` needs the literal `5e-4` — not `0.0005` — in the
-//! source, and a floor this tree *derives* (`61.07` is `Γ*/ci_ratio`, computed, never
-//! typed) still needs its recorded value carried as an explicit tripwire assertion.
-//! [`the_floor_is_where_the_frozen_params_put_it`] is that tripwire and is why the five
-//! CO₂ gates can stay derived.
+//! reading `non_collapsing(floor=5e-4)` needs that same lexeme — not `0.0005` — in an
+//! executable line, and a floor this tree *derives* (the CO₂ compensation point is
+//! `Γ*/ci_ratio`, computed, never typed) still needs its recorded value carried as an
+//! explicit tripwire assertion. [`the_floor_is_where_the_frozen_params_put_it`] is that
+//! tripwire and is why the five CO₂ gates can stay derived. ⚠ And a number quoted in a
+//! *comment* no longer counts, which is a real constraint on how these files are
+//! annotated: naming a bound's value in prose beside it used to satisfy the check.
 //!
-//! ## Scope: 13 gates, not 15
+//! ## Scope: 13 gates here, 2 in the station's table
 //!
-//! The two remaining markers (`crew_mission`'s respiratory-quotient prediction,
-//! `sealed_station`'s thermal fixed point) are **station**-manifest keys whose referents
-//! do not exist in the reference yet (the RQ helper and
-//! `predicted_equilibrium_temperature`). Slices 6–8 re-anchored one manifest per slice on
-//! purpose, so those two are **C4b**, scheduled with their own ceremony — recorded as a
-//! split, not as a deferral.
+//! `crew_mission`'s respiratory-quotient prediction and `sealed_station`'s thermal fixed
+//! point are **station**-manifest keys whose runs need `station` types, so they live in
+//! [`station::science_gates`] — same exported [`science_gates!`] macro, same shared
+//! [`check_bound_literals`], its own table and its own `source_file`. **Moved in slice
+//! C4b**, which is also when this paragraph stopped saying the reference had no referent
+//! for them: it already had `predicted_equilibrium_temperature`, the drift folds and the
+//! 15-yr energy run.
 //!
 //! ⚠ **Two `source` strings still name Python tests** (`test_the_shipped_floor_is_the_
 //! conservative_one_against_the_cited_route`). Their text is frozen manifest content, so
@@ -133,8 +143,21 @@ pub const LIVENESS_FLOORS: &str = "liveness_floors";
 /// unrepresentable: the row and the assertion are one declaration. The cost is that the
 /// table cannot be assembled from several files — which is a feature here, since a census
 /// spread over a tree is what needed a static parser in the first place.
+///
+/// ⚠ **Exported since slice C4b, and the `source_file:` header is why.** The station's
+/// two claims (the BVAD respiratory quotient, the thermal node's floor) need `station`
+/// types, and `station` depends on `domains` rather than the reverse — so the second
+/// census table lives in that crate and invokes this macro across the boundary. Copying
+/// the macro would put two copies of the census mechanism in the tree, which is the
+/// failure mode the whole "one declaration, not a roster" design exists to avoid. The
+/// path half of every `locus` is therefore a parameter: `concat!` takes only literals,
+/// so the invoking module states its own file once and [`check_bound_literals`] resolves
+/// it against the filesystem on every run.
+#[macro_export]
 macro_rules! science_gates {
-    ($(
+    (
+        source_file: $source_file:literal;
+        $(
         $(#[$attr:meta])*
         gate $name:ident {
             scenario: $scenario:literal,
@@ -145,22 +168,19 @@ macro_rules! science_gates {
             check: $body:block
         }
     )+) => {
-        /// Every science gate in the reference, in declaration order.
+        /// Every science gate in this half of the reference, in declaration order.
         ///
         /// ⚠ Declaration order is NOT manifest order — the manifest groups by scenario
-        /// and sorts by [`ScienceGate`]'s `Ord`. The dumper sorts; this array does not,
+        /// and sorts by `ScienceGate`'s `Ord`. The dumper sorts; this array does not,
         /// so gates can be declared next to the runs they read.
-        pub const GATES: &[ScienceGate] = &[
-            $(ScienceGate {
+        pub const GATES: &[$crate::biosphere::science_gates::ScienceGate] = &[
+            $($crate::biosphere::science_gates::ScienceGate {
                 scenario: $scenario,
                 field: $field,
                 quantity: $quantity,
                 bound: $bound,
                 source: $source,
-                locus: concat!(
-                    "rust/crates/domains/src/biosphere/science_gates.rs::",
-                    stringify!($name)
-                ),
+                locus: concat!($source_file, "::", stringify!($name)),
             },)+
         ];
 
@@ -464,6 +484,8 @@ const CYCLE_PERIOD: usize = 2;
 // ---------------------------------------------------------------------------------
 
 science_gates! {
+    source_file: "rust/crates/domains/src/biosphere/science_gates.rs";
+
     /// The baseline canopy band: a real wheat canopy peaks at ~5–8 LAI.
     ///
     /// The sibling band to the mutual-shading gate below, and the reason that one could
@@ -813,6 +835,252 @@ mod support {
 #[cfg(test)]
 use support::{band_gate, leaf_cycle_gate};
 
+// ---------------------------------------------------------------------------------
+// The census's shared rules — one copy, read by BOTH halves.
+// ---------------------------------------------------------------------------------
+//
+// ⚠ Public (not `#[cfg(test)]`) since slice C4b. `station`'s two claims live in
+// `station::science_gates` because they need `station` types, and a `cfg(test)` item in
+// this crate is invisible over there — so the choice was between exporting these and
+// transcribing the same regex twice.
+
+/// The Python gate's regex, transcribed: `\d+\.\d+(?:[eE]-?\d+)?|\d+[eE]-\d+`.
+///
+/// ⚠ Public and out of `#[cfg(test)]` since slice C4b, and not for convenience: a
+/// `cfg(test)` item is invisible to a *dependent* crate's tests, so the station's half of
+/// the census could not have reached it. The alternative was a second transcription of
+/// the same regex — a rule with two copies, one of which goes stale.
+///
+/// Hand-rolled because `simcore` and its dependents carry zero third-party crates and
+/// a regex engine is not worth breaking that for. The two alternatives are scanned in
+/// the same precedence order the regex uses.
+pub fn numeric_literals(bound: &str) -> Vec<String> {
+    let chars: Vec<char> = bound.chars().collect();
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    while i < chars.len() {
+        if !chars[i].is_ascii_digit() {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < chars.len() && chars[i].is_ascii_digit() {
+            i += 1;
+        }
+        let int_end = i;
+        let mut end = None;
+        if i < chars.len() && chars[i] == '.' {
+            let mut j = i + 1;
+            let frac_start = j;
+            while j < chars.len() && chars[j].is_ascii_digit() {
+                j += 1;
+            }
+            if j > frac_start {
+                // `\d+\.\d+` matched; try the optional `(?:[eE]-?\d+)` suffix.
+                let mut k = j;
+                if k < chars.len() && (chars[k] == 'e' || chars[k] == 'E') {
+                    let mut m = k + 1;
+                    if m < chars.len() && chars[m] == '-' {
+                        m += 1;
+                    }
+                    let digits = m;
+                    while m < chars.len() && chars[m].is_ascii_digit() {
+                        m += 1;
+                    }
+                    if m > digits {
+                        k = m;
+                    }
+                }
+                end = Some(k);
+            }
+        }
+        if end.is_none() {
+            // The second alternative: `\d+[eE]-\d+`.
+            let mut j = int_end;
+            if j + 1 < chars.len() && (chars[j] == 'e' || chars[j] == 'E') && chars[j + 1] == '-' {
+                let mut m = j + 2;
+                let digits = m;
+                while m < chars.len() && chars[m].is_ascii_digit() {
+                    m += 1;
+                }
+                if m > digits {
+                    j = m;
+                    end = Some(j);
+                }
+            }
+        }
+        if let Some(stop) = end {
+            out.push(chars[start..stop].iter().collect());
+            i = stop;
+        }
+        // No match starting here: `i` already sits past the integer run.
+    }
+    out
+}
+
+/// A Rust source with its comments and string literals removed — what is left is the
+/// **executable** text.
+///
+/// ⚠⚠ Written for slice C4b, and the reason is the finding that slice's first control
+/// produced. [`check_bound_literals`] used to search the raw source, which cannot fail:
+/// the `science_gates!` design puts the `bound:` string and the assertion in ONE file on
+/// purpose, so the record supplies its own literal. Subtracting the records' own
+/// contribution was not enough either — the scanner's pin test
+/// (`the_literal_scanner_matches_the_pythons_regex_on_every_shape_it_meets`) quotes six
+/// of the real frozen bounds as test data, which supplied the surplus for six more
+/// literals. Both were measured, not reasoned about.
+///
+/// Stripping is what makes the rule say what it always claimed: *the number appears in
+/// code at the locus*. Measured after the change: every one of the sixteen frozen
+/// literals appears in executable code, and eleven of them **exactly once** — so
+/// deleting that assertion is red.
+///
+/// ⚠ Raw strings (`r"..."` / `r#"..."#`) are not handled and the function **panics** on
+/// one rather than mis-parsing it into a silent pass. Neither census file has one today;
+/// a future one is a loud failure and a ten-line extension, which is the right trade for
+/// a scanner a freeze contract leans on.
+///
+/// ⚠ **This scanner reads RUST, and what keeps the assumption safe is stated rather than
+/// assumed:** [`check_bound_literals`] asserts `file == source_file` before opening
+/// anything, and each census table's `source_file` is its own `.rs` path. So a locus in
+/// another language cannot reach here quietly — it fails that equality first. Without
+/// that assertion this function would silently mis-strip a `.py` locus (whose comments
+/// start with `#`, not `//`) into a check that passes against nothing.
+pub fn code_only(src: &str) -> String {
+    // ⚠ The raw-string guard runs INSIDE the scan, at an identifier boundary. A first
+    // draft tested `src.contains("r\"")` up front and fired on ordinary prose — `not a
+    // roster" design` ends a word in `r` before a quote — so the guard rejected the very
+    // tree it was written to protect. Checked below instead: an `r` in code position,
+    // not preceded by an identifier character, followed by `"` or `#`.
+    let ident = |c: char| c.is_alphanumeric() || c == '_';
+    let chars: Vec<char> = src.chars().collect();
+    let mut out = String::with_capacity(src.len());
+    let mut i = 0usize;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '/' && i + 1 < chars.len() && chars[i + 1] == '/' {
+            // A line comment, doc comments included — the module prose quotes bounds.
+            while i < chars.len() && chars[i] != '\n' {
+                i += 1;
+            }
+        } else if c == '/' && i + 1 < chars.len() && chars[i + 1] == '*' {
+            i += 2;
+            while i + 1 < chars.len() && !(chars[i] == '*' && chars[i + 1] == '/') {
+                i += 1;
+            }
+            i = (i + 2).min(chars.len());
+        } else if c == '"' {
+            // A string literal: the `bound:` records themselves, and the scanner's test
+            // data. Both are the *record*, never the assertion.
+            i += 1;
+            while i < chars.len() {
+                if chars[i] == '\\' {
+                    i += 2;
+                    continue;
+                }
+                if chars[i] == '"' {
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+        } else if c == '\'' {
+            // Either a char literal (`'x'`, `'\n'`, `'\\'`) or a lifetime (`'static`).
+            // A char literal cannot carry a numeric bound, so only the lifetime case has
+            // to survive — and it survives by falling through to the copy below.
+            if i + 1 < chars.len() && chars[i + 1] == '\\' {
+                let mut j = i + 2;
+                while j < chars.len() && chars[j] != '\'' {
+                    j += 1;
+                }
+                i = j + 1;
+            } else if i + 2 < chars.len() && chars[i + 2] == '\'' {
+                i += 3;
+            } else {
+                out.push(c);
+                i += 1;
+            }
+        } else {
+            if c == 'r'
+                && i + 1 < chars.len()
+                && (chars[i + 1] == '"' || chars[i + 1] == '#')
+                && (i == 0 || !ident(chars[i - 1]))
+            {
+                panic!(
+                    "code_only does not handle raw strings, and mis-parsing one turns a \
+                     freeze gate into a silent pass — extend it deliberately"
+                );
+            }
+            out.push(c);
+            i += 1;
+        }
+    }
+    out
+}
+
+/// The census's teeth: every numeric literal in a recorded `bound` must appear in the
+/// **executable code** of the file its `locus` names.
+///
+/// ⚠⚠ **"Executable" is the whole check, and it was missing until slice C4b.** The rule
+/// as C4 ported it was *"the literal appears textually in the file"* — true, worthless,
+/// and **unable to fail**, because the `bound:` string sits in the same file by design
+/// and supplies its own number. Measured, not reasoned: deleting `0.8814` from the RQ
+/// gate's assertion left the check green. So did subtracting the records' own
+/// occurrences, for six biosphere literals the scanner's pin test quotes as test data.
+/// [`code_only`] is what closes both.
+///
+/// ⚠ The Python marker census carried the identical defect for the identical reason, and
+/// it predates the flip — the `bound=` keyword sat in the file its `locus` named. Both
+/// sides are fixed together; fixing one is the "a rule with two copies has one that is
+/// stale" hazard in its worst shape, because the stale copy still reads like coverage.
+///
+/// ⚠ **Why not "the literal must be in the gate's own `check:` block"**, which is
+/// tighter: the five CO₂ gates compare against a floor this tree *derives*
+/// (`Γ*/ci_ratio`, computed, never typed) and carry the recorded `61.07` in a separate
+/// tripwire test. A body-scoped rule would redden a design that is deliberate.
+///
+/// Still crude on purpose: it does not parse the expression, so it cannot prove the
+/// literal is *the* threshold. What it closes is the path where the number moves and the
+/// record does not — the retune-in-silence path `liveness_floors` exists to prevent, and
+/// the family that has already been retuned twice.
+///
+/// It also resolves the locus against the filesystem, which is what keeps a table's
+/// `GATE_SOURCE_FILE` and the path literal at its `science_gates!` invocation from
+/// drifting apart.
+///
+/// ⚠ `repo_root` is the caller's, because `CARGO_MANIFEST_DIR` is per-crate.
+pub fn check_bound_literals(gates: &[ScienceGate], source_file: &str, repo_root: &std::path::Path) {
+    let mut checked = 0usize;
+    for gate in gates {
+        let (file, test_name) = gate.locus.split_once("::").expect("locus is file::test");
+        assert_eq!(file, source_file);
+        let raw = std::fs::read_to_string(repo_root.join(file))
+            .unwrap_or_else(|e| panic!("locus {file} is not readable: {e}"));
+        let code = code_only(&raw);
+        assert!(
+            code.contains(test_name),
+            "{test_name} is not present at {file}"
+        );
+        let literals = numeric_literals(gate.bound);
+        assert!(
+            !literals.is_empty(),
+            "a bound with no number is not a bound: {gate:?}"
+        );
+        for literal in &literals {
+            assert!(
+                code.contains(literal.as_str()),
+                "{} records {literal}, and no executable line of {file} carries it — so \
+                 nothing at that locus asserts the number. Either the assertion moved off \
+                 the recorded value or it never carried it. (Quoting the number in a \
+                 comment does NOT satisfy this, deliberately.)",
+                gate.locus
+            );
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, gates.len());
+}
+
 #[cfg(test)]
 mod census {
     use super::*;
@@ -868,109 +1136,11 @@ mod census {
 
     /// ⚠ The census's teeth, and the Python-side check run from the reference's own side.
     ///
-    /// Deliberately crude — every numeric literal in `bound` must appear textually in the
-    /// file the locus points at. It does not parse the expression, so it cannot prove the
-    /// literal is *the* threshold; it does close the path where the number moves and the
-    /// record does not, which is the retune-in-silence path `liveness_floors` exists to
-    /// prevent and the family that has already been retuned twice.
-    ///
-    /// It also resolves the locus against the filesystem, which is what keeps
-    /// [`GATE_SOURCE_FILE`] and the path literal inside the macro from drifting apart.
+    /// The rule itself is [`check_bound_literals`], shared with the station's half of the
+    /// census since slice C4b so the transcribed regex has exactly one copy.
     #[test]
     fn the_bound_literals_appear_at_their_locus() {
-        let mut checked = 0usize;
-        for gate in GATES {
-            let (file, test_name) = gate.locus.split_once("::").expect("locus is file::test");
-            assert_eq!(file, GATE_SOURCE_FILE);
-            let src = std::fs::read_to_string(repo_root().join(file))
-                .unwrap_or_else(|e| panic!("locus {file} is not readable: {e}"));
-            assert!(
-                src.contains(test_name),
-                "{test_name} is not present at {file}"
-            );
-            let literals = numeric_literals(gate.bound);
-            assert!(
-                !literals.is_empty(),
-                "a bound with no number is not a bound: {gate:?}"
-            );
-            for literal in &literals {
-                assert!(src.contains(literal.as_str()), "{} / {literal}", gate.locus);
-            }
-            checked += 1;
-        }
-        assert_eq!(checked, GATES.len());
-    }
-
-    /// The Python gate's regex, transcribed: `\d+\.\d+(?:[eE]-?\d+)?|\d+[eE]-\d+`.
-    ///
-    /// Hand-rolled because `simcore` and its dependents carry zero third-party crates and
-    /// a regex engine is not worth breaking that for. The two alternatives are scanned in
-    /// the same precedence order the regex uses.
-    fn numeric_literals(bound: &str) -> Vec<String> {
-        let chars: Vec<char> = bound.chars().collect();
-        let mut out = Vec::new();
-        let mut i = 0usize;
-        while i < chars.len() {
-            if !chars[i].is_ascii_digit() {
-                i += 1;
-                continue;
-            }
-            let start = i;
-            while i < chars.len() && chars[i].is_ascii_digit() {
-                i += 1;
-            }
-            let int_end = i;
-            let mut end = None;
-            if i < chars.len() && chars[i] == '.' {
-                let mut j = i + 1;
-                let frac_start = j;
-                while j < chars.len() && chars[j].is_ascii_digit() {
-                    j += 1;
-                }
-                if j > frac_start {
-                    // `\d+\.\d+` matched; try the optional `(?:[eE]-?\d+)` suffix.
-                    let mut k = j;
-                    if k < chars.len() && (chars[k] == 'e' || chars[k] == 'E') {
-                        let mut m = k + 1;
-                        if m < chars.len() && chars[m] == '-' {
-                            m += 1;
-                        }
-                        let digits = m;
-                        while m < chars.len() && chars[m].is_ascii_digit() {
-                            m += 1;
-                        }
-                        if m > digits {
-                            k = m;
-                        }
-                    }
-                    end = Some(k);
-                }
-            }
-            if end.is_none() {
-                // The second alternative: `\d+[eE]-\d+`.
-                let mut j = int_end;
-                if j + 1 < chars.len()
-                    && (chars[j] == 'e' || chars[j] == 'E')
-                    && chars[j + 1] == '-'
-                {
-                    let mut m = j + 2;
-                    let digits = m;
-                    while m < chars.len() && chars[m].is_ascii_digit() {
-                        m += 1;
-                    }
-                    if m > digits {
-                        j = m;
-                        end = Some(j);
-                    }
-                }
-            }
-            if let Some(stop) = end {
-                out.push(chars[start..stop].iter().collect());
-                i = stop;
-            }
-            // No match starting here: `i` already sits past the integer run.
-        }
-        out
+        check_bound_literals(GATES, GATE_SOURCE_FILE, &repo_root());
     }
 
     #[test]
@@ -992,6 +1162,53 @@ mod census {
         assert_eq!(numeric_literals("1.5e-3 and 2E-4"), ["1.5e-3", "2E-4"]);
         assert!(numeric_literals("no numbers here").is_empty());
         assert!(numeric_literals("bare 42 integers do not count").is_empty());
+    }
+
+    /// Teeth on [`code_only`] itself — it is what makes the census's bound check able to
+    /// fail at all, so every construct it has to get right is pinned, including the
+    /// negatives.
+    ///
+    /// ⚠ The four cases that matter are the four places a frozen literal hides in this
+    /// file: a `bound:` record, a doc comment, a block comment, and the scanner pin
+    /// test's own string data. All four must be stripped; the assertion must not.
+    #[test]
+    fn code_only_keeps_the_assertions_and_drops_every_record() {
+        assert_eq!(
+            code_only("let x = 0.55; // 0.55 in a comment\n").trim(),
+            "let x = 0.55;"
+        );
+        assert_eq!(
+            code_only("/// doc says 0.55\nlet x = 0.55;").trim(),
+            "let x = 0.55;"
+        );
+        assert_eq!(code_only("/* 0.55 */let x = 0.55;"), "let x = 0.55;");
+        assert_eq!(code_only("bound: \"floor=0.55\",").trim(), "bound: ,");
+        // An escaped quote must not end the string early, or the code after it is eaten.
+        assert_eq!(code_only("a(\"x\\\"0.55\");b(0.55);"), "a();b(0.55);");
+        // A lifetime survives (it is code); a char literal is dropped, escapes included.
+        assert_eq!(code_only("&'static str"), "&'static str");
+        assert_eq!(code_only("m('\"', 0.55)"), "m(, 0.55)");
+        assert_eq!(code_only("m('\\\\', 0.55)"), "m(, 0.55)");
+        assert_eq!(code_only("m('\\n', 0.55)"), "m(, 0.55)");
+    }
+
+    /// ⚠ A raw string is a LOUD failure, not a silent mis-parse — the case the guard
+    /// exists for, and the case its first draft got wrong by testing the whole source
+    /// for `r"` up front (ordinary prose ending a word in `r` before a quote tripped it).
+    #[test]
+    #[should_panic(expected = "does not handle raw strings")]
+    fn code_only_refuses_a_raw_string() {
+        code_only("let s = r\"0.55\";");
+    }
+
+    /// ⚠ And the negative for that guard: a word ending in `r` before a quote is not a
+    /// raw string. This is the case the first draft failed on, so it is pinned.
+    #[test]
+    fn a_word_ending_in_r_before_a_quote_is_not_a_raw_string() {
+        assert_eq!(
+            code_only("// not a roster\" design\nlet x = 0.55;").trim(),
+            "let x = 0.55;"
+        );
     }
 
     /// ⚠ The tripwire that lets the five CO₂ gates stay DERIVED.
