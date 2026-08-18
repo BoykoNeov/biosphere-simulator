@@ -30,22 +30,35 @@ reviewed, and re-captured* — not silent.
 **Not part of the biosphere reference (scoped out, by name):**
 - The **Phase-0 engine-skeleton demo** — `domains/biosphere/flows.py` (the trivial
   `Photosynthesis`/`Respiration`/`Harvest` transfers, *no real biology*) and its
-  `params/demo.yaml`. These exercise the *engine* (RK4 vs Euler, the conservation gate) and
-  are frozen separately by their own Phase-0 goldens (`demo_euler_state.json`,
-  `demo_rk4_state.json`, `state_snapshot.json`). The manifest excludes `demo.yaml` explicitly.
+  `params/demo.yaml`. These exercise the *engine* (RK4 vs Euler, the conservation gate). The
+  manifest excludes `demo.yaml` explicitly.
+  ⚠ **Their two goldens were DELETED on 2026-08-18** (`demo_euler_state.json`,
+  `demo_rk4_state.json`; C6 of the reference flip — `docs/log/reference-flip.md`), because
+  the reference has no `build_demo` and no contract required them. `state_snapshot.json`
+  stays: it is a hand-authored `sim_io` fixture the reference *reads*. So `demo.yaml` is now
+  frozen by **nothing** — deliberate, and recorded here rather than left to be discovered.
 - **No new science.** Phase 4 added no flow, no trophic level, no coupled
   (Lotka-Volterra/Holling) dynamics — those were deferred at the Phase-3 capstone. The freeze
   captures the closed biosphere **as Phase 3 left it**.
 - **The two additive dormant-machinery scenarios** — `N_LIMITED_SCENARIO` (open field,
   `f_N` driven below 1 by N-dilution) and `WATER_BITING_SCENARIO` (sealed chamber, the closed
-  water cycle's `f_water` driven below 1) — added *after* the freeze (the Phase-5 sequencing
+  water cycle's `f_water` driven below 1). Added *after* the freeze (the Phase-5 sequencing
   decision) to flush the never-run-hot `f_N` and sealed-`f_water` limiter integrations before
-  Phase 5. They are **deliberately NON-frozen**: scenario *data* only (no new flow / aux /
-  param), their own goldens (`n_limited_state.json`, `water_biting_state.json`,
-  `test_{n_limited,water_biting}.py` + the two `test_regression_*` gates), and **not** in the
-  manifest. Adding them left all seven frozen goldens byte-identical — that byte-identity is
-  the proof the reference did not move. A future maintainer should read these as intentional
-  stress scenarios, not a freeze omission.
+  Phase 5, they were **deliberately NON-frozen**: scenario *data* only (no new flow / aux /
+  param), their own goldens and tests, and **not** in the manifest. Adding them left all seven
+  frozen goldens byte-identical — that byte-identity was the proof the reference did not move.
+  ⚠ **RETIRED 2026-08-18** (C6 of the reference flip; `docs/log/reference-flip.md`). Both
+  scenarios, both goldens and their five test files are deleted. The reference carries no such
+  scenarios, so keeping them would have meant a checker asserting science the reference cannot
+  run. **Nothing in the manifest moved** — neither name ever appeared in it, which is what
+  made the retirement an ordinary deletion rather than an unfreeze.
+  ⚠ **The limiters they existed to exercise are still exercised, in the reference.** `f_N`
+  and its uptake shutoff now have manufactured-condition pins in `rust/crates/domains`
+  (`science.rs::the_nitrogen_stress_ramp_is_linear_between_its_two_knots`,
+  `system.rs::nitrogen_limitation_is_wired_into_assimilation_and_no_scenario_shows_it`), and
+  the water side already had one. Before the deletion, `nitrogen_stress_factor` had **zero**
+  test callers in the reference — so this doc's "never-run-hot" concern was live, and the
+  successor landed first for exactly that reason.
 
 ## The frozen surface
 
@@ -703,6 +716,14 @@ CLAUDE.md already warns about as a second door into the same room: the ceremony 
 honor-system for such a change, so follow it deliberately rather than waiting for a red test.
 
 ### Unfreeze log
+
+⚠ **Every entry below is a DATED RECORD, true of the day it was written, and is not
+maintained afterwards.** Entries measured against scenarios that no longer exist keep their
+numbers: `n_limited` and `water_biting` were retired on 2026-08-18 (see the scope section
+above), so a present-tense sentence naming them — "the golden that moved", "one of only two
+runs where water limits", a golden count of 25 — describes the tree **as it was at that
+entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
+the top of this doc, which are live claims, are kept current.
 
 - **2026-08-17 — `allocation.yaml` is REFORMATTED out of YAML flow style (a FORMAT-only
   unfreeze; no value moved, and nothing could have caught it).** Reference-flip slice C1, the

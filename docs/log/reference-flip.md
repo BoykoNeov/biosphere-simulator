@@ -1393,3 +1393,15 @@ repair. Deleting both would have thrown away the reason the discipline exists.*
 gate, not `build_demo` — whose own tests assert engine-assembly properties, a different subject
 and Stage 3's problem. The consequence is recorded where it bites: `demo.yaml` is now frozen by
 nothing.
+
+**⚠ And the sweep was scoped too narrowly — caught in review, not by a gate.** Every
+post-deletion sweep ran over `tests/ src/ --include=*.py`, so the two **living freeze-contract
+docs** were in the slice's first grep and none of its later ones; both still described the
+retired scenarios in the present tense, inside their own "scoped out, by name" sections. The
+gating check that opened the slice proved no *machine-readable* half of any contract moved —
+and that is precisely the half that has a gate. *A contract here is doc + manifest, and only
+the manifest is gated.* The live scope statements were updated; the dated unfreeze-log entries
+naming those scenarios were **left alone**, under one new note saying entries are records of
+their date, because rewriting a measurement to match a later tree falsifies the measurement.
+⚠ *After any deletion, sweep the living contract docs explicitly — they are in neither `src/`
+nor `tests/`, so a language-scoped grep cannot see them.*

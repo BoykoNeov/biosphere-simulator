@@ -2390,7 +2390,9 @@ not as a deferral: both halves are scheduled, and the station half has its own c
 
 `test_the_vks_mutual_shading_regime_is_MODELLED_not_merely_avoided` asserts over a roster
 of **six** scenarios, and two of them — `n_limited` and `water_biting` — are precisely the
-Python-only scenarios **C6 retires**. `grep` over `rust/crates` finds them only inside
+Python-only scenarios **C6 retires**. ⚠ **ANSWERED: C6 landed first, 2026-08-18 —
+see §5k.** The roster is now exactly the four the reference carries, nothing is truncated,
+and the gate's pinned numbers did not move. `grep` over `rust/crates` finds them only inside
 comments *about* C6. So the gate cannot port as written: either it ships over four
 scenarios (a silent truncation of its own claim) or **C6 lands first**, after which four
 *is* the roster and nothing is truncated.
@@ -2549,3 +2551,32 @@ repaired.
 5 skipped** — with no bound anywhere loosened, no threshold widened and no golden
 regenerated. Commits `34430ed` (successor) and `01bf957` (retirement); the probes are in
 `M:/claud_projects/temp/c6-scenario-retirement/`.
+
+### ⚠ Addendum — the sweep that was scoped too narrowly, caught in review
+
+Every post-deletion sweep in this slice ran over `tests/ src/ --include=*.py`. The two
+**living freeze-contract docs** — `docs/biosphere-reference.md` and
+`docs/station-reference.md` — were in the very first grep of the slice and in none of the
+later ones, so both still described the retired scenarios and the deleted demo goldens in the
+present tense, inside their "Not part of the reference (scoped out, by name)" sections.
+
+⚠ **This is the sharpest form of the finding §5k already records.** The gating check that
+opened the slice — "all four names occur zero times in all three manifests" — proved no
+*machine-readable* half of any contract moved. But a contract here is **doc + manifest**, the
+manifest gate equates manifest↔tree, and *the doc is not a side*. So the half that was
+verified is precisely the half that has a gate. Fourth instance of the stale-prose finding,
+and the first inside a document that calls itself a freeze contract.
+
+Fixed by the same discriminator, applied deliberately:
+
+* **Live scope statements** (both docs' scoped-out sections) → updated. They now record the
+  retirement, that no manifest moved, that the limiters are still exercised in the reference,
+  and that `demo.yaml` is now frozen by **nothing**.
+* **Dated unfreeze-log entries** naming the retired scenarios → **left alone**, with one note
+  added at the top of the log saying entries are dated records not maintained afterwards.
+  Rewriting a measurement to match a later tree falsifies the measurement.
+* `docs/log/*.md` and `docs/plans/post-roadmap-*.md` (≈20 files) → untouched, same reason.
+
+**The rule this leaves:** after any deletion, sweep the **living contract docs** explicitly.
+They are not in `src/`, not in `tests/`, and not covered by a language-scoped grep — which is
+exactly why three separate sweeps missed them.

@@ -161,12 +161,14 @@ violation.
 
 - The **frozen biosphere** — **delegated**, not excluded: it is frozen by
   `docs/biosphere-reference.manifest.json` (the manifest's `delegates_to`).
-- The **Phase-0 engine-skeleton demo** goldens (`demo_euler_state.json`,
-  `demo_rk4_state.json`, `state_snapshot.json`) — no real science, frozen by their own
-  Phase-0 goldens.
-- The two **NON-frozen biosphere stress scenarios** (`n_limited_state.json`,
-  `water_biting_state.json`) — deliberately non-frozen scenario *data* (the biosphere doc
-  scopes them out too).
+- The **Phase-0 engine-skeleton demo** — no real science.
+  ⚠ Its two goldens (`demo_euler_state.json`, `demo_rk4_state.json`) were **deleted
+  2026-08-18** (C6 of the reference flip). `state_snapshot.json` stays — a hand-authored
+  `sim_io` fixture the reference *reads*, not a run.
+- The two **NON-frozen biosphere stress scenarios** (`n_limited`, `water_biting`) — scenario
+  *data*, scoped out by the biosphere doc too.
+  ⚠ **RETIRED 2026-08-18** with their goldens (same slice). Neither name ever appeared in
+  this manifest, so nothing frozen here moved.
 - The **cross-domain perturbation harness** (`src/station/perturbations.py`) — diagnostics,
   **no golden** (the Phase-3 `perturbations.py` precedent; determinism re-runs are the
   insurance). Its `ScaledFlow` is perturbation-only, so it is deliberately **not** in the
