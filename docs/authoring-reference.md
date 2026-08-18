@@ -873,7 +873,12 @@ and mirrors the biosphere's:
   grammar's meaning, `traj_vectors.txt` owns the VM's arithmetic, the anchors own the
   interpreter, and the station manifest owns the param values. The gate re-asserts none of
   it. Its two provenance hashes (of the vector files) are a re-derivable record of *which
-  cases were frozen*, regenerated on a deliberate unfreeze — **not** assertions.
+  cases were frozen*, regenerated on a deliberate unfreeze. ⚠ **They became assertions in
+  slice C7** and the older "not assertions" reading is now false: the reference writes them,
+  so `test_the_frozen_vector_roster_is_the_generators` recomputes both under the checker's
+  own newline rule and demands agreement. What that gate owns is still *provenance* rather
+  than semantics — that the frozen roster is the set the generator writes and the digits
+  are of those files — not what any vector case means.
 - **The gate owns *completeness*** — the one thing the vectors and anchors are blind to: a
   grammar node, a binary op, a schema field, a whole spec model, a flow type, or a param
   loader **added to the live tree but exercised by nothing**. This is the biosphere's

@@ -360,11 +360,32 @@ def test_manifest_delegates_param_values_to_the_station() -> None:
         f"{manifest['delegates_to']} freezes no param_files, so delegating param "
         "VALUES to it is a promise nothing keeps"
     )
+    # ⚠ The delegation is a promise about SPECIFIC VALUES, so check they resolve rather
+    # than merely that the target froze something. The file behind each loader is read
+    # off the loader itself — its default path — and looked up in the delegate's census.
+    # A loader with no frozen file behind it is an authored scenario reaching values
+    # nothing freezes, which is what delegating instead of re-hashing is meant to buy.
+    #
+    # ⚠⚠ DERIVED, and the first draft was not. It matched `<loader>.yaml` by naming
+    # convention, which is a rule this repo never adopted: `thermal` loads
+    # `radiator.yaml`, so the convention reported a real gap that does not exist. A
+    # convention invented at the gate is not a property of the tree — ask the loader.
+    unresolved = {}
     for loader in manifest["param_loaders"]:
-        assert loader, "an empty param-loader name cannot be delegated"
+        default = next(
+            iter(inspect.signature(PARAM_LOADERS[loader]).parameters.values())
+        ).default
+        if Path(default).name not in delegate["param_files"]:
+            unresolved[loader] = Path(default).name
+    assert not unresolved, (
+        f"param loaders whose file {manifest['delegates_to']} does not freeze: "
+        f"{unresolved}. Either the loader reads a param file that manifest does not "
+        "census, or the file was renamed on one side only — an authored scenario would "
+        "be reaching values nothing freezes."
+    )
 
 
-def test_the_frozen_vector_roster_is_the_generators() -> None:
+def test_the_frozen_vector_roster_is_the_generators(monkeypatch) -> None:
     """The two hashed vector files are the two the generator writes, and the hashes are
     of those files.
 
@@ -388,12 +409,14 @@ def test_the_frozen_vector_roster_is_the_generators() -> None:
     Python's broader ``splitlines`` one, which is the same two-rules-held-equal tie
     slice C8 built for ``param_files``.
 
-    The generator is imported inside the test (its directory pushed onto the path the
-    way ``tests/crossport/`` already reaches its own helpers) so it is not a
-    collection-time cost for the rest of the base suite. It pulls in ``authoring`` and
-    ``simcore`` only — no ``cargo``, so this stays offline-clean.
+    The generator is imported inside the test so it is not a collection-time cost for
+    the rest of the base suite; it pulls in ``authoring`` and ``simcore`` only — no
+    ``cargo``, so this stays offline-clean. ⚠ Via ``monkeypatch.syspath_prepend`` rather
+    than a bare ``sys.path.insert``, which would outlive the test: ``tests/crossport/``
+    holds generically-named modules (``compare``, ``authoring_files``) and leaving it at
+    position 0 would let a later plain import in the same worker resolve there.
     """
-    sys.path.insert(0, str(_REPO_ROOT / "tests" / "crossport"))
+    monkeypatch.syspath_prepend(_REPO_ROOT / "tests" / "crossport")
     import gen_authoring_vectors  # noqa: PLC0415
 
     manifest = _load_manifest()
@@ -431,6 +454,10 @@ def test_manifest_named_files_exist() -> None:
 
 
 def test_manifest_records_the_grammar_is_incomplete() -> None:
+    # ⚠ Since slice C7 this prose is written by the REFERENCE, so the assertion is
+    # unchanged and its meaning inverted, the same way the derivation gates below were
+    # inverted by slice 8: it asks whether the contract the reference writes still says
+    # this, not whether the checker's copy does.
     # The one thing a reader must not misread: freezing the arithmetic core does NOT
     # freeze a COMPLETE grammar. Division / the function set / named constants are
     # deferred by decision, each pending a real flow that forces its semantics. Pin that

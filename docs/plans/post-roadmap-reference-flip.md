@@ -3064,3 +3064,37 @@ mutation rather than trusting the verdict.
   them is Stage 3's call.
 * **`gen_authoring_vectors.py`.** It is scaffolding under the target state, and moving it
   is what would move `parity_vectors` off `python`. A successor item, not a rider.
+
+### ⚠ Addendum — five things the gates could not see, caught in review
+
+Taken in a follow-up commit; none moves a manifest byte.
+
+1. **A one-element `for` loop survived the row removal** in
+   `test_the_dump_key_sets_are_the_ones_the_generators_consume` — and here the deletion
+   that empties it is *scheduled*, since the station row leaves when its writer lands.
+   De-looped. C6 recorded this exact hazard on a surviving single arm three commits
+   earlier; the lesson was in the index row this slice edited.
+2. **The prose half said the two vector hashes are "not assertions"**, which this slice
+   made false by asserting them. Corrected — and it is the C3 finding a fourth time: a
+   present-tense claim about the tree went false and nothing compares that file to the
+   tree. ⚠ Worse than the usual instance, because the sentence was *quoted in this very
+   plan* as the evidence that the value check is new, and still not updated.
+3. **The value half of the new roster gate was claimed, not measured.** The drifted-vector
+   control ran against the byte gate, which reddens on any file change regardless — so
+   the hash assertion itself had never been shown to bite. Re-run against the roster gate:
+   red on its own line, baseline and restore both green.
+4. **⚠⚠ The delegation tie was first written against a naming convention this repo never
+   adopted**, and the convention manufactured a failure. `<loader>.yaml` looked right for
+   four of the five loaders and is wrong for `thermal`, which loads `radiator.yaml` — so
+   the gate reported an authored scenario reaching unfrozen values, and the tree was fine.
+   Rewritten to ask the **loader** for its default path instead of guessing from its name.
+   A convention invented at the gate is not a property of the tree, and its first red is
+   indistinguishable from a real finding.
+5. **`sys.path.insert(0, tests/crossport)` had no cleanup.** That directory holds
+   generically-named modules (`compare`, `authoring_files`), so leaving it at position 0
+   for the worker's lifetime lets a later plain import resolve there. Now
+   `monkeypatch.syspath_prepend`, which unwinds.
+
+Also pinned: `test_manifest_records_the_grammar_is_incomplete` asserts on prose the
+reference now writes, so its meaning inverted the way slice 8 inverted the derivation
+gates. Stated in the test rather than left implied.

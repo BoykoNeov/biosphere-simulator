@@ -1701,3 +1701,19 @@ Also corrected: `docs/authoring-reference.md` named the retired command in three
 including its own ceremony (nothing gates that file), and `tests/test_freeze_manifest.py`
 carried a stray trailing line from the biosphere half that `ruff format --check` would have
 reddened on CI. Full detail: `docs/plans/post-roadmap-reference-flip.md` §5n.
+
+#### ⚠ Addendum — caught in review, none of it visible to a gate
+
+A one-element `for` loop left where the *next* scheduled change empties it (C6's own
+lesson, three commits old); the contract's prose still calling the two vector hashes "not
+assertions" after this slice made them assertions (C3's finding a fourth time, and the
+sentence was quoted in the plan as evidence); the new gate's **value** half claimed but
+never controlled — the drifted-file control had run against the byte comparison, which
+reddens anyway.
+
+⚠⚠ And the delegation tie was first written against **a naming convention this repo
+never adopted**: `<loader>.yaml` fits four of five loaders and is wrong for `thermal`,
+which loads `radiator.yaml`. The gate reported an authored scenario reaching unfrozen
+values and the tree was fine. Rewritten to ask the loader for its default path. **A
+convention invented at the gate is not a property of the tree, and its first red looks
+exactly like a real finding.** Full detail: plan §5n.

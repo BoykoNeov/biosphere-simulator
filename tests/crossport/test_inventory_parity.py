@@ -563,17 +563,19 @@ def test_the_dump_key_sets_are_the_ones_the_generators_consume() -> None:
     sys.path.insert(0, str(REPO_ROOT / "tests"))
     import test_station_freeze_manifest  # noqa: PLC0415
 
-    for label, mine, theirs in (
-        ("station", _STATION_DUMP_KEYS, test_station_freeze_manifest._RUST_DUMP_KEYS),
-    ):
-        assert mine == theirs, (
-            f"the {label} dump's key set is declared twice and the copies disagree:\n"
-            f"  this gate expects:     {sorted(mine)}\n"
-            f"  the generator expects: {sorted(theirs)}\n"
-            "The generator's copy is the definition — it is what stops a regeneration "
-            "from splicing an unclassified key. Fix this module to match it, and read "
-            "that module's _AUTHORITY before concluding the new key belongs at all."
-        )
+    # ⚠ De-looped when the authoring row left: a one-element `for` is one deletion
+    # from asserting nothing, and the deletion is *scheduled* here — the station row
+    # leaves when its writer lands, and this test goes with it. Slice C6 recorded the
+    # same hazard on a surviving single arm.
+    theirs = test_station_freeze_manifest._RUST_DUMP_KEYS
+    assert theirs == _STATION_DUMP_KEYS, (
+        "the station dump's key set is declared twice and the copies disagree:\n"
+        f"  this gate expects:     {sorted(_STATION_DUMP_KEYS)}\n"
+        f"  the generator expects: {sorted(theirs)}\n"
+        "The generator's copy is the definition — it is what stops a regeneration "
+        "from splicing an unclassified key. Fix this module to match it, and read "
+        "that module's _AUTHORITY before concluding the new key belongs at all."
+    )
 
 
 def test_the_station_aux_axis_is_empty_by_delegation() -> None:
