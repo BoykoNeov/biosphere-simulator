@@ -48,7 +48,6 @@ from config import load_yaml
 from config.paths import SCENARIO_DIR
 from simcore.registry import Registry
 
-SCENARIO_DIR = SCENARIO_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 # The ECLSS anchor's four flows — the same graph Step 1 measured the identity on.

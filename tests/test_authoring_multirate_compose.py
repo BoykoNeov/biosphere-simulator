@@ -44,7 +44,6 @@ from config.paths import SCENARIO_DIR
 from simcore.ids import StockId
 from simcore.registry import Registry
 
-SCENARIO_DIR = SCENARIO_DIR
 TWO_BATTERIES_MULTIRATE = SCENARIO_DIR / "two_batteries_multirate.yaml"
 
 FAST_FLOW = "bat_fast.power.self_discharge"

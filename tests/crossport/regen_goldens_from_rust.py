@@ -101,7 +101,6 @@ from pathlib import Path
 from config.paths import GOLDEN_DIR
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GOLDEN_DIR = GOLDEN_DIR
 RUST_WORKSPACE_DIR = REPO_ROOT / "rust"
 RUST_CRATES_DIR = RUST_WORKSPACE_DIR / "crates"
 

@@ -72,7 +72,6 @@ from station.greenhouse import (
 )
 from station.scenario import GREENHOUSE_SCENARIO
 
-GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "greenhouse_state.json"
 _WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 

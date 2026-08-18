@@ -86,7 +86,6 @@ from station.system import (
 
 pytestmark = pytest.mark.slow
 
-GOLDEN_DIR = GOLDEN_DIR
 STATE_GOLDEN = GOLDEN_DIR / "sealed_station_state.json"
 ENERGY_SUMMARY_GOLDEN = GOLDEN_DIR / "sealed_energy_drift_summary.json"
 

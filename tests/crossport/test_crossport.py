@@ -54,7 +54,6 @@ from config.paths import WINTER_WHEAT_WEATHER  # noqa: E402
 from sim_io import snapshot  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GOLDEN_DIR = GOLDEN_DIR
 RUST_CRATE_DIR = REPO_ROOT / "rust" / "crates" / "simcore"
 RUST_DOMAINS_DIR = REPO_ROOT / "rust" / "crates" / "domains"
 RUST_AUTHORING_DIR = REPO_ROOT / "rust" / "crates" / "authoring"

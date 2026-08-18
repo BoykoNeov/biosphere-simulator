@@ -44,7 +44,6 @@ from simcore.ids import StockId
 from simcore.registry import Registry
 from simcore.state import State
 
-SCENARIO_DIR = SCENARIO_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 O2_EQ = 8.0  # o2_setpoint − Con_o2/k_makeup = 10 − 0.004/0.002 — the truth

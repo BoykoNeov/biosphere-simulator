@@ -62,7 +62,6 @@ from station.lighting import (
 from station.loader import load_lamp_params
 from station.scenario import LIGHTING_SCENARIO
 
-GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "lighting_state.json"
 _WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 

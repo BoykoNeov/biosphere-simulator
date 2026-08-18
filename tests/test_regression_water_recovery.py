@@ -56,7 +56,6 @@ from station.water import (
     water_recovery_steady_state,
 )
 
-GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "water_recovery_state.json"
 
 _CREW = load_crew_params()

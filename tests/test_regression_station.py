@@ -60,7 +60,6 @@ from station.system import (
     station_resolver,
 )
 
-GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "station_state.json"
 
 _CHARGE = load_charge_params()

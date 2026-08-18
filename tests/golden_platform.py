@@ -30,10 +30,10 @@ folded the station drift summary in Rust and C6 retired four Python-only goldens
 and neither correction reached this sentence until S1 re-measured from disk. ⚠ The
 numbers in this docstring are **prose and nothing gates them** — the roster below is
 what the suite checks. `test_golden_provenance.py` now carries a counted forcing
-literal so the next drift is loud.) That is the reference flip: Rust is
-canonical,
-Python is the checker. Two consequences this module owns, because both are policy rather
-than per-scenario detail:
+literal so the next drift is loud — ⚠ in a file S2/S6 retires, so that gate
+needs a Rust-side successor, recorded in the plan FINDING 2.) That is the reference
+flip: Rust is canonical, Python is the checker. Two consequences this module owns,
+because both are policy rather than per-scenario detail:
 
 * **Python must not author them** (:func:`write_python_golden`). Every
   ``tests/test_regression_*.py`` carries a ``_regenerate()`` ``__main__``; for a

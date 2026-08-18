@@ -58,7 +58,6 @@ from domains.eclss.loader import load_eclss_params
 from simcore.ids import StockId
 from simcore.state import State
 
-SCENARIO_DIR = SCENARIO_DIR
 ANCHOR_YAML = SCENARIO_DIR / "eclss_multirate_cabin.yaml"
 
 CABIN_O2 = StockId("eclss.cabin_o2")

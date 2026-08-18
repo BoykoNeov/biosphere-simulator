@@ -106,7 +106,6 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = _REPO_ROOT / "docs" / "biosphere-reference.manifest.json"
 
 PARAMS_DIR = BIOSPHERE_PARAMS_DIR
-GOLDEN_DIR = GOLDEN_DIR
 WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 
 # The Phase-0 engine-skeleton demo param file — NOT biosphere science. It feeds the demo

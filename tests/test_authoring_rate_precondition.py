@@ -56,7 +56,6 @@ from domains.eclss.loader import load_eclss_params
 from domains.power.loader import load_self_discharge_params
 from simcore.multirate import Split
 
-SCENARIO_DIR = SCENARIO_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 FROZEN_DT = 60.0  # the ECLSS anchor's own load-bearing sizing: k_makeup*dt = 0.12

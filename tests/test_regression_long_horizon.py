@@ -82,7 +82,6 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
 
-GOLDEN_DIR = GOLDEN_DIR
 PERENNIAL_GOLDEN = GOLDEN_DIR / "perennial_long_horizon_state.json"
 CONSUMER_GOLDEN = GOLDEN_DIR / "consumer_long_horizon_state.json"
 DRIFT_SUMMARY_GOLDEN = GOLDEN_DIR / "drift_summary.json"

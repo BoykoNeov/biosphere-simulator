@@ -40,7 +40,6 @@ from domains.crew.system import build_crew, crew_resolver, run_crew
 from simcore.flow import ConservationError
 from simcore.integrator import EulerIntegrator
 
-SCENARIO_DIR = SCENARIO_DIR
 CREW_YAML = SCENARIO_DIR / "crew_mission.yaml"
 BROKEN_YAML = SCENARIO_DIR / "crew_broken_wiring.yaml"
 

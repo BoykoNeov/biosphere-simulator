@@ -46,7 +46,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 import compare  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GOLDEN_DIR = GOLDEN_DIR
 RUST_WORKSPACE_DIR = REPO_ROOT / "rust"
 GODOT_PROJECT_DIR = REPO_ROOT / "godot"
 SCENARIO = SCENARIO_DIR / "crew_mission.yaml"

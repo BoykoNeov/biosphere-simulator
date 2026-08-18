@@ -48,7 +48,6 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
 
-GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "perennial_chamber_state.json"
 
 _WEATHER_FIXTURE = WINTER_WHEAT_WEATHER

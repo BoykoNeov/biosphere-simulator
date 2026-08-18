@@ -3601,6 +3601,14 @@ is not the whole picture: **the programs that check the contracts are still Pyth
 * `tests/crossport/test_golden_provenance.py` and every `tests/test_regression_*.py` —
   see FINDING 3.
 * `tests/crossport/test_inventory_parity.py` — the dumps' only consumer.
+* ⚠ **Added 2026-08-18 by S1 — this list is now four, and S1 itself lengthened it.**
+  `test_golden_provenance.py::test_the_golden_census_counts_are_what_the_prose_says`, the
+  counted forcing literal S1 added after finding the golden census prose stale in two
+  directions. It guards prose in `golden_platform.py`, `regen_goldens_from_rust.py`, that
+  same file and **`CLAUDE.md`** — and it sits in the directory S2/S6 retires, so deleting
+  it lets the prose rot again with nothing red. Writing a gate into the dying tree is
+  sometimes the only place it *can* go today; recording that it is there is what stops it
+  vanishing quietly.
 
 Retiring the checker therefore disarms the traps the last four slices installed. Each
 needs its successor built **before** its Python original goes, not after.
@@ -4025,8 +4033,11 @@ would have been wrong, and the reason is a **control**, not tidiness.
 
 `tests::a_recursive_walk_reddens_the_census` proves *"a directory is not a category"* by
 asserting `recursive.len() == census.len() + 4`. That assertion has teeth **only because the
-four potato files sit in a subdirectory of `PARAMS_DIR`** — leave them behind and it is
-measuring nothing about a hazard that no longer exists in the tree. Its sibling
+four potato files sit in a subdirectory of `PARAMS_DIR`** — leave them behind and the
+assertion cannot be satisfied at all (`recursive.len()` would equal `census.len()`), so it
+goes **red**. ⚠ That is the sharper danger, not a milder one: a control that fails for a
+reason nobody caused invites the repair *"delete the obsolete test"*, and the guard is lost
+to a tidy-up rather than to a decision. Its sibling
 `the_recursive_walk_would_see_four_more_and_the_census_does_not` is the same shape. Both went
 green at the new home, which is positive evidence that the directory *shape* survived and not
 merely its fifteen frozen files.
@@ -4199,3 +4210,9 @@ directory. All 47 moved files are git-recorded 100 %-similarity renames.
   golden. S1 only guarantees that when S2 writes them, the path they read is the final one.
 * **Deleting `tests/authoring/` and `tests/regression/`** as concepts — the directories are
   gone because they are empty, not because anything was retired.
+* ⚠⚠ **Giving the new forcing literal a home that outlives Python.** It lives in
+  `tests/crossport/test_golden_provenance.py`, which §5q's own table retires — so S1 closed a
+  prose-rot hole with a gate that dies with the tree, and **added a fourth entry to
+  FINDING 2's list in the act of fixing something else**. Recorded there as well as here.
+  **S2 must carry it**, not merely delete it: two counted literals against
+  `rust/data/golden/`, in Rust, is the smallest successor that survives S6.

@@ -46,7 +46,6 @@ from domains.thermal.flows import RadiatorReject
 from simcore.ids import StockId
 from simcore.state import State
 
-SCENARIO_DIR = SCENARIO_DIR
 HABITAT_YAML = SCENARIO_DIR / "eclss_thermal_habitat.yaml"
 
 CABIN_O2 = StockId("eclss.cabin_o2")

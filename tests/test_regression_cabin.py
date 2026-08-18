@@ -49,7 +49,6 @@ from station.cabin import build_cabin, cabin_resolver, cabin_steady_state
 from station.scenario import CABIN_GAS_SCENARIO, CABIN_GAS_STEPS
 from station.system import run_station
 
-GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "cabin_gas_state.json"
 
 _CREW = load_crew_params()

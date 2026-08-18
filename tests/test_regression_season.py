@@ -43,7 +43,6 @@ from golden_platform import (
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
 
-GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "season_euler_state.json"
 
 # The committed raw-weather fixture drives the canonical season (read as JSON, no PCSE).

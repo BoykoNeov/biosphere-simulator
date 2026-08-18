@@ -41,7 +41,6 @@ from config.paths import GOLDEN_DIR, SCENARIO_DIR
 from simcore.conservation import compute_ledger
 from simcore.quantities import Quantity
 
-SCENARIO_DIR = SCENARIO_DIR
 TEMPLATE_YAML = SCENARIO_DIR / "crew_habitat_template.yaml"
 GOLDEN_PATH = GOLDEN_DIR / "crew_state.json"
 

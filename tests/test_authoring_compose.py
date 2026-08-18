@@ -54,7 +54,6 @@ from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.registry import Registry
 from simcore.state import State, Stock
 
-SCENARIO_DIR = SCENARIO_DIR
 CREW_STATION = SCENARIO_DIR / "crew_station.yaml"
 STATION_COMPOSED = SCENARIO_DIR / "station_composed.yaml"
 MIXED_INLINE_BATTERY = SCENARIO_DIR / "crew_station_inline_battery.yaml"

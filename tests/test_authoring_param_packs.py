@@ -36,7 +36,6 @@ from simcore.conservation import compute_ledger
 from simcore.ids import StockId
 from simcore.quantities import Quantity
 
-SCENARIO_DIR = SCENARIO_DIR
 BASELINE_YAML = SCENARIO_DIR / "crew_mission.yaml"
 NOOP_YAML = SCENARIO_DIR / "crew_pack_noop.yaml"
 LOW_RESP_YAML = SCENARIO_DIR / "crew_pack_low_resp.yaml"

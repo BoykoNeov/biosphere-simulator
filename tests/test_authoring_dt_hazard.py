@@ -82,7 +82,6 @@ from authoring.schema import ScenarioSpec
 from config import load_yaml
 from config.paths import SCENARIO_DIR
 
-SCENARIO_DIR = SCENARIO_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 # The frozen eclss.yaml rates, restated so the arithmetic below is legible. Sourced from

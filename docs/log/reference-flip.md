@@ -2073,8 +2073,10 @@ the **working tree** and one frozen file is CRLF on this box.
 tidiness.** `a_recursive_walk_reddens_the_census` proves *"a directory is not a category"* by
 asserting the recursive walk sees exactly four more files than the census. That assertion has
 teeth **only because the four potato overrides sit in a subdirectory of `PARAMS_DIR`** — take
-the fifteen frozen files and leave the rest, and the control stops measuring a hazard the tree
-no longer contains. `demo.yaml` came for the parallel reason: it keeps the exclusion-**by-
+the fifteen frozen files and leave the rest and the assertion cannot be satisfied at all, so it
+goes **red** for a reason nobody caused. ⚠ That is the sharper danger, not the milder one: the
+inviting repair is *"delete the obsolete test"*, and the guard is then lost to a tidy-up rather
+than to a decision. `demo.yaml` came for the parallel reason: it keeps the exclusion-**by-
 name** rule true verbatim, so three literals (`param_files()`, the dump's `assert_eq!(15)`,
 the census test's own count) stay correct with no value change. Both die at S6, inside a
 retirement, where the rules dissolve deliberately.

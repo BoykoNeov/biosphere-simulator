@@ -66,7 +66,6 @@ from station.harvest import (
 from station.loader import load_harvest_params
 from station.scenario import HARVEST_SCENARIO
 
-GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "harvest_state.json"
 _WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 

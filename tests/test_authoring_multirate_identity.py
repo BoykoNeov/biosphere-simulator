@@ -62,8 +62,6 @@ from simcore.multirate import Split, multirate_step
 from simcore.registry import Registry
 from simcore.state import State
 
-SCENARIO_DIR = SCENARIO_DIR
-GOLDEN_DIR = GOLDEN_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 

@@ -134,7 +134,6 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = _REPO_ROOT / "docs" / "station-reference.manifest.json"
 BIOSPHERE_MANIFEST = "docs/biosphere-reference.manifest.json"
 
-GOLDEN_DIR = GOLDEN_DIR
 
 # The five sibling + one station params directories the station reference freezes. The
 # biosphere params dir is deliberately ABSENT — the biosphere is delegated to its own
