@@ -59,6 +59,27 @@
 //!   stop being the same bytes. That is the real hazard, and it is scheduled: the
 //!   relocation slice moves this fixture out of `tests/`, and a move that updates one
 //!   side's path and not the other's is now red instead of silent.
+//! * `science_bands` / `liveness_floors` — the **science-gate census**, `scenario ->
+//!   [claim]`, from [`domains::biosphere::science_gates::GATES`]. **New in slice C4, and
+//!   it is the largest single block of the biosphere contract to change hands.**
+//!
+//!   ⚠⚠ Until C4 this file's own header and `test_freeze_manifest.py`'s authority note
+//!   both said these fields could never arrive this way — *"a static AST census of
+//!   science_gate markers on pytest functions. There is no Rust referent and there cannot
+//!   be."* That was true of pytest markers and false of the claim: the census's job is to
+//!   be **derived from the tree rather than hand-listed**, and Rust reaches it by making
+//!   the declaration and the `#[test]` one thing instead of by parsing anything. An
+//!   unexercised row is now a compile error rather than something a meta-test hunts.
+//!
+//!   ⚠ **Only 13 of the 15 gates are here.** `crew_mission` and `sealed_station` are
+//!   *station*-manifest keys whose referents the reference does not carry yet; they are
+//!   C4b, with their own ceremony. Emitting them from this program would file two station
+//!   claims through the biosphere's producer.
+//!
+//!   ⚠ The **roster** is not emitted and does not move: which scenarios get a key (and
+//!   which get an explicitly empty list, saying "measured, none") is the manifest's own
+//!   hand-authored scenario set, and the checker still owns it. What moved is the CLAIMS.
+//!
 //! * `param_files` — the frozen param-file census, `filename -> newline-normalized
 //!   sha-256`, from [`domains::biosphere::params::param_files`]. **New in slice C8, and it
 //!   inverts what this file said for three slices.**
@@ -82,6 +103,7 @@
 
 use config::provenance::normalized_sha256;
 use domains::biosphere::light_path::half_sine_window_mean;
+use domains::biosphere::science_gates::{ScienceGate, GATES, LIVENESS_FLOORS, SCIENCE_BANDS};
 use domains::biosphere::system::{
     build_season, consumer_chamber_scenario, perennial_chamber_scenario, sealed_chamber_scenario,
     SeasonScenario, DEFAULT_SCENARIO,
@@ -128,6 +150,74 @@ fn light_path_samples() -> Vec<String> {
         }
     }
     samples
+}
+
+/// Minimal JSON string escaping — the only characters JSON requires escaped, plus the
+/// control range. The frozen claim strings are prose (they carry `⚠`, `Γ`, em dashes and
+/// `τ`), which JSON takes as raw UTF-8; the checker's own writer re-escapes to ASCII when
+/// it serializes the manifest, so nothing here needs to.
+fn json_string(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push('"');
+    for ch in text.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// One field of the science-gate census as `scenario -> [claim]`.
+///
+/// ⚠ Sorted by [`ScienceGate`]'s `Ord` — `(scenario, field, quantity, bound, source,
+/// locus)` — because that is the order the Python census produced (its dataclass is
+/// `order=True` over the same fields in the same sequence) and the manifest is a byte
+/// comparison. Rust orders `&str` by UTF-8 bytes and Python by code points, which agree.
+///
+/// ⚠ Scenarios with no gate are NOT emitted as empty lists here. The distinction between
+/// an absent key and a deliberately-empty one is the manifest's, and the roster it is
+/// taken over is hand-authored on the checker's side; inventing keys here would be this
+/// program claiming authority over a set it cannot see.
+fn census(field: &str) -> String {
+    let mut gates: Vec<&ScienceGate> = GATES.iter().filter(|g| g.field == field).collect();
+    gates.sort();
+    // Tier-0 sanity on the program itself, the same standing as the empty-inventory
+    // asserts below: since slice 6 the manifest is GENERATED from this output, so an
+    // empty census here would be written INTO the frozen contract by a regeneration run
+    // rather than merely compared against it.
+    assert!(!gates.is_empty(), "no science gates for field {field}");
+    let mut out = String::from("{");
+    let mut current: Option<&str> = None;
+    for gate in gates {
+        if current != Some(gate.scenario) {
+            if current.is_some() {
+                out.push_str("], ");
+            }
+            out.push_str(&format!("{}: [", json_string(gate.scenario)));
+            current = Some(gate.scenario);
+        } else {
+            out.push_str(", ");
+        }
+        out.push_str(&format!(
+            "{{\"bound\": {}, \"locus\": {}, \"quantity\": {}, \"source\": {}}}",
+            json_string(gate.bound),
+            json_string(gate.locus),
+            json_string(gate.quantity),
+            json_string(gate.source),
+        ));
+    }
+    if current.is_some() {
+        out.push(']');
+    }
+    out.push('}');
+    out
 }
 
 fn main() {
@@ -183,6 +273,8 @@ fn main() {
         println!("    \"{name}\": \"{}\"{comma}", normalized_sha256(text));
     }
     println!("  }},");
+    println!("  \"liveness_floors\": {},", census(LIVENESS_FLOORS));
+    println!("  \"science_bands\": {},", census(SCIENCE_BANDS));
     println!("  \"locked_dt_days\": {BIO_DT:?},");
     println!(
         "  \"weather_sha256\": \"{}\"",

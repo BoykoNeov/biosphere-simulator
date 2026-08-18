@@ -596,9 +596,15 @@ Python-retained field for a Rust-derived one. Two consequences:
   Python has*; it now says *Python still matches the reference*. A failure there is a **Python**
   drift and is **not** fixed by regenerating.
 
-⚠ **"The manifest is Rust-anchored" is the wrong summary.** By content most of it is still
+⚠ **"The manifest is Rust-anchored" was the wrong summary until slice C4 (2026-08-18), and
+this paragraph is the record of what changed.** It read: *"By content most of it is still
 Python's — `science_bands` + `liveness_floors` alone are about half the file and are a static
-census of pytest markers, with no Rust referent while the science gates are pytest-side.
+census of pytest markers, with no Rust referent while the science gates are pytest-side."*
+The subordinate clause was the load-bearing one, and C4 removed its premise: the 13 biosphere
+science gates are declared in `rust/crates/domains/src/biosphere/science_gates.rs`, where a
+macro emits the roster row and the `#[test]` that executes it as **one declaration**, so the
+census is derived from the tree in Rust without there being anything to parse. What is still
+the checker's, per key, is in the table below — read it rather than a summary sentence.
 
 | Key | Producer | Why |
 |---|---|---|
@@ -609,7 +615,7 @@ census of pytest markers, with no Rust referent while the science gates are pyte
 | `scenarios.drift_summary.golden_sha256` | **Python** | ⚠ one run, two authors: `drift.py`'s fold of the *same* 15-yr trajectory whose final state Rust authors. The fold is the artifact |
 | `param_files` | **Rust** (since slice C8) | ⚠ the *rules* re-anchored, not the digits: the census is now the set the reference LOADS (a compile-time `include_str!` list) and the digest is `config::provenance`. The 15 values are **author-neutral** — both sides hash the same file the same way — so the ceremony moved none of them |
 | `forcing.weather_fixture` / `weather_sha256` | **Python** | ⚠ the reason changed in slice C9 (2026-08-17) and the old one is now false: the port no longer reads a file *generated from* this fixture — it reads **this fixture**, with a compile-time `include_str!`. It stays Python's because `include_str!` takes a literal, so the reference knows the fixture's **bytes and not its name**; a Rust-authored filename would be a hand-typed duplicate of the include path, a literal dressed as a derivation. The *bytes* half is now cross-checked anyway — see the `weather_sha256` note below |
-| `science_bands`, `liveness_floors` | **Python** | a static AST census of `science_gate` markers on pytest functions |
+| `science_bands`, `liveness_floors` | **Rust** (since slice C4) | ⚠ the *claims* re-anchored, not the values: all 13 `quantity`/`bound`/`source` strings are byte-identical to the Python census's and every verdict was measured identical on both ports first — only the 13 `locus` strings moved. The **key set** is still this manifest's own hand roster (which scenarios get an entry, and which get an explicitly empty list meaning "measured, none"), and a Rust gate naming a scenario outside it **raises** during regeneration rather than being filtered away. ⚠ Two markers did not move: `crew_mission` and `sealed_station` are *station* keys whose referents the reference does not carry yet — slice C4b |
 | `integrator`, `dt_days` | **hand** | the two deliberate anti-derived literals (below) |
 | `scenarios.*.scenario` / `.golden` | **hand** | a human label; a filename |
 
@@ -657,9 +663,20 @@ gate and is none. It stays enforced by the goldens.
   `rationed == 0`, no extinction, conservation, determinism}: every one a property of the RUN.
   Assertions about the *science* — that `open_season`'s canopy is a real wheat canopy, that the
   closed chamber's CO₂ attractor has not collapsed — sat in test files reachable from no
-  manifest, so none could fail an unfreeze ceremony. Both fields are **derived** from
-  `science_gate` markers in the test tree (`tests/science_gates.py`, statically via `ast`), so
-  they carry the same completeness teeth as the flow set.
+  manifest, so none could fail an unfreeze ceremony. Both fields are **derived** rather than
+  hand-listed, so they carry the same completeness teeth as the flow set — and ⚠ **how** they
+  are derived changed in slice C4 while that requirement did not. Python met it by parsing
+  `science_gate` decorators out of the test tree with `ast` (`tests/science_gates.py`); the
+  reference meets it by making the roster row and the test **one declaration**
+  (`rust/crates/domains/src/biosphere/science_gates.rs`), so an unexercised entry is a compile
+  error rather than something a meta-test has to hunt for textually. The Python census
+  survives for the two *station* gates only, until slice C4b.
+
+  ⚠ **A deleted claim is a different failure from an unexercised row, and only one of them is
+  structural.** The macro makes the second impossible; the first is caught by the manifest
+  comparison in `tests/crossport/test_inventory_parity.py` — measured, not assumed: deleting a
+  gate declaration leaves the whole Rust suite **green** (the test simply ceases to exist) and
+  turns that gate red naming the missing scenario.
 
   **The two are deliberately separate names, because they are claims of different strength.** A
   `science_bands` bound comes from **outside this repo** (real wheat's ~5–8 LAI, Van Keulen &
@@ -724,6 +741,65 @@ above), so a present-tense sentence naming them — "the golden that moved", "on
 runs where water limits", a golden count of 25 — describes the tree **as it was at that
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
+
+- **2026-08-18 — the SCIENCE-GATE CENSUS re-anchors to the reference (a LOCUS-only unfreeze;
+  13 `locus` strings and two `_authority` notes moved, and not one recorded claim).**
+  Reference-flip slice C4. `science_bands` + `liveness_floors` were the largest
+  Python-authored block of any contract — about half this manifest by content — and this
+  doc's own producer table said they had "no Rust referent". They now come from
+  `rust/crates/domains/src/biosphere/science_gates.rs`.
+
+  **What moved and what did not.** All 13 `quantity`/`bound`/`source` strings are
+  byte-identical to the Python census's; the diff is exactly 13 `locus` strings plus the two
+  `_authority` entries. Every gate's verdict, and every quantity it reads, was measured
+  identical on both ports **before** the port was written (§5j of
+  `docs/plans/post-roadmap-reference-flip.md`: 39 keys, 37 byte-identical, the two that differ
+  being the same 4 values slice C5 already owns at 7 ULP, with every band's margin orders
+  above them). The gate values were re-measured after the port and match that probe to 17
+  significant digits, in the **debug** profile the permanent gates run in.
+
+  **Why a census could change language at all.** The requirement was never "parse the tree" —
+  it was **derived, never hand-listed**. Python met it with an `ast` walk over
+  `@pytest.mark.science_gate` decorators; Rust has no such introspection, so a table plus
+  tests would have been a hand-maintained roster. The macro makes the roster row and the
+  `#[test]` **one declaration**, which is stronger: an unexercised entry is a compile error
+  rather than something a meta-test hunts textually.
+
+  ⚠ **One parametrized Python test carried TWO markers.** In the reference the row *is* the
+  test, so it became two tests with two loci — same claims, same numbers, one more locus
+  string. That is the whole of why the diff is 13 loci and not 12.
+
+  ⚠ **Two of the 15 gates did NOT move, and it is a split rather than a deferral.**
+  `crew_mission` and `sealed_station` are *station*-manifest keys whose referents the
+  reference does not carry (the RQ helper; `predicted_equilibrium_temperature`). Slices 6–8
+  re-anchored one manifest per slice on purpose. They are slice **C4b**, scheduled.
+
+  ⚠ **A near-miss worth the whole entry: the first regeneration wrote MOJIBAKE into this
+  contract and nothing was red.** The reference emits UTF-8; `subprocess.run(text=True)`
+  decoded the pipe with the Windows locale's cp1252, so `—` was frozen as `â€"` and `Γ` as
+  `Î"`. Every gate stayed green, because the manifest and the checker agreed — the corruption
+  happened on the way in. It was caught by **predicting the diff before regenerating**
+  (13 loci, two notes, zero value changes) and finding 37 changed lines. Both readers now pin
+  `encoding="utf-8"`; losing it on one side is red in the crossport parity gate, and losing it
+  on **both** — which compares equal — is caught by
+  `test_the_frozen_claim_text_survived_the_pipe`, which asserts the characters themselves.
+  *Every byte this dump emitted was ASCII until this slice, which is why the pipe's encoding
+  had never mattered.*
+
+  ⚠ **A pin elsewhere went red, and that was the pin working.**
+  `test_acceptance_gate.py::test_the_plausibility_bands_are_now_named_by_a_manifest` asserted
+  that the manifest names `test_senescence_form` and `test_nitrogen_form` — the Python files
+  the loci pointed at when the standing was granted. It was **re-pointed at the new loci, not
+  relaxed**, which is the treatment its own docstring records for the pin it replaced.
+
+  **Negative controls, each reddening a different line and nothing else:** delete a gate
+  declaration → the Rust suite stays **green** (the test ceases to exist) and the crossport
+  parity gate reddens naming the missing scenario, which is why the manifest comparison and
+  not the macro is what catches a *deleted claim*; drop one sample from one pre-reduced series
+  → **exactly one** gate red, the annual-summary count (the CO₂ band does not notice, because
+  its minimum is not at the end); drop the observer's initial state → all 13 red; point a gate
+  at a scenario outside the roster → regeneration **raises** and writes nothing; re-mark a
+  biosphere test in Python → the two census gates red from both directions.
 
 - **2026-08-17 — `allocation.yaml` is REFORMATTED out of YAML flow style (a FORMAT-only
   unfreeze; no value moved, and nothing could have caught it).** Reference-flip slice C1, the

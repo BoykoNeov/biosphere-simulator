@@ -15,6 +15,7 @@ pub mod light_path;
 pub mod params;
 pub mod perturbations;
 pub mod science;
+pub mod science_gates;
 pub mod stocks;
 pub mod system;
 pub mod weather;

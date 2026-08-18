@@ -37,8 +37,8 @@
       "why": "one of the two deliberate anti-derived literals. Unlike dt_days it has no importable constant on EITHER side \u2014 each run helper selects the scheme inline \u2014 so it is documented here and enforced by the goldens (an RK4 switch moves every one). A literal typed into the Rust dump to make the pair symmetric would read like a gate and be none."
     },
     "liveness_floors/*": {
-      "side": "python",
-      "why": "the same census, for the bounds tuned to our own calibration"
+      "side": "rust",
+      "why": "the same census, for the bounds tuned to our own calibration rather than to an outside source \u2014 re-anchored with it in slice C4. \u26a0 This is the family that has already been retuned twice, so it is the one the bound-literal check was written for: every numeric literal in a recorded bound must appear textually in the file its locus names, and that check now runs on BOTH sides (Rust's the_bound_literals_appear_at_their_locus and the checker's test_science_gate_bounds_name_a_literal_present_at_their_locus). \u26a0 One Python test carried TWO markers through a parametrization; in the reference the row IS the test, so it became two tests with two loci. Same claims, same numbers, one more locus string."
     },
     "long_horizon_years": {
       "side": "rust",
@@ -73,8 +73,8 @@
       "why": "\u26a0 ONE RUN, TWO AUTHORS. This is drift.py's Python-side fold of the same 15-yr perennial trajectory whose final state Rust authors next door, and the two engines differ by 1 ULP on it. The fold is the artifact, and its correct reference is Python's own output \u2014 so the golden axis is not '6 Rust, 1 folded' scenario by scenario."
     },
     "science_bands/*": {
-      "side": "python",
-      "why": "a static AST census of science_gate markers on pytest functions (tests/science_gates.py). There is no Rust referent and there cannot be one while the science gates are pytest-side. This and liveness_floors are about half the manifest by content, which is why 'the manifest is Rust-anchored' is the wrong summary of slice 6."
+      "side": "rust",
+      "why": "\u26a0\u26a0 RE-ANCHORED IN SLICE C4, AND THIS ENTRY USED TO SAY IT COULD NOT BE. Its own text read 'a static AST census of science_gate markers on pytest functions. There is no Rust referent and there cannot be one while the science gates are pytest-side' \u2014 true of pytest markers, false of the claim it appeared to make. The census's requirement is that it be DERIVED from the tree rather than hand-listed; Python met it by parsing decorators with ast, and the reference meets it by making the declaration and the #[test] ONE THING (the science_gates! macro in rust/crates/domains/src/biosphere/science_gates.rs emits both the roster row and the test that executes it), so an unexercised entry is a compile error rather than something a meta-test hunts textually. Together with liveness_floors this is about half the manifest by content \u2014 the single largest block of any contract to change hands. \u26a0 What moved is the CLAIMS and their LOCI, not the values: the 13 quantity/bound/source strings are byte-identical to the Python census's and every gate's verdict was measured identical on both ports BEFORE the port was written (\u00a75j). \u26a0 The KEY SET is still the checker's: which scenarios get an entry, and which get an explicitly empty list meaning 'measured, none', is this manifest's own hand roster, and a Rust gate naming a scenario outside it RAISES during regeneration rather than being filtered away. \u26a0 Two markers did NOT move: crew_mission and sealed_station are station-manifest keys whose referents the reference does not carry yet, and they are slice C4b."
     }
   },
   "_comment": "Phase-4 freeze manifest (P4.3). Names the frozen biosphere reference surface. See docs/biosphere-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Each key's producer and why is in _authority: this file has MIXED authority since slice 6 of the reference flip. Regenerate on a deliberate unfreeze: uv run python tests/test_freeze_manifest.py \u2014 which now shells cargo, because the _authority 'rust' keys are read from the reference tree.",
@@ -121,13 +121,13 @@
     "consumer_long_horizon": [
       {
         "bound": "non_collapsing(floor=0.05)",
-        "locus": "tests/test_decade_stability.py::test_decade_leaf_cycle_is_stationary",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::consumer_decade_leaf_cycle_is_stationary_and_alive",
         "quantity": "annual peak leaf carbon (mol C)",
         "source": "self \u2014 the calibrated attractor, not a cited value"
       },
       {
         "bound": "non_collapsing(floor=5e-4)",
-        "locus": "tests/test_decade_stability.py::test_decade_consumer_biomass_is_stationary_and_alive",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::decade_consumer_biomass_is_stationary_and_alive",
         "quantity": "year-end consumer carbon (mol C)",
         "source": "self \u2014 the calibrated attractor, not a cited value"
       }
@@ -138,19 +138,19 @@
     "perennial_long_horizon": [
       {
         "bound": "non_collapsing(floor=0.05)",
-        "locus": "tests/test_decade_stability.py::test_decade_min_carbon_pool_stationary",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::decade_min_carbon_pool_stationary",
         "quantity": "annual minimum chamber CO2 pool (mol C)",
         "source": "self \u2014 anchored on the MEASURED trough attractor, converged well before yr 50, not on a 15-yr reading. \u26a0 The attractor has moved and the CLEARANCE with it: 0.0758448 / 1.52x (2026-08-14, the light path) -> 0.072238 / 1.44x (2026-08-15, the layered canopy). The floor is not re-anchored; the ratio is asserted separately so a shrinking clearance cannot pass unread; teeth witnessed by a mutation independent of any candidate science change (the jar shrunk 0.65x at fixed composition trips it at 0.0492366). Window removed: floor[2:] -> floor"
       },
       {
         "bound": "non_collapsing(floor=0.05)",
-        "locus": "tests/test_decade_stability.py::test_decade_leaf_cycle_is_stationary",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::perennial_decade_leaf_cycle_is_stationary_and_alive",
         "quantity": "annual peak leaf carbon (mol C)",
         "source": "self \u2014 the calibrated attractor, not a cited value"
       },
       {
         "bound": "max(tail) > 0.55",
-        "locus": "tests/test_decade_stability.py::test_perennial_leaf_cycle_is_a_fixed_point",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::perennial_leaf_cycle_is_a_fixed_point",
         "quantity": "converged peak-leaf fixed point (mol C)",
         "source": "self \u2014 originally anchored BELOW the measured 50-yr equilibrium (0.594984, reached ~yr 45), not on the 15-yr reading; 2.2x the 0.253 dead baseline. Moves: >1.0 -> >0.9 (decomposer calibration) -> >0.55 (humification split). \u26a0\u26a0 THAT RATIONALE INVERTED 2026-08-15 (the layered canopy): the 50-yr equilibrium now settles at 0.543748, BELOW the floor. The bound is NOT re-anchored and is NOT red \u2014 it reads max(tail) on the 15-YEAR run, which is 0.578137 and clears by 5.1 %. So what this floor now checks is the 15-yr trajectory, not the attractor it was named for; both numbers are asserted in the tests so the gap is visible. Moving 0.55 to fit would be the refused co-adaptation"
       }
@@ -224,7 +224,7 @@
     "consumer_chamber": [
       {
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
-        "locus": "tests/test_co2_compensation_band.py::test_consumer_chamber_stays_above_the_compensation_point",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::consumer_chamber_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
         "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }
@@ -232,7 +232,7 @@
     "consumer_long_horizon": [
       {
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
-        "locus": "tests/test_co2_compensation_band.py::test_consumer_long_horizon_stays_above_the_compensation_point",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::consumer_long_horizon_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
         "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }
@@ -241,19 +241,19 @@
     "open_season": [
       {
         "bound": "5.0 < peak < 8.0",
-        "locus": "tests/test_senescence_form.py::test_frozen_open_season_canopy_is_physical",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::open_season_canopy_is_physical",
         "quantity": "peak LAI (m2 m-2)",
         "source": "real wheat peaks at ~5-8 LAI"
       },
       {
         "bound": "peak < 6.0 OR the 5%/day mutual-shading loss is MODELLED",
-        "locus": "tests/test_senescence_form.py::test_the_vks_mutual_shading_regime_is_MODELLED_not_merely_avoided",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::the_vks_mutual_shading_regime_is_modelled_not_merely_avoided",
         "quantity": "peak LAI (m2 m-2) vs the mutual-shading threshold",
         "source": "Van Keulen & Seligman 1987 mutual-shading threshold, via [A] p. 101"
       },
       {
         "bound": "peak_w < 14.4248",
-        "locus": "tests/test_nitrogen_form.py::test_open_season_peaks_below_the_crossing_with_the_margin_pinned",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::open_season_peaks_below_the_greenwood_crossing",
         "quantity": "peak W excl. fibrous roots (t/ha)",
         "source": "Greenwood 1990 eqn (6) a=5.697 meets n_critical=1.5"
       }
@@ -261,7 +261,7 @@
     "perennial_chamber": [
       {
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
-        "locus": "tests/test_co2_compensation_band.py::test_perennial_chamber_stays_above_the_compensation_point",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::perennial_chamber_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
         "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }
@@ -269,7 +269,7 @@
     "perennial_long_horizon": [
       {
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
-        "locus": "tests/test_co2_compensation_band.py::test_perennial_long_horizon_stays_above_the_compensation_point",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::perennial_long_horizon_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
         "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }
@@ -277,7 +277,7 @@
     "sealed_chamber": [
       {
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
-        "locus": "tests/test_co2_compensation_band.py::test_sealed_chamber_stays_above_the_compensation_point",
+        "locus": "rust/crates/domains/src/biosphere/science_gates.rs::sealed_chamber_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
         "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }

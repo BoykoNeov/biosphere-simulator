@@ -201,13 +201,13 @@ def _open_season_peak_w() -> float:
     )
 
 
-@pytest.mark.science_gate(
-    scenario="open_season",
-    field="science_bands",
-    quantity="peak W excl. fibrous roots (t/ha)",
-    bound="peak_w < 14.4248",
-    source="Greenwood 1990 eqn (6) a=5.697 meets n_critical=1.5",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration: science_gates.rs::open_season_peaks_below_the_greenwood_crossing. The
+# biosphere manifest’s science_bands / liveness_floors are generated from there, so
+# this function is the CHECKER’s copy of the assertion and no longer the contract’s
+# locus. Deleting it is Stage 3’s call, not a free consequence of C4.
 def test_open_season_peaks_below_the_crossing_with_the_margin_pinned() -> None:
     """⚠ THE LOAD-BEARING MARGIN. ``open_season`` is the only frozen scenario that
     enters Greenwood's declining branch at all, and it peaks at 88 % of the crossing

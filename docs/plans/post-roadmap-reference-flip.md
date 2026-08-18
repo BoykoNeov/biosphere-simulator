@@ -2580,3 +2580,138 @@ Fixed by the same discriminator, applied deliberately:
 **The rule this leaves:** after any deletion, sweep the **living contract docs** explicitly.
 They are not in `src/`, not in `tests/`, and not covered by a language-scoped grep — which is
 exactly why three separate sweeps missed them.
+
+
+## §5l C4 — the 13 biosphere science gates move to the reference, COMPLETE 2026-08-18
+
+§5j measured this slice and split it; this is the build of the biosphere half. The census
+that produced about **half the biosphere manifest by content** is now the reference's, and
+the diff it left is **13 `locus` strings and two `_authority` notes — no recorded claim, no
+value, no golden, and the station manifest byte-identical.**
+
+### The mechanism: the row IS the test
+
+§5j named the open design question — "Rust has no introspection, so a table plus tests is a
+hand-maintained roster unless the table **is** the test roster". That is what was built.
+`rust/crates/domains/src/biosphere/science_gates.rs` declares each gate once, and a
+`macro_rules!` emits **both** the `GATES` row and the `#[test]` that executes it. The
+`locus` is built from the test's own identifier with `stringify!`, so it cannot drift from
+the test it names.
+
+⚠ **What this makes impossible is narrower than it first looks, and the distinction is
+measured rather than argued.** The macro makes an *unexercised row* unrepresentable. It does
+**nothing** about a *deleted claim*: removing a whole declaration leaves the Rust suite green
+— the test simply ceases to exist — and it is the manifest comparison in
+`tests/crossport/test_inventory_parity.py` that reddens, naming the missing scenario. Two
+different failures, two different mechanisms, and only one of them is structural.
+
+### The three things §5j left, and how each landed
+
+| §5j's open item | Outcome |
+|---|---|
+| the census mechanism | the macro above; the table is 13 declarations in one file |
+| `61.07` is derived, not typed | the gate derives `Γ*/ci_ratio` exactly as Python does, and the recorded literal is carried by a **tripwire** (`the_floor_is_where_the_frozen_params_put_it`) — which is also what puts `61.07` in the file for the locus check |
+| the C6 dependency | cleared before the build (§5k); the mutual-shading gate reads the four scenarios the reference carries and its pinned `0.5849` did not move |
+
+### Runtime, measured rather than assumed
+
+§5j took its numbers in `--release` and said out loud that the permanent gates would run in
+`cargo test`'s debug profile. Measured: the 13 gates add **~3.4 s** to `cargo test` (65 lib
+tests in `domains`, from 52), against a 27 s baseline. The six trajectories are shared
+through `OnceLock` — Python has a `scope="module"` fixture and Rust has no fixtures, so
+without it the two 15-year chambers would be re-run several times each. Every value matches
+the release probe to 17 significant digits, so the profile is byte-neutral for this family
+too.
+
+### ⚠⚠ The pre-reduced series, and the hole it opens that Python does not have
+
+The gates fold **per-step scalar series**, not `Vec<State>` — the station's own precedent
+(`emit_sealed_energy_drift.rs` folds a temperature series rather than materializing 109,801
+states, and `year_summaries` is generic precisely so it can).
+
+The hole: `year_summaries` computes `n_years = (len - 1) / year`, so an observer emitting
+`steps` samples instead of `steps + 1` yields **14** annual summaries instead of 15 — and
+**every gate still passes**, because `non_collapsing` over 14 years passes exactly as well as
+over 15. Python never needed a guard for it; the pre-reduction is what creates it. Closed
+with an observer-count assert and a per-gate summary-count assert, and both were controlled:
+dropping the initial state reddens all 13; dropping **one** sample from **one** series
+reddens **exactly one** gate — the count assert — while the CO₂ band does not notice, because
+its minimum is not at the end of the run.
+
+Two more silent-pass paths were closed on the way, both of the same shape (*a fold over an
+empty series returns the identity*): the open field has no `biosphere.carbon_pool` at all and
+only the consumer chambers carry a herbivore, so `min_ppm` over an absent series would return
+`+∞` — happily "above the compensation point".
+
+### ⚠⚠ THE MOJIBAKE, AND WHY IT IS THIS ENTRY'S REAL FINDING
+
+The first regeneration wrote **corrupted text into the frozen contract with every gate
+green**. The reference emits UTF-8; `subprocess.run(text=True)` decoded the pipe with the
+Windows locale's cp1252, so `—` was frozen as `â€"`, `⚠` as `âš `, `Γ` as `Î"`, `CO₂` as
+`COâ‚‚`. Nothing was red **because the manifest and the checker agreed** — the corruption
+happened on the way in, so the comparison was between two identically-mangled sides.
+
+What caught it was **predicting the diff before regenerating** (13 loci, two notes, zero
+value changes) and getting 37 changed lines instead.
+
+* Every byte this dump had ever emitted was ASCII — names, hex floats, sha-256 digests — so
+  the pipe's encoding had never mattered. **The first non-ASCII key is the one that finds
+  it**, and frozen *claim text* is the first thing in this contract that is prose.
+* Both readers now pin `encoding="utf-8"`. Losing it on **one** side is red in the parity
+  gate (controlled). Losing it on **both** compares equal and is *not*, which is why
+  `test_the_frozen_claim_text_survived_the_pipe` asserts the characters themselves — also
+  controlled: with both sides unpinned, it is the only thing red.
+* ⚠ **The class is wider than the two files fixed.** Roughly twenty other `text=True`
+  subprocess pipes read Rust output in `tests/crossport/`. None is red today because none
+  carries non-ASCII, so this is recorded as a **named condition, not a swept fix**: the next
+  Rust program to emit prose through a pipe needs the encoding pinned at the same time.
+
+### What else went red, and why that was correct
+
+`test_acceptance_gate.py::test_the_plausibility_bands_are_now_named_by_a_manifest` asserted
+that the manifest names `test_senescence_form` and `test_nitrogen_form` — the Python **files**
+the loci pointed at when the science was granted contract standing. Re-pointed at the new
+loci, **not relaxed**, which is exactly the treatment its own docstring records for the pin
+*it* replaced. It also now checks the band's text in the reference (`assert!(5.0 < peak &&
+peak < 8.0`) as well as in the checker's surviving copy.
+
+### The Python side: markers removed, tests kept, and the census inverted
+
+Thirteen `@pytest.mark.science_gate` decorators were deleted, each site carrying a comment
+naming its Rust successor. **The test functions stay** — they are the checker's own copy of
+the assertion, and deleting them is Stage 3's call, not a free consequence of C4.
+
+`tests/science_gates.py` survives for the two station gates. The Python-side gates inverted
+the way slice 6's did for `_flow_set()`:
+
+* `test_frozen_science_gates_are_complete` → `test_the_frozen_science_gates_are_the_references`
+  (every frozen entry's locus is under `rust/crates/domains/`, and there are 13);
+* new `test_the_python_science_census_is_only_the_station_pair` — the split asserted rather
+  than written in a doc; re-marking a biosphere test is red from both directions;
+* `test_science_gate_bounds_name_a_literal_present_at_their_locus` keeps working **unchanged
+  in its body** — the locus is a `.rs` path and the check reads whatever file it names. ⚠ Its
+  `checked == len(collect_science_gates())` tail could not survive, and replacing it with a
+  literal `15` would have turned a derived count into the hand-maintained roster the whole
+  census exists to prevent. It now derives the count from the manifests and separately asserts
+  that every gate the *Python* census still finds is in one.
+
+The same crude check now runs on the reference's side too
+(`the_bound_literals_appear_at_their_locus`), with the regex hand-transcribed (no crate may
+be added to a zero-dep tree) and its own pinned negatives — `5%/day` contributes no literal,
+so only `6.0` has to be present for the mutual-shading bound.
+
+### The residue, named rather than left
+
+* **Five frozen `source` strings still spell a Python test name**
+  (`test_the_shipped_floor_is_the_conservative_one_against_the_cited_route`). The companion
+  assertion was ported under the same name minus the `test_` prefix; the strings were **not**
+  edited, because editing them is a value change to the contract rather than the locus
+  re-anchoring this slice is. For whichever slice retires the Python file.
+* **C4b** — the two station gates and the two helpers they need
+  (the RQ comparison; `predicted_equilibrium_temperature`). Both contract docs now say so.
+
+### Verification
+
+`cargo test` + `cargo clippy --all-targets` green; `uv run pytest -n 12` **2441 passed, 5
+skipped**. No bound loosened, no threshold widened, no golden regenerated, no parameter
+moved. Probes: `M:/claud_projects/temp/c4-build/`.

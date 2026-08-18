@@ -216,7 +216,12 @@ hand-written. **The manifest states this itself**, per key, in its own `_authori
 which is the thing to read before assuming any field is Rust-derived. By content most of
 the file is not: `science_bands` + `liveness_floors` are a static census of pytest markers
 with no Rust referent, and `sealed_energy_drift`'s golden hash is a Python-side fold of a raw
-Rust series. ⚠ **`param_files` joined the Rust half on 2026-08-17 (slice C8)** — what
+Rust series. ⚠ **On the BIOSPHERE side that census re-anchored to Rust on 2026-08-18 (slice
+C4) and this contract's did not** — deliberately, not by omission. The station's two gates
+(`crew_mission`'s respiratory-quotient prediction, `sealed_station`'s thermal fixed point)
+need referents the reference does not carry: the RQ helper and
+`predicted_equilibrium_temperature`. Slice **C4b** builds those and re-anchors this half, with
+its own ceremony; until then this sentence is true of this file and false of the biosphere's. ⚠ **`param_files` joined the Rust half on 2026-08-17 (slice C8)** — what
 re-anchored there is the *census* rule (the eight files the reference **loads**, not a glob
 over six Python package directories) and the *normalization* rule, since the eight digits are
 author-neutral either way; the log entry below carries the detail and the two things it

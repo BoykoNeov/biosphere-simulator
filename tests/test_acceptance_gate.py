@@ -1469,7 +1469,19 @@ def test_the_plausibility_bands_are_now_named_by_a_manifest() -> None:
     silently regress now is the standing itself: both loci must be reachable from a
     manifest, and the band must still be where this says it is.
     """
-    named = ("test_senescence_form", "test_nitrogen_form")
+    # ⚠⚠ RE-POINTED IN SLICE C4 (2026-08-18), AND THE RED WAS THIS PIN WORKING. It
+    # named ``test_senescence_form`` and ``test_nitrogen_form`` — the Python files the
+    # loci pointed at when the standing was granted. The claims moved to the
+    # reference, where the roster row and the test that executes it are one
+    # declaration, so the file names went stale and this went red on the manifest
+    # regeneration. The STANDING is what this test guards and the standing did not
+    # move: it is restated against the new loci rather than relaxed, which is the same
+    # treatment the docstring above records for the pin this one replaced.
+    named = (
+        "science_gates.rs::open_season_canopy_is_physical",
+        "science_gates.rs::the_vks_mutual_shading_regime_is_modelled_not_merely_avoided",
+        "science_gates.rs::open_season_peaks_below_the_greenwood_crossing",
+    )
     text = BIOSPHERE_MANIFEST.read_text("utf-8")
     for name in named:
         assert name in text, name
@@ -1477,7 +1489,22 @@ def test_the_plausibility_bands_are_now_named_by_a_manifest() -> None:
     # gates — a chamber resized *toward* the flight spec fails them. See the inclusion
     # rule in docs/plans/post-roadmap-acceptance-gate-standing.md.
     assert "test_chamber_scale" not in text
-    # ...and the band itself is still where this says it is.
+    # ...and the band itself is still where this says it is. ⚠ Read from the
+    # REFERENCE: that file is the contract's locus now. The checker keeps its own copy
+    # of the same assertion (``tests/test_senescence_form.py``, unmarked since C4),
+    # and it is checked too — a band asserted in one port and silently dropped from
+    # the other is exactly the divergence the flip's posture says to investigate
+    # rather than paper over.
+    reference_band = (
+        _REPO_ROOT
+        / "rust"
+        / "crates"
+        / "domains"
+        / "src"
+        / "biosphere"
+        / "science_gates.rs"
+    ).read_text("utf-8")
+    assert "assert!(5.0 < peak && peak < 8.0" in reference_band
     band_src = (_REPO_ROOT / "tests" / "test_senescence_form.py").read_text("utf-8")
     assert "assert 5.0 < peak < 8.0" in band_src
 

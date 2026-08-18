@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3 and C6 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, and the four Python-only scenarios retired the same day)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, and the science-gate census — half the biosphere manifest — re-anchored the same day)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -1405,3 +1405,72 @@ naming those scenarios were **left alone**, under one new note saying entries ar
 their date, because rewriting a measurement to match a later tree falsifies the measurement.
 ⚠ *After any deletion, sweep the living contract docs explicitly — they are in neither `src/`
 nor `tests/`, so a language-scoped grep cannot see them.*
+
+
+### C4 — the science-gate census moves to the reference, and the diff was 13 loci (2026-08-18)
+
+The largest Python-authored block of any contract — about **half the biosphere manifest by
+content** — is now the reference's. §5j of the plan measured it first and split it: 13
+biosphere gates here, the two station ones (`crew_mission`, `sealed_station`) as **C4b**,
+because slices 6–8 re-anchor one manifest per slice and the station's two need referents the
+reference does not carry yet.
+
+**What moved: 13 `locus` strings and two `_authority` notes.** Nothing else. All 13
+`quantity`/`bound`/`source` strings are byte-identical, every gate value re-measured matches
+§5j's release probe to 17 digits, and the station manifest is untouched.
+
+#### The mechanism, and the failure it does *not* prevent
+
+§5j's open question was that Rust has no introspection, so a table plus tests is a
+hand-maintained roster — the exact thing the Python `ast` census existed to avoid. The answer
+is that **the row IS the test**: one `macro_rules!` invocation declares each gate once and
+emits both the roster entry and the `#[test]`, with the `locus` built from the test's own
+identifier.
+
+⚠ **Measured, not assumed: that makes an *unexercised row* unrepresentable and does nothing
+about a *deleted claim*.** Removing a whole declaration leaves the Rust suite **green** — the
+test ceases to exist — and it is the manifest comparison in `test_inventory_parity.py` that
+reddens. Two failures, two mechanisms; the macro covers one of them.
+
+#### ⚠⚠ The finding: the first regeneration froze mojibake, and every gate was green
+
+The reference emits UTF-8; `subprocess.run(text=True)` decoded it with the Windows locale's
+cp1252, so `—` entered the contract as `â€"` and `Γ` as `Î"`. **Nothing was red, because the
+manifest and the checker agreed** — the corruption happened on the way in, so the comparison
+was between two identically-mangled sides.
+
+It was caught by **predicting the diff before regenerating** and getting 37 changed lines
+where 17 were predicted. Every byte this dump had ever emitted was ASCII (names, hex floats,
+digests): *the first non-ASCII key is the one that finds this*, and frozen claim text is the
+first prose in the contract. Both readers now pin `encoding="utf-8"`; losing it on one side
+is red in the parity gate, losing it on **both** compares equal, so the characters themselves
+are asserted separately. ⚠ ~20 other `text=True` pipes read Rust output and none is red today
+because none carries non-ASCII — recorded as a **named condition, not a swept fix**.
+
+#### The hole the pre-reduction opened
+
+The gates fold per-step scalar series rather than `Vec<State>` (the station's own precedent).
+`year_summaries` computes `n_years = (len - 1) / year`, so an observer emitting `steps`
+instead of `steps + 1` gives **14** annual summaries — and every gate still passes, because
+`non_collapsing` over 14 years passes as well as over 15. Python never needed that guard.
+Controlled: dropping one sample from one series reddens **exactly one** gate (the count
+assert) and the CO₂ band does not notice, because its minimum is not at the end.
+
+#### A pin went red, and that was the pin working
+
+`test_the_plausibility_bands_are_now_named_by_a_manifest` asserted that the manifest names
+`test_senescence_form` and `test_nitrogen_form` — the Python **files** the loci pointed at
+when the science was granted standing. Re-pointed at the new loci, **not relaxed**: the same
+treatment its own docstring records for the pin it replaced.
+
+#### Cost and residue
+
+Runtime `+~3.4 s` on `cargo test` (the six trajectories shared through `OnceLock`, Rust's
+answer to Python's module fixture). The 13 markers left the Python suite with a comment at
+each site naming its Rust successor; **the test functions stay** as the checker's copy —
+deleting them is Stage 3's call. Five frozen `source` strings still spell a Python test name;
+the companion assertion was ported under the same name, and the strings were deliberately not
+edited, because that would be a value change rather than a locus re-anchoring.
+
+Full detail, including the five negative controls: `docs/plans/post-roadmap-reference-flip.md`
+§5l.

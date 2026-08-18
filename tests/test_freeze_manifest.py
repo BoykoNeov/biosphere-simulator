@@ -202,14 +202,24 @@ _RUST_DUMP_EXAMPLE = "dump_biosphere_inventory"
 #: emitted to be CHECKED and never spliced (``locked_dt_days`` is the first). The
 #: forcing hash stays Python-authored — see :data:`_AUTHORITY` — while the reference
 #: hashes what it compiled in, so the two can be compared.
+#: ⚠⚠ ``science_bands`` and ``liveness_floors`` joined in **slice C4**, and this
+#: constant's own comment named the science-gate census as the example of a key that
+#: "cannot honestly come from the reference" — see the raise below, which still says so
+#: and is now wrong about which census it means. It was right while the gates were
+#: pytest markers; the reference now declares them, one macro row per gate, and the row
+#: is the test. The forcing function is what made the change deliberate rather than
+#: quiet: adding the keys to the dump broke regeneration before anything was
+#: regenerated.
 _RUST_DUMP_KEYS = frozenset(
     {
         "flow_set",
         "aux_set",
         "horizons",
         "light_path_samples",
+        "liveness_floors",
         "locked_dt_days",
         "param_files",
+        "science_bands",
         "weather_sha256",
     }
 )
@@ -225,11 +235,22 @@ def _rust_reference() -> dict[str, Any]:
     live Rust tree are cargo-gated and live in
     ``tests/crossport/test_inventory_parity.py``.
     """
+    # ⚠⚠ `encoding="utf-8"`, and it is NOT boilerplate. `text=True` alone decodes
+    # the pipe with `locale.getpreferredencoding()` — cp1252 on the Windows dev box
+    # — and every byte this program emitted was ASCII (names, hex floats, sha-256
+    # digests) until slice C4, so the pipe's encoding had never mattered. The
+    # science census is the first non-ASCII key: it carries `—`, `⚠`, `Γ` and `CO₂`
+    # inside frozen claim text. Without this the first regeneration wrote mojibake
+    # (`—` -> `â€”`) INTO the frozen contract, and nothing was red — the manifest
+    # and the checker agreed, because the corruption happened on the way in. It was
+    # caught by predicting the diff before regenerating, which is the only reason it
+    # is a note here instead of a committed contract.
     proc = subprocess.run(
         ["cargo", "run", "-q", "--example", _RUST_DUMP_EXAMPLE],
         cwd=_RUST_CRATE_DIR,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
     if proc.returncode != 0:
@@ -244,8 +265,10 @@ def _rust_reference() -> dict[str, Any]:
             f"{_RUST_DUMP_EXAMPLE} emitted {sorted(dump)}, expected "
             f"{sorted(_RUST_DUMP_KEYS)}. Read _AUTHORITY before widening this: a new "
             "key has to be classified, and one that cannot honestly come from the "
-            "reference (a pytest-marker census) must not enter the manifest through "
-            "here."
+            "reference must not enter the manifest through here. ⚠ This sentence used "
+            "to name 'a pytest-marker census' as that example; slice C4 moved exactly "
+            "that census, so the test to apply is whether the reference DERIVES the "
+            "key, not which language used to hold it."
         )
     return dump
 
@@ -497,18 +520,47 @@ _AUTHORITY: dict[str, dict[str, str]] = {
         ),
     },
     "science_bands/*": {
-        "side": "python",
+        "side": "rust",
         "why": (
-            "a static AST census of science_gate markers on pytest functions "
-            "(tests/science_gates.py). There is no Rust referent and there cannot be "
-            "one while the science gates are pytest-side. This and liveness_floors are "
-            "about half the manifest by content, which is why 'the manifest is "
-            "Rust-anchored' is the wrong summary of slice 6."
+            "⚠⚠ RE-ANCHORED IN SLICE C4, AND THIS ENTRY USED TO SAY IT COULD NOT "
+            "BE. Its own text read 'a static AST census of science_gate markers on "
+            "pytest functions. There is no Rust referent and there cannot be one while "
+            "the science gates are pytest-side' — true of pytest markers, false of the "
+            "claim it appeared to make. The census's requirement is that it be DERIVED "
+            "from the tree rather than hand-listed; Python met it by parsing "
+            "decorators with ast, and the reference meets it by making the declaration "
+            "and the #[test] ONE THING (the science_gates! macro in "
+            "rust/crates/domains/src/biosphere/science_gates.rs emits both the roster "
+            "row and the test that executes it), so an unexercised entry is a compile "
+            "error rather than something a meta-test hunts textually. Together with "
+            "liveness_floors this is about half the manifest by content — the single "
+            "largest block of any contract to change hands. ⚠ What moved is the CLAIMS "
+            "and their LOCI, not the values: the 13 quantity/bound/source strings are "
+            "byte-identical to the Python census's and every gate's verdict was "
+            "measured identical on both ports BEFORE the port was written (§5j). ⚠ The "
+            "KEY SET is still the checker's: which scenarios get an entry, and which "
+            "get an explicitly empty list meaning 'measured, none', is this manifest's "
+            "own hand roster, and a Rust gate naming a scenario outside it RAISES "
+            "during regeneration rather than being filtered away. ⚠ Two markers did "
+            "NOT move: crew_mission and sealed_station are station-manifest keys whose "
+            "referents the reference does not carry yet, and they are slice C4b."
         ),
     },
     "liveness_floors/*": {
-        "side": "python",
-        "why": "the same census, for the bounds tuned to our own calibration",
+        "side": "rust",
+        "why": (
+            "the same census, for the bounds tuned to our own calibration rather than "
+            "to an outside source — re-anchored with it in slice C4. ⚠ This is the "
+            "family that has already been retuned twice, so it is the one the "
+            "bound-literal check was written for: every numeric literal in a recorded "
+            "bound must appear textually in the file its locus names, and that check "
+            "now runs on BOTH sides (Rust's the_bound_literals_appear_at_their_locus "
+            "and the checker's "
+            "test_science_gate_bounds_name_a_literal_present_at_their_locus). ⚠ One "
+            "Python test carried TWO markers through a parametrization; in the "
+            "reference the row IS the test, so it became two tests with two loci. Same "
+            "claims, same numbers, one more locus string."
+        ),
     },
     "scenarios/*/scenario": {
         "side": "hand",
@@ -542,6 +594,37 @@ _AUTHORITY: dict[str, dict[str, str]] = {
         ),
     },
 }
+
+
+def _science_census(reference: dict[str, Any], field: str) -> dict[str, list[dict]]:
+    """The reference's science-gate claims, filed under **this** manifest's roster.
+
+    ⚠ The skeleton is built first and every roster scenario gets a key, because an
+    absent key and a deliberately-empty one are different claims: an empty list says
+    "measured, none" and a missing one says nothing, and a reader using
+    ``.get(name, [])`` cannot tell them apart. ``drift_summary`` is the case that forces
+    it — a derived stability signature over two scenarios that are themselves in the
+    roster, carrying no gate of its own.
+
+    ⚠ A gate naming a scenario outside the roster **raises**. That is the whole reason
+    this is not a ``setdefault``-shaped merge: the biosphere and station manifests both
+    filter by scenario, so a typo or a gate on authored content would otherwise be
+    dropped by both in silence — the filter looking exactly like a clean result. The
+    Python census has had ``unknown_scenarios`` for this since the fields existed; the
+    splice needs its own, because the roster it filters against lives here.
+    """
+    out: dict[str, list[dict]] = {name: [] for name in sorted(_ROSTER)}
+    for scenario, entries in reference[field].items():
+        if scenario not in out:
+            raise SystemExit(
+                f"{_RUST_DUMP_EXAMPLE} emitted a {field} gate on {scenario!r}, "
+                f"which is not in this manifest's roster {sorted(_ROSTER)}. "
+                "Either the roster "
+                "moved or the gate names the wrong scenario — both are decisions, and "
+                "neither may be resolved by dropping the claim."
+            )
+        out[scenario] = list(entries)
+    return out
 
 
 def _build_manifest() -> dict[str, object]:
@@ -604,8 +687,12 @@ def _build_manifest() -> dict[str, object]:
         # author-neutral either way (both sides digest the same file); what moved is
         # the CENSUS rule and the NORMALIZATION rule. See _AUTHORITY.
         "param_files": reference["param_files"],
-        "science_bands": gates_for(_ROSTER, "science_bands"),
-        "liveness_floors": gates_for(_ROSTER, "liveness_floors"),
+        # ⚠⚠ SLICE C4: the science-gate census is spliced from the REFERENCE.
+        # ``gates_for`` is retained as a conformance check on the checker (see
+        # test_the_python_science_census_is_only_the_station_pair) — it now returns the
+        # two station markers and nothing of this manifest's.
+        "science_bands": _science_census(reference, "science_bands"),
+        "liveness_floors": _science_census(reference, "liveness_floors"),
         "scenarios": scenarios,
     }
 
@@ -704,18 +791,78 @@ def test_frozen_aux_set_is_complete() -> None:
     assert set(manifest["aux_set"]) == set(_aux_set())
 
 
-def test_frozen_science_gates_are_complete() -> None:
-    """The science half of the contract: bands and floors, derived from the tree.
+def test_the_frozen_science_gates_are_the_references() -> None:
+    """The science half of the contract is the REFERENCE's, locus by locus.
 
-    Before this field the frozen acceptance set was {golden bytes, ``rationed == 0``, no
-    extinction, conservation, determinism} — every one a property of the RUN, not the
+    Before these fields the frozen acceptance set was {golden bytes, ``rationed == 0``,
+    no extinction, conservation, determinism} — every one a property of the RUN, not the
     SCIENCE (``post-roadmap-acceptance-gate.md`` finding 5). A committed band could be
-    deleted with every gate green. Now it cannot: the manifest is compared against the
-    live marker set, so adding, editing or dropping a gate turns this red.
+    deleted with every gate green.
+
+    ⚠⚠ **REPLACED IN SLICE C4.** This asserted ``manifest[field] == gates_for(_ROSTER,
+    field)`` — the manifest against the checker's own pytest markers. That comparison is
+    now void in the direction that matters: the claims are declared in
+    ``rust/crates/domains/src/biosphere/science_gates.rs`` and spliced in by
+    :func:`_science_census`, so this module would be comparing the manifest against an
+    empty Python census and passing.
+
+    What is checkable **without cargo** is where every claim now lives, and that is not
+    a formality: it is the one assertion that would go red if a biosphere gate crept
+    back into ``tests/``, which is the concrete way this re-anchoring could be undone by
+    accident. The value comparison against the live reference tree is cargo-gated, in
+    ``tests/crossport/test_inventory_parity.py``.
     """
     manifest = _load_manifest()
+    entries = [e for field in FIELDS for v in manifest[field].values() for e in v]
+    assert len(entries) == 13, len(entries)
+    for entry in entries:
+        assert entry["locus"].startswith("rust/crates/domains/"), entry
+
+
+def test_the_frozen_claim_text_survived_the_pipe() -> None:
+    """⚠ The residual half of the mojibake hole, closed by naming the characters.
+
+    Slice C4's first regeneration wrote ``—`` into the contract as ``â€”``: the
+    reference emits UTF-8, ``subprocess.run(text=True)`` decoded it with the Windows
+    locale's cp1252, and nothing was red because the *manifest* and the *checker* agreed
+    — the corruption happened on the way in. Both readers now pin ``encoding="utf-8"``,
+    and the crossport parity gate catches losing it on **one** side.
+
+    It cannot catch losing it on **both**: two identically-corrupted sides compare
+    equal. So this asserts the characters themselves. Crude on purpose, and cheap: the
+    claim text is frozen, the characters are in it today, and a decode that mangles them
+    mangles all of them at once.
+    """
+    manifest = _load_manifest()
+    text = json.dumps(manifest, ensure_ascii=False)
+    for char, why in (
+        ("Γ", "the compensation point's gamma"),
+        ("₂", "the subscript in CO2"),
+        ("—", "the em dash the first corruption ate"),
+        ("⚠", "the warning marker"),
+    ):
+        assert char in text, (char, why)
+    assert "â€" not in text, "cp1252-decoded UTF-8 is frozen in the contract"
+
+
+def test_the_python_science_census_is_only_the_station_pair() -> None:
+    """What is LEFT of the pytest-marker census after slice C4 — asserted, not assumed.
+
+    Thirteen of the fifteen markers were removed from the suite when the reference took
+    the claims over. The two that remain are station-manifest keys whose referents the
+    reference does not carry yet (``crew_mission``'s respiratory-quotient prediction and
+    ``sealed_station``'s thermal fixed point) — slice C4b, with its own ceremony.
+
+    ⚠ Without this the split is a sentence in a doc. With it, re-marking a biosphere
+    test is red here and *also* red in
+    :func:`test_the_frozen_science_gates_are_the_references` — the two halves of "one
+    census, one language per manifest", from both directions.
+    """
+    census = collect_science_gates()
+    assert sorted({g.scenario for g in census}) == ["crew_mission", "sealed_station"]
+    assert len(census) == 2, census
     for field in FIELDS:
-        assert manifest[field] == gates_for(_ROSTER, field), field
+        assert gates_for(_ROSTER, field) == {name: [] for name in sorted(_ROSTER)}
 
 
 def test_every_roster_scenario_has_an_explicit_science_gate_entry() -> None:
@@ -820,7 +967,32 @@ def test_science_gate_bounds_name_a_literal_present_at_their_locus() -> None:
                     for literal in literals:
                         assert literal in src, (entry["locus"], literal)
                     checked += 1
-    assert checked == len(collect_science_gates()), checked
+    # ⚠⚠ THE RIGHT-HAND SIDE WAS ``len(collect_science_gates())`` UNTIL SLICE C4, and
+    # replacing it with a literal 15 would have turned a derived count into exactly the
+    # hand-maintained roster this whole census exists to prevent. The tree's gates now
+    # live in two languages, so the claim splits into the two halves that are still
+    # derivable HERE:
+    #
+    #   (1) every entry in both manifests was literal-checked — which needs the count to
+    #       come from the manifests themselves, not from a number typed here;
+    #   (2) every gate the PYTHON census still finds is actually in a manifest.
+    #
+    # The reference's half — every Rust gate is in a manifest and vice versa — needs
+    # cargo and lives in tests/crossport/test_inventory_parity.py.
+    total = 0
+    for manifest_path in manifests:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        total += sum(len(v) for field in FIELDS for v in manifest[field].values())
+    assert checked == total, (checked, total)
+    for gate in collect_science_gates():
+        frozen = [
+            entry
+            for manifest_path in manifests
+            for entry in json.loads(manifest_path.read_text(encoding="utf-8"))[
+                gate.field
+            ].get(gate.scenario, [])
+        ]
+        assert gate.entry() in frozen, gate
 
 
 def test_completeness_gate_detects_an_unfrozen_param(monkeypatch, tmp_path) -> None:

@@ -193,20 +193,16 @@ def test_decade_conservation_detector(runs, scenario, quantity) -> None:
 # --- axis (b): limit-cycle stationarity --------------------------------------
 
 
-@pytest.mark.science_gate(
-    scenario="perennial_long_horizon",
-    field="liveness_floors",
-    quantity="annual peak leaf carbon (mol C)",
-    bound="non_collapsing(floor=0.05)",
-    source="self — the calibrated attractor, not a cited value",
-)
-@pytest.mark.science_gate(
-    scenario="consumer_long_horizon",
-    field="liveness_floors",
-    quantity="annual peak leaf carbon (mol C)",
-    bound="non_collapsing(floor=0.05)",
-    source="self — the calibrated attractor, not a cited value",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration: rust/crates/domains/src/biosphere/science_gates.rs::perennial_decade_le
+# af_cycle_is_stationary_and_alive +
+# consumer_decade_leaf_cycle_is_stationary_and_alive (TWO markers on this one
+# parametrized test; in the reference the row IS the test, so it is two tests with two
+# loci). The biosphere manifest’s science_bands / liveness_floors are generated from
+# there, so this function is the CHECKER’s copy of the assertion and no longer the
+# contract’s locus. Deleting it is Stage 3’s call, not a free consequence of C4.
 @pytest.mark.parametrize("scenario", ["perennial", "consumer"])
 def test_decade_leaf_cycle_is_stationary(runs, scenario) -> None:
     # Peak leaf carbon per year: bounded + non-amplifying past the transient (not
@@ -223,21 +219,13 @@ def test_decade_leaf_cycle_is_stationary(runs, scenario) -> None:
     assert non_collapsing(summaries, floor=0.05)  # peak leaf never collapses to ~0
 
 
-@pytest.mark.science_gate(
-    scenario="perennial_long_horizon",
-    field="liveness_floors",
-    quantity="converged peak-leaf fixed point (mol C)",
-    bound="max(tail) > 0.55",
-    source="self — originally anchored BELOW the measured 50-yr equilibrium (0.594984, "
-    "reached ~yr 45), not on the 15-yr reading; 2.2x the 0.253 dead baseline. Moves: "
-    ">1.0 -> >0.9 (decomposer calibration) -> >0.55 (humification split). ⚠⚠ THAT "
-    "RATIONALE INVERTED 2026-08-15 (the layered canopy): the 50-yr equilibrium now "
-    "settles at 0.543748, BELOW the floor. The bound is NOT re-anchored and is NOT "
-    "red — it reads max(tail) on the 15-YEAR run, which is 0.578137 and clears by "
-    "5.1 %. So what this floor now checks is the 15-yr trajectory, not the "
-    "attractor it was named for; both numbers are asserted in the tests so the gap "
-    "is visible. Moving 0.55 to fit would be the refused co-adaptation",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration: science_gates.rs::perennial_leaf_cycle_is_a_fixed_point. The biosphere
+# manifest’s science_bands / liveness_floors are generated from there, so this
+# function is the CHECKER’s copy of the assertion and no longer the contract’s locus.
+# Deleting it is Stage 3’s call, not a free consequence of C4.
 def test_perennial_leaf_cycle_is_a_fixed_point(runs) -> None:
     # CHANGED by post-roadmap scope (B) increment 1 (vernalization + photoperiod). This
     # asserted a period-2 limit cycle ("gap ~0.07, ~28% of scale") until 2026-07-20.
@@ -310,13 +298,13 @@ def test_consumer_leaf_converges_to_a_fixed_point(runs) -> None:
     assert abs(diffs[-1]) < 1e-2 * max(tail)
 
 
-@pytest.mark.science_gate(
-    scenario="consumer_long_horizon",
-    field="liveness_floors",
-    quantity="year-end consumer carbon (mol C)",
-    bound="non_collapsing(floor=5e-4)",
-    source="self — the calibrated attractor, not a cited value",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration: science_gates.rs::decade_consumer_biomass_is_stationary_and_alive. The
+# biosphere manifest’s science_bands / liveness_floors are generated from there, so
+# this function is the CHECKER’s copy of the assertion and no longer the contract’s
+# locus. Deleting it is Stage 3’s call, not a free consequence of C4.
 def test_decade_consumer_biomass_is_stationary_and_alive(runs) -> None:
     # The consumer trophic level persists and its standing biomass reaches a stationary,
     # non-collapsing attractor over the decade — neither blowing up nor starving.
@@ -330,20 +318,13 @@ def test_decade_consumer_biomass_is_stationary_and_alive(runs) -> None:
     assert non_collapsing(summaries, floor=5e-4)  # consumer carbon stays well above 0
 
 
-@pytest.mark.science_gate(
-    scenario="perennial_long_horizon",
-    field="liveness_floors",
-    quantity="annual minimum chamber CO2 pool (mol C)",
-    bound="non_collapsing(floor=0.05)",
-    source="self — anchored on the MEASURED trough attractor, converged well before "
-    "yr 50, not on a 15-yr reading. ⚠ The attractor has moved and the CLEARANCE with "
-    "it: 0.0758448 / 1.52x (2026-08-14, the light path) -> 0.072238 / 1.44x "
-    "(2026-08-15, the layered canopy). The floor is not re-anchored; the ratio is "
-    "asserted separately so a shrinking clearance cannot pass unread; "
-    "teeth witnessed by a mutation independent of any candidate science change "
-    "(the jar shrunk 0.65x at fixed composition trips it at 0.0492366). "
-    "Window removed: floor[2:] -> floor",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration: science_gates.rs::decade_min_carbon_pool_stationary. The biosphere
+# manifest’s science_bands / liveness_floors are generated from there, so this
+# function is the CHECKER’s copy of the assertion and no longer the contract’s locus.
+# Deleting it is Stage 3’s call, not a free consequence of C4.
 def test_decade_min_carbon_pool_stationary(runs) -> None:
     # Chamber CO2 pool (the producer's only carbon source when sealed): its per-year
     # minimum stays bounded + non-amplifying, and never approaches exhaustion.

@@ -545,13 +545,13 @@ def test_rdr_root_is_the_closest_of_the_three_to_its_source() -> None:
 
 
 # --- 2/3. the canopy: what the flat rate has actually been doing ----------------------
-@pytest.mark.science_gate(
-    scenario="open_season",
-    field="science_bands",
-    quantity="peak LAI (m2 m-2)",
-    bound="5.0 < peak < 8.0",
-    source="real wheat peaks at ~5-8 LAI",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration: science_gates.rs::open_season_canopy_is_physical. The biosphere
+# manifest’s science_bands / liveness_floors are generated from there, so this
+# function is the CHECKER’s copy of the assertion and no longer the contract’s locus.
+# Deleting it is Stage 3’s call, not a free consequence of C4.
 def test_frozen_open_season_canopy_is_physical() -> None:
     """The baseline half of the finding, so the comparison below has a floor."""
     states, rationed, _ = _run(sc.DEFAULT_SCENARIO, 1)
@@ -1047,13 +1047,14 @@ def _roster_peak_lai() -> dict[str, float]:
     return peaks
 
 
-@pytest.mark.science_gate(
-    scenario="open_season",
-    field="science_bands",
-    quantity="peak LAI (m2 m-2) vs the mutual-shading threshold",
-    bound="peak < 6.0 OR the 5%/day mutual-shading loss is MODELLED",
-    source="Van Keulen & Seligman 1987 mutual-shading threshold, via [A] p. 101",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration:
+# science_gates.rs::the_vks_mutual_shading_regime_is_modelled_not_merely_avoided. The
+# biosphere manifest’s science_bands / liveness_floors are generated from there, so
+# this function is the CHECKER’s copy of the assertion and no longer the contract’s
+# locus. Deleting it is Stage 3’s call, not a free consequence of C4.
 def test_the_vks_mutual_shading_regime_is_MODELLED_not_merely_avoided() -> None:
     """⚠ FINDING 5 — the tripwire, in the style of the 14.4248 t/ha Greenwood one.
 

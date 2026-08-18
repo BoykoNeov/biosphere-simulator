@@ -101,6 +101,18 @@ _COMPARED_AXES = frozenset({"flow_set", "aux_set"})
 #: catches an *edited* param file whose manifest entry was never regenerated.
 _COMPARED_MAPPINGS = frozenset({"param_files"})
 
+#: The science-gate census axes (slice C4). A third comparison shape, and it is not
+#: pedantry that it is not folded into `_COMPARED_MAPPINGS`: the manifest gives EVERY
+#: roster scenario a key — an explicitly empty list where no gate exists, which says
+#: "measured, none" as opposed to saying nothing — while the dump emits only the
+#: scenarios that actually carry a claim, because the roster is the manifest's own hand
+#: authority and not the reference's. So the comparison drops the empty entries from the
+#: frozen side and then demands EXACT equality in both directions: a Rust gate the
+#: manifest lacks is an unregenerated re-anchoring, and a manifest claim no Rust gate
+#: produces is a frozen band whose assertion has been deleted — the precise failure
+#: `science_bands` was added to make impossible.
+_COMPARED_CENSUS = frozenset({"science_bands", "liveness_floors"})
+
 # (label, crate dir, example, manifest, dump keys). One per manifest that carries a
 # registry-derived inventory; the biosphere is delegated out of the station manifest, so
 # the two sets are disjoint by contract and each is checked against its own file. ⚠ The
@@ -112,14 +124,21 @@ _COMPARED_MAPPINGS = frozenset({"param_files"})
 # surface is its own unfreeze) — see the `numerics_note` entry in that manifest.
 #: ⚠ `weather_sha256` joined in slice C9 — the second checked-never-spliced key, see
 #: `test_the_weather_hash_matches_the_reference_tree`.
+#: ⚠⚠ `science_bands` / `liveness_floors` joined in slice C4 — the science-gate
+#: census, which until then had no Rust referent and was the largest Python-authored
+#: block of any contract. They are compared by `_COMPARED_CENSUS` below, which needs its
+#: own comparison shape: the value is `scenario -> [claim]` and the manifest carries
+#: roster keys the dump deliberately does not emit.
 _BIOSPHERE_DUMP_KEYS = frozenset(
     {
         "flow_set",
         "aux_set",
         "horizons",
         "light_path_samples",
+        "liveness_floors",
         "locked_dt_days",
         "param_files",
+        "science_bands",
         "weather_sha256",
     }
 )
@@ -161,11 +180,22 @@ _CASES = [
 
 def _rust_inventory(crate_dir: Path, example: str) -> dict:
     """Run an inventory dump example and parse its JSON stdout."""
+    # ⚠⚠ `encoding="utf-8"`, and it is NOT boilerplate. `text=True` alone decodes
+    # the pipe with `locale.getpreferredencoding()` — cp1252 on the Windows dev box —
+    # and every byte this program emitted was ASCII (names, hex floats, sha-256
+    # digests) until slice C4, so the pipe's encoding had never mattered. The science
+    # census is the first non-ASCII key: it carries `—`, `⚠`, `Γ` and `CO₂` inside
+    # frozen claim text. Without this the first regeneration wrote mojibake
+    # (`—` -> `â€”`) INTO the frozen contract, and nothing was red — the manifest and
+    # the checker agreed, because the corruption happened on the way in. It was
+    # caught by predicting the diff before regenerating, which is the only reason it
+    # is a note here instead of a committed contract.
     proc = subprocess.run(
         ["cargo", "run", "-q", "--example", example],
         cwd=crate_dir,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     assert proc.returncode == 0, f"cargo run {example} failed:\n{proc.stderr}"
     return json.loads(proc.stdout)
@@ -276,6 +306,30 @@ def test_rust_inventory_equals_the_frozen_manifest(
         # ⚠ And guard the comparison, not just its result: an empty mapping on both
         # sides is a green test that has checked nothing.
         assert frozen, f"{manifest_name} freezes no {axis} — nothing compared"
+
+    # ⚠ The census axes. Only the biosphere manifest carries a Rust-authored one today;
+    # the station's two gates are still pytest markers (slice C4b), so its dump emits no
+    # census key and this loop is skipped by the `axis in dump` guard rather than by a
+    # hardcoded label — when C4b lands, the gate starts comparing without being edited.
+    for axis in sorted(_COMPARED_CENSUS):
+        if axis not in dump:
+            continue
+        frozen_nonempty = {k: v for k, v in manifest[axis].items() if v}
+        assert frozen_nonempty, f"{manifest_name} freezes no {axis} — nothing compared"
+        changed = sorted(
+            k
+            for k in set(dump[axis]) & set(frozen_nonempty)
+            if dump[axis][k] != frozen_nonempty[k]
+        )
+        assert dump[axis] == frozen_nonempty, (
+            f"{label} {axis} diverges between the Rust tree and {manifest_name}:\n"
+            f"  only in Rust (declared, not frozen):     "
+            f"{sorted(set(dump[axis]) - set(frozen_nonempty))}\n"
+            f"  only in manifest (frozen, not declared): "
+            f"{sorted(set(frozen_nonempty) - set(dump[axis]))}\n"
+            f"  same scenario, different claims:         {changed}\n"
+            f"{advice}"
+        )
 
 
 @pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")

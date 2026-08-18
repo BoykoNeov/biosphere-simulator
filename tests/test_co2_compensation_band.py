@@ -216,16 +216,13 @@ def test_the_shipped_floor_is_the_conservative_one_against_the_cited_route() -> 
 # manifest, so it would freeze nothing while looking like it froze five things.
 
 
-@pytest.mark.science_gate(
-    scenario="sealed_chamber",
-    field="science_bands",
-    quantity="season-low chamber CO₂ (ppm)",
-    bound="min > Γ*/ci_ratio (61.07 ppm)",
-    source="FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. "
-    "1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so "
-    "the verdict is provenance-insensitive — test_the_shipped_floor_is_the_"
-    "conservative_one_against_the_cited_route",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration: science_gates.rs::sealed_chamber_stays_above_the_compensation_point.
+# The biosphere manifest’s science_bands / liveness_floors are generated from there,
+# so this function is the CHECKER’s copy of the assertion and no longer the contract’s
+# locus. Deleting it is Stage 3’s call, not a free consequence of C4.
 def test_sealed_chamber_stays_above_the_compensation_point() -> None:
     """71.44 ppm — and ⚠ this chamber **never crossed**, at any shipped step.
 
@@ -245,16 +242,13 @@ def test_sealed_chamber_stays_above_the_compensation_point() -> None:
     assert _season_low_ppm("sealed_chamber") > floor_ppm()
 
 
-@pytest.mark.science_gate(
-    scenario="perennial_chamber",
-    field="science_bands",
-    quantity="season-low chamber CO₂ (ppm)",
-    bound="min > Γ*/ci_ratio (61.07 ppm)",
-    source="FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. "
-    "1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so "
-    "the verdict is provenance-insensitive — test_the_shipped_floor_is_the_"
-    "conservative_one_against_the_cited_route",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration: science_gates.rs::perennial_chamber_stays_above_the_compensation_point.
+# The biosphere manifest’s science_bands / liveness_floors are generated from there,
+# so this function is the CHECKER’s copy of the assertion and no longer the contract’s
+# locus. Deleting it is Stage 3’s call, not a free consequence of C4.
 def test_perennial_chamber_stays_above_the_compensation_point() -> None:
     """⚠ **THE ONE THAT WAS RED.** 56.03 ppm at ``dt = 1``; 70.25 at the shipped step.
 
@@ -270,16 +264,13 @@ def test_perennial_chamber_stays_above_the_compensation_point() -> None:
     assert _season_low_ppm("perennial_chamber") > floor_ppm()
 
 
-@pytest.mark.science_gate(
-    scenario="consumer_chamber",
-    field="science_bands",
-    quantity="season-low chamber CO₂ (ppm)",
-    bound="min > Γ*/ci_ratio (61.07 ppm)",
-    source="FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. "
-    "1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so "
-    "the verdict is provenance-insensitive — test_the_shipped_floor_is_the_"
-    "conservative_one_against_the_cited_route",
-)
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration: science_gates.rs::consumer_chamber_stays_above_the_compensation_point.
+# The biosphere manifest’s science_bands / liveness_floors are generated from there,
+# so this function is the CHECKER’s copy of the assertion and no longer the contract’s
+# locus. Deleting it is Stage 3’s call, not a free consequence of C4.
 def test_consumer_chamber_stays_above_the_compensation_point() -> None:
     """⚠ **WAS the tightest of the five; as of 2026-08-15 it is the LOOSEST.**
 
@@ -298,17 +289,15 @@ def test_consumer_chamber_stays_above_the_compensation_point() -> None:
     assert _season_low_ppm("consumer_chamber") > floor_ppm()
 
 
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration:
+# science_gates.rs::perennial_long_horizon_stays_above_the_compensation_point. The
+# biosphere manifest’s science_bands / liveness_floors are generated from there, so
+# this function is the CHECKER’s copy of the assertion and no longer the contract’s
+# locus. Deleting it is Stage 3’s call, not a free consequence of C4.
 @pytest.mark.slow
-@pytest.mark.science_gate(
-    scenario="perennial_long_horizon",
-    field="science_bands",
-    quantity="season-low chamber CO₂ (ppm)",
-    bound="min > Γ*/ci_ratio (61.07 ppm)",
-    source="FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. "
-    "1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so "
-    "the verdict is provenance-insensitive — test_the_shipped_floor_is_the_"
-    "conservative_one_against_the_cited_route",
-)
 def test_perennial_long_horizon_stays_above_the_compensation_point() -> None:
     """15 yr: 70.2526 ppm — the *same* minimum as the 5-yr run, taken in year 2.
 
@@ -326,17 +315,15 @@ def test_perennial_long_horizon_stays_above_the_compensation_point() -> None:
     assert _season_low_ppm("perennial_long_horizon") > floor_ppm()
 
 
+# ⚠ The ``@pytest.mark.science_gate`` marker was REMOVED here in slice C4 of the
+# reference flip (2026-08-18). The claim did not go away and was not weakened — it
+# moved to the reference, where the roster row and the test that executes it are ONE
+# declaration:
+# science_gates.rs::consumer_long_horizon_stays_above_the_compensation_point. The
+# biosphere manifest’s science_bands / liveness_floors are generated from there, so
+# this function is the CHECKER’s copy of the assertion and no longer the contract’s
+# locus. Deleting it is Stage 3’s call, not a free consequence of C4.
 @pytest.mark.slow
-@pytest.mark.science_gate(
-    scenario="consumer_long_horizon",
-    field="science_bands",
-    quantity="season-low chamber CO₂ (ppm)",
-    bound="min > Γ*/ci_ratio (61.07 ppm)",
-    source="FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. "
-    "1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so "
-    "the verdict is provenance-insensitive — test_the_shipped_floor_is_the_"
-    "conservative_one_against_the_cited_route",
-)
 def test_consumer_long_horizon_stays_above_the_compensation_point() -> None:
     """15 yr: 73.3386 ppm, taken in year 5 — again the same minimum as the 5-yr run.
 
