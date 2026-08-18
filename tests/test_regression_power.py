@@ -11,10 +11,12 @@ surfaces here.
 **This is an additive, NON-frozen golden** — not in
 ``docs/biosphere-reference.manifest.json`` (that manifest is the frozen *biosphere*
 reference). It is the Power domain's own regression pin, the P5.2/P5.3 analogue of the
-biosphere scenario goldens; the seven frozen reference goldens + two demo goldens are
-untouched and byte-identical.
+biosphere scenario goldens; the seven frozen reference goldens are untouched and
+byte-identical.
 
-Mirrors ``test_regression_n_limited_season.py`` (the additive-scenario discipline): full
+Follows the **additive-scenario discipline** (its original exemplar,
+``test_regression_n_limited_season.py``, was retired on 2026-08-18 with the
+Python-only roster; the discipline is what survives, not the file): full
 ``State`` via ``sim_io.dumps``, Euler only, regeneration a separate explicit
 ``__main__`` action. The generator bakes in a **pre-golden gate specific to Power's
 purpose**: it asserts the run is well-fed (``rationed == 0``), event-free

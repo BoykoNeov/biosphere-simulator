@@ -214,30 +214,19 @@ PYTHON_FOLDED: dict[str, str] = {
 
 
 # --------------------------------------------------------------------------- #
-# Group 3 — no Rust referent at all (5)                                        #
+# Group 3 — no Rust referent at all (1)                                        #
 # --------------------------------------------------------------------------- #
-# None is in either manifest: all five are additive, non-frozen Python regression pins.
+# ⚠ FIVE UNTIL 2026-08-18. `n_limited`, `water_biting`, `demo_euler` and `demo_rk4`
+# were retired outright by C6 of the reference flip — a golden with no Rust referent
+# and no manifest entry is a checker asserting science the reference cannot run, which
+# is exactly what the flip's posture says to delete rather than port. Their reasons are
+# kept in `docs/log/reference-flip.md`, and every claim that HAD a successor moved to
+# the reference before the deletion (see the plan's C6 section). The one that remains
+# is not a simulation output at all, and it is not in either manifest.
 # ⚠ Each reason is a measured statement about the Rust tree, not a category judgement —
 # `test_golden_provenance.py` re-derives what it can (that no example emits them) and
 # this roster carries the part a test cannot: *why*.
 NO_RUST_REFERENT: dict[str, str] = {
-    "n_limited_state.json": (
-        "`N_LIMITED_SCENARIO` has no equivalent in the Rust scenario roster — the "
-        "dormant `f_N` limiter is pinned Python-side only. Building an emitter means "
-        "first porting the scenario."
-    ),
-    "water_biting_state.json": (
-        "`WATER_BITING_SCENARIO` likewise has no Rust equivalent, and the port says so "
-        "in its own words: `biosphere/system.rs`'s drought-wiring test "
-        "manufactures the condition by hand precisely because 'the Rust roster "
-        "has no equivalent of' the Python declaration."
-    ),
-    "demo_euler_state.json": (
-        "The Phase-0/1 two-domain demo skeleton (`build_demo`) is Python-only — no "
-        "`build_demo` anywhere under `rust/crates/`. Its params are excluded from the "
-        "frozen param list too; it is a teaching scaffold, not reference science."
-    ),
-    "demo_rk4_state.json": "The RK4 half of the same Python-only demo skeleton.",
     "state_snapshot.json": (
         "⚠ Not a simulation run at all: a hand-authored `sim_io` serialization "
         "fixture. And Rust **consumes** it — `simcore/src/snapshot.rs` reads this "

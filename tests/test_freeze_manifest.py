@@ -103,9 +103,13 @@ GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
 WEATHER_FIXTURE = Path(__file__).parent / "oracle" / "winter_wheat_weather.json"
 
 # The Phase-0 engine-skeleton demo param file — NOT biosphere science. It feeds the demo
-# flows in ``flows.py`` (no real biology), frozen separately by the Phase-0 demo
-# regression goldens (``demo_euler_state.json`` / ``demo_rk4_state.json``). Scoped out
-# of the biosphere reference, by name, so its absence reads as deliberate.
+# flows in ``flows.py`` (no real biology). Scoped out of the biosphere reference, by
+# name, so its absence reads as deliberate.
+# ⚠ Its two regression goldens (``demo_euler_state.json`` / ``demo_rk4_state.json``)
+# were deleted on 2026-08-18 by C6 of the reference flip, so this param file is now
+# frozen by NOTHING. ``build_demo`` and its unit tests survive in
+# ``test_biosphere_demo.py``; whether the whole skeleton follows is a Stage-3
+# question, not this exclusion's.
 _EXCLUDED_PARAMS = frozenset({"demo.yaml"})
 
 # Scenario name -> (human scenario label, horizon, golden filename). The four Phase-3

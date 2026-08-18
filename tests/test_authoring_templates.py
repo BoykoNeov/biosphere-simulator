@@ -12,7 +12,8 @@ decision-A amendment — a new boundary-eval cross-port surface). Proven:
    template→resolve→evaluate→interpret→run path against the frozen golden.
 2. **The knob is load-bearing ("it bit").** At ``crew_count = 4.0`` every stock is ≈ 4×
    its single-crew value (reconstruct-to-tolerance — accumulate-then-scale ≠
-   scale-then-accumulate in fp, the ``n_limited``/``water_biting`` discipline), the run
+   scale-then-accumulate in fp, the additive-scenario discipline named after
+   ``n_limited``/``water_biting``, both retired 2026-08-18), the run
    still conserves every quantity every step, ``rationed == 0`` / ``events == ()``, and
    the final state is **not** byte-identical to the golden (a non-scaling knob could not
    move it).

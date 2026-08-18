@@ -52,8 +52,6 @@ from domains.biosphere.scenario import (
     PERENNIAL_CHAMBER_YEARS,
     SEALED_CHAMBER_SCENARIO,
     SEALED_CHAMBER_YEARS,
-    WATER_BITING_SCENARIO,
-    WATER_BITING_YEARS,
     SeasonScenario,
 )
 from domains.biosphere.season import (
@@ -1660,38 +1658,13 @@ def test_the_shedding_fed_regime_takes_BOTH_sizings_and_the_better_trough_costs_
             # ⚠ 2026-08-15 canopy 0.276093 -> 0.282106 (was 0.460033 / 1.643391)
             0.282106,
         ),
-        (
-            WATER_BITING_SCENARIO,
-            WATER_BITING_YEARS,
-            # ⚠ 0.085006 until 2026-08-12, then 0.088509 the same day. Neither move was
-            # a mechanism change, and they had DIFFERENT causes. (1) The soil-water
-            # re-basing RE-DECLARED the scenario (its bite used to be
-            # `soil_water0 = 50` kg inside an absolute-kg band that no longer exists;
-            # it is now `soil_moisture_index = 0.05`). (2) `WSFD` ([F] Eqn 15.8,
-            # docs/plans/post-roadmap-water-stress-curves.md) made drought accelerate
-            # development, and `water_biting` is one of only two runs in the tree where
-            # water actually limits — so its whole carbon trajectory moved while every
-            # frozen scenario stayed bit-identical. Probe values of the scenario; they
-            # move when it does. The four CLAIMS below (sizing2 beats frozen, and pays
-            # for it in plant) were re-measured and all still hold.
-            # WARNING and re-measured a THIRD time 2026-08-12 by the stem-reserve
-            # build itself: 0.093346 -> 0.087965. Was 0.118940 / 0.143329 /
-            # (0.535004 / 2.143987).
-            # WARNING and a FOURTH time 2026-08-14 (the quarter-day step): 0.087965 /
-            # 0.089665 / 0.126958 / (0.453427 / 1.811621). ⚠ This row moves FURTHEST of
-            # the four scenarios — the frozen tail +8.8 %, sizing 1 +17.2 % — and that
-            # is consistent with what it is: `water_biting` is one of only two runs in
-            # the tree where water actually limits, so it has the most nonlinearity for
-            # a coarse step to truncate. It is not evidence about fractionation.
-            # WARNING and a FIFTH time 2026-08-14 (the light path), same reading as the
-            # step: this water-limited row moves furthest again.
-            0.091089,  # ⚠ 2026-08-15 canopy 0.097275 -> 0.091089
-            0.098210,  # ⚠ 2026-08-15 canopy 0.104499 -> 0.098210
-            0.122896,  # ⚠ 2026-08-15 canopy 0.135077 -> 0.122896
-            # ⚠ 2026-08-15 canopy 0.256814 -> 0.261551; ⚠ was 0.454588 / 1.780165
-            # (2026-08-14, the light path)
-            0.261551,
-        ),
+        # ⚠ A ``water_biting`` row stood here until 2026-08-18 — the WATER-LIMITED one,
+        # which moved furthest of the four on every re-measurement (the step unfreeze,
+        # the light path, the canopy) precisely because it had the most nonlinearity for
+        # a coarse step to truncate. C6 of the reference flip retired the scenario, so
+        # the four fractionation claims below are now witnessed on three carbon-limited
+        # runs only. That is a narrowing, and it is stated rather than absorbed: nothing
+        # left in this table exercises water limitation at all.
     ):
         tails = {}
         vegs = {}

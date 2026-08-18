@@ -13,7 +13,8 @@ sizing) surfaces here.
 frozen *biosphere* reference), and separate from ``power_state.json`` (the two-flow
 ``BOUNDED_SOC`` golden, which stays byte-identical — this run does not touch it). The
 Power domain's own regression pin for the third flow, the ``test_regression_power`` /
-additive-``n_limited`` discipline: full ``State`` via ``sim_io.dumps``, Euler only,
+additive-scenario discipline (named after ``n_limited``, retired 2026-08-18): full
+``State`` via ``sim_io.dumps``, Euler only,
 regeneration a separate explicit ``__main__`` action.
 
 **Pre-golden gate — the SelfDischarge purpose baked in.** The generator asserts the run

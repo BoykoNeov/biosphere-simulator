@@ -32,8 +32,6 @@ from domains.biosphere.scenario import (
     PERENNIAL_CHAMBER_YEARS,
     SEALED_CHAMBER_SCENARIO,
     SEALED_CHAMBER_YEARS,
-    WATER_BITING_SCENARIO,
-    WATER_BITING_YEARS,
     SeasonScenario,
 )
 from domains.biosphere.season import (
@@ -191,9 +189,9 @@ def test_the_census_covers_every_sealed_chamber_at_every_frozen_horizon() -> Non
 
     The census has three sealed rows. The biosphere manifest freezes SIX sealed ones
     (``sealed_chamber``, ``perennial_chamber``, ``consumer_chamber``, both 15-yr
-    long-horizons, ``drift_summary``) and ``water_biting`` is a sealed chamber outside
-    the manifest entirely. Three rows nevertheless cover all of them, and this pin is
-    what makes that a MEASUREMENT rather than an assumption — the shape that has
+    long-horizons, ``drift_summary``). Three rows nevertheless cover all of them, and
+    this pin is what makes that a MEASUREMENT rather than an assumption — the shape
+    that has
     already produced two corrections here (B-finding 4's five rows against seven frozen
     scenarios, A-finding 9's list checked against its own length).
     """
@@ -210,21 +208,14 @@ def test_the_census_covers_every_sealed_chamber_at_every_frozen_horizon() -> Non
         long_ = build_season(scenario)[0]
         assert _carbon_total(short).hex() == _carbon_total(long_).hex()
 
-    # (b) `water_biting` is the perennial chamber with soil_water0 moved -- NOT a fourth
-    #     carbon jar. Every gas field defaults; only the water IC differs.
-    wb, per = WATER_BITING_SCENARIO, PERENNIAL_CHAMBER_SCENARIO
-    assert wb.sealed and wb.litter_carbon0 == per.litter_carbon0
-    assert wb.chamber_air_mol == per.chamber_air_mol
-    assert wb.chamber_co2_mol0 == per.chamber_co2_mol0
-    assert wb.chamber_o2_mol0 == per.chamber_o2_mol0
-    assert wb.soil_water0 != per.soil_water0  # the one thing that DOES differ
-    wb_inventory = _carbon_total(build_season(wb)[0])
-    assert wb_inventory.hex() == _carbon_total(build_season(per)[0]).hex()
-
-    # And it behaves like the same jar: the plant still holds most of the carbon.
-    wb_states = _run(wb, WATER_BITING_YEARS, "season")
-    peak = max(sum(s.stocks[o].amount for o in _ORGANS) for s in wb_states)
-    assert 0.55 < peak / wb_inventory < 0.75
+    # ⚠ A part (b) stood here until 2026-08-18. It showed that ``water_biting`` was the
+    # perennial chamber with its water initial condition moved — the SAME carbon jar,
+    # bit-identical inventory — and not a fourth one, which is what let three census
+    # rows
+    # cover a scenario outside the manifest. C6 of the reference flip retired the
+    # scenario, and with it the only sealed chamber this census had to reach past the
+    # manifest for. The roster claim is now simply: three rows, six frozen sealed
+    # scenarios, nothing outside.
 
 
 @pytest.mark.slow

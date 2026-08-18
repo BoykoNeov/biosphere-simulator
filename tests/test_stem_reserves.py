@@ -111,12 +111,10 @@ from domains.biosphere.drift import (
 )
 from domains.biosphere.loader import (
     load_canopy_params,
-    load_nitrogen_params,
     load_phenology_params,
     load_stem_reserve_params,
 )
 from domains.biosphere.mineralization import NitrogenSenescence
-from domains.biosphere.nitrogen import nitrogen_stress_factor
 from domains.biosphere.phenology import PhenologyParams, development_stage
 from domains.biosphere.season import (
     CARBON_POOL,
@@ -1343,7 +1341,6 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
     for form in ({}, {"snapshot_fill": True}):
         for scen, years, resets in (
             (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, False),
-            (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, False),
             (sc.PERENNIAL_CHAMBER_SCENARIO, sc.PERENNIAL_CHAMBER_YEARS, True),
             (sc.CONSUMER_CHAMBER_SCENARIO, sc.CONSUMER_CHAMBER_YEARS, True),
         ):
@@ -1366,55 +1363,40 @@ def test_the_reserve_closes_every_sealed_chamber_on_both_integrators() -> None:
         )
         assert rationed == 0 and events == ()
 
-    # A detail worth keeping: in the two shedding-fed chambers our reconstruction leaves
-    # the CO2 trough EXACTLY at the frozen value, because the trough happens before the
-    # single fill event ever fires.
-    for scen, years, frozen_min, bit_identical in (
-        # ⚠ 0.076380 → 0.076482 on 2026-08-12, and NOT because of the reserve: this
-        # build
-        # re-sized `SEALED_CHAMBER_SCENARIO`'s litter seed 3.0 → 3.5, because the extra
-        # O₂ a reserve-carrying crop releases had lifted the chamber's O₂ trough from
-        # ~0.01 % of its fill to 5.08 % and killed the ≥95 %-depletion contract the
-        # scenario exists for. Recorded here rather than silently re-pinned, because a
-        # number that moves for a reason other than the mechanism under test is exactly
-        # the kind this repo has been caught by before.
-        # ⚠ 0.076482 → 0.077538 on 2026-08-14 (the step unfreeze, dt 1 → ¼).
-        # ⚠ 0.077538 -> 0.071668 on 2026-08-14 (the light path).
-        # ⚠ 0.071668 -> 0.071782 (2026-08-15): the chamber trough barely moves, as the
-        # depth integral is inert at LAI 0.54 and only the SLA anchor reaches it.
-        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS, 0.071782, True),
-        # ⚠ 0.085006 → 0.088509 → 0.093346, all on 2026-08-12 and for two different
-        # reasons: the soil-water re-basing re-declared the scenario, then `WSFD`
-        # ([F] Eqn 15.8) made drought accelerate development. `water_biting` is one of
-        # only two runs where water limits at all, so it absorbs both while the frozen
-        # roster stays bit-identical. The MECHANISM claim below (the trough is
-        # bit-identical with and without the reserve) is unchanged and is what the test
-        # is for. Note `sealed_chamber` above did NOT move on either occasion.
-        # ⚠ 0.101294 -> 0.103004 (2026-08-14, the light path).
-        # ⚠ 0.103004 -> 0.095854 (2026-08-15, the depth-resolved canopy + sourced SLA).
-        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, 0.095854, False),
-    ):
-        base, _, _ = _run(scen, years)
-        snap, _, _ = _run(scen, years, reserve=True, snapshot_fill=True)
-        assert min(_series(base, CARBON_POOL)) == pytest.approx(frozen_min, rel=1e-4)
-        if bit_identical:
-            assert _bits(min(_series(snap, CARBON_POOL))) == _bits(
-                min(_series(base, CARBON_POOL))
-            )
-        else:
-            # ⚠ `water_biting` STOPPED being bit-identical at `dt = ¼` (2026-08-14), and
-            # the comment above says exactly why it ever was: the trough "happens before
-            # the single fill event ever fires". That is an ORDERING of two events in
-            # time, and a finer step re-times both — for `water_biting` the trough now
-            # falls on the other side of the fill. `sealed_chamber` still clears it.
-            #
-            # So this was never a statement about the reserve being inert; it was a
-            # statement about *when* this scenario's trough happens, which the step
-            # controls. Recorded with the measured gap rather than dropped: the reserve
-            # still may not move the trough MUCH, and that bound is the surviving claim.
-            got = min(_series(snap, CARBON_POOL))
-            ref = min(_series(base, CARBON_POOL))
-            assert abs(got - ref) / ref < 0.05, (got, ref)
+    # A detail worth keeping: in ``sealed_chamber`` our reconstruction leaves the CO2
+    # trough EXACTLY at the frozen value, because the trough happens before the single
+    # fill event ever fires.
+    #
+    # ⚠ THIS WAS A TWO-ROW COMPARISON UNTIL 2026-08-18. ``water_biting`` was the second
+    # row and the ONLY one taking the non-bit-identical branch: at ``dt = 1`` its trough
+    # also preceded the fill, and the quarter-day step re-timed the two events so it no
+    # longer did — which is what proved the bit-identity was a statement about WHEN this
+    # scenario's trough happens rather than about the reserve being inert. C6 of the
+    # reference flip retired the scenario, so that branch has no subject left and the
+    # bound it carried (the reserve moves the trough by under 5 %) is retired with it,
+    # named as a gap in docs/plans/post-roadmap-reference-flip.md §5k rather than
+    # quietly dropped. What remains is the exact half, on the chamber that still clears
+    # it.
+    # ⚠ 0.076380 → 0.076482 on 2026-08-12, and NOT because of the reserve: this build
+    # re-sized `SEALED_CHAMBER_SCENARIO`'s litter seed 3.0 → 3.5, because the extra O₂ a
+    # reserve-carrying crop releases had lifted the chamber's O₂ trough from ~0.01 % of
+    # its fill to 5.08 % and killed the ≥95 %-depletion contract the scenario exists
+    # for.
+    # ⚠ 0.076482 → 0.077538 on 2026-08-14 (the step unfreeze, dt 1 → ¼).
+    # ⚠ 0.077538 -> 0.071668 on 2026-08-14 (the light path).
+    # ⚠ 0.071668 -> 0.071782 (2026-08-15): the chamber trough barely moves, as the depth
+    # integral is inert at LAI 0.54 and only the SLA anchor reaches it.
+    base, _, _ = _run(sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS)
+    snap, _, _ = _run(
+        sc.SEALED_CHAMBER_SCENARIO,
+        sc.SEALED_CHAMBER_YEARS,
+        reserve=True,
+        snapshot_fill=True,
+    )
+    assert min(_series(base, CARBON_POOL)) == pytest.approx(0.071782, rel=1e-4)
+    assert _bits(min(_series(snap, CARBON_POOL))) == _bits(
+        min(_series(base, CARBON_POOL))
+    )
 
 
 @pytest.mark.slow
@@ -1601,56 +1583,18 @@ def test_the_open_season_science_bands_survive_the_reserve_but_the_margin_shrink
     )  # ⚠ 2026-08-14 (light path), was 0.992368
 
 
-def test_n_limited_keeps_the_regime_it_was_built_for() -> None:
-    """The reserve takes carbon OUT of `f_N`'s own denominator, so this had to be
-    measured.
-
-    `n_limited` is the one place `f_N` bites, and it is not one of the frozen seven.
-    Option (A) deleted the knob it is built on; this candidate does not — the bite is
-    0.1789 over 186 steps against the recorded 0.1759 over 187.
-    """
-    frozen, _, _ = _run(sc.N_LIMITED_SCENARIO, sc.N_LIMITED_YEARS)
-    res, _, _ = _run(sc.N_LIMITED_SCENARIO, sc.N_LIMITED_YEARS, reserve=True)
-    p = load_nitrogen_params()
-
-    def fn(states):
-        return [
-            nitrogen_stress_factor(
-                s.stocks[PLANT_N].amount,
-                s.stocks[LEAF_C].amount
-                + s.stocks[STEM_C].amount
-                + s.stocks[ROOT_C].amount,
-                n_residual_per_mol_c=p.n_residual_per_mol_c,
-                n_critical_per_mol_c=p.n_critical_per_mol_c,
-            )
-            for s in states
-        ]
-
-    a, b = fn(frozen), fn(res)
-    assert min(a) == pytest.approx(
-        0.168814, rel=1e-5
-    )  # the recorded value  # ⚠ 2026-08-15 canopy 0.182361 -> 0.168814
-    # ⚠ These count STEPS the stress bites on, over a step-indexed trajectory — 187/186
-    # while a step was a day, and 4× that now. Compared in DAYS so the number keeps
-    # meaning what it did: the stress bites on ~187 days either way, which is the claim.
-    # ⚠ 187 -> 192 days (2026-08-14, the light path): the stress bites five days
-    # longer. Same direction on both runs, so the comparison the test makes is intact.
-    # ⚠ 192 -> 199 days (2026-08-15, the depth-resolved canopy + sourced SLA): the
-    # stress bites a further seven days. Same direction on both runs again.
-    assert day_of(sum(1 for v in a if v < 1.0)) == 199
-    assert min(b) == pytest.approx(
-        0.173012,
-        rel=1e-5,  # ⚠ 2026-08-15 canopy 0.186791 -> 0.173012
-    )  # ⚠ 2026-08-14 (light path), was 0.180928
-    # ⚠ 190 -> 198 days (2026-08-15, the depth-resolved canopy + sourced SLA), the
-    # same eight-day direction as its sibling above — which is the comparison the
-    # test defends: both forms lengthen together, so the reserve's regime is intact.
-    assert day_of(sum(1 for v in b if v < 1.0)) == 198  # ⚠ 186 -> 190, see above
-    # ⚠ 1.0243 on 2026-08-14 (was under 1.02): the reserve now weakens the nitrogen
-    # stress minimum by 2.4 % rather than under 2. The regime claim — the stress is
-    # still deep and still bites for ~190 days either way — is what the surrounding
-    # assertions carry; this bound is widened to the measured level, not removed.
-    assert min(b) / min(a) < 1.03  # weakened by under 3 %, regime intact
+# ⚠ RETIRED 2026-08-18 with its subject: ``test_n_limited_keeps_the_regime_it_was_
+# built_for`` stood here. It drove ``n_limited`` twice — the frozen form against the
+# reserve-on candidate — to show the stem reserve did not wreck the nitrogen-limited
+# regime (bite 0.1688 vs 0.1730, biting 199 vs 198 days). C6 of the reference flip
+# deleted ``n_limited``, and this comparison could not follow it: its second arm is a
+# CANDIDATE FORM from a decision already taken, so there is nothing left to compare the
+# frozen tree against. What survives, and is the half worth keeping, is that ``f_N``
+# genuinely bites somewhere — now pinned in the reference on a manufactured condition
+# (`system.rs`, `nitrogen_limitation_is_wired_into_assimilation_and_no_scenario_shows`
+# `_it`).
+# ⚠ The reserve's effect ON that bite is the part with no successor; it is named as a
+# gap in docs/plans/post-roadmap-reference-flip.md §5k rather than quietly dropped.
 
 
 def test_option_Bs_litter_C_to_N_identity_survives_the_nitrogen_free_starch() -> None:

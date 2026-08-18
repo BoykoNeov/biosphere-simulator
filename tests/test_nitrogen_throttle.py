@@ -182,7 +182,6 @@ def test_the_litter_pool_a_throttle_would_read_is_TWO_REGIMES_not_one_number() -
     seen = {}
     for label, scen, years, per in (
         ("sealed_chamber", sc.SEALED_CHAMBER_SCENARIO, 3, False),
-        ("water_biting", sc.WATER_BITING_SCENARIO, 1, False),
         ("perennial", sc.PERENNIAL_CHAMBER_SCENARIO, 5, True),
         ("consumer", sc.CONSUMER_CHAMBER_SCENARIO, 5, True),
     ):
@@ -222,18 +221,22 @@ def test_the_litter_pool_a_throttle_would_read_is_TWO_REGIMES_not_one_number() -
     # so any future move is visible instead of being absorbed by slack.
     shed_cn = _M_C / load_nitrogen_params().n_residual_per_mol_c
     assert shed_cn == 90.0  # the parameter identity this whole band is about
-    for label in ("sealed_chamber", "water_biting"):
-        assert seen[label] > shed_cn, (label, seen[label], shed_cn)
+    # ⚠ TWO SHEDDING-FED ARMS UNTIL 2026-08-18. ``water_biting`` was retired with the
+    # Python-only roster (C6 of the reference flip), and its pin (102.475804) went with
+    # it. The claim narrows honestly: the shedding-fed regime is now witnessed by ONE
+    # scenario rather than two, and that is the cost, stated rather than hidden. The
+    # SEPARATION this test is named for is unaffected — it was always sealed_chamber
+    # against the reset-driven pair.
+    # ⚠ Written WITHOUT a loop, deliberately. A one-element ``for label in (...)`` is
+    # one deletion away from asserting nothing at all, silently — the empty-collection
+    # hazard this repo has been caught by before.
+    assert seen["sealed_chamber"] > shed_cn, (seen["sealed_chamber"], shed_cn)
     # 104.972745 -> this (+0.18 %), and 100.678502 -> this (+0.30 %). As multiples of
     # the shed ratio: 1.1685x and 1.1220x, i.e. 16.9 % and 12.2 % above it.
     assert seen["sealed_chamber"] == pytest.approx(
         105.926531,
         rel=1e-4,  # ⚠ 2026-08-15 canopy 105.827924 -> 105.926531
     )  # ⚠ 2026-08-14 (light path), was 105.163
-    assert seen["water_biting"] == pytest.approx(
-        102.475804,
-        rel=1e-4,  # ⚠ 2026-08-15 canopy 102.17372 -> 102.475804
-    )  # ⚠ 2026-08-14 (light path), was 100.985
     # ⚠ The load-bearing claim of this test is not the tightness of either number — it
     # is that these are a DIFFERENT REGIME from the reset-driven pair below, which sits
     # near 13. That separation is asserted at the end of this function.
@@ -274,8 +277,7 @@ def test_the_litter_pool_a_throttle_would_read_is_TWO_REGIMES_not_one_number() -
     # is set by the dying plant's own composition and sits far below it. That is a
     # sign test against a parameter identity, not a threshold — it cannot drift, and it
     # is what "a throttle would be near-saturated after each reset" depends on.
-    for label in ("sealed_chamber", "water_biting"):
-        assert seen[label] > shed_cn, (label, seen[label])
+    assert seen["sealed_chamber"] > shed_cn, (seen["sealed_chamber"], shed_cn)
     for label in ("perennial", "consumer"):
         assert seen[label] < shed_cn / 4.0, (label, seen[label])
     # ...and the ratio is pinned as the MEASUREMENT it is, so a change is visible.

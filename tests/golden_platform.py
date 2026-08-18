@@ -105,11 +105,17 @@ windows_golden_only = pytest.mark.skipif(
 # two rosters name exactly the same files — the duplication is the gate, not an
 # oversight.
 #
-# The six NOT here stay Python-authored, and each for a stated reason (the census in
+# The TWO NOT here stay Python-authored, and each for a stated reason (the census in
 # `regen_goldens_from_rust.py`): `drift_summary` is folded Python-side from a raw Rust
-# series (*the fold is the artifact*); `n_limited` / `water_biting` / `demo_euler` /
-# `demo_rk4` have no Rust scenario at all; and `state_snapshot` is a hand-authored
-# `sim_io` fixture that Rust *reads*.
+# series (*the fold is the artifact*), and `state_snapshot` is a hand-authored `sim_io`
+# fixture that Rust *reads*.
+#
+# ⚠ SIX UNTIL 2026-08-18, and the other four did not become Rust-authored — they
+# were DELETED (C6 of the reference flip). `n_limited`, `water_biting`, `demo_euler`
+# and `demo_rk4` had no Rust scenario at all and no manifest entry, so each was a
+# golden the reference could not produce and no contract required. The roster went 25
+# goldens to 21 with no value moving anywhere, and the reference's share of it went
+# 19/25 to 19/21.
 #
 # ⚠ **Nineteen since slice C5, and only one of the two folded summaries could move.**
 # `domains::biosphere::drift` now carries the fold kit, so `emit_sealed_energy_drift`

@@ -902,9 +902,17 @@ _ROSTER = [
         True,
     ),
     ("consumer_chamber", sc.CONSUMER_CHAMBER_SCENARIO, sc.CONSUMER_CHAMBER_YEARS, True),
-    ("n_limited", sc.N_LIMITED_SCENARIO, sc.N_LIMITED_YEARS, False),
-    ("water_biting", sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS, False),
 ]
+# ⚠ SIX UNTIL 2026-08-18. ``n_limited`` and ``water_biting`` were retired with the
+# rest of the Python-only roster (C6 of the reference flip), so this roster is now
+# exactly the four the reference carries. The gate below is UNCHANGED by that: measured
+# before the deletion, the departing peaks were 0.0869 (n_limited) and 0.4718
+# (water_biting), and the ``max(chambers)`` the gate pins is 0.5849, which is
+# ``consumer_chamber`` — a survivor. Neither was ever the binding number.
+#
+# ⚠ It also removes a mislabel: ``n_limited`` is an OPEN-FIELD run by its own
+# declaration, and this function counted every label except ``open_season`` as a
+# "chamber". The four that remain really are open field + three chambers.
 
 
 def test_the_area_rule_transfers_because_lai_is_LINEAR_in_leaf_carbon() -> None:

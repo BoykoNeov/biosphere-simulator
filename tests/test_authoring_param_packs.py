@@ -8,7 +8,8 @@ unit validation — a pack is a param file, not a way around the guards. Proven:
    0.949/0.675 (with a different ``source:``, which is recorded-not-parsed)
    reproduces ``crew_state.json`` byte-for-byte — the pack *path* is faithful.
 2. **Changed pack → predicted shift** (the "it bit" reconstruct-the-factor gate,
-   the ``n_limited``/``water_biting`` precedent): a cultivar pack with
+   the additive-scenario precedent set by ``n_limited``/``water_biting``, both
+   retired 2026-08-18): a cultivar pack with
    ``respired_carbon_fraction`` 0.949→0.80 respires less CO₂ and egests more feces,
    in the exact 0.80/0.20 split, while the forced ``food_store`` depletion and the
    whole WATER/OXYGEN side stay bit-identical, and CARBON is conserved every step.

@@ -32,7 +32,6 @@ from domains.biosphere.scenario import (
     DEEP_WATER_SCENARIO,
     DEFAULT_SCENARIO,
     PERENNIAL_CHAMBER_SCENARIO,
-    WATER_BITING_SCENARIO,
     SeasonScenario,
 )
 from domains.biosphere.season import (
@@ -127,36 +126,14 @@ def test_both_stores_are_derived_from_geometry_not_chosen() -> None:
     assert s.soil_moisture_index == 1.0
 
 
-def test_water_biting_declares_one_lean_profile_not_a_dry_layer() -> None:
-    """The MAI declaration scales BOTH stores, which is why the override could go.
-
-    ``water_biting`` used to be the one scenario forcing ``subsoil_water0 = 0``, because
-    a fixed 195 kg subsoil "would pump ~2.3 kg/day into a 50 kg chamber and abolish the
-    water stress this scenario exists to exercise". Under geometry the subsoil scales
-    with the same MAI, so it abolishes nothing — and keeping the override would KILL the
-    crop (a sealed chamber holding 1.95 kg of total water grows nothing, and its roots
-    freeze at the sowing depth besides). Pinned so the retirement stays deliberate.
-    """
-    s = WATER_BITING_SCENARIO
-    mai = s.soil_moisture_index
-    assert mai == 0.05
-    assert s.soil_water0 == pytest.approx(
-        captured_water(
-            s.rooted_depth0,
-            soil_extractable_water=s.soil_extractable_water,
-            ground_area=s.ground_area,
-        )
-        * mai
-    )
-    assert s.subsoil_water0 == pytest.approx(
-        captured_water(
-            s.soil_depth - s.rooted_depth0,
-            soil_extractable_water=s.soil_extractable_water,
-            ground_area=s.ground_area,
-        )
-        * mai
-    )
-    assert s.subsoil_water0 > 0.0  # the retired override
+# ⚠ RETIRED 2026-08-18 with its subject: ``test_water_biting_declares_one_lean_
+# profile_not_a_dry_layer`` stood here. ``water_biting`` was deleted by C6 of the
+# reference flip, and the claim is NOT lost — the two identities it asserted (both
+# stores are ``depth x EXTR x rho x A x MAI``) are asserted for EVERY scenario by
+# ``test_every_scenarios_water_stores_are_geometric`` below, which enumerates from the
+# module rather than a hand list. What went with the scenario is only the historical
+# note that its ``subsoil_water0 = 0`` override had been retired in favour of one lean
+# MAI profile; that record now lives in docs/plans/post-roadmap-soil-water-rebasing.md.
 
 
 # --- the flow ------------------------------------------------------------------------
@@ -238,7 +215,8 @@ def test_capture_and_depth_use_the_same_gated_rate() -> None:
 def test_a_dry_subsoil_stops_root_extension() -> None:
     # [F] Box 14.1: "If WSTORG = 0 Then GRTD = 0" — roots do not extend into dry soil.
     # This is what makes a scenario's `subsoil_water0` load-bearing rather than
-    # decorative, and it is why `water_biting`/`drought` had to declare theirs.
+    # decorative, and it is why `drought` declares its own (`water_biting` did too,
+    # until C6 of the reference flip retired it on 2026-08-18).
     dry = _run(replace(DEFAULT_SCENARIO, subsoil_water0=0.0))
     assert {s.aux[ROOTED_DEPTH] for s in dry} == {DEFAULT_SCENARIO.rooted_depth0}
     # ...against the same run with water below, where the roots reach the crop's cap.
@@ -468,8 +446,8 @@ def test_drought_declares_a_stratified_profile_deliberately() -> None:
     # its own construction — the reachable subsoil does not weaken that cascade, it
     # abolishes it (measured; see the scenario comment). Pinned so a future default
     # change cannot silently re-water it. WARNING: `water_biting` was in this pin until
-    # 2026-08-12 and is not any more: it now declares ONE lean profile via MAI, which is
-    # both the honest reading and the survivable one. See the test above.
+    # 2026-08-12, when it moved to ONE lean profile via MAI; the scenario itself was
+    # retired on 2026-08-18 (C6 of the reference flip).
     from domains.biosphere.scenario import DROUGHT_SCENARIO
 
     assert DROUGHT_SCENARIO.subsoil_water0 == 0.0
@@ -484,7 +462,8 @@ def test_drought_declares_a_stratified_profile_deliberately() -> None:
 # --- every scenario, not just the three that happened to have a pin -------------------
 # ⚠ WHY THIS IS PARAMETRIZED OVER THE WHOLE ROSTER. The two identities below held on the
 # frozen tree by INHERITANCE — most scenarios take the defaults — so the pins that
-# existed covered `DEFAULT`, `water_biting` and `drought` and nothing else. That is
+# existed covered `DEFAULT`, `water_biting` (retired 2026-08-18) and `drought` and
+# nothing else. That is
 # precisely the gap `harvest` demonstrated on 2026-08-12: it overrode `rooted_depth0`
 # (a 1.3 m root system, injected past anthesis) while inheriting the 0.15 m zone's
 # water,
@@ -564,7 +543,12 @@ def test_the_roster_this_covers_is_not_empty_and_includes_the_station() -> None:
     names = [n for n, _ in _named_scenarios()]
     assert len(names) >= 8, names
     assert any(n.startswith("station:") for n in names), names
-    assert any(n.endswith("WATER_BITING_SCENARIO") for n in names), names
+    # ⚠ This named ``WATER_BITING_SCENARIO`` until 2026-08-18 (C6 of the reference
+    # flip retired it). The point of the assertion is that the enumeration reaches a
+    # scenario declaring NON-DEFAULT stores — inherit-the-defaults everywhere would make
+    # the identities above true by construction — so it now names ``DROUGHT``, which is
+    # the surviving scenario that declares its own.
+    assert any(n.endswith("DROUGHT_SCENARIO") for n in names), names
 
 
 def test_the_harvest_injection_keeps_depth_and_water_together() -> None:

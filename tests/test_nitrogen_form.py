@@ -515,10 +515,7 @@ def test_litter_pool_cn_is_TWO_regimes_set_by_which_event_fills_the_pool() -> No
 
     # --- regime 1: SHEDDING-FED (no annual reset) ------------------------------------
     shedding_ratios: list[float] = []
-    for scenario, years in (
-        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS),
-        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS),
-    ):
+    for scenario, years in ((sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS),):
         rows = _litter_rows(scenario, years, resets=False)
         at_peak, _ = peak(rows)
         # AT the shed ratio now, not 2.7x pushed away from it. The residual above
@@ -676,7 +673,7 @@ def test_the_pool_cn_IS_the_shed_ratio_and_the_deviation_is_the_N_FREE_SEED() ->
       **1.125x wheat straw's ~80**, not 1.25x;
     * the committed scenarios' deviation is a known **unphysical initial condition**,
       and it decays at ``decomposition_rate`` like anything else in the pool — which is
-      why ``sealed_chamber`` (3 yr) ends at 90.6 while ``water_biting`` (1 yr) still
+      why ``sealed_chamber`` (3 yr) ends at 90.6 while a 1-yr sealed run still
       reads 98.6 with ~0.10 mol of seed carbon left.
 
     ⚠ If anyone ever adds a ``litter_n0`` counterpart, the committed-scenario bounds in
@@ -686,10 +683,7 @@ def test_the_pool_cn_IS_the_shed_ratio_and_the_deviation_is_the_N_FREE_SEED() ->
     nitro = load_nitrogen_params()
     shed_cn = _CARBON_FRACTION / (nitro.n_residual_per_mol_c / nitro.dm_kg_per_mol_c)
 
-    for scenario, years in (
-        (sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS),
-        (sc.WATER_BITING_SCENARIO, sc.WATER_BITING_YEARS),
-    ):
+    for scenario, years in ((sc.SEALED_CHAMBER_SCENARIO, sc.SEALED_CHAMBER_YEARS),):
         seedless = replace(scenario, litter_carbon0=0.0)
         rows = _litter_rows(seedless, years, resets=False)
         ratios = [c * _M_C / n for n, c in rows if n > 0.0]

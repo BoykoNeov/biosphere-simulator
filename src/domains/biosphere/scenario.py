@@ -138,9 +138,12 @@ class SeasonScenario:
     # ⚠ Bit-identically inert on all 7 frozen scenarios and MEASURED so, not assumed:
     # every one of them holds WSFG ≡ 1 (min FTSW 0.7039 on drought, against wssg 0.30),
     # and WSFD(1) = 1 exactly. Only `water_biting` (min WSFG 0.1667) and `deep_water`
-    # (0.2677) move. Consequence: this unfreeze moves NOTHING in the manifest — no aux,
-    # no flow, no param file, no frozen golden — so `water_biting_state.json`, which is
-    # not in the manifest, is the only automatic gate there is.
+    # (0.2677) moved. Consequence: this unfreeze moves NOTHING in the manifest — no
+    # aux, no flow, no param file, no frozen golden.
+    # ⚠ `water_biting_state.json` WAS the only automatic gate there is, and it was
+    # deleted on 2026-08-18 (C6 of the reference flip). Nothing in this tree gates
+    # WSFD any more; the reference does, on a manufactured condition
+    # (`system.rs::drought_acceleration_is_wired_into_the_accumulator_...`).
     #
     # ⚠ Sits here rather than in params/crops/*/phenology.yaml only because `wssg` — the
     # SAME ROW of the same table — already does; in [F] both are indexed by crop.
@@ -180,9 +183,9 @@ class SeasonScenario:
     # ⚠ It must be > 0 for any scenario whose roots are meant to grow: [F]'s Box 14.1
     # carries ``If WSTORG = 0 Then GRTD = 0`` (roots do not extend into dry soil), so a
     # zero here freezes rooted depth. ``drought`` sets 0 deliberately — see its comment.
-    # (``water_biting`` used to as well; the re-basing RETIRED that override, because a
-    # subsoil that scales with the same MAI no longer abolishes the stress it was
-    # protecting — measured. See its scenario comment.)
+    # (``water_biting`` used to as well; the re-basing RETIRED that override in 2026-08,
+    # because a subsoil that scales with the same MAI no longer abolished the stress it
+    # was protecting — measured. The scenario itself was retired on 2026-08-18.)
     subsoil_water0: float = 175.5  # kg
     # EXTR, the volumetric extractable soil water (drained upper limit − lower limit).
     # SCENARIO/SOIL data like sw_wilting/ground_area, not a crop param — it is a
@@ -206,7 +209,8 @@ class SeasonScenario:
     # 0.15 m is the BOTTOM of that range — the cautious end, since a shallower start
     # makes the root-zone access gate tighter, not looser. Applies at sowing and at
     # every re-sow (``annual_reset``): a re-sown crop starts with the root system a sown
-    # crop has, which is what made ``water_biting``'s dry-throughout profile survivable.
+    # crop has, which is what made ``water_biting``'s dry-throughout profile survivable
+    # while that scenario existed (retired 2026-08-18).
     rooted_depth0: float = 0.15  # m
     # MAI, the moisture availability index — [F] Eqns 14.25-14.28. "These variables have
     # values between 0 and 1. A value of 0 indicates that soil water is at the lower
@@ -262,9 +266,10 @@ class SeasonScenario:
     # untestable.
     #
     # This is a SCENARIO-DATA change, not a calibration: it moves no cited value and no
-    # rate. n_limited overrides it deliberately (a tiny reserve inside the f_N band) and
-    # that scenario is unaffected — it is open-field, so it has no N-shedding flow at
-    # all.
+    # rate. ``n_limited`` overrode it deliberately (a tiny reserve inside the f_N band)
+    # and was unaffected — it was open-field, so it had no N-shedding flow at all. That
+    # scenario was retired on 2026-08-18; the reference now manufactures the same
+    # concentration directly.
     plant_n0: float = 0.000243294816
     sn_residual: float = 1.0  # kg N (soil-N availability band, scenario/soil data)
     sn_critical: float = 50.0  # kg N
@@ -474,96 +479,20 @@ CONSUMER_CHAMBER_YEARS: int = 5
 # cannot drift.
 LONG_HORIZON_YEARS: int = 15
 
-# --- Additive dormant-machinery scenarios (NOT frozen reference scenarios) -----------
-# Two **additive, non-reference** scenarios that deliberately drive code paths the seven
-# frozen scenarios leave dormant: the ``f_N`` photosynthesis limiter (every frozen
-# scenario keeps ``f_N ≡ 1`` — verified by ``test_*_f_n_stays_one``) and the sealed
-# water cycle's ``f_water`` (tuned **inert** in the frozen chambers — ``soil_water``
-# stays far above the stress band, so ``f_water ≡ 1``). Purpose: flush latent bugs in
-# the never-run-hot limiter integration before Phase 5 builds on it. **These are NOT
-# part of the freeze reference** (not in ``biosphere-reference.manifest.json``): they
-# add no flow/aux/param — only new scenario *data* + their own goldens — so every frozen
-# trajectory stays byte-identical. Sized by probe (the Step-4 rhythm); see each note.
-
-# **N-limiting** (open field, single season): N-limitation **by dilution** — the primary
-# mechanism ``nitrogen.py`` names. A deliberately small fixed plant-N reserve
-# (``plant_n0`` ~ the f_N critical concentration times the seedling biomass) puts the
-# whole-plant N concentration ``plant_n / (leaf+stem+root)`` inside the
-# ``(n_residual, n_critical)`` band at sowing; as biomass grows the concentration falls
-# *through* the band, so ``f_N`` ramps below 1 and N-limits gross assimilation (probe:
-# ``f_N`` reaches ~0.55, biting on ~66 of 305 steps, then recovers as the plant dies
-# back). Uptake is shut **off**: ``soil_n0`` below the default ``sn_residual=1.0``,
-# so ``soil_n_availability ≡ 0`` and ``NitrogenUptake`` yields a structural zero leg
-# every step — which keeps ``plant_n`` constant so the bite is pure dilution,
-# unconfounded by uptake. (The ``soil_n_availability`` *middle* ramp cannot be
-# co-exercised arbitration-free **with this dilution bite**: it pins ``plant_n`` in
-# the tiny f_N band, where the frozen ``max_uptake_capacity = 0.0015`` kg N/m2/day is
-# ~15x that band per day, so any in-band uptake either floods ``plant_n`` past the f_N
-# band or exhausts ``soil_n`` in one step -> the Euler backstop. The ramp IS traversable
-# in a *healthy-plant* run with a narrow high soil-N band, but that would not make f_N
-# bite — a different experiment, out of this scenario's two-scenario scope. So this
-# scenario owns the f_N concentration ramp + the uptake-shutoff path; the availability
-# *middle* ramp stays an integrated never-run-hot path, unit-tested in
-# ``test_nitrogen.py``.) Open field (the only place with no N return loop), single
-# season, ``rationed == 0`` / ``events == ()`` / loss-sink ``0.0``.
-N_LIMITED_SCENARIO: SeasonScenario = SeasonScenario(
-    plant_n0=6e-5,  # kg N — tiny reserve ⇒ conc in the f_N band, diluted by growth
-    soil_n0=0.5,  # kg N < sn_residual (1.0) ⇒ availability ≡ 0, uptake off (dilution)
-)
-N_LIMITED_YEARS: int = 1
-
-# **Water-biting** (sealed chamber, single season): the sealed water cycle made to
-# **bite** instead of run inert. The frozen chambers start at the drained upper limit
-# (``soil_moisture_index = 1``), so the closed loop (``soil_water -> water_vapor ->
-# condensate -> soil_water``) keeps ``FTSW`` far above ``wssg = 0.30`` and ``f_water ≡
-# 1``. Here the whole profile starts at **5 % of the upper limit**, so ``FTSW`` runs
-# 0.05-0.32 and ``f_water`` bottoms at 0.167 — water-limiting gross assimilation all
-# season while the plant survives (leaf C peak 0.7621, storage C 0.2452, against 0.8299
-# / 0.2610 under the retired declaration; ⚠ 0.6941 / 0.3266 since WSFD made drought
-# accelerate development — this is one of only TWO runs in the tree where water limits
-# at all, so it absorbs every water-side change while the frozen roster stays
-# untouched). Ample-O2 sibling of the perennial chamber
-# (``litter_carbon0 = 3``, default O2 = 210) so the carbon story is the clean perennial
-# one and the water bite is the only novelty. Single season, the water-loop total
-# conserved to round-off (measured 9.7500 -> 9.750000 exactly), ``rationed == 0`` /
-# ``events == ()`` / loss-sink ``0.0``. Keeps ``f_N ≡ 1`` (default ``plant_n0``) —
-# purely
-# water.
+# --- RETIRED 2026-08-18: the two additive dormant-machinery scenarios ---------------
+# ``N_LIMITED_SCENARIO`` and ``WATER_BITING_SCENARIO`` lived here. They were additive,
+# never-frozen scenarios (in no manifest) that existed to drive two limiters the seven
+# frozen scenarios leave dormant: ``f_N`` (nothing else in either tree ever took it
+# below 1) and the sealed ``f_water``. C6 of the reference flip retired them with the
+# rest of the Python-only roster — the reference carries no such scenarios, so keeping
+# them would have meant a checker asserting science the reference cannot run.
 #
-# ⚠ **RE-DECLARED 2026-08-12, because its old declaration named a band that no longer
-# exists.** It was ``soil_water0 = 50`` kg "inside ``(sw_wilting, sw_critical) = (20,
-# 60)``" — an absolute-kg band the geometry re-basing deleted. The replacement is one
-# number, ``soil_moisture_index``, and it was chosen against the scenario's OWN existing
-# contract written down first (``tests/test_water_biting.py``: a sustained bite, >30
-# days
-# below ~0.5; never fully wilted, ``0 < f <= 1``; the crop alive; the loop conserved),
-# then swept 0.10 → 0.02 and measured. 0.05 is the value that meets all four.
-WATER_BITING_SCENARIO: SeasonScenario = SeasonScenario(
-    sealed=True,
-    litter_carbon0=3.0,
-    # MAI = 0.05: the profile at 5 % of the drained upper limit. FTSW₀ = MAI, so this IS
-    # the sowing stress, and it needs no arithmetic against a store size — which is the
-    # whole advantage of the fraction over the band it replaced.
-    soil_moisture_index=0.05,
-    soil_water0=0.975,  # kg = 0.15 × 0.13 × 1000 × 1 × 0.05  ([F] Eqn 14.26)
-    # ⚠ **ITS DRY-SUBSOIL OVERRIDE IS RETIRED, ON A MEASUREMENT.** This scenario used to
-    # be the one place declaring ``subsoil_water0 = 0``, because "the default 195 kg
-    # subsoil would pump ~2.3 kg/day into a 50 kg chamber and ABOLISH the water stress
-    # this scenario exists to exercise". That reasoning was sound against a subsoil that
-    # did not scale: under geometry the subsoil is ``(1.5 − 0.15) × 0.13 × 1000 × MAI``
-    # =
-    # 8.775 kg at MAI 0.05, not 195, and it abolishes nothing — measured, FTSW stays
-    # ≤ 0.319 with it present. Keeping the override would instead KILL the crop at every
-    # MAI tried (leaf C 0.0500, storage C 0.0000): a sealed chamber holding 1.95 kg of
-    # total water grows nothing, and its roots are frozen at the sowing depth by
-    # ``WSTORG = 0 ⇒ GRTD = 0`` besides. A lean chamber is lean *in proportion*, which
-    # is
-    # what one MAI for the whole profile says. This also retires the depth-freezing trap
-    # the soil-layers build had to reason around.
-    # kg = (1.5 − 0.15) × 0.13 × 1000 × 1 × 0.05  ([F] Eqns 14.27/14.28)
-    subsoil_water0=8.775,
-)
-WATER_BITING_YEARS: int = 1
+# ⚠ Their claims did NOT go with them. Both are now manufactured-condition pins in the
+# reference: ``science.rs::the_nitrogen_stress_ramp_is_linear_between_its_two_knots`` /
+# ``system.rs::nitrogen_limitation_is_wired_into_assimilation_and_no_scenario_shows_it``
+# and, for the water side, ``drought_acceleration_is_wired_into_the_accumulator_and_no_
+# scenario_shows_it``. The full accounting, including what was NOT carried over, is in
+# docs/plans/post-roadmap-reference-flip.md §5k.
 
 
 # The post-roadmap **day-neutral** crop (the "second wheat"): an open-field plot with
@@ -647,7 +576,8 @@ POTATO_YEARS: int = 1
 # only scenario with irrigation to cut (the sealed chamber dropped it in Step 3 for
 # genuine water closure), so drought necessarily lives here. All other fields default.
 #
-# ⚠ It declares a DRY SUBSOIL for the same reason ``water_biting`` does, and the number
+# ⚠ It declares a DRY SUBSOIL for the same reason ``water_biting`` did (retired
+# 2026-08-18), and the number
 # that forced the decision is recorded rather than the decision merely asserted
 # (post-roadmap soil layers). A plot defined as *water-lean* cannot have a hidden
 # reservoir under it — but the measurement is the point, because the default profile
