@@ -1331,7 +1331,7 @@ classified `python` and would otherwise stay that way forever.
 |---|---|---|
 | C4 | **The science-gate census** | 15 pytest markers produce ~104 of the biosphere manifest's 208 lines. It is the **single largest Python-authored block of any contract**, and it has no Rust route at all while the gates are pytest functions |
 | C5 | **`drift.py`'s folds** | ends the "one run, two authors" split slice 5 created and slice 7 inherited — two goldens in two manifests |
-| C6 | **The 4 Python-only scenarios — RETIRE** (decided 2026-08-17) | now a **deletion with a written reason per scenario**, not a port. `demo_*` is a skeleton; `n_limited`/`water_biting` are science the Rust roster never carried. The record is the whole slice — a silent retirement is what it exists to prevent |
+| C6 | **The 4 Python-only scenarios — RETIRE** (decided 2026-08-17) — **COMPLETE 2026-08-18, §5k** | now a **deletion with a written reason per scenario**, not a port. `demo_*` is a skeleton; `n_limited`/`water_biting` are science the Rust roster never carried. The record is the whole slice — a silent retirement is what it exists to prevent |
 | C7 | **The manifest generators** | they are Python scripts that *write* the three frozen contracts. Until they move, "Rust is the reference" has a Python-shaped hole in the middle of it |
 
 **Stage 3 — the suite.** ~2,300 tests, 51k lines. Not one slice; a classification pass first,
@@ -2411,3 +2411,141 @@ found the same thing about C4 six hours earlier — from the other side.
   compile error rather than something a meta-test hunts textually).
 * **NOTHING IS BUILT.** `git diff` is empty for `src/`, `rust/`, the goldens and all three
   manifests; the probe lives in `M:/claud_projects/temp/c4-science-gates/`.
+
+
+## §5k C6 — the four Python-only scenarios retire, COMPLETE 2026-08-18
+
+The user's decision of 2026-08-17 executed: `n_limited`, `water_biting`, `demo_euler`
+and `demo_rk4` **deleted, not ported**, each with a written reason. Taken deliberately
+BEFORE C4's build, because C4's mutual-shading gate asserts over a six-scenario roster
+two of whose members were this slice's subject (§5j's unlisted dependency).
+
+### The gating check, done before predicting anything else
+
+All four names occur **zero times** in all three `.manifest.json` files. So C6 is **not
+an unfreeze of any contract** — it is a deletion of goldens no contract requires and of
+tests no manifest names. That single grep is what made the rest of the slice ordinary.
+
+Roster effect: **25 goldens → 21**, and the reference's share **19/25 → 19/21**, with no
+value moving anywhere. `RUST_AUTHORED` is untouched at 19; the Python-authored remainder
+falls from six to **two** (`drift_summary`, whose fold is the artifact — C5's measured
+refusal — and `state_snapshot`, which Rust *reads*).
+
+### ⚠ The successor landed FIRST, and the measurement that forced it
+
+`nitrogen_stress_factor` had **zero test callers anywhere in `rust/`**. Every Rust
+scenario holds `f_N ≡ 1`; `n_limited` was the one run in either tree that drove the
+limiter below 1. Deleting it would have left a branch of the **reference** exercised by
+nothing — the exact failure a "retirement with a written reason" exists to prevent, and
+the one thing in this slice that could not have been fixed after the fact.
+
+So the claims moved before the scenario died, in the shape Rust already uses for the
+water side (`drought_acceleration_is_wired_into_the_accumulator_and_no_scenario_shows_it`
+manufactures its condition rather than carrying `water_biting`):
+
+* `science.rs::the_nitrogen_stress_ramp_is_linear_between_its_two_knots` — knots EXACT,
+  monotone through the interior, plus `soil_n_below_the_residual_shuts_uptake_off_entirely`
+  (the shutoff that made the scenario *pure dilution*).
+* `system.rs::nitrogen_limitation_is_wired_into_assimilation_and_no_scenario_shows_it` —
+  the wiring, on a constructed run copying the retired declaration: a real sustained
+  bite, never N-dead, `rationed == 0` / no events, and a lower peak vegetative biomass
+  than an otherwise-identical N-replete run.
+
+**Two negative controls, each reddening a different load-bearing line and NOTHING else
+in the Rust suite** — which is also the measurement behind the tests' own warnings:
+
+| Control | Result |
+|---|---|
+| drop the `f_water * f_n` multiply in `flows.rs` | **1 of 45 red** — and on "stressed, never N-dead": unthrottled, the plant outgrows its fixed reserve and `f_N` reaches exactly 0 |
+| flatten the ramp to `1.0` | **2 red** — the knot pin and "`f_N` never bit" |
+
+⚠ **The linearity pin uses a band with representable knots, deliberately.** On the
+frozen band (1/90, 1/45) the midpoint reads `0.49999999999999994` — the round-off of the
+arithmetic *building the input*, not the function's. Pinning `== 0.5` there would have
+frozen an accident. Recorded because the first draft did exactly that and went red.
+
+### The price: two claims with no successor, and two narrowings
+
+Retired explicitly rather than quietly, each with a tombstone comment at its old site:
+
+1. **`test_stem_reserves`'s two-row CO₂-trough comparison.** `water_biting` was the only
+   row taking the non-bit-identical branch — at `dt = 1` its trough preceded the single
+   fill event, and the quarter-day step re-timed the two so it no longer did, which is
+   what proved the bit-identity was a claim about *when* that scenario's trough happens
+   rather than about the reserve being inert. Its bound (the reserve moves the trough by
+   under 5 %) has no subject left. The exact half survives on `sealed_chamber`.
+2. **The same file's reserve-vs-frozen check on the N-limited regime** (bite 0.1688 vs
+   0.1730, biting 199 vs 198 days). Its second arm is a **candidate form from a decision
+   already taken**, so nothing remains to compare the frozen tree against. ⚠ The
+   reserve's effect ON the nitrogen bite is the part with **no successor** — named here
+   as a gap rather than dropped.
+
+And two narrowings, stated where they happened:
+
+* the shedding-fed litter C:N regime is now witnessed by **one** scenario instead of
+  two. The surviving arm was **de-looped** — a one-element `for label in (...)` is one
+  deletion away from asserting nothing, silently — and negative-controlled: inverting it
+  fails at **105.93 vs 90.0**, a margin rather than a near miss.
+* the fractionation table's four claims now rest on **three carbon-limited runs**, none
+  of which exercises water limitation at all. `water_biting` was the row that moved
+  furthest on every re-measurement, precisely because it had the most nonlinearity for a
+  coarse step to truncate.
+
+### What did NOT need a successor — measured before touching anything
+
+| Claim | Where it already lives |
+|---|---|
+| both water stores are `depth × EXTR × ρ × A × MAI` | `test_every_scenarios_water_stores_are_geometric`, parametrized over an enumeration **from the module** — it auto-shrank with the deletion |
+| the drought accelerator is wired in | the Rust manufactured-condition test, which already named `water_biting` as the Python field it copies |
+| `f_N` bites somewhere | the new Rust pair above |
+
+### C4's blocker cleared, and a mislabel with it
+
+Peak LAI measured for all six roster members **before** the edit, because the gate's
+`max(chambers) < 1.0` pin carries an inline `0.585` and a departing scenario owning that
+number would have forced a re-measurement (§5j's own falsifier):
+
+| scenario | peak LAI | |
+|---|---|---|
+| `open_season` | 6.0228 | survives |
+| `consumer_chamber` | **0.5849** | survives — **this is the pinned number** |
+| `sealed_chamber` | 0.5425 | survives |
+| `perennial_chamber` | 0.4927 | survives |
+| `water_biting` | 0.4718 | retired |
+| `n_limited` | 0.0869 | retired |
+
+Neither departing peak was ever binding, so **the gate's numbers do not move** and it now
+reads over exactly the four scenarios the reference carries — C4 can port it without
+truncating its own claim. It also drops a mislabel: the gate calls every label except
+`open_season` a "chamber", and `n_limited` is an **open-field** run by its own
+declaration.
+
+### ⚠ Prose was corrected by TENSE, and this is the C3 finding a third time
+
+Roughly a dozen sites carried **present-tense claims about what the tree CONTAINS** —
+"`water_biting` is one of only two runs in the tree where water limits", "`n_limited` is
+the one place `f_N` bites", "`water_biting` is a sealed chamber outside the manifest
+entirely". Every one became false the moment the scenario went, and **no gate in either
+tree compares such a sentence to the tree**. They were rewritten to past tense with the
+retirement date, not deleted — the measurement they record is still true of the day it
+was taken. A separate class was left alone: "the `n_limited`/`water_biting` precedent"
+in the authoring and power tests names a **discipline**, which survives its exemplar;
+only the dangling *file* pointers (`Mirrors test_regression_n_limited_season.py`) were
+repaired.
+
+### Scope held deliberately
+
+* **`build_demo` and `params/demo.yaml` STAY.** C6 retired the two demo *goldens* and
+  their regression gate, not the Phase-0/1 skeleton — `test_biosphere_demo.py` asserts
+  engine-assembly properties, a different subject, and its fate is Stage 3's.
+  ⚠ Consequence recorded at the exclusion site: `demo.yaml` is now frozen by **nothing**.
+* **No science was taken in the same batch** (CLAUDE.md's rule). The Rust successor adds
+  no mechanism, no value and no scenario; it re-homes an existing exercise of existing
+  frozen science.
+
+### Verification
+
+`cargo test` + `cargo clippy --all-targets` green; `uv run pytest -n 12` **2439 passed,
+5 skipped** — with no bound anywhere loosened, no threshold widened and no golden
+regenerated. Commits `34430ed` (successor) and `01bf957` (retirement); the probes are in
+`M:/claud_projects/temp/c6-scenario-retirement/`.

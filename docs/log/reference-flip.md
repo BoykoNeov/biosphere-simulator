@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9 and C3 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, and the posture itself into CLAUDE.md 2026-08-18)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3 and C6 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, and the four Python-only scenarios retired the same day)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -1324,3 +1324,72 @@ section went, because every sentence in it was a second copy of the header, the 
 Working style. Final 10,906 B with 1,094 B spare. ⚠ *When an always-loaded file must grow, the
 budget is paid by finding the duplicate — a section that only restates other sections is the
 cheapest thing in the file and the hardest to notice.*
+
+### C6 — the four Python-only scenarios retire, and the successor had to land first (2026-08-18)
+
+The user's decision of 2026-08-17 executed: `n_limited`, `water_biting`, `demo_euler` and
+`demo_rk4` deleted rather than ported, each with a written reason. Taken before C4's build
+because C4's mutual-shading gate asserts over six scenarios, two of which were this slice's
+subject. The goldens go 25 → 21 and the reference's share of them 19/25 → 19/21, with **no
+value moving anywhere** — all four names occur zero times in all three manifests, so nothing
+here was an unfreeze.
+
+**⚠ Retiring the LAST run that reaches a branch is not a deletion, it is an orphaning — and the
+grep that proves it takes a minute.** `nitrogen_stress_factor` had **zero test callers anywhere
+in `rust/`**. Every Rust scenario holds the nitrogen limiter at exactly 1, so `n_limited` was
+the only run in either tree that ever drove it below 1; deleting it would have left a branch of
+the *reference* exercised by nothing, and that is not fixable after the fact the way a stale
+comment is. The successor landed **first**, in the shape Rust already used for the water side:
+manufacture the condition in a test rather than carry a scenario. Two negative controls,
+each reddening a different load-bearing line and **nothing else in the suite** — dropping the
+`f_water * f_n` multiply reddens exactly one of 45 tests; flattening the ramp reddens two.
+*The generalizable form: before deleting a scenario, ask which branches it is the last witness
+of, and answer it by grepping the REFERENCE for test callers — not by reading the scenario's
+own docstring, which describes what it does and never what nothing else does.*
+
+**Two claims had no successor, and the slice's value is that they are named rather than
+absorbed.** A two-row CO₂-trough comparison lost the only row that took its non-bit-identical
+branch, so the bound it carried has no subject left; and a reserve-vs-frozen check on the
+nitrogen-limited regime cannot follow, because its second arm is a *candidate form from a
+decision already taken* — there is nothing left to compare the frozen tree against. Both got a
+tombstone comment at the old site. Two further claims narrowed rather than died: the
+shedding-fed litter C:N regime now has one witness instead of two, and the fractionation
+table's four claims now rest on three carbon-limited runs, none of which exercises water
+limitation at all.
+
+**⚠ A one-element `for label in (...)` is one deletion away from asserting nothing.** Reducing
+a two-arm comparison to one arm left exactly that shape, so the survivor was rewritten without
+the loop and negative-controlled: inverted, it fails at 105.93 against 90.0 — a margin, not a
+near miss. *A loop over a literal collection is a vacuity hazard the moment the collection
+stops being plural.*
+
+**What did NOT need a successor was also measured, not assumed.** The water-store geometry
+identities the deleted test asserted are already asserted for *every* scenario by a test that
+enumerates from the module rather than a hand list — so it auto-shrank with the deletion and
+lost nothing. ⚠ *Before writing a successor, check whether the roster-wide test already covers
+the claim; a per-scenario pin is often a survivor of the era before the roster-wide one
+existed.*
+
+**The blocker C4 was waiting on cleared without a number moving, and that was measured before
+the edit.** The mutual-shading gate pins `max(chambers) < 1.0` with an inline `0.585`, and a
+departing scenario owning that number would have forced a re-measurement. Peaks taken for all
+six first: the pinned number is `consumer_chamber`'s 0.5849, a survivor; the departing peaks
+were 0.4718 and 0.0869, neither ever binding. ⚠ *Measure the pin's provenance before shrinking
+the roster it reads — the falsifier is cheap and finding it afterwards is not.* The edit also
+dropped a mislabel: the gate calls every label except `open_season` a "chamber", and one of the
+departing scenarios was an open-field run.
+
+**Prose was corrected by TENSE — the third instance of C3's finding, arriving from a new
+direction.** A dozen sites carried present-tense claims about what the tree *contains* ("one of
+only two runs in the tree where water limits", "the one place `f_N` bites", "a sealed chamber
+outside the manifest entirely"). Every one became false the moment the scenario went, and no
+gate in either tree compares such a sentence to the tree. They were rewritten with the
+retirement date rather than deleted, because the measurement each records is still true of the
+day it was taken. ⚠ *A separate class was deliberately left alone: prose naming a **discipline**
+("the `n_limited` precedent") survives its exemplar; only the dangling **file** pointers needed
+repair. Deleting both would have thrown away the reason the discipline exists.*
+
+⚠ **Scope held: the demo skeleton stays.** C6 retired the two demo goldens and their regression
+gate, not `build_demo` — whose own tests assert engine-assembly properties, a different subject
+and Stage 3's problem. The consequence is recorded where it bites: `demo.yaml` is now frozen by
+nothing.
