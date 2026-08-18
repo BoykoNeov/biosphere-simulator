@@ -26,8 +26,6 @@ is byte-identical *trivially* because Step 0 reuses the frozen ``load_crew_param
 loader by name (inline/override param packs are Step 1).
 """
 
-from pathlib import Path
-
 import pytest
 
 import sim_io
@@ -35,17 +33,18 @@ from authoring.interpreter import interpret, load_scenario
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import GOLDEN_DIR, SCENARIO_DIR
 from domains.crew.loader import load_crew_params
 from domains.crew.scenario import MISSION_DAYS, MISSION_SCENARIO
 from domains.crew.system import build_crew, crew_resolver, run_crew
 from simcore.flow import ConservationError
 from simcore.integrator import EulerIntegrator
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 CREW_YAML = SCENARIO_DIR / "crew_mission.yaml"
 BROKEN_YAML = SCENARIO_DIR / "crew_broken_wiring.yaml"
 
-GOLDEN_PATH = Path(__file__).parent / "regression" / "golden" / "crew_state.json"
+GOLDEN_PATH = GOLDEN_DIR / "crew_state.json"
 
 
 def _built():

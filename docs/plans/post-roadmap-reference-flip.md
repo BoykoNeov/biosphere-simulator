@@ -4105,3 +4105,97 @@ claim in its checkable form. All 28 param files and the weather fixture are reco
   it belongs to the half that edits those files.
 * **Deleting anything.** `demo.yaml` and `crops/potato/` moved rather than being dropped, on
   purpose; every retirement is still S6's.
+
+## §5s Stage 3 — S1's RUNTIME half; the reference now stands entirely on its own ground, COMPLETE 2026-08-18
+
+§5r moved what the reference compiles in and left a control standing as the to-do list: with
+`src/` and `tests/` renamed away, `cargo build` succeeded and `cargo test` failed, its panics
+naming `scenario_files.rs` and `snapshot.rs`. This half moves what those two read at
+**runtime** — the 26 authored-scenario fixtures and the 21 regression goldens — and closes
+FINDING 1.
+
+### The home, and why it is not crate-local this time
+
+`rust/data/scenarios/` and `rust/data/golden/`, workspace-level rather than inside a crate.
+The rule is unchanged from §5r — *put the data where the dependency is* — and it lands
+somewhere different because the dependency is shaped differently:
+
+* the scenario fixtures are read by `authoring`'s 40 tests **and** by `godot_bridge`;
+* the goldens are emitted by `emit_*` programs in **four** crates.
+
+Neither can live inside one crate without the others reaching into that crate's private tree,
+which is the thing this slice exists to stop. `rust/data/` is the smallest home that is
+nobody's private tree. ⚠ It is deliberately **not** the repo-root `scenarios/` directory —
+that is authored *content* (runtime artifacts, never reference) and the two have never been
+the same thing.
+
+### The control from §5r, re-run: both directions now green
+
+`cargo build` **and** `cargo test` both pass with `src/` and `tests/` renamed away. That is
+FINDING 1 discharged in the form it was written: *"`rm -rf src/ tests/` does not fail a test —
+it fails the build"* is no longer true of either.
+
+### ⚠⚠ The finding: the golden census prose was stale in two directions at once, and nothing gates it
+
+While re-pointing `GOLDEN_DIR` the counts were re-measured from disk rather than copied:
+**21 goldens, 19 of them Rust-authored, 2 Python-authored** (`drift_summary.json`,
+`state_snapshot.json`). Four files said something else — `golden_platform.py`'s
+*"Eighteen of the twenty-five goldens are now written by the Rust port"*,
+`regen_goldens_from_rust.py`'s *"The census — 25 goldens"*, `test_golden_provenance.py`'s
+*"two of the eighteen"*, and `CLAUDE.md`'s *"25 golden files"*.
+
+**Both halves of that sentence had rotted, in opposite directions and for different reasons:**
+
+* **18 → 19 authored**, when C5 folded the station drift summary in Rust;
+* **25 → 21 on disk**, when C6 (`01bf957`) retired four Python-only goldens.
+
+⚠ **Nothing was broken and nothing was ungated — which is exactly why it survived.** The
+*rosters* are derived and were right the whole time; `test_every_committed_golden_is_classified`
+enumerates from the directory precisely because this repo has been caught trusting a
+hand-maintained list before. What rotted is the layer no gate has ever owned: the sentences a
+reader uses to orient. Fourth instance of [[freeze-prose-half-is-ungated]] in this flip, and
+the first where the stale number sits in `CLAUDE.md`, the file loaded into every session.
+
+**So the fix is not only the four corrections.** `test_golden_provenance.py` gains
+`test_the_golden_census_counts_are_what_the_prose_says` — two counted literals `(21, 19)`
+whose failure message **names the four prose sites**. Deliberately a *forcing function*, not a
+second census: it cannot check that a sentence is true, only that somebody looked when the
+count moved. Same shape as `param_files`'s `assert_eq!(files.len(), 15)` on the Rust side, and
+stated as such so nobody later "simplifies" it into a derived check that would rot silently.
+
+**Control, run before the gate was believed:** one name added to `RUST_AUTHORED` → the gate
+goes red and the message names the prose sites; reverted → green. ⚠ Reverted by an in-place
+reverse edit from a copy in the temp tree, **never `git checkout`** — that file carried
+uncommitted work, and discarding an uncommitted slice with `git checkout` is a cost this flip
+has already paid once ([[manifest-reanchored-mixed-authority]]).
+
+### What moved, and what it cost each side
+
+| | before | after |
+|---|---|---|
+| scenario fixtures (26) | `tests/authoring/scenarios/` | `rust/data/scenarios/` |
+| goldens (21) | `tests/regression/golden/` | `rust/data/golden/` |
+| Rust readers | 2 `CARGO_MANIFEST_DIR` climbs out of `rust/` | 2 climbs that stay inside it |
+| the two manifest writers | `root/tests/regression/golden` | `root/rust/data/golden` |
+| Godot | `res://../tests/authoring/scenarios/` ×2 | `res://../rust/data/scenarios/` ×2 |
+| Python | 41 modules spelling their own path | `config.paths.{GOLDEN_DIR,SCENARIO_DIR}` |
+
+⚠ The Godot `.gd` constants are worth naming because they are the easiest thing in this repo
+to move and not notice: they are plain strings resolved at runtime by the editor, no compiler
+sees them, and the tests that exercise them are `skipif`-ed on CI
+([[godot-project-godot-skip-worktree]] is the neighbouring trap on the same directory).
+
+### Verification
+
+`cargo test` / `cargo clippy --all-targets` clean; `uv run pytest -n 12` → **2,448 passed,
+5 skipped**; `ruff` clean. The three manifests are byte-identical — the golden hashes they
+record are of file **content**, and the writers now read the same bytes from a different
+directory. All 47 moved files are git-recorded 100 %-similarity renames.
+
+### Deliberately NOT in this half
+
+* **Re-anchoring `forcing/weather_fixture`** — still S1's named successor, still not taken.
+* **S2's Rust-side comparators.** FINDING 3 stands: no Rust test compares a run to a committed
+  golden. S1 only guarantees that when S2 writes them, the path they read is the final one.
+* **Deleting `tests/authoring/` and `tests/regression/`** as concepts — the directories are
+  gone because they are empty, not because anything was retired.

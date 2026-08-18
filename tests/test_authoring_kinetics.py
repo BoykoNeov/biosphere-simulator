@@ -9,8 +9,6 @@ byte-identity anchor, with the frozen flow (not a new golden) as the oracle.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 import sim_io
@@ -18,6 +16,7 @@ from authoring.errors import AuthoringError
 from authoring.expr_parser import parse_rate_expr
 from authoring.interpreter import interpret, load_scenario
 from authoring.schema import ScenarioSpec
+from config.paths import SCENARIO_DIR
 from domains.power.flows import SelfDischarge
 from domains.power.loader import load_self_discharge_params
 from simcore.expr import BinOp, Const, ForcingRef, Neg, ParamRef, StepN, StockRef
@@ -26,7 +25,7 @@ from simcore.integrator import EulerIntegrator, Rk4Integrator
 from simcore.registry import Registry
 from simcore.state import State
 
-SCENARIOS = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIOS = SCENARIO_DIR
 DSL_SCENARIO = SCENARIOS / "self_discharge_dsl.yaml"
 
 

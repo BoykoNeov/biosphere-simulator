@@ -460,10 +460,12 @@ fn horizon(name: &str) -> i64 {
 
 /// The repository root, from this crate's own location.
 ///
-/// ⚠ The same reach-out as the `include_str!`s this crate already carries, and no worse:
-/// the goldens live under `tests/` in the Python tree, and the relocation slice that
-/// moves them is already scheduled. What it must not become is a *hidden* reach-out —
-/// hence one function, named, with the hop count in one place.
+/// ⚠ It used to be the same reach-out as the `include_str!`s this crate carried — the
+/// goldens lived under `tests/` in the Python tree. Stage-3 slice S1 moved them to
+/// `rust/data/golden/`, so this now climbs to the repo root only to come back down inside
+/// `rust/`; the docs directory is the one thing still genuinely outside. What it must not
+/// become is a *hidden* reach-out — hence one function, named, with the hop count in one
+/// place.
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent() // rust/crates/
@@ -655,7 +657,7 @@ fn authority_json() -> Json {
 /// The whole biosphere freeze manifest.
 fn manifest() -> Json {
     let root = repo_root();
-    let golden_dir = root.join("tests").join("regression").join("golden");
+    let golden_dir = root.join("rust").join("data").join("golden");
     let (flows, aux) = inventory();
 
     let scenarios = Json::obj(SCENARIOS.iter().map(|(name, label, years, golden)| {

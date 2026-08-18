@@ -22,10 +22,9 @@ toolchain moves.
 """
 
 import json
-from pathlib import Path
 
 import sim_io
-from config.paths import WINTER_WHEAT_WEATHER
+from config.paths import GOLDEN_DIR, WINTER_WHEAT_WEATHER
 from domains.biosphere.season import (
     SEALED_CHAMBER_SCENARIO,
     SEALED_CHAMBER_YEARS,
@@ -42,7 +41,7 @@ from golden_platform import (
 from simcore.integrator import EulerIntegrator
 from simcore.state import State
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "sealed_chamber_state.json"
 
 _WEATHER_FIXTURE = WINTER_WHEAT_WEATHER

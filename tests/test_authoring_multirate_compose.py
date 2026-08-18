@@ -34,17 +34,17 @@ exactly as unanchored as Step 6b found it.
 """
 
 from dataclasses import replace
-from pathlib import Path
 
 from authoring.compose import apply_includes
 from authoring.interpreter import load_scenario
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import SCENARIO_DIR
 from simcore.ids import StockId
 from simcore.registry import Registry
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 TWO_BATTERIES_MULTIRATE = SCENARIO_DIR / "two_batteries_multirate.yaml"
 
 FAST_FLOW = "bat_fast.power.self_discharge"

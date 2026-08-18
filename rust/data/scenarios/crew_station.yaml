@@ -4,7 +4,7 @@
 # plus its run config. The interpreter merges bundles/crew.domain.yaml's stocks/flows/
 # forcings/parameters into this scenario's (empty) inline set, so the built graph has
 # exactly the eight frozen crew ids. At the bundle's default `crew_count = 1.0`,
-# `1.0 * base == base` exactly ⇒ this reproduces tests/regression/golden/crew_state.json
+# `1.0 * base == base` exactly ⇒ this reproduces rust/data/golden/crew_state.json
 # BYTE-FOR-BYTE — the whole compose→flatten→interpret→run path validated against the
 # frozen Crew golden (no new golden; the frozen one is the oracle).
 #

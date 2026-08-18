@@ -44,7 +44,6 @@ self-consistent on each port — a default, a vocabulary, an interaction with
 from __future__ import annotations
 
 import copy
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -54,11 +53,12 @@ from authoring.interpreter import BuiltScenario, _effective_step, interpret
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import SCENARIO_DIR
 from domains.eclss.loader import load_eclss_params
 from simcore.ids import StockId
 from simcore.state import State
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 ANCHOR_YAML = SCENARIO_DIR / "eclss_multirate_cabin.yaml"
 
 CABIN_O2 = StockId("eclss.cabin_o2")

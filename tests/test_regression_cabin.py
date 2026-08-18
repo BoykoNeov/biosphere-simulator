@@ -33,11 +33,10 @@ goldens): the flows use only +−×÷ (no transcendental), so this golden is bit
 within a build; regenerate (review the diff) if the toolchain moves.
 """
 
-from pathlib import Path
-
 import pytest
 
 import sim_io
+from config.paths import GOLDEN_DIR
 from domains.crew.loader import load_crew_params
 from domains.eclss.loader import load_eclss_params
 from domains.eclss.stocks import CABIN_CO2, CABIN_H2O, CABIN_O2
@@ -50,7 +49,7 @@ from station.cabin import build_cabin, cabin_resolver, cabin_steady_state
 from station.scenario import CABIN_GAS_SCENARIO, CABIN_GAS_STEPS
 from station.system import run_station
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "cabin_gas_state.json"
 
 _CREW = load_crew_params()

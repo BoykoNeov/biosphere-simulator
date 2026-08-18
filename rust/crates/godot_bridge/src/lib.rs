@@ -1307,9 +1307,9 @@ mod tests {
         assert_eq!(resumed.n(), 24, "resumed composed session carries n");
     }
 
-    /// The scenario-file directory (repo `tests/authoring/scenarios`), from the crate root.
+    /// The scenario-file directory (`rust/data/scenarios`), from the crate root.
     fn scenarios_dir() -> std::path::PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tests/authoring/scenarios")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios")
     }
 
     /// Phase-9 Step 5: a declarative scenario **file** builds a single-rate session that steps

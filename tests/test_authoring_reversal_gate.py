@@ -43,9 +43,10 @@ from authoring.interpreter import interpret
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import SCENARIO_DIR
 from simcore.ids import StockId
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 SETPOINT = 10.0

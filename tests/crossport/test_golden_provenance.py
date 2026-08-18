@@ -3,7 +3,7 @@
 Slice 4 is where the reference moves — *the goldens are generated from Rust*. Two things
 have to be true before that sentence means anything, and this module gates both.
 
-**1. The census is complete.** Every file in ``tests/regression/golden/`` is classified
+**1. The census is complete.** Every file in ``rust/data/golden/`` is classified
 into exactly one of the three groups in ``regen_goldens_from_rust``: Rust emits its
 bytes, Rust emits a raw series that Python folds, or Rust has no referent for it at all.
 A golden added without a classification is red here — the same forcing-function move
@@ -72,6 +72,39 @@ def _frozen_goldens() -> set[str]:
 # --------------------------------------------------------------------------- #
 # 1. The census — pure Python, runs everywhere                                 #
 # --------------------------------------------------------------------------- #
+
+
+def test_the_golden_census_counts_are_what_the_prose_says() -> None:
+    """Two counted literals, so a roster change cannot leave the prose behind silently.
+
+    ⚠⚠ **This exists because it had already happened, twice, in opposite directions.**
+    ``golden_platform``'s docstring read *"eighteen of the twenty-five goldens are now
+    written by the Rust port"* until Stage-3 slice S1 re-measured from disk and found
+    **nineteen of twenty-one**: C5 folded the station drift summary in Rust (+1
+    authored)
+    and C6 retired four Python-only goldens (-4 on disk), and neither correction reached
+    the four files that quote the numbers. Nothing was broken — the *rosters* are
+    derived
+    and were always right — but every sentence a reader would use to orient was wrong.
+
+    This is deliberately a **forcing function, not a duplicated rule**: the numbers
+    below
+    are not a second census, they are a tripwire whose failure message names the prose
+    sites to fix. Same shape as ``param_files``'s ``assert_eq!(files.len(), 15)`` on the
+    Rust side — and the same standing as [the freeze's prose half is ungated]: the gate
+    cannot check that a sentence is *true*, only that somebody looked when the count
+    moved.
+    """
+    on_disk = regen.committed_goldens()
+    authored = golden_platform.RUST_AUTHORED
+    assert (len(on_disk), len(authored)) == (21, 19), (
+        f"the golden census moved: {len(authored)} of {len(on_disk)} are "
+        "Rust-authored, "
+        "not 19 of 21. That is fine — but the counts are quoted as PROSE in "
+        "tests/golden_platform.py, tests/crossport/regen_goldens_from_rust.py, "
+        "tests/crossport/test_golden_provenance.py and CLAUDE.md, and nothing else "
+        "checks them. Update those four, then this literal, in the same commit."
+    )
 
 
 def test_every_committed_golden_is_classified() -> None:
@@ -200,7 +233,7 @@ def test_rust_reproduces_the_committed_golden_bytes(golden: str) -> None:
     """Rust's stdout equals the committed golden, byte for byte. **No exemptions.**
 
     ⚠ Slice 4's version of this test carried a two-entry roster, because the golden was
-    Python's output and two of the eighteen genuinely differed. Slice 5 regenerated
+    Python's output and two of them genuinely differed. Slice 5 regenerated
     those
     two from Rust, so the golden *is* this program's output and an inequality here has
     only one meaning: **the reference moved**. Either the Rust engine changed and the

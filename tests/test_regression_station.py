@@ -36,9 +36,8 @@ bit-identical **within a build** but cross-platform last-ULP differences are tol
 territory. Regenerate (review the diff) if the toolchain moves.
 """
 
-from pathlib import Path
-
 import sim_io
+from config.paths import GOLDEN_DIR
 from domains.power.loader import load_charge_params
 from domains.power.stocks import WASTE_HEAT
 from domains.thermal.flows import temperature
@@ -61,7 +60,7 @@ from station.system import (
     station_resolver,
 )
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "station_state.json"
 
 _CHARGE = load_charge_params()

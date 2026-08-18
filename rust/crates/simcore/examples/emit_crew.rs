@@ -35,7 +35,7 @@ fn stock(
 }
 
 fn main() {
-    // Values transcribed verbatim from tests/regression/golden/crew_state.json.
+    // Values transcribed verbatim from rust/data/golden/crew_state.json.
     let state = State {
         n: 168,
         rng_seed: 0,

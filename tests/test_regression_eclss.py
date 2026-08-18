@@ -32,9 +32,8 @@ this golden is bit-identical **within a build**; cross-platform last-ULP differe
 remain tolerance territory. Regenerate (review the diff) if the toolchain moves.
 """
 
-from pathlib import Path
-
 import sim_io
+from config.paths import GOLDEN_DIR
 from domains.eclss.loader import load_eclss_params
 from domains.eclss.scenario import STEADY_STATE_SCENARIO, STEADY_STATE_STEPS
 from domains.eclss.stocks import CABIN_CO2, CABIN_H2O, CABIN_O2
@@ -45,7 +44,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "eclss_state.json"
 
 _PARAMS = load_eclss_params()

@@ -7,7 +7,7 @@
 #
 # Faithfulness gate: instantiate at crew_count = 1.0 → `1.0 * base == base` exactly (IEEE
 # multiply by 1.0 is identity) → identical to crew_mission.yaml → reproduces
-# tests/regression/golden/crew_state.json BYTE-FOR-BYTE.
+# rust/data/golden/crew_state.json BYTE-FOR-BYTE.
 # "It bit" gate: instantiate at crew_count = 4.0 → every stock ≈ 4× (reconstruct to
 # tolerance — accumulate-then-scale ≠ scale-then-accumulate in fp), still conserved,
 # rationed == 0, and NOT byte-identical to the golden (the knob is load-bearing).

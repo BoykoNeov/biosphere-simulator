@@ -54,12 +54,11 @@ regeneration action. A module-scoped fixture runs each 15-yr scenario exactly on
 
 import json
 from collections.abc import Sequence
-from pathlib import Path
 
 import pytest
 
 import sim_io
-from config.paths import WINTER_WHEAT_WEATHER
+from config.paths import GOLDEN_DIR, WINTER_WHEAT_WEATHER
 from domains.biosphere.drift import is_period_2, year_summaries
 from domains.biosphere.season import (
     CONSUMER_CARBON,
@@ -83,7 +82,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 PERENNIAL_GOLDEN = GOLDEN_DIR / "perennial_long_horizon_state.json"
 CONSUMER_GOLDEN = GOLDEN_DIR / "consumer_long_horizon_state.json"
 DRIFT_SUMMARY_GOLDEN = GOLDEN_DIR / "drift_summary.json"

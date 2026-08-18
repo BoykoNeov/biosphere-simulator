@@ -27,7 +27,7 @@ const FRAMES_TO_RUN := 6
 
 # A kinetics-bearing scenario (relative to the Godot project dir, like the dashboard's own
 # default) — the banner's positive case.
-const AUTHORED_SCENARIO := "res://../tests/authoring/scenarios/self_discharge_dsl.yaml"
+const AUTHORED_SCENARIO := "res://../rust/data/scenarios/self_discharge_dsl.yaml"
 
 var inst: Node
 var frames := 0

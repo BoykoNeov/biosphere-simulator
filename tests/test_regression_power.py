@@ -43,9 +43,9 @@ tolerance territory. Regenerate (review the diff) if the toolchain moves.
 """
 
 import math
-from pathlib import Path
 
 import sim_io
+from config.paths import GOLDEN_DIR
 from domains.power.loader import load_charge_params
 from domains.power.scenario import BOUNDED_SOC_DAYS, BOUNDED_SOC_SCENARIO
 from domains.power.stocks import BATTERY
@@ -60,7 +60,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "power_state.json"
 
 _CHARGE = load_charge_params()

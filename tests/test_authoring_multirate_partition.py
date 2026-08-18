@@ -45,9 +45,10 @@ from authoring.errors import AuthoringError
 from authoring.interpreter import BuiltScenario, interpret, load_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import SCENARIO_DIR
 from simcore.registry import Registry
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 # The ECLSS anchor's four flows — the same graph Step 1 measured the identity on.

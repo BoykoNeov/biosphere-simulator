@@ -41,10 +41,9 @@ diff) if the toolchain moves.
 """
 
 import json
-from pathlib import Path
 
 import sim_io
-from config.paths import WINTER_WHEAT_WEATHER
+from config.paths import GOLDEN_DIR, WINTER_WHEAT_WEATHER
 from domains.biosphere.stocks import LITTER_CARBON, STORAGE_C
 from domains.crew.loader import load_crew_params
 from domains.crew.stocks import FECAL_WASTE, FOOD_STORE
@@ -67,7 +66,7 @@ from station.harvest import (
 from station.loader import load_harvest_params
 from station.scenario import HARVEST_SCENARIO
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "harvest_state.json"
 _WEATHER_FIXTURE = WINTER_WHEAT_WEATHER
 

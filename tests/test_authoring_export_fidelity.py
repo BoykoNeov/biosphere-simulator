@@ -50,7 +50,6 @@ ONLY as a loosely-toleranced sanity reference, never as an exact assertion.
 
 import copy
 import math
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -60,9 +59,10 @@ from authoring.interpreter import interpret
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import SCENARIO_DIR
 from simcore.ids import StockId
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 # The frozen eclss.yaml values, restated so the arithmetic below is legible. The tests

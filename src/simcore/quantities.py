@@ -56,13 +56,13 @@ class StockKind(Enum):
 # requires one consistent canonical unit per quantity, but the science picks are
 # now fixed:
 #   - CARBON = mol, ENERGY = J  → GOLDEN-LOCKED: the committed demo regression
-#     goldens (``tests/regression/golden/demo_*``) carry these labels, so changing
+#     goldens carried these labels, so changing
 #     either forces regenerating those goldens. ``mol C`` / ``J`` are adequate.
 #   - WATER = kg, NITROGEN = kg → mass basis. kg H2O is the Penman-Monteith
 #     convention (transpiration mm/day = kg m^-2 day^-1); kg N is unambiguous
 #     element mass (WOFOST-native, unlike species-ambiguous "mol N"). (Flipping
 #     WATER from the Phase-0 ``mol`` placeholder regenerated the one golden that
-#     carries a water stock, ``tests/regression/golden/state_snapshot.json``.)
+#     carries a water stock, ``rust/data/golden/state_snapshot.json``.)
 #   - OXYGEN = mol → untracked in Phase 1 (no O2 stock/flow); molar keeps the
 #     gas-phase species consistent for the deferred Phase-2 stoichiometry.
 # Per-organ *biomass* is conventionally kg dry matter; our currency is CARBON in

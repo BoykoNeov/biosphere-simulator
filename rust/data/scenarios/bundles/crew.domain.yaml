@@ -11,7 +11,7 @@
 # A bundle carries NO run config (integrator/dt/steps live only in the top-level scenario)
 # and NO nested includes (both rejected by BundleSpec's extra="forbid"). Instantiated at
 # the default `crew_count = 1.0`, `1.0 * base == base` exactly ⇒ a scenario that includes
-# only this bundle reproduces tests/regression/golden/crew_state.json byte-for-byte.
+# only this bundle reproduces rust/data/golden/crew_state.json byte-for-byte.
 #
 # All floats carry an explicit decimal point (the YAML-1.1 dotless-exponent hazard).
 

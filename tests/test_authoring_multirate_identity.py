@@ -47,7 +47,6 @@ against a committed golden. No closed form is asserted against.
 """
 
 import copy
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -56,14 +55,15 @@ import sim_io
 from authoring.interpreter import BuiltScenario, interpret, load_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import GOLDEN_DIR, SCENARIO_DIR
 from simcore.ids import StockId
 from simcore.integrator import EulerIntegrator
 from simcore.multirate import Split, multirate_step
 from simcore.registry import Registry
 from simcore.state import State
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+SCENARIO_DIR = SCENARIO_DIR
+GOLDEN_DIR = GOLDEN_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 

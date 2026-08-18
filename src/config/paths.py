@@ -47,3 +47,25 @@ STATION_PARAMS_DIR: Path = REPO_ROOT / "rust" / "crates" / "station" / "params"
 WINTER_WHEAT_WEATHER: Path = (
     REPO_ROOT / "rust" / "crates" / "domains" / "data" / "winter_wheat_weather.json"
 )
+
+#: The 21 committed regression goldens — 19 of them the reference's own emitted bytes.
+#:
+#: ⚠ They lived in ``tests/regression/golden/`` while Python authored them. Since the
+#: flip
+#: the reference emits almost all of them and Python only compares, so keeping them
+#: inside
+#: the checker's tree had the ownership backwards; S1 moved them to a workspace-level
+#: home
+#: under ``rust/``. Not crate-local, unlike the params: four different crates carry the
+#: ``emit_*`` programs, so no single crate can own the directory without the other three
+#: reaching into its private tree.
+GOLDEN_DIR: Path = REPO_ROOT / "rust" / "data" / "golden"
+
+#: The 26 authored-scenario fixtures — the platform's cross-port anchors.
+#:
+#: Same reasoning as :data:`GOLDEN_DIR`: read by ``authoring``'s tests *and* by
+#: ``godot_bridge``, so they are workspace data rather than one crate's fixtures. ⚠
+#: Distinct
+#: from the repo-root ``scenarios/`` directory, which is authored **content** (runtime
+#: artifacts, never reference) — the two have never been the same thing.
+SCENARIO_DIR: Path = REPO_ROOT / "rust" / "data" / "scenarios"

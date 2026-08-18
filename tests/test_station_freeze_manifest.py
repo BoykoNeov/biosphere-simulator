@@ -108,7 +108,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from config.paths import DOMAIN_PARAMS_ROOT, STATION_PARAMS_DIR
+from config.paths import DOMAIN_PARAMS_ROOT, GOLDEN_DIR, STATION_PARAMS_DIR
 from domains.crew.loader import load_crew_params
 from domains.crew.system import build_crew
 from domains.eclss.loader import load_eclss_params
@@ -134,7 +134,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = _REPO_ROOT / "docs" / "station-reference.manifest.json"
 BIOSPHERE_MANIFEST = "docs/biosphere-reference.manifest.json"
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 
 # The five sibling + one station params directories the station reference freezes. The
 # biosphere params dir is deliberately ABSENT — the biosphere is delegated to its own

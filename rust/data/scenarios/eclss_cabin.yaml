@@ -1,7 +1,7 @@
 # The Tier-1 ECLSS anchor: a declarative re-expression of the frozen standalone ECLSS
 # STEADY_STATE_SCENARIO (domains/eclss). The authoring interpreter must build a graph
 # structurally identical to build_eclss(...) + eclss_resolver(...) and — run 900 steps
-# Euler — reproduce tests/regression/golden/eclss_state.json BYTE-FOR-BYTE.
+# Euler — reproduce rust/data/golden/eclss_state.json BYTE-FOR-BYTE.
 #
 # This is the strongest anchor the newly-registered flow types can carry: the crew
 # (`crew_mission.yaml` -> crew_state.json) precedent, now for a domain with THREE

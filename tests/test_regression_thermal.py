@@ -31,9 +31,8 @@ but cross-platform last-ULP differences are tolerance territory. Regenerate (rev
 diff) if the toolchain moves.
 """
 
-from pathlib import Path
-
 import sim_io
+from config.paths import GOLDEN_DIR
 from domains.thermal.flows import temperature
 from domains.thermal.loader import load_thermal_params
 from domains.thermal.scenario import EQUILIBRIUM_SCENARIO, EQUILIBRIUM_STEPS
@@ -54,7 +53,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "thermal_state.json"
 
 _PARAMS = load_thermal_params()

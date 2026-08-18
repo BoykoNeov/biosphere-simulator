@@ -1,7 +1,7 @@
 # The Step-0 composition anchor: a hand-written declarative re-expression of the
 # frozen standalone Crew MISSION_SCENARIO (domains/crew). The authoring interpreter
 # must build a graph structurally identical to build_crew(...) + crew_resolver(...)
-# and — run 7 days (168 steps) Euler — reproduce tests/regression/golden/crew_state.json
+# and — run 7 days (168 steps) Euler — reproduce rust/data/golden/crew_state.json
 # byte-for-byte. NOTHING here is frozen or reference: this is a runtime authored
 # artifact (Phase-9 decision B), and crew is the anchor precisely because it has NO
 # derived initial conditions (every value below is plain scenario data) — station /

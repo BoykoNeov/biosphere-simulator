@@ -657,7 +657,7 @@ mod tests {
     fn loads_the_python_golden_bit_exact() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../../tests/regression/golden/state_snapshot.json"
+            "/../../data/golden/state_snapshot.json"
         );
         let text = std::fs::read_to_string(path).expect("read state_snapshot.json golden");
         let state = from_json(&text).expect("Rust loads the Python golden");

@@ -37,9 +37,8 @@ uses ``math.sin``/``math.pi`` (not correctly-rounded per IEEE-754), so this gold
 bit-identical **within a build**; regenerate (review the diff) if the toolchain moves.
 """
 
-from pathlib import Path
-
 import sim_io
+from config.paths import GOLDEN_DIR
 from domains.power.loader import load_charge_params, load_self_discharge_params
 from domains.power.scenario import BOUNDED_SOC_SCENARIO, SELF_DISCHARGE_DAYS
 from domains.power.stocks import BATTERY
@@ -54,7 +53,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "power_self_discharge_state.json"
 
 _CHARGE = load_charge_params()

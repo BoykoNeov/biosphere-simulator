@@ -39,16 +39,18 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import GOLDEN_DIR, SCENARIO_DIR  # noqa: E402
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 import compare  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GOLDEN_DIR = REPO_ROOT / "tests" / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 RUST_WORKSPACE_DIR = REPO_ROOT / "rust"
 GODOT_PROJECT_DIR = REPO_ROOT / "godot"
-SCENARIO = REPO_ROOT / "tests" / "authoring" / "scenarios" / "crew_mission.yaml"
-_SCEN_DIR = REPO_ROOT / "tests" / "authoring" / "scenarios"
+SCENARIO = SCENARIO_DIR / "crew_mission.yaml"
+_SCEN_DIR = SCENARIO_DIR
 TEMPLATE = _SCEN_DIR / "crew_habitat_template.yaml"
 # A kinetics-bearing scenario — the "authored ≠ validated" marker's positive case
 # (SCENARIO, `crew_mission.yaml`, is authored but kinetics-free: the negative).

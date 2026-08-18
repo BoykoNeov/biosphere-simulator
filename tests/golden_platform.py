@@ -24,8 +24,13 @@ across glibc versions. Pure-arithmetic goldens (crew / eclss / cabin_gas /
 water_recovery / the basic-arithmetic demo) are bit-exact on every conformant platform
 and stay ungated.
 
-**2. Authorship — new in slice 5.** ⚠ **Eighteen of the twenty-five goldens are now
-written by the Rust port, not by Python.** That is the reference flip: Rust is
+**2. Authorship — new in slice 5.** ⚠ **Nineteen of the twenty-one goldens are now
+written by the Rust port, not by Python.** (Slice 5 wrote *eighteen of twenty-five*; C5
+folded the station drift summary in Rust and C6 retired four Python-only goldens,
+and neither correction reached this sentence until S1 re-measured from disk. ⚠ The
+numbers in this docstring are **prose and nothing gates them** — the roster below is
+what the suite checks. `test_golden_provenance.py` now carries a counted forcing
+literal so the next drift is loud.) That is the reference flip: Rust is
 canonical,
 Python is the checker. Two consequences this module owns, because both are policy rather
 than per-scenario detail:
@@ -37,7 +42,7 @@ than per-scenario detail:
   shape slice 4 refused to ship for ``emit_crew`` (a golden regenerated from itself).
   The blessed path is ``tests/crossport/regen_goldens_from_rust.py --write``.
 * **Python's byte-exactness against them is an observation, not a contract**
-  (:data:`PYTHON_DIVERGES`, :func:`assert_matches_golden`). Sixteen of the eighteen
+  (:data:`PYTHON_DIVERGES`, :func:`assert_matches_golden`). Seventeen of the nineteen
   still
   match bit for bit and stay byte-gated — see the note on that roster for why keeping
   them tight matters. Two do not.
@@ -165,7 +170,7 @@ RUST_AUTHORED = frozenset(
 # about
 # the other side. Same two files, same measured sizes, opposite consumer.
 #
-# ⚠ Sixteen of the eighteen stay **byte**-gated on the Python side, and that is not
+# ⚠ Seventeen of the nineteen stay **byte**-gated on the Python side, and that is not
 # fussiness. A change to reduction order — canonical flow-id order on every reduction, a
 # non-negotiable invariant — moves values by a ULP or two, i.e. *inside* any band this
 # repo would call a tolerance. The byte compare is the only Python-side gate that sees

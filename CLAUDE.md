@@ -72,8 +72,8 @@ assuming which side authored it.
   checker**, not the reference.
 - `godot/` — the front-end (a subdir, so Godot's importer never scans the tree).
 - `scenarios/` — authored **content** (runtime artifacts, never reference). Distinct
-  from `tests/authoring/scenarios/`, which are fixtures / cross-port anchors.
-- `tests/regression/golden/` — 25 golden files; the **20** in
+  from `rust/data/scenarios/`, which are fixtures / cross-port anchors.
+- `rust/data/golden/` — 21 golden files (19 the reference's own bytes); the **20** in
   `tests/crossport/tiers.json` (7 biosphere + 13 station) carry the cross-port
   tier contract.
 

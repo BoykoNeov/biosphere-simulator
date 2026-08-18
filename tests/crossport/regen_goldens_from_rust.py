@@ -44,15 +44,15 @@ the Rust-side one, and it carries the mapping as data so the mapping itself can 
 
 ---
 
-## The census — 25 goldens, and Rust can produce 19 of them
+## The census — 21 goldens, and Rust produces 19 of them
 
 ⚠ **This corrects the plan's own arithmetic.** §2f reads *"24 `emit_*` programs against
-25 golden files. One is missing or one program emits two; identifying which is slice 4's
+golden files. One is missing or one program emits two; identifying which is slice 4's
 first act."* Measured, that is wrong on three counts, and the gap is **7, not 1**:
 
 * two programs each serve **two** goldens (``emit_perennial`` / ``emit_consumer``, by a
   ``long`` argument);
-* four ``emit_*`` programs serve no golden in ``tests/regression/golden/`` at all
+* four ``emit_*`` programs serve no golden in ``rust/data/golden/`` at all
   (``emit_authored``, ``emit_perturbed_brownout``, ``emit_sealed_resume``,
   ``emit_composite`` — authoring fixtures and Godot cross-boundary references);
 * **six** goldens have no Rust program that emits their bytes — one folded summary
@@ -65,7 +65,7 @@ from, because if one side's came from the other the comparison is a round trip.
 
 ## ⚠ The two goldens the two ports did not agree on — measured 2026-08-16, now written
 
-Sixteen of the eighteen were already **byte-identical** between the ports on this
+Sixteen of them were already **byte-identical** between the ports on this
 Windows/UCRT box when slice 4 measured them — Rust's stdout equalled the committed file
 exactly. Two were not:
 
@@ -81,7 +81,7 @@ systematic disagreement to hunt. Both sat ~5 orders inside their Tier-2 band (1e
 the plan's stop-rule ("a value beyond band is a port bug") did not fire.
 
 **Slice 5 wrote both** (8 changed hex-float leaves across the two files, exactly as
-predicted; no structural field moved). So all eighteen are now Rust's bytes, and the
+predicted; no structural field moved). So all of them are now Rust's bytes, and the
 divergence moved to the other side of the comparison: it is *Python* that differs from
 the reference by those amounts. The roster followed its meaning to
 ``golden_platform.PYTHON_DIVERGES`` — see the note there on why it was renamed.
@@ -98,8 +98,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from config.paths import GOLDEN_DIR
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GOLDEN_DIR = REPO_ROOT / "tests" / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 RUST_WORKSPACE_DIR = REPO_ROOT / "rust"
 RUST_CRATES_DIR = RUST_WORKSPACE_DIR / "crates"
 

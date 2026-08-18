@@ -30,19 +30,20 @@ import pytest
 import sim_io
 from authoring.interpreter import load_scenario
 from authoring.run import run_scenario
+from config.paths import GOLDEN_DIR, SCENARIO_DIR
 from domains.crew.loader import load_crew_params
 from simcore.conservation import compute_ledger
 from simcore.ids import StockId
 from simcore.quantities import Quantity
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 BASELINE_YAML = SCENARIO_DIR / "crew_mission.yaml"
 NOOP_YAML = SCENARIO_DIR / "crew_pack_noop.yaml"
 LOW_RESP_YAML = SCENARIO_DIR / "crew_pack_low_resp.yaml"
 BAD_BOUND_YAML = SCENARIO_DIR / "crew_pack_bad_bound.yaml"
 NOOP_PACK = SCENARIO_DIR / "packs" / "crew_noop.yaml"
 
-GOLDEN_PATH = Path(__file__).parent / "regression" / "golden" / "crew_state.json"
+GOLDEN_PATH = GOLDEN_DIR / "crew_state.json"
 
 # Stocks that must stay bit-identical between baseline and the low-resp cultivar: the
 # WATER/OXYGEN side (insensible fraction unchanged; O₂ flow is param-free) and the

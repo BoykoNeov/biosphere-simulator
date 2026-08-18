@@ -30,7 +30,7 @@ const UNCALIBRATED_COLOR := Color(1.0, 0.65, 0.0)
 
 # A default scenario path relative to the Godot project dir (../tests/...). Globalized to an OS
 # path at Load time — `build_from_file` reads a filesystem path, not a `res://` URI.
-const DEFAULT_SCENARIO := "res://../tests/authoring/scenarios/crew_mission.yaml"
+const DEFAULT_SCENARIO := "res://../rust/data/scenarios/crew_mission.yaml"
 
 func _ready() -> void:
 	_build_ui()

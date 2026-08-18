@@ -28,7 +28,6 @@ demand-controlled flow, **not caught at all** — see
 import copy
 from collections.abc import Mapping
 from dataclasses import replace
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -38,13 +37,14 @@ from authoring.interpreter import BuiltScenario, interpret
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import SCENARIO_DIR
 from simcore.auxiliary import AuxId
 from simcore.environment import Environment
 from simcore.ids import StockId
 from simcore.registry import Registry
 from simcore.state import State
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 O2_EQ = 8.0  # o2_setpoint − Con_o2/k_makeup = 10 − 0.004/0.002 — the truth

@@ -41,6 +41,7 @@ from authoring.interpreter import load_scenario
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import GOLDEN_DIR, SCENARIO_DIR
 from domains.crew.loader import load_crew_params
 from domains.crew.scenario import MISSION_SCENARIO
 from domains.crew.system import build_crew
@@ -53,12 +54,12 @@ from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.registry import Registry
 from simcore.state import State, Stock
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 CREW_STATION = SCENARIO_DIR / "crew_station.yaml"
 STATION_COMPOSED = SCENARIO_DIR / "station_composed.yaml"
 MIXED_INLINE_BATTERY = SCENARIO_DIR / "crew_station_inline_battery.yaml"
 TWO_BATTERIES = SCENARIO_DIR / "two_batteries.yaml"
-GOLDEN_PATH = Path(__file__).parent / "regression" / "golden" / "crew_state.json"
+GOLDEN_PATH = GOLDEN_DIR / "crew_state.json"
 
 _ENERGY = Quantity.ENERGY
 

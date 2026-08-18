@@ -14,7 +14,7 @@ reference (``docs/authoring-reference.md``, "authored != validated"). The fixed-
 test below is an **internal-consistency** check — that the authored graph does what its
 own design arithmetic predicts — *not* a scientific validation.
 
-This lives outside ``tests/authoring/scenarios/`` on purpose: those files are test
+This lives outside ``rust/data/scenarios/`` on purpose: those files are test
 fixtures and cross-port anchors, whereas ``scenarios/`` is authored *content* — the
 thing the platform exists to make possible.
 """

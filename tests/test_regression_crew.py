@@ -32,9 +32,8 @@ so this golden is bit-identical **within a build**; cross-platform last-ULP diff
 remain tolerance territory. Regenerate (review the diff) if the toolchain moves.
 """
 
-from pathlib import Path
-
 import sim_io
+from config.paths import GOLDEN_DIR
 from domains.crew.loader import load_crew_params
 from domains.crew.scenario import MISSION_DAYS, MISSION_SCENARIO
 from domains.crew.stocks import FOOD_STORE, O2_STORE, WATER_STORE
@@ -45,7 +44,7 @@ from simcore.integrator import EulerIntegrator
 from simcore.quantities import Quantity
 from simcore.state import State
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 GOLDEN_PATH = GOLDEN_DIR / "crew_state.json"
 
 _PARAMS = load_crew_params()

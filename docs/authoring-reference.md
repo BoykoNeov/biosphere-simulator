@@ -48,7 +48,7 @@ This is the load-bearing asymmetry of the whole phase. The **platform** is froze
   volume. What this contract fixes is that the marker is **available and honest**, not how
   it is drawn.
 
-The scenario files under `tests/authoring/scenarios/` are consequently **test fixtures
+The scenario files under `rust/data/scenarios/` are consequently **test fixtures
 and cross-port anchors, not a frozen scenario library**. Their byte-identity to
 `crew_state.json` is evidence that the interpreter is faithful — it does not make them
 reference.
@@ -423,7 +423,7 @@ composing both **at a single `dt`** must pick one, and only **`dt ≤ ~60`** is 
 natural to both domains — which is why the author no longer has to pick one.** This
 paragraph used to end "there is no `dt` natural to both domains" full stop, and read as a
 statement about the platform rather than about single-rate integration; multi-rate falsified
-it (see *Multi-rate*, below, and `tests/authoring/scenarios/eclss_thermal_habitat.yaml` —
+it (see *Multi-rate*, below, and `rust/data/scenarios/eclss_thermal_habitat.yaml` —
 the file this sentence called impossible). Both halves of the bind are measured, and
 multi-rate escapes both: the shared `dt` is **unsafe** (single-rate `dt = 3600`: 840
 rationings, `cabin_o2` = **72.0** against a truth of 8.0) *and* the safe shared `dt` is

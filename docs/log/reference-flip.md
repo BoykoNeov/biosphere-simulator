@@ -2114,3 +2114,53 @@ unfalsifiable. Named as the successor in the manifest itself.
 `cargo build` / `cargo test` / `cargo clippy --all-targets` clean; `uv run pytest -n 12` →
 2,447 passed, 5 skipped (13m08s). `git status` on `tests/regression/` and on the other two
 manifests is empty — byte-neutrality in its checkable form.
+
+### S1 — the runtime half; FINDING 1 discharged (2026-08-18)
+
+Plan: `docs/plans/post-roadmap-reference-flip.md` §5s.
+
+The 26 authored-scenario fixtures and the 21 regression goldens moved to `rust/data/`. The
+control §5r left standing was re-run: with `src/` and `tests/` renamed away, `cargo build`
+**and** all 30 `cargo test` binaries now pass. FINDING 1 — *"`rm -rf src/ tests/` does not
+fail a test, it fails the build"* — is no longer true of either half.
+
+**Workspace-level, not crate-local, and the rule did not change to get there.** Put the data
+where the dependency is: the fixtures are read by `authoring`'s tests *and* by `godot_bridge`,
+and the goldens are emitted by `emit_*` programs in **four** crates. Neither can sit inside one
+crate without the others reaching into its private tree — the exact thing this slice exists to
+stop. ⚠ Deliberately not the repo-root `scenarios/`, which is authored *content*.
+
+**⚠⚠ The finding: the golden census prose was stale in two directions at once, and nothing
+gates it.** Re-measured from disk rather than copied: **21 goldens, 19 Rust-authored, 2
+Python-authored**. Four files said otherwise — `golden_platform.py` (*"Eighteen of the
+twenty-five"*), `regen_goldens_from_rust.py`, `test_golden_provenance.py` and **`CLAUDE.md`**.
+Both halves had rotted independently: **18 → 19** when C5 folded the station drift summary in
+Rust, **25 → 21** when C6 retired four Python-only goldens.
+
+Nothing was broken and nothing was ungated — which is why it survived. The *rosters* are
+derived and were right throughout; the census test enumerates from the directory precisely
+because this repo has been caught trusting a hand-maintained list. What rotted is the layer no
+gate owns: the sentences a reader uses to orient. Fourth instance of this family in the flip,
+and the first with the stale number sitting in the always-loaded `CLAUDE.md`.
+
+**So the fix is not just the four corrections.** `test_golden_provenance.py` gains
+`test_the_golden_census_counts_are_what_the_prose_says` — two counted literals `(21, 19)` whose
+failure message **names the four prose sites**. A forcing function, not a second census: it
+cannot check that a sentence is true, only that somebody looked when the count moved. Stated as
+such so nobody later "simplifies" it into a derived check that would rot silently.
+
+**Control, run before the gate was believed:** one name added to `RUST_AUTHORED` → red, and the
+message names the prose sites; reverted → green. ⚠ Reverted by an in-place reverse edit from a
+copy in the temp tree, **never `git checkout`** — that file held uncommitted work, and this
+flip has already paid for that mistake once.
+
+**Worth naming: the two Godot `.gd` scenario constants.** Plain strings, resolved at runtime by
+the editor, no compiler sees them, and the tests exercising them are `skipif`-ed on CI. They are
+the easiest thing in the repo to move and not notice.
+
+#### Verification
+
+`cargo test` / `cargo clippy --all-targets` clean; `uv run pytest -n 12` → 2,448 passed, 5
+skipped (11m40s). All three manifests byte-identical — they record hashes of golden **content**,
+and the writers read the same bytes from a new directory. All 47 moved files are git-recorded
+100 %-similarity renames.

@@ -32,7 +32,6 @@ The ``dt`` hazard that registration created has its own gate:
 from __future__ import annotations
 
 from dataclasses import fields
-from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -44,10 +43,11 @@ from authoring.interpreter import interpret, load_scenario
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import GOLDEN_DIR, SCENARIO_DIR
 from simcore.ids import StockId
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+SCENARIO_DIR = SCENARIO_DIR
+GOLDEN_DIR = GOLDEN_DIR
 
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 POWER_YAML = SCENARIO_DIR / "power_bus.yaml"

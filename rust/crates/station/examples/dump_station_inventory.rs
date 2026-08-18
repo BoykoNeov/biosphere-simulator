@@ -624,7 +624,7 @@ fn authority_json() -> Json {
 /// The whole station freeze manifest.
 fn manifest() -> Json {
     let root = repo_root();
-    let golden_dir = root.join("tests").join("regression").join("golden");
+    let golden_dir = root.join("rust").join("data").join("golden");
     let (flows, aux, files) = inventory();
 
     let scenarios = Json::obj(SCENARIOS.iter().map(|(name, label, golden)| {

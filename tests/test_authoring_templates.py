@@ -37,12 +37,13 @@ from authoring.interpreter import interpret, load_scenario
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from authoring.template import eval_numeric_field, resolve_parameters
+from config.paths import GOLDEN_DIR, SCENARIO_DIR
 from simcore.conservation import compute_ledger
 from simcore.quantities import Quantity
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 TEMPLATE_YAML = SCENARIO_DIR / "crew_habitat_template.yaml"
-GOLDEN_PATH = Path(__file__).parent / "regression" / "golden" / "crew_state.json"
+GOLDEN_PATH = GOLDEN_DIR / "crew_state.json"
 
 
 def _final_bytes(path: Path, overrides=None) -> bytes:

@@ -41,7 +41,6 @@ rate classes.
 from __future__ import annotations
 
 import copy
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -52,11 +51,12 @@ from authoring.interpreter import _effective_step, interpret
 from authoring.run import _SPLIT
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import SCENARIO_DIR
 from domains.eclss.loader import load_eclss_params
 from domains.power.loader import load_self_discharge_params
 from simcore.multirate import Split
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 ECLSS_YAML = SCENARIO_DIR / "eclss_cabin.yaml"
 
 FROZEN_DT = 60.0  # the ECLSS anchor's own load-bearing sizing: k_makeup*dt = 0.12
@@ -331,7 +331,7 @@ def test_the_committed_scenarios_all_pass_the_precondition() -> None:
     # already worked. Every committed scenario builds on the author's default path — no
     # hatch.
     #
-    # Scenario files only: `tests/authoring/scenarios/*.yaml` includes bundles and param
+    # Scenario files only: `rust/data/scenarios/*.yaml` includes bundles and param
     # packs, which are not scenarios and fail schema validation by design.
     built_count = 0
     for path in sorted(SCENARIO_DIR.glob("*.yaml")):

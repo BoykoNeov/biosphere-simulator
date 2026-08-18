@@ -32,7 +32,6 @@ import dataclasses
 import itertools
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -42,11 +41,12 @@ from authoring.interpreter import BuiltScenario, interpret
 from authoring.run import run_scenario
 from authoring.schema import ScenarioSpec
 from config import load_yaml
+from config.paths import SCENARIO_DIR
 from domains.thermal.flows import RadiatorReject
 from simcore.ids import StockId
 from simcore.state import State
 
-SCENARIO_DIR = Path(__file__).parent / "authoring" / "scenarios"
+SCENARIO_DIR = SCENARIO_DIR
 HABITAT_YAML = SCENARIO_DIR / "eclss_thermal_habitat.yaml"
 
 CABIN_O2 = StockId("eclss.cabin_o2")

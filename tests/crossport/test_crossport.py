@@ -33,6 +33,8 @@ from pathlib import Path
 
 import pytest
 
+from config.paths import GOLDEN_DIR, SCENARIO_DIR  # noqa: E402
+
 # The crossport helpers live beside this test; make them importable regardless of
 # pytest's import mode.
 sys.path.insert(0, str(Path(__file__).parent))
@@ -52,11 +54,11 @@ from config.paths import WINTER_WHEAT_WEATHER  # noqa: E402
 from sim_io import snapshot  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GOLDEN_DIR = REPO_ROOT / "tests" / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 RUST_CRATE_DIR = REPO_ROOT / "rust" / "crates" / "simcore"
 RUST_DOMAINS_DIR = REPO_ROOT / "rust" / "crates" / "domains"
 RUST_AUTHORING_DIR = REPO_ROOT / "rust" / "crates" / "authoring"
-SCENARIOS_DIR = REPO_ROOT / "tests" / "authoring" / "scenarios"
+SCENARIOS_DIR = SCENARIO_DIR
 TIERS_PATH = Path(__file__).parent / "tiers.json"
 
 # The hand-pinned RNG known-answer vectors live in tests/test_rng.py; import them to

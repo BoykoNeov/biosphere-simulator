@@ -21,11 +21,11 @@ Coverage:
 
 import dataclasses
 import math
-from pathlib import Path
 
 import pytest
 
 import sim_io
+from config.paths import GOLDEN_DIR
 from sim_io import snapshot
 from simcore import boundary
 from simcore.environment import Environment, SourceResolver
@@ -36,7 +36,7 @@ from simcore.quantities import Quantity, StockKind, canonical_unit
 from simcore.registry import Registry
 from simcore.state import State, Stock
 
-GOLDEN = Path(__file__).parent / "regression" / "golden" / "state_snapshot.json"
+GOLDEN = GOLDEN_DIR / "state_snapshot.json"
 
 # A 64-bit seed deliberately above 2**53 (9_007_199_254_740_992): a JSON *number*
 # would lose precision in an f64 reader (Rust/JS), which is why the seed is stored

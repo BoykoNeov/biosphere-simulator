@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from authoring.interpreter import BuiltScenario, load_scenario
 
-# The anchor scenarios (relative to tests/authoring/scenarios) + the template overrides
+# The anchor scenarios (relative to rust/data/scenarios) + the template overrides
 # each is exercised with. Kept here so `test_crossport.py` and any Rust-side driver
 # iterate the same set. `overrides` is the CLI form `param=value` the Rust example uses.
 #

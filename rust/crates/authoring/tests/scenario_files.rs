@@ -21,7 +21,7 @@ use authoring::{
 
 /// The repo's committed scenario directory (shared with the Python anchor tests).
 fn scenarios_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../tests/authoring/scenarios")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/scenarios")
 }
 
 fn no_overrides() -> BTreeMap<String, f64> {

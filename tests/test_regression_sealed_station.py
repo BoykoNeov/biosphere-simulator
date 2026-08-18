@@ -40,11 +40,11 @@ session-scoped ``sealed_tier2_run`` fixture).
 """
 
 import json
-from pathlib import Path
 
 import pytest
 
 import sim_io
+from config.paths import GOLDEN_DIR
 from domains.biosphere.drift import (
     is_stationary,
     same_phase_diffs,
@@ -86,7 +86,7 @@ from station.system import (
 
 pytestmark = pytest.mark.slow
 
-GOLDEN_DIR = Path(__file__).parent / "regression" / "golden"
+GOLDEN_DIR = GOLDEN_DIR
 STATE_GOLDEN = GOLDEN_DIR / "sealed_station_state.json"
 ENERGY_SUMMARY_GOLDEN = GOLDEN_DIR / "sealed_energy_drift_summary.json"
 
