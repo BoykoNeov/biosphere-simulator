@@ -1134,7 +1134,9 @@ pub fn run_perennial(
 
 #[cfg(test)]
 mod tests {
-    use super::super::{run_perennial_final, run_season_final, steps_for_years};
+    use super::super::{
+        run_perennial_final, run_season_final, season_setup, steps_for_years, BIO_DT,
+    };
     use super::*;
 
     /// `Drainage` reads no forcing at all (state only), so its pins need no resolver.
@@ -1573,6 +1575,116 @@ mod tests {
             wet(Some(0.40)),
             wet(None),
             "WSFD must be BIT-identical where water does not limit"
+        );
+    }
+
+    /// `f_N`'s WIRING, on a CONSTRUCTED nitrogen-limited run — the successor to the
+    /// Python `n_limited` scenario, retired by C6 of the reference flip (2026-08-18).
+    ///
+    /// ⚠ **Every scenario in the Rust roster holds `f_N == 1` for the whole season**,
+    /// so the nitrogen limiter is bit-identically inert across the suite: dropping the
+    /// `f_water * f_n` multiply in `flows.rs` leaves every golden, every parity run and
+    /// every session test green. Measured, not assumed — the wet half at the end of this
+    /// test is that measurement, and it is why the condition has to be manufactured.
+    ///
+    /// The declaration copied here is the retired `N_LIMITED_SCENARIO`: a tiny sowing
+    /// reserve (`plant_n0`) whose concentration sits inside the `f_N` band, over a soil
+    /// below `sn_residual` so uptake is off. The bite is therefore PURE DILUTION — a
+    /// fixed reserve spread through growing biomass — which is what made the scenario a
+    /// clean single-limiter experiment. It carries the four claims of
+    /// `tests/test_n_limited.py`: the bite is real and sustained, never N-dead, never
+    /// rations, and is strictly worse than an otherwise-identical N-replete run.
+    #[test]
+    fn nitrogen_limitation_is_wired_into_assimilation_and_no_scenario_shows_it() {
+        let nitro = params::nitrogen();
+        let starved = SeasonScenario {
+            plant_n0: 6e-5,
+            soil_n0: 0.5,
+            ..DEFAULT_SCENARIO
+        };
+        let vegetative =
+            |s: &State| s.stocks[LEAF_C].amount + s.stocks[STEM_C].amount + s.stocks[ROOT_C].amount;
+        let f_n = |s: &State| {
+            science::nitrogen_stress_factor(
+                s.stocks[PLANT_N].amount,
+                vegetative(s),
+                nitro.n_residual_per_mol_c,
+                nitro.n_critical_per_mol_c,
+            )
+        };
+        let trace = |scenario: &SeasonScenario| -> (Vec<State>, u64, Vec<Event>) {
+            let (state, integrator, resolver) = season_setup(scenario, 1).expect("setup");
+            let mut states: Vec<State> = Vec::new();
+            let (_last, rationed, events) = run_season(
+                &integrator,
+                state,
+                &resolver,
+                BIO_DT,
+                steps_for_years(1),
+                None,
+                &mut |s: &State| states.push(s.clone()),
+            )
+            .expect("run");
+            (states, rationed, events)
+        };
+
+        let (states, rationed, events) = trace(&starved);
+        let factors: Vec<f64> = states.iter().map(f_n).collect();
+        let min_f = factors.iter().copied().fold(f64::INFINITY, f64::min);
+
+        // A REAL bite, not float noise, and sustained rather than a one-step blip.
+        assert!(min_f < 0.9, "f_N never bit: min {min_f}");
+        assert!(
+            factors.iter().filter(|f| **f < 0.9).count() > 30,
+            "the bite was not sustained"
+        );
+        // Stressed, never N-DEAD: the limiter throttles growth, it does not kill.
+        assert!(
+            factors.iter().all(|f| *f > 0.0 && *f <= 1.0),
+            "f_N left (0, 1]"
+        );
+        // Pure dilution: uptake is shut off, so the reserve is CONSTANT and the whole
+        // fall in `f_N` is the growing biomass diluting it.
+        for s in &states {
+            assert_eq!(
+                science::soil_n_availability(
+                    s.stocks[SOIL_N].amount,
+                    starved.sn_residual,
+                    starved.sn_critical,
+                ),
+                0.0,
+                "uptake was not shut off"
+            );
+            assert_eq!(s.stocks[PLANT_N].amount, starved.plant_n0);
+        }
+        // The limiter reduces DRAWS; it must never push the Euler backstop or kill the
+        // crop (`rationed == 0` / `events == ()` were the scenario's own invariants).
+        assert_eq!(rationed, 0);
+        assert!(events.is_empty(), "{events:?}");
+
+        // The cascade, direction only: against an otherwise-IDENTICAL N-replete run —
+        // one field changed — the starved run reaches a LOWER peak vegetative biomass.
+        let replete = SeasonScenario {
+            plant_n0: 0.5,
+            ..starved
+        };
+        let (replete_states, _, _) = trace(&replete);
+        let peak = |ss: &[State]| ss.iter().map(vegetative).fold(f64::NEG_INFINITY, f64::max);
+        assert!(
+            replete_states.iter().all(|s| f_n(s) == 1.0),
+            "the baseline is not genuinely N-replete"
+        );
+        assert!(
+            peak(&states) < peak(&replete_states),
+            "the limiter did not cost the crop anything"
+        );
+
+        // ...and THE MEASUREMENT this test's warning rests on: the frozen roster's own
+        // declaration never leaves `f_N == 1`, so nothing else here can catch the wiring.
+        let (frozen_states, _, _) = trace(&DEFAULT_SCENARIO);
+        assert!(
+            frozen_states.iter().all(|s| f_n(s) == 1.0),
+            "a frozen scenario DOES reach the ramp — this warning is stale"
         );
     }
 

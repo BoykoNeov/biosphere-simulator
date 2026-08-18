@@ -664,4 +664,71 @@ mod tests {
         assert_eq!(at(0.6, 0.5), 0.0);
         assert!(at(0.6, 1.5) > 0.0); // ...and it is the SOIL cap doing it, not the depth
     }
+
+    /// The `f_N` RAMP and the uptake shutoff, called directly — the successor to the
+    /// Python `n_limited` scenario, retired by C6 of the reference flip.
+    ///
+    /// ⚠ **Every scenario in the Rust roster holds `f_N == 1`** (they all take the
+    /// default `plant_n0`, which sits above `n_critical_per_mol_c` for the whole season),
+    /// so the interior of this ramp is unreachable from any run here — the same position
+    /// `WSFD`, `Drainage` and `root_depth` are in, and the reason this pin has to
+    /// CONSTRUCT the concentration rather than drive a scenario. `n_limited` was the one
+    /// run in either tree that reached it; when it was deleted this test and the wiring
+    /// pin in `system.rs` took over its claims.
+    #[test]
+    fn the_nitrogen_stress_ramp_is_linear_between_its_two_knots() {
+        // The frozen band (nitrogen.yaml): residual 1/90, critical 1/45 kg N per kg C.
+        let (res, crit) = (1.0 / 90.0, 1.0 / 45.0);
+        let at = |conc: f64| nitrogen_stress_factor(conc, 1.0, res, crit);
+        // The two knots are EXACT — an `f_N` of 0.999... at saturation would move every
+        // golden's last ULP, and no scenario here would notice.
+        assert_eq!(at(crit), 1.0);
+        assert_eq!(at(2.0 * crit), 1.0);
+        assert_eq!(at(res), 0.0);
+        assert_eq!(at(0.0), 0.0);
+        // Strictly increasing through the interior, on the FROZEN band.
+        let interior: Vec<f64> = (1..10)
+            .map(|i| at(res + f64::from(i) / 10.0 * (crit - res)))
+            .collect();
+        assert!(
+            interior.iter().all(|f| *f > 0.0 && *f < 1.0),
+            "{interior:?}"
+        );
+        assert!(
+            interior.windows(2).all(|w| w[1] > w[0]),
+            "the ramp is not monotone: {interior:?}"
+        );
+        // ...and the LINEARITY is pinned on a band whose knots are exactly representable.
+        // ⚠ It cannot be pinned on the frozen band: 1/90 and 1/45 are not binary
+        // fractions, so `at(res + 0.5*(crit - res))` reads 0.49999999999999994 — the
+        // reconstruction's round-off, not the function's. Asserting `== 0.5` there would
+        // have been a pin on an accident of the arithmetic used to build the input.
+        let clean = |conc: f64| nitrogen_stress_factor(conc, 1.0, 1.0, 3.0);
+        assert_eq!(clean(2.0), 0.5);
+        assert_eq!(clean(1.5), 0.25);
+        assert_eq!(clean(2.5), 0.75);
+        // Zero biomass is the structural guard, not a division: an unsown plot is
+        // UNSTRESSED, not maximally stressed.
+        assert_eq!(nitrogen_stress_factor(0.0, 0.0, res, crit), 1.0);
+        assert_eq!(nitrogen_stress_factor(0.0, -1.0, res, crit), 1.0);
+    }
+
+    /// `soil_n_availability`'s HARD OFF — `n_limited`'s "pure dilution" regime.
+    ///
+    /// The scenario declared `soil_n0 = 0.5` against `sn_residual = 1.0`, so availability
+    /// is identically zero, `NitrogenUptake` yields a zero leg every step and `plant_n`
+    /// stays at its sowing value. The falling `f_N` was then wholly the growing biomass
+    /// diluting a FIXED reserve. Mirrors the retired
+    /// `tests/test_n_limited.py::test_n_limited_is_pure_dilution`.
+    #[test]
+    fn soil_n_below_the_residual_shuts_uptake_off_entirely() {
+        let (res, crit) = (1.0, 5.0);
+        assert_eq!(soil_n_availability(0.5, res, crit), 0.0);
+        assert_eq!(soil_n_availability(res, res, crit), 0.0); // `<=`, so AT it is off
+        assert_eq!(soil_n_availability(crit, res, crit), 1.0);
+        assert_eq!(soil_n_availability(1e9, res, crit), 1.0);
+        // The middle ramp is an integrated never-run-hot path in both trees; it is
+        // linear, and that is asserted here because nothing else can reach it.
+        assert_eq!(soil_n_availability(3.0, res, crit), 0.5);
+    }
 }
