@@ -19,6 +19,7 @@ pub mod cabin;
 pub mod display;
 pub mod driver;
 pub mod flows;
+pub mod goldens;
 pub mod greenhouse;
 pub mod harvest;
 pub mod inspection;

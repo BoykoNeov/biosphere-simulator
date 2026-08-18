@@ -3609,6 +3609,16 @@ is not the whole picture: **the programs that check the contracts are still Pyth
   it lets the prose rot again with nothing red. Writing a gate into the dying tree is
   sometimes the only place it *can* go today; recording that it is there is what stops it
   vanishing quietly.
+* ⚠⚠ **Added 2026-08-19 by S2 — this list is now FIVE, and the fifth is not a gate at all.**
+  `tests/crossport/tiers.json`, the file `docs/native-port-reference.md` calls the cross-port
+  **tolerance contract** (the 3 tiers + the measured bands for 20 of the goldens), is read by
+  **no program in `rust/`** — grepped, and the only occurrence of the name in the whole Rust
+  tree is a doc-comment pointer in `domains/src/lib.rs`. So one of the four freeze contracts
+  has its numbers stranded in the dying tree while the doc that names them lives on. Found
+  only because §5t went looking for a measured band and then declined to use one. ⚠ Unlike
+  the four above, porting it means porting the comparator and the tier machinery with it —
+  a different subject from "does this run still produce these bytes" — so it is recorded as
+  standing work rather than folded into S2. **S6 must not reach it as a free deletion.**
 
 Retiring the checker therefore disarms the traps the last four slices installed. Each
 needs its successor built **before** its Python original goes, not after.
@@ -3626,6 +3636,14 @@ authorship policy, and the single choke point every module routes through), and
 25 goldens on disk, 20 of them under the cross-port tier contract, and the whole
 comparison is in the tree scheduled for deletion. This is the single largest and
 earliest-ordered piece of Stage 3.
+
+> ⚠ **DISCHARGED 2026-08-19 by S2's first half (§5t).** `domains/tests/golden_regression.rs`
+> and `station/tests/golden_regression.rs` compare all 19 reference-authored goldens against
+> `rust/data/golden/`, and the census gates moved with them. ⚠ Two numbers in the paragraph
+> above are S1-stale and left as written because they date the finding: it is **21** on disk,
+> not 25 (C6 retired four), and 19 are reference-authored, not 18. The "20 under the tier
+> contract" clause is the one that survives unchanged — and §5t found that `tiers.json`
+> itself has no Rust reader, which is now FINDING 2's fifth entry.
 
 ### ⚠ FINDING 4 — four sibling domains: 1,411 lines of reference, no test *in `domains`*
 
@@ -3755,7 +3773,7 @@ slices, not one**, and the first two are not test work:
 | # | Slice | Why here |
 |---|---|---|
 | **S1** | **The reference's own ground** — relocate the 23 param YAMLs + the weather fixture + the 26 scenario fixtures + the goldens into paths the reference owns | FINDING 1. Nothing can be deleted until this lands; it moves data, not science, so it should be byte-neutral and provable as such |
-| **S2** | **The three gates come with it** — the manifest byte gate, the golden comparison + `golden_platform.py`'s policy, the inventory dumps' consumer | FINDINGS 2 + 3. These guard the *contracts*; every later slice runs behind them |
+| **S2** | **The three gates come with it** — the manifest byte gate, the golden comparison + `golden_platform.py`'s policy, the inventory dumps' consumer | FINDINGS 2 + 3. These guard the *contracts*; every later slice runs behind them. ⚠ **Splits in two, and the split is structural, not a size call** (§5t): the golden comparison stops at `station`, so `station` can own its census; the manifest gate spans `domains` + `station` + `authoring`, so it cannot. **First half COMPLETE 2026-08-19** — FINDING 3 discharged, the S1 forcing literal carried, FINDING 2 grown to five |
 | **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison |
 | **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable |
 | **S5** | **The biosphere mechanisms** — ~600 tests over `flows.rs` | FINDING 5. The largest and the one to take last, in crop/process batches, because it is where a silent narrowing does the most damage |
@@ -4208,6 +4226,9 @@ directory. All 47 moved files are git-recorded 100 %-similarity renames.
 * **Re-anchoring `forcing/weather_fixture`** — still S1's named successor, still not taken.
 * **S2's Rust-side comparators.** FINDING 3 stands: no Rust test compares a run to a committed
   golden. S1 only guarantees that when S2 writes them, the path they read is the final one.
+  ⚠ **Taken 2026-08-19, §5t** — and S1's guarantee held: the comparators read
+  `rust/data/golden/` through one helper, `domains::goldens::golden_dir`, so the two crates
+  share a single spelling of the path rather than each climbing out on their own.
 * **Deleting `tests/authoring/` and `tests/regression/`** as concepts — the directories are
   gone because they are empty, not because anything was retired.
 * ⚠⚠ **Giving the new forcing literal a home that outlives Python.** It lives in
@@ -4216,3 +4237,139 @@ directory. All 47 moved files are git-recorded 100 %-similarity renames.
   FINDING 2's list in the act of fixing something else**. Recorded there as well as here.
   **S2 must carry it**, not merely delete it: two counted literals against
   `rust/data/golden/`, in Rust, is the smallest successor that survives S6.
+
+## §5t Stage 3 — S2's first half: the reference compares its own runs, COMPLETE 2026-08-19
+
+FINDING 3 in one sentence: *"No Rust test compares a run against a committed golden."* This
+half discharges it. The manifest byte gate and the inventory dumps' consumer — the other two
+of FINDING 2's list — are **not** in this half; see "Deliberately NOT in this half".
+
+### The structural fact that had kept the comparison in Python
+
+An `examples/` program is a **binary target**: no integration test can call into it. So the
+19 runs the reference authors were unreachable from `cargo test` by construction, and
+shelling out to `cargo run` — which is what `test_golden_provenance.py` does — was the only
+way to reach them. That is *why* the comparison ended up on the checker's side, and it means
+S2 does not begin by writing a test:
+
+* the emitter bodies moved into the libraries, `domains::goldens` (11 goldens) and
+  `station::goldens` (8), each an ordinary `pub fn () -> String`;
+* the 17 `emit_*` examples became one-line wrappers that `print!` the same value, keeping
+  their module docs;
+* `domains/tests/golden_regression.rs` and `station/tests/golden_regression.rs` compare.
+
+⚠ **`station` is the lowest crate that can see all nineteen**, because it depends on
+`domains` and not the reverse — so the whole-census gates live there. A new workspace member
+was considered and refused: unlike the three freeze manifests, which genuinely span
+`domains` + `station` + `authoring`, the goldens stop at `station`. Same rule S1 used to put
+the data in `rust/data/` — *put the thing where the dependency is* — reaching a different
+answer because the dependency is shaped differently.
+
+### ⚠⚠ The platform policy: `cargo test` runs on Linux, and a skip was the wrong port
+
+`golden_platform.py`'s rule is that a hex-float golden is byte-exact only within a build on
+its generation platform (Windows/UCRT here), so the transcendental ones carry
+`windows_golden_only` — a pytest **skip**. The Rust job runs on `ubuntu-latest`, so this had
+to be settled before the first line of code; the obvious translation, `#[cfg(windows)]`,
+compiles the gate out, which is the shape this repo has been bitten by twice.
+
+So the port is **classification, not exclusion**. `Numerics::PureArithmetic` goldens are
+byte-compared on every platform; `Numerics::Transcendental` ones are byte-compared on the
+generation platform and **structurally** compared everywhere else — identical JSON tree,
+identical key order (the goldens are `sort_keys=True`), identical array lengths, identical
+non-float leaves, every hex-float leaf finite on both sides. Exact, and **not a tolerance**.
+That is strictly more than Python does off-Windows, where the test simply does not run.
+
+⚠ **A band was deliberately not invented**, and this is the same refusal `golden_platform.py`
+records at C3: *"writing a band nobody measured is the derived-not-measured move this
+contract exists to refuse."* The classification is inherited from where
+`@windows_golden_only` actually sits in `tests/test_regression_*.py` — a measurement, not a
+fresh judgement — and two tests pin the four pure-arithmetic names so a reclassification
+(which *weakens* a gate off Windows) is a visible edit rather than a one-word roster change.
+
+### ⚠⚠ FINDING 2 gains a FIFTH entry: `tiers.json` has no Rust reader
+
+Looking for a measured band turned one up. `tests/crossport/tiers.json` — the file
+`docs/native-port-reference.md` calls the cross-port **tolerance contract**, carrying the
+3 tiers and the measured bands for 20 of the goldens — is read by **no program in `rust/`**.
+Grepped: the only occurrence of the name in the whole Rust tree is a doc-comment pointer in
+`domains/src/lib.rs`. So the tolerance contract is a contract artifact stranded in the tree
+S6 deletes, exactly like the four gates FINDING 2 already lists, and it was found only
+because this slice went looking for a number it then declined to use.
+
+⚠ It is **not** a gap this slice fills. Porting `tiers.json` means porting the comparator
+and the tier machinery with it, which is a different subject from "does this run still
+produce these bytes". Recorded so S6 cannot reach it as a free deletion — the same standing
+`R!` has in §5q's table.
+
+### The expensive golden — a decision, not a default
+
+`sealed_station_state.json` is ~1.3 M sub-steps over five domains and costs **~100 s at every
+optimization level**: measured 378 s at the stock dev profile, 116 s at `[profile.dev]
+opt-level = 2`, 93 s in release. The cost is the run, not the build, so no build knob buys it
+back. Against a warm `cargo test` of **7.9 s**, including it unconditionally is a 15×
+regression on the reference's primary gate.
+
+**Put to the user, who chose: off by default, on in CI.** It is `#[ignore]`d and the `rust`
+CI job gained a `cargo test -- --ignored` step. ⚠ The `opt-level = 2` profile change was
+measured (and found byte-neutral across all 19 goldens — a *third* profile beyond the
+release/debug pair `regen_goldens_from_rust.py` already records) and then **reverted**,
+because it belonged to an option the user did not pick. The measurement is kept here rather
+than the change.
+
+⚠⚠ **`#[ignore]` alone is the green-by-skip shape, so it does not stand alone.** `Cost` is a
+roster field, and `the_ignored_set_is_exactly_the_expensive_roster` asserts both directions:
+exactly one golden is `Expensive`, and exactly one `#[ignore]` attribute exists in the file.
+A second `#[ignore]` added for convenience is red. What no test can guard is the CI step
+itself — deleting that line fails nothing — so the step carries the warning in a comment.
+
+### ⚠ The Linux path would have shipped unexercised
+
+`compare_structural` is unreachable on the development box: `compare` routes to it only for
+a transcendental golden **off** Windows. So the entire Linux branch was dead code locally,
+and would first have executed on CI on the day something diverged, with nobody having ever
+seen it work — the green-by-skip shape wearing different clothes. Eleven unit tests now
+exercise the comparator directly on hand-built pairs, on every platform: a last-bit
+perturbation passes, and a changed integer, label, stock id, key count, array length, key
+*order*, and a float leaf that turned into a label each fail by name.
+
+⚠ One of them asserts a **limitation** rather than a capability —
+`a_wildly_different_hex_float_is_still_structurally_equal`. The structural comparison says
+nothing about magnitude, which is precisely why it is the off-platform fallback and not the
+contract, and why `tiers.json`'s absence above is a finding rather than a shrug.
+
+### The controls
+
+1. **Byte-neutrality of the relocation.** All 19 emitters' stdout was captured *before* the
+   move and diffed against the committed goldens; 18 came back identical (the 19th, the
+   sealed station, is covered by its own test rather than a second six-minute run). "One code
+   path, two callers" is the claim; the diff is the control.
+2. **The comparison is live.** `thermal()` was mutated to run one fewer step → the gate went
+   red naming the exact divergence (`"n": 719` vs `720`). Reverted **in place from a copy in
+   the temp tree, never `git checkout`** — this tree carried uncommitted work, and discarding
+   an uncommitted slice that way is a cost this flip has already paid once.
+3. **The census is live.** A 20th roster entry was added → five of the seven station gates
+   went red, each from a different angle (the count literal, the classification partition,
+   the uniqueness/reality check, and the run itself).
+4. ⚠ **The control that caught its own author.** The first draft of
+   `the_ignored_set_is_exactly_the_expensive_roster` counted the bare string `#[ignore` and
+   found **12** — that file's own prose discusses the attribute eleven times. That is
+   `manifest_writer.rs`'s recorded lesson landing again in a new place: *an anchor that
+   matches prose as well as syntax checks whichever came first.* The count is now
+   line-anchored, with a paired assertion that the bare string really is ambiguous here, so
+   the reason is a measurement rather than a claim.
+
+### Deliberately NOT in this half
+
+* **The manifest byte gate** (FINDING 2's first entry) and **`test_inventory_parity.py`'s
+  successor** (its third). Both need the manifest builders out of the three
+  `dump_*_inventory` examples and into their crates, for the same binary-target reason as
+  above — and unlike the goldens they genuinely span `domains` + `station` + `authoring`, so
+  the "which crate owns it" question has a different answer. S2's second half.
+* **Retiring anything on the Python side.** S2 builds successors; S6 retires originals, and
+  only once S3–S5 have theirs. The two overlap on purpose: a slice that deletes its
+  predecessor before the successor has run *in CI* is how a gate goes missing.
+* **`golden_platform.py`'s other two policies.** `write_python_golden` (refusing Python
+  authorship) and `PYTHON_DIVERGES` / `DISAGREEMENT_CEILING` (the checker's conformance)
+  have no subject on the Rust side — they measure *Python*, so they die with it at S6 rather
+  than porting here. Named so the omission is a decision and not an oversight.

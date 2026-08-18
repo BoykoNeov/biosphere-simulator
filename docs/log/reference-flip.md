@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away; S2's first half then gave the reference its own golden comparison on 2026-08-19 — 19 runs moved out of the `examples/` binaries that made them unreachable, a platform policy that classifies rather than skips because `cargo test` runs on Linux, and a fifth entry for FINDING 2: the cross-port tolerance contract `tiers.json` is read by no program in `rust/`)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -2166,3 +2166,107 @@ the easiest thing in the repo to move and not notice.
 skipped (11m40s). All three manifests byte-identical — they record hashes of golden **content**,
 and the writers read the same bytes from a new directory. All 47 moved files are git-recorded
 100 %-similarity renames.
+
+### S2 — the first half: the reference compares its own runs; FINDING 3 discharged (2026-08-19)
+
+Plan §5t. The headline of the whole classification pass was one sentence — *"No Rust test
+compares a run against a committed golden"* — and this is the slice that makes it false.
+19 goldens, two crates, and a platform policy that had to be settled before any code.
+
+**Why the comparison had lived in Python, and why that is not a preference.** An `examples/`
+program is a **binary target**. No integration test can call into one. So the 19 runs the
+reference authors were unreachable from `cargo test` *by construction*, and shelling out to
+`cargo run` — what `test_golden_provenance.py` does — was the only way to reach them. The
+first act of this slice is therefore not writing a test but **moving the runs out of the
+binaries**: `domains::goldens` (11) and `station::goldens` (8), with the 17 `emit_*` examples
+reduced to one-line wrappers that print the same value.
+
+⚠ **`station` is the lowest crate that sees all nineteen**, since it depends on `domains` and
+not the reverse — so it owns the whole-census gates and no new workspace member was needed.
+The same question has the *opposite* answer for the manifest byte gate, which genuinely spans
+`domains` + `station` + `authoring`; that is why S2 split in two, and the split is structural
+rather than a size call.
+
+#### The finding: `tiers.json` has no Rust reader — FINDING 2 is now five
+
+The Linux problem forced the interesting question. `cargo test` runs on `ubuntu-latest`, and
+the transcendental goldens are byte-exact only on their Windows/UCRT generation platform.
+Python's answer is a skip (`windows_golden_only`); the obvious Rust translation is
+`#[cfg(windows)]`, which compiles the gate out — the shape this repo has been bitten by
+twice. The attractive alternative was a *tolerance* comparison off-platform, so this slice
+went looking for a measured band.
+
+**There isn't one on this side of the tree.** `tests/crossport/tiers.json` — the file
+`docs/native-port-reference.md` calls the cross-port tolerance contract, carrying the three
+tiers and the measured bands for 20 goldens — is read by **no program in `rust/`**. The only
+occurrence of the name in the whole Rust tree is a doc-comment pointer. So one of the four
+freeze contracts has its numbers stranded in the tree S6 deletes, and it turned up only
+because the slice went looking for a number *and then declined to use it*: the band was
+refused on `golden_platform.py`'s own C3 grounds — *writing a band nobody measured is the
+derived-not-measured move this contract exists to refuse.*
+
+The policy shipped instead is **classification, not exclusion**: pure-arithmetic goldens
+byte-compare everywhere; transcendental ones byte-compare on the generation platform and are
+compared **structurally** elsewhere (identical tree, key order, array lengths, discrete
+leaves; every hex-float finite). Exact, not a tolerance — and strictly more than Python does
+off-Windows, where the test simply does not run.
+
+#### ⚠ The Linux path would have shipped unexercised, and that is the same defect in miniature
+
+`compare_structural` is unreachable on this box: `compare` routes to it only for a
+transcendental golden **off** Windows. So the branch built to avoid a compile-out gate was
+itself dead code locally, and would first have executed on CI on the day something diverged
+— nobody ever having seen it work. Eleven unit tests now drive it directly on hand-built
+pairs, on every platform. ⚠ One of them asserts a **limitation**:
+`a_wildly_different_hex_float_is_still_structurally_equal`. The structural check says nothing
+about magnitude. That is exactly why it is a fallback and not the contract, and why the
+missing `tiers.json` reader is a finding rather than a shrug.
+
+#### The expensive golden — the user's call, and the profile measurement that was thrown away
+
+`sealed_station_state.json` is ~1.3 M sub-steps over five domains and costs **~100 s at every
+optimization level** — measured 378 s dev, 116 s at `opt-level = 2`, 93 s release. The cost
+is the *run*, not the build. Warm `cargo test` is 7.9 s, so including it unconditionally is a
+15× regression on the reference's primary gate. Put to the user, who chose **off by default,
+on in CI**.
+
+⚠ The `opt-level = 2` profile change was measured *and found byte-neutral across all 19
+goldens* — a third profile beyond the release/debug pair `regen_goldens_from_rust.py` already
+records — and then **reverted**, because it belonged to an option the user did not pick. The
+measurement is kept in the plan; the change is not. A measurement that argues for a thing the
+user declined is still a measurement worth keeping and not a licence to keep the thing.
+
+⚠⚠ **`#[ignore]` alone is the green-by-skip shape.** So `Cost` is a roster field, not just an
+attribute, and `the_ignored_set_is_exactly_the_expensive_roster` asserts both directions:
+exactly one golden is `Expensive`, exactly one `#[ignore]` attribute exists in the file. What
+no test can guard is the CI step itself — deleting that line fails nothing — so the step
+carries the warning inline.
+
+#### ⚠ The control that caught its own author
+
+The first draft of that very test counted the bare string `#[ignore` and found **12**: the
+file's own prose discusses the attribute eleven times. That is `manifest_writer.rs`'s
+recorded lesson landing again in a new place — *an anchor that matches prose as well as
+syntax checks whichever came first* — and it landed inside the test written to stop a
+different kind of invisibility. The count is now line-anchored, with a paired assertion that
+the bare string really is ambiguous here, so the reason is a measurement rather than a claim.
+
+#### The other controls
+
+* **Byte-neutrality of the relocation** — all 19 emitters' stdout captured before the move and
+  diffed after; identical. "One code path, two callers" is the claim, the diff is the control.
+* **The comparison is live** — `thermal()` mutated to run one fewer step → red, naming the
+  divergence (`"n": 719` vs `720`). ⚠ Reverted **in place from a temp-tree copy, never
+  `git checkout`**: this tree carried uncommitted work, and discarding an uncommitted slice
+  that way is a cost this flip has already paid once.
+* **The census is live** — a 20th roster entry → five of seven station gates red, each from a
+  different angle.
+
+#### What this slice did NOT do
+
+The Python side is untouched and still runs. S2 builds successors; **S6** retires originals,
+and only once S3–S5 have theirs — a slice that deletes its predecessor before the successor
+has run *in CI* is how a gate goes missing. And `golden_platform.py`'s other two policies
+(`write_python_golden`, `PYTHON_DIVERGES`/`DISAGREEMENT_CEILING`) are not ported at all:
+their subject is *Python's* conformance, so they lose their referent when Python goes rather
+than needing a Rust home. Named as a decision so the omission is not read as an oversight.

@@ -19,6 +19,7 @@
 pub mod biosphere;
 pub mod crew;
 pub mod eclss;
+pub mod goldens;
 pub mod params;
 pub mod power;
 pub mod thermal;
