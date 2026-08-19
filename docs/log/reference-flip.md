@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away; S2's first half then gave the reference its own golden comparison on 2026-08-19 — 19 runs moved out of the `examples/` binaries that made them unreachable, a platform policy that classifies rather than skips because `cargo test` runs on Linux, and a fifth entry for FINDING 2: the cross-port tolerance contract `tiers.json` is read by no program in `rust/`; its second half then moved the three manifest writers into their crates so every freeze contract byte-gates itself in Rust — which on its first run caught the move's own `crate::` rewrite silently re-wording three of the four contracts' frozen prose)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away; S2's first half then gave the reference its own golden comparison on 2026-08-19 — 19 runs moved out of the `examples/` binaries that made them unreachable, a platform policy that classifies rather than skips because `cargo test` runs on Linux, and a fifth entry for FINDING 2: the cross-port tolerance contract `tiers.json` is read by no program in `rust/`; its second half then moved the three manifest writers into their crates so every freeze contract byte-gates itself in Rust — which on its first run caught the move's own `crate::` rewrite silently re-wording three of the four contracts' frozen prose; S3 then gave the four sibling domains their first 160 tests the same day — 1,411 canonical lines that had none — and the five-mutation exit gate reads five with the golden byte compare deselected, where it read zero before, two of the five seen ONLY by flow-level or loader tests; and the registration-order control found MY OWN probe inert, not the subject: a single reverse of Power's build order IS canonical order, so it passed against a registry that never sorted, and all four tests now enumerate n! in full)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -2386,3 +2386,103 @@ claiming to discriminate between contracts while checking a string **all three m
 carry**. Both were caught by review, not by a test, in a slice whose entire subject is gates
 that assert what they claim. In this repo a `///` block is read as a finding, so writing one
 costs the same care as writing the assertion under it.
+
+### Stage 3, slice S3 — the four sibling domains, COMPLETE 2026-08-19
+
+Designed and gated in plan §5v *before* any Rust was written; built and measured in §5w.
+`domains/src/{crew,eclss,power,thermal}.rs` carried 1,411 lines the reference calls
+canonical and **zero `#[test]` of their own**, against 160 collected cases in the tree
+being deleted. They now carry 160 — the same count, case for case: 69 flow-level in-src,
+23 loader, 68 run-level.
+
+**Scope: nine files, not eleven.** `test_bvad_validation.py` and `test_crew_coupled_loop.py`
+are deferred to `station` **as science items with a destination**, not bucketed — the first
+because its reference owner is `station/src/science_gates.rs`, whose own doc comment calls
+the Python file "the checker's conformance half" (porting it means re-deciding what that
+sentence means once there is no checker), the second because its 672 lines encode the
+`crew-coupled-loop-refused` argument rather than coverage of `crew.rs`. `CLAUDE.md` settles
+it in one line: do not take a science item and a re-anchoring slice in one batch.
+
+#### The three gaps, and why each was closed the way it was
+
+* **No trajectory, no second integrator.** `domains::run` keeps only the final state and
+  takes `&EulerIntegrator` concretely; every `*_run.py` case is trajectory-shaped and
+  several run *both* schemes. Measured before choosing: `simcore`'s `Scheme` trait is
+  private, `step_report` is inherent on each integrator, and the public `Substepper` keeps
+  `n`, skips aux and **does not assert conservation** — the very thing these cases check.
+  So a `domains`-local `StepIntegrator` trait plus an additive `run_trajectory`, rather than
+  widening a frozen `simcore` API to serve test ergonomics. `run` is untouched because
+  `goldens.rs` calls it; the predicted golden diff was **zero** and `--test
+  golden_regression` proved it rather than the plan asserting it.
+* **The flow helpers are private,** so ~40 of the 69 flow-level cases are unreachable from
+  `crates/domains/tests/`. They live in `#[cfg(test)] mod tests` inside each domain file
+  (the `biosphere::science` precedent); widening `charge_split` / `scrub_flux` /
+  `makeup_flux` / `radiated_power` to `pub` to suit a test file is the tail wagging the dog.
+* **The loaders had no runtime path to a bad file** — five `include_str!`ed constants and a
+  panic. Each file now has a `*_from(&str)` loader returning a `Result`. ⚠⚠ **The bound
+  guards moved INSIDE those functions, and that placement is the whole slice.** Left in the
+  public wrappers, the 23 rejection tests would have exercised a path the guards are not on
+  and M-bound would have stayed green — reproducing, one section later, exactly the defect
+  §5v measurement 3 diagnoses. Every rejection carries its own in-range control.
+
+#### The exit gate reads FIVE
+
+Run with `--test golden_regression` **and** the Python cross-port comparison both
+deselected — i.e. `--lib` plus the five named run targets — so a golden byte compare cannot
+stand in for a behavioural gate. Before S3 this reading was **zero**: measurement 2's own
+table shows the only `domains` entry under any mutation was the golden.
+
+| Mutation | Site | `domains` tests red, by name |
+|---|---|---:|
+| M-power | `charge_split`'s legs swapped | 13 |
+| M-eclss | `makeup_flux`'s sign flipped | 7 |
+| M-thermal | `t.powf(4.0)` → `powf(3.0)` **in `radiated_power`** | 7 |
+| M-crew | `carbon_split`'s fractions swapped | 4 |
+| M-bound | `charge_from` loses its `require_half_open` | 2 |
+
+⚠ **Two of the five are seen ONLY by flow-level or loader tests, and that is worth naming.**
+M-crew reddens nothing at run level: carbon is conserved whichever way the split goes and
+the two destination sinks are never compared to each other, so a whole 12-case run suite is
+blind to the fractions. M-bound moves no committed value at all, so it has **no snapshot
+backstop anywhere in the workspace** — measured, not inferred: under M-bound the full
+648-test workspace reddens exactly those two tests and nothing else.
+
+#### ⚠⚠ The control found MY OWN permutation inert, not the subject
+
+`season_order_independence.rs` had already paid for one version of this — deleting the flow
+sort in `Registry::new` left its run comparison green at season magnitudes — so all four
+sibling order tests were written with the iteration-order assertion from the start, and then
+the control was run anyway. **Three reddened. Power stayed green.**
+
+The first version permuted by `into_parts()` + `reverse()`. Power builds
+`[SolarCharge, LoadDraw]`, and canonical order is `[load_draw, solar_charge]` — so with the
+sort deleted, reversing the *unsorted* build order produces canonical order, and both
+assertions passed against a registry that never sorted. The lesson generalises past this
+repo: **one hand-picked permutation is a coin flip on whether it discriminates.** All four
+tests now enumerate `n!` in full — 2, 6, 6 and 24 — and all four redden under the same
+control. This is the same shape as the season finding but a *different* mechanism: there the
+subject was not a discriminator, here the *probe* was not.
+
+#### ⚠ And a measurement artifact in my own reporting
+
+The first battery run under-reported: the regex collecting failing test names excluded
+digits, so every `o2_makeup_*` and `rk4` case was silently dropped. Four of the five rows
+above were short. Caught by noticing a name that had reddened in an earlier ad-hoc run and
+was missing from the summary — which is to say, by luck. A control's *instrument* is as
+capable of being inert as the control.
+
+#### The oracle rule, held
+
+Not one of the 160 takes its expected value from a Python run. Properties port freely; the
+five closed forms (`equilibrium_temperature`'s defining identity, the daily balance, the
+per-species steady states, crew endurance, Stefan-Boltzmann) are **re-derived in the test**
+from their own algebra — including `relaxation_time` and `steady_state`, which have no Rust
+twin at all, and `radiated_power`, which is private. The one already-correct case,
+`stefan_boltzmann_constant_is_codata_value`, keeps CODATA as its oracle.
+
+#### Standing after S3
+
+648 workspace tests pass (was 488), `clippy --all-targets -D warnings` clean, and the nine
+Python files still pass 160/160 — S6 retires them, and only once S4 and S5 have theirs.
+`bounds_match_the_loaders` is kept and re-documented as the inert gate it was measured to
+be, not deleted: what it asserts is still true, it is simply not the gate its name implies.

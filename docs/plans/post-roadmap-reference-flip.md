@@ -3774,7 +3774,7 @@ slices, not one**, and the first two are not test work:
 |---|---|---|
 | **S1** | **The reference's own ground** — relocate the 23 param YAMLs + the weather fixture + the 26 scenario fixtures + the goldens into paths the reference owns | FINDING 1. Nothing can be deleted until this lands; it moves data, not science, so it should be byte-neutral and provable as such |
 | **S2** | **The three gates come with it** — the manifest byte gate, the golden comparison + `golden_platform.py`'s policy, the inventory dumps' consumer | FINDINGS 2 + 3. These guard the *contracts*; every later slice runs behind them. ⚠ **Splits in two, and the split is structural, not a size call** (§5t): the golden comparison stops at `station`, so `station` can own its census; the manifest gate spans `domains` + `station` + `authoring`, so it cannot. **COMPLETE 2026-08-19** — first half (§5t) discharged FINDING 3 and carried the S1 forcing literal; second half (§5u) moved the three manifest writers into their crates and gave each contract a byte gate, plus Rust successors for the three `test_inventory_parity` claims the byte gate does NOT subsume. FINDING 2 grew to five on the way |
-| **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison. ⚠ **Designed in §5v, and this row is superseded on two counts**: the real figure is **160 collected cases over nine files**, not 158 over eleven — `test_bvad_validation.py` and `test_crew_coupled_loop.py` are deferred to `station` as science items. And **Control B's verdict here is dated**: §5v re-ran it and got 12 red, not 2 |
+| **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison. ⚠ **BUILT — see §5w (COMPLETE 2026-08-19).** ⚠ **Designed in §5v, and this row is superseded on two counts**: the real figure is **160 collected cases over nine files**, not 158 over eleven — `test_bvad_validation.py` and `test_crew_coupled_loop.py` are deferred to `station` as science items. And **Control B's verdict here is dated**: §5v re-ran it and got 12 red, not 2 |
 | **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable |
 | **S5** | **The biosphere mechanisms** — ~600 tests over `flows.rs` | FINDING 5. The largest and the one to take last, in crop/process batches, because it is where a silent narrowing does the most damage |
 | **S6** | **The retirements** — the two `R!` rows (only once S3's successors stand), the generators (each against its named successor), the Python tree itself | Only after S1–S5 have successors standing. ⚠ The cross-port comparison is **not** a free deletion: FINDING 7 makes it the sibling domains' only gate until S3 lands. The **D** rows (Godot drivers, `test_context_budget.py`, `test_headless_cli.py`) need answers before this slice, not during it |
@@ -4737,7 +4737,7 @@ comparable magnitudes re-associating the additions moves no bits. The four
 `*_registration_order_independent` ports must assert the rebuilt registry's **iteration
 order**, not only the final state, and must be controlled against exactly that mutation.
 
-### The acceptance criterion: a four-mutation battery, pre-committed
+### The acceptance criterion: a five-mutation battery, pre-committed
 
 S3 is not done when 160 tests exist. It is done when each of these reddens a test **in
 `domains`, by name** — a test that says what broke, not a byte compare that says bytes moved:
@@ -4746,7 +4746,7 @@ S3 is not done when 160 tests exist. It is done when each of these reddens a tes
 |---|---|---|
 | M-power | swap `charge_split`'s legs (§5q's Control B) | power |
 | M-eclss | flip `makeup_flux`'s sign so the regulator drives away from setpoint | eclss |
-| M-thermal | change `powf(4.0)` to `powf(3.0)` | thermal |
+| M-thermal | change `t.powf(4.0)` to `t.powf(3.0)` **in `radiated_power`** (`powf(4.0)` occurs three times in `thermal.rs`; naming the site is what makes the control reproducible) | thermal |
 | M-crew | swap the carbon split fractions | crew |
 | M-bound | drop a per-file bound guard in `params.rs` | (all four) |
 
@@ -4765,8 +4765,8 @@ S6 deletes `tests/crossport/test_crossport.py`. FINDING 7 says that deletion is 
 while it is the sibling domains' only by-name gate. So S3's exit criterion is written now,
 in S6's terms, and not left to be inferred:
 
-> Re-run the four mutations with the cross-port comparison **and `--test golden_regression`**
-> both deselected. `domains` must still redden, by name, for all four.
+> Re-run the five mutations with the cross-port comparison **and `--test golden_regression`**
+> both deselected. `domains` must still redden, by name, for all five.
 
 ⚠⚠ **The golden exclusion is not belt-and-braces; without it this gate is inert, and it was
 inert in this section's own first draft.** Measurement 2 shows M-power already reddens
@@ -4783,7 +4783,7 @@ byte compare that says bytes moved"*) and simply was not in the gate. It is now.
 ⚠ Deducible from measurement 2 rather than separately run: with the goldens excluded,
 `domains` today has **nothing** that reddens under any of the five, because it has no
 sibling-domain test at all. The tightened gate therefore reads zero before S3 and must read
-four after it.
+five after it.
 
 ⚠ This is S2's lesson applied one slice earlier — *"S6 must not retire the Python byte
 census believing this is like-for-like"* — and the reason it is stated here is that S6 will
@@ -4797,3 +4797,142 @@ otherwise inherit an **unmeasured** claim.
   that fails is a **finding to report**, never grounds for editing `domains` to suit it.
 * **No golden regeneration.** The predicted diff is zero; if it is not, that is the finding.
 * **No Python deletion.** The nine files stay green and running until S6.
+
+## §5w Stage 3 — S3 BUILT, COMPLETE 2026-08-19: 160 tests, five mutations, and a control that was itself inert
+
+§5v designed S3 and took three measurements before a line of Rust was written. This section
+is what happened when it was built. The design held; two things did not, and both were found
+by a control rather than by the suite.
+
+### What landed, against §5v's own count
+
+| | planned | built |
+|---|---:|---:|
+| flow-level (in-src `#[cfg(test)] mod tests`) | 69 | 69 |
+| loader rejection (`params.rs`) | 23 | 23 |
+| run-level (`crates/domains/tests/*_run.rs`) | 68 | 68 |
+| **total** | **160** | **160** |
+
+Case for case against the nine Python files, which still collect 160 and still pass. The
+workspace went 488 → **648**; `clippy --all-targets -D warnings` is clean.
+
+The one parametrized Python case (`test_eclss_two_runs_contract_geometrically`, three
+species) is written out as three named tests, so a failure says *which control loop* broke
+rather than which parameter id did.
+
+### The three gaps, as built
+
+**Gap 1.** A `domains`-local `StepIntegrator` trait with impls for both integrators, plus an
+additive `run_trajectory` returning `(Vec<State>, rationed, events)` with the initial state
+included. `run` is untouched. **The predicted golden diff was zero and it was zero** —
+`--test golden_regression` is what says so, per `soil-layers-built`'s rule.
+
+**Gap 2.** Flow-level cases in-src; run-level in `tests/{power_run, power_self_discharge,
+eclss_run, thermal_run, crew_run}.rs`. Small helpers are duplicated across the five files
+rather than pulled into a `tests/common/mod.rs` — `golden_regression.rs` states that choice
+explicitly for three shared lines and this follows it.
+
+**Gap 3.** Five `*_from(&str)` loaders returning `Result<_, ConfigError>`, with the public
+entry points as thin panicking wrappers.
+
+⚠⚠ **The bound guards had to move INSIDE the `*_from` functions, and that is the whole
+point of the gap.** Had `charge_from` carried only the parse and the unit guard while
+`charge()` kept `require_half_open`, the 23 new rejection tests would have exercised a path
+the guards are not on — and M-bound would have stayed green, reproducing §5v measurement 3's
+defect in the section written to close it. Flagged on review before the code was written,
+then verified by running M-bound against the new tests specifically rather than against the
+crate.
+
+### The exit gate: FIVE, measured
+
+Per §5v as corrected here (the section said "four" in three places while its table listed
+five — M-bound had been added after the wording, and the gate one commits against must not
+be off by the one mutation with no snapshot backstop).
+
+Selection: `cargo test -p domains --lib --test power_run --test power_self_discharge --test
+eclss_run --test thermal_run --test crew_run --no-fail-fast`. That is exactly "the cross-port
+comparison and `--test golden_regression` both deselected".
+
+| Mutation | Site | red, by name |
+|---|---|---:|
+| M-power | `charge_split` returns `(lost, stored)` | 13 |
+| M-eclss | `makeup_flux` computes `(cabin_o2 − setpoint)` | 7 |
+| M-thermal | `t.powf(3.0)` in `radiated_power` | 7 |
+| M-crew | `carbon_split` returns `(feces, respired)` | 4 |
+| M-bound | `charge_from` drops `require_half_open` | 2 |
+
+Before S3 this gate read **zero** — not separately re-run, but read off measurement 2's own
+table with the golden row removed, since the golden byte compare was the only `domains`
+entry it found. Each mutation ran against a clean tree with nothing else in flight and was
+restored from a backup, with the selection re-verified green (239 passed) afterwards.
+
+⚠ **Two of the five are caught only outside the run suites, and both facts are findings.**
+
+* **M-crew reddens nothing at run level.** Carbon is conserved whichever way the split goes,
+  and `crew_run.rs` never compares `exhaled_co2` against `fecal_waste` — it checks each sink
+  is monotone and that the three totals are invariant, all of which survive the swap. A
+  12-case run suite is blind to the two fractions its domain exists to apply.
+* **M-bound has no backstop anywhere in the workspace.** Measured rather than argued: under
+  M-bound the full 648-test workspace reddens exactly `charge_loader_rejects_zero_efficiency`
+  and `charge_loader_rejects_above_one_efficiency` and nothing else. Its verdict is therefore
+  a statement purely about behavioural coverage, which is why §5v called it the cleanest of
+  the five.
+
+### ⚠⚠ FINDING: the registration-order control found MY OWN PROBE inert, not the subject
+
+`season_order_independence.rs` had already established that a run comparison can be inert at
+real magnitudes, so all four sibling order tests asserted the rebuilt registry's **iteration
+order** from the first draft — §5v required it. The control was run anyway: delete
+`flows.sort_by(...)` in `Registry::new`, expect all four to redden.
+
+**Three reddened — crew, eclss, thermal. Power stayed green.**
+
+The probe was `into_parts()` then `reverse()`. `build_power` constructs
+`[SolarCharge, LoadDraw]`; canonical order is `[load_draw, solar_charge]`. So with the sort
+deleted, `into_parts()` hands back *build* order and reversing it lands on canonical order —
+the "permuted" registry iterated canonically anyway, and both assertions passed against a
+registry that never sorted.
+
+This is the season lesson's twin with the roles exchanged. There the **subject** was not a
+discriminator (real magnitudes hide re-association). Here the **probe** was not: one
+hand-picked permutation is a coin flip on whether it moves anything, and it lost the toss on
+exactly one of four registries. A discriminating probe on three subjects is not evidence
+about the fourth.
+
+*Fix:* all four tests enumerate `n!` in full — 2, 6, 6 and 24 flows-permutations
+respectively, which is cheap at this size and cannot miss — plus assertions that the family
+is the full factorial and is not the identity alone. Re-run under the same control: **all
+four redden.**
+
+### ⚠ FINDING: the battery's own reporting instrument was inert
+
+The first run of the five-mutation battery under-reported. The regex collecting failing test
+names was `^    [a-z_]+(::[a-z_:]+)?$` — **no digits** — so every `o2_makeup_*` and `rk4`
+case was dropped silently. Four of the five rows were short; the corrected numbers are the
+ones tabled above.
+
+It was noticed only because a name that had reddened in an earlier ad-hoc run was missing
+from the summary. Recorded because the failure mode is the section's own subject one level
+up: a control's *instrument* can be inert exactly as a control can, and a filter that
+silently matches nothing looks identical to a subject that changed nothing.
+
+### The oracle rule, held
+
+None of the 160 takes a value from a Python run. The five closed forms are re-derived in the
+tests from their own algebra — the equilibrium identity `εσA(T_eq⁴ − T_space⁴) = heat_load`,
+the daily-balance identity, the three per-species steady states, crew endurance
+`store0/rate`, and Stefan-Boltzmann. Three of those have **no Rust twin to import even if
+the rule allowed it** (`relaxation_time`, `steady_state`) or are private
+(`radiated_power`), so writing them out was forced as well as correct.
+`stefan_boltzmann_constant_is_codata_value` keeps CODATA, as §5v's template.
+
+### What S3 leaves standing
+
+* `bounds_match_the_loaders` is **kept and re-documented**, not deleted: what it asserts is
+  still true and cheap, it is simply not the gate its name implies. Its docstring now says
+  so and points at its successors — never weaken or delete a test to make a point.
+* `test_bvad_validation.py` and `test_crew_coupled_loop.py` remain deferred to `station`,
+  named with their destination.
+* The nine Python files stay green and running. **S6 retires them, and only once S4 and S5
+  have theirs** — the overlap is deliberate.
+* No science changed, no golden regenerated, no param file touched.
