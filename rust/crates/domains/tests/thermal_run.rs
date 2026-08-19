@@ -119,6 +119,23 @@ fn bits(state: &State) -> BTreeMap<&str, u64> {
         .collect()
 }
 
+/// Assert two states are identical: every stock's amount **bit for bit**, then the whole
+/// `State`.
+///
+/// ⚠ Both halves, deliberately, and the second one is honest about being weak **today**.
+/// `to_bits()` is the stricter float comparison — `PartialEq` treats `+0.0 == -0.0` — but it
+/// reads only the amounts, while the Python case this ports compared the whole `State`.
+/// `State` also carries `n`, `rng_seed` and `aux`; on the four siblings those are always the
+/// step count, 0, and empty, so **given the bit comparison passes, the `State` comparison
+/// cannot currently fail**. It is here because the ported claim is about the whole `State`
+/// and because it starts biting the moment a sibling gains an aux process or an RNG draw —
+/// not because it is measuring anything now. Said out loud rather than left to read as
+/// coverage.
+fn assert_same_state(a: &State, b: &State) {
+    assert_eq!(bits(a), bits(b), "stock amounts differ bit for bit");
+    assert_eq!(a, b, "the States differ outside their stock amounts");
+}
+
 // --- the payload: ENERGY conserved every step over the augmented system ---------------
 #[test]
 fn thermal_energy_conserved_every_step() {
@@ -303,7 +320,7 @@ fn thermal_space_sink_is_monotonic() {
 fn thermal_is_deterministic() {
     let (a, ra, ea) = euler(&EQUILIBRIUM_SCENARIO);
     let (b, rb, eb) = euler(&EQUILIBRIUM_SCENARIO);
-    assert_eq!(bits(&b[b.len() - 1]), bits(&a[a.len() - 1]));
+    assert_same_state(&b[b.len() - 1], &a[a.len() - 1]);
     assert_eq!((rb, eb.len()), (ra, ea.len()));
 }
 
@@ -404,11 +421,7 @@ fn thermal_registration_order_independent() {
         );
         let (states, rationed, events) =
             run_trajectory(&EulerIntegrator::new(reg), state, &resolver, DT, STEPS).expect("run");
-        assert_eq!(
-            bits(&states[states.len() - 1]),
-            bits(&baseline[baseline.len() - 1]),
-            "registration order {perm:?} changed the run"
-        );
+        assert_same_state(&states[states.len() - 1], &baseline[baseline.len() - 1]);
         assert_eq!((rationed, events.len()), (base_rationed, base_events.len()));
     }
 }

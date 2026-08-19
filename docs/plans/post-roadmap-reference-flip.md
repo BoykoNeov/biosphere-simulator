@@ -4936,3 +4936,91 @@ the rule allowed it** (`relaxation_time`, `steady_state`) or are private
 * The nine Python files stay green and running. **S6 retires them, and only once S4 and S5
   have theirs** — the overlap is deliberate.
 * No science changed, no golden regenerated, no param file touched.
+
+### ⚠ Four review follow-ups, and the first one is the only *new* unasserted claim S3 introduced
+
+Found by advisor review after S3 was committed, none of them falsifying the five-of-five
+result (that stands on 33 named reddenings) and all four worth doing before S4.
+
+#### 1. Nothing tied `run_trajectory` to `run` — closed
+
+S3's central additive decision was to leave [`domains::run`] alone because `goldens.rs`
+calls it. That was justified by predicting a zero golden diff, and `--test
+golden_regression` confirmed it — **but that check only ever exercises `run`.** Meanwhile
+all 68 sibling run-level tests go through `run_trajectory`. The tree therefore ended up with
+two step loops, one certified by the frozen bytes and one carrying the behavioural coverage,
+and nothing tying them together.
+
+Today they agree; the exposure is forward. An edit to either desynchronizes them silently,
+the goldens stay green, and 68 tests certify a path the frozen bytes do not cover — which is
+this slice's own subject, one level up from where it is already diagnosed.
+
+`crates/domains/tests/run_helpers_agree.rs`: the four frozen sibling scenarios plus the
+self-discharge arm, run through both helpers, compared on the whole final `State` and on
+`(rationed, events.len())`. **Control:** delete the trailing `trajectory.push` in
+`run_trajectory` — all five redden.
+
+#### 2. The three `#[ignore]`d goldens had never been asked
+
+`0 failed; 3 ignored` was reported as if it were a clean reading. S2's own record says the
+sealed station's byte comparison "happens only when a human runs `cargo test -- --ignored`
+on Windows", and this work was done on Windows. §5v's exit condition includes *"No golden
+regeneration. The predicted diff is zero; if it is not, that is the finding."* — a claim
+three goldens had not been asked to confirm.
+
+`cargo test --workspace -- --ignored`: **`cargo test --workspace -- --ignored`, on Windows: **all three pass**, in 404 s, 660 s and
+207 s — `the_sealed_station_golden_is_still_this_reference_s_output` (the byte comparison S2
+recorded as running nowhere automatic), `two_rate_sealed_session_matches_full_horizon_bit_exact`
+and `sealed_resume_across_a_season_boundary_is_bit_identical`. The zero-diff prediction now
+covers all 21 goldens rather than 18.
+
+⚠ **And the first reading of this was mine and wrong, in the same shape as the last two.** The
+first `--ignored` run reported "0 passed, everything filtered out", which read as *the ignored
+selection matched nothing*. It was a `| head -20` in my own command truncating the output
+before the `station` binaries ever printed. **Third instrument error in one slice** — a regex
+without digits, a probe that was a coin flip, and now a truncated pipe. All three had the same
+signature: an instrument returning *nothing* is indistinguishable from a subject in which
+*nothing happened*, and only the second look tells them apart.**
+
+#### 3. "The gate read zero before S3" was two measurements and three extrapolations
+
+§5w said the pre-S3 reading was "read off measurement 2's own table with the golden row
+removed". True for **M-power** — that *is* measurement 2 — and separately measured for
+**M-bound** (green across all 488). M-eclss, M-thermal and M-crew were never run pre-S3; the
+zero was inferred. A reasonable inference, but presented as a reading, in a section whose
+subject is claims that outrun their measurement.
+
+Rather than soften the sentence, the three were run at **workspace** scope. That closes the
+claim per mutation *and* produces the by-name coverage census S6 needs before it deletes
+`tests/crossport/test_crossport.py` — the same data measurement 2 gave for M-power and which
+nobody had for the other three.
+
+| Mutation | red workspace-wide | of those, in `domains` | S3's own | pre-existing `domains`, goldens excluded |
+|---|---:|---:|---:|---:|
+| M-eclss | 24 | 8 | 7 | **0** |
+| M-thermal | 11 | 8 | 7 | **0** |
+| M-crew | 10 | 5 | 4 | **0** |
+
+In each case the single non-S3 `domains` entry is `every_domains_golden_is_still_this_
+reference_s_output` — the byte compare the exit gate deselects. Everything else that reddens
+lives in `station` or `godot_bridge`: perturbation scenarios, the palette, session parity, two
+science gates. **So the pre-S3 reading really was zero, for all five mutations, and it is now
+measured rather than inferred for three of them.**
+
+⚠ The census also confirms the M-crew asymmetry from a second direction: workspace-wide it
+reddens ten tests and **not one of them is a run-level sibling test**. Its only by-name
+coverage anywhere is the four flow-level cases S3 wrote.
+
+#### 4. `bits()` compared less than the case it ports
+
+The determinism / bit-identity / order-independence tests compared stock amounts via
+`to_bits()`. The Python originals compared the whole `State` — `n`, `rng_seed` and `aux`
+included. `to_bits()` is *stricter* on the floats (`PartialEq` treats `+0.0 == -0.0`), so
+this was a narrowing rather than a hole, and both are now asserted.
+
+⚠ The added half is **recorded as weak today, not as coverage**: on the four siblings `n` is
+always the step count, `rng_seed` is 0 and `aux` is empty, so given the bit comparison
+passes the `State` comparison cannot currently fail. It is there because the ported claim is
+about the whole `State` and because it starts biting the moment a sibling gains an aux
+process or an RNG draw. Its docstring says exactly that — a `///` block in this repo is read
+as a finding, so it must not read as more than it is.

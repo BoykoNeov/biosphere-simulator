@@ -2486,3 +2486,31 @@ twin at all, and `radiated_power`, which is private. The one already-correct cas
 Python files still pass 160/160 — S6 retires them, and only once S4 and S5 have theirs.
 `bounds_match_the_loaders` is kept and re-documented as the inert gate it was measured to
 be, not deleted: what it asserts is still true, it is simply not the gate its name implies.
+
+#### ⚠ Four review follow-ups, taken (plan §5w addendum)
+
+1. **Nothing tied `run_trajectory` to `run`.** The additive design was justified by a zero
+   golden diff, but `--test golden_regression` only exercises `run`, while all 68 run-level
+   tests go through `run_trajectory` — two step loops, one certified by the frozen bytes and
+   one carrying the coverage, with nothing between them. `tests/run_helpers_agree.rs` closes
+   it on all five sibling scenarios; deleting `run_trajectory`'s trailing push reddens all
+   five. **This was the only genuinely new unasserted claim S3 introduced.**
+2. **The three `#[ignore]`d goldens had never been asked.** Run on Windows: all three pass
+   (404 s / 660 s / 207 s), including the sealed station **byte** comparison S2 recorded as
+   running nowhere automatic. The zero-diff prediction now covers 21 goldens, not 18.
+3. **"The gate read zero before S3" was two measurements and three extrapolations.** M-eclss,
+   M-thermal and M-crew re-run at workspace scope: 24 / 11 / 10 red, of which the only
+   non-S3 `domains` entry is the golden byte compare the gate deselects. Zero confirmed for
+   all five — and the by-name census is the data S6 needs before deleting
+   `tests/crossport/test_crossport.py`.
+4. **`bits()` compared less than the case it ports** (amounts only, vs Python's whole
+   `State`). Both now asserted — and the added half is documented as **inert today**, since
+   the siblings have no aux and no RNG, rather than left to read as coverage.
+
+⚠⚠ **Three instrument errors in one slice, all the same signature.** A regex without digits
+that dropped every `o2_*` and `rk4` name; a probe (one `reverse()`) that was a coin flip and
+lost on one of four registries; and a `| head -20` that truncated the ignored-golden run into
+looking like it had selected nothing. **An instrument returning nothing is indistinguishable
+from a subject in which nothing happened.** Only looking twice separates them, and in a slice
+whose whole subject is gates that measure what they claim, the instruments deserved the same
+suspicion as the gates.
