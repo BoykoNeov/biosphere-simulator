@@ -4541,3 +4541,230 @@ inside the suite can guard this line". Both were **doc comments asserting a prop
 tested**, in a slice whose entire subject is gates that assert what they claim. Recorded as a
 pattern rather than twice as an incident: in this repo a `///` block is read as a finding, so
 writing one costs the same care as writing the assertion under it.
+
+## §5v Stage 3 — S3, the four sibling domains: designed and gated, measured 2026-08-19 BEFORE any Rust was written
+
+S1 gave the reference its own ground and S2 gave it its own contract gates. S3 is the first
+slice whose subject is **science**: `domains/src/{crew,eclss,power,thermal}.rs` carry 1,411
+lines the reference calls canonical and **0 `#[test]` of their own**, against 160 collected
+cases in the tree being deleted. This section is the design and, in the §5d / §5h / §5j
+pattern, the measurements that chose it — all taken against a clean tree with nothing else
+in flight, before a line of Rust was written.
+
+### The count S3 is measured against, and it is 160, not 158
+
+`pytest --collect-only -q` over the nine files: **160 collected ids from 158 `def`s.**
+
+| File | ids |
+|---|---:|
+| `test_power_flows.py` | 29 |
+| `test_eclss_flows.py` | 23 |
+| `test_thermal_flows.py` | 22 |
+| `test_crew_flows.py` | 18 |
+| `test_eclss_run.py` | 16 |
+| `test_thermal_run.py` | 15 |
+| `test_power_run.py` | 14 |
+| `test_crew_run.py` | 12 |
+| `test_power_self_discharge.py` | 11 |
+| **total** | **160** |
+
+⚠ FINDING 10 put 725 of the suite's 2,452 on the parametrize axis, so the axis was measured
+here rather than assumed. **It is two cases wide.** The only parametrized `def` in the nine
+is `test_eclss_two_runs_contract_geometrically`, which fans to three. Recorded because the
+*expectation* was a much larger gap: on these nine files "one `#[test]` per `def`" happens
+to be nearly right, and it is right by measurement, not by luck holding elsewhere.
+
+### ⚠ Two of FINDING 4's eleven files are NOT in S3, and that is a rule, not a size call
+
+The classification pass listed eleven files under FINDING 4. Two of them leave:
+
+* **`test_bvad_validation.py` (8).** Its reference owner is `station/src/science_gates.rs`
+  — a different crate — whose own doc comment names `tests/test_bvad_validation.py` as
+  *"the checker's conformance half"*. Porting it is not a translation; it is re-deciding
+  what that sentence means once there is no checker. That is a science decision.
+* **`test_crew_coupled_loop.py` (8, 672 lines).** Its subject is the sealed station's
+  carbon budget at scale — the `crew-coupled-loop-refused` / `chamber-scale-diagnosed`
+  findings. Those tests *encode an argument*, not coverage of `crew.rs`.
+
+`CLAUDE.md` settles it in one line: **do not take a science item and a re-anchoring slice in
+one batch.** Both are science items in `station`, so both are named here as deferred with
+their destination, not folded in. **S3 proper is nine files / 160 cases.**
+
+### Gating measurement 1 — the baseline
+
+`cargo test --workspace`: **488 passed, 0 failed, 3 ignored**, ~87 s incremental. (§5q
+recorded 445; S1 and S2 added the rest. The three `#[ignore]`s are S2's expensive goldens.)
+
+### ⚠⚠ Gating measurement 2 — FINDING 7's control no longer measures what it measured
+
+§5q's **Control B** — swap the two legs of `charge_split` in `power.rs` so the battery
+stores `(1−η)` and loses `η` — was re-run. §5q recorded **2 of 445 red, both in
+`godot_bridge`**. Today it is **12 of 488**, and one of them is in `domains`:
+
+| Reddened | Crate | What kind of gate |
+|---|---|---|
+| `every_domains_golden_is_still_this_reference_s_output` | `domains` | **byte snapshot** (S2) |
+| `every_cheap_station_golden_is_still_this_reference_s_output` | `station` | byte snapshot (S2) |
+| `station_composition_matches_build_station_bit_exact` | `station` | composition parity |
+| `self_discharge_composition_matches_standalone_build_power_bit_exact` | `station` | composition parity |
+| `brownout_graceful_cools_node_without_rationing` | `station` | perturbation |
+| `radiator_failure_heats_node_conserving_no_rationing` | `station` | perturbation |
+| `radiator_failure_outside_window_is_baseline` | `station` | perturbation |
+| `three_part_leaky_station_steps_well_fed_with_a_bounded_node` | `station` | perturbation |
+| `palette::tests::station_carries_thermal_and_battery_context` | `station` | front-end context |
+| `science_gates::gate_tests::tier1_node_is_period_1_fixed_point` | `station` | science gate |
+| `tests::composed_energy_station_builds_steps_and_carries_readouts` | `godot_bridge` | readout |
+| `tests::observation_projection_carries_the_derived_readouts` | `godot_bridge` | readout |
+
+**FINDING 7's literal claim is now false and its substance is intact**, and the difference
+matters enough to state both halves:
+
+* *False:* "nothing in `domains` or `station` noticed." Eleven things in `station` notice,
+  and one thing in `domains` does. Slices C4b, S1 and S2 built those gates after §5q took
+  its reading, and nobody re-read the finding afterwards. **A control's verdict is dated to
+  the tree it ran against** — the same shape as `canopy-regulator-diagnosed`, where a
+  recorded blocker was false the day it was written.
+* *Intact:* **not one of the twelve is a test of power science.** The `domains` entry is a
+  golden byte compare, which reports "the bytes moved" and cannot say which coefficient is
+  wrong; the rest are composition, parity, perturbation and front-end readouts that happen
+  to depend on a battery number. Zero tests *named after* the thing that broke. So S3's
+  justification stands, restated accurately: the reference has **no behavioural gate on the
+  sibling-domain science**, and the cross-port comparison remains the only gate that fails
+  *by name*.
+
+⚠ The plan's §5q FINDING 7 text is left as written — it is a dated record — and this
+section is its correction. Do not quote the "2 of 445" figure forward.
+
+### ⚠⚠ Gating measurement 3 — the loader bound checks are inert, and this was not known
+
+`params.rs::bounds_match_the_loaders` reads as the gate on the five param files' bound
+wiring. It is not. Mutation **M-bound**: delete the `require_half_open(v[0], 0.0, 1.0, …)`
+wrapper from `params::charge()` so the efficiency is taken raw.
+
+**Result: 488 passed, 0 failed — bit-identical to the baseline.**
+
+The reason is structural, and it is the "inert by construction" shape this log keeps
+recording: `bounds_match_the_loaders` asserts that the *committed values* lie inside their
+ranges. Deleting the check does not move a committed value, so the assertion cannot notice.
+It can only fail if someone edits a YAML to a bad number — the one case where the loader's
+own guard would have fired anyway. ⚠ It is also incomplete on the roster: it covers charge,
+thermal and crew and **says nothing about `eclss.yaml`'s rate and setpoint bounds at all.**
+
+This decides how the 23 loader tests port (below). It is not a defect S3 introduces; it is
+one S3 is the first slice positioned to see.
+
+### The three infrastructure gaps, and each one's design
+
+**Gap 1 — there is no trajectory, and no second integrator. This blocks 68 of the 160.**
+
+`domains::run` returns `(final_state, rationed, events)` and takes `&EulerIntegrator` by
+concrete type. Every `*_run.py` test is trajectory-shaped (conserved *every step*, sinks
+monotonic, SOC returns each day, two runs contract geometrically, difference-is-constant)
+and several run **both** integrators — unlike the biosphere, the four siblings support RK4.
+
+Measured before choosing: `Scheme` (integrator.rs:287) is **private**, and `step_report` is
+an inherent method on each concrete integrator (:342, :398), so no public trait carries it.
+The public `Substepper::substep` is not a substitute — by its own doc it keeps `n`, skips
+aux, and **does not assert conservation**, which is the very thing these tests check.
+
+*Decision:* a **`domains`-local trait** with impls for the two integrators, plus an additive
+`run_trajectory` returning every state. Making `Scheme` public would reach into frozen
+`simcore` to serve test ergonomics — unfreeze-adjacent, and not what S3 is for.
+
+⚠ **Additive, not a change to `run`.** `goldens.rs` calls `run`, and `goldens.rs` produces
+the frozen golden bytes. The predicted golden diff is **zero**, and S2's byte gate is what
+proves it rather than the plan asserting it (`soil-layers-built`: predict the diff before
+regenerating).
+
+**Gap 2 — the flow-level helpers are private, so the tests must be in-src.**
+
+`charge_split`, `scrub_flux`, `condense_flux`, `makeup_flux` and `radiated_power` are
+private; only `thermal::temperature` is `pub`. About 40 of the 69 flow-level cases target
+these directly. `crates/domains/tests/*.rs` cannot see them, and widening them to `pub` to
+suit a test file is the tail wagging the dog.
+
+*Decision:* flow-level cases go in `#[cfg(test)] mod tests` inside each domain file (the
+`biosphere/science.rs` precedent); run-level cases go in `crates/domains/tests/{power,
+eclss,thermal,crew}_run.rs` (the `season_order_independence.rs` precedent).
+
+**Gap 3 — the 23 loader-rejection cases need a mechanism, not a translation.**
+
+Python writes a malformed YAML to `tmp_path` and asserts the loader raises. Rust's
+`params.rs` `include_str!`s five files at compile time and *panics*; there is no runtime
+path to hand it a bad one. A mechanical port lands inert — which measurement 3 shows is
+already the failure mode here.
+
+Measured first, as required: `config` already owns the **generic** mechanism —
+`a_wrong_declared_unit_is_rejected`, `a_non_numeric_value_is_rejected`,
+`an_unwired_extra_param_is_rejected_not_ignored`, `every_bound_rejects_nan`,
+`bounds_reject_what_the_loaders_reject`. What is unowned is the **per-file wiring**: that
+`charge.yaml`'s efficiency is guarded half-open on (0,1], that `radiator.yaml`'s area is
+required positive, that `eclss.yaml` is guarded at all.
+
+*Decision:* give `params.rs` a testable inner function over `&str` per file, so each
+rejection is exercised against a deliberately-bad text. **Every one carries its own control
+proving it can go red** — and M-bound is the standing example of what happens without one.
+
+### The oracle classification — and the one category that is forbidden
+
+FINDING 9 already found seven Rust tests naming the dying side as their oracle. S3 is where
+that could happen 160 more times, so every case is tagged before it is written:
+
+* **property** (conserved, monotone, dt-linear, order-independent, balanced, noop-at-zero)
+  — port freely; the law is the oracle.
+* **closed form** (`test_crew_depletion_matches_closed_form`,
+  `test_balanced_load_matches_daily_stored_solar`, `test_eclss_converges_to_the_steady_states`,
+  `test_thermal_equilibrium_balances_radiation_against_load`,
+  `test_radiated_power_matches_stefan_boltzmann`) — **re-derive the expression in the Rust
+  test.** Do not transcribe the Python number.
+* **snapshot** — already owned by `goldens.rs`; do not duplicate.
+* **a value read off a Python run** — ⚠⚠ **forbidden.** Python has no reference authority,
+  and inheriting a Python-produced constant re-creates that authority silently at the exact
+  moment Python is being deleted.
+
+⚠ `test_stefan_boltzmann_constant_is_codata_value` is the good case and the template: its
+oracle is CODATA, and it should cite CODATA in Rust too.
+
+⚠ And a trap `season_order_independence.rs` already paid for: **order-independence at real
+physical magnitudes can be inert** — deleting the registry sort left it green, because at
+comparable magnitudes re-associating the additions moves no bits. The four
+`*_registration_order_independent` ports must assert the rebuilt registry's **iteration
+order**, not only the final state, and must be controlled against exactly that mutation.
+
+### The acceptance criterion: a four-mutation battery, pre-committed
+
+S3 is not done when 160 tests exist. It is done when each of these reddens a test **in
+`domains`, by name** — a test that says what broke, not a byte compare that says bytes moved:
+
+| # | Mutation | Domain |
+|---|---|---|
+| M-power | swap `charge_split`'s legs (§5q's Control B) | power |
+| M-eclss | flip `makeup_flux`'s sign so the regulator drives away from setpoint | eclss |
+| M-thermal | change `powf(4.0)` to `powf(3.0)` | thermal |
+| M-crew | swap the carbon split fractions | crew |
+| M-bound | drop a per-file bound guard in `params.rs` | (all four) |
+
+Each is run against a clean tree with nothing else in flight, and each is restored with
+`git checkout --` and the workspace re-verified — §5p's third process trap, observed.
+
+### S3's exit gate, stated forward to S6
+
+S6 deletes `tests/crossport/test_crossport.py`. FINDING 7 says that deletion is not free
+while it is the sibling domains' only by-name gate. So S3's exit criterion is written now,
+in S6's terms, and not left to be inferred:
+
+> Re-run the four mutations with the cross-port comparison deselected. `domains` must still
+> redden, by name, for all four.
+
+⚠ This is S2's lesson applied one slice earlier — *"S6 must not retire the Python byte
+census believing this is like-for-like"* — and the reason it is stated here is that S6 will
+otherwise inherit an **unmeasured** claim.
+
+### Deliberately NOT in S3
+
+* **`test_bvad_validation.py` and `test_crew_coupled_loop.py`** — deferred as above, with
+  `station` as their destination. Named, not bucketed.
+* **No new science.** Every ported case must be satisfiable by the code as it stands. A case
+  that fails is a **finding to report**, never grounds for editing `domains` to suit it.
+* **No golden regeneration.** The predicted diff is zero; if it is not, that is the finding.
+* **No Python deletion.** The nine files stay green and running until S6.
