@@ -3774,7 +3774,7 @@ slices, not one**, and the first two are not test work:
 |---|---|---|
 | **S1** | **The reference's own ground** — relocate the 23 param YAMLs + the weather fixture + the 26 scenario fixtures + the goldens into paths the reference owns | FINDING 1. Nothing can be deleted until this lands; it moves data, not science, so it should be byte-neutral and provable as such |
 | **S2** | **The three gates come with it** — the manifest byte gate, the golden comparison + `golden_platform.py`'s policy, the inventory dumps' consumer | FINDINGS 2 + 3. These guard the *contracts*; every later slice runs behind them. ⚠ **Splits in two, and the split is structural, not a size call** (§5t): the golden comparison stops at `station`, so `station` can own its census; the manifest gate spans `domains` + `station` + `authoring`, so it cannot. **COMPLETE 2026-08-19** — first half (§5t) discharged FINDING 3 and carried the S1 forcing literal; second half (§5u) moved the three manifest writers into their crates and gave each contract a byte gate, plus Rust successors for the three `test_inventory_parity` claims the byte gate does NOT subsume. FINDING 2 grew to five on the way |
-| **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison |
+| **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison. ⚠ **Designed in §5v, and this row is superseded on two counts**: the real figure is **160 collected cases over nine files**, not 158 over eleven — `test_bvad_validation.py` and `test_crew_coupled_loop.py` are deferred to `station` as science items. And **Control B's verdict here is dated**: §5v re-ran it and got 12 red, not 2 |
 | **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable |
 | **S5** | **The biosphere mechanisms** — ~600 tests over `flows.rs` | FINDING 5. The largest and the one to take last, in crop/process batches, because it is where a silent narrowing does the most damage |
 | **S6** | **The retirements** — the two `R!` rows (only once S3's successors stand), the generators (each against its named successor), the Python tree itself | Only after S1–S5 have successors standing. ⚠ The cross-port comparison is **not** a free deletion: FINDING 7 makes it the sibling domains' only gate until S3 lands. The **D** rows (Godot drivers, `test_context_budget.py`, `test_headless_cli.py`) need answers before this slice, not during it |
@@ -4676,6 +4676,12 @@ the frozen golden bytes. The predicted golden diff is **zero**, and S2's byte ga
 proves it rather than the plan asserting it (`soil-layers-built`: predict the diff before
 regenerating).
 
+⚠ The 69 / 68 / 23 split (flow-level / run-level / loader) was checked rather than assumed
+on the case that could most easily have been mis-filed: the ten `*_is_dt_linear` cases read
+as run-shaped from their names, but `test_solar_charge_is_dt_linear` **calls `evaluate`
+twice at two `dt` values and compares legs** — no registry, no step. They are flow-level,
+and Gap 1 blocks 68, not more.
+
 **Gap 2 — the flow-level helpers are private, so the tests must be in-src.**
 
 `charge_split`, `scrub_flux`, `condense_flux`, `makeup_flux` and `radiated_power` are
@@ -4747,14 +4753,37 @@ S3 is not done when 160 tests exist. It is done when each of these reddens a tes
 Each is run against a clean tree with nothing else in flight, and each is restored with
 `git checkout --` and the workspace re-verified — §5p's third process trap, observed.
 
+⚠ **M-bound is the cleanest of the five, and for a reason worth naming.** The other four
+move a number, so a golden byte compare catches them whatever else exists — which is how
+measurement 2's misleading "`domains` noticed" arose. M-bound moves **no committed value**,
+so it has *no snapshot backstop at all*: measurement 3 found it green across all 488. It is
+the one mutation whose verdict is a statement purely about behavioural coverage.
+
 ### S3's exit gate, stated forward to S6
 
 S6 deletes `tests/crossport/test_crossport.py`. FINDING 7 says that deletion is not free
 while it is the sibling domains' only by-name gate. So S3's exit criterion is written now,
 in S6's terms, and not left to be inferred:
 
-> Re-run the four mutations with the cross-port comparison deselected. `domains` must still
-> redden, by name, for all four.
+> Re-run the four mutations with the cross-port comparison **and `--test golden_regression`**
+> both deselected. `domains` must still redden, by name, for all four.
+
+⚠⚠ **The golden exclusion is not belt-and-braces; without it this gate is inert, and it was
+inert in this section's own first draft.** Measurement 2 shows M-power already reddens
+`domains` today — via `every_domains_golden_is_still_this_reference_s_output`, with zero
+sibling tests written. So "the cross-port comparison is deselected and `domains` goes red"
+is **already satisfied for power before S3 begins**, which makes it a gate that cannot
+distinguish a finished S3 from an unstarted one. That is precisely the defect measurement 3
+diagnoses in `bounds_match_the_loaders`, reproduced one section later in a section about it.
+Caught on review, not by a test — the §5u pattern, again.
+
+The discriminator was already in this section's prose (*"a test that says what broke, not a
+byte compare that says bytes moved"*) and simply was not in the gate. It is now.
+
+⚠ Deducible from measurement 2 rather than separately run: with the goldens excluded,
+`domains` today has **nothing** that reddens under any of the five, because it has no
+sibling-domain test at all. The tightened gate therefore reads zero before S3 and must read
+four after it.
 
 ⚠ This is S2's lesson applied one slice earlier — *"S6 must not retire the Python byte
 census believing this is like-for-like"* — and the reason it is stated here is that S6 will
