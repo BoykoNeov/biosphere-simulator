@@ -368,3 +368,306 @@ pub fn power_resolver(
     );
     SourceResolver::new(forcings, HashMap::new())
 }
+
+#[cfg(test)]
+mod tests {
+    //! The flow-level Power gates — Stage-3 slice S3 of the reference flip.
+    //!
+    //! Subject: `tests/test_power_flows.py`'s 21 flow-level cases (its 8 loader cases port
+    //! to [`crate::params`], where the file the loader reads actually lives). **In-src
+    //! rather than in `crates/domains/tests/`** because [`charge_split`] and
+    //! [`self_discharge_flux`] are private: widening them to `pub` to suit a test file
+    //! would be the tail wagging the dog, and `biosphere::science` set the in-src
+    //! precedent.
+    //!
+    //! Every oracle here is a **property** (the split partitions the supply, legs balance,
+    //! flux is dt-linear, a zero input is a no-op) or a **hand value re-derived in place**.
+    //! Nothing reads a number off a Python run — §5v forbids it, because inheriting a
+    //! Python-produced constant would re-create Python's reference authority at the moment
+    //! it is being deleted.
+
+    use super::*;
+    use simcore::flow::{assert_flow_balanced_default, per_quantity_residual, FlowResult};
+
+    /// The three Power stocks (battery POOL + the two boundary reservoirs).
+    ///
+    /// ⚠ `boundary::source` takes an unclamped flag Python's does not: the solar source is
+    /// unclamped (it goes arbitrarily negative as cumulative supply).
+    fn state(battery: f64) -> State {
+        let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
+        for s in [
+            battery_stock(battery).expect("battery"),
+            boundary::source(SOLAR_SOURCE.to_string(), Quantity::Energy, 0.0, true)
+                .expect("solar source"),
+            boundary::sink(WASTE_HEAT.to_string(), Quantity::Energy, 0.0).expect("waste heat"),
+        ] {
+            stocks.insert(s.id.clone(), s);
+        }
+        State::new(0, stocks, 0, BTreeMap::new()).expect("state")
+    }
+
+    /// Constant solar/load forcing, ready to `bind`.
+    fn forcing(solar_power: f64, load_power: f64) -> SourceResolver {
+        let mut forcings: HashMap<String, Schedule> = HashMap::new();
+        forcings.insert(
+            SOLAR_POWER_VAR.to_string(),
+            constant(solar_power).expect("solar"),
+        );
+        forcings.insert(
+            LOAD_POWER_VAR.to_string(),
+            constant(load_power).expect("load"),
+        );
+        SourceResolver::new(forcings, HashMap::new()).expect("resolver")
+    }
+
+    fn solar_charge(eta: f64) -> SolarCharge {
+        SolarCharge::new(
+            SOLAR_CHARGE.to_string(),
+            SOLAR_SOURCE.to_string(),
+            BATTERY.to_string(),
+            WASTE_HEAT.to_string(),
+            ChargeParams {
+                charge_efficiency: eta,
+            },
+        )
+    }
+
+    fn load_draw() -> LoadDraw {
+        LoadDraw::new(
+            LOAD_DRAW.to_string(),
+            BATTERY.to_string(),
+            WASTE_HEAT.to_string(),
+        )
+    }
+
+    fn self_discharge(k: f64) -> SelfDischarge {
+        SelfDischarge::new(
+            SELF_DISCHARGE.to_string(),
+            BATTERY.to_string(),
+            WASTE_HEAT.to_string(),
+            SelfDischargeParams {
+                self_discharge_rate: k,
+            },
+        )
+    }
+
+    fn evaluated(
+        flow: &dyn Flow,
+        state: &State,
+        dt: f64,
+        solar_power: f64,
+        load_power: f64,
+    ) -> FlowResult {
+        let r = forcing(solar_power, load_power);
+        let env = r.bind(state, dt);
+        flow.evaluate(state, &env, dt).expect("evaluate")
+    }
+
+    /// Evaluate `flow` as a stock → amount map (the Python `{leg.stock: leg.amount}` idiom).
+    fn legs(
+        flow: &dyn Flow,
+        state: &State,
+        dt: f64,
+        solar_power: f64,
+        load_power: f64,
+    ) -> BTreeMap<String, f64> {
+        evaluated(flow, state, dt, solar_power, load_power)
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect()
+    }
+
+    /// The `math.isclose(..., rel_tol=1e-12)` the Python cases use, with an absolute floor
+    /// so a comparison against 0.0 is not vacuously true.
+    fn close(a: f64, b: f64) {
+        assert!(
+            (a - b).abs() <= 1e-12 * a.abs().max(b.abs()).max(1.0),
+            "{a:?} != {b:?}"
+        );
+    }
+
+    fn touched(result: &FlowResult, state: &State) -> Vec<Quantity> {
+        per_quantity_residual(result, &state.stocks)
+            .expect("residual")
+            .into_keys()
+            .collect()
+    }
+
+    // --- rate law: charge_split ---------------------------------------------------
+    /// ⚠ **The M-power mutation site.** Swapping [`charge_split`]'s two returned legs
+    /// (§5q's Control B) must redden HERE, by name — not only through a golden byte
+    /// compare, which reports that bytes moved and cannot say which coefficient is wrong
+    /// (§5v measurement 2).
+    #[test]
+    fn charge_split_is_the_efficiency_partition() {
+        let (stored, lost) = charge_split(100.0, 0.95);
+        close(stored, 95.0);
+        close(lost, 5.0);
+    }
+
+    #[test]
+    fn charge_split_sums_to_supply() {
+        // The two fractions sum back to the input — every joule named, none lost.
+        let (stored, lost) = charge_split(137.0, 0.88);
+        close(stored + lost, 137.0);
+    }
+
+    #[test]
+    fn charge_split_lossless_at_eta_one() {
+        let (stored, lost) = charge_split(100.0, 1.0);
+        assert_eq!(stored, 100.0);
+        assert_eq!(lost, 0.0);
+    }
+
+    #[test]
+    fn charge_split_zero_supply() {
+        assert_eq!(charge_split(0.0, 0.95), (0.0, 0.0));
+    }
+
+    // --- SolarCharge --------------------------------------------------------------
+    #[test]
+    fn solar_charge_splits_supply_into_battery_and_heat() {
+        let s = state(1_000.0);
+        let l = legs(&solar_charge(0.95), &s, 1.0, 100.0, 0.0);
+        close(l[SOLAR_SOURCE], -100.0);
+        close(l[BATTERY], 95.0);
+        close(l[WASTE_HEAT], 5.0);
+    }
+
+    #[test]
+    fn solar_charge_balances_energy_only() {
+        let s = state(1_000.0);
+        let result = evaluated(&solar_charge(0.95), &s, 1.0, 100.0, 0.0);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Energy]);
+    }
+
+    #[test]
+    fn solar_charge_always_three_legs() {
+        // The structural-legs convention: three legs at η<1, at η=1 (heat leg 0) and at
+        // night (all 0) — never a variable leg count.
+        let s = state(1_000.0);
+        for (eta, solar) in [(0.95, 100.0), (1.0, 100.0), (0.95, 0.0)] {
+            assert_eq!(legs(&solar_charge(eta), &s, 1.0, solar, 0.0).len(), 3);
+        }
+    }
+
+    #[test]
+    fn solar_charge_lossless_at_eta_one() {
+        let s = state(1_000.0);
+        let l = legs(&solar_charge(1.0), &s, 1.0, 100.0, 0.0);
+        assert_eq!(l[WASTE_HEAT], 0.0);
+        close(l[BATTERY], 100.0);
+    }
+
+    #[test]
+    fn solar_charge_night_is_noop() {
+        let s = state(1_000.0);
+        for (_, amount) in legs(&solar_charge(0.95), &s, 1.0, 0.0, 0.0) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+
+    #[test]
+    fn solar_charge_is_dt_linear() {
+        // flux = rate·dt — the increment-form contract (RK4 order; multi-rate-safe).
+        let s = state(1_000.0);
+        let half = legs(&solar_charge(0.95), &s, 0.5, 100.0, 0.0);
+        let full = legs(&solar_charge(0.95), &s, 1.0, 100.0, 0.0);
+        close(full[BATTERY], 2.0 * half[BATTERY]);
+        close(full[WASTE_HEAT], 2.0 * half[WASTE_HEAT]);
+    }
+
+    // --- LoadDraw -----------------------------------------------------------------
+    #[test]
+    fn load_draw_dissipates_battery_to_heat() {
+        let s = state(1_000.0);
+        let l = legs(&load_draw(), &s, 1.0, 0.0, 40.0);
+        close(l[BATTERY], -40.0);
+        close(l[WASTE_HEAT], 40.0);
+    }
+
+    #[test]
+    fn load_draw_balances_energy_only() {
+        let s = state(1_000.0);
+        let result = evaluated(&load_draw(), &s, 1.0, 0.0, 40.0);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Energy]);
+    }
+
+    #[test]
+    fn load_draw_zero_load_is_noop() {
+        let s = state(1_000.0);
+        for (_, amount) in legs(&load_draw(), &s, 1.0, 0.0, 0.0) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+
+    #[test]
+    fn load_draw_is_dt_linear() {
+        let s = state(1_000.0);
+        let half = legs(&load_draw(), &s, 0.5, 0.0, 40.0);
+        let full = legs(&load_draw(), &s, 1.0, 0.0, 40.0);
+        close(full[WASTE_HEAT], 2.0 * half[WASTE_HEAT]);
+    }
+
+    // --- SelfDischarge: the first donor-controlled Power flow ----------------------
+    #[test]
+    fn self_discharge_flux_is_first_order_donor_controlled() {
+        // leak = k · battery — proportional to the donor's own amount, so it self-limits
+        // as the battery empties.
+        close(self_discharge_flux(1_000.0, 1.0e-8), 1.0e-5);
+    }
+
+    #[test]
+    fn self_discharge_flux_zero_at_empty_battery() {
+        assert_eq!(self_discharge_flux(0.0, 1.0e-8), 0.0);
+    }
+
+    #[test]
+    fn self_discharge_flux_zero_at_zero_rate() {
+        // k = 0 ⇒ an ideal leak-free cell (inert machinery, the "a zero rate is valid" case).
+        assert_eq!(self_discharge_flux(1_000.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn self_discharge_leaks_battery_to_heat() {
+        let s = state(1_000.0);
+        let l = legs(&self_discharge(1.0e-8), &s, 1.0, 0.0, 0.0);
+        // A SET comparison, as in the Python: the map is id-sorted, so the pair comes
+        // back in byte order, not in leg-construction order.
+        let mut ids: Vec<&str> = l.keys().map(String::as_str).collect();
+        ids.sort_unstable();
+        assert_eq!(ids, vec![WASTE_HEAT, BATTERY]);
+        close(l[BATTERY], -1.0e-5);
+        close(l[WASTE_HEAT], 1.0e-5);
+    }
+
+    #[test]
+    fn self_discharge_balances_energy_only() {
+        let s = state(1_000.0);
+        let result = evaluated(&self_discharge(1.0e-8), &s, 1.0, 0.0, 0.0);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Energy]);
+    }
+
+    #[test]
+    fn self_discharge_two_legs() {
+        // Always two legs — and at battery 0 both are still emitted (zero-amount), unlike
+        // a flow that would drop a leg it has nothing to put in.
+        for battery in [1_000.0, 0.0] {
+            let s = state(battery);
+            assert_eq!(legs(&self_discharge(1.0e-8), &s, 1.0, 0.0, 0.0).len(), 2);
+        }
+    }
+
+    #[test]
+    fn self_discharge_is_dt_linear() {
+        // Evaluated on the SAME snapshot, so the leak scales linearly in dt.
+        let s = state(1_000.0);
+        let half = legs(&self_discharge(1.0e-8), &s, 0.5, 0.0, 0.0);
+        let full = legs(&self_discharge(1.0e-8), &s, 1.0, 0.0, 0.0);
+        close(full[WASTE_HEAT], 2.0 * half[WASTE_HEAT]);
+    }
+}

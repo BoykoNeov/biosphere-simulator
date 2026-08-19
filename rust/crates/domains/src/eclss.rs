@@ -444,3 +444,307 @@ pub fn eclss_resolver(scenario: &EclssScenario) -> Result<SourceResolver, SimErr
     );
     SourceResolver::new(forcings, HashMap::new())
 }
+
+#[cfg(test)]
+mod tests {
+    //! The flow-level ECLSS gates — Stage-3 slice S3 of the reference flip.
+    //!
+    //! Subject: `tests/test_eclss_flows.py`'s 19 flow-level cases (its 4 loader cases port
+    //! to [`crate::params`]). In-src because [`scrub_flux`], [`condense_flux`] and
+    //! [`makeup_flux`] are all private.
+    //!
+    //! Every oracle is a property or a hand value re-derived here from the rate law's own
+    //! algebra — never a number read off a Python run (§5v).
+
+    use super::*;
+    use simcore::flow::{assert_flow_balanced_default, per_quantity_residual, FlowResult};
+
+    /// The hand ECLSS params — the committed `eclss.yaml` values, restated so the hand
+    /// arithmetic stays meaningful. The loader is exercised in [`crate::params`].
+    const HAND: EclssParams = EclssParams {
+        co2_scrub_rate: 1.0e-3,
+        condense_rate: 5.0e-4,
+        o2_makeup_gain: 2.0e-3,
+        o2_setpoint: 10.0,
+    };
+
+    const DT: f64 = 60.0;
+
+    /// All nine ECLSS stocks (three cabin POOLs + six boundary reservoirs).
+    fn state(o2: f64, co2: f64, h2o: f64) -> State {
+        let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
+        for s in [
+            cabin_pool(CABIN_O2, Quantity::Oxygen, o2).expect("cabin o2"),
+            cabin_pool(CABIN_CO2, Quantity::Carbon, co2).expect("cabin co2"),
+            cabin_pool(CABIN_H2O, Quantity::Water, h2o).expect("cabin h2o"),
+            boundary::source(O2_SUPPLY.to_string(), Quantity::Oxygen, 0.0, true).expect("supply"),
+            boundary::sink(CO2_REMOVED.to_string(), Quantity::Carbon, 0.0).expect("removed"),
+            boundary::sink(HUMIDITY_CONDENSATE.to_string(), Quantity::Water, 0.0)
+                .expect("condensate"),
+            boundary::sink(METABOLIC_O2_SINK.to_string(), Quantity::Oxygen, 0.0).expect("o2 sink"),
+            boundary::source(
+                METABOLIC_CO2_SOURCE.to_string(),
+                Quantity::Carbon,
+                0.0,
+                true,
+            )
+            .expect("co2 source"),
+            boundary::source(METABOLIC_H2O_SOURCE.to_string(), Quantity::Water, 0.0, true)
+                .expect("h2o source"),
+        ] {
+            stocks.insert(s.id.clone(), s);
+        }
+        State::new(0, stocks, 0, BTreeMap::new()).expect("state")
+    }
+
+    /// The default cabin: 10 mol O₂, 3 mol CO₂, 0.04 kg H₂O.
+    fn default_state() -> State {
+        state(10.0, 3.0, 0.04)
+    }
+
+    fn forcing(o2: f64, co2: f64, h2o: f64) -> SourceResolver {
+        let mut forcings: HashMap<String, Schedule> = HashMap::new();
+        forcings.insert(O2_CONSUMPTION_VAR.to_string(), constant(o2).expect("o2"));
+        forcings.insert(CO2_PRODUCTION_VAR.to_string(), constant(co2).expect("co2"));
+        forcings.insert(H2O_PRODUCTION_VAR.to_string(), constant(h2o).expect("h2o"));
+        SourceResolver::new(forcings, HashMap::new()).expect("resolver")
+    }
+
+    /// The standalone scenario's crew rates.
+    fn crew_forcing() -> SourceResolver {
+        forcing(0.004, 0.003, 2.0e-5)
+    }
+
+    fn crew_metabolism() -> CrewMetabolism {
+        CrewMetabolism::new(
+            CREW_METABOLISM.to_string(),
+            CABIN_O2.to_string(),
+            CABIN_CO2.to_string(),
+            CABIN_H2O.to_string(),
+            METABOLIC_O2_SINK.to_string(),
+            METABOLIC_CO2_SOURCE.to_string(),
+            METABOLIC_H2O_SOURCE.to_string(),
+        )
+    }
+
+    fn scrubber() -> CO2Scrubber {
+        CO2Scrubber::new(
+            CO2_SCRUBBER.to_string(),
+            CABIN_CO2.to_string(),
+            CO2_REMOVED.to_string(),
+            HAND,
+        )
+    }
+
+    fn condenser() -> Condenser {
+        Condenser::new(
+            CONDENSER.to_string(),
+            CABIN_H2O.to_string(),
+            HUMIDITY_CONDENSATE.to_string(),
+            HAND,
+        )
+    }
+
+    fn makeup() -> O2Makeup {
+        O2Makeup::new(
+            O2_MAKEUP.to_string(),
+            O2_SUPPLY.to_string(),
+            CABIN_O2.to_string(),
+            HAND,
+        )
+    }
+
+    fn evaluated(flow: &dyn Flow, state: &State, env: &SourceResolver, dt: f64) -> FlowResult {
+        let bound = env.bind(state, dt);
+        flow.evaluate(state, &bound, dt).expect("evaluate")
+    }
+
+    fn legs(
+        flow: &dyn Flow,
+        state: &State,
+        env: &SourceResolver,
+        dt: f64,
+    ) -> BTreeMap<String, f64> {
+        evaluated(flow, state, env, dt)
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect()
+    }
+
+    fn close(a: f64, b: f64) {
+        assert!(
+            (a - b).abs() <= 1e-12 * a.abs().max(b.abs()).max(1.0),
+            "{a:?} != {b:?}"
+        );
+    }
+
+    fn touched(result: &FlowResult, state: &State) -> Vec<Quantity> {
+        per_quantity_residual(result, &state.stocks)
+            .expect("residual")
+            .into_keys()
+            .collect()
+    }
+
+    // --- rate law: scrub_flux / condense_flux (first-order, donor-controlled) ------
+    #[test]
+    fn scrub_flux_is_first_order() {
+        // R = k_scrub · cabin_co2.
+        close(scrub_flux(3.0, 1.0e-3), 3.0e-3);
+    }
+
+    #[test]
+    fn scrub_flux_zero_at_floor() {
+        assert_eq!(scrub_flux(0.0, 1.0e-3), 0.0);
+    }
+
+    #[test]
+    fn condense_flux_is_first_order() {
+        close(condense_flux(0.04, 5.0e-4), 2.0e-5);
+    }
+
+    #[test]
+    fn condense_flux_zero_at_floor() {
+        assert_eq!(condense_flux(0.0, 5.0e-4), 0.0);
+    }
+
+    // --- rate law: makeup_flux (demand-controlled toward the setpoint) -------------
+    /// ⚠ **The M-eclss mutation site.** Flipping [`makeup_flux`]'s sign — so the regulator
+    /// drives *away* from the setpoint — must redden this test by name.
+    #[test]
+    fn makeup_flux_is_proportional_to_the_deficit() {
+        // S = k_makeup · (o2_setpoint − cabin_o2): at 8 mol against a 10 mol setpoint the
+        // deficit is 2, so S = 2e-3 · 2 = 4e-3. Positive ⇒ the regulator ADDS.
+        close(makeup_flux(8.0, 2.0e-3, 10.0), 4.0e-3);
+    }
+
+    #[test]
+    fn makeup_flux_zero_at_setpoint() {
+        assert_eq!(makeup_flux(10.0, 2.0e-3, 10.0), 0.0);
+    }
+
+    // --- flow level: CrewMetabolism (multi-quantity, forced) -----------------------
+    #[test]
+    fn crew_metabolism_balances_all_three_quantities() {
+        // One flow, six legs; CARBON, OXYGEN and WATER each balance independently.
+        let s = default_state();
+        let result = evaluated(&crew_metabolism(), &s, &crew_forcing(), DT);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        let residual = per_quantity_residual(&result, &s.stocks).expect("residual");
+        for q in [Quantity::Carbon, Quantity::Oxygen, Quantity::Water] {
+            assert!(residual[&q].abs() < 1e-15, "{q:?}: {:?}", residual[&q]);
+        }
+    }
+
+    #[test]
+    fn crew_metabolism_touches_exactly_the_three_mass_quantities() {
+        let s = default_state();
+        let result = evaluated(&crew_metabolism(), &s, &crew_forcing(), DT);
+        assert_eq!(
+            touched(&result, &s),
+            vec![Quantity::Carbon, Quantity::Water, Quantity::Oxygen]
+        );
+    }
+
+    #[test]
+    fn crew_metabolism_directions_and_dt_linearity() {
+        // O₂ leaves the cabin (consumed); CO₂ and H₂O enter it (produced). Each leg is
+        // rate·dt — forced and dt-linear, so RK4-order-safe.
+        let s = default_state();
+        let l = legs(&crew_metabolism(), &s, &crew_forcing(), DT);
+        close(l[CABIN_O2], -0.004 * DT);
+        close(l[METABOLIC_O2_SINK], 0.004 * DT);
+        close(l[CABIN_CO2], 0.003 * DT);
+        close(l[METABOLIC_CO2_SOURCE], -0.003 * DT);
+        close(l[CABIN_H2O], 2.0e-5 * DT);
+        close(l[METABOLIC_H2O_SOURCE], -2.0e-5 * DT);
+    }
+
+    #[test]
+    fn crew_metabolism_zero_load_is_a_noop() {
+        let s = default_state();
+        for (_, amount) in legs(&crew_metabolism(), &s, &forcing(0.0, 0.0, 0.0), DT) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+
+    // --- flow level: CO2Scrubber ---------------------------------------------------
+    #[test]
+    fn co2_scrubber_balances_carbon_only() {
+        let s = state(10.0, 3.0, 0.04);
+        let result = evaluated(&scrubber(), &s, &crew_forcing(), DT);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Carbon]);
+    }
+
+    #[test]
+    fn co2_scrubber_removes_first_order_and_dt_linear() {
+        let s = state(10.0, 3.0, 0.04);
+        let l = legs(&scrubber(), &s, &crew_forcing(), DT);
+        let expected = HAND.co2_scrub_rate * 3.0 * DT;
+        close(l[CABIN_CO2], -expected);
+        close(l[CO2_REMOVED], expected);
+    }
+
+    #[test]
+    fn co2_scrubber_self_limits_at_floor() {
+        let s = state(10.0, 0.0, 0.04);
+        for (_, amount) in legs(&scrubber(), &s, &crew_forcing(), DT) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+
+    // --- flow level: Condenser -----------------------------------------------------
+    #[test]
+    fn condenser_balances_water_only() {
+        let s = state(10.0, 3.0, 0.04);
+        let result = evaluated(&condenser(), &s, &crew_forcing(), DT);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Water]);
+    }
+
+    #[test]
+    fn condenser_removes_first_order_and_dt_linear() {
+        let s = state(10.0, 3.0, 0.04);
+        let l = legs(&condenser(), &s, &crew_forcing(), DT);
+        let expected = HAND.condense_rate * 0.04 * DT;
+        close(l[CABIN_H2O], -expected);
+        close(l[HUMIDITY_CONDENSATE], expected);
+    }
+
+    #[test]
+    fn condenser_self_limits_at_floor() {
+        let s = state(10.0, 3.0, 0.0);
+        for (_, amount) in legs(&condenser(), &s, &crew_forcing(), DT) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+
+    // --- flow level: O2Makeup ------------------------------------------------------
+    #[test]
+    fn o2_makeup_balances_oxygen_only() {
+        let s = state(8.0, 3.0, 0.04);
+        let result = evaluated(&makeup(), &s, &crew_forcing(), DT);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Oxygen]);
+    }
+
+    #[test]
+    fn o2_makeup_adds_toward_setpoint_and_dt_linear() {
+        // 2 mol below the 10 mol setpoint: the tank gives up what the cabin receives.
+        let s = state(8.0, 3.0, 0.04);
+        let l = legs(&makeup(), &s, &crew_forcing(), DT);
+        let expected = HAND.o2_makeup_gain * (10.0 - 8.0) * DT;
+        close(l[O2_SUPPLY], -expected);
+        close(l[CABIN_O2], expected);
+        assert!(expected > 0.0);
+    }
+
+    #[test]
+    fn o2_makeup_idle_at_setpoint() {
+        let s = state(10.0, 3.0, 0.04);
+        for (_, amount) in legs(&makeup(), &s, &crew_forcing(), DT) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+}

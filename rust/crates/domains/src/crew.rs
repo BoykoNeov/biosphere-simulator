@@ -339,3 +339,250 @@ pub fn crew_resolver(scenario: &CrewScenario) -> Result<SourceResolver, SimError
     );
     SourceResolver::new(forcings, HashMap::new())
 }
+
+#[cfg(test)]
+mod tests {
+    //! The flow-level Crew gates — Stage-3 slice S3 of the reference flip.
+    //!
+    //! Subject: `tests/test_crew_flows.py`'s 14 flow-level cases (its 4 loader cases port
+    //! to [`crate::params`]). In-src because [`water_split`] and [`store`] are private —
+    //! [`carbon_split`] is `pub` only because the station-owned `CrewRespiration` reuses
+    //! the same split, and that is not a reason to widen the other one.
+    //!
+    //! ⚠ The hand fractions here (0.85 / 0.4) are **not** the committed ones (0.949 /
+    //! 0.675). That is the Python file's own arrangement and it is kept deliberately: the
+    //! flow cases check the *partition algebra*, which must hold at any fraction, and the
+    //! committed values are asserted where the file that carries them is read, in
+    //! [`crate::params`].
+
+    use super::*;
+    use simcore::flow::{assert_flow_balanced_default, per_quantity_residual, FlowResult};
+
+    const HAND: CrewParams = CrewParams {
+        respired_carbon_fraction: 0.85,
+        insensible_water_fraction: 0.4,
+    };
+
+    const DT: f64 = 3600.0;
+
+    /// All eight Crew stocks (three provisioned stores + five output sinks).
+    fn state() -> State {
+        let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
+        for s in [
+            store(FOOD_STORE, Quantity::Carbon, 1000.0).expect("food"),
+            store(WATER_STORE, Quantity::Water, 60.0).expect("water"),
+            store(O2_STORE, Quantity::Oxygen, 2000.0).expect("o2"),
+            boundary::sink(EXHALED_CO2.to_string(), Quantity::Carbon, 0.0).expect("co2"),
+            boundary::sink(FECAL_WASTE.to_string(), Quantity::Carbon, 0.0).expect("feces"),
+            boundary::sink(CREW_HUMIDITY.to_string(), Quantity::Water, 0.0).expect("humidity"),
+            boundary::sink(URINE.to_string(), Quantity::Water, 0.0).expect("urine"),
+            boundary::sink(CREW_O2_CONSUMED.to_string(), Quantity::Oxygen, 0.0).expect("consumed"),
+        ] {
+            stocks.insert(s.id.clone(), s);
+        }
+        State::new(0, stocks, 0, BTreeMap::new()).expect("state")
+    }
+
+    fn forcing(o2: f64, food: f64, water: f64) -> SourceResolver {
+        let mut forcings: HashMap<String, Schedule> = HashMap::new();
+        forcings.insert(O2_INTAKE_VAR.to_string(), constant(o2).expect("o2"));
+        forcings.insert(FOOD_INTAKE_VAR.to_string(), constant(food).expect("food"));
+        forcings.insert(
+            WATER_INTAKE_VAR.to_string(),
+            constant(water).expect("water"),
+        );
+        SourceResolver::new(forcings, HashMap::new()).expect("resolver")
+    }
+
+    /// The standalone mission scenario's intake rates.
+    fn mission_forcing() -> SourceResolver {
+        forcing(1.0e-3, 5.0e-4, 3.0e-5)
+    }
+
+    fn oxygen() -> OxygenConsumption {
+        OxygenConsumption::new(
+            OXYGEN_CONSUMPTION.to_string(),
+            O2_STORE.to_string(),
+            CREW_O2_CONSUMED.to_string(),
+        )
+    }
+
+    fn food(params: CrewParams) -> FoodMetabolism {
+        FoodMetabolism::new(
+            FOOD_METABOLISM.to_string(),
+            FOOD_STORE.to_string(),
+            EXHALED_CO2.to_string(),
+            FECAL_WASTE.to_string(),
+            params,
+        )
+    }
+
+    fn water() -> WaterBalance {
+        WaterBalance::new(
+            WATER_BALANCE.to_string(),
+            WATER_STORE.to_string(),
+            CREW_HUMIDITY.to_string(),
+            URINE.to_string(),
+            HAND,
+        )
+    }
+
+    fn evaluated(flow: &dyn Flow, state: &State, env: &SourceResolver, dt: f64) -> FlowResult {
+        let bound = env.bind(state, dt);
+        flow.evaluate(state, &bound, dt).expect("evaluate")
+    }
+
+    fn legs(
+        flow: &dyn Flow,
+        state: &State,
+        env: &SourceResolver,
+        dt: f64,
+    ) -> BTreeMap<String, f64> {
+        evaluated(flow, state, env, dt)
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect()
+    }
+
+    fn close(a: f64, b: f64) {
+        assert!(
+            (a - b).abs() <= 1e-12 * a.abs().max(b.abs()).max(1.0),
+            "{a:?} != {b:?}"
+        );
+    }
+
+    fn touched(result: &FlowResult, state: &State) -> Vec<Quantity> {
+        per_quantity_residual(result, &state.stocks)
+            .expect("residual")
+            .into_keys()
+            .collect()
+    }
+
+    // --- rate law: carbon_split / water_split (the fractional split) --------------
+    /// ⚠ **The M-crew mutation site.** Swapping [`carbon_split`]'s two returned fractions
+    /// must redden this test by name.
+    #[test]
+    fn carbon_split_partitions_the_intake() {
+        let (respired, feces) = carbon_split(10.0, 0.85);
+        close(respired, 8.5);
+        close(feces, 1.5);
+        close(respired + feces, 10.0);
+    }
+
+    #[test]
+    fn water_split_partitions_the_intake() {
+        let (humidity, urine) = water_split(10.0, 0.4);
+        close(humidity, 4.0);
+        close(urine, 6.0);
+        close(humidity + urine, 10.0);
+    }
+
+    #[test]
+    fn split_endpoint_collapses_one_leg() {
+        // f = 1 collapses the second leg to exactly 0 (the SolarCharge η = 1 convention);
+        // f = 0 collapses the first.
+        assert_eq!(carbon_split(10.0, 1.0), (10.0, 0.0));
+        assert_eq!(water_split(10.0, 0.0), (0.0, 10.0));
+    }
+
+    #[test]
+    fn split_zero_input_is_zero() {
+        assert_eq!(carbon_split(0.0, 0.85), (0.0, 0.0));
+        assert_eq!(water_split(0.0, 0.4), (0.0, 0.0));
+    }
+
+    // --- flow level: OxygenConsumption (forced, 2-leg) ----------------------------
+    #[test]
+    fn oxygen_consumption_balances_oxygen_only() {
+        let s = state();
+        let result = evaluated(&oxygen(), &s, &mission_forcing(), DT);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Oxygen]);
+    }
+
+    #[test]
+    fn oxygen_consumption_direction_and_dt_linearity() {
+        let s = state();
+        let l = legs(&oxygen(), &s, &mission_forcing(), DT);
+        close(l[O2_STORE], -1.0e-3 * DT);
+        close(l[CREW_O2_CONSUMED], 1.0e-3 * DT);
+    }
+
+    #[test]
+    fn oxygen_consumption_zero_intake_is_a_noop() {
+        let s = state();
+        for (_, amount) in legs(&oxygen(), &s, &forcing(0.0, 5.0e-4, 3.0e-5), DT) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+
+    // --- flow level: FoodMetabolism (forced, 3-leg split) -------------------------
+    #[test]
+    fn food_metabolism_balances_carbon_only() {
+        let s = state();
+        let result = evaluated(&food(HAND), &s, &mission_forcing(), DT);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Carbon]);
+    }
+
+    #[test]
+    fn food_metabolism_splits_intake_and_dt_linear() {
+        // The forced intake q = rate·dt splits into respired CO₂ and fecal waste, routing
+        // to two different destinations.
+        let s = state();
+        let q = 5.0e-4 * DT;
+        let l = legs(&food(HAND), &s, &mission_forcing(), DT);
+        close(l[FOOD_STORE], -q);
+        close(l[EXHALED_CO2], 0.85 * q);
+        close(l[FECAL_WASTE], 0.15 * q);
+    }
+
+    #[test]
+    fn food_metabolism_always_three_legs() {
+        // Three legs even when f_resp = 1 collapses the feces leg to 0.
+        let s = state();
+        let params = CrewParams {
+            respired_carbon_fraction: 1.0,
+            insensible_water_fraction: 0.4,
+        };
+        let l = legs(&food(params), &s, &mission_forcing(), DT);
+        assert_eq!(l.len(), 3);
+        assert_eq!(l[FECAL_WASTE], 0.0);
+    }
+
+    #[test]
+    fn food_metabolism_zero_intake_is_a_noop() {
+        let s = state();
+        for (_, amount) in legs(&food(HAND), &s, &forcing(1.0e-3, 0.0, 3.0e-5), DT) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+
+    // --- flow level: WaterBalance (forced, 3-leg split) ---------------------------
+    #[test]
+    fn water_balance_balances_water_only() {
+        let s = state();
+        let result = evaluated(&water(), &s, &mission_forcing(), DT);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Water]);
+    }
+
+    #[test]
+    fn water_balance_splits_intake_and_dt_linear() {
+        let s = state();
+        let q = 3.0e-5 * DT;
+        let l = legs(&water(), &s, &mission_forcing(), DT);
+        close(l[WATER_STORE], -q);
+        close(l[CREW_HUMIDITY], 0.4 * q);
+        close(l[URINE], 0.6 * q);
+    }
+
+    #[test]
+    fn water_balance_zero_intake_is_a_noop() {
+        let s = state();
+        for (_, amount) in legs(&water(), &s, &forcing(1.0e-3, 5.0e-4, 0.0), DT) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+}

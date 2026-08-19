@@ -252,3 +252,251 @@ pub fn thermal_resolver(scenario: &ThermalScenario) -> Result<SourceResolver, Si
     forcings.insert(HEAT_LOAD_VAR.to_string(), constant(scenario.heat_load_w)?);
     SourceResolver::new(forcings, HashMap::new())
 }
+
+#[cfg(test)]
+mod tests {
+    //! The flow-level Thermal gates — Stage-3 slice S3 of the reference flip.
+    //!
+    //! Subject: `tests/test_thermal_flows.py`'s 15 flow-level cases (its 7 loader cases
+    //! port to [`crate::params`]). In-src because [`radiated_power`] is private; only
+    //! [`temperature`] is `pub`.
+    //!
+    //! ⚠ The oracle for [`STEFAN_BOLTZMANN`] is **CODATA**, not a Python constant — §5v
+    //! names this case as the template for the whole slice. The `radiated_power` hand
+    //! value likewise re-derives `εσA(T⁴ − T_space⁴)` in the test rather than transcribing
+    //! a number a Python run printed.
+
+    use super::*;
+    use simcore::flow::{assert_flow_balanced_default, per_quantity_residual, FlowResult};
+
+    /// The hand radiator params — the committed `radiator.yaml` values, restated here so
+    /// the hand arithmetic below stays meaningful. The loader itself is exercised in
+    /// [`crate::params`].
+    const HAND: ThermalParams = ThermalParams {
+        emissivity: 0.85,
+        radiator_area: 10.0,
+        heat_capacity: 1.0e7,
+        space_temperature: 2.7,
+    };
+
+    /// The stored heat that puts the node at 300 K — `Q = C·(T − T_space)`.
+    fn heat_at_300k() -> f64 {
+        HAND.heat_capacity * (300.0 - HAND.space_temperature)
+    }
+
+    /// The three Thermal stocks (node POOL + the two boundary reservoirs).
+    fn state(node: f64) -> State {
+        let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
+        for s in [
+            node_stock(node).expect("node"),
+            boundary::source(HEAT_SOURCE.to_string(), Quantity::Energy, 0.0, true)
+                .expect("heat source"),
+            boundary::sink(SPACE.to_string(), Quantity::Energy, 0.0).expect("space"),
+        ] {
+            stocks.insert(s.id.clone(), s);
+        }
+        State::new(0, stocks, 0, BTreeMap::new()).expect("state")
+    }
+
+    fn forcing(heat_load: f64) -> SourceResolver {
+        let mut forcings: HashMap<String, Schedule> = HashMap::new();
+        forcings.insert(
+            HEAT_LOAD_VAR.to_string(),
+            constant(heat_load).expect("load"),
+        );
+        SourceResolver::new(forcings, HashMap::new()).expect("resolver")
+    }
+
+    fn heat_input() -> HeatInput {
+        HeatInput::new(
+            HEAT_INPUT.to_string(),
+            HEAT_SOURCE.to_string(),
+            NODE.to_string(),
+        )
+    }
+
+    fn radiator() -> RadiatorReject {
+        RadiatorReject::new(
+            RADIATOR_REJECT.to_string(),
+            NODE.to_string(),
+            SPACE.to_string(),
+            HAND,
+        )
+    }
+
+    fn evaluated(flow: &dyn Flow, state: &State, dt: f64, heat_load: f64) -> FlowResult {
+        let r = forcing(heat_load);
+        let env = r.bind(state, dt);
+        flow.evaluate(state, &env, dt).expect("evaluate")
+    }
+
+    fn legs(flow: &dyn Flow, state: &State, dt: f64, heat_load: f64) -> BTreeMap<String, f64> {
+        evaluated(flow, state, dt, heat_load)
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect()
+    }
+
+    fn close(a: f64, b: f64) {
+        assert!(
+            (a - b).abs() <= 1e-12 * a.abs().max(b.abs()).max(1.0),
+            "{a:?} != {b:?}"
+        );
+    }
+
+    fn touched(result: &FlowResult, state: &State) -> Vec<Quantity> {
+        per_quantity_residual(result, &state.stocks)
+            .expect("residual")
+            .into_keys()
+            .collect()
+    }
+
+    // --- rate law: temperature ----------------------------------------------------
+    #[test]
+    fn temperature_is_reference_plus_heat_over_capacity() {
+        // T = T_space + Q/C: 2.7 + 1e7/1e7 = 3.7 K.
+        close(temperature(1.0e7, 1.0e7, 2.7), 3.7);
+    }
+
+    #[test]
+    fn temperature_at_floor_is_space_temperature() {
+        // Q = 0 ⇒ T = T_space, the radiator floor where rejection is exactly 0.
+        assert_eq!(temperature(0.0, 1.0e7, 2.7), 2.7);
+    }
+
+    // --- rate law: radiated_power (the Stefan-Boltzmann T⁴ law) --------------------
+    #[test]
+    fn radiated_power_zero_at_floor() {
+        // At Q = 0 the driving term T⁴ − T_space⁴ is exactly 0 — structural positivity at
+        // the floor: the radiator cannot pull the node negative.
+        assert_eq!(radiated_power(0.0, &HAND), 0.0);
+    }
+
+    /// ⚠ **The M-thermal mutation site** is the `t.powf(4.0)` inside [`radiated_power`]
+    /// (there are three `powf(4.0)` calls in this file — the other two are the
+    /// `space_temperature` term here and the one in [`equilibrium_temperature`]). Changing
+    /// it to `powf(3.0)` must redden this test by name.
+    #[test]
+    fn radiated_power_matches_stefan_boltzmann() {
+        // The law re-derived in place at T = 300 K, NOT a value read off a Python run.
+        let expected = HAND.emissivity
+            * STEFAN_BOLTZMANN
+            * HAND.radiator_area
+            * (300.0f64.powf(4.0) - HAND.space_temperature.powf(4.0));
+        close(radiated_power(heat_at_300k(), &HAND), expected);
+    }
+
+    #[test]
+    fn radiated_power_is_monotone_increasing_in_heat() {
+        // More stored heat ⇒ hotter ⇒ more radiated: the restoring force rises with T.
+        let lo = radiated_power(1.0e9, &HAND);
+        let hi = radiated_power(2.0e9, &HAND);
+        assert!(0.0 < lo && lo < hi, "{lo:?} !< {hi:?}");
+    }
+
+    #[test]
+    fn stefan_boltzmann_constant_is_codata_value() {
+        // σ is the CODATA 2018 value, exact since the 2019 SI redefinition. Its oracle is
+        // the physical constant itself — the one case §5v names as already correct, and
+        // the template for how every other oracle in S3 was chosen.
+        assert_eq!(STEFAN_BOLTZMANN, 5.670374419e-8);
+    }
+
+    // --- HeatInput ----------------------------------------------------------------
+    #[test]
+    fn heat_input_moves_supply_into_node() {
+        // Heat → heat, no loss: two legs, single magnitude (unlike Power's 3-leg lossy
+        // SolarCharge).
+        let s = state(0.0);
+        let l = legs(&heat_input(), &s, 1.0, 100.0);
+        let mut ids: Vec<&str> = l.keys().map(String::as_str).collect();
+        ids.sort_unstable();
+        assert_eq!(ids, vec![HEAT_SOURCE, NODE]);
+        close(l[HEAT_SOURCE], -100.0);
+        close(l[NODE], 100.0);
+    }
+
+    #[test]
+    fn heat_input_balances_energy_only() {
+        let s = state(0.0);
+        let result = evaluated(&heat_input(), &s, 1.0, 100.0);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Energy]);
+    }
+
+    #[test]
+    fn heat_input_zero_load_is_noop() {
+        let s = state(0.0);
+        for (_, amount) in legs(&heat_input(), &s, 1.0, 0.0) {
+            assert_eq!(amount, 0.0);
+        }
+    }
+
+    #[test]
+    fn heat_input_is_dt_linear() {
+        let s = state(0.0);
+        let half = legs(&heat_input(), &s, 0.5, 100.0);
+        let full = legs(&heat_input(), &s, 1.0, 100.0);
+        close(full[NODE], 2.0 * half[NODE]);
+    }
+
+    // --- RadiatorReject -----------------------------------------------------------
+    #[test]
+    fn radiator_rejects_node_heat_to_space() {
+        let q = heat_at_300k();
+        let s = state(q);
+        let l = legs(&radiator(), &s, 1.0, 0.0);
+        let mut ids: Vec<&str> = l.keys().map(String::as_str).collect();
+        ids.sort_unstable();
+        assert_eq!(ids, vec![SPACE, NODE]);
+        let expected = radiated_power(q, &HAND);
+        close(l[NODE], -expected);
+        close(l[SPACE], expected);
+    }
+
+    #[test]
+    fn radiator_balances_energy_only() {
+        let s = state(heat_at_300k());
+        let result = evaluated(&radiator(), &s, 1.0, 0.0);
+        assert_flow_balanced_default(&result, &s.stocks).expect("balanced");
+        assert_eq!(touched(&result, &s), vec![Quantity::Energy]);
+    }
+
+    #[test]
+    fn radiator_is_donor_controlled_zero_at_floor() {
+        // At Q = 0 (T = T_space) rejection is exactly 0 — the donor-controlled self-limit.
+        // Two legs are still emitted, both zero-amount.
+        let s = state(0.0);
+        let l = legs(&radiator(), &s, 1.0, 0.0);
+        assert_eq!(l.len(), 2);
+        for (_, amount) in l {
+            assert_eq!(amount, 0.0);
+        }
+    }
+
+    #[test]
+    fn radiator_reads_the_snapshot_not_the_env() {
+        // Rejection depends on the node's amount, independent of the heat-load forcing: a
+        // hotter node radiates more even at zero load.
+        let q = heat_at_300k();
+        let cold = legs(&radiator(), &state(q / 2.0), 1.0, 0.0);
+        let hot = legs(&radiator(), &state(q), 1.0, 0.0);
+        assert!(
+            hot[SPACE] > cold[SPACE],
+            "{:?} !> {:?}",
+            hot[SPACE],
+            cold[SPACE]
+        );
+        assert!(cold[SPACE] > 0.0);
+    }
+
+    #[test]
+    fn radiator_is_dt_linear() {
+        // flux = rate·dt on the SAME snapshot (the increment-form contract).
+        let s = state(heat_at_300k());
+        let half = legs(&radiator(), &s, 0.5, 0.0);
+        let full = legs(&radiator(), &s, 1.0, 0.0);
+        close(full[SPACE], 2.0 * half[SPACE]);
+    }
+}

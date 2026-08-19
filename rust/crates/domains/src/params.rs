@@ -42,18 +42,108 @@ const RADIATOR_YAML: &str = include_str!("../params/thermal/radiator.yaml");
 const ECLSS_YAML: &str = include_str!("../params/eclss/eclss.yaml");
 const CREW_YAML: &str = include_str!("../params/crew/crew.yaml");
 
-/// Load a param file, panicking on a malformed one.
+/// Panic on a frozen file that does not load.
 ///
 /// These five files are **frozen and embedded at compile time**, so a failure here is a
 /// broken build artefact, not a runtime input error — the same standing the previous
 /// `expect("sibling param hex-float parses")` had. Authored files, which *are* runtime
 /// input, go through `authoring` and surface a `Result`.
-fn file(text: &str, name: &'static str) -> ParamFile {
-    ParamFile::parse(text, name).unwrap_or_else(|e| panic!("{name} is malformed: {e}"))
+fn frozen<T>(result: Result<T, ConfigError>, name: &'static str) -> T {
+    result.unwrap_or_else(|e| panic!("{name} failed its frozen schema/unit/bound check: {e}"))
 }
 
-fn checked<T>(result: Result<T, ConfigError>, name: &'static str) -> T {
-    result.unwrap_or_else(|e| panic!("{name} failed its frozen bound/unit check: {e}"))
+// --------------------------------------------------------------------------- //
+// The per-file loaders, each over `&str` and each returning a `Result`.        //
+// --------------------------------------------------------------------------- //
+//
+// ⚠⚠ **The bound guards live in THESE functions, not in their public wrappers, and that
+// placement is the whole point.** Stage-3 slice S3 measured the previous arrangement
+// (`§5v` measurement 3): `tests::bounds_match_the_loaders` reads as the gate on the five
+// files' bound wiring, and deleting `charge()`'s `require_half_open` wrapper left all 488
+// workspace tests green. It could not see the deletion because it asserts that the
+// *committed values* lie inside their ranges, and deleting a check moves no committed
+// value.
+//
+// A rejection test needs a bad file to hand the loader, and the public entry points read
+// `include_str!`-ed constants — there was no runtime path to give them one. So each file
+// gets a `*_from(&str)` loader carrying the parse, the unit guard AND the bounds, and the
+// `#[cfg(test)]` block below feeds each one a deliberately-bad text. Every rejection is
+// paired with the same fixture in range, which is what makes it a control rather than an
+// assertion about a typo.
+
+fn charge_from(text: &str, name: &str) -> Result<ChargeParams, ConfigError> {
+    let f = ParamFile::parse(text, name)?;
+    let v = f.guarded_set(&[("charge_efficiency", "dimensionless")], name)?;
+    Ok(ChargeParams {
+        charge_efficiency: require_half_open(v[0], 0.0, 1.0, "charge_efficiency", name)?,
+    })
+}
+
+fn self_discharge_from(text: &str, name: &str) -> Result<SelfDischargeParams, ConfigError> {
+    let f = ParamFile::parse(text, name)?;
+    let v = f.guarded_set(&[("self_discharge_rate", "1/s")], name)?;
+    Ok(SelfDischargeParams {
+        self_discharge_rate: require_non_negative(v[0], "self_discharge_rate", name)?,
+    })
+}
+
+fn thermal_from(text: &str, name: &str) -> Result<ThermalParams, ConfigError> {
+    let f = ParamFile::parse(text, name)?;
+    let v = f.guarded_set(
+        &[
+            ("emissivity", "dimensionless"),
+            ("radiator_area", "m^2"),
+            ("heat_capacity", "J/K"),
+            ("space_temperature", "K"),
+        ],
+        name,
+    )?;
+    Ok(ThermalParams {
+        emissivity: require_half_open(v[0], 0.0, 1.0, "emissivity", name)?,
+        radiator_area: require_positive(v[1], "radiator_area", name)?,
+        heat_capacity: require_positive(v[2], "heat_capacity", name)?,
+        space_temperature: require_non_negative(v[3], "space_temperature", name)?,
+    })
+}
+
+fn eclss_from(text: &str, name: &str) -> Result<EclssParams, ConfigError> {
+    let f = ParamFile::parse(text, name)?;
+    let v = f.guarded_set(
+        &[
+            ("co2_scrub_rate", "1/s"),
+            ("condense_rate", "1/s"),
+            ("o2_makeup_gain", "1/s"),
+            ("o2_setpoint", "mol"),
+        ],
+        name,
+    )?;
+    Ok(EclssParams {
+        co2_scrub_rate: require_positive(v[0], "co2_scrub_rate", name)?,
+        condense_rate: require_positive(v[1], "condense_rate", name)?,
+        o2_makeup_gain: require_positive(v[2], "o2_makeup_gain", name)?,
+        o2_setpoint: require_positive(v[3], "o2_setpoint", name)?,
+    })
+}
+
+fn crew_from(text: &str, name: &str) -> Result<CrewParams, ConfigError> {
+    let f = ParamFile::parse(text, name)?;
+    let v = f.guarded_set(
+        &[
+            ("respired_carbon_fraction", "dimensionless"),
+            ("insensible_water_fraction", "dimensionless"),
+        ],
+        name,
+    )?;
+    Ok(CrewParams {
+        respired_carbon_fraction: require_closed(v[0], 0.0, 1.0, "respired_carbon_fraction", name)?,
+        insensible_water_fraction: require_closed(
+            v[1],
+            0.0,
+            1.0,
+            "insensible_water_fraction",
+            name,
+        )?,
+    })
 }
 
 /// The Power one-way charge efficiency η_c (`charge.yaml`).
@@ -61,17 +151,7 @@ fn checked<T>(result: Result<T, ConfigError>, name: &'static str) -> T {
 /// η ∈ (0, 1]: 1 is lossless charging (the heat leg collapses to 0); 0 would be a
 /// battery that stores nothing.
 pub fn charge() -> ChargeParams {
-    let f = file(CHARGE_YAML, "charge.yaml");
-    let v = checked(
-        f.guarded_set(&[("charge_efficiency", "dimensionless")], "charge.yaml"),
-        "charge.yaml",
-    );
-    ChargeParams {
-        charge_efficiency: checked(
-            require_half_open(v[0], 0.0, 1.0, "charge_efficiency", "charge.yaml"),
-            "charge.yaml",
-        ),
-    }
+    frozen(charge_from(CHARGE_YAML, "charge.yaml"), "charge.yaml")
 }
 
 /// The Power first-order self-discharge rate k (`self_discharge.yaml`).
@@ -79,17 +159,10 @@ pub fn charge() -> ChargeParams {
 /// `k >= 0`: zero is valid (an ideal leak-free cell — inert, the herbivory "a zero rate
 /// is valid" precedent), negative is not.
 pub fn self_discharge() -> SelfDischargeParams {
-    let f = file(SELF_DISCHARGE_YAML, "self_discharge.yaml");
-    let v = checked(
-        f.guarded_set(&[("self_discharge_rate", "1/s")], "self_discharge.yaml"),
+    frozen(
+        self_discharge_from(SELF_DISCHARGE_YAML, "self_discharge.yaml"),
         "self_discharge.yaml",
-    );
-    SelfDischargeParams {
-        self_discharge_rate: checked(
-            require_non_negative(v[0], "self_discharge_rate", "self_discharge.yaml"),
-            "self_discharge.yaml",
-        ),
-    }
+    )
 }
 
 /// The Thermal radiator properties (`radiator.yaml`).
@@ -98,94 +171,20 @@ pub fn self_discharge() -> SelfDischargeParams {
 /// YAML 1.1 resolves as a *string*. See [`config::params`] for why parsing the text is
 /// both faithful to pydantic and bit-neutral.
 pub fn thermal() -> ThermalParams {
-    let f = file(RADIATOR_YAML, "radiator.yaml");
-    let v = checked(
-        f.guarded_set(
-            &[
-                ("emissivity", "dimensionless"),
-                ("radiator_area", "m^2"),
-                ("heat_capacity", "J/K"),
-                ("space_temperature", "K"),
-            ],
-            "radiator.yaml",
-        ),
+    frozen(
+        thermal_from(RADIATOR_YAML, "radiator.yaml"),
         "radiator.yaml",
-    );
-    ThermalParams {
-        emissivity: checked(
-            require_half_open(v[0], 0.0, 1.0, "emissivity", "radiator.yaml"),
-            "radiator.yaml",
-        ),
-        radiator_area: checked(
-            require_positive(v[1], "radiator_area", "radiator.yaml"),
-            "radiator.yaml",
-        ),
-        heat_capacity: checked(
-            require_positive(v[2], "heat_capacity", "radiator.yaml"),
-            "radiator.yaml",
-        ),
-        space_temperature: checked(
-            require_non_negative(v[3], "space_temperature", "radiator.yaml"),
-            "radiator.yaml",
-        ),
-    }
+    )
 }
 
 /// The ECLSS control-loop coefficients (`eclss.yaml`). All four are strictly positive.
 pub fn eclss() -> EclssParams {
-    let f = file(ECLSS_YAML, "eclss.yaml");
-    let v = checked(
-        f.guarded_set(
-            &[
-                ("co2_scrub_rate", "1/s"),
-                ("condense_rate", "1/s"),
-                ("o2_makeup_gain", "1/s"),
-                ("o2_setpoint", "mol"),
-            ],
-            "eclss.yaml",
-        ),
-        "eclss.yaml",
-    );
-    let names = [
-        "co2_scrub_rate",
-        "condense_rate",
-        "o2_makeup_gain",
-        "o2_setpoint",
-    ];
-    for (value, name) in v.iter().zip(names) {
-        checked(require_positive(*value, name, "eclss.yaml"), "eclss.yaml");
-    }
-    EclssParams {
-        co2_scrub_rate: v[0],
-        condense_rate: v[1],
-        o2_makeup_gain: v[2],
-        o2_setpoint: v[3],
-    }
+    frozen(eclss_from(ECLSS_YAML, "eclss.yaml"), "eclss.yaml")
 }
 
 /// The Crew metabolic-split fractions (`crew.yaml`). Both are fractions in [0, 1].
 pub fn crew() -> CrewParams {
-    let f = file(CREW_YAML, "crew.yaml");
-    let v = checked(
-        f.guarded_set(
-            &[
-                ("respired_carbon_fraction", "dimensionless"),
-                ("insensible_water_fraction", "dimensionless"),
-            ],
-            "crew.yaml",
-        ),
-        "crew.yaml",
-    );
-    CrewParams {
-        respired_carbon_fraction: checked(
-            require_closed(v[0], 0.0, 1.0, "respired_carbon_fraction", "crew.yaml"),
-            "crew.yaml",
-        ),
-        insensible_water_fraction: checked(
-            require_closed(v[1], 0.0, 1.0, "insensible_water_fraction", "crew.yaml"),
-            "crew.yaml",
-        ),
-    }
+    frozen(crew_from(CREW_YAML, "crew.yaml"), "crew.yaml")
 }
 
 /// The **frozen sibling param-file census**: `(filename, embedded text)` for the five files
@@ -323,6 +322,457 @@ mod tests {
         assert!(f.guarded("co2_scrub_rate", "1/s", "eclss.yaml").is_err());
     }
 
+    // ----------------------------------------------------------------------- //
+    // The 23 loader-rejection gates (Stage-3 slice S3).                        //
+    // ----------------------------------------------------------------------- //
+    //
+    // Subject: the loader halves of `tests/test_power_flows.py` (8),
+    // `test_thermal_flows.py` (7), `test_eclss_flows.py` (4) and `test_crew_flows.py` (4).
+    // They live here rather than beside the flow tests because what they exercise is the
+    // *file boundary*, and this is the module that reads the files.
+    //
+    // ⚠ **Two of these discharge a finding, not just coverage.** §5v measurement 3 found
+    // `bounds_match_the_loaders` (below) inert — it cannot see a bound guard vanish — and
+    // also found it silent about `eclss.yaml` altogether: the four ECLSS bounds were
+    // guarded by nothing on the reference side. `eclss_loader_rejects_*` closes that hole.
+    //
+    // Each rejection carries its own control: the SAME fixture with the offending value
+    // put back in range must load. Without that half, a fixture with a typo in it would
+    // "reject" for the wrong reason and read as a passing gate — which is the failure mode
+    // this whole section exists to stop reproducing.
+
+    /// One `{value, unit, source}` entry, block style (the frozen files' own shape).
+    fn block(name: &str, value: &str, unit: &str) -> String {
+        format!("  {name}:\n    value: {value}\n    unit: \"{unit}\"\n    source: \"test\"\n")
+    }
+
+    fn charge_yaml(value: &str, unit: &str) -> String {
+        format!(
+            "name: power\nprocess: charge\nparameters:\n{}",
+            block("charge_efficiency", value, unit)
+        )
+    }
+
+    fn self_discharge_yaml(value: &str, unit: &str) -> String {
+        format!(
+            "name: power\nprocess: self_discharge\nparameters:\n{}",
+            block("self_discharge_rate", value, unit)
+        )
+    }
+
+    fn radiator_yaml(
+        emissivity: (&str, &str),
+        area: (&str, &str),
+        capacity: (&str, &str),
+        space: (&str, &str),
+    ) -> String {
+        format!(
+            "name: thermal\nprocess: radiation\nparameters:\n{}{}{}{}",
+            block("emissivity", emissivity.0, emissivity.1),
+            block("radiator_area", area.0, area.1),
+            block("heat_capacity", capacity.0, capacity.1),
+            block("space_temperature", space.0, space.1),
+        )
+    }
+
+    fn eclss_yaml(
+        scrub: (&str, &str),
+        condense: (&str, &str),
+        makeup: (&str, &str),
+        setpoint: (&str, &str),
+    ) -> String {
+        format!(
+            "name: eclss\nprocess: cabin_air_control\nparameters:\n{}{}{}{}",
+            block("co2_scrub_rate", scrub.0, scrub.1),
+            block("condense_rate", condense.0, condense.1),
+            block("o2_makeup_gain", makeup.0, makeup.1),
+            block("o2_setpoint", setpoint.0, setpoint.1),
+        )
+    }
+
+    fn crew_yaml(respired: (&str, &str), insensible: (&str, &str)) -> String {
+        format!(
+            "name: crew\nprocess: metabolic_split\nparameters:\n{}{}",
+            block("respired_carbon_fraction", respired.0, respired.1),
+            block("insensible_water_fraction", insensible.0, insensible.1),
+        )
+    }
+
+    /// Assert `result` is the rejection whose message names `needle`.
+    fn rejected<T: std::fmt::Debug>(result: Result<T, ConfigError>, needle: &str) {
+        match result {
+            Ok(v) => panic!("expected a rejection naming {needle:?}, got {v:?}"),
+            Err(e) => assert!(
+                e.to_string().contains(needle),
+                "rejected, but for the wrong reason: {e} (expected a message naming {needle:?})"
+            ),
+        }
+    }
+
+    // --- charge.yaml (4) ----------------------------------------------------------
+    #[test]
+    fn charge_loader_reads_the_committed_efficiency() {
+        assert_eq!(charge().charge_efficiency, 0.95);
+    }
+
+    /// ⚠ **An M-bound site.** Deleting `charge_from`'s `require_half_open` must redden
+    /// this test and `charge_loader_rejects_above_one_efficiency` — it is the mutation
+    /// with no golden backstop at all, because it moves no committed value.
+    #[test]
+    fn charge_loader_rejects_zero_efficiency() {
+        // 0 = a battery that stores nothing; (0, 1] is required.
+        rejected(
+            charge_from(&charge_yaml("0.0", "dimensionless"), "charge.yaml"),
+            "charge_efficiency must be in",
+        );
+        // The control: the same fixture in range loads, so the rejection is about the
+        // bound and not about the fixture.
+        assert_eq!(
+            charge_from(&charge_yaml("0.95", "dimensionless"), "charge.yaml")
+                .expect("the in-range control loads")
+                .charge_efficiency,
+            0.95
+        );
+    }
+
+    #[test]
+    fn charge_loader_rejects_above_one_efficiency() {
+        // > 1 would create energy on charge.
+        rejected(
+            charge_from(&charge_yaml("1.5", "dimensionless"), "charge.yaml"),
+            "charge_efficiency must be in",
+        );
+        // ⚠ 1.0 is the legitimate endpoint (lossless charging), so the control here is the
+        // boundary itself: a `require_closed` mistaken for `require_half_open` would pass
+        // the test above and fail this line.
+        assert_eq!(
+            charge_from(&charge_yaml("1.0", "dimensionless"), "charge.yaml")
+                .expect("η = 1 is lossless, not out of range")
+                .charge_efficiency,
+            1.0
+        );
+    }
+
+    #[test]
+    fn charge_loader_rejects_a_bad_unit() {
+        rejected(
+            charge_from(&charge_yaml("0.95", "J"), "charge.yaml"),
+            "must be declared in",
+        );
+        assert!(charge_from(&charge_yaml("0.95", "dimensionless"), "charge.yaml").is_ok());
+    }
+
+    // --- self_discharge.yaml (4) --------------------------------------------------
+    #[test]
+    fn self_discharge_loader_reads_the_committed_rate() {
+        assert_eq!(self_discharge().self_discharge_rate, 1.0e-8);
+    }
+
+    #[test]
+    fn self_discharge_loader_accepts_a_zero_rate() {
+        // 0 = an ideal leak-free cell (inert machinery) — valid, the herbivory precedent.
+        // `>= 0` is the bound here, unlike the strictly-positive efficiency, so this case
+        // is the one that would catch `require_non_negative` being "tightened" to
+        // `require_positive`.
+        assert_eq!(
+            self_discharge_from(&self_discharge_yaml("0.0", "1/s"), "self_discharge.yaml")
+                .expect("a zero rate is valid")
+                .self_discharge_rate,
+            0.0
+        );
+    }
+
+    /// ⚠ **An M-bound site** (`require_non_negative` in `self_discharge_from`).
+    #[test]
+    fn self_discharge_loader_rejects_a_negative_rate() {
+        // < 0 would CREATE energy on the leak.
+        rejected(
+            self_discharge_from(
+                &self_discharge_yaml("-1.0e-8", "1/s"),
+                "self_discharge.yaml",
+            ),
+            "self_discharge_rate must be >= 0",
+        );
+        assert!(
+            self_discharge_from(&self_discharge_yaml("1.0e-8", "1/s"), "self_discharge.yaml")
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn self_discharge_loader_rejects_a_bad_unit() {
+        // Per-second is the exact-guarded unit (Power's natural time unit); /day rejected.
+        rejected(
+            self_discharge_from(
+                &self_discharge_yaml("1.0e-8", "1/day"),
+                "self_discharge.yaml",
+            ),
+            "must be declared in",
+        );
+        assert!(
+            self_discharge_from(&self_discharge_yaml("1.0e-8", "1/s"), "self_discharge.yaml")
+                .is_ok()
+        );
+    }
+
+    // --- radiator.yaml (7) --------------------------------------------------------
+    /// The committed fixture, as the control every radiator rejection below re-uses.
+    fn good_radiator() -> String {
+        radiator_yaml(
+            ("0.85", "dimensionless"),
+            ("10.0", "m^2"),
+            ("1.0e7", "J/K"),
+            ("2.7", "K"),
+        )
+    }
+
+    #[test]
+    fn radiator_loader_reads_the_committed_params() {
+        let p = thermal();
+        assert_eq!(p.emissivity, 0.85);
+        assert_eq!(p.radiator_area, 10.0);
+        assert_eq!(p.heat_capacity, 1.0e7);
+        assert_eq!(p.space_temperature, 2.7);
+    }
+
+    /// ⚠ **An M-bound site** (`require_half_open` on `emissivity`).
+    #[test]
+    fn radiator_loader_rejects_zero_emissivity() {
+        // 0 = a surface that radiates nothing, i.e. no rejection path at all.
+        let bad = radiator_yaml(
+            ("0.0", "dimensionless"),
+            ("10.0", "m^2"),
+            ("1.0e7", "J/K"),
+            ("2.7", "K"),
+        );
+        rejected(thermal_from(&bad, "radiator.yaml"), "emissivity must be in");
+        assert!(thermal_from(&good_radiator(), "radiator.yaml").is_ok());
+    }
+
+    #[test]
+    fn radiator_loader_rejects_above_one_emissivity() {
+        // > 1 would radiate more than a black body.
+        let bad = radiator_yaml(
+            ("1.5", "dimensionless"),
+            ("10.0", "m^2"),
+            ("1.0e7", "J/K"),
+            ("2.7", "K"),
+        );
+        rejected(thermal_from(&bad, "radiator.yaml"), "emissivity must be in");
+        // ε = 1 is a black body — the legitimate endpoint, as for η_c.
+        let black = radiator_yaml(
+            ("1.0", "dimensionless"),
+            ("10.0", "m^2"),
+            ("1.0e7", "J/K"),
+            ("2.7", "K"),
+        );
+        assert_eq!(
+            thermal_from(&black, "radiator.yaml")
+                .expect("a black body is not out of range")
+                .emissivity,
+            1.0
+        );
+    }
+
+    /// ⚠ **An M-bound site** (`require_positive` on `radiator_area`).
+    #[test]
+    fn radiator_loader_rejects_a_nonpositive_area() {
+        let bad = radiator_yaml(
+            ("0.85", "dimensionless"),
+            ("0.0", "m^2"),
+            ("1.0e7", "J/K"),
+            ("2.7", "K"),
+        );
+        rejected(
+            thermal_from(&bad, "radiator.yaml"),
+            "radiator_area must be > 0",
+        );
+        assert!(thermal_from(&good_radiator(), "radiator.yaml").is_ok());
+    }
+
+    #[test]
+    fn radiator_loader_rejects_a_nonpositive_heat_capacity() {
+        let bad = radiator_yaml(
+            ("0.85", "dimensionless"),
+            ("10.0", "m^2"),
+            ("0.0", "J/K"),
+            ("2.7", "K"),
+        );
+        rejected(
+            thermal_from(&bad, "radiator.yaml"),
+            "heat_capacity must be > 0",
+        );
+        assert!(thermal_from(&good_radiator(), "radiator.yaml").is_ok());
+    }
+
+    #[test]
+    fn radiator_loader_rejects_a_negative_space_temperature() {
+        // Absolute temperature: below 0 K is not a sink, it is a typo.
+        let bad = radiator_yaml(
+            ("0.85", "dimensionless"),
+            ("10.0", "m^2"),
+            ("1.0e7", "J/K"),
+            ("-1.0", "K"),
+        );
+        rejected(
+            thermal_from(&bad, "radiator.yaml"),
+            "space_temperature must be >= 0",
+        );
+        // 0 K is valid (a perfectly cold sink), which is why the bound is `>= 0`.
+        let absolute_zero = radiator_yaml(
+            ("0.85", "dimensionless"),
+            ("10.0", "m^2"),
+            ("1.0e7", "J/K"),
+            ("0.0", "K"),
+        );
+        assert_eq!(
+            thermal_from(&absolute_zero, "radiator.yaml")
+                .expect("0 K is a valid sink temperature")
+                .space_temperature,
+            0.0
+        );
+    }
+
+    #[test]
+    fn radiator_loader_rejects_a_bad_unit() {
+        // Absolute K is the exact-guarded temperature unit — the T⁴ law needs an absolute
+        // scale — so degC is rejected here, unlike the biosphere's degC kinetics.
+        let bad = radiator_yaml(
+            ("0.85", "dimensionless"),
+            ("10.0", "m^2"),
+            ("1.0e7", "J/K"),
+            ("2.7", "degC"),
+        );
+        rejected(thermal_from(&bad, "radiator.yaml"), "must be declared in");
+        assert!(thermal_from(&good_radiator(), "radiator.yaml").is_ok());
+    }
+
+    // --- eclss.yaml (4) — the roster hole §5v measurement 3 found -------------------
+    fn good_eclss() -> String {
+        eclss_yaml(
+            ("1.0e-3", "1/s"),
+            ("5.0e-4", "1/s"),
+            ("2.0e-3", "1/s"),
+            ("10.0", "mol"),
+        )
+    }
+
+    #[test]
+    fn eclss_loader_reads_the_committed_params() {
+        let p = eclss();
+        assert_eq!(p.co2_scrub_rate, 1.0e-3);
+        assert_eq!(p.condense_rate, 5.0e-4);
+        assert_eq!(p.o2_makeup_gain, 2.0e-3);
+        assert_eq!(p.o2_setpoint, 10.0);
+    }
+
+    /// ⚠ **An M-bound site, and the one `bounds_match_the_loaders` never covered at all.**
+    #[test]
+    fn eclss_loader_rejects_a_nonpositive_rate() {
+        // k_scrub = 0 is a scrubber that does not scrub — the loop stops being a loop.
+        let bad = eclss_yaml(
+            ("0.0", "1/s"),
+            ("5.0e-4", "1/s"),
+            ("2.0e-3", "1/s"),
+            ("10.0", "mol"),
+        );
+        rejected(eclss_from(&bad, "eclss.yaml"), "co2_scrub_rate must be > 0");
+        assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
+    }
+
+    #[test]
+    fn eclss_loader_rejects_a_nonpositive_setpoint() {
+        let bad = eclss_yaml(
+            ("1.0e-3", "1/s"),
+            ("5.0e-4", "1/s"),
+            ("2.0e-3", "1/s"),
+            ("-1.0", "mol"),
+        );
+        rejected(eclss_from(&bad, "eclss.yaml"), "o2_setpoint must be > 0");
+        assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
+    }
+
+    #[test]
+    fn eclss_loader_rejects_a_bad_unit() {
+        let bad = eclss_yaml(
+            ("1.0e-3", "1/s"),
+            ("5.0e-4", "1/min"),
+            ("2.0e-3", "1/s"),
+            ("10.0", "mol"),
+        );
+        rejected(
+            eclss_from(&bad, "eclss.yaml"),
+            "condense_rate must be declared in",
+        );
+        assert!(eclss_from(&good_eclss(), "eclss.yaml").is_ok());
+    }
+
+    // --- crew.yaml (4) ------------------------------------------------------------
+    fn good_crew() -> String {
+        crew_yaml(("0.949", "dimensionless"), ("0.675", "dimensionless"))
+    }
+
+    #[test]
+    fn crew_loader_reads_the_committed_params() {
+        // BVAD-calibrated (was 0.85 / 0.4 illustrative) — see `docs/bvad-reference.md`.
+        let p = crew();
+        assert_eq!(p.respired_carbon_fraction, 0.949);
+        assert_eq!(p.insensible_water_fraction, 0.675);
+    }
+
+    /// ⚠ **An M-bound site** (`require_closed` on `respired_carbon_fraction`).
+    #[test]
+    fn crew_loader_rejects_an_out_of_range_fraction() {
+        let bad = crew_yaml(("1.5", "dimensionless"), ("0.4", "dimensionless"));
+        rejected(
+            crew_from(&bad, "crew.yaml"),
+            "respired_carbon_fraction must be in",
+        );
+        assert!(crew_from(&good_crew(), "crew.yaml").is_ok());
+    }
+
+    #[test]
+    fn crew_loader_rejects_a_negative_fraction() {
+        let bad = crew_yaml(("0.85", "dimensionless"), ("-0.1", "dimensionless"));
+        rejected(
+            crew_from(&bad, "crew.yaml"),
+            "insensible_water_fraction must be in",
+        );
+        // ⚠ Both endpoints are legitimate here — the bound is CLOSED, not half-open like
+        // η_c and ε: a crew that respires all of its food carbon, or none of it, is a
+        // degenerate but well-defined split. This is the control that would catch the
+        // bound being copied from `charge_from`.
+        let endpoints = crew_yaml(("0.0", "dimensionless"), ("1.0", "dimensionless"));
+        let p = crew_from(&endpoints, "crew.yaml").expect("0 and 1 are valid fractions");
+        assert_eq!(p.respired_carbon_fraction, 0.0);
+        assert_eq!(p.insensible_water_fraction, 1.0);
+    }
+
+    #[test]
+    fn crew_loader_rejects_a_bad_unit() {
+        let bad = crew_yaml(("0.85", "1"), ("0.4", "dimensionless"));
+        rejected(
+            crew_from(&bad, "crew.yaml"),
+            "respired_carbon_fraction must be declared in",
+        );
+        assert!(crew_from(&good_crew(), "crew.yaml").is_ok());
+    }
+
+    /// ⚠⚠ **Measured INERT by Stage-3 slice S3, and kept as the record of that.**
+    ///
+    /// This reads as the gate on the five files' bound wiring. It is not one: it asserts
+    /// that the *committed values* lie inside their ranges, and deleting a loader's bound
+    /// check moves no committed value. §5v measurement 3 deleted `charge_from`'s
+    /// `require_half_open` and all 488 workspace tests stayed green — the exact
+    /// "inert by construction" shape this log keeps recording.
+    ///
+    /// It is not deleted, because what it *does* assert is still true and cheap: the
+    /// committed numbers are in range. It is simply not the gate its name implies. The
+    /// gates are the `*_loader_rejects_*` tests above, each of which hands a loader a
+    /// deliberately-bad file and carries its own in-range control.
+    ///
+    /// ⚠ Note what is still missing here and no longer missing above: this test says
+    /// nothing about `eclss.yaml` at all.
     #[test]
     fn bounds_match_the_loaders() {
         let c = charge();
