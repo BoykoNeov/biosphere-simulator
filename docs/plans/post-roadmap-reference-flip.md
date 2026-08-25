@@ -3775,7 +3775,7 @@ slices, not one**, and the first two are not test work:
 | **S1** | **The reference's own ground** — relocate the 23 param YAMLs + the weather fixture + the 26 scenario fixtures + the goldens into paths the reference owns | FINDING 1. Nothing can be deleted until this lands; it moves data, not science, so it should be byte-neutral and provable as such |
 | **S2** | **The three gates come with it** — the manifest byte gate, the golden comparison + `golden_platform.py`'s policy, the inventory dumps' consumer | FINDINGS 2 + 3. These guard the *contracts*; every later slice runs behind them. ⚠ **Splits in two, and the split is structural, not a size call** (§5t): the golden comparison stops at `station`, so `station` can own its census; the manifest gate spans `domains` + `station` + `authoring`, so it cannot. **COMPLETE 2026-08-19** — first half (§5t) discharged FINDING 3 and carried the S1 forcing literal; second half (§5u) moved the three manifest writers into their crates and gave each contract a byte gate, plus Rust successors for the three `test_inventory_parity` claims the byte gate does NOT subsume. FINDING 2 grew to five on the way |
 | **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison. ⚠ **BUILT — see §5w (COMPLETE 2026-08-19).** ⚠ **Designed in §5v, and this row is superseded on two counts**: the real figure is **160 collected cases over nine files**, not 158 over eleven — `test_bvad_validation.py` and `test_crew_coupled_loop.py` are deferred to `station` as science items. And **Control B's verdict here is dated**: §5v re-ran it and got 12 red, not 2 |
-| **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable |
+| **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable. ⚠ **BUILT — see §5x (COMPLETE 2026-08-25).** It is **two** slices wearing one row: five behavioural files whose subject is arithmetic, and two structure gates whose subject is what a manifest contains — different acceptance criteria, and the structure half taken first because it was the only part that could still change the slice's shape |
 | **S5** | **The biosphere mechanisms** — ~600 tests over `flows.rs` | FINDING 5. The largest and the one to take last, in crop/process batches, because it is where a silent narrowing does the most damage |
 | **S6** | **The retirements** — the two `R!` rows (only once S3's successors stand), the generators (each against its named successor), the Python tree itself | Only after S1–S5 have successors standing. ⚠ The cross-port comparison is **not** a free deletion: FINDING 7 makes it the sibling domains' only gate until S3 lands. The **D** rows (Godot drivers, `test_context_budget.py`, `test_headless_cli.py`) need answers before this slice, not during it |
 
@@ -3948,8 +3948,8 @@ its test count; **(0 tests)** means the implementation is there and nothing chec
 
 | File | tests | Reference owner | Note |
 |---|---:|---|---|
-| `test_biosphere_purity.py` | 39 | none | FINDING 7 |
-| `test_simcore_purity.py` | 20 | none | FINDING 7 — subject is the Python package; the Rust zero-dep charter is guarded by nothing |
+| `test_biosphere_purity.py` | 39 | domains/tests/biosphere_spine_purity.rs (10) | **FINDING 8**, not 7 — and this row is `R!`-shaped, not `R`: its successor had to be *written*. S4 wrote it (§5x) |
+| `test_simcore_purity.py` | 20 | simcore/tests/workspace_purity.rs (18) | **FINDING 8**, not 7 — subject is the Python package; the Rust zero-dep charter was guarded by nothing until S4 (§5x). `R!`-shaped, not `R` |
 | `test_biosphere_demo.py` | 17 | domains/biosphere/demo.py has no Rust referent | C6 retired both demo goldens; its one engine claim (decision #16) is covered by environment.rs::forcing_and_shared_resolve |
 | `test_authoring_multirate_crossport_anchor.py` | 7 | authoring/tests/multirate.rs (18) | its whole subject is the two ports agreeing on the partition |
 | `test_smoke.py` | 5 | none | imports the Python packages |
@@ -5024,3 +5024,286 @@ passes the `State` comparison cannot currently fail. It is there because the por
 about the whole `State` and because it starts biting the moment a sibling gains an aux
 process or an RNG draw. Its docstring says exactly that — a `///` block in this repo is read
 as a finding, so it must not read as more than it is.
+
+## §5x Stage 3 — S4, the engine residue: two slices wearing one row, COMPLETE 2026-08-25
+
+S3 gave the four sibling domains their own tests. S4 is the row the batch table called *"the
+engine residue — extinction, aux, environment, integrator, multirate, the purity + `gdext`
+gates"*, and the first thing to say about it is that it is **not one slice**. Its two halves
+have different subjects and need different acceptance criteria:
+
+* **Five behavioural port files** — `test_extinction.py` (7 cases), `test_aux.py` (23),
+  `test_environment.py` (20), `test_integrator.py` (13), `test_multirate.py` (17): 80
+  collected cases whose subject is arithmetic. S3's shape transfers unchanged.
+* **Two structure gates** — `test_simcore_purity.py` (20) and `test_biosphere_purity.py`
+  (39): 59 cases whose subject is *what a manifest contains and where a name appears*. The
+  "mutation" that tests them is an edit to a `Cargo.toml` or a source line, not a flipped
+  sign. This is exactly the class S3 taught the batch to distrust — a file-reading gate that
+  globs the wrong path passes green forever — so it was taken **first**, before 60
+  behavioural tests were written against a slice whose shape it could still change. That
+  ordering paid: it is where the slice's two real findings came from.
+
+### Gating measurement 1 — the baseline
+
+`cargo test --workspace` on a clean tree: **653 passed, 0 failed, 3 ignored**, across 39 test
+binaries. (The three `#[ignore]`s are S2's expensive goldens; §5w's review ran all three.)
+
+### ⚠⚠ Gating measurement 2 — the four structure mutations, each measured, none inferred
+
+§5w's own review found that *"the gate read zero before S3"* had been **two measurements and
+three extrapolations**. So each mutation below was applied to a clean tree, run at workspace
+scope, and reverted — no zero inferred from a neighbour:
+
+| Mutation | What it breaks | Red before S4 |
+|---|---|---:|
+| **MS-A** | `simcore` gains a third-party dependency (`quote`) in `[dependencies]` | **0 of 653** |
+| **MS-B** | `simcore` gains a third-party **dev**-dependency | **0 of 653** |
+| **MS-C** | `simcore` gains a path dependency on `config` — the core reaching down into the boundary layer | **0 of 653** |
+| **MS-D** | `station` gains `godot = "0.5.4"` — the gdext edge escaping the bridge | **0 of 653** |
+
+Zero in every case, which is what FINDING 8 predicted in prose and nothing had measured:
+**before this slice no Rust test in the repo read a `Cargo.toml` at all.** The Python purity
+scans read Python *packages*, so retiring them at S6 loses no Rust coverage — there was none
+to lose — but it removes the last thing in the tree that *looks* like a purity gate.
+
+⚠ **The first MS-A run was an instrument failure, not a reading.** It produced no
+test-result lines at all — `LNK1104: cannot open file …\emit_crew.exe`, a Windows relink
+lock that recurs on this box between back-to-back builds. The script printed *"NO TEST RESULT
+LINES (build failed?)"* rather than a zero, because it counted `test result` lines before
+reporting anything; without that guard a broken build and a workspace where nothing noticed
+would have produced **the same output**. That is S3's instrument-error signature in a new
+costume, and the only reason it was caught is that the guard was written before the
+measurement rather than after it went wrong. ⚠ It was first blamed on a stray recursive
+`grep` walking `rust/target` — a plausible story that the *second* occurrence, with no grep
+running, falsified. The battery now retries a run whose log contains `LNK1104` and reports an
+instrument failure only after three attempts; a blanket retry would have hidden a mutation
+that genuinely broke the build.
+
+### ⚠⚠ FINDING: the `gdext` gate's subject was an open question, and the obvious answer was wrong
+
+`CLAUDE.md` states the invariant as *"`gdext` appears in `rust/crates/godot_bridge` and
+nowhere else"*, and FINDING 8 recorded one matching line in the tree. Measured before writing
+anything, the string appears in **five** places outside the bridge — `station/src/session.rs`,
+`station/src/palette.rs`, `station/src/bin/sim.rs`, `station/tests/session_parity.rs`, and
+`Cargo.lock` — and **every one is a doc comment or a lock entry**, most of them saying the
+crate is deliberately gdext-*free*.
+
+So a literal text scan would have reddened on a clean tree on day one, and the natural next
+move — widening it until it passed — is how a gate ends up asserting nothing. The gate is
+over the **dependency graph** instead, and the reason that is not merely convenient is
+structural: in Python an import is the only coupling, but in Rust a crate cannot name a type
+it has not declared a dependency on. `use godot::…` in an engine crate **cannot compile**
+without the manifest edge, so here the text half is redundant *by construction* rather than
+by judgement. One thing the edge check genuinely does not imply gets its own case: a gdext
+type could still reach an engine crate by re-export if anything depended on the bridge, so
+`nothing_depends_on_the_bridge` closes that.
+
+### ⚠⚠ FINDING: that same reasoning does **not** carry to the biosphere half, and assuming it did would have shipped a gate that asserts nothing
+
+`test_biosphere_purity.py`'s subject is *intra-package*: the biosphere spine stays stdlib-pure
+and the loader is the sole module allowed to import `config`. The manifest gate cannot see
+that violation at all — the biosphere lives **inside** `domains`, and `domains -> config` is
+a legitimate declared edge that the param loader needs. Every module under
+`domains/src/biosphere/` could `use config::…` freely with every manifest assertion green.
+
+The first draft of `workspace_purity.rs` named both Python files as its subjects. It was
+caught in advisor review before the commit, and the correction is a second file —
+`domains/tests/biosphere_spine_purity.rs` — that scans the spine's **source**. Where the
+manifest edge is the whole coupling (gdext) the text scan is redundant; where the edge
+already exists and is legitimate (config inside `domains`) the text scan is the *only* thing
+that can see a violation. Two gates that look alike, one generalisation that does not travel.
+
+Two details of that scan are measurements rather than defensive coding:
+
+* **The boundary is two modules in Rust, not one.** `biosphere/params.rs` is `loader.py`'s
+  counterpart, and `biosphere/weather.rs` became a second boundary when slice C9 moved the
+  raw-weather path into the reference. Each exclusion carries the Python original's paired
+  assertion — that the excluded file genuinely *does* reach `config` — so an exclusion cannot
+  quietly decay into a typo that hides a leak.
+* **A `contains("config")` scan would flag `flows.rs`**, the largest module in the spine, for
+  the phrase *"when drought acceleration is not **configur**ed"* — a substring hit in a doc
+  comment, in a file that touches the boundary nowhere. The detector strips line comments and
+  matches `config` as a whole token; both halves have a control, and the substring control
+  cites that line.
+
+### What landed
+
+Seven new files, **89 tests**:
+
+| File | tests | Subject |
+|---|---:|---|
+| `simcore/tests/workspace_purity.rs` | 18 | the zero-dep charter, the crate layering, gdext containment — and ten discrimination controls on the manifest reader |
+| `simcore/tests/aux_channel.rs` | 16 | the non-conserved auxiliary channel (`auxiliary.rs` had **0** tests) |
+| `simcore/tests/multirate_driver.rs` | 16 | the master-step driver (`multirate.rs` had **0** tests) |
+| `simcore/tests/environment_wiring.rs` | 12 | the forcing ⊕ shared-stock resolver residue |
+| `simcore/tests/integrator_schemes.rs` | 10 | the Euler/RK4 arithmetic residue |
+| `domains/tests/biosphere_spine_purity.rs` | 10 | the biosphere spine is free of the config boundary |
+| `simcore/tests/extinction.rs` | 7 | FINDING 6 — extinction had no by-name test anywhere |
+
+### ⚠ 139 Python cases became 89 Rust tests, and the difference is a census rather than a shortfall
+
+FINDING 10's failure mode is copying a function and dropping its case table, and only the
+ratio makes that visible — so both counts are recorded. The seven Python files hold **78 test
+functions** expanding to **139 collected cases**. Where the difference goes:
+
+* **59 of the 139 are the two purity files, and 52 of those are one case per source file** —
+  `parametrize(_CORE_FILES)` yields 17, `parametrize(_PURE_FILES)` yields 35. The Rust
+  analogue of a per-file parametrize is not 52 tests; it is one assertion looping over the
+  files, plus an anti-vacuity guard and the detector's own controls. That half is a change of
+  shape, not of coverage — and the Rust side gained three claims the Python side never made
+  (the layering, gdext containment, and the dev/build/target dependency tables).
+* **Six behavioural cases are already covered by `laws.rs`** and were deliberately not
+  re-ported: step order-independence for both schemes (2), multi-rate order-independence (1),
+  the aux sum's order-independence (1) and its associativity pin (1), and the
+  forcing-depends-only-on-`(n, dt)` law (1). `laws.rs` enumerates its permutations
+  exhaustively where the Python originals sample with hypothesis, so a re-port would have been
+  a second, weaker copy.
+* **Eight cases are unrepresentable in Rust**, plus the immutability half of a ninth, and all
+  are named in the file headers rather than dropped silently: three Protocol-conformance
+  assertions on `Environment`, "both integrators satisfy the `Integrator` protocol", "both
+  satisfy `Substepper`", `AuxProcess` being `runtime_checkable`, the aux mapping being
+  read-only, and `State` detaching from the caller's dict. In Rust a type either implements a
+  trait or does not compile, and a `State`'s map is owned and moved in — there is no failing
+  state for a test to guard.
+
+The remainder is roughly one-for-one, with the parametrized axes expanded by hand (both
+integrators, three `n_sub` values, three non-finite shapes) rather than collapsed.
+
+### ⚠ A finding about the *core*, found by writing the tests rather than by reading it
+
+`StepIntegrator` — the trait that lets one function take either scheme — is defined in
+**`domains`**, one crate *above* `simcore`. So `simcore` has no polymorphic step interface of
+its own, and every `simcore` test wanting the Python `@parametrize("integrator_cls", [Euler,
+Rk4])` axis has to dispatch by hand over a local enum. Four of the new files do exactly that,
+and each says why. Recorded, not fixed: moving a trait between crates is a layering decision,
+and S4 is not the slice for it.
+
+### The acceptance battery: thirteen mutations, pre-committed
+
+S4 is not done when 89 tests exist. It is done when each of these reddens a test **in one of
+the seven new files** — not merely "reddens something", since the goldens and the
+cross-boundary vectors light up for most of the behavioural ones.
+
+Each mutation was applied to the finished tree, run at workspace scope with
+`--no-fail-fast`, and reverted. The **before** column is exact rather than re-measured: the
+seven new files are purely additive, so a mutation's pre-S4 reading is its total minus the
+reds that live in them.
+
+| Mutation | before | after | of those, in the new files |
+|---|---:|---:|---|
+| **MS-A** `simcore` gains a third-party dependency | 0 | 3 | **3** — the layering, third-party and zero-dep clauses |
+| **MS-B** `simcore` gains a third-party **dev**-dependency | 0 | 3 | **3** — the table a narrower gate would have missed |
+| **MS-C** `simcore` gains a path dependency on `config` | 0 | 2 | **2** — the third-party clause correctly stays green; this is a *layering* violation |
+| **MS-D** `station` gains `godot` | 0 | 3 | **3**, including `only_the_bridge_depends_on_gdext` |
+| **MB-9** a biosphere spine module reaches `config` | 0 | 1 | **1** — and it is the only test in the workspace that can see it |
+| **MB-1** the extinction branch is disabled | 1 | 6 | **5** — four in `extinction.rs`, one in `multirate_driver.rs` |
+| **MB-2** extinction snaps POOL stocks too | 110 | 111 | **1** — `a_pool_below_threshold_is_never_zeroed` |
+| **MB-3** aux advances four times per step | 9 | 16 | **7** |
+| **MB-4** `substep` advances aux as well as `step` | 0 | 1 | **1** — the only test in the workspace that can see it |
+| **MB-5** the Strang slow halves step at `dt/n_sub` | 0 | **0**, then 1 | see the finding below |
+| **MB-6** the master step commits `n + n_sub` | 2 | 5 | **3** |
+| **MB-7** the forcing non-finite guard is removed | 0 | 1 | **1** — the only test in the workspace that can see it |
+| **MB-8** the RK4 combine drops the key union | 1 | 2 | **1** |
+
+⚠ **MB-1's before-reading of 1 independently reproduces FINDING 6's original control** — same
+mutation, same single red (`engine_vectors.rs::engine_synthetic_trajectory_is_bit_exact`),
+measured eight days later on a tree with 296 more tests. A useful check on the apparatus
+itself.
+
+⚠ **MB-6 has one case that is inert by construction and it is not counted as coverage.** At
+`n_sub == 1`, `n + n_sub` *is* `n + 1`, so `n_advances_once_per_master_step_with_one_substep`
+cannot discriminate it. Two of the three cases on that axis do the work; the third is there
+because `n_sub = 1` is the degenerate partition the driver must also get right.
+
+### ⚠⚠ FINDING: MB-5 reddened nothing — a wrong slow half-step size was invisible to the whole workspace
+
+The mutation changes the Strang slow halves from `dt/2` to `dt/n_sub`. It reddened **0 of
+741**, and the reason is that every candidate gate was blind for a different reason:
+
+* The three **order-of-accuracy** cases all run at `n_sub == 2`, where `dt/n_sub` **is**
+  `dt/2` — the mutation is literally a no-op for them. One hand-picked parameter value, and it
+  happened to be the one that cancels: the same coin-flip S3 found in its own
+  registration-order probe, in a new costume.
+* **Conservation, determinism and the `n` contract** run at other `n_sub` but assert
+  quantities a wrong step size does not move. Each half is balanced whatever its size, so
+  carbon still closes exactly.
+* The **eval-count** case runs at `n_sub == 4` and counts *evaluations*: `ops` holds exactly
+  two slow entries whatever `n_sub` is, so the count stays 8. Its first docstring claimed the
+  opposite — that it would read 16 — and advisor review caught that before the commit.
+* `all_slow_strang_does_not_reproduce_a_single_rate_step` runs at `n_sub == 1`, where the
+  mutation *does* change the numbers — but its assertion is that the gap exceeds `1e-6`, and
+  the mutation makes the gap **larger**. Blind by the direction of its inequality.
+* ⚠ And outside this file, `authoring`'s `a_non_empty_slow_set_is_driven_at_dt_over_2` has the
+  behaviour **in its name** and asserts only that the slow flow's stock moved at all. It runs
+  at `n_sub = 60`, where the wrong size is `60 s` against `1800 s` — a thirty-fold error its
+  own assertion cannot see.
+
+This is the third recorded instance of the same blind spot in this repo — reasoning about
+`n_sub` as though it governed the slow rate class — after a performance prediction and a
+safety predicate that false-PASSED. The first two were wrong *claims*; this one is a wrong
+*absence of a gate*, which is why nothing caught it for a year.
+
+The closing case is exact rather than asymptotic, because an order fit at one `n_sub` is what
+failed here: with a **constant-rate** flow, an empty fast set and `n_sub ∈ {1, 2, 3, 5}`, the
+slow operator must move exactly `rate·dt` — `dt/2 + dt/2` — and under the mutation it moves
+`2·dt/n_sub` of it. No tolerance hides that and no `n_sub` cancels it.
+
+**Re-run with that case in place: MB-5 reddens 1 of 742, and it is the new case.** Nothing
+else in the workspace sees it, which is the same statement as "the pre-S4 reading was zero" —
+and this one was found by the battery rather than predicted by the design, which is the whole
+argument for pre-committing a mutation you expect to be caught.
+
+### ⚠⚠ The battery's own instrument was wrong first, and it read as a result
+
+The first battery pass reported **"MB-1: 1 red — `engine_vectors.rs`"**: extinction disabled,
+and none of the seven new `extinction.rs` cases noticed. That is impossible, which is the only
+reason it was caught. The cause was `cargo test` without `--no-fail-fast`: cargo stops after
+the first failing test *binary*, and `engine_vectors` sorts before `extinction`, so every
+simcore binary after it never ran. The log said `passed=552` against a baseline of 653 and
+nothing in the report drew attention to the gap.
+
+**The reading was not merely incomplete — it was the exact opposite of the truth**, and it
+would have been recorded as "the new tests are inert, the old vector is still the only gate".
+An instrument that stops early reports a *smaller* census, and a smaller census reads as
+*less coverage* — the direction that looks like an honest negative finding. That is the
+fourth instrument error in two slices and the first one whose failure mode was flattering to
+nobody: S3's three all returned *nothing*, which at least looks broken. This one returned a
+plausible number.
+
+### S4's exit gate, stated forward to S6
+
+S3's exit criterion was written in S6's terms so S6 would not have to infer it. S4's:
+
+> **S6 may delete `tests/test_simcore_purity.py` and `tests/test_biosphere_purity.py` only
+> once MS-A, MS-B, MS-C, MS-D and MB-9 each redden a named test in
+> `simcore/tests/workspace_purity.rs` or `domains/tests/biosphere_spine_purity.rs`.**
+
+Before S4 that gate read **0 of 653 for all five**, measured one mutation at a time. After
+S4 it reads as the battery table above records. Pair this with the table correction below:
+the two files are filed `R` — *retire free* — and they are `R!`-shaped.
+
+### Two corrections to §5o's own tables
+
+1. **The two purity files are `R!`, not `R`.** The `R` bucket means *"subject is the Python
+   tree, or unfalsifiable in Rust"*; both halves are true of the *scan* and neither is true of
+   the *conclusion*. FINDING 8's own text says the successor *"has to be written rather than
+   assumed"*, which is the definition of `R!` (retire only once its successor stands). As of
+   this slice the successor stands, so the practical effect is nil — but the row was wrong on
+   the day it was written, and S6 reads those rows as a work order.
+2. **Both rows cite FINDING 7 where the subject is FINDING 8.** FINDING 7 is the sibling
+   domains' cross-port gate; FINDING 8 is the purity/`gdext` pair.
+
+### What S4 leaves standing
+
+* **No Python deletion.** Same rule S3 held: the seven files stay green and running until S6.
+* **The rest of the `C?` engine residue is not covered and was not in this row**:
+  `test_state.py`, `test_flow.py`, `test_composition.py`, `test_boundary.py`,
+  `test_registry.py`, `test_observation.py`, `test_conservation.py`, `test_arbitration.py`,
+  `test_edge_cases.py`, and `test_config.py`'s pint half. S4's row named five files and took
+  five.
+* **FINDING 9's seven oracle-named Rust tests** are untouched; they belong to whichever batch
+  retires their subject.
+* **The sibling domains' own source purity is unclaimed.** `biosphere_spine_purity.rs` scans
+  the biosphere spine because that is what the Python original's subject was; `power.rs`,
+  `thermal.rs`, `eclss.rs`, `crew.rs` and `domains/src/params.rs` are not scanned, and
+  inventing a wider claim would have been a new gate wearing a port's name.

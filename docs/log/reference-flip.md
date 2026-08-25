@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away; S2's first half then gave the reference its own golden comparison on 2026-08-19 — 19 runs moved out of the `examples/` binaries that made them unreachable, a platform policy that classifies rather than skips because `cargo test` runs on Linux, and a fifth entry for FINDING 2: the cross-port tolerance contract `tiers.json` is read by no program in `rust/`; its second half then moved the three manifest writers into their crates so every freeze contract byte-gates itself in Rust — which on its first run caught the move's own `crate::` rewrite silently re-wording three of the four contracts' frozen prose; S3 then gave the four sibling domains their first 160 tests the same day — 1,411 canonical lines that had none — and the five-mutation exit gate reads five with the golden byte compare deselected, where it read zero before, two of the five seen ONLY by flow-level or loader tests; and the registration-order control found MY OWN probe inert, not the subject: a single reverse of Power's build order IS canonical order, so it passed against a registry that never sorted, and all four tests now enumerate n! in full)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away; S2's first half then gave the reference its own golden comparison on 2026-08-19 — 19 runs moved out of the `examples/` binaries that made them unreachable, a platform policy that classifies rather than skips because `cargo test` runs on Linux, and a fifth entry for FINDING 2: the cross-port tolerance contract `tiers.json` is read by no program in `rust/`; its second half then moved the three manifest writers into their crates so every freeze contract byte-gates itself in Rust — which on its first run caught the move's own `crate::` rewrite silently re-wording three of the four contracts' frozen prose; S3 then gave the four sibling domains their first 160 tests the same day — 1,411 canonical lines that had none — and the five-mutation exit gate reads five with the golden byte compare deselected, where it read zero before, two of the five seen ONLY by flow-level or loader tests; and the registration-order control found MY OWN probe inert, not the subject: a single reverse of Power's build order IS canonical order, so it passed against a registry that never sorted, and all four tests now enumerate n! in full; S4 then took the engine residue on 2026-08-25 — 89 tests over seven files for extinction, aux, environment, the integrator, the multi-rate driver and the purity/gdext gates, where `auxiliary.rs` and `multirate.rs` had none and no Rust test read a `Cargo.toml` at all — and its two findings both came from taking the STRUCTURE half first: the gdext rule cannot be gated as text (the string appears five times outside the bridge and every one is a comment saying the crate is gdext-free), and the reasoning that fixes it does NOT carry to the biosphere half, where `domains → config` is a legitimate declared edge so only a source scan can see a leak; then 13 pre-committed mutations found the thing the design had not: a wrong Strang slow half-step size was invisible to all 741 tests, because every candidate gate runs at `n_sub == 2` where the error is a literal no-op)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -2514,3 +2514,126 @@ looking like it had selected nothing. **An instrument returning nothing is indis
 from a subject in which nothing happened.** Only looking twice separates them, and in a slice
 whose whole subject is gates that measure what they claim, the instruments deserved the same
 suspicion as the gates.
+
+### Stage 3, slice S4 — the engine residue, COMPLETE 2026-08-25
+
+**S4 is two slices wearing one row.** Its five behavioural files (extinction, aux,
+environment, integrator, multirate — 80 collected cases) have arithmetic for a subject and
+take S3's shape unchanged. Its two **structure** gates (`test_simcore_purity.py`,
+`test_biosphere_purity.py` — 59 cases) have *what a manifest contains and where a name
+appears* for a subject, so the mutation that tests them is a file edit, not a flipped sign.
+The structure half was taken **first**, on the reasoning that it was the only part that could
+still change the slice's shape — and that is where both of the slice's real findings came
+from.
+
+**Seven new files, 89 tests**: `simcore/tests/{workspace_purity,aux_channel,multirate_driver,
+environment_wiring,integrator_schemes,extinction}.rs` and
+`domains/tests/biosphere_spine_purity.rs`. `auxiliary.rs` and `multirate.rs` had **zero**
+tests before this slice; extinction had no test naming it anywhere.
+
+**Thirteen pre-committed mutations, and twelve of thirteen redden a named test in the new files on the first pass; the thirteenth produced the slice's largest finding (below).**
+
+**The pre-reading was zero, measured five times rather than inferred once.** §5w's review had
+caught the previous slice presenting three extrapolations as a reading, so each structure
+mutation was applied to a clean tree, run at workspace scope and reverted on its own:
+`simcore` gaining a third-party dep (**0 of 653**), gaining a third-party *dev*-dep (**0**),
+gaining a path dep on `config` (**0**), `station` gaining `godot` (**0**), and a biosphere
+spine module reaching `config` (**0**). Nothing in the repo read a `Cargo.toml` at all.
+
+#### ⚠⚠ The gdext gate's subject was an open question, and the obvious answer was wrong
+
+`CLAUDE.md` says *"`gdext` appears in `godot_bridge` and nowhere else"* and FINDING 8 recorded
+one matching line. Measured: the string appears in **five** places outside the bridge, and
+every one is a doc comment or a lock entry — most of them saying the crate is deliberately
+gdext-*free*. A literal text scan would have reddened on a clean tree, and the natural next
+move, widening it until it passed, is how a gate ends up asserting nothing. **The gate is over
+the dependency graph**, and that is structural rather than convenient: in Rust a crate cannot
+name a type it has not declared a dependency on, so `use godot::…` in an engine crate cannot
+compile without the edge the gate forbids. The text half is redundant *by construction*. The
+one thing the edge does not imply — a re-export path — is a separate case.
+
+#### ⚠⚠ …and that reasoning does NOT carry to the biosphere half
+
+The first draft of `workspace_purity.rs` named **both** Python purity files as its subjects.
+It cannot succeed the second one. `test_biosphere_purity.py`'s subject is intra-package: the
+spine stays stdlib-pure and one loader is the sole importer of `config`. But the biosphere
+lives *inside* `domains`, and `domains -> config` is a legitimate declared edge — so every
+spine module could `use config::…` with every manifest assertion green. **Where the manifest
+edge is the whole coupling the text scan is redundant; where the edge already exists and is
+legitimate, the text scan is the only thing that can see the violation.** Two gates that look
+alike, one generalisation that does not travel. Caught in review before the commit; the
+correction is a second file that scans the spine's source.
+
+Two details of that scan are measurements, not defensive coding. **The Rust boundary is two
+modules, not one** — `biosphere/params.rs` is `loader.py`'s counterpart and
+`biosphere/weather.rs` became a second boundary when C9 moved the raw-weather path in — and
+each exclusion carries the Python original's paired assertion that the excluded file really
+does reach `config`. And **a `contains("config")` scan would flag `flows.rs`**, the largest
+module in the spine, for the phrase *"not **configur**ed"* in a doc comment; the detector
+strips comments and matches whole tokens, and the substring control cites that line.
+
+
+#### ⚠⚠ The finding the battery produced rather than confirmed: a wrong slow half-step size was invisible to the entire workspace
+
+One pre-committed mutation — the Strang slow halves stepping at `dt/n_sub` instead of `dt/2` —
+reddened **0 of 741**. Every candidate gate was blind, each for its own reason. The three
+order-of-accuracy cases all run at `n_sub == 2`, where `dt/n_sub` **is** `dt/2` and the
+mutation is a literal no-op — *one hand-picked parameter value, and it was the one that
+cancels*, the same coin flip S3 found in its own registration-order probe. Conservation,
+determinism and the `n` contract run at other `n_sub` but assert quantities a wrong step size
+does not move: each half is balanced whatever its size. The eval-count case counts
+*evaluations*, and `ops` holds exactly two slow entries whatever `n_sub` is. The
+all-slow-versus-single-rate case runs at `n_sub == 1` where the mutation does change the
+numbers — but its assertion is that a gap exceeds `1e-6`, and the mutation makes the gap
+*larger*: blind by the direction of its own inequality. ⚠ And outside this slice, `authoring`'s
+`a_non_empty_slow_set_is_driven_at_dt_over_2` has the behaviour **in its name**, runs at
+`n_sub = 60` where the wrong size is 60 s against 1800 s, and asserts only that the slow
+flow's stock moved at all.
+
+**Third recorded instance of the same blind spot** — reasoning about `n_sub` as though it
+governed the slow rate class — after a performance prediction and a safety predicate that
+false-PASSED. The first two were wrong *claims*; this one was a missing *gate*, which is why
+nothing caught it. The closing case is exact rather than asymptotic, because an order fit at a
+single `n_sub` is precisely what failed: a constant-rate flow, an empty fast set, and
+`n_sub ∈ {1,2,3,5}` — the slow operator must move exactly `rate·dt`. Re-run: **1 red, and it
+is that case.**
+
+#### ⚠⚠ The battery's own instrument was wrong first — and it read as a plausible result
+
+The first battery pass reported *"MB-1: 1 red — `engine_vectors.rs`"*: extinction disabled and
+none of the seven new `extinction.rs` cases noticing. Impossible, which is the only reason it
+was caught. The cause was `cargo test` without `--no-fail-fast`, which stops after the first
+failing test **binary** — and `engine_vectors` sorts before `extinction`, so every simcore
+binary after it never ran. The log said `passed=552` against a baseline of 653 and nothing
+drew attention to the gap.
+
+**The reading was not incomplete, it was inverted.** An instrument that stops early reports a
+*smaller* census, and a smaller census reads as *less coverage* — the direction that looks
+like an honest negative finding, and would have been recorded as "the new tests are inert, the
+old vector is still the only gate". Fourth instrument error in two slices, and the first whose
+failure mode flattered nobody: S3's three all returned *nothing*, which at least looks broken.
+This one returned a number.
+
+⚠ A fifth, smaller one, worth its line because the first diagnosis was confident and wrong: a
+`LNK1104` relink lock voided a run, was blamed on a stray recursive `grep` walking
+`rust/target`, and then **recurred with no grep running**. It is a Windows file lock between
+back-to-back builds. The battery now retries only a run whose log names `LNK1104`; a blanket
+retry would hide a mutation that genuinely broke the build.
+
+#### The exit gate, stated forward to S6
+
+**S6 may delete `test_simcore_purity.py` and `test_biosphere_purity.py` only once the five
+structure mutations each redden a named test in `workspace_purity.rs` or
+`biosphere_spine_purity.rs`.** Before S4 that read 0 of 653 for all five. ⚠ And a table
+correction those two rows need: they are filed **`R` (retire free)** and are **`R!`-shaped** —
+FINDING 8's own text says the successor *"has to be written rather than assumed"*, which is
+the `R!` definition. Both rows also cite **FINDING 7 where the subject is FINDING 8**.
+
+**Standing after S4:** no Python deleted — the seven files stay green until S6. The rest of the
+`C?` engine residue (`test_state.py`, `test_flow.py`, `test_composition.py`,
+`test_boundary.py`, `test_registry.py`, `test_observation.py`, `test_conservation.py`,
+`test_arbitration.py`, `test_edge_cases.py`) was not in S4's row and is not covered. And one
+finding about the core, found by writing the tests rather than reading it: **`StepIntegrator`
+lives in `domains`**, one crate above `simcore`, so the core has no polymorphic step interface
+of its own and four of the new files dispatch over a local enum instead. Recorded, not fixed —
+moving a trait between crates is a layering decision.
