@@ -3619,6 +3619,11 @@ is not the whole picture: **the programs that check the contracts are still Pyth
   the four above, porting it means porting the comparator and the tier machinery with it —
   a different subject from "does this run still produce these bytes" — so it is recorded as
   standing work rather than folded into S2. **S6 must not reach it as a free deletion.**
+  ⚠ **SHARPENED 2026-08-25 (§5y, CORRECTION 2): this entry under-states it.** The problem is
+  not only that the numbers are stranded — it is that the reference has **no numeric tolerance
+  at all** off Windows (`compare_structural` checks a leaf parses finite, never its value),
+  while Python's band gates run on the one CI job that is a genuine cross-libm measurement.
+  **ANSWERED: port the tolerance checks to Rust**, re-measuring rather than translating.
 
 Retiring the checker therefore disarms the traps the last four slices installed. Each
 needs its successor built **before** its Python original goes, not after.
@@ -3755,6 +3760,13 @@ directory would delete the only cross-boundary proof in the repo. Their new driv
 design question (a Rust integration test that shells out to Godot, or a script), which is
 why they are filed **D** rather than **P**.
 
+> ⚠ **CORRECTED 2026-08-25 (§5y): "local-only today" is FALSE and was already false when
+> this entry was written.** The `godot-parity` CI job installs headless Godot and runs
+> **15 of the 17**; only the two `-m slow` cases in `test_godot_two_rate_parity.py` are
+> mandatory-local. This entry read the `skipif` in the test file rather than the workflow
+> that defeats it. **ANSWERED 2026-08-25: ported to Rust** (`godot_bridge/tests/`), the
+> design question settled toward the integration test rather than a script.
+
 ### ⚠ FINDING 12 — the value-switch seam never moved, and C1 said it would
 
 C1's row reads *"⚠ **Take the user's harness with it** — `config/overrides.py` is the same
@@ -3777,7 +3789,7 @@ slices, not one**, and the first two are not test work:
 | **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison. ⚠ **BUILT — see §5w (COMPLETE 2026-08-19).** ⚠ **Designed in §5v, and this row is superseded on two counts**: the real figure is **160 collected cases over nine files**, not 158 over eleven — `test_bvad_validation.py` and `test_crew_coupled_loop.py` are deferred to `station` as science items. And **Control B's verdict here is dated**: §5v re-ran it and got 12 red, not 2 |
 | **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable. ⚠ **BUILT — see §5x (COMPLETE 2026-08-25).** It is **two** slices wearing one row: five behavioural files whose subject is arithmetic, and two structure gates whose subject is what a manifest contains — different acceptance criteria, and the structure half taken first because it was the only part that could still change the slice's shape |
 | **S5** | **The biosphere mechanisms** — ~600 tests over `flows.rs` | FINDING 5. The largest and the one to take last, in crop/process batches, because it is where a silent narrowing does the most damage |
-| **S6** | **The retirements** — the two `R!` rows (only once S3's successors stand), the generators (each against its named successor), the Python tree itself | Only after S1–S5 have successors standing. ⚠ The cross-port comparison is **not** a free deletion: FINDING 7 makes it the sibling domains' only gate until S3 lands. The **D** rows (Godot drivers, `test_context_budget.py`, `test_headless_cli.py`) need answers before this slice, not during it |
+| **S6** | **The retirements** — the two `R!` rows (only once S3's successors stand), the generators (each against its named successor), the Python tree itself | Only after S1–S5 have successors standing. ⚠ The cross-port comparison is **not** a free deletion: FINDING 7 makes it the sibling domains' only gate until S3 lands. The **D** rows (Godot drivers, `test_context_budget.py`, `test_headless_cli.py`) need answers before this slice, not during it. ⚠ **ANSWERED 2026-08-25 (§5y) — and the answers put four BUILD items in front of S6, not four filings:** all four went maximal-Rust, so `test_context_budget.py`, `test_headless_cli.py`, the nine Godot drivers and the `tiers.json` band gates each need a Rust successor written, and the last carries an unfreeze ceremony on `docs/native-port-reference.md`. S6 is a deletion slice again only once those stand |
 
 ⚠ **`test_context_budget.py` is the one row with no home on either side.** It guards this
 repo's own documentation discipline — `CLAUDE.md`'s byte ceiling, the log index ↔ record
@@ -3973,19 +3985,23 @@ its test count; **(0 tests)** means the implementation is there and nothing chec
 
 #### **D — decide** (no natural home; the user's call) — 11 files, 31 tests
 
+⚠ **ALL ELEVEN ANSWERED 2026-08-25 — see §5y.** Every one went the maximal-Rust way; no
+"keep it as a script CI calls" island survives. These are now **build items before S6**, not
+deletions, and none of them is free.
+
 | File | tests | Reference owner | Note |
 |---|---:|---|---|
-| `test_context_budget.py` | 10 | none | guards the repo's own docs; no Rust subject exists |
-| `crossport/test_headless_cli.py` | 4 | none | drives the Rust CLI from Python |
-| `crossport/test_godot_from_file.py` | 4 | godot_bridge (35 tests) | FINDING 11 |
-| `crossport/test_godot_compose.py` | 2 | godot_bridge (35 tests) | FINDING 11 — Rust-headless vs Rust-in-Godot, not port-vs-port; local-only |
-| `crossport/test_godot_flow_inspection.py` | 2 | godot_bridge (35 tests) | FINDING 11 |
-| `crossport/test_godot_save_load.py` | 2 | godot_bridge (35 tests) | FINDING 11 |
-| `crossport/test_godot_time_controls.py` | 2 | godot_bridge (35 tests) | FINDING 11 |
-| `crossport/test_godot_two_rate_parity.py` | 2 | godot_bridge (35 tests) | FINDING 11 |
-| `crossport/test_godot_objectives.py` | 1 | godot_bridge (35 tests) | FINDING 11 |
-| `crossport/test_godot_parity.py` | 1 | godot_bridge (35 tests) | FINDING 11 |
-| `crossport/test_godot_perturbations.py` | 1 | godot_bridge (35 tests) | FINDING 11 |
+| `test_context_budget.py` | 10 | none | guards the repo's own docs; no Rust subject exists. **ANSWERED → rewrite in Rust** (§5y); its crate home is still open |
+| `crossport/test_headless_cli.py` | 4 | none | drives the Rust CLI from Python. **ANSWERED → faithful Rust port** (§5y), nested cargo accepted to keep byte-exactness off Windows |
+| `crossport/test_godot_from_file.py` | 4 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
+| `crossport/test_godot_compose.py` | 2 | godot_bridge (35 tests) | FINDING 11 — Rust-headless vs Rust-in-Godot, not port-vs-port; local-only — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
+| `crossport/test_godot_flow_inspection.py` | 2 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
+| `crossport/test_godot_save_load.py` | 2 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
+| `crossport/test_godot_time_controls.py` | 2 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
+| `crossport/test_godot_two_rate_parity.py` | 2 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
+| `crossport/test_godot_objectives.py` | 1 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
+| `crossport/test_godot_parity.py` | 1 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
+| `crossport/test_godot_perturbations.py` | 1 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
 
 ### Deliberately NOT in this pass
 
@@ -5307,3 +5323,89 @@ the two files are filed `R` — *retire free* — and they are `R!`-shaped.
   the biosphere spine because that is what the Python original's subject was; `power.rs`,
   `thermal.rs`, `eclss.rs`, `crew.rs` and `domains/src/params.rs` are not scanned, and
   inventing a wider claim would have been a new gate wearing a port's name.
+
+## §5y Stage 3 — the four **D** decisions, ANSWERED 2026-08-25 (a decision pass; no code touched)
+
+§5q filed 11 files / 31 tests as **D — decide**: *"no natural Rust home; the user's call"*,
+and S6's row says they *"need answers before this slice, not during it"*. They were put to
+the user as four questions on 2026-08-25, after a fact-check pass that found **two of the
+things the questions would have rested on were stale in this very document**. Both
+corrections are below, because the second one changes what one of the answers costs.
+
+### The answers — all four the same direction
+
+The user chose the **maximal-Rust** option on every one. Stated as a posture rather than
+four unrelated calls: **after S6 the repo contains no executing Python outside the PCSE
+oracle carve-out.** No "keep it as a script CI calls" island survives — an option that was
+offered on three of the four, recommended on two, and declined every time.
+
+| # | Subject | Answer | What it costs |
+|---|---|---|---|
+| 1 | `test_context_budget.py` (10) | **Rewrite in Rust** | needs a home; see the crate question below |
+| 2 | `crossport/test_headless_cli.py` (4) | **Faithful Rust port** | a cargo process launching cargo; keeps byte-exactness on every platform |
+| 3 | the nine `crossport/test_godot_*.py` (17) | **Port to Rust tests** in `godot_bridge/tests/` | the CI job swaps `pytest` for `cargo test`; Godot install step unchanged |
+| 4 | `crossport/tiers.json` + the band gates | **Port the tolerance checks to Rust** | ⚠ an **unfreeze event** on `docs/native-port-reference.md`; the numbers must be RE-MEASURED, not translated |
+
+⚠ **This is four build items standing between S5 and the deletions, not four filing
+decisions.** S6's row reads *"the retirements"*; it now has a prerequisite batch in front
+of it, and #4 alone carries a freeze ceremony. Whether they land as one slice or four is
+not settled here — what is settled is the direction, and that none of them is a deletion.
+
+### ⚠ CORRECTION 1 — FINDING 11's "local-only" is STALE, and the D table repeated it
+
+FINDING 11 says the nine Godot files *"are `skipif`-ed on CI, so they are local-only
+today"*, and the D-table row for `test_godot_compose.py` repeats it as `local-only`. **False
+since Phase 8 Step 8.** `.github/workflows/ci.yml` carries a dedicated `godot-parity` job
+that installs headless Godot 4.7 plus the Rust toolchain and runs
+`pytest tests/crossport/ -k godot -m "not slow"` — **15 of the 17 run on CI**; only the two
+in `test_godot_two_rate_parity.py` are `-m slow` and therefore mandatory-local.
+
+The job's own comment says it *"promotes the Step-1 cross-boundary smoke from a silently-skipped
+local test to a real gate"* — so the promotion was recorded where it happened and the
+classification pass read the `skipif` in the test file instead of the workflow that defeats
+it. **A `skipif` is a claim about an environment, not about CI**; the only way to know
+whether it fires is to read the runner's install steps. This changes the decision's stakes
+rather than its answer: deleting these deletes a **running** gate, not a dormant one.
+
+### ⚠ CORRECTION 2 — the tolerance question had a measurable answer, and it is not "a data file"
+
+The `tiers.json` row was written as an orphaned-data problem (§5q FINDING 2's fifth entry:
+*"its numbers stranded in the dying tree"*). Measured before asking, the gap is larger:
+
+* **The reference has no numeric tolerance at all.** `domains::goldens::compare` returns
+  byte-exact when `Numerics::PureArithmetic` **or** `cfg!(windows)`; otherwise it falls to
+  `compare_structural`, which asserts a hex-float leaf *parses finite on both sides* and
+  compares nothing about its value. `goldens.rs:44` says so in its own words — *"a band was
+  deliberately NOT invented"* — and that was the right call for S2, which had no measurement.
+* **Python's band gates are live and are the only ones with teeth off Windows.**
+  `test_rust_siblings_match_their_tier` and `test_rust_biosphere_states_match_tier2` compare
+  parsed f64 against the committed band; `test_tier2_bands_sit_above_measured_sensitivity`
+  re-derives the ±1-ULP sensitivity from the tree and asserts `band > sensitivity` **and**
+  `band <= 1e-9`, so the band cannot be widened until it passes. Four more tests
+  (`covers_exactly_the_frozen_goldens`, `entries_are_internally_consistent`,
+  `tier1_set_is_the_four_transcendental_free_scenarios`, `power_is_tier2_not_tier1`) gate the
+  contract's own shape.
+* **So the CI matrix is the whole point.** Goldens are UCRT-generated on Windows; the
+  `crossport` job runs glibc Rust against them. That job is the repo's only genuine
+  cross-libm measurement, and on it the Rust-side comparison is structural while the
+  Python-side one is banded. Retiring Python without the port turns the one place the bands
+  were ever exercised into a presence-and-finiteness check.
+* ⚠ **It cannot be translated line by line.** `measure_tier2_bands.py` shims **CPython's own
+  `math`** to perturb a transcendental by one ULP; the sensitivity it reports is a property
+  of the scenario's dynamics, not of the language (this doc already argued that when the flip
+  declined to re-derive the bands). A Rust port re-measures and must land the same numbers —
+  which is the ceremony, and is also the only thing that proves the port is faithful.
+
+### The open sub-question decision 1 leaves — deliberately not answered here
+
+`test_context_budget.py` has **no crate that owns its subject**: it reads `CLAUDE.md`,
+`docs/post-roadmap-log.md`, `docs/log/*` and the memory index. Hosting it means either a new
+workspace member — which `rust/Cargo.toml`'s own comment refuses in principle (*"no empty
+speculative crates"*, written against exactly this move) — or hanging it off an existing
+crate, which makes an engine crate reach **up and out** of `rust/` and re-opens FINDING 1,
+the reach-out S1 spent a whole slice closing. Neither is free and the choice is a design
+call for the slice that builds it, not a consequence of the answer recorded above.
+
+⚠ Recording the collision now so the building slice cannot mistake it for a detail: the
+workspace comment is a rule this plan has cited before, and quietly adding the crate the
+rule forbids — without saying that is what is happening — is how a standing rule dies.
