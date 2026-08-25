@@ -3994,7 +3994,7 @@ deletions, and none of them is free.
 | `test_context_budget.py` | 10 | none | guards the repo's own docs; no Rust subject exists. **ANSWERED → rewrite in Rust** (§5y); its crate home is still open |
 | `crossport/test_headless_cli.py` | 4 | none | drives the Rust CLI from Python. **ANSWERED → faithful Rust port** (§5y), nested cargo accepted to keep byte-exactness off Windows |
 | `crossport/test_godot_from_file.py` | 4 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
-| `crossport/test_godot_compose.py` | 2 | godot_bridge (35 tests) | FINDING 11 — Rust-headless vs Rust-in-Godot, not port-vs-port; local-only — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
+| `crossport/test_godot_compose.py` | 2 | godot_bridge (35 tests) | FINDING 11 — Rust-headless vs Rust-in-Godot, not port-vs-port; ~~local-only~~ (**false — 15 of 17 run on CI, §5y**) — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
 | `crossport/test_godot_flow_inspection.py` | 2 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
 | `crossport/test_godot_save_load.py` | 2 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
 | `crossport/test_godot_time_controls.py` | 2 | godot_bridge (35 tests) | FINDING 11 — **ANSWERED → ported to `godot_bridge/tests/`** (§5y) |
@@ -5360,6 +5360,13 @@ that installs headless Godot 4.7 plus the Rust toolchain and runs
 `pytest tests/crossport/ -k godot -m "not slow"` — **15 of the 17 run on CI**; only the two
 in `test_godot_two_rate_parity.py` are `-m slow` and therefore mandatory-local.
 
+⚠ **And the job block was checked against the workflow's triggers, not read alone.** `on:` is
+`push: branches: [main]` plus `pull_request`, and **no job in the file carries an `if:`** — so
+`godot-parity` runs on every push to `main` and every PR, unconditionally. Stated because the
+correction above generalises one level further than it first did: a `skipif` is a claim about an
+*environment*, and a job block is a claim about a *workflow* — only the triggers say what actually
+executes. Verifying the second was the same move as verifying the first, and it was nearly skipped.
+
 The job's own comment says it *"promotes the Step-1 cross-boundary smoke from a silently-skipped
 local test to a real gate"* — so the promotion was recorded where it happened and the
 classification pass read the `skipif` in the test file instead of the workflow that defeats
@@ -5390,11 +5397,19 @@ The `tiers.json` row was written as an orphaned-data problem (§5q FINDING 2's f
   cross-libm measurement, and on it the Rust-side comparison is structural while the
   Python-side one is banded. Retiring Python without the port turns the one place the bands
   were ever exercised into a presence-and-finiteness check.
-* ⚠ **It cannot be translated line by line.** `measure_tier2_bands.py` shims **CPython's own
-  `math`** to perturb a transcendental by one ULP; the sensitivity it reports is a property
-  of the scenario's dynamics, not of the language (this doc already argued that when the flip
-  declined to re-derive the bands). A Rust port re-measures and must land the same numbers —
-  which is the ceremony, and is also the only thing that proves the port is faithful.
+* ⚠ **It cannot be translated line by line — and READ, the reason is worse than the claim.**
+  This bullet first sourced *"shims CPython's own `math`"* from `tiers.json`'s own `_comment`,
+  i.e. from the one file this document has caught carrying stale prose **three times in two
+  slices**. Opening `measure_tier2_bands.py` sharpens it: it does not shim the global `math`
+  module — it replaces the `math` reference **inside the Python domain modules**
+  (`domains.power.system`, `domains.biosphere.canopy`) with a one-ULP-nudged stand-in and then
+  runs the **Python engine** (`simcore.integrator.EulerIntegrator`) to propagate it. So the
+  measuring instrument is built out of the tree S6 deletes; it dies with its subject, and a Rust
+  port must re-measure against the *Rust* engine and land the same numbers. That is the ceremony,
+  and it is the only thing that proves the port faithful. ⚠ The script's own lines 209–215 record
+  the trap waiting for that port: both biosphere probes once shimmed a module the carbon path no
+  longer called and measured **exactly 0.0 — passing vacuously**. A re-measurement that reads zero
+  is the failure mode, not the result.
 
 ### The open sub-question decision 1 leaves — deliberately not answered here
 

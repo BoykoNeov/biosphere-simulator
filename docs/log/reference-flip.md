@@ -1,4 +1,4 @@
-## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away; S2's first half then gave the reference its own golden comparison on 2026-08-19 — 19 runs moved out of the `examples/` binaries that made them unreachable, a platform policy that classifies rather than skips because `cargo test` runs on Linux, and a fifth entry for FINDING 2: the cross-port tolerance contract `tiers.json` is read by no program in `rust/`; its second half then moved the three manifest writers into their crates so every freeze contract byte-gates itself in Rust — which on its first run caught the move's own `crate::` rewrite silently re-wording three of the four contracts' frozen prose; S3 then gave the four sibling domains their first 160 tests the same day — 1,411 canonical lines that had none — and the five-mutation exit gate reads five with the golden byte compare deselected, where it read zero before, two of the five seen ONLY by flow-level or loader tests; and the registration-order control found MY OWN probe inert, not the subject: a single reverse of Power's build order IS canonical order, so it passed against a registry that never sorted, and all four tests now enumerate n! in full; S4 then took the engine residue on 2026-08-25 — 89 tests over seven files for extinction, aux, environment, the integrator, the multi-rate driver and the purity/gdext gates, where `auxiliary.rs` and `multirate.rs` had none and no Rust test read a `Cargo.toml` at all — and its two findings both came from taking the STRUCTURE half first: the gdext rule cannot be gated as text (the string appears five times outside the bridge and every one is a comment saying the crate is gdext-free), and the reasoning that fixes it does NOT carry to the biosphere half, where `domains → config` is a legitimate declared edge so only a source scan can see a leak; then 13 pre-committed mutations found the thing the design had not: a wrong Strang slow half-step size was invisible to all 741 tests, because every candidate gate runs at `n_sub == 2` where the error is a literal no-op)
+## **The reference flip — Rust becomes canonical** (target state B → C; eleven slices, eight landed, then C1, C2, C5, C8, C9, C3, C6 and C4 of the C re-plan — the param load, the twelve laws, the drift folds, the param-file list and the weather path all moved into the reference 2026-08-17, the posture itself into CLAUDE.md 2026-08-18, the four Python-only scenarios retired the same day, the science-gate census — half the biosphere manifest — re-anchored the same day, and C4b then C7's station half landed the same day — no Python program writes a frozen contract any more; Stage 3's classification pass then measured the whole 2,452-test Python suite against the reference's 445 and found the flip's remaining hole is not the science tests but the ground under them — the reference compiles 24 files out of the tree being deleted, nothing in Rust compares a run to a golden, and for the four sibling domains the cross-port checker is the only gate there is — S1 then moved all of that data into `rust/` in two halves the same day, so `cargo build` and every `cargo test` binary now pass with `src/` and `tests/` renamed away; S2's first half then gave the reference its own golden comparison on 2026-08-19 — 19 runs moved out of the `examples/` binaries that made them unreachable, a platform policy that classifies rather than skips because `cargo test` runs on Linux, and a fifth entry for FINDING 2: the cross-port tolerance contract `tiers.json` is read by no program in `rust/`; its second half then moved the three manifest writers into their crates so every freeze contract byte-gates itself in Rust — which on its first run caught the move's own `crate::` rewrite silently re-wording three of the four contracts' frozen prose; S3 then gave the four sibling domains their first 160 tests the same day — 1,411 canonical lines that had none — and the five-mutation exit gate reads five with the golden byte compare deselected, where it read zero before, two of the five seen ONLY by flow-level or loader tests; and the registration-order control found MY OWN probe inert, not the subject: a single reverse of Power's build order IS canonical order, so it passed against a registry that never sorted, and all four tests now enumerate n! in full; S4 then took the engine residue on 2026-08-25 — 89 tests over seven files for extinction, aux, environment, the integrator, the multi-rate driver and the purity/gdext gates, where `auxiliary.rs` and `multirate.rs` had none and no Rust test read a `Cargo.toml` at all — and its two findings both came from taking the STRUCTURE half first: the gdext rule cannot be gated as text (the string appears five times outside the bridge and every one is a comment saying the crate is gdext-free), and the reasoning that fixes it does NOT carry to the biosphere half, where `domains → config` is a legitimate declared edge so only a source scan can see a leak; then 13 pre-committed mutations found the thing the design had not: a wrong Strang slow half-step size was invisible to all 741 tests, because every candidate gate runs at `n_sub == 2` where the error is a literal no-op; and S6's four **D** decisions were then answered the same day — all four maximal-Rust, so no "keep it as a script CI calls" Python island survives and the four are BUILD items in front of the deletions, not filings — while the fact-check under them falsified two of this record's own claims: the nine Godot cross-boundary smokes have NOT been local-only since Phase 8 Step 8 (a dedicated CI job runs 15 of 17 on every push, unconditionally — the classification read the `skipif` in the test file rather than the workflow that defeats it), and the `tiers.json` question is not orphaned data but a missing assertion: the reference has no numeric tolerance at all off Windows, and the instrument that measured the bands is built out of the Python engine S6 deletes, so it dies with its subject)
 
 Plan: `docs/plans/post-roadmap-reference-flip.md`. **Planned 2026-08-16 in eleven
 independently-landable slices**, on the user's explicit instruction (*"only plan now, work in
@@ -2639,3 +2639,53 @@ finding about the core, found by writing the tests rather than reading it: **`St
 lives in `domains`**, one crate above `simcore`, so the core has no polymorphic step interface
 of its own and four of the new files dispatch over a local enum instead. Recorded, not fixed —
 moving a trait between crates is a layering decision.
+
+### The four **D** decisions, answered 2026-08-25 — and two of this record's claims falsified
+
+S6 was blocked on eleven files the classification pass could find no Rust home for. Put to
+the user as four questions; **all four came back maximal-Rust**. The docs-discipline gate,
+the headless-CLI byte gate, the nine Godot cross-boundary smokes and the cross-port
+tolerance gates each get a Rust successor. The "lift it out of `tests/` into a script CI
+calls" option was offered on three of the four and recommended on two, and was declined
+every time — so after S6 the repo has **no executing Python outside the PCSE oracle
+carve-out**.
+
+⚠ **These are four BUILD items in front of S6, not four filings.** S6's row said "the
+retirements"; it is a deletion slice again only once four successors stand, and the last of
+them carries an unfreeze ceremony on `docs/native-port-reference.md`.
+
+**Two claims this record itself carried were false, and the fact-check ran before the
+questions rather than after.**
+
+* **"The Godot smokes are local-only" has been false since Phase 8 Step 8.** A dedicated
+  `godot-parity` CI job installs headless Godot 4.7 and runs 15 of the 17; only two
+  `-m slow` cases are mandatory-local. The classification read the `skipif` in the test file
+  rather than the workflow that defeats it. Checked one level further before publishing the
+  correction: `on:` is `push: branches: [main]` plus `pull_request` and **no job carries an
+  `if:`**, so it runs unconditionally. *A `skipif` is a claim about an environment; a job
+  block is a claim about a workflow; only the triggers say what executes.* This raises the
+  stakes rather than changing the answer — deleting these deletes a **running** gate.
+* **The `tiers.json` question is not orphaned data, it is a missing assertion.**
+  `domains::goldens::compare` is byte-exact for pure arithmetic or on Windows, and otherwise
+  falls to a structural compare that asserts a hex-float leaf *parses finite* and says
+  nothing about its value. Python's band gates are the only ones with teeth on the one CI
+  job that is a genuine cross-libm measurement. ⚠ And `measure_tier2_bands.py` does not
+  merely use CPython's `math` — it replaces the `math` reference **inside the Python domain
+  modules** and runs the **Python engine** to propagate a one-ULP nudge. The instrument is
+  built out of the tree S6 deletes; it dies with its subject, so the port must re-measure
+  against the Rust engine. Its own comment records the trap: both biosphere probes once
+  shimmed a module the carbon path no longer called and measured **exactly 0.0, passing
+  vacuously**. A re-measurement that reads zero is the failure mode, not the result.
+  ⚠ This bullet's first draft sourced its claim from `tiers.json`'s own comment — the file
+  this plan has caught with stale prose three times in two slices. Reading the script
+  changed the finding.
+
+**One sub-question deliberately left open.** `test_context_budget.py` has no crate that owns
+its subject, and both homes are forbidden by something: a new workspace member by
+`rust/Cargo.toml`'s own "no empty speculative crates" comment, or hanging it off an engine
+crate, which makes that crate reach up and out of `rust/` and re-opens the reach-out S1
+spent a slice closing. *An answer and its home are separate questions* — the user settled
+the language; the building slice settles the address, and must say out loud if it adds the
+crate the standing rule refuses.
+
+**Standing after the decision pass:** no code touched, no Python deleted, no test written.
