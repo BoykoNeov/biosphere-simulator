@@ -64,7 +64,7 @@ assuming which side authored it.
 ## Layout
 
 - `rust/crates/{simcore,domains,station,authoring,config,godot_bridge}/` — **the
-  reference.** Same shape as the Python tree below, which it now outranks.
+  reference.** (`repo_gates` is a seventh, dev-only: its subject is this repo, not the sim.) Same shape as the Python tree below, which it now outranks.
 - `src/simcore/` — the pure engine. `src/domains/{biosphere,power,thermal,eclss,crew}/`
   — no domain imports another. `src/station/` — the assembly layer that owns all
   cross-domain wiring. `src/authoring/` — the declarative scenario platform

@@ -1,0 +1,29 @@
+# The repo's own gates — the contracts whose subject is this repository rather than the
+# simulation it contains. Today that is exactly one: the context budget (the ceiling on
+# what loads into every session, and the index ↔ record parity that keeps the retirement
+# rule from decaying into a deletion rule). See `docs/context-budget.md`.
+#
+# ⚠ Why this crate does NOT violate the workspace's own rule. `rust/Cargo.toml` says "no
+# empty speculative crates before then" — a rule against standing a crate up before it has
+# content. This one arrives holding ten live gates ported from `tests/test_context_budget.py`
+# (reference flip, Stage 3, §5y decision 1), so it is neither empty nor speculative. The
+# rule is read here rather than worked around, because the plan recorded it as a possible
+# collision and a standing rule dies the first time someone steps over it silently.
+#
+# ⚠ And why this is NOT a re-opening of FINDING 1. That finding was about ENGINE crates
+# reaching out of `rust/` at COMPILE time (`include_str!` climbing five directories), so
+# `rm -rf src/ tests/` broke the build. This crate reads `CLAUDE.md`, `docs/` and the memory
+# index at RUN time, they are permanent repository documents rather than the tree being
+# deleted, and nothing in the engine depends on this crate. A failure here is a red test,
+# never a broken build.
+[package]
+name = "repo_gates"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# For the phase-table content pin only. Reuse rather than a second hand-rolled sha-256 —
+# `config` is a boundary crate below `domains`, so depending on it introduces no cycle and
+# no engine coupling. `config::provenance::sha256` carries its own FIPS 180-4 vectors.
+config = { path = "../config" }

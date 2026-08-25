@@ -5424,3 +5424,105 @@ call for the slice that builds it, not a consequence of the answer recorded abov
 ⚠ Recording the collision now so the building slice cannot mistake it for a detail: the
 workspace comment is a rule this plan has cited before, and quietly adding the crate the
 rule forbids — without saying that is what is happening — is how a standing rule dies.
+
+## §5z Stage 3 — D1 BUILT: the context budget gets a Rust home, COMPLETE 2026-08-25
+
+The first of §5y's four build items. `tests/test_context_budget.py`'s ten gates now stand in
+`rust/crates/repo_gates` — a **seventh workspace member**, dev-only, `publish = false`, whose
+subject is this repository rather than the simulation.
+
+### The crate question §5y left open, answered by reading the rule
+
+§5y recorded a collision: both homes looked forbidden. **On reading, one of them is not.**
+`rust/Cargo.toml` says *"no **empty** speculative crates **before then**"* — a rule against
+standing a crate up *before it has content*, written when `domains` and `station` were still
+speculative. A crate arriving with ten live gates and seventeen tests is neither empty nor
+speculative, so the rule permits it. The reading is recorded in the crate's own manifest so
+the next reader does not have to re-derive it.
+
+⚠ **And it is not a re-opening of FINDING 1.** That finding was about *engine* crates
+reaching out of `rust/` at **compile** time via `include_str!`, so `rm -rf src/ tests/` broke
+the build. `repo_gates` reads `CLAUDE.md`, `docs/` and the memory index at **run** time; the
+files are permanent repository documents rather than the tree being deleted; and **nothing
+depends on it**. A failure here is a red test, never a broken build. The last clause is not
+an intention — it is asserted (below).
+
+### What the port is not allowed to be: three scanners, and why they are pinned separately
+
+The Python original leans on three regular expressions. Rust got hand-rolled scanners rather
+than a regex dependency — the house style, and the smaller change for a crate that reads four
+markdown files. ⚠ **The danger is specific and it is not "the scanner is wrong".** Eight of
+the ten gates are *set comparisons*; a scanner that silently matches **less** shrinks both
+sides of every one of them, so the suite reads green while checking nothing. A set comparison
+cannot see this from the inside. So `tests/scanners.rs` (7 tests) pins the two exclusions that
+are easy to drop — the `memory/` lookbehind and the word boundary — plus greediness, the
+`.md` suffix, and multi-hit lines.
+
+### The controls — a differential, then nine mutations
+
+**Control A, differential.** Both implementations were run over the real corpus and their
+outputs diffed: **130 lines, identical** — every plan doc named by the index, every one named
+by the record files, every pointer link. The port sees exactly what the regexes saw, measured
+rather than argued.
+
+**Control B, the mutation battery.** Nine repository mutations, each applied to the real tree,
+run against **both** suites, then reverted:
+
+| | Mutation | Rust red | Python red |
+|---|---|---|---|
+| M1 | `CLAUDE.md` padded past the ceiling | `claude_md_ceiling` | same |
+| M2 | a status-ledger row appended to `CLAUDE.md` | `no_status_ledger_in_claude_md` | same |
+| M3 | one index line deleted | row count **+** plan-doc parity | same two |
+| M4 | a stray file in `docs/log/` | pointer parity | same |
+| M5 | a record file's heading changed | heading parity | same |
+| M6 | a 200-char line appended to a record file | line cap | same |
+| M7 | an unindexed plan doc on disk | completeness | same |
+| M8 | a phase-table row edited | phase-table pin | same |
+| M9 | a record file renamed away | heading **+** pointer **+** plan-doc parity | same three |
+
+**Nine of nine redden, and the two ports redden on the same gates every time.**
+
+⚠ **M8's first attempt reddened NOTHING — in either language — and the probe was the defect.**
+It replaced the first `COMPLETE` in `docs/phase-index.md`, which sits in the file's *prose*,
+not in a table row; the gate hashes only `|`-lines and correctly ignored it. Re-aimed at an
+actual row, both ports went red. This is S3's lesson arriving for the third time: **a control
+that stays green is a claim about the control until you have shown the probe can bite.** The
+inert reading was one sentence away from being written up as "the phase-table pin is inert".
+
+### The gate that caught this work — S4's, doing exactly its job
+
+`cargo test` went red the moment the crate joined the workspace:
+`simcore/tests/workspace_purity.rs::the_scan_sees_every_workspace_member_and_no_others`, with
+the message *"the workspace roster moved; give the new crate a layering rule in
+`allowed_edges()` and a decision about whether it may carry third-party deps"*. That gate is
+three commits old (§5x) and it stopped a new member from being silently exempted by a scan
+that never looks at it. Two new assertions answer it:
+
+* `the_repo_gate_crate_reaches_only_the_hash_helper` — exactly one edge, to `config`, for
+  sha-256; and every dep is a path dep. Controlled: adding `regex = "1"` reddens it.
+* `nothing_depends_on_the_repo_gate_crate` — the load-bearing direction.
+
+⚠ **The second one nearly went in unmeasured, and the first control was run wrong.** The
+control that added `station -> repo_gates` reddened `every_engine_edge_is_one_the_layering_allows`
+— the *pre-existing* test — not the new one, which reads like the new assertion is redundant.
+It is not: the layering test only inspects crates in `ENGINE_CRATES`, and `godot_bridge` is
+not one. Re-run as `godot_bridge -> repo_gates`, **only the new assertion reddens**. The
+justification in its doc comment is that measurement, not a plausible argument.
+
+⚠ **One self-inflicted finding worth recording because it cost real work.** A control's
+cleanup line was written as `git checkout -- <file> || git checkout -- .`. The crate was
+untracked, so the first half failed and **the fallback reverted every tracked edit in the
+tree** — the workspace roster and the purity gate's own changes. Nothing was lost that could
+not be retyped, and the untracked crate survived precisely because git could not touch it.
+*A cleanup command with a wider blast radius than the mutation it reverses is not a cleanup.*
+
+### What D1 leaves standing
+
+* **No Python deleted.** `tests/test_context_budget.py` stays green and running until S6 —
+  the same rule S3 and S4 held, and the reason both suites could be run against every mutation
+  above.
+* **The memory-index assertion still does not run on CI**, by design, and now says so on
+  stderr rather than through pytest's skip. `#[ignore]` was refused: it is opt-in, so it would
+  have been silent *locally* too, which is the one place the assertion can actually run.
+* **`docs/context-budget.md` is unchanged.** The rules did not move; only the language that
+  enforces them.

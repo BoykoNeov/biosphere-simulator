@@ -7,6 +7,7 @@ members = [
     "crates/station",
     "crates/godot_bridge",
     "crates/authoring",
+    "crates/repo_gates",
 ]
 
 # Phase 7 native port of the frozen Python reference. The Rust crate tree mirrors
@@ -15,6 +16,14 @@ members = [
 # crates before then). The port has NO reference authority: a divergence from a
 # frozen golden is an unfreeze-discipline finding about the Python reference, never
 # a silent Rust "fix".
+#
+# `repo_gates` (reference flip, Stage 3) is the odd one out and deliberately so: its subject
+# is this REPOSITORY rather than the simulation — the context budget, the log index/record
+# parity, the frozen phase table. It arrived holding ten live gates ported out of
+# `tests/test_context_budget.py`, so the "no empty speculative crates" rule below permits it
+# (that rule forbids standing a crate up BEFORE it has content); it is dev-only, `publish =
+# false`, and nothing in the engine depends on it. See its own manifest for why it is not a
+# re-opening of the compile-time reach-out FINDING 1 closed.
 #
 # `authoring` (Phase-9 Step 4a) is the boundary crate mirroring Python `src/authoring`:
 # the rate-expression parser (text→AST). It depends only on `simcore` (for the AST

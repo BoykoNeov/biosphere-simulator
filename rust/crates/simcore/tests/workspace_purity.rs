@@ -64,7 +64,10 @@ struct Dep {
 /// alone silently misses.
 fn is_dependency_section(header: &str) -> bool {
     let tail = header.rsplit('.').next().unwrap_or(header);
-    matches!(tail, "dependencies" | "dev-dependencies" | "build-dependencies")
+    matches!(
+        tail,
+        "dependencies" | "dev-dependencies" | "build-dependencies"
+    )
 }
 
 /// Every dependency a manifest's text declares, across every dependency table.
@@ -99,7 +102,13 @@ fn declared_deps(manifest: &str) -> Vec<Dep> {
             continue;
         };
         // `serde.workspace = true` and `serde.features = [...]` both name `serde`.
-        let name = key.trim().split('.').next().unwrap_or("").trim().trim_matches('"');
+        let name = key
+            .trim()
+            .split('.')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .trim_matches('"');
         if name.is_empty() {
             continue;
         }
@@ -107,7 +116,10 @@ fn declared_deps(manifest: &str) -> Vec<Dep> {
         // registry dep declaring `features = ["path"]` would otherwise be classified as an
         // in-workspace sibling and walk straight past the third-party clause.
         let is_path = has_key(value, "path");
-        match deps.iter_mut().find(|d| d.name == name && d.section == section) {
+        match deps
+            .iter_mut()
+            .find(|d| d.name == name && d.section == section)
+        {
             // Only record a name once per table, however many dotted keys it has.
             Some(existing) => existing.is_path |= is_path,
             None => deps.push(Dep {
@@ -160,7 +172,9 @@ fn workspace_members(manifest: &str) -> Vec<String> {
         }
         inside = true;
         for piece in line.split(',') {
-            let trimmed = piece.trim().trim_matches(|c| c == '[' || c == ']' || c == '"');
+            let trimmed = piece
+                .trim()
+                .trim_matches(|c| c == '[' || c == ']' || c == '"');
             if let Some(name) = trimmed.strip_prefix("crates/") {
                 out.push(name.trim_matches('"').to_string());
             }
@@ -219,11 +233,18 @@ fn allowed_edges(krate: &str) -> &'static [&'static str] {
 #[test]
 fn the_scan_sees_every_workspace_member_and_no_others() {
     let seen: BTreeSet<String> = workspace_deps().keys().cloned().collect();
-    let expected: BTreeSet<String> =
-        ["authoring", "config", "domains", "godot_bridge", "simcore", "station"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+    let expected: BTreeSet<String> = [
+        "authoring",
+        "config",
+        "domains",
+        "godot_bridge",
+        "repo_gates",
+        "simcore",
+        "station",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
     assert_eq!(
         seen, expected,
         "the workspace roster moved; give the new crate a layering rule in allowed_edges() \
@@ -256,7 +277,9 @@ fn no_engine_crate_carries_a_third_party_dependency() {
 /// `domains`), which is a *path* edge here and so invisible to the third-party clause.
 #[test]
 fn simcore_declares_no_dependencies_at_all() {
-    let deps = workspace_deps().remove("simcore").expect("simcore is a member");
+    let deps = workspace_deps()
+        .remove("simcore")
+        .expect("simcore is a member");
     assert!(
         deps.is_empty(),
         "simcore declares {deps:?} — the pure core depends on nothing, not even a sibling \
@@ -315,10 +338,59 @@ fn the_bridge_really_does_depend_on_gdext() {
         .remove("godot_bridge")
         .expect("godot_bridge is a member");
     assert!(
-        deps.iter().any(|d| d.name.starts_with("godot") && !d.is_path),
+        deps.iter()
+            .any(|d| d.name.starts_with("godot") && !d.is_path),
         "godot_bridge declares no gdext dependency ({deps:?}) — the containment gate above \
          would then be vacuously green"
     );
+}
+
+/// `repo_gates` answers the two questions the roster assertion above demands of any new
+/// member, and it is **not** an engine crate: its subject is the repository (the context
+/// budget, the log index/record parity, the frozen phase table), not the simulation. So it
+/// is deliberately outside `ENGINE_CRATES` and gets its own rule here rather than an
+/// exemption — the pair below is that rule.
+///
+/// This one is the dependency half: exactly one edge, to `config`, for its sha-256 helper.
+/// A registry crate here would be the easy way to "just add a regex", and the scanners it
+/// hand-rolls instead are what `repo_gates/tests/scanners.rs` pins.
+#[test]
+fn the_repo_gate_crate_reaches_only_the_hash_helper() {
+    let deps = workspace_deps()
+        .remove("repo_gates")
+        .expect("repo_gates is a member");
+    let names: Vec<&str> = deps.iter().map(|d| d.name.as_str()).collect();
+    assert_eq!(
+        names,
+        ["config"],
+        "repo_gates declares {deps:?}; it may reach `config` for sha-256 and nothing else"
+    );
+    assert!(
+        deps.iter().all(|d| d.is_path),
+        "repo_gates declares a registry dependency {deps:?} — it reads four markdown files          and hand-rolls its scanners, which is the whole reason it can sit outside the          engine's zero-dep charter without weakening it"
+    );
+}
+
+/// And the direction half, which is the load-bearing one: **nothing may depend on
+/// `repo_gates`**. That is what keeps this crate from re-opening FINDING 1 — the engine
+/// reaching out of `rust/` at compile time, so that deleting the Python tree broke the
+/// build. A leaf that nothing imports can only ever fail as a red test.
+///
+/// ⚠ This assertion is NOT implied by `every_engine_edge_is_one_the_layering_allows`. That
+/// one only inspects crates in `ENGINE_CRATES`, so an edge from `godot_bridge` — which is
+/// outside that list — would walk straight past it. Measured, not assumed: the control that
+/// added `station -> repo_gates` reddened the layering test and this one is what covers the
+/// crates the layering test never looks at.
+#[test]
+fn nothing_depends_on_the_repo_gate_crate() {
+    for (krate, deps) in workspace_deps() {
+        for dep in &deps {
+            assert_ne!(
+                dep.name, "repo_gates",
+                "{krate} depends on repo_gates — this crate reads repository documents at                  run time, so an edge INTO the engine would make the reference's build                  depend on the repo's prose. It is a leaf, and it stays one"
+            );
+        }
+    }
 }
 
 /// The one thing the edge check does *not* imply: a gdext type could still reach an engine
@@ -394,7 +466,11 @@ fn the_reader_sees_a_dependency_inside_a_multi_line_inline_table() {
         "[dependencies]\nfoo = {\n    version = \"1\",\n    features = [\"a\"],\n}\nbar = \"2\"\n",
     );
     let names: Vec<&str> = deps.iter().map(|d| d.name.as_str()).collect();
-    assert_eq!(names, ["foo", "bar"], "the table's body is not a dep: {deps:?}");
+    assert_eq!(
+        names,
+        ["foo", "bar"],
+        "the table's body is not a dep: {deps:?}"
+    );
 }
 
 #[test]
@@ -412,11 +488,16 @@ fn the_reader_distinguishes_a_path_sibling_from_a_registry_crate() {
 /// a hole in the direction that matters, since the clause only ever *excuses* path deps.
 #[test]
 fn the_reader_does_not_mistake_the_word_path_in_a_value_for_a_path_dependency() {
-    let deps = declared_deps("[dependencies]
+    let deps = declared_deps(
+        "[dependencies]
 foo = { version = \"1\", features = [\"path\"] }
-");
+",
+    );
     assert_eq!(deps.len(), 1, "{deps:?}");
-    assert!(!deps[0].is_path, "a feature named path is not a path dependency: {deps:?}");
+    assert!(
+        !deps[0].is_path,
+        "a feature named path is not a path dependency: {deps:?}"
+    );
 }
 
 #[test]
@@ -424,7 +505,10 @@ fn the_reader_ignores_a_commented_out_dependency() {
     // Every manifest in this workspace carries a prose block above its `[dependencies]`
     // explaining why it has none; a reader that read comments would flag all of them.
     let deps = declared_deps("[dependencies]\n# numpy = \"1.2\"  <- never\n");
-    assert!(deps.is_empty(), "a commented-out dep is not a dep: {deps:?}");
+    assert!(
+        deps.is_empty(),
+        "a commented-out dep is not a dep: {deps:?}"
+    );
 }
 
 #[test]
