@@ -5526,3 +5526,64 @@ not be retyped, and the untracked crate survived precisely because git could not
   have been silent *locally* too, which is the one place the assertion can actually run.
 * **`docs/context-budget.md` is unchanged.** The rules did not move; only the language that
   enforces them.
+
+## §5aa Stage 3 — D2 BUILT: the headless CLI gate, with no cargo on the reference side, COMPLETE 2026-08-25
+
+`tests/crossport/test_headless_cli.py`'s four cases now stand in
+`station/tests/headless_cli.rs` as three tests. The claim is unchanged: `sim <scenario>
+<steps>` is **byte-for-byte** the same simulation as the reference run, for two single-rate
+palette entries and one two-rate, and a bad invocation is visible to a shell.
+
+### The design the port did NOT take, and why the obvious shortcut is a weakening
+
+§5y and its advisor call both assumed a faithful port meant **cargo launching cargo** —
+Python shells out twice because from outside the workspace an `examples/` program is a binary.
+Reading the code killed that: every `emit_*` example is one line,
+`print!("{}", station::goldens::cabin_gas())`. From inside the crate the reference side is a
+**function call**. Same bytes, no subprocess, byte-exact on every platform.
+
+⚠ **The other shortcut — compare the CLI against the committed goldens — was measured and
+refused.** Off the generation platform `domains::goldens::compare` falls back to a *structural*
+comparison for transcendental goldens, so `greenhouse` would silently stop being byte-compared
+on the Linux CI job while still reading like it was. That is the §5t lesson (a platform policy
+that classifies rather than skips) arriving as a trap for the next slice, and it is exactly the
+shape this stage keeps finding: the cheaper route passes, and stops checking the thing.
+
+### The assumption the port introduced, and the one place a nested cargo earns its keep
+
+Calling the library function assumes the examples really are thin wrappers. **Nothing in
+`rust/` referenced the `emit_*` programs at all** — grepped before writing, and the only hit
+was a doc comment. So that assumption was gated by nothing until the next golden regeneration,
+at which point a stray newline would surface as a golden diff that *looks like the science
+moved*. `the_emit_examples_are_the_thin_wrappers_this_file_assumes` closes it, and does so by
+**running the program**, never by scanning its source — §5x is the record of a text scan being
+structurally unable to express the rule it was written for.
+
+### The controls
+
+`cargo test` deadlocking on its own build lock was treated as an open question rather than
+reasoned about: a throwaway probe ran `cargo run --example` from inside `cargo test` and
+exited 0. Then four mutations, each reverted, each naming the test it must redden:
+
+| | Mutation | Reddens |
+|---|---|---|
+| C1 | `sim` prints a trailing newline | the byte-identity test |
+| C2 | `sim` advances one extra step | the byte-identity test |
+| C3 | `emit_cabin_gas` grows a newline | **only** the wrapper test |
+| C4 | `sim` exits 0 on an unknown scenario | the bad-argument test |
+
+**C3 is the one that pays for the extra test.** The example broke and the byte-identity test
+stayed green — which is the whole reason the wrapper test exists, demonstrated rather than
+asserted.
+
+⚠ **All four were re-run after a clippy fix restructured the file** (`cases()` returned a
+four-element tuple; `clippy::type_complexity` refused it, so it became a named `Case` struct).
+The controls had already passed on the pre-refactor tree, and this repo's own rule is that a
+control's verdict is dated to the tree it ran on. Re-run: four for four, unchanged.
+
+### What D2 leaves standing
+
+* **No Python deleted.** `test_headless_cli.py` stays green until S6.
+* **The `sealed` palette entry is still uncovered.** `sim` accepts four scenarios; the Python
+  original tested three and so does this. Widening the roster would be a new claim wearing a
+  port's name — the same line §5x drew around the sibling domains' source purity.
