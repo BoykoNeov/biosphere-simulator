@@ -2531,7 +2531,8 @@ environment_wiring,integrator_schemes,extinction}.rs` and
 `domains/tests/biosphere_spine_purity.rs`. `auxiliary.rs` and `multirate.rs` had **zero**
 tests before this slice; extinction had no test naming it anywhere.
 
-**Thirteen pre-committed mutations, and twelve of thirteen redden a named test in the new files on the first pass; the thirteenth produced the slice's largest finding (below).**
+**Thirteen pre-committed mutations, and twelve of thirteen redden a named test in the new
+files on the first pass; the thirteenth produced the slice's largest finding (below).**
 
 **The pre-reading was zero, measured five times rather than inferred once.** §5w's review had
 caught the previous slice presenting three extrapolations as a reading, so each structure
@@ -2573,7 +2574,8 @@ module in the spine, for the phrase *"not **configur**ed"* in a doc comment; the
 strips comments and matches whole tokens, and the substring control cites that line.
 
 
-#### ⚠⚠ The finding the battery produced rather than confirmed: a wrong slow half-step size was invisible to the entire workspace
+#### ⚠⚠ The finding the battery produced rather than confirmed: a wrong slow half-step
+size was invisible to the entire workspace
 
 One pre-committed mutation — the Strang slow halves stepping at `dt/n_sub` instead of `dt/2` —
 reddened **0 of 741**. Every candidate gate was blind, each for its own reason. The three
