@@ -110,8 +110,9 @@ jobs:
     # sealed golden). See docs/phase-8-reference.md.
     steps:
       - uses: actions/checkout@v4
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      # ⚠ No `Install uv` step: since §5y decision 3 this job runs no Python at all. Removed
+      # WITH the driver rather than left behind — an installer for a language nothing in the
+      # job uses is the kind of thing that outlives its reason and then looks load-bearing.
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install headless Godot 4.7
@@ -127,10 +128,19 @@ jobs:
           sudo mv "/tmp/Godot_v${GODOT_VER}_linux.x86_64" /usr/local/bin/godot
           sudo chmod +x /usr/local/bin/godot
           godot --headless --version
-      - name: Sync Python dependencies
-        run: uv sync
-      # The fast Godot cross-boundary smokes (the slow sealed season-crossing run is
-      # mandatory-local, `-m slow`). Each shells out to `cargo build -p godot_bridge` (the
-      # cdylib Godot dlopen's) and `cargo run --example emit_*` (the headless reference).
+      # ⚠ The Python driver is GONE from this job (reference flip, Stage 3, §5y decision 3).
+      # The same seventeen smokes now live in `godot_bridge/tests/cross_boundary.rs`; they
+      # still shell out to `cargo build -p godot_bridge` (the cdylib Godot dlopen's) and to
+      # `cargo run --example emit_*` (the headless reference), and they still drive the real
+      # `godot --headless --script`. What changed is the language of the driver, not the
+      # coverage — `uv sync` is no longer needed here at all.
+      #
+      # ⚠ The slow sealed season-crossing run is excluded BY NAME rather than by `#[ignore]`.
+      # pytest's `-m slow` is opt-OUT (it runs on the developer machine by default and CI
+      # skips it); `#[ignore]` is opt-IN, so using it would have silently stopped that test
+      # running on the only machines that ever run it. The filter belongs in CI, not in the
+      # source.
       - name: Godot cross-boundary parity smokes (fast)
-        run: uv run pytest tests/crossport/ -k godot -m "not slow"
+        run: |
+          cd rust
+          cargo test -p godot_bridge --test cross_boundary -- --skip sealed_season_crossing

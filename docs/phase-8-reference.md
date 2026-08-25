@@ -80,17 +80,29 @@ scenario through the **actual `gdext` cdylib Godot loads**, in `--headless` mode
    denormal);
 3. **Tier-0 discretes** — `rationed == 0`, the expected step count.
 
-**Coverage (`tests/crossport/test_godot_*.py`):**
+**Coverage (`rust/crates/godot_bridge/tests/cross_boundary.rs`):**
+
+⚠ **The driver moved 2026-08-25** (reference flip, Stage 3, §5y decision 3). These smokes
+were nine `tests/crossport/test_godot_*.py` modules with Python pressing the button; they are
+now seventeen Rust tests in one file, and the `godot-parity` CI job runs `cargo test` instead
+of `pytest`. **The coverage is unchanged** — same GDScript smokes, same scenarios, same three
+claims above. Updated here because this document has no manifest, so nothing would have caught
+the table naming files that no longer exist.
 
 | smoke | scenario | rate | new coverage |
 |---|---|---|---|
-| `test_godot_parity` | `cabin_gas` | single | the FFI boundary itself (Step 1) |
-| `test_godot_compose` | `{power_plant, radiator}` | single | palette composition == frozen `station` |
-| `test_godot_save_load` | `cabin_gas` | single | a real `FileAccess` disk round-trip |
-| `test_godot_perturbations` | `station` brownout | single | a perturbed (rationing) run |
-| `test_godot_two_rate_parity` (greenhouse) | `greenhouse` | **two** | the two-rate driver across the boundary |
-| `test_godot_two_rate_parity` (sealed, **slow**) | `sealed` | **two** | 310 master days — the re-sow adopt branch crosses the boundary |
-| `test_godot_objectives` | `station` | single | stability **and** failure are both reachable |
+| `cabin_gas_crosses_the_boundary_bit_exact` | `cabin_gas` | single | the FFI boundary itself (Step 1) |
+| `the_composed_station_crosses_the_boundary` | `{power_plant, radiator}` | single | palette composition == frozen `station` |
+| `save_and_load_cross_the_boundary` | `cabin_gas` | single | a real `FileAccess` disk round-trip |
+| `the_perturbed_brownout_crosses_the_boundary` | `station` brownout | single | a perturbed (rationing) run |
+| `greenhouse_two_rate_crosses_the_boundary` | `greenhouse` | **two** | the two-rate driver across the boundary |
+| `sealed_season_crossing_crosses_the_boundary` (**slow**) | `sealed` | **two** | 310 master days — the re-sow adopt branch crosses the boundary |
+| `the_objectives_read_stability_and_failure_across_the_boundary` | `station` | single | stability **and** failure are both reachable |
+
+⚠ The slow one is excluded from CI **by name** (`-- --skip sealed_season_crossing`), not by
+`#[ignore]`. pytest's `-m slow` is opt-out — it runs on the developer machine by default —
+and `#[ignore]` is opt-in, so the attribute would have silently stopped the mandatory-local
+run on the only machines that ever perform it.
 
 The full multi-year sealed **science** parity is gated in CI by the frozen
 `sealed_station_state.json` golden (the `crossport` job); the full-horizon *resume*-parity

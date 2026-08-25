@@ -5587,3 +5587,88 @@ control's verdict is dated to the tree it ran on. Re-run: four for four, unchang
 * **The `sealed` palette entry is still uncovered.** `sim` accepts four scenarios; the Python
   original tested three and so does this. Widening the roster would be a new claim wearing a
   port's name — the same line §5x drew around the sibling domains' source purity.
+
+## §5ab Stage 3 — D3 BUILT: the cross-boundary proof moves to Rust, COMPLETE 2026-08-25
+
+The nine `tests/crossport/test_godot_*.py` modules — 1,671 lines, 17 tests — are now
+`godot_bridge/tests/cross_boundary.rs`: **19 tests**, one harness, the same twelve GDScript
+smokes and the same three claims (bit-exact snapshot, FTZ/DAZ off on the stepping thread,
+Tier-0 discretes). The `godot-parity` CI job runs `cargo test` instead of `pytest`, and its
+`Install uv` step went with the driver — nothing Python runs in that job any more.
+
+### Two extra tests, and they are the two that earn their place
+
+The port added `the_report_accessors_refuse_a_missing_or_mistyped_field` and
+`the_godot_lookup_agrees_with_the_environment`. Neither has a Python original, and both exist
+because a Rust port of a `skipif`-guarded subprocess harness has exactly two ways to be
+silently inert: **the report accessors defaulting** instead of failing, and **the tool lookup
+returning `None`** on a machine that has the tool. The second one earned itself inside an hour
+(below).
+
+### The findings, all four from running rather than reading
+
+⚠ **1. `Path::parent` is lexical, and the self-check is what said so.** `repo_root()` was
+built as `CARGO_MANIFEST_DIR` + `"/../.."`; `parent()` on a path *ending* in `..` strips that
+component rather than resolving it, so the Godot project resolved to
+`crates/godot_bridge/../godot`. Sixteen smokes failed with confusing "markers missing"
+messages and one test said plainly that `godot/project.godot` was not where the code thought.
+Rebuilt by walking **up** from the manifest dir.
+
+⚠ **2. Three of the twelve smokes take a scenario path after `--`, and omitting it does not
+crash.** `from_file_smoke.gd`, `from_file_template_smoke.gd` and `authored_marker_smoke.gd`
+each printed a **well-formed report with `ok: false`** and zeroed numbers. A laxer port — one
+that checked "markers present, JSON parses" — would have called that a pass and shipped three
+tests that drive nothing. They were caught only because every assertion reads the report's own
+`ok` flag first. Two field names were wrong in the same place (`base_food`/`big_food` for
+`food_default`/`food_4x`), and that too surfaced as a red rather than a default.
+
+⚠⚠ **3. `.trim()` is a narrowing, and only the control found it.** `assert_same_snapshot`
+compared `produced.trim()` against `headless.trim()`. It reads as tidiness. The control that
+made `emit_cabin_gas` print a trailing newline left the test **GREEN** — the one thing the
+whole file exists to catch, absorbed by a courtesy call. The Python original compares the two
+raw strings (only the JSON envelope between the markers is stripped). Trim removed from both
+the snapshot and the golden comparison; the control then reddened by name. *"Byte-for-byte"
+has to mean bytes.*
+
+⚠ **4. `cargo test -p godot_bridge` does not build the cdylib.** Measured by deleting
+`target/debug/godot_bridge.dll` and re-running: with `crate-type = ["cdylib"]` the test
+profile builds a harness, not the artifact Godot `dlopen`s. So the port builds it exactly as
+the Python driver did. A nested cargo inside `cargo test` does **not** deadlock on the build
+lock — also measured, with a throwaway probe, before the file was written rather than reasoned
+about afterwards.
+
+### The controls
+
+| | Mutation | Result |
+|---|---|---|
+| C-A | the headless reference grows a trailing newline | **first run: GREEN — finding 3**; after the trim came out, reddens by name |
+| C-B | a marker constant no longer matches the smoke's output | reddens with "markers missing", not a pass |
+| (live) | the path helper was wrong | 18 red, and the harness self-check named the cause |
+| (live) | three smokes invoked with no scenario argument | 3 red on the report's own `ok` flag |
+
+The last two were not designed — they happened, and they are recorded as controls because
+they measured the same thing a designed mutation would have.
+
+### The timeout was ported, not dropped
+
+Every `subprocess.run` in the Python original passed `timeout=`. The Rust `Command::output()`
+has no equivalent, so `run_bounded` drains both pipes on threads (a chatty child must not fill
+a pipe and deadlock) and polls `try_wait` to a deadline, killing on breach. Dropping it would
+have turned a hung headless Godot into a CI job that burns its whole budget without naming the
+test that hung.
+
+### The document nothing would have caught
+
+`docs/phase-8-reference.md` hand-lists the coverage as a table of **Python file names**. It is
+the one freeze doc with **no manifest** (Phase 8 added a consumer and changed no science), so
+the port would have left it naming files that no longer exist with every gate green — the
+"freeze's prose half is ungated" lesson, arriving exactly where that lesson predicts. Table
+re-pointed at the Rust test names, with the driver move stated in place.
+
+### What D3 leaves standing
+
+* **No Python deleted.** The nine modules stay green and running until S6 — and on the
+  `crossport` CI job they now simply skip, as they always did where Godot is absent.
+* **The GDScript smokes are untouched.** The Godot side of the boundary is not what moved.
+* **The slow pair is CI-excluded by name**, not by `#[ignore]`, so it still runs by default on
+  the developer machine that is the only place it ever runs.
