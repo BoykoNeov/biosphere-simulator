@@ -731,4 +731,321 @@ mod tests {
         // linear, and that is asserted here because nothing else can reach it.
         assert_eq!(soil_n_availability(3.0, res, crit), 0.5);
     }
+
+    // -----------------------------------------------------------------------------
+    // S5 batch A — carbon capture: FvCB + the depth-resolved canopy.
+    //
+    // Ported from `tests/test_photosynthesis.py` and `tests/test_canopy.py`. Every
+    // literal below is hand-computed from the cited equation and the params named in
+    // `_photo()`, with the arithmetic written out in the comment — never read back out
+    // of a run of this tree (§5ad exit gate, clause 2).
+    //
+    // ⚠ The Python fixture holds the params as literals ON PURPOSE, so that the physics
+    // pins are independent of the loader. Kept: `_photo()` and `_canopy()` do not call
+    // `params::photosynthesis()`, so a loader regression cannot silently move a pin.
+    // -----------------------------------------------------------------------------
+
+    /// The committed winter-wheat placeholders, mirroring `photosynthesis.yaml`.
+    fn _photo() -> PhotosynthesisParams {
+        PhotosynthesisParams {
+            vcmax: 100.0,
+            jmax: 180.0,
+            quantum_yield: 0.3,
+            theta: 0.7,
+            gamma_star: 42.75,
+            kc: 404.9,
+            ko: 278.4,
+            o2: 210.0,
+            t_min: 0.0,
+            t_opt_lo: 15.0,
+            t_opt_hi: 25.0,
+            t_max: 35.0,
+        }
+    }
+
+    /// ⚠ `sla_per_mol_c` is deliberately the OLD 0.5872… fold, not today's value. The
+    /// Python fixture froze it so the canopy pin below isolates the aggregator's form
+    /// from the parameter change that shipped the same day. Copying the live value here
+    /// would silently re-point the pin at a different LAI.
+    fn _canopy() -> CanopyParams {
+        CanopyParams {
+            sla_per_mol_c: 0.5872044444444445,
+            extinction_coef: 0.6,
+        }
+    }
+
+    /// `Ac = Vcmax·(Ci − Γ*) / (Ci + Kc·(1 + O/Ko))` — Farquhar, von Caemmerer & Berry
+    /// (1980). Hand value: `100·(400 − 42.75) / (400 + 404.9·(1 + 210/278.4))`.
+    /// Mirrors `test_photosynthesis.py::test_rubisco_limited_rate_known_value`.
+    #[test]
+    fn rubisco_limited_rate_is_the_hand_computed_fvcb_value() {
+        let ac = rubisco_limited_rate(400.0, &_photo());
+        assert!(
+            (ac - 32.175_401_396_692_39).abs() <= 1e-12 * 32.175_401_396_692_39,
+            "Ac {ac}"
+        );
+    }
+
+    /// `J` is the SMALLER root of `θJ² − (I₂+Jmax)J + I₂·Jmax = 0` with `I₂ = α·PAR`.
+    ///
+    /// ⚠ The root choice is the whole content of this function: the larger root exceeds
+    /// `Jmax`, which is unphysical, so saturation is asserted alongside the point value.
+    /// Mirrors the three `electron_transport` cases in `test_photosynthesis.py`.
+    #[test]
+    fn electron_transport_is_the_smaller_root_and_saturates_below_jmax() {
+        let p = _photo();
+        let j = electron_transport_rate(500.0, &p);
+        assert!(
+            (j - 105.369_374_350_752_44).abs() <= 1e-12 * 105.369_374_350_752_44,
+            "J {j}"
+        );
+        // No light, no electron transport: I₂ = 0 ⇒ the smaller root is 0 exactly.
+        assert_eq!(electron_transport_rate(0.0, &p), 0.0);
+        // Saturating light drives J toward Jmax FROM BELOW and never through it.
+        let saturated = electron_transport_rate(1.0e6, &p);
+        assert!(saturated < p.jmax, "J {saturated} reached or passed Jmax");
+        assert!((saturated - p.jmax).abs() <= 1e-3 * p.jmax, "J {saturated}");
+    }
+
+    /// `Aj = J·(Ci − Γ*) / (4·Ci + 8·Γ*)` at the `J` pinned above.
+    /// Mirrors `test_photosynthesis.py::test_light_limited_rate_known_value`.
+    #[test]
+    fn light_limited_rate_is_the_hand_computed_value() {
+        let p = _photo();
+        let j = electron_transport_rate(500.0, &p);
+        let aj = light_limited_rate(400.0, j, p.gamma_star);
+        assert!(
+            (aj - 19.383_732_742_948_663).abs() <= 1e-12 * 19.383_732_742_948_663,
+            "Aj {aj}"
+        );
+    }
+
+    /// `Ag = max(0, min(Ac, Aj))` — the CO-LIMITATION, and the `min` is load-bearing.
+    ///
+    /// ⚠ At `Ci = 400`, `PAR = 500` the two limits are 32.175 and 19.384, so the leaf is
+    /// light-limited and `Ag` must read the SMALLER. Inverting the co-limitation to
+    /// `max` is the M2 mutation of §5ad's control battery, which reddened eleven tests
+    /// and not one of them was about photosynthesis. This is that test.
+    #[test]
+    fn gross_leaf_assimilation_is_the_co_limited_minimum() {
+        let p = _photo();
+        let ag = gross_leaf_assimilation(400.0, 500.0, &p);
+        let ac = rubisco_limited_rate(400.0, &p);
+        let aj = light_limited_rate(400.0, electron_transport_rate(500.0, &p), p.gamma_star);
+        assert!(
+            aj < ac,
+            "the fixture must be light-limited: Ac {ac}, Aj {aj}"
+        );
+        assert!(
+            (ag - 19.383_732_742_948_663).abs() <= 1e-12 * 19.383_732_742_948_663,
+            "Ag {ag}"
+        );
+    }
+
+    /// The load-bearing clamp: at `Ci ≤ Γ*` the `(Ci − Γ*)` factor is ≤ 0, and gross
+    /// uptake floors at zero so the carbon SOURCE flow can never become a withdrawal
+    /// from plant carbon. Mirrors the parametrized clamp case and the zero-PAR case.
+    #[test]
+    fn gross_leaf_assimilation_clamps_at_or_below_the_compensation_point() {
+        let p = _photo();
+        for ci in [42.75, 30.0, 0.0] {
+            assert_eq!(gross_leaf_assimilation(ci, 500.0, &p), 0.0, "Ci {ci}");
+        }
+        // No light ⇒ Aj = 0 ⇒ min(Ac, Aj) = 0. Assimilation → 0 as light → 0.
+        assert_eq!(gross_leaf_assimilation(400.0, 0.0, &p), 0.0);
+    }
+
+    /// Strictly more light, strictly more carbon — the response is monotone in PAR.
+    #[test]
+    fn gross_leaf_assimilation_is_monotone_increasing_in_par() {
+        let p = _photo();
+        let rates: Vec<f64> = [50.0, 100.0, 200.0, 400.0]
+            .iter()
+            .map(|par| gross_leaf_assimilation(400.0, *par, &p))
+            .collect();
+        assert!(
+            rates.windows(2).all(|w| w[1] > w[0]),
+            "not monotone in PAR: {rates:?}"
+        );
+    }
+
+    /// The piecewise-linear cardinal-temperature response at all nine of its corners.
+    ///
+    /// ⚠ The two ramp midpoints are the cases that distinguish a ramp from a step, and
+    /// the two plateau ends are the cases that distinguish `<`/`<=`. Both pairs are
+    /// here for that reason rather than for symmetry.
+    #[test]
+    fn the_temperature_factor_hits_all_nine_cardinal_points() {
+        let p = _photo();
+        let cases = [
+            (-5.0, 0.0), // below t_min
+            (0.0, 0.0),  // at t_min
+            (7.5, 0.5),  // midpoint of the up-ramp [0, 15]
+            (15.0, 1.0), // start of the plateau
+            (20.0, 1.0), // inside the plateau
+            (25.0, 1.0), // end of the plateau
+            (30.0, 0.5), // midpoint of the down-ramp [25, 35]
+            (35.0, 0.0), // at t_max
+            (40.0, 0.0), // above t_max
+        ];
+        for (temp, expected) in cases {
+            let f = temperature_factor(temp, &p);
+            assert!((f - expected).abs() <= 1e-12, "f_temp({temp}) = {f}");
+        }
+    }
+
+    /// The composed daily flux, as a hand value.
+    ///
+    /// ⚠ RE-DERIVED 2026-08-15 in the Python original and carried across verbatim: the
+    /// aggregator stopped being a big leaf at the mean PAR and became the cited 3-point
+    /// Gaussian depth integral, so this value moved 1.3778614691309006 →
+    /// 1.3219831112621092, i.e. **4.05 % LOWER**. The SIGN is the point: `Ag` is concave
+    /// in PAR, so resolving the canopy into depths can only lower the sum. A port that
+    /// silently picked up the old number would be re-introducing the Jensen high-bias.
+    /// Mirrors `test_photosynthesis.py::test_canopy_assimilation_known_value`.
+    #[test]
+    fn canopy_assimilation_is_the_hand_composed_daily_flux() {
+        let lai = 5.0 * _canopy().sla_per_mol_c / 1.0; // 5 mol leaf C over 1 m² ⇒ 2.936
+        let daily = canopy_assimilation(
+            800.0,
+            lai,
+            400.0,
+            20.0,
+            43200.0,
+            &_photo(),
+            &_canopy(),
+            1.0,
+            1.0,
+        );
+        assert!(
+            (daily - 1.321_983_111_262_109_2).abs() <= 1e-12 * 1.321_983_111_262_109_2,
+            "daily flux {daily}"
+        );
+    }
+
+    /// `f_temp` multiplies the WHOLE canopy flux, so the up-ramp midpoint halves it
+    /// exactly. A temperature response applied per-layer instead would not.
+    #[test]
+    fn canopy_assimilation_scales_exactly_with_the_temperature_factor() {
+        let (p, c) = (_photo(), _canopy());
+        let lai = 5.0 * c.sla_per_mol_c;
+        let warm = canopy_assimilation(800.0, lai, 400.0, 20.0, 43200.0, &p, &c, 1.0, 1.0);
+        let cool = canopy_assimilation(800.0, lai, 400.0, 7.5, 43200.0, &p, &c, 1.0, 1.0);
+        assert!(
+            (cool - warm * 0.5).abs() <= 1e-12 * warm,
+            "cool {cool} vs warm/2 {}",
+            warm * 0.5
+        );
+    }
+
+    /// No leaf area, no carbon — and no `0/0` on the way there.
+    ///
+    /// ⚠ The small-LAI limit is the case a per-leaf-area formulation gets wrong: the
+    /// mean absorbed PAR per unit leaf tends to `k·incident_par` rather than diverging,
+    /// so the flux must vanish smoothly instead of blowing up or reading `NaN`.
+    #[test]
+    fn canopy_assimilation_vanishes_smoothly_as_lai_goes_to_zero() {
+        let (p, c) = (_photo(), _canopy());
+        assert_eq!(
+            canopy_assimilation(800.0, 0.0, 400.0, 20.0, 43200.0, &p, &c, 1.0, 1.0),
+            0.0
+        );
+        let flux: Vec<f64> = [1e-3, 1e-6, 1e-9]
+            .iter()
+            .map(|lai| canopy_assimilation(800.0, *lai, 400.0, 20.0, 43200.0, &p, &c, 1.0, 1.0))
+            .collect();
+        assert!(flux.iter().all(|f| f.is_finite() && *f > 0.0), "{flux:?}");
+        assert!(flux[0] > flux[1] && flux[1] > flux[2], "{flux:?}");
+    }
+
+    /// ⚠⚠ **THE ONE THE GOLDENS WERE DOING ALONE.** The depth quadrature must conserve
+    /// photons: it redistributes light through the canopy and creates none.
+    ///
+    /// The absorption profile is `k·PAR·exp(−k·L)`, whose exact integral over
+    /// `L ∈ [0, LAI]` is `PAR·(1 − exp(−k·LAI))` — Beer–Lambert, Monsi & Saeki (1953).
+    /// The reference evaluates that integral by 3-point Gauss–Legendre. So in a regime
+    /// where the leaf response is LINEAR in absorbed PAR, the canopy flux must equal the
+    /// Beer–Lambert total times that linear coefficient.
+    ///
+    /// The linear regime is real, not a fiction: at `I₂ ≪ Jmax` the smaller root of the
+    /// non-rectangular hyperbola tends to `I₂ = α·PAR`, so `Ag → α·PAR·(Ci − Γ*)/(4Ci +
+    /// 8Γ*)`. PAR is therefore driven to 1e-4 µmol here — far into that limit — and the
+    /// coefficient is taken from the function itself at a single leaf, so the test
+    /// compares the CANOPY INTEGRAL against the closed form rather than restating the
+    /// loop.
+    ///
+    /// ⚠ Why this test exists: §5ad's M1c control replaced the Gaussian weights with a
+    /// flat average and reddened **four tests, all four of them committed-byte golden
+    /// comparisons**. No behavioural gate moved. The quadrature is the one part of the
+    /// canopy whose correctness was asserted by nothing that survives a regeneration.
+    ///
+    /// ⚠ **The tolerance is DERIVED per canopy, not picked**, and the first attempt was
+    /// wrong in the instructive direction: a flat `1e-4` held at `LAI 2.936` and failed at
+    /// `LAI 6` with a residual of 7.3e-4, because the 3-point Gauss error grows as the
+    /// SIXTH power of `k·LAI`. The classical bound for `n = 3` on `[0, 1]` is
+    /// `(3!)⁴ / (7·(6!)³) · max|f⁽⁶⁾|`, and for `f(x) = exp(−a·x)` that maximum is `a⁶`;
+    /// dividing by the integral `(1 − e⁻ᵃ)/a` makes it relative. The gate therefore
+    /// tightens itself on open canopies — 4.0e-3 at `LAI 6`, 3.1e-8 at `LAI 1` — instead
+    /// of being set everywhere by its loosest case, which is what a flat tolerance does.
+    ///
+    /// ⚠ The `1e-6` floor is a second error term, not slack: the probe regime is very
+    /// nearly linear rather than exactly linear, and the leaf coefficient is read at a
+    /// different PAR from the one the shaded layers see. That residual is `~I₂/Jmax ≈ 2e-7`,
+    /// so a floor an order above it stops the sparse-canopy cases asserting past their own
+    /// arithmetic. Both terms sit far below the 26 % error M1c introduces.
+    #[test]
+    fn the_depth_quadrature_conserves_photons_against_beer_lambert() {
+        let (p, c) = (_photo(), _canopy());
+        let (ci, temp_c, window_s, area) = (400.0, 20.0, 43200.0, 1.0);
+        // Deep in the linear-response regime: I₂ = 0.3 * 1e-4 is ~6e-8 of Jmax.
+        let par = 1.0e-4;
+        // The per-leaf response coefficient, read from the reference at one leaf rather
+        // than re-derived, so this compares the INTEGRAL and not the leaf law.
+        let per_unit_absorbed = gross_leaf_assimilation(ci, par, &p) / par;
+        assert!(
+            per_unit_absorbed > 0.0,
+            "the linear regime must be positive"
+        );
+
+        for lai in [0.5, 1.0, 2.936, 6.0] {
+            let produced = canopy_assimilation(par, lai, ci, temp_c, window_s, &p, &c, area, 1.0);
+            // Beer–Lambert total absorbed, times the linear leaf response, times the
+            // same window / area / unit factors the aggregator applies.
+            let absorbed = par * (1.0 - (-c.extinction_coef * lai).exp());
+            let expected = absorbed
+                * per_unit_absorbed
+                * window_s
+                * area
+                * MICROMOL_TO_MOL
+                * temperature_factor(temp_c, &p);
+            // Gauss–Legendre n=3 truncation bound on exp(-a·x) over [0, 1], relative to
+            // the integral itself, floored by the probe's residual non-linearity.
+            let a = c.extinction_coef * lai;
+            const GAUSS3_COEF: f64 = 1296.0 / (7.0 * 720.0 * 720.0 * 720.0);
+            let integral = (1.0 - (-a).exp()) / a;
+            let tol = (GAUSS3_COEF * a.powi(6) / integral).max(1e-6);
+            let relative = (produced - expected).abs() / expected;
+            assert!(
+                relative <= tol,
+                "LAI {lai}: the depth quadrature lost or invented photons — \
+                 produced {produced}, Beer-Lambert {expected}, relative {relative} \
+                 against a derived bound of {tol}"
+            );
+        }
+    }
+
+    /// `LAI = leaf_carbon · sla_per_mol_c / ground_area`, exact in binary.
+    ///
+    /// ⚠ `ground_area` is a DIVISOR here and a factor in `canopy_assimilation`; the
+    /// inverse-scaling case is what distinguishes the two roles, so it is asserted
+    /// rather than left to the point value.
+    /// Mirrors the `leaf_area_index` block of `test_canopy.py`.
+    #[test]
+    fn leaf_area_index_is_carbon_times_sla_over_ground() {
+        assert_eq!(leaf_area_index(100.0, 0.5, 2.0), 25.0);
+        assert_eq!(leaf_area_index(0.0, 0.5, 2.0), 0.0);
+        let small = leaf_area_index(100.0, 0.5, 1.0);
+        let large = leaf_area_index(100.0, 0.5, 2.0);
+        assert_eq!(large, small / 2.0);
+    }
 }

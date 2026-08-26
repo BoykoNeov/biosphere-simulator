@@ -5881,13 +5881,44 @@ As S3 and S4 both did, the gate is written as what must be true when Python is d
 1. For every mechanism in the roster below, **mutating that mechanism reddens a test whose
    subject is that mechanism**, measured with `cargo test -p domains --lib` — the goldens and
    bands not merely discounted but out of the binary.
-2. Every ported test compares against a number **the cited source states**, or against an
-   exactly-derivable property (a limit, a threshold either side, a linear knot), never against
-   a value read out of this tree. A test whose expected value came from running the reference
-   is a snapshot, and the goldens already do snapshots better.
+2. Every ported test compares against a number **the cited source states**, a value
+   **hand-computed from the cited equation and its parameters with the derivation written in
+   the comment**, or an exactly-derivable property (a limit, a threshold either side, a linear
+   knot) — never against a value read out of this tree. A test whose expected value came from
+   running the reference is a snapshot, and the goldens already do snapshots better. ⚠ The
+   middle clause was added after batch A was read: most of the Python literals
+   (`32.17540139669239`, `1.3219831112621092`) are hand-computed rather than quoted, which the
+   first draft of this gate would have rejected — rejecting the very tests it was written to
+   license. A hand-computed pin is legitimate exactly when its derivation is in the comment,
+   which is what makes it re-checkable without running anything.
 3. A by-name claim census exists, so a mechanism that quietly loses its claim in translation
    is visible as a missing row rather than as a smaller number.
 4. `intercepted_fraction` is resolved — deleted or wired — and not merely left unported.
+
+### ⚠ The three argument guards are absent from Rust BY AN EXISTING DECISION, not by drift
+
+`canopy_assimilation` in Python raises on non-positive `ground_area`, non-positive `window_s`
+and negative `lai`. The Rust body validates none of them, and six Python tests exist for those
+three rules.
+
+⚠⚠ **This was first written up here as a behaviour gap, and that was wrong.**
+`science.rs`'s own module header states the decision in as many words: *"The `ValueError`-raising
+input guards (`ground_area > 0`, …) are omitted — they never fire for the frozen scenarios and
+would force `Result` on hot rate laws; the *behavioral* clamps (`lai == 0 → 0`, `max(0, …)`,
+piecewise cutoffs) are kept exactly."* It is a recorded Phase-7 port decision with a stated
+reason, not something the reference lost. I found it by reading the file head **after** writing
+the finding — the header was eight lines above the code I had already read twice. *Read the
+module header before reporting that a module is missing something.*
+
+What follows for S5 is unchanged in substance but different in kind: those six tests get **no
+Rust successor, and correctly so**. They are recorded here so that their absence reads as an
+inherited decision rather than as this slice narrowing the claim quietly — which is the whole
+failure mode S5 exists to avoid.
+
+⚠ One thing in that rationale is worth a later look and is NOT a finding today: *"they never
+fire for the frozen scenarios"* is a claim about the roster as it stood in Phase 7, and this
+repo has been bitten before by a scope claim outliving the roster that made it true. Cheap to
+re-check; it belongs with the guards decision, not inside a testing batch.
 
 ### The roster, and the batching
 
