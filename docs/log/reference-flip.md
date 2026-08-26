@@ -2689,3 +2689,149 @@ the language; the building slice settles the address, and must say out loud if i
 crate the standing rule refuses.
 
 **Standing after the decision pass:** no code touched, no Python deleted, no test written.
+
+### D1 — the context budget gets a Rust home (2026-08-25)
+
+`tests/test_context_budget.py`'s ten gates now stand in **`rust/crates/repo_gates`**, a
+seventh workspace member that is dev-only and `publish = false`, and whose subject is this
+repository rather than the simulation. §5y left the address open because both homes looked
+forbidden; **reading the rule showed one of them is not.** `rust/Cargo.toml` refuses *empty*
+speculative crates, and a crate arriving with ten live gates is neither. Nor is it a
+re-opening of FINDING 1: that was engine crates reaching out of `rust/` at **compile** time
+via `include_str!`; `repo_gates` reads permanent repository documents at **run** time and
+nothing depends on it — asserted, not intended.
+
+⚠ **Eight of the ten gates are set comparisons, so a scanner that silently matches LESS
+shrinks both sides and the suite reads green while checking nothing.** A set comparison
+cannot see this from the inside. Hence `tests/scanners.rs` pins the two exclusions that are
+easy to drop, plus greediness, the suffix and multi-hit lines — and Control A diffed both
+implementations over the real corpus: **130 lines, identical.**
+
+Nine repository mutations, run against **both** suites: nine of nine redden, on the same
+gates each time. ⚠ **M8's first attempt reddened nothing in either language and the probe was
+the defect** — it edited a `COMPLETE` in the phase index's *prose*, and the gate hashes only
+table rows. Re-aimed, both went red. Third arrival of S3's lesson: *a control that stays green
+is a claim about the control until you have shown the probe can bite.*
+
+**S4's own gate caught this work going in.** `workspace_purity.rs` reddened the moment the
+crate joined, demanding a layering rule for the new member — a gate three commits old
+stopping a new crate from being silently exempted by a scan that never looks at it. ⚠ The
+first control for its replacement assertion was **run wrong** (it reddened the pre-existing
+layering test, which only inspects `ENGINE_CRATES`); re-run through `godot_bridge`, only the
+new assertion reddens.
+
+⚠ **One self-inflicted finding, recorded because it cost real work.** A control's cleanup was
+a `git checkout` of one file with a bare `git checkout -- .` as its fallback; the file was
+untracked, the first half failed, and the fallback **reverted every tracked edit in the
+tree**. *A cleanup command with a wider blast radius than the mutation it reverses is not a
+cleanup.*
+
+### D2 — the headless CLI gate, and the shortcut that stops checking (2026-08-25)
+
+`test_headless_cli.py`'s four cases are now three tests in `station/tests/headless_cli.rs`.
+The claim is unchanged: `sim <scenario> <steps>` is byte-for-byte the reference run.
+
+**The obvious design was wrong twice over.** §5y and its advisor both assumed a faithful port
+meant **cargo launching cargo**, because Python shells out twice. Reading the code killed it:
+every `emit_*` example is a one-line `print!` of a library function, so from inside the crate
+the reference side is a **function call** — same bytes, no subprocess, byte-exact everywhere.
+⚠ And the *other* shortcut — compare the CLI against the committed goldens — was measured and
+**refused**: off the generation platform the golden compare falls back to a structural walk,
+so `greenhouse` would silently stop being byte-compared on Linux CI while still reading like
+it was. This is the shape the whole stage keeps finding: *the cheaper route passes, and stops
+checking the thing.*
+
+The function-call route introduces an assumption — that the examples really are thin wrappers
+— and **nothing in `rust/` referenced those programs at all**, so it was gated by nothing
+until the next golden regeneration, where a stray newline would surface as a golden diff that
+*looks like the science moved*. The new wrapper test closes it **by running the program**,
+never by scanning its source (§5x is the record of a text scan being unable to express its
+own rule). Control C3 pays for it: the example broke and the byte-identity test stayed green.
+
+⚠ All four controls were **re-run after a clippy fix restructured the file** — this repo's
+rule is that a control's verdict is dated to the tree it ran on. Four for four, unchanged.
+
+### D3 — the cross-boundary proof moves to Rust (2026-08-25)
+
+Nine `test_godot_*.py` modules — 1,671 lines, 17 tests — are now one
+`godot_bridge/tests/cross_boundary.rs` of **19**, same twelve GDScript smokes, same three
+claims. The `godot-parity` CI job runs `cargo test` instead of `pytest`, and its `Install uv`
+step went with the driver.
+
+**Two tests have no Python original and both earn their place**: a Rust port of a
+`skipif`-guarded subprocess harness has exactly two ways to be silently inert — the report
+accessors defaulting instead of failing, and the tool lookup returning `None` on a machine
+that has the tool. The second earned itself within the hour.
+
+⚠⚠ **`.trim()` is a narrowing, and only the control found it.** The snapshot assertion
+compared the produced string and the headless one *both trimmed* — it reads as tidiness. The
+control that made the reference print a trailing newline left the test **GREEN**: the one
+thing the file exists to catch, absorbed by a courtesy call. *"Byte-for-byte" has to mean
+bytes.*
+
+⚠ **`Path::parent` is lexical.** The repo-root helper was the manifest dir plus `"/../.."`,
+and `parent()` on a path *ending* in `..` strips that component instead of resolving it.
+Sixteen smokes failed; the harness self-check named the cause in plain words.
+
+⚠ **Three of the twelve smokes take a scenario path after `--`, and omitting it does not
+crash** — each printed a well-formed report with `ok: false` and zeroed numbers. A laxer port
+checking "markers present, JSON parses" would have shipped three tests that drive nothing.
+They were caught only because every assertion reads the report's own `ok` flag first.
+
+⚠ **`cargo test -p godot_bridge` does not build the cdylib** (measured by deleting the DLL):
+the test profile builds a harness, not the artifact Godot loads. And the timeout was
+**ported, not dropped** — the Rust command runner has no equivalent, so it drains both pipes
+on threads and polls to a deadline; dropping it turns a hung headless Godot into a CI job
+that burns its budget without naming the test that hung.
+
+**And the document nothing would have caught:** `docs/phase-8-reference.md` hand-lists its
+coverage as a table of **Python file names**, and it is the one freeze doc with no manifest —
+so the port would have left it naming files that no longer exist with every gate green. The
+"freeze's prose half is ungated" lesson, arriving exactly where it predicts.
+
+### D4 — the tolerance contract moves to the reference; one half deferred and named (2026-08-25)
+
+`tests/crossport/tiers.json` → **`rust/data/tiers.json`**, beside the goldens it classifies;
+`domains::tiers` reads it and implements the comparison; `domains/tests/tier_contract.rs` (7)
+and `station/tests/tier_contract.rs` (6) are the gates. The shape gates live in `station`
+because it is the only crate that can see **both** frozen rosters, and each `freeze_manifest`
+exposed `frozen_goldens()` so the roster comes from the manifest's own source rather than
+from a parsed document. **No band, floor or tier changed** — the predicted diff was a path.
+
+⚠⚠ **The hole is bigger than the orphaned-data filing it was made under: it is a missing
+assertion.** `domains::goldens::compare` carries **no numeric tolerance at all** — byte-exact
+for pure-arithmetic goldens and on Windows, otherwise a *structural* walk that asserts a
+hex-float leaf parses finite and says nothing about its value. So on the `crossport` CI job,
+the repo's only genuine cross-libm measurement, the banded assertion existed **only in
+Python**. One test pins that in-tree on any platform: hand the structural compare two
+snapshots differing by ten times a measured band and it reports **equal**.
+
+Five roster/data mutations plus six unit controls on the arithmetic. **C1 and C5 together are
+the pair that matters** — a golden leaf nudged 1e-11 reddens, the same leaf nudged 1e-13 does
+not — which proves the band *value* is load-bearing rather than merely present. ⚠ **C3 first
+read as inert and the probe was again the defect**: the harness grepped failing test names
+with a pattern that excludes digits, and the test's name contains a `1`. Third time this
+session that a green control was a statement about the control.
+
+⚠ **The floor's direction is recorded because the natural reading is backwards.** The floor
+*enlarges* the denominator near zero, so it makes the comparison **more** forgiving there and
+inert elsewhere; dropping it would make the gate **stricter**. An advisor note had it the
+other way round, and a test now pins the direction so nobody re-derives it.
+
+⚠ **DEFERRED, and it is the half the user's answer named:** the four `band > measured
+sensitivity` re-derivations. Their instrument substitutes a `math` reference **inside the
+Python domain modules** and runs the **Python engine**, so it is built out of the tree S6
+deletes. It **is** portable — checked, not assumed: the solar schedule returns a public
+closure a test can wrap and `Flow` is a public trait, so no frozen engine code changes. What
+it costs is four bespoke perturbation seams and a re-measurement that must land the same
+numbers. ⚠ The Python tool's own comments record the trap: both biosphere probes once shimmed
+a module the carbon path no longer called and measured **exactly 0.0, passing vacuously**. *A
+re-measurement that reads zero is the failure mode, not the result.* Until it lands the bands
+are **asserted but no longer justified in-tree**, and the justification dies at S6 — so this
+is a deadline, not an open-ended deferral.
+
+⚠ **The record itself was the last thing to close.** D1–D3 were committed touching only the
+plan document: no section here, no memory file, and none for **S4 built** either. The
+context-budget gate D1 had just moved into Rust could not see it — it pairs an index line to
+a file, not a slice to a section — so four consecutive slices violated the discipline one of
+them had just finished porting. *A gate's silence is bounded by what it compares.*
