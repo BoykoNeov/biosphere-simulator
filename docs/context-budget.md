@@ -204,6 +204,53 @@ the same week's other finding (`d8f5583`) is five frozen values in prose superse
 commits after they were written, while the assertion four lines below them fired on
 schedule and was re-pinned.
 
+#### It was raised again on 2026-08-26 — 16,000 → 20,000 — and the raise owed a THIRD bound
+
+**Pre-emptively, while still green.** 15,932 B over 94 lines (169.5 B/line): 67 B under
+the ceiling, 0.5 B/line under the budget. The raise was made because S5 batch D's own
+index line could not otherwise be written — the ordering the discipline forces, not a
+bypass of it.
+
+The decomposition against the 2026-08-15 baseline (11,925 B / 70 lines / 170.4 B/line) is
+the cleanest case this gate has produced:
+
+| cause | growth | share |
+|---|---|---|
+| **count** — 70 → 94 index lines at the old 170.4 B/line | +4,089 B | **102 %** |
+| **length** — 170.4 → 169.5 B/line across 94 lines | −82 B | −2 % |
+
+Actual growth +4,007 B. **All of it is count, and the per-line budget did not merely
+hold — it improved.** Last time the split was 69/31 and a raise was still right; here
+there is no length component to argue about at all.
+
+⚠ **But the two existing bounds have between them stopped being able to see the
+documented failure mode, so this raise ships a third.** The per-line budget is a **mean**,
+and a mean dilutes with every raise: one 400 B paragraph moves it +3.3 B/line at 70 lines
+and +2.0 at 117. Measured the day this shipped, the longest single index line is **239 B
+against a 169.5 B mean — 1.41×**. A hook can already be half again the typical one. That
+is the 2026-08-15 finding one turn further along: **a mean cannot tell one fat hook from
+94 slightly fatter ones**, exactly as a total cannot tell more memories from fatter ones.
+
+So `MAX_MEMORY_INDEX_LINE_BYTES = 240` is asserted, **pinned at the measurement** (239,
+plus one byte) rather than set somewhere comfortable above it — a max bound with room in
+it rots the way a ceiling with room in it rots. Its remedy is the per-line budget's aimed
+at a single line: shorten *that* hook. Like the per-line budget, it is not raised.
+
+⚠ **The honest scope, because two of the five controls measured it and "the new gate went
+red" would have been true for the wrong reason.** Appending a 241 B hook *today* reddens
+the **mean**, not the new bound — and so does a 239 B hook the new bound would allow,
+because the mean has 0.5 B of slack. The new bound fires **alone** only once the index has
+slack again: padded to 119 lines, the same fat hook reddens it and nothing else, and the
+same 119-line index without the fat hook is green. **Its bite is in the regime this raise
+creates**, which is the right place for it and is not the same as biting now.
+
+⚠⚠ **The cadence is itself a measurement, and it is the user's call, not this document's.**
+The 2026-08-15 raise bought "~24 memories of headroom". Those 24 index lines arrived in
+**eleven days**. 20,000 B is ~118 lines at budget — the same ~24 memories, so the same
+~11 days. If the ceremony keeps firing on that period, the finding is no longer "the index
+grew"; it is that a fortnightly raise ritual is the wrong instrument for an index growing
+this fast. Raised on precedent and **flagged**, not decided.
+
 ### What the gate deliberately does NOT check
 
 It cannot tell whether a row *should* have been retired, or whether a memory file
