@@ -1048,4 +1048,65 @@ mod tests {
         let large = leaf_area_index(100.0, 0.5, 2.0);
         assert_eq!(large, small / 2.0);
     }
+
+    // --- the chamber seam (batch A's third file) ---------------------------------
+    //
+    // ⚠ These two have NO Python ancestor in `test_gas_exchange.py`: that file's subject
+    // is flow-level stoichiometry, and it reaches `ci_from_co2_pool` only through the
+    // sealed `CarbonContext`. They are written here as ADDITIONAL coverage of two of the
+    // 28 untested `science.rs` functions, and the by-name census must not count them as
+    // successors to claims they do not cover.
+
+    /// `Ci = ci_ratio · (co2_mol / air_mol) · 1e6` — the finite chamber's Ci seam.
+    ///
+    /// The mole-fraction → µmol mol⁻¹ conversion and the Ci/Ca ratio are separate
+    /// factors, and both are pinned: 0.4 mol CO₂ in 1000 mol of air is a mole fraction
+    /// of 4e-4, i.e. `Ca = 400` µmol mol⁻¹, and at `ci_ratio = 0.7` that is `Ci = 280`.
+    /// The `ci_ratio = 1` case is asserted separately because it is the only input for
+    /// which Ci and Ca coincide — the case that distinguishes the two factors' roles.
+    #[test]
+    fn ci_from_a_finite_pool_is_the_mole_fraction_times_the_ci_ratio() {
+        assert_eq!(ci_from_co2_pool(0.4, 1000.0, 0.7), 280.0);
+        assert_eq!(ci_from_co2_pool(0.4, 1000.0, 1.0), 400.0);
+        // Linear in the pool, inverse in the air basis: halving the air doubles Ci.
+        assert_eq!(ci_from_co2_pool(0.8, 1000.0, 0.7), 560.0);
+        assert_eq!(ci_from_co2_pool(0.4, 500.0, 0.7), 560.0);
+        // An emptied chamber is Ci = 0, not a division artefact.
+        assert_eq!(ci_from_co2_pool(0.0, 1000.0, 0.7), 0.0);
+    }
+
+    /// `f_O2 = x / (K + x)` — the Michaelis self-limit on sealed respiration.
+    ///
+    /// The half-saturation point is the function's defining property and needs no
+    /// literature value to check: at `x = K` the factor is exactly ½, at `x = 9K`
+    /// exactly 0.9, whatever `K` is. Written that way on purpose — a pin on today's
+    /// `o2_half_saturation` would be a snapshot of a param file, not of the form.
+    ///
+    /// ⚠ The `max(0, …)` clamp is behaviour, not an input guard: a chamber driven to a
+    /// slightly negative O₂ by float noise must yield `f_O2 = 0`, never a negative
+    /// factor that would REVERSE the burn's sign. It is asserted here for that reason.
+    #[test]
+    fn oxygen_limitation_is_michaelis_and_half_saturates_at_k() {
+        let air = 1000.0;
+        for k in [1.0e-4, 1.0e-3, 0.05] {
+            // x == K  ⇒  K/(K+K) = 1/2, exactly, for any K.
+            assert_eq!(oxygen_limitation_factor(k * air, air, k), 0.5, "K = {k}");
+            // x == 9K ⇒  9K/(K+9K) = 9/10.
+            let f9 = oxygen_limitation_factor(9.0 * k * air, air, k);
+            assert!((f9 - 0.9).abs() <= 1e-15, "K = {k}: f(9K) = {f9}");
+            // An empty chamber shuts respiration off entirely.
+            assert_eq!(oxygen_limitation_factor(0.0, air, k), 0.0, "K = {k}");
+            // Saturating: below 1 always, and monotone increasing.
+            let lo = oxygen_limitation_factor(0.10 * air, air, k);
+            let hi = oxygen_limitation_factor(0.21 * air, air, k);
+            assert!(lo < hi && hi < 1.0, "K = {k}: {lo} !< {hi} !< 1");
+        }
+    }
+
+    /// The clamp's DIRECTION, on its own, because getting it wrong is silent.
+    #[test]
+    fn a_negative_oxygen_amount_clamps_to_zero_rather_than_reversing_the_sign() {
+        let f = oxygen_limitation_factor(-1.0e-9, 1000.0, 1.0e-4);
+        assert_eq!(f, 0.0);
+    }
 }

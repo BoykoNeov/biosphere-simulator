@@ -1535,3 +1535,454 @@ impl AuxProcess for VernalizationAccumulation {
         Ok(BTreeMap::from([(self.accumulator.clone(), rate * dt)]))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use simcore::environment::{constant, Schedule, SourceResolver};
+    use simcore::quantities::{Quantity, StockKind};
+    use simcore::state::Stock;
+    use std::collections::HashMap;
+
+    // -----------------------------------------------------------------------------
+    // S5 batch A, the gas-exchange third: the multi-quantity (CARBON+OXYGEN) flows.
+    //
+    // ⚠ These are FLOW-level, not equation-level, and that is why they are here rather
+    // than in `science.rs`. `test_gas_exchange.py`'s subject is leg structure — which
+    // stocks a transfer touches and in what proportion — and §5ad's roster wrongly filed
+    // it under batch A's `science.rs` surface. The correction is in §5ae.
+    //
+    // ⚠ What is deliberately NOT ported, and why the absence is a decision:
+    //
+    //   * `test_allocation_balances_carbon_and_oxygen`,
+    //     `test_maintenance_closed_balances_carbon_and_oxygen`,
+    //     `test_sealed_conserves_oxygen_exactly`,
+    //     `test_sealed_co2_o2_anti_correlate_at_pq1` — all four are the SAME claim as
+    //     the engine's own machinery. The CO₂ pool's composition is `{C:1, O:2}` and the
+    //     O₂ pool's is `{O:2}`, so "one O₂ released per carbon fixed" is precisely what
+    //     OXYGEN balance says; and with no boundary O₂ stock, `2·(CO₂+O₂) = const`
+    //     forces `ΔO₂ = −ΔCO₂` step for step. `assert_conserved` runs every step of
+    //     every run, so a completed sealed run already asserts them.
+    //   * `test_maintenance_closed_emits_single_pool_leg` — `FlowResult::new` REJECTS a
+    //     duplicate leg, so the withdraw+deposit pair the Python test rules out is not a
+    //     wrong flow in Rust, it is an `Err`. Guarded by the constructor, harder than by
+    //     a test.
+    //   * `test_sealed_o2_stays_far_from_rationing` — its premise is false in the
+    //     reference. It is the "`f_O2` is deferred" guard, and `f_O2` is LIVE here
+    //     (`MaintenanceRespiration` and the six soil flows all call
+    //     `oxygen_limitation_factor`). The reference's sealed chamber DEPLETES O₂ on
+    //     purpose; `system.rs::sealed_chamber_runs_well_fed` asserts that depletion and
+    //     `rationed == 0` together, which is the successor claim.
+    //
+    // What IS ported are the claims that survive removing the balance assertion: the
+    // magnitude and distribution of the burn, the sealed/open branch difference, and
+    // the empty-flow no-ops. Each one below was mutation-checked against
+    // `cargo test -p domains --lib`.
+    // -----------------------------------------------------------------------------
+
+    const LEAF: &str = "biosphere.leaf_c";
+    const STEM: &str = "biosphere.stem_c";
+    const ROOT: &str = "biosphere.root_c";
+    const STORAGE: &str = "biosphere.storage_c";
+    const RESERVE: &str = "biosphere.stem_reserve_c";
+    const PLANT_N: &str = "biosphere.plant_n";
+    const SOIL_WATER: &str = "biosphere.soil_water";
+    const CO2: &str = "biosphere.carbon_pool";
+    const O2: &str = "biosphere.o2_pool";
+    const THERMAL_TIME: &str = "thermal_time";
+    const ROOTED_DEPTH: &str = "biosphere.rooted_depth";
+
+    /// The chamber's air basis, in mol — the `f_O2` and Ci denominators.
+    const AIR_MOL: f64 = 1000.0;
+    /// 1.0 m of root zone at EXTR 0.13 over 1 m² holds 130 kg, so the 100 kg fill below
+    /// is FTSW 0.77 — well above `wssg`, i.e. unstressed. (Mirrors the Python fixture's
+    /// 2026-08-12 geometry re-basing.)
+    const TEST_DEPTH: f64 = 1.0;
+    const EXTR: f64 = 0.13;
+    const WSSG: f64 = 0.30;
+
+    /// Open-field context: Ci comes off the forcing, as in Phase 1.
+    fn ctx_open() -> CarbonContext {
+        CarbonContext {
+            leaf_c: LEAF.to_string(),
+            stem_c: STEM.to_string(),
+            root_c: ROOT.to_string(),
+            par_var: "par".to_string(),
+            ci_var: "ci".to_string(),
+            temp_var: "temp".to_string(),
+            soil_water_var: "soil_water".to_string(),
+            wssg: WSSG,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: EXTR,
+            plant_n: PLANT_N.to_string(),
+            photo: params::photosynthesis(),
+            canopy: params::canopy(),
+            resp: params::respiration(),
+            nitro: params::nitrogen(),
+            ground_area: 1.0,
+            co2_pool_var: None,
+            chamber_air_mol: None,
+            ci_ratio: None,
+        }
+    }
+
+    /// Sealed context: Ci is computed from the finite CO₂ pool through the chamber seam.
+    fn ctx_sealed(ci_ratio: f64) -> CarbonContext {
+        CarbonContext {
+            co2_pool_var: Some("co2_pool".to_string()),
+            chamber_air_mol: Some(AIR_MOL),
+            ci_ratio: Some(ci_ratio),
+            ..ctx_open()
+        }
+    }
+
+    fn state(leaf: f64, stem: f64, root: f64, co2: f64, o2: f64, thermal_time: f64) -> State {
+        let carbon = Quantity::Carbon.canonical_unit();
+        let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
+        for (id, amount) in [
+            (LEAF, leaf),
+            (STEM, stem),
+            (ROOT, root),
+            (STORAGE, 0.0),
+            (RESERVE, 0.0),
+        ] {
+            stocks.insert(
+                id.to_string(),
+                Stock::new(
+                    id.to_string(),
+                    "biosphere".to_string(),
+                    Quantity::Carbon,
+                    carbon.clone(),
+                    amount,
+                    StockKind::Population,
+                    0.0,
+                    false,
+                    BTreeMap::new(),
+                )
+                .expect("organ stock"),
+            );
+        }
+        let mut pool = |id: &str, q: Quantity, amount: f64, comp: BTreeMap<Quantity, f64>| {
+            stocks.insert(
+                id.to_string(),
+                Stock::new(
+                    id.to_string(),
+                    "biosphere".to_string(),
+                    q,
+                    q.canonical_unit(),
+                    amount,
+                    StockKind::Pool,
+                    0.0,
+                    false,
+                    comp,
+                )
+                .expect("pool stock"),
+            );
+        };
+        pool(PLANT_N, Quantity::Nitrogen, 1.0, BTreeMap::new());
+        pool(SOIL_WATER, Quantity::Water, 100.0, BTreeMap::new());
+        // The CO₂ pool is a true molecular stock: 1 mol C + 2 mol O per mol CO₂.
+        pool(
+            CO2,
+            Quantity::Carbon,
+            co2,
+            BTreeMap::from([(Quantity::Carbon, 1.0), (Quantity::Oxygen, 2.0)]),
+        );
+        // Its O₂ counterpart: 2 mol OXYGEN per mol O₂.
+        pool(
+            O2,
+            Quantity::Oxygen,
+            o2,
+            BTreeMap::from([(Quantity::Oxygen, 2.0)]),
+        );
+        State::new(
+            0,
+            stocks,
+            0,
+            BTreeMap::from([
+                (THERMAL_TIME.to_string(), thermal_time),
+                (ROOTED_DEPTH.to_string(), TEST_DEPTH),
+            ]),
+        )
+        .expect("fixture state")
+    }
+
+    /// A well-fed vegetative state: DVS ≈ 0.5, organs 3 : 1 : 1, chamber gases filled.
+    fn growing_state() -> State {
+        state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, 550.0)
+    }
+
+    fn resolver(par: f64, ci: f64) -> SourceResolver {
+        let forcings: HashMap<String, Schedule> = HashMap::from([
+            ("par".to_string(), constant(par).expect("par")),
+            ("ci".to_string(), constant(ci).expect("ci")),
+            ("temp".to_string(), constant(20.0).expect("temp")),
+        ]);
+        let shared: HashMap<String, String> = HashMap::from([
+            ("soil_water".to_string(), SOIL_WATER.to_string()),
+            ("co2_pool".to_string(), CO2.to_string()),
+        ]);
+        SourceResolver::new(forcings, shared).expect("resolver")
+    }
+
+    fn legs_of(flow: &dyn Flow, s: &State, par: f64) -> BTreeMap<String, f64> {
+        let r = resolver(par, 400.0);
+        let env = r.bind(s, 1.0);
+        flow.evaluate(s, &env, 1.0)
+            .expect("evaluate")
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect()
+    }
+
+    fn allocation(ctx: CarbonContext, o2_pool: Option<String>) -> Allocation {
+        Allocation {
+            id: "biosphere.allocation".to_string(),
+            ctx,
+            co2_atmos: CO2.to_string(),
+            storage_c: STORAGE.to_string(),
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: params::phenology(),
+            table: params::allocation().table,
+            o2_pool,
+            stem_reserve_c: None,
+            fstr: 0.0,
+            reserve_cessation_dvs: 0.0,
+        }
+    }
+
+    /// The sealed maintenance flow: source pool == sink pool, so `covered` is a round
+    /// trip and only the organ-burned shortfall is a real respiration.
+    fn maintenance_sealed() -> MaintenanceRespiration {
+        MaintenanceRespiration {
+            id: "biosphere.maintenance_respiration".to_string(),
+            ctx: ctx_open(),
+            co2_atmos: CO2.to_string(),
+            co2_resp: CO2.to_string(),
+            o2_pool: Some(O2.to_string()),
+            air_mol: Some(AIR_MOL),
+        }
+    }
+
+    // --- Allocation: CO₂ → biomass + O₂ ------------------------------------------
+
+    /// PQ = 1: every mol C fixed into an organ releases one mol O₂ and draws one mol C
+    /// from the pool, and the sum runs over ALL FOUR organs including storage.
+    ///
+    /// ⚠ Honest scope: given the pool compositions this is OXYGEN balance restated, so
+    /// its mutation-red is on loan from `assert_flow_balanced`. It is ported anyway
+    /// because it is the claim that would have to be re-checked if a composition ever
+    /// changed, and because the FOUR-organ sum (storage included) is the part a reader
+    /// gets wrong. Its independent content is the organ ROSTER, not the ratio.
+    /// Mirrors `test_gas_exchange.py::test_allocation_releases_o2_equal_to_carbon_fixed`
+    /// and `::test_allocation_storage_carbon_releases_o2_too`.
+    #[test]
+    fn allocation_releases_one_oxygen_per_carbon_fixed_across_all_four_organs() {
+        // DVS 1.5 (post-anthesis) so the storage leg is nonzero and joins the sum.
+        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, 1100.0 + 375.0);
+        let legs = legs_of(&allocation(ctx_open(), Some(O2.to_string())), &s, 800.0);
+        let fixed = legs[LEAF] + legs[STEM] + legs[ROOT] + legs[STORAGE];
+        assert!(fixed > 0.0, "no carbon fixed: the fixture is not growing");
+        assert!(legs[STORAGE] > 0.0, "grain is not filling at DVS 1.5");
+        assert_eq!(legs[O2], fixed);
+        assert_eq!(legs[CO2], -fixed);
+    }
+
+    /// `o2_pool: None` (open field) keeps the single-currency Phase-1 legs.
+    ///
+    /// Balance-immune in BOTH directions, which is what makes it worth writing: an open
+    /// field has no O₂ stock at all, so an unconditional leg would be a missing-stock
+    /// panic rather than an imbalance, and a conditional one that fires on the wrong
+    /// branch changes nothing any conserved quantity can see.
+    /// Mirrors `test_gas_exchange.py::test_allocation_open_field_has_no_o2_leg`.
+    #[test]
+    fn allocation_in_the_open_field_emits_no_oxygen_leg() {
+        let legs = legs_of(&allocation(ctx_open(), None), &growing_state(), 800.0);
+        assert!(!legs.contains_key(O2));
+        assert!(
+            legs[LEAF] > 0.0,
+            "the open-field flow still grows the plant"
+        );
+    }
+
+    /// The sealed Ci seam is WIRED: `CarbonContext::ci` reads the finite pool, not the
+    /// `ci` forcing. Magnitude-only and therefore balance-immune — a context that fell
+    /// back to the forcing would fix a different amount of carbon with every leg still
+    /// summing to zero.
+    ///
+    /// The fixture makes the two sources disagree on purpose: the forcing is 400
+    /// µmol mol⁻¹ while 0.4 mol of CO₂ in 1000 mol of air at `ci_ratio = 0.5` is 200.
+    /// No Python ancestor — `test_chamber.py` owns the seam there; this is the wiring
+    /// claim that makes `science.rs::ci_from_a_finite_pool_…` reachable from a flow.
+    #[test]
+    fn the_sealed_context_reads_ci_from_the_pool_and_not_the_forcing() {
+        let s = growing_state();
+        let sealed = legs_of(&allocation(ctx_sealed(0.5), None), &s, 800.0);
+        let open = legs_of(&allocation(ctx_open(), None), &s, 800.0);
+        assert!(
+            sealed[LEAF] < open[LEAF],
+            "Ci 200 must fix less than Ci 400: sealed {} vs open {}",
+            sealed[LEAF],
+            open[LEAF]
+        );
+        // And it is the SAME arithmetic: a sealed ratio of 1.0 puts Ci back at Ca = 400.
+        let matched = legs_of(&allocation(ctx_sealed(1.0), None), &s, 800.0);
+        assert_eq!(matched[LEAF], open[LEAF]);
+    }
+
+    // --- MaintenanceRespiration: biomass + O₂ → CO₂ ------------------------------
+
+    /// A deficit day (dark ⇒ GASS = 0): the shortfall is burned out of the organs and
+    /// returned to the pool as CO₂, consuming one mol O₂ per mol C burned.
+    /// Mirrors `::test_maintenance_closed_burns_biomass_to_co2_consuming_o2`.
+    #[test]
+    fn sealed_maintenance_burns_organs_to_co2_and_consumes_oxygen_one_for_one() {
+        let legs = legs_of(&maintenance_sealed(), &growing_state(), 0.0);
+        let burned = -(legs[LEAF] + legs[STEM] + legs[ROOT]);
+        assert!(
+            burned > 0.0,
+            "nothing burned: the fixture is not in deficit"
+        );
+        assert_eq!(legs[CO2], burned);
+        assert_eq!(legs[O2], -burned);
+    }
+
+    /// ⚠⚠ The balance-immune magnitude claim, and the reason this batch is not just a
+    /// restatement of conservation: the sealed burn is THROTTLED by `f_O2`.
+    ///
+    /// Scaling the whole burn leaves CARBON and OXYGEN balanced and leaves PQ = 1 intact
+    /// — organs, pool and O₂ all move by the same amount — so nothing in the balance or
+    /// conservation machinery can see the factor at all. What pins it is the Michaelis
+    /// ratio: at a chamber mole fraction of exactly `K` the factor is ½ and at `9K` it
+    /// is 9/10, so the two burns must stand in the ratio 5/9 whatever `K` is.
+    ///
+    /// No Python ancestor: `f_O2` was still deferred when `test_gas_exchange.py` was
+    /// written (its header says so, and that prose is stale against this tree).
+    #[test]
+    fn the_sealed_burn_is_throttled_by_f_o2_in_the_michaelis_ratio() {
+        let k = params::respiration().o2_half_saturation;
+        let burn = |o2: f64| {
+            let s = state(3.0, 1.0, 1.0, 0.4, o2, 550.0);
+            legs_of(&maintenance_sealed(), &s, 0.0)[CO2]
+        };
+        let half = burn(k * AIR_MOL); // x = K   ⇒ f_O2 = 1/2
+        let nine_tenths = burn(9.0 * k * AIR_MOL); // x = 9K  ⇒ f_O2 = 9/10
+        assert!(half > 0.0 && nine_tenths > 0.0);
+        let ratio = half / nine_tenths;
+        assert!(
+            (ratio - 5.0 / 9.0).abs() <= 1e-12,
+            "f_O2 is not throttling the burn: ratio {ratio}, want 5/9"
+        );
+    }
+
+    /// The shortfall is split across the organs IN PROPORTION to their carbon, not
+    /// evenly. Balance-immune: any split summing to the same total balances identically,
+    /// so only a distribution test can see this.
+    #[test]
+    fn the_sealed_burn_is_split_in_proportion_to_organ_carbon() {
+        // 3 : 1 : 1 leaf : stem : root, so the leaf must pay three fifths of the burn.
+        let legs = legs_of(&maintenance_sealed(), &growing_state(), 0.0);
+        let total = legs[LEAF] + legs[STEM] + legs[ROOT];
+        assert!(
+            (legs[LEAF] / total - 0.6).abs() <= 1e-12,
+            "leaf share {} of {total}",
+            legs[LEAF]
+        );
+        assert_eq!(legs[STEM], legs[ROOT]);
+        assert!(
+            (legs[STEM] / total - 0.2).abs() <= 1e-12,
+            "stem share {} of {total}",
+            legs[STEM]
+        );
+    }
+
+    /// `covered = min(GASS, MRES)`: on a surplus day the shortfall is zero, the covered
+    /// maintenance is a CO₂→CO₂ round trip on the single pool, and the flow is EMPTY —
+    /// not a set of zero legs.
+    ///
+    /// Balance-immune twice over: a zero leg balances exactly as an absent one does, and
+    /// a `min` flipped to `max` scales the burn without unbalancing anything.
+    /// Mirrors `::test_maintenance_closed_surplus_day_is_noop`.
+    #[test]
+    fn sealed_maintenance_on_a_surplus_day_is_an_empty_flow() {
+        let legs = legs_of(&maintenance_sealed(), &growing_state(), 800.0);
+        assert!(legs.is_empty(), "surplus day emitted legs: {legs:?}");
+    }
+
+    /// A partial deficit (large biomass, tiny canopy ⇒ 0 < GASS < MRES) still burns only
+    /// the shortfall: the covered half stays the dropped round trip, and what daylight
+    /// covered is exactly `f_O2·GASS·dt`.
+    /// Mirrors `::test_maintenance_closed_partial_deficit_balances`.
+    #[test]
+    fn sealed_maintenance_burns_only_the_shortfall_on_a_partial_deficit_day() {
+        let s = state(0.1, 50.0, 50.0, 0.4, 0.21 * AIR_MOL, 550.0);
+        let lit = legs_of(&maintenance_sealed(), &s, 800.0)[CO2];
+        let dark = legs_of(&maintenance_sealed(), &s, 0.0)[CO2];
+        assert!(lit > 0.0, "the partial-deficit fixture is not in deficit");
+        assert!(
+            lit < dark,
+            "daylight did not cover any maintenance: {lit} vs {dark}"
+        );
+        let r = resolver(800.0, 400.0);
+        let env = r.bind(&s, 1.0);
+        let (gass, _, _) = ctx_open().budget(&s, &env).expect("budget");
+        let f_o2 = science::oxygen_limitation_factor(
+            0.21 * AIR_MOL,
+            AIR_MOL,
+            params::respiration().o2_half_saturation,
+        );
+        assert!(
+            (dark - lit - f_o2 * gass).abs() <= 1e-12 * f_o2 * gass,
+            "the covered part is not GASS: {dark} − {lit} vs {}",
+            f_o2 * gass
+        );
+    }
+
+    /// The OPEN-field branch is different in kind, not merely in wiring: the covered
+    /// maintenance is a real draw on the atmosphere, so it appears as a leg even on a
+    /// surplus day — the day the sealed branch emits nothing at all.
+    #[test]
+    fn open_field_maintenance_draws_the_covered_part_from_the_atmosphere() {
+        let open = MaintenanceRespiration {
+            id: "biosphere.maintenance_respiration".to_string(),
+            ctx: ctx_open(),
+            co2_atmos: CO2.to_string(),
+            co2_resp: "boundary.co2".to_string(),
+            o2_pool: None,
+            air_mol: None,
+        };
+        let legs = legs_of(&open, &growing_state(), 800.0);
+        assert!(
+            legs[CO2] < 0.0,
+            "the open field must WITHDRAW the covered maintenance"
+        );
+        assert!(legs["boundary.co2"] > 0.0);
+    }
+
+    // --- GrowthRespiration -------------------------------------------------------
+
+    /// Growth-conversion carbon is gross-assimilated and immediately respired, so in a
+    /// sealed chamber it is a CO₂→CO₂ round trip whose O₂ release is reconsumed: an
+    /// empty flow. Balance-immune — the round trip it replaces balances perfectly.
+    /// Mirrors `::test_growth_resp_closed_is_noop`.
+    #[test]
+    fn sealed_growth_respiration_is_an_empty_round_trip() {
+        let sealed = GrowthRespiration {
+            id: "biosphere.growth_respiration".to_string(),
+            ctx: ctx_open(),
+            co2_atmos: CO2.to_string(),
+            co2_resp: CO2.to_string(),
+        };
+        assert!(legs_of(&sealed, &growing_state(), 800.0).is_empty());
+        // The open-field counterpart is NOT empty — so the emptiness is the branch, not
+        // a fixture that happens to produce no growth respiration.
+        let open = GrowthRespiration {
+            id: "biosphere.growth_respiration".to_string(),
+            ctx: ctx_open(),
+            co2_atmos: CO2.to_string(),
+            co2_resp: "boundary.co2".to_string(),
+        };
+        assert!(legs_of(&open, &growing_state(), 800.0)["boundary.co2"] > 0.0);
+    }
+}

@@ -2835,3 +2835,96 @@ plan document: no section here, no memory file, and none for **S4 built** either
 context-budget gate D1 had just moved into Rust could not see it — it pairs an index line to
 a file, not a slice to a section — so four consecutive slices violated the discipline one of
 them had just finished porting. *A gate's silence is bounded by what it compares.*
+
+### S5 batch A — the carbon-capture batch, in two halves (2026-08-26)
+
+98 Python tests over three files. `cargo test -p domains --lib` 183 → 196, workspace 795 →
+820, clippy clean, **no golden byte, band, floor or manifest moved**. Plan §5ad (the
+measurement) + §5ae (the build).
+
+**The equations half** ports `test_photosynthesis.py` and `test_canopy.py` onto the FvCB
+co-limitation functions, the temperature response and the canopy aggregator: 12 tests, every
+literal hand-computed from the cited equation with the arithmetic in the comment, the params
+fixture held as literals so a loader regression cannot move a physics pin. Seven mutations,
+all seven biting the test named for them.
+
+⚠⚠ **The canopy's integration scheme stopped being golden-only.** Flattening the three-point
+Gaussian depth weights previously reddened four tests, **all four committed-byte
+comparisons** and not one behavioural gate. It now reddens a photon-conservation test that
+checks the depth integral against the closed-form Beer–Lambert total in the linear-response
+regime. ⚠ That test's tolerance was wrong first: a flat `1e-4` held at LAI 2.936 and failed
+at LAI 6, because 3-point Gauss error grows as the sixth power of `k·LAI`. It is now derived
+per canopy from the classical n = 3 bound, so it tightens itself on open canopies instead of
+being set everywhere by its loosest case.
+
+⚠ **The exit gate's clause 2 widened during the batch, not after it.** As first written it
+demanded a value the cited source *states*; most of the Python literals are hand-computed
+from the source's equation instead, so the clause would have rejected the very tests it was
+written to license. A hand-computed pin is legitimate exactly when its derivation is in the
+comment.
+
+**⚠⚠ The roster was wrong about the third file, and the error is structural rather than
+clerical.** `test_gas_exchange.py` is **not** a `science.rs` file: its subject is flow-level
+stoichiometry — which stocks a transfer touches and in what proportion — so its Rust surface
+is `flows.rs`. §5ad's own text says equation work and flow work "must not be batched
+together" and gives that as the reason batch F is late; batch A was therefore **mixed all
+along** and the table hid it. What actually distinguishes F is not "flow-level" but
+"flow-level *and* no extracted functions exist" — A's flow half composes equations that are
+already in `science.rs`, and needed no production-code change.
+
+**The gases half** is 10 flow-level tests in a new `#[cfg(test)]` module **inside
+`flows.rs`** plus 3 chamber-seam equation tests in `science.rs`. The placement is
+load-bearing: the exit gate measures with `cargo test -p domains --lib`, and an integration
+test under `domains/tests/` falls out of that binary while landing in the same one as the
+goldens — the noise `--lib` exists to exclude by construction.
+
+**⚠⚠ The rule this half adds: mutate AGAINST the balance machinery, not with it.** In this
+engine a stoichiometric identity is what `assert_flow_balanced` and `assert_conserved`
+already check, so a mutation that drops or sign-flips an O₂ leg reddens because OXYGEN
+stopped balancing — golden-loan coverage under a more reassuring name. The discriminating
+mutations leave every conserved quantity balanced: a **magnitude** change that scales the
+whole transfer, a **distribution** change that redivides a fixed total, a **branch** change
+that swaps one balanced leg set for another, a **routing** change that reads the right number
+from the wrong source. Every test in the flow half is written against one of those four.
+*Before writing a flow-level test, ask what it still asserts once the balance check is
+removed; if the answer is "nothing", it is a second copy of `assert_conserved`.* This applies
+directly to batch F, whose soil-carbon flows are the same shape.
+
+**Five Python tests got NO successor and each absence is a decision**: the two
+`balances_carbon_and_oxygen` cases, `test_sealed_conserves_oxygen_exactly` and
+`test_sealed_co2_o2_anti_correlate_at_pq1` are all the same claim as machinery that already
+runs every step (given `{C:1,O:2}` and `{O:2}` compositions and no boundary O₂ stock,
+`2·(CO₂+O₂) = const` *forces* `ΔO₂ = −ΔCO₂`); and `test_maintenance_closed_emits_single_pool_leg`
+is guarded harder in Rust than in Python, because `FlowResult::new` **rejects** a duplicate
+leg outright.
+
+⚠ **A sixth has a premise that is false in the reference.**
+`test_sealed_o2_stays_far_from_rationing` is the *"`f_O2` is deferred"* guard and its own
+docstring says so — but `f_O2` is **live** here, called by `MaintenanceRespiration` and six
+soil flows, and the reference's sealed chamber depletes O₂ on purpose. The Python header
+prose describing the deferral was not ported. *Read a ported file's header as a dated
+document, not as a specification.*
+
+**Eleven mutations, eleven named reds, and four of them caught by nothing else in the
+binary** (M1 the `f_O2` throttle, M9 the negative-O₂ clamp, M10 the open/sealed branch split,
+M11 the growth-respiration no-op).
+
+⚠⚠ **M1 is the same finding as the canopy quadrature, one mechanism over.** Dropping the O₂
+self-limit from plant maintenance respiration — deleting a whole feedback, not perturbing a
+coefficient — was run at workspace scope and reddens **four committed-byte and band
+comparisons and nothing else in 820 tests**. Not one science gate, not one behavioural check,
+not one liveness floor. Two mechanisms sampled at random from the untested set, two answers
+of "golden-only": the pattern §5ad measured is not a coincidence of which mutations were
+picked.
+
+⚠ **The battery's revert path was the near-miss.** Its first draft reverted each mutation
+with `git checkout --`, against files holding the batch's own uncommitted work. Caught before
+it ran; it now restores from pristine copies and verifies both files byte-exact at the end.
+Same trap S1 recorded, arriving from the opposite direction — there the danger was reverting
+a control, here the danger was reverting the subject.
+
+⚠ **The exit gate's clause 3, the by-name claim census, is still unwritten** — it is an S5
+exit artefact rather than a per-batch one. When it lands, the three chamber-seam tests must
+be marked **additional coverage**, not successors: they have no Python ancestor in batch A's
+files at all. `intercepted_fraction` also stays unresolved (clause 4, an S6 item), and no
+Python was deleted — all three files stay green and running until S6.
