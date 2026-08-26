@@ -3545,3 +3545,128 @@ conditions overlap. That is now asserted, alongside the ramp — the same shape 
 for `allocation.yaml`'s two mutations that LOAD, so a validator appearing later says so out
 loud instead of a guard quietly materializing. Measured independent of the ramp inversion by
 construction, and confirmed against E3b.
+
+## S5 batch G — the senescence batch, and a file whose subject is two models never built (2026-08-26)
+
+`tests/test_senescence_form.py` 37 plus the **14 batch D handed forward** from
+`test_allocation.py` = 51 Python tests → **8 Rust tests over three surfaces** plus one
+production change (the `senescence_from` loader split, the fifth instance of the same
+refactor). `-p domains --lib` 298 → 306, workspace 930 → 938, clippy clean, **no golden byte
+or manifest moved**. Design and every measurement:
+`docs/plans/post-roadmap-reference-flip.md` §5ak.
+
+⚠ **Taken before batch F on the user's call**, against §5ad's own ordering: F is the only S5
+batch that may force a production-code extraction and needs its own decision; G was the last
+of the ones that do not.
+
+### ⚠⚠ The headline is an absence: 25 of 33 test functions have no live subject at all
+
+`test_senescence_form.py` is 2,856 lines, 100 of them its module docstring. Classified by
+what each test actually constructs: **12 functions run two candidate flow classes that are
+defined inside the test file and were never built**, 12 run the stem-only branch that was
+priced and REFUSED on 2026-07-28, and one is arithmetic on two source tables that also exist
+only as constants in the test file. Eight make a claim about the shipped tree.
+
+So the file is a decision record written as executable tests — batch D's disposition for
+`test_stem_reserves.py` and batch E's for `test_nitrogen_throttle.py`, at three times the
+size. Its own docstring says so: *"The candidate flows live in this module, not in `src/`:
+nothing here is built."* Porting it would mean building two refused models in Rust in order
+to re-refute them, one of which takes the open-field canopy to a leaf-area index of 16.4
+against real wheat's 5–8.
+
+### ⚠ The risk this file sets is the INVERSE of batch D's
+
+Batch D's failure mode was porting a design record; batch G's is letting a live claim ride
+out of the tree wearing decision-record clothing. Two tests had to be split **per assertion**
+rather than per test — one is 12.5× arithmetic on the test's own constants (no successor)
+*plus* the statement that the frozen rates shed over the entire phase where every reading of
+the source sheds nothing, which is the form gap and is ported. Batches D and E dispositioned
+per test; this one says out loud where it could not.
+
+### ⚠⚠ A pin AT the knot is blind to the shape either side of it
+
+`the_vks_mutual_shading_regime_is_modelled_not_merely_avoided` is the one genuine direct
+catch §5ad's whole battery found, and three of this batch's mutations die on it for its own
+stated reason: dropping the shading term, relaxing `>` to `>=`, and replacing the flat step
+with one proportional to the excess.
+
+It evaluates the function at exactly two points — the threshold and threshold + 1e-9. So
+**a step that switches back OFF above LAI 10, and a special case returning zero at zero leaf
+area, each left the entire binary green.** Those are precisely the two far-field points the
+Python original evaluates and the gate does not, and they carry the claim the source's own
+wording makes: flat above the threshold, not proportional to the excess, because the
+SUCROS/WOFOST shape is a different lineage. This is batch E's symmetry-point finding from
+the other side — pinned at exactly the right place for the *knot's* claim, and blind to the
+*form's*.
+
+### ⚠ Breaking stem senescence reddens two tests and neither is about it
+
+Zeroing `rdr_stem` reddens batch E's shed-nitrogen pin (which recomputes the same carbon
+flux, so it notices any change to it) and the mutual-shading gate — the latter because a
+bigger standing stem moves the trajectory until the open-field peak-LAI crossing shifts. A
+test named for canopy closure failing because the stem stopped dying is "a number moved"
+wearing the most reassuring name in the file. Shedding the stem at the root's rate reddens
+only the nitrogen pin.
+
+### ⚠ Batch C's ground-area finding, on a third call site
+
+Every frozen scenario is 1 m², so `Senescence` computing leaf-area index as bare
+`leaf_c · SLA` — dropping the divisor outright — returns the identical number for every run
+in the tree, and is invisible to this binary, to the goldens and to the cross-port
+comparison alike. Three batches have now found this on three unrelated mechanisms; it is a
+property of the scenario roster, not of any one flow.
+
+### The production change was licensed by measuring the guard inert, not by preferring it
+
+Before this batch, `senescence()` could only ever be handed the committed file, which is
+valid, so its `require_non_negative` loop was inert by construction: deleting it outright
+left the binary at 298 passed / 0 failed. That is batch B's phenology argument one file over
+and the fix is the same, an injectable `senescence_from(text, name)`. A negative relative
+death rate is not a slow organ — it is an organ that GROWS out of the litter sink at a fixed
+relative rate, internally balanced the whole way, so neither conservation nor the arbitration
+backstop can see it.
+
+### ⚠ Two "is this already covered?" questions, one method, opposite answers
+
+Neither was settleable by reading the tests side by side, which is what the first draft of
+both did.
+
+* A five-literal pin on the committed senescence values was **written and then deleted**. All
+  five are already pinned bit-exactly, as committed literals, by C1's own gate
+  `every_value_matches_the_generated_table`; doubling `rdr_root` in the YAML reddens it. A
+  second copy is the shape this project has been bitten by before — a rule with two copies
+  has one that goes stale.
+* A linearity test looked like a duplicate of the existing `leaf_area_index` point test. It
+  is not: a **quadratic**, `leaf_c² · sla / (100 · A)`, returns the point test's exact value
+  at its point, zero at zero, and still doubles when the area halves. Run as a mutation it
+  left that test green and reddened only the new one. *A point value is not a shape*, and the
+  licence for applying a leaf-AREA rule to leaf CARBON is a claim about the shape.
+
+### The transposed question, asked in both directions inside the batch
+
+After the batch, every one of the eleven mutations reddens a test whose subject IS the
+mutated mechanism, and the four that had been invisible to the whole binary are each caught
+by exactly one test — the shape that says the coverage is the new test's rather than a
+trajectory's.
+
+Asked the other way, two of the eight new tests are not reached by that battery at all. A
+**second battery** was run rather than the absence being reasoned away: doubling `rdr_root`
+in the YAML reaches the provenance test, and an offset then the quadratic in
+`leaf_area_index` reach the linearity one. Eight of eight reached, each by a mutation of its
+own subject, with no repeat of batch E's "reached only by a mutation of something else" case.
+
+### Four narrative margin bands now have no Rust home, and that is a pattern rather than four judgements
+
+Three of batch G's eight live claims are two-sided bands on *our own* numbers — the canopy's
+clearance to the mutual-shading threshold, the nitrogen concentration margin against the mass
+margin, and the open-field crop's margin to the Greenwood crossing. Each is deliberately
+unmarked as a gate by its own docstring, because freezing a ratio to our own peak would let
+an unfreeze ceremony fail for an improvement. Batch E left the Greenwood margin pin standing
+for the same reason. The question underneath — whether the reference wants a class of pin
+that is deliberately not a contract — is S6's, not a testing batch's.
+
+### The by-name claim census is now deferred by SIX consecutive batches
+
+Batch G's additions to its input: the two claims measured already-owned (one a genuine
+duplicate, one not — a census that cannot tell those apart is not doing its job), the
+twenty-five tests dispositioned as a decision record, and the four margin bands above.

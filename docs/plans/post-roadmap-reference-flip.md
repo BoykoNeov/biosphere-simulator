@@ -5933,7 +5933,7 @@ what makes a batch reviewable, not by crop or by Python filename:
 | D — carbon spending | `test_allocation` 43, `test_respiration` 25, `test_carbon_budget` 22, `test_stem_reserves` 22 | 112 | `science.rs` partition, Q10, growth budget |
 | E — nitrogen | `test_nitrogen` 37, `test_nitrogen_form` 15, `test_nitrogen_throttle` 7 | 59 | `science.rs` target N, uptake, stress — ⚠ **WRONG about two thirds of it, corrected in §5aj**: it lands on FOUR surfaces (`science.rs`, `flows.rs`, `params.rs`, `system.rs`), and 3 of the 59 are batch F's subject. **BUILT 2026-08-26.** |
 | F — soil carbon | `test_mineralization` 32, `test_soil_fractionation` 29, `test_decomposition` 19, `test_microbial_respiration` 17, **+3 handed over by batch E** | **100** | **flow-level** — no extracted functions exist. ⚠ Batch E measured the carried-N family (`carried_nitrogen` and the three N legs) guarded by the GOLDENS ALONE; that measurement is this batch's input |
-| G — senescence | `test_senescence_form` 37 | 37 | `science.rs` shading + `flows.rs` Senescence |
+| G — senescence | `test_senescence_form` 37, **+14 handed over by batch D** | **51** | `science.rs` shading + `flows.rs` Senescence — ⚠ **WRONG about the file it names**, corrected in §5ak: 25 of `test_senescence_form.py`'s 33 test functions have NO live subject at all (two candidate models that were never built, and a refused branch), so the batch's portable core is the 14 batch D handed over. It also lands on `params.rs`. **BUILT 2026-08-26**, taken before F on the user's call. |
 
 ⚠ **F is the batch that is not like the others** and it is deliberately late: it is the only
 one that cannot be written as pure-function tests without changing production code. If it
@@ -7419,3 +7419,235 @@ conditions overlap. That is now asserted, alongside the ramp — the same shape 
 for `allocation.yaml`'s two mutations that LOAD, so a validator appearing later says so out
 loud instead of a guard quietly materializing. Measured independent of the ramp inversion by
 construction, and confirmed against E3b.
+
+## §5ak Stage 3 — S5 batch G BUILT, COMPLETE 2026-08-26: the senescence batch, and a 2,856-line file whose subject is two models that were never built
+
+Batch G is the senescence batch: `test_senescence_form.py` 37, plus the **14 handed forward
+by batch D** from `test_allocation.py` (`senescence_flux`, the `Senescence` flow, mutual
+shading, and the whole `senescence.yaml` loader block) — 51 tests. It lands on four
+surfaces: `science.rs` (the mutual-shading step, `leaf_area_index`), `flows.rs` (the
+`Senescence` flow), `params.rs` (the loader) and — for two of its claims — nowhere, because
+they were already in the reference before this batch started.
+
+⚠ **Taken BEFORE batch F on the user's call, against §5ad's own ordering.** F is the only
+batch that may force a production-code extraction and needs its own decision; G is the last
+of the ones that do not. The argument for F-first — batch E measured F's weakest spot and
+the measurement is freshest now — is recorded as the road not taken, and that measurement is
+written down in §5aj rather than held in anyone's head.
+
+The batch is **8 tests plus one production change**, and the production change is licensed
+by a measurement rather than by a preference (below).
+
+### ⚠⚠ THE FINDING, and it is 90 % of the file: 25 of `test_senescence_form.py`'s 33 test functions have NO live subject
+
+`test_senescence_form.py` is 2,856 lines and its module docstring is 100 of them. Measured
+by classifying every test function by what it actually constructs:
+
+| what the test runs | functions | tests |
+|---|---:|---:|
+| the **`_DvsSenescence` / `_DvsNitrogenSenescence` candidate classes** — two flow models that exist only inside the test file and were never built | 12 | 16 |
+| the **stem-only candidate** (`rdr_stem → 0` on both senescence flows) — a branch PRICED AND REFUSED 2026-07-28 | 12 | 12 |
+| arithmetic on the two **source tables**, which also exist only inside the test file | 1 | 1 |
+| a claim about the **frozen tree** | 8 | 8 |
+
+So `test_senescence_form.py` is a **decision record written as executable tests** — the same
+disposition batch D gave `test_stem_reserves.py`'s ten design-record tests and batch E gave
+`test_nitrogen_throttle.py`'s seven, at three times the size. Its own docstring says so in as
+many words: *"The candidate flows live in this module, not in `src/`: nothing here is built,
+and `git diff src/simcore` stays empty."* Porting it would mean **building two refused models
+in Rust in order to re-refute them**, and one of the two (`_DvsSenescence`) is a
+development-stage-keyed senescence form whose measured effect is to take the open-field
+canopy from a leaf-area index of 5.2 to 16.4 against real wheat's 5–8.
+
+⚠ **The risk this file sets is the INVERSE of batch D's, and it is the one this batch was
+written against.** Batch D's failure mode was porting a design record. Batch G's is letting a
+live claim ride out of the tree wearing decision-record clothing. Three of the eight live
+claims are only visible per-*assertion* rather than per-test:
+`test_the_two_source_tables_disagree_by_an_order_but_agree_on_the_form` is 12.5× table
+arithmetic on the test's own constants (no successor) **plus** the statement that the frozen
+rates are non-zero over the entire phase where every reading of the source is zero (the form
+gap — ported). Batches D and E dispositioned per test; this batch splits two of them and says
+so out loud.
+
+### The control battery, before any Rust was written: ten mutations, three invisible to the entire binary
+
+`cargo test -p domains --lib --no-fail-fast`, Windows, baseline **298 passed / 0 failed**;
+every mutation reverted byte-exact. Harness and logs: `M:\claud_projects\temp\s5-batch-g`.
+
+| # | mechanism broken | red | of which **about the mutated mechanism** |
+|---|---|---:|---:|
+| G1 | the mutual-shading term dropped | 1 | **1** — the VKS gate |
+| G2 | the threshold comparison `>` relaxed to `>=` | 1 | **1** — the VKS gate |
+| G3 | flat step → proportional to the excess (the SUCROS shape) | 1 | **1** — the VKS gate |
+| G4 | a step that STOPS AGAIN above LAI 10 | **0** | — |
+| G5 | a special case returning 0 at zero LAI | **0** | — |
+| G6 | the stem simply does not senesce (`rdr_stem = 0`) | 2 | **0** |
+| G7 | the stem shed at the ROOT's rate (0.005 → 0.01) | 1 | **0** |
+| G8 | the flux not proportional to organ carbon | 28 | **0** |
+| G9 | `dt` dropped from all three legs | 18 | **0** |
+| G10 | the canopy's LAI drops its ground-area divisor | **0** | — |
+| G11 | the loader's `require_non_negative` loop deleted outright | **0** | — |
+
+⚠ **G1–G3 are the good news and they are the exception in S5, not the rule.**
+`the_vks_mutual_shading_regime_is_modelled_not_merely_avoided` is the one genuine direct
+catch §5ad's whole battery found, and three of this batch's mutations die on it *for its own
+stated reason*. It is also the template S5 has been copying since batch A.
+
+⚠⚠ **G4 and G5 are the finding, and they are that same gate's blind spot.** The gate
+evaluates `mutual_shading_rate` at exactly two points — `LAI*` and `LAI* + 1e-9` — which pins
+the knot and the strictness of `>` and **nothing about the shape either side of it**. A step
+that switches back off above LAI 10, and a special case returning zero at zero LAI, both left
+the whole binary green. Those are precisely the two points the Python original evaluates that
+the gate does not (`mutual_shading_rate(0.0)` and `(50.0)`), and the Python docstring names
+the distinction they carry: *"FLAT above the threshold ('once … exceeds'), NOT proportional
+to the excess. The SUCROS/WOFOST `(LAI − LAIcrit)/LAIcrit` shape is a different lineage and
+is not imported."* **This is batch E's "a pin evaluated at its subject's symmetry point is
+not a pin" arriving from the other side**: here the pin is at the knot, which is exactly
+right for the knot's own claim and blind to the form's.
+
+⚠ **G6 and G7 are the "reassuring name" reading again.** Breaking stem senescence outright
+reddens two tests, and *neither is about it*: one is batch E's shed-nitrogen pin (which
+recomputes the same carbon flux, so it notices any change to it), and the other is the
+mutual-shading gate, which reddens because a bigger standing stem moves the trajectory until
+`open_season`'s peak-LAI crossing shifts. A test named for canopy closure failing because the
+stem stopped dying is "a number moved" wearing the most reassuring name in the file.
+
+⚠ **G10 is batch C's ground-area finding on a THIRD call site** (after the water capture, and
+the uptake/fertilization pair batch E found). Every frozen scenario is 1 m², so `Senescence`
+computing LAI as bare `leaf_c · SLA` returns the identical number for every run in the tree —
+invisible to this binary, to the goldens, and to the cross-port comparison alike. Three
+batches have now found this on three different mechanisms; it is a property of the scenario
+roster, not of any one flow.
+
+⚠ **G11 is what licenses the production change.** Before this batch, `senescence()` could only
+ever be handed the committed file, which is valid — so its `require_non_negative` loop was
+**inert by construction**, and deleting it left the binary at 298 passed / 0 failed. That is
+batch B's phenology argument one file over, and the fix is the same: an injectable
+`senescence_from(text, name)`. Taken as an explicit decision, not slipped in under a testing
+batch. A negative relative death rate is not a slow organ — it is an organ that GROWS out of
+the litter sink at a fixed relative rate, internally balanced the whole way, so neither
+conservation nor the arbitration backstop can see it.
+
+### What the batch built
+
+**One production change**: `params::senescence_from(text, name)`, with `senescence()`
+delegating. Licensed by G11.
+
+**Eight tests**, over three surfaces:
+
+* `science.rs` — `the_mutual_shading_step_is_flat_above_the_threshold_and_absent_below_it`
+  (the far field: kills G4 and G5), and
+  `leaf_area_index_is_linear_in_leaf_carbon_which_is_what_licenses_the_area_rule`.
+* `flows.rs` — `the_senescence_legs_are_the_per_organ_relative_losses` (kills G6, G7, G8),
+  `the_senescence_legs_are_bit_exactly_linear_in_dt` (kills G9),
+  `senescence_sheds_faster_from_the_leaf_only_once_the_canopy_closes`, and
+  `the_senescence_canopy_is_measured_per_ground_area` (kills G10).
+* `params.rs` — `a_negative_senescence_rate_is_rejected_and_a_zero_one_loads` (kills G11) and
+  `rdr_root_is_the_closest_of_the_three_frozen_rates_to_its_cited_source`.
+
+**The licensing test is the one worth naming.** Van Keulen & Seligman state their rule on
+leaf **AREA**, and this tree has no area state — `Senescence` applies it to leaf **CARBON**.
+The transfer is legitimate only because `specific_leaf_area` is a single constant with no
+development-stage keying, so leaf-area index is *linear* in leaf carbon and a relative area
+rate IS a relative carbon rate, exactly. Linearity is the claim the identity needs; constancy
+is a different one. The `CanopyParams` destructure inside the test is the field census — **the
+compiler fails if that struct grows a stage-keyed field**, where the Python original asserted
+the field list by name and a rename would defeat it.
+
+### ⚠ Two claims measured to be ALREADY OWNED — and one of them was written first and then deleted
+
+Both are the discipline batch E set (do not port a rejection the loader already pins), and
+both were settled by running something rather than by reading:
+
+1. **`test_load_senescence_params_matches_committed_values` — DELETED after being written.**
+   The batch shipped a five-literal value pin, then measured: all five senescence values are
+   *already* pinned bit-exactly, as committed literals, by C1's own gate
+   `every_value_matches_the_generated_table` (`senesc.rdr_leaf` … `senesc.lai_threshold` are
+   five of its rows). Doubling `rdr_root` in the YAML reddens it. A second copy asserting the
+   same five numbers is the shape this project has been bitten by before — *a rule with two
+   copies has one that goes stale* — so the test was removed and the ownership recorded where
+   the test had been.
+2. **`leaf_area_index_is_linear_…` is NOT a duplicate, and that was measured, not argued.**
+   `science.rs` already carried `leaf_area_index_is_carbon_times_sla_over_ground`, which pins
+   the formula at one point, at zero, and under an area halving — and it looked like the same
+   claim. It is not: a **quadratic**, `leaf_c² · sla / (100 · A)`, returns 25.0 at that
+   point, 0 at zero, and still doubles when the area halves. Run as a mutation it left the
+   pre-existing test **green** and reddened only the new one. *A point value is not a shape,
+   and the area rule's licence is a claim about the shape.*
+
+⚠ The two outcomes are opposite and the method is identical. Neither question could be
+settled by reading the two tests side by side, which is what the first draft of both did.
+
+### The after-battery, and the transposed question asked in both directions
+
+Re-run after the batch, same instrument (baseline now **306 passed**):
+
+| # | red before → after | the new test that catches it |
+|---|---|---|
+| G1 | 1 → 4 | the step's far field, the closure pair, the area pair |
+| G2 | 1 → 2 | the step's far field |
+| G3 | 1 → 4 | the step's far field, the closure pair, the area pair |
+| G4 | **0 → 1** | the step's far field, alone |
+| G5 | **0 → 1** | the step's far field, alone |
+| G6 | 2 → 4 | the legs test, the closure pair |
+| G7 | 1 → 3 | the legs test, the closure pair |
+| G8 | 28 → 31 | the legs test, the closure pair, the area pair |
+| G9 | 18 → 19 | the dt-linearity test |
+| G10 | **0 → 1** | the area pair, alone |
+| G11 | **0 → 1** | the loader rejection, alone |
+
+**Every one of the eleven now reddens a test whose subject IS the mutated mechanism**, which
+is S5's exit-gate clause 1, and the four that were invisible to the whole binary are each
+caught by exactly one test — the shape that says the coverage is the new test's and not a
+trajectory's.
+
+**And the transposed question, which batch E's review found the first form of does not
+answer**: is each new TEST reached by a mutation of ITS OWN mechanism? Two of the eight are
+not reached by battery 1 at all, so a second battery was run rather than the absence being
+reasoned away — `G12` (doubling `rdr_root` in the YAML) reaches the provenance test, and
+`G13`/`G14` (an offset, then the quadratic, in `leaf_area_index`) reach the linearity test.
+**Eight of eight reached, each by a mutation of its own subject**, with no repeat of batch E's
+"reached only by a mutation of something else" case.
+
+### What batch G deliberately does NOT port, per test
+
+Written as a list rather than as forward items, per batch C's review finding that a batch
+shipping only forward items lets an absence read as an oversight. 51 Python tests, 8 Rust
+tests.
+
+| Python | disposition |
+|---|---|
+| the **12 candidate-form tests** of `test_senescence_form.py` (`test_the_primarys_form_takes_the_canopy_unphysical_*`, `test_frozen_form_is_nearer_*`, `test_the_n_leg_is_actually_swapped_*`, `test_the_dvs_form_crosses_the_greenwood_tripwire_*`, `test_the_exercise_table_would_have_reported_*`, `test_euler_reports_no_rationing_*`, `test_whether_rk4_still_hard_errors_*`, `test_the_exercise_table_NO_LONGER_breaks_the_re_sow`, `test_the_regulator_brings_*`, `test_the_regulator_is_BIT_IDENTICALLY_inert_*`, `test_the_regulator_is_DISJOINT_*`, `test_the_greenwood_tripwire_fires_WITHOUT_f_n_*`) | **no successor, by nature.** They run `_DvsSenescence` and `_DvsNitrogenSenescence`, two flow classes defined inside the test file and never built, to argue a decision already taken. Same disposition as batch D's `test_stem_reserves.py` design record and batch E's `test_nitrogen_throttle.py`, and for the same reason: porting them means building a refused model in Rust to re-refute it. Their content lives in `senescence.yaml`'s header and `docs/plans/post-roadmap-nitrogen-cycle-form.md` |
+| the **12 stem-only tests** (`test_the_stem_swap_is_real_*`, `test_zeroing_stem_death_GROWS_*`, `test_the_stem_grows_and_the_OTHER_THREE_*`, `test_stem_only_NOW_CROSSES_*`, `test_the_two_tripwires_move_in_OPPOSITE_directions`, `test_stem_only_NO_LONGER_rations_*`, `test_stem_only_NO_LONGER_collapses_*`, `test_RK4_survives_stem_only_*`, `test_the_sealed_carbon_inventory_is_CONSERVED_*`, `test_the_two_floors_*_come_FROM_the_manifest`, `test_the_ONE_REMAINING_stem_only_guard_*`, `test_the_stem_only_refusal_at_FIFTY_years_with_its_control`) | **no successor, by nature.** The stem-only branch was priced 2026-07-28 and REFUSED on a measurement; these run the refused candidate to record how it fails. ⚠ This is the largest single absence of the batch and it is a judgement: they carry real numbers (the decade CO₂ attractor at 3.4× too low while staying stationary, the two tripwires moving in opposite directions from one changed number), and those numbers live in `senescence.yaml`'s `rdr_stem` tag and `memory/stem-only-repriced-at-fifty-years.md`. What they do NOT carry is a claim about the shipped tree |
+| `test_the_exercise_table_reproduces_the_loss_pattern_it_states`, and the 12.5× half of `test_the_two_source_tables_disagree_*` | **no successor.** Arithmetic on two tables that exist only as constants in the test file, verifying a page of a book against another page of the same book. The round-5 citation discipline it enforces is real and is recorded in `senescence.yaml`'s header; it is not a claim about this tree. ⚠ The *other* half of the second test — the frozen rates being non-zero where every reading of the source is zero — IS the form gap and is ported |
+| `test_frozen_open_season_canopy_is_physical` | **already in the reference**, as `science_gates.rs::open_season_canopy_is_physical`. The Python function is the CHECKER's copy and its own comment says so (slice C4 moved the claim 2026-08-18) |
+| `test_the_vks_mutual_shading_regime_is_MODELLED_not_merely_avoided` | **already in the reference**, as the gate of the same name — assertion for assertion, including both evaluation points. ⚠ Its blind spot is G4/G5 above, and the far-field test is what closes it; the gate itself is not re-ported |
+| `test_senescence_flow_is_carbon_balanced` | **the engine's own machinery**: `assert_conserved` runs every step of every run. Batches A and D recorded the same disposition for the gas and growth flows. The legs test asserts all four legs exactly, which implies the balance anyway |
+| `test_senescence_params_file_exists` | **guarded by the COMPILER, harder than by a test**: `senescence.yaml` reaches `params.rs` through `include_str!`, so its absence does not build. Same disposition batch D gave `test_context_storage_excluded_from_biomass` |
+| `test_senescence_loader_rejects_a_wrong_unit`, `test_senescence_loader_rejects_a_missing_source` | **owned one layer down** by `config`: `a_wrong_declared_unit_is_rejected` is the exact-string guard `guarded_map` calls, and `ParamEntry` requires all three of `{value, unit, source}` with its own pin. A per-loader copy would assert that `config` still works. Batch E's disposition for `nitrogen_stress_factor`'s rejection |
+| `test_load_senescence_params_matches_committed_values` | **owned by C1's `every_value_matches_the_generated_table`** — written here, measured redundant, deleted. See above |
+| `test_how_close_the_open_season_lai_margin_is_to_the_threshold`, `test_the_frozen_concentration_margin_is_wider_than_the_frozen_mass_margin`, `test_the_FROZEN_open_season_margin_to_greenwood_is_now_THIN` | **no successor, and it is a judgement — recorded as an open item below, not filed as covered.** Three two-sided narrative bands on *our own* numbers, each deliberately unmarked as a gate by its own docstring, because freezing a ratio to our own peak would let an unfreeze ceremony fail for an improvement. Together they are the record of a margin spent in three moves from three unrelated causes. This is the same absence batch E recorded for the Greenwood margin pin, three tests larger |
+
+### What batch G leaves standing
+
+* **The three margin narratives have no Rust home**, and batch E's Greenwood margin pin still
+  does not either. That is now **four** two-sided characterization bands with no successor —
+  a pattern rather than four separate judgements, and the question underneath it (does the
+  reference want a class of pin that is deliberately not a contract?) belongs to S6, not to a
+  testing batch.
+* **The by-name claim census (exit-gate clause 3) is now deferred by SIX consecutive
+  batches.** Batch G's own additions to its input: the two claims measured to be already
+  owned (one of which was a genuine duplicate and one of which was not — a census that cannot
+  tell those apart is not doing its job), the twenty-five tests dispositioned as a decision
+  record, and the four margin narratives above.
+* **`intercepted_fraction` still unresolved** (S6; clause 4 of the exit gate).
+* **`soil_n_availability`'s band is ordered by nothing** — batch E's S6 item, untouched.
+* **`daily_thermal_time`'s 30 °C cap** — batch B's unreachable branch, still owned by nothing.
+* **The biosphere is still Euler-only in the Rust tree** (batch D).
+* **`compartment_boundary_ledger` has no Rust equivalent** — batch C's gap, untouched.
+* **Batch F is the only S5 batch left**, and its shape is unchanged by taking G first: 100
+  tests, flow-level, and the only one that may need a production extraction. Batch E's
+  measurement of the carried-nitrogen family — guarded by the goldens alone — is still its
+  input, and is written down in §5aj.
+* **No Python deleted.** Both files stay green and running (80 collected across the two)
+  until S6.

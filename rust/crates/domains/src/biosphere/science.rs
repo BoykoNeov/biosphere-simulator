@@ -2340,4 +2340,113 @@ mod tests {
             "f_N must fall as the crop grows into a fixed reserve: {diluting:?}"
         );
     }
+    // -----------------------------------------------------------------------------
+    // S5 batch G, the senescence batch: the EQUATION half.
+    //
+    // ⚠ `mutual_shading_rate` already had a caller-side claim before this batch —
+    // `science_gates.rs::the_vks_mutual_shading_regime_is_modelled_not_merely_avoided`,
+    // the one genuine direct catch §5ad's control battery found. It is not a duplicate of
+    // what is below and neither subsumes the other: the gate evaluates the function at
+    // exactly two points, `LAI*` and `LAI* + 1e-9`, so it pins the knot and the strictness
+    // of `>`. Measured on the five-mutation battery:
+    //
+    //   * dropping the shade term entirely:            1 red, the gate — its own subject
+    //   * `>` relaxed to `>=`:                         1 red, the gate — its own subject
+    //   * flat step -> proportional to the excess:     1 red, the gate — its own subject
+    //   * a step that STOPS again above LAI 10:        **0 reds anywhere**
+    //   * a special case returning 0 at zero LAI:      **0 reds anywhere**
+    //
+    // The last two are the FAR FIELD, and they are exactly the two points the Python
+    // original evaluates that the gate does not. That is batch E's "a pin evaluated at its
+    // subject's symmetry point is not a pin" arriving from the other side: here the pin is
+    // at the knot, which is the right place for the knot's own claim and the blind spot
+    // for the shape's.
+    // -----------------------------------------------------------------------------
+
+    /// The mutual-shading term is a STEP that is FLAT above the threshold, and it is the
+    /// bare `rdr_leaf` all the way down to a bare canopy.
+    ///
+    /// [A] p. 101, quoting Van Keulen & Seligman (1987): leaf area is lost at 5 %/day
+    /// **once** LAI exceeds 6. "Once ... exceeds" is the source's own form — the elevated
+    /// rate does not decay, and it is not proportional to the excess. The
+    /// SUCROS/WOFOST `(LAI − LAI*)/LAI*` shape is a different lineage and is deliberately
+    /// not imported, which is a claim about the FAR FIELD and is unfalsifiable at the knot.
+    ///
+    /// The constants are held as literals rather than read through `params::senescence()`
+    /// — batch A's convention, so a loader regression cannot silently move a physics pin.
+    /// Mirrors `test_mutual_shading_is_a_STEP_at_the_cited_threshold`.
+    #[test]
+    fn the_mutual_shading_step_is_flat_above_the_threshold_and_absent_below_it() {
+        const RDR: f64 = 0.02;
+        const SHADE: f64 = 0.05;
+        const THRESHOLD: f64 = 6.0;
+        let at = |lai: f64| mutual_shading_rate(lai, RDR, SHADE, THRESHOLD);
+
+        // Below, including the degenerate bare canopy: the term is simply not there.
+        assert_eq!(at(0.0), RDR, "a bare canopy shades nothing");
+        assert_eq!(at(5.999), RDR);
+        assert_eq!(at(THRESHOLD), RDR, "inert AT the threshold (strict `>`)");
+
+        // Above: `rdr + shade`, and it STAYS there. 50 is ~8x the threshold, far outside
+        // anything a wheat canopy reaches, which is the point — the claim is about the
+        // FORM and a form is only pinned where it could have bent.
+        let want = RDR + SHADE;
+        assert_eq!(at(6.001), want);
+        assert_eq!(at(50.0), want, "a step, not a ramp and not a pulse");
+        assert_eq!(at(1.0e6), want, "and it never comes back down");
+    }
+
+    /// ⚠ THE LICENSING STEP for a rule stated on leaf AREA in a tree with no area state.
+    ///
+    /// Van Keulen & Seligman give a rate of leaf AREA loss, "independently of leaf weight
+    /// loss", and `Senescence` applies it to leaf CARBON. The transfer is legitimate only
+    /// because `specific_leaf_area` is a single constant with no DVS keying, so LAI is
+    /// LINEAR in leaf carbon and a relative area rate IS a relative carbon rate, exactly.
+    /// Linearity is what the identity needs, and it is checkable; constancy is not the
+    /// same claim. It is also [A]'s own stated default, one sentence before the quote.
+    ///
+    /// ⚠ THE LIMITATION, pinned so it cannot be dropped: V-K&S separated area from weight
+    /// BECAUSE specific leaf weight varies by leaf cohort — [A]'s Figure 40, on the very
+    /// same page, plots it from ~230 to ~530 kg/ha over a season. A single constant cannot
+    /// express that, so the tree inherits their rule under an assumption they explicitly
+    /// declined to make. That is recorded here and in `senescence.yaml`, not asserted.
+    ///
+    /// The `CanopyParams` destructure is the field census: it is the COMPILER that fails
+    /// if the struct grows a DVS-keyed field, not a grep. The Python original asserted the
+    /// field list by name, which a rename defeats.
+    ///
+    /// ⚠ **This is NOT a duplicate of `leaf_area_index_is_carbon_times_sla_over_ground`
+    /// two tests up, and that was measured rather than argued.** That test pins the
+    /// formula at one point, at zero, and under an area halving — which a QUADRATIC
+    /// satisfies exactly: `leaf_c² · sla / (100 · A)` returns 25.0 at its point, 0 at
+    /// zero, and still doubles when the area halves. Run as a mutation, it left that test
+    /// GREEN and reddened only this one. A point value is not a shape, and the area rule's
+    /// licence is a claim about the shape.
+    /// Mirrors `test_the_area_rule_transfers_because_lai_is_LINEAR_in_leaf_carbon`.
+    #[test]
+    fn leaf_area_index_is_linear_in_leaf_carbon_which_is_what_licenses_the_area_rule() {
+        let crate::biosphere::params::CanopyParams {
+            sla_per_mol_c,
+            extinction_coef: _,
+        } = crate::biosphere::params::canopy();
+
+        // A non-unit ground area on purpose: the identity must be the LEAF carbon's, not
+        // an artefact of dividing by one.
+        let one = leaf_area_index(1.0, sla_per_mol_c, 3.0);
+        for x in [0.5, 2.0, 7.5, 1.0e3] {
+            let got = leaf_area_index(x, sla_per_mol_c, 3.0);
+            let want = x * one;
+            // ⚠ Not bit-exact, and the reason is arithmetic rather than modelling:
+            // `(x*sla)/A` and `x*((1*sla)/A)` associate differently and can land 1 ULP
+            // apart. The IDENTITY is exact; its float evaluation is not, so the tolerance
+            // is a few ULP rather than zero. Stated instead of quietly loosened.
+            assert!(
+                (got - want).abs() <= 4.0 * f64::EPSILON * want.abs(),
+                "LAI({x}) = {got}, linearity wants {want}"
+            );
+        }
+        // ...and zero leaf carbon is zero LAI, which is the limb the step function's
+        // `at(0.0)` case above is reached through in a real run.
+        assert_eq!(leaf_area_index(0.0, sla_per_mol_c, 3.0), 0.0);
+    }
 }

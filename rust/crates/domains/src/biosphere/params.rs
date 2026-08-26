@@ -596,7 +596,22 @@ pub fn photoperiod() -> PhotoperiodParams {
 
 /// Relative organ death rates + the mutual-shading term (`senescence.yaml`).
 pub fn senescence() -> SenescenceParams {
-    const NAME: &str = "senescence.yaml";
+    senescence_from(SENESCENCE_YAML, "senescence.yaml")
+}
+
+/// [`senescence`] from arbitrary file TEXT — see [`transpiration_from`] for why the split
+/// exists.
+///
+/// ⚠ **This split is S5 batch G's one production change, and the reason is a
+/// measurement rather than a preference.** Before it, the `require_non_negative` loop
+/// below could only ever be handed the committed file, which is valid — so the guard was
+/// INERT: deleting it outright left `cargo test -p domains --lib` at **298 passed / 0
+/// failed**, exactly as batch B measured for the three phenology guards. A negative
+/// relative death rate is not a slow organ, it is an organ that GROWS out of the litter
+/// sink at a fixed relative rate, and `Senescence`'s legs would carry the wrong sign with
+/// conservation still satisfied. Taken as an explicit decision, not slipped in: the
+/// alternative was four Python loader tests dying at S6 with no successor.
+pub fn senescence_from(text: &str, name: &'static str) -> SenescenceParams {
     let units: [(&str, &str); 5] = [
         ("rdr_leaf", "1/day"),
         ("rdr_stem", "1/day"),
@@ -604,10 +619,10 @@ pub fn senescence() -> SenescenceParams {
         ("shade_rate", "1/day"),
         ("lai_threshold", "dimensionless"),
     ];
-    let f = file(SENESCENCE_YAML, NAME);
-    let v = guarded_map(&f, &units, NAME);
+    let f = file(text, name);
+    let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_non_negative(v[field], field, NAME), NAME);
+        checked(require_non_negative(v[field], field, name), name);
     }
     SenescenceParams {
         rdr_leaf: v["rdr_leaf"],
@@ -2604,5 +2619,152 @@ parameters:
         assert_eq!(p.n_target_coefficient, 0.05697);
         assert_eq!(p.n_target_exponent, 0.5);
         assert_eq!(p.n_target_w_plateau, 1.0);
+    }
+    // -----------------------------------------------------------------------------
+    // S5 batch G, the senescence batch: the LOADER half.
+    //
+    // ⚠ Three of `test_allocation.py`'s seven senescence loader tests get NO successor
+    // here, and each absence is an ownership fact rather than a narrowing:
+    //
+    //   * `test_senescence_params_file_exists` — the file reaches this module through
+    //     `include_str!`, so its absence is a COMPILE error. Guarded harder than by a
+    //     test, the disposition batch D gave `test_context_storage_excluded_from_biomass`.
+    //   * `test_senescence_loader_rejects_a_wrong_unit` — owned one layer down by
+    //     `config`'s `a_wrong_declared_unit_is_rejected`, which is the exact-string guard
+    //     `guarded_map` calls. A per-loader copy would assert that `config` still works.
+    //   * `test_senescence_loader_rejects_a_missing_source` — likewise: `config`'s
+    //     `ParamEntry` requires all three of `{value, unit, source}` and has its own pin.
+    //
+    // What is NOT owned elsewhere is the domain bound — a relative death rate may not be
+    // negative — and before `senescence_from` existed nothing could reach it. Measured:
+    // deleting the whole `require_non_negative` loop left this binary at 298 passed / 0
+    // failed.
+    // -----------------------------------------------------------------------------
+
+    /// Mutate one `value:` line of the committed senescence file, asserting the
+    /// substitution applies. The `phenology_with` idiom, against the REAL file text so a
+    /// schema change cannot leave a synthetic fixture behind still passing.
+    fn senescence_with(field: &str, value: &str) -> &'static str {
+        let from = format!("  {field}:\n    value: ");
+        let at = SENESCENCE_YAML
+            .find(&from)
+            .unwrap_or_else(|| panic!("{field} is not a top-level senescence param"));
+        let start = at + from.len();
+        let end = start
+            + SENESCENCE_YAML[start..]
+                .find('\n')
+                .expect("a value line ends");
+        let mut out = String::with_capacity(SENESCENCE_YAML.len());
+        out.push_str(&SENESCENCE_YAML[..start]);
+        out.push_str(value);
+        out.push_str(&SENESCENCE_YAML[end..]);
+        assert_ne!(out, SENESCENCE_YAML, "the substitution must apply");
+        Box::leak(out.into_boxed_str())
+    }
+
+    /// A negative rate is rejected on EVERY one of the five fields; a zero rate LOADS.
+    ///
+    /// The two halves are one claim. A negative relative death rate is not a slow organ:
+    /// `Senescence`'s legs would come out with the organ GAINING carbon out of the litter
+    /// sink at a fixed relative rate, internally balanced the whole way, so conservation
+    /// cannot see it and neither can the arbitration backstop. A negative `lai_threshold`
+    /// puts every canopy permanently in the mutual-shading regime.
+    ///
+    /// ⚠ And the accept half is what stops the guard being always-on: `senescence.yaml`'s
+    /// own header states "a zero rate is valid (no turnover of that organ)", which is
+    /// exactly the case a `require_positive` would have broken.
+    /// Mirrors `test_senescence_loader_rejects_a_negative_rate` and
+    /// `test_senescence_loader_accepts_zero_rate`.
+    #[test]
+    fn a_negative_senescence_rate_is_rejected_and_a_zero_one_loads() {
+        for field in [
+            "rdr_leaf",
+            "rdr_stem",
+            "rdr_root",
+            "shade_rate",
+            "lai_threshold",
+        ] {
+            let negative = senescence_with(field, "-0.01");
+            rejects(
+                || {
+                    senescence_from(negative, "senescence.yaml");
+                },
+                field,
+            );
+            let zero = senescence_with(field, "0.0");
+            assert_eq!(
+                senescence_from(zero, "senescence.yaml").rdr_leaf,
+                if field == "rdr_leaf" { 0.0 } else { 0.02 },
+                "a zero {field} must LOAD"
+            );
+        }
+        // ...and the committed file still loads, so the guard is not simply always-on.
+        assert_eq!(senescence().rdr_leaf, 0.02);
+    }
+
+    // ⚠ `test_load_senescence_params_matches_committed_values` gets NO successor, and this
+    // batch WROTE one before measuring and then deleted it. All five senescence values are
+    // already pinned bit-exactly, as literals, by C1's own gate
+    // `every_value_matches_the_generated_table` — `senesc.rdr_leaf` … `senesc.lai_threshold`
+    // are five of its rows, and its control table is committed literals rather than
+    // anything regenerated from the loader. Measured: doubling `rdr_root` in the YAML
+    // reddens that gate. A second copy asserting the same five numbers would be the shape
+    // this project has been bitten by before — a rule with two copies has one that goes
+    // stale — so the claim is left where it already lives.
+
+    /// ⚠ `rdr_root` is the CLOSEST of the three death rates to its source, and that is a
+    /// separate finding from `rdr_leaf`'s — do not quote the leaf's "runs fast" reading as
+    /// covering all three.
+    ///
+    /// [A] Listing 5 ("Crop data for rice, variety IR36", p. 212) is the table §3.2.6
+    /// cites. Its root function `LRTT` plateaus at **0.010/day** from DS 1.8, and ours is
+    /// 0.01/day flat — inside 10 %. Its leaf function `LLVT` plateaus at **0.012/day**,
+    /// and ours is 0.02/day, i.e. **1.667×** the source where the source is fastest. So
+    /// the root gap is the FORM only (zero before anthesis) with the magnitude already
+    /// literature-centred; the leaf gap is form AND value.
+    ///
+    /// The two plateau values are the SOURCE's, read off the page image, and the ratio is
+    /// arithmetic on them — not a number this tree produced. The Python original's third
+    /// assertion (`LISTING5_STEM == ((0.0, 0.0),)`) has no successor and is not an
+    /// absence: it asserts that a constant defined four lines above it still holds the
+    /// value it was given, which is true of any constant.
+    /// Mirrors `test_rdr_root_is_the_closest_of_the_three_to_its_source`.
+    #[test]
+    fn rdr_root_is_the_closest_of_the_three_frozen_rates_to_its_cited_source() {
+        const LISTING5_LEAF_PLATEAU: f64 = 0.012; // LLVT at DS 1.8-2.5
+        const LISTING5_ROOT_PLATEAU: f64 = 0.010; // LRTT at DS 1.8-2.5
+        let p = senescence();
+        let root_gap = (p.rdr_root - LISTING5_ROOT_PLATEAU).abs() / LISTING5_ROOT_PLATEAU;
+        assert!(root_gap < 0.10, "rdr_root is {root_gap} from its source");
+        let leaf_ratio = p.rdr_leaf / LISTING5_LEAF_PLATEAU;
+        assert!(
+            (leaf_ratio - 1.667).abs() < 1e-3,
+            "rdr_leaf is {leaf_ratio}x its source's plateau"
+        );
+        // ...and the ORDERING is the claim, stated so a calibration that moved both could
+        // not leave both bounds satisfied while inverting which one is the outlier.
+        assert!(
+            root_gap < (leaf_ratio - 1.0).abs(),
+            "the root must stay the nearer of the two"
+        );
+
+        // ⚠ THE FORM GAP, which is the load-bearing half and survives BOTH readings of the
+        // source. `LLVT` and `LRTT` are exactly **0.0/day at DS 0 through 1.0**, and so is
+        // the exercise table [A] p. 113 that our own record quoted for five citation rounds
+        // — the two disagree by 12.5x on the terminal magnitude and not at all on this. Our
+        // three rates are bare constants applied from DS 0, i.e. non-zero over the entire
+        // vegetative phase where every reading of the source is zero. That is the
+        // degenerate case of the form we cite, it is DIAGNOSED AND NOT TAKEN, and the
+        // reason is in `senescence.yaml`'s header: the flat rate has been standing in for
+        // canopy regulation, and the DS-keyed form takes `open_season`'s peak LAI to 16.4
+        // against real wheat's ~5-8.
+        // Mirrors the surviving half of
+        // `test_the_two_source_tables_disagree_by_an_order_but_agree_on_the_form`. Its
+        // other half — the 12.5x ratio between two tables that exist only in the test file
+        // — has no successor: it is arithmetic on the test's own constants.
+        assert!(
+            p.rdr_leaf > 0.0 && p.rdr_stem > 0.0 && p.rdr_root > 0.0,
+            "the frozen rates shed from DS 0, where the source sheds nothing"
+        );
     }
 }

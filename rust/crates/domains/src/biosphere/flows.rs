@@ -3872,4 +3872,206 @@ mod tests {
             "the shed material left the real-residue band"
         );
     }
+    // -----------------------------------------------------------------------------
+    // S5 batch G, the senescence batch: the FLOW half.
+    //
+    // `test_allocation.py`'s seven senescence flow/equation tests, minus the two that are
+    // owned elsewhere. `senescence_flux` has no Rust counterpart to point an equation test
+    // at — Rust inlines `rate · organ · dt` in `Senescence::evaluate` — so its two Python
+    // tests (proportionality, and zero organ → zero) are covered here at flow level, which
+    // is the same disposition §5ad prescribed for the soil-carbon family.
+    //
+    // ⚠ `test_senescence_flow_is_carbon_balanced` gets NO successor, and that is batches A
+    // and D's recorded disposition rather than a gap: `assert_conserved` runs every step of
+    // every run, so a flow that failed it could not survive a single scenario. The legs
+    // test below asserts all four legs exactly, which implies the balance anyway.
+    //
+    // Measured before writing, with `cargo test -p domains --lib --no-fail-fast`
+    // (baseline 298 passed):
+    //
+    //   * the stem simply does not senesce (`rdr_stem = 0`):   2 red, NEITHER about it —
+    //         one is batch E's shed-nitrogen pin, one is the mutual-shading GATE, which
+    //         reddens because a bigger standing stem moves the trajectory and the peak-LAI
+    //         crossing with it. "A number moved, wearing a reassuring name."
+    //   * the stem shed at the ROOT's rate (0.005 -> 0.01):    1 red, batch E's N pin only
+    //   * the flux not proportional to organ carbon:          28 red, all trajectory movers
+    //   * `dt` dropped from all three legs:                   18 red, all trajectory movers
+    //   * the LAI dropped its ground-area divisor:            **0 reds anywhere**
+    //
+    // The last one is batch C's ground-area finding on a THIRD call site (`Senescence`,
+    // after the capture and the uptake/fertilization pair): every frozen scenario is 1 m²,
+    // so an area factor is invisible to this binary, to the goldens, and to the cross-port
+    // comparison alike. The test below is therefore a constructed state on a 2 m² plot.
+    // -----------------------------------------------------------------------------
+
+    /// The committed rates, as literals — batch A's convention (a loader regression must
+    /// not be able to move a physics pin silently). They mirror `senescence.yaml`, and
+    /// `params.rs::the_committed_senescence_rates_are_the_five_values_the_file_states` is
+    /// what ties these literals to that file.
+    const G_RDR_LEAF: f64 = 0.02;
+    const G_RDR_STEM: f64 = 0.005;
+    const G_RDR_ROOT: f64 = 0.01;
+    /// The Python fixture's SLA: 0.6 m² per mol C, so on 1 m² LAI is simply `0.6 · leaf_c`
+    /// and the threshold crossing lands on a round leaf carbon.
+    const G_SLA: f64 = 0.6;
+
+    fn senescence_flow(ground_area: f64) -> Senescence {
+        Senescence {
+            id: "biosphere.senescence".to_string(),
+            leaf_c: LEAF.to_string(),
+            stem_c: STEM.to_string(),
+            root_c: ROOT.to_string(),
+            litter_sink: LITTER_SINK.to_string(),
+            rdr_leaf: G_RDR_LEAF,
+            rdr_stem: G_RDR_STEM,
+            rdr_root: G_RDR_ROOT,
+            // The CITED constants, but every state below except the closure pair sits well
+            // under LAI 6, so the shading term is inert there by construction.
+            shade_rate: 0.05,
+            lai_threshold: 6.0,
+            sla_per_mol_c: G_SLA,
+            ground_area,
+        }
+    }
+
+    /// A state carrying the litter BOUNDARY sink the organ fixture does not build.
+    fn sen_state(leaf: f64, stem: f64, root: f64) -> State {
+        let mut s = state(leaf, stem, root, 0.4, 0.21 * AIR_MOL, 550.0);
+        s.stocks.insert(
+            LITTER_SINK.to_string(),
+            Stock::new(
+                LITTER_SINK.to_string(),
+                "biosphere".to_string(),
+                Quantity::Carbon,
+                Quantity::Carbon.canonical_unit(),
+                0.0,
+                StockKind::Boundary,
+                0.0,
+                false,
+                BTreeMap::new(),
+            )
+            .expect("litter sink"),
+        );
+        s
+    }
+
+    /// `legs_of` fixes `dt = 1`; senescence needs it as a knob.
+    fn sen_legs(flow: &Senescence, s: &State, dt: f64) -> BTreeMap<String, f64> {
+        let r = resolver(0.0, 400.0);
+        let env = r.bind(s, dt);
+        flow.evaluate(s, &env, dt)
+            .expect("evaluate")
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect()
+    }
+
+    /// All four legs, hand-computed from the rates and the organ carbon.
+    ///
+    /// Each organ loses `rdr · organ · dt` and the litter sink receives the sum — one
+    /// atomic stoichiometric transfer, not three. Three distinct rates on three distinct
+    /// organ sizes, so no pair of legs can be swapped without the arithmetic noticing:
+    /// that is what makes this the test the "stem shed at the root's rate" mutation dies
+    /// on, which nothing about senescence caught before.
+    /// Mirrors `test_senescence_legs_are_the_hand_computed_losses`,
+    /// `test_senescence_flux_proportional_to_organ_carbon` and
+    /// `test_senescence_flux_zero_organ_is_zero`.
+    #[test]
+    fn the_senescence_legs_are_the_per_organ_relative_losses() {
+        let s = sen_state(3.0, 1.0, 1.0);
+        let legs = sen_legs(&senescence_flow(1.0), &s, 1.0);
+        let (leaf, stem, root) = (3.0 * G_RDR_LEAF, 1.0 * G_RDR_STEM, 1.0 * G_RDR_ROOT);
+        assert_eq!(legs[LEAF], -leaf);
+        assert_eq!(legs[STEM], -stem);
+        assert_eq!(legs[ROOT], -root);
+        assert_eq!(legs[LITTER_SINK], leaf + stem + root);
+
+        // Proportional to the organ, and self-limiting: an organ at zero sheds nothing, so
+        // positivity is structural rather than clamped. A flux that read a fixed amount,
+        // or `sqrt`, satisfies neither.
+        let double = sen_legs(&senescence_flow(1.0), &sen_state(6.0, 2.0, 2.0), 1.0);
+        for id in [LEAF, STEM, ROOT] {
+            assert_eq!(double[id].to_bits(), (2.0 * legs[id]).to_bits(), "{id}");
+        }
+        let empty = sen_legs(&senescence_flow(1.0), &sen_state(0.0, 0.0, 0.0), 1.0);
+        for id in [LEAF, STEM, ROOT, LITTER_SINK] {
+            assert_eq!(empty[id], 0.0, "{id} on a dead plant");
+        }
+    }
+
+    /// Every leg is linear in `dt`, bit-exactly.
+    ///
+    /// Asserted on `to_bits` rather than a tolerance: a first-order rate law times a step
+    /// has no rounding to hide behind, and the biosphere is frozen at `dt = ¼`, so a leg
+    /// that was only approximately dt-linear would be a different mechanism at the frozen
+    /// step than at the fixture's.
+    /// Mirrors `test_senescence_scales_linearly_with_dt`.
+    #[test]
+    fn the_senescence_legs_are_bit_exactly_linear_in_dt() {
+        let s = sen_state(3.0, 1.0, 1.0);
+        let flow = senescence_flow(1.0);
+        let one = sen_legs(&flow, &s, 1.0);
+        for dt in [0.5, 0.25, 0.125] {
+            let scaled = sen_legs(&flow, &s, dt);
+            for id in [LEAF, STEM, ROOT, LITTER_SINK] {
+                assert_eq!(
+                    scaled[id].to_bits(),
+                    (dt * one[id]).to_bits(),
+                    "{id} at dt={dt}"
+                );
+            }
+        }
+    }
+
+    /// The mutual-shading term reaches the flow, and it moves the LEAF leg only.
+    ///
+    /// Two states either side of the cited threshold on one flow: at SLA 0.6 over 1 m²,
+    /// LAI is `0.6 · leaf_c`, so 9 mol C is LAI 5.4 and 11 mol C is LAI 6.6. ⚠ The leaf
+    /// legs are compared against their own hand-computed values rather than against each
+    /// other, because the leg is also proportional to leaf carbon and the two states must
+    /// differ in leaf carbon to differ in LAI — a bare ratio would be confounded.
+    ///
+    /// The stem leg is asserted UNCHANGED across the crossing: mutual shading is a
+    /// canopy-closure mechanism, and a term that leaked into the other organs would still
+    /// balance, still be dt-linear, and still shed faster once the canopy closed.
+    /// Mirrors `test_senescence_sheds_FASTER_once_the_canopy_closes`.
+    #[test]
+    fn senescence_sheds_faster_from_the_leaf_only_once_the_canopy_closes() {
+        let flow = senescence_flow(1.0);
+        let below = sen_legs(&flow, &sen_state(9.0, 1.0, 1.0), 1.0); // LAI 5.4
+        let above = sen_legs(&flow, &sen_state(11.0, 1.0, 1.0), 1.0); // LAI 6.6
+        assert_eq!(below[LEAF], -9.0 * G_RDR_LEAF);
+        assert_eq!(above[LEAF], -11.0 * (G_RDR_LEAF + 0.05));
+        // ...and the other two organs never hear about it.
+        assert_eq!(below[STEM], above[STEM]);
+        assert_eq!(below[ROOT], above[ROOT]);
+        assert_eq!(above[STEM], -G_RDR_STEM); // stem carbon is 1.0 in both states
+    }
+
+    /// ⚠ THE CANOPY IS MEASURED PER GROUND AREA, at `Senescence`'s own call site.
+    ///
+    /// Every frozen scenario is 1 m², so a `Senescence` that computed LAI as bare
+    /// `leaf_c · SLA` — dropping the divisor entirely — returns the identical number for
+    /// every run in the tree. Measured: that mutant left `cargo test -p domains --lib` at
+    /// 298 passed / 0 failed, and it is invisible to the goldens and to the cross-port
+    /// comparison for the same reason. Batch C's finding on a third call site, so this is
+    /// a constructed state on a 2 m² plot rather than a scenario run.
+    ///
+    /// The claim is stated as a CROSSING rather than as a value: the same standing leaf
+    /// carbon is inside the mutual-shading regime on 1 m² and outside it on 2 m², which is
+    /// the only way an area error changes behaviour rather than merely changing a number.
+    #[test]
+    fn the_senescence_canopy_is_measured_per_ground_area() {
+        // 11 mol C: LAI 6.6 on 1 m² (in the regime), LAI 3.3 on 2 m² (out of it).
+        let s = sen_state(11.0, 1.0, 1.0);
+        let dense = sen_legs(&senescence_flow(1.0), &s, 1.0);
+        let spread = sen_legs(&senescence_flow(2.0), &s, 1.0);
+        assert_eq!(dense[LEAF], -11.0 * (G_RDR_LEAF + 0.05), "6.6 > 6, shading");
+        assert_eq!(spread[LEAF], -11.0 * G_RDR_LEAF, "3.3 < 6, no shading");
+        // ...and the two organs with no area term in their rate law are untouched, so the
+        // difference above cannot be read as the plot scaling everything.
+        assert_eq!(dense[STEM], spread[STEM]);
+        assert_eq!(dense[ROOT], spread[ROOT]);
+    }
 }
