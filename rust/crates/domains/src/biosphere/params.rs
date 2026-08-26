@@ -2675,8 +2675,28 @@ parameters:
     /// exactly the case a `require_positive` would have broken.
     /// Mirrors `test_senescence_loader_rejects_a_negative_rate` and
     /// `test_senescence_loader_accepts_zero_rate`.
+    ///
+    /// ⚠ **The accept half READS BACK THE FIELD UNDER TEST, and the first draft did not.**
+    /// It asserted `…rdr_leaf` on every iteration, so for four of the five fields it checked
+    /// that the field it had NOT touched was unchanged and never looked at the one it had.
+    /// A loader that dropped `shade_rate` to a default, or failed to parse `lai_threshold`
+    /// and fell back, would have passed it. Measured: hard-coding `shade_rate` to its
+    /// committed value inside the loader left the first draft GREEN and reddens this one.
+    /// That is this batch's own mutual-shading finding — a pin evaluated where its subject
+    /// is invisible — for the third time in one batch, and the third time it was in OUR
+    /// column rather than the tree's.
     #[test]
     fn a_negative_senescence_rate_is_rejected_and_a_zero_one_loads() {
+        fn field_of(p: &SenescenceParams, field: &str) -> f64 {
+            match field {
+                "rdr_leaf" => p.rdr_leaf,
+                "rdr_stem" => p.rdr_stem,
+                "rdr_root" => p.rdr_root,
+                "shade_rate" => p.shade_rate,
+                "lai_threshold" => p.lai_threshold,
+                other => panic!("{other} is not a senescence field"),
+            }
+        }
         for field in [
             "rdr_leaf",
             "rdr_stem",
@@ -2692,14 +2712,38 @@ parameters:
                 field,
             );
             let zero = senescence_with(field, "0.0");
+            let loaded = senescence_from(zero, "senescence.yaml");
             assert_eq!(
-                senescence_from(zero, "senescence.yaml").rdr_leaf,
-                if field == "rdr_leaf" { 0.0 } else { 0.02 },
-                "a zero {field} must LOAD"
+                field_of(&loaded, field),
+                0.0,
+                "a zero {field} must LOAD, and must load AS zero"
             );
         }
-        // ...and the committed file still loads, so the guard is not simply always-on.
-        assert_eq!(senescence().rdr_leaf, 0.02);
+        // ...and the committed file still loads, so the rejection is not simply always-on —
+        // with all five fields DISTINCT, which is what a loader returning one constant (and
+        // therefore passing every `== 0.0` above) fails. Stated as distinctness rather than
+        // as five literals on purpose: the VALUES are already pinned bit-exactly by C1's
+        // `every_value_matches_the_generated_table`, which is also what would catch a
+        // permutation of the five keys. This half is the control for the loop, not a second
+        // copy of that gate.
+        let p = senescence();
+        let mut seen: Vec<u64> = [
+            "rdr_leaf",
+            "rdr_stem",
+            "rdr_root",
+            "shade_rate",
+            "lai_threshold",
+        ]
+        .iter()
+        .map(|f| field_of(&p, f).to_bits())
+        .collect();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(
+            seen.len(),
+            5,
+            "the five fields must not collapse to one value"
+        );
     }
 
     // ⚠ `test_load_senescence_params_matches_committed_values` gets NO successor, and this

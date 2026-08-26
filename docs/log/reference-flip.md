@@ -3670,3 +3670,62 @@ that is deliberately not a contract — is S6's, not a testing batch's.
 Batch G's additions to its input: the two claims measured already-owned (one a genuine
 duplicate, one not — a census that cannot tell those apart is not doing its job), the
 twenty-five tests dispositioned as a decision record, and the four margin bands above.
+
+### ⚠ The batch G review, 2026-08-26: the same defect a THIRD time, and this time in our own column
+
+The batch shipped, then an independent read of it asked three questions its own two batteries
+could not. Two resolved clean; one was a real defect, and it is the finding this batch has
+now recorded three times over.
+
+**The defect.** `a_negative_senescence_rate_is_rejected_and_a_zero_one_loads` iterates all
+five fields. Its reject half is per-field and correct. Its **accept** half read
+`…rdr_leaf` on every iteration:
+
+```rust
+assert_eq!(senescence_from(zero, "senescence.yaml").rdr_leaf,
+           if field == "rdr_leaf" { 0.0 } else { 0.02 }, "a zero {field} must LOAD");
+```
+
+For four of the five fields that asserts the field it had **not** touched is unchanged, and
+never reads the one it had. The zero-loads claim was therefore only ever made for `rdr_leaf`.
+Measured rather than argued: a loader that ignores the file's `shade_rate` and hard-codes the
+committed 0.05 left the first draft **green**, and reddens the fix — where it is the **only**
+test in the binary that catches it.
+
+⚠⚠ **This is batch G's own headline finding, arriving for the third time in one batch and
+the first time in our column.** The mutual-shading gate is pinned at its knot and blind to
+its shape (G4/G5, the tree's). The `leaf_area_index` point test is pinned at a point and
+blind to a quadratic (G14, the tree's). And this test is pinned on the field it is not
+varying. All three are the same shape: *the assertion sits where its subject cannot move it.*
+Finding it in a test written the same day, by the batch that had just written that sentence
+twice, is the honest measure of how invisible the shape is from inside.
+
+**The fix, and what it deliberately does not restate.** The accept half now reads back the
+field under test through a `field_of` match. The control that stops a returns-a-constant
+loader passing every `== 0.0` is stated as **distinctness of the five loaded values**, not as
+five literals — because the values are already pinned bit-exactly by C1's
+`every_value_matches_the_generated_table`, which is also what would catch a permutation of
+the five keys. Re-adding the five literals here would have re-introduced the very duplicate
+this batch deleted an hour earlier.
+
+**The two questions that resolved clean**, recorded so the absence of a change is not read as
+the question not having been asked:
+
+* **Does `senescence_from` need a manifest entry, the way a new param file would?** No. The
+  biosphere manifest's `param_files` names FILES (15 of them), not loader functions, and no
+  manifest names a `_from` reader anywhere. C7's byte-for-byte writer gate ran clean in the
+  938-test workspace pass, which is the instrument that would have said otherwise.
+* **Was the end-of-batch routine complete?** No — and this is the second half of the review.
+  The batch had written the plan section, the `docs/log/` record and the memory file, and had
+  **not** extended the reference-flip row in `docs/post-roadmap-log.md`, which every batch
+  since B has extended with its own clause. The index was one batch stale, and no gate would
+  have caught it: `log_index_and_record_name_the_same_plan_docs` compares plan-doc PATHS, and
+  the path had not changed. *An index keyed on the file name cannot see a missing paragraph
+  about the file.*
+
+⚠ **And one shape defect of my own making, fixed in the same pass.** The batch's first append
+put the full plan-doc section — tables and all — into `docs/log/reference-flip.md`, which
+reddened `no_record_file_is_one_giant_line` on twelve rows. The log is a **prose** record: it
+carries 16 table rows against the plan doc's 815, and none of the per-batch "does not port"
+tables. The gate caught it, which is what it is for; the lesson is that the two files are not
+copies of one another and this batch had assumed they were.
