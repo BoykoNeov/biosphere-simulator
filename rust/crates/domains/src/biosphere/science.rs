@@ -1559,7 +1559,10 @@ mod tests {
     /// Mirrors `test_penman_monteith_zero_energy_zero_vpd_is_zero`.
     #[test]
     fn penman_monteith_is_zero_with_no_energy_and_no_vapour_deficit() {
-        assert_eq!(penman_monteith_transpiration(0.0, 0.0, 20.0, 50.0, 70.0), 0.0);
+        assert_eq!(
+            penman_monteith_transpiration(0.0, 0.0, 20.0, 50.0, 70.0),
+            0.0
+        );
     }
 
     /// The negative-energy clamp — **and the finding that nothing in this tree can reach
@@ -1803,7 +1806,10 @@ mod tests {
         // (1.3 - 0.15)/1.3 = 0.8846... of it.
         let returned = resow_water_return(100.0, 1.3, 0.15);
         let want = 100.0 * (1.3 - 0.15) / 1.3;
-        assert!((returned - want).abs() <= 1e-12 * want, "{returned} vs {want}");
+        assert!(
+            (returned - want).abs() <= 1e-12 * want,
+            "{returned} vs {want}"
+        );
         // It can never exceed the store — the fraction is < 1 by construction, which is
         // why the rule needs no clamp (the form it replaced did, and the clamp fired
         // every re-sow once the stores became geometric).
@@ -1823,4 +1829,304 @@ mod tests {
         assert_eq!(resow_water_return(100.0, 0.10, 0.15), 0.0);
     }
 
+    // --- batch D: the carbon-spending equations -----------------------------
+    //
+    // ⚠ THE PROVENANCE OF EVERY NUMBER IN THIS BLOCK, stated once. The respiration
+    // scalars (`m_ref = 0.02`, `Q10 = 2`, `t_ref = 25`, `Yg = 0.75`) and the whole
+    // partition table are `TODO(cite)` PROVISIONAL PLACEHOLDERS in their own param
+    // files, and the partition table is additionally a FITTED one — the winter-wheat
+    // backfill from the cited Table 18 was taken and REFUSED because it drives peak LAI
+    // to 2.201 against a 5.0–8.0 contract band
+    // (docs/plans/post-roadmap-wheat-partition-backfill.md). So S5's exit-gate clause 2
+    // is satisfied here by its MIDDLE limb only: every expected value below is
+    // hand-computed from the stated equation and the committed inputs, with the
+    // arithmetic written out, and NONE is presented as a number a source states. Pinning
+    // a fitted value as though it were cited is the overclaim species that batch A's and
+    // batch C's reviews each caught once.
+
+    fn resp_params() -> RespirationParams {
+        RespirationParams {
+            maintenance_coef: 0.02,
+            q10: 2.0,
+            t_ref: 25.0,
+            growth_efficiency: 0.75,
+            o2_half_saturation: 0.001, // inert here: the rate laws never touch O₂
+        }
+    }
+
+    /// The committed `allocation.yaml` table, as a literal.
+    ///
+    /// ⚠ Deliberately NOT `params::allocation().table` — these tests are about the
+    /// interpolation ARITHMETIC, so reading the table through the loader would make
+    /// every expected value below depend on the file, and a table edit would then redden
+    /// the equation tests rather than the value pin that owns it
+    /// (`params::tests::every_value_matches_the_generated_table`). Two gates, two
+    /// subjects.
+    fn table() -> Vec<PartitionRow> {
+        vec![
+            PartitionRow {
+                dvs: 0.0,
+                fl: 0.55,
+                fs: 0.10,
+                fr: 0.35,
+                fo: 0.00,
+            },
+            PartitionRow {
+                dvs: 1.0,
+                fl: 0.30,
+                fs: 0.50,
+                fr: 0.20,
+                fo: 0.00,
+            },
+            PartitionRow {
+                dvs: 2.0,
+                fl: 0.00,
+                fs: 0.10,
+                fr: 0.10,
+                fo: 0.80,
+            },
+        ]
+    }
+
+    fn close(a: f64, b: f64, what: &str) {
+        assert!(
+            (a - b).abs() <= 1e-12 * b.abs().max(1.0),
+            "{what}: got {a}, want {b}"
+        );
+    }
+
+    /// `Q10^((T − t_ref)/10)` on the doubling ladder either side of the reference.
+    ///
+    /// Hand-computed from the exponent alone: at `t_ref` the exponent is 0 so the factor
+    /// is exactly 1; each +10 °C multiplies by `q10` and each −10 divides by it. With the
+    /// committed `q10 = 2`, `t_ref = 25` that is 1, 2, 4, ½, ¼ at 25, 35, 45, 15, 5 °C.
+    ///
+    /// ⚠ §5ad's control M3 measured this function BARE: changing the per-10 °C exponent
+    /// to per-5 reddened 6 tests and NOT ONE of them was about temperature response.
+    /// This is the test that was missing.
+    /// Mirrors `tests/test_respiration.py::test_q10_factor_known_values`.
+    #[test]
+    fn q10_is_the_doubling_ladder_either_side_of_the_reference_temperature() {
+        for (temp, want) in [
+            (25.0, 1.0),
+            (35.0, 2.0),
+            (45.0, 4.0),
+            (15.0, 0.5),
+            (5.0, 0.25),
+        ] {
+            close(
+                q10_factor(temp, 2.0, 25.0),
+                want,
+                &format!("q10 at {temp} °C"),
+            );
+        }
+        // The reference temperature is a REFERENCE, not a floor: below it the factor
+        // is < 1 and never clamps. A `max(0, …)` here would be invisible above t_ref.
+        assert!(q10_factor(-5.0, 2.0, 25.0) < 1.0);
+        // It is a pure exponential in the DIFFERENCE, so shifting both ends by the same
+        // amount is exactly identical — which is what makes `t_ref` a real parameter
+        // rather than a constant that happens to be passed in.
+        assert_eq!(q10_factor(35.0, 2.0, 25.0), q10_factor(45.0, 2.0, 35.0));
+    }
+
+    /// `MRES = m_ref · biomass · Q10 · maturity`, hand-composed.
+    ///
+    /// At the reference temperature Q10 is exactly 1, so `0.02 · 5 = 0.1` mol C/day; at
+    /// 35 °C the Q10 doubles it to 0.2 and at 15 °C halves it to 0.05. Linear in biomass
+    /// by inspection of the product, and exactly zero for no tissue — positivity here is
+    /// structural rather than clamped, which is why the zero is an EXACT equality.
+    ///
+    /// ⚠ `maturity` is hard-coded to 1.0 in this port and Python's optional argument gets
+    /// no successor. It is not drift: nothing in EITHER tree ever passes anything but the
+    /// default, so that seam was exercised by its own test and by nothing else. Recorded
+    /// in batch D's disposition list rather than ported.
+    /// Mirrors the `maintenance_respiration_*` block of `tests/test_respiration.py`.
+    #[test]
+    fn maintenance_respiration_is_the_reference_rate_scaled_by_biomass_and_q10() {
+        let p = resp_params();
+        close(
+            maintenance_respiration_flux(5.0, 25.0, &p),
+            0.1,
+            "MRES at t_ref",
+        );
+        close(
+            maintenance_respiration_flux(5.0, 35.0, &p),
+            0.2,
+            "MRES at +10 °C",
+        );
+        close(
+            maintenance_respiration_flux(5.0, 15.0, &p),
+            0.05,
+            "MRES at −10 °C",
+        );
+        // Linear in biomass at a fixed temperature: twice the tissue, twice the cost.
+        let a = maintenance_respiration_flux(3.0, 20.0, &p);
+        let b = maintenance_respiration_flux(6.0, 20.0, &p);
+        close(b, 2.0 * a, "MRES doubles with biomass");
+        // No tissue, no cost — exactly, at any temperature.
+        assert_eq!(maintenance_respiration_flux(0.0, 30.0, &p), 0.0);
+        assert_eq!(maintenance_respiration_flux(0.0, -10.0, &p), 0.0);
+    }
+
+    /// `available = max(0, GASS − MRES)`, and the clamp is the whole point.
+    ///
+    /// Hand values: `1.0 − 0.2 = 0.8`. The clamp limb is asserted as an EXACT zero at
+    /// both the strict-deficit and the exactly-equal case, because a `>` written where
+    /// `>=` belongs is invisible everywhere except at equality.
+    ///
+    /// ⚠ Why the clamp is load-bearing rather than defensive: `Allocation` multiplies
+    /// this by `Yg` and `GrowthRespiration` by `(1 − Yg)`, so a NEGATIVE `available`
+    /// runs both flows BACKWARDS — the plant would deposit carbon into the atmosphere
+    /// and un-respire. §5ad's battery measured the unclamped form reddening 21 tests,
+    /// none of them about the carbon budget.
+    /// Mirrors `tests/test_respiration.py::test_growth_respiration_clamps_*`.
+    #[test]
+    fn available_for_growth_is_the_difference_and_the_clamp_is_exact_at_equality() {
+        close(available_for_growth(1.0, 0.2), 0.8, "surplus day");
+        assert_eq!(available_for_growth(0.2, 1.0), 0.0);
+        assert_eq!(available_for_growth(1.0, 1.0), 0.0);
+        // The composed growth-respiration loss Python returns from its own function:
+        // (1 − Yg) · available = 0.25 · 0.8 = 0.2 mol C/day. Composed here rather than
+        // wrapped, because Rust computes it inline in `GrowthRespiration::evaluate`.
+        close(
+            (1.0 - resp_params().growth_efficiency) * available_for_growth(1.0, 0.2),
+            0.2,
+            "GRES on the surplus day",
+        );
+    }
+
+    /// The three knots are the table's own rows, returned unchanged.
+    ///
+    /// Mirrors `tests/test_allocation.py::test_partition_fractions_known_values`.
+    #[test]
+    fn partition_fractions_at_a_knot_are_that_row_verbatim() {
+        let t = table();
+        for row in &t {
+            let got = partition_fractions(row.dvs, &t);
+            assert_eq!(got, (row.fl, row.fs, row.fr, row.fo), "at DVS {}", row.dvs);
+        }
+    }
+
+    /// Between knots it is a linear interpolation, pinned OFF THE MIDPOINT.
+    ///
+    /// ⚠⚠ THE OFF-MIDPOINT PART IS THE TEST, not a flourish. At DVS 0.5 the weight is
+    /// 0.5, so a weight computed as `1 − w` instead of `w` — the interpolation running
+    /// BACKWARDS, the leaf taking the stem's share — returns the identical answer. A
+    /// midpoint pin is symmetric under exactly the mistake it exists to catch. §5ad's
+    /// battery measured the reversed weight reddening 2 tests, neither about allocation.
+    ///
+    /// Hand-derived from `lo + w·(hi − lo)` with `w = (dvs − lo.dvs)/(hi.dvs − lo.dvs)`:
+    ///   DVS 0.25, w = 0.25 between rows 0 and 1:
+    ///     fl 0.55 + 0.25·(0.30 − 0.55) = 0.55 − 0.0625 = 0.4875
+    ///     fs 0.10 + 0.25·(0.50 − 0.10) = 0.10 + 0.10   = 0.20
+    ///     fr 0.35 + 0.25·(0.20 − 0.35) = 0.35 − 0.0375 = 0.3125
+    ///     fo 0
+    ///   DVS 1.75, w = 0.75 between rows 1 and 2:
+    ///     fl 0.30 + 0.75·(0.00 − 0.30) = 0.075
+    ///     fs 0.50 + 0.75·(0.10 − 0.50) = 0.20
+    ///     fr 0.20 + 0.75·(0.10 − 0.20) = 0.125
+    ///     fo 0.00 + 0.75·(0.80 − 0.00) = 0.60
+    /// Mirrors `tests/test_allocation.py::test_partition_fractions_known_values[0.5|1.5]`.
+    #[test]
+    fn partition_fractions_between_knots_interpolate_in_the_right_direction() {
+        let t = table();
+        let (fl, fs, fr, fo) = partition_fractions(0.25, &t);
+        close(fl, 0.4875, "fl at DVS 0.25");
+        close(fs, 0.20, "fs at DVS 0.25");
+        close(fr, 0.3125, "fr at DVS 0.25");
+        assert_eq!(fo, 0.0);
+        let (fl, fs, fr, fo) = partition_fractions(1.75, &t);
+        close(fl, 0.075, "fl at DVS 1.75");
+        close(fs, 0.20, "fs at DVS 1.75");
+        close(fr, 0.125, "fr at DVS 1.75");
+        close(fo, 0.60, "fo at DVS 1.75");
+        // The midpoint, for completeness — and it is precisely the case that CANNOT see
+        // a reversed weight, which is why it is not left to carry this claim alone.
+        let (fl, ..) = partition_fractions(0.5, &t);
+        close(fl, 0.425, "fl at the midpoint");
+    }
+
+    /// Outside the table the fractions FLAT-EXTRAPOLATE from the nearer END row.
+    ///
+    /// ⚠ The two limbs must be pinned separately: a top limb returning the FIRST row
+    /// instead of the last still sums to 1, still returns a legal set of fractions, and
+    /// reddened 2 tests in §5ad's battery — neither about allocation. The below-table
+    /// limb is reached by any pre-emergence step, so neither branch is hypothetical.
+    /// Mirrors `tests/test_allocation.py::test_partition_fractions_known_values[-1.0|3.0]`.
+    #[test]
+    fn partition_fractions_flat_extrapolate_from_the_nearer_end_row() {
+        let t = table();
+        let below = partition_fractions(-1.0, &t);
+        assert_eq!(below, (0.55, 0.10, 0.35, 0.00));
+        let above = partition_fractions(3.0, &t);
+        assert_eq!(above, (0.00, 0.10, 0.10, 0.80));
+        assert_ne!(below, above, "the two ends must not extrapolate to one row");
+    }
+
+    /// The four fractions sum to 1 at, between and outside every knot.
+    ///
+    /// A property of the FILE SHAPE rather than of the arithmetic: one shared-breakpoint
+    /// table interpolates to sum 1 everywhere by linearity (`lerp(1,1) = 1`), which is
+    /// exactly why `allocation.yaml`'s header refuses independent FL/FS/FR/FO tables.
+    /// Mirrors `tests/test_allocation.py::test_partition_fractions_sum_to_one_everywhere`.
+    #[test]
+    fn the_partition_fractions_sum_to_one_everywhere_including_outside_the_table() {
+        let t = table();
+        for dvs in [-2.0, 0.0, 0.13, 0.5, 0.99, 1.0, 1.37, 2.0, 5.0] {
+            let (fl, fs, fr, fo) = partition_fractions(dvs, &t);
+            close(fl + fs + fr + fo, 1.0, &format!("sum at DVS {dvs}"));
+            for (label, f) in [("fl", fl), ("fs", fs), ("fr", fr), ("fo", fo)] {
+                assert!((0.0..=1.0).contains(&f), "{label} at DVS {dvs} is {f}");
+            }
+        }
+    }
+
+    /// `partition` splits a given DMI into four legs that sum back to it exactly.
+    ///
+    /// Hand values at DVS 0 with DMI 10: `(5.5, 1.0, 3.5, 0.0)`; at DVS 1.5, the midpoint
+    /// of rows 1 and 2, `(1.5, 3.0, 1.5, 4.0)`.
+    ///
+    /// ⚠ The GRAIN leg is asserted by identity, not only through the sum. §5ad's battery
+    /// routed the storage share into the ROOT leg — DMI conserved to the last bit, every
+    /// flow still balanced — and reddened 2 tests, neither about where the carbon went.
+    /// A sum-preserving reshuffle is invisible to conservation BY CONSTRUCTION, which is
+    /// the shape of most of this batch.
+    /// Mirrors `tests/test_allocation.py::test_partition_splits_dmi_exactly` and
+    /// `test_partition_fills_storage_in_the_reproductive_phase`.
+    #[test]
+    fn partition_splits_the_increment_into_four_named_legs_that_sum_back_to_it() {
+        let t = table();
+        let (leaf, stem, root, storage) = partition(10.0, 0.0, &t);
+        close(leaf, 5.5, "leaf at DVS 0");
+        close(stem, 1.0, "stem at DVS 0");
+        close(root, 3.5, "root at DVS 0");
+        assert_eq!(storage, 0.0, "no grain before anthesis");
+        close(
+            leaf + stem + root + storage,
+            10.0,
+            "the four legs sum to DMI",
+        );
+
+        let (leaf, stem, root, storage) = partition(10.0, 1.5, &t);
+        close(leaf, 1.5, "leaf at DVS 1.5");
+        close(stem, 3.0, "stem at DVS 1.5");
+        close(root, 1.5, "root at DVS 1.5");
+        close(storage, 4.0, "grain at DVS 1.5");
+        close(
+            leaf + stem + root + storage,
+            10.0,
+            "the four legs sum to DMI",
+        );
+
+        // The grain fills ONLY in the reproductive phase, and the boundary is anthesis.
+        for dvs in [0.0, 0.5, 0.99, 1.0] {
+            assert_eq!(partition(10.0, dvs, &t).3, 0.0, "grain at DVS {dvs}");
+        }
+        assert!(
+            partition(10.0, 1.01, &t).3 > 0.0,
+            "grain starts after anthesis"
+        );
+        // Zero in, zero out on every leg — the split creates nothing.
+        assert_eq!(partition(0.0, 1.5, &t), (0.0, 0.0, 0.0, 0.0));
+    }
 }

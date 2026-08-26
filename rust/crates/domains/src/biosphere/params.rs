@@ -424,8 +424,21 @@ pub fn photosynthesis() -> PhotosynthesisParams {
 
 /// Maintenance + growth respiration params (`respiration.yaml`).
 pub fn respiration() -> RespirationParams {
-    const NAME: &str = "respiration.yaml";
-    let f = file(RESPIRATION_YAML, NAME);
+    respiration_from(RESPIRATION_YAML, "respiration.yaml")
+}
+
+/// The same reader over an arbitrary text, so the guards above can be exercised.
+///
+/// ⚠ A PRODUCTION CHANGE INSIDE A TESTING BATCH, and it is the same one batches B and C
+/// each made rather than a fresh decision: every other guarded loader in this module was
+/// already split into a text-taking core plus a thin wrapper, because a loader that can
+/// only ever read its own `include_str!` has guards no test can reach. This splits the
+/// last two (`respiration`, `stem_reserves`). It is NOT the extraction §5ad rules out —
+/// that one is about lifting equations out of `Flow::demand` to make them unit-testable,
+/// which changes what the science is made of. This changes nothing but who may call it,
+/// and the committed values are asserted unchanged by the params census.
+pub fn respiration_from(text: &str, name: &'static str) -> RespirationParams {
+    let f = file(text, name);
     let v = guarded_map(
         &f,
         &[
@@ -435,18 +448,18 @@ pub fn respiration() -> RespirationParams {
             ("growth_efficiency", "dimensionless"),
             ("o2_half_saturation", "mol/mol"),
         ],
-        NAME,
+        name,
     );
     for field in ["maintenance_coef", "q10"] {
-        checked(require_positive(v[field], field, NAME), NAME);
+        checked(require_positive(v[field], field, name), name);
     }
     checked(
-        require_half_open(v["growth_efficiency"], 0.0, 1.0, "growth_efficiency", NAME),
-        NAME,
+        require_half_open(v["growth_efficiency"], 0.0, 1.0, "growth_efficiency", name),
+        name,
     );
     checked(
-        require_non_negative(v["o2_half_saturation"], "o2_half_saturation", NAME),
-        NAME,
+        require_non_negative(v["o2_half_saturation"], "o2_half_saturation", name),
+        name,
     );
     RespirationParams {
         maintenance_coef: v["maintenance_coef"],
@@ -632,8 +645,12 @@ pub fn root_depth() -> RootDepthParams {
 
 /// Stem-reserve remobilization (`stem_reserves.yaml`).
 pub fn stem_reserves() -> StemReserveParams {
-    const NAME: &str = "stem_reserves.yaml";
-    let f = file(STEM_RESERVES_YAML, NAME);
+    stem_reserves_from(STEM_RESERVES_YAML, "stem_reserves.yaml")
+}
+
+/// The same reader over an arbitrary text (see `respiration_from` for why).
+pub fn stem_reserves_from(text: &str, name: &'static str) -> StemReserveParams {
+    let f = file(text, name);
     let v = guarded_map(
         &f,
         &[
@@ -642,24 +659,24 @@ pub fn stem_reserves() -> StemReserveParams {
             ("trigger_dvs", "dimensionless"),
             ("cessation_dvs", "dimensionless"),
         ],
-        NAME,
+        name,
     );
     let (fstr, rate) = (v["remobilizable_fraction"], v["remobilization_rate"]);
     let (trigger, cessation) = (v["trigger_dvs"], v["cessation_dvs"]);
     assert!(
         0.0 < fstr && fstr < 1.0,
-        "{NAME}: remobilizable_fraction must be in (0, 1), got {fstr}"
+        "{name}: remobilizable_fraction must be in (0, 1), got {fstr}"
     );
     checked(
-        require_half_open(rate, 0.0, 1.0, "remobilization_rate", NAME),
-        NAME,
+        require_half_open(rate, 0.0, 1.0, "remobilization_rate", name),
+        name,
     );
-    checked(require_closed(trigger, 0.0, 2.0, "trigger_dvs", NAME), NAME);
+    checked(require_closed(trigger, 0.0, 2.0, "trigger_dvs", name), name);
     // ⚠ `cessation_dvs` closes BOTH halves at maturity — a DOMAIN boundary, not a cited
     // cessation rule (see the struct's own doc comment).
     assert!(
         trigger < cessation && cessation <= 2.0,
-        "{NAME}: must satisfy trigger_dvs < cessation_dvs <= 2, got ({trigger}, {cessation})"
+        "{name}: must satisfy trigger_dvs < cessation_dvs <= 2, got ({trigger}, {cessation})"
     );
     StemReserveParams {
         remobilizable_fraction: fstr,
@@ -1868,7 +1885,11 @@ parameters:
         );
         let no_source = Box::leak(
             TRANSPIRATION_YAML
-                .replacen("    source: \"TODO(cite)", "    provenance: \"TODO(cite)", 1)
+                .replacen(
+                    "    source: \"TODO(cite)",
+                    "    provenance: \"TODO(cite)",
+                    1,
+                )
                 .into_boxed_str(),
         );
         assert_ne!(no_source, TRANSPIRATION_YAML, "the substitution must apply");
@@ -2054,4 +2075,355 @@ parameters:
         );
     }
 
+    // --- batch D: the three carbon-spending param files and their guards --------
+    //
+    // ⚠ WHAT THESE DO AND DO NOT OWN. The committed VALUES of all three files are already
+    // pinned bit-for-bit by `every_value_matches_the_generated_table` (C8's params
+    // census), which also carries the partition table row by row. What had no test at
+    // all is the other half — the REJECTIONS: the unit strings, the bound checks and the
+    // structural rules that decide which files are legal in the first place. A guard
+    // nothing exercises is a guard that can be deleted with the suite green, which is
+    // this slice's whole subject.
+
+    /// Every unit string in `respiration.yaml` is exact-matched at the loader.
+    ///
+    /// The exact-string guard is the one that counts (`config/units.py`'s live pint
+    /// conversions were all measured to be identities), so a file that renames `1/day`
+    /// to `per_day` must be refused rather than coerced.
+    /// Mirrors `tests/test_respiration.py::test_resp_loader_rejects_a_wrong_unit`.
+    #[test]
+    fn a_wrong_respiration_unit_is_rejected() {
+        for (field, wrong) in [
+            ("maintenance_coef", "per_day"),
+            ("q10", "1"),
+            ("t_ref", "K"),
+            ("growth_efficiency", "fraction"),
+            ("o2_half_saturation", "ppm"),
+        ] {
+            let broken = unit_of(RESPIRATION_YAML, field, wrong);
+            rejects(
+                || {
+                    respiration_from(broken, "respiration.yaml");
+                },
+                &format!("{field} declared in {wrong:?}"),
+            );
+        }
+        // The committed file still loads through the same reader.
+        assert_eq!(
+            respiration_from(RESPIRATION_YAML, "respiration.yaml").q10,
+            2.0
+        );
+    }
+
+    /// The respiration bound checks: two strictly positive rates, an efficiency in
+    /// `(0, 1]` and a non-negative half-saturation.
+    ///
+    /// ⚠ THE THREE BOUNDS HAVE DELIBERATELY DIFFERENT SHAPES and the test asserts the
+    /// difference, because "they must all be positive" is the plausible wrong reading and
+    /// it is wrong at BOTH ends. `growth_efficiency` is half-open `(0, 1]`, so 1.0 is
+    /// LEGAL — a lossless conversion is degenerate but not malformed — while 0.0 is
+    /// refused. `o2_half_saturation` is the opposite: zero is legal (the `f_O2` throttle
+    /// turned off) and only a negative is refused.
+    ///
+    /// ⚠ The first draft of this test asserted the mirror image of both — a `[0, 1)`
+    /// efficiency and a legal zero rate — and went red on its first run. `require_half_open`
+    /// says which way round it is in as many words ("zero is a degenerate model, one is
+    /// lossless and legitimate"); it was written from the range NAME rather than from the
+    /// helper, and the helper was four files away. Recorded because a bound test written
+    /// from the wrong end passes on every input except the two that define it.
+    /// Mirrors `test_resp_loader_rejects_non_positive_rates` and
+    /// `test_resp_loader_rejects_out_of_unit_interval_efficiency`.
+    #[test]
+    fn the_respiration_bounds_are_rejected_each_at_its_own_shape() {
+        for field in ["maintenance_coef", "q10"] {
+            for bad in ["0.0", "-1.0"] {
+                let broken = value_of(RESPIRATION_YAML, field, bad);
+                rejects(
+                    || {
+                        respiration_from(broken, "respiration.yaml");
+                    },
+                    &format!("{field} = {bad}"),
+                );
+            }
+        }
+        for bad in ["-0.1", "0.0", "1.5"] {
+            let broken = value_of(RESPIRATION_YAML, "growth_efficiency", bad);
+            rejects(
+                || {
+                    respiration_from(broken, "respiration.yaml");
+                },
+                &format!("growth_efficiency = {bad}"),
+            );
+        }
+        // ...and exactly 1.0 is LEGAL: a lossless conversion, degenerate but not
+        // malformed. This is the assertion that stops the bound being "simplified" to a
+        // closed interval or an exclusive one.
+        let lossless = value_of(RESPIRATION_YAML, "growth_efficiency", "1.0");
+        assert_eq!(
+            respiration_from(lossless, "respiration.yaml").growth_efficiency,
+            1.0
+        );
+        let broken = value_of(RESPIRATION_YAML, "o2_half_saturation", "-1e-9");
+        rejects(
+            || {
+                respiration_from(broken, "respiration.yaml");
+            },
+            "a negative O2 half-saturation",
+        );
+        // ...but a ZERO half-saturation is legal — it turns the f_O2 throttle off, which
+        // is a real wiring and not a malformed file. This is the assertion that stops
+        // the guard from being tightened to `require_positive` by mistake.
+        let zeroed = value_of(RESPIRATION_YAML, "o2_half_saturation", "0.0");
+        assert_eq!(
+            respiration_from(zeroed, "respiration.yaml").o2_half_saturation,
+            0.0
+        );
+    }
+
+    /// The partition table's three structural rules, each rejected on its own.
+    ///
+    /// A table is legal only if its DVS knots strictly increase, every fraction is in
+    /// `[0, 1]`, each row sums to 1 and there are at least two rows to interpolate
+    /// between. ⚠ The strictly-increasing rule is asserted with an EQUAL pair as well as
+    /// a decreasing one: equal knots make the interpolation weight a division by zero,
+    /// and a `<=` written for `<` is invisible on any decreasing case.
+    /// Mirrors `test_alloc_loader_rejects_non_increasing_dvs`,
+    /// `test_alloc_loader_rejects_out_of_range_fraction` and
+    /// `test_alloc_loader_rejects_too_few_rows`.
+    #[test]
+    fn the_partition_tables_structural_rules_are_each_rejected_separately() {
+        // Knots that do not strictly increase — decreasing, and equal.
+        for (from, to) in [("- dvs: 1.0", "- dvs: -1.0"), ("- dvs: 1.0", "- dvs: 0.0")] {
+            let broken = ALLOCATION_YAML.replacen(from, to, 1);
+            assert_ne!(broken, ALLOCATION_YAML, "the substitution must apply");
+            rejects(
+                || {
+                    allocation_from(Box::leak(broken.into_boxed_str()), "allocation.yaml");
+                },
+                &format!("dvs knots {to}"),
+            );
+        }
+        // A fraction outside [0, 1]. Both are paired with a compensating change so the
+        // ROW STILL SUMS TO 1 — otherwise the sum rule fires first and this test would
+        // be checking the guard next door.
+        for (bad_fl, bad_fr) in [("fl: -0.10", "fr: 1.00"), ("fl: 1.50", "fr: -0.60")] {
+            let broken = ALLOCATION_YAML
+                .replacen("fl: 0.55", bad_fl, 1)
+                .replacen("fr: 0.35", bad_fr, 1);
+            assert_ne!(broken, ALLOCATION_YAML, "the substitution must apply");
+            rejects(
+                || {
+                    allocation_from(Box::leak(broken.into_boxed_str()), "allocation.yaml");
+                },
+                &format!("{bad_fl} with {bad_fr}"),
+            );
+        }
+        // Fewer than two rows: nothing to interpolate between.
+        let one_row = ALLOCATION_YAML
+            .split("      - dvs: 1.0")
+            .next()
+            .expect("the table has a second row")
+            .to_string();
+        rejects(
+            || {
+                allocation_from(Box::leak(one_row.into_boxed_str()), "allocation.yaml");
+            },
+            "a one-row partition table",
+        );
+    }
+
+    /// The stem-reserve guards, including the ORDERING rule that spans two fields.
+    ///
+    /// ⚠⚠ `trigger_dvs < cessation_dvs <= 2` is the one that matters and it is not a
+    /// per-field bound: a window whose ends are each individually legal can still be
+    /// EMPTY (trigger == cessation) or UNREACHABLE (cessation above the DVS cap, which
+    /// caps at 2.0, so the drain would never stop). Both are asserted, because a
+    /// per-field check would pass either.
+    /// Mirrors `tests/test_stem_reserves.py::test_the_loader_refuses_a_cessation_that_is_unreachable_or_empty`.
+    #[test]
+    fn the_stem_reserve_window_is_rejected_when_empty_or_unreachable() {
+        // An EMPTY window: the two ends coincide, so the mechanism can never act.
+        let broken = value_of(STEM_RESERVES_YAML, "trigger_dvs", "2.0");
+        rejects(
+            || {
+                stem_reserves_from(broken, "stem_reserves.yaml");
+            },
+            "trigger == cessation (an empty window)",
+        );
+        // An INVERTED window.
+        let broken = value_of(STEM_RESERVES_YAML, "cessation_dvs", "0.5");
+        rejects(
+            || {
+                stem_reserves_from(broken, "stem_reserves.yaml");
+            },
+            "cessation below the trigger",
+        );
+        // An UNREACHABLE cessation: DVS caps at 2.0, so a bound above it never stops
+        // the drain and the post-maturity tail runs forever.
+        let broken = value_of(STEM_RESERVES_YAML, "cessation_dvs", "2.5");
+        rejects(
+            || {
+                stem_reserves_from(broken, "stem_reserves.yaml");
+            },
+            "a cessation above the DVS cap",
+        );
+        // The per-field bounds, each on its own.
+        for bad in ["0.0", "1.0", "-0.1"] {
+            let broken = value_of(STEM_RESERVES_YAML, "remobilizable_fraction", bad);
+            rejects(
+                || {
+                    stem_reserves_from(broken, "stem_reserves.yaml");
+                },
+                &format!("remobilizable_fraction = {bad}"),
+            );
+        }
+        for bad in ["-0.1", "0.0"] {
+            let broken = value_of(STEM_RESERVES_YAML, "remobilization_rate", bad);
+            rejects(
+                || {
+                    stem_reserves_from(broken, "stem_reserves.yaml");
+                },
+                &format!("remobilization_rate = {bad}"),
+            );
+        }
+        // ⚠ THE TWO FRACTIONS ARE BOUNDED DIFFERENTLY AND BOTH ENDS MATTER. The RATE is
+        // `(0, 1]`, so 1.0 — the whole standing reserve drained in one day — is legal.
+        // The FRACTION is open at BOTH ends (`0 < fstr < 1`), so 1.0 is refused, because
+        // a stem that diverts its entire growth into starch never builds structure at
+        // all. Asserted side by side, because reading either bound off the other is the
+        // mistake, and a zero rate is where the file's own note says nitrogen moves.
+        let whole = value_of(STEM_RESERVES_YAML, "remobilization_rate", "1.0");
+        assert_eq!(
+            stem_reserves_from(whole, "stem_reserves.yaml").remobilization_rate,
+            1.0
+        );
+        // The committed window is the one the flows actually use.
+        let p = stem_reserves_from(STEM_RESERVES_YAML, "stem_reserves.yaml");
+        assert!(p.trigger_dvs < p.cessation_dvs && p.cessation_dvs <= 2.0);
+    }
+
+    /// Provenance and field-set: enforced at the LOADER for two of the three files, and
+    /// at the MANIFEST for the third.
+    ///
+    /// ⚠⚠ THE ASYMMETRY IS THE FINDING, and it was measured rather than assumed.
+    /// `respiration.yaml` and `stem_reserves.yaml` go through `guarded_map`, which is
+    /// where the `source:` requirement and the exact-field-set rule live, so both are
+    /// refused at load. `allocation.yaml` does NOT: its schema is a LIST of rows rather
+    /// than flat value/unit/source scalars, so `allocation_from` reads the table through
+    /// the raw node API and never meets those guards. Probed here before this test was
+    /// written: stripping its `source:` and adding an unknown top-level key were BOTH
+    /// accepted.
+    ///
+    /// It is not unguarded, and this is the part worth writing down rather than filing as
+    /// a gap: the file's newline-normalized sha-256 is pinned in
+    /// `docs/biosphere-reference.manifest.json` under `param_files`, and since slice C7
+    /// the reference WRITES that manifest and `tests/crossport/test_manifest_writer.py`
+    /// compares the committed bytes. So a provenance-only edit to `allocation.yaml` is
+    /// caught — as a STALE MANIFEST, not as a load error. Two different failures, two
+    /// different fixes, and only one of them names the file.
+    ///
+    /// What has no guard either way is a FUTURE list-shaped param file: it would inherit
+    /// allocation's loader shape and nothing would require it to carry a source until it
+    /// reached the manifest census. Recorded as an S6 item, not fixed inside a testing
+    /// batch.
+    /// Mirrors the `rejects_a_missing_source` / `rejects_an_unknown_field` tests of
+    /// `test_respiration.py` and `test_allocation.py`.
+    #[test]
+    fn provenance_is_enforced_at_the_loader_for_two_files_and_at_the_manifest_for_the_third() {
+        // The two guarded files: an entry that loses its `source:` is refused.
+        let stripped = strip_first_source(RESPIRATION_YAML);
+        rejects(
+            || {
+                respiration_from(stripped, "respiration.yaml");
+            },
+            "a respiration entry with no source",
+        );
+        let stripped = strip_first_source(STEM_RESERVES_YAML);
+        rejects(
+            || {
+                stem_reserves_from(stripped, "stem_reserves.yaml");
+            },
+            "a stem-reserve entry with no source",
+        );
+        // ...and so is a key wired to nothing, which is how a parameter gets "set" in a
+        // file and never reaches the model.
+        let extra = RESPIRATION_YAML.replacen(
+            "parameters:
+",
+            "parameters:
+  mystery_coefficient:
+    value: 1.0
+    unit: \"1/day\"
+    source: \"x\"
+",
+            1,
+        );
+        assert_ne!(extra, RESPIRATION_YAML, "the substitution must apply");
+        rejects(
+            || {
+                respiration_from(Box::leak(extra.into_boxed_str()), "respiration.yaml");
+            },
+            "an unknown respiration field",
+        );
+
+        // ⚠ THE THIRD FILE, asserted as it actually behaves. Both mutations LOAD, and
+        // that is pinned rather than left implicit — if `allocation_from` is ever routed
+        // through `guarded_map`, this assertion is what says so out loud instead of a
+        // guard quietly appearing.
+        let no_source = ALLOCATION_YAML.replacen("    source:", "    provenance:", 1);
+        assert_ne!(no_source, ALLOCATION_YAML, "the substitution must apply");
+        allocation_from(Box::leak(no_source.into_boxed_str()), "allocation.yaml");
+        let extra = format!(
+            "{ALLOCATION_YAML}
+  mystery:
+    value: 1.0
+"
+        );
+        allocation_from(Box::leak(extra.into_boxed_str()), "allocation.yaml");
+
+        // What allocation's loader DOES enforce is the row shape: exactly dvs/fl/fs/fr/fo.
+        let sixth = ALLOCATION_YAML.replacen(
+            "        fo: 0.00",
+            "        fo: 0.00
+        fx: 0.00",
+            1,
+        );
+        assert_ne!(sixth, ALLOCATION_YAML, "the substitution must apply");
+        rejects(
+            || {
+                allocation_from(Box::leak(sixth.into_boxed_str()), "allocation.yaml");
+            },
+            "a partition row with a sixth key",
+        );
+    }
+
+    /// Replace the declared unit of one top-level param (`value_of`, one field over).
+    fn unit_of(text: &'static str, field: &str, unit: &str) -> &'static str {
+        let anchor = format!(
+            "  {field}:
+"
+        );
+        let at = text
+            .find(&anchor)
+            .unwrap_or_else(|| panic!("{field} is not a top-level param of this file"));
+        let key = "    unit: \"";
+        let start = at + text[at..].find(key).expect("the entry declares a unit") + key.len();
+        let end = start + text[start..].find('"').expect("the unit is quoted");
+        let mut out = String::with_capacity(text.len());
+        out.push_str(&text[..start]);
+        out.push_str(unit);
+        out.push_str(&text[end..]);
+        assert_ne!(out, text, "the substitution must apply");
+        Box::leak(out.into_boxed_str())
+    }
+
+    /// Rename the FIRST `source:` key, so exactly ONE entry loses its provenance.
+    ///
+    /// One entry rather than the whole file: a file-wide strip would be refused by
+    /// whichever guard happens to run first and would not say which rule fired.
+    fn strip_first_source(text: &'static str) -> &'static str {
+        let out = text.replacen("    source:", "    provenance:", 1);
+        assert_ne!(out, text, "the file must carry at least one source");
+        Box::leak(out.into_boxed_str())
+    }
 }

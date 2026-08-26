@@ -2614,12 +2614,18 @@ mod tests {
                     "{name}: {stock} is not dt-linear ({} vs {amount})",
                     half[stock]
                 );
-                assert_ne!(*amount, 0.0, "{name}: {stock} moved nothing, so this is vacuous");
+                assert_ne!(
+                    *amount, 0.0,
+                    "{name}: {stock} moved nothing, so this is vacuous"
+                );
             }
             let r = water_resolver(200.0, 5.0);
             let env = r.bind(&s, 1.0);
-            assert_flow_balanced_default(&flow.evaluate(&s, &env, 1.0).expect("evaluate"), &s.stocks)
-                .unwrap_or_else(|e| panic!("{name} is unbalanced: {e:?}"));
+            assert_flow_balanced_default(
+                &flow.evaluate(&s, &env, 1.0).expect("evaluate"),
+                &s.stocks,
+            )
+            .unwrap_or_else(|e| panic!("{name} is unbalanced: {e:?}"));
         }
     }
 
@@ -2636,7 +2642,7 @@ mod tests {
     #[test]
     fn irrigation_takes_the_smaller_of_the_system_capacity_and_the_deficit() {
         let full = science::transpirable_capacity(TEST_DEPTH, EXTR, 1.0); // 130 kg
-        // (a) deficit 4 kg against a 5 kg/day capacity ⇒ the DEFICIT binds.
+                                                                          // (a) deficit 4 kg against a 5 kg/day capacity ⇒ the DEFICIT binds.
         let s = water_only_state(full - 4.0, TEST_DEPTH, 0.0, 0.0);
         let legs = water_legs(&irrigation_flow(1.0), &s, 200.0, 5.0, 1.0);
         assert!((legs[SOIL_WATER] - 4.0).abs() <= 1e-12 * 4.0, "{:?}", legs);
@@ -2648,7 +2654,11 @@ mod tests {
         // the 2 m² zone holds 260 kg so the deficit is nowhere near binding.
         let wide = water_only_state(15.0, TEST_DEPTH, 0.0, 0.0);
         let legs = water_legs(&irrigation_flow(2.0), &wide, 200.0, 5.0, 1.0);
-        assert!((legs[SOIL_WATER] - 10.0).abs() <= 1e-12 * 10.0, "{:?}", legs);
+        assert!(
+            (legs[SOIL_WATER] - 10.0).abs() <= 1e-12 * 10.0,
+            "{:?}",
+            legs
+        );
         assert!(
             (legs[IRRIGATION_SUPPLY] + 10.0).abs() <= 1e-12 * 10.0,
             "the supply leg must mirror the soil leg"
@@ -2754,4 +2764,577 @@ mod tests {
         );
     }
 
+    // --- batch D: the carbon BUDGET, and the two halves of the stem reserve ------
+    //
+    // ⚠ WHY THIS HALF OF THE BATCH IS THE DANGEROUS ONE, stated once. Almost every claim
+    // below is about a REDISTRIBUTION — the partition table splitting one increment four
+    // ways, `fstr` moving part of the stem leg into shielded starch, the maintenance
+    // shortfall burning organs in proportion, the reserve draining into the grain. Every
+    // one of those keeps each flow's legs summing exactly as they did, so the
+    // biosphere's strongest machinery — `assert_flow_balanced`, the conservation
+    // assertion on every step, the boundary ledger — is blind to ALL of them by
+    // construction. §5ad's battery for this batch was built around that: of eight
+    // sum-preserving mutations, exactly two reddened anything whose subject was the
+    // mutated mechanism, and both of those were value or leg-SHAPE pins rather than
+    // rate laws. These tests have to state the rate law itself.
+
+    /// Put carbon in the stem RESERVE, which starts empty in `state()`.
+    fn with_reserve(mut s: State, amount: f64) -> State {
+        s.stocks.get_mut(RESERVE).expect("reserve stock").amount = amount;
+        s
+    }
+
+    /// Thermal time that puts `development_stage` exactly at `dvs`.
+    ///
+    /// Vegetative `DVS = tt / tsum_anthesis`; reproductive
+    /// `DVS = 1 + (tt − tsum_anthesis)/tsum_maturity`, capped at 2. With the committed
+    /// (1100, 750) that is 550 for DVS 0.5, 1100 for 1.0, 1475 for 1.5, 1850 for 2.0.
+    fn thermal_time_for(dvs: f64) -> f64 {
+        let p = params::phenology();
+        if dvs <= 1.0 {
+            dvs * p.tsum_anthesis
+        } else {
+            p.tsum_anthesis + (dvs - 1.0) * p.tsum_maturity
+        }
+    }
+
+    fn open_growth_respiration() -> GrowthRespiration {
+        GrowthRespiration {
+            id: "biosphere.growth_respiration".to_string(),
+            ctx: ctx_open(),
+            co2_atmos: CO2.to_string(),
+            co2_resp: "boundary.co2".to_string(),
+        }
+    }
+
+    fn open_maintenance() -> MaintenanceRespiration {
+        MaintenanceRespiration {
+            id: "biosphere.maintenance_respiration".to_string(),
+            ctx: ctx_open(),
+            co2_atmos: CO2.to_string(),
+            co2_resp: "boundary.co2".to_string(),
+            o2_pool: None,
+            air_mol: None,
+        }
+    }
+
+    fn remobilization(p: params::StemReserveParams) -> StemRemobilization {
+        StemRemobilization {
+            id: "biosphere.stem_remobilization".to_string(),
+            stem_reserve_c: RESERVE.to_string(),
+            storage_c: STORAGE.to_string(),
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            pheno: params::phenology(),
+            params: p,
+        }
+    }
+
+    /// `Allocation` wired with a live stem reserve.
+    fn allocation_with_reserve(fstr: f64, cessation: f64) -> Allocation {
+        Allocation {
+            stem_reserve_c: Some(RESERVE.to_string()),
+            fstr,
+            reserve_cessation_dvs: cessation,
+            ..allocation(ctx_open(), None)
+        }
+    }
+
+    fn budget_of(ctx: &CarbonContext, s: &State, par: f64) -> (f64, f64, f64) {
+        let r = resolver(par, 400.0);
+        let env = r.bind(s, 1.0);
+        ctx.budget(s, &env).expect("budget")
+    }
+
+    /// The shared budget is the three standalone rate laws, composed.
+    ///
+    /// `GASS` is the canopy aggregator at the state's own LAI and limitation, `MRES` is
+    /// the maintenance flux at the maintained biomass, and `available` is their clamped
+    /// difference. Recomposed here from `science.rs` rather than compared against a
+    /// number this tree produced — the same shape as the standalone equation tests, one
+    /// layer up. This is what stops the three budget-coupled flows from silently
+    /// disagreeing about the day they are all spending.
+    /// Mirrors `tests/test_carbon_budget.py::test_context_budget_matches_standalone_rate_laws`.
+    #[test]
+    fn the_shared_carbon_budget_is_the_standalone_rate_laws_recomposed() {
+        let ctx = ctx_open();
+        let s = with_storage(growing_state(), 2.0);
+        let (gass, mres, available) = budget_of(&ctx, &s, 800.0);
+
+        let leaf = s.stocks[LEAF].amount;
+        let biomass = leaf + s.stocks[STEM].amount + s.stocks[ROOT].amount;
+        let lai = science::leaf_area_index(leaf, ctx.canopy.sla_per_mol_c, ctx.ground_area);
+        let f_water = science::soil_water_stress(
+            s.stocks[SOIL_WATER].amount,
+            TEST_DEPTH,
+            EXTR,
+            ctx.ground_area,
+            WSSG,
+        );
+        let f_n = science::nitrogen_stress_factor(
+            s.stocks[PLANT_N].amount,
+            biomass,
+            ctx.nitro.n_residual_per_mol_c,
+            ctx.nitro.n_critical_per_mol_c,
+        );
+        let want_gass = science::canopy_assimilation(
+            800.0,
+            lai,
+            400.0,
+            20.0,
+            light_path::SECONDS_PER_DAY,
+            &ctx.photo,
+            &ctx.canopy,
+            ctx.ground_area,
+            f_water * f_n,
+        );
+        let want_mres = science::maintenance_respiration_flux(biomass, 20.0, &ctx.resp);
+        assert_eq!(gass.to_bits(), want_gass.to_bits(), "GASS");
+        assert_eq!(mres.to_bits(), want_mres.to_bits(), "MRES");
+        assert_eq!(
+            available.to_bits(),
+            science::available_for_growth(want_gass, want_mres).to_bits(),
+            "available"
+        );
+        assert!(
+            available > 0.0,
+            "the fixture must be a surplus day, not a no-op"
+        );
+    }
+
+    /// The limitation is the PRODUCT of the two stress factors, and it is exactly 1 when
+    /// neither bites.
+    ///
+    /// ⚠ The storage organ is loaded here on purpose. `leaf_and_biomass` excludes it, so
+    /// the nitrogen factor's denominator is `leaf + stem + root`; with storage at 0 —
+    /// the state a first draft would use — the excluded and included readings are the
+    /// same number and the test cannot tell them apart. (The same trap `with_storage`
+    /// was written for in batch A.)
+    /// Mirrors `test_context_limitation_is_f_water_times_f_n`,
+    /// `test_context_limitation_is_one_at_the_non_limiting_point` and
+    /// `test_context_storage_excluded_from_biomass`.
+    #[test]
+    fn the_limitation_is_water_times_nitrogen_and_excludes_the_storage_organ() {
+        let ctx = ctx_open();
+        // Unstressed: FTSW 0.77 against wssg 0.30, and plant N well above the critical
+        // concentration for a 5 mol C crop.
+        let s = with_storage(growing_state(), 2.0);
+        let r = resolver(800.0, 400.0);
+        let env = r.bind(&s, 1.0);
+        let lim = ctx.limitation(&s, &env).expect("limitation");
+        assert_eq!(
+            lim, 1.0,
+            "neither factor bites at the fixture's operating point"
+        );
+
+        // Now make water bite and nothing else: FTSW = 0.5 · wssg = 0.15 of a 130 kg
+        // zone is 19.5 kg, which is WSFG = 0.5 exactly.
+        let mut dry = with_storage(growing_state(), 2.0);
+        dry.stocks.get_mut(SOIL_WATER).expect("soil water").amount = 19.5;
+        let env = r.bind(&dry, 1.0);
+        let lim = ctx.limitation(&dry, &env).expect("limitation");
+        let biomass = dry.stocks[LEAF].amount + dry.stocks[STEM].amount + dry.stocks[ROOT].amount;
+        let f_water = science::soil_water_stress(19.5, TEST_DEPTH, EXTR, ctx.ground_area, WSSG);
+        let f_n = science::nitrogen_stress_factor(
+            dry.stocks[PLANT_N].amount,
+            biomass,
+            ctx.nitro.n_residual_per_mol_c,
+            ctx.nitro.n_critical_per_mol_c,
+        );
+        assert_eq!(lim.to_bits(), (f_water * f_n).to_bits(), "the product");
+        assert!(lim < 1.0, "the dry state must actually stress the crop");
+
+        // Storage is excluded from the maintained biomass: adding grain must not change
+        // the limitation, because the nitrogen denominator is leaf + stem + root only.
+        let fat = with_storage(growing_state(), 50.0);
+        let env = r.bind(&fat, 1.0);
+        let lim_open = ctx_open().limitation(&fat, &env).expect("limitation");
+        assert_eq!(lim_open, 1.0);
+        let (_, mres_lean, _) = budget_of(&ctx, &with_storage(growing_state(), 0.0), 800.0);
+        let (_, mres_fat, _) = budget_of(&ctx, &fat, 800.0);
+        assert_eq!(
+            mres_lean.to_bits(),
+            mres_fat.to_bits(),
+            "the grain must not be maintained"
+        );
+    }
+
+    /// The growth-respiration leg is `(1 − Yg) · available`, on an OPEN-field wiring.
+    ///
+    /// ⚠⚠ THIS TEST EXISTS BECAUSE NOTHING ELSE IN THE TREE DOES. §5ad's battery replaced
+    /// the complement `(1 − Yg)` with `Yg` — respiring three times as much carbon as the
+    /// law says, with the leg still balanced — and reddened **zero** tests of
+    /// `cargo test -p domains --lib`. Not "no test about growth respiration": no test at
+    /// all. It moves carbon between two BOUNDARY stocks, so no organ, no chamber gas and
+    /// no conserved quantity moves with it, and only the goldens' committed bytes see it.
+    /// Mirrors `test_carbon_budget.py::test_growth_flow_leg_is_the_composed_loss_and_pins_the_step6_literal`.
+    #[test]
+    fn the_growth_respiration_leg_is_the_complement_of_the_growth_efficiency() {
+        let ctx = ctx_open();
+        let s = growing_state();
+        let (_, _, available) = budget_of(&ctx, &s, 800.0);
+        let legs = legs_of(&open_growth_respiration(), &s, 800.0);
+        let want = (1.0 - ctx.resp.growth_efficiency) * available;
+        assert_eq!(legs["boundary.co2"].to_bits(), want.to_bits(), "GRES leg");
+        assert_eq!(legs[CO2].to_bits(), (-want).to_bits(), "its source leg");
+        // The complement is the SMALLER share at the committed Yg = 0.75, which is what
+        // makes the wrong-way-round form (Yg instead of 1 − Yg) a 3x error rather than a
+        // rounding one. Asserted so the direction is pinned, not just the magnitude.
+        assert!(
+            want < ctx.resp.growth_efficiency * available,
+            "at Yg > 0.5 the respired share must be the smaller one"
+        );
+    }
+
+    /// `Allocation`'s four organ legs ARE `partition(Yg · available, DVS)`, and the CO₂
+    /// leg is their exact sum.
+    ///
+    /// The budget is recomposed rather than quoted, so the test states the rule
+    /// (`DMI = Yg · available`, split by the table at this state's DVS) rather than a
+    /// number this tree produced.
+    /// Mirrors `test_allocation_legs_are_the_partitioned_increment` and
+    /// `test_allocation_dmi_agrees_with_growth_resp_budget`.
+    #[test]
+    fn the_allocation_legs_are_the_partitioned_increment_and_the_co2_leg_is_their_sum() {
+        let ctx = ctx_open();
+        // DVS 1.5, so all four legs including the grain are nonzero.
+        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, thermal_time_for(1.5));
+        let (_, _, available) = budget_of(&ctx, &s, 800.0);
+        let dmi = ctx.resp.growth_efficiency * available;
+        let (leaf, stem, root, storage) = science::partition(dmi, 1.5, &params::allocation().table);
+
+        let legs = legs_of(&allocation(ctx_open(), None), &s, 800.0);
+        assert_eq!(legs[LEAF].to_bits(), leaf.to_bits(), "leaf leg");
+        assert_eq!(legs[STEM].to_bits(), stem.to_bits(), "stem leg");
+        assert_eq!(legs[ROOT].to_bits(), root.to_bits(), "root leg");
+        assert_eq!(legs[STORAGE].to_bits(), storage.to_bits(), "grain leg");
+        assert!(storage > 0.0, "the fixture must be past anthesis");
+        assert_eq!(
+            legs[CO2].to_bits(),
+            (-(leaf + stem + root + storage)).to_bits(),
+            "the CO2 leg is the exact sum of the four organ legs"
+        );
+        // DMI and the growth-respiration loss together are the whole day's assimilate:
+        // Yg · available + (1 − Yg) · available == available.
+        let gres = legs_of(&open_growth_respiration(), &s, 800.0)["boundary.co2"];
+        let sum = dmi + gres;
+        assert!(
+            (sum - available).abs() <= 1e-12 * available,
+            "DMI + GRES = {sum} != available {available}"
+        );
+    }
+
+    /// Open-field maintenance covers what it can from the atmosphere and burns the rest
+    /// out of the organs IN PROPORTION to each organ's carbon.
+    ///
+    /// ⚠ The proportional split is a pure redistribution — replacing `organ_c / biomass`
+    /// with a flat one-third burns the identical TOTAL and leaves every leg balanced.
+    /// §5ad measured that mutation reddening one test in 259, and that one is about a
+    /// deep-water crop. So the shares are asserted individually, against the organ
+    /// ratios, and not merely through their sum.
+    /// Mirrors `test_maintenance_deficit_day_draws_the_shortfall_from_organs` and
+    /// `test_maintenance_partial_deficit_splits_covered_and_shortfall`.
+    #[test]
+    fn open_field_maintenance_burns_the_shortfall_in_proportion_to_each_organ() {
+        let ctx = ctx_open();
+        // A DARK deficit day: no PAR, so GASS is 0 and the whole of MRES is a shortfall.
+        // Organs 3 : 1 : 1 make the three shares 0.6, 0.2, 0.2 of the burn.
+        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, 550.0);
+        let (gass, mres, _) = budget_of(&ctx, &s, 0.0);
+        assert_eq!(gass, 0.0, "the fixture must be a genuine dark day");
+        let legs = legs_of(&open_maintenance(), &s, 0.0);
+        let biomass = 3.0 + 1.0 + 1.0;
+        for (id, organ_c) in [(LEAF, 3.0), (STEM, 1.0), (ROOT, 1.0)] {
+            let want = -(mres * (organ_c / biomass));
+            assert_eq!(legs[id].to_bits(), want.to_bits(), "{id} share of the burn");
+        }
+        // Nothing is drawn from the atmosphere on a day with no assimilate, and the
+        // respired leg is the whole burn.
+        assert_eq!(
+            legs.get(CO2).copied().unwrap_or(0.0),
+            0.0,
+            "no covered part"
+        );
+        assert!((legs["boundary.co2"] - mres).abs() <= 1e-12 * mres);
+
+        // A SURPLUS day is the other limb: covered entirely from the atmosphere, no
+        // organ touched at all. Asserted here so the covered/shortfall cap is pinned
+        // from both sides — `covered = min(GASS, MRES)` uncapped reddened 7 tests.
+        let legs = legs_of(&open_maintenance(), &s, 800.0);
+        let (gass, mres, _) = budget_of(&ctx, &s, 800.0);
+        assert!(gass > mres, "the fixture must be a genuine surplus day");
+        assert_eq!(legs[CO2].to_bits(), (-mres).to_bits(), "covered == MRES");
+        for id in [LEAF, STEM, ROOT] {
+            assert_eq!(legs.get(id).copied().unwrap_or(0.0), 0.0, "{id} untouched");
+        }
+    }
+
+    /// The stem-reserve FORMATION diverts `fstr` of the stem leg and moves nothing else.
+    ///
+    /// ⚠⚠ §5ad's battery deleted this split entirely — the reserve receiving nothing, the
+    /// stem keeping the whole leg — and reddened 2 tests of 259, neither about stem
+    /// reserves. The mechanism has its own 1,643-line Python file and shipped only on an
+    /// explicit call from the user, and in Rust it was guarded by nothing that names it.
+    ///
+    /// The invariance of `organ_total` is the second half of the claim and it is
+    /// CORRECTNESS rather than tidiness: the diverted starch is still carbon fixed out of
+    /// the atmosphere, so the CO₂ source leg and the O₂ release must not move when the
+    /// split turns on. Asserted by comparing against the same flow with `fstr = 0`.
+    /// Mirrors the formation half of `tests/test_stem_reserves.py`.
+    #[test]
+    fn the_reserve_formation_diverts_the_stem_share_and_moves_no_other_leg() {
+        let fstr = params::stem_reserves().remobilizable_fraction;
+        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, thermal_time_for(0.5));
+        let plain = legs_of(&allocation(ctx_open(), Some(O2.to_string())), &s, 800.0);
+        let split = legs_of(
+            &Allocation {
+                o2_pool: Some(O2.to_string()),
+                ..allocation_with_reserve(fstr, 2.0)
+            },
+            &s,
+            800.0,
+        );
+        let stem_leg = plain[STEM];
+        assert!(stem_leg > 0.0, "the fixture must actually grow stem");
+        assert_eq!(
+            split[RESERVE].to_bits(),
+            (fstr * stem_leg).to_bits(),
+            "the reserve gets exactly fstr of the stem leg"
+        );
+        assert_eq!(
+            split[STEM].to_bits(),
+            (stem_leg - fstr * stem_leg).to_bits(),
+            "and the stem keeps the complement, by subtraction"
+        );
+        for id in [LEAF, ROOT, STORAGE, CO2, O2] {
+            assert_eq!(
+                split[id].to_bits(),
+                plain[id].to_bits(),
+                "{id} must be bit-identical with and without the split"
+            );
+        }
+    }
+
+    /// Both halves of the reserve STOP at `cessation_dvs`, and the bound is strict.
+    ///
+    /// ⚠⚠ The strictness is the load-bearing part and NOTHING measured it. Our DVS *caps*
+    /// at 2.0 rather than growing past it, so a `<=` leaves both halves running for the
+    /// whole post-maturity tail — 11 steps on `open_season`, two YEARS on
+    /// `sealed_chamber`, which never re-sows. §5ad's battery loosened each half in turn:
+    /// **zero** tests of `-p domains --lib` reddened for either, and applied together
+    /// they moved only committed golden bytes.
+    ///
+    /// Pinned at three stages: inside the window (both halves act), exactly AT the
+    /// cessation (both stop), and above it (both stop and stay stopped).
+    /// Mirrors `test_the_transfer_actually_STOPS_and_the_ungated_control_reproduces`,
+    /// `test_the_two_halves_share_ONE_cessation_number_in_the_shipped_wiring` and
+    /// `test_a_forgotten_cessation_fails_CLOSED_rather_than_running_unbounded`.
+    #[test]
+    fn both_halves_of_the_reserve_stop_at_the_cessation_and_the_bound_is_strict() {
+        let p = params::stem_reserves();
+        let flow = remobilization(p);
+        let filled = |dvs: f64| {
+            with_reserve(
+                state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, thermal_time_for(dvs)),
+                10.0,
+            )
+        };
+        // Inside the window the drain acts...
+        let inside = legs_of(&flow, &filled(1.5), 800.0);
+        assert!(inside[RESERVE] < 0.0 && inside[STORAGE] > 0.0);
+        // ...and exactly AT the cessation it emits no legs at all — not a zero leg.
+        assert!(
+            legs_of(&flow, &filled(p.cessation_dvs), 800.0).is_empty(),
+            "the drain must stop AT the cessation, not after it"
+        );
+        // DVS caps at 2.0, so "above" is reached by any later thermal time.
+        assert!(legs_of(&flow, &filled(p.cessation_dvs + 5.0), 800.0).is_empty());
+        // Below the trigger it has not started yet — the window is half-open at BOTH
+        // ends, and a test that only checked the top would pass on an ungated flow.
+        assert!(legs_of(&flow, &filled(p.trigger_dvs - 0.01), 800.0).is_empty());
+
+        // The FILL shares the same number, so the two stop on the same step. A drain
+        // that stopped alone would leave the dead stem stashing starch forever.
+        let fill = Allocation {
+            ..allocation_with_reserve(p.remobilizable_fraction, p.cessation_dvs)
+        };
+        assert!(
+            legs_of(&fill, &filled(1.5), 800.0)[RESERVE] > 0.0,
+            "the fill must be live inside the window"
+        );
+        let at_cessation = legs_of(&fill, &filled(p.cessation_dvs), 800.0);
+        assert_eq!(
+            at_cessation.get(RESERVE).copied().unwrap_or(0.0),
+            0.0,
+            "the fill must stop at the same stage the drain does"
+        );
+        // Fail-CLOSED: a wiring that supplies a stock and a fraction but forgets the
+        // bound gets NO split rather than an unbounded one (DVS >= 0 always).
+        let forgotten = allocation_with_reserve(p.remobilizable_fraction, 0.0);
+        assert_eq!(
+            legs_of(&forgotten, &filled(0.5), 800.0)
+                .get(RESERVE)
+                .copied()
+                .unwrap_or(0.0),
+            0.0,
+            "a forgotten cessation must fail closed"
+        );
+    }
+
+    /// The drain runs stem → grain, first-order on the STANDING reserve.
+    ///
+    /// ⚠⚠ §5ad's battery reversed this flow — the grain feeding the stem — and reddened
+    /// **28** tests of 259, not one of which is about stem reserves. Twenty-eight reds
+    /// with zero information about what broke is the same reading as a golden red: a
+    /// number moved. The direction is therefore asserted by NAME here, not inferred from
+    /// a trajectory.
+    ///
+    /// First-order means the draw is donor-controlled and therefore self-limiting, which
+    /// is why the Euler arbitration backstop is structurally unreachable on it: doubling
+    /// the standing reserve exactly doubles the flux.
+    /// Mirrors `test_the_drain_rate_is_BIT_INERT_on_carbon_and_only_relabels` (the form
+    /// half) and the remobilization block of `tests/test_stem_reserves.py`.
+    #[test]
+    fn the_remobilization_drains_the_reserve_into_the_grain_and_is_first_order() {
+        let p = params::stem_reserves();
+        let flow = remobilization(p);
+        let at = |reserve: f64| {
+            with_reserve(
+                state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, thermal_time_for(1.5)),
+                reserve,
+            )
+        };
+        let legs = legs_of(&flow, &at(10.0), 800.0);
+        let want = p.remobilization_rate * 10.0;
+        assert_eq!(
+            legs[RESERVE].to_bits(),
+            (-want).to_bits(),
+            "the reserve pays"
+        );
+        assert_eq!(
+            legs[STORAGE].to_bits(),
+            want.to_bits(),
+            "the grain receives"
+        );
+        assert_eq!(legs[RESERVE] + legs[STORAGE], 0.0, "an internal transfer");
+
+        // First-order: twice the standing reserve, exactly twice the flux.
+        let double = legs_of(&flow, &at(20.0), 800.0);
+        assert_eq!(double[STORAGE].to_bits(), (2.0 * want).to_bits());
+        // An empty reserve emits no legs at all rather than a zero pair.
+        assert!(legs_of(&flow, &at(0.0), 800.0).is_empty());
+        // Donor-controlled, so it can never overdraw its own donor in one step at the
+        // committed rate — the reason arbitration is unreachable here.
+        assert!(
+            want < 10.0,
+            "a first-order draw must be a fraction of the stock"
+        );
+    }
+
+    /// All three budget-coupled flows read ONE budget, clamp together in the dark, and
+    /// scale linearly with `dt`.
+    ///
+    /// The structural claim is that they cannot drift: each holds a clone of the same
+    /// `CarbonContext`, so a state that produces no assimilate produces no growth, no
+    /// growth respiration and no allocation — from the same arithmetic, not from three
+    /// agreeing accidents. `dt`-linearity is asserted on the same three flows in one
+    /// test because it is one property of the whole budget, and a per-flow version would
+    /// pass while two of them disagreed about the day.
+    /// Mirrors `test_three_flows_share_one_budget`, the three `*_clamps_to_zero_in_the_dark`
+    /// tests and the three `*_scales_linearly_with_dt` tests.
+    #[test]
+    fn the_three_budget_flows_share_one_budget_clamp_together_and_scale_with_dt() {
+        let s = growing_state();
+        // The dark: GASS is 0, so `available` clamps and BOTH growth-side flows vanish.
+        // Maintenance does NOT — it becomes a pure organ burn, which is the asymmetry.
+        let (gass, _, available) = budget_of(&ctx_open(), &s, 0.0);
+        assert_eq!((gass, available), (0.0, 0.0));
+        for id in [LEAF, STEM, ROOT, STORAGE] {
+            assert_eq!(
+                legs_of(&allocation(ctx_open(), None), &s, 0.0)
+                    .get(id)
+                    .copied()
+                    .unwrap_or(0.0),
+                0.0,
+                "{id} must not grow in the dark"
+            );
+        }
+        assert_eq!(
+            legs_of(&open_growth_respiration(), &s, 0.0)["boundary.co2"],
+            0.0
+        );
+        assert!(
+            legs_of(&open_maintenance(), &s, 0.0)["boundary.co2"] > 0.0,
+            "maintenance is NOT clamped in the dark — the plant still pays rent"
+        );
+
+        // dt-linearity, on all three at once.
+        let r = resolver(800.0, 400.0);
+        let flows: Vec<Box<dyn Flow>> = vec![
+            Box::new(allocation(ctx_open(), None)),
+            Box::new(open_growth_respiration()),
+            Box::new(open_maintenance()),
+        ];
+        for flow in &flows {
+            let env = r.bind(&s, 1.0);
+            let full: BTreeMap<String, f64> = flow
+                .evaluate(&s, &env, 1.0)
+                .expect("dt 1")
+                .legs
+                .iter()
+                .map(|l| (l.stock.clone(), l.amount))
+                .collect();
+            let half: BTreeMap<String, f64> = flow
+                .evaluate(&s, &env, 0.5)
+                .expect("dt 0.5")
+                .legs
+                .iter()
+                .map(|l| (l.stock.clone(), l.amount))
+                .collect();
+            assert_eq!(full.len(), half.len(), "{} leg count", flow.type_name());
+            for (id, amount) in &full {
+                assert_eq!(
+                    half[id].to_bits(),
+                    (0.5 * amount).to_bits(),
+                    "{} leg {id} must halve with dt",
+                    flow.type_name()
+                );
+            }
+        }
+    }
+
+    /// The limitation scales growth and allocation IDENTICALLY.
+    ///
+    /// Both flows multiply the same `available`, so a stress that halves assimilation
+    /// must move both by the same ratio — the property that says the budget is shared
+    /// rather than recomputed twice with a drifting argument.
+    /// Mirrors `test_limitation_scales_growth_and_allocation_identically`.
+    #[test]
+    fn the_limitation_scales_growth_and_allocation_by_the_same_ratio() {
+        let s = with_storage(growing_state(), 2.0);
+        let mut dry = with_storage(growing_state(), 2.0);
+        dry.stocks.get_mut(SOIL_WATER).expect("soil water").amount = 19.5;
+
+        let alloc = allocation(ctx_open(), None);
+        let gres = open_growth_respiration();
+        let (a_wet, a_dry) = (
+            legs_of(&alloc, &s, 800.0)[LEAF],
+            legs_of(&alloc, &dry, 800.0)[LEAF],
+        );
+        let (g_wet, g_dry) = (
+            legs_of(&gres, &s, 800.0)["boundary.co2"],
+            legs_of(&gres, &dry, 800.0)["boundary.co2"],
+        );
+        assert!(
+            a_dry < a_wet && g_dry < g_wet,
+            "the stress must actually bite"
+        );
+        // ⚠ NOT bit-equality: the two ratios are `Yg·A/Yg·B` and `(1−Yg)·A/(1−Yg)·B`,
+        // algebraically identical but computed through different products, so the last
+        // bits may differ. The claim is the ratio, and it is asserted as such.
+        let (ra, rg) = (a_dry / a_wet, g_dry / g_wet);
+        assert!(
+            (ra - rg).abs() <= 1e-12,
+            "allocation scaled by {ra}, growth respiration by {rg}"
+        );
+    }
 }

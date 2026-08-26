@@ -6763,3 +6763,255 @@ census, and the census has to be written down.*
   `test_sealed_water_scoped_compartment_ledger_balances_every_step` has no successor. A
   gap found by the review's absence census, not a decision.
 * **No Python deleted.** All four files stay green and running until S6.
+
+## §5ah Stage 3 — S5 batch D BUILT, COMPLETE 2026-08-26: the spending batch, where conservation is blind by construction
+
+Batch D is the carbon-spending batch: `test_allocation` 43, `test_respiration` 25,
+`test_carbon_budget` 22, `test_stem_reserves` 22 = **112 Python tests**, of which **14 are
+not batch D's subject at all** (see the roster correction below). It lands on three
+surfaces in one crate.
+
+`cargo test -p domains --lib` **259 → 282**; `cargo test --workspace --no-fail-fast`
+**891 → 914**; clippy clean at `--all-targets -D warnings`. **No golden byte, band, floor
+or manifest moved** — asserted with `git status --porcelain rust/data/` (empty), not
+inferred from a green suite. Harness and all logs:
+`M:\claud_projects\temp\s5-batch-d`.
+
+The batch is tests plus **one production change**, taken as an application of batches B
+and C's already-given answer rather than as a fresh decision (see "the loader split").
+
+### ⚠⚠ What makes this batch different in KIND: it is the redistribution batch
+
+Three of its four subjects are *redistributions*: the partition table splitting one
+increment four ways, `fstr` moving part of the stem leg into shielded starch, the
+maintenance shortfall burning organs in proportion, the reserve draining into the grain.
+**Every one of those keeps each flow's legs summing exactly as they did**, so the
+biosphere's strongest machinery — `assert_flow_balanced`, the conservation assertion on
+every step, the boundary ledger — is blind to all of them by construction.
+
+Batch C learned this once (its M15: a balanced mutation of `Recycling` was invisible to the
+balance machinery). Here it is not an analogy, it is the default case, so the battery was
+built around it: **eight of the fifteen mutations below are sum-preserving reshuffles.**
+
+### The before-battery: fifteen mutations, THREE caught by a test about the mechanism
+
+Baseline 259 passed / 0 failed. `bal` marks a mutation that preserves every leg sum.
+
+| # | bal | mechanism broken | red | of which **about the mutated mechanism** |
+|---|:-:|---|---:|---:|
+| D1 | ● | partition table: swap leaf↔stem at the DVS-0 knot | 7 | **1** — and one more red is a *broken fixture*, see below |
+| D2 | ● | `partition_fractions` reverses the interpolation weight | 2 | **0** |
+| D3 | ● | `Allocation`'s `fstr` reserve split deposits nothing | 2 | **0** |
+| D4 | ● | open-field maintenance burns organs EQUALLY, not in proportion | 1 | **0** |
+| D5 | ● | `StemRemobilization` runs BACKWARDS, grain → reserve | **28** | **0** |
+| D6 | ● | the same equal-split reshuffle, sealed limb | 4 | **1** |
+| D7 | | `maintenance_respiration_flux` drops Q10 entirely | 3 | **0** |
+| D8 | | `available_for_growth` drops its non-negative clamp | 21 | **0** |
+| D9 | | `Allocation`'s DMI drops the growth efficiency `Yg` | 3 | **0** |
+| D10 | | `GrowthRespiration`: `(1 − Yg)` → `Yg` | **0** | — |
+| D11 | | maintenance `covered` uncapped by GASS | 7 | **1** |
+| D12 | ● | `partition_fractions` extrapolates the TOP end from the FIRST row | 2 | **0** |
+| D13 | | `StemRemobilization`'s cessation bound goes non-strict | **0** | — |
+| D14 | | `Allocation`'s reserve FILL loses its cessation | **0** | — |
+| D15 | ● | `partition` routes the grain share into the ROOT leg | 2 | **0** |
+
+**Twelve of fifteen reddened nothing whose subject was the mutated mechanism**, and three
+reddened nothing at all. Of the eight sum-preserving reshuffles, exactly two were caught by
+something about them, and **both catches are value or leg-SHAPE pins rather than rate
+laws**: D1's is `every_value_matches_the_generated_table` (C8's params census, which pins
+the table's rows bit-for-bit) and D6's is batch A's
+`the_sealed_burn_is_split_in_proportion_to_organ_carbon`.
+
+⚠ **One of D1's seven reds is not a catch, and reading it as one would have inflated the
+column.** `a_partition_row_that_does_not_sum_to_one_is_rejected` builds its broken file by
+`replacen("fl: 0.55", …)`; D1 changes that literal, so the test's own
+`assert_ne!("the substitution must apply")` fires. It reddened because its FIXTURE broke,
+not because it saw the mutation — which is the self-protecting assertion doing exactly its
+job, and exactly why the "of which" column has to be read from each test's body.
+
+⚠⚠ **D5 is the sharpest reading in the battery.** Reversing the stem-reserve drain — the
+grain feeding the stem instead of the stem feeding the grain, a whole mechanism running
+backwards — reddens **28 tests in 259, and not one of them is about stem reserves.**
+Twenty-eight reds carrying zero information about what broke is the same reading as a
+golden red: *a number moved.* This mechanism has a 1,643-line Python file behind it and
+shipped only on the user's explicit call, and in Rust it was guarded by nothing that names
+it. D3 is the same finding from the other side: deleting the reserve's FORMATION entirely
+reddened two tests, neither about reserves.
+
+### ⚠⚠ Three mechanisms were guarded by the goldens and by NOTHING ELSE
+
+D10, D13 and D14 each reddened **zero** tests of `-p domains --lib`. Applied together they
+were re-run under `cargo test --workspace --no-fail-fast`, which came back **888 passed / 3
+failed** — and all three failures are committed-byte comparisons.
+
+Applied together is not an attribution, so each was then re-run ALONE against the three
+golden binaries. The result is uniform and it is the point:
+
+| mutation | golden reds, applied alone |
+|---|---|
+| D10 `GrowthRespiration`'s complement | `every_domains_golden_is_still_this_reference_s_output`, both tier-contract bands |
+| D13 the drain's cessation | the same three |
+| D14 the fill's cessation | the same three |
+| *control: clean tree* | 14 passed, 0 failed |
+
+**So three live mechanisms of the frozen biosphere were guarded by committed bytes and by
+nothing else** — nothing behavioural, nothing named, nothing that would survive someone
+regenerating the goldens. That is batch A's canopy-quadrature finding reproduced on three
+more mechanisms, and D13/D14 are the pair whose param file argues about them at length (the
+`FINISH DS = 2.` domain-boundary reasoning runs to a full paragraph in
+`stem_reserves.yaml`, and nothing in the tree checked that the bound was strict).
+
+⚠ **Why D10 is invisible in particular, read rather than guessed.** `GrowthRespiration`
+moves carbon from `co2_atmos` to `co2_resp`. In the frozen open-field wiring both are
+BOUNDARY stocks, so no organ, no chamber gas and no conserved quantity moves with it; in
+the sealed wiring the two are the same stock and the flow is empty by construction. A
+mutation of its coefficient therefore changes exactly one thing: numbers in a file.
+
+### The silent-branch probe: eleven branches, all live, and one reached by a single test
+
+Batch B's second instrument (`panic!` at the top of a branch, count the tests that fire),
+run on all eleven branches of batch D's surfaces. **None is unreachable** — unlike batch
+C's six — so every one is a *write a test* case rather than a *only a scenario can reach
+it* case.
+
+The one worth naming is **P9, `StemRemobilization`'s empty-reserve zero-flux limb, reached
+by exactly ONE test in 282** — and that test is this batch's own
+`the_remobilization_drains_the_reserve_into_the_grain_and_is_first_order`. Before batch D
+it was reached by nothing. The other ten fire in 14–41 tests apiece.
+
+### The roster correction, predicted BEFORE the port rather than found in review
+
+§5ad's roster row says batch D lands on "`science.rs` partition, Q10, growth budget". That
+is true of a quarter of it. **This is the fourth consecutive batch to correct that column**,
+so this time the correction was written down before any Rust was, and it has two halves.
+
+**Half one — 14 of the 112 tests are batch G's subject, not batch D's.**
+`test_allocation.py` is two files in one: 29 tests about partitioning and its loader, and
+**14 about senescence** (`senescence_flux`, the `Senescence` flow, mutual shading, and the
+whole `senescence.yaml` loader block). Senescence is batch G's mechanism. They are **handed
+forward by name** rather than ported here or dropped — batch G's roster row grows from 37
+tests to 51.
+
+**Half two — the surfaces.** Batch D's own 98 tests split by SUBJECT:
+
+| surface | tests | subject |
+|---|---:|---|
+| `domains/src/biosphere/science.rs` | 8 | the equations: Q10, maintenance, the clamped budget, the partition table's interpolation, extrapolation, sum rule and split |
+| `domains/src/biosphere/flows.rs` | 10 | the shared budget and its limitation, the three budget-coupled flows' legs, both halves of the stem reserve |
+| `domains/src/biosphere/params.rs` | 5 | the three param files' REJECTIONS (the values were already pinned by C8's census) |
+
+### The loader split: one production change, and it is the third instance of the same one
+
+`respiration()` and `stem_reserves()` were the last two guarded loaders in `params.rs`
+still hard-wired to their own `include_str!`, so their bound and unit guards were
+unreachable from any test. Both are now split into a text-taking core
+(`respiration_from`, `stem_reserves_from`) plus a thin wrapper — **the same refactor
+batches B and C each made** for phenology, transpiration, root depth and the water cycle,
+and it is not the extraction §5ad rules out. That one is about lifting equations out of
+`Flow::demand` to make them unit-testable, which changes what the science is made of; this
+changes nothing but who may call the reader, and the committed values are asserted
+unchanged by the params census.
+
+### ⚠ A guard asymmetry, found by an absence census and MEASURED before it was written up
+
+`allocation.yaml` is the one frozen biosphere param file whose loader enforces **neither**
+the provenance rule nor the field-set rule. Its schema is a LIST of rows rather than flat
+value/unit/source scalars, so `allocation_from` reads the table through the raw node API
+and never meets `guarded_map`, which is where both rules live. Probed before the finding was
+written: stripping its `source:` and adding an unknown top-level key were **both accepted**.
+
+It is not unguarded, and that is the half worth recording rather than filing as a gap: the
+file's newline-normalized sha-256 is pinned in `docs/biosphere-reference.manifest.json`
+under `param_files`, and since C7 the reference WRITES that manifest while
+`tests/crossport/test_manifest_writer.py` compares the committed bytes. A provenance-only
+edit is therefore caught — **as a stale manifest, not as a load error**. Two different
+failures, two different fixes, and only one of them names the file.
+
+`provenance_is_enforced_at_the_loader_for_two_files_and_at_the_manifest_for_the_third`
+pins all of it, including the two mutations that LOAD — so if `allocation_from` is ever
+routed through `guarded_map`, that assertion says so out loud instead of a guard quietly
+appearing. What has no guard either way is a FUTURE list-shaped param file, which would
+inherit this loader shape and be required to carry a source by nothing until it reached
+the manifest census. **Recorded as an S6 item, not fixed inside a testing batch.**
+
+### ⚠ A bound test written from the wrong end passes on every input except the two that define it
+
+`the_respiration_bounds_are_rejected_each_at_its_own_shape` went RED on its first run, and
+the reason is worth a sentence. Its first draft asserted a `[0, 1)` growth efficiency and a
+legal zero remobilization rate — **the mirror image of both bounds**. `require_half_open`
+is `(0, 1]` and says so in as many words in its own doc comment ("zero is a degenerate
+model, one is lossless and legitimate"); the draft was written from the range's NAME, and
+the helper was four files away in `config/`. Every input except `0.0` and `1.0` behaves
+identically under the two readings, so a bound test written from the wrong end is green on
+everything but the two values that are the point of having a bound.
+
+The shipped test now asserts the shapes side by side and states why they differ: the
+remobilization RATE is `(0, 1]` (draining the whole standing reserve in a day is
+degenerate but legal), while the remobilizable FRACTION is open at BOTH ends (a stem that
+diverts all of its growth to starch never builds structure at all).
+
+### ⚠ The Python claim that has no Rust successor: the RK4 half
+
+`test_the_reserve_closes_every_sealed_chamber_on_both_integrators` asserts closure under
+**Euler and RK4**. Rust has `Rk4Integrator`, and `crew_run`, `eclss_run`, `power_run` and
+`thermal_run` all use it — but **nothing in the Rust tree ever runs the BIOSPHERE under
+RK4**. Measured by enumerating every `Rk4Integrator` user in `crates/*/src` and
+`crates/*/tests`.
+
+So the Euler half of that claim is covered structurally (the science gates and
+`system.rs`'s season runs exercise the reserve-live wiring and assert conservation every
+step — which is why D3 and D5 reddened so many of them), and the RK4 half has no successor
+at all. It is not fixed here: running the biosphere under RK4 is a capability change with
+its own consequences (under RK4+ a needed arbitration scale is a HARD ERROR, not a
+backstop), and §5ad forbids slipping that into a testing batch. **Recorded as a successor
+item.** It also sits next to a trap this repo has already logged twice — `rationed == 0`
+under Euler is blind by construction, and the Euler/RK4 trap runs both ways.
+
+### What batch D deliberately does NOT port, per test
+
+Written as a list rather than as forward items, because batch C's review found that a batch
+shipping only forward items lets an absence read as an oversight. 112 Python tests, 23 Rust
+tests, and here is every difference.
+
+| Python test(s) | disposition |
+|---|---|
+| the 14 senescence-subject tests of `test_allocation.py` | **handed to batch G by name** — its mechanism, its roster row grows 37 → 51 |
+| `test_maintenance_respiration_maturity_seam_scales_linearly` | **no successor, and correctly so**: `maturity` is hard-coded to 1.0 in this port, and nothing in EITHER tree ever passes anything but the default. The seam was exercised by its own test and by nothing else — a finding about the reference it came from, not a gap in the port |
+| `test_*_params_file_exists`, `test_*_loader_round_trips_a_valid_file`, `test_load_*_matches_committed_values` | folded into `include_str!` plus C8's params census — "the file exists", "it round-trips" and "its values are these" are one assertion once the file is compiled in |
+| `test_growth_flow_is_carbon_balanced`, `test_maintenance_flow_is_carbon_balanced_both_regimes`, `test_allocation_is_carbon_balanced` | the engine's own machinery: `assert_conserved` runs every step of every run, and batch A recorded the same disposition for the gas flows |
+| `test_maintenance_zero_biomass_is_inert` | covered by `maintenance_respiration_is_the_reference_rate_scaled_by_biomass_and_q10`'s exact zeros plus the `biomass > 0.0` branch probe (P10/P11) |
+| `test_partition_fractions_empty_table_raises` | **inherited port decision**: `partition_fractions` indexes `table[0]` directly, so an empty table is a panic rather than a raised error. The loader refuses a table with fewer than two rows before the function can ever see one — pinned by `the_partition_tables_structural_rules_are_each_rejected_separately` |
+| `test_resp_loader_rejects_a_missing_source` / `_an_unknown_field` for **allocation** | **no loader successor and that is a measured asymmetry**, see the guard-asymmetry section above; the manifest owns it instead |
+| `test_the_reserve_closes_every_sealed_chamber_on_both_integrators` | Euler half covered structurally; **RK4 half has no successor**, see above |
+| the ten design-record tests of `test_stem_reserves.py` (`test_the_SOURCED_form_*`, `test_OUR_reconstruction_*`, `test_NEITHER_form_*`, `test_the_partition_table_is_what_blocks_it_*`, `test_the_drain_rate_is_BIT_INERT_*`, `test_a_reserve_that_never_drains_moves_NITROGEN_*`, `test_the_trigger_is_OURS_*`, `test_the_fill_fraction_is_the_only_number_*`, `test_the_grain_gain_is_the_TRANSFER_*`, `test_the_frozen_harvest_index_is_LOW_*`) | **no successor, by nature.** These run candidate flow classes (`_GrowthFractionFill`, `_SnapshotFill`, `_ReserveShedding`) that exist only inside the test file and were never built, and they measure sensitivities to argue a decision that has already been taken. They are a DECISION RECORD written as executable tests; their content lives in `stem_reserves.yaml`'s header and `docs/plans/post-roadmap-stem-reserves.md`. ⚠ This is the largest single absence in the batch and it is a judgement, not an oversight: porting them would mean building two unbuilt models in Rust to re-refute them |
+| `test_the_reserve_passes_every_manifest_liveness_floor_*`, `test_the_open_season_science_bands_survive_*`, `test_option_Bs_litter_C_to_N_identity_survives_*` | covered structurally by the science gates, which run the reserve-live wiring — measured, not assumed: D3 and D5 reddened those gates. **But structurally is not by name**, which is exactly what the by-name claim census (clause 3) exists to make visible |
+
+### What batch D leaves standing
+
+* **The by-name claim census (clause 3) is now deferred by FOUR consecutive batches**, and
+  it is named here rather than deferred silently a fourth time. Its accumulated input:
+  batch B's two no-ancestor pins, batch C's three, and batch D's **three new ones** — the
+  goldens-only guard on `GrowthRespiration`'s complement and on both cessation bounds; the
+  measured loader/manifest guard asymmetry on `allocation.yaml`; and the three structural
+  coverings above, which are the census's own subject (a claim covered structurally but not
+  by name is precisely a row that would go missing).
+* **The biosphere is Euler-only in the Rust tree.** New, and the largest of the leftovers.
+* **A future list-shaped param file would have no provenance guard at its loader.** S6.
+* **`intercepted_fraction` still unresolved** (S6; clause 4 of the exit gate).
+* **`daily_thermal_time`'s 30 °C cap** — batch B's unreachable branch, still owned by
+  nothing.
+* **The Penman–Monteith negative-energy clamp is unreachable and the model has no longwave
+  term** — batch C's science question, untouched.
+* **`compartment_boundary_ledger` has no Rust equivalent** — batch C's gap, untouched.
+* **`flows.rs`'s test-local `ROOTED_DEPTH`** still shadows `stocks::ROOTED_DEPTH`.
+* **No Python deleted.** All four files stay green (112 passed, re-measured) until S6.
+
+### ⚠ One harness defect, found and fixed mid-batch
+
+The battery's revert check hashed the file's **decoded text**, and `Path.read_text` /
+`write_text` translate newlines on Windows — so it round-tripped CRLF → LF on two files and
+its own sha-256 comparison could not see it. Caught by `git status`, not by the check that
+existed to catch it. The harness now reads and writes BYTES, and the digest is over the
+bytes on disk. *A byte-exactness check that normalizes before hashing is checking
+something else.* Same species as this batch's other instrument findings, one level down: in
+the harness rather than in the subject.

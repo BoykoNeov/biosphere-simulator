@@ -3261,3 +3261,102 @@ about *absence* — a file the scan was never pointed at, tests with no successo
 recorded reason, a claim with no test. No mutation of any shipped mechanism could surface
 any of them, because none is a mechanism that is wrong; they are claims that are missing.
 *The instrument for absence is a census, and the census has to be written down.*
+
+## S5 batch D — the spending batch, and three mechanisms the goldens were guarding alone
+
+**BUILT, COMPLETE 2026-08-26.** `test_allocation` 43, `test_respiration` 25,
+`test_carbon_budget` 22, `test_stem_reserves` 22 = 112 Python tests. `-p domains --lib`
+**259 → 282**, workspace **891 → 914**, clippy clean, and `git status --porcelain
+rust/data/` empty — no golden, band, floor or manifest moved. Design and every measurement:
+`docs/plans/post-roadmap-reference-flip.md` §5ah.
+
+### The batch is different in KIND, and the battery was built around that
+
+Three of its four subjects are **redistributions** — the partition table splitting one
+increment four ways, `fstr` diverting part of the stem leg into starch, the maintenance
+shortfall burning organs in proportion, the reserve draining into the grain. Each keeps
+every leg summing exactly as before, so `assert_flow_balanced`, the per-step conservation
+assertion and the boundary ledger are **blind to all of them by construction**. Batch C met
+this once as a surprise (its `Recycling` mutation); here it is the default case, so **eight
+of the fifteen mutations are sum-preserving reshuffles**.
+
+Twelve of fifteen reddened nothing whose subject was the mutated mechanism. Of the eight
+reshuffles, two were caught by something about them — and **both catches are value or
+leg-SHAPE pins rather than rate laws**.
+
+**The sharpest reading: reversing the stem-reserve drain — the grain feeding the stem —
+reddens 28 tests of 259 and not one is about stem reserves.** Twenty-eight reds carrying
+zero information about what broke is the same reading as a golden red: *a number moved.*
+The mechanism has a 1,643-line Python file behind it and shipped only on the user's explicit
+call. Deleting its formation entirely reddened two.
+
+⚠ One of that battery's reds was not a catch and counting it would have inflated the
+column: a loader test builds its broken file by `replacen("fl: 0.55", …)`, and the mutation
+changed that literal, so the test's own *"the substitution must apply"* fired. The
+self-protecting assertion working — and the reason the column has to be read from each
+test's body rather than from its name.
+
+### ⚠⚠ Three mechanisms were guarded by committed bytes and by nothing else
+
+`GrowthRespiration`'s `(1 − Yg)` complement, and the cessation bound on **each** half of the
+stem reserve, each reddened **zero** tests of `-p domains --lib`. Applied together the full
+workspace came back 888 / 3 — all three failures committed-byte comparisons. *Applied
+together is not an attribution*, so each was re-run alone against the golden binaries: all
+three are caught by the goldens, individually, and by nothing else. Clean-tree control
+green.
+
+Batch A found this once, on the canopy quadrature. It is now four mechanisms, and the
+cessation pair is the one whose param file argues about it for a full paragraph (the
+`FINISH DS = 2.` domain-boundary reasoning) while nothing in the tree checked the bound was
+strict. *A mechanism whose only guard is a golden is guarded by nobody the day someone
+regenerates it.*
+
+### The roster correction was predicted, not discovered
+
+Fourth consecutive batch to correct §5ad's "lands on" column, so this time it was written
+before any Rust was — and it had a half no previous batch had: **14 of the 112 tests are
+batch G's subject, not batch D's.** `test_allocation.py` is two files in one, and its
+senescence half is handed forward **by name** rather than ported or dropped. Batch G's
+roster row grows 37 → 51.
+
+### ⚠ A bound test written from the wrong end is green on everything but the point
+
+The respiration bounds test went red on its first run. Its draft asserted a `[0, 1)`
+efficiency and a legal zero rate — **the mirror image of both bounds**. `require_half_open`
+is `(0, 1]` and says so in its own doc comment; the draft was written from the range's
+*name*, and the helper was four files away in another crate. Every input except `0.0` and
+`1.0` behaves identically under the two readings. *A bound test written from the wrong end
+passes on everything except the two values that are the reason the bound exists.*
+
+### ⚠ Two absences found by census rather than by mutation
+
+* **`allocation.yaml`'s loader enforces neither provenance nor the field set** — its schema
+  is a list of rows, so it reads the table through the raw node API and never meets
+  `guarded_map`, where both rules live. Probed before being written up: stripping its
+  `source:` and adding an unknown key were both accepted. It is not unguarded — the file's
+  hash is pinned in the manifest and C7's writer test compares the committed bytes, so an
+  edit is caught **as a stale manifest, not as a load error**. Two failures, two fixes, and
+  only one names the file. The shipped test pins both mutations *loading*, so a guard
+  cannot quietly appear.
+* **The biosphere is Euler-only in the Rust tree.** A Python claim asserts the reserve
+  closes every sealed chamber on **both** integrators; `Rk4Integrator` exists and the four
+  sibling domains use it, but nothing runs the biosphere under it. Euler half covered
+  structurally, RK4 half with no successor at all. Not fixed here — under RK4+ a needed
+  arbitration scale is a hard error, which is a capability decision, not a testing one.
+
+### ⚠ The harness's own byte-exactness check was blind to what the harness did
+
+The mutation battery hashed the file's **decoded text**, and `read_text`/`write_text`
+translate newlines on Windows — so it round-tripped CRLF → LF on two files and its own
+sha-256 comparison could not see it. Caught by `git status`, not by the check written to
+catch it. *A byte-exactness check that normalizes before hashing is checking something
+else.* Same species as the batch's other instrument findings, one level down: in the
+instrument rather than in the subject.
+
+### The by-name claim census is now deferred by FOUR batches, and it is named rather than deferred silently
+
+Its accumulated input: batch B's two no-ancestor pins, batch C's three, and batch D's three
+— the goldens-only guard on the growth-respiration complement and on both cessation bounds,
+the measured loader/manifest guard asymmetry, and three stem-reserve claims covered
+**structurally but not by name**, which is precisely the shape the census exists to make
+visible.
