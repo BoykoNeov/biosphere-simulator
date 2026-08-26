@@ -58,7 +58,11 @@ RUST_CRATE_DIR = REPO_ROOT / "rust" / "crates" / "simcore"
 RUST_DOMAINS_DIR = REPO_ROOT / "rust" / "crates" / "domains"
 RUST_AUTHORING_DIR = REPO_ROOT / "rust" / "crates" / "authoring"
 SCENARIOS_DIR = SCENARIO_DIR
-TIERS_PATH = Path(__file__).parent / "tiers.json"
+# ⚠ MOVED 2026-08-25 to `rust/data/tiers.json` (reference flip, Stage 3, §5ac). The
+# cross-port tolerance contract is one of the four freeze contracts and its numbers were
+# stranded in the tree S6 deletes, read by no program in `rust/` — plan FINDING 2, fifth
+# entry. The data now lives with the reference; this checker follows it until S6 retires it.
+TIERS_PATH = Path(__file__).resolve().parents[2] / "rust" / "data" / "tiers.json"
 
 # The hand-pinned RNG known-answer vectors live in tests/test_rng.py; import them to
 # anchor the generated cross-port file to external truth (published splitmix64).

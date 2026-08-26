@@ -399,6 +399,17 @@ enum Years {
 /// tree — a scenario the reference can build but that no golden pins would otherwise walk
 /// into the manifest on its own. The `_authority` table marks `scenarios/*/scenario` and
 /// `scenarios/*/golden` `hand` for exactly this reason.
+/// The frozen golden filenames this contract pins, in roster order.
+///
+/// Exposed for the cross-port tolerance gate (`tiers.rs`), which must check that the
+/// tolerance table classifies **exactly** the frozen set — no orphan row, no unclassified
+/// golden. Reading the roster from the manifest's own source is the point: the alternative,
+/// parsing the committed `.manifest.json` out of `docs/`, would make an engine crate depend
+/// on a document and give the check a second source of truth.
+pub fn frozen_goldens() -> Vec<&'static str> {
+    SCENARIOS.iter().map(|(_, _, _, golden)| *golden).collect()
+}
+
 const SCENARIOS: [(&str, &str, Years, &str); 7] = [
     (
         "open_season",

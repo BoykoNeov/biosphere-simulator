@@ -338,6 +338,12 @@ const AUTHORITY: [(&str, &str, &str); 16] = [
     ),
 ];
 
+/// The frozen golden filenames this contract pins, in roster order. See
+/// `domains::freeze_manifest::frozen_goldens` for why this is exposed.
+pub fn frozen_goldens() -> Vec<&'static str> {
+    SCENARIOS.iter().map(|(_, _, golden)| *golden).collect()
+}
+
 const SCENARIOS: [(&str, &str, &str); 13] = [
     (
         "cabin_gas",

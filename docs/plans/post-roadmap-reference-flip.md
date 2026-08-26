@@ -5672,3 +5672,96 @@ re-pointed at the Rust test names, with the driver move stated in place.
 * **The GDScript smokes are untouched.** The Godot side of the boundary is not what moved.
 * **The slow pair is CI-excluded by name**, not by `#[ignore]`, so it still runs by default on
   the developer machine that is the only place it ever runs.
+
+## §5ac Stage 3 — D4: the tolerance contract moves to the reference, COMPLETE 2026-08-25 (one half deferred, named)
+
+The fourth and last of §5y's build items, and the only one carrying a freeze ceremony. The
+cross-port tolerance contract — `docs/native-port-reference.md` and its numbers — is now read
+and enforced by the reference.
+
+### What moved
+
+* **`tests/crossport/tiers.json` → `rust/data/tiers.json`**, beside the goldens it classifies.
+  The Python checker follows it to the new path and stays green until S6. **No band, floor or
+  tier changed** — the predicted diff was a path and nothing else, and that is what it was.
+* **`domains/src/tiers.rs`** — the reader and the comparison. Tier 1 is bit-exact on parsed
+  f64; Tier 2 is `max |c−r| / max(|r|, floor) ≤ band`. The table is *read*, never mirrored in
+  Rust: a hand-copied roster is the defect `coverage-roster-is-not-the-manifest.md` records.
+* **`domains/tests/tier_contract.rs` (7) + `station/tests/tier_contract.rs` (6)** — the gates.
+  The shape gates live in `station` because it is the only crate that can see **both** frozen
+  rosters, and `frozen_goldens()` was exposed on each `freeze_manifest` so the roster comes
+  from the manifest's own source rather than from parsing a committed document.
+
+### ⚠⚠ The hole this closes is bigger than "the data was stranded"
+
+§5q filed this as orphaned data. Measured, it is a **missing assertion**.
+`domains::goldens::compare` carries *no numeric tolerance at all*: byte-exact for
+pure-arithmetic goldens and on Windows, and otherwise a **structural** walk that asserts a
+hex-float leaf parses finite and says nothing about its value. So on the `crossport` CI job —
+glibc Rust against UCRT-generated goldens, the repo's only genuine cross-libm measurement —
+the banded assertion existed **only in Python**.
+
+`the_structural_walk_is_blind_to_the_value_this_file_checks` pins that in-tree and on any
+platform: hand `compare_structural` two snapshots differing by ten times a measured band and
+it reports **equal**; the same pair fails `compare_at_tier`. Written because the golden-nudging
+control below cannot demonstrate it on Windows, where both gates are strict.
+
+### The controls
+
+| | Mutation | Reddens |
+|---|---|---|
+| C1 | a golden leaf nudged **1e-11**, above power's 1e-12 band | the banded run gate, naming the leaf and both numbers |
+| C5 | the same leaf nudged **1e-13**, below the band | **nothing — correct.** C1+C5 together prove the band *value* is load-bearing, not merely present |
+| C2 | a classified row dropped | "classifies exactly the frozen goldens" |
+| C3 | a Tier-1 golden promoted to Tier 2 | the Tier-1 set gate |
+| C4 | a Tier-2 row half-calibrated (band null, floor kept) | internal consistency **and** the banded run gate |
+
+Plus six unit controls on the arithmetic itself: a generous band cannot rescue a Tier-1
+difference, an uncalibrated Tier-2 row refuses to compare rather than permitting anything, a
+shape mismatch is an error, and **a comparison that finds no numeric leaves is a failure, not
+a vacuous pass**.
+
+⚠ **C3 first read as inert and the probe was again the defect.** The control harness grepped
+failing test names with `^ *[a-z_]+$` — which excludes digits, and the test is called
+`the_tier1_set_...`. Third time this session that a green control was a statement about the
+control. Re-run with the output read directly: it reddens.
+
+### ⚠ The direction of the floor, recorded because the natural reading is backwards
+
+`floor` **enlarges** the denominator when a reference leaf is smaller than it, so it makes the
+comparison *more* forgiving near zero and inert elsewhere. Dropping it would make the gate
+**stricter**, not weaker — it would fail loudly rather than pass quietly. An advisor note in
+this slice had it the other way round; the code is the authority and
+`the_floor_is_permissive_and_only_near_zero` pins the direction so nobody re-derives it.
+
+### ⚠ What is DEFERRED, and it is the half the user's answer named
+
+The four `band > measured sensitivity` re-derivations are **not ported**. They perturb a
+transcendental by one ULP and propagate it through the engine;
+`tests/crossport/measure_tier2_bands.py` does this by substituting a `math` reference **inside
+the Python domain modules** and running the **Python engine**. The instrument is built out of
+the tree S6 deletes.
+
+**It is portable** — checked rather than assumed, and the answer changed the verdict.
+`solar_schedule` returns a public `Box<dyn Fn>` closure a test can wrap with a nudge, `Flow` is
+a public trait and `RadiatorReject` a public struct, so a test can register a perturbed flow
+exactly as Python replaces a module attribute — **no change to frozen engine code**. What it
+costs is four bespoke perturbation seams (power ×2, thermal, the biosphere `exp`, the
+greenhouse) and a re-measurement that must land the same numbers.
+
+⚠ And the trap is recorded in the Python tool's own comments: both biosphere probes once
+shimmed a module the carbon path no longer called and measured **exactly 0.0, passing
+vacuously** for weeks. A re-measurement that reads zero is the failure mode, not the result.
+
+**This is left for the user's call rather than done or dropped**, because it is a scope
+decision they already paid for once: they chose "port the tolerance checks" knowing it meant
+re-measuring. What is deferred is one clearly-named piece, and until it lands the committed
+bands are *asserted* but no longer *justified in-tree* — the Python justification still runs,
+and dies at S6.
+
+### The ceremony
+
+Advisor-reviewed; gates written before the data moved; mutation-controlled;
+`docs/native-port-reference.md` carries a dated UNFREEZE block naming what moved, what did
+not, and what is outstanding. **`CLAUDE.md`'s own pointer was repointed in the same commit** —
+it named the old path, and the always-loaded map is audited by nothing (the C3 lesson).

@@ -10,11 +10,45 @@ Tier-2 bands and their provenance, the op-for-op libm audit, and the discovered-
 protocol.
 
 Like the freeze contracts this is **boundary-side docs only**: `git diff src/` stays
-**empty** — the Python reference is untouched; the Rust port lives under `rust/`, and the
-cross-port comparator + classification table live under `tests/crossport/` (test tooling).
-The machine-readable companion is **`tests/crossport/tiers.json`** (the per-golden tier +
+**empty** — the Python reference is untouched; the Rust port lives under `rust/`.
+The machine-readable companion is **`rust/data/tiers.json`** (the per-golden tier +
 band table — the **authoritative** source; this doc's prose must not contradict it). The
 plan of record is [`docs/plans/phase-7-native-core.md`](plans/phase-7-native-core.md).
+
+> ## ⚠ 2026-08-25 — UNFREEZE: the contract's numbers moved, and the reference now enforces them
+>
+> **What changed: the file's home and who reads it. No band, floor or tier moved.**
+>
+> Until this date the table lived at `tests/crossport/tiers.json` and was read by **no program
+> in `rust/`** — the whole tolerance contract was enforced by the Python checker alone, inside
+> the tree the reference flip is deleting. Worse than stranded data: the reference's own golden
+> comparison (`domains::goldens::compare`) carries **no numeric tolerance at all**. It is
+> byte-exact for pure-arithmetic goldens and on Windows, and otherwise falls back to a
+> *structural* walk that asserts a hex-float leaf parses finite and says nothing about its
+> value. So on the `crossport` CI job — glibc Rust against UCRT-generated goldens, the repo's
+> only genuine cross-libm measurement — the banded assertion existed only in Python.
+>
+> Under the flip's posture that is a hole in the **reference**, so:
+>
+> * the table moved to **`rust/data/tiers.json`**, beside the goldens it classifies;
+> * `domains::tiers` reads it and implements the comparison — Tier 1 bit-exact on parsed f64,
+>   Tier 2 `max |c−r| / max(|r|, floor) ≤ band`;
+> * `domains/tests/tier_contract.rs` and `station/tests/tier_contract.rs` are the gates: the
+>   contract classifies exactly the 20 frozen goldens, every row is internally consistent, the
+>   Tier-1 set is the four transcendental-free scenarios, and every classified run sits inside
+>   its own measured band;
+> * the Python checker follows the file to its new path and stays green until it is retired.
+>
+> ⚠ **What did NOT move, and is recorded as outstanding:** the four `band > measured
+> sensitivity` re-derivations. Those perturb a transcendental by one ULP and propagate it
+> through the engine, and the tool that does it (`tests/crossport/measure_tier2_bands.py`)
+> substitutes a `math` reference **inside the Python domain modules** and runs the **Python
+> engine** — so the instrument is built out of the tree being deleted and dies with its
+> subject. Porting it means re-measuring against the Rust engine, not translating. See
+> `docs/plans/post-roadmap-reference-flip.md` §5ac.
+>
+> Ceremony: advisor-reviewed, gates written before the data moved, mutation-controlled
+> (a golden nudged 1e-11 fails and 1e-13 passes against a 1e-12 band), documented here.
 
 ## ⚠ 2026-08-16 — the reference flip inverted who is judged (slice 5)
 
@@ -310,7 +344,8 @@ the measured bands absorb the real cross-libm divergence.
 
 ## Port-agnostic — and C# at the Phase-8 boundary
 
-The interchange (`sim_io` hex-float JSON) and the comparator (`compare.py` + `tiers.json`) are
+The interchange (`sim_io` hex-float JSON) and the comparator (`domains::tiers` +
+`rust/data/tiers.json`, and `compare.py` until it is retired) are
 **port-agnostic**: they validate *any* port's snapshot, not Rust's specifically. Phase 7 is
 Rust-only, but the roadmap's second port target — **C#** for the Godot front-end (Phase 8) —
 reuses this whole harness for free: a C# emitter producing the same `sim_io` snapshot is

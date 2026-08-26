@@ -74,7 +74,7 @@ assuming which side authored it.
 - `scenarios/` — authored **content** (runtime artifacts, never reference). Distinct
   from `rust/data/scenarios/`, which are fixtures / cross-port anchors.
 - `rust/data/golden/` — 21 golden files (19 the reference's own bytes); the **20** in
-  `tests/crossport/tiers.json` (7 biosphere + 13 station) carry the cross-port
+  `rust/data/tiers.json` (7 biosphere + 13 station) carry the cross-port
   tier contract.
 
 ## Posture — Rust is the reference, Python is retiring (the flip, 2026-08-16)
