@@ -155,3 +155,79 @@ pub fn run_harvest(
         None,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::params as station_params;
+    use crate::scenario::harvest_scenario;
+    use domains::biosphere::science;
+    use domains::params;
+
+    /// The station's past-anthesis injection keeps DEPTH and WATER together — the place
+    /// this gap actually bit.
+    ///
+    /// `build_harvest` overrides `rooted_depth0` to 1.3 m on top of a greenhouse built for
+    /// the 0.15 m sowing zone. Before 2026-08-12 it inherited that zone's water: 19.5 kg
+    /// inside a 169 kg capacity, `FTSW = 0.115`, grain 79 % low — a grain-filling crop
+    /// declared at a third of its growth threshold on day 0. Both stores are now re-derived
+    /// from the injected depth, and this asserts the resulting STATE rather than the code
+    /// path, so a future refactor cannot quietly drop it.
+    ///
+    /// ⚠ This is the concrete case behind
+    /// `scenario.rs`'s `every_scenarios_water_stores_are_geometric`: that census covers
+    /// declared scenarios, and the harvest injection is a store rewritten at BUILD time,
+    /// which no scenario-level census can see.
+    /// Mirrors `tests/test_soil_layers.py::test_the_harvest_injection_keeps_depth_and_
+    /// water_together`.
+    #[test]
+    fn the_harvest_injection_keeps_depth_and_water_together() {
+        let crew = params::crew();
+        let eclss = params::eclss();
+        let harvest_params = station_params::harvest();
+        let scenario = harvest_scenario();
+        let (state, _bio, _cabin) =
+            build_harvest(&crew, &eclss, &harvest_params, &scenario, true, true)
+                .expect("build_harvest");
+        let bio = &scenario.greenhouse.bio;
+        let depth = state.aux[ROOTED_DEPTH];
+        assert_eq!(depth, scenario.rooted_depth0);
+
+        let capacity = science::captured_water(depth, bio.soil_extractable_water, bio.ground_area);
+        let held = state.stocks[SOIL_WATER].amount;
+        assert!(
+            (held - capacity * bio.soil_moisture_index).abs() <= 1e-12 * capacity,
+            "the injected crop's root zone holds {held}, not its own geometry {capacity}"
+        );
+        // ...which is to say it starts at its DECLARED FTSW, not at 0.115.
+        let ftsw = held / capacity;
+        assert!(
+            (ftsw - bio.soil_moisture_index).abs() <= 1e-12,
+            "the injected crop starts at FTSW {ftsw}, not the declared MAI {}",
+            bio.soil_moisture_index
+        );
+        assert!(
+            ftsw > 0.5,
+            "the 0.115 regression is back: a grain-filling crop below its growth threshold"
+        );
+        // The below-root store follows the same re-derivation, or the profile stops being
+        // a partition and the injection creates or destroys water.
+        let below = state.stocks[SUBSOIL_WATER].amount;
+        let want = science::captured_water(
+            bio.soil_depth - depth,
+            bio.soil_extractable_water,
+            bio.ground_area,
+        ) * bio.soil_moisture_index;
+        assert!(
+            (below - want).abs() <= 1e-12 * want,
+            "the below-root store {below} is not (SOLDEP - DEPORT) geometry {want}"
+        );
+        // ⚠ NON-VACUITY: the injection must actually have MOVED the stores. If the
+        // greenhouse's own `soil_water0` happened to equal the injected value, every
+        // assertion above would hold on a build that had dropped the re-derivation.
+        assert_ne!(
+            bio.soil_water0, held,
+            "the injected depth did not change the store, so this test proves nothing"
+        );
+    }
+}

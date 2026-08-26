@@ -3080,3 +3080,119 @@ the engine's `stocks::ROOTED_DEPTH` is the bare `"rooted_depth"`. Harmless where
 an aux test inheriting it reads a key nothing writes and passes on an `unwrap_or(0.0)`.
 *A test-local constant is a fixture, not a fact — check it against the thing it names before
 building on it.*
+
+### S5 batch C — the water batch, and six branches nothing in the tree can reach (2026-08-26)
+
+`test_transpiration` 46, `test_soil_layers` 27, `test_water_cycle` 17, `test_root_depth` 16
+= 106 Python tests, onto five surfaces across **two crates**. `cargo test -p domains --lib`
+221 → 257, `-p station --lib` 53 → 60, workspace 845 → 888, clippy clean, **no frozen value
+moved** (measured with `git status --porcelain rust/data/`, not inferred from a green
+suite). Plan record: §5ag.
+
+#### ⚠⚠ Sixteen mutations, and TWO reddened a test about their own mechanism
+
+Eight of the sixteen reddened **nothing at all** — the analytic SVP slope, the
+Penman–Monteith canopy-resistance term, its negative-energy clamp, the zero-capacity limb
+of `FTSW`, both guards on `root_zone_fraction`, the re-sow return's zero-depth guard, and a
+doubled condensation rate. Of the eight that did, six reddened strangers.
+
+The sharpest: **deleting the soil-water stress factor from transpiration outright** — a
+plant that transpires as if never water-limited, a whole feedback removed rather than a
+coefficient perturbed — reddened **one test in 221**, and that test is about
+drought-*accelerated* phenology. Same shape as batch A's canopy quadrature and batch B's
+photoperiod, one mechanism over.
+
+And batch A's balance lesson, reproduced on a new mechanism: making `Recycling` first-order
+in `soil_water` instead of `condensate` keeps every leg balanced and every quantity
+conserved, so conservation cannot see it. It reddened nine tests, every one a chamber or
+compensation-point gate. *A balanced mutation is invisible to the balance machinery by
+construction; only the rate law itself can catch it.*
+
+#### ⚠⚠ Six unreachable branches — and reading WHY falsified a comment carried since Phase 1
+
+Batch B's `panic!`-per-silent-branch probe, run again. Three of nine probes fired (live but
+unasserted). The other six fired in zero tests of `--lib`, and re-run together under
+`cargo test --workspace --no-fail-fast` the whole suite **stayed green, goldens included**.
+
+The one that matters is `penman_monteith_transpiration`'s negative-energy clamp. Its Python
+test justifies it by saying daily-average net radiation *"goes negative on short midwinter
+days (the winter-wheat season overwinters)"*. That is false here, and not because the winter
+is mild: `weather::net_radiation` is **net SHORTWAVE only** — `(1 − α)·IRRAD/86400`, with no
+longwave-loss term — so it cannot be negative for any non-negative irradiance, and
+`vapor_pressure_deficit` is itself a `max(0, …)`. The clamp is unreachable **by
+construction**.
+
+The clamp stays and is pinned at the function's own contract, with the **unreachability
+asserted over the committed weather** rather than left in a comment that could rot. Whether
+`net_radiation` should grow a longwave term is a science question, recorded and not taken
+inside a testing batch.
+
+*The general form, one turn past batch B's: a probe tells you a branch never ran. Reading
+WHY it never ran is what turns a coverage gap into a finding — here the answer was eight
+lines away in a different module, and it falsified a sentence a test had carried for months.*
+
+#### ⚠⚠ A census cannot be ported as a list, because the list IS the failure it prevents
+
+`test_every_scenarios_water_stores_are_geometric` enumerates scenarios by reflection, and
+its own comment says why: a hand-listed roster silently omits the scenario added after it
+was written. Rust has no reflection. Porting it as a literal array would have reproduced
+exactly the failure the original exists to prevent — green, and covering less, with nothing
+to say so.
+
+The successor is a **source scan with two controls**, the shape `params.rs`'s directory
+census already uses here: scan the production half of both crates' scenario files (cutting
+at `#[cfg(test)]`) for the two declaration shapes, assert the checked roster equals the scan
+as sets, prove the scanner can find more (the test modules' diagnostics), and prove the
+comparison bites. Measured: declaring a new production scenario reddens exactly one test of
+60, the census.
+
+⚠ It also had to move CRATES. The roster is split across `domains` and `station`, and
+`domains` cannot see `station`, so `station` is the only place both halves are visible — and
+the station's four scenarios plus the harvest injection are precisely what a biosphere-only
+census would miss. *When a claim is about a set, check where the whole set is visible from
+before choosing the file.*
+
+#### The clean control existed after all, and checking beat concluding
+
+The deep-water headline claim needs a run with *only* `RootZoneCapture` removed. `Registry`
+does not lend out its owned flows, which reads as "Rust cannot have this control" — the
+answer would then have been the naive control, which the Python file itself records as
+**silently destroyed** by the geometry re-basing (`EXTR` now appears in `TTSW` as well as in
+the transfer, so a zero kills the crop instead of isolating it). But `compartments()` is
+module-private and the test module is *inside* that module, so the flow list is reachable
+before `Registry::new` closes over it. **No production seam was needed.** *An API that does
+not expose something to the outside may still expose it to the inside; check the privacy
+boundary before pricing a production change.*
+
+That control produced a cross-port reading worth keeping: leaf **9.5775×**, grain
+**5.8281×**, measured here first and then found to sit inside Python's own current bands
+(`9.0–10.5`, `5.5–6.2`) — bands Python reached through two independent re-measurements.
+
+#### ⚠ The loader guards again, and a decision NOT re-asked
+
+All six guards on the three water param files were measurably inert — `include_str!` meant
+they could only ever see the committed file. Deleting any left 221/0 against a live control
+that reddened 25. `transpiration_from` / `root_depth_from` / `water_cycle_from` ship, `--lib`
+unchanged at 239 across the split, and all three now redden exactly the test about them.
+
+This was **not** put to the user again. Batch B asked the identical question about the
+identical shape the same day and was answered "build it"; three files is a larger surface,
+not a different decision. What batch B's finding forbids is letting *"recorded in three
+places"* stand in for *asking* — not re-asking a question already answered. Stated in the
+commit as an application of that answer so it can be reversed on sight.
+
+⚠ `water_cycle`'s guard is `require_non_negative`, not `require_positive`, and the asymmetry
+is the science: **a zero rate is how a chamber with no condenser is declared**, which is
+every open-field scenario in the tree. Every rejection test pins that legal boundary
+alongside the rejection — a guard one notch tighter would forbid the frozen roster.
+
+#### The Python literal that could not be copied
+
+`test_penman_monteith_pinned_value`'s `6.158958394549651` is self-described as a "pinned
+regression literal" — a value read out of the tree, which the exit gate rejects. The
+successor hand-composes the combination equation in the comment and asserts every
+intermediate separately, reproducing the same number while making it re-checkable without
+running anything. ⚠ And one of this batch's own bounds was re-pinned from the measurement
+rather than from the guess: the canopy-resistance term's contribution was written `> 1.5×`
+and measured **1.4432×**; it is now two-sided, so a change that shrinks the term is caught
+as well as one that drops it.

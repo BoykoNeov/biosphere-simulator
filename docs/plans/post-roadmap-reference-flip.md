@@ -6408,3 +6408,258 @@ says more than its test measures.
   coverage (B10's gate boundary, B11's unit seam, the two `science.rs`/`params.rs` claims with
   no Python ancestor) to mark as *additional* rather than as successors.
 * **No Python deleted.** `test_phenology.py` stays green and running until S6.
+
+## §5ag Stage 3 — S5 batch C BUILT, COMPLETE 2026-08-26: the water batch, and six branches nothing in the tree can reach
+
+Batch C is the water batch: `test_transpiration` 46, `test_soil_layers` 27,
+`test_water_cycle` 17, `test_root_depth` 16 = **106 Python tests**. It lands on five
+surfaces across **two crates**, and the second crate is a correction to the roster, not a
+convenience — see "Where the tests went" below.
+
+`cargo test -p domains --lib` **221 → 257**; `cargo test -p station --lib` **53 → 60**;
+`cargo test --workspace --no-fail-fast` **845 → 888**; clippy clean at `--all-targets -D
+warnings`. **No golden byte, band, floor or manifest moved** — asserted with
+`git status --porcelain rust/data/` (empty), not inferred from a green suite.
+
+The batch is tests plus **one production change**, taken as an application of batch B's
+already-given answer rather than as a fresh decision. Harness and all 23 logs:
+`M:\claud_projects\temp\s5-batch-c`.
+
+### The before-battery: sixteen mutations, ONE caught by a test about its own mechanism
+
+Baseline 221 passed / 0 failed. §5ad predicted this batch would come back *mixed* rather
+than uniformly bare, because four of `science.rs`'s six already-tested functions are
+water/root ones. It did, and the split is the finding.
+
+| # | mechanism broken | red | of which **about the mutated mechanism** |
+|---|---|---:|---:|
+| M1 | `slope_svp` drops the `SVP_C` factor | **0** | — |
+| M2 | Penman–Monteith drops the `(1 + r_s/r_a)` canopy term | **0** | — |
+| M3 | Penman–Monteith drops the negative-energy clamp | **0** | — |
+| M4 | `transpirable_capacity` drops `ground_area` | 3 | **1** |
+| M5 | `FTSW` zero-capacity limb returns 1 instead of 0 | **0** | — |
+| M6 | `WSFG` uncapped above 1 | 15 | **0** — every one a compensation-point or leaf-cycle gate |
+| M7 | `WSFG` gains a hard wilting floor at 0.05 | 1 | **0** |
+| M8 | `soil_water_stress` hardcodes unit area in the denominator | 2 | **0** |
+| M9 | `root_zone_fraction` uncapped above 1 | **0** | — |
+| M10 | `root_zone_fraction` drops its non-positive-depth guard | **0** | — |
+| M11 | `resow_water_return` drops its zero-depth guard | **0** | — |
+| M12 | **`Transpiration` drops `f_water` entirely** | 1 | **0** |
+| M13 | `Irrigation` drops the deficit limb | 1 | **0** |
+| M14 | condensation rate doubled | **0** | — |
+| M15 | `Recycling` reads `soil_water` instead of `condensate` | 9 | **0** |
+| M16 | the dry-subsoil stop tests `< 0` instead of `<= 0` | 1 | **1** |
+
+**Eight of sixteen reddened nothing at all.** Of the eight that did, exactly two reddened
+a test whose subject is the mutated mechanism, and M4's "1" is the ground-area pin batch
+`soil-layers` wrote for a different call site.
+
+⚠⚠ **M12 is the sharpest reading and deserves its own sentence.** Deleting the soil-water
+stress factor from transpiration — a plant that transpires as if it were never
+water-limited, a whole feedback removed rather than a coefficient perturbed — reddened
+**one test in 221**, and that test is about drought-*accelerated* phenology. Same shape as
+batch A's canopy quadrature and batch B's photoperiod, one mechanism over.
+
+⚠ **M15 is the balance lesson from batch A, reproduced.** Making `Recycling` first-order in
+`soil_water` instead of `condensate` keeps every leg balanced and every conserved quantity
+conserved, so conservation cannot see it; it reddened nine tests, every one a chamber or
+compensation-point gate. *A balanced mutation is invisible to the balance machinery by
+construction — only the rate law itself can catch it.*
+
+### ⚠⚠ The second probe again, and this time SIX branches are unreachable
+
+Batch B's `panic!`-per-silent-branch probe, which separates "the branch runs and nothing
+checks it" (write a test) from "the branch never runs" (only a *scenario* can reach it).
+Nine probes on `--lib`; the three that fired were `root_zone_fraction`'s saturation limb
+(20 tests), and both `Irrigation` limbs (7 each) — live but unasserted.
+
+The other six fired in **zero tests of `--lib`**, and were re-run together under
+`cargo test --workspace --no-fail-fast`, which **stayed fully green, goldens included**:
+
+* `fraction_transpirable`'s zero-capacity limb,
+* `root_zone_fraction`'s non-positive-depth guard,
+* `resow_water_return`'s zero-old-depth guard,
+* `resow_water_return`'s nothing-abandoned limb,
+* `water_stress_factor`'s exactly-empty-zone limb,
+* **`penman_monteith_transpiration`'s negative-energy clamp.**
+
+#### The clamp's own stated rationale is false in this tree, and the reason is structural
+
+`test_penman_monteith_clamps_negative_radiation_to_zero`'s comment justifies the clamp by
+saying daily-average net radiation *"goes negative on short midwinter days (the winter-wheat
+season overwinters)"*. Measured here it never does, and not because the winter is mild:
+`weather::net_radiation` is **net SHORTWAVE only** — `(1 − α)·IRRAD/86400`, with no longwave
+loss term — so it is non-negative for every non-negative irradiance, and
+`vapor_pressure_deficit` is itself a `max(0, …)`. Both drivers of `λE` are non-negative at
+every call site in the tree, so the clamp is unreachable **by construction**, not by luck.
+
+The clamp is kept and pinned at the function's own contract (it is `pub`, and a longwave
+term is the obvious next weather science), and the **unreachability is asserted over the
+committed weather rather than left in a comment that could rot**. Adding a longwave term is
+a science question, recorded rather than taken inside a testing batch.
+
+*The general form, and it is batch B's with one turn more: a probe tells you a branch never
+ran. Reading WHY it never ran is what turns a coverage gap into a finding — here the answer
+was eight lines away in a different module, and it falsifies a sentence the Python test has
+carried since Phase 1.*
+
+### Where the tests went, and why the batch spans two crates
+
+§5ad's roster row says batch C "lands on `science.rs` Penman-Monteith, stress, root zone".
+That is true of the largest third and wrong about the rest — the same correction batch A
+and batch B each had to make, for the third time. The split is by SUBJECT:
+
+| surface | tests | subject |
+|---|---:|---|
+| `domains/src/biosphere/science.rs` | 11 | the equations: SVP + its analytic slope, the PM combination equation, `TTSW`/`FTSW`/`WSFG`, the composed stress, `FROOT1`, the re-sow return |
+| `domains/src/biosphere/flows.rs` | 7 | the flows: `Transpiration`'s three factors, `Irrigation`'s two limbs, the two cycle flows' rate law |
+| `domains/src/biosphere/params.rs` | 9 | the three water param files + their guards |
+| `domains/src/biosphere/system.rs` | 9 | the season: the extension law, the flowering stop, the re-sow, the access gate, the deep-water rescue, the ring, sealed water conservation |
+| `station/src/scenario.rs` + `harvest.rs` | 7 | the scenario **census**, and the past-anthesis injection |
+
+⚠ **The station half is forced, not chosen.** The `SeasonScenario` roster is split across
+two crates and `domains` cannot see `station`, so `station` is the only place both halves
+are visible. A census that enumerated only the biosphere's four would miss the station's
+four and the harvest injection — which is precisely the scenario the Python test was
+written after.
+
+### ⚠⚠ The census had to change SHAPE, and porting it as a list would have lost the claim
+
+`test_every_scenarios_water_stores_are_geometric` enumerates by reflection (`dir(module)`),
+and its own comment states why: *a hand-listed roster silently omits the scenario added
+after it was written* (`coverage-roster-is-not-the-manifest`). Rust has no reflection, and a
+literal array in the test would reproduce exactly the failure the original exists to
+prevent — green while covering less, with nothing to say so.
+
+The successor is a **source scan with two controls**, the shape
+`params::tests::the_census_matches_the_directory_on_disk` already uses in this codebase:
+
+1. `the_scenario_roster_matches_what_the_source_declares` scans the **production half** of
+   `system.rs` and `scenario.rs` (everything before `#[cfg(test)]`) for both declaration
+   shapes — `const NAME: SeasonScenario =` and `fn name() -> SeasonScenario {` — and
+   asserts the checked roster equals the scan, as sets.
+2. `a_whole_file_scan_finds_more_than_the_census_does` proves the scanner is not blind: the
+   whole-file scan picks up the test modules' diagnostics, batch C's own
+   `deep_water_scenario` among them.
+3. `the_census_comparison_reddens_on_an_unlisted_scenario` proves the comparison bites.
+
+Measured, not argued: declaring a new production `SeasonScenario` in `station/src/scenario.rs`
+reddens **exactly one test of 60**, the census.
+
+⚠ Cutting at `#[cfg(test)]` is load-bearing rather than tidy. Test modules declare
+scenarios (the retired `WATER_BITING` and `N_LIMITED` copies, and this batch's own
+diagnostics); those never build a shipped run, so they owe no identity — but a scan that
+counted them would make the census un-satisfiable and it would be *loosened* rather than
+fixed.
+
+### The three Python scenarios with no Rust roster entry
+
+`DEEP_WATER`, `DROUGHT` and the retired `WATER_BITING` do not exist on this side. The
+diagnostics **declare their subject inline** — the shape
+`nitrogen_limitation_is_wired_into_assimilation_and_no_scenario_shows_it` already uses in
+`system.rs` — rather than being added to the production roster, where a new
+`SeasonScenario` would stand in front of the freeze manifest for no reference gain.
+
+**The clean control needed no production seam, and that was checked rather than assumed.**
+The deep-water headline claim needs a run with *only* `RootZoneCapture` removed;
+`Registry` does not lend out its owned flows, so the obvious reading is that Rust cannot
+have the control. But `compartments()` is module-private and the test module is *inside*
+that module, so the flow list is reachable before `Registry::new` closes over it. ⚠ The
+naive control (`soil_extractable_water = 0`) is the one the Python file records as having
+been **destroyed silently** by the geometry re-basing — `EXTR` now appears in `TTSW` as
+well as in the transfer, so a zero kills the crop instead of isolating the transfer. *A
+control that changes more than it claims is worse than no control.*
+
+#### The cross-port reading the deep-water pin produced
+
+Measured on this port, first, before looking at Python's bands: leaf **9.5775×**, grain
+**5.8281×**. Python's current pins are `9.0 < r < 10.5` and `5.5 < r < 6.2` — bands it
+arrived at through two independent re-measurements. The Rust numbers sit inside both. That
+agreement is a **cross-port reading, not a copied literal**, and it is worth recording
+because this ratio has moved twice for reasons unrelated to what it measures (WSFD, then
+the depth-resolved canopy), each time with nothing red because the bound had slack.
+
+### ⚠ The production change: three loader guards that could not be handed a bad file
+
+`transpiration()`, `root_depth()` and `water_cycle()` all read their YAML through
+`include_str!`, so their six guards could only ever see the committed file — which is valid.
+**Measured inert exactly as batch B measured phenology's**: deleting the whole guard loop
+from any of the three left `cargo test -p domains --lib` at **221 passed / 0 failed**,
+against a live control (declaring `aerodynamic_resistance` in `min/m`) that reddened **25**.
+
+`transpiration_from` / `root_depth_from` / `water_cycle_from` ship, the `allocation_from`
+shape already in that file, and `--lib` was **unchanged at 239 across the split**. All three
+guards now redden exactly the test about them.
+
+⚠ **This was NOT re-asked, and the reason is recorded rather than assumed.** Batch B put
+the identical question to the user in their own terms and was answered "build it"; three
+files is a larger surface, not a different decision, and the alternative is the same — ten
+Python rejection tests dying at S6 with no successor. What batch B's finding forbids is
+letting *"recorded in three places"* stand in for *asking*; it does not require re-asking a
+question answered the same day about the same shape. Stated here and in the commit as an
+application of that answer, so it can be reversed on sight.
+
+⚠ Every rejection test also pins the **LEGAL** boundary. `water_cycle`'s is the sharp one:
+the guard is `require_non_negative`, not `require_positive`, and the asymmetry is a design
+decision — **a zero rate is how a chamber with no condenser is declared**, which is every
+open-field scenario in the tree, since the ring exists only in the sealed branch. A guard
+tuned one notch tighter would forbid the frozen roster.
+
+### The after-battery: 16 + 3 + 4, every one now caught by a test about itself
+
+All sixteen mutations re-run against the finished batch, plus the three guard deletions and
+four station-side mutations (a new unrostered scenario, a rostered scenario losing its
+geometry, the harvest injection dropping its water re-derivation, and the harvest depth
+ceasing to track the crop cap). **Every one reddens a test whose subject IS the mutated
+mechanism.** Six of the 23 redden exactly one test in the whole binary.
+
+⚠ **The instrument was checked before the readings were believed.** All 19 domain logs were
+confirmed to carry a `test result:` line collecting **257**, and all four station logs
+collecting **60** — a mutation that fails to COMPILE produces zero "FAILED" lines, which
+reads identically to "nothing noticed", and this batch's before-half rests on eight such
+zeroes. The tree was restored from pristine copies and verified byte-exact by sha-256 after
+every battery, never with `git checkout --` (batch A's near-miss).
+
+### Two pins that are the port's own hazards, with no Python ancestor
+
+* **The anthesis boundary of the flowering stop.** `is_vegetative` tests `DVS < 1.0`, so at
+  `thermal_time == tsum_anthesis` exactly the stop must already have fired. The Python test
+  checks `+1.0` only. Same boundary batch B pinned for the anthesis gate.
+* **The per-STEP extension ceiling.** The engine runs at `dt = ¼`, so the largest legal
+  depth increment is a *quarter* of the daily rate. A test comparing against the daily rate
+  would pass on a build that had dropped `dt` from the accumulator entirely — the
+  days-vs-steps unit trap this repo has already been bitten by once.
+
+### The one Python literal that was NOT copied, and why
+
+`test_penman_monteith_pinned_value` asserts `6.158958394549651` and its own comment calls it
+a *"pinned regression literal"* — a value read out of the tree, which S5's exit gate
+(clause 2) rejects outright. The successor **hand-composes the combination equation in the
+comment and asserts every intermediate separately** (`e_s = 2338.2813 Pa`,
+`Δ = 144.7462 Pa/°C`, aero `= 24413.3 W/m²`, denominator `= 305.5462`, `λE = 174.6464 W/m²`,
+`= 6.1590 mm/day`), which reproduces the same number while making it re-checkable without
+running anything. The FAO-56 `e_s` table (0.6108 / 1.2280 / 2.3383 / 4.2431 kPa) ports as-is
+— it is genuinely external — and the file's own honest scope note survives with it: the
+slope literals are only *formula-consistent*, so the independent slope check is the finite
+difference, not the table.
+
+⚠ One bound was **re-pinned from the measurement rather than from the guess**: the
+canopy-resistance term's contribution was written as `> 1.5×` and measured at **1.4432×**.
+It is now two-sided on the measurement, so a change that *shrinks* the term is caught as
+well as one that drops it.
+
+### What batch C leaves standing
+
+* **`intercepted_fraction` still unresolved** (S6 item; clause 4 of the exit gate).
+* **The by-name claim census (clause 3) still unwritten** — now with batch C's additional
+  no-ancestor pins (the anthesis boundary, the per-step ceiling, the PM unreachability
+  assertion) to declare alongside batch B's two.
+* **`daily_thermal_time`'s 30 °C cap** — batch B's unreachable branch, still owned by
+  nothing.
+* **The Penman–Monteith negative-energy clamp is unreachable, and the model has no longwave
+  term.** New, and it is a science question rather than a testing one: either the clamp is
+  dead weight or `net_radiation` is missing a term. Not decided here.
+* **`flows.rs`'s test-local `ROOTED_DEPTH`** still shadows `stocks::ROOTED_DEPTH` with a
+  different string (batch B's finding). Batch C's own fixtures use the engine's name
+  explicitly and say so, but the shadow is untouched.
+* **No Python deleted.** All four files stay green and running until S6.

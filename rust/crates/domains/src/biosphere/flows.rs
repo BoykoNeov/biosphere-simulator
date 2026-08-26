@@ -2355,4 +2355,403 @@ mod tests {
             18.0
         );
     }
+
+    // -----------------------------------------------------------------------------
+    // S5 batch C, the water flows: `Transpiration`, `Irrigation`, and the two closed-loop
+    // cycle flows. FLOW-level, so they live here rather than in `science.rs` — the claims
+    // are about legs and limbs, not about the equations the legs are computed from.
+    //
+    // ⚠ These fixtures build their OWN state and use the canonical aux key
+    // `stocks::ROOTED_DEPTH` (`"rooted_depth"`) rather than this module's `ROOTED_DEPTH`
+    // const, which is the different string `"biosphere.rooted_depth"`. The two are
+    // interchangeable only while a test writes the aux key AND the flow's
+    // `rooted_depth_aux` field from the same constant; batch B recorded the shadow, and
+    // the safe habit is to use the engine's own name where the engine's own name is what
+    // a season would write.
+    // -----------------------------------------------------------------------------
+
+    const VAPOR_SINK: &str = "boundary.vapor";
+    const IRRIGATION_SUPPLY: &str = "boundary.irrigation_supply";
+    const WATER_VAPOR: &str = "biosphere.water_vapor";
+    const CONDENSATE: &str = "biosphere.condensate";
+
+    /// A WATER-only state: the root zone at `soil_water`, a boundary sink and supply, and
+    /// the two cycle pools. The round geometry mirrors the Python fixture — a 1.0 m zone
+    /// at EXTR 0.13 over 1 m² holds 130 kg, so `wssg = 0.30` sits at exactly 39 kg.
+    fn water_only_state(soil_water: f64, depth: f64, vapor: f64, condensate: f64) -> State {
+        let unit = Quantity::Water.canonical_unit();
+        let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
+        let mut put = |id: &str, domain: &str, amount: f64, kind: StockKind, unclamped: bool| {
+            stocks.insert(
+                id.to_string(),
+                Stock::new(
+                    id.to_string(),
+                    domain.to_string(),
+                    Quantity::Water,
+                    unit.clone(),
+                    amount,
+                    kind,
+                    0.0,
+                    unclamped,
+                    BTreeMap::new(),
+                )
+                .expect("water stock"),
+            );
+        };
+        put(SOIL_WATER, "biosphere", soil_water, StockKind::Pool, false);
+        put(WATER_VAPOR, "biosphere", vapor, StockKind::Pool, false);
+        put(CONDENSATE, "biosphere", condensate, StockKind::Pool, false);
+        put(VAPOR_SINK, "boundary", 0.0, StockKind::Boundary, false);
+        put(
+            IRRIGATION_SUPPLY,
+            "boundary",
+            1.0e9,
+            StockKind::Boundary,
+            true,
+        );
+        State::new(
+            0,
+            stocks,
+            0,
+            BTreeMap::from([(super::super::stocks::ROOTED_DEPTH.to_string(), depth)]),
+        )
+        .expect("water fixture state")
+    }
+
+    /// The transpiration forcings: `Rn = 200 W/m²`, `VPD = 1000 Pa`, `T = 20 °C` — the
+    /// operating point `science.rs`'s hand-composed Penman–Monteith test derives.
+    fn water_resolver(rn: f64, irrigation: f64) -> SourceResolver {
+        let forcings: HashMap<String, Schedule> = HashMap::from([
+            ("rn".to_string(), constant(rn).expect("rn")),
+            ("vpd".to_string(), constant(1000.0).expect("vpd")),
+            ("temp".to_string(), constant(20.0).expect("temp")),
+            (
+                "irrigation".to_string(),
+                constant(irrigation).expect("irrigation"),
+            ),
+        ]);
+        SourceResolver::new(forcings, HashMap::new()).expect("water resolver")
+    }
+
+    fn transpiration_flow(ground_area: f64) -> Transpiration {
+        let p = params::transpiration();
+        Transpiration {
+            id: "biosphere.transpiration".to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            vapor_sink: VAPOR_SINK.to_string(),
+            rn_var: "rn".to_string(),
+            vpd_var: "vpd".to_string(),
+            temp_var: "temp".to_string(),
+            aerodynamic_resistance: p.aerodynamic_resistance,
+            surface_resistance: p.surface_resistance,
+            ground_area,
+            rooted_depth_aux: super::super::stocks::ROOTED_DEPTH.to_string(),
+            soil_extractable_water: EXTR,
+            wssg: WSSG,
+        }
+    }
+
+    fn irrigation_flow(ground_area: f64) -> Irrigation {
+        Irrigation {
+            id: "biosphere.irrigation".to_string(),
+            water_source: IRRIGATION_SUPPLY.to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            irrigation_var: "irrigation".to_string(),
+            ground_area,
+            rooted_depth_aux: super::super::stocks::ROOTED_DEPTH.to_string(),
+            soil_extractable_water: EXTR,
+        }
+    }
+
+    fn water_legs(
+        flow: &dyn Flow,
+        s: &State,
+        rn: f64,
+        irrigation: f64,
+        dt: f64,
+    ) -> BTreeMap<String, f64> {
+        let r = water_resolver(rn, irrigation);
+        let env = r.bind(s, dt);
+        flow.evaluate(s, &env, dt)
+            .expect("evaluate")
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect()
+    }
+
+    /// The transpiration leg IS `PM · WSFG · area`, composed from the three factors
+    /// separately rather than compared with a number this tree produced.
+    ///
+    /// ⚠ THE BEFORE-BATTERY'S SHARPEST WATER READING. Deleting `f_water` from this
+    /// product entirely — a plant that transpires as if it were never water-limited —
+    /// reddened exactly ONE test in the 221-test lib binary, and that test is about
+    /// drought-ACCELERATED phenology. A whole feedback removed, noticed by one stranger.
+    /// Mirrors `test_transpiration_leg_is_pm_times_fwater_times_area`.
+    #[test]
+    fn the_transpiration_leg_is_potential_times_water_stress_times_area() {
+        // 25 kg in a 130 kg zone is FTSW 0.1923, so WSFG = 0.1923/0.30 = 0.6410...
+        let s = water_only_state(25.0, TEST_DEPTH, 0.0, 0.0);
+        let legs = water_legs(&transpiration_flow(1.0), &s, 200.0, 0.0, 1.0);
+        let p = params::transpiration();
+        let potential = science::penman_monteith_transpiration(
+            200.0,
+            1000.0,
+            20.0,
+            p.aerodynamic_resistance,
+            p.surface_resistance,
+        );
+        let f_water = (25.0 / 130.0) / WSSG;
+        assert!(
+            (f_water - 0.641_025_641_025_641).abs() < 1e-12,
+            "the fixture is not the FTSW the comment claims: {f_water}"
+        );
+        let want = potential * f_water * 1.0;
+        assert!(
+            (legs[SOIL_WATER] + want).abs() <= 1e-12 * want,
+            "soil leg {} vs -{want}",
+            legs[SOIL_WATER]
+        );
+        assert!(
+            (legs[VAPOR_SINK] - want).abs() <= 1e-12 * want,
+            "vapor leg {} vs {want}",
+            legs[VAPOR_SINK]
+        );
+        // ...and the stress factor really is doing work here: an unstressed zone of the
+        // same depth transpires strictly more, by exactly 1/f_water.
+        let full = water_only_state(130.0, TEST_DEPTH, 0.0, 0.0);
+        let unstressed = water_legs(&transpiration_flow(1.0), &full, 200.0, 0.0, 1.0)[VAPOR_SINK];
+        assert!(
+            (unstressed * f_water - want).abs() <= 1e-12 * want,
+            "the stressed leg is not the unstressed one scaled by WSFG"
+        );
+    }
+
+    /// An empty root zone transpires exactly zero, so the flow can never drive the pool
+    /// negative from 0.
+    ///
+    /// ⚠ The shutoff MOVED when the stress form was re-based on geometry (2026-08-12):
+    /// `WSFG` reaches 0 only at `FTSW = 0`, where the absolute-kg ramp it replaced shut
+    /// off at a nonzero wilting mass. Exactly zero at exactly empty is what replaces the
+    /// old structural-positivity guarantee.
+    /// Mirrors `test_transpiration_shuts_off_at_an_empty_root_zone`.
+    #[test]
+    fn transpiration_shuts_off_exactly_at_an_empty_root_zone() {
+        let s = water_only_state(0.0, TEST_DEPTH, 0.0, 0.0);
+        let legs = water_legs(&transpiration_flow(1.0), &s, 200.0, 0.0, 1.0);
+        assert_eq!(legs[SOIL_WATER], 0.0);
+        assert_eq!(legs[VAPOR_SINK], 0.0);
+        // A hair of water is a hair of transpiration — asymptotic, not a hard floor.
+        let hair = water_only_state(1e-9, TEST_DEPTH, 0.0, 0.0);
+        assert!(water_legs(&transpiration_flow(1.0), &hair, 200.0, 0.0, 1.0)[VAPOR_SINK] > 0.0);
+    }
+
+    /// The extensive transform, BOTH halves — and the half that is a surprise.
+    ///
+    /// `ground_area` appears twice since the re-basing: once in the demand and once in
+    /// `TTSW`. So tripling the PLOT triples the flux only if the WATER triples with it;
+    /// a three-times-larger plot on the SAME water is three times drier, and the two
+    /// factors cancel exactly. The second half is the physically right consequence of
+    /// sizing the soil honestly, and a test that pinned only the first would pass on a
+    /// build that had dropped the denominator's area.
+    /// Mirrors `test_transpiration_scales_with_ground_area_under_the_extensive_transform`
+    /// and `test_a_bigger_plot_on_the_same_water_is_drier`.
+    #[test]
+    fn transpiration_scales_with_the_plot_only_when_the_water_scales_with_it() {
+        let one = water_legs(
+            &transpiration_flow(1.0),
+            &water_only_state(25.0, TEST_DEPTH, 0.0, 0.0),
+            200.0,
+            0.0,
+            1.0,
+        )[VAPOR_SINK];
+        // (a) The similarity transform: three times the plot AND three times the water.
+        let triple = water_legs(
+            &transpiration_flow(3.0),
+            &water_only_state(75.0, TEST_DEPTH, 0.0, 0.0),
+            200.0,
+            0.0,
+            1.0,
+        )[VAPOR_SINK];
+        assert!(
+            (triple - 3.0 * one).abs() <= 1e-12 * one,
+            "{triple} != 3 x {one}"
+        );
+        // (b) Three times the plot on the SAME water: exactly unchanged.
+        let same_water = water_legs(
+            &transpiration_flow(3.0),
+            &water_only_state(25.0, TEST_DEPTH, 0.0, 0.0),
+            200.0,
+            0.0,
+            1.0,
+        )[VAPOR_SINK];
+        assert!(
+            (same_water - one).abs() <= 1e-12 * one,
+            "a bigger plot on the same water must transpire the same: {same_water} vs {one}"
+        );
+    }
+
+    /// Both water flows are dt-linear and balanced leg-for-leg.
+    ///
+    /// dt-linearity is what makes the step size a numerical choice rather than a
+    /// scientific one; the balance is what keeps a sealed chamber's water conserved.
+    /// Mirrors `test_transpiration_scales_linearly_with_dt`,
+    /// `test_transpiration_is_water_balanced` and `test_irrigation_is_water_balanced`.
+    #[test]
+    fn the_water_flows_are_dt_linear_and_balanced() {
+        let s = water_only_state(25.0, TEST_DEPTH, 0.0, 0.0);
+        let transp = transpiration_flow(1.0);
+        let irrig = irrigation_flow(1.0);
+        for (name, flow) in [
+            ("transpiration", &transp as &dyn Flow),
+            ("irrigation", &irrig as &dyn Flow),
+        ] {
+            let full = water_legs(flow, &s, 200.0, 5.0, 1.0);
+            let half = water_legs(flow, &s, 200.0, 5.0, 0.5);
+            for (stock, amount) in &full {
+                assert!(
+                    (half[stock] - 0.5 * amount).abs() <= 1e-12 * amount.abs().max(1.0),
+                    "{name}: {stock} is not dt-linear ({} vs {amount})",
+                    half[stock]
+                );
+                assert_ne!(*amount, 0.0, "{name}: {stock} moved nothing, so this is vacuous");
+            }
+            let r = water_resolver(200.0, 5.0);
+            let env = r.bind(&s, 1.0);
+            assert_flow_balanced_default(&flow.evaluate(&s, &env, 1.0).expect("evaluate"), &s.stocks)
+                .unwrap_or_else(|e| panic!("{name} is unbalanced: {e:?}"));
+        }
+    }
+
+    /// `IRGW = min(capacity · A · dt, max(0, TTSW − ATSW))` — BOTH limbs, at the
+    /// crossover, so neither can be dropped without a red test.
+    ///
+    /// ⚠ Both limbs are LIVE on the frozen roster (a `panic!` probe in either stops seven
+    /// tests), and neither was asserted: replacing the whole `min` with the bare capacity
+    /// reddened one test, about the root-zone capture. The forcing changed MEANING on
+    /// 2026-08-12 — mm/day applied became mm/day AVAILABLE — so what the capacity limb
+    /// means is "the irrigation system's throughput", not "the amount applied".
+    /// Mirrors `test_irrigation_takes_the_smaller_of_capacity_and_deficit` and
+    /// `test_irrigation_leg_is_rate_times_area`.
+    #[test]
+    fn irrigation_takes_the_smaller_of_the_system_capacity_and_the_deficit() {
+        let full = science::transpirable_capacity(TEST_DEPTH, EXTR, 1.0); // 130 kg
+        // (a) deficit 4 kg against a 5 kg/day capacity ⇒ the DEFICIT binds.
+        let s = water_only_state(full - 4.0, TEST_DEPTH, 0.0, 0.0);
+        let legs = water_legs(&irrigation_flow(1.0), &s, 200.0, 5.0, 1.0);
+        assert!((legs[SOIL_WATER] - 4.0).abs() <= 1e-12 * 4.0, "{:?}", legs);
+        // (b) deficit 9 kg against the same capacity ⇒ the CAPACITY binds.
+        let s = water_only_state(full - 9.0, TEST_DEPTH, 0.0, 0.0);
+        let legs = water_legs(&irrigation_flow(1.0), &s, 200.0, 5.0, 1.0);
+        assert!((legs[SOIL_WATER] - 5.0).abs() <= 1e-12 * 5.0, "{:?}", legs);
+        // (c) The capacity limb carries the AREA: 5 mm/day over 2 m² is 10 kg/day, and
+        // the 2 m² zone holds 260 kg so the deficit is nowhere near binding.
+        let wide = water_only_state(15.0, TEST_DEPTH, 0.0, 0.0);
+        let legs = water_legs(&irrigation_flow(2.0), &wide, 200.0, 5.0, 1.0);
+        assert!((legs[SOIL_WATER] - 10.0).abs() <= 1e-12 * 10.0, "{:?}", legs);
+        assert!(
+            (legs[IRRIGATION_SUPPLY] + 10.0).abs() <= 1e-12 * 10.0,
+            "the supply leg must mirror the soil leg"
+        );
+    }
+
+    /// A full zone takes nothing, an over-full zone does not run the supply BACKWARDS,
+    /// and a zero capacity is a hard off whatever the deficit.
+    ///
+    /// The first is [F] Eqn 14.8's own limb and the reason `Drainage` is inert on the
+    /// frozen roster — the supply tracks the deficit instead of pushing a flat rate into
+    /// a bucket with a bottom, so "water non-limiting" became a checkable claim rather
+    /// than a label. The last is how an irrigation-cut window works, and it had to survive
+    /// the rate → capacity re-interpretation unchanged.
+    /// Mirrors `test_irrigation_stops_at_the_drained_upper_limit` and
+    /// `test_a_zero_capacity_is_still_a_hard_off`.
+    #[test]
+    fn irrigation_stops_at_the_drained_upper_limit_and_a_zero_capacity_is_a_hard_off() {
+        let full = science::transpirable_capacity(TEST_DEPTH, EXTR, 2.0);
+        let at_dul = water_only_state(full, TEST_DEPTH, 0.0, 0.0);
+        let legs = water_legs(&irrigation_flow(2.0), &at_dul, 200.0, 5.0, 1.0);
+        assert_eq!(legs[SOIL_WATER], 0.0);
+        assert_eq!(legs[IRRIGATION_SUPPLY], 0.0);
+        // An OVER-full zone: still zero, and emphatically not a negative (which would
+        // pump water out of the soil and into the boundary supply).
+        let over = water_only_state(full * 2.0, TEST_DEPTH, 0.0, 0.0);
+        let legs = water_legs(&irrigation_flow(2.0), &over, 200.0, 5.0, 1.0);
+        assert_eq!(legs[SOIL_WATER], 0.0);
+        assert_eq!(legs[IRRIGATION_SUPPLY], 0.0);
+        // A zero capacity against a DEEP deficit: only the zero can stop it.
+        let parched = water_only_state(1.0, TEST_DEPTH, 0.0, 0.0);
+        let legs = water_legs(&irrigation_flow(1.0), &parched, 200.0, 0.0, 1.0);
+        assert_eq!(legs[SOIL_WATER], 0.0);
+    }
+
+    /// `Condensation` and `Recycling` are first-order in their OWN donor pool — the
+    /// engineered-condenser framing, and the structural positivity that keeps the
+    /// arbitration backstop out of the closed water ring.
+    ///
+    /// ⚠ Pinned against a hand rate rather than the committed one, so the LAW is the
+    /// subject and not the parameter. The before-battery is the reason both halves are
+    /// here: doubling the condensation rate reddened NOTHING in the lib binary, and
+    /// making `Recycling` read `soil_water` instead of `condensate` — a change of donor
+    /// that stays perfectly balanced — reddened nine tests, every one of them a
+    /// compensation-point or chamber gate. A balanced mutation is invisible to
+    /// conservation by construction; only the rate law itself can catch it.
+    /// Mirrors `test_condensation_flux_is_first_order_in_vapor`,
+    /// `test_recycling_flux_is_first_order_in_condensate`,
+    /// `test_fluxes_are_zero_at_empty_pools` and `test_cycle_flows_are_dt_linear`.
+    #[test]
+    fn the_two_cycle_flows_are_first_order_in_their_own_donor_pool() {
+        let cond = Condensation {
+            id: "biosphere.condensation".to_string(),
+            water_vapor: WATER_VAPOR.to_string(),
+            condensate: CONDENSATE.to_string(),
+            condensation_rate: 0.5,
+        };
+        let rec = Recycling {
+            id: "biosphere.recycling".to_string(),
+            condensate: CONDENSATE.to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            recycling_rate: 0.5,
+        };
+        // k = 0.5 per day: half the standing pool per day, linear in the pool.
+        for (vapor, condensate) in [(2.0, 2.0), (4.0, 4.0)] {
+            let s = water_only_state(100.0, TEST_DEPTH, vapor, condensate);
+            let c = water_legs(&cond, &s, 200.0, 0.0, 1.0);
+            assert!(
+                (c[CONDENSATE] - 0.5 * vapor).abs() <= 1e-12 * vapor,
+                "condensation {} != 0.5 x {vapor}",
+                c[CONDENSATE]
+            );
+            assert_eq!(c[WATER_VAPOR], -c[CONDENSATE], "condensation is unbalanced");
+            let r = water_legs(&rec, &s, 200.0, 0.0, 1.0);
+            assert!(
+                (r[SOIL_WATER] - 0.5 * condensate).abs() <= 1e-12 * condensate,
+                "recycling {} != 0.5 x {condensate}",
+                r[SOIL_WATER]
+            );
+            assert_eq!(r[CONDENSATE], -r[SOIL_WATER], "recycling is unbalanced");
+        }
+        // ⚠ EACH READS ITS OWN DONOR. With a full 100 kg root zone and an empty
+        // condensate pool, `Recycling` must move NOTHING — the mutation that reads
+        // `soil_water` instead would move 50 kg here and still balance perfectly.
+        let s = water_only_state(100.0, TEST_DEPTH, 6.0, 0.0);
+        assert_eq!(water_legs(&rec, &s, 200.0, 0.0, 1.0)[SOIL_WATER], 0.0);
+        // ...and symmetrically for condensation against an empty vapour pool.
+        let s = water_only_state(100.0, TEST_DEPTH, 0.0, 6.0);
+        assert_eq!(water_legs(&cond, &s, 200.0, 0.0, 1.0)[CONDENSATE], 0.0);
+        // Self-limiting: no standing pool, no flux, so positivity is structural.
+        let empty = water_only_state(0.0, TEST_DEPTH, 0.0, 0.0);
+        assert_eq!(water_legs(&cond, &empty, 200.0, 0.0, 1.0)[CONDENSATE], 0.0);
+        assert_eq!(water_legs(&rec, &empty, 200.0, 0.0, 1.0)[SOIL_WATER], 0.0);
+        // dt-linear, like every other rate law in the tree.
+        let s = water_only_state(100.0, TEST_DEPTH, 4.0, 4.0);
+        assert_eq!(
+            water_legs(&cond, &s, 200.0, 0.0, 0.5)[CONDENSATE],
+            0.5 * water_legs(&cond, &s, 200.0, 0.0, 1.0)[CONDENSATE]
+        );
+        assert_eq!(
+            water_legs(&rec, &s, 200.0, 0.0, 0.5)[SOIL_WATER],
+            0.5 * water_legs(&rec, &s, 200.0, 0.0, 1.0)[SOIL_WATER]
+        );
+    }
+
 }

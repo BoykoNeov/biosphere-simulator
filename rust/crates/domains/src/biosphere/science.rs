@@ -1436,4 +1436,391 @@ mod tests {
             "drought must accelerate monotonically: {factors:?}"
         );
     }
+
+    // --- S5 batch C: the water equations ------------------------------------------
+    //
+    // ⚠ THE BEFORE-BATTERY THIS BLOCK ANSWERS. Sixteen mutations of the water science
+    // were run against `cargo test -p domains --lib` (221 passed) BEFORE any of these
+    // tests existed. Exactly ONE reddened a test whose subject was the mutated mechanism
+    // (`a_dry_subsoil_stops_extension`, below). Eight reddened NOTHING AT ALL: the
+    // analytic SVP slope, the Penman–Monteith canopy-resistance term, its negative-energy
+    // clamp, the zero-capacity limb of `FTSW`, both guards on `root_zone_fraction`, the
+    // re-sow return's zero-depth limb, and a doubled condensation rate. The rest reddened
+    // strangers — dropping the water-stress factor from transpiration outright moved one
+    // test, and that one is about drought-accelerated phenology.
+    // Record: `docs/plans/post-roadmap-reference-flip.md` §5ag.
+
+    /// `e_s(T)` against FAO-56's own table, and `Δ` alongside it.
+    ///
+    /// ⚠ SCOPE, STATED HONESTLY (the Python file states it too and it survives the port):
+    /// the `e_s` magnitudes are an external cross-check — FAO-56 tabulates
+    /// `e_s(20 °C) = 2.339 kPa` and this tree computes it from Tetens' constants. The
+    /// SLOPE literals are only formula-consistent (FAO-56's 4098-form and this module's
+    /// analytic `B·C` derivative agree to these digits), so they are not independent
+    /// evidence; the independent slope check is the finite difference below.
+    /// Mirrors `tests/test_transpiration.py::test_svp_and_slope_match_fao56_table`.
+    #[test]
+    fn saturation_vapour_pressure_and_its_slope_match_the_fao56_table() {
+        for (temp_c, es_kpa, slope_kpa) in [
+            (0.0, 0.6108, 0.04445),
+            (10.0, 1.2280, 0.08228),
+            (20.0, 2.3383, 0.14474),
+            (30.0, 4.2431, 0.24336),
+        ] {
+            let es = saturation_vapor_pressure(temp_c) / 1000.0;
+            let slope = slope_svp(temp_c) / 1000.0;
+            assert!(
+                (es - es_kpa).abs() <= 2e-3 * es_kpa,
+                "e_s({temp_c}) = {es} kPa, FAO-56 says {es_kpa}"
+            );
+            assert!(
+                (slope - slope_kpa).abs() <= 2e-3 * slope_kpa,
+                "slope({temp_c}) = {slope} kPa/C, want {slope_kpa}"
+            );
+        }
+    }
+
+    /// `Δ` IS the derivative of `e_s`, checked against a central difference rather than
+    /// against a second transcription of the same closed form.
+    ///
+    /// This is the one genuinely independent check on the slope: it would redden for a
+    /// dropped or transposed factor even if the table literals above were themselves
+    /// copied out of this tree. Measured: the before-battery's `slope_svp` mutation
+    /// (dropping the `SVP_C` factor) reddened NOTHING in the whole lib binary.
+    /// Mirrors `test_slope_is_the_analytic_derivative_of_svp`.
+    #[test]
+    fn the_svp_slope_is_the_analytic_derivative_of_the_curve() {
+        let (t, h) = (18.0, 1e-4);
+        let numeric =
+            (saturation_vapor_pressure(t + h) - saturation_vapor_pressure(t - h)) / (2.0 * h);
+        let analytic = slope_svp(t);
+        assert!(
+            (analytic - numeric).abs() <= 1e-6 * numeric.abs(),
+            "analytic {analytic} vs finite difference {numeric}"
+        );
+    }
+
+    /// The combination equation at one operating point, **hand-composed in the comment**.
+    ///
+    /// ⚠ The Python test calls its `6.158958394549651` a "pinned regression literal" — a
+    /// value read out of the tree, which S5's exit gate (clause 2) rejects. The same
+    /// number is legitimate as a HAND computation, so the derivation is written out here
+    /// and each intermediate is asserted, which is what makes it re-checkable without
+    /// running anything:
+    ///
+    /// ```text
+    ///   T = 20 °C, Rn = 200 W/m2, VPD = 1000 Pa, r_a = 50 s/m, r_s = 70 s/m, G = 0
+    ///   e_s(20)  = 610.8 · exp(17.27·20/257.3)        = 2338.2813 Pa
+    ///   Δ        = 17.27 · 237.3 · e_s / (257.3)^2    =  144.7462 Pa/°C
+    ///   aero     = ρ·c_p·VPD/r_a = 1.205·1013·1000/50 = 24413.3 W/m2
+    ///   denom    = Δ + γ(1 + r_s/r_a) = 144.7462 + 67·2.4 = 305.5462
+    ///   λE       = (Δ·Rn + aero)/denom = (28949.25 + 24413.3)/305.5462 = 174.6464 W/m2
+    ///   T_pot    = λE/λ · 86400 = 174.6464/2.45e6 · 86400 = 6.1590 mm/day
+    /// ```
+    ///
+    /// Mirrors `test_penman_monteith_pinned_value`.
+    #[test]
+    fn penman_monteith_is_the_hand_composed_combination_equation() {
+        let (ra, rs) = (50.0, 70.0);
+        // Each intermediate on its own, so a wrong answer names its own factor.
+        let es = saturation_vapor_pressure(20.0);
+        assert!((es - 2338.2813).abs() < 1e-3, "e_s(20) = {es}");
+        let delta = slope_svp(20.0);
+        assert!((delta - 144.7462).abs() < 1e-3, "delta = {delta}");
+        let aero: f64 = 1.205 * 1013.0 * 1000.0 / ra;
+        assert!((aero - 24413.3).abs() < 1e-9, "aero = {aero}");
+        let denom = delta + 67.0 * (1.0 + rs / ra);
+        assert!((denom - 305.5462).abs() < 1e-3, "denom = {denom}");
+        let latent = (delta * 200.0 + aero) / denom;
+        assert!((latent - 174.6464).abs() < 1e-3, "latent = {latent}");
+        let want = latent / 2.45e6 * 86400.0;
+
+        let got = penman_monteith_transpiration(200.0, 1000.0, 20.0, ra, rs);
+        assert!(
+            (got - want).abs() <= 1e-12 * want,
+            "PM gave {got}, the hand composition gives {want}"
+        );
+        // ...and the composition really is ~6.16 mm/day, a realistic summer potential.
+        assert!((got - 6.1590).abs() < 1e-3, "{got} mm/day");
+        // THE CANOPY RESISTANCE IS LOAD-BEARING. Dropping `(1 + r_s/r_a)` from the
+        // denominator reddened nothing in the lib binary before this line; it is a
+        // different mechanism (an open water surface), not a rounding difference. The
+        // bound is two-sided on the measured 1.4432 rather than a one-sided "is bigger",
+        // so a later change that shrinks the term is caught as well as one that drops it.
+        let no_canopy = (delta * 200.0 + aero) / (delta + 67.0) / 2.45e6 * 86400.0;
+        let ratio = no_canopy / got;
+        assert!(
+            (1.44..1.45).contains(&ratio),
+            "the r_s term must matter: {no_canopy} vs {got} (ratio {ratio})"
+        );
+    }
+
+    /// No available energy and no vapour deficit ⇒ no evaporative demand, exactly.
+    /// Mirrors `test_penman_monteith_zero_energy_zero_vpd_is_zero`.
+    #[test]
+    fn penman_monteith_is_zero_with_no_energy_and_no_vapour_deficit() {
+        assert_eq!(penman_monteith_transpiration(0.0, 0.0, 20.0, 50.0, 70.0), 0.0);
+    }
+
+    /// The negative-energy clamp — **and the finding that nothing in this tree can reach
+    /// it**.
+    ///
+    /// The Python test justifies the clamp by saying daily-average net radiation "goes
+    /// negative on short midwinter days (the winter-wheat season overwinters)". Measured
+    /// on the Rust side and that is FALSE HERE, for a structural reason rather than a
+    /// mild-winter one: `weather::net_radiation` is net SHORTWAVE only,
+    /// `(1 − α)·IRRAD/86400`, with no longwave-loss term, so it is non-negative for every
+    /// non-negative irradiance — and `vapor_pressure_deficit` is itself `max(0, …)`. Both
+    /// drivers of `λE` are therefore non-negative at every call site in the tree.
+    ///
+    /// ⚠ Measured, not reasoned: replacing the clamp with a `panic!` on a negative
+    /// `mm/day` left `cargo test --workspace --no-fail-fast` fully green, goldens
+    /// included. The clamp is not merely untested, it is UNREACHABLE from every scenario.
+    /// It is pinned here at the function's own contract (it is `pub`, and a longwave term
+    /// is the obvious next weather science), and the unreachability is asserted rather
+    /// than left as a comment that could rot.
+    /// Mirrors `test_penman_monteith_clamps_negative_radiation_to_zero`.
+    #[test]
+    fn penman_monteith_clamps_negative_available_energy_and_no_weather_row_can_reach_it() {
+        // (a) The clamp itself, on the function's own contract. Unclamped this operating
+        // point gives −0.4705 mm/day — a sink flipped into a deposit.
+        let (ra, rs) = (50.0, 70.0);
+        assert_eq!(penman_monteith_transpiration(-80.0, 50.0, 2.0, ra, rs), 0.0);
+        let delta = slope_svp(2.0);
+        let unclamped = (delta * -80.0 + 1.205 * 1013.0 * 50.0 / ra)
+            / (delta + 67.0 * (1.0 + rs / ra))
+            / 2.45e6
+            * 86400.0;
+        assert!(
+            unclamped < 0.0,
+            "the fixture must actually be a clamped case: {unclamped}"
+        );
+        assert!((unclamped + 0.4705).abs() < 1e-3, "{unclamped} mm/day");
+
+        // (b) THE UNREACHABILITY, asserted over the committed weather rather than argued.
+        let (_latitude, rows) =
+            super::super::weather::read_weather_facts(super::super::weather::WEATHER_FIXTURE)
+                .expect("the committed weather fixture");
+        assert!(rows.len() > 300, "the fixture must be a whole season");
+        for row in &rows {
+            let rn = super::super::weather::net_radiation(row.irrad_j_m2_day);
+            assert!(rn >= 0.0, "net radiation went negative: {rn}");
+            let vpd = super::super::weather::vapor_pressure_deficit(row.temp_c, row.vap_hpa);
+            assert!(vpd >= 0.0, "VPD went negative: {vpd}");
+            assert!(
+                penman_monteith_transpiration(rn, vpd, row.temp_c, ra, rs) > 0.0,
+                "day {} demanded nothing at all",
+                row.day_of_year
+            );
+        }
+    }
+
+    /// `TTSW = DEPORT · EXTR · ρ · A` ([F] Eqn 14.6), and the identity with
+    /// `captured_water` that makes a season a closed cycle.
+    ///
+    /// The two names price different things — a newly explored SLAB versus the whole
+    /// COLUMN — and the re-sow return uses one where the stress denominator uses the
+    /// other. They must be the same arithmetic or water appears and disappears at a
+    /// re-sow. ⚠ The before-battery's `ground_area` mutation reddened three tests, only
+    /// one of which is about the area factor.
+    /// Mirrors `test_transpirable_capacity_is_the_column_arithmetic` and
+    /// `test_transpirable_capacity_agrees_with_captured_water`.
+    #[test]
+    fn transpirable_capacity_is_the_column_arithmetic_and_agrees_with_captured_water() {
+        // 1 m at EXTR 0.13 over 1 m2 = 130 kg; a fraction of the depth over twice the
+        // plot is 39 kg, which is linear in BOTH factors at once.
+        assert_eq!(transpirable_capacity(1.0, 0.13, 1.0), 130.0);
+        let thirty_nine = transpirable_capacity(0.15, 0.13, 2.0);
+        assert!((thirty_nine - 39.0).abs() < 1e-12, "{thirty_nine}");
+        assert_eq!(transpirable_capacity(0.0, 0.13, 1.0), 0.0);
+        // The anti-drift identity, to the BIT (not `approx`): the same product.
+        for depth in [0.15, 0.4, 1.3] {
+            for area in [1.0, 2.5] {
+                assert_eq!(
+                    transpirable_capacity(depth, 0.13, area),
+                    captured_water(depth, 0.13, area),
+                    "the two names for one product drifted at depth {depth}, area {area}"
+                );
+            }
+        }
+    }
+
+    /// `FTSW = ATSW / TTSW` ([F] Eqn 14.7) — the cardinals, and the two things it
+    /// deliberately does NOT do.
+    ///
+    /// It is not clamped above 1 (an over-filled zone is a real state, the one `Drainage`
+    /// relieves), and a zero capacity returns 0.0 — maximally stressed — rather than
+    /// raising or returning 1. ⚠ The zero-capacity limb is UNREACHABLE from every
+    /// scenario and every golden (measured with a `panic!` probe under
+    /// `cargo test --workspace`): `rooted_depth0` is a cited positive everywhere, so no
+    /// run ever asks. Flipping its return to 1.0 — "a crop with no root zone is
+    /// unstressed" — reddened nothing at all before this test.
+    /// Mirrors `test_fraction_transpirable_is_atsw_over_ttsw` and
+    /// `test_fraction_transpirable_returns_zero_for_zero_capacity`.
+    #[test]
+    fn fraction_transpirable_is_atsw_over_ttsw_and_is_not_clamped_above_one() {
+        for (soil_water, expected) in [
+            (0.0, 0.0),   // empty root zone
+            (39.0, 0.30), // exactly at the WSSG threshold
+            (65.0, 0.50), // half the capacity
+            (130.0, 1.0), // the drained upper limit
+            (260.0, 2.0), // ⚠ NOT clamped: over-filled is a real, reportable state
+        ] {
+            let got = fraction_transpirable(soil_water, 130.0);
+            assert!(
+                (got - expected).abs() <= 1e-12 * expected.max(1.0),
+                "FTSW({soil_water}) = {got}, want {expected}"
+            );
+        }
+        // The zero-capacity limb: maximally stressed, not unstressed, and not a panic.
+        assert_eq!(fraction_transpirable(5.0, 0.0), 0.0);
+        assert_eq!(fraction_transpirable(0.0, 0.0), 0.0);
+        // A negative capacity cannot arise, but if it did it must not invert the sign.
+        assert_eq!(fraction_transpirable(5.0, -1.0), 0.0);
+    }
+
+    /// `WSFG = min(1, FTSW/WSSG)` ([F] Eqn 15.3, Box 14.1) — the ramp, the cap, and the
+    /// absence of a wilting floor.
+    ///
+    /// Both ends are load-bearing and neither was covered. **The cap**: without it an
+    /// over-filled zone manufactures growth, and the before-battery shows removing it
+    /// reddens fifteen tests, EVERY ONE of them a compensation-point or leaf-cycle gate —
+    /// "a number moved" wearing a behavioural name. **The floor**: [F]'s form reaches zero
+    /// only AT `FTSW = 0`, so the shutoff is asymptotic; reinstating a hard floor at 0.05
+    /// reddened exactly one stranger. The absence is a deliberate rule, not an oversight —
+    /// it is what the absolute-kg ramp this replaced used to provide.
+    /// Mirrors `test_water_stress_factor_cardinal_values` and
+    /// `test_water_stress_factor_has_no_wilting_floor`.
+    #[test]
+    fn water_stress_factor_is_the_wssg_ramp_with_a_cap_and_no_wilting_floor() {
+        let wssg = 0.30;
+        for (ftsw, expected) in [
+            (0.0, 0.0),    // no transpirable water left
+            (0.075, 0.25), // a quarter of the way up the ramp
+            (0.15, 0.5),   // half
+            (0.30, 1.0),   // at the threshold
+            (0.85, 1.0),   // above it: unstressed
+            (1.30, 1.0),   // over-filled is still just unstressed, never > 1
+            (7.00, 1.0),   // ...however over-filled
+        ] {
+            let got = water_stress_factor(ftsw, wssg);
+            assert!(
+                (got - expected).abs() <= 1e-12 * expected.max(1.0),
+                "WSFG({ftsw}) = {got}, want {expected}"
+            );
+        }
+        // NO WILTING FLOOR: positive everywhere above zero, exactly zero only at zero.
+        assert!(water_stress_factor(1e-12, wssg) > 0.0);
+        assert_eq!(water_stress_factor(0.0, wssg), 0.0);
+        // ⚠ The empty-zone limb is UNREACHABLE from every scenario and golden (measured
+        // with a `panic!` probe under `cargo test --workspace`), so this is the only
+        // thing in the tree that enters it.
+        assert_eq!(water_stress_factor(-1.0, wssg), 0.0);
+    }
+
+    /// `soil_water_stress` composes the three, and the composition's own property: a root
+    /// zone at the drained upper limit is unstressed AT EVERY DEPTH.
+    ///
+    /// That property is why re-basing the stores on geometry was safe — a shallow zone is
+    /// not a dry one — and the absolute-kg band it replaced could not express it (it read
+    /// a full 19.5 kg zone as below wilting, which killed every sealed chamber; measured
+    /// before the form was written). Also pins the `ground_area` factor in the
+    /// DENOMINATOR: hardcoding it to 1.0 there reddened two tests, neither of which is
+    /// about the stress path.
+    /// Mirrors `test_soil_water_stress_composes_the_three` and
+    /// `test_a_full_root_zone_is_unstressed_at_every_depth`.
+    #[test]
+    fn soil_water_stress_composes_the_three_and_a_full_zone_is_unstressed_at_any_depth() {
+        let (extr, wssg) = (0.13, 0.30);
+        // 39 kg in a 1.0 m zone over 1 m2 is FTSW 0.30 == WSSG, i.e. exactly unstressed.
+        assert_eq!(soil_water_stress(39.0, 1.0, extr, 1.0, wssg), 1.0);
+        // 19.5 kg is FTSW 0.15, half the ramp.
+        let half = soil_water_stress(19.5, 1.0, extr, 1.0, wssg);
+        assert!((half - 0.5).abs() <= 1e-12, "{half}");
+        // The area is in the denominator: the SAME water over twice the plot is half as
+        // full in FTSW terms, so it is half as unstressed.
+        let wide = soil_water_stress(39.0, 1.0, extr, 2.0, wssg);
+        assert!((wide - 0.5).abs() <= 1e-12, "{wide}");
+        // FTSW0 = MAI independent of depth, for a zone at the drained upper limit.
+        for depth in [0.15, 0.3, 0.75, 1.3] {
+            for area in [1.0, 3.0] {
+                let full = transpirable_capacity(depth, extr, area);
+                assert_eq!(
+                    soil_water_stress(full, depth, extr, area, wssg),
+                    1.0,
+                    "a full {depth} m zone over {area} m2 read as stressed"
+                );
+            }
+        }
+    }
+
+    /// `FROOT1` — the root-zone access gate ([E] p. 136; it is NOT a function of root
+    /// mass), a clamped ratio that can only reduce a supply, never reverse or amplify it.
+    ///
+    /// ⚠ BOTH of its guards were unreachable before this test. Removing the clamp at 1
+    /// (so a deep crop manufactures nitrogen) and removing the non-positive-depth guard
+    /// (so a negative depth reverses the flow) each reddened NOTHING in the lib binary.
+    /// The saturation branch itself is live — a `panic!` in it stops 20 tests — but
+    /// nothing was checking what it returns.
+    /// Mirrors `test_root_zone_fraction_is_a_clamped_ratio` and
+    /// `test_root_zone_fraction_can_only_reduce_never_reverse`.
+    #[test]
+    fn root_zone_fraction_is_a_clamped_ratio_that_can_only_reduce() {
+        for (depth, layer, expected) in [
+            (0.0, 0.30, 0.0),  // a sown seed reaches nothing
+            (-1.0, 0.30, 0.0), // defensive: never negative
+            (0.15, 0.30, 0.5), // half the layer
+            (0.30, 0.30, 1.0), // exactly the layer
+            (1.30, 0.30, 1.0), // deeper than the layer still saturates at 1
+        ] {
+            assert_eq!(
+                root_zone_fraction(depth, layer),
+                expected,
+                "FROOT1({depth}, {layer})"
+            );
+        }
+        // It multiplies a SUPPLY term, so it must live in [0, 1] for every input a run
+        // could hand it: > 1 manufactures nitrogen, < 0 reverses the flow.
+        for depth in [0.0, 1e-9, 0.05, 0.3, 1.3, 1e6] {
+            let f = root_zone_fraction(depth, 0.30);
+            assert!((0.0..=1.0).contains(&f), "FROOT1({depth}) = {f}");
+        }
+    }
+
+    /// The re-sow return's own arithmetic, and its two degenerate limbs.
+    ///
+    /// The season-level properties (a redistribution, `FTSW` preserved, the fraction rule)
+    /// are pinned in `system.rs`'s `the_resow_returns_the_abandoned_fraction_and_preserves
+    /// _ftsw`. What is left here is the function's contract on inputs no season produces:
+    /// a zero old depth (divide by zero) and a zone that abandoned nothing. ⚠ Both limbs
+    /// are UNREACHABLE from every scenario and golden — measured with `panic!` probes
+    /// under `cargo test --workspace`, which stayed fully green — and deleting either
+    /// guard reddened nothing in the lib binary.
+    #[test]
+    fn resow_water_return_is_the_abandoned_fraction_and_its_degenerate_limbs_are_safe() {
+        // The rule: the abandoned FRACTION of the water, not the abandoned column at the
+        // drained upper limit. A 1.3 m zone holding 100 kg, re-sown to 0.15 m, gives back
+        // (1.3 - 0.15)/1.3 = 0.8846... of it.
+        let returned = resow_water_return(100.0, 1.3, 0.15);
+        let want = 100.0 * (1.3 - 0.15) / 1.3;
+        assert!((returned - want).abs() <= 1e-12 * want, "{returned} vs {want}");
+        // It can never exceed the store — the fraction is < 1 by construction, which is
+        // why the rule needs no clamp (the form it replaced did, and the clamp fired
+        // every re-sow once the stores became geometric).
+        for held in [0.0, 1.0, 1e6] {
+            for old in [0.16, 0.5, 1.3, 40.0] {
+                let out = resow_water_return(held, old, 0.15);
+                assert!(out <= held, "returned {out} from a store of {held}");
+                assert!(out >= 0.0, "returned a negative {out}");
+            }
+        }
+        // Limb 1: a zero (or negative) old depth returns nothing rather than NaN.
+        assert_eq!(resow_water_return(100.0, 0.0, 0.15), 0.0);
+        assert_eq!(resow_water_return(100.0, -1.0, 0.15), 0.0);
+        // Limb 2: a zone that abandoned nothing (or grew) gives back nothing rather than
+        // a negative — which would run the transfer backwards into the root zone.
+        assert_eq!(resow_water_return(100.0, 0.15, 0.15), 0.0);
+        assert_eq!(resow_water_return(100.0, 0.10, 0.15), 0.0);
+    }
+
 }

@@ -457,25 +457,40 @@ pub fn respiration() -> RespirationParams {
     }
 }
 
-/// Penman–Monteith transpiration resistances (`transpiration.yaml`).
-pub fn transpiration() -> TranspirationParams {
-    const NAME: &str = "transpiration.yaml";
-    let f = file(TRANSPIRATION_YAML, NAME);
+/// Penman–Monteith transpiration resistances, from arbitrary file TEXT.
+///
+/// ⚠ The `_from` split is the `allocation_from` / `phenology_from` shape and exists for
+/// one measured reason: the positivity guards below read `TRANSPIRATION_YAML` through
+/// `include_str!`, so the only file they could ever see was the committed one — which is
+/// valid. Measured, not assumed: before this split, deleting the whole guard loop left
+/// `cargo test -p domains --lib` at 221 passed / 0 failed, against a live control
+/// (declaring `aerodynamic_resistance` in `min/m`) that reddened 25. A guard that cannot
+/// be handed a bad file is a comment. Nothing about the committed load changed.
+///
+/// Both resistances are DIVISORS in the combination equation — a zero `r_a` is an
+/// infinity in the aerodynamic term, not a slow crop.
+pub fn transpiration_from(text: &str, name: &'static str) -> TranspirationParams {
+    let f = file(text, name);
     let v = guarded_map(
         &f,
         &[
             ("aerodynamic_resistance", "s/m"),
             ("surface_resistance", "s/m"),
         ],
-        NAME,
+        name,
     );
     for field in ["aerodynamic_resistance", "surface_resistance"] {
-        checked(require_positive(v[field], field, NAME), NAME);
+        checked(require_positive(v[field], field, name), name);
     }
     TranspirationParams {
         aerodynamic_resistance: v["aerodynamic_resistance"],
         surface_resistance: v["surface_resistance"],
     }
+}
+
+/// Penman–Monteith transpiration resistances (`transpiration.yaml`).
+pub fn transpiration() -> TranspirationParams {
+    transpiration_from(TRANSPIRATION_YAML, "transpiration.yaml")
 }
 
 /// The whole 12-field `phenology.yaml` block, validated once for all three readers.
@@ -590,19 +605,29 @@ pub fn senescence() -> SenescenceParams {
     }
 }
 
-/// Root-extension params (`root_depth.yaml`).
-pub fn root_depth() -> RootDepthParams {
-    const NAME: &str = "root_depth.yaml";
+/// Root-extension params, from arbitrary file TEXT — see [`transpiration_from`] for why
+/// the split exists.
+///
+/// Both bounds disable the mechanism SILENTLY and no golden would notice: a zero rate
+/// freezes rooted depth at sowing so the root-zone access gate is shut forever, and a
+/// zero maximum depth divides by a crop that cannot root. Measured inert before the
+/// split, exactly as the transpiration pair was.
+pub fn root_depth_from(text: &str, name: &'static str) -> RootDepthParams {
     let units: [(&str, &str); 2] = [("max_extension_rate", "m/day"), ("max_rooted_depth", "m")];
-    let f = file(ROOT_DEPTH_YAML, NAME);
-    let v = guarded_map(&f, &units, NAME);
+    let f = file(text, name);
+    let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_positive(v[field], field, NAME), NAME);
+        checked(require_positive(v[field], field, name), name);
     }
     RootDepthParams {
         max_extension_rate: v["max_extension_rate"],
         max_rooted_depth: v["max_rooted_depth"],
     }
+}
+
+/// Root-extension params (`root_depth.yaml`).
+pub fn root_depth() -> RootDepthParams {
+    root_depth_from(ROOT_DEPTH_YAML, "root_depth.yaml")
 }
 
 /// Stem-reserve remobilization (`stem_reserves.yaml`).
@@ -768,19 +793,30 @@ pub fn humification() -> HumificationParams {
     }
 }
 
-/// Condensation + recycling rates (`water_cycle.yaml`).
-pub fn water_cycle() -> WaterCycleParams {
-    const NAME: &str = "water_cycle.yaml";
+/// Condensation + recycling rates, from arbitrary file TEXT — see [`transpiration_from`]
+/// for why the split exists.
+///
+/// ⚠ NON-NEGATIVE, not positive, and the difference is a design decision rather than a
+/// looser guard: a zero rate is the legal way to declare a chamber with no condenser,
+/// which is what every OPEN-field scenario in the tree does. A NEGATIVE rate would run
+/// the ring backwards — condensate evaporating into vapour through a flow whose legs say
+/// the opposite — so that is what is rejected.
+pub fn water_cycle_from(text: &str, name: &'static str) -> WaterCycleParams {
     let units: [(&str, &str); 2] = [("condensation_rate", "1/day"), ("recycling_rate", "1/day")];
-    let f = file(WATER_CYCLE_YAML, NAME);
-    let v = guarded_map(&f, &units, NAME);
+    let f = file(text, name);
+    let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_non_negative(v[field], field, NAME), NAME);
+        checked(require_non_negative(v[field], field, name), name);
     }
     WaterCycleParams {
         condensation_rate: v["condensation_rate"],
         recycling_rate: v["recycling_rate"],
     }
+}
+
+/// Condensation + recycling rates (`water_cycle.yaml`).
+pub fn water_cycle() -> WaterCycleParams {
+    water_cycle_from(WATER_CYCLE_YAML, "water_cycle.yaml")
 }
 
 /// Minimal-consumer params (`herbivory.yaml`).
@@ -1699,4 +1735,311 @@ parameters:
             0.0
         );
     }
+
+    // -----------------------------------------------------------------------------
+    // S5 batch C: the three water param files.
+    //
+    // ⚠ THESE GUARDS WERE COMMENTS UNTIL THIS BATCH, and it was measured rather than
+    // assumed: deleting the whole positivity loop from `transpiration()`, from
+    // `root_depth()` or from `water_cycle()` each left `cargo test -p domains --lib` at
+    // 221 passed / 0 failed, against a live control (declaring `aerodynamic_resistance`
+    // in `min/m`) that reddened 25. All three read their file through `include_str!`, so
+    // the only text they could ever see was the committed one. The `_from` split is the
+    // same production change batch B took for `phenology.yaml`, applied to the shape it
+    // was answered for — see §5ag.
+    // -----------------------------------------------------------------------------
+
+    /// Substitute one `value:` line of any committed param text, asserting it applied.
+    ///
+    /// The generic sibling of `phenology_with`. It mutates the REAL file rather than a
+    /// synthetic fixture, so a schema change cannot leave a fixture behind still passing.
+    fn value_of(text: &'static str, field: &str, value: &str) -> &'static str {
+        let from = format!("  {field}:\n    value: ");
+        let at = text
+            .find(&from)
+            .unwrap_or_else(|| panic!("{field} is not a top-level param of this file"));
+        let start = at + from.len();
+        let end = start + text[start..].find('\n').expect("a value line ends");
+        let mut out = String::with_capacity(text.len());
+        out.push_str(&text[..start]);
+        out.push_str(value);
+        out.push_str(&text[end..]);
+        assert_ne!(out, text, "the substitution must apply");
+        Box::leak(out.into_boxed_str())
+    }
+
+    /// The committed Penman–Monteith resistances, and what they honestly are.
+    ///
+    /// ⚠ Pinned as VALUES with their provenance status stated: both are `TODO(cite)`
+    /// PROVISIONAL literature-typical placeholders (r_a ~30–100 s/m, r_s ~50–100 s/m for
+    /// a well-watered crop), not cited points. Recorded here so the pin is not misread as
+    /// an endorsement — it asserts that the numbers the frozen goldens were produced with
+    /// are these, not that a source states them.
+    /// Mirrors `test_load_transpiration_params_matches_committed_values`.
+    #[test]
+    fn the_committed_transpiration_resistances_are_the_provisional_literature_typical_pair() {
+        let p = transpiration();
+        assert_eq!(p.aerodynamic_resistance, 50.0);
+        assert_eq!(p.surface_resistance, 70.0);
+        // The status, asserted rather than left in a comment that could rot.
+        assert!(
+            TRANSPIRATION_YAML.contains("TODO(cite)"),
+            "the provisional flag has gone; the pin above now over-claims"
+        );
+        // Both sit inside the ranges the file's own header states.
+        assert!((30.0..=100.0).contains(&p.aerodynamic_resistance));
+        assert!((50.0..=100.0).contains(&p.surface_resistance));
+    }
+
+    /// A non-positive resistance is rejected, and the LEGAL boundary still loads.
+    ///
+    /// Both are DIVISORS in the combination equation: `r_a = 0` is an infinity in the
+    /// aerodynamic term and in `r_s/r_a`, not a slow crop. ⚠ The second half is the part
+    /// a rejection-only test cannot have — a guard tuned one notch too tight forbids a
+    /// real crop rather than a bad file, and here the committed 50/70 is what proves the
+    /// guard is not simply always-on.
+    /// Mirrors `test_transp_loader_rejects_non_positive`.
+    #[test]
+    fn a_non_positive_transpiration_resistance_is_rejected() {
+        for field in ["aerodynamic_resistance", "surface_resistance"] {
+            for bad in ["0.0", "-1.0"] {
+                let broken = value_of(TRANSPIRATION_YAML, field, bad);
+                rejects(
+                    || {
+                        transpiration_from(broken, "transpiration.yaml");
+                    },
+                    &format!("{field} = {bad}"),
+                );
+            }
+        }
+        // The committed file still loads through the same reader.
+        assert_eq!(
+            transpiration_from(TRANSPIRATION_YAML, "transpiration.yaml").surface_resistance,
+            70.0
+        );
+    }
+
+    /// A wrong declared unit, an unknown field and a missing source are each rejected on
+    /// `transpiration.yaml`.
+    ///
+    /// `min/m` is the plausible slip rather than a nonsense unit — it is the same
+    /// quantity at 60× the scale, so it would load a canopy sixty times more resistant
+    /// and produce a perfectly plausible-looking season.
+    /// Mirrors `test_transp_loader_rejects_a_wrong_unit`,
+    /// `test_transp_loader_rejects_an_unknown_field` and
+    /// `test_transp_loader_rejects_a_missing_source`.
+    #[test]
+    fn a_malformed_transpiration_entry_is_rejected() {
+        let from = "  aerodynamic_resistance:\n    value: 50.0\n    unit: \"s/m\"";
+        assert_eq!(TRANSPIRATION_YAML.matches(from).count(), 1);
+        let wrong_unit = Box::leak(
+            TRANSPIRATION_YAML
+                .replace(
+                    from,
+                    "  aerodynamic_resistance:\n    value: 50.0\n    unit: \"min/m\"",
+                )
+                .into_boxed_str(),
+        );
+        rejects(
+            || {
+                transpiration_from(wrong_unit, "transpiration.yaml");
+            },
+            "a resistance declared in min/m",
+        );
+        let extended = Box::leak(
+            format!(
+                "{TRANSPIRATION_YAML}  bogus:\n    value: 1.0\n    unit: \"s/m\"\n    source: \"x\"\n"
+            )
+            .into_boxed_str(),
+        );
+        rejects(
+            || {
+                transpiration_from(extended, "transpiration.yaml");
+            },
+            "a param wired to nothing",
+        );
+        let no_source = Box::leak(
+            TRANSPIRATION_YAML
+                .replacen("    source: \"TODO(cite)", "    provenance: \"TODO(cite)", 1)
+                .into_boxed_str(),
+        );
+        assert_ne!(no_source, TRANSPIRATION_YAML, "the substitution must apply");
+        rejects(
+            || {
+                transpiration_from(no_source, "transpiration.yaml");
+            },
+            "an entry without a source",
+        );
+    }
+
+    /// The winter-wheat rooting habit is [E] Table 25's own row, not the body text's
+    /// cross-species range and not spring wheat's.
+    ///
+    /// Pinned as VALUES because the file's provenance is the whole point: 0.018 m/day and
+    /// 1.3 m are the "Wheat winter" row (Gregory et al., 1978). Spring wheat is 0.012 /
+    /// 1.8 — slower but deeper — so the two wheats are not interchangeable, and the
+    /// body-text range is 3–5 cm/day, which our 1.8 cm/day sits below.
+    /// Mirrors `test_winter_wheat_carries_table_25s_own_row`.
+    #[test]
+    fn winter_wheat_carries_table_25s_own_root_depth_row() {
+        let p = root_depth();
+        assert_eq!(p.max_extension_rate, 0.018);
+        assert_eq!(p.max_rooted_depth, 1.3);
+        // Not spring wheat's row, which is the one adjacent misreading.
+        assert_ne!(p.max_extension_rate, 0.012);
+        assert_ne!(p.max_rooted_depth, 1.8);
+        // Below the body text's general 3-5 cm/day range, the cautious direction.
+        assert!(p.max_extension_rate < 0.03);
+        // Inside [E] p. 137's stated 0.5-1.5 m species range.
+        assert!((0.5..=1.5).contains(&p.max_rooted_depth));
+    }
+
+    /// Both root-depth bounds are rejected at zero, and the LEGAL pair still loads.
+    ///
+    /// Both disable the mechanism SILENTLY and no golden would notice: a zero rate freezes
+    /// depth at sowing so the root-zone access gate is shut for the whole season, and a
+    /// zero maximum depth is a crop that cannot root at all. That is exactly the shape
+    /// this file's own header warns about — the mechanism is bit-identically inert on
+    /// every frozen scenario — so the guard has to be where the value is read.
+    /// Mirrors `test_a_non_positive_parameter_is_rejected_at_the_boundary`.
+    #[test]
+    fn a_non_positive_root_depth_bound_is_rejected() {
+        for field in ["max_extension_rate", "max_rooted_depth"] {
+            for bad in ["0.0", "-0.5"] {
+                let broken = value_of(ROOT_DEPTH_YAML, field, bad);
+                rejects(
+                    || {
+                        root_depth_from(broken, "root_depth.yaml");
+                    },
+                    &format!("{field} = {bad}"),
+                );
+            }
+        }
+        assert_eq!(
+            root_depth_from(ROOT_DEPTH_YAML, "root_depth.yaml").max_rooted_depth,
+            1.3
+        );
+    }
+
+    /// Potato OVERRIDES the rooting habit rather than sharing wheat's, and its numbers
+    /// come from its own reference.
+    ///
+    /// [E] Table 25 gives potato a row of its own (Vos & Groenwold, 1986) differing in
+    /// BOTH values, so sharing wheat's file would assert a rooting habit the source
+    /// contradicts. ⚠ The port has NO potato build — its stage 2 is deferred and the four
+    /// `crops/potato/*.yaml` overrides are deliberately outside the census (see
+    /// `the_recursive_walk_would_see_four_more_and_the_census_does_not`) — so this reads
+    /// the override off disk rather than through `include_str!`, which would quietly add
+    /// a file to `param_files()` and therefore to the freeze manifest.
+    /// Mirrors `test_potato_overrides_root_depth_rather_than_sharing_wheats`.
+    #[test]
+    fn potato_overrides_the_rooting_habit_rather_than_sharing_wheats() {
+        let path = std::path::Path::new(PARAMS_DIR)
+            .join("crops/potato")
+            .join("root_depth.yaml");
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("the potato override at {path:?} is readable: {e}"));
+        let text: &'static str = Box::leak(text.into_boxed_str());
+        let potato = root_depth_from(text, "root_depth.yaml");
+        assert_eq!(potato.max_extension_rate, 0.014);
+        // ⚠ 0.9 is the MIDPOINT of the source's "0.8-1.0" range, recorded as such in the
+        // file. The choice of midpoint is ours; either endpoint is equally cited.
+        assert_eq!(potato.max_rooted_depth, 0.9);
+        // The qualitative fact the two numbers really assert: potato roots shallower and
+        // slower than winter wheat. That is the claim a shared file would destroy.
+        let wheat = root_depth();
+        assert!(potato.max_rooted_depth < wheat.max_rooted_depth);
+        assert!(potato.max_extension_rate < wheat.max_extension_rate);
+        // ...and it goes through the SAME guards, so the override cannot smuggle a zero.
+        rejects(
+            || {
+                root_depth_from(value_of(text, "max_rooted_depth", "0.0"), "root_depth.yaml");
+            },
+            "a potato override with a zero depth",
+        );
+    }
+
+    /// The two water-cycle rates, and the positivity argument that rests on them.
+    ///
+    /// Both are DESIGN values (a ~2-day engineered-condenser turnover), deliberately equal
+    /// so neither half of the ring is the bottleneck. What makes them load-bearing rather
+    /// than decorative is `k·dt < 1`: each first-order draw self-limits against the
+    /// start-of-step pool, which is why the closed water ring never needs the arbitration
+    /// backstop. Asserted at the engine's ACTUAL step, not at 1.0 day.
+    /// Mirrors `test_loader_reads_committed_rates`.
+    #[test]
+    fn the_committed_water_cycle_rates_are_the_matched_design_pair() {
+        let p = water_cycle();
+        assert_eq!(p.condensation_rate, 0.5);
+        assert_eq!(p.recycling_rate, 0.5);
+        assert_eq!(
+            p.condensation_rate, p.recycling_rate,
+            "the two halves of the ring must stay matched"
+        );
+        for k in [p.condensation_rate, p.recycling_rate] {
+            assert!(
+                k * super::super::BIO_DT < 1.0,
+                "k*dt = {} would let a first-order draw exceed its own pool",
+                k * super::super::BIO_DT
+            );
+        }
+    }
+
+    /// A NEGATIVE cycle rate is rejected; a ZERO one is legal, and that asymmetry is a
+    /// design decision rather than a looser guard.
+    ///
+    /// A zero is how a chamber with no condenser is declared — which is every OPEN-field
+    /// scenario in the tree, since the ring exists only in the sealed branch. A negative
+    /// would run the ring backwards: condensate evaporating into vapour through a flow
+    /// whose legs say the opposite, which the flow-level direction pins would not catch
+    /// because the legs would still balance.
+    /// Mirrors `test_loader_rejects_negative_rate`.
+    #[test]
+    fn a_negative_water_cycle_rate_is_rejected_but_a_zero_one_is_legal() {
+        for field in ["condensation_rate", "recycling_rate"] {
+            let broken = value_of(WATER_CYCLE_YAML, field, "-0.1");
+            rejects(
+                || {
+                    water_cycle_from(broken, "water_cycle.yaml");
+                },
+                &format!("{field} = -0.1"),
+            );
+            // THE LEGAL BOUNDARY: zero is a chamber with no condenser, not a bad file.
+            let off = value_of(WATER_CYCLE_YAML, field, "0.0");
+            let loaded = water_cycle_from(off, "water_cycle.yaml");
+            let got = if field == "condensation_rate" {
+                loaded.condensation_rate
+            } else {
+                loaded.recycling_rate
+            };
+            assert_eq!(got, 0.0, "a zero {field} must load, not be rejected");
+        }
+    }
+
+    /// A wrong declared unit on `water_cycle.yaml` is rejected.
+    ///
+    /// `1/year` is the plausible slip: the same dimension at 365× the scale, so it would
+    /// load a condenser that recovers half the standing vapour per YEAR and still produce
+    /// a run that conserves water perfectly.
+    /// Mirrors `test_loader_rejects_bad_unit`.
+    #[test]
+    fn a_wrong_water_cycle_unit_is_rejected() {
+        let from = "  condensation_rate:\n    value: 0.5\n    unit: \"1/day\"";
+        assert_eq!(WATER_CYCLE_YAML.matches(from).count(), 1);
+        let broken = Box::leak(
+            WATER_CYCLE_YAML
+                .replace(
+                    from,
+                    "  condensation_rate:\n    value: 0.5\n    unit: \"1/year\"",
+                )
+                .into_boxed_str(),
+        );
+        rejects(
+            || {
+                water_cycle_from(broken, "water_cycle.yaml");
+            },
+            "a condensation rate declared per year",
+        );
+    }
+
 }

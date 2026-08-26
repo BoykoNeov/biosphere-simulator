@@ -1938,4 +1938,622 @@ mod tests {
             "an uncited WSSD must leave the plain degree-day rate byte-for-byte"
         );
     }
+
+    // -----------------------------------------------------------------------------
+    // S5 batch C, the season-level water and root-depth claims.
+    //
+    // ⚠ Three Python scenarios have no Rust roster entry — `DEEP_WATER`, `DROUGHT` and the
+    // retired `WATER_BITING` — so the diagnostics below DECLARE their subject inline, the
+    // shape `nitrogen_limitation_is_wired_into_assimilation_and_no_scenario_shows_it`
+    // already uses in this file. They are diagnostics, not reference scenarios: adding
+    // them to the production roster would put a new SeasonScenario in front of the freeze
+    // manifest for no reference gain.
+    // -----------------------------------------------------------------------------
+
+    /// The Python `DEEP_WATER_SCENARIO`: the default stratified profile with the supply
+    /// cut to 1 mm/day — deliberately below the measured 5.7744 kg/day peak demand, so
+    /// what the roots can REACH decides the season.
+    ///
+    /// ⚠ The capacity is 1.0 because a sweep found it: at 2 mm/day and above the subsoil
+    /// is irrelevant, at 0 the season is physically unwinnable (a 1.3 m root system over
+    /// 1 m² can ever reach 169 kg against a 582 kg season demand). Choosing the operating
+    /// point that exposes a mechanism is legitimate for a DIAGNOSTIC — provided the sweep
+    /// is recorded, which it is, in the Python scenario's own comment. What would NOT be
+    /// legitimate is quoting the effect size as a property of the model rather than of
+    /// this scenario at this capacity.
+    fn deep_water_scenario() -> SeasonScenario {
+        SeasonScenario {
+            irrigation_mm_day: 1.0,
+            ..DEFAULT_SCENARIO
+        }
+    }
+
+    /// Run a scenario, returning every emitted state.
+    fn trace_season(scenario: &SeasonScenario, years: usize) -> Vec<State> {
+        let (state, integrator, resolver) = super::super::season_setup(scenario, years).unwrap();
+        let mut seen: Vec<State> = Vec::new();
+        let mut observe = |s: &State| seen.push(s.clone());
+        let (_, rationed, events) = run_season(
+            &integrator,
+            state,
+            &resolver,
+            super::super::BIO_DT,
+            super::super::steps_for_years(years),
+            None,
+            &mut observe,
+        )
+        .expect("season");
+        assert_eq!(rationed, 0, "the backstop must stay out of a water diagnostic");
+        assert!(events.is_empty(), "unexpected extinction: {events:?}");
+        seen
+    }
+
+    /// The same season with exactly ONE flow removed from the registry.
+    ///
+    /// ⚠ **THE CONTROL THIS CLAIM NEEDS, AND THE ONE THE PYTHON FILE RECORDS AS HAVING
+    /// BEEN DESTROYED ONCE ALREADY.** The obvious control — `soil_extractable_water = 0`
+    /// — was justified as "removes the transfer, leaves rooted depth to grow exactly as
+    /// in the subject". That held while `EXTR` appeared in ONE place; since the geometry
+    /// re-basing it appears in TWO, the transfer *and* `TTSW`, so a zero makes every
+    /// stress reading `FTSW = 0` and kills the crop outright rather than isolating the
+    /// transfer. A control that changes more than it claims is worse than no control.
+    /// Dropping the flow from the registry changes exactly one thing.
+    ///
+    /// No production seam was added for this: `compartments` is module-private and this
+    /// test module is inside the module, so the flow list is reachable before
+    /// `Registry::new` closes over it.
+    fn trace_without_flow(scenario: &SeasonScenario, drop_id: &str) -> Vec<State> {
+        let p = params::biosphere();
+        let builds = compartments(scenario, &p).expect("compartments");
+        let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
+        for build in &builds {
+            for stock in &build.stocks {
+                stocks.insert(stock.id.clone(), stock.clone());
+            }
+        }
+        for (id, s) in boundary::loss_sinks(&[Quantity::Carbon]).expect("loss sinks") {
+            stocks.insert(id, s);
+        }
+        let mut flows: Vec<Box<dyn Flow>> = Vec::new();
+        let mut aux: Vec<Box<dyn AuxProcess>> = Vec::new();
+        let mut dropped = 0usize;
+        for build in builds {
+            for flow in build.flows {
+                if flow.id() == drop_id {
+                    dropped += 1;
+                } else {
+                    flows.push(flow);
+                }
+            }
+            aux.extend(build.aux);
+        }
+        assert_eq!(dropped, 1, "{drop_id} is not in this scenario's registry");
+        let state = State::new(
+            0,
+            stocks.clone(),
+            0,
+            BTreeMap::from([
+                (THERMAL_TIME.to_string(), 0.0),
+                (VERNALIZATION_DAYS.to_string(), 0.0),
+                (ROOTED_DEPTH.to_string(), scenario.rooted_depth0),
+            ]),
+        )
+        .expect("state");
+        let registry = Registry::new(flows, &stocks, aux).expect("trimmed registry");
+        let integrator = EulerIntegrator::new(registry);
+        let resolver = super::super::weather_resolver(scenario, 1).expect("resolver");
+        let mut seen: Vec<State> = Vec::new();
+        let mut observe = |s: &State| seen.push(s.clone());
+        let (_, rationed, _) = run_season(
+            &integrator,
+            state,
+            &resolver,
+            super::super::BIO_DT,
+            super::super::steps_for_years(1),
+            None,
+            &mut observe,
+        )
+        .expect("control season");
+        assert_eq!(rationed, 0);
+        seen
+    }
+
+    /// Rooted depth follows [E]'s law over a whole season: monotone, gated, and stopped at
+    /// the cited cap with a bounded overshoot.
+    ///
+    /// The overshoot bound is the documented consequence of cutting the RATE at the cap
+    /// rather than clamping the increment — clamping would break the aux channel's
+    /// dt-independence contract, so one step's unstressed extension is allowed through and
+    /// nothing more. ⚠ The GATING half is the part that distinguishes `0.018 m/day` from
+    /// `0.018 m/day × f_water × f_temp`: without it the crop would reach the cap in
+    /// exactly 73 days, and the two are otherwise indistinguishable from a trajectory.
+    /// Mirrors `test_depth_follows_es_law_and_stops_at_the_cited_cap` and
+    /// `test_extension_is_temperature_and_water_gated_not_a_flat_rate`.
+    #[test]
+    fn rooted_depth_follows_the_gated_extension_law_and_stops_at_the_cited_cap() {
+        let rootd = params::root_depth();
+        let depths: Vec<f64> = trace_season(&DEFAULT_SCENARIO, 1)
+            .iter()
+            .map(|s| s.aux[ROOTED_DEPTH])
+            .collect();
+        // A sown crop starts at the CITED emergence depth, not at 0 ([F] Ch. 14: "It is
+        // normally between 150 to 400 mm").
+        assert_eq!(depths[0], DEFAULT_SCENARIO.rooted_depth0);
+        assert!((0.15..=0.40).contains(&DEFAULT_SCENARIO.rooted_depth0));
+        // Monotone: roots only deepen.
+        assert!(
+            depths.windows(2).all(|w| w[1] >= w[0]),
+            "rooted depth went backwards"
+        );
+        // The cap binds, and the overshoot is at most ONE step's unstressed extension.
+        let deepest = depths.iter().copied().fold(f64::MIN, f64::max);
+        assert!(deepest >= rootd.max_rooted_depth, "the cap never bound: {deepest}");
+        assert!(
+            deepest <= rootd.max_rooted_depth + rootd.max_extension_rate,
+            "overshoot beyond one step: {deepest}"
+        );
+        // No step extends faster than the unstressed maximum — f_water, f_temp <= 1.
+        // ⚠ In STEPS, not days: the engine runs at dt = 1/4, so the per-step ceiling is a
+        // QUARTER of the daily rate. A test that compared against the daily rate would
+        // pass on a build that had dropped `dt` from the accumulator entirely.
+        let per_step = rootd.max_extension_rate * super::super::BIO_DT;
+        let steps: Vec<f64> = depths.windows(2).map(|w| w[1] - w[0]).collect();
+        let fastest = steps.iter().copied().fold(f64::MIN, f64::max);
+        assert!(fastest <= per_step + 1e-15, "a step of {fastest} > {per_step}");
+        // ...and the two response factors really are applied: many steps are strictly
+        // slower than the maximum without being zero.
+        let throttled = steps
+            .iter()
+            .filter(|s| **s > 0.0 && **s < per_step - 1e-12)
+            .count();
+        assert!(
+            throttled > 30,
+            "the temperature and water gates are not being applied ({throttled} throttled steps)"
+        );
+    }
+
+    /// [E] p. 136: "Root growth generally stops around flowering" — exercised DIRECTLY,
+    /// because for the frozen winter wheat the 1.3 m cap binds first (~day 140 against
+    /// anthesis ~day 255) so a full run cannot tell the two cut-offs apart.
+    ///
+    /// The fixture lifts BOTH the crop cap and the soil cap to 99 m, leaving the flowering
+    /// stop as the only thing that can bind, and evaluates the accumulator on two
+    /// hand-built states either side of anthesis.
+    /// Mirrors `test_root_growth_stops_at_flowering`.
+    #[test]
+    fn root_growth_stops_at_flowering_when_neither_cap_can_bind() {
+        struct WarmEnv;
+        impl simcore::environment::Environment for WarmEnv {
+            fn get(&self, _var: &str) -> Result<f64, SimError> {
+                Ok(20.0) // comfortably inside the optimum plateau
+            }
+        }
+        let pheno = params::phenology();
+        let proc = RootDepthExtension {
+            id: "test.rooted_depth".to_string(),
+            accumulator: ROOTED_DEPTH.to_string(),
+            thermal_time_aux: THERMAL_TIME.to_string(),
+            temp_var: TEMP_VAR.to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            subsoil_water: SUBSOIL_WATER.to_string(),
+            params: params::RootDepthParams {
+                max_extension_rate: 0.018,
+                max_rooted_depth: 99.0,
+            },
+            photo: params::photosynthesis(),
+            pheno,
+            wssg: DEFAULT_SCENARIO.wssg,
+            soil_depth: 99.0, // the SOIL cap lifted too
+            soil_extractable_water: DEFAULT_SCENARIO.soil_extractable_water,
+            ground_area: DEFAULT_SCENARIO.ground_area,
+        };
+        let (base, _) = build_season(&DEFAULT_SCENARIO).expect("season");
+        let at = |thermal_time: f64| -> State {
+            State::new(
+                0,
+                base.stocks.clone(),
+                0,
+                BTreeMap::from([
+                    (THERMAL_TIME.to_string(), thermal_time),
+                    (ROOTED_DEPTH.to_string(), 0.5),
+                ]),
+            )
+            .expect("hand-built state")
+        };
+        let vegetative = proc.evaluate(&at(0.0), &WarmEnv, 1.0).expect("vegetative")
+            [ROOTED_DEPTH];
+        // Past `tsum_anthesis` the crop is at DVS >= 1 and extension is off.
+        let flowering = proc
+            .evaluate(&at(pheno.tsum_anthesis + 1.0), &WarmEnv, 1.0)
+            .expect("flowering")[ROOTED_DEPTH];
+        assert!(vegetative > 0.0, "the vegetative crop must still be rooting");
+        assert_eq!(flowering, 0.0, "root growth must stop at flowering");
+        // ⚠ ON the boundary, not merely past it: `is_vegetative` tests DVS < 1, so
+        // exactly at anthesis the stop must already have fired. The port's own hazard —
+        // the Python file does not make this distinction — and the same boundary batch B
+        // pinned for the anthesis gate.
+        let exactly = proc
+            .evaluate(&at(pheno.tsum_anthesis), &WarmEnv, 1.0)
+            .expect("at anthesis")[ROOTED_DEPTH];
+        assert_eq!(exactly, 0.0, "the stop must fire ON the anthesis boundary");
+    }
+
+    /// A dry below-root store stops extension for the WHOLE SEASON, and a wet one lets the
+    /// roots reach the crop's cap.
+    ///
+    /// [F] Box 14.1's `If WSTORG = 0 Then GRTD = 0` — roots do not extend into dry soil.
+    /// This is what makes a scenario's `subsoil_water0` load-bearing rather than
+    /// decorative, and it is the season-level companion to the equation-level pin in
+    /// `science.rs`. The dry declaration is the Python `DROUGHT_SCENARIO`'s, which the
+    /// Rust roster has no entry for.
+    /// Mirrors `test_a_dry_subsoil_stops_root_extension`.
+    #[test]
+    fn a_dry_below_root_store_stops_extension_for_the_whole_season() {
+        let dry = SeasonScenario {
+            subsoil_water0: 0.0,
+            ..DEFAULT_SCENARIO
+        };
+        let depths: Vec<f64> = trace_season(&dry, 1)
+            .iter()
+            .map(|s| s.aux[ROOTED_DEPTH])
+            .collect();
+        assert!(
+            depths.iter().all(|d| *d == DEFAULT_SCENARIO.rooted_depth0),
+            "a crop over dry soil rooted anyway: max {}",
+            depths.iter().copied().fold(f64::MIN, f64::max)
+        );
+        // ⚠ Non-vacuity, and it is the whole point: the SAME season with water below
+        // reaches the crop's cap. Without this half the test passes on a build where
+        // extension is broken outright.
+        let wet: Vec<f64> = trace_season(&DEFAULT_SCENARIO, 1)
+            .iter()
+            .map(|s| s.aux[ROOTED_DEPTH])
+            .collect();
+        assert!(wet.iter().copied().fold(f64::MIN, f64::max) > 1.3);
+        // The DROUGHT scenario's own construction: a dry layer under a root zone that is
+        // still at the drained upper limit. The leanness is the STRATIFICATION, not a dry
+        // bed — and it survives only because the sowing depth is a cited nonzero (at depth
+        // 0 the root-zone access fraction is 0 and nitrogen uptake would be off).
+        assert_eq!(dry.soil_water0, DEFAULT_SCENARIO.soil_water0);
+        assert!(dry.rooted_depth0 > 0.0);
+    }
+
+    /// A re-sown crop starts with the SOWING root system, not with the old one and not
+    /// with none.
+    ///
+    /// Rooted depth is a property of the standing crop, not of the soil, so it resets with
+    /// the other per-cycle accumulators. No golden can see it (measured bit-identical
+    /// either way on the Python side), and the chambers re-sow many times.
+    /// ⚠ The recorded value just after a reset is NOT exactly `rooted_depth0`:
+    /// `annual_reset` sets the accumulator and the same step then applies one extension
+    /// increment before the state is snapshotted. So the bound is one unstressed STEP
+    /// (`rate · dt`), not one day — pinning the value exactly would be pinning the reset's
+    /// position within the step.
+    /// Mirrors `test_a_resown_crop_starts_with_the_sowing_root_system`.
+    #[test]
+    fn a_resown_crop_starts_with_the_sowing_root_system() {
+        let scenario = perennial_chamber_scenario();
+        let (state, integrator, resolver) = super::super::season_setup(&scenario, 3).unwrap();
+        let mut depths: Vec<f64> = Vec::new();
+        let mut observe = |s: &State| depths.push(s.aux[ROOTED_DEPTH]);
+        let (_, rationed, _) = run_perennial(
+            &integrator,
+            state,
+            &scenario,
+            &resolver,
+            super::super::BIO_DT,
+            super::super::steps_for_years(3),
+            super::super::season_steps(),
+            &mut observe,
+        )
+        .expect("perennial");
+        assert_eq!(rationed, 0);
+        let drops: Vec<usize> = depths
+            .windows(2)
+            .enumerate()
+            .filter(|(_, w)| w[1] < w[0])
+            .map(|(i, _)| i)
+            .collect();
+        assert!(
+            !drops.is_empty(),
+            "rooted depth never reset — a re-sown crop kept the old root system"
+        );
+        let sown = scenario.rooted_depth0;
+        let per_step = params::root_depth().max_extension_rate * super::super::BIO_DT;
+        for i in drops {
+            assert!(
+                depths[i + 1] >= sown && depths[i + 1] <= sown + per_step,
+                "post-reset depth {} is not the sowing root system",
+                depths[i + 1]
+            );
+            // ...and it is a genuine reset, not a small dip.
+            assert!(depths[i + 1] < depths[i] / 2.0);
+        }
+    }
+
+    /// The root-zone access gate THROTTLES nitrogen supply — and is bit-identically inert
+    /// on the frozen reference, which is a measured fact rather than a disclaimer.
+    ///
+    /// Both halves are needed and they say opposite-looking things. The gate does real
+    /// work: against a reference layer far deeper than the crop can reach, `FROOT1` stays
+    /// small all season and the crop takes up strictly less nitrogen than the same run
+    /// with the gate wide open. And on the FROZEN scenario it changes nothing, because
+    /// uptake is demand-bound there and the gate only shrinks supply — so if the second
+    /// half ever reddens, the frozen crop has become supply-bound and `soil_layer_depth`
+    /// (a DESIGN value) has silently become load-bearing.
+    /// Mirrors `test_the_gate_scales_uptake_capacity` and
+    /// `test_the_gate_is_inert_on_the_frozen_reference_and_that_is_recorded`.
+    #[test]
+    fn the_root_zone_gate_throttles_uptake_and_is_inert_on_the_frozen_reference() {
+        let final_n = |layer: f64| -> f64 {
+            let scenario = SeasonScenario {
+                soil_layer_depth: layer,
+                ..DEFAULT_SCENARIO
+            };
+            super::super::run_season_final(&scenario, 1)
+                .expect("season")
+                .0
+                .stocks[PLANT_N]
+                .amount
+        };
+        // A 50 m reference layer keeps FROOT1 tiny all season; 0.01 m saturates it after
+        // one step.
+        let gated = final_n(50.0);
+        let open = final_n(0.01);
+        assert!(
+            gated < open,
+            "the root-zone gate does not restrict nitrogen uptake ({gated} vs {open})"
+        );
+        // INERT ON THE FROZEN REFERENCE, to the BIT: the default layer and a layer so
+        // shallow the gate is wide open from step 1 give the same number.
+        let frozen = super::super::run_season_final(&DEFAULT_SCENARIO, 1)
+            .expect("frozen season")
+            .0
+            .stocks[PLANT_N]
+            .amount;
+        assert_eq!(
+            frozen.to_bits(),
+            final_n(0.0001).to_bits(),
+            "the frozen crop has become supply-bound; soil_layer_depth is now load-bearing"
+        );
+    }
+
+    /// THE HEADLINE WATER CLAIM: reaching the below-root store is what saves a crop whose
+    /// supply is deliberately below its demand — measured against a control that removes
+    /// ONLY the transfer.
+    ///
+    /// ⚠ The effect size is a property of THIS scenario at THIS irrigation capacity, not
+    /// of the model, and the bound is two-sided so a slide in either direction is caught
+    /// rather than absorbed. The Python side has watched this ratio move twice for reasons
+    /// unrelated to what it measures (WSFD in 2026-08-12, the depth-resolved canopy in
+    /// 2026-08-15), each time with nothing red because the bound had slack — which is why
+    /// it is re-measured on this port rather than copied across.
+    /// Mirrors `test_reaching_the_subsoil_is_what_saves_the_deep_water_crop`.
+    #[test]
+    fn reaching_the_below_root_store_is_what_saves_the_deep_water_crop() {
+        let scenario = deep_water_scenario();
+        let subject = trace_season(&scenario, 1);
+        let control = trace_without_flow(&scenario, "biosphere.root_zone_capture");
+        let peak = |states: &[State]| -> f64 {
+            states
+                .iter()
+                .map(|s| s.stocks[LEAF_C].amount)
+                .fold(f64::MIN, f64::max)
+        };
+        // SAME ROOT SYSTEM IN BOTH — that is what makes this a water measurement rather
+        // than a rooting one. The control's roots still grow: `subsoil_water` is full, it
+        // is simply never drawn from.
+        let deepest = |states: &[State]| -> f64 {
+            states
+                .iter()
+                .map(|s| s.aux[ROOTED_DEPTH])
+                .fold(f64::MIN, f64::max)
+        };
+        assert!(
+            (deepest(&subject) - deepest(&control)).abs() < 0.02,
+            "the two runs grew different root systems: {} vs {}",
+            deepest(&subject),
+            deepest(&control)
+        );
+        // The rescue itself, an order of magnitude in the canopy and several times the
+        // grain. Measured on this port; see the plan record for the values.
+        let leaf_ratio = peak(&subject) / peak(&control);
+        let grain_ratio = subject.last().unwrap().stocks[STORAGE_C].amount
+            / control.last().unwrap().stocks[STORAGE_C].amount;
+        // ⚠ MEASURED ON THIS PORT: leaf 9.5775x, grain 5.8281x. Two-sided on the
+        // measurement, and the bands are the Python file's own current ones — which its
+        // last two re-measurements landed on independently. That agreement is a
+        // cross-port reading, not a copied literal: the numbers were produced here first
+        // and then found to sit inside bounds Python had already re-pinned twice.
+        assert!(
+            (9.0..10.5).contains(&leaf_ratio),
+            "the canopy rescue moved: {leaf_ratio}"
+        );
+        assert!(
+            (5.5..6.2).contains(&grain_ratio),
+            "the grain rescue moved: {grain_ratio}"
+        );
+        assert!(
+            subject.last().unwrap().stocks[STORAGE_C].amount > 2.5,
+            "the subject did not fill grain, so the ratio is about two failures"
+        );
+    }
+
+    /// The two controls for the claim above are NOT interchangeable, and the difference is
+    /// the honest result rather than a nuisance.
+    ///
+    /// The naive control (`subsoil_water0 = 0`) removes the water AND freezes rooted depth
+    /// through the `WSTORG = 0` gate, so it also moves the depth-gated nitrogen supply.
+    /// The clean control removes only the transfer. This project has had a causal claim
+    /// ("one cause, two symptoms") come back at 39 % before, so the attribution is
+    /// measured rather than asserted — and pinned so nobody "simplifies" the headline test
+    /// back onto the cheaper control.
+    /// Mirrors `test_the_deep_water_effect_is_water_and_not_the_nitrogen_gate`.
+    #[test]
+    fn the_clean_and_naive_deep_water_controls_are_not_interchangeable() {
+        let scenario = deep_water_scenario();
+        let clean = trace_without_flow(&scenario, "biosphere.root_zone_capture");
+        let naive = trace_season(
+            &SeasonScenario {
+                subsoil_water0: 0.0,
+                ..scenario
+            },
+            1,
+        );
+        let last_clean = clean.last().unwrap();
+        let last_naive = naive.last().unwrap();
+        // The naive control freezes depth at sowing; the clean one lets it grow.
+        assert_eq!(last_naive.aux[ROOTED_DEPTH], scenario.rooted_depth0);
+        assert!(last_clean.aux[ROOTED_DEPTH] > 1.0);
+        // So they are different experiments, and they do not agree.
+        assert_ne!(
+            last_clean.stocks[LEAF_C].amount,
+            last_naive.stocks[LEAF_C].amount
+        );
+    }
+
+    /// The three cycle flows carry ONLY water, in the ring order soil → atmosphere →
+    /// water → soil.
+    ///
+    /// ⚠ THE WIRING CHECK THE LEDGER IDENTITY CANNOT MAKE: both sides of a conservation
+    /// identity move together under a mislabel, so a flow plumbed to the wrong pool still
+    /// balances. Evaluated against the registry's REAL flow objects on a synthetic
+    /// all-positive state, so a builder mis-wiring is caught here. The before-battery is
+    /// the reason: making `Recycling` read `soil_water` instead of `condensate` — still
+    /// perfectly balanced — reddened nine tests, none of them about the ring.
+    ///
+    /// ⚠ The rooted-depth aux is LOAD-BEARING in this fixture. Stress divides by
+    /// `TTSW = depth · EXTR · ρ · A`, so a synthetic state without it has zero capacity,
+    /// zero FTSW, and a transpiration flow that returns nothing at all — a silent pass for
+    /// a test whose whole subject is that these flows carry water.
+    /// Mirrors `test_three_cycle_flows_carry_only_water_in_ring_order`.
+    #[test]
+    fn the_three_cycle_flows_carry_only_water_in_ring_order() {
+        let scenario = sealed_chamber_scenario();
+        let (base, registry) = build_season(&scenario).expect("sealed season");
+        // A 1.3 m root zone holding 1000 kg is FTSW 4.7, far above wssg — f_water = 1 —
+        // and both ring pools are nonzero so every flux is positive.
+        let mut stocks = base.stocks.clone();
+        for (id, amount) in [
+            (SOIL_WATER, 1000.0),
+            (WATER_VAPOR, 5.0),
+            (CONDENSATE, 5.0),
+        ] {
+            stocks.insert(id.to_string(), stocks[id].with_amount(amount).unwrap());
+        }
+        let mut aux = base.aux.clone();
+        aux.insert(ROOTED_DEPTH.to_string(), 1.3);
+        let state = State::new(base.n, stocks, base.rng_seed, aux).expect("ring state");
+        let resolver = super::super::weather_resolver(&scenario, 1).expect("resolver");
+        let env = resolver.bind(&state, 1.0);
+
+        let expected: [(&str, &str, &str); 3] = [
+            ("biosphere.transpiration", SOIL_WATER, WATER_VAPOR),
+            ("biosphere.condensation", WATER_VAPOR, CONDENSATE),
+            ("biosphere.recycling", CONDENSATE, SOIL_WATER),
+        ];
+        for (id, want_source, want_sink) in expected {
+            let flow = registry
+                .flows()
+                .iter()
+                .find(|f| f.id() == id)
+                .unwrap_or_else(|| panic!("{id} is not in the sealed registry"));
+            let result = flow.evaluate(&state, &env, 1.0).expect("evaluate");
+            // WATER only: every touched stock carries WATER and nothing else.
+            for leg in &result.legs {
+                let stock = &state.stocks[&leg.stock];
+                assert_eq!(stock.quantity, Quantity::Water, "{id} touched {}", leg.stock);
+                assert!(
+                    stock.composition.is_empty()
+                        || stock.composition.keys().all(|q| *q == Quantity::Water),
+                    "{id} touched a multi-quantity stock"
+                );
+            }
+            simcore::flow::assert_flow_balanced_default(&result, &state.stocks)
+                .unwrap_or_else(|e| panic!("{id} is unbalanced: {e:?}"));
+            // Exactly one source and one sink, and they are the ring's.
+            let sources: Vec<&str> = result
+                .legs
+                .iter()
+                .filter(|l| l.amount < 0.0)
+                .map(|l| l.stock.as_str())
+                .collect();
+            let sinks: Vec<&str> = result
+                .legs
+                .iter()
+                .filter(|l| l.amount > 0.0)
+                .map(|l| l.stock.as_str())
+                .collect();
+            assert_eq!(sources, vec![want_source], "{id} draws from the wrong pool");
+            assert_eq!(sinks, vec![want_sink], "{id} delivers to the wrong pool");
+        }
+    }
+
+    /// The sealed chamber's water is conserved over ALL FOUR stores, and the ring is
+    /// genuinely running.
+    ///
+    /// ⚠ `subsoil_water` is a term here, and NOT because the ring grew a fourth leg. The
+    /// below-root store is in-system soil water that `RootZoneCapture` moves into
+    /// `soil_water` as the roots reach it; it crosses no boundary, so a sealed chamber's
+    /// water is conserved over four stocks rather than three. Omitting it would make a
+    /// conserved transfer look like a leak — and including it without the non-vacuity
+    /// half below would make a frozen ring look conserved.
+    /// Mirrors `test_sealed_closed_water_loop_is_conserved`,
+    /// `test_sealed_water_cycle_is_active_and_distributes` and
+    /// `test_sealed_water_cycle_never_rations`.
+    #[test]
+    fn the_sealed_chamber_conserves_water_over_all_four_stores() {
+        let scenario = sealed_chamber_scenario();
+        let (state, integrator, resolver) =
+            super::super::season_setup(&scenario, SEALED_CHAMBER_YEARS).unwrap();
+        let total = |s: &State| -> f64 {
+            s.stocks[SOIL_WATER].amount
+                + s.stocks[SUBSOIL_WATER].amount
+                + s.stocks[WATER_VAPOR].amount
+                + s.stocks[CONDENSATE].amount
+        };
+        let mut totals: Vec<f64> = Vec::new();
+        let mut peak_vapor = 0.0f64;
+        let mut peak_condensate = 0.0f64;
+        let mut first: Option<(f64, f64)> = None;
+        let mut observe = |s: &State| {
+            totals.push(total(s));
+            peak_vapor = peak_vapor.max(s.stocks[WATER_VAPOR].amount);
+            peak_condensate = peak_condensate.max(s.stocks[CONDENSATE].amount);
+            if first.is_none() {
+                first = Some((s.stocks[WATER_VAPOR].amount, s.stocks[CONDENSATE].amount));
+            }
+        };
+        let (_, rationed, _) = run_season(
+            &integrator,
+            state,
+            &resolver,
+            super::super::BIO_DT,
+            super::super::steps_for_years(SEALED_CHAMBER_YEARS),
+            None,
+            &mut observe,
+        )
+        .expect("sealed season");
+        // Structural positivity through the ring: each first-order draw self-limits
+        // against the start-of-step pool, so the Euler backstop never fires.
+        assert_eq!(rationed, 0, "the closed water ring needed the backstop");
+        // CONSERVED. `soil_water` is O(1e2-1e3) kg, so the band is absolute rather than
+        // relative — the float-subtraction noise of the large pool.
+        let first_total = totals[0];
+        for t in &totals {
+            assert!(
+                (t - first_total).abs() < 1e-7,
+                "water leaked: {t} vs {first_total}"
+            );
+        }
+        // NON-VACUITY: the ring genuinely moves water. Both pools start at zero and build
+        // from transpiration, so a frozen cycle would be conserved and useless.
+        assert_eq!(first, Some((0.0, 0.0)));
+        assert!(peak_vapor > 1e-3, "the vapour pool never filled: {peak_vapor}");
+        assert!(
+            peak_condensate > 1e-3,
+            "the condensate pool never filled: {peak_condensate}"
+        );
+    }
+
 }
