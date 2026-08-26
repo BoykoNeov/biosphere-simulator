@@ -2556,4 +2556,129 @@ mod tests {
         );
     }
 
+
+    /// The re-sow is a CYCLE and not a RATCHET — the below-root store lands on a fixed
+    /// point over five cycles instead of stepping down.
+    ///
+    /// ⚠ NO SINGLE GOLDEN CAN SHOW THIS, and neither can the single-`annual_reset` pin
+    /// above it: `RootZoneCapture` is one-way within a season, so without a return leg
+    /// every re-sow would move more of the profile permanently into the root zone, and a
+    /// one-cycle test cannot tell a return from a smaller ratchet.
+    ///
+    /// ⚠ The claim is sharper than "not a ratchet" and the tolerance says so. The rule
+    /// this replaced returned the abandoned column *at the drained upper limit*, which made
+    /// every cycle start identical from year 2; the FRACTION rule instead CONVERGES — one
+    /// transient cycle, then a fixed point held to round-off. So the assertion is a
+    /// convergence at 1e-12, four orders below the transient it has to distinguish itself
+    /// from, plus the transient's own existence and direction.
+    /// ⚠ HONEST SCOPE, measured rather than assumed. This catches a return that STOPS (the
+    /// true ratchet: the store steps down every cycle), not a return that is merely the
+    /// wrong SIZE. A multiplicative drift on the fraction — `× 1.000001` — converges to a
+    /// *different* fixed point rather than ratcheting, so it leaves this test green and is
+    /// caught instead by the exact-value pins in `science.rs` and in
+    /// `the_resow_returns_the_abandoned_fraction_and_preserves_ftsw`. The three tests are a
+    /// set, and this is the one that covers the shape no single golden can see.
+    /// Mirrors `test_the_resow_returns_the_abandoned_zones_water_so_there_is_no_ratchet`.
+    #[test]
+    fn the_resow_makes_a_cycle_and_not_a_ratchet_over_five_years() {
+        let scenario = perennial_chamber_scenario();
+        let years = PERENNIAL_CHAMBER_YEARS;
+        let (state, integrator, resolver) = super::super::season_setup(&scenario, years).unwrap();
+        let mut below: Vec<f64> = Vec::new();
+        let mut both: Vec<f64> = Vec::new();
+        let mut observe = |s: &State| {
+            below.push(s.stocks[SUBSOIL_WATER].amount);
+            both.push(s.stocks[SUBSOIL_WATER].amount + s.stocks[SOIL_WATER].amount);
+        };
+        let year = super::super::season_steps();
+        let (_, rationed, _) = run_perennial(
+            &integrator,
+            state,
+            &scenario,
+            &resolver,
+            super::super::BIO_DT,
+            super::super::steps_for_years(years),
+            year,
+            &mut observe,
+        )
+        .expect("perennial");
+        assert_eq!(rationed, 0);
+        // The store at the same point in each cycle — one step after the re-sow refills it.
+        // ⚠ In STEPS: `year` is a step count and the `+ 1` means "one integration step
+        // after the reset", not "one day after".
+        let at_cycle_start: Vec<f64> = (1..years).map(|i| below[i * year + 1]).collect();
+        assert_eq!(at_cycle_start.len(), years - 1);
+        let settled = &at_cycle_start[1..];
+        for v in settled {
+            assert!(
+                (v - settled[0]).abs() <= 1e-12 * settled[0].abs(),
+                "the below-root store drifts rather than settling: {at_cycle_start:?}"
+            );
+        }
+        // The transient is ONE cycle wide, small, and in one direction — not the first two
+        // steps of a slow ratchet that happen to look flat at this tolerance.
+        assert_ne!(at_cycle_start[0], settled[0]);
+        assert!((at_cycle_start[0] - settled[0]).abs() / settled[0] < 1e-3);
+        assert!(at_cycle_start[0] > settled[0]);
+        // The two soil stores TOGETHER are conserved across every cycle boundary, which is
+        // what says the convergence is a REDISTRIBUTION and not a leak.
+        let totals: Vec<f64> = (1..years).map(|i| both[i * year + 1]).collect();
+        for t in &totals {
+            assert!(
+                (t - totals[0]).abs() <= 1e-14 * totals[0].abs(),
+                "the two stores together are not conserved across cycles: {totals:?}"
+            );
+        }
+        // NON-VACUITY: the store really is drawn down within a year, so "no ratchet" is not
+        // trivially true of a mechanism that never ran.
+        let lowest = below.iter().copied().fold(f64::INFINITY, f64::min);
+        assert!(lowest < at_cycle_start[0] / 2.0, "the capture never ran: {lowest}");
+    }
+
+    /// `RootZoneCapture` is a BALANCED INTERNAL transfer — both legs are in-system soil
+    /// stocks summing to zero, and neither is a boundary.
+    ///
+    /// It only re-labels which water the crop can reach. ⚠ If it ever gained a boundary
+    /// leg, a sealed chamber's water would stop being conserved — and the every-step
+    /// conservation gate would NOT name this flow, because it folds state deltas after all
+    /// flows are applied. Batch A's review found the biosphere called
+    /// `assert_flow_balanced_default` nowhere in the crate and added the gas-flow case;
+    /// this is the water one.
+    /// Mirrors `test_the_capture_is_a_balanced_internal_transfer`.
+    #[test]
+    fn the_root_zone_capture_is_a_balanced_internal_transfer() {
+        let scenario = DEFAULT_SCENARIO;
+        let (state, registry) = build_season(&scenario).expect("season");
+        let resolver = super::super::weather_resolver(&scenario, 1).expect("resolver");
+        let env = resolver.bind(&state, 1.0);
+        let flow = registry
+            .flows()
+            .iter()
+            .find(|f| f.id() == "biosphere.root_zone_capture")
+            .expect("the capture is in the registry");
+        let result = flow.evaluate(&state, &env, 1.0).expect("evaluate");
+        simcore::flow::assert_flow_balanced_default(&result, &state.stocks)
+            .expect("the capture must balance leg by leg");
+        let sum: f64 = result.legs.iter().map(|l| l.amount).sum();
+        assert_eq!(sum, 0.0, "a single-currency internal transfer must sum to zero");
+        let touched: std::collections::BTreeSet<&str> =
+            result.legs.iter().map(|l| l.stock.as_str()).collect();
+        assert_eq!(
+            touched,
+            std::collections::BTreeSet::from([SOIL_WATER, SUBSOIL_WATER])
+        );
+        for leg in &result.legs {
+            assert!(
+                !leg.stock.starts_with("boundary."),
+                "the capture crossed a boundary: {}",
+                leg.stock
+            );
+        }
+        // NON-VACUITY: it actually moved water on this step, or the sum is zero trivially.
+        assert!(
+            result.legs.iter().any(|l| l.amount != 0.0),
+            "the capture moved nothing, so balance is vacuous here"
+        );
+    }
+
 }

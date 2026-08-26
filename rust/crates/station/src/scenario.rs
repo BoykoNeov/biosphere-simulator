@@ -383,12 +383,52 @@ mod water_geometry_tests {
     // and a deliberately wider scan is shown to find MORE — proving the census can redden.
     // -----------------------------------------------------------------------------
 
-    fn repo_file(relative: &str) -> String {
+    fn crates_dir() -> std::path::PathBuf {
         // rust/crates/station -> rust/crates
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join(relative);
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
+    }
+
+    fn repo_file(relative: &str) -> String {
+        let path = crates_dir().join(relative);
         std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path:?} is readable: {e}"))
+    }
+
+    /// Every `.rs` file under `rust/crates/*/src`, found by walking rather than listed.
+    ///
+    /// ⚠ **THE CENSUS IS ONLY AS WIDE AS ITS FILE SET, AND A HAND LIST OF FILES IS THE
+    /// SAME DEFECT ONE LEVEL UP.** The first draft named `system.rs` and `scenario.rs`
+    /// outright — which replaces a hand list of scenarios with a hand list of files, and a
+    /// scenario declared in a third module would have been invisible while every control
+    /// still passed. The walk is what makes the claim about the TREE. `src` only: an
+    /// integration test or an example builds no shipped run.
+    fn source_files() -> Vec<std::path::PathBuf> {
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            let entries = match std::fs::read_dir(dir) {
+                Ok(e) => e,
+                Err(_) => return,
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    out.push(path);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        for crate_entry in std::fs::read_dir(crates_dir())
+            .expect("rust/crates is readable")
+            .flatten()
+        {
+            let src = crate_entry.path().join("src");
+            if src.is_dir() {
+                walk(&src, &mut out);
+            }
+        }
+        out.sort();
+        assert!(out.len() > 40, "the walk found almost nothing: {}", out.len());
+        out
     }
 
     /// Every `SeasonScenario` DECLARATION in one source file, by name.
@@ -451,14 +491,29 @@ mod water_geometry_tests {
     #[test]
     fn the_scenario_roster_matches_what_the_source_declares() {
         let mut found: Vec<String> = Vec::new();
-        for relative in [
-            "domains/src/biosphere/system.rs",
-            "station/src/scenario.rs",
-        ] {
-            let text = repo_file(relative);
-            found.extend(declared_scenarios(production_half(&text)));
+        let mut files_with_scenarios: Vec<String> = Vec::new();
+        for path in source_files() {
+            let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path:?}: {e}"));
+            let here = declared_scenarios(production_half(&text));
+            if !here.is_empty() {
+                files_with_scenarios.push(
+                    path.file_name()
+                        .expect("a file name")
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+            }
+            found.extend(here);
         }
         found.sort();
+        // ⚠ The file set is DISCOVERED, and this records what the discovery found. If a
+        // third module ever declares a scenario the census picks it up automatically —
+        // and this line reddens, which is the prompt to look at it rather than a failure.
+        assert_eq!(
+            files_with_scenarios,
+            vec!["system.rs".to_string(), "scenario.rs".to_string()],
+            "a scenario is now declared somewhere new; check it belongs in the roster"
+        );
         let mut listed: Vec<String> = rostered().iter().map(|(n, _)| n.to_string()).collect();
         listed.sort();
         assert_eq!(
@@ -595,6 +650,53 @@ mod water_geometry_tests {
             DEFAULT_SCENARIO.soil_moisture_index, 1.0,
             "MAI defaults to the drained upper limit, which is what makes FTSW0 = 1"
         );
+    }
+
+    /// ⚠ THE PRECONDITIONS THE OMITTED INPUT GUARDS USED TO CARRY, asserted over the whole
+    /// census rather than left as a claim about the roster as it stood in Phase 7.
+    ///
+    /// `science.rs`'s module header records a Phase-7 port decision: the `ValueError`-raising
+    /// input guards (`ground_area > 0`, …) are omitted because "they never fire for the
+    /// frozen scenarios and would force `Result` on hot rate laws". That is why
+    /// `test_water_stress_factor_rejects_non_positive_threshold` and
+    /// `test_penman_monteith_rejects_non_positive_aerodynamic_resistance` get no direct
+    /// successor — an inherited decision, not this batch narrowing the claim.
+    ///
+    /// But §5ad flagged the rationale's soft half: *"they never fire for the frozen
+    /// scenarios"* is a claim about the roster **as it stood when it was written**, and this
+    /// repo has been bitten by a scope claim outliving its roster before. So the claim is
+    /// now checked, on every scenario the census finds, at the field that carries it.
+    ///
+    /// `wssg` is the sharp one and it is a SCENARIO field, so none of the param-file guards
+    /// reaches it: `water_stress_factor` returns `1.0` whenever `ftsw >= threshold`, so a
+    /// zero `wssg` reads even a bone-dry root zone as perfectly unstressed. Python raises;
+    /// Rust cannot without putting a `Result` on a rate law called every step. Asserting no
+    /// scenario declares one is the successor that costs nothing at runtime.
+    #[test]
+    fn no_scenario_declares_an_input_the_omitted_guards_would_have_rejected() {
+        for (name, scenario) in rostered() {
+            assert!(
+                scenario.wssg > 0.0,
+                "{name}: wssg = {} would make every crop permanently unstressed",
+                scenario.wssg
+            );
+            assert!(scenario.ground_area > 0.0, "{name}: non-positive ground_area");
+            assert!(
+                scenario.soil_extractable_water > 0.0,
+                "{name}: a zero EXTR is a zero TTSW, hence FTSW = 0 everywhere"
+            );
+            assert!(scenario.soil_depth > 0.0, "{name}: non-positive soil_depth");
+            assert!(
+                scenario.rooted_depth0 > 0.0,
+                "{name}: a zero sowing depth shuts the root-zone access gate forever"
+            );
+        }
+        // The Penman-Monteith resistances are PARAM-file fields, so their guard did move —
+        // `transpiration_from` rejects a non-positive pair, which IS the successor to
+        // `test_penman_monteith_rejects_non_positive_aerodynamic_resistance`. Asserted here
+        // so the two halves of the same claim are visible in one place.
+        let transp = domains::biosphere::params::transpiration();
+        assert!(transp.aerodynamic_resistance > 0.0 && transp.surface_resistance > 0.0);
     }
 
     /// A CONSISTENCY REQUIREMENT ACROSS TWO FILES, enforced here because nothing else can.

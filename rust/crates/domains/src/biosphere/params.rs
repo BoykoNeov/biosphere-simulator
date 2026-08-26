@@ -796,11 +796,19 @@ pub fn humification() -> HumificationParams {
 /// Condensation + recycling rates, from arbitrary file TEXT — see [`transpiration_from`]
 /// for why the split exists.
 ///
-/// ⚠ NON-NEGATIVE, not positive, and the difference is a design decision rather than a
-/// looser guard: a zero rate is the legal way to declare a chamber with no condenser,
-/// which is what every OPEN-field scenario in the tree does. A NEGATIVE rate would run
-/// the ring backwards — condensate evaporating into vapour through a flow whose legs say
-/// the opposite — so that is what is rejected.
+/// ⚠ NON-NEGATIVE, not positive, and the difference is an inherited design decision rather
+/// than a looser guard. The file's own header states it: *"A zero rate is valid (no
+/// condensation / no recycling); negative is rejected (it would create water)."* A negative
+/// rate would run the ring backwards — condensate evaporating into vapour through a flow
+/// whose legs say the opposite — which the flow-level direction pins could not catch,
+/// because the legs would still balance.
+///
+/// ⚠ **A first draft of this comment justified the zero by saying it is how every
+/// open-field scenario declares no condenser. That is FALSE and it was measured, not
+/// argued**: the ring is built only inside the `sealed` branch, so an open-field scenario
+/// omits the two flows entirely rather than declaring zero rates, and nothing in the tree
+/// declares a zero (the shipped file is 0.5/0.5). The guard's shape is the FILE's rule, not
+/// a claim about the roster — batch A's overclaim shape, caught in review.
 pub fn water_cycle_from(text: &str, name: &'static str) -> WaterCycleParams {
     let units: [(&str, &str); 2] = [("condensation_rate", "1/day"), ("recycling_rate", "1/day")];
     let f = file(text, name);
@@ -1988,11 +1996,12 @@ parameters:
     /// A NEGATIVE cycle rate is rejected; a ZERO one is legal, and that asymmetry is a
     /// design decision rather than a looser guard.
     ///
-    /// A zero is how a chamber with no condenser is declared — which is every OPEN-field
-    /// scenario in the tree, since the ring exists only in the sealed branch. A negative
-    /// would run the ring backwards: condensate evaporating into vapour through a flow
-    /// whose legs say the opposite, which the flow-level direction pins would not catch
-    /// because the legs would still balance.
+    /// A zero is how a chamber with no condenser is declared — the file header's own rule.
+    /// ⚠ NOT a claim about the roster: no scenario in the tree declares one, because the
+    /// ring is built only inside the `sealed` branch and an open-field scenario omits the
+    /// flows entirely. A negative would run the ring backwards: condensate evaporating into
+    /// vapour through a flow whose legs say the opposite, which the flow-level direction
+    /// pins would not catch because the legs would still balance.
     /// Mirrors `test_loader_rejects_negative_rate`.
     #[test]
     fn a_negative_water_cycle_rate_is_rejected_but_a_zero_one_is_legal() {
@@ -2004,7 +2013,10 @@ parameters:
                 },
                 &format!("{field} = -0.1"),
             );
-            // THE LEGAL BOUNDARY: zero is a chamber with no condenser, not a bad file.
+            // THE LEGAL BOUNDARY: zero is a chamber with no condenser, not a bad file —
+            // the file header's own rule. ⚠ No scenario in the tree declares one (the ring
+            // is built only in the sealed branch, which omits the flows rather than zeroing
+            // them), so this half asserts the GUARD's shape and nothing about the roster.
             let off = value_of(WATER_CYCLE_YAML, field, "0.0");
             let loaded = water_cycle_from(off, "water_cycle.yaml");
             let got = if field == "condensation_rate" {

@@ -6648,6 +6648,103 @@ canopy-resistance term's contribution was written as `> 1.5×` and measured at *
 It is now two-sided on the measurement, so a change that *shrinks* the term is caught as
 well as one that drops it.
 
+### §5ag review — four corrections, and the one that could have falsified the batch's headline artefact
+
+An audit of the batch after it was committed. As with batch A's, **none of the four could
+have been found by either battery**: all 23 mutations reddened a test whose subject was the
+mutated mechanism, and the batch read as finished.
+
+`cargo test -p domains --lib` 257 → **259**, `-p station --lib` 60 → **61**, clippy clean, no
+frozen value moved.
+
+#### ⚠⚠ 1. The census scanned a HAND LIST OF FILES, which is the same defect one level up
+
+`the_scenario_roster_matches_what_the_source_declares` named two paths outright:
+`domains/src/biosphere/system.rs` and `station/src/scenario.rs`. Its two controls prove the
+*scanner* works and the *comparison* bites — and neither can see a `SeasonScenario` declared
+in a **third** module. So the census replaced a hand list of scenarios with a hand list of
+files, while making a claim about the tree. That is precisely the failure the
+reflection-based Python original exists to prevent, moved up one level and out of view of
+every control the batch shipped.
+
+The file set is now **discovered**: a walk of `rust/crates/*/src/**/*.rs`, with the two
+files it currently finds asserted as a recorded measurement (the shape
+`the_census_matches_the_directory_on_disk` uses against its directory) rather than as the
+input. Measured: declaring a scenario in `station/src/greenhouse.rs` — a module the first
+draft could not have looked at — now reddens exactly one test of 60, the census.
+
+*The general form: when you replace a reflective enumeration with a scan, ask what the scan
+itself is hand-fed. A control that proves the scanner works says nothing about whether the
+scanner was pointed at everything.*
+
+#### ⚠⚠ 2. The batch had no "deliberately NOT ported" list, which is §5ad's whole subject
+
+Batches A and B each enumerate the tests that get no successor and why. Batch C shipped with
+"what batch C leaves standing" (forward items) and **no per-test absence list** — so 77
+Python test functions became 43 Rust tests with the difference unexplained, and an absence
+reads as an oversight rather than as a decision. That is the exact failure mode S5 exists to
+prevent, in the batch that exists to prevent it.
+
+The list, with what each absence actually is:
+
+| Python test | disposition |
+|---|---|
+| `test_water_stress_factor_rejects_non_positive_threshold` | **inherited port decision** (`science.rs`'s module header omits the `ValueError` input guards on hot rate laws) — but its PRECONDITION is now asserted, see below |
+| `test_penman_monteith_rejects_non_positive_aerodynamic_resistance` | **successor exists, one layer down**: `transpiration_from` rejects a non-positive pair. The check moved from the function to the loader |
+| `test_sealed_water_scoped_compartment_ledger_balances_every_step` | **no successor**: `compartment_boundary_ledger` has no Rust equivalent anywhere in the tree. Recorded as a gap, not as a decision |
+| `test_transp_loader_round_trips_a_valid_file`, `test_transpiration_params_file_exists`, `test_loader_reads_committed_rates` | folded into the committed-value pins — `include_str!` makes "the file exists" and "it round-trips" the same assertion |
+| `test_the_rate_is_exactly_zero_with_nothing_below` | covered by `a_dry_subsoil_stops_extension` (which already sweeps `<= 0`) plus M16 |
+| `test_drought_declares_a_stratified_profile_deliberately`, `test_the_roster_this_covers_is_not_empty_and_includes_the_station` | folded into `a_dry_below_root_store_stops_extension_for_the_whole_season` and the census's own non-vacuity assertions |
+
+Two of these produced work rather than a row:
+
+**`wssg` is a SCENARIO field, and no guard in this port reaches it.** `water_stress_factor`
+returns `1.0` whenever `ftsw >= threshold`, so a zero `wssg` reads even a bone-dry root zone
+as perfectly unstressed — Python raises, Rust cannot without putting a `Result` on a rate law
+called every step. The omission is the inherited Phase-7 decision, but §5ad had already
+flagged its soft half: *"they never fire for the frozen scenarios"* is a claim about the
+roster **as it stood when it was written**. `no_scenario_declares_an_input_the_omitted_guards
+_would_have_rejected` now checks it on every scenario the census finds, at zero runtime cost.
+Measured: declaring `wssg = 0` on the frozen scenario reddens it, alone in the station binary.
+
+**The five-cycle ratchet claim had no successor at all.** The batch's re-sow pins were a
+single `annual_reset` call and a two-year run asserting `returned > 0`; the Python claim is a
+FIXED POINT over five cycles, *"the difference between a cycle and a ratchet, and no single
+golden can show it"*. `the_resow_makes_a_cycle_and_not_a_ratchet_over_five_years` ships,
+with the transient's existence, size and direction pinned alongside the convergence, and
+with the two stores' joint conservation across every cycle boundary — which is what says the
+convergence is a redistribution rather than a leak. ⚠ Its honest scope is measured and
+stated in the test: it catches a return that **stops**, not one that is the wrong **size** (a
+`× 1.000001` drift converges to a *different* fixed point and leaves it green, and is caught
+by the exact-value pins instead).
+
+**And `RootZoneCapture` had no balance test**, which is batch A's own review finding one
+mechanism over: the biosphere called `assert_flow_balanced_default` nowhere until batch A
+added the gas case, and batch C added the water flows' — but not the capture's.
+`the_root_zone_capture_is_a_balanced_internal_transfer` ships.
+
+#### ⚠ 3. A guard's justification asserted something about the roster that is false
+
+`water_cycle_from`'s doc comment said the non-negative guard exists because a zero rate is
+how *"every OPEN-field scenario in the tree"* declares no condenser. It is not: the ring is
+built only inside the `sealed` branch, so an open-field scenario **omits the two flows
+entirely** rather than declaring zero rates, and nothing in the tree declares a zero (the
+shipped file is 0.5/0.5). The guard's shape is the FILE's own rule — its header says *"A zero
+rate is valid ...; negative is rejected"* — and that is what the comment now says, with the
+correction recorded in place. Same species as batch A's overclaims: **a reason asserted about
+a roster that does not hold**.
+
+#### What this review says about the batch's method, again
+
+Batch A's correction concluded that *a green mutation battery is evidence about the
+INSTRUMENT, not about the arithmetic*. Batch C adds a second axis: **a battery is also
+evidence about the mechanisms you chose to mutate, and says nothing about the ones you did
+not port.** Three of the four items here are about *absence* — a file the scan was never
+pointed at, tests with no successor and no recorded reason, a claim with no test. No
+mutation of any shipped mechanism could surface any of them, because none of them is a
+mechanism that is wrong; they are claims that are missing. *The instrument for absence is a
+census, and the census has to be written down.*
+
 ### What batch C leaves standing
 
 * **`intercepted_fraction` still unresolved** (S6 item; clause 4 of the exit gate).
@@ -6662,4 +6759,7 @@ well as one that drops it.
 * **`flows.rs`'s test-local `ROOTED_DEPTH`** still shadows `stocks::ROOTED_DEPTH` with a
   different string (batch B's finding). Batch C's own fixtures use the engine's name
   explicitly and say so, but the shadow is untouched.
+* **`compartment_boundary_ledger` has no Rust equivalent** anywhere in the tree, so
+  `test_sealed_water_scoped_compartment_ledger_balances_every_step` has no successor. A
+  gap found by the review's absence census, not a decision.
 * **No Python deleted.** All four files stay green and running until S6.

@@ -3196,3 +3196,68 @@ running anything. ⚠ And one of this batch's own bounds was re-pinned from the 
 rather than from the guess: the canopy-resistance term's contribution was written `> 1.5×`
 and measured **1.4432×**; it is now two-sided, so a change that shrinks the term is caught
 as well as one that drops it.
+
+### S5 batch C review — a scan is only as wide as the file list you hand it (2026-08-26)
+
+Four corrections from an audit of the batch just committed. As with batch A's,
+**none could have been found by either battery**: all 23 mutations reddened a test whose
+subject was the mutated mechanism, and the batch read as finished. `--lib` 257 → 259,
+`station --lib` 60 → 61, clippy clean, no frozen value moved.
+
+#### ⚠⚠ The census scanned a hand list of FILES — the same defect one level up
+
+The every-scenario geometry census named two paths outright. Its two controls prove the
+*scanner* works and the *comparison* bites; neither can see a scenario declared in a
+**third** module. So the fix for "a hand list of scenarios goes stale" was a hand list of
+files, making a claim about the tree while looking at two files — and every control the
+batch shipped was blind to it.
+
+The file set is now discovered by walking `rust/crates/*/src`, with the two files it finds
+asserted as a recorded measurement rather than used as the input. Measured: a scenario
+declared in `station/src/greenhouse.rs` now reddens exactly one test of 60.
+
+*When you replace a reflective enumeration with a scan, ask what the SCAN is hand-fed. A
+control that proves the scanner works says nothing about where it was pointed.*
+
+#### ⚠⚠ The batch shipped with no "deliberately NOT ported" list, which is S5's whole subject
+
+Batches A and B each enumerate their non-ported tests and why. Batch C did not, so 77 Python
+test functions became 43 Rust tests with the difference unexplained — an absence reading as
+an oversight rather than a decision, in the batch that exists to stop exactly that. The list
+is now written, and three of its rows turned into work:
+
+* **`wssg` is a SCENARIO field and no guard in this port reaches it.**
+  `water_stress_factor` returns `1.0` whenever `ftsw >= threshold`, so a zero `wssg` reads a
+  bone-dry root zone as perfectly unstressed. Python raises; Rust cannot without a `Result`
+  on a rate law called every step, and the omission is a recorded Phase-7 decision. But
+  §5ad had already flagged its soft half — *"they never fire for the frozen scenarios"* is a
+  claim about the roster **as it stood when written**. It is now asserted over every scenario
+  the census finds, at zero runtime cost. *An input guard you decline to write becomes a
+  PRECONDITION, and a precondition is checkable at the roster even when it is not checkable
+  in the function.*
+* **The five-cycle ratchet claim had no successor at all** — the batch's re-sow pins were a
+  single reset call and a two-year run asserting `returned > 0`, where the Python claim is a
+  FIXED POINT over five cycles. Now shipped, with the transient's size and direction and the
+  two stores' joint conservation across every boundary. ⚠ Honest scope, measured: it catches
+  a return that **stops**, not one of the wrong **size** — a `× 1.000001` drift converges to a
+  *different* fixed point and leaves it green.
+* **`RootZoneCapture` had no balance test** — batch A's own review finding, one mechanism
+  over.
+
+#### ⚠ A guard's justification asserted something false about the roster
+
+`water_cycle_from`'s comment said the non-negative guard exists because a zero rate is how
+*"every open-field scenario in the tree"* declares no condenser. It is not: the ring is built
+only in the `sealed` branch, so open-field scenarios omit the flows entirely, and nothing in
+the tree declares a zero. The guard's shape is the FILE's rule, not a fact about the roster.
+Same species as batch A's overclaims.
+
+#### What this says about the method, on a second axis
+
+Batch A's correction concluded that a green battery is evidence about the **instrument**, not
+about the arithmetic. Batch C adds: **it is also evidence only about the mechanisms you chose
+to mutate, and says nothing about the ones you never ported.** Three of these four items are
+about *absence* — a file the scan was never pointed at, tests with no successor and no
+recorded reason, a claim with no test. No mutation of any shipped mechanism could surface
+any of them, because none is a mechanism that is wrong; they are claims that are missing.
+*The instrument for absence is a census, and the census has to be written down.*
