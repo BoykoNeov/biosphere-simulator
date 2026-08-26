@@ -3788,7 +3788,7 @@ slices, not one**, and the first two are not test work:
 | **S2** | **The three gates come with it** — the manifest byte gate, the golden comparison + `golden_platform.py`'s policy, the inventory dumps' consumer | FINDINGS 2 + 3. These guard the *contracts*; every later slice runs behind them. ⚠ **Splits in two, and the split is structural, not a size call** (§5t): the golden comparison stops at `station`, so `station` can own its census; the manifest gate spans `domains` + `station` + `authoring`, so it cannot. **COMPLETE 2026-08-19** — first half (§5t) discharged FINDING 3 and carried the S1 forcing literal; second half (§5u) moved the three manifest writers into their crates and gave each contract a byte gate, plus Rust successors for the three `test_inventory_parity` claims the byte gate does NOT subsume. FINDING 2 grew to five on the way |
 | **S3** | **The sibling domains** — crew, eclss, power, thermal: 158 Python tests, 0 Rust | FINDINGS 4 + 7. The cheapest large win, and Control B shows the coverage is real and currently on loan from the cross-port comparison. ⚠ **BUILT — see §5w (COMPLETE 2026-08-19).** ⚠ **Designed in §5v, and this row is superseded on two counts**: the real figure is **160 collected cases over nine files**, not 158 over eleven — `test_bvad_validation.py` and `test_crew_coupled_loop.py` are deferred to `station` as science items. And **Control B's verdict here is dated**: §5v re-ran it and got 12 red, not 2 |
 | **S4** | **The engine residue** — extinction, aux, environment, integrator, multirate, the purity + `gdext` gates | FINDINGS 6 + 8. Small, invariant-shaped, and each one is a `CLAUDE.md` non-negotiable. ⚠ **BUILT — see §5x (COMPLETE 2026-08-25).** It is **two** slices wearing one row: five behavioural files whose subject is arithmetic, and two structure gates whose subject is what a manifest contains — different acceptance criteria, and the structure half taken first because it was the only part that could still change the slice's shape |
-| **S5** | **The biosphere mechanisms** — ~600 tests over `flows.rs` | FINDING 5. The largest and the one to take last, in crop/process batches, because it is where a silent narrowing does the most damage |
+| **S5** | **The biosphere mechanisms** — **599 tests over 20 files**, whose reference owner is `science.rs`, not `flows.rs` | FINDING 5. The largest and the one to take last, because it is where a silent narrowing does the most damage. ⚠ **DESIGNED — see §5ad (measured 2026-08-26, before any Rust).** This row is superseded on three counts: the owner is `domains/src/biosphere/science.rs` (34 public functions, **7** tests), not `flows.rs`, which holds wiring; the batching is by **Rust surface**, not by crop or process — seven batches, one of which (soil carbon) has no extracted functions and must be tested at flow level; and a six-mutation control shows **five of the six caught by nothing that is about them**, so the coverage is on loan from goldens and unrelated bands. One cited `science.rs` function, `intercepted_fraction`, is **dead code** and would silently absorb a whole batch |
 | **S6** | **The retirements** — the two `R!` rows (only once S3's successors stand), the generators (each against its named successor), the Python tree itself | Only after S1–S5 have successors standing. ⚠ The cross-port comparison is **not** a free deletion: FINDING 7 makes it the sibling domains' only gate until S3 lands. The **D** rows (Godot drivers, `test_context_budget.py`, `test_headless_cli.py`) need answers before this slice, not during it. ⚠ **ANSWERED 2026-08-25 (§5y) — and the answers put four BUILD items in front of S6, not four filings:** all four went maximal-Rust, so `test_context_budget.py`, `test_headless_cli.py`, the nine Godot drivers and the `tiers.json` band gates each need a Rust successor written, and the last carries an unfreeze ceremony on `docs/native-port-reference.md`. S6 is a deletion slice again only once those stand |
 
 ⚠ **`test_context_budget.py` is the one row with no home on either side.** It guards this
@@ -3855,6 +3855,8 @@ its test count; **(0 tests)** means the implementation is there and nothing chec
 | `test_authoring_multirate_compose.py` | 4 | authoring/tests/multirate.rs (18) |  |
 
 #### **P — port** (the reference implements it and tests it nowhere) — 62 files, 1204 tests
+
+⚠⚠ **The `Reference owner` cell on every FINDING 5 row is WRONG — corrected in §5ad, measured 2026-08-26.** It names `flows.rs (0 tests)`, but `flows.rs` holds the flow *wiring*; the equations live in `domains/src/biosphere/science.rs` (34 public functions, 7 tests). The four soil-carbon rows (`mineralization`, `soil_fractionation`, `decomposition`, `microbial_respiration`) are the exception — those equations really are inline in `flows.rs`, which is why §5ad batches them apart. Do not port a mechanism against this column without reading §5ad first; one of the functions it would send you to is dead code.
 
 | File | tests | Reference owner | Note |
 |---|---:|---|---|
@@ -5765,3 +5767,145 @@ Advisor-reviewed; gates written before the data moved; mutation-controlled;
 `docs/native-port-reference.md` carries a dated UNFREEZE block naming what moved, what did
 not, and what is outstanding. **`CLAUDE.md`'s own pointer was repointed in the same commit** —
 it named the old path, and the always-loaded map is audited by nothing (the C3 lesson).
+
+## §5ad Stage 3 — S5, the biosphere mechanisms: MEASURED 2026-08-26, before any Rust was written
+
+S5 is the last big porting slice and the one where a silent narrowing does the most damage:
+**20 Python files, 599 collected tests**, all of them about the plant science itself. Same
+shape as §5v — measure first, write the design against what was measured, and only then
+write Rust.
+
+### ⚠ The owner column in the "P — port" table above is WRONG, and it points at the wrong file
+
+Every FINDING 5 row names `domains/src/biosphere/flows.rs (0 tests)`. Measured from the Rust
+side, `flows.rs` holds **wiring** — 26 `Flow`/`AuxProcess` impls that say which stocks a
+transfer moves — and computes almost none of the science. The equations live in
+`domains/src/biosphere/science.rs`: **734 lines, 34 public functions, 7 tests**.
+
+Those 7 cover six functions — `captured_water`, `drought_development_factor`,
+`extension_rate` (+`root_zone_fraction`), `nitrogen_stress_factor`, `soil_n_availability`.
+The other 28 have no direct test: FvCB (`rubisco_limited_rate`, `electron_transport_rate`,
+`light_limited_rate`, `gross_leaf_assimilation`, `temperature_factor`,
+`canopy_assimilation`), `leaf_area_index`, `q10_factor`, `maintenance_respiration_flux`,
+`available_for_growth`, `slope_svp`, `penman_monteith_transpiration`, `transpirable_capacity`,
+`fraction_transpirable`, `water_stress_factor`, `soil_water_stress`, `daily_thermal_time`,
+`vernalization_day`, `vernalization_factor`, `photoperiod_factor`, `development_stage`,
+`partition_fractions`, `partition`, `target_n_concentration`, `ci_from_co2_pool`,
+`oxygen_limitation_factor`, `resow_water_return`, `mutual_shading_rate`.
+
+This changes the slice's shape, not its size: a pure-function equation test is cheap, and
+most of S5 is that. It also changes where the tests go.
+
+⚠ **A second structural fact the table hides.** Python has extracted per-mechanism modules
+(`decomposition`, `humification`, `mineralization`, `microbial_respiration`), and Rust does
+**not** — those equations are inline inside `Flow::demand`/`apply` in `flows.rs`. So S5 is
+two kinds of work, and they must not be batched together: equation tests against
+`science.rs`, and **flow-level** tests that construct the struct and assert its legs for the
+soil-carbon and soil-nitrogen families. Testing those at flow level is the default;
+extracting them into `science.rs` to make them unit-testable would be a production-code
+change smuggled in under a testing slice.
+
+### ⚠ `intercepted_fraction` is dead code, and it is a live trap for this slice
+
+`science.rs`'s Monsi–Saeki one-liner `1 − exp(−k·LAI)` — public, doc-commented, cited — has
+**zero callers anywhere in the Rust tree**. The layered-canopy work replaced it with a
+three-point Gaussian over canopy depth inside `canopy_assimilation`, which computes its own
+`(-k · depth · LAI).exp()` per layer, and the old function was left behind.
+
+The trap: `test_canopy.py`'s 33 tests are about light interception, and the obvious-looking
+Rust function to point them at is the one nothing calls. A batch ported that way would
+compile, pass, and check nothing. **Recorded as an S6 item** (delete it, or wire it back —
+this slice does not decide which).
+
+### The control battery: five mechanisms broken, and what saw it
+
+`cargo test --workspace --no-fail-fast`, Windows, baseline **795 passed / 0 failed**; revert
+verified byte-exact. Harness and logs: `M:\claud_projects\temp\s5-control`.
+
+| # | mechanism broken | red | of which **about the mutated mechanism** |
+|---|---|---:|---:|
+| M1 | `intercepted_fraction` (Beer–Lambert) | **0** | — probe defect: the function is dead |
+| M1b | extinction coefficient where the canopy uses it | 7 | **0** |
+| M2 | FvCB co-limitation `min` → `max` | 11 | **0** |
+| M3 | Q10 per-10 °C → per-5 °C | 6 | **0** |
+| M4 | vegetative DVS scaled by the wrong TSUM | 6 | **0** |
+| M5 | mutual shading term dropped | 4 | **1** |
+
+⚠ **The "of which" column is the finding, and the first draft of this table got it wrong.**
+It counted reds that name *a* mechanism as coverage of *the mutated* one. Each gate's subject
+was then read from its own body: `open_season_canopy_is_physical` is a peak-LAI band,
+`open_season_peaks_below_the_greenwood_crossing` is peak biomass against a nitrogen crossing,
+`perennial_leaf_cycle_is_a_fixed_point` is a trajectory-convergence claim. None of them is
+about photosynthesis, respiration, phenology or interception. **They redden because a broken
+equation moves a trajectory and a band somewhere else notices** — which is the same failure
+mode as a golden red, "a number moved", wearing a more reassuring name.
+
+⚠ **Scope of the claim, stated honestly.** The mutations were *selected* from mechanisms the
+owner-map work had already shown carry no unit test, so this is not a census of the
+reference's testing style; the four mechanisms that do have unit tests were not sampled. What
+it establishes is exact: **six live mutations of mechanisms known to lack a unit test, and
+five of the six are caught by nothing that is about them.**
+
+### The one genuine direct catch is also the template — S5 invents no convention
+
+M5's `the_vks_mutual_shading_regime_is_modelled_not_merely_avoided` calls
+`mutual_shading_rate` directly with hand-chosen arguments and asserts exact returns either
+side of the threshold — an equation-level check living inside a science gate. Alongside
+`drought_development_factor_reproduces_the_sources_worked_examples`, a unit test in
+`science.rs` that reproduces the cited source's own worked examples, S5 has **two existing
+shapes to copy**. Both are the same idea: evaluate the equation, compare against a number the
+source states, not against a number this tree produced.
+
+### ⚠ The trap S5 sets for itself, and the instrument that removes it
+
+Because the goldens and bands redden on *any* numeric movement, a batch of newly-ported tests
+that check the wrong thing would leave this battery's output **completely unchanged**. "The
+suite went red" is not evidence that an S5 batch works — it is the one thing that would be
+true either way.
+
+The fix is structural rather than name-based. `science_gates` and the behavioural tests are
+`#[cfg(test)]` modules inside `domains/src/`; the goldens and tolerance bands are integration
+tests under `domains/tests/`. So **`cargo test -p domains --lib` is exactly the set to
+measure, and it excludes the golden/band noise by construction rather than by discounting it
+afterwards.** M2's log times that binary at **5.25 s for 167 tests** against 119 s for the
+slow one, so a per-mechanism control costs seconds rather than 25 minutes. One full-workspace
+run per *batch* stays as the backstop.
+
+### S5's exit gate, stated forward in S6's terms
+
+As S3 and S4 both did, the gate is written as what must be true when Python is deleted:
+
+1. For every mechanism in the roster below, **mutating that mechanism reddens a test whose
+   subject is that mechanism**, measured with `cargo test -p domains --lib` — the goldens and
+   bands not merely discounted but out of the binary.
+2. Every ported test compares against a number **the cited source states**, or against an
+   exactly-derivable property (a limit, a threshold either side, a linear knot), never against
+   a value read out of this tree. A test whose expected value came from running the reference
+   is a snapshot, and the goldens already do snapshots better.
+3. A by-name claim census exists, so a mechanism that quietly loses its claim in translation
+   is visible as a missing row rather than as a smaller number.
+4. `intercepted_fraction` is resolved — deleted or wired — and not merely left unported.
+
+### The roster, and the batching
+
+20 files / 599 tests. Batched by **which Rust surface the test lands on**, because that is
+what makes a batch reviewable, not by crop or by Python filename:
+
+| batch | Python files | tests | lands on |
+|---|---|---:|---|
+| A — carbon capture | `test_photosynthesis` 50, `test_canopy` 33, `test_gas_exchange` 15 | 98 | `science.rs` FvCB + canopy functions |
+| B — timing | `test_phenology` 90 | 90 | `science.rs` thermal time, vernalization, photoperiod, DVS |
+| C — water | `test_transpiration` 46, `test_soil_layers` 27, `test_water_cycle` 17, `test_root_depth` 16 | 106 | `science.rs` Penman-Monteith, stress, root zone |
+| D — carbon spending | `test_allocation` 43, `test_respiration` 25, `test_carbon_budget` 22, `test_stem_reserves` 22 | 112 | `science.rs` partition, Q10, growth budget |
+| E — nitrogen | `test_nitrogen` 37, `test_nitrogen_form` 15, `test_nitrogen_throttle` 7 | 59 | `science.rs` target N, uptake, stress |
+| F — soil carbon | `test_mineralization` 32, `test_soil_fractionation` 29, `test_decomposition` 19, `test_microbial_respiration` 17 | 97 | **flow-level** — no extracted functions exist |
+| G — senescence | `test_senescence_form` 37 | 37 | `science.rs` shading + `flows.rs` Senescence |
+
+⚠ **F is the batch that is not like the others** and it is deliberately late: it is the only
+one that cannot be written as pure-function tests without changing production code. If it
+turns out to need an extraction, that is a separate decision with its own advisor call, not a
+thing to slip inside a testing batch.
+
+⚠ **A is not "canopy" despite the name**: `test_canopy.py`'s subject is interception, whose
+Rust home is `canopy_assimilation`'s inner loop and **not** the dead `intercepted_fraction`.
+Written here because this is exactly where the next reader would go wrong.
