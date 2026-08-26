@@ -3421,4 +3421,455 @@ mod tests {
             "allocation scaled by {ra}, growth respiration by {rg}"
         );
     }
+    // -----------------------------------------------------------------------------
+    // S5 batch E — nitrogen: the three flows the frozen wiring builds.
+    //
+    // Ported from `tests/test_nitrogen.py` (the assembled-flow block) and
+    // `tests/test_nitrogen_form.py` (claims 3 and 4). Before this batch the three flows
+    // between them were guarded like this, measured on `-p domains --lib` and then on the
+    // golden + tier binaries:
+    //
+    //   * dropping the demand limb, so a full plant keeps drawing:  1 red, about the ROOT-ZONE gate
+    //   * dropping the deficit's non-negative clamp:                1 red, about the WIRING
+    //   * feeding Greenwood's curve the root-inclusive mass:        0 reds, goldens only
+    //   * dropping the availability gate from the capacity:         1 red, about the WIRING
+    //   * dropping the ground-area factor (uptake, and fertilization): 0 reds ANYWHERE
+    //   * dropping the shed remobilization `min`:                   0 reds, goldens only
+    //
+    // The ground-area pair is the batch C finding on two more call sites: every frozen
+    // scenario is 1 m2, so an area factor is invisible to the whole suite, the goldens and
+    // the cross-port comparison alike. The tests below are therefore constructed states,
+    // not scenario runs.
+    // -----------------------------------------------------------------------------
+
+    const SOIL_N: &str = "biosphere.soil_n";
+    const LITTER_N: &str = "biosphere.litter_n";
+    const LITTER_SINK: &str = "biosphere.litter_carbon";
+    const N_SOURCE: &str = "boundary.fertilizer_supply";
+
+    /// The soil-N band of the Python fixture. Scenario/soil data, not crop params.
+    const SN_RESIDUAL: f64 = 0.01;
+    const SN_CRITICAL: f64 = 0.05;
+
+    /// A state carrying the nitrogen stocks the base fixture does not build.
+    ///
+    /// `storage` is a separate argument on purpose: Greenwood's `W` is leaf+stem+storage
+    /// and `f_N`'s denominator is leaf+stem+root, so a fixture with `storage == root`
+    /// cannot tell the two denominators apart — the same trap `with_storage` was added to
+    /// escape one mechanism over.
+    fn n_state(leaf: f64, stem: f64, root: f64, storage: f64, plant_n: f64, soil_n: f64) -> State {
+        let mut s = with_storage(state(leaf, stem, root, 0.4, 0.21 * AIR_MOL, 550.0), storage);
+        s.stocks.get_mut(PLANT_N).expect("plant n").amount = plant_n;
+        for (id, amount, kind) in [
+            (SOIL_N, soil_n, StockKind::Pool),
+            (LITTER_N, 0.0, StockKind::Pool),
+            (N_SOURCE, 1.0e9, StockKind::Boundary),
+        ] {
+            s.stocks.insert(
+                id.to_string(),
+                Stock::new(
+                    id.to_string(),
+                    "biosphere".to_string(),
+                    Quantity::Nitrogen,
+                    Quantity::Nitrogen.canonical_unit(),
+                    amount,
+                    kind,
+                    0.0,
+                    false,
+                    BTreeMap::new(),
+                )
+                .expect("nitrogen stock"),
+            );
+        }
+        s.stocks.insert(
+            LITTER_SINK.to_string(),
+            Stock::new(
+                LITTER_SINK.to_string(),
+                "biosphere".to_string(),
+                Quantity::Carbon,
+                Quantity::Carbon.canonical_unit(),
+                0.0,
+                StockKind::Pool,
+                0.0,
+                false,
+                BTreeMap::new(),
+            )
+            .expect("litter carbon"),
+        );
+        s
+    }
+
+    fn uptake(ground_area: f64) -> NitrogenUptake {
+        let p = params::nitrogen();
+        NitrogenUptake {
+            id: "biosphere.n_uptake".to_string(),
+            soil_n: SOIL_N.to_string(),
+            plant_n: PLANT_N.to_string(),
+            leaf_c: LEAF.to_string(),
+            stem_c: STEM.to_string(),
+            root_c: ROOT.to_string(),
+            storage_c: STORAGE.to_string(),
+            max_uptake_capacity: p.max_uptake_capacity,
+            n_target_coefficient: p.n_target_coefficient,
+            n_target_exponent: p.n_target_exponent,
+            n_target_w_plateau: p.n_target_w_plateau,
+            dm_kg_per_mol_c: p.dm_kg_per_mol_c,
+            ground_area,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            // A reference layer this thin is reached by any nonzero rooted depth, so the
+            // root-access gate is fully OPEN and every assertion below is about the uptake
+            // law. The gate's own behaviour is pinned in `system.rs`.
+            soil_layer_depth: 1e-9,
+            sn_residual: SN_RESIDUAL,
+            sn_critical: SN_CRITICAL,
+        }
+    }
+
+    fn fertilization(ground_area: f64) -> Fertilization {
+        Fertilization {
+            id: "biosphere.fertilization".to_string(),
+            n_source: N_SOURCE.to_string(),
+            soil_n: SOIL_N.to_string(),
+            fertilization_var: "fertilization".to_string(),
+            ground_area,
+        }
+    }
+
+    /// Evaluate with a resolver that also carries the N-application forcing.
+    fn n_legs_of(flow: &dyn Flow, s: &State, dt: f64, fert: f64) -> BTreeMap<String, f64> {
+        let forcings: HashMap<String, Schedule> = HashMap::from([
+            ("par".to_string(), constant(800.0).expect("par")),
+            ("ci".to_string(), constant(400.0).expect("ci")),
+            ("temp".to_string(), constant(20.0).expect("temp")),
+            ("fertilization".to_string(), constant(fert).expect("fert")),
+        ]);
+        let shared: HashMap<String, String> = HashMap::from([
+            ("soil_water".to_string(), SOIL_WATER.to_string()),
+            ("co2_pool".to_string(), CO2.to_string()),
+        ]);
+        let r = SourceResolver::new(forcings, shared).expect("resolver");
+        let env = r.bind(s, dt);
+        flow.evaluate(s, &env, dt)
+            .expect("evaluate")
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect()
+    }
+
+    /// `min(deficit, capacity·availability)` — and BOTH arms are exercised, because a
+    /// fixture that only ever reaches one of them cannot tell the law from either half.
+    ///
+    /// The starved plant is supply-bound: `W = 0.5 mol C = 0.1335 t/ha` sits on
+    /// Greenwood's plateau, so the target is `a = 5.697 %` and the deficit is
+    /// `0.05697 · 0.0266911 · 2.0 = 3.041e-3 kg N` — four times the day's supply of
+    /// `0.0015 · 1 m² · 0.5 = 7.5e-4 kg N`. The nearly-full plant is demand-bound: it is
+    /// `1e-5 kg N` short with the soil saturated, so the draw is the SHORTFALL.
+    /// Mirrors `test_uptake_leg_is_capacity_times_availability_times_area`,
+    /// `test_uptake_is_demand_limited_when_the_shortfall_is_small` and
+    /// `test_uptake_shuts_off_at_residual_soil_n`.
+    #[test]
+    fn the_uptake_draws_the_smaller_of_the_deficit_and_the_supply_and_both_arms_bite() {
+        // --- the SUPPLY arm: soil_n 0.03 in the band [0.01, 0.05] => availability 0.5.
+        let starved = n_state(0.5, 0.0, 1.5, 0.0, 0.0, 0.03);
+        let legs = n_legs_of(&uptake(1.0), &starved, 1.0, 0.0);
+        // ⚠ NOT bit-equality, and the reason is the fixture rather than the flow: the
+        // availability `(0.03 - 0.01) / 0.04` reconstructs 0.5 as 0.4999999999999999,
+        // because none of 0.03/0.01/0.05 is a binary fraction. Asserting `== 0.00075`
+        // would be a pin on the round-off of the arithmetic used to build the INPUT — the
+        // same trap `the_nitrogen_stress_ramp_is_linear_between_its_two_knots` records for
+        // the 1/90 and 1/45 knots.
+        assert!(
+            (legs[PLANT_N] - 0.00075).abs() <= 1e-15 * 0.00075,
+            "{:?}",
+            legs[PLANT_N]
+        );
+        assert_eq!(legs[SOIL_N], -legs[PLANT_N]);
+
+        // --- the DEMAND arm: the same plant, a saturated soil, and 1e-5 kg N short.
+        let p = params::nitrogen();
+        let target_per_mol_c = p.n_target_coefficient * p.dm_kg_per_mol_c;
+        let full = target_per_mol_c * 2.0;
+        let shortfall = 1.0e-5;
+        let nearly = n_state(0.5, 0.0, 1.5, 0.0, full - shortfall, 1.0);
+        let legs = n_legs_of(&uptake(1.0), &nearly, 1.0, 0.0);
+        assert!(
+            (legs[PLANT_N] - shortfall).abs() <= 1e-9 * shortfall,
+            "the demand arm drew {}",
+            legs[PLANT_N]
+        );
+        assert!(
+            (legs[SOIL_N] + legs[PLANT_N]).abs() <= 1e-18,
+            "the flow must be nitrogen-balanced leg for leg"
+        );
+        // The two arms really are different selections: the same plant on a saturated soil
+        // could have drawn the full day's capacity, and did not.
+        assert!(
+            legs[PLANT_N] < 0.0015 * 0.01,
+            "the demand arm must dominate"
+        );
+
+        // --- the HARD OFF: soil N AT the residual point supplies nothing, however large
+        // the plant's deficit.
+        let shut = n_state(0.5, 0.0, 1.5, 0.0, 0.0, SN_RESIDUAL);
+        let legs = n_legs_of(&uptake(1.0), &shut, 1.0, 0.0);
+        assert_eq!(legs[PLANT_N], 0.0);
+        assert_eq!(legs[SOIL_N], 0.0);
+    }
+
+    /// The shortfall closes in ONE step at `dt = 1` and the step after draws nothing.
+    ///
+    /// The deficit is a STOCK read as a per-day rate, so at the frozen step it is a
+    /// deadbeat controller — and there is no restoring force to overshoot against, because
+    /// the deficit clamps at zero. That is what separates it from a demand-controlled
+    /// makeup whose error is SIGNED and can oscillate (bucket 2's export-fidelity
+    /// finding), and it is why the clamp is a modelling statement rather than a guard.
+    /// Mirrors `test_demand_limited_uptake_is_dt_linear_and_deadbeat_at_dt_1`.
+    #[test]
+    fn the_uptake_closes_the_shortfall_in_one_step_and_does_not_overshoot() {
+        let p = params::nitrogen();
+        let full = p.n_target_coefficient * p.dm_kg_per_mol_c * 2.0;
+        let shortfall = 1.0e-5;
+        let s = n_state(0.5, 0.0, 1.5, 0.0, full - shortfall, 1.0);
+        let flow = uptake(1.0);
+        // dt-linear: the RATE comes from the snapshot alone, never from dt.
+        let half = n_legs_of(&flow, &s, 0.5, 0.0)[PLANT_N];
+        let one = n_legs_of(&flow, &s, 1.0, 0.0)[PLANT_N];
+        assert_eq!(one.to_bits(), (2.0 * half).to_bits());
+        // Deadbeat at the frozen step...
+        assert!((one - shortfall).abs() <= 1e-9 * shortfall);
+        // ...and the settled plant draws exactly zero on the next step.
+        let settled = n_state(0.5, 0.0, 1.5, 0.0, full - shortfall + one, 1.0);
+        for (_, amount) in n_legs_of(&flow, &settled, 1.0, 0.0) {
+            assert_eq!(amount, 0.0, "a settled plant must draw nothing");
+        }
+    }
+
+    /// A plant AT or ABOVE its target takes up nothing, however rich the soil.
+    ///
+    /// This is what makes `plant_n` a tracked quantity rather than a monotone
+    /// accumulator. ⚠ It is also the assertion that catches the clamp being dropped:
+    /// without `.max(0.0)` an over-full plant computes a NEGATIVE deficit and the flow
+    /// runs backwards, pumping nitrogen out of the plant and into the soil at a rate set
+    /// by how far above target it is. Measured before this test existed: that mutation
+    /// reddened one test in 282, and that test is about the wiring, not the law.
+    /// Mirrors `test_uptake_stops_entirely_at_or_above_the_target_concentration`.
+    #[test]
+    fn the_uptake_stops_at_the_target_and_never_runs_backwards() {
+        let p = params::nitrogen();
+        let full = p.n_target_coefficient * p.dm_kg_per_mol_c * 2.0;
+        for factor in [1.0, 1.5, 100.0] {
+            let s = n_state(0.5, 0.0, 1.5, 0.0, full * factor, 1.0);
+            for (id, amount) in n_legs_of(&uptake(1.0), &s, 1.0, 0.0) {
+                assert_eq!(amount, 0.0, "leg {id} at {factor}x the target");
+            }
+        }
+    }
+
+    /// ⚠ THE TWO DENOMINATORS, which differ on purpose and were guarded by nothing.
+    ///
+    /// Greenwood's `%N` and `W` "refer to the dry matter in the whole plant (EXCLUDING
+    /// fibrous roots)", so the curve is evaluated on leaf+stem+storage. The deficit it
+    /// produces is then applied to `f_N`'s own denominator, leaf+stem+root — the pool the
+    /// stress factor will read back. `nitrogen.yaml`'s own source tag records the delta
+    /// and records that feeding the curve the root-INCLUSIVE mass was measured and is
+    /// worse.
+    ///
+    /// Nothing in the tree said so. Measured: swapping `storage_c` for `root_c` in the
+    /// curve's argument reddened ZERO tests of `-p domains --lib` and only committed
+    /// golden bytes of the whole workspace — because six of the seven frozen scenarios
+    /// peak an order of magnitude below the 1 t/ha domain bound, where the target is a
+    /// CONSTANT and the argument cannot matter. This state is built above the bound on
+    /// both readings so that it can.
+    ///
+    /// The arithmetic, hand-computed: `W = 20 + 10 + 15 = 45 mol C`, i.e.
+    /// `45 · 0.0266911 kg = 1.2011 kg/m² = 12.011 t/ha`; the target there is
+    /// `5.697 / sqrt(12.011) = 1.6438 %`, or `4.38756e-4 kg N per mol C`. Against a
+    /// biomass of `20 + 10 + 5 = 35 mol C` that is `1.53565e-2 kg N` at target, so a plant
+    /// holding `1.53e-2` is `5.6468e-5 kg N` short — the demand arm, well under the day's
+    /// `1.5e-3` supply. Under the swapped reading the curve sees `9.3419 t/ha`, asks for
+    /// `1.7413e-2`, and the draw saturates at capacity instead: a 27-fold difference, not
+    /// a last-bit one.
+    /// Mirrors the delta recorded in `nitrogen.yaml`'s `n_target_coefficient` source tag.
+    #[test]
+    fn greenwoods_mass_excludes_the_fibrous_roots_that_the_deficit_is_applied_to() {
+        let s = n_state(20.0, 10.0, 5.0, 15.0, 0.0153, 1.0);
+        let drawn = n_legs_of(&uptake(1.0), &s, 1.0, 0.0)[PLANT_N];
+        assert!(
+            (drawn - 5.646780255798463e-5).abs() <= 1e-15,
+            "the shoot-basis deficit is 5.64678e-5 kg N, drew {drawn}"
+        );
+        // ...and the root-inclusive reading is a different answer, not a rounding of the
+        // same one. Asserted rather than described, so this test is discriminating by
+        // construction rather than by hope.
+        let p = params::nitrogen();
+        let swapped_w_t_ha = (20.0 + 10.0 + 5.0) * p.dm_kg_per_mol_c * 10.0;
+        let swapped_target = crate::biosphere::science::target_n_concentration(
+            swapped_w_t_ha,
+            p.n_target_coefficient,
+            p.n_target_exponent,
+            p.n_target_w_plateau,
+        ) * p.dm_kg_per_mol_c;
+        let swapped_draw = (swapped_target * 35.0 - 0.0153).min(0.0015);
+        assert!(
+            swapped_draw > 20.0 * drawn,
+            "the fixture cannot tell the denominators apart: {drawn} vs {swapped_draw}"
+        );
+    }
+
+    /// Both nitrogen flows that carry a plot area actually scale with it.
+    ///
+    /// ⚠ Every frozen scenario is 1 m², so a dropped area factor computes the identical
+    /// number and is invisible to the goldens, to the tier bands and to the cross-port
+    /// comparison. Measured before this test existed: dropping it from the uptake capacity
+    /// and dropping it from the fertilization rate each left the ENTIRE workspace green.
+    /// That is the same hole `system.rs::capture_scales_with_ground_area_at_its_call_sites`
+    /// was written for one currency over, on two more call sites.
+    /// Mirrors `test_uptake_scales_with_ground_area` and
+    /// `test_fertilization_leg_is_rate_times_area`.
+    #[test]
+    fn the_uptake_and_the_fertilization_both_scale_with_the_plot() {
+        // Uptake: the same starved plant on a 1 m² and a 3 m² plot. The plant's state is
+        // held fixed on purpose — this asserts the CAPACITY's area factor, which is the
+        // one the mutation removes.
+        let s = n_state(0.5, 0.0, 1.5, 0.0, 0.0, 0.03);
+        let one = n_legs_of(&uptake(1.0), &s, 1.0, 0.0)[PLANT_N];
+        let three = n_legs_of(&uptake(3.0), &s, 1.0, 0.0)[PLANT_N];
+        // Relative, not bit-exact: the area enters the capacity product in a different
+        // position than the `3.0 *` here, so the last bit may differ. The claim is the
+        // proportionality, and it is asserted as such.
+        assert!(
+            (three - 3.0 * one).abs() <= 1e-15 * three,
+            "{one} m-2 against {three} on 3 m2"
+        );
+
+        // Fertilization: 0.001 kg N m⁻² day⁻¹ over 2 m² is 0.002 kg N/day into the soil.
+        let legs = n_legs_of(&fertilization(2.0), &s, 1.0, 0.001);
+        assert_eq!(legs[SOIL_N], 0.002);
+        assert_eq!(legs[N_SOURCE], -0.002);
+        // ...and it is dt-linear and balanced, which is the whole of the rest of the flow.
+        let half = n_legs_of(&fertilization(2.0), &s, 0.5, 0.001);
+        assert_eq!(half[SOIL_N].to_bits(), (0.5 * legs[SOIL_N]).to_bits());
+        assert_eq!(half[SOIL_N] + half[N_SOURCE], 0.0);
+    }
+
+    /// The shed nitrogen is the senescing CARBON times the remobilized concentration.
+    ///
+    /// One physical event, two currency legs, and no channel between them: a flow may only
+    /// read the step-entry snapshot, so `NitrogenSenescence` RECOMPUTES the carbon flux
+    /// `Senescence` is sending to litter. That recomputation is the hazard the Python side
+    /// pinned by comparing the two flows' legs, and it is pinned the same way here.
+    ///
+    /// The `min` is remobilization: a well-fed plant retains its nitrogen and sheds only
+    /// the residual concentration [C] measures in mature straw. ⚠ Dropping it entirely
+    /// reddened no test of `-p domains --lib` and only golden bytes; and a branch probe
+    /// says the LEAN arm — a plant already below the residual — is reached by NOTHING in
+    /// the binary, because every frozen scenario runs above `n_critical` all season. Both
+    /// arms are therefore constructed here rather than driven.
+    /// Mirrors `test_shed_nitrogen_uses_the_same_carbon_flux_as_the_senescence_flow`.
+    #[test]
+    fn the_shed_nitrogen_is_the_senescing_carbon_at_the_remobilized_concentration() {
+        let sen = params::senescence();
+        let canopy = params::canopy();
+        let nitro = params::nitrogen();
+        let carbon = Senescence {
+            id: "probe.senescence".to_string(),
+            leaf_c: LEAF.to_string(),
+            stem_c: STEM.to_string(),
+            root_c: ROOT.to_string(),
+            litter_sink: LITTER_SINK.to_string(),
+            rdr_leaf: sen.rdr_leaf,
+            rdr_stem: sen.rdr_stem,
+            rdr_root: sen.rdr_root,
+            shade_rate: sen.shade_rate,
+            lai_threshold: sen.lai_threshold,
+            sla_per_mol_c: canopy.sla_per_mol_c,
+            ground_area: 1.0,
+        };
+        let shed_n = |plant_n: f64| {
+            NitrogenSenescence {
+                id: "biosphere.nitrogen_senescence".to_string(),
+                plant_n: PLANT_N.to_string(),
+                litter_n: LITTER_N.to_string(),
+                leaf_c: LEAF.to_string(),
+                stem_c: STEM.to_string(),
+                root_c: ROOT.to_string(),
+                rdr_leaf: sen.rdr_leaf,
+                rdr_stem: sen.rdr_stem,
+                rdr_root: sen.rdr_root,
+                n_residual_per_mol_c: nitro.n_residual_per_mol_c,
+                shade_rate: sen.shade_rate,
+                lai_threshold: sen.lai_threshold,
+                sla_per_mol_c: canopy.sla_per_mol_c,
+                ground_area: 1.0,
+            }
+            .evaluate(
+                &n_state(3.0, 1.0, 1.0, 0.0, plant_n, 1.0),
+                &SourceResolver::new(HashMap::new(), HashMap::new())
+                    .expect("resolver")
+                    .bind(&n_state(3.0, 1.0, 1.0, 0.0, plant_n, 1.0), 1.0),
+                1.0,
+            )
+            .expect("shed")
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect::<BTreeMap<String, f64>>()
+        };
+
+        let biomass = 5.0; // leaf 3 + stem 1 + root 1
+        let shed_c = legs_of(&carbon, &n_state(3.0, 1.0, 1.0, 0.0, 1.0, 1.0), 800.0)[LITTER_SINK];
+        assert!(shed_c > 0.0, "the carbon leg must actually shed");
+
+        // --- the WELL-FED arm: concentration above the residual, so the plant retains the
+        // difference and litter leaves at the straw concentration.
+        let rich = 1.0; // 0.2 kg N/mol C, far above the 1.3346e-4 residual
+        let legs = shed_n(rich);
+        let want = nitro.n_residual_per_mol_c * shed_c;
+        assert!(
+            (legs[LITTER_N] - want).abs() <= 1e-15 * want,
+            "well-fed shed {} against {want}",
+            legs[LITTER_N]
+        );
+        assert_eq!(legs[PLANT_N], -legs[LITTER_N]);
+
+        // --- the LEAN arm, which no scenario in the tree reaches: a plant already below
+        // the residual sheds at its OWN concentration, because there is nothing left to
+        // remobilize. Without the `min` this arm and the one above are the same line.
+        let lean = 0.5 * nitro.n_residual_per_mol_c * biomass;
+        let legs = shed_n(lean);
+        let want = (lean / biomass) * shed_c;
+        assert!(
+            (legs[LITTER_N] - want).abs() <= 1e-15 * want,
+            "lean shed {} against {want}",
+            legs[LITTER_N]
+        );
+        assert!(
+            legs[LITTER_N] < 0.6 * nitro.n_residual_per_mol_c * shed_c,
+            "the lean arm must be strictly leaner than the residual one"
+        );
+    }
+
+    /// The shed material's C:N is `carbon_fraction / n_residual = 0.45 / 0.005 = 90`.
+    ///
+    /// The deliverable of the N-cycle form change, in one number: litter composition is
+    /// now a consequence of two CITED concentrations ([B] Raimanova 2024 for the carbon
+    /// fraction, [C] Van Hecke 2020 for the residual N) rather than the ratio of two
+    /// unrelated first-order rate constants — which is what it was before, and which
+    /// measured 0.004. Real wheat straw is ~80, so this is the right quantity in the right
+    /// place rather than a fitted one.
+    /// Mirrors `test_shed_material_has_a_straw_like_carbon_to_nitrogen_ratio`.
+    #[test]
+    fn the_shed_material_has_a_straw_like_carbon_to_nitrogen_ratio() {
+        let p = params::nitrogen();
+        // Back to Greenwood's basis: kg N per kg DM, then C:N on a mass basis.
+        let n_residual_kg_kg = p.n_residual_per_mol_c / p.dm_kg_per_mol_c;
+        let carbon_fraction = params::MOLAR_MASS_CARBON_KG_PER_MOL / p.dm_kg_per_mol_c;
+        let shed_cn = carbon_fraction / n_residual_kg_kg;
+        assert!((shed_cn - 90.0).abs() <= 1e-9, "shed C:N is {shed_cn}");
+        assert!(
+            (60.0..120.0).contains(&shed_cn),
+            "the shed material left the real-residue band"
+        );
+    }
 }

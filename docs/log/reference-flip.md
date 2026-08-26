@@ -3429,3 +3429,93 @@ to mutate. Batch D: **it is evidence about the mutations, and says nothing about
 your new TESTS are reachable.** Both questions come out of the same run, and only one was
 asked. The check is one pass over the report: every new test name must appear in at least
 one hit list, or it owes a control showing what it does catch.
+
+## S5 batch E — the nitrogen batch, and the first batch whose subject was already tested (2026-08-26)
+
+`tests/test_nitrogen.py` 37, `test_nitrogen_form.py` 15, `test_nitrogen_throttle.py` 7 = 59
+Python tests → **16 Rust tests over four surfaces** plus one production change (the
+`nitrogen_from` loader split, the fourth instance of the same refactor). `-p domains --lib`
+282 → 298, workspace 914 → 930, clippy clean, **no golden byte or manifest moved**, and the
+three Python gates batch D's review found unrun — `ruff check`, `ruff format --check`,
+`pyright` — all ran and are clean. Design and every measurement:
+`docs/plans/post-roadmap-reference-flip.md` §5aj.
+
+### The subtraction, which is what makes this batch different in kind
+
+Every earlier batch started from a surface with no direct Rust tests. Nitrogen already had
+three, so the first job was deciding what NOT to write: a second copy of the `f_N` ramp
+would have inflated the count and pinned nothing. What the subtraction left was
+`target_n_concentration` — Greenwood's published dilution curve, the one function of the
+four with no direct test in either tree.
+
+### ⚠⚠ Eleven of sixteen mutations reddened nothing, and the split of the eleven is the finding
+
+Seven were caught by committed golden bytes and by nothing else — Greenwood's domain bound,
+the exponent's sign, the two crop-mass denominators, the shed remobilization, the carried-N
+kernel, the N respired/stabilised split, and the re-sow's nitrogen split. **Four were caught
+by nothing at all, goldens included**: the availability ramp's shape, the uptake's and the
+fertilization's plot scaling, and the shed concentration's coupling to the plant. A
+mechanism whose mutation does not move a golden byte would not even be recorded as changed
+by someone regenerating them.
+
+Three of those four turned out to be **equivalent mutants or known holes** once the branch
+probe ran — the `min` arm no scenario reaches, and the 1 m² plot that makes every area
+factor invisible (batch C's finding, on two more call sites). One was a real coverage hole,
+below.
+
+### ⚠⚠ Two existing pins were each evaluated at the one point where their subject is invisible
+
+Both found by mutation, neither by reading, and they are the same defect twice:
+
+* The soil-N availability ramp's only interior assertion is at its **midpoint** — a fixed
+  point of `x ↦ 1 − x` — so **inverting the whole ramp left the entire workspace green**. A
+  probe says why nothing else helps: the interior is reached by that one test, because every
+  frozen scenario sits below the residual or above the critical point.
+* `f_N`'s ramp test passes `biomass_c = 1.0` on every call, and **a denominator of one is
+  the arithmetic identity of having no denominator** — so replacing the concentration
+  `plant_n / biomass_c` with the bare amount left it green. The one test that caught it was
+  a flow-level pin from batch D, one layer out.
+
+*A pin evaluated at its subject's symmetry point is not a pin.* The Python originals had the
+discriminating points in both cases; the port kept the tidy one.
+
+### ⚠ A Python test that is inert on its own subject, and the correction that stopped one line short
+
+`test_nitrogen_is_conserved_across_the_annual_reset` drives its perennial scenario through
+`run_season` — the driver with **no reset hook** — so it never crosses a reset. Measured:
+delete the reset's litter leg so nitrogen is *destroyed* every year boundary, and it still
+passes. (The mutation is caught, by a test named for litter C:N, through the engine's own
+conservation gate.) The file's own helper carries a warning that the reset "is not a knob —
+it is a property of the scenario, and getting it wrong is what this module's correction was
+about". **The correction was applied to the helper and not to the test one function below
+it.** *A correction is a claim about a file; it stops at the call sites someone remembered
+to visit.*
+
+The successor asserts the SPLIT — the seedling inherits the parent's concentration, the
+remainder is the balancing residual — because conservation is exactly what both readings
+satisfy. That is batch D's redistribution lesson, arriving on a different mechanism.
+
+### The transposed question, asked inside the batch instead of in review
+
+Batch D's review learned that a battery says nothing about whether the NEW tests are
+reachable. Asked here as part of the batch: twelve of sixteen appear in a hit list under a
+mutation of their own mechanism; the four that do not are about guards, a fold, a derived
+constant and a degeneracy — things a mechanism mutation cannot touch. Each got a targeted
+control, and **two of them redden exactly one test each**, which is the strongest possible
+reading: those two tests are the only thing in the tree that sees those two rules. A no-op
+control reddened nothing, so the instrument is honest.
+
+### One pin measured inert before it was written
+
+An assertion that the loader divides before it multiplies was drafted, then measured: at the
+committed values the two orders are bit-identical. Not shipped; the measurement is recorded
+in the test that would have carried it, so nobody writes it again.
+
+### ⚠ Batch D's harness defect, reproduced one layer over
+
+Batch D found its own byte-exactness check normalizing newlines before hashing, and fixed it
+by reading and writing BYTES. This batch then edited three docs with `Path.write_text`, which
+on Windows translates every LF into a CRLF on the way out — so a two-line edit rewrote 214 line
+endings in `docs/post-roadmap-log.md` and 118 in the memory index. Caught by `git`'s own
+CRLF warning, not by anything of ours. *The rule batch D wrote for its digest is a rule about
+every write, not about digests.*

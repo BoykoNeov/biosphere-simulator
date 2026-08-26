@@ -5931,8 +5931,8 @@ what makes a batch reviewable, not by crop or by Python filename:
 | B — timing | `test_phenology` 90 | 90 | `science.rs` thermal time, vernalization, photoperiod, DVS |
 | C — water | `test_transpiration` 46, `test_soil_layers` 27, `test_water_cycle` 17, `test_root_depth` 16 | 106 | `science.rs` Penman-Monteith, stress, root zone |
 | D — carbon spending | `test_allocation` 43, `test_respiration` 25, `test_carbon_budget` 22, `test_stem_reserves` 22 | 112 | `science.rs` partition, Q10, growth budget |
-| E — nitrogen | `test_nitrogen` 37, `test_nitrogen_form` 15, `test_nitrogen_throttle` 7 | 59 | `science.rs` target N, uptake, stress |
-| F — soil carbon | `test_mineralization` 32, `test_soil_fractionation` 29, `test_decomposition` 19, `test_microbial_respiration` 17 | 97 | **flow-level** — no extracted functions exist |
+| E — nitrogen | `test_nitrogen` 37, `test_nitrogen_form` 15, `test_nitrogen_throttle` 7 | 59 | `science.rs` target N, uptake, stress — ⚠ **WRONG about two thirds of it, corrected in §5aj**: it lands on FOUR surfaces (`science.rs`, `flows.rs`, `params.rs`, `system.rs`), and 3 of the 59 are batch F's subject. **BUILT 2026-08-26.** |
+| F — soil carbon | `test_mineralization` 32, `test_soil_fractionation` 29, `test_decomposition` 19, `test_microbial_respiration` 17, **+3 handed over by batch E** | **100** | **flow-level** — no extracted functions exist. ⚠ Batch E measured the carried-N family (`carried_nitrogen` and the three N legs) guarded by the GOLDENS ALONE; that measurement is this batch's input |
 | G — senescence | `test_senescence_form` 37 | 37 | `science.rs` shading + `flows.rs` Senescence |
 
 ⚠ **F is the batch that is not like the others** and it is deliberately late: it is the only
@@ -7147,3 +7147,249 @@ about whether your new TESTS are reachable.** Both questions are answered from t
 run — the hit lists were already on disk — and only one of them was asked. The check is one
 pass over the report: *every new test name must appear in at least one hit list, or it owes
 a control that shows what it does catch.*
+
+## §5aj Stage 3 — S5 batch E BUILT, COMPLETE 2026-08-26: the nitrogen batch, and seven mechanisms the goldens were guarding alone
+
+Batch E is the nitrogen batch: `test_nitrogen` 37, `test_nitrogen_form` 15,
+`test_nitrogen_throttle` 7 = **59 Python tests**. It lands on **four** surfaces in one
+crate, and it is the first batch whose subject already carried direct Rust tests — so its
+first job was a **subtraction**, not an addition.
+
+`cargo test -p domains --lib` **282 → 298**; `cargo test --workspace --no-fail-fast`
+**914 → 930**; clippy clean at `--all-targets -D warnings`. **No golden byte, band, floor
+or manifest moved** — asserted with `git status --porcelain rust/data/` (empty). The
+Python gates `uv run ruff check .`, `ruff format --check .` and `uv run pyright` all ran
+and are clean (batch D's review finding 1, which this batch inherits as a checklist item
+rather than as a lesson to relearn). Harness and all logs:
+`M:\claud_projects\temp\s5-batch-e`.
+
+The batch is tests plus **one production change**: the `nitrogen_from(text, name)` loader
+split, the FOURTH instance of the one batches B, C and D each made, taken as an
+application of the given answer rather than as a fresh decision.
+
+### The subtraction that had to come first
+
+`science.rs` already carried three Phase-7 tests over two of batch E's four functions —
+`the_nitrogen_stress_ramp_is_linear_between_its_two_knots` (both knots, the interior
+monotonicity, the linearity on a clean band, the zero-biomass guard) and
+`soil_n_below_the_residual_shuts_uptake_off_entirely`. Batches A–D all started from
+surfaces with no direct coverage; here a straight port would have written a second copy of
+the `f_N` ramp and called it growth. **So `f_N`'s ramp gets no successor**, and the reason
+is written into the block header rather than left as a gap in the count.
+
+⚠ The subtraction is the right first move and it was still half wrong — measured, and
+corrected below: the existing pin covers the ramp and is blind to the DENOMINATOR.
+
+What the subtraction left standing is the batch's real subject: **`target_n_concentration`
+— Greenwood's curve, the one function of the four with no direct test in either surface.**
+
+### The before-battery: sixteen mutations, ELEVEN of which reddened nothing
+
+Baseline 282 passed / 0 failed, `cargo test -p domains --lib`.
+
+| # | mechanism broken | red | of which **about the mutated mechanism** |
+|---|---|---:|---:|
+| E1 | `target_n_concentration`: the PLATEAU removed, the curve extrapolated below 1 t/ha | **0** | — |
+| E2 | `target_n_concentration`: the exponent's sign flipped | **0** | — |
+| E3 | `soil_n_availability`: the hard-off boundary `<=` → `<` | **0** | — *equivalent mutant, see below* |
+| E3b | `soil_n_availability`: the interior ramp INVERTED | **0** | — |
+| E4 | `nitrogen_stress_factor`: `f_N` reads absolute N, not a concentration | 10 | **1** — and *not* the unit test, see below |
+| E5 | `NitrogenUptake`: Greenwood's `W` collapses onto `f_N`'s denominator | **0** | — |
+| E6 | `NitrogenUptake`: demand-limiting removed (the retired fixed-flux law) | 1 | **0** |
+| E7 | `NitrogenUptake`: the deficit's non-negative clamp dropped | 1 | **0** |
+| E8 | `NitrogenUptake`: the availability gate dropped from the capacity | 1 | **0** |
+| E9 | `NitrogenUptake`: capacity stops scaling with ground area | **0** | — |
+| E10 | `Fertilization`: the rate stops scaling with ground area | **0** | — |
+| E11 | `NitrogenSenescence`: the remobilization `min` dropped | **0** | — |
+| E12 | `NitrogenSenescence`: the shed concentration decoupled from the plant | **0** | — |
+| E13 | `carried_nitrogen`: the donor pool's N:C normalization dropped | **0** | — |
+| E14 | `LitterNitrogenTransfer`: the mineralized/stabilised N shares SWAPPED | **0** | — |
+| E15 | `annual_reset`: the seedling N WINDFALL returns (total N still conserved) | **0** | — |
+
+**Fifteen of sixteen reddened nothing whose subject was the mutated mechanism**, and
+eleven reddened nothing at all.
+
+⚠⚠ **The one direct catch is not the test the subtraction had just credited, and that is
+the batch's second-sharpest reading.** E4 replaces `f_N`'s concentration
+`plant_n / biomass_c` with the bare amount, and
+`the_nitrogen_stress_ramp_is_linear_between_its_two_knots` — the Phase-7 pin that made
+`f_N` "already covered" — **stayed green**, because every call it makes passes
+`biomass_c = 1.0`. A denominator of one is the arithmetic identity of having no
+denominator at all. The single catch was `flows::tests::the_limitation_is_the_product_and_
+both_factors_actually_bite`, a flow-level pin one layer out, from batch D.
+
+So the subtraction was right that `f_N`'s RAMP is covered and wrong that `f_N` is, and the
+correction is a sixteenth test rather than a note: `the_stress_factor_reads_a_concentration_
+and_not_an_amount` puts one amount of nitrogen against two biomasses. **This is the same
+species of defect as the availability midpoint below — an existing pin evaluated at the one
+point where the thing it is named for cannot be seen — and two independent instances in one
+batch is a pattern, not a coincidence.** Both were found by mutation and neither by
+reading.
+
+### ⚠⚠ Seven mechanisms were guarded by committed bytes and by nothing else — and four by NOTHING
+
+Each of the eleven zero-red mutations was then re-run ALONE against the golden and
+tier-contract binaries (`--test golden_regression --test tier_contract`, whose clean-tree
+control is 22 passed / 2 ignored). The split is the finding:
+
+| guarded by the goldens ALONE | guarded by **nothing at all** |
+|---|---|
+| E1 Greenwood's domain bound | E3b the availability ramp's shape |
+| E2 the exponent's sign | E9 the uptake's plot scaling |
+| E5 the two denominators | E10 the fertilization's plot scaling |
+| E11 the remobilization `min` | E12 the shed concentration's coupling |
+| E13 the carried-N kernel | |
+| E14 the N respired/stabilised split | |
+| E15 the re-sow's nitrogen split | |
+
+That is batch D's three-mechanism finding at more than twice the size, and the second
+column is worse than the first: four live mechanisms whose mutation moves **no golden
+byte**, so regenerating the goldens would not even record that they changed.
+
+### The branch probe explains three of the four zeros, and only three
+
+Batch B's instrument (a `panic!` at the top of a branch, count the tests that fire), run
+on fifteen branches of batch E's surfaces:
+
+* **E3 is an EQUIVALENT MUTANT, not a coverage hole.** At `soil_n == sn_residual` the `<=`
+  returns 0 and the `<` falls through to `(0)/(crit−res) = 0`. Same number, both readings.
+  Recorded rather than counted, and it is why E3b was written: a battery that scores an
+  equivalent mutant as an uncaught one inflates its own column.
+* **E12 is an equivalent mutant ON THE FROZEN ROSTER.** Probe P14 — the lean arm of
+  `min(plant_n/biomass_c, n_residual)` — fires in **zero** tests: no scenario in the tree
+  ever runs a plant below the residual concentration, so the `min` always selects the
+  residual and replacing it with that constant changes nothing. E11 (dropping the `min`
+  outright) does move, which is the consistent reading.
+* **E9/E10 are batch C's ground-area finding on two more call sites.** Every frozen
+  scenario is 1 m², so an area factor is invisible to the goldens, the tier bands and the
+  cross-port comparison alike. `system.rs::capture_scales_with_ground_area_at_its_call_sites`
+  already says this for water; nothing said it for nitrogen.
+* **E3b is a coverage hole, and a specific one.** Probe P5 says the availability ramp's
+  interior is reached by **one test in the whole binary** — the Phase-7 pin — and that
+  test's only interior assertion is at the ramp's MIDPOINT. The midpoint is a fixed point
+  of `x ↦ 1 − x`, so **a full inversion of the ramp is invisible to the only test that
+  reaches it.** The Python side parametrizes six points including the quarter band; the
+  port carried the midpoint over and lost the discriminating ones.
+
+Two more probe readings worth keeping: `nitrogen_stress_factor`'s fully-stressed limb and
+zero-biomass guard each fire in exactly ONE test (the Phase-7 pin), and
+`NitrogenSenescence`'s zero-shed guard fires in none.
+
+### ⚠ The Python test that is inert on its own subject, measured rather than inferred
+
+`test_nitrogen_form.py::test_nitrogen_is_conserved_across_the_annual_reset` builds
+`PERENNIAL_CHAMBER_SCENARIO` and drives it through **`run_season`** — the driver with no
+reset hook — so it never crosses a reset at all. Measured: with the reset's litter leg
+deleted outright, so that nitrogen is DESTROYED at every year boundary, **that test still
+passes**. The mutation *is* caught — by `test_litter_pool_cn_is_TWO_regimes_...`, which
+drives the same scenario through `run_perennial` and trips the engine's own conservation
+gate. So the claim was held structurally, inside a test named for something else.
+
+The sharp part is that the file already knew: `_litter_rows`' docstring says in as many
+words that *"`resets` is not a knob — it is a property of the scenario, and getting it
+wrong is what this module's correction was about."* **The correction was applied to the
+helper and not to the test one function below it.** A correction is a claim about a file,
+and it stops at the call sites someone remembered to visit.
+
+The Rust successor asserts the **split** — the seedling inherits the parent's tissue
+concentration, the remainder is the balancing residual into litter — and only then the
+total, because the total is exactly what the windfall reading also satisfies.
+
+### The roster correction — the FIFTH consecutive one, and the first to add a fourth surface
+
+§5ad's row says batch E lands on "`science.rs` target N, uptake, stress". True of a third
+of it. Batch E's 59 tests split by SUBJECT:
+
+| surface | Rust tests | subject |
+|---|---:|---|
+| `domains/src/biosphere/science.rs` | 5 | Greenwood's curve (both branches, the crossing, the degenerate bound), the availability ramp off its symmetry point, and `f_N`'s denominator |
+| `domains/src/biosphere/flows.rs` | 7 | `NitrogenUptake`'s two arms, its two denominators, the plot scaling, `Fertilization`, and both arms of the coupled shed |
+| `domains/src/biosphere/params.rs` | 2 | every guard on `nitrogen.yaml`, and the kg N/kg DM → kg N/mol C fold |
+| `domains/src/biosphere/system.rs` | 2 | the re-sow's nitrogen split; the roster fact that only the open field leaves the plateau |
+
+### ⚠ Two Rust-side ADDITIONS, named as such
+
+`nitrogen_from` enforces two rules with no Python counterpart, and both are now pinned:
+`n_target_coefficient > n_critical` (without it Greenwood's plateau — the curve's maximum
+— sits below the stress threshold, so `f_N < 1` from the first step at every crop mass),
+and the EQUAL case of the concentration band, which is what separates the `<` the loader
+writes from the `<=` it could have been written with. They belong in the by-name claim
+census as additions rather than as ports.
+
+### The transposed question, asked INSIDE the batch this time
+
+Batch D's review found that a battery answers "was this mutation caught?" and never "was
+each new TEST reached?". Cross-referencing batch E's 16 new names against the after-battery
+hit lists: **twelve appear, each under a mutation of its own mechanism.** Four appear
+nowhere, and all four are about things a mechanism mutation cannot touch — guards, a fold,
+a derived constant, a degeneracy. Each was given a targeted control:
+
+| control | red | which unreached test fired |
+|---|---:|---|
+| C1 the loader's ordered-band guard disabled | 1 | the guard census — **and only it** |
+| C2 the kg DM per mol C fold INVERTED | 17 | the fold pin, the guard census, the straw C:N |
+| C3 the non-positive domain bound PANICS instead of degenerating | 1 | the degeneracy pin — **and only it** |
+| C4 the cited straw residual N 0.5 % → 0.6 % | 3 | the straw C:N, the fold pin |
+| C5 *(no-op control: a comment only)* | **0** | none, correctly |
+
+All four are live. C1 and C3 reddening exactly one test each is the strongest reading in
+the table: those two tests are the *only* thing in the tree that sees those two rules.
+
+### One candidate pin measured INERT before it was written
+
+An assertion that the loader divides before it multiplies (`M_C / cf` then `× value`,
+rather than `value × M_C / cf`) was drafted and then measured: at the committed values the
+two orders are **bit-identical**, so the pin would have been green under both. It is not
+shipped; the order stays a comment, and the measurement is recorded in the fold test's
+docstring so nobody writes it again.
+
+### What batch E deliberately does NOT port, per test
+
+59 Python tests, 16 Rust tests. Written as a list, per batch C's review finding that a
+batch shipping only forward items lets an absence read as an oversight.
+
+| Python test(s) | disposition |
+|---|---|
+| `test_nitrogen_stress_factor_cardinal_values`, `_zero_or_negative_biomass_is_neutral` | **already pinned** by Phase 7's `the_nitrogen_stress_ramp_is_linear_between_its_two_knots` — both knots, the interior, the zero-biomass guard. ⚠ With ONE measured exception: that test evaluates at `biomass_c = 1.0` throughout and is therefore blind to the DENOMINATOR, which is exactly what makes `f_N` a concentration. `the_stress_factor_reads_a_concentration_and_not_an_amount` is that half, and only that half |
+| `test_soil_n_availability_cardinal_values` | **partly** already pinned (`soil_n_below_the_residual_shuts_uptake_off_entirely`); the discriminating quarter points are the one thing that port lost, and they are what `the_availability_ramp_is_pinned_off_its_own_symmetry_point` restores |
+| `test_soil_n_availability_rejects_inverted_band`, `test_nitrogen_stress_factor_rejects_inverted_band` | **no successor, by an inherited decision.** Neither Rust function raises — `science.rs`'s module header states the rule for the whole module (the `ValueError`-raising input guards are omitted; the behavioural clamps are kept exactly). ⚠ For `nitrogen_stress_factor` the loader owns the rejection and it is pinned. For `soil_n_availability` **nothing does**: `sn_residual`/`sn_critical` are SCENARIO fields, not param-file entries, and no scenario validator checks their order. Recorded as an S6 item, not fixed inside a testing batch |
+| `test_target_rejects_a_non_positive_plateau_bound` | **split in two**: the loader's rejection is pinned in `params.rs`, and the function's DEGENERACY is pinned in `science.rs`, so the pair is visible from both ends |
+| `test_uptake_is_nitrogen_balanced`, `test_fertilization_is_nitrogen_balanced` | the engine's own machinery — `assert_conserved` runs every step of every run. Same disposition batches A and D gave the gas and budget flows |
+| `test_nitrogen_params_file_exists`, `test_nitrogen_loader_round_trips_a_valid_file` | folded into `include_str!` plus C8's params census: "the file exists" and "it round-trips" are one assertion once the file is compiled in |
+| `test_committed_nitrogen_carbon_fraction_matches_canopy` | **already pinned**, and harder: `params.rs::the_two_carbon_fractions_agree` compares the two FOLDED constants rather than two YAML literals, so it also catches a fold that diverges without the file doing so |
+| `test_uptake_scales_linearly_with_dt` | folded into the two-arm test's dt half and the fertilization dt pin; the capacity branch alone (which is all the Python test reaches) is the weaker of the two |
+| `test_open_season_peaks_below_the_crossing_with_the_margin_pinned` | **already the reference's own gate** — `science_gates::open_season_peaks_below_the_greenwood_crossing`, since slice C4. The Python function is the checker's copy. What the gate does NOT assert is that the crossing is where the curve actually crosses, and `the_greenwood_target_meets_the_stress_threshold_at_the_crossing` is that other half |
+| `test_open_season_peak_w_margin_to_the_crossing` | **no successor, and it is a judgement.** A two-sided characterization band on our own peak (`13.2 < peak_w < 13.6`, ratio `0.920–0.939`), re-measured FOUR times, whose own docstring argues it is deliberately not a gate. It has caught two real regressions, so this absence is the largest of the batch — recorded as an open item below rather than filed as covered |
+| `test_shed_nitrogen_uses_the_same_carbon_flux_as_the_senescence_flow` | ported as `the_shed_nitrogen_is_the_senescing_carbon_at_the_remobilized_concentration`, which compares the N leg against `Senescence`'s own litter-carbon leg — plus the LEAN arm, which nothing in either tree reaches |
+| `test_litter_pool_cn_is_TWO_regimes_set_by_which_event_fills_the_pool`, `test_the_pool_cn_IS_the_shed_ratio_and_the_deviation_is_the_N_FREE_SEED`, `test_the_free_mineralization_rate_no_longer_EXISTS_to_be_calibrated` | **handed to batch F by name.** Their subject is the decomposer chain's carried-N family (`carried_nitrogen`, `LitterNitrogenTransfer`, `MicrobialNitrogenRelease`, `HumusNitrogenRelease`) — `test_mineralization.py`'s surface, which is batch F's. E13 and E14 measure exactly how unguarded that family is today (goldens only), and that measurement is batch F's input, not batch E's to spend. Batch F's roster row grows from 97 tests to 100 |
+| `test_shed_material_has_a_straw_like_carbon_to_nitrogen_ratio` | ported — it is the shed COMPOSITION, which is batch E's subject, unlike the pool ratios above |
+| the seven tests of `test_nitrogen_throttle.py` | **no successor, by nature.** Option (D) was priced and NOT BUILT; the file is a decision record written as executable tests — PDF phrase extraction from a gitignored `sources/` (so every one of them `skip`s on CI already: `memory/pdf-pins-green-by-skip-on-ci.md`), absence assertions about a module that no longer exists, and a measurement of a pool ratio whose home is batch F. Its content lives in `docs/plans/post-roadmap-nitrogen-cycle-form.md`. Same disposition batch D gave `test_stem_reserves.py`'s ten design-record tests, and for the same reason: porting them would mean rebuilding a refused model in Rust to re-refute it |
+
+### What batch E leaves standing
+
+* **`soil_n_availability`'s band is ordered by nothing.** `sn_residual`/`sn_critical` are
+  scenario fields; Python's function raised on an inverted band and Rust's returns a step
+  function instead. **S6** — a scenario validator is a production change.
+* **The Greenwood margin pin has no Rust successor.** The load-bearing half (the 14.4248
+  crossing, and that the frozen crop stays under it) is the reference's own gate; the
+  narrative band that has caught two regressions is not ported. Open.
+* **The by-name claim census (clause 3) is now deferred by FIVE consecutive batches.** Its
+  accumulated input grows by batch E's own: the seven goldens-only guards and the four
+  no-guard-at-all mechanisms above, the two Rust-side loader additions, and one *claim held
+  structurally inside a test named for something else* (the reset's nitrogen), which is the
+  census's own subject stated as plainly as it will ever be stated.
+* **`carried_nitrogen` and the three N legs of the decomposer chain are guarded by the
+  goldens alone** — measured here, handed to batch F.
+* **The biosphere is still Euler-only in the Rust tree** (batch D).
+* **`intercepted_fraction` still unresolved** (S6; clause 4 of the exit gate).
+* **`daily_thermal_time`'s 30 °C cap** — batch B's unreachable branch, still owned by nothing.
+* **No Python deleted.** All three files stay green (59 passed, re-measured) until S6.
+
+### ⚠ Batch D's harness defect, reproduced one layer over
+
+Batch D found its own byte-exactness check normalizing newlines before hashing, and fixed it
+by reading and writing BYTES. This batch then edited three docs with `Path.write_text`, which
+on Windows translates every LF into a CRLF on the way out — so a two-line edit rewrote 214 line
+endings in `docs/post-roadmap-log.md` and 118 in the memory index. Caught by `git`'s own
+CRLF warning, not by anything of ours. *The rule batch D wrote for its digest is a rule about
+every write, not about digests.*

@@ -2681,4 +2681,192 @@ mod tests {
         );
     }
 
+    // -----------------------------------------------------------------------------
+    // S5 batch E — nitrogen: the two claims that live on a RUN rather than on a flow.
+    // -----------------------------------------------------------------------------
+
+    /// The re-sow splits the parent's nitrogen by CONCENTRATION; it does not hand it over.
+    ///
+    /// The seedling keeps the tissue concentration the dying crop had, and the remainder
+    /// dies to litter as the balancing residual — the same idiom the carbon half uses, so
+    /// nitrogen is conserved by construction rather than by formula. Before coupled
+    /// shedding the reset was carbon-only, which left the seedling holding the whole
+    /// parent's `plant_n`: an N windfall on a fraction of the biomass.
+    ///
+    /// ⚠⚠ THIS CLAIM WAS PREVIOUSLY GUARDED BY NOTHING THAT COULD SEE IT, IN EITHER TREE,
+    /// and the two halves of that are different failures.
+    ///
+    /// In Rust: restoring the windfall (`seedling_n = old_plant_n`) reddened ZERO tests of
+    /// `-p domains --lib` and only committed golden bytes of the whole workspace. It
+    /// cannot be otherwise — the windfall is a REDISTRIBUTION between two stocks, so the
+    /// conservation assertion that runs on every step and across every reset is blind to
+    /// it by construction. Batch D's lesson, one mechanism over.
+    ///
+    /// In Python: `test_nitrogen_form.py::test_nitrogen_is_conserved_across_the_annual_reset`
+    /// drives `PERENNIAL_CHAMBER_SCENARIO` through `run_season` — the driver with NO reset
+    /// hook — so it never crosses a reset at all. Measured, not inferred: with the litter
+    /// leg of the reset deleted outright, so that nitrogen is DESTROYED at every year
+    /// boundary, that test still passes. (The mutation is caught, by
+    /// `test_litter_pool_cn_is_TWO_regimes_...`, which drives the same scenario through
+    /// `run_perennial` and trips the engine's own conservation gate — so the claim was
+    /// held structurally, inside a test named for something else.) The file's own helper
+    /// carries a warning that `resets` "is not a knob — it is a property of the scenario";
+    /// the correction was applied to the helper and not to this test.
+    ///
+    /// So this successor asserts the SPLIT, not just the total: the total is what both
+    /// readings agree on.
+    /// Mirrors `test_nitrogen_is_conserved_across_the_annual_reset`, widened.
+    #[test]
+    fn the_resow_splits_the_parents_nitrogen_by_concentration_and_is_not_a_windfall() {
+        let scenario = perennial_chamber_scenario();
+        let (state, _integrator, _resolver) = super::super::season_setup(&scenario, 1).unwrap();
+        let seedling_total = scenario.leaf_c0 + scenario.stem_c0 + scenario.root_c0;
+
+        // A grown crop with a seed bank, and a nitrogen pool that is not a round number.
+        let mut stocks = state.stocks.clone();
+        for (id, amount) in [
+            (LEAF_C, 4.0),
+            (STEM_C, 2.0),
+            (ROOT_C, 2.0),
+            (STORAGE_C, seedling_total + 1.0),
+        ] {
+            stocks.insert(id.to_string(), stocks[id].with_amount(amount).unwrap());
+        }
+        let old_plant_n = 0.2;
+        stocks.insert(
+            PLANT_N.to_string(),
+            stocks[PLANT_N].with_amount(old_plant_n).unwrap(),
+        );
+        let litter_n0 = stocks[LITTER_N].amount;
+        let before = State::new(state.n, stocks, state.rng_seed, state.aux.clone()).unwrap();
+
+        let after = annual_reset(&before, &scenario).expect("re-sow");
+
+        // (a) THE SPLIT: the seedling inherits the parent's tissue concentration.
+        // old_veg = 4 + 2 + 2 = 8 mol C, so conc = 0.2 / 8 = 0.025 kg N per mol C.
+        let conc = old_plant_n / 8.0;
+        assert_eq!(conc, 0.025);
+        let want_seedling = conc * seedling_total;
+        assert!(
+            (after.stocks[PLANT_N].amount - want_seedling).abs() <= 1e-15 * want_seedling,
+            "seedling holds {} against {want_seedling}",
+            after.stocks[PLANT_N].amount
+        );
+        // (b) The remainder is the balancing residual into litter.
+        let gained = after.stocks[LITTER_N].amount - litter_n0;
+        assert!(
+            (gained - (old_plant_n - want_seedling)).abs() <= 1e-15 * gained,
+            "litter gained {gained}"
+        );
+        // (c) ...and only THEN the total, which is what a windfall also satisfies.
+        assert!(
+            (after.stocks[PLANT_N].amount + after.stocks[LITTER_N].amount
+                - (old_plant_n + litter_n0))
+                .abs()
+                <= 1e-15 * old_plant_n,
+            "nitrogen must be conserved across the reset"
+        );
+        // (d) The fixture can tell the two readings apart: the seedling is a small
+        // fraction of the parent, so a windfall would be an order of magnitude more.
+        assert!(
+            old_plant_n > 10.0 * after.stocks[PLANT_N].amount,
+            "the fixture cannot distinguish the split from the windfall"
+        );
+    }
+
+    /// Only the open field leaves Greenwood's plateau — the roster fact the FORM rests on.
+    ///
+    /// Six of the seven frozen scenarios are carbon-limited chambers that peak an order of
+    /// magnitude below the curve's 1 t/ha domain bound, so they run entirely on the flat
+    /// branch and never see the power law at all. That is why the PLATEAU reading — the
+    /// primary's own statement that %N is constant while growth is exponential — is what
+    /// decided the form, and why extrapolating the declining branch downward would have
+    /// manufactured a season-long N decline for every chamber in the tree.
+    ///
+    /// ⚠ It is asserted rather than described because it is a claim about the ROSTER, and
+    /// this repo has been bitten more than once by a scope claim outliving the roster that
+    /// made it true. A new chamber scenario that grew past 1 t/ha would move onto a branch
+    /// this reasoning assumes it never reaches, and nothing else would say so.
+    /// Mirrors `test_only_open_season_enters_the_declining_branch`.
+    #[test]
+    fn only_the_open_field_crop_leaves_greenwoods_plateau() {
+        let bound = params::nitrogen().n_target_w_plateau;
+        let fold = params::nitrogen().dm_kg_per_mol_c;
+        let peak_w = |scenario: &SeasonScenario, years: usize, perennial: bool| -> f64 {
+            let (state, integrator, resolver) =
+                super::super::season_setup(scenario, years).unwrap();
+            let mut peak = f64::NEG_INFINITY;
+            let mut observe = |s: &State| {
+                let w =
+                    s.stocks[LEAF_C].amount + s.stocks[STEM_C].amount + s.stocks[STORAGE_C].amount;
+                peak = peak.max((w * fold / scenario.ground_area) * 10.0);
+            };
+            let steps = super::super::steps_for_years(years);
+            if perennial {
+                run_perennial(
+                    &integrator,
+                    state,
+                    scenario,
+                    &resolver,
+                    BIO_DT,
+                    steps,
+                    super::super::season_steps(),
+                    &mut observe,
+                )
+                .expect("perennial run");
+            } else {
+                run_season(
+                    &integrator,
+                    state,
+                    &resolver,
+                    BIO_DT,
+                    steps,
+                    None,
+                    &mut observe,
+                )
+                .expect("season run");
+            }
+            peak
+        };
+
+        for (name, scenario, years, perennial) in [
+            (
+                "sealed",
+                sealed_chamber_scenario(),
+                SEALED_CHAMBER_YEARS,
+                false,
+            ),
+            (
+                "perennial",
+                perennial_chamber_scenario(),
+                PERENNIAL_CHAMBER_YEARS,
+                true,
+            ),
+            (
+                "consumer",
+                consumer_chamber_scenario(),
+                CONSUMER_CHAMBER_YEARS,
+                true,
+            ),
+        ] {
+            let w = peak_w(&scenario, years, perennial);
+            assert!(
+                w < bound,
+                "{name} peaked at {w} t/ha, past the domain bound"
+            );
+            // ...and not by a whisker. Measured on this tree: sealed 0.37688,
+            // perennial 0.32108, consumer 0.34375 t/ha — a ~2.6x margin under the bound.
+            // ⚠ The Python docstring this is ported from quotes "0.09-0.63 t/ha", which is
+            // a different tree's numbers; the RANGE is re-measured here rather than
+            // carried over, because a ported band is a claim about the port's own run.
+            assert!(w < 0.5 * bound, "{name} peaked at {w} t/ha");
+        }
+        // The control, and the half that makes the claim about the ROSTER rather than
+        // about chambers in general: the open field DOES enter the declining branch.
+        let open = peak_w(&DEFAULT_SCENARIO, 1, false);
+        assert!(
+            open > bound,
+            "the open field must reach the power law: {open} t/ha"
+        );
+    }
 }

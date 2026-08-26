@@ -688,8 +688,21 @@ pub fn stem_reserves_from(text: &str, name: &'static str) -> StemReserveParams {
 
 /// Nitrogen uptake + limitation, with the two thresholds folded (`nitrogen.yaml`).
 pub fn nitrogen() -> NitrogenParams {
-    const NAME: &str = "nitrogen.yaml";
-    let f = file(NITROGEN_YAML, NAME);
+    nitrogen_from(NITROGEN_YAML, "nitrogen.yaml")
+}
+
+/// The same reader over an arbitrary text, so the guards below can be exercised.
+///
+/// ⚠ A PRODUCTION CHANGE INSIDE A TESTING BATCH, and the FOURTH instance of the one
+/// batches B, C and D each made rather than a fresh decision: a loader wired to its own
+/// `include_str!` has guards no test can reach. `nitrogen.yaml` carries more of them than
+/// any other biosphere file — a unit, a positivity bound, a `[0, 1]` fraction, an ordered
+/// concentration band, a positive domain bound, and the ordering rule between the target
+/// coefficient and `n_critical` — and before this split every one of them was unreachable.
+/// It is NOT the extraction §5ad rules out: nothing about what the science is made of
+/// moves, and the committed values stay pinned by C8's params census.
+pub fn nitrogen_from(text: &str, name: &'static str) -> NitrogenParams {
+    let f = file(text, name);
     let v = guarded_map(
         &f,
         &[
@@ -701,34 +714,34 @@ pub fn nitrogen() -> NitrogenParams {
             ("n_target_w_plateau", "t/ha"),
             ("carbon_fraction", "dimensionless"),
         ],
-        NAME,
+        name,
     );
     checked(
-        require_positive(v["max_uptake_capacity"], "max_uptake_capacity", NAME),
-        NAME,
+        require_positive(v["max_uptake_capacity"], "max_uptake_capacity", name),
+        name,
     );
     // ⚠ MUST EQUAL canopy.yaml's carbon_fraction — a divergence models a silently
     // inconsistent plant. Both files fold with it; the dedup is a long-standing nicety.
-    let cf = carbon_fraction(v["carbon_fraction"], NAME);
+    let cf = carbon_fraction(v["carbon_fraction"], name);
     let (n_residual, n_critical) = (v["n_residual"], v["n_critical"]);
-    checked(require_non_negative(n_residual, "n_residual", NAME), NAME);
+    checked(require_non_negative(n_residual, "n_residual", name), name);
     assert!(
         n_residual < n_critical,
-        "{NAME}: N-concentration thresholds must satisfy n_residual < n_critical, \
+        "{name}: N-concentration thresholds must satisfy n_residual < n_critical, \
          got ({n_residual}, {n_critical})"
     );
     // ⚠ divide first, then multiply — the Python loader's order. See the header.
     let fold = MOLAR_MASS_CARBON_KG_PER_MOL / cf;
     checked(
-        require_positive(v["n_target_w_plateau"], "n_target_w_plateau", NAME),
-        NAME,
+        require_positive(v["n_target_w_plateau"], "n_target_w_plateau", name),
+        name,
     );
     // The target must sit ABOVE the stress threshold, or the plant is stressed by
     // construction at every crop mass (Greenwood's curve declines, so the plateau is its
     // maximum; if even that is below critical, f_N < 1 always).
     assert!(
         v["n_target_coefficient"] > n_critical,
-        "{NAME}: n_target_coefficient must exceed n_critical, got ({}, {n_critical})",
+        "{name}: n_target_coefficient must exceed n_critical, got ({}, {n_critical})",
         v["n_target_coefficient"]
     );
     NitrogenParams {
@@ -2425,5 +2438,171 @@ parameters:
         let out = text.replacen("    source:", "    provenance:", 1);
         assert_ne!(out, text, "the file must carry at least one source");
         Box::leak(out.into_boxed_str())
+    }
+    // -----------------------------------------------------------------------------
+    // S5 batch E — nitrogen: the loader's guards, reachable for the first time.
+    //
+    // Ported from `tests/test_nitrogen.py`'s config-boundary block and
+    // `tests/test_nitrogen_form.py::test_committed_params_are_the_values_read_off_the_primary`.
+    // `nitrogen.yaml` carries more guards than any other biosphere param file and, before
+    // this batch's `nitrogen_from` split, every one of them was unreachable from any test.
+    // -----------------------------------------------------------------------------
+
+    /// Each guard on `nitrogen.yaml`, rejected on its own shape — and each LEGAL edge
+    /// asserted beside it, so a bound cannot be quietly widened or narrowed.
+    ///
+    /// ⚠ Two of these have no Python counterpart and are Rust-side ADDITIONS rather than
+    /// ports, written down here so they read as such: the `n_target_coefficient >
+    /// n_critical` ordering (without it Greenwood's curve sits below the stress threshold
+    /// at *every* crop mass, so `f_N < 1` by construction from the first step) and the
+    /// EQUAL case of the concentration band, which is what separates the `<` the loader
+    /// writes from the `<=` it could have been written with.
+    ///
+    /// Mirrors `test_nitrogen_loader_rejects_a_wrong_unit`,
+    /// `_rejects_non_positive_capacity`, `_rejects_out_of_range_carbon_fraction`,
+    /// `_rejects_inverted_concentration_band`, `_rejects_negative_residual`,
+    /// `_rejects_a_missing_source`, `_rejects_an_unknown_field` and
+    /// `test_target_rejects_a_non_positive_plateau_bound`.
+    #[test]
+    fn the_nitrogen_bounds_are_each_rejected_at_their_own_shape() {
+        // The capacity is a RATE: zero is a plant that can never take up nitrogen at all.
+        for bad in ["0.0", "-1.0"] {
+            let broken = value_of(NITROGEN_YAML, "max_uptake_capacity", bad);
+            rejects(
+                || {
+                    nitrogen_from(broken, "nitrogen.yaml");
+                },
+                &format!("max_uptake_capacity = {bad}"),
+            );
+        }
+        // The carbon fraction is `(0, 1]` — the same shape, and the same argument, as
+        // canopy.yaml's: zero is a plant made of no carbon, and one is legitimate (dry
+        // matter that is all carbon is degenerate, not malformed).
+        for bad in ["0.0", "-0.1", "1.5"] {
+            let broken = value_of(NITROGEN_YAML, "carbon_fraction", bad);
+            rejects(
+                || {
+                    nitrogen_from(broken, "nitrogen.yaml");
+                },
+                &format!("carbon_fraction = {bad}"),
+            );
+        }
+        let lossless = value_of(NITROGEN_YAML, "carbon_fraction", "1.0");
+        assert_eq!(
+            nitrogen_from(lossless, "nitrogen.yaml").dm_kg_per_mol_c,
+            MOLAR_MASS_CARBON_KG_PER_MOL
+        );
+        // A NEGATIVE residual is refused...
+        let broken = value_of(NITROGEN_YAML, "n_residual", "-0.001");
+        rejects(
+            || {
+                nitrogen_from(broken, "nitrogen.yaml");
+            },
+            "a negative n_residual",
+        );
+        // ...but ZERO is legal: a plant that can be stripped to bare carbon is a
+        // degenerate model, not a malformed file, and `f_N`'s ramp is still well defined.
+        // This is the assertion that stops the guard being tightened to `require_positive`.
+        let zeroed = value_of(NITROGEN_YAML, "n_residual", "0.0");
+        assert_eq!(
+            nitrogen_from(zeroed, "nitrogen.yaml").n_residual_per_mol_c,
+            0.0
+        );
+        // The concentration band must be ORDERED — inverted, and (the discriminating
+        // case) EQUAL, which makes the ramp a division by zero rather than a ramp.
+        for bad in ["0.02", "0.015"] {
+            let broken = value_of(NITROGEN_YAML, "n_residual", bad);
+            rejects(
+                || {
+                    nitrogen_from(broken, "nitrogen.yaml");
+                },
+                &format!("n_residual = {bad} against n_critical = 0.015"),
+            );
+        }
+        // Greenwood's domain bound is a positive crop mass. ⚠ The FUNCTION does not raise
+        // on a non-positive bound — `science::target_n_concentration` degenerates to the
+        // plateau branch instead, a recorded port decision — so this loader guard is the
+        // only thing standing between the file and that degeneracy, and it is the
+        // successor to Python's `test_target_rejects_a_non_positive_plateau_bound`.
+        for bad in ["0.0", "-1.0"] {
+            let broken = value_of(NITROGEN_YAML, "n_target_w_plateau", bad);
+            rejects(
+                || {
+                    nitrogen_from(broken, "nitrogen.yaml");
+                },
+                &format!("n_target_w_plateau = {bad}"),
+            );
+        }
+        // ⚠ RUST-SIDE ADDITION, no Python counterpart. The plateau is the curve's
+        // MAXIMUM, so a target coefficient at or below `n_critical` means the plant is
+        // stressed at its own target at every crop mass. Equal is refused too: a plant
+        // sitting exactly at critical reads as unstressed only by luck of the ramp's `>=`.
+        for bad in ["0.015", "0.014"] {
+            let broken = value_of(NITROGEN_YAML, "n_target_coefficient", bad);
+            rejects(
+                || {
+                    nitrogen_from(broken, "nitrogen.yaml");
+                },
+                &format!("n_target_coefficient = {bad} against n_critical = 0.015"),
+            );
+        }
+        // The unit is an EXACT string: kg/ha/day is the same physical dimension a
+        // ten-thousand-fold out, which is exactly the mistake a dimension check passes.
+        let rescaled = unit_of(NITROGEN_YAML, "max_uptake_capacity", "kg/ha/day");
+        rejects(
+            || {
+                nitrogen_from(rescaled, "nitrogen.yaml");
+            },
+            "max_uptake_capacity in kg/ha/day",
+        );
+        // Provenance, and a key wired to nothing.
+        let stripped = strip_first_source(NITROGEN_YAML);
+        rejects(
+            || {
+                nitrogen_from(stripped, "nitrogen.yaml");
+            },
+            "a nitrogen entry with no source",
+        );
+        let extra = NITROGEN_YAML.replacen(
+            "parameters:\n",
+            "parameters:\n  mystery_threshold:\n    value: 1.0\n    unit: \"kg/kg\"\n    source: \"x\"\n",
+            1,
+        );
+        assert_ne!(extra, NITROGEN_YAML, "the substitution must apply");
+        rejects(
+            || {
+                nitrogen_from(Box::leak(extra.into_boxed_str()), "nitrogen.yaml");
+            },
+            "an unknown nitrogen field",
+        );
+        // ...and the committed file still loads, so none of the guards above is simply
+        // always-on.
+        assert_eq!(nitrogen().max_uptake_capacity, 0.0015);
+    }
+
+    /// The kg N/kg DM → kg N/mol C fold, against literals computed OUTSIDE the loader.
+    ///
+    /// `M_C / carbon_fraction = 0.012011 / 0.45 = 0.026691111… kg DM per mol C`, so
+    /// `0.005 kg N/kg DM → 1.3345556e-4` and `0.015 → 4.0036667e-4 kg N/mol C`. Written
+    /// this way rather than as `n_residual * fold` on purpose: restating the loader's own
+    /// formula would assert that the loader matches itself, and would pass just as
+    /// happily under a fold applied in the wrong DIRECTION (`cf / M_C`).
+    ///
+    /// ⚠ A pin on the fold's ORDER was written and then MEASURED INERT rather than
+    /// shipped: `0.005 * (M_C / cf)` and `0.005 * M_C / cf` are bit-identical at these
+    /// values, so an assertion that the loader divides before it multiplies would have
+    /// been green under both orders. The order comment in `nitrogen_from` stays a comment.
+    /// Mirrors `test_load_nitrogen_params_applies_carbon_fraction_fold` and
+    /// `test_committed_params_are_the_values_read_off_the_primary`.
+    #[test]
+    fn the_committed_nitrogen_thresholds_fold_to_kg_n_per_mol_c() {
+        let p = nitrogen();
+        assert!((p.n_residual_per_mol_c - 1.3345556e-4).abs() < 1e-10);
+        assert!((p.n_critical_per_mol_c - 4.0036667e-4).abs() < 1e-10);
+        // Greenwood eqn (6) as this file carries it: a = 5.697 % (the equation's digits,
+        // NOT the abstract's rounded 5.7), b = 0.5, domain bound 1.0 t/ha.
+        assert_eq!(p.n_target_coefficient, 0.05697);
+        assert_eq!(p.n_target_exponent, 0.5);
+        assert_eq!(p.n_target_w_plateau, 1.0);
     }
 }

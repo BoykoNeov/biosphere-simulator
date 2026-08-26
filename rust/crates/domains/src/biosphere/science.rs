@@ -2129,4 +2129,196 @@ mod tests {
         // Zero in, zero out on every leg — the split creates nothing.
         assert_eq!(partition(0.0, 1.5, &t), (0.0, 0.0, 0.0, 0.0));
     }
+    // -----------------------------------------------------------------------------
+    // S5 batch E — nitrogen: Greenwood's target curve, and one asymmetry the existing
+    // availability pin cannot see.
+    //
+    // Ported from `tests/test_nitrogen_form.py` (the curve block) and
+    // `tests/test_nitrogen.py` (the availability block). `f_N` itself needs no successor
+    // here — `the_nitrogen_stress_ramp_is_linear_between_its_two_knots` above already
+    // pins both knots, the zero-biomass guard and the interior linearity, and a second
+    // copy of that claim would inflate the count and assert nothing new.
+    //
+    // ⚠ `target_n_concentration` had NO direct test in either surface before this batch.
+    // Measured: removing the plateau entirely, and flipping the exponent's sign, each
+    // reddened ZERO tests of `-p domains --lib` and only committed golden bytes of the
+    // full workspace. Greenwood's domain bound is the one form the primary contradicts,
+    // and it was guarded by numbers in a file.
+    // -----------------------------------------------------------------------------
+
+    /// Greenwood eqn (6) either side of its stated domain bound.
+    ///
+    /// `%N = a·W^-b` for `W > 1 t/ha` with `a = 5.697 %` (C3) and `b = 0.5`; CONSTANT at
+    /// `a` below the bound. The plateau is the paper's own statement rather than our
+    /// interpolation — below 1 t/ha growth is near-exponential, so plant %N does not
+    /// change with mass (Ågren 1985) — and [A] omits all data there. Extrapolating the
+    /// declining branch down into that region manufactures a season-long decline for
+    /// crops far too small to have one, which is what makes it the one candidate form the
+    /// primary rules out rather than merely leaves unsupported.
+    ///
+    /// Every literal is hand-computed from the equation: `5.697 / sqrt(4) = 2.8485 %` and
+    /// `5.697 / sqrt(16) = 1.424250 %`, i.e. the concentration halves per four-fold mass,
+    /// which IS `b = 0.5`.
+    /// Mirrors `test_target_is_constant_below_greenwoods_domain_bound`,
+    /// `test_target_declines_as_a_power_law_above_the_bound` and
+    /// `test_target_is_continuous_at_the_bound`.
+    #[test]
+    fn the_greenwood_target_is_flat_below_its_domain_bound_and_declines_above_it() {
+        let (a, b, bound) = (0.05697, 0.5, 1.0);
+        let at = |w: f64| target_n_concentration(w, a, b, bound);
+        // The plateau, INCLUDING its right-hand endpoint: the bound itself is flat.
+        for w in [0.0, 1e-6, 0.09, 0.35, 0.63, 0.999, 1.0] {
+            assert_eq!(at(w), a, "the plateau is flat at W = {w}");
+        }
+        // The declining branch, at two masses whose square roots are exact.
+        assert_eq!(at(4.0), 0.028485);
+        assert_eq!(at(16.0), 0.01424250);
+        // ...and it really does halve per four-fold mass, which is the exponent.
+        assert!((at(16.0) * 2.0 - at(4.0)).abs() <= 1e-18, "b is not 0.5");
+        // Strictly DECREASING above the bound — the sign of the exponent, stated as the
+        // property rather than as another value.
+        let ws = [1.0, 2.0, 5.0, 10.0, 20.0, 50.0];
+        let vals: Vec<f64> = ws.iter().map(|w| at(*w)).collect();
+        assert!(
+            vals.windows(2).all(|w| w[1] < w[0]),
+            "the target must fall with crop mass: {vals:?}"
+        );
+        // No STEP at the bound: the plateau meets the curve at `a`, by construction.
+        assert_eq!(at(1.0), a);
+        // ⚠ The tolerance is RELATIVE and is not decoration: `(1 + 1e-12)^-0.5` differs
+        // from 1 in the 13th place, so the gap here is ~3e-14 in absolute terms. An
+        // absolute `1e-15` reads as a tighter claim and is simply a wrong one.
+        assert!(
+            (at(1.0 + 1e-12) - a).abs() <= 1e-9 * a,
+            "the two branches must meet: {} vs {a}",
+            at(1.0 + 1e-12)
+        );
+    }
+
+    /// The crop mass at which Greenwood's target meets the flat stress threshold.
+    ///
+    /// `W* = (a / n_critical)^(1/b) = (5.697 / 1.5)^2 = 14.4248 t/ha`. Below it the
+    /// target sits above critical and `f_N == 1`; above it the plant is stressed at its
+    /// own target concentration. The arithmetic is derived here from the COMMITTED params
+    /// rather than written as a literal, so a change to either number moves it.
+    ///
+    /// This is the number `science_gates::open_season_peaks_below_the_greenwood_crossing`
+    /// is named for, and that gate asserts the frozen crop stays under it. What it does
+    /// NOT assert is that the crossing is where the curve actually crosses — a gate on
+    /// `peak_w < 14.4248` stays green if the curve moves out from under the constant. So
+    /// this pin is the gate's other half rather than a second copy of it.
+    /// Mirrors `test_the_target_meets_n_critical_at_14_42_t_per_ha`.
+    #[test]
+    fn the_greenwood_target_meets_the_stress_threshold_at_the_crossing() {
+        let p = crate::biosphere::params::nitrogen();
+        // Back out the flat threshold on Greenwood's own basis (kg N / kg DM).
+        let n_critical_kg_kg = p.n_critical_per_mol_c / p.dm_kg_per_mol_c;
+        let crossing = (p.n_target_coefficient / n_critical_kg_kg).powf(1.0 / p.n_target_exponent);
+        assert!(
+            (crossing - 14.4248).abs() < 1.5e-3,
+            "the crossing moved: {crossing}"
+        );
+        // ...and the curve really does cross THERE, in both directions — the assertion a
+        // bare literal cannot make.
+        let at = |w: f64| {
+            target_n_concentration(
+                w,
+                p.n_target_coefficient,
+                p.n_target_exponent,
+                p.n_target_w_plateau,
+            )
+        };
+        assert!(at(crossing * 0.99) > n_critical_kg_kg);
+        assert!(at(crossing * 1.01) < n_critical_kg_kg);
+    }
+
+    /// The non-positive domain bound DEGENERATES here rather than raising, and that is an
+    /// inherited port decision, not a lost guard.
+    ///
+    /// Python's `target_n_concentration` raises on `w_plateau <= 0`; this one returns the
+    /// plateau value, for the reason this module's header gives for the three
+    /// `canopy_assimilation` guards — a `Result` on a hot rate law buys nothing the file
+    /// boundary cannot buy more cheaply. The rejection lives at the loader instead, and
+    /// `params::tests::the_nitrogen_bounds_are_each_rejected_at_their_own_shape` is the
+    /// test that owns it. Pinned as BEHAVIOUR here so the pair is visible from both ends:
+    /// if this function ever grows a panic, this test says so rather than a scenario
+    /// dying mid-step.
+    /// Mirrors the omitted half of `test_target_rejects_a_non_positive_plateau_bound`.
+    #[test]
+    fn a_non_positive_domain_bound_degenerates_to_the_plateau_and_does_not_panic() {
+        for bad in [0.0, -1.0] {
+            assert_eq!(target_n_concentration(2.0, 0.05, 0.5, bad), 0.05);
+            assert_eq!(target_n_concentration(1e6, 0.05, 0.5, bad), 0.05);
+        }
+    }
+
+    /// The soil-N availability ramp at a point that is NOT its own symmetry point.
+    ///
+    /// ⚠ THIS TEST EXISTS BECAUSE OF A MEASUREMENT, and the measurement is the finding.
+    /// `soil_n_below_the_residual_shuts_uptake_off_entirely` above asserts the two knots
+    /// and exactly one interior value — the MIDPOINT, `0.5`. The midpoint is a fixed
+    /// point of the map `x -> 1 - x`, so **replacing the whole interior ramp with its own
+    /// inversion left every test in the workspace green**: the `-p domains --lib` battery
+    /// scored zero, and so did the goldens and both tier-contract bands. A branch probe
+    /// says why the goldens cannot help — the interior limb is reached by ONE test in the
+    /// whole binary (that one), because every frozen scenario sits either below the
+    /// residual or above the critical point and never on the ramp.
+    ///
+    /// So the quarter points are the assertion, not a decoration: `0.25` and `0.75` are
+    /// each other's images under the inversion, which is exactly what makes an inverted
+    /// ramp visible. The Python side had them all along
+    /// (`test_soil_n_availability_cardinal_values` parametrizes six points); the port
+    /// carried the midpoint over and lost the discriminating ones.
+    /// Mirrors `test_soil_n_availability_cardinal_values`.
+    #[test]
+    fn the_availability_ramp_is_pinned_off_its_own_symmetry_point() {
+        // The band `[0.01, 0.05]` of the Python fixture, whose quarter points are exact
+        // in binary: (0.02 - 0.01) / 0.04 = 0.25.
+        let (res, crit) = (0.01, 0.05);
+        let at = |soil_n: f64| soil_n_availability(soil_n, res, crit);
+        assert_eq!(at(0.02), 0.25);
+        assert_eq!(at(0.04), 0.75);
+        // ...and the ramp is INCREASING through them, which is the property an inversion
+        // breaks and a midpoint cannot see.
+        assert!(at(0.02) < at(0.03) && at(0.03) < at(0.04));
+        // The two clamps, at a band the frozen scenarios do not use, so the pin is about
+        // the function rather than about a scenario's numbers.
+        assert_eq!(at(0.005), 0.0);
+        assert_eq!(at(0.07), 1.0);
+    }
+    /// `f_N` reads a CONCENTRATION, and the existing pin evaluates at a denominator of 1.
+    ///
+    /// ⚠ THE SECOND MEASURED BLIND SPOT OF THIS BATCH, and the same species as the
+    /// availability midpoint above. `the_nitrogen_stress_ramp_is_linear_between_its_two_knots`
+    /// passes `biomass_c = 1.0` on every call it makes, so `plant_n / biomass_c` and
+    /// `plant_n` are the same number for all of them: **replacing the concentration with
+    /// the bare amount left that test green.** It reddened ten tests elsewhere, and exactly
+    /// one of them was about the nitrogen factor — `flows::tests::the_limitation_is_the_
+    /// product_and_both_factors_actually_bite`, a flow-level pin one layer out.
+    ///
+    /// A denominator of one is the arithmetic identity of having no denominator. What this
+    /// pin adds is the only thing that separates them: the SAME plant nitrogen against two
+    /// different biomasses must give two different answers, and each must be the ramp read
+    /// at that state's own concentration — which is what makes `f_N` a dilution factor
+    /// rather than a stock threshold.
+    #[test]
+    fn the_stress_factor_reads_a_concentration_and_not_an_amount() {
+        let (res, crit) = (1.0, 3.0);
+        // One amount of nitrogen, two crops. The lean crop is at conc 2.0 (mid-ramp);
+        // the same nitrogen in a crop twice as large is at 1.0, which is the residual.
+        let plant_n = 4.0;
+        assert_eq!(nitrogen_stress_factor(plant_n, 2.0, res, crit), 0.5);
+        assert_eq!(nitrogen_stress_factor(plant_n, 4.0, res, crit), 0.0);
+        // ...and growth alone stresses a plant that has taken up nothing new — the
+        // "pure dilution" regime, stated as the function's own property rather than as a
+        // scenario's outcome.
+        let diluting: Vec<f64> = [1.5, 2.0, 3.0, 4.0]
+            .iter()
+            .map(|biomass| nitrogen_stress_factor(plant_n, *biomass, res, crit))
+            .collect();
+        assert!(
+            diluting.windows(2).all(|w| w[1] < w[0]),
+            "f_N must fall as the crop grows into a fixed reserve: {diluting:?}"
+        );
+    }
 }
