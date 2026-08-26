@@ -5826,6 +5826,7 @@ verified byte-exact. Harness and logs: `M:\claud_projects\temp\s5-control`.
 |---|---|---:|---:|
 | M1 | `intercepted_fraction` (Beer–Lambert) | **0** | — probe defect: the function is dead |
 | M1b | extinction coefficient where the canopy uses it | 7 | **0** |
+| M1c | 3-point Gaussian depth weights → a flat average | 4 | **0** — and all four reds are goldens/bands |
 | M2 | FvCB co-limitation `min` → `max` | 11 | **0** |
 | M3 | Q10 per-10 °C → per-5 °C | 6 | **0** |
 | M4 | vegetative DVS scaled by the wrong TSUM | 6 | **0** |
@@ -5839,6 +5840,8 @@ was then read from its own body: `open_season_canopy_is_physical` is a peak-LAI 
 about photosynthesis, respiration, phenology or interception. **They redden because a broken
 equation moves a trajectory and a band somewhere else notices** — which is the same failure
 mode as a golden red, "a number moved", wearing a more reassuring name.
+
+⚠⚠ **M1c is the sharpest reading in the battery and it deserves its own sentence.** Replacing the canopy's three-point Gaussian quadrature weights with a flat average — a change to the *numerical scheme* by which light is integrated over canopy depth — reddens **four tests, all four of them committed-byte comparisons**. Not one behavioural gate moved; the peak-LAI band did not notice, and neither did any trajectory check. The canopy's integration scheme is currently guarded by nothing except the goldens, which means it is guarded by nothing that would survive someone regenerating them.
 
 ⚠ **Scope of the claim, stated honestly.** The mutations were *selected* from mechanisms the
 owner-map work had already shown carry no unit test, so this is not a census of the
