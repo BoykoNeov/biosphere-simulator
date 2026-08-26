@@ -41,13 +41,33 @@ const MAX_CLAUDE_MD_BYTES: usize = 12_000;
 /// commit. Two-thirds of that growth was *more distinct lessons* (62 → 70 lines) and one
 /// third was line drift — so the ceiling buys more memories and the per-line budget below
 /// owns the half the discipline actually controls.
-const MAX_MEMORY_INDEX_BYTES: usize = 16_000;
+///
+/// ⚠⚠ RAISED AGAIN 2026-08-26, 16_000 → 20_000 — **and this copy was MISSED for a whole
+/// commit.** The raise landed in `tests/test_context_budget.py` with its decomposition, its
+/// controls and its new bound, and this mirror kept the old ceiling; it went red on the
+/// next workspace run, on the first memory line the raise existed to make room for. Nothing
+/// is wrong with either gate — there are simply TWO COPIES of one rule, and a raise that
+/// edits one of them is half a raise. *A rule with two copies has one that is stale*, and
+/// this repo has logged that before; the ceiling ceremony is now itself an instance.
+///
+/// The reasoning is not restated here — it belongs in one place. `docs/context-budget.md`
+/// ("the memory side") carries the decomposition (count +4,089 B, 102 %; length −82 B,
+/// −2 %), the five controls and the cadence note. What this file owes is the SAME NUMBERS,
+/// which is what being a mirror means.
+const MAX_MEMORY_INDEX_BYTES: usize = 20_000;
 const MAX_MEMORY_BYTES_PER_LINE: usize = 170;
+
+/// ⚠ The THIRD bound, added 2026-08-26 alongside the raise. The per-line budget is a MEAN,
+/// and a mean dilutes with every raise — one 400 B paragraph moves it +3.3 B/line at 70
+/// lines and +2.0 at 117. Measured the day this shipped: longest index line 239 B against a
+/// 169.5 B mean, 1.41×. So a mean cannot tell ONE fat hook from 94 slightly fatter ones,
+/// exactly as a total cannot tell more memories from fatter ones. Pinned AT the measurement
+/// (239 → 240) rather than above it, and never raised — same standing as the budget above.
+const MAX_MEMORY_INDEX_LINE_BYTES: usize = 240;
 
 /// The Phase 0–9 table as it stood in `d86d9c8:CLAUDE.md`, verified character-for-character
 /// after the move.
-const PHASE_TABLE_SHA256: &str =
-    "5551a414e790ca0cbc7c5f80ad59cd5ac763ecbdfa3a41509b5cb683c864d434";
+const PHASE_TABLE_SHA256: &str = "5551a414e790ca0cbc7c5f80ad59cd5ac763ecbdfa3a41509b5cb683c864d434";
 
 /// The index legitimately carries MORE rows than the record, because an index line may
 /// point into a record row it shares. Exactly one such pair exists (measured 2026-08-12):
@@ -357,5 +377,19 @@ fn memory_index_ceiling() {
          of the ceiling's: SHORTEN the hooks, pushing detail into the memory files. Do NOT \
          raise this to make room — raising the ceiling buys more memories, raising this buys \
          longer lines, and only the first is growth."
+    );
+
+    // ⚠ The third bound. Both assertions above are blind to a SINGLE hook grown into a
+    // paragraph: a ceiling sees only the total, and an average dilutes one long line
+    // across every short one. Its remedy is the per-line budget's, aimed at one line.
+    let longest = text
+        .lines()
+        .filter(|l| l.starts_with("- ["))
+        .map(|l| l.len())
+        .max()
+        .unwrap_or(0);
+    assert!(
+        longest <= MAX_MEMORY_INDEX_LINE_BYTES,
+        "MEMORY.md's longest index line is {longest} B, past the          {MAX_MEMORY_INDEX_LINE_BYTES} B per-line maximum — one hook has grown into a          paragraph, which BOTH bounds above are blind to. The remedy is that single hook:          SHORTEN it, pushing the detail into its memory file, and keep the distinguishing          terms — they are the recall matching surface, so trimming is not condensing. Do          NOT raise this bound; it is pinned at a measurement on purpose."
     );
 }

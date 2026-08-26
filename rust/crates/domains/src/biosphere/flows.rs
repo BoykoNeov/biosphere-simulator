@@ -2853,6 +2853,21 @@ mod tests {
     /// number this tree produced — the same shape as the standalone equation tests, one
     /// layer up. This is what stops the three budget-coupled flows from silently
     /// disagreeing about the day they are all spending.
+    ///
+    /// ⚠⚠ READ THE SCOPE BEFORE TRUSTING THIS ONE. It is a **composition** check and it
+    /// is structurally BLIND to anything inside the functions it composes: it calls the
+    /// same `science.rs` entry points the flow does, so a wrong rate law moves both sides
+    /// identically and this test stays green. Measured, not argued — it reddened under
+    /// **none** of the fifteen mutations in §5ah's battery, including the two that broke
+    /// `maintenance_respiration_flux` and `available_for_growth` outright. Those are owned
+    /// by the equation tests in `science.rs`.
+    ///
+    /// What it DOES own is everything between the functions, and that was measured too:
+    /// maintaining the LEAF instead of the whole biomass (a wrong argument) and
+    /// transposing `available_for_growth`'s two arguments both redden it. *A composition
+    /// check is real coverage of the wiring and no coverage at all of the arithmetic; the
+    /// after-battery could not see the difference, because it only ever asked whether each
+    /// MUTATION was caught and never whether each new TEST was reachable.*
     /// Mirrors `tests/test_carbon_budget.py::test_context_budget_matches_standalone_rate_laws`.
     #[test]
     fn the_shared_carbon_budget_is_the_standalone_rate_laws_recomposed() {
@@ -2901,60 +2916,122 @@ mod tests {
         );
     }
 
-    /// The limitation is the PRODUCT of the two stress factors, and it is exactly 1 when
-    /// neither bites.
+    /// The limitation is the PRODUCT of the two stress factors, and BOTH of them bite at
+    /// the operating point this test constructs.
     ///
-    /// ⚠ The storage organ is loaded here on purpose. `leaf_and_biomass` excludes it, so
-    /// the nitrogen factor's denominator is `leaf + stem + root`; with storage at 0 —
-    /// the state a first draft would use — the excluded and included readings are the
-    /// same number and the test cannot tell them apart. (The same trap `with_storage`
-    /// was written for in batch A.)
-    /// Mirrors `test_context_limitation_is_f_water_times_f_n`,
-    /// `test_context_limitation_is_one_at_the_non_limiting_point` and
-    /// `test_context_storage_excluded_from_biomass`.
+    /// ⚠⚠ THE FIXTURE IS THE TEST, and the first version of it made this gate INERT. It
+    /// asserted `lim == f_water · f_n` on a state whose `plant_n` was 1.0 against 5 mol C
+    /// of biomass — a concentration a hundred times the critical one, so `f_n` saturated
+    /// at exactly 1.0 and the claim degenerated to `lim == f_water`. Measured: deleting
+    /// the nitrogen factor from the product outright reddened **one** test in 282, and it
+    /// was not this one. A test named for a product cannot see one of its factors when
+    /// that factor is pinned at the multiplicative identity.
+    ///
+    /// So the stressed state is DERIVED from the ramp instead of guessed. `f_N` is linear
+    /// between `n_residual` and `n_critical` per mol C, so a plant nitrogen of
+    /// `midpoint · (leaf + stem + root)` puts the concentration exactly halfway and
+    /// `f_N = 0.5`. ⚠ Derived from the loaded params rather than written as a literal,
+    /// because the first draft of this fixture hardcoded 0.001/0.002 — the PYTHON TEST
+    /// FIXTURE's thresholds, not the committed file's (0.005/0.015, folded) — and read
+    /// `f_N = 1.0` for a state it had just declared stressed. A test that constructs a
+    /// stressed state must construct it from the numbers the code will actually use.
+    ///
+    /// The same value does a second job, and it holds for any thresholds: against the
+    /// LEAF alone (3 of the 5 mol C) the concentration is 5/3 of the midpoint, which is
+    /// above `n_critical` whenever the midpoint is, so `f_N` would read 1.0. One fixture
+    /// therefore separates "the nitrogen factor is missing" from "its denominator is the
+    /// wrong organ set", and both were measured to redden it.
+    ///
+    /// Mirrors `test_context_limitation_is_f_water_times_f_n` and
+    /// `test_context_limitation_is_one_at_the_non_limiting_point`.
     #[test]
-    fn the_limitation_is_water_times_nitrogen_and_excludes_the_storage_organ() {
+    fn the_limitation_is_the_product_and_both_factors_actually_bite() {
         let ctx = ctx_open();
-        // Unstressed: FTSW 0.77 against wssg 0.30, and plant N well above the critical
-        // concentration for a 5 mol C crop.
-        let s = with_storage(growing_state(), 2.0);
         let r = resolver(800.0, 400.0);
-        let env = r.bind(&s, 1.0);
-        let lim = ctx.limitation(&s, &env).expect("limitation");
-        assert_eq!(
-            lim, 1.0,
-            "neither factor bites at the fixture's operating point"
-        );
+        let f_n_of = |s: &State| {
+            let biomass = s.stocks[LEAF].amount + s.stocks[STEM].amount + s.stocks[ROOT].amount;
+            science::nitrogen_stress_factor(
+                s.stocks[PLANT_N].amount,
+                biomass,
+                ctx.nitro.n_residual_per_mol_c,
+                ctx.nitro.n_critical_per_mol_c,
+            )
+        };
+        let f_water_of = |s: &State| {
+            science::soil_water_stress(
+                s.stocks[SOIL_WATER].amount,
+                TEST_DEPTH,
+                EXTR,
+                ctx.ground_area,
+                WSSG,
+            )
+        };
+        let lim_of = |s: &State| ctx.limitation(s, &r.bind(s, 1.0)).expect("limitation");
+        // The exact midpoint of f_N's ramp, over the fixture's 5 mol C of maintained
+        // biomass. Derived, never a literal — see the note above.
+        let midpoint = (ctx.nitro.n_residual_per_mol_c + ctx.nitro.n_critical_per_mol_c) / 2.0;
+        let half_stress_n = midpoint * 5.0;
+        // ⚠ A DERIVED half is not a BIT half: `midpoint · 5 / 5` round-trips to
+        // 0.5000000000000001, so the ramp assertions carry a tolerance while the
+        // saturated ones (1.0) and the water factor stay EXACT — those really are exact,
+        // and weakening them would hide a real drift.
+        let half = |got: f64, what: &str| {
+            assert!(
+                (got - 0.5).abs() <= 1e-12,
+                "{what}: got {got}, want 0.5 (the ramp midpoint)"
+            );
+        };
 
-        // Now make water bite and nothing else: FTSW = 0.5 · wssg = 0.15 of a 130 kg
-        // zone is 19.5 kg, which is WSFG = 0.5 exactly.
-        let mut dry = with_storage(growing_state(), 2.0);
-        dry.stocks.get_mut(SOIL_WATER).expect("soil water").amount = 19.5;
-        let env = r.bind(&dry, 1.0);
-        let lim = ctx.limitation(&dry, &env).expect("limitation");
-        let biomass = dry.stocks[LEAF].amount + dry.stocks[STEM].amount + dry.stocks[ROOT].amount;
-        let f_water = science::soil_water_stress(19.5, TEST_DEPTH, EXTR, ctx.ground_area, WSSG);
-        let f_n = science::nitrogen_stress_factor(
-            dry.stocks[PLANT_N].amount,
-            biomass,
+        // (a) Neither factor bites: FTSW 0.77 against wssg 0.30, N far above critical.
+        let easy = growing_state();
+        assert_eq!(f_n_of(&easy), 1.0);
+        assert_eq!(f_water_of(&easy), 1.0);
+        assert_eq!(lim_of(&easy), 1.0, "the non-limiting point is exactly one");
+
+        // (b) NITROGEN alone bites, at the exact midpoint of its ramp.
+        let mut lean = growing_state();
+        lean.stocks.get_mut(PLANT_N).expect("plant N").amount = half_stress_n;
+        half(
+            f_n_of(&lean),
+            "the fixture must sit ON the ramp, not past it",
+        );
+        assert_eq!(f_water_of(&lean), 1.0, "only nitrogen may bite here");
+        half(lim_of(&lean), "lim == f_water · f_n == 1.0 · 0.5");
+        // ⚠ The denominator is leaf + stem + root, NOT the leaf. Against the leaf alone
+        // (3 of the 5 mol C) this same state reads 5/3 of the midpoint, which is above
+        // `n_critical` for any thresholds — so f_N would read 1.0 and the assertion above
+        // is exactly the one that separates the two organ sets.
+        let leaf_only = science::nitrogen_stress_factor(
+            half_stress_n,
+            easy.stocks[LEAF].amount,
             ctx.nitro.n_residual_per_mol_c,
             ctx.nitro.n_critical_per_mol_c,
         );
-        assert_eq!(lim.to_bits(), (f_water * f_n).to_bits(), "the product");
-        assert!(lim < 1.0, "the dry state must actually stress the crop");
-
-        // Storage is excluded from the maintained biomass: adding grain must not change
-        // the limitation, because the nitrogen denominator is leaf + stem + root only.
-        let fat = with_storage(growing_state(), 50.0);
-        let env = r.bind(&fat, 1.0);
-        let lim_open = ctx_open().limitation(&fat, &env).expect("limitation");
-        assert_eq!(lim_open, 1.0);
-        let (_, mres_lean, _) = budget_of(&ctx, &with_storage(growing_state(), 0.0), 800.0);
-        let (_, mres_fat, _) = budget_of(&ctx, &fat, 800.0);
         assert_eq!(
-            mres_lean.to_bits(),
-            mres_fat.to_bits(),
-            "the grain must not be maintained"
+            leaf_only, 1.0,
+            "a leaf-only denominator would NOT be stressed"
+        );
+
+        // (c) WATER alone bites: FTSW = 0.5 · wssg = 0.15 of a 130 kg zone is 19.5 kg,
+        // which is WSFG = 0.5 exactly.
+        let mut dry = growing_state();
+        dry.stocks.get_mut(SOIL_WATER).expect("soil water").amount = 19.5;
+        assert_eq!(f_water_of(&dry), 0.5);
+        assert_eq!(f_n_of(&dry), 1.0, "only water may bite here");
+        assert_eq!(lim_of(&dry), 0.5);
+
+        // (d) BOTH bite, and the composition is a product rather than a min or a mean —
+        // which is the distinction (b) and (c) alone cannot make, since 0.5 is 0.5 under
+        // all three rules. 0.5 · 0.5 = 0.25; a `min` would give 0.5 and a mean 0.5.
+        let mut both = growing_state();
+        both.stocks.get_mut(PLANT_N).expect("plant N").amount = half_stress_n;
+        both.stocks.get_mut(SOIL_WATER).expect("soil water").amount = 19.5;
+        half(f_n_of(&both), "nitrogen at the ramp midpoint");
+        assert_eq!(f_water_of(&both), 0.5);
+        assert!(
+            (lim_of(&both) - 0.25).abs() <= 1e-12,
+            "a product, not a min (0.5) or a mean (0.5): got {}",
+            lim_of(&both)
         );
     }
 
@@ -3307,6 +3384,13 @@ mod tests {
     /// Both flows multiply the same `available`, so a stress that halves assimilation
     /// must move both by the same ratio — the property that says the budget is shared
     /// rather than recomputed twice with a drifting argument.
+    ///
+    /// ⚠ Its scope, measured rather than assumed (same pass that found the limitation
+    /// fixture inert). It reddens when the limitation reaches only ONE of the two flows,
+    /// and it is blind to a CONSTANT that reaches only one: scaling `Allocation`'s DMI by
+    /// a factor `GrowthRespiration` does not share leaves the two ratios identical, and
+    /// that mutation left this test green. A ratio test sees a factor that VARIES with the
+    /// state and cannot see one that does not.
     /// Mirrors `test_limitation_scales_growth_and_allocation_identically`.
     #[test]
     fn the_limitation_scales_growth_and_allocation_by_the_same_ratio() {

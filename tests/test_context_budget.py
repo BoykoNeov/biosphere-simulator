@@ -131,9 +131,9 @@ MAX_CLAUDE_MD_BYTES = 12_000
 #   * COUNT   70 -> 94 lines at the old 170.4 B/line ... +4,089 B  (102 %)
 #   * LENGTH  170.4 -> 169.5 B/line across 94 lines .... -   82 B  (  -2 %)
 #
-# Actual growth +4,007 B. ALL of it is count; the per-line budget did not merely hold, it
-# IMPROVED. Last time the split was 69/31 and the raise was still the right remedy; here
-# there is no length component to argue about at all.
+# Actual growth +4,007 B. ALL of it is count; the per-line budget did not merely
+# hold, it IMPROVED. Last time the split was 69/31 and the raise was still right;
+# here there is no length component to argue about at all.
 #
 # ⚠ THE PART THAT MATTERS: this raise ships a THIRD bound, because the two existing ones
 # have between them stopped being able to see the documented failure mode. The per-line
@@ -145,10 +145,10 @@ MAX_CLAUDE_MD_BYTES = 12_000
 # cannot tell one fat hook from 94 slightly fatter ones either.
 #
 # So MAX_MEMORY_INDEX_LINE_BYTES is pinned AT today's measurement (239 -> 240, one byte
-# of slack) rather than set somewhere comfortable above it. A max bound with room in it
-# rots the way a ceiling with room in it rots. Its remedy is the per-line budget's, aimed
-# at one line: SHORTEN THAT HOOK, pushing the detail into the memory file. Do not raise
-# it, for the same reason the per-line budget is not raised.
+# of slack) rather than set somewhere comfortable above it. A max bound with room
+# in it rots the way a ceiling with room in it rots. Its remedy is the per-line
+# budget's, aimed at one line: SHORTEN THAT HOOK, pushing the detail into the
+# memory file. Do not raise it, for the reason the per-line budget is not raised.
 #
 # ⚠ THE CADENCE IS ITSELF A MEASUREMENT, recorded here rather than absorbed. The
 # 2026-08-15 raise bought "~24 memories of headroom"; 24 index lines arrived in ELEVEN
@@ -474,11 +474,11 @@ def test_memory_index_ceiling() -> None:
         f"more memories, raising this buys longer lines, and only the first is growth."
     )
     # ⚠ THE THIRD BOUND, asserted 2026-08-26 alongside the 16_000 -> 20_000 raise, and
-    # it is what that raise OWES rather than a tidy-up. The budget above is a MEAN, and a
-    # mean dilutes with every raise — one 400 B paragraph moves it +3.3 B/line at 70
-    # lines and +2.0 at 117. Measured the day this shipped: longest line 239 B against a
-    # 169.5 B mean, 1.41x. So a hook can already be half again the typical one while both
-    # bounds above stay quiet, which is the 2026-08-15 finding one turn further: a mean
+    # it is what that raise OWES rather than a tidy-up. The budget above is a MEAN,
+    # and a mean dilutes with every raise — one 400 B paragraph moves it +3.3 B/line
+    # at 70 lines and +2.0 at 117. Measured the day this shipped: longest line 239 B
+    # against a 169.5 B mean, 1.41x. So a hook can already be half again the typical
+    # one while both bounds stay quiet — the 2026-08-15 finding one turn further: a
     # cannot tell ONE fat hook from 94 slightly fatter ones. The remedy is the per-line
     # budget's, aimed at a single line.
     #
@@ -492,9 +492,9 @@ def test_memory_index_ceiling() -> None:
     #   C3b same 119-line index, no fat hook .... GREEN
     #   C4  +30 rows of 168 B ................... RED on the CEILING
     #
-    # C1/C2 say this bound is **largely redundant TODAY**: the mean sits at 169.5 against
-    # a 170 budget — 0.5 B of slack — so any line over ~217 B reddens the mean first, and
-    # C2 shows even a line this bound would ALLOW is caught by the mean. The bound is not
+    # C1/C2 say this bound is **largely redundant TODAY**: the mean sits at 169.5
+    # against a 170 budget — 0.5 B of slack — so any line over ~217 B reddens the mean
+    # first, and C2 shows even a line this bound would ALLOW is caught by it. Not
     # inert (C3 fires it alone), but its bite is in the regime THIS RAISE CREATES: once
     # the ceiling's new headroom is spent on ordinary lines, the mean regains slack and
     # stops seeing a single paragraph — C3b is that index, and it is green until the fat
@@ -507,7 +507,7 @@ def test_memory_index_ceiling() -> None:
         f"{MAX_MEMORY_INDEX_LINE_BYTES} B per-line maximum — one hook has grown into a "
         f"paragraph, which BOTH bounds above are blind to (a ceiling sees only the "
         f"total, an average dilutes one long line across every short one). The remedy "
-        f"is that single hook: SHORTEN it, pushing the detail into its memory file, and "
+        f"is that single hook: SHORTEN it, pushing the detail into its file, and "
         f"keep the distinguishing terms — they are the recall matching surface, so "
         f"trimming is not condensing. Do NOT raise this bound; it is pinned at a "
         f"measurement on purpose, the same way the per-line budget is."

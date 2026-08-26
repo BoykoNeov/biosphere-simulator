@@ -244,6 +244,22 @@ slack again: padded to 119 lines, the same fat hook reddens it and nothing else,
 same 119-line index without the fat hook is green. **Its bite is in the regime this raise
 creates**, which is the right place for it and is not the same as biting now.
 
+⚠⚠ **THE RAISE HAS TO BE MADE TWICE, AND THE FIRST ATTEMPT ONLY MADE IT ONCE.** This gate
+has **two copies** — `tests/test_context_budget.py` and
+`rust/crates/repo_gates/tests/context_budget.rs`, the mirror the reference flip built. The
+2026-08-26 raise edited the Python one, with its decomposition, its controls and its new
+bound; the Rust one kept `16_000` and went red on the next full workspace run — on the very
+first memory line the raise existed to make room for. Nothing was wrong with either gate:
+there are simply two copies of one rule, and *a rule with two copies has one that is stale*,
+which this repo has logged before on a different subject. The ceiling ceremony is now
+itself an instance of it.
+
+Both copies now carry the same three bounds and were controlled **together**: a 241 B hook,
+a 239 B hook and 40 padding rows each produce the identical verdict and fire the identical
+bound on both sides, and a byte-exact revert returns both to green. When this gate is raised
+again, **raise both, and control them side by side** — the numbers live here, and each copy
+owes the same numbers rather than its own reasoning.
+
 ⚠⚠ **The cadence is itself a measurement, and it is the user's call, not this document's.**
 The 2026-08-15 raise bought "~24 memories of headroom". Those 24 index lines arrived in
 **eleven days**. 20,000 B is ~118 lines at budget — the same ~24 memories, so the same

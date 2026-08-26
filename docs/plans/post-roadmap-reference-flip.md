@@ -6979,6 +6979,7 @@ tests, and here is every difference.
 | `test_maintenance_respiration_maturity_seam_scales_linearly` | **no successor, and correctly so**: `maturity` is hard-coded to 1.0 in this port, and nothing in EITHER tree ever passes anything but the default. The seam was exercised by its own test and by nothing else — a finding about the reference it came from, not a gap in the port |
 | `test_*_params_file_exists`, `test_*_loader_round_trips_a_valid_file`, `test_load_*_matches_committed_values` | folded into `include_str!` plus C8's params census — "the file exists", "it round-trips" and "its values are these" are one assertion once the file is compiled in |
 | `test_growth_flow_is_carbon_balanced`, `test_maintenance_flow_is_carbon_balanced_both_regimes`, `test_allocation_is_carbon_balanced` | the engine's own machinery: `assert_conserved` runs every step of every run, and batch A recorded the same disposition for the gas flows |
+| `test_context_storage_excluded_from_biomass` | **guarded by the TYPE, harder than by a test** — `CarbonContext` has no `storage_c` field, so `leaf_and_biomass` cannot include storage and no mutation short of adding a field can redden a test for it. Same disposition batch A gave `FlowResult::new` rejecting a duplicate leg. ⚠ The batch first shipped this as a ported claim whose docstring said `with_storage` made it falsifiable; measured in review, it did not — see §5ai |
 | `test_maintenance_zero_biomass_is_inert` | covered by `maintenance_respiration_is_the_reference_rate_scaled_by_biomass_and_q10`'s exact zeros plus the `biomass > 0.0` branch probe (P10/P11) |
 | `test_partition_fractions_empty_table_raises` | **inherited port decision**: `partition_fractions` indexes `table[0]` directly, so an empty table is a panic rather than a raised error. The loader refuses a table with fewer than two rows before the function can ever see one — pinned by `the_partition_tables_structural_rules_are_each_rejected_separately` |
 | `test_resp_loader_rejects_a_missing_source` / `_an_unknown_field` for **allocation** | **no loader successor and that is a measured asymmetry**, see the guard-asymmetry section above; the manifest owns it instead |
@@ -7015,3 +7016,134 @@ existed to catch it. The harness now reads and writes BYTES, and the digest is o
 bytes on disk. *A byte-exactness check that normalizes before hashing is checking
 something else.* Same species as this batch's other instrument findings, one level down: in
 the harness rather than in the subject.
+
+## §5ai Stage 3 — S5 batch D review, 2026-08-26: the after-battery asked the wrong question
+
+Four findings, and the first of them is a red CI job that was already pushed. Same shape as
+batch C's review section: each is something neither of the batch's two instruments could
+have surfaced, because none of them is a mechanism that is wrong.
+
+### ⚠⚠ 1. The Python-side gates were never run, and one of them was RED
+
+Batch D's verification was `cargo test`, `cargo clippy`, the mutation battery, the branch
+probes, `tests/test_context_budget.py` and the four batch-D Python files. `CLAUDE.md`'s
+command list also carries `uv run ruff check .`, `uv run ruff format .` and
+`uv run pyright`, and **none of them ran** — on either commit.
+
+`uv run ruff check .` came back with **8 `E501` errors**, all in the ceiling commit's own
+comment block, all already on `main`. That is a red CI Python job pushed twice over.
+
+⚠ The near-miss inside the miss: `ruff format --check` **passes** on the same file. The
+formatter does not re-wrap comments, so a comment block over the line limit is formatted
+and lint-red at the same time, and checking the formatter would have said "clean". *Two
+tools with adjacent names own different halves of the same rule.* This repo already has
+`ci-python-job-red-on-linux` recorded — "local green ≠ CI green" — and this is the weaker
+version of it: not local-green-CI-red, but **local never asked**.
+
+### ⚠⚠ 2. Three of the batch's 23 new tests were reddened by NOTHING, and the after-battery could not see it
+
+The after-battery asked, for each of fifteen mutations, *was this caught, and by a test
+about it?* — and answered yes fifteen times. It never asked the transposed question: **was
+each new TEST reached by anything at all?** Cross-referencing the hit lists against the 23
+new names answers it in one pass, and three never appear — in the battery **or** in the
+eleven branch probes.
+
+That is the C4b finding (a gate can be inert BY CONSTRUCTION) arriving through a hole in
+the instrument rather than in the subject. A targeted control battery was run on the three:
+
+| control | red | which of the three fired |
+|---|---:|---|
+| A1 MRES maintains the LEAF, not the whole biomass | 5 | the budget recomposition |
+| A2 canopy assimilation ignores the limitation | 3 | the ratio test |
+| A3 `available_for_growth`'s two arguments transposed | 29 | the budget recomposition, the ratio test |
+| B1 the nitrogen factor dropped from the limitation product | 1 | **NONE** |
+| B2 the nitrogen denominator is the LEAF, not leaf+stem+root | 1 | **NONE** |
+| C1 `Allocation`'s DMI scaled by a constant the growth flow does not share | 5 | **NONE** |
+| C2 *(no-op control: an attribute only)* | 0 | none, correctly |
+
+**Two of the three are real but narrower than their docstrings claimed**, and both now say
+so. The budget recomposition is a **composition** check: it calls the same `science.rs`
+entry points the flow does, so a wrong rate law moves both sides identically and it stays
+green — which is exactly why the two mutations that broke `maintenance_respiration_flux`
+and `available_for_growth` outright never touched it. What it owns is everything *between*
+the functions (A1, A3). The ratio test is the same species one level out, with its own
+measured limit: it sees a limitation that reaches only ONE flow (A2) and is blind to a
+CONSTANT that reaches only one (C1), because a constant cancels in a ratio.
+
+**The third was genuinely INERT on its central claim, and it is fixed rather than
+re-described.** `the_limitation_is_water_times_nitrogen_and_excludes_the_storage_organ`
+asserted `lim == f_water · f_n` on a state whose `plant_n` was 1.0 against 5 mol C — a
+concentration a hundred times critical — so `f_N` saturated at exactly 1.0 and the claim
+degenerated to `lim == f_water`. **Deleting the nitrogen factor from the product outright
+reddened one test in 282, and it was not the test named for the product.**
+
+Rewritten as `the_limitation_is_the_product_and_both_factors_actually_bite`, with the
+stressed state DERIVED from the loaded thresholds rather than written as a literal, and
+four operating points: neither factor biting, nitrogen alone, water alone, and both — the
+last one being the only one that distinguishes a product from a `min` or a mean, since all
+three agree at 0.5. Measured after: it now reddens on B1 **and** B2.
+
+⚠ **The derivation had to be derived for a reason.** The first rewrite hardcoded
+`n_residual = 0.001`, `n_critical = 0.002` — the **Python test fixture's** thresholds, not
+the committed file's (0.005 / 0.015, folded) — and read `f_N = 1.0` for a state it had just
+declared stressed. *A test that constructs a stressed state must construct it from the
+numbers the code will actually use, not from the numbers the test it was ported from used.*
+
+### ⚠ 3. A claim guarded by the TYPE, described as though guarded by the test
+
+The storage half of that test asserted that adding grain does not change the maintained
+biomass. `CarbonContext` has no `storage_c` field at all, so `leaf_and_biomass` **cannot**
+include storage — the exclusion is enforced by the struct, not by a line that could be
+wrong, and no mutation short of adding a field can redden it. The docstring said
+`with_storage` was what made the claim falsifiable; measured, it was not: both `lim == 1.0`
+assertions passed under either reading, because the nitrogen factor was saturated either
+way.
+
+Python's `test_context_storage_excluded_from_biomass` therefore moves to the disposition
+table under batch A's existing heading — *guarded by the constructor, harder than by a
+test* — which is the same disposition batch A gave `FlowResult::new` rejecting a duplicate
+leg. Not a gap; a claim that a type already makes unfalsifiable.
+
+### ⚠ 4. A long verification run overlapping a mutation battery reports the battery's tree
+
+The first `tests/crossport` run came back **3 failed / 191 passed**, all three
+`test_rust_reproduces_the_committed_golden_bytes`. It was started in the background and the
+inertness controls were run while it was in flight, so the Rust tree it built from was
+**mutated** for part of the run. Re-run alone: clean.
+
+Cheap to state, easy to misread as a real golden regression, and it is a harness rule
+rather than a finding: *a verification that builds the tree cannot share the tree with
+anything that edits it.* Batch D's other harness defect (the byte-exactness check that
+hashed decoded text) is the same species — the instrument, not the subject — and this is
+the third in one batch.
+
+### ⚠⚠ 5. The memory ceiling has TWO copies, and the raise edited one
+
+The raise that made room for this batch's memory line went into
+`tests/test_context_budget.py`. The gate also has a Rust mirror,
+`rust/crates/repo_gates/tests/context_budget.rs`, built during this very slice — and it kept
+the old `16_000`. It went red on the final full workspace run, on the **first memory line
+the raise existed to make room for**, one commit after the raise.
+
+Neither gate was wrong. There are two copies of one rule, and *a rule with two copies has
+one that is stale* — a lesson already on the record here from a different subject, and the
+ceiling ceremony has now become an instance of it. Both copies carry the same three bounds
+as of this commit, and were controlled **together**: a 241 B hook, a 239 B hook and 40
+padding rows produce the identical verdict and fire the identical bound on both sides; a
+byte-exact revert returns both to green.
+
+⚠ It is worth noting *why* the batch's own gates did not catch it earlier. The batch-D
+workspace run (914 / 0) finished **before** the memory index line was written, and the
+memory line was written after — so the sequence "run the gate, then edit the thing the gate
+guards" hid it for exactly one commit. The general form is the same one this review keeps
+finding: *a gate run before the change is not a gate run on the change.*
+
+### What the review says about the method
+
+Batch A: a green battery is evidence about the **instrument**, not the arithmetic.
+Batch C: a battery is evidence only about the mechanisms you **chose to mutate**.
+Batch D adds the transpose: **a battery is evidence about the mutations, and says nothing
+about whether your new TESTS are reachable.** Both questions are answered from the same
+run — the hit lists were already on disk — and only one of them was asked. The check is one
+pass over the report: *every new test name must appear in at least one hit list, or it owes
+a control that shows what it does catch.*

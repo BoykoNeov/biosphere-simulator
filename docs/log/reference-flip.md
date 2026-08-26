@@ -3360,3 +3360,72 @@ Its accumulated input: batch B's two no-ancestor pins, batch C's three, and batc
 the measured loader/manifest guard asymmetry, and three stem-reserve claims covered
 **structurally but not by name**, which is precisely the shape the census exists to make
 visible.
+
+### The batch D review — the after-battery asked only half the question
+
+**2026-08-26, four findings.** Full detail: `docs/plans/post-roadmap-reference-flip.md`
+§5ai.
+
+**⚠⚠ The Python-side gates were never run, and one was RED and already pushed.**
+Verification was `cargo test`, clippy, the battery, the probes and the four batch-D Python
+files; `ruff check`, `ruff format` and `pyright` were not run on either commit.
+`uv run ruff check .` came back with **8 `E501` errors** in the ceiling commit's own comment
+block — a red CI Python job, pushed twice. ⚠ The near-miss inside the miss: `ruff format
+--check` *passes* on the same file, because the formatter does not re-wrap comments. *Two
+tools with adjacent names own different halves of the same rule.* Weaker cousin of the
+already-recorded "local green ≠ CI green": here local was never asked.
+
+**⚠⚠ Three of the batch's 23 new tests were reddened by NOTHING — and the after-battery
+could not see it.** It asked, for each mutation, *was this caught by a test about it?*, and
+answered yes fifteen times. It never asked the transpose: **was each new TEST reached by
+anything?** The hit lists were already on disk; one pass over them answers it, and three
+names never appear — in the battery or in the eleven probes.
+
+A targeted control battery on the three sorted them. Two are real but NARROWER than their
+docstrings claimed, and now say so: the budget recomposition is a **composition** check
+that calls the same `science.rs` entry points the flow does, so a wrong rate law moves both
+sides identically and it stays green (which is why the mutations that broke maintenance and
+the growth clamp never touched it) — what it owns is everything *between* the functions.
+The ratio test has its own measured limit: it sees a limitation reaching only one flow and
+is blind to a CONSTANT reaching only one, because a constant cancels in a ratio.
+
+**The third was genuinely INERT on its central claim.** A test named "the limitation is
+water times nitrogen" asserted the product on a state whose plant nitrogen was a hundred
+times critical, so `f_N` was pinned at 1.0 and the claim degenerated to `lim == f_water`.
+**Deleting the nitrogen factor outright reddened one test in 282, and it was not that one.**
+Rewritten with the stressed state DERIVED from the loaded thresholds and four operating
+points — neither factor, nitrogen alone, water alone, both — the last being the only one
+that separates a product from a `min` or a mean, since all three agree at 0.5. It now
+reddens on both nitrogen mutations. ⚠ The first rewrite hardcoded the **Python test
+fixture's** thresholds rather than the committed file's and read "unstressed" for a state
+it had just declared stressed: *construct a stressed state from the numbers the code will
+use, not from the numbers the test you ported from used.*
+
+**⚠ A claim guarded by the TYPE, described as though guarded by the test.** `CarbonContext`
+has no storage field, so the exclusion of grain from maintained biomass cannot be violated
+by a line of code. Moved to the disposition table under batch A's existing heading —
+*guarded by the constructor, harder than by a test*.
+
+**⚠ A long verification that builds the tree cannot share the tree with anything that edits
+it.** The first crossport run came back 3 failed / 191 passed, all golden-provenance — it
+had been started in the background while the inertness controls were mutating `flows.rs`.
+Re-run alone: clean. Third instrument defect in one batch, after the byte-exactness check
+that hashed decoded text.
+
+**⚠⚠ The memory ceiling has TWO copies, and the raise edited one.** The raise that made
+room for this batch's memory line went into the Python gate; the Rust mirror in
+`repo_gates` — built during this very slice — kept the old ceiling and went red on the final
+workspace run, on the **first memory line the raise existed to make room for**. Neither gate
+was wrong: *a rule with two copies has one that is stale*, already on the record here from a
+different subject, and the ceiling ceremony is now an instance of it. Both now carry the
+same three bounds and were controlled **together** — a 241 B hook, a 239 B hook and 40
+padding rows give the identical verdict and fire the identical bound on both sides. ⚠ It hid
+for exactly one commit because the workspace run finished BEFORE the memory line was
+written: *a gate run before the change is not a gate run on the change.*
+
+**What it says about the method.** Batch A: a green battery is evidence about the
+INSTRUMENT, not the arithmetic. Batch C: it is evidence only about the mechanisms you CHOSE
+to mutate. Batch D: **it is evidence about the mutations, and says nothing about whether
+your new TESTS are reachable.** Both questions come out of the same run, and only one was
+asked. The check is one pass over the report: every new test name must appear in at least
+one hit list, or it owes a control showing what it does catch.
