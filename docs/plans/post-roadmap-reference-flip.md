@@ -6023,8 +6023,8 @@ narrowing:**
 
 | Python test | why no successor |
 |---|---|
-| `test_allocation_balances_carbon_and_oxygen` | the CO₂ pool's composition is `{C:1, O:2}` and the O₂ pool's is `{O:2}`, so "one O₂ per carbon fixed" **is** what OXYGEN balance says |
-| `test_maintenance_closed_balances_carbon_and_oxygen` | same |
+| ~~`test_allocation_balances_carbon_and_oxygen`~~ | ⚠ **WRONG — corrected below; it now HAS a successor.** The reason given was a step-level claim standing in for a per-flow one |
+| ~~`test_maintenance_closed_balances_carbon_and_oxygen`~~ | ⚠ **WRONG — same correction** |
 | `test_sealed_conserves_oxygen_exactly` | `assert_conserved` runs every step of every run; a completed sealed run already asserts it |
 | `test_sealed_co2_o2_anti_correlate_at_pq1` | with no boundary O₂ stock, `2·(CO₂+O₂) = const` **forces** `ΔO₂ = −ΔCO₂` step for step — it is oxygen conservation restated |
 | `test_maintenance_closed_emits_single_pool_leg` | `FlowResult::new` **rejects** a duplicate leg, so the withdraw+deposit pair it rules out is an `Err` in Rust, not a wrong flow |
@@ -6037,6 +6037,73 @@ call `oxygen_limitation_factor` — and the reference's sealed chamber depletes 
 together, which is the successor claim). The Python file's header prose describing the
 deferral is stale against this tree and was **not ported**. *Read a ported file's header as
 a dated document, not as a specification.*
+
+### ⚠⚠ §5ae CORRECTED the same day: two of the five "no successor" reasons were wrong, and the audit found a hole
+
+The table above was reviewed after the batch was committed, and it **overstated what had been
+measured** in exactly the way this slice exists to prevent. Three fixes landed as a follow-up
+(`cargo test -p domains --lib` 196 → 197, workspace 820 → 821, clippy clean, no golden moved).
+
+**1. "Covered by the engine's machinery" was a step-level claim standing in for a per-flow
+one — and the biosphere was the one domain that had dropped it.**
+
+What runs every step is `assert_conserved`, which folds **state deltas** across every stock
+*after every flow has been applied*. `assert_flow_balanced` is the **local** assertion: this
+flow, on its own, moves no net CARBON or OXYGEN. The step-level fold cannot see an imbalance
+another flow in the same step cancels, and where it does fire it says "the step drifted",
+naming no flow.
+
+The gap was found by **grepping for the assertion rather than reasoning about it**:
+`crew`, `eclss`, `power` and `thermal` each call `assert_flow_balanced_default` in their own
+in-src tests, and `assert_flow_balanced` appeared **nowhere in the biosphere, in the entire
+crate**. So the two `balances_carbon_and_oxygen` tests were not claims the engine already
+made — they were the ones the reference's largest domain was missing. They now have a real
+successor, `every_gas_flow_balances_carbon_and_oxygen_leg_by_leg`, covering Allocation (open
+and sealed), the sealed maintenance burn, and open-field growth respiration.
+*Grep for the assertion before recording a claim as covered.*
+
+The two run-level entries in the table (`test_sealed_conserves_oxygen_exactly`,
+`test_sealed_co2_o2_anti_correlate_at_pq1`) stand as written — those genuinely are the
+step-level claim, and the step-level claim is genuinely asserted every step.
+
+**2. ⚠⚠ A test whose fixture zeroes a stock cannot see a denominator that wrongly includes
+it — and mine did.**
+
+`the_sealed_burn_is_split_in_proportion_to_organ_carbon` asserted leaf 0.6 / stem 0.2 / root
+0.2 from a 3 : 1 : 1 fixture. The maintenance denominator is `leaf + stem + root`; grain does
+**not** pay maintenance. But the fixture's storage organ held **0.0**, so
+`leaf + stem + root` and `leaf + stem + root + storage` were the same number, and the test
+agreed with both readings.
+
+Measured, not argued: filling storage to 10 mol C and then making the denominator include it
+reddens **1 test of 197 — this one, and nothing else in the binary.** Before the fix that
+mutation reddened *nothing at all*. A maintenance respiration that charged the grain for the
+upkeep of tissue it does not have was invisible to the whole reference. The test now fills
+storage, and pins the burn *total* as well as the shares, because that is the same claim
+about the same denominator read from the other side.
+
+*The general form, and it is not the same as "test a non-trivial case": ask which stock each
+expected number would be unchanged by, and fill exactly those. A zero in a fixture is a
+silent case-merge.*
+
+**3. The `f_O2` ratio is now swept rather than pinned at one pair.**
+
+`burn(K)/burn(9K) == 5/9` is exactly derivable **only if** nothing else in the burn depends
+on the O₂ amount — a premise the test's comment did not state and could not check. It now
+asserts the whole curve: for every multiple `m` of `K` the factor is `m/(1+m)`, so the burn
+must be `2m/(1+m)` times the burn at `K`, swept over `m ∈ {½, 2, 4, 9, 100, 2100}`. A single
+ratio can be right by coincidence; a curve cannot. ⚠ Honest scope: this is a *coincidence*
+argument, not a new measurement — no mutation was found that the pair missed and the sweep
+catches, and none is claimed.
+
+**⚠ What this correction says about the batch's own method.** All eleven of the original
+mutations reddened a named test, and the batch read as finished. But a mutation battery
+proves the tests are **reachable and sensitive**; it cannot prove an expected value is
+**right**, because a test that encodes a misreading is sensitive to that misreading. Both
+real defects here were found by *reading the fixture against the code* — asking which stock
+each pinned number would be unchanged by — and one of them was found only because someone
+asked what `biomass` meant. **A green battery is evidence about the instrument, not about the
+arithmetic.**
 
 ### The mutation battery: 11 mutations, 11 named reds, and four caught by nothing else
 

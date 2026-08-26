@@ -1540,6 +1540,7 @@ impl AuxProcess for VernalizationAccumulation {
 mod tests {
     use super::*;
     use simcore::environment::{constant, Schedule, SourceResolver};
+    use simcore::flow::assert_flow_balanced_default;
     use simcore::quantities::{Quantity, StockKind};
     use simcore::state::Stock;
     use std::collections::HashMap;
@@ -1712,6 +1713,18 @@ mod tests {
         state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, 550.0)
     }
 
+    /// Put carbon in the STORAGE organ, which `leaf_and_biomass` excludes.
+    ///
+    /// It exists to make the maintenance denominator falsifiable. With storage at 0 — the
+    /// state the first draft of these tests used — `leaf + stem + root` and
+    /// `leaf + stem + root + storage` are the same number, so every share and every burn
+    /// total agrees under both readings and the tests cannot tell them apart. Filling it
+    /// separates the two.
+    fn with_storage(mut s: State, amount: f64) -> State {
+        s.stocks.get_mut(STORAGE).expect("storage stock").amount = amount;
+        s
+    }
+
     fn resolver(par: f64, ci: f64) -> SourceResolver {
         let forcings: HashMap<String, Schedule> = HashMap::from([
             ("par".to_string(), constant(par).expect("par")),
@@ -1831,6 +1844,75 @@ mod tests {
         assert_eq!(matched[LEAF], open[LEAF]);
     }
 
+    /// ⚠⚠ PER-FLOW balance on the three gas flows — the successor to
+    /// `test_allocation_balances_carbon_and_oxygen` and
+    /// `test_maintenance_closed_balances_carbon_and_oxygen`, which §5ae first recorded as
+    /// needing none.
+    ///
+    /// **That reasoning was wrong, and the error is worth keeping.** It said the claim was
+    /// already made by "the engine's own machinery". What runs every step is
+    /// `assert_conserved`, which folds **state deltas** across every stock after every flow
+    /// has been applied — a step-level claim. `assert_flow_balanced` is the **local** one:
+    /// this flow, on its own, moves no net CARBON or OXYGEN. The step-level fold cannot see
+    /// an imbalance that another flow in the same step cancels, and it diagnoses one it does
+    /// see as "the step drifted", naming no flow.
+    ///
+    /// The gap was found by grepping for the assertion rather than by reasoning about it:
+    /// `crew`, `eclss`, `power` and `thermal` each call `assert_flow_balanced_default` in
+    /// their own in-src tests, and the **biosphere called it nowhere in the entire crate**.
+    /// So this was not a claim the engine already made — it was the one domain that had
+    /// dropped it. *Grep for the assertion before recording a claim as covered.*
+    #[test]
+    fn every_gas_flow_balances_carbon_and_oxygen_leg_by_leg() {
+        let r = resolver(800.0, 400.0);
+        let dark = resolver(0.0, 400.0);
+        // Storage filled and DVS past anthesis, so all four organ legs are live.
+        let s = with_storage(
+            state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, 1100.0 + 375.0),
+            10.0,
+        );
+
+        let alloc = allocation(ctx_open(), Some(O2.to_string()));
+        let result = alloc
+            .evaluate(&s, &r.bind(&s, 1.0), 1.0)
+            .expect("allocation");
+        assert!(
+            result.legs.len() >= 6,
+            "the fixture is not exercising every leg"
+        );
+        assert_flow_balanced_default(&result, &s.stocks).expect("Allocation balances");
+
+        // The sealed maintenance burn, on the day it actually burns.
+        let m = maintenance_sealed();
+        let burning = m
+            .evaluate(&s, &dark.bind(&s, 1.0), 1.0)
+            .expect("maintenance");
+        assert!(!burning.legs.is_empty(), "the fixture is not burning");
+        assert_flow_balanced_default(&burning, &s.stocks).expect("sealed burn balances");
+
+        // The sealed chamber's Ci seam changes the amounts, not the balance.
+        let sealed_alloc = allocation(ctx_sealed(0.7), Some(O2.to_string()));
+        let sealed = sealed_alloc
+            .evaluate(&s, &r.bind(&s, 1.0), 1.0)
+            .expect("sealed allocation");
+        assert_flow_balanced_default(&sealed, &s.stocks).expect("sealed Allocation balances");
+
+        // And the open-field growth respiration, the one flow with a boundary sink.
+        let growth = GrowthRespiration {
+            id: "biosphere.growth_respiration".to_string(),
+            ctx: ctx_open(),
+            co2_atmos: CO2.to_string(),
+            co2_resp: "boundary.co2".to_string(),
+        };
+        let gres = growth.evaluate(&s, &r.bind(&s, 1.0), 1.0).expect("growth");
+        assert!(!gres.legs.is_empty());
+        // ⚠ `boundary.co2` is not in the fixture's stock map, and `assert_flow_balanced`
+        // reads compositions from it — so this one is asserted on CARBON directly, which
+        // is the only quantity a single-currency boundary sink can be checked on here.
+        let net: f64 = gres.legs.iter().map(|l| l.amount).sum();
+        assert!(net.abs() <= 1e-15, "GrowthRespiration nets {net}, not 0");
+    }
+
     // --- MaintenanceRespiration: biomass + O₂ → CO₂ ------------------------------
 
     /// A deficit day (dark ⇒ GASS = 0): the shortfall is burned out of the organs and
@@ -1866,14 +1948,21 @@ mod tests {
             let s = state(3.0, 1.0, 1.0, 0.4, o2, 550.0);
             legs_of(&maintenance_sealed(), &s, 0.0)[CO2]
         };
-        let half = burn(k * AIR_MOL); // x = K   ⇒ f_O2 = 1/2
-        let nine_tenths = burn(9.0 * k * AIR_MOL); // x = 9K  ⇒ f_O2 = 9/10
-        assert!(half > 0.0 && nine_tenths > 0.0);
-        let ratio = half / nine_tenths;
-        assert!(
-            (ratio - 5.0 / 9.0).abs() <= 1e-12,
-            "f_O2 is not throttling the burn: ratio {ratio}, want 5/9"
-        );
+        // The reference point: x = K ⇒ f_O2 = 1/2.
+        let at_k = burn(k * AIR_MOL);
+        assert!(at_k > 0.0, "the fixture is not in deficit");
+        // ⚠ SWEPT, not pinned at one pair. A single ratio can be right by coincidence if
+        // the burn depends on O₂ through some path other than `f_O2`; the whole curve
+        // cannot. For every multiple m of K the factor is m/(1+m), so the burn must be
+        // `2·m/(1+m)` times the burn at K — exactly, for every m.
+        for m in [0.5, 2.0, 4.0, 9.0, 100.0, 2100.0] {
+            let want = at_k * 2.0 * m / (1.0 + m);
+            let got = burn(m * k * AIR_MOL);
+            assert!(
+                (got - want).abs() <= 1e-12 * want,
+                "f_O2 is not throttling the burn at x = {m}·K: {got}, want {want}"
+            );
+        }
     }
 
     /// The shortfall is split across the organs IN PROPORTION to their carbon, not
@@ -1881,8 +1970,12 @@ mod tests {
     /// so only a distribution test can see this.
     #[test]
     fn the_sealed_burn_is_split_in_proportion_to_organ_carbon() {
-        // 3 : 1 : 1 leaf : stem : root, so the leaf must pay three fifths of the burn.
-        let legs = legs_of(&maintenance_sealed(), &growing_state(), 0.0);
+        // ⚠ Storage is filled to 10 mol C on purpose. The denominator is `leaf + stem +
+        // root` — grain does NOT pay maintenance and does NOT dilute the organ shares —
+        // and with storage at 0 that reading is indistinguishable from "the whole plant".
+        let s = with_storage(growing_state(), 10.0);
+        let legs = legs_of(&maintenance_sealed(), &s, 0.0);
+        // 3 : 1 : 1 leaf : stem : root, so the leaf pays three fifths of the burn.
         let total = legs[LEAF] + legs[STEM] + legs[ROOT];
         assert!(
             (legs[LEAF] / total - 0.6).abs() <= 1e-12,
@@ -1894,6 +1987,12 @@ mod tests {
             (legs[STEM] / total - 0.2).abs() <= 1e-12,
             "stem share {} of {total}",
             legs[STEM]
+        );
+        // ...and the burn TOTAL is untouched by the grain, which is the same claim about
+        // the same denominator, read off MRES instead of off the shares.
+        assert_eq!(
+            legs[CO2],
+            legs_of(&maintenance_sealed(), &growing_state(), 0.0)[CO2]
         );
     }
 
