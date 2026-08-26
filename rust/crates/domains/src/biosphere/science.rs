@@ -1109,4 +1109,331 @@ mod tests {
         let f = oxygen_limitation_factor(-1.0e-9, 1000.0, 1.0e-4);
         assert_eq!(f, 0.0);
     }
+
+    // --- S5 batch B: phenology, the equation half -------------------------------
+    //
+    // Ported from `tests/test_phenology.py` (the `daily_thermal_time`,
+    // `development_stage`, `vernalization_day`, `vernalization_factor` and
+    // `photoperiod_factor` blocks). Every expected value is hand-computed from the cited
+    // equation with the arithmetic in the comment, never read out of this tree.
+    //
+    // ⚠⚠ **The before-battery is the reason these exist, and it is worse than batch
+    // A's.** Eight live mutations were run against `cargo test -p domains --lib`
+    // (197 tests, logs in `M:\claud_projects\temp\s5-batch-b`):
+    //
+    //   | mutation                                            | red | about the mechanism |
+    //   |-----------------------------------------------------|----:|--------------------:|
+    //   | uncap `daily_thermal_time` at `t_cap`                |   0 |                   0 |
+    //   | `development_stage` reproductive divisor -> TSUM1    |   0 |                   0 |
+    //   | drop `development_stage`'s 2.0 cap                   |   0 |                   0 |
+    //   | flip `vernalization_day`'s upper ramp                |   0 |                   0 |
+    //   | drop `vernalization_factor`'s clamp                  |   0 |                   0 |
+    //   | `photoperiod_factor` long-day -> short-day           |   3 |                   0 |
+    //   | drop the photoperiod multiply in the accumulator     |   3 |                   0 |
+    //   | drop the vernalization multiply in the accumulator   |   3 |                   0 |
+    //
+    // The three reds are the SAME three tests every time - a peak-LAI band, a
+    // mutual-shading regime check and a trajectory fixed-point. None of them is about
+    // phenology; they redden because a broken development rate moves a trajectory and a
+    // band somewhere else notices, which is 5ad's finding restated on a second batch.
+    //
+    // ⚠⚠ **A separate probe separated "untested" from "unreachable", and they are
+    // not the same defect.** Replacing each branch body with a `panic!` and re-running
+    // measures whether the suite ever ENTERS it: the reproductive branch fires in 23
+    // tests, the `DVS = 2` cap in 20, the vernalization upper ramp in 20 and the
+    // `verfun` clamp in 20 - all live, all asserted by nothing. The `t_cap` plateau
+    // fires in **zero tests of the entire workspace, goldens included**: no scenario is
+    // ever that warm. That one is recorded as a finding rather than fixed here - a test
+    // can pin the branch, but only a scenario can exercise it.
+
+    /// `daily_thermal_time` - the cardinal-capped degree-day rate, at its cardinals.
+    ///
+    /// Hand values with `t_base = 5`, `t_cap = 25` (band = 20 degC), deliberately NOT the
+    /// committed `(0, 30)`: with a base of zero the subtraction is invisible, so a rate
+    /// that returned the raw temperature would pass on the frozen params.
+    /// Mirrors `test_daily_thermal_time_cardinal_values` and its two neighbours.
+    #[test]
+    fn thermal_time_is_the_degree_day_rate_capped_at_both_cardinals() {
+        // Every value below is exact in binary, so these are equalities, not bands.
+        for (temp, expected) in [
+            (-3.0, 0.0),  // below base
+            (5.0, 0.0),   // AT base - the boundary is closed at zero
+            (12.0, 7.0),  // mid-band: 12 - 5
+            (15.0, 10.0), // mid-band: 15 - 5
+            (25.0, 20.0), // AT cap -> the band width, t_cap - t_base
+            (33.0, 20.0), // above cap -> the plateau, not 28
+        ] {
+            assert_eq!(
+                daily_thermal_time(temp, 5.0, 25.0),
+                expected,
+                "T = {temp} degC"
+            );
+        }
+        // The plateau is exactly the band width however hot it gets - the claim that
+        // separates a capped rate from an uncapped one, and the one no scenario in the
+        // tree can make (nothing ever reaches 30 degC).
+        for temp in [25.0, 100.0, 1.0e6] {
+            assert_eq!(daily_thermal_time(temp, 5.0, 25.0), 20.0);
+        }
+        // Monotone non-decreasing across both breakpoints.
+        let ladder = [-10.0, 0.0, 5.0, 5.0001, 15.0, 24.999, 25.0, 50.0];
+        let rates: Vec<f64> = ladder
+            .iter()
+            .map(|t| daily_thermal_time(*t, 5.0, 25.0))
+            .collect();
+        assert!(
+            rates.windows(2).all(|w| w[0] <= w[1]),
+            "the rate must never fall as it warms: {rates:?}"
+        );
+    }
+
+    /// `development_stage` - the two-phase TSUM ramp, at its cardinals.
+    ///
+    /// Round sums (TSUM1 = 1000, TSUM2 = 500) so every literal is exact: DVS 0 at
+    /// emergence, 0.5 at half of TSUM1, 1 at anthesis, 1.5 halfway through TSUM2, 2 at
+    /// maturity, and capped at 2 beyond it.
+    ///
+    /// ⚠ The two phases divide by DIFFERENT sums, and the mutation that swaps them
+    /// (reproductive / TSUM1 instead of / TSUM2) reddens nothing else in the binary -
+    /// 1250 degC*day would read 1.25 instead of 1.5. It is pinned here because the
+    /// reproductive branch IS live (23 tests enter it) and no other test looks at it.
+    /// Mirrors `test_development_stage_cardinal_values` and its monotonicity neighbour.
+    #[test]
+    fn development_stage_is_the_two_phase_tsum_ramp() {
+        for (thermal_time, expected) in [
+            (-50.0, 0.0),  // before emergence - clamped, not negative
+            (0.0, 0.0),    // emergence
+            (500.0, 0.5),  // half the vegetative sum
+            (1000.0, 1.0), // ANTHESIS: the boundary is CLOSED, which is what gates the
+            //                two vegetative modifiers off at exactly this point
+            (1250.0, 1.5), // 1 + 250/500 - the reproductive divisor is TSUM2
+            (1500.0, 2.0), // maturity
+            (3000.0, 2.0), // past maturity -> the cap, not 5.0
+        ] {
+            assert_eq!(
+                development_stage(thermal_time, 1000.0, 500.0),
+                expected,
+                "TT = {thermal_time} degC*day"
+            );
+        }
+        let ladder = [0.0, 250.0, 1000.0, 1100.0, 1500.0, 5000.0];
+        let dvs: Vec<f64> = ladder
+            .iter()
+            .map(|tt| development_stage(*tt, 1000.0, 500.0))
+            .collect();
+        assert!(
+            dvs.windows(2).all(|w| w[0] <= w[1]),
+            "development is forward-only: {dvs:?}"
+        );
+    }
+
+    /// `vernalization_day` (VERDAY) - Soltani & Sinclair (2012) Eqn 8.3, at its four
+    /// cardinals and both ramp midpoints.
+    ///
+    /// Committed winter-Europe wheat cardinals (Fig. 8.1 / Table 8.1): base -1 degC,
+    /// lower optimum 0 degC, upper optimum 8 degC, ceiling 12 degC. Both ramps are exact
+    /// dyadics: the lower midpoint -0.5 gives (-0.5 - -1)/(0 - -1) = 0.5, the upper
+    /// midpoint 10 gives (12 - 10)/(12 - 8) = 0.5.
+    ///
+    /// ⚠ Both BOUNDARIES are closed at zero - at the base AND at the ceiling - so
+    /// a `<`/`<=` slip at either end is a silent full vernalization day.
+    /// Mirrors `test_vernalization_day_matches_hand_computed_literals`.
+    #[test]
+    fn vernalization_day_is_the_three_segment_cold_response() {
+        let c = (-1.0, 0.0, 8.0, 12.0);
+        for (temp, expected) in [
+            (-5.0, 0.0), // below base
+            (-1.0, 0.0), // AT base - closed
+            (-0.5, 0.5), // lower ramp midpoint
+            (0.0, 1.0),  // lower optimum - full effect begins
+            (4.0, 1.0),  // inside the optimum band
+            (8.0, 1.0),  // upper optimum - still full effect
+            (10.0, 0.5), // upper ramp midpoint
+            (12.0, 0.0), // AT ceiling - closed
+            (20.0, 0.0), // above ceiling
+        ] {
+            assert_eq!(
+                vernalization_day(temp, c.0, c.1, c.2, c.3),
+                expected,
+                "T = {temp} degC"
+            );
+        }
+        // Bounded on [0, 1] and unimodal - no interior dip, which is what a swapped
+        // ramp numerator would produce.
+        let xs: Vec<f64> = (0..160).map(|i| i as f64 * 0.25 - 8.0).collect();
+        let vs: Vec<f64> = xs
+            .iter()
+            .map(|x| vernalization_day(*x, c.0, c.1, c.2, c.3))
+            .collect();
+        assert!(vs.iter().all(|v| (0.0..=1.0).contains(v)), "{vs:?}");
+        let peak = vs
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).expect("no NaN in the response"))
+            .expect("the sweep is non-empty")
+            .0;
+        assert!(
+            vs[..peak].windows(2).all(|w| w[0] <= w[1]),
+            "the cold response must rise to its plateau without a dip"
+        );
+        assert!(
+            vs[peak..].windows(2).all(|w| w[0] >= w[1]),
+            "...and fall from it without a rise"
+        );
+    }
+
+    /// ⚠⚠ **THE TRANSCRIPTION CHECK.** Soltani & Sinclair (2012) p. 91 states an
+    /// arithmetic CONSEQUENCE of Eqn 8.3: five days at 7 degC give 5 vernalization days,
+    /// while five days at 10 degC - or at -0.5 degC - give only 2.5.
+    ///
+    /// That is the one claim in this block whose expected values were written down by
+    /// the source rather than derived here, so it verifies the equation was READ
+    /// correctly rather than merely copied plausibly. The two half-value cases sit on
+    /// opposite ramps, so a single mis-transcribed cardinal breaks one of them.
+    /// Mirrors `test_vernalization_day_reproduces_the_sources_own_worked_example`.
+    #[test]
+    fn vernalization_day_reproduces_the_sources_own_worked_example() {
+        let c = (-1.0, 0.0, 8.0, 12.0);
+        assert_eq!(5.0 * vernalization_day(7.0, c.0, c.1, c.2, c.3), 5.0);
+        assert_eq!(5.0 * vernalization_day(10.0, c.0, c.1, c.2, c.3), 2.5);
+        assert_eq!(5.0 * vernalization_day(-0.5, c.0, c.1, c.2, c.3), 2.5);
+    }
+
+    /// `vernalization_factor` (VERFUN) - Eqn 8.6, and why its clamp is LOAD-BEARING.
+    ///
+    /// With the cited winter-Europe values `vsen*vdsat = 0.033 x 50 = 1.65 > 1`, so the
+    /// unclamped expression is `1 - 1.65 = -0.65` at zero accumulated cold. Clamping
+    /// makes this cultivar QUALITATIVE in the source's terms (Fig. 8.2): development is
+    /// fully ARRESTED, not merely slowed, until the break-even
+    /// `CUMVER = vdsat - 1/vsen = 50 - 30.303... = 19.697` days accrue. Without the clamp
+    /// the rate goes NEGATIVE and thermal time runs backwards.
+    ///
+    /// ⚠ Measured: removing the clamp reddens nothing in the binary, and the clamp
+    /// is live (20 tests enter it with a raw value outside [0, 1]).
+    /// Mirrors `test_vernalization_factor_is_qualitative_for_winter_europe_wheat` and
+    /// `test_a_quantitative_cultivar_never_reaches_the_clamp`.
+    #[test]
+    fn vernalization_factor_arrests_a_qualitative_cultivar_and_saturates_at_one() {
+        let (vsen, vdsat) = (0.033, 50.0);
+        assert!(vsen * vdsat > 1.0, "the cited cultivar must be qualitative");
+        assert_eq!(vernalization_factor(0.0, vsen, vdsat), 0.0);
+        // Break-even: 1 - vsen*(vdsat - c) = 0  =>  c = vdsat - 1/vsen = 19.696969...
+        let breakeven = vdsat - 1.0 / vsen;
+        assert!(
+            (breakeven - 19.697).abs() <= 1.0e-3,
+            "break-even {breakeven}"
+        );
+        assert_eq!(vernalization_factor(breakeven - 0.1, vsen, vdsat), 0.0);
+        assert!(vernalization_factor(breakeven + 0.1, vsen, vdsat) > 0.0);
+        // Saturation: at and beyond vdsat it is exactly 1 and STAYS there.
+        assert_eq!(vernalization_factor(vdsat, vsen, vdsat), 1.0);
+        assert_eq!(vernalization_factor(vdsat + 500.0, vsen, vdsat), 1.0);
+        // Mid-curve, hand-computed: 1 - 0.033*(50 - 30) = 1 - 0.66 = 0.34.
+        let mid = vernalization_factor(30.0, vsen, vdsat);
+        assert!((mid - 0.34).abs() <= 1.0e-12, "verfun(30) = {mid}");
+        // The OTHER branch of Fig. 8.2: a quantitative cultivar (vsen*vdsat < 1) never
+        // reaches the clamp - 1 - 0.003*50 = 0.85 with no cold at all.
+        let quantitative = vernalization_factor(0.0, 0.003, 50.0);
+        assert!(
+            (quantitative - 0.85).abs() <= 1.0e-12,
+            "quantitative verfun(0) = {quantitative}"
+        );
+        // Monotone non-decreasing in accumulated cold, and bounded.
+        let vs: Vec<f64> = (0..140)
+            .map(|c| vernalization_factor(c as f64 * 0.5, vsen, vdsat))
+            .collect();
+        assert!(vs.windows(2).all(|w| w[0] <= w[1]), "{vs:?}");
+        assert!(vs.iter().all(|v| (0.0..=1.0).contains(v)));
+    }
+
+    /// `photoperiod_factor` (PPFUN) - Eqn 7.6 in its LONG-DAY form, the one wheat uses.
+    ///
+    /// Committed winter-Europe values (Table 7.2): critical photoperiod `cpp = 16` h,
+    /// sensitivity `ppsen = 0.09` per hour. Hand-computed pins:
+    ///   * 14.53 h (midsummer at 52 degN): 1 - 0.09*(16 - 14.53) = 1 - 0.1323 = 0.8677
+    ///   * 8 h: 1 - 0.09*8 = 1 - 0.72 = 0.28
+    ///   * 5 h: 1 - 0.09*11 = 1 - 0.99 = 0.01
+    ///
+    /// ⚠ The DIRECTION is the whole content: a long-day crop is slowed by SHORT
+    /// days, so the factor rises with daylength and is 1 at/above `cpp`. Swapping the
+    /// comparison turns this into a short-day crop and reddens only three unrelated
+    /// bands. Mirrors `test_photoperiod_factor_matches_hand_computed_literals`.
+    #[test]
+    fn photoperiod_factor_is_the_long_day_response_and_never_goes_negative() {
+        let (cpp, ppsen) = (16.0, 0.09);
+        assert_eq!(photoperiod_factor(16.0, cpp, ppsen), 1.0); // AT cpp - no slowdown
+        assert_eq!(photoperiod_factor(20.0, cpp, ppsen), 1.0); // above - never > 1
+        for (hours, expected) in [(14.53, 0.8677), (8.0, 0.28), (5.0, 0.01)] {
+            let got = photoperiod_factor(hours, cpp, ppsen);
+            assert!(
+                (got - expected).abs() <= 1.0e-12,
+                "ppfun({hours} h) = {got}, hand-computed {expected}"
+            );
+        }
+        // The source is explicit that a negative ppfun becomes zero, because
+        // development is a forward-only process. At cpp = 16 and ppsen = 0.09 the
+        // unclamped value at zero daylength is 1 - 1.44 = -0.44.
+        assert!(
+            1.0 - ppsen * cpp < 0.0,
+            "the clamp must have something to clamp"
+        );
+        assert_eq!(photoperiod_factor(0.0, cpp, ppsen), 0.0);
+        // ...and with a steeper sensitivity, far more negative: 1 - 0.2*16 = -2.2.
+        assert_eq!(photoperiod_factor(0.0, 16.0, 0.2), 0.0);
+        // Monotone non-decreasing in daylength, bounded on [0, 1].
+        let vs: Vec<f64> = (0..97)
+            .map(|h| photoperiod_factor(h as f64 * 0.25, cpp, ppsen))
+            .collect();
+        assert!(vs.windows(2).all(|w| w[0] <= w[1]), "{vs:?}");
+        assert!(vs.iter().all(|v| (0.0..=1.0).contains(v)));
+    }
+
+    /// ⚠ **The structural difference between the two vegetative modifiers**, and
+    /// the property that identified which mechanism the PCSE oracle was using.
+    ///
+    /// Vernalization reads an ACCUMULATOR: once saturated it is pinned at 1 and cannot
+    /// fall again whatever the weather does afterwards - it has memory. Photoperiod
+    /// reads an INSTANTANEOUS driver: the same daylength always gives the same factor,
+    /// and a later shorter day drops it back down - no ratchet. A trajectory whose
+    /// development multiplier keeps climbing after the cold requirement is met therefore
+    /// cannot be vernalization-driven.
+    ///
+    /// This is a claim about the two forms TOGETHER, which is why it is one test rather
+    /// than a line in each. Mirrors
+    /// `test_vernalization_has_memory_and_photoperiod_does_not`.
+    #[test]
+    fn vernalization_has_memory_and_photoperiod_does_not() {
+        let (vsen, vdsat) = (0.033, 50.0);
+        assert_eq!(vernalization_factor(vdsat, vsen, vdsat), 1.0);
+        assert_eq!(vernalization_factor(vdsat * 3.0, vsen, vdsat), 1.0);
+        let (cpp, ppsen) = (16.0, 0.09);
+        let long_day = photoperiod_factor(15.0, cpp, ppsen);
+        let short_day = photoperiod_factor(8.0, cpp, ppsen);
+        assert!(short_day < long_day, "{short_day} !< {long_day}");
+        assert_eq!(photoperiod_factor(15.0, cpp, ppsen), long_day);
+    }
+
+    /// `WSFD` breaks BOTH patterns its two neighbours set, and that is the reason it is
+    /// easy to "fix" into consistency with them.
+    ///
+    /// `verfun` and `ppfun` are limitation factors bounded above by 1; `WSFD` is a ratio
+    /// on `[0, 1 + WSSD]` and drought HASTENS development ([F] Table 15.2). Written
+    /// against the other two functions rather than as a bare inequality, because the
+    /// claim IS the comparison. Mirrors `test_wsfd_may_exceed_one_unlike_its_two_
+    /// neighbours` and `test_wsfd_is_monotone_increasing_as_water_runs_out`.
+    #[test]
+    fn wsfd_may_exceed_one_unlike_the_two_vegetative_modifiers() {
+        assert!(drought_development_factor(0.0, 0.4) > 1.0);
+        assert!(vernalization_factor(0.0, 0.01, 50.0) <= 1.0);
+        assert!(photoperiod_factor(0.0, 16.0, 0.09) <= 1.0);
+        // Monotone INCREASING as the water runs out (WSFG falls from 1 to 0).
+        let factors: Vec<f64> = (0..=10)
+            .rev()
+            .map(|w| drought_development_factor(w as f64 / 10.0, 0.4))
+            .collect();
+        assert!(
+            factors.windows(2).all(|w| w[0] <= w[1]),
+            "drought must accelerate monotonically: {factors:?}"
+        );
+    }
 }

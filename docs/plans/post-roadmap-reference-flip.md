@@ -6176,3 +6176,224 @@ second copy of `assert_conserved`.*
   entries that must be marked as *additional* coverage rather than as successors: they have
   no Python ancestor in batch A's files at all.
 * **No Python deleted.** All three files stay green and running until S6.
+
+## §5af Stage 3 — S5 batch B BUILT, COMPLETE 2026-08-26: the timing batch, and a branch no scenario reaches
+
+Batch B is the timing batch: `tests/test_phenology.py`, 90 tests over the cardinal-capped
+degree-day rate, the two-phase DVS ramp, vernalization, photoperiod, drought acceleration,
+the two aux accumulators and the config boundary.
+
+**Totals.** `cargo test -p domains --lib` 197 → **221**; `cargo test --workspace` 821 → **845**.
+Clippy clean at `--all-targets -D warnings` (it caught one thing — see the review pass).
+**No golden byte moved, no band, no floor, no manifest** — asserted by
+`git status --porcelain rust/data/` returning empty, not inferred from a green suite. The
+The batch is tests plus **one production change, taken as an explicit decision rather than
+slipped in** — the three injectable loader readers below.
+
+### The before-battery, and it is worse than batch A's
+
+Eight live mutations against `cargo test -p domains --lib` (197 tests). Harness and logs:
+`M:\claud_projects\temp\s5-batch-b`.
+
+| # | mechanism broken | red | of which **about the mutated mechanism** |
+|---|---|---:|---:|
+| B1 | uncap `daily_thermal_time` at `t_cap` | **0** | — |
+| B2 | `development_stage` reproductive divisor → TSUM1 | **0** | — |
+| B3 | drop `development_stage`'s 2.0 cap | **0** | — |
+| B4 | flip `vernalization_day`'s upper ramp | **0** | — |
+| B5 | drop `vernalization_factor`'s clamp | **0** | — |
+| B6 | `photoperiod_factor` long-day → short-day | 3 | **0** |
+| B7 | drop the photoperiod multiply in the accumulator | 3 | **0** |
+| B8 | drop the vernalization multiply in the accumulator | 3 | **0** |
+
+⚠ **Five of eight reddened nothing at all**, and the three that did reddened the *same three
+tests* every time: `open_season_canopy_is_physical` (a peak-LAI band),
+`the_vks_mutual_shading_regime_is_modelled_not_merely_avoided` (a shading-regime check) and
+`perennial_leaf_cycle_is_a_fixed_point` (a trajectory-convergence claim). Not one is about
+photosynthesis timing, cold, or daylength. They redden because a broken development rate
+moves a trajectory and a band somewhere else notices — §5ad's finding, reproduced on a
+second batch with a different mechanism set.
+
+⚠ **The instrument was checked before the reading was believed.** All eight logs carry a
+`test result:` line with 197 collected, so none of the five zeroes is a silent build
+failure — the trap that would read exactly like "the mechanism is covered".
+
+### ⚠⚠ A second probe separated "untested" from "unreachable", and they are NOT the same defect
+
+A zero-red mutation has two possible causes and the batch's response differs completely:
+the branch runs and nothing checks its value (write a test), or the branch never runs at all
+(a test can pin it, but only a *scenario* can exercise it). Replacing each branch body with a
+`panic!` and re-running measures which:
+
+| branch | tests that ENTER it |
+|---|---:|
+| `development_stage` reproductive phase | 23 |
+| `development_stage`'s `DVS = 2` cap (raw value > 2) | 20 |
+| `vernalization_day`'s upper ramp (8–12 °C) | 20 |
+| `vernalization_factor`'s clamp (raw value outside [0, 1]) | 20 |
+| **`daily_thermal_time`'s `t_cap` plateau** | **0** |
+
+⚠⚠ **The `t_cap` plateau is entered by ZERO tests of the entire workspace, goldens
+included** — the probe was re-run under `cargo test --workspace` and the run stayed green
+with a `panic!` in that branch. No scenario in the tree is ever 30 °C warm. The cardinal cap
+on degree-day accumulation is therefore not merely untested, it is *unexercised*: batch B
+pins the branch as a function, and the remaining half — that no run ever needs it — is
+recorded as a finding below rather than fixed inside a testing batch.
+
+### Where the tests went, and why the batch spans four files
+
+The roster row said "lands on `science.rs`". As with batch A's third file that is true of the
+majority and not of the batch, and the split is by SUBJECT, not by convenience:
+
+| file | tests | subject |
+|---|---:|---|
+| `science.rs` | 8 | the five rate laws as pure functions: the GDD cardinals, the two-phase DVS ramp, VERDAY's three segments and the source's own worked example, VERFUN's load-bearing clamp, PPFUN's long-day direction, and the memory-vs-no-memory contrast between the two vegetative modifiers |
+| `flows.rs` | 6 | the two accumulators as PROCESSES: increment form, what each reads through `env`, the multiplicative composition, the complete arrest of an unvernalized qualitative cultivar, and the anthesis gate **on its boundary** |
+| `system.rs` | 1 | the WIRING: `wssd: None` declines the drought modifier, on an off-default plot |
+| `params.rs` | 9 | the config boundary: the committed block as the two cited "Winter Europe" rows, the three reader-level schema guards, and — after the decision below — the five that reach the semantic guards |
+
+⚠ **The aux tests are in `flows.rs`, where the structs live, but two aux-level claims already
+had successors in `system.rs`** (`wsfd_uses_wssg_and_is_not_gated_off_at_anthesis`,
+`drought_acceleration_is_wired_into_the_accumulator_and_no_scenario_shows_it`). They were
+NOT duplicated, and the split is written into both files so the census reads as one roster
+rather than as a gap.
+
+⚠ **The wiring test EVALUATES rather than inspecting fields.** Python asserts
+`proc.drought is None`, because reaching into a built registry is what it can do; Rust cannot
+downcast a `Box<dyn AuxProcess>` at all, and the alternative turned out to be the better
+claim — build the season, evaluate the accumulator on a hand-built bone-dry root zone, and
+assert the increment is the plain rate. A field can be right while the arithmetic that reads
+it is wrong; the increment cannot.
+
+### The after-battery: 14 mutations, 14 subjects
+
+Every mutation now reddens a test whose subject **is** the mutated mechanism (the three
+unrelated bands still redden alongside, and are not counted as coverage):
+
+| # | mechanism broken | the test that is ABOUT it |
+|---|---|---|
+| B1 | uncap the GDD rate | `thermal_time_is_the_degree_day_rate_capped_at_both_cardinals` |
+| B2 | reproductive divisor → TSUM1 | `development_stage_is_the_two_phase_tsum_ramp` |
+| B3 | drop the `DVS = 2` cap | `development_stage_is_the_two_phase_tsum_ramp` |
+| B4 | flip VERDAY's upper ramp | `vernalization_day_is_the_three_segment_cold_response` |
+| B5 | drop VERFUN's clamp | `vernalization_factor_arrests_a_qualitative_cultivar…` (+ both arrest tests) |
+| B6 | PPFUN long-day → short-day | `photoperiod_factor_is_the_long_day_response…` |
+| B7 | drop the photoperiod multiply | `thermal_time_aux_multiplies_the_two_vegetative_modifiers` |
+| B8 | drop the vernalization multiply | `thermal_time_aux_arrests_completely_when_unvernalized` |
+| B9 | modifiers ADD instead of MULTIPLY | `thermal_time_aux_multiplies_the_two_vegetative_modifiers` |
+| B10 | anthesis gate `< 1` → `<= 1` | `the_vegetative_modifiers_are_gated_off_at_and_after_anthesis` |
+| B11 | daylength read as hours (drop `/3600`) | `thermal_time_aux_multiplies_the_two_vegetative_modifiers` |
+| B12 | WSFD moved inside the vegetative branch | `wsfd_uses_wssg_and_is_not_gated_off_at_anthesis` (pre-existing) |
+| B13 | wire the drought modifier unconditionally | `the_wiring_declines_the_drought_modifier_when_no_wssd_is_cited` |
+| B14 | wiring hardcodes a 1 m² plot | `the_wiring_declines_the_drought_modifier_when_no_wssd_is_cited` |
+
+⚠ **B10 and B11 are the two the port could plausibly get wrong and the Python file does not
+test at all.** B10 is the gate's *boundary*: `DVS == 1.0` exactly at anthesis, and
+`is_vegetative` tests `< 1.0`, so the modifiers switch off AT anthesis rather than after it —
+the successor asserts the plain rate at `tsum_anthesis` and the complete arrest one degree-day
+earlier, which is what makes it a claim about the gate and not about the weather. B11 is the
+UNIT seam: the forcing carries daylength in seconds and the accumulator divides by 3600, so
+feeding hours reads a near-zero day and clamps PPFUN to nothing. Neither is in
+`test_phenology.py`; both are the reference's own hazards and are additional coverage, not
+successors.
+
+⚠ **One candidate mutation was dropped because it is not a bug.** Opening VERDAY's closed
+boundaries (`<=`/`>=` → `<`/`>`) is arithmetically inert: at the base and at the ceiling both
+ramps evaluate to exactly zero, so the two forms agree everywhere. Recorded so nobody adds a
+test for it — the same shape as `captured_water`'s symmetric factors.
+
+### What got NO successor, and why each absence is a decision
+
+| Python test(s) | why no successor |
+|---|---|
+| `test_daily_thermal_time_rejects_inverted_band`, `test_development_stage_rejects_non_positive_sums`, `test_vernalization_day_rejects_ill_ordered_cardinals`, `test_vernalization_factor_rejects_bad_params`, `test_photoperiod_factor_rejects_bad_params` (9 tests) | the `ValueError`-raising input guards are omitted from `science.rs` **by the recorded Phase-7 decision in its own module header** — they never fire for the frozen scenarios and would force `Result` on hot rate laws. The ordering/positivity rules moved to the LOADER, which is where the successor claim lives (and where it is now blocked; see below) |
+| `test_aux_process_satisfies_protocol`, `test_vernalization_aux_satisfies_protocol` | the trait is a compile-time obligation in Rust: a type that does not implement `AuxProcess` cannot be put in the aux vector. The compiler is the census, not a test |
+| `test_constant_temperature_season_accumulates_to_rate_times_n_dt`, `test_derived_dvs_tracks_the_accumulator` | ENGINE claims (aux advances once per step at the step-entry snapshot, under **both** integrators) wearing a phenology costume. ⚠ **Grepped, not reasoned** — §5ae's correction was exactly this row's shape, so the successors were named before the row was written: `simcore/tests/aux_channel.rs` carries `a_constant_rate_process_accumulates_to_rate_times_n_dt_under_euler`, `..._under_rk4` and `all_four_rk4_stages_see_the_step_entry_aux`. The RK4 half is the non-obvious one — four flow evaluations per step, one aux advance — and it is covered |
+| `test_potato_declines_wssd_because_the_source_has_no_potato_row` | ⚠ **a GAP, not a decision** — the Rust roster has no potato build at all (`params.rs` records its stage 2 as deferred), so the crop-specific half cannot be ported. The RULE it rests on (`wssd: None` declines the modifier) IS ported |
+| `test_phen_loader_rejects_inverted_cardinal_band`, `test_phen_loader_rejects_non_positive_sum` (3 tests) | **now ported** — the decision above made them reachable |
+
+### ⚠ The one production change, and it was DECIDED rather than assumed
+
+`phenology()`'s `t_base < t_cap` assertion, `vernalization()`'s cardinal-ordering assertion
+and the `tsum` positivity check all read `PHENOLOGY_YAML` through `include_str!`. The only
+file they could ever see was the committed one, which is valid, so **they were inert**:
+removing any of the three left `cargo test -p domains --lib` at 216 passed / 0 failed, against
+a live control — declaring `t_base` in kelvin, which the committed file is not, reddened 29.
+*A guard that cannot be handed a bad file is a comment.*
+
+The three READER-level guards (wrong unit, unknown field, missing `source`) were already
+reachable, because `ParamFile::parse` and `guarded_set` take text. The three SEMANTIC ones
+needed text-injectable variants of the readers — the shape `allocation_from` already uses **in
+the same file**. That is a production change inside a testing batch, which batch A's rule says
+is a decision of its own; it was **put to the user in plain terms and answered "build it"**,
+the alternative being five Python tests dying at S6 with no successor.
+
+Shipped: `phenology_from`, `vernalization_from`, `photoperiod_from` and a shared
+`phenology_block_from`, each public reader now a one-line call at `PHENOLOGY_YAML`. **No
+committed load changed** — `--lib` stayed at 216 across the split before the five tests were
+added. The after-battery says the guards now have teeth:
+
+| guard dropped | red | the test that is ABOUT it |
+|---|---:|---|
+| `t_base < t_cap` | 1 | `an_inverted_phenology_cardinal_band_is_rejected` |
+| `tsum > 0` (both) | 1 | `a_non_positive_thermal_sum_is_rejected` |
+| vernalization cardinal ordering | 1 | `ill_ordered_vernalization_cardinals_are_rejected` |
+| `vdsat > 0` | 1 | `a_bad_vernalization_sensitivity_or_saturation_is_rejected` |
+| `vsen >= 0` | 1 | `a_bad_vernalization_sensitivity_or_saturation_is_rejected` |
+| `cpp > 0` | 1 | `a_bad_photoperiod_pair_is_rejected` |
+| `ppsen >= 0` | 1 | `a_bad_photoperiod_pair_is_rejected` |
+| *control:* `t_base` declared in K | 35 | — (the live unit guard, unchanged) |
+
+⚠ **Each rejection test also asserts the LEGAL boundary case**, because a guard tuned one
+notch too tight forbids a real crop rather than a bad file: `vsen == 0` and `ppsen == 0` are
+the day-neutral cultivar, which the tree ships, and both must still load.
+
+### ⚠ The review pass caught three overclaims and one lint, and they are the batch's own failure mode
+
+Written down because all four are the shape this slice exists to prevent — a comment that
+says more than its test measures.
+
+1. **The "engine owns it" row was reasoning, not grepping** — §5ae's correction, four hours
+   old, reappearing. Discharged by naming the three `simcore` tests above.
+2. **`thermal_time_aux_without_a_cited_wssd_ignores_a_bone_dry_root_zone`'s comment claimed
+   it would catch an unconditionally-wired modifier.** It would not: the test hand-builds
+   `drought: None`, so `build_plants` never runs, and B13's log confirms that mutation
+   reddens the two `system.rs` tests and leaves this one green. What it actually guards is
+   `drought_factor`'s `let-else` early return. The comment now says so.
+3. **The three trailing ordering `assert!`s in the params test read as coverage of the
+   loader's guard.** They are a RESTATEMENT of the rule against the committed values —
+   deleting the guard leaves them green. Now labelled, so the census does not count them.
+4. **Clippy rejected `assert!(1.0 - 0.09 * 16.0 < 0.0)`** as always-true. It was a comment
+   doing work as an assertion; it is now written against the same `cpp`/`ppsen` bindings the
+   test uses, which is the better claim anyway.
+
+### Findings recorded, not fixed
+
+1. ⚠⚠ **The `t_cap` plateau is unexercised workspace-wide** (above). Either a scenario should
+   reach it or the cap is decoration; both answers are science decisions, not testing ones.
+2. ⚠ **A test-local constant shadows a real one with a DIFFERENT value.** Batch A's test
+   module in `flows.rs` declares `const ROOTED_DEPTH: &str = "biosphere.rooted_depth"`, while
+   the engine's `stocks::ROOTED_DEPTH` is the bare `"rooted_depth"`. It is harmless where it
+   sits — those tests are self-consistent — but an aux test that inherited it would read an
+   aux key nothing writes and pass on a `unwrap_or(0.0)` default. Batch B's block imports the
+   real constants and says why, in the file.
+3. ⚠ **Two doc comments are attached to the wrong item.** `science.rs`'s
+   "Development stage `DVS ∈ [0, 2]`…" line sits on `root_zone_fraction` (and
+   `development_stage` itself carries none), and `flows.rs`'s "`AuxProcess` advancing the
+   `vernalization_days` accumulator" sits on `RootDepthExtension` (and
+   `VernalizationAccumulation` carries none). Doc-only, no behaviour, deliberately not
+   touched inside a testing batch.
+4. ⚠ The Phase-7 header's rationale for omitting the input guards — *"they never fire for the
+   frozen scenarios"* — is a claim about the roster as it stood then, and §5ad already flagged
+   it as cheap to re-check. Finding 1 is the first evidence that a roster-dated claim about
+   this file has actually drifted: the `t_cap` branch is now not merely unfired but
+   unreachable.
+
+### What batch B leaves standing
+
+* **Batches C–G unchanged in scope.** C (water) is next by the roster.
+* **`intercepted_fraction` still unresolved** (S6 item; clause 4 of the exit gate).
+* **The by-name claim census (clause 3) still unwritten** — now with batch B's own additional
+  coverage (B10's gate boundary, B11's unit seam, the two `science.rs`/`params.rs` claims with
+  no Python ancestor) to mark as *additional* rather than as successors.
+* **No Python deleted.** `test_phenology.py` stays green and running until S6.

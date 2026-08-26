@@ -2995,3 +2995,88 @@ real defects here were found by *reading the fixture against the code* — askin
 each pinned number would be unchanged by — and one of them was found only because someone
 asked what `biomass` meant. **A green battery is evidence about the instrument, not about the
 arithmetic.**
+
+### S5 batch B — the timing batch, and a branch no scenario reaches (2026-08-26)
+
+`test_phenology.py`, 90 tests, onto four Rust surfaces. `cargo test -p domains --lib`
+197 → 221, workspace 821 → 845, clippy clean, **no frozen value moved** (measured with
+`git status --porcelain rust/data/`, not inferred from a green suite). Plan record: §5af.
+
+#### ⚠⚠ Five of eight mutations reddened NOTHING, and the three that did reddened the same three strangers
+
+The before-battery is §5ad's finding reproduced on a different mechanism set, and worse:
+uncapping the degree-day rate, swapping the DVS ramp's reproductive divisor, dropping its
+2.0 cap, flipping the vernalization upper ramp and deleting the `verfun` clamp each left
+`cargo test -p domains --lib` at **197 passed / 0 failed**. Breaking photoperiod — in the
+equation, in the multiply, either way — reddened exactly three tests, the *same* three every
+time: a peak-LAI band, a mutual-shading regime check and a trajectory fixed-point. None is
+about timing. *A broken rate moves a trajectory and a band somewhere else notices; that is
+a golden red wearing a behavioural name.*
+
+#### ⚠⚠ The finding the battery could not produce: "untested" and "unreachable" are different defects
+
+A zero-red mutation has two causes and they want opposite responses — the branch runs and
+nothing checks it (write a test), or the branch never runs (a test pins the function, but
+only a **scenario** can exercise the model). Replacing each branch body with a `panic!`
+separates them, and it is cheap: `--lib` is 197 tests in four seconds.
+
+Four of the five were live — the reproductive branch fires in 23 tests, the `DVS = 2` cap in
+20, the vernalization upper ramp in 20, the `verfun` clamp in 20. **The fifth fires in zero
+tests of the entire workspace, goldens included**: no scenario in the tree ever reaches the
+30 °C cap on degree-day accumulation. Re-run under `cargo test --workspace` with a `panic!`
+in the branch, the whole suite stayed green.
+
+*The general form: a mutation battery ranks mechanisms by whether anything notices. It cannot
+tell you whether the mechanism ever RAN. One extra probe per silent mutation buys that, and
+it is the probe that turns a coverage gap into a science question.*
+
+#### ⚠ The instrument was checked before the reading was believed
+
+Every one of the eight logs was confirmed to carry a `test result:` line with 197 collected.
+A mutation that fails to COMPILE produces zero "FAILED" lines, which reads identically to
+"nothing noticed" — and the batch's whole conclusion rests on five such zeroes.
+
+#### The wiring test evaluates rather than inspecting, and that was forced into being better
+
+Python asserts `proc.drought is None` on a registry it walked. Rust cannot downcast a
+`Box<dyn AuxProcess>`, so the successor builds the season, evaluates the accumulator on a
+hand-built bone-dry root zone and asserts the increment is the plain rate. *A field can be
+right while the arithmetic reading it is wrong.* The plot is deliberately off-default
+(3.5 m², EXTR 0.09, `wssg` 0.42) — every scenario in the tree is 1 m², so a hardcoded area
+in the wiring is invisible on the defaults, and a separate mutation confirms the test sees it.
+
+#### ⚠ Two mutations the Python file does not make, and they are the port's own hazards
+
+The anthesis **gate boundary** (`DVS == 1.0` exactly; `is_vegetative` tests `< 1.0`) and the
+daylength **unit seam** (the forcing is seconds, the accumulator divides by 3600). Both are
+additional coverage with no Python ancestor, and the census must not count them as successors.
+One candidate was dropped as *not a bug*: opening `vernalization_day`'s closed boundaries is
+arithmetically inert, because both ramps evaluate to exactly zero there.
+
+#### ⚠⚠ A guard that cannot be handed a bad file is a comment — and the batch ASKED before writing the fix
+
+Seven loader guards on the crop-timing file (the cardinal band, the vernalization ordering,
+the two thermal sums, `vdsat`, `vsen`, `cpp`, `ppsen`) read the committed YAML through
+`include_str!`, so the only file they could ever see was a valid one. Measured inert: deleting
+any of them left 216 passed / 0 failed, against a live control (declaring `t_base` in kelvin
+reddened 29). Reaching them needs text-injectable readers — the shape `allocation_from` already
+uses in that same file — which is a **production change inside a tests-only batch**, and batch
+A's rule is that those get their own decision.
+
+*The disposition that mattered was not the answer, it was refusing to let "recorded in three
+places" stand in for "asked".* It was put to the user in their own terms and answered "build
+it": the alternative was five Python tests dying at S6 with no successor. `phenology_from` /
+`vernalization_from` / `photoperiod_from` shipped, `--lib` unchanged at 216 across the split,
+and all seven guards now redden exactly one test each — the one about them.
+
+⚠ Every rejection test also pins the LEGAL boundary: `vsen == 0` and `ppsen == 0` are the
+day-neutral cultivar the tree ships. *A guard tuned one notch too tight forbids a real crop
+rather than a bad file, and a rejection-only test cannot see that.*
+
+#### ⚠ A test-local constant that shadows a real one with a different value
+
+Batch A's `flows.rs` test module declares `const ROOTED_DEPTH = "biosphere.rooted_depth"`;
+the engine's `stocks::ROOTED_DEPTH` is the bare `"rooted_depth"`. Harmless where it sits, but
+an aux test inheriting it reads a key nothing writes and passes on an `unwrap_or(0.0)`.
+*A test-local constant is a fixture, not a fact — check it against the thing it names before
+building on it.*

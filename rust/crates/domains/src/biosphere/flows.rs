@@ -2084,4 +2084,275 @@ mod tests {
         };
         assert!(legs_of(&open, &growing_state(), 800.0)["boundary.co2"] > 0.0);
     }
+
+    // -----------------------------------------------------------------------------
+    // S5 batch B, the aux-process half: `ThermalTimeAccumulation` and
+    // `VernalizationAccumulation`.
+    //
+    // These live here rather than in `science.rs` for the same reason batch A's
+    // gas-exchange tests do: the subject is the PROCESS - what it reads, what it
+    // multiplies, and when a modifier is gated off - not the equations it composes,
+    // which are pinned one file over. Two aux-level claims already had successors in
+    // `system.rs` before this batch (`wsfd_uses_wssg_and_is_not_gated_off_at_anthesis`
+    // and `drought_acceleration_is_wired_into_the_accumulator_and_no_scenario_shows_it`);
+    // they are NOT duplicated here, and the census records them under `system.rs`.
+    //
+    // ⚠ The measured hole these close: dropping either vegetative modifier's
+    // multiply reddens three tests, and not one of the three is about phenology (a
+    // peak-LAI band, a mutual-shading regime check, a trajectory fixed-point). The
+    // multiplicative COMPOSITION and the anthesis GATE had no test of their own.
+    //
+    // ⚠ The batch-A test module above declares a local
+    // `const ROOTED_DEPTH: &str = "biosphere.rooted_depth"`, which is NOT the aux key the
+    // engine uses (`stocks::ROOTED_DEPTH` is the bare `"rooted_depth"`). It is harmless
+    // there because those tests are self-consistent, but an aux test must read the real
+    // one, so the block below imports the constants rather than inheriting the shadow.
+    use super::super::stocks::{
+        pool_stock, ROOTED_DEPTH as AUX_ROOTED_DEPTH, SOIL, THERMAL_TIME as AUX_THERMAL_TIME,
+        VERNALIZATION_DAYS as AUX_VERNALIZATION_DAYS,
+    };
+
+    /// The committed winter-Europe wheat cardinals, held as LITERALS rather than read
+    /// through `params::vernalization()` - batch A's convention, so a loader regression
+    /// cannot silently move a physics pin.
+    const VERN: params::VernalizationParams = params::VernalizationParams {
+        t_base_v: -1.0,
+        t_opt_lower_v: 0.0,
+        t_opt_upper_v: 8.0,
+        t_ceiling_v: 12.0,
+        vsen: 0.033,
+        vdsat: 50.0,
+    };
+    const PHOTOPERIOD: params::PhotoperiodParams = params::PhotoperiodParams {
+        cpp: 16.0,
+        ppsen: 0.09,
+    };
+    /// `(t_base, t_cap, tsum_anthesis, tsum_maturity)` - the committed phenology block.
+    const PHENO: (f64, f64, f64, f64) = (0.0, 30.0, 1100.0, 750.0);
+
+    /// A bare accumulator with every optional modifier switched off.
+    fn plain_thermal_time() -> ThermalTimeAccumulation {
+        ThermalTimeAccumulation {
+            id: "test.thermal_time".to_string(),
+            accumulator: AUX_THERMAL_TIME.to_string(),
+            temp_var: "temp".to_string(),
+            t_base: PHENO.0,
+            t_cap: PHENO.1,
+            tsum_anthesis: PHENO.2,
+            tsum_maturity: PHENO.3,
+            vernalization: None,
+            vernalization_accumulator: None,
+            photoperiod: None,
+            daylength_var: None,
+            drought: None,
+            drought_soil_water: None,
+            drought_rooted_depth_aux: None,
+        }
+    }
+
+    /// Constant `temp` (degC) and, optionally, constant `daylength_s` (SECONDS - the
+    /// canonical forcing unit; the accumulator divides by 3600 itself).
+    fn weather(temp_c: f64, daylength_h: Option<f64>) -> SourceResolver {
+        let mut forcings: HashMap<String, Schedule> =
+            HashMap::from([("temp".to_string(), constant(temp_c).expect("temp"))]);
+        if let Some(h) = daylength_h {
+            forcings.insert(
+                "daylength_s".to_string(),
+                constant(h * 3600.0).expect("daylength"),
+            );
+        }
+        SourceResolver::new(forcings, HashMap::new()).expect("resolver")
+    }
+
+    /// A snapshot carrying only aux values - no stocks, which is all the two vegetative
+    /// modifiers read.
+    fn aux_only(entries: &[(&str, f64)]) -> State {
+        State::new(
+            0,
+            BTreeMap::new(),
+            0,
+            entries
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), *v))
+                .collect(),
+        )
+        .expect("aux-only snapshot")
+    }
+
+    fn increment(proc_: &dyn AuxProcess, snapshot: &State, r: &SourceResolver, dt: f64) -> f64 {
+        let env = r.bind(snapshot, dt);
+        let out = proc_.evaluate(snapshot, &env, dt).expect("aux evaluate");
+        assert_eq!(out.len(), 1, "an accumulator advances exactly one aux key");
+        *out.values().next().expect("the single increment")
+    }
+
+    /// The INCREMENT FORM, and the byte-for-byte guarantee for a crop with no cold or
+    /// daylength requirement: with both modifiers absent the accumulator is exactly
+    /// `daily_thermal_time(T) * dt`, the pre-scope-(B) behaviour.
+    ///
+    /// At 18 degC with the committed `t_base = 0` that is 18.0 per day, so a half-day
+    /// step is exactly 9.0. Mirrors `test_aux_process_returns_increment_form` and
+    /// `test_thermal_time_aux_without_modifiers_is_the_plain_rate`.
+    #[test]
+    fn thermal_time_aux_without_modifiers_is_the_plain_rate_times_dt() {
+        let proc_ = plain_thermal_time();
+        let snap = aux_only(&[(AUX_THERMAL_TIME, 0.0)]);
+        assert_eq!(increment(&proc_, &snap, &weather(18.0, None), 1.0), 18.0);
+        assert_eq!(increment(&proc_, &snap, &weather(18.0, None), 0.5), 9.0);
+        // Cold below base: no thermal time at all, read through `env` (decision #16).
+        assert_eq!(increment(&proc_, &snap, &weather(-4.0, None), 1.0), 0.0);
+    }
+
+    /// The SECOND accumulator, in its own increment form: 4 degC is inside the cited
+    /// optimum band `[0, 8]`, so VERDAY is exactly 1 day/day and a half-day step accrues
+    /// exactly 0.5. Mirrors `test_vernalization_aux_returns_increment_form`.
+    ///
+    /// ⚠ It reads AIR temperature and ignores the snapshot entirely - the source
+    /// prescribes crown temperature but notes the two differ only under snow cover, and
+    /// no snow forcing exists.
+    #[test]
+    fn vernalization_aux_accrues_verday_times_dt() {
+        let proc_ = VernalizationAccumulation {
+            id: "test.vernalization_days".to_string(),
+            accumulator: AUX_VERNALIZATION_DAYS.to_string(),
+            temp_var: "temp".to_string(),
+            params: VERN,
+        };
+        let snap = aux_only(&[(AUX_VERNALIZATION_DAYS, 0.0)]);
+        assert_eq!(increment(&proc_, &snap, &weather(4.0, None), 0.5), 0.5);
+        assert_eq!(increment(&proc_, &snap, &weather(4.0, None), 1.0), 1.0);
+        // Above the ceiling there is no cold to accrue, however long the step.
+        assert_eq!(increment(&proc_, &snap, &weather(20.0, None), 1.0), 0.0);
+    }
+
+    /// ⚠ **The two vegetative modifiers MULTIPLY** - Eqn 7.4's biological day
+    /// `BD = tempfun * ppfun`, extended by Eqn 8.2's `verfun`. Adding them instead, or
+    /// applying only the last one written, is caught by nothing else in the binary.
+    ///
+    /// Hand-computed: fully vernalized (60 >= vdsat = 50) gives `verfun = 1`; a 10-hour
+    /// day at `cpp = 16`, `ppsen = 0.09` gives `ppfun = 1 - 0.09*6 = 0.46`; the plain
+    /// rate at 18 degC is 18. So the increment is `18 * 1 * 0.46 = 8.28`.
+    /// Mirrors `test_thermal_time_aux_applies_both_modifiers_multiplicatively`.
+    #[test]
+    fn thermal_time_aux_multiplies_the_two_vegetative_modifiers() {
+        let proc_ = ThermalTimeAccumulation {
+            vernalization: Some(VERN),
+            vernalization_accumulator: Some(AUX_VERNALIZATION_DAYS.to_string()),
+            photoperiod: Some(PHOTOPERIOD),
+            daylength_var: Some("daylength_s".to_string()),
+            ..plain_thermal_time()
+        };
+        // Vegetative (thermal_time 0 => DVS 0), fully vernalized, 10 h day.
+        let snap = aux_only(&[(AUX_THERMAL_TIME, 0.0), (AUX_VERNALIZATION_DAYS, 60.0)]);
+        let got = increment(&proc_, &snap, &weather(18.0, Some(10.0)), 1.0);
+        assert!(
+            (got - 8.28).abs() <= 1.0e-12,
+            "18 * verfun(60) * ppfun(10 h) must be 8.28, got {got}"
+        );
+        // The daylength arrives in SECONDS and the process converts: the same increment
+        // must NOT be reproduced by feeding hours, which would read 10/3600 h - a
+        // near-zero daylength, hence ppfun clamped to 0.
+        let hours_by_mistake = SourceResolver::new(
+            HashMap::from([
+                ("temp".to_string(), constant(18.0).expect("temp")),
+                (
+                    "daylength_s".to_string(),
+                    constant(10.0).expect("daylength"),
+                ),
+            ]),
+            HashMap::new(),
+        )
+        .expect("resolver");
+        assert_eq!(increment(&proc_, &snap, &hours_by_mistake, 1.0), 0.0);
+    }
+
+    /// The qualitative cultivar's ARREST, at the process level: with no accumulated cold
+    /// `verfun` is 0, so thermal time does not advance AT ALL despite warm weather. A
+    /// clamp-free `verfun` would make this NEGATIVE and run development backwards.
+    /// Mirrors `test_thermal_time_aux_arrests_completely_when_unvernalized`.
+    #[test]
+    fn thermal_time_aux_arrests_completely_when_unvernalized() {
+        let proc_ = ThermalTimeAccumulation {
+            vernalization: Some(VERN),
+            vernalization_accumulator: Some(AUX_VERNALIZATION_DAYS.to_string()),
+            ..plain_thermal_time()
+        };
+        let snap = aux_only(&[(AUX_THERMAL_TIME, 0.0), (AUX_VERNALIZATION_DAYS, 0.0)]);
+        assert_eq!(increment(&proc_, &snap, &weather(18.0, None), 1.0), 0.0);
+        // ...and it is an ARREST, not a slowdown: still zero over a longer step.
+        assert_eq!(increment(&proc_, &snap, &weather(18.0, None), 4.0), 0.0);
+    }
+
+    /// ⚠ **The anthesis gate, ON its boundary.** Wheat is insensitive to both cold
+    /// and daylength at and after anthesis, so past `DVS = 1` the PLAIN degree-day rate
+    /// must be recovered EXACTLY - even with zero cold and an 8-hour day, which before
+    /// anthesis would arrest development entirely.
+    ///
+    /// The boundary case is the point: `thermal_time == tsum_anthesis` gives `DVS == 1.0`
+    /// exactly, and `is_vegetative` tests `< 1.0`, so the gate closes AT anthesis rather
+    /// than after it. One step earlier the same weather gives zero.
+    /// Mirrors `test_thermal_time_modifiers_are_gated_off_at_and_after_anthesis`.
+    #[test]
+    fn the_vegetative_modifiers_are_gated_off_at_and_after_anthesis() {
+        let proc_ = ThermalTimeAccumulation {
+            vernalization: Some(VERN),
+            vernalization_accumulator: Some(AUX_VERNALIZATION_DAYS.to_string()),
+            photoperiod: Some(PHOTOPERIOD),
+            daylength_var: Some("daylength_s".to_string()),
+            ..plain_thermal_time()
+        };
+        let cold_and_dark = weather(18.0, Some(8.0));
+        let at = |thermal_time: f64| {
+            let snap = aux_only(&[
+                (AUX_THERMAL_TIME, thermal_time),
+                (AUX_VERNALIZATION_DAYS, 0.0),
+            ]);
+            increment(&proc_, &snap, &cold_and_dark, 1.0)
+        };
+        // AT anthesis: the gate is closed, so the modifiers are off and the rate is plain.
+        assert_eq!(at(PHENO.2), 18.0);
+        assert_eq!(at(PHENO.2 + 1.0), 18.0);
+        // ...and JUST short of it the same inputs arrest development completely, which is
+        // what makes the assertion above a claim about the GATE and not about the weather.
+        assert_eq!(at(PHENO.2 - 1.0), 0.0);
+    }
+
+    /// The byte-for-byte guarantee for the THIRD modifier: a crop with no cited `WSSD`
+    /// gets exactly the pre-existing rate even on a bone-dry root zone.
+    ///
+    /// ⚠ **What this guards is `drought_factor`'s early return, NOT the wiring**, and the
+    /// distinction is worth stating because the obvious claim is the wrong one: this test
+    /// hand-builds the struct with `drought: None`, so `build_plants` never runs and a
+    /// modifier wired unconditionally there is invisible here. Measured - that mutation
+    /// reddens `system.rs`'s two wiring tests and leaves this one green. The claim it does
+    /// make is that the `let-else` returns 1.0 rather than reading a partially-configured
+    /// drought seam: with `drought: None` but a real dry root zone in the snapshot, an
+    /// early return that fell through would read `WSFG = 0` and multiply by 1.4.
+    ///
+    /// ⚠ The dry state is CONSTRUCTED. No scenario in the Rust roster is water
+    /// limited - every one of them holds `WSFG == 1` - so this condition cannot be
+    /// reached by running anything the tree ships.
+    /// Mirrors `test_thermal_time_aux_without_drought_is_the_plain_rate`.
+    #[test]
+    fn thermal_time_aux_without_a_cited_wssd_ignores_a_bone_dry_root_zone() {
+        let mut stocks = BTreeMap::new();
+        stocks.insert(
+            SOIL_WATER.to_string(),
+            pool_stock(SOIL_WATER, SOIL, Quantity::Water, 0.0).expect("dry soil water"),
+        );
+        let dry = State::new(
+            0,
+            stocks,
+            0,
+            BTreeMap::from([
+                (AUX_THERMAL_TIME.to_string(), 0.0),
+                (AUX_ROOTED_DEPTH.to_string(), 0.15),
+            ]),
+        )
+        .expect("bone-dry snapshot");
+        assert_eq!(
+            increment(&plain_thermal_time(), &dry, &weather(18.0, None), 1.0),
+            18.0
+        );
+    }
 }

@@ -1839,4 +1839,103 @@ mod tests {
         let err = annual_reset(&state, &scenario);
         assert!(matches!(err, Err(SimError::Validation(_))));
     }
+
+    /// ⚠ **The WIRING declines the drought modifier when no `WSSD` is cited** -
+    /// the pin every other `WSFD` test provably cannot make.
+    ///
+    /// All the others construct `ThermalTimeAccumulation` directly, so every one of them
+    /// stays green if `build_plants` wires the modifier UNCONDITIONALLY and a crop with
+    /// no cited coefficient silently inherits wheat's 0.40. On the Python side that exact
+    /// break passed the whole file; here it would additionally pass every golden, because
+    /// no scenario in the Rust roster is water-limited.
+    ///
+    /// This walks the aux vector `build_plants` actually produces and EVALUATES it, which
+    /// is a stronger claim than reading the struct fields back: the Python test asserts
+    /// `proc.drought is None`, this asserts that a bone-dry root zone changes nothing.
+    ///
+    /// ⚠ The plot is deliberately OFF-DEFAULT (3.5 m2, EXTR 0.09, `wssg` 0.42,
+    /// `wssd` 0.17). Every scenario in the tree has `ground_area == 1.0` and the
+    /// reference EXTR, so a hardcoded 1.0 or a swapped threshold in the wiring is
+    /// invisible on the defaults - the same blindness the soil-layers build recorded.
+    /// Mirrors `test_the_wiring_declines_wssd_for_potato_not_just_the_scenario_field`
+    /// and `test_thermal_time_aux_without_drought_is_the_plain_rate`.
+    ///
+    /// ⚠ **Potato has no Rust successor and that is a GAP, not a decision.** The
+    /// Python test names `POTATO_SCENARIO` because [F] Table 15.1 has no potato row; the
+    /// Rust roster has no potato build at all (`params.rs` records its stage 2 as
+    /// deferred), so the crop-specific half of that claim cannot be ported. What is
+    /// portable is the RULE - `wssd: None` declines the modifier - and that is what this
+    /// asserts.
+    #[test]
+    fn the_wiring_declines_the_drought_modifier_when_no_wssd_is_cited() {
+        const AREA: f64 = 3.5;
+        const EXTR: f64 = 0.09;
+        const WSSG: f64 = 0.42;
+        const WSSD: f64 = 0.17;
+        const DEPTH: f64 = 0.20;
+
+        // Hand geometry: TTSW = 0.20 m x 0.09 x 1000 kg/m3 x 3.5 m2 = 63.0 kg, and
+        // holding half of `wssg` worth of it puts FTSW at 0.21 - exactly half the
+        // threshold - so WSFG = 0.5 and WSFD = (1 - 0.5) x 0.17 + 1 = 1.085.
+        let ttsw = DEPTH * EXTR * 1000.0 * AREA;
+        assert_eq!(ttsw, 63.0, "the hand geometry must be the tree's geometry");
+        let held = 0.5 * WSSG * ttsw;
+        let expected_accelerated = 18.0 * 1.085;
+
+        struct WarmEnv;
+        impl simcore::environment::Environment for WarmEnv {
+            fn get(&self, _var: &str) -> Result<f64, SimError> {
+                Ok(18.0)
+            }
+        }
+
+        let p = params::biosphere();
+        let increment = |wssd: Option<f64>| -> f64 {
+            let scenario = SeasonScenario {
+                wssd,
+                ground_area: AREA,
+                soil_extractable_water: EXTR,
+                wssg: WSSG,
+                ..DEFAULT_SCENARIO
+            };
+            let build = build_plants(&scenario, &p).expect("build_plants");
+            let procs: Vec<&Box<dyn AuxProcess>> = build
+                .aux
+                .iter()
+                .filter(|a| a.type_name() == "ThermalTimeAccumulation")
+                .collect();
+            assert_eq!(procs.len(), 1, "exactly one thermal-time accumulator");
+            let mut stocks = std::collections::BTreeMap::new();
+            stocks.insert(
+                SOIL_WATER.to_string(),
+                pool_stock(SOIL_WATER, SOIL, Quantity::Water, held).expect("soil water"),
+            );
+            // PAST ANTHESIS on purpose: it gates the two vegetative modifiers off, so
+            // this reads WSFD alone rather than WSFD times an unvernalized zero.
+            let state = State::new(
+                0,
+                stocks,
+                0,
+                std::collections::BTreeMap::from([
+                    (ROOTED_DEPTH.to_string(), DEPTH),
+                    (THERMAL_TIME.to_string(), p.pheno.tsum_anthesis + 1.0),
+                ]),
+            )
+            .expect("stressed snapshot");
+            procs[0].evaluate(&state, &WarmEnv, 1.0).expect("evaluate")[THERMAL_TIME]
+        };
+
+        // Cited: the modifier is wired, reads THIS plot's geometry and THIS threshold.
+        let accelerated = increment(Some(WSSD));
+        assert!(
+            (accelerated - expected_accelerated).abs() <= 1.0e-12 * expected_accelerated,
+            "wired WSFD must give {expected_accelerated}, got {accelerated}"
+        );
+        // Not cited: the same bone-dry root zone changes nothing at all.
+        assert_eq!(
+            increment(None),
+            18.0,
+            "an uncited WSSD must leave the plain degree-day rate byte-for-byte"
+        );
+    }
 }

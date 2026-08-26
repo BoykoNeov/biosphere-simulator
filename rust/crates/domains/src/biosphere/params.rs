@@ -479,23 +479,32 @@ pub fn transpiration() -> TranspirationParams {
 }
 
 /// The whole 12-field `phenology.yaml` block, validated once for all three readers.
-fn phenology_block() -> std::collections::BTreeMap<String, f64> {
-    let f = file(PHENOLOGY_YAML, "phenology.yaml");
-    guarded_map(&f, &PHENOLOGY_UNITS, "phenology.yaml")
+///
+/// ⚠ The `_from` split below is the `allocation_from` shape, and it exists for one
+/// reason: the three SEMANTIC guards (the cardinal band, the vernalization ordering, the
+/// positive sums) read `PHENOLOGY_YAML` through `include_str!`, so the only file they could
+/// ever see was the committed one — which is valid. Measured, not assumed: before this
+/// split, deleting any of the three left `cargo test -p domains --lib` at 216 passed / 0
+/// failed, while the live control (declaring `t_base` in kelvin) reddened 29. A guard that
+/// cannot be handed a bad file is a comment. Nothing about the committed load changed —
+/// each public reader is its own `_from` at `PHENOLOGY_YAML`.
+fn phenology_block_from(text: &str, name: &'static str) -> std::collections::BTreeMap<String, f64> {
+    let f = file(text, name);
+    guarded_map(&f, &PHENOLOGY_UNITS, name)
 }
 
-/// Thermal-time phenology params (`phenology.yaml`).
-pub fn phenology() -> PhenologyParams {
-    const NAME: &str = "phenology.yaml";
-    let v = phenology_block();
+/// Thermal-time phenology params from arbitrary file text — the testable half of
+/// [`phenology`].
+pub fn phenology_from(text: &str, name: &'static str) -> PhenologyParams {
+    let v = phenology_block_from(text, name);
     assert!(
         v["t_base"] < v["t_cap"],
-        "{NAME}: cardinal temperatures must satisfy t_base < t_cap, got ({}, {})",
+        "{name}: cardinal temperatures must satisfy t_base < t_cap, got ({}, {})",
         v["t_base"],
         v["t_cap"]
     );
     for field in ["tsum_anthesis", "tsum_maturity"] {
-        checked(require_positive(v[field], field, NAME), NAME);
+        checked(require_positive(v[field], field, name), name);
     }
     PhenologyParams {
         t_base: v["t_base"],
@@ -505,22 +514,27 @@ pub fn phenology() -> PhenologyParams {
     }
 }
 
-/// Vernalization cardinals (`phenology.yaml`) — Soltani & Sinclair Eqn 8.3 / 8.6.
-pub fn vernalization() -> VernalizationParams {
-    const NAME: &str = "phenology.yaml";
-    let v = phenology_block();
+/// Thermal-time phenology params (`phenology.yaml`).
+pub fn phenology() -> PhenologyParams {
+    phenology_from(PHENOLOGY_YAML, "phenology.yaml")
+}
+
+/// Vernalization cardinals from arbitrary file text — the testable half of
+/// [`vernalization`].
+pub fn vernalization_from(text: &str, name: &'static str) -> VernalizationParams {
+    let v = phenology_block_from(text, name);
     // A well-ordered response with a strictly positive ramp on each side; the two strict
     // pairs are divisors.
     assert!(
         v["t_base_v"] < v["t_opt_lower_v"]
             && v["t_opt_lower_v"] <= v["t_opt_upper_v"]
             && v["t_opt_upper_v"] < v["t_ceiling_v"],
-        "{NAME}: vernalization cardinals must satisfy \
+        "{name}: vernalization cardinals must satisfy \
          t_base_v < t_opt_lower_v <= t_opt_upper_v < t_ceiling_v"
     );
-    checked(require_positive(v["vdsat"], "vdsat", NAME), NAME);
+    checked(require_positive(v["vdsat"], "vdsat", name), name);
     // A negative sensitivity would make cold *retard* development.
-    checked(require_non_negative(v["vsen"], "vsen", NAME), NAME);
+    checked(require_non_negative(v["vsen"], "vsen", name), name);
     VernalizationParams {
         t_base_v: v["t_base_v"],
         t_opt_lower_v: v["t_opt_lower_v"],
@@ -531,16 +545,25 @@ pub fn vernalization() -> VernalizationParams {
     }
 }
 
-/// Photoperiod (daylength) params (`phenology.yaml`) — long-day form.
-pub fn photoperiod() -> PhotoperiodParams {
-    const NAME: &str = "phenology.yaml";
-    let v = phenology_block();
-    checked(require_positive(v["cpp"], "cpp", NAME), NAME);
-    checked(require_non_negative(v["ppsen"], "ppsen", NAME), NAME);
+/// Vernalization cardinals (`phenology.yaml`) — Soltani & Sinclair Eqn 8.3 / 8.6.
+pub fn vernalization() -> VernalizationParams {
+    vernalization_from(PHENOLOGY_YAML, "phenology.yaml")
+}
+
+/// Photoperiod params from arbitrary file text — the testable half of [`photoperiod`].
+pub fn photoperiod_from(text: &str, name: &'static str) -> PhotoperiodParams {
+    let v = phenology_block_from(text, name);
+    checked(require_positive(v["cpp"], "cpp", name), name);
+    checked(require_non_negative(v["ppsen"], "ppsen", name), name);
     PhotoperiodParams {
         cpp: v["cpp"],
         ppsen: v["ppsen"],
     }
+}
+
+/// Photoperiod (daylength) params (`phenology.yaml`) — long-day form.
+pub fn photoperiod() -> PhotoperiodParams {
+    photoperiod_from(PHENOLOGY_YAML, "phenology.yaml")
 }
 
 /// Relative organ death rates + the mutual-shading term (`senescence.yaml`).
@@ -1355,5 +1378,316 @@ parameters:
                  the reference's normalization does not — the two hash rules would diverge"
             );
         }
+    }
+
+    // --- S5 batch B: the phenology loader ---------------------------------------
+    //
+    // Ported from `tests/test_phenology.py`'s config-boundary block. The three schema
+    // guards below are reachable because they live in the READER (`ParamFile::parse` and
+    // `guarded_set`), which takes text.
+    //
+    // ⚠ **The three SEMANTIC guards are not reachable, and that was measured, not
+    // assumed.** `phenology()`'s `t_base < t_cap` assertion, `vernalization()`'s
+    // cardinal-ordering assertion and the `tsum` positivity check all read
+    // `PHENOLOGY_YAML` through `include_str!`, so the only file they can ever see is the
+    // committed one - which is valid. Removing any of the three leaves
+    // `cargo test -p domains --lib` at 212 passed / 0 failed; the control (declaring
+    // `t_base` in K, which the committed file is not) reddens 29. Python has five tests
+    // for exactly those three rules and they have NO successor here. Closing that needs
+    // text-injectable variants of the three readers - the shape `allocation_from` already
+    // uses in this file - which is a production change and therefore a decision of its
+    // own, not something to slip inside a testing batch.
+
+    /// The committed block IS the two cited "Winter Europe" rows - the same cultivar
+    /// class in both chapters, not a mix of two.
+    ///
+    /// ⚠ This is NOT a second copy of `every_value_matches_the_generated_table`.
+    /// That test is a ROUND TRIP: it compares the load against a table the Python loaders
+    /// produced from the same YAML, so it pins agreement between two readers of one file
+    /// and would happily agree on a wrong number. This one names the SOURCE ROW each
+    /// value comes from, so replacing a cardinal with a plausible neighbour from [D]'s
+    /// range (-1.3 / 3.8 / 6.0 / 15.7) fails here and nowhere else.
+    /// Mirrors `test_load_phenology_params_matches_committed_values` and
+    /// `test_committed_file_loads_the_cited_winter_europe_values`.
+    #[test]
+    fn the_committed_phenology_block_is_the_cited_winter_europe_parameterization() {
+        let v = phenology_block_from(PHENOLOGY_YAML, "phenology.yaml");
+        // Cardinal-cap GDD, [A] McMaster & Wilhelm - both still TODO(cite) placeholders.
+        assert_eq!((v["t_base"], v["t_cap"]), (0.0, 30.0));
+        // [E] Penning de Vries Table 12 / Table 15, winter-wheat rows.
+        assert_eq!((v["tsum_anthesis"], v["tsum_maturity"]), (1100.0, 750.0));
+        // [C] Soltani & Sinclair Fig. 8.1 - the wheat vernalization cardinals.
+        assert_eq!(
+            (
+                v["t_base_v"],
+                v["t_opt_lower_v"],
+                v["t_opt_upper_v"],
+                v["t_ceiling_v"]
+            ),
+            (-1.0, 0.0, 8.0, 12.0)
+        );
+        // [C] Table 8.1, row "Wheat / Winter Europe".
+        assert_eq!((v["vsen"], v["vdsat"]), (0.033, 50.0));
+        // [C] Table 7.2, the SAME row of the SAME cultivar class, one chapter over.
+        assert_eq!((v["cpp"], v["ppsen"]), (16.0, 0.09));
+        // The property those two rows jointly imply, asserted where the numbers live:
+        // vsen*vdsat = 1.65 > 1 makes this cultivar QUALITATIVE, so `verfun`'s clamp is
+        // load-bearing rather than defensive. A quieter cultivar would silently turn the
+        // clamp into dead code and the equation-level test into a tautology.
+        assert!(
+            v["vsen"] * v["vdsat"] > 1.0,
+            "the committed cultivar must stay qualitative"
+        );
+        // ...and the ordering rule, RESTATED against the committed values.
+        //
+        // ⚠ This is not coverage of the loader's guard and must not be counted as such:
+        // deleting `vernalization()`'s ordering assertion leaves these three green,
+        // because they read the same valid file the guard reads. What they do assert is
+        // that the committed values still SATISFY the rule - which is what makes a future
+        // re-parameterization that violates it fail here rather than at a caller.
+        assert!(v["t_base"] < v["t_cap"]);
+        assert!(
+            v["t_base_v"] < v["t_opt_lower_v"]
+                && v["t_opt_lower_v"] <= v["t_opt_upper_v"]
+                && v["t_opt_upper_v"] < v["t_ceiling_v"]
+        );
+        assert!(v["tsum_anthesis"] > 0.0 && v["tsum_maturity"] > 0.0);
+    }
+
+    /// A wrong declared unit is rejected, on the REAL file text rather than a fixture.
+    ///
+    /// Both cases matter and they fail for different reasons: a temperature declared in
+    /// kelvin is a unit the tree never uses, while a thermal SUM declared as a bare
+    /// `degC` is the plausible slip - a sum is not a temperature, and the two differ by
+    /// a factor of time. Mirrors `test_phen_loader_rejects_a_wrong_unit`.
+    #[test]
+    fn a_wrong_phenology_unit_is_rejected() {
+        for (from, to, what) in [
+            (
+                "  t_base:\n    value: 0.0\n    unit: \"degC\"",
+                "  t_base:\n    value: 0.0\n    unit: \"K\"",
+                "a cardinal temperature in kelvin",
+            ),
+            (
+                "  tsum_anthesis:\n    value: 1100.0\n    unit: \"degC*day\"",
+                "  tsum_anthesis:\n    value: 1100.0\n    unit: \"degC\"",
+                "a thermal sum declared as a bare temperature",
+            ),
+        ] {
+            assert_eq!(
+                PHENOLOGY_YAML.matches(from).count(),
+                1,
+                "the substitution must apply exactly once: {what}"
+            );
+            let broken = PHENOLOGY_YAML.replace(from, to);
+            let f = ParamFile::parse(&broken, "phenology.yaml").expect("still parses");
+            assert!(
+                f.guarded_set(&PHENOLOGY_UNITS, "phenology.yaml").is_err(),
+                "{what} must be rejected"
+            );
+        }
+    }
+
+    /// A param added to the file and wired to nothing must FAIL, not be ignored - the
+    /// `extra="forbid"` half of the schema. Mirrors
+    /// `test_phen_loader_rejects_an_unknown_field`.
+    #[test]
+    fn an_unknown_phenology_field_is_rejected() {
+        let extended = format!(
+            "{PHENOLOGY_YAML}  bogus:\n    value: 1.0\n    unit: \"degC\"\n    source: \"x\"\n"
+        );
+        let f = ParamFile::parse(&extended, "phenology.yaml").expect("still parses");
+        assert_eq!(
+            f.fields().len(),
+            PHENOLOGY_UNITS.len() + 1,
+            "the extra key must actually reach the reader"
+        );
+        assert!(
+            f.guarded_set(&PHENOLOGY_UNITS, "phenology.yaml").is_err(),
+            "a param wired to nothing must be rejected, not silently ignored"
+        );
+    }
+
+    /// An entry missing its `source` is rejected - the provenance half of the schema.
+    ///
+    /// Renaming the key rather than deleting the line breaks it BOTH ways at once (the
+    /// required key is absent and an unexpected one is present), which is what the
+    /// entry-level `require_keys` is for. Mirrors
+    /// `test_phen_loader_rejects_a_missing_source`.
+    #[test]
+    fn a_phenology_entry_without_a_source_is_rejected() {
+        let from = "  vsen:\n    value: 0.033\n    unit: \"1/day\"\n    source:";
+        let to = "  vsen:\n    value: 0.033\n    unit: \"1/day\"\n    provenance:";
+        assert_eq!(PHENOLOGY_YAML.matches(from).count(), 1);
+        let broken = PHENOLOGY_YAML.replace(from, to);
+        let f = ParamFile::parse(&broken, "phenology.yaml").expect("still parses");
+        assert!(
+            f.guarded_set(&PHENOLOGY_UNITS, "phenology.yaml").is_err(),
+            "an unsourced param must be rejected"
+        );
+    }
+
+    // --- S5 batch B: the three SEMANTIC loader guards, now reachable ----------------
+    //
+    // ⚠ These five tests are the reason `phenology_from`/`vernalization_from`/
+    // `photoperiod_from` exist. Before the split the three guards could only ever see the
+    // committed file, which is valid, so they were inert - deleting any of the three left
+    // `cargo test -p domains --lib` at 216 passed / 0 failed against a live control
+    // (declaring `t_base` in kelvin reddened 29). Adding the injectable readers was a
+    // production change inside a testing batch and was taken as an explicit decision, not
+    // slipped in: the alternative was five Python tests dying at S6 with no successor.
+    //
+    // Each case mutates the REAL file text rather than a synthetic fixture, so a schema
+    // change cannot leave a fixture behind still passing. The guards panic rather than
+    // returning `Err` (the frozen loaders' idiom), so the assertion is on `catch_unwind`,
+    // exactly as `a_partition_row_that_does_not_sum_to_one_is_rejected` does.
+
+    /// Mutate one `value:` line of the committed file, asserting the substitution applies.
+    fn phenology_with(field: &str, value: &str) -> &'static str {
+        let from = format!("  {field}:\n    value: ");
+        let at = PHENOLOGY_YAML
+            .find(&from)
+            .unwrap_or_else(|| panic!("{field} is not a top-level phenology param"));
+        let start = at + from.len();
+        let end = start
+            + PHENOLOGY_YAML[start..]
+                .find('\n')
+                .expect("a value line ends");
+        let mut out = String::with_capacity(PHENOLOGY_YAML.len());
+        out.push_str(&PHENOLOGY_YAML[..start]);
+        out.push_str(value);
+        out.push_str(&PHENOLOGY_YAML[end..]);
+        assert_ne!(out, PHENOLOGY_YAML, "the substitution must apply");
+        // `_from` takes a plain `&str`, but `catch_unwind` wants the captured reference
+        // unwind-safe; leaking is what the allocation test already does here.
+        Box::leak(out.into_boxed_str())
+    }
+
+    fn rejects(f: impl FnOnce() + std::panic::UnwindSafe, what: &str) {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {})); // the guards' panics are the expected result
+        let caught = std::panic::catch_unwind(f);
+        std::panic::set_hook(previous);
+        assert!(caught.is_err(), "{what} must be rejected, not loaded");
+    }
+
+    /// An inverted cardinal band is rejected: `t_base` above `t_cap` would make the
+    /// degree-day rate NEGATIVE on the plateau branch, which is the one branch no scenario
+    /// in the tree reaches. Mirrors `test_phen_loader_rejects_inverted_cardinal_band`.
+    #[test]
+    fn an_inverted_phenology_cardinal_band_is_rejected() {
+        let broken = phenology_with("t_base", "40.0");
+        rejects(
+            || {
+                phenology_from(broken, "phenology.yaml");
+            },
+            "t_base above t_cap",
+        );
+        // ...and the committed ordering still loads, so the guard is not simply always-on.
+        assert_eq!(phenology_from(PHENOLOGY_YAML, "phenology.yaml").t_base, 0.0);
+    }
+
+    /// A non-positive thermal sum is rejected - both of them are DIVISORS in
+    /// `development_stage`, so a zero is an infinity in DVS rather than a slow crop.
+    /// Mirrors `test_phen_loader_rejects_non_positive_sum`.
+    #[test]
+    fn a_non_positive_thermal_sum_is_rejected() {
+        for field in ["tsum_anthesis", "tsum_maturity"] {
+            let zero = phenology_with(field, "0.0");
+            rejects(
+                || {
+                    phenology_from(zero, "phenology.yaml");
+                },
+                field,
+            );
+            let negative = phenology_with(field, "-1.0");
+            rejects(
+                || {
+                    phenology_from(negative, "phenology.yaml");
+                },
+                field,
+            );
+        }
+    }
+
+    /// Ill-ordered vernalization cardinals are rejected, in all three ways the ordering can
+    /// break. Two of the pairs are DIVISORS (the ramp widths), so an equal pair is a
+    /// division by zero and a swapped pair is a negative-width ramp - the response would
+    /// come out inverted rather than merely wrong.
+    /// Mirrors `test_vernalization_day_rejects_ill_ordered_cardinals`.
+    #[test]
+    fn ill_ordered_vernalization_cardinals_are_rejected() {
+        for (field, value, what) in [
+            (
+                "t_base_v",
+                "0.0",
+                "base equal to the lower optimum (a zero-width ramp)",
+            ),
+            ("t_opt_lower_v", "9.0", "lower optimum above the upper one"),
+            ("t_ceiling_v", "8.0", "ceiling equal to the upper optimum"),
+        ] {
+            let broken = phenology_with(field, value);
+            rejects(
+                || {
+                    vernalization_from(broken, "phenology.yaml");
+                },
+                what,
+            );
+        }
+        // The committed set loads, so none of the three above passes vacuously.
+        assert_eq!(
+            vernalization_from(PHENOLOGY_YAML, "phenology.yaml").t_ceiling_v,
+            12.0
+        );
+    }
+
+    /// The two saturation params are bound-checked: `vdsat` is a DIVISOR-shaped saturation
+    /// point that must be positive, and a negative `vsen` would make cold RETARD
+    /// development - the opposite of the mechanism.
+    /// Mirrors `test_vernalization_factor_rejects_bad_params`.
+    #[test]
+    fn a_bad_vernalization_sensitivity_or_saturation_is_rejected() {
+        rejects(
+            || {
+                vernalization_from(phenology_with("vdsat", "0.0"), "phenology.yaml");
+            },
+            "vdsat of zero",
+        );
+        rejects(
+            || {
+                vernalization_from(phenology_with("vsen", "-0.1"), "phenology.yaml");
+            },
+            "a negative vsen",
+        );
+        // `vsen == 0` is LEGAL and must stay so: it is the day-neutral cultivar, whose
+        // verfun is 1 everywhere. A guard that rejected it would forbid a real crop.
+        assert_eq!(
+            vernalization_from(phenology_with("vsen", "0.0"), "phenology.yaml").vsen,
+            0.0
+        );
+    }
+
+    /// The photoperiod pair, same shape: `cpp` is the critical daylength and must be
+    /// positive, and a negative `ppsen` would make SHORT days accelerate a long-day crop.
+    /// `ppsen == 0` is legal - that is the day-neutral crop, and the tree ships one.
+    /// Mirrors `test_photoperiod_factor_rejects_bad_params`.
+    #[test]
+    fn a_bad_photoperiod_pair_is_rejected() {
+        rejects(
+            || {
+                photoperiod_from(phenology_with("cpp", "0.0"), "phenology.yaml");
+            },
+            "a critical photoperiod of zero",
+        );
+        rejects(
+            || {
+                photoperiod_from(phenology_with("ppsen", "-0.1"), "phenology.yaml");
+            },
+            "a negative ppsen",
+        );
+        assert_eq!(
+            photoperiod_from(phenology_with("ppsen", "0.0"), "phenology.yaml").ppsen,
+            0.0
+        );
     }
 }
