@@ -2285,6 +2285,25 @@ mod tests {
         // the function rather than about a scenario's numbers.
         assert_eq!(at(0.005), 0.0);
         assert_eq!(at(0.07), 1.0);
+
+        // ⚠ AN INVERTED BAND, asserted as it BEHAVES rather than left as a prose gap.
+        // Python's `soil_n_availability` raises on `sn_residual >= sn_critical`; this one
+        // does not, per this module's header decision, and unlike `n_residual`/`n_critical`
+        // there is nothing downstream that rejects it either — `sn_residual`/`sn_critical`
+        // are SCENARIO fields, not param-file entries, and no scenario validator checks
+        // their order. Adding one is a production change and an S6 item.
+        //
+        // What the S6 note cannot say, and this can: the function degenerates to a STEP at
+        // `sn_residual`, and the interior is unreachable because the two conditions overlap.
+        // Pinned the way batch D pinned `allocation.yaml`'s two mutations that LOAD — so if
+        // a validator ever appears, this assertion says so out loud instead of a guard
+        // quietly materializing. ⚠ It is independent of the ramp above by construction: the
+        // interior limb never runs here, so inverting the ramp cannot move it.
+        let inverted = |soil_n: f64| soil_n_availability(soil_n, 0.05, 0.01);
+        assert_eq!(inverted(0.03), 0.0); // below the (higher) residual — off
+        assert_eq!(inverted(0.05), 0.0); // AT it — still off, the `<=`
+        assert_eq!(inverted(0.0500001), 1.0); // and immediately saturated: a step, not a ramp
+        assert_eq!(inverted(1e9), 1.0);
     }
     /// `f_N` reads a CONCENTRATION, and the existing pin evaluates at a denominator of 1.
     ///

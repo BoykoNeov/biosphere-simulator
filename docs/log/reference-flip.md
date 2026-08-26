@@ -3498,9 +3498,10 @@ satisfy. That is batch D's redistribution lesson, arriving on a different mechan
 ### The transposed question, asked inside the batch instead of in review
 
 Batch D's review learned that a battery says nothing about whether the NEW tests are
-reachable. Asked here as part of the batch: twelve of sixteen appear in a hit list under a
-mutation of their own mechanism; the four that do not are about guards, a fold, a derived
-constant and a degeneracy — things a mechanism mutation cannot touch. Each got a targeted
+reachable. Asked here as part of the batch: twelve of sixteen appear in a hit list —
+eleven under a mutation of their own mechanism, one only under a mutation of something
+else (below); the four that do not are about guards, a fold, a derived constant and a
+degeneracy — things a mechanism mutation cannot touch. Each got a targeted
 control, and **two of them redden exactly one test each**, which is the strongest possible
 reading: those two tests are the only thing in the tree that sees those two rules. A no-op
 control reddened nothing, so the instrument is honest.
@@ -3519,3 +3520,28 @@ on Windows translates every LF into a CRLF on the way out — so a two-line edit
 endings in `docs/post-roadmap-log.md` and 118 in the memory index. Caught by `git`'s own
 CRLF warning, not by anything of ours. *The rule batch D wrote for its digest is a rule about
 every write, not about digests.*
+
+### ⚠ The transposed question's own blind spot, found by the same review
+
+"Does each new test appear in a hit list?" answers REACHABILITY, not whether the test
+reddens for the reason its name gives. One of the twelve does not:
+`only_the_open_field_crop_leaves_greenwoods_plateau` appears **only under E4** — `f_N`
+reading an absolute amount — which has nothing to do with the plateau and reddens it purely
+by moving a trajectory until a chamber's peak crosses the margin. **E1, removing the plateau
+outright, left it green**, and that is not a defect: the test's load-bearing half is
+`w < bound`, a claim about which SCENARIOS exist, which no mutation of a rate law can move.
+So the honest count is **eleven reached by a mutation of their own mechanism, plus one whose
+only reader is a mutation of something else** — recorded in the test's own docstring, because
+this is exactly the "a number moved, wearing a reassuring name" reading §5ad's battery was
+built to expose, and it does not stop being that when it appears in our column instead of
+theirs.
+
+### The inverted soil-N band: the guard is S6, but the BEHAVIOUR is pinned now
+
+`soil_n_availability`'s band is ordered by nothing (below), and the S6 note said "unguarded"
+without saying what the unguarded case does. It does something specific: the function
+degenerates to a **step at `sn_residual`**, with the interior unreachable because the two
+conditions overlap. That is now asserted, alongside the ramp — the same shape batch D used
+for `allocation.yaml`'s two mutations that LOAD, so a validator appearing later says so out
+loud instead of a guard quietly materializing. Measured independent of the ramp inversion by
+construction, and confirmed against E3b.

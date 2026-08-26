@@ -2783,6 +2783,17 @@ mod tests {
     /// decided the form, and why extrapolating the declining branch downward would have
     /// manufactured a season-long N decline for every chamber in the tree.
     ///
+    /// ⚠⚠ WHAT THIS TEST IS REACHED BY, measured and stated rather than assumed. The
+    /// load-bearing half is `w < bound` — a claim about which SCENARIOS exist, not about a
+    /// rate law, so no mutation of `target_n_concentration` can move it and none did:
+    /// removing the plateau outright (E1), the mechanism this test is named for, left it
+    /// GREEN. The one mutation that reddens it is E4, `f_N` reading an absolute amount
+    /// instead of a concentration — which has nothing to do with the plateau and reddens it
+    /// only by moving the trajectory until a chamber's peak crosses the margin below. That
+    /// is "a number moved" wearing a reassuring name, inside this test rather than outside
+    /// it, and it is recorded here because the batch's own method rejects that reading
+    /// everywhere else. The margin is a characterization pin; the roster claim is the gate.
+    ///
     /// ⚠ It is asserted rather than described because it is a claim about the ROSTER, and
     /// this repo has been bitten more than once by a scope claim outliving the roster that
     /// made it true. A new chamber scenario that grew past 1 t/ha would move onto a branch
