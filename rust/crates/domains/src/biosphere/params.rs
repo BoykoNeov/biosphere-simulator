@@ -1563,12 +1563,21 @@ parameters:
         Box::leak(out.into_boxed_str())
     }
 
+    /// ⚠ **The panic hook is deliberately NOT suppressed, and that is a correction.**
+    /// The first draft wrapped each call in `take_hook`/`set_hook(no-op)`/restore to keep
+    /// the expected panics quiet. `set_hook` is PROCESS-GLOBAL and cargo runs these tests
+    /// on parallel threads, so two concurrent calls interleave: A installs the no-op, B
+    /// takes the *no-op* as its "previous", A restores the real hook, B restores the
+    /// no-op — and every panic for the rest of the run prints nothing. It cannot cause a
+    /// false pass; it silently destroys the FAILURE MESSAGE of some other test in some
+    /// later run, which is this slice's own failure mode one level removed. The
+    /// backtraces these produce are noise, and noise is the correct price.
+    /// `a_partition_row_that_does_not_sum_to_one_is_rejected` never suppressed it either.
     fn rejects(f: impl FnOnce() + std::panic::UnwindSafe, what: &str) {
-        let previous = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {})); // the guards' panics are the expected result
-        let caught = std::panic::catch_unwind(f);
-        std::panic::set_hook(previous);
-        assert!(caught.is_err(), "{what} must be rejected, not loaded");
+        assert!(
+            std::panic::catch_unwind(f).is_err(),
+            "{what} must be rejected, not loaded"
+        );
     }
 
     /// An inverted cardinal band is rejected: `t_base` above `t_cap` would make the

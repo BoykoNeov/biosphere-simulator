@@ -6366,6 +6366,14 @@ says more than its test measures.
 4. **Clippy rejected `assert!(1.0 - 0.09 * 16.0 < 0.0)`** as always-true. It was a comment
    doing work as an assertion; it is now written against the same `cpp`/`ppsen` bindings the
    test uses, which is the better claim anyway.
+5. ⚠⚠ **The `rejects()` test helper suppressed the panic hook, and `set_hook` is
+   PROCESS-GLOBAL.** Cargo runs these on parallel threads, so two concurrent calls interleave
+   — A installs the no-op, B takes the *no-op* as its "previous", A restores the real hook,
+   B restores the no-op — and every panic for the rest of the run prints nothing. It cannot
+   cause a false pass; it silently destroys some OTHER test's failure message in some later
+   run. Removed — the backtraces are noise, and noise is the correct price, which is what the
+   `allocation_from` precedent had been doing all along. *The divergence from the precedent
+   was the defect, and it was invisible because the tests still passed.*
 
 ### Findings recorded, not fixed
 
@@ -6392,6 +6400,9 @@ says more than its test measures.
 ### What batch B leaves standing
 
 * **Batches C–G unchanged in scope.** C (water) is next by the roster.
+* ⚠⚠ **The `t_cap` plateau is a SCIENCE question with no owner yet** — does a scenario
+  need to get that hot, or is the cap decoration? Queued here as well as recorded in the
+  findings, because a finding that lives only in a findings list is owned by nothing.
 * **`intercepted_fraction` still unresolved** (S6 item; clause 4 of the exit gate).
 * **The by-name claim census (clause 3) still unwritten** — now with batch B's own additional
   coverage (B10's gate boundary, B11's unit seam, the two `science.rs`/`params.rs` claims with
