@@ -8217,3 +8217,80 @@ measurably is rather than as the thing that catches a probe aimed at the wrong s
 * Every S6 item S5 handed over is untouched and still open, plus the compensated-reduction
   hazard above. `intercepted_fraction`'s deadness on the reference side was confirmed in
   passing and deliberately **not** resolved here — it is clause 4 of S5's exit gate.
+
+## §5an Stage 3 — S6's PREREQUISITES BUILT, COMPLETE 2026-08-27: the exit gate's last two clauses, and the census that found a hole before it was written
+
+S6's row reads *"the retirements"*, and three things stood in front of it. Two are clauses of
+S5's own exit gate — clause 4 (`intercepted_fraction` resolved) and clause 3 (a by-name claim
+census exists) — and the third is the set of leftovers that are repairs rather than decisions.
+All three are built. **No Python is deleted here.** The census is built out of the tree S6
+destroys, so it is committed and green *before* the deletion slice opens, and the deletion
+slice gets its own advisor call.
+
+The full record is `docs/log/reference-flip.md` (§ *"S6's prerequisites"*). What belongs in
+the plan is the sequencing, the two decisions this slice took, and the one it did not.
+
+### The order was load-bearing, and it was not the order the menu listed
+
+Items 3 and 4 (the dead value, the repairs) landed **before** item 2 (the census), because
+both change the Rust test inventory and the census is a snapshot of it. Building the census
+first would have frozen a roster that the same batch then moved. Stated because the menu's
+numbering invites the opposite.
+
+### Clause 4 — `intercepted_fraction` is DELETED, and two of the three checks looked live
+
+Recorded in the log. The one that matters for the plan: `docs/*.manifest.json` names no
+functions, so this was **not** an unfreeze event, and the ceremony did not apply. Had it been
+a manifest key the resolution would have been a different slice.
+
+### Clause 3 — the census, and its denominator
+
+`rust/crates/domains/src/biosphere/claim_census.tsv` (455 Python rows + 53 additional Rust
+rows) with `claim_census.rs` as its gate. **The denominator was decided once and written into
+the file**: the rule "every test must be claimed" binds on the four surfaces S5 landed on
+(`science.rs`, `flows.rs`, `params.rs`, `system.rs`); the other seven are claimable but not
+required, because they descend from Python files outside S5's twenty. Control C4 measures
+that choice — a new test in `science_gates.rs` reddens nothing — and it is recorded as the
+cost of the decision rather than found later as a hole.
+
+⚠ **197 of the 455 dispositions come from the reference's own docstrings**, mechanically
+extracted from `Mirrors \`test_x\`` annotations. That is the half of the census nobody
+decided, and it is why the file is an expansion rather than a transcription. 168 rows are
+S6's own rules; 90 come from the plan's authored tables, keyed by the section that wrote them.
+
+### ⚠⚠ THE FINDING, and it arrived before the census file existed
+
+`canopy`, `photosynthesis` and `herbivory` had **no `*_from` seam**, so no test could hand
+them a mutated file and their bound guards were exercised by nothing — measured green with
+every guard deleted. Eleven Python tests read exactly like their coverage and every one of
+them tests the **Python** loader.
+
+**This is the argument for clause 3 stated as a measurement rather than as a principle.** A
+count of covered claims calls those eleven covered; only asking per name which *Rust* test
+carries the claim finds it. §5ad wrote the clause as insurance against a claim quietly
+shrinking in translation; what it actually caught first was a claim that never crossed at all.
+
+### The decision this slice did NOT take, and why it is in front of S6 rather than inside it
+
+⚠⚠ **`daily_thermal_time`'s 30 °C cap is the USER'S call and is put to them with this batch.**
+§5af recorded it twice as *"a SCIENCE question with no owner yet"* — does a scenario need to
+get that hot, or is the cap decoration? Both answers are science decisions. It is not a
+repair and this slice does not pick.
+
+⚠ **`compartment_boundary_ledger` is re-classified from leftover to S6 PREREQUISITE.** It is a
+module port plus its test file, not a repair, so it does not belong in this batch — but
+deleting `tests/test_compartments.py` at S6 with no successor is the **orphaning** pattern
+`docs/log/scenarios-retired-c6.md` already records. It has to land *before* the deletion
+slice, not be discovered inside it.
+
+### What S6 now needs before it can delete
+
+1. `compartment_boundary_ledger` ported, or its test's claims explicitly dispositioned.
+2. The `t_cap` answer.
+3. The four two-sided characterization bands and the question underneath them — does the
+   reference want a class of pin that is deliberately not a contract?
+4. The carve-outs already written down: `tests/oracle/` survives; `config/units.py` needs an
+   executing caller or it becomes a green check guarding a dead path; `test_crossport.py` is
+   not a free deletion (FINDING 7); and §5am's measured note that retiring the four Python
+   band tests loses a *tighter* floor (the Rust readings are up to 3.7× lower), which is fine
+   at margins of 380× and up but is a loss, not a wash.

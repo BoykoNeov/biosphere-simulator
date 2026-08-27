@@ -9,6 +9,14 @@
 //! the cross-port deviation is bounded by last-ULP libm differences (all 7 biosphere
 //! goldens are Tier 2; the biosphere is Euler-locked by its freeze — no RK4 cross-check).
 
+// ⚠ TEST-ONLY, deliberately. Unlike `params::param_files` -- which the manifest writer
+// calls at runtime -- the claim census has no runtime consumer, and its gate READS THE
+// SOURCE DIRECTORY FROM DISK. A spine module that does file I/O in a shipped build is
+// exactly what `biosphere_spine_purity` exists to prevent; `#[cfg(test)]` keeps the
+// filesystem out of the engine and the census where it belongs, beside the suite it
+// measures.
+#[cfg(test)]
+pub mod claim_census;
 pub mod drift;
 pub mod flows;
 pub mod light_path;

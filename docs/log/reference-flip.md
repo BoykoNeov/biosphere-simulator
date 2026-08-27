@@ -4094,3 +4094,158 @@ measurably is rather than as the thing that catches a probe aimed at the wrong s
   passing), the unordered soil-nitrogen band, the unreachable thermal-time cap, the Euler-only
   biosphere, the missing compartment ledger, and the four narrative margin bands with no Rust
   home. One item is **added**: the compensated-reduction hazard above.
+
+## S6's prerequisites — the dead value, the small repairs, and the by-name claim census (2026-08-27)
+
+S6 is the deletion slice. Three things stood in front of it: clause 4 of S5's exit gate
+(`intercepted_fraction` resolved), the leftovers that are repairs rather than decisions, and
+clause 3 — the by-name claim census, deferred by seven consecutive batches. All three are
+built. **No Python is deleted here**, deliberately: the census is built out of the tree the
+next slice destroys, so it has to be committed and green first.
+
+### `intercepted_fraction` — deleted, after three checks that could each have changed the answer
+
+The big-leaf `1 − exp(−k · LAI)` had no production caller in either tree; the layered canopy
+moved that `exp` into `canopy_assimilation`'s per-depth loop in 2026-08-15. Deleting it was
+still not automatic, and the checks are worth recording because two of them looked live:
+
+* **Is it a manifest key?** No — `docs/*.manifest.json` names no functions. Had it been one,
+  deletion would have been an unfreeze with the full ceremony.
+* **Is it the value-switch harness's subject?** No. `tests/test_param_overrides.py` mentions
+  it, but only as the cautionary example in a docstring; the harness's subject is
+  `extinction_coef`, which has one live production consumer. A grep hit is not a dependency.
+* **Does the cross-port probe still need it?** Python shims `canopy.math` for its `exp`. That
+  shim's contribution was **measured at exactly zero** in 2026-08-15 — both biosphere rows
+  read `0.0` when `canopy` was the only shim, which is what forced the second one — so the
+  Python instrument's numbers come from its `photosynthesis` shim alone. The Python twin
+  stays until S6 and the deletion cannot move its readings.
+
+### The four small repairs, and the two controls that came back inert
+
+The soil-nitrogen band got an owner: `validate_scenario`, called by `build_season` — the one
+production change in the batch. Python raises on `sn_residual >= sn_critical`; the port omits
+raising guards on hot rate laws by a stated Phase-7 decision, and unlike the plant-N band
+there is no param-file loader to own it. It sits at assembly, not in the rate law, so the
+Phase-7 rationale (`Result` on a hot path) does not apply. The rate law is unchanged and
+§5aj's pin on what it *does* with an inverted band still bites — the guard closes the door
+scenarios come through, not the function.
+
+`allocation.yaml`'s loader got the provenance rules its list shape had skipped. Two doc
+comments moved back to their subjects, and `RootDepthExtension` got the first description it
+has ever had. The batch-A test module's shadowing `ROOTED_DEPTH` is gone.
+
+⚠ **R5 was inert on its first run, and that is a finding rather than a tuning.** The
+table-level exact-key-set rule was redundant against the non-empty-source rule — the renamed
+`source:` mutation is refused by both — so deleting the key-set assertion left the test
+green. *A guard no mutation can redden is not a guard.* It now has the one case it alone
+catches: a key added beside `rows` that the loader reads nothing from.
+
+⚠ **R6 is inert and stays recorded as inert.** Restoring batch A's aux-key shadow reddens
+nothing, exactly as batch B said. The repair removes a trap for the next aux test, not a live
+defect, and writing it up as a fix would be the "a number moved, wearing a reassuring name"
+reading with the roles swapped.
+
+### ⚠⚠ THE CENSUS'S FIRST FINDING, and it is the clearest argument for having built it
+
+`canopy`, `photosynthesis` and `herbivory` were the only three loaders in `params.rs` with no
+`*_from` seam, so **no test could hand them a mutated file** and their bound checks were
+exercised by nothing. Measured before the fix: deleting all three guards from `canopy` left
+the whole binary **green**; the same for both guard loops in `photosynthesis`.
+
+⚠ **The reason it was invisible is the census's own subject.** Eleven Python tests read
+exactly like coverage of those rules — `test_canopy_loader_rejects_a_non_positive_sla`,
+`test_photo_loader_rejects_out_of_unit_interval`, nine more — and every one of them exercises
+the **Python** loader. *A count of covered claims would have called this covered.* Only
+asking, per name, which **Rust** test carries the claim finds it. That is clause 3's whole
+argument, and it paid for itself before the census file was written.
+
+The three seams are a pure refactor; the new test asserts each bound at its own shape and
+both accepting halves (a carbon fraction of exactly 1.0 is legal, an isothermal optimum
+plateau is legal) — the two readings a mirror-imaged bound gets wrong and every other input
+agrees on.
+
+### The census: 455 rows extracted, not read
+
+`rust/crates/domains/src/biosphere/claim_census.tsv`, one row per Python test **function**
+across S5's twenty files, plus 53 rows declaring Rust tests no Python claim maps to. Its own
+header carries the format and the vocabulary and is not repeated here. What matters is where
+the dispositions came from, because *"a coverage table built by READING cannot see its own
+omissions"* is this repo's own lesson, twice over:
+
+| source | rows | what it is |
+|---|---:|---|
+| the reference's **own docstrings** | **197** | a Rust test naming the Python test it mirrors: extracted, not judged |
+| the plan's authored disposition tables | 90 | keyed by the section that wrote them (`§5ae`…`§5al`) |
+| rules written by S6 | 168 | the remainder, and the only rows this slice decided |
+
+Both rosters are read **from disk**. A Python test matched by none of the sources is a hard
+error in the generator, which is what makes the expansion a completeness check rather than a
+transcription. The generator itself is scaffolding and is **not committed**: it is Python,
+built out of the tree S6 deletes, and the census is the artifact that survives it.
+
+### ⚠ The number that makes a 455-row census honest: three
+
+`the_unbacked_gaps_are_counted_and_there_are_three` pins the count of rows that are both
+`open` (no successor, no decision) **and** evidenced `S6` (decided today, nothing behind
+them). Rows I was unsure about go **there** rather than getting a plausible successor. A
+census that says "three rows are my judgement today, unbacked" is worth more than one that
+says nothing and is quietly wrong about a dozen. All three are the same shape: claims about
+the whole scenario roster or about a station scenario, which the biosphere crate cannot
+assert. Seven further `open` rows carry an earlier slice's reasoning.
+
+### ⚠⚠ The scanner's blind spot was real, and it hid sixteen tests including three successors
+
+The science gates are declared through the `science_gates!` macro as `gate <name> { … }`, not
+as bare `#[test] fn`. The first draft of the scanner knew only the second shape and found
+**none** of the sixteen — and three of them are named as successors by census rows, so the
+census reported them absent. Both shapes are now recognised, `the_scanner_finds_both_declaration_shapes`
+pins one name of each, and control C8 (delete the macro arm) reddens three gates. *The
+instrument's own coverage is a property to measure, not to assume* — the same shape as
+`Nudge::Off` comparing against the golden rather than against itself.
+
+### The controls: both directions, and one inert by design
+
+| # | mutation | reddens |
+|---|---|---:|
+| C1 | a Rust test named by four census rows is renamed | 3 |
+| C2 | a science **gate** named by census rows is renamed (macro shape) | 2 |
+| C3 | a new test is added to an S5 surface and declared nowhere | 1 |
+| C4 | a new test in a **non-required** surface | **0 — by design** |
+| C5 | a census row is deleted | 2 |
+| C6 | an unbacked gap is quietly given a plausible successor | 1 |
+| C7 | a disposition outside the closed vocabulary | 1 |
+| C8 | the scanner forgets the macro shape | 3 |
+| C9 | harness identity control | 0 |
+
+**C4 is the denominator decision, stated rather than discovered.** Requiring every test in all
+eleven biosphere surfaces to be censused would force rows about `weather.rs`, `light_path.rs`,
+`perturbations.rs` and `science_gates.rs`, which descend from Python files **outside** S5's
+twenty. The rule binds on the four surfaces S5 landed on; the other seven are claimable but
+not required, and their tests are still declared, by an `A` row. A new test in one of them is
+therefore invisible to the census — recorded here as the cost of the choice.
+
+### ⚠ Two of the repo's own gates caught the census module, which is the system working
+
+`claim_census.rs` failed `biosphere_spine_purity` twice over on its first build. Its
+disposition vocabulary contained the literal string `"config"`, which the spine scanner reads
+as reaching the param-file boundary — renamed to `boundary`, which is the better name anyway.
+And its inventory scanner reads the source directory from disk, which is file I/O in a
+**shipped** spine module; the whole module is now `#[cfg(test)]`, unlike `params::param_files`,
+which has a runtime consumer in the manifest writer. Neither was caught by review.
+
+### Standing after this batch
+
+* **Clauses 3 and 4 of S5's exit gate are CLOSED.** All four now hold, so S5 is complete in
+  the sense its own gate defines rather than in the sense of "all seven batches BUILT".
+* **No Python deleted.** Every one of the twenty files stays green and running until S6.
+* **`daily_thermal_time`'s 30 °C cap is still owned by nothing, and it is the USER'S call** —
+  a science question (does a scenario need to get that hot, or is the cap decoration?), not a
+  testing one, twice recorded as such. Put to the user with this batch rather than decided.
+* **`compartment_boundary_ledger` is an S6 PREREQUISITE, not a leftover.** Deleting
+  `tests/test_compartments.py` with no Rust successor is the orphaning pattern this log
+  already records; it is a module port, and it belongs in front of the deletion slice.
+* Unchanged and still open: the biosphere is Euler-only in Rust; the four two-sided
+  characterization bands have no Rust home, and the question underneath them — does the
+  reference want a class of pin that is deliberately not a contract? — is still S6's; the
+  compensated-reduction hazard; and the ten `open` census rows, which now have somewhere to
+  live and a count that cannot drift.
