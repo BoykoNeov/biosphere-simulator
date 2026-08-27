@@ -33,14 +33,14 @@ phase.** The simulator "is not really about plants; it is about closure of matte
 
 Changing anything a manifest names is an **unfreeze event**, not a refactor —
 each doc spells out the ceremony. The three manifests have a paired gate
-(`tests/test_freeze_manifest.py` biosphere, `test_station_freeze_manifest.py`,
-`test_authoring_freeze_manifest.py`) that owns **completeness** (something added
-but exercised by nothing); the goldens own **values**.
+(`rust/crates/{domains,station,authoring}/tests/manifest_writer.rs`, plus each crate's
+`science_gates.rs`) that owns **completeness** (something added but exercised by nothing);
+the goldens own **values**.
 
 **A provenance-only edit is an unfreeze, and since C7 it FORCES a regeneration.** The
 per-file sha-256 is still never compared as a *value*, so editing a param's `source:`
 asserts nothing new — but the reference now writes each manifest from the files it compiles
-in, and `tests/crossport/test_manifest_writer.py` compares the committed file byte for byte.
+in, and each crate's `tests/manifest_writer.rs` compares the committed file byte for byte.
 So a `source:`-only edit leaves the manifest **stale and red** until it is regenerated.
 ⚠ This paragraph said *"NOTHING CATCHES"* until 2026-08-18; C7 falsified it and nothing was
 watching — measured, not assumed. What is still honor-system is the **ceremony**, not the
@@ -84,11 +84,11 @@ working on" category. The record and its cost: `docs/log/reference-flip.md`.
 - **Python has NO reference authority** (this inverts Phase 7/8/9's rule). A Python run
   that disagrees with Rust is a finding to investigate, never grounds for a silent
   Python-side fix. The two ports are no longer independent — that was the priced cost.
-- **Sixteen Python files remain, and `git ls-files '*.py'` is the whole list.** The PCSE
+- **Fifteen Python files remain, and `git ls-files '*.py'` is the whole list.** The PCSE
   oracle carve-out (`tests/oracle/`, hand-run `-m oracle`, a diagnostic and never a gate);
-  three crossport gates with no Rust successor **yet** — the manifest byte gate, the golden
-  regeneration tool and its provenance tests — plus their two helpers and `config/paths.py`.
-  Those three are S6's remaining build items; when they land, the count is the oracle alone.
+  two crossport gates with no Rust successor **yet** — the golden regeneration tool and its
+  provenance tests — plus their two helpers and `config/paths.py`. Those two are S6's
+  remaining build items; when they land, the count is the oracle alone.
 - **`gdext` appears in `rust/crates/godot_bridge` and nowhere else.** Engine
   crates carry no Godot types.
 - **"Authored ≠ validated."** Authored artifacts are runtime-only and never
@@ -137,12 +137,14 @@ own gates, so they run first. ⚠ A **mutation battery must pass `--no-fail-fast
 stops at the first failing test *binary*, so a truncated run reports **fewer** reds — which
 reads as "the new tests are inert", not as a broken instrument.
 
-What is left of Python is a **46-test harness**, ~2 min, no parallelism worth
-configuring: three crossport gates awaiting Rust successors, and the opt-in oracle.
+What is left of Python is a **40-test harness**, no parallelism worth configuring: two
+crossport gates awaiting Rust successors, and the opt-in oracle. ⚠ Its wall clock is not
+its own — the golden byte census shells 19 `cargo run` emitters, two of them `--release`,
+so it is ~2 min against a warm `target/` and ~7 min against a cold one.
 
 ```
 uv sync                 # install/lock deps (no runtime deps since S6)
-uv run pytest           # 42 tests + 4 oracle skips
+uv run pytest           # 36 tests + 4 oracle skips
 uv run pytest -m oracle # the PCSE carve-out (opt-in; needs the `oracle` group + network)
 uv run ruff check .     # lint
 uv run pyright          # types

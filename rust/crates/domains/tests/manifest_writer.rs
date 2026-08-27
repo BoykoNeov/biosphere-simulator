@@ -267,3 +267,103 @@ fn the_frozen_weather_hash_is_the_fixture_the_reference_actually_embeds() {
     // of some other line that happened to match.
     assert_eq!(frozen.len(), 64, "extracted {frozen:?}, which is not a sha-256");
 }
+
+// --------------------------------------------------------------------------- //
+// The default write target — S6 build item 1's half of the argument parse      //
+// --------------------------------------------------------------------------- //
+
+/// The `dump_biosphere_inventory` program, as text. Same reason as `WRITER_SOURCE` above: a renamed or
+/// moved example is a compile error here rather than a test that quietly reads nothing.
+const EXAMPLE_SOURCE: &str = include_str!("../examples/dump_biosphere_inventory.rs");
+
+/// ⚠⚠ **`--write-manifest` with no path rewrites THIS contract, and this is what says
+/// which file that is.**
+///
+/// The parse itself is gated in `config/tests/manifest_cli.rs`; what cannot be tested
+/// there is the part that differs per crate — the *target*. A writer whose default named a
+/// sibling contract would pass every test in that file and, on the interim by-hand
+/// regeneration route both freeze docs now name, overwrite the wrong freeze contract.
+///
+/// It is asserted by **content**, not by filename: the default target must hold the very
+/// bytes the byte gate above compares against. A filename comparison would agree with a
+/// second copy of the manifest sitting somewhere else; this cannot.
+#[test]
+fn the_default_write_target_is_the_contract_this_gate_compares() {
+    let target = domains::freeze_manifest::committed_manifest_path();
+    assert!(
+        target.is_file(),
+        "the default --write-manifest target {} does not exist, so the bare flag would          CREATE a manifest rather than regenerate one",
+        target.display()
+    );
+    let on_disk = std::fs::read_to_string(&target).expect("the committed contract reads");
+    assert_eq!(
+        on_disk,
+        COMMITTED,
+        "the default --write-manifest target is {}, which is not the file this gate          compares against. One of the two is pointed at a different freeze contract, and          the bare flag is the dangerous side: it rewrites whatever it names.",
+        target.display()
+    );
+}
+
+/// ⚠ The control on the test above and on `config/tests/manifest_cli.rs` together: the
+/// example must actually *use* the parse that is gated, rather than carry a private copy
+/// that drifts from it.
+///
+/// A source grep, for the same structural reason the byte gate needed S2: an `examples/`
+/// program is a binary target and no test can call its `main`. The discriminating check is
+/// that the flag **literal** appears zero times here — a re-added local `match` on
+/// `"--write-manifest"` is what this is watching for, and it is the shape the program had
+/// before S6 build item 1.
+#[test]
+fn the_example_delegates_its_argument_parse() {
+    assert!(
+        EXAMPLE_SOURCE.contains("fn main()"),
+        "the example source read as {} bytes with no main — the include path is wrong and          the greps below are reading nothing",
+        EXAMPLE_SOURCE.len()
+    );
+    assert!(
+        EXAMPLE_SOURCE.contains("parse_args("),
+        "the example must route its arguments through config::manifest_cli::parse_args,          which is the copy that is tested"
+    );
+    assert!(
+        EXAMPLE_SOURCE.contains("committed_manifest_path()"),
+        "the example must take its default target from the library, where the test above          can see which contract it is"
+    );
+    let flag_sites = EXAMPLE_SOURCE.matches("\"--write-manifest\"").count();
+    assert_eq!(
+        flag_sites, 0,
+        "the --write-manifest literal appears {flag_sites} time(s) in the example, so it          parses the flag itself again. That copy is reachable by no test — move it into          config::manifest_cli, which is why that module exists."
+    );
+}
+
+/// ⚠⚠ **The bytes the CEREMONY produces are the bytes this file compares** — and until S6
+/// build item 1 that was an assumption.
+///
+/// The byte gate above calls `manifest_text()`. The unfreeze ceremony runs
+/// `--write-manifest`, which calls [`domains::freeze_manifest::write_manifest`]. Those were
+/// two expressions — `write_manifest` re-derived `dumps(&manifest())` itself — while the
+/// comment above `manifest_text` claimed *"one serialization, three callers … sharing makes
+/// the drift impossible instead of merely detectable"*. Nothing was broken, because the two
+/// expressions were the same; but the sharing that sentence describes did not exist, which
+/// is the doc-comment-asserting-an-untested-property shape this repo has retracted twice.
+///
+/// `write_manifest` now calls `manifest_text`, so the drift really is impossible — and this
+/// runs the write path anyway, because "impossible by construction" is the claim and a diff
+/// is the control. It catches what sharing alone cannot: a BOM, a text-mode newline
+/// translation, a truncated write.
+///
+/// It writes into `CARGO_TARGET_TMPDIR` and never near `docs/`.
+#[test]
+fn the_write_path_produces_exactly_what_the_byte_gate_compares() {
+    let dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("manifest_write_domains");
+    std::fs::create_dir_all(&dir).expect("the temp dir is creatable");
+    let target = dir.join("regenerated.manifest.json");
+    domains::freeze_manifest::write_manifest(&target);
+    let written = std::fs::read(&target).expect("the writer wrote a file");
+    assert_eq!(
+        written,
+        domains::freeze_manifest::manifest_text().into_bytes(),
+        "--write-manifest put different bytes on disk than the byte gate compares, so the          unfreeze ceremony would produce a file this gate immediately rejects"
+    );
+    // The control: the comparison must be against a real manifest, not two empty reads.
+    assert!(written.len() > 1_000, "the writer produced {} bytes", written.len());
+}

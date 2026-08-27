@@ -342,7 +342,8 @@ gate), so the discipline is enforced, not merely requested.
   held it; the two fields at risk are exactly those `_authority` marks `hand`, which no
   gate can re-derive. `test_the_frozen_roster_is_the_references` closes it. What the move
   *closed* is a hand edit to the committed manifest, invisible to every gate before now
-  and caught by `tests/crossport/test_manifest_writer.py`'s byte comparison.
+  and caught by the byte comparison in `rust/crates/station/tests/manifest_writer.rs`
+  (`tests/crossport/test_manifest_writer.py` until S2 moved it and S6 retired it).
 
   **Verification.** `cargo test` + `cargo clippy --all-targets -D warnings`; `ruff`,
   `pyright`, the Python suite and the crossport suite green. Controls: hand-edited

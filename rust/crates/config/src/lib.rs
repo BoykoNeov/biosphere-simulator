@@ -39,6 +39,7 @@ pub mod canonical_json;
 pub mod date;
 pub mod errors;
 pub mod json;
+pub mod manifest_cli;
 pub mod params;
 pub mod provenance;
 pub mod yaml;
@@ -47,6 +48,7 @@ pub use canonical_json::{dumps, Json};
 pub use date::{is_leap_year, iso_day_of_year};
 pub use errors::ConfigError;
 pub use json::{parse_json, JsonValue};
+pub use manifest_cli::{parse_args, ManifestAction};
 pub use params::{
     require_closed, require_half_open, require_non_negative, require_positive, Entry, ParamFile,
 };

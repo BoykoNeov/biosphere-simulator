@@ -2521,7 +2521,7 @@ parameters:
     /// ⚠ The reason it was not left alone. `allocation.yaml` itself was never unguarded —
     /// its newline-normalized sha-256 is pinned in `docs/biosphere-reference.manifest.json`
     /// under `param_files`, and since slice C7 the reference WRITES that manifest while
-    /// `tests/crossport/test_manifest_writer.py` compares the committed bytes, so a
+    /// `domains/tests/manifest_writer.rs` compares the committed bytes, so a
     /// provenance-only edit to it was caught as a STALE MANIFEST rather than as a load
     /// error. The exposure was the **next** list-shaped file: it would inherit this loader
     /// and be required to carry a source by nothing until it reached the manifest census —

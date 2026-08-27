@@ -591,7 +591,8 @@ It names the integrator + dt, the horizon, the derived flow set + aux set, the p
 ⚠ **`tests/test_freeze_manifest.py` no longer writes it.** Until C7 that module assembled and
 serialized the file — so the contract was *authored* by the reference (slices 6, C4, C8, C9)
 and *written* by the checker. It is now a checker only, and the committed file is held to the
-writer byte for byte by `tests/crossport/test_manifest_writer.py`. One consequence to know
+writer byte for byte by `rust/crates/domains/tests/manifest_writer.rs` (S2 moved that gate
+out of Python; S6 build item 1 retired the original). One consequence to know
 before editing: **the manifest is a generated artifact, so a hand edit to it is red.** The
 edit belongs in the writer.
 

@@ -747,14 +747,32 @@ pub fn manifest() -> Json {
     ])
 }
 
+/// The committed contract this writer owns — the default `--write-manifest` target.
+///
+/// ⚠⚠ **It is a function rather than a literal in the example because it is the
+/// dangerous default.** `--write-manifest` with no path rewrites the *freeze contract*,
+/// so which file that is has to be reachable by a test; `tests/manifest_writer.rs`
+/// asserts this path holds the very bytes the byte gate compares against, which is what
+/// says the writer is pointed at its own contract and not at a sibling.
+pub fn committed_manifest_path() -> PathBuf {
+    repo_root().join("docs").join("biosphere-reference.manifest.json")
+}
+
 /// Write the manifest to `path`, and report what changed.
 ///
 /// ⚠ Reports rather than asserts: this is the *regeneration* entry point, run on a
 /// deliberate unfreeze, so a moved byte is the thing being reviewed. The assertion that
-/// the committed file matches lives on the checking side
-/// (`tests/crossport/test_manifest_writer.py`), where a stale manifest is red in CI.
+/// the committed file matches lives on the checking side — `tests/manifest_writer.rs`,
+/// in this crate since slice S2 — where a stale manifest is red in CI.
+///
+/// ⚠ **It writes [`manifest_text`] rather than re-deriving the serialization.** It used
+/// to call `dumps(&manifest())` itself, one expression away from the gate's subject, while
+/// the comment above `manifest_text` claimed *"one serialization, three callers … sharing
+/// makes the drift impossible instead of merely detectable"*. Nothing was broken — the two
+/// expressions were the same — but the sharing that sentence describes did not exist, which
+/// is a doc comment asserting a property nobody tested (S6 build item 1).
 pub fn write_manifest(path: &Path) {
-    let text = dumps(&manifest());
+    let text = manifest_text();
     let previous = std::fs::read_to_string(path).ok();
     std::fs::write(path, text.as_bytes())
         .unwrap_or_else(|e| panic!("cannot write {}: {e}", path.display()));

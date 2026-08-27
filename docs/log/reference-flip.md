@@ -4413,3 +4413,97 @@ overclaim S6 wrote in the fix for it and then corrected against the roster.
   `test_golden_provenance.py`.
 * `CLAUDE.md`, `pyproject.toml` and the census were all edited **in the deletion's own
   commits**, never a follow-up — nothing reddens on a stale always-loaded file.
+
+## S6 build item 1 — the manifest byte gate is retired, and the claim it was named for was already dead (2026-08-27)
+
+`tests/crossport/test_manifest_writer.py` is deleted; **fifteen Python files remain, 36
+tests + 4 oracle skips.** Full design, the ten-mutation battery and the disposition table:
+`docs/plans/post-roadmap-reference-flip.md` §5ap.
+
+### ⚠⚠ The build item's name was a record, and the record was a slice behind
+
+S6's enumeration called this *"the manifest BYTE gate"* and said deleting the file *"retires
+the only check that the committed contracts are what the reference writes"*. Reading the tree
+rather than the record: **slice S2 had already ported the byte half, in all three crates**,
+and it had been green in CI since. What was unported was the file's *control* — and that
+control's own docstring gave a reason that S2's move had already falsified (it existed
+because the byte gate passed a flag; S2's gate passes none).
+
+*The same correction §5ao made one level up — a deletion list built by READING cannot see its
+own omissions — applies to a deletion list's own entries.* The item was not "port the gate";
+it was "find out what is actually left of this file".
+
+### ⚠⚠ What survives the move is the DEFAULT, and it is worse than what does not
+
+`--write-manifest` with no path resolves to the committed contract itself. So an argument the
+parse mishandles does not write a stray temp file — it rewrites a **freeze contract**,
+unreviewed. S6's own follow-up had just put that command on the live operator path, by
+writing the by-hand regeneration route into both freeze ceremonies when `--write` started
+refusing. That is the claim that earned a successor.
+
+The parse moved into `config::manifest_cli` for the *same structural reason* S2 moved the
+writer: an `examples/` program is a binary target, so nothing in `cargo test` can call it.
+The per-crate default target moved into each `freeze_manifest` so a test can see **which**
+contract the bare flag would overwrite — asserted by content against the byte gate's own
+`include_str!`, never by filename, because a filename would agree with a second copy
+somewhere else.
+
+### ⚠⚠ A doc comment claimed a sharing that was not in the code
+
+`manifest_text`'s comment: *"One serialization, three callers … sharing makes the drift
+impossible instead of merely detectable."* Measured — `write_manifest` called
+`dumps(&manifest())` itself. Nothing was broken (same expression, same value), but the
+sharing the sentence describes did not exist. **Same species as the two doc-comment claims
+S2's review had to retract**, and it is now three.
+
+⚠ *"Impossible by construction" is itself a claim, so it got a control anyway.* The new test
+runs the **write** path into a temp dir and diffs the bytes — and the finding under it is
+that **nothing had ever executed `write_manifest` in a test, on either port**. The unfreeze
+ceremony's own step was ungated. It catches what sharing cannot: a BOM, a newline
+translation, a truncated write. (The revert-to-`dumps` mutation is inert **by construction**
+and is recorded as inert rather than tuned away — the third such this slice.)
+
+### ⚠⚠ The always-loaded file was naming three files S6 had already deleted
+
+`CLAUDE.md`'s freeze-contract paragraph still gave the paired completeness gates as
+`tests/test_freeze_manifest.py` / `test_station_freeze_manifest.py` /
+`test_authoring_freeze_manifest.py`. S6 deleted all three the same day, and S6's own record
+says *"`CLAUDE.md` … edited in the deletion's own commits, never a follow-up"* — true of the
+sentences it looked at, false of this one. **Nothing reddens on a stale always-loaded file,
+and this is now the second time that has been the finding** (C3's `dt = 1` was the first).
+
+### ⚠ Two losses and a vacuous green, all recorded rather than tidied
+
+* **The end-to-end binary run is gone.** The Python test invoked the compiled example and
+  checked the process. The successors test the library and grep the example's source. The
+  alternative — `cargo` inside `cargo test` — was declined for a three-line `main`; the
+  reduction in scope is real and is written down, not papered over.
+* **The `_WRITERS` forcing function has no successor and never had a subject** — the table
+  was hand-listed, so it was honour-system on the Python side too.
+* ⚠ **The slice's first `ruff` run was vacuous**: invoked with the shell still inside
+  `rust/`, it printed *"No Python files found"* and then *"All checks passed"*. A green that
+  checked nothing, caught only by reading the line above the verdict.
+
+### ⚠⚠ Carried to item 2: the write path it must restore was already broken for one golden
+
+S6 wrote the disabled `--write` up as a stated LOSS — *"every candidate was validated through
+`sim_io.snapshot` before it could reach the disk"*. Measured: true of 18 of the 19.
+`sealed_energy_drift_summary.json` is a folded summary with no `version` key, and the deleted
+validator raises on a missing version. **So since C5 moved that golden into the Rust-emitted
+group, `--write` would have raised part-way through** — after rewriting whichever earlier
+goldens had moved. The check S6 mourned had been unrunnable for one of the nineteen since the
+slice that added it, and neither slice noticed *because nobody ran `--write`*.
+
+The design consequence is direct: item 2's Rust tool cannot blanket-validate through
+`simcore::snapshot::from_json`. It needs a declared **shape** axis beside the existing
+`Numerics` one, so a new golden with no declared shape is red — not a skip for the one file
+that does not fit.
+
+### Standing
+
+* **Two build items remain, and they are COUPLED**: the golden regeneration path, and the
+  read of `test_golden_provenance.py` — which imports the regeneration tool, which imports
+  `config/paths.py`. They land together or not at all.
+* ⚠ **The `crossport` CI job's remaining subject is one gate.** Its comment says so, and
+  carries the trap in writing: `uv run pytest` on an empty directory **exits 5**, so the job
+  must be deleted in the same commit as the last file.

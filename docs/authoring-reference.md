@@ -862,7 +862,7 @@ the reference** since slice C7 of the reference flip (2026-08-18):
 `cd rust && cargo run --example dump_authoring_inventory -- --write-manifest`.
 `tests/test_authoring_freeze_manifest.py` keeps the completeness and conformance gates
 and has **no writer** — the manifest is a generated artifact, so a hand edit to it is
-red (`tests/crossport/test_manifest_writer.py` regenerates and compares bytes). Every
+red (`rust/crates/authoring/tests/manifest_writer.rs` regenerates and compares bytes). Every
 frozen set in it is **derived from its live single source of truth, never hand-listed**
 — the discipline both prior manifests rest on.
 
@@ -1024,7 +1024,7 @@ type or its wiring names, a param loader, or the composition semantics — is an
    are the git-visible record of exactly what was unfrozen. ⚠ **Since slice C7 the
    reference writes the whole file**, so this step is a `cargo` step and nothing else;
    editing the committed manifest by hand is red rather than merely discouraged
-   (`tests/crossport/test_manifest_writer.py` compares it byte for byte with a
+   (`rust/crates/authoring/tests/manifest_writer.rs` compares it byte for byte with a
    regeneration). Predict the diff *before* running it — and note that step 3's "land it
    on both ports" has a direction: the reference side is what the manifest records, so
    landing Rust first and Python second is the order that keeps the ceremony honest.

@@ -106,8 +106,8 @@ fn the_sealed_station_golden_is_still_this_reference_s_output() {
 /// ⚠⚠ The anti-green-by-skip control, and the reason `Cost` is a roster field at all.
 ///
 /// This repo has two recorded incidents of a gate that was green because it never ran
-/// ([[pdf-pins-green-by-skip-on-ci]], and `test_manifest_writer.py`'s own note that its CI
-/// collection was *checked, not inherited*). A bare `#[ignore]` is that shape: nothing
+/// ([[pdf-pins-green-by-skip-on-ci]], and the note the Python manifest byte gate carried
+/// until S6 retired it — that its CI collection was *checked, not inherited*). A bare `#[ignore]` is that shape: nothing
 /// relates the attribute to a reason, so a second `#[ignore]` added for convenience is
 /// indistinguishable from this one, which was added for a measured 100 seconds.
 ///

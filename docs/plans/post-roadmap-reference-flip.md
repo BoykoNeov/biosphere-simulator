@@ -8351,3 +8351,148 @@ the same commit as the infrastructure deletion, never in a follow-up.
 
 `tests/oracle/` and its five committed JSON fixtures survive: hand-run, `-m oracle`, a
 diagnostic and never a gate. That is the only Python the flip's posture keeps.
+
+## §5ap Stage 3 — S6 build item 1 BUILT, COMPLETE 2026-08-27: the manifest byte gate is retired, and the claim it was named for was already dead
+
+`tests/crossport/test_manifest_writer.py` is deleted. **Fifteen Python files remain.** The
+enumeration in §5ao called this build item "the manifest BYTE gate" and said deleting the
+file *"retires the only check that the committed contracts are what the reference writes"*.
+Reading the tree rather than the record corrects that in the same direction §5ao itself
+moved: **the byte half was already ported by slice S2**, in all three crates, and had been
+green in CI since. What was actually unported was the file's *control*, and its stated
+reason had died in the same move.
+
+### ⚠⚠ What the file's two claims turned out to be
+
+| claim (×3, parametrized over the contracts) | disposition |
+|---|---|
+| `test_the_committed_manifest_is_what_the_reference_writes` | **already ported, S2.** `{domains,station,authoring}/tests/manifest_writer.rs` each call `manifest_text()` and compare against an `include_str!` of the committed contract. Better than the original in one measured way: there is no `subprocess` pipe, so the C4 cp1252 trap (both sides mangled identically, every gate green) is structurally unreachable |
+| `test_the_writer_refuses_an_unknown_argument` | **unported, and its docstring's reason was already false.** It said it existed because the byte gate passed `--write-manifest <tmp>` and *"a writer that ignored the flag and wrote the file anyway would make the comparison pass while proving the wrong thing."* S2's gate passes no flag. Porting that sentence would have been a test written to a dead rationale |
+
+### ⚠⚠ The hazard that survives the move, and it is worse than the one that did not
+
+`--write-manifest` **with no path defaults to the committed contract itself**. So an
+argument the parse mishandles does not produce a stray temp file — it rewrites a *freeze
+contract*, unreviewed. And S6 put that command on the live operator path: the follow-up pass
+found both freeze ceremonies naming the now-refusing `--write`, and wrote the by-hand
+`cargo run -q -p <crate> --example <emitter>` route into them. So this is the claim that
+earns a successor; the flag-ignoring one is retired with its reason stated rather than
+carried over.
+
+### What was built
+
+* **`config/src/manifest_cli.rs`** — the parse, as a library function, for the same
+  structural reason S2 moved the writer: *an `examples/` program is a binary target, so
+  nothing in `cargo test` can call into it.* One implementation in `config` rather than
+  three (the slice-5 rule: *a policy with two implementations has one that is stale*); the
+  part that genuinely differs per crate — which contract is the default target — is a
+  parameter.
+* **`freeze_manifest::committed_manifest_path()`**, per crate, so the *dangerous default* is
+  reachable by a test instead of being a literal inside a `main` nothing can call.
+* **`config/tests/manifest_cli.rs`** (7) and **three per-crate tests** — the default target,
+  and a source grep that the example still delegates.
+* ⚠ **A strengthening, flagged as one rather than smuggled in as a port**:
+  `--write-manifest <path> <extra>` used to ignore `<extra>`, and `--write-manifest
+  --nonsense` used to write a file *named* `--nonsense`. Both are the same species as the
+  unknown flag — an argument the program received and did not act on — so both are refused.
+
+### ⚠⚠ FINDING: the doc comment claimed a sharing that did not exist
+
+`manifest_text`'s comment reads *"One serialization, three callers: `write_manifest` writes
+it, the byte gate compares it, and nothing re-derives it … sharing makes the drift impossible
+instead of merely detectable."* Measured: `write_manifest` called `dumps(&manifest())`
+itself. Nothing was broken — the two expressions are the same value — but the sharing the
+sentence describes was not in the code, which is the same species as the two doc-comment
+claims S2's review had to retract. `write_manifest` now calls `manifest_text()`.
+
+⚠ And "impossible by construction" got a control anyway, because that phrase is a claim:
+`the_write_path_produces_exactly_what_the_byte_gate_compares` runs the *write* path into
+`CARGO_TARGET_TMPDIR` and diffs the bytes. **Nothing had ever executed `write_manifest` in a
+test** — the ceremony's own step was ungated on both ports — so it catches what sharing
+cannot: a BOM, a text-mode newline translation, a truncated write.
+
+### The mutation battery — ten, and the one that is inert is inert by construction
+
+| # | mutation | reddens |
+|---|---|---:|
+| M1 | an unknown argument falls through to `Dump` | 2 |
+| M2 | an unknown argument falls through to the **default write** | 2 |
+| M3 | the given path is ignored and the default is written | 1 |
+| M4 | no argument writes instead of dumping | 1 |
+| M5 | a trailing argument is silently ignored | 1 |
+| M6 | the usage text stops naming the file it would overwrite | 1 |
+| M7 | `domains`' default target names the **station** contract | 1 |
+| M8 | the example re-adds a private `--write-manifest` match | 1 |
+| M9 | `write_manifest` re-derives `dumps(&manifest())` | **0 — by construction** |
+| M10 | `write_manifest` appends a newline the gate does not have | 1 |
+
+⚠ **M9 is the honest one.** `manifest_text()` *is* `dumps(&manifest())`, so no test can
+distinguish them and none should be written pretending to — the same species as S6's own T4
+and batch F's redundant guard. What the change buys is that a *future* move of the
+serialization cannot leave the write path behind, and M10 is the control that says the write
+path is now watched at all.
+
+### ⚠ What is NOT carried over, said as a loss rather than tidied away
+
+* **The Python test ran the compiled binary end-to-end** — `cargo run --example … --
+  --write-manifest <tmp>`, checking the process exits 0 and a file appears. The successors
+  test the library and grep the example's source. That is a genuine reduction in scope: an
+  example whose `main` compiled but was wired wrong in some way the grep does not name would
+  now be missed. The alternative was `Command::new(env!("CARGO"))` inside `cargo test`
+  (there is precedent in `godot_bridge/tests/cross_boundary.rs`), and it was declined —
+  a cargo-inside-cargo run per contract, to re-check a `main` that is now three lines.
+* **The `_WRITERS` table's forcing function** — *"a contract added without a row here is the
+  gap"* — has no successor, **and it never had a subject**: the table was hand-listed, so it
+  was honour-system on the Python side too. The per-crate file location is a weaker but real
+  substitute (a fourth contract arrives in a crate, and that crate has no
+  `tests/manifest_writer.rs`).
+
+### ⚠ The stale-prose sweep, in the same commit — including one in the always-loaded file
+
+C3's lesson (*a stale `dt = 1` outlived a full ceremony*) applies to a retirement as much as
+to a science change, so every pointer moved in the deletion's own commit: both `CLAUDE.md`
+paragraphs, all three freeze contracts, the CI job comment, `params.rs`, and
+`station/tests/golden_regression.rs`.
+
+⚠⚠ **`CLAUDE.md` was naming three files S6 had already deleted.** Its freeze-contract
+paragraph gave the paired completeness gates as `tests/test_freeze_manifest.py` /
+`test_station_freeze_manifest.py` / `test_authoring_freeze_manifest.py` — gone since
+2026-08-27, successors in each crate's `manifest_writer.rs` + `science_gates.rs`. S6's own
+record says *"`CLAUDE.md` … edited in the deletion's own commits, never a follow-up"*; that
+was true of the sentences S6 looked at and false of this one. **The always-loaded file is
+audited by nothing, and this is the second time that has been the finding.**
+
+⚠ And the CI job's remaining subject is now **one** gate, not two. Its comment says so, and
+carries the trap forward in writing: `uv run pytest` on an empty directory **exits 5**, so
+the job must be deleted in the same commit as the last file rather than left to fail with
+"no tests ran".
+
+### Standing after build item 1
+
+* **Two build items remain**: the golden regeneration path (item 2, whose write half is
+  disabled until it lands) and a read of `test_golden_provenance.py` (item 3). They are
+  **coupled** — the provenance test imports the regeneration tool, which imports
+  `config/paths.py` — so they land together or not at all.
+* Python: **15 files, 36 tests + 4 oracle skips.**
+* Verification: `cargo test` (all green, no failures) + `cargo clippy --all-targets -D
+  warnings`; `uv run pytest` 36 passed / 4 skipped; `ruff`, `pyright` green. ⚠ The first
+  `ruff` run of this slice was **vacuous** — invoked with the shell still inside `rust/`, it
+  reported *"No Python files found"* and then *"All checks passed"*. Re-run from the repo
+  root. A green that checked nothing, caught by reading the line above the verdict.
+
+### ⚠⚠ Carried forward to item 2: the write path it must restore was already broken for one golden
+
+Measured while reading `regen_goldens_from_rust.py` for item 2, and recorded here because it
+corrects S6's own record rather than item 2's design. S6 wrote the disabled `--write` up as a
+stated LOSS: *"every candidate was validated through `sim_io.snapshot` before it could reach
+the disk"*. That was true of 18 of the 19 emitters. `sealed_energy_drift_summary.json` has no
+`version` key — it is a folded summary, not a state snapshot — and the deleted validator
+`state_from_dict` **raises on a missing version**. So since C5 moved that golden into the
+Rust-emitted group, `--write` would have raised part-way through, after rewriting whichever
+earlier goldens had moved. *The check S6 mourned had been unrunnable for one of the nineteen
+since the slice that added it, and neither slice noticed because nobody ran `--write`.*
+
+⚠ The design consequence for item 2 is direct: the Rust tool **cannot** blanket-validate
+through `simcore::snapshot::from_json`. It needs a declared *shape* axis beside the existing
+`Numerics` one, so a new golden with no declared shape is red — not a skip for the one file
+that does not fit, which is the widen-the-gate-from-inside move this repo refuses.

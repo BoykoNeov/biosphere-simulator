@@ -24,9 +24,10 @@ manifest. Re-run the manifest writer as part of the unfreeze ceremony — from `
 
 ⚠ **The half of that warning that said "turns *nothing* red" was true until slice C7 and
 is now false for every frozen golden** (measured, not assumed: a moved golden was fed to
-the gate and it went red). ``tests/crossport/test_manifest_writer.py`` regenerates each
-manifest and compares the committed file byte for byte, and every writer hashes the
-goldens from disk — so a desynchronised hash is red rather than silent.
+the gate and it went red). Each crate's ``rust/crates/*/tests/manifest_writer.rs``
+regenerates its manifest and compares the committed file byte for byte — the gate was
+``tests/crossport/test_manifest_writer.py`` until S6 build item 1 retired it — and every
+writer hashes the goldens from disk, so a desynchronised hash is red rather than silent.
 
 ⚠ **This sentence has now been corrected twice and both times by the slice that
 falsified it.** C7's biosphere half made it false for the biosphere and said *"it is

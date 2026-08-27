@@ -89,13 +89,18 @@ jobs:
       # still redden by name with the comparison AND the goldens deselected, and the tier
       # contract itself now lives in `domains/tests/tier_contract.rs`.
       #
-      # What is left here is the two gates with no Rust successor YET, which is exactly
-      # why the job keeps a Rust toolchain: `test_manifest_writer.py` regenerates all three
-      # freeze manifests through `cargo run --example … --write-manifest` and demands the
-      # committed bytes are identical, and `test_golden_provenance.py` checks the golden
-      # roster against the emitters that author it. Both are S6 build items; when their
-      # successors land, this job goes with them.
-      - name: Contract gates (manifest byte-identity, golden provenance)
+      # What is left here is the ONE gate with no Rust successor yet, which is why the job
+      # still keeps a Rust toolchain: `test_golden_provenance.py` checks the golden roster
+      # against the emitters that author it, and its byte census shells `cargo run`.
+      #
+      # ⚠ The manifest byte gate is gone from here — S6 build item 1 (2026-08-27) retired
+      # `test_manifest_writer.py`, whose byte half S2 had already moved into each crate's
+      # `tests/manifest_writer.rs` and whose argument-parse control now lives in
+      # `config/tests/manifest_cli.rs`. Both run under the ordinary `cargo test` job.
+      # ⚠ When the last gate's successor lands, this job goes with it — and `uv run pytest`
+      # on an EMPTY directory exits 5, so the job must be deleted in the same commit as the
+      # file rather than left to fail with "no tests ran".
+      - name: Contract gates (golden provenance)
         run: uv run pytest tests/crossport/
 
   godot-parity:
