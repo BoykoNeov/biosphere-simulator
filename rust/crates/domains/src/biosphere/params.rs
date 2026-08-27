@@ -344,8 +344,20 @@ pub struct BiosphereParams {
 
 /// Beer–Lambert canopy params, with `sla_per_mol_c` folded (`canopy.yaml`).
 pub fn canopy() -> CanopyParams {
-    const NAME: &str = "canopy.yaml";
-    let f = file(CANOPY_YAML, NAME);
+    canopy_from(CANOPY_YAML, "canopy.yaml")
+}
+
+/// `canopy()`'s body, with the file's text injectable.
+///
+/// ⚠ Added by S6, 2026-08-27, and the reason is a MEASURED hole rather than symmetry with
+/// the other loaders. Every `*_from` seam in this module exists so a test can hand the
+/// loader a mutated file; `canopy`, `photosynthesis` and `herbivory` were the three
+/// without one, and their bound guards were therefore reachable by nothing. Measured
+/// before the seam was written: deleting all three guards below left the whole binary
+/// green (probe P1). Nine loaders had rejection tests, these did not, and the Python
+/// tests that looked like their coverage test the PYTHON loader.
+pub fn canopy_from(text: &str, name: &'static str) -> CanopyParams {
+    let f = file(text, name);
     let v = guarded_map(
         &f,
         &[
@@ -353,16 +365,16 @@ pub fn canopy() -> CanopyParams {
             ("specific_leaf_area", "m^2/kg"),
             ("carbon_fraction", "dimensionless"),
         ],
-        NAME,
+        name,
     );
-    let cf = carbon_fraction(v["carbon_fraction"], NAME);
+    let cf = carbon_fraction(v["carbon_fraction"], name);
     let k = checked(
-        require_positive(v["extinction_coef"], "extinction_coef", NAME),
-        NAME,
+        require_positive(v["extinction_coef"], "extinction_coef", name),
+        name,
     );
     let sla = checked(
-        require_positive(v["specific_leaf_area"], "specific_leaf_area", NAME),
-        NAME,
+        require_positive(v["specific_leaf_area"], "specific_leaf_area", name),
+        name,
     );
     CanopyParams {
         // ⚠ multiply first, then divide — the Python loader's order. See the header.
@@ -373,8 +385,13 @@ pub fn canopy() -> CanopyParams {
 
 /// FvCB photosynthesis params (`photosynthesis.yaml`).
 pub fn photosynthesis() -> PhotosynthesisParams {
-    const NAME: &str = "photosynthesis.yaml";
-    let f = file(PHOTOSYNTHESIS_YAML, NAME);
+    photosynthesis_from(PHOTOSYNTHESIS_YAML, "photosynthesis.yaml")
+}
+
+/// `photosynthesis()`'s body, with the file's text injectable — see `canopy_from` for why
+/// this seam exists and what was measured before it did.
+pub fn photosynthesis_from(text: &str, name: &'static str) -> PhotosynthesisParams {
+    let f = file(text, name);
     let v = guarded_map(
         &f,
         &[
@@ -391,19 +408,19 @@ pub fn photosynthesis() -> PhotosynthesisParams {
             ("t_opt_hi", "degC"),
             ("t_max", "degC"),
         ],
-        NAME,
+        name,
     );
     for field in ["vcmax", "jmax", "gamma_star", "kc", "ko", "o2"] {
-        checked(require_positive(v[field], field, NAME), NAME);
+        checked(require_positive(v[field], field, name), name);
     }
     for field in ["quantum_yield", "theta"] {
-        checked(require_half_open(v[field], 0.0, 1.0, field, NAME), NAME);
+        checked(require_half_open(v[field], 0.0, 1.0, field, name), name);
     }
     let (t_min, t_opt_lo, t_opt_hi, t_max) = (v["t_min"], v["t_opt_lo"], v["t_opt_hi"], v["t_max"]);
     // Well-ordered cardinals: the two strict pairs are divisors in the response curve.
     assert!(
         t_min < t_opt_lo && t_opt_lo <= t_opt_hi && t_opt_hi < t_max,
-        "{NAME}: cardinal temperatures must satisfy t_min < t_opt_lo <= t_opt_hi < t_max, \
+        "{name}: cardinal temperatures must satisfy t_min < t_opt_lo <= t_opt_hi < t_max, \
          got ({t_min}, {t_opt_lo}, {t_opt_hi}, {t_max})"
     );
     PhotosynthesisParams {
@@ -901,17 +918,21 @@ pub fn water_cycle() -> WaterCycleParams {
 
 /// Minimal-consumer params (`herbivory.yaml`).
 pub fn herbivory() -> HerbivoryParams {
-    const NAME: &str = "herbivory.yaml";
+    herbivory_from(HERBIVORY_YAML, "herbivory.yaml")
+}
+
+/// `herbivory()`'s body, with the file's text injectable — see `canopy_from`.
+pub fn herbivory_from(text: &str, name: &'static str) -> HerbivoryParams {
     let units: [(&str, &str); 4] = [
         ("grazing_rate", "1/day"),
         ("respiration_rate", "1/day"),
         ("mortality_rate", "1/day"),
         ("o2_half_saturation", "mol/mol"),
     ];
-    let f = file(HERBIVORY_YAML, NAME);
-    let v = guarded_map(&f, &units, NAME);
+    let f = file(text, name);
+    let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_non_negative(v[field], field, NAME), NAME);
+        checked(require_non_negative(v[field], field, name), name);
     }
     HerbivoryParams {
         grazing_rate: v["grazing_rate"],
@@ -2171,6 +2192,101 @@ parameters:
     // structural rules that decide which files are legal in the first place. A guard
     // nothing exercises is a guard that can be deleted with the suite green, which is
     // this slice's whole subject.
+
+    /// ⚠⚠ THE THREE LOADERS WHOSE GUARDS WERE REACHABLE BY NOTHING, found by S6's by-name
+    /// claim census and MEASURED before this test was written.
+    ///
+    /// `canopy`, `photosynthesis` and `herbivory` were the only loaders in this module with
+    /// no `*_from` seam, so no test could hand them a mutated file and their bound checks
+    /// were exercised by nothing. Probe P1/P2, run on the tree as it stood: deleting all
+    /// three `require_*` guards from `canopy` and both guard loops from `photosynthesis`
+    /// left the entire binary GREEN. Nine loaders had rejection tests; these did not, and
+    /// the eleven Python tests that read like their coverage
+    /// (`test_canopy_loader_rejects_*`, `test_photo_loader_rejects_*`) exercise the PYTHON
+    /// loader — a distinction the census exists to make visible, and one that a count of
+    /// covered claims would have hidden.
+    ///
+    /// Each bound is asserted at its own shape, because reading one off another is the
+    /// mistake this module has already made once (`the_respiration_bounds_are_rejected_each
+    /// _at_its_own_shape`, whose first draft had both bounds mirror-imaged).
+    /// Mirrors `test_canopy_loader_rejects_a_non_positive_sla`,
+    /// `test_canopy_loader_rejects_a_non_positive_extinction_coef`,
+    /// `test_canopy_loader_rejects_a_bad_carbon_fraction`,
+    /// `test_photo_loader_rejects_non_positive_kinetics` and
+    /// `test_photo_loader_rejects_out_of_unit_interval`.
+    #[test]
+    fn the_three_seamless_loaders_bounds_are_each_rejected_at_their_own_shape() {
+        // canopy: two strictly-positive fields, and a carbon fraction on (0, 1].
+        for (field, bad) in [
+            ("extinction_coef", "0.0"),
+            ("extinction_coef", "-0.6"),
+            ("specific_leaf_area", "0.0"),
+            ("specific_leaf_area", "-22.0"),
+            ("carbon_fraction", "0.0"),
+            ("carbon_fraction", "1.5"),
+        ] {
+            let broken = value_of(CANOPY_YAML, field, bad);
+            rejects(
+                || {
+                    canopy_from(broken, "canopy.yaml");
+                },
+                &format!("canopy {field} = {bad}"),
+            );
+        }
+        // ...and `1.0` is a LEGAL carbon fraction (the bound is half-open), which is the
+        // half a mirror-imaged reading gets wrong and every other input agrees on.
+        canopy_from(value_of(CANOPY_YAML, "carbon_fraction", "1.0"), "canopy.yaml");
+
+        // photosynthesis: six strictly-positive kinetics, two on the unit interval (0, 1],
+        // and the cardinal ordering `t_min < t_opt_lo <= t_opt_hi < t_max`.
+        for (field, bad) in [
+            ("vcmax", "0.0"),
+            ("jmax", "-1.0"),
+            ("gamma_star", "0.0"),
+            ("kc", "-404.9"),
+            ("ko", "0.0"),
+            ("o2", "-210.0"),
+            ("quantum_yield", "0.0"),
+            ("quantum_yield", "1.5"),
+            ("theta", "0.0"),
+            ("theta", "1.01"),
+            ("t_opt_lo", "-5.0"),  // below t_min: the first strict pair
+            ("t_opt_hi", "100.0"), // above t_max: the second
+        ] {
+            let broken = value_of(PHOTOSYNTHESIS_YAML, field, bad);
+            rejects(
+                || {
+                    photosynthesis_from(broken, "photosynthesis.yaml");
+                },
+                &format!("photosynthesis {field} = {bad}"),
+            );
+        }
+        // The middle pair is NON-strict, so an isothermal optimum plateau is legal — the
+        // one ordering a `<` here would wrongly refuse.
+        let flat = value_of(PHOTOSYNTHESIS_YAML, "t_opt_hi", "20.0");
+        photosynthesis_from(
+            value_of(flat, "t_opt_lo", "20.0"),
+            "photosynthesis.yaml",
+        );
+
+        // herbivory: four NON-negative rates, so zero is legal and negative is not — the
+        // opposite shape to canopy's, asserted here rather than assumed from the family.
+        for field in [
+            "grazing_rate",
+            "respiration_rate",
+            "mortality_rate",
+            "o2_half_saturation",
+        ] {
+            let broken = value_of(HERBIVORY_YAML, field, "-1.0");
+            rejects(
+                || {
+                    herbivory_from(broken, "herbivory.yaml");
+                },
+                &format!("herbivory {field} = -1.0"),
+            );
+            herbivory_from(value_of(HERBIVORY_YAML, field, "0.0"), "herbivory.yaml");
+        }
+    }
 
     /// Every unit string in `respiration.yaml` is exact-matched at the loader.
     ///
