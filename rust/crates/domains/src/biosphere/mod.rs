@@ -35,10 +35,10 @@ use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
 
 pub use system::{
-    annual_reset, build_season, consumer_chamber_scenario, perennial_chamber_scenario,
-    run_perennial, run_season, sealed_chamber_scenario, weather_resolver, SeasonScenario,
-    CONSUMER_CHAMBER_YEARS, DEFAULT_SCENARIO, LONG_HORIZON_YEARS, PERENNIAL_CHAMBER_YEARS,
-    SEALED_CHAMBER_YEARS,
+    annual_reset, build_season, build_season_with, consumer_chamber_scenario,
+    perennial_chamber_scenario, run_perennial, run_season, sealed_chamber_scenario,
+    weather_resolver, SeasonScenario, CONSUMER_CHAMBER_YEARS, DEFAULT_SCENARIO,
+    LONG_HORIZON_YEARS, PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
 };
 
 /// The biosphere's integration step, in days — mirrors `domains.biosphere.step.BIO_DT`.
@@ -86,7 +86,27 @@ pub fn season_setup(
     scenario: &SeasonScenario,
     weather_years: usize,
 ) -> Result<(State, EulerIntegrator, SourceResolver), SimError> {
+    // ⚠ Via `build_season`, NOT via `season_setup_with(.., &params::biosphere())`. Both
+    // spell the same run; only this one leaves the whole spine with a **single** production
+    // param load, which is the property `tests/param_funnel.rs` gates. A second frozen-params
+    // call here would cost nothing today and turn that gate into a roster of allowed sites.
     let (state, registry) = build_season(scenario)?;
+    let resolver = weather_resolver(scenario, weather_years)?;
+    Ok((state, EulerIntegrator::new(registry), resolver))
+}
+
+/// [`season_setup`] against caller-supplied params — the value-switch seam's pass-through.
+///
+/// ⚠ **The weather is deliberately NOT part of the seam.** `weather_resolver` reads the
+/// committed fixture and the scenario's own fields; a param substitution must not be able to
+/// change the forcing, or an A/B table stops being about the coefficient. See
+/// [`system::build_season_with`] for the seam's own note.
+pub fn season_setup_with(
+    scenario: &SeasonScenario,
+    weather_years: usize,
+    p: &params::BiosphereParams,
+) -> Result<(State, EulerIntegrator, SourceResolver), SimError> {
+    let (state, registry) = system::build_season_with(scenario, p)?;
     let resolver = weather_resolver(scenario, weather_years)?;
     Ok((state, EulerIntegrator::new(registry), resolver))
 }

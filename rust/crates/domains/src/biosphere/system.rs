@@ -868,10 +868,42 @@ fn validate_scenario(scenario: &SeasonScenario) -> Result<(), SimError> {
 }
 
 /// Assemble the season's initial `State` and the flow + aux `Registry`.
+///
+/// Delegates to [`build_season_with`] against the **frozen** params. This is the entry
+/// point every golden, gate and scenario uses, and its behaviour is unchanged by the
+/// split — see that function's note for why the split exists.
 pub fn build_season(scenario: &SeasonScenario) -> Result<(State, Registry), SimError> {
+    build_season_with(scenario, &params::biosphere())
+}
+
+/// Assemble the season against a **caller-supplied** [`params::BiosphereParams`].
+///
+/// # Why this exists, and why it is the ONLY injection point
+///
+/// The value-switch harness (`docs/plans/post-roadmap-value-switch-harness.md`) needs to run
+/// a season with one coefficient substituted, and Python's route — hooking a runtime YAML
+/// load — does not exist here: all 15 biosphere param files are `include_str!`-ed in at
+/// compile time. Measured before this was written (§5R of that plan): `build_season` held
+/// the **only** production `params::…()` call in the whole biosphere — every other call site
+/// is inside `#[cfg(test)]` — and `compartments` already threads `&BiosphereParams` the
+/// whole way down. So the seam is this parameter, and nothing else had to move.
+///
+/// ⚠ **A substitution is expected to arrive as re-parsed YAML text**, through the
+/// `params::*_from` loaders, so it passes the same schema, unit guard, bounds and boundary
+/// folds as the frozen path. Constructing a `BiosphereParams` field-wise bypasses all four —
+/// that is what the deleted Python harness did with `dataclasses.replace`, and it is the one
+/// thing this seam is better than.
+///
+/// ⚠ **This funnel being singular is a fact about today's tree, not a guarantee.** A future
+/// flow that reaches for `params::canopy()` at step time would silently escape an override
+/// and report "no effect" as a finding. `tests/param_funnel.rs` is the gate that keeps that
+/// from happening quietly.
+pub fn build_season_with(
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+) -> Result<(State, Registry), SimError> {
     validate_scenario(scenario)?;
-    let p = params::biosphere();
-    let builds = compartments(scenario, &p)?;
+    let builds = compartments(scenario, p)?;
     let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
     for build in &builds {
         for stock in &build.stocks {

@@ -288,6 +288,52 @@ Three routes, none free, **and this is the decision to take next**:
    it: *a rule with two copies has one that is stale* is this repo's most-repeated lesson, and
    a margin computed twice is exactly that.
 
+
+### The route, DECIDED 2026-08-27 by reading `mod runs` and `mod folds`
+
+**Narrowed route 2 — lift the FIXTURE, not the census.** The two `#[cfg(test)]` modules
+behind the gates turn out to be exactly what the harness needs, and neither is a claim:
+
+* `mod runs` is a pure fixture — it builds a `Trajectory` (per-step `leaf_c` / `stem_c` /
+  `storage_c` / `carbon_pool` / `consumer_c`, plus `rationed`, `events`, `years`) by calling
+  `season_setup` + `run_season` / `run_perennial`, **all of which are already public non-test**.
+  Its only assertion is the observer-sample-count sanity check. Its `OnceLock` caching is a
+  fixture's analogue, not a claim.
+* `mod folds` is pure arithmetic over a `Trajectory` — `peak_lai`, `min_ppm`, `peak_w`,
+  `floor_ppm`, `t_per_ha`, the segment folds. No bounds, no asserts except two anti-vacuity
+  guards.
+* each gate body is then two lines: `let peak = folds::peak_lai(t);` then the `assert!` that
+  compares it to the bound.
+
+So the harness can have **every quantity a gate reads, computed by the same code the gate
+uses**, without touching one gate declaration and without a second copy of any arithmetic.
+Route 3 is avoided outright and route 1's ugliness is unnecessary. The macro's "the row and
+the assertion are one declaration" invariant is untouched — what moves is the fixture beneath
+it.
+
+⚠ **The runs must become param-aware, and that is what ties this half to the seam.**
+`runs::trajectory` reaches the frozen params through `season_setup → build_season →
+params::biosphere()`. The gates must keep doing exactly that (a gate is a claim about the
+frozen tree). The harness needs the same fixture driven with substituted params, so the lifted
+function takes `&BiosphereParams` and the cached frozen accessors pass `params::biosphere()`.
+⚠ And the override runs must **not** share the `OnceLock` cells — a cached frozen trajectory
+returned for a variant run is §7's silent no-op with a different cause.
+
+### ⚠ What this route does NOT give, stated now rather than discovered in the output
+
+**A numeric margin.** `ScienceGate::bound` is a human-readable `&'static str`
+(`"5.0 < peak < 8.0"`, `"non_collapsing(floor=5e-4)"`), not an evaluator, and parsing it would
+be a fragile second copy of the census — the thing route 3 was rejected for. So the first cut
+reports, per gate: the **authority label** (`science_bands` vs `liveness_floors`, §6.2), the
+recorded bound **as written**, and the **measured quantity** under baseline and each variant,
+with the movement between them. That satisfies §6.3 (opposed movement is visible), §6.4 (no
+stored ranking — the table is re-derived every run) and §6.5 (a null result is a row reading
+zero). §6.1's distance-from-degenerate is carried where a degenerate baseline is on record
+rather than invented per gate.
+
+**Say this in the output itself.** A table that shows quantities while the reader assumes it
+shows pass/fail is a worse failure than not printing it.
+
 ## 6. Requirements earned by the canopy-provenance session
 
 Each of these exists because reporting *without* it produced a wrong read on 2026-08-15.
