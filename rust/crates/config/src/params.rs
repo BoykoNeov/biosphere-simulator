@@ -279,6 +279,92 @@ pub fn require_half_open(
     Ok(value)
 }
 
+/// Rewrite one `{value, unit, source}` entry's **value** in a param file's TEXT.
+///
+/// # Why a text rewrite rather than a struct edit
+///
+/// This is the substitution half of the value-switch seam
+/// (`docs/plans/post-roadmap-value-switch-harness.md`). Handing the result back through the
+/// ordinary loader means an experimental value passes the *same* schema, exact-string unit
+/// guard, frozen bounds and boundary folds as a committed one. The Python harness this
+/// replaces edited the already-constructed dataclass and so bypassed all four: an
+/// out-of-range experimental value ran silently. Here it cannot.
+///
+/// # ⚠ It writes nothing to disk, and that is the plan's whole safety property
+///
+/// The input is the `include_str!`-ed text; the output is a `String` that lives for one run.
+/// No file is touched, so no per-file digest in any manifest can move.
+///
+/// # ⚠ A silent no-op is impossible by construction
+///
+/// The harness's structural failure mode is a substitution that quietly misses (§7 of the
+/// plan; `cc44b41` is this tree's own instance). Three things make that unrepresentable
+/// here: the field must parse as a `{value, unit, source}` entry **before** the rewrite,
+/// **exactly one** line may change, and the result is re-parsed and the new value compared
+/// **bit for bit** with the one asked for. Any of the three failing is an `Err`, never a
+/// quietly-unchanged file.
+pub fn with_override(
+    text: &str,
+    field: &str,
+    value: f64,
+    context: &str,
+) -> Result<String, ConfigError> {
+    if !value.is_finite() {
+        return Err(ConfigError::new(format!(
+            "{context}: override {field} = {value} is not finite"
+        )));
+    }
+    // Rejects a misspelled field, a field that is a table rather than a scalar entry
+    // (`allocation.yaml`'s partition rows), and a malformed file — before anything is
+    // rewritten.
+    ParamFile::parse(text, context)?.entry(field, context)?;
+
+    let key_line = format!("  {field}:");
+    let mut out: Vec<String> = Vec::with_capacity(text.lines().count());
+    let mut in_field = false;
+    let mut rewritten = 0usize;
+    for line in text.lines() {
+        if line == key_line {
+            in_field = true;
+            out.push(line.to_string());
+            continue;
+        }
+        if in_field {
+            if let Some(rest) = line.strip_prefix("    value:") {
+                let _ = rest;
+                out.push(format!("    value: {value:?}"));
+                rewritten += 1;
+                in_field = false;
+                continue;
+            }
+            // The entry's own sub-keys are indented further; anything else ends it.
+            if !line.starts_with("    ") {
+                in_field = false;
+            }
+        }
+        out.push(line.to_string());
+    }
+    if rewritten != 1 {
+        return Err(ConfigError::new(format!(
+            "{context}: rewriting {field} touched {rewritten} lines, expected exactly 1"
+        )));
+    }
+    let mut result = out.join("\n");
+    if text.ends_with('\n') {
+        result.push('\n');
+    }
+
+    // The proof, not a convention: re-read the rewritten text through the real parser and
+    // require the value to be the one asked for, bit for bit.
+    let got = ParamFile::parse(&result, context)?.entry(field, context)?.value;
+    if got.to_bits() != value.to_bits() {
+        return Err(ConfigError::new(format!(
+            "{context}: {field} re-read as {got:?} after an override to {value:?}"
+        )));
+    }
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,5 +474,90 @@ parameters:
         assert!(require_half_open(1.0, 0.0, 1.0, "eta", "f").is_ok());
         assert!(require_closed(0.0, 0.0, 1.0, "f", "f").is_ok());
         assert!(require_closed(1.5, 0.0, 1.0, "f", "f").is_err());
+    }
+
+    // ------------------------------------------------------------------ //
+    // The value-switch substitution                                       //
+    // ------------------------------------------------------------------ //
+
+    const TWO: &str = "\
+name: demo_crop
+process: demo_process
+parameters:
+  a_rate:
+    value: 0.25
+    unit: \"1/day\"
+    source: \"[A] table 1\"
+  b_rate:
+    value: 4.0
+    unit: \"1/day\"
+    source: \"[A] table 2\"
+";
+
+    #[test]
+    fn an_override_moves_the_value_and_nothing_else() {
+        let out = with_override(TWO, "a_rate", 0.65, "demo.yaml").expect("override");
+        let f = ParamFile::parse(&out, "demo.yaml").expect("re-parses");
+        assert_eq!(f.entry("a_rate", "demo.yaml").unwrap().value, 0.65);
+        // The other entry, the units, the sources and the file's shape are untouched.
+        assert_eq!(f.entry("b_rate", "demo.yaml").unwrap().value, 4.0);
+        assert_eq!(f.entry("a_rate", "demo.yaml").unwrap().unit, "1/day");
+        assert_eq!(f.entry("a_rate", "demo.yaml").unwrap().source, "[A] table 1");
+        assert_eq!(out.lines().count(), TWO.lines().count());
+        let changed: Vec<_> = TWO
+            .lines()
+            .zip(out.lines())
+            .filter(|(a, b)| a != b)
+            .collect();
+        assert_eq!(changed.len(), 1, "{changed:?}");
+    }
+
+    /// ⚠ The `1.0e7` hazard from the module header, applied to the OUTPUT side: an
+    /// override must be written in a form the reader's text parse reads back identically.
+    /// `{:?}` on `f64` is the shortest round-tripping form, and the check is bit equality.
+    #[test]
+    fn an_override_round_trips_awkward_magnitudes() {
+        for v in [1.0e7, 1e-7, 0.1 + 0.2, 6.02214076e23, -3.5, 0.0] {
+            let out = with_override(TWO, "a_rate", v, "demo.yaml").expect("override");
+            let got = ParamFile::parse(&out, "demo.yaml")
+                .unwrap()
+                .entry("a_rate", "demo.yaml")
+                .unwrap()
+                .value;
+            assert_eq!(got.to_bits(), v.to_bits(), "{v:?} round-tripped as {got:?}");
+        }
+    }
+
+    /// The §7 guard: a substitution that misses its target is an error, never a quiet
+    /// no-change that a harness would report as "this parameter does not matter".
+    #[test]
+    fn a_missed_substitution_is_loud() {
+        for bad in ["a_rat", "A_RATE", "value", "parameters", ""] {
+            assert!(
+                with_override(TWO, bad, 1.0, "demo.yaml").is_err(),
+                "{bad:?} was accepted as a field"
+            );
+        }
+    }
+
+    #[test]
+    fn a_non_finite_override_is_rejected() {
+        assert!(with_override(TWO, "a_rate", f64::NAN, "demo.yaml").is_err());
+        assert!(with_override(TWO, "a_rate", f64::INFINITY, "demo.yaml").is_err());
+    }
+
+    /// A table-shaped entry (`allocation.yaml`'s partition rows) has no single `value:`
+    /// line, so it must be refused rather than half-rewritten.
+    #[test]
+    fn a_table_entry_is_refused() {
+        let table = "\
+name: demo_crop
+process: demo_process
+parameters:
+  rows:
+    - dvs: 0.0
+      leaf: 0.5
+";
+        assert!(with_override(table, "rows", 1.0, "demo.yaml").is_err());
     }
 }

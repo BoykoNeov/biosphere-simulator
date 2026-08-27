@@ -50,7 +50,8 @@ pub use errors::ConfigError;
 pub use json::{parse_json, JsonValue};
 pub use manifest_cli::{parse_args, ManifestAction};
 pub use params::{
-    require_closed, require_half_open, require_non_negative, require_positive, Entry, ParamFile,
+    require_closed, require_half_open, require_non_negative, require_positive, with_override,
+    Entry, ParamFile,
 };
 pub use provenance::{normalize_newlines, normalized_sha256, sha256_hex};
 pub use yaml::{parse_document, YamlValue};

@@ -21,6 +21,7 @@ pub mod crew;
 pub mod eclss;
 pub mod freeze_manifest;
 pub mod goldens;
+pub mod lab;
 pub mod tiers;
 pub mod params;
 pub mod power;
