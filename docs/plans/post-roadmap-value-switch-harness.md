@@ -148,6 +148,23 @@ live candidates are an **example under `station`** (matches the precedent exactl
 crate *above* `station`. **Not decided here** — take it at build time, with §7's proof-the-
 override-is-live requirement as the deciding criterion rather than tidiness.
 
+**✅ DECIDED BY THE BUILD, 2026-08-27 — and NEITHER candidate was taken.** Both options above
+assumed the harness would be one piece sitting above `station`; it is two pieces, and each was
+placed by a constraint rather than a preference:
+
+* **`domains/src/biosphere/readouts.rs`** — the runs and folds stay **inside** the spine, because
+  the science gates reference them (`runs::` / `folds::` in every gate body) and moving them out
+  would have edited the census to no purpose. They reach no boundary, so the spine's purity rule
+  is untouched.
+* **`domains/src/lab/`** — the substitution and the report sit **beside** the spine, because they
+  reach `config` and `biosphere_spine_purity.rs` allows exactly two spine modules to do that. A
+  lab tool is a *consumer* of that boundary, not a third one.
+* **`domains/examples/value_switch.rs`** — the thin entry point, which is the shape the
+  `regen_goldens` precedent actually has: logic in the library, an example as the command.
+
+⚠ `station` was not the home for any of it: the first target is biosphere-only, and putting a
+biosphere tool a crate away from the biosphere would have bought nothing.
+
 *(As written 2026-08-15:)* `src/lab/`. It already holds `oracle_match.py`, `convergence.py`,
 `rk45.py` — the offline-study area, outside the frozen core and outside the port's mirror
 obligation. `simcore` purity is untouched: `lab/` may import domains, never the reverse.

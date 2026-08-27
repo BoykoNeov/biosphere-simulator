@@ -420,6 +420,27 @@ mod tests {
         }
     }
 
+    /// ⚠⚠ **A spec whose scenario has no `runs()` entry is silently unmeasured**, and that is
+    /// this design's version of *a census ported as a LIST is the failure it prevents*.
+    /// [`measure`] iterates the runs and filters the specs by name, so a spec naming a scenario
+    /// that is not in `runs()` matches nothing and simply produces no row — no error, no gap in
+    /// the table, just a claim quietly not measured. The short report's count assertion catches
+    /// it for a short spec and **nothing catches it for a `long: true` one**, which is not
+    /// hypothetical: `consumer_long_horizon` is already a scenario in [`GATES`] with no `runs()`
+    /// entry, so the next spec added under it is the one that would vanish.
+    #[test]
+    fn every_spec_names_a_scenario_that_is_actually_run() {
+        let names: Vec<&str> = runs().iter().map(|(n, _, _, _)| *n).collect();
+        for spec in SPECS {
+            assert!(
+                names.contains(&spec.scenario),
+                "{}/{} names no run — it would be silently unmeasured, not reported missing",
+                spec.scenario,
+                spec.quantity
+            );
+        }
+    }
+
     /// Anti-vacuity: the roster must actually cover both authorities, or requirement 2's
     /// labelling is decoration.
     #[test]

@@ -89,6 +89,17 @@ uniform-amplifier framing does not predict. It argues for no value and changes n
 ⚠ Any run including the frozen value carries a free self-check: that column prints `UNCHANGED`
 on every row, so a drifted substitution path would show itself.
 
+## ⚠ The freeze docs' prose half, CHECKED rather than assumed
+
+This batch added a spine module, moved two modules out of `#[cfg(test)]` and added a new
+directory — exactly the shape of change the recorded ungated hole covers (*the manifest gate
+equates manifest↔tree, and the doc is not a side*). So the three reference docs were grepped for
+prose describing the structure: `biosphere-reference.md` names `science_gates.rs` and the
+"declaration and `#[test]` are one thing" design, **both still true** — that design is precisely
+what was preserved — and neither it, `native-port-reference.md` nor `phase-8-reference.md` names
+a module roster, the fixture modules, or `cfg(test)`. **No prose correction was owed.** Recorded
+because "nothing to fix" is only worth anything when someone actually looked.
+
 ## What is NOT built, and what is NOT taken
 
 * **The sibling domains and the station.** Their `*_from` loaders are private and their params

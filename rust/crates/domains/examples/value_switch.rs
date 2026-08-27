@@ -24,6 +24,12 @@ use domains::lab::Substitution;
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let long = args.iter().any(|a| a == "--long");
+    // ⚠ An unknown flag is rejected, not ignored. `--lon` would otherwise silently produce the
+    // SHORT report — which is precisely the one that cannot show opposed movement, so the
+    // typo's cost is a wrong reading rather than a missing section.
+    if let Some(bad) = args.iter().find(|a| a.starts_with("--") && *a != "--long") {
+        fail(&format!("unknown flag {bad:?} (the only flag is --long)"));
+    }
     let specs: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if specs.is_empty() {
         eprintln!(
