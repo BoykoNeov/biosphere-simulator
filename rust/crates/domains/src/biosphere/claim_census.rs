@@ -291,7 +291,7 @@ mod tests {
         let all = rows();
         let (p, a): (Vec<_>, Vec<_>) = all.iter().partition(|r| r.kind == "P");
         assert_eq!(p.len(), 455, "Python test functions across S5's twenty files");
-        assert_eq!(a.len(), 66, "Rust tests declared as additional coverage");
+        assert_eq!(a.len(), 67, "Rust tests declared as additional coverage");
         for row in &p {
             assert!(
                 DISPOSITIONS.contains(&row.tag),

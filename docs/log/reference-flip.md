@@ -4271,3 +4271,112 @@ which has a runtime consumer in the manifest writer. Neither was caught by revie
   reference want a class of pin that is deliberately not a contract? — is still S6's; the
   compensated-reduction hazard; and the ten `open` census rows, which now have somewhere to
   live and a count that cannot drift.
+
+## S6 — the Python checker is DELETED, and the 30 °C plateau is entered by a run (2026-08-27)
+
+Two user decisions, both taken today, both built.
+
+### The deletion: 271 files gone, seventeen survive
+
+Every file was checked against a recorded disposition, and the list came from `git ls-files`.
+The two exit gates written **forward in S6's terms** — S3's and S4's — were checked rather
+than inherited: all five sibling mutations redden S3's own by-name tests with the cross-port
+comparison *and* the goldens deselected, and the pre-S3 reading was zero, so FINDING 7 is
+discharged and `test_crossport.py` was free.
+
+What survives is now enumerable by one command: the PCSE oracle carve-out, three crossport
+gates awaiting their Rust successors, two helpers, and one path constant.
+
+### ⚠⚠ Four things the deletion broke that only RUNNING found
+
+None was visible from reading the tree, and three were invisible until pytest collected:
+
+* **`CLAUDE.md`'s carve-out sentence was FALSE.** It says the surviving Python is
+  *"`tests/oracle/` and its committed JSON fixtures"*; two of those tests imported
+  `lab.oracle_match`, so the carve-out reached into the tree being deleted. The helper moved
+  into `tests/oracle/match.py` unchanged, and the sentence is now checkable by `git ls-files`
+  rather than by trust. ⚠ **Same shape as the recorded `config/units.py` trap, arriving from
+  the other side**: there a callee would have survived with no executing caller; here a
+  caller survived and its callee was being deleted underneath it. *An always-loaded file
+  states an invariant; nothing was checking it.*
+* `src/config/__init__.py` re-exported three deleted modules, so a package with two files
+  left was an `ImportError`.
+* `conftest.py` held a fixture whose body imports a deleted helper.
+* `golden_platform.py` kept two functions policing an act that no longer exists — a Python
+  regression main rewriting a golden — one importing the deleted `crossport.compare`. Gone;
+  the **roster constants stay**, because the provenance tests read them as data.
+
+### ⚠⚠ One stated LOSS, and it is recorded as a loss rather than tidied away
+
+`regen_goldens_from_rust.py` validated every candidate through `sim_io.snapshot` before it
+could reach the disk — *"a golden that does not round-trip must never be written"*. That
+module is gone, so **`--write` now refuses**. A regeneration tool that writes unvalidated
+bytes over a freeze contract's values is worse than one that refuses; reporting is
+unaffected, because it only compares bytes. Restored by S6 build item 2.
+
+### The 30 °C thermal-time plateau, entered by a run for the first time
+
+Batch B filed it as *"a SCIENCE question with no owner"* — does a scenario need to get that
+hot, or is the cap decoration? The user's answer: **make the rule real.**
+
+⚠ **Not added to the frozen roster, and that is a decision.** The scenario carries no
+scientific claim — it is the frozen crop under a forcing hot enough to reach a branch.
+Freezing it would put a golden and a manifest row behind *"it is hot"*. *"Authored ≠
+validated"* cuts this way too: a scenario earns a freeze by making a claim, not by
+exercising a line. It uses the existing `with_forcing` seam, moves no golden, touches no
+manifest.
+
+⚠ **The crop has to be DAY-NEUTRAL or the branch is entered and invisible.**
+`ThermalTimeAccumulation` multiplies the degree-day rate by the vernalization and
+photoperiod factors, and a constant-35 °C season never vernalizes — so the frozen winter
+wheat would enter the plateau inside `daily_thermal_time` and accumulate **zero**. The test
+would then pass on an arrested crop, which is "a number moved wearing a reassuring name" in
+reverse: *nothing* moves, and the run looks like coverage.
+
+**The discriminating assertion is that 35 °C and 45 °C give a bit-identical trajectory** —
+above the cap, temperature is not an input any more, which is the entire content of "flat".
+Paired with a below-cap control (10 °C and 20 °C *do* differ), because "identical" proves
+nothing on a dead accumulator.
+
+| # | mutation | reddens |
+|---|---|---:|
+| T1 | the cap is removed (batch B's B1, which read **0** before batch B wrote its pin) | 2 |
+| T2 | the plateau switches back OFF higher up (batch G's G4 shape) | 2 |
+| T3 | the plateau is a shallow ramp, not flat | 2 |
+| T4 | the comparison relaxes from `>=` to `>` | **0 — by construction** |
+| T5 | harness identity | 0 |
+
+⚠ **T4 is inert BY NATURE, and that is the third time this batch.** At exactly `t_cap` the
+two branches return the same number — `t_cap − t_base` and `temp_c − t_base` are the same
+expression there — so no test can distinguish them and none should be written pretending to.
+The same species as R5's redundant table-key guard and R6's harmless aux shadow. *Three
+inert controls, three different reasons, none of them tuned away.*
+
+⚠ The precise correction to batch B's finding: what was unreachable was the plateau **in a
+run** (*"entered by ZERO tests of the entire workspace, goldens included"*), not the
+function's own pin — `thermal_time_is_the_degree_day_rate_capped_at_both_cardinals` has
+covered the rate law since batch B, and reddens under T1–T3 alongside the new test.
+
+### ⚠ The census's forcing function fired for real, twice, in the same session
+
+Adding `compartments.rs` and then the hot-season test each left a test in the census's
+denominator undeclared, and the gate went red both times — the strong direction (control C3)
+on live work rather than on a mutation. It also surfaced two defects in the census's own
+tooling within one commit of shipping it: the extractor's **hardcoded** surface list (which
+is "a census ported as a LIST is the failure it prevents", in the census's own tooling), and
+control C4's by-design exemption arriving immediately.
+
+⚠ **The generator's Python half is now dead by design.** Its input — the 455 `def test_*` —
+was deleted by this very slice, so the census's Python column can never be re-derived. That
+is what "frozen snapshot" meant, and it is why it was built that way; maintaining the
+additional block is now a one-line edit that the gate names for you.
+
+### Standing after S6
+
+* **The Python simulation tree is gone.** `simcore`, `domains`, `station`, `authoring`,
+  `sim_io`, `lab` — none of them resolve. Rust is the only implementation.
+* **Three build items remain before the last three gates can go**: the manifest byte gate,
+  the golden regeneration path (whose write half is disabled until it lands), and a read of
+  `test_golden_provenance.py`.
+* `CLAUDE.md`, `pyproject.toml` and the census were all edited **in the deletion's own
+  commits**, never a follow-up — nothing reddens on a stale always-loaded file.

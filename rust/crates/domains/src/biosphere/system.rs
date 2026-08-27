@@ -2298,6 +2298,109 @@ mod tests {
         assert!(dry.rooted_depth0 > 0.0);
     }
 
+    /// ⚠⚠ THE 30 °C THERMAL-TIME PLATEAU, ENTERED BY A RUN FOR THE FIRST TIME.
+    ///
+    /// Batch B measured `daily_thermal_time`'s `t_cap` branch as unreachable **workspace
+    /// wide** — zero tests, zero goldens, zero scenarios — and filed it as a science
+    /// question with no owner: does a scenario need to get that hot, or is the cap
+    /// decoration? Answered 2026-08-27 (the user's call): **make the rule real.**
+    ///
+    /// # Why this scenario is NOT in the frozen roster, decided rather than defaulted
+    ///
+    /// It carries no scientific claim — it is not a habitat anyone is modelling, it is
+    /// the frozen crop under a forcing hot enough to reach a branch. Freezing it would
+    /// put a golden and a manifest row behind "it is hot", and *"authored ≠ validated"*
+    /// cuts the other way too: a scenario earns a freeze by making a claim, not by
+    /// exercising a line. So it lives here, uses the existing `with_forcing` seam, moves
+    /// no golden and touches no manifest.
+    ///
+    /// # ⚠ The crop has to be DAY-NEUTRAL or the branch is entered and invisible
+    ///
+    /// `ThermalTimeAccumulation` multiplies the degree-day rate by the vernalization and
+    /// photoperiod factors, and a constant-35 °C season never vernalizes — so the frozen
+    /// winter wheat would enter the plateau inside `daily_thermal_time` and accumulate
+    /// **zero**, which is exactly the "a number moved wearing a reassuring name" reading
+    /// in reverse: nothing would move, and the test would pass on an arrested crop. The
+    /// day-neutral switches (already in the roster for the second crop) are what make the
+    /// plateau observable at run level at all.
+    ///
+    /// # The assertions, and which mutation each one is for
+    ///
+    /// 1. The frozen fixture never reaches the cap — so this is new coverage rather than
+    ///    a duplicate, and batch B's measurement is re-confirmed rather than inherited.
+    /// 2. The accrual is EXACTLY `(t_cap − t_base)` per day. Removing the cap breaks it.
+    /// 3. ⚠ The discriminating one: **35 °C and 45 °C give a bit-identical trajectory.**
+    ///    That is the plateau's defining property — above the cap, temperature cannot
+    ///    matter — and it is what a "flat, then switches back off higher up" shape (batch
+    ///    G's G4, which left the whole binary green on the shading step) would break.
+    #[test]
+    fn a_hot_season_enters_the_thermal_time_plateau_and_temperature_stops_mattering() {
+        use super::super::perturbations::with_forcing;
+        use simcore::environment::constant;
+
+        // 1. The frozen fixture never gets there. Measured here, not quoted.
+        let (_lat, rows) = super::super::weather::weather_facts();
+        let hottest = rows.iter().map(|r| r.temp_c).fold(f64::MIN, f64::max);
+        let p = params::phenology();
+        assert!(
+            hottest < p.t_cap,
+            "the fixture reaches {hottest} °C, so the cap is no longer unreachable and              this test has stopped being new coverage"
+        );
+
+        // A day-neutral crop under a constant forcing, run through the real engine.
+        let day_neutral = SeasonScenario {
+            vernalization: false,
+            photoperiod: false,
+            ..DEFAULT_SCENARIO
+        };
+        let hot_run = |temp_c: f64| -> Vec<f64> {
+            let (state, integrator, resolver) =
+                super::super::season_setup(&day_neutral, 1).expect("setup");
+            let resolver =
+                with_forcing(resolver, TEMP_VAR, constant(temp_c).expect("a finite constant"))
+                    .expect("one var swapped");
+            let mut seen: Vec<f64> = Vec::new();
+            let mut observe = |s: &State| seen.push(s.aux[THERMAL_TIME]);
+            run_season(
+                &integrator,
+                state,
+                &resolver,
+                super::super::BIO_DT,
+                super::super::steps_for(40),
+                None,
+                &mut observe,
+            )
+            .expect("a hot season still runs");
+            seen
+        };
+
+        // 2. The rate on the plateau is the capped one, exactly.
+        let at_35 = hot_run(35.0);
+        let per_step = (p.t_cap - p.t_base) * super::super::BIO_DT;
+        for (i, tt) in at_35.iter().enumerate() {
+            assert_eq!(
+                *tt,
+                per_step * i as f64,
+                "step {i}: thermal time is not accruing at the capped rate"
+            );
+        }
+        assert!(
+            at_35.last().copied().unwrap_or(0.0) > 0.0,
+            "the accumulator never moved — the run is vacuous"
+        );
+
+        // 3. ⚠ Ten degrees hotter changes NOTHING, bit for bit. Above the cap the
+        // forcing is not an input any more, and that is the whole content of "flat".
+        assert_eq!(at_35, hot_run(45.0), "temperature still matters above the cap");
+
+        // ...and the control that stops 3 passing on a dead accumulator: BELOW the cap,
+        // ten degrees does move it. Without this half, "identical" proves nothing.
+        let at_10 = hot_run(10.0);
+        let at_20 = hot_run(20.0);
+        assert_ne!(at_10, at_20, "below the cap the forcing must still drive the rate");
+        assert_ne!(at_20, at_35, "the plateau must be above 20 °C, not at it");
+    }
+
     /// A re-sown crop starts with the SOWING root system, not with the old one and not
     /// with none.
     ///

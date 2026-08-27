@@ -569,3 +569,4 @@ A	weather.rs	facts_parse_305_rows	outside-the-20	tests/test_weather.py
 A	weather.rs	the_rows_arrive_as_consecutive_calendar_days_in_source_order	outside-the-20	tests/test_weather.py
 A	weather.rs	a_malformed_fixture_is_an_error_rather_than_a_partial_season	outside-the-20	tests/test_weather.py
 A	weather.rs	equator_daylength_is_12h	outside-the-20	tests/test_weather.py
+A	system.rs	a_hot_season_enters_the_thermal_time_plateau_and_temperature_stops_mattering	no-ancestor-named	-
