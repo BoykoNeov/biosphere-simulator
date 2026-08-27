@@ -1,21 +1,17 @@
-"""Behavioral trajectory matching: is a candidate series within a band of a reference?
+"""Fixture-comparison helpers for the PCSE oracle carve-out.
 
-The measurement helper for the Phase-1 PCSE/WOFOST oracle gate (P5). Our crop model
-is reimplemented clean-room from primary literature with independently-sourced
-parameters, so it **cannot** reproduce the oracle bit-for-bit (that is what
-determinism invariant #7 governs for *our* engine, not for a third-party reference).
-The validation is therefore **behavioral** — trajectory *shape and magnitude within a
-tolerance band* — exactly analogous to how ``lab/convergence.py:fit_order`` *measures*
-an order instead of asserting an exact value.
+⚠ MOVED HERE from `src/lab/oracle_match.py` by slice S6 (2026-08-27), unchanged.
 
-This module is a **measurement**, not a pass/fail policy: it returns discrepancy
-numbers; the calling test picks the variables and the band (the Phase-1 gate is wired
-at Step 11). It is pure stdlib and PCSE-free by design — it compares two in-memory
-series, so it (and its tests) run with **zero oracle dependency**; PCSE is needed only
-to *regenerate* the reference fixture (``tests/oracle/runner.py``).
+`CLAUDE.md` says the surviving Python is *"`tests/oracle/` and its committed JSON
+fixtures"*, and it was not true: two of those tests imported `lab.oracle_match`, so the
+carve-out reached into the tree S6 deletes. Found by RUNNING the collection after the
+deletion, not by reading the sentence — the same shape as `config/units.py`'s recorded
+trap (*"retiring them without giving it an executing caller"*), arriving from the other
+side: here the caller survived and the callee was being deleted underneath it.
 
-Out-of-core ``lab`` tooling (analysis, not engine): plain float arithmetic, none of
-the core's determinism guarantees.
+The carve-out is now self-contained, which is what makes that sentence in `CLAUDE.md`
+checkable by `git ls-files` rather than by trust. `max_abs_relative_deviation` came with
+it — it is `within_band`'s own implementation, not a separate export.
 """
 
 import math

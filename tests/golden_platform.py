@@ -69,7 +69,6 @@ rosters are asserted equal by ``test_golden_provenance.py``.
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -197,96 +196,19 @@ DISAGREEMENT_CEILING = 1e-14
 DISAGREEMENT_FLOOR = 1e-12
 
 
-def write_python_golden(path: Path, data: bytes) -> None:
-    """Write a **Python-authored** golden, refusing the 18 Rust authors.
-
-    Every ``tests/test_regression_*.py`` has a ``_regenerate()`` ``__main__``. Before
-    the
-    flip that was the only blessed way to move a golden; after it, for a Rust-authored
-    file it is the wrong path and running it silently reverts the reference to the
-    checker. Making the refusal a *choke point* rather than a docstring note is
-    deliberate: a future scenario's regeneration main will reach for this helper, and
-    will be told which side owns its artifact without having to know the rule.
-    """
-    if path.name in RUST_AUTHORED:
-        raise SystemExit(
-            f"refusing to write {path.name} from Python: it is one of the "
-            f"{len(RUST_AUTHORED)} goldens the Rust port authors (the reference flip, "
-            "docs/plans/post-roadmap-reference-flip.md). Regenerate it with:\n"
-            "    uv run python tests/crossport/regen_goldens_from_rust.py --write\n"
-            "then review the diff and re-run the freeze-manifest ceremony if it is a "
-            "frozen golden."
-        )
-    path.write_bytes(data)
-    print(f"wrote {path}")
-
-
-def assert_matches_golden(path: Path, produced: str) -> None:
-    """Assert Python's ``produced`` serialization matches the committed golden.
-
-    Byte-exact unless ``path`` is on :data:`PYTHON_DIVERGES`, in which case the
-    comparison is Tier-0-exact (structure, discrete fields, stock-id set) plus a numeric
-    deviation under :data:`DISAGREEMENT_CEILING`.
-
-    ⚠ **Argument order is the inversion, spelled out.** The golden is the *reference*
-    and
-    Python's fresh output is the *candidate* — the roles slice 5 swapped. Before the
-    flip
-    the golden was Python's own output and the port was the candidate.
-    """
-    expected = path.read_bytes()
-    if produced.encode("utf-8") == expected:
-        assert path.name not in PYTHON_DIVERGES, (
-            f"{path.name} is on PYTHON_DIVERGES as {PYTHON_DIVERGES[path.name]!r}, but "
-            "Python now reproduces the reference byte for byte. Drop it from the "
-            "roster "
-            "and restore the byte gate — a divergence that healed must not be left "
-            "standing as an exemption nobody re-measures."
-        )
-        return
-
-    # ⚠ Which side is the reference depends on the golden, and so does the advice. The
-    # message below is the *only* place a reader is told which way to look, and no test
-    # can catch it being backwards — the assertion fires identically either way.
-    if path.name in RUST_AUTHORED:
-        whose = (
-            "⚠ This golden is the Rust port's output — the reference. So this is a "
-            "*Python* regression, or a reference move Python has not followed yet. It "
-            "is NOT a golden to regenerate from Python; "
-            "`tests/crossport/regen_goldens_from_rust.py` owns it. Do not widen the "
-            "roster to silence this."
-        )
-    else:
-        whose = (
-            "⚠ This golden is **Python-authored** — the reference flip does not reach "
-            "it (no Rust program produces this artifact; see the census in "
-            "`tests/crossport/regen_goldens_from_rust.py`). So Python *is* the "
-            "reference here, and if the move is intended the regeneration main in this "
-            "module is the right path. The divergence roster does not apply to it: a "
-            "Python-authored golden cannot disagree with Python."
-        )
-    assert path.name in PYTHON_DIVERGES, (
-        f"{path.name}: Python's output no longer matches the committed golden, "
-        f"and it is not on the divergence roster.\n{whose}"
-    )
-
-    # Rostered: pin *how much*. Imported lazily so the base regression suite does not
-    # take `tests/crossport` onto its import path for the sixteen byte-exact cases.
-    import json  # noqa: PLC0415
-
-    sys.path.insert(0, str(Path(__file__).parent / "crossport"))
-    import compare  # noqa: PLC0415
-
-    result = compare.compare(
-        json.loads(expected.decode("utf-8")),
-        json.loads(produced),
-        tier=compare.TIER_2_BAND,
-        band=DISAGREEMENT_CEILING,
-        floor=DISAGREEMENT_FLOOR,
-    )
-    assert result.ok, (
-        f"{path.name} is a known last-bit divergence ({PYTHON_DIVERGES[path.name]}), "
-        f"but Python has moved past {DISAGREEMENT_CEILING:g} from the Rust "
-        f"reference:\n{result.report()}"
-    )
-    assert result.numeric_pairs, "expected numeric leaves to be compared"
+# ⚠ `write_python_golden` and `assert_matches_golden` were DELETED here by slice S6
+# (2026-08-27), and the constants above them were not.
+#
+# Both functions policed one act: a Python regression main rewriting a committed golden.
+# Slice 5 had already made `regen_goldens_from_rust.py` the only blessed path and
+# routed those mains through the refusal below; S6 deleted the mains themselves, along
+# with every `tests/test_regression_*.py`. A refusal with nothing left to refuse is not
+# a guard, and `assert_matches_golden`'s tolerance arm imported `crossport.compare`,
+# which went with them -- so keeping either would leave an import that cannot resolve.
+#
+# `RUST_AUTHORED`, `PYTHON_DIVERGES` and the two disagreement bounds SURVIVE because
+# `test_golden_provenance.py` reads them as data: which goldens Rust authors, which
+# ones Python used to disagree with in the last bits, and by how much. That roster is a
+# record
+# of a measurement, not a live comparison, and it is the reason those numbers are not
+# deleted along with the code that once used them.

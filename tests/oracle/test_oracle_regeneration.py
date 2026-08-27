@@ -16,7 +16,7 @@ pytestmark = pytest.mark.oracle
 
 pytest.importorskip("pcse", reason="oracle dep group not installed")
 
-from lab.oracle_match import nrmse  # noqa: E402
+from oracle.match import nrmse  # noqa: E402
 
 from .runner import (  # noqa: E402
     OUTPUT_VARIABLES,

@@ -4,14 +4,12 @@ version = "0.0.0"
 description = "Deterministic stock-and-flow station/biosphere simulation engine (Phase 0 skeleton)."
 readme = "README.md"
 requires-python = ">=3.12"
-# Runtime deps live ONLY in the outer layers (config/, sim_io/).
-# simcore/ is stdlib-only (zero third-party deps) — enforced by a purity test
-# in a later step, not by packaging. See docs/plans/phase-0-engine-skeleton.md.
-dependencies = [
-    "pydantic>=2",   # config/: param schema validation
-    "pint>=0.24",    # config/: unit validation at the boundary
-    "pyyaml>=6",     # config/: YAML param loading (safe_load)
-]
+# ⚠ NO RUNTIME DEPENDENCIES since slice S6 (2026-08-27). `pydantic`, `pint` and
+# `pyyaml` all existed for `src/config`, which is gone: `rust/crates/config` is the
+# param-file boundary that counts (slice C1), and its exact unit-string guard replaced
+# every live pint conversion — each of which had been measured to be an identity.
+# What remains of this project in Python is a test harness and the PCSE oracle.
+dependencies = []
 
 [dependency-groups]
 # PEP 735 dev group; `uv sync` installs it by default.
@@ -33,17 +31,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-# Multi-package src-layout: each path maps to a top-level import package.
-# `lab` is out-of-core validation/analysis tooling (convergence fitter, RK45
-# oracle) — outside simcore, exempt from the core purity/determinism invariants.
-packages = [
-    "src/simcore",
-    "src/sim_io",
-    "src/config",
-    "src/domains",
-    "src/station",
-    "src/lab",
-]
+# ⚠ ONE package, and it is a single path constant. S6 deleted `simcore`, `sim_io`,
+# `domains`, `station` and `lab`; `config` survives only because
+# `tests/crossport/regen_goldens_from_rust.py` reads `GOLDEN_DIR` from it, and both die
+# together when that tool gets its Rust successor (S6 build item 2).
+packages = ["src/config"]
 
 [tool.ruff]
 # Lint against the minimum supported version (the floor), not the dev version.
@@ -68,10 +60,17 @@ addopts = "-ra"
 # loop skips them with `-m "not slow"`. The two 100k gates: tests/test_stability.py
 # (the Phase-0.5 ENGINE A⇌B numerical gate, N6) and tests/test_biosphere_stress.py
 # (the Phase-4 BIOSPHERE slow-drift gate — perennial + consumer to ~328 yr).
+# ⚠ `slow` and `science_gate` are RETAINED WITH NO SUBJECT, deliberately and for one
+# release only. S6 deleted every test carrying either: the 100k stability gates went with
+# `test_stability.py` / `test_biosphere_stress.py`, and the science gates moved to
+# `domains/src/biosphere/science_gates.rs` back in slice C4. They are listed here so that
+# `--strict-markers` keeps working for anyone resuming an old branch, and so the removal
+# is a decision rather than a silent side effect of a deletion. Drop them when the last
+# three crossport gates go.
 markers = [
-    "slow: long-running gates (e.g. the 100k-step stability run); deselect with -m 'not slow'",
+    "slow: NO SUBJECT since S6 — long-running gates, all deleted with their tests",
     "oracle: PCSE/WOFOST oracle regeneration (needs the `oracle` dep group + network); skipped cleanly when pcse is absent (importorskip). Run with -m oracle.",
-    "science_gate(scenario, field, quantity, bound, source): this test asserts the SCIENCE of a frozen scenario, not a property of its run. Enumerated statically by tests/science_gates.py and frozen in the manifests' science_bands / liveness_floors fields, so it cannot be dropped without an unfreeze. Decorator form with string literals only — see docs/plans/post-roadmap-acceptance-gate-standing.md.",
+    "science_gate(scenario, field, quantity, bound, source): NO SUBJECT since S6 — the census moved to domains/src/biosphere/science_gates.rs in slice C4, where the roster row and the test that executes it are ONE declaration.",
 ]
 
 [tool.pyright]
@@ -83,6 +82,8 @@ include = ["src", "tests"]
 # venv happens to have pcse). The oracle runner is optional tooling over an untyped
 # external lib; excluding it from type-checking keeps CI green without vendoring pcse. The
 # default excludes are re-listed because setting `exclude` overrides them.
+# ⚠ This exclusion now also covers `tests/oracle/match.py`, which S6 moved out of
+# `src/lab/` so the carve-out stops reaching into the tree being deleted.
 exclude = ["**/node_modules", "**/__pycache__", "**/.*", "tests/oracle"]
 # `tests/crossport/` modules (`compare`, `regen_goldens_from_rust`, …) are imported by
 # sibling directories through a runtime `sys.path.insert`, which pyright cannot follow.

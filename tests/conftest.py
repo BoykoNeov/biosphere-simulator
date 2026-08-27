@@ -185,35 +185,10 @@ def pytest_collection_modifyitems(
             item.add_marker(skip_oracle)
 
 
-@pytest.fixture(scope="session")
-def sealed_tier2_run():
-    """The canonical Tier-2 sealed-station trajectory, run **once** per session (P6.7).
-
-    The ~1.3 M-sub-step run (~3 min) is shared between the stability gate
-    (``test_sealed_station_stability``) and the regression golden
-    (``test_regression_sealed_station``) so it is not paid twice. Session-scoped, so it
-    is
-    computed lazily only when a slow-marked test that requests it actually runs (the
-    fast
-    ``-m "not slow"`` loop never triggers it). Returns a
-    :class:`sealed_tier2_helper.Tier2Run` (the day-boundary states + rationed + events).
-
-    ⚠ **Under xdist, "once per session" means once per WORKER.** Its six consumers
-    (four in the stability gate, two in the regression golden) load-balance across
-    workers, so a parallel run of the slow tier recomputes this several times —
-    measured as four ~305s setups in one ``-n 12`` full run. That is why parallelism
-    buys the slow tier much less than it buys the fast loop, and it is not fixable by
-    a marker: see the negative result in :func:`pytest_configure`.
-
-    ⚠ **2026-08-10: "four ... in one full run" no longer reproduces, and the count is
-    not a constant.** Re-measured under the shipped ``load`` default: the **full suite**
-    pays **two** setups (379.6s, 374.3s) and ``-m slow`` **alone** pays **four**. So the
-    recomputation count tracks the SELECTION, not the distribution mode — and the
-    consequence is that running only the slow tier is *slower* than running everything
-    (504.47s vs 425.49s). The sentence above is kept because the way it is wrong is the
-    finding: a count measured once, under a mode since removed, written as a property of
-    "a full run". See docs/test-suite-runtime.md.
-    """
-    from sealed_tier2_helper import run_tier2
-
-    return run_tier2()
+# ⚠ The session-scoped tier-2 fixture was DELETED here by slice S6 (2026-08-27).
+# Its helper (`tests/sealed_tier2_helper.py`) and every test that requested it went
+# with the suite; a fixture whose body imports a deleted module is an ImportError
+# waiting for the first caller, not dead weight. The long finding it carried -- that
+# the recomputation count tracks the SELECTION rather than the distribution mode, so
+# running only the slow tier was SLOWER than running everything -- lives on in
+# `docs/test-suite-runtime.md`, which is now a record rather than current advice.

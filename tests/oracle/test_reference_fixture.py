@@ -6,7 +6,7 @@ oracle data. PCSE is **not** imported here â€” only the committed JSON is read â
 runs on every plain ``uv run pytest``.
 """
 
-from lab.oracle_match import nrmse, within_band
+from oracle.match import nrmse, within_band
 
 from .runner import OUTPUT_VARIABLES, column, load_fixture
 

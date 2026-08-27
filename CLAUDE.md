@@ -2,7 +2,7 @@
 
 A deterministic **stock-and-flow** simulation engine. Multi-domain from commit 1;
 biosphere is the first domain. **Rust (`rust/crates/`) is the canonical reference**
-since 2026-08-16 (the flip; see "Posture"); Python is a checker being retired, and a
+since 2026-08-16 (the flip; see "Posture"); the Python checker is **retired** (S6), and a
 Godot front-end consumes the Rust core. End goal (reached): a science-credible Godot
 station sim that runs the *same* simulation headless.
 
@@ -64,12 +64,9 @@ assuming which side authored it.
 ## Layout
 
 - `rust/crates/{simcore,domains,station,authoring,config,godot_bridge}/` — **the
-  reference.** (`repo_gates` is a seventh, dev-only: its subject is this repo, not the sim.) Same shape as the Python tree below, which it now outranks.
-- `src/simcore/` — the pure engine. `src/domains/{biosphere,power,thermal,eclss,crew}/`
-  — no domain imports another. `src/station/` — the assembly layer that owns all
-  cross-domain wiring. `src/authoring/` — the declarative scenario platform
-  (boundary code). `src/{sim_io,config,lab}/` — boundary. **All of it is the retiring
-  checker**, not the reference.
+  reference.** (`repo_gates` is a seventh, dev-only: its subject is this repo, not the sim.)
+- `src/` — **DELETED by S6 (2026-08-27), all 112 modules.** One file survives,
+  `config/paths.py`, read for one constant by a crossport tool that dies with it.
 - `godot/` — the front-end (a subdir, so Godot's importer never scans the tree).
 - `scenarios/` — authored **content** (runtime artifacts, never reference). Distinct
   from `rust/data/scenarios/`, which are fixtures / cross-port anchors.
@@ -77,7 +74,7 @@ assuming which side authored it.
   `rust/data/tiers.json` (7 biosphere + 13 station) carry the cross-port
   tier contract.
 
-## Posture — Rust is the reference, Python is retiring (the flip, 2026-08-16)
+## Posture — Rust is the reference; Python is RETIRED (the flip, 2026-08-16; S6, 2026-08-27)
 
 Standing rules, not a finished-work record — this is the "before you know what you are
 working on" category. The record and its cost: `docs/log/reference-flip.md`.
@@ -87,12 +84,11 @@ working on" category. The record and its cost: `docs/log/reference-flip.md`.
 - **Python has NO reference authority** (this inverts Phase 7/8/9's rule). A Python run
   that disagrees with Rust is a finding to investigate, never grounds for a silent
   Python-side fix. The two ports are no longer independent — that was the priced cost.
-- **`git diff src/` empty also inverts.** It was the port's exit criterion; now `src/`
-  is what *shrinks*. Touching a Python file is the moment to ask whether it should be
-  deleted instead — keeping a checker alive needs a reason.
-- **The only Python that survives is the PCSE oracle carve-out**: `tests/oracle/` and
-  its committed JSON fixtures, hand-run (`-m oracle`), a diagnostic and never a gate.
-  Everything else in `src/` and `tests/` is ported or retired, slice by slice.
+- **Sixteen Python files remain, and `git ls-files '*.py'` is the whole list.** The PCSE
+  oracle carve-out (`tests/oracle/`, hand-run `-m oracle`, a diagnostic and never a gate);
+  three crossport gates with no Rust successor **yet** — the manifest byte gate, the golden
+  regeneration tool and its provenance tests — plus their two helpers and `config/paths.py`.
+  Those three are S6's remaining build items; when they land, the count is the oracle alone.
 - **`gdext` appears in `rust/crates/godot_bridge` and nowhere else.** Engine
   crates carry no Godot types.
 - **"Authored ≠ validated."** Authored artifacts are runtime-only and never
@@ -102,10 +98,9 @@ working on" category. The record and its cost: `docs/log/reference-flip.md`.
 
 ## Non-negotiable invariants (the things that are easy to get wrong)
 
-- **Core is pure.** `simcore` in **both** trees carries **zero third-party deps**
-  (no numpy/pint/yaml/json/plotting/UI/net; the Rust crates hand-roll their readers).
-  Boundary stuff lives in `sim_io/` and `config/` — and `rust/crates/config` sits
-  below `domains`, so it may not reach up into the engine.
+- **Core is pure.** `simcore` carries **zero third-party deps** (no numpy/pint/yaml/
+  json/plotting/UI/net; the Rust crates hand-roll their readers). Boundary code lives in
+  `rust/crates/config`, which sits *below* `domains` and may not reach up into the engine.
 - **Flows return structured per-stock legs, never a net delta.** A flow is an
   atomic stoichiometric transfer; arbitration scales the *whole flow*.
 - **Every flow is internally balanced.** The "outside" is explicit BOUNDARY
@@ -119,16 +114,12 @@ working on" category. The record and its cost: `docs/log/reference-flip.md`.
   **hard error** (positivity comes from kinetics).
 - **Extinction conserves mass:** POPULATION stock below threshold → 0 with the
   residual routed to the loss-sink. POOL stocks are never zeroed-with-loss.
-- **RNG** is a counter-based, keyed, dependency-free generator in `simcore` (both
-  trees), keyed by `(seed, key, n)` so draws are order-independent. No sequential-state
-  RNG.
-- **Units** validated at the file boundary — **`rust/crates/config` is the one that
-  counts** (an exact unit-string guard; every live pint conversion measured an
-  identity). ⚠ Python's `config/units.py` stays live *only* while the retained param
-  generators call it; retiring them without giving it an executing caller leaves a
-  green check guarding a dead path. The core stores plain floats + a unit label.
-- **Parameters are data** (YAML; Rust loads them, pydantic still schema-checks the
-  Python side). No hardcoded coefficients.
+- **RNG** is a counter-based, keyed, dependency-free generator in `simcore`, keyed by
+  `(seed, key, n)` so draws are order-independent. No sequential-state RNG.
+- **Units** validated at the file boundary — **`rust/crates/config`** is now the only one
+  (an exact unit-string guard; every live pint conversion had been measured to be an
+  identity). The core stores plain floats + a unit label.
+- **Parameters are data** (YAML, loaded by Rust). No hardcoded coefficients.
 
 ## Reuse & licensing (see docs/reuse-and-licenses.md)
 
@@ -146,24 +137,21 @@ own gates, so they run first. ⚠ A **mutation battery must pass `--no-fail-fast
 stops at the first failing test *binary*, so a truncated run reports **fewer** reds — which
 reads as "the new tests are inert", not as a broken instrument.
 
+What is left of Python is a **46-test harness**, ~2 min, no parallelism worth
+configuring: three crossport gates awaiting Rust successors, and the opt-in oracle.
+
 ```
-uv sync                 # install/lock deps
-uv run pytest           # tests (pytest + hypothesis)
-uv run pytest -n 12     # ...in parallel (xdist); grouping is handled in conftest
+uv sync                 # install/lock deps (no runtime deps since S6)
+uv run pytest           # 42 tests + 4 oracle skips
+uv run pytest -m oracle # the PCSE carve-out (opt-in; needs the `oracle` group + network)
 uv run ruff check .     # lint
-uv run ruff format .    # format
 uv run pyright          # types
 ```
 
-Markers: `-m slow` (opt-out; ~9 min serial, **7m05s at `-n 12`**, re-measured 2026-08-10;
-was 4m33s at ~160 fewer tests), `-m oracle` (opt-in).
-
-**Suite runtime** (measurements + controls: `docs/test-suite-runtime.md`). Two rules
-bite: never `--dist loadgroup` (a group assigned from a collection hook is silently
-dropped, and it doubled the full run), and hypothesis's 200 ms per-example deadline
-stays disabled (`--hypothesis-profile=strict-deadline` restores it). Pytest runs at
-below-normal priority *class*, inherited by the xdist workers and `cargo` children;
-`SIMTEST_PRIORITY=normal` opts out.
+⚠ **`docs/test-suite-runtime.md` describes a suite that no longer exists** — the xdist
+rules, the `loadgroup` trap, the 7m05s measurement and the below-normal priority class all
+had ~2,400 tests as their subject. Kept as the record of why those rules existed; do not
+read it as current advice.
 
 ## Testing
 
