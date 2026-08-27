@@ -21,6 +21,7 @@ use domains::biosphere::{
     run_season, season_setup, season_setup_with, steps_for_years, SeasonScenario, BIO_DT,
     DEFAULT_SCENARIO,
 };
+use domains::biosphere::readouts::{peak_lai, trajectory};
 use domains::lab::{biosphere_with, Substitution};
 use simcore::state::State;
 
@@ -122,5 +123,33 @@ fn the_frozen_run_sits_between_a_lower_and_a_higher_substitution() {
     assert!(
         low < base && base < high,
         "frozen {base} is not between k=0.55 ({low}) and k=0.65 ({high})"
+    );
+}
+
+/// ⚠ The hazard `readouts.rs`'s header names, tested rather than trusted: the gates cache
+/// their trajectories in `OnceLock` cells keyed by name, and a cache one level down — on the
+/// parameterized `readouts::trajectory` itself, keyed by scenario — would hand a substituted
+/// run the frozen trajectory. The harness would then print "no change" as a finding, which is
+/// §7 of the plan with a new cause.
+///
+/// Two variants either side of the frozen value, read through the **lifted** path the harness
+/// will use, must give three distinct peaks.
+#[test]
+fn the_lifted_readouts_are_not_cached_across_substitutions() {
+    let at = |k: f64| {
+        let p = biosphere_with(&[Substitution::new("canopy.yaml", "extinction_coef", k)])
+            .expect("substitution");
+        peak_lai(&trajectory(DEFAULT_SCENARIO, 1, false, &p))
+    };
+    let (low, high) = (at(0.55), at(0.65));
+    let frozen = peak_lai(&trajectory(
+        DEFAULT_SCENARIO,
+        1,
+        false,
+        &biosphere_with(&[]).expect("empty"),
+    ));
+    assert!(
+        low < frozen && frozen < high,
+        "the lifted readouts returned a cached trajectory: {low} / {frozen} / {high}"
     );
 }

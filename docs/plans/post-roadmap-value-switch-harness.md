@@ -334,6 +334,84 @@ rather than invented per gate.
 **Say this in the output itself.** A table that shows quantities while the reader assumes it
 shows pass/fail is a worse failure than not printing it.
 
+
+### BUILT 2026-08-27 — the seam, the substitution and the lifted fixture
+
+Three commits, in this order, each verified with `cargo test --no-fail-fast`, `cargo clippy
+--all-targets -D warnings` and the regeneration tool reporting **19 of 19 goldens identical**.
+
+1. **The seam.** `system::build_season_with(scenario, &BiosphereParams)`, with `build_season`
+   delegating to it, plus `season_setup_with`. Predicted byte-neutral before running, and
+   measured so.
+2. **The substitution.** `config::with_override` rewrites one entry's value in a param file's
+   **text**; `domains::lab::biosphere_with` hands the rewritten text back through the ordinary
+   `params::*_from` loaders. `domains/src/lab.rs` sits beside the spine rather than in it,
+   because it reaches the config boundary and `biosphere_spine_purity` allows exactly two spine
+   modules to do that.
+3. **The lifted fixture.** `domains/src/biosphere/readouts.rs` — `Trajectory`, the
+   parameterized `trajectory(scenario, years, perennial, &p)`, and the seven folds. `mod runs`
+   and `mod folds` survive in `science_gates.rs` as `#[cfg(test)]` shims that supply the frozen
+   params, so **not one gate declaration changed** and the names in every gate body still
+   resolve.
+
+**The gates this earned, and what each is FOR:**
+
+* `tests/param_funnel.rs` — the biosphere has **exactly one** production param load and it is
+  the seam's hand-off. ⚠ The obvious §7 guard ("assert an override changes the output") is
+  inert by construction with a single funnel; the property that can actually rot is the funnel
+  being singular, so that is what is gated. A source scan is the only instrument that can see
+  it, for the same reason `biosphere_spine_purity.rs` gives.
+* `tests/value_switch_run.rs` — both directions, because either alone passes for the wrong
+  reason: unsubstituted is **bit-identical** to the frozen entry point, substituted **differs**,
+  and the frozen run sits strictly between a lower and a higher `k`.
+* `readouts::tests` — a fold reads **the trajectory's own** params.
+
+### ⚠⚠ The finding, and it is about a test being blind rather than a defect shipping
+
+The lift's whole hazard is a fold that reads `params::canopy()` instead of the trajectory's
+params: a substituted run would then be *folded with frozen coefficients* and the harness would
+under-report the movement. That mutation was applied and measured against the end-to-end suite:
+
+**`value_switch_run.rs` stayed GREEN.** It substitutes `extinction_coef`; the mutated fold
+reads `specific_leaf_area`. A behavioural A/B test can only see this defect when the field it
+substitutes is one the fold itself reads — which is a coincidence, not a design. Only
+`param_funnel.rs` caught it, and only because that particular mutation happened to add a
+production param load; a version reaching the frozen value by another route would have been
+invisible to the whole tree.
+
+So the property is now asserted directly (`a_fold_reads_the_trajectorys_own_params_not_the_
+frozen_ones`): two trajectories with the same series and different params must fold
+differently. **The lesson generalises: an end-to-end test is not a substitute for a test of the
+mechanism, and "the suite is green under my mutation" is a fact about the suite's reach, not
+about the mutation.**
+
+### The other hazards, closed rather than noted
+
+* **`OnceLock` across substitutions.** The gates cache their trajectories; a cache one level
+  down, on the parameterized `trajectory` keyed by scenario, would hand a substituted run the
+  frozen one and print "no change". The parameterized function is uncached and
+  `the_lifted_readouts_are_not_cached_across_substitutions` pins three distinct peaks either
+  side of the frozen value.
+* **The census macro's invocation is test code carrying no `#[cfg(test)]`** — found by the
+  funnel gate on its first run. Excluded as an *assertion*, not a list entry:
+  `the_gate_body_exclusion_is_real` fails if the macro stops emitting under `#[cfg(test)]`.
+* **A live ambiguity, refused rather than resolved.** `carbon_fraction` is declared by both
+  `canopy.yaml` and `nitrogen.yaml`, which fold it differently, so a bare field name resolves
+  only when exactly one file owns it.
+
+### What is left, and what it now costs
+
+The **report** — §8's comparison mode with §6's five requirements, driving each fold against
+its own gate's scenario (a chamber fold on an unsealed run must be an error, not a row) and
+labelling each gate's authority. Everything it needs is now callable from ordinary code.
+
+⚠ Still true, and still stated in the output when it lands: `ScienceGate::bound` is a string,
+so the report carries the bound **as written** beside the measured quantity, not a numeric
+margin. ⚠ And §6.1's distance-from-degenerate has exactly one baseline on record (0.253, the
+stunted regime) — whose source file was deleted with the Python suite, so **check it survived
+into the Rust senescence tests before citing it, and say the baseline is unavailable rather
+than inventing one.**
+
 ## 6. Requirements earned by the canopy-provenance session
 
 Each of these exists because reporting *without* it produced a wrong read on 2026-08-15.

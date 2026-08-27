@@ -198,127 +198,34 @@ macro_rules! science_gates {
 }
 
 // ---------------------------------------------------------------------------------
-// The runs the gates read — collected ONCE each, as pre-reduced per-step scalars.
+// The runs the gates read, and the folds they share.
 // ---------------------------------------------------------------------------------
+//
+// ⚠ **BOTH MOVED to `super::readouts` on 2026-08-27, and what is left here is a shim.**
+// The value-switch harness needs these quantities under substituted params, and a
+// `#[cfg(test)]` module is unreachable from any non-test binary — so the *fixture* moved out
+// while the *census* stayed put. Not one gate declaration changed, and the two names below are
+// still `runs::` and `folds::` for exactly that reason: renaming them would have edited every
+// gate body to no purpose. See `readouts.rs`'s header for the three routes and why this one.
 
 #[cfg(test)]
 mod runs {
-    use crate::biosphere::stocks::{CARBON_POOL, CONSUMER_CARBON, LEAF_C, STEM_C, STORAGE_C};
+    pub use crate::biosphere::readouts::Trajectory;
+
+    use crate::biosphere::params;
+    use crate::biosphere::readouts::trajectory;
     use crate::biosphere::system::{
         consumer_chamber_scenario, perennial_chamber_scenario, sealed_chamber_scenario,
     };
     use crate::biosphere::{
-        run_perennial, run_season, season_setup, season_steps, steps_for, steps_for_years,
-        SeasonScenario, BIO_DT, CONSUMER_CHAMBER_YEARS, DEFAULT_SCENARIO, LONG_HORIZON_YEARS,
-        PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS, SEASON_DAYS,
+        SeasonScenario, CONSUMER_CHAMBER_YEARS, DEFAULT_SCENARIO, LONG_HORIZON_YEARS,
+        PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
     };
-    use simcore::state::State;
     use std::sync::OnceLock;
 
-    /// One trajectory, reduced to the scalar series the gates fold.
-    ///
-    /// ⚠⚠ **Pre-reduction is the station's precedent, and it opens a hole Python does not
-    /// have.** `station/examples/emit_sealed_energy_drift.rs` already folds a per-step
-    /// temperature series rather than materializing 109,801 `State`s, and `year_summaries`
-    /// is generic precisely so it can. But that fold computes `n_years = (len - 1) / year`,
-    /// so an observer emitting `steps` samples instead of `steps + 1` yields **14** annual
-    /// summaries instead of 15 — and every gate still passes, because `non_collapsing`
-    /// over 14 years passes exactly as well as over 15. Python never needed a guard for
-    /// that; the pre-reduction is what creates it. Hence [`Trajectory::years`] and the
-    /// count assertion in every decade gate.
-    pub struct Trajectory {
-        pub scenario: SeasonScenario,
-        /// `biosphere.leaf_c` per step (initial state included).
-        pub leaf_c: Vec<f64>,
-        /// `biosphere.stem_c` per step.
-        pub stem_c: Vec<f64>,
-        /// `biosphere.storage_c` per step.
-        pub storage_c: Vec<f64>,
-        /// `biosphere.carbon_pool` per step — the chamber atmosphere.
-        pub carbon_pool: Vec<f64>,
-        /// `biosphere.consumer_carbon` per step, or empty where the stock is absent.
-        pub consumer_c: Vec<f64>,
-        /// Arbitration firings over the whole run. A band is a claim about a *well-fed*
-        /// run; a rationed run's trace is not the model's answer.
-        pub rationed: u64,
-        /// Extinction events over the whole run.
-        pub events: usize,
-        /// Seasons run — what the annual summary count must equal.
-        pub years: usize,
-    }
-
-    impl Trajectory {
-        /// Samples per season, in **steps** (the unit the trajectory is indexed by).
-        pub fn year(&self) -> usize {
-            steps_for(SEASON_DAYS)
-        }
-    }
-
-    fn trajectory(scenario: SeasonScenario, years: usize, perennial: bool) -> Trajectory {
-        let (state, integrator, resolver) = season_setup(&scenario, years).expect("season setup");
-        let steps = steps_for_years(years);
-        let mut t = Trajectory {
-            scenario,
-            leaf_c: Vec::with_capacity(steps + 1),
-            stem_c: Vec::with_capacity(steps + 1),
-            storage_c: Vec::with_capacity(steps + 1),
-            carbon_pool: Vec::with_capacity(steps + 1),
-            consumer_c: Vec::new(),
-            rationed: 0,
-            events: 0,
-            years,
-        };
-        {
-            let mut observe = |s: &State| {
-                t.leaf_c.push(s.stocks[LEAF_C].amount);
-                t.stem_c.push(s.stocks[STEM_C].amount);
-                t.storage_c.push(s.stocks[STORAGE_C].amount);
-                // ⚠ Both of these are present only in some scenarios, and the empty
-                // series that leaves is a SILENT-PASS hazard, not a convenience: an open
-                // field has no `biosphere.carbon_pool` at all (unsealed runs draw on the
-                // boundary atmosphere), and only the consumer chambers carry a herbivore.
-                // A fold over an empty series returns the identity — `min` returns
-                // +infinity, which is happily "above the compensation point". The folds
-                // that read them assert non-emptiness for exactly that reason.
-                if let Some(stock) = s.stocks.get(CARBON_POOL) {
-                    t.carbon_pool.push(stock.amount);
-                }
-                if let Some(stock) = s.stocks.get(CONSUMER_CARBON) {
-                    t.consumer_c.push(stock.amount);
-                }
-            };
-            let (_final, rationed, events) = if perennial {
-                run_perennial(
-                    &integrator,
-                    state,
-                    &scenario,
-                    &resolver,
-                    BIO_DT,
-                    steps,
-                    season_steps(),
-                    &mut observe,
-                )
-                .expect("perennial run")
-            } else {
-                run_season(
-                    &integrator,
-                    state,
-                    &resolver,
-                    BIO_DT,
-                    steps,
-                    None,
-                    &mut observe,
-                )
-                .expect("season run")
-            };
-            t.rationed = rationed;
-            t.events = events.len();
-        }
-        // The observer contract this whole module's arithmetic rests on: `run_season`
-        // calls it on the initial state AND each produced state. Asserted rather than
-        // trusted — see the `Trajectory` note.
-        assert_eq!(t.leaf_c.len(), steps + 1, "observer sample count");
-        t
+    /// A gate's run: the frozen scenario against the **frozen** params, always.
+    fn frozen(scenario: SeasonScenario, years: usize, perennial: bool) -> Trajectory {
+        trajectory(scenario, years, perennial, &params::biosphere())
     }
 
     macro_rules! cached_run {
@@ -326,7 +233,7 @@ mod runs {
             $(#[$attr])*
             pub fn $name() -> &'static Trajectory {
                 static CELL: OnceLock<Trajectory> = OnceLock::new();
-                CELL.get_or_init(|| trajectory($scenario, $years, $perennial))
+                CELL.get_or_init(|| frozen($scenario, $years, $perennial))
             }
         };
     }
@@ -336,6 +243,12 @@ mod runs {
     // would re-run the two 15-year chambers several times each. `OnceLock` is the
     // fixture's analogue and it is thread-safe, which matters because the test harness
     // runs these concurrently.
+    //
+    // ⚠⚠ The cells are keyed by NAME, and every one of them passes the frozen params —
+    // which is what makes caching safe here and would make it a defect one level down. A
+    // cache on `readouts::trajectory` keyed by scenario alone would hand a SUBSTITUTED run
+    // the frozen trajectory, and the value-switch harness would report "no change" as a
+    // finding. That is why the parameterized function is the uncached one.
     //
     // ⚠ Each scenario is driven THE WAY ITS OWN GOLDEN DRIVES IT — `sealed_chamber`
     // through `run_season` with no re-sow, the other four through `run_perennial`'s
@@ -367,90 +280,16 @@ mod runs {
     }
 }
 
-// ---------------------------------------------------------------------------------
-// The folds the gates share.
-// ---------------------------------------------------------------------------------
-
 #[cfg(test)]
 mod folds {
-    use super::runs::Trajectory;
-    use crate::biosphere::params::{canopy, photosynthesis, MOLAR_MASS_CARBON_KG_PER_MOL};
-    use crate::biosphere::science::leaf_area_index;
-    use crate::biosphere::system::sealed_chamber_scenario;
+    pub use crate::biosphere::readouts::{
+        min_ppm, peak_lai, peak_w, scale_of, segment_last, segment_max, segment_min,
+    };
 
-    /// kg C / kg DM — Greenwood's basis (`nitrogen.yaml` / `canopy.yaml`, cited).
-    pub const CARBON_FRACTION: f64 = 0.45;
-
-    /// The CO₂ compensation point in **chamber** ppm, from the frozen params.
-    ///
-    /// `Γ*` is the compensation point in the *intercellular* air; the gate is on the
-    /// *ambient* air, and the two are related by the C3 set point `Ci = ci_ratio · Ca`
-    /// the sealed carbon budget already uses. So the ambient floor is `Γ*/ci_ratio`.
-    /// Computed, never typed — which is why the recorded 61.07 needs its own tripwire.
+    /// The compensation-point floor at the **frozen** params — the gates' reading of
+    /// [`crate::biosphere::readouts::floor_ppm`], which takes them explicitly.
     pub fn floor_ppm() -> f64 {
-        photosynthesis().gamma_star / sealed_chamber_scenario().ci_ratio
-    }
-
-    /// Minimum chamber CO₂ (ppm) over the whole trajectory.
-    pub fn min_ppm(t: &Trajectory) -> f64 {
-        // ⚠ Not defensive tidying: an empty series folds to +infinity, which passes
-        // `min > floor` vacuously. An unsealed scenario reaching this fold is a wiring
-        // error that must be loud, not a band that quietly holds.
-        assert!(
-            !t.carbon_pool.is_empty(),
-            "min_ppm on a run with no chamber carbon pool"
-        );
-        let air = t.scenario.chamber_air_mol;
-        t.carbon_pool
-            .iter()
-            .map(|c| c / air * 1e6)
-            .fold(f64::INFINITY, f64::min)
-    }
-
-    /// Peak leaf area index over the whole trajectory.
-    pub fn peak_lai(t: &Trajectory) -> f64 {
-        let sla = canopy().sla_per_mol_c;
-        t.leaf_c
-            .iter()
-            .map(|c| leaf_area_index(*c, sla, t.scenario.ground_area))
-            .fold(f64::NEG_INFINITY, f64::max)
-    }
-
-    /// mol C → t DM/ha on Greenwood's basis (1 kg/m² == 10 t/ha).
-    pub fn t_per_ha(mol_c: f64, ground_area: f64) -> f64 {
-        ((mol_c * MOLAR_MASS_CARBON_KG_PER_MOL / CARBON_FRACTION) / ground_area) * 10.0
-    }
-
-    /// Peak whole-plant mass **excluding fibrous roots** (t/ha) — Greenwood's W.
-    pub fn peak_w(t: &Trajectory) -> f64 {
-        (0..t.leaf_c.len())
-            .map(|i| {
-                t_per_ha(
-                    t.leaf_c[i] + t.stem_c[i] + t.storage_c[i],
-                    t.scenario.ground_area,
-                )
-            })
-            .fold(f64::NEG_INFINITY, f64::max)
-    }
-
-    /// Per-year maximum of a per-step series (the `_peak_leaf` / segment-max fold).
-    pub fn segment_max(seg: &[f64]) -> f64 {
-        seg.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b))
-    }
-
-    /// Per-year minimum of a per-step series (the `_min_carbon_pool` fold).
-    pub fn segment_min(seg: &[f64]) -> f64 {
-        seg.iter().fold(f64::INFINITY, |a, &b| a.min(b))
-    }
-
-    /// Per-year LAST value of a per-step series (the `_year_end_consumer` fold).
-    pub fn segment_last(seg: &[f64]) -> f64 {
-        *seg.last().expect("non-empty year segment")
-    }
-
-    /// `max` over a slice — the scale the relative stationarity bounds are taken against.
-    pub fn scale_of(values: &[f64]) -> f64 {
-        segment_max(values)
+        crate::biosphere::readouts::floor_ppm(&crate::biosphere::params::biosphere())
     }
 }
 
