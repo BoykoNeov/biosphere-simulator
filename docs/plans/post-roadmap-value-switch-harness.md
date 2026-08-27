@@ -412,6 +412,76 @@ stunted regime) — whose source file was deleted with the Python suite, so **ch
 into the Rust senescence tests before citing it, and say the baseline is unavailable rather
 than inventing one.**
 
+
+### BUILT 2026-08-27 (cont.) — the report, and §9's first target MET
+
+`domains::lab::report` + `domains/examples/value_switch.rs`. The command is:
+
+```
+cargo run --release -q -p domains --example value_switch -- extinction_coef=0.60,0.65,0.68
+cargo run --release -q -p domains --example value_switch -- canopy.yaml:extinction_coef=0.65 --long
+```
+
+**§9's target is met, and it validates against the hand-measured numbers.** The long table
+reproduces the 2026-08-15 session's own readings *exactly*: the perennial fixed point moves
+0.578137 → 0.552202 at `k = 0.65`, which is **2.285× → 2.183×** the 0.253 degenerate baseline
+— §6.1 of this plan quotes 2.29× → 2.18× from the hand-written probes, and the clearance
+against the 0.55 bound moves 5.12 % → 0.40 %, which is what that session quoted too. Three
+throwaway probes, one command, same numbers.
+
+**The five §6 requirements, each as a feature of the output:**
+
+| # | How it lands |
+|---|---|
+| 1 distance-from-degenerate | printed as `[2.183x the 0.253 degenerate baseline]` — and only where a baseline is on record. The one that exists is carried in a gate's frozen `source` as PROSE; no baseline is invented for the rows that have none |
+| 2 authority label | every row prints `informs: science_bands` / `liveness_floors`, resolved from `GATES` rather than restated |
+| 3 opposed movement | a per-column tally with an explicit `OPPOSED` marker |
+| 4 no stored ranking | nothing is cached between runs; the table is re-derived every time |
+| 5 what did NOT move | a zero delta prints `<- UNCHANGED` rather than blending in |
+
+### ⚠⚠ The report's own first finding: the cheap table cannot show requirement 3, and now says so
+
+The short (no `--long`) table showed **"5 rose, 0 fell"** — a clean, one-directional
+improvement — and that reading is wrong. Every short row informs `science_bands`, because the
+roster's only `liveness_floors` quantity is a 15-year one. The opposition requirement 3 exists
+for is invisible *by omission*, not by misreading, and nothing in the table said so.
+
+Fixed as a line of output, not a note: the report now prints **"NO liveness_floors ROW IS IN
+THIS TABLE … opposed movement CANNOT be read from it"** whenever the rendered set carries only
+one authority, and `the_short_table_declares_the_family_it_cannot_show` pins it. With `--long`
+the same run reads **6 rose, 1 fell — OPPOSED**.
+
+⚠ The long test is **not** `#[ignore]`d. It costs the two 15-year runs (~15 s), and an ignored
+test is a test that never runs — this is the one assertion that the harness's whole reason for
+existing still holds.
+
+### A result worth recording, and NOT acting on
+
+`k = 0.68` gives a **lower** peak LAI (6.058617) than `k = 0.65` (6.069990), while peak W and
+every chamber CO₂ low keep rising. So peak LAI is **non-monotone in `k`** across this range,
+which the 2026-08-15 framing (a uniform ~3.5× amplifier from `k` to peak LAI) does not predict.
+Recorded as a measurement. It is not a defect, it is not an argument for any value, and it
+changes nothing in the tree.
+
+⚠ There is a free self-check built into any run that includes the frozen value: `k = 0.60`
+substitutes the value already in the file, and every one of its rows prints `<- UNCHANGED`. A
+harness whose substitution path had drifted would show a non-zero delta there.
+
+### Standing
+
+* **BUILT:** the seam, the substitution, the lifted readouts, the report, the command. §10's
+  re-expressed exit criteria are met: no param YAML, golden, manifest or gate bound moved
+  (regeneration 19/19 identical), the §9 table is one command, a mis-targeted override is
+  detected rather than reported as no-change, `cargo test` + clippy green, `simcore` untouched.
+* **NOT BUILT, and deliberately:** the sibling domains and the station. Their `*_from` loaders
+  are private and their params load at ~15 scattered sites (§5R); a biosphere-shaped seam does
+  not generalise, and a harness that quietly covered half while presenting itself as universal
+  is §7 wearing a different hat.
+* **NOT TAKEN:** the `extinction_coef` decision. Still open, still the user's. The evidence it
+  was priced on is now regenerable in one command instead of three throwaway scripts.
+* **The user's wider charge** — *"toggle of parameters **and science**"* — is half done. Values
+  toggle. Swapping a **mechanism** is a different seam and has not been priced.
+
 ## 6. Requirements earned by the canopy-provenance session
 
 Each of these exists because reporting *without* it produced a wrong read on 2026-08-15.
