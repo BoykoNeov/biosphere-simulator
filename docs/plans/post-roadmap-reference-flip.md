@@ -5932,7 +5932,7 @@ what makes a batch reviewable, not by crop or by Python filename:
 | C — water | `test_transpiration` 46, `test_soil_layers` 27, `test_water_cycle` 17, `test_root_depth` 16 | 106 | `science.rs` Penman-Monteith, stress, root zone |
 | D — carbon spending | `test_allocation` 43, `test_respiration` 25, `test_carbon_budget` 22, `test_stem_reserves` 22 | 112 | `science.rs` partition, Q10, growth budget |
 | E — nitrogen | `test_nitrogen` 37, `test_nitrogen_form` 15, `test_nitrogen_throttle` 7 | 59 | `science.rs` target N, uptake, stress — ⚠ **WRONG about two thirds of it, corrected in §5aj**: it lands on FOUR surfaces (`science.rs`, `flows.rs`, `params.rs`, `system.rs`), and 3 of the 59 are batch F's subject. **BUILT 2026-08-26.** |
-| F — soil carbon | `test_mineralization` 32, `test_soil_fractionation` 29, `test_decomposition` 19, `test_microbial_respiration` 17, **+3 handed over by batch E** | **100** | **flow-level** — no extracted functions exist. ⚠ Batch E measured the carried-N family (`carried_nitrogen` and the three N legs) guarded by the GOLDENS ALONE; that measurement is this batch's input |
+| F — soil carbon | `test_mineralization` 32, `test_soil_fractionation` 29, `test_decomposition` 19, `test_microbial_respiration` 17, **+3 handed over by batch E** | **100** | **flow-level** — ⚠ **and "no extracted functions exist" is TRUE while "cannot be tested without changing production code" is FALSE**, corrected in §5al: the flows are constructible structs and batch A's flow half already tested them that way. It also lands on `params.rs` and `system.rs`. ⚠ Batch E measured the carried-N family guarded by the GOLDENS ALONE; that measurement was this batch's input and is now closed. **BUILT 2026-08-27**, and S5 with it |
 | G — senescence | `test_senescence_form` 37, **+14 handed over by batch D** | **51** | `science.rs` shading + `flows.rs` Senescence — ⚠ **WRONG about the file it names**, corrected in §5ak: 25 of `test_senescence_form.py`'s 33 test functions have NO live subject at all (two candidate models that were never built, and a refused branch), so the batch's portable core is the 14 batch D handed over. It also lands on `params.rs`. **BUILT 2026-08-26**, taken before F on the user's call. |
 
 ⚠ **F is the batch that is not like the others** and it is deliberately late: it is the only
@@ -7710,3 +7710,251 @@ reddened `no_record_file_is_one_giant_line` on twelve rows. The log is a **prose
 carries 16 table rows against the plan doc's 815, and none of the per-batch "does not port"
 tables. The gate caught it, which is what it is for; the lesson is that the two files are not
 copies of one another and this batch had assumed they were.
+
+## §5al Stage 3 — S5 batch F BUILT, COMPLETE 2026-08-27: the last S5 batch, and the premise that held it back was false
+
+Batch F is the soil-carbon batch and the last of S5: `test_mineralization.py` 32,
+`test_soil_fractionation.py` 29, `test_decomposition.py` 19, `test_microbial_respiration.py`
+17, plus the **3 handed forward by batch E** from `test_nitrogen_form.py` (the carried-N
+family's litter-pool C:N claims). **100 tests, and for once the roster's headline number is
+right** — measured by collecting rather than by counting `def`s, which gives 94 because three
+of the four files carry a parametrized case.
+
+⚠ **F was held back through six batches for a reason that does not hold.** §5ad filed it as
+"the batch that is not like the others" and said it "cannot be written as pure-function tests
+without changing production code", warning that if an extraction were needed it would be "a
+separate decision with its own advisor call, not a thing to slip inside a testing batch".
+That premise is **false**, and measuring it was the first thing this batch did:
+
+* the six decomposer flows are plain structs with **public fields** — `Decomposition { .. }`
+  is a legal literal from a test module;
+* `respired_and_stabilized` is already `pub`;
+* `carried_nitrogen` is private, but the test module is *inside* the module, so `use super::*`
+  reaches it;
+* and batch A's gas-exchange third already tested flows exactly this way, one screen above, in
+  this very `mod tests`.
+
+So the batch was written with **no change to any science code at all**. The premise is
+recorded as falsified rather than silently skipped, per batch G's rule that an unstated no-op
+reads as the question never having been asked. What the batch *did* change is three
+`_from(text, name)` splits in `params.rs` — the mechanical kind, with ten existing precedents
+in the same file, needed for the reason every one of those exists: the committed text reaches
+the loader through `include_str!`, so without a text-taking entry point a rejection rule has
+**no caller that can hand it a broken file** and the guard is unreachable from any test. That
+is a testability seam, not the science extraction §5ad was guarding against.
+
+### ⚠ What the roster IS wrong about: 26 of `test_soil_fractionation.py`'s 29 have no live subject
+
+Soil carbon pool fractionation was **REFUSED TWICE** (2026-08-10). The file recording the
+refusal is written as executable tests, and its own docstring says so in as many words: *"The
+fractionated form does not exist in the tree, so it is assembled here"*, and *"nothing here is
+imported by `src/`"*. It defines `SplitSenescence` and `AggregateLitterNitrogenTransfer` in the
+test file, builds offline variants through its own `build_variant`, and measures how two
+principled sizings fail. **23 of the 29 run that refused form**; 3 more are arithmetic on
+RothC constants that exist only in the file; 3 are not about the refused model, and of those
+only **one** — `test_our_rate_sits_between_the_two_plant_material_rates` — makes a claim about
+a number the shipped tree holds.
+
+This is the third batch running to find its largest file is mostly a decision record: batch D
+found it in `test_stem_reserves.py` (10 of 22), batch G in `test_senescence_form.py` (25 of
+33), and here it is 26 of 29. **Three times is a property of this tree, not three separate
+judgements** — a refusal in this project is recorded by writing the refused model as runnable
+tests, and S5 inherits every one of them as a file it cannot port. The disposition is
+unchanged and for the same reason: porting them means building a refused model in Rust in
+order to re-refute it. Their content lives in
+`docs/plans/post-roadmap-soil-fractionation.md` and in `decomposition.yaml`'s own header.
+
+⚠ One of the three live claims is **recast rather than ported**, and the difference matters.
+`test_every_rothc_rate_is_safe_at_the_frozen_timestep` asserts `k·dt < 1` for the four RothC
+rates — rates *a build would adopt*, none of which this tree uses. Its successor asserts the
+same rule for the three rates the tree **does** use (`decomposition_rate`,
+`microbial_respiration_rate`, `slow_decomposition_rate`). Same rule, different subject; filed
+as a recast so it is not read as a port that quietly changed what it covers.
+
+### What the batch built
+
+**17 tests, no science-code change.** Ten flow-level in `flows.rs`, four loader-level in
+`params.rs`, three run-level in `system.rs`. `cargo test -p domains --lib` went from
+**306 passed** (batch G's exit measurement) to **323**, and the whole workspace plus
+`cargo clippy --all-targets -D warnings` is green.
+
+| # | test | home | subject |
+|---|---|---|---|
+| F1 | `the_three_humified_flows_each_send_their_own_cited_share_to_co2` | `flows.rs` | the three CO₂ shares (0.45 / 0.85 / 0.55), driven in ONE table so a cross-wired fraction reddens |
+| F2 | `every_decomposer_flux_is_first_order_in_its_own_donor_and_zero_at_an_empty_one` | `flows.rs` | `k · pool`, and structural positivity |
+| F3 | `every_soil_leg_is_bit_exactly_linear_in_dt` | `flows.rs` | the increment-form contract, over all six flows and every leg |
+| F4 | `the_partition_complement_is_computed_by_subtraction_and_that_is_measurable` | `flows.rs` | the exact-sum claim, WITH the control that makes it falsifiable |
+| F5 | `the_oxygen_throttle_is_live_on_all_six_soil_flows_and_shaped_either_side_of_its_knot` | `flows.rs` | `f_O2 = x/(K+x)` at three depleted points |
+| F6 | `carried_nitrogen_moves_the_donor_pools_own_ratio_and_is_zero_at_every_degenerate_input` | `flows.rs` | the one kernel behind all three N legs |
+| F7 | `the_nitrogen_riding_a_first_order_carbon_flux_is_that_same_carbon_rate` | `flows.rs` | THE identity that retired `mineralization_rate` |
+| F8 | `each_nitrogen_leg_splits_its_pool_exactly_as_its_carbon_sibling_splits_the_carbon` | `flows.rs` | N follows the carbon partition, three distinct N:C ratios in the fixture |
+| F9 | `each_nitrogen_leg_recomputes_its_siblings_carbon_flux_with_the_o2_throttle_biting` | `flows.rs` | the recomputation-drift guard, bit-exact against the ACTUAL sibling |
+| F10 | `no_nitrogen_leaves_a_soil_pool_whose_carbon_is_not_moving` | `flows.rs` | the mediation claim that survived the humification split |
+| F11 | `a_negative_decomposer_rate_is_rejected_and_a_zero_one_loads` | `params.rs` | both decomposer rate files, accept half reading back the field under test |
+| F12 | `each_humification_share_is_rejected_outside_the_closed_unit_interval` | `params.rs` | `[0,1]` CLOSED on three shares, non-negative on the fourth field |
+| F13 | `a_wrong_decomposer_unit_is_rejected` | `params.rs` | the exact unit-string guard on all seven decomposer scalars |
+| F14 | `the_frozen_decomposer_rates_are_step_safe_and_the_litter_rate_is_dpm_like` | `params.rs` | `k·dt < 1` at `BIO_DT`, and RothC's DPM/RPM ordering |
+| F15 | `the_sealed_soil_cascade_fills_and_drains_all_six_of_its_pools` | `system.rs` | the cascade RUNS — every pool fed and drained |
+| F16 | `the_seedless_litter_pool_holds_the_shed_carbon_to_nitrogen_ratio_as_an_identity` | `system.rs` | batch E's handover: the pool C:N is `M_C / n_residual` exactly |
+| F17 | `only_a_sealed_chamber_builds_soil_pools_and_its_organic_carbon_roster_is_these_eight` | `system.rs` | the open-field branch, and the organic-C summary roster |
+
+### The mutation battery: 27 mutations, and 20 of them the binary could not see before
+
+Harness and logs: `M:\claud_projects\temp\s5-batch-f`. Each mutation is applied alone to
+production code, `cargo test -p domains --lib --no-fail-fast` is run, and the file is reverted
+byte-exact; the baseline is re-run at the end and is green.
+
+**Every one of the 17 tests is reached by a mutation of its own subject.** Two needed a second
+pass to get there, and that is recorded below rather than smoothed over.
+
+⚠⚠ **The headline measurement: 20 of the 27 mutations reddened NOTHING but batch F's own
+tests.** Cross-wiring the humus flow's respiration share to the litter one, dropping the O₂
+throttle from any of the six flows, collapsing `LitterNitrogenTransfer` to a bare rate,
+removing `carried_nitrogen`'s negative guard, adding a ninth organic carbon pool to the sealed
+build, and every one of the four loader-guard mutations each left the pre-batch binary
+**entirely green**. Only five were caught by something that already existed: reading the wrong
+carbon pool, cross-wiring the microbial share, zeroing the slow rate (by C1's value table, not
+by anything about the mechanism), building the soil pools unsealed, and disabling the unit
+comparison — and the last two are caught because they break thirteen and eleven *other*
+mechanisms respectively, not because the soil chain was watched.
+
+⚠ The honest qualifier, because "green" here is `--lib`: **the goldens are a different
+binary**, and most of those mutants move a trajectory, so a full run would have caught them
+downstream — as a moved number, with no name attached. What no gate anywhere would have caught
+is the subset that changes no frozen run at all: **the four loader-guard mutations and
+`carried_nitrogen`'s negative guard**. A removed bound still loads the committed file to the
+same bits, and a negative `moved_carbon` never occurs on any scenario, so those five were
+guarded by nothing in the tree.
+
+**The two that needed a second pass**, recorded because a mutation that does not compile is
+not a mutation that missed:
+
+* the unit guard's first mutant tried to bypass `guarded_map` in `decomposition_from` and did
+  not compile. Rewritten against the real mechanism — `ParamFile::guarded`'s exact string
+  comparison in the `config` crate — where it is shared by every param file rather than
+  isolated to the decomposer ones: disabling it reddens twelve tests across five domains, of
+  which `a_wrong_decomposer_unit_is_rejected` is the only one covering these three files. That
+  is a true statement about where the guard lives, and a weaker isolation than the other
+  twenty-four, which is why it is written down.
+* the open-field/roster test had **no mutation in the first battery at all**, which is exactly
+  the hole a battery exists to expose — a test with no mutation is a test whose reachability
+  was argued rather than measured. Two were added: building the soil pools unsealed (13 other
+  tests redden with it) and adding a ninth organic carbon pool to the sealed build, which
+  reddens **only** this test in the whole binary. The organic-carbon roster — the guard against
+  a new pool slipping out of a "total organic C" summary, which this project has already been
+  bitten by four times — was watched by nothing before.
+
+### ⚠ The batch F self-review: one decorative assertion, one already-covered one, one red gate
+
+The batch was read again after the battery, asking the question batch G's review asked: is any
+assertion *inside* a passing test sitting where its subject cannot move it? Three answers, and
+the first is a real defect of the same family.
+
+**A value pin made the two assertions after it decoration.** `the_frozen_decomposer_rates_are_step_safe_and_the_litter_rate_is_dpm_like`
+opened with `(ours_yr - 4.015).abs() < 1e-12` and only then asserted the RothC band and the
+DPM-vs-RPM ordering. Given the value pin, both are consequences — and a moved rate fails the
+pin first, so the band and the ordering never run. It was also a **duplicate**:
+`decomp.decomposition_rate` is pinned bit-exactly by C1 and 4.015 is that number times 365,
+which is the very shape batch G deleted a five-literal pin for. The value pin is gone; the band
+and the ordering are what the test is for and are now all it says. Measured after the change:
+multiplying the loaded rate by 5 reddens it, along with C1's value table and one canopy gate.
+
+**The "O₂ draw is the burned carbon, not the moved carbon" assertion is real but already
+covered.** Making `Decomposition` draw O₂ against the whole withdrawal reddens 22 tests — the
+whole scenario roster. So F1's last line is not inert, but it is also not this batch's only
+cover for that claim, and it is written down as such rather than counted as new ground.
+
+**And the end-of-batch routine turned a gate red that a scoped run had called green.**
+`cargo test -p repo_gates` passes 7 tests and says nothing about `context_budget`, which is a
+separate **integration target** (`--test context_budget`) and did not run. The new `MEMORY.md`
+index line pushed the average hook length to 170.2 B against a 170 B/line budget, and only the
+full `cargo test --workspace` found it. ⚠ *This is `memory/pdf-pins-green-by-skip-on-ci.md`'s
+third arrow arriving again — a scoped command's green is a claim about the scope, not about the
+gate you had in mind.* The fix is the one the gate's own message prescribes: **shorten the
+hook**, not raise the bound.
+
+### ⚠ Three findings, and two of them are this batch's own drafts failing
+
+**1. The carried-nitrogen identity is structurally blind to the carbon AMOUNT, and the first
+draft of its test did not know that.** `carried_nitrogen(k·C·dt, N, C) = k·N·dt`: the `C`
+cancels exactly. The draft tried to state "this is not the collapsed `rate · litter_n` form"
+by halving the litter carbon and expecting the moved nitrogen to halve. It does not move at
+all — the test failed measuring `0.022` against an expected `0.011`, and it failed for the
+right reason. *The one input this identity cannot see is the one the draft chose to vary.*
+What does separate the two forms is anything the carbon **flux** carries and a bare rate does
+not: the `f_O2` throttle, and an empty carbon pool under standing nitrogen. Those are now the
+test's second half and F10's first half. Confirmed by mutation: collapsing the leg to a bare
+rate reddens five tests, and the fixed F7 is one of them.
+
+**2. `respired + stabilized == moved` is a TAUTOLOGY, and it was nearly shipped as the
+claim.** `respired_and_stabilized`'s doc comment justifies computing the complement by
+subtraction rather than as `moved · (1 - f)` — "so the two destination legs sum back to the
+withdrawal exactly in floating point and no partition round-off reaches the conservation
+gate". The obvious test of that sentence cannot fail: for the subtraction form the sum is
+exact at every input. Worse, at the batch's own fixture values (`0.044` at `f = 0.45`) the
+rejected multiplication form gives a **bit-identical** complement, so even comparing the two
+forms says nothing there. An input where they part had to be searched for — `moved = 5e-5` at
+`f = 0.45`, where the multiplication complement is one ulp high and its sum overshoots. The
+test states both halves, and the multiplication mutant reddens it and nothing else in the
+binary. ⚠ Same shape as the batch's inheritance — *an assertion sitting where its subject
+cannot move it* — but at a new kind of place: not a symmetry point, a region where two
+different implementations are numerically indistinguishable.
+
+**3. A ported assertion can carry its old scenario's initial condition.** The Python sealed
+tests open with `litter[0] == 0.0` and then assert the pool rises. That is a claim about a bare
+`SeasonScenario(sealed=True)`, which seeds no litter. The **named** chamber this tree runs
+seeds `litter_carbon0 = 3.0`, so the litter pool starts at its own maximum and only drains —
+and the ported form failed on its first run. The claim that survives the difference, and the
+one those tests were making anyway, is *rises somewhere AND falls somewhere*: a cascade
+missing any one of its three sinks still conserves carbon perfectly, and the pile-up in the
+pool whose outflow is gone is invisible to every other gate in the binary.
+
+### The `f_O2` precondition, applied before writing rather than found after
+
+At the chamber's own fill the oxygen mole fraction is 0.21 against `K_O2 = 1e-4`, so
+`f_O2 = 0.99952`. **Deleting the factor outright moves every number by 5e-4** — inside any
+tolerance loose enough to be written down. Batch G's finding (a pin AT the knot is blind to
+the shape either side of it) and batch E's (a pin at its subject's symmetry point is not a
+pin) are the same defect, and a full O₂ pool is exactly such a place for all six soil flows.
+So every `f_O2` assertion in this batch is evaluated at a **depleted** pool, at three points
+rather than one: `o2 = 0.1` mol gives `f = 1/2` exactly (the half-saturation knot), `o2 = 0.3`
+gives `3/4`, `o2 = 0.9` gives `9/10`. A single pin at the knot is satisfied by any curve
+through it — `x/(2K + x)` would give 1/3 and 3/5 at the other two — so the shape is what makes
+a wrong `K` or a wrong form visible. The battery confirms it: the throttle mutants redden F5
+on all six flows.
+
+### What batch F deliberately does NOT port, per test
+
+Written as a list rather than as forward items, per batch C's review finding.
+
+| the tests | disposition |
+|---|---|
+| the **23 tests of `test_soil_fractionation.py` that run the refused form** (`test_the_cited_partition_gives_one_aggregate_rate_and_a_647x_gain`, `test_the_aggregate_rate_is_NOT_constant_*`, `test_cited_and_fitted_partitions_agree_BY_CONSTRUCTION_*`, `test_the_remaining_gap_*`, `test_the_constant_inventory_sizing_starves_the_re_sow`, `test_whether_the_constant_flux_sizing_still_rations`, `test_a_seeded_slow_pool_only_ever_DRAINS`, `test_the_frozen_consumer_chamber_carries_stem_only_CLEANLY`, `test_whether_fractionation_still_MOVES_*`, `test_half_a_mol_higher_*`, `test_the_option_b_identity_is_EXACT_under_fractionation_*`, `test_the_seed_artefact_becomes_PERMANENT_*`, `test_peak_litter_n_names_a_DIFFERENT_EVENT_*`, `test_the_split_re_targets_the_litter_leg_*`, `test_the_open_field_builds_no_litter_pools_*`, `test_exactly_one_swept_sizing_clears_both_gates_*`, `test_the_form_alone_is_benign_across_the_sealed_roster`, `test_whether_the_one_pool_form_can_take_the_same_inventory`, `test_whether_sizing_1s_attractor_*`, `test_fractionation_does_not_STARVE_the_loop_*`, `test_the_shedding_fed_regime_takes_BOTH_sizings_*`, `test_the_flux_sizing_fires_on_the_SAME_season_day_*`, `test_the_consumer_chamber_is_NOT_what_refuses_the_seam`) | **no successor, by nature.** They run `SplitSenescence`, `AggregateLitterNitrogenTransfer` and `build_variant`, three constructions defined inside the test file and never built, to record a refusal. Same disposition as batch D's `test_stem_reserves.py` design record, batch E's `test_nitrogen_throttle.py` and batch G's two candidate-model families. ⚠ They carry real numbers — the 6.47x aggregate-rate gain, the 50-year attractor at 0.64x the liveness floor, the exactly-one-swept-sizing window — and those live in `docs/plans/post-roadmap-soil-fractionation.md` and `memory/soil-fractionation-refused.md` |
+| `test_the_hoosfield_pools_sum_exactly_to_the_stated_total` | **no successor, and it is not an absence.** Its subject is the test file's own `HOOSFIELD_T_C_HA` literals — arithmetic authenticating a `pdftotext` reading of a page render, from a gitignored `sources/` tree. Nothing in the shipped tree holds those five numbers. Batch G gave the identical disposition to a `LISTING5_STEM` constant asserted against itself |
+| `test_loader_reads_committed_rate` (×2), `test_loader_reads_the_cited_partition`, `test_loader_reads_the_cited_stabilization_efficiency` | **already owned, measured not assumed.** All seven decomposer scalars are pinned bit-exactly, as hex-float literals, by C1's `every_value_matches_the_generated_table`. Batch G's rule: a rule with two copies has one that goes stale |
+| `test_decomposition_balances_carbon_AND_oxygen`, `test_respiration_balances_carbon_and_oxygen`, `test_flows_balance_nitrogen_only`, `test_sealed_conserves_carbon_exactly` (×2), `test_sealed_conserves_oxygen_exactly`, `test_sealed_conserves_oxygen_through_microbial_respiration`, `test_sealed_conserves_nitrogen_exactly` | **the engine's own machinery.** `assert_conserved` runs every step of every run, so a completed scenario run is the proof. Batch A recorded the identical disposition |
+| `test_sealed_never_rations` (×3), `test_sealed_no_extinction` (×3) | **already owned.** `system.rs::sealed_chamber_runs_well_fed` asserts `rationed == 0` and `events.is_empty()` on that very run. Six copies of one claim |
+| `test_sealed_o2_stays_far_from_rationing` | **premise false in the reference** — batch A already recorded why: `f_O2` is LIVE here and the sealed chamber depletes O₂ on purpose |
+| `test_there_is_no_mineralization_param_file_or_loader`, the `hasattr` half of `test_the_free_mineralization_rate_no_longer_EXISTS_to_be_calibrated` | **guarded by the COMPILER**, harder than by a test. No `mineralization` module exists, and `params.rs` reaches its files through `include_str!`, so a re-added file is unread AND caught by `the_census_matches_the_directory_on_disk`. Same disposition batch D gave `test_context_storage_excluded_from_biomass` |
+| `test_the_retired_provenance_record_is_preserved` | **no successor.** Its subject is a Python-tree archive path (`docs/retired/mineralization.yaml`) — the ungated-prose gap, not a science claim |
+| `test_the_return_legs_take_the_DECOMPOSER_params_not_their_own` | **recast, not dropped.** A Python `isinstance` check; the Rust flows carry bare `f64` rate fields, so there is no type to assert. What the check is really about is that no independent N rate exists — and an independent N rate is exactly what makes F16's identity fail. Asserted end to end on the built registry instead, which is stronger than reading a field back |
+| `test_a_zero_respired_fraction_reproduces_the_pre_split_transfer`, `test_es_of_one_reproduces_the_pre_split_respiration` | **no successor, and it is a judgement.** Both assert a member of the partition family that the tree does NOT ship (`f = 0`, `Es = 1`), pinned so "the frozen form implicitly asserted a CUE of 1.0" reads as checkable rather than as prose. F1 pins the partition as a function of the share and F12 pins that both interval ends load, which together make the family's behaviour derivable — but neither states the historical claim, and the historical claim is what those two tests are for. Its home is `humification.yaml`'s own header, which says it in as many words |
+| `test_sealed_plant_n_is_withdrawn_by_shedding`'s target-floor half, `test_sealed_f_n_stays_one_carbon_decoupled` | **already owned.** `only_the_open_field_crop_leaves_greenwoods_plateau` and the `f_N` wiring test in `system.rs` are batch E's successors to both |
+
+### What batch F leaves standing
+
+* **S5 is COMPLETE.** All seven batches are built; no Python biosphere test file is unported
+  and undispositioned.
+* **The four two-sided characterization bands still have no Rust home** (batch E's Greenwood
+  margin pin and batch G's three margin narratives), and the question underneath — does the
+  reference want a class of pin that is deliberately not a contract? — is S6's.
+* **The by-name claim census (exit-gate clause 3) is now deferred by SEVEN consecutive
+  batches**, and batch F's own additions to its input are the twenty-six soil-fractionation
+  dispositions above.
+* **`intercepted_fraction` still unresolved** (S6; clause 4 of the exit gate).
+* **`soil_n_availability`'s band is ordered by nothing** — batch E's S6 item, untouched.
+* **`daily_thermal_time`'s 30 °C cap** — batch B's unreachable branch, still owned by nothing.
+* **The biosphere is still Euler-only in the Rust tree** (batch D).
+* **`compartment_boundary_ledger` has no Rust equivalent** — batch C's gap, untouched.
+* **No Python deleted.** All four files stay green and running (97 collected across them)
+  until S6.

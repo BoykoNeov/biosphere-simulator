@@ -770,30 +770,41 @@ pub fn nitrogen_from(text: &str, name: &'static str) -> NitrogenParams {
     }
 }
 
-/// First-order litter decay (`decomposition.yaml`). Zero is valid (no decomposition).
-pub fn decomposition() -> DecompositionParams {
-    const NAME: &str = "decomposition.yaml";
-    let f = file(DECOMPOSITION_YAML, NAME);
-    let v = guarded_map(&f, &[("decomposition_rate", "1/day")], NAME);
+/// First-order litter decay, from arbitrary file TEXT — see [`transpiration_from`] for
+/// why the split exists.
+///
+/// ⚠ NON-NEGATIVE, not positive: the file's own header states *"A zero rate is valid (no
+/// decomposition)"*, so a `require_positive` here would reject a legal file. A NEGATIVE
+/// rate would run the decomposer chain backwards — microbial biomass and CO2 flowing back
+/// into standing litter through a flow whose legs say the opposite — and the flow-level
+/// direction pins could not catch it, because the legs would still balance.
+pub fn decomposition_from(text: &str, name: &'static str) -> DecompositionParams {
+    let f = file(text, name);
+    let v = guarded_map(&f, &[("decomposition_rate", "1/day")], name);
     DecompositionParams {
         decomposition_rate: checked(
-            require_non_negative(v["decomposition_rate"], "decomposition_rate", NAME),
-            NAME,
+            require_non_negative(v["decomposition_rate"], "decomposition_rate", name),
+            name,
         ),
     }
 }
 
-/// First-order microbial respiration (`microbial_respiration.yaml`).
-pub fn microbial_respiration() -> MicrobialRespirationParams {
-    const NAME: &str = "microbial_respiration.yaml";
+/// First-order litter decay (`decomposition.yaml`). Zero is valid (no decomposition).
+pub fn decomposition() -> DecompositionParams {
+    decomposition_from(DECOMPOSITION_YAML, "decomposition.yaml")
+}
+
+/// First-order microbial respiration, from arbitrary file TEXT — see
+/// [`transpiration_from`] for why the split exists.
+pub fn microbial_respiration_from(text: &str, name: &'static str) -> MicrobialRespirationParams {
     let units: [(&str, &str); 2] = [
         ("microbial_respiration_rate", "1/day"),
         ("o2_half_saturation", "mol/mol"),
     ];
-    let f = file(MICROBIAL_RESPIRATION_YAML, NAME);
-    let v = guarded_map(&f, &units, NAME);
+    let f = file(text, name);
+    let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_non_negative(v[field], field, NAME), NAME);
+        checked(require_non_negative(v[field], field, name), name);
     }
     MicrobialRespirationParams {
         microbial_respiration_rate: v["microbial_respiration_rate"],
@@ -801,10 +812,21 @@ pub fn microbial_respiration() -> MicrobialRespirationParams {
     }
 }
 
-/// The humification split, a carbon-use efficiency (`humification.yaml`).
-pub fn humification() -> HumificationParams {
-    const NAME: &str = "humification.yaml";
-    let f = file(HUMIFICATION_YAML, NAME);
+/// First-order microbial respiration (`microbial_respiration.yaml`).
+pub fn microbial_respiration() -> MicrobialRespirationParams {
+    microbial_respiration_from(MICROBIAL_RESPIRATION_YAML, "microbial_respiration.yaml")
+}
+
+/// The humification split, from arbitrary file TEXT — see [`transpiration_from`] for why
+/// the split exists.
+///
+/// ⚠ The three CO2 shares are guarded on the CLOSED unit interval and the slow rate is
+/// guarded non-negative, which is two different rules in one file. A share outside [0, 1]
+/// is not a hot partition: it would send MORE carbon to CO2 than the flow withdrew, and the
+/// complement — computed by subtraction — would come out negative, i.e. a destination leg
+/// that withdraws from its own receiver while the flow still balances.
+pub fn humification_from(text: &str, name: &'static str) -> HumificationParams {
+    let f = file(text, name);
     let v = guarded_map(
         &f,
         &[
@@ -813,22 +835,22 @@ pub fn humification() -> HumificationParams {
             ("slow_respired_fraction", "mol/mol"),
             ("slow_decomposition_rate", "1/day"),
         ],
-        NAME,
+        name,
     );
     for field in [
         "litter_respired_fraction",
         "active_stabilization_co2_fraction",
         "slow_respired_fraction",
     ] {
-        checked(require_closed(v[field], 0.0, 1.0, field, NAME), NAME);
+        checked(require_closed(v[field], 0.0, 1.0, field, name), name);
     }
     checked(
         require_non_negative(
             v["slow_decomposition_rate"],
             "slow_decomposition_rate",
-            NAME,
+            name,
         ),
-        NAME,
+        name,
     );
     HumificationParams {
         litter_respired_fraction: v["litter_respired_fraction"],
@@ -836,6 +858,11 @@ pub fn humification() -> HumificationParams {
         slow_respired_fraction: v["slow_respired_fraction"],
         slow_decomposition_rate: v["slow_decomposition_rate"],
     }
+}
+
+/// The humification split, a carbon-use efficiency (`humification.yaml`).
+pub fn humification() -> HumificationParams {
+    humification_from(HUMIFICATION_YAML, "humification.yaml")
 }
 
 /// Condensation + recycling rates, from arbitrary file TEXT — see [`transpiration_from`]
@@ -2809,6 +2836,285 @@ parameters:
         assert!(
             p.rdr_leaf > 0.0 && p.rdr_stem > 0.0 && p.rdr_root > 0.0,
             "the frozen rates shed from DS 0, where the source sheds nothing"
+        );
+    }
+
+    // -----------------------------------------------------------------------------
+    // S5 batch F — soil carbon: the three decomposer files' loader guards, reachable for
+    // the first time.
+    //
+    // The three `_from(text, name)` splits above are this batch's ONLY production change,
+    // and they are the mechanical precedent-following kind: ten such splits already exist
+    // in this file (`respiration_from`, `transpiration_from`, `phenology_from`,
+    // `senescence_from`, `water_cycle_from`, …), each for exactly this reason — the
+    // committed text reaches the loader through `include_str!`, so without a text-taking
+    // entry point a rejection rule has no caller that can hand it a broken file and the
+    // guard is unreachable from any test. ⚠ This is NOT the "production extraction" §5ad
+    // held batch F back for. That was about the soil SCIENCE having no extracted
+    // functions, and it turned out not to need one (see the batch F block in `flows.rs`).
+    //
+    // ⚠ The four "loader reads the committed value" tests get NO successor: all seven
+    // decomposer scalars are pinned bit-exactly, as hex-float literals, by
+    // `every_value_matches_the_generated_table` above. Batch G's rule — a rule with two
+    // copies has one that goes stale — and its own measurement that the second copy adds
+    // nothing.
+    // -----------------------------------------------------------------------------
+
+    /// A NEGATIVE decomposer rate is rejected on every field of both files; a ZERO one
+    /// LOADS, and loads AS zero.
+    ///
+    /// The two halves are one claim. `decomposition.yaml`'s own header states *"A zero rate
+    /// is valid (no decomposition)"*, so a `require_positive` would reject a legal file —
+    /// which is what makes the accept half the control that stops the guard being
+    /// always-on. A NEGATIVE rate is the dangerous one and is invisible downstream: the
+    /// decomposer chain would run backwards, microbial biomass and CO2 flowing back into
+    /// standing litter, with every leg internally balanced the whole way. Conservation
+    /// cannot see it and neither can the arbitration backstop.
+    ///
+    /// ⚠ **The accept half READS BACK THE FIELD UNDER TEST.** That is batch G's review
+    /// finding written into this batch before the fact rather than after it: an accept half
+    /// that reads one fixed field asserts, for every OTHER field, that the field it did not
+    /// touch is unchanged — and never looks at the one it did.
+    /// Mirrors `test_loader_rejects_negative_rate` in `test_decomposition.py` and
+    /// `test_microbial_respiration.py`.
+    #[test]
+    fn a_negative_decomposer_rate_is_rejected_and_a_zero_one_loads() {
+        let broken = value_of(DECOMPOSITION_YAML, "decomposition_rate", "-0.01");
+        rejects(
+            || {
+                decomposition_from(broken, "decomposition.yaml");
+            },
+            "decomposition_rate",
+        );
+        let zero = value_of(DECOMPOSITION_YAML, "decomposition_rate", "0.0");
+        assert_eq!(
+            decomposition_from(zero, "decomposition.yaml").decomposition_rate,
+            0.0,
+            "a zero decomposition_rate must LOAD, and load AS zero"
+        );
+
+        fn micro_field(p: &MicrobialRespirationParams, field: &str) -> f64 {
+            match field {
+                "microbial_respiration_rate" => p.microbial_respiration_rate,
+                "o2_half_saturation" => p.o2_half_saturation,
+                other => panic!("{other} is not a microbial_respiration field"),
+            }
+        }
+        for field in ["microbial_respiration_rate", "o2_half_saturation"] {
+            let broken = value_of(MICROBIAL_RESPIRATION_YAML, field, "-0.01");
+            rejects(
+                || {
+                    microbial_respiration_from(broken, "microbial_respiration.yaml");
+                },
+                field,
+            );
+            let zero = value_of(MICROBIAL_RESPIRATION_YAML, field, "0.0");
+            let loaded = microbial_respiration_from(zero, "microbial_respiration.yaml");
+            assert_eq!(
+                micro_field(&loaded, field),
+                0.0,
+                "a zero {field} must LOAD, and load AS zero"
+            );
+        }
+        // ...and the committed file still loads, with its two fields DISTINCT — the
+        // control for the loop, which a loader returning one constant (and so passing
+        // every `== 0.0` above) fails. Stated as distinctness rather than as two literals
+        // because the VALUES are already pinned by `every_value_matches_the_generated_table`.
+        let p = microbial_respiration();
+        assert_ne!(
+            p.microbial_respiration_rate.to_bits(),
+            p.o2_half_saturation.to_bits(),
+            "the two fields must not collapse to one value"
+        );
+    }
+
+    /// Each humification share is rejected OUTSIDE the closed unit interval and accepted at
+    /// both ends of it; the slow rate is rejected only below zero.
+    ///
+    /// Two different rules in one file, so they are exercised separately. A share above 1
+    /// is not a merely hot partition: `respired_and_stabilized` computes the complement by
+    /// SUBTRACTION, so `f > 1` makes the stabilised leg NEGATIVE — a destination leg that
+    /// withdraws from its own receiver — and the flow still balances, which is exactly the
+    /// class of error the conservation gate cannot see. `f = 0` and `f = 1` are both legal
+    /// and meaningful (`f = 0` is the pre-2026-08-10 frozen form, in which the whole
+    /// decayed flux reached the receiving pool), which is why the bound is CLOSED and why
+    /// the accept half matters.
+    ///
+    /// ⚠ The accept half reads back the field under test, per the note above. ⚠ And the
+    /// three shares are checked with the OTHER two left at their committed values, so a
+    /// guard applied to the wrong field of the four reddens rather than passing.
+    #[test]
+    fn each_humification_share_is_rejected_outside_the_closed_unit_interval() {
+        fn humi_field(p: &HumificationParams, field: &str) -> f64 {
+            match field {
+                "litter_respired_fraction" => p.litter_respired_fraction,
+                "active_stabilization_co2_fraction" => p.active_stabilization_co2_fraction,
+                "slow_respired_fraction" => p.slow_respired_fraction,
+                "slow_decomposition_rate" => p.slow_decomposition_rate,
+                other => panic!("{other} is not a humification field"),
+            }
+        }
+        for field in [
+            "litter_respired_fraction",
+            "active_stabilization_co2_fraction",
+            "slow_respired_fraction",
+        ] {
+            for bad in ["-0.01", "1.01"] {
+                let broken = value_of(HUMIFICATION_YAML, field, bad);
+                rejects(
+                    || {
+                        humification_from(broken, "humification.yaml");
+                    },
+                    field,
+                );
+            }
+            for (edge, want) in [("0.0", 0.0), ("1.0", 1.0)] {
+                let ok = value_of(HUMIFICATION_YAML, field, edge);
+                assert_eq!(
+                    humi_field(&humification_from(ok, "humification.yaml"), field),
+                    want,
+                    "{field} at {edge} is inside the CLOSED interval and must load"
+                );
+            }
+        }
+        // The slow rate is a rate, not a share: below zero is rejected, and ABOVE one is
+        // not — a `require_closed` copied onto it would reject a legal (if fast) file.
+        let negative = value_of(HUMIFICATION_YAML, "slow_decomposition_rate", "-0.01");
+        rejects(
+            || {
+                humification_from(negative, "humification.yaml");
+            },
+            "slow_decomposition_rate",
+        );
+        let fast = value_of(HUMIFICATION_YAML, "slow_decomposition_rate", "2.0");
+        assert_eq!(
+            humification_from(fast, "humification.yaml").slow_decomposition_rate,
+            2.0,
+            "the slow rate carries no upper bound"
+        );
+        // ...and the committed file's four values are DISTINCT, which is what a loader
+        // returning one constant for all four fails.
+        let p = humification();
+        let mut seen: Vec<u64> = [
+            "litter_respired_fraction",
+            "active_stabilization_co2_fraction",
+            "slow_respired_fraction",
+            "slow_decomposition_rate",
+        ]
+        .iter()
+        .map(|f| humi_field(&p, f).to_bits())
+        .collect();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), 4, "the four fields must not collapse");
+    }
+
+    /// A wrong unit is rejected on every field of all three decomposer files.
+    ///
+    /// The unit guard is an exact string match, and the failure it exists to catch is a
+    /// silent factor: `1/year` where `1/day` is meant would run the decomposer chain 365x
+    /// slow, produce a perfectly conserved, perfectly plausible trajectory, and move no
+    /// bound anything else asserts.
+    /// Mirrors `test_loader_rejects_bad_unit` in `test_decomposition.py` and
+    /// `test_microbial_respiration.py`.
+    #[test]
+    fn a_wrong_decomposer_unit_is_rejected() {
+        let broken = unit_of(DECOMPOSITION_YAML, "decomposition_rate", "1/year");
+        rejects(
+            || {
+                decomposition_from(broken, "decomposition.yaml");
+            },
+            "decomposition_rate",
+        );
+        for field in ["microbial_respiration_rate", "o2_half_saturation"] {
+            let broken = unit_of(MICROBIAL_RESPIRATION_YAML, field, "1/year");
+            rejects(
+                || {
+                    microbial_respiration_from(broken, "microbial_respiration.yaml");
+                },
+                field,
+            );
+        }
+        for field in [
+            "litter_respired_fraction",
+            "active_stabilization_co2_fraction",
+            "slow_respired_fraction",
+            "slow_decomposition_rate",
+        ] {
+            let broken = unit_of(HUMIFICATION_YAML, field, "kg/m^2");
+            rejects(
+                || {
+                    humification_from(broken, "humification.yaml");
+                },
+                field,
+            );
+        }
+    }
+
+    /// The frozen decomposer rates are safe at the frozen STEP, and the litter rate is a
+    /// DPM-like one on RothC's own scale.
+    ///
+    /// Two live claims recovered from `test_soil_fractionation.py`, which is otherwise a
+    /// record of a REFUSED design (see the batch F note in the plan doc). Both are about
+    /// the tree that exists rather than about the fractionated form that does not:
+    ///
+    /// * `k · dt < 1` for all three first-order decomposer rates at `BIO_DT`. This is what
+    ///   makes every decomposer draw self-limit against its own start-of-step pool, and it
+    ///   is why the sealed chambers never need the arbitration backstop. ⚠ Asserted at the
+    ///   engine's ACTUAL step: the Python original had the `dt` in its docstring and not in
+    ///   its expression, dividing by 365 and stopping, which blessed a rate against a step
+    ///   nothing checked.
+    /// * [RothC] Coleman & Jenkinson, RothC-26.3 guide §1.5 p. 9 states the plant-material
+    ///   decay constants as `DPM 10.0/yr` and `RPM 0.3/yr`. Ours is `0.011/day = 4.015/yr`
+    ///   — below the decomposable pool, an order above the resistant one. That places the
+    ///   single bulk litter pool on the DECOMPOSABLE side of RothC's split, which is the
+    ///   provenance claim `decomposition.yaml`'s own header makes ("fast edge, top of the
+    ///   cited range") stated as an ordering rather than as prose.
+    ///
+    /// ⚠ Stated as a BAND and an ORDERING, and deliberately NOT as the value. A first
+    /// draft opened with `(ours_yr - 4.015).abs() < 1e-12`, which made the two assertions
+    /// after it decoration: a moved rate fails the value pin first and the band never runs.
+    /// It was also a duplicate — `decomp.decomposition_rate` is pinned bit-exactly by
+    /// `every_value_matches_the_generated_table`, and 4.015 is that number times 365. The
+    /// claim this test is FOR is where our rate sits on RothC's scale, so that is all it
+    /// asserts. The two RothC constants are the SOURCE's, not numbers this tree produced.
+    /// Mirrors `test_every_rothc_rate_is_safe_at_the_frozen_timestep` and
+    /// `test_our_rate_sits_between_the_two_plant_material_rates`.
+    #[test]
+    fn the_frozen_decomposer_rates_are_step_safe_and_the_litter_rate_is_dpm_like() {
+        let rates = [
+            decomposition().decomposition_rate,
+            microbial_respiration().microbial_respiration_rate,
+            humification().slow_decomposition_rate,
+        ];
+        for k in rates {
+            assert!(
+                k > 0.0 && k * super::super::BIO_DT < 1.0,
+                "k*dt = {} would let a first-order draw exceed its own pool",
+                k * super::super::BIO_DT
+            );
+        }
+        // [RothC] §1.5 p. 9 — the two plant-material compartments, in 1/year.
+        const K_DPM_YR: f64 = 10.0;
+        const K_RPM_YR: f64 = 0.3;
+        let ours_yr = decomposition().decomposition_rate * 365.0;
+        assert!(
+            K_RPM_YR < ours_yr && ours_yr < K_DPM_YR,
+            "{ours_yr}/yr is outside RothC's plant-material span"
+        );
+        // ...and it is nearer the decomposable end than the resistant one, which is the
+        // half a two-sided band alone does not say. (Currently 4.015/yr, i.e. 13.4x RPM
+        // against 2.5x below DPM.)
+        assert!(
+            ours_yr / K_RPM_YR > K_DPM_YR / ours_yr,
+            "{ours_yr}/yr is nearer the RESISTANT end"
+        );
+        // The slow pool's rate is [A] Parton 1987 p. 1176's K6 = 0.0038/week, and the
+        // committed daily value is that number divided by 7 — arithmetic on the source,
+        // not a value read out of this tree.
+        assert!(
+            (humification().slow_decomposition_rate - 0.0038 / 7.0).abs() < 1e-18,
+            "the slow rate is not K6/7"
         );
     }
 }

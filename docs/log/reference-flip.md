@@ -3729,3 +3729,136 @@ reddened `no_record_file_is_one_giant_line` on twelve rows. The log is a **prose
 carries 16 table rows against the plan doc's 815, and none of the per-batch "does not port"
 tables. The gate caught it, which is what it is for; the lesson is that the two files are not
 copies of one another and this batch had assumed they were.
+
+### Stage 3 — S5 batch F BUILT, COMPLETE 2026-08-27: the last batch, and the premise that held it back was false
+
+Batch F is the soil-carbon batch and the last of S5 — 100 Python tests across
+`test_mineralization.py`, `test_soil_fractionation.py`, `test_decomposition.py`,
+`test_microbial_respiration.py`, plus the three batch E handed forward. For once the roster's
+headline number is right; it was checked by collecting rather than by counting `def`s, which
+gives 94 because three files carry a parametrized case.
+
+**F was held back through six batches for a reason that does not hold.** §5ad filed it as the
+batch that "cannot be written as pure-function tests without changing production code", and
+warned that any extraction would need its own decision rather than being slipped inside a
+testing batch. Measuring that was the first thing this batch did, and it is false: the six
+decomposer flows are plain structs with public fields, `respired_and_stabilized` is already
+`pub`, `carried_nitrogen` is reachable from a test module inside its own module, and batch A's
+gas-exchange third had already tested flows this way one screen above. The batch changed no
+science code at all. What it did change is three text-taking loader splits in `params.rs` —
+the mechanical kind with ten precedents in the same file, needed because the committed text
+reaches the loader through `include_str!`, so without one a rejection rule has no caller that
+can hand it a broken file and the guard is unreachable from any test. That is a testability
+seam, not the extraction §5ad was guarding against. Recorded rather than skipped: an unstated
+no-op reads as the question never having been asked.
+
+**What the roster IS wrong about is the character of its largest file.** Soil carbon pool
+fractionation was refused twice, and the file recording the refusal is written as executable
+tests — its own docstring says the fractionated form does not exist in the tree and nothing in
+the file is imported by `src/`. Twenty-three of its twenty-nine tests run two flow classes
+defined inside the test file and never built; three more are arithmetic on source constants
+that exist only there; three are about the shipped tree, and only one of those makes a claim
+about a number the tree holds. This is the third batch running whose largest file is mostly a
+decision record — batch D found 10 of 22, batch G 25 of 33, this one 26 of 29. *Three times is
+a property of this tree rather than three separate judgements*: a refusal here is recorded by
+writing the refused model as runnable tests, and S5 inherits every one of them as a file it
+cannot port.
+
+**One of the three live claims is recast rather than ported, and the difference is worth the
+sentence.** The Python asserts that every RothC rate is safe at the frozen step — rates a
+build would adopt, none of which this tree uses. Its successor asserts the same rule for the
+three rates the tree does use. Same rule, different subject, filed as a recast so it is not
+read as a port that quietly changed what it covers.
+
+**Seventeen tests, and the battery is the finding.** Twenty-seven mutations were applied one at
+a time to production code and reverted byte-exact. Every one of the seventeen is reached by a
+mutation of its own subject — and *twenty of the twenty-seven reddened nothing but batch F's own
+tests*. Cross-wiring one decomposer flow's respiration share to another's, dropping the oxygen
+throttle from any of the six flows, collapsing the litter nitrogen leg to a bare rate,
+removing the carried-nitrogen kernel's negative guard, adding a ninth organic carbon pool to
+the sealed build, and every one of the four loader-guard mutations each left the pre-batch
+binary entirely green. The honest qualifier is that "green" here means the mechanism-level
+binary, with the goldens in a different one: most of those mutants move a trajectory and would
+surface downstream as a moved number with no name attached. What no gate anywhere would have
+caught is the five that change no frozen run at all — the four loader guards and the negative
+guard, because a removed bound still loads the committed file to the same bits and a negative
+carbon flux never occurs on any scenario.
+
+**Two tests needed a second battery pass, and a mutation that does not compile is not a
+mutation that missed.** The unit guard's first mutant tried to bypass the guarded read inside
+one loader and would not build; rewritten against the real mechanism — the exact unit-string
+comparison in the `config` crate — it reddens twelve tests across five domains, of which the
+new one is the only cover for these three files. That is a weaker isolation than the other
+twenty-four and is written down as such. The open-field/roster test had **no mutation at all**
+in the first battery, which is exactly the hole a battery exists to expose: *a test with no
+mutation is a test whose reachability was argued rather than measured*. Two were added, and
+the sharper of them — a ninth organic carbon pool in the sealed build — reddens only that
+test in the whole binary. The organic-carbon roster guards against a new pool slipping out of
+a "total organic C" summary, a failure this project has already had four times, and nothing
+was watching it.
+
+**Three findings, and two of them are this batch's own drafts failing.**
+
+The carried-nitrogen identity is structurally blind to the carbon amount, and the first draft
+of its test did not know that. The nitrogen riding a first-order carbon flux is that flux times
+the pool's own nitrogen-to-carbon ratio, so the carbon cancels exactly. The draft tried to show
+"this is not the collapsed bare-rate form" by halving the litter carbon and expecting the moved
+nitrogen to halve; it does not move at all, and the test failed for the right reason. *The one
+input this identity cannot see is the one the draft chose to vary.* What does separate the two
+forms is anything the carbon flux carries and a bare rate does not — the oxygen throttle, and
+an empty carbon pool under standing nitrogen — and those are what the fixed test uses.
+
+"The two destination legs sum back to the withdrawal exactly" is a tautology, and it was
+nearly shipped as the claim. The kernel's own doc comment justifies computing the complement
+by subtraction rather than as the withdrawal times one-minus-the-share, so that no partition
+round-off reaches the conservation gate. The obvious test of that sentence cannot fail: for
+the subtraction form the sum is exact at every input. Worse, at the batch's own fixture values
+the rejected form gives a bit-identical complement, so even comparing the two says nothing
+there. An input where they part had to be searched for. The test states both halves, and the
+rejected-form mutant reddens it and nothing else. This is the batch's inherited defect — an
+assertion sitting where its subject cannot move it — at a new kind of place: not a symmetry
+point, but a region where two different implementations are numerically indistinguishable.
+
+A ported assertion can carry its old scenario's initial condition. The Python sealed tests open
+by asserting the litter pool starts empty and then rises. That is true of a bare sealed
+scenario, which seeds no litter; the named chamber this tree runs seeds three moles, so the
+pool starts at its own maximum and only drains, and the ported form failed on its first run.
+The claim that survives the difference — and the one those tests were making anyway — is that
+each pool rises somewhere and falls somewhere. A cascade missing any one of its three sinks
+still conserves carbon perfectly; the pile-up in the pool whose outflow is gone is invisible to
+every other gate in the binary.
+
+**The oxygen precondition was applied before writing rather than found after.** At the
+chamber's own fill the oxygen mole fraction is 0.21 against a half-saturation constant of
+1e-4, so the throttle reads 0.99952 and deleting it outright moves every number by five parts
+in ten thousand — inside any tolerance loose enough to write down. Every throttle assertion in
+this batch is therefore evaluated at a depleted pool, and at three points rather than one: the
+half-saturation knot where the factor is exactly one half, and two points either side at three
+quarters and nine tenths. A single pin at the knot is satisfied by any curve through it, so the
+shape is what makes a wrong constant or a wrong form visible. That is batch G's finding and
+batch E's, stated as a precondition instead of as a post-mortem.
+
+**S5 is complete.** All seven batches are built and no Python biosphere test file is left
+unported and undispositioned. What S5 hands to S6 is unchanged in kind and one batch longer:
+four two-sided characterization bands with no Rust home and the open question of whether the
+reference wants a class of pin that is deliberately not a contract; the by-name claim census,
+now deferred by seven consecutive batches; `intercepted_fraction`; the unordered soil-nitrogen
+band; the unreachable thermal-time cap; the Euler-only biosphere; and the missing compartment
+ledger. No Python is deleted yet — all four files stay green and running.
+
+**The self-review pass found one more of the inherited defect, in the batch's own column.** The
+RothC provenance test opened by pinning the rate's value and only then asserted the band and
+the ordering; given the value pin both are consequences, and a moved rate fails the pin first
+so neither ever runs. It was also a duplicate of C1's bit-exact value table — the very shape
+batch G had deleted a five-literal pin for. The value pin is gone and the band and the ordering
+are all the test says; multiplying the loaded rate by five now reddens it. A second assertion
+was checked the same way and cleared: drawing oxygen against the whole withdrawal rather than
+the burned share reddens twenty-two tests, so that line is real but not new ground.
+
+**And the end-of-batch routine turned a gate red that a scoped run had called green.** Running
+the repo-gates package passes seven tests and says nothing about the context-budget checks,
+which live in a separate integration target that did not run; the new memory-index line pushed
+the average hook length one fifth of a byte past its budget, and only the full workspace run
+found it. *A scoped command's green is a claim about the scope, not about the gate you had in
+mind* — the third arrow of the CI-skip lesson, arriving locally this time. Fixed the way the
+gate's own message prescribes: shorten the hook, do not raise the bound.

@@ -4074,4 +4074,755 @@ mod tests {
         assert_eq!(dense[STEM], spread[STEM]);
         assert_eq!(dense[ROOT], spread[ROOT]);
     }
+
+    // =============================================================================
+    // S5 batch F, the soil-carbon batch: the six decomposer flows.
+    //
+    // ⚠ These are FLOW-level and there is no equation-level alternative — that is the
+    // property §5ad named when it filed F as "the batch that is not like the others" and
+    // held it back. What §5ad ALSO said is that F "cannot be written as pure-function
+    // tests without changing production code", and **that premise is false**.
+    // `Decomposition` and its five siblings are plain structs with public fields,
+    // `respired_and_stabilized` is already `pub`, and `carried_nitrogen` is reachable from
+    // here through `use super::*`. Constructing a flow and calling `evaluate` gets
+    // leg-level assertions with no production change at all — which is exactly the
+    // technique batch A's gas-exchange third already used one screen above. Recorded
+    // rather than silently skipped, because an unstated no-op reads as the question never
+    // having been asked.
+    //
+    // ⚠ What is deliberately NOT ported, and why each absence is a decision:
+    //
+    //   * `test_loader_reads_committed_rate` (x2), `test_loader_reads_the_cited_partition`
+    //     and `test_loader_reads_the_cited_stabilization_efficiency` — all four assert a
+    //     committed scalar, and all seven decomposer scalars (`decomp.decomposition_rate`,
+    //     `micro.*`, `humi.*`) are ALREADY pinned bit-exactly, as hex-float literals, by
+    //     C1's `params::tests::every_value_matches_the_generated_table`. A second copy is
+    //     the shape this project has been bitten by — a rule with two copies has one that
+    //     goes stale — so the claim is left where it already lives. Same disposition batch
+    //     G gave the five senescence values.
+    //   * `test_decomposition_balances_carbon_AND_oxygen`,
+    //     `test_respiration_balances_carbon_and_oxygen`, `test_flows_balance_nitrogen_only`
+    //     and the four `test_sealed_conserves_{carbon,oxygen,nitrogen}_exactly` — the
+    //     engine's own machinery. `assert_conserved` runs every step of every run, so a
+    //     completed scenario run is the proof. Batch A recorded the identical disposition
+    //     for the identical reason.
+    //   * `test_sealed_never_rations` (x3) and `test_sealed_no_extinction` (x3) —
+    //     `system.rs::sealed_chamber_runs_well_fed` already asserts `rationed == 0` and
+    //     `events.is_empty()` on that very run. Six copies of one claim.
+    //   * `test_sealed_o2_stays_far_from_rationing` — its premise is false in the
+    //     reference, and batch A already recorded why: `f_O2` is LIVE here and the sealed
+    //     chamber depletes O2 on purpose.
+    //   * `test_there_is_no_mineralization_param_file_or_loader` and the `hasattr` half of
+    //     `test_the_free_mineralization_rate_no_longer_EXISTS_to_be_calibrated` — guarded
+    //     by the COMPILER, harder than by a test. There is no `mineralization` module and
+    //     no `MineralizationParams`; `params.rs` reaches its files through `include_str!`,
+    //     so a re-added file is not silently unread but unread AND caught by
+    //     `params::tests::the_census_matches_the_directory_on_disk`. Same disposition
+    //     batch D gave `test_context_storage_excluded_from_biomass`.
+    //   * `test_the_retired_provenance_record_is_preserved` — its subject is a Python-tree
+    //     archive path (`docs/retired/mineralization.yaml`). That is the ungated-prose gap
+    //     recorded elsewhere, not a science claim this batch can port.
+    //   * `test_the_return_legs_take_the_DECOMPOSER_params_not_their_own` — a Python
+    //     `isinstance` check on a params object. The Rust flows carry bare `f64` rate
+    //     fields, so there is no type to assert; what the claim is really about is the
+    //     WIRING, and that is asserted against the built registry in `system.rs` instead.
+    //
+    // Each test below was mutation-checked against `cargo test -p domains --lib`.
+    // -----------------------------------------------------------------------------
+
+    const LITTER_C: &str = "biosphere.litter_carbon";
+    const MICROBIAL_C: &str = "biosphere.microbial_carbon";
+    const HUMUS_C: &str = "biosphere.humus_carbon";
+    const MICROBIAL_N: &str = "biosphere.microbial_n";
+    const HUMUS_N: &str = "biosphere.humus_n";
+
+    /// The three committed decomposer rates and the three committed CO2 shares.
+    ///
+    /// Named here as the tests' own arithmetic inputs. They are NOT a second copy of the
+    /// value gate: every assertion below drives the flows with these numbers explicitly
+    /// and checks the ARITHMETIC, while `every_value_matches_the_generated_table` owns
+    /// whether the committed files still hold them.
+    const F_K_LITTER: f64 = 0.011; // decomposition.yaml
+    const F_K_MICROBIAL: f64 = 0.016; // microbial_respiration.yaml
+    /// humification.yaml — [A] Parton 1987 p. 1176's `K6 = 0.0038 week-1`, per day.
+    const F_K_HUMUS: f64 = 0.0038 / 7.0;
+    const F_CO2_LITTER: f64 = 0.45; // Parton 1987 p. 1174, surface structural litter
+    const F_CO2_MICROBIAL: f64 = 0.85; // Parton 1987 eq. [6] at T = 0 (Es)
+    const F_CO2_HUMUS: f64 = 0.55; // CENTURY's slow-SOM respiration share
+    /// `microbial_respiration.yaml`'s committed `o2_half_saturation` (mol/mol).
+    const F_K_O2: f64 = 1e-4;
+    /// A full chamber: 21 % O2 of `AIR_MOL`.
+    const F_FULL_O2: f64 = 0.21 * AIR_MOL;
+
+    /// `a` within a relative `1e-12` of `b` — the soil legs span 1e-5 to 1e-2, so one
+    /// absolute tolerance cannot serve them all.
+    fn f_close(a: f64, b: f64) -> bool {
+        (a - b).abs() <= 1e-12 * b.abs()
+    }
+
+    /// A soil state: the three carbon pools, their three N counterparts, soil N and the
+    /// two gas pools. `o2` is in mol against `AIR_MOL`, so the mole fraction is `o2/1000`.
+    fn soil_state(
+        litter_c: f64,
+        microbial_c: f64,
+        humus_c: f64,
+        litter_n: f64,
+        microbial_n: f64,
+        humus_n: f64,
+        o2: f64,
+    ) -> State {
+        let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
+        let mut pool = |id: &str, q: Quantity, amount: f64, comp: BTreeMap<Quantity, f64>| {
+            stocks.insert(
+                id.to_string(),
+                Stock::new(
+                    id.to_string(),
+                    "biosphere".to_string(),
+                    q,
+                    q.canonical_unit(),
+                    amount,
+                    StockKind::Pool,
+                    0.0,
+                    false,
+                    comp,
+                )
+                .expect("soil pool"),
+            );
+        };
+        for (id, amount) in [
+            (LITTER_C, litter_c),
+            (MICROBIAL_C, microbial_c),
+            (HUMUS_C, humus_c),
+        ] {
+            pool(id, Quantity::Carbon, amount, BTreeMap::new());
+        }
+        for (id, amount) in [
+            (LITTER_N, litter_n),
+            (MICROBIAL_N, microbial_n),
+            (HUMUS_N, humus_n),
+            (SOIL_N, 100.0),
+        ] {
+            pool(id, Quantity::Nitrogen, amount, BTreeMap::new());
+        }
+        pool(
+            CO2,
+            Quantity::Carbon,
+            0.4,
+            BTreeMap::from([(Quantity::Carbon, 1.0), (Quantity::Oxygen, 2.0)]),
+        );
+        pool(
+            O2,
+            Quantity::Oxygen,
+            o2,
+            BTreeMap::from([(Quantity::Oxygen, 2.0)]),
+        );
+        State::new(0, stocks, 0, BTreeMap::new()).expect("soil fixture state")
+    }
+
+    /// The default soil fixture: 4 mol litter C, 2 mol microbial C, 100 mol humus C, and
+    /// the three N pools at their own distinct N:C.
+    ///
+    /// ⚠ The three N:C ratios are deliberately DISTINCT (0.5, 0.025, 0.001). With one
+    /// shared ratio, a leg reading the wrong pool's nitrogen returns the right number and
+    /// every assertion below stays green.
+    fn soil_fixture(o2: f64) -> State {
+        soil_state(4.0, 2.0, 100.0, 2.0, 0.05, 0.1, o2)
+    }
+
+    fn decomposition_flow(k_o2: f64) -> Decomposition {
+        Decomposition {
+            id: "biosphere.decomposition".to_string(),
+            litter_carbon: LITTER_C.to_string(),
+            microbial_carbon: MICROBIAL_C.to_string(),
+            co2_pool: CO2.to_string(),
+            o2_pool: O2.to_string(),
+            decomposition_rate: F_K_LITTER,
+            litter_respired_fraction: F_CO2_LITTER,
+            o2_half_saturation: k_o2,
+            air_mol: AIR_MOL,
+        }
+    }
+
+    fn microbial_respiration_flow(k_o2: f64) -> MicrobialRespiration {
+        MicrobialRespiration {
+            id: "biosphere.microbial_respiration".to_string(),
+            microbial_carbon: MICROBIAL_C.to_string(),
+            humus_carbon: HUMUS_C.to_string(),
+            co2_pool: CO2.to_string(),
+            o2_pool: O2.to_string(),
+            microbial_respiration_rate: F_K_MICROBIAL,
+            active_stabilization_co2_fraction: F_CO2_MICROBIAL,
+            o2_half_saturation: k_o2,
+            air_mol: AIR_MOL,
+        }
+    }
+
+    fn humus_decomposition_flow(k_o2: f64) -> HumusDecomposition {
+        HumusDecomposition {
+            id: "biosphere.humus_decomposition".to_string(),
+            humus_carbon: HUMUS_C.to_string(),
+            microbial_carbon: MICROBIAL_C.to_string(),
+            co2_pool: CO2.to_string(),
+            o2_pool: O2.to_string(),
+            slow_decomposition_rate: F_K_HUMUS,
+            slow_respired_fraction: F_CO2_HUMUS,
+            o2_half_saturation: k_o2,
+            air_mol: AIR_MOL,
+        }
+    }
+
+    fn litter_n_transfer_flow(k_o2: f64) -> LitterNitrogenTransfer {
+        LitterNitrogenTransfer {
+            id: "biosphere.litter_n_transfer".to_string(),
+            litter_n: LITTER_N.to_string(),
+            microbial_n: MICROBIAL_N.to_string(),
+            soil_n: SOIL_N.to_string(),
+            litter_carbon: LITTER_C.to_string(),
+            o2_pool: O2.to_string(),
+            decomposition_rate: F_K_LITTER,
+            litter_respired_fraction: F_CO2_LITTER,
+            o2_half_saturation: k_o2,
+            air_mol: AIR_MOL,
+        }
+    }
+
+    fn microbial_n_release_flow(k_o2: f64) -> MicrobialNitrogenRelease {
+        MicrobialNitrogenRelease {
+            id: "biosphere.microbial_n_release".to_string(),
+            microbial_n: MICROBIAL_N.to_string(),
+            soil_n: SOIL_N.to_string(),
+            humus_n: HUMUS_N.to_string(),
+            microbial_carbon: MICROBIAL_C.to_string(),
+            o2_pool: O2.to_string(),
+            microbial_respiration_rate: F_K_MICROBIAL,
+            active_stabilization_co2_fraction: F_CO2_MICROBIAL,
+            o2_half_saturation: k_o2,
+            air_mol: AIR_MOL,
+        }
+    }
+
+    fn humus_n_release_flow(k_o2: f64) -> HumusNitrogenRelease {
+        HumusNitrogenRelease {
+            id: "biosphere.humus_n_release".to_string(),
+            humus_n: HUMUS_N.to_string(),
+            soil_n: SOIL_N.to_string(),
+            microbial_n: MICROBIAL_N.to_string(),
+            humus_carbon: HUMUS_C.to_string(),
+            o2_pool: O2.to_string(),
+            slow_decomposition_rate: F_K_HUMUS,
+            slow_respired_fraction: F_CO2_HUMUS,
+            o2_half_saturation: k_o2,
+            air_mol: AIR_MOL,
+        }
+    }
+
+    /// Evaluate a soil flow at `dt`; none of the six read a forcing.
+    fn soil_legs(flow: &dyn Flow, s: &State, dt: f64) -> BTreeMap<String, f64> {
+        let r = SourceResolver::new(HashMap::new(), HashMap::new()).expect("resolver");
+        let env = r.bind(s, dt);
+        flow.evaluate(s, &env, dt)
+            .expect("evaluate")
+            .legs
+            .iter()
+            .map(|l| (l.stock.clone(), l.amount))
+            .collect()
+    }
+
+    /// The three carbon flows, boxed, at a given `o2_half_saturation`.
+    fn carbon_soil_flows(k_o2: f64) -> Vec<(&'static str, Box<dyn Flow>, &'static str)> {
+        vec![
+            (
+                "decomposition",
+                Box::new(decomposition_flow(k_o2)) as Box<dyn Flow>,
+                LITTER_C,
+            ),
+            (
+                "microbial_respiration",
+                Box::new(microbial_respiration_flow(k_o2)) as Box<dyn Flow>,
+                MICROBIAL_C,
+            ),
+            (
+                "humus_decomposition",
+                Box::new(humus_decomposition_flow(k_o2)) as Box<dyn Flow>,
+                HUMUS_C,
+            ),
+        ]
+    }
+
+    /// The three nitrogen flows, boxed, at a given `o2_half_saturation`.
+    fn nitrogen_soil_flows(k_o2: f64) -> Vec<(&'static str, Box<dyn Flow>, &'static str)> {
+        vec![
+            (
+                "litter_n_transfer",
+                Box::new(litter_n_transfer_flow(k_o2)) as Box<dyn Flow>,
+                LITTER_N,
+            ),
+            (
+                "microbial_n_release",
+                Box::new(microbial_n_release_flow(k_o2)) as Box<dyn Flow>,
+                MICROBIAL_N,
+            ),
+            (
+                "humus_n_release",
+                Box::new(humus_n_release_flow(k_o2)) as Box<dyn Flow>,
+                HUMUS_N,
+            ),
+        ]
+    }
+
+    /// F1 — each humified flow sends **its own** cited share to CO2, and the three shares
+    /// are DIFFERENT numbers.
+    ///
+    /// The withdrawals are hand-computed from `k · pool · dt` at `f_O2 ≡ 1` (`k_o2 = 0`,
+    /// which the loader permits and which the Python fixtures use for the same reason):
+    ///
+    /// * litter    `0.011 · 4 = 0.044` mol C/day, 45 % of it (`0.0198`) to CO2
+    /// * microbial `0.016 · 2 = 0.032` mol C/day, 85 % of it (`0.0272`) to CO2
+    /// * humus     `0.000542857142857142857 · 100 = 0.05428571428571428…`, 55 % to CO2
+    ///
+    /// ⚠ The three shares are 0.45 / 0.85 / 0.55 and the test drives all three flows in
+    /// one table, so a wiring that read one flow's fraction into another — the failure a
+    /// single-flow test structurally cannot see — reddens here. Each flow's O2 leg is
+    /// asserted to be the NEGATIVE of its own CO2 leg, which states the PQ = 1
+    /// stoichiometry where it can be wrong rather than leaving it to the composition gate.
+    /// Mirrors `test_decomposition_PARTITIONS_the_decayed_litter_into_co2_and_microbes`
+    /// and `test_respiration_burns_microbial_to_co2_consuming_o2`.
+    #[test]
+    fn the_three_humified_flows_each_send_their_own_cited_share_to_co2() {
+        let s = soil_fixture(F_FULL_O2);
+        for (label, legs, donor, receiver, moved, share) in [
+            (
+                "litter",
+                soil_legs(&decomposition_flow(0.0), &s, 1.0),
+                LITTER_C,
+                MICROBIAL_C,
+                0.044,
+                F_CO2_LITTER,
+            ),
+            (
+                "microbial",
+                soil_legs(&microbial_respiration_flow(0.0), &s, 1.0),
+                MICROBIAL_C,
+                HUMUS_C,
+                0.032,
+                F_CO2_MICROBIAL,
+            ),
+            (
+                "humus",
+                soil_legs(&humus_decomposition_flow(0.0), &s, 1.0),
+                HUMUS_C,
+                MICROBIAL_C,
+                F_K_HUMUS * 100.0,
+                F_CO2_HUMUS,
+            ),
+        ] {
+            assert!(
+                f_close(-legs[donor], moved),
+                "{label}: withdrew {} not {moved}",
+                -legs[donor]
+            );
+            let respired = moved * share;
+            assert!(
+                f_close(legs[CO2], respired),
+                "{label}: {} to CO2, not {respired}",
+                legs[CO2]
+            );
+            assert!(
+                f_close(legs[receiver], moved - respired),
+                "{label}: {} stabilised, not {}",
+                legs[receiver],
+                moved - respired
+            );
+            // PQ = 1 on the RESPIRED leg: one O2 consumed per carbon burned, and not per
+            // carbon moved. A flow drawing O2 against the whole withdrawal would still
+            // balance OXYGEN — but only by sending the whole withdrawal to CO2, which the
+            // two assertions above rule out.
+            assert_eq!(legs[O2], -legs[CO2], "{label}: the O2 draw is the burned C");
+        }
+    }
+
+    /// F2 — every decomposer flux is first-order in ITS OWN donor and self-limits at an
+    /// empty one.
+    ///
+    /// Doubling the donor doubles the withdrawal (`k · pool`), and an empty donor gives
+    /// every leg exactly zero — which is what makes positivity structural rather than
+    /// clamped. Asserted per flow with the other two pools held fixed, so a flow reading
+    /// the wrong pool's carbon reddens instead of merely returning a different number.
+    /// Mirrors `test_flux_is_first_order_in_litter`, `test_flux_is_zero_at_zero_litter`,
+    /// `test_flux_is_first_order_in_microbial`, `test_flux_is_zero_at_zero_microbial`,
+    /// `test_decomposition_self_limits_at_zero_litter` and
+    /// `test_respiration_self_limits_at_zero_microbial`.
+    #[test]
+    fn every_decomposer_flux_is_first_order_in_its_own_donor_and_zero_at_an_empty_one() {
+        let base = soil_fixture(F_FULL_O2);
+        for (label, flow, donor) in carbon_soil_flows(0.0) {
+            let one = soil_legs(flow.as_ref(), &base, 1.0);
+            let mut doubled = base.clone();
+            doubled.stocks.get_mut(donor).expect("donor").amount *= 2.0;
+            let two = soil_legs(flow.as_ref(), &doubled, 1.0);
+            assert_eq!(
+                two[donor].to_bits(),
+                (2.0 * one[donor]).to_bits(),
+                "{label} is not first-order in its own donor"
+            );
+            let mut empty = base.clone();
+            empty.stocks.get_mut(donor).expect("donor").amount = 0.0;
+            for (id, amount) in soil_legs(flow.as_ref(), &empty, 1.0) {
+                assert_eq!(amount, 0.0, "{label}: leg {id} is live at an empty donor");
+            }
+        }
+    }
+
+    /// F3 — every soil leg is bit-exactly linear in `dt` (the increment-form contract).
+    ///
+    /// All six flows, every leg: `leg(dt) == dt · leg(1)` to the bit. Stated over the
+    /// whole leg vector rather than one representative leg, because a partition applied
+    /// before the `dt` scaling rather than after would leave the withdrawal linear and one
+    /// destination not.
+    /// Mirrors `test_decomposition_is_dt_linear`, `test_respiration_is_dt_linear` and
+    /// `test_flows_are_dt_linear`.
+    #[test]
+    fn every_soil_leg_is_bit_exactly_linear_in_dt() {
+        let s = soil_fixture(F_FULL_O2);
+        let mut flows = carbon_soil_flows(F_K_O2);
+        flows.extend(nitrogen_soil_flows(F_K_O2));
+        for (label, flow, _) in &flows {
+            let one = soil_legs(flow.as_ref(), &s, 1.0);
+            for dt in [0.25, 0.5] {
+                for (id, amount) in soil_legs(flow.as_ref(), &s, dt) {
+                    assert_eq!(
+                        amount.to_bits(),
+                        (dt * one[&id]).to_bits(),
+                        "{label}: {id} at dt={dt}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// F4 — the partition complement is computed by SUBTRACTION, and that is measurable.
+    ///
+    /// `respired_and_stabilized`'s own doc comment says the complement is `moved -
+    /// respired` rather than `moved · (1 - f)` "so the two destination legs sum back to
+    /// the withdrawal exactly in floating point and no partition round-off reaches the
+    /// conservation gate".
+    ///
+    /// ⚠ Asserting `respired + stabilized == moved` ALONE would be a tautology: it cannot
+    /// fail for the subtraction form at any input, so it is an assertion its subject
+    /// cannot move. The claim is only worth something with a control showing the rejected
+    /// form genuinely differs somewhere, and at most inputs it does not — `0.044` at
+    /// `f = 0.45` gives bit-identical complements both ways.
+    ///
+    /// `moved = 5e-5` at `f = 0.45` is an input where they part, found by search: the
+    /// multiplication complement is `2.7500000000000004e-5` against the subtraction's
+    /// `2.75e-5`, and its sum with the respired share overshoots `moved` by one ulp. Both
+    /// halves are stated, which is what makes the exactness claim falsifiable at all.
+    #[test]
+    fn the_partition_complement_is_computed_by_subtraction_and_that_is_measurable() {
+        const MOVED: f64 = 5e-5;
+        let (respired, stabilized) = respired_and_stabilized(MOVED, F_CO2_LITTER);
+        assert_eq!(respired + stabilized, MOVED, "the legs must sum exactly");
+        assert_eq!(stabilized.to_bits(), (MOVED - respired).to_bits());
+        // ...and the control. Without it the two assertions above hold for EVERY
+        // implementation of the partition, including the one the doc comment rejects.
+        let multiplied = MOVED * (1.0 - F_CO2_LITTER);
+        assert_ne!(
+            stabilized.to_bits(),
+            multiplied.to_bits(),
+            "the fixture does not distinguish the two forms"
+        );
+        assert_ne!(respired + multiplied, MOVED);
+    }
+
+    /// F5 — the O2 throttle is live on all SIX soil flows, and it is measured where it
+    /// BITES rather than where its subject cannot move it.
+    ///
+    /// ⚠⚠ This is batch G's headline defect stated as a precondition rather than found
+    /// afterwards. At the chamber's own fill `x_O2 = 0.21` against `K_O2 = 1e-4`, so
+    /// `f_O2 = 0.99952`: deleting the factor outright moves every number by 5e-4, which no
+    /// tolerance loose enough to be written would catch. Every assertion here is therefore
+    /// evaluated at a DEPLETED pool, where the factor is the difference between a half and
+    /// a whole.
+    ///
+    /// The knot and its shape, hand-computed from `f = x/(K + x)` with `x = o2/1000`:
+    ///
+    /// * `o2 = 0.1` mol → `x = 1e-4 = K` → `f = 1/2` exactly
+    /// * `o2 = 0.3` mol → `x = 3e-4`     → `f = 3/4` exactly
+    /// * `o2 = 0.9` mol → `x = 9e-4`     → `f = 9/10`
+    ///
+    /// ⚠ Three points, not one. A pin at the half-saturation knot alone is satisfied by
+    /// any curve through it — `x/(2K + x)` would give 1/3 and 3/5 at the other two and
+    /// 1/2 nowhere near — so a wrong `K` or a wrong FORM is invisible to it. That is batch
+    /// G's mutual-shading finding (a pin AT the knot is blind to the shape either side of
+    /// it) applied before writing rather than found after.
+    /// Mirrors `test_release_leg_throttles_with_f_o2_rather_than_ignoring_it` and the
+    /// `o2_half_saturation = 0` isolation every Python fixture in this batch relies on.
+    #[test]
+    fn the_oxygen_throttle_is_live_on_all_six_soil_flows_and_shaped_either_side_of_its_knot() {
+        let mut flows = carbon_soil_flows(F_K_O2);
+        flows.extend(nitrogen_soil_flows(F_K_O2));
+        for (label, flow, donor) in &flows {
+            // The unthrottled withdrawal, recovered from the full-pool one: at x = 0.21
+            // the factor is 0.21/(0.21 + K), which is the number this test refuses to
+            // assert anything at.
+            let at_fill = -soil_legs(flow.as_ref(), &soil_fixture(F_FULL_O2), 1.0)[*donor];
+            let unthrottled = at_fill / (0.21 / (0.21 + F_K_O2));
+            for (o2, want) in [(0.1, 0.5), (0.3, 0.75), (0.9, 0.9)] {
+                let moved = -soil_legs(flow.as_ref(), &soil_fixture(o2), 1.0)[*donor];
+                let ratio = moved / unthrottled;
+                assert!(
+                    (ratio - want).abs() < 1e-12,
+                    "{label} at o2={o2}: f_O2 reads {ratio}, not {want}"
+                );
+            }
+        }
+    }
+
+    /// F6 — `carried_nitrogen` moves the donor pool's OWN ratio, and is zero at every
+    /// degenerate input.
+    ///
+    /// `moved_C · (pool_N / pool_C)`: a hand value (`0.5 · 2/10 = 0.1`) and linearity in
+    /// the carbon moved. The degenerate half is what makes positivity structural — an
+    /// empty or absent pool moves nothing, so there is never a divide-by-zero and never a
+    /// negative leg — and it includes a NEGATIVE `moved_carbon`, which the guard rejects
+    /// rather than propagating into a leg that would deposit into its own donor.
+    /// Mirrors `test_carried_nitrogen_moves_the_donor_pools_own_ratio` and
+    /// `test_carried_nitrogen_is_zero_at_every_degenerate_input`.
+    #[test]
+    fn carried_nitrogen_moves_the_donor_pools_own_ratio_and_is_zero_at_every_degenerate_input() {
+        assert!(f_close(carried_nitrogen(0.5, 2.0, 10.0), 0.1));
+        assert!(f_close(carried_nitrogen(1.0, 2.0, 10.0), 0.2));
+        assert_eq!(carried_nitrogen(0.0, 2.0, 10.0), 0.0);
+        assert_eq!(carried_nitrogen(0.5, 0.0, 10.0), 0.0);
+        assert_eq!(carried_nitrogen(0.5, 2.0, 0.0), 0.0);
+        assert_eq!(carried_nitrogen(-1.0, 2.0, 10.0), 0.0);
+    }
+
+    /// F7 — THE IDENTITY THAT RETIRED `mineralization_rate`, pinned as an equivalence.
+    ///
+    /// `Decomposition` withdraws `k · litter_C`, so the nitrogen riding it is
+    /// `k · litter_C · (litter_N / litter_C) == k · litter_N`. The free N rate was
+    /// therefore never independent: stoichiometry forces it to equal the carbon decay
+    /// rate, which is *why* retiring it was a citation upgrade rather than a
+    /// recalibration.
+    ///
+    /// ⚠ Pinned as an EQUIVALENCE, never as an implementation. The flow deliberately does
+    /// NOT collapse to `decomposition_rate · litter_n`, because the identity holds only
+    /// while `Decomposition` stays first-order and the collapsed form would read
+    /// identically today and silently outlive that premise.
+    ///
+    /// ⚠⚠ **And the first draft's attempt to state that second half was WRONG, in a way
+    /// worth recording rather than quietly fixing.** It halved the litter CARBON while
+    /// holding the nitrogen, expecting the carried N to halve — but the pool's own ratio
+    /// is the multiplier, so `k · C · (N/C)` cancels `C` exactly and the number does not
+    /// move. It measured `0.022` against an expected `0.011` and failed. *The carbon
+    /// amount is the one input this identity is structurally blind to*, which is the whole
+    /// reason it is an identity. What DOES separate the two forms is any input the carbon
+    /// flux carries and a bare rate does not: the `f_O2` throttle (F5, F9) and an empty
+    /// carbon pool under standing nitrogen (F10). The second half below uses the first of
+    /// those, so this test rules out the collapsed form rather than merely describing it.
+    /// Mirrors `test_carried_n_on_a_first_order_carbon_flux_is_that_same_rate`.
+    #[test]
+    fn the_nitrogen_riding_a_first_order_carbon_flux_is_that_same_carbon_rate() {
+        let s = soil_fixture(F_FULL_O2);
+        let withdrawn = -soil_legs(&litter_n_transfer_flow(0.0), &s, 1.0)[LITTER_N];
+        assert!(
+            f_close(withdrawn, F_K_LITTER * 2.0),
+            "the carried N reads {withdrawn}, not k · litter_n"
+        );
+        // ...and it is the CARBON flux that carries it, not the rate: at f_O2 = 1/2 the
+        // collapsed `k · litter_n` returns the unchanged 0.022 and this flow returns half.
+        let throttled =
+            -soil_legs(&litter_n_transfer_flow(F_K_O2), &soil_fixture(0.1), 1.0)[LITTER_N];
+        assert!(
+            f_close(throttled, withdrawn / 2.0),
+            "the carried N does not follow the carbon flux: {throttled}"
+        );
+    }
+
+    /// F8 — each nitrogen leg splits its pool EXACTLY as its carbon sibling splits the
+    /// carbon, and the three splits are different numbers.
+    ///
+    /// The withdrawal is `carried_nitrogen` at the donor's own N:C; the partition is the
+    /// sibling's own CO2 share, because *the nitrogen of the carbon that left as CO2* is
+    /// what mineralizes. That is not an approximation chosen for tidiness: the textbook
+    /// mineralization/immobilization balance reduces to it exactly when donor and receiver
+    /// carry the same C:N, which is this tree's own stoichiometry (no homeostatic
+    /// microbial C:N — measured and refused). Hand-computed on the fixture at `f_O2 ≡ 1`:
+    ///
+    /// * litter:    `0.011 · 4 · (2/4) = 0.022` N, 45 % (`0.0099`) to soil
+    /// * microbial: `0.016 · 2 · (0.05/2) = 8e-4` N, 85 % (`6.8e-4`) to soil
+    /// * humus:     `k_h · 100 · (0.1/100)` N, 55 % to soil
+    ///
+    /// ⚠ The three N:C ratios in the fixture are distinct, so a leg reading the wrong
+    /// pool's nitrogen reddens rather than returning a plausible number.
+    /// Mirrors `test_litter_transfer_splits_its_nitrogen_the_way_the_carbon_split`,
+    /// `test_microbial_release_splits_its_nitrogen_the_way_the_carbon_split` and
+    /// `test_mineralization_is_the_nitrogen_of_the_carbon_that_LEFT_AS_CO2`.
+    #[test]
+    fn each_nitrogen_leg_splits_its_pool_exactly_as_its_carbon_sibling_splits_the_carbon() {
+        let s = soil_fixture(F_FULL_O2);
+        for (label, legs, donor, mineral_share, other, moved) in [
+            (
+                "litter",
+                soil_legs(&litter_n_transfer_flow(0.0), &s, 1.0),
+                LITTER_N,
+                F_CO2_LITTER,
+                MICROBIAL_N,
+                0.022,
+            ),
+            (
+                "microbial",
+                soil_legs(&microbial_n_release_flow(0.0), &s, 1.0),
+                MICROBIAL_N,
+                F_CO2_MICROBIAL,
+                HUMUS_N,
+                8e-4,
+            ),
+            (
+                "humus",
+                soil_legs(&humus_n_release_flow(0.0), &s, 1.0),
+                HUMUS_N,
+                F_CO2_HUMUS,
+                MICROBIAL_N,
+                F_K_HUMUS * 100.0 * 0.001,
+            ),
+        ] {
+            assert!(
+                f_close(-legs[donor], moved),
+                "{label}: withdrew {} not {moved}",
+                -legs[donor]
+            );
+            let mineralized = moved * mineral_share;
+            assert!(
+                f_close(legs[SOIL_N], mineralized),
+                "{label}: {} mineralized, not {mineralized}",
+                legs[SOIL_N]
+            );
+            assert!(
+                f_close(legs[other], moved - mineralized),
+                "{label}: {} to {other}, not {}",
+                legs[other],
+                moved - mineralized
+            );
+        }
+    }
+
+    /// F9 — the nitrogen legs recompute EXACTLY what their carbon siblings move, `f_O2`
+    /// included, and the check is run where `f_O2` is not 1.
+    ///
+    /// A flow may read only the step-entry snapshot, so there is no channel by which
+    /// `Decomposition` could hand `LitterNitrogenTransfer` its computed flux —
+    /// recomputation from the same rate on the same snapshot is the only pure form. The
+    /// hazard that creates is silent drift if someone changes one and not the other, and
+    /// the symptom would be a wrong pool C:N rather than a crash. So the agreement is
+    /// pinned against the ACTUAL sibling flow, bit for bit, not against a re-derivation.
+    ///
+    /// ⚠ Run at `o2 = 0.1` mol, i.e. `f_O2 = 0.5`. At the chamber fill the factor is
+    /// 0.99952 and an N leg that dropped it would agree with its sibling to 5e-4 — inside
+    /// any tolerance loose enough to be written. Same trap as F5, one flow further on, and
+    /// the third assertion is the control that says the throttle really is biting here
+    /// rather than the two flows agreeing because both ignore it.
+    /// Mirrors `test_transfer_leg_recomputes_EXACTLY_the_carbon_Decomposition_moves` and
+    /// `test_release_leg_recomputes_EXACTLY_the_carbon_MicrobialRespiration_burns`.
+    #[test]
+    fn each_nitrogen_leg_recomputes_its_siblings_carbon_flux_with_the_o2_throttle_biting() {
+        let s = soil_fixture(0.1); // x_O2 = 1e-4 = K, so f_O2 = 1/2 exactly
+        for (label, carbon, nitrogen, free, c_donor, n_donor, n_per_c) in [
+            (
+                "litter",
+                soil_legs(&decomposition_flow(F_K_O2), &s, 1.0),
+                soil_legs(&litter_n_transfer_flow(F_K_O2), &s, 1.0),
+                soil_legs(&decomposition_flow(0.0), &s, 1.0),
+                LITTER_C,
+                LITTER_N,
+                2.0 / 4.0,
+            ),
+            (
+                "microbial",
+                soil_legs(&microbial_respiration_flow(F_K_O2), &s, 1.0),
+                soil_legs(&microbial_n_release_flow(F_K_O2), &s, 1.0),
+                soil_legs(&microbial_respiration_flow(0.0), &s, 1.0),
+                MICROBIAL_C,
+                MICROBIAL_N,
+                0.05 / 2.0,
+            ),
+            (
+                "humus",
+                soil_legs(&humus_decomposition_flow(F_K_O2), &s, 1.0),
+                soil_legs(&humus_n_release_flow(F_K_O2), &s, 1.0),
+                soil_legs(&humus_decomposition_flow(0.0), &s, 1.0),
+                HUMUS_C,
+                HUMUS_N,
+                0.1 / 100.0,
+            ),
+        ] {
+            let moved_c = -carbon[c_donor];
+            let moved_n = -nitrogen[n_donor];
+            assert_eq!(
+                moved_n.to_bits(),
+                (moved_c * n_per_c).to_bits(),
+                "{label}: the N leg does not ride its sibling's carbon"
+            );
+            assert!(
+                moved_c < 0.75 * -free[c_donor],
+                "{label}: f_O2 is not biting in this fixture, so the pin says nothing"
+            );
+        }
+    }
+
+    /// F10 — no nitrogen leaves a soil pool whose CARBON is not moving.
+    ///
+    /// The half the retired free-rate form could not express: under a direct
+    /// `litter_n -> soil_n` jump at a `mineralization_rate`, a standing N pool mineralized
+    /// every step regardless of whether any carbon was decomposing. That decoupling is
+    /// exactly what the microbe-mediated form removes, so it is pinned from the zero end —
+    /// a full nitrogen pool over an EMPTY carbon pool must move nothing at all.
+    ///
+    /// ⚠ And the inverse, which is the mediation claim that SURVIVED the humification
+    /// split: with carbon moving, the soil leg is strictly between zero and the whole
+    /// withdrawal. Before the split the guard was "no litter N ever reaches soil N in one
+    /// step", and that stopped being true when part of the litter carbon began leaving as
+    /// CO2 at the litter step. The two-sided bound is the form that is still true, and a
+    /// re-collapsed direct mineralization — which would send the WHOLE withdrawal to
+    /// soil — still fails it. *A pin guarding a mechanism you removed is decoration.*
+    /// Mirrors `test_return_legs_self_limit_when_no_carbon_is_moving`,
+    /// `test_return_legs_self_limit_at_an_empty_donor` and
+    /// `test_only_the_RESPIRED_share_reaches_soil_n_the_rest_still_transits`.
+    #[test]
+    fn no_nitrogen_leaves_a_soil_pool_whose_carbon_is_not_moving() {
+        let full = soil_fixture(F_FULL_O2);
+        for ((label, flow, n_donor), c_donor) in
+            nitrogen_soil_flows(F_K_O2)
+                .into_iter()
+                .zip([LITTER_C, MICROBIAL_C, HUMUS_C])
+        {
+            let mut no_carbon = full.clone();
+            no_carbon.stocks.get_mut(c_donor).expect("carbon").amount = 0.0;
+            no_carbon.stocks.get_mut(n_donor).expect("nitrogen").amount = 5.0;
+            for (id, amount) in soil_legs(flow.as_ref(), &no_carbon, 1.0) {
+                assert_eq!(amount, 0.0, "{label}: leg {id} moved with no carbon");
+            }
+            let mut no_nitrogen = full.clone();
+            no_nitrogen
+                .stocks
+                .get_mut(n_donor)
+                .expect("nitrogen")
+                .amount = 0.0;
+            for (id, amount) in soil_legs(flow.as_ref(), &no_nitrogen, 1.0) {
+                assert_eq!(amount, 0.0, "{label}: leg {id} moved with no nitrogen");
+            }
+            let legs = soil_legs(flow.as_ref(), &full, 1.0);
+            let withdrawn = -legs[n_donor];
+            assert!(
+                withdrawn > 0.0,
+                "{label}: nothing moved on the live fixture"
+            );
+            assert!(
+                legs[SOIL_N] > 0.0 && legs[SOIL_N] < withdrawn,
+                "{label}: {} of {withdrawn} reached soil_n",
+                legs[SOIL_N]
+            );
+        }
+    }
 }

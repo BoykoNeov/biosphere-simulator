@@ -2880,4 +2880,207 @@ mod tests {
             "the open field must reach the power law: {open} t/ha"
         );
     }
+
+    // -----------------------------------------------------------------------------
+    // S5 batch F — soil carbon: the sealed cascade, seen from the run.
+    //
+    // The flow-level claims are in `flows.rs` and the loader's in `params.rs`; these three
+    // are the ones whose subject is a whole season. ⚠ The Python originals' conservation
+    // and `rationed == 0` halves get no successor — `assert_conserved` runs every step and
+    // `sealed_chamber_runs_well_fed` above already asserts the backstop count and the
+    // extinction list on this very run. What is left is what those cannot see: that the
+    // cascade RUNS, what ratio it settles at, and which scenarios build it at all.
+    // -----------------------------------------------------------------------------
+
+    /// The sealed cascade fills AND drains every one of its six pools.
+    ///
+    /// Litter is fed by senescence and drained by decomposition; microbial biomass is fed
+    /// by decomposition and drained by respiration; humus is fed by respiration and
+    /// drained by its own slow decay — and each carbon pool's nitrogen counterpart does
+    /// the same. Six pools, each asserted to rise above its start AND to be drawn down on
+    /// some step.
+    ///
+    /// ⚠ The draw-down half is the load-bearing one and it is why this is not a
+    /// conservation restatement. A cascade with any one of its three sinks missing still
+    /// conserves carbon perfectly — the carbon just piles up in the pool whose outflow is
+    /// gone. The pile-up is exactly what "fed but never drained" looks like, and it is
+    /// invisible to every gate in the binary except this one.
+    ///
+    /// ⚠ **Stated as RISES-somewhere and FALLS-somewhere, not as "above its start".** The
+    /// Python originals assert `pool[0] == 0.0` and `max(pool) > bound`, which is a claim
+    /// about a bare `SeasonScenario(sealed=True)` — a scenario that seeds no litter. The
+    /// NAMED chamber this tree runs seeds `litter_carbon0 = 3.0`, so the litter pool
+    /// starts at its own maximum and drains: the ported form failed here on its first run,
+    /// and it failed for the right reason. Both directions on the series is the claim that
+    /// survives the difference, and it is the claim those tests were making anyway.
+    /// Mirrors `test_sealed_litter_accumulates_then_drains`,
+    /// `test_sealed_microbial_is_fed_and_respired`,
+    /// `test_sealed_microbial_respiration_is_active` and
+    /// `test_sealed_litter_n_accumulates_then_drains`.
+    #[test]
+    fn the_sealed_soil_cascade_fills_and_drains_all_six_of_its_pools() {
+        let states = trace_season(&sealed_chamber_scenario(), SEALED_CHAMBER_YEARS);
+        for id in [
+            LITTER_CARBON,
+            MICROBIAL_CARBON,
+            HUMUS_CARBON,
+            LITTER_N,
+            MICROBIAL_N,
+            HUMUS_N,
+        ] {
+            let series: Vec<f64> = states.iter().map(|s| s.stocks[id].amount).collect();
+            assert!(
+                series.iter().cloned().fold(f64::MIN, f64::max) > 0.0,
+                "{id} is empty for the whole run"
+            );
+            assert!(
+                series.windows(2).any(|w| w[1] > w[0]),
+                "{id} is drained and never fed"
+            );
+            assert!(
+                series.windows(2).any(|w| w[1] < w[0]),
+                "{id} is fed and never drained"
+            );
+        }
+    }
+
+    /// The litter pool's C:N settles at the SHED ratio exactly, and the committed
+    /// scenario's deviation from it is the N-free seed rather than a rate artefact.
+    ///
+    /// The microbe-mediated legs carry nitrogen on the very carbon flux their decomposer
+    /// siblings move, so both currencies leave the litter pool on the same first-order
+    /// flux: `dC/dt = -kC` and `dN/dt = -kN`, hence `d(C/N)/dt = 0`. The pool therefore
+    /// converges on the composition of the material fed into it —
+    /// `carbon_fraction / n_residual`, both cited — rather than on the ratio of two
+    /// unrelated rate constants, which is what the retired free `mineralization_rate`
+    /// made it.
+    ///
+    /// ⚠ This is the batch-E handover, and it is the wiring pin as well as the science
+    /// one. The Python file asserted the wiring with an `isinstance` check that the return
+    /// legs hold the DECOMPOSER params rather than N params of their own; there is no type
+    /// to assert here, because the Rust flows carry bare `f64` rate fields. What that
+    /// check was really guarding is that no independent N rate exists — and an independent
+    /// N rate is precisely what makes this identity fail. Asserted end to end on the built
+    /// registry, which is a stronger claim than reading a field back.
+    ///
+    /// ⚠ Measured with the seed REMOVED. The committed chambers start `litter_carbon0`
+    /// mol of carbon with no `litter_n0` counterpart, i.e. C:N = infinity, so the pool
+    /// sits above the shed ratio by exactly that unphysical initial condition — which
+    /// decays at `decomposition_rate` like anything else in the pool. Both halves are
+    /// stated: an identity without the seed, and a bounded deviation with it. A first
+    /// write-up of the Python original attributed that deviation to a "pulsed-input
+    /// transient", which the algebra above rules out.
+    /// Mirrors `test_the_pool_cn_IS_the_shed_ratio_and_the_deviation_is_the_N_FREE_SEED`,
+    /// `test_litter_pool_cn_is_TWO_regimes_set_by_which_event_fills_the_pool`'s
+    /// shedding-fed regime and
+    /// `test_the_free_mineralization_rate_no_longer_EXISTS_to_be_calibrated`.
+    #[test]
+    fn the_seedless_litter_pool_holds_the_shed_carbon_to_nitrogen_ratio_as_an_identity() {
+        // shed C:N = carbon_fraction / n_residual (kg/kg) = M_C / n_residual_per_mol_c,
+        // since both fractions fold through the same dry-matter mass per mol C.
+        let nitro = params::nitrogen();
+        let shed_cn = params::MOLAR_MASS_CARBON_KG_PER_MOL / nitro.n_residual_per_mol_c;
+
+        let seedless = SeasonScenario {
+            litter_carbon0: 0.0,
+            ..sealed_chamber_scenario()
+        };
+        let mut worst = 0.0_f64;
+        for s in trace_season(&seedless, SEALED_CHAMBER_YEARS) {
+            let n = s.stocks[LITTER_N].amount;
+            if n <= 0.0 {
+                continue;
+            }
+            let ratio = s.stocks[LITTER_CARBON].amount * params::MOLAR_MASS_CARBON_KG_PER_MOL / n;
+            worst = worst.max((ratio - shed_cn).abs() / shed_cn);
+        }
+        assert!(
+            worst < 1e-12,
+            "the seedless litter C:N is not an identity: worst {worst} from {shed_cn}"
+        );
+
+        // ...and the committed scenario sits ABOVE it, by the seed and only by the seed.
+        let seeded = trace_season(&sealed_chamber_scenario(), SEALED_CHAMBER_YEARS);
+        let peak_n = seeded
+            .iter()
+            .map(|s| s.stocks[LITTER_N].amount)
+            .fold(f64::MIN, f64::max);
+        let at_peak = seeded
+            .iter()
+            .find(|s| s.stocks[LITTER_N].amount == peak_n)
+            .map(|s| s.stocks[LITTER_CARBON].amount * params::MOLAR_MASS_CARBON_KG_PER_MOL / peak_n)
+            .expect("a peak state");
+        assert!(
+            at_peak > shed_cn && at_peak / shed_cn < 1.2,
+            "the seeded pool reads {at_peak} against a shed ratio of {shed_cn}"
+        );
+    }
+
+    /// Only a SEALED chamber builds the soil pools, and the organic-carbon roster it
+    /// builds is exactly these eight stocks.
+    ///
+    /// The open field keeps the Phase-1 `litter_sink` BOUNDARY and grows no decomposer
+    /// stocks at all, which is why the frozen open-field goldens are untouched by every
+    /// change to this cascade.
+    ///
+    /// ⚠ The second half is a structural guard against a failure this project has already
+    /// had: five separate "the biosphere's organic carbon" tuples exist across the tree,
+    /// and the humification split added a pool to every one of them. Four were caught only
+    /// by moved goldens. The dangerous case is the fifth kind — a summary feeding a
+    /// STATIONARITY watch, which goes on passing while summing the wrong total. So the
+    /// roster is asserted as a SET derived from the built state rather than trusted to
+    /// memory: adding a soil pool without updating the summaries fails here, by name.
+    /// The set is computed the way the Python original computes it — every CARBON stock
+    /// that is not a boundary and carries no oxygen in its composition, i.e. not CO2.
+    /// Mirrors `test_open_field_has_no_decomposer_stocks`, `test_open_field_has_no_litter_n`
+    /// and `test_every_organic_carbon_pool_is_named_by_the_summary_tuples`.
+    #[test]
+    fn only_a_sealed_chamber_builds_soil_pools_and_its_organic_carbon_roster_is_these_eight() {
+        let (open, _) = build_season(&DEFAULT_SCENARIO).expect("open season");
+        assert!(open.stocks.contains_key(LITTER_SINK));
+        for id in [
+            LITTER_CARBON,
+            MICROBIAL_CARBON,
+            HUMUS_CARBON,
+            LITTER_N,
+            MICROBIAL_N,
+            HUMUS_N,
+            CARBON_POOL,
+            O2_POOL,
+        ] {
+            assert!(!open.stocks.contains_key(id), "the open field built {id}");
+        }
+
+        let (sealed, _) = build_season(&sealed_chamber_scenario()).expect("sealed chamber");
+        let organic: std::collections::BTreeSet<&str> = sealed
+            .stocks
+            .iter()
+            .filter(|(id, stock)| {
+                stock.quantity == Quantity::Carbon
+                    && !id.starts_with("boundary.")
+                    && stock
+                        .composition
+                        .get(&Quantity::Oxygen)
+                        .copied()
+                        .unwrap_or(0.0)
+                        == 0.0
+            })
+            .map(|(id, _)| id.as_str())
+            .collect();
+        assert_eq!(
+            organic,
+            std::collections::BTreeSet::from([
+                LEAF_C,
+                STEM_C,
+                STEM_RESERVE_C,
+                ROOT_C,
+                STORAGE_C,
+                LITTER_CARBON,
+                MICROBIAL_CARBON,
+                HUMUS_CARBON,
+            ]),
+            "the organic-carbon stock set changed — every 'total organic C' summary in the \
+             tree must be updated with it"
+        );
+    }
 }
