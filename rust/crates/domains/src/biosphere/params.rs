@@ -930,13 +930,45 @@ pub fn herbivory() -> HerbivoryParams {
 /// everywhere by linearity rather than only at the knots.
 pub fn allocation_from(text: &str, name: &'static str) -> AllocationParams {
     let f = file(text, name);
+    // ⚠ THE PROVENANCE GUARD THE LIST SHAPE USED TO MISS (added by S6, 2026-08-27).
+    //
+    // `guarded_map` is where the `source:` requirement and the exact-field-set rule live,
+    // and a table-shaped block never reaches it — so until now `allocation.yaml` could lose
+    // its citation, or gain a key wired to nothing, and still load. Batch F measured both
+    // mutations being accepted and recorded the real exposure as a FUTURE list-shaped file:
+    // the third one is caught by its manifest hash, but a file added tomorrow would inherit
+    // this loader and be required to carry a source by nothing until it reached the census.
+    // Two rules, stated here because there is no shared helper for this shape:
+    assert_eq!(
+        f.fields(),
+        vec!["partition_table"],
+        "{name}: `parameters` must hold exactly `partition_table`"
+    );
     let table = checked(f.raw("partition_table", name), name);
     let entries = checked(table.as_mapping(name), name);
+    let mut table_keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
+    table_keys.sort_unstable();
+    assert_eq!(
+        table_keys,
+        ["rows", "source"],
+        "{name}: partition_table must hold exactly `source` and `rows`"
+    );
+    let source_node = entries
+        .iter()
+        .find(|(k, _)| k == "source")
+        .map(|(_, v)| v)
+        .expect("the key set above admits only `source` and `rows`");
+    match source_node {
+        // Non-empty after trimming: an empty string is a `source:` key that cites nothing,
+        // which is the shape a stripped citation would most plausibly leave behind.
+        YamlValue::Scalar { text, .. } if !text.trim().is_empty() => {}
+        _ => panic!("{name}: partition_table `source` must be a non-empty scalar"),
+    }
     let rows_node = entries
         .iter()
         .find(|(k, _)| k == "rows")
         .map(|(_, v)| v)
-        .unwrap_or_else(|| panic!("{name}: partition_table has no `rows`"));
+        .expect("the key set above admits only `source` and `rows`");
     let items = checked(rows_node.as_sequence(name), name);
     assert!(
         items.len() >= 2,
@@ -2357,34 +2389,33 @@ parameters:
         assert!(p.trigger_dvs < p.cessation_dvs && p.cessation_dvs <= 2.0);
     }
 
-    /// Provenance and field-set: enforced at the LOADER for two of the three files, and
-    /// at the MANIFEST for the third.
+    /// Provenance and field-set: enforced at the LOADER for **all three** files.
     ///
-    /// ⚠⚠ THE ASYMMETRY IS THE FINDING, and it was measured rather than assumed.
-    /// `respiration.yaml` and `stem_reserves.yaml` go through `guarded_map`, which is
-    /// where the `source:` requirement and the exact-field-set rule live, so both are
-    /// refused at load. `allocation.yaml` does NOT: its schema is a LIST of rows rather
-    /// than flat value/unit/source scalars, so `allocation_from` reads the table through
-    /// the raw node API and never meets those guards. Probed here before this test was
-    /// written: stripping its `source:` and adding an unknown top-level key were BOTH
-    /// accepted.
+    /// ⚠⚠ THIS TEST NAMED AN ASYMMETRY, AND S6 CLOSED IT. Batch F measured the finding:
+    /// `respiration.yaml` and `stem_reserves.yaml` go through `guarded_map`, which is where
+    /// the `source:` requirement and the exact-field-set rule live, so both are refused at
+    /// load. `allocation.yaml` did NOT — its schema is a LIST of rows rather than flat
+    /// value/unit/source scalars, so `allocation_from` reads the table through the raw node
+    /// API and never met those guards. Probed then: stripping its `source:` and adding an
+    /// unknown top-level key were BOTH accepted, and both were pinned here **as they
+    /// behaved**, so that a guard could not appear quietly. It did not appear quietly: this
+    /// block is the one that reddened when `allocation_from` grew its own two rules, and
+    /// the assertions below are their inverse.
     ///
-    /// It is not unguarded, and this is the part worth writing down rather than filing as
-    /// a gap: the file's newline-normalized sha-256 is pinned in
-    /// `docs/biosphere-reference.manifest.json` under `param_files`, and since slice C7
-    /// the reference WRITES that manifest and `tests/crossport/test_manifest_writer.py`
-    /// compares the committed bytes. So a provenance-only edit to `allocation.yaml` is
-    /// caught — as a STALE MANIFEST, not as a load error. Two different failures, two
-    /// different fixes, and only one of them names the file.
+    /// ⚠ The reason it was not left alone. `allocation.yaml` itself was never unguarded —
+    /// its newline-normalized sha-256 is pinned in `docs/biosphere-reference.manifest.json`
+    /// under `param_files`, and since slice C7 the reference WRITES that manifest while
+    /// `tests/crossport/test_manifest_writer.py` compares the committed bytes, so a
+    /// provenance-only edit to it was caught as a STALE MANIFEST rather than as a load
+    /// error. The exposure was the **next** list-shaped file: it would inherit this loader
+    /// and be required to carry a source by nothing until it reached the manifest census —
+    /// i.e. after it was already committed and read. That is what the loader rules close,
+    /// and it is why the fix is in `allocation_from` rather than in the manifest.
     ///
-    /// What has no guard either way is a FUTURE list-shaped param file: it would inherit
-    /// allocation's loader shape and nothing would require it to carry a source until it
-    /// reached the manifest census. Recorded as an S6 item, not fixed inside a testing
-    /// batch.
     /// Mirrors the `rejects_a_missing_source` / `rejects_an_unknown_field` tests of
     /// `test_respiration.py` and `test_allocation.py`.
     #[test]
-    fn provenance_is_enforced_at_the_loader_for_two_files_and_at_the_manifest_for_the_third() {
+    fn provenance_is_enforced_at_the_loader_for_all_three_files() {
         // The two guarded files: an entry that loses its `source:` is refused.
         let stripped = strip_first_source(RESPIRATION_YAML);
         rejects(
@@ -2421,20 +2452,76 @@ parameters:
             "an unknown respiration field",
         );
 
-        // ⚠ THE THIRD FILE, asserted as it actually behaves. Both mutations LOAD, and
-        // that is pinned rather than left implicit — if `allocation_from` is ever routed
-        // through `guarded_map`, this assertion is what says so out loud instead of a
-        // guard quietly appearing.
+        // ⚠ THE THIRD FILE — the two mutations that used to LOAD, now refused, each by its
+        // own rule. Renaming the key is the exact probe batch F ran; it is a stronger
+        // mutation than deleting the line, because it leaves the table structurally intact
+        // and only removes the citation.
         let no_source = ALLOCATION_YAML.replacen("    source:", "    provenance:", 1);
         assert_ne!(no_source, ALLOCATION_YAML, "the substitution must apply");
-        allocation_from(Box::leak(no_source.into_boxed_str()), "allocation.yaml");
+        rejects(
+            || {
+                allocation_from(Box::leak(no_source.into_boxed_str()), "allocation.yaml");
+            },
+            "a partition table with no source",
+        );
+        // A `source:` that survives as a key but cites nothing — the shape a half-stripped
+        // citation leaves, and the one an exact-key-set check alone would wave through.
+        // ⚠ Only the source LINE changes, so the key set is still exactly {source, rows}
+        // and the exact-key-set rule cannot be what refuses it — which is what makes this a
+        // test of the non-empty rule rather than a second test of the first one.
+        let empty_source = ALLOCATION_YAML
+            .lines()
+            .map(|line| {
+                if line.trim_start().starts_with("source:") {
+                    "    source: \"\""
+                } else {
+                    line
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert_ne!(empty_source, ALLOCATION_YAML, "the substitution must apply");
+        rejects(
+            || {
+                allocation_from(Box::leak(empty_source.into_boxed_str()), "allocation.yaml");
+            },
+            "a partition table whose source cites nothing",
+        );
         let extra = format!(
             "{ALLOCATION_YAML}
   mystery:
     value: 1.0
 "
         );
-        allocation_from(Box::leak(extra.into_boxed_str()), "allocation.yaml");
+        rejects(
+            || {
+                allocation_from(Box::leak(extra.into_boxed_str()), "allocation.yaml");
+            },
+            "an unknown allocation parameter",
+        );
+        // ⚠ A key INSIDE the table, and the reason this case exists. Without it the
+        // table-level exact-key-set rule is REDUNDANT and measurably inert: the renamed
+        // `source:` above is refused by the non-empty rule's own lookup as well, so
+        // deleting the key-set assertion left this whole test green (control R5). A guard
+        // no mutation can redden is not a guard; this is the one thing it alone catches —
+        // a field added beside `rows` that the loader reads nothing from, which is how a
+        // parameter gets "set" in a file and never reaches the model.
+        let extra_in_table = ALLOCATION_YAML.replacen(
+            "    rows:",
+            "    notes: \"provisional\"
+    rows:",
+            1,
+        );
+        assert_ne!(
+            extra_in_table, ALLOCATION_YAML,
+            "the substitution must apply"
+        );
+        rejects(
+            || {
+                allocation_from(Box::leak(extra_in_table.into_boxed_str()), "allocation.yaml");
+            },
+            "an unread key beside the partition table's rows",
+        );
 
         // What allocation's loader DOES enforce is the row shape: exactly dvs/fl/fs/fr/fo.
         let sixth = ALLOCATION_YAML.replacen(

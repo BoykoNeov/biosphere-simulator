@@ -834,8 +834,42 @@ fn compartments(
     ])
 }
 
+/// Reject a scenario whose soil-nitrogen band is not ordered.
+///
+/// ⚠ This is the ONE production change S6 makes outside a deletion, and it exists because
+/// the rule had nowhere else to live. Python's `soil_n_availability` raises on
+/// `sn_residual >= sn_critical`; the port omits the raising input guards on its hot rate laws
+/// by a stated Phase-7 decision (`science.rs`'s module header), and for the *other* band —
+/// `n_residual` / `n_critical` — the param-file loader owns the rejection and it is pinned.
+/// `sn_residual` / `sn_critical` are SCENARIO fields, not param-file entries, so there was no
+/// loader to own them and nothing in the tree rejected an inverted band. Batch E recorded
+/// that as an S6 item; §5aj then pinned what the unguarded function DOES with one (it
+/// degenerates to a step at `sn_residual`, the interior unreachable because the two
+/// conditions overlap), so the guard lands on top of an asserted behaviour rather than in
+/// place of a prose gap.
+///
+/// It sits at assembly, not in the rate law: `build_season` already returns `Result` and runs
+/// once per season, so the Phase-7 rationale for omitting a guard (`Result` on a hot path)
+/// does not apply. `soil_n_availability` itself is unchanged and still permissive, and
+/// `science::tests::the_availability_ramp_is_pinned_off_its_own_symmetry_point` still pins
+/// the degenerate shape by calling it directly — the guard closes the door scenarios come
+/// through, not the function.
+///
+/// **No number moves.** Every scenario in the tree derives `sn_residual` / `sn_critical` from
+/// the one `DEFAULT` (`1.0` / `50.0`), which the guard accepts.
+fn validate_scenario(scenario: &SeasonScenario) -> Result<(), SimError> {
+    if scenario.sn_residual >= scenario.sn_critical {
+        return Err(SimError::Validation(format!(
+            "soil-nitrogen band is not ordered: sn_residual {:?} >= sn_critical {:?}",
+            scenario.sn_residual, scenario.sn_critical
+        )));
+    }
+    Ok(())
+}
+
 /// Assemble the season's initial `State` and the flow + aux `Registry`.
 pub fn build_season(scenario: &SeasonScenario) -> Result<(State, Registry), SimError> {
+    validate_scenario(scenario)?;
     let p = params::biosphere();
     let builds = compartments(scenario, &p)?;
     let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
@@ -1838,6 +1872,52 @@ mod tests {
         // storage_c starts at 0 < seedling_total, so a reset must error.
         let err = annual_reset(&state, &scenario);
         assert!(matches!(err, Err(SimError::Validation(_))));
+    }
+
+    /// An inverted soil-nitrogen band is rejected at assembly, and BOTH sides of the
+    /// boundary are asserted.
+    ///
+    /// Mirrors `test_soil_n_availability_rejects_inverted_band`, whose Rust successor batch
+    /// E recorded as absent by an inherited decision and left as an S6 item: the rate law
+    /// keeps the Phase-7 no-guard rule, so the rejection had to land somewhere else or
+    /// nowhere. Here it lands on `build_season`.
+    ///
+    /// ⚠ The equal case is the one worth writing down. Python's rule is `>=`, and equality
+    /// is not a harmless edge: `sn_residual == sn_critical` makes the ramp's denominator
+    /// zero, so it is the one inverted-band input that could produce a NaN rather than a
+    /// step. It is rejected, and asserted separately from the strictly-inverted case.
+    ///
+    /// The accepting side is not decoration — a guard with the comparison reversed would
+    /// reject every scenario in the tree, and a run of the goldens would say so, but this
+    /// says so in the binary that owns the guard.
+    #[test]
+    fn an_inverted_soil_nitrogen_band_is_rejected_at_assembly() {
+        let ordered = SeasonScenario {
+            sn_residual: 1.0,
+            sn_critical: 50.0,
+            ..DEFAULT_SCENARIO
+        };
+        assert!(build_season(&ordered).is_ok(), "the frozen band is accepted");
+
+        let inverted = SeasonScenario {
+            sn_residual: 50.0,
+            sn_critical: 1.0,
+            ..DEFAULT_SCENARIO
+        };
+        assert!(matches!(
+            build_season(&inverted),
+            Err(SimError::Validation(_))
+        ));
+
+        let degenerate = SeasonScenario {
+            sn_residual: 5.0,
+            sn_critical: 5.0,
+            ..DEFAULT_SCENARIO
+        };
+        assert!(matches!(
+            build_season(&degenerate),
+            Err(SimError::Validation(_))
+        ));
     }
 
     /// ⚠ **The WIRING declines the drought modifier when no `WSSD` is cited** -

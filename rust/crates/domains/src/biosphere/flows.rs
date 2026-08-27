@@ -1369,12 +1369,15 @@ impl AuxProcess for ThermalTimeAccumulation {
     }
 }
 
-/// `AuxProcess` advancing the `vernalization_days` accumulator (the SECOND accumulator).
+/// `AuxProcess` advancing the `rooted_depth` accumulator (`DEPORT`, [F] Box 14.1).
 ///
-/// Structural mirror of `ThermalTimeAccumulation`. Reads AIR temperature: the source
-/// prescribes crown temperature but notes the two differ only under snow cover, and no
-/// snow forcing exists. De-vernalization (Eqn 8.5) needs daily MAXIMUM temperature, which
-/// the forcing does not carry, so it is unimplementable rather than omitted.
+/// The rate, and every stop on it, come from `science::extension_rate` — see `evaluate`,
+/// which states why that sharing is load-bearing rather than convenient.
+///
+/// ⚠ From the Phase-7 port until 2026-08-27 this carried `VernalizationAccumulation`'s doc
+/// comment verbatim — a description of a different accumulator reading a different forcing.
+/// Batch B recorded the misattribution and S6 moved it back; the text above is new, since
+/// the displaced block belonged to the other struct and nothing described this one.
 pub struct RootDepthExtension {
     pub id: String,
     pub accumulator: String,
@@ -1504,6 +1507,12 @@ impl Flow for RootZoneCapture {
     }
 }
 
+/// `AuxProcess` advancing the `vernalization_days` accumulator (the SECOND accumulator).
+///
+/// Structural mirror of `ThermalTimeAccumulation`. Reads AIR temperature: the source
+/// prescribes crown temperature but notes the two differ only under snow cover, and no
+/// snow forcing exists. De-vernalization (Eqn 8.5) needs daily MAXIMUM temperature, which
+/// the forcing does not carry, so it is unimplementable rather than omitted.
 pub struct VernalizationAccumulation {
     pub id: String,
     pub accumulator: String,
@@ -1591,7 +1600,16 @@ mod tests {
     const CO2: &str = "biosphere.carbon_pool";
     const O2: &str = "biosphere.o2_pool";
     const THERMAL_TIME: &str = "thermal_time";
-    const ROOTED_DEPTH: &str = "biosphere.rooted_depth";
+    /// ⚠ The AUX keys are the ENGINE's, imported, not literals like the stock ids above.
+    ///
+    /// The stock ids may be literals here: a flow reads the id this module hands it, so a
+    /// literal that drifted would break these tests loudly. An AUX key cannot — the reads go
+    /// through `unwrap_or(0.0)`, so a key nothing writes returns a plausible zero and the
+    /// test passes on it. This constant was the bare literal `"biosphere.rooted_depth"` from
+    /// batch A until 2026-08-27, while the engine's is `"rooted_depth"`; harmless where it
+    /// sat, because these tests both wrote and read it, and a trap for any aux test that
+    /// inherited it. Batch B declined to inherit it and said so; S6 removed the shadow.
+    use super::super::stocks::ROOTED_DEPTH;
 
     /// The chamber's air basis, in mol — the `f_O2` and Ci denominators.
     const AIR_MOL: f64 = 1000.0;
@@ -2102,11 +2120,12 @@ mod tests {
     // peak-LAI band, a mutual-shading regime check, a trajectory fixed-point). The
     // multiplicative COMPOSITION and the anthesis GATE had no test of their own.
     //
-    // ⚠ The batch-A test module above declares a local
-    // `const ROOTED_DEPTH: &str = "biosphere.rooted_depth"`, which is NOT the aux key the
-    // engine uses (`stocks::ROOTED_DEPTH` is the bare `"rooted_depth"`). It is harmless
-    // there because those tests are self-consistent, but an aux test must read the real
-    // one, so the block below imports the constants rather than inheriting the shadow.
+    // ⚠ The aux keys are imported, never re-declared: an aux read goes through
+    // `unwrap_or(0.0)`, so a key nothing writes returns a plausible zero instead of failing.
+    // Batch A's module above had exactly that shadow (`"biosphere.rooted_depth"` against the
+    // engine's `"rooted_depth"`) and this block was written not to inherit it; S6 removed
+    // the shadow at its source on 2026-08-27, and the rule stated here is why both blocks
+    // now import rather than declare.
     use super::super::stocks::{
         pool_stock, ROOTED_DEPTH as AUX_ROOTED_DEPTH, SOIL, THERMAL_TIME as AUX_THERMAL_TIME,
         VERNALIZATION_DAYS as AUX_VERNALIZATION_DAYS,

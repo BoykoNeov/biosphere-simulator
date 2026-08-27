@@ -33,10 +33,16 @@ pub fn leaf_area_index(leaf_carbon: f64, sla_per_mol_c: f64, ground_area: f64) -
     leaf_carbon * sla_per_mol_c / ground_area
 }
 
-/// Intercepted fraction `1 − exp(−k · LAI)` (Monsi & Saeki).
-pub fn intercepted_fraction(lai: f64, extinction_coef: f64) -> f64 {
-    1.0 - (-extinction_coef * lai).exp()
-}
+// ⚠ `intercepted_fraction` — the big-leaf `1 − exp(−k · LAI)` (Monsi & Saeki) — was DELETED
+// here on 2026-08-27, resolving clause 4 of S5's exit gate. The layered canopy (2026-08-15)
+// moved that `exp` into `canopy_assimilation`'s per-depth-point loop, leaving this function
+// with no production call site in either tree; it survived only as an export and as unit
+// tests of itself. Its claims did not go with it: `test_canopy.py`'s live physics landed on
+// `the_depth_quadrature_conserves_photons_against_beer_lambert` in batch A, which checks the
+// depth integral against the closed-form Beer–Lambert total rather than against a function
+// nothing calls. The Python twin (`domains/biosphere/canopy.py`) outlives it by one slice: it
+// is still a shim target for `tests/crossport/measure_tier2_bands.py`, and dies with the
+// checker at S6.
 
 // --- FvCB photosynthesis ----------------------------------------------------
 
@@ -344,7 +350,6 @@ pub fn drought_development_factor(wsfg: f64, wssd: f64) -> f64 {
     (1.0 - wsfg) * wssd + 1.0
 }
 
-/// Development stage `DVS ∈ [0, 2]` from thermal time (TSUM1/TSUM2).
 /// `FROOT1 = min(depth / layer, 1)` - the fraction of the reference soil layer the
 /// roots have reached ([F] Soltani & Sinclair). A multiplicative gate on a supply term,
 /// so it can only reduce a flow, never reverse it.
@@ -414,6 +419,11 @@ pub fn extension_rate(
     params.max_extension_rate * f_water * f_temp
 }
 
+/// Development stage `DVS ∈ [0, 2]` from thermal time (TSUM1/TSUM2).
+///
+/// ⚠ This line spent from the Phase-7 port until 2026-08-27 attached to `root_zone_fraction`
+/// three items below, where it read as that function's first sentence; batch B recorded the
+/// misattribution and S6 moved it back. Doc-only, no behaviour.
 pub fn development_stage(thermal_time: f64, tsum_anthesis: f64, tsum_maturity: f64) -> f64 {
     if thermal_time <= 0.0 {
         return 0.0;
@@ -2288,17 +2298,21 @@ mod tests {
 
         // ⚠ AN INVERTED BAND, asserted as it BEHAVES rather than left as a prose gap.
         // Python's `soil_n_availability` raises on `sn_residual >= sn_critical`; this one
-        // does not, per this module's header decision, and unlike `n_residual`/`n_critical`
-        // there is nothing downstream that rejects it either — `sn_residual`/`sn_critical`
-        // are SCENARIO fields, not param-file entries, and no scenario validator checks
-        // their order. Adding one is a production change and an S6 item.
+        // does not, per this module's header decision, and until 2026-08-27 nothing
+        // downstream rejected it either — `sn_residual`/`sn_critical` are SCENARIO fields,
+        // not param-file entries, so unlike `n_residual`/`n_critical` there was no loader to
+        // own the rule. S6 gave it one: `system::validate_scenario`, called by
+        // `build_season`.
         //
-        // What the S6 note cannot say, and this can: the function degenerates to a STEP at
-        // `sn_residual`, and the interior is unreachable because the two conditions overlap.
-        // Pinned the way batch D pinned `allocation.yaml`'s two mutations that LOAD — so if
-        // a validator ever appears, this assertion says so out loud instead of a guard
-        // quietly materializing. ⚠ It is independent of the ramp above by construction: the
-        // interior limb never runs here, so inverting the ramp cannot move it.
+        // ⚠ THE FUNCTION IS UNCHANGED AND THIS PIN STILL BITES — that is the point of
+        // keeping it. The guard closes the door scenarios come through; the rate law is
+        // still permissive, and what it does with an inverted band is asserted here rather
+        // than left to be inferred from the guard's existence. It degenerates to a STEP at
+        // `sn_residual`, the interior unreachable because the two conditions overlap.
+        // Pinned the way batch D pinned `allocation.yaml`'s two mutations that LOAD, so the
+        // validator arriving reads as a decision instead of a guard quietly materializing.
+        // ⚠ Independent of the ramp above by construction: the interior limb never runs
+        // here, so inverting the ramp cannot move it.
         let inverted = |soil_n: f64| soil_n_availability(soil_n, 0.05, 0.01);
         assert_eq!(inverted(0.03), 0.0); // below the (higher) residual — off
         assert_eq!(inverted(0.05), 0.0); // AT it — still off, the `<=`

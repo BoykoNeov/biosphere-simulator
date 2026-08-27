@@ -83,11 +83,16 @@
 //! workspace ([`crate::biosphere::flows`]'s `CarbonContext`); the station's lighting/sealed
 //! seams *write* `PAR_VAR`, none reads it. So nothing else moves.
 //!
-//! ⚠ One inherited fact worth recording and **not** resolving here: Python shims
-//! `canopy.math` for `intercepted_fraction`'s `exp`, and on the reference side that function
-//! is **dead** — no production call site (grep: definition and unit tests only). That is
-//! clause 4 of S5's exit gate (resolve `intercepted_fraction` — delete it or wire it), an S6
-//! item, not this slice's.
+//! ⚠ The asymmetry this probe inherited is now **half** resolved, and the half that remains
+//! is the reason this note stays. Python shims `canopy.math` for `intercepted_fraction`'s
+//! `exp`; on the reference side that function was dead (no production call site) and was
+//! **deleted on 2026-08-27**, closing clause 4 of S5's exit gate. The Python twin is still
+//! there and still shimmed, so `measure_tier2_bands.py` goes on perturbing a path its own
+//! carbon budget no longer runs. That contribution was **measured at exactly zero** in
+//! 2026-08-15 (both biosphere rows read `0.0` when `canopy` was the only shim, which is what
+//! forced the second shim), so the Python instrument's numbers come from its
+//! `photosynthesis` shim alone and the deletion cannot move them. It dies with the checker
+//! at S6; nothing here depends on it.
 //!
 //! **Thermal.** The `t⁴` is inside a flow, and the subtraction `t⁴ − T_space⁴` can cancel, so
 //! perturbing the flow's *output* would understate the sensitivity — the one place a cheaper
