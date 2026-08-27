@@ -8294,3 +8294,60 @@ slice, not be discovered inside it.
    not a free deletion (FINDING 7); and §5am's measured note that retiring the four Python
    band tests loses a *tighter* floor (the Rust readings are up to 3.7× lower), which is fine
    at margins of 380× and up but is a loss, not a wash.
+
+## §5ao Stage 3 — S6 opened 2026-08-27: the deletion set enumerated FROM DISK, and it is not yet a deletion slice
+
+S6's first act is not a deletion. It is the same move the census made one level up: *a
+deletion list is a coverage table, and a coverage table built by READING cannot see its own
+omissions* (§5al). So the list comes from `git ls-files`, and every file is checked against a
+recorded disposition rather than against anyone's memory of one.
+
+**287 tracked Python files**: 140 under `tests/` (the suite), 18 + 7 under `tests/crossport/`,
+9 under `tests/oracle/`, 112 under `src/`, one bench. Plus five committed JSON fixtures.
+
+### What the enumeration confirms
+
+* **137 of the 140 suite files are named by a plan coverage row.** The three that are not
+  (`conftest.py`, `day_index.py`, `sealed_tier2_helper.py`) are helpers, not test files.
+* **The nine `test_godot_*.py` drivers are free.** §5y's decision-3 successor **landed**:
+  `godot_bridge/tests/cross_boundary.rs` carries all nineteen, driving the real cdylib
+  through Godot from Rust, and the CI job swaps `pytest` for `cargo test`. Likewise
+  `test_headless_cli.py` → `station/tests/headless_cli.rs` (3), and `test_context_budget.py`
+  → `repo_gates` (10). All four §5y build items are standing.
+* **The three param generators are free, and the rule that says so was written in advance.**
+  `params.rs`'s own header: *"`biosphere_params.txt` is retained as the CONTROL … the
+  generator is retired only once that gate has been green, per the rule §5c sets for every
+  generator."* The `.txt` files are committed and read with `include_str!`, so they survive
+  as frozen controls; what dies is the ability to regenerate them, which is what "retained as
+  the control" already means. ⚠ Their headers say *"Regenerate: uv run python …"* and that
+  line becomes false the moment the generator goes — three files, and nothing would redden.
+
+### ⚠⚠ What the enumeration FINDS: S6 has four build items in front of it, not one
+
+The record named one prerequisite (`compartment_boundary_ledger`). Reading the tree finds
+three more, and two of them are gates the repo would silently lose:
+
+| # | what | why it is not a deletion |
+|---|---|---|
+| 1 | **The manifest BYTE gate** | `tests/crossport/test_manifest_writer.py` regenerates each of the three manifests into a temp file and demands the committed one is **byte-identical**. `domains/tests/manifest_writer.rs` guards a *different* claim (C7's anti-derived literals). This is FINDING 2 — *"the byte gate itself is Python"* — and deleting it retires the only check that the committed contracts are what the reference writes |
+| 2 | **The golden regeneration path** | `regen_goldens_from_rust.py` is *"the blessed path"* and slice 5 made it **the only one**. It is a Python driver over the Rust `emit_*` examples. Deleting it leaves the reference able to emit goldens and unable to regenerate them as a reviewed act |
+| 3 | **`compartment_boundary_ledger`** | 22 claims across `test_compartments.py` (15) and `test_compartment_ledger.py` (7), no Rust equivalent anywhere. Batch C recorded it as a gap; deleting with no successor is the orphaning pattern `docs/log/scenarios-retired-c6.md` names |
+| 4 | **`test_golden_provenance.py`** (10) | named by no plan row, and its subject is the provenance of the freeze contract's *values*. Needs a read before it goes, not a classification from its filename |
+
+⚠ **`config/units.py` and the generators are ONE decision, and `CLAUDE.md` already names the
+trap**: it *"stays live only while the retained param generators call it; retiring them
+without giving it an executing caller leaves a green check guarding a dead path."* Decided
+together or the slice ships exactly the failure that sentence describes.
+
+### ⚠ The blind spot after the last deletion, recorded before it happens
+
+`CLAUDE.md` and `docs/test-suite-runtime.md` describe a tree that will not exist — `uv sync`,
+`uv run pytest -n 12`, the markers, the 7m05s measurement, the pytest-priority rules, the
+`config/units.py` warning. **Nothing reddens on a stale always-loaded file**; that is C3's
+recorded lesson (a stale `dt = 1` outlived a full ceremony). The `CLAUDE.md` edit belongs in
+the same commit as the infrastructure deletion, never in a follow-up.
+
+### The carve-out, unchanged
+
+`tests/oracle/` and its five committed JSON fixtures survive: hand-run, `-m oracle`, a
+diagnostic and never a gate. That is the only Python the flip's posture keeps.
