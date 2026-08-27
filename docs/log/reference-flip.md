@@ -4203,6 +4203,28 @@ pins one name of each, and control C8 (delete the macro arm) reddens three gates
 instrument's own coverage is a property to measure, not to assume* — the same shape as
 `Nudge::Off` comparing against the golden rather than against itself.
 
+### ⚠⚠ The check that caught the census's own worst case, after it was committed
+
+The three file-wide `test_* -> no-subject` rules are the largest authored block in the file
+(44 rows), and a blanket rule that swallows a LIVE claim is the exact inverse risk §5ak names:
+letting a live claim ride out of the tree wearing decision-record clothing. One command
+discriminates it, because §5ak counted the same file independently: **25 of 33** functions
+with no live subject.
+
+The census said **26**. The extra one is
+`test_the_two_source_tables_disagree_by_an_order_but_agree_on_the_form`, whose 12.5x table
+arithmetic has no successor but whose *other* half — the frozen rates are non-zero over the
+entire phase where every reading of the source is zero — is carried by the form-gap block of
+`params.rs::rdr_root_is_the_closest_of_the_three_frozen_rates_to_its_cited_source`.
+
+⚠ **The link extractor missed it because that Mirrors annotation is an inline comment
+INSIDE the function body, not in the doc block above it** — the same species of blind spot as
+the macro shape, found the same way and not by review. A body-scan pass now runs too;
+exactly one roster name is reachable only that way, and `test_soil_fractionation.py` (24) and
+`test_nitrogen_throttle.py` (7) both land on their sections' independent counts unchanged.
+*Two of this batch's three sharpest findings are about the INSTRUMENT rather than its
+subject, which is what measuring an instrument against an independent count is for.*
+
 ### The controls: both directions, and one inert by design
 
 | # | mutation | reddens |
