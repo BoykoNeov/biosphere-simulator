@@ -715,11 +715,38 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
    unfreeze path that edits `simcore/`.)
 3. **Regenerate the affected goldens** and **review the byte diff** — a change there means the
    trajectory moved, which is the point. ⚠ **Six of this contract's seven goldens are the Rust
-   port's output** since the reference flip, and the blessed path for them is
-   `uv run python tests/crossport/regen_goldens_from_rust.py --write`; the per-module
-   `__main__` in `tests/test_regression_*.py` **refuses** to write one (`golden_platform.
-   write_python_golden`). `drift_summary.json` is the exception — it is Python's fold and its
-   own `__main__` is still right.
+   port's output** since the reference flip, and `drift_summary.json` was the exception —
+   Python's fold. ⚠⚠ **That fold's program was deleted by slice S6, so `drift_summary.json`
+   is now UNREGENERABLE by any path.** Recorded as a gap rather than glossed: slice C5 had
+   already ported the fold kit to `domains::biosphere::drift`, and the reason this one file
+   did not move with it was *measured* — folding the Rust series moves 4 of its 45 values
+   (≤7 ULP), which would have needed tolerance-gating. That blocker was a property of the
+   Python comparator, which no longer exists, so converting `emit_drift` to emit the summary
+   directly is now a smaller job than it was; until someone does it, an unfreeze that moves
+   this golden has no regeneration step.
+
+   ⚠⚠ **`--write` REFUSES since 2026-08-27 (slice S6), and the interim path is below.**
+   That tool validated every candidate through `sim_io.snapshot` before it could reach the
+   disk — *a golden that does not round-trip must never be written* — and S6 deleted the
+   Python tree that check lived in. A regeneration tool that writes **unvalidated** bytes over
+   a freeze contract's values is worse than one that refuses, so it refuses. **Reporting is
+   unaffected** (`uv run python tests/crossport/regen_goldens_from_rust.py`, no flag): it
+   compares the emitter's bytes against the committed ones and needs no validator, so the
+   *"which goldens would move"* half of this step still works exactly as before.
+
+   Until the blessed path moves to Rust (S6 build item 2), regenerate **one golden at a time,
+   by hand**, from `rust/`:
+
+   ```
+   cargo run -q -p <crate> --example <emitter> > ../rust/data/golden/<name>
+   git diff -- rust/data/golden/<name>      # review it; this diff IS the record
+   ```
+
+   ⚠ Always `-p <crate> --example`, never a built binary path: `emit_crew` exists in **two**
+   crates and `target/*/examples/emit_crew` is whichever built last — one of which re-emits the
+   golden *from itself*. `-p` is what makes that unreachable. The emitter for each golden is
+   named in `regen_goldens_from_rust.py`'s `RUST_EMITTERS`, which is still the roster even
+   though its write half is disabled.
 4. **Regenerate the manifest** — from `rust/`, `cargo run --example dump_biosphere_inventory
    -- --write-manifest` — and review its diff: the changed hashes / flow set / param set are
    the git-visible record of exactly what was unfrozen. ⚠ **The reference writes this file

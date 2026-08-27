@@ -1,6 +1,11 @@
 # Performance baseline (Phase 0.5, Step 6)
 
-**NON-GATING.** Absolute numbers are machine-dependent — this is a tracked *regression reference*, not a pass/fail gate. Regenerate with `uv run python bench/perf.py --out docs/perf-baseline.md`.
+**NON-GATING, AND A RECORD RATHER THAN A REFERENCE SINCE 2026-08-27.** Absolute numbers
+are machine-dependent, so this was always a tracked regression reference and never a
+pass/fail gate. ⚠ Slice S6 deleted  with the rest of the Python tree, and
+these numbers are the **Python engine’s** — they describe an implementation that no longer
+exists. Kept as the record of what the checker cost; do not compare a Rust measurement
+against it, and do not treat the regeneration command it used to carry as live.
 
 - **Date (UTC):** 2026-06-17 10:39
 - **Commit:** `d9cf43a`

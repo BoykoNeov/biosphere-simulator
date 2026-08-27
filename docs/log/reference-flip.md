@@ -4371,6 +4371,39 @@ was deleted by this very slice, so the census's Python column can never be re-de
 is what "frozen snapshot" meant, and it is why it was built that way; maintaining the
 additional block is now a one-line edit that the gate names for you.
 
+### ⚠⚠ The follow-up pass, and the gap it found in what S6 had just written
+
+Four checks after the deletion landed. One is a real gap the deletion created; one is an
+overclaim S6 wrote in the fix for it and then corrected against the roster.
+
+* **CI was NOT red — checked rather than assumed.** The two surviving crossport gates
+  `skipif` on `shutil.which("cargo")`, so the Python job skips them rather than erroring;
+  and the `godot-parity` job had already run `cargo test -p godot_bridge --test
+  cross_boundary` since §5y decision 3, so only its *comment* still named the deleted Python
+  drivers. ⚠ The parity job's **name** was false, though: its subject stopped being two-port
+  parity the moment the comparator went, and a job called *"Cross-port parity (Rust port vs
+  20 frozen goldens)"* that runs neither is the ungated-prose problem wearing a green tick.
+  Renamed to what it now gates.
+* ⚠⚠ **`drift_summary.json` is now UNREGENERABLE, and that is a new gap.** The first draft
+  of this section claimed every golden is now the reference's own bytes; measured against
+  the roster, that was wrong. Nineteen of the twenty-one have `emit_*` examples;
+  `state_snapshot.json` never was regenerable and should not be — Rust **reads** it, so
+  regenerating it from Rust is the round trip in its purest form; and `drift_summary.json`
+  was Python's fold. ⚠ **The reason C5 had not already moved it is worth keeping, because it
+  has partly dissolved**: folding the Rust series moves 4 of its 45 values by ≤7 ULP, which
+  would have needed tolerance-gating **in the Python comparator** — and that comparator no
+  longer exists. *A blocker that was a property of the checker outlived the checker by one
+  slice, inside our own record.*
+* **Both freeze contracts' unfreeze ceremonies named the now-refusing `--write`.** That is
+  the one procedure this repo says must be followed exactly, and its regeneration step had
+  quietly become a `SystemExit`. Both now carry the interim by-hand path — `cargo run -q -p
+  <crate> --example <emitter>`, then review the diff — including why it must be `-p <crate>
+  --example` and never a built binary path (`emit_crew` exists in two crates, and one of
+  them re-emits the golden *from itself*).
+* `docs/perf-baseline.md` measures an engine that no longer exists; marked a record, the
+  same disposition `docs/test-suite-runtime.md` already got. `uv.lock` re-resolved against
+  the now-empty runtime dependency set.
+
 ### Standing after S6
 
 * **The Python simulation tree is gone.** `simcore`, `domains`, `station`, `authoring`,

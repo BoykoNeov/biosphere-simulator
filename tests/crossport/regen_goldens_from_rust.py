@@ -11,7 +11,7 @@ Built in slice 4 as the committed, reviewable entry point for the act the plan n
 Run it::
 
     uv run python tests/crossport/regen_goldens_from_rust.py            # report only
-    uv run python tests/crossport/regen_goldens_from_rust.py --write    # rewrite
+    uv run python tests/crossport/regen_goldens_from_rust.py --write   # REFUSES (S6)
 
 **Reporting is the default and ``--write`` is explicit**, matching the discipline every
 Python regeneration main already follows: rewriting a golden is a deliberate act whose

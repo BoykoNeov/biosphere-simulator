@@ -72,7 +72,7 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
   crossport:
-    name: Cross-port parity (Rust port vs 20 frozen goldens)
+    name: Contract gates (manifest bytes · golden provenance)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,13 +82,20 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Sync Python dependencies
         run: uv sync
-      # The whole tests/crossport/ suite, INCLUDING -m slow: the two sealed goldens
-      # (sealed_station ~1.3M substeps + the 15-yr energy drift) are slow-marked, and
-      # omitting them would gate only 18 of the 20. Each parity test shells out to
-      # `cargo run --example …`; the first invocation builds the rust/ workspace (a
-      # second build for the --release sealed cases). The Python comparator applies the
-      # per-scenario tier rules (Tier-0 exact / Tier-1 bit-exact / Tier-2 measured band).
-      - name: Cross-port parity suite (incl. slow sealed goldens)
+      # ⚠ THIS JOB'S SUBJECT CHANGED IN SLICE S6 (2026-08-27) and its name changed with
+      # it. It used to run the two-port parity comparison — the Python comparator applying
+      # the per-scenario tier rules against 20 frozen goldens. That comparator is deleted:
+      # S3's exit gate, re-measured before the deletion, showed all five sibling mutations
+      # still redden by name with the comparison AND the goldens deselected, and the tier
+      # contract itself now lives in `domains/tests/tier_contract.rs`.
+      #
+      # What is left here is the two gates with no Rust successor YET, which is exactly
+      # why the job keeps a Rust toolchain: `test_manifest_writer.py` regenerates all three
+      # freeze manifests through `cargo run --example … --write-manifest` and demands the
+      # committed bytes are identical, and `test_golden_provenance.py` checks the golden
+      # roster against the emitters that author it. Both are S6 build items; when their
+      # successors land, this job goes with them.
+      - name: Contract gates (manifest byte-identity, golden provenance)
         run: uv run pytest tests/crossport/
 
   godot-parity:
@@ -96,8 +103,10 @@ jobs:
     runs-on: ubuntu-latest
     # Phase-8 Step 8 (P8.8) promotes the Step-1 cross-boundary smoke from a silently-skipped
     # local test to a real gate. This job installs headless Godot AND the Rust toolchain, so
-    # the Godot cross-boundary smokes (`tests/crossport/test_godot_*.py`, which `skipif` when
-    # Godot/cargo are absent) actually RUN: each drives a scenario through the actual
+    # the Godot cross-boundary smokes actually RUN: each drives a scenario through the actual
+    # ⚠ (they lived in `tests/crossport/test_godot_*.py` until §5y decision 3 moved them to
+    # `godot_bridge/tests/cross_boundary.rs`; S6 deleted the Python drivers, and this comment
+    # named them for one slice after the step below had stopped using them)
     # `godot_bridge` cdylib Godot loads and asserts the snapshot is byte-identical to the
     # headless `emit_*` reference, with FTZ/DAZ OFF on the stepping thread. This is the genuine
     # glibc-Rust-cdylib-vs-headless FP-environment check the intra-process `session_parity.rs`
