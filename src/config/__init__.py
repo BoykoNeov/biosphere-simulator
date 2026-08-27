@@ -6,10 +6,17 @@ is gone: `rust/crates/config` is the one that counts (slice C1), and the exact
 unit-string guard there replaced every live pint conversion, each of which had been
 measured to be an identity.
 
-⚠ What survives is **`paths`, and only because a surviving gate reads one constant
-from it** — `regen_goldens_from_rust.py` wants `GOLDEN_DIR`. That tool is S6 build
-item 2 and dies with its successor; this package dies in the same commit. It is not
+⚠ What survives is **`paths`, and only because one surviving reader wants one
+constant from it** — `tests/oracle/runner.py` wants `WINTER_WHEAT_WEATHER`. It is not
 a boundary layer any more, it is a single path constant wearing one.
+
+⚠⚠ **This paragraph said the package dies with S6 build item 2, and that was wrong.**
+It named `regen_goldens_from_rust.py` and `GOLDEN_DIR` as the last reader and reasoned
+that retiring the tool retires the package. Build item 2 landed and the package did not
+die: the PCSE oracle reaches in here too, and the carve-out outlives the checker. The
+constant it wanted is a different one, so build item 3 deleted the other five and kept
+the file. *A dated claim about who reads you is a claim about a roster — re-derive it
+before acting on it.*
 
 Deliberately re-exports nothing. The old `__init__` pulled in `errors`, `loader` and
 `units`, so leaving it untouched would have turned a package with two files into an

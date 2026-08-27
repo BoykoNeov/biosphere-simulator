@@ -41,8 +41,8 @@ pub fn leaf_area_index(leaf_carbon: f64, sla_per_mol_c: f64, ground_area: f64) -
 // `the_depth_quadrature_conserves_photons_against_beer_lambert` in batch A, which checks the
 // depth integral against the closed-form Beer–Lambert total rather than against a function
 // nothing calls. The Python twin (`domains/biosphere/canopy.py`) outlives it by one slice: it
-// is still a shim target for `tests/crossport/measure_tier2_bands.py`, and dies with the
-// checker at S6.
+// was a shim target for `tests/crossport/measure_tier2_bands.py`, and died with the checker
+// at S6 (2026-08-27). The band basis is measured in-tree now, by `domains::ulp_probe`.
 
 // --- FvCB photosynthesis ----------------------------------------------------
 

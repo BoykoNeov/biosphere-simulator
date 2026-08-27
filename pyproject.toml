@@ -13,12 +13,17 @@ dependencies = []
 
 [dependency-groups]
 # PEP 735 dev group; `uv sync` installs it by default.
+# ⚠ `hypothesis>=6` and `pytest-xdist>=3` were removed on 2026-08-27 (S6 build item 3).
+# Every property test and every parallel run went with the deleted suite: `grep` over
+# `tests/` finds no `@given` and no `strategies`, and what is left is twelve tests that
+# read committed JSON in under a second. They were not merely unused — `conftest.py`
+# imported hypothesis at module scope to configure a profile for nothing, which made a
+# dead dependency a single point of failure for the PCSE carve-out that collects
+# through it.
 dev = [
     "ruff>=0.6",
     "pytest>=8",
-    "hypothesis>=6",
     "pyright>=1.1",
-    "pytest-xdist>=3",
 ]
 # PCSE (EUPL) is an OFFLINE validation oracle only (Phase 1, Step 3). It drags
 # numpy + a large tree, so it stays a dev/test-only extra — never imported by the
@@ -32,9 +37,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 # ⚠ ONE package, and it is a single path constant. S6 deleted `simcore`, `sim_io`,
-# `domains`, `station` and `lab`; `config` survives only because
-# `tests/crossport/regen_goldens_from_rust.py` reads `GOLDEN_DIR` from it, and both die
-# together when that tool gets its Rust successor (S6 build item 2).
+# `domains`, `station` and `lab`; `config` survives because `tests/oracle/runner.py` reads
+# `WINTER_WHEAT_WEATHER` from it.
+# ⚠⚠ This comment said the package dies with S6 build item 2 — it named
+# `regen_goldens_from_rust.py`/`GOLDEN_DIR` as the last reader. Item 2 landed, the tool is
+# gone, and the package is still here: the PCSE carve-out reaches in too, and it outlives
+# the checker. Item 3 deleted the five unread constants instead.
 packages = ["src/config"]
 
 [tool.ruff]
@@ -65,8 +73,10 @@ addopts = "-ra"
 # `test_stability.py` / `test_biosphere_stress.py`, and the science gates moved to
 # `domains/src/biosphere/science_gates.rs` back in slice C4. They are listed here so that
 # `--strict-markers` keeps working for anyone resuming an old branch, and so the removal
-# is a decision rather than a silent side effect of a deletion. Drop them when the last
-# three crossport gates go.
+# is a decision rather than a silent side effect of a deletion. ⚠ The last crossport gate
+# went on 2026-08-27 (S6 items 1-3) and these two are STILL here, deliberately: `oracle` is
+# live and the other two are the one-release grace this paragraph grants. Drop `slow` and
+# `science_gate` on the next release.
 markers = [
     "slow: NO SUBJECT since S6 — long-running gates, all deleted with their tests",
     "oracle: PCSE/WOFOST oracle regeneration (needs the `oracle` dep group + network); skipped cleanly when pcse is absent (importorskip). Run with -m oracle.",
@@ -85,12 +95,11 @@ include = ["src", "tests"]
 # ⚠ This exclusion now also covers `tests/oracle/match.py`, which S6 moved out of
 # `src/lab/` so the carve-out stops reaching into the tree being deleted.
 exclude = ["**/node_modules", "**/__pycache__", "**/.*", "tests/oracle"]
-# `tests/crossport/` modules (`compare`, `regen_goldens_from_rust`, …) are imported by
-# sibling directories through a runtime `sys.path.insert`, which pyright cannot follow.
-# Naming the directory here type-checks those imports properly instead of silencing them
-# per call site — the reference flip put one such import in `tests/golden_platform.py`,
-# which is in `tests/`, not beside them.
-extraPaths = ["tests/crossport"]
+# ⚠ `extraPaths = ["tests/crossport"]` stood here until 2026-08-27. It existed because
+# modules in that directory were imported across it through a runtime `sys.path.insert`,
+# which pyright cannot follow. S6 items 1-3 deleted the directory, so the setting pointed
+# at nothing — a configuration line that resolves to no path is not inert, it is a silent
+# claim that something is being type-checked.
 # Check against the supported floor (matches requires-python and ruff target),
 # even though the dev interpreter is pinned to 3.13 via .python-version.
 pythonVersion = "3.12"

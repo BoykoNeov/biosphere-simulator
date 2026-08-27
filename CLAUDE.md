@@ -66,7 +66,7 @@ assuming which side authored it.
 - `rust/crates/{simcore,domains,station,authoring,config,godot_bridge}/` — **the
   reference.** (`repo_gates` is a seventh, dev-only: its subject is this repo, not the sim.)
 - `src/` — **DELETED by S6 (2026-08-27), all 112 modules.** One file survives,
-  `config/paths.py`, read for one constant by a crossport tool that dies with it.
+  `config/paths.py`, cut down to the one constant the PCSE oracle reads.
 - `godot/` — the front-end (a subdir, so Godot's importer never scans the tree).
 - `scenarios/` — authored **content** (runtime artifacts, never reference). Distinct
   from `rust/data/scenarios/`, which are fixtures / cross-port anchors.
@@ -84,11 +84,11 @@ working on" category. The record and its cost: `docs/log/reference-flip.md`.
 - **Python has NO reference authority** (this inverts Phase 7/8/9's rule). A Python run
   that disagrees with Rust is a finding to investigate, never grounds for a silent
   Python-side fix. The two ports are no longer independent — that was the priced cost.
-- **Fifteen Python files remain, and `git ls-files '*.py'` is the whole list.** The PCSE
-  oracle carve-out (`tests/oracle/`, hand-run `-m oracle`, a diagnostic and never a gate);
-  two crossport gates with no Rust successor **yet** — the golden regeneration tool and its
-  provenance tests — plus their two helpers and `config/paths.py`. Those two are S6's
-  remaining build items; when they land, the count is the oracle alone.
+- **THE PYTHON CHECKER IS GONE.** `git ls-files '*.py'` is thirteen files and the whole
+  list: the PCSE oracle carve-out (`tests/oracle/`, hand-run `-m oracle`, a diagnostic and
+  never a gate), its `conftest.py`, and `src/config/paths.py` — one path constant the
+  oracle reads. **No Python gates anything.** S6's three build items all landed
+  2026-08-27; there is no CI job running `pytest` on a contract any more.
 - **`gdext` appears in `rust/crates/godot_bridge` and nowhere else.** Engine
   crates carry no Godot types.
 - **"Authored ≠ validated."** Authored artifacts are runtime-only and never
@@ -137,14 +137,21 @@ own gates, so they run first. ⚠ A **mutation battery must pass `--no-fail-fast
 stops at the first failing test *binary*, so a truncated run reports **fewer** reds — which
 reads as "the new tests are inert", not as a broken instrument.
 
-What is left of Python is a **40-test harness**, no parallelism worth configuring: two
-crossport gates awaiting Rust successors, and the opt-in oracle. ⚠ Its wall clock is not
-its own — the golden byte census shells 19 `cargo run` emitters, two of them `--release`,
-so it is ~2 min against a warm `target/` and ~7 min against a cold one.
+What is left of Python is the opt-in oracle and its eight committed-fixture tests —
+**12 tests, under a second.** ⚠ Do not reach for it as a check on the simulation: it is a
+diagnostic against PCSE and has never been a gate.
+
+**Regenerating a golden** (the blessed path since S6, from `rust/`):
+
+```
+cargo run --release -q -p station --example regen_goldens              # report only
+cargo run --release -q -p station --example regen_goldens -- --write   # rewrite
+cargo run -q -p station --example regen_goldens -- --only <substring>  # one golden
+```
 
 ```
 uv sync                 # install/lock deps (no runtime deps since S6)
-uv run pytest           # 36 tests + 4 oracle skips
+uv run pytest           # 8 fixture tests + 4 oracle skips
 uv run pytest -m oracle # the PCSE carve-out (opt-in; needs the `oracle` group + network)
 uv run ruff check .     # lint
 uv run pyright          # types

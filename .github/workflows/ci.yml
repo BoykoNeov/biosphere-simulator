@@ -1,19 +1,21 @@
 name: CI
 
 # Phase-7 Step 0 (P7.0) added the Rust job alongside the pre-existing Python gate.
-# Phase-7 Step 6 (P7.6) added the `crossport` job — the third job carries BOTH
-# toolchains so the Python comparator actually gates the Rust port's snapshots against
-# the 20 frozen goldens (`tests/crossport/`). The Python reference and the native Rust
-# port are checked in the same run so a divergence surfaces immediately. The Rust port
-# has NO reference authority — a parity failure is an unfreeze-discipline finding about
-# the Python reference, not a licence to silently patch the Rust side.
+# Phase-7 Step 6 (P7.6) added the `crossport` job — a third job carrying BOTH toolchains,
+# so the Python comparator gated the Rust port's snapshots against the 20 frozen goldens.
+# ⚠⚠ **That job is gone (2026-08-27, S6 items 1-3) and so is its premise.** There is no
+# Python reference to compare against: Rust is the reference, the goldens are its own
+# bytes, and every gate the job carried runs under `cargo test` below. The paragraph that
+# followed here — "the Rust port has NO reference authority; a parity failure is a finding
+# about the Python reference" — inverted with the flip and is kept nowhere as advice.
 #
-# The Ubuntu runner uses glibc's libm for BOTH CPython `math.*` and Rust `f64::sin/exp/
-# powf`, while the committed goldens were generated on Windows/UCRT — so this job is the
-# repo's first genuine cross-libm parity measurement (glibc-Rust vs UCRT-golden), not a
-# same-libm no-op. Tier-1 scenarios (transcendental-free) stay bit-exact on any
-# platform; the Tier-2 bands (measured in `tiers.json`) are what absorb the real
-# UCRT-vs-glibc last-ULP divergence. See docs/native-port-reference.md.
+# ⚠ The cross-libm question that job existed for did not go with it. The Ubuntu runner
+# uses glibc's libm while the committed goldens were generated on Windows/UCRT, so a
+# byte compare of a re-run is last-ULP-different by design off the generation platform.
+# That is now handled inside `cargo test`, by classification rather than by a skip:
+# `domains::goldens::Numerics` byte-compares the pure-arithmetic goldens everywhere and
+# compares the transcendental ones STRUCTURALLY off-platform. See
+# docs/native-port-reference.md and `domains/src/goldens.rs`.
 
 on:
   push:
@@ -71,37 +73,24 @@ jobs:
       - name: Cargo clippy (deny warnings)
         run: cargo clippy --all-targets -- -D warnings
 
-  crossport:
-    name: Contract gates (manifest bytes · golden provenance)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Sync Python dependencies
-        run: uv sync
-      # ⚠ THIS JOB'S SUBJECT CHANGED IN SLICE S6 (2026-08-27) and its name changed with
-      # it. It used to run the two-port parity comparison — the Python comparator applying
-      # the per-scenario tier rules against 20 frozen goldens. That comparator is deleted:
-      # S3's exit gate, re-measured before the deletion, showed all five sibling mutations
-      # still redden by name with the comparison AND the goldens deselected, and the tier
-      # contract itself now lives in `domains/tests/tier_contract.rs`.
-      #
-      # What is left here is the ONE gate with no Rust successor yet, which is why the job
-      # still keeps a Rust toolchain: `test_golden_provenance.py` checks the golden roster
-      # against the emitters that author it, and its byte census shells `cargo run`.
-      #
-      # ⚠ The manifest byte gate is gone from here — S6 build item 1 (2026-08-27) retired
-      # `test_manifest_writer.py`, whose byte half S2 had already moved into each crate's
-      # `tests/manifest_writer.rs` and whose argument-parse control now lives in
-      # `config/tests/manifest_cli.rs`. Both run under the ordinary `cargo test` job.
-      # ⚠ When the last gate's successor lands, this job goes with it — and `uv run pytest`
-      # on an EMPTY directory exits 5, so the job must be deleted in the same commit as the
-      # file rather than left to fail with "no tests ran".
-      - name: Contract gates (golden provenance)
-        run: uv run pytest tests/crossport/
+  # ⚠⚠ THE `crossport` JOB WAS DELETED HERE ON 2026-08-27 (S6 build items 1-3), and the
+  # deletion is the point rather than a tidy-up. It ran `uv run pytest tests/crossport/`;
+  # that directory is now empty, and `pytest` on an empty directory **exits 5** ("no tests
+  # ran"), so leaving the job would have turned a completed retirement into a permanent red
+  # that reads like a broken gate. Recorded in the plan before it happened, and done in the
+  # same commit as the files.
+  #
+  # Where its three subjects went: the manifest byte gate into each crate's
+  # `tests/manifest_writer.rs` (S2) with its argument-parse control in
+  # `config/tests/manifest_cli.rs` (item 1); the golden byte census into
+  # `{domains,station}/tests/golden_regression.rs` (S2); the provenance/classification
+  # census into the same file, plus `station/tests/regen.rs` for the frozen-golden claim and
+  # the regeneration path's validator (items 2-3). All of them run in the `cargo test` job
+  # above, on every push — a strictly wider trigger than the Python job they left.
+  #
+  # ⚠ What is NOT here any more, said plainly: there is no Python job in this workflow. The
+  # only Python left in the repo is the PCSE oracle carve-out, which is hand-run, needs the
+  # network, and has never been a gate.
 
   godot-parity:
     name: Cross-boundary parity (Godot cdylib vs headless)

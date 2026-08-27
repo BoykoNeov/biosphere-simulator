@@ -285,11 +285,18 @@ biosphere change follows *its* discipline instead.) The procedure:
 
 1. **Justify + review.** Write down *why* (a calibration source, a new process, a bug). For
    a science or numerical change, get it **advisor-reviewed** before regenerating anything.
-2. **Make the change** boundary-side. `git diff src/simcore/` **must stay empty** and
-   `src/domains/` changes are domain-side data/citation edits only (a sibling param is a
-   Phase-5 domain param, not a `simcore/` change).
-3. **Regenerate the affected goldens**, each via its own explicit `__main__` action, and
-   **review the byte diff** — a change there means the trajectory moved, which is the point.
+2. **Make the change** boundary-side. `git diff rust/crates/simcore/` **must stay empty**
+   and `rust/crates/domains/` changes are domain-side data/citation edits only (a sibling
+   param is a Phase-5 domain param, not a `simcore` change). ⚠ This step named `src/simcore/`
+   and `src/domains/` until 2026-08-27; S6 deleted both, so the check it prescribed had no
+   subject.
+3. **Regenerate the affected goldens** — from `rust/`, `cargo run --release -q -p station
+   --example regen_goldens -- --write` (or `--only <substring>` for one) — and **review the
+   byte diff**: a change there means the trajectory moved, which is the point. ⚠ This step
+   said *"each via its own explicit `__main__` action"* until 2026-08-27; those were the
+   Python regeneration mains S6 deleted, and the blessed path is `station::regen` (S6 build
+   item 2). Reporting is the default; `--write` is explicit, and every candidate is
+   validated against its declared shape before **any** byte is written.
 4. **Regenerate the manifest** — from `rust/`, `cargo run --example
    dump_station_inventory -- --write-manifest` — and review its diff: the changed hashes /
    flow set / param set are the git-visible record of exactly what was unfrozen. ⚠ **The

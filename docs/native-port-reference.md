@@ -142,28 +142,36 @@ checker, and the measured reason it had not already moved to Rust (4 of 45 value
 ≤7 ULP, needing tolerance-gating) was a property of the Python comparator that no longer
 exists.
 
-⚠⚠ **`--write` REFUSES since 2026-08-27 (slice S6), and the interim path is below.**
-That tool validated every candidate through `sim_io.snapshot` before it could reach the
-disk — *a golden that does not round-trip must never be written* — and S6 deleted the
-Python tree that check lived in. A regeneration tool that writes **unvalidated** bytes over
-a freeze contract's values is worse than one that refuses, so it refuses. **Reporting is
-unaffected** (`uv run python tests/crossport/regen_goldens_from_rust.py`, no flag): it
-compares the emitter's bytes against the committed ones and needs no validator, so the
-*"which goldens would move"* half of this step still works exactly as before.
-
-Until the blessed path moves to Rust (S6 build item 2), regenerate **one golden at a time,
-by hand**, from `rust/`:
+⚠⚠ **The blessed path is Rust since 2026-08-27 (slice S6, build item 2).** From `rust/`:
 
 ```
-cargo run -q -p <crate> --example <emitter> > ../rust/data/golden/<name>
-git diff -- rust/data/golden/<name>      # review it; this diff IS the record
+cargo run --release -q -p station --example regen_goldens              # report only
+cargo run --release -q -p station --example regen_goldens -- --write   # rewrite
+cargo run -q -p station --example regen_goldens -- --only <substring>  # one golden
+git diff -- rust/data/golden/            # review it; this diff IS the record
 ```
 
-⚠ Always `-p <crate> --example`, never a built binary path: `emit_crew` exists in **two**
-crates and `target/*/examples/emit_crew` is whichever built last — one of which re-emits the
-golden *from itself*. `-p` is what makes that unreachable. The emitter for each golden is
-named in `regen_goldens_from_rust.py`'s `RUST_EMITTERS`, which is still the roster even
-though its write half is disabled.
+**Reporting is the default and `--write` is explicit**, unchanged in discipline from the
+Python tool it replaces: rewriting a golden is a deliberate act whose diff is reviewed,
+never a side effect of running something.
+
+⚠ **Every candidate is validated before ANY byte is written** — the check S6 lost with
+`src/sim_io` and this restores, through each golden's declared
+`domains::goldens::Shape`. It is also restored *fixed*: the Python version validated
+inline, so a failure aborted the loop with earlier goldens already rewritten, and that
+abort was reachable rather than hypothetical (`sealed_energy_drift_summary.json` has had
+no `version` key since C5 and the validator raised on a missing one). The Rust tool runs
+and validates everything first, then writes.
+
+⚠ The `-p <crate> --example` discipline the Python tool had to carry as prose — `emit_crew`
+exists in **two** crates and `target/*/examples/emit_crew` is whichever built last, one of
+which re-emits the golden *from itself* — is now unreachable by construction: the tool
+holds function pointers, not command lines. It survives above only for the manifest
+writers, which are still invoked as programs.
+
+⚠ `--release` is a speed choice and not part of the reference: the profile was measured
+byte-neutral for all nineteen. It is a large one — the sealed station is ~1.3 M sub-steps,
+378 s at the dev profile against 93 s in release.
 
 **2. "The port has no reference authority" is superseded for those eighteen** (it still
 holds verbatim for the seven). Its replacement is not weaker, it points the other way: a

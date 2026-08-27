@@ -29,6 +29,7 @@ pub mod objectives;
 pub mod palette;
 pub mod params;
 pub mod perturbations;
+pub mod regen;
 pub mod scenario;
 pub mod science_gates;
 pub mod sealed;

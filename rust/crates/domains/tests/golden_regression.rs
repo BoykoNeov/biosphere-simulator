@@ -24,8 +24,11 @@
 //!
 //! Exactly one thing, and it is not "the ports disagree": since slice 5 the golden **is**
 //! this code's output. So a mismatch is the reference moving. Decide whether the move was
-//! intended; if it was, regenerate (`uv run python tests/crossport/regen_goldens_from_rust.py
-//! --write`) and re-run the freeze-manifest ceremony for whichever contract names the file.
+//! intended; if it was, regenerate (from `rust/`: `cargo run --release -q -p station
+//! --example regen_goldens -- --write`) and re-run the freeze-manifest ceremony for whichever
+//! contract names the file. ⚠ That command was `uv run python
+//! tests/crossport/regen_goldens_from_rust.py --write` until S6 build item 2 moved the
+//! blessed path to Rust.
 //! Never widen this test.
 
 use domains::goldens::{committed, compare, Cost, Golden, Verdict, DOMAINS};

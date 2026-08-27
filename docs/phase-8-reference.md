@@ -113,8 +113,10 @@ whole decade through headless Godot.
 
 ### Where the gate runs
 
-- The **`crossport` CI job** gates the 20 goldens (Rust-vs-Python) and the **headless CLI
-  bit-identity** (cargo only, no Godot) — bit-exact on Linux/glibc.
+- ⚠ The **`crossport` CI job** gated the 20 goldens (Rust-vs-Python) and the headless CLI
+  bit-identity. **It was deleted on 2026-08-27** (reference flip S6) with the Python
+  comparator it ran: the tier contract is now `{domains,station}/tests/tier_contract.rs`
+  and the CLI bit-identity is `station/tests/headless_cli.rs`, both under `cargo test`.
 - The **`godot-parity` CI job** installs headless Godot and runs the cross-boundary Godot
   smokes (the fast set; `-m "not slow"`), so **Step-1's smoke is promoted from a
   silently-skipped local test to a real gate** — the genuine glibc-Rust-cdylib-vs-UCRT-golden

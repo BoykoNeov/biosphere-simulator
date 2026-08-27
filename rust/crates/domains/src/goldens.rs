@@ -107,6 +107,39 @@ pub enum Cost {
     Expensive,
 }
 
+/// What KIND of artifact the golden is — the axis S6 build item 2 had to add before a
+/// regeneration tool could validate anything.
+///
+/// # ⚠⚠ Why this exists, measured rather than assumed
+///
+/// The Python regeneration tool validated every candidate before it could reach the disk:
+/// `sim_io.snapshot.loads(produced)`, i.e. *"a golden that does not round-trip must never
+/// be written"*. S6 recorded losing that check as a stated loss when `src/sim_io` was
+/// deleted. Measured while porting it: **that check had been unrunnable for one of the
+/// nineteen since slice C5.** `sealed_energy_drift_summary.json` is a folded summary with
+/// no `version` key, and `state_from_dict` *raises* on a missing version — so `--write`
+/// would have died part-way through, after rewriting whichever earlier goldens had moved.
+/// Nobody had run it.
+///
+/// So the successor cannot blanket-validate through [`simcore::snapshot::from_json`]. The
+/// shape is declared per golden and the validator dispatches on it — and because this is a
+/// struct field and not a lookup table, a golden added without a declared shape is a
+/// **compile error** rather than a silent skip. The alternative (special-casing the one
+/// file that does not fit) is the widen-the-gate-from-inside move this repo refuses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shape {
+    /// A full engine state snapshot: reconstructible through
+    /// [`simcore::snapshot::from_json`], so every core invariant re-fires on load.
+    StateSnapshot,
+    /// A folded summary — a hand-serialized JSON document of scalars and hex-float
+    /// arrays, with no `version` and no stocks. ⚠ **Its validation is genuinely weaker
+    /// and that is stated rather than hidden**: there is no reader to round-trip through,
+    /// because the reference writes this artifact and never reads it. What is checked is
+    /// that it parses and that every hex-float leaf parses — enough to refuse a truncated
+    /// or malformed write, not enough to re-fire an invariant.
+    FoldedSummary,
+}
+
 /// One committed golden and the run that produces its exact bytes.
 pub struct Golden {
     /// The file name in `rust/data/golden/`.
@@ -116,6 +149,7 @@ pub struct Golden {
     pub run: fn() -> String,
     pub numerics: Numerics,
     pub cost: Cost,
+    pub shape: Shape,
 }
 
 /// `rust/data/golden/` — S1's home for the goldens, resolved from this crate.
@@ -286,6 +320,94 @@ fn first_difference(produced: &str, expected: &str) -> String {
 
 // --------------------------------------------------------------------------- //
 // The runs — the bodies the `emit_*` examples used to hold                     //
+// --------------------------------------------------------------------------- //
+// The validator — S6 build item 2's half of the regeneration path              //
+// --------------------------------------------------------------------------- //
+
+/// Refuse a golden that is not a well-formed artifact of its declared [`Shape`].
+///
+/// # ⚠⚠ The gate this restores, and the way it was already broken
+///
+/// `regen_goldens_from_rust.py` ran `sim_io.snapshot.loads(produced)` on every candidate
+/// before it could reach the disk — *"a golden that does not round-trip must never be
+/// written"*. S6 deleted `src/sim_io`, disabled `--write` and recorded the loss.
+///
+/// Measured while porting it: **that check had been unrunnable for one of the nineteen
+/// since slice C5.** `sealed_energy_drift_summary.json` has no `version` key and the
+/// validator raised on a missing one, so a real `--write` would have died part-way
+/// through — after rewriting whichever earlier goldens had moved. The reason nobody saw it
+/// is that nobody ran `--write`; the report path, which is what gets run, never validated.
+///
+/// So the check comes back **dispatched on the declared shape** rather than applied
+/// blanket. See [`Shape`] for why that is a struct field and not a lookup table.
+///
+/// ⚠ The two arms are not equally strong, and the asymmetry is the point rather than a
+/// gap to paper over: a snapshot is reconstructed through the engine's own constructors,
+/// so every core invariant re-fires; a folded summary has no reader to round-trip through
+/// — the reference writes it and never reads it — so what is checked is that it parses and
+/// that its float leaves parse. Enough to refuse a truncated or malformed write; not
+/// enough to re-fire an invariant, and it does not claim to be.
+pub fn validate(name: &str, text: &str, shape: Shape) -> Result<(), String> {
+    match shape {
+        Shape::StateSnapshot => simcore::snapshot::from_json(text)
+            .map(|_| ())
+            .map_err(|e| format!("{name} does not reconstruct as an engine state: {e:?}")),
+        Shape::FoldedSummary => {
+            let value = json::parse(text)
+                .map_err(|e| format!("{name} is not well-formed JSON: {e:?}"))?;
+            let fields = value.as_object().ok_or_else(|| {
+                format!("{name} is not a JSON object, so it is not a folded summary")
+            })?;
+            if fields.is_empty() {
+                return Err(format!("{name} is an empty object"));
+            }
+            let mut floats = 0usize;
+            check_float_leaves(&value, "$", &mut floats)?;
+            if floats == 0 {
+                return Err(format!(
+                    "{name} carries no hex-float leaf at all — a folded summary that \
+                     folded nothing is a truncated write, not a summary"
+                ));
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Every string leaf that *looks* like a hex-float must parse to a finite number.
+///
+/// ⚠ The discriminator is `hexfloat::parse` and not a key-name rule, exactly as in
+/// [`compare_structural`]: `"kg"` fails it and `"0x1.0p+0"` does not, so a float leaf
+/// that turned into a label is caught rather than classified away.
+fn check_float_leaves(value: &JsonValue, path: &str, floats: &mut usize) -> Result<(), String> {
+    match value {
+        JsonValue::Object(fields) => {
+            for (key, v) in fields {
+                check_float_leaves(v, &format!("{path}.{key}"), floats)?;
+            }
+            Ok(())
+        }
+        JsonValue::Array(items) => {
+            for (i, v) in items.iter().enumerate() {
+                check_float_leaves(v, &format!("{path}[{i}]"), floats)?;
+            }
+            Ok(())
+        }
+        JsonValue::Str(s) => {
+            if s.starts_with("0x") || s.starts_with("-0x") {
+                let f = simcore::hexfloat::parse(s)
+                    .map_err(|e| format!("{path}: {s:?} is not a hex-float: {e:?}"))?;
+                if !f.is_finite() {
+                    return Err(format!("{path}: non-finite hex-float {s:?}"));
+                }
+                *floats += 1;
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
 // --------------------------------------------------------------------------- //
 
 fn snapshot(state: &State) -> String {
@@ -494,66 +616,77 @@ pub const DOMAINS: &[Golden] = &[
         run: season,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "sealed_chamber_state.json",
         run: sealed_chamber,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "perennial_chamber_state.json",
         run: perennial_short,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "perennial_long_horizon_state.json",
         run: perennial_long,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "consumer_chamber_state.json",
         run: consumer_short,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "consumer_long_horizon_state.json",
         run: consumer_long,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "crew_state.json",
         run: crew,
         numerics: Numerics::PureArithmetic,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "eclss_state.json",
         run: eclss,
         numerics: Numerics::PureArithmetic,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "power_state.json",
         run: power,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "power_self_discharge_state.json",
         run: power_self_discharge,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "thermal_state.json",
         run: thermal,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
 ];
 

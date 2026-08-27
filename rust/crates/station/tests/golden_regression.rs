@@ -321,9 +321,10 @@ fn the_golden_census_counts_are_what_the_prose_says() {
          19 of 21. That is fine — but the counts are quoted as PROSE in CLAUDE.md \
          ('21 golden files (19 the reference's own bytes)'), in \
          rust/crates/station/src/goldens.rs and rust/crates/domains/src/goldens.rs \
-         ('the eleven goldens'), and (while the checker lives) in \
-         tests/golden_platform.py and tests/crossport/regen_goldens_from_rust.py. \
-         Nothing else checks them. Update those, then this literal, in the same commit."
+         ('the eleven goldens'), and in rust/crates/station/src/regen.rs. Nothing else \
+         checks them. Update those, then this literal, in the same commit. \
+         ⚠ Two Python prose sites stood here until 2026-08-27, when S6 build items 2-3 \
+         deleted them; this list is the whole set again."
     );
 }
 

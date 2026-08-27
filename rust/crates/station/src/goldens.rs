@@ -11,7 +11,7 @@
 //! considered and refused as unnecessary: unlike the three freeze manifests, which really
 //! do span `domains` + `station` + `authoring`, the goldens stop at `station`.
 
-use domains::goldens::{Cost, Golden, Numerics};
+use domains::goldens::{Cost, Golden, Numerics, Shape};
 use domains::params;
 use simcore::hexfloat;
 use simcore::integrator::EulerIntegrator;
@@ -335,48 +335,58 @@ pub const STATION: &[Golden] = &[
         run: cabin_gas,
         numerics: Numerics::PureArithmetic,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "water_recovery_state.json",
         run: water_recovery,
         numerics: Numerics::PureArithmetic,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "station_state.json",
         run: station,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "greenhouse_state.json",
         run: greenhouse,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "lighting_state.json",
         run: lighting,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "harvest_state.json",
         run: harvest,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "sealed_station_state.json",
         run: sealed_station,
         numerics: Numerics::Transcendental,
         cost: Cost::Expensive,
+        shape: Shape::StateSnapshot,
     },
     Golden {
         name: "sealed_energy_drift_summary.json",
         run: sealed_energy_drift,
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
+        // ⚠ The one that is not a snapshot, and the reason the axis exists — see
+        // `Shape`'s header for the check that had been unrunnable since C5 because of it.
+        shape: Shape::FoldedSummary,
     },
 ];
 

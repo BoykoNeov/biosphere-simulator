@@ -4507,3 +4507,145 @@ that does not fit.
 * ⚠ **The `crossport` CI job's remaining subject is one gate.** Its comment says so, and
   carries the trap in writing: `uv run pytest` on an empty directory **exits 5**, so the job
   must be deleted in the same commit as the last file.
+
+## S6 build items 2 + 3 — the regeneration path returns to Rust, and the last Python gate goes (2026-08-27)
+
+**S6 is complete.** `tests/crossport/` is gone, `tests/golden_platform.py` with it, and the
+`crossport` CI job too. **Thirteen Python files remain and none of them gates anything** — the
+PCSE oracle carve-out, its `conftest.py`, and one path constant the oracle reads. Full design,
+the ten-claim disposition table and the eight-mutation battery:
+`docs/plans/post-roadmap-reference-flip.md` §5aq.
+
+The two items were taken together because they are **coupled**: the provenance test imports
+the regeneration tool, which imports `config/paths.py`. Deleting one alone leaves the other
+importing a module that no longer resolves — the same shape S6's first pass hit twice.
+
+### ⚠⚠ Read the file before porting it: six of the ten claims needed nothing
+
+Four of `test_golden_provenance.py`'s ten tests were **already ported by S2**, and four more
+are **VOID because their subject was deleted** — the two authorship rosters became one roster
+(a name that cannot be spelled without the run beside it), and `PYTHON_DIVERGES` described
+tolerance-gating for Python regression tests that no longer exist. Two are **unreachable by
+construction**: the emitter map's `(crate, example)` strings became function pointers, so the
+`emit_crew`-in-two-crates trap — where a built binary path could rewrite the golden *from
+itself* — has no way to be spelled wrong.
+
+*A void claim needs no successor and a gap does, and saying which is which is the work.* The
+one real gap was **"every FROZEN golden has an emitter or a stated reason"**: the census gates
+partition the *directory*, and nothing tied the **contracts** to the authorship roster. Built,
+reading both manifests as data.
+
+⚠ Before deleting the file, the two ULP measurements its rosters carried were checked to
+survive elsewhere (`consumer_chamber` 7 of 205 leaves at 4.6e-16; `perennial_long_horizon` 1 of
+196 at 1.6e-16 — both in this file and in the plan). *A roster is sometimes the only copy of a
+measurement; look before deleting it, not after.*
+
+### ⚠⚠ The check S6 mourned had been broken for one of the nineteen since C5
+
+S6 recorded the disabled `--write` as a stated loss: *"every candidate was validated through
+`sim_io.snapshot` before it could reach the disk"*. Measured — true of 18.
+`sealed_energy_drift_summary.json` is a folded summary with **no `version` key**, and the
+deleted validator raised on a missing version. So from C5, which moved that golden into the
+emitted group, a real `--write` would have raised part-way through — *after* rewriting
+whichever earlier goldens had moved. **Nobody saw it because the report path never validated
+and nobody ran `--write`.**
+
+That is a defect in the shape of a gate: the code was there, it was documented, it was mourned
+when it died, and it could not have run. What made it visible was porting it — asking "what
+does this actually do to each of the nineteen" rather than "what does it say it does".
+
+Two consequences, both built into the successor:
+
+* **A `Shape` axis on `Golden`** (`StateSnapshot` / `FoldedSummary`), a **struct field rather
+  than a lookup table**, so a golden added without a declared shape is a compile error and not
+  a silent skip. ⚠ The two arms are not equally strong and that is stated rather than hidden:
+  a snapshot is reconstructed through the engine's own constructors so every invariant
+  re-fires; a folded summary has no reader — the reference writes it and never reads it — so
+  what is checked is that it parses and that its hex-float leaves parse.
+* **Two phases**: everything runs and validates before anything is written. The Python defect
+  fixed, not reproduced.
+
+### ⚠⚠ A claim about where a write lands is prose until the destination is a parameter
+
+The discriminating test for the two-phase split needs a **changed** golden ahead of a failing
+one — inline validation puts the first on disk before the second raises. Against
+`rust/data/golden/` that test would rewrite a freeze contract's values to find out whether they
+get rewritten. So the directory became a parameter, the test uses `CARGO_TARGET_TMPDIR`, and
+the mutation that restores the Python shape is red. Before the parameter existed the test could
+not be written at all.
+
+*Same move as build item 1's `committed_manifest_path()`, one day apart: the thing that decides
+where a write lands has to be reachable by a test.*
+
+### ⚠⚠ "This package dies with build item 2" — it did not, and the file said so itself
+
+`src/config/__init__.py` named `regen_goldens_from_rust.py`/`GOLDEN_DIR` as its last reader
+and concluded the package dies when that tool does. Item 2 landed; the package is still here,
+because `tests/oracle/runner.py` reads a *different* constant and the carve-out outlives the
+checker. So item 3 deleted the **five unread constants** rather than the file — five paths
+that resolve, that nothing loads, and that no gate would redden if the directories moved.
+*That is the `config/units.py` trap `CLAUDE.md` names, arriving at the file that outlived it.*
+
+**A dated claim about who reads you is a claim about a roster — re-derive it before acting on
+it.** Third time this pattern has been the finding in two days.
+
+### ⚠ The deletion's traps, handled in the same commit
+
+* **The `crossport` CI job is deleted, not left pointed at an empty directory** — `pytest`
+  with nothing to collect **exits 5**, which would have turned a completed retirement into a
+  permanent red that reads like a broken gate. Written into the plan before it happened.
+* **`pyproject.toml`'s `extraPaths = ["tests/crossport"]`** pointed at nothing. A config line
+  that resolves to no path is not inert; it is a silent claim that something is type-checked.
+* **All three freeze ceremonies named the refusing `--write`** and its interim by-hand route;
+  all three now name the Rust tool. ⚠ The station's step 3 still prescribed *"each via its own
+  explicit `__main__` action"* (the Python mains S6 deleted) and its step 2 still said to check
+  `git diff src/simcore/` — a directory deleted the same day.
+
+### ⚠ The review pass, and the three things it found after the work looked done
+
+* ⚠⚠ **The 19/19 measurement predated the refactor that made the two-phase split
+  testable.** The tool was run in full before `regenerate_in` was extracted and
+  `committed(name)` became `dir.join(name)`; after that only the temp-directory tests had
+  run, never the composed `regenerate()` → `regenerate_in(&golden_dir(), …)` path the
+  example actually calls. It was almost certainly equivalent — and "almost certainly
+  equivalent" is what a measurement is for. **Re-run after the refactor: 19 of 19 identical
+  through the shipped path.** *A measurement is about the binary that existed when it ran.*
+* ⚠⚠ **`tests/conftest.py` was configuring a suite that no longer exists — the same
+  dead-path shape this slice had just written up twice.** It imported `hypothesis` at module
+  scope to register a deadline profile, and dropped the process priority class for "the
+  parallel loop [that] saturates every core". `grep` over `tests/` finds no `@given` and no
+  `strategies`; what is left is twelve tests that read committed JSON in under a second. The
+  hypothesis import was worse than unused: it was a **single point of failure for the PCSE
+  carve-out**, which collects through this conftest — the day hypothesis fell out of the
+  lock it would have taken the oracle with it. Pruned to the oracle opt-in hook, and
+  `hypothesis` + `pytest-xdist` dropped from the dev group. The reasoning both blocks
+  carried is good and is kept in `docs/test-suite-runtime.md`; what they had lost was a
+  subject. *Suite runtime 0.74 s → 0.04 s, which is the import.*
+* ⚠⚠ **`rust/data/tiers.json`'s `_comment` still described the deleted `crossport` job as
+  the gate.** It is a **contract artifact**, so its prose reads as current — and this file
+  has now been the stale-prose finding **four times in four slices**, its own `_the_finding`
+  key recording three of them. Corrected here, along with the two `evidence` strings and the
+  `PYTHON_DIVERGES` roster pointer, `docs/phase-8-reference.md`'s "where the gate runs"
+  bullet, and a `science.rs` comment saying a deleted module *"is still a shim target"*.
+  ⚠ Not hashed by any manifest (checked, not assumed), so this is prose repair rather than
+  an unfreeze. The distinction between **history** and **instruction** is what was swept
+  for: "ported from `tests/crossport/…`" is worth keeping; "the `crossport` job gates the 20
+  goldens" is a false statement about today.
+
+⚠ **Noted, not fixed:** CI's `uv sync` does not install the `oracle` group, so the eight
+committed-fixture tests are now the `python` job's entire subject and they ran locally with
+`pcse` present. [[ci-python-job-red-on-linux]] is this repo's own record that local green is
+not CI green.
+
+### Standing
+
+* **The reference flip's Stage 3 is done.** No Python gates anything; `CLAUDE.md` states it in
+  terms `git ls-files` settles.
+* ⚠ **`drift_summary.json` is the only frozen golden the reference cannot produce**, and it is
+  now pinned *by name* — a second one arriving is red. The blocker C5 recorded (folding the
+  Rust series moves 4 of 45 values by ≤7 ULP, needing tolerance-gating in the Python
+  comparator) **dissolved with the comparator**; what is left is an unfreeze with its own
+  ceremony, not a classification. That is the next item on this thread if anyone wants one.
+* Verification: `cargo test` all green + `cargo clippy --all-targets -D warnings`; the
+  regeneration tool run in full before any deletion — **19 of 19 identical**; `uv run pytest`
+  8 passed / 4 skipped; `ruff`, `ruff format --check`, `pyright` green.
