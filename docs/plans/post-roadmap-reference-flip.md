@@ -8081,9 +8081,11 @@ Perturbing the radiator flow's *output* would understate the sensitivity because
    scenario, so it can drift and go on measuring a scenario nobody froze. This is what licenses
    writing mirrors at all.
 2. **Every reading `> 0.0`** — the 2026-08-15 vacuous-zero trap, inherited from the Python side.
-3. **Every reading within an order of magnitude of the Python instrument's.** New. `1e-30` is
-   non-zero and still wrong, and only the number this re-measures can see that. It is also what
-   caught the finding below.
+3. **Every reading within an order of magnitude of the Python instrument's.** New, and ⚠ **a
+   reach check rather than a subject check** — the battery below measured how loose it is (a
+   16-ULP nudge reddens one band test of four; a *wrong forcing* reddens none). It earned its
+   place for a different reason than the one it was written for: chasing an exact factor of two
+   *inside* it is what caught the finding below. Layers 1 and 2 are the load-bearing ones.
 
 ### ⚠⚠ The finding: CPython's `sum()` is compensated, and `daily_solar_energy`'s comment denied it
 
@@ -8199,7 +8201,17 @@ measurably is rather than as the thing that catches a probe aimed at the wrong s
 ### Standing after §5am
 
 * **No Python deleted.** `measure_tier2_bands.py` and the four `test_crossport.py` band tests
-  stay green until S6 — which may now retire them, because their successors stand.
+  stay green until S6 — which may now retire them, because their successors stand. ⚠ **Said
+  precisely, because "the successor stands" is the scope claim this repo has watched outlive its
+  reasoning:** both gates assert the *same inequality against the same committed bands*, and the
+  four keys that differ differ because the Rust readings are **lower** — by up to 3.7× — so the
+  Rust gate is the weaker of the two. That is fine at margins of 380× and up, and it is written
+  down as a measured fact rather than inherited: retiring the Python tests loses a slightly
+  tighter floor, not a claim.
+* **No manifest key covers this contract.** Checked rather than assumed: `docs/native-port-reference.md`
+  is the freeze contract with no manifest, and no `_authority` entry in the three that do have
+  one names the tiers, the bands or the tolerance. So there is no `python`-sided queue entry to
+  drain as part of this ceremony.
 * **D4 is closed**, and its deferral paragraph in `docs/native-port-reference.md` is marked
   landed rather than deleted.
 * Every S6 item S5 handed over is untouched and still open, plus the compensated-reduction

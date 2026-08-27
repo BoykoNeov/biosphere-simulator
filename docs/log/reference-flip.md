@@ -4074,7 +4074,16 @@ measurably is rather than as the thing that catches a probe aimed at the wrong s
 
 * **No Python deleted.** `tests/crossport/measure_tier2_bands.py` and the four
   `test_crossport.py` band tests stay green and running until S6 — which may now retire them,
-  because their successors stand.
+  because their successors stand. ⚠ **Said precisely**, because *"the successor stands"* is the
+  scope claim this repo has watched outlive its reasoning: both gates assert the **same
+  inequality against the same committed bands**, and where the two instruments differ the Rust
+  readings are **lower** — by up to 3.7× — so the Rust gate is the *weaker* of the two. Fine at
+  margins of 380× and up, and recorded as a measured fact: retiring the Python tests loses a
+  slightly tighter floor, not a claim.
+* **No manifest key covers this contract**, checked rather than assumed:
+  `docs/native-port-reference.md` is the freeze contract with no manifest, and no `_authority`
+  entry in the three that have one names the tiers, the bands or the tolerance. There is no
+  `python`-sided queue entry to drain as part of this ceremony.
 * **No band moved**, no golden regenerated, no manifest touched. `rust/data/tiers.json` gained
   a `measured_2026_08_27_by_the_reference` block; `docs/native-port-reference.md` carries the
   dated unfreeze and a two-column band table.
