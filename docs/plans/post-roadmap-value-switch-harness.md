@@ -208,6 +208,86 @@ shape it would otherwise repeat is `memory/asserted-attributions-rot`.)
 *(Option B — writing temporary crop directories to disk — is rejected: `CROPS_DIR` is a
 module constant under `src/`, so this would write into the repo tree, losing §3.)*
 
+## 5R. The Rust seam, MEASURED 2026-08-27 (before any design)
+
+Nothing here is carried over from §5 by analogy; each line was read out of the tree today.
+
+### The finding that changes the shape of the problem: **there is no runtime load to hook**
+
+All **23** frozen param YAMLs are `include_str!`-ed into the binary at compile time — 15
+biosphere (`crates/domains/src/biosphere/params.rs`), 5 sibling (`crates/domains/src/params.rs`),
+3 station (`crates/station/src/params.rs`). Python's seam was one line inside a *runtime*
+function (`config.loader.load_yaml`); the Rust reference has no such function to hook, and
+`grep read_to_string` finds no production path that reads a param file. **So "intercept the
+loader" is not available, and §5's options A/B/C are not merely stale — their whole premise
+is.**
+
+### What is available instead, and it is STRICTLY BETTER than what Python had
+
+`biosphere/params.rs` exposes **17 `pub fn <loader>_from(text, name)`** entry points beside
+the 17 zero-argument loaders. They are the *same* code path: same hand-rolled reader, same
+exact-string unit guard, same frozen bounds, same two boundary folds. So an override in Rust
+is naturally expressed as **modified YAML text**, and it is *validated on the way in*.
+
+⚠ This is a real gain over the deleted Python harness, and worth stating as one: that one
+substituted with `dataclasses.replace` on an already-constructed object, which **bypassed
+the schema, the unit guard and the bounds**. An out-of-range experimental value would have
+run silently. Through `_from`, it cannot.
+
+### The biosphere has exactly ONE production param load
+
+`crates/domains/src/biosphere/system.rs:873` — `let p = params::biosphere();` inside
+`build_season`. **Every other `params::…()` call in the biosphere is inside `#[cfg(test)]`**
+(checked by line number against each file's `#[cfg(test)]`: `flows.rs` 1637/1638/3792/4882 vs
+1548; `science.rs` 2445 vs 539; `science_gates.rs` 1246 vs 93; `system.rs` 1972/2086/2223 vs
+1169). And everything downstream **already takes `&BiosphereParams`** — `compartments(scenario, &p)`
+threads it the whole way.
+
+So the injection point is `build_season_with(scenario, &BiosphereParams)` with the existing
+`build_season` delegating to it — additive, one funnel, and behaviour-neutral by construction
+rather than by measurement. `season_setup` / `run_season_final` / `run_perennial_final` need
+the same `_with` pass-through; weather is a separate resolver and is not touched.
+
+⚠ **This single funnel is what makes §7's failure mode small HERE, and the argument does not
+travel** — see the next paragraph. Note the funnel is a fact about today's tree, not a
+guarantee: a future flow that calls `params::canopy()` at step time would silently escape the
+override. That is a gate the harness owes itself, not a risk to accept.
+
+### ⚠⚠ The sibling domains and the station are the OPPOSITE shape
+
+* their `*_from` functions are **private** (`crates/domains/src/params.rs:74-128`) — no
+  validated text entry point exists at all;
+* their params are loaded at **~15 scattered production sites** with no funnel:
+  `station/src/builder.rs:277-279`, `station/src/goldens.rs`, `domains/src/goldens.rs`,
+  `authoring/src/flow_registry.rs:314-376`.
+
+**A biosphere-shaped seam does not generalise to them**, and a harness that quietly covers
+only the biosphere while presenting itself as universal is §7 wearing a different hat. Say
+which half is covered, in the output, or cover both deliberately. §9's first target is
+biosphere-only, so this is a scope statement, not a blocker.
+
+### ⚠⚠ The REPORTING half is harder than the seam, and it is what decides §4
+
+§8 asks for *"every `science_gate` bound with its margin and its distance-from-degenerate"*.
+Measured: **no non-test binary can obtain a margin today.**
+
+* `science_gates!` emits each gate's `check:` body into `#[cfg(test)] mod gate_tests`, and the
+  runs those bodies read into `#[cfg(test)] mod runs`;
+* `GATES` *is* public at ordinary compile time — but it carries `bound` as a **`&'static str`**,
+  a human-readable claim, not an evaluator. There is nothing to call.
+
+Three routes, none free, **and this is the decision to take next**:
+
+1. **The harness is a test, not an example.** It then sees the gate bodies — but "one command"
+   becomes `cargo test`-shaped, and a test that prints a table is an odd thing.
+2. **Lift the gate bodies and `runs` out of `#[cfg(test)]` into library code.** Cleanest to
+   consume, but it edits the file every science claim in the biosphere is filed in, and the
+   macro's whole design point is that the row and the assertion are one declaration — worth
+   re-reading `science_gates.rs`'s header before touching.
+3. **The harness re-derives the quantities itself.** Rejected on sight unless something forces
+   it: *a rule with two copies has one that is stale* is this repo's most-repeated lesson, and
+   a margin computed twice is exactly that.
+
 ## 6. Requirements earned by the canopy-provenance session
 
 Each of these exists because reporting *without* it produced a wrong read on 2026-08-15.
