@@ -17,6 +17,7 @@
 // measures.
 #[cfg(test)]
 pub mod claim_census;
+pub mod compartments;
 pub mod drift;
 pub mod flows;
 pub mod light_path;
