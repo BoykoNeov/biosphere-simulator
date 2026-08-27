@@ -1,6 +1,30 @@
 # A value-switch harness — "source A vs source B, what changes?" as a command
 
-> ## ⚠ STATUS 2026-08-15 — THE SEAM IS BUILT; THE HARNESS IS NOT. Read this before §5.
+> ## ⚠⚠ STATUS 2026-08-27 — THE SEAM IS GONE AGAIN. Read this before the 2026-08-15 block below.
+>
+> **The reference flip finished today (S6, `9b87d09`), which is the event this plan was
+> sequenced behind** — the user, 2026-08-16: *"after the switch to Rust, work will continue
+> on the universal harness, that permits easy toggle of parameters and science."* That
+> instruction widens the subject from values to **science**, and it is now unblocked.
+>
+> ⚠⚠ **And the 2026-08-15 block below is FALSE as of `4f7168e`.** `src/config/overrides.py`
+> and its 19 tests were deleted with the other 271 Python files; `grep overrides
+> rust/crates/config/src/` finds nothing. **The seam is NOT built.** The remaining scope is
+> therefore *both* halves in Rust — the injection seam **and** the reporting layer — not
+> "just the reporting layer" as that block says. Nothing of the Python build survives except
+> its findings.
+>
+> **What DOES survive the language change, unchanged:** §2 (register vs switch), §3 (the
+> harness writes nothing), §6 (the five reporting requirements — none of them was about
+> Python), §7 (the shim-a-dead-path failure mode, which Rust does not fix), §9 (the first
+> target). **What is superseded:** §4's placement, §5's whole option set, §10's exit criteria.
+> Each is marked in place below.
+>
+> **Still out of scope, unchanged:** the `extinction_coef` decision (still the user's; the
+> analysis still favours 0.65), its ceremony, and any touch of the perennial liveness floor.
+> The harness regenerates the evidence; it does not take the decision.
+
+> ## ⚠ STATUS 2026-08-15 — SUPERSEDED BY THE BLOCK ABOVE; kept because its findings survive its tree. (As written: "THE SEAM IS BUILT; THE HARNESS IS NOT. Read this before §5.")
 >
 > The user chose **Option C (the clean seam)** over Option A. It shipped in `666670a` as
 > `src/config/overrides.py` + the one-line hook in `config.loader.load_yaml`, with 19
@@ -101,7 +125,9 @@ substitutes values for the duration of one run, and touches no file. Therefore:
 * no param YAML is edited → no per-file sha-256 moves in either manifest;
 * no golden is regenerated;
 * no `science_bands` / `liveness_floors` entry moves;
-* `git diff src/` stays empty outside `src/lab/`.
+* `git diff src/` stays empty outside `src/lab/`. ⚠ 2026-08-27: `src/` no longer exists;
+  the same property in Rust is that the harness moves no file under `rust/data/` and no
+  committed manifest — see §10.
 
 **Experiments become cheap precisely because they cannot accidentally become commitments.**
 A harness that wrote YAML would be a calibration tool wearing an experiment's name, and
@@ -109,11 +135,43 @@ A harness that wrote YAML would be a calibration tool wearing an experiment's na
 
 ## 4. Placement
 
-`src/lab/`. It already holds `oracle_match.py`, `convergence.py`, `rk45.py` — the
-offline-study area, outside the frozen core and outside the port's mirror obligation.
-`simcore` purity is untouched: `lab/` may import domains, never the reverse.
+⚠⚠ **SUPERSEDED 2026-08-27 — `src/lab/` does not exist.** Kept for the *rule* it states,
+which does survive: the harness lives outside the frozen core and may depend on the domains,
+never the reverse.
+
+**The Rust constraint that decides this, and it closes one obvious option:** the harness has
+to reach *up* — run scenarios, read each science gate's bound and margin — so it **cannot**
+live in `rust/crates/config`, which by invariant sits *below* `domains` and may not reach into
+the engine. The precedent the tree already uses for "a tool that drives a run and reports" is
+S6's regeneration path: `cargo run --release -q -p station --example regen_goldens`. So the
+live candidates are an **example under `station`** (matches the precedent exactly) or a small
+crate *above* `station`. **Not decided here** — take it at build time, with §7's proof-the-
+override-is-live requirement as the deciding criterion rather than tidiness.
+
+*(As written 2026-08-15:)* `src/lab/`. It already holds `oracle_match.py`, `convergence.py`,
+`rk45.py` — the offline-study area, outside the frozen core and outside the port's mirror
+obligation. `simcore` purity is untouched: `lab/` may import domains, never the reverse.
 
 ## 5. THE OPEN DESIGN DECISION — the injection seam
+
+⚠⚠ **SUPERSEDED 2026-08-27 in its entirety — every symbol below is deleted code.** Options A,
+B and C are all about Python modules that no longer exist, and the "the user chose C" verdict
+died with the file it shipped. **The seam has to be measured again against the Rust loader
+(`rust/crates/config`) before it can be designed** — where params are read, whether a
+pre-loaded param object can be handed in, and what the equivalent of "patch the use site, not
+the definition site" is when the compiler resolves the call. Do not port A/B/C by analogy.
+
+⚠ **What DOES carry over, because it is language-independent:** the Option-A cost —
+*intercepting the definition site when the run reaches a different path silently no-ops* — is
+the same defect as §7, and Rust's type system does not catch it. It is the thing to measure
+first, not the thing to assume away.
+
+⚠ **And the widened subject changes this section's shape.** The user's 2026-08-16 wording is
+*"parameters **and science**"*. Substituting a number and substituting a *mechanism* are not
+the same seam, and this section was written when only the first existed. Price them as two,
+and say so, before building either.
+
+*(The 2026-08-15 measurement follows, kept as the record of how the Python side worked.)*
 
 **Measured 2026-08-15: there is no injection point.** `build_season(scenario)` takes only a
 scenario; `_carbon_context` and `build_plants` call `crop_param_set(scenario.crop)` and then
@@ -190,6 +248,9 @@ must be impossible, not merely unlikely.
 
 ## 8. Scope
 
+⚠ **2026-08-27: read every `src/` path below as its Rust home per §4, and add the seam itself
+to the "In" list — it is no longer built.** The out-list is unchanged and still binding.
+
 **In:**
 * one module in `src/lab/` — take a set of `{param: value}` substitutions plus a scenario,
   run, return the readouts (canopy peak, DVS at peak, harvest, chamber CO₂ lows, every
@@ -223,8 +284,20 @@ alternatives, and §1 lists the three precedents.
 
 ## 10. Exit criteria
 
-* `git diff src/` empty outside `src/lab/`; no manifest hash, golden, or gate bound moved.
-* The §9 table regenerable by one command, on a tree with `extinction_coef` unchanged.
-* A test proving a mis-targeted override is **detected**, not silently reported as no-change.
-* Suite green (`uv run pytest -n 12`), `ruff`, `pyright`.
-* `simcore` imports unchanged (stdlib only).
+⚠⚠ **RE-EXPRESSED 2026-08-27 — the 2026-08-15 list gated a deleted tree.** Three of its five
+criteria named Python tooling that no longer runs, so as written the list was unmeetable, not
+merely stale.
+
+* No param YAML under `rust/data/`, no golden, no committed manifest and no science-gate bound
+  moves. (`git status` clean outside the harness's own files after a full harness run.)
+* The §9 table regenerable by **one command**, on a tree with `extinction_coef` unchanged.
+* A test proving a **mis-targeted override is detected**, not silently reported as
+  no-change — §7, and the criterion that outranks the rest.
+* `cargo test` green + `cargo clippy --all-targets -D warnings`.
+* `simcore` purity untouched — the zero-third-party-deps rule, already gated by S4's structure
+  half; point at that gate rather than re-asserting it here.
+
+*(As written 2026-08-15:)* `git diff src/` empty outside `src/lab/`; no manifest hash, golden,
+or gate bound moved. · The §9 table regenerable by one command. · A test proving a mis-targeted
+override is detected. · Suite green (`uv run pytest -n 12`), `ruff`, `pyright`. · `simcore`
+imports unchanged (stdlib only).
