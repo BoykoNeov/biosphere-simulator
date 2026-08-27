@@ -25,6 +25,7 @@ pub mod tiers;
 pub mod params;
 pub mod power;
 pub mod thermal;
+pub mod ulp_probe;
 
 use simcore::environment::SourceResolver;
 use simcore::error::SimError;

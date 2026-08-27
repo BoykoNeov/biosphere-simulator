@@ -39,8 +39,9 @@ plan of record is [`docs/plans/phase-7-native-core.md`](plans/phase-7-native-cor
 >   its own measured band;
 > * the Python checker follows the file to its new path and stays green until it is retired.
 >
-> ⚠ **What did NOT move, and is recorded as outstanding:** the four `band > measured
-> sensitivity` re-derivations. Those perturb a transcendental by one ULP and propagate it
+> ⚠ **What did NOT move, and was recorded as outstanding — LANDED 2026-08-27, see the block
+> above; this paragraph is kept because the deferral is part of the record:** the four
+> `band > measured sensitivity` re-derivations. Those perturb a transcendental by one ULP and propagate it
 > through the engine, and the tool that does it (`tests/crossport/measure_tier2_bands.py`)
 > substitutes a `math` reference **inside the Python domain modules** and runs the **Python
 > engine** — so the instrument is built out of the tree being deleted and dies with its
@@ -49,6 +50,78 @@ plan of record is [`docs/plans/phase-7-native-core.md`](plans/phase-7-native-cor
 >
 > Ceremony: advisor-reviewed, gates written before the data moved, mutation-controlled
 > (a golden nudged 1e-11 fails and 1e-13 passes against a 1e-12 band), documented here.
+
+> ## ⚠ 2026-08-27 — UNFREEZE: the reference now measures its own band basis
+>
+> **What changed: which port justifies the bands. No band, floor or tier moved — the
+> re-measurement moved nothing, which was the point.**
+>
+> The 2026-08-25 unfreeze moved the *numbers* and the *comparison* into the reference and left
+> one half named and outstanding: the four `band > measured sensitivity` re-derivations, whose
+> instrument (`tests/crossport/measure_tier2_bands.py`) substitutes a `math` reference inside
+> the Python domain modules and runs the Python engine. Until today the committed bands were
+> **asserted** by the reference and **justified** only by a program built out of the tree being
+> deleted. They are now both.
+>
+> * **`domains::ulp_probe`** carries the perturbation, the metric and the four sibling/biosphere
+>   measurements; **`station::ulp_probe`** composes the same seams onto the two coupled runs.
+> * **`domains/tests/tier_sensitivity.rs`** (10 keys) and **`station/tests/tier_sensitivity.rs`**
+>   (6 keys) are the gates — the whole Tier-2 roster.
+>
+> **The four seams, and what each one perturbs.** Three need no engine change:
+>
+> | run | the Python shim | the reference's seam |
+> |---|---|---|
+> | power ×2 | `domains.power.system.math.sin` | a mirrored schedule nudging the `sin` result, and the load derived from it |
+> | thermal | `domains.thermal.flows.radiated_power` | a mirrored `RadiatorReject` swapped into the registry |
+> | biosphere / greenhouse | `canopy.math.exp` + `photosynthesis.math.exp` | the `par` forcing |
+> | station energy | both of the above | the same two, perturbed **separately** and the worse taken |
+>
+> ⚠ The `par` seam is **exact, not an approximation**, and it was checked rather than argued:
+> `incident_par` enters `canopy_assimilation` in exactly one place — `absorbed_par = k ·
+> incident_par · exp(−k·depth·lai)` — so a relative one-ULP nudge of either is the same
+> perturbation of `absorbed_par`; and `env.get("par")` has exactly one consumer in the whole
+> workspace (the station's lighting and sealed seams *write* the var, none reads it). The
+> thermal `t⁴` is the one place a cheaper seam is measurably wrong — the subtraction
+> `t⁴ − T_space⁴` can cancel, so perturbing the flow's *output* would understate it.
+>
+> **Three defences against the vacuous-zero trap this file records twice below**, and the third
+> is one the Python instrument never had:
+>
+> 1. with the nudge **off**, every probe harness must emit its golden emitter's exact bytes —
+>    so a harness that has drifted cannot go on measuring a scenario nobody froze;
+> 2. every reading must be `> 0.0`;
+> 3. every reading must land within an **order of magnitude** of the Python instrument's figure
+>    for the same scenario. A probe that reads `1e-30` is non-zero and still wrong, and only the
+>    number this re-measures can see that.
+>
+> ### ⚠⚠ The finding: CPython's `sum()` is compensated, and the port's comment said otherwise
+>
+> The two power readings came back at **exactly half** the Python instrument's. Chasing an exact
+> factor of two rather than accepting it inside the order-of-magnitude window is what turned it
+> into a finding. The 24 schedule values are bit-identical across the ports, nudged and
+> un-nudged alike; the **derived load** differs by one ULP.
+>
+> **CPython's builtin `sum()` has used Neumaier compensation for floats since 3.12.** It is not a
+> left-to-right accumulation and agrees with `math.fsum`, while `domains::power::daily_solar_energy`
+> — whose own doc comment claimed to mirror it — accumulates naively. The two agree bit-for-bit on
+> the frozen scenario, which is why every golden matches and nothing caught it, and they diverge
+> the moment the summands move. Compensating that one sum in a throwaway Rust probe reproduced
+> **both** Python figures exactly (`5.215406e-15`, `4.146325e-15`), which is what makes this
+> measured rather than inferred. The naive accumulation is what the reference computes and is
+> therefore the definition; what was corrected is the false claim about the other port.
+>
+> ⚠ **The durable half is about this contract.** A compensated reduction is a **second** source of
+> cross-port divergence, independent of libm, and the tier classification at the top of
+> `tiers.json` names only transcendentals. Five more `sum()` calls over floats live in the
+> retiring Python tree — the drift regression and the perennial re-sow among them, both feeding
+> frozen goldens. Nothing diverges today; until the checker is retired, a **Tier-1** byte
+> disagreement could come from this rather than from a port defect, and the discovered-discrepancy
+> protocol below should be read with that in mind.
+>
+> Ceremony: advisor-reviewed, the harness controls written before the measurements were trusted,
+> mutation-controlled (8 mutations, each naming the test it must redden), documented here and in
+> `rust/data/tiers.json`'s `measured_2026_08_27_by_the_reference` block.
 
 ## ⚠ 2026-08-16 — the reference flip inverted who is judged (slice 5)
 
@@ -211,14 +284,43 @@ be a *derived guess* violating the contract. So each band is justified by the **
 ±1-ULP transcendental sensitivity** (`tests/crossport/measure_tier2_bands.py`): perturb the
 relevant `sin` / `exp` / `t**4` by one ULP and re-run to the final state.
 
-| Scenario group | Measured ±1-ULP sensitivity | Band | Margin |
-|---|---|---|---|
-| power (half-sine `sin`) | `5.2e-15` | `1e-12` | ~190× |
-| power + self-discharge | `4.1e-15` | `1e-12` | ~240× |
-| thermal (`T⁴`, contracting attractor damps it) | `1.9e-16` | `1e-12` | ~5000× |
-| station energy (`sin` + `T⁴`, coupled 7-day) | `5.2e-15` | `1e-12` | ~190× |
-| biosphere (worst: Beer–Lambert `exp`, perennial 15-yr) | `3.5e-15` | `1e-11` | ~2800× |
-| greenhouse (7-day Beer–Lambert `exp`) | `2.8e-16` | `1e-11` | ~36000× |
+| Scenario group | Python instrument | **The reference (2026-08-27)** | Band | Margin |
+|---|---|---|---|---|
+| power (half-sine `sin`) | `5.215406e-15` | **`2.607703e-15`** | `1e-12` | ~380× |
+| power + self-discharge | `4.146325e-15` | **`1.130816e-15`** | `1e-12` | ~880× |
+| thermal (`T⁴`, contracting attractor damps it) | `1.909423e-16` | **`1.909423e-16`** | `1e-12` | ~5200× |
+| station energy (`sin` + `T⁴`, coupled 7-day) | `5.215406e-15` | **`2.607703e-15`** | `1e-12` | ~380× |
+| biosphere (Beer–Lambert `exp`, perennial 15-yr — *representative*, see below) | `3.519726e-15` | **`2.471757e-15`** | `1e-11` | ~4000× |
+| greenhouse (7-day Beer–Lambert `exp`) | `2.814887e-16` | **`2.762079e-16`** | `1e-11` | ~36000× |
+
+⚠⚠ **"worst" was the wrong word, and this table carried it until 2026-08-27.** The biosphere
+row used to read *"worst: Beer–Lambert `exp`"*, and the Python instrument's own comment calls
+it *"the dominant per-step transcendental"*. Measured on the perennial 15-year chamber, a
+±1-ULP nudge of each weather forcing in turn gives:
+
+| nudged forcing | propagated deviation | has a transcendental in its derivation? |
+|---|---|---|
+| `par` (the Beer–Lambert seam) | `2.412586e-15` | yes (`cos`, `exp`) |
+| `daylength` | `1.981152e-15` | yes (solar geometry `sin`/`cos`/`tan`/`acos`) |
+| `vpd` | `1.812943e-14` | yes (`exp`) |
+| `net_radiation` | `1.926252e-14` | **no** — a raw fixture value |
+| `temp` | `3.399269e-14` | **no** — a raw fixture value |
+
+The two that cannot diverge across libm at all — they are JSON numbers parsed identically by
+both ports — perturb the trajectory the *most*. So the spread is the **conditioning of the
+15-year trajectory**, not a ranking of transcendental paths: a daily-constant table value
+applied at every step moves more than a within-day value that is zero at night. The probe site
+is therefore a **representative** choice and never was a maximum, in either port. Nothing here
+touches the contract — the largest reading is still ~300× under the `1e-11` band — but a band
+whose provenance says *worst* is claiming something it does not measure.
+
+⚠ **The reference column is now the one that counts**, and the two columns differ for two
+measured reasons, neither of which is a band moving. Thermal matches to every digit. The two
+power rows read half because of CPython's compensated `sum()` (the 2026-08-27 unfreeze block).
+The biosphere reads 0.70× because a one-ULP step is a *relative* perturbation of between
+`2⁻⁵³` and `2⁻⁵²` depending on where the value sits inside its binade, and the `par` seam and
+the `exp` it stands in for sit in different binades — the greenhouse, on a shorter run, reads
+0.98×. Every margin is computed against the reference's own number.
 
 ⚠ **The two biosphere rows were re-measured 2026-08-14 (the within-day light path) and had
 been stale in the other direction: `6.7e-14` → `8.2e-15` and `2.7e-15` → `6.1e-15`.** The

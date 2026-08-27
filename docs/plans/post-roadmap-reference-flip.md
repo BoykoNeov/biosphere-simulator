@@ -8022,3 +8022,186 @@ Written as a list rather than as forward items, per batch C's review finding.
 * **`compartment_boundary_ledger` has no Rust equivalent** — batch C's gap, untouched.
 * **No Python deleted.** All four files stay green and running (97 collected across them)
   until S6.
+
+## §5am Stage 3 — D4's DEFERRED HALF BUILT, COMPLETE 2026-08-27: the reference measures its own band basis
+
+**The subject.** §5ac (D4) moved `tiers.json` into `rust/data/`, gave the reference its own
+banded comparison (`domains::tiers`) and two `tier_contract.rs` gate files, and deferred one
+clearly-named piece: the four `band > measured sensitivity` re-derivations that *justify* each
+Tier-2 band. Their instrument, `tests/crossport/measure_tier2_bands.py`, substitutes a `math`
+reference **inside the Python domain modules** and runs the **Python engine**, so it is built
+out of the tree S6 deletes. §5ac's own words: *"until it lands the committed bands are asserted
+but no longer justified in-tree"*, and *"a re-measurement that reads zero is the failure mode,
+not the result."*
+
+⚠ **This was an ordering constraint on S6, not one item among many.** The instrument dies with
+its subject; if the deletions ran first, six frozen bands would be asserted with no way to
+re-justify them short of rebuilding the tool. It is why this was taken before the by-name
+census and before `intercepted_fraction`.
+
+**What was built.**
+
+* `rust/crates/domains/src/ulp_probe.rs` — the `Nudge` perturbation, the three seams, the
+  metric (reusing `tiers::paired_leaves` + `tiers::max_abs_relative_deviation`, so the number a
+  band is compared *against* and the number a run is compared *with* cannot disagree about what
+  they measure), and the four `domains`-side measurements.
+* `rust/crates/station/src/ulp_probe.rs` — the same seams composed onto the coupled
+  Power→Thermal run and the 7-day greenhouse.
+* `rust/crates/domains/tests/tier_sensitivity.rs` (8 tests, 10 keys) and
+  `rust/crates/station/tests/tier_sensitivity.rs` (4 tests, 6 keys) — the whole Tier-2 roster.
+
+**What did not change.** No band, no floor, no tier, no golden, no manifest. The
+re-measurement moved nothing, which is the outcome §5ac asked for.
+
+### The seams, and the one place a cheaper route is measurably wrong
+
+Three of the four need no engine change, which §5ac predicted but had only checked for power
+and thermal. The biosphere's is the one it did not spell out:
+
+| run | Python shims | the reference |
+|---|---|---|
+| power ×2 | `domains.power.system.math.sin` | a mirrored schedule nudging the `sin` result + the load derived from it |
+| thermal | `domains.thermal.flows.radiated_power` | a mirrored `RadiatorReject` swapped in via `Registry::into_parts` |
+| biosphere / greenhouse | `canopy.math.exp` + `photosynthesis.math.exp` | the `par` forcing |
+| station energy | both | the same two, perturbed **separately**, the worse taken |
+
+⚠ The `par` seam is **exact**, and the justification was grepped rather than argued:
+`incident_par` enters `canopy_assimilation` in exactly one place, `absorbed_par = k ·
+incident_par · exp(−k·depth·lai)`, so a relative one-ULP nudge of either is the same
+perturbation of `absorbed_par`; and `env.get("par")` has exactly one consumer in the workspace
+(`CarbonContext`) — the station's lighting/sealed seams *write* `PAR_VAR`, none reads it.
+
+⚠ **Thermal is the one place the cheap route is wrong, and it was measured, not assumed.**
+Perturbing the radiator flow's *output* would understate the sensitivity because
+`t⁴ − T_space⁴` can cancel. Hence the mirrored flow — eight lines, every ingredient public.
+
+### The three-layer defence, and why layer 3 is new
+
+1. **`Nudge::Off` must emit the golden emitter's exact bytes.** Each probe assembles its own
+   scenario, so it can drift and go on measuring a scenario nobody froze. This is what licenses
+   writing mirrors at all.
+2. **Every reading `> 0.0`** — the 2026-08-15 vacuous-zero trap, inherited from the Python side.
+3. **Every reading within an order of magnitude of the Python instrument's.** New. `1e-30` is
+   non-zero and still wrong, and only the number this re-measures can see that. It is also what
+   caught the finding below.
+
+### ⚠⚠ The finding: CPython's `sum()` is compensated, and `daily_solar_energy`'s comment denied it
+
+Both power readings came back at **exactly half** the Python instrument's. The
+order-of-magnitude gate was green either way; *chasing the exact factor of two is what turned
+it into a finding.* The 24 schedule values are bit-identical across the ports, nudged and
+un-nudged; the **derived load** differs by one ULP.
+
+CPython's builtin `sum()` has used **Neumaier compensation** for floats since 3.12 — it agrees
+with `math.fsum` and is not a left-to-right accumulation — while
+`domains::power::daily_solar_energy`, whose doc comment claimed to mirror *"Python's
+left-to-right `sum(...)`"*, accumulates naively. They agree bit-for-bit on the frozen scenario,
+which is why every golden matches and nothing caught it, and diverge as soon as the summands
+move. Compensating that one sum in a throwaway Rust probe reproduced **both** Python figures to
+every digit, so this is measured rather than inferred.
+
+The reference's naive accumulation is the definition and stays; the false comment is corrected.
+⚠ **The durable half is about the contract: a compensated reduction is a second source of
+cross-port divergence, independent of libm**, and `tiers.json`'s classification names only
+transcendentals. Five more float `sum()` calls live in the retiring Python tree — the drift
+regression and the perennial re-sow among them, both feeding frozen goldens. Nothing diverges
+today; until S6, a **Tier-1** byte disagreement could come from this rather than a port defect.
+**Added to the S6 list.**
+
+### The measurements
+
+| group | Python | reference | band | margin |
+|---|---|---|---|---|
+| `power_bounded_soc` | `5.215406e-15` | `2.607703e-15` | `1e-12` | ~380× |
+| `power_self_discharge` | `4.146325e-15` | `1.130816e-15` | `1e-12` | ~880× |
+| `thermal_equilibrium` | `1.909423e-16` | `1.909423e-16` | `1e-12` | ~5200× |
+| biosphere ×7 | `3.519726e-15` | `2.471757e-15` | `1e-11` | ~4000× |
+| station energy ×2 | `5.215406e-15` | `2.607703e-15` | `1e-12` | ~380× |
+| greenhouse ×4 | `2.814887e-16` | `2.762079e-16` | `1e-11` | ~36000× |
+
+Thermal matches to every digit. Power is the finding above. The biosphere reads 0.70× and the
+greenhouse 0.98× because a one-ULP step is a relative perturbation of between `2⁻⁵³` and
+`2⁻⁵²` depending on the value's position in its binade, and the `par` seam and the `exp` it
+stands in for sit in different ones.
+
+### ⚠⚠ The mutation battery lied once, and that is the slice's second finding
+
+The first battery run was killed by a two-minute timeout **mid-mutation**. The second run took
+its backup *from the mutated tree* and restored that after every row, so every row ran with a
+stale mutation live — and the first two rows reported the harness-identity control reddening,
+which reads as "the new tests bite" and was nothing of the kind. It surfaced only because two
+mutations that cannot affect an un-nudged run both reddened the un-nudged control.
+
+*A mutation battery must assert its own baseline is green before it mutates anything*, and it
+now does so as its first act. Same shape as `Nudge::Off` comparing against the golden rather
+than against itself: an instrument reports on its subject only once something independent has
+established what unperturbed looks like.
+
+### The mutation battery — 8 of 10 bite, and both inert rows are findings
+
+Run with `--no-fail-fast` across both crates, each row naming the test it must redden.
+
+| # | mutation | reddens |
+|---|---|---|
+| M1 | the nudge is a no-op | 6 tests, incl. all four band tests |
+| M2 | the nudge is 16 ULP, not 1 | 1 (the station biosphere band) |
+| M3 | an absent forcing is a silent no-op | `a_seam_that_finds_no_subject_is_an_error` |
+| M4 | the power harness runs one day short | the `Nudge::Off` identity control |
+| M5 | the radiator swap does nothing | 5 tests |
+| M6 | only one nudge direction is measured | **nothing** |
+| M7 | the biosphere seam nudges `vpd`, not `par` | **nothing** |
+| M8 | the station solar seam is left unperturbed | 2 |
+| M9 | a band is widened to `1e-8` | 2 (the `≤ 1e-9` tightness clause) |
+| M10 | a band is tightened to `1e-15` | 2 (`band > measured`) |
+
+**M6 — inert, and now given a subject.** Taking the worse of the two directions changes no
+number: `Up` dominates in all six groups today, so an `Up`-only probe reports the same six
+readings. That is a property of these trajectories, not of the design — a libm disagreement has
+no preferred sign. But the directions are demonstrably *not* one measurement written twice: on
+the thermal run `Up` reads `1.909423e-16` and `Down` reads **exactly zero**, so a one-direction
+probe could read `0.0` and trip the non-zero gate for a reason unrelated to its seam.
+`the_two_nudge_directions_are_not_the_same_measurement` pins that, and "make `Down` alias `Up`"
+reddens it. M6 itself stays inert and is recorded as such rather than tuned away.
+
+**M7 — inert, and that is the correct outcome.** Pointing the biosphere seam at `vpd` instead
+of `par` passes every gate. Measured, that is not a hole in the wiring; it is what these
+trajectories are like. Nudging each weather forcing in turn on the perennial 15-year chamber:
+
+| nudged forcing | deviation | transcendental in its derivation? |
+|---|---|---|
+| `par` | `2.412586e-15` | yes |
+| `daylength` | `1.981152e-15` | yes |
+| `vpd` | `1.812943e-14` | yes |
+| `net_radiation` | `1.926252e-14` | **no** — a raw fixture value |
+| `temp` | `3.399269e-14` | **no** — a raw fixture value |
+
+⚠⚠ **The two that cannot diverge across libm at all perturb the trajectory the most.** They are
+JSON numbers parsed identically by both ports. So the 2e-15…3.4e-14 spread is the *conditioning
+of the 15-year trajectory*, not a ranking of transcendental paths — a daily-constant table value
+applied at every step moves more than a within-day value that is zero at night. Two consequences:
+
+* **No gate built on propagated magnitude can tell which forcing it nudges.** The seam's
+  identity is defended by the grep-checked argument in the module header, not by a number. Said
+  plainly instead of adding a test that pretends otherwise.
+* **`docs/native-port-reference.md` said "worst: Beer–Lambert `exp`" and that word was false**
+  — as was the Python instrument's *"the dominant per-step transcendental"*. The probe site is a
+  **representative** choice and never was a maximum, in either port. Corrected, with the table
+  above as the evidence. The contract is untouched: the largest reading is still ~300× under the
+  `1e-11` band.
+
+**And the third defence is a reach check, not a subject check.** M2 and M7 measure exactly how
+loose the order-of-magnitude window is — a 16-ULP nudge reddens one band test of four, and a
+wrong forcing reddens none. It earned its place anyway, because chasing an exact factor of two
+*inside* it is what produced the compensated-`sum()` finding. The load-bearing layers are the
+`Nudge::Off` identity control and the non-zero check; the window is described here as what it
+measurably is rather than as the thing that catches a probe aimed at the wrong subject.
+
+### Standing after §5am
+
+* **No Python deleted.** `measure_tier2_bands.py` and the four `test_crossport.py` band tests
+  stay green until S6 — which may now retire them, because their successors stand.
+* **D4 is closed**, and its deferral paragraph in `docs/native-port-reference.md` is marked
+  landed rather than deleted.
+* Every S6 item S5 handed over is untouched and still open, plus the compensated-reduction
+  hazard above. `intercepted_fraction`'s deadness on the reference side was confirmed in
+  passing and deliberately **not** resolved here — it is clause 4 of S5's exit gate.

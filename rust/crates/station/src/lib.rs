@@ -35,6 +35,7 @@ pub mod sealed;
 pub mod session;
 pub mod stocks;
 pub mod system;
+pub mod ulp_probe;
 pub mod water;
 
 use simcore::environment::SourceResolver;

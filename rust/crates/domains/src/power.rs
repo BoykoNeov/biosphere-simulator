@@ -332,8 +332,24 @@ pub fn solar_schedule(scenario: &PowerScenario) -> Schedule {
     })
 }
 
-/// The discrete solar energy supplied over one day (J): `Σ_day solar(n)·dt`, summed in
-/// canonical step order (0 → spd−1), mirroring Python's left-to-right `sum(...)`.
+/// The discrete solar energy supplied over one day (J): `Σ_day solar(n)·dt`, accumulated
+/// naively in canonical step order (0 → spd−1).
+///
+/// ⚠⚠ **This does NOT mirror the Python checker's `sum(...)`, and the comment here said it
+/// did until 2026-08-27.** CPython's builtin `sum` has used **Neumaier compensation** for
+/// float arguments since 3.12 — it is not a left-to-right accumulation and agrees with
+/// `math.fsum`. The two reductions happen to produce identical bits on the frozen scenario,
+/// which is why every golden matches and nothing ever caught it; they diverge by one ULP as
+/// soon as the summands move. `ulp_probe` found it by measuring the Tier-2 band basis and
+/// reading exactly half of the Python instrument's number, and reproduced the Python figure
+/// **bit for bit** by compensating this one sum.
+///
+/// The naive accumulation is what the *reference* computes, so it is the definition and it
+/// stays; what was wrong was the claim about the other port. ⚠ The general point outlives
+/// this function: a compensated reduction is a **second** source of cross-port divergence,
+/// independent of libm, and the tolerance contract's rationale names only transcendentals.
+/// Five more `sum()` calls over floats live in the retiring Python tree — the drift
+/// regression and the perennial re-sow among them.
 pub fn daily_solar_energy(scenario: &PowerScenario) -> f64 {
     let solar = solar_schedule(scenario);
     let dt = scenario.dt_seconds;
