@@ -3838,8 +3838,12 @@ quarters and nine tenths. A single pin at the knot is satisfied by any curve thr
 shape is what makes a wrong constant or a wrong form visible. That is batch G's finding and
 batch E's, stated as a precondition instead of as a post-mortem.
 
-**S5 is complete.** All seven batches are built and no Python biosphere test file is left
-unported and undispositioned. What S5 hands to S6 is unchanged in kind and one batch longer:
+**All seven S5 batches are built**, and every Python biosphere test now has a successor or a
+written disposition. ⚠ That is not the same as S5's exit gate being met: of its four clauses,
+the two about test quality are satisfied batch by batch and the other two — the by-name claim
+census, and `intercepted_fraction` — are open and belong to S6. Said precisely because "S5 is
+COMPLETE" in an always-loaded index row is exactly the scope claim that outlives its reasoning.
+What S5 hands to S6 is unchanged in kind and one batch longer:
 four two-sided characterization bands with no Rust home and the open question of whether the
 reference wants a class of pin that is deliberately not a contract; the by-name claim census,
 now deferred by seven consecutive batches; `intercepted_fraction`; the unordered soil-nitrogen
@@ -3862,3 +3866,43 @@ the average hook length one fifth of a byte past its budget, and only the full w
 found it. *A scoped command's green is a claim about the scope, not about the gate you had in
 mind* — the third arrow of the CI-skip lesson, arriving locally this time. Fixed the way the
 gate's own message prescribes: shorten the hook, do not raise the bound.
+
+### ⚠⚠ The batch F review, 2026-08-27: the disposition table was never DIFFED against its own input
+
+The batch shipped, then an independent read asked the question the batch had asked of its
+battery and never of its table: the coverage claim was assembled by reading the four Python
+files and writing rows as it went — was it ever checked against the list of a hundred? It was
+not. The check is one command: pull every mirrored test name out of the three Rust files, pull
+every backticked name out of the "does not port" rows, union them, subtract from the collected
+names.
+
+Nine names came back unaccounted. Four were already covered by batch E and had simply never
+been written down; one was a naming error in a row; and four were real gaps. Plus one the
+name-level diff cannot see at all — the batch-E handover test has two regimes and the batch
+ported one, so the table said "covered" about half a test. *A coverage table assembled by
+reading cannot see its own omissions.* The battery had been enumerated against the test list,
+which is how the roster pin's missing mutation was found; the same discipline was never applied
+one level up. The arithmetic is worth writing down because three counts are correct at once:
+the four files hold 94 definitions, seven of whose names repeat across files, so 87 distinct;
+they collect 97 because one case is parametrized three ways; and with the three handed over the
+input is 100 collected over 90 distinct names. The diff runs on the distinct names and, after
+the two tests below, returns zero unaccounted.
+
+Two tests were added. The one that mattered pins the stock KINDS of the decomposer nitrogen
+pools: the microbial carbon pool is a population that an extinction pass can zero, so its
+nitrogen counterpart must be a pool or that pass would orphan the nitrogen and break the
+emergent carbon-to-nitrogen ratio. Nothing in Rust touched stock kinds at all. Building the
+nitrogen pool as a population now reddens it along with twenty-two scenario tests — the
+invariant was defended downstream, but by nothing that names it.
+
+The other was INERT on its first draft, which is the third time in this batch and the third
+time in our own column. It was written as a test of the shedding flow's degenerate-input guard,
+and claimed the divisor arm returns NaN without it. Measured: deleting the whole condition
+leaves the binary entirely green. Every disjunct is arithmetically redundant — the body
+multiplies by the shed carbon, an empty nitrogen pool makes the concentration zero, and an
+empty biomass gives infinity or NaN, both of which the minimum and the multiplication collapse
+back to zero. The condition is defensive code and no mutation of it can redden anything; the
+Python originals are not guard tests either, and never were. What the test is actually for is
+the coupling — under the retired free-rate form a standing plant shed nitrogen every step
+whether or not any tissue was dying — and restoring that form reddens exactly three tests, this
+one among them. The docstring now says that, and the false NaN claim is gone.

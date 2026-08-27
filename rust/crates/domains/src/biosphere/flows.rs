@@ -4825,4 +4825,91 @@ mod tests {
             );
         }
     }
+
+    /// F18 — no nitrogen is shed by a plant that is not losing tissue, in any of the three
+    /// ways it can fail to be.
+    ///
+    /// ⚠ Added by the batch F review, which found the claim by DIFFING the disposition
+    /// table against the 100 input tests rather than by reading it. Batch E ported this
+    /// flow's rate law and both arms of its `min`; the degenerate-input half had neither a
+    /// successor nor a row, and *a coverage table assembled by reading cannot see its own
+    /// omissions.*
+    ///
+    /// ⚠⚠ **The first draft of this test called itself a GUARD test and it is not one —
+    /// measured, not argued.** `NitrogenSenescence` opens with
+    /// `if shed_carbon <= 0 || plant_n <= 0 || biomass_c <= 0 { 0.0 }`, and **deleting that
+    /// whole condition leaves `cargo test -p domains --lib` entirely green**, because every
+    /// disjunct is arithmetically redundant: the body multiplies by `shed_carbon`, so a
+    /// zero there is zero either way; `plant_n = 0` makes the concentration zero; and
+    /// `biomass_c = 0` gives `inf` or `NaN`, both of which `f64::min` and the multiplication
+    /// by a zero `shed_carbon` collapse back to zero. The condition is defensive code, and
+    /// no mutation of it can redden anything. The first draft's claim that the divisor arm
+    /// "returns NaN without its guard" was simply false — the third time in this batch that
+    /// an assertion was written where its subject cannot move it, and the third time in our
+    /// own column.
+    ///
+    /// **What this test actually pins is the COUPLING**, which is the claim the Python
+    /// originals are for: under the retired `n_senescence_rate` form, a standing `plant_n`
+    /// shed nitrogen every step regardless of whether any tissue was dying. Restoring that
+    /// form reddens exactly three tests and this is one of them. The three states below are
+    /// three different ways for nothing to be dying — no nitrogen, no biomass, no death
+    /// rate — and an uncoupled form sheds in the last two.
+    /// Mirrors `test_n_shedding_flux_is_zero_at_every_degenerate_input`,
+    /// `test_n_senescence_self_limits_at_zero_plant_n` and
+    /// `test_n_senescence_self_limits_when_no_carbon_is_senescing`.
+    #[test]
+    fn the_shed_nitrogen_is_zero_on_each_of_its_three_degenerate_arms() {
+        let sen = params::senescence();
+        let canopy = params::canopy();
+        let nitro = params::nitrogen();
+        let flow = |rdr: f64| NitrogenSenescence {
+            id: "biosphere.nitrogen_senescence".to_string(),
+            plant_n: PLANT_N.to_string(),
+            litter_n: LITTER_N.to_string(),
+            leaf_c: LEAF.to_string(),
+            stem_c: STEM.to_string(),
+            root_c: ROOT.to_string(),
+            rdr_leaf: rdr * sen.rdr_leaf,
+            rdr_stem: rdr * sen.rdr_stem,
+            rdr_root: rdr * sen.rdr_root,
+            n_residual_per_mol_c: nitro.n_residual_per_mol_c,
+            shade_rate: rdr * sen.shade_rate,
+            lai_threshold: sen.lai_threshold,
+            sla_per_mol_c: canopy.sla_per_mol_c,
+            ground_area: 1.0,
+        };
+        for (label, rdr, s) in [
+            // no nitrogen in a live, senescing plant
+            ("empty plant_n", 1.0, n_state(3.0, 1.0, 1.0, 0.0, 0.0, 1.0)),
+            // no biomass at all, but nitrogen still standing: the state an uncoupled
+            // rate form would shed from most obviously
+            ("empty biomass", 1.0, n_state(0.0, 0.0, 0.0, 0.0, 1.0, 1.0)),
+            // organs and nitrogen both present, but nothing is dying
+            (
+                "nothing senescing",
+                0.0,
+                n_state(3.0, 1.0, 1.0, 0.0, 1.0, 1.0),
+            ),
+        ] {
+            let r = SourceResolver::new(HashMap::new(), HashMap::new()).expect("resolver");
+            let env = r.bind(&s, 1.0);
+            for l in flow(rdr).evaluate(&s, &env, 1.0).expect("shed").legs {
+                assert_eq!(l.amount, 0.0, "{label}: leg {} is live", l.stock);
+            }
+        }
+        // ...and the control: the same flow on a live plant sheds a strictly positive
+        // amount, so the three zeros above are the coupling rather than an inert fixture.
+        let live = n_state(3.0, 1.0, 1.0, 0.0, 1.0, 1.0);
+        let r = SourceResolver::new(HashMap::new(), HashMap::new()).expect("resolver");
+        let env = r.bind(&live, 1.0);
+        let shed = flow(1.0)
+            .evaluate(&live, &env, 1.0)
+            .expect("shed")
+            .legs
+            .iter()
+            .find(|l| l.stock == LITTER_N)
+            .map(|l| l.amount)
+            .expect("a litter_n leg");
+        assert!(shed > 0.0, "the fixture does not shed at all");
+    }
 }

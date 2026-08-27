@@ -3083,4 +3083,50 @@ mod tests {
              tree must be updated with it"
         );
     }
+
+    /// `microbial_n` is a POOL, so an extinction pass can never orphan it.
+    ///
+    /// ⚠ Added by the batch F review. `microbial_carbon` is a POPULATION, so an extinction
+    /// pass could in principle zero it and route the residual to the loss-sink. Were its
+    /// nitrogen counterpart also a POPULATION, that pass would zero the nitrogen with it
+    /// and break the emergent C:N — the project's extinction invariant is that POOL stocks
+    /// are never zeroed-with-loss, and that is the whole reason the two siblings have
+    /// different kinds.
+    ///
+    /// ⚠ The seam this pins is on the CARBON side: `microbial_carbon`'s threshold is 0.0,
+    /// and it is that zero which makes the asymmetry safe TODAY. If anyone raises it, the
+    /// nitrogen counterpart must be zeroed with it — and a comment would not survive that
+    /// edit. Asserted on the built sealed state rather than on the stock catalogue, so it
+    /// is a claim about what a chamber actually contains.
+    ///
+    /// ⚠⚠ This test exists because the batch F disposition table was built by READING the
+    /// Python files and was never DIFFED against them. Diffing found this claim with
+    /// neither a successor nor a row — a live structural invariant, silently absent. *A
+    /// coverage table assembled by reading cannot see its own omissions; enumerate the
+    /// inputs and subtract.*
+    /// Mirrors `test_microbial_n_is_a_POOL_so_extinction_can_never_orphan_it`.
+    #[test]
+    fn microbial_nitrogen_is_a_pool_so_an_extinction_pass_can_never_orphan_it() {
+        let (state, _) = build_season(&sealed_chamber_scenario()).expect("sealed chamber");
+        let micro_n = &state.stocks[MICROBIAL_N];
+        assert_eq!(micro_n.kind, StockKind::Pool, "microbial_n must be a POOL");
+        assert_eq!(micro_n.quantity, Quantity::Nitrogen);
+        // The carbon sibling is the POPULATION, and its threshold is what makes the
+        // asymmetry safe. Both halves: a same-kind pair would satisfy neither line.
+        let micro_c = &state.stocks[MICROBIAL_CARBON];
+        assert_eq!(micro_c.kind, StockKind::Population);
+        assert_eq!(
+            micro_c.extinction_threshold, 0.0,
+            "raising this threshold means microbial_n must be zeroed with its carbon"
+        );
+        // ...and the other two nitrogen counterparts of the cascade are POOLs for the same
+        // reason, so this is the family's rule rather than one stock's.
+        for id in [LITTER_N, HUMUS_N] {
+            assert_eq!(
+                state.stocks[id].kind,
+                StockKind::Pool,
+                "{id} must be a POOL"
+            );
+        }
+    }
 }
