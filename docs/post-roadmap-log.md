@@ -43,18 +43,25 @@ plan-doc parity check reads the index *section* on one side and the union of the
 files on the other, so a record naming it puts it on the record side only and turns that
 check red. Record files refer to it as *"the direction plan"* and rely on this paragraph.
 
-⚠ **A SECOND forward-looking plan joined it on 2026-08-14: `post-roadmap-gross-net-gas-exchange.md`**
-— the continuous plant gas exchange + within-day light path work (planned, nothing built,
-`git diff src/` empty). Same shape, same exemption, same two consequences: it is named *here*
-rather than in the index, and a file in `docs/log/` must not name it by filename while it is
-exempt — call it *"the gas-exchange plan"*. **When it is built it earns the normal three and
-this paragraph goes with it**; until then it is deliberately exempt rather than missed.
-⚠ It was written on 2026-08-14 and left **untracked** for a day, which turned
-`test_every_plan_doc_is_indexed` **red on the working tree while `main` itself was green** —
-an unindexed plan doc fails the gate whether or not git is tracking it. Two lessons, and the
-second is the one that bites: a plan doc is committed *with* its exemption in the same commit,
-and **an exemption written for a temporary state is a deletion someone must remember** — which
-is exactly what the step-unfreeze paragraph two paragraphs down records going wrong.
+⚠ **The gas-exchange exemption is GONE (deleted 2026-08-31), and it had been FALSE for
+seventeen days.** It covered `post-roadmap-gross-net-gas-exchange.md`, written 2026-08-14; the
+work **built the same day**, took the normal three, and the paragraph stayed — still asserting
+that a record file *"must not name it by filename"* while `docs/log/gross-net-gas-exchange.md`
+had named it all along. Nothing was red: the doc is in the index *and* the record, so both
+parity checks pass and the false constraint was invisible to every gate. ⚠ **Its own lesson
+was written two days too late to catch it** — the FOURTH exemption below states the rule
+(*an exemption expires when the first slice lands*) on 2026-08-16, and nobody walked back over
+the exemptions that already existed. *A rule adopted after the instances it covers does not
+apply itself retroactively.* Two lessons survive the deletion: a plan doc is committed **with**
+its exemption in the same commit, and an unindexed plan doc fails the gate whether or not git
+is tracking it — that one cost a day of a red working tree against a green `main`.
+
+⚠ **A LIVE exemption, added 2026-08-31: `post-roadmap-science-switch.md`** — the pricing pass
+for the second half of the user's harness charge ("parameters *and* science"), planned with
+nothing built (`git diff rust/crates/` empty). Same shape, same two consequences: it is named
+*here* rather than in the index, and a file in `docs/log/` must not name it by filename while
+it is exempt — call it *"the science-switch plan"*. **It expires when the FIRST slice lands**,
+per the rule below, and the doc's own status block says so too so the deletion has two homes.
 
 ⚠ **A FOURTH exemption existed for exactly one day and is GONE (2026-08-16).** It covered
 `post-roadmap-reference-flip.md`, written the day before as a plan-only doc with nothing built.
