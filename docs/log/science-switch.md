@@ -131,7 +131,7 @@ design.
 
 ## Verification
 
-`cargo test --workspace --no-fail-fast` green — **1069 passed, 0 failed** —
+`cargo test --workspace --no-fail-fast` green — **1070 passed, 0 failed** —
 `cargo clippy --all-targets -D warnings` clean, and the regeneration tool reporting **19 of 19
 goldens identical**. That last was expected before it was run rather than hoped for: the seam is
 post-assembly and no canonical scenario goes through it.
@@ -153,3 +153,12 @@ to print:
 
 ⚠ The last one is also the evidence that the scan reads test code: the fork it caught was inside
 `#[cfg(test)]`, where the original defect lived.
+
+⚠ **One flake, recorded rather than swallowed.** In the middle full-workspace run,
+`godot_bridge`'s `the_authored_kinetics_marker_crosses_the_boundary` failed once; it passed alone
+and passed again with all 19 of its binary's smokes (218 s) and in a third full run. Those smokes
+launch Godot child processes under a wall-clock bound, and the run was loaded. **The failure
+message was not captured** — the log was filtered to `test result` lines — so the cause is
+unknown rather than diagnosed, and it is written here as an unknown. Nothing in this batch
+compiles into that crate: the edits between the clean run and the flake were two `domains` test
+binaries and prose.
