@@ -47,8 +47,11 @@ check red. Record files refer to it as *"the direction plan"* and rely on this p
 seventeen days.** It covered `post-roadmap-gross-net-gas-exchange.md`, written 2026-08-14; the
 work **built the same day**, took the normal three, and the paragraph stayed — still asserting
 that a record file *"must not name it by filename"* while `docs/log/gross-net-gas-exchange.md`
-had named it all along. Nothing was red: the doc is in the index *and* the record, so both
-parity checks pass and the false constraint was invisible to every gate. ⚠ **Its own lesson
+had named it all along. **No gate could see it, and here is the exact reason** — the doc is
+named in the index row *and* in the record file, so both parity checks take it as an ordinary
+indexed plan and the false sentence is prose neither one reads. (Checked against the pre-edit
+state by construction: this deletion touches only the paragraph, never the index row or the
+record file, so the inputs to both checks are unchanged by it.) ⚠ **Its own lesson
 was written two days too late to catch it** — the FOURTH exemption below states the rule
 (*an exemption expires when the first slice lands*) on 2026-08-16, and nobody walked back over
 the exemptions that already existed. *A rule adopted after the instances it covers does not

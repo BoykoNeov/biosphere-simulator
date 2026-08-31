@@ -40,13 +40,33 @@ own docstring records why the crude control was rejected: zeroing a parameter to
 process changed *two* things once the soil geometry re-basing gave `EXTR` a second reader,
 so *"a control that changes more than it claims is worse than no control."*
 
-**B. Switch a process on or off (a scenario flag).** *Already built — AND FROZEN.*
-`SeasonScenario` carries `sealed`, `stem_reserves`, `vernalization`, `consumer`, `perennial`,
-and `compartments` branches on all five (system.rs:304, 419, 436, 542, 658, 672, 745, 786).
+**B. Switch a process on or off (a scenario flag).** *Already built — AND FROZEN, but
+CONTINGENTLY, which is the part worth writing down.*
+`SeasonScenario` carries four flow-gating flags — `sealed`, `consumer`, `stem_reserves`,
+`vernalization` — and `compartments` branches on all four (system.rs:304, 419, 436, 542, 658,
+672, 745, 786). (*"Perennial" is a run mode, `run_perennial`, not a scenario field; an earlier
+draft of this section listed it as a fifth flag and that was wrong.*)
 ⚠ **This is a finding, not a shortfall: a real part of the user's charge is already
-discharged and has been since Phase 1.** But it is discharged *inside the freeze* — the
-manifest's `flow_set` is the union over the four canonical builds (§5), so those five flags
-are contract inputs, not experiment knobs. They are how the frozen roster is *defined*.
+discharged and has been since Phase 1.** And it is discharged *inside* the freeze — but not
+structurally. Measured on the four canonical scenarios (system.rs:129–222):
+
+* `DEFAULT_SCENARIO` sets **`vernalization: true` and `stem_reserves: true`**;
+* the three chambers inherit it with `..DEFAULT_SCENARIO` and add `sealed: true`, one of them
+  `consumer: true`.
+
+So every flow type any flag can wire is ON in at least one canonical build, and the manifest's
+`flow_set` — a **union** (§5) — already contains all of them. Turning a flag off can only
+subtract from a run, never add a type outside the frozen roster. **The flags are contract
+inputs, not experiment knobs.**
+
+⚠⚠ **But that holds because of two literals in a default, and nothing gates it.** Flip
+`DEFAULT_SCENARIO.stem_reserves` to `false` and `StemRemobilization` / `NitrogenSenescence`
+leave the frozen union — at which point the flag becomes an **unfrozen mechanism switch
+sitting in production scenario config**, reachable from `build_season`, and §6's whole property
+is void. The union is derived, so the manifest would follow the code silently; that is exactly
+the auto-follow failure `locked_dt_days` is hand-written to avoid. **A cheap assertion is owed
+here regardless of whether the rest of this plan is built**: every flag-gated flow type is
+wired ON by at least one canonical scenario.
 
 **C. Replace form A with form B.** *The actual subject — and it has NO second side today.*
 Measured: no alternative form of any biosphere process exists anywhere in
@@ -170,7 +190,15 @@ afterwards, delivers mechanism-removal as a real harness capability in the same 
 **Slice 2 — the replace/add composers + the three gates of §6.** Buildable, but §2C says it
 is inert without slice 3, so the two land together.
 
-**Slice 3 — the first A/B pair.** Needs science authored. See §8.
+**Slice 3 — the two constructional controls** (no-op replacement, scaled replacement). No new
+science; they are what make slice 2's composers trustworthy. See §8.
+
+**Slice 3b — the first A/B *science* pair.** Needs a second form authored. See §8.
+
+**Slice 0 — one assertion owed regardless** (§2B): every flag-gated flow type is wired ON by at
+least one canonical scenario, so the manifest's union genuinely contains them. Two literals in
+`DEFAULT_SCENARIO` currently carry that property and nothing checks it. Cheap, independent of
+every other slice, and it should not wait for them.
 
 **Slice 4 — the report.** `lab::report` already renders a baseline-vs-variants table with the
 two requirements the last batch earned the hard way (a fold reads *the trajectory's own*
@@ -186,18 +214,41 @@ seam reporting a number nobody can check is exactly the failure §6 exists to pr
 this project has already logged a probe whose *name* and *arithmetic* disagreed three lines
 apart, with the number travelling into a plan.
 
-**Recommended: the big-leaf canopy vs the layered (Goudriaan) canopy.** On 2026-08-15
-`photosynthesis.canopy_assimilation` stopped being a big-leaf aggregator (one call at
-layer-mean light × intercepted fraction) and became a depth integral with Goudriaan
-quadrature; the predecessor is gone from the tree, both forms are cited, and **the
-consequence was measured at the time** (`docs/log/layered-canopy.md`). Re-authoring the
-retired form as a lab-only alternative is small, and the seam's first output can be checked
-against a number the repo already holds. ⚠ It also re-tests a finding worth re-testing: that
-build retracted its own predecessor's headline number.
+⚠⚠ **The obvious candidate for that control does NOT work, and finding out why is this
+section's result.** The tempting pick is the retired big-leaf canopy against the shipped
+layered (Goudriaan) one: on 2026-08-15 `photosynthesis.canopy_assimilation` stopped being a
+big-leaf aggregator and became a depth integral, both forms are cited, and the build measured
+plenty. But **the repo holds no isolated big-leaf-vs-layered number**, for two independent
+reasons, both in `docs/log/layered-canopy.md`:
 
-Other candidates, all of which are *questions* rather than controls, and any of which can
-follow: the twice-refused soil fractionation (single vs multi-pool decomposition), nitrogen
-option D, leaf expansion re-authored in Rust per §3.
+* **the build moved three things at once** — the canopy scheme, `specific_leaf_area`
+  22.0 → 23.53 (a +7.0 % *calibration*), and a new 5 %/day mutual-shading loss — so the golden
+  diff is a three-mechanism delta, not this pair's;
+* the numbers that *are* in the record measure something else: the layered scheme against a
+  100-layer reference (0.2 %, against the midpoint rule's −5.2 %), the peak LAI, and the
+  LINTUL3 gap closing 22 % → 6.4 %. And the predecessor's headline number was **retracted by
+  that same build**, because a probe's docstring named a scheme its arithmetic did not
+  implement.
+
+**So the pair is a question, not a control** — a perfectly good first *scientific* target, but
+recovering an isolated delta is part of the work, not an input to it. ⚠ Taking it as a control
+would have meant validating a new seam against a number produced by the one build in this
+repo's history that caught its own instrument being self-inconsistent.
+
+**What IS available is a control whose answer is known BY CONSTRUCTION, and that is stronger
+than an archived measurement:**
+
+* **the no-op replacement** — replace a flow with a freshly built identical instance; the run
+  must be **bit-identical** to `build_season`. This exercises the composer's every step
+  (locate by id, remove, insert, rebuild the registry) with a predicted answer that cannot
+  drift, and it is the science-side analogue of the value harness's `UNCHANGED` column;
+* **the scaled replacement** — wrap one flow in `ScaledFlow` (already written, in
+  `station::perturbations`) at a known factor; at 1.0 it must be bit-identical, at 0.5 the
+  affected legs must halve exactly on the first step. Arithmetic, not archive.
+
+Only after both pass does a *scientific* pair mean anything. Candidates, all questions:
+big-leaf vs layered per above, the twice-refused soil fractionation (single vs multi-pool
+decomposition), nitrogen option D, leaf expansion re-authored in Rust per §3.
 
 ## 9. Scope
 
@@ -215,6 +266,9 @@ The harness regenerates evidence; it endorses nothing.
 * `git status` clean outside the harness's own files after a full run — no param YAML, no
   golden, no committed manifest, no science-gate bound moved.
 * An unswapped lab run is **bit-identical** to `build_season`, asserted, both directions.
+* The **no-op replacement** is bit-identical and the **scaled replacement** halves the affected
+  legs exactly — the two answers known by construction, before any science pair is read.
+* Every flag-gated flow type is wired ON by at least one canonical scenario (§2B, slice 0).
 * A source scan proving no alternative mechanism is constructed under the biosphere spine.
 * A mis-targeted drop/replace **fails**, and is not reported as no-change.
 * One assembly body: `trace_without_flow`'s duplicate is gone, not merely deprecated.
