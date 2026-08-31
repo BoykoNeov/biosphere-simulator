@@ -364,6 +364,31 @@ mod tests {
 
     /// The round trip of the module header: no drops is the ordinary build. Kept because it
     /// is cheap, labelled because it proves less than it looks like it does.
+    /// A refusal must be **this** guard's refusal.
+    ///
+    /// ⚠⚠ `is_err()` alone is not enough, and that was measured rather than reasoned. Four of
+    /// the five guards in [`build_season_composed`] are redundant with a *later* error —
+    /// `Registry::new` rejects a duplicate flow id on its own, and guard 5 catches a target that
+    /// never matched — so an `is_err()` test stays green with the guard deleted. Mutations M7,
+    /// M9 and M10 each disabled one guard and the whole battery came back with **zero
+    /// failures**. Those guards earn their place by the *message* they produce (guard 4's own
+    /// comment says so: the engine would call it "duplicate flow id", which reads as an engine
+    /// fault rather than as this composition asking for a replacement under the wrong name), so
+    /// the message is what these tests assert.
+    #[track_caller]
+    fn refused_with<T>(result: Result<T, SimError>, needle: &str) {
+        match result {
+            Ok(_) => panic!("expected a refusal mentioning {needle:?}, but the build succeeded"),
+            Err(err) => {
+                let text = format!("{err:?}");
+                assert!(
+                    text.contains(needle),
+                    "refused, but not by the guard under test: expected {needle:?} in {text:?}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn dropping_nothing_is_the_ordinary_build() {
         let (base_state, base) = build_season_with(&DEFAULT_SCENARIO, &frozen()).expect("build");
@@ -554,9 +579,9 @@ mod tests {
     #[test]
     fn a_replacement_that_renames_is_refused() {
         let other = fresh_flow(&DEFAULT_SCENARIO, ROOT_ZONE_CAPTURE);
-        assert!(
-            build_season_replacing(&DEFAULT_SCENARIO, &frozen(), vec![(MAINTENANCE, other)])
-                .is_err()
+        refused_with(
+            build_season_replacing(&DEFAULT_SCENARIO, &frozen(), vec![(MAINTENANCE, other)]),
+            "a replacement that renames is a drop plus an add",
         );
     }
 
@@ -605,8 +630,9 @@ mod tests {
     /// `Registry::new` would also reject it — as a duplicate id, in the engine's words.
     #[test]
     fn an_addition_that_is_already_there_is_refused() {
-        assert!(
-            build_season_adding(&DEFAULT_SCENARIO, &frozen(), vec![inert(MAINTENANCE)]).is_err()
+        refused_with(
+            build_season_adding(&DEFAULT_SCENARIO, &frozen(), vec![inert(MAINTENANCE)]),
+            "is already in this scenario's registry",
         );
     }
 
@@ -622,10 +648,7 @@ mod tests {
             vec![(MAINTENANCE, fresh_flow(&DEFAULT_SCENARIO, MAINTENANCE))],
             Vec::new(),
         );
-        assert!(
-            dropped_and_replaced.is_err(),
-            "dropped and replaced at once"
-        );
+        refused_with(dropped_and_replaced, "is named twice as a target");
 
         let dropped_and_added = build_season_composed(
             &DEFAULT_SCENARIO,
@@ -634,10 +657,7 @@ mod tests {
             Vec::new(),
             vec![inert(MAINTENANCE)],
         );
-        assert!(
-            dropped_and_added.is_err(),
-            "dropping an id and adding it back is a replacement"
-        );
+        refused_with(dropped_and_added, "is both a target and an addition");
 
         let added_twice = build_season_composed(
             &DEFAULT_SCENARIO,
@@ -646,7 +666,7 @@ mod tests {
             Vec::new(),
             vec![inert("biosphere.lab_extra"), inert("biosphere.lab_extra")],
         );
-        assert!(added_twice.is_err(), "the same id added twice");
+        refused_with(added_twice, "is added twice");
     }
 
     /// The general entry point does all three at once, and the arithmetic of the flow count
