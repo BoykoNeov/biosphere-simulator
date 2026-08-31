@@ -2111,47 +2111,18 @@ mod tests {
     /// transfer. A control that changes more than it claims is worse than no control.
     /// Dropping the flow from the registry changes exactly one thing.
     ///
-    /// No production seam was added for this: `compartments` is module-private and this
-    /// test module is inside the module, so the flow list is reachable before
-    /// `Registry::new` closes over it.
+    /// ⚠ **This body used to be a second copy of `build_season_with`** — its own stock
+    /// collection, loss-sinks, flow/aux extend, `State::new` and `Registry::new` — on the
+    /// grounds that *"no production seam was added for this"*. The science-switch plan's
+    /// slice 1 added one: [`crate::lab::mechanism::build_season_without`]. The copy is the
+    /// defect, not the convenience — a control assembled by a different body than the run
+    /// it is differenced against stops controlling the moment the two bodies diverge, and
+    /// every gate stays green while it does. `tests/one_assembly_body.rs` now keeps this
+    /// from being re-forked.
     fn trace_without_flow(scenario: &SeasonScenario, drop_id: &str) -> Vec<State> {
-        let p = params::biosphere();
-        let builds = compartments(scenario, &p).expect("compartments");
-        let mut stocks: BTreeMap<String, Stock> = BTreeMap::new();
-        for build in &builds {
-            for stock in &build.stocks {
-                stocks.insert(stock.id.clone(), stock.clone());
-            }
-        }
-        for (id, s) in boundary::loss_sinks(&[Quantity::Carbon]).expect("loss sinks") {
-            stocks.insert(id, s);
-        }
-        let mut flows: Vec<Box<dyn Flow>> = Vec::new();
-        let mut aux: Vec<Box<dyn AuxProcess>> = Vec::new();
-        let mut dropped = 0usize;
-        for build in builds {
-            for flow in build.flows {
-                if flow.id() == drop_id {
-                    dropped += 1;
-                } else {
-                    flows.push(flow);
-                }
-            }
-            aux.extend(build.aux);
-        }
-        assert_eq!(dropped, 1, "{drop_id} is not in this scenario's registry");
-        let state = State::new(
-            0,
-            stocks.clone(),
-            0,
-            BTreeMap::from([
-                (THERMAL_TIME.to_string(), 0.0),
-                (VERNALIZATION_DAYS.to_string(), 0.0),
-                (ROOTED_DEPTH.to_string(), scenario.rooted_depth0),
-            ]),
-        )
-        .expect("state");
-        let registry = Registry::new(flows, &stocks, aux).expect("trimmed registry");
+        let (state, registry) =
+            crate::lab::mechanism::build_season_without(scenario, &params::biosphere(), &[drop_id])
+                .expect("the knockout build");
         let integrator = EulerIntegrator::new(registry);
         let resolver = super::super::weather_resolver(scenario, 1).expect("resolver");
         let mut seen: Vec<State> = Vec::new();

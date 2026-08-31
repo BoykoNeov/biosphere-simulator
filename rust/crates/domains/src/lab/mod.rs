@@ -37,6 +37,9 @@ use config::{with_override, ConfigError, ParamFile};
 /// The comparison report — §6 of the plan, every requirement earned by a wrong read.
 pub mod report;
 
+/// The **science** half: a season with a named flow removed from the assembled registry.
+pub mod mechanism;
+
 /// One substitution: a field of one frozen param file, and the value to run instead.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Substitution {

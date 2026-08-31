@@ -1,19 +1,27 @@
 # The science switch — swapping a MECHANISM, not a value
 
-> ## STATUS 2026-08-31 — PLANNED, NOTHING BUILT. `git diff rust/crates/` is empty.
+> ## STATUS 2026-08-31 — SLICES 0 AND 1 BUILT. The pricing below stands; §7 is the queue.
 >
-> This is the **pricing pass** the value-switch record left open, and pricing is the
-> deliverable: the user's charge of 2026-08-16 was a harness *"that permits easy toggle of
-> parameters and science"*. The parameter half shipped 2026-08-27 (`docs/log/value-switch-harness.md`);
-> that record's closing section lists **"the toggle-the-SCIENCE half … a different seam and
-> has not been priced"** as what was not taken. This doc prices it.
+> This began as the **pricing pass** the value-switch record left open — the user's charge of
+> 2026-08-16 was a harness *"that permits easy toggle of parameters and science"*, and the
+> parameter half shipped 2026-08-27 (`docs/log/value-switch-harness.md`). Priced in the
+> morning, and the two slices that need neither new science nor a decision were built the same
+> day; the record is `docs/log/science-switch.md`.
 >
-> Forward-looking, so it carries no file in `docs/log/` and is **exempt from the log index**
-> per the paragraph in `docs/post-roadmap-log.md`. ⚠ A record file must call it *"the
-> science-switch plan"* and never name it by filename while the exemption stands — naming it
-> there puts it on the record side of the parity check and turns that check red. ⚠ The
-> exemption expires when the **first** slice lands, not the last (the rule the reference-flip
-> exemption established after one day).
+> * **Slice 1 — BUILT.** `domains::lab::mechanism::build_season_without(scenario, p, &[ids])`,
+>   and `trace_without_flow`'s duplicate assembly body is gone. `tests/one_assembly_body.rs` is
+>   the gate — ⚠ the empty-drop control §7 leaned on turned out to be a **round trip**, so the
+>   source scan is the evidence, not it.
+> * **Slice 0 — BUILT.** `tests/scenario_flag_types.rs`: no flag setting wires a type outside
+>   the canonical union, with the roster derived from the struct declaration. `photoperiod`
+>   measured at **zero** gated types, which is §2B's "four, not five" made a measurement.
+> * **Slices 2, 3, 3b, 4 — NOT built**, unchanged and still correctly priced: §2C measured that
+>   the tree holds no second form of any biosphere process, so the replace/add composers would
+>   have nothing to substitute. They land with the first pair, per §8.
+>
+> No longer forward-looking, so it is **indexed normally** in `docs/post-roadmap-log.md` and
+> its exemption paragraph there was deleted in the landing commit — the rule that an exemption
+> expires when the FIRST slice lands, applied to itself.
 
 ---
 
