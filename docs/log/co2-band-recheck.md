@@ -74,5 +74,25 @@ list is written once and read many times, and **nothing re-checks it**. The free
 beside it; the direction plan has none, and its items go stale from the front, where the cheap
 ones are.
 
-**No code changed. No golden, param, manifest entry or gate bound moved** — `git status` clean
-outside the three docs and the memory file.
+**No code changed. No golden, param, manifest entry or gate bound moved.** Four repo files:
+`docs/biosphere-reference.md`, the direction plan, `docs/post-roadmap-log.md` and this file, plus
+the memory file outside the repo. ⚠ *"The three docs"* is what this sentence said when it was
+written, in the one sentence whose whole job is to prove nothing else moved — corrected before the
+push, and it is the same defect as FINDING 2 one level down: a count written from memory of the
+plan rather than from the diff.
+
+⚠ **The full suite was NOT re-run, and that is a decision, not an omission.** `cargo test` +
+`cargo clippy --all-targets -- -D warnings` are the reference's gates and their subject is code;
+zero code changed here, and the gate whose subject *is* these files — `repo_gates`, 17 tests
+covering the index/record parity, the record-line cap and the memory ceiling — was run and is
+green. Stated because a doc commit with a partial gate run and no note is indistinguishable from
+a skipped one.
+
+⚠ **A ruler finding, worth one line because it will be re-derived wrong:** `memory_index_ceiling`
+computes its per-line mean as **whole-file bytes ÷ the count of `- [` lines** — so the section
+headers and the preamble in `MEMORY.md` are charged to the budget, and a hand-count over the index
+rows alone reads ~4.5 B/line LOW (165.9 against the gate's 170.3). The shave that cleared it was
+measured with the wrong ruler and happened to be in the right direction. Re-measured the gate's
+way after the fix: **169.64 B/line against the 170 cap — 39 bytes of headroom**, so the next
+memory added trips it unless its hook is short and something else is merged. *A rule with two
+copies has one that is stale, and the second copy here was in my head.*
