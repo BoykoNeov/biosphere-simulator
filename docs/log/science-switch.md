@@ -338,3 +338,32 @@ was written as `cargo test --workspace --no-fail-fast | grep … | head -20`, an
 not cargo's. Counting the result lines caught it; reading them would not have. The rule the two
 defects above share, stated once: **a check must report how much it looked at, not only what it
 found.**
+
+## Five more mutations, and the finding they produced: `is_err()` is not a gate
+
+The first battery mutated **one** of `build_season_composed`'s five guards (M3, every-target-
+matched). Five more were written for the other four, and the run was the finding.
+
+**M7, M9 and M10 each disabled a guard and the whole battery came back with ZERO failures.**
+Four of the five guards are redundant with a *later* error: `Registry::new` rejects a duplicate
+flow id by itself, and guard 5 catches a target that never matched. So a test asserting only
+`is_err()` stays green with the guard deleted — it observes *a* refusal, never *this* refusal.
+
+Guard 4's own comment had already said what those guards are for — the engine would call it
+"duplicate flow id", which reads as an engine fault rather than as this composition asking for a
+replacement under the wrong name. **They earn their place by the message.** So the message is
+what the tests assert now, through `refused_with(result, needle)`, whose docstring carries the
+measurement so the next reader does not weaken it back.
+
+⚠ M6 and M8 did not apply at all on the first attempt — a `sed` replacement containing a raw
+newline. **The liveness check added an hour earlier caught it and said so**, instead of printing
+a clean run. That is the fix from the section above working on its first real occasion.
+
+With the messages asserted, **all ten mutations redden, each on exactly one test.** M6, M8 and M9
+land on three *different* assertion lines inside `the_cross_composer_collisions_are_refused`
+(651, 669, 660), so they are three distinct guards and not one test answering for all of them.
+
+**The census, stated as a number rather than as "green":** `cargo test --workspace
+--no-fail-fast` = **64 test binaries, 1088 passed, 0 failed, exit 0**. ⚠ An earlier capture in
+this session showed 60 binaries; that stream had been filtered, so 60 was never a census. 64 is
+the number to reproduce.

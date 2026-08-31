@@ -132,7 +132,7 @@ working on" category. The record and its cost: `docs/log/reference-flip.md`.
 
 ## Commands
 
-`cargo test` + `cargo clippy --all-targets -D warnings` in `rust/` — the reference's
+`cargo test` + `cargo clippy --all-targets -- -D warnings` in `rust/` — the reference's
 own gates, so they run first. ⚠ A **mutation battery must pass `--no-fail-fast`**: cargo
 stops at the first failing test *binary*, so a truncated run reports **fewer** reds — which
 reads as "the new tests are inert", not as a broken instrument.
