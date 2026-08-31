@@ -286,6 +286,24 @@ fn is_constant(series: &[f64]) -> bool {
     }
 }
 
+/// Whether every series a readout folds never moved — requirement 7's predicate, and the
+/// one place `all` rather than `any` is decided.
+///
+/// ⚠ **`all`, and the difference is scientific rather than stylistic.** `peak_w` folds three
+/// organ series. If storage froze while leaf and stem grew, the quantity the row reports still
+/// moved and the number is doing its job — flagging it would put a "never moved" warning on a
+/// live readout, which is how a warning stops being read. Only a readout whose *every* input
+/// is frozen is reporting its own initial condition.
+///
+/// ⚠ It is a named function rather than a line inside the loop because that is the only way
+/// the rule has a subject a test can point at: the mixed case (one series frozen, the others
+/// not) has **no demonstrated composition that produces it** — see
+/// `a_readout_is_frozen_only_when_every_series_it_folds_is` — so the rule is pinned over a
+/// constructed trajectory. That test is evidence about the *rule*, not about a run.
+fn readout_is_frozen(spec: &ReadoutSpec, t: &Trajectory) -> bool {
+    (spec.series)(t).iter().all(|s| is_constant(s))
+}
+
 /// Measure every applicable spec at `p`, through the frozen build — the value-switch column.
 /// ⚠ The `expect` is not a shrug. With no composition the only `Err` route left is
 /// `build_season_with` itself refusing these params — every *run* failure is captured as a
@@ -360,7 +378,7 @@ pub fn measure_composed(
         events += t.events;
         for i in needed {
             values.push((i, (SPECS[i].fold)(&t)));
-            if (SPECS[i].series)(&t).iter().all(|s| is_constant(s)) {
+            if readout_is_frozen(&SPECS[i], &t) {
                 constant.push(i);
             }
         }
@@ -764,7 +782,14 @@ mod tests {
                     .0
                     .into_iter()
                     .find(|f| f.id() == id)
-                    .unwrap_or_else(|| panic!("{id} is not in this build"));
+                    .unwrap_or_else(|| {
+                    // ⚠ Not a convenience unwrap. A replacement factory is run only after
+                    // `absent_targets` has cleared this scenario, so reaching this arm is the
+                    // applicability pre-check having been skipped — which is what it says.
+                    panic!(
+                        "{id} is not in this build — the applicability pre-check did not run"
+                    )
+                });
                 Box::new(ScaledMechanism::new(flow, factor)) as Box<dyn Flow>
             }),
         )
@@ -989,6 +1014,138 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         assert!(!col.values.is_empty(), "nothing was measured");
+    }
+
+    /// ⚠⚠ **The negative half of requirement 7, and the mutation battery is why it exists.**
+    /// `a_readout_folded_over_a_frozen_series_is_flagged` freezes leaf, stem *and* storage at
+    /// once, so it cannot tell `all` from `any` — turning the fold into `any` left the whole
+    /// suite green. The rule is that a readout is degenerate only when **every** series it
+    /// folds is frozen; `peak_w` reads three, and one frozen organ out of three is a live
+    /// number, not a warning.
+    ///
+    /// ⚠ Built rather than run, and the record says so: no composition in the tree freezes one
+    /// of the three organs alone (they share `biosphere.allocation` as their only writer, so
+    /// removing it freezes all three — measured in
+    /// `the_frozen_baselines_organ_series_each_move` below). This pins the **rule**; the mixed
+    /// case's reachability from a real season is unmeasured and may be nil.
+    #[test]
+    fn a_readout_is_frozen_only_when_every_series_it_folds_is() {
+        let spec = SPECS
+            .iter()
+            .find(|s| s.scenario == "open_season" && s.quantity.starts_with("peak W"))
+            .expect("the three-series readout is gone — this test has lost its subject");
+        assert_eq!(
+            (spec.series)(&stub(&[1.0, 1.0], &[2.0, 2.0], &[3.0, 3.0])).len(),
+            3,
+            "peak W no longer folds three series; the all-vs-any question moved with it"
+        );
+
+        let mixed = stub(&[1.0, 1.5], &[2.0, 2.0], &[3.0, 3.0]);
+        assert!(
+            !readout_is_frozen(spec, &mixed),
+            "a readout with one live series was called frozen — the fold is `any`, not `all`,              and every three-organ row would carry a warning while its number moved"
+        );
+
+        let all_frozen = stub(&[1.0, 1.0], &[2.0, 2.0], &[3.0, 3.0]);
+        assert!(
+            readout_is_frozen(spec, &all_frozen),
+            "nothing moved and the readout was not flagged"
+        );
+    }
+
+    /// A `Trajectory` carrying only the three organ series — enough for
+    /// [`readout_is_frozen`], which reads nothing else.
+    fn stub(leaf: &[f64], stem: &[f64], storage: &[f64]) -> Trajectory {
+        Trajectory {
+            scenario: DEFAULT_SCENARIO,
+            params: crate::biosphere::params::biosphere(),
+            leaf_c: leaf.to_vec(),
+            stem_c: stem.to_vec(),
+            storage_c: storage.to_vec(),
+            carbon_pool: Vec::new(),
+            consumer_c: Vec::new(),
+            rationed: 0,
+            events: 0,
+            years: 1,
+        }
+    }
+
+    /// Anti-vacuity for `all`: on the frozen tree each of the three organ series moves **on
+    /// its own**. If one were already frozen, `all` would be silently masking it and the
+    /// choice above would be hiding a real degeneracy rather than avoiding a false alarm.
+    #[test]
+    fn the_frozen_baselines_organ_series_each_move() {
+        let t = crate::biosphere::readouts::trajectory(
+            DEFAULT_SCENARIO,
+            1,
+            false,
+            &crate::biosphere::params::biosphere(),
+        );
+        for (name, series) in [
+            ("leaf_c", &t.leaf_c),
+            ("stem_c", &t.stem_c),
+            ("storage_c", &t.storage_c),
+        ] {
+            assert!(
+                !is_constant(series),
+                "{name} never moves in the frozen open season, so `all` is masking a                  permanently degenerate input to peak W"
+            );
+        }
+    }
+
+    /// ⚠ The applicability pre-check must cover **replacements**, not only drops. The battery
+    /// found this open: `Composition::targets` chaining nothing instead of the replacement
+    /// ids left the whole suite green, because every applicability test used a drop.
+    ///
+    /// `biosphere.decomposition` is absent from `open_season` and present in the chambers, so
+    /// one column carries both answers. The factor is 1.0 — the run must be *identical* where
+    /// it applies, so this test is about the cell's marking and nothing else.
+    #[test]
+    fn a_replacement_that_does_not_reach_a_scenario_is_marked_not_applicable() {
+        let comp = Composition {
+            replacements: vec![scaled("biosphere.decomposition", 1.0)],
+            ..Composition::default()
+        };
+        let (columns, text) = short_report("replace decomposition (x1)", comp);
+        let (base, col) = (&columns[0], &columns[1]);
+
+        let na: Vec<&str> = col
+            .not_applicable
+            .iter()
+            .map(|(i, _)| SPECS[*i].scenario)
+            .collect();
+        assert!(
+            na.contains(&"open_season"),
+            "open_season carries no decomposition and the cell was not marked n/a: {na:?}
+{text}"
+        );
+        assert!(
+            text.contains("NOT APPLICABLE"),
+            "the reader is not told why the cell is blank
+{text}"
+        );
+
+        // ⚠ And it must still MEASURE where the flow exists — an applicability check that
+        // marked every cell would pass the assertion above while measuring nothing.
+        let measured: Vec<&str> = col.values.iter().map(|(i, _)| SPECS[*i].scenario).collect();
+        assert!(
+            measured.contains(&"sealed_chamber"),
+            "the chambers do carry decomposition and nothing was measured there: {measured:?}"
+        );
+        for (i, v) in &col.values {
+            let b = base
+                .values
+                .iter()
+                .find(|(j, _)| j == i)
+                .map(|(_, b)| *b)
+                .expect("the baseline did not measure a row the variant did");
+            assert_eq!(
+                b.to_bits(),
+                v.to_bits(),
+                "{}: a x1.0 replacement moved the run",
+                SPECS[*i].quantity
+            );
+        }
     }
 
     /// A request that is wrong about *itself*, rather than about a scenario, still stops the
