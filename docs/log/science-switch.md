@@ -501,3 +501,69 @@ The first attempt at this census was captured through a background stream and ca
 only for failures. It was a truncated capture, not a truncated run. *A census that disagrees
 with the last recorded one by a factor of twenty-five is an instrument reading, not a result*;
 this one was re-run writing to a file of its own and reproduces 64 exactly.
+
+## The mutation battery — and the instrument was the first finding
+
+Eleven mutations, each a one-line edit to `rust/crates/domains/src/lab/{report,mechanism}.rs` or
+`biosphere/readouts.rs`, run one at a time against `cargo test --no-fail-fast -p domains` and
+restored with `git checkout --`. Driver: `M:\claud_projects\temp\science-switch-slice4\battery.py`.
+
+**The first run reported ten of eleven as "DID NOT COMPILE" and nothing as red.** That was the
+classifier, not the tree. It decided compilation with `^error(\[|:)`, and cargo prints
+`error: test failed, to rerun pass ...` once per test binary that *went red* — so the signature of
+a working guard was being read as a broken build. Seven genuine reds were thrown away by a regex.
+
+⚠ **The tell was available and I did not use it: a battery in which nothing reddens has almost
+certainly measured itself.** The battery now says so out loud — it appends
+`*** INSTRUMENT: not one mutation classified RED — read this as a broken classifier until proven
+otherwise ***` when a whole run finds no red — and classifies compilation on `error[E####]` /
+`could not compile` alone. This is the *third* instrument failure in slice 4 (after the truncated
+census and the heredoc that ate its own backslashes); all three shared one shape: a reading that
+disagreed with the last recorded one, accepted instead of questioned.
+
+Re-classified from the logs already on disk — no re-run needed for the eight that had reported —
+the true first tally was **7 red, 1 that genuinely did not compile, 3 with no red**.
+
+### The one that never ran
+
+**M5** (skip the applicability pre-check) was written as `Some(_) => Vec::new(),`, which leaves
+the element type uninferable: `error[E0282]`. The mutation had therefore measured **nothing** in
+any earlier run, while reading in the summary exactly like a red-free result. With
+`Vec::<String>::new()` it compiles and reddens two tests.
+
+### The two real holes, and what closed them
+
+**M10 — a replacement's target was never checked for applicability.** Chaining
+`std::iter::empty()` instead of the replacement ids left the suite green, because every
+applicability test in the slice used a *drop*. Closed by
+`a_replacement_that_does_not_reach_a_scenario_is_marked_not_applicable`: it replaces
+`biosphere.decomposition` (absent from `open_season`, present in both chambers) so one column
+carries a `NOT APPLICABLE` marking **and** a live measurement at once, and asserts the specific
+marking rather than `is_ok()`/`is_err()` — the same failure the slice-0–4 record already names.
+
+**M11 — `any` in place of `all` in the frozen-readout flag.** The only constancy test froze all
+three of `peak W`'s organ series together, so it could not tell the two apart. The predicate is
+now a named function, `readout_is_frozen`, precisely so the rule has a subject a test can point
+at, and `a_readout_is_frozen_only_when_every_series_it_folds_is` pins the mixed case over a
+constructed trajectory (one organ frozen, two moving → **not** flagged).
+
+⚠ That test is evidence about the **rule**, not about a run, and it says so: no composition on
+this tree is known to freeze one organ and not its siblings. The anti-vacuity partner
+(`the_frozen_baselines_organ_series_each_move`) checks the other end — each of the three organ
+series moves in the frozen baseline, so `all` is not quietly riding on a permanent degeneracy.
+
+### The one that stays open, and is not a gap
+
+**M2** — treating an *empty* series as constant — does not redden, and no test was written for
+it. It is **unreachable, not untested**: a composition rewrites the flow list, but stock presence
+and series length come from `build_season_with`'s compartments, so no composition can produce an
+empty series. `None => false` stays as a documented dead arm. Inventing a test here would have
+rebuilt the defect the slice-2/3 record already names — a test immune by construction to the
+thing it claims to check.
+
+### After the fixes
+
+`M5`, `M10`, `M11` all red on re-run (`rerun.log`), so the battery stands at **10 red of 11, one
+unreachable**. `cargo test --workspace --no-fail-fast` = 64 binaries, **1098 passed**, 0 failed
+(1095 before; exactly the three new tests). `cargo clippy --all-targets -- -D warnings` clean.
+Working tree clean after restore, checked by the battery itself.
