@@ -583,6 +583,8 @@ mutation is measured against the same tree.
 only *uncovered* or *unreachable*, but **the mutation never applied**. The script asserts its
 needle matched and prints `DID NOT APPLY … instrument failure, not a pass` when it does not —
 checked here rather than assumed, because M11's needle had already gone stale under this slice's
-own refactor. Rule that one out first; it is the only one that is a fact about the instrument. `cargo test --workspace --no-fail-fast` = 64 binaries, **1098 passed**, 0 failed
+own refactor. Rule that one out first; it is the only one that is a fact about the instrument.
+
+`cargo test --workspace --no-fail-fast` = 64 binaries, **1098 passed**, 0 failed
 (1095 before; exactly the three new tests). `cargo clippy --all-targets -- -D warnings` clean.
 Working tree clean after restore, checked by the battery itself.
