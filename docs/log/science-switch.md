@@ -269,3 +269,72 @@ two are asserted to agree. They are different axes: `Flow::type_name` is hand-wr
 (*"deliberately not defaulted from `std::any::type_name`"*), so an `impl Flow for AltPhotosynthesis`
 returning `"CanopyAssimilation"` — a copy-paste, or a disguise — walks straight past a
 struct-name-derived roster wearing a frozen name. A disagreement is itself the finding.
+
+## The battery: five mutations, five reds — and the battery itself was the defect
+
+Run 2026-08-31 from `rust/`, script kept at
+`M:\claud_projects\temp\science-switch-mutations\run.sh`. Every mutation reddened its intended
+gate **by name**:
+
+**M1 — the composer keeps the *original* box (the argument is never inserted).** Reddens
+`a_replacement_takes_its_targets_slot`, `the_general_composer_takes_all_three_at_once` and the
+run-level `a_halved_mechanism_moves_the_run_in_the_direction_the_science_says`.
+
+**M2 — the target is dropped and nothing inserted.** Reddens those, plus
+`a_no_op_replacement_is_invisible_in_the_inventory` and **both** bit-identity controls.
+
+**M3 — a mis-targeted replacement returns `Ok`.** Reddens
+`a_replacement_that_matches_nothing_is_an_error`, and that one alone.
+
+**M4 — `ScaledMechanism` constructed in the spine.** Reddens
+`no_lab_mechanism_is_named_under_the_spine`, and that one alone.
+
+**M5 — a lab type reports a frozen type's name.** Reddens
+`every_lab_flow_type_reports_its_own_name`, plus the spine and **committed-manifest** scans.
+
+M5 is the measurement behind *failure 2* above: with `InertFlow` renamed to `"Decomposition"`,
+`no_committed_manifest_names_a_lab_mechanism` reddens because the frozen manifest really does
+name that type. The manifest half is not decoration.
+
+⚠ **A claim above is corrected by M1.** `a_scaled_replacement_halves_its_targets_legs_exactly`
+constructs the wrapper and evaluates it **directly** — so it is evidence about the wrapper's
+arithmetic, and is immune to a broken composer by construction. It stayed green under M1 and M2,
+correctly. The *insertion* is carried by the registry `type_name` check and by the run-level
+direction test, both of which M1 does redden. The coverage is complete; the sentence describing
+it was not.
+
+## ⚠⚠ The battery destroyed the work it was written to check, and then reported nothing
+
+Both halves are instrument defects, and the second is the transferable one.
+
+**1 — a revert-first battery ran against an uncommitted subject.** The script opened with
+`git checkout -- <mechanism.rs> <system.rs>` so each mutation would start clean. The 467 new
+lines in `mechanism.rs` had never been committed, so that first line deleted them. The two new
+test files survived only because they were untracked. Recovery was a replay of the nine `Edit`
+operations out of the session transcript onto the reverted file — each `old_string` matched
+exactly once, which is what makes the reconstruction sound — plus one `sed` rename found the same
+way; `rustfmt` accounted for the only remaining difference, and the surviving tests (24, all
+green) are the independent oracle. The script now snapshots to a temp copy, restores from that,
+and **refuses to run at all if either target is dirty in git**.
+
+**2 — the filter that greps for reds cannot tell "no failures" from "no run."** After the revert,
+the two test files referenced functions that no longer existed, so nothing compiled. The filter
+matched only `test result`, `panicked` and `assertion` lines, and compile errors match none of
+those — so the battery printed **five headers and no other output**, which reads as five clean
+runs. This is the same family as CLAUDE.md's `--no-fail-fast` warning (*a truncated run reports
+fewer reds, which reads as "the new tests are inert"*), and it is worse: there the count is low,
+here it is silent. The script now (a) names a build failure explicitly instead of dropping it,
+(b) treats a run that emitted **no `test result:` line at all** as a hard instrument error, and
+(c) verifies each mutation actually changed the file, since a `sed` that matches nothing runs the
+original code and its green means nothing.
+
+**Nothing else moved.** `cargo test --workspace --no-fail-fast` green, `cargo clippy
+--all-targets -- -D warnings` clean, and the 19 goldens byte-identical — predicted before running
+on the grounds that the seam is post-assembly and no canonical scenario reaches `lab::mechanism`.
+
+⚠ **It bit a third time in the same session, in the verification itself.** The full-suite command
+was written as `cargo test --workspace --no-fail-fast | grep … | head -20`, and the workspace has
+**60** test binaries — so the stream was cut at 20 and the pipeline's exit code was the `echo`'s,
+not cargo's. Counting the result lines caught it; reading them would not have. The rule the two
+defects above share, stated once: **a check must report how much it looked at, not only what it
+found.**
