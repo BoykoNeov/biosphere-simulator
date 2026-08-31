@@ -16,8 +16,14 @@ which changed three other sections), and §7 **question 2**, the science-vs-prod
 Struck-through text below is kept deliberately: the reasoning that turned out to be wrong is
 the most useful part of a plan doc to leave visible.
 
-⚠ **Step 0 is complete. The one open item in this doc is §7 question 1 — the step decision,
-which is the user's.**
+~~⚠ **Step 0 is complete. The one open item in this doc is §7 question 1 — the step decision,~~
+~~which is the user's.**~~
+
+⚠ **STALE since 2026-08-14, marked 2026-08-31: the step decision was TAKEN** (`dt = ¼`, the
+user's *"quarter the step"*), so this doc has no open item left in the sense this line means.
+Read §4 and §6b as a **menu that other work has been eating from**, not as a live queue: its
+first bullet was struck below after its premise was found sixteen days dead. Nothing here
+re-checks itself, and a forward-looking doc goes stale from the front.
 
 ---
 
@@ -288,14 +294,40 @@ These should ride the *same* unfreeze, not pay for a second one:
 
 ## 4. What does not touch the gate and can move now
 
-- ⚠ **The documented allowance — do this first, regardless of both answers in section 7.**
-  A known-deviation note in `docs/biosphere-reference.md`: *the shipped step puts the sealed
-  chamber's season-low CO₂ below the compensation point (57.9 ppm measured against 61.07),
-  and 24 % below the converged 76.3*, with the measured numbers and the pointer to
-  `log/co2-enrichment-margin.md`. **The freeze's prose half is ungated, so this moves no hash
-  and needs no ceremony** — it is free. It converts a silent wrong answer into a visible one
-  while the decision is pending, which is the honest version of what the tree does today.
-  ⚠ Being free is exactly why it is easy to keep deferring; it is listed first on purpose.
+- ~~⚠ **The documented allowance — do this first, regardless of both answers in section 7.**~~
+  ~~A known-deviation note in `docs/biosphere-reference.md`: *the shipped step puts the sealed~~
+  ~~chamber's season-low CO₂ below the compensation point (57.9 ppm measured against 61.07),~~
+  ~~and 24 % below the converged 76.3*, with the measured numbers and the pointer to~~
+  ~~`log/co2-enrichment-margin.md`. **The freeze's prose half is ungated, so this moves no hash~~
+  ~~and needs no ceremony** — it is free. It converts a silent wrong answer into a visible one~~
+  ~~while the decision is pending, which is the honest version of what the tree does today.~~
+  ~~⚠ Being free is exactly why it is easy to keep deferring; it is listed first on purpose.~~
+
+  ⚠⚠ **STRUCK 2026-08-31: there is no deviation to document, and writing the note would have
+  put a false statement into the frozen reference.** Taken as the next item on the user's call,
+  and the first thing the target file said was that it was already discharged. Three reasons,
+  each independently fatal to the bullet:
+
+  1. **Its premise ended the day after it was written.** *"While the decision is pending"* — the
+     §7 step decision landed 2026-08-14 (`dt = 1 → ¼`) and *fixed* the crossing rather than
+     documenting it. This bullet says it holds *"regardless of both answers in section 7"*, and
+     the §7 answer is exactly what discharged it. **An item written to be answer-independent was
+     the one the answer cancelled** — because it was scoped to the waiting, not to the defect.
+  2. **Its numbers name the one scenario that never crossed.** `57.9 ppm` is the sealed chamber
+     driven through an unconditional re-sow no golden performs; the crossing was the *perennial*
+     chamber's, at 56.03. Corrected in the freeze doc on 2026-08-14 — this bullet inherited the
+     locus error and outlived the correction by seventeen days.
+  3. **Measured, not assumed** (shipped tree `7f60442`): sealed 71.44, perennial 70.25, consumer
+     73.34, both long horizons 70.25 / 73.34, against a 61.07 floor. All five clear, all five
+     identical to the freeze doc's `cc44b41` table, and all five gated in Rust.
+
+  ⚠ **What the visit did find, and it is the free work this bullet was reaching for:** the
+  freeze doc's band section pointed at `tests/test_co2_compensation_band.py` and offered
+  *"`git diff src/` empty"* as its evidence — both naming a tree S6 deleted on 2026-08-27 — and
+  the **five-margin pin did not survive that deletion**, so nothing in `rust/` now records how
+  near any of the five sits to its floor. Marked in place, with the re-measurement, at
+  `docs/biosphere-reference.md` (*"RE-CHECKED 2026-08-31"*). The pin itself is a **candidate,
+  not built**: a new assertion on a frozen observable is not a prose correction.
 - **`Γ*`'s citation.** The floor this whole diagnosis is measured against is one of
   `photosynthesis.yaml`'s 13 `TODO(cite)` entries. The measurement survives any plausible
   re-value (a 3× crossing is robust), but the *number* 61.07 ppm should not appear in a

@@ -184,9 +184,17 @@ scenario, which is also the form that does not need the diagnosis to have been r
 `science_bands` gains five entries — `sealed_chamber`, `perennial_chamber`,
 `consumer_chamber`, `perennial_long_horizon`, `consumer_long_horizon` — each asserting
 *season-low chamber CO₂ > `Γ*/ci_ratio`*, at
-[`tests/test_co2_compensation_band.py`](../tests/test_co2_compensation_band.py). **A
+~~[`tests/test_co2_compensation_band.py`](../tests/test_co2_compensation_band.py)~~. **A
 schema-free unfreeze: five manifest entries, no value moved, no golden regenerated, no
-`src/` change** (`git diff src/` empty). Measured at the shipped step:
+~~`src/`~~ change** (~~`git diff src/` empty~~). Measured at the shipped step:
+
+> ⚠ **Both struck spans name a tree that no longer exists** (marked 2026-08-31). S6 deleted the
+> Python checker on 2026-08-27, `tests/test_co2_compensation_band.py` with it, and `src/` with
+> it — so this section's own evidence sentence (*"`git diff src/` empty"*) is now vacuous rather
+> than false, which is the worse of the two. The band's live home is
+> [`rust/crates/domains/src/biosphere/science_gates.rs`](../rust/crates/domains/src/biosphere/science_gates.rs),
+> five gates plus both tripwires; what did **not** survive the move is the margin pin — see the
+> re-check at the end of this section.
 
 | scenario | driver | season-low CO₂ | margin |
 |---|---|---|---|
@@ -280,6 +288,55 @@ once. The band itself is one-sided (`>`) on purpose — it must survive the next
 mechanism's golden movement without being re-pinned — with the five margins pinned
 loosely and separately, because *an inequality that passes says nothing about how nearly
 it failed*.
+
+##### ✅ RE-CHECKED 2026-08-31 — every value above reproduces EXACTLY, and the pin that owned them is GONE
+
+Re-measured on the shipped tree (`7f60442`), each scenario driven the way its own golden drives
+it. Four of the five through the lab report's frozen column
+(`cargo run --release -q -p domains --example value_switch -- extinction_coef=0.68 --long`); the
+fifth through a throwaway example, because **the report's readout roster has no row for
+`consumer_long_horizon`** — four of the five band scenarios are printable, not five.
+
+| scenario | season-low CO₂ | margin | vs the `cc44b41` table above |
+|---|---|---|---|
+| `sealed_chamber` | 71.435803 ppm | 1.1697× | **identical** |
+| `perennial_chamber` | 70.252606 | 1.1503× | **identical** |
+| `consumer_chamber` | 73.338613 | 1.2009× | **identical** |
+| `perennial_long_horizon` | 70.252606 | 1.1503× | **identical** |
+| `consumer_long_horizon` | 73.338613 | 1.2009× | **identical** |
+
+Floor `61.071429 ppm`. Sixteen days and two unfreezes later the table above is exact to every
+digit it prints — recorded because this is the one section whose own lesson is that *a value
+written into prose acquires no owner*, and a re-measurement that **confirms** is the only thing
+that discharges that, cheaply, without waiting for the next unfreeze to discover otherwise.
+
+⚠⚠ **The margin pin did NOT survive the Python deletion, and nothing replaced it.**
+`test_the_five_margins_are_pinned_not_merely_positive` — the guard the section above singles out
+as *"the pin written for exactly this event DID fire"* — lived only in
+`tests/test_co2_compensation_band.py`, deleted with the rest of the checker on 2026-08-27. C4
+moved the **band** into Rust and both tripwires with it; the classification table that authorised
+the move named the residue as *"the probe arithmetic"* and the margin pin went with it. Today
+`rust/crates/domains/src/biosphere/science_gates.rs` carries the five one-sided `min > floor`
+gates, `the_floor_is_where_the_frozen_params_put_it` and
+`the_shipped_floor_is_the_conservative_one_against_the_cited_route`, and **no assertion anywhere
+in `rust/` records how NEAR any of the five sits to the floor.**
+
+⚠ **Stated at its real size — it is closer to a supersession than to a loss, and the difference
+is which of the pin's two jobs is unowned.** The pin did two things:
+
+* **detect silent degradation.** Mostly re-owned, but not by a pin on this quantity: all five
+  scenarios have byte-frozen goldens, so a change that moves the run reddens one. ⚠ Those
+  goldens are **final-state snapshots** (`perennial_chamber_state.json` is the state at
+  `n = 6100`), not trajectories — the *trough* is not among the pinned quantities, and the
+  one-sided band is what stands between the season-low and the floor. A change halving every
+  margin still leaves all five gates green, which is the exact hazard
+  `docs/log/co2-compensation-band.md` wrote the pin to cover.
+* **make the number visible at unfreeze time.** *Unowned.* The lab report prints it on demand
+  for four of the five, and **nothing requires anyone to run it** during a ceremony.
+
+Not built here: writing a five-margin characterisation pin in Rust is a new assertion on a
+frozen contract's observable, not a prose correction, so it is named as a candidate rather than
+folded into a doc pass. What is asserted here is only the measurement.
 
 ### The flow set + the aux processes
 
