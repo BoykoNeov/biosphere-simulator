@@ -1,6 +1,6 @@
 # The science switch — swapping a MECHANISM, not a value
 
-> ## STATUS 2026-08-31 — SLICES 0 AND 1 BUILT. The pricing below stands; §7 is the queue.
+> ## STATUS 2026-08-31 — SLICES 0, 1, 2 AND 3 BUILT. The pricing below stands; §7 is the queue.
 >
 > This began as the **pricing pass** the value-switch record left open — the user's charge of
 > 2026-08-16 was a harness *"that permits easy toggle of parameters and science"*, and the
@@ -15,9 +15,23 @@
 > * **Slice 0 — BUILT.** `tests/scenario_flag_types.rs`: no flag setting wires a type outside
 >   the canonical union, with the roster derived from the struct declaration. `photoperiod`
 >   measured at **zero** gated types, which is §2B's "four, not five" made a measurement.
-> * **Slices 2, 3, 3b, 4 — NOT built**, unchanged and still correctly priced: §2C measured that
->   the tree holds no second form of any biosphere process, so the replace/add composers would
->   have nothing to substitute. They land with the first pair, per §8.
+> * **Slices 2 and 3 — BUILT** (a second batch the same day, on the user's call).
+>   `build_season_replacing`, `build_season_adding`, and the general `build_season_composed`
+>   behind all three; `ScaledMechanism` as the scaled instrument; `tests/mechanism_switch_run.rs`
+>   for the two constructional controls and both run directions;
+>   `tests/lab_only_mechanisms.rs` for §6's reachability property. ⚠ **This does not contradict
+>   §2C's "the seam and its first pair must land together".** §8's resolution is that the first
+>   pair is the pair of *constructional* controls — the no-op and the scaled replacement — and
+>   both are available on the frozen tree today. What is still absent is a *scientific* pair.
+>   ⚠ And §8's ranking of those two controls was **wrong by omission**: they are not equally
+>   strong, and the record says which is which (`docs/log/science-switch.md`).
+> * **Slices 3b and 4 — NOT built.** 3b needs a second form of some process **authored**, which
+>   is a science decision and the user's. 4 (the report rows) was left deliberately: `report`
+>   measures through `readouts::trajectory`, which is shared with the science gates and whose
+>   own header names the failure a mechanism swap uniquely causes — a swap can remove a stock's
+>   only writer, the series goes empty, and a `min` fold over an empty series returns +infinity,
+>   which reads as *"comfortably above the compensation point"*. That is a slice with its own
+>   guard, not a row.
 >
 > No longer forward-looking, so it is **indexed normally** in `docs/post-roadmap-log.md` and
 > its exemption paragraph there was deleted in the landing commit — the rule that an exemption
@@ -253,6 +267,13 @@ than an archived measurement:**
 * **the scaled replacement** — wrap one flow in `ScaledFlow` (already written, in
   `station::perturbations`) at a known factor; at 1.0 it must be bit-identical, at 0.5 the
   affected legs must halve exactly on the first step. Arithmetic, not archive.
+  ⚠ **CORRECTED 2026-08-31 when it was built: that instrument is not reachable, twice over.**
+  `station` depends on `domains`, so the dependency runs the wrong way, and that wrapper reads
+  its factor from a **forcing var** — using it would mean adding a forcing to the frozen
+  weather resolver before a lab replacement could run at all. The built instrument is
+  `lab::mechanism::ScaledMechanism`, a plain constant factor. *An instrument named in a plan
+  is a claim about a crate graph, and this one was written from the shape of the code rather
+  than from its dependencies.*
 
 Only after both pass does a *scientific* pair mean anything. Candidates, all questions:
 big-leaf vs layered per above, the twice-refused soil fractionation (single vs multi-pool

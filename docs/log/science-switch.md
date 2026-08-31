@@ -162,3 +162,110 @@ message was not captured** — the log was filtered to `test result` lines — s
 unknown rather than diagnosed, and it is written here as an unknown. Nothing in this batch
 compiles into that crate: the edits between the clean run and the flake were two `domains` test
 binaries and prose.
+
+---
+
+## **The science switch — slices 2 and 3** (the replace/add composers, and the two answers arithmetic fixes in advance)
+
+**BUILT 2026-08-31**, a second batch the same day, on the user's call ("finish the mechanism-swap
+harness"). Slices 0 and 1 are above; this is the substitution half.
+
+⚠ **This is not the "seam without a second side" §2C warned about.** That section's rule is *the
+seam and its first pair must land together, or the seam proves nothing* — and §8 answers what the
+first pair is: **the two constructional controls**, not a science pair. Both are available on the
+frozen tree, so the seam lands with them and with nothing scientific claimed.
+
+## What was built
+
+Three named composers over one public body, in `domains::lab::mechanism`:
+
+* `build_season_without(scenario, p, &[ids])` — the knockout, from slice 1;
+* `build_season_replacing(scenario, p, vec![(id, flow)])` — one flow out, one in, **same id**;
+* `build_season_adding(scenario, p, vec![flow])` — a process the frozen build does not carry;
+* `build_season_composed(scenario, p, drops, replacements, additions)` — all three at once, and
+  **public on purpose**: the collisions *between* the composers are checkable only here, and a
+  guard no caller can reach is a guard no mutation can redden. It is also the shape a real A/B
+  pair takes (swap the form, drop the process it makes redundant).
+
+Plus `ScaledMechanism`, a wrapper multiplying every leg by a constant. It scales the *whole*
+flow, so the result stays internally balanced; `id`/`priority` delegate (so the wrapper keeps the
+wrapped flow's slot in the id-sorted reduction order) and `type_name` does not, which is what
+makes a replacement visible in an inventory without running anything.
+
+**A replacement must carry its target's id.** A renaming replacement is refused with an error
+saying what to do instead: a rename is a drop plus an add. Two changes wearing one name is how
+"the new form of X did this" gets attributed to a difference that was partly a different process
+arriving.
+
+## ⚠ The finding: the instrument the plan named does not exist for this caller
+
+§8 said to wrap the target in `station::perturbations::ScaledFlow`, *"already written"*. It is
+unreachable, for two independent reasons, and either alone is fatal:
+
+* **the dependency runs the wrong way** — `station` depends on `domains`, so the lab cannot see it;
+* **it reads its factor from a forcing var**, so using it would mean adding a forcing to the frozen
+  weather resolver before a lab replacement could run at all.
+
+*An instrument named in a plan is a claim about a crate graph.* That one was written from the
+shape of the code — the wrapper does exactly the right thing — without checking which side of the
+graph it sits on. The plan's §8 now carries the correction beside the original sentence.
+
+⚠ And a third instance of this same replace-a-flow-by-id shape already existed and was found only
+while looking for the second: `domains::ulp_probe::nudge_radiator`, for thermal. Three hand-rolled
+bodies now (that one, `station::with_radiator_failure`, and this). A shared primitive belongs in
+`simcore::registry`; moving one is not this batch, and it is written down here so the next reader
+does not have to re-find it.
+
+## ⚠⚠ The two controls are NOT equally strong, and §8 did not say so
+
+This is the batch's main correction, and it came from review before the code was written.
+
+* **The scaled replacement is the evidence.** At 1.0 the run is bit-identical (`x · 1.0 == x`); at
+  0.5 the target's legs halve **exactly** (both factors are exact in binary floating point) and
+  the run moves.
+* **The no-op replacement — replace a flow with a freshly built identical instance — is nearly
+  blind.** A composer that locates the target, drops it and quietly keeps the **original** box
+  passes it green: the argument never inserted, the run unchanged, and even the registry's type
+  names identical either way. It is the *"and nothing else moved"* half, not the evidence.
+
+Both are kept and both are labelled in place, the same treatment slice 1's empty-drop round trip
+got. Two cheap additions make the insertion directly observable without a run: after a scaled
+replacement the target's slot must report `type_name == "ScaledMechanism"`, and the baseline's
+must not.
+
+⚠ **"A freshly built identical instance" has only one honest source**: a *second* ordinary build.
+The flows are constructed inside `compartments`, which is module-private to `system.rs` — so
+building one by hand would be the second assembly body slice 1 just deleted. Same body, run
+twice, which is also part of why this control is the weaker one.
+
+⚠ **The halving control asserts its subject is non-zero.** `maintenance_respiration` was chosen
+because standing biomass burns from the first step, and the test asserts a non-zero leg before
+comparing halves — `0.0 == 0.5 · 0.0` passes vacuously, which is exactly the failure the ULP
+probe logged for weeks when a shimmed function the carbon path no longer called measured 0.0.
+
+## The gate: what a source scan can see that a manifest cannot
+
+§6's property is *every alternative mechanism is reachable only through the lab*.
+`tests/lab_only_mechanisms.rs` is the gate, and **the obvious half of it was measured and left
+out**: "build the four canonical scenarios and assert no lab type is in the inventory" is
+redundant — `freeze_manifest::inventory()` walks exactly those four builds and
+`tests/manifest_writer.rs` compares the written manifest byte for byte, so a lab type reaching a
+canonical build already reddens that gate. *A redundant guard has no mutation that reddens.*
+
+Two failures survive that reasoning and are what the file gates:
+
+1. **a lab type constructed in spine code on a path no canonical scenario reaches** — behind a
+   flag no frozen scenario sets, or in a helper nothing calls yet. Invisible to every run and to
+   every manifest; visible only to a scan of the tree;
+2. **a lab type wired in *and* the manifest regenerated.** The manifest is *derived*, so it
+   follows the code silently — the auto-follow hazard `locked_dt_days` is hand-written to avoid.
+   The committed manifests are therefore read as **text** and asserted not to name a lab type.
+
+⚠⚠ **Failure 2 was measured, not argued** (below). It is the one that would otherwise pass the
+whole repo.
+
+**The roster is derived from the `type_name` string literal, not from the struct name**, and the
+two are asserted to agree. They are different axes: `Flow::type_name` is hand-written on purpose
+(*"deliberately not defaulted from `std::any::type_name`"*), so an `impl Flow for AltPhotosynthesis`
+returning `"CanopyAssimilation"` — a copy-paste, or a disguise — walks straight past a
+struct-name-derived roster wearing a frozen name. A disagreement is itself the finding.

@@ -1,9 +1,10 @@
-//! The **mechanism-switch lab**, first composer — a season with named flows *removed*.
+//! The **mechanism-switch lab** — a season with named flows removed, replaced or added.
 //!
-//! Plan: the science-switch plan (`docs/plans/post-roadmap-science-switch.md`), slice 1.
-//! Where [`super::biosphere_with`] substitutes a **number** before assembly, this removes a
-//! **process** after it: `build_season_with` builds the frozen machine, and the composer
-//! takes one `Box<dyn Flow>` back out of the built [`Registry`].
+//! Plan: the science-switch plan (`docs/plans/post-roadmap-science-switch.md`), slices 1
+//! (the knockout) and 2 + 3 (the replace/add composers and their two constructional
+//! controls). Where [`super::biosphere_with`] substitutes a **number** before assembly, this
+//! changes a **process** after it: `build_season_with` builds the frozen machine, and the
+//! composers move `Box<dyn Flow>`s in and out of the built [`Registry`].
 //!
 //! # Why this is a production seam and not a test helper
 //!
@@ -29,18 +30,124 @@
 //! `biosphere_with(&[])` and `params::biosphere()` reach one object down two independent
 //! routes. Here there is no second route, so the gate is the source scan.
 //!
+//! # The three composers are one body, and the collisions between them are errors
+//!
+//! [`build_season_without`], [`build_season_replacing`] and [`build_season_adding`] are thin
+//! callers of one [`build_season_composed`], for the reason slice 1 existed at all: three
+//! copies of "take the registry apart, change one thing, rebuild" is three places to diverge.
+//! Composing them in one call also makes a family of silent no-ops expressible — drop *and*
+//! replace the same id, add an id that is already there, name one target twice — and every one
+//! of them is an error rather than a run whose difference the caller misattributes. ⚠ That
+//! general entry point is **public rather than private on purpose**: those collision guards
+//! are reachable only through it, and a guard no caller can reach is a guard no mutation can
+//! redden. **A replacement must carry its target's id**: renaming a process is a drop plus an
+//! add, and saying so keeps "the composed run differs from the baseline **in one named
+//! place**" true by construction.
+//!
+//! # ⚠ Which control is the evidence, and which one is nearly blind
+//!
+//! §8 of the plan asks for two answers known *by construction*, and they are not equal:
+//!
+//! * **the scaled replacement is the evidence.** [`ScaledMechanism`] at 0.5 must halve the
+//!   target's legs exactly and move the run; at 1.0 it must reproduce the baseline bit for
+//!   bit (`x · 1.0 == x`). Only this one can see a composer that locates the target, drops it,
+//!   and quietly keeps the **original** box — the argument never inserted;
+//! * **the no-op replacement is the "and nothing else moved" half.** Replacing a flow with a
+//!   freshly built identical instance must be bit-identical — but a composer that ignored the
+//!   argument passes it green, and even the registry's own type names are unchanged either
+//!   way. It is kept and labelled, exactly like the empty-drop round trip above it.
+//!
+//! # ⚠ Why the scaler is written here rather than reused from `station`
+//!
+//! The plan says to wrap a flow in `station::perturbations::ScaledFlow`, "already written".
+//! It is not reachable and would not fit if it were: `station` depends on `domains`, so the
+//! dependency runs the wrong way, and that wrapper reads its factor from a **forcing var**,
+//! which a lab replacement would have to add to the frozen weather resolver before it could
+//! run. [`ScaledMechanism`] takes a plain constant instead and needs no resolver change.
+//! (`domains::ulp_probe::nudge_radiator` is the third hand-rolled instance of this same
+//! replace-a-flow-by-id shape, for thermal. A shared primitive would belong in
+//! `simcore::registry`, and moving one is not this batch.)
+//!
 //! # This module takes no decision and endorses no science
 //!
 //! A knockout regenerates evidence about a mechanism's contribution. It says nothing about
 //! whether the mechanism should be there — the same standing `lab` has had since the value
-//! half (`docs/log/value-switch-harness.md`).
+//! half (`docs/log/value-switch-harness.md`). ⚠ The tree still holds **no second form of any
+//! biosphere process** (§2C of the plan, measured), so nothing here has yet been pointed at a
+//! scientific question; the composers' answers so far are the two that arithmetic fixes in
+//! advance.
 
 use crate::biosphere::params::BiosphereParams;
 use crate::biosphere::system::{build_season_with, SeasonScenario};
+use simcore::environment::Environment;
 use simcore::error::SimError;
-use simcore::flow::Flow;
+use simcore::flow::{Flow, FlowResult, Leg};
 use simcore::registry::Registry;
 use simcore::state::State;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Wrap a flow, multiplying **every** leg by a constant `factor` — the lab's scaled
+/// replacement, and the one instrument whose answer arithmetic fixes in advance.
+///
+/// It scales the whole flow, so the result stays internally balanced
+/// (`Σ (α·leg) = α·Σ leg = 0` per quantity) — "arbitration scales the *whole* flow", applied
+/// as an experiment rather than as a backstop. `factor = 1.0` reproduces the wrapped flow
+/// **bit-identically** (`x · 1.0 == x`) and `0.5` halves each leg exactly (both are exact in
+/// binary floating point, which is why the controls use those two and not, say, 0.9).
+///
+/// `id` and `priority` delegate, so [`Registry::new`] sorts the wrapper into the wrapped
+/// flow's slot and the reduction order is untouched. `type_name` does **not** delegate — a
+/// wrapper reports its own name (the [`Flow::type_name`] contract), which is what makes a
+/// scaled replacement visible in a registry inventory without running anything, and what
+/// `tests/lab_only_mechanisms.rs` scans for.
+///
+/// ⚠ A non-finite `factor` is not rejected here; it surfaces as a [`Leg::new`] validation
+/// error at the first `evaluate`, which is the same guard a non-finite rate law meets.
+pub struct ScaledMechanism {
+    inner: Box<dyn Flow>,
+    factor: f64,
+}
+
+impl ScaledMechanism {
+    /// Wrap `inner`, scaling all its legs by `factor`.
+    pub fn new(inner: Box<dyn Flow>, factor: f64) -> ScaledMechanism {
+        ScaledMechanism { inner, factor }
+    }
+
+    /// The constant every leg is multiplied by.
+    pub fn factor(&self) -> f64 {
+        self.factor
+    }
+}
+
+impl Flow for ScaledMechanism {
+    fn type_name(&self) -> &'static str {
+        "ScaledMechanism"
+    }
+
+    fn id(&self) -> &str {
+        self.inner.id()
+    }
+
+    fn priority(&self) -> i64 {
+        self.inner.priority()
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<FlowResult, SimError> {
+        let result = self.inner.evaluate(snapshot, env, dt)?;
+        let legs: Vec<Leg> = result
+            .legs
+            .iter()
+            .map(|leg| Leg::new(leg.stock.clone(), leg.amount * self.factor))
+            .collect::<Result<Vec<_>, _>>()?;
+        FlowResult::new(legs)
+    }
+}
 
 /// The season with every flow in `drop_ids` removed from the assembled registry.
 ///
@@ -71,31 +178,162 @@ pub fn build_season_without(
     p: &BiosphereParams,
     drop_ids: &[&str],
 ) -> Result<(State, Registry), SimError> {
-    for (i, id) in drop_ids.iter().enumerate() {
-        if drop_ids[..i].contains(id) {
+    build_season_composed(scenario, p, drop_ids, Vec::new(), Vec::new())
+}
+
+/// The season with each named flow **replaced** by the flow given for it.
+///
+/// The replacement carries the target's id (enforced below), so it takes the target's slot in
+/// the id-sorted reduction order and the run differs in exactly one named place. This is the
+/// composer an alternative *form* of a process arrives through — and the tree has none today
+/// (§2C), so its live callers are the two constructional controls of
+/// `tests/mechanism_switch_run.rs`: a freshly built identical instance (bit-identical) and a
+/// [`ScaledMechanism`] (halves its target's legs exactly).
+///
+/// # ⚠ Same id, or it is a drop plus an add
+///
+/// A replacement whose id differs from its target is refused. It would be two changes wearing
+/// one name — one process gone and a differently-identified one arrived — and the caller
+/// would attribute the whole difference to "the new form of X". Spell it as
+/// [`build_season_without`] plus [`build_season_adding`] and the two changes stay countable.
+///
+/// A target that matches nothing is an error, for the reason [`build_season_without`] gives:
+/// a swap that misses is read back as the baseline.
+pub fn build_season_replacing(
+    scenario: &SeasonScenario,
+    p: &BiosphereParams,
+    replacements: Vec<(&str, Box<dyn Flow>)>,
+) -> Result<(State, Registry), SimError> {
+    build_season_composed(scenario, p, &[], replacements, Vec::new())
+}
+
+/// The season with extra flows **added** to the assembled registry.
+///
+/// The "add one process" half of the plan's §4 — a mechanism the frozen build does not carry
+/// at all. An id already in this scenario's registry is refused: that is a replacement, and
+/// letting it through would mean [`Registry::new`]'s duplicate-id rejection reporting the
+/// composition's mistake in the engine's words rather than the lab's.
+///
+/// ⚠ **Flows only, over the frozen stock set.** An addition whose legs touch a stock the
+/// season does not have fails at the first step, and adding the stock is deliberately not
+/// offered here: it changes what conservation is asserted over, which is a bigger claim than
+/// a mechanism swap. `station::perturbations::with_station_leak` is the shape that does it,
+/// and it is a station-layer composer with no golden behind it.
+pub fn build_season_adding(
+    scenario: &SeasonScenario,
+    p: &BiosphereParams,
+    additions: Vec<Box<dyn Flow>>,
+) -> Result<(State, Registry), SimError> {
+    build_season_composed(scenario, p, &[], Vec::new(), additions)
+}
+
+/// Drop, replace and add in **one** composition: assemble, change the flow list, rebuild.
+///
+/// The one body behind the three named composers above, and public rather than private for a
+/// reason this tree has paid for twice: a guard on a branch no caller can reach is a guard
+/// nothing can redden. Every collision *between* the three — a target named twice, an id both
+/// dropped and added, a renaming replacement — is checked here, and each is reachable only
+/// through this entry point. Two mechanism changes in one run is also the shape a real A/B
+/// pair takes (swap the form, drop the process it makes redundant), so this is the general
+/// case and the three above are its convenient names.
+///
+/// Every check runs **before** the season is built, so a bad request fails as a statement
+/// about the request rather than about the run.
+pub fn build_season_composed(
+    scenario: &SeasonScenario,
+    p: &BiosphereParams,
+    drop_ids: &[&str],
+    replacements: Vec<(&str, Box<dyn Flow>)>,
+    additions: Vec<Box<dyn Flow>>,
+) -> Result<(State, Registry), SimError> {
+    // 1. One id may be named as a target once, across both composers. Twice is either a
+    //    no-op the caller cannot see (two drops) or two changes to one process.
+    let mut targets: BTreeSet<&str> = BTreeSet::new();
+    for id in drop_ids.iter().chain(replacements.iter().map(|(id, _)| id)) {
+        if !targets.insert(id) {
             return Err(SimError::Validation(format!(
-                "{id:?} is dropped twice — the second drop would silently do nothing"
+                "{id:?} is named twice as a target — dropping and replacing one process in \
+                 one composition, or naming it twice, hides a change the caller cannot count"
             )));
         }
     }
+    // 2. A replacement keeps its target's id (see `build_season_replacing`).
+    for (target, flow) in &replacements {
+        if flow.id() != *target {
+            return Err(SimError::Validation(format!(
+                "the replacement for {target:?} has id {:?} — a replacement that renames is a \
+                 drop plus an add, and must be spelled as one",
+                flow.id()
+            )));
+        }
+    }
+    // 3. Additions are distinct from each other and from every target.
+    let mut added: BTreeSet<&str> = BTreeSet::new();
+    for flow in &additions {
+        if !added.insert(flow.id()) {
+            return Err(SimError::Validation(format!(
+                "{:?} is added twice — `Registry::new` would reject the pair, in the engine's \
+                 words rather than the lab's",
+                flow.id()
+            )));
+        }
+        if targets.contains(flow.id()) {
+            return Err(SimError::Validation(format!(
+                "{:?} is both a target and an addition — re-implementing a process in place \
+                 is a replacement",
+                flow.id()
+            )));
+        }
+    }
+
     let (state, registry) = build_season_with(scenario, p)?;
     let (flows, aux) = registry.into_parts();
 
-    let mut matched: Vec<&str> = Vec::with_capacity(drop_ids.len());
-    let mut kept: Vec<Box<dyn Flow>> = Vec::with_capacity(flows.len());
+    // 4. An addition must not already be there. `Registry::new` would catch the duplicate,
+    //    but as "duplicate flow id", which reads as an engine fault rather than as this
+    //    composition asking for a replacement under the wrong name.
+    for flow in &additions {
+        if flows.iter().any(|f| f.id() == flow.id()) {
+            return Err(SimError::Validation(format!(
+                "{:?} is already in this scenario's registry — that is a replacement, not an \
+                 addition",
+                flow.id()
+            )));
+        }
+    }
+
+    let mut pending: BTreeMap<&str, Box<dyn Flow>> = replacements.into_iter().collect();
+    let mut dropped: BTreeSet<&str> = BTreeSet::new();
+    let mut kept: Vec<Box<dyn Flow>> = Vec::with_capacity(flows.len() + additions.len());
     for flow in flows {
-        match drop_ids.iter().find(|id| **id == flow.id()) {
-            Some(id) => matched.push(id),
+        if let Some(id) = drop_ids.iter().find(|id| **id == flow.id()) {
+            dropped.insert(id);
+            continue;
+        }
+        // The `remove` is bound before the match: `flow.id()` borrows `flow`, and a borrow
+        // living across the arms would forbid moving `flow` into `kept` in the `None` one.
+        let replacement = pending.remove(flow.id());
+        match replacement {
+            Some(replacement) => kept.push(replacement),
             None => kept.push(flow),
         }
     }
-    if matched.len() != drop_ids.len() {
-        let missing: Vec<&&str> = drop_ids.iter().filter(|id| !matched.contains(id)).collect();
+    // 5. Every target matched. A miss is the failure this whole shape is built around: a
+    //    typo, or a flow this scenario's flags never wired, giving a clean run that reads
+    //    back as the baseline.
+    if dropped.len() != drop_ids.len() || !pending.is_empty() {
+        let mut missing: Vec<&str> = drop_ids
+            .iter()
+            .copied()
+            .filter(|id| !dropped.contains(id))
+            .collect();
+        missing.extend(pending.keys().copied());
         return Err(SimError::Validation(format!(
-            "{missing:?} is not in this scenario's registry — a drop that misses would be \
-             read back as the baseline"
+            "{missing:?} is not in this scenario's registry — a drop or replacement that \
+             misses would be read back as the baseline"
         )));
     }
+    kept.extend(additions);
     let registry = Registry::new(kept, &state.stocks, aux)?;
     Ok((state, registry))
 }
@@ -108,6 +346,9 @@ mod tests {
     use std::collections::BTreeSet;
 
     const ROOT_ZONE_CAPTURE: &str = "biosphere.root_zone_capture";
+    /// The replacement controls' subject: a flow with non-zero legs from the first step
+    /// (standing biomass burns at sowing), so a scaled replacement is measurable at `n = 0`.
+    const MAINTENANCE: &str = "biosphere.maintenance_respiration";
 
     fn frozen() -> BiosphereParams {
         params::biosphere()
@@ -209,6 +450,223 @@ mod tests {
             &[ROOT_ZONE_CAPTURE, ROOT_ZONE_CAPTURE]
         )
         .is_err());
+    }
+
+    /// A test-local flow that moves nothing, for the composition guards that need an id and
+    /// no behaviour. An empty `FlowResult` is a valid no-op ([`FlowResult::empty`]).
+    struct InertFlow(String);
+
+    impl Flow for InertFlow {
+        fn type_name(&self) -> &'static str {
+            "InertFlow"
+        }
+        fn id(&self) -> &str {
+            &self.0
+        }
+        fn evaluate(
+            &self,
+            _snapshot: &State,
+            _env: &dyn Environment,
+            _dt: f64,
+        ) -> Result<FlowResult, SimError> {
+            Ok(FlowResult::empty())
+        }
+    }
+
+    fn inert(id: &str) -> Box<dyn Flow> {
+        Box::new(InertFlow(id.to_string()))
+    }
+
+    /// A freshly built instance of `id`, taken out of a **second** ordinary build.
+    ///
+    /// ⚠ The only way to obtain one without re-forking the assembly: the flows are
+    /// constructed inside `compartments`, which is module-private to `system.rs`
+    /// (`tests/one_assembly_body.rs` pins that). So "a fresh identical instance" means *the
+    /// same body, run twice*, which is exactly what the no-op control needs — and is also why
+    /// that control is the weaker of the two.
+    fn fresh_flow(scenario: &SeasonScenario, id: &str) -> Box<dyn Flow> {
+        let (_, registry) = build_season_with(scenario, &frozen()).expect("build");
+        let (flows, _) = registry.into_parts();
+        flows
+            .into_iter()
+            .find(|f| f.id() == id)
+            .unwrap_or_else(|| panic!("{id} is not in the second build"))
+    }
+
+    fn type_name_of(registry: &Registry, id: &str) -> String {
+        registry
+            .flows()
+            .iter()
+            .find(|f| f.id() == id)
+            .unwrap_or_else(|| panic!("{id} is not in this registry"))
+            .type_name()
+            .to_string()
+    }
+
+    /// ⚠⚠ **The insertion check, without running anything.** A composer that located the
+    /// target, dropped it and kept the *original* box would leave `type_name` unchanged here;
+    /// the wrapper reports its own name, so the argument arriving in the target's slot is
+    /// directly observable. The id set and the flow count are untouched, which is the
+    /// "one named place" property.
+    #[test]
+    fn a_replacement_takes_its_targets_slot() {
+        let (_, base) = build_season_with(&DEFAULT_SCENARIO, &frozen()).expect("build");
+        let wrapped = ScaledMechanism::new(fresh_flow(&DEFAULT_SCENARIO, MAINTENANCE), 0.5);
+        let (_, registry) = build_season_replacing(
+            &DEFAULT_SCENARIO,
+            &frozen(),
+            vec![(MAINTENANCE, Box::new(wrapped))],
+        )
+        .expect("replacement");
+
+        assert_eq!(flow_ids(&registry), flow_ids(&base), "an id moved");
+        assert_eq!(registry.len(), base.len());
+        assert_eq!(registry.aux_processes().len(), base.aux_processes().len());
+        assert_eq!(
+            type_name_of(&registry, MAINTENANCE),
+            "ScaledMechanism",
+            "the replacement never reached the registry — the composer kept the original box"
+        );
+        assert_ne!(type_name_of(&base, MAINTENANCE), "ScaledMechanism");
+    }
+
+    /// The other side of the same coin, stated as a test so the blindness is on the record: a
+    /// no-op replacement is invisible in the inventory. Nothing distinguishes it from the
+    /// composer having ignored its argument — only the run does, and only barely (it cannot
+    /// either). This is why the scaled control, not this one, is the evidence.
+    #[test]
+    fn a_no_op_replacement_is_invisible_in_the_inventory() {
+        let (_, base) = build_season_with(&DEFAULT_SCENARIO, &frozen()).expect("build");
+        let (_, registry) = build_season_replacing(
+            &DEFAULT_SCENARIO,
+            &frozen(),
+            vec![(MAINTENANCE, fresh_flow(&DEFAULT_SCENARIO, MAINTENANCE))],
+        )
+        .expect("no-op replacement");
+        assert_eq!(flow_ids(&registry), flow_ids(&base));
+        assert_eq!(
+            type_name_of(&registry, MAINTENANCE),
+            type_name_of(&base, MAINTENANCE)
+        );
+    }
+
+    /// A replacement that renames is two changes wearing one name.
+    #[test]
+    fn a_replacement_that_renames_is_refused() {
+        let other = fresh_flow(&DEFAULT_SCENARIO, ROOT_ZONE_CAPTURE);
+        assert!(
+            build_season_replacing(&DEFAULT_SCENARIO, &frozen(), vec![(MAINTENANCE, other)])
+                .is_err()
+        );
+    }
+
+    /// The miss, on the replace side: an unknown id, and a real flow this scenario's flags
+    /// never wired.
+    #[test]
+    fn a_replacement_that_matches_nothing_is_an_error() {
+        assert!(build_season_replacing(
+            &DEFAULT_SCENARIO,
+            &frozen(),
+            vec![("biosphere.no_such", inert("biosphere.no_such"))]
+        )
+        .is_err());
+        let sealed_only = "biosphere.recycling";
+        assert!(build_season_replacing(
+            &DEFAULT_SCENARIO,
+            &frozen(),
+            vec![(
+                sealed_only,
+                fresh_flow(&sealed_chamber_scenario(), sealed_only)
+            )]
+        )
+        .is_err());
+    }
+
+    /// An addition lands once, and leaves everything else alone.
+    #[test]
+    fn an_addition_lands_once() {
+        let (_, base) = build_season_with(&DEFAULT_SCENARIO, &frozen()).expect("build");
+        let (_, registry) = build_season_adding(
+            &DEFAULT_SCENARIO,
+            &frozen(),
+            vec![inert("biosphere.lab_extra")],
+        )
+        .expect("addition");
+        assert_eq!(registry.len(), base.len() + 1);
+        let gained: BTreeSet<String> = flow_ids(&registry)
+            .difference(&flow_ids(&base))
+            .cloned()
+            .collect();
+        assert_eq!(gained, BTreeSet::from(["biosphere.lab_extra".to_string()]));
+        assert_eq!(type_name_of(&registry, "biosphere.lab_extra"), "InertFlow");
+    }
+
+    /// Adding an id the season already carries is a replacement asking for the wrong name.
+    /// `Registry::new` would also reject it — as a duplicate id, in the engine's words.
+    #[test]
+    fn an_addition_that_is_already_there_is_refused() {
+        assert!(
+            build_season_adding(&DEFAULT_SCENARIO, &frozen(), vec![inert(MAINTENANCE)]).is_err()
+        );
+    }
+
+    /// ⚠ The collisions **between** the composers, reachable only through the general entry
+    /// point — which is why that entry point is public. Each of these is a silent no-op or a
+    /// double change if it is allowed through.
+    #[test]
+    fn the_cross_composer_collisions_are_refused() {
+        let dropped_and_replaced = build_season_composed(
+            &DEFAULT_SCENARIO,
+            &frozen(),
+            &[MAINTENANCE],
+            vec![(MAINTENANCE, fresh_flow(&DEFAULT_SCENARIO, MAINTENANCE))],
+            Vec::new(),
+        );
+        assert!(
+            dropped_and_replaced.is_err(),
+            "dropped and replaced at once"
+        );
+
+        let dropped_and_added = build_season_composed(
+            &DEFAULT_SCENARIO,
+            &frozen(),
+            &[MAINTENANCE],
+            Vec::new(),
+            vec![inert(MAINTENANCE)],
+        );
+        assert!(
+            dropped_and_added.is_err(),
+            "dropping an id and adding it back is a replacement"
+        );
+
+        let added_twice = build_season_composed(
+            &DEFAULT_SCENARIO,
+            &frozen(),
+            &[],
+            Vec::new(),
+            vec![inert("biosphere.lab_extra"), inert("biosphere.lab_extra")],
+        );
+        assert!(added_twice.is_err(), "the same id added twice");
+    }
+
+    /// The general entry point does all three at once, and the arithmetic of the flow count
+    /// is the check: one gone, one swapped in place, one arrived.
+    #[test]
+    fn the_general_composer_takes_all_three_at_once() {
+        let (_, base) = build_season_with(&DEFAULT_SCENARIO, &frozen()).expect("build");
+        let wrapped = ScaledMechanism::new(fresh_flow(&DEFAULT_SCENARIO, MAINTENANCE), 0.5);
+        let (_, registry) = build_season_composed(
+            &DEFAULT_SCENARIO,
+            &frozen(),
+            &[ROOT_ZONE_CAPTURE],
+            vec![(MAINTENANCE, Box::new(wrapped))],
+            vec![inert("biosphere.lab_extra")],
+        )
+        .expect("all three");
+        assert_eq!(registry.len(), base.len());
+        assert!(!flow_ids(&registry).contains(ROOT_ZONE_CAPTURE));
+        assert_eq!(type_name_of(&registry, MAINTENANCE), "ScaledMechanism");
+        assert_eq!(type_name_of(&registry, "biosphere.lab_extra"), "InertFlow");
     }
 
     /// The two halves compose: a substituted **value** and a removed **process** in one
