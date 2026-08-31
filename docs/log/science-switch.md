@@ -563,7 +563,26 @@ thing it claims to check.
 
 ### After the fixes
 
-`M5`, `M10`, `M11` all red on re-run (`rerun.log`), so the battery stands at **10 red of 11, one
-unreachable**. `cargo test --workspace --no-fail-fast` = 64 binaries, **1098 passed**, 0 failed
+`M5`, `M10`, `M11` all red on re-run, so the battery stands at **10 red of 11, one unreachable**.
+
+⚠ **That tally was a composite of two trees, and a composite is not a measurement.** The seven
+original reds were measured *before* the predicate was extracted, the call site changed and the
+three tests added; the re-run covered only the three. Written as "eleven mutations, ten red", it
+read as one run of the shipped tree and was not — the same shape as everything else this slice
+found. So the whole battery was re-run with no filter against the committed tree (`full.log`):
+**M1 and M3–M11 red, M2 the only no-red**, tree clean after restore, and the sentence is now true
+of the code that shipped. *Re-running eight already-green mutations cost eight minutes; carrying
+an unverified composite in the record would have cost the record's credibility.*
+
+One thing the whole run adds that the composite could not: M1 (the constancy check never fires)
+now reddens **both** frozen-readout tests, and M9 (the composed build ignored, the frozen one run
+instead) reddens five — the report's guards overlap, and that overlap is only visible when every
+mutation is measured against the same tree.
+
+⚠ And the third answer to "why did this not redden", which the earlier write-up left out: not
+only *uncovered* or *unreachable*, but **the mutation never applied**. The script asserts its
+needle matched and prints `DID NOT APPLY … instrument failure, not a pass` when it does not —
+checked here rather than assumed, because M11's needle had already gone stale under this slice's
+own refactor. Rule that one out first; it is the only one that is a fact about the instrument. `cargo test --workspace --no-fail-fast` = 64 binaries, **1098 passed**, 0 failed
 (1095 before; exactly the three new tests). `cargo clippy --all-targets -- -D warnings` clean.
 Working tree clean after restore, checked by the battery itself.
