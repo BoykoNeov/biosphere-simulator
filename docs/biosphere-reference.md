@@ -193,8 +193,8 @@ schema-free unfreeze: five manifest entries, no value moved, no golden regenerat
 > it — so this section's own evidence sentence (*"`git diff src/` empty"*) is now vacuous rather
 > than false, which is the worse of the two. The band's live home is
 > [`rust/crates/domains/src/biosphere/science_gates.rs`](../rust/crates/domains/src/biosphere/science_gates.rs),
-> five gates plus both tripwires; what did **not** survive the move is the margin pin — see the
-> re-check at the end of this section.
+> five gates plus both tripwires; what did **not** survive the move is the margin pin — **restored
+> 2026-08-31**, see the re-check at the end of this section.
 
 | scenario | driver | season-low CO₂ | margin |
 |---|---|---|---|
@@ -318,13 +318,25 @@ moved the **band** into Rust and both tripwires with it; the classification tabl
 the move named the residue as *"the probe arithmetic"* and the margin pin went with it. Today
 `rust/crates/domains/src/biosphere/science_gates.rs` carries the five one-sided `min > floor`
 gates, `the_floor_is_where_the_frozen_params_put_it` and
-`the_shipped_floor_is_the_conservative_one_against_the_cited_route`, and **no assertion anywhere
-in `rust/` records how NEAR any of the five sits to the floor.**
+`the_shipped_floor_is_the_conservative_one_against_the_cited_route`, ~~and **no assertion anywhere
+in `rust/` records how NEAR any of the five sits to the floor.**~~
+
+⚠ **STRUCK 2026-08-31 — restored the same day it was written down.** The struck clause was true for
+the four days between S6 and this line, and it is left visible because the paragraph is the record of
+*how* the pin was lost: it went out inside a phrase (*"the probe arithmetic"*) rather than by a
+decision to drop it.
 
 ⚠ **Stated at its real size — it is closer to a supersession than to a loss, and the difference
 is which of the pin's two jobs is unowned.** The pin did two things:
 
-* **detect silent degradation.** Mostly re-owned, but not by a pin on this quantity: all five
+* **detect silent degradation.** ✅ **Re-owned by an assertion on this quantity, 2026-08-31** —
+  `margins::the_five_margins_are_pinned_not_merely_positive` in the same file, pinning all five to
+  2 % against a **computed** floor. ⚠ It is not the only detector and does not claim to be: the
+  paragraph below stands, and a mutation reddening the pin (`vcmax` 100 → 130, every margin −4.4 %,
+  every one-sided gate still green) reddens the goldens too. What the pin adds is the *quantity* —
+  which number moved and by how much — and a movement under 2 % leaves it green on purpose. The
+  measurement of what was previously owned, unchanged: mostly re-owned, but not by a pin on this
+  quantity: all five
   scenarios have byte-frozen goldens, so a change that moves the run reddens one. ⚠ Those
   goldens are **final-state snapshots** (`perennial_chamber_state.json` is the state at
   `n = 6100`), not trajectories — the *trough* is not among the pinned quantities, and the
@@ -334,9 +346,18 @@ is which of the pin's two jobs is unowned.** The pin did two things:
 * **make the number visible at unfreeze time.** *Unowned.* The lab report prints it on demand
   for four of the five, and **nothing requires anyone to run it** during a ceremony.
 
-Not built here: writing a five-margin characterisation pin in Rust is a new assertion on a
-frozen contract's observable, not a prose correction, so it is named as a candidate rather than
-folded into a doc pass. What is asserted here is only the measurement.
+~~Not built here: writing a five-margin characterisation pin in Rust is a new assertion on a~~
+~~frozen contract's observable, not a prose correction, so it is named as a candidate rather than~~
+~~folded into a doc pass. What is asserted here is only the measurement.~~
+
+✅ **BUILT 2026-08-31 as its own piece of work, on the user's call** —
+[`log/co2-margin-pin.md`](log/co2-margin-pin.md). It is a plain `#[test]`, **not** a
+`science_gates!` row, so it adds no manifest entry and took no unfreeze: the band stays one-sided
+so it survives the next mechanism's golden movement, and the pin holds the numbers beside it. The
+five values it pins are the table above, divided by the floor — 1.169709, 1.150335, 1.200866, and
+the two long horizons equal to their 5-year siblings. ⚠ The *visibility* bullet above is still
+unowned and was left so deliberately: `consumer_long_horizon` has no row in the lab report's
+roster, and adding one forces a second 15-year run on every long report.
 
 ### The flow set + the aux processes
 

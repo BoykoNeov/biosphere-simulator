@@ -269,12 +269,24 @@ These should ride the *same* unfreeze, not pay for a second one:
    by 5.2 %, thickness inside real wheat's range, rationing 0, the `WSFL` leverage cut) was
    measured at Euler `dt = 1`, and finding 6(b) gives a concrete reason to expect it to move.
    **Re-measure the evidence base at the shipping step before merging.**
-2. **A science band for the chamber's minimum CO₂.** `science_bands` in both manifests
-   already give assertions contract standing; *"the sealed chamber's season-low CO₂ stays
-   above the compensation point"* is exactly that shape and would have caught this on day
-   one. ⚠ It is **red on the frozen tree today**, so the *band* cannot land before the step
-   decision — but the **documented allowance can, and should, land immediately**; see
-   section 4.
+2. ~~**A science band for the chamber's minimum CO₂.** `science_bands` in both manifests~~
+   ~~already give assertions contract standing; *"the sealed chamber's season-low CO₂ stays~~
+   ~~above the compensation point"* is exactly that shape and would have caught this on day~~
+   ~~one. ⚠ It is **red on the frozen tree today**, so the *band* cannot land before the step~~
+   ~~decision — but the **documented allowance can, and should, land immediately**; see~~
+   ~~section 4.~~
+
+   ⚠⚠ **STRUCK 2026-08-31: this bullet is stale twice over, and the two staleness causes are
+   opposite.** The band it asks for **shipped** with the step unfreeze — five
+   `..._stays_above_the_compensation_point` rows in `rust/crates/domains/src/biosphere/science_gates.rs`,
+   one per sealed scenario — and the *"red on the frozen tree today"* that was supposed to block
+   it stopped being true the same day, because the step change (`dt = 1 → ¼`) **fixed** the
+   crossing rather than documenting it. So the item was simultaneously already done and no longer
+   blocked, and neither fact reached the line. ⚠ **The third instance of the shape
+   [`../log/co2-band-recheck.md`](../log/co2-band-recheck.md) named the day before** — *a
+   forward-looking list is written once and read many times, and nothing re-checks it* — and the
+   second one found in this section. What the band could not hold, because it is written one-sided
+   on purpose, is now held next to it: [`../log/co2-margin-pin.md`](../log/co2-margin-pin.md).
 
 **And one that was moved out from behind the gate, measured, and moved back:**
 

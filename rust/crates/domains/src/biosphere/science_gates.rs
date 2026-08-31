@@ -674,6 +674,134 @@ mod support {
 #[cfg(test)]
 use support::{band_gate, leaf_cycle_gate};
 
+/// The five compensation-point margins, pinned as VALUES — the observable, not the
+/// contract.
+///
+/// ⚠ This is the restoration of `test_the_five_margins_are_pinned_not_merely_positive`,
+/// which lived only in `tests/test_co2_compensation_band.py` and went out with the
+/// checker on 2026-08-27. C4 moved the *band* and both tripwires here; the classification
+/// table called the residue "the probe arithmetic" and this went with that phrase, so
+/// between then and now **nothing in `rust/` recorded how NEAR any of the five sits to
+/// its floor**.
+///
+/// ⚠⚠ Deliberately NOT a `science_gates!` entry. The five `..._stays_above_the_
+/// compensation_point` gates are the contract and are written one-sided (`>`) on purpose
+/// — they must survive the next mechanism's golden movement without a re-pin. A value
+/// here would be a second, tighter copy of a frozen claim, i.e. a manifest row and an
+/// unfreeze. This is a plain characterisation test: it holds the *numbers* the one-sided
+/// claim cannot hold, and re-pinning it is an ordinary edit.
+#[cfg(test)]
+mod margins {
+    use super::{folds, runs};
+
+    /// How far a margin may move before the pin asks to be re-read, as a fraction.
+    ///
+    /// ⚠ 2 % is not a round number picked for comfort — it is the Python pin's own
+    /// tolerance, kept because it was **measured to fire**. The within-day light path
+    /// (2026-08-14) moved three of the five past it while every one-sided gate above
+    /// stayed green, which is exactly the degradation this test exists to catch.
+    const TOLERANCE: f64 = 0.02;
+
+    /// The pinned margins: `season-low CO₂ ÷ the compensation-point floor`.
+    ///
+    /// ⚠ The floor is **computed**, never written here. It is
+    /// `photosynthesis.gamma_star / ci_ratio`, and `gamma_star` is one of the live
+    /// `TODO(cite)` params — a literal denominator would leave this pin reading a dead
+    /// value on the day that citation lands, while the five gates moved.
+    ///
+    /// ⚠ The two `*_long_horizon` rows read identically to their 5-year siblings today,
+    /// and they are NOT redundant: the 15-year runs share those numbers only because each
+    /// trough falls inside the shorter horizon (perennial's in year 2, consumer's in
+    /// year 5). If they ever diverge, the trough has moved past the short run's end — a
+    /// claim changing, not a duplicate drifting.
+    /// ⚠ MEASURED on the shipped tree (`12e2161`, Euler `dt = ¼`), read off this test's
+    /// own failure output — not transcribed from the deleted Python pin and not from the
+    /// prose table in `docs/biosphere-reference.md`. Both of those agree with it, and
+    /// that agreement is a *result*: the Python constants (1.1671 / 1.1543 / 1.2086) are
+    /// within 0.7 % of these, so the pin restored verbatim would have been green. Nothing
+    /// moved the margins between the checker's deletion and this restoration — which is
+    /// the honest size of what the four dead days cost.
+    const PINNED: &[(&str, f64)] = &[
+        ("sealed_chamber", 1.169709),
+        ("perennial_chamber", 1.150335),
+        ("consumer_chamber", 1.200866),
+        ("perennial_long_horizon", 1.150335),
+        ("consumer_long_horizon", 1.200866),
+    ];
+
+    /// The measured margins, in `PINNED`'s order.
+    fn measured() -> Vec<(&'static str, f64)> {
+        let floor = folds::floor_ppm();
+        vec![
+            ("sealed_chamber", folds::min_ppm(runs::sealed_chamber())),
+            (
+                "perennial_chamber",
+                folds::min_ppm(runs::perennial_chamber()),
+            ),
+            ("consumer_chamber", folds::min_ppm(runs::consumer_chamber())),
+            (
+                "perennial_long_horizon",
+                folds::min_ppm(runs::perennial_long()),
+            ),
+            (
+                "consumer_long_horizon",
+                folds::min_ppm(runs::consumer_long()),
+            ),
+        ]
+        .into_iter()
+        .map(|(name, min)| (name, min / floor))
+        .collect()
+    }
+
+    /// Is `got` within [`TOLERANCE`] of `want`, relatively?
+    fn within(got: f64, want: f64) -> bool {
+        (got - want).abs() / want.abs() <= TOLERANCE
+    }
+
+    /// ⚠ An inequality that passes tells you nothing about **how nearly** it failed.
+    ///
+    /// The five gates above are one-sided, and a one-sided claim degrades silently: a
+    /// change that halved every margin would leave all five green. The goldens do not
+    /// cover the gap either — they are **final-state** snapshots (`perennial_chamber_
+    /// state.json` is the state at `n = 6100`), and the trough is not among the pinned
+    /// quantities.
+    ///
+    /// So the margins are pinned here, loosely and in one place, as the number the next
+    /// unfreeze's gate report quotes.
+    #[test]
+    fn the_five_margins_are_pinned_not_merely_positive() {
+        let measured = measured();
+        assert_eq!(measured.len(), PINNED.len());
+        let mut drifted = Vec::new();
+        for ((name, got), (pinned_name, want)) in measured.iter().zip(PINNED) {
+            assert_eq!(name, pinned_name, "roster order");
+            if !within(*got, *want) {
+                drifted.push(format!("{name}: {got:.6} pinned {want:.6}"));
+            }
+        }
+        assert!(
+            drifted.is_empty(),
+            "the compensation-point margins moved past {}%; re-read them before re-pinning \
+             — the direction of the movement is the finding, not the numbers: {drifted:#?}",
+            TOLERANCE * 100.0
+        );
+    }
+
+    /// Anti-vacuity for the pin above: the tolerance must actually reject something.
+    ///
+    /// ⚠ Written because the pin's whole subject is a comparison that is easy to make
+    /// inert — a `TOLERANCE` fat-fingered by a factor of a hundred, or an `.abs()` on the
+    /// wrong side, passes every real margin and every mutation of them alike. The halving
+    /// case is the hazard `docs/log/co2-band-recheck.md` names by hand.
+    #[test]
+    fn the_tolerance_rejects_a_margin_that_actually_moved() {
+        assert!(within(1.1503, 1.1503), "an exact match must pass");
+        assert!(within(1.1503 * 1.01, 1.1503), "1 % must pass");
+        assert!(!within(1.1503 * 1.03, 1.1503), "3 % must fail");
+        assert!(!within(1.1503 * 0.5, 1.1503), "a halved margin must fail");
+    }
+}
+
 // ---------------------------------------------------------------------------------
 // The census's shared rules — one copy, read by BOTH halves.
 // ---------------------------------------------------------------------------------
