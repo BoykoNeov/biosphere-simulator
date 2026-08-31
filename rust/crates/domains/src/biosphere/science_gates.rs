@@ -692,7 +692,14 @@ use support::{band_gate, leaf_cycle_gate};
 /// claim cannot hold, and re-pinning it is an ordinary edit.
 #[cfg(test)]
 mod margins {
-    use super::{folds, runs};
+    use super::{folds, runs, ScienceGate, GATES};
+    use std::collections::BTreeSet;
+
+    /// The `quantity` string every compensation-point band is filed under.
+    ///
+    /// ⚠ One copy, read by the roster tie below — the five gates carry it verbatim, and a
+    /// sixth must too or it is not the same claim.
+    const BANDED_QUANTITY: &str = "season-low chamber CO₂ (ppm)";
 
     /// How far a margin may move before the pin asks to be re-read, as a fraction.
     ///
@@ -784,6 +791,34 @@ mod margins {
             "the compensation-point margins moved past {}%; re-read them before re-pinning \
              — the direction of the movement is the finding, not the numbers: {drifted:#?}",
             TOLERANCE * 100.0
+        );
+    }
+
+    /// The roster is TIED to [`GATES`], not maintained beside it.
+    ///
+    /// ⚠⚠ Without this, [`PINNED`] and [`measured`] are two hand-written lists of five and
+    /// the pin's own length check compares one of them to the other — so a **sixth** sealed
+    /// scenario would get its one-sided band and no margin, silently, which is this repo's
+    /// *a census ported as a LIST is the failure it prevents* in the guard written to stop
+    /// exactly that drift. The shape is borrowed from `lab::report`'s
+    /// `every_spec_names_a_scenario_that_is_actually_run`, which exists for the same reason.
+    #[test]
+    fn every_banded_scenario_has_a_pinned_margin() {
+        let banded: BTreeSet<&str> = GATES
+            .iter()
+            .filter(|g: &&ScienceGate| g.quantity == BANDED_QUANTITY)
+            .map(|g| g.scenario)
+            .collect();
+        let pinned: BTreeSet<&str> = PINNED.iter().map(|(name, _)| *name).collect();
+        assert!(
+            !banded.is_empty(),
+            "no gate carries {BANDED_QUANTITY:?} any more"
+        );
+        assert_eq!(
+            banded, pinned,
+            "the compensation-point band roster and the margin pin disagree — a band with no \
+             pinned margin is a one-sided claim nothing measures the size of, and a pinned \
+             margin with no band is a number filed under a claim that no longer exists"
         );
     }
 

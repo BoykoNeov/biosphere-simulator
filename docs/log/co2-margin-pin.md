@@ -3,8 +3,8 @@
 > One row of the record table in [`../post-roadmap-log.md`](../post-roadmap-log.md), written
 > under rule 4 of [`../context-budget.md`](../context-budget.md) — one file per work item.
 > The plan doc this row is filed under is
-> [`../plans/post-roadmap-direction.md`](../plans/post-roadmap-direction.md), whose §3 item 2
-> this work strikes.
+> [`../plans/post-roadmap-direction.md`](../plans/post-roadmap-direction.md), whose §3 item 2,
+> §6 items 2 and 3 and §7 question 1 this work strikes — see FINDING 6.
 
 **BUILT 2026-08-31.** One source file changed — `rust/crates/domains/src/biosphere/science_gates.rs`,
 a new `#[cfg(test)] mod margins` — plus the docs below. No param, golden, manifest entry, science
@@ -87,6 +87,37 @@ Written because the subject is a comparison that is easy to make inert — a `TO
 a factor, an `.abs()` on the wrong side — and every real margin would go on passing either way, so the
 pin would read green for the rest of its life without a single one of its checks doing work.
 
+**FINDING 5 — the pin's own roster was the failure it was written to prevent, one level down.**
+As first written, `PINNED` was five literal tuples and `measured()` five hand-written calls, and
+the length check compared **one of my lists to my own other list**. A sixth sealed scenario would
+have got its one-sided band and no margin, silently — *a census ported as a LIST is the failure it
+prevents*, in the guard written against exactly that drift. Fixed by deriving the roster from
+`GATES`: `every_banded_scenario_has_a_pinned_margin` compares the set of scenarios carrying the
+band's `quantity` string against `PINNED`.
+
+⚠ **Controlled, not asserted.** A temporary sixth `gate` row (`open_season`, the same quantity)
+reddens the tie and leaves both other margin tests **green** — which is the point: the length check
+could not see it, so the two guards do not overlap. Probe reverted; the file is byte-identical to
+its pre-probe state.
+
+**FINDING 6 — striking one stale bullet left three more armed in the same file, and this item is
+what found them.** §3 item 2 was struck for being stale; a re-read of the rest of
+`docs/plans/post-roadmap-direction.md` found the same defect three more times, all reading as
+current seventeen days after the fact:
+
+* **§6 item 2** still carried `← THE PROJECT IS HERE` against a step decision taken 2026-08-14,
+  with eight work items landed since — the most misleading string in the document.
+* **§6 item 3** described *"one ceremony"* bundling the step change, the leaf mechanism and the
+  CO₂ band, in the future tense. All three shipped **separately**, and the margin pin is a fourth
+  piece. The plan was written around a bundle reality routed past.
+* **§7 question 1** still lists the step options as live. The struck header at the top of the file
+  covers it — but only for a reader who starts at the top, which is not how a reader lands in §7.
+
+⚠ **This is why the item taken here was half-built already**, and it upgrades the recheck's own
+closing note from an observation to a measurement: **four spans, one file, nothing re-checking any
+of them.** All four are now struck in place with their reasons. The file has no gate and this pass
+is not one — it is a re-read, and the next one is owed the next time an item is taken off it.
+
 **NOT TAKEN, and named rather than skipped quietly: the visibility half.** The dead pin had two jobs.
 *Detection* is now re-owned for all five. *Visibility* is still four of five: `consumer_long_horizon`
 is a scenario in `GATES` with no `runs()` entry and no `SPECS` row in `lab::report`, so the lab report
@@ -95,10 +126,27 @@ report's own guard `every_spec_names_a_scenario_that_is_actually_run` forces the
 together, which means **a second 15-year run on every long-report invocation** — a runtime cost worth
 deciding on its own rather than folding into this item. Left to the user with the price attached.
 
-**Gates run:** `cargo test --release --no-fail-fast` — **321 tests across 30 binaries, all green**,
-including `manifest_writer` on all three contracts and both `golden_regression` suites;
-`cargo clippy --all-targets -- -D warnings` clean; `rustfmt` on the one changed file, never bare
-`cargo fmt`. The `repo_gates` context-budget gates are inside that run.
+**Gates run, on the committed tree:** `cargo test --release --no-fail-fast` — **1101 tests across
+64 result lines, all green, 0 failed**, with
+`manifest_writer` (domains, station, authoring) and both `golden_regression` suites confirmed by
+name in the output rather than inferred from the binary count; `cargo clippy --all-targets -- -D
+warnings` clean; `rustfmt` on the one changed file, never bare `cargo fmt`; and
+`regen_goldens` reporting **19 of 19 run, 0 would change**.
+
+⚠⚠ **And its test COUNT was wrong, by the repo's own documented mechanism.** The first landing
+said *"321 tests across 30 binaries"*. The real figure is **1101 across 64**: the count had been
+summed from a `| grep … | tail -60` pipeline, so it totalled the last sixty lines of the run rather
+than the run. Green either way, and the verdict was never in doubt — but *a battery that greps its
+own output can report fewer tests than ran*, which is `CLAUDE.md`'s `--no-fail-fast` warning one
+level up: there the instrument truncates the reds, here it truncated the greens. The rule is the
+same — **read the count off the whole output, or do not quote a count.**
+
+⚠ **The first landing's gate sentence spanned two tree states and is corrected here rather than
+left standing.** Its 321-test run happened *before* the doc edits and `repo_gates` *after*, so no
+single run covered what was committed. Nothing under `docs/` feeds any test but `repo_gates`, and
+the reference edit is prose rather than `.manifest.json` — but that is reasoning, and the record
+this item grew out of is the one that wrote down *a doc commit with a partial gate run and no note
+is indistinguishable from a skipped one.*
 
 **Docs touched:** this file, the index and pointer rows in `docs/post-roadmap-log.md`,
 `docs/plans/post-roadmap-direction.md` (§3 item 2 struck), and `docs/biosphere-reference.md`, whose

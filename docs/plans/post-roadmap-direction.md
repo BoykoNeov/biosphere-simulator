@@ -396,15 +396,28 @@ It is not closed — re-open it at a natural stop in the science thread.
 1. ✅ **Step 0, the measurement pass — COMPLETE ON BOTH AXES.** Axis 2 (the controller) DONE
    2026-08-13, negative; **axis 1 (the step sweep) DONE 2026-08-14** — see section 2. Every
    input to the decision is now measured.
-2. **The step decision** — the user's call, informed by (1). ~~⚠ Which question it even is
-   depends on (1).~~ **Settled: it is "which step". ← THE PROJECT IS HERE.**
-3. **Then: one ceremony**, carrying the step change + the leaf mechanism with a re-measured
-   evidence base + the chamber-CO₂ science band. Three contracts, one unfreeze, one Rust
-   parity re-measure, one CI-goldens hazard — ⚠ **plus a `src/station/driver.py` change**,
-   which axis 1 found and this list did not have: `run_master_day` pins the biosphere to one
-   step per master day, so four station goldens cannot take a finer step without it. (*The
-   alternative branch — "the controller path, no step unfreeze" — was measured out; a
-   controller needs a finer step than the frozen tree does.*)
+2. ~~**The step decision** — the user's call, informed by (1). ⚠ Which question it even is~~
+   ~~depends on (1). **Settled: it is "which step". ← THE PROJECT IS HERE.**~~
+
+   ✅ **TAKEN 2026-08-14: `dt = 1` → `dt = ¼`** ([`../log/step-unfreeze.md`](../log/step-unfreeze.md)).
+   ⚠⚠ **The arrow is struck 2026-08-31, seventeen days and eight work items late, and it was
+   the single most misleading string in this file** — a reader landing in §6 was told the
+   project was waiting on a decision that had already been taken.
+3. ~~**Then: one ceremony**, carrying the step change + the leaf mechanism with a re-measured~~
+   ~~evidence base + the chamber-CO₂ science band. Three contracts, one unfreeze, one Rust~~
+   ~~parity re-measure, one CI-goldens hazard — ⚠ **plus a `src/station/driver.py` change**,~~
+   ~~which axis 1 found and this list did not have: `run_master_day` pins the biosphere to one~~
+   ~~step per master day, so four station goldens cannot take a finer step without it. (*The~~
+   ~~alternative branch — "the controller path, no step unfreeze" — was measured out; a~~
+   ~~controller needs a finer step than the frozen tree does.*)~~
+
+   ⚠⚠ **STRUCK 2026-08-31: the bundle never happened, and all three parts shipped
+   separately.** The step change went alone; the leaf mechanism *"stays excluded"* by that
+   record's own closing line and its ship/refuse call is still the user's
+   ([`../log/leaf-remeasurement.md`](../log/leaf-remeasurement.md)); the band landed on its own
+   with the unfreeze; and the margin pin the band could not carry landed as a fourth piece
+   ([`../log/co2-margin-pin.md`](../log/co2-margin-pin.md)). Written in the future tense about
+   a plan that reality had already routed around, and left that way for seventeen days.
 4. **In parallel, independent of all of the above:** `Γ*`'s citation, the two contract
    hygiene holes, the canopy regulator, potato stage 2.
 5. **Separately and explicitly: the product-track fork** in section 5.
@@ -479,8 +492,14 @@ provenance finding before it is a mechanism finding.
 
 ## 7. The open questions for the user
 
-1. **The step. Fully unblocked as of 2026-08-14** — both axes have run and neither removes the
-   reason to ask. The live options are: Euler `dt = ½`, Euler `dt = ¼` (more headroom for the
+1. ✅ **ANSWERED 2026-08-14: Euler `dt = ¼`** — the user's *"quarter the step"*, shipped the
+   same day ([`../log/step-unfreeze.md`](../log/step-unfreeze.md)). ⚠ **The paragraph below is
+   the QUESTION as it stood, kept for the options it priced and struck 2026-08-31**, because a
+   reader landing in §7 does not see the struck status header at the top of this file and would
+   read a settled decision as live. Everything from here to the end of this item is history.
+
+   ~~**The step. Fully unblocked as of 2026-08-14** — both axes have run and neither removes the~~
+   ~~reason to ask.~~ The live options were: Euler `dt = ½`, Euler `dt = ¼` (more headroom for the
    next mechanism, one ceremony instead of two), kinetic saturation (needs a *cited* form),
    RK4 `dt = ½`, or hold and accept the now-documented deviation with the leaf mechanism
    refused. ~~the controller at `dt = 1`~~ is off the menu — measured. ⚠ **RK4 now carries an
