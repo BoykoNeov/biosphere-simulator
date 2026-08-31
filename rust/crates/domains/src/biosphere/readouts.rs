@@ -32,9 +32,10 @@ use crate::biosphere::science::leaf_area_index;
 use crate::biosphere::stocks::{CARBON_POOL, CONSUMER_CARBON, LEAF_C, STEM_C, STORAGE_C};
 use crate::biosphere::system::sealed_chamber_scenario;
 use crate::biosphere::{
-    run_perennial, run_season, season_setup_with, season_steps, steps_for, steps_for_years,
-    SeasonScenario, BIO_DT, SEASON_DAYS,
+    build_season_with, run_perennial, run_season, season_setup_composed, season_steps, steps_for,
+    steps_for_years, SeasonBuild, SeasonScenario, BIO_DT, SEASON_DAYS,
 };
+use simcore::error::SimError;
 use simcore::state::State;
 
 /// One trajectory, reduced to the scalar series the gates fold.
@@ -95,8 +96,68 @@ pub fn trajectory(
     perennial: bool,
     p: &BiosphereParams,
 ) -> Trajectory {
+    trajectory_composed(scenario, years, perennial, p, &build_season_with)
+}
+
+/// [`trajectory`] against a caller-supplied **build** — the mechanism-switch seam's readouts.
+///
+/// The science half of the harness needs the same folds under a *composed* registry, and
+/// there is exactly one reason this is a parameter rather than a second function: the
+/// observer body below is where [`Trajectory`]'s whole contract lives — which stocks are
+/// sampled, the empty-series hazard, the `steps + 1` count assertion. A second copy of it for
+/// composed runs would be the two-assembly-bodies defect the mechanism lab was built to
+/// close, one layer up. ⚠ So [`trajectory`] is this function at the frozen build, not its
+/// sibling: there is no path by which the two can drift.
+pub fn trajectory_composed(
+    scenario: SeasonScenario,
+    years: usize,
+    perennial: bool,
+    p: &BiosphereParams,
+    build: SeasonBuild<'_>,
+) -> Trajectory {
+    try_trajectory_composed(scenario, years, perennial, p, build).expect("trajectory")
+}
+
+/// Why a composed trajectory could not be produced — and the distinction is the whole point.
+///
+/// ⚠ A caller composing mechanisms needs to tell these two apart, and nothing else in the
+/// tree needed to before: [`Setup`](TrajectoryError::Setup) is a bad **request**, wrong under
+/// every scenario, and must stop a comparison; [`Run`](TrajectoryError::Run) is a fact about
+/// *this* scenario under *this* mechanism set, and is a result worth printing. Collapsing them
+/// would mean either aborting a whole report because one chamber died, or swallowing a
+/// malformed request as if it were a scientific outcome.
+#[derive(Debug)]
+pub enum TrajectoryError {
+    /// The season could not be assembled — the composition is malformed.
+    Setup(SimError),
+    /// The season was assembled and the run did not survive it.
+    ///
+    /// ⚠ This is the ordinary outcome of knocking out a load-bearing process, not an edge
+    /// case: remove root water uptake and the perennial chambers raise at the annual reset
+    /// (*"seed bank too small to re-sow"*), because the crop never stored enough carbon to
+    /// sow the next season. Measured 2026-08-31, on the first mechanism column ever built.
+    Run(SimError),
+}
+
+impl std::fmt::Display for TrajectoryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TrajectoryError::Setup(e) => write!(f, "the season could not be assembled: {e}"),
+            TrajectoryError::Run(e) => write!(f, "the run did not survive the season: {e}"),
+        }
+    }
+}
+
+/// [`trajectory_composed`], with the two failure modes separated rather than panicked on.
+pub fn try_trajectory_composed(
+    scenario: SeasonScenario,
+    years: usize,
+    perennial: bool,
+    p: &BiosphereParams,
+    build: SeasonBuild<'_>,
+) -> Result<Trajectory, TrajectoryError> {
     let (state, integrator, resolver) =
-        season_setup_with(&scenario, years, p).expect("season setup");
+        season_setup_composed(&scenario, years, p, build).map_err(TrajectoryError::Setup)?;
     let steps = steps_for_years(years);
     let mut t = Trajectory {
         scenario,
@@ -122,6 +183,16 @@ pub fn trajectory(
             // A fold over an empty series returns the identity — `min` returns
             // +infinity, which is happily "above the compensation point". The folds
             // that read them assert non-emptiness for exactly that reason.
+            //
+            // ⚠ A **mechanism** composition cannot reach that hazard, and the
+            // science-switch plan's slice 4 said it could. Stock presence is decided
+            // by `build_season_with`'s compartments and a composition only rewrites
+            // the flow list, so every series here is exactly as long as the frozen
+            // run's. What a swap CAN do is leave a series **constant** — remove a
+            // stock's only writer and `min_ppm` returns the initial charge, which is
+            // finite, plausible, and reads as comfortably above the floor. That is
+            // the worse failure, because `+inf` is conspicuous; the guard for it is
+            // `lab::report`'s constancy check, not this assertion.
             if let Some(stock) = s.stocks.get(CARBON_POOL) {
                 t.carbon_pool.push(stock.amount);
             }
@@ -129,7 +200,7 @@ pub fn trajectory(
                 t.consumer_c.push(stock.amount);
             }
         };
-        let (_final, rationed, events) = if perennial {
+        let outcome = if perennial {
             run_perennial(
                 &integrator,
                 state,
@@ -140,7 +211,6 @@ pub fn trajectory(
                 season_steps(),
                 &mut observe,
             )
-            .expect("perennial run")
         } else {
             run_season(
                 &integrator,
@@ -151,16 +221,20 @@ pub fn trajectory(
                 None,
                 &mut observe,
             )
-            .expect("season run")
         };
+        let (_final, rationed, events) = outcome.map_err(TrajectoryError::Run)?;
         t.rationed = rationed;
         t.events = events.len();
     }
     // The observer contract this whole module's arithmetic rests on: `run_season`
     // calls it on the initial state AND each produced state. Asserted rather than
     // trusted — see the `Trajectory` note.
+    //
+    // ⚠ Still an assertion and not a `TrajectoryError`: a short sample count is a
+    // broken observer, which is a defect in this file, not an outcome a composed run
+    // can produce. A run that ends early raises above instead.
     assert_eq!(t.leaf_c.len(), steps + 1, "observer sample count");
-    t
+    Ok(t)
 }
 
 // ---------------------------------------------------------------------------------

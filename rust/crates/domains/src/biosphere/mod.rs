@@ -33,6 +33,7 @@ pub mod weather;
 use simcore::environment::SourceResolver;
 use simcore::error::SimError;
 use simcore::integrator::EulerIntegrator;
+use simcore::registry::Registry;
 use simcore::state::State;
 
 pub use system::{
@@ -107,7 +108,32 @@ pub fn season_setup_with(
     weather_years: usize,
     p: &params::BiosphereParams,
 ) -> Result<(State, EulerIntegrator, SourceResolver), SimError> {
-    let (state, registry) = system::build_season_with(scenario, p)?;
+    season_setup_composed(scenario, weather_years, p, &system::build_season_with)
+}
+
+/// How a season's `(State, Registry)` is obtained — [`system::build_season_with`], or a
+/// `domains::lab::mechanism` composition of it.
+///
+/// ⚠ The **science** seam's pass-through, and it is deliberately a build rather than a
+/// registry: a caller handing in a pre-built pair could hand in one assembled from a
+/// different scenario than the resolver is bound to, and nothing here could tell. Taking the
+/// build keeps the scenario the single input it already is.
+pub type SeasonBuild<'a> =
+    &'a dyn Fn(&SeasonScenario, &params::BiosphereParams) -> Result<(State, Registry), SimError>;
+
+/// [`season_setup_with`] against a caller-supplied **build** — the mechanism-switch seam.
+///
+/// ⚠ The weather note on [`season_setup_with`] applies here unchanged and more strongly: a
+/// mechanism swap must not be able to move the forcing either, or an A/B table stops being
+/// about the process. `weather_resolver` reads the committed fixture and the scenario, and
+/// neither is reachable from `build`.
+pub fn season_setup_composed(
+    scenario: &SeasonScenario,
+    weather_years: usize,
+    p: &params::BiosphereParams,
+    build: SeasonBuild<'_>,
+) -> Result<(State, EulerIntegrator, SourceResolver), SimError> {
+    let (state, registry) = build(scenario, p)?;
     let resolver = weather_resolver(scenario, weather_years)?;
     Ok((state, EulerIntegrator::new(registry), resolver))
 }

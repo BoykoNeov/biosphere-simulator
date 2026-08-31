@@ -367,3 +367,137 @@ land on three *different* assertion lines inside `the_cross_composer_collisions_
 --no-fail-fast` = **64 test binaries, 1088 passed, 0 failed, exit 0**. ⚠ An earlier capture in
 this session showed 60 binaries; that stream had been filtered, so 60 was never a census. 64 is
 the number to reproduce.
+
+---
+
+## **The science switch — slice 4** (the mechanism half of the comparison report)
+
+**BUILT 2026-08-31**, a third batch the same day, on the user's call ("slice 4"). Slices 0–3 are
+above. This is the reporting half: a knockout or a swap becomes a **column** of the same table
+the value harness prints, and the slice's own gates are the three ways that table could lie.
+
+⚠⚠ **The plan's description of this slice was wrong in two places and incomplete in a third, and
+the corrections are the substance of the batch.** The code is small; what it cost was finding out
+that "more rows, not a new renderer" is false three times over.
+
+## What was built
+
+* `readouts::trajectory_composed` / `try_trajectory_composed` — the trajectory against a
+  caller-supplied **build**. `trajectory` is now that function at the frozen build, not its
+  sibling, so the composed run goes through the *same* observer body: the stock sampling, the
+  empty-series note and the `steps + 1` count assertion have one copy, not two. This is
+  `one_assembly_body.rs`'s argument applied one layer up, before the second body existed.
+* `biosphere::season_setup_composed` beneath it, with `season_setup_with` delegating. It takes a
+  **build**, not a built pair: a caller handing in `(State, Registry)` could hand in one
+  assembled from a different scenario than the resolver is bound to, and nothing could tell.
+* `lab::mechanism::Composition` — a mechanism change held as a *request* (drops, replacements,
+  additions) so it can be asked of several scenarios, plus `absent_targets` to ask **before**
+  running whether a scenario can answer it at all.
+* `lab::report::Change` (`Values` | `Mechanism`), `measure_composed`, `compare_changes`, and
+  three new cell states in the renderer: not applicable, dead, constant-series.
+* `examples/science_switch.rs` — `science_switch <flow.id> [...] [--long]`, the knockout as one
+  command. Only the knockout is expressible from a command line: the other two composers take a
+  *flow*, and there is still no second form of any biosphere process in this tree.
+* The shared renderer stopped calling itself *"value-switch report"*. A caption is quoted later.
+
+## ⚠⚠ Finding 1: the hazard this slice was written around cannot happen
+
+The plan named it precisely: *a swap can remove a stock's only writer, the series goes empty, and
+a `min` fold over an empty series returns +infinity, which reads as "comfortably above the
+compensation point"*. **Measured: unreachable.** A composition rewrites the flow list; stock
+presence is decided by `build_season_with`'s compartments, and the observer gates on
+`s.stocks.get(CARBON_POOL)`. So every series under a composition is exactly as long as the frozen
+run's. `min_ppm` already asserts non-emptiness, with a test behind it since the readouts moved.
+
+**The reachable form is a *constant* series, and it is worse.** Remove a stock's only writer and
+the fold returns the run's starting value — finite, plausible, comfortably above the floor, and
+attached to a run where nothing happened. `+infinity` is conspicuous; 71.4 ppm is not.
+
+⚠ *A named hazard is not the same as a measured one.* This one was written into a plan, survived
+a design review, and was false about its own mechanism the whole time — while pointing at a real
+defect one step to the left.
+
+## ⚠⚠ Finding 2: the frozen scenarios do not share a flow set, and that breaks the renderer
+
+**Ten of the twenty-three biosphere flows are in all four canonical builds.** The other thirteen
+are scenario-specific — and they are where the interesting science lives: decomposition,
+humification, microbial respiration, the three nitrogen releases, grazing, condensation,
+irrigation. Measured, not assumed.
+
+So "swap the soil carbon scheme" is an ordinary request that **cannot be asked of the open
+field** — and the renderer's `(Some, Some) => …, _ => continue` dropped that cell with no marker,
+while the movement counter's `_ => {}` shrank the count. A column reading *"1 rose, 0 fell"* over
+a table where four of five rows were never measured. That is
+`every_spec_names_a_scenario_that_is_actually_run`'s own failure — a claim quietly not measured —
+arriving through a door that test cannot see, and it was **safe until this slice** only because a
+param substitution applies to every scenario by construction.
+
+⚠ The alternative was to refuse a variant that does not apply uniformly, which is simpler. The
+measurement is what ruled it out: with 13 of 23 flows scenario-specific, refusing would have made
+the harness useless for most of the swaps worth running. **The design question was decided by one
+two-minute measurement, not by argument.**
+
+## ⚠⚠ Finding 3: a knockout ENDS the run, and that is the ordinary case
+
+Neither the plan nor the design review predicted this. It appeared on the first mechanism column
+anyone would think to run.
+
+Drop `biosphere.root_zone_capture` (root water uptake) and the crop never stores enough carbon to
+re-sow, so **both perennial chambers raise at the annual reset** — `annual_reset: seed bank too
+small to re-sow — storage_c 0.0115 < seedling 0.16`. Drop `biosphere.decomposition` and the same
+two die for the same reason. Two of the first two knockouts tried; this is not an edge case, it
+is what knocking out a load-bearing process *does*.
+
+Before it was handled the whole report **panicked from inside `readouts`**, four levels below the
+caller, because `trajectory` was written for the frozen path where a run cannot fail.
+
+**It is a result, and arguably the strongest one a knockout can produce** — "this chamber cannot
+close its cycle without this process" is a bigger statement than any number in the table. So it
+is printed, in the engine's own words, in its own cell state.
+
+⚠ **And it is kept distinct from finding 2's cell**, which is the part worth remembering: *"this
+scenario has no such process"* says nothing about the science, *"this scenario dies without it"*
+says a great deal. One marker for both would have merged a fact about the roster with a result.
+`TrajectoryError` splits the two at the source — `Setup` is a bad **request**, wrong under every
+scenario, and still stops the whole comparison; `Run` is this scenario's answer.
+
+## The guard the slice actually owed
+
+`ReadoutSpec` now carries the **series its fold reads** as data beside the fold, and a column
+flags any readout whose every input series never moved. Data rather than a loop that re-derives
+the pairing, for the reason the scenario pairing is data: two copies, one stale.
+
+Two-direction, because a flag that fires everywhere proves nothing: the frozen baseline has **no**
+constant series (asserted, so the guard cannot be firing green and later weakened to silence it),
+and a composition zeroing all three writers of leaf carbon flags `peak LAI` **and not** the
+chamber CO₂ row, whose writers that composition leaves alone.
+
+⚠ **Three flows, not one, and that is a measurement.** Every stock these readouts fold has at
+least two writers on the frozen tree, so no single swap can freeze one. `build_season_composed`
+takes several changes at once precisely because that is the shape a real pair takes.
+
+## The science this incidentally produced, and did not interpret
+
+Dropping soil decomposition **raises** the sealed chamber's season-low CO₂ by 21.0 %
+(71.44 → 86.43 ppm). That is the opposite sign to the naive reading — decomposition puts carbon
+into the chamber air — and it is exactly the kind of number this harness exists to generate and
+**not** to explain. No cause is asserted here; this repo has logged what an asserted attribution
+costs (`asserted-attributions-rot`). It is written down as a measurement with a knockout beside
+it, and the explaining is a separate piece of work with its own control.
+
+## Verification
+
+* **`cargo test --workspace --no-fail-fast` = 64 test binaries, 1095 passed, 0 failed, exit 0.**
+  The previous batch recorded 64 / 1088; slice 4 adds exactly its seven new tests and moves
+  nothing else. The `readouts` refactor is the one place this slice could have moved a frozen
+  number — it is shared with every science gate — so it was **measured**, not argued.
+* **19 of 19 goldens byte-identical**, reported by `regen_goldens` (report mode). No param file,
+  manifest, science band or golden touched; `git status` clean outside this batch's own files.
+* `cargo clippy --all-targets -- -D warnings` clean.
+
+⚠ **One instrument note, and it is the same shape as the last batch's "60 was never a census".**
+The first attempt at this census was captured through a background stream and came back as
+**12 binaries, 40 passed** — a number that would have read as a green run to anything grepping
+only for failures. It was a truncated capture, not a truncated run. *A census that disagrees
+with the last recorded one by a factor of twenty-five is an instrument reading, not a result*;
+this one was re-run writing to a file of its own and reproduces 64 exactly.

@@ -1,6 +1,10 @@
 # The science switch — swapping a MECHANISM, not a value
 
-> ## STATUS 2026-08-31 — SLICES 0, 1, 2 AND 3 BUILT. The pricing below stands; §7 is the queue.
+> ## STATUS 2026-08-31 — SLICES 0–4 BUILT; only 3b is left, and it is a science decision.
+>
+> ⚠ The pricing below stands, but **§7's own description of slice 4 does not** — it named a
+> hazard that cannot happen and a renderer change that was needed. Both are struck in place
+> rather than rewritten, because the correction is the finding.
 >
 > This began as the **pricing pass** the value-switch record left open — the user's charge of
 > 2026-08-16 was a harness *"that permits easy toggle of parameters and science"*, and the
@@ -25,13 +29,22 @@
 >   both are available on the frozen tree today. What is still absent is a *scientific* pair.
 >   ⚠ And §8's ranking of those two controls was **wrong by omission**: they are not equally
 >   strong, and the record says which is which (`docs/log/science-switch.md`).
-> * **Slices 3b and 4 — NOT built.** 3b needs a second form of some process **authored**, which
->   is a science decision and the user's. 4 (the report rows) was left deliberately: `report`
->   measures through `readouts::trajectory`, which is shared with the science gates and whose
->   own header names the failure a mechanism swap uniquely causes — a swap can remove a stock's
->   only writer, the series goes empty, and a `min` fold over an empty series returns +infinity,
->   which reads as *"comfortably above the compensation point"*. That is a slice with its own
->   guard, not a row.
+> * **Slice 4 — BUILT** (2026-08-31, a third batch the same day, on the user's call). Mechanism
+>   columns in `lab::report`, one command (`examples/science_switch.rs`), and the trajectory
+>   parameterized by its build so the composed run goes through the **same** observer body as
+>   the frozen one. ⚠⚠ **This slice's own description below was wrong twice, and both
+>   corrections are worth more than the code.** (a) The hazard named here — an *empty* series
+>   folding to `+infinity` — **is unreachable**: a composition rewrites the flow list and stock
+>   presence comes from `build_season_with`, so every series is exactly as long as the frozen
+>   run's, and `min_ppm` asserts non-emptiness anyway. The reachable form is a **constant**
+>   series, which is worse, because a plausible number is not conspicuous. (b) *"Mechanism
+>   variants are more rows, not a new renderer"* was **false**: the renderer dropped a missing
+>   cell with no marker and shrank the movement count silently, which was safe only while every
+>   variant applied to every scenario. ⚠ And a third thing neither this plan nor the design
+>   review predicted: **a knockout can END the run**, and that is the ordinary case, not the
+>   exception. See `docs/log/science-switch.md`.
+> * **Slice 3b — NOT built.** It needs a second form of some process **authored**, which is a
+>   science decision and the user's.
 >
 > No longer forward-looking, so it is **indexed normally** in `docs/post-roadmap-log.md` and
 > its exemption paragraph there was deleted in the landing commit — the rule that an exemption
@@ -224,9 +237,27 @@ every other slice, and it should not wait for them.
 
 **Slice 4 — the report.** `lab::report` already renders a baseline-vs-variants table with the
 two requirements the last batch earned the hard way (a fold reads *the trajectory's own*
-params; a table that cannot show opposed movement must say so). Mechanism variants are more
-rows, not a new renderer — **provided** the readouts stay identical, which a mechanism swap
+params; a table that cannot show opposed movement must say so). ~~Mechanism variants are more
+rows, not a new renderer~~ — **provided** the readouts stay identical, which a mechanism swap
 does not guarantee the way a value swap does.
+
+> ⚠ **BUILT 2026-08-31, and the struck sentence was false.** The proviso was the right
+> instinct pointed at the wrong thing. Three things the renderer could not do, each found by
+> running rather than by reading:
+>
+> 1. **A cell that was not measured vanished.** `render`'s `(Some, Some) => …, _ => continue`
+>    dropped the cell with no marker and the rose/fell counter's `_ => {}` shrank the count.
+>    Safe only while every variant applied to every scenario, which a *value* substitution
+>    always does and a mechanism swap need not: **ten of the twenty-three biosphere flows are
+>    in all four canonical builds** and the other thirteen — decomposition, humification,
+>    microbial respiration, the nitrogen releases, grazing — are chamber-only. So "swap the
+>    soil carbon scheme" is an ordinary request the open field cannot be asked.
+> 2. **The hazard this slice was written around cannot happen** (see the STATUS block); the
+>    reachable one is a *constant* series, and that is the guard that was built.
+> 3. **A knockout can end the run**, which nothing here anticipated. Not built for, found on
+>    the first column: dropping root water uptake starves the crop and both perennial chambers
+>    raise at the annual reset (*"seed bank too small to re-sow"*). Before it was handled the
+>    report panicked four levels down, inside `readouts`.
 
 ## 8. The first pair — the recommendation, and why it is a control rather than a question
 

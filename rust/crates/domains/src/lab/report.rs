@@ -16,6 +16,32 @@
 //! 4. **Never store a ranking; re-derive it.** "The tightest of the five" inverted in six
 //!    commits. Nothing here is cached between runs.
 //! 5. **State what did NOT move.** A null result is the finding.
+//! 6. **A cell that was not measured says so.** Added for the mechanism variants of slice 4,
+//!    because until then it could not arise: a parameter substitution applies to every
+//!    scenario, so every column had every row. A mechanism swap need not — ten of the
+//!    twenty-three biosphere flows are in all four canonical builds, and the other thirteen
+//!    are where the soil-carbon and nitrogen science lives. The renderer used to `continue`
+//!    past a missing value, dropping the cell with no marker and shrinking the rose/fell
+//!    count silently, which is `every_spec_names_a_scenario_that_is_actually_run`'s failure
+//!    arriving through a new door.
+//! 7. **A readout whose series never moved says so.** ⚠ Slice 4 of the science-switch plan
+//!    named the wrong hazard here, and the correction is worth more than the guard. The plan
+//!    expected an *empty* series folding to `+infinity` — "comfortably above the compensation
+//!    point". That cannot happen: a composition rewrites the flow list and stock presence
+//!    comes from `build_season_with`, so every series is exactly as long as the frozen run's,
+//!    and `min_ppm` asserts non-emptiness anyway. What a swap **can** do is remove a stock's
+//!    only writer, leaving the series **constant** — and then `min_ppm` returns the initial
+//!    charge, which is finite, plausible and passes any reading of the floor. That is the
+//!    worse failure, because `+infinity` is conspicuous and a plausible number is not.
+//! 8. **A run that did not survive the season is a result, not a crash.** ⚠ The one nobody
+//!    predicted — not the plan, not the design review, and it appeared on the first mechanism
+//!    column ever built. Knocking out a load-bearing process does not merely move the numbers:
+//!    drop root water uptake and the crop never stores enough carbon to re-sow, so the two
+//!    perennial chambers raise at the annual reset. That is the *ordinary* outcome of an
+//!    interesting knockout, and arguably the strongest result one can produce, so it is
+//!    printed in the engine's own words — and kept distinct from requirement 6, because
+//!    "this scenario has no such process" says nothing about the science and "this scenario
+//!    dies without it" says a great deal.
 //!
 //! ## ⚠⚠ What this report is NOT
 //!
@@ -32,18 +58,21 @@
 //! The `extinction_coef` question this was built for is open and the user's. The report
 //! regenerates the evidence; it does not choose.
 
+use super::mechanism::Composition;
 use super::Substitution;
 use crate::biosphere::drift::year_summaries;
 use crate::biosphere::params::BiosphereParams;
 use crate::biosphere::readouts::{
-    floor_ppm, min_ppm, peak_lai, peak_w, segment_max, trajectory, Trajectory,
+    floor_ppm, min_ppm, peak_lai, peak_w, segment_max, try_trajectory_composed, Trajectory,
+    TrajectoryError,
 };
 use crate::biosphere::science_gates::{ScienceGate, GATES};
 use crate::biosphere::{
-    consumer_chamber_scenario, perennial_chamber_scenario, sealed_chamber_scenario, SeasonScenario,
-    CONSUMER_CHAMBER_YEARS, DEFAULT_SCENARIO, LONG_HORIZON_YEARS, PERENNIAL_CHAMBER_YEARS,
-    SEALED_CHAMBER_YEARS,
+    build_season_with, consumer_chamber_scenario, perennial_chamber_scenario,
+    sealed_chamber_scenario, SeasonScenario, CONSUMER_CHAMBER_YEARS, DEFAULT_SCENARIO,
+    LONG_HORIZON_YEARS, PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
 };
+use simcore::error::SimError;
 
 /// Years dropped before the fixed point is read — the perennial gate's own transient.
 const FIXED_POINT_TRANSIENT: usize = 8;
@@ -65,6 +94,13 @@ pub struct ReadoutSpec {
     /// Needs the 15-year horizon: minutes rather than seconds.
     pub long: bool,
     fold: fn(&Trajectory) -> f64,
+    /// The per-step series `fold` reads — requirement 7's subject.
+    ///
+    /// ⚠ Data beside the fold rather than re-derived in the constancy check, for the reason
+    /// the `scenario` pairing is data: a loop that guessed which series a fold reads would be
+    /// a second copy of the pairing, and the copies would disagree the first time a fold
+    /// changed. `peak_w` reads three, which is why this is a list and not one accessor.
+    series: fn(&Trajectory) -> Vec<&[f64]>,
 }
 
 fn fixed_point(t: &Trajectory) -> f64 {
@@ -90,6 +126,7 @@ pub const SPECS: &[ReadoutSpec] = &[
         degenerate: None,
         long: false,
         fold: peak_lai,
+        series: |t| vec![&t.leaf_c],
     },
     ReadoutSpec {
         scenario: "open_season",
@@ -98,6 +135,7 @@ pub const SPECS: &[ReadoutSpec] = &[
         degenerate: None,
         long: false,
         fold: peak_w,
+        series: |t| vec![&t.leaf_c, &t.stem_c, &t.storage_c],
     },
     ReadoutSpec {
         scenario: "sealed_chamber",
@@ -106,6 +144,7 @@ pub const SPECS: &[ReadoutSpec] = &[
         degenerate: None,
         long: false,
         fold: min_ppm,
+        series: |t| vec![&t.carbon_pool],
     },
     ReadoutSpec {
         scenario: "perennial_chamber",
@@ -114,6 +153,7 @@ pub const SPECS: &[ReadoutSpec] = &[
         degenerate: None,
         long: false,
         fold: min_ppm,
+        series: |t| vec![&t.carbon_pool],
     },
     ReadoutSpec {
         scenario: "consumer_chamber",
@@ -122,6 +162,7 @@ pub const SPECS: &[ReadoutSpec] = &[
         degenerate: None,
         long: false,
         fold: min_ppm,
+        series: |t| vec![&t.carbon_pool],
     },
     ReadoutSpec {
         scenario: "perennial_long_horizon",
@@ -134,6 +175,7 @@ pub const SPECS: &[ReadoutSpec] = &[
         degenerate: Some(0.253),
         long: true,
         fold: fixed_point,
+        series: |t| vec![&t.leaf_c],
     },
     ReadoutSpec {
         scenario: "perennial_long_horizon",
@@ -142,6 +184,7 @@ pub const SPECS: &[ReadoutSpec] = &[
         degenerate: None,
         long: true,
         fold: min_ppm,
+        series: |t| vec![&t.carbon_pool],
     },
 ];
 
@@ -179,12 +222,45 @@ fn runs() -> Vec<(&'static str, SeasonScenario, usize, bool)> {
     ]
 }
 
+/// What one column varies against the frozen tree.
+///
+/// The two halves of the harness, as one type so a table can hold both: `Values` is the
+/// value switch (`docs/log/value-switch-harness.md`), `Mechanism` the science switch.
+pub enum Change {
+    /// Param substitutions, applied before assembly. **Always applicable** — every scenario
+    /// loads every param file, so a substitution reaches every row of every column.
+    Values(Vec<Substitution>),
+    /// A flow composition, applied after assembly, at the frozen params. Applicable only to
+    /// the scenarios whose registry contains its targets — see [`Composition`].
+    Mechanism(Composition),
+}
+
 /// One measured column of the table.
 pub struct Column {
     /// What was substituted, in the reader's words (`"frozen"` for the baseline).
     pub label: String,
     /// `(spec index, value)` for every spec measured.
     pub values: Vec<(usize, f64)>,
+    /// `(spec index, why)` for every spec this column could **not** be measured on.
+    ///
+    /// ⚠ Requirement 6. A mechanism variant whose target is not in a scenario's registry is
+    /// not a failure and not a zero — it is a question that scenario cannot answer. Carried
+    /// so the renderer prints a marked cell; what it replaced was a cell that simply was not
+    /// there, and a rose/fell count quietly taken over fewer rows.
+    pub not_applicable: Vec<(usize, String)>,
+    /// `(spec index, why)` for every spec whose run **did not survive the season**.
+    ///
+    /// ⚠ Requirement 8, and it is the one nobody predicted — neither the plan nor the design
+    /// review. Knocking out a load-bearing process does not merely move the numbers: it can
+    /// end the run. Dropping root water uptake starves the crop, the perennial chambers raise
+    /// at the annual reset (*"seed bank too small to re-sow"*), and that is the **ordinary**
+    /// outcome of an interesting knockout rather than an edge case. It is a result — arguably
+    /// the strongest one a knockout can produce — so it is printed, with the engine's own
+    /// words, and kept distinct from [`Column::not_applicable`]: "this scenario has no such
+    /// process" says nothing about the science, "this scenario dies without it" says a lot.
+    pub failed: Vec<(usize, String)>,
+    /// Spec indices whose input series never moved over the whole run — requirement 7.
+    pub constant: Vec<usize>,
     /// The compensation-point floor at these params.
     ///
     /// ⚠ A column, not a constant: it is `Γ*/ci_ratio`, so a substitution touching
@@ -198,9 +274,44 @@ pub struct Column {
     pub events: usize,
 }
 
-/// Measure every applicable spec against `p`.
+/// Whether a per-step series ever moved. Bitwise, so a `-0.0`/`0.0` pair reads as movement
+/// and a series that returns to where it started still counts as having moved.
+fn is_constant(series: &[f64]) -> bool {
+    match series.first() {
+        // ⚠ An EMPTY series is deliberately not "constant". Emptiness is the folds' own
+        // assertion to make (`min_ppm` panics on it), and calling it constant here would turn
+        // a loud wiring error into a printed warning.
+        None => false,
+        Some(first) => series.iter().all(|v| v.to_bits() == first.to_bits()),
+    }
+}
+
+/// Measure every applicable spec at `p`, through the frozen build — the value-switch column.
+/// ⚠ The `expect` is not a shrug. With no composition the only `Err` route left is
+/// `build_season_with` itself refusing these params — every *run* failure is captured as a
+/// dead cell rather than returned — and a substitution that a compartment builder rejects has
+/// already been rejected by the frozen bounds in [`super::biosphere_with`]. If this ever fires
+/// it is the value seam's guard having been bypassed, not a case this function should absorb.
 pub fn measure(label: &str, p: &BiosphereParams, long: bool) -> Column {
+    measure_composed(label, p, long, None)
+        .expect("the frozen build refused params the value seam's bounds had accepted")
+}
+
+/// The one measurement body: every spec of every run, optionally through a composition.
+///
+/// `comp` is `None` for the baseline and for a value variant, and the flow list is then the
+/// frozen one. With a composition, each run is checked for applicability **before** it is
+/// driven, so a scenario the request does not reach costs one assembly rather than a season.
+pub fn measure_composed(
+    label: &str,
+    p: &BiosphereParams,
+    long: bool,
+    comp: Option<&Composition>,
+) -> Result<Column, SimError> {
     let mut values = Vec::new();
+    let mut not_applicable = Vec::new();
+    let mut failed = Vec::new();
+    let mut constant = Vec::new();
     let mut rationed = 0;
     let mut events = 0;
     for (name, scenario, years, perennial) in runs() {
@@ -213,32 +324,95 @@ pub fn measure(label: &str, p: &BiosphereParams, long: bool) -> Column {
         if needed.is_empty() {
             continue;
         }
-        let t = trajectory(scenario, years, perennial, p);
+        // ⚠ Applicability is asked **before** the run and answered per scenario. A composition
+        // naming a flow this scenario's build does not carry is not an error here: the frozen
+        // scenarios do not share a flow set, and refusing the whole comparison would make the
+        // report unusable for exactly the swaps worth running. Every OTHER refusal in
+        // `build_season_composed` is about the request rather than the scenario, so it still
+        // propagates and stops the comparison.
+        let absent = match comp {
+            Some(c) => c.absent_targets(&scenario, p)?,
+            None => Vec::new(),
+        };
+        if !absent.is_empty() {
+            let why = format!("{absent:?} is not in {name}'s registry");
+            not_applicable.extend(needed.iter().map(|i| (*i, why.clone())));
+            continue;
+        }
+        let build = |s: &SeasonScenario, p: &BiosphereParams| match comp {
+            Some(c) => c.apply(s, p),
+            None => build_season_with(s, p),
+        };
+        // ⚠ The two failure modes are handled differently on purpose (see `TrajectoryError`).
+        // A malformed composition is wrong under every scenario and stops the comparison; a
+        // run that does not survive the season is this scenario's answer to the question, and
+        // requirement 8 is that it gets printed rather than crashing the report.
+        let t = match try_trajectory_composed(scenario, years, perennial, p, &build) {
+            Ok(t) => t,
+            Err(TrajectoryError::Setup(e)) => return Err(e),
+            Err(TrajectoryError::Run(e)) => {
+                let why = format!("{name}: {e}");
+                failed.extend(needed.iter().map(|i| (*i, why.clone())));
+                continue;
+            }
+        };
         rationed += t.rationed;
         events += t.events;
         for i in needed {
             values.push((i, (SPECS[i].fold)(&t)));
+            if (SPECS[i].series)(&t).iter().all(|s| is_constant(s)) {
+                constant.push(i);
+            }
         }
     }
-    Column {
+    Ok(Column {
         label: label.to_string(),
         values,
+        not_applicable,
+        failed,
+        constant,
         floor_ppm: floor_ppm(p),
         rationed,
         events,
-    }
+    })
 }
 
 /// The baseline column plus one per variant, in the order given.
 pub fn compare(
     variants: &[(String, Vec<Substitution>)],
     long: bool,
-) -> Result<Vec<Column>, config::ConfigError> {
-    let mut columns = vec![measure("frozen", &super::biosphere_with(&[])?, long)];
-    for (label, subs) in variants {
-        columns.push(measure(label, &super::biosphere_with(subs)?, long));
+) -> Result<Vec<Column>, SimError> {
+    let changes: Vec<(String, Change)> = variants
+        .iter()
+        .map(|(label, subs)| (label.clone(), Change::Values(subs.clone())))
+        .collect();
+    compare_changes(&changes, long)
+}
+
+/// The baseline column plus one per variant, values and mechanisms mixed.
+///
+/// ⚠ A mechanism column takes the **frozen** params. This harness changes one thing at a time
+/// by construction; a column varying a coefficient *and* a process is spelled by a caller who
+/// means it, through [`measure_composed`] against substituted params.
+pub fn compare_changes(variants: &[(String, Change)], long: bool) -> Result<Vec<Column>, SimError> {
+    let frozen = super::biosphere_with(&[]).map_err(as_request_error)?;
+    let mut columns = vec![measure("frozen", &frozen, long)];
+    for (label, change) in variants {
+        columns.push(match change {
+            Change::Values(subs) => {
+                let p = super::biosphere_with(subs).map_err(as_request_error)?;
+                measure(label, &p, long)
+            }
+            Change::Mechanism(comp) => measure_composed(label, &frozen, long, Some(comp))?,
+        });
     }
     Ok(columns)
+}
+
+/// A bad substitution is a bad **request**, and the report has one error type so a caller does
+/// not have to know which half of the harness refused it.
+fn as_request_error(e: config::ConfigError) -> SimError {
+    SimError::Validation(e.to_string())
 }
 
 /// The gates a spec informs, resolved against [`GATES`] — requirement 2's authority label.
@@ -256,8 +430,12 @@ fn value_of(col: &Column, spec: usize) -> Option<f64> {
 /// Render the comparison as text. See the module header for what these numbers are and are not.
 pub fn render(columns: &[Column], long: bool) -> String {
     let mut out = String::new();
+    // ⚠ "lab report", not "value-switch report", which is what it said until slice 4 handed
+    // the same renderer to the mechanism half. A shared renderer announcing one of its two
+    // callers is a small thing that misfiles evidence: a table headed "value-switch" over a
+    // knockout column is the kind of caption a reader quotes later.
     out.push_str(
-        "value-switch report — MEASURED QUANTITIES, not pass/fail verdicts.\n\
+        "biosphere lab report — MEASURED QUANTITIES, not pass/fail verdicts.\n\
          Each row gives what the model produces and the bound as the contract RECORDS it;\n\
          comparing the two is the reader's job, because a bound is prose, not an evaluator.\n\n",
     );
@@ -282,28 +460,65 @@ pub fn render(columns: &[Column], long: bool) -> String {
         for g in &gates {
             out.push_str(&format!("    bound as recorded: {}\n", g.bound));
         }
-        let base_v = value_of(base, i);
+        // ⚠ The baseline column measures every rendered row by construction — the frozen build
+        // reaches every scenario. If it ever does not, the row is unreadable rather than
+        // partly readable, and saying so beats printing variant numbers with nothing to
+        // difference them against.
+        let Some(b) = value_of(base, i) else {
+            out.push_str(
+                "    ⚠ THE BASELINE DID NOT MEASURE THIS ROW — no cell below can be compared\n\n",
+            );
+            continue;
+        };
         for col in columns {
-            let (b, v) = match (base_v, value_of(col, i)) {
-                (Some(b), Some(v)) => (b, v),
-                _ => continue,
-            };
-            let mut line = format!("    {:<38} {v:>14.6}", col.label);
-            if col.label != base.label {
-                let delta = v - b;
-                let rel = if b == 0.0 {
-                    f64::NAN
-                } else {
-                    delta / b * 100.0
-                };
-                line.push_str(&format!("  {delta:+.6} ({rel:+.3} %)"));
-                if delta == 0.0 {
-                    line.push_str("  <- UNCHANGED");
+            let mut line = match value_of(col, i) {
+                Some(v) => {
+                    let mut line = format!("    {:<38} {v:>14.6}", col.label);
+                    if col.label != base.label {
+                        let delta = v - b;
+                        let rel = if b == 0.0 {
+                            f64::NAN
+                        } else {
+                            delta / b * 100.0
+                        };
+                        line.push_str(&format!("  {delta:+.6} ({rel:+.3} %)"));
+                        if delta == 0.0 {
+                            line.push_str("  <- UNCHANGED");
+                        }
+                    }
+                    if let Some(d) = spec.degenerate {
+                        line.push_str(&format!("  [{:.3}x the {d} degenerate baseline]", v / d));
+                    }
+                    // Requirement 7: a plausible number off a series that never moved.
+                    if col.constant.contains(&i) {
+                        line.push_str(
+                            "  <- CONSTANT SERIES: this quantity's stock never moved, so the \
+                             number is the run's starting value and not a result",
+                        );
+                    }
+                    line
                 }
-            }
-            if let Some(d) = spec.degenerate {
-                line.push_str(&format!("  [{:.3}x the {d} degenerate baseline]", v / d));
-            }
+                // Requirements 6 and 8: a marked cell, never a missing one.
+                None => {
+                    let na = col.not_applicable.iter().find(|(j, _)| *j == i);
+                    let dead = col.failed.iter().find(|(j, _)| *j == i);
+                    match (na, dead) {
+                        (Some((_, why)), _) => format!(
+                            "    {:<38} {:>14}  <- NOT APPLICABLE: {why}",
+                            col.label, "n/a"
+                        ),
+                        (None, Some((_, why))) => format!(
+                            "    {:<38} {:>14}  <- RUN DID NOT COMPLETE: {why}",
+                            col.label, "dead"
+                        ),
+                        (None, None) => format!(
+                            "    {:<38} {:>14}  <- MEASURED BY NOTHING, and reported neither \
+                             inapplicable nor dead — this is a bug in the report",
+                            col.label, "?"
+                        ),
+                    }
+                }
+            };
             line.push('\n');
             out.push_str(&line);
         }
@@ -347,8 +562,13 @@ pub fn render(columns: &[Column], long: bool) -> String {
     }
 
     // Requirement 3 — opposed movement, stated rather than left to be spotted.
+    //
+    // ⚠ The unmeasured rows are counted and named here, not skipped. Until the mechanism
+    // variants arrived every column had every row, so `_ => {}` was unreachable; a mechanism
+    // swap makes it ordinary, and a summary reading "1 rose, 0 fell" over a table where four
+    // rows were never measured is requirement 3's wrong answer with a new cause.
     for col in columns.iter().skip(1) {
-        let (mut up, mut down, mut flat) = (0, 0, 0);
+        let (mut up, mut down, mut flat, mut absent) = (0, 0, 0, 0);
         for (i, spec) in SPECS.iter().enumerate() {
             if spec.long && !long {
                 continue;
@@ -357,18 +577,37 @@ pub fn render(columns: &[Column], long: bool) -> String {
                 (Some(b), Some(v)) if v > b => up += 1,
                 (Some(b), Some(v)) if v < b => down += 1,
                 (Some(_), Some(_)) => flat += 1,
+                (Some(_), None) => absent += 1,
                 _ => {}
             }
         }
         out.push_str(&format!(
-            "{}: {up} rose, {down} fell, {flat} did not move{}\n",
+            "{}: {up} rose, {down} fell, {flat} did not move{}{}\n",
             col.label,
+            if absent > 0 {
+                format!(", {absent} NOT MEASURED (see the marked cells above)")
+            } else {
+                String::new()
+            },
             if up > 0 && down > 0 {
                 "  <- OPPOSED: reading either family alone gives the wrong answer"
             } else {
                 ""
             }
         ));
+    }
+
+    // Requirement 7 — the stock that never moved, gathered where a reader scanning the
+    // warnings will see it rather than only beside its own cell.
+    for col in columns {
+        for i in &col.constant {
+            out.push_str(&format!(
+                "⚠ {}: {} / {} was folded over a series that NEVER MOVED — a mechanism swap can \
+                 remove a stock's only writer, and the fold then returns the run's starting \
+                 value, which is finite and plausible and means nothing\n",
+                col.label, SPECS[*i].scenario, SPECS[*i].quantity
+            ));
+        }
     }
 
     // The run-level preconditions a band depends on, and requirement 5's null results.
@@ -394,6 +633,8 @@ pub fn render(columns: &[Column], long: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lab::mechanism::{FlowFactory, ScaledMechanism};
+    use simcore::flow::Flow;
 
     /// ⚠ The link between a measured quantity and the claim it informs is the one thing here
     /// that could rot silently — a gate's `quantity` string is frozen manifest content and can
@@ -502,6 +743,266 @@ mod tests {
         assert!(
             text.contains("NO liveness_floors ROW IS IN THIS TABLE"),
             "{text}"
+        );
+    }
+
+    // -------------------------------------------------------------------------------------
+    // The mechanism half — slice 4 of the science-switch plan.
+    // -------------------------------------------------------------------------------------
+
+    /// A flow this scenario's own build carries, wrapped by `ScaledMechanism` at `factor`.
+    ///
+    /// Built per run, which is what [`FlowFactory`] exists for: five runs, and
+    /// `Box<dyn Flow>` is not `Clone`.
+    fn scaled(id: &'static str, factor: f64) -> (String, FlowFactory) {
+        (
+            id.to_string(),
+            Box::new(move |s: &SeasonScenario, p: &BiosphereParams| {
+                let (_state, registry) = build_season_with(s, p).expect("build");
+                let flow = registry
+                    .into_parts()
+                    .0
+                    .into_iter()
+                    .find(|f| f.id() == id)
+                    .unwrap_or_else(|| panic!("{id} is not in this build"));
+                Box::new(ScaledMechanism::new(flow, factor)) as Box<dyn Flow>
+            }),
+        )
+    }
+
+    fn short_report(label: &str, comp: Composition) -> (Vec<Column>, String) {
+        let columns = compare_changes(&[(label.to_string(), Change::Mechanism(comp))], false)
+            .expect("compare");
+        let text = render(&columns, false);
+        (columns, text)
+    }
+
+    /// ⚠⚠ **Direction one**, and it is the control the rest of this section rests on: a
+    /// composition that asks for nothing must reproduce the baseline column exactly. The
+    /// mechanism path assembles, tears the registry apart and rebuilds it; if that round trip
+    /// moved a number, every mechanism column below would be part composition and part
+    /// harness, with no way to tell which.
+    #[test]
+    fn an_empty_composition_reproduces_the_baseline_column_bit_for_bit() {
+        let (columns, _) = short_report("nothing", Composition::default());
+        let (base, empty) = (&columns[0], &columns[1]);
+        assert_eq!(base.values.len(), empty.values.len(), "row count");
+        for ((i, b), (j, v)) in base.values.iter().zip(&empty.values) {
+            assert_eq!(i, j, "the rows came back in a different order");
+            assert_eq!(
+                b.to_bits(),
+                v.to_bits(),
+                "{} / {}: the composers' round trip moved it ({b} vs {v})",
+                SPECS[*i].scenario,
+                SPECS[*i].quantity
+            );
+        }
+        assert!(empty.not_applicable.is_empty());
+        assert!(empty.failed.is_empty(), "{:?}", empty.failed);
+        assert!(empty.constant.is_empty(), "{:?}", empty.constant);
+        assert_eq!(empty.rationed, 0);
+        assert_eq!(empty.events, 0);
+    }
+
+    /// **Direction two**: a knockout reaches the table and moves it.
+    ///
+    /// `stem_remobilization` is in all four builds and the crop survives without it, so this
+    /// is the clean case: every row measured, numbers moved, no marker of any kind. The
+    /// interesting knockouts do not behave like this — see the test below.
+    #[test]
+    fn a_knockout_reaches_the_table() {
+        let (columns, text) = short_report(
+            "drop stem_remobilization",
+            Composition::dropping(&["biosphere.stem_remobilization"]),
+        );
+        let (base, dropped) = (&columns[0], &columns[1]);
+        assert!(
+            dropped.not_applicable.is_empty() && dropped.failed.is_empty(),
+            "expected every row measured, got n/a {:?} and dead {:?}",
+            dropped.not_applicable,
+            dropped.failed
+        );
+        assert_eq!(base.values.len(), dropped.values.len());
+        assert!(
+            base.values
+                .iter()
+                .zip(&dropped.values)
+                .any(|((_, b), (_, v))| b.to_bits() != v.to_bits()),
+            "the knockout column equals the baseline — it never reached the run:\n{text}"
+        );
+        assert!(!text.contains("NOT APPLICABLE"), "{text}");
+        assert!(!text.contains("DID NOT COMPLETE"), "{text}");
+        assert!(!text.contains("MEASURED BY NOTHING"), "{text}");
+    }
+
+    /// ⚠⚠ **Requirement 8**, and it is the finding this slice did not go looking for: a
+    /// knockout can **end the run**, and that is the ordinary case rather than the exception.
+    /// Without root water uptake the crop never stores enough carbon to re-sow, so both
+    /// perennial chambers raise at the annual reset while the two non-perennial runs complete
+    /// normally.
+    ///
+    /// Before this was handled the whole report panicked from inside `readouts`, four levels
+    /// below the caller, on the first mechanism column anyone would think to run.
+    ///
+    /// ⚠ Both directions in one column, which is what makes it evidence: the dead runs are
+    /// reported dead **and** the surviving runs are still measured. A report that gave up on
+    /// the whole column would pass a one-sided version of this.
+    #[test]
+    fn a_knockout_that_kills_the_run_reports_it_and_keeps_the_runs_that_survived() {
+        let (columns, text) = short_report(
+            "drop root_zone_capture",
+            Composition::dropping(&["biosphere.root_zone_capture"]),
+        );
+        let col = &columns[1];
+        assert!(
+            col.not_applicable.is_empty(),
+            "root_zone_capture is in all four builds: {:?}",
+            col.not_applicable
+        );
+        let dead: Vec<&str> = col.failed.iter().map(|(i, _)| SPECS[*i].scenario).collect();
+        assert_eq!(
+            dead,
+            vec!["perennial_chamber", "consumer_chamber"],
+            "the perennial runs are the ones that cannot re-sow without root uptake"
+        );
+        assert!(
+            col.failed.iter().all(|(_, why)| why.contains("seed bank")),
+            "the cell does not carry the engine's own reason: {:?}",
+            col.failed
+        );
+        assert!(
+            col.values.len() == 3,
+            "the surviving runs stopped being measured: {:?}",
+            col.values
+        );
+        assert!(text.contains("RUN DID NOT COMPLETE"), "{text}");
+        assert!(text.contains("2 NOT MEASURED"), "{text}");
+        assert!(!text.contains("MEASURED BY NOTHING"), "{text}");
+    }
+
+    /// ⚠⚠ **Requirement 6.** `biosphere.decomposition` is in the three chambers and not in the
+    /// open field, so two of the five rows cannot be asked of this variant at all. Before this
+    /// slice the renderer dropped those cells with no marker and the movement summary was
+    /// silently taken over the rows that remained.
+    ///
+    /// The assertion is in both directions on purpose: the inapplicable rows say so **and** the
+    /// applicable ones are still measured. A column that simply failed everywhere would pass a
+    /// one-sided version of this test.
+    ///
+    /// ⚠ And this variant turns out to be the one that carries **every** cell state at once —
+    /// two rows the open field cannot be asked, two runs that die without soil carbon, one
+    /// number. Four of the five short rows answer nothing, which the summary line says. A
+    /// reader who saw only "1 rose, 0 fell" would take a one-row table for a five-row one.
+    #[test]
+    fn a_variant_that_does_not_reach_a_scenario_says_so_in_the_cell_and_the_summary() {
+        let (columns, text) = short_report(
+            "drop decomposition",
+            Composition::dropping(&["biosphere.decomposition"]),
+        );
+        let col = &columns[1];
+        let absent: Vec<&str> = col
+            .not_applicable
+            .iter()
+            .map(|(i, _)| SPECS[*i].scenario)
+            .collect();
+        assert_eq!(
+            absent,
+            vec!["open_season", "open_season"],
+            "the open field's two rows are the ones decomposition cannot be asked of"
+        );
+        let dead: Vec<&str> = col.failed.iter().map(|(i, _)| SPECS[*i].scenario).collect();
+        assert_eq!(
+            dead,
+            vec!["perennial_chamber", "consumer_chamber"],
+            "without soil decomposition the perennial chambers cannot re-sow"
+        );
+        let measured: Vec<&str> = col.values.iter().map(|(i, _)| SPECS[*i].scenario).collect();
+        assert_eq!(
+            measured,
+            vec!["sealed_chamber"],
+            "the one run that both carries decomposition and survives without it"
+        );
+        assert!(text.contains("NOT APPLICABLE"), "{text}");
+        assert!(
+            text.contains("is not in open_season's registry"),
+            "the cell does not say WHY:\n{text}"
+        );
+        assert!(text.contains("RUN DID NOT COMPLETE"), "{text}");
+        assert!(
+            text.contains("4 NOT MEASURED"),
+            "the movement summary counted over the measured rows only:\n{text}"
+        );
+        assert!(!text.contains("MEASURED BY NOTHING"), "{text}");
+    }
+
+    /// ⚠⚠ **Requirement 7 — the guard slice 4 actually owed**, and the plan named a different
+    /// one (see the module header). Zeroing every flow that writes leaf carbon leaves the leaf
+    /// series flat for the whole run: `peak_lai` then returns the sown value, which is a
+    /// perfectly ordinary-looking number off a run where nothing grew.
+    ///
+    /// ⚠ Three flows, not one, and that is a measurement rather than a convenience: every
+    /// stock these readouts fold has **at least two** writers on the frozen tree, so no single
+    /// swap can freeze one. `build_season_composed` takes several changes at once precisely
+    /// because that is the shape a real pair takes.
+    ///
+    /// The two-direction half is [`the_frozen_baseline_has_no_constant_series`] — without it
+    /// this assertion would also pass on a report that flagged everything.
+    #[test]
+    fn a_readout_folded_over_a_frozen_series_is_flagged() {
+        let comp = Composition {
+            replacements: vec![
+                scaled("biosphere.allocation", 0.0),
+                scaled("biosphere.maintenance_respiration", 0.0),
+                scaled("biosphere.senescence", 0.0),
+            ],
+            ..Composition::default()
+        };
+        let (columns, text) = short_report("no leaf carbon flows", comp);
+        let col = &columns[1];
+        let flagged: Vec<&str> = col.constant.iter().map(|i| SPECS[*i].quantity).collect();
+        assert!(
+            flagged.contains(&"peak LAI (m2 m-2)"),
+            "the leaf series was frozen and nothing said so: {flagged:?}\n{text}"
+        );
+        assert!(text.contains("CONSTANT SERIES"), "{text}");
+        assert!(text.contains("NEVER MOVED"), "{text}");
+
+        // ⚠ And NOT every row: the chamber pool still has writers this composition left alone,
+        // so a flag on it would mean the check is reporting the column rather than the series.
+        assert!(
+            !flagged.contains(&"season-low chamber CO2 (ppm)"),
+            "the chamber CO2 series was flagged too — the guard is not reading its own series"
+        );
+    }
+
+    /// Anti-vacuity for the guard above: on the frozen tree **no** readout's series is
+    /// constant, so the flag cannot be firing green and being weakened later to silence it.
+    #[test]
+    fn the_frozen_baseline_has_no_constant_series() {
+        let col = measure("frozen", &crate::biosphere::params::biosphere(), false);
+        assert!(
+            col.constant.is_empty(),
+            "the frozen tree already folds over a series that never moves: {:?}",
+            col.constant
+                .iter()
+                .map(|i| (SPECS[*i].scenario, SPECS[*i].quantity))
+                .collect::<Vec<_>>()
+        );
+        assert!(!col.values.is_empty(), "nothing was measured");
+    }
+
+    /// A request that is wrong about *itself*, rather than about a scenario, still stops the
+    /// whole comparison. The applicability path must not have turned every refusal into an
+    /// `n/a` cell.
+    #[test]
+    fn a_bad_request_is_still_an_error_and_not_a_blank_column() {
+        let comp = Composition::dropping(&["biosphere.allocation", "biosphere.allocation"]);
+        let err = compare_changes(&[("twice".to_string(), Change::Mechanism(comp))], false)
+            .map(|columns| columns.len())
+            .expect_err("naming one target twice is a bad request");
+        assert!(
+            format!("{err:?}").contains("named twice"),
+            "refused, but not by the guard under test: {err:?}"
         );
     }
 

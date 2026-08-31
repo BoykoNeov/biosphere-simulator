@@ -338,6 +338,132 @@ pub fn build_season_composed(
     Ok((state, registry))
 }
 
+/// A flow built fresh for one `(scenario, params)` pair.
+///
+/// ⚠ A factory rather than a `Box<dyn Flow>`, and the reason is the comparison report: it
+/// drives **five** runs per column, `Box<dyn Flow>` is not `Clone`, and the composers consume
+/// what they are given. Handing the same box to five runs is not expressible; re-deriving one
+/// per run in the caller is the roster-in-a-loop shape this module already refuses elsewhere.
+pub type FlowFactory = Box<dyn Fn(&SeasonScenario, &BiosphereParams) -> Box<dyn Flow>>;
+
+/// One mechanism change, held as a **request** so it can be applied to several scenarios.
+///
+/// [`build_season_composed`] takes a composition and a scenario together and answers for that
+/// pair. A report column is one composition against *many* scenarios, which raises a question
+/// a single call never has to answer: **the frozen scenarios do not share a flow set.** Ten of
+/// the twenty-three biosphere flows are in all four canonical builds; the other thirteen are
+/// scenario-specific, and they are where the interesting science lives — decomposition,
+/// humification, microbial respiration, the nitrogen releases, grazing. Measured 2026-08-31.
+///
+/// So "swap the soil carbon scheme" is a perfectly ordinary request that **cannot apply to the
+/// open field**, and a harness that treats that as an error is unusable for most of the swaps
+/// anyone would want. [`Composition::absent_targets`] is how a caller asks *before* running,
+/// so a scenario the request does not reach can be reported as not applicable rather than as a
+/// failure — or, worse, silently left out of the table.
+#[derive(Default)]
+pub struct Composition {
+    /// Flow ids removed — [`build_season_without`]'s argument.
+    pub drop_ids: Vec<String>,
+    /// `(target id, the flow to run instead)` — [`build_season_replacing`]'s argument.
+    pub replacements: Vec<(String, FlowFactory)>,
+    /// Flows the frozen build does not carry — [`build_season_adding`]'s argument.
+    pub additions: Vec<FlowFactory>,
+}
+
+impl Composition {
+    /// A knockout: the named flows removed.
+    pub fn dropping(ids: &[&str]) -> Composition {
+        Composition {
+            drop_ids: ids.iter().map(|id| id.to_string()).collect(),
+            ..Composition::default()
+        }
+    }
+
+    /// One flow replaced by the flow `make` builds for each run.
+    pub fn replacing(target: &str, make: FlowFactory) -> Composition {
+        Composition {
+            replacements: vec![(target.to_string(), make)],
+            ..Composition::default()
+        }
+    }
+
+    /// One flow the frozen build does not carry, added.
+    pub fn adding(make: FlowFactory) -> Composition {
+        Composition {
+            additions: vec![make],
+            ..Composition::default()
+        }
+    }
+
+    /// The ids this composition needs to find in a scenario's registry: everything it drops
+    /// or replaces.
+    ///
+    /// ⚠ Additions are **not** here, and that asymmetry is the point. A missing target means
+    /// "this scenario does not have this process", which is a fact about the scenario; an
+    /// addition whose id is already present means "this is a replacement wearing the wrong
+    /// name", which is a fact about the *request* and stays an error.
+    pub fn targets(&self) -> Vec<&str> {
+        self.drop_ids
+            .iter()
+            .map(String::as_str)
+            .chain(self.replacements.iter().map(|(id, _)| id.as_str()))
+            .collect()
+    }
+
+    /// Which of [`Composition::targets`] this scenario's registry does not contain.
+    ///
+    /// Empty means [`Composition::apply`] will not fail *for that reason* — every other
+    /// refusal in [`build_season_composed`] is about the request and applies to every
+    /// scenario equally.
+    ///
+    /// ⚠ This builds the season a second time rather than reading the ids out of a build the
+    /// caller already has. That is deliberate: the alternative is to hand the assembled parts
+    /// to a second composition path, which is the two-bodies defect this module exists to
+    /// close. An assembly is cheap next to the run it precedes — the long-horizon column
+    /// spends minutes in `run_perennial` — so the honest shape is affordable here.
+    pub fn absent_targets(
+        &self,
+        scenario: &SeasonScenario,
+        p: &BiosphereParams,
+    ) -> Result<Vec<String>, SimError> {
+        let (_state, registry) = build_season_with(scenario, p)?;
+        let present: BTreeSet<&str> = registry.flows().iter().map(|f| f.id()).collect();
+        Ok(self
+            .targets()
+            .into_iter()
+            .filter(|id| !present.contains(id))
+            .map(str::to_string)
+            .collect())
+    }
+
+    /// This composition, applied — [`build_season_composed`] with the factories run.
+    pub fn apply(
+        &self,
+        scenario: &SeasonScenario,
+        p: &BiosphereParams,
+    ) -> Result<(State, Registry), SimError> {
+        let drops: Vec<&str> = self.drop_ids.iter().map(String::as_str).collect();
+        let replacements: Vec<(&str, Box<dyn Flow>)> = self
+            .replacements
+            .iter()
+            .map(|(id, make)| (id.as_str(), make(scenario, p)))
+            .collect();
+        let additions: Vec<Box<dyn Flow>> =
+            self.additions.iter().map(|make| make(scenario, p)).collect();
+        build_season_composed(scenario, p, &drops, replacements, additions)
+    }
+
+    /// Whether this composition asks for anything at all.
+    ///
+    /// ⚠ An empty composition is the science half's `UNCHANGED` column — a round trip through
+    /// the composers that must reproduce the frozen run bit for bit. It is not an error, but a
+    /// *report* built from one is measuring nothing, and the caller that offers a column
+    /// should say so rather than print a second baseline under an experiment's label.
+    pub fn is_empty(&self) -> bool {
+        self.drop_ids.is_empty() && self.replacements.is_empty() && self.additions.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
