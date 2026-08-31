@@ -56,10 +56,22 @@ one object down two independent routes, so it can fail. Here there is no second 
 
 The control is kept (it is cheap, and would catch a `Registry::new` that was not order-invariant)
 and labelled in place as proving less than it looks like it does. The gate with teeth is a
-**source scan**, `tests/one_assembly_body.rs`: three needles that only an assembly uses —
-`compartments(`, `boundary::loss_sinks(`, `Registry::new(` — must each occur exactly once under
-`src/biosphere/`, inside `build_season_with`'s line range. Re-fork the body anywhere in the spine
-and it goes red by file and line.
+**source scan**, `tests/one_assembly_body.rs`: the three steps only an assembly takes — walk the
+compartment builds, add the boundary loss-sinks, close a registry over them — must each happen
+exactly once under `src/biosphere/`, inside `build_season_with`'s line range. Re-fork the body
+anywhere in the spine and it goes red by file and line.
+
+⚠ **The first draft of that gate had a hole, found by review before it shipped:** it looked for
+the literal `Registry::new(`, and `Registry::flows_only` delegates to it — so a fork spelling the
+registry step the other way would have passed. Measured at zero calls under the spine, then
+closed by **deriving** the spellings from `simcore`'s own `impl Registry` (every `pub fn`
+returning `Result<Registry, …>`) and combining the counts. A third constructor tomorrow is
+scanned for without editing the gate. *A name is not a claim its arithmetic checks.*
+
+**And the one-directory scope is a proof, not a limitation:** `fn compartments(` is
+module-private, so nothing outside `system.rs` can walk the compartment builds at all. The
+privacy is pinned by the same test that pins the exclusion, because the scope argument rests on
+it.
 
 Three details it earned:
 
@@ -100,6 +112,11 @@ Three anti-vacuity halves, since a subset check passes over an empty set:
 * the toggle roster is read off the `SeasonScenario` **declaration**: a sixth `bool` field
   reddens the test by name instead of quietly escaping the sweep.
 
+⚠ **What the sweep is, said plainly:** one flip from each of four canonical bases — not the
+32-point flag space. A type gated by a conjunction two flips from every base would be outside
+its reach; none is today, and that is a measurement of this roster rather than a property of the
+design.
+
 ## What is NOT built, and what is NOT taken
 
 * **Slices 2 and 3** — the replace/add composers, their three gates, and the two constructional
@@ -129,7 +146,10 @@ to print:
   on any canonical scenario"*);
 * a sixth `bool` field on `SeasonScenario` → the roster gate, naming `extra_switch`;
 * a second assembly body, written into test code → the source scan, at `system.rs:2086`, quoting
-  the offending line.
+  the offending line;
+* **(after the widening)** a registry built by the *other* constructor and nothing else → the
+  registry step, listing both derived spellings. This is the mutation the first draft would have
+  passed.
 
 ⚠ The last one is also the evidence that the scan reads test code: the fork it caught was inside
 `#[cfg(test)]`, where the original defect lived.

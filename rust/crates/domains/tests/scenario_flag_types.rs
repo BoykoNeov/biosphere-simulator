@@ -39,6 +39,13 @@
 //!   declaration and asserts this file toggles all of its `bool` fields. A sixth flag lands
 //!   here by name instead of quietly escaping the scan — the derive-from-the-tree rule the
 //!   science-gate census and `param_funnel.rs`'s loader roster both follow.
+//!
+//! ⚠ **What the sweep is, stated rather than implied: one flip from each of four canonical
+//! bases** — 5 flags × 2 values × 4 scenarios, not the 32-point flag space. A type gated by a
+//! conjunction lying two flips from every canonical base would be outside its reach. None is
+//! today (`consumer` needs `sealed`, and the chambers supply it, so every real pair here is one
+//! flip from some base), but that is a measurement of this roster and not a property of the
+//! design — a claim about a space is dated to how it was measured.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
