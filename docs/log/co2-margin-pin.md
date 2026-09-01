@@ -233,16 +233,32 @@ line 163:
 
 The probe was reverted byte-for-byte (`git diff` on `params/` empty, the gate green again).
 
-**Gates run for the visibility half, on the finished tree — one run, after every edit.** ⚠ Stated
-that way on purpose: the first landing's gate sentence spanned two tree states and this one does
-not. `cargo test --release --no-fail-fast` → **1101 passed, 0 failed, 4 ignored across 64 result
-lines, exit 0**, with `manifest_writer`, `golden_regression` and `context_budget` confirmed by name
-in the binary list rather than inferred. ⚠ The count is read off the **whole** file: the first
-attempt was captured with `2>&1 > file`, which sends stderr to the *old* stdout and would have
-dropped `error: test failed` — that run was discarded and re-run with `> file 2>&1`, because *an
-instrument that cannot record a failure cannot report a pass*. `cargo clippy --all-targets -- -D
-warnings` clean; `rustfmt` on the one changed file, never bare `cargo fmt`; and
-`cargo run --release -q -p station --example regen_goldens` → **19 of 19 run, 0 would change**.
+**Gates run for the visibility half — and stated as WHAT RAN WHEN, not as one run.** The first
+landing's gate sentence was corrected for spanning two tree states, so this one names its states
+instead of claiming there was only one:
+
+* `cargo test --release --no-fail-fast` over the code change and every doc edit **except the two
+  below** → **1101 passed, 0 failed, 4 ignored across 64 result lines, exit 0**, with
+  `manifest_writer`, `golden_regression` and `context_budget` confirmed by name in the binary list
+  rather than inferred.
+* Then this gate paragraph was appended and the index row compressed — **doc-only, and nothing
+  under `docs/` feeds any test but `repo_gates`** — after which `context_budget` was re-run alone:
+  **10 passed**, which is the line cap and both parity checks.
+* `cargo clippy --all-targets -- -D warnings` clean; `rustfmt` on the one changed file, never bare
+  `cargo fmt`; `cargo run --release -q -p station --example regen_goldens` → **19 of 19 run, 0
+  would change**.
+
+⚠ **The count is read off the whole file, and the first capture was thrown away.** It used
+`2>&1 > file`, which sends stderr to the *old* stdout and would therefore have dropped
+`error: test failed` into the terminal instead of the file. Re-run with `> file 2>&1`, because *an
+instrument that cannot record a failure cannot report a pass* — the redirect operator is
+`mutation-battery-liveness` one level down from the `tail -60` pipeline the last landing corrected.
+
+⚠⚠ **1101 is byte-identical to the previous landing's figure, and that is not confirmation.** No
+test was added, so an unchanged total is exactly what a working suite prints — it says nothing
+about whether the new code was exercised. The evidence that it was: the `lab::report` module's own
+**16 tests** run green with the new row in the roster, and the guard reddening **by name** on the
+row before the run existed. A total that could not have moved is not a measurement.
 ⚠ **`canopy.yaml`'s own stale sentence is deliberately NOT fixed**, and that is the rule working
 rather than laziness: a comment-only edit to a param file moves its manifest hash and is itself an
 unfreeze event, which this control just demonstrated. A prose fix is not worth a freeze ceremony —
