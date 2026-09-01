@@ -118,13 +118,136 @@ closing note from an observation to a measurement: **four spans, one file, nothi
 of them.** All four are now struck in place with their reasons. The file has no gate and this pass
 is not one — it is a re-read, and the next one is owed the next time an item is taken off it.
 
-**NOT TAKEN, and named rather than skipped quietly: the visibility half.** The dead pin had two jobs.
+**~~NOT TAKEN~~, and named rather than skipped quietly: the visibility half.** The dead pin had two jobs.
 *Detection* is now re-owned for all five. *Visibility* is still four of five: `consumer_long_horizon`
 is a scenario in `GATES` with no `runs()` entry and no `SPECS` row in `lab::report`, so the lab report
 prints the margin for four of the five and nothing requires anyone to run it at unfreeze time. The
 report's own guard `every_spec_names_a_scenario_that_is_actually_run` forces the two to be added
 together, which means **a second 15-year run on every long-report invocation** — a runtime cost worth
-deciding on its own rather than folding into this item. Left to the user with the price attached.
+deciding on its own rather than folding into this item. ~~Left to the user with the price attached.~~
+
+---
+
+## The visibility half — **TAKEN AND BUILT 2026-09-01**, and the price was one second
+
+Same item, second half, so this is an amendment rather than a new row: no index line, no pointer
+row, no second record file. One source file changed —
+`rust/crates/domains/src/lab/report.rs` — one `SPECS` row, one `runs()` entry, two doc comments.
+No param, golden, manifest entry, science band or gate bound moved.
+
+**FINDING 7 — the price that parked it is ~1.2 s, and the default report pays nothing.** The
+paragraph above deferred this on a runtime cost it *described* but never *measured*: "a second
+15-year run on every long-report invocation… worth deciding on its own." Measured, release build,
+min-of-5, with the before and after binaries built separately and **alternated in one window**:
+
+| invocation (baseline + 1 variant) | before | after |
+|---|---|---|
+| default (short) report | 1.12 s | 1.09 s — **unchanged** |
+| `--long` | 2.28 s | 3.60 s — **+1.3 s** |
+
+The short report's zero is **structural, not luck**: `measure_composed` computes each run's
+`needed` spec set and `continue`s when it is empty, so a `long: true` spec costs nothing on the
+path that does not ask for it. The whole price falls on `--long`, and it is about a second per
+column.
+
+⚠ **The instrument had to be fixed before the number could be trusted, and the first three
+attempts were wrong.** Single `cargo run` passes on this box disagreed by **3×** — 4-column
+`--long` timed 9.8 s, 12.4 s, 23.5 s in three consecutive runs, and at one point the *before*
+binary timed **slower than the after**, which is impossible and was the tell. `Get-Process` named
+the cause: `MsMpEng` (the antivirus) was the top CPU consumer on the machine. *A wall clock on a
+contended box is not a measurement, and a before/after pair taken in two different windows is not
+a comparison.* Min-of-5, both binaries alternated in one window, reproduced across two passes.
+
+**FINDING 8 — the guard's own hypothetical was discharged as a prediction, not merely as a fix.**
+`every_spec_names_a_scenario_that_is_actually_run` carried this exact case in its doc comment:
+*"`consumer_long_horizon` is already a scenario in `GATES` with no `runs()` entry, so the next spec
+added under it is the one that would vanish."* The `SPECS` row was therefore landed **alone
+first** — and the guard failed by name on it (`consumer_long_horizon/season-low chamber CO2 (ppm)
+names no run`) before the `runs()` entry was added. So the control is the prediction being run,
+and the comment now records a **spent** example rather than being reworded into a fresh imaginary
+one.
+
+**The fifth row agrees with the pin — and that is a wiring check, not a second route to the
+number.** The report prints `consumer_long_horizon / season-low chamber CO2 (ppm)` frozen at
+**73.338613 ppm**; the pin holds that scenario's margin at **1.200866**, and
+`73.338613 / 61.071429 = 1.200866`. ⚠ Stated as exactly what it is, because this file's own
+standard is *a matching boolean from different arguments is `[] == []` in a passing test's
+clothes*: the pin folds `min_ppm` over `runs::consumer_long()` and the report folds `min_ppm` over
+`consumer_chamber_scenario()` at `LONG_HORIZON_YEARS` — same scenario, same fold, two call sites.
+What the agreement establishes is that the new row is wired to the **right run**. It is not
+independent evidence about the value.
+
+**One stale claim corrected at its locus:** `ReadoutSpec::long`'s doc said the 15-year horizon
+costs *"minutes rather than seconds"*. It is seconds — the numbers above are written in, with the
+contention caveat, because the next reader deciding whether to add a long row will read that field.
+
+### The standing re-read this item owed — §4 of the direction plan
+
+The half above closes with *"the next one is owed the next time an item is taken off it."* Taking
+this one, §4's remaining bullets were checked **against the tree, not re-read as prose**. Two are
+stale, one number is stale, three stand:
+
+⚠ Written as a **list, not a table**: the record-file cap is 120 characters and a markdown table
+row has no legal wrap point, so a table here would have forced the verdicts to be shortened to fit
+the format — and the verdicts are the finding. (`7f60442` is the same cap catching the same shape.)
+
+* **`Γ*`'s citation — STANDS.** `gamma_star` is still `TODO(cite)` in `photosynthesis.yaml`, and
+  all five band gates say so in their own `source`.
+* **Citation debt, "79 `TODO(cite)` across 37 files" — COUNT STALE, claim stands.** That count was
+  the deleted Python tree's. Re-measured on the reference: **60 across 20 files** in `domains`,
+  4 across 3 in `station`; the biosphere alone is 53 across 15.
+* **"A provenance-only edit is an unfreeze that nothing catches" — FALSIFIED**, measured rather
+  than argued. FINDING 10 below.
+* **"The freeze's prose half is ungated" — STANDS.**
+* **Potato stage 2 — STANDS.** The params came across with the flip
+  (`params/biosphere/crops/potato/`, 4 files), but `system.rs:1977` says in so many words that
+  *"the Rust roster has no potato build at all"*. A param move is not the habitat mirror.
+* **The canopy regulator, "DIAGNOSED, not built" — BUILT.** FINDING 9 below.
+
+**FINDING 9 — the canopy regulator shipped, under another item's name.** §4 still offers it as
+cheap open work whose *"inertness makes it a low-risk unfreeze"*. It is in the tree:
+`science::mutual_shading_rate`, called from two sites in `flows.rs`, parameterised in
+`senescence.yaml`, and gated by `the_vks_mutual_shading_regime_is_modelled_not_merely_avoided`
+— the Van Keulen & Seligman 5 %/day-above-LAI-6 rule that `canopy-regulator.md`'s FINDING 1
+identified. It landed as *"the mutual-shading loss the pair forced"* inside
+[`layered-canopy.md`](layered-canopy.md), so no row ever said "the canopy regulator is built".
+⚠ And the bullet is wrong twice more even as a description: `acceptance-gate-standing.md` records
+it as *inert on the chambers, **flipping** the canopy on `open_season`* — not "bit-identically
+inert on every frozen scenario" — and `gross-net-gas-exchange.md`'s FINDING 5 **eliminated it by
+measurement** as a fix, because it is a 5 %/day *loss* and the canopy it was offered to repair had
+fallen to 4.71. **Fourth instance of the shape** the last two records named: *a forward-looking
+list is written once and read many times, and nothing re-checks it.*
+
+**FINDING 10 — "nothing catches a provenance-only edit" is false, and the control is three
+commands.** `CLAUDE.md` has said since 2026-08-18 that C7 falsified it; §4 was never updated, and
+neither was the sentence inside `canopy.yaml` itself (*"a provenance-only unfreeze, which the
+manifest records and no test can see"*). Rather than cite the correction, it was **run**: append
+`(control probe)` to one `source:` string in `canopy.yaml`, and
+`the_committed_manifest_is_what_the_reference_writes` fails, naming the file and both hashes —
+
+```
+line 163:
+  writes:    "canopy.yaml": "8a504ca856651b046d8cd5271add2204a009718f1bc7c4972442a6d4ac53ad78",
+  committed: "canopy.yaml": "2e5a2f7f665886dff0f3c60f739b97163cb690213a6d30f6a850aa29411748fc",
+```
+
+The probe was reverted byte-for-byte (`git diff` on `params/` empty, the gate green again).
+
+**Gates run for the visibility half, on the finished tree — one run, after every edit.** ⚠ Stated
+that way on purpose: the first landing's gate sentence spanned two tree states and this one does
+not. `cargo test --release --no-fail-fast` → **1101 passed, 0 failed, 4 ignored across 64 result
+lines, exit 0**, with `manifest_writer`, `golden_regression` and `context_budget` confirmed by name
+in the binary list rather than inferred. ⚠ The count is read off the **whole** file: the first
+attempt was captured with `2>&1 > file`, which sends stderr to the *old* stdout and would have
+dropped `error: test failed` — that run was discarded and re-run with `> file 2>&1`, because *an
+instrument that cannot record a failure cannot report a pass*. `cargo clippy --all-targets -- -D
+warnings` clean; `rustfmt` on the one changed file, never bare `cargo fmt`; and
+`cargo run --release -q -p station --example regen_goldens` → **19 of 19 run, 0 would change**.
+⚠ **`canopy.yaml`'s own stale sentence is deliberately NOT fixed**, and that is the rule working
+rather than laziness: a comment-only edit to a param file moves its manifest hash and is itself an
+unfreeze event, which this control just demonstrated. A prose fix is not worth a freeze ceremony —
+the same reasoning `post-roadmap-log.md` records for `self_discharge.yaml`. What *is* honor-system
+is still the **ceremony**, not the regeneration.
 
 **Gates run, on the committed tree:** `cargo test --release --no-fail-fast` — **1101 tests across
 64 result lines, all green, 0 failed**, with

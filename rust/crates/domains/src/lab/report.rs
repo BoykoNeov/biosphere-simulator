@@ -91,7 +91,19 @@ pub struct ReadoutSpec {
     /// The measured **degenerate** value this quantity is read against, where one is on
     /// record — requirement 1.
     pub degenerate: Option<f64>,
-    /// Needs the 15-year horizon: minutes rather than seconds.
+    /// Needs the 15-year horizon, so it is off by default and `--long` asks for it.
+    ///
+    /// ⚠ *"minutes rather than seconds"* until 2026-09-01, when it was measured rather than
+    /// asserted. Adding this roster's fifth CO₂ row — a second 15-year run — moved a two-column
+    /// `--long` report from **2.3 s to 3.6 s**, and the short report **not at all** (1.1 s
+    /// either side). Release build, min-of-5, both binaries alternated in one window because
+    /// single passes on this box disagreed by 3× with the antivirus scanning.
+    ///
+    /// The short report's zero is structural, not luck: [`measure_composed`] skips a run whose
+    /// `needed` set is empty, so a `long: true` spec costs nothing on the default path. Between
+    /// them those two numbers are what discharged the price the fifth row had been parked
+    /// behind — *"a second 15-year run on every long-report invocation"* was true and cost
+    /// about a second.
     pub long: bool,
     fold: fn(&Trajectory) -> f64,
     /// The per-step series `fold` reads — requirement 7's subject.
@@ -186,6 +198,15 @@ pub const SPECS: &[ReadoutSpec] = &[
         fold: min_ppm,
         series: |t| vec![&t.carbon_pool],
     },
+    ReadoutSpec {
+        scenario: "consumer_long_horizon",
+        quantity: "season-low chamber CO2 (ppm)",
+        informs: &["season-low chamber CO₂ (ppm)"],
+        degenerate: None,
+        long: true,
+        fold: min_ppm,
+        series: |t| vec![&t.carbon_pool],
+    },
 ];
 
 /// The runs the specs read, `(name, scenario, years, perennial)`.
@@ -216,6 +237,17 @@ fn runs() -> Vec<(&'static str, SeasonScenario, usize, bool)> {
         (
             "perennial_long_horizon",
             perennial_chamber_scenario(),
+            LONG_HORIZON_YEARS,
+            true,
+        ),
+        // ⚠ The same scenario as `consumer_chamber`, driven 15 years instead of 5 — a second
+        // run, not a longer one, because `measure_composed` folds each run once and the two
+        // horizons are two rows. Its trough falls in year 5, so today it reads identically to
+        // its 5-year sibling; `margins::the_five_margins_are_pinned_not_merely_positive` says
+        // why that is a claim rather than a duplicate.
+        (
+            "consumer_long_horizon",
+            consumer_chamber_scenario(),
             LONG_HORIZON_YEARS,
             true,
         ),
@@ -543,7 +575,9 @@ pub fn render(columns: &[Column], long: bool) -> String {
         out.push('\n');
     }
 
-    out.push_str("chamber CO2 compensation point (ppm) — the floor the CO2 rows are read against\n");
+    out.push_str(
+        "chamber CO2 compensation point (ppm) — the floor the CO2 rows are read against\n",
+    );
     for col in columns {
         out.push_str(&format!("    {:<38} {:>14.6}\n", col.label, col.floor_ppm));
     }
@@ -684,9 +718,16 @@ mod tests {
     /// [`measure`] iterates the runs and filters the specs by name, so a spec naming a scenario
     /// that is not in `runs()` matches nothing and simply produces no row — no error, no gap in
     /// the table, just a claim quietly not measured. The short report's count assertion catches
-    /// it for a short spec and **nothing catches it for a `long: true` one**, which is not
-    /// hypothetical: `consumer_long_horizon` is already a scenario in [`GATES`] with no `runs()`
-    /// entry, so the next spec added under it is the one that would vanish.
+    /// it for a short spec and **nothing catches it for a `long: true` one**, which is why this
+    /// exists.
+    ///
+    /// ⚠ Its example was `consumer_long_horizon` — *"already a scenario in [`GATES`] with no
+    /// `runs()` entry, so the next spec added under it is the one that would vanish"* — and on
+    /// 2026-09-01 that spec was added. **The prediction was exercised before it was fixed**: the
+    /// spec landed alone first and this test failed by name on it, then the `runs()` entry landed
+    /// and it passed. So the example is spent, and it is recorded as a discharged prediction
+    /// rather than reworded into a fresh hypothetical — a guard whose example has been *run* is
+    /// worth more than one whose example is still imaginary.
     #[test]
     fn every_spec_names_a_scenario_that_is_actually_run() {
         let names: Vec<&str> = runs().iter().map(|(n, _, _, _)| *n).collect();
@@ -704,11 +745,7 @@ mod tests {
     /// labelling is decoration.
     #[test]
     fn the_roster_covers_both_authorities() {
-        let fields: Vec<&str> = SPECS
-            .iter()
-            .flat_map(gates_for)
-            .map(|g| g.field)
-            .collect();
+        let fields: Vec<&str> = SPECS.iter().flat_map(gates_for).map(|g| g.field).collect();
         assert!(fields.contains(&"science_bands"), "{fields:?}");
         assert!(fields.contains(&"liveness_floors"), "{fields:?}");
     }
@@ -757,7 +794,10 @@ mod tests {
     #[test]
     fn the_short_table_declares_the_family_it_cannot_show() {
         let text = at_k(0.65, false);
-        assert!(text.contains("MEASURED QUANTITIES, not pass/fail"), "{text}");
+        assert!(
+            text.contains("MEASURED QUANTITIES, not pass/fail"),
+            "{text}"
+        );
         assert!(
             text.contains("NO liveness_floors ROW IS IN THIS TABLE"),
             "{text}"
@@ -783,13 +823,13 @@ mod tests {
                     .into_iter()
                     .find(|f| f.id() == id)
                     .unwrap_or_else(|| {
-                    // ⚠ Not a convenience unwrap. A replacement factory is run only after
-                    // `absent_targets` has cleared this scenario, so reaching this arm is the
-                    // applicability pre-check having been skipped — which is what it says.
-                    panic!(
-                        "{id} is not in this build — the applicability pre-check did not run"
-                    )
-                });
+                        // ⚠ Not a convenience unwrap. A replacement factory is run only after
+                        // `absent_targets` has cleared this scenario, so reaching this arm is the
+                        // applicability pre-check having been skipped — which is what it says.
+                        panic!(
+                            "{id} is not in this build — the applicability pre-check did not run"
+                        )
+                    });
                 Box::new(ScaledMechanism::new(flow, factor)) as Box<dyn Flow>
             }),
         )

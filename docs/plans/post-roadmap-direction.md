@@ -345,17 +345,48 @@ These should ride the *same* unfreeze, not pay for a second one:
   re-value (a 3× crossing is robust), but the *number* 61.07 ppm should not appear in a
   science claim until it is sourced. It is a standard FvCB quantity — one targeted retrieval
   attempt, not a reopening of the citation bucket.
-- **Citation debt generally.** 79 `TODO(cite)` across 37 files. Bucket 3(C) closed after 7
+- **Citation debt generally.** ~~79 `TODO(cite)` across 37 files.~~ Bucket 3(C) closed after 7
   rounds as *blocked on retrieval, not effort*, with the residual risk documented. Don't
   reopen it wholesale; take single params when a finding leans on one.
-- **Contract hygiene — two known holes, both cheap:**
-  - A **provenance-only edit is an unfreeze that nothing catches** (the per-file sha-256 is
-    recorded but never compared). Currently honor-system.
+
+  ⚠ **The count was the deleted Python tree's; re-measured on the reference 2026-09-01:
+  60 `TODO(cite)` across 20 files in `domains` and 4 across 3 in `station` — the biosphere
+  alone is 53 across 15.** The claim stands; only the number was stale.
+- **Contract hygiene — ~~two known holes, both cheap~~ one, and the other was falsified:**
+  - ~~A **provenance-only edit is an unfreeze that nothing catches** (the per-file sha-256 is~~
+    ~~recorded but never compared). Currently honor-system.~~
+
+    ⚠⚠ **STRUCK 2026-09-01 — false since C7 (2026-08-18), and this time it was RUN rather
+    than cited.** `CLAUDE.md` has carried the correction for two weeks; this bullet never got
+    it. The reference now *writes* each manifest from the files it compiles in and
+    `manifest_writer.rs` byte-compares the committed one, so a `source:`-only edit leaves the
+    manifest stale and **red**. Control: appending `(control probe)` to one `source:` string
+    in `canopy.yaml` fails `the_committed_manifest_is_what_the_reference_writes` by name, with
+    both hashes printed; reverted byte-for-byte, gate green again. Record:
+    [`../log/co2-margin-pin.md`](../log/co2-margin-pin.md) FINDING 10. **What is still
+    honor-system is the ceremony, not the regeneration.**
   - **The freeze's prose half is ungated** — the manifest gate equates manifest↔tree; the
-    doc is not a side.
-- **Potato stage 2** — the Rust habitat mirror, deferred at stage 1.
-- **The canopy regulator** — DIAGNOSED, not built; fixes the canopy and is bit-identically
-  inert on every frozen scenario. Cheap, and its inertness makes it a low-risk unfreeze.
+    doc is not a side. ✅ **Re-checked 2026-09-01: stands.**
+- **Potato stage 2** — the Rust habitat mirror, deferred at stage 1. ✅ **Re-checked
+  2026-09-01: stands.** The params crossed with the flip
+  (`params/biosphere/crops/potato/`, 4 files), but `system.rs:1977` records that *"the Rust
+  roster has no potato build at all"* — a param move is not the habitat mirror.
+- ~~**The canopy regulator** — DIAGNOSED, not built; fixes the canopy and is bit-identically~~
+  ~~inert on every frozen scenario. Cheap, and its inertness makes it a low-risk unfreeze.~~
+
+  ⚠⚠ **STRUCK 2026-09-01: it is BUILT, and the bullet is wrong twice more as a description.**
+  `science::mutual_shading_rate` is called from two sites in `flows.rs`, parameterised in
+  `senescence.yaml` and gated by
+  `the_vks_mutual_shading_regime_is_modelled_not_merely_avoided` — the Van Keulen & Seligman
+  5 %/day-above-LAI-6 rule that [`../log/canopy-regulator.md`](../log/canopy-regulator.md)
+  FINDING 1 identified. It shipped as *"the mutual-shading loss the pair forced"* inside
+  [`../log/layered-canopy.md`](../log/layered-canopy.md), so **no row ever said "the canopy
+  regulator is built"**. Beyond that: it is *inert on the chambers and flips the canopy on
+  `open_season`* (`../log/acceptance-gate-standing.md`), not inert everywhere; and
+  `../log/gross-net-gas-exchange.md` FINDING 5 **eliminated it by measurement** as a fix,
+  since it is a 5 %/day *loss* and the canopy offered to it had fallen to 4.71. **Fourth
+  instance** of *a forward-looking list is written once and read many times, and nothing
+  re-checks it*.
 
 ---
 
