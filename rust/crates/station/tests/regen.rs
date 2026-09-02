@@ -213,6 +213,7 @@ fn the_summary_of_a_narrowed_run_names_the_narrowing() {
     let outcomes = vec![Outcome {
         name: "season_euler_state.json",
         changed: false,
+        ulp_only: false,
         written: false,
     }];
     let narrowed = summary(
@@ -245,11 +246,13 @@ fn a_reported_change_names_the_next_step_and_a_clean_report_does_not() {
     let changed = vec![Outcome {
         name: "season_euler_state.json",
         changed: true,
+        ulp_only: false,
         written: false,
     }];
     let clean = vec![Outcome {
         name: "season_euler_state.json",
         changed: false,
+        ulp_only: false,
         written: false,
     }];
     let request = Request {
@@ -423,6 +426,82 @@ fn a_validation_failure_leaves_every_earlier_golden_untouched() {
         std::fs::read_to_string(dir.join(real.name)).expect("still there"),
         stale
     );
+}
+
+/// ⚠⚠ A last-bit difference on a transcendental golden is `ulp-only`, never `CHANGED`,
+/// and is not rewritten even under `--write`.
+///
+/// Measured before this test existed (2026-09-02, Linux): the byte-comparing tool reported
+/// eleven of nineteen goldens `CHANGED` on the untouched tree — the UCRT-minted
+/// transcendental set, last-ULP different under glibc — while `golden_regression.rs` was
+/// green. The tool now reaches the gate's verdict. This seeds a transcendental golden with
+/// its own fresh bytes minus one bit in one float leaf, which is exactly the off-platform
+/// state, and asserts the classification and the no-write in one run.
+///
+/// ⚠ `cfg(not(windows))`: on the generation platform the gate accepts nothing less than
+/// byte-exact, so there the same seed is correctly `CHANGED` — the classification is a
+/// property of the platform policy, not of the bytes.
+#[cfg(not(windows))]
+#[test]
+fn a_last_bit_difference_off_platform_is_ulp_only_and_is_never_rewritten() {
+    let dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("regen_ulp_only");
+    std::fs::create_dir_all(&dir).expect("temp dir");
+    let real = all()
+        .into_iter()
+        .find(|g| g.name == "season_euler_state.json")
+        .expect("on the roster");
+    assert_eq!(
+        real.numerics,
+        domains::goldens::Numerics::Transcendental,
+        "the seed must be a transcendental golden or the structural path is unreachable"
+    );
+    let fresh = (real.run)();
+    // Flip the last hex digit of the first float leaf: `"0x1.…7p+3"` → `…6p+3` or `…8p+3`.
+    let at = fresh
+        .find("p+")
+        .or_else(|| fresh.find("p-"))
+        .expect("a hex-float leaf");
+    let mut bytes = fresh.clone().into_bytes();
+    bytes[at - 1] = if bytes[at - 1] == b'0' { b'1' } else { b'0' };
+    let perturbed = String::from_utf8(bytes).expect("still utf-8");
+    assert_ne!(perturbed, fresh, "the perturbation must change a byte");
+    std::fs::write(dir.join(real.name), &perturbed).expect("seed");
+
+    let outcomes = regenerate_in(&dir, &[real], true).expect("validates");
+    assert!(
+        outcomes[0].ulp_only,
+        "a last-bit difference off-platform is ulp-only"
+    );
+    assert!(!outcomes[0].changed, "…and is not a change");
+    assert!(
+        !outcomes[0].written,
+        "…and is not rewritten, even under --write"
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.join(real.name)).expect("still there"),
+        perturbed,
+        "the generation platform's bytes must survive a --write from another platform"
+    );
+
+    let text = summary(
+        &Request {
+            write: true,
+            only: None,
+        },
+        &outcomes,
+    );
+    assert!(text.contains("0 rewritten"), "{text}");
+    assert!(text.contains("1 differ only in the last bits"), "{text}");
+
+    // The control: the same seed with a REAL difference (a non-float leaf) is CHANGED.
+    let real_change = fresh.replacen("\"version\"", "\"versoin\"", 1);
+    assert_ne!(
+        real_change, fresh,
+        "the golden must carry a version key to perturb"
+    );
+    std::fs::write(dir.join(real.name), &real_change).expect("seed");
+    let outcomes = regenerate_in(&dir, &[real], false).expect("validates");
+    assert!(outcomes[0].changed && !outcomes[0].ulp_only);
 }
 
 /// ⚠ The report path writes nothing — the default, and the one a mistake here inverts.

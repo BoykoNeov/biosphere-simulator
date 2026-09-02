@@ -52,7 +52,7 @@
 
 use std::path::{Path, PathBuf};
 
-use domains::goldens::{golden_dir, validate, Golden};
+use domains::goldens::{compare, golden_dir, validate, Golden, Verdict};
 
 use crate::goldens::all;
 
@@ -116,8 +116,16 @@ pub fn select(only: Option<&str>) -> Vec<&'static Golden> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Outcome {
     pub name: &'static str,
-    /// The freshly produced bytes differ from the committed ones.
+    /// The freshly produced bytes differ from the committed ones **and** the gate would
+    /// call that a change: a real difference, or a byte difference on the generation
+    /// platform, where the gate accepts nothing less than byte-exact.
     pub changed: bool,
+    /// The bytes differ only in the last bits of hex-float leaves, on a
+    /// [`domains::goldens::Numerics::Transcendental`] golden **off** its generation
+    /// platform — the state `golden_regression.rs` accepts as green, and the state this
+    /// tool used to report as `CHANGED`. Never true on Windows, and never true together
+    /// with `changed`.
+    pub ulp_only: bool,
     /// The file was rewritten (only ever true under [`Request::write`]).
     pub written: bool,
 }
@@ -175,7 +183,20 @@ pub fn regenerate_in(
         let path = dir.join(golden.name);
         let current = std::fs::read_to_string(&path)
             .map_err(|e| format!("cannot read committed golden {}: {e}", path.display()))?;
-        let changed = text != current;
+        // ⚠ The SAME verdict the gate reaches, not a bare byte compare. Measured on
+        // 2026-09-02 (Linux, the CI platform): a byte compare on the untouched tree
+        // reported ELEVEN of nineteen goldens `CHANGED` while `cargo test` was green —
+        // every transcendental golden is UCRT-minted, so off Windows it is last-ULP
+        // different by design, and the gate compares those STRUCTURALLY. A report that
+        // calls the reference "moved" on a tree nothing moved cannot be used as the
+        // control an unfreeze ceremony needs ("predict the diff before running it"),
+        // and a `--write` of those eleven would have re-minted them on the wrong platform
+        // and turned the byte-exact Windows gate red.
+        let (changed, ulp_only) = match compare(&text, &current, golden.numerics) {
+            Verdict::ByteExact => (false, false),
+            Verdict::StructurallyEqual => (false, true),
+            Verdict::Differs(_) => (true, false),
+        };
         let mut written = false;
         if changed {
             // ⚠ Since slice 5 the golden IS this code's output, so any diff here is the
@@ -190,12 +211,21 @@ pub fn regenerate_in(
                     .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
                 written = true;
             }
+        } else if ulp_only {
+            // Not written even under `--write`: the bytes on disk are the generation
+            // platform's and the gate accepts them here; ours would fail there.
+            println!(
+                "  ulp-only   {}  [last-bit libm difference off the generation platform — \
+                 structurally equal, the gate is green; NOT rewritten]",
+                golden.name
+            );
         } else {
             println!("  identical  {}", golden.name);
         }
         outcomes.push(Outcome {
             name: golden.name,
             changed,
+            ulp_only,
             written,
         });
     }
@@ -215,12 +245,20 @@ pub fn summary(request: &Request, outcomes: &[Outcome]) -> String {
         Some(needle) => format!(" (⚠ NARROWED to names containing {needle:?})"),
         None => String::new(),
     };
+    let ulp_only = outcomes.iter().filter(|o| o.ulp_only).count();
     let mut out = format!(
         "\n{} of {} goldens run{}; {changed} {verb}.",
         outcomes.len(),
         all().len(),
         scope
     );
+    if ulp_only > 0 {
+        out.push_str(&format!(
+            "\n⚠ {ulp_only} differ only in the last bits of their floats: transcendental \
+             goldens compared off their generation platform. The gate accepts them and \
+             this tool never rewrites them — regenerate those on the generation platform."
+        ));
+    }
     if !request.write && changed > 0 {
         out.push_str(
             "\nRe-run with --write to rewrite them, then review the diff — and re-run the \
