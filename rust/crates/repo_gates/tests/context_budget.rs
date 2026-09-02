@@ -306,6 +306,55 @@ fn every_plan_doc_is_indexed() {
     );
 }
 
+/// The live forward-looking plan, and the one file this module holds to the record.
+///
+/// ⚠ A filename, deliberately: when the plan is superseded again, the successor takes
+/// this constant and the predecessor keeps its banner. A glob over `post-roadmap-direction*`
+/// would make two live plans look like one.
+const DIRECTION_PLAN: &str = "post-roadmap-direction-2026-09.md";
+
+/// The marker line the direction plan carries, followed by the record file it was last
+/// re-read against, in backticks.
+const RE_READ_MARKER: &str = "**Re-read against the record's last row:**";
+
+#[test]
+fn the_direction_plan_was_re_read_against_the_latest_record() {
+    // The gap every other gate here is blind to, measured four times before it was closed:
+    // a forward-looking list is written once and read many times, and nothing re-checks it.
+    // The 2026-08-13 plan was found stale by the recheck (2026-08-31), the margin pin (the
+    // same day, four more spans in the same file), and two records before them — each one
+    // ending "the next re-read is owed the next time an item is taken off the list", and
+    // each re-read finding what the previous one had missed.
+    //
+    // This makes the promise mechanical: the plan names the record table's LAST row. Landing
+    // a new item appends a row, so the plan goes red until someone has re-read it against
+    // that item and moved the marker. It does not judge the re-read — it cannot — it only
+    // refuses to let a new record land without one being claimed.
+    let root = repo_root();
+    let log = read_normalised(&root.join("docs").join("post-roadmap-log.md"));
+    let (_, record) = log_sections(&log);
+    let last = data_rows(record)
+        .last()
+        .and_then(|row| record_link(row))
+        .expect("the record table has at least one linked row");
+
+    let plan = read_normalised(&root.join("docs").join("plans").join(DIRECTION_PLAN));
+    let marker = plan
+        .lines()
+        .find(|l| l.trim_start().starts_with(RE_READ_MARKER))
+        .unwrap_or_else(|| {
+            panic!("docs/plans/{DIRECTION_PLAN} carries no `{RE_READ_MARKER}` line")
+        });
+    assert!(
+        marker.contains(&format!("`{last}`")),
+        "docs/plans/{DIRECTION_PLAN} was last re-read against a record that is no longer the \
+         latest.\n  marker: {marker}\n  latest record: {last}\nA new item landed. Re-read the \
+         plan against it — strike what it discharged, add what it named — and move the \
+         marker to `{last}`. Moving the marker without the re-read is the failure this gate \
+         cannot see, so do not."
+    );
+}
+
 #[test]
 fn phase_table_survived_its_move() {
     // A row count would pass on 11 REWRITTEN rows, so this pins content. Every roadmap phase

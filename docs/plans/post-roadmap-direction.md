@@ -1,5 +1,12 @@
 # Post-roadmap direction — one plan for what is next
 
+> ⚠⚠ **SUPERSEDED 2026-09-02 by `post-roadmap-direction-2026-09.md`.** Kept whole as the
+> record of a plan and of every place it went stale: four re-reads found stale spans here,
+> and this file's own header says why (*a forward-looking doc goes stale from the front, and
+> nothing here re-checks itself*). The September doc is the live queue, and it is the one
+> `repo_gates` holds to the record table. Nothing below is current advice; read it for the
+> reasoning that was priced and refused, which is still the most useful part.
+
 **Written 2026-08-13, on frozen `main` (`80db320`), nothing built.** The roadmap ended at
 Phase 9; everything since has been chosen one item at a time from the successors the
 previous item named. This doc does the thing that has never been done: reads the whole

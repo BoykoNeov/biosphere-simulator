@@ -138,9 +138,12 @@ change fixes; the **headline outputs that moved ~3 %** moved as predicted (seale
 carbon 0.9215 → 0.8923, −3.2 %). Neither alone was an honest summary of the defect, and
 neither alone is an honest summary of the repair.
 
-⚠ **Two things this does NOT claim.** (a) `Γ*` remains a `TODO(cite)` entry in
+⚠ **Two things this does NOT claim.** (a) `Γ*` ~~remains a `TODO(cite)` entry in
 `photosynthesis.yaml`, so the *crossing* was robust but the *number* 61.07 is still
-provisional — clearing a provisional threshold is a weaker result than clearing a cited one.
+provisional — clearing a provisional threshold is a weaker result than clearing a cited one.~~
+**BOUND 2026-09-02** to Bernacchi et al. (2001)'s 25 °C value — the value it always was, so
+61.07 ppm is now a cited floor and nothing below moved; see the unfreeze log's 2026-09-02
+entry for what was and was not checked in binding it.
 (b) ~~The sweep's convergence sequence is stale because the tree gained mechanisms.~~
 **WITHDRAWN 2026-08-14 — that explanation was wrong.** The sequence
 (`57.9 → 75.1 → 75.8 → 76.0` against a limit of `76.29`) is arithmetically correct and
@@ -872,6 +875,60 @@ above), so a present-tense sentence naming them — "the golden that moved", "on
 runs where water limits", a golden count of 25 — describes the tree **as it was at that
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
+
+- **2026-09-02 — `photosynthesis.{gamma_star, kc, ko, o2}` BOUND TO THEIR SOURCES, and the
+  five compensation-point band strings corrected with them (provenance only; one param-file
+  hash and five `science_bands.source` values, NO number, NO golden).** The honour-system
+  ceremony (advisor review → regenerate the manifest as the git-visible record → this
+  entry), with the review owed on the branch rather than taken before it — this was built
+  in an unattended session. **The manifest diff was predicted before regenerating and held
+  exactly: six lines**, `param_files["photosynthesis.yaml"]` and the five `source` strings.
+  `regen_goldens` reports the same set before and after (0 would change; see below).
+
+  **Why it is an unfreeze, and why now.** `Γ*` was the direction plan's standing free item
+  (*"the number 61.07 ppm should not appear in a science claim until it is sourced"*), the
+  floor all five chamber CO₂ bands are measured against, and one of the eight things the
+  2026-08-31 re-read confirmed still stood. The three 25 °C Rubisco constants in the file —
+  404.9, 278.4, 42.75 — are Bernacchi et al. (2001)'s to every digit; no other
+  parameterization on the shelf produces that triple (Teh's specificity-factor route gives
+  40.4). So the values were *taken* from that paper and never said so: the fifth instance of
+  *check your own shelf*, and the first where the shelf was the literature's rather than ours.
+  `o2` is the atmosphere's mole fraction and is bound to that, with [A]'s own `O = 210 mbar`.
+
+  ⚠ **What was NOT checked, stated at its size.** The PDF is not in `sources/`, and the box
+  this was written on could reach no scholarly host, so the binding is to the paper's
+  constants *as the FvCB literature has reproduced them since* (Medlyn et al. 2002; Sharkey
+  et al. 2007's tool), not to a page render. The file's header says so in as many words.
+  The page-level check is **owed** and is the one retrieval the record names; it can confirm
+  digits that already match or expose a transcription this entry would then be wrong about.
+  ⚠ Bernacchi fits in vivo on tobacco: treating Rubisco kinetics as conserved across C3
+  species is the FvCB convention, named in the file as a convention rather than a wheat
+  measurement.
+
+  ⚠⚠ **The five band strings moved in the same ceremony, on purpose.** Each said *"Γ* is
+  TODO(cite)"* and named a Python test by its `test_` prefix — residue C4 left deliberately
+  and S6 did not retire. Both claims were false the moment the citation landed, and *a
+  correction lands where it is written, not everywhere the claim was repeated* is this
+  freeze's own rule (the 2026-08-14 locus error). They are frozen `science_bands` content,
+  so this is the second half of the six-line diff, not a tidy-up. The `bound` (`min >
+  Γ*/ci_ratio (61.07 ppm)`) did not move.
+
+  **Gate report.** Every band and floor reads exactly what it read: the value did not move,
+  so `floor_ppm()` is 61.071429 as before and the five pinned margins are byte-identical.
+  `the_shipped_floor_is_the_conservative_one_against_the_cited_route` keeps its assertion
+  (57.69 < 61.07) and gains its real meaning — the cited floor is the harder of the two
+  parameterizations the shelf holds. `regen_goldens`: **19 of 19 run, 0 would change**, on a
+  Linux box — ⚠ which is a sentence the tool could not say the day before: it byte-compared,
+  so on any platform but the goldens' own it reported the eleven UCRT-minted transcendental
+  goldens as `CHANGED` on the *untouched* tree. It now reaches `golden_regression.rs`'s
+  verdict (`ulp-only`, never rewritten). That fix shipped with this ceremony because this
+  ceremony needed the control — `docs/log/fvcb-provenance.md` FINDING 2.
+
+  **Two form gaps named, neither built.** (1) `o2` is a constant while every sealed chamber
+  carries O₂ as a live stock, so the oxygenation term sees an atmosphere the crop no longer
+  breathes; (2) Kc, Ko and Γ* are single-temperature constants scaled by the [B] cardinal
+  multiplier on the whole rate, while [C] supplies each its own Arrhenius response. Both are
+  candidates for the science switch's first *scientific* pair — the September direction plan.
 
 - **2026-08-18 — the census's BOUND-LITERAL CHECK gains teeth (slice C4b; NO manifest byte
   moved — not a value change, a gate that could not fail is made able to).** The check

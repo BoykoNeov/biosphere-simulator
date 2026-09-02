@@ -80,12 +80,15 @@
 //! for them: it already had `predicted_equilibrium_temperature`, the drift folds and the
 //! 15-yr energy run.
 //!
-//! ⚠ **Two `source` strings still name Python tests** (`test_the_shipped_floor_is_the_
-//! conservative_one_against_the_cited_route`). Their text is frozen manifest content, so
-//! editing it would be a value change to the contract rather than the locus re-anchoring
-//! C4 is; the companion assertions they name were ported here under the same names minus
-//! the `test_` prefix, and the strings are left alone deliberately. Named as residue for
-//! whichever slice retires the Python file.
+//! ⚠ **Five `source` strings named a Python test** (`test_the_shipped_floor_is_the_
+//! conservative_one_against_the_cited_route`) until 2026-09-02. Their text is frozen
+//! manifest content, so editing it is a value change to the contract rather than a locus
+//! re-anchoring — which is why C4 left them alone and named them as residue for whichever
+//! slice retired the Python file. S6 retired it and the strings stayed. They moved with the
+//! `Γ*` provenance unfreeze (`docs/log/fvcb-provenance.md`): the same five strings also
+//! asserted *"Γ* is TODO(cite)"*, which that unfreeze made false, and a correction lands
+//! where it is written — so both stale claims went in the one ceremony that already had
+//! the manifest open. ⚠ The paragraph that stood here said "two" strings; there were five.
 
 // ⚠ `cfg(test)`, not a plain import: the folds are reached only from the gate bodies,
 // and an unconditional `use` here would be an unused import in every ordinary build —
@@ -461,7 +464,7 @@ science_gates! {
         field: "science_bands",
         quantity: "season-low chamber CO₂ (ppm)",
         bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive — test_the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
         check: { band_gate(runs::sealed_chamber()); }
     }
 
@@ -474,7 +477,7 @@ science_gates! {
         field: "science_bands",
         quantity: "season-low chamber CO₂ (ppm)",
         bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive — test_the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
         check: { band_gate(runs::perennial_chamber()); }
     }
 
@@ -484,7 +487,7 @@ science_gates! {
         field: "science_bands",
         quantity: "season-low chamber CO₂ (ppm)",
         bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive — test_the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
         check: { band_gate(runs::consumer_chamber()); }
     }
 
@@ -495,7 +498,7 @@ science_gates! {
         field: "science_bands",
         quantity: "season-low chamber CO₂ (ppm)",
         bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive — test_the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
         check: { band_gate(runs::perennial_long()); }
     }
 
@@ -505,7 +508,7 @@ science_gates! {
         field: "science_bands",
         quantity: "season-low chamber CO₂ (ppm)",
         bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). ⚠ Γ* is TODO(cite); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive — test_the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
         check: { band_gate(runs::consumer_long()); }
     }
 
@@ -712,9 +715,11 @@ mod margins {
     /// The pinned margins: `season-low CO₂ ÷ the compensation-point floor`.
     ///
     /// ⚠ The floor is **computed**, never written here. It is
-    /// `photosynthesis.gamma_star / ci_ratio`, and `gamma_star` is one of the live
-    /// `TODO(cite)` params — a literal denominator would leave this pin reading a dead
-    /// value on the day that citation lands, while the five gates moved.
+    /// `photosynthesis.gamma_star / ci_ratio`, and `gamma_star` was a live `TODO(cite)`
+    /// param when this was written — a literal denominator would have left this pin
+    /// reading a dead value on the day that citation landed, while the five gates moved.
+    /// It landed 2026-09-02 (provenance only, the value did not move), and this pin did
+    /// not have to be touched — which is the argument, spent.
     ///
     /// ⚠ The two `*_long_horizon` rows read identically to their 5-year siblings today,
     /// and they are NOT redundant: the 15-year runs share those numbers only because each
@@ -1229,20 +1234,24 @@ mod census {
         );
     }
 
-    /// ⚠ The band does not depend on `Γ*`'s missing citation — measured, not assumed.
+    /// ⚠ The band does not depend on which parameterization of `Γ*` is on the shelf —
+    /// measured, not assumed.
     ///
-    /// `gamma_star` is `TODO(cite)`. The only route to the same quantity on the shelf is
-    /// Teh eq. 6.19, `Γ* = O₂/(2·τ)`, with `τ` tabulated at 25 °C. It lands BELOW the
-    /// shipped value, so the shipped floor is the harder test and closing the citation
-    /// gap can only widen every margin.
+    /// Written while `gamma_star` was `TODO(cite)`: the only route to the same quantity
+    /// on the shelf was Teh eq. 6.19, `Γ* = O₂/(2·τ)`, with `τ` tabulated at 25 °C. It
+    /// lands BELOW the shipped value, so the shipped floor is the harder test and closing
+    /// the citation gap could only widen every margin. The gap closed 2026-09-02 —
+    /// `gamma_star` is bound to Bernacchi et al. (2001), the value it always was — and
+    /// the test keeps its job: it now pins that the cited floor is the conservative one
+    /// of the two parameterizations the shelf holds.
     ///
     /// ⚠ A statement about the FLOOR, not an endorsement of swapping the value: Teh's
     /// companion constants disagree with ours, so the two are different parameterizations
     /// and mixing them would be the co-adaptation this project refuses. The comparison is
     /// legitimate *because* it only ever moves the bound in the harder direction.
     ///
-    /// ⚠ Named without the `test_` prefix that five frozen `source` strings still spell —
-    /// see the module note on why those strings were not edited.
+    /// ⚠ Named without the `test_` prefix. Five frozen `source` strings spelled the prefix
+    /// until 2026-09-02 — see the module note.
     #[test]
     fn the_shipped_floor_is_the_conservative_one_against_the_cited_route() {
         let photo = crate::biosphere::params::photosynthesis();

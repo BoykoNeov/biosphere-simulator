@@ -13,15 +13,40 @@
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
 #   The FvCB equations are Farquhar et al. [A]; the cardinal-temperature response is
-#   the WOFOST-style TMPFTB idiom [B]. All numeric VALUES are provisional,
-#   literature-typical placeholders pending the Step-11 validation gate — flagged
-#   TODO(cite) until each is bound to a primary source (never backfilled from WOFOST).
+#   the WOFOST-style TMPFTB idiom [B]. Of the twelve numeric VALUES, the three Rubisco
+#   kinetic constants (gamma_star, kc, ko) are bound to [C] and the O₂ mole fraction to
+#   the atmosphere it names (2026-09-02); the other eight remain provisional,
+#   literature-typical placeholders — flagged TODO(cite) until each is bound to a
+#   primary source (never backfilled from WOFOST).
+#
+# ⚠ HOW [C] WAS BOUND, stated so the next reader knows what was and was not checked.
+#   The three 25 °C constants in this file — 404.9, 278.4, 42.75 — are [C]'s to every
+#   digit, which is the evidence they were TAKEN from it: no other parameterization on
+#   the shelf gives that triple (Teh's specificity-factor route gives Γ* = 40.4). They
+#   are the constants the FvCB literature has reproduced from [C] since (Medlyn et al.
+#   2002; Sharkey et al. 2007's fitting tool). ⚠ The PDF is NOT in `sources/` and the
+#   scholarly hosts were unreachable from the box that wrote this line, so the
+#   page-level check this project's shelf rule asks for is OWED — it is the one retrieval
+#   the record names, and it can only confirm digits that already match or expose a
+#   transcription this note would then be wrong about. ⚠ [C] fits them in vivo on
+#   TOBACCO (a C3 leaf, transgenic-antisense rbcS), not wheat: Rubisco kinetics are
+#   treated as conserved across C3 species by the FvCB tradition, which is a modelling
+#   convention rather than a wheat measurement, and is why the source is a species-
+#   independent one. [C] also supplies each constant's Arrhenius TEMPERATURE response
+#   (a form this file does not carry: the whole rate is scaled by the [B] cardinal
+#   multiplier instead) — named as a mechanism candidate, not built.
 #
 # Sources:
 #   [A] Farquhar, G.D., von Caemmerer, S. & Berry, J.A. (1980), "A biochemical model
 #       of photosynthetic CO₂ assimilation in leaves of C3 species", Planta 149:78–90.
 #   [B] Degree-day / crop-model cardinal-temperature response literature (the WOFOST
 #       AMAX temperature-response table TMPFTB) — primary citation pending Step 11.
+#   [C] Bernacchi, C.J., Singsaas, E.L., Pimentel, C., Portis Jr., A.R. & Long, S.P.
+#       (2001), "Improved temperature response functions for models of Rubisco-limited
+#       photosynthesis", Plant, Cell & Environment 24(2):253–259.
+#       https://doi.org/10.1046/j.1365-3040.2001.00668.x — the 25 °C values of Kc, Ko
+#       and Γ* and their temperature functions, fitted in vivo. Bound 2026-09-02 without
+#       the page in hand; see the note above.
 
 name: winter_wheat
 process: fvcb_photosynthesis
@@ -46,19 +71,19 @@ parameters:
   gamma_star:
     value: 42.75
     unit: "umol/mol"
-    source: "TODO(cite) — provisional, CO₂ compensation point w/o Rd at ~25°C; primary citation pending Step 11"
+    source: "[C] Bernacchi et al. (2001): Γ*, the CO₂ compensation point in the absence of mitochondrial respiration, 42.75 µmol/mol at 25 °C — the paper's value to four figures. Bound 2026-09-02 without the page in hand (see the header); the temperature function [C] gives it is NOT carried here. It is the floor every chamber CO₂ band is measured against (Γ*/ci_ratio = 61.07 ppm), which is why it was the first of the twelve to be bound"
   kc:
     value: 404.9
     unit: "umol/mol"
-    source: "TODO(cite) — provisional, Rubisco Michaelis constant for CO₂ at ~25°C; primary citation pending Step 11"
+    source: "[C] Bernacchi et al. (2001): Kc, the Michaelis constant of Rubisco for CO₂, 404.9 µmol/mol at 25 °C — the paper's value to four figures. Bound 2026-09-02 without the page in hand (see the header); [C]'s Arrhenius temperature function is NOT carried here"
   ko:
     value: 278.4
     unit: "mmol/mol"
-    source: "TODO(cite) — provisional, Rubisco Michaelis constant for O₂ at ~25°C; primary citation pending Step 11"
+    source: "[C] Bernacchi et al. (2001): Ko, the Michaelis constant of Rubisco for O₂, 278.4 mmol/mol at 25 °C — the paper's value to four figures. Bound 2026-09-02 without the page in hand (see the header); [C]'s Arrhenius temperature function is NOT carried here"
   o2:
     value: 210.0
     unit: "mmol/mol"
-    source: "TODO(cite) — provisional, atmospheric O₂ mole fraction (~21%); primary citation pending Step 11"
+    source: "The atmospheric O₂ mole fraction, 20.95 % ≈ 210 mmol/mol — a property of the air, not a fitted constant, and the O at which [A] runs its model (O = 210 mbar at 1 bar) and at which [C]'s 25 °C constants apply. ⚠ A CONSTANT here while the sealed chambers carry O₂ as a live STOCK (`chamber_o2_mol0`): the oxygenation term sees the atmosphere the crop no longer breathes. Named as a form gap in the record of 2026-09-02, not built"
   t_min:
     value: 0.0
     unit: "degC"

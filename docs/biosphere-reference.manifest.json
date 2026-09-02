@@ -167,7 +167,7 @@
     "microbial_respiration.yaml": "de5a01c81a5c9ab20229259369511e8e8a9e42b0ef932b99a6bd3d1f1e8f6d8a",
     "nitrogen.yaml": "f012a5cfad4d40efa29ab917c05c0e9c8d831426cb39415f990a44950abf240a",
     "phenology.yaml": "534aff0b9a7557a16cbcafc61d87279dd61b96fc5df17b7837fc67e225201d38",
-    "photosynthesis.yaml": "51bb4fe98ab6176fcd1308c4b51d84b961ef3472eaa789c531ccec2114fc1e3c",
+    "photosynthesis.yaml": "3fc1843072424a20b2df3449e6f040e6986848f6559669b21478ffa557102aa0",
     "respiration.yaml": "b6ec929a0129f41cb48e6b02b2ab7298eb7a590a6493e40feb57b73375d8e638",
     "root_depth.yaml": "fefdbcc39e3e5cb1ef88368a30afe467b7be6ac3dd825657574bcdc020b358e7",
     "senescence.yaml": "21163d3c54c958655b0e39d1613610e1264bdecb85e7432576a6cc471c3b669b",
@@ -226,7 +226,7 @@
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::consumer_chamber_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }
     ],
     "consumer_long_horizon": [
@@ -234,7 +234,7 @@
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::consumer_long_horizon_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }
     ],
     "drift_summary": [],
@@ -263,7 +263,7 @@
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::perennial_chamber_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }
     ],
     "perennial_long_horizon": [
@@ -271,7 +271,7 @@
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::perennial_long_horizon_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }
     ],
     "sealed_chamber": [
@@ -279,7 +279,7 @@
         "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::sealed_chamber_stays_above_the_compensation_point",
         "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u26a0 \u0393* is TODO(cite); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the verdict is provenance-insensitive \u2014 test_the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
       }
     ]
   }
