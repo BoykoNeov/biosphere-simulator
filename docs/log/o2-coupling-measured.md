@@ -38,10 +38,13 @@ of the form's time-dependence lives in Γ* and none in the term the gap was writ
 the open field runs on the light-limited branch and the oxygenation term is **unreachable**
 there rather than damped (the observable is live: Γ* moves it +13 %). ⚠ But `vcmax` 90 is
 still +0.000 %, 80 is −0.69 %, 70 −6.20 %, 60 −18.80 %, 50 −42.08 % — **the crossover is
-between 80 and 90.** The September plan's item 3, the Arrhenius temperature form, cuts Vcmax
-at the cool end of a 5–25 °C season, so it does not merely "raise assimilation at 15–25 °C"
-as the plan predicts: it **moves the tree across the branch boundary** and makes this term
-reachable. A larger claim than the plan carries, and one to predict before that build.
+between 80 and 90.** ⚠ **Whether the plan's item 3 (the Arrhenius temperature form) moves
+Vcmax at all is NOT established here** — it is understood to, but no Vcmax Arrhenius
+parameters have been retrieved, which is the same class of unretrieved claim as Γ* ∝ O₂
+above and is what the owed page check would settle. **Conditionally:** *if* it cuts Vcmax by
+more than ~15 % at the cool end of a 5–25 °C season, then it does not merely "raise
+assimilation at 15–25 °C" as the plan predicts — it **moves the tree across the branch
+boundary** and makes this term reachable. Predict that before the build, do not discover it.
 ⚠ `vcmax=50` also puts `perennial_long_horizon`'s converged peak-leaf at 0.545058, **below
 its 0.55 liveness floor** — the cool end has a floor to clear, not just a band.
 
@@ -79,14 +82,16 @@ predict the branch crossing before the temperature form; and note that only one 
 science is at stake.
 
 **Gates run on the committed tree, counts read off the whole output, written after the run:**
-`cargo test --workspace --no-fail-fast` from `rust/` — **1107 passed, 0 failed** across 64
-result lines. ⚠ **Predicted 1108 and it is 1107**, so the difference was chased rather than
-waved through: this box is Windows and the previous item's 1103 was Linux. The one test that
-does not exist here is `regen.rs::a_last_bit_difference_off_platform_is_ulp_only_and_is_never_rewritten`,
+`cargo test --workspace --no-fail-fast` from `rust/` — **1108 passed, 0 failed** across 64
+result lines. ⚠ A first run read **1107 where 1108 was predicted**, and the gap was chased
+rather than waved through: this box is Windows and the previous item's 1103 was Linux, and the
+one test that does not exist here is
+`regen.rs::a_last_bit_difference_off_platform_is_ulp_only_and_is_never_rewritten`,
 `#[cfg(not(windows))]` **by construction** — it is the FvCB item's own control, and on the
 generation platform the gate accepts nothing but byte-exact, so the classification it asserts
-is unreachable here. Windows baseline 1102 + the five parser tests this batch adds = 1107;
-the total moved by exactly the tests added. `cargo clippy --all-targets -- -D warnings`
+is unreachable here. So the Windows baseline is **1102**, and 1102 + the six parser tests this
+batch adds = 1108; the total moved by exactly the tests added, which is the check the
+2026-09-01 record asked for. `cargo clippy --all-targets -- -D warnings`
 clean; `cargo run --release -q -p station --example regen_goldens` → **19 of 19 run; 0 would
 change**, byte-exact on all 19 here where the Linux run read 11 `ulp-only` — the same
 platform policy, and the difference that item predicted rather than a finding; `uv run

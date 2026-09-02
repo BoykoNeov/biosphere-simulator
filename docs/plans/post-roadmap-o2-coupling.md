@@ -14,7 +14,7 @@ golden moved, no manifest key moved, and no decision was taken.
 | Building both halves together | the band becomes ~10× *safer*, and thereby stops discriminating (§5) |
 | The other two sealed chambers | **INERT by arithmetic**, not by measurement — they sit at 210.2 mmol/mol |
 | The open field | the oxygenation term is **unreachable** there — but by only ~15 % of Vcmax (§3) |
-| The temperature form (the plan's item 3) | **RE-PRICED** — it crosses the branch boundary this item measured |
+| The temperature form (the plan's item 3) | **RE-PRICED** — *if* it cuts Vcmax at the cool end (unverified, §3), it crosses the branch boundary this item measured |
 | The harness | **EXTENDED** — it could not spell the one column the recommendation rests on (§6) |
 
 The record is `docs/log/o2-coupling-measured.md`.
@@ -109,12 +109,16 @@ itself is live (Γ* moves it +13 %), so this is a fact about the branch, not a c
 **The crossover is between 80 and 90 — about 15 % below the shipped Vcmax.** So "the Rubisco
 branch is unreachable in the open field" is true of *this* Vcmax and has almost no margin.
 
-The September plan's item 3 is the Arrhenius temperature form of Kc, Ko and Γ*, and the same
-paper gives Vcmax an Arrhenius response too; the open field runs 5–25 °C through a season.
-A form that cuts Vcmax by more than ~15 % at the cool end **moves the tree across this
-branch boundary**, which means it does not merely "raise assimilation at 15–25 °C" as the
-plan predicts — it switches which limitation is binding, and switches the oxygenation term
-this item just measured as unreachable *into* reachability. That is a different and larger
+The September plan's item 3 is the Arrhenius temperature form of Kc, Ko and Γ*, and the open
+field runs 5–25 °C through a season. ⚠ **Whether that form also moves Vcmax is NOT established
+here.** The cited paper is *understood* to give Vcmax a temperature response as well, but no
+Vcmax Arrhenius parameters have been retrieved — that is the same class of unretrieved claim
+as Γ* ∝ O₂ above, and the page check the FvCB item owes is the thing that would settle it.
+What is measured is only the ladder below. **Conditionally, then:** *if* the form cuts Vcmax
+by more than ~15 % at the cool end, it **moves the tree across this branch boundary** — which
+means it does not merely "raise assimilation at 15–25 °C" as the plan predicts, but switches
+which limitation is binding, and switches the oxygenation term this item just measured as
+unreachable *into* reachability. That is a different and larger
 claim than the plan carries, and it should be predicted before that build, not discovered.
 
 Second-order, worth recording: `vcmax=50` also puts `perennial_long_horizon`'s converged

@@ -264,6 +264,12 @@ fn one(target: &str, raw: &str) -> Result<Substitution, ConfigError> {
 /// The column heading. The file prefix is printed once and then only when it CHANGES —
 /// `photosynthesis.yaml:o2=2+gamma_star=0.4071` rather than the same 19 bytes twice, which
 /// at the report's column width is the difference between a readable table and a wrapped one.
+///
+/// ⚠ It tracks only the **previous** part, not every file seen, so an interleaved spec
+/// (`a.yaml:x=1+b.yaml:y=2+a.yaml:z=3`) re-prints `a.yaml` on the third part and reads at a
+/// glance as three files rather than two. Cosmetic, and it never *drops* a prefix that is
+/// needed — but a heading is quoted as evidence in the record, so it is not a faithful
+/// serialization for three-or-more parts and should not be treated as one.
 fn label_of(subs: &[Substitution]) -> String {
     let mut out = String::new();
     let mut last_file: Option<&str> = None;
@@ -451,6 +457,23 @@ mod tests {
         // Each half alone is fine, so the refusal is about the MIXTURE and nothing else.
         assert!(parse_variants("o2=2.0,0.033").is_ok());
         assert!(parse_variants("o2=2.0+gamma_star=0.4071").is_ok());
+    }
+
+    /// ⚠ **Where the `+` split falls on an exponent, pinned because it is surprising.**
+    /// The combined/sweep choice is made by a *global* `contains('+')`, and `+` is also legal
+    /// inside an f64 literal — so `1e+5` puts the spec on the combined branch and splits
+    /// mid-number. The outcome is still an error rather than a wrong column, which is the
+    /// property that matters; what it is NOT is a good error message. Pinned so the next
+    /// reader learns this from a test instead of from a confusing failure, and so that
+    /// teaching the splitter about exponents is a visible change rather than a silent one.
+    #[test]
+    fn an_exponent_is_not_a_combination_but_the_split_does_not_know_that() {
+        assert!(parse_variants("o2=1e+5").is_err());
+        assert!(parse_variants("o2=2.0+gamma_star=1e+5").is_err());
+        // Written without the `+`, the same magnitude parses fine — so the refusal is about
+        // the SPLITTER, not about the value being rejected somewhere downstream.
+        let v = parse_variants("o2=1e5").expect("a bare exponent is a number");
+        assert_eq!(v[0].1[0].value, 1e5);
     }
 
     /// A malformed part is loud. ⚠ `a=1+` must NOT degrade to the one-substitution column:

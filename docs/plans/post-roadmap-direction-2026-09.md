@@ -32,7 +32,9 @@ Strike-through is kept when this doc is wrong, per the predecessor's rule.
   `git ls-files '*.py'` is thirteen files, all the PCSE oracle carve-out or its one path.
 - Four freeze contracts hold: biosphere (Euler, `dt = ¼`, 15 param files, 7 scenarios),
   station (13 scenarios, biosphere delegated), native-port tolerance, authoring platform.
-- `cargo test --workspace --no-fail-fast`: **1108 passed** across 64 result lines; clippy
+- `cargo test --workspace --no-fail-fast`: **1108 passed on Windows / 1109 on Linux** across
+  64 result lines — the one‑test gap is `regen.rs`'s `#[cfg(not(windows))]` ulp‑only control,
+  by construction; clippy
   clean; `regen_goldens` **19 of 19, 0 would change** (11 `ulp-only` on Linux — §3.1;
   **0 `ulp-only` on Windows**, which is the platform difference that item predicted and was
   confirmed on the author's box 2026-09-02, not a finding).
@@ -91,7 +93,9 @@ re-tuning the bound (refused three times).
    field runs on the **light-limited branch** and the whole Rubisco branch is *unreachable*
    there. But the margin is thin — `vcmax` 90 is still +0.000 %, 80 is −0.69 %, 70 −6.20 %,
    60 −18.80 %, 50 −42.08 %, so **the crossover sits between 80 and 90, ~15 % below the
-   shipped Vcmax**. A temperature form that cuts Vcmax at the cool end of a 5–25 °C season
+   shipped Vcmax**. ⚠ That the temperature form moves Vcmax at all is **understood, not
+   retrieved** — no Vcmax Arrhenius parameters are on the shelf, and the owed page check is
+   what would settle it. *If* it cuts Vcmax at the cool end of a 5–25 °C season, the form
    therefore does not "raise assimilation": it **switches which process is limiting**. That
    makes it the most likely mover of this item's observable *and* the least predictable —
    predict the crossing before building, not after. ⚠ `vcmax = 50` also drops
@@ -117,6 +121,11 @@ not reopen it wholesale. Single params when a finding leans on one:
   discharge it with a secondary table (PhotoGEA, Sharkey 2007, an R package's constants):
   those are the *same* reproduced-by-the-literature evidence the file already cites, so
   fetching one adds nothing the header does not already say.
+  ⚠ **It is now worth more than it was.** As of the o2-coupling item this retrieval also
+  settles the *second* question §2.1 item 4 and §2.3.1 both now hang a conditional on —
+  whether the paper gives **Vcmax** a temperature response, and with what parameters. That
+  is the difference between item 3 being "raises assimilation a little" and "switches which
+  process limits", so it is a prerequisite for pricing item 3 rather than a tidy-up.
 - **The eight remaining `photosynthesis.yaml` markers.** `vcmax` 100 and `jmax` 180: a
   species survey exists (Wullschleger 1993, *J. Exp. Bot.* 44:907, tabulates wheat) and is
   the retrieval to make; ⚠ a wheat-specific value is a *value* question — the pair moves
