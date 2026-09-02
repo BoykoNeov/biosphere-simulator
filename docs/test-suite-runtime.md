@@ -1,5 +1,12 @@
 # Test-suite runtime — parallelism, priority, and what is *not* claimed
 
+> ⚠⚠ **This document describes a suite that no longer exists.** The xdist rules, the
+> `loadgroup` trap, the 7m05s measurement and the below-normal priority class all had
+> ~2,400 Python tests as their subject; S6 (2026-08-27) deleted them, and what is left is
+> twelve fixture tests that run in under a second. Kept as the record of *why* those rules
+> existed — do not read it as current advice. (This banner moved here from `CLAUDE.md` on
+> 2026-09-02: a warning about a record belongs on the record, not in the always-loaded map.)
+
 **NON-GATING.** Nothing here changes a scientific result; it changes how long the
 suite takes and how much of the machine it takes while doing it. The sibling document
 `docs/perf-baseline.md` is about *engine* throughput and is a different subject.

@@ -38,8 +38,11 @@ jobs:
         run: uv run ruff format --check .
       - name: Pyright
         run: uv run pyright
-      - name: Pytest (fast loop)
-        run: uv run pytest -m "not slow"
+      # ⚠ Plain `pytest`, not `-m "not slow"`: the `slow` marker was retired 2026-09-02
+      # (nothing had carried it since S6), and an expression over an unregistered marker
+      # selects everything while looking like a filter.
+      - name: Pytest (the carve-out's fixture tests; oracle skips unless `-m oracle`)
+        run: uv run pytest
 
   rust:
     name: Rust (test · clippy)
@@ -88,9 +91,12 @@ jobs:
   # the regeneration path's validator (items 2-3). All of them run in the `cargo test` job
   # above, on every push — a strictly wider trigger than the Python job they left.
   #
-  # ⚠ What is NOT here any more, said plainly: there is no Python job in this workflow. The
-  # only Python left in the repo is the PCSE oracle carve-out, which is hand-run, needs the
-  # network, and has never been a gate.
+  # ⚠ What the `python` job above IS, said plainly, because this paragraph claimed for six
+  # days that no Python job existed while one ran on every push: it lints and type-checks
+  # the thirteen Python files that remain and runs the PCSE carve-out's twelve committed-
+  # fixture tests (the oracle itself is opt-in, needs the network, and has never been a
+  # gate). It is kept because a carve-out with no CI rots silently — the poppler re-wrap
+  # in `docs/log/pdf-pins-ci.md` is what that looks like. It gates no science.
 
   godot-parity:
     name: Cross-boundary parity (Godot cdylib vs headless)

@@ -63,24 +63,17 @@ testpaths = ["tests"]
 # the fast-loop `-m "not slow"` would override it). Run the oracle tests with
 # `-m oracle`.
 addopts = "-ra"
-# `slow` is an opt-OUT handle, not deselected by default: a plain `uv run pytest`
-# runs the marked tests (the 100k stability gates stay real), while a fast iteration
-# loop skips them with `-m "not slow"`. The two 100k gates: tests/test_stability.py
-# (the Phase-0.5 ENGINE A⇌B numerical gate, N6) and tests/test_biosphere_stress.py
-# (the Phase-4 BIOSPHERE slow-drift gate — perennial + consumer to ~328 yr).
-# ⚠ `slow` and `science_gate` are RETAINED WITH NO SUBJECT, deliberately and for one
-# release only. S6 deleted every test carrying either: the 100k stability gates went with
-# `test_stability.py` / `test_biosphere_stress.py`, and the science gates moved to
-# `domains/src/biosphere/science_gates.rs` back in slice C4. They are listed here so that
-# `--strict-markers` keeps working for anyone resuming an old branch, and so the removal
-# is a decision rather than a silent side effect of a deletion. ⚠ The last crossport gate
-# went on 2026-08-27 (S6 items 1-3) and these two are STILL here, deliberately: `oracle` is
-# live and the other two are the one-release grace this paragraph grants. Drop `slow` and
-# `science_gate` on the next release.
+# ⚠ ONE marker. `slow` and `science_gate` stood here with NO SUBJECT from S6 (2026-08-27)
+# until 2026-09-02, under a paragraph granting them "one release" of grace so that
+# `--strict-markers` kept working on old branches. This project has no releases, so the
+# grace had no end — a grace period denominated in an event that never happens is a
+# permanent exemption. Dropped; the CI step that filtered on `slow` now runs plain
+# `pytest`. Where they went: the 100k stability gates were deleted with
+# `test_stability.py` / `test_biosphere_stress.py`; the science-gate census lives in
+# `rust/crates/domains/src/biosphere/science_gates.rs` (slice C4), where the roster row
+# and the test that executes it are ONE declaration.
 markers = [
-    "slow: NO SUBJECT since S6 — long-running gates, all deleted with their tests",
     "oracle: PCSE/WOFOST oracle regeneration (needs the `oracle` dep group + network); skipped cleanly when pcse is absent (importorskip). Run with -m oracle.",
-    "science_gate(scenario, field, quantity, bound, source): NO SUBJECT since S6 — the census moved to domains/src/biosphere/science_gates.rs in slice C4, where the roster row and the test that executes it are ONE declaration.",
 ]
 
 [tool.pyright]

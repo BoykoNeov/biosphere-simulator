@@ -157,11 +157,6 @@ uv run ruff check .     # lint
 uv run pyright          # types
 ```
 
-⚠ **`docs/test-suite-runtime.md` describes a suite that no longer exists** — the xdist
-rules, the `loadgroup` trap, the 7m05s measurement and the below-normal priority class all
-had ~2,400 tests as their subject. Kept as the record of why those rules existed; do not
-read it as current advice.
-
 ## Testing
 
 - Prefer **test-first** for engine invariants. Use **property-based** tests
