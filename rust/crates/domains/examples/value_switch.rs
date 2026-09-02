@@ -4,7 +4,12 @@
 //! ```text
 //! cargo run --release -q -p domains --example value_switch -- extinction_coef=0.60,0.65,0.68
 //! cargo run --release -q -p domains --example value_switch -- canopy.yaml:extinction_coef=0.65 --long
+//! cargo run --release -q -p domains --example value_switch -- o2=2.0+gamma_star=0.4071
 //! ```
+//!
+//! `,` sweeps one target into one column per value; `+` joins several targets into ONE
+//! column, which is the only way to measure a FORM that moves two numbers together. The two
+//! cannot be mixed in one spec — see [`domains::lab::parse_variants`].
 //!
 //! A bare field name resolves only when exactly one frozen file declares it; `carbon_fraction`
 //! is declared by two and must be addressed as `file.yaml:field`.
@@ -19,7 +24,7 @@
 //! the user's; this regenerates the evidence it was already priced on.
 
 use domains::lab::report::{compare, render};
-use domains::lab::Substitution;
+use domains::lab::{parse_variants, Substitution};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -43,26 +48,15 @@ fn main() {
         std::process::exit(2);
     }
 
+    // ⚠ The grammar lives in `domains::lab::parse_variants`, not here. It was inline in this
+    // binary until 2026-09-02, which meant the one thing it could get wrong — collapsing a
+    // coupled `+` column into two independent ones — was reachable by no test at all, because
+    // an `examples/` binary's `main` is not a test subject. Lifted so it is gated.
     let mut variants: Vec<(String, Vec<Substitution>)> = Vec::new();
     for spec in specs {
-        let (target, values) = match spec.split_once('=') {
-            Some(pair) => pair,
-            None => fail(&format!("{spec:?} is not `field=value[,value...]`")),
-        };
-        for raw in values.split(',') {
-            let value: f64 = match raw.trim().parse() {
-                Ok(v) => v,
-                Err(_) => fail(&format!("{raw:?} is not a number")),
-            };
-            let sub = match target.split_once(':') {
-                Some((file, field)) => Substitution::new(file, field, value),
-                // A bare field: refused rather than guessed when two files declare it.
-                None => match Substitution::resolve(target, value) {
-                    Ok(s) => s,
-                    Err(e) => fail(&e.to_string()),
-                },
-            };
-            variants.push((format!("{}:{}={}", sub.file, sub.field, value), vec![sub]));
+        match parse_variants(spec) {
+            Ok(vs) => variants.extend(vs),
+            Err(e) => fail(&e.to_string()),
         }
     }
 

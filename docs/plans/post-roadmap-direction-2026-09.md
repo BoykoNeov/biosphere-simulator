@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `fvcb-provenance.md`
+**Re-read against the record's last row:** `o2-coupling-measured.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -32,12 +32,18 @@ Strike-through is kept when this doc is wrong, per the predecessor's rule.
   `git ls-files '*.py'` is thirteen files, all the PCSE oracle carve-out or its one path.
 - Four freeze contracts hold: biosphere (Euler, `dt = ¼`, 15 param files, 7 scenarios),
   station (13 scenarios, biosphere delegated), native-port tolerance, authoring platform.
-- `cargo test --workspace --no-fail-fast`: **1103 passed** across 64 result lines; clippy
-  clean; `regen_goldens` **19 of 19, 0 would change** (11 `ulp-only` on Linux — §3.1).
+- `cargo test --workspace --no-fail-fast`: **1108 passed** across 64 result lines; clippy
+  clean; `regen_goldens` **19 of 19, 0 would change** (11 `ulp-only` on Linux — §3.1;
+  **0 `ulp-only` on Windows**, which is the platform difference that item predicted and was
+  confirmed on the author's box 2026-09-02, not a finding).
 - The last four science items were: the step unfreeze (`dt = 1 → ¼`, the crossing fixed);
   the layered canopy; two provenance discharges (`carbon_fraction`, and now the FvCB
   constants). The last five *tooling* items were the reference flip, the value switch, the
   science switch (slices 0–4), the margin pin, and the regeneration tool's verdict.
+- **The last item was a MEASUREMENT** (`log/o2-coupling-measured.md`), the first of the two
+  form gaps the FvCB item named. It moved no number and it changed three things in this
+  doc: §2.3.2 is discharged, §2.3.1 is re-priced, and §2.1 gained a measured bound it did
+  not have. Read those three before planning from §4.
 - **The science thread's shape since 2026-08-14:** every mechanism offered to the canopy
   problem (§2.1) has been measured and either refused on its sign or shipped and found
   inert on the chambers. What is left there is provenance and one form question, not a
@@ -78,9 +84,18 @@ re-tuning the bound (refused three times).
    assimilation (`log/wheat-partition-backfill.md`), so it is a suspect in exactly the way
    the band is. The value switch can measure a uniform root-share perturbation in minutes.
    **Needs: a measurement**, no decision.
-4. **The temperature form of the kinetics (§2.3)** raises assimilation at 15–25 °C relative
-   to the cardinal multiplier if it does anything, and it is the first cited alternative
-   form on the shelf. It bears on this item and is listed under its own heading.
+4. **The temperature form of the kinetics (§2.3)** — ~~raises assimilation at 15–25 °C
+   relative to the cardinal multiplier if it does anything~~. **RE-PRICED 2026-09-02 and the
+   old wording was too small.** Measured (`log/o2-coupling-measured.md`): `vcmax` +10 % moves
+   `open_season` peak LAI by **+0.000 %** and `jmax` +10 % moves it +0.756 %, so the open
+   field runs on the **light-limited branch** and the whole Rubisco branch is *unreachable*
+   there. But the margin is thin — `vcmax` 90 is still +0.000 %, 80 is −0.69 %, 70 −6.20 %,
+   60 −18.80 %, 50 −42.08 %, so **the crossover sits between 80 and 90, ~15 % below the
+   shipped Vcmax**. A temperature form that cuts Vcmax at the cool end of a 5–25 °C season
+   therefore does not "raise assimilation": it **switches which process is limiting**. That
+   makes it the most likely mover of this item's observable *and* the least predictable —
+   predict the crossing before building, not after. ⚠ `vcmax = 50` also drops
+   `perennial_long_horizon`'s converged peak-leaf to 0.545058, **below its 0.55 floor**.
 
 ### 2.2 Provenance — what is still `TODO(cite)`, and what it would take
 
@@ -95,6 +110,13 @@ not reopen it wholesale. Single params when a finding leans on one:
   Table 1, confirm 404.9 / 278.4 / 42.75 at 25 °C, and strike the "owed" in the file
   header. If a digit differs: record it, do not move the number (a value move is a
   13-golden ceremony and its own decision).
+  ⚠ **Re-checked 2026-09-02 from the author's box: the blocker is NOT the network.** Web
+  access works here; Wiley returns 403 and no open copy of the paper is on the web. So the
+  retrieval is not "try again from a better box" — it needs the PDF put into `sources/` by
+  hand, or a logged-in fetch. **Asked of the user 2026-09-02; still owed.** ⚠ Do not
+  discharge it with a secondary table (PhotoGEA, Sharkey 2007, an R package's constants):
+  those are the *same* reproduced-by-the-literature evidence the file already cites, so
+  fetching one adds nothing the header does not already say.
 - **The eight remaining `photosynthesis.yaml` markers.** `vcmax` 100 and `jmax` 180: a
   species survey exists (Wullschleger 1993, *J. Exp. Bot.* 44:907, tabulates wheat) and is
   the retrieval to make; ⚠ a wheat-specific value is a *value* question — the pair moves
@@ -125,7 +147,17 @@ two, from the paper it cited:
    ⚠ It will not be inert: the open field runs 5–25 °C through a season and the chambers
    are held near 20 °C (check `weather.rs` and each scenario's forcing before predicting
    a sign).
-2. **`o2` is a constant; chamber O₂ is a stock.** Measured off the goldens 2026-09-02:
+   ⚠⚠ **RE-PRICED 2026-09-02 — bigger than "not inert".** Per §2.1 item 4, the open field
+   sits only ~15 % of Vcmax above the light/Rubisco crossover. If this form's Vcmax response
+   cuts more than that at the cool end, the build changes *which* limitation binds, and in
+   the same move makes item 2's oxygenation term — measured as unreachable in the open field
+   — reachable there. So the two form gaps are **not independent**, which is how they were
+   listed. Predict the crossing, and use the `vcmax` ladder in
+   `log/o2-coupling-measured.md` as the baseline it is read against.
+2. ~~**`o2` is a constant; chamber O₂ is a stock.**~~ **MEASURED 2026-09-02 —
+   `log/o2-coupling-measured.md`.** The question this asked (*"do the jar's science bands
+   move?"*) is answered **yes**, and the answer inverts the item as written. Kept below with
+   what it got right; what it got wrong is struck. Measured off the goldens 2026-09-02:
 
    | scenario | `biosphere.o2_pool` at the golden's end | vs its charge |
    |---|---|---|
@@ -136,9 +168,27 @@ two, from the paper it cited:
 
    In the jar the crop's Rubisco oxygenates against 210 mmol/mol of an O₂ it has already
    consumed; with the live pool, Γ* would fall toward zero and the compensation floor with
-   it. In the two big chambers the coupling is inert at the 0.1 % level. **Needs: a
+   it. In the two big chambers the coupling is inert at the 0.1 % level. ~~**Needs: a
    measurement** through the value switch first (`o2` at the jar's actual fraction), then a
-   form build only if the jar's science bands move — they are the ones that would.
+   form build only if the jar's science bands move — they are the ones that would.~~
+
+   **What the measurement found, and where this entry was wrong.** The jar's fraction is
+   **2.0 mmol/mol at charge and 0.033 at the end** against a frozen 210 — 105× and 6329×,
+   and the constant is *exactly right* (210.0/210.2) for the other two chambers. The two
+   halves of the form move the band in **opposite** directions: the oxygenation denominator
+   alone cuts the jar's headroom above the floor 10.364 → 5.853 ppm (**−43 %**), while the
+   whole form (Γ* ∝ O₂, a **derivation**, not a retrieved number) takes the ratio 1.1697 →
+   **12.35** at charge and **685** at the end. So **a half-built form is worse than the
+   frozen constant**, and the entry's own phrasing — which names only the denominator —
+   describes the dangerous half. The denominator also **saturates by ~2 mmol/mol**, so all
+   the time-dependence lives in Γ*, none in the term this entry was about.
+
+   ⚠ **And the build would retire its own guard:** `min > Γ*/ci_ratio` is written against a
+   *constant* floor, so a live Γ* makes it a pointwise claim — a different assertion, not a
+   re-tuned one — and at ratios of 12 to 685 it stops discriminating.
+
+   **Needs: a DECISION, not a measurement** (moved to §4's decision list): build both halves
+   or neither, and re-pose the band first. Only `sealed_chamber` can move under the form.
 
 ### 2.4 The chamber CO₂ controller — priced, a `dt = ¼` object, and it vents
 
@@ -174,6 +224,15 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
   only be regenerated on Windows/UCRT; an unfreeze that moves one of them from a Linux box
   has no regeneration step there. Record it in the ceremony, do not `--write` around it.
 - **The direction plan rotted four times.** This doc carries the re-read gate (the marker under its title).
+  ⚠ It fired for the first time on 2026-09-02, on the o2-coupling item, exactly as designed:
+  the row landed, the gate reddened, and the re-read that cleared it is what struck §2.3.2
+  and re-priced §2.1 item 4 and §2.3.1. The mechanism works; it is the re-read that has to
+  be honest, and the gate still cannot tell.
+- **The value switch could not spell a coupled column.** `report::compare` always accepted a
+  multi-substitution variant; `examples/value_switch.rs` parsed every spec into exactly one,
+  so a form that moves two numbers together could be *argued* across two columns and never
+  *measured*. The grammar moved into `domains::lab::parse_variants` (gated, five tests, and
+  a collapsing mutation reddens two of them) and `+` joins targets into one column.
 - **`README.md` described the Python-canonical project** and listed five deleted
   directories. Rewritten to the tree.
 - **`ci.yml` said there was no Python job** two paragraphs below a Python job; the job ran
@@ -210,23 +269,32 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
 **Work (no decision needed):**
 
 1. The Bernacchi page check (§2.2) — a retrieval, and it closes the FvCB item's one "owed".
-2. The `o2` measurement through the value switch (§2.3.2) — minutes; decides whether the
-   jar's bands are sensitive to a form the tree does not carry.
+   ⚠ **BLOCKED on a PDF, not on a box** (§2.2) — asked of the user 2026-09-02.
+2. ~~The `o2` measurement through the value switch (§2.3.2)~~ — **DONE 2026-09-02,
+   `log/o2-coupling-measured.md`.** It produced a decision, not a next task; see below.
 3. The temperature-kinetics form as the science switch's first scientific pair (§2.3.1) —
    lab-only, no unfreeze, and it is the measurement §2.1 item 4 is waiting on.
+   ⚠ **Now the highest-leverage item in this list, and the least predictable** — it is the
+   one candidate measured to move `open_season`'s observable, and it does so by switching
+   which process limits (§2.1 item 4). Predict the crossing before building.
 4. The partition-table sensitivity measurement (§2.1 item 3) — value switch, minutes.
+   ⚠ Now cheaper than when written: a `+` column can perturb the whole partition table at
+   once rather than one share at a time (§3.1).
 5. The `specific_leaf_area` retrieval (§2.1 item 1) — the highest-leverage provenance
    question on the peak-LAI observable.
 6. Potato stage 2 (§2.6); `drift_summary` regeneration (§3.2). Either can go any time.
 
 **Decisions (the user's; listed apart because listing them as work is how the predecessor
-went stale):** `extinction_coef` (§2.1 item 2); the parked leaf mechanism (§2.5,
-recommended refuse); the CO₂ controller (§2.4, recommended not yet); the product track
+went stale):** `extinction_coef` (§2.1 item 2); **the live-O₂ FvCB form (§2.3.2, NEW
+2026-09-02 — the measurement turned it from a task into a call)**; the parked leaf mechanism
+(§2.5, recommended refuse); the CO₂ controller (§2.4, recommended not yet); the product track
 (dormant by the 2026-08-13 decision; re-open when the science thread reaches a natural
 stop — §2.1 resolving would be one).
 
 **Not recommended:** reopening the citation bucket wholesale; any value move on the FvCB
-constants before the page check; a `--write` of a transcendental golden from a Linux box.
+constants before the page check; a `--write` of a transcendental golden from a Linux box;
+**building the oxygenation half of §2.3.2 without the Γ* half** — measured to be the one
+change that makes the jar's band *tighter*, and it is the half the gap's own wording names.
 
 ---
 

@@ -189,6 +189,98 @@ pub fn biosphere_with(subs: &[Substitution]) -> Result<BiosphereParams, ConfigEr
     })
 }
 
+/// The value-switch command's spec grammar, parsed into the columns it asks for.
+///
+/// ```text
+/// [file.yaml:]field=v1[,v2,...]              one column PER value, one substitution each
+/// [file.yaml:]field=v + [file.yaml:]field=v  ONE column, several substitutions at once
+/// ```
+///
+/// # ⚠ Why the `+` form exists, stated rather than left to be inferred
+///
+/// A sweep answers *"how sensitive is the tree to this one number?"*. It cannot answer
+/// *"what would this FORM do?"* whenever a form moves two numbers together — and the
+/// physically coupled case is exactly that: O₂ enters the Rubisco denominator *and* sets
+/// `Γ* = 0.5·O/(S_c/o)`, so a column varying one of them is a counterfactual no atmosphere
+/// produces. With single-substitution columns only, the combined effect can be *argued*
+/// across two columns but never *measured*, which is the difference between evidence and
+/// arithmetic done by the reader. [`report::compare`] always accepted a multi-substitution
+/// variant; only this grammar could not spell one (`docs/log/o2-coupling-measured.md`).
+///
+/// # What is refused rather than guessed
+///
+/// * **`,` and `+` in one spec.** `a=1,2+b=3` could mean two coupled columns or three
+///   independent ones; a harness that picks one produces a table whose caption is wrong in
+///   a way no reader can see. Same discipline as [`Substitution::resolve`]'s ambiguity.
+/// * **An empty or malformed part**, so `a=1+` is an error, not a silent one-substitution
+///   column that would read as the coupled measurement and is not one.
+/// * **The same target twice in one column** — refused downstream by [`biosphere_with`],
+///   where the second value would silently win.
+pub fn parse_variants(spec: &str) -> Result<Vec<(String, Vec<Substitution>)>, ConfigError> {
+    let combined = spec.contains('+');
+    if combined && spec.contains(',') {
+        return Err(ConfigError::new(format!(
+            "{spec:?} mixes `,` (a sweep of one target) with `+` (one column of several \
+             targets) — write them as separate specs, because the combination has two \
+             readings and this harness guesses at neither"
+        )));
+    }
+    if !combined {
+        let (target, values) = split_once_or_err(spec)?;
+        let mut out = Vec::new();
+        for raw in values.split(',') {
+            let sub = one(target, raw)?;
+            out.push((label_of(std::slice::from_ref(&sub)), vec![sub]));
+        }
+        return Ok(out);
+    }
+    let mut subs = Vec::new();
+    for part in spec.split('+') {
+        let (target, value) = split_once_or_err(part.trim())?;
+        subs.push(one(target, value)?);
+    }
+    Ok(vec![(label_of(&subs), subs)])
+}
+
+/// `target=value`, or a loud error naming the whole spec rather than the fragment.
+fn split_once_or_err(spec: &str) -> Result<(&str, &str), ConfigError> {
+    spec.split_once('=').ok_or_else(|| {
+        ConfigError::new(format!("{spec:?} is not `[file.yaml:]field=value`"))
+    })
+}
+
+/// One `[file.yaml:]field` + one number, resolved the same way the sweep form resolves it.
+fn one(target: &str, raw: &str) -> Result<Substitution, ConfigError> {
+    let value: f64 = raw
+        .trim()
+        .parse()
+        .map_err(|_| ConfigError::new(format!("{:?} is not a number", raw.trim())))?;
+    match target.trim().split_once(':') {
+        Some((file, field)) => Ok(Substitution::new(file.trim(), field.trim(), value)),
+        None => Substitution::resolve(target.trim(), value),
+    }
+}
+
+/// The column heading. The file prefix is printed once and then only when it CHANGES —
+/// `photosynthesis.yaml:o2=2+gamma_star=0.4071` rather than the same 19 bytes twice, which
+/// at the report's column width is the difference between a readable table and a wrapped one.
+fn label_of(subs: &[Substitution]) -> String {
+    let mut out = String::new();
+    let mut last_file: Option<&str> = None;
+    for s in subs {
+        if !out.is_empty() {
+            out.push('+');
+        }
+        if last_file != Some(s.file.as_str()) {
+            out.push_str(&s.file);
+            out.push(':');
+            last_file = Some(s.file.as_str());
+        }
+        out.push_str(&format!("{}={}", s.field, s.value));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,5 +393,75 @@ mod tests {
             both.canopy.sla_per_mol_c.to_bits(),
             params::biosphere().canopy.sla_per_mol_c.to_bits()
         );
+    }
+
+    /// The sweep form: N values of one target become N columns of ONE substitution each.
+    #[test]
+    fn a_swept_spec_is_one_column_per_value() {
+        let v = parse_variants("extinction_coef=0.60,0.65").expect("sweep");
+        assert_eq!(v.len(), 2, "a two-value sweep is two columns");
+        assert!(v.iter().all(|(_, subs)| subs.len() == 1));
+        assert_eq!(v[0].1[0], Substitution::new("canopy.yaml", "extinction_coef", 0.60));
+        assert_eq!(v[1].1[0], Substitution::new("canopy.yaml", "extinction_coef", 0.65));
+    }
+
+    /// ⚠⚠ **The property the `+` form exists for, and the one a column count cannot see.**
+    /// A parser that returned two columns of one substitution here would pass any "did it
+    /// parse?" check while producing exactly the two-counterfactual table that could not
+    /// measure the coupled form. So this asserts the SHAPE — one column, two substitutions —
+    /// not merely that the call succeeded.
+    #[test]
+    fn a_combined_spec_is_one_column_carrying_every_substitution() {
+        let v = parse_variants("o2=2.0+gamma_star=0.4071").expect("combined");
+        assert_eq!(v.len(), 1, "a `+` spec is ONE column, not a sweep");
+        let (label, subs) = &v[0];
+        assert_eq!(subs.len(), 2, "both substitutions must reach the column");
+        assert_eq!(subs[0], Substitution::new("photosynthesis.yaml", "o2", 2.0));
+        assert_eq!(
+            subs[1],
+            Substitution::new("photosynthesis.yaml", "gamma_star", 0.4071)
+        );
+        // The heading names both, with the shared file printed once.
+        assert_eq!(label, "photosynthesis.yaml:o2=2+gamma_star=0.4071");
+        // And it must actually LAND — the substitutions are live, not just parsed.
+        let p = biosphere_with(subs).expect("both substitutions apply");
+        assert_eq!(p.photo.o2, 2.0);
+        assert_eq!(p.photo.gamma_star, 0.4071);
+    }
+
+    /// A combined spec across two files keeps each file's prefix.
+    #[test]
+    fn a_combined_spec_may_span_files() {
+        let v = parse_variants("o2=2.0+canopy.yaml:extinction_coef=0.65").expect("two files");
+        let (label, subs) = &v[0];
+        assert_eq!(subs.len(), 2);
+        assert_eq!(subs[1].file, "canopy.yaml");
+        assert_eq!(
+            label,
+            "photosynthesis.yaml:o2=2+canopy.yaml:extinction_coef=0.65"
+        );
+    }
+
+    /// ⚠ The ambiguous spec is REFUSED, not resolved to a house reading. `a=1,2+b=3` is two
+    /// coupled columns or three independent ones depending on precedence, and a table built
+    /// on the wrong one is wrong in a way its caption hides.
+    #[test]
+    fn mixing_a_sweep_and_a_combination_is_refused() {
+        assert!(parse_variants("o2=2.0,0.033+gamma_star=0.4071").is_err());
+        // Each half alone is fine, so the refusal is about the MIXTURE and nothing else.
+        assert!(parse_variants("o2=2.0,0.033").is_ok());
+        assert!(parse_variants("o2=2.0+gamma_star=0.4071").is_ok());
+    }
+
+    /// A malformed part is loud. ⚠ `a=1+` must NOT degrade to the one-substitution column:
+    /// that column would be read as the coupled measurement and would not be one.
+    #[test]
+    fn a_malformed_or_unknown_part_is_loud() {
+        assert!(parse_variants("o2=2.0+").is_err());
+        assert!(parse_variants("o2").is_err());
+        assert!(parse_variants("o2=notanumber").is_err());
+        assert!(parse_variants("o2=2.0+no_such_param=1.0").is_err());
+        // The live ambiguity is still refused through this grammar, not only through resolve.
+        assert!(parse_variants("carbon_fraction=0.45").is_err());
     }
 }
