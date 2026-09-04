@@ -178,9 +178,14 @@ either.
 * **`Cardinal` is bit-identical to the loader on all eight quantities**, by two independent
   routes (`biosphere_with_form(&[], Cardinal)` parses the frozen file text;
   `params::biosphere()` goes through the ordinary loader). Not a round trip.
-* **Two mutations, both reddening the intended test.** Making the `Q10Teh` branch return the
+* **Three mutations, each reddening the intended test.** Making the `Q10Teh` branch return the
   Cardinal answer reddened the mis-target guard *and* the 2×2; flipping the loader's default
   to `Q10Teh` reddened the bit-identity control.
+  ⚠ Those two left the 2×2's **own headline assertion** (`cardinal_off == cardinal_on`)
+  uncovered — it carries "the term is inert in the frozen tree", and nothing run so far could
+  have reddened it. Third mutation, aimed at it: lowering the LAI threshold by 1.0 makes the
+  loss bite under `Cardinal` (peak 6.022837 → **5.087177**), and that assertion is what fails.
+  *A control battery is only as good as the assertion nobody aimed at.*
 * **The first draft of the test file hand-listed the six runs and its own folds, and silently
   measured 7 of the 8 quantities** — it had no fixed-point row. The count assertion caught it,
   and the file was rewritten to derive its roster from `report::SPECS` and use the report's
