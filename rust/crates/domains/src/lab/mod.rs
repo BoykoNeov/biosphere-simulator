@@ -40,6 +40,10 @@ pub mod report;
 /// The **science** half: a season with a named flow removed from the assembled registry.
 pub mod mechanism;
 
+/// The **partition table**: the one frozen param [`Substitution`] cannot address, because
+/// `with_override` refuses a table-shaped field. Perturbed by re-emitting the rows.
+pub mod partition;
+
 /// One substitution: a field of one frozen param file, and the value to run instead.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Substitution {

@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `o2-coupling-measured.md`
+**Re-read against the record's last row:** `partition-sensitivity.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -42,10 +42,11 @@ Strike-through is kept when this doc is wrong, per the predecessor's rule.
   the layered canopy; two provenance discharges (`carbon_fraction`, and now the FvCB
   constants). The last five *tooling* items were the reference flip, the value switch, the
   science switch (slices 0–4), the margin pin, and the regeneration tool's verdict.
-- **The last item was a MEASUREMENT** (`log/o2-coupling-measured.md`), the first of the two
-  form gaps the FvCB item named. It moved no number and it changed three things in this
-  doc: §2.3.2 is discharged, §2.3.1 is re-priced, and §2.1 gained a measured bound it did
-  not have. Read those three before planning from §4.
+- **The last TWO items were MEASUREMENTS**, and neither moved a number.
+  `log/o2-coupling-measured.md` (2026-09-02) discharged §2.3.2, re-priced §2.1 item 4 and
+  gave §2.1 a measured bound. `log/partition-sensitivity.md` (2026-09-04) discharged §2.1
+  item 3 and §4 item 4 — and **struck §2.1's headline state and §2.1 item 1's premise**,
+  both of which had been stale since 2026-08-15. Read those before planning from §4.
 - **The science thread's shape since 2026-08-14:** every mechanism offered to the canopy
   problem (§2.1) has been measured and either refused on its sign or shipped and found
   inert on the chambers. What is left there is provenance and one form question, not a
@@ -57,10 +58,32 @@ Strike-through is kept when this doc is wrong, per the predecessor's rule.
 
 ### 2.1 The canopy this tree cannot grow — THE BIGGEST OPEN ITEM, and it is a provenance item first
 
-**State, verified:** `open_season`'s peak LAI band is `5.0 < peak < 8.0` (*"real wheat peaks
+~~**State, verified:** `open_season`'s peak LAI band is `5.0 < peak < 8.0` (*"real wheat peaks
 at ~5–8"*). At the shipped step the tree reads **5.03** and converged **4.42**
 (`log/canopy-magnitude.md`; the layered canopy moved it 5.38 → 5.03 shipped). The band
-passes only because the observable is still moving between `dt = ¼` and the limit.
+passes only because the observable is still moving between `dt = ¼` and the limit.~~
+
+⚠⚠ **STRUCK 2026-09-04 — this paragraph is the deviation the frozen contract RETIRED three
+weeks before this doc was written** (`log/partition-sensitivity.md`, FINDING 2). The band is
+`5.0 < peak < 8.0`; the tree reads **6.022837** at the shipped step, measured off the frozen
+params by that item's own baseline column, and `docs/biosphere-reference.md` carries the step
+sweep as a table — **6.0228 at `dt = ¼`, 5.4273 converged** — under its own verdict
+*"**The deviation is retired: the band now clears at every step in the sweep, converged value
+included.**"* So the struck last sentence is false in both halves: the band does not pass
+narrowly, and it does not depend on the step. ⚠ 5.03 / 4.42 were never the tree's — they are
+`log/canopy-magnitude.md`'s **probe** figures (5.0314 / 4.4169) for the layered canopy taken
+*alone*, computed with the midpoint rule that record **retracted in the same paragraph**, for
+a candidate it **refused as a fix**. This doc cites that record by name while its own second
+paragraph promises every claim was *"checked against the tree … not carried over"*: it was
+checked against a **record**, and that record says on its face that it built nothing.
+
+**Verified state, 2026-09-04:** peak LAI **6.0228** shipped / **5.4273** converged, inside
+`5.0 < peak < 8.0` at every step in the sweep; **0.38 % over** the *separate* `peak < 6.0`
+check, which is satisfied by its restated *"…**or** the 5 %/day mutual-shading loss is
+MODELLED"* clause (that loss is inert — 6.0228 either way). ⚠ **So this item is SMALLER than
+the "THE BIGGEST OPEN ITEM" in its own title, and §4's ranking was computed against 5.03.**
+What is left is the provenance the subtitle already names, plus item 4's form question — not
+a canopy the tree cannot grow.
 
 **Eliminated by measurement, so not re-proposed:** the canopy regulator (a loss; built,
 inert on chambers); the parked leaf mechanism (below the frozen tree on both observables at
@@ -69,23 +92,50 @@ re-tuning the bound (refused three times).
 
 **What is actually open, in order of leverage:**
 
-1. **`specific_leaf_area` keyed to development — a CITATION question.** Measured
-   2026-08-15: keying the constant spans peak LAI **3.04 (−35 %) to 8.24 (+75 %)** depending
-   on whether the frozen 22.0 m²/kg ([B] Table 19, "425 kg/ha per unit LAI") is read as the
-   *young*- or the *mature*-leaf value — and `canopy.yaml` does not say which the table
-   reports. The late-anchored reading also moves the independently pinned "LAI peaks after
-   anthesis" defect the right way (DVS 1.37 → 0.96). **Needs: one retrieval** — what leaf
-   population Table 19's figure describes — then a form build if it is age-specific.
+1. ~~**`specific_leaf_area` keyed to development — a CITATION question.** Measured
+   ~~2026-08-15: keying the constant spans peak LAI **3.04 (−35 %) to 8.24 (+75 %)** depending~~
+   ~~on whether the frozen 22.0 m²/kg ([B] Table 19, "425 kg/ha per unit LAI") is read as the~~
+   ~~*young*- or the *mature*-leaf value — and `canopy.yaml` does not say which the table~~
+   ~~reports. The late-anchored reading also moves the independently pinned "LAI peaks after~~
+   ~~anthesis" defect the right way (DVS 1.37 → 0.96). **Needs: one retrieval** — what leaf~~
+   ~~population Table 19's figure describes — then a form build if it is age-specific.~~
+   ⚠ **PREMISE STRUCK 2026-09-04** (`log/partition-sensitivity.md`, FINDING 3). `canopy.yaml`
+   reads **23.53**, not 22.0, with `source: "[B], Table 19 p.100, 'Wheat, winter' (425 kg/ha
+   per unit LAI → 10000/425)"` — the `TODO(cite)` was retired and the value moved +7.0 % by
+   the layered-canopy item, and the file's own header now says `extinction_coef` is *"the live
+   provenance queue, **alone**"*. So this is **not a missing-citation retrieval**, and the
+   −35 %/+75 % span was measured against the superseded 4.71 / 5.38 anchor.
+   **What survives, restated:** the page names the crop but not the leaf **population**, so
+   whether a *cited* constant should be development-keyed is still open. **Needs: one
+   retrieval** — what leaf population Table 19's figure describes — then a form build if it is
+   age-specific. Re-measure the span before quoting it.
 2. **`extinction_coef` 0.60 / 0.65 / 0.68 — a DECISION, priced.** Three shelf readings
    disagree (`log/canopy-provenance.md`); +8.3 % on `k` buys +0.8 % of peak LAI shipped,
    +7.3 % converged, moves the LAI peak before anthesis, loosens all five CO₂ bands, and
    spends the perennial liveness floor down to 0.40 %. **Needs: the user's call**; the
    record recommends 0.60 (coherence with Goudriaan's quadrature, conservative on the
    gates) or 0.65 (crop-specific) and refuses 0.68 (unpublished).
-3. **The partition table is UNMEASURED as a cause.** It was fitted against the pre-light-path
+3. ~~**The partition table is UNMEASURED as a cause.** It was fitted against the pre-light-path
    assimilation (`log/wheat-partition-backfill.md`), so it is a suspect in exactly the way
    the band is. The value switch can measure a uniform root-share perturbation in minutes.
-   **Needs: a measurement**, no decision.
+   **Needs: a measurement**, no decision.~~ **MEASURED 2026-09-04 —
+   `log/partition-sensitivity.md`. It IS a live lever, and strongly asymmetric.** Every organ
+   share scaled at every DVS knot, others compensated proportionally: a **25 % rise** in
+   either non-leaf share costs ~**27 %** of peak LAI (`fr×1.25` 4.4094, `fs×1.25` 4.3857
+   against 6.0228), while a 25 % **fall** buys under **2 %** and saturates. ⚠ That saturation
+   is on the non-leaf-reduction side **only**: raising the leaf share directly is still
+   climbing at `fl×1.8` (**7.369**, +22.35 %), and the ladder stops there because `fl×2.0` is
+   arithmetically impossible, not because the response flattened — **an unexhausted direction
+   on this item's own observable**. ⚠ **The compensation scheme decides which
+   gate breaks**, so it is a variable, not a nuisance: more carbon to leaf is clean spelled
+   `fl×1.8` (LAI **7.369**, biomass *falls* to 12.96, liveness floor +34 %) and **breaks the
+   above-ground biomass cap** spelled `fr×0.75` (**14.4621** against 14.4248) for a tenth of
+   the LAI gain — because that cap excludes fibrous roots, so shrinking the root share raises
+   it by arithmetic. ⚠ **And the harness this item was priced on cannot address the table:**
+   `with_override` refuses a table-shaped field by construction and `+` joins **scalar**
+   substitutions, so §4 item 4's ⚠ was false when it was written. `lab::partition` +
+   `examples/partition_switch.rs` now spell it, by re-emitting the perturbed rows into the
+   frozen file's own text so the loader's rules stay the only copy.
 4. **The temperature form of the kinetics (§2.3)** — ~~raises assimilation at 15–25 °C
    relative to the cardinal multiplier if it does anything~~. **RE-PRICED 2026-09-02 and the
    old wording was too small.** Measured (`log/o2-coupling-measured.md`): `vcmax` +10 % moves
@@ -237,6 +287,14 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
   the row landed, the gate reddened, and the re-read that cleared it is what struck §2.3.2
   and re-priced §2.1 item 4 and §2.3.1. The mechanism works; it is the re-read that has to
   be honest, and the gate still cannot tell.
+  ⚠⚠ **It fired a SECOND time on 2026-09-04, and this time the re-read found the previous
+  re-read's own damage** (`log/partition-sensitivity.md`): the 09-02 pass wrote a *new* false
+  claim (§4 item 4's `+` ⚠) about a harness it had not run, and it left §2.1's headline
+  numbers — a deviation the frozen contract had **retired** three weeks earlier — untouched,
+  because it checked them against the record they cite rather than against a run. **The
+  mechanism forces a re-read; it cannot force the re-read to RUN anything, and reading is how
+  both misses happened.** The countermeasure adopted here, and it is cheap: a re-read of a
+  numeric claim quotes a **measured baseline column**, never a record.
 - **The value switch could not spell a coupled column.** `report::compare` always accepted a
   multi-substitution variant; `examples/value_switch.rs` parsed every spec into exactly one,
   so a form that moves two numbers together could be *argued* across two columns and never
@@ -286,11 +344,19 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
    ⚠ **Now the highest-leverage item in this list, and the least predictable** — it is the
    one candidate measured to move `open_season`'s observable, and it does so by switching
    which process limits (§2.1 item 4). Predict the crossing before building.
-4. The partition-table sensitivity measurement (§2.1 item 3) — value switch, minutes.
+4. ~~The partition-table sensitivity measurement (§2.1 item 3) — value switch, minutes.
    ⚠ Now cheaper than when written: a `+` column can perturb the whole partition table at
-   once rather than one share at a time (§3.1).
+   once rather than one share at a time (§3.1).~~ **DONE 2026-09-04,
+   `log/partition-sensitivity.md`** — and **BOTH struck sentences were false**. The value
+   switch cannot address a table-shaped field in either of its forms; the ⚠ that said `+`
+   could was **added by this doc's own 2026-09-02 re-read**, i.e. the re-read the gate had
+   just forced wrote a *new* false cheapening claim about a harness it did not run. *A
+   re-read checks the claims it is looking at; the claims it writes are checked by nothing.*
+   The measurement produced a live result (§2.1 item 3) and a struck §2.1 premise.
 5. The `specific_leaf_area` retrieval (§2.1 item 1) — the highest-leverage provenance
-   question on the peak-LAI observable.
+   question on the peak-LAI observable. ⚠ **RE-SCOPED 2026-09-04** — the constant is CITED (23.53, [B]
+   Table 19 p.100); what is owed is the leaf **population** the page reports, not the
+   citation, and the −35 %/+75 % span it was ranked on is against a superseded anchor.
 6. Potato stage 2 (§2.6); `drift_summary` regeneration (§3.2). Either can go any time.
 
 **Decisions (the user's; listed apart because listing them as work is how the predecessor
