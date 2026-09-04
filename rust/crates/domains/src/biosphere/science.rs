@@ -72,6 +72,102 @@ pub fn gross_leaf_assimilation(ci: f64, absorbed_par: f64, p: &PhotosynthesisPar
     ac.min(aj).max(0.0)
 }
 
+// --- the two temperature forms ----------------------------------------------
+//
+// Plan: `docs/plans/post-roadmap-temperature-kinetics.md`. The tree's frozen treatment of
+// temperature in photosynthesis is ONE piecewise-linear multiplier on the WHOLE rate — the
+// [B] cardinal/TMPFTB idiom — over constants held at 25 °C. [D] Teh gives each kinetic
+// constant its own Q10 instead, and gives the light branch its own response through a
+// temperature-dependent quantum efficiency. Both are cited; they are not the same claim.
+//
+// ⚠ **This is a LAB alternative and endorses nothing.** [`KineticsForm::Cardinal`] is the
+// frozen body verbatim, which is the only reason a second form here is not an unfreeze.
+
+/// [D] Teh's Q10 for `Vcmax` (Table 6.2, p. 130).
+pub const TEH_Q10_VCMAX: f64 = 2.4;
+/// [D] Teh's Q10 for `Kc` (Table 6.2, p. 130).
+pub const TEH_Q10_KC: f64 = 2.1;
+/// [D] Teh's Q10 for `Ko` (Table 6.2, p. 130).
+pub const TEH_Q10_KO: f64 = 1.2;
+/// [D] Teh's Q10 for the CO₂/O₂ specificity factor `τ` (Table 6.2, p. 130).
+///
+/// ⚠ **Below 1**: specificity *falls* as the leaf warms, which is why warming favours
+/// oxygenation. Checked against the rendered page, not the PDF text layer.
+pub const TEH_Q10_TAU: f64 = 0.57;
+/// The reference temperature all of [D]'s Q10s are anchored at (°C).
+pub const TEH_Q10_REFERENCE_C: f64 = 25.0;
+
+/// `Γ*`'s Q10 — **DERIVED**, `1/Q10(τ)`, not a tabulated number.
+///
+/// [D] eq. 6.19 makes `Γ* = O/(2·τ)` with `O` constant, so `Γ*(T)/Γ*(25) = τ(25)/τ(T)` and
+/// the specificity factor's Q10 inverts. Kept as its own named constant, and labelled a
+/// derivation everywhere it appears, because the shelf tabulates `τ` and not this.
+pub const TEH_Q10_GAMMA_STAR: f64 = 1.0 / TEH_Q10_TAU;
+
+/// [D] eq. 6.23 — the intrinsic quantum efficiency of a C3 leaf against leaf temperature
+/// (µmol CO₂ µmol⁻¹ photon), after Ehleringer & Björkman (1977).
+///
+/// ⚠ Used as a **shape**, never as a value: [D]'s `e_m` is mol CO₂ per mol absorbed photon
+/// and this tree's `quantum_yield` is mol electrons per mol photon, so only the ratio
+/// `e_m(T)/e_m(25)` transfers. [`kinetics_at`] is the one caller and it takes that ratio.
+pub fn teh_quantum_efficiency(temp_c: f64) -> f64 {
+    0.081 - 0.000053 * temp_c - 0.000019 * temp_c * temp_c
+}
+
+/// Which temperature form a [`PhotosynthesisParams`]'s constants are read under.
+///
+/// This is not a fitted coefficient and never comes out of a param file — it selects between
+/// two cited *forms* over the same frozen numbers. See the module note above.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum KineticsForm {
+    /// The frozen reference: 25 °C constants, whole rate scaled by [`temperature_factor`].
+    #[default]
+    Cardinal,
+    /// [D] Teh ch. 6: per-constant Q10s on `Vcmax`/`Kc`/`Ko`/`Γ*`, [D] eq. 6.23's shape on
+    /// the quantum yield, and **no** whole-rate multiplier — [D] carries none because its
+    /// constants carry the response instead.
+    Q10Teh,
+}
+
+/// `q · Q10^((T − 25)/10)` — [D] eq. 6.29, the one arithmetic body the four constants share.
+///
+/// ⚠ Deliberately NOT [`q10_factor`], which anchors at a param-supplied `t_ref` for
+/// respiration. Sharing the two would tie a photosynthesis form to a respiration param.
+fn teh_q10(value: f64, q10: f64, temp_c: f64) -> f64 {
+    value * q10.powf((temp_c - TEH_Q10_REFERENCE_C) / 10.0)
+}
+
+/// The constants `form` reads at `temp_c`, plus the whole-rate multiplier that form applies.
+///
+/// Returns `(params_at_T, whole_rate_scale)`. For [`KineticsForm::Cardinal`] the params come
+/// back **untouched** and the scale is [`temperature_factor`] — so the caller's arithmetic is
+/// the frozen one, term for term, and the goldens cannot move. For [`KineticsForm::Q10Teh`]
+/// the four kinetic constants and the quantum yield move and the scale is exactly `1.0`.
+///
+/// ⚠ `Jmax` and `theta` are left alone by both forms. [D] has no `Jmax` — its light branch is
+/// Collatz's, with no such parameter — so scaling it would be inventing a response neither
+/// source states. The plan measures what that omission is worth (about 3 %: at this canopy's
+/// absorbed PAR the branch is quantum-yield-limited and `Jmax` is nearly inert).
+pub fn kinetics_at(
+    temp_c: f64,
+    p: &PhotosynthesisParams,
+    form: KineticsForm,
+) -> (PhotosynthesisParams, f64) {
+    match form {
+        KineticsForm::Cardinal => (*p, temperature_factor(temp_c, p)),
+        KineticsForm::Q10Teh => {
+            let mut q = *p;
+            q.vcmax = teh_q10(p.vcmax, TEH_Q10_VCMAX, temp_c);
+            q.kc = teh_q10(p.kc, TEH_Q10_KC, temp_c);
+            q.ko = teh_q10(p.ko, TEH_Q10_KO, temp_c);
+            q.gamma_star = teh_q10(p.gamma_star, TEH_Q10_GAMMA_STAR, temp_c);
+            q.quantum_yield = p.quantum_yield * teh_quantum_efficiency(temp_c)
+                / teh_quantum_efficiency(TEH_Q10_REFERENCE_C);
+            (q, 1.0)
+        }
+    }
+}
+
 /// Cardinal-temperature response `f_temp(T) ∈ [0, 1]` (piecewise-linear TMPFTB).
 pub fn temperature_factor(temp_c: f64, p: &PhotosynthesisParams) -> f64 {
     if temp_c <= p.t_min || temp_c >= p.t_max {
@@ -115,13 +211,18 @@ pub fn canopy_assimilation(
     let half_spread = 0.5 * 0.6_f64.sqrt();
     let depths = [0.5 - half_spread, 0.5, 0.5 + half_spread];
     let weights = [5.0 / 18.0, 8.0 / 18.0, 5.0 / 18.0];
+    // The temperature form, resolved ONCE per call rather than per depth point: both forms
+    // are functions of air temperature alone, and the quadrature below already assumes a
+    // depth-independent response (`canopy_assimilation_scales_exactly_with_the_temperature_
+    // factor` pins that for the frozen form). ⚠ Under `Cardinal` this returns the params
+    // unchanged and the frozen multiplier, so every operation below is the frozen one.
+    let (photo, f_temp) = kinetics_at(temp_c, photo, photo.kinetics);
     let mut weighted_leaf_rate = 0.0;
     for (depth, weight) in depths.iter().zip(weights.iter()) {
         let absorbed_par = k * incident_par * (-k * depth * lai).exp();
-        weighted_leaf_rate += weight * gross_leaf_assimilation(ci, absorbed_par, photo);
+        weighted_leaf_rate += weight * gross_leaf_assimilation(ci, absorbed_par, &photo);
     }
     let canopy_rate = weighted_leaf_rate * lai;
-    let f_temp = temperature_factor(temp_c, photo);
     canopy_rate * window_s * ground_area * MICROMOL_TO_MOL * f_temp * limitation
 }
 
@@ -613,6 +714,7 @@ mod tests {
             t_opt_lo: 15.0,
             t_opt_hi: 25.0,
             t_max: 40.0,
+            kinetics: KineticsForm::Cardinal,
         };
         let pheno = params::PhenologyParams {
             t_base: 0.0,
@@ -654,6 +756,7 @@ mod tests {
             t_opt_lo: 15.0,
             t_opt_hi: 25.0,
             t_max: 40.0,
+            kinetics: KineticsForm::Cardinal,
         };
         let pheno = params::PhenologyParams {
             t_base: 0.0,
@@ -770,6 +873,7 @@ mod tests {
             t_opt_lo: 15.0,
             t_opt_hi: 25.0,
             t_max: 35.0,
+            kinetics: KineticsForm::Cardinal,
         }
     }
 

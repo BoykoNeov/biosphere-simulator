@@ -32,6 +32,7 @@
 //! (`docs/log/canopy-provenance.md`) is still open and still the user's.
 
 use crate::biosphere::params::{self, BiosphereParams};
+use crate::biosphere::science::KineticsForm;
 use config::{with_override, ConfigError, ParamFile};
 
 /// The comparison report — §6 of the plan, every requirement earned by a wrong read.
@@ -86,6 +87,37 @@ impl Substitution {
             ))),
         }
     }
+}
+
+/// The frozen params read under a different **temperature form** — the science half's
+/// second instrument, and the first alternative *form* of any biosphere process in this tree.
+///
+/// Plan: `docs/plans/post-roadmap-temperature-kinetics.md`. Where [`Substitution`] changes a
+/// number and [`mechanism`] changes which flows are assembled, this changes the rate law the
+/// assembled flows evaluate — over the **frozen numbers**, so an A/B attributes to the form
+/// and not to a moved value.
+///
+/// # ⚠ Why this is one field on the params object and not three flow replacements
+///
+/// `Allocation`, `GrowthRespiration` and `MaintenanceRespiration` each hold a
+/// `CarbonContext` and each calls `budget()`. Replacing one leaves a step whose growth
+/// respiration is computed off the frozen assimilation and whose allocation is not —
+/// internally inconsistent, and it would look entirely plausible in a report. Replacing all
+/// three means rebuilding their contexts, i.e. a **second assembly body**, which
+/// [`mechanism`]'s header names as the defect that module exists to prevent. The form rides
+/// the one funnel `tests/param_funnel.rs` gates instead, and all three follow.
+///
+/// # ⚠ This endorses no form
+///
+/// [`KineticsForm::Cardinal`] is the reference and stays the reference. A column measured
+/// under [`KineticsForm::Q10Teh`] is evidence about a cited alternative, not a proposal.
+pub fn biosphere_with_form(
+    subs: &[Substitution],
+    form: KineticsForm,
+) -> Result<BiosphereParams, ConfigError> {
+    let mut p = biosphere_with(subs)?;
+    p.photo.kinetics = form;
+    Ok(p)
 }
 
 /// Which frozen files declare `field`, in census order.

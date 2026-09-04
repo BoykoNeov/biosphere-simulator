@@ -62,6 +62,7 @@ use super::mechanism::Composition;
 use super::Substitution;
 use crate::biosphere::drift::year_summaries;
 use crate::biosphere::params::BiosphereParams;
+use crate::biosphere::science::KineticsForm;
 use crate::biosphere::readouts::{
     floor_ppm, min_ppm, peak_lai, peak_w, segment_max, try_trajectory_composed, Trajectory,
     TrajectoryError,
@@ -265,6 +266,10 @@ pub enum Change {
     /// A flow composition, applied after assembly, at the frozen params. Applicable only to
     /// the scenarios whose registry contains its targets — see [`Composition`].
     Mechanism(Composition),
+    /// An alternative **temperature form** of the FvCB kinetics, over the frozen numbers.
+    /// **Always applicable**, like [`Change::Values`]: every scenario evaluates the same rate
+    /// law, so the form reaches every row of every column. See [`super::biosphere_with_form`].
+    Form(KineticsForm),
 }
 
 /// One measured column of the table.
@@ -454,6 +459,13 @@ pub fn compare_changes(variants: &[(String, Change)], long: bool) -> Result<Vec<
                 measure(label, &p, long)
             }
             Change::Mechanism(comp) => measure_composed(label, &frozen, long, Some(comp))?,
+            // ⚠ Built from the frozen params through the same seam, not from `frozen` with a
+            // field poked: `biosphere_with_form` is the one place the form is set, so a
+            // column and a direct call cannot drift.
+            Change::Form(form) => {
+                let p = super::biosphere_with_form(&[], *form).map_err(as_request_error)?;
+                measure(label, &p, long)
+            }
         });
     }
     Ok(columns)

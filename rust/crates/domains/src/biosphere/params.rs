@@ -36,6 +36,7 @@
 //! provenance unfreeze **no test can see**; see the ceremony record in
 //! `docs/biosphere-reference.md`.
 
+use super::science::KineticsForm;
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
     ParamFile, YamlValue,
@@ -146,6 +147,19 @@ pub struct PhotosynthesisParams {
     pub t_opt_lo: f64,
     pub t_opt_hi: f64,
     pub t_max: f64,
+    /// **Which temperature form the twelve constants above are read under** — not a
+    /// thirteenth constant, and never loaded from the file.
+    ///
+    /// The loader always sets [`KineticsForm::Cardinal`], the frozen reference, so the
+    /// goldens cannot see this field exists. `domains::lab` flips it to run the cited
+    /// alternative against the same numbers
+    /// (`docs/plans/post-roadmap-temperature-kinetics.md`).
+    ///
+    /// ⚠ It lives here rather than on `CarbonContext` because **three** flows hold a context
+    /// and all three call `budget()`; moving the form with the params object is what keeps
+    /// them consistent through the one funnel `tests/param_funnel.rs` gates, instead of
+    /// through a second assembly body.
+    pub kinetics: KineticsForm,
 }
 
 /// Maintenance + growth respiration params.
@@ -436,6 +450,9 @@ pub fn photosynthesis_from(text: &str, name: &'static str) -> PhotosynthesisPara
         t_opt_lo,
         t_opt_hi,
         t_max,
+        // The frozen form, always. A file cannot ask for the other one: `kinetics` has no
+        // key in `guarded_map` above, so a YAML that named it would be an unknown field.
+        kinetics: KineticsForm::Cardinal,
     }
 }
 

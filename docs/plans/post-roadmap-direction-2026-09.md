@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `partition-leaf-direction.md`
+**Re-read against the record's last row:** `temperature-kinetics.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -222,7 +222,7 @@ The science-switch plan's slice 3b is *"a scientific pair"* and its own §2C mea
 **no alternative form of any biosphere process exists in the tree**. The FvCB item found
 two, from the paper it cited:
 
-1. **Temperature response of Kc, Ko, Γ*.** The tree scales the whole assimilation rate by
+1. ~~**Temperature response of Kc, Ko, Γ*.** The tree scales the whole assimilation rate by
    the [B] cardinal multiplier over 25 °C constants. Bernacchi (2001) gives each constant
    an Arrhenius function (the paper's subject). A lab-only mechanism —
    `build_season_replacing` the FvCB aux with a temperature-resolved one — is exactly
@@ -237,7 +237,30 @@ two, from the paper it cited:
    the same move makes item 2's oxygenation term — measured as unreachable in the open field
    — reachable there. So the two form gaps are **not independent**, which is how they were
    listed. Predict the crossing, and use the `vcmax` ladder in
-   `log/o2-coupling-measured.md` as the baseline it is read against.
+   `log/o2-coupling-measured.md` as the baseline it is read against.~~
+
+   ⚠⚠ **BUILT 2026-09-04 — `log/temperature-kinetics.md`. Struck whole, because three of its
+   own claims were false and one of them is the reason this item sat.**
+
+   * **The source was not Bernacchi and the retrieval was never needed.** [D] Teh ch. 6,
+     already in `sources/` and already cited BY CONSTANT in `science_gates.rs`, tabulates a
+     Q10 for every constant *including* `Vcmax` (2.4, Table 6.2 p. 130). The response §2.2
+     called *"understood, not retrieved"* was tabulated on our own shelf. **Fourth time.**
+   * **"Predict the crossing" was aimed at the wrong branch.** The light-limited branch binds
+     **99 % of lit steps**; the `vcmax` ladder this doc told the builder to read against
+     measures the branch that is nearly invisible. Both this item and §2.1 item 4 were priced
+     on it.
+   * **"The chambers are held near 20 °C" is false.** Every frozen scenario reads the same
+     weather series — mean 10.67 °C, whole season below 25 °C — so no chamber was ever going
+     to be inert for that reason. 8 of 8 gated quantities moved.
+
+   **What it found** (details in the record): assimilation +56 % at fixed LAI, yet `open_season`
+   peak LAI moves only **+3.5 %**, because the 5 %/day mutual-shading loss — **exactly inert**
+   in the frozen tree — absorbs 7.31 of LAI. The band this tree passes is held by a loss term,
+   not by its canopy. Two gates go red: the biomass cap really is breached (18.366 vs 14.4248),
+   while the three CO₂ crossings are read against a **constant** floor the form dissolves and
+   are therefore a demand to re-pose the gate, not a verdict on the form. **A decision is now
+   owed** — see §4.
 2. ~~**`o2` is a constant; chamber O₂ is a stock.**~~ **MEASURED 2026-09-02 —
    `log/o2-coupling-measured.md`.** The question this asked (*"do the jar's science bands
    move?"*) is answered **yes**, and the answer inverts the item as written. Kept below with
@@ -364,11 +387,19 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
    ⚠ **BLOCKED on a PDF, not on a box** (§2.2) — asked of the user 2026-09-02.
 2. ~~The `o2` measurement through the value switch (§2.3.2)~~ — **DONE 2026-09-02,
    `log/o2-coupling-measured.md`.** It produced a decision, not a next task; see below.
-3. The temperature-kinetics form as the science switch's first scientific pair (§2.3.1) —
+3. ~~The temperature-kinetics form as the science switch's first scientific pair (§2.3.1) —
    lab-only, no unfreeze, and it is the measurement §2.1 item 4 is waiting on.
    ⚠ **Now the highest-leverage item in this list, and the least predictable** — it is the
    one candidate measured to move `open_season`'s observable, and it does so by switching
-   which process limits (§2.1 item 4). Predict the crossing before building.
+   which process limits (§2.1 item 4). Predict the crossing before building.~~
+   **BUILT 2026-09-04, `log/temperature-kinetics.md`.** The prediction was written first, in
+   `post-roadmap-temperature-kinetics.md`, and **2 of its 4 numeric calls were wrong** — peak
+   LAI by an order of magnitude in the change, the liveness floor by its sign. It did switch
+   which process limits (Rubisco-bound lit steps 1.1 % → 9.1 %), which also promotes the
+   uncited `vcmax = 100` into a load-bearing position and **raises** the value of item 1's
+   retrieval. ⚠ It leaves a decision, not a next task, and a NEW question this doc has never
+   carried: **the peak-LAI band is held by a loss term measured to be inert at the frozen
+   params** — a fact about the frozen tree that does not depend on adopting anything.
 4. ~~The partition-table sensitivity measurement (§2.1 item 3) — value switch, minutes.
    ⚠ Now cheaper than when written: a `+` column can perturb the whole partition table at
    once rather than one share at a time (§3.1).~~ **DONE 2026-09-04,
@@ -390,7 +421,10 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
 
 **Decisions (the user's; listed apart because listing them as work is how the predecessor
 went stale):** `extinction_coef` (§2.1 item 2); **the live-O₂ FvCB form (§2.3.2, NEW
-2026-09-02 — the measurement turned it from a task into a call)**; the parked leaf mechanism
+2026-09-02 — the measurement turned it from a task into a call)**; **the Q10 temperature form
+(§2.3.1, NEW 2026-09-04 — recommendation: refuse as a replacement, keep as an instrument; it
+breaks the biomass cap, collapses the chamber liveness floor, and promotes an uncited
+`vcmax`)**; the parked leaf mechanism
 (§2.5, recommended refuse); the CO₂ controller (§2.4, recommended not yet); the product track
 (dormant by the 2026-08-13 decision; re-open when the science thread reaches a natural
 stop — §2.1 resolving would be one).

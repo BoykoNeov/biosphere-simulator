@@ -11,12 +11,19 @@
 //! coefficient's effect are read off the same quantities against the same recorded bounds, and
 //! two renderers would be two copies of the rule for reading them.
 //!
-//! # ⚠ Why only the knockout is reachable from a command line
+//! # ⚠ What is reachable from a command line, and what is not
 //!
-//! The lab's other two composers take a *flow*, not a name — an alternative form of a process
-//! is code, and there is no second form of any biosphere process in this tree (§2C of the
-//! plan, measured). `lab::report::compare_changes` takes replacements and additions and the
-//! tests drive them; a command line can only name what already exists.
+//! Two things: a **knockout** by flow id, and a **temperature form** by name (`form=q10_teh`,
+//! `docs/plans/post-roadmap-temperature-kinetics.md`).
+//!
+//! ⚠ This header said until 2026-09-04 that only the knockout was reachable, *"because there
+//! is no second form of any biosphere process in this tree (§2C of the plan, measured)"*. That
+//! was true when it was written and the temperature-kinetics item is what ended it — a form is
+//! nameable here precisely because it rides the params object rather than a `Box<dyn Flow>`.
+//!
+//! The lab's replace/add composers still take a *flow*, not a name, and remain test-driven
+//! only: `lab::report::compare_changes` takes them, but a command line can only name what
+//! already exists.
 //!
 //! # ⚠ A column can be blank, and that is a result rather than a fault
 //!
@@ -28,8 +35,23 @@
 //! ⚠ **It writes nothing and it takes no decision.** A knockout regenerates evidence about a
 //! mechanism's contribution; it says nothing about whether the mechanism belongs there.
 
+use domains::biosphere::science::KineticsForm;
 use domains::lab::mechanism::Composition;
 use domains::lab::report::{compare_changes, render, Change};
+
+/// The form names this command accepts — one roster, shared by the usage text and the error,
+/// so adding a form cannot leave one of them behind.
+const FORM_NAMES: [&str; 2] = ["cardinal", "q10_teh"];
+
+/// `form=<name>` resolved. `cardinal` is accepted (it reproduces the baseline exactly) so a
+/// reader can SEE the no-op column rather than being told it would be one.
+fn kinetics_form(name: &str) -> Option<KineticsForm> {
+    match name {
+        "cardinal" => Some(KineticsForm::Cardinal),
+        "q10_teh" => Some(KineticsForm::Q10Teh),
+        _ => None,
+    }
+}
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -42,12 +64,13 @@ fn main() {
     let ids: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if ids.is_empty() {
         eprintln!(
-            "usage: science_switch <flow.id> [more flow ids...] [--long]\n\
+            "usage: science_switch <flow.id | form=NAME> [more...] [--long]\n\
              \n\
              Runs the frozen biosphere scenarios with each flow knocked out and tabulates the\n\
              quantities the science gates are read off. Writes nothing.\n\
              \n\
              example: science_switch biosphere.root_zone_capture\n\
+             example: science_switch form=q10_teh --long\n\
              \n\
              A flow id absent from a scenario's registry is reported n/a for that scenario's\n\
              rows, not as an error: the four canonical builds do not share a flow set."
@@ -55,13 +78,22 @@ fn main() {
         std::process::exit(2);
     }
 
+    // ⚠ A `form=` argument that names nothing is REFUSED, never silently read as a flow id:
+    // `biosphere.foo` and `form=foo` fail in different places, and a caller who typoed the
+    // second would otherwise get a knockout column labelled as a form.
     let variants: Vec<(String, Change)> = ids
         .iter()
-        .map(|id| {
-            (
-                format!("drop {id}"),
-                Change::Mechanism(Composition::dropping(&[id.as_str()])),
-            )
+        .map(|arg| match arg.strip_prefix("form=") {
+            Some(name) => match kinetics_form(name) {
+                Some(form) => (format!("form {name}"), Change::Form(form)),
+                None => fail(&format!(
+                    "unknown temperature form {name:?} (have {FORM_NAMES:?})"
+                )),
+            },
+            None => (
+                format!("drop {arg}"),
+                Change::Mechanism(Composition::dropping(&[arg.as_str()])),
+            ),
         })
         .collect();
 
