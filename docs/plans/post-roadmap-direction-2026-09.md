@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `partition-sensitivity.md`
+**Re-read against the record's last row:** `partition-leaf-direction.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -115,6 +115,17 @@ re-tuning the bound (refused three times).
    spends the perennial liveness floor down to 0.40 %. **Needs: the user's call**; the
    record recommends 0.60 (coherence with Goudriaan's quadrature, conservative on the
    gates) or 0.65 (crop-specific) and refuses 0.68 (unpublished).
+   ⚠ **RE-CHECKED AGAINST A RUN 2026-09-04** (`reread-extinction-coef.txt`, the re-read the
+   partition item's gate forced, done the way its predecessor demanded — a run, not a
+   record). The shipped numbers **hold**: `0.65` is peak LAI 6.069990, **+0.783 %**, and the
+   perennial fixed point 0.552202 against the 0.55 floor, **+0.40 %** of clearance. The
+   converged half (+7.3 %) was NOT re-checked — it needs the step sweep, not this harness.
+   ⚠⚠ **And the run carries a harder ground for refusing 0.68 than this doc records.** At
+   `k = 0.68` the perennial fixed point is **0.538913 — BELOW the 0.55 liveness floor**, so
+   that option is not merely unpublished, it is red on a gate. It is also **non-monotone on
+   the observable it was proposed to move**: peak LAI at 0.68 is 6.058617 (+0.594 %),
+   *lower* than at 0.65. Both facts are new here; neither is in `log/canopy-provenance.md`'s
+   summary as quoted above.
 3. ~~**The partition table is UNMEASURED as a cause.** It was fitted against the pre-light-path
    assimilation (`log/wheat-partition-backfill.md`), so it is a suspect in exactly the way
    the band is. The value switch can measure a uniform root-share perturbation in minutes.
@@ -125,8 +136,22 @@ re-tuning the bound (refused three times).
    against 6.0228), while a 25 % **fall** buys under **2 %** and saturates. ⚠ That saturation
    is on the non-leaf-reduction side **only**: raising the leaf share directly is still
    climbing at `fl×1.8` (**7.369**, +22.35 %), and the ladder stops there because `fl×2.0` is
-   arithmetically impossible, not because the response flattened — **an unexhausted direction
-   on this item's own observable**. ⚠ **The compensation scheme decides which
+   arithmetically impossible, not because the response flattened — ~~**an unexhausted direction
+   on this item's own observable**~~. ⚠ **EXHAUSTED 2026-09-04 —
+   `log/partition-leaf-direction.md`.** That ceiling was set by the knot with the *least*
+   leverage: a uniform scale is capped by `min` of `1/fl`, which is 1.818 at the `dvs 0` knot
+   against **3.333** at `dvs 1` — and `dvs 1` is the knot that matters, because peak LAI falls
+   at **DVS 1.306192** (measured 2026-09-04; this doc's ~1.37 was computed against the
+   superseded 4.71/5.38 anchor). Scaling leaf at the `dvs 1` knot **alone** crosses the band's
+   8.0 ceiling between **×3.11 (7.995473) and ×3.12 (8.007606)** — the anthesis leaf share must
+   go 0.30 → ~0.934 — while every other gate moves *away*: the biomass cap gains 24.8 % of
+   clearance, the liveness floor 33.9 %, and CO₂ spends 2.84 ppm of its 10.36. **So the frozen
+   table absorbs a threefold error in the direction of this item's own observable before the
+   contract goes red, and it is not a suspect in any recorded bound.** ⚠ Which gate is *nearest*
+   depends on the **knot** as well as the compensation scheme: `fl@dvs0` raises above-ground
+   biomass to within **2.10 %** of its cap (it takes from root, outside the band) where
+   `fl@dvs1` cuts it a quarter (it takes from stem, inside it), and neither gate breaks on the
+   emergence rung — it runs out of arithmetic first and turns **down** in its last 0.2 %. ⚠ **The compensation scheme decides which
    gate breaks**, so it is a variable, not a nuisance: more carbon to leaf is clean spelled
    `fl×1.8` (LAI **7.369**, biomass *falls* to 12.96, liveness floor +34 %) and **breaks the
    above-ground biomass cap** spelled `fr×0.75` (**14.4621** against 14.4248) for a tenth of
@@ -353,6 +378,10 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
    just forced wrote a *new* false cheapening claim about a harness it did not run. *A
    re-read checks the claims it is looking at; the claims it writes are checked by nothing.*
    The measurement produced a live result (§2.1 item 3) and a struck §2.1 premise.
+   ⚠ **Its own lead was then taken and CLOSED 2026-09-04, `log/partition-leaf-direction.md`**
+   — the leaf direction is exhausted, the table absorbs a threefold error at the knot the
+   canopy responds to, and it is **not a suspect in any bound the contract records**. So
+   nothing on this list descends from §2.1 item 3 any more.
 5. The `specific_leaf_area` retrieval (§2.1 item 1) — the highest-leverage provenance
    question on the peak-LAI observable. ⚠ **RE-SCOPED 2026-09-04** — the constant is CITED (23.53, [B]
    Table 19 p.100); what is owed is the leaf **population** the page reports, not the

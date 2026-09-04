@@ -131,3 +131,15 @@ subtitle already says — *"a provenance item first"* — but with the retired d
 it is a **smaller** item than the plan's biggest, and the ranking in §4 was computed against
 5.03. That ranking is now unsourced. ⚠ The next re-read is owed the same thing this one
 found: check the plan's numbers against a **run**, not against the record they cite.
+
+⚠ **TAKEN 2026-09-04, and the lead above it was taken first — see
+[`partition-leaf-direction.md`](partition-leaf-direction.md).** The user took the *unexhausted
+leaf direction* of FINDING 4 rather than the re-read, and the direction turned out to be
+exhaustible after all: the `fl×1.8` ceiling was set by the **emergence** knot (`1/0.55`), not
+by the knot the canopy responds to (peak LAI falls at **DVS 1.306**, and `1/0.30 = 3.33` at
+anthesis). Scaling the leaf share at the `dvs 1` knot alone crosses the peak-LAI band's 8.0
+ceiling between **×3.11 and ×3.12** — a **threefold** error in one provisional number before
+any gate breaks — with every other gate moving *away* from its bound. ⚠ And FINDING 5
+generalises: which gate is nearest depends on the **knot** as well as the compensation scheme
+(`fl@dvs0` raises the above-ground biomass to within 2.1 % of its cap; `fl@dvs1` cuts it by a
+quarter). The re-read named above is **still owed** and is now the sole remaining successor.
