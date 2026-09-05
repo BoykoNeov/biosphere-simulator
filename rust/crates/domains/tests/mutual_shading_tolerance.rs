@@ -79,6 +79,64 @@ fn open_field(mult: f64, shading: bool) -> (f64, f64) {
     (peak_lai(&t), peak_w(&t))
 }
 
+/// `open_season`'s peak W at an SLA rung with one further substitution applied.
+fn peak_w_with(mult: f64, field: &str, value: f64) -> f64 {
+    let subs = [
+        Substitution::resolve("specific_leaf_area", FROZEN_SLA * mult).expect("one owner"),
+        Substitution::resolve(field, value).expect("one owner"),
+    ];
+    let p = biosphere_with(&subs).expect("inside every frozen bound");
+    peak_w(&trajectory(DEFAULT_SCENARIO, 1, false, &p))
+}
+
+/// **Why `peak W` saturates — measured, because a causal claim earns the experiment that
+/// removes the cause.**
+///
+/// The crest is 14.4435 and the cap it clears is 14.4248, 0.13 % below it. That near-agreement
+/// invites a nitrogen reading, and `nitrogen.yaml` supplies the invitation in its own words:
+/// the flat `n_critical` threshold and the Greenwood dilution curve *"[coincide] only at
+/// W ≈ 14.44 t/ha"*, and `senescence.yaml` records 14.4248 as where `f_N` first bites. If the
+/// crop were pinned there by its own nitrogen limitation, "the cap is unfalsifiable in this
+/// direction" would mean something quite different — the observable held **at the gate's own
+/// bound by a mechanism inside the model**, rather than approaching a physical limit.
+///
+/// **It is not nitrogen.** At the crest, dropping `n_critical` to 0.010 and doubling
+/// `max_uptake_capacity` each leave `peak W` **bit-identical**: `f_N` is not biting at all, and
+/// the 0.13 % agreement is a coincidence of two unrelated numbers.
+///
+/// **It is light interception, and that is measured rather than derived from `k`.** Cutting
+/// `extinction_coef` 0.60 → 0.45 costs **25.1 %** of `peak W` at the frozen canopy and costs
+/// **nothing** at the crest (it gains 1.1 %) — the signature of an interception that is already
+/// saturated, so more leaf area buys no carbon.
+#[test]
+fn the_peak_w_crest_is_light_saturation_and_not_nitrogen() {
+    const CREST: f64 = 4.50;
+    let crest = open_field(CREST, true).1;
+
+    for (field, value) in [("n_critical", 0.010), ("max_uptake_capacity", 0.0030)] {
+        let moved = peak_w_with(CREST, field, value);
+        assert_eq!(
+            moved, crest,
+            "{field} must leave the crest BIT-identical — {moved} vs {crest}"
+        );
+    }
+
+    let frozen = open_field(1.0, true).1;
+    let frozen_dim = peak_w_with(1.0, "extinction_coef", 0.45);
+    let crest_dim = peak_w_with(CREST, "extinction_coef", 0.45);
+    let cost_at_frozen = (frozen - frozen_dim) / frozen;
+    let cost_at_crest = (crest - crest_dim) / crest;
+    assert!(
+        cost_at_frozen > 0.20,
+        "a 25 % cut in k must cost the frozen canopy real biomass — {cost_at_frozen}"
+    );
+    assert!(
+        cost_at_crest.abs() < 0.02,
+        "...and must cost the crest nothing, because it intercepts everything already — \
+         {cost_at_crest}"
+    );
+}
+
 /// The SLA multiplier at which `read` crosses `bound`, bisected to ~0.1 % of the multiplier.
 ///
 /// ⚠ **Bisection assumes the observable is monotone on `[1.0, hi]`, and one of the four

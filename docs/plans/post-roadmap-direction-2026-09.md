@@ -402,6 +402,13 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
   and the "memory file" the working style requires per item cannot be written from a
   remote session (this one did not). Not a defect to fix in the repo; a fact to know
   when reading a CI-green claim about the memory budget.
+- **`senescence.yaml`'s `shade_rate` note says the term is *"BIT-IDENTICALLY inert added to
+  the frozen form"*** — written 2026-07-27, when the canopy peaked at 5.19, under the
+  threshold. It has been stale since the layered-canopy commit crossed it, and
+  `log/mutual-shading-tolerance.md` measured how: inert on peak LAI, **live on peak W**
+  (+0.206 %). Left deliberately, on `canopy.yaml`'s rationale below — a comment edit is a
+  manifest hash and an unfreeze — and to be corrected the next time that file's manifest entry
+  moves for a real reason. **Listed so nobody "fixes" it into one.**
 - **`canopy.yaml`'s header still says a provenance edit is invisible** (*"which the manifest
   records and no test can see"*), falsified by C7. Left deliberately — a comment edit is a
   manifest hash and an unfreeze — and to be corrected the next time that file's manifest

@@ -78,8 +78,36 @@ headroom (7.8 %). Measured:
 
 The prediction never asked whether `peak W` *saturates*. It does — with the loss on it crests
 at **14.4435 at ×4.5**, which is **0.13 %** above the recorded cap, and falls away beyond
-(14.1450 at ×8.0). The canopy already absorbs ~97 % of incident light at the frozen LAI, so
-more leaf area buys almost no carbon and eventually costs maintenance respiration.
+(14.1450 at ×8.0).
+
+**WHY it saturates was measured, not derived, because the obvious reading is the wrong one.**
+The crest sits 0.13 % above the cap, and that near-agreement invites a nitrogen explanation
+which this tree's own files supply in their own words: `nitrogen.yaml` records that the flat
+`n_critical` threshold and the Greenwood dilution curve *"[coincide] only at W ≈ 14.44 t/ha"*,
+and `senescence.yaml` records 14.4248 as the point where `f_N` **first bites in a frozen
+scenario**. Two numbers from unrelated derivations agreeing to one part in 800 is not something
+to write up as an accident — and if the crop were pinned there by its own nitrogen limitation,
+*"the cap is unfalsifiable in this direction"* would mean something else entirely: an
+observable held **at the gate's own bound by a mechanism inside the model**.
+
+**It is not nitrogen.** At the crest, dropping `n_critical` 0.015 → 0.010 and doubling
+`max_uptake_capacity` each leave `peak W` **bit-identical** at 14.443512 — `f_N` is not biting
+there at all, and the 0.13 % agreement is a coincidence of two unrelated numbers.
+
+**It is light interception, and this is the 2×2 that says so** rather than arithmetic off the
+extinction coefficient:
+
+| `peak W` | frozen canopy | at the crest (×4.5) |
+|---|---|---|
+| `extinction_coef` 0.60 | 13.379084 | 14.443512 |
+| `extinction_coef` 0.45 | **10.015729 (−25.1 %)** | **14.600939 (+1.1 %)** |
+
+A 25 % cut in light capture costs the frozen canopy a quarter of its biomass and costs the
+crest **nothing** — the signature of interception that is already complete, so more leaf area
+buys no carbon and eventually costs maintenance respiration. ⚠ *The first draft of this
+paragraph asserted the light explanation from `exp(-0.6 × 6.02) ≈ 0.027`, i.e. reasoned and then
+written as measured. Both halves above exist because a causal claim earns the experiment that
+removes the cause — and the one that was ASSUMED away turned out to be the refutable one.*
 
 **So while the loss is modelled the biomass cap is nearly unfalsifiable in this direction**:
 it can be exceeded at all only between about ×3.8 and the crest, and then by a tenth of a
