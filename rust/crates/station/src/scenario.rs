@@ -361,7 +361,8 @@ mod water_geometry_tests {
     use super::*;
     use domains::biosphere::science;
     use domains::biosphere::system::{
-        consumer_chamber_scenario, perennial_chamber_scenario, sealed_chamber_scenario,
+        consumer_chamber_scenario, perennial_chamber_scenario, potato_scenario,
+        sealed_chamber_scenario,
     };
 
     // -----------------------------------------------------------------------------
@@ -474,6 +475,13 @@ mod water_geometry_tests {
             ("sealed_chamber_scenario", sealed_chamber_scenario()),
             ("perennial_chamber_scenario", perennial_chamber_scenario()),
             ("consumer_chamber_scenario", consumer_chamber_scenario()),
+            // The second species (potato stage 2, 2026-09-06). It inherits the whole plot
+            // from `DEFAULT_SCENARIO` and overrides only crop switches, so both identities
+            // hold by inheritance — which is exactly the case this census exists for: this
+            // file's own header records that correct-by-inheritance is not covered, it is
+            // untested, and a scenario is owed the identities whether or not it declares
+            // any geometry of its own.
+            ("potato_scenario", potato_scenario()),
             ("greenhouse_bio_scenario", greenhouse_bio_scenario()),
             ("lighting_bio_scenario", lighting_bio_scenario()),
             (

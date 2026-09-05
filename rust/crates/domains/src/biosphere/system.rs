@@ -223,6 +223,46 @@ pub fn consumer_chamber_scenario() -> SeasonScenario {
     }
 }
 
+/// The potato plot — the second species, run as **authored habitat content**.
+///
+/// Stage 2 of `docs/plans/post-roadmap-potato-crop.md`. The same open-field plot as
+/// [`DEFAULT_SCENARIO`]; what changes is the crop's own switches, and every one of the four
+/// is a **declined** modifier rather than a tuned value:
+///
+/// * `vernalization: false` / `photoperiod: false` — day-neutral **by the source's own
+///   marking**, [E] Table 12's daylength column reading "–", legended *not relevant*. Not by
+///   analogy to the wheat gates.
+/// * `wssd: None` — [F] Table 15.1 has no potato row and populates `WSSD` for only two of its
+///   ten crops, so there is no coefficient to carry. Declining it is the honest reading;
+///   inheriting wheat's 0.40 would be our number wearing their name.
+/// * `stem_reserves: false` — [E] Table 7 gives potato a RANGE ("0.2–0.4") where wheat gets a
+///   single 0.4, and picking inside someone else's range is the same failure.
+///
+/// # ⚠ This is the FIRST scenario in the Rust tree to decline either of the last two
+///
+/// Measured, not assumed: before this landed, `stem_reserves: false` appeared nowhere in
+/// `rust/crates/` and `wssd: None` only inside one unit test's inline scenario. So the potato
+/// build is also the first *run* through the branch that leaves `StemRemobilization` and the
+/// drought development modifier out of the registry, and `tests/potato_crop.rs` asserts that
+/// absence rather than trusting the flag.
+///
+/// # ⚠ Deliberately NOT one of the four canonical builds
+///
+/// `freeze_manifest::inventory` unions its `flow_set` / `aux_set` over
+/// [`DEFAULT_SCENARIO`] and the three chambers. This scenario is not added to that union and
+/// must not be: it only ever *subtracts* types, and a crop that is authored-not-validated has
+/// no business widening a frozen contract. See `tests/scenario_flag_types.rs` for why the
+/// flags are a subtract-only vocabulary.
+pub fn potato_scenario() -> SeasonScenario {
+    SeasonScenario {
+        vernalization: false,
+        photoperiod: false,
+        wssd: None,
+        stem_reserves: false,
+        ..DEFAULT_SCENARIO
+    }
+}
+
 /// One compartment's contribution (stocks, flows, aux, shared-map entries).
 struct CompartmentBuild {
     stocks: Vec<Stock>,
@@ -1972,12 +2012,12 @@ mod tests {
     /// Mirrors `test_the_wiring_declines_wssd_for_potato_not_just_the_scenario_field`
     /// and `test_thermal_time_aux_without_drought_is_the_plain_rate`.
     ///
-    /// ⚠ **Potato has no Rust successor and that is a GAP, not a decision.** The
-    /// Python test names `POTATO_SCENARIO` because [F] Table 15.1 has no potato row; the
-    /// Rust roster has no potato build at all (`params.rs` records its stage 2 as
-    /// deferred), so the crop-specific half of that claim cannot be ported. What is
-    /// portable is the RULE - `wssd: None` declines the modifier - and that is what this
-    /// asserts.
+    /// ⚠ **The gap this note used to record is CLOSED.** It read *"potato has no Rust
+    /// successor and that is a GAP, not a decision"* — true until the stage-2 build landed
+    /// `potato_scenario`, which is the crop-specific half: [F] Table 15.1 has no potato row,
+    /// so that scenario declines `wssd` for the reason the Python test names. This test keeps
+    /// the RULE half - `wssd: None` declines the modifier, on an off-default plot no scenario
+    /// in the tree supplies - and `tests/potato_crop.rs` carries the crop half.
     #[test]
     fn the_wiring_declines_the_drought_modifier_when_no_wssd_is_cited() {
         const AREA: f64 = 3.5;

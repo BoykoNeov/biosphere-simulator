@@ -38,9 +38,9 @@ use simcore::state::State;
 
 pub use system::{
     annual_reset, build_season, build_season_with, consumer_chamber_scenario,
-    perennial_chamber_scenario, run_perennial, run_season, sealed_chamber_scenario,
-    weather_resolver, SeasonScenario, CONSUMER_CHAMBER_YEARS, DEFAULT_SCENARIO,
-    LONG_HORIZON_YEARS, PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
+    perennial_chamber_scenario, potato_scenario, run_perennial, run_season,
+    sealed_chamber_scenario, weather_resolver, SeasonScenario, CONSUMER_CHAMBER_YEARS,
+    DEFAULT_SCENARIO, LONG_HORIZON_YEARS, PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
 };
 
 /// The biosphere's integration step, in days — mirrors `domains.biosphere.step.BIO_DT`.

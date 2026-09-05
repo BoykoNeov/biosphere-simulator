@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `mutual-shading-tolerance.md`
+**Re-read against the record's last row:** `potato-crop-stage-2.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -358,9 +358,27 @@ on it, and §2.1's inventory does not include it.
 
 ### 2.6 Potato stage 2 — the Rust habitat mirror; buildable, no decision
 
-The params crossed with the flip (`params/biosphere/crops/potato/`, 4 files) and
+~~The params crossed with the flip (`params/biosphere/crops/potato/`, 4 files) and
 `system.rs` records that the Rust roster has no potato build. It is the second species'
-second half, authored-not-validated by the day-neutral precedent. **Needs: a build.**
+second half, authored-not-validated by the day-neutral precedent. **Needs: a build.**~~
+**BUILT 2026-09-06, `log/potato-crop-stage-2.md`.** No decision was needed and none was
+taken; the crop is wired into no golden and named in no manifest, and nothing frozen moved.
+
+Three things it leaves this doc, none of them a new task:
+
+* **The value-switch seam now has a consumer outside the lab.** A crop is exactly what
+  `build_season_with` takes, so the second species cost one params constructor and one
+  scenario constructor and no new assembly path. Anything else this doc calls "a second
+  crop" should be priced the same way before it is priced as a build.
+* **A pricing rule for the stale sentences §3.2 lists.** The census's own stated exclusion
+  reason died with this build and *looked* like a freeze-contract edit; one grep showed it
+  lives only in Rust doc comments, so the correction was free. §3.2's four "left
+  deliberately" items are the opposite case — they are param-file and manifest text, where
+  the edit really is a hash — but the rule to apply is *check which side of the freeze the
+  sentence is on*, not *assume a stale sentence is expensive*.
+* **A branch got its first run.** `stem_reserves: false` had no scenario anywhere in
+  `rust/crates/` before this. Any future claim about the stem-reserve mechanism's coverage
+  is dated to 2026-09-06, not earlier.
 
 ---
 
@@ -471,7 +489,9 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
    this list's leverage argument. ⚠ **RE-SCOPED 2026-09-04** — the constant is CITED (23.53, [B]
    Table 19 p.100); what is owed is the leaf **population** the page reports, not the
    citation, and the −35 %/+75 % span it was ranked on is against a superseded anchor.
-6. Potato stage 2 (§2.6); `drift_summary` regeneration (§3.2). Either can go any time.
+6. ~~Potato stage 2 (§2.6);~~ **DONE 2026-09-06, `log/potato-crop-stage-2.md`.**
+   `drift_summary` regeneration (§3.2) can go any time and is now the only item left on this
+   "no decision needed" list that is neither blocked nor re-ranked.
 
 **Decisions (the user's; listed apart because listing them as work is how the predecessor
 went stale):** `extinction_coef` (§2.1 item 2); **the live-O₂ FvCB form (§2.3.2, NEW

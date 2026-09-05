@@ -73,7 +73,10 @@ const ALLOCATION_YAML: &str = include_str!("../../params/biosphere/allocation.ya
 /// ⚠ One file, three structs: thermal-time phenology, vernalization and photoperiod all
 /// live in `phenology.yaml` and each loader validates the *whole* 12-field block (the
 /// `extra="forbid"` half). That is why the biosphere manifest's `param_files` has 15
-/// entries against 17 loaders.
+/// entries against 17 frozen loaders. ⚠ The roster is larger than 17 and the manifest is
+/// still 15: `potato` and the four `crops/potato/*.yaml` texts it reads are an **authored
+/// overlay**, loaded by this module and deliberately outside the census. See
+/// [`POTATO_OVERRIDES`].
 const PHENOLOGY_UNITS: [(&str, &str); 12] = [
     ("t_base", "degC"),
     ("t_cap", "degC"),
@@ -1100,6 +1103,98 @@ pub fn biosphere() -> BiosphereParams {
     }
 }
 
+// --------------------------------------------------------------------------------- //
+// The potato crop overlay — AUTHORED CONTENT, deliberately outside the freeze         //
+// --------------------------------------------------------------------------------- //
+
+/// The potato override files, `(loader name, embedded text)`.
+///
+/// Stage 2 of `docs/plans/post-roadmap-potato-crop.md` — the Rust habitat mirror. Stage 1's
+/// crop was Python and died with the checker (S6), so this is the potato's only live form.
+///
+/// # ⚠ These ARE loaded by the reference and are NOT in [`param_files`]
+///
+/// That is the design, and the reason had to be restated when this landed. Until now the
+/// census docstring gave *"the port has no potato build, so it loads none of them"* as the
+/// reason the four are excluded — a reason that is retired the moment this module embeds
+/// them. The rule that survives is the one that was always doing the work: a crop overlay is
+/// **authored content**, and the project's standing rule is *authored ≠ validated* — freezing
+/// a set we simultaneously call unvalidated would be incoherent. So [`param_files`] is the set
+/// the reference loads **as the frozen reference crop**, non-recursion is the mechanism that
+/// implements the exclusion, and the two counts stay 15 and 4.
+///
+/// ⚠ **A compile-time embed does not enter the census — measured here, and it falsifies a
+/// belief this file used to carry.** `tests::potato_overrides_the_rooting_habit_rather_than_sharing_wheats`
+/// read its override *off disk* through a `Box::leak`, on the stated grounds that an
+/// `include_str!` *"would quietly add a file to `param_files()` and therefore to the freeze
+/// manifest"*. It would not: [`param_files`] is a hand-written list, so nothing follows an
+/// embed anywhere. The avoidance was real work spent on a hazard that did not exist, and the
+/// manifest being byte-identical across this commit is the check.
+pub const POTATO_OVERRIDES: [(&str, &str); 4] = [
+    ("crops/potato/allocation.yaml", POTATO_ALLOCATION_YAML),
+    ("crops/potato/canopy.yaml", POTATO_CANOPY_YAML),
+    ("crops/potato/phenology.yaml", POTATO_PHENOLOGY_YAML),
+    ("crops/potato/root_depth.yaml", POTATO_ROOT_DEPTH_YAML),
+];
+
+pub(crate) const POTATO_ALLOCATION_YAML: &str =
+    include_str!("../../params/biosphere/crops/potato/allocation.yaml");
+pub(crate) const POTATO_CANOPY_YAML: &str =
+    include_str!("../../params/biosphere/crops/potato/canopy.yaml");
+pub(crate) const POTATO_PHENOLOGY_YAML: &str =
+    include_str!("../../params/biosphere/crops/potato/phenology.yaml");
+pub(crate) const POTATO_ROOT_DEPTH_YAML: &str =
+    include_str!("../../params/biosphere/crops/potato/root_depth.yaml");
+
+/// The potato crop: the frozen coefficients with the **four** plant-side files a second
+/// species really owns swapped for its own.
+///
+/// # What a crop is here
+///
+/// The set, partitioned — that is the whole seam, and it is what makes a reuse claim
+/// testable rather than a comment. **Overridden** (four files): `allocation`, `canopy`,
+/// `phenology`, `root_depth`. **Shared** (everything else): photosynthesis, respiration,
+/// transpiration, senescence, stem reserves, nitrogen, decomposition, microbial respiration,
+/// humification, the water cycle, herbivory. The partition is pinned field-by-field in
+/// `tests/potato_crop.rs`, because a *file*-level pin is either red or vacuous here:
+/// potato's `canopy.yaml` overrides the file but carries wheat's `extinction_coef` and
+/// `carbon_fraction` unchanged and says so in its own `source:` strings.
+///
+/// # ⚠ Three structs come out of ONE potato file, deliberately
+///
+/// `phenology.yaml` feeds `pheno`, `vern` and `photoperiod`, and all three are read from the
+/// **potato** file rather than only the first. The eight vernalization/photoperiod fields
+/// there carry wheat's values under the source line *"INERT for potato — never read"*, and
+/// loading them from wheat's file instead would make that sentence decoration: the fields
+/// would be unread because nothing pointed at them, not because the crop is day-neutral. Read
+/// this way the claim is a **measurement** — `tests/potato_crop.rs` mutates `vsen` and `cpp`
+/// to absurd values through the loader seam and asserts the run is bit-identical.
+///
+/// # ⚠ Authored, not validated — and not frozen
+///
+/// This crop is wired into **no golden**, appears in **no manifest**, and is gated by
+/// conservation, determinism and a well-fed run rather than by any scientific endorsement.
+/// Its measured disagreements with WOFOST are the record in `docs/log/potato-crop.md`, not a
+/// calibration target.
+///
+/// # ⚠ Callers hand this to `build_season_with`; no production spine file may call it
+///
+/// `tests/param_funnel.rs` gates the biosphere having exactly **one** production param load,
+/// and this function is in the loader roster that gate derives from the tree. A spine module
+/// reaching for it would redden that gate, which is the intended outcome: a second crop is a
+/// caller's choice, never a branch inside the assembly.
+pub fn potato() -> BiosphereParams {
+    BiosphereParams {
+        canopy: canopy_from(POTATO_CANOPY_YAML, "crops/potato/canopy.yaml"),
+        pheno: phenology_from(POTATO_PHENOLOGY_YAML, "crops/potato/phenology.yaml"),
+        vern: vernalization_from(POTATO_PHENOLOGY_YAML, "crops/potato/phenology.yaml"),
+        photoperiod: photoperiod_from(POTATO_PHENOLOGY_YAML, "crops/potato/phenology.yaml"),
+        rootd: root_depth_from(POTATO_ROOT_DEPTH_YAML, "crops/potato/root_depth.yaml"),
+        alloc: allocation_from(POTATO_ALLOCATION_YAML, "crops/potato/allocation.yaml"),
+        ..biosphere()
+    }
+}
+
 /// The **frozen biosphere param-file census**: `(filename, embedded text)` for every YAML
 /// file this module loads, in filename order (slice C8 of the reference flip).
 ///
@@ -1116,8 +1211,14 @@ pub fn biosphere() -> BiosphereParams {
 /// `crates/domains/params/biosphere/` holds **20** `*.yaml` files and the manifest names
 /// **15**. The excluded five split:
 ///
-/// * **four `crops/potato/*.yaml`** — excluded because the census is **non-recursive**. The
-///   port has no potato build (its stage 2 is deferred), so it loads none of them.
+/// * **four `crops/potato/*.yaml`** — excluded because the census is **non-recursive**, and
+///   since the potato build landed that is the *whole* reason rather than a mechanism on top
+///   of one. ⚠ This bullet used to end *"the port has no potato build (its stage 2 is
+///   deferred), so it loads none of them"*, which stopped being true the day [`potato`]
+///   embedded them. The rule that survives is the one that was always load-bearing: a crop
+///   overlay is **authored content**, and *authored ≠ validated* — so it is loaded by the
+///   reference and frozen by nothing. Read this docstring's opening claim accordingly: the
+///   census is the set the reference loads **as the frozen reference crop**.
 /// * **`demo.yaml`** — excluded **by name**. It is a skeleton feeding two Python-only
 ///   scenarios that slice C6 retires.
 ///
@@ -2080,21 +2181,21 @@ parameters:
     ///
     /// [E] Table 25 gives potato a row of its own (Vos & Groenwold, 1986) differing in
     /// BOTH values, so sharing wheat's file would assert a rooting habit the source
-    /// contradicts. ⚠ The port has NO potato build — its stage 2 is deferred and the four
-    /// `crops/potato/*.yaml` overrides are deliberately outside the census (see
-    /// `the_recursive_walk_would_see_four_more_and_the_census_does_not`) — so this reads
-    /// the override off disk rather than through `include_str!`, which would quietly add
-    /// a file to `param_files()` and therefore to the freeze manifest.
+    /// contradicts. The four `crops/potato/*.yaml` overrides are outside the census (see
+    /// `the_recursive_walk_would_see_four_more_and_the_census_does_not`) and stay outside it
+    /// now that the port has a potato build.
+    ///
+    /// ⚠ **This test used to read the override off disk through a `Box::leak`**, on the
+    /// stated grounds that an `include_str!` *"would quietly add a file to `param_files()`
+    /// and therefore to the freeze manifest"*. That was false: `param_files` is a
+    /// hand-written list and nothing in the tree follows an embed into it. The belief cost a
+    /// filesystem read and a leak in a unit test; it is retired here, and the manifest going
+    /// byte-identical across the commit that added four embeds is the measurement.
     /// Mirrors `test_potato_overrides_root_depth_rather_than_sharing_wheats`.
     #[test]
     fn potato_overrides_the_rooting_habit_rather_than_sharing_wheats() {
-        let path = std::path::Path::new(PARAMS_DIR)
-            .join("crops/potato")
-            .join("root_depth.yaml");
-        let text = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("the potato override at {path:?} is readable: {e}"));
-        let text: &'static str = Box::leak(text.into_boxed_str());
-        let potato = root_depth_from(text, "root_depth.yaml");
+        let text = POTATO_ROOT_DEPTH_YAML;
+        let potato = root_depth_from(text, "crops/potato/root_depth.yaml");
         assert_eq!(potato.max_extension_rate, 0.014);
         // ⚠ 0.9 is the MIDPOINT of the source's "0.8-1.0" range, recorded as such in the
         // file. The choice of midpoint is ours; either endpoint is equally cited.
@@ -2107,7 +2208,10 @@ parameters:
         // ...and it goes through the SAME guards, so the override cannot smuggle a zero.
         rejects(
             || {
-                root_depth_from(value_of(text, "max_rooted_depth", "0.0"), "root_depth.yaml");
+                root_depth_from(
+                    value_of(text, "max_rooted_depth", "0.0"),
+                    "crops/potato/root_depth.yaml",
+                );
             },
             "a potato override with a zero depth",
         );
