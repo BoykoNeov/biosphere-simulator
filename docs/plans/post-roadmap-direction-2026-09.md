@@ -291,6 +291,16 @@ two, from the paper it cited:
    * The biomass cap is the **last** detector on that knob (×3.81), and `peak W` saturates:
      its crest with the loss on is 14.4435, **0.13 % over the 14.4248 cap**. ⚠ That is a
      statement about the SLA direction only — the Q10 form broke the same cap by **27 %**.
+   * ⚠ **WHY it saturates was asserted before it was measured, and the assumed-away branch was
+     the refutable one.** The record's first draft explained the crest by "the canopy already
+     absorbs ~97 % of incident light" — arithmetic off `extinction_coef`, never run. This tree
+     supplies a competing account **in its own words**: `nitrogen.yaml` records that the flat
+     `n_critical` and the Greenwood curve coincide *"only at W ≈ 14.44 t/ha"*, and the crest sits
+     0.13 % from there. It is **not** nitrogen — at the crest both N knobs leave `peak W`
+     bit-identical — and it **is** interception: a 25 % cut in `extinction_coef` costs the
+     frozen canopy **−25.1 %** and the crest **+1.1 %**. So the 0.13 % agreement is a
+     coincidence of two unrelated derivations, not a mechanism holding the observable at the
+     gate's own bound. Pinned by `the_peak_w_crest_is_light_saturation_and_not_nitrogen`.
 
    So the Q10 recommendation in §4 stands on its own two grounds (the biomass breach and the
    chamber liveness collapse); the *"held by an inert term"* framing behind it is withdrawn.
