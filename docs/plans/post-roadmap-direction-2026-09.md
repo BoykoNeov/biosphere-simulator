@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `temperature-kinetics.md`
+**Re-read against the record's last row:** `mutual-shading-tolerance.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -42,7 +42,9 @@ Strike-through is kept when this doc is wrong, per the predecessor's rule.
   the layered canopy; two provenance discharges (`carbon_fraction`, and now the FvCB
   constants). The last five *tooling* items were the reference flip, the value switch, the
   science switch (slices 0–4), the margin pin, and the regeneration tool's verdict.
-- **The last TWO items were MEASUREMENTS**, and neither moved a number.
+- **The last FOUR items were MEASUREMENTS or lab-only builds**, and none moved a number.
+  `log/mutual-shading-tolerance.md` (2026-09-05) answered the question the kinetics item
+  left behind — see §2.3.1 — and **retired the high side of §2.1 item 1's ranking figure**.
   `log/o2-coupling-measured.md` (2026-09-02) discharged §2.3.2, re-priced §2.1 item 4 and
   gave §2.1 a measured bound. `log/partition-sensitivity.md` (2026-09-04) discharged §2.1
   item 3 and §4 item 4 — and **struck §2.1's headline state and §2.1 item 1's premise**,
@@ -108,7 +110,17 @@ re-tuning the bound (refused three times).
    **What survives, restated:** the page names the crop but not the leaf **population**, so
    whether a *cited* constant should be development-keyed is still open. **Needs: one
    retrieval** — what leaf population Table 19's figure describes — then a form build if it is
-   age-specific. Re-measure the span before quoting it.
+   age-specific. ~~Re-measure the span before quoting it.~~
+   ⚠⚠ **RE-MEASURED 2026-09-05 — `log/mutual-shading-tolerance.md`, and the span's HIGH SIDE
+   IS RETIRED.** It is a **pre-clamp** number, and this is checkable rather than arguable:
+   `git log -S` puts `shade_rate` and `23.53` in the SAME commit (`a436a96`), landed *after*
+   the span was measured — the mutual-shading parameter did not exist in the tree that
+   produced 8.2391. At the current anchor the ramp's own top rung (a uniform ×1.318) gives
+   **+70.8 % with the loss off** — reproducing the recorded +74.8 %, which is the control that
+   identifies the old figure — and **+4.1 % with it on**. ⚠ The LOW side is not re-measured and
+   must not be quoted from that record: the old figure came from a DVS *ramp*, and a uniform
+   ×0.682 gives −87.0 % against the recorded −35.4 %. **So this item's leverage is not what §4
+   ranked it on**; the retrieval itself is unaffected.
 2. **`extinction_coef` 0.60 / 0.65 / 0.68 — a DECISION, priced.** Three shelf readings
    disagree (`log/canopy-provenance.md`); +8.3 % on `k` buys +0.8 % of peak LAI shipped,
    +7.3 % converged, moves the LAI peak before anthesis, loosens all five CO₂ bands, and
@@ -261,6 +273,27 @@ two, from the paper it cited:
    while the three CO₂ crossings are read against a **constant** floor the form dissolves and
    are therefore a demand to re-pose the gate, not a verdict on the form. **A decision is now
    owed** — see §4.
+
+   ⚠⚠ **THE QUESTION THIS ITEM LEFT BEHIND IS ANSWERED, AND ITS HYPOTHESIS IS REFUTED**
+   (`log/mutual-shading-tolerance.md`, 2026-09-05). *"The band the tree passes is held by a
+   term measured INERT"* is true of exactly one point and one observable, and is not to be
+   carried further:
+
+   * The term is bit-identically inert on peak LAI at the frozen params and **live on peak W
+     in the same run** (13.379084 → 13.406590 with it off, +0.206 %) — peak W is reached after
+     the LAI summit, by which time the loss has been shedding for days.
+   * The `5.0 < peak < 8.0` **ceiling is reachable**: peak LAI crosses 8.0 at
+     `specific_leaf_area` ×2.014 with the loss modelled and ×1.138 without. The band's upper
+     half is **not blind — it is tolerant by 1.77×**.
+   * **Without the loss the two open-field bounds are near-redundant** (×1.138 and ×1.170,
+     2.8 % apart); with it they separate by 1.9×. **The loss does not blind the contract, it
+     ORDERS it** — an argument for the mechanism rather than against the band.
+   * The biomass cap is the **last** detector on that knob (×3.81), and `peak W` saturates:
+     its crest with the loss on is 14.4435, **0.13 % over the 14.4248 cap**. ⚠ That is a
+     statement about the SLA direction only — the Q10 form broke the same cap by **27 %**.
+
+   So the Q10 recommendation in §4 stands on its own two grounds (the biomass breach and the
+   chamber liveness collapse); the *"held by an inert term"* framing behind it is withdrawn.
 2. ~~**`o2` is a constant; chamber O₂ is a stock.**~~ **MEASURED 2026-09-02 —
    `log/o2-coupling-measured.md`.** The question this asked (*"do the jar's science bands
    move?"*) is answered **yes**, and the answer inverts the item as written. Kept below with
@@ -397,9 +430,11 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
    LAI by an order of magnitude in the change, the liveness floor by its sign. It did switch
    which process limits (Rubisco-bound lit steps 1.1 % → 9.1 %), which also promotes the
    uncited `vcmax = 100` into a load-bearing position and **raises** the value of item 1's
-   retrieval. ⚠ It leaves a decision, not a next task, and a NEW question this doc has never
+   retrieval. ~~⚠ It leaves a decision, not a next task, and a NEW question this doc has never
    carried: **the peak-LAI band is held by a loss term measured to be inert at the frozen
-   params** — a fact about the frozen tree that does not depend on adopting anything.
+   params** — a fact about the frozen tree that does not depend on adopting anything.~~
+   **The decision stands; the question was TAKEN and ANSWERED 2026-09-05 — and REFUTED.**
+   `log/mutual-shading-tolerance.md`; see §2.3.1.
 4. ~~The partition-table sensitivity measurement (§2.1 item 3) — value switch, minutes.
    ⚠ Now cheaper than when written: a `+` column can perturb the whole partition table at
    once rather than one share at a time (§3.1).~~ **DONE 2026-09-04,
@@ -413,8 +448,10 @@ second half, authored-not-validated by the day-neutral precedent. **Needs: a bui
    — the leaf direction is exhausted, the table absorbs a threefold error at the knot the
    canopy responds to, and it is **not a suspect in any bound the contract records**. So
    nothing on this list descends from §2.1 item 3 any more.
-5. The `specific_leaf_area` retrieval (§2.1 item 1) — the highest-leverage provenance
-   question on the peak-LAI observable. ⚠ **RE-SCOPED 2026-09-04** — the constant is CITED (23.53, [B]
+5. The `specific_leaf_area` retrieval (§2.1 item 1) — ~~the highest-leverage provenance
+   question on the peak-LAI observable~~ **RE-RANKED 2026-09-05: the leverage figure it was
+   ranked on is retired** (§2.1 item 1). Still worth doing as provenance; it is no longer
+   this list's leverage argument. ⚠ **RE-SCOPED 2026-09-04** — the constant is CITED (23.53, [B]
    Table 19 p.100); what is owed is the leaf **population** the page reports, not the
    citation, and the −35 %/+75 % span it was ranked on is against a superseded anchor.
 6. Potato stage 2 (§2.6); `drift_summary` regeneration (§3.2). Either can go any time.
