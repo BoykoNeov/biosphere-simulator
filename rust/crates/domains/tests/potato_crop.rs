@@ -272,6 +272,22 @@ fn every_shared_parameter_is_bit_identical_to_the_reference_crop() {
             format!("{:?}", wheat.herb),
             format!("{:?}", potato.herb),
         ),
+        // ⚠ These two are the awkward pair and they belong here for exactly that reason:
+        // `potato()` loads them from the POTATO file (so the "INERT for potato" source lines
+        // are falsifiable), yet every one of their eight fields must still equal the
+        // reference crop's. Nothing else in this file pins them at the STRUCT level — the
+        // field-level test compares YAML text — so without these entries a diverging fold, or
+        // an edited value with the other test's roster updated to match, would pass.
+        (
+            "vern",
+            format!("{:?}", wheat.vern),
+            format!("{:?}", potato.vern),
+        ),
+        (
+            "photoperiod",
+            format!("{:?}", wheat.photoperiod),
+            format!("{:?}", potato.photoperiod),
+        ),
     ] {
         assert_eq!(a, b, "{name} is not shared with the reference crop");
     }
@@ -495,8 +511,15 @@ fn the_declined_modifiers_are_absent_from_the_potato_build() {
         "the potato build ADDED a type the reference crop does not have: {:?}",
         potato.difference(&wheat).collect::<Vec<_>>()
     );
-    // The scenario really is the source of that: same params, the flag back on, and the type
-    // comes back.
+
+    // ⚠ The comparison above confounds two differences — different params AND a different
+    // scenario — so on its own it cannot say the FLAGS are what subtracted. These two hold
+    // the params fixed and vary only the scenario, which is the discriminator.
+    let potato_params_default_plot = type_set(&DEFAULT_SCENARIO, &params::potato());
+    assert_eq!(
+        potato_params_default_plot, wheat,
+        "the potato PARAMS alone changed the type set — the subset above is not about the flags"
+    );
     let with_reserves = type_set(
         &SeasonScenario {
             stem_reserves: true,

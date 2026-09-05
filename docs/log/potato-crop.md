@@ -10,7 +10,11 @@
 
 **COMPLETE 2026-08-11.** User chose "both, staged" + "potato only" after being shown the
 shelf audit; the validated Python crop landed, the **Rust habitat mirror is stage 2,
-deferred not dropped**. Until now the tree could hold exactly **one crop** —
+deferred not dropped**. ⚠ **STAGE 2 LANDED 2026-09-06** — `potato-crop-stage-2.md`; the
+deferral clause above is discharged, and stage 1's Python half no longer exists (S6).
+Nothing else in this file is maintained: it is a dated record of what was measured.
+
+Until now the tree could hold exactly **one crop** —
 `_carbon_context`/`build_plants` called every loader argument-free, so the frozen
 `params/*.yaml` defaults *were* the crop (the day-neutral crop is not a counterexample; by
 its own record it is the same wheat files with the gates off, "not a new param file"). **The
