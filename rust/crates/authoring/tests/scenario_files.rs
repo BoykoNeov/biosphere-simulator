@@ -890,7 +890,7 @@ fn at_an_unsafe_dt_the_run_is_rejected_not_returned() {
     // sniffing the message) is the point of ErrorKind existing.
     assert_eq!(err.kind, authoring::ErrorKind::Rationed);
     assert!(
-        err.message.contains("37"),
+        err.message.contains("38"),
         "count must be named: {}",
         err.message
     );
@@ -908,8 +908,16 @@ fn the_underlying_hazard_is_unchanged_only_its_silence_was_fixed() {
     // physics is untouched: we made the failure loud, we did not make the scenario work.
     let result = run_scenario_allowing_rationing(eclss_anchor_at("3600.0", "15"))
         .expect("the escape hatch returns the rationed run");
+    // ⚠ 37 until 2026-09-06, when `o2_setpoint` moved 10.0 -> 1995.0 and this fixture's
+    // cabin moved with it. The MECHANISM is unchanged — an unsafe `k*h = 7.2 > 1` still
+    // overshoots and still empties the cabin — and only the count moved, by ONE step,
+    // because a 200x larger inventory takes one more overshoot to reach the zero clamp.
+    // Re-measured, not re-tuned; the airless assertion below is what says the mechanism
+    // is the same one. ⚠ The cross-port half of this claim ("both ports ration
+    // identically") is now HISTORICAL and un-recheckable: S6 deleted the Python port, so
+    // 37 was the last number both sides ever produced. See docs/log/o2-setpoint-cited.md.
     assert_eq!(
-        result.total_rationed, 37,
+        result.total_rationed, 38,
         "the hazard's mechanism moved — docs are stale"
     );
     assert!(result.events.is_empty());
@@ -936,20 +944,37 @@ fn the_underlying_hazard_is_unchanged_only_its_silence_was_fixed() {
 // game path, which is exactly the divergence the port-mirror discipline exists to stop.
 // ---------------------------------------------------------------------------------
 
-/// The anchor's YAML with `cabin_o2` wired ABOVE the frozen 10.0 mol setpoint.
+/// The anchor's YAML with `cabin_o2` wired ABOVE the frozen setpoint.
+///
+/// ⚠ The literal it rewrites is the FIXTURE's `cabin_o2` amount, which tracks
+/// `eclss.yaml`'s `o2_setpoint` by design — 10.0 until 2026-09-06, 1995.0 since. Named
+/// through [`SETPOINT`] so the two cannot drift apart silently; the `assert!` below is what
+/// turns a drift into a red rather than a helper that quietly returns the anchor unchanged
+/// and a "reversal" test that passes because nothing reversed.
 fn eclss_anchor_above_setpoint(amount: &str) -> String {
     let text = eclss_anchor_yaml_at("60.0", "4");
-    let retargeted = text.replace("amount: 10.0", &format!("amount: {amount}"));
+    let from = format!("amount: {SETPOINT:?}");
+    let retargeted = text.replace(&from, &format!("amount: {amount}"));
     assert!(
         retargeted.contains(&format!("amount: {amount}")),
-        "the anchor's `amount: 10.0` line moved — this helper is silently a no-op now"
+        "the anchor's `{from}` line moved — this helper is silently a no-op now"
     );
     retargeted
 }
 
+/// `eclss.yaml`'s `o2_setpoint`, and the amount the committed fixture starts its cabin at.
+///
+/// ⚠ One name for what was four copies of `10.0` across this file and the fixture. It moved
+/// to 1995.0 on 2026-09-06 when the setpoint was re-derived from a cited cabin atmosphere,
+/// and the four tests below went red — correctly, and unpredicted.
+const SETPOINT: f64 = 1995.0;
+
+/// Comfortably above [`SETPOINT`], so the demand-controlled flow reverses.
+const ABOVE_SETPOINT: f64 = 2005.0;
+
 #[test]
 fn a_reversed_run_is_refused_and_the_message_names_the_step() {
-    let built = interpret_str(&eclss_anchor_above_setpoint("20.0"))
+    let built = interpret_str(&eclss_anchor_above_setpoint(&format!("{ABOVE_SETPOINT:?}")))
         .expect("a scenario above the setpoint still BUILDS — reversal is a run verdict");
     let err = match run_scenario(built) {
         Err(e) => e,
@@ -969,14 +994,15 @@ fn the_reversed_run_is_still_returned_for_study() {
     // trajectory AND the evidence, so a reversal can be examined rather than only
     // refused. Asserting the reversal is genuinely present is what makes this different
     // from asserting the permissive path merely fails to raise.
-    let built = interpret_str(&eclss_anchor_above_setpoint("20.0")).expect("interpret");
+    let built = interpret_str(&eclss_anchor_above_setpoint(&format!("{ABOVE_SETPOINT:?}")))
+        .expect("interpret");
     let result = run_scenario_allowing_rationing(built).expect("study path must return");
     let reversal = result
         .first_reversal
         .expect("the permissive path must still RECORD the reversal it declined to raise");
     assert_eq!(reversal.step, 0);
-    assert_eq!(reversal.setpoint, 10.0);
-    assert_eq!(reversal.amount, 20.0);
+    assert_eq!(reversal.setpoint, SETPOINT);
+    assert_eq!(reversal.amount, ABOVE_SETPOINT);
     assert_eq!(result.total_rationed, 0, "and nothing else objected");
 }
 

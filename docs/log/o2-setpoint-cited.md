@@ -126,12 +126,38 @@ not**.
 `-p domains --lib`: **404 passed, 0 failed.** `-p station -p domains --test manifest_writer`:
 green after regeneration. `-p repo_gates`: **25 passed**, covering the index/pointer/record
 parity, the plan-doc indexing, the direction-plan re-read gate and the memory bounds.
-`regen_goldens`: **20 of 20 run, 6 rewritten.** ⚠ `cargo test --workspace --no-fail-fast` and
-`cargo clippy --all-targets -- -D warnings` were **still running when this was committed**, and
-this sentence says so rather than claiming a result it did not have — the failure mode
-`mutation-battery-liveness` names. Any finding from them is appended below.
+`regen_goldens`: **20 of 20 run, 6 rewritten.** ⚠ The first `cargo test --workspace --no-fail-fast` was **still running at the first commit**,
+and that commit's record said so rather than claiming a result it did not have. **It came back
+with four reds** — FINDING 7, which no targeted run could have found. `-p authoring`:
+**96 passed, 0 failed** after the fix.
 ⚠ The station manifest byte gate **reddened first and by itself** — the automatic guard this
 unfreeze had, confirmed present before the edit rather than hoped for.
+
+**FINDING 7 — a FOURTH copy of the setpoint lived in AUTHORED CONTENT, and the full suite
+is what found it.** The targeted runs were green and the workspace run was not: four
+`authoring` tests reddened. `rust/data/scenarios/eclss_cabin.yaml` carries
+`amount: 10.0  # EclssScenario.cabin_o2_0 (== the frozen o2_setpoint)` — a fixture whose
+oxygen amount **means** *"at the setpoint"*, which is precisely what the direction gate's
+boundary case is pinned on (*"a `>=` gate would have condemned the platform's own example"*).
+It moved to 1995.0, because its meaning is what must be preserved, not its digits. Two tests
+that wired the cabin *above* the old setpoint (20.0) now wire it above the new one, through a
+named `SETPOINT` / `ABOVE_SETPOINT` pair rather than four scattered literals.
+
+⚠ **One test in that family stayed GREEN while its stated premise became false.**
+`at_the_setpoint_the_gate_is_silent_because_the_flow_does_not_reverse` passed throughout —
+but between the setpoint moving and the fixture following it, the fixture was **not** at the
+setpoint, and the test passed because the flow was strongly *forward* rather than because the
+magnitude was zero. *The most dangerous member of a broken family is the one that did not go
+red.*
+
+⚠ **And the hazard count moved 37 → 38, against a prediction of "fewer, possibly zero".**
+Wrong in direction: a 200× larger inventory needs **one more overshoot** to reach the zero
+clamp, not fewer. The mechanism is unchanged — the airless-cabin assertion still holds at 38 —
+so it was **re-measured, not re-tuned**. ⚠ The real cost is the other half: 37 was the last
+number **both ports** ever produced, and S6 deleted the Python side, so *"both ports ration
+identically"* can never be re-established at 38. `log/rationing-gate.md` and its plan are
+dated rather than corrected. *A cross-port parity number outlives the port that made it
+checkable; the day one side moves is the day it stops being a gate and becomes a date.*
 
 **What is still owed: slice 2, adoption.** The band re-poses cleanly (measured ×10.67 at its
 binding instant, not the ×685 the direction plan quoted at the wrong instant), the `ci_ratio`

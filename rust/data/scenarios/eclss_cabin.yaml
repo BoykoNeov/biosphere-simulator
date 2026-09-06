@@ -43,13 +43,19 @@ rng_seed: 0
 
 stocks:
   # The three cabin-air POOLs. cabin_o2 starts AT the setpoint (the regulator idles) and
-  # the crew draw pulls it down to o2_eq = 8.0; CO2/H2O start at 0 (a clean cabin) and
+  # the crew draw pulls it down to o2_eq = 1993.0; CO2/H2O start at 0 (a clean cabin) and
   # rise to co2_eq = 3.0 mol / h2o_eq = 0.04 kg. No `composition` — see the note above.
   - id: eclss.cabin_o2
     domain: eclss
     quantity: oxygen
     kind: pool
-    amount: 10.0          # EclssScenario.cabin_o2_0 (== the frozen o2_setpoint)
+    amount: 1995.0        # EclssScenario.cabin_o2_0 (== the frozen o2_setpoint)
+                          # ⚠ 10.0 until 2026-09-06. This is a FOURTH copy of
+                          # `eclss.yaml`'s `o2_setpoint` and it must track it: the
+                          # value's MEANING is "at the setpoint", which is what the
+                          # direction gate's boundary case is pinned on. It moved when
+                          # the setpoint was re-derived from a cited cabin atmosphere
+                          # (0.21 x 9500 mol). See docs/log/o2-setpoint-cited.md.
   - id: eclss.cabin_co2
     domain: eclss
     quantity: carbon

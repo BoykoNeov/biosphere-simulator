@@ -139,7 +139,7 @@ registry** — an unfreeze, which this scope was chosen to avoid.
 **The silence is fixed. The hazard is not.** The physics, the params, and every frozen
 sizing are untouched. `k_scrub·dt` is still `3.6` at `dt = 3600`; the cabin still
 asphyxiates, and `test_the_underlying_hazard_is_UNCHANGED_only_its_silence_was_fixed`
-asserts that it still does, at the same 37 firings and the same airless cabin, via the
+asserts that it still does, at the same airless cabin, via the
 escape hatch. **We made the failure loud. We did not make the scenario work.** A reader who
 takes a green run as "the `dt` hazard is handled" has it exactly backwards — the
 composability constraint (no `dt` is natural to both ECLSS and Thermal) is untouched, and
@@ -180,3 +180,14 @@ This is the same shape as scope (A)'s finding one level down: *an explanation is
 good as the measurement behind it.* Here: **a safety property is only as good as the
 failure it can see**, and a guard that silently succeeds is indistinguishable from a system
 that never needed it.
+
+---
+
+⚠ **DATED 2026-09-06 — the Rust count is 38, and the cross-port claim is now historical.**
+`eclss.yaml`'s `o2_setpoint` moved 10.0 → 1995.0 (a cited cabin atmosphere,
+`docs/log/o2-setpoint-cited.md`) and `eclss_cabin.yaml`'s cabin moved with it, because that
+fixture's amount MEANS "at the setpoint". A 200× larger inventory takes **one more overshoot**
+to reach the zero clamp: 37 → 38. The hazard's mechanism is unchanged — the airless-cabin
+assertion still holds — so this is a re-measurement, not a re-tune. ⚠ The **37 was the last
+number both ports ever produced**; S6 deleted the Python side, so the parity half of this
+item's claim is a dated fact now rather than a live gate.

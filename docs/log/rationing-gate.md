@@ -19,4 +19,12 @@ counter-example (blackouts legitimately ration `load_draw`) **dissolved**: that 
 station path, which already scores it a *lost game* — same verdict, player idiom vs author
 idiom. **The silence is fixed; the hazard is NOT** — the cabin still asphyxiates at
 `dt=3600` (37 firings, both ports — a free cross-port confirmation, now pinned).
+⚠ **The Rust count is 38 since 2026-09-06 and the cross-port half is now HISTORICAL.** The
+`o2_setpoint` moved 10.0 → 1995.0 (`o2-setpoint-cited.md`) and this fixture's cabin moved
+with it, so a 200× larger inventory takes **one more overshoot** to reach the zero clamp.
+The mechanism is unchanged — the airless-cabin assertion still holds — and the count was
+**re-measured, not re-tuned**. ⚠ But 37 was the last number BOTH ports ever produced: S6
+deleted the Python side, so *"both ports ration identically"* can never be re-established
+at 38. *A cross-port parity number outlives the port that made it checkable, and the day
+one side moves is the day it becomes a dated claim rather than a live one.*
 `docs/plans/post-roadmap-rationing-gate.md`
