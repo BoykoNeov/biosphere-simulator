@@ -9,7 +9,7 @@
 //! the scanners are pinned here, on inputs chosen for the two exclusions that are easy to
 //! drop: the `memory/` lookbehind and the word boundary.
 
-use repo_gates::{memory_link, plan_docs, record_link};
+use repo_gates::{doc_bounds, memory_link, plan_docs, record_link, usize_consts};
 
 fn set(items: &[&str]) -> std::collections::BTreeSet<String> {
     items.iter().map(|s| s.to_string()).collect()
@@ -139,4 +139,56 @@ fn memory_link_reads_the_index_line_and_rejects_everything_else() {
     assert!(memory_link("## Direction & posture").is_none());
     assert!(memory_link("- [Title](notes.txt) — hook").is_none());
     assert!(memory_link("- plain text with no link").is_none());
+}
+
+/// The scanners' shared number reader, exercised through both of them because the two sides
+/// spell one bound differently: Rust groups with `_`, English prose groups with `,`. A reader
+/// that handled only one would make the doc↔code comparison red for every four-digit bound
+/// and green for `170` — i.e. it would look like it worked.
+#[test]
+fn both_scanners_read_underscore_and_comma_grouping() {
+    assert_eq!(
+        usize_consts("const MAX_A: usize = 12_000;"),
+        vec![("MAX_A".to_string(), 12_000)]
+    );
+    assert_eq!(
+        doc_bounds("| `MAX_A` | 12,000 | bytes | a thing |"),
+        vec![("MAX_A".to_string(), 12_000)]
+    );
+}
+
+#[test]
+fn usize_consts_takes_only_module_level_usize_declarations() {
+    // The three neighbours of a real bound in `context_budget.rs`, each of which must NOT
+    // become a row the document owes: a `&str` const, an indented one, and the word `const`
+    // inside prose. The last is not hypothetical — that file's doc comments discuss its own
+    // constants at length, and a scanner matching them would demand table rows for sentences.
+    let source = concat!(
+        "const KEPT: usize = 240;\n",
+        "const PHASE_TABLE_SHA256: &str = \"5551a414\";\n",
+        "    const INDENTED: usize = 7;\n",
+        "/// See const MAX_A: usize = 1; in the module above.\n",
+    );
+    assert_eq!(usize_consts(source), vec![("KEPT".to_string(), 240)]);
+}
+
+#[test]
+fn doc_bounds_requires_the_name_to_be_the_whole_cell() {
+    // ⚠ The exclusion that keeps this scanner safe on the file it actually reads.
+    // `docs/context-budget.md` opens with a table whose first cell is a backticked commit
+    // hash followed by prose, and closes with one whose first cell is a backticked FILE name
+    // — eleven rows in the shape `| `x` … | <number> |`. Matching them would invent bounds
+    // that no constant can ever satisfy, so the doc↔code comparison would be permanently red
+    // and the only available "fix" would be to weaken it.
+    assert!(doc_bounds("| `255da30` move the record out, leaving an index | 14,458 |").is_empty());
+    assert!(doc_bounds("| `CLAUDE.md` | 17,715 B | 9,520 B (ceiling 12,000) |").is_empty());
+    // A digits-only hash cannot pass for a constant either: the name must start with a letter.
+    assert!(doc_bounds("| `1234567` | 14,458 |").is_empty());
+}
+
+#[test]
+fn doc_bounds_ignores_a_row_whose_value_cell_is_prose() {
+    // A well-formed name with an unparseable value is silently skipped rather than read as
+    // zero. Pinned because "0" would be a plausible-looking bound that no code declares.
+    assert!(doc_bounds("| `MAX_A` | see below | bytes | a thing |").is_empty());
 }

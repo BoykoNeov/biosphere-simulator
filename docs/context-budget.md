@@ -156,6 +156,62 @@ pair above — a real property of the ledger that nothing had previously stated.
 The ceiling is not a target to grow into. Headroom exists so a genuine new invariant can
 land without a same-commit ceiling bump; it is not budget for status rows.
 
+#### The bounds themselves — the table below is ASSERTED equal to the code
+
+⚠ **Added 2026-09-06, closing the gap the FOURTH bound's own commit flagged on its way out.**
+Every bound in this document was prose; every bound in
+`rust/crates/repo_gates/tests/context_budget.rs` was a `const`; and **nothing compared them.**
+That is the *"a rule with two copies has one that is stale"* shape this file has now logged
+three times. The 2026-08-26 raise edited one copy of the ceiling and left the other. The
+2026-09-06 raise then **retracted** the warning about it, on the grounds that S6 had deleted
+the second copy — and that retraction was right about the Python file and wrong about the
+count. The doc↔code pair had been the surviving second copy the whole time, and it had never
+been asserted in either direction.
+
+| constant | value | unit | what it bounds |
+|---|---|---|---|
+| `MAX_CLAUDE_MD_BYTES` | 12,000 | bytes | `CLAUDE.md`, which loads into every session |
+| `MAX_MEMORY_INDEX_BYTES` | 40,000 | bytes | `MEMORY.md`, the memory index, likewise |
+| `MAX_MEMORY_BYTES_PER_LINE` | 170 | bytes/line | the MEAN hook length — the half the discipline owns |
+| `MAX_MEMORY_INDEX_LINE_BYTES` | 240 | bytes | the LONGEST single hook, which a mean dilutes |
+| `INDEX_SURPLUS_ROWS` | 1 | rows | index rows minus record rows, asserted exactly |
+| `MAX_RECORD_LINE_CHARS` | 120 | characters | one line of `docs/log/*.md` — rule 4's shape defect, kept fixed |
+
+**This table is the normative copy, and it is the only one that is checked.**
+`the_doc_states_the_same_bounds_as_the_code` compares it against the `const` declarations by
+**exact set equality in both directions**, so a bound added to the code and never written
+down here is as red as a value that drifted. Raising a bound is therefore a two-file edit by
+construction, which is the property the 2026-08-26 half-raise did not have.
+
+⚠ **What it deliberately does NOT check: the prose.** Every other number in this document is
+*dated history* — the 12,000 and 16,000 and 20,000 ceilings, the 162 and 170.4 B/line
+measurements, the `MAX_MEMORY_BYTES_PER_LINE = 170` sentence a few paragraphs below — and
+history is not maintained, per this file's own rule against editing its own past. So a future
+raise leaves those sentences standing, correct as of their date and stale as statements of
+the rule. The table is where a reader finds out what is true *now*; that is the whole reason
+it exists as a separate normative block rather than as one more paragraph.
+
+**Six controls, each predicted before it was run, and all six as predicted.** The prediction
+matters here for the same reason it did at the third raise: a comparison of two sets can go
+red for a reason that has nothing to do with the mutation, and "it went red" would read as a
+pass either way.
+
+| control | expected | measured |
+|---|---|---|
+| A untouched | GREEN | GREEN |
+| B a value drifts in the doc (40,000 → 40,001) | RED | RED |
+| C a value drifts in the code (170 → 171) | RED | RED |
+| D a table row silently loses its backticks | RED | RED |
+| E a new constant added to the code, documented nowhere | RED | RED |
+| F the doc states one bound twice, with two values | RED | RED |
+
+Both files were restored byte-exactly afterwards (sha-256 measured before and after all six).
+⚠ **E and F are the two the obvious design would have missed.** A subset check in one
+direction passes E; a map built by silent overwrite passes F. Neither is hypothetical: E is
+how a bound becomes unreachable to a reader, which is the same shape as the unindexed memory
+file the fourth bound exists for.
+
+
 ### The memory side — what retirement means there
 
 Rule 1 retires rows from the docs side. **The memory index has no such rule, and its

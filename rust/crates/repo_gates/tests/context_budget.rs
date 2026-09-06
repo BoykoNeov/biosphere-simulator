@@ -25,11 +25,11 @@
 //! — it would go red on the next legitimate row, and the fix would be "bump it", which
 //! trains precisely the reflex this module exists to prevent.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use repo_gates::{
-    data_rows, log_sections, memory_files, memory_index, memory_link, normalised_bytes, plan_docs,
-    read_normalised, record_files, record_link, repo_root,
+    data_rows, doc_bounds, log_sections, memory_files, memory_index, memory_link, normalised_bytes,
+    plan_docs, read_normalised, record_files, record_link, repo_root, usize_consts,
 };
 
 /// Measured 2026-08-12, immediately after the retirement rule was applied. The headroom is
@@ -526,5 +526,85 @@ fn every_memory_index_line_names_a_file_and_vice_versa() {
         dangling.is_empty(),
         "{} index line(s) in MEMORY.md name a file that does not exist: {dangling:?}. That          is a dead recall target — it costs bytes in every session and points at nothing.          Either restore the file or remove its line.",
         dangling.len()
+    );
+}
+
+/// Collapse a scanner's `Vec` into a map, reddening on a name stated twice with two values.
+///
+/// The scanners return sequences precisely so this can be checked: a document that states a
+/// bound in two tables, or a source file with two declarations of one name, is the drift this
+/// pair of copies exists to prevent — and a map built by silent overwrite would hide it
+/// behind whichever copy happened to come last.
+fn unique(pairs: Vec<(String, usize)>, side: &str) -> BTreeMap<String, usize> {
+    let mut map: BTreeMap<String, usize> = BTreeMap::new();
+    for (name, value) in pairs {
+        if let Some(prev) = map.insert(name.clone(), value) {
+            assert_eq!(
+                prev, value,
+                "{side} states {name} twice, as {prev} and as {value}. Two statements of one \
+                 bound is the defect this comparison exists to make impossible; delete one \
+                 rather than picking a winner."
+            );
+        }
+    }
+    map
+}
+
+/// ⚠ THE FIFTH BOUND, added 2026-09-06 — and unlike the fourth it is not this gate's own
+/// idea. The commit that shipped the fourth flagged it on the way out, out of scope there:
+/// *"with the Python gate deleted, the surviving pair of 'two copies of one rule' is
+/// `docs/context-budget.md` and the Rust constants — the doc states 40,000/170/240 and
+/// nothing asserts they match the code."*
+///
+/// **What makes it worth a bound is the retraction sitting above `MAX_MEMORY_INDEX_BYTES`.**
+/// That comment withdraws the "TWO COPIES" warning on the grounds that S6 deleted the Python
+/// mirror, leaving this file as *the only copy*. True of executable copies, false of copies:
+/// `docs/context-budget.md` states every one of these numbers, a reader reaches for the
+/// document before the test, and nothing had ever compared them. So the retraction was right
+/// about the file it named and wrong about the count — and the half-raise it was describing
+/// (2026-08-26: one copy edited, the other left) is the only failure any of the five bounds
+/// here has been observed suffering in real life.
+///
+/// Compared by **exact set equality in both directions**. A subset check either way would
+/// wave through the interesting case: a bound added to the code and written down nowhere,
+/// which is unreachable to a reader and therefore not a rule at all — the same shape as an
+/// unindexed memory file, which is what the fourth bound is about.
+#[test]
+fn the_doc_states_the_same_bounds_as_the_code() {
+    let root = repo_root();
+    let doc = read_normalised(&root.join("docs").join("context-budget.md"));
+    let stated = unique(doc_bounds(&doc), "docs/context-budget.md");
+
+    // ⚠ `include_str!` rather than a path under `repo_root()`: this is the source of the file
+    // being compiled, so the text read here cannot be a different revision from the constants
+    // above it. A path lookup would compare the document against whatever is on disk, which
+    // is the same class of gap as the one this test closes.
+    let declared = unique(usize_consts(include_str!("context_budget.rs")), "this file");
+
+    assert!(
+        declared.len() >= 6,
+        "usize_consts found only {} bound(s) in this file's own source. Every assertion in \
+         this module rests on one, so a near-empty set means the scanner stopped matching \
+         the declarations rather than that the bounds went away — the inert-by-construction \
+         failure `tests/scanners.rs` exists for.",
+        declared.len()
+    );
+
+    assert_eq!(
+        stated,
+        declared,
+        "docs/context-budget.md and this file disagree about the bounds.\n  stated in the \
+         doc but not declared here: {:?}\n  declared here but not stated in the doc: \
+         {:?}\nRaising a bound edits BOTH — the normative table under rule 3 and the const \
+         above. A raise that edits one is half a raise, which is what happened on 2026-08-26 \
+         and went unnoticed for a whole commit.",
+        stated
+            .iter()
+            .filter(|(k, v)| declared.get(*k) != Some(v))
+            .collect::<Vec<_>>(),
+        declared
+            .iter()
+            .filter(|(k, v)| stated.get(*k) != Some(v))
+            .collect::<Vec<_>>(),
     );
 }

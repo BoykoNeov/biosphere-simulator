@@ -216,3 +216,86 @@ pub fn memory_index() -> Option<PathBuf> {
             .join("MEMORY.md"),
     )
 }
+
+/// A number written with `_` or `,` grouping, as Rust source and English prose respectively
+/// spell the same bound. `None` for anything that is not purely grouped digits.
+fn parse_grouped(text: &str) -> Option<usize> {
+    let digits: String = text.chars().filter(|c| *c != '_' && *c != ',').collect();
+    if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse().ok()
+}
+
+/// A SCREAMING_CASE identifier: the shape both scanners below use to decide that a name is a
+/// declared bound rather than prose. Requires a leading letter, so a hex commit hash made
+/// entirely of digits cannot pass for a constant.
+fn is_const_name(name: &str) -> bool {
+    name.starts_with(|c: char| c.is_ascii_uppercase())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+}
+
+/// Every module-level `const NAME: usize = <value>;` in a Rust source file, in file order.
+///
+/// Anchored at the start of the line on purpose. `const` appears inside doc comments and
+/// assertion messages in the file this reads, and picking those up would make the paired
+/// document owe rows for sentences rather than for rules.
+///
+/// Returns a `Vec` rather than a map so the caller can see a name declared twice; collapsing
+/// duplicates here would hide exactly the drift this exists to find.
+pub fn usize_consts(source: &str) -> Vec<(String, usize)> {
+    let mut found = Vec::new();
+    for line in source.split('\n') {
+        let Some(rest) = line.strip_prefix("const ") else {
+            continue;
+        };
+        let Some((name, rest)) = rest.split_once(": usize = ") else {
+            continue;
+        };
+        if !is_const_name(name) {
+            continue;
+        }
+        let Some((value, _)) = rest.split_once(';') else {
+            continue;
+        };
+        if let Some(n) = parse_grouped(value.trim()) {
+            found.push((name.to_string(), n));
+        }
+    }
+    found
+}
+
+/// Every ``| `NAME` | <number> | …`` markdown table row in `text` — a document's own copy of
+/// a numeric bound, stated where a reader will see it.
+///
+/// The name must be the WHOLE first cell and SCREAMING_CASE, which is what keeps the two
+/// unrelated backticked tables in `docs/context-budget.md` (commit hashes, file names) out of
+/// the set. Returns a `Vec` for the same reason [`usize_consts`] does.
+pub fn doc_bounds(text: &str) -> Vec<(String, usize)> {
+    let mut found = Vec::new();
+    for line in text.split('\n') {
+        let Some(rest) = line.trim_start().strip_prefix("| `") else {
+            continue;
+        };
+        let Some((name, rest)) = rest.split_once('`') else {
+            continue;
+        };
+        if !is_const_name(name) {
+            continue;
+        }
+        // The backtick must have closed the cell — otherwise the name is prose inside a cell
+        // that says something else, as every row of the byte-growth table above does.
+        let Some(rest) = rest.trim_start().strip_prefix("| ") else {
+            continue;
+        };
+        let Some((cell, _)) = rest.split_once('|') else {
+            continue;
+        };
+        if let Some(n) = parse_grouped(cell.trim()) {
+            found.push((name.to_string(), n));
+        }
+    }
+    found
+}
