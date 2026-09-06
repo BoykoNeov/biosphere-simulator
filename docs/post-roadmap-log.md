@@ -29,10 +29,10 @@ So: **this file is the index, plus a pointer table into `docs/log/`.** New work 
 line to the index, one pointer row, and one file in `docs/log/` — and adds nothing to
 `CLAUDE.md`. The paired test fails if a row exists on one side and not the other.
 
-⚠ **TWO plan docs on disk are deliberately not in the index below, and this paragraph is
-what satisfies `every_plan_doc_is_indexed` for both.** They are the *forward-looking* plans:
-they have no finished work behind them and therefore no file in `docs/log/`, and naming one
-in the index would break the index↔record pairing for the right reason and the wrong way.
+⚠ **THREE plan docs on disk are deliberately not in the index below, and this paragraph is
+what satisfies `every_plan_doc_is_indexed` for all three.** They are the *forward-looking*
+plans: they have no finished work behind them and therefore no file in `docs/log/`, and naming
+one in the index would break the index↔record pairing for the right reason and the wrong way.
 
 * **`post-roadmap-direction-3.md` — the LIVE one**, written 2026-09-06. **Record files refer
   to it as *"the third direction plan"*, never by filename**, because the plan-doc parity
@@ -47,6 +47,16 @@ in the index would break the index↔record pairing for the right reason and the
   into. **A doc's exemption is retired with the doc only if something else came to name it —
   and for this one nothing did.** The trigger for superseding it was measured rather than
   argued: 30 strike-through spans holding 71.6 % of its bytes.
+* **`post-roadmap-o2-form-adoption.md` — WRITTEN 2026-09-06, nothing built.** The re-posing
+  the third direction plan's §2.3 names as adoption's precondition (*"adopting means re-posing
+  that band first, in writing, before a run"*), committed **before** the flip precisely so its
+  predicted red set can fail against the measurement instead of being assembled from it. It is
+  a plan and not a record: the loader still selects `O2Form::Constant` and not one frozen byte
+  has moved. ⚠ **This exemption expires when the first slice lands, not when the last one
+  does** — the FOURTH exemption's rule below — and its own §7 recommends the slice that lands
+  first be a *measurement* (the station's three sealed assemblies), which changes no frozen
+  byte and therefore does **not** end the exemption's premise on its own. Read that carefully
+  the day it happens rather than applying either rule by reflex.
 
 ⚠ **The FIRST plan, `post-roadmap-direction.md` (2026-08-13), is SUPERSEDED and no longer
 needs this paragraph:** the 2026-08-31 margin-pin item filed itself under it, so its index
