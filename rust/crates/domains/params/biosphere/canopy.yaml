@@ -7,14 +7,20 @@
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
-#   The intercepted-fraction LAW (1 − exp(−k·LAI)) is Monsi & Saeki [A]. Of the three
-#   numeric VALUES, specific_leaf_area is bound to [B] and carbon_fraction to [C];
-#   extinction_coef remains a provisional, literature-typical placeholder pending the
-#   Step-11 validation gate — flagged TODO(cite) until bound (per the convention doc's
-#   provisional path; never backfilled from WOFOST).
-#   ⚠ The one survivor sits under a ~3.5× amplifier: peak LAI compounds a uniform error
-#   through light interception, so a ±2 % disagreement about k is roughly the whole
-#   margin of the peak-LAI science band. It is the live provenance queue, alone.
+#   The intercepted-fraction LAW (1 − exp(−k·LAI)) is Monsi & Saeki [A]. All three
+#   numeric VALUES are bound: specific_leaf_area and extinction_coef to [B],
+#   carbon_fraction to [C]. THIS FILE'S PROVENANCE QUEUE IS EMPTY as of 2026-09-06 — no
+#   TODO(cite) remains here (never backfilled from WOFOST).
+#   ⚠ EMPTY IS NOT SETTLED. extinction_coef was bound at the value it already carried,
+#   over a shelf that disagrees with itself (0.60 / 0.65 / 0.68). Its own `source:` below
+#   records the disagreement and the two OPPOSED risks rather than hiding them: a citation
+#   that conceals a live alternative is worse than the TODO(cite) that admitted one.
+#   ⚠ The "~3.5× amplifier" this header asserted until 2026-09-06 does NOT apply to k,
+#   and was refuted in the same record that priced the binding
+#   (docs/log/canopy-provenance.md). That elasticity is to a UNIFORM perturbation; k raises
+#   absorption at the canopy top and lowers penetration to the base, so it self-cancels in a
+#   closed canopy — +8.3 % on k buys +0.78 % of peak LAI, not +30 % (re-measured
+#   2026-09-06 through `value_switch`, where 0.60 reproduced the frozen tree in all 8 rows).
 #
 # ⚠ carbon_fraction WAS THE SECOND SURVIVOR UNTIL 2026-08-15, AND IT WAS NEVER MISSING.
 #   ../nitrogen.yaml has carried the IDENTICAL 0.45 bound to [C] since the 2026-07-16
@@ -26,8 +32,11 @@
 #   OVERRIDE was the record of it. Fourth instance of the shape (canopy-regulator,
 #   stem-reserve-form, the SLA anchor in test_potato_crop.py): CHECK YOUR OWN SHELF
 #   BEFORE TREATING A VALUE AS UNSOURCED. ⚠ Provenance-only — the value does not move,
-#   which is exactly why nothing could have gone red and why the manifest regeneration
-#   in this commit is the only git-visible record that an unfreeze happened.
+#   and the manifest regeneration in that commit is the git-visible record that an unfreeze
+#   happened. ⚠ This sentence also said "which is exactly why nothing could have gone red"
+#   until 2026-09-06. True when written (2026-08-15) and FALSE three days later: slice C7
+#   (2026-08-18) made the reference WRITE each manifest from the files it compiles in, so a
+#   `source:`-only edit leaves the committed manifest stale and RED until it is regenerated.
 #
 # Sources:
 #   [A] Monsi, M. & Saeki, T. (1953), "Über den Lichtfaktor in den
@@ -43,7 +52,9 @@
 #       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
 #       Simulation Monographs 29, PUDOC, Wageningen. ISBN 90-220-0937-8. Table 19
 #       (p. 100), "Wheat, winter" — read off the page render, not the text layer
-#       (the OCR of this book is mangled; see docs/log/canopy-magnitude.md).
+#       (the OCR of this book is mangled; see docs/log/canopy-magnitude.md). ALSO p. 36,
+#       the canopy extinction coefficient by leaf-architecture class (bound 2026-09-06,
+#       same page-render discipline).
 
 name: winter_wheat
 process: canopy_light_interception
@@ -52,7 +63,7 @@ parameters:
   extinction_coef:
     value: 0.6
     unit: "dimensionless"
-    source: "TODO(cite) — provisional, literature-typical (wheat k≈0.4–0.7); primary citation pending Step 11"
+    source: "[B] Penning de Vries et al. (1989), p. 36: ‘about 0.6 for a canopy with erect leaves and 0.8 for one with horizontal leaves (Goudriaan, 1977)’ — an ARCHITECTURE-class PAR extinction coefficient, read off the page render (this book’s OCR is mangled), and winter wheat is an erect-leaved canopy. Coherent with the rest of the file: [B] already sources specific_leaf_area, and Goudriaan is the author of the depth quadrature this domain’s canopy integrates over. ⚠ THE SHELF DISAGREES WITH ITSELF AND THIS IS THE CONSERVATIVE READING, NOT THE ONLY ONE. Soltani & Sinclair (2012) Table 10.1 gives 0.65 for the ‘Wheat’ row under the IDENTICAL equation — but that table’s own caption lists [B] among its sources, so it is partly derived rather than an independent measurement; ibid. Fig. 10.8a gives 0.68 for cv. Zagros from explicitly UNPUBLISHED data, which cannot retire a TODO(cite) in a tree whose rule is cite-the-primary-literature. ⚠ THE TWO RISKS ARE OPPOSED AND NO DIRECTION IS SAFE ON BOTH AXES: on provenance 0.60 may be ~8 % low against the crop-specific reading, while on the GATES 0.60 is the conservative side. Measured 2026-09-04 and re-measured 2026-09-06 (`value_switch extinction_coef=0.60,0.65,0.68 --long`): 0.60 reproduces the frozen tree in all 8 gated rows; 0.65 spends the perennial liveness floor from 5.12 % of clearance to 0.40 % (0.578137 → 0.552202 against > 0.55) and 0.68 puts it BELOW the floor at 0.538913 — and 0.68 is NON-MONOTONE on the observable it was proposed to move (peak LAI 6.058617, below 0.65’s 6.069990). Value unchanged at 0.6, decided by the user 2026-09-06; the disagreement is RECORDED, not resolved. See docs/log/extinction-coef-bound.md and docs/log/canopy-provenance.md"
   # [B] Table 19 tabulates the RECIPROCAL — specific leaf WEIGHT, 425 kg/ha of leaf per
   # unit LAI for winter wheat (spring wheat is 500) — so the SLA here is 10000 m²/ha ÷
   # 425 kg/ha = 23.53 m²/kg. Basis matches ours: leaf blades, ONE surface, excluding
@@ -76,4 +87,4 @@ parameters:
   carbon_fraction:
     value: 0.45
     unit: "dimensionless"
-    source: "[C] Raimanova et al. (2024), Discussion: measured wheat C content 45.05 % (±0.81) in grain and 45.66 % (±1.09) in straw, which the paper itself calls 'near to the value of 45% used for the calculation of C content in plant dry mass'. Applied here to LEAF BLADE carbon, for which the straw (above-ground vegetative) figure is the nearer measurement; [C]'s root reading of 34.9 % is ~10 points lower, so this fraction is a SHOOT value and must not be read as a whole-plant one. ⚠ NOT a new retrieval: ../nitrogen.yaml has carried this exact citation for this exact value since 2026-07-16, under the MUST-EQUAL constraint between the two files, and ./crops/potato/canopy.yaml has described the reference value as 'cited' since 2026-08-11. The TODO(cite) here was stale, not open. Value unchanged at 0.45 — a provenance-only unfreeze, which the manifest records and no test can see"
+    source: "[C] Raimanova et al. (2024), Discussion: measured wheat C content 45.05 % (±0.81) in grain and 45.66 % (±1.09) in straw, which the paper itself calls 'near to the value of 45% used for the calculation of C content in plant dry mass'. Applied here to LEAF BLADE carbon, for which the straw (above-ground vegetative) figure is the nearer measurement; [C]'s root reading of 34.9 % is ~10 points lower, so this fraction is a SHOOT value and must not be read as a whole-plant one. ⚠ NOT a new retrieval: ../nitrogen.yaml has carried this exact citation for this exact value since 2026-07-16, under the MUST-EQUAL constraint between the two files, and ./crops/potato/canopy.yaml has described the reference value as 'cited' since 2026-08-11. The TODO(cite) here was stale, not open. Value unchanged at 0.45 — a provenance-only unfreeze, which the manifest records. ⚠ This string ended 'and no test can see' until 2026-09-06; slice C7 (2026-08-18) falsified that three days after it was written, because the reference now writes the manifest from the files it compiles in and tests/manifest_writer.rs compares the committed bytes — so a source:-only edit is stale-and-RED until regenerated. What is still honour-system is the CEREMONY, not the regeneration"

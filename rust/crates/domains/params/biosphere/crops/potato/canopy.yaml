@@ -32,9 +32,14 @@
 # crop's committed values, carried unchanged. They are NOT equally justified, and the
 # difference is stated rather than averaged:
 #
-#   extinction_coef — the reference value is itself a TODO(cite) placeholder tagged
-#     "literature-typical (wheat k≈0.4–0.7)". Reusing it for potato is therefore reusing
-#     a placeholder, not borrowing a wheat measurement. It is a WEAKER position than
+#   extinction_coef — ⚠ RE-READ 2026-09-06: the reference value is NO LONGER a
+#     placeholder. ../../canopy.yaml bound it that day to [B] p. 36, an ARCHITECTURE-class
+#     coefficient ("about 0.6 for a canopy with erect leaves and 0.8 for one with
+#     horizontal leaves"). That STRENGTHENS the reuse for wheat and WEAKENS it for potato
+#     in the same sentence: the cited basis is leaf architecture, and potato's is the
+#     opposite class, so the bias below is now a bias against a CITED class rather than a
+#     guess about a placeholder. This entry read "reusing a placeholder, not borrowing a
+#     wheat measurement" until then. It is still a WEAKER position than
 #     ./phenology.yaml's shared FvCB block (which is at least tagged generic-C3),
 #     because a broad-leaved determinate canopy and an erectophile cereal canopy really
 #     do differ in extinction — planophile canopies typically sit HIGHER, nearer 0.8–1.0.
@@ -82,7 +87,7 @@ parameters:
   extinction_coef:
     value: 0.6
     unit: "dimensionless"
-    source: "SHARED, not potato — the winter-wheat reference's own TODO(cite) placeholder ('literature-typical, wheat k≈0.4–0.7'), carried unchanged. ⚠ Plausibly biased LOW for potato: a broad-leaved planophile canopy typically extinguishes light more strongly than an erectophile cereal (nearer 0.8–1.0). [E] Table 19 carries no extinction column. The direction of the bias is recorded so a later session inherits the finding, not just the number"
+    source: "SHARED, not potato — the winter-wheat reference's committed value, carried unchanged. ⚠ RE-READ 2026-09-06: this said 'the reference's own TODO(cite) placeholder' until that day, when ../../canopy.yaml bound 0.6 to [B] p. 36 as an ARCHITECTURE-class coefficient — 'about 0.6 for a canopy with erect leaves and 0.8 for one with horizontal leaves'. ⚠ So the LOW bias for potato is now cited rather than guessed, and by the citation's own words: a broad-leaved planophile canopy belongs to [B]'s 0.8 class, not its 0.6 one, so reusing the wheat value here imports a coefficient the source assigns to the opposite architecture. [E] Table 19 carries no extinction column. The direction of the bias is recorded so a later session inherits the finding, not just the number"
   specific_leaf_area:
     value: 33.33
     unit: "m^2/kg"

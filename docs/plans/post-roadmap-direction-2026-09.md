@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `drift-summary-regenerable.md`
+**Re-read against the record's last row:** `extinction-coef-bound.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -126,12 +126,26 @@ re-tuning the bound (refused three times).
    must not be quoted from that record: the old figure came from a DVS *ramp*, and a uniform
    ×0.682 gives −87.0 % against the recorded −35.4 %. **So this item's leverage is not what §4
    ranked it on**; the retrieval itself is unaffected.
-2. **`extinction_coef` 0.60 / 0.65 / 0.68 — a DECISION, priced.** Three shelf readings
+2. ✅ **DECIDED 2026-09-06 — `0.60`, and BOUND** (`log/extinction-coef-bound.md`). The
+   user's call. It is the value the tree already carried, so it shipped as a provenance-only
+   unfreeze: one `source:` string, one manifest hash, **no number and no golden**. The file
+   now names [B] p. 36 — an ARCHITECTURE-class coefficient ("about 0.6 for a canopy with erect
+   leaves and 0.8 for one with horizontal leaves") — and **records the shelf's disagreement
+   instead of hiding it**. Two things the re-read confirmed against a fresh column rather than
+   against a record: the 0.60 column is bit-identical to frozen in **all 8 gated rows** ("0
+   rose, 0 fell, 8 did not move"), and 0.68 is **red on the perennial liveness floor**
+   (0.538913 against `> 0.55`) as well as **non-monotone** on peak LAI (6.058617, below 0.65's
+   6.069990). ⚠ The C7 manifest gate fired on its first provenance edit — one line, predicted
+   before it was run — which falsified the sentence in `canopy.yaml` claiming no test could
+   see such an edit. **This item is CLOSED; the paragraph below is kept as the pricing it was
+   decided on.**
+
+   ~~**`extinction_coef` 0.60 / 0.65 / 0.68 — a DECISION, priced.** Three shelf readings
    disagree (`log/canopy-provenance.md`); +8.3 % on `k` buys +0.8 % of peak LAI shipped,
    +7.3 % converged, moves the LAI peak before anthesis, loosens all five CO₂ bands, and
    spends the perennial liveness floor down to 0.40 %. **Needs: the user's call**; the
    record recommends 0.60 (coherence with Goudriaan's quadrature, conservative on the
-   gates) or 0.65 (crop-specific) and refuses 0.68 (unpublished).
+   gates) or 0.65 (crop-specific) and refuses 0.68 (unpublished).~~
    ⚠ **RE-CHECKED AGAINST A RUN 2026-09-04** (`reread-extinction-coef.txt`, the re-read the
    partition item's gate forced, done the way its predecessor demanded — a run, not a
    record). The shipped numbers **hold**: `0.65` is peak LAI 6.069990, **+0.783 %**, and the
@@ -456,10 +470,18 @@ Three things it leaves this doc, none of them a new task:
   (+0.206 %). Left deliberately, on `canopy.yaml`'s rationale below — a comment edit is a
   manifest hash and an unfreeze — and to be corrected the next time that file's manifest entry
   moves for a real reason. **Listed so nobody "fixes" it into one.**
-- **`canopy.yaml`'s header still says a provenance edit is invisible** (*"which the manifest
+- ~~**`canopy.yaml`'s header still says a provenance edit is invisible** (*"which the manifest
   records and no test can see"*), falsified by C7. Left deliberately — a comment edit is a
   manifest hash and an unfreeze — and to be corrected the next time that file's manifest
-  entry moves for a real reason. Same for `self_discharge.yaml`'s stale pointer.
+  entry moves for a real reason.~~ **CLOSED 2026-09-06** — that "real reason" arrived
+  (`log/extinction-coef-bound.md`) and the rule was honoured exactly: the three stale sentences
+  in `canopy.yaml` came out in the same commit as its `source:` edit, and **only** that file's.
+  ⚠ A THIRD sentence came out with them that §3.2 had never listed, because it was not stale
+  — it was **false**: the header's *"~3.5× amplifier"* claim about `extinction_coef` itself,
+  refuted where it was first asserted (+8.3 % on `k` buys +0.78 % of peak LAI, not +30 %) and
+  still sitting in the file three weeks later. *Nothing reads a header comment, so a refutation
+  recorded in a log does not reach the file it refutes.* **Still open:** `self_discharge.yaml`'s
+  stale pointer, whose manifest entry did not move here.
 - **Two records say "Γ* is TODO(cite)" as of their date** (`co2-margin-pin.md`,
   `co2-compensation-band.md`). Dated records, not maintained — the rule; listed so nobody
   "fixes" them.
@@ -517,7 +539,8 @@ Three things it leaves this doc, none of them a new task:
    not as *the plan is finished* — the decisions below are where it goes next.
 
 **Decisions (the user's; listed apart because listing them as work is how the predecessor
-went stale):** `extinction_coef` (§2.1 item 2); **the live-O₂ FvCB form (§2.3.2, NEW
+went stale):** ~~`extinction_coef` (§2.1 item 2)~~ **TAKEN 2026-09-06 — `0.60`, bound and
+shipped, `log/extinction-coef-bound.md`**; **the live-O₂ FvCB form (§2.3.2, NEW
 2026-09-02 — the measurement turned it from a task into a call)**; **the Q10 temperature form
 (§2.3.1, NEW 2026-09-04 — recommendation: refuse as a replacement, keep as an instrument; it
 breaks the biomass cap, collapses the chamber liveness floor, and promotes an uncited

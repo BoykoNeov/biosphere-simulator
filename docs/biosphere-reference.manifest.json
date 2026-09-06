@@ -160,7 +160,7 @@
   "long_horizon_years": 15,
   "param_files": {
     "allocation.yaml": "b26cc1e6587a99d8b055530f9dc8de02ce8d2536ec465acdd4683d15a97109ea",
-    "canopy.yaml": "2e5a2f7f665886dff0f3c60f739b97163cb690213a6d30f6a850aa29411748fc",
+    "canopy.yaml": "5d498ac61fe3bd2d7ba484493172a249dd48316afa880fcc42b15070ac0462ea",
     "decomposition.yaml": "491f196483f5d131131369b0c15c5dc6f368e60d38be185067484f4c0f34af13",
     "herbivory.yaml": "33903c12acd162cc377a9fe4536a971cc3d2f4943a959a69aeebc5a989198c1b",
     "humification.yaml": "327cd89ee455cf0cf20767e4081dbe1344287f2e132760b668cae5a20d6f4b09",
