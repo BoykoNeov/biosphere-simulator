@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `extinction-coef-bound.md`
+**Re-read against the record's last row:** `q10-form-refused.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -323,6 +323,17 @@ two, from the paper it cited:
 
    So the Q10 recommendation in §4 stands on its own two grounds (the biomass breach and the
    chamber liveness collapse); the *"held by an inert term"* framing behind it is withdrawn.
+
+   ✅ **DECIDED 2026-09-06 — REFUSED as a replacement, KEPT as an instrument**
+   (`log/q10-form-refused.md`). The user's call, and it is the recommendation above taken on
+   the two grounds that survived. Nothing moved: no code, param, golden, manifest key, band or
+   floor — a refusal is a decision **not** to unfreeze. `Q10Teh` remains reachable only from
+   the lab (`science_switch -- form=q10_teh`), the loader still always selects `Cardinal`, and
+   the test that reddens if that default flips is what keeps the decision true rather than
+   merely written down. ⚠ What a future adoption owes is recorded in that file so it does not
+   restart at zero: a defensible `Vcmax`, an argument for deleting the whole-rate multiplier
+   that addresses *our* `Jmax` branch, and a biomass cap re-posed **in writing before** a run.
+   **This item is CLOSED.**
 2. ~~**`o2` is a constant; chamber O₂ is a stock.**~~ **MEASURED 2026-09-02 —
    `log/o2-coupling-measured.md`.** The question this asked (*"do the jar's science bands
    move?"*) is answered **yes**, and the answer inverts the item as written. Kept below with
@@ -541,10 +552,11 @@ Three things it leaves this doc, none of them a new task:
 **Decisions (the user's; listed apart because listing them as work is how the predecessor
 went stale):** ~~`extinction_coef` (§2.1 item 2)~~ **TAKEN 2026-09-06 — `0.60`, bound and
 shipped, `log/extinction-coef-bound.md`**; **the live-O₂ FvCB form (§2.3.2, NEW
-2026-09-02 — the measurement turned it from a task into a call)**; **the Q10 temperature form
+2026-09-02 — the measurement turned it from a task into a call)**; ~~**the Q10 temperature form
 (§2.3.1, NEW 2026-09-04 — recommendation: refuse as a replacement, keep as an instrument; it
 breaks the biomass cap, collapses the chamber liveness floor, and promotes an uncited
-`vcmax`)**; the parked leaf mechanism
+`vcmax`)**~~ **TAKEN 2026-09-06 — REFUSED as a replacement, kept as an instrument,
+`log/q10-form-refused.md`**; the parked leaf mechanism
 (§2.5, recommended refuse); the CO₂ controller (§2.4, recommended not yet); the product track
 (dormant by the 2026-08-13 decision; re-open when the science thread reaches a natural
 stop — §2.1 resolving would be one).
