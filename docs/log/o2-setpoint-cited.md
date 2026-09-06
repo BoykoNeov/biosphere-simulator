@@ -126,10 +126,16 @@ not**.
 `-p domains --lib`: **404 passed, 0 failed.** `-p station -p domains --test manifest_writer`:
 green after regeneration. `-p repo_gates`: **25 passed**, covering the index/pointer/record
 parity, the plan-doc indexing, the direction-plan re-read gate and the memory bounds.
-`regen_goldens`: **20 of 20 run, 6 rewritten.** ⚠ The first `cargo test --workspace --no-fail-fast` was **still running at the first commit**,
+`regen_goldens`: **20 of 20 run, 6 rewritten.** ⚠ The first
+`cargo test --workspace --no-fail-fast` was **still running at the first commit**,
 and that commit's record said so rather than claiming a result it did not have. **It came back
 with four reds** — FINDING 7, which no targeted run could have found. `-p authoring`:
 **96 passed, 0 failed** after the fix.
+**FINAL**: `cargo clippy --all-targets -- -D warnings` **exit 0**;
+`cargo test --workspace --no-fail-fast` **1139 passed, 1 failed** — and the one red was this
+file, over the 120-char record-line cap, because the gates were run and *then* the record was
+appended to. ⚠ *A green gate is a claim about the tree that existed when it ran*, which is the
+same shape as everything else in this item; wrapped and re-run to 1140/0.
 ⚠ The station manifest byte gate **reddened first and by itself** — the automatic guard this
 unfreeze had, confirmed present before the edit rather than hoped for.
 
