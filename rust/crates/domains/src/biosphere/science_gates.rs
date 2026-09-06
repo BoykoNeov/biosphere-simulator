@@ -677,6 +677,150 @@ mod support {
 #[cfg(test)]
 use support::{band_gate, leaf_cycle_gate};
 
+/// The pointwise compensation fold's own controls — the witness `×10.67` does not have.
+///
+/// ⚠⚠ **Without these the fold could be arbitrarily wrong and every band above would still
+/// pass.** The five gates read `min_compensation_ratio` and nothing else in the tree does, so
+/// a fold that (say) divided by the wrong air inventory would produce a plausible number, a
+/// green suite, and a frozen contract asserting nothing. The control is the collapse: under
+/// `O2Form::Constant` the pointwise floor is a constant, so the fold must reproduce the old
+/// `min_ppm/floor_ppm` **exactly** — a quantity that has been pinned since the band was first
+/// written and whose value is known independently.
+///
+/// ⚠ These runs are built with the form forced to `Constant`, never taken from `runs::`,
+/// which passes the **loaded** params. That distinction is the whole test after adoption: a
+/// version reading `runs::` would compare the new fold against itself.
+#[cfg(test)]
+mod pointwise_fold {
+    use crate::biosphere::params;
+    use crate::biosphere::readouts::{
+        floor_ppm, min_compensation_ratio, min_ppm, trajectory, Trajectory,
+    };
+    use crate::biosphere::science::O2Form;
+    use crate::biosphere::system::{
+        consumer_chamber_scenario, perennial_chamber_scenario, sealed_chamber_scenario,
+    };
+    use crate::biosphere::{
+        SeasonScenario, CONSUMER_CHAMBER_YEARS, PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
+    };
+
+    /// The frozen run with the oxygen form forced to the constant, whatever the loader says.
+    fn under_constant(scenario: SeasonScenario, years: usize, perennial: bool) -> Trajectory {
+        let mut p = params::biosphere();
+        p.photo.o2_form = O2Form::Constant;
+        trajectory(scenario, years, perennial, &p)
+    }
+
+    /// The three banded scenarios, at their **short** horizons.
+    ///
+    /// ⚠ The two `*_long_horizon` rows are deliberately absent and it costs nothing: they are
+    /// the same two scenarios driven further, so the fold's arithmetic on them is the identical
+    /// code path over a longer series. Adding them would buy a second copy of this claim at the
+    /// price of two fresh 15-year runs that no cache can serve, because the whole point is that
+    /// these params are not the loaded ones.
+    fn banded() -> Vec<(&'static str, Trajectory)> {
+        vec![
+            (
+                "sealed_chamber",
+                under_constant(sealed_chamber_scenario(), SEALED_CHAMBER_YEARS, false),
+            ),
+            (
+                "perennial_chamber",
+                under_constant(perennial_chamber_scenario(), PERENNIAL_CHAMBER_YEARS, true),
+            ),
+            (
+                "consumer_chamber",
+                under_constant(consumer_chamber_scenario(), CONSUMER_CHAMBER_YEARS, true),
+            ),
+        ]
+    }
+
+    /// Under the constant form the pointwise fold IS the old one, bit for bit.
+    ///
+    /// Exact equality rather than a tolerance, and that is a claim about the arithmetic: the
+    /// floor is the same `f64` at every step, division by a constant is monotone, so the
+    /// minimum is taken at the same index and computed by the same operation. A tolerance here
+    /// would let a genuinely different fold through.
+    #[test]
+    fn the_pointwise_fold_is_the_constant_one_under_the_constant_form() {
+        let mut p = params::biosphere();
+        p.photo.o2_form = O2Form::Constant;
+        let floor = floor_ppm(&p);
+        for (name, t) in banded() {
+            let want = min_ppm(&t) / floor;
+            let got = min_compensation_ratio(&t);
+            assert_eq!(got, want, "{name}: pointwise {got} vs constant {want}");
+        }
+    }
+
+    /// Anti-vacuity: the collapse above must not be the trivial one.
+    ///
+    /// ⚠ If the fold silently ignored the oxygen series it would also pass the identity, so
+    /// the identity alone proves nothing about the live branch. This asserts that the same
+    /// three runs give a **different** answer under `LivePool` — i.e. that the oxygen the fold
+    /// reads is load-bearing — and it is the fold's half of the guard
+    /// `tests/o2_form.rs` carries for the flow.
+    #[test]
+    fn the_fold_actually_reads_the_oxygen_series() {
+        for (name, mut t) in banded() {
+            let constant = min_compensation_ratio(&t);
+            t.params.photo.o2_form = O2Form::LivePool;
+            let live = min_compensation_ratio(&t);
+            assert!(
+                (live - constant).abs() / constant > 1e-6,
+                "{name}: the fold gave {live} under LivePool and {constant} under Constant — \
+                 it is not reading the O2 series"
+            );
+        }
+    }
+
+    /// The oxygen series is as long as the carbon one on every banded run.
+    ///
+    /// ⚠ Not hygiene. `Trajectory` samples both stocks conditionally, so a scenario that lost
+    /// its O₂ pool would leave the series empty — and an empty series is exactly what
+    /// `min_compensation_ratio`'s length assertion exists to catch. This pins that the three
+    /// banded runs are on the correct side of it, so a future scenario edit that drops the
+    /// stock reddens here with a diagnosis rather than inside a gate with a panic.
+    #[test]
+    fn every_banded_run_carries_both_series() {
+        for (name, t) in banded() {
+            assert!(!t.o2_pool.is_empty(), "{name} has no O2 series");
+            assert_eq!(t.o2_pool.len(), t.carbon_pool.len(), "{name} series lengths");
+        }
+    }
+
+    /// ⚠ **The open field is unreachable by the oxygen form, and that is a property of the
+    /// REFERENCE now, not of a lab alternative.**
+    ///
+    /// `oxygen_at` falls through to the frozen constant when a scenario has no O₂ stock. For a
+    /// field breathing the atmosphere that is correct physics — and it is byte-for-byte
+    /// identical to *forgetting to wire the form*. While `Constant` was the reference nothing
+    /// depended on telling those apart; the adopted form makes it a live distinction, so the
+    /// two halves are asserted separately: the run is unchanged by the form, **and** the reason
+    /// is that it carries no oxygen stock. Either alone is the silent baseline
+    /// `tests/o2_form.rs`'s header names.
+    #[test]
+    fn the_open_field_has_no_oxygen_stock_and_is_therefore_unmoved_by_the_form() {
+        use crate::biosphere::DEFAULT_SCENARIO;
+        let mut constant = params::biosphere();
+        constant.photo.o2_form = O2Form::Constant;
+        let mut live = params::biosphere();
+        live.photo.o2_form = O2Form::LivePool;
+
+        let a = trajectory(DEFAULT_SCENARIO, 1, false, &constant);
+        let b = trajectory(DEFAULT_SCENARIO, 1, false, &live);
+
+        assert!(
+            a.o2_pool.is_empty(),
+            "the open field acquired an O2 stock — the fall-through below is no longer the \
+             reason this run is unmoved, and the form now reaches the reference scenario"
+        );
+        assert_eq!(a.leaf_c, b.leaf_c, "open_season leaf carbon moved");
+        assert_eq!(a.stem_c, b.stem_c, "open_season stem carbon moved");
+        assert_eq!(a.storage_c, b.storage_c, "open_season storage carbon moved");
+    }
+}
+
 /// The five compensation-point margins, pinned as VALUES — the observable, not the
 /// contract.
 ///

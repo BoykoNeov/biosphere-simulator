@@ -28,8 +28,8 @@
 //! harness would print "no change": §7 of the plan with a new cause.
 
 use crate::biosphere::params::{BiosphereParams, MOLAR_MASS_CARBON_KG_PER_MOL};
-use crate::biosphere::science::leaf_area_index;
-use crate::biosphere::stocks::{CARBON_POOL, CONSUMER_CARBON, LEAF_C, STEM_C, STORAGE_C};
+use crate::biosphere::science::{leaf_area_index, o2_mole_fraction, oxygen_at};
+use crate::biosphere::stocks::{CARBON_POOL, CONSUMER_CARBON, LEAF_C, O2_POOL, STEM_C, STORAGE_C};
 use crate::biosphere::system::sealed_chamber_scenario;
 use crate::biosphere::{
     build_season_with, run_perennial, run_season, season_setup_composed, season_steps, steps_for,
@@ -66,6 +66,13 @@ pub struct Trajectory {
     pub storage_c: Vec<f64>,
     /// `biosphere.carbon_pool` per step — the chamber atmosphere.
     pub carbon_pool: Vec<f64>,
+    /// `biosphere.o2_pool` per step, or empty where the stock is absent.
+    ///
+    /// ⚠ Sampled since the live-O₂ form became the reference: the compensation floor is no
+    /// longer one number per run, so [`min_compensation_ratio`] needs the oxygen the run
+    /// actually had at each instant. An open field has no such stock and leaves this empty,
+    /// which is the same silent-pass hazard `carbon_pool` carries and is guarded the same way.
+    pub o2_pool: Vec<f64>,
     /// `biosphere.consumer_carbon` per step, or empty where the stock is absent.
     pub consumer_c: Vec<f64>,
     /// Arbitration firings over the whole run. A band is a claim about a *well-fed*
@@ -166,6 +173,7 @@ pub fn try_trajectory_composed(
         stem_c: Vec::with_capacity(steps + 1),
         storage_c: Vec::with_capacity(steps + 1),
         carbon_pool: Vec::with_capacity(steps + 1),
+        o2_pool: Vec::with_capacity(steps + 1),
         consumer_c: Vec::new(),
         rationed: 0,
         events: 0,
@@ -195,6 +203,9 @@ pub fn try_trajectory_composed(
             // `lab::report`'s constancy check, not this assertion.
             if let Some(stock) = s.stocks.get(CARBON_POOL) {
                 t.carbon_pool.push(stock.amount);
+            }
+            if let Some(stock) = s.stocks.get(O2_POOL) {
+                t.o2_pool.push(stock.amount);
             }
             if let Some(stock) = s.stocks.get(CONSUMER_CARBON) {
                 t.consumer_c.push(stock.amount);
@@ -270,6 +281,46 @@ pub fn min_ppm(t: &Trajectory) -> f64 {
         .fold(f64::INFINITY, f64::min)
 }
 
+/// The season-low chamber CO₂ as a multiple of **its own instant's** compensation point.
+///
+/// The pointwise form of [`floor_ppm`]: at each step it reads that step's oxygen out of the
+/// run, resolves the params the flow would have read there, and divides the chamber's ppm by
+/// `Γ*(t)/ci_ratio`. The band is `> 1.0` — net assimilation is exactly zero at the
+/// compensation point, so a run that dips to 1.0 is fixing no carbon at its worst instant.
+///
+/// ⚠ **This is the flow's own arithmetic, not a second copy of it.** The per-step params come
+/// from [`oxygen_at`], which is the function `PhotosynthesisFlow::photo_at` calls; a
+/// reimplementation here could disagree with the model and every gate would still pass.
+/// Under [`crate::biosphere::science::O2Form::Constant`] `oxygen_at` returns the params
+/// untouched, so this collapses to `min_ppm(t)/floor_ppm(p)` **exactly** — asserted, not
+/// assumed, by `the_pointwise_fold_is_the_constant_one_under_the_constant_form`.
+///
+/// ⚠ Both series are asserted non-empty for the reason [`min_ppm`] gives and then one more:
+/// an empty **oxygen** series folds to nothing at all, so a run reaching this fold without an
+/// O₂ stock would return `+∞` and pass the band vacuously. The open field is exactly such a
+/// run, and it is not banded.
+pub fn min_compensation_ratio(t: &Trajectory) -> f64 {
+    assert!(
+        !t.carbon_pool.is_empty(),
+        "min_compensation_ratio on a run with no chamber carbon pool"
+    );
+    assert_eq!(
+        t.o2_pool.len(),
+        t.carbon_pool.len(),
+        "min_compensation_ratio on a run whose O2 series does not match its carbon series          — a sealed scenario carries both, and an unsealed one is not banded"
+    );
+    let air = t.scenario.chamber_air_mol;
+    let ci_ratio = sealed_chamber_scenario().ci_ratio;
+    (0..t.carbon_pool.len())
+        .map(|i| {
+            let ppm = t.carbon_pool[i] / air * 1e6;
+            let x_o2 = o2_mole_fraction(t.o2_pool[i], air);
+            let photo = oxygen_at(&t.params.photo, Some(x_o2), t.params.photo.o2_form);
+            ppm / (photo.gamma_star / ci_ratio)
+        })
+        .fold(f64::INFINITY, f64::min)
+}
+
 /// Peak leaf area index over the whole trajectory.
 pub fn peak_lai(t: &Trajectory) -> f64 {
     let sla = t.params.canopy.sla_per_mol_c;
@@ -330,6 +381,7 @@ mod tests {
             stem_c: vec![0.0, 1.0, 0.5],
             storage_c: vec![0.0, 0.0, 0.0],
             carbon_pool: Vec::new(),
+            o2_pool: Vec::new(),
             consumer_c: Vec::new(),
             rationed: 0,
             events: 0,

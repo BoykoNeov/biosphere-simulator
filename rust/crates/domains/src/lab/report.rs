@@ -1152,6 +1152,7 @@ mod tests {
             stem_c: stem.to_vec(),
             storage_c: storage.to_vec(),
             carbon_pool: Vec::new(),
+            o2_pool: Vec::new(),
             consumer_c: Vec::new(),
             rationed: 0,
             events: 0,
