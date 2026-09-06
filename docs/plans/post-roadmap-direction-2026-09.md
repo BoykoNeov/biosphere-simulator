@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `q10-form-refused.md`
+**Re-read against the record's last row:** `o2-form-built.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -367,8 +367,23 @@ two, from the paper it cited:
    *constant* floor, so a live Γ* makes it a pointwise claim — a different assertion, not a
    re-tuned one — and at ratios of 12 to 685 it stops discriminating.
 
-   **Needs: a DECISION, not a measurement** (moved to §4's decision list): build both halves
-   or neither, and re-pose the band first. Only `sealed_chamber` can move under the form.
+   ~~**Needs: a DECISION, not a measurement** (moved to §4's decision list): build both halves
+   or neither, and re-pose the band first. Only `sealed_chamber` can move under the form.~~
+
+   ✅ **DECIDED AND BUILT 2026-09-06 — BOTH halves, lab-only** (`log/o2-form-built.md`). The
+   user's call was *"so build both"*, and that answered which halves; the repo's precedent
+   answered the rest, so it took the Q10 form's shape — no unfreeze, loader still
+   `O2Form::Constant`, reachable as `science_switch -- o2form=live_pool`. **Only
+   `sealed_chamber` moved, exactly as this entry predicted**: 71.435803 → **7.294541**, while
+   the two big chambers moved +0.140 % / +0.118 % and the open field is bit-identical *by
+   construction* (it has no O₂ stock). ⚠ The band was **NOT** re-posed — that would be an
+   unfreeze inside a build claiming to unfreeze nothing. The report **refuses** the constant
+   floor for that column instead, printing `n/a` with the reason, because the params object
+   still holds 42.75 and would otherwise have shown 61.071429 for a run that no longer reads
+   it. ⚠ One recorded claim was corrected on the way: the *"denominator saturates — `o2=2`
+   and `o2=0.033` agree to six figures"* line above is true of the **whole-run observable**
+   and not of the leaf rate it names, which moves 4.06e-3. **This item is CLOSED**; adoption
+   is a new decision and nothing waits on it.
 
 ### 2.4 The chamber CO₂ controller — priced, a `dt = ¼` object, and it vents
 
@@ -551,8 +566,9 @@ Three things it leaves this doc, none of them a new task:
 
 **Decisions (the user's; listed apart because listing them as work is how the predecessor
 went stale):** ~~`extinction_coef` (§2.1 item 2)~~ **TAKEN 2026-09-06 — `0.60`, bound and
-shipped, `log/extinction-coef-bound.md`**; **the live-O₂ FvCB form (§2.3.2, NEW
-2026-09-02 — the measurement turned it from a task into a call)**; ~~**the Q10 temperature form
+shipped, `log/extinction-coef-bound.md`**; ~~**the live-O₂ FvCB form (§2.3.2, NEW
+2026-09-02 — the measurement turned it from a task into a call)**~~ **TAKEN 2026-09-06 — BOTH
+halves BUILT, lab-only, `log/o2-form-built.md`; ADOPTION is a new and separate decision**; ~~**the Q10 temperature form
 (§2.3.1, NEW 2026-09-04 — recommendation: refuse as a replacement, keep as an instrument; it
 breaks the biomass cap, collapses the chamber liveness floor, and promotes an uncited
 `vcmax`)**~~ **TAKEN 2026-09-06 — REFUSED as a replacement, kept as an instrument,

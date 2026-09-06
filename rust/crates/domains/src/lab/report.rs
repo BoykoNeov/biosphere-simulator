@@ -62,7 +62,7 @@ use super::mechanism::Composition;
 use super::Substitution;
 use crate::biosphere::drift::year_summaries;
 use crate::biosphere::params::BiosphereParams;
-use crate::biosphere::science::KineticsForm;
+use crate::biosphere::science::{KineticsForm, O2Form};
 use crate::biosphere::readouts::{
     floor_ppm, min_ppm, peak_lai, peak_w, segment_max, try_trajectory_composed, Trajectory,
     TrajectoryError,
@@ -270,6 +270,15 @@ pub enum Change {
     /// **Always applicable**, like [`Change::Values`]: every scenario evaluates the same rate
     /// law, so the form reaches every row of every column. See [`super::biosphere_with_form`].
     Form(KineticsForm),
+    /// An alternative **oxygen form**: the chamber's own O₂ stock instead of the atmospheric
+    /// constant. See [`super::biosphere_with_o2_form`].
+    ///
+    /// ⚠ **NOT always applicable, and unlike [`Change::Mechanism`] it cannot say so per
+    /// row.** The form reads a stock, so a scenario with no O₂ pool keeps the frozen constant
+    /// and its rows come back **bit-identical by construction**. That is a fact about the
+    /// wiring, not a measurement, and it is why `docs/plans/post-roadmap-o2-form.md` §4c makes
+    /// the two big chambers the controls rather than the open field.
+    OxygenForm(O2Form),
 }
 
 /// One measured column of the table.
@@ -302,7 +311,15 @@ pub struct Column {
     ///
     /// ⚠ A column, not a constant: it is `Γ*/ci_ratio`, so a substitution touching
     /// `photosynthesis.yaml` moves the *floor* as well as the readings taken against it.
-    pub floor_ppm: f64,
+    ///
+    /// ⚠⚠ **`None` under [`O2Form::LivePool`], and that is the point.** Under that form
+    /// `Γ*` tracks a live stock, so there is no one number the CO₂ rows are read against —
+    /// the frozen `min > Γ*/ci_ratio` guard becomes a *pointwise* claim, which is a different
+    /// assertion rather than a re-tuned one. The params object still holds 42.75, because the
+    /// substitution happens per step inside the flow, so printing the floor here would show
+    /// **61.071429** and invite a reader to divide by it. An `Option` refuses that instead of
+    /// hiding it — *a number in prose acquires no owner*.
+    pub floor_ppm: Option<f64>,
     /// Arbitration firings summed across the runs. ⚠ A band is a claim about a **well-fed**
     /// run; a rationed column's numbers are not the model's answer, and the report says so
     /// rather than printing them as if they were.
@@ -426,7 +443,12 @@ pub fn measure_composed(
         not_applicable,
         failed,
         constant,
-        floor_ppm: floor_ppm(p),
+        // ⚠ The floor is `Γ*/ci_ratio` at these params, and under the live-O₂ form the
+        // params' `Γ*` is no longer what the run reads. Refused rather than printed stale.
+        floor_ppm: match p.photo.o2_form {
+            O2Form::Constant => Some(floor_ppm(p)),
+            O2Form::LivePool => None,
+        },
         rationed,
         events,
     })
@@ -464,6 +486,12 @@ pub fn compare_changes(variants: &[(String, Change)], long: bool) -> Result<Vec<
             // column and a direct call cannot drift.
             Change::Form(form) => {
                 let p = super::biosphere_with_form(&[], *form).map_err(as_request_error)?;
+                measure(label, &p, long)
+            }
+            // ⚠ Same seam discipline as the temperature form: built through
+            // `biosphere_with_o2_form`, never by poking the field on `frozen`.
+            Change::OxygenForm(form) => {
+                let p = super::biosphere_with_o2_form(&[], *form).map_err(as_request_error)?;
                 measure(label, &p, long)
             }
         });
@@ -591,7 +619,16 @@ pub fn render(columns: &[Column], long: bool) -> String {
         "chamber CO2 compensation point (ppm) — the floor the CO2 rows are read against\n",
     );
     for col in columns {
-        out.push_str(&format!("    {:<38} {:>14.6}\n", col.label, col.floor_ppm));
+        match col.floor_ppm {
+            Some(f) => out.push_str(&format!("    {:<38} {:>14.6}\n", col.label, f)),
+            // ⚠ Not a missing measurement — a refusal. Spelled out in the cell, because a
+            // blank would read as "the same as above" to exactly the reader it must not.
+            None => out.push_str(&format!(
+                "    {:<38} {:>14}  <- Γ* tracks the live O2 stock under this form; the \
+                 constant floor is NOT this column's floor\n",
+                col.label, "n/a"
+            )),
+        }
     }
     out.push('\n');
 

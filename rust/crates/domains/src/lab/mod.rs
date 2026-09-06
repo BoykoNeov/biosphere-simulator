@@ -32,7 +32,7 @@
 //! (`docs/log/canopy-provenance.md`) is still open and still the user's.
 
 use crate::biosphere::params::{self, BiosphereParams};
-use crate::biosphere::science::KineticsForm;
+use crate::biosphere::science::{KineticsForm, O2Form};
 use config::{with_override, ConfigError, ParamFile};
 
 /// The comparison report — §6 of the plan, every requirement earned by a wrong read.
@@ -117,6 +117,32 @@ pub fn biosphere_with_form(
 ) -> Result<BiosphereParams, ConfigError> {
     let mut p = biosphere_with(subs)?;
     p.photo.kinetics = form;
+    Ok(p)
+}
+
+/// The frozen params under an alternative **oxygen** form — [`biosphere_with_form`]'s sibling.
+///
+/// # ⚠ This one is only HALF a switch, and the other half is not here
+///
+/// The temperature form is complete on the params object: both branches are functions of air
+/// temperature, which every scenario already has. The oxygen form is not. Its VALUE is a
+/// **stock**, so setting this field selects the form and supplies nothing —
+/// `CarbonContext::o2_pool_var` reads the amount per step, and a scenario with no O₂ pool
+/// falls through to the frozen constant.
+///
+/// The consequence for reading a report: an `open_season` row under [`O2Form::LivePool`] is
+/// **unchanged by construction**, not measured to be small. See
+/// `docs/plans/post-roadmap-o2-form.md` §4c.
+///
+/// # ⚠ This endorses no form
+///
+/// [`O2Form::Constant`] is the reference and stays the reference.
+pub fn biosphere_with_o2_form(
+    subs: &[Substitution],
+    form: O2Form,
+) -> Result<BiosphereParams, ConfigError> {
+    let mut p = biosphere_with(subs)?;
+    p.photo.o2_form = form;
     Ok(p)
 }
 

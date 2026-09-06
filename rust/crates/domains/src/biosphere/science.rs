@@ -168,6 +168,96 @@ pub fn kinetics_at(
     }
 }
 
+// --- the two OXYGEN forms ---------------------------------------------------
+//
+// Plan: `docs/plans/post-roadmap-o2-form.md`. The frozen tree reads O₂ from a CONSTANT,
+// `photosynthesis.yaml`'s `o2` — the atmosphere's mole fraction. Three frozen scenarios are
+// sealed chambers carrying O₂ as a live STOCK, and one of them (`sealed_chamber`, the jar)
+// ends its golden at 0.033 mmol/mol against that constant 210: a factor of 6329. The other
+// two sit at 210.2 and the constant is right for them to 0.1 %.
+//
+// ⚠ **This is a LAB alternative and endorses nothing.** [`O2Form::Constant`] is the frozen
+// body verbatim, which is the only reason a second form here is not an unfreeze.
+
+/// Millimoles per mole — the unit `photosynthesis.yaml` declares for `o2` and `ko`.
+///
+/// ⚠ Named rather than inlined because it is the ONE place a stock in mol and a param in
+/// mmol/mol meet, and a silent factor of 1000 here would look exactly like a form that does
+/// nothing (or like one that does far too much).
+pub const MMOL_PER_MOL: f64 = 1000.0;
+
+/// A chamber's live O₂ mole fraction in mmol/mol, from the stock and the chamber air.
+///
+/// Negative amounts clamp to zero rather than reversing a sign, the same guard
+/// [`oxygen_limitation_factor`] carries for the same reason.
+pub fn o2_mole_fraction(o2_mol: f64, air_mol: f64) -> f64 {
+    MMOL_PER_MOL * o2_mol.max(0.0) / air_mol
+}
+
+/// Which oxygen a [`PhotosynthesisParams`] is read against.
+///
+/// Not a fitted coefficient and never loaded from a param file — it selects between the
+/// atmosphere's constant and the chamber's own stock over the same frozen numbers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum O2Form {
+    /// The frozen reference: `o2` is the atmospheric constant, everywhere, always.
+    #[default]
+    Constant,
+    /// The sealed chamber's live O₂ stock drives **both** places O₂ enters FvCB — the
+    /// Rubisco denominator `Kc·(1 + O/Ko)` and `Γ* ∝ O`. See [`o2_coupled`].
+    ///
+    /// ⚠ Both halves or neither. Measured 2026-09-02: the denominator alone CUTS the jar's
+    /// headroom above its compensation floor by 43 %, while the pair LOOSENS the same ratio
+    /// tenfold — so the half the gap was originally written about is the dangerous one.
+    LivePool,
+}
+
+/// The frozen params re-read at a live O₂ mole fraction `x_o2` (mmol/mol, [`MMOL_PER_MOL`]).
+///
+/// Both halves of the coupling, as one operation because they are one substitution:
+///
+/// * `o2` becomes `x_o2`, which enters the Rubisco denominator `Kc·(1 + O/Ko)`;
+/// * `Γ*` is scaled by `x_o2 / p.o2`.
+///
+/// ⚠ **The proportionality is a DERIVATION, not a retrieved number.** [D] eq. 6.19 makes
+/// `Γ* = O/(2·τ)` with `τ` a property of Rubisco, so `Γ*(O)/Γ*(O_ref) = O/O_ref` at fixed
+/// temperature. Labelled here for the same reason [`TEH_Q10_GAMMA_STAR`] is: the shelf gives
+/// the relation, not this ratio.
+///
+/// The scaling is relative to the params' OWN `o2` rather than to a literal 210, which is
+/// what makes it unit-agnostic and makes the identity control exact: at `x_o2 == p.o2` the
+/// ratio is `1.0` and every field comes back **bit-identical**.
+///
+/// ⚠ A non-positive `p.o2` would make the ratio meaningless, so the params come back
+/// untouched — a guard against a caller, not a modelling choice (the loader requires `o2`
+/// positive).
+pub fn o2_coupled(p: &PhotosynthesisParams, x_o2: f64) -> PhotosynthesisParams {
+    // ⚠ `is_finite()` first rather than a bare `p.o2 <= 0.0`: the comparison alone is FALSE
+    // for a NaN, so a NaN `o2` would fall through and propagate into `Γ*` — the one input the
+    // whole form is about. Written as `!(p.o2 > 0.0)` at first, which is the same thing and
+    // is what clippy's `neg_cmp_op_on_partial_ord` refuses, so it is spelled out instead.
+    if !p.o2.is_finite() || p.o2 <= 0.0 {
+        return *p;
+    }
+    let ratio = x_o2 / p.o2;
+    let mut q = *p;
+    q.o2 = x_o2;
+    q.gamma_star = p.gamma_star * ratio;
+    q
+}
+
+/// The params `form` reads at a chamber's live O₂, or the frozen ones.
+///
+/// `x_o2` is `None` for a scenario with no O₂ stock — the open field, which breathes the
+/// atmosphere and is therefore **unreachable by this form by construction**. That is a fact
+/// about the wiring and must be reported as such rather than as a small measured effect.
+pub fn oxygen_at(p: &PhotosynthesisParams, x_o2: Option<f64>, form: O2Form) -> PhotosynthesisParams {
+    match (form, x_o2) {
+        (O2Form::LivePool, Some(x)) => o2_coupled(p, x),
+        _ => *p,
+    }
+}
+
 /// Cardinal-temperature response `f_temp(T) ∈ [0, 1]` (piecewise-linear TMPFTB).
 pub fn temperature_factor(temp_c: f64, p: &PhotosynthesisParams) -> f64 {
     if temp_c <= p.t_min || temp_c >= p.t_max {
@@ -715,6 +805,7 @@ mod tests {
             t_opt_hi: 25.0,
             t_max: 40.0,
             kinetics: KineticsForm::Cardinal,
+            o2_form: O2Form::Constant,
         };
         let pheno = params::PhenologyParams {
             t_base: 0.0,
@@ -757,6 +848,7 @@ mod tests {
             t_opt_hi: 25.0,
             t_max: 40.0,
             kinetics: KineticsForm::Cardinal,
+            o2_form: O2Form::Constant,
         };
         let pheno = params::PhenologyParams {
             t_base: 0.0,
@@ -874,6 +966,7 @@ mod tests {
             t_opt_hi: 25.0,
             t_max: 35.0,
             kinetics: KineticsForm::Cardinal,
+            o2_form: O2Form::Constant,
         }
     }
 

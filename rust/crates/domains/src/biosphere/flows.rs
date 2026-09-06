@@ -64,6 +64,13 @@ pub struct CarbonContext {
     pub co2_pool_var: Option<String>,
     pub chamber_air_mol: Option<f64>,
     pub ci_ratio: Option<f64>,
+    /// The chamber's O₂ stock id — the VALUE half of [`O2Form`], which cannot ride the
+    /// params object because it is a stock rather than a constant.
+    ///
+    /// `None` for a scenario with no O₂ pool (the open field), and that scenario is therefore
+    /// **unreachable by the live form by construction**, not merely unmoved by it.
+    /// ⚠ Read with `chamber_air_mol`, so it is all-or-nothing with the sealed triple above.
+    pub o2_pool_var: Option<String>,
 }
 
 impl CarbonContext {
@@ -76,6 +83,30 @@ impl CarbonContext {
                 Ok(science::ci_from_co2_pool(env.get(var)?, air_mol, ci_ratio))
             }
         }
+    }
+
+    /// The FvCB params this step reads, under whichever [`O2Form`] the params carry.
+    ///
+    /// ⚠ Under [`O2Form::Constant`] this returns `self.photo` **unchanged**, so every
+    /// operation downstream is the frozen one and no golden can move. Under
+    /// [`O2Form::LivePool`] it resolves the chamber's own O₂ from the step-entry snapshot —
+    /// the same snapshot the rest of `budget()` reads, so assimilation cannot see a different
+    /// instant from the biomass it is computed against.
+    ///
+    /// ⚠ **A scenario with no O₂ pool falls through to the frozen constant even under
+    /// `LivePool`.** That is right for the open field, which breathes the atmosphere — but it
+    /// means a caller who forgot to wire `o2_pool_var` would get a clean run that reads the
+    /// baseline back, which is the failure `lab::biosphere_with`'s header names. The guard is
+    /// therefore in `tests/o2_form.rs`, which asserts the sealed chamber MOVES: nothing here
+    /// can tell "not wired" from "correctly wired and inert".
+    fn photo_at(&self, snapshot: &State) -> PhotosynthesisParams {
+        let x_o2 = match (&self.o2_pool_var, self.chamber_air_mol) {
+            (Some(var), Some(air_mol)) => {
+                Some(science::o2_mole_fraction(amt(snapshot, var), air_mol))
+            }
+            _ => None,
+        };
+        science::oxygen_at(&self.photo, x_o2, self.photo.o2_form)
     }
 
     /// `(leaf_carbon, Σ(leaf + stem + root))`.
@@ -123,7 +154,7 @@ impl CarbonContext {
             self.ci(env)?,
             env.get(&self.temp_var)?,
             light_path::SECONDS_PER_DAY,
-            &self.photo,
+            &self.photo_at(snapshot),
             &self.canopy,
             self.ground_area,
             self.limitation(snapshot, env)?,
@@ -1642,6 +1673,7 @@ mod tests {
             co2_pool_var: None,
             chamber_air_mol: None,
             ci_ratio: None,
+            o2_pool_var: None,
         }
     }
 
@@ -1651,6 +1683,10 @@ mod tests {
             co2_pool_var: Some("co2_pool".to_string()),
             chamber_air_mol: Some(AIR_MOL),
             ci_ratio: Some(ci_ratio),
+            // ⚠ Wired here as `system.rs` wires it, so a unit test can reach the live O₂
+            // form at all. Inert for every EXISTING test in this module: they all run the
+            // loader's `O2Form::Constant`, under which `photo_at` returns `photo` untouched.
+            o2_pool_var: Some(O2.to_string()),
             ..ctx_open()
         }
     }

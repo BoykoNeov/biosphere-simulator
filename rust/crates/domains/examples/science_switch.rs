@@ -13,8 +13,19 @@
 //!
 //! # ⚠ What is reachable from a command line, and what is not
 //!
-//! Two things: a **knockout** by flow id, and a **temperature form** by name (`form=q10_teh`,
-//! `docs/plans/post-roadmap-temperature-kinetics.md`).
+//! Three things: a **knockout** by flow id, a **temperature form** by name (`form=q10_teh`,
+//! `docs/plans/post-roadmap-temperature-kinetics.md`), and an **oxygen form** by name
+//! (`o2form=live_pool`, `docs/plans/post-roadmap-o2-form.md`).
+//!
+//! ⚠ The two forms are **independent axes** and are spelled by different keywords on purpose.
+//! One selects which temperature response the constants carry; the other selects whether O₂
+//! is the atmosphere's constant or the chamber's stock. Folding them into one `form=` would
+//! make a reader think a column had chosen between them.
+//!
+//! ⚠ `o2form=live_pool` is the one variant here whose applicability is **not** reported per
+//! row. It reads a stock, so `open_season` — which has none — comes back bit-identical BY
+//! CONSTRUCTION rather than measured to be inert, and the compensation-point line prints
+//! `n/a` for it because Γ* is no longer one number. Read that plan's §4c before the table.
 //!
 //! ⚠ This header said until 2026-09-04 that only the knockout was reachable, *"because there
 //! is no second form of any biosphere process in this tree (§2C of the plan, measured)"*. That
@@ -35,7 +46,7 @@
 //! ⚠ **It writes nothing and it takes no decision.** A knockout regenerates evidence about a
 //! mechanism's contribution; it says nothing about whether the mechanism belongs there.
 
-use domains::biosphere::science::KineticsForm;
+use domains::biosphere::science::{KineticsForm, O2Form};
 use domains::lab::mechanism::Composition;
 use domains::lab::report::{compare_changes, render, Change};
 
@@ -43,12 +54,25 @@ use domains::lab::report::{compare_changes, render, Change};
 /// so adding a form cannot leave one of them behind.
 const FORM_NAMES: [&str; 2] = ["cardinal", "q10_teh"];
 
+/// The oxygen-form names, on the same one-roster rule as [`FORM_NAMES`].
+const O2_FORM_NAMES: [&str; 2] = ["constant", "live_pool"];
+
 /// `form=<name>` resolved. `cardinal` is accepted (it reproduces the baseline exactly) so a
 /// reader can SEE the no-op column rather than being told it would be one.
 fn kinetics_form(name: &str) -> Option<KineticsForm> {
     match name {
         "cardinal" => Some(KineticsForm::Cardinal),
         "q10_teh" => Some(KineticsForm::Q10Teh),
+        _ => None,
+    }
+}
+
+/// `o2form=<name>` resolved. `constant` is accepted for [`kinetics_form`]'s reason — a reader
+/// can SEE the no-op column rather than being told it would be one.
+fn oxygen_form(name: &str) -> Option<O2Form> {
+    match name {
+        "constant" => Some(O2Form::Constant),
+        "live_pool" => Some(O2Form::LivePool),
         _ => None,
     }
 }
@@ -64,13 +88,14 @@ fn main() {
     let ids: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if ids.is_empty() {
         eprintln!(
-            "usage: science_switch <flow.id | form=NAME> [more...] [--long]\n\
+            "usage: science_switch <flow.id | form=NAME | o2form=NAME> [more...] [--long]\n\
              \n\
              Runs the frozen biosphere scenarios with each flow knocked out and tabulates the\n\
              quantities the science gates are read off. Writes nothing.\n\
              \n\
              example: science_switch biosphere.root_zone_capture\n\
-             example: science_switch form=q10_teh --long\n\
+             example: science_switch form=q10_teh --long
+\n             example: science_switch o2form=live_pool --long\n\
              \n\
              A flow id absent from a scenario's registry is reported n/a for that scenario's\n\
              rows, not as an error: the four canonical builds do not share a flow set."
@@ -81,19 +106,32 @@ fn main() {
     // ⚠ A `form=` argument that names nothing is REFUSED, never silently read as a flow id:
     // `biosphere.foo` and `form=foo` fail in different places, and a caller who typoed the
     // second would otherwise get a knockout column labelled as a form.
+    // ⚠ `o2form=` is tested FIRST even though the two prefixes are disjoint (`strip_prefix`
+    // anchors at the start, so "o2form=x" never matches "form="). Written in this order so a
+    // reader does not have to verify that to know which branch a spelling takes.
     let variants: Vec<(String, Change)> = ids
         .iter()
-        .map(|arg| match arg.strip_prefix("form=") {
-            Some(name) => match kinetics_form(name) {
-                Some(form) => (format!("form {name}"), Change::Form(form)),
-                None => fail(&format!(
-                    "unknown temperature form {name:?} (have {FORM_NAMES:?})"
-                )),
-            },
-            None => (
+        .map(|arg| {
+            if let Some(name) = arg.strip_prefix("o2form=") {
+                return match oxygen_form(name) {
+                    Some(form) => (format!("o2 form {name}"), Change::OxygenForm(form)),
+                    None => fail(&format!(
+                        "unknown oxygen form {name:?} (have {O2_FORM_NAMES:?})"
+                    )),
+                };
+            }
+            if let Some(name) = arg.strip_prefix("form=") {
+                return match kinetics_form(name) {
+                    Some(form) => (format!("form {name}"), Change::Form(form)),
+                    None => fail(&format!(
+                        "unknown temperature form {name:?} (have {FORM_NAMES:?})"
+                    )),
+                };
+            }
+            (
                 format!("drop {arg}"),
                 Change::Mechanism(Composition::dropping(&[arg.as_str()])),
-            ),
+            )
         })
         .collect();
 

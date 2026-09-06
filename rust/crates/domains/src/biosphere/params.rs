@@ -36,7 +36,7 @@
 //! provenance unfreeze **no test can see**; see the ceremony record in
 //! `docs/biosphere-reference.md`.
 
-use super::science::KineticsForm;
+use super::science::{KineticsForm, O2Form};
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
     ParamFile, YamlValue,
@@ -163,6 +163,19 @@ pub struct PhotosynthesisParams {
     /// them consistent through the one funnel `tests/param_funnel.rs` gates, instead of
     /// through a second assembly body.
     pub kinetics: KineticsForm,
+    /// **Which oxygen the FvCB terms are read against** — not a thirteenth constant, and
+    /// never loaded from the file.
+    ///
+    /// The loader always sets [`O2Form::Constant`], the frozen reference, so the goldens
+    /// cannot see this field exists. `domains::lab` flips it to run the cited alternative
+    /// against the same numbers (`docs/plans/post-roadmap-o2-form.md`).
+    ///
+    /// ⚠ It rides here for [`kinetics`](Self::kinetics)'s reason — three flows hold a
+    /// `CarbonContext` and all three call `budget()`, so a per-flow switch would make a step
+    /// whose growth respiration is computed off frozen assimilation and whose allocation is
+    /// not. But unlike the temperature form it is **only half** of the switch: the VALUE it
+    /// reads is a stock, so `CarbonContext::o2_pool_var` supplies it per step.
+    pub o2_form: O2Form,
 }
 
 /// Maintenance + growth respiration params.
@@ -453,9 +466,11 @@ pub fn photosynthesis_from(text: &str, name: &'static str) -> PhotosynthesisPara
         t_opt_lo,
         t_opt_hi,
         t_max,
-        // The frozen form, always. A file cannot ask for the other one: `kinetics` has no
-        // key in `guarded_map` above, so a YAML that named it would be an unknown field.
+        // The frozen forms, always. A file cannot ask for either alternative: neither
+        // `kinetics` nor `o2_form` has a key in `guarded_map` above, so a YAML that named
+        // one would be an unknown field.
         kinetics: KineticsForm::Cardinal,
+        o2_form: O2Form::Constant,
     }
 }
 

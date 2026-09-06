@@ -334,6 +334,14 @@ fn carbon_context(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Car
         } else {
             None
         },
+        // ⚠ Wired for every sealed build and for no open one, which is what makes the open
+        // field unreachable by `O2Form::LivePool` BY CONSTRUCTION rather than by measurement.
+        // Inert under the frozen `O2Form::Constant`, which is the only form the loader sets.
+        o2_pool_var: if scenario.sealed {
+            Some(O2_POOL.to_string())
+        } else {
+            None
+        },
     }
 }
 
