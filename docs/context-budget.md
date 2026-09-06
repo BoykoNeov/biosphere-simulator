@@ -318,9 +318,20 @@ instead of to the next fortnight. Recorded as a decision, not as precedent.
   the per-line **maximum is 240 B and the longest line already measures 239 B**. So a merged
   line holds two subjects' terms, not five, and the realistic true-merges on the index
   (the four `s5-batch-*`, the two `python-checker-*`, a handful of genuine pairs) buy
-  ~1,300–1,800 B — **four or five days.** ⚠ **The merge remedy and the max-line bound are
-  in direct tension**, and at one byte of headroom that tension is live rather than
-  theoretical. Merging remains legitimate housekeeping; it is not an answer to a ceiling.
+  **629 B — 1.7 days.** ⚠ **The merge remedy and the max-line bound are in direct tension**,
+  and at one byte of headroom that tension is live rather than theoretical.
+
+  > ⚠ **That figure was "~1,300–1,800 B, four or five days" when this section was first
+  > written, and it was an eyeball, not a measurement — in a document whose own rule 4 says
+  > *a number quoted in three places is a number nobody re-measures*, quoted in three
+  > places.** Measured afterwards on the actual index: the four `s5-batch-*` lines are
+  > 691 B and collapse to one 241 B line (saves 450 B); the two `python-checker-*` lines
+  > are 336 B (saves 95 B); the two `stem-only-*` lines are 325 B (saves 84 B). **629 B
+  > total, 3.7 memories, 1.7 days at the measured 367 B/day — between a half and a third of
+  > what was claimed.** The estimate was wrong in the direction that *flattered the option
+  > being refused*, so measuring strengthened the refusal rather than overturning it. That
+  > is luck, not method: the number was load-bearing for a decision and was carried
+  > unmeasured through three documents first. Merging remains legitimate housekeeping; it is not an answer to a ceiling.
   Doing it *now*, with 20 KB of fresh headroom, would be merging to satisfy a count — the
   exact inversion the 2026-08-15 entry above warns against.
 
@@ -377,6 +388,36 @@ the raise was *necessary*, not merely convenient — one ordinary memory line wa
 it and green after, with H showing the untouched index was still green, so G isolates the
 new line and not some other drift. The index was restored byte-exactly (sha-256
 `6494ec66…d024a23b` before and after all eight), and the gate file likewise.
+
+⚠ **One mechanism correction, because this repo distinguishes them.** The new index line
+written for this work item was 253 B and was cut to 239 — but it was caught by a
+hand-written `assert` in the throwaway measuring script that *mirrors* the bound, not by
+the gate, which never saw that line. The bound would have caught it on the next run; it
+did not catch it. *A check that would have fired is not a check that fired.*
+
+##### Which bound binds NEXT — the forward accounting, because "~2 months" is a CEILING claim
+
+⚠ The 2026-08-26 entry did this arithmetic forward ("its bite is in the regime this raise
+creates") and the first pass of *this* entry did not. Measured after the raise landed:
+**20,268 B / 120 index lines / mean 168.90 / longest 239.**
+
+The mean is `total ÷ line count`, so at 120 lines the budget allows 20,400 B — **132 B of
+slack, 1.10 B/line.** Solving forward for `k` further lines of hook length `L`:
+
+| next hooks are… | lines before a bound reddens | which bound |
+|---|---|---|
+| ≤ 169 B (the historical mean) | ~116 | **ceiling** — the ~2 months the raise bought |
+| 200 B | 4 | **mean** |
+| 239 B (both hooks written by *this* work item) | **1** | **mean** |
+
+**So "~2 months of headroom" is true of the ceiling and only holds if hook length returns
+to ~168 B.** This one work item spent 1.1 of the mean's 2.1 B/line slack, because both
+lines it added sit at the max-line bound.
+
+⚠⚠ **If the mean is what goes red next, that is NOT this ceremony firing again, and the
+remedy is the opposite one: TRIM the fattest hooks, pushing detail into the memory files.
+Do not reach for a fifth ceiling raise.** The whole point of keeping three bounds with
+opposing remedies is that the failure message tells you which one you are in; read it.
 
 ##### The "raise both copies" ceremony is retracted — there is only one copy now
 
