@@ -30,6 +30,15 @@ pointwise band's true minimum is ×10.67, not ×685; and §5's concern about `ci
 **the wrong sign**. Two of my own conclusions did not survive the measurement they told me
 they were owed.
 
+⚠ **`6b6129f`'s commit subject — *"the band CANNOT be re-posed into anything that binds on the
+jar"* — is FALSE, refuted by §8a.** It is named here because a commit subject cannot be
+rewritten once pushed, and `git log --oneline` otherwise shows a confident wrong claim whose
+only correction is in the *next* subject. The pointer belongs at the false claim.
+
+⚠ **And §9 is superseded by §10**, which is a third refutation — of the recommendation §9
+itself made. The oxygen pool the station runs on is **regulated to a setpoint**, so §9(a)'s
+"re-charge the scenario" is a no-op a controller undoes. **Read §10 for the courses.**
+
 ---
 
 ## 0. ⚠ HEADLINE — the scope claim adoption was priced under is FALSE, and the correction is
@@ -520,7 +529,11 @@ as reference science.
 
 ---
 
-## 9. RECOMMENDATION — revised after §8, and the question for the user has changed
+## 9. ⚠ SUPERSEDED BY §10 — RECOMMENDATION revised after §8
+
+⚠⚠ **Its recommended course (a) is a NO-OP** — the station's oxygen pool is held at an ECLSS
+setpoint, so re-charging the scenario's initial fill is undone by a controller. Kept verbatim
+as the record of a prescription written against a mechanism I had not identified. Read §10.
 
 **§7's recommendation is withdrawn.** It rested on §4 and §5, both refuted. Two of its three
 courses were built on my own errors and are not the choice any more.
@@ -556,3 +569,90 @@ So the choice is now about **order**, not about whether:
 ⚠ **Whichever is chosen, the pieces adoption itself needs are now known and cheap**: §6's
 ceremony stands with steps 1 and 2 struck (they are done — this section is their result), and
 §4a's hunt for a successor bound is dropped.
+
+---
+
+## 10. The oxygen pool HAS a writer — and §9(a) is a no-op. What the charge actually is.
+
+§8d flagged the identical `biosphere.o2_pool = 8.102000000000007` across a 28-step greenhouse
+run and a 4880-step sealed station as *"a fixed point worth understanding before re-charging
+it."* It is understood now, and understanding it **invalidates §9(a) as written.**
+
+### 10a. It is a regulated setpoint, not an untouched fill
+
+`rust/crates/station/src/sealed.rs:190` and `greenhouse.rs:111` re-point the ECLSS at the
+biosphere's own pool — *"the greenhouse seam: crew breathes the bio O₂"* — so `O2_POOL` has
+three writers: photosynthesis adds to it, crew respiration draws on it, and `O2Makeup`
+regulates it. `O2Makeup` is a proportional controller, `S = k·(o2_setpoint − cabin_o2)`, and
+it is **two-sided** (that reversal is itself inside the station freeze,
+`log/o2-makeup-reversal.md`). Its steady state is `o2_setpoint − consumption/k`, which is why
+both runs sit at the same 8.102 whatever their horizon: they are both at the controller's
+offset, reached early and held.
+
+⚠ **So §9(a) — "set the station's sealed biospheres to ~1995 mol in 9500" — does nothing.**
+The scenario's `chamber_o2_mol0` is an *initial* charge; the regulator pulls it back to its
+setpoint within a few hundred steps and would run in reverse to do it. **Recommending it was
+prescribing against a mechanism I had not identified.** The advisor caught it on exactly that
+ground before it reached the user.
+
+### 10b. What the charge actually is — two coherent conventions that were never reconciled
+
+`eclss.yaml`'s `o2_setpoint` is **10.0 mol**, and `greenhouse_bio_scenario` sets
+`chamber_o2_mol0 = 10.0` to match it. Both are self-consistent. The problem is the *other*
+number in the same scenario:
+
+| quantity | charge | ÷ `chamber_air_mol = 9500` | reads as | realistic? |
+|---|---|---|---|---|
+| CO₂ | 3.796 mol | 3.9958e-4 | **399.6 ppm** | **yes** — a real cabin |
+| O₂ | 10.0 mol | 1.0526e-3 | **1.05 mmol/mol** | **no** — 0.5 % of breathable |
+
+**The CO₂ charge was set against the air inventory; the O₂ charge was set against a controller
+setpoint.** Two different bases, both defensible on their own terms, and **nothing in the tree
+ever divided the oxygen pool by the air** — so the incoherence could not surface. `Ci` has
+been computed from CO₂/air since Phase 2; O₂ was a constant 210 until the form was built.
+**Adoption is the first thing that ever compares them.**
+
+### 10c. ⚠ The param file PREDICTED this, in its own `source:` string
+
+`eclss.yaml`'s `o2_setpoint` carries, and has carried since it was written:
+
+> DESIGN — sizing choice, not a literature value: target cabin O₂ inventory. **PERMANENTLY
+> un-bindable as written** — real systems regulate O₂ **PARTIAL PRESSURE**, never a mole
+> count, so the units themselves foreclose citation (**restating it as a ppO₂ target would be
+> a model change, not a citation edit**). Not calibrated.
+
+That is this finding, written in advance, by whoever wrote the param. What it could not know
+is *when* the mole-count convention would stop being harmless. **Adoption is that moment**:
+the setpoint stops being an isolated inventory target and becomes a number the crop's
+photosynthesis divides by an air volume.
+
+⚠ And the honest fix is the one that string already names — a ppO₂ target, a cabin volume, and
+`n = pV/RT` — which it correctly calls **a model change**. At a 21 kPa ppO₂ in a 101.3 kPa
+cabin, a 9500 mol atmosphere holds ≈ **1995 mol** of O₂, ~200× the current setpoint. That is
+a frozen **station** param moving by two orders of magnitude, which reaches the ECLSS, crew
+and cabin-gas goldens as well as the three sealed assemblies. **It is a bigger unfreeze than
+adoption is**, and it is not something to fold into adoption's ceremony.
+
+### 10d. What this does to the courses
+
+**§9's three courses are replaced.** (a) is a no-op as written; the real (a) is much larger
+than described.
+
+* **(A) Adopt now, and record the oxygen setpoint as a KNOWN, named limitation.** The form is
+  right, the band re-poses (§8a), the controls behave (§8d), the manifest gate catches a
+  half-done job. The 60–75 % move on the station's flagship golden is then frozen with a
+  written statement of what causes it — a cabin oxygen inventory the param file itself calls
+  un-bindable — and the ppO₂ restatement becomes the named successor item. **This is what I
+  now recommend.** It is honest, it is bounded, and it does not hold a correct piece of
+  science hostage to a much larger model change.
+* **(B) Do the ppO₂ restatement first, then adopt.** Scientifically the tidiest order and it
+  keeps the two causes in separate golden diffs. But it is a two-order-of-magnitude move in a
+  frozen station param, touching the ECLSS, crew and cabin-gas contracts, and it needs its own
+  citation work (a ppO₂ requirement) and its own cabin-volume decision. **A much bigger job
+  than the thing it is unblocking**, and adoption would wait on it.
+* **(C) Leave the form in the lab.** Still available, still costs nothing — the form stays
+  reachable as `science_switch -- o2form=live_pool`, exactly as the Q10 form does. Weaker than
+  it looked in §7, because §8a and §8c removed both scientific objections to adopting.
+
+⚠ **What is NOT on the list, and was on §9's:** re-charging `chamber_o2_mol0`. §10a rules it
+out — a controller undoes it.
