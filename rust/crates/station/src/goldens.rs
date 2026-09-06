@@ -4,7 +4,7 @@
 //! module holds the eight runs the assembled station produces and the *whole-census*
 //! roster [`ALL`], which is here rather than in `domains` for the one structural reason
 //! S1 kept running into: **`station` depends on `domains` and not the reverse**, so this
-//! is the lowest crate that can see all nineteen.
+//! is the lowest crate that can see all twenty.
 //!
 //! ⚠ That is the same rule S1 used to put the data in `rust/data/` — *put the thing where
 //! the dependency is*. The alternative (a new workspace crate owning the census) was
@@ -390,16 +390,16 @@ pub const STATION: &[Golden] = &[
     },
 ];
 
-/// **Every golden the reference authors** — the nineteen, across both crates.
+/// **Every golden the reference authors** — the twenty, across both crates.
 ///
 /// ⚠ This is the Rust successor to `tests/golden_platform.RUST_AUTHORED` and
 /// `tests/crossport/regen_goldens_from_rust.RUST_EMITTERS`, which the Python side keeps as
 /// *two* rosters with a gate asserting they name the same files. Here they are one thing:
 /// a name that cannot be spelled without the function beside it, so the duplication the
-/// Python gate exists to police does not arise. The two goldens on disk that are **not**
-/// here are the ones Python authors — `drift_summary.json` (folded Python-side; the fold
-/// moved to Rust in C5 but the artifact did not, for a measured reason) and
-/// `state_snapshot.json` (a hand-authored `sim_io` fixture the reference *reads*).
+/// Python gate exists to police does not arise. ⚠ The exception list is now **one** entry
+/// and not two: `drift_summary.json` joined `domains::goldens::DOMAINS` on 2026-09-06,
+/// leaving only `state_snapshot.json` (a hand-authored `sim_io` fixture the reference
+/// *reads*, so "regenerate it from Rust" would be a round trip).
 pub fn all() -> Vec<&'static Golden> {
     domains::goldens::DOMAINS.iter().chain(STATION).collect()
 }

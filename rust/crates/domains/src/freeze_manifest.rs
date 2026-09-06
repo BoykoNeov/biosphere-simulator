@@ -362,8 +362,11 @@ pub fn dump() {
 // and that is why this move is authority-neutral.** The precedent predates C7 and is in
 // the table below: `scenarios/*/golden_sha256` has read `rust` since slice 4 while
 // *Python* computed the digest, on the ground that the golden is the reference's own
-// output. The same reading applies in reverse now — this program hashes
-// `drift_summary.json`, whose fold Python still authors, without becoming its author.
+// output. The same reading applied in reverse when this was written: the program hashed
+// `drift_summary.json`, whose fold Python still authored, without becoming its author.
+// ⚠ That example expired on 2026-09-06 — `drift_summary.json` is the reference's own
+// output now too — but the RULE it illustrated is the one the paragraph is about and it
+// is unchanged: who runs the digest is not who authored the value.
 //
 // ⚠ **The step is the trap.** `dt_days` is one of the two deliberately anti-derived
 // literals: a manifest that read `BIO_DT` would auto-follow a step change, which is the
@@ -641,8 +644,8 @@ const AUTHORITY: [(&str, &str, &str); 19] = [
     ),
     (
         "scenarios/drift_summary/golden_sha256",
-        "python",
-        "⚠ ONE RUN, TWO AUTHORS. This is drift.py's Python-side fold of the same 15-yr perennial trajectory whose final state Rust authors next door, and the two engines differ by 1 ULP on it. The fold is the artifact, and its correct reference is Python's own output — so the golden axis is not '6 Rust, 1 folded' scenario by scenario.",
+        "rust",
+        "⚠⚠ RE-ANCHORED 2026-09-06, THE LAST `python` KEY IN THIS MANIFEST. It read: 'ONE RUN, TWO AUTHORS. This is drift.py's Python-side fold of the same 15-yr perennial trajectory whose final state Rust authors next door, and the two engines differ by 1 ULP on it. The fold is the artifact, and its correct reference is Python's own output.' Every clause of that was true and the last one stopped being true when the Python engine was deleted (S6): an artifact whose correct reference is a port that no longer exists is not a reference, it is a fossil — and NOTHING could regenerate this golden, so an unfreeze that moved it had no regeneration step. `domains::goldens::drift_summary` is now that step, and the 4 values the two ports disagreed on (<=7 ULP, consumer years 3-4) are the reference's own bytes rather than a tolerated deviation. ⚠ This key is why `_authority` is a per-key block and not a file-level label: it was the one row that dissented, and it dissented for two slices after the flip.",
     ),
     (
         "science_bands/*",

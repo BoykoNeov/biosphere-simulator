@@ -46,7 +46,13 @@
 //! # ⚠ Profile
 //!
 //! Byte-neutral — measured by the Python tool across debug and `--release` for all
-//! nineteen. It is a speed choice only, and it is a large one: `sealed_station_state.json`
+//! nineteen. ⚠ That measurement is a fact about the roster **as it then was**, and the
+//! tool that made it is deleted; `drift_summary.json` (the 20th, 2026-09-06) was never in
+//! it. Re-measured directly for that one on arrival — `emit_drift`'s debug and release
+//! stdout are byte-identical, and both equal the committed file — so the claim now covers
+//! the whole roster again. ⚠ The count is left at nineteen deliberately: it dates the
+//! Python measurement, and rewriting it to twenty would assert a run that never happened.
+//! It is a speed choice only, and it is a large one: `sealed_station_state.json`
 //! is ~1.3 M sub-steps and was measured at 378 s on the stock dev profile against 93 s in
 //! release. Run this tool with `--release`, or narrow it with `--only`.
 

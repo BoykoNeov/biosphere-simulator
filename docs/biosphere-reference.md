@@ -708,8 +708,8 @@ the checker's, per key, is in the table below — read it rather than a summary 
 | `flow_set`, `aux_set` | **Rust** | the union of `type_name()` over the four canonical builds |
 | `forcing.light_path` | **Rust** | its samples; **measured** byte-identical to Python's before re-anchoring, because this key is gated exactly rather than tolerance-bound |
 | `long_horizon_years`, `scenarios.*.years` | **Rust** | the reference tree's horizon constants |
-| `scenarios.*.golden_sha256` | **Rust** (6 of 7) | the golden is the reference's own output |
-| `scenarios.drift_summary.golden_sha256` | **Python** | ⚠ one run, two authors: `drift.py`'s fold of the *same* 15-yr trajectory whose final state Rust authors. The fold is the artifact |
+| `scenarios.*.golden_sha256` | **Rust** (all 7 since 2026-09-06) | the golden is the reference's own output |
+| `scenarios.drift_summary.golden_sha256` | **Rust** | ⚠ the last row that dissented, and it dissented for two slices after the flip. It read *"one run, two authors: `drift.py`'s fold of the same 15-yr trajectory whose final state Rust authors"* — true until S6 deleted the Python engine, after which the artifact's stated reference did not exist and nothing could regenerate the file. `domains::goldens::drift_summary` folds it now; the 4 values the ports disagreed on are the reference's own bytes |
 | `param_files` | **Rust** (since slice C8) | ⚠ the *rules* re-anchored, not the digits: the census is now the set the reference LOADS (a compile-time `include_str!` list) and the digest is `config::provenance`. The 15 values are **author-neutral** — both sides hash the same file the same way — so the ceremony moved none of them |
 | `forcing.weather_fixture` / `weather_sha256` | **Python** | ⚠ the reason changed in slice C9 (2026-08-17) and the old one is now false: the port no longer reads a file *generated from* this fixture — it reads **this fixture**, with a compile-time `include_str!`. It stays Python's because `include_str!` takes a literal, so the reference knows the fixture's **bytes and not its name**; a Rust-authored filename would be a hand-typed duplicate of the include path, a literal dressed as a derivation. The *bytes* half is now cross-checked anyway — see the `weather_sha256` note below |
 | `science_bands`, `liveness_floors` | **Rust** (since slice C4) | ⚠ the *claims* re-anchored, not the values: all 13 `quantity`/`bound`/`source` strings are byte-identical to the Python census's and every verdict was measured identical on both ports first — only the 13 `locus` strings moved. The **key set** is still this manifest's own hand roster (which scenarios get an entry, and which get an explicitly empty list meaning "measured, none"), and a Rust gate naming a scenario outside it **raises** during regeneration rather than being filtered away. ⚠ Two markers did not move here because they are *station* keys: `crew_mission` and `sealed_station` moved in **slice C4b** (2026-08-18) into `rust/crates/station/src/science_gates.rs`, a second table using this same macro — "the reference does not carry their referents" was the reason given and it was already false, `predicted_equilibrium_temperature` and the folds existed |
@@ -796,16 +796,18 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
    unconditionally. (Even an RK4 escalation is a domain-side instantiation choice; there is no
    unfreeze path that edits `simcore/`.)
 3. **Regenerate the affected goldens** and **review the byte diff** — a change there means the
-   trajectory moved, which is the point. ⚠ **Six of this contract's seven goldens are the Rust
-   port's output** since the reference flip, and `drift_summary.json` was the exception —
-   Python's fold. ⚠⚠ **That fold's program was deleted by slice S6, so `drift_summary.json`
-   is now UNREGENERABLE by any path.** Recorded as a gap rather than glossed: slice C5 had
-   already ported the fold kit to `domains::biosphere::drift`, and the reason this one file
-   did not move with it was *measured* — folding the Rust series moves 4 of its 45 values
-   (≤7 ULP), which would have needed tolerance-gating. That blocker was a property of the
-   Python comparator, which no longer exists, so converting `emit_drift` to emit the summary
-   directly is now a smaller job than it was; until someone does it, an unfreeze that moves
-   this golden has no regeneration step.
+   trajectory moved, which is the point. **All seven of this contract's goldens are the
+   reference's own output**, and the tool below produces every one of them.
+
+   ⚠⚠ **That was not true until 2026-09-06, and the gap is worth keeping visible.**
+   `drift_summary.json` was Python's fold; slice S6 deleted the program that folded it, so
+   for ten days this contract had a frozen golden **no path could regenerate** — an
+   unfreeze rule with a missing step, which is a worse failure than a stale value because
+   nothing goes red to say so. The reason it had been left behind was measured (folding the
+   Rust series moved 4 of its 45 values, ≤7 ULP, which would have needed Python
+   tolerance-gating that a provenance gate refused), and that blocker was a property of the
+   comparator S6 deleted. Converting `emit_drift` to emit the summary directly closed it;
+   the 4 values were re-measured unchanged to the digit and are now the reference's bytes.
 
    ⚠⚠ **The blessed path is Rust since 2026-08-27 (slice S6, build item 2).** From `rust/`:
 
@@ -875,6 +877,39 @@ above), so a present-tense sentence naming them — "the golden that moved", "on
 runs where water limits", a golden count of 25 — describes the tree **as it was at that
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
+
+- **2026-09-06 — `drift_summary.json` becomes REGENERABLE, and its 4 tolerated ULPs become
+  reference values (one golden, one golden hash, one `_authority` row; NO science, NO
+  param, NO other golden).** The contract's last Python-authored artifact. The unfreeze
+  discipline above told a reader to "regenerate the affected goldens", and for this one file
+  that instruction had pointed at nothing since 2026-08-27: slice S6 deleted the program that
+  folded it, so the golden's stated reference was a port that no longer existed. **The
+  failure mode is the point — a rule with a missing step goes red nowhere.**
+
+  `domains::goldens::drift_summary` now runs the two 15-yr chamber trajectories and folds
+  them with the kit C5 already ported (`domains::biosphere::drift`); `emit_drift` is a
+  one-line wrapper, like every other emitter. The blocker C5 recorded was real and is gone:
+  it was a *Python provenance gate* (`test_every_diverging_scenario_keeps_a_byte_gated_
+  sibling`) refusing a tolerance entry, and S6 deleted it.
+
+  **Predicted before running, then measured: exactly 4 of the 45 values move**, all in the
+  consumer scenario, ULP 7/1/2/2 and relative deviations 9.955e-16 / 1.493e-16 / 4.389e-16 /
+  2.289e-16 — matching plan §5h's 2026-08-17 figures **to every digit** twenty days later.
+  Both period-class booleans held `false` (Tier-0 exact, no stability-class change) and all
+  15 perennial peaks are byte-identical. That agreement is the control that makes this a
+  statement about the two ports rather than about a new fold: a segmentation error would
+  have moved values, not last bits, and would have moved the perennial too. The cause is
+  unchanged from C5's diagnosis — a 1-ULP transcendental divergence at step 4095 that the
+  contracting attractor damps back to a bit-identical final state, so the per-year peaks are
+  the only artifact that samples the trajectory while the difference is still alive.
+
+  ⚠ **What changed in KIND, not in value:** those four ULPs were a *deviation absorbed by a
+  Tier-2 band*; they are now the golden's own bytes. That is what the reference flip means,
+  and it is why this is an unfreeze rather than a re-anchoring. ⚠ **Out of scope and named
+  rather than fixed:** `rust/data/tiers.json`'s `drift_summary` evidence string still reads
+  `max_rel_dev 0.0` (dated P7.4, measured 9.955e-16 on 2026-08-17). It belongs to the
+  native-port contract, which has its own ceremony — §5h ruled it out of this work and it
+  stays out. Record: `docs/log/drift-summary-regenerable.md`.
 
 - **2026-09-02 — `photosynthesis.{gamma_star, kc, ko, o2}` BOUND TO THEIR SOURCES, and the
   five compensation-point band strings corrected with them (provenance only; one param-file
@@ -1078,7 +1113,9 @@ the top of this doc, which are live claims, are kept current.
   `drift_summary` golden's hash, and the whole `science_bands` / `liveness_floors` census —
   roughly half the file — remain Python's, each with its reason written beside it in the
   manifest itself. *(`param_files` left that list on 2026-08-17; see the C8 entry below.
-  The weather fixture is still on it, but its **reason** was replaced the same day — see C9.)*
+  `science_bands` / `liveness_floors` left it in C4/C4b, and the `drift_summary` hash on
+  2026-09-06 — the last one, and the entry below. The weather fixture is the only member
+  still standing, and its **reason** was replaced on 2026-08-17 — see C9.)*
 
 - **2026-08-17 — `param_files` RE-ANCHORED TO THE REFERENCE (slice C8 of the flip). Not one
   hash moved, and the reason is the finding.** The key's 15 digits are **author-neutral by

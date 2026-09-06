@@ -70,7 +70,7 @@ assuming which side authored it.
 - `godot/` — the front-end (a subdir, so Godot's importer never scans the tree).
 - `scenarios/` — authored **content** (runtime artifacts, never reference). Distinct
   from `rust/data/scenarios/`, which are fixtures / cross-port anchors.
-- `rust/data/golden/` — 21 golden files (19 the reference's own bytes); the **20** in
+- `rust/data/golden/` — 21 golden files (20 the reference's own bytes); the **20** in
   `rust/data/tiers.json` (7 biosphere + 13 station) carry the cross-port
   tier contract.
 

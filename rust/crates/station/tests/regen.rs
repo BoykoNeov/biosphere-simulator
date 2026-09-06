@@ -2,7 +2,7 @@
 //!
 //! # ⚠⚠ What is testable here and what deliberately is not
 //!
-//! The tool's *act* — run nineteen goldens and compare — is minutes of CPU and is already
+//! The tool's *act* — run twenty goldens and compare — is minutes of CPU and is already
 //! gated: `{domains,station}/tests/golden_regression.rs` compares every run against its
 //! committed bytes on every `cargo test`. Duplicating that here would buy nothing and cost
 //! a 1.3 M-sub-step station run per test binary.
@@ -30,7 +30,7 @@ use station::regen::{parse_args, regenerate_in, select, summary, Outcome, Reques
 /// This is the standing form of the check the Python tool ran only on the write path — and
 /// running it against the *committed* bytes is strictly more than the original did, because
 /// the original validated only what it had just produced and the report path validated
-/// nothing at all. Cheap: nineteen file reads, no runs.
+/// nothing at all. Cheap: twenty file reads, no runs.
 #[test]
 fn every_committed_golden_validates_against_its_declared_shape() {
     for golden in all() {
@@ -46,18 +46,25 @@ fn every_committed_golden_validates_against_its_declared_shape() {
     }
 }
 
-/// ⚠⚠ **The one golden that is not a snapshot, named — because it is why the axis exists.**
+/// ⚠⚠ **The goldens that are not snapshots, named — because they are why the axis exists.**
 ///
 /// `sealed_energy_drift_summary.json` is a folded summary with no `version` key. The Python
 /// validator raised on a missing version, so from slice C5 (which moved this golden into the
 /// emitted group) until S6, `--write` would have died part-way through — after rewriting
 /// whichever earlier goldens had moved. Nobody saw it because nobody ran `--write`.
 ///
-/// This pins the classification so a future edit cannot quietly re-declare it a snapshot and
-/// re-create the abort. ⚠ It also pins the *count*: exactly one folded summary, so a second
-/// one arriving is a decision somebody makes rather than a row that slips in.
+/// This pins the classification so a future edit cannot quietly re-declare one a snapshot
+/// and re-create the abort. ⚠ It also pins the *count*, so a new folded summary is a
+/// decision somebody makes rather than a row that slips in.
+///
+/// ⚠⚠ **RE-PINNED 1 → 2 on 2026-09-06, and the gate did its job.** `drift_summary.json`
+/// joined the roster when the reference took over its fold, and this assertion is what said
+/// so — a deliberate second entry, re-pinned with its reason rather than loosened to a
+/// count or a `>= 1`. The two are the same kind of artifact (a hand-serialized fold with no
+/// `version` and no stocks) and they arrive from opposite crates, which is why the order
+/// below is `domains` first: `all()` is `DOMAINS.chain(STATION)`.
 #[test]
-fn exactly_one_golden_is_a_folded_summary_and_it_is_the_drift_one() {
+fn exactly_two_goldens_are_folded_summaries_and_both_are_drift_signatures() {
     let summaries: Vec<&str> = all()
         .iter()
         .filter(|g| g.shape == Shape::FoldedSummary)
@@ -65,7 +72,7 @@ fn exactly_one_golden_is_a_folded_summary_and_it_is_the_drift_one() {
         .collect();
     assert_eq!(
         summaries,
-        vec!["sealed_energy_drift_summary.json"],
+        vec!["drift_summary.json", "sealed_energy_drift_summary.json"],
         "the folded-summary set moved. That set is exactly the goldens that CANNOT be \
          validated by reconstructing an engine state, which is why the shape is declared \
          rather than sniffed — see domains::goldens::Shape."
@@ -173,7 +180,7 @@ fn the_write_flag_is_the_only_thing_that_turns_writing_on() {
 
 /// ⚠ An unknown argument is refused rather than ignored. The dangerous fall-through here is
 /// not the same as the manifest writer's — there is no default target to clobber — but a
-/// mistyped `--only` that silently became a full nineteen-golden `--write` is worse.
+/// mistyped `--only` that silently became a full twenty-golden `--write` is worse.
 #[test]
 fn an_unknown_argument_is_refused() {
     let err = parse(&["--onlyy", "season"]).expect_err("must be refused");
@@ -189,7 +196,7 @@ fn an_unknown_argument_is_refused() {
 #[test]
 fn no_filter_selects_every_reference_authored_golden() {
     assert_eq!(select(None).len(), all().len());
-    assert_eq!(select(None).len(), 19, "the roster moved; see the census gates");
+    assert_eq!(select(None).len(), 20, "the roster moved; see the census gates");
 }
 
 /// A filter narrows, and a filter that matches nothing is not a quiet success.
@@ -225,7 +232,7 @@ fn the_summary_of_a_narrowed_run_names_the_narrowing() {
     );
     assert!(narrowed.contains("NARROWED"), "{narrowed}");
     assert!(
-        narrowed.contains("1 of 19"),
+        narrowed.contains("1 of 20"),
         "the summary must show the selection against the whole roster: {narrowed}"
     );
 
@@ -323,28 +330,33 @@ fn every_frozen_golden_is_one_the_reference_authors() {
         .iter()
         .filter(|f| !authored.contains(&f.as_str()))
         .collect();
+    let empty: Vec<&String> = Vec::new();
     assert_eq!(
-        unauthored,
-        vec![&"drift_summary.json".to_string()],
-        "the set of FROZEN goldens the reference cannot produce moved.\n⚠ Exactly one is \
-         expected and it is a recorded, dated gap: `drift_summary.json` is Python's fold, \
-         left behind by C5 for a reason that has since dissolved (the comparator that made \
-         it a blocker no longer exists) — it is now an unfreeze with its own ceremony, not \
-         a classification. Anything else here is a frozen contract whose values nothing on \
-         the canonical side can regenerate."
+        unauthored, empty,
+        "the set of FROZEN goldens the reference cannot produce moved.\n⚠ It has been \
+         EMPTY since 2026-09-06, when `drift_summary.json` — the last one, Python's fold, \
+         left behind by C5 for a blocker that S6 dissolved — was regenerated from \
+         `domains::goldens::drift_summary`. Anything appearing here is a frozen contract \
+         whose values nothing on the canonical side can regenerate: an unfreeze with no \
+         regeneration step. Author it; do not widen this assertion back."
     );
 }
 
 /// ⚠ The `Numerics` axis is orthogonal to `Shape`, and this says so rather than leaving it
-/// to be inferred: the folded summary is `Transcendental`, so a reader cannot conclude
-/// "summary ⇒ ungated" or the reverse from one example.
+/// to be inferred: **every** folded summary is `Transcendental`, so a reader cannot conclude
+/// "summary ⇒ ungated" or the reverse from the shape alone.
 #[test]
 fn the_shape_axis_is_not_a_restatement_of_the_numerics_axis() {
-    let summary_golden = all()
+    // ⚠ All of them, not the first: with two on the roster since 2026-09-06, `find` would
+    // check one and pass while the other said the opposite.
+    let summaries: Vec<&Golden> = all()
         .into_iter()
-        .find(|g| g.shape == Shape::FoldedSummary)
-        .expect("there is one");
-    assert_eq!(summary_golden.numerics, Numerics::Transcendental);
+        .filter(|g| g.shape == Shape::FoldedSummary)
+        .collect();
+    assert!(!summaries.is_empty(), "the control: there is at least one");
+    for summary_golden in summaries {
+        assert_eq!(summary_golden.numerics, Numerics::Transcendental);
+    }
     let pure_snapshots = all()
         .iter()
         .filter(|g| g.shape == Shape::StateSnapshot && g.numerics == Numerics::PureArithmetic)

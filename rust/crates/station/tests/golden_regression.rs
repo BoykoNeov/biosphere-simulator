@@ -5,7 +5,7 @@
 //!
 //! The census lives here rather than in `domains` for the reason `station::goldens` states:
 //! `station` depends on `domains` and not the reverse, so this is the lowest crate that can
-//! see all nineteen reference-authored goldens at once.
+//! see all twenty reference-authored goldens at once.
 
 use domains::goldens::{committed, committed_goldens, compare, Cost, Golden, Numerics, Verdict};
 use station::goldens::{all, STATION};
@@ -205,21 +205,26 @@ fn ci_still_runs_the_ignored_tests() {
 // The census — the successor to test_golden_provenance.py                      //
 // --------------------------------------------------------------------------- //
 
-/// The two goldens on disk the reference does **not** author, each with the reason.
+/// The one golden on disk the reference does **not** author, with the reason.
 ///
-/// ⚠ The successor to `regen_goldens_from_rust.{PYTHON_FOLDED, NO_RUST_REFERENT}`. Both
-/// entries carry a *measured* reason rather than a category judgement, and the reasons are
-/// carried across verbatim in substance because the classification is what a test cannot
-/// re-derive: a test can check that no emitter produces them, not *why*.
+/// ⚠ The successor to `regen_goldens_from_rust.{PYTHON_FOLDED, NO_RUST_REFERENT}`. The
+/// entry carries a *measured* reason rather than a category judgement, and it is carried
+/// across verbatim in substance because the classification is what a test cannot
+/// re-derive: a test can check that no emitter produces it, not *why*.
+///
+/// ⚠⚠ **This was two entries until 2026-09-06.** `drift_summary.json` sat here because C5
+/// measured that folding the Rust series moves 4 of its 45 values (≤7 ULP, consumer years
+/// 3–4) and Python would then have needed a tolerance-gating entry that
+/// `test_every_diverging_scenario_keeps_a_byte_gated_sibling` refused. S6 deleted that
+/// gate with the rest of the checker, so what the deferral left behind was a **frozen
+/// golden no tool could regenerate**. It is now `domains::goldens::drift_summary` and
+/// those four values are the reference's own bytes.
+///
+/// ⚠ The two reasons were never the same KIND, and the list read as though they were:
+/// the survivor is structural and permanent (an input cannot be regenerated from its own
+/// consumer), the departed one was a dated blocker. An entry here does not mean "cannot
+/// be authored".
 const NOT_REFERENCE_AUTHORED: &[(&str, &str)] = &[
-    (
-        "drift_summary.json",
-        "folded Python-side. C5 ported the fold to Rust (`domains::biosphere::drift`) and \
-         this artifact still did not move: folding the Rust series moves 4 of its 45 \
-         values (<=7 ULP, consumer years 3-4), which would need Python tolerance-gating \
-         and turn `test_every_diverging_scenario_keeps_a_byte_gated_sibling` red. \
-         Deferred to its own ceremony; plan §5h.",
-    ),
     (
         "state_snapshot.json",
         "not a simulation run at all — a hand-authored `sim_io` serialization fixture that \
@@ -316,12 +321,12 @@ fn the_golden_census_counts_are_what_the_prose_says() {
     let authored = all().len();
     assert_eq!(
         (on_disk, authored),
-        (21, 19),
+        (21, 20),
         "the golden census moved: {authored} of {on_disk} are reference-authored, not \
-         19 of 21. That is fine — but the counts are quoted as PROSE in CLAUDE.md \
-         ('21 golden files (19 the reference's own bytes)'), in \
+         20 of 21. That is fine — but the counts are quoted as PROSE in CLAUDE.md \
+         ('21 golden files (20 the reference's own bytes)'), in \
          rust/crates/station/src/goldens.rs and rust/crates/domains/src/goldens.rs \
-         ('the eleven goldens'), and in rust/crates/station/src/regen.rs. Nothing else \
+         ('the twelve goldens' / 'the twenty'), and in rust/crates/station/src/regen.rs. Nothing else \
          checks them. Update those, then this literal, in the same commit. \
          ⚠ Two Python prose sites stood here until 2026-08-27, when S6 build items 2-3 \
          deleted them; this list is the whole set again."

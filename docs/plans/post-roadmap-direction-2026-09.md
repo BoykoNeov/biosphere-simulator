@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `potato-crop-stage-2.md`
+**Re-read against the record's last row:** `drift-summary-regenerable.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -32,10 +32,15 @@ Strike-through is kept when this doc is wrong, per the predecessor's rule.
   `git ls-files '*.py'` is thirteen files, all the PCSE oracle carve-out or its one path.
 - Four freeze contracts hold: biosphere (Euler, `dt = ¼`, 15 param files, 7 scenarios),
   station (13 scenarios, biosphere delegated), native-port tolerance, authoring platform.
-- `cargo test --workspace --no-fail-fast`: **1108 passed on Windows / 1109 on Linux** across
-  64 result lines — the one‑test gap is `regen.rs`'s `#[cfg(not(windows))]` ulp‑only control,
-  by construction; clippy
-  clean; `regen_goldens` **19 of 19, 0 would change** (11 `ulp-only` on Linux — §3.1;
+- `cargo test --workspace --no-fail-fast`: **1134 passed on Windows across 67 result lines**
+  (re-measured 2026-09-06; it read 1108/64 as written 2026-09-02, and the growth is the items
+  landed since, not this one — the drift item renamed and re-pinned tests without adding
+  any). ⚠ **The Linux figure is NOT re-measured**: it stood at 1109, one ahead, because of
+  `regen.rs`'s `#[cfg(not(windows))]` ulp‑only control, which is by construction — but that
+  is arithmetic on a stale total, so treat only the +1 relationship as live, not the number;
+  clippy
+  clean; `regen_goldens` **20 of 20, 0 would change** (re-run 2026-09-06; it was 19 of 19
+  until `drift_summary.json` joined the roster that day) (11 `ulp-only` on Linux — §3.1;
   **0 `ulp-only` on Windows**, which is the platform difference that item predicted and was
   confirmed on the author's box 2026-09-02, not a finding).
 - The last four science items were: the step unfreeze (`dt = 1 → ¼`, the crossing fixed);
@@ -391,6 +396,12 @@ Three things it leaves this doc, none of them a new task:
   `ulp-only`, never rewriting those. ⚠ Still true: the eleven transcendental goldens can
   only be regenerated on Windows/UCRT; an unfreeze that moves one of them from a Linux box
   has no regeneration step there. Record it in the ceremony, do not `--write` around it.
+  ⚠ **The "11 of 19" is a Linux measurement dated 2026-09-02 and the roster is now 20.**
+  `drift_summary.json` is `Transcendental`, so it is a candidate for that set, but **nobody
+  has run it on Linux** — the count is not known to be 11 or 12 and this doc should not
+  guess. What WAS measured on arrival (Windows): its debug and release stdout are
+  byte-identical and both equal the committed file. Re-measure the Linux count the next
+  time anyone is on that platform; until then read "11 of 19" as dated, not as current.
 - **The direction plan rotted four times.** This doc carries the re-read gate (the marker under its title).
   ⚠ It fired for the first time on 2026-09-02, on the o2-coupling item, exactly as designed:
   the row landed, the gate reddened, and the re-read that cleared it is what struck §2.3.2
@@ -420,10 +431,18 @@ Three things it leaves this doc, none of them a new task:
 
 ### 3.2 OPEN
 
-- **`drift_summary.json` is unregenerable by any path** (`biosphere-reference.md`, the
-  unfreeze discipline, step 3). Slice C5 ported the fold; converting `emit_drift` to emit
-  the summary directly is now a small job and the record says so. An unfreeze that moves
-  that golden has no regeneration step until it is done. **Needs: a build.**
+- ~~**`drift_summary.json` is unregenerable by any path**~~ — **CLOSED 2026-09-06,
+  `log/drift-summary-regenerable.md`.** `domains::goldens::drift_summary` folds it;
+  `emit_drift` is a one-line wrapper; the roster is 19→20 so the existing byte compare
+  covers it by iteration; the biosphere manifest's last `python` authority row is now
+  `rust`. **Exactly the 4 of 45 values C5 predicted moved, to every digit, and both
+  period-class booleans held** — and the staleness of those 20-day-old figures was
+  *checked* before they were reused, not assumed. ⚠ What the item was really about, and
+  the half worth carrying: **a rule with a step that cannot be performed goes red
+  nowhere.** Every value gate on that file was green the whole time. ⚠ Still open and
+  deliberately out of scope: `rust/data/tiers.json`'s `drift_summary` evidence string
+  (`max_rel_dev 0.0`, dated P7.4, measured 9.955e-16) — the **native-port** contract, its
+  own ceremony, ruled out of this work by plan §5h when C5 was written.
 - **The memory index is outside the repo.** `repo_gates` reads
   `~/.claude/projects/M--claud-projects-space-station/memory/MEMORY.md` and says loudly
   when it is absent — so on CI and on any box but the author's the ceiling is unchecked,
@@ -490,8 +509,12 @@ Three things it leaves this doc, none of them a new task:
    Table 19 p.100); what is owed is the leaf **population** the page reports, not the
    citation, and the −35 %/+75 % span it was ranked on is against a superseded anchor.
 6. ~~Potato stage 2 (§2.6);~~ **DONE 2026-09-06, `log/potato-crop-stage-2.md`.**
-   `drift_summary` regeneration (§3.2) can go any time and is now the only item left on this
-   "no decision needed" list that is neither blocked nor re-ranked.
+   ~~`drift_summary` regeneration (§3.2)~~ **DONE 2026-09-06,
+   `log/drift-summary-regenerable.md`** — it was the last item on this "no decision needed"
+   list that was neither blocked nor re-ranked, so **the list is now empty**. What remains in
+   §3.2 is the memory-index item (a fact to know, not a defect to fix); everything else on
+   this plan is either a user decision or blocked. ⚠ Read that as *the free work is done*,
+   not as *the plan is finished* — the decisions below are where it goes next.
 
 **Decisions (the user's; listed apart because listing them as work is how the predecessor
 went stale):** `extinction_coef` (§2.1 item 2); **the live-O₂ FvCB form (§2.3.2, NEW

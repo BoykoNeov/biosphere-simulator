@@ -101,7 +101,16 @@ pub enum Numerics {
 /// red, which is the failure mode `#[ignore]` alone cannot see.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cost {
-    /// Under ~4 s. Runs in every `cargo test`.
+    /// Runs in every `cargo test`. ⚠ The **"under ~4 s"** this said until 2026-09-06 was
+    /// stale, and it was already false before the entry that measured it: `cargo test`
+    /// builds unoptimized, and `emit_perennial long` — one of the oldest `Cheap` entries —
+    /// takes **11.7 s** in debug. Measured against `drift_summary` (**17.4 s**, two such
+    /// runs) in the same invocation, so the ratio ~1.5x is the sound half; the box was
+    /// carrying other builds, so treat the seconds as illustration and the pair as the
+    /// claim. The figure arrived WITH the port (S2, 2026-08-19) and was never re-measured
+    /// against a Rust debug run. Corrected rather than reclassified: no gate reads this
+    /// prose, and no entry moved sides. The real boundary is `Expensive`'s ~100 s, which
+    /// IS measured, three ways, right above.
     Cheap,
     /// Minutes. `#[ignore]`d, run by CI with `--ignored`.
     Expensive,
@@ -590,6 +599,146 @@ pub fn thermal() -> String {
     snapshot(&final_state)
 }
 
+/// The 15-yr biosphere **stability signature** — the per-year limit-cycle summaries of
+/// both chamber scenarios, plus each one's period class.
+///
+/// # ⚠⚠ This artifact was Python's until 2026-09-06, and the reason it stayed was a gate
+///
+/// C5 ported `drift.py`'s folds here and converted the *station's* drift emitter to emit
+/// its summary directly, but left this one streaming a raw per-step series for Python to
+/// fold. That was not inertia: folding the Rust series moves **4 of the 45 values** (≤7
+/// ULP, consumer years 3–4 — a 1-ULP transcendental divergence at step 4095 that the
+/// contracting attractor damps back to a bit-identical final state), so Python would have
+/// needed a `PYTHON_DIVERGES` entry, and
+/// `test_every_diverging_scenario_keeps_a_byte_gated_sibling` refused one because
+/// `emit_drift` served exactly one golden. Widening that gate from inside the slice that
+/// needed it widened is the co-adaptation this repo refuses, so authorship was deferred to
+/// its own ceremony (plan §5h).
+///
+/// **S6 deleted the Python checker, and with it that gate.** The blocker dissolved; what
+/// was left was a frozen golden *no tool could regenerate* — an unfreeze with no
+/// regeneration step. This function is that step.
+///
+/// # ⚠ The segmentation period is in STEPS
+///
+/// [`year_summaries`] takes the period in whatever unit the trajectory is indexed by, and
+/// `run_perennial` appends one state per **step**. So the period is [`season_steps`] =
+/// `steps_for(305)` = 1220 at `dt = ¼`, not `SEASON_DAYS` = 305 — Python spelled this
+/// `steps_for(raw["season_days"])` for the same reason. Passing days would silently cut
+/// the 15-yr run into 60 quarter-year segments.
+///
+/// ⚠ The JSON below is a `write!` and not a serializer, so the **sorted** key order
+/// (`indent=2, sort_keys=True` + trailing newline, matching what `sim_io.dumps` wrote) is
+/// an invariant of this function. Note it is *not* the order the fold computes them in.
+pub fn drift_summary() -> String {
+    use crate::biosphere::drift::{is_period_2, year_summaries};
+    use crate::biosphere::stocks::{CONSUMER_CARBON, LEAF_C};
+    use crate::biosphere::{consumer_chamber_scenario, perennial_chamber_scenario, run_perennial};
+    use crate::biosphere::{season_setup, season_steps};
+    use simcore::hexfloat;
+    use std::fmt::Write as _;
+
+    /// Years dropped before the period check — the value the golden was captured with
+    /// (`test_regression_long_horizon._PERIOD_TRANSIENT`), long enough to reach the
+    /// settled tail. ⚠ In YEARS: it indexes the folded 15-element summary vectors, not
+    /// the trajectory.
+    const PERIOD_TRANSIENT: usize = 8;
+    /// `is_period_2`'s branch-gap floor — Python's keyword default, which the golden was
+    /// captured with and which the Rust port takes positionally.
+    const MIN_REL_GAP: f64 = 1e-3;
+
+    let years = LONG_HORIZON_YEARS;
+    let steps = steps_for_years(years);
+    let year = season_steps();
+
+    let perennial = perennial_chamber_scenario();
+    let (p_state, p_integ, p_res) = season_setup(&perennial, years).expect("perennial setup");
+    let mut perennial_leaf: Vec<f64> = Vec::new();
+    let (_final, rationed, events) = run_perennial(
+        &p_integ,
+        p_state,
+        &perennial,
+        &p_res,
+        BIO_DT,
+        steps,
+        year,
+        &mut |s: &State| perennial_leaf.push(s.stocks[LEAF_C].amount),
+    )
+    .expect("run perennial");
+    assert_eq!(rationed, 0, "Tier-0: perennial drift rationed must be 0");
+    assert!(
+        events.is_empty(),
+        "Tier-0: perennial drift events must be empty"
+    );
+
+    let consumer = consumer_chamber_scenario();
+    let (c_state, c_integ, c_res) = season_setup(&consumer, years).expect("consumer setup");
+    let mut consumer_leaf: Vec<f64> = Vec::new();
+    let mut consumer_carbon: Vec<f64> = Vec::new();
+    let (_final, rationed, events) = run_perennial(
+        &c_integ,
+        c_state,
+        &consumer,
+        &c_res,
+        BIO_DT,
+        steps,
+        year,
+        &mut |s: &State| {
+            consumer_leaf.push(s.stocks[LEAF_C].amount);
+            consumer_carbon.push(s.stocks[CONSUMER_CARBON].amount);
+        },
+    )
+    .expect("run consumer");
+    assert_eq!(rationed, 0, "Tier-0: consumer drift rationed must be 0");
+    assert!(
+        events.is_empty(),
+        "Tier-0: consumer drift events must be empty"
+    );
+
+    // ⚠ Two different summary functions over the SAME segmentation: the leaf vectors are
+    // the segment's peak, `consumer_carbon` is the segment's LAST value (the year-end
+    // standing stock). `year_summaries`' segment is `[y*year ..= (y+1)*year]`, inclusive
+    // of the next year's boundary state, so its last element IS Python's `s[(y+1)*year]`.
+    let peak = |series: &[f64]| {
+        year_summaries(series, year, |segment: &[f64]| {
+            segment.iter().fold(f64::NEG_INFINITY, |acc, &v| acc.max(v))
+        })
+    };
+    let p_leaf = peak(&perennial_leaf);
+    let c_leaf = peak(&consumer_leaf);
+    let c_carbon = year_summaries(&consumer_carbon, year, |segment: &[f64]| {
+        *segment.last().expect("a segment is never empty")
+    });
+
+    // ⚠ Classified on the FOLDED per-year vectors, not the raw series: a phase is a year
+    // here, which is what makes `PERIOD_TRANSIENT` a count of years.
+    let p_period_2 = is_period_2(&p_leaf, PERIOD_TRANSIENT, MIN_REL_GAP);
+    let c_period_2 = is_period_2(&c_leaf, PERIOD_TRANSIENT, MIN_REL_GAP);
+
+    let mut out = String::new();
+    let array = |out: &mut String, name: &str, values: &[f64], last: bool| {
+        writeln!(out, "    \"{name}\": [").unwrap();
+        for (i, v) in values.iter().enumerate() {
+            let comma = if i + 1 < values.len() { "," } else { "" };
+            writeln!(out, "      \"{}\"{}", hexfloat::format(*v), comma).unwrap();
+        }
+        writeln!(out, "    ]{}", if last { "" } else { "," }).unwrap();
+    };
+    writeln!(out, "{{").unwrap();
+    writeln!(out, "  \"consumer\": {{").unwrap();
+    array(&mut out, "consumer_carbon", &c_carbon, false);
+    writeln!(out, "    \"is_period_2\": {c_period_2},").unwrap();
+    array(&mut out, "peak_leaf", &c_leaf, true);
+    writeln!(out, "  }},").unwrap();
+    writeln!(out, "  \"horizon_years\": {years},").unwrap();
+    writeln!(out, "  \"perennial\": {{").unwrap();
+    writeln!(out, "    \"is_period_2\": {p_period_2},").unwrap();
+    array(&mut out, "peak_leaf", &p_leaf, true);
+    writeln!(out, "  }}").unwrap();
+    writeln!(out, "}}").unwrap();
+    out
+}
+
 fn perennial_short() -> String {
     perennial_chamber(PERENNIAL_CHAMBER_YEARS)
 }
@@ -603,7 +752,7 @@ fn consumer_long() -> String {
     consumer_chamber(LONG_HORIZON_YEARS)
 }
 
-/// The eleven goldens this crate's reference produces.
+/// The twelve goldens this crate's reference produces.
 ///
 /// ⚠ The `numerics` column mirrors `tests/test_regression_*.py`'s `@windows_golden_only`
 /// placement exactly, which is a measurement rather than a fresh judgement: crew and eclss
@@ -687,6 +836,24 @@ pub const DOMAINS: &[Golden] = &[
         numerics: Numerics::Transcendental,
         cost: Cost::Cheap,
         shape: Shape::StateSnapshot,
+    },
+    Golden {
+        name: "drift_summary.json",
+        run: drift_summary,
+        numerics: Numerics::Transcendental,
+        // Two 15-yr chamber runs, i.e. `perennial_long` + `consumer_long` back to back.
+        // ⚠ `Cheap` by the roster's PRACTICE, not by [`Cost::Cheap`]'s stated "~4 s" — that
+        // figure is stale and was already false before this entry existed. Measured
+        // 2026-09-06 (`cargo test` builds unoptimized, so debug is the number that matters;
+        // min of repeated runs on a contended box): `emit_perennial long`, an existing
+        // `Cheap` entry doing ONE of these two runs, takes **11.7 s**; this one takes
+        // **17.4 s** — 1.5x a sibling already on this side of the line, not a new category.
+        // The control is the point: the "~4 s" arrived WITH the port (S2, 2026-08-19) and
+        // was never re-measured against a Rust debug run, so reclassifying HERE would be
+        // reading one entry's cost as if it set the boundary. See `Cost`'s own header.
+        cost: Cost::Cheap,
+        // The second folded summary, and the first in this crate — see `Shape`.
+        shape: Shape::FoldedSummary,
     },
 ];
 
