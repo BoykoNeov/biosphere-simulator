@@ -29,18 +29,26 @@ So: **this file is the index, plus a pointer table into `docs/log/`.** New work 
 line to the index, one pointer row, and one file in `docs/log/` — and adds nothing to
 `CLAUDE.md`. The paired test fails if a row exists on one side and not the other.
 
-⚠ **One plan doc on disk is deliberately not in the index below:
-`post-roadmap-direction-2026-09.md`** — the *forward-looking* plan, the consolidated re-read
-of the whole open queue written 2026-09-02, so it has no finished work behind it and
-therefore no file in `docs/log/`. Naming it in the index would break the index↔record
-pairing for the right reason and the wrong way, so it is named here instead, and
-`every_plan_doc_is_indexed` (which reads this whole file) is satisfied by this paragraph.
-**When its items are executed they each earn the normal three (index line, pointer row,
-record file), and record files refer to it as *"the September direction plan"* — never by
-filename**, because the plan-doc parity check reads the index *section* on one side and the
-union of the record files on the other, so a record naming it puts it on the record side
-only and turns that check red (found the hard way on 2026-08-13).
-⚠ **Its predecessor, `post-roadmap-direction.md` (2026-08-13), is SUPERSEDED and no longer
+⚠ **TWO plan docs on disk are deliberately not in the index below, and this paragraph is
+what satisfies `every_plan_doc_is_indexed` for both.** They are the *forward-looking* plans:
+they have no finished work behind them and therefore no file in `docs/log/`, and naming one
+in the index would break the index↔record pairing for the right reason and the wrong way.
+
+* **`post-roadmap-direction-3.md` — the LIVE one**, written 2026-09-06. **Record files refer
+  to it as *"the third direction plan"*, never by filename**, because the plan-doc parity
+  check reads the index *section* on one side and the union of the record files on the other,
+  so a record naming it puts it on the record side only and turns that check red (found the
+  hard way on 2026-08-13). When its items are executed they each earn the normal three: index
+  line, pointer row, record file.
+* **`post-roadmap-direction-2026-09.md` — SUPERSEDED 2026-09-06**, bannered in place and kept
+  whole. ⚠ It still needs naming here, which is the opposite of what happened to *its*
+  predecessor below: no record ever filed under it by filename, so unlike
+  `post-roadmap-direction.md` it never acquired an ordinary index row to retire the exemption
+  into. **A doc's exemption is retired with the doc only if something else came to name it —
+  and for this one nothing did.** The trigger for superseding it was measured rather than
+  argued: 30 strike-through spans holding 71.6 % of its bytes.
+
+⚠ **The FIRST plan, `post-roadmap-direction.md` (2026-08-13), is SUPERSEDED and no longer
 needs this paragraph:** the 2026-08-31 margin-pin item filed itself under it, so its index
 row *and* its record name the doc and both parity checks take it as an ordinary indexed
 plan. The exemption that stood here for it had been moot since that day — the paragraph

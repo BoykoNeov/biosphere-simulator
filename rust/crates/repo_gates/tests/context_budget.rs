@@ -333,7 +333,15 @@ fn every_plan_doc_is_indexed() {
 /// ⚠ A filename, deliberately: when the plan is superseded again, the successor takes
 /// this constant and the predecessor keeps its banner. A glob over `post-roadmap-direction*`
 /// would make two live plans look like one.
-const DIRECTION_PLAN: &str = "post-roadmap-direction-2026-09.md";
+/// ⚠ MOVED 2026-09-06, `post-roadmap-direction-2026-09.md` → `post-roadmap-direction-3.md`,
+/// the second supersede this constant has seen. The predecessor keeps its banner and its own
+/// (now inert) marker line, which is why this is a filename and not a glob.
+///
+/// The supersede trigger stopped being a judgement on this pass: the predecessor was measured
+/// at **30 strike-through spans holding 71.6 % of its bytes** before anyone counted, and its
+/// own rule 5 asks only that the struck spans outnumber the live ones. Half the bytes is the
+/// line the successor writes down.
+const DIRECTION_PLAN: &str = "post-roadmap-direction-3.md";
 
 /// The marker line the direction plan carries, followed by the record file it was last
 /// re-read against, in backticks.

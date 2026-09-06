@@ -1,5 +1,16 @@
 # Post-roadmap direction, September 2026 — the open queue, re-read against the tree
 
+⚠⚠ **SUPERSEDED 2026-09-06 by `post-roadmap-direction-3.md` — "the third direction plan".**
+Kept whole as the record of a plan and of every place it went stale; **nothing below is live,**
+including the recommendations and the re-read marker. Its own rule 5 says *"supersede, do not
+strike a fourth time, when the struck spans outnumber the live ones"*, and the trigger was
+measured on the day it fired: **30 complete strike-through spans holding 34,949 B of 48,821 —
+71.6 % of this file** — plus 61 `~~` markers, an odd number, so one strike here was opened and
+never closed. What survives is in the successor's §3 ("closed by measurement — do not
+re-propose these") and §5 (the repeat findings); it was carried across by re-reading, not by
+copying.
+
+
 **Written 2026-09-02 on `b70bacf` plus the FvCB provenance item, superseding
 `post-roadmap-direction.md` (2026-08-13).** Every claim below was checked against the
 tree the day it was written — a grep, a test name, a golden value — not carried over from
