@@ -944,3 +944,192 @@ alone would have given the wrong sign for the other.
 bad oxygen inventory was already costing, with the frozen constant still in place and adoption
 not taken. Had adoption landed first, this 12–25 % soil movement would have been inside the
 60–75 % diff and indistinguishable from the oxygen science.
+
+---
+
+## 13. SLICE 2 — adopting the form, planned against the POST-SLICE-1 tree
+
+**Chosen by the user 2026-09-06: "slice 2 (adopting the live-oxygen form) — do it."** Written
+**before** anything is flipped, for the third time in this document, and for the reason the
+previous two record: the discipline has caught four of my own errors so far (§8a, §8c, §10a,
+§12c/d/f) and every one of them was caught by a number written down before a run.
+
+### 13a. ⚠ §8 IS STALE EVERYWHERE EXCEPT THE JAR — slice 1 removed its headline's cause
+
+§8d's finding was *"the station's Tier-2 golden moves by two thirds."* **That finding is now
+void, and slice 1 is what voided it.** Read straight off the shipped goldens (hex-float
+decoded, `biosphere.o2_pool` ÷ each scenario's own `chamber_air_mol`):
+
+| golden | O₂ at end (mol) | air (mol) | mmol/mol | frozen constant | predicted move |
+|---|---|---|---|---|---|
+| `greenhouse_state` | 1993.102 | 9500 | **209.800** | 210 | ~0.1 % — a **control** now |
+| `harvest_state` | 1993.102 | 9500 | **209.800** | 210 | ~0.1 % — a **control** now |
+| `sealed_station_state` | 1993.102 | 9500 | **209.800** | 210 | ~0.1 % — a **control** now |
+| `perennial_chamber_state` | 210.241 | 1000 | 210.241 | 210 | ~0.1 % (control) |
+| `perennial_long_horizon_state` | 210.241 | 1000 | 210.241 | 210 | ~0.1 % (control) |
+| `consumer_chamber_state` | 420.460 | 2000 | 210.230 | 210 | ~0.1 % (control) |
+| `consumer_long_horizon_state` | 420.462 | 2000 | 210.231 | 210 | ~0.1 % (control) |
+| `lighting_state` | 210.132 | 1000 | 210.132 | 210 | ~0.06 % (control) |
+| `sealed_chamber_state` (the jar) | 0.0331859 | 1000 | **0.033** | 210 | **LARGE — the only one** |
+| `season_euler_state` | no O₂ pool | — | — | — | bit-identical by construction |
+
+⚠ **The 60–75 % was never the oxygen science arriving; it was the crop reading 1.05 mmol/mol
+instead of 210, exactly as §8d said.** Slice 1 moved the setpoint 10 → 1995 mol, so the crop
+now reads 209.8 and the frozen constant is right for the station to **0.1 %**. Adoption's
+whole station-side cost has been paid, in a separate golden diff, by the previous slice.
+
+⚠ **And the charge moved, not only the setpoint** — checked rather than inferred, because
+§8a's own lesson is that a number read at the wrong instant lies. `station/src/scenario.rs:89`
+carries `chamber_o2_mol0: 1995.0`, so these runs **start** at 210.000 mmol/mol and settle to
+209.800 at the controller's offset. There is no early transient in the bad regime for a
+pointwise band to find.
+
+**Consequence: the control count goes from two to five.** §2b's rule stands and now has more
+teeth — *if a control moves past 2 %, the form is wired wrong and adoption stops.*
+
+⚠ **What is NOT stale: the jar.** `sealed_chamber` is a biosphere scenario; slice 1 touched
+`eclss.yaml` and `station/src/scenario.rs` and neither is reachable from it. Its golden reads
+0.0331859, matching §0's table to every digit. **So §8a's jar figures are a validation anchor,
+not stale data**, and the run below must reproduce them:
+
+* season-low chamber CO₂ under `LivePool`: **7.294541 ppm**
+* pointwise minimum ratio: **×10.674948**, at **step 779**, where x_O₂ = **2.349705 mmol/mol**
+
+If the flip does not reproduce those, something other than slice 1 moved and adoption stops
+until it is found. This is §8's own self-validation step, repeated because the tree changed
+underneath it.
+
+### 13b. The design — six edits, in order
+
+1. **`Trajectory` gains `o2_pool`** (`readouts.rs`). The pointwise band needs the series and
+   nothing samples it; §8 added it in a scratch harness that was deleted. Pushed under the
+   same `if let Some(stock)` shape `carbon_pool` uses, so an unsealed run leaves it empty.
+   Three exhaustive struct literals must be updated: `readouts.rs:162`, `readouts.rs:326`,
+   `lab/report.rs:1148`.
+2. **A new fold, `min_compensation_ratio`** (`readouts.rs`), which is the flow's own
+   arithmetic rather than a second copy of it: at each step it computes the chamber's ppm, the
+   step's `x_O₂` through `science::o2_mole_fraction`, and the step's params through
+   `science::oxygen_at(&p.photo, Some(x), p.photo.o2_form)` — **the same function `photo_at`
+   calls** — then divides ppm by `Γ*(t)/ci_ratio`. Under `O2Form::Constant` `oxygen_at`
+   returns the params untouched, so the fold collapses to `min_ppm/floor_ppm` **exactly**.
+   ⚠ It carries `min_ppm`'s vacuity guard *and one more*: an empty carbon series folds to
+   `+∞` and passes; so does an empty oxygen series. Both assert loudly.
+3. **The five band gates re-posed** to the pointwise claim (`science_gates.rs`), with
+   `BANDED_QUANTITY` re-posed with them since the roster tie reads one copy.
+4. **The loader flipped** — `params.rs:473`, `O2Form::Constant` → `O2Form::LivePool`, plus the
+   three doc comments that say the loader always sets `Constant`.
+5. **The pin re-posed** — `margins::PINNED` becomes the five pointwise ratios.
+6. **The two stale-green tests re-posed** (§2f), the `o2_form.rs` identity control inverted
+   (§2c), and two guards added that adoption newly owes (§13e).
+
+### 13c. The bound string, and a weakening it forces
+
+The re-posed bound is
+
+> `min over t of CO₂(t)/(Γ*(t)/ci_ratio) > 1.0`
+
+⚠ **`check_bound_literals` is FILE-scoped, and `1.0` is not a distinctive literal.** The rule
+extracts a decimal from the bound and requires it in executable text anywhere in
+`science_gates.rs` — verified by reading the function, not assumed. `61.07` was distinctive
+enough that only its own tripwire carried it; `1.0` will be satisfied by any line in a
+1200-line file. **So the literal check stops being teeth on this claim.** That is a real,
+recorded loss and it is not repairable inside the bound: the physical threshold *is* one, and
+writing a measured margin into the bound would make the frozen contract a
+second, tighter copy of the pin — the exact thing `margins`' own docstring refuses. **The
+teeth move to `the_five_margins_are_pinned_not_merely_positive`**, which is where the numbers
+already live and which is where an unfreeze report already quotes them.
+
+### 13d. The predicted red set — step B, the bare flip with nothing else re-posed
+
+| what | predicted | why |
+|---|---|---|
+| `sealed_chamber_stays_above_the_compensation_point` | **RED** | 7.294541 vs the constant 61.071429 → ×0.119 |
+| the other four band gates | **green** | 209.8–210.3 mmol/mol, floor moves ≤ 0.15 % |
+| `the_five_margins_are_pinned_not_merely_positive` | **RED**, one row | `sealed_chamber` 1.169709 → 0.119443 (−89.8 %); the other four inside 2 % |
+| `o2_form.rs::the_constant_form_is_the_frozen_run_on_every_measured_quantity` | **RED** | asserts the loader is `Constant` — the tripwire firing as designed |
+| `domains/tests/manifest_writer.rs` | **RED** | 6 of 7 `golden_sha256` move |
+| `station/tests/manifest_writer.rs` | **RED** | greenhouse / harvest / lighting / sealed_station hashes move |
+| `domains/tests/golden_regression.rs`, `station/tests/golden_regression.rs` | **RED** | 10 goldens |
+| `the_floor_is_where_the_frozen_params_put_it` | **green and STALE** | reads the params object, which does not move |
+| `the_shipped_floor_is_the_conservative_one_against_the_cited_route` | **green and STALE** | computes Teh's route from the constant `photo.o2` |
+| `o2_form.rs::the_sealed_chamber_moves_under_the_live_form` | **green, meaning inverted** | now reference vs lab counterfactual |
+| the two station science gates | **green** | crew RQ and the thermal fixed point carry no biosphere carbon |
+
+**Predicted `regen_goldens` report: 20 of 20 run, 10 would change** — the nine `bio=Y` state
+files plus `drift_summary.json`. `sealed_energy_drift_summary.json` unchanged (measured in
+§8b: it folds thermal quantities the biosphere's carbon does not reach); `season_euler_state`
+bit-identical; the 21st golden `state_snapshot.json` not in the set.
+
+**Predicted golden magnitudes** — the part §8d got wrong and slice 1 fixed:
+
+| golden | predicted move | basis |
+|---|---|---|
+| `sealed_chamber` `biosphere.leaf_c` | **−44.8 %** | §8d, and the jar is untouched by slice 1 |
+| `sealed_chamber` `biosphere.o2_pool` | **+363.3 %** | §8d, same reason |
+| `sealed_station` principal carbon stocks | **≤ 0.15 %** | 209.800 vs 210 — *§8d said +60–75 %* |
+| `greenhouse` / `harvest` carbon stocks | **≤ 0.15 %** | same — *§8d said +44–90 %* |
+| the four chamber controls + `lighting` | **≤ 0.15 %** | unchanged from §8d's control rows |
+
+⚠ **That row is the falsifiable one.** If `sealed_station` moves by more than a fraction of a
+percent, then either slice 1 did not do what §12 says it did or the form reaches something
+this analysis has not found — and either way adoption stops.
+
+**Predicted manifest diffs**, stated as line counts because §12f caught this exact
+under-prediction once (7 lines, not 1):
+
+* `docs/biosphere-reference.manifest.json` — **~21 lines**: 6 `golden_sha256` (all but
+  `season_euler_state`) + 5 `bound` + 5 `quantity` + 5 `source`.
+* `docs/station-reference.manifest.json` — **4 lines**: the `golden_sha256` of `greenhouse`,
+  `harvest`, `lighting`, `sealed_station`. No band lives on that side (§2d), plus whatever
+  §13e's station gate adds if it is built.
+
+### 13e. Three things adoption newly owes, that no earlier section names
+
+1. **`open_season` falls through to `Constant` INSIDE the reference.** The `O2Form` switch
+   rides the params object but its *value* is a stock, so a scenario with no O₂ pool reads
+   the frozen constant even under `LivePool`. For an open field breathing the atmosphere that
+   is **correct physics** — and it is byte-for-byte identical to *forgetting to wire the
+   form*. Under `Constant`-as-reference this was invisible; it is now a property of the
+   reference itself. `log/o2-form-built.md`'s recorded lesson — *a half-switch cannot guard
+   itself* — arrives at the reference, so it owes an explicit test (the open field is
+   bit-identical under both forms, **and** that is because it carries no O₂ stock, asserted
+   separately) and a sentence in `docs/biosphere-reference.md`.
+2. **The fold's own identity control.** Under forced `Constant` params,
+   `min_compensation_ratio` must equal `min_ppm/floor_ppm` on all five banded runs. Without
+   it the new fold could be arbitrarily wrong and every gate would still pass, because
+   ×10.67 has no independent witness.
+3. **The station side still has no band** (§2d, §0's other half). Post-slice-1 the cabin sits
+   at 209.800 mmol/mol and the constant is right — **but that is a fact about today's
+   setpoint, not a check.** A station gate asserting the cabin's O₂ mole fraction stays within
+   5 % of the biosphere's frozen `photo.o2` converts it into one, and it is a claim about the
+   *model's internal coherence* (is the constant-O₂ approximation valid where it is used?)
+   rather than new science. **Built in this slice**; if it turns out to need station types the
+   census cannot reach, it is recorded as a named gap instead, never left unmentioned.
+
+### 13f. One decision taken deliberately, not inherited
+
+`lab/report.rs:448–450` returns `floor_ppm: None` under `LivePool`, printing `n/a` with a
+reason. That was right when `LivePool` was the lab alternative. After adoption **every
+reference column prints `n/a`**, including the five scenarios where the constant is right to
+0.1 %, so the reference's own instrument loses a readout it had.
+
+**Kept as `None` anyway, and here is why rather than by inheritance:** the cell is a *refusal*,
+and the refusal is still true — under the adopted form there is no single number the CO₂ rows
+are read against. Printing 61.071429 would be printing a number the reference no longer uses,
+which is the stale-green failure §2f is about, in prose instead of a test. The pointwise
+minimum ratio is the quantity that replaces it, and it is checked in **two** places already
+(the five gates and the pin). Threading it through `Column`, whose `floor_ppm` is one number
+per column while a min ratio is one per scenario **per** column, is a reporting change that
+does not belong in an adoption slice. **Recorded as a named loss with a named successor.**
+
+### 13g. The ceremony, in order
+
+Build A (the fold and its identity control, loader untouched — suite must stay fully green) →
+Build B (flip only; record the actual red set against §13d, changing nothing) → Build C
+(re-pose the band, the pin, the two stale tests, the identity control; add §13e's three
+guards) → Build D (`regen_goldens --write`, regenerate both manifests) → Build E (the
+reference doc's unfreeze entry, `docs/log/`, the memory file, the commit).
+
+⚠ **B is not skippable into C.** A flip that is fixed in the same edit cannot tell "the red
+set is what I predicted" from "the re-posing masked a red I did not predict", and the missing
+red is the failure `tests/o2_form.rs`'s own header names.
