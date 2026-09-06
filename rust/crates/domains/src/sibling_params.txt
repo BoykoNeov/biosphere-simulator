@@ -7,6 +7,18 @@
 # these hex-floats pin the loader-produced bits exactly.
 # Regenerate: uv run python tests/crossport/gen_sibling_params.py
 #
+# ⚠⚠ ONE ROW WAS REMOVED BY HAND, 2026-09-06, and this note is the only reason that is not
+# a violation of the "do not edit" above. `o2_setpoint` was 0x1.4000000000000p+3 (10.0);
+# eclss.yaml's value deliberately moved to 1995.0 when the setpoint was re-derived from a
+# cited cabin atmosphere. The row could not be UPDATED: this table asserts its numbers came
+# from the Python loaders, and Python cannot produce a value it never loaded, so writing the
+# new bits here would make the file lie about its own provenance. It could not be
+# regenerated either — the generator named on the line above was deleted by slice S6 and
+# `tests/crossport/` no longer exists. So the row is RETIRED: `o2_setpoint` keeps its
+# eclss.yaml manifest hash and its goldens as checks, and loses its bit-level control.
+# ⚠ The count assertion in `params.rs` goes 12 -> 11 with it. That is a real, if small,
+# WEAKENING of this control's completeness, and it is called that rather than tidied away.
+#
 # name	hexfloat
 charge_efficiency	0x1.e666666666666p-1
 self_discharge_rate	0x1.5798ee2308c3ap-27
@@ -17,6 +29,5 @@ space_temperature	0x1.599999999999ap+1
 co2_scrub_rate	0x1.0624dd2f1a9fcp-10
 condense_rate	0x1.0624dd2f1a9fcp-11
 o2_makeup_gain	0x1.0624dd2f1a9fcp-9
-o2_setpoint	0x1.4000000000000p+3
 respired_carbon_fraction	0x1.e5e353f7ced91p-1
 insensible_water_fraction	0x1.599999999999ap-1

@@ -29,10 +29,21 @@ So: **this file is the index, plus a pointer table into `docs/log/`.** New work 
 line to the index, one pointer row, and one file in `docs/log/` — and adds nothing to
 `CLAUDE.md`. The paired test fails if a row exists on one side and not the other.
 
-⚠ **THREE plan docs on disk are deliberately not in the index below, and this paragraph is
-what satisfies `every_plan_doc_is_indexed` for all three.** They are the *forward-looking*
-plans: they have no finished work behind them and therefore no file in `docs/log/`, and naming
-one in the index would break the index↔record pairing for the right reason and the wrong way.
+⚠ **TWO plan docs on disk are deliberately not in the index below, and this paragraph is
+what satisfies `every_plan_doc_is_indexed` for both.** They are the *forward-looking* plans:
+they have no finished work behind them and therefore no file in `docs/log/`, and naming one
+in the index would break the index↔record pairing for the right reason and the wrong way.
+
+⚠ **A THIRD exemption stood here for one day and is GONE (2026-09-06), in the commit that
+ended its premise.** It covered `post-roadmap-o2-form-adoption.md`, written that morning as a
+re-posing with nothing built. Slice 1 landed the same day and moved six goldens, a param hash
+and six golden hashes, so the doc took the normal three and the paragraph went with it. ⚠ Its
+own text had anticipated the *other* outcome — it warned that §7's recommended first slice was
+a **measurement**, which moves no frozen byte and would therefore NOT have ended the premise —
+and said to read that carefully on the day rather than applying either rule by reflex. The user
+chose a different course, the premise ended the ordinary way, and the caveat was still worth
+having written: *an exemption's expiry condition is not always the first slice; it is the first
+slice that moves a frozen byte.*
 
 * **`post-roadmap-direction-3.md` — the LIVE one**, written 2026-09-06. **Record files refer
   to it as *"the third direction plan"*, never by filename**, because the plan-doc parity
@@ -47,20 +58,6 @@ one in the index would break the index↔record pairing for the right reason and
   into. **A doc's exemption is retired with the doc only if something else came to name it —
   and for this one nothing did.** The trigger for superseding it was measured rather than
   argued: 30 strike-through spans holding 71.6 % of its bytes.
-* **`post-roadmap-o2-form-adoption.md` — WRITTEN 2026-09-06, nothing built.** ⚠ Its §8 carries
-  a **measurement** taken the same day on a reverted working tree — no frozen byte moved, so
-  the doc is still forward-looking — and that measurement **refuted two of the document's own
-  three findings**, which is the entire argument for committing the prediction before the run.
-  The re-posing
-  the third direction plan's §2.3 names as adoption's precondition (*"adopting means re-posing
-  that band first, in writing, before a run"*), committed **before** the flip precisely so its
-  predicted red set can fail against the measurement instead of being assembled from it. It is
-  a plan and not a record: the loader still selects `O2Form::Constant` and not one frozen byte
-  has moved. ⚠ **This exemption expires when the first slice lands, not when the last one
-  does** — the FOURTH exemption's rule below — and its own §7 recommends the slice that lands
-  first be a *measurement* (the station's three sealed assemblies), which changes no frozen
-  byte and therefore does **not** end the exemption's premise on its own. Read that carefully
-  the day it happens rather than applying either rule by reflex.
 
 ⚠ **The FIRST plan, `post-roadmap-direction.md` (2026-08-13), is SUPERSEDED and no longer
 needs this paragraph:** the 2026-08-31 margin-pin item filed itself under it, so its index
@@ -202,6 +199,7 @@ it was 7.3 KB loaded into *every* session, to index a file most sessions never o
 | **The Q10 temperature form is REFUSED as the reference and KEPT as an instrument** (the decision the kinetics item left owed — and it survives its own headline being withdrawn) | **DECIDED 2026-09-06, the user's call** — refused as a replacement on two grounds only: it breaks the above-ground biomass cap by **27 %** and collapses the chamber liveness floor. `KineticsForm::Q10Teh` stays a lab instrument and the loader still always selects `Cardinal`; **no code, param, golden or manifest key moved.** ⚠ The recommendation's own HEADLINE — *"the band is held by a term measured INERT"* — had been **refuted the next day** by `log/mutual-shading-tolerance.md`, so the call survives the argument that was decorating it | `post-roadmap-temperature-kinetics.md` |
 | **The live-O₂ FvCB form is BUILT, both halves, lab-only** (every prediction held — and the one finding is that a "saturates" claim had been carrying a scope it was never measured at) | **BUILT 2026-09-06, the user's call ("so build both")** — lab-only, the shape the Q10 form took: no unfreeze, no param, golden, manifest key, band or floor. Both halves, because the denominator alone CUTS the jar's headroom 43 % while the pair loosens it tenfold. Every §5 prediction held, including the one written to FAIL: the plan pinned ~7.18 ppm from a GLOBAL substitution before the run and the form landed at **7.294541**, while the perennial floor moved 0.024 % instead of the counterfactual's collapse to 0.417240 — which is what separates a scenario-shaped form from a global one. ⚠ The report now REFUSES the constant compensation floor for that column instead of printing 61.07 stale | `post-roadmap-o2-form.md` |
 | **Table 19's leaf population, RETRIEVED** (the last open question about `specific_leaf_area` — answered by the page refusing the question) | **RETRIEVED 2026-09-06** — the direction plan asked whether the frozen 23.53 m²/kg is the **young**- or the **mature**-leaf value, with a form build owed if it were age-specific. The caption offers neither: the constants *"are average values for the entire canopy"*. ⚠ The source was **on our own shelf** the whole time, so unlike the FvCB page check this was never blocked on a fetch. Two halves the file did not carry: p. 99 says the constant is not a season average either but the canopy average **sampled at ~DVS 0.5**, and p. 98 defines its method as *"dividing the weight of live leaves by the specific leaf weight"* — which is `science::leaf_area_index` verbatim, so **value, population and locus all agree and nothing is owed.** ⚠ The locus check was run BEFORE the page was read, and it is what gives the answer teeth. [B]'s development-keyed alternative (Table 20's `SLT`) applies to **new** leaves, so it is a form build with a new state variable, not a re-reading — and winter wheat's own row **starts at 1.0** and wiggles 0.85–1.5, not the thin→thick ramp the page's prose describes, which removes the *citation-side* argument for the late anchor (the measured 1.37 → 0.96 was a separate harness result, already retired as pre-clamp). One provenance-only unfreeze: one `source:`, one manifest hash, **0 goldens**; the red was observed before regenerating, not asserted | `post-roadmap-sla-leaf-population.md` |
+| **The cabin oxygen setpoint is CITED** (and the number was never inert — six frozen flows had been reading it for four phases while nobody could see it) | **BUILT 2026-09-06 on the user's call** — offered adoption of the live-O₂ FvCB form, the user chose *"fix the setting first"*, so this is **slice 1 of two** and adoption is NOT taken. `eclss.yaml`'s `o2_setpoint` 10.0 → **1995.0 mol**, from BVAD Rev 2 §4.1.1 p. 61 (*"ISS EVA operations originate from 21% oxygen and 101.3 kPa"*) × the cabin's own 9500 mol air. A **station** unfreeze: 6 goldens, 1 param hash, 6 golden hashes. ⚠ Found because adoption's pricing (*"only the jar"*) was measured on the biosphere lab's roster, which **cannot reach a station assembly** — adoption actually moves `sealed_station` by 60–75 %, caused by a cabin charged at **1.05 mmol/mol O₂, half a percent of breathable**. ⚠ The number was **never inert**: six frozen respiration flows had been reading it, holding station soil respiration at f_O2 = 0.895 for four phases against 0.9995 everywhere else. ⚠ The param file **predicted this in its own `source:` string** and was wrong about why — `V` and `T` are constants here, so the "un-bindable" verdict was about a missing derivation, not the model form. ⚠ A bit-identity prediction across the translation **failed at 3.4e-13** (real arithmetic, not `f64`), and a bit-equality control whose generator S6 deleted had to have its row **retired 12 → 11** rather than hand-edited. `post-roadmap-o2-form-adoption.md` |
 
 ## The record
 
@@ -279,3 +277,4 @@ with why the table could not stay: 255,567 bytes in 32 physical lines defeats `G
 | **The Q10 temperature form is REFUSED as the reference and KEPT as an instrument** (the decision the kinetics item left owed — and it survives its own headline being withdrawn) | [the record](log/q10-form-refused.md) |
 | **The live-O₂ FvCB form is BUILT, both halves, lab-only** (every prediction held — and the one finding is that a "saturates" claim had been carrying a scope it was never measured at) | [the record](log/o2-form-built.md) |
 | **Table 19's leaf population, RETRIEVED** (the question had a false dichotomy in it — and our locus turned out to be the book's own) | [the record](log/sla-leaf-population.md) |
+| **The cabin oxygen setpoint is CITED** (and the number was never inert — six frozen flows had been reading it for four phases while nobody could see it) | [the record](log/o2-setpoint-cited.md) |

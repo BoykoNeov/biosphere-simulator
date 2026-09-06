@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `sla-leaf-population.md`
+**Re-read against the record's last row:** `o2-setpoint-cited.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -75,7 +75,34 @@ matter cycles. It is buildable now that the step is `¼`.
   move is a design question about what this simulator is *for*, not a measurement. It is a
   reasonable thing to want; it is not a defect to fix.
 
-### 2.3 DECISION — adopt the live-O₂ FvCB form, or leave it in the lab
+### 2.3 ~~DECISION — adopt the live-O₂ FvCB form, or leave it in the lab~~ — TAKEN, and HALF BUILT
+
+⚠⚠ **DECIDED 2026-09-06 and this section's pricing was FALSE.** The user chose adoption, then —
+shown the measurement — chose **course (B): fix the cabin oxygen setpoint first**. Slice 1 is
+BUILT (`log/o2-setpoint-cited.md`); **adoption itself is still owed.** Three of this section's
+own claims were struck by measurement rather than by argument:
+
+* ⚠ *"only `sealed_chamber` — the jar"* is **FALSE about the tree.** It was measured through the
+  biosphere lab's roster, which cannot reach a station assembly. Adoption moves
+  `sealed_station`'s principal stocks by **60–75 %** — and the cause was a cabin charged at
+  1.05 mmol/mol O₂, not the science.
+* ⚠ *"at the ratios this form produces (12 at charge, 685 at the end) it stops
+  discriminating"* — **the ×685 is at the wrong instant.** The band's true minimum is
+  **×10.674948**, at step 779 of 3661. In a sealed chamber CO₂ and O₂ are anticorrelated
+  (PQ = 1), so the live floor is HIGHEST exactly when CO₂ is lowest: the pointwise band is
+  evaluated at the hardest instant the run contains, automatically.
+* ⚠ *"Adopting means re-posing that band first"* — **discharged.** The re-posing is
+  `post-roadmap-o2-form-adoption.md` §3/§8a, and it holds: the band binds on all five
+  scenarios.
+
+**What remains is slice 2**, and it is unblocked: no scientific objection survived. The
+`ci_ratio` worry raised while re-posing was refuted **on its sign** (a fixed Ci/Ca understates
+Ci at low ambient CO₂, so it is the conservative assumption). ⚠ **Unmeasured prediction:** with
+slice 1 landed, adoption's station move should shrink to the control-sized one it was priced at.
+
+~~The original pricing follows, struck, because its numbers are still the record of what was
+believed:~~
+
 
 **NEW 2026-09-06.** Both halves are built and lab-only (`log/o2-form-built.md`): the loader
 still selects `O2Form::Constant`, and the form is reachable as
@@ -224,6 +251,11 @@ count is the reason it is here rather than in a record nobody re-reads.
    already cited by constant in `science_gates.rs`), and `sla-leaf-population.md` — ranked
    three times across five days without anyone opening the PDF. **Before pricing a retrieval,
    open the shelf.**
+   ⚠ **SIXTH instance, 2026-09-06** (`log/o2-setpoint-cited.md`): the BVAD cabin-atmosphere
+   page was in the same PDF the 2026-07-02 crew-params retrieval had already fetched, with an
+   extract of it still on disk. **The first time the shelf held the NEXT SECTION of a document
+   already cited** — which is a harder case to notice than a missing source, because the
+   document is already in the citation list.
    ⚠ **Do not quote a count for this.** Those records number themselves *"fourth instance"*,
    *"fourth time"*, *"fifth instance"* and *"5th"* in an order that cannot all be right, and
    `fvcb-provenance.md` claims a fifth as well. The pattern is solid and the tally is not —
@@ -231,6 +263,15 @@ count is the reason it is here rather than in a record nobody re-reads.
 2. **A re-read checks the claims it is looking at; the claims it *writes* are checked by
    nothing.** The 2026-09-02 re-read added a brand-new false claim about a harness it had not
    run, in the same pass that was fixing stale claims.
+   ⚠ **THREE more instances on 2026-09-06, all inside one document written to prevent exactly
+   this** (`post-roadmap-o2-form-adoption.md`): a headline built on a ratio read at the wrong
+   instant (§8a); a `ci_ratio` objection whose sign was backwards (§8c); and a recommendation
+   to re-charge a pool that a controller regulates, written four lines after the same document
+   flagged that pool's constancy as *"worth understanding before re-charging it"* (§10a).
+   ⚠ **The sharper form, from the two unpredicted reds in §12d:** *a search that finds an
+   instance of what it is looking for stops looking.* Two `makeup_flux_*` tests were found,
+   correctly reasoned about, and the conclusion written as though it covered the family — the
+   flow-level pair sat one screen further down the same file.
 3. **A number quoted in three places is a number nobody re-measures.** The merge-remedy
    figure was an eyeball carried through three documents while load-bearing for a refusal;
    measured, it was a third to a half of the claim.

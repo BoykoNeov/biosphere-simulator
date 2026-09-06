@@ -822,3 +822,125 @@ that adoption itself produces.
    built on.
 6. `domains/src/params.rs`'s loader tests — **GREEN**: they build synthetic YAML inline and
    never read the committed file.
+
+---
+
+## 12. SLICE 1 MEASURED — the golden prediction was exact, the arithmetic one was not
+
+Run after §11 was committed. Scored against §11f/§11g line by line, including the misses.
+
+### 12a. ✅ The golden set — exact
+
+**Predicted 6 of 20; measured 6 of 20, and the same six**: `eclss_state`, `cabin_gas_state`,
+`water_recovery_state`, `greenhouse_state`, `harvest_state`, `sealed_station_state`. Every
+scenario predicted unchanged was `identical`, including the two drift summaries, `crew_state`,
+`station_state`, `lighting_state`, the four chambers and `season_euler_state`.
+
+### 12b. ✅ The translation — exactly +1985.0, on all three pools
+
+`1995.0 − 10.0 = 1985.0`, and the shift is that number to the last bit:
+
+| golden | stock | before | after | Δ |
+|---|---|---|---|---|
+| `eclss_state` | `eclss.cabin_o2` | 8.0 | 1993.0 | **+1985** |
+| `cabin_gas_state` | `eclss.cabin_o2` | 8.102 | 1993.102 | **+1985** |
+| `water_recovery_state` | `eclss.cabin_o2` | 8.102 | 1993.102 | **+1985** |
+| `greenhouse` / `harvest` / `sealed_station` | `biosphere.o2_pool` | 8.102 | 1993.102 | **+1985** |
+
+And on the three runs with no biosphere writing the pool, **only 2 of 9–10 stocks moved at
+all** — the pool and its boundary source. The controller offset survives verbatim: 1995 − 2.0
+for the standalone (`Con/k = 0.004/2e-3`), 1995 − 1.898 for the crewed cabins.
+
+### 12c. ⚠ MISS — `boundary.o2_supply` is NOT bit-identical, and the reason is arithmetic
+
+§11f predicted it in bold: *"`boundary.o2_supply` and `boundary.co2_removed` are
+BIT-IDENTICAL."* Measured: `co2_removed` is, `o2_supply` is not. It moves by **7.24e-11** on
+the standalone and **6.20e-11** on the two cabins — a **relative** change of 3.4e-13.
+
+**The physics was right and the arithmetic was wrong.** The regulator's dynamics live in
+`e = setpoint − cabin_o2`, and translating both by the same amount leaves `e(t)` invariant —
+*in real arithmetic*. In `f64` it does not: subtracting two numbers near 1995 rounds
+differently from subtracting two numbers near 10, so `e` is preserved only to about 1e-13
+relative, and the supply is `∫k·e dt`. The residual is the signature of that cancellation, and
+its size is the right size for it.
+
+⚠ **Worth keeping because it is a fact about the model, not this edit:** the O₂ regulator is
+now solving for a small deviation on top of a large inventory, where before both were small.
+It is numerically less well-conditioned at 1995 mol than at 10 — harmlessly so at 3e-13, but
+that is the direction, and a future cabin an order of magnitude larger would push it further.
+**A prediction of bit-identity across a translation is a claim about real arithmetic; the
+machine does not make it.**
+
+### 12d. ⚠ MISS — two unpredicted reds, and I checked the thing I was looking at
+
+Predicted red: the goldens, the station manifest gate, and
+`every_value_matches_the_generated_table`. All three fired. **Two more did, unpredicted:**
+
+* **`params::tests::eclss_loader_reads_the_committed_params`** — §11g item 6 said the loader
+  tests *"build synthetic YAML inline and never read the committed file."* True of the others,
+  **false of this one**, which calls `eclss()` and asserts `o2_setpoint == 10.0`. Re-posed to
+  1995.0: it is the right place for the committed value to be pinned, and it fired correctly.
+* **`o2_makeup_adds_toward_setpoint_and_dt_linear`** and **`o2_makeup_idle_at_setpoint`** —
+  flow-level tests that build a state at the old setpoint (`state(8.0, …)` against a literal
+  10.0, and `state(10.0, …)`).
+
+⚠ **How I missed the pair is the same defect as §8a's ×685.** I searched for tests pinning the
+setpoint, found `makeup_flux_is_proportional_to_the_deficit` and `makeup_flux_zero_at_setpoint`
+— which pass their arguments *explicitly* and therefore stay green — reasoned correctly about
+those, and wrote the conclusion as though it covered the family. The flow-level pair sits one
+screen further down the same file. **A search that finds an instance of what it is looking for
+stops looking.** Third time in this document.
+
+⚠ **Both were re-posed rather than re-valued**, and that is a strengthening: they now read
+`HAND.o2_setpoint − deficit` and `HAND.o2_setpoint`, because their claims are *"proportional to
+the deficit"* and *"idle at the setpoint"* — neither is a claim about where the setpoint sits.
+The setpoint's value is pinned once, in the loader test, which is where it belongs. The old
+form pinned two things in one assertion and went red for the wrong one.
+
+### 12e. ✅ The relation pins survived — which is why they are written that way
+
+* `domains/tests/eclss_run.rs` asserts `o2_eq = o2_setpoint − Con/k` and is **green**. A pin on
+  a relation survives a value move; a pin on a value would have been a second red with an
+  argument owed. Predicted green, and green.
+* The station's `crew_mission` science gate is **green**: at steady state the supply flux equals
+  the crew's consumption whatever the setpoint, `rationed == 0` still holds, and 900 steps still
+  converge from the new initial condition — which was the part §11g said to verify rather than
+  reason about.
+* `every_value_matches_the_generated_table` is **green** after the row retirement (§11e).
+
+### 12f. ⚠ MISS — the manifest diff was 7 lines, not 1
+
+§11d predicted the station manifest would move *"the `eclss.yaml` sha-256"*. It moved **seven
+hashes**: that one **plus the `golden_sha256` of all six changed goldens**, which the manifest
+carries per scenario. Benign, internally consistent, and caught only because the ceremony asks
+for the prediction — no `flow_set`, `aux_set`, scenario or science band moved, which is the
+part that would have mattered.
+
+### 12g. The science — plants down as predicted, soil larger than predicted
+
+Direction predicted **DOWN** for biomass, magnitude **single-digit percent**. Plants: correct
+on both. Soil: correct on nothing.
+
+| run | leaf | stem | root | storage | humus C | microbial C | litter C |
+|---|---|---|---|---|---|---|---|
+| `sealed_station` | −0.047 % | −0.047 % | −0.051 % | −0.034 % | −1.20 % | **−12.77 %** | **−12.08 %** |
+| `greenhouse` | −0.335 % | −0.335 % | −0.335 % | — | **+23.94 %** | **+10.86 %** | — |
+| `harvest` | — | — | — | — | **+24.57 %** | **+11.21 %** | — |
+
+**The plants barely notice and the soil moves by a quarter.** That is the right shape: `f_O2`
+throttles *respiration*, and the microbes are the ones respiring — 0.8951 → 0.99952, a 11.7 %
+release of the throttle, which lands almost exactly on the microbial carbon in the two short
+runs (+10.9 %, +11.2 %). The plants lose only the small maintenance-respiration share the same
+factor gates.
+
+⚠ **The two directions are not a contradiction, they are horizon.** `greenhouse` and `harvest`
+are 28-step runs: faster decomposition has built humus and microbial biomass and has not yet
+drawn the litter down. `sealed_station` is 4880 steps: the same faster decomposition has run to
+its consequence, so litter and microbial standing stock are **lower** while humus has been
+processed through. A rate change raises a pool early and lowers it late; reading either horizon
+alone would have given the wrong sign for the other.
+
+⚠ **And this is the whole justification for slice 1 being first.** These numbers are what the
+bad oxygen inventory was already costing, with the frozen constant still in place and adoption
+not taken. Had adoption landed first, this 12–25 % soil movement would have been inside the
+60–75 % diff and indistinguishable from the oxygen science.

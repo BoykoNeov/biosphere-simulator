@@ -69,7 +69,7 @@
       "unit": "mol"
     },
     {
-      "amount": "-0x1.ac00000000044p+7",
+      "amount": "-0x1.abffffffff651p+7",
       "composition": {
         "oxygen": "0x1.0000000000000p+0"
       },
@@ -108,7 +108,7 @@
       "unit": "kg"
     },
     {
-      "amount": "0x1.0000000000004p+3",
+      "amount": "0x1.f240000000004p+10",
       "composition": {
         "oxygen": "0x1.0000000000000p+0"
       },

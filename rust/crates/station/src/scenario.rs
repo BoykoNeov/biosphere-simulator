@@ -52,7 +52,10 @@ pub struct CabinScenario {
 
 /// `CABIN_GAS_SCENARIO`: the crew respiring into / breathing from the ECLSS cabin.
 pub const CABIN_GAS_SCENARIO: CabinScenario = CabinScenario {
-    cabin_o2_0: 10.0,
+    // Starts at `eclss.yaml`'s `o2_setpoint` (1995.0), as it always has. ⚠ This cabin has
+    // NO air inventory — nothing here converts the pool to a concentration — so the number
+    // is the setpoint's, carried for the transient-free start, not a composition of its own.
+    cabin_o2_0: 1995.0,
     cabin_co2_0: 0.0,
     cabin_h2o_0: 0.0,
     food_store0: 1000.0,
@@ -80,7 +83,10 @@ pub const WATER_RECOVERY_STEPS: u64 = CABIN_GAS_STEPS;
 pub fn greenhouse_bio_scenario() -> SeasonScenario {
     SeasonScenario {
         sealed: true,
-        chamber_o2_mol0: 10.0,
+        // 0.21 x 9500 — the cited ISS cabin composition, matching eclss.yaml's
+        // `o2_setpoint` so the regulator starts AT its target and the run has no
+        // start-up transient. The two move together or neither moves.
+        chamber_o2_mol0: 1995.0,
         chamber_co2_mol0: 3.796,
         chamber_air_mol: 9500.0,
         litter_carbon0: 0.0,

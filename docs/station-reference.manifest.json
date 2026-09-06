@@ -114,7 +114,7 @@
   "param_files": {
     "charge.yaml": "e82def3cdf9420921952a5c960eacd636e41b74a7b378a04e3a25d7602e622a2",
     "crew.yaml": "69f6f2ae1defacf137eb796c7042e2648e591eb3d5709e59717a48f13935ac23",
-    "eclss.yaml": "b063c5f41e36ced3cf15c18dbff1ebac46d5b9a47bb794e7e38ebededeb8d095",
+    "eclss.yaml": "7e12f58843b9b3fadceac26d23b9eb60d1f102c050c86b75ccc2c8f278f39415",
     "harvest.yaml": "358ae0150f64cf67f5b83b2357af0f786ee657ab88d1cfbb87866ac1eb08ff05",
     "lamp.yaml": "f4407882cab6cf06ab103a23030cff2d5081af2a86057ef1decf4124145a44eb",
     "radiator.yaml": "56229679bd3d369b08658e8401ff3579355ffb4fda62038f1e2ca7952a15af81",
@@ -125,7 +125,7 @@
   "scenarios": {
     "cabin_gas": {
       "golden": "cabin_gas_state.json",
-      "golden_sha256": "c84998153af31ab070046b90cec77f9cdceb80a8a92d78e64cb90d03041578a7",
+      "golden_sha256": "e57725d7f95437783fbda3dabb48f9fe52f29715cbbecee733544ba67841d182",
       "scenario": "CABIN_GAS_SCENARIO (P6.2 crew\u2194ECLSS)"
     },
     "crew_mission": {
@@ -135,17 +135,17 @@
     },
     "eclss_steady_state": {
       "golden": "eclss_state.json",
-      "golden_sha256": "e69e39074460c2e519a1068da8513c7a168f9f7a2699498c364fe8790ffc898b",
+      "golden_sha256": "1cbe3560358521a65e8a0f109f089f6a8a3941c1878fdf8f70ca6534924b57ac",
       "scenario": "STEADY_STATE_SCENARIO (standalone ECLSS)"
     },
     "greenhouse": {
       "golden": "greenhouse_state.json",
-      "golden_sha256": "07fa2a30578c99142ff96d46b68f14a3df50ff1630e4f7b6631b0151ce57eb58",
+      "golden_sha256": "3756fd430ee05f60b0b8b309c714ce194b097f25a078bcb2da79c93f5a8e888f",
       "scenario": "GREENHOUSE_SCENARIO (P6.3 biosphere\u2194cabin)"
     },
     "harvest": {
       "golden": "harvest_state.json",
-      "golden_sha256": "8fd36696ff0eb320dd81ab858af87b6833534aba57b335e189d45d33c9624f0e",
+      "golden_sha256": "79d517ba5f6762f15766ed90fc537d1a8b1bfb60a0c45456cfb0e23c0d9f9fe2",
       "scenario": "HARVEST_SCENARIO (P6.6 biomass\u2192food)"
     },
     "lighting": {
@@ -170,7 +170,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "9ed1d09dfcc6c0c232a3473504fea8471c4c65c8b54d17f55cb995330a76ce6a",
+      "golden_sha256": "1ad9f47e30dae995f338128c19256562f366a9088b8e3f6c5908e1fec24d6020",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {
@@ -185,7 +185,7 @@
     },
     "water_recovery": {
       "golden": "water_recovery_state.json",
-      "golden_sha256": "37b53c3dadf38ee5e2c6156cd38e408d4757032084b70cfaf59cec73962bf1d8",
+      "golden_sha256": "d7d784d0c6f00eadb22593113f349481ba39b200c486d84252d9536ed1a1de95",
       "scenario": "WATER_RECOVERY_SCENARIO (P6.4 crew water loop)"
     }
   },

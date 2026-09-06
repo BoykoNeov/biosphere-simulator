@@ -25,9 +25,12 @@
 #   balance). The depleting side is the crew O₂ draw (scenario), sized so cabin_o2 never
 #   empties — positivity by well-fed sizing (the LoadDraw discipline), not structural.
 #
-# o2_setpoint — target cabin O₂ inventory the regulator drives toward (mol), > 0. The
-#   analogue of an O₂ partial-pressure setpoint at fixed cabin volume/temperature (a
-#   derived pressure readout is a deferred seam — no standalone flow needs it).
+# o2_setpoint — target cabin O₂ inventory the regulator drives toward (mol), > 0. DERIVED
+#   from a cited cabin atmosphere since 2026-09-06: 0.21 x 9500 mol = 1995.0 (see the value's
+#   own source). It is the analogue of an O₂ partial-pressure setpoint at fixed cabin
+#   volume/temperature — and because V and T ARE constants in this model, that analogy is an
+#   exact proportionality rather than a hand-wave, which is what makes the mole count
+#   citable at all.
 #
 # Emergent (NOT params): the three steady states co2_eq / h2o_eq / o2_eq above are computed
 #   (system.steady_state) from these coefficients + the forced crew rates, never stored —
@@ -57,11 +60,19 @@
 #       our abstraction; real hardware is not characterized that way, so no paper reports
 #       "k_scrub = 1e-3 /s". Same for the CCAA condensing heat exchanger, whose rate is set
 #       by coolant temperature, airflow and dewpoint.
-#     * o2_setpoint is a MOL INVENTORY. Real systems regulate O₂ PARTIAL PRESSURE, never a
-#       mole count, so the UNITS THEMSELVES foreclose citation. (If a bindable setpoint is
-#       ever wanted, the honest path is to restate it as a ppO₂ target, cite a ppO₂
-#       requirement, and derive n = pV/RT from a cabin volume — a model change, not a
-#       citation edit.)
+#     * ⚠ o2_setpoint WAS listed here as permanently un-bindable, on the grounds that a mol
+#       inventory cannot carry a partial-pressure citation. RETIRED 2026-09-06 and the
+#       reasoning was wrong in an instructive way: V and T are CONSTANTS in this model — there
+#       is no volume state and no cabin thermodynamics — so a mole target and a ppO₂ target
+#       differ by a fixed factor, and regulating one IS regulating the other. What was missing
+#       was the derivation, not a model feature. The paragraph predicted its own fix ("derive
+#       n from a cabin volume") and then called it a model change; it needed only Dalton's law
+#       and the cabin's own air inventory, both already in the tree.
+#       ⚠ It was ALSO not harmless while it stood. Six frozen respiration flows throttle by
+#       f_O2 = x/(k + x) on this same pool (respiration.yaml o2_half_saturation = 1e-4), so
+#       the 10 mol inventory against the greenhouse's 9500 mol air held the station's soil
+#       respiration at f_O2 = 0.895 for four phases, where every correctly-charged chamber
+#       sits at 0.9995. An uncited value is not an inert one.
 #
 #   REALITY CHECK on k_scrub (context, not a source — see [C]): the ISS CDRA runs a nominal
 #   144-MINUTE bed-swing cycle (≈ 8 640 s) at 34.7 m³/hr. Our τ ≈ 1 000 s cabin time
@@ -105,6 +116,6 @@ parameters:
     unit: "1/s"
     source: "DESIGN — controller-tuning choice, not a literature value: proportional gain (τ ≈ 500 s) giving cabin O₂ its restoring force. The clearest DESIGN case in the file — a P gain is a property of the controller WE wrote, tuned against OUR plant and OUR dt. [B] supports the control law's form; no source can state our gain. Not calibrated."
   o2_setpoint:
-    value: 10.0
+    value: 1995.0
     unit: "mol"
-    source: "DESIGN — sizing choice, not a literature value: target cabin O₂ inventory. PERMANENTLY un-bindable as written — real systems regulate O₂ PARTIAL PRESSURE, never a mole count, so the units themselves foreclose citation (restating it as a ppO₂ target would be a model change, not a citation edit). Not calibrated."
+    source: "[D] BVAD Rev 2 §4.1.1 p. 61, verbatim: 'ISS EVA operations originate from 21% oxygen and 101.3 kPa (14.7 psia) of pressure'. Taken as the cabin COMPOSITION (a mole fraction of 0.21 for an ideal gas), which is the quantity this model needs — NOT Table 4-1's 'p[O2] for Crew; nominal no impairment' 21.2 kPa, which is a crew physiological requirement and a different quantity. n = 0.21 x 9500 mol = 1995.0, where 9500 mol is the cabin air inventory this tree models (station::scenario::greenhouse_bio_scenario chamber_air_mol, untouched here and NOT independently cited). ⚠ WHICH ATMOSPHERE IS A MODELLING CHOICE, not a lookup: the same page and Table 4-1 give three nominal total pressures (101 / 70.3 / 56.5 kPa) and a 34%-oxygen 57 kPa exploration option (Norcross 2013) for surface habitats; the crop reads the mole fraction, so 34% would give a materially different photosynthetic and microbial response. This habitat is modelled ISS-like and sea-level-equivalent. Cross-check across two loci (a consistency check, not a second derivation): Table 4-1's 21.2 kPa over 101.3 kPa is 20.93%, within 0.4% of 21%. ⚠ TRIGGER — this value silently encodes the ONE cabin air inventory within O2Makeup's reach (9500 mol; the other four ECLSS scenarios carry no air inventory at all). If an ECLSS is ever wired to a cabin whose air is not 9500 mol, this MUST become a mole fraction and the flow MUST read the air. Superseded the 10.0 mol DESIGN sizing choice 2026-09-06."

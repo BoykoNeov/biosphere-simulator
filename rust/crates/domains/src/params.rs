@@ -261,7 +261,12 @@ mod tests {
         let th = thermal();
         let ec = eclss();
         let cr = crew();
-        let pairs: [(&str, f64); 12] = [
+        // ⚠ ELEVEN, not twelve: `o2_setpoint` was retired from the control table on
+        // 2026-09-06 when its value deliberately moved (see `sibling_params.txt`'s own note).
+        // A row whose value moved cannot be updated here without forging a claim about what
+        // Python's loaders produced, and cannot be regenerated because S6 deleted the
+        // generator. It keeps its manifest hash and its goldens; it loses this check.
+        let pairs: [(&str, f64); 11] = [
             ("charge_efficiency", ch.charge_efficiency),
             ("self_discharge_rate", sd.self_discharge_rate),
             ("emissivity", th.emissivity),
@@ -271,7 +276,6 @@ mod tests {
             ("co2_scrub_rate", ec.co2_scrub_rate),
             ("condense_rate", ec.condense_rate),
             ("o2_makeup_gain", ec.o2_makeup_gain),
-            ("o2_setpoint", ec.o2_setpoint),
             ("respired_carbon_fraction", cr.respired_carbon_fraction),
             ("insensible_water_fraction", cr.insensible_water_fraction),
         ];
@@ -287,8 +291,8 @@ mod tests {
         }
         assert_eq!(
             t.len(),
-            12,
-            "the control table still names exactly 12 params"
+            11,
+            "the control table still names exactly 11 params"
         );
     }
 
@@ -663,7 +667,7 @@ mod tests {
         assert_eq!(p.co2_scrub_rate, 1.0e-3);
         assert_eq!(p.condense_rate, 5.0e-4);
         assert_eq!(p.o2_makeup_gain, 2.0e-3);
-        assert_eq!(p.o2_setpoint, 10.0);
+        assert_eq!(p.o2_setpoint, 1995.0);
     }
 
     /// ⚠ **An M-bound site, and the one `bounds_match_the_loaders` never covered at all.**

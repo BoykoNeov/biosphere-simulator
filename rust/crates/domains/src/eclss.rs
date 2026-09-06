@@ -69,7 +69,12 @@ pub struct EclssParams {
 /// ECLSS scenario data (initial cabin inventories, forced crew rates, step).
 #[derive(Debug, Clone, Copy)]
 pub struct EclssScenario {
-    /// Initial cabin O₂ (mol) — starts at the setpoint.
+    /// Initial cabin O₂ (mol) — starts at the setpoint (`eclss.yaml`'s `o2_setpoint`).
+    ///
+    /// ⚠ Every scenario that sets this must move WITH the setpoint. The regulator's dynamics
+    /// live in the deviation `e = setpoint − cabin_o2`, so a matched shift leaves `e(t)` — and
+    /// therefore `boundary.o2_supply` — bit-identical; an unmatched one injects a start-up
+    /// transient that is not the science.
     pub cabin_o2_0: f64,
     /// Initial cabin CO₂ (mol).
     pub cabin_co2_0: f64,
@@ -88,7 +93,7 @@ pub struct EclssScenario {
 /// The standalone validation scenario (`STEADY_STATE_SCENARIO`): a clean cabin under a
 /// constant crew load, each species relaxing to an emergent steady state.
 pub const STEADY_STATE_SCENARIO: EclssScenario = EclssScenario {
-    cabin_o2_0: 10.0,
+    cabin_o2_0: 1995.0,
     cabin_co2_0: 0.0,
     cabin_h2o_0: 0.0,
     o2_consumption_rate: 0.004,
@@ -465,7 +470,7 @@ mod tests {
         co2_scrub_rate: 1.0e-3,
         condense_rate: 5.0e-4,
         o2_makeup_gain: 2.0e-3,
-        o2_setpoint: 10.0,
+        o2_setpoint: 1995.0,
     };
 
     const DT: f64 = 60.0;
@@ -731,10 +736,19 @@ mod tests {
 
     #[test]
     fn o2_makeup_adds_toward_setpoint_and_dt_linear() {
-        // 2 mol below the 10 mol setpoint: the tank gives up what the cabin receives.
-        let s = state(8.0, 3.0, 0.04);
+        // 2 mol below the setpoint: the tank gives up what the cabin receives.
+        //
+        // ⚠ Written against `HAND.o2_setpoint` rather than a literal, and the change is a
+        // RE-POSING to the claim this test actually makes. It was `state(8.0, ...)` against a
+        // literal 10.0, which pinned the DEFICIT and the SETPOINT in one assertion; when the
+        // setpoint moved 10.0 -> 1995.0 (the cited cabin atmosphere, 2026-09-06) it went red
+        // for a reason that has nothing to do with proportionality or dt-linearity. The
+        // setpoint's own value is pinned where it belongs — `params::tests::
+        // eclss_loader_reads_the_committed_params` — and this test is about the deficit.
+        let deficit = 2.0;
+        let s = state(HAND.o2_setpoint - deficit, 3.0, 0.04);
         let l = legs(&makeup(), &s, &crew_forcing(), DT);
-        let expected = HAND.o2_makeup_gain * (10.0 - 8.0) * DT;
+        let expected = HAND.o2_makeup_gain * deficit * DT;
         close(l[O2_SUPPLY], -expected);
         close(l[CABIN_O2], expected);
         assert!(expected > 0.0);
@@ -742,7 +756,9 @@ mod tests {
 
     #[test]
     fn o2_makeup_idle_at_setpoint() {
-        let s = state(10.0, 3.0, 0.04);
+        // ⚠ `HAND.o2_setpoint`, not a literal — same re-posing as the test above: "idle AT the
+        // setpoint" is a claim about the zero of `setpoint − cabin_o2`, wherever that sits.
+        let s = state(HAND.o2_setpoint, 3.0, 0.04);
         for (_, amount) in legs(&makeup(), &s, &crew_forcing(), DT) {
             assert_eq!(amount, 0.0);
         }
