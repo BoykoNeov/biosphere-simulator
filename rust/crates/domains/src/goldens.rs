@@ -845,7 +845,9 @@ pub const DOMAINS: &[Golden] = &[
         // ⚠ `Cheap` by the roster's PRACTICE, not by [`Cost::Cheap`]'s stated "~4 s" — that
         // figure is stale and was already false before this entry existed. Measured
         // 2026-09-06 (`cargo test` builds unoptimized, so debug is the number that matters;
-        // min of repeated runs on a contended box): `emit_perennial long`, an existing
+        // min of repeated runs on a contended box — ⚠ a SEPARATE batch of this same binary
+        // floored at 25.2 s, so the seconds are one batch's floor and the RATIO, measured in
+        // a single invocation, is the durable half): `emit_perennial long`, an existing
         // `Cheap` entry doing ONE of these two runs, takes **11.7 s**; this one takes
         // **17.4 s** — 1.5x a sibling already on this side of the line, not a new category.
         // The control is the point: the "~4 s" arrived WITH the port (S2, 2026-08-19) and
