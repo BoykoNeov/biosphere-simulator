@@ -9,7 +9,7 @@
 //! the scanners are pinned here, on inputs chosen for the two exclusions that are easy to
 //! drop: the `memory/` lookbehind and the word boundary.
 
-use repo_gates::{plan_docs, record_link};
+use repo_gates::{memory_link, plan_docs, record_link};
 
 fn set(items: &[&str]) -> std::collections::BTreeSet<String> {
     items.iter().map(|s| s.to_string()).collect()
@@ -112,4 +112,31 @@ fn record_link_reads_the_pointer_and_rejects_everything_else() {
     assert!(record_link("[the record](log/.md)").is_none());
     // The slug character class is the same one the plan-doc scanner uses.
     assert!(record_link("[the record](log/Ref.md)").is_none());
+}
+
+/// ⚠ Pinned for the reason at the top of this file, which bites the memory parity gate
+/// harder than the others: it is a set comparison **against the disk**, so a scanner that
+/// silently reads fewer index lines shrinks only the indexed side and reports every one of
+/// the files it stopped seeing as UNREACHABLE. That is loud. But the mirror case is silent
+/// — a scanner that read *nothing* would make both differences empty and the gate green,
+/// which is the "inert by construction" failure this file exists to stop. The first two
+/// assertions are that mirror case.
+#[test]
+fn memory_link_reads_the_index_line_and_rejects_everything_else() {
+    assert_eq!(
+        memory_link("- [Soil layers: BUILT](soil-layers-built.md) — the expensive design")
+            .as_deref(),
+        Some("soil-layers-built.md")
+    );
+    // A hook containing its own parentheses must not shorten the match: the link is the
+    // FIRST `](`, and the close is the first `)` after it.
+    assert_eq!(
+        memory_link("- [N-cycle, all four options](nitrogen-cycle-form.md) — (A)+(B) BUILT")
+            .as_deref(),
+        Some("nitrogen-cycle-form.md")
+    );
+    // Not links, not `.md`, and no target at all — each None rather than a partial match.
+    assert!(memory_link("## Direction & posture").is_none());
+    assert!(memory_link("- [Title](notes.txt) — hook").is_none());
+    assert!(memory_link("- plain text with no link").is_none());
 }

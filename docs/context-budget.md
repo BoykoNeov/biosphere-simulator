@@ -110,6 +110,14 @@ does no work at load time loses it.**
 
 `tests/test_context_budget.py`. The assertions:
 
+> ⚠ **That file no longer exists.** S6 deleted the Python checker on 2026-08-27; the gate
+> now lives — solely — in `rust/crates/repo_gates/tests/context_budget.rs`, where it had
+> been mirrored since the reference flip's Stage 3. **Every `tests/test_context_budget.py`
+> below is read as naming that file.** The Python paths are kept rather than rewritten
+> because they are what the record said when it was written, and this document does not
+> edit its own history; see the 2026-09-06 raise for why a deleted copy is a worse kind of
+> stale than a drifted one.
+
 1. `CLAUDE.md` is under a **hard byte ceiling** (`MAX_CLAUDE_MD_BYTES`). Raising it is a
    deliberate, reviewable, git-visible act — not the silent accretion the table above
    documents.
@@ -244,7 +252,9 @@ slack again: padded to 119 lines, the same fat hook reddens it and nothing else,
 same 119-line index without the fat hook is green. **Its bite is in the regime this raise
 creates**, which is the right place for it and is not the same as biting now.
 
-⚠⚠ **THE RAISE HAS TO BE MADE TWICE, AND THE FIRST ATTEMPT ONLY MADE IT ONCE.** This gate
+⚠⚠ **THE RAISE HAS TO BE MADE TWICE, AND THE FIRST ATTEMPT ONLY MADE IT ONCE.**
+**[RETRACTED AS AN INSTRUCTION 2026-09-06 — there is only one copy now; see below. The
+finding it records still stands; the ceremony it prescribes does not.]** This gate
 has **two copies** — `tests/test_context_budget.py` and
 `rust/crates/repo_gates/tests/context_budget.rs`, the mirror the reference flip built. The
 2026-08-26 raise edited the Python one, with its decomposition, its controls and its new
@@ -266,6 +276,121 @@ The 2026-08-15 raise bought "~24 memories of headroom". Those 24 index lines arr
 ~11 days. If the ceremony keeps firing on that period, the finding is no longer "the index
 grew"; it is that a fortnightly raise ritual is the wrong instrument for an index growing
 this fast. Raised on precedent and **flagged**, not decided.
+
+> **The flag was called correctly, to the day.** The next firing came 2026-09-06 — 11 days,
+> for the third time running. See the section below, where it was decided rather than
+> flagged again.
+
+#### It was raised a THIRD time on 2026-09-06 — 20,000 → 40,000 — and this time the CADENCE was the finding
+
+The two raises above each bought ~11 days. This one arrived after ~11 more, at **19,981 B
+over 119 index lines (167.9 B/line) — 19 bytes of headroom**, which is to say the next
+thing the project learned could not be written down. The decomposition against the
+2026-08-26 baseline (15,932 B / 94 lines / 169.5 B/line):
+
+| cause | growth | share |
+|---|---|---|
+| **count** — 94 → 119 index lines at the old 169.5 B/line | +4,237 B | **105 %** |
+| **length** — 169.5 → 167.9 B/line across 119 lines | −190 B | −5 % |
+
+Actual growth +4,049 B. **All count, and the per-line budget improved for the second raise
+running.** That is now three firings, three all-count decompositions, three times with both
+line bounds green.
+
+⚠ **So the finding is about the bound, not about the index: this ceiling has never once
+fired on the failure mode it was built for.** Fat hooks are owned by the per-line budget and
+the per-line maximum, and those have held every single time. What the total has actually
+been measuring, three times over, is **project age** — and answering that fortnightly, 4 KB
+at a time, is the ritual this document itself predicted would become the wrong instrument.
+The prediction named the period (~11 days) and named the owner (the user). Both were right.
+
+**So it was put to the user as the question three raises had been answering without asking:
+how much always-loaded index are you willing to pay for, per session?** With the sizes
+priced — 20 KB ≈ 5k tokens today, ~370 B/day measured — the answer on 2026-09-06 was
+**40,000 B (~10k tokens, ~2 months of headroom at the measured pace)**: sized to a horizon
+instead of to the next fortnight. Recorded as a decision, not as precedent.
+
+##### Two remedies were considered and REFUSED, both with a measurement
+
+- **Merging, the remedy the ceiling's own failure message prescribes, cannot buy its way
+  out of this — and the reason is a bound in this same gate.** A merged line has to carry
+  the distinguishing terms of every memory it absorbs, or recall for those subjects dies;
+  the per-line **maximum is 240 B and the longest line already measures 239 B**. So a merged
+  line holds two subjects' terms, not five, and the realistic true-merges on the index
+  (the four `s5-batch-*`, the two `python-checker-*`, a handful of genuine pairs) buy
+  ~1,300–1,800 B — **four or five days.** ⚠ **The merge remedy and the max-line bound are
+  in direct tension**, and at one byte of headroom that tension is live rather than
+  theoretical. Merging remains legitimate housekeeping; it is not an answer to a ceiling.
+  Doing it *now*, with 20 KB of fresh headroom, would be merging to satisfy a count — the
+  exact inversion the 2026-08-15 entry above warns against.
+
+- **Archiving — one index line per finished thread, the ~31 reference-flip slice files
+  left on disk unindexed — was proposed and refused.** It is not this document's merge; it
+  is this document's headline failure wearing the merge's name. *Deleting an index line is
+  not available*: the lines are the matching surface that decides whether a memory is
+  recalled at all, so an unindexed file is a lost memory, not a saved one. **A relocation
+  is not a discipline**, and an archive that unindexes 31 files is a relocation.
+
+##### The raise owes a bound, and this one is a HOLE, not a new idea
+
+Each raise so far has shipped a new assertion, because a raise widens the regime the
+existing bounds are blind in. This one ships
+`every_memory_index_line_names_a_file_and_vice_versa`, and its provenance is worth stating
+plainly: **it closes a gap the memory side has had since it was written, which the archive
+proposal above is what exposed.**
+
+The ceiling's failure message prescribes *merge two files into one file with one line*.
+That is two deletions — a file and a line — and doing only one of them fails invisibly:
+
+- a file left on disk with **no index line** is unreachable, and it makes the index
+  *smaller*, so **every byte bound in this gate reads the loss as an improvement**;
+- an index line naming a **deleted file** is a dead recall target, spending bytes in every
+  session to point at nothing.
+
+The docs side has held exactly this invariant since rule 4
+(`every_pointer_row_names_a_record_file_and_vice_versa`). The memory side never got it —
+which is precisely why the archive design could be proposed at all: **it would have
+orphaned 31 files and turned every bound in this file green while doing it.** Measured the
+day it shipped: 119 index lines, 119 files, exact parity.
+
+##### Eight controls, each predicted before it was run
+
+The prediction is part of the control here, because at 239/240 and 19 B two bounds were one
+byte apart and "it went red" would have been true for the wrong reason.
+
+| control | predicted | verdict | bound fired |
+|---|---|---|---|
+| A a memory file on disk with no index line | UNREACHABLE | RED | UNREACHABLE |
+| B an index line whose file is gone | DANGLING | RED | DANGLING |
+| C half a merge: index line deleted, file kept | UNREACHABLE | RED | UNREACHABLE |
+| D one 241 B hook appended | MAXLINE **alone** | RED | MAXLINE |
+| E one ordinary 168 B memory line | green | GREEN | — |
+| F byte-exact revert of the index | green | GREEN | — |
+| G control E's line against the **old 20,000 B** ceiling | RED / CEILING | RED | CEILING |
+| H index untouched against the **old 20,000 B** ceiling | green (19 B spare) | GREEN | — |
+
+Two of those are load-bearing beyond the new bound. **D fires the max-line bound and
+nothing else** — the 2026-08-26 entry above predicted its bite would arrive "in the regime
+this raise creates", and this raise created it: at 20,000 B the same hook reddened the
+ceiling too. And **G is the counterfactual made a measurement rather than an assertion**:
+the raise was *necessary*, not merely convenient — one ordinary memory line was red before
+it and green after, with H showing the untouched index was still green, so G isolates the
+new line and not some other drift. The index was restored byte-exactly (sha-256
+`6494ec66…d024a23b` before and after all eight), and the gate file likewise.
+
+##### The "raise both copies" ceremony is retracted — there is only one copy now
+
+⚠⚠ The 2026-08-26 entry ends "when this gate is raised again, **raise both, and control
+them side by side**". **Do not: `tests/test_context_budget.py` was deleted by S6 on
+2026-08-27**, and `rust/crates/repo_gates/tests/context_budget.rs` is the whole gate.
+
+The lesson survives its instructions going stale, one turn further along. *A rule with two
+copies has one that is stale* — and when the stale copy is **deleted** rather than drifted,
+the staleness lands in the **ceremony** rather than in a number, where **nothing goes red on
+it**. A wrong constant went red on the next workspace run; a ceremony naming a deleted file
+would have been followed, found impossible, and improvised around, and this document is the
+only thing that catches that. `CLAUDE.md` was pointing at the same deleted file and was
+corrected in the same commit.
 
 ### What the gate deliberately does NOT check
 

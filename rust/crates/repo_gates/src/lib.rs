@@ -171,6 +171,35 @@ pub fn record_link(row: &str) -> Option<String> {
     Some(name.to_string())
 }
 
+/// The memory FILES themselves — `*.md` beside the index, excluding the index.
+///
+/// `None` on exactly the same terms as [`memory_index`]: the caller decides what an
+/// absent directory means, because on CI there is no user profile at all.
+pub fn memory_files() -> Option<Vec<String>> {
+    let dir = memory_index()?.parent()?.to_path_buf();
+    let entries = std::fs::read_dir(&dir).ok()?;
+    let mut names: Vec<String> = entries
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|x| x == "md"))
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|n| n != "MEMORY.md")
+        .collect();
+    names.sort();
+    Some(names)
+}
+
+/// The memory file an index line names: `- [Title](some-name.md) — hook`.
+///
+/// `None` for any line that is not an index row, so the caller can filter with it.
+pub fn memory_link(row: &str) -> Option<String> {
+    let start = row.find("](")? + 2;
+    let rest = &row[start..];
+    let close = rest.find(')')?;
+    let name = &rest[..close];
+    name.strip_suffix(".md")?;
+    Some(name.to_string())
+}
+
 /// The user's memory index, which lives in the profile rather than the repo.
 ///
 /// `None` when the home directory is not discoverable; the caller decides what an absent

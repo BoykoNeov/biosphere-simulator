@@ -28,8 +28,8 @@
 use std::collections::BTreeSet;
 
 use repo_gates::{
-    data_rows, log_sections, memory_index, normalised_bytes, plan_docs, read_normalised,
-    record_files, record_link, repo_root,
+    data_rows, log_sections, memory_files, memory_index, memory_link, normalised_bytes, plan_docs,
+    read_normalised, record_files, record_link, repo_root,
 };
 
 /// Measured 2026-08-12, immediately after the retirement rule was applied. The headroom is
@@ -50,11 +50,33 @@ const MAX_CLAUDE_MD_BYTES: usize = 12_000;
 /// edits one of them is half a raise. *A rule with two copies has one that is stale*, and
 /// this repo has logged that before; the ceiling ceremony is now itself an instance.
 ///
-/// The reasoning is not restated here — it belongs in one place. `docs/context-budget.md`
-/// ("the memory side") carries the decomposition (count +4,089 B, 102 %; length −82 B,
-/// −2 %), the five controls and the cadence note. What this file owes is the SAME NUMBERS,
-/// which is what being a mirror means.
-const MAX_MEMORY_INDEX_BYTES: usize = 20_000;
+/// ⚠⚠⚠ RAISED A THIRD TIME 2026-09-06, 20_000 → 40_000, and **this raise is the one that
+/// answers a question instead of buying a fortnight.** The two raises above were each 4 KB
+/// and each bought ~11 days; this one was measured at 19,981 B / 119 lines / 167.9 B per
+/// line — 19 B of headroom — and the decomposition is the *third consecutive* all-count
+/// result: count 94 → 119 at the old 169.5 B/line is +4,237 B (105 %), length 169.5 → 167.9
+/// across 119 lines is −190 B (−5 %).
+///
+/// **THAT IS THE FINDING, AND IT IS ABOUT THIS BOUND, NOT ABOUT THE INDEX.** Three firings,
+/// three times all-count, three times with both line bounds green. This ceiling has never
+/// once fired on the failure mode it was built for — fat hooks — because the per-line
+/// budget and the maximum below own that mode and have held every time. What it actually
+/// measures is *project age*. `docs/context-budget.md` predicted exactly this cadence and
+/// said the verdict was the user's; asked 2026-09-06, the user sized the bound to a horizon
+/// (~2 months at the measured 367 B/day) rather than take a fourth 4 KB step.
+///
+/// ⚠ **The "TWO COPIES" warning above is RETRACTED as written — the Python copy is GONE.**
+/// S6 deleted `tests/test_context_budget.py` on 2026-08-27; this file is now the *only*
+/// copy, so "raise both, control them side by side" is a ceremony pointing at a file that
+/// does not exist. The lesson survives its own instructions being stale, one turn further
+/// along: *a rule with two copies has one that is stale* — and when a copy is deleted
+/// rather than drifting, the staleness lands in the **ceremony** instead of in a number,
+/// where nothing goes red on it.
+const MAX_MEMORY_INDEX_BYTES: usize = 40_000;
+/// ⚠ RESTATED 2026-09-06 with the third raise, as the ceremony requires and **unchanged**:
+/// measured 167.9 B/line, 2.1 B under budget, having *improved* for the second raise
+/// running. Raising the ceiling buys more memories; raising this would buy longer lines,
+/// and only the first is growth.
 const MAX_MEMORY_BYTES_PER_LINE: usize = 170;
 
 /// ⚠ The THIRD bound, added 2026-08-26 alongside the raise. The per-line budget is a MEAN,
@@ -440,5 +462,69 @@ fn memory_index_ceiling() {
     assert!(
         longest <= MAX_MEMORY_INDEX_LINE_BYTES,
         "MEMORY.md's longest index line is {longest} B, past the          {MAX_MEMORY_INDEX_LINE_BYTES} B per-line maximum — one hook has grown into a          paragraph, which BOTH bounds above are blind to. The remedy is that single hook:          SHORTEN it, pushing the detail into its memory file, and keep the distinguishing          terms — they are the recall matching surface, so trimming is not condensing. Do          NOT raise this bound; it is pinned at a measurement on purpose."
+    );
+}
+
+/// ⚠ THE FOURTH BOUND, added 2026-09-06 alongside the third raise — and it is the one this
+/// gate has been missing since it was written, not a new idea the raise invented.
+///
+/// **The ceiling's own failure message prescribes a remedy that nothing audits.** It says:
+/// *merge related memory files — two files become one file with one line, the detail
+/// preserved inside*. That operation has two halves, a file deletion and a line deletion,
+/// and doing only one of them fails in a way every bound above is blind to:
+///
+/// - a file left on disk with **no index line** is UNREACHABLE. The index lines are the
+///   matching surface that decides whether a memory is recalled at all, so an unindexed
+///   file is not a saved memory, it is a lost one — and it makes the index *smaller*, so
+///   the ceiling reads it as an improvement;
+/// - an index line naming a **file that is gone** is a dead recall target: it spends bytes
+///   in every session to point at nothing.
+///
+/// The docs side has held exactly this invariant since rule 4
+/// (`every_pointer_row_names_a_record_file_and_vice_versa`). The memory side never got it,
+/// which is why the archive-and-unindex design considered on 2026-09-06 could be proposed
+/// at all: **it would have orphaned 31 files and turned every bound in this file green
+/// doing it.** Raising the ceiling makes the hole worse rather than better — a bigger index
+/// is a larger surface for a half-finished merge to hide in.
+///
+/// Measured the day it shipped: 119 index lines, 119 files, exact parity.
+#[test]
+fn every_memory_index_line_names_a_file_and_vice_versa() {
+    // ⚠ Does not run when the memory directory is absent — every CI run, same terms as
+    // `memory_index_ceiling`. Said out loud rather than discovered later.
+    let (Some(path), Some(files)) = (memory_index(), memory_files()) else {
+        eprintln!(
+            "every_memory_index_line_names_a_file_and_vice_versa: the memory directory is              not resolvable (expected on CI — it lives in the user's profile, not the              repo). THIS ASSERTION DID NOT RUN."
+        );
+        return;
+    };
+    if !path.is_file() {
+        eprintln!(
+            "every_memory_index_line_names_a_file_and_vice_versa: {} not present. THIS              ASSERTION DID NOT RUN.",
+            path.display()
+        );
+        return;
+    }
+
+    let text = read_normalised(&path);
+    let indexed: BTreeSet<String> = text
+        .lines()
+        .filter(|l| l.starts_with("- ["))
+        .filter_map(memory_link)
+        .collect();
+    let on_disk: BTreeSet<String> = files.into_iter().collect();
+
+    let unreachable: Vec<&String> = on_disk.difference(&indexed).collect();
+    assert!(
+        unreachable.is_empty(),
+        "{} memory file(s) exist with NO line in MEMORY.md: {unreachable:?}. The index lines          are the matching surface for recall, so an unindexed file is unreachable — a lost          memory, not a saved one, and one that makes the index SMALLER so every byte bound          above reads it as an improvement. If this is a half-finished merge, finish it: fold          the detail into the surviving file and delete the absorbed one. Do NOT leave a file          parked on disk to buy index bytes.",
+        unreachable.len()
+    );
+
+    let dangling: Vec<&String> = indexed.difference(&on_disk).collect();
+    assert!(
+        dangling.is_empty(),
+        "{} index line(s) in MEMORY.md name a file that does not exist: {dangling:?}. That          is a dead recall target — it costs bytes in every session and points at nothing.          Either restore the file or remove its line.",
+        dangling.len()
     );
 }

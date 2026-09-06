@@ -173,6 +173,6 @@ uv run pyright          # types
 - **On finishing a piece of work: a line in the log's index, a pointer row, a file in
   `docs/log/`, a memory file. Nothing here.** A finished item leaves the always-loaded map
   the moment its lesson is written down elsewhere. Rationale + the paired ceiling test:
-  `docs/context-budget.md`, `tests/test_context_budget.py`.
+  `docs/context-budget.md`, `rust/crates/repo_gates/tests/context_budget.rs`.
 - Repo etiquette: branch before committing; Conventional Commits.
   (Commits keep the harness-required `Co-Authored-By: Claude` trailer.)
