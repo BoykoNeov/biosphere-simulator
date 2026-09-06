@@ -85,6 +85,17 @@ mentions the Python file as a **dated historical instance** rather than a pointe
 naming a deleted file is not a broken reference to any tool* — nothing in this repo can go red
 on one, which is why they outlived their target by ten days.
 
+**THE MEMORY INDEX HIT ITS CEILING, AND THE FIX IS RECORDED HERE BECAUSE NOTHING ELSE CAN HOLD
+IT.** This item's memory line pushed `MEMORY.md` to 20,118 B against its 20,000 B ceiling. The
+remedy is the gate's own, quoted in its assertion message — *"MERGE related memory files (two
+files become one file with one line, the detail preserved inside), not … condense"* — so
+`extinction-coef-bound.md` was absorbed into `canopy-provenance-split.md` (that name survived: it
+had eight inbound links against one), its index line removed, the survivor's hook rewritten to
+carry both lessons, and the one backlink re-pointed. ⚠ **The memory tree is not in git**, so this
+paragraph is the only durable record of that merge — and the standing after it is **19,981 B and
+167.9 B/line against ceilings of 20,000 and 170.0**. *The next memory line of any normal length
+turns that gate red: the next item owes a merge, not a new line.*
+
 **WHAT THIS DOES NOT CLOSE.** Whether this tree should model leaf-cohort thickness at all is a
 form question with a new state variable, priced by nothing here. [B] itself says the effect is
 days-to-weeks on canopy-closure date and *"small"* on leaf biomass and final yield. **The page
