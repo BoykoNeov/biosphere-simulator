@@ -72,8 +72,14 @@ concluded the opposite.** Photosynthetic quotient 1 makes CO₂ and O₂ anticor
 jar's oxygen — and therefore its floor — is at its **highest** at the instant its CO₂ is at
 its lowest. A pointwise band on a sealed run evaluates itself at the physically hardest
 instant the run contains, automatically. §4 had quoted the ratio at the run's *end* (×685) and
-called the band vacuous; the binding instant is step 779 of a 1000-step run and the true
-minimum is **×10.674948**. *A number read at the wrong instant lies.*
+called the band vacuous; the binding instant is step **779 of 3661** — 3 seasons × 305 days
+÷ `dt = ¼`, plus the initial sample — and the true minimum is **×10.674948**. *A number read at
+the wrong instant lies.*
+
+⚠ That denominator was written as "a 1000-step run" in the first draft of this file, from
+nothing, and corrected on review. It changes no conclusion, which is exactly why it is the kind
+of number that survives: **an unsourced figure in prose acquires no owner**, and this section is
+about a paragraph whose premises nobody ran.
 
 Measured minima: jar **×10.674948**, the four controls **×1.150381 / ×1.200661**.
 
