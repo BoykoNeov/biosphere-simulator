@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `o2-setpoint-cited.md`
+**Re-read against the record's last row:** `o2-form-adopted.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -75,7 +75,7 @@ matter cycles. It is buildable now that the step is `¼`.
   move is a design question about what this simulator is *for*, not a measurement. It is a
   reasonable thing to want; it is not a defect to fix.
 
-### 2.3 ~~DECISION — adopt the live-O₂ FvCB form, or leave it in the lab~~ — TAKEN, and HALF BUILT
+### 2.3 ~~DECISION — adopt the live-O₂ FvCB form, or leave it in the lab~~ — TAKEN and BUILT, both slices
 
 ⚠⚠ **DECIDED 2026-09-06 and this section's pricing was FALSE.** The user chose adoption, then —
 shown the measurement — chose **course (B): fix the cabin oxygen setpoint first**. Slice 1 is
@@ -95,10 +95,30 @@ own claims were struck by measurement rather than by argument:
   `post-roadmap-o2-form-adoption.md` §3/§8a, and it holds: the band binds on all five
   scenarios.
 
-**What remains is slice 2**, and it is unblocked: no scientific objection survived. The
-`ci_ratio` worry raised while re-posing was refuted **on its sign** (a fixed Ci/Ca understates
-Ci at low ambient CO₂, so it is the conservative assumption). ⚠ **Unmeasured prediction:** with
-slice 1 landed, adoption's station move should shrink to the control-sized one it was priced at.
+~~**What remains is slice 2**~~ — **BUILT 2026-09-07** (`log/o2-form-adopted.md`). No
+scientific objection survived: the `ci_ratio` worry raised while re-posing was refuted **on its
+sign** (a fixed Ci/Ca understates Ci at low ambient CO₂, so it is the conservative assumption).
+
+✅ **The unmeasured prediction is MEASURED and it held.** *"With slice 1 landed, adoption's
+station move should shrink to the control-sized one it was priced at"* — `sealed_station`'s
+largest carbon move is **+0.058 %**, against the 60–75 % the row above records. The station's
+three sealed assemblies are controls on this form now, so this section's original *"only the
+jar"* pricing is **true of today's tree and was false of the tree it was written on**, which is
+a stranger outcome than either being simply right.
+
+⚠ **Two things this item NAMED, neither of them a decision:**
+
+* **The station census still carries no CO₂ or cabin-oxygen band**, and adoption did not add
+  one. A gate was designed and **refused on measurement**: `O2Makeup` holds the cabin at
+  209.800 mmol/mol with ~50× of headroom against any defensible band, so it would have been
+  inert by construction. Closing it needs a subject with a reachable falsifier — a **perturbed**
+  run, not a regulated nominal one.
+* **A form can be nearly inert on the frozen roster and loud under perturbation.**
+  `sealed_station` moves 0.058 % under adoption and **9.8 %** under an oxygen leak on the same
+  tree, and the sign inverts the ECLSS reading: less O₂ is less photorespiration, so a leak that
+  is damage to the regulator is a yield increase to the crop. §3's "closed by measurement"
+  entries are all measured on the nominal roster; **that roster is not the model's behaviour
+  space**, and the perturbation suite is where this class of finding lives.
 
 ~~The original pricing follows, struck, because its numbers are still the record of what was
 believed:~~

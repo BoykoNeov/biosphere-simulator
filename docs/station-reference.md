@@ -315,6 +315,31 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-09-07 — the biosphere adopts the LIVE-O₂ FvCB form; 4 station goldens move by
+  ≤ 0.058 % and 4 `golden_sha256` rows follow. No station flow, param, seam or claim
+  changed.**
+  The delegated half: this contract freezes the multi-domain assembly and delegates the
+  biosphere's science to `docs/biosphere-reference.md`, whose 2026-09-07 entry is the record.
+  `greenhouse`, `harvest`, `lighting` and `sealed_station` re-ran; `sealed_energy_drift_
+  summary.json` did **not** change, because it folds thermal quantities the biosphere's carbon
+  does not reach.
+
+  ⚠ **The size of this is the previous slice's doing, and the contrast is the point.**
+  Measured before the cabin oxygen setpoint was cited (10 → 1995 mol, 2026-09-06), the same
+  flip moved `sealed_station`'s plant and soil carbon by **60–75 %** — the crop was reading
+  1.05 mmol/mol of O₂ where a cabin holds ~210. Measured after: **+0.058 %**. The station's
+  three sealed assemblies are now *controls* on the biosphere's form rather than its largest
+  consumers, and taking the two changes in one diff would have made them indistinguishable.
+
+  ⚠ **A KNOWN GAP this slice did not close: the station census still carries no CO₂ band.**
+  Its two claims are the crew respiratory quotient and the thermal fixed point, so the
+  biosphere's five pointwise compensation-point gates have no station-side counterpart, and
+  the cabin's oxygen mole fraction — which the crop now reads — is asserted by nothing here.
+  A gate for it was designed and **refused on measurement**: `O2Makeup` holds the pool at
+  209.800 mmol/mol against any defensible band with ~50× of headroom, and everything that
+  could move it already moves four goldens and a param hash, so the row would have been inert
+  by construction. Recorded as a gap rather than filed as a green claim.
+
 - **2026-08-18 — the MANIFEST WRITER moves to the reference (C7's station half; a
   PROSE-only diff — three `_authority`/`_comment` rows, no hash, set, claim or horizon).**
   Until this slice the file was *authored* by the reference key by key (slices 3, 7, C8,

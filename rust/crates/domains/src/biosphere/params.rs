@@ -166,9 +166,15 @@ pub struct PhotosynthesisParams {
     /// **Which oxygen the FvCB terms are read against** — not a thirteenth constant, and
     /// never loaded from the file.
     ///
-    /// The loader always sets [`O2Form::Constant`], the frozen reference, so the goldens
-    /// cannot see this field exists. `domains::lab` flips it to run the cited alternative
-    /// against the same numbers (`docs/plans/post-roadmap-o2-form.md`).
+    /// ⚠ **The loader sets [`O2Form::LivePool`] since 2026-09-07 — the live form IS the
+    /// reference now** (`docs/plans/post-roadmap-o2-form-adoption.md` §13). `domains::lab`
+    /// flips it the other way to run the retired constant against the same numbers.
+    ///
+    /// ⚠ It stays a field rather than becoming the only behaviour because the constant is
+    /// still what an unsealed scenario reads: the VALUE this form needs is a stock, and the
+    /// open field has none. That fall-through is correct physics and is indistinguishable
+    /// from forgetting to wire the form, which is why it is asserted in two halves by
+    /// `science_gates::pointwise_fold` rather than left to read as an accident.
     ///
     /// ⚠ It rides here for [`kinetics`](Self::kinetics)'s reason — three flows hold a
     /// `CarbonContext` and all three call `budget()`, so a per-flow switch would make a step
@@ -466,11 +472,12 @@ pub fn photosynthesis_from(text: &str, name: &'static str) -> PhotosynthesisPara
         t_opt_lo,
         t_opt_hi,
         t_max,
-        // The frozen forms, always. A file cannot ask for either alternative: neither
+        // The reference forms, always. A file cannot ask for either alternative: neither
         // `kinetics` nor `o2_form` has a key in `guarded_map` above, so a YAML that named
-        // one would be an unknown field.
+        // one would be an unknown field. ⚠ `LivePool` is the ADOPTED form, not a lab
+        // selection; `Constant` is the retired one and is reachable only from `domains::lab`.
         kinetics: KineticsForm::Cardinal,
-        o2_form: O2Form::Constant,
+        o2_form: O2Form::LivePool,
     }
 }
 

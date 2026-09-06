@@ -66,7 +66,11 @@
 //! executable line, and a floor this tree *derives* (the CO₂ compensation point is
 //! `Γ*/ci_ratio`, computed, never typed) still needs its recorded value carried as an
 //! explicit tripwire assertion. [`the_floor_is_where_the_frozen_params_put_it`] is that
-//! tripwire and is why the five CO₂ gates can stay derived. ⚠ And a number quoted in a
+//! tripwire and is why the five CO₂ gates can stay derived. ⚠ When the CO₂ band went
+//! POINTWISE (2026-09-07) its threshold became `1.0`, which any line of this file supplies —
+//! so the bound carries its ANCHOR alongside the threshold (`Γ*(210 mmol/mol)/ci_ratio =
+//! 61.07 ppm`) and the check keeps its teeth. A bound whose only literal is a round number
+//! the file is full of is a retired check wearing a green tick. ⚠ And a number quoted in a
 //! *comment* no longer counts, which is a real constraint on how these files are
 //! annotated: naming a bound's value in prose beside it used to satisfy the check.
 //!
@@ -285,8 +289,12 @@ mod runs {
 
 #[cfg(test)]
 mod folds {
+    // ⚠ `min_ppm` left this list when the band went pointwise: `min_compensation_ratio`
+    // folds the ratio directly, so nothing here reads the ppm minimum any more. Kept public
+    // in `readouts` — `lab::report::SPECS` still measures it as a REPORTED quantity, which is
+    // a different job from being the thing a gate asserts on.
     pub use crate::biosphere::readouts::{
-        min_ppm, peak_lai, peak_w, scale_of, segment_last, segment_max, segment_min,
+        min_compensation_ratio, peak_lai, peak_w, scale_of, segment_last, segment_max, segment_min,
     };
 
     /// The compensation-point floor at the **frozen** params — the gates' reading of
@@ -462,9 +470,9 @@ science_gates! {
     gate sealed_chamber_stays_above_the_compensation_point {
         scenario: "sealed_chamber",
         field: "science_bands",
-        quantity: "season-low chamber CO₂ (ppm)",
-        bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        quantity: "season-low chamber CO₂ ÷ its own compensation point",
+        bound: "min over t of CO₂(t)/(Γ*(t)/ci_ratio) > 1.0; Γ*(210 mmol/mol)/ci_ratio = 61.07 ppm",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value at the reference 210 mmol/mol O₂, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O₂ form was adopted 2026-09-07: Γ* is evaluated at the run's own oxygen, and BOTH routes are linear in O₂ (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged — asserted, not argued.",
         check: { band_gate(runs::sealed_chamber()); }
     }
 
@@ -475,9 +483,9 @@ science_gates! {
     gate perennial_chamber_stays_above_the_compensation_point {
         scenario: "perennial_chamber",
         field: "science_bands",
-        quantity: "season-low chamber CO₂ (ppm)",
-        bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        quantity: "season-low chamber CO₂ ÷ its own compensation point",
+        bound: "min over t of CO₂(t)/(Γ*(t)/ci_ratio) > 1.0; Γ*(210 mmol/mol)/ci_ratio = 61.07 ppm",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value at the reference 210 mmol/mol O₂, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O₂ form was adopted 2026-09-07: Γ* is evaluated at the run's own oxygen, and BOTH routes are linear in O₂ (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged — asserted, not argued.",
         check: { band_gate(runs::perennial_chamber()); }
     }
 
@@ -485,9 +493,9 @@ science_gates! {
     gate consumer_chamber_stays_above_the_compensation_point {
         scenario: "consumer_chamber",
         field: "science_bands",
-        quantity: "season-low chamber CO₂ (ppm)",
-        bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        quantity: "season-low chamber CO₂ ÷ its own compensation point",
+        bound: "min over t of CO₂(t)/(Γ*(t)/ci_ratio) > 1.0; Γ*(210 mmol/mol)/ci_ratio = 61.07 ppm",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value at the reference 210 mmol/mol O₂, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O₂ form was adopted 2026-09-07: Γ* is evaluated at the run's own oxygen, and BOTH routes are linear in O₂ (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged — asserted, not argued.",
         check: { band_gate(runs::consumer_chamber()); }
     }
 
@@ -496,9 +504,9 @@ science_gates! {
     gate perennial_long_horizon_stays_above_the_compensation_point {
         scenario: "perennial_long_horizon",
         field: "science_bands",
-        quantity: "season-low chamber CO₂ (ppm)",
-        bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        quantity: "season-low chamber CO₂ ÷ its own compensation point",
+        bound: "min over t of CO₂(t)/(Γ*(t)/ci_ratio) > 1.0; Γ*(210 mmol/mol)/ci_ratio = 61.07 ppm",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value at the reference 210 mmol/mol O₂, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O₂ form was adopted 2026-09-07: Γ* is evaluated at the run's own oxygen, and BOTH routes are linear in O₂ (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged — asserted, not argued.",
         check: { band_gate(runs::perennial_long()); }
     }
 
@@ -506,9 +514,9 @@ science_gates! {
     gate consumer_long_horizon_stays_above_the_compensation_point {
         scenario: "consumer_long_horizon",
         field: "science_bands",
-        quantity: "season-low chamber CO₂ (ppm)",
-        bound: "min > Γ*/ci_ratio (61.07 ppm)",
-        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route",
+        quantity: "season-low chamber CO₂ ÷ its own compensation point",
+        bound: "min over t of CO₂(t)/(Γ*(t)/ci_ratio) > 1.0; Γ*(210 mmol/mol)/ci_ratio = 61.07 ppm",
+        source: "FvCB: net assimilation is exactly zero at Ci = Γ* ([A] Farquhar et al. 1980). Γ* = 42.75 µmol/mol is [C] Bernacchi et al. (2001)'s 25 °C value at the reference 210 mmol/mol O₂, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (τ=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations — the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O₂ form was adopted 2026-09-07: Γ* is evaluated at the run's own oxygen, and BOTH routes are linear in O₂ (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged — asserted, not argued.",
         check: { band_gate(runs::consumer_long()); }
     }
 
@@ -655,12 +663,34 @@ mod support {
     /// The pre-conditions are part of the claim, not hygiene: a band is a statement about
     /// a **closed, well-fed** run, and a rationed or extinction-hit trace is not the
     /// model's answer.
+    ///
+    /// ⚠⚠ **POINTWISE since 2026-09-07, and that is a DIFFERENT assertion rather than a
+    /// re-tuned one.** It used to compare one fold of the run against one constant,
+    /// `Γ*/ci_ratio` at the atmosphere's 210 mmol/mol. Adopting the live-O₂ form made that
+    /// constant wrong for the one scenario whose oxygen leaves 210 — the jar ends its golden
+    /// at 0.033 mmol/mol — so the floor is now evaluated at the oxygen each step actually
+    /// has. Nothing in the new bound was chosen to make any scenario pass: the old bound is
+    /// the **special case** of this one at constant O₂, so the four scenarios sitting at
+    /// ~210 keep, to a tenth of a percent, the bound they already had.
+    ///
+    /// ⚠ It is also **harder, not looser, on a sealed chamber**, which is the opposite of
+    /// what the re-posing was priced at. Photosynthetic quotient 1 makes CO₂ and O₂
+    /// anticorrelated, so the jar's oxygen — and therefore its floor — is at its HIGHEST at
+    /// the instant its CO₂ is at its lowest. A pointwise band on a sealed run evaluates
+    /// itself at the physically hardest instant the run contains, automatically.
+    ///
+    /// ⚠ The margin is NOT asserted here. `> 1.0` is one-sided on purpose so the next
+    /// mechanism's golden movement does not force a re-pin; how NEARLY each of the five
+    /// passes is pinned once, in [`super::margins`], and that pin is now where this claim's
+    /// teeth are — see its header for why the literal check no longer supplies them.
     pub fn band_gate(t: &Trajectory) {
         assert_eq!(t.rationed, 0, "band run must be well-fed");
         assert_eq!(t.events, 0, "band run must be extinction-free");
-        let min = folds::min_ppm(t);
-        let floor = folds::floor_ppm();
-        assert!(min > floor, "season-low {min} ppm vs floor {floor} ppm");
+        let ratio = folds::min_compensation_ratio(t);
+        assert!(
+            ratio > 1.0,
+            "the chamber's CO₂ fell to {ratio}x its own instant's compensation point — below              1.0 the run is fixing no carbon at its worst moment"
+        );
     }
 
     /// The per-year peak-leaf stationarity + liveness pair, for both decade chambers.
@@ -846,7 +876,7 @@ mod margins {
     ///
     /// ⚠ One copy, read by the roster tie below — the five gates carry it verbatim, and a
     /// sixth must too or it is not the same claim.
-    const BANDED_QUANTITY: &str = "season-low chamber CO₂ (ppm)";
+    const BANDED_QUANTITY: &str = "season-low chamber CO₂ ÷ its own compensation point";
 
     /// How far a margin may move before the pin asks to be re-read, as a fraction.
     ///
@@ -877,36 +907,67 @@ mod margins {
     /// within 0.7 % of these, so the pin restored verbatim would have been green. Nothing
     /// moved the margins between the checker's deletion and this restoration — which is
     /// the honest size of what the four dead days cost.
+    /// ⚠ MEASURED on this tree, read off this test's own failure output — not transcribed
+    /// from the plan's pre-slice-1 probe. That they agree with it to all six decimals is a
+    /// **result**: the five banded runs are biosphere scenarios, and the cabin-oxygen slice
+    /// that landed the day before could not reach them.
+    ///
+    /// ⚠⚠ **RE-POSED 2026-09-07 with the band, and ALL FIVE changed MEANING even though
+    /// four barely changed value.** These are no longer `season-low ppm ÷ one constant`; they
+    /// are `min over t of CO₂(t) ÷ that step's own compensation point`. Four of the five sit
+    /// at ~210 mmol/mol all season, so the pointwise floor is within 0.15 % of the constant
+    /// one and their numbers move in the third decimal — **a reader who takes four unchanged
+    /// numbers as evidence that nothing happened is reading the wrong thing.** The jar is the
+    /// one whose oxygen leaves 210, and it moves 1.169709 → 10.674948.
+    ///
+    /// ⚠ **A weakening was nearly shipped here, and the repair is in the BOUND rather than
+    /// in this pin.** `check_bound_literals` requires a bound's numeric literal in executable
+    /// text at the locus, and it scans the whole FILE. The old bound carried `61.07`,
+    /// distinctive enough that only its own tripwire supplied it; the pointwise threshold is
+    /// `1.0`, which any line of a 1200-line file satisfies, so re-posing the bound as the
+    /// ratio alone would have retired that check in silence. The bound therefore carries its
+    /// **anchor** too — `Γ*(210 mmol/mol)/ci_ratio = 61.07 ppm` — which is the frozen params'
+    /// own derived value, the number the old bound already carried, and is supplied by
+    /// `the_floor_is_where_the_frozen_params_put_it` alone. It is NOT a measured margin: the
+    /// distinction is exactly the one the note below draws, and putting `10.674948` there
+    /// would have been the second, tighter copy of this pin that it refuses.
     const PINNED: &[(&str, f64)] = &[
-        ("sealed_chamber", 1.169709),
-        ("perennial_chamber", 1.150335),
-        ("consumer_chamber", 1.200866),
-        ("perennial_long_horizon", 1.150335),
-        ("consumer_long_horizon", 1.200866),
+        ("sealed_chamber", 10.674948),
+        ("perennial_chamber", 1.150381),
+        ("consumer_chamber", 1.200661),
+        ("perennial_long_horizon", 1.150381),
+        ("consumer_long_horizon", 1.200661),
     ];
 
     /// The measured margins, in `PINNED`'s order.
+    ///
+    /// ⚠ The division by the floor moved INSIDE the fold when the band went pointwise:
+    /// there is no longer one floor to divide by afterwards, so `min_compensation_ratio`
+    /// returns the ratio directly. That is also why this reads the same fold the five gates
+    /// read — a pin computed a different way would be a second definition of the claim.
     fn measured() -> Vec<(&'static str, f64)> {
-        let floor = folds::floor_ppm();
         vec![
-            ("sealed_chamber", folds::min_ppm(runs::sealed_chamber())),
+            (
+                "sealed_chamber",
+                folds::min_compensation_ratio(runs::sealed_chamber()),
+            ),
             (
                 "perennial_chamber",
-                folds::min_ppm(runs::perennial_chamber()),
+                folds::min_compensation_ratio(runs::perennial_chamber()),
             ),
-            ("consumer_chamber", folds::min_ppm(runs::consumer_chamber())),
+            (
+                "consumer_chamber",
+                folds::min_compensation_ratio(runs::consumer_chamber()),
+            ),
             (
                 "perennial_long_horizon",
-                folds::min_ppm(runs::perennial_long()),
+                folds::min_compensation_ratio(runs::perennial_long()),
             ),
             (
                 "consumer_long_horizon",
-                folds::min_ppm(runs::consumer_long()),
+                folds::min_compensation_ratio(runs::consumer_long()),
             ),
         ]
-        .into_iter()
-        .map(|(name, min)| (name, min / floor))
-        .collect()
     }
 
     /// Is `got` within [`TOLERANCE`] of `want`, relatively?
@@ -1365,16 +1426,36 @@ mod census {
     /// ⚠ The tripwire that lets the five CO₂ gates stay DERIVED.
     ///
     /// `Γ*` or `ci_ratio` moving is an unfreeze and should be loud. Every band gate
-    /// compares a measured minimum against [`folds::floor_ppm`], which is computed rather
-    /// than typed — so a silent re-value of `Γ*` would move all five bounds at once and
-    /// no assertion would notice. This is the one place the number is pinned, and it is
-    /// also what puts the literal `61.07` in this file for the locus check.
+    /// compares a measured minimum against a floor that is computed rather than typed — so
+    /// a silent re-value of `Γ*` would move all five bounds at once and no assertion would
+    /// notice. This is the one place the number is pinned.
+    ///
+    /// ⚠⚠ **RE-POSED 2026-09-07, because adoption would otherwise have left it GREEN and
+    /// STALE** — the worse outcome of the two. `floor_ppm` reads the loaded params object,
+    /// and the live-O₂ substitution happens per step inside the flow, so this test went on
+    /// passing while pinning a number the reference had stopped using. What it pins now is
+    /// what the number actually is: the compensation floor **at the reference oxygen**, i.e.
+    /// the anchor the pointwise floor scales from. The second assertion is the link — at
+    /// `x_O₂ = photo.o2` the live form reproduces the frozen floor exactly — without which
+    /// 61.07 would be a number in this file with nothing tying it to the adopted band.
     #[test]
     fn the_floor_is_where_the_frozen_params_put_it() {
         assert!(
             (folds::floor_ppm() - 61.07).abs() < 5e-3,
             "{}",
             folds::floor_ppm()
+        );
+        // The anchor: the pointwise floor AT the reference oxygen IS the constant floor.
+        // Bit-identical, because `o2_coupled` scales by `x_o2 / p.o2` and that ratio is 1.
+        let p = crate::biosphere::params::biosphere();
+        let at_reference = crate::biosphere::science::oxygen_at(
+            &p.photo,
+            Some(p.photo.o2),
+            crate::biosphere::science::O2Form::LivePool,
+        );
+        assert_eq!(
+            at_reference.gamma_star, p.photo.gamma_star,
+            "the live form no longer reproduces the frozen Γ* at the reference oxygen, so              61.07 is not the anchor the pointwise floor scales from"
         );
     }
 
@@ -1396,6 +1477,15 @@ mod census {
     ///
     /// ⚠ Named without the `test_` prefix. Five frozen `source` strings spelled the prefix
     /// until 2026-09-02 — see the module note.
+    /// ⚠⚠ **RE-POSED 2026-09-07 for the same reason as its neighbour: adoption would have
+    /// left it GREEN on an argument that no longer described the reference.** It computed
+    /// Teh's route from `photo.o2`, the constant, and compared it to a constant floor — two
+    /// numbers the adopted band stopped using. The second half below is what makes the
+    /// argument survive rather than merely still compile: BOTH parameterizations are linear
+    /// in O₂ (ours by construction, `Γ* = 42.75·O/210`; Teh's by eq. 6.19, `Γ* = O/2τ`), so
+    /// their RATIO does not depend on the oxygen at all and the ordering is scale-invariant.
+    /// That is a fact worth asserting rather than asserting at one oxygen and hoping: it is
+    /// what lets a pointwise band inherit a citation argued at 210 mmol/mol.
     #[test]
     fn the_shipped_floor_is_the_conservative_one_against_the_cited_route() {
         let photo = crate::biosphere::params::photosynthesis();
@@ -1406,6 +1496,23 @@ mod census {
             teh_floor < folds::floor_ppm(),
             "Teh's route no longer sits below the shipped floor — the robustness argument \
              is void and the band's provenance must be re-argued, not re-tuned"
+        );
+
+        // Scale-invariance, at the jar's own depleted oxygen rather than at a chosen one:
+        // if the ordering held only at 210 the pointwise band would have inherited nothing.
+        let jar_o2 = 2.349705;
+        let ours = crate::biosphere::science::oxygen_at(
+            &photo,
+            Some(jar_o2),
+            crate::biosphere::science::O2Form::LivePool,
+        )
+        .gamma_star;
+        let teh = jar_o2 * 1000.0 / (2.0 * TEH_SPECIFICITY_FACTOR);
+        assert!(
+            teh < ours,
+            "Teh's route ({teh}) no longer sits below ours ({ours}) at a depleted oxygen — \
+             the conservativeness ordering is not scale-invariant and the pointwise band \
+             cannot inherit an argument made at 210 mmol/mol"
         );
     }
 }

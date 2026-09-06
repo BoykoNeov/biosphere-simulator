@@ -373,34 +373,61 @@ fn carbon_leak_lowers_biomass_and_scrubber_effort() {
     assert!(leaked.stocks[LEAK_SINK].amount > 0.0);
 }
 
+/// ⚠⚠ **THIS TEST'S HEADLINE INVERTED WHEN THE LIVE-O₂ FORM WAS ADOPTED (2026-09-07), and
+/// the inversion is the finding — not a tolerance that needed widening.**
+///
+/// It used to say: the O₂ pool is DEFENDED, so unlike carbon a leak surfaces as makeup
+/// EFFORT and *"the plant is essentially UNTOUCHED"* — measured at a 10715× contrast (carbon
+/// moved biomass 16.6 %, O₂ 0.0015 %). That was a true statement about a model in which the
+/// crop could not see oxygen: `photosynthesis.o2` was a constant 210 mmol/mol and the pool
+/// was pure bookkeeping. **Adoption gives the leak a second, biological path** — the pool
+/// drives `Γ*` and the Rubisco denominator — and the contrast collapses from 10715× to
+/// under 2×. The controller still defends the LEVEL; it cannot defend the crop from the
+/// excursion on the way there.
+///
+/// ⚠ The direction is the part worth reading twice: an oxygen leak makes the crop grow
+/// **more**, because less O₂ is less photorespiration. A perturbation that reads as damage
+/// on the ECLSS side reads as a yield increase on the biology side, and nothing in the model
+/// was arranged to produce that — it is FvCB's own oxygen terms arriving.
+///
+/// What survives unchanged is the ECLSS signature (supply works harder, the sink fills) and
+/// the ordering: the undefended pool is still the louder one. What is retired is "orders
+/// quieter", which was never a claim about the controller — it was a claim about the crop
+/// being blind.
 #[test]
-fn o2_leak_is_absorbed_by_makeup_effort() {
-    // O2_POOL is DEFENDED (O2Makeup is demand-controlled), so — unlike CARBON — the leak
-    // surfaces as makeup EFFORT, not a pool/biology change: o2_supply supplies strictly MORE
-    // (its cumulative bookkeeping runs further negative), the plant is essentially UNTOUCHED,
-    // and the leak-sink accumulates. The two pools fail differently.
+fn o2_leak_is_absorbed_by_makeup_effort_but_no_longer_by_the_crop() {
+    // O2_POOL is DEFENDED (O2Makeup is demand-controlled), so the leak still surfaces as
+    // makeup EFFORT: o2_supply supplies strictly MORE (its cumulative bookkeeping runs
+    // further negative) and the leak-sink accumulates. THIS half is unchanged by adoption.
     let baseline = sealed_baseline();
     let leaked = run_carbon_leak(O2_POOL);
     assert!(leaked.stocks[O2_SUPPLY].amount < baseline.stocks[O2_SUPPLY].amount);
     assert!(leaked.stocks[LEAK_SINK].amount > 0.0);
 
-    // ⚠ The "untouched" claim is a CONTRAST and is asserted as one — mirrors the Python
-    // reference (see its comment for the full derivation). The old absolute `rel < 1e-6`
-    // went red at dt=1/4 on a 1.5e-5 deviation, which is the operator split resolving the
-    // intra-day O₂ drawdown more finely, not the defence failing. Measured: CARBON moves
-    // biomass 16.6 %, O₂ 0.0015 % — a 10715× contrast. The ratio form is scale-free and
-    // strictly stronger (the old form also passed if the carbon leak did nothing).
     let base_b = biomass(baseline);
-    let o2_effect = (biomass(&leaked) - base_b).abs() / base_b.abs();
-    let carbon_effect = (biomass(&run_carbon_leak(CARBON_POOL)) - base_b).abs() / base_b.abs();
+    let o2_signed = (biomass(&leaked) - base_b) / base_b.abs();
+    let carbon_signed = (biomass(&run_carbon_leak(CARBON_POOL)) - base_b) / base_b.abs();
+
+    // The ordering survives: the undefended pool is still the larger effect. Kept as a
+    // one-sided contrast because that is the claim the controller actually supports.
     assert!(
-        carbon_effect > 1000.0 * o2_effect,
-        "the defended pool must be orders quieter than the undefended one: \
-         carbon {carbon_effect:.3e} vs O2 {o2_effect:.3e}"
+        carbon_signed.abs() > o2_signed.abs(),
+        "the defended pool is no longer the quieter one: carbon {carbon_signed:.3e} vs \
+         O2 {o2_signed:.3e}"
+    );
+
+    // ⚠ A SIGN assertion, not a magnitude one, and it is the load-bearing line. Losing
+    // oxygen relieves photorespiration, so the crop must end UP; a leak that made it end
+    // DOWN would mean the coupling reached the run with the wrong sense, which no
+    // conservation or arbitration check can see.
+    assert!(
+        o2_signed > 0.0,
+        "an O2 leak lowered biomass ({o2_signed:.3e}); under the adopted form less oxygen \
+         is less photorespiration and the crop must end up AHEAD"
     );
     assert!(
-        o2_effect < 1e-3,
-        "and quiet in absolute terms too: {o2_effect:.3e}"
+        carbon_signed < 0.0,
+        "a carbon leak raised biomass ({carbon_signed:.3e})"
     );
 }
 

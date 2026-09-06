@@ -1133,3 +1133,154 @@ reference doc's unfreeze entry, `docs/log/`, the memory file, the commit).
 ⚠ **B is not skippable into C.** A flip that is fixed in the same edit cannot tell "the red
 set is what I predicted" from "the re-posing masked a red I did not predict", and the missing
 red is the failure `tests/o2_form.rs`'s own header names.
+
+---
+
+## 14. SLICE 2 MEASURED — the golden prediction held decisively, and five reds were unforeseen
+
+Everything here was produced **after** §13 was committed. The order was §13g's: A (the fold,
+loader untouched, workspace fully green) → B (the bare flip, nothing else changed) → C (the
+re-posing) → D (goldens + manifests) → E (this).
+
+### 14a. ✅ THE HEADLINE — §13a's re-prediction was right and §8d is void
+
+| golden | §8d predicted (pre-slice-1) | §13a predicted | **measured** |
+|---|---|---|---|
+| `sealed_station` largest carbon move | **+74.9 %** | ≤ 0.15 % | **+0.058 %** |
+| `greenhouse` largest carbon move | +89.5 % | ≤ 0.15 % | **+0.046 %** |
+| `harvest` largest carbon move | +72.1 % | ≤ 0.15 % | **+0.049 %** |
+| `lighting` / the four chamber controls | ~0.1 % | ≤ 0.15 % | **0.022–0.098 %** |
+| `sealed_chamber` `o2_pool` | +363.3 % | +363.3 % | **+363.3163 %** |
+| `sealed_chamber` `leaf_c` | −44.8 % | −44.8 % | **−44.7829 %** |
+
+**The station's flagship golden moves by six hundredths of a percent, where the same flip
+moved it by three quarters a day earlier.** Nothing about the form changed between those two
+measurements; slice 1 did, and this is what it bought. The jar reproduces §8d to four
+significant figures on both rows, which is the anchor §13a demanded: `sealed_chamber` is a
+biosphere scenario and the cabin setpoint could not reach it.
+
+⚠ The five pointwise margins were **read off the pin's own failure output on this tree**, not
+transcribed: 10.674948 / 1.150381 / 1.200661 / 1.150381 / 1.200661 — §8a's pre-slice-1
+figures **to all six decimals**. Recorded that way because a green pin at a 2 % tolerance
+would only have said "within 2 %", and this slice's whole argument is about which
+measurements slice 1 could and could not reach.
+
+`regen_goldens`: **20 of 20 run, 10 would change** — predicted 10, and the *identical* set
+matched name for name (`season_euler_state`, `sealed_energy_drift_summary`, and the eight
+non-biosphere goldens).
+
+### 14b. ✅ The manifest line counts — exact, after §12f's miss
+
+| manifest | predicted | measured | composition |
+|---|---|---|---|
+| `biosphere-reference.manifest.json` | ~21 lines | **21** | 6 `golden_sha256` + 5 `bound` + 5 `quantity` + 5 `source` |
+| `station-reference.manifest.json` | 4 lines | **4** | 4 `golden_sha256` |
+
+No `flow_set`, `aux_set`, `param_files`, scenario or horizon row moved, which is the part
+that would have mattered. §12f under-predicted this same diff a day earlier (7 lines, not 1);
+predicting the *composition* rather than a count is what made it checkable.
+
+### 14c. ⚠ MISS — five unpredicted reds, and only two are bookkeeping
+
+§13d listed five reds and got all five. It missed five more:
+
+1. **`domains/tests/manifest_writer.rs` did NOT redden at the flip**, though §2d called it
+   *"the one automatic gate"* and §13d predicted it. The manifest's `golden_sha256` hashes the
+   golden **file on disk**, and at Build B no golden had been rewritten yet. So the gate is
+   real but fires one step **later** than assumed — at regeneration, not at the flip. It is
+   still the thing that catches a half-done job; it is not what tells you a flip reaches the
+   goldens. (The golden comparison is.)
+2. **`domains --test tier_contract`** and 3. **`station --test tier_contract`** — the
+   cross-port tolerance bands read the same goldens. §13d listed `golden_regression` and
+   stopped, which is a census error rather than a surprise: *enumerate the readers of a file,
+   not the one you thought of.*
+4. **`o2_form::a_live_oxygen_column_is_built_through_the_seam_and_not_by_poking_the_field`** —
+   it asserted `columns[0].floor_ppm.is_some()` on the **baseline**, which is now the adopted
+   form and has no single floor. Re-posed by swapping which form is the variant: asking for a
+   `LivePool` variant today compares the reference against itself and passes while measuring
+   nothing.
+5. **`station::perturbations::o2_leak_is_absorbed_by_makeup_effort`** — §14d.
+
+### 14d. ⚠⚠ THE FINDING — an oxygen leak now makes the crop grow BETTER, and a test said it could not
+
+The station's perturbation suite asserted that the O₂ pool is *defended*: `O2Makeup` is a
+demand-controlled regulator, so a leak surfaces as makeup **effort**, and *"the plant is
+essentially UNTOUCHED"* — measured at a **10715×** contrast (a carbon leak moved biomass
+16.6 %, an oxygen leak 0.0015 %).
+
+Under the adopted form the contrast is **under 2×**: carbon −18.4 %, oxygen **+9.8 %**.
+
+⚠ **The old claim was true, and it was a claim about the crop being blind, not about the
+controller.** `photosynthesis.o2` was a constant, so the pool was pure ECLSS bookkeeping and
+no amount of leaking could reach the biology. Adoption gives the leak a second path — the
+pool drives `Γ*` and the Rubisco denominator — and the regulator, which defends the *level*,
+cannot defend the crop from the excursion on the way there.
+
+⚠ **And the sign is the part worth reading twice: the crop ends AHEAD.** Less oxygen is less
+photorespiration. A perturbation that reads as damage on the ECLSS side reads as a yield
+increase on the biology side, and nothing was arranged to produce that — it is FvCB's own
+oxygen terms arriving. The re-posed test asserts the **signs** of both leaks rather than a
+magnitude, because a sign is what a mis-sensed coupling breaks and no conservation or
+arbitration check can see it.
+
+⚠ This was **not** predictable from the golden diff. `sealed_station` moves 0.058 % under
+adoption; the same tree under a 20 % oxygen leak moves 9.8 %. A form can be nearly inert on
+the frozen roster and loud under perturbation, and only the perturbation suite says so.
+
+### 14e. ⚠ MISS — §13c's "unrepairable" weakening was repairable, and I argued myself out of it
+
+§13c recorded that the pointwise bound's literal is `1.0`, that `check_bound_literals` scans
+the whole file, and that the check therefore stops discriminating — concluding it was **not
+repairable inside the bound** because the physical threshold *is* one and writing a measured
+margin there would make the contract a second copy of the pin.
+
+That reasoning presented two options and there were three. The bound now reads
+
+> `min over t of CO₂(t)/(Γ*(t)/ci_ratio) > 1.0; Γ*(210 mmol/mol)/ci_ratio = 61.07 ppm`
+
+and `61.07` is supplied by `the_floor_is_where_the_frozen_params_put_it` alone. It is the
+**frozen params' own derived anchor** — the number the old bound already carried — not a
+measured margin, so the objection that killed the idea never applied to it. Caught in review,
+one step before the manifests were regenerated; a step later it would have cost two
+regenerations.
+
+⚠ **The shape: a well-argued paragraph explaining why something cannot be fixed is the
+easiest place in a plan for a missing option to hide.** The prediction discipline catches
+wrong numbers; it does not catch an argument whose premises were never enumerated.
+
+### 14f. ⚠ MISS — three test runs, no clippy
+
+CLAUDE.md makes `cargo clippy --all-targets -- -D warnings` a co-equal gate and slice 1's own
+commit headline was *"clippy exit 0"*. Builds A, B and C were checked with `cargo test` alone.
+The warning was real and predictable from the edit — rewriting `measured()` left
+`folds::min_ppm` imported and unread — and it was named in review before it was run. Clippy is
+exit 0 now. **A gate you do not run is indistinguishable from a gate that passes**, and the
+commands section of CLAUDE.md lists both for that reason.
+
+### 14g. ✅ §13e's first two owed guards landed; the third is REFUSED and recorded
+
+* `pointwise_fold::the_pointwise_fold_is_the_constant_one_under_the_constant_form` — the fold
+  collapses **exactly** to `min_ppm/floor_ppm` under forced-`Constant` params. Plus the
+  anti-vacuity sibling: a fold that ignored the oxygen series would pass the identity too, so
+  it is separately asserted that the answer **moves** under `LivePool`.
+* `the_open_field_has_no_oxygen_stock_and_is_therefore_unmoved_by_the_form` — both halves
+  asserted separately, because "correct physics for a field breathing the atmosphere" is
+  byte-for-byte identical to forgetting to wire the form, and adoption makes that a property
+  of the reference rather than of a lab alternative.
+* **The station-side band is REFUSED, not deferred.** §13e priced it as buildable and it is —
+  the types are reachable. It was refused on a stronger ground found in review: `O2Makeup`
+  holds the cabin at 209.800 mmol/mol, any defensible band around 210 leaves ~50× of headroom,
+  and every input that could move it (the setpoint, `k`, the crew load) already moves four
+  goldens and a param hash. **The gate would have been inert by construction** — the failure
+  `log/station-science-claims-in-rust.md` records, where three controls failed before one bit.
+  A recorded gap is a better artifact than a green row that cannot go red. It is also a third
+  claim in a census whose own test says a third claim is a widening of the frozen contract.
+
+### 14h. The decision of §13f, unchanged after measurement
+
+`lab/report.rs` still returns `floor_ppm: None` under the adopted form, so the reference's own
+report prints `n/a` in that cell for every column. Re-read after the runs and kept: the cell is
+a **refusal** and the refusal is still true. What the measurement added is that the quantity
+which replaces it — the pointwise minimum ratio — is now pinned with real numbers in
+`margins::PINNED` and asserted by five gates, so the readout is not lost, only moved to where
+it is checked rather than printed.

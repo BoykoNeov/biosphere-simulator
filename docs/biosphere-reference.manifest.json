@@ -179,19 +179,19 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "cc5f79f089f1b6ea5ed746fb265ce92007a7e903d0fb8dd88ac3bc7fcaa40433",
+      "golden_sha256": "c135c6396973f7224e82445bc065dcb25db62b80ab76737f98c1d9f020e715ef",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "155d633053d779d7b5092c13cc74d933f6fd62e62b3b931176fdc37988b44846",
+      "golden_sha256": "c44cf90643883050106b4c673797100cd8239a0660dc4d9db47b7d814fd249ae",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
     "drift_summary": {
       "golden": "drift_summary.json",
-      "golden_sha256": "cd0868bbd575d4ee4ef79ddf742382bd9861675917fa3efe285b7bd58f19a555",
+      "golden_sha256": "d2e30a55ff2a7cd7dfacab9fb1d389482724a79f558056892224d37141c0d1bd",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
       "years": 15
     },
@@ -203,19 +203,19 @@
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "23034da7685e3339905d70b8c329e9b032974083c4da2425f20139d034748b75",
+      "golden_sha256": "c48795b4b29a426f2512c7c593c9eb41fbf5b53b65f6330de799e13011db76d8",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "096624e05e13f65c74bf6a323ee78f15aa15eed58a7c694c3360169a31958e29",
+      "golden_sha256": "40406497b2d1dd45d0c12d8d041e431d0a60bf3c6c7f27a2c90088204dc5757a",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "82aec11874eef6d5b6b7a0f582f39a9a50c4a5f035d45466cc5e2a612ae5aab0",
+      "golden_sha256": "e90fc54e05ac951821a3988aa5b56cb18c21ba34d5b63e3759a658d654470456",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }
@@ -223,18 +223,18 @@
   "science_bands": {
     "consumer_chamber": [
       {
-        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "bound": "min over t of CO\u2082(t)/(\u0393*(t)/ci_ratio) > 1.0; \u0393*(210 mmol/mol)/ci_ratio = 61.07 ppm",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::consumer_chamber_stays_above_the_compensation_point",
-        "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "quantity": "season-low chamber CO\u2082 \u00f7 its own compensation point",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value at the reference 210 mmol/mol O\u2082, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O\u2082 form was adopted 2026-09-07: \u0393* is evaluated at the run's own oxygen, and BOTH routes are linear in O\u2082 (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged \u2014 asserted, not argued."
       }
     ],
     "consumer_long_horizon": [
       {
-        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "bound": "min over t of CO\u2082(t)/(\u0393*(t)/ci_ratio) > 1.0; \u0393*(210 mmol/mol)/ci_ratio = 61.07 ppm",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::consumer_long_horizon_stays_above_the_compensation_point",
-        "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "quantity": "season-low chamber CO\u2082 \u00f7 its own compensation point",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value at the reference 210 mmol/mol O\u2082, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O\u2082 form was adopted 2026-09-07: \u0393* is evaluated at the run's own oxygen, and BOTH routes are linear in O\u2082 (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged \u2014 asserted, not argued."
       }
     ],
     "drift_summary": [],
@@ -260,26 +260,26 @@
     ],
     "perennial_chamber": [
       {
-        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "bound": "min over t of CO\u2082(t)/(\u0393*(t)/ci_ratio) > 1.0; \u0393*(210 mmol/mol)/ci_ratio = 61.07 ppm",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::perennial_chamber_stays_above_the_compensation_point",
-        "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "quantity": "season-low chamber CO\u2082 \u00f7 its own compensation point",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value at the reference 210 mmol/mol O\u2082, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O\u2082 form was adopted 2026-09-07: \u0393* is evaluated at the run's own oxygen, and BOTH routes are linear in O\u2082 (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged \u2014 asserted, not argued."
       }
     ],
     "perennial_long_horizon": [
       {
-        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "bound": "min over t of CO\u2082(t)/(\u0393*(t)/ci_ratio) > 1.0; \u0393*(210 mmol/mol)/ci_ratio = 61.07 ppm",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::perennial_long_horizon_stays_above_the_compensation_point",
-        "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "quantity": "season-low chamber CO\u2082 \u00f7 its own compensation point",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value at the reference 210 mmol/mol O\u2082, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O\u2082 form was adopted 2026-09-07: \u0393* is evaluated at the run's own oxygen, and BOTH routes are linear in O\u2082 (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged \u2014 asserted, not argued."
       }
     ],
     "sealed_chamber": [
       {
-        "bound": "min > \u0393*/ci_ratio (61.07 ppm)",
+        "bound": "min over t of CO\u2082(t)/(\u0393*(t)/ci_ratio) > 1.0; \u0393*(210 mmol/mol)/ci_ratio = 61.07 ppm",
         "locus": "rust/crates/domains/src/biosphere/science_gates.rs::sealed_chamber_stays_above_the_compensation_point",
-        "quantity": "season-low chamber CO\u2082 (ppm)",
-        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route"
+        "quantity": "season-low chamber CO\u2082 \u00f7 its own compensation point",
+        "source": "FvCB: net assimilation is exactly zero at Ci = \u0393* ([A] Farquhar et al. 1980). \u0393* = 42.75 \u00b5mol/mol is [C] Bernacchi et al. (2001)'s 25 \u00b0C value at the reference 210 mmol/mol O\u2082, bound 2026-09-02 (photosynthesis.yaml); Teh eq. 6.19 (\u03c4=2600) gives 57.69 ppm there, below it, so the shipped floor is the harder of the two parameterizations \u2014 the_shipped_floor_is_the_conservative_one_against_the_cited_route. POINTWISE since the live-O\u2082 form was adopted 2026-09-07: \u0393* is evaluated at the run's own oxygen, and BOTH routes are linear in O\u2082 (ours by construction, Teh's by eq. 6.19), so the conservativeness ordering is scale-invariant and survives the change unchanged \u2014 asserted, not argued."
       }
     ]
   }

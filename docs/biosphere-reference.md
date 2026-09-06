@@ -116,6 +116,13 @@ scenario is a perennial one — and the 2026-08-13 step sweep drove *every* scen
 it. The sealed chamber's golden (`tests/test_regression_sealed_season.py`) uses plain
 `run_season` and re-sows never. Re-measured on today's tree:
 
+⚠ **This table is a 2026-08-14 record and its `sealed_chamber` row no longer describes the
+reference.** Adoption of the live-O₂ form (2026-09-07) puts the jar's season-low at **7.2945
+ppm**, far below 61.07 — and that is not a crossing, because 61.07 is no longer the jar's
+floor: at the oxygen it actually has, its compensation point is 0.68 ppm and the run clears it
+by ×10.67. The numbers below are kept as measured; the *live* statement of the band is the
+pointwise one in the unfreeze log's 2026-09-07 entry.
+
 | scenario, in **its own golden's** configuration | `dt = 1` | `dt = ¼` | crossed at `dt = 1`? |
 |---|---|---|---|
 | `sealed_chamber` (no re-sow) | **75.75** | **76.82** | **no — never below 61.07** |
@@ -287,7 +294,10 @@ comparison is legitimate only because it moves the bound in the harder direction
 ⚠ **The bound is derived at run time, never typed.** The literal `61.07` appears in the
 test file only as a *tripwire* on the params (`test_the_floor_is_where_the_frozen_params_
 put_it`), so a silent re-value of `Γ*` goes red instead of quietly moving five bounds at
-once. The band itself is one-sided (`>`) on purpose — it must survive the next
+once. ⚠⚠ **Half of this went false on 2026-09-07.** The pointwise bound's own threshold is
+`1.0`, which the locus check cannot discriminate on, so the bound now *does* carry `61.07` —
+as its stated **anchor**, `Γ*(210 mmol/mol)/ci_ratio`. Still not a measured margin, and the
+five gates are still one-sided; what changed is that "never typed" stopped being affordable. The band itself is one-sided (`>`) on purpose — it must survive the next
 mechanism's golden movement without being re-pinned — with the five margins pinned
 loosely and separately, because *an inequality that passes says nothing about how nearly
 it failed*.
@@ -307,6 +317,12 @@ fifth through a throwaway example, because **the report's readout roster has no 
 | `consumer_chamber` | 73.338613 | 1.2009× | **identical** |
 | `perennial_long_horizon` | 70.252606 | 1.1503× | **identical** |
 | `consumer_long_horizon` | 73.338613 | 1.2009× | **identical** |
+
+⚠ **RETIRED as a description of the reference on 2026-09-07** — the table below is the last
+reading of the CONSTANT-oxygen form, kept as the measurement it was. Under the adopted
+live-O₂ form the four control rows move in the third decimal and `sealed_chamber` goes
+71.435803 → **7.294541 ppm** against a floor of 0.683 rather than 61.071429. The margins that
+replaced these are in `margins::PINNED`, and they are ratios to a *pointwise* floor.
 
 Floor `61.071429 ppm`. Sixteen days and two unfreezes later the table above is exact to every
 digit it prints — recorded because this is the one section whose own lesson is that *a value
@@ -877,6 +893,72 @@ above), so a present-tense sentence naming them — "the golden that moved", "on
 runs where water limits", a golden count of 25 — describes the tree **as it was at that
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
+
+- **2026-09-07 — the LIVE-O₂ FvCB form is ADOPTED: the crop reads the chamber's own oxygen
+  stock, not the atmosphere's constant 210 mmol/mol. 10 goldens, 21 manifest lines here and
+  4 on the station, and the CO₂ band is re-posed POINTWISE.**
+  Plan and every prediction: `docs/plans/post-roadmap-o2-form-adoption.md` §13–14; record
+  `docs/log/o2-form-adopted.md`. Slice 2 of two; slice 1 (the cabin oxygen setpoint, 10 →
+  1995 mol) landed the day before and is what made this affordable.
+
+  **The science.** O₂ enters FvCB twice — the Rubisco denominator `Kc·(1 + O/Ko)` and
+  `Γ* ∝ O` — and the reference read a constant for both. Three frozen scenarios are sealed
+  chambers carrying O₂ as a **stock**, and `sealed_chamber` ends its golden at 0.033
+  mmol/mol: the jar's crop was oxygenating against an atmosphere it had consumed weeks
+  earlier, 6329× off. The form itself was built and gated on 2026-09-06
+  (`post-roadmap-o2-form.md`); this entry is only the choice of which built form the
+  reference selects.
+
+  **What moved.** `sealed_chamber` is the whole story: `o2_pool` +363.3 %, `leaf_c` −44.8 %,
+  season-low CO₂ 71.4358 → **7.2945 ppm**. Every other scenario moved ≤ 0.1 % — including
+  `greenhouse`, `harvest` and `sealed_station`, which sit at **209.800 mmol/mol** after
+  slice 1 and are therefore controls, not results. `season_euler_state` is bit-identical by
+  construction (no O₂ stock).
+
+  ⚠ **The cost of this unfreeze was paid by the previous one.** Measured before slice 1, the
+  same flip moved `sealed_station`'s principal carbon stocks by **60–75 %** — because the
+  greenhouse's cabin then held 10 mol of O₂ in 9500 mol of air, 1.05 mmol/mol, and the crop
+  had never divided the pool by the air. That was an unrealistic oxygen charge becoming
+  visible, not the oxygen science arriving, and citing the setpoint first is what separated
+  the two into their own golden diffs. Measured after: **+0.058 %**.
+
+  **The band is re-posed, not re-tuned, and it is a DIFFERENT assertion.** The five
+  `..._stays_above_the_compensation_point` gates compared one fold of a run against one
+  constant, `Γ*/ci_ratio = 61.071429 ppm`. They now compare two series pointwise:
+  `CO₂(t) > Γ*(t)/ci_ratio` with `Γ*(t) = 42.75·O₂(t)/210`. Nothing in it was chosen to make
+  a scenario pass — the old bound is the **special case** at constant O₂, so the four
+  scenarios at ~210 keep the bound they had to within a tenth of a percent. And on a sealed
+  chamber it is **harder, not looser**: photosynthetic quotient 1 makes CO₂ and O₂
+  anticorrelated, so the jar's floor is at its highest exactly when its CO₂ is at its lowest.
+  The pointwise minima: jar ×10.674948, the four controls ×1.150–×1.201.
+
+  ⚠ **A retired check was nearly shipped wearing a green tick.** `check_bound_literals`
+  requires a bound's numeric literal in *executable* text and scans the whole file. `61.07`
+  was distinctive enough that only its own tripwire supplied it; the pointwise threshold is
+  `1.0`, which any line of a 1200-line file satisfies. The bound therefore carries its
+  **anchor** as well — `Γ*(210 mmol/mol)/ci_ratio = 61.07 ppm` — which is the frozen params'
+  own derived value and not a measured margin. Caught in review, not by a test.
+
+  ⚠ **Two tests would have stayed GREEN while asserting retired claims**, which is worse than
+  red: `the_floor_is_where_the_frozen_params_put_it` and
+  `the_shipped_floor_is_the_conservative_one_against_the_cited_route` both read the loaded
+  params object, and the live substitution happens per step inside the flow. Both are
+  re-posed. The second gained the assertion that makes its citation survive the change: BOTH
+  parameterizations are linear in O₂ (ours by construction, Teh's by eq. 6.19), so the
+  conservativeness ordering is **scale-invariant** — checked at the jar's depleted oxygen,
+  not argued.
+
+  ⚠ **`open_season` falls through to the constant INSIDE the reference now.** The form rides
+  the params object but the value it reads is a stock, and the open field has none. That is
+  correct physics for a field breathing the atmosphere — and byte-for-byte identical to
+  forgetting to wire the form. While the constant was the reference nothing depended on
+  telling those apart. `science_gates::pointwise_fold` now asserts the two halves separately.
+
+  ⚠ **A KNOWN GAP, recorded rather than closed: the station side still has no band.** The
+  station manifest carries no copy of this claim, and adoption did not add one. A gate on the
+  cabin's O₂ mole fraction was designed and **refused on measurement**: the pool is held by
+  `O2Makeup` at 209.800 against a ±5 % band, ~50× of headroom, and everything that could move
+  it already moves four goldens and a param hash. It would have been inert by construction.
 
 - **2026-09-06 — `specific_leaf_area` gains the POPULATION and the TIMING its citation was
   silent on (one `source:` string, one manifest hash; NO value, NO golden, NO band, NO floor).**

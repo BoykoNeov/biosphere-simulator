@@ -1,10 +1,13 @@
-//! The **oxygen form** of the FvCB kinetics — the lab's second alternative form, and the
-//! controls that say what its columns mean.
+//! The **oxygen form** of the FvCB kinetics — and the controls that say what its columns mean.
 //!
-//! Plan: `docs/plans/post-roadmap-o2-form.md`. The frozen tree reads O₂ from a constant, the
-//! atmosphere's 210 mmol/mol. Three frozen scenarios are sealed chambers carrying O₂ as a
-//! live stock, and one of them ends its golden at 0.033 mmol/mol — a factor of 6329.
-//! `O2Form` selects between the constant and the stock over the **same frozen numbers**.
+//! Plan: `docs/plans/post-roadmap-o2-form.md`; adoption `post-roadmap-o2-form-adoption.md` §13.
+//! ⚠⚠ **The live form was ADOPTED on 2026-09-07 and the roles here are inverted from what
+//! this file was written for.** `LivePool` is the reference the loader builds and the goldens
+//! record; `Constant` — the atmosphere's 210 mmol/mol, everywhere, always — is the retired
+//! form, still reachable through the lab so the two can be compared over the **same frozen
+//! numbers**. Three frozen scenarios are sealed chambers carrying O₂ as a live stock, and one
+//! of them ends its golden at 0.033 mmol/mol — a factor of 6329, which is why the constant
+//! stopped being defensible for it.
 //!
 //! # ⚠ Why this file's central assertion is that something MOVED
 //!
@@ -65,23 +68,36 @@ fn rel_change(a: f64, b: f64) -> f64 {
 
 // --- the seam adds nothing -------------------------------------------------
 
+/// ⚠ **INVERTED at adoption, which is this tripwire firing as designed rather than a repair.**
+/// It asserted that the loader builds `Constant` and that the seam reproduces it. Both halves
+/// flipped on the same commit, and a version of this test that had been *deleted* instead of
+/// re-posed would have left the tree with no assertion at all about which form the goldens
+/// run — the unlabelled-form failure its own last line names.
 #[test]
-fn the_constant_form_is_the_frozen_run_on_every_measured_quantity() {
-    let by_loader = measure("frozen", &params::biosphere(), true);
-    let by_form = column(O2Form::Constant);
+fn the_reference_form_is_what_the_loader_builds_on_every_measured_quantity() {
+    let by_loader = measure("reference", &params::biosphere(), true);
+    let by_form = column(O2Form::LivePool);
 
     // Bit for bit. A tolerance would let the seam introduce a reordering and still pass, and
     // the whole claim is that it introduces nothing.
     assert_eq!(by_loader.values, by_form.values);
     assert!(
         by_form.failed.is_empty() && by_form.not_applicable.is_empty(),
-        "the Constant column did not measure cleanly: {:?} / {:?}",
+        "the LivePool column did not measure cleanly: {:?} / {:?}",
         by_form.failed,
         by_form.not_applicable
     );
     // The default matters as much as the branch: params built by the loader must already BE
-    // `Constant`, or every golden in the tree is running an unlabelled form.
-    assert_eq!(params::biosphere().photo.o2_form, O2Form::Constant);
+    // `LivePool`, or every golden in the tree is running an unlabelled form.
+    assert_eq!(params::biosphere().photo.o2_form, O2Form::LivePool);
+    // ...and the retired form must still be REACHABLE and DIFFERENT. Without this the
+    // assertion above would also pass if `O2Form` had collapsed to one variant, which is a
+    // different tree from the one this file is about.
+    assert_ne!(
+        column(O2Form::Constant).values,
+        by_form.values,
+        "the retired constant form is no longer distinguishable from the reference"
+    );
 }
 
 // --- THE guard: the live form must MOVE the one scenario it can reach ------
@@ -294,19 +310,32 @@ fn the_constant_floor_is_refused_rather_than_printed_stale_under_the_live_form()
     );
 }
 
+/// ⚠ **The variant is now the CONSTANT form, and that is the whole edit.** Before adoption
+/// the baseline was `Constant` and the interesting column was `LivePool`; asking for a
+/// `LivePool` variant today would compare the reference against itself and pass while
+/// measuring nothing. The seam claim is unchanged — the `Change` route and the direct route
+/// must land on the same numbers — but the column that exercises it had to swap sides.
 #[test]
-fn a_live_oxygen_column_is_built_through_the_seam_and_not_by_poking_the_field() {
+fn a_constant_oxygen_column_is_built_through_the_seam_and_not_by_poking_the_field() {
     // The `Change` route and the direct route must land on the same numbers. A reader sees
     // the report's column, and it must not be able to drift from the seam every other caller
     // uses — the discipline `Change::Form` already carries, applied to its sibling.
     let columns = compare_changes(
-        &[("o2 form live".to_string(), Change::OxygenForm(O2Form::LivePool))],
+        &[(
+            "o2 form constant".to_string(),
+            Change::OxygenForm(O2Form::Constant),
+        )],
         true,
     )
-    .expect("the live-O2 column measures");
+    .expect("the constant-O2 column measures");
     assert_eq!(columns.len(), 2, "a baseline and one variant");
-    assert_eq!(columns[1].values, column(O2Form::LivePool).values);
-    assert!(columns[1].floor_ppm.is_none());
-    // ...and the baseline column the table is read against still has its floor.
-    assert!(columns[0].floor_ppm.is_some());
+    assert_eq!(columns[1].values, column(O2Form::Constant).values);
+    // The retired form has one floor for the whole run and prints it...
+    assert!(columns[1].floor_ppm.is_some());
+    // ...while the baseline is the ADOPTED form, whose Γ* tracks a stock, so it has none.
+    assert!(columns[0].floor_ppm.is_none());
+    assert_ne!(
+        columns[0].values, columns[1].values,
+        "the variant column reproduced the baseline — the seam did not apply the form"
+    );
 }

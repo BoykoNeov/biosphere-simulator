@@ -153,7 +153,7 @@ pub const SPECS: &[ReadoutSpec] = &[
     ReadoutSpec {
         scenario: "sealed_chamber",
         quantity: "season-low chamber CO2 (ppm)",
-        informs: &["season-low chamber CO₂ (ppm)"],
+        informs: &["season-low chamber CO₂ ÷ its own compensation point"],
         degenerate: None,
         long: false,
         fold: min_ppm,
@@ -162,7 +162,7 @@ pub const SPECS: &[ReadoutSpec] = &[
     ReadoutSpec {
         scenario: "perennial_chamber",
         quantity: "season-low chamber CO2 (ppm)",
-        informs: &["season-low chamber CO₂ (ppm)"],
+        informs: &["season-low chamber CO₂ ÷ its own compensation point"],
         degenerate: None,
         long: false,
         fold: min_ppm,
@@ -171,7 +171,7 @@ pub const SPECS: &[ReadoutSpec] = &[
     ReadoutSpec {
         scenario: "consumer_chamber",
         quantity: "season-low chamber CO2 (ppm)",
-        informs: &["season-low chamber CO₂ (ppm)"],
+        informs: &["season-low chamber CO₂ ÷ its own compensation point"],
         degenerate: None,
         long: false,
         fold: min_ppm,
@@ -193,7 +193,7 @@ pub const SPECS: &[ReadoutSpec] = &[
     ReadoutSpec {
         scenario: "perennial_long_horizon",
         quantity: "season-low chamber CO2 (ppm)",
-        informs: &["season-low chamber CO₂ (ppm)"],
+        informs: &["season-low chamber CO₂ ÷ its own compensation point"],
         degenerate: None,
         long: true,
         fold: min_ppm,
@@ -202,7 +202,7 @@ pub const SPECS: &[ReadoutSpec] = &[
     ReadoutSpec {
         scenario: "consumer_long_horizon",
         quantity: "season-low chamber CO2 (ppm)",
-        informs: &["season-low chamber CO₂ (ppm)"],
+        informs: &["season-low chamber CO₂ ÷ its own compensation point"],
         degenerate: None,
         long: true,
         fold: min_ppm,
