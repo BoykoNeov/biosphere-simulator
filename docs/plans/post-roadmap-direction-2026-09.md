@@ -6,7 +6,7 @@ tree the day it was written — a grep, a test name, a golden value — not carr
 the predecessor. The predecessor is kept whole as the record of a plan and of every place it
 went stale.
 
-**Re-read against the record's last row:** `o2-form-built.md`
+**Re-read against the record's last row:** `sla-leaf-population.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -99,6 +99,11 @@ re-tuning the bound (refused three times).
 
 **What is actually open, in order of leverage:**
 
+⚠ **RE-READ 2026-09-06: three of the four are now CLOSED and only item 4 is live.** Item 2 was
+decided and bound; item 3 was measured and then exhausted; item 1 was retrieved and the page
+refused its question. **What is left of "THE BIGGEST OPEN ITEM" is item 4's form question and
+nothing else** — the title, already too big on 2026-09-04, is now wrong twice over.
+
 1. ~~**`specific_leaf_area` keyed to development — a CITATION question.** Measured
    ~~2026-08-15: keying the constant spans peak LAI **3.04 (−35 %) to 8.24 (+75 %)** depending~~
    ~~on whether the frozen 22.0 m²/kg ([B] Table 19, "425 kg/ha per unit LAI") is read as the~~
@@ -126,6 +131,23 @@ re-tuning the bound (refused three times).
    must not be quoted from that record: the old figure came from a DVS *ramp*, and a uniform
    ×0.682 gives −87.0 % against the recorded −35.4 %. **So this item's leverage is not what §4
    ranked it on**; the retrieval itself is unaffected.
+   ✅ **DONE 2026-09-06 — `log/sla-leaf-population.md`, and the page REFUSED THE QUESTION.**
+   Table 19's caption: the constants *"are average values for the entire canopy"* — so it is
+   neither the young- nor the mature-leaf value, and **the two readings this item was built on
+   were never a choice the source presented.** Two things the retrieval added that no version of
+   this item asked for: the constant is not a season average either but the canopy average
+   *sampled at ~DVS 0.5* (p. 99), and **our locus is [B]'s own** — p. 98 defines the method as
+   *"dividing the weight of live leaves by the specific leaf weight"*, which is
+   `science::leaf_area_index` verbatim. ⚠ That locus check was run **before** the page was read,
+   and it is what turns "whole-canopy average" from a fact into a discharge. ⚠ The
+   development-keyed form is **not** a re-reading of this constant: [B]'s `SLT` (Table 20)
+   applies to **new** leaves, so it needs leaf-cohort state this tree does not have. And winter
+   wheat's own row **starts at 1.0** (0.85–1.5, non-monotone), not the thin→thick ramp p. 99's
+   prose describes — so the *citation-side* argument for the "late-anchored reading" is gone
+   too. ⚠ The 1.37 → 0.96 figure quoted above was a **scalar-keying harness result**, not
+   Table 20's row; it is retired separately, as pre-clamp. **The source was on our own shelf the
+   whole time** — this was never the blocked kind of retrieval §4 item 1 is.
+   **This item is CLOSED. No value moved, no form is owed.**
 2. ✅ **DECIDED 2026-09-06 — `0.60`, and BOUND** (`log/extinction-coef-bound.md`). The
    user's call. It is the value the tree already carried, so it shipped as a provenance-only
    unfreeze: one `source:` string, one manifest hash, **no number and no golden**. The file
@@ -550,7 +572,13 @@ Three things it leaves this doc, none of them a new task:
    — the leaf direction is exhausted, the table absorbs a threefold error at the knot the
    canopy responds to, and it is **not a suspect in any bound the contract records**. So
    nothing on this list descends from §2.1 item 3 any more.
-5. The `specific_leaf_area` retrieval (§2.1 item 1) — ~~the highest-leverage provenance
+5. ~~The `specific_leaf_area` retrieval (§2.1 item 1)~~ — **DONE 2026-09-06,
+   `log/sla-leaf-population.md`.** The answer refutes the question (§2.1 item 1), no value
+   moved, and one thing this list had wrong for four days: **it was never blocked**, the book
+   is in `sources/`. ⚠ It was ranked, re-ranked and re-scoped three times across five days
+   without anyone opening the PDF that was already on the shelf — the same shape as
+   `canopy-regulator` and the `carbon_fraction` citation, now the **fifth** instance. The
+   paragraph below is kept as the pricing it was closed against. ~~the highest-leverage provenance
    question on the peak-LAI observable~~ **RE-RANKED 2026-09-05: the leverage figure it was
    ranked on is retired** (§2.1 item 1). Still worth doing as provenance; it is no longer
    this list's leverage argument. ⚠ **RE-SCOPED 2026-09-04** — the constant is CITED (23.53, [B]
@@ -563,6 +591,14 @@ Three things it leaves this doc, none of them a new task:
    §3.2 is the memory-index item (a fact to know, not a defect to fix); everything else on
    this plan is either a user decision or blocked. ⚠ Read that as *the free work is done*,
    not as *the plan is finished* — the decisions below are where it goes next.
+   ⚠⚠ **RE-READ 2026-09-06: "the list is now empty" was FALSE WHEN WRITTEN, by this list's own
+   accounting.** Item 5 was on it, and it was excluded by the qualifier *"neither blocked nor
+   re-ranked"* — but re-ranking is a statement about **leverage**, not about availability, and
+   it had never made that item unavailable. It was done in an afternoon the same day, off a PDF
+   that had been in `sources/` throughout. *A qualifier that quietly converts "lower priority"
+   into "not on the list" is how an available item disappears from a queue.* With item 5 closed
+   the sentence is now true for a different reason: **the only thing left on this list is item
+   1, which is genuinely blocked** — on a PDF nobody can reach, not on a ranking.
 
 **Decisions (the user's; listed apart because listing them as work is how the predecessor
 went stale):** ~~`extinction_coef` (§2.1 item 2)~~ **TAKEN 2026-09-06 — `0.60`, bound and

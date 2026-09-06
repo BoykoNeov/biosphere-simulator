@@ -17,12 +17,26 @@
 #     SLA [m²/kg DM] = 10 000 [m²/ha] / SLW [kg/ha]
 #
 # Potato's row is 300 kg/ha → SLA = 33.33 m²/kg. The reference crop's own row in the
-# SAME table (winter wheat, 425 kg/ha → 23.53 m²/kg) is a useful check in two
-# directions: it corroborates the frozen file's uncited placeholder of 22.0 (within
-# 7 %), and it confirms that potato's thinner, broader leaf really is a ~1.5x difference
-# in the source, not an artefact of our conversion. Potato intercepts more light per
-# unit of leaf carbon invested — which, in a habitat where carbon is the scarce thing,
-# is exactly the sort of difference between crops that is worth being able to express.
+# SAME table is winter wheat, 425 kg/ha → 23.53 m²/kg. ⚠ RE-READ 2026-09-06: this was
+# written as "a useful check in two directions" and EXACTLY ONE of them survived
+# 2026-08-15, when ../../canopy.yaml retired its own placeholder and adopted that very
+# row. (1) DEAD: "it corroborates the frozen file's uncited placeholder of 22.0 (within
+# 7 %)" — the frozen value IS 10000/425 off this table now, so that leg compares the
+# reference number to the row it comes from and agrees with itself. (2) STANDS: potato's
+# thinner, broader leaf really is a ~1.5x difference in the SOURCE and not an artefact
+# of our conversion — 300 and 425 are two DISTINCT rows, which no later adoption changes.
+# Potato intercepts more light per unit of leaf carbon invested — which, in a habitat
+# where carbon is the scarce thing, is exactly the sort of difference between crops that
+# is worth being able to express.
+#
+# ⚠ WHAT THE TABLE'S OWN CAPTION SAYS ABOUT BOTH ROWS (retrieved 2026-09-06, off a page
+#   render): these constants "are average values for the entire canopy", leaf blades one
+#   surface, excluding petioles and leaf sheaths — NOT a young-leaf and NOT a mature-leaf
+#   value. And p. 99 qualifies WHEN: the constant is a fair approximation "provided that
+#   its value is measured at a proper time, such as at the end of the phase when most
+#   assimilates go to the leaves", with Table 19 giving values "at about this stage".
+#   Both facts apply to the potato row as much as to the wheat one. See
+#   docs/log/sla-leaf-population.md.
 #
 # ⚠ READ OFF A PAGE IMAGE (PDF page 120 = printed page 100), never the text layer, for
 #   the reason ./phenology.yaml records.
@@ -60,7 +74,11 @@
 #   file but NOT nitrogen.yaml, so the constraint spans a crop boundary: potato's canopy
 #   carbon fraction must equal the REFERENCE crop's nitrogen carbon fraction. It does,
 #   because this file carries 0.45 unchanged — and that is pinned across every crop set
-#   by tests/test_potato_crop.py, not left to this comment.
+#   by rust/crates/domains/tests/potato_crop.rs, not left to this comment. ⚠ This line named
+#   tests/test_potato_crop.py until 2026-09-06 — a file slice S6 deleted on 2026-08-27. The
+#   pin itself never lapsed (potato stage 2 rebuilt it Rust-side), but the pointer outlived
+#   its target by ten days and nothing could see it: a comment naming a deleted file is not
+#   a broken reference to any tool.
 #
 # Clean-room: values from cited primary literature ONLY, never from the WOFOST potato
 #   oracle's parameters (which are not read at all — see ./phenology.yaml).
@@ -72,7 +90,9 @@
 #   [E] Penning de Vries, F.W.T., Jansen, D.M., ten Berge, H.F.M. & Bakema, A. (1989),
 #       "Simulation of Ecophysiological Processes of Growth in Several Annual Crops",
 #       Simulation Monographs 29, PUDOC, Wageningen / IRRI, Los Baños.
-#       ISBN 90-220-0937-2. Table 19, p. 100 — specific leaf weight by crop. The potato
+#       ISBN 90-220-0937-8 (⚠ the check digit read "-2" here until 2026-09-06; the book's
+#       own colophon page says -8, which is also what ../../canopy.yaml has always said).
+#       Table 19, p. 100 — specific leaf weight by crop. The potato
 #       row carries no per-row reference, which the table's own footnote defines as
 #       "obtained from colleagues at CABO, Wageningen" — i.e. a PERSONAL COMMUNICATION,
 #       weaker than a published measurement. Recorded, dated 2026-08-11, not glossed.
@@ -91,7 +111,7 @@ parameters:
   specific_leaf_area:
     value: 33.33
     unit: "m^2/kg"
-    source: "Penning de Vries et al. (1989) Table 19 [E], potato row (verified off the page image): specific leaf WEIGHT 300 kg ha⁻¹, inverted to SLA = 10000/300 = 33.33 m² kg⁻¹ DM. CITED — where the reference crop's SLA remains TODO(cite). Corroboration in the same table: winter wheat's row (425 kg/ha → 23.53 m²/kg) sits within 7 % of the frozen file's placeholder 22.0, so the conversion is sound and potato's ~1.5× thinner leaf is the source's, not ours. ⚠ The potato row carries no per-row reference — the table footnote makes it a CABO personal communication, weaker than a published measurement"
+    source: "Penning de Vries et al. (1989) Table 19 [E], potato row (verified off the page image): specific leaf WEIGHT 300 kg ha⁻¹, inverted to SLA = 10000/300 = 33.33 m² kg⁻¹ DM. The table's caption gives the population: these constants 'are average values for the entire canopy', leaf blades one surface, excluding petioles and leaf sheaths — and p. 99 gives the timing, 'measured at a proper time, such as at the end of the phase when most assimilates go to the leaves', with the table's values being 'at about this stage'. ⚠ RE-READ 2026-09-06: this string said 'CITED — where the reference crop's SLA remains TODO(cite)' until then, which had been FALSE since 2026-08-15, when ../../canopy.yaml adopted this same table's winter-wheat row. Of the corroboration that followed it, one leg died with that adoption and one stands: comparing 23.53 to 'the frozen file's placeholder 22.0' is now tautological (23.53 IS 10000/425 off this table), while potato's ~1.5× thinner leaf remains the SOURCE's difference and not our conversion's, because 300 and 425 are two distinct rows. ⚠ The potato row carries no per-row reference — the table footnote makes it a CABO personal communication, weaker than a published measurement"
   carbon_fraction:
     value: 0.45
     unit: "dimensionless"

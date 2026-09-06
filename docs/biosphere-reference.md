@@ -878,6 +878,32 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-09-06 — `specific_leaf_area` gains the POPULATION and the TIMING its citation was
+  silent on (one `source:` string, one manifest hash; NO value, NO golden, NO band, NO floor).**
+  A provenance-only unfreeze, the same shape as `extinction_coef`'s the same day. The open
+  question was whether Table 19's 425 kg/ha is the **young**- or the **mature**-leaf figure,
+  with a form build owed if it were age-specific. **The page refuses the question:** the caption
+  says the constants *"are average values for the entire canopy"*, so neither reading was ever
+  on it. p. 99 adds the half nobody asked for — it is not a season average either, but the
+  canopy average *"measured at a proper time, such as at the end of the phase when most
+  assimilates go to the leaves"*, i.e. sampled at about DVS 0.5.
+
+  **What makes this a discharge rather than a fact: the locus agrees.** [B] p. 98 §3.3.3 defines
+  the constant's method as *"dividing the weight of live leaves by the specific leaf weight"* —
+  which is `science::leaf_area_index` over the standing leaf pool, this value's only consumer.
+  That check was run *before* the page was read, deliberately. [B]'s development-keyed
+  alternative (Table 20's `SLT`) applies to **new** leaves, so it is a form build with a new
+  state variable, not a re-reading of this number — and winter wheat's own row starts at 1.0 and
+  wiggles 0.85–1.5 rather than ramping thin→thick, so the page's general narrative is not a
+  claim about the row we use.
+
+  **Predicted before running, then observed in this order:** `manifest_writer`'s byte compare
+  **red on save** (1 test, line 163, `canopy.yaml` only) → regenerate → manifest diff **exactly
+  one line** → `regen_goldens` **0 of 20 would change**. The red was observed rather than
+  asserted, which is the difference between recording a gate and citing one. ⚠ A free control
+  fell out of it: the same commit edits `crops/potato/canopy.yaml` and **no hash moved**,
+  confirming the census's non-recursion exclusion is real and not just documented.
+
 - **2026-09-06 — `drift_summary.json` becomes REGENERABLE, and its 4 tolerated ULPs become
   reference values (one golden, one golden hash, one `_authority` row; NO science, NO
   param, NO other golden).** The contract's last Python-authored artifact. The unfreeze

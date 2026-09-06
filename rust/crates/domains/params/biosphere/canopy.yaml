@@ -72,10 +72,38 @@ parameters:
   # ⚠ This RETIRED a `TODO(cite)` placeholder of 22.0 and MOVED THE VALUE +7.0 %, which
   # is a calibration, not a provenance-only edit — it moved goldens. See the unfreeze
   # log in docs/biosphere-reference.md (2026-08-15).
+  #
+  # ⚠ THE POPULATION AND THE TIMING, retrieved 2026-09-06 (docs/log/sla-leaf-population.md).
+  # The open question was whether this number is the YOUNG- or the MATURE-leaf value, with
+  # a form build owed if it were age-specific. The caption answers it by refusing the
+  # question: the constants "are average values for the entire canopy". Neither reading was
+  # ever on the page. ⚠ And p. 99 adds a qualification this file did not carry — the
+  # constant is not a season average either, but the canopy average sampled at ONE MOMENT:
+  # "a fair approximation provided that its value is measured at a proper time, such as at
+  # the end of the phase when most assimilates go to the leaves (e.g., development stage 0.5
+  # for rice)", with Table 19 giving values "at about this stage".
+  #
+  # ⚠ WHY THAT DISCHARGES THE ITEM RATHER THAN OPENING ONE: our LOCUS is [B]'s own. p. 98
+  # §3.3.3 defines the method this constant serves — "Leaf area is determined by dividing
+  # the weight of LIVE LEAVES by the specific leaf weight" — and science::leaf_area_index is
+  # exactly `leaf_carbon · sla_per_mol_c / ground_area` over the standing pool, the only
+  # consumer of this value. Value, population and application point agree.
+  #
+  # ⚠ THE ALTERNATIVE [B] OFFERS IS A DIFFERENT LOCUS, NOT A RE-READING OF THIS NUMBER.
+  # Table 20 (p. 102) keys a factor SLT to development stage and applies it to NEW leaves,
+  # which needs leaf-cohort state this tree does not have by design (P2: LAI is derived, not
+  # stored). So "key it to development" is a form build with a new state variable, and it is
+  # NOT what reading this constant differently would have been. Two things to know before
+  # anyone prices it: winter wheat's own row is 0.,1., 0.33,1.1, 0.36,1.06, 0.43,1.5,
+  # 0.53,1.05, 0.62,1., 0.77,0.85, 0.95,1.07, 1.14,1., 2.1,1. — it STARTS AT 1.0 and is a
+  # bounded non-monotone wiggle, not the thin→thick ramp p. 99's prose describes (spring
+  # wheat's row is the ramp); and [B] itself prices the method as days-to-weeks on the
+  # canopy-CLOSURE DATE while "the effect on leaf biomass and on final yield tends to be
+  # small".
   specific_leaf_area:
     value: 23.53
     unit: "m^2/kg"
-    source: "[B], Table 19 p.100, 'Wheat, winter' (425 kg/ha per unit LAI → 10000/425)"
+    source: "[B], Table 19 p.100, 'Wheat, winter' (425 kg/ha per unit LAI → 10000/425). POPULATION, retrieved 2026-09-06 off the page render: the table's own caption says these constants 'are average values for the entire canopy' — leaf blades, one surface, excluding petioles and leaf sheaths — so this is NEITHER a young-leaf NOR a mature-leaf value, which is what the open question had assumed it must be one of. TIMING, same retrieval, p. 99: not a season average either, but the canopy average sampled at one moment — 'a fair approximation provided that its value is measured at a proper time, such as at the end of the phase when most assimilates go to the leaves (e.g., development stage 0.5 for rice)', with the table's values being 'at about this stage'. ⚠ The application point agrees with the source: [B] p. 98 §3.3.3 defines this constant's method as 'dividing the weight of LIVE LEAVES by the specific leaf weight', which is science::leaf_area_index over the standing leaf pool. [B]'s development-keyed alternative (Table 20's SLT) applies to NEW leaves and is therefore a different locus, not a re-reading of this number. See docs/log/sla-leaf-population.md"
   # ⚠ THE BASIS MATTERS HERE AND DIFFERS FROM ../nitrogen.yaml's USE OF THE SAME NUMBER.
   # This file applies the fraction to LEAF BLADE carbon, to fold specific_leaf_area into
   # m²/mol C; nitrogen.yaml applies it to the whole plant, and records a root delta ([C]
