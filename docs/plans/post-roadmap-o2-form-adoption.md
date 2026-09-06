@@ -21,6 +21,17 @@ expires the moment the first slice lands.
 
 ---
 
+⚠⚠ **MEASURED 2026-09-06, AFTER this document was committed — and it REFUTES two of its own
+three findings.** §8 is the outcome and it is the part to read. Everything above it is left
+**exactly as written before the run**, banners aside, because a prediction edited after the
+fact is not a prediction. In short: §0's station finding **held and got much larger**; §4's
+headline (*"the band cannot be re-posed into anything that binds"*) is **WRONG** — the
+pointwise band's true minimum is ×10.67, not ×685; and §5's concern about `ci_ratio` has
+**the wrong sign**. Two of my own conclusions did not survive the measurement they told me
+they were owed.
+
+---
+
 ## 0. ⚠ HEADLINE — the scope claim adoption was priced under is FALSE, and the correction is
 ## a station-side one
 
@@ -156,6 +167,9 @@ is bit-identical by construction (no O₂ pool). The ten non-biosphere goldens a
 
 **Predicted `regen_goldens` report: 20 of 20 run, 11 would change.**
 
+⚠ **MEASURED: 20 of 20 run, 10 would change** — see §8b. One over-prediction
+(`sealed_energy_drift_summary.json`), and the 21st golden is **not** in the changed set.
+
 ⚠ `regen_goldens` covers 20; `rust/data/golden/` holds 21. That surplus is the known
 `coverage-roster-is-not-the-manifest` gap, and it must be re-checked here rather than
 assumed harmless: if the 21st is one of the eleven, it has no regeneration path in the tool
@@ -223,7 +237,14 @@ why §4 cannot be skipped.
 
 ---
 
-## 4. Does the re-posed band still bind? — and this is where it fails
+## 4. ⚠ REFUTED BY §8a — does the re-posed band still bind?
+
+⚠⚠ **This section's conclusion is WRONG and the measurement it says it is owed is what
+refuted it.** The pointwise band's true minimum on the jar is **×10.674948**, not ×685: the
+×685 figure is the ratio at the run's END, and the binding instant is nowhere near the end.
+The section is kept verbatim as the record of a conclusion drawn from a number taken at the
+wrong instant. Read §8a instead.
+
 
 A re-posed bound that cannot fail is not a bound. `log/co2-guard-reanchored.md` is the
 precedent and it is unambiguous: *the window was measured inert and removed, not resized until
@@ -269,7 +290,12 @@ outcome.
 
 ---
 
-## 5. The assumption that inherits the load — the reason to stop
+## 5. ⚠ REFUTED BY §8c — the assumption that inherits the load
+
+⚠⚠ **The sign is backwards.** A fixed `Ci/Ca` **understates** the leaf's internal CO₂ at low
+ambient CO₂, not overstates it, so the assumption makes the model **conservative** exactly
+where I claimed it made it unsafe. Kept verbatim; read §8c.
+
 
 The frozen 61.07 floor was doing a second job nobody had written down. **It was the only thing
 standing between the model and a regime its other assumptions do not cover.**
@@ -361,3 +387,172 @@ courses, not one:
 
 ⚠ **None of the three is "adopt and quietly widen the band."** That option is closed by this
 document existing.
+
+---
+
+## 8. MEASURED — what the runs said, 2026-09-06
+
+Everything here was produced **after** the sections above were committed, by a scratch harness
+that has since been deleted and a loader flip that was reverted: `git status` is clean and
+**no frozen byte moved.** The harness added one series to `Trajectory` (`biosphere.o2_pool`,
+which the pointwise band needs and which nothing sampled), flipped `params.rs:473` in the
+working tree, ran, and was reverted in full.
+
+⚠ **The harness validated itself against the record before anything new was read.** Under
+`O2Form::Constant` it reproduced the frozen minima exactly — 71.435803 / 70.252606 /
+73.338613 — and under `LivePool` it reproduced `log/o2-form-built.md`'s finding-1 column
+exactly — 7.294541 / 70.351292 / 73.425099. Both columns to six decimals, so the numbers
+below are this tree's, not a re-derivation that happens to look similar.
+
+### 8a. ⚠ §4 is REFUTED — the pointwise band binds, at ×10.67
+
+`min over t of CO₂(t)/(Γ*(t)/ci_ratio)` on the five banded scenarios, under `LivePool`:
+
+| scenario | min ratio | at step | CO₂ there | live floor there | x_O₂ there |
+|---|---|---|---|---|---|
+| `sealed_chamber` | **×10.674948** | 779 | 7.294541 | 0.683333 | 2.349705 |
+| `perennial_chamber` | ×1.150381 | 1999 | 70.351292 | 61.154791 | 210.286649 |
+| `consumer_chamber` | ×1.200661 | 2043 | 73.425099 | 61.153897 | 210.283575 |
+| `perennial_long_horizon` | ×1.150381 | 1999 | 70.351292 | 61.154791 | 210.286649 |
+| `consumer_long_horizon` | ×1.200661 | 2043 | 73.425099 | 61.153897 | 210.283575 |
+
+**×10.67, not ×685.** And the reason is a piece of physics §4 should have seen: in a sealed
+chamber the two series are **anticorrelated** — photosynthetic quotient 1, so every mole of
+CO₂ fixed releases a mole of O₂. The jar's oxygen is at its **highest** (2.349705 mmol/mol,
+*above* its 2.0 charge) exactly when its CO₂ is at its lowest. So the live floor is at its
+highest at the moment the band is evaluated.
+
+⚠ **That inverts §4's argument rather than softening it.** A pointwise band on a sealed
+chamber is not loose by construction — it is evaluated at the physically hardest instant the
+run contains, automatically, which is more than the constant floor ever did. The ×685 figure
+is the ratio at the run's **end**, hundreds of steps after the binding instant, when CO₂ has
+recovered on respiration and the oxygen has drained to 0.153756. Quoting it as the band's
+margin was reading a number at the wrong instant — the same defect as the record's own
+*"a record's probe figures are not the tree's"*, one level down.
+
+**So the re-posed band is a real bound on all five scenarios**, ×10.67 on the jar against
+×1.15–1.20 on the four controls. Nine times looser, and not vacuous. §4a's search for a
+successor bound was a search for a problem that does not exist; option 2 (the depletion
+contract) is still worth having as a *companion*, but nothing forces it.
+
+### 8b. §2's predicted red set — 10 of 11, and the surplus golden is out of scope
+
+`regen_goldens` report-only after the flip: **20 of 20 run, 10 would change.** Predicted 11.
+
+* The nine `bio=Y` state files and `drift_summary.json` changed, exactly as predicted.
+* **`sealed_energy_drift_summary.json` did NOT change** — the one over-prediction. It folds
+  `node_peak_temp_k` and `is_stationary` on the sealed station's thermal side, and the
+  biosphere's carbon does not reach either.
+* `season_euler_state.json` identical, as predicted by construction.
+* ⚠ **§2e's open question is answered: the 21st golden (`state_snapshot.json`) carries no
+  biosphere and is not in the changed set**, so adoption does *not* inherit `drift_summary`'s
+  old defect of a frozen golden with no regeneration path.
+
+### 8c. ⚠ §5 is REFUTED — the `ci_ratio` concern has the wrong sign
+
+§5 argued that a fixed `Ci/Ca = 0.7` lets the model believe in assimilation a real leaf could
+not achieve at 7 ppm ambient, because the diffusion gradient is gone. **The sign is
+backwards**, and it follows from the definition rather than needing a run:
+
+`Ci = Ca − A/g`. As `Ca` falls toward the compensation point, `A` falls with it — steeply,
+because `A ∝ (Ci − Γ*)` — so the drawdown `A/g` falls **faster than `Ca` does**, and the real
+`Ci/Ca` therefore **rises toward 1**. A real leaf at 7 ppm ambient sits at `Ci ≈ Ca`, not at
+`0.7·Ca`.
+
+So holding the ratio at 0.7 puts `Ci` **below** where a real leaf would hold it, which
+**understates** assimilation and puts the ambient compensation point `Γ*/0.7` **above** the
+true one (`Γ*/1.0`). The fixed ratio is the **conservative** assumption in exactly the regime
+§5 said it was dangerous in — and that is the same shape
+`the_shipped_floor_is_the_conservative_one_against_the_cited_route` already argues about the
+floor's other parameterization, which §5 had read without recognising.
+
+⚠ **This is `log/canopy-magnitude-diagnosed.md`'s shape** — *the plan's fix had the wrong sign
+and our own docstring said so* — reproduced by me, in a document written to stop exactly this
+kind of thing. It is recorded rather than quietly deleted because that is the whole discipline:
+**a claim written into a fix is checked by nothing unless someone checks it.**
+
+⚠ It is an **argument**, not a measurement: the model has no conductance term, so `g` is not a
+quantity this tree carries and the inequality above cannot be read off a run. It is recorded at
+the strength it has.
+
+### 8d. ⚠ §0 HELD, and it is far larger than "huge" — the station's Tier-2 golden moves by two thirds
+
+The one finding that survived, and the measurement made it the decisive one. Largest relative
+moves per golden, frozen → adopted:
+
+| golden | stock | frozen | adopted | move |
+|---|---|---|---|---|
+| `sealed_station_state` | `biosphere.humus_carbon` | 25.823 | 45.1658 | **+74.9 %** |
+| `sealed_station_state` | `biosphere.microbial_carbon` | 12.3966 | 21.1391 | **+70.5 %** |
+| `sealed_station_state` | `biosphere.storage_c` | 37.9945 | 63.6084 | **+67.4 %** |
+| `sealed_station_state` | `biosphere.root_c` | 8.18673 | 13.6531 | **+66.8 %** |
+| `sealed_station_state` | `biosphere.stem_c` | 11.2998 | 18.6024 | **+64.6 %** |
+| `greenhouse_state` | `biosphere.stem_reserve_c` | 0.00314025 | 0.00595129 | **+89.5 %** |
+| `greenhouse_state` | `biosphere.leaf_c` | 0.0820178 | 0.118064 | **+43.9 %** |
+| `harvest_state` | `biosphere.storage_c` | 0.00234709 | 0.00403986 | **+72.1 %** |
+| `sealed_chamber` (the jar) | `biosphere.o2_pool` | 0.0331859 | 0.153756 | **+363.3 %** |
+| `sealed_chamber` (the jar) | `biosphere.leaf_c` | 8.75291e-8 | 4.8331e-8 | **−44.8 %** |
+| `lighting_state` (control) | `biosphere.stem_reserve_c` | 0.0052749 | 0.00527374 | −0.022 % |
+| `perennial_chamber` (control) | `biosphere.carbon_pool` | 0.115822 | 0.115935 | +0.098 % |
+
+**The controls behave** — 0.02 % and 0.098 % maxima — so the flip is scenario-shaped and the
+wiring is right. **And `sealed_station` is the fully-coupled multi-year station**, the Tier-2
+golden this whole contract exists to freeze. Its plant and soil carbon rise by **two thirds**.
+
+⚠ **The direction plan priced adoption at "one row of one scenario."** The measurement says it
+is a **60–75 % move in the principal stocks of the station's flagship run**, plus a 45 % fall
+in the jar's biomass, plus 44–90 % rises in the greenhouse and harvest seams. Nothing about
+the form is wrong; what was wrong is that its consequences were measured on an instrument that
+could not see the station.
+
+⚠ **And the cause is the greenhouse charge, which is almost certainly an authoring artifact.**
+`greenhouse_bio_scenario` puts 10 mol of O₂ into 9500 mol of cabin air — **1.05 mmol/mol,
+0.5 % of a breathable atmosphere.** Under the frozen constant the crop read 210 regardless, so
+nobody had to notice. Under adoption the crop reads 1.05, its oxygenation nearly vanishes, and
+it grows two thirds more. **The 60–75 % is not the oxygen science arriving; it is an
+unrealistic oxygen charge becoming visible**, and adopting the form would freeze that number
+as reference science.
+
+⚠ **Not yet checked, and it belongs to whoever takes course (a):** whether the cabin's O₂ is
+*meant* to be the crew's breathable supply — the ECLSS seam writes `boundary.o2_supply`, and
+`biosphere.o2_pool` ends at the same 8.102 mol in both the 28-step greenhouse run and the
+4880-step sealed station, which is a fixed point worth understanding before re-charging it.
+
+---
+
+## 9. RECOMMENDATION — revised after §8, and the question for the user has changed
+
+**§7's recommendation is withdrawn.** It rested on §4 and §5, both refuted. Two of its three
+courses were built on my own errors and are not the choice any more.
+
+What the measurement leaves is one clean fact and one genuine question.
+
+**The clean fact: adopting the form is scientifically sound and its ceremony is unblocked.**
+The band re-poses into a bound that binds on all five scenarios (§8a), evaluated at the
+hardest instant each run contains; the `ci_ratio` assumption is conservative rather than
+dangerous (§8c); the controls confirm the wiring (§8d); the red set is predictable and the
+manifest gate will catch a half-done job (§2d). Nothing scientific stands in the way.
+
+**The genuine question: the station's greenhouse air is not breathable, and adoption is what
+makes that matter.** A cabin at 0.5 % oxygen is not a habitat anyone designed; it is a fill
+value that never had to be right. Adoption would freeze a 60–75 % change in the station's
+flagship golden that is **caused by that fill value**, not by the science being adopted.
+
+So the choice is now about **order**, not about whether:
+
+* **(a) Fix the greenhouse oxygen charge first, then adopt.** Set the station's sealed
+  biospheres to a real cabin fraction (≈210 mmol/mol, i.e. ~1995 mol in 9500) — its own small
+  unfreeze with its own goldens — and *then* adopt the form, at which point the station
+  scenarios become controls that barely move and the jar is genuinely the only thing that
+  changes, exactly as adoption was priced. **This is what I recommend.** It separates
+  "a fill value was wrong" from "the oxygen science changed", which are two findings that
+  should not share one golden diff.
+* **(b) Adopt now, and accept the 60–75 % move** as the honest consequence of the scenario as
+  authored. Defensible, and cheaper by one unfreeze — but it freezes a large change whose
+  cause is a charge nobody defends, and it makes the two causes inseparable in the record.
+* **(c) Adopt now and fix the charge afterwards**, in two unfreezes. Worst of both: the same
+  large diff lands, and then most of it is undone.
+
+⚠ **Whichever is chosen, the pieces adoption itself needs are now known and cheap**: §6's
+ceremony stands with steps 1 and 2 struck (they are done — this section is their result), and
+§4a's hunt for a successor bound is dropped.

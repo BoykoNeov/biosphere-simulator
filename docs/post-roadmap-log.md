@@ -47,7 +47,11 @@ one in the index would break the index↔record pairing for the right reason and
   into. **A doc's exemption is retired with the doc only if something else came to name it —
   and for this one nothing did.** The trigger for superseding it was measured rather than
   argued: 30 strike-through spans holding 71.6 % of its bytes.
-* **`post-roadmap-o2-form-adoption.md` — WRITTEN 2026-09-06, nothing built.** The re-posing
+* **`post-roadmap-o2-form-adoption.md` — WRITTEN 2026-09-06, nothing built.** ⚠ Its §8 carries
+  a **measurement** taken the same day on a reverted working tree — no frozen byte moved, so
+  the doc is still forward-looking — and that measurement **refuted two of the document's own
+  three findings**, which is the entire argument for committing the prediction before the run.
+  The re-posing
   the third direction plan's §2.3 names as adoption's precondition (*"adopting means re-posing
   that band first, in writing, before a run"*), committed **before** the flip precisely so its
   predicted red set can fail against the measurement instead of being assembled from it. It is
