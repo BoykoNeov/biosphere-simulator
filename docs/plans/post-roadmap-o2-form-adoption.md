@@ -35,6 +35,10 @@ jar"* — is FALSE, refuted by §8a.** It is named here because a commit subject
 rewritten once pushed, and `git log --oneline` otherwise shows a confident wrong claim whose
 only correction is in the *next* subject. The pointer belongs at the false claim.
 
+⚠ **DECIDED 2026-09-06: the user chose course (B) — fix the setting first, then adopt.**
+§11 is slice 1's plan and predictions, written before anything was flipped. Adoption itself
+(§6's ceremony, with §8a's re-posed band) is slice 2 and has not been taken.
+
 ⚠ **And §9 is superseded by §10**, which is a third refutation — of the recommendation §9
 itself made. The oxygen pool the station runs on is **regulated to a setpoint**, so §9(a)'s
 "re-charge the scenario" is a no-op a controller undoes. **Read §10 for the courses.**
@@ -656,3 +660,165 @@ than described.
 
 ⚠ **What is NOT on the list, and was on §9's:** re-charging `chamber_o2_mol0`. §10a rules it
 out — a controller undoes it.
+
+---
+
+## 11. SLICE 1 — the cabin oxygen setpoint, restated from a cited atmosphere
+
+**Chosen by the user 2026-09-06: "fix the setting first."** This section is the plan and the
+predictions, written **before** anything is flipped, for the same reason §2 was: the discipline
+has now caught three of my own errors in a row.
+
+### 11a. The design — a value-and-provenance move, NOT the model change the param file feared
+
+`eclss.yaml`'s `o2_setpoint` says of itself that it is *"PERMANENTLY un-bindable as written"*
+because it is a mole count and real systems regulate partial pressure. **That is true of the
+units and false of this model**, and the reason is that `V` and `T` are constants here — there
+is no volume state and no cabin thermodynamics — so a mole target and a partial-pressure
+target differ by a fixed factor, and regulating one *is* regulating the other. **The
+un-bindability was the derivation being absent, not the model form.**
+
+⚠ **The structural alternative was considered and rejected on measurement, not taste.** Making
+the setpoint a mole *fraction* that the flow multiplies by the cabin's air is the tidier shape,
+and it is what I was advised to build. It is wrong here: within `O2Makeup`'s reach there is
+exactly **one** air inventory (9500 mol, the greenhouse group) and **four scenarios with no air
+inventory at all** — `eclss` standalone, `cabin_gas`, `water_recovery`, `crew` never convert a
+pool to a concentration. The fraction design would force inventing a cabin size for four
+scenarios that do not have the concept, which is scope growth of exactly the kind this document
+declined for `chamber_air_mol`'s provenance. **Where the setpoint is actually used, the two
+designs differ by a constant.**
+
+**What is owed instead is the trigger, in writing, in the `source:` string:** if an ECLSS is
+ever wired to a cabin whose air inventory is not 9500 mol, this value must become a fraction
+and the flow must read the air. That converts a latent coupling into a stated condition, which
+is the difference between a documented simplification and a hidden one.
+
+### 11b. The number, and the choice of atmosphere is SCIENTIFIC
+
+From **BVAD Rev 2 (NASA/TP-2015-218570), §4.1.1 "Design Values for Atmospheric Systems",
+p. 61**, verbatim:
+
+> ISS EVA operations originate from **21% oxygen and 101.3 kPa (14.7 psia) of pressure**, with
+> a prebreathe period at 70.3 kPa (10.2 psia).
+
+`n_O2 = 0.21 × 9500 mol = **1995.0 mol**`.
+
+⚠ **Which atmosphere is a modelling decision with a consequence, and it is stated as one.**
+The same page and `Table 4-1` (p. 63) give *three* nominal total pressures — **"101 or 70.3 or
+56.5"** kPa — and the reduced-pressure exploration option runs **34 % oxygen at 57 kPa**
+(Norcross 2013) so that lungs see an Earth-like ppO₂ at lower total pressure. **The crop reads
+the mole fraction**, so 34 % would give a materially different photosynthetic and microbial
+response than 21 %. This habitat is modelled as **ISS-like, sea-level-equivalent**, and that is
+a choice, not a lookup.
+
+⚠ **A weak internal-consistency reading supports it and is not presented as a derivation:** the
+same cabin carries CO₂ at 399.6 ppm — Earth-ambient — and BVAD's own `p[CO₂] for Plants` lower
+bound is *"0.04 kPa (4) Earth normal"*, which at 101.3 kPa is 395 ppm. A ppm is dimensionless
+and fixes no total pressure, so this cannot select the atmosphere; it is the reading that
+leaves the tree self-consistent.
+
+⚠ **Cross-check between two loci, not a second derivation:** `Table 4-1`'s *"p[O₂] for Crew;
+nominal no impairment"* is **21.2 kPa** nominal (ref (2) NASA HIDH 2014), which over 101.3 kPa
+is 20.93 % — within 0.4 % of the 21 % cabin composition. Those are **different quantities** (a
+crew physiological requirement vs a cabin composition) and the agreement is a consistency
+check. The value taken is the composition, because the composition is what this model needs.
+
+### 11c. ⚠ The bad number was NEVER inert — the soil microbes have been reading it all along
+
+The oxygen form is not the only thing that reads this pool. `MaintenanceRespiration` (and five
+sibling flows) throttle by `f_O2 = x/(k + x)` with `x = o2_mol/air_mol` and
+`k = o2_half_saturation = 1e-4` (`respiration.yaml`), and that coupling is **live and frozen**,
+not lab-only.
+
+| cabin | x_O₂ | `f_O2` |
+|---|---|---|
+| greenhouse / harvest / sealed_station, **today** | 8.529e-4 | **0.8951** |
+| greenhouse / harvest / sealed_station, **fixed** | 0.21 | **0.99952** |
+| perennial / consumer chambers (correctly charged) | 0.2102 | 0.99952 |
+| `sealed_chamber` (the jar — designed near-anoxia) | 3.32e-5 | 0.2492 |
+
+**So the station's soil respiration has been throttled to 89.5 % of its unlimited rate for four
+phases, by an oxygen inventory 200× too low, while every correctly-charged chamber sat at
+99.95 %.** The defect was never waiting for adoption to matter — adoption is only what made it
+*visible*. This is the honest reason the fix comes first.
+
+### 11d. The edit set — five numbers that move together
+
+They move together or the runs acquire a start-up transient that is not the science:
+
+1. `rust/crates/domains/params/eclss/eclss.yaml` — `o2_setpoint` 10.0 → **1995.0**, with the
+   citation and the trigger condition in `source:`. ⚠ This file is **hashed in the station
+   manifest**, so `station/tests/manifest_writer.rs` is the automatic gate.
+2. `station/src/scenario.rs::greenhouse_bio_scenario` — `chamber_o2_mol0` 10.0 → 1995.0.
+3. `sealed_station_bio_scenario` — inherits (2) via `..greenhouse_bio_scenario()`; **verify**.
+4. `station/src/scenario.rs::CABIN_GAS_SCENARIO` — `cabin_o2_0` 10.0 → 1995.0
+   (`WATER_RECOVERY_SCENARIO = CABIN_GAS_SCENARIO`, so it follows).
+5. `domains/src/eclss.rs::STEADY_STATE_SCENARIO` — `cabin_o2_0` 10.0 → 1995.0.
+
+Plus prose that becomes false: `EclssScenario::cabin_o2_0`'s *"starts at the setpoint"* stays
+true only if all five move; the `HAND` const in `eclss.rs`'s test module restates the yaml.
+
+### 11e. ⚠ A BLOCKER of the drift_summary class — and it is the one real cost
+
+`domains::params::tests::every_value_matches_the_generated_table` asserts **bit equality** of
+twelve loaded params against `src/sibling_params.txt`, a hex-float table whose own header reads
+*"GENERATED, do not edit. Source of truth: the frozen Python loaders"* and whose regeneration
+line is `uv run python tests/crossport/gen_sibling_params.py` — **a file S6 deleted.** The
+directory does not exist.
+
+So moving `o2_setpoint` reddens a control that **cannot be regenerated**. Three options:
+
+* **Hand-edit the hex float. REFUSED.** The file asserts its values came from Python's loaders.
+  Writing a number Python never produced makes the file lie, and it is a control precisely
+  because nobody edits it.
+* **Retire the whole table.** Its purpose — proving slice C1's re-anchoring bit-neutral — is
+  discharged, and Python is gone so it can never be regenerated for any future move. But this
+  orphans the surviving evidence for eleven params that have *not* moved.
+* **Retire the `o2_setpoint` ROW only**, dropping it from `pairs` and the count assertion
+  12 → 11, with the reason recorded in the file. **This is what I will do.** The eleven
+  unmoved params keep their bit-level control; the moved one keeps its manifest hash and its
+  goldens, which is adequate. ⚠ The count assertion going 12 → 11 is a real, if small,
+  weakening and is called that rather than presented as a tidy-up.
+
+### 11f. Predicted golden set, written before the run
+
+**Predicted: 6 of 20 change** — `eclss_state`, `cabin_gas_state`, `water_recovery_state`,
+`greenhouse_state`, `harvest_state`, `sealed_station_state`. Unchanged: `crew_state` (no
+ECLSS), `station_state` (no oxygen stocks), `lighting_state`, the four chambers,
+`season_euler_state`, `drift_summary` (folds chambers with no ECLSS), and
+`sealed_energy_drift_summary` (thermal folds only — it did not move for the oxygen form
+either).
+
+⚠ **A sharp prediction that can fail.** For the three scenarios with **no biosphere writing the
+pool** — `eclss`, `cabin_gas`, `water_recovery` — the regulator's dynamics are in the deviation
+`e = setpoint − cabin_o2`, and **both** the setpoint and the initial condition shift by the same
++1985.0. So `e(t)` is unchanged, and therefore:
+
+* `eclss.cabin_o2` / `biosphere.o2_pool` shift by **exactly +1985.0**, and
+* **`boundary.o2_supply` and `boundary.co2_removed` are BIT-IDENTICAL.**
+
+If the supply moves on those three, the shift is not a pure translation and something else
+reads the pool. For the three station assemblies it is **not** a pure translation — the
+biosphere both writes the pool and reads it through `f_O2` (§11c) — so their biomass moves too:
+**direction predicted DOWN**, because a less-throttled maintenance respiration burns more.
+Magnitude predicted **small** — single-digit percent — and in any case far below the 60–75 %
+that adoption itself produces.
+
+### 11g. Predicted red set
+
+1. `every_value_matches_the_generated_table` — RED, §11e, no regeneration path. **The one
+   finding this slice buys.**
+2. `station/tests/manifest_writer.rs` — RED until the station manifest is regenerated (the
+   `eclss.yaml` sha-256 moves). The automatic gate, confirmed present.
+3. The six golden comparisons — RED until regenerated.
+4. `domains/tests/eclss_run.rs`'s steady-state check — **GREEN**: it asserts the *relation*
+   `o2_eq = o2_setpoint − Con/k`, not a value. A pin on a relation survives a value move; that
+   is the whole reason to write pins that way.
+5. `station`'s `crew_mission` science gate (`bvad_o2_per_cm_per_day`) — **GREEN**: at steady
+   state the supply flux equals the crew's consumption whatever the setpoint. ⚠ Verify rather
+   than reason — it also asserts `rationed == 0` and no extinction events, and 900 steps must
+   still converge from the new initial condition. A 200× larger setpoint gives the regulator
+   more headroom, so both should improve; "should" is what the last three refutations were
+   built on.
+6. `domains/src/params.rs`'s loader tests — **GREEN**: they build synthetic YAML inline and
+   never read the committed file.
