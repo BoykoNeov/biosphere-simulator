@@ -184,12 +184,25 @@ down here is as red as a value that drifted. Raising a bound is therefore a two-
 construction, which is the property the 2026-08-26 half-raise did not have.
 
 ⚠ **What it deliberately does NOT check: the prose.** Every other number in this document is
-*dated history* — the 12,000 and 16,000 and 20,000 ceilings, the 162 and 170.4 B/line
-measurements, the `MAX_MEMORY_BYTES_PER_LINE = 170` sentence a few paragraphs below — and
-history is not maintained, per this file's own rule against editing its own past. So a future
-raise leaves those sentences standing, correct as of their date and stale as statements of
-the rule. The table is where a reader finds out what is true *now*; that is the whole reason
-it exists as a separate normative block rather than as one more paragraph.
+*dated history*, and history is not maintained, per this file's own rule against editing its
+own past. So a future raise leaves those sentences standing — correct as of their date, stale
+as statements of the rule. **A number outside the table is dated to the section it sits in; a
+number inside the table is the rule.** That is the whole reason the table exists as a separate
+normative block rather than as one more paragraph.
+
+⚠ **An earlier draft of this paragraph LISTED the stale sentences by name, and that list was
+cut.** A list of the places a rule is restated is one more copy of the rule, going stale on
+exactly the schedule of the sentences it points at — the defect this section exists to close,
+reappearing one level up and inside the fix itself. Where a historical sentence states a bound
+as if it were still current, it now carries a pointer back to the table rather than a rewrite.
+
+⚠ **The check reaches the whole file, not just the table.** `doc_bounds` scans every line, so
+a row **anywhere** in this document whose first cell is a backticked `SCREAMING_CASE` name and
+whose second cell is a bare number joins the checked set. The commit-hash and file-size rows
+further down stay out for two independent reasons — their names are not `SCREAMING_CASE`, and
+their values carry units (`17,715 B`) — so dropping a unit suffix in a cosmetic tidy would not
+be enough on its own to pull one in. The failure direction is safe either way: a doc-only name
+can never match a Rust `const`, so the worst case is a spurious RED, never a silent pass.
 
 **Six controls, each predicted before it was run, and all six as predicted.** The prediction
 matters here for the same reason it did at the third raise: a comparison of two sets can go
@@ -255,7 +268,9 @@ ceiling cannot tell "the project learned eight new things" from "the hooks grew 
 paragraphs" — it fires identically on both, and this document opens with a story about
 exactly the second one hiding behind a quiet byte count. So
 `MAX_MEMORY_BYTES_PER_LINE = 170` is now **asserted** in
-`tests/test_context_budget.py::test_memory_index_ceiling`, and the two bounds have
+`tests/test_context_budget.py::test_memory_index_ceiling` — that path is gone (S6 deleted the
+Python checker) and the figure is the bound *as of 2026-08-15*; the normative table above is
+the checked copy. The two bounds have
 opposite remedies on purpose:
 
 - the **ceiling** fires on *more memories* → merge related files;
@@ -297,7 +312,7 @@ is the 2026-08-15 finding one turn further along: **a mean cannot tell one fat h
 
 So `MAX_MEMORY_INDEX_LINE_BYTES = 240` is asserted, **pinned at the measurement** (239,
 plus one byte) rather than set somewhere comfortable above it — a max bound with room in
-it rots the way a ceiling with room in it rots. Its remedy is the per-line budget's aimed
+it rots the way a ceiling with room in it rots. (The figure is the bound as set on that date; the normative table above is the checked copy.) Its remedy is the per-line budget's aimed
 at a single line: shorten *that* hook. Like the per-line budget, it is not raised.
 
 ⚠ **The honest scope, because two of the five controls measured it and "the new gate went
