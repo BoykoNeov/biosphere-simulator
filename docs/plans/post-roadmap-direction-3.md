@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `o2-form-adopted.md`
+**Re-read against the record's last row:** `perturbation-suite.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -38,6 +38,11 @@ predecessor, which is kept whole.
 - **Rust is the reference** (2026-08-16); the Python checker is gone (S6, 2026-08-27).
 - Four freeze contracts hold: biosphere (Euler, `dt = ¼`, 15 param files, 7 scenarios),
   station (13 scenarios, biosphere delegated), native-port tolerance, authoring platform.
+- ⚠ **The two lines below were true on 2026-09-06 and were ended on 2026-09-08** by the
+  perturbation batch and the decision that followed it (§6): the stop was a stop of the
+  *nominal-roster* thread, and the model's behaviour space off that roster had never been
+  entered. Kept because the reasoning that produced them was sound and the boundary it missed
+  is the finding.
 - **The science thread has reached a natural stop.** Not "ran out of ideas" — every mechanism
   offered to the open canopy question over three weeks was measured and either refused on its
   sign or shipped and found inert (§3). The three decisions in §2 are what is left, and none
@@ -71,6 +76,12 @@ matter cycles. It is buildable now that the step is `¼`.
 * The measured surprise worth remembering: holding the sealed chamber at the 357 ppm it
   starts from is **four times worse** than letting it deplete, because the uncontrolled
   chamber self-limits and a controller removes that feedback.
+  ⚠ **A SECOND, independent arrival at that mechanism, 2026-09-08** (`log/perturbation-suite.md`):
+  shrinking the chamber while holding its composition rations at ×0.75, while *dropping* the
+  composition does not ration even at ×0.25 with a third the carbon — because a falling mole
+  fraction drops demand along with supply. Holding the fraction holds the appetite and removes
+  the buffer. Two unrelated routes to one mechanism; this bullet is no longer a single
+  measurement.
 * **Why "not yet" rather than "no":** whether a habitat that vents carbon is the right realism
   move is a design question about what this simulator is *for*, not a measurement. It is a
   reasonable thing to want; it is not a defect to fix.
@@ -113,12 +124,24 @@ a stranger outcome than either being simply right.
   209.800 mmol/mol with ~50× of headroom against any defensible band, so it would have been
   inert by construction. Closing it needs a subject with a reachable falsifier — a **perturbed**
   run, not a regulated nominal one.
-* **A form can be nearly inert on the frozen roster and loud under perturbation.**
-  `sealed_station` moves 0.058 % under adoption and **9.8 %** under an oxygen leak on the same
-  tree, and the sign inverts the ECLSS reading: less O₂ is less photorespiration, so a leak that
-  is damage to the regulator is a yield increase to the crop. §3's "closed by measurement"
-  entries are all measured on the nominal roster; **that roster is not the model's behaviour
-  space**, and the perturbation suite is where this class of finding lives.
+  ⚠ **STILL OPEN, and the 2026-09-08 batch deliberately did not close it.** That batch built
+  perturbed subjects, which is the prerequisite this bullet names — but a census row lands in
+  `docs/station-reference.manifest.json`, so closing it is **an unfreeze with a ceremony**, not
+  a free consequence of having a subject. It is better taken **after B**, when the quantity it
+  would freeze is the one B leaves behind rather than the one B replaces.
+* ~~**A form can be nearly inert on the frozen roster and loud under perturbation.**~~
+  **TAKEN and BUILT 2026-09-08** (`log/perturbation-suite.md`), on the user's *"start
+  deliberately breaking things"*. The claim stands and its scope was too small: the perturbation
+  suite existed but had **never reached the biosphere** (`grep -rln "perturbations::"` returned
+  nothing under `domains/tests/`), so no perturbation had ever touched the plant science.
+  ⚠⚠ **And the +9.8 % is scoped to REGULATION, not to the science.** Halving oxygen alone gives
+  **jar −1.45 %, big perennial chamber −0.86 %** — both opposite in sign to the station —
+  because O₂ enters twice (leaf `Γ*`; soil `x/(K+x)` on the decomposers, who *are* a sealed
+  chamber's CO₂ supply) and only the station's cabin is **defended** by `O2Makeup`. So *"less
+  oxygen is better for plants"* is a statement about a regulated habitat and is false of every
+  chamber in the frozen roster. ⚠ The obvious explanation — the jar's low charge — was
+  **refuted by its own control** inside that batch; the big chamber's route is 18× its soil
+  throttle and is left **open**.
 
 ~~The original pricing follows, struck, because its numbers are still the record of what was
 believed:~~
@@ -318,11 +341,21 @@ work — so they can be taken in one sitting or left indefinitely. Recommended: 
 parked leaf mechanism (§2.1), because it is the only one where the evidence points one way
 and it has been open the longest.
 
-**Then the project needs a direction, not an item.** With the science thread at a natural
-stop, the standing candidate is the **product track**, dormant by the 2026-08-13 decision
-with "re-open when the science thread reaches a natural stop" as its own condition. That
-condition is now met. Re-opening it is a decision about what this project is *for*, and it
-belongs to the user.
+~~**Then the project needs a direction, not an item.**~~ **ANSWERED 2026-09-08, and not with
+the product track.** Shown that the perturbation axis was unexplored biosphere-side, the user
+chose it (*"i agree, go with it"*), and then, shown that the habitat has no atmosphere to lose,
+chose the follow-on explicitly: **"ok A now, but immediately after that (next session) B"**.
+
+* **A — BUILT 2026-09-08**, `log/perturbation-suite.md`.
+* **B — DECIDED, not proposed: give the habitat a real atmosphere.** Total gas becomes a
+  stock, pressure becomes state, and the leaf reads partial pressures instead of mole fractions
+  over a constant. **This is a frozen-science change and carries the full ceremony**, unlike A.
+  It trips the trigger `eclss.yaml`'s own `o2_setpoint` source string wrote on 2026-09-06:
+  *"If an ECLSS is ever wired to a cabin whose air is not 9500 mol, this MUST become a mole
+  fraction and the flow MUST read the air."*
+
+The **product track** remains dormant and remains the standing candidate after B; its
+2026-08-13 re-open condition is still met and nothing here consumes it.
 
 **Not recommended:** reopening the citation bucket wholesale; any value move on the FvCB
 constants before the page check; a `--write` of a transcendental golden from a Linux box;
