@@ -200,6 +200,18 @@ all taken, and all four are now closed.
 This is the section that earns the supersede. Each line is a direction that looks open to a
 fresh reader and is not, with the record that closed it.
 
+⚠⚠ **EVERY VERDICT BELOW WAS MEASURED ON THE NOMINAL ROSTER, AND THAT ROSTER IS NOT THE
+MODEL'S BEHAVIOUR SPACE.** This caveat lived in §2.3 until 2026-09-08, where discharging the
+build it was attached to would have carried it off with them; it belongs here, against the
+verdicts it qualifies. The 2026-09-08 perturbation batch (`log/perturbation-suite.md`) **did
+not re-measure any row below** — it built the instrument that could. So a row reading *"inert
+on the chambers"* is a claim about nominal runs, and the one thing that batch demonstrated is
+that a claim of that exact shape can invert off them: an oxygen leak moves `sealed_station`
+0.058 % nominally and 9.8 % perturbed, and the *sign* of an oxygen change is opposite in a
+regulated cabin and an unregulated chamber. **Do not re-propose the mechanisms below. Asking
+whether one of their verdicts is scoped to an observable the nominal roster silences is a
+different question, and it is open.**
+
 **The canopy magnitude question is CLOSED, and it was smaller than three weeks of planning
 said.** `open_season` peak LAI reads **6.0228** at the shipped step and **5.4273** converged,
 inside the `5.0 < peak < 8.0` band **at every step in the sweep** — the deviation the plans

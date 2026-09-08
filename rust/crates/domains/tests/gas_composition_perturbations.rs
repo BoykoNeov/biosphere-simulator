@@ -492,6 +492,13 @@ fn oxygen_is_a_carbon_supply_nutrient_where_it_is_not_defended() {
 /// only to locate the *regime* — whether the decomposers sit inside the limiting region —
 /// never to reproduce a rate, so a drift in the file would change which regime these tests
 /// describe and not whether their whole-run asserts hold.
+///
+/// ⚠ **There are THREE of this parameter, one per struct** (`RespirationParams`,
+/// `MicrobialRespirationParams`, `HerbivoryParams`), declared in three files —
+/// `respiration.yaml`, `microbial_respiration.yaml`, `herbivory.yaml`. **All three read
+/// 0.0001 today** (checked 2026-09-08), so the single literal here is unambiguous; if they
+/// ever diverge it describes whichever one the reader assumes. The drift argument above
+/// covers a value moving, not the three disagreeing.
 const SOIL_K_O2: f64 = 1.0e-4;
 
 /// ⚠⚠ **Halving the jar's oxygen charge drives it ANOXIC — and the model absorbs that
@@ -504,7 +511,15 @@ const SOIL_K_O2: f64 = 1.0e-4;
 /// Two halves, and both are worth having pinned:
 ///
 /// * **The fragility.** The jar is *one halving* away from total oxygen exhaustion. Its charge
-///   is not a comfortable margin; it is the edge.
+///   is not a comfortable margin; it is the edge — its own healthy trough already sits at a
+///   soil factor of **0.606**, a 39 % throttle.
+///   ⚠ **And two param files say otherwise in prose.** `respiration.yaml` describes this
+///   self-limit as *"O2-saturated (f_O2 ~ 1) until near-anoxia in a well-mixed chamber"*, and
+///   `herbivory.yaml` calls it *"Behaviourally inert today (f_O2 ≈ 1 at the ample-O2 chamber
+///   fill)"*. **Measured, the frozen jar's trough is 0.606**, not ≈1. Left uncorrected on
+///   purpose: a comment edit in a param file is a manifest hash and therefore an unfreeze, so
+///   it is taken the next time either file's entry moves for a real reason (the standing
+///   convention). Recorded in `docs/log/perturbation-suite.md` so it is not lost meanwhile.
 /// * **The robustness, which is the better news.** Across 3661 steps the stock is **never
 ///   negative**, the arbitration backstop **never fires**, and no event is raised — first-order
 ///   donor control means the draw vanishes with the pool, so the model reaches zero smoothly
@@ -550,10 +565,17 @@ fn halving_the_jars_oxygen_takes_it_to_anoxia_without_going_negative() {
 /// ⚠ **The two probes are different experiments, and this is what says so.**
 ///
 /// E1 and E2 apply the same factor to the same two gas stocks and differ only in whether the
-/// air goes with them. If the biology were reading absolute moles rather than fractions they
-/// would be the *same* run, every assert above would still pass, and the distinction this
-/// whole file is built on would be fictional. Measured as a contrast rather than argued from
-/// the source.
+/// air goes with them. If the biology read absolute moles rather than fractions they would be
+/// the *same* run and the distinction this whole file is built on would be fictional.
+///
+/// ⚠⚠ **MEASURED CAVEAT: this test is guarded by the OXYGEN path, not the carbon one.**
+/// Severing `Ci` from the air entirely — `ci_from_co2_pool` hardcoded to the jar's own 1000.0
+/// — leaves it **green**, because E1 still moves `o2_mol / air_mol` and the contrast survives
+/// through `Γ*` and the soil factor. So it detects "the run ignores the air" only while at
+/// least one of the two gas paths still reads it, and it is **not** the single sentinel its
+/// first docstring implied. Found by re-running the mutation with the jar's real air inventory
+/// after the first attempt used the *station's* 9500.0 — which perturbed `Ci` by 9.5× and
+/// measured something else entirely.
 #[test]
 fn holding_the_air_is_what_makes_e2_a_different_experiment_from_e1() {
     let base_w = peak_w(&jar(sealed_chamber_scenario()));

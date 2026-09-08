@@ -161,9 +161,27 @@ Five mutations to `science.rs`, each applied alone, `--no-fail-fast`, reverted a
 |---|---|
 | M1 `Kc` term folded into `Ci` | 7 of 9 |
 | M2 `Aj` denominator `+1.0` | 1 — **only** the invariance test |
-| M3 `Ci` ignores `air_mol` | 3 — the air-reading tests |
+| M3 `Ci` ignores `air_mol` (hardcoded to the jar's **1000.0**) | 3 — the E1 room-size tests |
 | M4 `Γ*` stops scaling with O₂ | 3 |
 | M5 soil O₂ factor forced to `1.0` | 5 |
+
+⚠ **M3 was mis-targeted on the first pass and the correction changed what it proves.** It
+hardcoded the *station's* 9500.0 against a jar whose air is **1000.0**, so it was a 9.5× `Ci`
+perturbation rather than an air-deafness mutation. Re-run at 1000.0, the same three tests
+redden — **and `holding_the_air_is_what_makes_e2_a_different_experiment_from_e1` stays
+green**, the one test written to detect exactly this. It survives because E1 still moves
+`o2_mol / air_mol`, so the E1/E2 contrast persists through the oxygen path while the carbon
+path is severed. Its docstring claimed more than it checks and has been corrected in place.
+
+⚠ **A second stale-prose finding, recorded and NOT fixed.** `respiration.yaml` describes the
+O₂ self-limit as *"O2-saturated (f_O2 ~ 1) until near-anoxia in a well-mixed chamber"* and
+`herbivory.yaml` as *"Behaviourally inert today (f_O2 ≈ 1 at the ample-O2 chamber fill)"*.
+**The frozen jar's own trough measures 0.606** — a 39 % throttle, not ≈1 — and at half charge
+it reaches 0. Left uncorrected deliberately: a comment edit in a param file is a manifest hash
+and therefore an unfreeze, so it is taken the next time either file's entry moves for a real
+reason. (Three structs declare `o2_half_saturation` — `respiration`, `microbial_respiration`,
+`herbivory` — and **all three read 0.0001 today**, checked 2026-09-08, so the tests' single
+literal is unambiguous.)
 
 Every test reddened under at least one mutation **except** `the_gas_perturbations_are_
 deterministic`, which is **inert by nature**: only a nondeterminism-introducing change could

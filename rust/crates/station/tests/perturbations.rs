@@ -388,7 +388,22 @@ fn carbon_leak_lowers_biomass_and_scrubber_effort() {
 /// ⚠ The direction is the part worth reading twice: an oxygen leak makes the crop grow
 /// **more**, because less O₂ is less photorespiration. A perturbation that reads as damage
 /// on the ECLSS side reads as a yield increase on the biology side, and nothing in the model
-/// was arranged to produce that — it is FvCB's own oxygen terms arriving.
+/// was arranged to produce that.
+///
+/// ⚠⚠ **SCOPED 2026-09-08, and the scope is narrower than this test first claimed**
+/// (`docs/log/perturbation-suite.md`). Two corrections, neither of which touches the
+/// assertions below:
+///
+/// * **The sign holds where the pool is DEFENDED, and nowhere else measured.** Halving O₂ in
+///   the unregulated biosphere chambers moves the crop the *other* way — jar −1.45 %, big
+///   perennial chamber −0.86 %. This run's cabin is held at 209.8 mmol/mol by `O2Makeup`,
+///   which is what leaves the leaf path alone to answer. *"Less oxygen is better for plants"*
+///   is a statement about a regulated habitat.
+/// * **"FvCB's own oxygen terms arriving" named ONE of oxygen's two entries.** The other is
+///   `oxygen_limitation_factor`, a Michaelis–Menten `x/(K+x)` on decomposition and microbial
+///   respiration — and in a sealed chamber the decomposers *are* the CO₂ supply. That path is
+///   what inverts the sign in both chambers, and it is invisible here because a defended cabin
+///   never lets it bite.
 ///
 /// What survives unchanged is the ECLSS signature (supply works harder, the sink fills) and
 /// the ordering: the undefended pool is still the louder one. What is retired is "orders
