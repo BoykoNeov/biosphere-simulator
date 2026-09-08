@@ -123,7 +123,7 @@ It is a legitimate later target; it is not this one.
 
 ## 3. ⚠ The parked leaf branch is NOT a second side — MEASURED, and this corrects the record
 
-`docs/log/leaf-remeasurement.md:96` keeps the worktree `M:\claud_projects\temp\leaf-worktree`
+`docs/log/leaf-remeasurement.md:96` keeps the worktree `W:\temp\claude\leaf-worktree`
 and the branch `leaf-expansion-rebase` alive *"so a decision need not re-do the work"*. Both
 still exist (`git worktree list` confirms, at `b865291`). But:
 

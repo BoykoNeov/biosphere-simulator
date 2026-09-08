@@ -202,8 +202,10 @@ step — only that its own recorded evidence was re-measured there. The science 
 
 ## Housekeeping — declared, not left
 
-The worktree `M:/claud_projects/temp/leaf-worktree` and the branch `leaf-expansion-rebase`
-(a clean rebase of `leaf-expansion-blocked` onto `main`) are **kept deliberately**, so a
-decision does not have to redo the rebase. `step.py` is restored to the shipped `BIO_DT =
-0.25` there and `git status` is clean. ⚠ `leaf-expansion-blocked` is unchanged and still
-points at `cb668f6`; the rebase is a *second* branch, not a rewrite of the parked one.
+The worktree `W:/temp/claude/leaf-worktree` (it was `M:/claud_projects/temp/leaf-worktree`
+when this was written; relocated 2026-09-08 with the repo) and the branch
+`leaf-expansion-rebase` (a clean rebase of `leaf-expansion-blocked` onto `main`) are
+**kept deliberately**, so a decision does not have to redo the rebase. `step.py` is
+restored to the shipped `BIO_DT = 0.25` there and `git status` is clean.
+⚠ `leaf-expansion-blocked` is unchanged and still points at `cb668f6`; the rebase is
+a *second* branch, not a rewrite of the parked one.
