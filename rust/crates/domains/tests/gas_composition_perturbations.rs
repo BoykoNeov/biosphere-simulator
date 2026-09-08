@@ -19,9 +19,9 @@
 //!
 //! # The axis: gas composition, and the atmosphere that is not there
 //!
-//! The biology reads mole fractions — `co2_mol / chamber_air_mol` and `o2_mol /
-//! chamber_air_mol`. ⚠ **`chamber_air_mol` is a constant carried on the flow**
-//! ([`crate::biosphere::flows`]'s `chamber_air_mol: Option<f64>`), not a stock. There is no
+//! The biology reads mole fractions — `co2_mol / chamber_air_capacity_mol` and `o2_mol /
+//! chamber_air_capacity_mol`. ⚠ **`chamber_air_capacity_mol` is a constant carried on the flow**
+//! ([`crate::biosphere::flows`]'s `chamber_air_capacity_mol: Option<f64>`), not a stock. There is no
 //! total-gas state, no nitrogen and no pressure anywhere in the tree, so **nothing in this
 //! model can lose an atmosphere.** A hull breach has no representation.
 //!
@@ -169,7 +169,7 @@ fn jar(scenario: SeasonScenario) -> Trajectory {
 fn vented(f: f64) -> SeasonScenario {
     let base = sealed_chamber_scenario();
     SeasonScenario {
-        chamber_air_mol: base.chamber_air_mol * f,
+        chamber_air_capacity_mol: base.chamber_air_capacity_mol * f,
         chamber_co2_mol0: base.chamber_co2_mol0 * f,
         chamber_o2_mol0: base.chamber_o2_mol0 * f,
         ..base
@@ -178,6 +178,19 @@ fn vented(f: f64) -> SeasonScenario {
 
 /// **E2** — the two gases scaled, the air held: the partial-pressure drop as the leaf feels
 /// it.
+///
+/// ⚠ **Sharpened 2026-09-08, when the chamber got an inert fill** (`CHAMBER_INERT`, charged as
+/// the room's remainder). Both this probe's numbers and its finding are **unchanged** — the
+/// inert term enters no flow, so nothing the leaf or the decomposers read has moved — but what
+/// it *depicts* is now more precise. With an inert fill present, scaling only the two reactive
+/// gases raises the remainder to match, so this state is reached at **constant total
+/// pressure**: it is an inert-gas dilution, not a vent.
+///
+/// That the leaf cannot tell the two apart is the correct physics, not a defect: it reads
+/// `n_i/n_ref`, which is the partial pressure, and both routes lower it identically. The
+/// genuine vent — every species falling together, total pressure falling with them — is the
+/// hull breach in `tests/atmosphere_breach.rs`, which is what E2 could only imitate before
+/// there was an atmosphere to take.
 fn depressurized(f: f64) -> SeasonScenario {
     let base = sealed_chamber_scenario();
     SeasonScenario {
@@ -223,8 +236,8 @@ fn the_bookkeeping_correct_vent_holds_composition_and_shrinks_the_room() {
         let s = vented(f);
 
         // The composition half: initial mole fractions are unchanged, exactly.
-        let x_co2 = |s: &SeasonScenario| s.chamber_co2_mol0 / s.chamber_air_mol;
-        let x_o2 = |s: &SeasonScenario| s.chamber_o2_mol0 / s.chamber_air_mol;
+        let x_co2 = |s: &SeasonScenario| s.chamber_co2_mol0 / s.chamber_air_capacity_mol;
+        let x_o2 = |s: &SeasonScenario| s.chamber_o2_mol0 / s.chamber_air_capacity_mol;
         assert!(
             (x_co2(&s) - x_co2(&base)).abs() <= 1e-15 * x_co2(&base),
             "E1 changed the CO2 fraction at f={f}"
@@ -466,7 +479,7 @@ fn oxygen_is_a_carbon_supply_nutrient_where_it_is_not_defended() {
 
     // The mechanism at the arithmetic level: the decomposers are INSIDE the limiting region at
     // the jar's charge, which is what makes this a supply story and not a leaf story.
-    let f_at = |mol: f64| oxygen_limitation_factor(mol, base.chamber_air_mol, SOIL_K_O2);
+    let f_at = |mol: f64| oxygen_limitation_factor(mol, base.chamber_air_capacity_mol, SOIL_K_O2);
     let full = f_at(base.chamber_o2_mol0);
     let half = f_at(base.chamber_o2_mol0 * 0.5);
     assert!(
@@ -550,13 +563,13 @@ fn halving_the_jars_oxygen_takes_it_to_anoxia_without_going_negative() {
         "the halved jar did not go anoxic: {min_o2} against a baseline minimum of {base_min}"
     );
     assert!(
-        oxygen_limitation_factor(min_o2, base.chamber_air_mol, SOIL_K_O2) < 1.0e-6,
+        oxygen_limitation_factor(min_o2, base.chamber_air_capacity_mol, SOIL_K_O2) < 1.0e-6,
         "the soil oxygen factor did not collapse with the pool"
     );
     // The baseline is already deep in the limiting region — the jar is not comfortable, it is
     // one halving from the edge. This is the line that makes the pin above a margin statement.
     assert!(
-        oxygen_limitation_factor(base_min, base.chamber_air_mol, SOIL_K_O2) < 0.7,
+        oxygen_limitation_factor(base_min, base.chamber_air_capacity_mol, SOIL_K_O2) < 0.7,
         "the healthy jar is not oxygen-limited at its trough, so 'one halving from the edge' \
          is the wrong reading"
     );
@@ -570,7 +583,7 @@ fn halving_the_jars_oxygen_takes_it_to_anoxia_without_going_negative() {
 ///
 /// ⚠⚠ **MEASURED CAVEAT: this test is guarded by the OXYGEN path, not the carbon one.**
 /// Severing `Ci` from the air entirely — `ci_from_co2_pool` hardcoded to the jar's own 1000.0
-/// — leaves it **green**, because E1 still moves `o2_mol / air_mol` and the contrast survives
+/// — leaves it **green**, because E1 still moves `o2_mol / air_capacity_mol` and the contrast survives
 /// through `Γ*` and the soil factor. So it detects "the run ignores the air" only while at
 /// least one of the two gas paths still reads it, and it is **not** the single sentinel its
 /// first docstring implied. Found by re-running the mutation with the jar's real air inventory

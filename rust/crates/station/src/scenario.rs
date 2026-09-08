@@ -88,7 +88,7 @@ pub fn greenhouse_bio_scenario() -> SeasonScenario {
         // start-up transient. The two move together or neither moves.
         chamber_o2_mol0: 1995.0,
         chamber_co2_mol0: 3.796,
-        chamber_air_mol: 9500.0,
+        chamber_air_capacity_mol: 9500.0,
         litter_carbon0: 0.0,
         ..DEFAULT_SCENARIO
     }

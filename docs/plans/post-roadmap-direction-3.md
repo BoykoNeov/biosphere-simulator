@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `perturbation-suite.md`
+**Re-read against the record's last row:** `atmosphere.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -287,6 +287,14 @@ against the branch that does not bind.
 * **Two records say "Γ* is TODO(cite)" as of their date** (`co2-margin-pin.md`,
   `co2-compensation-band.md`). Dated records are not maintained — listed so nobody "fixes"
   them.
+* ⚠ **`scenarios/bioregenerative_station.yaml`'s direction-gate reasoning is FALSE**, found
+  2026-09-08 by B. It states the O₂ regulator *"approaches 9.76275 MONOTONICALLY FROM BELOW"* —
+  the arithmetic of `o2_setpoint = 10.0`, superseded by 1995.0 on 2026-09-06. Nothing caught it
+  because **nothing in `rust/crates` runs the authored scenarios at all**; they are runtime-only
+  content under *"authored ≠ validated"*. Listed as a fact rather than a defect to fix here,
+  because the fix belongs with the slice-4 authoring decision above — but note the shape, which
+  is new: the *unvalidated* half of the tree can be silently broken by a frozen-side change, and
+  the freeze ceremony does not look there.
 * **The eleven transcendental goldens can only be regenerated on Windows/UCRT.** An unfreeze
   that moves one of them from a Linux box has no regeneration step there. Record it in the
   ceremony; do not `--write` around it.
@@ -359,15 +367,56 @@ chose it (*"i agree, go with it"*), and then, shown that the habitat has no atmo
 chose the follow-on explicitly: **"ok A now, but immediately after that (next session) B"**.
 
 * **A — BUILT 2026-09-08**, `log/perturbation-suite.md`.
-* **B — DECIDED, not proposed: give the habitat a real atmosphere.** Total gas becomes a
+* ~~**B — DECIDED, not proposed: give the habitat a real atmosphere.** Total gas becomes a
   stock, pressure becomes state, and the leaf reads partial pressures instead of mole fractions
-  over a constant. **This is a frozen-science change and carries the full ceremony**, unlike A.
-  It trips the trigger `eclss.yaml`'s own `o2_setpoint` source string wrote on 2026-09-06:
-  *"If an ECLSS is ever wired to a cabin whose air is not 9500 mol, this MUST become a mole
-  fraction and the flow MUST read the air."*
+  over a constant. It trips the trigger `eclss.yaml`'s own `o2_setpoint` source string wrote on
+  2026-09-06.~~ **BUILT 2026-09-08**, `log/atmosphere.md` — slices 1–3 with the full ceremony,
+  9 goldens and 9 manifest hashes. ⚠⚠ **Two sentences of the entry above were FALSIFIED by
+  building it, and both are struck rather than quietly reworded, because each was load-bearing
+  when it was written:**
 
-The **product track** remains dormant and remains the standing candidate after B; its
-2026-08-13 re-open condition is still met and nothing here consumes it.
+  1. *"the leaf reads partial pressures instead of mole fractions **over a constant**"* — the
+     second half is a **misdiagnosis**. At fixed V and T, `p_i = n_i·R·T/V`, so
+     `p_i/P_ref = n_i/n_ref` where `n_ref` is the moles filling the **room** at reference
+     pressure — which is exactly what the constant already was. Dividing by a *live* total
+     gives the mole fraction, which does not move under depressurization at fixed composition,
+     so building this sentence literally would have made the leaf **blind to a hull breach** —
+     and no golden could have caught it, since `n_total == n_ref` at charge. What was missing
+     was never the denominator: it was that **nothing conserved the air**.
+  2. *"Total gas becomes a **stock**"* — it did not, deliberately. A stock that must equal a
+     sum of other stocks is a redundancy the conservation gate cannot police. The inert fill is
+     the stock; total gas and pressure are **folded** from the species.
+  3. *"It trips the trigger"* — **it does not.** The trigger's condition is an ECLSS wired to a
+     cabin whose air is *not* 9500 mol, and the capacity stays 9500 wherever an ECLSS reaches.
+     ⚠ But the condition was **already true when the trigger was written**:
+     `scenarios/bioregenerative_station.yaml` has wired `eclss.o2_makeup` to an 8-mol cabin
+     since 2026-08-11, and the 2026-09-06 commit that added the warning is the one that
+     falsified that habitat's own stated fixed point (9.76275, the arithmetic of the old
+     setpoint 10.0). Nothing went red because nothing in `rust/crates` runs the authored
+     scenarios.
+
+**What B named on its way out — three successors, none of them scheduled:**
+
+* **A saturation bound on the chamber's gas-phase water.** B's finding 2, and the strongest
+  result it produced: all three chambers hold the **same 536.995 mol** of vapour (identical to
+  8e-16) regardless of room size, so wet pressure reaches 1.537 against a saturation-implied
+  ceiling near 1.023 — ~20× what physics allows, and **room-independence is what proves it is
+  the water model's defect rather than a scenario's sizing**. Held by a labelled tripwire that
+  is meant to redden when this is fixed. This is now the biggest known physical defect in the
+  tree.
+* **The `o2_setpoint` mole-fraction conversion (B's slice 4), now BLOCKED behind an authoring
+  decision.** It is bit-neutral (`0.21 × 9500.0 == 1995.0` exactly, verified both directions)
+  but cannot ship as designed: the frozen params reach every authored `eclss.o2_makeup`, so
+  putting the cabin capacity there hands 9500 to a habitat that is not 9500 — relocating the
+  silent default rather than closing it. The honest version is an **authoring grammar change**,
+  a second unfreeze, and its own item.
+* **The station census row for a cabin gas band** — the predecessor deferred this to "after B,
+  when the quantity it would freeze is the one B leaves behind". B leaves `pressure_ratio`
+  behind, and finding 2 says freezing the **wet** one would freeze a defect. The row should
+  name the **dry** total, which B measured to be structurally incapable of drifting.
+
+The **product track** remains dormant and remains the standing candidate now that B is built;
+its 2026-08-13 re-open condition is still met and nothing here consumes it.
 
 **Not recommended:** reopening the citation bucket wholesale; any value move on the FvCB
 constants before the page check; a `--write` of a transcendental golden from a Linux box;

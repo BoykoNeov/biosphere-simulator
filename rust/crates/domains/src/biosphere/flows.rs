@@ -60,16 +60,16 @@ pub struct CarbonContext {
     pub resp: RespirationParams,
     pub nitro: NitrogenParams,
     pub ground_area: f64,
-    /// Sealed-chamber Ci source (all-or-nothing with `chamber_air_mol`/`ci_ratio`).
+    /// Sealed-chamber Ci source (all-or-nothing with `chamber_air_capacity_mol`/`ci_ratio`).
     pub co2_pool_var: Option<String>,
-    pub chamber_air_mol: Option<f64>,
+    pub chamber_air_capacity_mol: Option<f64>,
     pub ci_ratio: Option<f64>,
     /// The chamber's O₂ stock id — the VALUE half of [`O2Form`], which cannot ride the
     /// params object because it is a stock rather than a constant.
     ///
     /// `None` for a scenario with no O₂ pool (the open field), and that scenario is therefore
     /// **unreachable by the live form by construction**, not merely unmoved by it.
-    /// ⚠ Read with `chamber_air_mol`, so it is all-or-nothing with the sealed triple above.
+    /// ⚠ Read with `chamber_air_capacity_mol`, so it is all-or-nothing with the sealed triple above.
     pub o2_pool_var: Option<String>,
 }
 
@@ -78,9 +78,9 @@ impl CarbonContext {
         match &self.co2_pool_var {
             None => env.get(&self.ci_var),
             Some(var) => {
-                let air_mol = self.chamber_air_mol.expect("sealed ctx has air_mol");
+                let air_capacity_mol = self.chamber_air_capacity_mol.expect("sealed ctx has air_capacity_mol");
                 let ci_ratio = self.ci_ratio.expect("sealed ctx has ci_ratio");
-                Ok(science::ci_from_co2_pool(env.get(var)?, air_mol, ci_ratio))
+                Ok(science::ci_from_co2_pool(env.get(var)?, air_capacity_mol, ci_ratio))
             }
         }
     }
@@ -100,9 +100,9 @@ impl CarbonContext {
     /// therefore in `tests/o2_form.rs`, which asserts the sealed chamber MOVES: nothing here
     /// can tell "not wired" from "correctly wired and inert".
     fn photo_at(&self, snapshot: &State) -> PhotosynthesisParams {
-        let x_o2 = match (&self.o2_pool_var, self.chamber_air_mol) {
-            (Some(var), Some(air_mol)) => {
-                Some(science::o2_mole_fraction(amt(snapshot, var), air_mol))
+        let x_o2 = match (&self.o2_pool_var, self.chamber_air_capacity_mol) {
+            (Some(var), Some(air_capacity_mol)) => {
+                Some(science::o2_mole_fraction(amt(snapshot, var), air_capacity_mol))
             }
             _ => None,
         };
@@ -292,7 +292,7 @@ pub struct MaintenanceRespiration {
     pub co2_atmos: String,
     pub co2_resp: String,
     pub o2_pool: Option<String>,
-    pub air_mol: Option<f64>,
+    pub air_capacity_mol: Option<f64>,
 }
 
 impl Flow for MaintenanceRespiration {
@@ -318,12 +318,12 @@ impl Flow for MaintenanceRespiration {
             // biomass-burned shortfall is a real respiration, O₂-throttled by f_O2.
             let mut f_o2 = 1.0;
             if let Some(o2) = &self.o2_pool {
-                let air_mol = self
-                    .air_mol
-                    .expect("sealed MaintenanceRespiration has air_mol");
+                let air_capacity_mol = self
+                    .air_capacity_mol
+                    .expect("sealed MaintenanceRespiration has air_capacity_mol");
                 f_o2 = science::oxygen_limitation_factor(
                     amt(snapshot, o2),
-                    air_mol,
+                    air_capacity_mol,
                     self.ctx.resp.o2_half_saturation,
                 );
             }
@@ -801,7 +801,7 @@ pub struct Decomposition {
     pub decomposition_rate: f64,
     pub litter_respired_fraction: f64,
     pub o2_half_saturation: f64,
-    pub air_mol: f64,
+    pub air_capacity_mol: f64,
 }
 
 impl Flow for Decomposition {
@@ -819,7 +819,7 @@ impl Flow for Decomposition {
     ) -> Result<FlowResult, SimError> {
         let f_o2 = science::oxygen_limitation_factor(
             amt(snapshot, &self.o2_pool),
-            self.air_mol,
+            self.air_capacity_mol,
             self.o2_half_saturation,
         );
         let decayed = self.decomposition_rate * amt(snapshot, &self.litter_carbon) * f_o2 * dt;
@@ -846,7 +846,7 @@ pub struct HumusDecomposition {
     pub slow_decomposition_rate: f64,
     pub slow_respired_fraction: f64,
     pub o2_half_saturation: f64,
-    pub air_mol: f64,
+    pub air_capacity_mol: f64,
 }
 
 impl Flow for HumusDecomposition {
@@ -864,7 +864,7 @@ impl Flow for HumusDecomposition {
     ) -> Result<FlowResult, SimError> {
         let f_o2 = science::oxygen_limitation_factor(
             amt(snapshot, &self.o2_pool),
-            self.air_mol,
+            self.air_capacity_mol,
             self.o2_half_saturation,
         );
         let decayed = amt(snapshot, &self.humus_carbon) * self.slow_decomposition_rate * f_o2 * dt;
@@ -888,7 +888,7 @@ pub struct MicrobialRespiration {
     pub microbial_respiration_rate: f64,
     pub active_stabilization_co2_fraction: f64,
     pub o2_half_saturation: f64,
-    pub air_mol: f64,
+    pub air_capacity_mol: f64,
 }
 
 impl Flow for MicrobialRespiration {
@@ -906,7 +906,7 @@ impl Flow for MicrobialRespiration {
     ) -> Result<FlowResult, SimError> {
         let f_o2 = science::oxygen_limitation_factor(
             amt(snapshot, &self.o2_pool),
-            self.air_mol,
+            self.air_capacity_mol,
             self.o2_half_saturation,
         );
         let turned =
@@ -1014,7 +1014,7 @@ pub struct LitterNitrogenTransfer {
     pub decomposition_rate: f64,
     pub litter_respired_fraction: f64,
     pub o2_half_saturation: f64,
-    pub air_mol: f64,
+    pub air_capacity_mol: f64,
 }
 
 impl Flow for LitterNitrogenTransfer {
@@ -1035,7 +1035,7 @@ impl Flow for LitterNitrogenTransfer {
         // which the carbon side gained with its CO2 leg (the humification split).
         let f_o2 = science::oxygen_limitation_factor(
             amt(snapshot, &self.o2_pool),
-            self.air_mol,
+            self.air_capacity_mol,
             self.o2_half_saturation,
         );
         let decomposed = self.decomposition_rate * litter_c * f_o2 * dt;
@@ -1067,7 +1067,7 @@ pub struct MicrobialNitrogenRelease {
     pub microbial_respiration_rate: f64,
     pub active_stabilization_co2_fraction: f64,
     pub o2_half_saturation: f64,
-    pub air_mol: f64,
+    pub air_capacity_mol: f64,
 }
 
 impl Flow for MicrobialNitrogenRelease {
@@ -1087,7 +1087,7 @@ impl Flow for MicrobialNitrogenRelease {
         // The identical flux MicrobialRespiration burns to CO2 -- f_O2 included.
         let f_o2 = science::oxygen_limitation_factor(
             amt(snapshot, &self.o2_pool),
-            self.air_mol,
+            self.air_capacity_mol,
             self.o2_half_saturation,
         );
         let turned = self.microbial_respiration_rate * microbial_c * f_o2 * dt;
@@ -1116,7 +1116,7 @@ pub struct HumusNitrogenRelease {
     pub slow_decomposition_rate: f64,
     pub slow_respired_fraction: f64,
     pub o2_half_saturation: f64,
-    pub air_mol: f64,
+    pub air_capacity_mol: f64,
 }
 
 impl Flow for HumusNitrogenRelease {
@@ -1135,7 +1135,7 @@ impl Flow for HumusNitrogenRelease {
         let humus_c = amt(snapshot, &self.humus_carbon);
         let f_o2 = science::oxygen_limitation_factor(
             amt(snapshot, &self.o2_pool),
-            self.air_mol,
+            self.air_capacity_mol,
             self.o2_half_saturation,
         );
         let decayed = humus_c * self.slow_decomposition_rate * f_o2 * dt;
@@ -1244,7 +1244,7 @@ pub struct ConsumerRespiration {
     pub o2_pool: String,
     pub respiration_rate: f64,
     pub o2_half_saturation: f64,
-    pub air_mol: f64,
+    pub air_capacity_mol: f64,
 }
 
 impl Flow for ConsumerRespiration {
@@ -1262,7 +1262,7 @@ impl Flow for ConsumerRespiration {
     ) -> Result<FlowResult, SimError> {
         let f_o2 = science::oxygen_limitation_factor(
             amt(snapshot, &self.o2_pool),
-            self.air_mol,
+            self.air_capacity_mol,
             self.o2_half_saturation,
         );
         let respired = self.respiration_rate * amt(snapshot, &self.consumer_carbon) * f_o2 * dt;
@@ -1643,7 +1643,7 @@ mod tests {
     use super::super::stocks::ROOTED_DEPTH;
 
     /// The chamber's air basis, in mol — the `f_O2` and Ci denominators.
-    const AIR_MOL: f64 = 1000.0;
+    const AIR_CAPACITY_MOL: f64 = 1000.0;
     /// 1.0 m of root zone at EXTR 0.13 over 1 m² holds 130 kg, so the 100 kg fill below
     /// is FTSW 0.77 — well above `wssg`, i.e. unstressed. (Mirrors the Python fixture's
     /// 2026-08-12 geometry re-basing.)
@@ -1671,7 +1671,7 @@ mod tests {
             nitro: params::nitrogen(),
             ground_area: 1.0,
             co2_pool_var: None,
-            chamber_air_mol: None,
+            chamber_air_capacity_mol: None,
             ci_ratio: None,
             o2_pool_var: None,
         }
@@ -1681,7 +1681,7 @@ mod tests {
     fn ctx_sealed(ci_ratio: f64) -> CarbonContext {
         CarbonContext {
             co2_pool_var: Some("co2_pool".to_string()),
-            chamber_air_mol: Some(AIR_MOL),
+            chamber_air_capacity_mol: Some(AIR_CAPACITY_MOL),
             ci_ratio: Some(ci_ratio),
             // ⚠ Wired here as `system.rs` wires it, so a unit test can reach the live O₂
             // form at all. Inert for every EXISTING test in this module: they all run the
@@ -1764,7 +1764,7 @@ mod tests {
 
     /// A well-fed vegetative state: DVS ≈ 0.5, organs 3 : 1 : 1, chamber gases filled.
     fn growing_state() -> State {
-        state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, 550.0)
+        state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_CAPACITY_MOL, 550.0)
     }
 
     /// Put carbon in the STORAGE organ, which `leaf_and_biomass` excludes.
@@ -1828,7 +1828,7 @@ mod tests {
             co2_atmos: CO2.to_string(),
             co2_resp: CO2.to_string(),
             o2_pool: Some(O2.to_string()),
-            air_mol: Some(AIR_MOL),
+            air_capacity_mol: Some(AIR_CAPACITY_MOL),
         }
     }
 
@@ -1847,7 +1847,7 @@ mod tests {
     #[test]
     fn allocation_releases_one_oxygen_per_carbon_fixed_across_all_four_organs() {
         // DVS 1.5 (post-anthesis) so the storage leg is nonzero and joins the sum.
-        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, 1100.0 + 375.0);
+        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_CAPACITY_MOL, 1100.0 + 375.0);
         let legs = legs_of(&allocation(ctx_open(), Some(O2.to_string())), &s, 800.0);
         let fixed = legs[LEAF] + legs[STEM] + legs[ROOT] + legs[STORAGE];
         assert!(fixed > 0.0, "no carbon fixed: the fixture is not growing");
@@ -1922,7 +1922,7 @@ mod tests {
         let dark = resolver(0.0, 400.0);
         // Storage filled and DVS past anthesis, so all four organ legs are live.
         let s = with_storage(
-            state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, 1100.0 + 375.0),
+            state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_CAPACITY_MOL, 1100.0 + 375.0),
             10.0,
         );
 
@@ -2003,7 +2003,7 @@ mod tests {
             legs_of(&maintenance_sealed(), &s, 0.0)[CO2]
         };
         // The reference point: x = K ⇒ f_O2 = 1/2.
-        let at_k = burn(k * AIR_MOL);
+        let at_k = burn(k * AIR_CAPACITY_MOL);
         assert!(at_k > 0.0, "the fixture is not in deficit");
         // ⚠ SWEPT, not pinned at one pair. A single ratio can be right by coincidence if
         // the burn depends on O₂ through some path other than `f_O2`; the whole curve
@@ -2011,7 +2011,7 @@ mod tests {
         // `2·m/(1+m)` times the burn at K — exactly, for every m.
         for m in [0.5, 2.0, 4.0, 9.0, 100.0, 2100.0] {
             let want = at_k * 2.0 * m / (1.0 + m);
-            let got = burn(m * k * AIR_MOL);
+            let got = burn(m * k * AIR_CAPACITY_MOL);
             assert!(
                 (got - want).abs() <= 1e-12 * want,
                 "f_O2 is not throttling the burn at x = {m}·K: {got}, want {want}"
@@ -2069,7 +2069,7 @@ mod tests {
     /// Mirrors `::test_maintenance_closed_partial_deficit_balances`.
     #[test]
     fn sealed_maintenance_burns_only_the_shortfall_on_a_partial_deficit_day() {
-        let s = state(0.1, 50.0, 50.0, 0.4, 0.21 * AIR_MOL, 550.0);
+        let s = state(0.1, 50.0, 50.0, 0.4, 0.21 * AIR_CAPACITY_MOL, 550.0);
         let lit = legs_of(&maintenance_sealed(), &s, 800.0)[CO2];
         let dark = legs_of(&maintenance_sealed(), &s, 0.0)[CO2];
         assert!(lit > 0.0, "the partial-deficit fixture is not in deficit");
@@ -2081,8 +2081,8 @@ mod tests {
         let env = r.bind(&s, 1.0);
         let (gass, _, _) = ctx_open().budget(&s, &env).expect("budget");
         let f_o2 = science::oxygen_limitation_factor(
-            0.21 * AIR_MOL,
-            AIR_MOL,
+            0.21 * AIR_CAPACITY_MOL,
+            AIR_CAPACITY_MOL,
             params::respiration().o2_half_saturation,
         );
         assert!(
@@ -2103,7 +2103,7 @@ mod tests {
             co2_atmos: CO2.to_string(),
             co2_resp: "boundary.co2".to_string(),
             o2_pool: None,
-            air_mol: None,
+            air_capacity_mol: None,
         };
         let legs = legs_of(&open, &growing_state(), 800.0);
         assert!(
@@ -2869,7 +2869,7 @@ mod tests {
             co2_atmos: CO2.to_string(),
             co2_resp: "boundary.co2".to_string(),
             o2_pool: None,
-            air_mol: None,
+            air_capacity_mol: None,
         }
     }
 
@@ -3129,7 +3129,7 @@ mod tests {
     fn the_allocation_legs_are_the_partitioned_increment_and_the_co2_leg_is_their_sum() {
         let ctx = ctx_open();
         // DVS 1.5, so all four legs including the grain are nonzero.
-        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, thermal_time_for(1.5));
+        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_CAPACITY_MOL, thermal_time_for(1.5));
         let (_, _, available) = budget_of(&ctx, &s, 800.0);
         let dmi = ctx.resp.growth_efficiency * available;
         let (leaf, stem, root, storage) = science::partition(dmi, 1.5, &params::allocation().table);
@@ -3170,7 +3170,7 @@ mod tests {
         let ctx = ctx_open();
         // A DARK deficit day: no PAR, so GASS is 0 and the whole of MRES is a shortfall.
         // Organs 3 : 1 : 1 make the three shares 0.6, 0.2, 0.2 of the burn.
-        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, 550.0);
+        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_CAPACITY_MOL, 550.0);
         let (gass, mres, _) = budget_of(&ctx, &s, 0.0);
         assert_eq!(gass, 0.0, "the fixture must be a genuine dark day");
         let legs = legs_of(&open_maintenance(), &s, 0.0);
@@ -3215,7 +3215,7 @@ mod tests {
     #[test]
     fn the_reserve_formation_diverts_the_stem_share_and_moves_no_other_leg() {
         let fstr = params::stem_reserves().remobilizable_fraction;
-        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, thermal_time_for(0.5));
+        let s = state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_CAPACITY_MOL, thermal_time_for(0.5));
         let plain = legs_of(&allocation(ctx_open(), Some(O2.to_string())), &s, 800.0);
         let split = legs_of(
             &Allocation {
@@ -3266,7 +3266,7 @@ mod tests {
         let flow = remobilization(p);
         let filled = |dvs: f64| {
             with_reserve(
-                state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, thermal_time_for(dvs)),
+                state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_CAPACITY_MOL, thermal_time_for(dvs)),
                 10.0,
             )
         };
@@ -3331,7 +3331,7 @@ mod tests {
         let flow = remobilization(p);
         let at = |reserve: f64| {
             with_reserve(
-                state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_MOL, thermal_time_for(1.5)),
+                state(3.0, 1.0, 1.0, 0.4, 0.21 * AIR_CAPACITY_MOL, thermal_time_for(1.5)),
                 reserve,
             )
         };
@@ -3513,7 +3513,7 @@ mod tests {
     /// cannot tell the two denominators apart — the same trap `with_storage` was added to
     /// escape one mechanism over.
     fn n_state(leaf: f64, stem: f64, root: f64, storage: f64, plant_n: f64, soil_n: f64) -> State {
-        let mut s = with_storage(state(leaf, stem, root, 0.4, 0.21 * AIR_MOL, 550.0), storage);
+        let mut s = with_storage(state(leaf, stem, root, 0.4, 0.21 * AIR_CAPACITY_MOL, 550.0), storage);
         s.stocks.get_mut(PLANT_N).expect("plant n").amount = plant_n;
         for (id, amount, kind) in [
             (SOIL_N, soil_n, StockKind::Pool),
@@ -3991,7 +3991,7 @@ mod tests {
 
     /// A state carrying the litter BOUNDARY sink the organ fixture does not build.
     fn sen_state(leaf: f64, stem: f64, root: f64) -> State {
-        let mut s = state(leaf, stem, root, 0.4, 0.21 * AIR_MOL, 550.0);
+        let mut s = state(leaf, stem, root, 0.4, 0.21 * AIR_CAPACITY_MOL, 550.0);
         s.stocks.insert(
             LITTER_SINK.to_string(),
             Stock::new(
@@ -4206,8 +4206,8 @@ mod tests {
     const F_CO2_HUMUS: f64 = 0.55; // CENTURY's slow-SOM respiration share
     /// `microbial_respiration.yaml`'s committed `o2_half_saturation` (mol/mol).
     const F_K_O2: f64 = 1e-4;
-    /// A full chamber: 21 % O2 of `AIR_MOL`.
-    const F_FULL_O2: f64 = 0.21 * AIR_MOL;
+    /// A full chamber: 21 % O2 of `AIR_CAPACITY_MOL`.
+    const F_FULL_O2: f64 = 0.21 * AIR_CAPACITY_MOL;
 
     /// `a` within a relative `1e-12` of `b` — the soil legs span 1e-5 to 1e-2, so one
     /// absolute tolerance cannot serve them all.
@@ -4216,7 +4216,7 @@ mod tests {
     }
 
     /// A soil state: the three carbon pools, their three N counterparts, soil N and the
-    /// two gas pools. `o2` is in mol against `AIR_MOL`, so the mole fraction is `o2/1000`.
+    /// two gas pools. `o2` is in mol against `AIR_CAPACITY_MOL`, so the mole fraction is `o2/1000`.
     fn soil_state(
         litter_c: f64,
         microbial_c: f64,
@@ -4294,7 +4294,7 @@ mod tests {
             decomposition_rate: F_K_LITTER,
             litter_respired_fraction: F_CO2_LITTER,
             o2_half_saturation: k_o2,
-            air_mol: AIR_MOL,
+            air_capacity_mol: AIR_CAPACITY_MOL,
         }
     }
 
@@ -4308,7 +4308,7 @@ mod tests {
             microbial_respiration_rate: F_K_MICROBIAL,
             active_stabilization_co2_fraction: F_CO2_MICROBIAL,
             o2_half_saturation: k_o2,
-            air_mol: AIR_MOL,
+            air_capacity_mol: AIR_CAPACITY_MOL,
         }
     }
 
@@ -4322,7 +4322,7 @@ mod tests {
             slow_decomposition_rate: F_K_HUMUS,
             slow_respired_fraction: F_CO2_HUMUS,
             o2_half_saturation: k_o2,
-            air_mol: AIR_MOL,
+            air_capacity_mol: AIR_CAPACITY_MOL,
         }
     }
 
@@ -4337,7 +4337,7 @@ mod tests {
             decomposition_rate: F_K_LITTER,
             litter_respired_fraction: F_CO2_LITTER,
             o2_half_saturation: k_o2,
-            air_mol: AIR_MOL,
+            air_capacity_mol: AIR_CAPACITY_MOL,
         }
     }
 
@@ -4352,7 +4352,7 @@ mod tests {
             microbial_respiration_rate: F_K_MICROBIAL,
             active_stabilization_co2_fraction: F_CO2_MICROBIAL,
             o2_half_saturation: k_o2,
-            air_mol: AIR_MOL,
+            air_capacity_mol: AIR_CAPACITY_MOL,
         }
     }
 
@@ -4367,7 +4367,7 @@ mod tests {
             slow_decomposition_rate: F_K_HUMUS,
             slow_respired_fraction: F_CO2_HUMUS,
             o2_half_saturation: k_o2,
-            air_mol: AIR_MOL,
+            air_capacity_mol: AIR_CAPACITY_MOL,
         }
     }
 

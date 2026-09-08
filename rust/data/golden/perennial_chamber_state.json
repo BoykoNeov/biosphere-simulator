@@ -22,6 +22,19 @@
       "unit": "mol"
     },
     {
+      "amount": "0x1.61edeac37f5c9p+4",
+      "composition": {
+        "nitrogen": "0x1.0000000000000p+0"
+      },
+      "domain": "biosphere.atmosphere",
+      "extinction_threshold": "0x0.0p+0",
+      "id": "biosphere.chamber_inert",
+      "kind": "pool",
+      "quantity": "nitrogen",
+      "unclamped": false,
+      "unit": "kg"
+    },
+    {
       "amount": "0x1.d7fdb4ae5a057p+2",
       "composition": {
         "water": "0x1.0000000000000p+0"

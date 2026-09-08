@@ -28,8 +28,13 @@
 //! harness would print "no change": §7 of the plan with a new cause.
 
 use crate::biosphere::params::{BiosphereParams, MOLAR_MASS_CARBON_KG_PER_MOL};
-use crate::biosphere::science::{leaf_area_index, o2_mole_fraction, oxygen_at};
-use crate::biosphere::stocks::{CARBON_POOL, CONSUMER_CARBON, LEAF_C, O2_POOL, STEM_C, STORAGE_C};
+use crate::biosphere::science::{
+    leaf_area_index, o2_mole_fraction, oxygen_at, H2O_MOLAR_MASS_KG_PER_MOL,
+    N2_MOLAR_MASS_KG_PER_MOL,
+};
+use crate::biosphere::stocks::{
+    CARBON_POOL, CHAMBER_INERT, CONSUMER_CARBON, LEAF_C, O2_POOL, STEM_C, STORAGE_C, WATER_VAPOR,
+};
 use crate::biosphere::system::sealed_chamber_scenario;
 use crate::biosphere::{
     build_season_with, run_perennial, run_season, season_setup_composed, season_steps, steps_for,
@@ -75,6 +80,18 @@ pub struct Trajectory {
     pub o2_pool: Vec<f64>,
     /// `biosphere.consumer_carbon` per step, or empty where the stock is absent.
     pub consumer_c: Vec<f64>,
+    /// `biosphere.chamber_inert` per step (**kg**), or empty where the stock is absent.
+    ///
+    /// The inert fill is written by no flow in this tree, so in a nominal run this series is
+    /// constant — which is the point: it is the term that lets [`total_gas_mol`] be a real
+    /// total rather than the 22 % of the air the reactive species happen to occupy.
+    pub inert_kg: Vec<f64>,
+    /// `biosphere.water_vapor` per step (**kg**), or empty where the stock is absent.
+    ///
+    /// Sampled since the atmosphere work: vapour occupies volume like any other gas, so it
+    /// belongs in the total. ⚠ This one is NOT constant — transpiration fills it and
+    /// condensation drains it — so it is the only reason nominal pressure moves at all.
+    pub water_vapor_kg: Vec<f64>,
     /// Arbitration firings over the whole run. A band is a claim about a *well-fed*
     /// run; a rationed run's trace is not the model's answer.
     pub rationed: u64,
@@ -175,6 +192,8 @@ pub fn try_trajectory_composed(
         carbon_pool: Vec::with_capacity(steps + 1),
         o2_pool: Vec::with_capacity(steps + 1),
         consumer_c: Vec::new(),
+        inert_kg: Vec::new(),
+        water_vapor_kg: Vec::new(),
         rationed: 0,
         events: 0,
         years,
@@ -209,6 +228,12 @@ pub fn try_trajectory_composed(
             }
             if let Some(stock) = s.stocks.get(CONSUMER_CARBON) {
                 t.consumer_c.push(stock.amount);
+            }
+            if let Some(stock) = s.stocks.get(CHAMBER_INERT) {
+                t.inert_kg.push(stock.amount);
+            }
+            if let Some(stock) = s.stocks.get(WATER_VAPOR) {
+                t.water_vapor_kg.push(stock.amount);
             }
         };
         let outcome = if perennial {
@@ -274,7 +299,7 @@ pub fn min_ppm(t: &Trajectory) -> f64 {
         !t.carbon_pool.is_empty(),
         "min_ppm on a run with no chamber carbon pool"
     );
-    let air = t.scenario.chamber_air_mol;
+    let air = t.scenario.chamber_air_capacity_mol;
     t.carbon_pool
         .iter()
         .map(|c| c / air * 1e6)
@@ -309,7 +334,7 @@ pub fn min_compensation_ratio(t: &Trajectory) -> f64 {
         t.carbon_pool.len(),
         "min_compensation_ratio on a run whose O2 series does not match its carbon series          — a sealed scenario carries both, and an unsealed one is not banded"
     );
-    let air = t.scenario.chamber_air_mol;
+    let air = t.scenario.chamber_air_capacity_mol;
     let ci_ratio = sealed_chamber_scenario().ci_ratio;
     (0..t.carbon_pool.len())
         .map(|i| {
@@ -319,6 +344,90 @@ pub fn min_compensation_ratio(t: &Trajectory) -> f64 {
             ppm / (photo.gamma_star / ci_ratio)
         })
         .fold(f64::INFINITY, f64::min)
+}
+
+/// The chamber's **live total gas** (mol) per step — the quantity that did not exist before
+/// `docs/plans/post-roadmap-atmosphere.md`.
+///
+/// `CO₂ + O₂ + inert + water vapour`, each in moles. ⚠ **Folded from the species, never
+/// stored.** A total-gas *stock* would have to equal this sum, and a stock that must equal a
+/// sum of other stocks is a redundancy the conservation gate cannot police — it is not an
+/// independent quantity, so nothing would catch it drifting. Folding makes the two
+/// impossible to desynchronize.
+///
+/// ⚠⚠ **Which of the two folds to trust, stated plainly.** This one is the honest *arithmetic*
+/// over the chamber's four gases; it is **not** a trustworthy pressure, because one of those
+/// four is defective. The vapour stock obeys no saturation law, and it dominates: measured
+/// 2026-09-08, all three frozen chambers peak at the **same 536.995 mol** of vapour regardless
+/// of room size, ~20x what saturation permits, pushing wet pressure to 1.54 in a 1000-mol jar.
+/// [`dry_gas_mol`] is the part this model gets right. Read that one unless the question is
+/// specifically about the vapour.
+///
+/// ⚠ **This is NOT the denominator the science divides by.** That is
+/// `scenario.chamber_air_capacity_mol`, a property of the room — see its own doc comment for
+/// why a live total in that position would make the leaf blind to a hull breach. This fold
+/// is an *observable*: nothing reads it back into a flow.
+///
+/// Panics on an unsealed run, for [`min_ppm`]'s reason: the open field has no chamber, and a
+/// fold that returned something plausible there would be a wiring error nobody could see.
+pub fn total_gas_mol(t: &Trajectory) -> Vec<f64> {
+    assert!(
+        !t.carbon_pool.is_empty() && !t.o2_pool.is_empty() && !t.inert_kg.is_empty(),
+        "total_gas_mol on a run with no chamber atmosphere"
+    );
+    let vapour = |i: usize| {
+        t.water_vapor_kg
+            .get(i)
+            .map_or(0.0, |kg| kg / H2O_MOLAR_MASS_KG_PER_MOL)
+    };
+    (0..t.carbon_pool.len())
+        .map(|i| {
+            t.carbon_pool[i]
+                + t.o2_pool[i]
+                + t.inert_kg[i] / N2_MOLAR_MASS_KG_PER_MOL
+                + vapour(i)
+        })
+        .collect()
+}
+
+/// The chamber's **dry** gas (mol) per step — everything but the water vapour.
+///
+/// ⚠ Split out from [`total_gas_mol`] because the two answer different questions and the
+/// difference is a **finding**, not a convenience. Measured 2026-09-08 on the perennial jar:
+/// the dry total is `capacity` for the whole run — the reactive pair self-cancels (PQ = 1) and
+/// the inert fill is written by nothing — while the *wet* total peaks 54 % above it, because
+/// the model's gas-phase water is bounded by no saturation law. At 20 °C saturation would cap
+/// the vapour near 2.3 % of the total; the jar reaches ~47 %.
+///
+/// So: `total_gas_mol` is the honest pressure and carries that defect; `dry_gas_mol` is the
+/// part of the atmosphere this model gets right. Neither is dropped, because dropping the
+/// vapour would hide the finding and dropping the total would be the silent physics error.
+pub fn dry_gas_mol(t: &Trajectory) -> Vec<f64> {
+    assert!(
+        !t.carbon_pool.is_empty() && !t.o2_pool.is_empty() && !t.inert_kg.is_empty(),
+        "dry_gas_mol on a run with no chamber atmosphere"
+    );
+    (0..t.carbon_pool.len())
+        .map(|i| t.carbon_pool[i] + t.o2_pool[i] + t.inert_kg[i] / N2_MOLAR_MASS_KG_PER_MOL)
+        .collect()
+}
+
+/// Chamber pressure as a multiple of reference, per step — `total_gas / capacity`.
+///
+/// At fixed V and T, `P/P_ref = n_total/n_ref` exactly, so this ratio *is* the pressure and
+/// needs no gas constant, no volume and no temperature. It reads **1.0 at t=0 for every
+/// scenario** by construction, because `system::chamber_inert_charge_mol` charges the inert
+/// fill with exactly the room's remainder.
+///
+/// ⚠ An observable, not a driver: no flow reads it. Making pressure a driver needs a
+/// consumer (a crew hypoxia response, a structural event) and that consumer is deliberately
+/// out of scope — see `docs/plans/post-roadmap-atmosphere.md` §1.2.
+pub fn pressure_ratio(t: &Trajectory) -> Vec<f64> {
+    let capacity = t.scenario.chamber_air_capacity_mol;
+    total_gas_mol(t)
+        .into_iter()
+        .map(|n| n / capacity)
+        .collect()
 }
 
 /// Peak leaf area index over the whole trajectory.
@@ -383,6 +492,8 @@ mod tests {
             carbon_pool: Vec::new(),
             o2_pool: Vec::new(),
             consumer_c: Vec::new(),
+            inert_kg: Vec::new(),
+            water_vapor_kg: Vec::new(),
             rationed: 0,
             events: 0,
             years: 1,

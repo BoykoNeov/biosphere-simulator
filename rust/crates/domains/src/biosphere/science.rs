@@ -186,12 +186,52 @@ pub fn kinetics_at(
 /// nothing (or like one that does far too much).
 pub const MMOL_PER_MOL: f64 = 1000.0;
 
-/// A chamber's live O₂ mole fraction in mmol/mol, from the stock and the chamber air.
+/// Molar mass of N₂ (kg mol⁻¹) — the one constant the inert-gas stock needs.
+///
+/// The chamber's inert fill is stored in `NITROGEN`'s canonical unit (kg) like every other
+/// nitrogen stock, while the quantity the gas laws want is **moles**. This converts.
+///
+/// ⚠ **Argon is lumped into "the inert fill" and carries N₂'s molar mass.** Dry air is
+/// 78.084 % N₂ and 0.934 % Ar, so the true mean molar mass of the lump is ~28.15 g mol⁻¹ and
+/// this understates its MASS by ~0.5 %. It does **not** perturb the mole count, which is what
+/// pressure and every composition ratio are computed from: the charge is defined in moles
+/// (`system::chamber_inert_charge_mol`) and converted here, so moles are exact by
+/// construction and the approximation lives only in the nitrogen ledger's kg.
+/// Value: standard atomic weight of N (14.0067) x 2 — CIAAW/IUPAC, a definitional constant
+/// rather than a fitted one.
+pub const N2_MOLAR_MASS_KG_PER_MOL: f64 = 0.0280134;
+
+/// Molar mass of H₂O (kg mol⁻¹) — water vapour occupies volume like any other gas, so the
+/// chamber's vapour stock (kg) has to reach the total-gas fold in moles.
+///
+/// ⚠ Excluding vapour from the total would be a silent physics error in the one quantity the
+/// atmosphere work exists to create, so it is counted. Every scenario charges
+/// `water_vapor0 = 0.0`, so it contributes nothing at t=0 and everything it contributes
+/// later is transpiration the model actually ran.
+pub const H2O_MOLAR_MASS_KG_PER_MOL: f64 = 0.01801528;
+
+/// A chamber's live O₂ in mmol per mol of the chamber's **reference** air fill.
+///
+/// Equal to the mole fraction exactly when the chamber sits at reference pressure, which is
+/// where the frozen constants are calibrated; away from it this is the partial-pressure
+/// ratio, which is the quantity FvCB actually wants.
 ///
 /// Negative amounts clamp to zero rather than reversing a sign, the same guard
 /// [`oxygen_limitation_factor`] carries for the same reason.
-pub fn o2_mole_fraction(o2_mol: f64, air_mol: f64) -> f64 {
-    MMOL_PER_MOL * o2_mol.max(0.0) / air_mol
+///
+/// # ⚠ The denominator is a ROOM PROPERTY, and it must stay one
+///
+/// `air_capacity_mol` is the moles that fill the chamber **at reference pressure**, not the
+/// live total-gas inventory. At fixed V and T, `p_i = n_i·R·T/V`, so
+/// `p_i / P_ref = n_i / n_ref` — the ratio the frozen FvCB / Michaelis constants are
+/// calibrated against is a species' own mole count over the room's reference fill. Dividing
+/// by a live total instead yields the mole *fraction*, which does not move when the chamber
+/// depressurizes at fixed composition, so the consumer would be **blind to a hull breach**.
+///
+/// ⚠ No gate can catch the substitution: at charge `n_total == n_ref`, so every golden reads
+/// the same either way. See `docs/plans/post-roadmap-atmosphere.md` §0.
+pub fn o2_mole_fraction(o2_mol: f64, air_capacity_mol: f64) -> f64 {
+    MMOL_PER_MOL * o2_mol.max(0.0) / air_capacity_mol
 }
 
 /// Which oxygen a [`PhotosynthesisParams`] is read against.
@@ -712,14 +752,42 @@ pub fn nitrogen_stress_factor(
 // --- chamber seam -----------------------------------------------------------
 
 /// Intercellular `Ci` (µmol mol⁻¹) from a finite chamber carbon pool.
-pub fn ci_from_co2_pool(co2_mol: f64, air_mol: f64, ci_ratio: f64) -> f64 {
-    let ca = co2_mol / air_mol * MOLEFRAC_TO_MICRO;
+///
+/// # ⚠ The denominator is a ROOM PROPERTY, and it must stay one
+///
+/// `air_capacity_mol` is the moles that fill the chamber **at reference pressure**, not the
+/// live total-gas inventory. At fixed V and T, `p_i = n_i·R·T/V`, so
+/// `p_i / P_ref = n_i / n_ref` — the ratio the frozen FvCB / Michaelis constants are
+/// calibrated against is a species' own mole count over the room's reference fill. Dividing
+/// by a live total instead yields the mole *fraction*, which does not move when the chamber
+/// depressurizes at fixed composition, so the consumer would be **blind to a hull breach**.
+///
+/// ⚠ No gate can catch the substitution: at charge `n_total == n_ref`, so every golden reads
+/// the same either way. See `docs/plans/post-roadmap-atmosphere.md` §0.
+pub fn ci_from_co2_pool(co2_mol: f64, air_capacity_mol: f64, ci_ratio: f64) -> f64 {
+    let ca = co2_mol / air_capacity_mol * MOLEFRAC_TO_MICRO;
     ci_ratio * ca
 }
 
 /// O₂ self-limitation `f_O2 = x_O2 / (K_O2 + x_O2) ∈ [0, 1]`.
-pub fn oxygen_limitation_factor(o2_mol: f64, air_mol: f64, k_o2: f64) -> f64 {
-    let x_o2 = o2_mol.max(0.0) / air_mol;
+///
+/// ⚠ The soil decomposers reach O₂ through Henry's law, which is driven by the gas-phase
+/// **partial pressure** — so this consumer wants the same reference-basis ratio the leaf
+/// does, for a physically independent reason.
+///
+/// # ⚠ The denominator is a ROOM PROPERTY, and it must stay one
+///
+/// `air_capacity_mol` is the moles that fill the chamber **at reference pressure**, not the
+/// live total-gas inventory. At fixed V and T, `p_i = n_i·R·T/V`, so
+/// `p_i / P_ref = n_i / n_ref` — the ratio the frozen FvCB / Michaelis constants are
+/// calibrated against is a species' own mole count over the room's reference fill. Dividing
+/// by a live total instead yields the mole *fraction*, which does not move when the chamber
+/// depressurizes at fixed composition, so the consumer would be **blind to a hull breach**.
+///
+/// ⚠ No gate can catch the substitution: at charge `n_total == n_ref`, so every golden reads
+/// the same either way. See `docs/plans/post-roadmap-atmosphere.md` §0.
+pub fn oxygen_limitation_factor(o2_mol: f64, air_capacity_mol: f64, k_o2: f64) -> f64 {
+    let x_o2 = o2_mol.max(0.0) / air_capacity_mol;
     let denom = k_o2 + x_o2;
     if denom <= 0.0 {
         return 0.0;
@@ -1264,7 +1332,7 @@ mod tests {
     // 28 untested `science.rs` functions, and the by-name census must not count them as
     // successors to claims they do not cover.
 
-    /// `Ci = ci_ratio · (co2_mol / air_mol) · 1e6` — the finite chamber's Ci seam.
+    /// `Ci = ci_ratio · (co2_mol / air_capacity_mol) · 1e6` — the finite chamber's Ci seam.
     ///
     /// The mole-fraction → µmol mol⁻¹ conversion and the Ci/Ca ratio are separate
     /// factors, and both are pinned: 0.4 mol CO₂ in 1000 mol of air is a mole fraction

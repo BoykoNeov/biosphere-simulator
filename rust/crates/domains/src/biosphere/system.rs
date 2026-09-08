@@ -45,7 +45,29 @@ pub struct SeasonScenario {
     pub co2_atmos0: f64,
     pub ci: f64,
     pub sealed: bool,
-    pub chamber_air_mol: f64,
+    /// The moles of gas that fill this chamber **at reference pressure** — a property of
+    /// the ROOM, not an inventory. Renamed from `chamber_air_mol` 2026-09-08.
+    ///
+    /// ⚠ **Do NOT re-point this at a live total-gas sum.** It is the denominator every gas
+    /// consumer divides by, and the derivation says why it must be a constant. At fixed V
+    /// and T — and V and T *are* constants in this model — the ideal gas law gives
+    /// `p_i = n_i·R·T/V`, so a species' partial pressure is proportional to **its own mole
+    /// count alone**, and the ratio the frozen FvCB constants are calibrated against is
+    ///
+    /// ```text
+    /// p_i / P_ref = (n_i·RT/V) / (n_ref·RT/V) = n_i / n_ref
+    /// ```
+    ///
+    /// with `n_ref` this field. Dividing by a **live** total would give the mole
+    /// *fraction*, which is invariant under depressurization at fixed composition — a leaf
+    /// reading it would be **blind to a hull breach**, the exact opposite of what the
+    /// atmosphere work was for. ⚠ And the substitution is invisible to every gate: at
+    /// charge `n_total == n_ref`, so no golden can tell the two denominators apart. See
+    /// `docs/plans/post-roadmap-atmosphere.md` §0.
+    ///
+    /// The live inventory it is NOT: that is `chamber_inert` + `carbon_pool` + `o2_pool`
+    /// (+ `water_vapor`), folded by `readouts::total_gas_mol`.
+    pub chamber_air_capacity_mol: f64,
     pub chamber_co2_mol0: f64,
     pub ci_ratio: f64,
     pub chamber_o2_mol0: f64,
@@ -135,7 +157,7 @@ pub const DEFAULT_SCENARIO: SeasonScenario = SeasonScenario {
     co2_atmos0: 0.0,
     ci: 250.0,
     sealed: false,
-    chamber_air_mol: 1000.0,
+    chamber_air_capacity_mol: 1000.0,
     chamber_co2_mol0: 0.357,
     ci_ratio: 0.7,
     chamber_o2_mol0: 210.0,
@@ -216,7 +238,7 @@ pub fn consumer_chamber_scenario() -> SeasonScenario {
         sealed: true,
         litter_carbon0: 3.0,
         consumer: true,
-        chamber_air_mol: 2000.0,
+        chamber_air_capacity_mol: 2000.0,
         chamber_co2_mol0: 0.714,
         chamber_o2_mol0: 420.0,
         ..DEFAULT_SCENARIO
@@ -324,8 +346,8 @@ fn carbon_context(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Car
         } else {
             None
         },
-        chamber_air_mol: if scenario.sealed {
-            Some(scenario.chamber_air_mol)
+        chamber_air_capacity_mol: if scenario.sealed {
+            Some(scenario.chamber_air_capacity_mol)
         } else {
             None
         },
@@ -343,6 +365,32 @@ fn carbon_context(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Car
             None
         },
     }
+}
+
+/// The chamber's inert-gas charge (mol) — **derived, never a scenario field**.
+///
+/// `capacity - CO₂ - O₂`: whatever is left of the room's reference fill once the two
+/// reactive species are placed. Two things follow, and both are the reason it is computed
+/// rather than authored:
+///
+/// * the chamber starts at **exactly** reference pressure by construction, so
+///   `pressure_ratio` is 1.0 at t=0 for every scenario without anyone tuning it;
+/// * **no scenario gains a number that has to be defended.** "The rest of the air" needs no
+///   citation; a charge someone typed would need one.
+///
+/// ⚠ Negative would mean a scenario whose named gases already exceed its own room, which is
+/// a malformed chamber rather than a thin one — hence the error, not a clamp. (No frozen
+/// scenario is near it: the tightest, `perennial_chamber`, leaves 789.643 of 1000.)
+pub fn chamber_inert_charge_mol(scenario: &SeasonScenario) -> Result<f64, SimError> {
+    let inert =
+        scenario.chamber_air_capacity_mol - scenario.chamber_co2_mol0 - scenario.chamber_o2_mol0;
+    if inert < 0.0 {
+        return Err(SimError::Validation(format!(
+            "chamber gases exceed the room: capacity {:?} mol < CO2 {:?} + O2 {:?}",
+            scenario.chamber_air_capacity_mol, scenario.chamber_co2_mol0, scenario.chamber_o2_mol0
+        )));
+    }
+    Ok(inert)
 }
 
 fn build_atmosphere(
@@ -370,6 +418,16 @@ fn build_atmosphere(
                 ATMOSPHERE,
                 Quantity::Water,
                 scenario.water_vapor0,
+            )?,
+            // The inert fill. Stored in NITROGEN's canonical kg (the 1:1 default
+            // composition, exactly as the water-vapour stock above), charged from a mole
+            // count so the room starts at exactly reference pressure. No flow in this tree
+            // writes it: nothing fixes nitrogen, and only a hull breach vents it.
+            pool_stock(
+                CHAMBER_INERT,
+                ATMOSPHERE,
+                Quantity::Nitrogen,
+                chamber_inert_charge_mol(scenario)? * science::N2_MOLAR_MASS_KG_PER_MOL,
             )?,
         ];
         let flows: Vec<Box<dyn Flow>> = vec![Box::new(Condensation {
@@ -504,7 +562,7 @@ fn build_soil(
             decomposition_rate: p.decomp.decomposition_rate,
             litter_respired_fraction: p.humi.litter_respired_fraction,
             o2_half_saturation: p.micro.o2_half_saturation,
-            air_mol: scenario.chamber_air_mol,
+            air_capacity_mol: scenario.chamber_air_capacity_mol,
         }));
         flows.push(Box::new(MicrobialRespiration {
             id: "biosphere.microbial_respiration".to_string(),
@@ -515,7 +573,7 @@ fn build_soil(
             microbial_respiration_rate: p.micro.microbial_respiration_rate,
             active_stabilization_co2_fraction: p.humi.active_stabilization_co2_fraction,
             o2_half_saturation: p.micro.o2_half_saturation,
-            air_mol: scenario.chamber_air_mol,
+            air_capacity_mol: scenario.chamber_air_capacity_mol,
         }));
         flows.push(Box::new(HumusDecomposition {
             id: "biosphere.humus_decomposition".to_string(),
@@ -526,7 +584,7 @@ fn build_soil(
             slow_decomposition_rate: p.humi.slow_decomposition_rate,
             slow_respired_fraction: p.humi.slow_respired_fraction,
             o2_half_saturation: p.micro.o2_half_saturation,
-            air_mol: scenario.chamber_air_mol,
+            air_capacity_mol: scenario.chamber_air_capacity_mol,
         }));
         // The microbe-mediated N return leg: each carried by the carbon its decomposer
         // sibling already moved, so neither carries a rate of its own.
@@ -540,7 +598,7 @@ fn build_soil(
             decomposition_rate: p.decomp.decomposition_rate,
             litter_respired_fraction: p.humi.litter_respired_fraction,
             o2_half_saturation: p.micro.o2_half_saturation,
-            air_mol: scenario.chamber_air_mol,
+            air_capacity_mol: scenario.chamber_air_capacity_mol,
         }));
         flows.push(Box::new(MicrobialNitrogenRelease {
             id: "biosphere.microbial_n_release".to_string(),
@@ -552,7 +610,7 @@ fn build_soil(
             microbial_respiration_rate: p.micro.microbial_respiration_rate,
             active_stabilization_co2_fraction: p.humi.active_stabilization_co2_fraction,
             o2_half_saturation: p.micro.o2_half_saturation,
-            air_mol: scenario.chamber_air_mol,
+            air_capacity_mol: scenario.chamber_air_capacity_mol,
         }));
         flows.push(Box::new(HumusNitrogenRelease {
             id: "biosphere.humus_n_release".to_string(),
@@ -564,7 +622,7 @@ fn build_soil(
             slow_decomposition_rate: p.humi.slow_decomposition_rate,
             slow_respired_fraction: p.humi.slow_respired_fraction,
             o2_half_saturation: p.micro.o2_half_saturation,
-            air_mol: scenario.chamber_air_mol,
+            air_capacity_mol: scenario.chamber_air_capacity_mol,
         }));
     }
     Ok(CompartmentBuild {
@@ -647,8 +705,8 @@ fn build_plants(
             co2_atmos: wiring.carbon_source.clone(),
             co2_resp: wiring.resp_sink.clone(),
             o2_pool: wiring.o2_pool.clone(),
-            air_mol: if scenario.sealed {
-                Some(scenario.chamber_air_mol)
+            air_capacity_mol: if scenario.sealed {
+                Some(scenario.chamber_air_capacity_mol)
             } else {
                 None
             },
@@ -853,7 +911,7 @@ fn build_consumers(
             o2_pool: O2_POOL.to_string(),
             respiration_rate: p.herb.respiration_rate,
             o2_half_saturation: p.herb.o2_half_saturation,
-            air_mol: scenario.chamber_air_mol,
+            air_capacity_mol: scenario.chamber_air_capacity_mol,
         }),
         Box::new(ConsumerMortality {
             id: "biosphere.consumer_mortality".to_string(),

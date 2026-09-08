@@ -40,6 +40,22 @@ pub const MICROBIAL_N: &str = "biosphere.microbial_n";
 /// (2026-08-10), never seeded and never fed fresh plant input. Both POOLs.
 pub const HUMUS_CARBON: &str = "biosphere.humus_carbon";
 pub const HUMUS_N: &str = "biosphere.humus_n";
+/// The sealed chamber's **inert gas fill** — the N₂ (with Ar lumped in) that makes up the
+/// rest of the air, and the stock that makes total gas a conserved quantity at all.
+///
+/// Added 2026-09-08 by `docs/plans/post-roadmap-atmosphere.md`. Before it, the chamber held
+/// CO₂ and O₂ and nothing else, so **nothing in this model could lose an atmosphere**: a
+/// leak could only ever take one gas, and total pressure was not a quantity that existed.
+///
+/// ⚠ **Deliberately NOT a total-gas stock.** A stock whose value must equal the sum of other
+/// stocks is a redundancy that can drift, and the conservation gate cannot police it because
+/// it is not independent. Total gas and pressure are FOLDED from the species instead
+/// (`readouts::total_gas_mol`), so they cannot desynchronize from the stocks they summarize.
+///
+/// ⚠ **Unreachable from the plant, and that is correct.** The model has no nitrogen fixation,
+/// so no flow converts this pool into `plant_n`. Neither wheat nor potato fixes N₂. Recorded
+/// so a later reader does not file it as a missing edge.
+pub const CHAMBER_INERT: &str = "biosphere.chamber_inert";
 pub const WATER_VAPOR: &str = "biosphere.water_vapor";
 pub const CONDENSATE: &str = "biosphere.condensate";
 pub const CONSUMER_CARBON: &str = "biosphere.consumer_carbon";

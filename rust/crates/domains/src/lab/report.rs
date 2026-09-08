@@ -1154,6 +1154,8 @@ mod tests {
             carbon_pool: Vec::new(),
             o2_pool: Vec::new(),
             consumer_c: Vec::new(),
+            inert_kg: Vec::new(),
+            water_vapor_kg: Vec::new(),
             rationed: 0,
             events: 0,
             years: 1,

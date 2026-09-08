@@ -17,6 +17,8 @@
 //! inside `step_report`, so a completed run is itself the proof).
 
 pub mod biosphere;
+/// The hull-breach composer — beside the biosphere spine, not inside it (see its header).
+pub mod breach;
 pub mod crew;
 pub mod eclss;
 pub mod freeze_manifest;

@@ -894,6 +894,80 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-09-08 — the sealed chamber gains an ATMOSPHERE: one inert-gas stock, 9 goldens,
+  9 manifest hashes. Not one existing value moved.**
+  Plan and every prediction: `docs/plans/post-roadmap-atmosphere.md`; record
+  `docs/log/atmosphere.md`. Predecessor: the perturbation suite, whose probes were built to
+  be this item's instrument.
+
+  **What was wrong.** The chamber held CO₂ and O₂ and nothing else, so *nothing in this model
+  could lose an atmosphere*: there was no inert gas, therefore no total gas, therefore no
+  pressure, and a leak could only ever take one species. Documented twice — `eclss.yaml`'s
+  `o2_setpoint` trigger and `consumer_chamber_scenario`'s invariance note — and tested never.
+
+  ⚠ **The decided framing was wrong in one word, and the correction is the item's first
+  deliverable.** Both the plan that decided this work and the memory recording it said the
+  leaf should read *"partial pressures rather than mole fractions over a constant"*. The
+  second half is a misdiagnosis. At fixed V and T — and V and T ARE constants here — the gas
+  law gives `p_i = n_i·R·T/V`, so `p_i/P_ref = n_i/n_ref` where `n_ref` is the moles filling
+  the room at reference pressure: **a property of the room, which is exactly what the old
+  constant already was.** `n_i/n_total_live` is the mole *fraction*, and it does not move when
+  a chamber depressurizes at fixed composition — a leaf reading it would be **blind to a hull
+  breach**. So the arithmetic was right and the NAME was wrong (`chamber_air_mol` →
+  `chamber_air_capacity_mol`, with the derivation carried at the field and at all three
+  science functions that divide by it). ⚠ And no gate could have caught the substitution: at
+  charge `n_total == n_ref`, so every golden reads identically under either denominator.
+
+  **What changed.** One POOL stock, `biosphere.chamber_inert`, in each sealed chamber's
+  atmosphere compartment — `NITROGEN`, kg, the 1:1 default composition, exactly the
+  water-vapour stock's shape. **Deliberately not a total-gas stock:** a stock that must equal
+  the sum of other stocks is a redundancy the conservation gate cannot police, because it is
+  not independent. Total gas and pressure are FOLDED from the species instead
+  (`readouts::total_gas_mol` / `dry_gas_mol` / `pressure_ratio`), so they cannot desynchronize.
+  The charge is **derived** — `capacity − CO₂ − O₂` — so every chamber starts at exactly
+  reference pressure by construction and no scenario gains a number anyone must defend.
+  No new `Quantity`; `simcore` untouched. No flow, no aux, no param file: `flow_set`,
+  `aux_set` and `param_files` are byte-identical in the manifest.
+
+  **What moved, and the prediction it was scored against.** Written before the run: *every
+  sealed golden gains exactly one stock entry and not one existing hex-float changes; the open
+  field is byte-identical.* Measured: **9 of 20 goldens changed, every one of them `+13 −0`** —
+  five biosphere (`sealed_chamber`, both `perennial`, both `consumer`) and four station
+  (`greenhouse`, `lighting`, `harvest`, `sealed_station`). `season_euler_state.json` untouched;
+  `drift_summary` and `sealed_energy_drift_summary` untouched. 9 manifest `golden_sha256`
+  lines followed, and nothing else in either manifest.
+
+  **The two findings.**
+  1. **The DRY chamber never leaves reference pressure — structurally.** The reactive pair is
+     one-for-one (photosynthesis takes a CO₂ and returns an O₂; every respiration runs it
+     backwards at PQ = 1), so `n_CO₂ + n_O₂` is conserved by the biology itself, and the inert
+     fill is written by nothing. That is what makes ONE inert stock sufficient rather than a
+     total-gas stock — and it bounds what this model can say: **a sealed chamber's dry pressure
+     is structurally incapable of drifting**, so a slow pressure loss has no representation in
+     the nominal tree at all. It takes an explicit breach.
+  2. ⚠⚠ **The chamber's gas-phase water obeys no saturation law**, and counting vapour as a gas
+     is what exposed it. All three frozen chambers peak at the **same 536.995 mol** of vapour —
+     identical to 8e-16 relative, in rooms of 1000 and 2000 mol — so the vapour load is set
+     entirely by the plot's transpiration and is **completely uncoupled from the air it enters**.
+     Wet pressure reaches 1.537 in a 1000-mol jar against a saturation-implied ceiling near
+     1.023: ~20x what physics allows. Room-independence is what makes this a fact about the
+     **water model** rather than about any scenario's sizing, and one chamber could not have
+     settled that. **Recorded, not fixed** — a saturation bound is a water-science change with
+     its own ceremony. Held by a labelled TRIPWIRE that is meant to redden when the water model
+     is corrected.
+
+  **Also landed (diagnostics, no golden, no manifest):** `domains::breach::with_hull_breach`
+  vents every gas to its own boundary sink, first-order at one rate — which is the physics, not
+  a simplification, since a well-mixed volume venting to vacuum loses each species in
+  proportion to its own partial pressure. Measured: all four species vent exactly `k·dt` in the
+  first active step. It lives beside the biosphere spine rather than inside it because
+  `tests/one_assembly_body.rs` holds the spine to one assembly body — the gate caught the first
+  placement, and the fix was to move the composer, not to widen the gate.
+
+  Advisor-reviewed before the design and again before the regeneration; the golden diff was
+  predicted in writing first and the two-direction control (`+13 −0`, open field untouched) is
+  what scored it.
+
 - **2026-09-07 — the LIVE-O₂ FvCB form is ADOPTED: the crop reads the chamber's own oxygen
   stock, not the atmosphere's constant 210 mmol/mol. 10 goldens, 21 manifest lines here and
   4 on the station, and the CO₂ band is re-posed POINTWISE.**
