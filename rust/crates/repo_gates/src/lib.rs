@@ -211,7 +211,7 @@ pub fn memory_index() -> Option<PathBuf> {
     Some(
         home.join(".claude")
             .join("projects")
-            .join("M--claud-projects-space-station")
+            .join("W--Claude-projects-space-station")
             .join("memory")
             .join("MEMORY.md"),
     )

@@ -517,7 +517,7 @@ Three things it leaves this doc, none of them a new task:
   (`max_rel_dev 0.0`, dated P7.4, measured 9.955e-16) — the **native-port** contract, its
   own ceremony, ruled out of this work by plan §5h when C5 was written.
 - **The memory index is outside the repo.** `repo_gates` reads
-  `~/.claude/projects/M--claud-projects-space-station/memory/MEMORY.md` and says loudly
+  `~/.claude/projects/W--Claude-projects-space-station/memory/MEMORY.md` and says loudly
   when it is absent — so on CI and on any box but the author's the ceiling is unchecked,
   and the "memory file" the working style requires per item cannot be written from a
   remote session (this one did not). Not a defect to fix in the repo; a fact to know
