@@ -53,18 +53,45 @@ predecessor, which is kept whole.
 Three decisions and one blocked retrieval. **Nothing here is work you can just do**, which is
 why they are not presented as a queue.
 
-### 2.1 DECISION — the parked leaf mechanism. Recommendation: REFUSE
+### 2.1 ~~DECISION — the parked leaf mechanism. Recommendation: REFUSE~~ — DECIDED 2026-09-23: KEEP, as a NEW Rust work item
 
-`leaf-expansion-blocked` sits below the frozen tree on **both** gated observables at **every**
-step (`log/leaf-remeasurement.md`). Its ship/refuse call has been the user's since 2026-08-14
-— the longest-standing open item in the project.
+⚠⚠ **DECIDED by the user 2026-09-23 (*"keep it as a new Rust work item"*), and this section's
+headline argument was FALSE.** It said shipping *"makes two frozen observables worse"*. The
+record it cites says the opposite: both gated observables are **ceilings** (the Greenwood
+peak-W crossing and the CO₂ band's floor margin), and the mechanism sits **below** the frozen
+tree on peak W at every step — at the shipped step its Greenwood margin is 2.5 % against the
+frozen tree's 2.20 %, i.e. *better*. "Lower" was read as "worse" against a ceiling. The
+recommendation to refuse was built on that sentence and is withdrawn with it.
 
-* **If refused:** the branch is retired with a record, exactly as the Q10 form was
-  (`log/q10-form-refused.md` is the shape). Nothing moves; no unfreeze.
-* **If shipped:** it makes two frozen observables worse. There is no reading of the evidence
-  that recommends this.
-* ⚠ **Nothing is waiting on it either way.** It has been listed as open for three weeks
-  because refusing something is still a decision, not because anything depends on the answer.
+**What the item is now — not a merge of the old branch:**
+
+* `leaf-expansion-blocked` / `leaf-expansion-rebase` are **Python** (`src/`, 847 lines), and
+  `src/` was deleted by S6. There is nothing to rebase onto. The item is a **clean Rust
+  re-implementation** of the mechanism (a temperature-driven node timetable for leaf area,
+  bounded on the *state* by [E] Table 20's two-sided leaf-thickness envelope — see
+  `log/leaf-expansion.md` findings 2–5 for why each half is needed), with the branch as a
+  design reference only.
+* **Its case is the carbon-limited chambers** (1.27–1.32× the derived canopy), not
+  `open_season`, where it had converged to ~0.26 % at `dt = ¼`. Every number in
+  `log/leaf-remeasurement.md` measured a tree that no longer exists (the canopy has since been
+  layered, lit and temperature-coupled), so the item **starts by re-measuring**, not by
+  quoting them.
+* **Unpaid scope, unchanged:** a real test suite (the branch had none — its evidence was probe
+  scripts outside the repo), the biosphere goldens and the station goldens that carry a
+  greenhouse, both manifests, the full unfreeze ceremony.
+* Not scheduled. It is a work item on the list, not the next thing.
+
+~~The pricing as written on 2026-09-06 follows, struck:~~
+
+~~`leaf-expansion-blocked` sits below the frozen tree on **both** gated observables at
+**every** step (`log/leaf-remeasurement.md`). Its ship/refuse call has been the user's since
+2026-08-14 — the longest-standing open item in the project.~~
+
+* ~~**If refused:** the branch is retired with a record, exactly as the Q10 form was
+  (`log/q10-form-refused.md` is the shape). Nothing moves; no unfreeze.~~
+* ~~**If shipped:** it makes two frozen observables worse. There is no reading of the evidence
+  that recommends this.~~
+* ⚠ **Nothing is waiting on it either way** — still true after the decision.
 
 ### 2.2 DECISION — the chamber CO₂ setpoint controller. Recommendation: NOT YET
 
@@ -357,9 +384,11 @@ this line was false when written. There is genuinely nothing left that can be bu
 either a decision or the Bernacchi PDF.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
-work — so they can be taken in one sitting or left indefinitely. Recommended: refuse the
+work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
 parked leaf mechanism (§2.1), because it is the only one where the evidence points one way
-and it has been open the longest.
+and it has been open the longest.~~ **§2.1 DECIDED 2026-09-23: keep, as a new Rust work item** —
+the "evidence points one way" was a ceiling misread as a floor (see §2.1). Two decisions
+(§2.2, and §2.3's successors) remain; §2.1 is now **work**, unscheduled.
 
 ~~**Then the project needs a direction, not an item.**~~ **ANSWERED 2026-09-08, and not with
 the product track.** Shown that the perturbation axis was unexplored biosphere-side, the user
