@@ -311,67 +311,66 @@ fn the_dry_chamber_never_leaves_reference_pressure() {
     }
 }
 
-/// **FINDING (a TRIPWIRE, not a guard) — the chamber's gas-phase water is bounded by no
-/// saturation law, and counting it as a gas is what exposed that.**
+/// **The chamber's water vapour obeys saturation** — the guard that replaced a tripwire.
 ///
-/// ⚠ **Read the word tripwire first.** This test is *designed to go red* if the water model is
-/// ever corrected, and that red would be good news. It must not be "fixed" by lowering a
-/// threshold — the remedy is to delete it and record the finding as discharged. Labelled
-/// because this repo has a memory file, *the liveness floor is a tripwire*, about exactly this
-/// confusion.
+/// # What stood here, and why it was deleted rather than re-thresholded
 ///
-/// # The measurement, and why it settles whose defect this is
+/// Until 2026-09-23 this slot held a **tripwire**: a test designed to go red when the water
+/// model gained a saturation bound. It measured the defect the atmosphere work exposed — all
+/// three chambers peaked at the **same 536.995 mol** of vapour in rooms of 1000 and 2000 mol,
+/// wet pressure 1.537 against a saturation-implied ≈1.023, because transpiration filled the air
+/// with no regard for whether it could hold the water. The fix
+/// (`docs/plans/post-roadmap-vapour-saturation.md`) turned it red, and it was deleted as its
+/// own text instructed.
 ///
-/// | chamber | capacity (mol) | peak wet pressure | peak vapour (mol) |
-/// |---|---|---|---|
-/// | `sealed_chamber` | 1000 | 1.5369950225921074 | 536.9950225921074 |
-/// | `perennial_chamber` | 1000 | 1.5369950225921083 | 536.9950225921083 |
-/// | `consumer_chamber` | 2000 | 1.2684975112960535 | 536.9950225921069 |
+/// ⚠ **Only ONE of its two assertions fired, and the silent one was mis-set.** Its
+/// room-independence half went red, as designed. Its `peak > 1.023` half stayed GREEN on the
+/// corrected model, because 1.023 is saturation at **20 °C** and the weather's warmest day is
+/// warmer: the saturated jar peaks at 1.0235. A tripwire whose threshold is a single
+/// temperature's ceiling cannot tell "saturated on a warm day" from "unbounded" by a margin of
+/// 5e-4. The half that caught the fix was the one that asked about the SHAPE (does vapour
+/// scale with the room?), not the one that asked about a VALUE.
 ///
-/// ⚠⚠ **The three peak vapour loads are the SAME NUMBER — identical to 8e-16 relative — across
-/// a chamber twice the size.** The pressures differ only because the same vapour is divided by
-/// a different room. So the vapour load is set entirely by the plot's transpiration and is
-/// **completely uncoupled from the atmosphere it enters**: nothing in the model asks whether
-/// the air can hold it.
+/// # What this asserts instead
 ///
-/// That is what makes this a fact about the **water model** rather than about any scenario's
-/// sizing — the distinction the advisor asked for, and it could not have been settled by
-/// measuring one chamber. Real air at 20 °C saturates near 2.3 kPa in 101 kPa (**~2.3 %**), so
-/// a physical chamber cannot exceed a wet pressure of about **1.023**. The 1000-mol jars hold
-/// roughly twenty times the vapour physics allows and would have been raining long before.
-///
-/// ⚠ Recorded, **not fixed**. A saturation bound is a change to the water science with its own
-/// ceremony; this item's charge was the atmosphere. What it owed was to surface the defect
-/// rather than launder it — excluding vapour from the total would have made `pressure_ratio`
-/// look respectable and left the model exactly as wrong.
+/// 1. **The bound, per step, at that step's own temperature** — never at a fixed 20 °C, for
+///    exactly the reason above. `vapour(n+1) ≤ e_s(T_n)/P_std · n_ref`, with `T_n` the
+///    temperature step `n` ran at (a day boundary may lower the NEXT cap; the next step's
+///    condensation removes that excess).
+/// 2. **The vapour now belongs to the room**: the 2000-mol consumer chamber holds twice the
+///    sealed jar's peak, to the bit. That is the tripwire's live half, inverted.
 #[test]
-fn tripwire_the_wet_chamber_is_far_above_reference_because_vapour_is_unsaturated() {
-    /// The wet pressure a chamber could not exceed if its vapour obeyed saturation at 20 °C.
-    const SATURATION_CEILING: f64 = 1.023;
-
-    let mut peak_vapour_mol: Vec<(&str, f64)> = Vec::new();
+fn the_chamber_vapour_never_exceeds_saturation_and_scales_with_the_room() {
+    use domains::biosphere::science::saturation_vapour_kg;
+    use domains::biosphere::{weather, STEPS_PER_DAY};
+    let dt = 1.0 / STEPS_PER_DAY as f64;
+    let mut peak_vapour: Vec<(&str, f64, f64)> = Vec::new();
     for (name, scenario, years, perennial) in chambers() {
         let t = run(scenario, years, perennial);
         let capacity = t.scenario.chamber_air_capacity_mol;
-        let peak = pressure_ratio(&t)
-            .into_iter()
-            .fold(f64::NEG_INFINITY, f64::max);
-        assert!(
-            peak > SATURATION_CEILING,
-            "{name}: wet pressure peaked at {peak}, at or below the saturation-implied ceiling              {SATURATION_CEILING}. If the water model gained a saturation bound, this TRIPWIRE              has done its job — delete it and record the finding as discharged. Do NOT lower              the threshold."
-        );
-        // The dry total is exactly the capacity (its own test), so the whole excess IS vapour.
-        peak_vapour_mol.push((name, (peak - 1.0) * capacity));
+        let (latitude, rows) = weather::weather_facts();
+        let temp = weather::season_forcing(latitude, &rows, years).temp;
+        let v = &t.water_vapor_kg;
+        assert!(v.iter().any(|kg| *kg > 0.0), "{name}: no vapour — the bound is untested");
+        for n in 0..v.len() - 1 {
+            let day = ((n as f64 * dt) as usize).min(temp.len() - 1);
+            let cap = saturation_vapour_kg(temp[day], capacity);
+            assert!(
+                v[n + 1] <= cap * (1.0 + 1.0e-12),
+                "{name}: step {n} ended with {} kg of vapour above saturation {cap} kg at {} °C",
+                v[n + 1],
+                temp[day]
+            );
+        }
+        let peak = v.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        peak_vapour.push((name, capacity, peak));
     }
-
-    // ⚠ The half of this finding that names its owner: the same vapour load, in a room of a
-    // different size. If a future water fix couples vapour to the air, THIS is the assertion
-    // that should break first.
-    let (_, reference) = peak_vapour_mol[0];
-    for (name, mol) in &peak_vapour_mol {
+    let (_, ref_room, ref_peak) = peak_vapour[0];
+    for (name, room, peak) in &peak_vapour {
+        let want = ref_peak * room / ref_room;
         assert!(
-            (mol - reference).abs() <= 1.0e-12 * reference,
-            "{name} peaks at {mol} mol of vapour against {reference} elsewhere — the vapour              load is no longer room-independent, so this finding needs re-measuring rather              than re-asserting: {peak_vapour_mol:?}"
+            (peak - want).abs() <= 1.0e-12 * want,
+            "{name}: peak vapour {peak} kg is not the room-scaled {want} kg: {peak_vapour:?}"
         );
     }
 }

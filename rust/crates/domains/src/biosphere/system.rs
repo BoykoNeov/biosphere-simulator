@@ -27,7 +27,7 @@ use super::flows::{
     Irrigation, LitterNitrogenTransfer, MaintenanceRespiration, MicrobialNitrogenRelease,
     MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling, RootDepthExtension,
     RootZoneCapture, Senescence, StemRemobilization, ThermalTimeAccumulation, Transpiration,
-    VernalizationAccumulation,
+    VapourSaturation, VernalizationAccumulation,
 };
 use super::light_path;
 use super::params;
@@ -435,6 +435,8 @@ fn build_atmosphere(
             water_vapor: WATER_VAPOR.to_string(),
             condensate: CONDENSATE.to_string(),
             condensation_rate: p.water.condensation_rate,
+            temp_var: TEMP_VAR.to_string(),
+            air_capacity_mol: scenario.chamber_air_capacity_mol,
         })];
         Ok(CompartmentBuild {
             stocks,
@@ -738,6 +740,14 @@ fn build_plants(
             rooted_depth_aux: ROOTED_DEPTH.to_string(),
             soil_extractable_water: scenario.soil_extractable_water,
             wssg: scenario.wssg,
+            // Sealed: the air takes what saturation allows and the rest condenses in the
+            // same step (docs/plans/post-roadmap-vapour-saturation.md). Open field: the
+            // weather's boundary sink, unbounded, byte-for-byte as before.
+            saturation: scenario.sealed.then(|| VapourSaturation {
+                water_vapor: WATER_VAPOR.to_string(),
+                condensate: CONDENSATE.to_string(),
+                air_capacity_mol: scenario.chamber_air_capacity_mol,
+            }),
         }),
         Box::new(NitrogenUptake {
             id: "biosphere.nitrogen_uptake".to_string(),
@@ -1310,6 +1320,7 @@ mod tests {
         run_perennial_final, run_season_final, season_setup, steps_for_years, BIO_DT,
     };
     use super::*;
+    use simcore::environment::Environment;
 
     /// `Drainage` reads no forcing at all (state only), so its pins need no resolver.
     struct NoEnv;
@@ -2725,10 +2736,20 @@ mod tests {
         let (base, registry) = build_season(&scenario).expect("sealed season");
         // A 1.3 m root zone holding 1000 kg is FTSW 4.7, far above wssg — f_water = 1 —
         // and both ring pools are nonzero so every flux is positive.
+        //
+        // ⚠ The vapour sits at HALF of saturation, and that is load-bearing since the
+        // saturation bound (docs/plans/post-roadmap-vapour-saturation.md): at or above the
+        // cap, transpiration sends nothing to the air and its only sink is the condensate —
+        // the old 5 kg charge was ~12× a 1000-mol room's cap and would have hidden the
+        // vapour leg entirely. Below the cap the flux reaches the air first and any
+        // remainder condenses, so transpiration may have TWO sinks, air first.
+        let resolver = super::super::weather_resolver(&scenario, 1).expect("resolver");
+        let temp = resolver.bind(&base, 1.0).get(TEMP_VAR).expect("temp");
+        let cap = science::saturation_vapour_kg(temp, scenario.chamber_air_capacity_mol);
         let mut stocks = base.stocks.clone();
         for (id, amount) in [
             (SOIL_WATER, 1000.0),
-            (WATER_VAPOR, 5.0),
+            (WATER_VAPOR, 0.5 * cap),
             (CONDENSATE, 5.0),
         ] {
             stocks.insert(id.to_string(), stocks[id].with_amount(amount).unwrap());
@@ -2736,15 +2757,18 @@ mod tests {
         let mut aux = base.aux.clone();
         aux.insert(ROOTED_DEPTH.to_string(), 1.3);
         let state = State::new(base.n, stocks, base.rng_seed, aux).expect("ring state");
-        let resolver = super::super::weather_resolver(&scenario, 1).expect("resolver");
         let env = resolver.bind(&state, 1.0);
 
-        let expected: [(&str, &str, &str); 3] = [
-            ("biosphere.transpiration", SOIL_WATER, WATER_VAPOR),
-            ("biosphere.condensation", WATER_VAPOR, CONDENSATE),
-            ("biosphere.recycling", CONDENSATE, SOIL_WATER),
+        let expected: [(&str, &str, &[&str]); 3] = [
+            (
+                "biosphere.transpiration",
+                SOIL_WATER,
+                &[WATER_VAPOR, CONDENSATE],
+            ),
+            ("biosphere.condensation", WATER_VAPOR, &[CONDENSATE]),
+            ("biosphere.recycling", CONDENSATE, &[SOIL_WATER]),
         ];
-        for (id, want_source, want_sink) in expected {
+        for (id, want_source, want_sinks) in expected {
             let flow = registry
                 .flows()
                 .iter()
@@ -2777,7 +2801,12 @@ mod tests {
                 .map(|l| l.stock.as_str())
                 .collect();
             assert_eq!(sources, vec![want_source], "{id} draws from the wrong pool");
-            assert_eq!(sinks, vec![want_sink], "{id} delivers to the wrong pool");
+            // The ring's first sink is always reached; a second only as the overflow.
+            assert_eq!(sinks.first(), want_sinks.first(), "{id} delivers to the wrong pool");
+            assert!(
+                sinks.iter().all(|s| want_sinks.contains(s)),
+                "{id} delivers outside the ring: {sinks:?}"
+            );
         }
     }
 

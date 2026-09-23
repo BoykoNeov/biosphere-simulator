@@ -210,6 +210,36 @@ pub const N2_MOLAR_MASS_KG_PER_MOL: f64 = 0.0280134;
 /// later is transpiration the model actually ran.
 pub const H2O_MOLAR_MASS_KG_PER_MOL: f64 = 0.01801528;
 
+/// The standard atmosphere (Pa) — the pressure `chamber_air_capacity_mol` is read against when
+/// a partial pressure has to become a mole count.
+///
+/// Value: 101 325 Pa **exactly, by definition** (10th CGPM, 1954, Resolution 4), not a
+/// measurement or a fit. It is the one pressure in the model with a unit: everything else is
+/// the dimensionless `n_i/n_ref`, and the saturation ceiling is the first quantity that arrives
+/// in pascals (FAO-56's `e_s`) and has to be brought into that ratio.
+pub const STANDARD_ATMOSPHERE_PA: f64 = 101_325.0;
+
+/// The most water vapour (**kg**) a sealed chamber's air can hold at `temp_c` — saturation,
+/// relative humidity 1.
+///
+/// `n_sat = e_s(T) / P_std · n_ref`: the FAO-56 saturation pressure (already cited, the VPD
+/// build's own curve) as a fraction of the standard atmosphere, times the room's reference fill.
+/// That is the same `p_i/P_ref = n_i/n_ref` identity the leaf's partial pressures use, so vapour
+/// and CO₂/O₂ are placed in one room by one rule.
+///
+/// ⚠ **One term is dropped, deliberately.** `n_ref` is the room's fill at reference pressure and
+/// the model carries no chamber temperature state (V and T are constants everywhere), so the
+/// `T/T_ref` factor in the ideal-gas conversion — ≈7 % across the weather's range — is omitted
+/// here exactly as it is for every other gas.
+///
+/// ⚠ No humidity setpoint is invented: the ceiling is plain saturation. A real chamber's
+/// condenser holds it lower; that would be a controlled RH, a design number with no source here.
+pub fn saturation_vapour_kg(temp_c: f64, air_capacity_mol: f64) -> f64 {
+    saturation_vapor_pressure(temp_c) / STANDARD_ATMOSPHERE_PA
+        * air_capacity_mol
+        * H2O_MOLAR_MASS_KG_PER_MOL
+}
+
 /// A chamber's live O₂ in mmol per mol of the chamber's **reference** air fill.
 ///
 /// Equal to the mole fraction exactly when the chamber sits at reference pressure, which is

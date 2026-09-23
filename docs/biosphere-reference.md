@@ -894,6 +894,41 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-09-23 — the sealed chamber's WATER VAPOUR is bounded by saturation: 9 goldens,
+  9 `golden_sha256` rows (5 here, 4 on the station) and `water_cycle.yaml`'s hash. Only water
+  stocks moved.**
+  Plan and every prediction: `docs/plans/post-roadmap-vapour-saturation.md`; record
+  `docs/log/vapour-saturation.md`. Discharges the 2026-09-08 entry's finding 2.
+
+  **What was wrong.** Transpiration filled `water_vapor` with no regard for whether the air
+  could hold it; `Condensation` was first-order in the pool and nothing else. All three
+  chambers peaked at the same 536.995 mol in rooms of 1000 and 2000 mol — wet pressure 1.537
+  against ≈1.023.
+
+  **What changed.** A saturation ceiling, `e_s(T) / 101 325 Pa · chamber_air_capacity_mol`
+  (`science::saturation_vapour_kg`: FAO-56's cited curve, the standard atmosphere by
+  definition, the room's existing capacity — **no new parameter**, RH ceiling 1). Sealed
+  `Transpiration` sends the air only its headroom and the rest to `condensate` in the same
+  step (a third leg; the flux is unchanged, the open field keeps its two). `Condensation`
+  removes `max(0, v − cap) + rate·dt·min(v, cap)`. Flow ids and type names unchanged, so
+  `flow_set` is byte-identical. ⚠ Why at the source: one ¼-day step transpires up to **4.85×**
+  a 1000-mol room's whole saturation capacity, so a condenser-only bound overshoots by a step
+  every step, and a condenser fast enough is `k·dt ≈ 3–4`.
+
+  **What moved, against the prediction written first.** 9 of 20 goldens, file for file as
+  predicted (the predicted irrigation/drainage movement did NOT happen — no boundary moved); `season_euler_state` (open field) byte-identical. In all 9, **only**
+  `water_vapor`, `condensate`, `soil_water` and (six of them) `subsoil_water` — no carbon, O₂,
+  N or consumer value, because the water-stress factor was measured at exactly 1 on every step
+  under both thresholds. Water totals unchanged; wet pressure peaks at 1.0235.
+
+  ⚠ **The tripwire the 2026-09-08 entry left had one live half.** Its room-scaling assertion
+  fired; its `peak > 1.023` stayed green on the corrected model (1.023 is 20 °C saturation; the
+  warmest day is warmer). Deleted as instructed; replaced by a per-step bound at each step's own
+  temperature plus the room scaling, both reddened by mutation.
+
+  Advisor-reviewed before the design; regenerated with `regen_goldens --write` and both
+  manifest writers.
+
 - **2026-09-08 — the sealed chamber gains an ATMOSPHERE: one inert-gas stock, 9 goldens,
   9 manifest hashes. Not one existing value moved.**
   Plan and every prediction: `docs/plans/post-roadmap-atmosphere.md`; record

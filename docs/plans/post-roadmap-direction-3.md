@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `atmosphere.md`
+**Re-read against the record's last row:** `vapour-saturation.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -397,13 +397,21 @@ chose the follow-on explicitly: **"ok A now, but immediately after that (next se
 
 **What B named on its way out — three successors, none of them scheduled:**
 
-* **A saturation bound on the chamber's gas-phase water.** B's finding 2, and the strongest
+* ~~**A saturation bound on the chamber's gas-phase water.** B's finding 2, and the strongest
   result it produced: all three chambers hold the **same 536.995 mol** of vapour (identical to
   8e-16) regardless of room size, so wet pressure reaches 1.537 against a saturation-implied
   ceiling near 1.023 — ~20× what physics allows, and **room-independence is what proves it is
   the water model's defect rather than a scenario's sizing**. Held by a labelled tripwire that
   is meant to redden when this is fixed. This is now the biggest known physical defect in the
-  tree.
+  tree.~~ **BUILT 2026-09-23**, `log/vapour-saturation.md` — bounded at the source (one step
+  transpires up to 4.85× the room's whole saturation capacity, so the condenser alone could
+  not), no new number, only water stocks moved in all 9 goldens. ⚠ **The tripwire had one live
+  half**: its room-scaling assertion fired and its `peak > 1.023` stayed green on the fixed
+  model, because 1.023 is 20 °C saturation and the warmest day is warmer.
+  **It named one successor — the plants read the WEATHER's VPD, not the chamber's humidity.**
+  Not a defect the bound needed (Penman–Monteith's radiation term transpires at VPD 0), and the
+  crop's water-stress headroom says these chambers would not notice; it is the same "reads
+  something other than the chamber's air" shape as CO₂ and O₂ before. Not scheduled.
 * **The `o2_setpoint` mole-fraction conversion (B's slice 4), now BLOCKED behind an authoring
   decision.** It is bit-neutral (`0.21 × 9500.0 == 1995.0` exactly, verified both directions)
   but cannot ship as designed: the frozen params reach every authored `eclss.o2_makeup`, so
@@ -414,6 +422,9 @@ chose the follow-on explicitly: **"ok A now, but immediately after that (next se
   when the quantity it would freeze is the one B leaves behind". B leaves `pressure_ratio`
   behind, and finding 2 says freezing the **wet** one would freeze a defect. The row should
   name the **dry** total, which B measured to be structurally incapable of drifting.
+  ⚠ *Re-read 2026-09-23:* the wet total is no longer defective (vapour is bounded by
+  saturation), so the "would freeze a defect" reason is gone; the dry total is still the one
+  that cannot drift, which remains the better reason.
 
 The **product track** remains dormant and remains the standing candidate now that B is built;
 its 2026-08-13 re-open condition is still met and nothing here consumes it.

@@ -315,6 +315,15 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-09-23 — the biosphere bounds chamber water vapour by saturation; 4 station
+  goldens move (water stocks only) and 4 `golden_sha256` rows follow. No station flow,
+  param, seam or claim changed.**
+  Delegated: `docs/biosphere-reference.md`'s 2026-09-23 entry is the record. `greenhouse`,
+  `harvest`, `lighting` and `sealed_station` re-ran; in each only `biosphere.water_vapor`,
+  `condensate`, `soil_water` (and in `sealed_station` 1e-4 kg of `subsoil_water`) moved — no
+  carbon, O₂ or N value, which the prediction had flagged as unmeasured for these four and
+  which held. `sealed_energy_drift_summary.json` unchanged.
+
 - **2026-09-07 — the biosphere adopts the LIVE-O₂ FvCB form; 4 station goldens move by
   ≤ 0.058 % and 4 `golden_sha256` rows follow. No station flow, param, seam or claim
   changed.**

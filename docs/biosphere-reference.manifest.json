@@ -173,19 +173,19 @@
     "senescence.yaml": "21163d3c54c958655b0e39d1613610e1264bdecb85e7432576a6cc471c3b669b",
     "stem_reserves.yaml": "65ae25bf8ec5ad213763c41282221837b3d0e6e8de14a70d2c5ed53ed9cbe39e",
     "transpiration.yaml": "8859b2a8612372f9ae7d4468754d3b2d5a3e4530941281fb81327fc2daf303eb",
-    "water_cycle.yaml": "b38bc1dc390dce0cc5c89562977ecb38e241560e7e3f794330d2438b7a4bfadf"
+    "water_cycle.yaml": "4802c9ed288b22d49d123e2e763130298626495896130355b98ffba58bb58837"
   },
   "reference_doc": "docs/biosphere-reference.md",
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "5869b68c4fb1200e17bb2717e44a1212a1da11a67ebe7bcdf9c642bfbf6c4e92",
+      "golden_sha256": "0618fae36485b2641276b6786f01fbf38fe90b8ff06a5e988e7c94abdaa4c88b",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "687f523f8926392873a6e062720c99a5431fbd24a3038c104a31b6a3a5a63b6e",
+      "golden_sha256": "8ea589a0be882fedd569d6ebee5255aadb702bc8a1e8a3f8d77c0ce4b001979c",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
@@ -203,19 +203,19 @@
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "38aac2ac3f16e28b9e2831c16a62a5f33620a9c0da2652097d2a805d083e4b97",
+      "golden_sha256": "4d069902a7f224a19ac19ad42fd3c2bbb411a0ac6d0c1e7b9533afc0c472d313",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "7cae133adbf284bb5de1f7ba3774df37a067876c01eae49d5b2c5a76b7cb8a3d",
+      "golden_sha256": "67e22985b464df3f85d39c8da17b8e87a7980de44cb2aa7d09019a08f03f0f10",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "37074548d43f7ac3ab8b66d8b1e5f84a2a808d7d57971dc99c6685be7b27e5c9",
+      "golden_sha256": "58f2d45507a59bbc9731c9b4fdacb8f8ce3e1d9c970bf53a9960194b9cdd0563",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }

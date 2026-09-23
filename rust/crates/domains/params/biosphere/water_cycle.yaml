@@ -23,7 +23,18 @@
 #   zero architectural payoff here), but RIGHT for an engineered condenser + water-recovery
 #   loop — a dehumidifier / condensing heat-exchanger at fixed clearance, which is what a
 #   sealed bioregenerative life-support chamber actually has (CELSS; Biosphere 2 condensate
-#   management). The saturation-physics condensation is a documented refinement seam.
+#   management).
+#
+# ⚠ SATURATION IS NO LONGER DEFERRED (2026-09-23, docs/plans/post-roadmap-vapour-saturation.md).
+#   The first-order rate above was the WHOLE law until then, and the air held whatever the
+#   plot transpired: all three chambers peaked at the same 536.995 mol of vapour in rooms of
+#   1000 and 2000 mol, ~20x saturation. The chamber now carries a saturation CEILING —
+#   e_s(T) / 101 325 Pa · chamber_air_capacity_mol (FAO-56's cited curve, the standard
+#   atmosphere by definition; no new parameter). Transpiration sends the air only its
+#   headroom and the rest straight to condensate; condensation removes everything above the
+#   ceiling and applies `condensation_rate` to the saturated remainder. So this rate is now
+#   the condenser's draw BELOW saturation, not the only thing standing between the plot and
+#   the air.
 #
 # Sizing discipline (the Step-3 linchpin). The rates are chosen large enough that the
 #   in-flight water (water_vapor + condensate ≈ T/k_cond + T/k_rec, T = transpiration
@@ -38,9 +49,10 @@
 #   decomposition_rate / mineralization's two rates). A zero rate is valid (no condensation
 #   / no recycling); negative is rejected (it would create water).
 #
-# Deferred seams (documented in water_cycle.py): saturation/dew-point condensation
-#   (humidity-dependent, needs chamber volume + T-coupling); a finite condenser capacity;
-#   and explicit gas-phase humidity as a mole-fraction concentration.
+# Deferred seams: a finite condenser capacity; a controlled relative-humidity setpoint below
+#   saturation (a design number with no source here); and the plants reading the CHAMBER'S
+#   humidity rather than the weather's VPD (the saturation bound does not need it — see the
+#   plan named above).
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
@@ -77,7 +89,7 @@ parameters:
   condensation_rate:
     value: 0.5
     unit: "1/day"
-    source: "DESIGN — round-number choice, not a literature value: 0.5/day = a chosen ~2-day engineered-condenser turnover, fast enough that the closed water ring visibly closes on a season-scale run. No source can fix it — this is the condenser of a FICTIONAL sealed chamber, and a real unit's rate follows from its coolant temperature, airflow and surface area (the humidity/dew-point coupling this model explicitly defers). Closed-loop architecture from [A][B]; the magnitude is ours. Not calibrated."
+    source: "DESIGN — round-number choice, not a literature value: 0.5/day = a chosen ~2-day engineered-condenser turnover, fast enough that the closed water ring visibly closes on a season-scale run. No source can fix it — this is the condenser of a FICTIONAL sealed chamber, and a real unit's rate follows from its coolant temperature, airflow and surface area. Since 2026-09-23 it applies only to vapour BELOW saturation; the excess above the saturation ceiling condenses whole (docs/plans/post-roadmap-vapour-saturation.md). Closed-loop architecture from [A][B]; the magnitude is ours. Not calibrated."
   recycling_rate:
     value: 0.5
     unit: "1/day"

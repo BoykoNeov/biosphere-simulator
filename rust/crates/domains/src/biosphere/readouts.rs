@@ -355,13 +355,13 @@ pub fn min_compensation_ratio(t: &Trajectory) -> f64 {
 /// independent quantity, so nothing would catch it drifting. Folding makes the two
 /// impossible to desynchronize.
 ///
-/// ⚠⚠ **Which of the two folds to trust, stated plainly.** This one is the honest *arithmetic*
-/// over the chamber's four gases; it is **not** a trustworthy pressure, because one of those
-/// four is defective. The vapour stock obeys no saturation law, and it dominates: measured
-/// 2026-09-08, all three frozen chambers peak at the **same 536.995 mol** of vapour regardless
-/// of room size, ~20x what saturation permits, pushing wet pressure to 1.54 in a 1000-mol jar.
-/// [`dry_gas_mol`] is the part this model gets right. Read that one unless the question is
-/// specifically about the vapour.
+/// ⚠ **The vapour term is bounded by saturation since 2026-09-23.** Until then this fold was
+/// honest arithmetic over a defective species: the vapour obeyed no saturation law, all three
+/// frozen chambers peaked at the same 536.995 mol regardless of room size, and wet pressure
+/// reached 1.54 in a 1000-mol jar. The chamber now caps vapour at `e_s(T)/P_std · n_ref`
+/// (`docs/plans/post-roadmap-vapour-saturation.md`), and the jar's wet pressure peaks at
+/// 1.0235 on the weather's warmest day. The vapour term still moves with temperature and
+/// transpiration while [`dry_gas_mol`] does not — read that one for the part that cannot drift.
 ///
 /// ⚠ **This is NOT the denominator the science divides by.** That is
 /// `scenario.chamber_air_capacity_mol`, a property of the room — see its own doc comment for
@@ -395,13 +395,14 @@ pub fn total_gas_mol(t: &Trajectory) -> Vec<f64> {
 /// ⚠ Split out from [`total_gas_mol`] because the two answer different questions and the
 /// difference is a **finding**, not a convenience. Measured 2026-09-08 on the perennial jar:
 /// the dry total is `capacity` for the whole run — the reactive pair self-cancels (PQ = 1) and
-/// the inert fill is written by nothing — while the *wet* total peaks 54 % above it, because
-/// the model's gas-phase water is bounded by no saturation law. At 20 °C saturation would cap
-/// the vapour near 2.3 % of the total; the jar reaches ~47 %.
+/// the inert fill is written by nothing — while the *wet* total then peaked 54 % above it,
+/// because the gas-phase water was bounded by no saturation law. That was corrected
+/// 2026-09-23: vapour is now capped at saturation, and the wet total peaks ≈2.4 % above
+/// the dry one on the warmest day.
 ///
-/// So: `total_gas_mol` is the honest pressure and carries that defect; `dry_gas_mol` is the
-/// part of the atmosphere this model gets right. Neither is dropped, because dropping the
-/// vapour would hide the finding and dropping the total would be the silent physics error.
+/// So: `total_gas_mol` is the pressure, vapour included; `dry_gas_mol` is the part that is
+/// structurally constant. Neither is dropped — vapour occupies volume, and dropping it would
+/// be the silent physics error.
 pub fn dry_gas_mol(t: &Trajectory) -> Vec<f64> {
     assert!(
         !t.carbon_pool.is_empty() && !t.o2_pool.is_empty() && !t.inert_kg.is_empty(),

@@ -492,7 +492,26 @@ impl Flow for Senescence {
     }
 }
 
+/// Where a **sealed** chamber's transpiration goes once the air is saturated.
+///
+/// The air takes `clamp(cap − vapour, 0, F)` of the flux `F`; the rest condenses in the same
+/// step. Measured 2026-09-23: one ¼-day step transpires up to **4.85×** a 1000-mol room's whole
+/// saturation capacity, so the bound cannot live in `Condensation` alone — that flow sees only
+/// start-of-step vapour and would overshoot by a step's transpiration every step.
+/// `docs/plans/post-roadmap-vapour-saturation.md`.
+pub struct VapourSaturation {
+    /// The chamber's `water_vapor` stock — must be the same stock as `vapor_sink`.
+    pub water_vapor: String,
+    /// Where the excess goes — the chamber's `condensate`.
+    pub condensate: String,
+    /// The room's reference fill (mol), `chamber_air_capacity_mol`.
+    pub air_capacity_mol: f64,
+}
+
 /// WATER `soil_water -> vapor_sink` (Penman–Monteith · f_water).
+///
+/// Sealed (`saturation` is `Some`): `soil_water -> water_vapor + condensate`, the vapour share
+/// bounded by saturation at this step's temperature. Open field (`None`): two legs, unchanged.
 pub struct Transpiration {
     pub id: String,
     pub soil_water: String,
@@ -506,6 +525,7 @@ pub struct Transpiration {
     pub rooted_depth_aux: String,
     pub soil_extractable_water: f64,
     pub wssg: f64,
+    pub saturation: Option<VapourSaturation>,
 }
 
 impl Flow for Transpiration {
@@ -545,9 +565,19 @@ impl Flow for Transpiration {
         );
         let daily_kg = potential * f_water * self.ground_area;
         let flux = daily_kg * dt;
+        let Some(sat) = &self.saturation else {
+            return FlowResult::new(vec![
+                leg(&self.soil_water, -flux)?,
+                leg(&self.vapor_sink, flux)?,
+            ]);
+        };
+        let cap = science::saturation_vapour_kg(temp_c, sat.air_capacity_mol);
+        let headroom = (cap - amt(snapshot, &sat.water_vapor)).max(0.0);
+        let to_air = flux.min(headroom);
         FlowResult::new(vec![
             leg(&self.soil_water, -flux)?,
-            leg(&self.vapor_sink, flux)?,
+            leg(&self.vapor_sink, to_air)?,
+            leg(&sat.condensate, flux - to_air)?,
         ])
     }
 }
@@ -1150,11 +1180,19 @@ impl Flow for HumusNitrogenRelease {
 }
 
 /// WATER `water_vapor -> condensate`.
+///
+/// `max(0, v − cap) + rate·dt·min(v, cap)`: everything above saturation at this step's
+/// temperature (a cooler day lowers the cap), plus the engineered condenser's first-order
+/// draw on the saturated remainder. Withdraws at most `v` while `rate·dt < 1`.
+/// Transpiration's split keeps new vapour at or below the cap; this term is what brings
+/// vapour *already* above it back down.
 pub struct Condensation {
     pub id: String,
     pub water_vapor: String,
     pub condensate: String,
     pub condensation_rate: f64,
+    pub temp_var: String,
+    pub air_capacity_mol: f64,
 }
 
 impl Flow for Condensation {
@@ -1167,10 +1205,12 @@ impl Flow for Condensation {
     fn evaluate(
         &self,
         snapshot: &State,
-        _env: &dyn Environment,
+        env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
-        let condensed = self.condensation_rate * amt(snapshot, &self.water_vapor) * dt;
+        let vapour = amt(snapshot, &self.water_vapor);
+        let cap = science::saturation_vapour_kg(env.get(&self.temp_var)?, self.air_capacity_mol);
+        let condensed = (vapour - cap).max(0.0) + self.condensation_rate * vapour.min(cap) * dt;
         FlowResult::new(vec![
             leg(&self.water_vapor, -condensed)?,
             leg(&self.condensate, condensed)?,
@@ -2503,6 +2543,8 @@ mod tests {
             rooted_depth_aux: super::super::stocks::ROOTED_DEPTH.to_string(),
             soil_extractable_water: EXTR,
             wssg: WSSG,
+            // The open-field shape: two legs to the boundary sink, no saturation bound.
+            saturation: None,
         }
     }
 
@@ -2770,6 +2812,11 @@ mod tests {
             water_vapor: WATER_VAPOR.to_string(),
             condensate: CONDENSATE.to_string(),
             condensation_rate: 0.5,
+            temp_var: "temp".to_string(),
+            // A room so large (≈415 kg of saturation at 20 °C) that every pool below sits
+            // under the cap: this test is the first-order law's, and the above-cap term has
+            // its own test (`vapour_above_saturation_condenses_and_transpiration_stops_at_the_cap`).
+            air_capacity_mol: 1.0e6,
         };
         let rec = Recycling {
             id: "biosphere.recycling".to_string(),
@@ -2817,6 +2864,94 @@ mod tests {
             water_legs(&rec, &s, 200.0, 0.0, 0.5)[SOIL_WATER],
             0.5 * water_legs(&rec, &s, 200.0, 0.0, 1.0)[SOIL_WATER]
         );
+    }
+
+    /// **The saturation bound** — a sealed chamber's air holds at most `e_s(T)/P_std · n_ref`
+    /// of vapour, and both halves of the ring enforce it
+    /// (`docs/plans/post-roadmap-vapour-saturation.md`).
+    ///
+    /// Pinned against hand arithmetic on FAO-56's own 20 °C value (`e_s = 2338.28 Pa`,
+    /// `science.rs`'s Penman–Monteith test), so the SHAPE is the subject:
+    ///
+    /// * transpiration sends the air only its headroom and the rest to condensate — the same
+    ///   flux, split, never a negative vapour leg;
+    /// * at or above the cap, transpiration adds nothing to the air;
+    /// * condensation removes the whole excess plus the first-order draw on the cap.
+    #[test]
+    fn vapour_above_saturation_condenses_and_transpiration_stops_at_the_cap() {
+        const ROOM_MOL: f64 = 1000.0;
+        let cap = science::saturation_vapour_kg(20.0, ROOM_MOL);
+        let by_hand = 2338.2813 / 101_325.0 * ROOM_MOL * science::H2O_MOLAR_MASS_KG_PER_MOL;
+        assert!(
+            (cap - by_hand).abs() <= 1e-6 * by_hand,
+            "cap {cap} vs {by_hand}"
+        );
+
+        let open = transpiration_flow(2.0);
+        let sealed = Transpiration {
+            vapor_sink: WATER_VAPOR.to_string(),
+            saturation: Some(VapourSaturation {
+                water_vapor: WATER_VAPOR.to_string(),
+                condensate: CONDENSATE.to_string(),
+                air_capacity_mol: ROOM_MOL,
+            }),
+            ..transpiration_flow(2.0)
+        };
+        let full = science::transpirable_capacity(TEST_DEPTH, EXTR, 2.0);
+        // The fixture's flux is ~kg/day, far above a 1000-mol room's ~0.42 kg cap — the
+        // regime the chambers actually run in (one step transpires up to 4.85× the cap).
+        let flux = -water_legs(
+            &open,
+            &water_only_state(full, TEST_DEPTH, 0.0, 0.0),
+            200.0,
+            0.0,
+            1.0,
+        )[SOIL_WATER];
+        assert!(flux > cap, "fixture flux {flux} must exceed the cap {cap}");
+
+        for vapour in [0.0, 0.25 * cap, cap, 3.0 * cap] {
+            let s = water_only_state(full, TEST_DEPTH, vapour, 0.0);
+            let legs = water_legs(&sealed, &s, 200.0, 0.0, 1.0);
+            let to_air = (cap - vapour).max(0.0);
+            assert_eq!(
+                legs[SOIL_WATER], -flux,
+                "the split must not change the flux"
+            );
+            assert!(
+                (legs[WATER_VAPOR] - to_air).abs() <= 1e-12 * flux,
+                "v={vapour}: air got {}",
+                legs[WATER_VAPOR]
+            );
+            assert!(legs[WATER_VAPOR] >= 0.0, "transpiration withdrew vapour");
+            assert!((legs[CONDENSATE] - (flux - to_air)).abs() <= 1e-12 * flux);
+        }
+
+        let cond = Condensation {
+            id: "biosphere.condensation".to_string(),
+            water_vapor: WATER_VAPOR.to_string(),
+            condensate: CONDENSATE.to_string(),
+            condensation_rate: 0.5,
+            temp_var: "temp".to_string(),
+            air_capacity_mol: ROOM_MOL,
+        };
+        for (vapour, dt) in [(3.0 * cap, 0.25), (3.0 * cap, 1.0), (0.5 * cap, 0.25)] {
+            let s = water_only_state(full, TEST_DEPTH, vapour, 0.0);
+            let got = water_legs(&cond, &s, 200.0, 0.0, dt)[CONDENSATE];
+            let want = (vapour - cap).max(0.0) + 0.5 * vapour.min(cap) * dt;
+            assert!(
+                (got - want).abs() <= 1e-12 * want,
+                "v={vapour} dt={dt}: {got} vs {want}"
+            );
+            assert!(
+                got <= vapour,
+                "condensation withdrew more vapour than there is"
+            );
+            assert!(
+                vapour - got <= cap,
+                "vapour left above the cap: {}",
+                vapour - got
+            );
+        }
     }
 
     // --- batch D: the carbon BUDGET, and the two halves of the stem reserve ------
