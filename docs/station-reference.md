@@ -324,6 +324,12 @@ gate), so the discipline is enforced, not merely requested.
   carbon, O₂ or N value, which the prediction had flagged as unmeasured for these four and
   which held. `sealed_energy_drift_summary.json` unchanged.
 
+  ⚠ **The bound is per STOCK, not per room.** The crew's humidity is a separate
+  `eclss.cabin_h2o` in the same cabin air, held by the ECLSS condenser at 3.75 mol at the end of
+  every run against a 115–219 mol saturation cap — so the cabin's total water can exceed
+  saturation by at most ~3 %. This entry claims the biosphere's vapour is bounded, not the
+  cabin's humidity.
+
 - **2026-09-07 — the biosphere adopts the LIVE-O₂ FvCB form; 4 station goldens move by
   ≤ 0.058 % and 4 `golden_sha256` rows follow. No station flow, param, seam or claim
   changed.**

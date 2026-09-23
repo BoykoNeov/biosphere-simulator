@@ -86,13 +86,20 @@ Record: `docs/log/vapour-saturation.md`.
 
 * **Goldens:** 9 changed, 11 identical — file for file as predicted (20 are regenerated; the
   21st, `state_snapshot.json`, is not a reference output — §4's "other 12" miscounted it).
-* **Only water moved:** `water_vapor`, `condensate`, `soil_water`, and in six files
+* **Only water moved:** `water_vapor`, `condensate`, `soil_water`, and in five files
   `subsoil_water`. No carbon/O₂/N/consumer value in any of the 9 — the two unmeasured branches
   (dry-subsoil root stop; the four station chambers) did not bind.
 * **Bound:** vapour ≤ saturation at the step's temperature on every step of all three chambers;
   `rationed == 0`; wet pressure peak 1.537 → 1.0235; the 2000-mol chamber's peak vapour is
   exactly twice the jar's.
 * **Manifests:** 9 golden hashes + `water_cycle.yaml` (header rewritten), nothing else.
+* **Scope:** the bound is an Euler-at-¼-day construct: above the cap both flows move a per-step
+  AMOUNT (the whole excess; the headroom), not a rate, and no live path runs a sealed chamber
+  under RK4 or another step, so it is untested there. And the cap is PER STOCK, not per room: in
+  the station's sealed assemblies the crew's humidity sits in a separate `eclss.cabin_h2o` in
+  the same cabin air — 3.75 mol at the end of every run against a 115–219 mol cap, so the
+  cabin's total water can exceed saturation by at most ~3 %. The biosphere's vapour is bounded;
+  the cabin's humidity is not claimed to be.
 * ⚠ **MISSED — "the irrigation/drainage boundaries move with them".** No boundary stock moved in
   any of the 9 files; the water was redistributed entirely among the four in-chamber stores.
   Not investigated — the prediction over-reached, and the golden diff is what says so.

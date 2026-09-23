@@ -2854,7 +2854,8 @@ mod tests {
         let empty = water_only_state(0.0, TEST_DEPTH, 0.0, 0.0);
         assert_eq!(water_legs(&cond, &empty, 200.0, 0.0, 1.0)[CONDENSATE], 0.0);
         assert_eq!(water_legs(&rec, &empty, 200.0, 0.0, 1.0)[SOIL_WATER], 0.0);
-        // dt-linear, like every other rate law in the tree.
+        // dt-linear BELOW the saturation cap (every pool here is below it). Above the cap the
+        // excess is removed whole, a per-step amount, not a rate — see the saturation test.
         let s = water_only_state(100.0, TEST_DEPTH, 4.0, 4.0);
         assert_eq!(
             water_legs(&cond, &s, 200.0, 0.0, 0.5)[CONDENSATE],

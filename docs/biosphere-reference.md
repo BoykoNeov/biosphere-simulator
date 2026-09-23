@@ -917,7 +917,7 @@ the top of this doc, which are live claims, are kept current.
 
   **What moved, against the prediction written first.** 9 of 20 goldens, file for file as
   predicted (the predicted irrigation/drainage movement did NOT happen — no boundary moved); `season_euler_state` (open field) byte-identical. In all 9, **only**
-  `water_vapor`, `condensate`, `soil_water` and (six of them) `subsoil_water` — no carbon, O₂,
+  `water_vapor`, `condensate`, `soil_water` and (five of them) `subsoil_water` — no carbon, O₂,
   N or consumer value, because the water-stress factor was measured at exactly 1 on every step
   under both thresholds. Water totals unchanged; wet pressure peaks at 1.0235.
 

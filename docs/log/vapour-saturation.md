@@ -47,7 +47,8 @@ Written before any code:
   "the other 12", counting `state_snapshot.json`, which is not a reference output);
   `season_euler_state.json` (open field) byte-identical.
 * **Only water stocks move.** Held in all 9: `water_vapor`, `condensate`, `soil_water`, and in
-  six of them `subsoil_water`. Not one carbon, O₂, nitrogen or consumer value changed —
+  five of them `subsoil_water` (both consumer, both perennial, `sealed_station`). Not one
+  carbon, O₂, nitrogen or consumer value changed —
   including the four **station** chambers, which the prediction had flagged as unmeasured, and
   the root extension's dry-subsoil stop, flagged as the one unmeasured reader in the biosphere.
   The stress factor had been measured at exactly 1 on every step of all three chambers under
@@ -103,6 +104,14 @@ bound per step at that step's own temperature, and the room scaling to 1e-12.
 
 ## Left open
 
+* **Scope of the bound, stated after the advisor's final review:** the bound is an
+  Euler-at-¼-day construct: above the cap both flows move a per-step AMOUNT (the whole excess;
+  the headroom), not a rate, and no live path runs a sealed chamber under RK4 or another step,
+  so it is untested there. And the cap is PER STOCK, not per room: in the station's sealed
+  assemblies the crew's humidity sits in a separate `eclss.cabin_h2o` in the same cabin air —
+  3.75 mol at the end of every run against a 115–219 mol cap, so the cabin's total water can
+  exceed saturation by at most ~3 %. The biosphere's vapour is bounded; the cabin's humidity is
+  not claimed to be.
 * **The plants still read the weather's VPD, not the chamber's humidity.** A saturated jar
   transpires as if the air were Dutch weather. This does not block the bound — Penman–Monteith's
   radiation term transpires at VPD 0, so coupling alone could not have bounded the vapour — but
