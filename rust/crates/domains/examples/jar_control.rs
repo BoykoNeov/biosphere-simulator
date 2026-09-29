@@ -20,6 +20,7 @@
 //! It writes nothing and takes no decision.
 
 use domains::biosphere::params::BiosphereParams;
+use domains::biosphere::readouts::withdrawal_demand;
 use domains::biosphere::science::{self, LeafAreaForm, O2Form};
 use domains::biosphere::stocks::{CARBON_POOL, LEAF_AREA_INDEX, LEAF_C, O2_POOL};
 use domains::biosphere::system::{
@@ -33,7 +34,6 @@ use simcore::flow::FlowResult;
 use simcore::integrator::{EulerIntegrator, Rk4Integrator};
 use simcore::registry::Registry;
 use simcore::state::State;
-use std::collections::BTreeMap;
 
 fn params(leaf: LeafAreaForm, o2: O2Form) -> BiosphereParams {
     // A fresh object per cell; the O₂ form is set on the leaf-form params, never on a shared one.
@@ -54,19 +54,6 @@ fn evaluate(registry: &Registry, state: &State, env: &SourceResolver) -> Vec<Flo
         .iter()
         .map(|f| f.evaluate(state, &bound, BIO_DT).expect("evaluate"))
         .collect()
-}
-
-/// Per-stock withdrawal demand, summed in canonical order (arbitration's own sum).
-fn demand(results: &[FlowResult]) -> BTreeMap<String, f64> {
-    let mut d = BTreeMap::new();
-    for r in results {
-        for leg in &r.legs {
-            if leg.amount < 0.0 {
-                *d.entry(leg.stock.clone()).or_insert(0.0) -= leg.amount;
-            }
-        }
-    }
-    d
 }
 
 struct Cell {
@@ -110,7 +97,7 @@ fn euler(p: &BiosphereParams) -> Cell {
         }
         let results = evaluate(integrator.registry(), &state, &env);
         let factors = arbitration::scale_factors(&results, &state.stocks).expect("factors");
-        let d = demand(&results);
+        let d = withdrawal_demand(&results, &state.stocks);
         let co2 = amount(&state, CARBON_POOL);
         if (757..=793).contains(&state.n) && state.n % 4 == 1 {
             cell.squeeze.push(format!(

@@ -233,5 +233,10 @@ would ration the jar — added demand also lowers the pool earlier and the crop'
 CO₂ falls, so the threshold is not that arithmetic. Recorded, not acted on — **whether the step
 margin should be pinned is the user's call.**
 
+**ANSWERED 2026-09-29 — PINNED** (user: *"Add a test that tracks how close the jar's worst step
+comes to running out of CO2"*): `science_gates::margins::the_jars_tightest_co2_step_is_pinned_by_its_headroom`,
+0.756662 at step 777, tolerance ±2 % of the HEADROOM (`1 − draw`), instrument `readouts::step_draws`.
+Detail: `log/leaf-rust-remeasure.md`, last section.
+
 **Standing:** unchanged. The lab form is still not adopted, nothing frozen moved, and whether
 the rewrite continues is the user's decision — now with a named cause for the jar.

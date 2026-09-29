@@ -41,8 +41,12 @@ use crate::biosphere::{
     build_season_with, run_perennial_with, run_season, season_setup_composed, season_steps, steps_for,
     steps_for_years, SeasonBuild, SeasonScenario, BIO_DT, SEASON_DAYS,
 };
+use simcore::arbitration;
 use simcore::error::SimError;
-use simcore::state::State;
+use simcore::flow::FlowResult;
+use simcore::ids::StockId;
+use simcore::state::{State, Stock};
+use std::collections::BTreeMap;
 
 /// One trajectory, reduced to the scalar series the gates fold.
 ///
@@ -512,6 +516,142 @@ pub fn segment_last(seg: &[f64]) -> f64 {
 /// `max` over a slice — the scale the relative stationarity bounds are taken against.
 pub fn scale_of(values: &[f64]) -> f64 {
     segment_max(values)
+}
+
+// ---------------------------------------------------------------------------------
+// The step draw — how much of a stock one step asks for.
+// ---------------------------------------------------------------------------------
+
+/// One step's withdrawal demand per **clamped** stock: every negative leg summed in canonical
+/// flow order — the sum the Euler backstop compares each stock's amount against.
+///
+/// ⚠ A second copy of the loop inside `simcore::arbitration`'s private `compute_scale_factors`
+/// (simcore is frozen, and the loop is not exposed). It cannot drift silently: [`step_draws`]
+/// asserts on every step that this sum exceeds the amount held on exactly the steps the
+/// backstop's own [`arbitration::scale_factors`] throttles a flow.
+pub fn withdrawal_demand(
+    results: &[FlowResult],
+    stocks: &BTreeMap<StockId, Stock>,
+) -> BTreeMap<StockId, f64> {
+    let mut demand = BTreeMap::new();
+    for result in results {
+        for leg in &result.legs {
+            if leg.amount < 0.0 && stocks.get(&leg.stock).is_some_and(|s| !s.unclamped) {
+                *demand.entry(leg.stock.clone()).or_insert(0.0) -= leg.amount;
+            }
+        }
+    }
+    demand
+}
+
+/// A stock's tightest step: the largest `withdrawal demand ÷ amount held` at step entry, and
+/// the step it happened on. Above 1 the backstop rations; the distance below 1 is how much of
+/// the stock that step would have left.
+#[derive(Clone, Copy, Debug)]
+pub struct StepDraw {
+    /// `demand ÷ held` on the tightest step.
+    pub ratio: f64,
+    /// That step's `n` (the entry state's step count).
+    pub step: u64,
+}
+
+/// [`step_draws`]' result: every clamped stock's tightest step, and the run's firing count.
+pub struct StepDraws {
+    /// Per stock that was ever drawn from.
+    pub worst: BTreeMap<StockId, StepDraw>,
+    /// Arbitration firings over the run — the integrator's own count.
+    pub rationed: u64,
+}
+
+impl StepDraws {
+    /// The tightest step on `stock`.
+    ///
+    /// ⚠ Panics on a stock never drawn from, rather than returning a draw of 0 — "never
+    /// drawn" on the stock a test is asking about is a wiring fault, and 0 would read as the
+    /// most comfortable margin possible.
+    pub fn of(&self, stock: &str) -> StepDraw {
+        *self
+            .worst
+            .get(stock)
+            .unwrap_or_else(|| panic!("no flow ever drew on {stock:?}"))
+    }
+}
+
+/// Run `scenario` for `years` seasons against `p` under Euler **with no re-sow** (the way the
+/// sealed jar's golden drives it), recording every clamped stock's tightest step.
+///
+/// The question it answers is one the rest of this module cannot: **how close did a step come
+/// to rationing?** `rationed == 0` is binary — it reads the same at a draw of 0.28 as at 0.76 —
+/// and the compensation-point margin measures a different limit (the photosynthesis floor, not
+/// the pool running dry).
+///
+/// ⚠ Its own stepping loop, not an observer on [`run_season`]: the draw needs the flows
+/// evaluated at each step-entry state, and the cross-check below needs each step's own
+/// `rationed`, which `run_season` only returns summed. The loop is `run_season`'s body with no
+/// reset hook, so this is the same trajectory `trajectory(scenario, years, false, p)` samples.
+/// ⚠ No perennial variant, deliberately: `run_perennial`'s observer sees the PRE-reset state,
+/// so an observer-based draw would be measured on a state the next step never starts from.
+///
+/// ⚠ Every flow is evaluated twice per step (here, and inside the step) — the price of not
+/// touching frozen simcore. Pure functions of the state, so it changes no number.
+pub fn step_draws(scenario: SeasonScenario, years: usize, p: &BiosphereParams) -> StepDraws {
+    let (mut state, integrator, resolver) =
+        season_setup_composed(&scenario, years, p, &build_season_with).expect("setup");
+    let mut out = StepDraws {
+        worst: BTreeMap::new(),
+        rationed: 0,
+    };
+    for _ in 0..steps_for_years(years) {
+        let bound = resolver.bind(&state, BIO_DT);
+        let results: Vec<FlowResult> = integrator
+            .registry()
+            .flows()
+            .iter()
+            .map(|f| f.evaluate(&state, &bound, BIO_DT).expect("evaluate"))
+            .collect();
+        let demand = withdrawal_demand(&results, &state.stocks);
+        let mut overdrawn = false;
+        for (stock, d) in &demand {
+            let ratio = d / state.stocks[stock].amount;
+            overdrawn |= *d > state.stocks[stock].amount;
+            let worst = out.worst.entry(stock.clone()).or_insert(StepDraw {
+                ratio,
+                step: state.n,
+            });
+            if ratio > worst.ratio {
+                *worst = StepDraw {
+                    ratio,
+                    step: state.n,
+                };
+            }
+        }
+        let throttled = arbitration::scale_factors(&results, &state.stocks)
+            .expect("scale factors")
+            .iter()
+            .any(|f| *f < 1.0);
+        let report = integrator
+            .step_report(&state, &resolver, BIO_DT)
+            .expect("euler step");
+        // ⚠ Two different claims, asserted separately. The first ties this probe's flow
+        // evaluation to the step's own (a probe evaluating a different state would still read
+        // plausible numbers). The second ties `withdrawal_demand` to arbitration's private sum —
+        // compared through the backstop's own factor, since `amount / d < 1` and `d > amount`
+        // may disagree by one rounding at exactly the marginal step this exists to watch.
+        assert_eq!(
+            throttled,
+            report.rationed > 0,
+            "step {}: the probe's evaluation disagrees with the step's — it is not measuring the run",
+            state.n
+        );
+        assert_eq!(
+            overdrawn, throttled,
+            "step {}: withdrawal_demand disagrees with arbitration's own demand sum",
+            state.n
+        );
+        out.rationed += report.rationed;
+        state = report.state;
+    }
+    out
 }
 
 #[cfg(test)]

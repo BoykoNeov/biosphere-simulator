@@ -1032,6 +1032,58 @@ mod margins {
         );
     }
 
+    /// The sealed jar's tightest step: the most of its CO₂ pool one Euler step asks for,
+    /// `withdrawal demand ÷ amount held`, at step entry. Above 1 the backstop rations.
+    ///
+    /// ⚠ **A different distance from the jar's ×10.674948 above, on the same run.** That one
+    /// is the CO₂ low point over the *photosynthesis floor* (the compensation point, ~0.7 ppm
+    /// in the jar since live O₂); this one is the pool *running dry within a step*. On
+    /// 2026-09-29 the lab leaf form pushed this past 1 and rationed the jar while the ×10.67
+    /// margin still read comfortably — `docs/plans/post-roadmap-leaf-rust-remeasure.md` §5a.
+    /// Pinned on the user's word the same day.
+    ///
+    /// ⚠ MEASURED off this test's own failure output (a deliberately wrong pin first): 0.756662
+    /// at step 777, day 194.25 of season 1. The `jar_control` example's 0.757 at step 777 was
+    /// the prediction, and it held.
+    ///
+    /// ⚠ Kept OUT of [`PINNED`]: that list is tied to the compensation-band roster by
+    /// `every_banded_scenario_has_a_pinned_margin`, and this is not a band. And not a
+    /// `science_gates!` row — that would be a manifest entry, i.e. an unfreeze.
+    const JAR_CO2_STEP_DRAW: f64 = 0.756662;
+
+    /// ⚠⚠ **The tolerance is on the HEADROOM, `1 − draw`, not on the draw.** The question is
+    /// how close the jar comes to running out, and what is left is ~0.24 of the pool. 2 % of
+    /// the draw would let ~6 % of that headroom go unnoticed — the ratio-vs-margin mix
+    /// `leaf-rust-remeasure` P7 caught (a ratio moved 4 % while its margin lost a third). Same
+    /// [`TOLERANCE`], so ±2 % of the headroom: ±0.005 on the draw.
+    #[test]
+    fn the_jars_tightest_co2_step_is_pinned_by_its_headroom() {
+        use crate::biosphere::params;
+        use crate::biosphere::readouts::step_draws;
+        use crate::biosphere::stocks::CARBON_POOL;
+        use crate::biosphere::system::sealed_chamber_scenario;
+        use crate::biosphere::SEALED_CHAMBER_YEARS;
+
+        let draws = step_draws(
+            sealed_chamber_scenario(),
+            SEALED_CHAMBER_YEARS,
+            &params::biosphere(),
+        );
+        assert_eq!(draws.rationed, 0, "the reference jar rations");
+        let co2 = draws.of(CARBON_POOL);
+        assert!(
+            within(1.0 - co2.ratio, 1.0 - JAR_CO2_STEP_DRAW),
+            "the jar's tightest CO₂ step moved: it draws {:.6} of the pool (step {}), pinned \
+             {JAR_CO2_STEP_DRAW:.6} — headroom {:.6} vs {:.6}, past {}%. Rising is the jar \
+             closing on rationing; re-read before re-pinning",
+            co2.ratio,
+            co2.step,
+            1.0 - co2.ratio,
+            1.0 - JAR_CO2_STEP_DRAW,
+            TOLERANCE * 100.0
+        );
+    }
+
     /// Anti-vacuity for the pin above: the tolerance must actually reject something.
     ///
     /// ⚠ Written because the pin's whole subject is a comparison that is easy to make

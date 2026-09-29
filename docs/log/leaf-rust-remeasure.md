@@ -84,3 +84,25 @@ written first, all five held. Instrument: `examples/jar_control.rs`.
   starts with, and **no gate measures that distance** — searched, not asserted: the jar's trough
   is pinned (×10.674948, 2 %), but to the compensation floor; `rationed == 0` is binary; no
   test in `rust/crates` bounds a step's draw on `biosphere.carbon_pool`. Left for the user.
+
+## The jar's step draw, PINNED (2026-09-29, the same day)
+
+User: *"Add a test that tracks how close the jar's worst step comes to running out of CO2."*
+
+* **The pin:** `science_gates::margins::the_jars_tightest_co2_step_is_pinned_by_its_headroom`
+  holds the reference jar's tightest step at **0.756662** of its CO₂ pool (step 777, day 194.25
+  of season 1). Read off the test's own red with a deliberately wrong pin first; the control's
+  0.757 was the prediction and it held.
+* **The tolerance is on the headroom (`1 − draw` = 0.243), ±2 %, i.e. ±0.005 on the draw** —
+  not 2 % of the draw, which would let ~6 % of what is left go unnoticed (the P7 ratio-vs-margin
+  mix again). Mutation: pinning 0.762 (0.7 % on the ratio, 2.2 % of the headroom) reddens it.
+* **The instrument:** `readouts::step_draws` evaluates every flow at each step's entry state and
+  divides each clamped stock's summed withdrawals by what it holds. It asserts every step that
+  its firing call matches the backstop's own `scale_factors` AND the integrator's `rationed` —
+  the demand sum is a copy of simcore's private one, and that assertion is what keeps the copy
+  honest. `examples/jar_control.rs` now uses the same `withdrawal_demand` and reproduces §5a's
+  table exactly.
+* **Control:** `leaf_form.rs`'s jar test reads the lab form's CO₂ draw through the same function
+  and asserts `> 1` on the run that rations, so the pin is not a probe that never sees a squeeze.
+* Not a `science_gates!` row (that is a manifest entry, an unfreeze) and not in `PINNED` (tied
+  to the compensation-band roster). A characterisation pin; re-pinning it is an ordinary edit.

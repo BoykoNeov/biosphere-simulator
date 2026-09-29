@@ -19,9 +19,9 @@
 //!   stored area. On the Python branch that rationed 85 times. It is an error now, pinned below.
 
 use domains::biosphere::params::{self, BiosphereParams};
-use domains::biosphere::readouts::{leaf_thickness_ratio, peak_lai, trajectory};
+use domains::biosphere::readouts::{leaf_thickness_ratio, peak_lai, step_draws, trajectory};
 use domains::biosphere::science::{self, LeafAreaForm};
-use domains::biosphere::stocks::{LEAF_AREA_INDEX, LEAF_C};
+use domains::biosphere::stocks::{CARBON_POOL, LEAF_AREA_INDEX, LEAF_C};
 use domains::biosphere::system::{
     annual_reset, annual_reset_with, build_season, build_season_with, consumer_chamber_scenario,
     perennial_chamber_scenario, sealed_chamber_scenario, SeasonScenario, DEFAULT_SCENARIO,
@@ -199,11 +199,23 @@ fn the_form_moves_the_perennial_chamber_without_rationing() {
 /// Pinned as `> 0`, not `== 5` — a marginal firing count can move by libm ULPs on CI's Linux
 /// box, the zero control cannot. When this goes green-to-red the mechanism has changed and the
 /// remeasure record is stale.
+///
+/// ⚠ Also the **control for the jar's step-draw pin** (`science_gates::margins::
+/// the_jars_tightest_co2_step_is_pinned_by_its_headroom`): the same `step_draws` must read the
+/// CO₂ pool past 1 on the run that rations, or that pin's 0.76 could be a probe that never
+/// sees a squeeze. Measured through `step_draws` rather than `trajectory` so the jar is run once
+/// per form, not twice; `step_draws` asserts its own firing count against the integrator's.
 #[test]
 fn the_form_rations_the_sealed_jar_and_the_frozen_tree_does_not() {
     let s = sealed_chamber_scenario();
-    let frozen = trajectory(s, 1, false, &params::biosphere());
-    let lab = trajectory(s, 1, false, &lab());
+    let frozen = step_draws(s, 1, &params::biosphere());
+    let lab = step_draws(s, 1, &lab());
     assert_eq!(frozen.rationed, 0);
     assert!(lab.rationed > 0, "the jar no longer rations under the lab form — re-measure");
+    assert!(frozen.of(CARBON_POOL).ratio < 1.0);
+    assert!(
+        lab.of(CARBON_POOL).ratio > 1.0,
+        "the lab jar rations but step_draws does not see its CO₂ pool overdrawn: {:?}",
+        lab.of(CARBON_POOL)
+    );
 }
