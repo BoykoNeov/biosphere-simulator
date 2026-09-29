@@ -58,6 +58,10 @@ doing early because it lowers the price of every ceremony after it.
 
 ## Step 1 — plants and cabin trade gas within the day
 
+**TAKEN 2026-09-29, lab slices only** → `docs/plans/post-roadmap-intraday-gas-exchange.md`
+(predictions, controls, results). ⚠ Its predictions correct this step's golden count: `lighting`
+cannot move (lamp and crop share no stock) and `sealed_energy_drift` does not run on this driver.
+
 ### The problem, measured
 
 `rust/crates/station/src/driver.rs`, `advance_one_master_day`: per day, the plant side takes

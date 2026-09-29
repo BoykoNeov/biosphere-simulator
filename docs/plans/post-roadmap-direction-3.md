@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `vapour-step-artefact.md`
+**Re-read against the record's last row:** `intraday-gas-exchange.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -401,6 +401,12 @@ count is the reason it is here rather than in a record nobody re-reads.
 **Work with no decision needed: NONE.** Said plainly, because the predecessor's version of
 this line was false when written. There is genuinely nothing left that can be built without
 either a decision or the Bernacchi PDF.
+⚠ *Re-read 2026-09-29* (`log/intraday-gas-exchange.md`): a separate proposal written that day
+after a science review lists eight hurdles, each ending in a decision. It does not supersede
+this plan. Its first step (plant and cabin steps interleaved within the day) was opened on the
+user's *"start implementing"* as **lab-only** work that stops before the adopt decision. It
+discharges nothing here and touches no §2 or §3 item. The station's crew-loop refusal
+(`log/crew-coupled-loop.md`) is the record it answers.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
