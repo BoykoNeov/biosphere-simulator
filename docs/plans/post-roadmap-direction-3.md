@@ -406,10 +406,10 @@ after a science review lists eight hurdles, each ending in a decision. It does n
 this plan. Its first step (plant and cabin steps interleaved within the day) was opened on the
 user's *"start implementing"* as **lab-only** work that stops before the adopt decision, and
 measured the same day: the old order starves a crew-sized crop through CO₂ concentration, and
-interleaving lifts one crew member's crop from 57 % to 98.8 % of the unconstrained crop. Adopt
-is recommended and is the user's call. It discharges nothing here and touches no §2 or §3 item.
-⚠ For §2.2: at the whole crew's area the remaining limit is the cabin air's size or the
-scrubber's rate, which bears on any future setpoint question for the station. The station's crew-loop refusal
+interleaving lifts one crew member's crop from 57 % to 98.8 % of the 1 m² crop's growth per
+m². Adopt is recommended and is the user's call. It discharges nothing here and touches no §2
+or §3 item. ⚠ For §2.2: at the whole crew's area the heaviest step still asks 7.26× the
+scrubbed pool; which lever relieves that (scrubber rate, step, air) is not measured. The station's crew-loop refusal
 (`log/crew-coupled-loop.md`) is the record it answers.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any

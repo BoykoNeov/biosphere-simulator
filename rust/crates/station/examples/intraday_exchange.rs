@@ -28,7 +28,9 @@ use std::collections::BTreeMap;
 use domains::biosphere::params::biosphere;
 use domains::biosphere::readouts::withdrawal_demand;
 use domains::biosphere::science::leaf_area_index;
-use domains::biosphere::stocks::{CARBON_POOL, LEAF_C, ROOT_C, STEM_C, STEM_RESERVE_C, STORAGE_C};
+use domains::biosphere::stocks::{
+    CARBON_POOL, LEAF_C, O2_POOL, ROOT_C, STEM_C, STEM_RESERVE_C, STORAGE_C,
+};
 use domains::biosphere::system::{
     build_season, sealed_chamber_scenario, weather_resolver, SeasonScenario, SEALED_CHAMBER_YEARS,
 };
@@ -98,6 +100,8 @@ struct Books {
     /// sum and count, so the mean is what the crop saw. Quarters 1 and 2 carry 6 of the lamp's
     /// 16 hours each; 0 and 3 carry 2.
     pool_at_entry: [(f64, u64); 4],
+    /// The same for the cabin O₂ pool — the other gas the two sides share.
+    o2_at_entry: [(f64, u64); 4],
 }
 
 struct Measured {
@@ -162,6 +166,9 @@ fn measure(two: &TwoRate, order: DayOrder, s0: State, days: usize, ground_area: 
                 let slot = &mut books.pool_at_entry[(before.n % slow_per_day) as usize % 4];
                 slot.0 += amount(before, CARBON_POOL);
                 slot.1 += 1;
+                let slot = &mut books.o2_at_entry[(before.n % slow_per_day) as usize % 4];
+                slot.0 += amount(before, O2_POOL);
+                slot.1 += 1;
             }
         }
     };
@@ -188,9 +195,10 @@ fn print_books(label: &str, m: &Measured, exhale_per_day: f64) {
     let crop_net_draw = -b.slow_dpool;
     println!("  {label}");
     println!(
-        "    rationing: plant side {}, cabin side {}   (days with a plant-side firing: {})",
+        "    rationing: plant side {}, cabin side {}, events {}   (days with a plant-side firing: {})",
         m.totals.slow_rationed,
         m.totals.fast_rationed,
+        m.totals.events.len(),
         b.firing_days.len()
     );
     if !b.binding.is_empty() {
@@ -220,6 +228,16 @@ fn print_books(label: &str, m: &Measured, exhale_per_day: f64) {
     println!(
         "    mean cabin CO2 at plant-step entry, by quarter-day (mol): {}",
         means.join("  ")
+    );
+    let o2: Vec<String> = b
+        .o2_at_entry
+        .iter()
+        .enumerate()
+        .map(|(q, (s, c))| format!("q{q} {:.3}", s / *c as f64))
+        .collect();
+    println!(
+        "    mean cabin O2 at plant-step entry, by quarter-day (mol): {}",
+        o2.join("  ")
     );
     println!(
         "    carbon books (mol C): crew exhaled {exhaled:.4} (expected {exhaled_expected:.4}, \
@@ -561,9 +579,11 @@ fn main() {
                 gh.cabin_dt,
                 gh.days,
             );
-            let (a, _) = two_rate_final(&build, &bio_res, &cabin_res, shape, DayOrder::SlowFirst);
-            let (b, _) = two_rate_final(&build, &bio_res, &cabin_res, shape, DayOrder::Interleaved);
+            let (a, ta) = two_rate_final(&build, &bio_res, &cabin_res, shape, DayOrder::SlowFirst);
+            let (b, tb) =
+                two_rate_final(&build, &bio_res, &cabin_res, shape, DayOrder::Interleaved);
             compare("harvest (7 d)", &a, &b);
+            println!("      rationed {ta:?} → {tb:?}");
 
             // Isolation for the harvest ring's movement: which of its two seams makes the order
             // matter — harvest draining the grain store, or feces landing in the soil litter?

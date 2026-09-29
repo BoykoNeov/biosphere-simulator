@@ -44,13 +44,16 @@ crop asks for more, and the backstop fires more. A rationing count cannot measur
 the crew-loop record already said `rationed == 0` cannot measure closure.
 
 **2. At one crew member's area, interleaving removes the schedule's share of the starvation.**
-Per m² the crop reaches **98.8 %** of the 1 m² crop's peak carbon (reference order: 57 %).
+Per m² the crop reaches **98.8 %** of the peak carbon of the 1 m² crop, which starts every
+step at the scrubber's level (reference order: 57 %).
 Closure share 0.64 % → 1.26 %.
 
 **3. At the whole crew's area (187.45 m²) it helps and does not solve**: 18 % of the 1 m²
 crop per m² (reference order 7.4 %), closure ×3.77 (predicted ×2–4). The predicted 11× draw
-**failed** (7.26×) because its premise scaled an unstarved crop. What remains is the air's
-size or the scrubber's rate, not the order.
+**failed** (7.26×) because its premise scaled an unstarved crop. The heaviest step still asks
+7.26× the pool, which is the scrubber's equilibrium AMOUNT and independent of the room's volume.
+Which lever relieves it is NOT measured (no run varied the scrubber, the air or the step); ⚠ not
+"a bigger room" — the crew-loop record measured that as a lower concentration and a worse crop.
 
 **4. ⚠ The harvest ring moves far more than predicted** (grain store +37.5 %, humus +19 % in
 7 days; predicted < 0.1 %). Isolated: the harvest flow carries the grain half, feces-to-litter
@@ -64,5 +67,10 @@ Adoption would move **three** goldens: `greenhouse` (≤ 4.7e-4), `sealed_statio
 
 **6.** The crew-loop record's Python-era numbers are not today's (187.45 m², reference order:
 466 firings and LAI 0.439 today, 282 and 0.2772 then) — recorded side by side, not joined.
+
+**7. Checked on review, both clean:** the three goldens adoption would move keep their own gates
+interleaved (0 rationing, 0 events each, `sealed_station` over its full 4 years), so adoption is
+a regeneration; and O₂ at plant-step entry differs between orders by ≤ 0.13 % against CO₂'s
+3.3×, so the starvation runs through CO₂.
 
 **Recommendation to the user: adopt** (the plan's §7) — a station unfreeze moving three goldens.

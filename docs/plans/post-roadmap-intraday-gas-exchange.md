@@ -194,9 +194,13 @@ Per square metre the 14.09 m² crop reaches **98.8 %** of the 1 m² crop's peak 
 **3. At the whole crew's area, it helps and does not solve.** The crop reaches **18 %** of the
 1 m² crop's peak carbon per m² (slow-first: 7.4 %); closure share ×3.77. The 11× prediction
 failed because its premise did: it scaled an **unstarved** crop's demand, and this crop is
-starved to a fifth, so it asks for less (7.26×). The plan's own risk note applies: a finer
-interleave by hand is not the next move — a pool of 3.8 mol against a crop drawing tens per
-quarter-day is the air's size (Step 2's territory) or the scrubber's rate, not the schedule.
+starved to a fifth, so it asks for less (7.26×). Its heaviest step still asks for **7.26×** the
+pool it starts from, and that pool is the scrubber's equilibrium **amount** (3.796 mol), which
+does not depend on the room's volume. **Which lever would relieve it is NOT measured**: no run
+here varied the scrubber rate, the air or the step. ⚠ Not "a bigger room": the crew-loop record
+(finding 8(c)) measured that more air at the same scrubbed amount is a LOWER concentration and a
+worse crop. The plan's own risk note applies — a finer interleave by hand is not the next move;
+this is the squeeze the review's Step 2 measures.
 
 **4. The harvest ring moves because the two sides share two more stocks than the air.**
 Isolated by switching each seam off (7 days, relative change, slow-first → interleaved):
@@ -214,7 +218,16 @@ land in `litter_carbon`), so the order decides what the plant sees there too. My
 reasoned only about the air. ⚠ **Why** each moves this much in 7 days is not isolated: the
 harvest scenario starts past anthesis with a 119-mol litter pile, and no run varied either.
 
-**5. The crew-loop record's numbers are not today's.** At 187.45 m² slow-first, today's tree
+**5. Two checks added on the advisor's review, both clean.**
+
+* **The three goldens adoption would move keep their own gates under interleaving.** Each golden
+  producer asserts zero rationing and zero events. Measured interleaved: `greenhouse` 0 / 0,
+  `harvest` 0 / 0, `sealed_station` (4 y) 0 / 0. Adoption is a regeneration, not a gate change.
+* **Oxygen is not the route.** The cabin O₂ each plant step starts from differs between the
+  orders by at most **0.13 %** (1993.1 vs 1995.7 mol at 187.45 m²), against CO₂ differing by up
+  to **3.3×**. The starvation runs through CO₂.
+
+**6. The crew-loop record's numbers are not today's.** At 187.45 m² slow-first, today's tree
 gives 466 plant-side firings and peak LAI 0.439; the record (deleted Python, a one-day step)
 gave 282 and 0.2772. Recorded side by side, not joined: the step, the humidity setting and the
 oxygen form have all changed since.
@@ -231,8 +244,9 @@ same commit, and the moved goldens regenerated.
 
 **Recommendation: adopt.** The review's condition was "if the large crop stops being starved by
 the schedule". Measured, the schedule's share of the starvation is removed at one crew member's
-area (98.8 % of the unconstrained crop) and more than halved at the whole crew's; what remains
-at 187 m² is the air's size, not the order. The interleaved order is also the one that matches
+area (98.8 % of the 1 m² crop, which starts every step at the scrubber's level) and more than
+halved at the whole crew's; what remains at 187 m² is a draw of 7.26× the scrubbed pool, and
+which lever relieves it is not measured (finding 3). The interleaved order is also the one that matches
 the physics — the crew breathes out while the plants take CO₂ in — and it costs no new number.
 The one thing to weigh is the `harvest` golden's large move, which is the same effect on two
 stocks the old order hid.
