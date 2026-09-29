@@ -447,19 +447,29 @@ pub fn measure_composed(
                 continue;
             }
         };
-        // ⚠ A run that went NaN or infinite is DEAD, not measured. The engine's conservation
-        // check compares `residual > tol`, which a NaN residual passes, so nothing upstream
-        // stops such a run; and a fold like `max` would print a finite number out of it.
-        // Reachable in practice only through a WHAT-IF, whose range checks were skipped.
+        // ⚠ A run that went NaN or infinite is DEAD, not measured, and there are TWO ways in.
+        // A series can hold one (a fold like `max` would print a finite number out of it), or
+        // a FOLD can make one out of finite series — it multiplies by params, and a what-if
+        // param can be infinite. ⚠ The second was missed on first writing: `carbon_fraction =
+        // 0` makes `sla_per_mol_c` infinite, every stock stays finite, and peak LAI printed as
+        // `inf`. Measured 2026-09-29 with the what-if refusal bypassed; the engine never saw a
+        // non-finite value (`tests/non_finite_refusal.rs` says why it cannot).
+        // ⚠ The series are checked BEFORE anything is folded, so no fold is ever handed a NaN
+        // series; only then are the folds computed and checked themselves.
+        let why = format!("{name}: the run went non-finite (NaN or infinite)");
         if needed.iter().any(|i| readout_went_non_finite(&SPECS[*i], &t)) {
-            let why = format!("{name}: the run went non-finite (NaN or infinite)");
+            failed.extend(needed.iter().map(|i| (*i, why.clone())));
+            continue;
+        }
+        let folded: Vec<(usize, f64)> = needed.iter().map(|&i| (i, (SPECS[i].fold)(&t))).collect();
+        if folded.iter().any(|(_, v)| !v.is_finite()) {
             failed.extend(needed.iter().map(|i| (*i, why.clone())));
             continue;
         }
         rationed += t.rationed;
         events += t.events;
-        for i in needed {
-            values.push((i, (SPECS[i].fold)(&t)));
+        for (i, v) in folded {
+            values.push((i, v));
             if readout_is_frozen(&SPECS[i], &t) {
                 constant.push(i);
             }

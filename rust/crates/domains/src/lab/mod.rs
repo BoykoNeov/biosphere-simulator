@@ -210,9 +210,16 @@ pub fn biosphere_with(subs: &[Substitution]) -> Result<BiosphereParams, ConfigEr
 /// Everything else [`biosphere_with`] refuses is still refused (an unknown file or field, a
 /// table-shaped field, a doubled substitution, a unit mismatch). And one thing is refused that
 /// the default route never needs to: **non-finite folded params**. A skipped range check is
-/// exactly how an infinity gets in — `carbon_fraction = 0` divides in two folds — and the
-/// engine's per-step conservation check compares `residual > tol`, which a NaN residual passes
-/// silently. So a what-if that cannot be computed is an error here, not a quiet column.
+/// exactly how an infinity gets in — `carbon_fraction = 0` divides in two folds — so a what-if
+/// that cannot be computed is an error here, not a quiet column.
+///
+/// ⚠ **Corrected 2026-09-29.** This said the refusal was needed because the engine's
+/// conservation check compares `residual > tol`, which a NaN residual passes silently. The
+/// comparison is blind, but the engine never reaches it with a NaN: legs and stock amounts are
+/// refused when non-finite first (`tests/non_finite_refusal.rs`). Measured with this refusal
+/// bypassed, `carbon_fraction = 0` left every stock finite and put the infinity in a REPORT
+/// fold — peak LAI printed as `inf`. The refusal stands for that reason: an infinite param
+/// cannot be run as a question, and the report now marks a non-finite fold dead too.
 ///
 /// ⚠ A run can still go non-finite later, from params that are finite but degenerate;
 /// [`report::measure_composed`] marks such a run dead rather than printing its numbers.
@@ -661,6 +668,27 @@ mod tests {
         assert!(e.to_string().contains("sla_per_mol_c"), "{e}");
         // The typo guards are not what-if territory: an unknown field is refused as before.
         assert!(biosphere_what_if(&[Substitution::new("canopy.yaml", "no_such", 1.0)]).is_err());
+    }
+
+    /// Behind that refusal, the report's own guard: an infinite param that reaches a run puts
+    /// the infinity in a FOLD, not in a stock, and the fold is marked dead rather than printed.
+    /// Reached here only by bypassing the refusal above — which is the point: it is the second
+    /// line, and before 2026-09-29 it printed peak LAI as `inf`.
+    #[test]
+    fn an_infinite_param_that_reaches_a_run_is_reported_dead_not_printed() {
+        let subs = [Substitution::new("canopy.yaml", "carbon_fraction", 0.0)];
+        let p = build(&subs, Bounds::WhatIf).expect("the unguarded build");
+        let col = report::measure_composed("inf", &p, false, None).expect("measured");
+        assert!(
+            col.values.iter().all(|(_, v)| v.is_finite()),
+            "a non-finite readout was printed: {:?}",
+            col.values
+        );
+        let dead: Vec<&str> = col.failed.iter().map(|(_, why)| why.as_str()).collect();
+        assert!(
+            dead.iter().any(|w| w.starts_with("open_season") && w.contains("non-finite")),
+            "open_season's infinite peak LAI was not marked dead: {dead:?}"
+        );
     }
 
     #[test]

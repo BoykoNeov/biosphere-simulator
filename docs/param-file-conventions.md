@@ -130,8 +130,11 @@ fractions, ordered bands) are skipped — they reject *impossible or degenerate*
 what a what-if may want to ask ("what if roots never grow?"). Everything that catches a typo still runs (field names, exact units, the
 rewrite's bit re-read). The column heading reads `WHAT-IF …` by code. Refused rather than run:
 params that fold to infinity or NaN (`carbon_fraction = 0` divides). A run that goes non-finite
-prints as dead — needed because the engine's per-step conservation check compares
-`residual > tol`, which a NaN residual passes silently. The reference loaders are unchanged:
+prints as dead, whether the NaN or infinity is in a series or appears only when a readout is
+folded (an infinite param leaves every stock finite and surfaces in the fold). ~~needed because
+the engine's per-step conservation check compares `residual > tol`, which a NaN residual passes
+silently.~~ ⚠ Corrected 2026-09-29: the engine refuses a non-finite leg or stock amount before
+that check runs (`rust/crates/domains/tests/non_finite_refusal.rs`). The reference loaders are unchanged:
 every frozen load still enforces every range check.
 
 ## ⚠ The YAML a param file may use is a CLOSED SUBSET (since 2026-08-17)
