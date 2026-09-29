@@ -32,7 +32,7 @@
 //! (`docs/log/canopy-provenance.md`) is still open and still the user's.
 
 use crate::biosphere::params::{self, BiosphereParams};
-use crate::biosphere::science::{KineticsForm, O2Form};
+use crate::biosphere::science::{KineticsForm, LeafAreaForm, O2Form};
 use config::{with_override, ConfigError, ParamFile};
 
 /// The comparison report — §6 of the plan, every requirement earned by a wrong read.
@@ -143,6 +143,26 @@ pub fn biosphere_with_o2_form(
 ) -> Result<BiosphereParams, ConfigError> {
     let mut p = biosphere_with(subs)?;
     p.photo.o2_form = form;
+    Ok(p)
+}
+
+/// The frozen params under an alternative **leaf-area** form — the third form sibling.
+///
+/// [`LeafAreaForm::NodeEnvelope`] makes leaf area a state (the parked leaf mechanism,
+/// re-implemented for re-measurement: `docs/plans/post-roadmap-leaf-rust-remeasure.md`). Unlike
+/// the two siblings above it changes the build's SHAPE — it adds an aux process and an aux key
+/// — so a perennial run of these params must re-sow through `annual_reset_with`; the plain
+/// `annual_reset` refuses the state rather than skip the reset.
+///
+/// # ⚠ This endorses no form
+///
+/// [`LeafAreaForm::Derived`] is the reference and stays the reference.
+pub fn biosphere_with_leaf_form(
+    subs: &[Substitution],
+    form: LeafAreaForm,
+) -> Result<BiosphereParams, ConfigError> {
+    let mut p = biosphere_with(subs)?;
+    p.canopy.leaf_form = form;
     Ok(p)
 }
 

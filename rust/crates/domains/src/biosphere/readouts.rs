@@ -33,11 +33,12 @@ use crate::biosphere::science::{
     N2_MOLAR_MASS_KG_PER_MOL,
 };
 use crate::biosphere::stocks::{
-    CARBON_POOL, CHAMBER_INERT, CONSUMER_CARBON, LEAF_C, O2_POOL, STEM_C, STORAGE_C, WATER_VAPOR,
+    CARBON_POOL, CHAMBER_INERT, CONSUMER_CARBON, LEAF_AREA_INDEX, LEAF_C, O2_POOL, STEM_C,
+    STORAGE_C, WATER_VAPOR,
 };
 use crate::biosphere::system::sealed_chamber_scenario;
 use crate::biosphere::{
-    build_season_with, run_perennial, run_season, season_setup_composed, season_steps, steps_for,
+    build_season_with, run_perennial_with, run_season, season_setup_composed, season_steps, steps_for,
     steps_for_years, SeasonBuild, SeasonScenario, BIO_DT, SEASON_DAYS,
 };
 use simcore::error::SimError;
@@ -92,6 +93,11 @@ pub struct Trajectory {
     /// belongs in the total. ⚠ This one is NOT constant — transpiration fills it and
     /// condensation drains it — so it is the only reason nominal pressure moves at all.
     pub water_vapor_kg: Vec<f64>,
+    /// The STORED leaf area index per step — **empty** unless the run was built under the lab
+    /// `LeafAreaForm::NodeEnvelope`, in which case it is the LAI the canopy actually
+    /// intercepts with and [`peak_lai`] reads it instead of deriving one from leaf carbon.
+    /// Deriving it there would measure the frozen quantity under a run that no longer uses it.
+    pub leaf_area_state: Vec<f64>,
     /// Arbitration firings over the whole run. A band is a claim about a *well-fed*
     /// run; a rationed run's trace is not the model's answer.
     pub rationed: u64,
@@ -194,6 +200,7 @@ pub fn try_trajectory_composed(
         consumer_c: Vec::new(),
         inert_kg: Vec::new(),
         water_vapor_kg: Vec::new(),
+        leaf_area_state: Vec::new(),
         rationed: 0,
         events: 0,
         years,
@@ -235,12 +242,18 @@ pub fn try_trajectory_composed(
             if let Some(stock) = s.stocks.get(WATER_VAPOR) {
                 t.water_vapor_kg.push(stock.amount);
             }
+            if let Some(lai) = s.aux.get(LEAF_AREA_INDEX) {
+                t.leaf_area_state.push(*lai);
+            }
         };
         let outcome = if perennial {
-            run_perennial(
+            // `_with`, so a stored leaf area re-sows with the crop; identical to
+            // `run_perennial` for every params object that stores none.
+            run_perennial_with(
                 &integrator,
                 state,
                 &t.scenario,
+                &t.params,
                 &resolver,
                 BIO_DT,
                 steps,
@@ -431,13 +444,37 @@ pub fn pressure_ratio(t: &Trajectory) -> Vec<f64> {
         .collect()
 }
 
-/// Peak leaf area index over the whole trajectory.
+/// Peak leaf area index over the whole trajectory — the LAI the canopy **used**: the stored
+/// state under the lab leaf form, else derived from leaf carbon (the frozen path, unchanged).
 pub fn peak_lai(t: &Trajectory) -> f64 {
+    if !t.leaf_area_state.is_empty() {
+        return t.leaf_area_state.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    }
     let sla = t.params.canopy.sla_per_mol_c;
     t.leaf_c
         .iter()
         .map(|c| leaf_area_index(*c, sla, t.scenario.ground_area))
         .fold(f64::NEG_INFINITY, f64::max)
+}
+
+/// `(min, max)` of the stored LAI over the carbon-derived LAI — leaf thinness relative to
+/// nominal, the quantity [E]'s envelope bounds (`[1/1.50, 1/0.85]`). `None` for a run that
+/// stores no leaf area. Steps with no leaf carbon are skipped (the ratio is undefined there).
+pub fn leaf_thickness_ratio(t: &Trajectory) -> Option<(f64, f64)> {
+    if t.leaf_area_state.is_empty() {
+        return None;
+    }
+    let sla = t.params.canopy.sla_per_mol_c;
+    let mut lo = f64::INFINITY;
+    let mut hi = f64::NEG_INFINITY;
+    for (state, leaf) in t.leaf_area_state.iter().zip(&t.leaf_c) {
+        let derived = leaf_area_index(*leaf, sla, t.scenario.ground_area);
+        if derived > 0.0 {
+            lo = lo.min(state / derived);
+            hi = hi.max(state / derived);
+        }
+    }
+    Some((lo, hi))
 }
 
 /// mol C → t DM/ha on Greenwood's basis (1 kg/m² == 10 t/ha).
@@ -495,6 +532,7 @@ mod tests {
             consumer_c: Vec::new(),
             inert_kg: Vec::new(),
             water_vapor_kg: Vec::new(),
+            leaf_area_state: Vec::new(),
             rationed: 0,
             events: 0,
             years: 1,

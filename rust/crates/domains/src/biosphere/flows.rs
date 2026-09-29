@@ -71,6 +71,14 @@ pub struct CarbonContext {
     /// **unreachable by the live form by construction**, not merely unmoved by it.
     /// ⚠ Read with `chamber_air_capacity_mol`, so it is all-or-nothing with the sealed triple above.
     pub o2_pool_var: Option<String>,
+    /// The aux accumulator holding leaf area as a STATE, under the lab
+    /// [`science::LeafAreaForm::NodeEnvelope`]. `None` — the frozen form, and every canonical
+    /// build — derives LAI from leaf carbon, byte for byte as before.
+    ///
+    /// ⚠ Set by the SAME condition that builds [`LeafAreaExpansion`] (`system.rs`): wired
+    /// without the process, the budget would read an accumulator nothing advances; the process
+    /// without this, an area nothing reads.
+    pub leaf_area_aux: Option<String>,
 }
 
 impl CarbonContext {
@@ -144,10 +152,22 @@ impl CarbonContext {
         Ok(f_water * f_n)
     }
 
+    /// The LAI the canopy intercepts light with: the stored state when
+    /// [`CarbonContext::leaf_area_aux`] is wired, else derived from leaf carbon (frozen).
+    ///
+    /// The `max(0, ·)` hides no amount: `DLAI = rdr_leaf·LAI` is relative, so the state cannot
+    /// cross zero through senescence; it guards only a negative seed.
+    pub fn lai_at(&self, snapshot: &State, leaf: f64) -> f64 {
+        match &self.leaf_area_aux {
+            None => science::leaf_area_index(leaf, self.canopy.sla_per_mol_c, self.ground_area),
+            Some(aux) => snapshot.aux.get(aux).copied().unwrap_or(0.0).max(0.0),
+        }
+    }
+
     /// Daily `(GASS, MRES, available)` at the step-entry snapshot.
     fn budget(&self, snapshot: &State, env: &dyn Environment) -> Result<(f64, f64, f64), SimError> {
         let (leaf, biomass) = self.leaf_and_biomass(snapshot);
-        let lai = science::leaf_area_index(leaf, self.canopy.sla_per_mol_c, self.ground_area);
+        let lai = self.lai_at(snapshot, leaf);
         let gass = science::canopy_assimilation(
             env.get(&self.par_var)?,
             lai,
@@ -1352,6 +1372,7 @@ impl Flow for ConsumerMortality {
 /// Eqn-7.6 factors, applied ONLY in the vegetative phase (`DVS < 1` — wheat is
 /// insensitive to both cold and daylength at/after anthesis). With both `None` this is
 /// byte-for-byte the pre-scope-(B) plain degree-day rate.
+#[derive(Clone)]
 pub struct ThermalTimeAccumulation {
     pub id: String,
     pub accumulator: String,
@@ -1437,6 +1458,99 @@ impl AuxProcess for ThermalTimeAccumulation {
         // only and applies it to the already-modified DTU.
         rate *= self.drought_factor(snapshot);
         Ok(BTreeMap::from([(self.accumulator.clone(), rate * dt)]))
+    }
+}
+
+/// LAB `AuxProcess` advancing the stored `leaf_area_index` — [F] Eqn 9.8,
+/// `LAI += (GLAI − DLAI)·dt`, held inside [E]'s leaf-thickness envelope.
+///
+/// Built only under `LeafAreaForm::NodeEnvelope`, never by a canonical build. Re-implemented
+/// rule for rule from the deleted Python branch (`leaf_area.py`,
+/// `docs/log/leaf-expansion.md`) for re-measurement; the rationale lives there, the rules
+/// here:
+///
+/// * **below `TLM`** the rate is node-driven and SINK-limited — [`science::leaf_node_area_rate`]
+///   times `WSFL = min(1, FTSW/WSSL)`. The day's temperature unit comes from the tree's own
+///   [`ThermalTimeAccumulation`] (evaluated at unit `dt`), so the node clock and the
+///   development clock can never disagree;
+/// * **at and after `TLM`** it is carbon-driven: `Allocation`'s leaf leg, RECOMPUTED through
+///   the shared [`CarbonContext`] (an aux sees only the step-entry snapshot), times SLA;
+/// * `DLAI = rdr_leaf · LAI` — `Senescence`'s own rate, in area terms. ⚠ The frozen
+///   `Senescence` also adds MUTUAL SHADING on a DERIVED LAI; this mirrors the branch, which
+///   did not route shading through the state (see the remeasure plan §2.4);
+/// * then the envelope, as an absolute **projection on the state**: clamped, this returns
+///   `bound − LAI`, whose implied rate depends on `dt` on purpose — a bound on a state is
+///   honoured at every step size, which a `dt`-independent rate cannot promise.
+pub struct LeafAreaExpansion {
+    pub id: String,
+    pub accumulator: String,
+    pub ctx: CarbonContext,
+    pub thermal_time_aux: String,
+    pub pheno: PhenologyParams,
+    pub table: Vec<PartitionRow>,
+    pub rdr_leaf: f64,
+    pub soil_water: String,
+    pub thermal_time_rate: ThermalTimeAccumulation,
+}
+
+impl LeafAreaExpansion {
+    /// `WSFL` ([F] Eqn 15.5) — the same `FTSW` every other consumer computes, against `WSSL`.
+    fn water_factor(&self, snapshot: &State) -> f64 {
+        science::soil_water_stress(
+            amt(snapshot, &self.soil_water),
+            snapshot
+                .aux
+                .get(&self.ctx.rooted_depth_aux)
+                .copied()
+                .unwrap_or(0.0),
+            self.ctx.soil_extractable_water,
+            self.ctx.ground_area,
+            science::LEAF_WSSL,
+        )
+    }
+}
+
+impl AuxProcess for LeafAreaExpansion {
+    fn type_name(&self) -> &'static str {
+        "LeafAreaExpansion"
+    }
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn evaluate(
+        &self,
+        snapshot: &State,
+        env: &dyn Environment,
+        dt: f64,
+    ) -> Result<BTreeMap<String, f64>, SimError> {
+        let thermal_time = snapshot
+            .aux
+            .get(&self.thermal_time_aux)
+            .copied()
+            .unwrap_or(0.0);
+        let lai = snapshot.aux.get(&self.accumulator).copied().unwrap_or(0.0);
+        let glai = if thermal_time < science::LEAF_TU_TLM {
+            let rate = self.thermal_time_rate.evaluate(snapshot, env, 1.0)?[&self.thermal_time_aux];
+            science::leaf_node_area_rate(thermal_time, rate, self.water_factor(snapshot))
+        } else {
+            let (_, _, available) = self.ctx.budget(snapshot, env)?;
+            let dmi = self.ctx.resp.growth_efficiency * available;
+            let dvs = science::development_stage(
+                thermal_time,
+                self.pheno.tsum_anthesis,
+                self.pheno.tsum_maturity,
+            );
+            let (leaf_rate, _, _, _) = science::partition(dmi, dvs, &self.table);
+            leaf_rate * self.ctx.canopy.sla_per_mol_c / self.ctx.ground_area
+        };
+        let dlai = self.rdr_leaf * lai;
+        let (floor, ceiling) = science::leaf_thickness_envelope(
+            amt(snapshot, &self.ctx.leaf_c),
+            self.ctx.canopy.sla_per_mol_c,
+            self.ctx.ground_area,
+        );
+        let target = (lai + (glai - dlai) * dt).max(floor).min(ceiling);
+        Ok(BTreeMap::from([(self.accumulator.clone(), target - lai)]))
     }
 }
 
@@ -1714,6 +1828,7 @@ mod tests {
             chamber_air_capacity_mol: None,
             ci_ratio: None,
             o2_pool_var: None,
+            leaf_area_aux: None,
         }
     }
 

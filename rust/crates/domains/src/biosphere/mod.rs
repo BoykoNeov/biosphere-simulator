@@ -37,8 +37,8 @@ use simcore::registry::Registry;
 use simcore::state::State;
 
 pub use system::{
-    annual_reset, build_season, build_season_with, consumer_chamber_scenario,
-    perennial_chamber_scenario, potato_scenario, run_perennial, run_season,
+    annual_reset, annual_reset_with, build_season, build_season_with, consumer_chamber_scenario,
+    perennial_chamber_scenario, potato_scenario, run_perennial, run_perennial_with, run_season,
     sealed_chamber_scenario, weather_resolver, SeasonScenario, CONSUMER_CHAMBER_YEARS,
     DEFAULT_SCENARIO, LONG_HORIZON_YEARS, PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
 };

@@ -36,7 +36,7 @@
 //! provenance unfreeze **no test can see**; see the ceremony record in
 //! `docs/biosphere-reference.md`.
 
-use super::science::{KineticsForm, O2Form};
+use super::science::{KineticsForm, LeafAreaForm, O2Form};
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
     ParamFile, YamlValue,
@@ -133,6 +133,10 @@ fn carbon_fraction(value: f64, name: &'static str) -> f64 {
 pub struct CanopyParams {
     pub sla_per_mol_c: f64,
     pub extinction_coef: f64,
+    /// Whether leaf area is derived from leaf carbon (the frozen form) or held as a state.
+    /// ⚠ Not in `canopy.yaml`: the loader always sets [`LeafAreaForm::Derived`], and the lab
+    /// form is reachable only through `lab::biosphere_with_leaf_form`.
+    pub leaf_form: LeafAreaForm,
 }
 
 /// FvCB photosynthesis params (reference temperature).
@@ -416,6 +420,7 @@ pub fn canopy_from(text: &str, name: &'static str) -> CanopyParams {
         // ⚠ multiply first, then divide — the Python loader's order. See the header.
         sla_per_mol_c: sla * MOLAR_MASS_CARBON_KG_PER_MOL / cf,
         extinction_coef: k,
+        leaf_form: LeafAreaForm::Derived,
     }
 }
 

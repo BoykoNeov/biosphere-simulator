@@ -24,7 +24,8 @@ use simcore::state::{State, Stock};
 use super::flows::{
     Allocation, CarbonContext, Condensation, ConsumerMortality, ConsumerRespiration, Decomposition,
     Drainage, Fertilization, Grazing, GrowthRespiration, HumusDecomposition, HumusNitrogenRelease,
-    Irrigation, LitterNitrogenTransfer, MaintenanceRespiration, MicrobialNitrogenRelease,
+    Irrigation, LeafAreaExpansion, LitterNitrogenTransfer, MaintenanceRespiration,
+    MicrobialNitrogenRelease,
     MicrobialRespiration, NitrogenSenescence, NitrogenUptake, Recycling, RootDepthExtension,
     RootZoneCapture, Senescence, StemRemobilization, ThermalTimeAccumulation, Transpiration,
     VapourSaturation, VernalizationAccumulation,
@@ -364,7 +365,23 @@ fn carbon_context(scenario: &SeasonScenario, p: &params::BiosphereParams) -> Car
         } else {
             None
         },
+        // The lab leaf form only — `None` under the loader's `Derived`, so every canonical
+        // build reads the derived LAI exactly as before. The SAME predicate builds
+        // `LeafAreaExpansion` in `build_plants` and seeds the key in `build_season_with`.
+        leaf_area_aux: stores_leaf_area(p).then(|| LEAF_AREA_INDEX.to_string()),
     }
+}
+
+/// Whether this params object holds leaf area as a state — the one predicate the three wiring
+/// sites (context, aux process, initial aux key) share, so they cannot disagree.
+fn stores_leaf_area(p: &params::BiosphereParams) -> bool {
+    p.canopy.leaf_form == science::LeafAreaForm::NodeEnvelope
+}
+
+/// The seedling's leaf area — the frozen derived expression at `leaf_c0`, so a run under the
+/// lab form starts (and re-sows) at exactly the LAI the frozen form would give it.
+fn seedling_leaf_area(scenario: &SeasonScenario, p: &params::BiosphereParams) -> f64 {
+    science::leaf_area_index(scenario.leaf_c0, p.canopy.sla_per_mol_c, scenario.ground_area)
 }
 
 /// The chamber's inert-gas charge (mol) — **derived, never a scenario field**.
@@ -833,7 +850,7 @@ fn build_plants(
         ground_area: scenario.ground_area,
         soil_depth: scenario.soil_depth,
     };
-    let mut aux: Vec<Box<dyn AuxProcess>> = vec![Box::new(ThermalTimeAccumulation {
+    let thermal_time = ThermalTimeAccumulation {
         id: "biosphere.thermal_time".to_string(),
         accumulator: THERMAL_TIME.to_string(),
         temp_var: TEMP_VAR.to_string(),
@@ -856,7 +873,26 @@ fn build_plants(
         }),
         drought_soil_water: scenario.wssd.map(|_| SOIL_WATER.to_string()),
         drought_rooted_depth_aux: scenario.wssd.map(|_| ROOTED_DEPTH.to_string()),
-    })];
+    };
+    // The LAB fourth accumulator, built only under `LeafAreaForm::NodeEnvelope` — never by a
+    // canonical build. It takes a COPY of the thermal-time process for the day's temperature
+    // unit, so the node clock cannot disagree with the development clock. Built before
+    // `thermal_time` is moved; the integrator sorts aux by id, so push order is not
+    // evaluation order.
+    let leaf_area = stores_leaf_area(p).then(|| LeafAreaExpansion {
+        id: "biosphere.leaf_area_index".to_string(),
+        accumulator: LEAF_AREA_INDEX.to_string(),
+        ctx: ctx.clone(),
+        thermal_time_aux: THERMAL_TIME.to_string(),
+        pheno: p.pheno,
+        table: p.alloc.table.clone(),
+        // The SAME rdr_leaf `Senescence` sheds carbon at: the area and the mass that die are
+        // one event.
+        rdr_leaf: p.senesc.rdr_leaf,
+        soil_water: SOIL_WATER.to_string(),
+        thermal_time_rate: thermal_time.clone(),
+    });
+    let mut aux: Vec<Box<dyn AuxProcess>> = vec![Box::new(thermal_time)];
     aux.push(Box::new(root_depth));
     if scenario.vernalization {
         aux.push(Box::new(VernalizationAccumulation {
@@ -865,6 +901,9 @@ fn build_plants(
             temp_var: TEMP_VAR.to_string(),
             params: p.vern,
         }));
+    }
+    if let Some(process) = leaf_area {
+        aux.push(Box::new(process));
     }
     Ok(CompartmentBuild { stocks, flows, aux })
 }
@@ -1036,18 +1075,20 @@ pub fn build_season_with(
         flows.extend(build.flows);
         aux.extend(build.aux);
     }
-    let state = State::new(
-        0,
-        stocks.clone(),
-        0,
-        BTreeMap::from([
-            (THERMAL_TIME.to_string(), 0.0),
-            (VERNALIZATION_DAYS.to_string(), 0.0),
-            // The CITED sowing depth, not 0 ([F] Ch. 14 makes DEPORT-at-emergence an
-            // input); mirrors the Python `season.build_season`.
-            (ROOTED_DEPTH.to_string(), scenario.rooted_depth0),
-        ]),
-    )?;
+    let mut initial_aux = BTreeMap::from([
+        (THERMAL_TIME.to_string(), 0.0),
+        (VERNALIZATION_DAYS.to_string(), 0.0),
+        // The CITED sowing depth, not 0 ([F] Ch. 14 makes DEPORT-at-emergence an
+        // input); mirrors the Python `season.build_season`.
+        (ROOTED_DEPTH.to_string(), scenario.rooted_depth0),
+    ]);
+    // ⚠ Seeded ONLY under the lab leaf form — the Python branch seeded it always, which here
+    // would add a key to every golden that dumps aux. Seeded at the seedling's derived area,
+    // so step 0 is identical under both forms and the difference is entirely in evolution.
+    if stores_leaf_area(p) {
+        initial_aux.insert(LEAF_AREA_INDEX.to_string(), seedling_leaf_area(scenario, p));
+    }
+    let state = State::new(0, stocks.clone(), 0, initial_aux)?;
     let registry = Registry::new(flows, &stocks, aux)?;
     Ok((state, registry))
 }
@@ -1150,7 +1191,42 @@ pub fn weather_resolver(
 }
 
 /// The annual phenology reset / re-sow (P3.4) — a pure, carbon-conserving transform.
+///
+/// ⚠ **Refuses a state that stores leaf area** (the lab `LeafAreaForm::NodeEnvelope`). That
+/// state must be re-sown by [`annual_reset_with`], which has the params to compute the
+/// seedling's area; this signature does not, and reaching for `params::canopy()` here would be
+/// the step-time escape `tests/param_funnel.rs` exists to catch. Omitting the reset is not
+/// harmless — on the Python branch it handed each seedling the dead crop's canopy and rationed
+/// 85 times on `consumer_long_horizon` — so a path that cannot do it errors instead.
 pub fn annual_reset(state: &State, scenario: &SeasonScenario) -> Result<State, SimError> {
+    if state.aux.contains_key(LEAF_AREA_INDEX) {
+        return Err(SimError::Validation(format!(
+            "annual_reset: this state stores {LEAF_AREA_INDEX:?} (the lab leaf form) and \
+             must be re-sown by annual_reset_with, which can reset it"
+        )));
+    }
+    reset_crop(state, scenario)
+}
+
+/// [`annual_reset`] for a state built from `p` — also re-sows a stored leaf area, to the
+/// seedling's own derived area (the expression `build_season_with` seeds), so a re-sown crop
+/// starts exactly where a sown one does. Identical to [`annual_reset`] when `p` stores none.
+pub fn annual_reset_with(
+    state: &State,
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+) -> Result<State, SimError> {
+    let reset = reset_crop(state, scenario)?;
+    if !reset.aux.contains_key(LEAF_AREA_INDEX) {
+        return Ok(reset);
+    }
+    let mut aux = reset.aux.clone();
+    aux.insert(LEAF_AREA_INDEX.to_string(), seedling_leaf_area(scenario, p));
+    State::new(reset.n, reset.stocks.clone(), reset.rng_seed, aux)
+}
+
+/// The body both resets share.
+fn reset_crop(state: &State, scenario: &SeasonScenario) -> Result<State, SimError> {
     let seedling_total = scenario.leaf_c0 + scenario.stem_c0 + scenario.root_c0;
     let mut stocks = state.stocks.clone();
     let grain = stocks[STORAGE_C].amount;
@@ -1294,11 +1370,46 @@ pub fn run_perennial(
     year: usize,
     observer: &mut dyn FnMut(&State),
 ) -> Result<(State, u64, Vec<Event>), SimError> {
+    let resow = |current: &State| annual_reset(current, scenario);
+    perennial_body(integrator, initial, resolver, dt, steps, year, &resow, observer)
+}
+
+/// [`run_perennial`] re-sowing through [`annual_reset_with`] — the route for a state built from
+/// `p` under the lab leaf form, whose stored leaf area must reset with the crop. Identical to
+/// [`run_perennial`] for any `p` that stores none.
+#[allow(clippy::too_many_arguments)]
+pub fn run_perennial_with(
+    integrator: &EulerIntegrator,
+    initial: State,
+    scenario: &SeasonScenario,
+    p: &params::BiosphereParams,
+    resolver: &SourceResolver,
+    dt: f64,
+    steps: usize,
+    year: usize,
+    observer: &mut dyn FnMut(&State),
+) -> Result<(State, u64, Vec<Event>), SimError> {
+    let resow = |current: &State| annual_reset_with(current, scenario, p);
+    perennial_body(integrator, initial, resolver, dt, steps, year, &resow, observer)
+}
+
+/// The schedule both perennial runs share — one copy of *when* a re-sow happens.
+#[allow(clippy::too_many_arguments)]
+fn perennial_body(
+    integrator: &EulerIntegrator,
+    initial: State,
+    resolver: &SourceResolver,
+    dt: f64,
+    steps: usize,
+    year: usize,
+    resow: &dyn Fn(&State) -> Result<State, SimError>,
+    observer: &mut dyn FnMut(&State),
+) -> Result<(State, u64, Vec<Event>), SimError> {
     let year_u = year as u64;
     let reset = move |n: u64, current: &State| -> Result<Option<State>, SimError> {
         // Python: `n > 0 and n % year == 0` (is_multiple_of is true at n=0, hence the guard).
         if n > 0 && n.is_multiple_of(year_u) {
-            Ok(Some(annual_reset(current, scenario)?))
+            Ok(Some(resow(current)?))
         } else {
             Ok(None)
         }

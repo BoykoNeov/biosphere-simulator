@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `vapour-saturation.md`
+**Re-read against the record's last row:** `leaf-rust-remeasure.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -71,8 +71,10 @@ recommendation to refuse was built on that sentence and is withdrawn with it.
   bounded on the *state* by [E] Table 20's two-sided leaf-thickness envelope — see
   `log/leaf-expansion.md` findings 2–5 for why each half is needed), with the branch as a
   design reference only.
-* **Its case is the carbon-limited chambers** (1.27–1.32× the derived canopy), not
-  `open_season`, where it had converged to ~0.26 % at `dt = ¼`. Every number in
+* **Its case is the carbon-limited chambers** (1.27–1.32× the derived canopy)~~, not
+  `open_season`, where it had converged to ~0.26 % at `dt = ¼`~~. ⚠ **Struck 2026-09-29 by
+  `log/leaf-rust-remeasure.md`**: on today's tree `open_season` moves **−5.3 %**, not −0.26 %.
+  Every number in
   `log/leaf-remeasurement.md` measured a tree that no longer exists (the canopy has since been
   layered, lit and temperature-coupled), so the item **starts by re-measuring**, not by
   quoting them.
@@ -80,6 +82,14 @@ recommendation to refuse was built on that sentence and is withdrawn with it.
   scripts outside the repo), the biosphere goldens and the station goldens that carry a
   greenhouse, both manifests, the full unfreeze ceremony.
 * Not scheduled. It is a work item on the list, not the next thing.
+* ⚠⚠ **RE-MEASURED 2026-09-29, and the re-measure changed the item** (`log/leaf-rust-remeasure.md`).
+  Now a **lab-only Rust form** (`science_switch -- leafform=node_envelope`), nothing frozen
+  moved. The two big chambers hold the case — canopy **1.29× / 1.30×**, zero rationing, RK4
+  clean — at **a third of their CO₂ floor margin**. The **jar breaks under both integrators**
+  (5 Euler rationing firings; an RK4 raise at day 193): August's *"the RK4 blocker clears at
+  `dt = ¼`"* does not hold on today's tree, and no cause is claimed. Drought response is
+  unmeasured (no scenario on the roster fires the leaf drought factor). **Continue, park, or
+  refuse is the user's call again**, on these numbers.
 
 ~~The pricing as written on 2026-09-06 follows, struck:~~
 
@@ -251,7 +261,7 @@ satisfied by its own restated *"…or the 5 %/day mutual-shading loss is MODELLE
 | candidate | verdict | record |
 |---|---|---|
 | the canopy regulator | built; **inert on the chambers** | `log/canopy-regulator.md` |
-| the parked leaf mechanism | below the frozen tree on both observables at every step | `log/leaf-remeasurement.md` |
+| the parked leaf mechanism | ~~below the frozen tree on both observables at every step~~ — re-measured in Rust: **not a closed direction**; the jar breaks, see §2.1 | `log/leaf-rust-remeasure.md` |
 | the intra-canopy light path | **sign is backwards** — `Ag` is concave in PAR | `log/gross-net-gas-exchange.md` |
 | re-tuning the band | refused three times | `log/canopy-magnitude.md` |
 | the partition table | absorbs a **threefold** error at the knot the canopy responds to | `log/partition-leaf-direction.md` |

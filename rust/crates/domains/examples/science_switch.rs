@@ -13,9 +13,10 @@
 //!
 //! # ⚠ What is reachable from a command line, and what is not
 //!
-//! Three things: a **knockout** by flow id, a **temperature form** by name (`form=q10_teh`,
-//! `docs/plans/post-roadmap-temperature-kinetics.md`), and an **oxygen form** by name
-//! (`o2form=live_pool`, `docs/plans/post-roadmap-o2-form.md`).
+//! Four things: a **knockout** by flow id, a **temperature form** by name (`form=q10_teh`,
+//! `docs/plans/post-roadmap-temperature-kinetics.md`), an **oxygen form** by name
+//! (`o2form=live_pool`, `docs/plans/post-roadmap-o2-form.md`), and a **leaf-area form** by name
+//! (`leafform=node_envelope`, `docs/plans/post-roadmap-leaf-rust-remeasure.md`).
 //!
 //! ⚠ The two forms are **independent axes** and are spelled by different keywords on purpose.
 //! One selects which temperature response the constants carry; the other selects whether O₂
@@ -46,7 +47,7 @@
 //! ⚠ **It writes nothing and it takes no decision.** A knockout regenerates evidence about a
 //! mechanism's contribution; it says nothing about whether the mechanism belongs there.
 
-use domains::biosphere::science::{KineticsForm, O2Form};
+use domains::biosphere::science::{KineticsForm, LeafAreaForm, O2Form};
 use domains::lab::mechanism::Composition;
 use domains::lab::report::{compare_changes, render, Change};
 
@@ -56,6 +57,18 @@ const FORM_NAMES: [&str; 2] = ["cardinal", "q10_teh"];
 
 /// The oxygen-form names, on the same one-roster rule as [`FORM_NAMES`].
 const O2_FORM_NAMES: [&str; 2] = ["constant", "live_pool"];
+
+/// The leaf-area-form names, on the same one-roster rule.
+const LEAF_FORM_NAMES: [&str; 2] = ["derived", "node_envelope"];
+
+/// `leafform=<name>` resolved; `derived` is the visible no-op column.
+fn leaf_form(name: &str) -> Option<LeafAreaForm> {
+    match name {
+        "derived" => Some(LeafAreaForm::Derived),
+        "node_envelope" => Some(LeafAreaForm::NodeEnvelope),
+        _ => None,
+    }
+}
 
 /// `form=<name>` resolved. `cardinal` is accepted (it reproduces the baseline exactly) so a
 /// reader can SEE the no-op column rather than being told it would be one.
@@ -88,7 +101,7 @@ fn main() {
     let ids: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if ids.is_empty() {
         eprintln!(
-            "usage: science_switch <flow.id | form=NAME | o2form=NAME> [more...] [--long]\n\
+            "usage: science_switch <flow.id | form=NAME | o2form=NAME | leafform=NAME> [more...] [--long]\n\
              \n\
              Runs the frozen biosphere scenarios with each flow knocked out and tabulates the\n\
              quantities the science gates are read off. Writes nothing.\n\
@@ -112,6 +125,14 @@ fn main() {
     let variants: Vec<(String, Change)> = ids
         .iter()
         .map(|arg| {
+            if let Some(name) = arg.strip_prefix("leafform=") {
+                return match leaf_form(name) {
+                    Some(form) => (format!("leaf form {name}"), Change::LeafForm(form)),
+                    None => fail(&format!(
+                        "unknown leaf form {name:?} (have {LEAF_FORM_NAMES:?})"
+                    )),
+                };
+            }
             if let Some(name) = arg.strip_prefix("o2form=") {
                 return match oxygen_form(name) {
                     Some(form) => (format!("o2 form {name}"), Change::OxygenForm(form)),

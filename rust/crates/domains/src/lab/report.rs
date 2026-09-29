@@ -62,7 +62,7 @@ use super::mechanism::Composition;
 use super::Substitution;
 use crate::biosphere::drift::year_summaries;
 use crate::biosphere::params::BiosphereParams;
-use crate::biosphere::science::{KineticsForm, O2Form};
+use crate::biosphere::science::{KineticsForm, LeafAreaForm, O2Form};
 use crate::biosphere::readouts::{
     floor_ppm, min_ppm, peak_lai, peak_w, segment_max, try_trajectory_composed, Trajectory,
     TrajectoryError,
@@ -279,6 +279,11 @@ pub enum Change {
     /// wiring, not a measurement, and it is why `docs/plans/post-roadmap-o2-form.md` §4c makes
     /// the two big chambers the controls rather than the open field.
     OxygenForm(O2Form),
+    /// An alternative **leaf-area** form: leaf area as a stored state (the parked leaf
+    /// mechanism) instead of derived from leaf carbon. See [`super::biosphere_with_leaf_form`].
+    /// **Always applicable** — every scenario grows a canopy — and the `peak_lai` rows read the
+    /// stored state under it, not a derived one.
+    LeafForm(LeafAreaForm),
 }
 
 /// One measured column of the table.
@@ -492,6 +497,10 @@ pub fn compare_changes(variants: &[(String, Change)], long: bool) -> Result<Vec<
             // `biosphere_with_o2_form`, never by poking the field on `frozen`.
             Change::OxygenForm(form) => {
                 let p = super::biosphere_with_o2_form(&[], *form).map_err(as_request_error)?;
+                measure(label, &p, long)
+            }
+            Change::LeafForm(form) => {
+                let p = super::biosphere_with_leaf_form(&[], *form).map_err(as_request_error)?;
                 measure(label, &p, long)
             }
         });
@@ -1156,6 +1165,7 @@ mod tests {
             consumer_c: Vec::new(),
             inert_kg: Vec::new(),
             water_vapor_kg: Vec::new(),
+            leaf_area_state: Vec::new(),
             rationed: 0,
             events: 0,
             years: 1,

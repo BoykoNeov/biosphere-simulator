@@ -825,6 +825,104 @@ pub fn oxygen_limitation_factor(o2_mol: f64, air_capacity_mol: f64, k_o2: f64) -
     x_o2 / denom
 }
 
+// --- sink-limited leaf expansion (LAB form) ---------------------------------
+//
+// ⚠ **This is a LAB alternative and endorses nothing.** [`LeafAreaForm::Derived`] is the
+// frozen reference and the only form the loader sets. The node-driven branch below is the
+// parked leaf mechanism (`docs/log/leaf-expansion.md`), re-implemented from the deleted
+// Python branch `leaf-expansion-rebase:src/domains/biosphere/leaf_area.py` so it can be
+// RE-MEASURED on today's tree (`docs/plans/post-roadmap-leaf-rust-remeasure.md`).
+//
+// The numbers are `const`s here rather than a param file for the reason [`TEH_Q10_VCMAX`]'s
+// are: a `leaf_area.yaml` under `params/biosphere/` would join the frozen census and the
+// manifest, which is an unfreeze. Each carries its locus; the full provenance (and every
+// exposure) is the branch's `params/leaf_area.yaml`, recorded in the leaf-expansion plan doc.
+//
+// Sources: [F] Soltani & Sinclair, *Modeling Physiology of Crop Development, Growth and
+// Yield* (Ch. 9, Ch. 12, Ch. 15); [E] Penning de Vries et al., Tables 19–20.
+
+/// `PHYL`, °C·d per main-stem node — [F] Fig. 12.5 row 17 (cv. Tajan). ⚠ Table 9.1 gives
+/// 120; 112 is taken so the phyllochron, `PLAPOW` and the density come from ONE
+/// parameterization (the Run and Crops sheets of the same model file).
+pub const LEAF_PHYLLOCHRON: f64 = 112.0;
+/// `PLACON`, cm² per plant at one node — [F] Table 9.1 / Fig. 12.5 row 18, and p. 106 names
+/// it a CONVENTION ("assume PLACON = 1 cm2"), not a measurement.
+pub const LEAF_PLA_CONSTANT: f64 = 1.0;
+/// `PLAPOW` — [F] Table 9.1 and Fig. 12.5 row 19 agree exactly. Density-dependent by [F]'s
+/// own statement (Fig. 9.2b), hence paired with [`LEAF_PLANT_DENSITY`] from the same model.
+pub const LEAF_PLA_EXPONENT: f64 = 2.464;
+/// `tuEMRTLM`, °C·d from emergence to termination of main-stem leaf growth — [F] Table 6.4
+/// and Fig. 12.5 row 12 agree. ⚠ Table 6.4 is "rough estimates ... unpublished data".
+pub const LEAF_TU_TLM: f64 = 724.0;
+/// `WSSL`, the FTSW threshold for leaf-area development — [F] Table 15.1, wheat.
+pub const LEAF_WSSL: f64 = 0.40;
+/// [E] Table 20 winter wheat, minimum `SLT` (specific leaf WEIGHT fraction) — the THINNEST
+/// leaf, and therefore the CEILING on area: `LAI ≤ derived / 0.85`.
+pub const LEAF_SLW_FRACTION_MIN: f64 = 0.85;
+/// [E] Table 20 winter wheat, maximum `SLT` — the THICKEST leaf, the FLOOR on area.
+pub const LEAF_SLW_FRACTION_MAX: f64 = 1.50;
+/// `PDEN`, plants m⁻² — [F] Fig. 12.4, the Run sheet's MANAGEMENT inputs. Scenario data by
+/// [F]'s own filing; a const here only because the form is lab-only.
+pub const LEAF_PLANT_DENSITY: f64 = 300.0;
+/// [F] Eqn 9.5's cm² → m² conversion, kept beside the equation rather than folded into a
+/// cited value.
+const CM2_PER_M2: f64 = 10_000.0;
+
+/// How the canopy's leaf area is obtained.
+///
+/// Not a fitted coefficient and never loaded from a param file — like [`O2Form`], it selects
+/// between the frozen form and a lab one over the same frozen numbers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LeafAreaForm {
+    /// The frozen reference: `LAI = leaf_C · SLA / A`, derived from leaf carbon every step.
+    #[default]
+    Derived,
+    /// Leaf area is a STATE ([F] Eqn 9.8): node-driven and sink-limited before `TLM`,
+    /// carbon-driven after, and held inside [E]'s leaf-thickness envelope throughout.
+    /// See [`leaf_node_area_rate`] and [`leaf_thickness_envelope`].
+    NodeEnvelope,
+}
+
+/// `MSNN = 1 + CTU/PHYL` — main-stem node number, DERIVED ([F] Eqns 9.1–9.2).
+///
+/// [F] Box 9.2 starts `MSNN` at 1 and adds `DTU/PHYL` per step, which integrates to this
+/// closed form for a constant phyllochron. It stays derived because `WSFL` attaches to the
+/// area rate (Eqn 15.7, what Box 16.2 programs), not to node appearance (Eqn 15.6).
+pub fn leaf_main_stem_nodes(thermal_time: f64) -> f64 {
+    1.0 + thermal_time / LEAF_PHYLLOCHRON
+}
+
+/// `GLAI` for the node-driven branch, m² m⁻² per day — [F] Eqn 9.5 × Eqn 15.7.
+///
+/// ⚠ **The analytic derivative is a deliberate delta from the source**:
+/// `dPLA/dt = PLACON·PLAPOW·MSNN^(PLAPOW−1)·(dCTU/dt)/PHYL`. [F] differences `PLA` between
+/// consecutive days, which is a `dt = 1` object; the derivative keeps the rate independent of
+/// the step, as the aux channel requires. Carried from the branch, not re-decided.
+pub fn leaf_node_area_rate(thermal_time: f64, thermal_time_rate: f64, water_factor: f64) -> f64 {
+    let nodes = leaf_main_stem_nodes(thermal_time);
+    let dpla = LEAF_PLA_CONSTANT
+        * LEAF_PLA_EXPONENT
+        * nodes.powf(LEAF_PLA_EXPONENT - 1.0)
+        * thermal_time_rate
+        / LEAF_PHYLLOCHRON;
+    dpla * LEAF_PLANT_DENSITY / CM2_PER_M2 * water_factor
+}
+
+/// `(floor, ceiling)` on LAI from [E] Table 20's leaf-thickness range, around the frozen
+/// carbon-derived area.
+///
+/// ⚠ **The fractions invert**: `SLT` is specific leaf *weight* (mass per area), so the
+/// SMALLEST fraction is the thinnest leaf and the LARGEST area. Where either side binds, the
+/// model reduces to the frozen derived form — a wrong envelope fails TOWARD the reference.
+///
+/// ⚠ The pair is [E]'s own mixture answer, not a loose stand-in: for `S = W/A`, [E] Listing 3
+/// reduces to `dS/dt = (GLV/A)(1 − S/SLN)`, so `SLC·[min, max]` is forward-invariant for any
+/// growth history (`docs/log/leaf-expansion.md` finding 10).
+pub fn leaf_thickness_envelope(leaf_carbon: f64, sla_per_mol_c: f64, ground_area: f64) -> (f64, f64) {
+    let derived = leaf_area_index(leaf_carbon, sla_per_mol_c, ground_area);
+    (derived / LEAF_SLW_FRACTION_MAX, derived / LEAF_SLW_FRACTION_MIN)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1076,6 +1174,7 @@ mod tests {
         CanopyParams {
             sla_per_mol_c: 0.5872044444444445,
             extinction_coef: 0.6,
+            leaf_form: LeafAreaForm::Derived,
         }
     }
 
@@ -2737,6 +2836,7 @@ mod tests {
         let crate::biosphere::params::CanopyParams {
             sla_per_mol_c,
             extinction_coef: _,
+            leaf_form: _,
         } = crate::biosphere::params::canopy();
 
         // A non-unit ground area on purpose: the identity must be the LEAF carbon's, not

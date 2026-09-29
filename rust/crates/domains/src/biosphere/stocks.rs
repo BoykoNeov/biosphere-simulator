@@ -89,6 +89,9 @@ pub const VERNALIZATION_DAYS: &str = "vernalization_days";
 /// The third aux accumulator: rooted depth (m). Deliberately NOT derived from root
 /// carbon - see the Python `root_depth.py` header for the primary's own statement.
 pub const ROOTED_DEPTH: &str = "rooted_depth";
+/// The LAB fourth accumulator: leaf area index as a state (m² m⁻²). Present **only** under
+/// `LeafAreaForm::NodeEnvelope`; no canonical build seeds it, so no golden carries the key.
+pub const LEAF_AREA_INDEX: &str = "leaf_area_index";
 
 /// The handful of stock ids whose identity depends on `sealed`, computed once.
 #[derive(Debug, Clone)]
