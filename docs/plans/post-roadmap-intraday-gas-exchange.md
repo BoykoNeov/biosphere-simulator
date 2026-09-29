@@ -118,12 +118,121 @@ the crew is rationed by the schedule, not by the air.
 
 **The step-counter risk:** control 2 passes, and so does the no-plant run.
 
-## 6. Grading
+## 6. Grading — measured 2026-09-29
 
-*(Filled in after the run.)*
+Command: `cargo run --release -q -p station --example intraday_exchange` (sections `roster`,
+`sealed`, `similarity`, `crew`; none runs all). Output kept at `W:\temp\claude\intraday\`.
+
+**Tree state after the build:** `cargo test --workspace --no-fail-fast`, Windows: **1219 passed,
+0 failed, 4 ignored** (1212 + the 7 new controls), exit 0; clippy `-D warnings` clean;
+`regen_goldens` report: **20 of 20 run, 0 would change.**
+
+### 6.1 Controls — all held
+
+| control | result |
+|---|---|
+| 1. slow-first is the reference | bit-identical on the greenhouse, the harvest ring, a 3-day sealed run with a re-sow (tests), **and the full 4-year sealed station with its real re-sow** (the lab) |
+| 2. no plants, no change | bit-identical; no cabin-side flow reads the step count (grepped) |
+| 3. the order is not a no-op | the greenhouse differs |
+| 4. area scaling is exact | worst stock deviation from A× **1.04e-14** (A = 14.09) and **1.32e-14** (A = 187.45) over 3,660 steps; aux identical to the bit |
+| 5. the probe counts what the backstop counts | equal in every run |
+| 6. the carbon books close | pool budget residual ≤ 8.2e-11 mol; crew exhalation matches the respired fraction × food eaten to ≤ 4e-12 |
+
+**The controls themselves were mutation-checked** (`tests/day_order.rs`): five mutations — the
+interleaved order run slow-first, the slow-first order run cabin-first, the uneven-split refusal
+disabled, the re-sow not reported to the observer, one fast step too many per plant step — each
+turned its intended test red. ⚠ My first attempt at the refusal mutation was malformed (operator
+precedence left the check live), so its green meant nothing; it was redone and went red.
+
+### 6.2 Predictions
+
+| prediction | measured | grade |
+|---|---|---|
+| `lighting` bit-identical | 25 of 25 stocks bit-identical | **held** |
+| `sealed_energy_drift` and 15 other goldens cannot move | by construction (they do not run on this driver) | **held** |
+| `greenhouse` plant stocks move < 1e-3 | largest 4.7e-4 (stem reserve); cabin stocks 1.6e-8 | **held** |
+| `harvest` plant stocks move < 1e-3 | grain store **+37.5 %**, humus **+19 %**, microbes **+12 %** | **FALSIFIED** |
+| `sealed_station` crop C up 0.3–5 % | **+1.23 %**, up | **held** |
+| `sealed_station` cabin-side stocks < 1e-4 | all below 2.3e-5 | **held** |
+| 14.09 m²: heaviest step asks ≥ 0.84× the refilled pool | 1.10× | **held** (a floor) |
+| 187.45 m²: heaviest step asks ≥ 11× | **7.26×** | **FALSIFIED** — see finding 3 |
+| 14.09 m²: rationing falls ≥ 90 % | **rises**, 22 → 72 | **FALSIFIED** — see finding 1 |
+| 187.45 m²: still rations, on the CO₂ pool | 943 firings, every one on `carbon_pool` | **held** |
+| cabin-side rationing 0 everywhere | 0 in all 10 runs | **held** |
+| 1 m² closure share well under 1 % | 0.030 % (4 y), 0.089 % (1 season) | **held** |
+| 187.45 m² closure share ×2 to ×4 | 0.613 % → 2.313 %, **×3.77** | **held** |
+| step-counter risk empty | controls 2 and 3 | **held** |
+
+### 6.3 Findings
+
+**1. The schedule starves the crop through CONCENTRATION, not through rationing — so the
+rationing count went UP as the starvation eased.** Measured, not argued: the lab records the
+cabin CO₂ each plant step starts from, by quarter of the day.
+
+| run | quarter 0 | quarter 1 | quarter 2 | quarter 3 | peak LAI | peak crop C per m² |
+|---|---|---|---|---|---|---|
+| 1 m², slow-first | 3.7960 | 3.7828 | 3.6471 | 3.5151 | 5.467 | 33.60 |
+| 1 m², interleaved | 3.7960 | 3.7960 | 3.7960 | 3.7960 | 5.571 | 34.18 |
+| 14.09 m², slow-first | 3.7960 | 3.4799 | **1.8946** | **1.4654** | 3.119 | 19.13 |
+| 14.09 m², interleaved | 3.7960 | 3.7960 | 3.7960 | 3.7960 | **5.498** | **33.78** |
+| 187.45 m², slow-first | 3.7960 | 2.5465 | 1.1613 | 1.1640 | 0.439 | 2.50 |
+| 187.45 m², interleaved | 3.7960 | 3.7960 | 3.7960 | 3.7960 | 1.096 | 6.20 |
+
+(One season, harvest on, CO₂ in mol.) Under slow-first the crop's afternoon steps see the pool
+at half and two-fifths of the scrubber's level; photosynthesis follows the concentration down,
+so demand falls with supply and the backstop rarely fires (22 times). Interleaved, every step
+sees the pool re-settled at **exactly 3.7960** — the scrubber closes a quarter-day gap
+completely — so the crop asks for more, and when it asks for more than the pool holds the
+backstop fires (72 times). **A rationing count cannot measure this starvation**: the crew-loop
+record showed `rationed == 0` cannot measure closure; here the count moved in the opposite
+direction to the harm.
+
+**2. At one crew member's area, interleaving removes the schedule's starvation almost entirely.**
+Per square metre the 14.09 m² crop reaches **98.8 %** of the 1 m² crop's peak carbon and
+**98.7 %** of its leaf area (slow-first: 57 %). Closure share doubles, 0.64 % → 1.26 %.
+
+**3. At the whole crew's area, it helps and does not solve.** The crop reaches **18 %** of the
+1 m² crop's peak carbon per m² (slow-first: 7.4 %); closure share ×3.77. The 11× prediction
+failed because its premise did: it scaled an **unstarved** crop's demand, and this crop is
+starved to a fifth, so it asks for less (7.26×). The plan's own risk note applies: a finer
+interleave by hand is not the next move — a pool of 3.8 mol against a crop drawing tens per
+quarter-day is the air's size (Step 2's territory) or the scrubber's rate, not the schedule.
+
+**4. The harvest ring moves because the two sides share two more stocks than the air.**
+Isolated by switching each seam off (7 days, relative change, slow-first → interleaved):
+
+| harvest flow | feces → litter | grain store | microbes | humus |
+|---|---|---|---|---|
+| off | off | +3.4e-4 | +3.1e-5 | +2.4e-5 |
+| **on** | off | **+0.402** | +3.1e-5 | +2.4e-5 |
+| off | **on** | −0.011 | **+0.121** | **+0.191** |
+| on | on | +0.375 | +0.121 | +0.191 |
+
+Each seam carries one half and the soil half is unchanged by the harvest flow. Both are
+cabin-side flows that write a plant-side stock (harvest drains `storage_c`; the crew's feces
+land in `litter_carbon`), so the order decides what the plant sees there too. My prediction
+reasoned only about the air. ⚠ **Why** each moves this much in 7 days is not isolated: the
+harvest scenario starts past anthesis with a 119-mol litter pile, and no run varied either.
+
+**5. The crew-loop record's numbers are not today's.** At 187.45 m² slow-first, today's tree
+gives 466 plant-side firings and peak LAI 0.439; the record (deleted Python, a one-day step)
+gave 282 and 0.2772. Recorded side by side, not joined: the step, the humidity setting and the
+oxygen form have all changed since.
 
 ## 7. The decision this stops in front of
 
 **Adopt interleaving into the reference, or keep it lab-only?** Adoption is a station unfreeze:
 the ceremony, the reference function replaced (not kept as a switch), the session switched in the
 same commit, and the moved goldens regenerated.
+
+**What adoption would move, measured:** three goldens. `greenhouse` by at most 4.7e-4;
+`sealed_station` by +1.2 % in crop carbon; `harvest` by **+37.5 %** in its grain store and
++19 % in its humus (finding 4). Seventeen cannot move, `lighting` included.
+
+**Recommendation: adopt.** The review's condition was "if the large crop stops being starved by
+the schedule". Measured, the schedule's share of the starvation is removed at one crew member's
+area (98.8 % of the unconstrained crop) and more than halved at the whole crew's; what remains
+at 187 m² is the air's size, not the order. The interleaved order is also the one that matches
+the physics — the crew breathes out while the plants take CO₂ in — and it costs no new number.
+The one thing to weigh is the `harvest` golden's large move, which is the same effect on two
+stocks the old order hid.

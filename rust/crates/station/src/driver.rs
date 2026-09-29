@@ -164,3 +164,204 @@ pub fn run_master_day(
     }
     Ok((states, total_rationed, events))
 }
+
+// =====================================================================================
+// LAB-ONLY — the day ORDER, as a choice (post-roadmap-intraday-gas-exchange.md)
+// =====================================================================================
+//
+// Nothing in the reference calls anything below: not a runner, not the session, not the
+// bridge. It exists so the lab can run a master day in a second order and keep books per
+// side. The reference day is `advance_one_master_day` above, unedited. If the interleaved
+// order is ever adopted, that function takes its body and this section is deleted rather
+// than kept as a switch.
+
+/// The order a master day runs its two operators in. **Lab-only.**
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DayOrder {
+    /// The reference: every slow step, then every fast step (`P P P P c … c`).
+    SlowFirst,
+    /// One slow step, then that step's share of the fast steps, repeated
+    /// (`P c…c P c…c P c…c P c…c`). The fast side refills a shared pool between the slow
+    /// side's draws. Requires `steps_per_day` to divide evenly by `slow_steps_per_day`.
+    Interleaved,
+}
+
+/// Which operator produced a step, as the lab's observer sees it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Side {
+    /// The slow domain's re-sow hook adopted a new state.
+    Reset,
+    /// One slow `step_report` (advances `n` and the phenology aux).
+    Slow,
+    /// One fast `substep` (keeps `n`).
+    Fast,
+}
+
+/// A day's (or a run's) rationing, **split by side**. The reference driver sums the two
+/// into one integer, and the crew-loop record showed that sum cannot say which side rationed.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SideTotals {
+    /// Backstop firings on the slow side.
+    pub slow_rationed: u64,
+    /// Backstop firings on the fast side.
+    pub fast_rationed: u64,
+    /// Every event, in the order the steps produced them.
+    pub events: Vec<Event>,
+}
+
+/// The pieces of a two-rate run, bundled so the lab's day order is one argument rather than
+/// eleven. **Lab-only.**
+pub struct TwoRate<'a> {
+    /// The slow (biosphere) integrator.
+    pub slow: &'a EulerIntegrator,
+    /// The fast (cabin / Power / Thermal) integrator.
+    pub fast: &'a EulerIntegrator,
+    /// The slow side's forcing.
+    pub slow_resolver: &'a SourceResolver,
+    /// The fast side's forcing.
+    pub fast_resolver: &'a SourceResolver,
+    /// Fast sub-steps per master day.
+    pub steps_per_day: u64,
+    /// Slow steps per master day.
+    pub slow_steps_per_day: u64,
+    /// The slow step (days).
+    pub slow_dt: f64,
+    /// The fast step (s).
+    pub fast_dt: f64,
+    /// The slow side's re-sow hook, consulted once per master day at its start.
+    pub slow_reset: Option<ResetHook<'a>>,
+}
+
+impl TwoRate<'_> {
+    /// The reference runner's two day-length guards, plus the interleaved order's own:
+    /// the fast steps must split evenly across the slow ones.
+    pub fn validate(&self, order: DayOrder) -> Result<(), SimError> {
+        if self.fast_dt * self.steps_per_day as f64 != SECONDS_PER_DAY {
+            return Err(SimError::Validation(format!(
+                "fast_dt*steps_per_day must equal one day ({SECONDS_PER_DAY} s), got {}*{}",
+                self.fast_dt, self.steps_per_day
+            )));
+        }
+        if self.slow_dt * self.slow_steps_per_day as f64 != DAYS_PER_MASTER_DAY {
+            return Err(SimError::Validation(format!(
+                "slow_dt*slow_steps_per_day must equal one day ({DAYS_PER_MASTER_DAY}), got \
+                 {}*{}",
+                self.slow_dt, self.slow_steps_per_day
+            )));
+        }
+        self.fast_per_slow(order).map(|_| ())
+    }
+
+    /// Fast sub-steps after each slow step under `Interleaved`; refuses an uneven split.
+    fn fast_per_slow(&self, order: DayOrder) -> Result<u64, SimError> {
+        if order == DayOrder::SlowFirst {
+            return Ok(self.steps_per_day);
+        }
+        if self.slow_steps_per_day == 0
+            || !self.steps_per_day.is_multiple_of(self.slow_steps_per_day)
+        {
+            return Err(SimError::Validation(format!(
+                "the interleaved day order needs steps_per_day ({}) to divide evenly by \
+                 slow_steps_per_day ({}): each slow step must be followed by the same stretch \
+                 of fast time",
+                self.steps_per_day, self.slow_steps_per_day
+            )));
+        }
+        Ok(self.steps_per_day / self.slow_steps_per_day)
+    }
+
+    /// One slow step, observed; returns the new state.
+    fn slow_step(
+        &self,
+        state: State,
+        totals: &mut SideTotals,
+        observe: &mut dyn FnMut(Side, &State, &State),
+    ) -> Result<State, SimError> {
+        let report = self
+            .slow
+            .step_report(&state, self.slow_resolver, self.slow_dt)?;
+        observe(Side::Slow, &state, &report.state);
+        totals.slow_rationed += report.rationed;
+        totals.events.extend(report.events);
+        Ok(report.state)
+    }
+
+    /// `count` fast sub-steps, each conservation-asserted over the whole shared ledger
+    /// exactly as the reference day does it, and observed.
+    fn fast_steps(
+        &self,
+        mut state: State,
+        count: u64,
+        totals: &mut SideTotals,
+        observe: &mut dyn FnMut(Side, &State, &State),
+    ) -> Result<State, SimError> {
+        for _ in 0..count {
+            let before = state.clone();
+            let report = self
+                .fast
+                .substep(&state, self.fast_resolver, self.fast_dt)?;
+            state = report.state;
+            assert_conserved_default(&before, &state)?;
+            observe(Side::Fast, &before, &state);
+            totals.fast_rationed += report.rationed;
+            totals.events.extend(report.events);
+        }
+        Ok(state)
+    }
+
+    /// Advance one master day in `order`. The re-sow hook is consulted first, as in the
+    /// reference. Under `SlowFirst` the arithmetic is the reference day's, operation for
+    /// operation — a test holds it to that, bit for bit.
+    pub fn advance_day(
+        &self,
+        order: DayOrder,
+        state: &State,
+        totals: &mut SideTotals,
+        observe: &mut dyn FnMut(Side, &State, &State),
+    ) -> Result<State, SimError> {
+        let fast_per_slow = self.fast_per_slow(order)?;
+        let mut state = state.clone();
+        if let Some(reset_fn) = self.slow_reset {
+            if let Some(reset_state) = reset_fn(state.n, &state)? {
+                assert_conserved_default(&state, &reset_state)?;
+                observe(Side::Reset, &state, &reset_state);
+                state = reset_state;
+            }
+        }
+        match order {
+            DayOrder::SlowFirst => {
+                for _ in 0..self.slow_steps_per_day {
+                    state = self.slow_step(state, totals, observe)?;
+                }
+                state = self.fast_steps(state, self.steps_per_day, totals, observe)?;
+            }
+            DayOrder::Interleaved => {
+                for _ in 0..self.slow_steps_per_day {
+                    state = self.slow_step(state, totals, observe)?;
+                    state = self.fast_steps(state, fast_per_slow, totals, observe)?;
+                }
+            }
+        }
+        Ok(state)
+    }
+
+    /// Run `days` master days in `order`. Returns one state per master day (length
+    /// `days + 1`, as the reference runner) and the run's split totals.
+    pub fn run(
+        &self,
+        order: DayOrder,
+        initial: State,
+        days: usize,
+        observe: &mut dyn FnMut(Side, &State, &State),
+    ) -> Result<(Vec<State>, SideTotals), SimError> {
+        self.validate(order)?;
+        let mut totals = SideTotals::default();
+        let mut state = initial;
+        let mut states = vec![state.clone()];
+        for _ in 0..days {
+            state = self.advance_day(order, &state, &mut totals, observe)?;
+            states.push(state.clone());
+        }
+        Ok((states, totals))
+    }
+}
