@@ -240,3 +240,140 @@ Detail: `log/leaf-rust-remeasure.md`, last section.
 
 **Standing:** unchanged. The lab form is still not adopted, nothing frozen moved, and whether
 the rewrite continues is the user's decision — now with a named cause for the jar.
+
+## 6. Which part of the leaf form squeezes the jar? (opened 2026-09-29, user: *"continue work on the leaf mechanism"*)
+
+§5a named the interaction (leaf form × live O₂) and left one thing open: whether the extra leaf
+area — the stored area sitting 1.18× above what its carbon implies at every firing — is what
+adds the demand and draws the pool down early. This section is that diagnostic. **It changes no
+number of the mechanism, adopts nothing, and is not a search for a fix.**
+
+⚠⚠ **Written before any result: nothing measured here licenses narrowing the envelope.** The
+one whole-run cell below caps the stored area at the carbon-implied value — which is,
+structurally, the retune `log/leaf-expansion.md` finding 9 refused. It is run as a CONTROL, to
+locate the squeeze; if it quiets the jar, that is a fact about where the squeeze lives, not a
+candidate. The envelope's numbers are [E]'s, cited, and stay.
+
+**What each outcome would change** (the decision is continue / park / refuse; adoption and
+retune are both off the table, so a cell earns its run only if an outcome moves that decision):
+
+* If the squeeze is the **late extra area** (removing it after the leaf-growth cutoff quiets the
+  jar): the break is a property of how the form couples to the jar's near-empty CO₂ late in the
+  season — a continue-case question about the form's senescence/area coupling, which is the
+  part the branch mirrored without re-deciding (§2.4's shading choice lives there too).
+* If the **early head start alone** still rations (the cap after the cutoff does not quiet it):
+  the break is the seedling phase growing a bigger plant that empties the pool sooner — i.e. any
+  form that speeds early growth breaks this jar. That leans toward park: the jar's live-O₂ margin
+  (0.757, now pinned) is the binding fact, not this form.
+
+**Instrument:** `examples/jar_squeeze.rs`, one season (all five firings are in season 1), Euler,
+plus RK4 status on the capped cell. The cap is a wrapper around the leaf-area process built in
+the example only (same aux id); the probe's firing count is asserted equal to the integrator's.
+
+1. **Timeline, at fixed checkpoints** (the leaf-growth cutoff crossing, anthesis, steps 757 and
+   777, and each firing): stored vs carbon-implied area, **whether the envelope clamp bound this
+   step and from which side**, lab vs frozen CO₂ and O₂ pools.
+2. **Local split at step 777** (demand only — the numerator, never demand ÷ held): the lab
+   state's CO₂ demand, then with the stored area swapped to carbon-implied, then additionally
+   the CO₂ pool swapped to the frozen run's value, then the O₂ pool too; the frozen state's
+   demand is the residual's anchor. Reported in **both swap orders** for area vs CO₂, because
+   assimilation is not additive in them.
+3. **Whole-run cell "capped after the cutoff":** from the first step at/after the leaf-growth
+   cutoff, the stored area is held ≤ carbon-implied. The head start's extra carbon and early
+   drawdown stay; the late extra area goes. The one-step area drop at the cutoff is printed.
+
+**Predictions, written BEFORE the first run:**
+
+| # | Claim | Predicted |
+|---|---|---|
+| Q1 | Which side the clamp binds from late in season 1 (steps 757–789) | the **ceiling, pressing DOWN**: after the cutoff nothing grows the excess, so a ratio pinned at 1.176 means leaf carbon is falling faster than the area decays (advisor, 2026-09-29 — I had described it to the user as area "held at" the ceiling, which reads as reached from below) |
+| Q2 | When the excess area is made | before the cutoff (the early seedling phase); at the cutoff crossing the ratio is already ≥ 1.1 |
+| Q3 | Area swap at step 777 | removes **most** of the lab's demand excess over frozen: canopy interception at LAI ≈ 0.5 is near-linear, so 1.18× area ≈ +15 % interception, about the whole +15 % |
+| Q4 | Adding the CO₂ swap | **raises** demand (the lab pool is 24 % lower; at ~10 ppm assimilation is near-linear in CO₂) — so after both swaps the lab state asks for MORE than frozen, the bigger plant's residue |
+| Q5 | O₂ swap | small (< 5 % of demand): both jars sit near 0.2 % O₂ |
+| Q6 | "Capped after the cutoff" | **still rations** (low confidence): the pool arrives 24 % lower at step 777 on the head start alone, and the frozen jar already draws 0.757 |
+
+### 6a. Outcome — MEASURED 2026-09-29; the squeeze is in the SEEDLING phase, and my one whole-run cell could not see it
+
+Instrument: `cargo run --release -q -p domains --example jar_squeeze` (committed). Its step-777
+values reproduce §5a's exactly (demand 1.4140e-2 / 1.2302e-2, held 1.2333e-2 / 1.6258e-2), and
+its firing count is asserted equal to the integrator's every step.
+
+**⚠ The design's premise was wrong, and the run said so in its first line.** The leaf-growth
+cutoff (`tuEMRTLM`, 724 °C·d) falls at **step 902, day 225.5** — thirty days AFTER the squeeze
+(days 193–197). Both the "capped after the cutoff" cell and Q1's reasoning assumed the squeeze
+came after it (so did the advisor's review of the design). **The cell is uninformative by
+construction**: the cap never engages before the firings, which come out identical (5, RK4 at
+773). It is not graded as "Q6 held".
+
+**The timeline** (lab ÷ frozen unless marked):
+
+| day | stored ÷ carbon-implied area | clamp | CO₂ pool, lab / frozen (mol) | plant C, lab vs frozen |
+|---|---|---|---|---|
+| 150.0 | 1.181 | ceiling | 1.53 / 0.833 | |
+| 162.5 | 0.951 | – | 1.27 / 0.410 | **−36 %** |
+| 168.75 | 0.792 | – | 0.889 / 0.0129 | |
+| 175.0 | 0.786 | – | 0.698 / 0.0208 | −16 % |
+| 181.25 | 0.721 | – | 0.0328 / 0.0225 | |
+| 189.25 | 1.067 | – | 0.0168 / 0.0223 | **+21 %** |
+| 192.25–197.25 | 1.18 | **ceiling, every step** | 0.0149→0.0103 / 0.0191→0.0142 | +18.5 % (day 194.25) |
+
+Clamp census over season 1: before the cutoff, ceiling 143 steps, floor 132, free 627; after
+it, free 318.
+
+**What happens, as far as this measures:**
+
+1. **Early, the lab crop is SMALLER.** The sink-limited seedling rule holds leaf area BELOW what
+   its carbon implies (ratio 0.72–0.79 around days 169–181 — thicker leaves), so it intercepts
+   less and grows slower: plant carbon −36 % at day 162.5. The frozen crop empties the jar's CO₂
+   by ~day 169; the lab crop leaves it there until ~day 181.
+2. **At the squeeze, it is BIGGER** (+18.5 % plant carbon, +30 % leaf carbon at step 777). The
+   jar's total carbon is identical in both (4.017 mol); the difference is WHERE it sits — the
+   frozen crop had already shed more to the soil (2.42 vs 2.13 mol) — consistent with it having
+   grown earlier, not tested as the cause.
+3. **During the squeeze, leaf carbon is FALLING** (carbon-implied area 0.478 → 0.452 over days
+   192–197) in a CO₂-starved jar, while the seedling rule — which reads thermal time, not carbon
+   — keeps pushing area UP. Only the thin-leaf ceiling (1.18×) holds it.
+
+**The split at step 777 (CO₂ demand, mol per step):**
+
+| state | demand | vs frozen |
+|---|---|---|
+| lab | 1.4140e-2 | +14.9 % |
+| lab, area → carbon-implied | 1.1492e-2 | −6.6 % |
+| lab, CO₂ pool → frozen's | 1.9772e-2 | +60.7 % |
+| lab, area AND CO₂ swapped | 1.6256e-2 | +32.1 % |
+| … AND O₂ swapped | 1.6258e-2 | +32.2 % |
+| frozen | 1.2302e-2 | — |
+
+Area effect −18.7 % (at the lab's CO₂) / −17.8 % (at frozen's); CO₂ effect +39.8 % / +41.5 %;
+interaction 1.012 — the two nearly multiply. The residual +32 % matches the +30 % leaf carbon.
+**With the extra area removed alone, step 777 would draw 0.93 of its pool** (1.1492e-2 ÷
+1.2333e-2): locally, the ceiling-held area is what tips the step past 1. ⚠ That is a one-step
+counterfactual, not a run: it does not say a run without the excess would stay unrationed,
+since the excess also shapes the pool's path into step 777.
+
+**Graded as written:**
+
+* **Q1 — the SIDE held, the REASON falsified.** The ceiling binds on every step 769–789 and it
+  presses down on a rising area as leaf carbon falls. But it is not "after the cutoff, nothing
+  grows the excess": the seedling rule is still growing it.
+* **Q2 — FALSIFIED as a story.** "Before the cutoff" is trivially true (everything is), and the
+  ratio at the cutoff is 1.179 ≥ 1.1. But there is no early head start: the lab crop is BEHIND
+  early, and the squeeze-time excess is made in days 187–192 (ratio 0.975 → 1.18).
+* **Q3 HELD** — the area swap removes 18.7 %, more than the whole +14.9 % excess.
+* **Q4 HELD** — the CO₂ swap raises demand ~40 %; with both swapped the lab asks +32 % more.
+* **Q5 HELD** — O₂ swap +0.01 %.
+* **Q6 — UNINFORMATIVE BY CONSTRUCTION** (above).
+
+**What this means for the decision, in the terms §6 set:** neither branch fits as written — the
+squeeze is neither "late extra area after the cutoff" nor "an early head start". It is the
+**seedling rule running on thermal time while the crop is carbon-starved**: area keeps rising
+as leaf carbon falls, and the envelope's ceiling is the only coupling between them in that
+window. ⚠ **Not checked, and the obvious next question:** whether [F]'s own seedling phase
+limits area growth by carbon supply — a rule the port would then have omitted, with the
+envelope standing in for it. That is a SOURCE check ([F] Ch. 9, and the branch's
+`leaf_area.py`), not a run; this record does not claim either answer.
+
+**Standing:** unchanged — lab-only, nothing frozen moved, no retune, nothing adopted. Continue /
+park / refuse is still the user's decision.

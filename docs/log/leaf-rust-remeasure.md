@@ -106,3 +106,23 @@ User: *"Add a test that tracks how close the jar's worst step comes to running o
   and asserts `> 1` on the run that rations, so the pin is not a probe that never sees a squeeze.
 * Not a `science_gates!` row (that is a manifest entry, an unfreeze) and not in `PINNED` (tied
   to the compensation-band roster). A characterisation pin; re-pinning it is an ordinary edit.
+
+## Which part squeezes the jar (2026-09-29, the same day) — the SEEDLING phase, carbon-starved
+
+User: *"continue work on the leaf mechanism"*. Plan §6/§6a, predictions first; instrument
+`examples/jar_squeeze.rs`.
+
+* **My design's premise was wrong, and the run's first line said so:** the leaf-growth cutoff is
+  at day 225.5, the squeeze at days 193–197. The one whole-run control ("cap the area after the
+  cutoff") therefore never engaged — **uninformative by construction**, not "held".
+* **Early the lab crop is SMALLER** (plant carbon −36 % at day 162.5): the seedling rule keeps
+  leaf area below what its carbon implies, so it grows slower and leaves the jar's CO₂ in place
+  ~12 days longer. **At the squeeze it is BIGGER** (+18.5 % plant, +30 % leaf carbon), with the
+  same total carbon in the jar sitting less in the soil.
+* **During the squeeze** leaf carbon falls in a CO₂-starved jar while the seedling rule (thermal
+  time, not carbon) keeps pushing area up; the thin-leaf ceiling (1.18×) is the only coupling.
+* **Split at step 777:** removing the extra area alone → 0.93 of the pool (one-step
+  counterfactual, not a run); lower CO₂ and more leaf carbon roughly cancel; O₂ nothing.
+* Graded: Q3–Q5 held; Q1's side held but its reason was falsified; Q2 falsified as a story;
+  Q6 uninformative. **Open, a source check not a run:** does [F]'s seedling phase limit area
+  growth by carbon supply, a rule the port may have omitted with the envelope standing in?
