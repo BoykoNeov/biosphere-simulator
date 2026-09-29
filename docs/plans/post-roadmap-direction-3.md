@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `leaf-rust-remeasure.md`
+**Re-read against the record's last row:** `what-if-experiments.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -90,6 +90,10 @@ recommendation to refuse was built on that sentence and is withdrawn with it.
   `dt = ¼`"* does not hold on today's tree, and no cause is claimed. Drought response is
   unmeasured (no scenario on the roster fires the leaf drought factor). **Continue, park, or
   refuse is the user's call again**, on these numbers.
+* ⚠ **A lab route reopened 2026-09-29 by a rule change** (`log/what-if-experiments.md`): uncited or
+  tuned science is now allowed in lab experiments, tagged WHAT-IF. "No citation / no retune" no
+  longer blocks *asking* about the jar — a what-if seedling carbon coupling, or a tuned leaf
+  ceiling (the leaf plan's §7). It still blocks shipping either into the reference. Not started.
 
 ~~The pricing as written on 2026-09-06 follows, struck:~~
 
@@ -248,6 +252,11 @@ that a claim of that exact shape can invert off them: an oxygen leak moves `seal
 regulated cabin and an unregulated chamber. **Do not re-propose the mechanisms below. Asking
 whether one of their verdicts is scoped to an observable the nominal roster silences is a
 different question, and it is open.**
+
+⚠ **Since 2026-09-29 a verdict below that rests on "uncited" or "fitted" binds the REFERENCE
+only** (`log/what-if-experiments.md`). Running one of these as a labelled WHAT-IF experiment is
+allowed; proposing it for the reference on the same evidence is still the re-proposal this
+section refuses.
 
 **The canopy magnitude question is CLOSED, and it was smaller than three weeks of planning
 said.** `open_season` peak LAI reads **6.0228** at the shipped step and **5.4273** converged,

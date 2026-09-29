@@ -28,6 +28,10 @@ bounds; an out-of-range experimental value ran silently. Here it cannot.
 exactly as a committed one would. That is the guard working — a value the bound rejects is an
 unfreeze request, not an experiment.
 
+⚠ **Superseded 2026-09-29** (`log/what-if-experiments.md`): the default route still panics, but
+`value_switch --what-if` skips the range checks on purpose, labelled WHAT-IF in code. They are
+validity checks, not science limits, and a what-if may ask about exactly those values.
+
 ## What was built
 
 * **The seam.** `build_season_with(scenario, &BiosphereParams)`, with `build_season` delegating.
