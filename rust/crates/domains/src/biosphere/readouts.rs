@@ -376,8 +376,10 @@ pub fn min_compensation_ratio(t: &Trajectory) -> f64 {
 /// honest arithmetic over a defective species: the vapour obeyed no saturation law, all three
 /// frozen chambers peaked at the same 536.995 mol regardless of room size, and wet pressure
 /// reached 1.54 in a 1000-mol jar. The chamber now caps vapour at `e_s(T)/P_std · n_ref`
-/// (`docs/plans/post-roadmap-vapour-saturation.md`), and the jar's wet pressure peaks at
-/// 1.0235 on the weather's warmest day. The vapour term still moves with temperature and
+/// (`docs/plans/post-roadmap-vapour-saturation.md`), and since 2026-09-29 the condenser holds
+/// it at 75 % of that (`docs/plans/post-roadmap-vapour-step-artefact.md`): the jar's wet
+/// pressure peaks at 1.0198 on the weather's warmest day (1.0235 before, when the air sat at a
+/// step-size fraction of saturation). The vapour term still moves with temperature and
 /// transpiration while [`dry_gas_mol`] does not — read that one for the part that cannot drift.
 ///
 /// ⚠ **This is NOT the denominator the science divides by.** That is
@@ -414,8 +416,8 @@ pub fn total_gas_mol(t: &Trajectory) -> Vec<f64> {
 /// the dry total is `capacity` for the whole run — the reactive pair self-cancels (PQ = 1) and
 /// the inert fill is written by nothing — while the *wet* total then peaked 54 % above it,
 /// because the gas-phase water was bounded by no saturation law. That was corrected
-/// 2026-09-23: vapour is now capped at saturation, and the wet total peaks ≈2.4 % above
-/// the dry one on the warmest day.
+/// 2026-09-23: vapour is now capped at saturation, and since 2026-09-29 held at 75 % of it, so
+/// the wet total peaks ≈2.0 % above the dry one on the warmest day (≈2.4 % before).
 ///
 /// So: `total_gas_mol` is the pressure, vapour included; `dry_gas_mol` is the part that is
 /// structurally constant. Neither is dropped — vapour occupies volume, and dropping it would

@@ -315,6 +315,16 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-09-29 — the biosphere's condenser holds 75 % relative humidity; 4 station goldens
+  move (water stocks only) and 4 `golden_sha256` rows follow. No station flow, param, seam or
+  claim changed.**
+  Delegated: `docs/biosphere-reference.md`'s 2026-09-29 entry is the record. `greenhouse`,
+  `harvest`, `lighting` and `sealed_station` re-ran. In each, `biosphere.water_vapor` moved
+  ×0.84372–0.84377, with `condensate` and `soil_water` taking up the difference (and in
+  `sealed_station` 6e-4 kg of `subsoil_water`); no carbon, O₂ or N value moved.
+  `sealed_energy_drift_summary.json` unchanged. ⚠ The 2026-09-23 entry's per-STOCK caveat
+  stands: the crew's `eclss.cabin_h2o` still sits outside the biosphere's target.
+
 - **2026-09-23 — the biosphere bounds chamber water vapour by saturation; 4 station
   goldens move (water stocks only) and 4 `golden_sha256` rows follow. No station flow,
   param, seam or claim changed.**

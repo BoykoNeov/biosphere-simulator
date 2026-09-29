@@ -232,12 +232,40 @@ pub const STANDARD_ATMOSPHERE_PA: f64 = 101_325.0;
 /// `T/T_ref` factor in the ideal-gas conversion — ≈7 % across the weather's range — is omitted
 /// here exactly as it is for every other gas.
 ///
-/// ⚠ No humidity setpoint is invented: the ceiling is plain saturation. A real chamber's
-/// condenser holds it lower; that would be a controlled RH, a design number with no source here.
+/// This is plain saturation. The chamber's condenser holds the air lower, at
+/// [`humidity_target_kg`].
 pub fn saturation_vapour_kg(temp_c: f64, air_capacity_mol: f64) -> f64 {
     saturation_vapor_pressure(temp_c) / STANDARD_ATMOSPHERE_PA
         * air_capacity_mol
         * H2O_MOLAR_MASS_KG_PER_MOL
+}
+
+/// The water vapour (**kg**) a sealed chamber's condenser holds the air at: the humidity
+/// setting times saturation, `setpoint · e_s(T)/P_std · n_ref`.
+///
+/// The setting is `water_cycle.yaml`'s `humidity_setpoint`, BVAD Rev 2's *"plants require
+/// higher relative humidity – about 75%"* (§4.5.7 p. 130, §4.14.1 p. 175). ⚠ That sentence
+/// states what plants need, not a condenser's setting; reading it as the controlled humidity is
+/// a recorded choice (`docs/plans/post-roadmap-vapour-step-artefact.md` §5). Until 2026-09-29
+/// the chamber had no setting and saturation was the ceiling.
+pub fn humidity_target_kg(temp_c: f64, air_capacity_mol: f64, humidity_setpoint: f64) -> f64 {
+    humidity_setpoint * saturation_vapour_kg(temp_c, air_capacity_mol)
+}
+
+/// The vapour (**kg**) a sealed chamber's condenser removes in one step, from `vapour` at the
+/// start of the step against the humidity `target` ([`humidity_target_kg`]).
+///
+/// `max(0, v − target) + rate·dt·min(v, target)`: the whole excess above the target, plus the
+/// engineered condenser's first-order draw on the remainder. Withdraws at most `v` while
+/// `rate·dt < 1`. ⚠ The first-order draw runs below the target too, which a real dehumidifier
+/// would not; that is a recorded scope line, not a claim.
+///
+/// ⚠ **One formula with two readers.** `Condensation` moves this amount, and sealed
+/// transpiration adds it to its headroom so the air ends the step at the target rather than at
+/// `target / (1 + rate·dt)`, a value set by the step size
+/// (`docs/plans/post-roadmap-vapour-step-artefact.md`). Two copies would let one go stale.
+pub fn condensed_vapour_kg(vapour: f64, target: f64, condensation_rate: f64, dt: f64) -> f64 {
+    (vapour - target).max(0.0) + condensation_rate * vapour.min(target) * dt
 }
 
 /// A chamber's live O₂ in mmol per mol of the chamber's **reference** air fill.

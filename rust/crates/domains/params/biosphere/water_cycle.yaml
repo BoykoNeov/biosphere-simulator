@@ -36,6 +36,17 @@
 #   the condenser's draw BELOW saturation, not the only thing standing between the plot and
 #   the air.
 #
+# ⚠ THE CONDENSER NOW HOLDS A HUMIDITY SETTING (2026-09-29,
+#   docs/plans/post-roadmap-vapour-step-artefact.md). Two changes, one file entry:
+#   (1) the ceiling is humidity_setpoint x saturation, not saturation — BVAD's "about 75%"
+#       (see its source string for why that is a recorded CHOICE of locus); and
+#   (2) transpiration's headroom now counts what the condenser takes in the same step, so a
+#       step the plants can fill ends AT the setting. Without (2) the air settled at
+#       setting / (1 + condensation_rate x dt) — 0.889 of saturation at dt = 1/4 before this
+#       entry — a number set by the step size, not by the chamber.
+#   So condensation_rate is now the condenser's draw below the SETTING. ⚠ It still runs below
+#   the setting, which a real dehumidifier would not; recorded, not changed.
+#
 # Sizing discipline (the Step-3 linchpin). The rates are chosen large enough that the
 #   in-flight water (water_vapor + condensate ≈ T/k_cond + T/k_rec, T = transpiration
 #   flux) stays ≪ soil_water0, so soil_water stays ≫ sw_critical and f_water ≡ 1 — i.e.
@@ -49,14 +60,14 @@
 #   decomposition_rate / mineralization's two rates). A zero rate is valid (no condensation
 #   / no recycling); negative is rejected (it would create water).
 #
-# Deferred seams: a finite condenser capacity; a controlled relative-humidity setpoint below
-#   saturation (a design number with no source here); and the plants reading the CHAMBER'S
-#   humidity rather than the weather's VPD (the saturation bound does not need it — see the
-#   plan named above).
+# Deferred seams: a finite condenser capacity; and the plants reading the CHAMBER'S humidity
+#   rather than the weather's VPD (BVAD's own crop transpiration model does, §4.14 Eqn 4-23 —
+#   a lead, not built). The controlled relative-humidity setpoint that this line used to defer
+#   is humidity_setpoint below (2026-09-29).
 #
 # Clean-room: values from cited primary literature ONLY. NOT from the unlicensed
 #   WOFOST_crop_parameters YAML or PCSE source. See docs/param-file-conventions.md.
-#   Both VALUES are DESIGN choices.
+#   condensation_rate and recycling_rate are DESIGN choices; humidity_setpoint is cited ([C]).
 #
 # PROVENANCE (post-roadmap bucket 3 scope C, 2026-07-16 — docs/plans/post-roadmap-citation.md).
 #   Both TODO(cite) tags discharged as DESIGN. [A]/[B] establish that an engineered
@@ -81,6 +92,9 @@
 #       "Using a closed ecological system to study Earth's biosphere: initial results
 #       from Biosphere 2", BioScience 43(4):225–236 (condensate management in a sealed
 #       chamber — the fast condenser turnover the rates approximate).
+#   [C] NASA (2022), Life Support Baseline Values and Assumptions Document (BVAD), NASA/TP-2015-
+#       218570/Rev2, Feb 2022 — §4.5.7 p. 130 and §4.14.1 p. 175 (the plant humidity sentence)
+#       and Table 4-1 p. 63 (crew relative humidity 25 / 40 / 75 %).
 
 name: chamber
 process: water_cycle
@@ -94,3 +108,7 @@ parameters:
     value: 0.5
     unit: "1/day"
     source: "DESIGN — round-number choice, not a literature value: 0.5/day = a chosen ~2-day condensate-return turnover, deliberately matched to condensation_rate so neither half of the ring is the bottleneck. No source can fix a plumbing cadence we invented for a fictional chamber. Closed-loop architecture from [A][B]; the magnitude is ours. Not calibrated."
+  humidity_setpoint:
+    value: 0.75
+    unit: "dimensionless"
+    source: "[C] BVAD Rev 2 §4.5.7 p. 130 and §4.14.1 p. 175 (the same paragraph printed twice), verbatim: 'Similarly, plants require higher relative humidity – about 75% – to avoid water stress and minimize nutrient solution usage. Such humidity levels are at the high end for crew comfort.' Taken as the relative humidity the chamber's condenser HOLDS (a fraction of saturation at the step's temperature). ⚠ THAT IS A CHOICE OF LOCUS, not a lookup: the sentence states what plants NEED, not what a condenser is set to, and 'about' makes the value approximate. The humidity claim carries no citation of its own (the Wheeler et al. 1993 in the same paragraph belongs to the CO2 sentence). Cross-check (a consistency check, not a second derivation): 75% is Table 4-1 p. 63's UPPER crew relative humidity (NASA-STD-3001; nominal 40%, typical ISS), which is what 'the high end for crew comfort' says. Bounded (0, 1]: 1 is plain saturation, the model before 2026-09-29. Read off the page images, not only pdftotext. docs/plans/post-roadmap-vapour-step-artefact.md §5."

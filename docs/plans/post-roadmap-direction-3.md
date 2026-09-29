@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `what-if-experiments.md`
+**Re-read against the record's last row:** `vapour-step-artefact.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -460,6 +460,13 @@ chose the follow-on explicitly: **"ok A now, but immediately after that (next se
   Not a defect the bound needed (Penman–Monteith's radiation term transpires at VPD 0), and the
   crop's water-stress headroom says these chambers would not notice; it is the same "reads
   something other than the chamber's air" shape as CO₂ and O₂ before. Not scheduled.
+  ⚠ *Re-read 2026-09-29* (`log/vapour-step-artefact.md`): pricing this found the chamber's
+  humidity was a **step-size number** (the air settled at `cap / (1 + k·dt)` = 0.889), so the
+  user had it fixed first. The chamber now holds **BVAD's 75 %** at any step. That changes this
+  item's premise: the chamber's own VPD is now **≈2.5× the weather's**, so coupled plants would
+  transpire *more* than today, and "would not notice" was measured at today's rates, not at
+  2.5×. BVAD's crop model (§4.14, Eqn 4-23) reads the chamber's RH, a precedent for the form.
+  Still the user's call; unblocked, not scheduled.
 * **The `o2_setpoint` mole-fraction conversion (B's slice 4), now BLOCKED behind an authoring
   decision.** It is bit-neutral (`0.21 × 9500.0 == 1995.0` exactly, verified both directions)
   but cannot ship as designed: the frozen params reach every authored `eclss.o2_makeup`, so
@@ -473,6 +480,14 @@ chose the follow-on explicitly: **"ok A now, but immediately after that (next se
   ⚠ *Re-read 2026-09-23:* the wet total is no longer defective (vapour is bounded by
   saturation), so the "would freeze a defect" reason is gone; the dry total is still the one
   that cannot drift, which remains the better reason.
+  ⚠ *Re-read 2026-09-29 — PARKED by the user* ("keep it for later"): measured, the station's
+  `cabin_gas` golden has **no inert fill** (its stocks are `eclss.cabin_co2`, `cabin_h2o`,
+  `cabin_o2` and crew stores); the fill exists only in the 9 chamber goldens, where the dry
+  total is structurally constant, so a row on it would be inert, and nothing on the shelf gave
+  a pressure limit. Revisit with a leak model and a sourced limit. Leads, not built: BVAD
+  Table 4-1 p. 63 gives an air leakage rate (0.01 / 0.02 / 0.09 kg/day/module) and total cabin
+  pressure (48.0 / 101 or 70.3 or 56.5 / 102.7 kPa) — read the page image; `pdftotext`
+  scrambles that table. `log/vapour-step-artefact.md`.
 
 The **product track** remains dormant and remains the standing candidate now that B is built;
 its 2026-08-13 re-open condition is still met and nothing here consumes it.

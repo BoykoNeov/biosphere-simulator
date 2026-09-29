@@ -334,30 +334,40 @@ fn the_dry_chamber_never_leaves_reference_pressure() {
 /// # What this asserts instead
 ///
 /// 1. **The bound, per step, at that step's own temperature** — never at a fixed 20 °C, for
-///    exactly the reason above. `vapour(n+1) ≤ e_s(T_n)/P_std · n_ref`, with `T_n` the
-///    temperature step `n` ran at (a day boundary may lower the NEXT cap; the next step's
-///    condensation removes that excess).
+///    exactly the reason above. `vapour(n+1) ≤ setpoint · e_s(T_n)/P_std · n_ref`, with `T_n`
+///    the temperature step `n` ran at (a day boundary may lower the NEXT target; the next
+///    step's condensation removes that excess). ⚠ **Tightened 2026-09-29 from saturation to the
+///    humidity target** (`docs/plans/post-roadmap-vapour-step-artefact.md`): checked against
+///    saturation, this bound stayed green with the condenser's 75 % setting ignored entirely,
+///    because the air then sits below saturation either way. It is read from the run's own
+///    params, so it follows the committed value rather than restating it.
 /// 2. **The vapour now belongs to the room**: the 2000-mol consumer chamber holds twice the
 ///    sealed jar's peak, to the bit. That is the tripwire's live half, inverted.
 #[test]
 fn the_chamber_vapour_never_exceeds_saturation_and_scales_with_the_room() {
-    use domains::biosphere::science::saturation_vapour_kg;
+    use domains::biosphere::science::humidity_target_kg;
     use domains::biosphere::{weather, STEPS_PER_DAY};
     let dt = 1.0 / STEPS_PER_DAY as f64;
     let mut peak_vapour: Vec<(&str, f64, f64)> = Vec::new();
     for (name, scenario, years, perennial) in chambers() {
         let t = run(scenario, years, perennial);
         let capacity = t.scenario.chamber_air_capacity_mol;
+        let setpoint = t.params.water.humidity_setpoint;
+        assert!(
+            setpoint < 1.0,
+            "{name}: the setting is saturation, so this bound is not tight"
+        );
         let (latitude, rows) = weather::weather_facts();
         let temp = weather::season_forcing(latitude, &rows, years).temp;
         let v = &t.water_vapor_kg;
         assert!(v.iter().any(|kg| *kg > 0.0), "{name}: no vapour — the bound is untested");
         for n in 0..v.len() - 1 {
             let day = ((n as f64 * dt) as usize).min(temp.len() - 1);
-            let cap = saturation_vapour_kg(temp[day], capacity);
+            let target = humidity_target_kg(temp[day], capacity, setpoint);
             assert!(
-                v[n + 1] <= cap * (1.0 + 1.0e-12),
-                "{name}: step {n} ended with {} kg of vapour above saturation {cap} kg at {} °C",
+                v[n + 1] <= target * (1.0 + 1.0e-12),
+                "{name}: step {n} ended with {} kg of vapour above the humidity target \
+                 {target} kg at {} °C",
                 v[n + 1],
                 temp[day]
             );

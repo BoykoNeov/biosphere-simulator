@@ -512,10 +512,17 @@ impl Flow for Senescence {
     }
 }
 
-/// Where a **sealed** chamber's transpiration goes once the air is saturated.
+/// Where a **sealed** chamber's transpiration goes once the air is at its humidity target.
 ///
-/// The air takes `clamp(cap − vapour, 0, F)` of the flux `F`; the rest condenses in the same
-/// step. Measured 2026-09-23: one ¼-day step transpires up to **4.85×** a 1000-mol room's whole
+/// The air takes `clamp(target − vapour + condensed, 0, F)` of the flux `F`, where `target` is
+/// the humidity setting times saturation ([`science::humidity_target_kg`]) and `condensed` the
+/// condenser's draw this step ([`science::condensed_vapour_kg`]); the rest condenses in the same
+/// step. So a flux that can fill the room leaves it AT the target at the end of the step, at any
+/// step size. Before 2026-09-29 the target was saturation and the condenser's term was missing,
+/// so the air settled at `cap / (1 + rate·dt)`, 0.889 at `dt = ¼`
+/// (`docs/plans/post-roadmap-vapour-step-artefact.md`).
+///
+/// Measured 2026-09-23: one ¼-day step transpires up to **4.85×** a 1000-mol room's whole
 /// saturation capacity, so the bound cannot live in `Condensation` alone — that flow sees only
 /// start-of-step vapour and would overshoot by a step's transpiration every step.
 /// `docs/plans/post-roadmap-vapour-saturation.md`.
@@ -526,12 +533,19 @@ pub struct VapourSaturation {
     pub condensate: String,
     /// The room's reference fill (mol), `chamber_air_capacity_mol`.
     pub air_capacity_mol: f64,
+    /// The condenser's rate (1/day) — the SAME `water.condensation_rate` `Condensation` is
+    /// built from, so the headroom counts what the condenser takes in the same step.
+    pub condensation_rate: f64,
+    /// The humidity the condenser holds (fraction of saturation) — the SAME
+    /// `water.humidity_setpoint` `Condensation` is built from.
+    pub humidity_setpoint: f64,
 }
 
 /// WATER `soil_water -> vapor_sink` (Penman–Monteith · f_water).
 ///
 /// Sealed (`saturation` is `Some`): `soil_water -> water_vapor + condensate`, the vapour share
-/// bounded by saturation at this step's temperature. Open field (`None`): two legs, unchanged.
+/// bounded by the humidity target at this step's temperature. Open field (`None`): two legs,
+/// unchanged.
 pub struct Transpiration {
     pub id: String,
     pub soil_water: String,
@@ -591,8 +605,15 @@ impl Flow for Transpiration {
                 leg(&self.vapor_sink, flux)?,
             ]);
         };
-        let cap = science::saturation_vapour_kg(temp_c, sat.air_capacity_mol);
-        let headroom = (cap - amt(snapshot, &sat.water_vapor)).max(0.0);
+        let target =
+            science::humidity_target_kg(temp_c, sat.air_capacity_mol, sat.humidity_setpoint);
+        let vapour = amt(snapshot, &sat.water_vapor);
+        // The room left at the END of the step: the target, less the vapour now, plus what the
+        // condenser takes this step (never negative: above the target the excess is part of
+        // what condenses). Without the condenser's term the air ends at `target − rate·dt·v`,
+        // which settles at `target / (1 + rate·dt)` — a step-size number, not a humidity.
+        let condensed = science::condensed_vapour_kg(vapour, target, sat.condensation_rate, dt);
+        let headroom = (target - vapour + condensed).max(0.0);
         let to_air = flux.min(headroom);
         FlowResult::new(vec![
             leg(&self.soil_water, -flux)?,
@@ -1201,11 +1222,13 @@ impl Flow for HumusNitrogenRelease {
 
 /// WATER `water_vapor -> condensate`.
 ///
-/// `max(0, v − cap) + rate·dt·min(v, cap)`: everything above saturation at this step's
-/// temperature (a cooler day lowers the cap), plus the engineered condenser's first-order
-/// draw on the saturated remainder. Withdraws at most `v` while `rate·dt < 1`.
-/// Transpiration's split keeps new vapour at or below the cap; this term is what brings
-/// vapour *already* above it back down.
+/// `max(0, v − target) + rate·dt·min(v, target)` ([`science::condensed_vapour_kg`]): everything
+/// above the humidity target at this step's temperature (a cooler day lowers it), plus the
+/// engineered condenser's first-order draw on the remainder. Withdraws at most `v` while
+/// `rate·dt < 1`. Transpiration's split keeps new vapour at or below the target; this term is
+/// what brings vapour *already* above it back down. The target is `humidity_setpoint` ×
+/// saturation since 2026-09-29, saturation itself before
+/// (`docs/plans/post-roadmap-vapour-step-artefact.md`).
 pub struct Condensation {
     pub id: String,
     pub water_vapor: String,
@@ -1213,6 +1236,8 @@ pub struct Condensation {
     pub condensation_rate: f64,
     pub temp_var: String,
     pub air_capacity_mol: f64,
+    /// The humidity the condenser holds (fraction of saturation), `water.humidity_setpoint`.
+    pub humidity_setpoint: f64,
 }
 
 impl Flow for Condensation {
@@ -1229,8 +1254,12 @@ impl Flow for Condensation {
         dt: f64,
     ) -> Result<FlowResult, SimError> {
         let vapour = amt(snapshot, &self.water_vapor);
-        let cap = science::saturation_vapour_kg(env.get(&self.temp_var)?, self.air_capacity_mol);
-        let condensed = (vapour - cap).max(0.0) + self.condensation_rate * vapour.min(cap) * dt;
+        let target = science::humidity_target_kg(
+            env.get(&self.temp_var)?,
+            self.air_capacity_mol,
+            self.humidity_setpoint,
+        );
+        let condensed = science::condensed_vapour_kg(vapour, target, self.condensation_rate, dt);
         FlowResult::new(vec![
             leg(&self.water_vapor, -condensed)?,
             leg(&self.condensate, condensed)?,
@@ -2932,6 +2961,7 @@ mod tests {
             // under the cap: this test is the first-order law's, and the above-cap term has
             // its own test (`vapour_above_saturation_condenses_and_transpiration_stops_at_the_cap`).
             air_capacity_mol: 1.0e6,
+            humidity_setpoint: 0.75,
         };
         let rec = Recycling {
             id: "biosphere.recycling".to_string(),
@@ -2991,8 +3021,14 @@ mod tests {
     ///
     /// * transpiration sends the air only its headroom and the rest to condensate — the same
     ///   flux, split, never a negative vapour leg;
-    /// * at or above the cap, transpiration adds nothing to the air;
-    /// * condensation removes the whole excess plus the first-order draw on the cap.
+    /// * the headroom is the room left at the END of the step: `target − v` plus what the
+    ///   condenser takes this step, so at or above the target the air gets exactly the
+    ///   condenser's draw (before 2026-09-29 it got nothing, and the air settled below the cap
+    ///   by a step-size factor — `docs/plans/post-roadmap-vapour-step-artefact.md`);
+    /// * condensation removes the whole excess plus the first-order draw on the target.
+    ///
+    /// The target is the humidity setting (0.75, the committed value) times the cap, written
+    /// out by hand here rather than read back from `science::humidity_target_kg`.
     #[test]
     fn vapour_above_saturation_condenses_and_transpiration_stops_at_the_cap() {
         const ROOM_MOL: f64 = 1000.0;
@@ -3003,6 +3039,8 @@ mod tests {
             "cap {cap} vs {by_hand}"
         );
 
+        let target = 0.75 * cap;
+
         let open = transpiration_flow(2.0);
         let sealed = Transpiration {
             vapor_sink: WATER_VAPOR.to_string(),
@@ -3010,6 +3048,8 @@ mod tests {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),
                 air_capacity_mol: ROOM_MOL,
+                condensation_rate: 0.5,
+                humidity_setpoint: 0.75,
             }),
             ..transpiration_flow(2.0)
         };
@@ -3025,10 +3065,17 @@ mod tests {
         )[SOIL_WATER];
         assert!(flux > cap, "fixture flux {flux} must exceed the cap {cap}");
 
-        for vapour in [0.0, 0.25 * cap, cap, 3.0 * cap] {
+        for vapour in [0.0, 0.25 * cap, target, cap, 3.0 * cap] {
             let s = water_only_state(full, TEST_DEPTH, vapour, 0.0);
             let legs = water_legs(&sealed, &s, 200.0, 0.0, 1.0);
-            let to_air = (cap - vapour).max(0.0);
+            // By hand, dt = 1, rate 0.5: below the target the air lacks `target − v` and the
+            // condenser frees `0.5·v`; above it the excess condenses whole and the condenser
+            // frees `0.5·target`.
+            let to_air = if vapour <= target {
+                target - vapour + 0.5 * vapour
+            } else {
+                0.5 * target
+            };
             assert_eq!(
                 legs[SOIL_WATER], -flux,
                 "the split must not change the flux"
@@ -3049,11 +3096,18 @@ mod tests {
             condensation_rate: 0.5,
             temp_var: "temp".to_string(),
             air_capacity_mol: ROOM_MOL,
+            humidity_setpoint: 0.75,
         };
-        for (vapour, dt) in [(3.0 * cap, 0.25), (3.0 * cap, 1.0), (0.5 * cap, 0.25)] {
+        let cases = [
+            (3.0 * cap, 0.25),
+            (3.0 * cap, 1.0),
+            (0.9 * cap, 0.25),
+            (0.5 * cap, 0.25),
+        ];
+        for (vapour, dt) in cases {
             let s = water_only_state(full, TEST_DEPTH, vapour, 0.0);
             let got = water_legs(&cond, &s, 200.0, 0.0, dt)[CONDENSATE];
-            let want = (vapour - cap).max(0.0) + 0.5 * vapour.min(cap) * dt;
+            let want = (vapour - target).max(0.0) + 0.5 * vapour.min(target) * dt;
             assert!(
                 (got - want).abs() <= 1e-12 * want,
                 "v={vapour} dt={dt}: {got} vs {want}"
@@ -3063,10 +3117,75 @@ mod tests {
                 "condensation withdrew more vapour than there is"
             );
             assert!(
-                vapour - got <= cap,
-                "vapour left above the cap: {}",
+                vapour - got <= target,
+                "vapour left above the target: {}",
                 vapour - got
             );
+        }
+    }
+
+    /// **The air ends a filling step AT the humidity target, at any step size.**
+    ///
+    /// Both water flows read the vapour at the start of the step. Before 2026-09-29 the
+    /// headroom ignored the condenser's draw, so a step that could fill the room ended at
+    /// `target − rate·dt·v`, which settles at `target / (1 + rate·dt)`. With saturation as the
+    /// target (the model then) that was 0.889 at `dt = ¼` and 0.941 at `dt = ⅛`, and the
+    /// chambers' humidity was measured at 0.8890–0.8903, so the number was the step's, not the
+    /// chamber's (`docs/plans/post-roadmap-vapour-step-artefact.md`).
+    ///
+    /// Evaluated through the real flow objects at one state and summed, which is what one
+    /// Euler step does to the vapour pool, from below the target, at the old fixed point, at
+    /// the target, and above it at and past saturation (a cooling step), at both steps. The
+    /// flux is checked to fill the room first: a flux that cannot fill it leaves the vapour
+    /// below the target under either form, and the test would pass without a subject.
+    #[test]
+    fn the_air_ends_a_filling_step_at_the_cap_at_any_step_size() {
+        const ROOM_MOL: f64 = 1000.0;
+        const RATE: f64 = 0.5;
+        const SETPOINT: f64 = 0.75;
+        let target = SETPOINT * science::saturation_vapour_kg(20.0, ROOM_MOL);
+        let sealed = Transpiration {
+            vapor_sink: WATER_VAPOR.to_string(),
+            saturation: Some(VapourSaturation {
+                water_vapor: WATER_VAPOR.to_string(),
+                condensate: CONDENSATE.to_string(),
+                air_capacity_mol: ROOM_MOL,
+                condensation_rate: RATE,
+                humidity_setpoint: SETPOINT,
+            }),
+            ..transpiration_flow(2.0)
+        };
+        let cond = Condensation {
+            id: "biosphere.condensation".to_string(),
+            water_vapor: WATER_VAPOR.to_string(),
+            condensate: CONDENSATE.to_string(),
+            condensation_rate: RATE,
+            temp_var: "temp".to_string(),
+            air_capacity_mol: ROOM_MOL,
+            humidity_setpoint: SETPOINT,
+        };
+        let full = science::transpirable_capacity(TEST_DEPTH, EXTR, 2.0);
+        for dt in [0.25, 0.125] {
+            let stale = target / (1.0 + RATE * dt);
+            let saturated = target / SETPOINT;
+            for vapour in [0.0, 0.5 * target, stale, target, saturated, 3.0 * target] {
+                let s = water_only_state(full, TEST_DEPTH, vapour, 0.0);
+                let t = water_legs(&sealed, &s, 200.0, 0.0, dt);
+                assert!(
+                    t[CONDENSATE] > 0.0,
+                    "dt={dt} v={vapour}: the flux did not fill the room, so there is no \
+                     target to reach"
+                );
+                let c = water_legs(&cond, &s, 200.0, 0.0, dt);
+                let end = vapour + t[WATER_VAPOR] + c[WATER_VAPOR];
+                assert!(
+                    (end - target).abs() <= 1e-12 * target,
+                    "dt={dt}: from {vapour} kg the step ended at {end} kg, not the target \
+                     {target} kg ({:.4} of it; the step-size fixed point is {:.4})",
+                    end / target,
+                    1.0 / (1.0 + RATE * dt)
+                );
+            }
         }
     }
 

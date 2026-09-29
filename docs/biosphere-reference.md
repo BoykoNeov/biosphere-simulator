@@ -895,6 +895,46 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-09-29 — the sealed chamber's condenser HOLDS 75 % relative humidity, and the step
+  no longer sets the humidity: 9 goldens, 9 `golden_sha256` rows (5 here, 4 on the station)
+  and `water_cycle.yaml`'s hash. Only water stocks moved.**
+  Plan, both rounds and every prediction: `docs/plans/post-roadmap-vapour-step-artefact.md`;
+  record `docs/log/vapour-step-artefact.md`.
+
+  **What was wrong.** The 2026-09-23 entry's air settled at `cap / (1 + rate·dt)`: both water
+  flows read start-of-step vapour, transpiration filled to the cap, and the condenser then took
+  `rate·dt·v` of it. Measured 0.8890–0.8903 of saturation against 1/(1 + 0.5·¼) = 0.8889. That
+  entry's goldens froze a humidity set by the STEP, and it would have been 0.941 at `dt = ⅛`.
+
+  **What changed.** (1) Transpiration's headroom counts the condenser's same-step draw, via one
+  helper both flows call (`science::condensed_vapour_kg`), so a step the plants can fill ends
+  AT the target at any step. (2) The target is `humidity_setpoint · saturation`
+  (`science::humidity_target_kg`), a **new param** in `water_cycle.yaml`: **0.75**, BVAD Rev 2
+  §4.5.7 p. 130 / §4.14.1 p. 175, *"plants require higher relative humidity – about 75%"*.
+  ⚠ Recorded as a CHOICE of locus: the sentence says what plants need, not what a condenser is
+  set to. Flow ids and type names unchanged, so `flow_set` is byte-identical. (1) alone was
+  built and measured first (air at 100 %, vapour ×1.125, every prediction held); the user held
+  it for a published setting before anything was written.
+
+  **What moved, against the prediction written first.** 9 of 20 goldens, file for file. Only
+  `water_vapor` (×**0.84372–0.84377**, predicted 0.84375 = 0.75 × 1.125), `condensate`,
+  `soil_water` and `subsoil_water`. No carbon, O₂, N, consumer or boundary value; the
+  water-stress factor stayed exactly 1 at every step. Mean relative humidity 0.751; wet
+  pressure peak **1.0235 → 1.0198**.
+
+  **Tests.** The per-step bound in `tests/atmosphere.rs` now checks the humidity target, not
+  saturation: against saturation it stayed green with the setting ignored. Mutations: the
+  setting forced to 1.0 → that bound red; the step fix removed → both flow tests red.
+
+  ⚠ **Scope.** The condenser's first-order draw still runs below the setting (a real
+  dehumidifier would stop), recorded not changed; the equality at the target is a per-step
+  AMOUNT, claimed for Euler at `dt = ¼`. ⚠ `biosphere_params.txt` carries no row for the new
+  param: its generator was deleted by S6, and a hand-written row would misstate its source
+  (the 2026-09-06 O₂-setpoint precedent). The loader test pins the value instead.
+
+  Advisor-reviewed before each round's design; regenerated with `regen_goldens --write` and
+  both manifest writers.
+
 - **2026-09-23 — the sealed chamber's WATER VAPOUR is bounded by saturation: 9 goldens,
   9 `golden_sha256` rows (5 here, 4 on the station) and `water_cycle.yaml`'s hash. Only water
   stocks moved.**

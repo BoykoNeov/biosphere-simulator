@@ -454,6 +454,7 @@ fn build_atmosphere(
             condensation_rate: p.water.condensation_rate,
             temp_var: TEMP_VAR.to_string(),
             air_capacity_mol: scenario.chamber_air_capacity_mol,
+            humidity_setpoint: p.water.humidity_setpoint,
         })];
         Ok(CompartmentBuild {
             stocks,
@@ -757,13 +758,16 @@ fn build_plants(
             rooted_depth_aux: ROOTED_DEPTH.to_string(),
             soil_extractable_water: scenario.soil_extractable_water,
             wssg: scenario.wssg,
-            // Sealed: the air takes what saturation allows and the rest condenses in the
-            // same step (docs/plans/post-roadmap-vapour-saturation.md). Open field: the
+            // Sealed: the air takes what the humidity target allows and the rest condenses in
+            // the same step (docs/plans/post-roadmap-vapour-saturation.md, and
+            // docs/plans/post-roadmap-vapour-step-artefact.md for the target). Open field: the
             // weather's boundary sink, unbounded, byte-for-byte as before.
             saturation: scenario.sealed.then(|| VapourSaturation {
                 water_vapor: WATER_VAPOR.to_string(),
                 condensate: CONDENSATE.to_string(),
                 air_capacity_mol: scenario.chamber_air_capacity_mol,
+                condensation_rate: p.water.condensation_rate,
+                humidity_setpoint: p.water.humidity_setpoint,
             }),
         }),
         Box::new(NitrogenUptake {

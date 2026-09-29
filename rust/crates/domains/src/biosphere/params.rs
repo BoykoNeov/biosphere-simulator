@@ -372,11 +372,13 @@ pub struct HumificationParams {
 // identically, so the free N rate was redundant with the carbon one. The N legs therefore
 // take `DecompositionParams` / `MicrobialRespirationParams`.
 
-/// Water-cycle params (condensation + recycling).
+/// Water-cycle params (condensation + recycling + the humidity the condenser holds).
 #[derive(Debug, Clone, Copy)]
 pub struct WaterCycleParams {
     pub condensation_rate: f64,
     pub recycling_rate: f64,
+    /// Fraction of saturation, `(0, 1]` — BVAD's "about 75%" (2026-09-29).
+    pub humidity_setpoint: f64,
 }
 
 /// Minimal-consumer params (grazing + respiration + mortality + f_O2 Monod).
@@ -1125,15 +1127,29 @@ pub fn water_cycle_from_bounded(
     bounds: Bounds,
 ) -> WaterCycleParams {
     let g = Range { bounds, name };
-    let units: [(&str, &str); 2] = [("condensation_rate", "1/day"), ("recycling_rate", "1/day")];
+    let units: [(&str, &str); 3] = [
+        ("condensation_rate", "1/day"),
+        ("recycling_rate", "1/day"),
+        ("humidity_setpoint", "dimensionless"),
+    ];
     let f = file(text, name);
     let v = guarded_map(&f, &units, name);
-    for (field, _) in units {
+    for field in ["condensation_rate", "recycling_rate"] {
         g.check(require_non_negative(v[field], field, name));
     }
+    // A fraction of saturation: zero would condense every drop the plants give off, and above
+    // one the air would hold more than it can.
+    g.check(require_half_open(
+        v["humidity_setpoint"],
+        0.0,
+        1.0,
+        "humidity_setpoint",
+        name,
+    ));
     WaterCycleParams {
         condensation_rate: v["condensation_rate"],
         recycling_rate: v["recycling_rate"],
+        humidity_setpoint: v["humidity_setpoint"],
     }
 }
 
@@ -2488,6 +2504,32 @@ parameters:
             };
             assert_eq!(got, 0.0, "a zero {field} must load, not be rejected");
         }
+    }
+
+    /// The humidity the condenser holds is BVAD's *"about 75%"*, and only a fraction of
+    /// saturation loads.
+    ///
+    /// Zero would condense every drop the plants give off, above one the air would hold more
+    /// than it can, and NaN would pass a bare `v < lo || v > hi` guard, so all three are
+    /// rejected; exactly one (plain saturation, the pre-2026-09-29 model) is legal.
+    /// `docs/plans/post-roadmap-vapour-step-artefact.md` §5.
+    #[test]
+    fn the_humidity_setpoint_is_bvads_75_percent_and_a_fraction_of_saturation() {
+        assert_eq!(water_cycle().humidity_setpoint, 0.75);
+        for bad in ["0.0", "1.01", "-0.5", "NaN"] {
+            let broken = value_of(WATER_CYCLE_YAML, "humidity_setpoint", bad);
+            rejects(
+                || {
+                    water_cycle_from(broken, "water_cycle.yaml");
+                },
+                &format!("humidity_setpoint = {bad}"),
+            );
+        }
+        let saturated = value_of(WATER_CYCLE_YAML, "humidity_setpoint", "1.0");
+        assert_eq!(
+            water_cycle_from(saturated, "water_cycle.yaml").humidity_setpoint,
+            1.0
+        );
     }
 
     /// A wrong declared unit on `water_cycle.yaml` is rejected.
