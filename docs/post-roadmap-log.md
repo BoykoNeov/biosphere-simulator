@@ -29,8 +29,8 @@ So: **this file is the index, plus a pointer table into `docs/log/`.** New work 
 line to the index, one pointer row, and one file in `docs/log/` — and adds nothing to
 `CLAUDE.md`. The paired test fails if a row exists on one side and not the other.
 
-⚠ **TWO plan docs on disk are deliberately not in the index below, and this paragraph is
-what satisfies `every_plan_doc_is_indexed` for both.** They are the *forward-looking* plans:
+⚠ **THREE plan docs on disk are deliberately not in the index below, and this paragraph is
+what satisfies `every_plan_doc_is_indexed` for all three.** They are the *forward-looking* plans:
 they have no finished work behind them and therefore no file in `docs/log/`, and naming one
 in the index would break the index↔record pairing for the right reason and the wrong way.
 
@@ -58,6 +58,12 @@ slice that moves a frozen byte.*
   into. **A doc's exemption is retired with the doc only if something else came to name it —
   and for this one nothing did.** The trigger for superseding it was measured rather than
   argued: 30 strike-through spans holding 71.6 % of its bytes.
+* **`post-roadmap-review-2026-09-29.md` — a PROPOSAL**, written 2026-09-29 on the user's call
+  after a read-through review: eight hurdles, each ending in a decision, nothing built. It does
+  **not** supersede the third direction plan. **Record files do not name it by filename**, for
+  the reason given for that plan. Each step taken earns the normal three under its own plan
+  doc; this exemption goes when the first of them moves a frozen byte, or when the proposal is
+  declined.
 
 ⚠ **The FIRST plan, `post-roadmap-direction.md` (2026-08-13), is SUPERSEDED and no longer
 needs this paragraph:** the 2026-08-31 margin-pin item filed itself under it, so its index
