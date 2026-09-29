@@ -64,3 +64,20 @@ No retune (narrowing the envelope or refining the step until the jar goes quiet 
 `leaf-expansion.md` finding 9 refused); no cause-hunting control; no adoption. The form stays
 reachable from `science_switch -- leafform=node_envelope` and moves nothing frozen. **Whether
 the rewrite continues is the user's decision.**
+
+## The jar control (2026-09-29, the same day) — an INTERACTION, and a thin reference margin
+
+User: *"the next step is the control run that finds out why the jar fails"*. Plan §5, predictions
+written first, all five held. Instrument: `examples/jar_control.rs`.
+
+* **What overdraws:** `biosphere.allocation` draws more CO₂ (`biosphere.carbon_pool`) than the
+  jar holds, days 193–197 of season 1, once a day; RK4's flow #0 is the same flow.
+* **The 2×2** (leaf form × O₂ form): only lab × live O₂ rations. Frozen × live O₂, frozen ×
+  constant O₂ and lab × constant O₂ are all 0 firings, RK4 clean. **Neither change alone breaks
+  the jar.** Mutual shading measured uninvolved (LAI ≤ 0.67 against 6).
+* **Why:** at 0.2 % O₂ the live form removes photorespiration, so the crop pulls the jar's CO₂
+  to ~7 ppm instead of stopping at ~70. The reference jar's tightest step (777) already draws
+  **76 %** of the pool; the lab form, at the same step, draws **115 %**.
+* **⚠ Outlives the leaf form:** the reference jar is **1.32×** from rationing and nothing
+  watches that distance — its science gate reads ×10.67 to a different limit, and
+  `rationed == 0` is binary. Left for the user to decide.

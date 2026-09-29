@@ -132,3 +132,81 @@ W rises but sits far below it. The CO₂ ratio is a FLOOR, so lower is *less* he
 
 **Standing:** not adopted; the lab form stays reachable (`science_switch -- leafform=node_envelope`)
 and moves nothing frozen. Whether the rewrite continues is the user's decision.
+
+## 5. The jar control — why does the sealed jar break? (opened 2026-09-29, user: *"the next step is the control run that finds out why the jar fails"*)
+
+§4 withheld a cause. This section is the control that §4 said naming one would need. It
+changes no number of the mechanism and adopts nothing; it toggles forms that already exist.
+
+**Order (advisor call, 2026-09-29): name the failure first, then let it pick the control.**
+
+1. **Name it.** Per Euler step, evaluate every flow at the step-entry state and read
+   `arbitration::scale_factors` — the same computation the backstop applies. For each firing:
+   the flow, the stock it overdraws (summed demand vs amount), stored and derived LAI, the
+   chamber's CO₂ and O₂. For the RK4 raise: `registry.flows()[i].id()` names "flow #i" exactly.
+   ⚠ RK4 fails at a *stage*, so an entry-state probe can read all factors = 1 on step 773; the
+   flow index is exact, the limiting stock comes from the Euler side.
+2. **The O₂ control, as a full 2×2** — leaf form {`Derived`, `NodeEnvelope`} × O₂ form
+   {`LivePool` (the loader's, since 2026-09-07), `Constant`}. The frozen×Constant cell is
+   measured, not assumed, or the control is uninterpretable. Graded 0 vs `> 0`, not by count.
+3. **Mutual shading, by measurement:** max of derived AND stored LAI on the lab jar vs the
+   threshold 6.
+4. The named suspects are not the list: the habitat atmosphere and vapour saturation also
+   changed sealed chambers after August. If step 1's stock fits neither suspect, it picks.
+
+**Predictions, written BEFORE the first run:**
+
+| # | Claim | Predicted |
+|---|---|---|
+| J1 | The overdrawn stock | the chamber **CO₂ pool** (`biosphere.carbon_pool`), drawn by assimilation: the jar holds ~2 days of carbon and the form grows a bigger canopy. Alternative I would not be surprised by: the **O₂ pool** (2 mol at start), drawn by respiration |
+| J2 | The five Euler firings | one cluster, near step 773 (day ~193 of season 1), the same flow as RK4's flow #0 |
+| J3 | frozen × `Constant` | **0** firings, RK4 clean (else the control means nothing) |
+| J4 | lab × `Constant` | **0** firings, RK4 clean — i.e. an **interaction**: the jar breaks only with both the leaf form and live O₂. Low confidence; the O₂ form moved the jar ~10×, which is why it is my lead |
+| J5 | Jar LAI, derived and stored | both stay **below 6** all run → mutual shading measured uninvolved |
+
+### 5a. Outcome — MEASURED 2026-09-29; all five predictions held, and the jar was already close
+
+Instrument: `cargo run --release -q -p domains --example jar_control` (committed). The probe's
+own firing count is asserted equal to the integrator's `rationed` every step, and its jar
+minimum under the reference reproduces `log/o2-form-adopted.md`'s **7.294541 ppm** exactly.
+
+| cell (leaf × O₂) | Euler firings | CO₂ pool min (mol, room 1000) | tightest step's CO₂ draw ÷ held (step) | max LAI derived / stored | RK4 |
+|---|---|---|---|---|---|
+| frozen × `LivePool` (the reference) | 0 | 7.29e-3 | **0.757** (777) | 0.443 / — | clean |
+| frozen × `Constant` | 0 | 7.14e-2 | 0.284 (734) | 0.543 / — | clean |
+| lab × `LivePool` | **5** | 3.38e-3 | **1.147** (777) | 0.548 / 0.572 | raises, step 773 |
+| lab × `Constant` | 0 | 6.79e-2 | 0.235 (758) | 0.601 / 0.674 | clean |
+
+The five firings, all `biosphere.allocation` overdrawing `biosphere.carbon_pool`: steps 773,
+777, 781, 785, 789 — days 193.25–197.25 of season 1, **once a day at the same quarter-day**,
+f = 0.986 / 0.872 / 0.897 / 0.980 / 0.970. RK4's "flow #0" resolves to `biosphere.allocation`.
+At every firing the stored leaf area sat at the envelope's **ceiling** (0.5587 / 0.4728 = 1.18×
+what its carbon implies).
+
+**Graded as written:** J1 HELD (CO₂ pool, by allocation). J2 HELD (one cluster, 773–789, same
+flow as RK4). J3 HELD. J4 HELD — **an interaction**: neither the leaf form nor live O₂ alone
+rations the jar. J5 HELD — LAI peaks at 0.60 derived / 0.67 stored against a threshold of 6;
+mutual shading is measured uninvolved in the jar.
+
+**What the cause is, as far as this control reaches:**
+
+* Live O₂ removed the jar's kinetic floor. The jar starts with 2 mol O₂ in 1000 (0.2 %), so
+  under `LivePool` there is almost no photorespiration and the crop pulls CO₂ to **~7 ppm**;
+  under `Constant` it stops near **~70 ppm**, and a step never draws more than 28 % of the pool.
+* That leaves the **reference** jar drawing **76 %** of its CO₂ in one step at step 777 — and
+  the lab form's worst step is the **same step**, drawing 115 %. The leaf form does not create
+  the squeeze; it is the ~50 % more demand at the squeeze's tightest instant that tips it.
+* ⚠ **Not established:** that the extra leaf area (the ceiling-sitting stored LAI) is the part
+  of the form that adds the demand. It is what the probe *saw* at every firing, not a control.
+
+**⚠ THE FINDING THAT OUTLIVES THE LEAF FORM: the reference jar's rationing headroom is 1.32×,
+and nothing watches it.** The jar's science gate reads **×10.67** above its compensation floor
+(`log/o2-form-adopted.md` §2) — true, and a distance to a *different* limit. The limit that
+fires here is one Euler step overdrawing a small pool, and the only gate on it is
+`rationed == 0`, which is binary: it reads the same at 0.28 as at 0.76. Since 2026-09-07 any
+change that adds ~32 % to the crop's CO₂ demand at day 194 of the jar rations it, whatever that
+change is for. Recorded, not acted on — **whether that headroom should be pinned is the user's
+call.**
+
+**Standing:** unchanged. The lab form is still not adopted, nothing frozen moved, and whether
+the rewrite continues is the user's decision — now with a named cause for the jar.
