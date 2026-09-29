@@ -84,6 +84,44 @@ validate the model, and neither class asserts correctness (`docs/authoring-refer
 disagreement is recorded as a **finding** — **changing the number is calibration**, a
 separate act with its own unfreeze discipline and moved goldens.
 
+## A fourth class, for EXPERIMENTS only: WHAT-IF (since 2026-09-29)
+
+**Decided by the user 2026-09-29:** *"making up science with no citation, or tuning numbers
+to pass — can be used in mechanisms for tests and experiments ('what would happen if this
+works that way...')"*.
+
+So outside the reference, a mechanism may use an **uncited rule** or a **tuned number** to ask
+a question. Inside the reference nothing changed: every frozen value is still CITED, DESIGN or
+TODO(cite), and a frozen band is still never re-tuned so a change fits
+(`docs/biosphere-reference.md`, unfreeze step 5).
+
+| class | where it may live | tag |
+|---|---|---|
+| **WHAT-IF** | lab-only forms, lab substitutions, `examples/`, and tests that exercise them — **never** a frozen param file, flow or golden | `WHAT-IF — <the question>: <the assumed rule or number, and how it was chosen>` |
+
+**Rules for WHAT-IF** (each one closes a back door):
+
+1. **Label it and name the question.** Every what-if rule and number carries the tag, in the
+   code beside it and in any record that reports it — e.g. *"WHAT-IF — would the jar hold if
+   seedling leaves grew only on spare carbon: area rate × min(1, supply/demand), assumed"*.
+2. **A result is about the ASSUMPTION, not the plant.** Report it as *"if X, then Y"*, never as
+   a finding about real crops.
+3. **A tuned number that passes a gate is FITTED, and is reported as fitted.** Passing a band
+   it was tuned to pass is not evidence for it (`log/wheat-partition-backfill.md` is that trap
+   on a frozen table).
+4. **The numbers live in lab code**, as consts on a lab form (the `TEH_Q10_*` precedent) —
+   **not** in a YAML under `params/biosphere/`, which the param census would count, i.e. an
+   unfreeze.
+5. **It enters the reference only the normal way**: a real citation (or a genuine DESIGN
+   sizing choice) plus the unfreeze ceremony. Relabelling a what-if as DESIGN to get it in is
+   the fabrication this document exists to prevent — DESIGN is for sizing choices, not for
+   invented mechanisms.
+6. **Licensing is NOT relaxed.** "Made up" means *ours*; it never means taken from the WOFOST
+   parameter YAML or PCSE source (`docs/reuse-and-licenses.md`). That rule is legal, not
+   scientific, and this decision did not touch it.
+7. **Not changed by this decision:** the PCSE oracle is still a diagnostic, never a fit target;
+   and a test that pins a what-if is welcome, but no gate on the reference is weakened for one.
+
 ## ⚠ The YAML a param file may use is a CLOSED SUBSET (since 2026-08-17)
 
 **A param file is read by the Rust reference, whose YAML reader is hand-rolled over a

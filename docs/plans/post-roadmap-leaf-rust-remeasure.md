@@ -400,3 +400,14 @@ calling it a PDF job; the shelf lesson, again). `log/leaf-expansion.md`:
 
 **Standing:** unchanged — lab-only, nothing frozen moved, no retune, nothing adopted. Continue /
 park / refuse is still the user's decision.
+
+## 7. Rule change 2026-09-29 — "no retune" and "no uncited rule" no longer bind the LAB route
+
+The user changed the project rules the same day: uncited science and tuned numbers **may** be
+used in experiments and tests, tagged `WHAT-IF` (`docs/param-file-conventions.md`, the WHAT-IF
+section). §6's *"adoption and retune are both off the table"* is **superseded for lab-only
+experiments**; adoption into the reference is still off the table, and still needs a citation.
+
+What this reopens (priced, not started): a WHAT-IF carbon coupling for the seedling phase
+(the gap `log/leaf-expansion.md` finding 2 names in [F]), or a WHAT-IF tuned thin-leaf ceiling —
+each asked as *"would the jar hold if…"*, and each reported as an assumption, not as a finding.

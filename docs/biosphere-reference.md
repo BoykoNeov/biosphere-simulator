@@ -866,7 +866,8 @@ Phase-1 PCSE/clean-room provenance rigor, applied to our own reference):
    `science_bands` and `liveness_floors`. A band failure is a **blocking finding** that must be
    argued past in writing, not a number to re-tune — retuning a bound so a change fits is the
    co-adaptation shape this project has refused (the consumer-chamber 2×, the DPM/RPM labile
-   re-read, ruling B). ⚠ And the converse is not licensed either: a band **passing** is not an
+   re-read, ruling B). This binds the **reference**; a lab-only experiment may tune, tagged
+   `WHAT-IF` (`docs/param-file-conventions.md`, since 2026-09-29). ⚠ And the converse is not licensed either: a band **passing** is not an
    endorsement. `open_season` sits **3.8 %** above the LAI lower bound and **12 %** below the
    Greenwood crossing — these are tight margins, not comfort.
 6. **Record provenance.** Update this file and the Phase-4 plan with what changed and why (a

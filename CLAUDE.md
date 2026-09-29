@@ -124,6 +124,8 @@ working on" category. The record and its cost: `docs/log/reference-flip.md`.
 ## Reuse & licensing (see docs/reuse-and-licenses.md)
 
 - Reimplement science from **primary literature**; cite the paper, not PCSE.
+- **Experiments may use uncited or tuned science**, tagged `WHAT-IF`, lab-only — never in
+  the reference. Rules: `docs/param-file-conventions.md` (WHAT-IF).
 - **PCSE is EUPL (copyleft): offline validation oracle only, never ported or
   imported.** The WOFOST param YAML repo has no license — don't copy it.
 - Project's own license is **BNCL-1.0** (Boyko Non-Commercial License v1.0) —
