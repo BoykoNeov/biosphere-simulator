@@ -85,8 +85,12 @@ byte-identical to the measured temp copy.
 * ⚠ `biosphere_params.txt` has no row for the new param: its generator was deleted in S6, and
   a hand-written row would misstate where the number came from.
 * **For item 2 (plants reading the chamber's humidity), now unblocked:** at 75 % the chamber's
-  own vapour-pressure deficit averages **≈2.5× the weather's** over a run (probe ratio
-  2.52 / 2.52 / 2.55). Coupled plants would transpire *more* than today, not less. BVAD's own
+  own vapour-pressure deficit summed over a run is **1.50× the weather's**, and the potential
+  transpiration it drives **1.21× (+21 %)**. Coupled plants would transpire *more* than today,
+  not less; how low the soil water would then go is unmeasured. ⚠ *Corrected the same day:*
+  first recorded as **≈2.5×**, the MEAN of per-step ratios (2.52 / 2.52 / 2.55), which days with
+  a small weather VPD inflate — it had already been told to the user when the
+  advisor caught it, and the correction was told too. BVAD's own
   crop transpiration model (§4.14, Monje 1998, Equation 4-23) takes VPD from the chamber's
   relative humidity, a precedent for the form. Not built; the user's call.
 * **For the parked cabin gas check** (the user: keep it for later, until there is a leak model

@@ -2852,12 +2852,13 @@ mod tests {
         // A 1.3 m root zone holding 1000 kg is FTSW 4.7, far above wssg — f_water = 1 —
         // and both ring pools are nonzero so every flux is positive.
         //
-        // ⚠ The vapour sits at HALF of saturation, and that is load-bearing since the
-        // saturation bound (docs/plans/post-roadmap-vapour-saturation.md): at or above the
-        // cap, transpiration sends nothing to the air and its only sink is the condensate —
-        // the old 5 kg charge was ~12× a 1000-mol room's cap and would have hidden the
-        // vapour leg entirely. Below the cap the flux reaches the air first and any
-        // remainder condenses, so transpiration may have TWO sinks, air first.
+        // ⚠ The vapour sits at HALF of saturation, below the 75 % humidity target, and that is
+        // load-bearing since the saturation bound (docs/plans/post-roadmap-vapour-saturation.md):
+        // at or above the target, transpiration sends the air only the condenser's same-step
+        // draw (docs/plans/post-roadmap-vapour-step-artefact.md) and the rest to condensate —
+        // the old 5 kg charge was ~12× a 1000-mol room's cap and would have all but hidden the
+        // vapour leg. Below the target the flux reaches the air first and any remainder
+        // condenses, so transpiration may have TWO sinks, air first.
         let resolver = super::super::weather_resolver(&scenario, 1).expect("resolver");
         let temp = resolver.bind(&base, 1.0).get(TEMP_VAR).expect("temp");
         let cap = science::saturation_vapour_kg(temp, scenario.chamber_air_capacity_mol);

@@ -463,9 +463,10 @@ chose the follow-on explicitly: **"ok A now, but immediately after that (next se
   ⚠ *Re-read 2026-09-29* (`log/vapour-step-artefact.md`): pricing this found the chamber's
   humidity was a **step-size number** (the air settled at `cap / (1 + k·dt)` = 0.889), so the
   user had it fixed first. The chamber now holds **BVAD's 75 %** at any step. That changes this
-  item's premise: the chamber's own VPD is now **≈2.5× the weather's**, so coupled plants would
-  transpire *more* than today, and "would not notice" was measured at today's rates, not at
-  2.5×. BVAD's crop model (§4.14, Eqn 4-23) reads the chamber's RH, a precedent for the form.
+  item's premise: the chamber's own VPD summed over a run is now **1.5× the weather's**, and
+  potential transpiration **+21 %**, so coupled plants would transpire *more* than today, and
+  "would not notice" was measured at today's rates, not at +21 % (first recorded as ≈2.5×, a
+  mean of per-step ratios; corrected the same day). BVAD's crop model (§4.14, Eqn 4-23) reads the chamber's RH, a precedent for the form.
   Still the user's call; unblocked, not scheduled.
 * **The `o2_setpoint` mole-fraction conversion (B's slice 4), now BLOCKED behind an authoring
   decision.** It is bit-neutral (`0.21 × 9500.0 == 1995.0` exactly, verified both directions)

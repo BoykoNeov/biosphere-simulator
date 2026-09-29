@@ -195,7 +195,13 @@ Built in the working tree; regenerated into a fresh temp copy of the committed g
   per-step bound in `tests/atmosphere.rs` goes red. The step fix removed → both flow tests go
   red. All 420 lib tests green on the fixed tree.
 * ⚠ **A finding for item 2, not acted on:** with the air held at 75 %, the chamber's own
-  vapour-pressure deficit averages **≈2.5× the weather's** over a run (the probe's mean ratio
-  2.52 / 2.52 / 2.55). So plants coupled to the chamber's humidity would transpire MORE than
-  today, not less. At 100 % it would have been the opposite. That coupling is the user's next
-  call, and this is the number it starts from.
+  vapour-pressure deficit summed over a run is **1.50× the weather's** (1.498 / 1.497 / 1.500),
+  and the transpiration it drives — Penman–Monteith with each step's own radiation and
+  temperature, summed — is **1.21× (+21 %)** (1.206 / 1.206 / 1.207; the radiation term does not
+  read VPD). So plants coupled to the chamber's humidity would transpire MORE than today, not
+  less. At 100 % it would have been the opposite. Unmeasured: how low the soil water would then
+  go. That coupling is the user's next call, and this is the number it starts from.
+  ⚠ *Corrected the same day:* first recorded as **≈2.5×**, the MEAN of per-step ratios (2.52 /
+  2.52 / 2.55), which days with a small weather VPD inflate — it had already been told to the
+  user when the
+  advisor caught it, and the correction was told too.
