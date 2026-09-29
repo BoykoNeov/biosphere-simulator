@@ -323,10 +323,18 @@ it, free 318.
 
 **What happens, as far as this measures:**
 
-1. **Early, the lab crop is SMALLER.** The sink-limited seedling rule holds leaf area BELOW what
-   its carbon implies (ratio 0.72–0.79 around days 169–181 — thicker leaves), so it intercepts
-   less and grows slower: plant carbon −36 % at day 162.5. The frozen crop empties the jar's CO₂
-   by ~day 169; the lab crop leaves it there until ~day 181.
+1. **Early, the lab crop is SMALLER — from the first weeks, and mostly in CARBON.** ⚠ Corrected
+   in review (advisor, 2026-09-29): the first draft said *"the seedling rule holds area below its
+   carbon (0.72–0.79, days 169–181), so it intercepts less and grows slower"*. That compared the
+   lab's area with its OWN carbon, not with the reference crop's, and the window it cited comes
+   AFTER the deficit it was meant to explain (−36 % plant carbon already at day 162.5). With the
+   reference's area added (`froz LAI`, `area/fr`, `leafC/fr` columns): at day 100 the lab canopy
+   is **0.44×** the reference's, of which **0.55 is leaf carbon** and 0.79 thickness. The floor
+   (thickest leaf) binds intermittently, about twice a day, from **day 2.75 to day 79.75** — the
+   seedling rule would have held area lower still. That fits an early thick-leaf phase
+   compounding into a carbon deficit over ~80 days; **it is not tested as the cause** (it would
+   take a control). The frozen crop empties the jar's CO₂ by ~day 169; the lab crop leaves it
+   there until ~day 181.
 2. **At the squeeze, it is BIGGER** (+18.5 % plant carbon, +30 % leaf carbon at step 777). The
    jar's total carbon is identical in both (4.017 mol); the difference is WHERE it sits — the
    frozen crop had already shed more to the soil (2.42 vs 2.13 mol) — consistent with it having
@@ -370,10 +378,25 @@ since the excess also shapes the pool's path into step 777.
 squeeze is neither "late extra area after the cutoff" nor "an early head start". It is the
 **seedling rule running on thermal time while the crop is carbon-starved**: area keeps rising
 as leaf carbon falls, and the envelope's ceiling is the only coupling between them in that
-window. ⚠ **Not checked, and the obvious next question:** whether [F]'s own seedling phase
-limits area growth by carbon supply — a rule the port would then have omitted, with the
-envelope standing in for it. That is a SOURCE check ([F] Ch. 9, and the branch's
-`leaf_area.py`), not a run; this record does not claim either answer.
+window. **The open question — does [F]'s seedling phase limit area by carbon supply? — is ANSWERED BY
+OUR OWN RECORD, not by a source check** (searched 2026-09-29 on the advisor's prompt, before
+calling it a PDF job; the shelf lesson, again). `log/leaf-expansion.md`:
+
+* **Finding 2:** [F] Ch. 9 is scoped to *"non-limiting water and nutrients"* and has no
+  mechanism by which the atmosphere runs out of carbon — **below the cutoff there is no carbon
+  feedback whatsoever.** The port omitted nothing; the gap is [F]'s.
+* **Finding 3:** the one carbon-supply rule [F] mentions (a per-day `min(node, carbon)` rate,
+  p. 103, describing Boote et al. 1998) was built and **ratchets into a death spiral**.
+* **Findings 4–5:** the [E] envelope was chosen **deliberately as the stand-in** for that missing
+  feedback. So what §6a measured is that stand-in's ceiling (1.18×) binding in the one window
+  where carbon is scarcest.
+* **Finding 10:** [E]'s own thickness mixture, integrated on the four carbon-limited runs, never
+  goes thinner than nominal (area ≤ carbon-implied) — the lab jar's 1.18× is outside what it
+  reaches there. ⚠ And a ceiling derived from that was **already priced as landing inside the
+  refused retune window** (1.058× from `open_season`); it is recorded here as context, not as a
+  route.
+* **Finding 11:** August's jar wall was the jar's carbon turning over faster than one step — the
+  quantity the new pin now watches (0.757 of the pool per step on the reference).
 
 **Standing:** unchanged — lab-only, nothing frozen moved, no retune, nothing adopted. Continue /
 park / refuse is still the user's decision.

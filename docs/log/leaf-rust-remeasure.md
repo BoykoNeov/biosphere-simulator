@@ -115,14 +115,21 @@ User: *"continue work on the leaf mechanism"*. Plan §6/§6a, predictions first;
 * **My design's premise was wrong, and the run's first line said so:** the leaf-growth cutoff is
   at day 225.5, the squeeze at days 193–197. The one whole-run control ("cap the area after the
   cutoff") therefore never engaged — **uninformative by construction**, not "held".
-* **Early the lab crop is SMALLER** (plant carbon −36 % at day 162.5): the seedling rule keeps
-  leaf area below what its carbon implies, so it grows slower and leaves the jar's CO₂ in place
-  ~12 days longer. **At the squeeze it is BIGGER** (+18.5 % plant, +30 % leaf carbon), with the
-  same total carbon in the jar sitting less in the soil.
+* **Early the lab crop is SMALLER, from the first weeks and mostly in carbon:** at day 100 its
+  canopy is 0.44× the reference's (0.55 leaf carbon × 0.79 thickness); the thickest-leaf floor
+  binds on and off from day 2.75 to 79.75. Consistent with an early thick-leaf phase compounding,
+  not tested as the cause. It leaves the jar's CO₂ in place ~12 days longer. ⚠ First drafted as
+  "thick leaves at days 169–181 slow it" — a ratio against its OWN carbon, and a window after the
+  deficit it explained; corrected in review. **At the squeeze it is BIGGER** (+18.5 % plant,
+  +30 % leaf carbon), with the same total carbon in the jar sitting less in the soil.
 * **During the squeeze** leaf carbon falls in a CO₂-starved jar while the seedling rule (thermal
   time, not carbon) keeps pushing area up; the thin-leaf ceiling (1.18×) is the only coupling.
 * **Split at step 777:** removing the extra area alone → 0.93 of the pool (one-step
   counterfactual, not a run); lower CO₂ and more leaf carbon roughly cancel; O₂ nothing.
 * Graded: Q3–Q5 held; Q1's side held but its reason was falsified; Q2 falsified as a story;
-  Q6 uninformative. **Open, a source check not a run:** does [F]'s seedling phase limit area
-  growth by carbon supply, a rule the port may have omitted with the envelope standing in?
+  Q6 uninformative.
+* **The "open" question was answered by our own record** (`leaf-expansion.md` findings 2–5, 10,
+  11): [F] has no carbon feedback below the cutoff at all, its one supply rule (Boote's `min`)
+  spirals, and the envelope is the deliberate stand-in — so the port omitted nothing, and the jar
+  shows the stand-in's ceiling binding where carbon is scarcest. First written here as "a source
+  check"; searching the shelf first closed it.

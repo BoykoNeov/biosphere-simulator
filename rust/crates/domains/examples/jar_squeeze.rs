@@ -251,7 +251,8 @@ fn main() {
         checkpoints.push((a, "anthesis".into()));
     }
     for n in [
-        600u64, 625, 650, 675, 700, 725, 740, 750, 757, 769, 773, 777, 781, 789,
+        400u64, 500, 550, 575, 590, 600, 612, 625, 650, 675, 700, 725, 740, 750, 757, 769, 773,
+        777, 781, 789,
     ] {
         checkpoints.push((n, String::new()));
     }
@@ -268,13 +269,16 @@ fn main() {
         "\n== 1. timeline (lab form; stored ÷ carbon-implied area; clamp on the step n → n+1)"
     );
     println!(
-        "  {:>5} {:>7}  {:>8} {:>8} {:>6} {:>8}   {:>10} {:>10}   {:>8} {:>8}  label",
+        "  {:>5} {:>7}  {:>8} {:>8} {:>6} {:>8}  {:>8} {:>7} {:>8}   {:>10} {:>10}   {:>8} {:>8}  label",
         "step",
         "day",
         "stored",
         "implied",
         "ratio",
         "clamp",
+        "froz LAI",
+        "area/fr",
+        "leafC/fr",
         "CO2 lab",
         "CO2 froz",
         "O2 lab",
@@ -286,13 +290,18 @@ fn main() {
         let f = &frozen.states[i];
         let stored = s.aux[LEAF_AREA_INDEX];
         println!(
-            "  {:>5} {:>7.2}  {:>8.5} {:>8.5} {:>6.4} {:>8}   {:>10.4e} {:>10.4e}   {:>8.4} {:>8.4}  {label}",
+            "  {:>5} {:>7.2}  {:>8.5} {:>8.5} {:>6.4} {:>8}  {:>8.5} {:>7.4} {:>8.4}   {:>10.4e} {:>10.4e}   {:>8.4} {:>8.4}  {label}",
             n,
             *n as f64 * BIO_DT,
             stored,
             derived(s),
             stored / derived(s),
             clamp_side(&lab_p, s, &lab_run.states[i + 1]),
+            // ⚠ The frozen crop's area: `ratio` compares the lab's area with its OWN carbon,
+            // and cannot say whether the lab canopy is smaller than the reference's.
+            derived(f),
+            stored / derived(f),
+            amount(s, LEAF_C) / amount(f, LEAF_C),
             amount(s, CARBON_POOL),
             amount(f, CARBON_POOL),
             amount(s, O2_POOL),
@@ -311,6 +320,35 @@ fn main() {
         *census.entry((phase, side)).or_insert(0) += 1;
     }
     println!("  clamp census (steps): {census:?}");
+    // The contiguous stretches each side bound, as day ranges — WHEN, not only how often.
+    let mut stretch: Option<(&str, usize, usize)> = None;
+    let mut stretches = Vec::new();
+    for i in 0..season_steps() {
+        let side = clamp_side(&lab_p, &lab_run.states[i], &lab_run.states[i + 1]);
+        match stretch {
+            Some((sd, a, _)) if sd == side => stretch = Some((sd, a, i)),
+            _ => {
+                if let Some(st) = stretch.take() {
+                    stretches.push(st);
+                }
+                stretch = Some((side, i, i));
+            }
+        }
+    }
+    stretches.extend(stretch);
+    for (side, a, b) in stretches.iter().filter(|s| s.0 != "-") {
+        println!(
+            "    {side:<7} steps {a:>4}-{b:>4}  days {:>6.2}-{:>6.2}  ({} steps)",
+            *a as f64 * BIO_DT,
+            *b as f64 * BIO_DT,
+            b - a + 1
+        );
+    }
+    let emergence = lab_run
+        .states
+        .iter()
+        .position(|s| s.aux.get(LEAF_AREA_INDEX).copied().unwrap_or(0.0) > 0.0);
+    println!("  first step with stored leaf area > 0: {emergence:?}");
     println!("  lab firings: {:?}", lab_run.firings);
 
     // --- 2. Local split at the squeeze -------------------------------------------------
