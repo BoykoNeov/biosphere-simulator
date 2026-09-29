@@ -79,6 +79,10 @@ struct Cell {
     max_co2_draw: f64,
     max_co2_draw_step: u64,
     min_co2: f64,
+    /// Demand and amount held, separately, on the squeeze's quarter-day (steps ≡ 1 mod 4
+    /// around step 777) — a draw RATIO cannot say whether the crop asked for more or the pool
+    /// held less, and the two cells' pools differ.
+    squeeze: Vec<String>,
 }
 
 fn euler(p: &BiosphereParams) -> Cell {
@@ -95,6 +99,7 @@ fn euler(p: &BiosphereParams) -> Cell {
         max_co2_draw: 0.0,
         max_co2_draw_step: 0,
         min_co2: f64::INFINITY,
+        squeeze: Vec::new(),
     };
     for _ in 0..steps_for_years(SEALED_CHAMBER_YEARS) {
         let derived = science::leaf_area_index(amount(&state, LEAF_C), sla, scenario.ground_area);
@@ -107,6 +112,16 @@ fn euler(p: &BiosphereParams) -> Cell {
         let factors = arbitration::scale_factors(&results, &state.stocks).expect("factors");
         let d = demand(&results);
         let co2 = amount(&state, CARBON_POOL);
+        if (757..=793).contains(&state.n) && state.n % 4 == 1 {
+            cell.squeeze.push(format!(
+                "    step {:>4}  demand {:.4e}  held {:.4e}  ratio {:.4}  LAI derived {derived:.4} canopy {:.4}",
+                state.n,
+                d.get(CARBON_POOL).copied().unwrap_or(0.0),
+                co2,
+                d.get(CARBON_POOL).copied().unwrap_or(0.0) / co2,
+                stored.unwrap_or(derived),
+            ));
+        }
         cell.min_co2 = cell.min_co2.min(co2);
         if let Some(dc) = d.get(CARBON_POOL) {
             if dc / co2 > cell.max_co2_draw {
@@ -222,6 +237,9 @@ fn main() {
             e.max_lai_stored.map(|s| format!("{s:.4}")).unwrap_or_else(|| "-".into()),
             rk4(&p)
         );
+        for l in e.squeeze {
+            println!("{l}");
+        }
         for l in e.lines {
             println!("{l}");
         }

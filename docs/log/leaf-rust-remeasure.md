@@ -77,7 +77,10 @@ written first, all five held. Instrument: `examples/jar_control.rs`.
   the jar.** Mutual shading measured uninvolved (LAI ≤ 0.67 against 6).
 * **Why:** at 0.2 % O₂ the live form removes photorespiration, so the crop pulls the jar's CO₂
   to ~7 ppm instead of stopping at ~70. The reference jar's tightest step (777) already draws
-  **76 %** of the pool; the lab form, at the same step, draws **115 %**.
-* **⚠ Outlives the leaf form:** the reference jar is **1.32×** from rationing and nothing
-  watches that distance — its science gate reads ×10.67 to a different limit, and
-  `rationed == 0` is binary. Left for the user to decide.
+  **76 %** of the pool; the lab form, at the same step, draws **115 %** — its crop asks **15 %
+  more** and its pool arrives **24 % lower** (drawn down earlier). ⚠ First written as "~50 %
+  more demand"; a ratio of ratios, corrected in review.
+* **⚠ Outlives the leaf form:** on the reference run step 777 withdraws 76 % of the CO₂ it
+  starts with, and **no gate measures that distance** — searched, not asserted: the jar's trough
+  is pinned (×10.674948, 2 %), but to the compensation floor; `rationed == 0` is binary; no
+  test in `rust/crates` bounds a step's draw on `biosphere.carbon_pool`. Left for the user.

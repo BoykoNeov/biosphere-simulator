@@ -195,18 +195,43 @@ mutual shading is measured uninvolved in the jar.
   under `Constant` it stops near **~70 ppm**, and a step never draws more than 28 % of the pool.
 * That leaves the **reference** jar drawing **76 %** of its CO₂ in one step at step 777 — and
   the lab form's worst step is the **same step**, drawing 115 %. The leaf form does not create
-  the squeeze; it is the ~50 % more demand at the squeeze's tightest instant that tips it.
-* ⚠ **Not established:** that the extra leaf area (the ceiling-sitting stored LAI) is the part
-  of the form that adds the demand. It is what the probe *saw* at every firing, not a control.
+  the squeeze; it tips it, **from both sides**. At step 777 (the probe's `squeeze` rows):
 
-**⚠ THE FINDING THAT OUTLIVES THE LEAF FORM: the reference jar's rationing headroom is 1.32×,
-and nothing watches it.** The jar's science gate reads **×10.67** above its compensation floor
-(`log/o2-form-adopted.md` §2) — true, and a distance to a *different* limit. The limit that
-fires here is one Euler step overdrawing a small pool, and the only gate on it is
-`rationed == 0`, which is binary: it reads the same at 0.28 as at 0.76. Since 2026-09-07 any
-change that adds ~32 % to the crop's CO₂ demand at day 194 of the jar rations it, whatever that
-change is for. Recorded, not acted on — **whether that headroom should be pinned is the user's
-call.**
+  | cell | CO₂ demand (mol) | CO₂ held (mol) | ratio |
+  |---|---|---|---|
+  | frozen × `LivePool` | 1.2302e-2 | 1.6258e-2 | 0.757 |
+  | lab × `LivePool` | 1.4140e-2 (**+15 %**) | 1.2333e-2 (**−24 %**) | 1.147 |
+
+  So the crop asks for somewhat more *and* the pool arrives lower — the lab jar is already
+  drawn down 20 steps earlier (held 1.68e-2 vs 2.23e-2 at step 757). By logs, the lower pool is
+  about two thirds of the ratio's rise. ⚠ Corrected in review (advisor, 2026-09-29): the first
+  draft said *"~50 % more demand"*, dividing two ratios whose denominators differ — the
+  ratio-vs-quantity mix this record's own P7 grading warned about.
+* ⚠ **Not established:** that the extra leaf area (the ceiling-sitting stored LAI) is the part
+  of the form that adds the demand or draws the pool down early. It is what the probe *saw* at
+  every firing, not a control.
+
+**⚠ THE FINDING THAT OUTLIVES THE LEAF FORM: on the reference run, step 777 withdraws 76 % of
+the CO₂ it starts with, and no gate measures that distance.** What was searched, since
+*"nothing watches it"* was first written unsearched (advisor, 2026-09-29) and this project has
+retracted that sentence once before:
+
+* **The jar's trough IS pinned.** `margins::the_five_margins_are_pinned_not_merely_positive`
+  (`science_gates.rs`) holds `sealed_chamber` at **×10.674948** within a 2 % relative
+  tolerance, so a change that moves the jar's CO₂ minimum reddens it. But the pinned quantity is
+  the distance to the **compensation floor**, which live O₂ put near 0.7 ppm — a different
+  limit from the one that fires here.
+* **`rationed == 0`** is the only gate on overdraw, and it is binary: it reads the same at 0.28
+  as at 0.76.
+* **Grepped `rust/crates`** for `scale_factors` (two callers: `station/src/inspection.rs`, a
+  display read, and this probe) and for any headroom / draw / demand assertion on
+  `biosphere.carbon_pool`: **none bounds one step's draw.**
+
+So a re-pin of the ×10.67 margin after some future change would read as "still ten times clear"
+while the step margin could be gone. ⚠ What is NOT claimed: that any change adding ~32 % demand
+would ration the jar — added demand also lowers the pool earlier and the crop's demand falls as
+CO₂ falls, so the threshold is not that arithmetic. Recorded, not acted on — **whether the step
+margin should be pinned is the user's call.**
 
 **Standing:** unchanged. The lab form is still not adopted, nothing frozen moved, and whether
 the rewrite continues is the user's decision — now with a named cause for the jar.
