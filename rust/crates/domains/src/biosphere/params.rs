@@ -104,6 +104,52 @@ fn checked<T>(result: Result<T, ConfigError>, name: &'static str) -> T {
     result.unwrap_or_else(|e| panic!("{name} failed its frozen bound/unit check: {e}"))
 }
 
+/// Whether a loader enforces its **value-range** checks — positivity, `[0, 1]` fractions,
+/// ordered cardinals.
+///
+/// Every frozen load is [`Bounds::Enforce`]; the public `*_from(text, name)` loaders and the
+/// zero-argument ones cannot be asked for anything else. [`Bounds::WhatIf`] is reachable only
+/// through `*_from_bounded`, which `domains::lab` calls for a WHAT-IF experiment
+/// (`docs/param-file-conventions.md`, the WHAT-IF section, 2026-09-29).
+///
+/// ⚠ **What `WhatIf` skips, and what it does not.** It skips the range checks, which reject
+/// values that are *impossible or degenerate* — a zero rate that switches a process off, a
+/// fraction of 0 or above 1, a cardinal band that divides by zero. Those are exactly the
+/// questions a what-if may want to ask. It does **not** skip the schema, the exact unit
+/// strings or the field set (`guarded_map`, which always runs through [`checked`]): those
+/// catch typos, not science. Non-finite folded values are the caller's check, because a skipped
+/// range check is how an infinity gets in (`carbon_fraction = 0` divides).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Bounds {
+    /// The reference's rule: an out-of-range value panics at load.
+    Enforce,
+    /// A lab-only what-if: the range checks are skipped, nothing else is.
+    WhatIf,
+}
+
+/// The value-range half of one loader's checks, under a [`Bounds`] mode.
+#[derive(Clone, Copy)]
+struct Range {
+    bounds: Bounds,
+    name: &'static str,
+}
+
+impl Range {
+    /// A `require_*` result: panics exactly as [`checked`] does under `Enforce`.
+    fn check(self, result: Result<f64, ConfigError>) {
+        if self.bounds == Bounds::Enforce {
+            checked(result, self.name);
+        }
+    }
+
+    /// A raw ordering rule: panics with `why` under `Enforce`.
+    fn ensure(self, ok: bool, why: impl FnOnce() -> String) {
+        if self.bounds == Bounds::Enforce {
+            assert!(ok, "{}", why());
+        }
+    }
+}
+
 /// Read a whole `field → unit` table into a name-keyed lookup, guarding every unit and
 /// rejecting any `parameters` key the table does not name.
 fn guarded_map(
@@ -121,11 +167,9 @@ fn guarded_map(
 
 /// The `carbon_fraction` bound, kg C per kg DM ∈ (0, 1] — shared by the two files that
 /// fold with it, and by the same argument in both.
-fn carbon_fraction(value: f64, name: &'static str) -> f64 {
-    checked(
-        require_half_open(value, 0.0, 1.0, "carbon_fraction", name),
-        name,
-    )
+fn carbon_fraction(value: f64, g: Range) -> f64 {
+    g.check(require_half_open(value, 0.0, 1.0, "carbon_fraction", g.name));
+    value
 }
 
 /// Beer–Lambert canopy params (core-ready — `sla_per_mol_c` is pre-folded).
@@ -397,6 +441,12 @@ pub fn canopy() -> CanopyParams {
 /// green (probe P1). Nine loaders had rejection tests, these did not, and the Python
 /// tests that looked like their coverage test the PYTHON loader.
 pub fn canopy_from(text: &str, name: &'static str) -> CanopyParams {
+    canopy_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`canopy_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn canopy_from_bounded(text: &str, name: &'static str, bounds: Bounds) -> CanopyParams {
+    let g = Range { bounds, name };
     let f = file(text, name);
     let v = guarded_map(
         &f,
@@ -407,15 +457,11 @@ pub fn canopy_from(text: &str, name: &'static str) -> CanopyParams {
         ],
         name,
     );
-    let cf = carbon_fraction(v["carbon_fraction"], name);
-    let k = checked(
-        require_positive(v["extinction_coef"], "extinction_coef", name),
-        name,
-    );
-    let sla = checked(
-        require_positive(v["specific_leaf_area"], "specific_leaf_area", name),
-        name,
-    );
+    let cf = carbon_fraction(v["carbon_fraction"], g);
+    let k = v["extinction_coef"];
+    g.check(require_positive(k, "extinction_coef", name));
+    let sla = v["specific_leaf_area"];
+    g.check(require_positive(sla, "specific_leaf_area", name));
     CanopyParams {
         // ⚠ multiply first, then divide — the Python loader's order. See the header.
         sla_per_mol_c: sla * MOLAR_MASS_CARBON_KG_PER_MOL / cf,
@@ -432,6 +478,16 @@ pub fn photosynthesis() -> PhotosynthesisParams {
 /// `photosynthesis()`'s body, with the file's text injectable — see `canopy_from` for why
 /// this seam exists and what was measured before it did.
 pub fn photosynthesis_from(text: &str, name: &'static str) -> PhotosynthesisParams {
+    photosynthesis_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`photosynthesis_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn photosynthesis_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> PhotosynthesisParams {
+    let g = Range { bounds, name };
     let f = file(text, name);
     let v = guarded_map(
         &f,
@@ -452,17 +508,21 @@ pub fn photosynthesis_from(text: &str, name: &'static str) -> PhotosynthesisPara
         name,
     );
     for field in ["vcmax", "jmax", "gamma_star", "kc", "ko", "o2"] {
-        checked(require_positive(v[field], field, name), name);
+        g.check(require_positive(v[field], field, name));
     }
     for field in ["quantum_yield", "theta"] {
-        checked(require_half_open(v[field], 0.0, 1.0, field, name), name);
+        g.check(require_half_open(v[field], 0.0, 1.0, field, name));
     }
     let (t_min, t_opt_lo, t_opt_hi, t_max) = (v["t_min"], v["t_opt_lo"], v["t_opt_hi"], v["t_max"]);
     // Well-ordered cardinals: the two strict pairs are divisors in the response curve.
-    assert!(
+    g.ensure(
         t_min < t_opt_lo && t_opt_lo <= t_opt_hi && t_opt_hi < t_max,
-        "{name}: cardinal temperatures must satisfy t_min < t_opt_lo <= t_opt_hi < t_max, \
-         got ({t_min}, {t_opt_lo}, {t_opt_hi}, {t_max})"
+        || {
+            format!(
+                "{name}: cardinal temperatures must satisfy t_min < t_opt_lo <= t_opt_hi < \
+                 t_max, got ({t_min}, {t_opt_lo}, {t_opt_hi}, {t_max})"
+            )
+        },
     );
     PhotosynthesisParams {
         vcmax: v["vcmax"],
@@ -502,6 +562,16 @@ pub fn respiration() -> RespirationParams {
 /// which changes what the science is made of. This changes nothing but who may call it,
 /// and the committed values are asserted unchanged by the params census.
 pub fn respiration_from(text: &str, name: &'static str) -> RespirationParams {
+    respiration_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`respiration_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn respiration_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> RespirationParams {
+    let g = Range { bounds, name };
     let f = file(text, name);
     let v = guarded_map(
         &f,
@@ -515,16 +585,20 @@ pub fn respiration_from(text: &str, name: &'static str) -> RespirationParams {
         name,
     );
     for field in ["maintenance_coef", "q10"] {
-        checked(require_positive(v[field], field, name), name);
+        g.check(require_positive(v[field], field, name));
     }
-    checked(
-        require_half_open(v["growth_efficiency"], 0.0, 1.0, "growth_efficiency", name),
+    g.check(require_half_open(
+        v["growth_efficiency"],
+        0.0,
+        1.0,
+        "growth_efficiency",
         name,
-    );
-    checked(
-        require_non_negative(v["o2_half_saturation"], "o2_half_saturation", name),
+    ));
+    g.check(require_non_negative(
+        v["o2_half_saturation"],
+        "o2_half_saturation",
         name,
-    );
+    ));
     RespirationParams {
         maintenance_coef: v["maintenance_coef"],
         q10: v["q10"],
@@ -547,6 +621,16 @@ pub fn respiration_from(text: &str, name: &'static str) -> RespirationParams {
 /// Both resistances are DIVISORS in the combination equation — a zero `r_a` is an
 /// infinity in the aerodynamic term, not a slow crop.
 pub fn transpiration_from(text: &str, name: &'static str) -> TranspirationParams {
+    transpiration_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`transpiration_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn transpiration_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> TranspirationParams {
+    let g = Range { bounds, name };
     let f = file(text, name);
     let v = guarded_map(
         &f,
@@ -557,7 +641,7 @@ pub fn transpiration_from(text: &str, name: &'static str) -> TranspirationParams
         name,
     );
     for field in ["aerodynamic_resistance", "surface_resistance"] {
-        checked(require_positive(v[field], field, name), name);
+        g.check(require_positive(v[field], field, name));
     }
     TranspirationParams {
         aerodynamic_resistance: v["aerodynamic_resistance"],
@@ -588,15 +672,21 @@ fn phenology_block_from(text: &str, name: &'static str) -> std::collections::BTr
 /// Thermal-time phenology params from arbitrary file text — the testable half of
 /// [`phenology`].
 pub fn phenology_from(text: &str, name: &'static str) -> PhenologyParams {
+    phenology_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`phenology_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn phenology_from_bounded(text: &str, name: &'static str, bounds: Bounds) -> PhenologyParams {
+    let g = Range { bounds, name };
     let v = phenology_block_from(text, name);
-    assert!(
-        v["t_base"] < v["t_cap"],
-        "{name}: cardinal temperatures must satisfy t_base < t_cap, got ({}, {})",
-        v["t_base"],
-        v["t_cap"]
-    );
+    g.ensure(v["t_base"] < v["t_cap"], || {
+        format!(
+            "{name}: cardinal temperatures must satisfy t_base < t_cap, got ({}, {})",
+            v["t_base"], v["t_cap"]
+        )
+    });
     for field in ["tsum_anthesis", "tsum_maturity"] {
-        checked(require_positive(v[field], field, name), name);
+        g.check(require_positive(v[field], field, name));
     }
     PhenologyParams {
         t_base: v["t_base"],
@@ -614,19 +704,33 @@ pub fn phenology() -> PhenologyParams {
 /// Vernalization cardinals from arbitrary file text — the testable half of
 /// [`vernalization`].
 pub fn vernalization_from(text: &str, name: &'static str) -> VernalizationParams {
+    vernalization_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`vernalization_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn vernalization_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> VernalizationParams {
+    let g = Range { bounds, name };
     let v = phenology_block_from(text, name);
     // A well-ordered response with a strictly positive ramp on each side; the two strict
     // pairs are divisors.
-    assert!(
+    g.ensure(
         v["t_base_v"] < v["t_opt_lower_v"]
             && v["t_opt_lower_v"] <= v["t_opt_upper_v"]
             && v["t_opt_upper_v"] < v["t_ceiling_v"],
-        "{name}: vernalization cardinals must satisfy \
-         t_base_v < t_opt_lower_v <= t_opt_upper_v < t_ceiling_v"
+        || {
+            format!(
+                "{name}: vernalization cardinals must satisfy \
+                 t_base_v < t_opt_lower_v <= t_opt_upper_v < t_ceiling_v"
+            )
+        },
     );
-    checked(require_positive(v["vdsat"], "vdsat", name), name);
+    g.check(require_positive(v["vdsat"], "vdsat", name));
     // A negative sensitivity would make cold *retard* development.
-    checked(require_non_negative(v["vsen"], "vsen", name), name);
+    g.check(require_non_negative(v["vsen"], "vsen", name));
     VernalizationParams {
         t_base_v: v["t_base_v"],
         t_opt_lower_v: v["t_opt_lower_v"],
@@ -644,9 +748,19 @@ pub fn vernalization() -> VernalizationParams {
 
 /// Photoperiod params from arbitrary file text — the testable half of [`photoperiod`].
 pub fn photoperiod_from(text: &str, name: &'static str) -> PhotoperiodParams {
+    photoperiod_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`photoperiod_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn photoperiod_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> PhotoperiodParams {
+    let g = Range { bounds, name };
     let v = phenology_block_from(text, name);
-    checked(require_positive(v["cpp"], "cpp", name), name);
-    checked(require_non_negative(v["ppsen"], "ppsen", name), name);
+    g.check(require_positive(v["cpp"], "cpp", name));
+    g.check(require_non_negative(v["ppsen"], "ppsen", name));
     PhotoperiodParams {
         cpp: v["cpp"],
         ppsen: v["ppsen"],
@@ -676,6 +790,12 @@ pub fn senescence() -> SenescenceParams {
 /// conservation still satisfied. Taken as an explicit decision, not slipped in: the
 /// alternative was four Python loader tests dying at S6 with no successor.
 pub fn senescence_from(text: &str, name: &'static str) -> SenescenceParams {
+    senescence_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`senescence_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn senescence_from_bounded(text: &str, name: &'static str, bounds: Bounds) -> SenescenceParams {
+    let g = Range { bounds, name };
     let units: [(&str, &str); 5] = [
         ("rdr_leaf", "1/day"),
         ("rdr_stem", "1/day"),
@@ -686,7 +806,7 @@ pub fn senescence_from(text: &str, name: &'static str) -> SenescenceParams {
     let f = file(text, name);
     let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_non_negative(v[field], field, name), name);
+        g.check(require_non_negative(v[field], field, name));
     }
     SenescenceParams {
         rdr_leaf: v["rdr_leaf"],
@@ -705,11 +825,17 @@ pub fn senescence_from(text: &str, name: &'static str) -> SenescenceParams {
 /// zero maximum depth divides by a crop that cannot root. Measured inert before the
 /// split, exactly as the transpiration pair was.
 pub fn root_depth_from(text: &str, name: &'static str) -> RootDepthParams {
+    root_depth_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`root_depth_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn root_depth_from_bounded(text: &str, name: &'static str, bounds: Bounds) -> RootDepthParams {
+    let g = Range { bounds, name };
     let units: [(&str, &str); 2] = [("max_extension_rate", "m/day"), ("max_rooted_depth", "m")];
     let f = file(text, name);
     let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_positive(v[field], field, name), name);
+        g.check(require_positive(v[field], field, name));
     }
     RootDepthParams {
         max_extension_rate: v["max_extension_rate"],
@@ -729,6 +855,16 @@ pub fn stem_reserves() -> StemReserveParams {
 
 /// The same reader over an arbitrary text (see `respiration_from` for why).
 pub fn stem_reserves_from(text: &str, name: &'static str) -> StemReserveParams {
+    stem_reserves_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`stem_reserves_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn stem_reserves_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> StemReserveParams {
+    let g = Range { bounds, name };
     let f = file(text, name);
     let v = guarded_map(
         &f,
@@ -742,21 +878,18 @@ pub fn stem_reserves_from(text: &str, name: &'static str) -> StemReserveParams {
     );
     let (fstr, rate) = (v["remobilizable_fraction"], v["remobilization_rate"]);
     let (trigger, cessation) = (v["trigger_dvs"], v["cessation_dvs"]);
-    assert!(
-        0.0 < fstr && fstr < 1.0,
-        "{name}: remobilizable_fraction must be in (0, 1), got {fstr}"
-    );
-    checked(
-        require_half_open(rate, 0.0, 1.0, "remobilization_rate", name),
-        name,
-    );
-    checked(require_closed(trigger, 0.0, 2.0, "trigger_dvs", name), name);
+    g.ensure(0.0 < fstr && fstr < 1.0, || {
+        format!("{name}: remobilizable_fraction must be in (0, 1), got {fstr}")
+    });
+    g.check(require_half_open(rate, 0.0, 1.0, "remobilization_rate", name));
+    g.check(require_closed(trigger, 0.0, 2.0, "trigger_dvs", name));
     // ⚠ `cessation_dvs` closes BOTH halves at maturity — a DOMAIN boundary, not a cited
     // cessation rule (see the struct's own doc comment).
-    assert!(
-        trigger < cessation && cessation <= 2.0,
-        "{name}: must satisfy trigger_dvs < cessation_dvs <= 2, got ({trigger}, {cessation})"
-    );
+    g.ensure(trigger < cessation && cessation <= 2.0, || {
+        format!(
+            "{name}: must satisfy trigger_dvs < cessation_dvs <= 2, got ({trigger}, {cessation})"
+        )
+    });
     StemReserveParams {
         remobilizable_fraction: fstr,
         remobilization_rate: rate,
@@ -781,6 +914,12 @@ pub fn nitrogen() -> NitrogenParams {
 /// It is NOT the extraction §5ad rules out: nothing about what the science is made of
 /// moves, and the committed values stay pinned by C8's params census.
 pub fn nitrogen_from(text: &str, name: &'static str) -> NitrogenParams {
+    nitrogen_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`nitrogen_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn nitrogen_from_bounded(text: &str, name: &'static str, bounds: Bounds) -> NitrogenParams {
+    let g = Range { bounds, name };
     let f = file(text, name);
     let v = guarded_map(
         &f,
@@ -795,34 +934,38 @@ pub fn nitrogen_from(text: &str, name: &'static str) -> NitrogenParams {
         ],
         name,
     );
-    checked(
-        require_positive(v["max_uptake_capacity"], "max_uptake_capacity", name),
+    g.check(require_positive(
+        v["max_uptake_capacity"],
+        "max_uptake_capacity",
         name,
-    );
+    ));
     // ⚠ MUST EQUAL canopy.yaml's carbon_fraction — a divergence models a silently
     // inconsistent plant. Both files fold with it; the dedup is a long-standing nicety.
-    let cf = carbon_fraction(v["carbon_fraction"], name);
+    let cf = carbon_fraction(v["carbon_fraction"], g);
     let (n_residual, n_critical) = (v["n_residual"], v["n_critical"]);
-    checked(require_non_negative(n_residual, "n_residual", name), name);
-    assert!(
-        n_residual < n_critical,
-        "{name}: N-concentration thresholds must satisfy n_residual < n_critical, \
-         got ({n_residual}, {n_critical})"
-    );
+    g.check(require_non_negative(n_residual, "n_residual", name));
+    g.ensure(n_residual < n_critical, || {
+        format!(
+            "{name}: N-concentration thresholds must satisfy n_residual < n_critical, \
+             got ({n_residual}, {n_critical})"
+        )
+    });
     // ⚠ divide first, then multiply — the Python loader's order. See the header.
     let fold = MOLAR_MASS_CARBON_KG_PER_MOL / cf;
-    checked(
-        require_positive(v["n_target_w_plateau"], "n_target_w_plateau", name),
+    g.check(require_positive(
+        v["n_target_w_plateau"],
+        "n_target_w_plateau",
         name,
-    );
+    ));
     // The target must sit ABOVE the stress threshold, or the plant is stressed by
     // construction at every crop mass (Greenwood's curve declines, so the plateau is its
     // maximum; if even that is below critical, f_N < 1 always).
-    assert!(
-        v["n_target_coefficient"] > n_critical,
-        "{name}: n_target_coefficient must exceed n_critical, got ({}, {n_critical})",
-        v["n_target_coefficient"]
-    );
+    g.ensure(v["n_target_coefficient"] > n_critical, || {
+        format!(
+            "{name}: n_target_coefficient must exceed n_critical, got ({}, {n_critical})",
+            v["n_target_coefficient"]
+        )
+    });
     NitrogenParams {
         max_uptake_capacity: v["max_uptake_capacity"],
         n_residual_per_mol_c: n_residual * fold,
@@ -843,13 +986,22 @@ pub fn nitrogen_from(text: &str, name: &'static str) -> NitrogenParams {
 /// into standing litter through a flow whose legs say the opposite — and the flow-level
 /// direction pins could not catch it, because the legs would still balance.
 pub fn decomposition_from(text: &str, name: &'static str) -> DecompositionParams {
+    decomposition_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`decomposition_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn decomposition_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> DecompositionParams {
+    let g = Range { bounds, name };
     let f = file(text, name);
     let v = guarded_map(&f, &[("decomposition_rate", "1/day")], name);
+    let rate = v["decomposition_rate"];
+    g.check(require_non_negative(rate, "decomposition_rate", name));
     DecompositionParams {
-        decomposition_rate: checked(
-            require_non_negative(v["decomposition_rate"], "decomposition_rate", name),
-            name,
-        ),
+        decomposition_rate: rate,
     }
 }
 
@@ -861,6 +1013,16 @@ pub fn decomposition() -> DecompositionParams {
 /// First-order microbial respiration, from arbitrary file TEXT — see
 /// [`transpiration_from`] for why the split exists.
 pub fn microbial_respiration_from(text: &str, name: &'static str) -> MicrobialRespirationParams {
+    microbial_respiration_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`microbial_respiration_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn microbial_respiration_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> MicrobialRespirationParams {
+    let g = Range { bounds, name };
     let units: [(&str, &str); 2] = [
         ("microbial_respiration_rate", "1/day"),
         ("o2_half_saturation", "mol/mol"),
@@ -868,7 +1030,7 @@ pub fn microbial_respiration_from(text: &str, name: &'static str) -> MicrobialRe
     let f = file(text, name);
     let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_non_negative(v[field], field, name), name);
+        g.check(require_non_negative(v[field], field, name));
     }
     MicrobialRespirationParams {
         microbial_respiration_rate: v["microbial_respiration_rate"],
@@ -890,6 +1052,16 @@ pub fn microbial_respiration() -> MicrobialRespirationParams {
 /// complement — computed by subtraction — would come out negative, i.e. a destination leg
 /// that withdraws from its own receiver while the flow still balances.
 pub fn humification_from(text: &str, name: &'static str) -> HumificationParams {
+    humification_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`humification_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn humification_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> HumificationParams {
+    let g = Range { bounds, name };
     let f = file(text, name);
     let v = guarded_map(
         &f,
@@ -906,16 +1078,13 @@ pub fn humification_from(text: &str, name: &'static str) -> HumificationParams {
         "active_stabilization_co2_fraction",
         "slow_respired_fraction",
     ] {
-        checked(require_closed(v[field], 0.0, 1.0, field, name), name);
+        g.check(require_closed(v[field], 0.0, 1.0, field, name));
     }
-    checked(
-        require_non_negative(
-            v["slow_decomposition_rate"],
-            "slow_decomposition_rate",
-            name,
-        ),
+    g.check(require_non_negative(
+        v["slow_decomposition_rate"],
+        "slow_decomposition_rate",
         name,
-    );
+    ));
     HumificationParams {
         litter_respired_fraction: v["litter_respired_fraction"],
         active_stabilization_co2_fraction: v["active_stabilization_co2_fraction"],
@@ -946,11 +1115,21 @@ pub fn humification() -> HumificationParams {
 /// declares a zero (the shipped file is 0.5/0.5). The guard's shape is the FILE's rule, not
 /// a claim about the roster — batch A's overclaim shape, caught in review.
 pub fn water_cycle_from(text: &str, name: &'static str) -> WaterCycleParams {
+    water_cycle_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`water_cycle_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn water_cycle_from_bounded(
+    text: &str,
+    name: &'static str,
+    bounds: Bounds,
+) -> WaterCycleParams {
+    let g = Range { bounds, name };
     let units: [(&str, &str); 2] = [("condensation_rate", "1/day"), ("recycling_rate", "1/day")];
     let f = file(text, name);
     let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_non_negative(v[field], field, name), name);
+        g.check(require_non_negative(v[field], field, name));
     }
     WaterCycleParams {
         condensation_rate: v["condensation_rate"],
@@ -970,6 +1149,12 @@ pub fn herbivory() -> HerbivoryParams {
 
 /// `herbivory()`'s body, with the file's text injectable — see `canopy_from`.
 pub fn herbivory_from(text: &str, name: &'static str) -> HerbivoryParams {
+    herbivory_from_bounded(text, name, Bounds::Enforce)
+}
+
+/// [`herbivory_from`] under a [`Bounds`] mode — the lab's WHAT-IF route.
+pub fn herbivory_from_bounded(text: &str, name: &'static str, bounds: Bounds) -> HerbivoryParams {
+    let g = Range { bounds, name };
     let units: [(&str, &str); 4] = [
         ("grazing_rate", "1/day"),
         ("respiration_rate", "1/day"),
@@ -979,7 +1164,7 @@ pub fn herbivory_from(text: &str, name: &'static str) -> HerbivoryParams {
     let f = file(text, name);
     let v = guarded_map(&f, &units, name);
     for (field, _) in units {
-        checked(require_non_negative(v[field], field, name), name);
+        g.check(require_non_negative(v[field], field, name));
     }
     HerbivoryParams {
         grazing_rate: v["grazing_rate"],

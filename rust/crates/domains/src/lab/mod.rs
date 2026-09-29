@@ -22,16 +22,24 @@
 //!   and boundary folds as a committed one.
 //!
 //! ⚠ **That second property has a consequence worth stating rather than discovering:** a
-//! substitution outside a frozen bound **panics**, exactly as a committed one would. That is
-//! the guard doing its job, not a limitation to route around — a value the bound rejects is
-//! a request to change the contract, which is an unfreeze, not an experiment.
+//! substitution outside a loader's range check **panics** on [`biosphere_with`], exactly as a
+//! committed one would. Those checks are not frozen science ranges — they reject values that
+//! are *impossible or degenerate*: a zero or negative rate, a fraction outside `[0, 1]`, a
+//! cardinal band that divides by zero. On the default route that is the guard catching a typo
+//! (`-0.65` for `0.65`).
+//!
+//! **To ask the question on purpose, use [`biosphere_what_if`]** (since 2026-09-29, the user's
+//! WHAT-IF rule: `docs/param-file-conventions.md`). It skips the range checks and nothing else
+//! — schema, exact unit strings, the one-line rewrite and its bit re-read all still run — and
+//! it refuses a substitution whose folded params come out non-finite. Its report column is
+//! labelled `WHAT-IF` by the code, not by convention ([`report::Change::WhatIf`]).
 //!
 //! # ⚠ This module takes no decision and endorses no value
 //!
 //! It regenerates evidence. The `extinction_coef` question it was built for
 //! (`docs/log/canopy-provenance.md`) is still open and still the user's.
 
-use crate::biosphere::params::{self, BiosphereParams};
+use crate::biosphere::params::{self, BiosphereParams, Bounds};
 use crate::biosphere::science::{KineticsForm, LeafAreaForm, O2Form};
 use config::{with_override, ConfigError, ParamFile};
 
@@ -193,6 +201,46 @@ pub fn owners_of(field: &str) -> Result<Vec<&'static str>, ConfigError> {
 /// What this function cannot check is whether the *run* reads the field it moved — that is
 /// `tests/param_funnel.rs`'s subject, and it is a property of the tree rather than of a call.
 pub fn biosphere_with(subs: &[Substitution]) -> Result<BiosphereParams, ConfigError> {
+    build(subs, Bounds::Enforce)
+}
+
+/// [`biosphere_with`] as a **WHAT-IF**: the loaders' range checks are skipped, so a zero rate,
+/// a fraction of 0 or 1, or an unordered band can be asked about on purpose.
+///
+/// Everything else [`biosphere_with`] refuses is still refused (an unknown file or field, a
+/// table-shaped field, a doubled substitution, a unit mismatch). And one thing is refused that
+/// the default route never needs to: **non-finite folded params**. A skipped range check is
+/// exactly how an infinity gets in — `carbon_fraction = 0` divides in two folds — and the
+/// engine's per-step conservation check compares `residual > tol`, which a NaN residual passes
+/// silently. So a what-if that cannot be computed is an error here, not a quiet column.
+///
+/// ⚠ A run can still go non-finite later, from params that are finite but degenerate;
+/// [`report::measure_composed`] marks such a run dead rather than printing its numbers.
+pub fn biosphere_what_if(subs: &[Substitution]) -> Result<BiosphereParams, ConfigError> {
+    let p = build(subs, Bounds::WhatIf)?;
+    if let Some(field) = first_non_finite(&format!("{p:?}")) {
+        return Err(ConfigError::new(format!(
+            "the what-if {subs:?} folds to a non-finite value ({field}) — the question cannot \
+             be computed, so it is refused rather than run"
+        )));
+    }
+    Ok(p)
+}
+
+/// The first `field: inf|-inf|NaN` in a `Debug` rendering, if any.
+///
+/// ⚠ Read off `Debug` rather than a field list so a param added tomorrow is covered without
+/// anyone remembering to list it. Matched on whole value TOKENS after `: `, because a bare
+/// substring search for `inf` would fire on any field whose name contains it.
+fn first_non_finite(debug: &str) -> Option<String> {
+    debug.split([',', '{', '}', '(', ')', '[', ']']).find_map(|part| {
+        let (field, value) = part.split_once(": ")?;
+        matches!(value.trim(), "inf" | "-inf" | "NaN").then(|| field.trim().to_string())
+    })
+}
+
+/// The one assembly body behind both routes.
+fn build(subs: &[Substitution], bounds: Bounds) -> Result<BiosphereParams, ConfigError> {
     for (i, s) in subs.iter().enumerate() {
         if subs[..i].iter().any(|p| p.file == s.file && p.field == s.field) {
             return Err(ConfigError::new(format!(
@@ -231,9 +279,9 @@ pub fn biosphere_with(subs: &[Substitution]) -> Result<BiosphereParams, ConfigEr
     };
 
     let (n, t) = text("phenology.yaml");
-    let pheno = params::phenology_from(t, n);
-    let vern = params::vernalization_from(t, n);
-    let photoperiod = params::photoperiod_from(t, n);
+    let pheno = params::phenology_from_bounded(t, n, bounds);
+    let vern = params::vernalization_from_bounded(t, n, bounds);
+    let photoperiod = params::photoperiod_from_bounded(t, n, bounds);
 
     let (cn, ct) = text("canopy.yaml");
     let (pn, pt) = text("photosynthesis.yaml");
@@ -251,22 +299,25 @@ pub fn biosphere_with(subs: &[Substitution]) -> Result<BiosphereParams, ConfigEr
     let (an, at) = text("allocation.yaml");
 
     Ok(BiosphereParams {
-        canopy: params::canopy_from(ct, cn),
-        photo: params::photosynthesis_from(pt, pn),
-        resp: params::respiration_from(rt, rn),
-        transp: params::transpiration_from(tt, tn),
+        canopy: params::canopy_from_bounded(ct, cn, bounds),
+        photo: params::photosynthesis_from_bounded(pt, pn, bounds),
+        resp: params::respiration_from_bounded(rt, rn, bounds),
+        transp: params::transpiration_from_bounded(tt, tn, bounds),
         pheno,
         vern,
         photoperiod,
-        senesc: params::senescence_from(st, sn),
-        stem_reserve: params::stem_reserves_from(srt, srn),
-        rootd: params::root_depth_from(rdt, rdn),
-        nitro: params::nitrogen_from(nt, nn),
-        decomp: params::decomposition_from(dt, dn),
-        micro: params::microbial_respiration_from(mt, mn),
-        humi: params::humification_from(ht, hn),
-        water: params::water_cycle_from(wt, wn),
-        herb: params::herbivory_from(hbt, hbn),
+        senesc: params::senescence_from_bounded(st, sn, bounds),
+        stem_reserve: params::stem_reserves_from_bounded(srt, srn, bounds),
+        rootd: params::root_depth_from_bounded(rdt, rdn, bounds),
+        nitro: params::nitrogen_from_bounded(nt, nn, bounds),
+        decomp: params::decomposition_from_bounded(dt, dn, bounds),
+        micro: params::microbial_respiration_from_bounded(mt, mn, bounds),
+        humi: params::humification_from_bounded(ht, hn, bounds),
+        water: params::water_cycle_from_bounded(wt, wn, bounds),
+        herb: params::herbivory_from_bounded(hbt, hbn, bounds),
+        // ⚠ No bounded twin: a substitution cannot address the partition TABLE
+        // (`with_override` refuses a table-shaped field), so there is no what-if to pass
+        // through. `lab::partition` is that table's own instrument.
         alloc: params::allocation_from(at, an),
     })
 }
@@ -556,6 +607,74 @@ mod tests {
         // the SPLITTER, not about the value being rejected somewhere downstream.
         let v = parse_variants("o2=1e5").expect("a bare exponent is a number");
         assert_eq!(v[0].1[0].value, 1e5);
+    }
+
+    /// The control for the WHAT-IF route: with nothing substituted it is the frozen tree,
+    /// so a what-if column's differences are the what-if's and not the route's.
+    #[test]
+    fn an_empty_what_if_is_the_frozen_params_exactly() {
+        let frozen = params::biosphere();
+        let lab = biosphere_what_if(&[]).expect("no substitutions");
+        assert_eq!(format!("{frozen:?}"), format!("{lab:?}"));
+    }
+
+    /// ⚠⚠ **The pair this route exists for, asserted on the SAME value both ways.** A zero
+    /// root-extension rate ("what if roots never grow?") is refused by the guarded route — a
+    /// positivity check — and accepted by the what-if route, where it must LAND, not merely
+    /// return `Ok`. Delete the `Bounds::Enforce` branch and the first half goes red; route the
+    /// what-if through `Enforce` and the second does.
+    #[test]
+    fn a_range_check_refuses_by_default_and_yields_to_a_what_if() {
+        let zero_rate = [Substitution::new("root_depth.yaml", "max_extension_rate", 0.0)];
+        let guarded = std::panic::catch_unwind(|| biosphere_with(&zero_rate));
+        assert!(guarded.is_err(), "the default route accepted a zero rate");
+
+        let p = biosphere_what_if(&zero_rate).expect("the what-if route accepts it");
+        assert_eq!(p.rootd.max_extension_rate.to_bits(), 0.0_f64.to_bits());
+        // Its file-mate is untouched.
+        assert_eq!(
+            p.rootd.max_rooted_depth.to_bits(),
+            params::biosphere().rootd.max_rooted_depth.to_bits()
+        );
+    }
+
+    /// The same, for a raw ORDERING rule rather than a `require_*` helper — the two are
+    /// routed separately (`Range::ensure` vs `Range::check`), so each needs its own witness.
+    #[test]
+    fn an_ordering_rule_refuses_by_default_and_yields_to_a_what_if() {
+        let whole_stem = [Substitution::new(
+            "stem_reserves.yaml",
+            "remobilizable_fraction",
+            1.0,
+        )];
+        assert!(std::panic::catch_unwind(|| biosphere_with(&whole_stem)).is_err());
+        let p = biosphere_what_if(&whole_stem).expect("the what-if route accepts it");
+        assert_eq!(p.stem_reserve.remobilizable_fraction, 1.0);
+    }
+
+    /// What the what-if route still refuses: a question it cannot compute. `carbon_fraction
+    /// = 0` passes the skipped range check and divides in the canopy fold.
+    #[test]
+    fn a_what_if_that_folds_to_infinity_is_refused() {
+        let e = biosphere_what_if(&[Substitution::new("canopy.yaml", "carbon_fraction", 0.0)])
+            .expect_err("an infinite fold was run");
+        assert!(e.to_string().contains("sla_per_mol_c"), "{e}");
+        // The typo guards are not what-if territory: an unknown field is refused as before.
+        assert!(biosphere_what_if(&[Substitution::new("canopy.yaml", "no_such", 1.0)]).is_err());
+    }
+
+    #[test]
+    fn the_non_finite_scan_reads_values_not_names() {
+        assert_eq!(first_non_finite("P { infiltration: 1.0, info: 2.0 }"), None);
+        assert_eq!(
+            first_non_finite("P { infiltration: 1.0, rate: inf }"),
+            Some("rate".to_string())
+        );
+        assert_eq!(first_non_finite("Q { a: -inf }"), Some("a".to_string()));
+        assert_eq!(
+            first_non_finite("R { x: S { y: NaN } }"),
+            Some("y".to_string())
+        );
     }
 
     /// A malformed part is loud. ⚠ `a=1+` must NOT degrade to the one-substitution column:

@@ -263,6 +263,11 @@ pub enum Change {
     /// Param substitutions, applied before assembly. **Always applicable** — every scenario
     /// loads every param file, so a substitution reaches every row of every column.
     Values(Vec<Substitution>),
+    /// Param substitutions as a **WHAT-IF** ([`super::biosphere_what_if`]): the loaders' range
+    /// checks are skipped, so a zero rate or a fraction of 0 or 1 can be asked about. The
+    /// column's heading is prefixed `WHAT-IF ` here, in code, so a reader of the table cannot
+    /// take it for a guarded substitution (`docs/param-file-conventions.md`, WHAT-IF rule 1).
+    WhatIf(Vec<Substitution>),
     /// A flow composition, applied after assembly, at the frozen params. Applicable only to
     /// the scenarios whose registry contains its targets — see [`Composition`].
     Mechanism(Composition),
@@ -363,6 +368,15 @@ fn readout_is_frozen(spec: &ReadoutSpec, t: &Trajectory) -> bool {
     (spec.series)(t).iter().all(|s| is_constant(s))
 }
 
+/// Whether any series a readout folds holds a NaN or an infinity — a run that cannot be
+/// measured. Named for the same reason as [`readout_is_frozen`]: so the rule has a subject a
+/// test can construct, since no frozen run reaches it.
+fn readout_went_non_finite(spec: &ReadoutSpec, t: &Trajectory) -> bool {
+    (spec.series)(t)
+        .iter()
+        .any(|s| s.iter().any(|v| !v.is_finite()))
+}
+
 /// Measure every applicable spec at `p`, through the frozen build — the value-switch column.
 /// ⚠ The `expect` is not a shrug. With no composition the only `Err` route left is
 /// `build_season_with` itself refusing these params — every *run* failure is captured as a
@@ -433,6 +447,15 @@ pub fn measure_composed(
                 continue;
             }
         };
+        // ⚠ A run that went NaN or infinite is DEAD, not measured. The engine's conservation
+        // check compares `residual > tol`, which a NaN residual passes, so nothing upstream
+        // stops such a run; and a fold like `max` would print a finite number out of it.
+        // Reachable in practice only through a WHAT-IF, whose range checks were skipped.
+        if needed.iter().any(|i| readout_went_non_finite(&SPECS[*i], &t)) {
+            let why = format!("{name}: the run went non-finite (NaN or infinite)");
+            failed.extend(needed.iter().map(|i| (*i, why.clone())));
+            continue;
+        }
         rationed += t.rationed;
         events += t.events;
         for i in needed {
@@ -485,6 +508,13 @@ pub fn compare_changes(variants: &[(String, Change)], long: bool) -> Result<Vec<
                 let p = super::biosphere_with(subs).map_err(as_request_error)?;
                 measure(label, &p, long)
             }
+            // ⚠ `measure_composed`, not `measure`: `measure`'s `expect` rests on the range
+            // checks having run, and this route skipped them — a builder refusing a what-if is
+            // an answer to report, not a broken invariant to panic on.
+            Change::WhatIf(subs) => {
+                let p = super::biosphere_what_if(subs).map_err(as_request_error)?;
+                measure_composed(&what_if_label(label), &p, long, None)?
+            }
             Change::Mechanism(comp) => measure_composed(label, &frozen, long, Some(comp))?,
             // ⚠ Built from the frozen params through the same seam, not from `frozen` with a
             // field poked: `biosphere_with_form` is the one place the form is set, so a
@@ -506,6 +536,11 @@ pub fn compare_changes(variants: &[(String, Change)], long: bool) -> Result<Vec<
         });
     }
     Ok(columns)
+}
+
+/// A WHAT-IF column's heading: the caller's label behind a fixed `WHAT-IF ` prefix.
+pub fn what_if_label(label: &str) -> String {
+    format!("WHAT-IF {label}")
 }
 
 /// A bad substitution is a bad **request**, and the report has one error type so a caller does
@@ -1148,6 +1183,39 @@ mod tests {
         assert!(
             readout_is_frozen(spec, &all_frozen),
             "nothing moved and the readout was not flagged"
+        );
+    }
+
+    /// ⚠ A NaN anywhere in a folded series makes the readout unmeasurable — including a NaN
+    /// that a `max` fold would have silently dropped. The control: the same shape, finite,
+    /// is measurable.
+    #[test]
+    fn a_readout_with_a_non_finite_value_is_unmeasurable() {
+        let spec = SPECS
+            .iter()
+            .find(|s| s.scenario == "open_season" && s.quantity.starts_with("peak W"))
+            .expect("the three-series readout is gone — this test has lost its subject");
+        assert!(!readout_went_non_finite(
+            spec,
+            &stub(&[1.0, 2.0], &[2.0, 2.0], &[3.0, 3.0])
+        ));
+        assert!(readout_went_non_finite(
+            spec,
+            &stub(&[1.0, 2.0], &[2.0, f64::NAN], &[3.0, 3.0])
+        ));
+        assert!(readout_went_non_finite(
+            spec,
+            &stub(&[1.0, f64::INFINITY], &[2.0, 2.0], &[3.0, 3.0])
+        ));
+        // `f64::max` ignores NaN, so the fold alone would have printed a finite peak.
+        assert!([1.0, f64::NAN, 2.0].iter().copied().fold(0.0, f64::max).is_finite());
+    }
+
+    #[test]
+    fn a_what_if_heading_is_labelled_in_code() {
+        assert_eq!(
+            what_if_label("decomposition.yaml:decomposition_rate=0"),
+            "WHAT-IF decomposition.yaml:decomposition_rate=0"
         );
     }
 

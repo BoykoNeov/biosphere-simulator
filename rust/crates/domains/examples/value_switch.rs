@@ -20,25 +20,34 @@
 //! mistake for a commitment. `--long` adds the 15-year rows, without which no
 //! `liveness_floors` quantity is in the table at all (the report says so).
 //!
+//! **`--what-if`** runs every spec as a WHAT-IF (`docs/param-file-conventions.md`): the
+//! loaders' range checks are skipped, so `decomposition_rate=0` ("what if nothing decays?")
+//! runs instead of being refused as a typo. The column headings say `WHAT-IF`; a what-if whose
+//! params fold to a non-finite value is refused, and a run that goes non-finite prints as dead.
+//!
 //! ⚠ **It takes no decision.** The `extinction_coef` question this was built for is open and
 //! the user's; this regenerates the evidence it was already priced on.
 
-use domains::lab::report::{compare, render};
+use domains::lab::report::{compare, compare_changes, render, Change};
 use domains::lab::{parse_variants, Substitution};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let long = args.iter().any(|a| a == "--long");
+    let what_if = args.iter().any(|a| a == "--what-if");
     // ⚠ An unknown flag is rejected, not ignored. `--lon` would otherwise silently produce the
     // SHORT report — which is precisely the one that cannot show opposed movement, so the
     // typo's cost is a wrong reading rather than a missing section.
-    if let Some(bad) = args.iter().find(|a| a.starts_with("--") && *a != "--long") {
-        fail(&format!("unknown flag {bad:?} (the only flag is --long)"));
+    if let Some(bad) = args
+        .iter()
+        .find(|a| a.starts_with("--") && *a != "--long" && *a != "--what-if")
+    {
+        fail(&format!("unknown flag {bad:?} (the flags are --long and --what-if)"));
     }
     let specs: Vec<&String> = args.iter().filter(|a| !a.starts_with("--")).collect();
     if specs.is_empty() {
         eprintln!(
-            "usage: value_switch [file.yaml:]field=v1[,v2,...] [more...] [--long]\n\
+            "usage: value_switch [file.yaml:]field=v1[,v2,...] [more...] [--long] [--what-if]\n\
              \n\
              Runs the frozen biosphere scenarios at each value and tabulates the quantities\n\
              the science gates are read off. Writes nothing.\n\
@@ -60,7 +69,16 @@ fn main() {
         }
     }
 
-    match compare(&variants, long) {
+    let result = if what_if {
+        let changes: Vec<(String, Change)> = variants
+            .into_iter()
+            .map(|(label, subs)| (label, Change::WhatIf(subs)))
+            .collect();
+        compare_changes(&changes, long)
+    } else {
+        compare(&variants, long)
+    };
+    match result {
         Ok(columns) => print!("{}", render(&columns, long)),
         Err(e) => fail(&e.to_string()),
     }

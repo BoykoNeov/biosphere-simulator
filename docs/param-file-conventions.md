@@ -122,6 +122,17 @@ TODO(cite), and a frozen band is still never re-tuned so a change fits
 7. **Not changed by this decision:** the PCSE oracle is still a diagnostic, never a fit target;
    and a test that pins a what-if is welcome, but no gate on the reference is weakened for one.
 
+**The tool for a what-if VALUE** (built 2026-09-29): `lab::biosphere_what_if`, or from `rust/`
+`cargo run --release -q -p domains --example value_switch -- decomposition_rate=0 --what-if`.
+The loaders' range checks (positive rates, `[0, 1]` fractions, ordered bands) are skipped — they
+reject *impossible or degenerate* values, which is what a what-if may want to ask ("what if
+nothing decays?"). Everything that catches a typo still runs (field names, exact units, the
+rewrite's bit re-read). The column heading reads `WHAT-IF …` by code. Refused rather than run:
+params that fold to infinity or NaN (`carbon_fraction = 0` divides). A run that goes non-finite
+prints as dead — needed because the engine's per-step conservation check compares
+`residual > tol`, which a NaN residual passes silently. The reference loaders are unchanged:
+every frozen load still enforces every range check.
+
 ## ⚠ The YAML a param file may use is a CLOSED SUBSET (since 2026-08-17)
 
 **A param file is read by the Rust reference, whose YAML reader is hand-rolled over a
