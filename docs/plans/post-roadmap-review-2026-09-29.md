@@ -154,7 +154,9 @@ answer. ⚠ **The shipped step leaves the sealed jar's final harvest 7.1 % short
 2.1 %). Only a finer step moves that (⅛ day −2.5 %, 1/16 −1.4 %). C, in both scopes, prevents
 overdrawing but leaves the harvest where it was: the error is not the crop's in-step draw. B is
 dominated by uniform refinement at equal cost. Cause not identified. **Slice 4, the decision, is
-the user's.**
+the user's.** The user's call, 2026-09-30: *"Go with your recommendation"* — find the cause, then
+the step. The cause → `docs/plans/post-roadmap-step-cause.md`; it reports back before any
+unfreeze.
 
 ### The problem, measured
 
