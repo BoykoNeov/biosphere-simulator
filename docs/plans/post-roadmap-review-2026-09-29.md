@@ -141,6 +141,13 @@ on this driver). Record: `docs/log/intraday-gas-exchange-adopted.md`; plan §8 o
 
 ## Step 2 — small air volumes against a big step
 
+**Slice 1 TAKEN 2026-09-30, measurement only** → `docs/plans/post-roadmap-draw-census.md`
+(predictions, controls, the table). Only CO₂ pools drawn by the crop come near a limit; every
+other store is rate × step or the weather. ⚠ It corrects this step's framing twice: the vapour
+store's worst draw is set by a cold night, not by the step, and the 7-day station goldens hold
+seedlings, so the station crop's pull on the cabin air (0.078) is visible only on the 4-year
+sealed station. Slices 2–4 are not started.
+
 ### The problem, measured
 
 - The reference sealed jar's tightest step withdraws **0.757** of the CO₂ it starts with
