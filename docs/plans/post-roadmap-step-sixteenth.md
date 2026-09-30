@@ -254,3 +254,53 @@ in a dated comment, none loosened):**
 
 Before the flip the advisor also flagged that the plan had no manifest prediction and asked for
 the sweep inside flows; both were done and committed first (`70d2b37`).
+
+## Slice 2 — C, predictions and cost (written 2026-09-30, after slice 1's numbers, before code)
+
+### The design, fixed before code
+
+* **A form field, the O₂ form's shape.** `PhotosynthesisParams` gains `co2_read`, which CO₂ the
+  crop's growth reads: `StartOfStep` (Euler, the shipped form until now) or `EndOfStep` (C). The
+  loader sets `EndOfStep`; `domains::lab` can flip it back so the dated lab records (which ran
+  the explicit form) stay re-runnable. Never loaded from a param file. Only `Allocation` acts
+  on it; growth and maintenance respiration read the start of the step (the lab's crop-only
+  scope). No new `type_name`, so the authoring registry does not move.
+* **The equation.** `X = C₀ − U(X)`, where `U(X)` is the allocation flow's draw on the chamber
+  pool when the pool variable reads `X`. `U` does not fall as `X` rises (more CO₂, more
+  assimilation), so `h(X) = X − C₀ + U(X)` rises and has one root.
+* **The solve, one per step, bracketed.** The explicit draw `U(C₀)` is evaluated first (it is
+  the step's own evaluation today). If it is 0 — every night step — `X = C₀` and the result is
+  the explicit one, bit for bit. Otherwise the root lies in `[max(0, C₀ − U(C₀)), C₀]`: `h ≤ 0`
+  at the low end (checked, an error if not) and `h = U(C₀) > 0` at the high end. Illinois
+  false position inside that bracket to `|h| ≤ 1e-12·C₀`, at most 100 iterations, else an
+  error. **The low end is returned**, where `h ≤ 0`, so `U(X) ≤ C₀ − X ≤ C₀` holds exactly, not
+  to rounding: the crop never takes more CO₂ than the start of the step holds.
+* **Where it acts.** Only where the scenario is sealed and the pool variable is wired (the jar,
+  the chambers, and the station's cabin, which *is* the biosphere carbon pool). The open field
+  has no pool: unchanged by construction.
+
+### Predictions
+
+* **Q1 — structure.** Moving: the five chamber goldens (`sealed_chamber`, `perennial_chamber`,
+  `consumer_chamber`, and the two long horizons), `drift_summary` (its folds read the
+  chambers), and the four station goldens with a crop (`greenhouse`, `harvest`, `lighting`,
+  `sealed_station`): **10**. Byte-identical: `season_euler` (open field) and the nine
+  plant-free station goldens. `n` and lengths unchanged. Manifests: only those 10 goldens'
+  `golden_sha256` rows (6 biosphere, 4 station); no `dt_days`, no param hash, authoring
+  untouched.
+* **Q2 — small, and in C's direction.** The lab found C and Euler converging as the step shrinks
+  (34 ppm apart at ¼, 2.7 at 1/64), both leaving more CO₂ in the air than the fine answer and
+  growing less. At 1/16: every chamber's grain moves by **less than 1 %, down**; season-low CO₂
+  and the five compensation margins move **up**, by less than 3 %.
+* **Q3 — the station's seedlings barely move.** The 7-day goldens (`greenhouse`, `harvest`,
+  `lighting`) draw at most 0.078 of the cabin's CO₂ a step (draw census), so they move in
+  the 4th significant figure or later; `sealed_station` (4 years) less than 1 %.
+* **Q4 — no guard fires, by construction.** Rationing 0 on every golden; the jar's tightest
+  step (read by `step_draws`, which evaluates the flows as the step does) falls a little under
+  0.2009, to 0.19–0.20.
+* **Q5 — cost.** Night steps cost nothing extra. A day step costs the explicit evaluation plus
+  2–5 Illinois evaluations. On the jar, fewer than 3 extra allocation evaluations per step on
+  average, measured. The whole suite stays under 300 s (254 s after slice 1).
+* **Q6 — the lab.** Lab tests that compare against "the shipped run" at four steps a day will
+  see C where they expect Euler; where one goes red it is pointed at `StartOfStep`, the form it
+  measured, and nothing in its numbers is re-pinned.
