@@ -623,9 +623,9 @@ pub fn thermal() -> String {
 ///
 /// [`year_summaries`] takes the period in whatever unit the trajectory is indexed by, and
 /// `run_perennial` appends one state per **step**. So the period is [`season_steps`] =
-/// `steps_for(305)` = 1220 at `dt = ¼`, not `SEASON_DAYS` = 305 — Python spelled this
+/// `steps_for(305)` = 4880 at `dt = 1/16` (1220 at ¼ before 2026-09-30), not `SEASON_DAYS` = 305 — Python spelled this
 /// `steps_for(raw["season_days"])` for the same reason. Passing days would silently cut
-/// the 15-yr run into 60 quarter-year segments.
+/// the 15-yr run into 240 sixteenth-year segments (60 quarter-year ones at the old ¼ step).
 ///
 /// ⚠ The JSON below is a `write!` and not a serializer, so the **sorted** key order
 /// (`indent=2, sort_keys=True` + trailing newline, matching what `sim_io.dumps` wrote) is

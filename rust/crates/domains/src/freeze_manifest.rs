@@ -156,7 +156,8 @@ fn json_array(names: &BTreeSet<&str>) -> String {
 
 /// The within-day PAR shape, sampled on the fingerprint's fixed grid.
 ///
-/// Three day lengths × the four quarters of the day at the shipped step, each rendered
+/// Three day lengths × the four quarters of the day — a fixed grid of the light FUNCTION, not
+/// the step (chosen at the ¼ step and kept when the step moved to 1/16 on 2026-09-30), each rendered
 /// with the same hex-float writer the goldens use — so the record is exact rather than
 /// tolerance-bound and moves on any change to the shape, including one that preserves the
 /// day's dose. `daytime_mean_par = 400` is an arbitrary non-zero scale; the fingerprint is
@@ -373,7 +374,7 @@ pub fn dump() {
 // opposite of a freeze, and the 2026-08-14 step move became a ceremony only because this
 // literal went red. C7 moves the writer *into the crate that owns `BIO_DT`*, where
 // splicing it in is a one-character mistake. Two things stop it: the literal is written
-// as **text** (`Json::num("0.25")` — `config::canonical_json::Json::Number` takes no
+// as **text** (`Json::num("0.0625")` — `config::canonical_json::Json::Number` takes no
 // `f64`, deliberately), and `test_the_locked_dt_matches_the_reference_tree` still checks
 // the frozen literal against the constant across the port boundary.
 //
@@ -708,7 +709,7 @@ pub fn manifest() -> Json {
         // ⚠ TEXT, not `BIO_DT`. See the header: this is the anti-derived literal, and
         // `Json::num` takes a lexeme precisely so the constant cannot be spliced in by a
         // one-character edit.
-        ("dt_days", Json::num("0.25")),
+        ("dt_days", Json::num("0.0625")),
         ("flow_set", Json::strs(flows.iter().copied())),
         (
             "forcing",

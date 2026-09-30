@@ -43,16 +43,17 @@ pub use system::{
     DEFAULT_SCENARIO, LONG_HORIZON_YEARS, PERENNIAL_CHAMBER_YEARS, SEALED_CHAMBER_YEARS,
 };
 
-/// The biosphere's integration step, in days — mirrors `domains.biosphere.step.BIO_DT`.
+/// The biosphere's integration step, in days: **1/16** since 2026-09-30.
 ///
-/// ⚠ **The port has no reference authority.** This is a mirror of the Python constant,
-/// not an independent choice; the reason it is `1/4` and not `1` lives in
-/// `src/domains/biosphere/step.py` and `docs/plans/post-roadmap-step-unfreeze.md`. If the
-/// two ever disagree, Python is right by definition.
-pub const BIO_DT: f64 = 0.25;
+/// The reference's own choice since the flip (Python, whose `step.py` this once mirrored, is
+/// retired). History: `1` until 2026-08-14 (`docs/plans/post-roadmap-step-unfreeze.md`), `1/4`
+/// until 2026-09-30, then `1/16` on the user's call after the step options were priced against
+/// a 1/256-day answer (`docs/plans/post-roadmap-step-sixteenth.md`). A power of two, so
+/// `n · dt` stays exact, and it divides the station's 1440 cabin minutes into 90 per plant step.
+pub const BIO_DT: f64 = 0.0625;
 
-/// Integration steps per physical day — mirrors `domains.biosphere.step.STEPS_PER_DAY`.
-pub const STEPS_PER_DAY: usize = 4;
+/// Integration steps per physical day; `BIO_DT · STEPS_PER_DAY == 1`.
+pub const STEPS_PER_DAY: usize = 16;
 
 /// Integration steps in `days` physical days — the exact analogue of the Python
 /// `domains.biosphere.step.steps_for`, **taking the same unit**.

@@ -194,28 +194,47 @@ fn the_form_moves_the_perennial_chamber_without_rationing() {
     assert!(leaf_thickness_ratio(&frozen).is_none());
 }
 
-/// ⚠ **P5's falsification, pinned: the lab form RATIONS the sealed jar and the frozen form does
-/// not.** Measured 2026-09-29: 5 firings in season 1 under Euler (and RK4 raises at step 773).
-/// Pinned as `> 0`, not `== 5` — a marginal firing count can move by libm ULPs on CI's Linux
-/// box, the zero control cannot. When this goes green-to-red the mechanism has changed and the
-/// remeasure record is stale.
+/// ⚠ **P5's falsification, and the finer step retired it: the lab form no longer rations the
+/// sealed jar.**
 ///
-/// ⚠ Also the **control for the jar's step-draw pin** (`science_gates::margins::
-/// the_jars_tightest_co2_step_is_pinned_by_its_headroom`): the same `step_draws` must read the
-/// CO₂ pool past 1 on the run that rations, or that pin's 0.76 could be a probe that never
-/// sees a squeeze. Measured through `step_draws` rather than `trajectory` so the jar is run once
-/// per form, not twice; `step_draws` asserts its own firing count against the integrator's.
+/// At the quarter-day step (measured 2026-09-29) the lab form rationed the jar 5 times in
+/// season 1 under Euler (RK4 raised at step 773), drawing 1.15 of the CO₂ pool in one step,
+/// and this test pinned that as `lab.rationed > 0`. That was the "jar breaks" reading holding
+/// the leaf form back. **At the 1/16-day step (2026-09-30) it does not ration at all**: its
+/// tightest step draws 0.3128 of the pool (the frozen form's 0.2009), both on step 3108. So the
+/// jar-breaks reading was taken at a step the reference no longer uses; whether the leaf form
+/// should be reconsidered is the user's call, not this test's.
+///
+/// ⚠ Still the **control for the jar's step-draw pin** (`science_gates::margins::
+/// the_jars_tightest_co2_step_is_pinned_by_its_headroom`): `step_draws` must read a CO₂ pool
+/// past 1 on a run that rations, or that pin could be a probe that never sees a squeeze. With
+/// the lab jar no longer rationing, the control is the frozen jar with its room shrunk to a
+/// tenth (air and both gases scaled): measured 205 firings and a tightest draw of 1.488.
 #[test]
-fn the_form_rations_the_sealed_jar_and_the_frozen_tree_does_not() {
+fn the_form_no_longer_rations_the_sealed_jar_and_the_draw_probe_still_sees_a_squeeze() {
     let s = sealed_chamber_scenario();
     let frozen = step_draws(s, 1, &params::biosphere());
     let lab = step_draws(s, 1, &lab());
-    assert_eq!(frozen.rationed, 0);
-    assert!(lab.rationed > 0, "the jar no longer rations under the lab form — re-measure");
-    assert!(frozen.of(CARBON_POOL).ratio < 1.0);
+    assert_eq!((frozen.rationed, lab.rationed), (0, 0));
+    let (f, l) = (frozen.of(CARBON_POOL).ratio, lab.of(CARBON_POOL).ratio);
+    assert!(f < l, "the lab form must still draw harder than the frozen one: {f} vs {l}");
     assert!(
-        lab.of(CARBON_POOL).ratio > 1.0,
-        "the lab jar rations but step_draws does not see its CO₂ pool overdrawn: {:?}",
+        (0.29..0.34).contains(&l),
+        "the lab jar's tightest step moved (measured 0.3128): {:?}",
         lab.of(CARBON_POOL)
+    );
+
+    let squeezed = SeasonScenario {
+        chamber_air_capacity_mol: s.chamber_air_capacity_mol * 0.1,
+        chamber_co2_mol0: s.chamber_co2_mol0 * 0.1,
+        chamber_o2_mol0: s.chamber_o2_mol0 * 0.1,
+        ..s
+    };
+    let control = step_draws(squeezed, 1, &params::biosphere());
+    assert!(control.rationed > 0, "the tenth-size jar was measured to ration");
+    assert!(
+        control.of(CARBON_POOL).ratio > 1.0,
+        "the squeezed jar rations but step_draws does not see its CO₂ pool overdrawn: {:?}",
+        control.of(CARBON_POOL)
     );
 }

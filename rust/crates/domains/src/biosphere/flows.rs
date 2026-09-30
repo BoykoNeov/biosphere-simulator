@@ -4428,7 +4428,7 @@ mod tests {
     /// Every leg is linear in `dt`, bit-exactly.
     ///
     /// Asserted on `to_bits` rather than a tolerance: a first-order rate law times a step
-    /// has no rounding to hide behind, and the biosphere is frozen at `dt = ¼`, so a leg
+    /// has no rounding to hide behind, and the biosphere is frozen at `dt = 1/16` (¼ before 2026-09-30), so a leg
     /// that was only approximately dt-linear would be a different mechanism at the frozen
     /// step than at the fixture's.
     /// Mirrors `test_senescence_scales_linearly_with_dt`.

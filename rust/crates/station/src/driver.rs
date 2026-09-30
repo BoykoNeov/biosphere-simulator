@@ -4,9 +4,9 @@
 //! that must advance) to a **second-scale** fast domain (the cabin / Power: `dt = 60`/`3600`
 //! s). `simcore::multirate` cannot bridge these — it splits ONE shared master `dt`, and
 //! `substep` freezes the biosphere aux — so the driver does the operator split (Lie,
-//! **interleaved**) **by hand**: per master day, `slow_steps_per_day` times over, the slow
-//! domain takes one `step_report` (advancing aux **and** `n`), then the fast domain takes
-//! that slow step's share of the day's `steps_per_day` `substep` calls (keeping `n`).
+//! **interleaved**) **by hand**: per master day, in [`day_groups`]' equal groups, the slow
+//! domain takes its group's `step_report`s (advancing aux **and** `n`), then the fast domain
+//! takes the group's share of the day's `steps_per_day` `substep` calls (keeping `n`).
 //!
 //! ⚠ Until 2026-09-30 the day ran **slow-first** — every slow step, then every fast step —
 //! so all four plant quarter-days drew on the cabin air as it stood at dawn and the crew's
@@ -45,11 +45,11 @@ pub type OwnedResetHook = Box<dyn Fn(u64, &State) -> Result<Option<State>, SimEr
 
 /// Advance exactly **one** master day in place: consult `slow_reset` (adopting a returned
 /// re-sow state after a conservation check), then `slow_steps_per_day` times run one slow
-/// `step_report` (advancing the phenology aux **and** `n`) followed by
-/// `steps_per_day / slow_steps_per_day` fast `substep`s at `fast_dt` (keeping `n`),
+/// `step_report` (advancing the phenology aux **and** `n`) followed by, group by group
+/// ([`day_groups`]), its share of the fast `substep`s at `fast_dt` (keeping `n`),
 /// asserting conservation over the full shared ledger after **each** fast sub-step. The fast
 /// side refills the shared pools between the slow side's draws. Returns
-/// `(next_state, day_rationed, day_events)`; refuses a split that does not divide evenly.
+/// `(next_state, day_rationed, day_events)`; refuses a split with no equal grouping.
 ///
 /// ⚠ `n` is the slow domain's **step** count, not the day count — it was the same number
 /// only while the biosphere's step was one day. Nothing here needs it to be a day count
@@ -86,17 +86,19 @@ pub fn advance_one_master_day(
             state = reset_state;
         }
     }
-    let fast_per_slow = fast_steps_per_slow_step(steps_per_day, slow_steps_per_day)?;
-    for _ in 0..slow_steps_per_day {
-        // Slow operator: one sub-step (advances the phenology aux AND n).
-        let slow_report = slow_integrator.step_report(&state, slow_resolver, slow_dt)?;
-        state = slow_report.state;
-        total_rationed += slow_report.rationed;
-        events.extend(slow_report.events);
-        // Fast operator: this slow step's share of the day at fast_dt (n kept). substep
-        // skips the conservation assert, so we own it here — after each sub-step, over the
-        // full shared ledger — keeping the every-step teeth.
-        for _ in 0..fast_per_slow {
+    let groups = day_groups(steps_per_day, slow_steps_per_day)?;
+    for _ in 0..groups.count {
+        // Slow operator: this group's slow sub-steps (each advances the phenology aux AND n).
+        for _ in 0..groups.slow {
+            let slow_report = slow_integrator.step_report(&state, slow_resolver, slow_dt)?;
+            state = slow_report.state;
+            total_rationed += slow_report.rationed;
+            events.extend(slow_report.events);
+        }
+        // Fast operator: this group's share of the day at fast_dt (n kept). substep skips
+        // the conservation assert, so we own it here — after each sub-step, over the full
+        // shared ledger — keeping the every-step teeth.
+        for _ in 0..groups.fast {
             let before = state.clone();
             let fast_report = fast_integrator.substep(&state, fast_resolver, fast_dt)?;
             state = fast_report.state;
@@ -108,21 +110,55 @@ pub fn advance_one_master_day(
     Ok((state, total_rationed, events))
 }
 
-/// Fast sub-steps after each slow step: `steps_per_day / slow_steps_per_day`, refusing a
-/// split that does not divide evenly — each slow step must be followed by the same stretch
-/// of fast time, and an integer division would silently drop the remainder.
-pub fn fast_steps_per_slow_step(
-    steps_per_day: u64,
-    slow_steps_per_day: u64,
-) -> Result<u64, SimError> {
-    if slow_steps_per_day == 0 || !steps_per_day.is_multiple_of(slow_steps_per_day) {
+/// How a master day interleaves its two operators: `count` equal groups, each `slow` slow
+/// steps then `fast` fast sub-steps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DayGroups {
+    /// Groups per master day: the greatest common divisor of the two step counts.
+    pub count: u64,
+    /// Slow steps per group.
+    pub slow: u64,
+    /// Fast sub-steps per group.
+    pub fast: u64,
+}
+
+/// The finest **equal** grouping of a master day: `gcd(steps_per_day, slow_steps_per_day)`
+/// groups, each `slow_steps_per_day / gcd` slow steps followed by `steps_per_day / gcd` fast
+/// ones.
+///
+/// When the fast count divides evenly by the slow one (every sealed/greenhouse scenario: 1440
+/// cabin minutes over 16 plant steps) this is one slow step then its 90 fast ones, the
+/// interleaved day adopted 2026-09-30, operation for operation. Until the 1/16-day step it
+/// **refused** any other split; the lamp scenarios' 24 hourly power steps over 16 plant steps
+/// made that rule unrunnable, and on the user's call (2026-09-30, "loosen the even-split
+/// rule", `docs/plans/post-roadmap-step-sixteenth.md`) it now groups them: 8 groups of 2 plant
+/// steps then 3 power hours.
+///
+/// ⚠ Still refused: counts sharing no common factor (with more than one slow step), because
+/// the finest equal grouping is then the whole day, every slow step before every fast one,
+/// which is the order the interleaving retired. An integer division that dropped a remainder
+/// is impossible here by construction.
+pub fn day_groups(steps_per_day: u64, slow_steps_per_day: u64) -> Result<DayGroups, SimError> {
+    let gcd = {
+        let (mut a, mut b) = (steps_per_day, slow_steps_per_day);
+        while b != 0 {
+            (a, b) = (b, a % b);
+        }
+        a
+    };
+    if steps_per_day == 0 || slow_steps_per_day == 0 || (gcd == 1 && slow_steps_per_day > 1) {
         return Err(SimError::Validation(format!(
-            "the master day interleaves the two operators, so steps_per_day ({steps_per_day}) \
-             must divide evenly by slow_steps_per_day ({slow_steps_per_day}): each slow step \
-             must be followed by the same stretch of fast time"
+            "the master day interleaves the two operators in equal groups, but steps_per_day \
+             ({steps_per_day}) and slow_steps_per_day ({slow_steps_per_day}) share no common \
+             factor: the only equal grouping is the whole day, every slow step before every \
+             fast one, which is the retired slow-first order"
         )));
     }
-    Ok(steps_per_day / slow_steps_per_day)
+    Ok(DayGroups {
+        count: gcd,
+        slow: slow_steps_per_day / gcd,
+        fast: steps_per_day / gcd,
+    })
 }
 
 /// Step `days` master days (slow ×`slow_steps_per_day` + fast ×`steps_per_day`), interleaved.
@@ -130,14 +166,14 @@ pub fn fast_steps_per_slow_step(
 /// Per day: `slow_reset` (if given) is consulted first — a returned `Some(state)` is
 /// conservation-checked then adopted; then, `slow_steps_per_day` times, the `slow_integrator`
 /// runs one `step_report` at `slow_dt` (its own gate fires on each) and the `fast_integrator`
-/// runs that step's `steps_per_day / slow_steps_per_day` `substep` calls at `fast_dt` (`n`
+/// runs its group's share of the `substep` calls at `fast_dt` (`n`
 /// kept), the driver asserting conservation after **each** over the full shared ledger. Returns `(states, total_rationed, events)`
 /// with `states` one entry per **master day** — not per slow step — (length `days + 1`;
 /// a golden pins the final one), so station trajectories stay day-indexed.
 ///
 /// Requires `fast_dt · steps_per_day == 86400` s and `slow_dt · slow_steps_per_day == 1`
-/// day, so both operators cover the same interval, and `steps_per_day` to divide evenly by
-/// `slow_steps_per_day`, so every slow step is followed by the same stretch of fast time.
+/// day, so both operators cover the same interval, and the two counts to share a common
+/// factor ([`day_groups`]), so every group is followed by the same stretch of fast time.
 #[allow(clippy::too_many_arguments)]
 pub fn run_master_day(
     slow_integrator: &EulerIntegrator,
@@ -166,7 +202,7 @@ pub fn run_master_day(
             slow_dt * slow_steps_per_day as f64
         )));
     }
-    fast_steps_per_slow_step(steps_per_day, slow_steps_per_day)?;
+    day_groups(steps_per_day, slow_steps_per_day)?;
     let mut state = initial;
     let mut states: Vec<State> = vec![state.clone()];
     let mut total_rationed = 0u64;
@@ -213,7 +249,8 @@ pub enum DayOrder {
     SlowFirst,
     /// The reference: one slow step, then that step's share of the fast steps, repeated
     /// (`P c…c P c…c P c…c P c…c`). The fast side refills a shared pool between the slow
-    /// side's draws. Requires `steps_per_day` to divide evenly by `slow_steps_per_day`.
+    /// side's draws. With counts that do not divide evenly, the slow steps come in equal
+    /// groups ([`day_groups`]); counts with no equal grouping are refused.
     Interleaved,
 }
 
@@ -265,7 +302,7 @@ pub struct TwoRate<'a> {
 
 impl TwoRate<'_> {
     /// The reference runner's two day-length guards, plus the interleaved order's own:
-    /// the fast steps must split evenly across the slow ones.
+    /// the two step counts must have an equal grouping ([`day_groups`]).
     pub fn validate(&self, order: DayOrder) -> Result<(), SimError> {
         if self.fast_dt * self.steps_per_day as f64 != SECONDS_PER_DAY {
             return Err(SimError::Validation(format!(
@@ -280,15 +317,20 @@ impl TwoRate<'_> {
                 self.slow_dt, self.slow_steps_per_day
             )));
         }
-        self.fast_per_slow(order).map(|_| ())
+        self.groups(order).map(|_| ())
     }
 
-    /// Fast sub-steps after each slow step under `Interleaved`; refuses an uneven split.
-    fn fast_per_slow(&self, order: DayOrder) -> Result<u64, SimError> {
+    /// The day's grouping in `order`: `SlowFirst` is one group of the whole day, and
+    /// `Interleaved` is the reference's [`day_groups`] (refusing counts with no equal grouping).
+    fn groups(&self, order: DayOrder) -> Result<DayGroups, SimError> {
         if order == DayOrder::SlowFirst {
-            return Ok(self.steps_per_day);
+            return Ok(DayGroups {
+                count: 1,
+                slow: self.slow_steps_per_day,
+                fast: self.steps_per_day,
+            });
         }
-        fast_steps_per_slow_step(self.steps_per_day, self.slow_steps_per_day)
+        day_groups(self.steps_per_day, self.slow_steps_per_day)
     }
 
     /// One slow step, observed; returns the new state.
@@ -340,7 +382,7 @@ impl TwoRate<'_> {
         totals: &mut SideTotals,
         observe: &mut dyn FnMut(Side, &State, &State),
     ) -> Result<State, SimError> {
-        let fast_per_slow = self.fast_per_slow(order)?;
+        let groups = self.groups(order)?;
         let mut state = state.clone();
         if let Some(reset_fn) = self.slow_reset {
             if let Some(reset_state) = reset_fn(state.n, &state)? {
@@ -349,19 +391,11 @@ impl TwoRate<'_> {
                 state = reset_state;
             }
         }
-        match order {
-            DayOrder::SlowFirst => {
-                for _ in 0..self.slow_steps_per_day {
-                    state = self.slow_step(state, totals, observe)?;
-                }
-                state = self.fast_steps(state, self.steps_per_day, totals, observe)?;
+        for _ in 0..groups.count {
+            for _ in 0..groups.slow {
+                state = self.slow_step(state, totals, observe)?;
             }
-            DayOrder::Interleaved => {
-                for _ in 0..self.slow_steps_per_day {
-                    state = self.slow_step(state, totals, observe)?;
-                    state = self.fast_steps(state, fast_per_slow, totals, observe)?;
-                }
-            }
+            state = self.fast_steps(state, groups.fast, totals, observe)?;
         }
         Ok(state)
     }

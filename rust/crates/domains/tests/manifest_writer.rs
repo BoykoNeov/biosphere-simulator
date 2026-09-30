@@ -48,7 +48,7 @@ fn the_frozen_step_is_a_typed_literal_and_not_the_constant() {
         .find(|l| l.contains("(\"dt_days\", Json::"))
         .expect("the writer emits a dt_days key");
     assert!(
-        line.contains("Json::num(\"0.25\")"),
+        line.contains("Json::num(\"0.0625\")"),
         "dt_days must be a hand-typed literal — a manifest that derives the step \
          auto-follows a step change, which is the opposite of a freeze. Found: {line}"
     );
@@ -213,7 +213,7 @@ fn the_committed_manifest_is_this_contract_and_is_not_truncated() {
 /// which reads like a gate and is none. The integrator stays enforced by the goldens.
 #[test]
 fn the_frozen_step_still_equals_the_step_the_reference_runs() {
-    let frozen: f64 = "0.25".parse().expect("the frozen dt_days literal parses");
+    let frozen: f64 = "0.0625".parse().expect("the frozen dt_days literal parses");
     assert_eq!(
         frozen,
         domains::biosphere::BIO_DT,
@@ -226,8 +226,8 @@ fn the_frozen_step_still_equals_the_step_the_reference_runs() {
     // The control: the literal compared here must be the one the writer emits, or this
     // test drifts away from the manifest it is about.
     assert!(
-        WRITER_SOURCE.contains("Json::num(\"0.25\")"),
-        "the writer no longer emits 0.25 as dt_days, so the literal checked above is not \
+        WRITER_SOURCE.contains("Json::num(\"0.0625\")"),
+        "the writer no longer emits 0.0625 as dt_days, so the literal checked above is not \
          the frozen one"
     );
 }

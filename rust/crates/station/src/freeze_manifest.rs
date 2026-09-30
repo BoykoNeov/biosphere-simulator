@@ -414,7 +414,7 @@ const SCENARIOS: [(&str, &str, &str); 13] = [
 
 const COMMENT: &str = "Phase-6 Step-10 station freeze manifest (P6.10). Names the frozen WHOLE-ASSEMBLY station reference surface (Phase-5 siblings + the station seams); the biosphere is delegated to docs/biosphere-reference.manifest.json (see delegates_to). See docs/station-reference.md for the freeze contract + the unfreeze discipline. Hashes are newline-normalized sha-256 PROVENANCE (value enforcement is the scenario goldens). Each key's producer and why is in _authority: this file has MIXED authority since slice 7 of the reference flip. Regenerate on a deliberate unfreeze, from rust/: cargo run --example dump_station_inventory -- --write-manifest. C7 moved the WRITER to the reference; tests/test_station_freeze_manifest.py has none and is now only a checker.";
 
-const NUMERICS_NOTE: &str = "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/4 day, 4 slow sub-steps per master day, each followed by its quarter of the everything-fast dt=60 s sub-steps (interleaved, since 2026-09-30; slow-first before); Tier-1 energy single-rate dt=3600 s.";
+const NUMERICS_NOTE: &str = "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/16 day, 16 slow sub-steps per master day, each followed by its sixteenth of the everything-fast dt=60 s sub-steps (90 of them; interleaved since 2026-09-30, slow-first before); Tier-1 energy single-rate dt=3600 s.";
 
 /// The flow and aux inventories, and the eight-file param census — walked ONCE and read
 /// by **both** halves of this program, the dump and the manifest writer.

@@ -65,10 +65,10 @@ reviewed, and re-captured* — not silent.
 The manifest is the authoritative, machine-checked list. This section is the human-readable
 account.
 
-### Locked integrator + dt — **Euler, `dt = ¼ day`**
+### Locked integrator + dt — **Euler, `dt = 1/16 day`** (¼ until 2026-09-30, 1 until 2026-08-14)
 
-The biosphere runs the **forward-Euler** integrator at a **quarter-day** step (`t = n·dt`,
-integer step count; `n` counts *steps*, so it is 4× the day count). Euler was **locked by
+The biosphere runs the **forward-Euler** integrator at a **1/16-day** step (`t = n·dt`,
+integer step count; `n` counts *steps*, so it is 16× the day count). Euler was **locked by
 probe, with evidence** (P4.1, Step 1): both closed scenarios were run Euler *and* RK4 to 15 yr
 and structurally agreed (both stationary, both closed, same period class); the 100k-step
 stress (Step 3, 328 yr) confirmed no slow drift. RK4 ships in `simcore` but the biosphere does
@@ -76,11 +76,11 @@ stress (Step 3, 328 yr) confirmed no slow drift. RK4 ships in `simcore` but the 
 RK4-refinable.
 
 ⚠ **The step and the day are now different numbers, and that is the whole point.** The step
-lives in **one** place, `src/domains/biosphere/step.py` (`BIO_DT`, `STEPS_PER_DAY`,
+lives in **one** place, `rust/crates/domains/src/biosphere/mod.rs` (`BIO_DT`, `STEPS_PER_DAY`,
 `steps_for`), and every run length, reset period and perturbation window is expressed in
 **days** and converted. The weather table stays **one row per physical day** at any step —
 `season._table` indexes `int(n · dt)`, not `n` — and must never be tiled to match
-`STEPS_PER_DAY`. The manifest records `dt_days`, `tests/test_freeze_manifest.py` asserts it
+`STEPS_PER_DAY`. The manifest records `dt_days`, `rust/crates/domains/tests/manifest_writer.rs` asserts it
 against a **hard-coded literal** (deliberately *not* against `BIO_DT` — a contract that
 imports its value from the code auto-follows the code), and the goldens enforce the values.
 
@@ -894,6 +894,23 @@ above), so a present-tense sentence naming them — "the golden that moved", "on
 runs where water limits", a golden count of 25 — describes the tree **as it was at that
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
+
+- **2026-09-30 — THE INTEGRATION STEP: `dt = ¼ day` → `dt = 1/16 day`. 7 goldens here (and 4
+  on the station), their 7 `golden_sha256` rows, and `dt_days` 0.25 → 0.0625. No flow, aux,
+  param file or `simcore` byte changed.** The user's call on the review's Step 2, slice 4
+  (*"1 + 3. But ensure the tests runtime would not quadruple"*), on the step options priced
+  against a 1/256-day answer (`docs/log/step-options.md`, `docs/log/step-cause.md`). Plan,
+  predictions committed before the flip, and grading: `docs/plans/post-roadmap-step-sixteenth.md`.
+  **Why.** The quarter-day step left the open field's canopy 11 % above its converged value and
+  the sealed jar's harvest 7 % short; 1/16 brings the open-field harvest to within 0.01 % and
+  the canopy to within 0.3 %. **What moved.** Every `n` exactly 4×; open-field peak LAI 6.0228 →
+  5.4406 (band 5–8 holds), open-field harvest +2.15 %, the chambers' grain +6.2 % to +8.8 %;
+  rationing 0 everywhere. **Consequences recorded, not tuned:** no frozen scenario reaches the
+  mutual-shading threshold any more, so its science gate shows the loss acting on a pushed run
+  (the user's call); the five compensation margins rose (jar 10.675 → 11.665); the jar's
+  tightest step 0.757 → 0.201 of the pool per step, though per day it rose. The test suite was
+  held to its old run time by optimising the simulation crates in test builds first (`99c256e`,
+  byte-neutral). Advisor-reviewed before the flip. `git diff rust/crates/simcore/` empty.
 
 - **2026-09-29 — the sealed chamber's condenser HOLDS 75 % relative humidity, and the step
   no longer sets the humidity: 9 goldens, 9 `golden_sha256` rows (5 here, 4 on the station)

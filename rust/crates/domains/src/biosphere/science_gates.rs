@@ -371,6 +371,10 @@ science_gates! {
     /// because the canopy crosses the threshold *at* its summit and the loss acts on the
     /// way down.
     ///
+    /// ⚠ **2026-09-30, the 1/16-day step:** the crossing above was the quarter-day step's
+    /// canopy bias. At 1/16 `open_season` peaks at 5.44 and no frozen scenario enters the
+    /// regime, so the "it genuinely bites" half is now shown on a pushed run (see the check).
+    ///
     /// ⚠ The roster is the four scenarios the reference carries. It was six until
     /// 2026-08-18, when C6 retired `n_limited` and `water_biting`; measured before that
     /// deletion, the departing peaks were 0.0869 and 0.4718 while the pinned
@@ -431,9 +435,36 @@ science_gates! {
             assert_eq!(below, sen.rdr_leaf, "inert AT the threshold (strict >)");
             assert_eq!(above, sen.rdr_leaf + sen.shade_rate);
 
-            // And it genuinely bites on the scenario that crossed — a mechanism present
-            // but never reached would satisfy everything above and guard nothing.
-            assert!(peaks[0].1 > VKS_LAI_THRESHOLD, "{peaks:?}");
+            // And it genuinely bites — a mechanism present but never reached would satisfy
+            // everything above and guard nothing. ⚠ Until 2026-09-30 this read
+            // `peaks[0].1 > VKS_LAI_THRESHOLD`: `open_season` itself crossed, at 6.0228. That
+            // crossing was the quarter-day step's canopy bias; at the 1/16 step the field
+            // peaks at 5.4406 (converged answer 5.4273, `docs/log/step-options.md`), and no
+            // frozen scenario reaches the threshold. On the user's call ("test it on a pushed
+            // run") the reach is shown on the open field with leaves 10 % thinner
+            // (`specific_leaf_area` ×1.1), an instrument and not a cultivar claim: the pushed
+            // canopy must enter the regime with the loss off, and the loss must hold it
+            // visibly lower. Measured at 1/16: 6.8832 off, 6.0797 on.
+            let pushed = |shading: bool| {
+                let mut p = crate::biosphere::params::biosphere();
+                p.canopy.sla_per_mol_c *= 1.1;
+                if !shading {
+                    p.senesc.shade_rate = 0.0;
+                }
+                let open_field = crate::biosphere::DEFAULT_SCENARIO;
+                crate::biosphere::readouts::trajectory(open_field, 1, false, &p)
+            };
+            let (on, off) = (pushed(true), pushed(false));
+            assert_eq!((on.rationed, off.rationed), (0, 0), "the pushed runs must be well-fed");
+            let (lai_on, lai_off) = (folds::peak_lai(&on), folds::peak_lai(&off));
+            assert!(
+                lai_off > VKS_LAI_THRESHOLD + 0.5,
+                "the pushed canopy must enter the regime with the loss off — {lai_off}"
+            );
+            assert!(
+                lai_off - lai_on > 0.5,
+                "the loss must act on the pushed canopy — {lai_on} on vs {lai_off} off"
+            );
         }
     }
 
@@ -931,12 +962,21 @@ mod margins {
     /// `the_floor_is_where_the_frozen_params_put_it` alone. It is NOT a measured margin: the
     /// distinction is exactly the one the note below draws, and putting `10.674948` there
     /// would have been the second, tighter copy of this pin that it refuses.
+    ///
+    /// ⚠⚠ **RE-PINNED 2026-09-30 for the 1/16-day step, read off this test's own failure
+    /// output with every pin first set wrong** (`docs/plans/post-roadmap-step-sixteenth.md`).
+    /// All five ROSE, which is the direction that matters: at the finer step the CO₂ low point
+    /// sits further above the compensation point. Jar 10.674948 → 11.665179 (+9.3 %),
+    /// perennial 1.150381 → 1.189982 (+3.4 %), consumer 1.200661 → 1.217510 (+1.4 %, inside
+    /// the 2 % tolerance and re-pinned anyway so the next unfreeze quotes this step's value).
+    /// The long horizons still equal their short runs, so the troughs have not moved past
+    /// the short runs' ends.
     const PINNED: &[(&str, f64)] = &[
-        ("sealed_chamber", 10.674948),
-        ("perennial_chamber", 1.150381),
-        ("consumer_chamber", 1.200661),
-        ("perennial_long_horizon", 1.150381),
-        ("consumer_long_horizon", 1.200661),
+        ("sealed_chamber", 11.665179),
+        ("perennial_chamber", 1.189982),
+        ("consumer_chamber", 1.217510),
+        ("perennial_long_horizon", 1.189982),
+        ("consumer_long_horizon", 1.217510),
     ];
 
     /// The measured margins, in `PINNED`'s order.
@@ -1046,16 +1086,28 @@ mod margins {
     /// at step 777, day 194.25 of season 1. The `jar_control` example's 0.757 at step 777 was
     /// the prediction, and it held.
     ///
+    /// ⚠ **RE-PINNED 2026-09-30 for the 1/16-day step: 0.200940 at step 3108**, the same
+    /// moment (day 194.25 of season 1) as the quarter-day step's 0.756662 at step 777. ⚠ **Per
+    /// step it fell almost fourfold; per DAY it ROSE**, 0.756662 × 4 = 3.03 → 0.200940 × 16 =
+    /// 3.22 of the pool: the finer step resolves the midday peak the quarter-day window
+    /// averaged away. So this is not "four times the headroom" on the draw's own time base;
+    /// it is the headroom inside one step, which is what decides whether the backstop fires.
+    /// The control that `step_draws` can see a squeeze moved with it: the lab leaf form no
+    /// longer rations the jar at 1/16, so `leaf_form.rs` now uses a tenth-size jar.
+    ///
     /// ⚠ Kept OUT of [`PINNED`]: that list is tied to the compensation-band roster by
     /// `every_banded_scenario_has_a_pinned_margin`, and this is not a band. And not a
     /// `science_gates!` row — that would be a manifest entry, i.e. an unfreeze.
-    const JAR_CO2_STEP_DRAW: f64 = 0.756662;
+    const JAR_CO2_STEP_DRAW: f64 = 0.200940;
 
-    /// ⚠⚠ **The tolerance is on the HEADROOM, `1 − draw`, not on the draw.** The question is
-    /// how close the jar comes to running out, and what is left is ~0.24 of the pool. 2 % of
-    /// the draw would let ~6 % of that headroom go unnoticed — the ratio-vs-margin mix
-    /// `leaf-rust-remeasure` P7 caught (a ratio moved 4 % while its margin lost a third). Same
-    /// [`TOLERANCE`], so ±2 % of the headroom: ±0.005 on the draw.
+    /// ⚠⚠ **The tolerance is on the HEADROOM, `1 − draw` — and, since the 1/16 step, on the
+    /// draw as well.** The question is how close the jar comes to running out. At the
+    /// quarter-day step what was left was ~0.24 of the pool, and 2 % of the draw would have let
+    /// ~6 % of that headroom go unnoticed — the ratio-vs-margin mix `leaf-rust-remeasure` P7
+    /// caught (a ratio moved 4 % while its margin lost a third). So it was ±2 % of the
+    /// headroom: ±0.005 on the draw. At 1/16 the headroom is ~0.80, and 2 % of it alone would
+    /// be ±0.016 on a 0.20 draw, an 8 % blind spot: the same mix the other way round. Both are
+    /// now held to [`TOLERANCE`], so whichever is the smaller number is the one that binds.
     #[test]
     fn the_jars_tightest_co2_step_is_pinned_by_its_headroom() {
         use crate::biosphere::params;
@@ -1072,7 +1124,8 @@ mod margins {
         assert_eq!(draws.rationed, 0, "the reference jar rations");
         let co2 = draws.of(CARBON_POOL);
         assert!(
-            within(1.0 - co2.ratio, 1.0 - JAR_CO2_STEP_DRAW),
+            within(1.0 - co2.ratio, 1.0 - JAR_CO2_STEP_DRAW)
+                && within(co2.ratio, JAR_CO2_STEP_DRAW),
             "the jar's tightest CO₂ step moved: it draws {:.6} of the pool (step {}), pinned \
              {JAR_CO2_STEP_DRAW:.6} — headroom {:.6} vs {:.6}, past {}%. Rising is the jar \
              closing on rationing; re-read before re-pinning",

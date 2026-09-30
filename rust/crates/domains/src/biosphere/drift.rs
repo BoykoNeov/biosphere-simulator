@@ -159,8 +159,8 @@ pub const MASS_DRIFT_SLOPE_BOUND: f64 = 1e-11;
 ///   `steps + 1` states (the initial one included).
 ///
 /// ⚠ `year` is a period in **the unit the trajectory is indexed by**, which is not always
-/// days: the biosphere's `run_season` trajectory is per-STEP (`steps_for(305)` = 1220 at
-/// `dt = 1/4`), while the station's `run_master_day` trajectory is per-DAY. Passing days
+/// days: the biosphere's `run_season` trajectory is per-STEP (`steps_for(305)` = 4880 at
+/// `dt = 1/16`), while the station's `run_master_day` trajectory is per-DAY. Passing days
 /// where steps are meant is the trap `post-roadmap-step-unfreeze.md` §1 records.
 /// ⚠ Generic over the element type, not fixed to `State`, and that is the faithful port:
 /// Python's is duck-typed over any sequence and only *happens* to be handed a

@@ -10,4 +10,9 @@ predictions (committed before any code) and per-slice results:
 
 * Slice 0 (`99c256e`): the simulation crates are optimised in dev/test builds. The suite's run
   time went from 496 s to 110 s, byte-neutral.
-* Slice 1 (the step) and slice 2 (C): open. This record is written out when they close.
+* Slice 1: the biosphere step is 1/16 day (a biosphere and station unfreeze, 11 goldens). The
+  whole suite runs in 254 s against 496 s before slice 0. Two user decisions on the way: the
+  master day may run in equal groups (the lamp scenarios' 24 power hours over 16 plant steps),
+  and the mutual-shading loss, which no frozen scenario reaches any more, is shown acting on a
+  pushed run. Six measured claims moved and were restated; see the plan's slice 1 results.
+* Slice 2 (C): open. This record is written out when it closes.

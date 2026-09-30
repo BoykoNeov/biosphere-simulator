@@ -2408,8 +2408,8 @@ mod tests {
             "overshoot beyond one step: {deepest}"
         );
         // No step extends faster than the unstressed maximum — f_water, f_temp <= 1.
-        // ⚠ In STEPS, not days: the engine runs at dt = 1/4, so the per-step ceiling is a
-        // QUARTER of the daily rate. A test that compared against the daily rate would
+        // ⚠ In STEPS, not days: the engine runs at dt = BIO_DT (1/16), so the per-step
+        // ceiling is that fraction of the daily rate. A test that compared against the daily rate would
         // pass on a build that had dropped `dt` from the accumulator entirely.
         let per_step = rootd.max_extension_rate * super::super::BIO_DT;
         let steps: Vec<f64> = depths.windows(2).map(|w| w[1] - w[0]).collect();
@@ -2783,12 +2783,18 @@ mod tests {
         // last two re-measurements landed on independently. That agreement is a
         // cross-port reading, not a copied literal: the numbers were produced here first
         // and then found to sit inside bounds Python had already re-pinned twice.
+        //
+        // ⚠ RE-PINNED 2026-09-30 for the 1/16-day step: leaf 11.8272x, grain 7.7398x (at the
+        // quarter-day step the bands were 9.0..10.5 and 5.5..6.2). Both runs do worse at the finer step, the
+        // droughted control more: peak LAI 6.662 → 5.672 with the deep store, 0.696 → 0.480
+        // without; grain 10.059 → 9.604 and 1.726 → 1.241. So the rescue grew because the
+        // unrescued drought bites harder, not because the rescue got stronger.
         assert!(
-            (9.0..10.5).contains(&leaf_ratio),
+            (11.1..13.0).contains(&leaf_ratio),
             "the canopy rescue moved: {leaf_ratio}"
         );
         assert!(
-            (5.5..6.2).contains(&grain_ratio),
+            (7.3..8.2).contains(&grain_ratio),
             "the grain rescue moved: {grain_ratio}"
         );
         assert!(

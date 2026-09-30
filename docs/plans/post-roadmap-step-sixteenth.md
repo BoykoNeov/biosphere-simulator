@@ -189,3 +189,68 @@ among them: 90 s, the two-rate full horizon 179 s, sealed resume 59 s, the expen
 band 83 s — **411 s** in all, against **1649 s** unoptimised (357, 670, 269, 353), measured
 afterwards in the as-shipped worktree with nothing else running. `regen_goldens` was not run for this slice: it runs in `--release`, which the change
 does not touch, so it could not have seen it. `clippy -D warnings` clean.
+
+### Slice 1 — done 2026-09-30
+
+The first whole-suite run at 1/16 gave 25 reds (`--no-fail-fast`). Every one was classed before
+any golden was regenerated.
+
+**Two decisions went back to the user**, asked together:
+
+* *The lamp scenarios could not run.* `lighting` and `day_neutral_lighting` step their power side
+  hourly (24 a day), which does not divide by 16 plant steps, and the driver refused uneven
+  splits. The user chose **"Loosen the even-split rule"** over the recommended half-hour power
+  step. `driver::day_groups` now runs the day in `gcd(fast, slow)` equal groups: 1440/16 is 16
+  groups of 1 plant step + 90 minutes (the adopted interleaved day, operation for operation);
+  24/16 is 8 groups of 2 plant steps + 3 power hours. Counts with no common factor (1440/7) are
+  still refused, because their only equal grouping is the retired slow-first order. The lamp
+  scenario's battery came out **bit-identical** (the lamp and crop share no stock), as the
+  advisor predicted before the question was asked.
+* *The mutual-shading loss lost its last reach.* The science gate
+  `the_vks_mutual_shading_regime_is_modelled_not_merely_avoided` asserted that the open field
+  itself crosses LAI 6.0, and at 1/16 it peaks at 5.4406. The user chose **"Test it on a pushed
+  run"**: the gate now runs the open field with `specific_leaf_area` ×1.1 and asserts the canopy
+  enters the regime with the loss off (6.8832) and that the loss holds it visibly lower (6.0797).
+
+**Findings (class c: a measured claim moved; each restated at its new value, the old one kept
+in a dated comment, none loosened):**
+
+1. *The mutual-shading loss becomes a ceiling.* With leaves 5–30 % thinner the loss holds peak
+   LAI at 6.01–6.19, where without it the canopy reaches 6.2–9.5. On the ladder the LAI
+   ceiling's absorption held (×2.058 against ×1.181, factor 1.74; was 1.77), the biomass cap's
+   fell (×2.526 against ×1.210, factor 2.1; was 3.3), and the crest now overshoots the cap by
+   0.97 % (was 0.13 %). "Nearly unfalsifiable in this direction" was partly the coarse step.
+2. *The jar's rationing threshold moved from 75–80 % of its room to 16–17 %*, roughly with the
+   step's per-step draw. The season-low CO₂ still reverses as the room shrinks (low point near
+   half the room, above the healthy jar's by a quarter), but now in runs with **zero**
+   rationing. The quarter-day record attributed the reversal to the backstop; that attribution
+   does not survive the finer step. The depressurised jar still never rations (down to 2 %).
+3. *The lab leaf form no longer rations the jar* (tightest step 0.3128 of the pool; it was
+   1.15). The "jar breaks" reading that holds the leaf form back was taken at a retired step.
+   Reopening it is the user's call.
+4. *All five compensation-point margins rose*: jar 10.675 → 11.665, perennial 1.150 → 1.190,
+   consumer 1.201 → 1.218.
+5. *The jar's tightest step* is 0.200940 of the pool (step 3108), at the same moment of the
+   season as the quarter-day step's 0.756662 (step 777). Per day it rose, 3.03 → 3.22. That pin
+   now holds both the draw and the headroom to 2 %, because 2 % of a 0.80 headroom alone would
+   have been an 8 % blind spot on the draw.
+6. *The deep-water rescue grew* (leaf ×9.58 → ×11.83, grain ×5.83 → ×7.74) because the
+   droughted control does worse at the finer step (peak LAI −31 %, grain −28 %) while the
+   rescued crop loses less (−15 %, −4.5 %).
+
+**Predictions graded.**
+
+| # | predicted | measured | |
+|---|---|---|---|
+| P1 | 11 goldens, `n` exactly 4×, no length change, 9 identical | exactly so; but `lighting` could not run until the driver rule changed | half |
+| P2 | open-field peak LAI 5.4–5.5, inside 5–8 | 5.4406 | held |
+| P3 | the loss goes inert; the science gate still passes via "below 6.0" | inert on **both** observables; the gate went red on its reach check | half |
+| P4 | open-field harvest ~+2 %, jar ~+6 % | +2.15 %; sealed-chamber golden +6.2 % (other chambers +8.3–8.8 %, sealed station +4.9 %) | held |
+| P5 | no guard fires, every band and floor holds | rationed 0 on every golden; every science gate green | held |
+| P6 | tightest draw 0.19–0.25 | 0.2009 per step; per day it rose | held, with the per-day caveat |
+| P7 | tier-2 bands: not predicted | no band crossed (`tier_contract`, `tier_sensitivity` green) | — |
+| P8 | whole suite within ±15 % of 445 s | **254 s** (the same suite measured 496 s before slice 0); ignored tests 417 s (411 s at ¼ optimised, 1649 s before slice 0) | refuted, the good way |
+| P9 | one value moves in each of the two manifests; authoring and `tiers.json` untouched | `dt_days` and `numerics_note` as written, authoring and `tiers.json` untouched; **missed** the `golden_sha256` rows (7 biosphere, 4 station) that follow every moved golden | half |
+
+Before the flip the advisor also flagged that the plan had no manifest prediction and asked for
+the sweep inside flows; both were done and committed first (`70d2b37`).

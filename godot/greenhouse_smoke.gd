@@ -4,7 +4,7 @@
 #   godot --headless --path godot --script res://greenhouse_smoke.gd
 #
 # Step-1's smoke proved the FFI boundary preserves determinism for the SINGLE-RATE `cabin_gas`.
-# This closes the two-rate gap: each `step()` here is one MASTER DAY = four quarter-day biosphere
+# This closes the two-rate gap: each `step()` here is one MASTER DAY = sixteen 1/16-day biosphere
 # steps, each followed by its share of the 1440 fast cabin sub-steps, so it exercises the two-rate driver (`advance_one_master_day`)
 # across the boundary. `greenhouse` is `reset = None`, 7 master days — cheap enough to run in the
 # fast crossport gate (the sealed re-sow arm is the slow companion, `sealed_smoke.gd`).

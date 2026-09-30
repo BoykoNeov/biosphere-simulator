@@ -32,7 +32,7 @@ use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
 
 use crate::driver::{
-    advance_one_master_day, fast_steps_per_slow_step, OwnedResetHook, DAYS_PER_MASTER_DAY,
+    advance_one_master_day, day_groups, OwnedResetHook, DAYS_PER_MASTER_DAY,
     SECONDS_PER_DAY,
 };
 
@@ -40,7 +40,7 @@ use crate::driver::{
 /// `step_report` per [`SimSession::step`]; a two-rate (sealed / greenhouse) session ticks
 /// one **master day** — `slow_steps_per_day` slow biosphere steps, each followed by its
 /// share of the `steps_per_day` fast sub-steps — per step. ⚠ `n` is the slow STEP count
-/// (4× the day count at `dt = ¼`), not the day count; this line said "day count" until
+/// (16× the day count at `dt = 1/16`; 4× at the ¼ step before 2026-09-30), not the day count; this line said "day count" until
 /// 2026-09-30, a leftover from the one-day step.
 // ⚠ Deliberate, not an oversight. Adding `slow_steps_per_day` (8 bytes) for the step
 // unfreeze pushed this over clippy's variant-size-difference threshold (376 → 384). The
@@ -117,7 +117,7 @@ impl SimSession {
     /// [`crate::sealed::sealed_reset_hook`] (or `None` for the greenhouse's no-reset seam).
     ///
     /// Requires `fast_dt · steps_per_day == 86400` s and `slow_dt · slow_steps_per_day == 1`
-    /// day, and `steps_per_day` to divide evenly by `slow_steps_per_day`, exactly like
+    /// day, and the two counts to have an equal grouping ([`crate::driver::day_groups`]), exactly like
     /// [`crate::driver::run_master_day`] — validated once at construction.
     #[allow(clippy::too_many_arguments)]
     pub fn two_rate(
@@ -146,7 +146,7 @@ impl SimSession {
                 slow_dt * slow_steps_per_day as f64
             )));
         }
-        fast_steps_per_slow_step(steps_per_day, slow_steps_per_day)?;
+        day_groups(steps_per_day, slow_steps_per_day)?;
         Ok(SimSession {
             mode: Mode::TwoRate {
                 slow_integrator,

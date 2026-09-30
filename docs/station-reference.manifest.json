@@ -110,7 +110,7 @@
     "thermal_equilibrium": [],
     "water_recovery": []
   },
-  "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/4 day, 4 slow sub-steps per master day, each followed by its quarter of the everything-fast dt=60 s sub-steps (interleaved, since 2026-09-30; slow-first before); Tier-1 energy single-rate dt=3600 s.",
+  "numerics_note": "Euler everywhere; dt per scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/16 day, 16 slow sub-steps per master day, each followed by its sixteenth of the everything-fast dt=60 s sub-steps (90 of them; interleaved since 2026-09-30, slow-first before); Tier-1 energy single-rate dt=3600 s.",
   "param_files": {
     "charge.yaml": "e82def3cdf9420921952a5c960eacd636e41b74a7b378a04e3a25d7602e622a2",
     "crew.yaml": "69f6f2ae1defacf137eb796c7042e2648e591eb3d5709e59717a48f13935ac23",
@@ -140,17 +140,17 @@
     },
     "greenhouse": {
       "golden": "greenhouse_state.json",
-      "golden_sha256": "2afef138ebba348394fc22d355930ce17d27af25ac9f688c11be1213f4b4912d",
+      "golden_sha256": "263a092190570858b242fcc4d95f8a14d021414f30b8c12744f3def2a2196d5b",
       "scenario": "GREENHOUSE_SCENARIO (P6.3 biosphere\u2194cabin)"
     },
     "harvest": {
       "golden": "harvest_state.json",
-      "golden_sha256": "5943a0ae47619d456d912612d17769c53e3706f618425d4f34cb057aef20bd2e",
+      "golden_sha256": "01a27c0bdeaf4e2f4bf6317e546ccf9e5cc1e65452212f91041edc5f8d204fa9",
       "scenario": "HARVEST_SCENARIO (P6.6 biomass\u2192food)"
     },
     "lighting": {
       "golden": "lighting_state.json",
-      "golden_sha256": "23b750ba878a0b2fdeab54ef4a8c24f1c591a4f324570e0735ad62ed750b99dc",
+      "golden_sha256": "2a50a90f6b51d339e066a1788f282ac84d72a56f6a31cb2630e5e5461fd02fd9",
       "scenario": "LIGHTING_SCENARIO (P6.5 Power\u2192biosphere lamp)"
     },
     "power_bounded_soc": {
@@ -170,7 +170,7 @@
     },
     "sealed_station": {
       "golden": "sealed_station_state.json",
-      "golden_sha256": "e0702e42b9cef5ddf3e284271f7aa2fd3063e38215eaf6674424d3abd5a0c82b",
+      "golden_sha256": "9e0b22a47af1d671a182734278cd297ef55926fc8f6714e20cdb8065ce8820aa",
       "scenario": "SEALED_STATION_SCENARIO (P6.7 Tier-2 combined-ledger multi-year)"
     },
     "station_heat_closure": {

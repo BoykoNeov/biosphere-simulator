@@ -220,11 +220,13 @@ fn well_posed(t: &Trajectory, what: &str) {
 /// than assumed from the construction.
 ///
 /// ⚠⚠ **Bounded to the well-posed regime, and that bound is a MEASUREMENT, not caution.**
-/// The plan predicted this direction with no cliff in it. Below `f ≈ 0.8` the arbitration
-/// backstop starts firing (2 firings at 0.75, 28 at 0.5) and the direction **reverses** —
-/// pinned separately in
-/// [`the_gated_observable_reads_HEALTHIER_once_the_backstop_fires`], because a reversal that
-/// this test merely avoided would be a fact nothing in the tree recorded.
+/// The plan predicted this direction with no cliff in it. At the quarter-day step, below
+/// `f ≈ 0.8` the arbitration backstop started firing (2 firings at 0.75, 28 at 0.5) and the
+/// direction **reversed**. ⚠ At the 1/16-day step (2026-09-30) the backstop first fires between
+/// `f = 0.17` and `0.16`, but the direction still reverses below `f ≈ 0.5`, in well-posed runs
+/// — pinned separately in
+/// [`the_gated_observable_reads_healthier_as_the_room_shrinks_before_any_backstop`], because a
+/// reversal that this test merely avoided would be a fact nothing in the tree recorded.
 #[test]
 fn the_bookkeeping_correct_vent_holds_composition_and_shrinks_the_room() {
     let base = sealed_chamber_scenario();
@@ -268,76 +270,87 @@ fn the_bookkeeping_correct_vent_holds_composition_and_shrinks_the_room() {
     );
 }
 
-/// ⚠⚠ **THE FINDING THIS BATCH DID NOT PREDICT: past the rationing cliff, the gated
-/// observable improves as the chamber gets worse.**
+/// ⚠⚠ **THE FINDING THIS BATCH DID NOT PREDICT: shrink the room far enough and the gated
+/// observable improves as the chamber gets worse — and at the 1/16-day step it does so
+/// before the backstop ever fires.**
 ///
 /// `season-low chamber CO₂ (ppm)` is the quantity the biosphere contract gates the jar on.
-/// Shrink the room and it falls, correctly — until the arbitration backstop starts firing, at
-/// which point the throttled withdrawal stops drawing the pool down and the *minimum comes
-/// back up*. At `f = 0.5` the jar rations 28 times and reads **above** its own healthy
-/// baseline.
+/// Shrink the room and it falls, correctly, to a minimum near `f = 0.5`, and then comes back
+/// up: at `f = 0.25` the jar reads **above** its own healthy baseline. Anything ranking
+/// chambers by this number — and the compensation-point band does exactly that — is
+/// non-monotone in room size.
 ///
-/// So a chamber broken badly enough to need the backstop reads *healthier* on the gated
-/// observable than one merely stressed. Anything ranking chambers by this number — and the
-/// compensation-point band does exactly that — is non-monotone across that boundary.
-///
-/// ⚠ The backstop is not misbehaving; it is doing its job, and the golden runs assert its
-/// firing count is 0 precisely so the reference never sits here. What is new is that the
-/// observable's **direction** is not safe outside that assumption, which is a property of the
-/// metric and not of the run.
+/// ⚠ **The cause recorded at the quarter-day step does not survive the finer step.** At ¼ the
+/// reversal coincided with the arbitration backstop (2 firings at `f = 0.75`, 28 at 0.5, where
+/// the jar read above baseline), and this test's doc said the throttled withdrawal was what
+/// brought the minimum back up; it was named `…_once_the_backstop_fires`. At 1/16
+/// (2026-09-30) the backstop first fires between `f = 0.17` and `0.16`, and the reversal is
+/// already complete above it in runs with **zero** firings (season lows: baseline 7.969; 7.258
+/// at 0.5; 8.200 at 0.25; 8.547 at 0.2). So the reversal belongs to the jar, not to the
+/// backstop. The likely reading is the jar's own feedback: a smaller room starves the crop
+/// sooner, so it grows less and draws less later (peak W falls monotonically, see the next
+/// test). That is named, not measured.
 #[test]
-fn the_gated_observable_reads_healthier_once_the_backstop_fires() {
+fn the_gated_observable_reads_healthier_as_the_room_shrinks_before_any_backstop() {
     let baseline = jar(sealed_chamber_scenario());
-    well_posed(&baseline, "cliff baseline");
+    well_posed(&baseline, "reversal baseline");
     let base_low = min_ppm(&baseline);
 
-    let stressed = jar(vented(0.8));
-    let broken = jar(vented(0.5));
+    let stressed = jar(vented(0.5));
+    let shrunk = jar(vented(0.25));
+    well_posed(&stressed, "f=0.5");
+    well_posed(&shrunk, "f=0.25");
 
-    // The stressed room is well-posed and reads lower, as E1 says it must.
-    assert_eq!(
-        stressed.rationed, 0,
-        "f=0.8 was expected to stay well-posed"
+    // The stressed room reads lower, as E1 says it must.
+    assert!(
+        min_ppm(&stressed) < base_low,
+        "f=0.5 did not deplete: {} vs baseline {base_low} ppm",
+        min_ppm(&stressed)
     );
-    assert!(min_ppm(&stressed) < base_low);
+    // The smaller, still well-posed room reads HIGHER than the healthy baseline.
+    assert!(
+        min_ppm(&shrunk) > base_low,
+        "the reversal is gone: f=0.25 {} vs baseline {base_low} ppm",
+        min_ppm(&shrunk)
+    );
+    assert!(
+        min_ppm(&shrunk) > min_ppm(&stressed),
+        "the smaller room does not read better than the merely stressed one"
+    );
 
-    // The broken room rations — and reads HIGHER than the healthy baseline.
+    // The backstop's own threshold, bracketed as measured: well-posed at 0.17, firing at 0.16.
+    assert_eq!(jar(vented(0.17)).rationed, 0, "f=0.17 was measured well-posed");
     assert!(
-        broken.rationed > 0,
-        "f=0.5 was expected to ration; the cliff has moved and this finding needs re-measuring"
-    );
-    assert!(
-        min_ppm(&broken) > base_low,
-        "the reversal is gone: broken {} vs baseline {base_low} ppm",
-        min_ppm(&broken)
-    );
-    assert!(
-        min_ppm(&broken) > min_ppm(&stressed),
-        "the broken room does not read better than the merely stressed one"
+        jar(vented(0.16)).rationed > 0,
+        "f=0.16 was measured to ration; the backstop threshold has moved"
     );
 }
 
 /// The companion to the reversal: **peak biomass stays monotone where season-low CO₂ does
-/// not.** Across the same four rooms, including the two that ration, the crop orders
+/// not.** Across four rooms spanning the reversal (at the quarter-day step 0.5/0.8/1/1.5, two
+/// of them rationing; at 1/16 the reversal sits lower, so 0.25/0.5/1/1.5, none rationing), the crop orders
 /// correctly every time.
 ///
 /// That makes it the honest observable off the nominal roster, and it is worth having pinned
 /// next to the reversal — the pair is what says "the metric misled", rather than "the run
 /// went strange".
 #[test]
-fn peak_biomass_stays_monotone_across_the_cliff_that_reverses_the_gated_one() {
+fn peak_biomass_stays_monotone_across_the_reversal_of_the_gated_one() {
     let w = |f: f64| peak_w(&jar(vented(f)));
-    let (half, four_fifths, one, half_again) = (w(0.5), w(0.8), w(1.0), w(1.5));
+    let (quarter, half, one, half_again) = (w(0.25), w(0.5), w(1.0), w(1.5));
     assert!(
-        half < four_fifths && four_fifths < one && one < half_again,
-        "peak W is not monotone in room size: {half} {four_fifths} {one} {half_again}"
+        quarter < half && half < one && one < half_again,
+        "peak W is not monotone in room size: {quarter} {half} {one} {half_again}"
     );
 }
 
 /// ⚠ **Why E1 breaks where E2 does not, and it is not about how much carbon is left.**
 ///
-/// E1 rations at `f = 0.75`. E2 does **not** ration at `f = 0.25`, with a third as much CO₂
-/// in the chamber in absolute moles. The difference is the *feedback*: E2 lowers the mole
+/// E1 rations at `f = 0.1`. E2 does **not** ration at `f = 0.05`, with half as much CO₂ in
+/// the chamber in absolute moles (nor at 0.02, measured). ⚠ At the quarter-day step the pair
+/// was E1 at 0.75 against E2 at 0.25; at 1/16 (2026-09-30) E1's backstop threshold fell to
+/// between 0.17 and 0.16, roughly with the step's per-step draw, and the contrast was
+/// re-taken below it. E2 still never rations, so the contrast holds. The difference is the *feedback*: E2 lowers the mole
 /// fraction, so `Ci` falls, so the plant's own demand falls with the supply — it self-limits.
 /// E1 holds the fraction and therefore holds the appetite, while removing the buffer that
 /// appetite was drawing on.
@@ -349,22 +362,22 @@ fn peak_biomass_stays_monotone_across_the_cliff_that_reverses_the_gated_one() {
 /// pinned rather than cross-referenced.
 #[test]
 fn the_self_limiting_feedback_is_what_keeps_the_jar_well_posed() {
-    let e1 = jar(vented(0.75));
-    let e2 = jar(depressurized(0.25));
+    let e1 = jar(vented(0.1));
+    let e2 = jar(depressurized(0.05));
 
     let base = sealed_chamber_scenario();
     assert!(
-        base.chamber_co2_mol0 * 0.25 < base.chamber_co2_mol0 * 0.75,
+        base.chamber_co2_mol0 * 0.05 < base.chamber_co2_mol0 * 0.1,
         "the comparison is only interesting if E2 holds strictly LESS carbon"
     );
 
     assert!(
         e1.rationed > 0,
-        "E1 at f=0.75 no longer rations; the cliff has moved"
+        "E1 at f=0.1 no longer rations; the backstop threshold has moved"
     );
     assert_eq!(
         e2.rationed, 0,
-        "E2 at f=0.25 rationed — the self-limiting reading of the contrast is wrong"
+        "E2 at f=0.05 rationed — the self-limiting reading of the contrast is wrong"
     );
 }
 

@@ -76,16 +76,18 @@ Every station/sibling scenario runs **forward-Euler** (`t = n·dt`, integer step
 The dt varies by scenario and is **not** an importable constant (each run helper selects
 it inline), so the manifest *documents* `integrator = "EulerIntegrator"` + a per-scenario
 note and the **goldens enforce** it (an integrator or dt switch moves every committed
-golden). The **sealed reference** is two-rate: biosphere-slow **`dt = ¼` day, four slow
+golden). The **sealed reference** is two-rate: biosphere-slow **`dt = 1/16` day, sixteen slow
 sub-steps per master day** + everything-fast **`dt = 60 s`** (ECLSS's binding
 `k_scrub·dt < 1`), stepped by `station.driver.run_master_day` **interleaved**: each slow
-sub-step is followed by its quarter of the day's fast sub-steps (360), so the cabin refills
-the shared air between the plant's draws. It ran **slow-first** (all four slow sub-steps,
+sub-step is followed by its sixteenth of the day's fast sub-steps (90), so the cabin refills
+the shared air between the plant's draws (¼ day and 360 until the 2026-09-30 step change; where
+the two counts do not divide evenly the day runs in equal groups, `driver::day_groups`, see the
+log). It ran **slow-first** (all the slow sub-steps,
 then all 1440 fast ones) until the 2026-09-30 unfreeze logged below. The Tier-1 energy loop is
 single-rate **`dt = 3600 s`** (`station.system.run_station`, where `n` advances so the
 diurnal SOC swing + the SB radiator's emergent `T_eq` attractor are expressible). The
 biosphere carries its own Euler/`dt` lock (its manifest); the station does **not** re-declare
-it — `bio_dt` / `bio_steps_per_day` bind to `domains.biosphere.step`.
+it — `bio_dt` / `bio_steps_per_day` bind to `domains::biosphere::{BIO_DT, STEPS_PER_DAY}`.
 
 ⚠ **Two things about `n` that were true here until 2026-08-14 and are not any more.**
 (a) **`n` is NOT the master-day count** — it is the slow domain's *step* count, so under the
@@ -317,6 +319,21 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-09-30 — the plant step moves to 1/16 day, and the master day may run in equal
+  GROUPS. 4 station goldens move (`greenhouse`, `harvest`, `lighting`, `sealed_station`), their
+  4 `golden_sha256` rows and `numerics_note` follow. No flow, param, seam, claim or `simcore`
+  byte changed.** The biosphere's step unfreeze of the same day (see its log); plan and grading:
+  `docs/plans/post-roadmap-step-sixteenth.md`. The sealed reference now interleaves each 1/16-day
+  plant step with its 90 cabin minutes. **The even-split refusal logged just below became
+  unrunnable**: the lamp scenarios step power hourly, and 24 does not divide by 16. On the
+  user's call (*"Loosen the even-split rule"*, over a half-hour power step) `driver::day_groups`
+  replaced `fast_steps_per_slow_step`: the day runs in `gcd(fast, slow)` equal groups of slow
+  steps then fast ones, which is the adopted interleaving whenever the counts divide (every
+  cabin scenario) and 8 × (2 plant steps + 3 power hours) for the lamps. Counts with no common
+  factor are still refused, because their only equal grouping is the retired slow-first day.
+  `lighting`'s battery is bit-identical (lamp and crop share no stock); its crop moved with the
+  step. Every station golden keeps 0 rationing and 0 events; no tier-2 band was crossed.
 
 - **2026-09-30 — the master day is INTERLEAVED: each plant quarter-day is followed by its 360
   cabin minutes, where it had been all four plant steps then all 1440 minutes. 3 station

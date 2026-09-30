@@ -11,7 +11,7 @@
 //!    step counter move four times a day is measured, not assumed harmless);
 //! 3. a scenario whose two sides share no stock cannot tell the orders apart;
 //! 4. on a scenario whose sides do share a stock, the orders differ (not a no-op);
-//! 5. an uneven split is refused — by the lab driver, the reference runner, the per-day
+//! 5. a split with no equal grouping is refused — by the lab driver, the reference runner, the per-day
 //!    function and the session alike.
 //!
 //! States are compared by their hex-float snapshot, so equal means bit-identical.
@@ -22,7 +22,9 @@ use simcore::error::SimError;
 use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
 use simcore::state::State;
-use station::driver::{advance_one_master_day, run_master_day, DayOrder, Side, TwoRate};
+use station::driver::{
+    advance_one_master_day, day_groups, run_master_day, DayGroups, DayOrder, Side, TwoRate,
+};
 use station::greenhouse::{build_greenhouse, greenhouse_bio_resolver, greenhouse_cabin_resolver};
 use station::harvest::{build_harvest, harvest_bio_resolver, harvest_cabin_resolver};
 use station::lighting::{build_lighting, lighting_bio_resolver, lighting_power_resolver};
@@ -292,14 +294,15 @@ fn an_uneven_split_is_refused_and_the_reference_guards_hold() {
         fast_dt,
         slow_reset: None,
     };
-    // 1440 minutes over 7 slow steps does not split evenly: interleaved refuses, the
+    // 1440 minutes over 7 slow steps share no common factor, so the only equal grouping is
+    // the whole day (the retired order): interleaved refuses, the
     // retired order (which needs no split) does not.
     let uneven = with(1440, 7, 1.0 / 7.0, 60.0);
     let msg = uneven
         .validate(DayOrder::Interleaved)
         .unwrap_err()
         .to_string();
-    assert!(msg.contains("divide evenly"), "{msg}");
+    assert!(msg.contains("share no common factor"), "{msg}");
     assert!(uneven.validate(DayOrder::SlowFirst).is_ok());
     // advance_day refuses on its own, not only through run().
     let (s0, _, _) = build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE).unwrap();
@@ -334,7 +337,7 @@ fn the_reference_refuses_an_uneven_split_on_every_entry() {
     let build = || build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE).unwrap();
     let divide = |e: SimError| {
         let msg = e.to_string();
-        assert!(msg.contains("divide evenly"), "{msg}");
+        assert!(msg.contains("share no common factor"), "{msg}");
     };
 
     let (s0, bio, cabin) = build();
@@ -399,4 +402,21 @@ fn the_reference_refuses_an_uneven_split_on_every_entry() {
         &slow, &fast, &s0, &bio_res, &cabin_res, 1440, 4, 0.25, 60.0, None
     )
     .is_ok());
+}
+
+/// The grouping itself, at the counts the reference runs and at the edges. An evenly dividing
+/// pair is one slow step per group (the interleaved day as adopted, unchanged); the lamp
+/// scenarios' 24 power hours over 16 plant steps are 8 groups of 2 plant steps then 3 hours;
+/// a pair with no common factor would collapse to the retired order and is refused.
+#[test]
+fn the_day_is_grouped_as_finely_as_equal_groups_allow() {
+    let g = |count, slow, fast| DayGroups { count, slow, fast };
+    assert_eq!(day_groups(1440, 16).unwrap(), g(16, 1, 90));
+    assert_eq!(day_groups(1440, 4).unwrap(), g(4, 1, 360));
+    assert_eq!(day_groups(24, 16).unwrap(), g(8, 2, 3));
+    assert_eq!(day_groups(24, 4).unwrap(), g(4, 1, 6));
+    assert_eq!(day_groups(24, 1).unwrap(), g(1, 1, 24));
+    for (fast, slow) in [(1440, 7), (0, 16), (24, 0)] {
+        assert!(day_groups(fast, slow).is_err(), "{fast} over {slow}");
+    }
 }

@@ -7,6 +7,12 @@
 //! science: a mechanism that does nothing at the frozen params is nonetheless the thing that
 //! decides what the bands can detect once anything moves.
 //!
+//! ⚠ **Re-measured at the 1/16-day step, 2026-09-30** (`docs/plans/post-roadmap-step-sixteenth.md`).
+//! The frozen canopy no longer reaches the threshold (5.4406), so the loss is inert on both
+//! observables; the ceiling's absorption held (1.74, was 1.77); the cap's fell (2.1, was 3.3)
+//! and its crest overshoot rose (0.97 %, was 0.13 %). Each test carries both numbers. The
+//! prediction table below is the quarter-day record, left as written.
+//!
 //! This file measures that, on **one knob** — `specific_leaf_area`, the linear carbon→area
 //! conversion (`require_positive`, no upper bound) — swept with the loss ON and with
 //! `shade_rate = 0.0`. The number that answers it is the SLA multiplier at which each bound
@@ -160,33 +166,37 @@ fn crossing(shading: bool, bound: f64, read: fn((f64, f64)) -> f64, hi: f64) -> 
     0.5 * (lo + hi)
 }
 
-/// FINDING 5's claim re-derived — **and its scope corrected**.
+/// FINDING 5's claim re-derived, its scope corrected — **and then removed by the step**.
 ///
-/// The loss is bit-identically inert on `peak LAI` at the frozen params, exactly as recorded:
-/// the canopy crosses the threshold *at* its summit, so the loss only ever acts on the way
-/// down. But *"exactly inert"* is a statement about **one observable**. On the sibling
-/// quantity of the same run it is live, because `peak W` is reached later than `peak LAI` —
-/// by which time the loss has been shedding leaf carbon for days.
+/// ⚠ **At the quarter-day step (until 2026-09-30)** the loss was bit-identically inert on
+/// `peak LAI` (6.022837: the canopy crossed the threshold *at* its summit) and live on
+/// `peak W` (gap 0.00206), because `peak W` came later, after days of shedding leaf carbon.
+/// That was this test, and "exactly inert" was a statement about one observable.
+///
+/// **At the 1/16-day step the canopy never reaches the threshold** (peak LAI 5.440614; the
+/// converged answer is 5.4273), so the loss is bit-identically inert on **both** observables:
+/// the crossing was the coarse step's canopy bias. Asserted as three facts, and the regime is
+/// then shown reachable one rung up, so this file still has a run where the loss acts.
 #[test]
-fn the_loss_is_inert_on_peak_lai_and_live_on_peak_w_at_the_frozen_params() {
+fn the_loss_is_inert_on_both_observables_at_the_frozen_params_and_live_one_rung_up() {
     let (lai_on, w_on) = open_field(1.0, true);
     let (lai_off, w_off) = open_field(1.0, false);
-
-    assert_eq!(
-        lai_on, lai_off,
-        "peak LAI must be BIT-identical with the loss off — {lai_on} vs {lai_off}"
-    );
-
-    // ⚠ Two absolute facts, not a ratio: a ratio against the zero above would pass for a
-    // reason that has nothing to do with the loss.
     assert!(
-        w_off > w_on,
-        "removing a loss must retain carbon — {w_off} vs {w_on}"
+        lai_on < 6.0,
+        "the frozen canopy must stay under the 6.0 threshold at 1/16 — {lai_on}"
     );
+    assert_eq!(lai_on, lai_off, "peak LAI: {lai_on} vs {lai_off}");
+    assert_eq!(w_on, w_off, "peak W: {w_on} vs {w_off}");
+
+    // One rung up (×1.1) the loss is live on both, each as an absolute fact. Measured at
+    // 1/16: peak LAI 6.0797 on vs 6.8832 off; peak W 13.5804 on vs 13.8495 off (gap 0.0198).
+    let (lai_on, w_on) = open_field(1.1, true);
+    let (lai_off, w_off) = open_field(1.1, false);
+    assert!(lai_off - lai_on > 0.5, "peak LAI: {lai_on} on vs {lai_off} off");
     let rel = (w_off - w_on) / w_on;
     assert!(
-        (0.0015..0.0030).contains(&rel),
-        "peak W gap {rel} (measured 0.00206: {w_on} on, {w_off} off)"
+        (0.015..0.025).contains(&rel),
+        "peak W gap {rel} (measured 0.0198: {w_on} on, {w_off} off)"
     );
 }
 
@@ -207,13 +217,16 @@ fn the_loss_roughly_doubles_the_sla_error_the_lai_ceiling_absorbs() {
     // ⚠ The two crossings are asserted as absolute facts BEFORE their ratio, because a ratio
     // alone would be satisfied by both arms moving together — which is exactly what a mutation
     // that disables the loss produces.
+    // ⚠ Re-measured at the 1/16-day step (2026-09-30): ×1.181 and ×2.058, absorption 1.74.
+    // At the quarter-day step they were ×1.138 and ×2.014 (1.77); the claim held, the rungs
+    // moved up with the smaller canopy the finer step grows.
     assert!(
-        (1.10..1.18).contains(&off),
-        "loss-OFF crossing (measured x1.138) — {off}"
+        (1.14..1.22).contains(&off),
+        "loss-OFF crossing (measured x1.181) — {off}"
     );
     assert!(
-        (1.95..2.10).contains(&on),
-        "loss-ON crossing (measured x2.014) — {on}"
+        (2.00..2.12).contains(&on),
+        "loss-ON crossing (measured x2.058) — {on}"
     );
     assert!(
         on / off > 1.7,
@@ -221,30 +234,34 @@ fn the_loss_roughly_doubles_the_sla_error_the_lai_ceiling_absorbs() {
     );
 }
 
-/// The biomass cap is crossed **later and by a hair**: `peak W` saturates just above it.
+/// The biomass cap is crossed **later, and `peak W` saturates about 1 % above it**.
 ///
-/// Crossings of `W_CAP`: loss OFF between ×1.16 and ×1.18, loss ON between ×3.80 and ×4.00 —
-/// a factor of ~**3.3**. And the maximum `peak W` reachable at any rung with the loss on is
-/// **14.4435** at ×4.5, only 0.13 % over the cap, after which it turns back down.
+/// ⚠ **Re-measured at the 1/16-day step (2026-09-30), and the claim weakened.** At the
+/// quarter-day step the crossings were ×1.170 off and ×3.81 on (a factor of ~3.3), and the
+/// crest with the loss on was 14.4435 at ×4.5, only 0.13 % over the cap: "nearly
+/// unfalsifiable in this direction", this test's name until then. At 1/16 they are **×1.210
+/// off and ×2.526 on (a factor of ~2.1)**, and the crest is **14.5649 at ×4.5, 0.97 % over
+/// the cap**. The loss still delays the cap and bounds the overshoot, but by far less; the
+/// quarter-day number was partly the coarse step.
 ///
-/// ⚠ Without the loss the two open-field bounds break within 2 % of each other (×1.14 and
-/// ×1.16) — near-redundant detectors. With it they separate by ~1.9×, and the LAI ceiling
-/// becomes the one that fires first.
+/// ⚠ Without the loss the two open-field bounds break within 3 % of each other (×1.181 and
+/// ×1.210) — near-redundant detectors. With it they still separate, and the LAI ceiling
+/// (×2.058) still fires first, now only just ahead of the cap (×2.526).
 #[test]
-fn the_loss_makes_the_biomass_cap_nearly_unfalsifiable_in_this_direction() {
+fn the_loss_delays_the_biomass_cap_and_bounds_its_overshoot() {
     let off = crossing(false, W_CAP, |q| q.1, 1.5);
     let on = crossing(true, W_CAP, |q| q.1, 4.5);
     assert!(
-        (1.14..1.22).contains(&off),
-        "loss-OFF cap crossing (measured x1.170) — {off}"
+        (1.17..1.25).contains(&off),
+        "loss-OFF cap crossing (measured x1.210) — {off}"
     );
     assert!(
-        (3.6..4.0).contains(&on),
-        "loss-ON cap crossing (measured x3.81) — {on}"
+        (2.45..2.60).contains(&on),
+        "loss-ON cap crossing (measured x2.526) — {on}"
     );
     assert!(
-        on / off > 3.0,
-        "the loss must absorb at least 3x the SLA error on the cap — {on} / {off}"
+        on / off > 2.0,
+        "the loss must absorb at least 2x the SLA error on the cap — {on} / {off}"
     );
 
     // The ceiling of the whole direction, not just of the crossing. ⚠ `peak W` is NOT monotone
@@ -258,8 +275,8 @@ fn the_loss_makes_the_biomass_cap_nearly_unfalsifiable_in_this_direction() {
     );
     let overshoot = (crest - W_CAP) / W_CAP;
     assert!(
-        overshoot < 0.002,
-        "the cap can be exceeded by at most a fraction of a percent — {overshoot}"
+        (0.008..0.012).contains(&overshoot),
+        "the crest overshoots the cap by about 1 % (measured 0.0097; 0.0013 at the quarter-day step) — {overshoot}"
     );
 }
 
