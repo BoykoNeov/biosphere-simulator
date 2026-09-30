@@ -162,6 +162,15 @@ reaches the jar's harvest (−0.02 %) at 1.7–4× the shipped cost. That is a n
 but not a dominant one: on the open field and on the jar's worst CO₂ error a 1/16 step does
 better (the stepping of the state carries real error there). Slice 4 is still the user's.
 
+**Slice 4 TAKEN AND BUILT 2026-09-30** on the user's *"1 + 3. But ensure the tests runtime would
+not quadruple"* → `docs/plans/post-roadmap-step-sixteenth.md`, record `docs/log/step-sixteenth.md`.
+The biosphere step is 1/16 day, and in a sealed build the crop's growth reads the CO₂ the step
+leaves (C), so it can never take more than the air holds (tested: squeezed jars that ration 205
+and 1403 times explicitly ration 0 times). The simulation crates were optimised in test builds
+first, so the test suite went from 445–496 s to about 250 s. **Step 2 is done.** What it leaves
+open: the lab leaf form no longer rations the jar at 1/16 (a re-measurement, the user's call),
+and the mutual-shading loss is now reached only on a pushed run.
+
 ### The problem, measured
 
 - The reference sealed jar's tightest step withdraws **0.757** of the CO₂ it starts with

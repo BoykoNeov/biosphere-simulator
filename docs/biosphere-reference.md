@@ -364,7 +364,7 @@ is which of the pin's two jobs is unowned.** The pin did two things:
   quantity: all five
   scenarios have byte-frozen goldens, so a change that moves the run reddens one. ⚠ Those
   goldens are **final-state snapshots** (`perennial_chamber_state.json` is the state at
-  `n = 6100`), not trajectories — the *trough* is not among the pinned quantities, and the
+  `n = 6100` then, 24400 at the 1/16 step), not trajectories — the *trough* is not among the pinned quantities, and the
   one-sided band is what stands between the season-low and the floor. A change halving every
   margin still leaves all five gates green, which is the exact hazard
   `docs/log/co2-compensation-band.md` wrote the pin to cover.
@@ -592,7 +592,8 @@ answer was two things at once: a **sourced leaf-thickness constant** (`specific_
 canopy** that lowers assimilation further. See the 2026-08-15 entry in the unfreeze log.
 
 ⚠ Two honest qualifications, neither of which reopens the deviation. (a) The **step
-sensitivity is not gone** — the shipped `dt = ¼` still reads 11 % above the converged value,
+sensitivity is not gone** — the shipped `dt = ¼` still read 11 % above the converged value (⚠ since
+2026-09-30 the shipped step is 1/16, which reads +0.3 %: see the unfreeze log),
 so the shipped number remains the loosest point of the sweep. What changed is that the whole
 sweep now sits inside the band, so no reading of the step turns the band red. (b) The floor
 was cleared by a **provenance** move as much as by a mechanism, which is exactly what the

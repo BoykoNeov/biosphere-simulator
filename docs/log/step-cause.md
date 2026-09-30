@@ -86,7 +86,7 @@ held (the control-4 wording).
 
 ## Open
 
-* **The step decision (Step 2, slice 4) is the user's**, now with three shapes: a finer step
+* ~~**The step decision (Step 2, slice 4) is the user's**~~ → **taken and built 2026-09-30**: a 1/16 step plus C (`docs/log/step-sixteenth.md`); originally, now with three shapes: a finer step
   (A), the light resolved inside the budget flows (E2's shape), and C for the within-step CO₂
   swing, alone or combined.
 * **Curvature vs the growth kink** (finding 3): the top-hat run.
