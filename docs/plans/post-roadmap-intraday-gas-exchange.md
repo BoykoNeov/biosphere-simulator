@@ -250,3 +250,56 @@ which lever relieves it is not measured (finding 3). The interleaved order is al
 the physics — the crew breathes out while the plants take CO₂ in — and it costs no new number.
 The one thing to weigh is the `harvest` golden's large move, which is the same effect on two
 stocks the old order hid.
+
+## 8. ADOPTED by the user, 2026-09-30 — the unfreeze
+
+**The user's call, 2026-09-30:** *"1. adopt"*. A station unfreeze under
+`docs/station-reference.md` §"The unfreeze discipline". Advisor-reviewed before any code.
+
+### 8.1 The design, as reviewed
+
+* `advance_one_master_day` takes the interleaved body: one plant step, then
+  `steps_per_day / slow_steps_per_day` cabin steps, repeated. The runners and the session call
+  that one function, so the session and the Godot bridge follow with no edit of their own.
+* **An uneven split is refused** where the two day-length guards already live (`run_master_day`
+  and `SimSession::two_rate`), because the per-day function does not validate and an integer
+  division would silently drop cabin time. Every caller today passes 1440 or 24 cabin steps
+  against 4 plant steps. **Authored scenarios cannot reach this driver**: nothing in
+  `rust/crates/authoring` calls it, and the bridge reaches it only through the fixed palette.
+* **§7's "delete the lab section" is NOT followed, on review.** Deleting `TwoRate` would orphan
+  `examples/intraday_exchange.rs` — the only thing that reproduces findings 1–4 — and the
+  controls comparing the orders. §7's objection was to a *switch in the reference*; a lab-only
+  arm that re-runs the retired order for the record is not that. `DayOrder::SlowFirst` becomes
+  "the retired order, lab-only", and the bit-identity control now says **interleaved** equals
+  the reference.
+
+### 8.2 Predictions — written 2026-09-30, before any code changed
+
+From the lab's own runs on the unedited tree (`intraday_exchange -- roster` and `-- sealed`):
+
+1. **Structure.** Of the 21 golden files, exactly **3** change: `greenhouse_state.json`,
+   `harvest_state.json`, `sealed_station_state.json`. The other 18 are byte-identical —
+   `lighting_state.json` and `sealed_energy_drift_summary.json` included.
+2. **Values — exact, not approximate.** Each new golden is the lab's interleaved final state bit
+   for bit, because the new reference day performs the lab's interleaved arithmetic operation for
+   operation. Recognisable figures:
+   * `greenhouse`: 16 stocks move, the largest `stem_reserve_c` +4.691e-4; crop C
+     0.215763 → 0.215797.
+   * `harvest`: 17 stocks move; `storage_c` +37.53 %, `humus_carbon` +19.05 %,
+     `microbial_carbon` +12.12 %; crop C 0.187205 → 0.187629.
+   * `sealed_station` (4 y): 17 stocks move; crop C 60.811979 → 61.557289 (+1.2256 %).
+3. **Gates.** All three keep 0 rationing and 0 events (measured interleaved, finding 5); the
+   sealed station's one science claim (the thermal node does not collapse) holds; session
+   parity and the bridge's save/load round trip hold, since they call the same function.
+4. **Manifest.** Exactly three `golden_sha256` rows move, plus `numerics_note`, whose prose is
+   edited by hand to name the order (it is the manifest's record of the station's numerics and
+   today does not say the order at all). No param, flow, aux or claim row moves. The biosphere
+   and authoring manifests do not move.
+5. **Tier-2 band basis.** The greenhouse ±1-ULP sensitivity is re-measured by
+   `station/tests/tier_sensitivity.rs` on the new order; predicted to stay within 10× of the
+   recorded 2.8e-16 and below the 1e-11 band. The band's written argument ("regulators hold the
+   pools at setpoint between the once-daily biosphere lumps") becomes truer, not weaker: the
+   lumps are now quarter-day ones with the regulator between each.
+6. **No simcore byte moves** (`git diff rust/crates/simcore/` empty).
+
+A row that moves unpredicted, or a gate that reddens, is a finding — not a diff to accept.
