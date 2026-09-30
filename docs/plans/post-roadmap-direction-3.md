@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `step-options.md`
+**Re-read against the record's last row:** `step-cause.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -435,6 +435,18 @@ magnitude, closed):** re-confirmed by a second instrument. `open_season` peak LA
 ¼ day against 5.4248 at 1/256, i.e. 6.0228 against the 5.4273 converged recorded here (0.05 %
 apart). The verdict stands. **§2.2:** unaffected, but the jar's shipped-step harvest is 7.1 %
 step-sensitive, so any controller pricing on the jar at ¼ day inherits that.
+⚠ *Re-read 2026-09-30* (`log/step-cause.md`): Step 2 slice 3b, lab-only. It discharges nothing
+here, and it re-scopes the previous note's word "step". The jar's 7.1 % is **the light's time
+resolution** (PAR as a quarter-day window mean), not the stepping of the state: a 1/256 step with
+quarter-day light keeps all of it, a quarter-day step with the light resolved inside the budget
+flows loses it. **§3 (canopy magnitude, closed):** re-confirmed a third way — E1 keeps +10.6 % of
+`open_season`'s +11.0 % peak-LAI bias with the step removed, so the canopy's "step sensitivity"
+is the light-path record's concavity, as recorded. The verdict stands. **§2.1:** unmeasured here
+(E2 does not reach the leaf form's leaf-area aux), but the convergence it asks for now has two
+routes, a finer step or the light resolved inside the step, and only the first reaches that aux
+as built. **§2.2:** the jar's mean CO₂ error at ¼ day is mostly light too (42.6 → 1.7 ppm with
+the light resolved); what remains is a within-step swing of about 31 ppm, which is the stepping
+and is what C addresses. A controller priced on the jar at ¼ day inherits both.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

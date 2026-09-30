@@ -156,7 +156,10 @@ overdrawing but leaves the harvest where it was: the error is not the crop's in-
 dominated by uniform refinement at equal cost. Cause not identified. **Slice 4, the decision, is
 the user's.** The user's call, 2026-09-30: *"Go with your recommendation"* — find the cause, then
 the step. The cause → `docs/plans/post-roadmap-step-cause.md`; it reports back before any
-unfreeze.
+unfreeze. **Measured the same day** (`docs/log/step-cause.md`): the 7.1 % is the light's time
+resolution, not the step — a quarter-day step with the light resolved inside the budget flows
+reaches the answer (−0.02 %) at 1.7–4× the shipped cost. That is a new option for slice 4, and
+slice 4 is still the user's.
 
 ### The problem, measured
 

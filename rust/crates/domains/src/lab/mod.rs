@@ -57,6 +57,10 @@ pub mod partition;
 /// step, splitting only tight steps, and the crop's uptake solved against the end-of-step air.
 pub mod step_options;
 
+/// **Why the quarter-day step loses the jar's harvest** (Step 2, slice 3b): the step size and the
+/// light's time resolution, separated.
+pub mod step_cause;
+
 /// One substitution: a field of one frozen param file, and the value to run instead.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Substitution {
