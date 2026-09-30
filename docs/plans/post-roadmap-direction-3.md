@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `draw-census.md`
+**Re-read against the record's last row:** `co2-uptake-source.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -418,7 +418,11 @@ only frozen store near its limit (CO₂ 0.757 of the pool in one step, over half
 the leaf form takes it to 1.15. **§2.2:** the frozen sealed station's grown 1 m² crop takes at
 most 0.078 of the cabin CO₂ in a step; the two 7-day station goldens whose crop shares the cabin air (greenhouse, harvest) hold seedlings and cannot
 show it. The station's crew-loop refusal
-(`log/crew-coupled-loop.md`) is the record it answers.
+(`log/crew-coupled-loop.md`) is the record it answers. ⚠ *Re-read 2026-09-30*
+(`log/co2-uptake-source.md`): a source search for Step 2's option C, no code. It discharges
+nothing here. It bears on **§2.1**: the scheme it found (modified Patankar–Euler) can never
+overdraw a pool, so it would quiet the jar's 1.15 under the leaf form **by construction** —
+which is no evidence for the leaf form either way; only convergence on a finer step is.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

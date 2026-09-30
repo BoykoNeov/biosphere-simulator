@@ -188,6 +188,11 @@ hours. Each new mechanism spends some of what headroom is left.
      wanted regardless of which option Step 2 picks for the step itself. The source-or-WHAT-IF
      rule above still decides which side of the line it lands on — find a published form for
      uptake against a depleting pool first; failing that, it is lab-only and tagged.
+     ⚠ **Searched 2026-09-30** (`docs/log/co2-uptake-source.md`): the biology is already built
+     (FvCB falls to zero at the compensation point); what C adds is inside the step, and that
+     has a published scheme — modified Patankar–Euler (Burchard, Deleersnijder & Meister 2003).
+     It is an **integrator** (a linear solve over every stock), so it replaces the frozen Euler
+     key, and it puts C and B on the same footing: both are how the step is taken.
 3. **Judge by convergence, not by silence.** For each option: does the result approach what a
    much finer uniform step gives? A quiet safety net is not the test.
 4. **Decision point.**
