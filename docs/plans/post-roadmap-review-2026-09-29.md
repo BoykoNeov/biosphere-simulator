@@ -189,10 +189,11 @@ hours. Each new mechanism spends some of what headroom is left.
      rule above still decides which side of the line it lands on — find a published form for
      uptake against a depleting pool first; failing that, it is lab-only and tagged.
      ⚠ **Searched 2026-09-30** (`docs/log/co2-uptake-source.md`): the biology is already built
-     (FvCB falls to zero at the compensation point); what C adds is inside the step, and that
-     has a published scheme — modified Patankar–Euler (Burchard, Deleersnijder & Meister 2003).
-     It is an **integrator** (a linear solve over every stock), so it replaces the frozen Euler
-     key, and it puts C and B on the same footing: both are how the step is taken.
+     (FvCB falls to zero at the compensation point); what C adds is inside the step, so C and B
+     are both "how the step is taken". Literal C is backward Euler on the crop's flow (lives in
+     `domains`). The published candidate found, modified Patankar–Euler (2003, read only via a
+     restatement), is a whole-system integrator — probably a `simcore` edit — and does not
+     respect the compensation point, so it is not C.
 3. **Judge by convergence, not by silence.** For each option: does the result approach what a
    much finer uniform step gives? A quiet safety net is not the test.
 4. **Decision point.**

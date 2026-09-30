@@ -27,7 +27,10 @@ A usable (a) source must say which concentration it is on (chamber `Ca` or leaf 
 reads `Ci` through a fixed ratio 0.7), whether it is per leaf or per stand, and whether it is a
 rate law or a curve fitted to one chamber.
 
-## 2. Predictions — written before any search (the advisor's, 2026-09-30)
+## 2. Predictions — stated before the search (the advisor's, 2026-09-30)
+
+⚠ Stated in the conversation before searching; this file was written after the search and
+committed with the results, so the commit history does not show them first.
 
 * P1: our own shelf holds no drawdown form.
 * P2: the literature gives only the straight line near the compensation point (uptake ∝
@@ -38,8 +41,9 @@ rate law or a curve fitted to one chamber.
 
 Graded and written out in `docs/log/co2-uptake-source.md`. In short: P1 held. P2 half held — no
 new *law* was found, but the search found a **measured whole-stand drawdown curve** (NASA KSC,
-Wheeler & Sager 1990), which is a validation target, not a form. Half (b) has a published
-answer: the modified Patankar–Euler scheme (Burchard, Deleersnijder & Meister 2003).
+Wheeler & Sager 1990), which is a validation target, not a form. Half (b) found a candidate,
+the modified Patankar–Euler scheme (Burchard, Deleersnijder & Meister 2003, unread), which keeps
+pools non-negative but is **not** C: C taken literally is backward Euler on the crop's flow.
 
 ## 4. What this does not do
 
@@ -47,5 +51,5 @@ answer: the modified Patankar–Euler scheme (Burchard, Deleersnijder & Meister 
 * It does not compare the model with the NASA curve — that is Step 6 work, and needs the
   chamber's geometry replayed in the lab.
 * It does not read Burchard et al. 2003 itself (paywalled); the scheme is taken from an open
-  paper by two of its authors' group that restates and attributes it. Read the original before
+  paper co-written by one of its authors (Meister) that restates and attributes it. Read the original before
   any reference use.
