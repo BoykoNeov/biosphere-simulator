@@ -304,3 +304,30 @@ the sweep inside flows; both were done and committed first (`70d2b37`).
 * **Q6 — the lab.** Lab tests that compare against "the shipped run" at four steps a day will
   see C where they expect Euler; where one goes red it is pointed at `StartOfStep`, the form it
   measured, and nothing in its numbers is re-pinned.
+
+### Amendments before code (the advisor's review of the above, 2026-09-30)
+
+* **Design: the solve ends when the bracket cannot shrink, not at a tolerance.** A tolerance stop
+  lands anywhere inside the tolerance depending on the path, so a 1-ULP change in an input could
+  move `X` by up to `1e-12·C₀`, which the tier-2 sensitivity tests (bands ~1e-11 over thousands
+  of steps, and on Linux CI) would read as divergence. So: Illinois steps, a midpoint whenever
+  the Illinois point is not strictly inside `(lo, hi)`, stop when no float lies strictly
+  between `lo` and `hi`, error at an iteration cap. `|h(lo)| ≤ 1e-12·C₀` stays, as a check after
+  the solve. Not a change of prediction.
+* **Q4's "by construction", checked rather than assumed.** In a sealed build maintenance
+  respiration only *returns* CO₂ to the pool (its covered part is a dropped round trip, its
+  shortfall burns organs) and growth respiration is empty; nothing else in the slow step
+  withdraws from the carbon pool. So the allocation flow's draw is the only withdrawal the
+  backstop sums, and bounding it bounds the step.
+* **Q7 — the tests whose subject C removes.** With C in the reference, "the jar rations" cannot
+  happen, so these do not move by a number; their behaviour is gone:
+  `gas_composition_perturbations.rs` (the 0.17/0.16 threshold bracket and E1 at 0.1) and
+  `leaf_form.rs`'s tenth-size-jar control. Each is restated on `StartOfStep` (the explicit
+  form's finding stays recorded) and paired with an assertion that the same squeeze rations
+  **zero** times under `EndOfStep`. The promise itself becomes a test: the tenth-size jar and the
+  2 % jar (205 and 1403 firings explicit) ration 0 times with C. If that fails, it is a finding.
+* **Q6 strengthened.** `step_options` and `step_cause` (examples and tests) are pointed at
+  `StartOfStep` explicitly whatever their colour, because under `EndOfStep` the lab's C would
+  wrap a flow that already solves. Both examples are re-run and one headline number from each
+  record must reproduce (the jar's −7.14 % harvest at ¼ against the 1/256-day answer).
+* **Q5 graded on evaluations**, not wall-clock alone.
