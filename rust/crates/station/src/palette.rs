@@ -117,8 +117,8 @@ fn build_station() -> Result<(SimSession, DisplayContext), SimError> {
 
 /// The biosphere ↔ cabin `greenhouse` as a **two-rate** session — the palette's first
 /// two-rate entry, and the reason time controls run off the render thread: each
-/// [`SimSession::step`] is one **master day** = one slow biosphere step + `steps_per_day`
-/// (1440) fast cabin sub-steps. Mirrors [`crate::greenhouse::run_greenhouse`]'s setup (and
+/// [`SimSession::step`] is one **master day** = four quarter-day biosphere steps, each
+/// followed by its share of the `steps_per_day` (1440) fast cabin sub-steps. Mirrors [`crate::greenhouse::run_greenhouse`]'s setup (and
 /// `tests/session_parity.rs`) with `reset = None`. The shared stocks are the biosphere
 /// carbon/O₂ pools the cabin flows are re-pointed at (a construction-time fact of the
 /// reversed greenhouse seam). No thermal node or battery, so both scalars project to `None`.

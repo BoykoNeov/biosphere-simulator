@@ -400,8 +400,9 @@ The bands absorb realistic **multi-ULP cross-libm** divergence while a real port
 trips them. `test_crossport.py` re-measures each sensitivity and asserts `band > sensitivity`
 (and `≤ 1e-9` for teeth). The sealed-station band reuses `BIOSPHERE_BAND` (`1e-11`) on the
 regulator-erasure / period-1 argument — the ECLSS scrubber and O₂ makeup hold the shared gas
-pools at their setpoints between the once-daily biosphere lumps, so a one-ULP nudge cannot
-amplify across master days — **not** a ±1-ULP sweep of the 1.3 M-substep run (a deliberate
+pools at their setpoints between the biosphere's lumps (once-daily when this was written;
+quarter-day ones with the regulators between each since the 2026-09-30 interleaving, which
+only strengthens it), so a one-ULP nudge cannot amplify across master days — **not** a ±1-ULP sweep of the 1.3 M-substep run (a deliberate
 cost choice).
 
 **Framed by use:** the sim's scientific claims survive at these bands — period class matches

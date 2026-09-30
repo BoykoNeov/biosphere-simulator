@@ -132,6 +132,11 @@ BVAD-sized one.
 goldens. Recommendation: adopt, if slice 3 shows the large crop stops being starved by the
 schedule.
 
+**DECIDED 2026-09-30: ADOPTED** (the user: *"adopt"*). Built the same day as a station unfreeze;
+it moved **three** goldens, not five (`lighting` cannot move and `sealed_energy_drift` never runs
+on this driver). Record: `docs/log/intraday-gas-exchange-adopted.md`; plan §8 of
+`docs/plans/post-roadmap-intraday-gas-exchange.md`. Step 2 is next in this plan's order.
+
 ---
 
 ## Step 2 — small air volumes against a big step
@@ -171,6 +176,11 @@ hours. Each new mechanism spends some of what headroom is left.
    - **C — make the draw self-limiting.** The crop's CO₂ uptake is computed against the air it
      would leave behind, not the air it found. This is a change of form to the science and
      needs a source for the form, or it is WHAT-IF.
+     ⚠ **The user, 2026-09-30: *"C — make plants take less as the CO₂ runs low — this should
+     be implemented at some point for sure."*** So C is not only a candidate to price: it is
+     wanted regardless of which option Step 2 picks for the step itself. The source-or-WHAT-IF
+     rule above still decides which side of the line it lands on — find a published form for
+     uptake against a depleting pool first; failing that, it is lab-only and tagged.
 3. **Judge by convergence, not by silence.** For each option: does the result approach what a
    much finer uniform step gives? A quiet safety net is not the test.
 4. **Decision point.**

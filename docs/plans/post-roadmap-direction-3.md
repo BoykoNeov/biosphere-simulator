@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `intraday-gas-exchange.md`
+**Re-read against the record's last row:** `intraday-gas-exchange-adopted.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -408,7 +408,9 @@ user's *"start implementing"* as **lab-only** work that stops before the adopt d
 measured the same day: the old order starves a crew-sized crop through CO₂ concentration, and
 interleaving lifts one crew member's crop from 57 % to 98.8 % of the 1 m² crop's growth per
 m². Adopt is recommended and is the user's call. It discharges nothing here and touches no §2
-or §3 item. ⚠ For §2.2: at the whole crew's area the heaviest step still asks 7.26× the
+or §3 item. ⚠ *Re-read 2026-09-30* (`log/intraday-gas-exchange-adopted.md`): **ADOPTED** by
+the user and built the same day — a station unfreeze, 3 goldens. Still discharges nothing here;
+the §2.2 note below stands unchanged, and the proposal's Step 2 is its next step. ⚠ For §2.2: at the whole crew's area the heaviest step still asks 7.26× the
 scrubbed pool; which lever relieves that (scrubber rate, step, air) is not measured. The station's crew-loop refusal
 (`log/crew-coupled-loop.md`) is the record it answers.
 

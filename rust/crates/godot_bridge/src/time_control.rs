@@ -2,8 +2,8 @@
 //!
 //! # Why a worker thread at all (advisor #3)
 //!
-//! A two-rate [`CoreSession::step`] is one **master day** = one slow biosphere step +
-//! `steps_per_day` (1440) fast cabin sub-steps, so fast-forwarding decades is *minutes* of
+//! A two-rate [`CoreSession::step`] is one **master day** = four quarter-day biosphere
+//! steps, each followed by its share of the `steps_per_day` (1440) fast cabin sub-steps, so fast-forwarding decades is *minutes* of
 //! compute even in release. Stepping on Godot's render thread would freeze the UI. So a
 //! [`TimeController`] spawns **one** long-lived worker thread that owns the stepping; the
 //! render thread only sends commands ([`Cmd`]) down an `mpsc` channel and reads the latest

@@ -78,7 +78,10 @@ it inline), so the manifest *documents* `integrator = "EulerIntegrator"` + a per
 note and the **goldens enforce** it (an integrator or dt switch moves every committed
 golden). The **sealed reference** is two-rate: biosphere-slow **`dt = ¼` day, four slow
 sub-steps per master day** + everything-fast **`dt = 60 s`** (ECLSS's binding
-`k_scrub·dt < 1`), stepped by `station.driver.run_master_day`. The Tier-1 energy loop is
+`k_scrub·dt < 1`), stepped by `station.driver.run_master_day` **interleaved**: each slow
+sub-step is followed by its quarter of the day's fast sub-steps (360), so the cabin refills
+the shared air between the plant's draws. It ran **slow-first** (all four slow sub-steps,
+then all 1440 fast ones) until the 2026-09-30 unfreeze logged below. The Tier-1 energy loop is
 single-rate **`dt = 3600 s`** (`station.system.run_station`, where `n` advances so the
 diurnal SOC swing + the SB radiator's emergent `T_eq` attractor are expressible). The
 biosphere carries its own Euler/`dt` lock (its manifest); the station does **not** re-declare
@@ -314,6 +317,29 @@ An undocumented unfreeze fails CI by construction (a moved golden, or the comple
 gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
+
+- **2026-09-30 — the master day is INTERLEAVED: each plant quarter-day is followed by its 360
+  cabin minutes, where it had been all four plant steps then all 1440 minutes. 3 station
+  goldens move, 3 `golden_sha256` rows and `numerics_note` follow. No flow, param, seam, claim
+  or `simcore` byte changed.** The user's call (*"adopt"*), on the lab measurement in
+  `docs/log/intraday-gas-exchange.md`; plan, predictions (committed before any code) and
+  grading: `docs/plans/post-roadmap-intraday-gas-exchange.md` §8.
+  **Why.** Slow-first let all four plant steps draw on the cabin CO₂ as it stood at dawn, with
+  the crew's exhalation for the day arriving only afterwards, so a crop sized to the crew was
+  starved by the schedule: at one crew member's area it reached 57 % of the 1 m² crop's growth
+  per m², and 98.8 % interleaved. Interleaved is also the order that matches the physics.
+  **What moved.** `greenhouse` (16 stocks, largest +4.7e-4), `harvest` (grain store +37.5 %,
+  humus +19.0 %, microbes +12.1 % — the harvest flow and the feces-to-litter seam are two more
+  stocks the sides share besides the air), `sealed_station` (crop carbon +1.23 % over 4 years).
+  All three keep 0 rationing and 0 events. `lighting` cannot move (lamp and crop share no
+  stock) and did not.
+  **The new refusal.** `driver::fast_steps_per_slow_step` refuses a cabin-step count that does
+  not divide evenly by the plant-step count, in the per-day function, `run_master_day` and
+  `SimSession::two_rate`. No shipped scenario trips it; authored scenarios cannot reach this
+  driver.
+  **The retired order is kept, lab-only** (`driver::DayOrder::SlowFirst`), so the record that
+  retired it can be re-run; the plan's §7 said to delete it and §8 says why it was not.
+  Tier-2 basis re-measured: greenhouse ±1-ULP sensitivity 2.76e-16 → 3.49e-16, band 1e-11.
 
 - **2026-09-29 — the biosphere's condenser holds 75 % relative humidity; 4 station goldens
   move (water stocks only) and 4 `golden_sha256` rows follow. No station flow, param, seam or

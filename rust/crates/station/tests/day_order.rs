@@ -1,15 +1,18 @@
-//! Controls for the lab-only day order (`station::driver::TwoRate`),
-//! `docs/plans/post-roadmap-intraday-gas-exchange.md` §3.
+//! Controls for the day order: the reference day (`station::driver::advance_one_master_day`)
+//! and the lab's two-order driver (`station::driver::TwoRate`),
+//! `docs/plans/post-roadmap-intraday-gas-exchange.md` §3 and §8.
 //!
-//! The lab measures the interleaved order against the reference. These tests are what make
-//! those measurements mean anything:
+//! The interleaved order was ADOPTED 2026-09-30; slow-first is the retired order, kept in the
+//! lab so the record that retired it can be re-run. These tests are what make the lab's
+//! comparisons mean anything:
 //!
-//! 1. the slow-first path IS the reference day, bit for bit (else the lab measures a copy);
-//! 2. with no plants, interleaving changes nothing (the cabin seeing the step counter move
-//!    four times a day is measured, not assumed harmless);
+//! 1. the interleaved path IS the reference day, bit for bit (else the lab measures a copy);
+//! 2. with no plants, the retired order gives the reference's bits (the cabin seeing the
+//!    step counter move four times a day is measured, not assumed harmless);
 //! 3. a scenario whose two sides share no stock cannot tell the orders apart;
 //! 4. on a scenario whose sides do share a stock, the orders differ (not a no-op);
-//! 5. an uneven split is refused.
+//! 5. an uneven split is refused — by the lab driver, the reference runner, the per-day
+//!    function and the session alike.
 //!
 //! States are compared by their hex-float snapshot, so equal means bit-identical.
 
@@ -19,7 +22,7 @@ use simcore::error::SimError;
 use simcore::integrator::EulerIntegrator;
 use simcore::snapshot::from_engine;
 use simcore::state::State;
-use station::driver::{run_master_day, DayOrder, Side, TwoRate};
+use station::driver::{advance_one_master_day, run_master_day, DayOrder, Side, TwoRate};
 use station::greenhouse::{build_greenhouse, greenhouse_bio_resolver, greenhouse_cabin_resolver};
 use station::harvest::{build_harvest, harvest_bio_resolver, harvest_cabin_resolver};
 use station::lighting::{build_lighting, lighting_bio_resolver, lighting_power_resolver};
@@ -28,6 +31,7 @@ use station::scenario::{
     greenhouse_scenario, harvest_scenario, lighting_scenario, sealed_station_scenario,
 };
 use station::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_resolver};
+use station::session::SimSession;
 
 fn snap(state: &State) -> String {
     from_engine(state).to_json()
@@ -86,14 +90,14 @@ fn greenhouse_both(order: DayOrder, with_plants: bool) -> (String, String, u64, 
 }
 
 #[test]
-fn slow_first_is_the_reference_day_bit_for_bit_on_the_greenhouse() {
-    let (reference, lab, ref_rationed, lab_rationed) = greenhouse_both(DayOrder::SlowFirst, true);
+fn interleaved_is_the_reference_day_bit_for_bit_on_the_greenhouse() {
+    let (reference, lab, ref_rationed, lab_rationed) = greenhouse_both(DayOrder::Interleaved, true);
     assert_eq!(lab, reference);
     assert_eq!(lab_rationed, ref_rationed);
 }
 
 #[test]
-fn slow_first_is_the_reference_day_bit_for_bit_on_the_harvest_ring() {
+fn interleaved_is_the_reference_day_bit_for_bit_on_the_harvest_ring() {
     let crew = params::crew();
     let eclss = params::eclss();
     let hp = station_params::harvest();
@@ -133,7 +137,7 @@ fn slow_first_is_the_reference_day_bit_for_bit_on_the_harvest_ring() {
         slow_reset: None,
     };
     let (states, totals) = two
-        .run(DayOrder::SlowFirst, s0, gh.days, &mut ignore)
+        .run(DayOrder::Interleaved, s0, gh.days, &mut ignore)
         .unwrap();
     assert_eq!(
         snap(states.last().unwrap()),
@@ -147,7 +151,7 @@ fn slow_first_is_the_reference_day_bit_for_bit_on_the_harvest_ring() {
 /// season's seed bank); this one exercises the adopt branch and its observer call in both
 /// runners. The full horizon with the real hook is compared in the lab example.
 #[test]
-fn slow_first_is_the_reference_day_bit_for_bit_across_a_resow() {
+fn interleaved_is_the_reference_day_bit_for_bit_across_a_resow() {
     let charge = params::charge();
     let thermal = params::thermal();
     let crew = params::crew();
@@ -203,7 +207,9 @@ fn slow_first_is_the_reference_day_bit_for_bit_across_a_resow() {
     let mut count = |side: Side, _: &State, _: &State| {
         seen[side as usize] += 1;
     };
-    let (states, totals) = two.run(DayOrder::SlowFirst, s0, days, &mut count).unwrap();
+    let (states, totals) = two
+        .run(DayOrder::Interleaved, s0, days, &mut count)
+        .unwrap();
     assert_eq!(
         snap(states.last().unwrap()),
         snap(ref_states.last().unwrap())
@@ -222,18 +228,19 @@ fn slow_first_is_the_reference_day_bit_for_bit_across_a_resow() {
 }
 
 #[test]
-fn interleaving_without_plants_changes_nothing() {
-    // The cabin now sees the step counter move four times a day. With no plant flows the
-    // slow side only advances the counter, so any difference is the cabin reading it.
-    let (reference, lab, _, _) = greenhouse_both(DayOrder::Interleaved, false);
+fn without_plants_the_retired_order_gives_the_reference_bits() {
+    // The reference cabin sees the step counter move four times a day, the retired order's
+    // once. With no plant flows the slow side only advances the counter, so any difference
+    // is the cabin reading it.
+    let (reference, lab, _, _) = greenhouse_both(DayOrder::SlowFirst, false);
     assert_eq!(lab, reference);
 }
 
 #[test]
-fn interleaving_moves_a_scenario_whose_sides_share_a_stock() {
+fn the_order_moves_a_scenario_whose_sides_share_a_stock() {
     // Control on the control above: the order is not a no-op where the crop and the cabin
     // share the air.
-    let (reference, lab, _, _) = greenhouse_both(DayOrder::Interleaved, true);
+    let (reference, lab, _, _) = greenhouse_both(DayOrder::SlowFirst, true);
     assert_ne!(lab, reference);
 }
 
@@ -286,7 +293,7 @@ fn an_uneven_split_is_refused_and_the_reference_guards_hold() {
         slow_reset: None,
     };
     // 1440 minutes over 7 slow steps does not split evenly: interleaved refuses, the
-    // reference order (which needs no split) does not.
+    // retired order (which needs no split) does not.
     let uneven = with(1440, 7, 1.0 / 7.0, 60.0);
     let msg = uneven
         .validate(DayOrder::Interleaved)
@@ -312,4 +319,84 @@ fn an_uneven_split_is_refused_and_the_reference_guards_hold() {
         );
         assert!(with(1440, 4, 0.25, 60.0).validate(order).is_ok());
     }
+}
+
+/// The reference refuses the uneven split on every path a run can enter by: the runner and
+/// the session up front, and the per-day function on its own (it validates nothing else, so
+/// without this an integer division would drop the remainder's cabin time silently).
+#[test]
+fn the_reference_refuses_an_uneven_split_on_every_entry() {
+    let crew = params::crew();
+    let eclss = params::eclss();
+    let scenario = greenhouse_scenario();
+    let bio_res = greenhouse_bio_resolver(&scenario).unwrap();
+    let cabin_res = greenhouse_cabin_resolver(&scenario).unwrap();
+    let build = || build_greenhouse(&crew, &eclss, &scenario, true, FECAL_WASTE).unwrap();
+    let divide = |e: SimError| {
+        let msg = e.to_string();
+        assert!(msg.contains("divide evenly"), "{msg}");
+    };
+
+    let (s0, bio, cabin) = build();
+    let (slow, fast) = (EulerIntegrator::new(bio), EulerIntegrator::new(cabin));
+    divide(
+        run_master_day(
+            &slow,
+            &fast,
+            s0,
+            &bio_res,
+            &cabin_res,
+            1,
+            1440,
+            7,
+            1.0 / 7.0,
+            60.0,
+            None,
+        )
+        .map(|_| ())
+        .unwrap_err(),
+    );
+
+    let (s0, _, _) = build();
+    divide(
+        advance_one_master_day(
+            &slow,
+            &fast,
+            &s0,
+            &bio_res,
+            &cabin_res,
+            1440,
+            7,
+            1.0 / 7.0,
+            60.0,
+            None,
+        )
+        .map(|_| ())
+        .unwrap_err(),
+    );
+
+    let (s0, bio, cabin) = build();
+    divide(
+        SimSession::two_rate(
+            EulerIntegrator::new(bio),
+            EulerIntegrator::new(cabin),
+            s0,
+            greenhouse_bio_resolver(&scenario).unwrap(),
+            greenhouse_cabin_resolver(&scenario).unwrap(),
+            1440,
+            7,
+            1.0 / 7.0,
+            60.0,
+            None,
+        )
+        .map(|_| ())
+        .unwrap_err(),
+    );
+
+    // The same three accept the shipped split.
+    let (s0, _, _) = build();
+    assert!(advance_one_master_day(
+        &slow, &fast, &s0, &bio_res, &cabin_res, 1440, 4, 0.25, 60.0, None
+    )
+    .is_ok());
 }

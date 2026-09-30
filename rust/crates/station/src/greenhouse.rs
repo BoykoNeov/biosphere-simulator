@@ -5,7 +5,8 @@
 //! biosphere's `CARBON_POOL` (`{C:1,O:2}`) / `O2_POOL` (`{O:2}`) stay the shared cabin air,
 //! and the CABIN's five all-parameterised flows are re-pointed at those ids (`build_season`
 //! reused wholesale). Runs under the two-rate [`crate::driver::run_master_day`] (biosphere
-//! slow once/day, cabin fast ×`steps_per_day`). Tier-2 (the FvCB biosphere in the graph).
+//! slow ×`bio_steps_per_day`, each step followed by its share of the cabin's fast
+//! ×`steps_per_day`). Tier-2 (the FvCB biosphere in the graph).
 
 use std::collections::BTreeMap;
 

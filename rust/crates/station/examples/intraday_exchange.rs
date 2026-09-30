@@ -5,10 +5,11 @@
 //! cargo run --release -q -p station --example intraday_exchange
 //! ```
 //!
-//! Runs every two-rate scenario that carries a plant in both day orders (the reference's
-//! slow-first, and interleaved) through the lab-only [`TwoRate`] driver, and prints:
+//! Runs every two-rate scenario that carries a plant in both day orders (the retired
+//! slow-first, and interleaved — the reference since its adoption on 2026-09-30, plan §8)
+//! through the lab-only [`TwoRate`] driver, and prints:
 //!
-//! * **control 1 at full length** — slow-first against the reference `run_sealed`, the whole
+//! * **control 1 at full length** — interleaved against the reference `run_sealed`, the whole
 //!   4-year sealed station with its real re-sow hook, bit for bit;
 //! * **slice 2** — every stock at the end of each frozen scenario, order against order;
 //! * **control 4** — the area-scaling transform on the standalone sealed chamber;
@@ -415,9 +416,9 @@ fn sealed_measure(sc: &SealedStationScenario, with_harvest: bool, order: DayOrde
     measure(&two, order, s0, sc.days(), sc.bio.ground_area)
 }
 
-/// Control 1 at full length: the reference `run_sealed` against `TwoRate` slow-first, with the
-/// real re-sow hook, over the whole frozen horizon.
-fn control_full_sealed(slow_first: &State) {
+/// Control 1 at full length: the reference `run_sealed` against `TwoRate` interleaved, with
+/// the real re-sow hook, over the whole frozen horizon. (Slow-first until the adoption.)
+fn control_full_sealed(interleaved: &State) {
     let charge = params::charge();
     let thermal = params::thermal();
     let crew = params::crew();
@@ -440,9 +441,9 @@ fn control_full_sealed(slow_first: &State) {
     )
     .expect("reference run");
     let same =
-        from_engine(states.last().expect("day")).to_json() == from_engine(slow_first).to_json();
+        from_engine(states.last().expect("day")).to_json() == from_engine(interleaved).to_json();
     println!(
-        "  control 1, full 4-year sealed station with the real re-sow: slow-first == reference \
+        "  control 1, full 4-year sealed station with the real re-sow: interleaved == reference \
          bit for bit: {same}"
     );
     assert!(
@@ -620,12 +621,16 @@ fn main() {
             .iter()
             .map(|o| sealed_measure(&sealed, false, *o))
             .collect();
-        control_full_sealed(&runs[0].last);
+        control_full_sealed(&runs[1].last);
         compare("sealed_station (4 y)", &runs[0].last, &runs[1].last);
 
         println!("\n== slice 5: the carbon books, the frozen 1 m² sealed station (4 y) ==");
-        print_books("slow-first (the reference order)", &runs[0], exhale_per_day);
-        print_books("interleaved", &runs[1], exhale_per_day);
+        print_books("slow-first (the retired order)", &runs[0], exhale_per_day);
+        print_books(
+            "interleaved (the reference order)",
+            &runs[1],
+            exhale_per_day,
+        );
     }
     if want("similarity") {
         println!("\n== control 4: area scaling on the standalone sealed chamber (air included) ==");

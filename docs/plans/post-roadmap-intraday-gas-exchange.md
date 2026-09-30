@@ -303,3 +303,36 @@ From the lab's own runs on the unedited tree (`intraday_exchange -- roster` and 
 6. **No simcore byte moves** (`git diff rust/crates/simcore/` empty).
 
 A row that moves unpredicted, or a gate that reddens, is a finding — not a diff to accept.
+
+### 8.3 Grading — measured 2026-09-30
+
+| # | Prediction | Result |
+|---|---|---|
+| 1 | exactly 3 of the goldens change | **held**: `regen_goldens` reported 20 run, 3 changed (`greenhouse`, `harvest`, `sealed_station`); 17 byte-identical, `lighting` and `sealed_energy_drift_summary` included |
+| 2 | each new golden is the lab's interleaved end state, bit for bit | **held to every printed digit**: greenhouse 16 stocks moved, `stem_reserve_c` +4.6912e-4; harvest 17, `storage_c` +37.532 %, `humus_carbon` +19.049 %, `microbial_carbon` +12.123 %; sealed station 17, `stem_reserve_c` +1.5002 %, `storage_c` +1.3349 %. No non-stock field moved. The three bit-identity controls in `tests/day_order.rs` (greenhouse, harvest ring, a re-sow) now hold the *interleaved* lab arm to the reference and pass |
+| 3 | gates hold | **held**: full `cargo test --release --no-fail-fast`, 74 test binaries, 0 failed; session parity and the bridge's save/load pass unedited; the ignored long runs are graded in §8.4 |
+| 4 | manifest: 3 `golden_sha256` rows + `numerics_note` | **held**: exactly those 4 lines; biosphere and authoring manifests unmoved |
+| 5 | greenhouse ±1-ULP sensitivity within 10× of 2.8e-16, below 1e-11 | **held**: 3.490512e-16 (was 2.762079e-16, ratio 1.26); recorded in `rust/data/tiers.json` `measured_2026_09_30_interleaved_day` |
+| 6 | no `simcore` byte moves | **held**: `git diff rust/crates/simcore/` empty |
+
+**The refusal.** `fast_steps_per_slow_step` is the one place the split is checked; the per-day
+function calls it (so no path can drop cabin time), and `run_master_day` and
+`SimSession::two_rate` call it up front. A new test drives all three with 1440 cabin steps over
+7 plant steps and reads the refusal from each. No shipped scenario is refused; authored files
+cannot reach this driver.
+
+**Prose that named the old order, all corrected:** the driver's module doc, the session's
+docs (one also still called `n` a day count — a leftover of the one-day step), `greenhouse.rs`,
+`palette.rs`, the bridge's `time_control.rs`, `godot/greenhouse_smoke.gd`, `ulp_probe.rs`, the
+native-port doc and `tiers.json`'s sealed-station evidence ("once-daily biosphere lumps": they
+are quarter-day lumps with the regulators between each now, which only strengthens that
+argument), and `docs/station-reference.md`'s numerics paragraph.
+
+### 8.4 The long runs — measured 2026-09-30
+
+`cargo test --release -- --ignored`, 4 of 4 pass: the sealed-station golden is still the
+reference's output (88 s, 1.3 M sub-steps); a session stepped over the full sealed horizon
+matches `run_master_day` bit for bit; a resume across a sealed season boundary is
+bit-identical; every expensive station golden sits inside its measured band. The lab example's
+full-length control now reads *interleaved == reference bit for bit: true* over the 4-year
+sealed station with its real re-sow.

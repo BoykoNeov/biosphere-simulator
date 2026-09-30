@@ -31,12 +31,17 @@ use simcore::events::Event;
 use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
 
-use crate::driver::{advance_one_master_day, OwnedResetHook, DAYS_PER_MASTER_DAY, SECONDS_PER_DAY};
+use crate::driver::{
+    advance_one_master_day, fast_steps_per_slow_step, OwnedResetHook, DAYS_PER_MASTER_DAY,
+    SECONDS_PER_DAY,
+};
 
 /// The per-mode machinery a [`SimSession`] owns. A single-rate session ticks one
 /// `step_report` per [`SimSession::step`]; a two-rate (sealed / greenhouse) session ticks
-/// one **master day** — one slow biosphere step + `steps_per_day` fast sub-steps — per
-/// step (`n` is the day count under the `substep`-keeps-`n` design).
+/// one **master day** — `slow_steps_per_day` slow biosphere steps, each followed by its
+/// share of the `steps_per_day` fast sub-steps — per step. ⚠ `n` is the slow STEP count
+/// (4× the day count at `dt = ¼`), not the day count; this line said "day count" until
+/// 2026-09-30, a leftover from the one-day step.
 // ⚠ Deliberate, not an oversight. Adding `slow_steps_per_day` (8 bytes) for the step
 // unfreeze pushed this over clippy's variant-size-difference threshold (376 → 384). The
 // lint guards against wasting memory across MANY instances; a process holds exactly one
@@ -104,14 +109,16 @@ impl SimSession {
     }
 
     /// A **two-rate** session (sealed / greenhouse: one **master day** per
-    /// [`step`](SimSession::step) — `slow_steps_per_day` slow biosphere `step_report`s +
-    /// `steps_per_day` fast sub-steps, the conservation gate re-asserted after each).
+    /// [`step`](SimSession::step) — `slow_steps_per_day` slow biosphere `step_report`s, each
+    /// followed by its share of the `steps_per_day` fast sub-steps, the conservation gate
+    /// re-asserted after each).
     /// Mirrors [`crate::sealed::run_sealed`]'s setup; `step` calls the same
     /// [`crate::driver::advance_one_master_day`] its loop does. Pass the re-sow hook from
     /// [`crate::sealed::sealed_reset_hook`] (or `None` for the greenhouse's no-reset seam).
     ///
     /// Requires `fast_dt · steps_per_day == 86400` s and `slow_dt · slow_steps_per_day == 1`
-    /// day, exactly like [`crate::driver::run_master_day`] — validated once at construction.
+    /// day, and `steps_per_day` to divide evenly by `slow_steps_per_day`, exactly like
+    /// [`crate::driver::run_master_day`] — validated once at construction.
     #[allow(clippy::too_many_arguments)]
     pub fn two_rate(
         slow_integrator: EulerIntegrator,
@@ -139,6 +146,7 @@ impl SimSession {
                 slow_dt * slow_steps_per_day as f64
             )));
         }
+        fast_steps_per_slow_step(steps_per_day, slow_steps_per_day)?;
         Ok(SimSession {
             mode: Mode::TwoRate {
                 slow_integrator,

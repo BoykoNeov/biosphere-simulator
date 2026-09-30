@@ -16,8 +16,10 @@
 //!   the seven biosphere goldens) — a biosphere FvCB transcendental is in the graph, measured
 //!   on the cheap 7-day greenhouse rather than the 1.3 M-sub-step sealed run. That is the same
 //!   deliberate cost choice Python made, and it rests on the same structural argument: the
-//!   station regulators hold the shared gas pools at their setpoints between the once-daily
-//!   biosphere lumps, so a one-ULP nudge cannot amplify across master days.
+//!   station regulators hold the shared gas pools at their setpoints between the
+//!   biosphere's lumps, so a one-ULP nudge cannot amplify across master days. (The lumps
+//!   were once-daily; since the 2026-09-30 interleaving they are quarter-day ones with the
+//!   regulators running between each, which the argument only strengthens.)
 //!
 //! ⚠ [`domains::ulp_probe::nudged_power_resolver`] is the station's solar seam and not a
 //! second copy of one: `crate::system::station_resolver` **is** `power_resolver`.

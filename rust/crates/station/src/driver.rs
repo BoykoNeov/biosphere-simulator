@@ -4,9 +4,15 @@
 //! that must advance) to a **second-scale** fast domain (the cabin / Power: `dt = 60`/`3600`
 //! s). `simcore::multirate` cannot bridge these — it splits ONE shared master `dt`, and
 //! `substep` freezes the biosphere aux — so the driver does the operator split (Lie,
-//! slow-first) **by hand**: per master day the slow domain takes `slow_steps_per_day`
-//! `step_report`s (advancing aux **and** `n`), then the fast domain takes `steps_per_day`
-//! `substep` calls (keeping `n`).
+//! **interleaved**) **by hand**: per master day, `slow_steps_per_day` times over, the slow
+//! domain takes one `step_report` (advancing aux **and** `n`), then the fast domain takes
+//! that slow step's share of the day's `steps_per_day` `substep` calls (keeping `n`).
+//!
+//! ⚠ Until 2026-09-30 the day ran **slow-first** — every slow step, then every fast step —
+//! so all four plant quarter-days drew on the cabin air as it stood at dawn and the crew's
+//! exhalation for the day arrived only afterwards. Adopted on the user's call;
+//! `docs/plans/post-roadmap-intraday-gas-exchange.md` §8. The retired order survives only in
+//! the lab section at the bottom of this file.
 //!
 //! **The load-bearing Tier-0 gate:** `substep` deliberately skips the conservation assert,
 //! so the driver re-asserts it (`assert_conserved_default`) after **every** fast sub-step
@@ -38,10 +44,12 @@ pub type ResetHook<'a> = &'a dyn Fn(u64, &State) -> Result<Option<State>, SimErr
 pub type OwnedResetHook = Box<dyn Fn(u64, &State) -> Result<Option<State>, SimError>>;
 
 /// Advance exactly **one** master day in place: consult `slow_reset` (adopting a returned
-/// re-sow state after a conservation check), run `slow_steps_per_day` slow `step_report`s
-/// (each advancing the phenology aux **and** `n`), then `steps_per_day` fast `substep`s at
-/// `fast_dt` (keeping `n`), asserting conservation over the full shared ledger after
-/// **each** sub-step. Returns `(next_state, day_rationed, day_events)`.
+/// re-sow state after a conservation check), then `slow_steps_per_day` times run one slow
+/// `step_report` (advancing the phenology aux **and** `n`) followed by
+/// `steps_per_day / slow_steps_per_day` fast `substep`s at `fast_dt` (keeping `n`),
+/// asserting conservation over the full shared ledger after **each** fast sub-step. The fast
+/// side refills the shared pools between the slow side's draws. Returns
+/// `(next_state, day_rationed, day_events)`; refuses a split that does not divide evenly.
 ///
 /// ⚠ `n` is the slow domain's **step** count, not the day count — it was the same number
 /// only while the biosphere's step was one day. Nothing here needs it to be a day count
@@ -78,40 +86,58 @@ pub fn advance_one_master_day(
             state = reset_state;
         }
     }
-    // Slow operator: slow_steps_per_day sub-steps covering one day (each advances the
-    // phenology aux AND n).
+    let fast_per_slow = fast_steps_per_slow_step(steps_per_day, slow_steps_per_day)?;
     for _ in 0..slow_steps_per_day {
+        // Slow operator: one sub-step (advances the phenology aux AND n).
         let slow_report = slow_integrator.step_report(&state, slow_resolver, slow_dt)?;
         state = slow_report.state;
         total_rationed += slow_report.rationed;
         events.extend(slow_report.events);
-    }
-    // Fast operator: steps_per_day sub-steps at fast_dt (n kept). substep skips the
-    // conservation assert, so we own it here — after each sub-step, over the full shared
-    // ledger — keeping the every-step teeth.
-    for _ in 0..steps_per_day {
-        let before = state.clone();
-        let fast_report = fast_integrator.substep(&state, fast_resolver, fast_dt)?;
-        state = fast_report.state;
-        assert_conserved_default(&before, &state)?;
-        total_rationed += fast_report.rationed;
-        events.extend(fast_report.events);
+        // Fast operator: this slow step's share of the day at fast_dt (n kept). substep
+        // skips the conservation assert, so we own it here — after each sub-step, over the
+        // full shared ledger — keeping the every-step teeth.
+        for _ in 0..fast_per_slow {
+            let before = state.clone();
+            let fast_report = fast_integrator.substep(&state, fast_resolver, fast_dt)?;
+            state = fast_report.state;
+            assert_conserved_default(&before, &state)?;
+            total_rationed += fast_report.rationed;
+            events.extend(fast_report.events);
+        }
     }
     Ok((state, total_rationed, events))
 }
 
-/// Step `days` master days (slow ×`slow_steps_per_day` + fast ×`steps_per_day`), slow-first.
+/// Fast sub-steps after each slow step: `steps_per_day / slow_steps_per_day`, refusing a
+/// split that does not divide evenly — each slow step must be followed by the same stretch
+/// of fast time, and an integer division would silently drop the remainder.
+pub fn fast_steps_per_slow_step(
+    steps_per_day: u64,
+    slow_steps_per_day: u64,
+) -> Result<u64, SimError> {
+    if slow_steps_per_day == 0 || !steps_per_day.is_multiple_of(slow_steps_per_day) {
+        return Err(SimError::Validation(format!(
+            "the master day interleaves the two operators, so steps_per_day ({steps_per_day}) \
+             must divide evenly by slow_steps_per_day ({slow_steps_per_day}): each slow step \
+             must be followed by the same stretch of fast time"
+        )));
+    }
+    Ok(steps_per_day / slow_steps_per_day)
+}
+
+/// Step `days` master days (slow ×`slow_steps_per_day` + fast ×`steps_per_day`), interleaved.
 ///
 /// Per day: `slow_reset` (if given) is consulted first — a returned `Some(state)` is
-/// conservation-checked then adopted; then the `slow_integrator` runs `slow_steps_per_day`
-/// `step_report`s at `slow_dt` (its own gate fires on each); then the `fast_integrator` runs
-/// `steps_per_day` `substep` calls at `fast_dt` (`n` kept), the driver asserting conservation
-/// after **each** over the full shared ledger. Returns `(states, total_rationed, events)`
+/// conservation-checked then adopted; then, `slow_steps_per_day` times, the `slow_integrator`
+/// runs one `step_report` at `slow_dt` (its own gate fires on each) and the `fast_integrator`
+/// runs that step's `steps_per_day / slow_steps_per_day` `substep` calls at `fast_dt` (`n`
+/// kept), the driver asserting conservation after **each** over the full shared ledger. Returns `(states, total_rationed, events)`
 /// with `states` one entry per **master day** — not per slow step — (length `days + 1`;
 /// a golden pins the final one), so station trajectories stay day-indexed.
 ///
 /// Requires `fast_dt · steps_per_day == 86400` s and `slow_dt · slow_steps_per_day == 1`
-/// day, so both operators cover the same interval.
+/// day, so both operators cover the same interval, and `steps_per_day` to divide evenly by
+/// `slow_steps_per_day`, so every slow step is followed by the same stretch of fast time.
 #[allow(clippy::too_many_arguments)]
 pub fn run_master_day(
     slow_integrator: &EulerIntegrator,
@@ -140,6 +166,7 @@ pub fn run_master_day(
             slow_dt * slow_steps_per_day as f64
         )));
     }
+    fast_steps_per_slow_step(steps_per_day, slow_steps_per_day)?;
     let mut state = initial;
     let mut states: Vec<State> = vec![state.clone()];
     let mut total_rationed = 0u64;
@@ -170,17 +197,21 @@ pub fn run_master_day(
 // =====================================================================================
 //
 // Nothing in the reference calls anything below: not a runner, not the session, not the
-// bridge. It exists so the lab can run a master day in a second order and keep books per
-// side. The reference day is `advance_one_master_day` above, unedited. If the interleaved
-// order is ever adopted, that function takes its body and this section is deleted rather
-// than kept as a switch.
+// bridge. It exists so the lab can run a master day in either order and keep books per
+// side. ⚠ The interleaved order was ADOPTED 2026-09-30: `advance_one_master_day` above took
+// its body, and `DayOrder::Interleaved` is now the reference day, which a test holds bit for
+// bit. `DayOrder::SlowFirst` is the RETIRED order, kept only so the lab can reproduce the
+// record that retired it (`examples/intraday_exchange.rs`). §7 of the plan said to delete
+// this section on adoption; §8 records why it was kept instead — its objection was to a
+// switch in the reference, and nothing in the reference can reach this.
 
 /// The order a master day runs its two operators in. **Lab-only.**
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DayOrder {
-    /// The reference: every slow step, then every fast step (`P P P P c … c`).
+    /// The RETIRED order (the reference until 2026-09-30): every slow step, then every fast
+    /// step (`P P P P c … c`).
     SlowFirst,
-    /// One slow step, then that step's share of the fast steps, repeated
+    /// The reference: one slow step, then that step's share of the fast steps, repeated
     /// (`P c…c P c…c P c…c P c…c`). The fast side refills a shared pool between the slow
     /// side's draws. Requires `steps_per_day` to divide evenly by `slow_steps_per_day`.
     Interleaved,
@@ -257,17 +288,7 @@ impl TwoRate<'_> {
         if order == DayOrder::SlowFirst {
             return Ok(self.steps_per_day);
         }
-        if self.slow_steps_per_day == 0
-            || !self.steps_per_day.is_multiple_of(self.slow_steps_per_day)
-        {
-            return Err(SimError::Validation(format!(
-                "the interleaved day order needs steps_per_day ({}) to divide evenly by \
-                 slow_steps_per_day ({}): each slow step must be followed by the same stretch \
-                 of fast time",
-                self.steps_per_day, self.slow_steps_per_day
-            )));
-        }
-        Ok(self.steps_per_day / self.slow_steps_per_day)
+        fast_steps_per_slow_step(self.steps_per_day, self.slow_steps_per_day)
     }
 
     /// One slow step, observed; returns the new state.
@@ -310,7 +331,7 @@ impl TwoRate<'_> {
     }
 
     /// Advance one master day in `order`. The re-sow hook is consulted first, as in the
-    /// reference. Under `SlowFirst` the arithmetic is the reference day's, operation for
+    /// reference. Under `Interleaved` the arithmetic is the reference day's, operation for
     /// operation — a test holds it to that, bit for bit.
     pub fn advance_day(
         &self,
