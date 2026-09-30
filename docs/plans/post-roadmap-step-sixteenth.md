@@ -64,9 +64,44 @@ The hand-typed literals that must change by hand, on purpose: the manifest's `dt
 the station `numerics_note` prose ("dt=1/4 day, 4 slow sub-steps per master day, each followed by
 its quarter of …"), which nothing checks.
 
-**The lab experiments stay at four steps a day.** `step_options`, `step_cause` and any lab test
-that compares against "the shipped run" are dated records; they are pinned to 4 steps a day
-explicitly so they stay re-runnable rather than silently following the new step.
+**The step experiments stay at four steps a day; the older lab instruments follow the shipped
+step.** `step_options` and `step_cause` (examples and tests) already pass `4` explicitly
+everywhere they mean "the shipped run", so they stay re-runnable as dated records with no edit.
+The five older instruments (`jar_squeeze`, `jar_control`, `leaf_remeasure`, `intraday_exchange`,
+`draw_census`) read `BIO_DT` and `season_steps()`/`steps_for_years` together, so they measure
+*the shipped model* consistently at whatever step it has; their printed numbers are dated in
+their own log records. They are not pinned. (Corrected before the flip, on an advisor check:
+this paragraph first said all lab experiments would be pinned to four.) `draw_census` is the
+instrument P6 is read with.
+
+**The sweep, done before the flip (2026-09-30).** Every `BIO_DT`/`STEPS_PER_DAY`/`steps_for*`/
+`season_steps` use in `domains`, `station`, `authoring`, `godot_bridge` was classed. None is read
+inside a flow or a parameter conversion. Each is a horizon count, a test passing `dt` in, or a
+test ceiling already written as `rate · BIO_DT` (so it follows the step). `params.rs`'s
+`k · BIO_DT < 1` stability checks loosen by 4×. The Godot scripts (`godot/*.gd`) and the authored
+scenarios (`scenarios/*.yaml`, `rust/data/scenarios/`) carry no biosphere step: the Godot
+scripts' `24`s are the power domain's hourly step, and the authored scenarios set their own
+`dt`. Present-tense prose saying "quarter-day"/"dt = ¼" is reworded; prose that records a
+measurement dated at ¼ is left as history. The param YAML comments are **not** reworded: those
+files are hashed into the manifest.
+
+### Manifest predictions (P9, written before the flip)
+
+* **Biosphere manifest:** exactly one value moves, `"dt_days": 0.25` → `0.0625`, by hand in the
+  writer. The anti-derived literal appears three times in `domains/tests/manifest_writer.rs`
+  (lines 51, 216, 229) and all three change with it. No param-file hash moves (no YAML edited);
+  the light-path fingerprint (`raw_light_path_samples`, a fixed quarter-day sampling grid of the
+  light function, not a step) does not move.
+* **Station manifest:** exactly one value moves, `numerics_note`, to: *"Euler everywhere; dt per
+  scenario (enforced by goldens, no importable constant). Sealed reference: biosphere-slow dt=1/16
+  day, 16 slow sub-steps per master day, each followed by its sixteenth of the everything-fast
+  dt=60 s sub-steps (90 of them; interleaved since 2026-09-30, slow-first before); Tier-1 energy
+  single-rate dt=3600 s."* Nothing checks this prose.
+* **Authoring manifest:** byte-identical. Its only step mention is the key name `dt` in the
+  scenario schema; the flow-type registry is read off each type's spec, which carries no step.
+  So slice 1 is **not** an authoring unfreeze.
+* **`rust/data/tiers.json`:** unchanged unless P7 fires (a measured tier-2 band crossed); a crossing
+  goes back to the user, not into this file.
 
 ### The sweep before any value is read
 
