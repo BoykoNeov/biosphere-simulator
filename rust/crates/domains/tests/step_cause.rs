@@ -13,6 +13,15 @@ use domains::biosphere::system::{
     DEFAULT_SCENARIO,
 };
 use domains::lab::biosphere_with_leaf_form;
+use domains::biosphere::science::Co2Read;
+
+/// ⚠ The explicit CO₂ form, pinned: this record measured the crop at the START-of-step air
+/// (every run before 2026-09-30), and under the reference's `EndOfStep` the lab's own option C
+/// would wrap a flow that already solves. See `docs/plans/post-roadmap-step-sixteenth.md`, Q6.
+fn start_of_step(mut p: domains::biosphere::params::BiosphereParams) -> domains::biosphere::params::BiosphereParams {
+    p.photo.co2_read = Co2Read::StartOfStep;
+    p
+}
 use domains::lab::step_cause::{
     blocked_light_resolver, build_season_light_quadrature, par_readers, par_schedule,
     run_uniform_blocked_light, LightQuadrature, BUDGET_FLOWS,
@@ -25,7 +34,7 @@ use simcore::registry::Registry;
 use simcore::state::State;
 
 fn frozen() -> BiosphereParams {
-    biosphere_with_leaf_form(&[], LeafAreaForm::Derived).expect("params")
+    start_of_step(biosphere_with_leaf_form(&[], LeafAreaForm::Derived).expect("params"))
 }
 
 fn fingerprint(s: &State) -> Vec<u64> {

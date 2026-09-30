@@ -216,6 +216,147 @@ pub struct Allocation {
     pub reserve_cessation_dvs: f64,
 }
 
+/// One step's end-of-step pool for [`Co2Read::EndOfStep`]: the `X` with `X = c0 − draw(X)`.
+///
+/// `draw(x)` is the crop's withdrawal from the pool when the pool reads `x`, and `draw_at_c0`
+/// is its value at `c0` (the explicit step's own evaluation, passed in so it is not paid twice).
+/// `draw` must not fall as `x` rises (more CO₂, more assimilation), so `h(x) = x − c0 + draw(x)`
+/// rises and has one root.
+///
+/// * `draw_at_c0 == 0` (every night step): `X = c0` with no further evaluation.
+/// * Otherwise the root lies in `[lo, c0]`, `lo = max(0, c0 − draw_at_c0)`, where `h(lo) ≤ 0`
+///   (checked; an error if not) and `h(c0) = draw_at_c0 > 0`.
+/// * Illinois false position inside the bracket, falling back to the midpoint whenever the
+///   Illinois point is not strictly inside it, until **no float lies strictly between `lo` and
+///   `hi`**. A tolerance stop would land anywhere inside the tolerance depending on the path, and
+///   the tier-2 sensitivity gates read a 1-ULP input nudge; this stop depends only on the root.
+/// * **The low end is returned**, where `h ≤ 0`: then `draw(X) ≤ c0 − X ≤ c0` holds exactly,
+///   which is the whole promise ("never takes more CO₂ than the air holds").
+///
+/// Returns `(X, evaluations of draw spent)`. An iteration cap, a bracket that does not bracket
+/// and a residual above `1e-12·c0` at the returned end are errors, never a silent answer.
+pub fn end_of_step_pool(
+    c0: f64,
+    draw_at_c0: f64,
+    mut draw: impl FnMut(f64) -> Result<f64, SimError>,
+) -> Result<(f64, u32), SimError> {
+    if draw_at_c0 <= 0.0 {
+        return Ok((c0, 0));
+    }
+    let mut evaluations = 0u32;
+    let mut h = |x: f64| -> Result<f64, SimError> {
+        evaluations += 1;
+        Ok(x - c0 + draw(x)?)
+    };
+    let (mut lo, mut hi) = ((c0 - draw_at_c0).max(0.0), c0);
+    // `h_lo` is the TRUE h at `lo` (the returned end, and the residual checked below);
+    // `w_lo`/`w_hi` are the Illinois weights the secant uses, which get halved.
+    let mut h_lo = h(lo)?;
+    // At `lo = c0 − draw(c0)` the exact `h` is `draw(lo) − draw(c0) ≤ 0`, but when the draw
+    // barely moves over the bracket the computed `h` is that difference plus the rounding of
+    // `(c0 − draw) − c0 + draw`, which can land a few ULPs above zero. Nudge `lo` down by that
+    // excess (the slope of `h` is at least 1) a few times; anything larger than rounding is the
+    // monotonicity failure the error names.
+    let mut nudges = 0;
+    while h_lo > 0.0 {
+        if h_lo > 1e-12 * c0 || nudges == 8 || lo == 0.0 {
+            return Err(SimError::Validation(format!(
+                "end-of-step CO₂: h({lo}) = {h_lo} > 0 at the bracket's low end — the crop's \
+                 draw rose as the air thinned, or exceeds the pool at zero"
+            )));
+        }
+        let ulp = lo - f64::from_bits(lo.to_bits() - 1);
+        lo = (lo - h_lo.max(ulp)).max(0.0);
+        h_lo = h(lo)?;
+        nudges += 1;
+    }
+    let (mut w_lo, mut w_hi) = (h_lo, draw_at_c0);
+    // Illinois: the end that stays put twice running has its weight halved.
+    let mut side = 0i8;
+    let mut closed = false;
+    for _ in 0..200 {
+        let mid = 0.5 * (lo + hi);
+        if h_lo == 0.0 || mid <= lo || mid >= hi {
+            closed = true;
+            break;
+        }
+        let secant = lo - w_lo * (hi - lo) / (w_hi - w_lo);
+        let x = if secant > lo && secant < hi { secant } else { mid };
+        let hx = h(x)?;
+        if hx <= 0.0 {
+            (lo, h_lo, w_lo) = (x, hx, hx);
+            if side == -1 {
+                w_hi *= 0.5;
+            }
+            side = -1;
+            // Illinois closes on the root from one side while the far end lags; once the low
+            // end is within rounding of it, probe the next float up, which closes the bracket
+            // in one evaluation when `lo` IS the last float below the root. The stop stays
+            // "no float between lo and hi", so the shortcut changes the cost, not the answer
+            // (up to the last few floats, where the rounding of `h` need not be monotone).
+            if hx > -1e-12 * c0 {
+                let up = f64::from_bits(lo.to_bits() + 1);
+                if up < hi {
+                    let h_up = h(up)?;
+                    if h_up > 0.0 {
+                        (hi, w_hi) = (up, h_up);
+                    } else {
+                        (lo, h_lo, w_lo) = (up, h_up, h_up);
+                    }
+                }
+            }
+        } else {
+            (hi, w_hi) = (x, hx);
+            if side == 1 {
+                w_lo *= 0.5;
+            }
+            side = 1;
+            // The mirror of the probe above, from the high side.
+            if hx < 1e-12 * c0 {
+                let down = f64::from_bits(hi.to_bits() - 1);
+                if down > lo {
+                    let h_down = h(down)?;
+                    if h_down <= 0.0 {
+                        (lo, h_lo, w_lo) = (down, h_down, h_down);
+                    } else {
+                        (hi, w_hi) = (down, h_down);
+                    }
+                }
+            }
+        }
+    }
+    if !closed {
+        return Err(SimError::Validation(format!(
+            "end-of-step CO₂: the solve did not close its bracket [{lo}, {hi}] in 200 iterations"
+        )));
+    }
+    let residual = h_lo.abs();
+    if residual > 1e-12 * c0 {
+        return Err(SimError::Validation(format!(
+            "end-of-step CO₂: |h(X)| = {residual} at X = {lo} against a pool of {c0}"
+        )));
+    }
+    Ok((lo, evaluations))
+}
+
+/// `env` with one variable read as `value` — how the allocation flow is asked "what would you
+/// take if the chamber held this much CO₂?" for [`science::Co2Read::EndOfStep`].
+struct PoolReads<'a> {
+    inner: &'a dyn Environment,
+    var: &'a str,
+    value: f64,
+}
+
+impl Environment for PoolReads<'_> {
+    fn get(&self, var: &str) -> Result<f64, SimError> {
+        if var == self.var {
+            Ok(self.value)
+        } else {
+            self.inner.get(var)
+        }
+    }
+}
+
 impl Flow for Allocation {
     fn type_name(&self) -> &'static str {
         "Allocation"
@@ -223,12 +364,54 @@ impl Flow for Allocation {
     fn id(&self) -> &str {
         &self.id
     }
+    /// The step's growth, read against the chamber CO₂ that [`science::Co2Read`] names.
+    ///
+    /// Under `EndOfStep`, and only where a chamber pool variable is wired, the draw is solved
+    /// against the pool the step leaves ([`end_of_step_pool`]); everywhere else, and
+    /// on every step the crop takes nothing, this is the explicit evaluation bit for bit.
     fn evaluate(
         &self,
         snapshot: &State,
         env: &dyn Environment,
         dt: f64,
     ) -> Result<FlowResult, SimError> {
+        let explicit = self.at(snapshot, env, dt)?;
+        let var = match (&self.ctx.co2_pool_var, self.ctx.photo.co2_read) {
+            (Some(var), science::Co2Read::EndOfStep) => var,
+            _ => return Ok(explicit),
+        };
+        let c0 = env.get(var)?;
+        let held = amt(snapshot, &self.co2_atmos);
+        if c0.to_bits() != held.to_bits() {
+            return Err(SimError::Validation(format!(
+                "{}: the CO₂ pool variable reads {c0} but the stock the crop draws from ({}) \
+                 holds {held} — the end-of-step solve would be against a different air",
+                self.id, self.co2_atmos
+            )));
+        }
+        let draw_of = |r: &FlowResult| -> f64 {
+            -r.legs
+                .iter()
+                .filter(|l| l.stock == self.co2_atmos)
+                .map(|l| l.amount)
+                .sum::<f64>()
+        };
+        let draw_at_c0 = draw_of(&explicit);
+        let (x, _) = end_of_step_pool(c0, draw_at_c0, |x| {
+            let at_x = PoolReads { inner: env, var, value: x };
+            Ok(draw_of(&self.at(snapshot, &at_x, dt)?))
+        })?;
+        if x.to_bits() == c0.to_bits() {
+            return Ok(explicit);
+        }
+        self.at(snapshot, &PoolReads { inner: env, var, value: x }, dt)
+    }
+}
+
+impl Allocation {
+    /// The step's growth legs with the CO₂ read off `env` as given — the explicit evaluation
+    /// when `env` is the step's own.
+    fn at(&self, snapshot: &State, env: &dyn Environment, dt: f64) -> Result<FlowResult, SimError> {
         let (_, _, available) = self.ctx.budget(snapshot, env)?;
         let dmi = self.ctx.resp.growth_efficiency * available;
         let thermal_time = snapshot
@@ -2068,8 +2251,16 @@ mod tests {
     /// claim that makes `science.rs::ci_from_a_finite_pool_…` reachable from a flow.
     #[test]
     fn the_sealed_context_reads_ci_from_the_pool_and_not_the_forcing() {
+        // ⚠ The wiring claim is about the EXPLICIT read (the start-of-step pool). This fixture
+        // draws 0.648 mol from a 0.4 mol pool in one step, so under the reference's option C
+        // the draw is solved against the air it leaves and cannot match the open field; that
+        // half is asserted separately below.
+        let explicit = |mut c: CarbonContext| {
+            c.photo.co2_read = science::Co2Read::StartOfStep;
+            c
+        };
         let s = growing_state();
-        let sealed = legs_of(&allocation(ctx_sealed(0.5), None), &s, 800.0);
+        let sealed = legs_of(&allocation(explicit(ctx_sealed(0.5)), None), &s, 800.0);
         let open = legs_of(&allocation(ctx_open(), None), &s, 800.0);
         assert!(
             sealed[LEAF] < open[LEAF],
@@ -2078,8 +2269,15 @@ mod tests {
             open[LEAF]
         );
         // And it is the SAME arithmetic: a sealed ratio of 1.0 puts Ci back at Ca = 400.
-        let matched = legs_of(&allocation(ctx_sealed(1.0), None), &s, 800.0);
+        let matched = legs_of(&allocation(explicit(ctx_sealed(1.0)), None), &s, 800.0);
         assert_eq!(matched[LEAF], open[LEAF]);
+
+        // Under C the same step cannot take more than the pool holds.
+        let pool = s.stocks[CO2].amount;
+        assert!(-matched[CO2] > pool, "the fixture must overdraw explicitly to test C");
+        let c = legs_of(&allocation(ctx_sealed(1.0), None), &s, 800.0);
+        assert!(-c[CO2] <= pool, "C drew {} from a pool of {pool}", -c[CO2]);
+        assert!(-c[CO2] > 0.0, "C must still grow the crop");
     }
 
     /// ⚠⚠ PER-FLOW balance on the three gas flows — the successor to
@@ -5336,5 +5534,53 @@ mod tests {
             .map(|l| l.amount)
             .expect("a litter_n leg");
         assert!(shed > 0.0, "the fixture does not shed at all");
+    }
+
+    // --- option C's solve (`end_of_step_pool`) -------------------------------------------
+
+    /// A night step — the crop takes nothing — returns the start of the step with no
+    /// evaluation, which is what makes C bit-identical to Euler there.
+    #[test]
+    fn the_end_of_step_solve_is_free_and_exact_when_the_crop_takes_nothing() {
+        let mut called = false;
+        let (x, n) = end_of_step_pool(3.0, 0.0, |_| {
+            called = true;
+            Ok(0.0)
+        })
+        .unwrap();
+        assert_eq!((x.to_bits(), n, called), (3.0f64.to_bits(), 0, false));
+    }
+
+    /// A linear draw `draw(x) = k·x` has the closed-form root `c0 / (1 + k)`, which is backward
+    /// Euler's answer. The solve must land on it to within the bracket's last float, from the
+    /// side where the draw cannot exceed the pool, for draws far above the pool too.
+    #[test]
+    fn the_end_of_step_solve_is_backward_euler_and_never_overdraws() {
+        let c0 = 2.0;
+        for k in [1e-6, 0.2, 1.0, 3.0, 50.0] {
+            let (x, n) = end_of_step_pool(c0, k * c0, |x| Ok(k * x)).unwrap();
+            let exact = c0 / (1.0 + k);
+            assert!((x - exact).abs() <= 4.0 * f64::EPSILON * c0, "k={k}: {x} vs {exact}");
+            assert!(k * x <= c0 - x, "k={k}: the draw {} exceeds what is left {}", k * x, c0 - x);
+            assert!(n < 80, "k={k}: {n} evaluations");
+        }
+    }
+
+    /// A draw that RISES as the air thins breaks the one assumption the bracket rests on, and
+    /// must be an error rather than an answer.
+    #[test]
+    fn the_end_of_step_solve_refuses_a_draw_that_rises_as_the_air_thins() {
+        let err = end_of_step_pool(1.0, 0.5, |x| Ok(0.5 + (1.0 - x))).unwrap_err();
+        assert!(err.to_string().contains("rose as the air thinned"), "{err}");
+    }
+
+    /// The loader's form is C — a default or a stale literal must not hand the reference the
+    /// explicit form without a test going red.
+    #[test]
+    fn the_reference_reads_the_crops_co2_at_the_end_of_the_step() {
+        assert_eq!(
+            super::super::params::biosphere().photo.co2_read,
+            science::Co2Read::EndOfStep
+        );
     }
 }

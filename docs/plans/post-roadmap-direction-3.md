@@ -458,6 +458,15 @@ threshold, so no frozen scenario reaches the cited loss; the science gate's "gen
 half goes red. How to keep that mechanism covered is the user's call. **§2.2:** the jar's
 tightest single-step draw falls 0.757 → 0.201 of the pool; per day it rises (3.03 → 3.21), so
 a controller priced per step must not read that as four times the headroom.
+⚠ *Re-read again 2026-09-30, the item LANDED* (`log/step-sixteenth.md`, BUILT). The readings
+above held. **§1:** the biosphere is now Euler at `dt = 1/16` with one implicit flow in sealed
+builds (C: the crop's growth reads the CO₂ the step leaves). **§2.1:** the leaf form still does
+not ration the jar (0.31 of the pool at the tightest step explicitly, 0.23 under C); the
+re-measurement at 1/16 with C is owed before any ship/refuse reading. **§3:** the user chose to
+gate the shading loss on a pushed run (leaves 10 % thinner). **§2.2:** under C the backstop
+cannot fire on the crop's CO₂ at all, so a controller priced on the jar now prices against a
+crop that self-limits within the step; the jar's tightest step is 0.165 of the pool (2.64 per
+day).
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

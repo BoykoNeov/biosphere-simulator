@@ -573,3 +573,7 @@ A	system.rs	a_hot_season_enters_the_thermal_time_plateau_and_temperature_stops_m
 A	flows.rs	vapour_above_saturation_condenses_and_transpiration_stops_at_the_cap	no-ancestor-named	-
 A	flows.rs	the_air_ends_a_filling_step_at_the_cap_at_any_step_size	no-ancestor-named	-
 A	params.rs	the_humidity_setpoint_is_bvads_75_percent_and_a_fraction_of_saturation	no-ancestor-named	-
+A	flows.rs	the_end_of_step_solve_is_free_and_exact_when_the_crop_takes_nothing	no-ancestor-named	-
+A	flows.rs	the_end_of_step_solve_is_backward_euler_and_never_overdraws	no-ancestor-named	-
+A	flows.rs	the_end_of_step_solve_refuses_a_draw_that_rises_as_the_air_thins	no-ancestor-named	-
+A	flows.rs	the_reference_reads_the_crops_co2_at_the_end_of_the_step	no-ancestor-named	-

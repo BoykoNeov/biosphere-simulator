@@ -36,7 +36,7 @@
 //! provenance unfreeze **no test can see**; see the ceremony record in
 //! `docs/biosphere-reference.md`.
 
-use super::science::{KineticsForm, LeafAreaForm, O2Form};
+use super::science::{Co2Read, KineticsForm, LeafAreaForm, O2Form};
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
     ParamFile, YamlValue,
@@ -230,6 +230,14 @@ pub struct PhotosynthesisParams {
     /// not. But unlike the temperature form it is **only half** of the switch: the VALUE it
     /// reads is a stock, so `CarbonContext::o2_pool_var` supplies it per step.
     pub o2_form: O2Form,
+    /// **Which chamber CO₂ the crop's growth is read against within a step** — the start of
+    /// the step or the air it leaves ([`Co2Read`]). Never loaded from the file; the loader sets
+    /// [`Co2Read::EndOfStep`] since 2026-09-30, and `domains::lab` can flip it back.
+    ///
+    /// ⚠ It rides here for [`o2_form`](Self::o2_form)'s reason (one params object through the
+    /// funnel), but only the allocation flow acts on it: growth and maintenance respiration
+    /// read the start of the step, which is the crop-only scope the user chose.
+    pub co2_read: Co2Read,
 }
 
 /// Maintenance + growth respiration params.
@@ -545,6 +553,9 @@ pub fn photosynthesis_from_bounded(
         // selection; `Constant` is the retired one and is reachable only from `domains::lab`.
         kinetics: KineticsForm::Cardinal,
         o2_form: O2Form::LivePool,
+        // Adopted 2026-09-30 (option C, `docs/plans/post-roadmap-step-sixteenth.md`); the
+        // explicit `StartOfStep` is reachable only from `domains::lab`.
+        co2_read: Co2Read::EndOfStep,
     }
 }
 

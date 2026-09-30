@@ -310,6 +310,28 @@ pub enum O2Form {
     LivePool,
 }
 
+/// **Which chamber CO₂ the crop's growth is read against** within a step: the air it starts
+/// the step with, or the air it leaves behind (option C of the 2026-09-29 review's Step 2).
+///
+/// Not a fitted coefficient and never loaded from a param file. The loader sets
+/// [`Co2Read::EndOfStep`] since 2026-09-30 (`docs/plans/post-roadmap-step-sixteenth.md`,
+/// slice 2); `domains::lab` flips it back so the dated records that measured the explicit form
+/// stay re-runnable. Deliberately **no `Default`**: [`O2Form`]'s default is its retired variant,
+/// and a default here could quietly hand a fixture the form the reference does not run.
+///
+/// Only the allocation flow acts on it, and only where a chamber CO₂ pool is wired; the open
+/// field has none and reads the same either way, by construction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Co2Read {
+    /// Forward Euler: the draw is evaluated at the start-of-step pool `C₀`. The shipped form
+    /// until 2026-09-30. Its draw can exceed `C₀`, and then the backstop rations.
+    StartOfStep,
+    /// Backward Euler on the crop's uptake alone: the draw `U` is evaluated at the pool the
+    /// step leaves, `X = C₀ − U(X)`, solved by `flows::end_of_step_pool`. It can never take more
+    /// than `C₀`.
+    EndOfStep,
+}
+
 /// The frozen params re-read at a live O₂ mole fraction `x_o2` (mmol/mol, [`MMOL_PER_MOL`]).
 ///
 /// Both halves of the coupling, as one operation because they are one substitution:
@@ -1030,6 +1052,7 @@ mod tests {
             t_max: 40.0,
             kinetics: KineticsForm::Cardinal,
             o2_form: O2Form::Constant,
+            co2_read: Co2Read::EndOfStep,
         };
         let pheno = params::PhenologyParams {
             t_base: 0.0,
@@ -1073,6 +1096,7 @@ mod tests {
             t_max: 40.0,
             kinetics: KineticsForm::Cardinal,
             o2_form: O2Form::Constant,
+            co2_read: Co2Read::EndOfStep,
         };
         let pheno = params::PhenologyParams {
             t_base: 0.0,
@@ -1191,6 +1215,7 @@ mod tests {
             t_max: 35.0,
             kinetics: KineticsForm::Cardinal,
             o2_form: O2Form::Constant,
+            co2_read: Co2Read::EndOfStep,
         }
     }
 

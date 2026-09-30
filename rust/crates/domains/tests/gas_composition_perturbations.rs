@@ -52,6 +52,7 @@
 use domains::biosphere::params;
 use domains::biosphere::readouts::{min_ppm, peak_w, trajectory, Trajectory};
 use domains::biosphere::science::{
+    Co2Read,
     electron_transport_rate, light_limited_rate, o2_coupled, oxygen_limitation_factor,
     rubisco_limited_rate,
 };
@@ -161,6 +162,15 @@ fn the_rubisco_branch_is_strictly_monotone_in_a_proportional_gas_change() {
 // ===================================================================================
 
 /// The jar, driven exactly as its own golden drives it (`run_season`, no re-sow).
+/// The jar in the EXPLICIT CO₂ form (`Co2Read::StartOfStep`), the form every rationing
+/// finding in this file was measured in. Under the reference's `EndOfStep` the crop cannot
+/// take more CO₂ than the air holds, so the rationing these tests record cannot happen there
+/// at all (`docs/plans/post-roadmap-step-sixteenth.md`, Q7).
+fn jar_explicit(scenario: SeasonScenario) -> Trajectory {
+    let p = domains::lab::biosphere_with_co2_read(&[], Co2Read::StartOfStep).expect("params");
+    trajectory(scenario, SEALED_CHAMBER_YEARS, false, &p)
+}
+
 fn jar(scenario: SeasonScenario) -> Trajectory {
     trajectory(scenario, SEALED_CHAMBER_YEARS, false, &params::biosphere())
 }
@@ -290,21 +300,26 @@ fn the_bookkeeping_correct_vent_holds_composition_and_shrinks_the_room() {
 /// backstop. The likely reading is the jar's own feedback: a smaller room starves the crop
 /// sooner, so it grows less and draws less later (peak W falls monotonically, see the next
 /// test). That is named, not measured.
+///
+/// ⚠ **Under option C (the reference since 2026-09-30, slice 2) the reversal holds and rations
+/// nowhere at any room size.** The crop's draw is read against the air it leaves, which lifts
+/// every low: baseline 9.661, the minimum 9.501 at `f = 0.7`, back above baseline by 0.5
+/// (9.678), 12.378 at 0.25. The numbers above are the explicit form's at 1/16.
 #[test]
 fn the_gated_observable_reads_healthier_as_the_room_shrinks_before_any_backstop() {
     let baseline = jar(sealed_chamber_scenario());
     well_posed(&baseline, "reversal baseline");
     let base_low = min_ppm(&baseline);
 
-    let stressed = jar(vented(0.5));
+    let stressed = jar(vented(0.7));
     let shrunk = jar(vented(0.25));
-    well_posed(&stressed, "f=0.5");
+    well_posed(&stressed, "f=0.7");
     well_posed(&shrunk, "f=0.25");
 
     // The stressed room reads lower, as E1 says it must.
     assert!(
         min_ppm(&stressed) < base_low,
-        "f=0.5 did not deplete: {} vs baseline {base_low} ppm",
+        "f=0.7 did not deplete: {} vs baseline {base_low} ppm",
         min_ppm(&stressed)
     );
     // The smaller, still well-posed room reads HIGHER than the healthy baseline.
@@ -318,10 +333,11 @@ fn the_gated_observable_reads_healthier_as_the_room_shrinks_before_any_backstop(
         "the smaller room does not read better than the merely stressed one"
     );
 
-    // The backstop's own threshold, bracketed as measured: well-posed at 0.17, firing at 0.16.
-    assert_eq!(jar(vented(0.17)).rationed, 0, "f=0.17 was measured well-posed");
+    // The backstop's own threshold in the EXPLICIT form, bracketed as measured: well-posed at
+    // 0.17, firing at 0.16. Under the reference (C) the same room cannot ration at all.
+    assert_eq!(jar_explicit(vented(0.17)).rationed, 0, "f=0.17 was measured well-posed");
     assert!(
-        jar(vented(0.16)).rationed > 0,
+        jar_explicit(vented(0.16)).rationed > 0,
         "f=0.16 was measured to ration; the backstop threshold has moved"
     );
 }
@@ -362,8 +378,9 @@ fn peak_biomass_stays_monotone_across_the_reversal_of_the_gated_one() {
 /// pinned rather than cross-referenced.
 #[test]
 fn the_self_limiting_feedback_is_what_keeps_the_jar_well_posed() {
-    let e1 = jar(vented(0.1));
-    let e2 = jar(depressurized(0.05));
+    // Both in the explicit form, where the contrast was measured; C removes E1's rationing.
+    let e1 = jar_explicit(vented(0.1));
+    let e2 = jar_explicit(depressurized(0.05));
 
     let base = sealed_chamber_scenario();
     assert!(
@@ -379,6 +396,29 @@ fn the_self_limiting_feedback_is_what_keeps_the_jar_well_posed() {
         e2.rationed, 0,
         "E2 at f=0.05 rationed — the self-limiting reading of the contrast is wrong"
     );
+}
+
+/// ⚠⚠ **THE USER'S PROMISE FOR OPTION C, as a test: the crop never takes more CO₂ than the air
+/// holds.** (*"Option C only guarantees the plant never takes more CO₂ than the air holds"*,
+/// chosen 2026-09-30.)
+///
+/// The jar shrunk to a tenth and to a fiftieth of its room: in the explicit form the backstop
+/// fires on both (205 and 1403 times, measured at the 1/16 step before C). Under the reference's
+/// `EndOfStep` it must fire on **neither**: the crop's draw is solved against the pool the step
+/// leaves and returned from the side where it cannot exceed the start of the step. This is the
+/// behaviour the explicit-form tests above record, removed; pairing them is what says "C
+/// removed it", rather than "the squeeze stopped being a squeeze".
+#[test]
+fn the_crop_never_takes_more_co2_than_the_air_holds() {
+    for f in [0.1, 0.02] {
+        assert!(
+            jar_explicit(vented(f)).rationed > 0,
+            "f={f}: the explicit form no longer rations, so this is not a squeeze"
+        );
+        let c = jar(vented(f));
+        assert_eq!(c.rationed, 0, "f={f}: the crop overdrew the air under C");
+        assert_eq!(c.events, 0, "f={f}: the run raised events under C");
+    }
 }
 
 /// **E2 — the depressurization, as the leaf would actually feel it.**

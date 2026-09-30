@@ -201,7 +201,8 @@ fn the_form_moves_the_perennial_chamber_without_rationing() {
 /// season 1 under Euler (RK4 raised at step 773), drawing 1.15 of the CO₂ pool in one step,
 /// and this test pinned that as `lab.rationed > 0`. That was the "jar breaks" reading holding
 /// the leaf form back. **At the 1/16-day step (2026-09-30) it does not ration at all**: its
-/// tightest step draws 0.3128 of the pool (the frozen form's 0.2009), both on step 3108. So the
+/// tightest step draws 0.3128 of the pool (the frozen form's 0.2009), both on step 3108, in the
+/// explicit CO₂ form; under C, 0.2324. So the
 /// jar-breaks reading was taken at a step the reference no longer uses; whether the leaf form
 /// should be reconsidered is the user's call, not this test's.
 ///
@@ -213,15 +214,29 @@ fn the_form_moves_the_perennial_chamber_without_rationing() {
 #[test]
 fn the_form_no_longer_rations_the_sealed_jar_and_the_draw_probe_still_sees_a_squeeze() {
     let s = sealed_chamber_scenario();
-    let frozen = step_draws(s, 1, &params::biosphere());
-    let lab = step_draws(s, 1, &lab());
-    assert_eq!((frozen.rationed, lab.rationed), (0, 0));
-    let (f, l) = (frozen.of(CARBON_POOL).ratio, lab.of(CARBON_POOL).ratio);
+    // The finding was measured in the EXPLICIT CO₂ form (the reference until C, 2026-09-30).
+    let explicit_of = |mut p: BiosphereParams| {
+        p.photo.co2_read = science::Co2Read::StartOfStep;
+        p
+    };
+    let frozen = step_draws(s, 1, &explicit_of(params::biosphere()));
+    let lab_explicit = step_draws(s, 1, &explicit_of(lab()));
+    assert_eq!((frozen.rationed, lab_explicit.rationed), (0, 0));
+    let (f, l) = (frozen.of(CARBON_POOL).ratio, lab_explicit.of(CARBON_POOL).ratio);
     assert!(f < l, "the lab form must still draw harder than the frozen one: {f} vs {l}");
     assert!(
         (0.29..0.34).contains(&l),
         "the lab jar's tightest step moved (measured 0.3128): {:?}",
-        lab.of(CARBON_POOL)
+        lab_explicit.of(CARBON_POOL)
+    );
+    // Under C the lab form's tightest step reads 0.2324 (step 3155): the draw is solved against
+    // the air the step leaves, so the hardest step asks for less.
+    let lab_c = step_draws(s, 1, &lab());
+    assert_eq!(lab_c.rationed, 0);
+    assert!(
+        (0.21..0.25).contains(&lab_c.of(CARBON_POOL).ratio),
+        "the lab jar's tightest step under C moved (measured 0.2324): {:?}",
+        lab_c.of(CARBON_POOL)
     );
 
     let squeezed = SeasonScenario {
@@ -230,11 +245,23 @@ fn the_form_no_longer_rations_the_sealed_jar_and_the_draw_probe_still_sees_a_squ
         chamber_o2_mol0: s.chamber_o2_mol0 * 0.1,
         ..s
     };
-    let control = step_draws(squeezed, 1, &params::biosphere());
+    // ⚠ In the EXPLICIT CO₂ form: under the reference's option C (2026-09-30) the crop cannot
+    // take more CO₂ than the air holds, so no reference run can show the probe a squeeze. The
+    // pair below says C removed it, not that the squeeze stopped being one.
+    let explicit =
+        domains::lab::biosphere_with_co2_read(&[], science::Co2Read::StartOfStep).expect("params");
+    let control = step_draws(squeezed, 1, &explicit);
     assert!(control.rationed > 0, "the tenth-size jar was measured to ration");
     assert!(
         control.of(CARBON_POOL).ratio > 1.0,
         "the squeezed jar rations but step_draws does not see its CO₂ pool overdrawn: {:?}",
         control.of(CARBON_POOL)
+    );
+    let under_c = step_draws(squeezed, 1, &params::biosphere());
+    assert_eq!(under_c.rationed, 0, "the tenth-size jar rations under C");
+    assert!(
+        under_c.of(CARBON_POOL).ratio <= 1.0,
+        "under C the probe reads the pool overdrawn: {:?}",
+        under_c.of(CARBON_POOL)
     );
 }

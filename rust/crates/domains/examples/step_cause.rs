@@ -20,6 +20,15 @@ use domains::biosphere::system::{
 };
 use domains::biosphere::SEASON_DAYS;
 use domains::lab::biosphere_with_leaf_form;
+use domains::biosphere::science::Co2Read;
+
+/// ⚠ The explicit CO₂ form, pinned: this record measured the crop at the START-of-step air
+/// (every run before 2026-09-30), and under the reference's `EndOfStep` the lab's own option C
+/// would wrap a flow that already solves. See `docs/plans/post-roadmap-step-sixteenth.md`, Q6.
+fn start_of_step(mut p: domains::biosphere::params::BiosphereParams) -> domains::biosphere::params::BiosphereParams {
+    p.photo.co2_read = Co2Read::StartOfStep;
+    p
+}
 use domains::lab::step_cause::{
     build_season_light_quadrature, dose_partition_worst, par_readers, run_uniform_blocked_light,
     BUDGET_FLOWS,
@@ -202,7 +211,7 @@ fn print_table(runs: &[&Run], truth: &Run) {
 
 fn main() {
     let frozen: BiosphereParams =
-        biosphere_with_leaf_form(&[], LeafAreaForm::Derived).expect("the frozen params load");
+        start_of_step(biosphere_with_leaf_form(&[], LeafAreaForm::Derived).expect("the frozen params load"));
     let jar = sealed_chamber_scenario();
     let cases: [(&str, SeasonScenario, usize); 2] = [
         ("open field", DEFAULT_SCENARIO, 1),

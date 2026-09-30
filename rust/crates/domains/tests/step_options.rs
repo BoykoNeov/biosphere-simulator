@@ -13,6 +13,15 @@ use domains::biosphere::system::{
     DEFAULT_SCENARIO,
 };
 use domains::lab::biosphere_with_leaf_form;
+use domains::biosphere::science::Co2Read;
+
+/// ⚠ The explicit CO₂ form, pinned: this record measured the crop at the START-of-step air
+/// (every run before 2026-09-30), and under the reference's `EndOfStep` the lab's own option C
+/// would wrap a flow that already solves. See `docs/plans/post-roadmap-step-sixteenth.md`, Q6.
+fn start_of_step(mut p: domains::biosphere::params::BiosphereParams) -> domains::biosphere::params::BiosphereParams {
+    p.photo.co2_read = Co2Read::StartOfStep;
+    p
+}
 use domains::lab::step_options::{
     build_season_implicit_uptake, run_split, run_uniform, Scope, SolveLog, SplitRule, Watched,
 };
@@ -21,7 +30,7 @@ use simcore::registry::Registry;
 use simcore::state::State;
 
 fn frozen() -> BiosphereParams {
-    biosphere_with_leaf_form(&[], LeafAreaForm::Derived).expect("params")
+    start_of_step(biosphere_with_leaf_form(&[], LeafAreaForm::Derived).expect("params"))
 }
 
 fn fingerprint(s: &State) -> Vec<u64> {
@@ -78,7 +87,7 @@ fn b_refuses_rather_than_rations() {
     // The lab leaf form draws 1.15 of the jar's CO₂ on one quarter-day step. With no room to
     // split, B must refuse — not hand the step to the backstop.
     let jar = sealed_chamber_scenario();
-    let p = biosphere_with_leaf_form(&[], LeafAreaForm::NodeEnvelope).expect("params");
+    let p = start_of_step(biosphere_with_leaf_form(&[], LeafAreaForm::NodeEnvelope).expect("params"));
     let rule = SplitRule { theta: 0.5, watched: Watched::ChamberCo2, max_depth: 0 };
     let mut obs = |_: &State| {};
     let err = run_split(&jar, 1, false, &p, &build_season_with, 4, rule, &mut obs)

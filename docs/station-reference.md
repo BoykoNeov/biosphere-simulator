@@ -320,6 +320,16 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-09-30 — option C reaches the station: the crop's growth reads the cabin CO₂ the plant
+  step leaves. 4 station goldens (`greenhouse`, `harvest`, `lighting`, `sealed_station`) and
+  their `golden_sha256` rows; no station flow, param, seam or `simcore` byte changed.** The
+  biosphere's C entry of the same day (see its log). The station's cabin air *is* the biosphere
+  carbon pool, so the plant step's draw is solved against the cabin air it leaves before the
+  cabin's 90 minutes run. The 7-day seedling goldens move in the 4th significant figure
+  (`lighting`, whose chamber holds 0.23 mol of CO₂, in the 3rd); `sealed_station`'s grain
+  −0.88 % over 4 years. Every station golden keeps 0 rationing and 0 events; no tier-2 band
+  was crossed.
+
 - **2026-09-30 — the plant step moves to 1/16 day, and the master day may run in equal
   GROUPS. 4 station goldens move (`greenhouse`, `harvest`, `lighting`, `sealed_station`), their
   4 `golden_sha256` rows and `numerics_note` follow. No flow, param, seam, claim or `simcore`

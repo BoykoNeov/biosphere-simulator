@@ -331,3 +331,54 @@ the sweep inside flows; both were done and committed first (`70d2b37`).
   wrap a flow that already solves. Both examples are re-run and one headline number from each
   record must reproduce (the jar's −7.14 % harvest at ¼ against the 1/256-day answer).
 * **Q5 graded on evaluations**, not wall-clock alone.
+
+### Slice 2 — done 2026-09-30
+
+Built as designed and amended: `science::Co2Read` on `PhotosynthesisParams` (loader:
+`EndOfStep`), `flows::end_of_step_pool` (Illinois inside `[max(0, C₀ − U(C₀)), C₀]`, exact
+bracket stop, low end returned), acting only in `Allocation` and only where a chamber pool is
+wired. The lab step experiments (`step_options`, `step_cause`, examples and tests) pinned to
+`StartOfStep`; both examples re-run and reproduce their records (jar harvest at ¼ against the
+1/256-day answer −7.143 %, at ⅛ −2.509 %, at 1/16 −1.420 %; the light-cause cells −7.143 /
+−7.185 / −0.023; the lab's C at ¼ −7.465 %).
+
+**Two changes during implementation, before any golden was written:**
+
+* *The low end of the bracket can read a few ULPs above zero*: at `lo = C₀ − U(C₀)` the exact `h`
+  is `U(lo) − U(C₀) ≤ 0`, but the computed one carries the rounding of `(C₀ − U) − C₀ + U`
+  (seen: 4e-17 to 1e-16). `lo` is nudged down by that excess, at most 8 times and only while it
+  is below `1e-12·C₀`; anything larger stays the monotonicity error.
+* *The exact stop cost 19.5 evaluations on a daytime step*, no better than the lab's bisection:
+  Illinois closes from one side while the far end lags. A one-evaluation probe of the
+  neighbouring float, taken once an end is within rounding of the root, closes the bracket.
+  Measured on the jar (3 years) and the perennial chamber (1 year): **5.3 and 6.0 evaluations
+  per daytime step, 1.35 and 2.84 per step** (night steps cost none; 10,925 of the jar's 14,640
+  steps are idle), and C costs 3–5 % of a chamber run's wall time. The season lows were
+  unchanged to the printed digits by the probe.
+
+**Findings.**
+
+1. *The promise holds as a test.* The jar at a tenth and a fiftieth of its room rations 205 and
+   1403 times explicitly and **0 times under C** (`the_crop_never_takes_more_co2_than_the_air_holds`).
+2. *C lifts the jar's CO₂ low point most*, because that is where the explicit step overdrew most:
+   season low 7.969 → 9.661 ppm, compensation margin 11.665 → 14.152 (+21 %), tightest step
+   0.2009 → 0.1652 of the pool (per day 3.22 → 2.64). The other chambers' margins rose
+   +2.9 % and +1.5 %.
+3. *Harvests barely move*: chamber grain −0.02 % to −0.09 %, `sealed_station` −0.88 %.
+4. *The season-low reversal survives C, with no rationing anywhere*: lowest at 70 % of the
+   room (9.501), back above the healthy jar by half the room.
+5. *The lab leaf form's tightest jar step* is 0.2324 under C (0.3128 explicit).
+
+**Predictions graded.**
+
+| # | predicted | measured | |
+|---|---|---|---|
+| Q1 | 10 goldens move, `season_euler` and the 9 plant-free station goldens identical; only their 10 `golden_sha256` rows | exactly so | held |
+| Q2 | grain down < 1 %; season lows and margins up < 3 % | grain −0.02 to −0.09 %; perennial +2.9 %, consumer +1.5 %, **jar +21 %** | half |
+| Q3 | seedlings in the 4th significant figure; `sealed_station` < 1 % | `greenhouse`, `harvest` yes; **`lighting` in the 3rd** (−0.28 % leaf carbon; its chamber holds 0.23 mol); `sealed_station` −0.88 % | half |
+| Q4 | rationing 0; tightest step 0.19–0.20 | rationing 0 everywhere; **0.1652** | half |
+| Q5 | 2–5 evaluations per daytime step, < 3 per step, suite < 300 s | first build **19.5**; with the closing probe 5.3–6.0 per daytime step, 1.35–2.84 per step; suite **251 s**, ignored tests 339 s | half |
+| Q6/Q7 | the step experiments pinned and reproducing; the rationing tests restated with a C pair | done; **missed** one test whose fixture overdraws (`the_sealed_context_reads_ci_from_the_pool_and_not_the_forcing`, restated on the explicit form with a C bound) and the claim census's four new `A` rows | half |
+
+**Whole-batch cost.** Test suite 496 s → 251 s; the four ignored tests 1649 s → 339 s. The user's
+"roughly the same time as now" is met with room to spare.

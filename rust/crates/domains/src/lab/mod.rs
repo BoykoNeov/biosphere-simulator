@@ -40,7 +40,7 @@
 //! (`docs/log/canopy-provenance.md`) is still open and still the user's.
 
 use crate::biosphere::params::{self, BiosphereParams, Bounds};
-use crate::biosphere::science::{KineticsForm, LeafAreaForm, O2Form};
+use crate::biosphere::science::{Co2Read, KineticsForm, LeafAreaForm, O2Form};
 use config::{with_override, ConfigError, ParamFile};
 
 /// The comparison report — §6 of the plan, every requirement earned by a wrong read.
@@ -159,6 +159,25 @@ pub fn biosphere_with_o2_form(
 ) -> Result<BiosphereParams, ConfigError> {
     let mut p = biosphere_with(subs)?;
     p.photo.o2_form = form;
+    Ok(p)
+}
+
+/// The frozen params with the crop's CO₂ read at `form` — the fourth form sibling.
+///
+/// [`Co2Read::EndOfStep`] is the reference since 2026-09-30; [`Co2Read::StartOfStep`] is the
+/// explicit form every record before it measured, kept reachable so those records re-run.
+/// Like the O₂ form it selects and supplies nothing: the value is the chamber's CO₂ stock, and
+/// the open field has none, so an `open_season` row is unchanged by construction.
+///
+/// # ⚠ This endorses no form
+///
+/// [`Co2Read::EndOfStep`] is the reference and stays the reference.
+pub fn biosphere_with_co2_read(
+    subs: &[Substitution],
+    form: Co2Read,
+) -> Result<BiosphereParams, ConfigError> {
+    let mut p = biosphere_with(subs)?;
+    p.photo.co2_read = form;
     Ok(p)
 }
 

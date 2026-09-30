@@ -22,6 +22,15 @@ use domains::biosphere::system::{
 };
 use domains::biosphere::{SeasonBuild, SEASON_DAYS};
 use domains::lab::biosphere_with_leaf_form;
+use domains::biosphere::science::Co2Read;
+
+/// ⚠ The explicit CO₂ form, pinned: this record measured the crop at the START-of-step air
+/// (every run before 2026-09-30), and under the reference's `EndOfStep` the lab's own option C
+/// would wrap a flow that already solves. See `docs/plans/post-roadmap-step-sixteenth.md`, Q6.
+fn start_of_step(mut p: domains::biosphere::params::BiosphereParams) -> domains::biosphere::params::BiosphereParams {
+    p.photo.co2_read = Co2Read::StartOfStep;
+    p
+}
 use domains::lab::step_options::{
     build_season_implicit_uptake, run_split, run_uniform, Scope, SolveLog, SplitRule, SplitStats,
     Watched,
@@ -36,7 +45,7 @@ const TRUTH_SPD: usize = 256;
 const MAX_DEPTH: u32 = 6;
 
 fn params(form: LeafAreaForm) -> BiosphereParams {
-    biosphere_with_leaf_form(&[], form).expect("the frozen params load")
+    start_of_step(biosphere_with_leaf_form(&[], form).expect("the frozen params load"))
 }
 
 /// Every stock amount and aux value, bit for bit, in key order.

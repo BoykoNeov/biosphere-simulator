@@ -971,12 +971,17 @@ mod margins {
     /// the 2 % tolerance and re-pinned anyway so the next unfreeze quotes this step's value).
     /// The long horizons still equal their short runs, so the troughs have not moved past
     /// the short runs' ends.
+    ///
+    /// ⚠⚠ **RE-PINNED AGAIN the same day for option C** (slice 2: the crop's draw read against
+    /// the air the step leaves). All five rose further, the jar most: 11.665179 → 14.152401
+    /// (+21.3 %), perennial 1.189982 → 1.224157 (+2.9 %), consumer 1.217510 → 1.235336 (+1.5 %).
+    /// The jar's low point is where the explicit step overdrew most, so that is where C lifts it.
     const PINNED: &[(&str, f64)] = &[
-        ("sealed_chamber", 11.665179),
-        ("perennial_chamber", 1.189982),
-        ("consumer_chamber", 1.217510),
-        ("perennial_long_horizon", 1.189982),
-        ("consumer_long_horizon", 1.217510),
+        ("sealed_chamber", 14.152401),
+        ("perennial_chamber", 1.224157),
+        ("consumer_chamber", 1.235336),
+        ("perennial_long_horizon", 1.224157),
+        ("consumer_long_horizon", 1.235336),
     ];
 
     /// The measured margins, in `PINNED`'s order.
@@ -1095,10 +1100,15 @@ mod margins {
     /// The control that `step_draws` can see a squeeze moved with it: the lab leaf form no
     /// longer rations the jar at 1/16, so `leaf_form.rs` now uses a tenth-size jar.
     ///
+    /// ⚠ **RE-PINNED AGAIN for option C: 0.165230**, same step 3108 (per day 2.64). Under C the
+    /// draw is solved against the air the step leaves, so the hardest step asks for less, and
+    /// the backstop cannot fire at all; this pin now watches how much of the pool the hardest
+    /// step still takes. The explicit form's 0.200940 is recorded above and in the plan.
+    ///
     /// ⚠ Kept OUT of [`PINNED`]: that list is tied to the compensation-band roster by
     /// `every_banded_scenario_has_a_pinned_margin`, and this is not a band. And not a
     /// `science_gates!` row — that would be a manifest entry, i.e. an unfreeze.
-    const JAR_CO2_STEP_DRAW: f64 = 0.200940;
+    const JAR_CO2_STEP_DRAW: f64 = 0.165230;
 
     /// ⚠⚠ **The tolerance is on the HEADROOM, `1 − draw` — and, since the 1/16 step, on the
     /// draw as well.** The question is how close the jar comes to running out. At the

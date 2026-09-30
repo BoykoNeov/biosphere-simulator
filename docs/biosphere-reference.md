@@ -75,6 +75,12 @@ stress (Step 3, 328 yr) confirmed no slow drift. RK4 ships in `simcore` but the 
 **not** use it — crop physiology is daily-integrated and the daily canopy flux is not
 RK4-refinable.
 
+**One flow is implicit in a sealed build (since 2026-09-30, option C).** The allocation flow
+reads the chamber CO₂ at the end of its own step (`X = C₀ − U(X)`, backward Euler on the
+crop's draw alone; `science::Co2Read::EndOfStep`, solved by `flows::end_of_step_pool`), so
+the crop can never take more CO₂ than the start of the step holds. Every other flow, and the
+open field entirely, stays forward Euler. See the unfreeze log.
+
 ⚠ **The step and the day are now different numbers, and that is the whole point.** The step
 lives in **one** place, `rust/crates/domains/src/biosphere/mod.rs` (`BIO_DT`, `STEPS_PER_DAY`,
 `steps_for`), and every run length, reset period and perturbation window is expressed in
@@ -894,6 +900,28 @@ above), so a present-tense sentence naming them — "the golden that moved", "on
 runs where water limits", a golden count of 25 — describes the tree **as it was at that
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
+
+- **2026-09-30 — OPTION C: in a sealed build the crop's growth reads the chamber CO₂ the step
+  LEAVES, not the CO₂ it starts with. 6 goldens here (4 on the station), their `golden_sha256`
+  rows; no flow set, aux, param file, `dt_days` or `simcore` byte changed; the open field is
+  byte-identical by construction.** The user's call on the review's Step 2, slice 4 (*"Option C
+  only guarantees the plant never takes more CO₂ than the air holds … 1 + 3"*). Plan,
+  predictions and amendments committed before the code, and grading:
+  `docs/plans/post-roadmap-step-sixteenth.md`, slice 2. **The form.** `PhotosynthesisParams`
+  gained `co2_read` (`Co2Read::EndOfStep`, set by the loader, never by a file; the lab can
+  select `StartOfStep`, the explicit form every record before this one measured). Only
+  `Allocation` acts on it: it solves `X = C₀ − U(X)` (backward Euler on its own draw) with a
+  bracketed Illinois search that stops only when no float lies between its ends and returns
+  the end where the draw cannot exceed the start-of-step pool. Night steps (the crop takes
+  nothing) are the explicit evaluation bit for bit. No new `type_name`: the authoring registry
+  does not move. **What moved.** Chamber grain −0.02 % to −0.09 %, chamber CO₂ up; the jar's
+  compensation margin 11.665 → 14.152 (its low point is where the explicit step overdrew most);
+  the jar's tightest step 0.2009 → 0.1652 of the pool. **The promise is a test**
+  (`the_crop_never_takes_more_co2_than_the_air_holds`): the jar shrunk to a tenth and to a
+  fiftieth of its room, which ration 205 and 1403 times explicitly, ration 0 times under C.
+  Tests whose subject was the jar rationing were restated on the explicit form and paired with
+  that zero. ⚠ Under RK4 a sealed build is now a hybrid (each stage solves its own end-of-step
+  pool); the reference is Euler and nothing frozen runs RK4 on a sealed build.
 
 - **2026-09-30 — THE INTEGRATION STEP: `dt = ¼ day` → `dt = 1/16 day`. 7 goldens here (and 4
   on the station), their 7 `golden_sha256` rows, and `dt_days` 0.25 → 0.0625. No flow, aux,

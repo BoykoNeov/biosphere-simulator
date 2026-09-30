@@ -179,19 +179,19 @@
   "scenarios": {
     "consumer_chamber": {
       "golden": "consumer_chamber_state.json",
-      "golden_sha256": "0eb378eac6f632c76fb1b3c7b9b05e2f4a4287c38b1455bb4c1894c0efd741c4",
+      "golden_sha256": "09261127bd09719947296e863c18098b7d7ff1e998c2f2d051d504226bed8150",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 5
     },
     "consumer_long_horizon": {
       "golden": "consumer_long_horizon_state.json",
-      "golden_sha256": "0ee44734b39fc84f07fabd0d90c9fd9eafc427f754c2cb68cd1614f0697ead2c",
+      "golden_sha256": "2143c9b28b7adbfb3079f1356d570aeaa28c8135a3cadd30fc1ca4b2f90c5d68",
       "scenario": "CONSUMER_CHAMBER_SCENARIO",
       "years": 15
     },
     "drift_summary": {
       "golden": "drift_summary.json",
-      "golden_sha256": "54c99508dbe8c41691af4ebb4917a60e58a291a05210f8df88bb7ed90d6742bd",
+      "golden_sha256": "1291223e7a590a8fdfcd0c06c5a4e13efdedf0d3650015fc999e4878a1aadaa8",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO + CONSUMER_CHAMBER_SCENARIO (stability signature)",
       "years": 15
     },
@@ -203,19 +203,19 @@
     },
     "perennial_chamber": {
       "golden": "perennial_chamber_state.json",
-      "golden_sha256": "9d0068b0426ade949b4db4faf5c5054b886f4148a74cfd470cf406d9f400674f",
+      "golden_sha256": "c65fef2c4c59a6ee0dc3a736d3b2f82e4eba8532157df98a11269e4c625b71ac",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 5
     },
     "perennial_long_horizon": {
       "golden": "perennial_long_horizon_state.json",
-      "golden_sha256": "ffb265be9ba67b5d53ee1d67a3e410fcf8327d52098eafae89d02362926a8fbf",
+      "golden_sha256": "31021d8971c3ecbc33635fe55badd28a8cd36a7480bf9fcdc13c97fdfd4a253c",
       "scenario": "PERENNIAL_CHAMBER_SCENARIO",
       "years": 15
     },
     "sealed_chamber": {
       "golden": "sealed_chamber_state.json",
-      "golden_sha256": "a10823ed0be5d785df5a43d7e8fb0f44725b25843583753166ef84df3c8cbfa3",
+      "golden_sha256": "edfa57a2e26941dfbdf063db147dfeabc0b9eb396782a1de8a8d616155e0f012",
       "scenario": "SEALED_CHAMBER_SCENARIO",
       "years": 3
     }
