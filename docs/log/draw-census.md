@@ -30,35 +30,43 @@ before any code, `6aa7329`), grading and the full table:
 * About 1.9 million steps re-applied bit for bit from the probe's own sums. This is the
   control that can fail on a run that never rations.
 * Firing counts agree everywhere. Because every frozen run reads `0 == 0`, it was also run on
-  the lab leaf-form jar, which rations: the probe names CO₂, worst 1.1465, 135 steps over 0.5.
+  the lab leaf-form jar, which rations: **5 firings, the same 5 `log/leaf-rust-remeasure.md`
+  recorded**, CO₂ named, worst 1.1465, 135 steps over 0.5. The bit-for-bit re-application held
+  on those 5 scaled steps too.
 
 ## Findings
 
 **1. Only a CO₂ pool drawn by the crop comes near its limit.** Every draw above 0.1 that is not
 a fixed rate or the weather is the crop's uptake on a CO₂ pool. The jar: worst **0.757**, over
-0.5 on **52** steps and over 0.1 on 632, of 3660. The perennial chamber 0.262, the consumer
-chamber 0.230, the sealed station's crop on the cabin air **0.078**.
+0.5 on **52** steps and over 0.1 on 632, of 3660, so it has held with as little as 0.24 of its
+pool to spare. The perennial chamber 0.262, the consumer chamber 0.230, the sealed station's
+crop on the cabin air **0.078**.
 
-**2. Every other store's worst is rate × step or the weather, and cannot reach 1 by
-construction.** Condensate 0.125 (0.5/day × ¼ day), cabin CO₂ on the cabin side 0.060
+**2. Every other store above 0.1 is a fixed rate × step or the weather, which cannot reach 1 by
+construction.** Condensate 0.125 (0.5/day × ¼ day); below 0.1, cabin CO₂ on the cabin side 0.060
 (1e-3/s × 60 s), recovered water 0.060, cabin water 0.030, stem reserve 0.025, flat on every
-step. The vapour store reads **0.447 in every sealed chamber on the same step**: a 16.7 °C →
-9.7 °C night lowers the humidity target and the condenser takes the whole excess at once.
+step. The vapour store reads **0.447 in every run that reaches day 198**, on the same step: a
+16.7 °C → 9.7 °C night (printed for the jar's run) lowers the humidity target and the condenser
+takes the whole excess at once. ⚠ Below 0.1 sit stores emptied by demand: the battery (0.090)
+and soil water (0.029). Nothing in their form keeps them below 1; they are far from it here.
 
-**3. ⚠ The four 7-day station goldens cannot see the station crop pull on the cabin air.** Their
-crops are seedlings (0.002 and 0.0016). Only the 4-year sealed station grows one. A sizing
-question about the station's plants, Step 3's included, has to be measured there.
+**3. ⚠ The 7-day station goldens cannot see the station crop pull on the cabin air.** Three of
+the four 7-day station goldens carry a crop, and only `greenhouse` and `harvest` share the
+cabin air with it (`lighting`'s crop has its own chamber; `station_heat_closure` has none).
+Both are seedlings (0.002 and 0.0016). Only the 4-year sealed station grows a crop on the cabin
+air. A sizing question about the station's plants, Step 3's included, has to be measured there.
 
-**4. ⚠ My station prediction was off by a factor of two, and the cause was a unit.** Predicted
-≈ 0.16, measured 0.078. The basis (the crew-loop record's 6.31× headroom) is the crop's biggest
-**daily net** gain against the pool, from when the plant step was a whole day; I read it as a
-per-step draw. Redone per quarter-day step it gives about 0.07. The same days-against-steps
-mistake `log/step-unfreeze.md` records.
+**4. ⚠ My station prediction was off by a factor of two.** Predicted ≈ 0.16, measured 0.078. The
+basis (the crew-loop record's 6.31× headroom) is the crop's biggest **daily net** gain against
+the pool, from when the plant step was a whole day; I read it as a per-step draw. The measured
+figure is *consistent with* that explanation, and it is **not measured**. Per quarter-day step
+the day's figure gives 0.06, and the gap needs a gross-over-net factor nobody measured. The
+same kind of days-against-steps mistake `log/step-unfreeze.md` records.
 
-**5. For Step 3 (the reason the review said to read this slice first):** no water store is
-within a factor of ten of its limit except the vapour store, and that one is set by a cold
-night, not by transpiration. Step 3's +21 % water use is not expected to squeeze a water store —
-expected, not measured.
+**5. For Step 3 (the reason the review said to read this slice first):** the only water stores
+within a factor of ten of their limit are the vapour store (0.447, a cold night) and the
+condensate (0.125, a fixed rate). Neither worst is set by transpiration; soil water is at 0.029.
+Step 3's +21 % water use is not expected to squeeze a water store — expected, not measured.
 
 ## Predictions
 

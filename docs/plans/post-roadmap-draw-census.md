@@ -148,15 +148,17 @@ is 163 s of it). Full output kept outside the repo at `W:\temp\claude\draw-censu
 2. **Jar CO₂: 0.756662 at step 777** — the pinned figure, to the last printed digit.
 3. **Every probed step re-applies bit for bit**: about 1.9 million steps, both sides, every run.
 4. **Firing counts agree** on every run and side. On the frozen runs that is `0 == 0`. On the
-   lab leaf-form jar it is a real count, and the probe names the store: CO₂, worst 1.1465 at
-   step 777, over 0.5 on 135 steps.
+   lab leaf-form jar it is a real count, **5 firings, the same 5 `docs/log/leaf-rust-remeasure.md`
+   recorded**, and the probe names the store: CO₂, worst 1.1465 at step 777, over 0.5 on 135
+   steps. Control 3 held on those 5 scaled steps too, so the probe reproduces the backstop's
+   scaling exactly, not only the unscaled case.
 
 ### The table — the worst store of each kind (frozen runs only)
 
 | Store | Worst draw | Mean | Steps > 0.5 | Where | Drawn by | Kind |
 |---|---|---|---|---|---|---|
 | sealed jar CO₂ | **0.757** | 0.185 | **52** of 3660 | day 194 | crop uptake | demand |
-| chamber vapour | 0.447 | 0.134 | 0 | day 198, every chamber | condenser | weather-set |
+| chamber vapour | 0.447 | 0.134 | 0 | day 198, every run that reaches it | condenser | weather-set |
 | perennial chamber CO₂ | 0.262 | 0.036 | 0 | day 184 | crop uptake | demand |
 | consumer chamber CO₂ | 0.230 | 0.018 | 0 | day 196 | crop uptake | demand |
 | condensate | 0.125 | 0.125 | 0 | every step | recycling, 0.5/day | fixed rate |
@@ -173,7 +175,9 @@ is 163 s of it). Full output kept outside the repo at `W:\temp\claude\draw-censu
 ### Predictions, graded
 
 * **P1 — HELD.** The two tightest frozen stores are the jar's CO₂ and the vapour store. ⚠ The
-  vapour half is not the jar's: it reads **0.447203 in every sealed chamber**, on the same step.
+  vapour half is not the jar's: it reads **0.447203 in every run that reaches day 198** (all five
+  chambers and the sealed station), on the same step. The 7-day runs never reach it and peak at
+  0.20 and 0.22 on other days. The weather was printed for the jar's run only.
 * **P2 — HELD.** Open field worst: soil water, 0.027, on the first step.
 * **P3 — HELD.** Soil water 0.029, subsoil water 0.015. Every nitrogen store < 0.005.
 * **P4 — HELD.** 0.757 at step 777, season 1 of 3.
@@ -187,10 +191,13 @@ is 163 s of it). Full output kept outside the repo at `W:\temp\claude\draw-censu
 * **P7 — REFUTED by a factor of two, and the cause is mine.** The station crop's worst draw on
   the cabin CO₂ is **0.078** (sealed station, 4 years), not ≈ 0.16. ⚠ The basis was a **per-day**
   figure (the crew-loop record's 6.31× headroom is the crop's biggest *daily net gain* against
-  the pool, from when the plant step was a whole day), read as a **per-step** draw. Redone per
-  step it agrees: 0.158 of the pool per day, times the brightest quarter's 6 of the lamp's 16
-  hours, times gross over net, is about 0.07. This is the same days-against-steps mistake this
-  project has recorded before, when the step went from a day to a quarter-day (`docs/log/step-unfreeze.md`). Cabin O₂ on the
+  the pool, from when the plant step was a whole day), read as a **per-step** draw. The
+  measured 0.078 is *consistent with* that explanation, and it is **not measured**. 0.158 of
+  the pool per day, times the brightest quarter's 6 of the lamp's 16 hours, gives 0.06. Closing
+  the gap needs a gross-over-net factor I did not measure. The 0.078 is also taken against the
+  pool as it stood at that step, not the scrubber's 3.796 mol. It is the same kind of
+  days-against-steps mistake this project recorded when the step went from a day to a
+  quarter-day (`docs/log/step-unfreeze.md`). Cabin O₂ on the
   plant side < 0.0001, as predicted. `lighting`'s crop draws only its own chamber (0.034), as
   predicted.
 * **P8 — HELD.** On the cabin side, only the fixed-rate stores reach 0.03 or more. Every other
@@ -205,21 +212,29 @@ is 163 s of it). Full output kept outside the repo at `W:\temp\claude\draw-censu
    uptake.** Every row above 0.1 that is not a fixed rate or the weather is a crop drawing CO₂,
    and the uptake flow (`biosphere.allocation`) is the largest withdrawal on every one of them.
    The sealed jar is the extreme: its pool loses more than half its contents in one step on 52
-   steps, and more than a tenth on 632 of 3660. So `rationed == 0` has been holding there by a
-   margin of 0.24 at best.
-2. **Every other store's worst draw is set by rate × step or by the weather, and cannot reach 1
+   steps, and more than a tenth on 632 of 3660. So `rationed == 0` has been holding there with
+   as little as 0.24 of the pool to spare.
+2. **Every other store above 0.1 is a fixed rate × step or the weather, and those cannot reach 1
    by construction.** The fixed-rate stores read exactly rate × step (0.5/day × ¼ day = 0.125;
-   1e-3/s × 60 s = 0.06). Halving the step halves them and nothing else changes.
-3. **The four 7-day station goldens cannot see the station crop pull on the cabin air.** Their
-   crops are seedlings: 0.002 on `greenhouse`, 0.0016 on `harvest`. Only the 4-year sealed
-   station grows a crop, and it reads 0.078. Any sizing question about the station's plants
-   (Step 3 included) has to be measured on that run.
-4. **For Step 3's sizing (the review's reason to read this slice first):** no water store is
-   within a factor of ten of its limit except the vapour store, whose worst is set by a cold
-   night, not by how much the plants transpire. Step 3's +21 % water use is not expected to
-   squeeze a water store. *Expected, not measured* — Step 3 has to measure it.
-5. **The probe is only needed where it can fail.** Control 3 is the one that could go red on a
-   run that never rations, and on every run it did not.
+   1e-3/s × 60 s = 0.06), so halving the step halves them. The vapour store's weather-set draw
+   is an excess plus a fixed fraction, which stays below 1. ⚠ That is a claim about the stores
+   **above 0.1** only. Below it sit stores emptied by demand, such as the battery (0.090, the
+   load) and soil water (0.029, transpiration). Nothing about their form keeps them below 1.
+   They are simply far from it on the frozen roster.
+3. **The 7-day station goldens cannot see the station crop pull on the cabin air.** Three of the
+   four 7-day station goldens carry a crop (`greenhouse`, `lighting`, `harvest`;
+   `station_heat_closure` has none), and only `greenhouse` and `harvest` share the cabin air
+   with it (`lighting`'s crop has its own chamber). Both crops are seedlings: 0.002 and 0.0016.
+   Only the 4-year sealed station grows a crop on the cabin air, and it reads 0.078. Any sizing
+   question about the station's plants, Step 3's included, has to be measured on that run.
+4. **For Step 3's sizing (the review's reason to read this slice first):** the only water stores
+   within a factor of ten of their limit are the vapour store (worst 0.447, set by a cold night)
+   and the condensate (0.125, a fixed rate). Neither worst is set by how much the plants
+   transpire. Soil water is at 0.029. Step 3's +21 % water use is not expected to squeeze a
+   water store. *Expected, not measured*: Step 3 has to measure it.
+5. **Control 3 carries the evidence.** It is the one check that could fail on a run that never
+   rations. It held on every step of every run, including the 5 scaled steps of the rationing
+   case.
 
 ## 7. What this slice does not do
 

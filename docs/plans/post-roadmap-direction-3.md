@@ -416,7 +416,7 @@ scrubbed pool; which lever relieves that (scrubber rate, step, air) is not measu
 discharges nothing here. It bears on two items. **§2.1 (the leaf mechanism):** the jar is the
 only frozen store near its limit (CO₂ 0.757 of the pool in one step, over half on 52 steps), and
 the leaf form takes it to 1.15. **§2.2:** the frozen sealed station's grown 1 m² crop takes at
-most 0.078 of the cabin CO₂ in a step; the four 7-day station goldens hold seedlings and cannot
+most 0.078 of the cabin CO₂ in a step; the two 7-day station goldens whose crop shares the cabin air (greenhouse, harvest) hold seedlings and cannot
 show it. The station's crew-loop refusal
 (`log/crew-coupled-loop.md`) is the record it answers.
 
