@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `step-cause.md`
+**Re-read against the record's last row:** `step-sixteenth.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -447,6 +447,17 @@ routes, a finer step or the light resolved inside the step, and only the first r
 as built. **§2.2:** the jar's mean CO₂ error at ¼ day is mostly light too (42.6 → 1.7 ppm with
 the light resolved); what remains is a within-step swing of about 31 ppm, which is the stepping
 and is what C addresses. A controller priced on the jar at ¼ day inherits both.
+⚠ *Re-read 2026-09-30* (`log/step-sixteenth.md`, IN PROGRESS): the user's decision on Step 2
+slice 4, a 1/16-day step plus C. Read against it while slice 1 is uncommitted, so these are
+first readings off the whole suite at 1/16, not landed facts. **§1:** "Euler, `dt = ¼`" goes
+stale when slice 1 lands. **§2.1:** at 1/16 the lab leaf form **no longer rations the jar**
+(`leaf_form.rs` goes red on exactly that), so the jar-breaks reading that holds the leaf form
+back was taken at a step now retired; it is re-measured before anything is claimed. **§3
+(mutual shading orders the contract):** `open_season` peaks at LAI 5.44 at 1/16, under the 6.0
+threshold, so no frozen scenario reaches the cited loss; the science gate's "genuinely bites"
+half goes red. How to keep that mechanism covered is the user's call. **§2.2:** the jar's
+tightest single-step draw falls 0.757 → 0.201 of the pool; per day it rises (3.03 → 3.21), so
+a controller priced per step must not read that as four times the headroom.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

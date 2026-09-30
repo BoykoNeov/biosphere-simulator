@@ -186,5 +186,6 @@ this form does on purpose.
 Byte-neutrality: every golden the default suite compares passed unregenerated, and the four
 ignored tests (`cargo test -- --ignored`, CI's second job) passed too, the sealed station golden
 among them: 90 s, the two-rate full horizon 179 s, sealed resume 59 s, the expensive-golden
-band 83 s. `regen_goldens` was not run for this slice: it runs in `--release`, which the change
+band 83 s — **411 s** in all, against **1649 s** unoptimised (357, 670, 269, 353), measured
+afterwards in the as-shipped worktree with nothing else running. `regen_goldens` was not run for this slice: it runs in `--release`, which the change
 does not touch, so it could not have seen it. `clippy -D warnings` clean.
