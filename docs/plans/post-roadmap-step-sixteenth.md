@@ -1,0 +1,133 @@
+# Post-roadmap — the biosphere moves to a 1/16-day step, and the crop's CO₂ uptake is taken against the air it leaves (Step 2, slice 4)
+
+**Opened 2026-09-30** on the user's decision for the review's Step 2, slice 4:
+
+> *"1. A finer step everywhere (1/16 day …) 3. Option C only guarantees the plant never takes
+> more CO₂ than the air holds … 1 + 3. But ensure the tests runtime would not quadruple"* —
+> and then: *"i want the test suite to be roughly the same time as now"*.
+
+Evidence the choice rests on: `docs/log/step-options.md` (the options priced against a 1/256-day
+answer), `docs/log/step-cause.md` (the jar's loss is the light's time resolution; a 1/16 step is
+the better shape on the open field and on the jar's worst CO₂ error), `docs/log/co2-uptake-source.md`
+(C is backward Euler on the crop's flow; no published biology form is missing).
+
+This is an **unfreeze** of the biosphere contract (`docs/biosphere-reference.md` freezes
+Euler/`dt = ¼`) and of the station contract's plant step. It follows the discipline in
+`docs/biosphere-reference.md` §"The unfreeze discipline". `simcore` is not edited.
+
+## Three commits, in this order, each attributable
+
+| Slice | What | Goldens | Why this order |
+|---|---|---|---|
+| 0 | Optimise the simulation crates in the dev/test profile | **none** (must be byte-neutral) | buys the runtime the step will spend; proven neutral before anything moves |
+| 1 | `BIO_DT` ¼ → 1/16, `STEPS_PER_DAY` 4 → 16 | 11 predicted | every byte of this diff is the step's |
+| 2 | C: the crop's uptake read against the end-of-step pool | sealed/chamber goldens predicted | every byte of this diff is C's |
+
+The step and C are not one batch: C's diff must be readable on its own, and the step's price
+must be known before C spends more.
+
+## Slice 0 — the runtime budget
+
+**Measured before planning (2026-09-30, this box, test run time excluding compilation):** the
+whole suite takes **445 s**; `godot_bridge`'s `cross_boundary` (which drives the real Godot) is
+185 s of it. With every crate optimised the suite passes identically (1231 of 1231) in **206 s**,
+and everything outside `cross_boundary` goes from 221 s to 66 s.
+
+That first measurement optimised the Godot binding library too, and its child `cargo` builds
+inherited the setting through the environment. The committable form is narrower: per-package
+`opt-level = 3` for `simcore`, `domains`, `station`, `authoring`, `config` only, written into
+`rust/Cargo.toml`, so the child builds `cross_boundary` spawns see it too and the heavy `godot`
+dependency stays unoptimised. Measured in two scratch worktrees (fresh build, incremental build
+after touching one `domains` file, test run): see §Results.
+
+Why it is byte-neutral, and how that is checked rather than assumed: Rust does no floating-point
+contraction or reassociation at any opt level, and the goldens are already regenerated in
+`--release` and compared in debug — so both profiles already produce the same bytes. The check is
+the full suite green with no golden regenerated, plus `regen_goldens` (report only) reporting no
+change. `debug-assertions` and `overflow-checks` stay on (they are separate profile keys).
+
+**The price, stated for the user:** a slower first build and slower incremental rebuilds of the
+simulation crates, and a debugger stepping through optimised code in those crates.
+
+## Slice 1 — the step
+
+### The change
+
+`domains::biosphere::{BIO_DT, STEPS_PER_DAY}`: `0.25 / 4` → `0.0625 / 16`. Everything that
+counts plant steps derives from these (the 2026-08-14 ceremony converted the days-vs-steps unit
+everywhere). 1/16 is a power of two, so `n · dt` stays exact; the cabin's 1440 one-minute steps
+per day split into 16 plant steps of 90 exactly (`driver::fast_steps_per_slow_step` refuses an
+uneven split).
+
+The hand-typed literals that must change by hand, on purpose: the manifest's `dt_days`
+(`domains/src/freeze_manifest.rs`, and the assertion in `domains/tests/manifest_writer.rs`), and
+the station `numerics_note` prose ("dt=1/4 day, 4 slow sub-steps per master day, each followed by
+its quarter of …"), which nothing checks.
+
+**The lab experiments stay at four steps a day.** `step_options`, `step_cause` and any lab test
+that compares against "the shipped run" are dated records; they are pinned to 4 steps a day
+explicitly so they stay re-runnable rather than silently following the new step.
+
+### The sweep before any value is read
+
+A unit sweep over every phrasing, not one grep: "quarter-day", "quarter day", "¼", "1/4",
+"0.25", "360 cabin minutes", "six hours", "6 h", "its quarter", "×4", "four plant/slow/steps",
+bare `4`/`/ 4` next to a step, in Rust, `.gd`, JSON and the contract docs. Then the flip, then the
+whole suite `--no-fail-fast`, and every red is classed before any golden is regenerated:
+(a) a step count that should now be a day count — convert to days; (b) a pin that measured the
+step (a per-step margin) — convert to days (`margin · dt`); (c) a science claim that moved —
+recorded as a finding, never re-tuned; (d) a band or liveness failure — **blocking, back to the
+user**.
+
+### Predictions (written before the flip)
+
+* **P1 — structure.** Exactly 11 goldens move: the 10 plant-bearing state goldens
+  (`season_euler`, `sealed_chamber`, `perennial_chamber`, `consumer_chamber`,
+  `perennial_long_horizon`, `consumer_long_horizon`, `greenhouse`, `harvest`, `lighting`,
+  `sealed_station`) and `drift_summary`. Each state golden's `n` is **exactly 4×**
+  (1220 → 4880, 3660 → 14640, 6100 → 24400, 18300 → 73200, 28 → 112, 4880 → 19520). No array
+  changes length. The 10 others (`cabin_gas`, `crew`, `eclss`, `power`, `power_self_discharge`,
+  `station_state`, `thermal`, `water_recovery`, `sealed_energy_drift_summary`,
+  `state_snapshot`) are byte-identical.
+* **P2 — the open field loses ~10 % of peak leaf area.** The lab measured `open_season`'s peak
+  LAI +11 % above the 1/256 answer at ¼ and +0.3 % at 1/16, so 6.02 → about 5.4–5.5. It stays
+  inside the 5–8 science band.
+* **P3 — ⚠ the mutual-shading loss stops acting in the open field.** Its threshold is LAI 6.0; the
+  shipped canopy peaks at 6.02, just over it, since the 2026-08-15 leaf-area citation. At 1/16 the
+  canopy should never reach 6.0, so the loss goes inert and
+  `the_loss_is_inert_on_peak_lai_and_live_on_peak_w_at_the_frozen_params` goes red on its "live on
+  peak W" half. That is a finding (the regime was reached through the step's canopy bias), not a
+  test to loosen. The science gate `the_vks_mutual_shading_regime_is_modelled_not_merely_avoided`
+  still passes (it accepts "below 6.0").
+* **P4 — harvests rise.** Open field ~+2 % (lab: −2.1 % → −0.01 % of the answer). Sealed jar's
+  harvest ~+6 % (lab: −7.1 % → −1.4 %) — scoped to the lab's one-season jar; the frozen
+  `sealed_chamber` golden is a 3-year run whose state is set by year 1.
+* **P5 — no guard fires.** Rationed stays 0 on every golden run; every science band and liveness
+  floor holds.
+* **P6 — per-step margins roughly quarter.** The jar's tightest single-step draw (0.757) drops to
+  about 0.19–0.25; pins written per step go red and are converted to days.
+* **P7 — cross-port tier-2 sensitivity** may grow with four times as many steps; whether any
+  measured band is crossed is not predicted. A crossing is re-measured under the native-port
+  contract, not widened.
+* **P8 — cost.** Biosphere-only runs cost ~4×; station runs less than 4× (the cabin's steps do not
+  change). With slice 0 the whole suite stays within ±15 % of 445 s.
+
+## Slice 2 — C
+
+Predictions and the solver's cost are written into this file **before** slice 2's code, after
+slice 1's numbers are in. Fixed now, from the review of the lab build:
+
+* **Scope: crop only** — backward Euler on the allocation flow's uptake, `X = C₀ − U(X)`. The
+  scope that also counts same-step returns can take more than the start-of-step pool, which is
+  exactly what the user's promise ("never takes more CO₂ than the air holds") excludes.
+* **Inside the allocation flow**, not a wrapper with its own `type_name`: the authoring contract
+  freezes the flow-type registry, and a numerics change must not become an authoring unfreeze.
+  (To be confirmed against the authoring manifest before code.)
+* **One solve per step, a bracketed fast root-finder** (not the lab's bisection to machine
+  precision, ~50–60 crop evaluations a step), deterministic, with the lab's checks kept: the
+  bracket must bracket and the residual must meet its tolerance, or the step is an error.
+* It reaches the station too: the station's cabin air *is* the biosphere's `carbon_pool`.
+
+## Results
+
+(Filled in per slice.)
