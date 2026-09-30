@@ -1,4 +1,4 @@
-## **Three ways to take the step, priced** (the 2026-09-29 review's Step 2, slice 2 — the shipped step costs the sealed jar 15 % of its yield, and only a finer step moves it)
+## **Three ways to take the step, priced** (the 2026-09-29 review's Step 2, slice 2 — the shipped step leaves the sealed jar's harvest 7 % short, and only a finer step moves it)
 
 > One row of the record table in [`../post-roadmap-log.md`](../post-roadmap-log.md),
 > written out. The heading is that row's Work cell verbatim — a gate checks it.
@@ -6,6 +6,9 @@
 **MEASURED 2026-09-30 on the user's call** (*"yes"* to starting Step 2's slice 2). Lab only:
 nothing frozen touched, no golden regenerated, nothing decided. Plan, predictions (committed
 before any code, `e585aac`), full tables and grading: `docs/plans/post-roadmap-step-options.md`.
+⚠ The first commit of this record (`c384fa1`) headlined **−15 %**. That was the day-305 snapshot
+of a jar whose grain is still filling, not its harvest. Corrected the same day, before
+reporting, on an advisor challenge.
 
 ## What was built
 
@@ -36,51 +39,63 @@ satisfies its equation to 2e-12 mol on every step. The explicit processes never 
 pool on the frozen jar. **On the leaf-form jar the leaf-area aux process does** (270–342 steps),
 so C as built does not reach it. The fine-step answer (1/256 day) converges, but not cleanly at
 first order at coarse steps. Its own error, estimated as the last halving, is 0.6–2.7 ppm and
-0.05 % yield.
+0.03 % on harvest. As a cross-check, it reproduces the direction plan's recorded converged
+`open_season` peak LAI to 0.05 % (5.4248 vs 5.4273).
 
 ## Findings
 
-**1. The shipped quarter-day step costs the sealed jar 15 % of its yield** (−15.1 %; the lab leaf
-form −16.1 %), and CO₂ errors of up to 241 ppm. The open field loses only 2.1 % of its yield. The
-step sweep had measured the jar's harvest at −0.7 % at `dt = 1`, **before** the within-day light
-path. The light-path record then found the open field's canopy step-sensitive (15 %), and the
+**1. The shipped quarter-day step leaves the sealed jar's final harvest 7.1 % short** of a
+5-minute step (lab leaf form 7.2 %), with CO₂ errors of up to 241 ppm. At day 305 the jar is
+15 % behind: the coarse step fills the grain later. The open field's one-season harvest is 2.1 %
+short. The step sweep had measured sealed-chamber harvest at −0.7 % at `dt = 1`, before the
+within-day light path. Its table does not say which run or horizon that was, so no trend is
+claimed. The light-path record found the open field's canopy step-sensitive (15 %), and the
 user's call there was to finish at the shipped step. It measured the jar's day-night swing, not
-its yield. So the jar's yield went from 0.7 % step-sensitive to 15 % across the science added
-since, unmeasured until now.
+its harvest.
 
 **2. It is not the crop's uptake outrunning the air inside a step.** C removes exactly that
-error, and the yield moves 0.2 points (−15.3 %). C with same-step returns also lets the crop spend
-what the chamber gives back during the step, and it moves 0.1 (−15.2 %). Both candidate causes are
+error, and the harvest moves the wrong way (−7.5 %). C with same-step returns also lets the crop
+spend what the chamber gives back during the step, and gives −7.4 %. Both candidate causes are
 refuted by the experiment that removes them. The loss lives in the steps where the crop draws
 hard: refining only those (B at θ = 0.1) recovers most of it. But that refines every process and
-the light at once. **Cause not identified.** The named candidate, the light path's curved-response
-bias, is unmeasured for the jar, and its sign does not follow simply.
+the light at once. **Cause not identified.** The named candidate, the light path's
+curved-response bias, is unmeasured for the jar, and its sign does not follow simply.
 
-**3. A is the only option that moves the error**: −3.9 % at ⅛ (2× the evaluations), −2.2 % at 1/16
-(4×), −0.2 % at 1/64 (16×). It is also the only one that fixes the leaf-form jar's peak leaf area
-(−4.2 % → −0.2 %). Its price is a step unfreeze of every biosphere golden, plus the station's plant
-step, which is unmeasured.
+**3. A moves the error the furthest per unit cost**: −2.5 % at ⅛ (2× the evaluations), −1.4 % at
+1/16 (4×), −0.1 % at 1/64 (16×). It is also the only option that fixes the leaf-form jar's peak
+leaf area (−4.2 % → −0.2 %). Its price is a step unfreeze of every biosphere golden, plus the
+station's plant step, which is unmeasured.
 
-**4. B, built without touching `simcore`, is dominated by A.** Its probe cannot share the step's
-evaluation. To match A's accuracy it needs θ = 0.1 at 3.9× Euler's cost, twice A's. At θ = 0.5 it
-moves only the jar's golden and buys nothing there. Watching every store, it bottoms out on cold
-nights, where the condenser takes the whole humidity excess at any step size, and it moves every
-chamber golden.
+**4. B, built without touching `simcore`, is dominated by uniform refinement at the same cost.**
+Its probe cannot share the step's evaluation. θ = 0.25 costs 10.2 evaluations a day for −3.5 %
+(A: 8 for −2.5 %). θ = 0.1 costs 15.7 for −2.2 % (1/16: 16 for −1.4 %). At θ = 0.5 it moves only
+the jar's golden and buys nothing there. Watching every store, it bottoms out on cold nights,
+where the condenser takes the whole humidity excess at any step size, and it moves every chamber
+golden.
 
 **5. C is a safety property, not an accuracy fix.** It can never overdraw, so the backstop never
 fires on the crop's CO₂. On accuracy it matches the shipped step. It would move every sealed
 golden and not the open field. For the user's standing wish (*"make plants take less as the CO₂
-runs low"*): C buys no rationing, and no better yield.
+runs low"*): C buys no rationing, and no better harvest.
 
 **6. Predictions: 9 graded.** Three held (P6, P7, and P9 for the pre-registered controls). Four
 half held (P1, P4, P8). Three refuted: P2 is the finding; P3 refuted in the good direction; P5
-refuted. The sign in P4 was wrong: C does not sit on the other side of the answer from Euler.
-Both leave more CO₂ in the air and grow less.
+refuted on CO₂. The sign in P4 was wrong: C does not sit on the other side of the answer from
+Euler. Both leave more CO₂ in the air and grow less.
+
+## Lessons
+
+* **A season-end snapshot of a run that is never re-sown is not a harvest.** The jar's grain is
+  still filling at day 305. A "max error over season ends" folded a timing difference into a
+  yield headline. The give-away was in the table: peak leaf area within 0.5 % while "yield" was
+  15 % off.
+* **Grep the prior record before claiming a gap.** "The step decision never compared against a
+  converged answer" was false. The step sweep did, and the record said so.
 
 ## Open
 
 * **The decision (Step 2, slice 4) is the user's.** The options on the table: A at ⅛ or 1/16 (a
   step unfreeze); C for safety, alone or with A; nothing.
-* **The 15 %'s cause.** A mechanism experiment is owed before any claim about it: for example, the
-  jar at ¼ day with the light forcing taken from a finer window.
+* **The harvest loss's cause.** A mechanism experiment is owed before any claim about it: for
+  example, the jar at ¼ day with the light forcing taken from a finer window.
 * **The station**: none of the three options was run through the two-rate driver.

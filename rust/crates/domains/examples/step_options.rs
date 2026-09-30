@@ -203,7 +203,22 @@ fn ppm_err(a: &[f64], truth: &[f64]) -> (f64, f64, f64) {
     (max, sum / n, signed / n)
 }
 
+/// The FINAL storage's relative error, signed (+ = above the truth) — the harvest the run ends
+/// with. ⚠ Not the season-1 end: the jar is never re-sown and its grain is still filling at day
+/// 305, so a season-1 snapshot measures *when* the grain fills, not how much.
+fn harvest_err(a: &[f64], truth: &[f64]) -> f64 {
+    assert_eq!(a.len(), truth.len());
+    let (x, t) = (a[a.len() - 1], truth[truth.len() - 1]);
+    (x - t) / t
+}
+
+/// The season-1 end's relative error, signed — a timing readout on the never-re-sown jar.
+fn day305_err(a: &[f64], truth: &[f64]) -> f64 {
+    (a[0] - truth[0]) / truth[0]
+}
+
 /// The season's relative yield error of largest magnitude, SIGNED (+ = above the truth).
+#[allow(dead_code)]
 fn yield_err(a: &[f64], truth: &[f64]) -> f64 {
     assert_eq!(a.len(), truth.len());
     a.iter()
@@ -218,18 +233,19 @@ fn lai_err(a: f64, truth: f64) -> f64 {
 
 fn print_score(runs: &[&Run], truth: &Run) {
     println!(
-        "  {:<26} {:>9} {:>9} {:>9} {:>8} {:>8} {:>9} {:>9} {:>6} {:>7}",
-        "option", "maxΔppm", "meanΔppm", "biasppm", "yield%", "LAI%", "evals/d", "alloc/st", "rat.", "secs"
+        "  {:<26} {:>9} {:>9} {:>9} {:>8} {:>8} {:>8} {:>9} {:>9} {:>6} {:>7}",
+        "option", "maxΔppm", "meanΔppm", "biasppm", "harv%", "d305%", "LAI%", "evals/d", "alloc/st", "rat.", "secs"
     );
     for r in runs {
         let (max, mean, bias) = ppm_err(&r.series.ppm, &truth.series.ppm);
         println!(
-            "  {:<26} {:>9.3} {:>9.4} {:>+9.4} {:>+8.3} {:>+8.3} {:>9.2} {:>9.2} {:>6} {:>7.2}",
+            "  {:<26} {:>9.3} {:>9.4} {:>+9.4} {:>+8.3} {:>+8.3} {:>+8.3} {:>9.2} {:>9.2} {:>6} {:>7.2}",
             r.label,
             max,
             mean,
             bias,
-            100.0 * yield_err(&r.series.yields, &truth.series.yields),
+            100.0 * harvest_err(&r.series.yields, &truth.series.yields),
+            100.0 * day305_err(&r.series.yields, &truth.series.yields),
             100.0 * lai_err(r.series.peak_lai, truth.series.peak_lai),
             r.evals_per_day,
             r.alloc_evals_per_step,
@@ -260,7 +276,7 @@ fn main() {
         println!(
             "  {:<14} {:>+10.5} {:>+10.5} {:>6}",
             r.label,
-            100.0 * yield_err(&r.series.yields, &open_truth.series.yields),
+            100.0 * harvest_err(&r.series.yields, &open_truth.series.yields),
             100.0 * lai_err(r.series.peak_lai, open_truth.series.peak_lai),
             r.rationed
         );
@@ -271,6 +287,35 @@ fn main() {
         open_truth.series.peak_lai
     );
     if std::env::args().any(|a| a == "--open-field-only") {
+        return;
+    }
+
+    // ------------------------------------------------------------------------------- //
+    // Per season: the jar is never re-sown, so its season-1 end (day 305) can be a      //
+    // mid-fill snapshot rather than the harvest. Every season's storage, side by side.  //
+    // ------------------------------------------------------------------------------- //
+    println!("\n== per-season storage carbon (mol C) at each season's end, sealed jar ==");
+    for (case, p) in [("frozen science", &frozen), ("lab leaf form", &leafy)] {
+        let mut rows: Vec<Run> = Vec::new();
+        for spd in [4usize, 8, 16, 64, TRUTH_SPD] {
+            rows.push(uniform(&format!("euler 1/{spd}"), &jar, jar_years, false, p, &build_season_with, spd, false));
+        }
+        rows.push(implicit("C 1/4", &jar, jar_years, false, p, 4, Scope::CropOnly, false).0);
+        rows.push(implicit("C+returns 1/4", &jar, jar_years, false, p, 4, Scope::WithInflows, false).0);
+        let truth: Vec<f64> = rows[4].series.yields.clone();
+        println!("  {case}:");
+        for r in &rows {
+            let cells: Vec<String> = r
+                .series
+                .yields
+                .iter()
+                .zip(&truth)
+                .map(|(y, t)| format!("{y:.4} ({:+.2} %)", 100.0 * (y - t) / t))
+                .collect();
+            println!("    {:<16} {}", r.label, cells.join("   "));
+        }
+    }
+    if std::env::args().any(|a| a == "--per-season-only") {
         return;
     }
 
@@ -333,13 +378,13 @@ fn main() {
             euler.push(uniform(&format!("euler 1/{spd}"), &jar, jar_years, false, p, &build_season_with, spd, false));
         }
         println!("\n-- control 1: does plain Euler converge? (difference to the next step size down) --");
-        println!("  {:<16} {:>10} {:>8} {:>10} {:>8} {:>10} {:>8} {:>6}", "step", "maxΔppm", "ratio", "yield%", "ratio", "LAI%", "ratio", "rat.");
+        println!("  {:<16} {:>10} {:>8} {:>10} {:>8} {:>10} {:>8} {:>6}", "step", "maxΔppm", "ratio", "harv%", "ratio", "LAI%", "ratio", "rat.");
         let mut prev: Option<(f64, f64, f64)> = None;
         for w in euler.windows(2) {
             let (a, b) = (&w[0], &w[1]);
             let d = (
                 ppm_err(&a.series.ppm, &b.series.ppm).0,
-                (100.0 * yield_err(&a.series.yields, &b.series.yields)).abs(),
+                (100.0 * harvest_err(&a.series.yields, &b.series.yields)).abs(),
                 (100.0 * lai_err(a.series.peak_lai, b.series.peak_lai)).abs(),
             );
             let ratio = |x: f64, y: f64| if y > 0.0 { x / y } else { f64::NAN };

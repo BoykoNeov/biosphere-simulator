@@ -426,16 +426,15 @@ which is no evidence for the leaf form either way; only convergence on a finer s
 ⚠ *Re-read 2026-09-30* (`log/step-options.md`): the proposal's Step 2 slices 2–3, lab-only,
 scored against a 1/256-day answer. It discharges nothing here. It bears on three items.
 **§2.1:** the convergence this plan asked for was measured. The leaf-form jar stops rationing at
-⅛ day, and at the shipped step it sits 16 % below its own converged yield and 4.2 % below its
-converged peak leaf area. The frozen jar is 15 % below *its* converged yield, so any
+⅛ day, and at the shipped step it sits 7.2 % below its own converged harvest and 4.2 % below its
+converged peak leaf area. The frozen jar is 7.1 % below *its* converged harvest, so any
 leaf-form-vs-frozen comparison at ¼ day compares two runs that both carry a step error
 several times larger than the difference being judged. Option C quiets the jar by construction,
 as this plan warned, and does not reach the leaf form's leaf-area process at all. **§3 (canopy
 magnitude, closed):** re-confirmed by a second instrument. `open_season` peak LAI is +11.02 % at
 ¼ day against 5.4248 at 1/256, i.e. 6.0228 against the 5.4273 converged recorded here (0.05 %
-apart). The verdict stands. **§2.2:** unaffected, but the jar's shipped-step yield is 15 %
-step-sensitive (the step sweep measured 0.7 % before the light path), so any controller pricing
-on the jar at ¼ day inherits that.
+apart). The verdict stands. **§2.2:** unaffected, but the jar's shipped-step harvest is 7.1 %
+step-sensitive, so any controller pricing on the jar at ¼ day inherits that.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
