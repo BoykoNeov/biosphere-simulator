@@ -26,6 +26,7 @@ use domains::lab::step_cause::{
 };
 use domains::lab::step_options::run_uniform;
 use simcore::error::SimError;
+use simcore::quantities::Quantity;
 use simcore::registry::Registry;
 use simcore::state::State;
 
@@ -304,5 +305,31 @@ fn main() {
                 println!("    {id:<34} {:>14.6} {a:>+12.6} {b:>+12.6} {c:>+12.6}", st.amount);
             }
         }
+        // The water stores: does E1 (fine step) end on the answer's water and E2 (quarter-day
+        // step) on the shipped run's — bit for bit, not just to the printed digits?
+        let water: Vec<&String> = truth
+            .end
+            .stocks
+            .iter()
+            .filter(|(_, st)| st.quantity == Quantity::Water)
+            .map(|(id, _)| id)
+            .collect();
+        assert!(!water.is_empty(), "no water stores to compare");
+        let gap = |x: &Run, y: &Run| -> (bool, f64) {
+            let mut same = true;
+            let mut worst = 0.0f64;
+            for id in &water {
+                let (u, v) = (x.end.stocks[*id].amount, y.end.stocks[*id].amount);
+                same &= u.to_bits() == v.to_bits();
+                worst = worst.max((u - v).abs() / v.abs().max(1e-300));
+            }
+            (same, worst)
+        };
+        let (e1_same, e1_worst) = gap(&e1[0], &truth);
+        let (e2_same, e2_worst) = gap(&e2[2], &shipped);
+        println!(
+            "  water stores ({}): E1 vs answer bit-identical {e1_same} (worst rel {e1_worst:.1e}); E2 vs shipped bit-identical {e2_same} (worst rel {e2_worst:.1e})",
+            water.len()
+        );
     }
 }

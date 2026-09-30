@@ -34,7 +34,8 @@ partition the dose to 8e-16. Nothing outside the wrapped flows reads PAR (the pl
 those three"; in the jar growth respiration returns empty before reading it, so the wording was
 corrected on the first run, not the instrument). On the open field E1 keeps the light-path
 record's canopy bias (+10.6 % of +11.0 %). And a check nobody planned: the water stores, which
-read no light, end identical to the answer under E1 and identical to the shipped run under E2.
+read no light, end identical to the answer under E1 and identical to the shipped run under E2,
+bit for bit (checked in the runner).
 
 ## Findings
 
@@ -58,15 +59,19 @@ separate the two.
 **4. The open field splits:** light −1.5 points of harvest and nearly all the canopy bias;
 stepping −0.9 points and −1.9 % canopy, which E2 exposes once the light no longer masks it.
 
-**5. A new option for the step decision.** Resolving the light inside the budget flows reaches the
-jar's answer at a quarter-day step: `k = 16` gets −0.17 % for 1.7× the shipped run time, `k = 64`
-gets −0.02 % for 4×, where a 1/16 step costs 4× and stays 1.4 % short. It is a lab instrument, not
+**5. A new option for the step decision, scoped to the jar's harvest.** Resolving the light
+inside the budget flows reaches the jar's harvest at a quarter-day step: `k = 16` gets −0.17 % for
+1.7× the shipped run time, `k = 64` gets −0.02 % for 4×, where a 1/16 step costs 4× and stays
+1.4 % short. ⚠ **Neither shape dominates:** on the open field the 1/16 step is the better one
+(harvest −0.01 % against −0.87 %, peak LAI +0.3 % against −1.9 %), and on the jar's worst CO₂
+error too (15 ppm against 31), because there the stepping of the state carries real error. It is a lab instrument, not
 a scheme, and adopting its shape would change the frozen science's form (how the budget flows
 take the day's light), moving every plant-bearing golden. It leaves the within-step CO₂ swing
 (about 31 ppm at worst, the size C addresses). The station is not measured.
 
 **6. Predictions: 7 graded.** Q1–Q4 held; Q5 refuted (above); Q6 refuted as stated (E2 at `k = 64`
-cost about what the 1/16 step costs, not a third of it, but for 60 times the accuracy); Q7 half
+cost about what the 1/16 step costs, not a third of it, but for 60 times the accuracy on the jar's
+harvest); Q7 half
 held (the control-4 wording).
 
 ## Lessons
@@ -76,7 +81,7 @@ held (the control-4 wording).
   them apart took a wrapper on each side and a four-cell table; the step sweep's harvest curve
   turned out to be a light-resolution curve all along.
 * **A store the variable cannot reach is a free control.** The water stores read no light, so
-  they had to follow the step and ignore the light. They did, to every digit, which is a stronger
+  they had to follow the step and ignore the light. They did, bit for bit, which is a stronger
   proof than any designed control that the two instruments separate what they claim.
 
 ## Open

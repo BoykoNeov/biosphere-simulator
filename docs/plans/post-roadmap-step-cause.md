@@ -116,10 +116,11 @@ renumbering, E1's block — each turned exactly one red).
 5. **The known answer holds on the open field.** E1 (fine step, quarter-day light) gives peak
    LAI **+10.6 %** against the shipped step's +11.0 %: it keeps the light-path record's canopy
    bias almost whole while removing the step.
-6. **An unplanned cross-check, and the strongest one.** The water stores (soil, subsoil,
-   condensate) read no light. At the end of the run they are **identical to the answer in E1**
-   (fine step) and **identical to the shipped run in E2** (quarter-day step), to every printed
-   digit, on both cases. Each instrument moves exactly the half it claims to.
+6. **An unplanned cross-check, and the strongest one.** The four water stores read no light.
+   At the end of the run they are **identical to the answer in E1** (fine step) and **identical
+   to the shipped run in E2** (quarter-day step), **bit for bit** on both cases (first seen to
+   six printed decimals; the bit check was added to the runner after an advisor challenge that
+   six decimals is not "every digit"). Each instrument moves exactly the half it claims to.
 
 ### The four cells — final harvest against the 1/256-day answer
 
@@ -192,8 +193,9 @@ as the light-path record found.
   The mechanism I wrote the prediction around is the open field's, not the jar's.
 * **Q6 — REFUTED as stated.** E2 at `k = 64` took 0.83 s against A at 1/16's 0.74 s, not under a
   third. But it is 60 times more accurate on the jar's harvest at that cost, and `k = 16`
-  (0.35 s, 1.7× the shipped run) reaches −0.17 %, eight times closer than A at 1/16 for under
-  half its time. Wall times are single runs.
+  (0.35 s, 1.7× the shipped run) reaches −0.17 %, eight times closer than A at 1/16 on the jar's
+  harvest for under half its time. Wall times are single runs. ⚠ On the open field's harvest and
+  canopy, and on the jar's worst CO₂ error, A at 1/16 is the better of the two (finding 3).
 * **Q7 — HALF HELD.** Control 4's wording failed on the first run (above); the instrument did
   not, and every other control held first time.
 
@@ -210,10 +212,15 @@ as the light-path record found.
    compensation, a quarter-day mean light can put a whole window on the wrong side of it, where
    finely resolved light keeps the bright hours productive. **Named, not measured.** A top-hat
    light (the light-path record's own control) is the experiment that would separate them.
-3. **This changes what the step decision has to fix.** A finer step (option A) fixes the
-   harvest only because it also resolves the light. Resolving the light inside the budget
-   flows (E2's shape) reaches the answer at a quarter-day step for 1.7–4× the shipped cost, where
-   A at 1/16 costs 4× and stays 1.4 % short. E2's shape is **not a candidate as built**: it is a
+3. **This changes what the step decision has to fix.** On the **jar's harvest**, a finer step
+   (option A) helps only because it also resolves the light. Resolving the light inside the
+   budget flows (E2's shape) reaches the jar's harvest at a quarter-day step for 1.7–4× the
+   shipped cost, where A at 1/16 costs 4× and stays 1.4 % short. ⚠ **Scoped to the jar's harvest.**
+   Neither shape dominates: on the open field the 1/16 step is the better one (harvest −0.01 %
+   against E2's −0.87 %, peak LAI +0.3 % against −1.9 %), and on the jar's worst CO₂ error too (15
+   ppm against 31), because there the stepping of the state carries real error that only a finer
+   step removes.
+   E2's shape is **not a candidate as built**: it is a
    lab instrument, and adopting anything like it is a change to the frozen science's form (how
    the budget flows take the day's light), so it would move every plant-bearing golden, with the
    usual ceremony. It leaves the within-step CO₂ swing (31 ppm) that C addresses. The station

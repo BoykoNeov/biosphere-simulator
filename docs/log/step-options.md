@@ -100,6 +100,7 @@ Euler. Both leave more CO₂ in the air and grow less.
   example, the jar at ¼ day with the light forcing taken from a finer window. → **Opened
   2026-09-30** on the user's *"Go with your recommendation"* (cause first, then the step):
   `docs/plans/post-roadmap-step-cause.md`. **Answered** (`docs/log/step-cause.md`): it is the
-  light's time resolution, all of it — "only a finer step moves it" in this record's heading
-  holds only because a finer step also resolves the light.
+  light's time resolution, all of it — on the jar's harvest, "only a finer step moves it" in
+  this record's heading holds only because a finer step also resolves the light (on the open
+  field the stepping carries real error too).
 * **The station**: none of the three options was run through the two-rate driver.

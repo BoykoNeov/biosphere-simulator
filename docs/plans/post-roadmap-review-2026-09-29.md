@@ -158,8 +158,9 @@ the user's.** The user's call, 2026-09-30: *"Go with your recommendation"* — f
 the step. The cause → `docs/plans/post-roadmap-step-cause.md`; it reports back before any
 unfreeze. **Measured the same day** (`docs/log/step-cause.md`): the 7.1 % is the light's time
 resolution, not the step — a quarter-day step with the light resolved inside the budget flows
-reaches the answer (−0.02 %) at 1.7–4× the shipped cost. That is a new option for slice 4, and
-slice 4 is still the user's.
+reaches the jar's harvest (−0.02 %) at 1.7–4× the shipped cost. That is a new option for slice 4,
+but not a dominant one: on the open field and on the jar's worst CO₂ error a 1/16 step does
+better (the stepping of the state carries real error there). Slice 4 is still the user's.
 
 ### The problem, measured
 
