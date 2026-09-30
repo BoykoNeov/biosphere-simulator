@@ -30,3 +30,22 @@ members = [
 # types); no YAML dependency yet — runtime scenario-file parsing (decision E) is Step
 # 4b/5, deliberately separated so the parse-parity + trajectory-parity crux needs no
 # new dep.
+
+# The simulation crates are optimised even in dev/test builds (2026-09-30, the 1/16-day step's
+# runtime budget: docs/plans/post-roadmap-step-sixteenth.md, slice 0). Measured on the full
+# suite: 496 s -> 110 s test run, for 64 s -> 87 s on a fresh build and 8 s -> 9 s on an
+# incremental one. Byte-neutral: Rust does no floating-point contraction or reassociation at
+# any opt level, and the goldens are regenerated in --release and compared here. Written in
+# this file (not an env var) so the child `cargo` builds `cross_boundary` spawns see it too.
+# `godot_bridge` and its heavy `godot` dependency stay unoptimised on purpose. Assertions are
+# separate profile keys and stay on.
+[profile.dev.package.simcore]
+opt-level = 3
+[profile.dev.package.domains]
+opt-level = 3
+[profile.dev.package.station]
+opt-level = 3
+[profile.dev.package.authoring]
+opt-level = 3
+[profile.dev.package.config]
+opt-level = 3

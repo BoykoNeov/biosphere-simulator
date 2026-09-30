@@ -130,4 +130,26 @@ slice 1's numbers are in. Fixed now, from the review of the lab build:
 
 ## Results
 
-(Filled in per slice.)
+### Slice 0 — done 2026-09-30
+
+Two scratch worktrees of `d219872`, default target directories (so `cross_boundary`'s child
+builds and Godot's fixed library path are the real ones), measured back to back on this box:
+
+| | as shipped | 5 crates at `opt-level = 3` |
+|---|---|---|
+| fresh build (`cargo test --no-run`) | 64 s | 87 s |
+| rebuild after touching one `domains` file | 8 s | 9 s |
+| whole suite, run | **496 s** | **110 s** |
+| `cross_boundary` alone, rerun | 191 s | 45 s |
+| tests passed | 1231 of 1231 | 1231 of 1231 |
+
+The 496 s is the same suite as the planning measurement's 445 s on a busier box; the ratio is the
+number. `cross_boundary` gains the most because its child builds of the simulation crates are
+now optimised too, which the first (environment-variable) measurement had done by accident and
+this form does on purpose.
+
+Byte-neutrality: every golden the default suite compares passed unregenerated, and the four
+ignored tests (`cargo test -- --ignored`, CI's second job) passed too, the sealed station golden
+among them: 90 s, the two-rate full horizon 179 s, sealed resume 59 s, the expensive-golden
+band 83 s. `regen_goldens` was not run for this slice: it runs in `--release`, which the change
+does not touch, so it could not have seen it. `clippy -D warnings` clean.
