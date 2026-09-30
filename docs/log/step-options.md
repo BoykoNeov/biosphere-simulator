@@ -94,7 +94,8 @@ Euler. Both leave more CO₂ in the air and grow less.
 
 ## Open
 
-* ~~**The decision (Step 2, slice 4) is the user's.**~~ → **Taken and built 2026-09-30**: a 1/16 step plus C (`docs/log/step-sixteenth.md`). The options on the table: A at ⅛ or 1/16 (a
+* ~~**The decision (Step 2, slice 4) is the user's.**~~ → **Taken and built 2026-09-30**: a
+  1/16 step plus C (`docs/log/step-sixteenth.md`). The options on the table: A at ⅛ or 1/16 (a
   step unfreeze); C for safety, alone or with A; nothing.
 * **The harvest loss's cause.** A mechanism experiment is owed before any claim about it: for
   example, the jar at ¼ day with the light forcing taken from a finer window. → **Opened
