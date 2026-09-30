@@ -53,6 +53,10 @@ pub mod mechanism;
 /// `with_override` refuses a table-shaped field. Perturbed by re-emitting the rows.
 pub mod partition;
 
+/// **Three ways to take the step** (the 2026-09-29 review's Step 2, slice 2): a finer uniform
+/// step, splitting only tight steps, and the crop's uptake solved against the end-of-step air.
+pub mod step_options;
+
 /// One substitution: a field of one frozen param file, and the value to run instead.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Substitution {

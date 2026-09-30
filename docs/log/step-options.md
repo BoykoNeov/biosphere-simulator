@@ -1,0 +1,86 @@
+## **Three ways to take the step, priced** (the 2026-09-29 review's Step 2, slice 2 — the shipped step costs the sealed jar 15 % of its yield, and only a finer step moves it)
+
+> One row of the record table in [`../post-roadmap-log.md`](../post-roadmap-log.md),
+> written out. The heading is that row's Work cell verbatim — a gate checks it.
+
+**MEASURED 2026-09-30 on the user's call** (*"yes"* to starting Step 2's slice 2). Lab only:
+nothing frozen touched, no golden regenerated, nothing decided. Plan, predictions (committed
+before any code, `e585aac`), full tables and grading: `docs/plans/post-roadmap-step-options.md`.
+
+## What was built
+
+* `rust/crates/domains/src/lab/step_options.rs`:
+  * **A**, `run_uniform`: any power-of-two steps per day. It is also the source of the fine-step
+    answer. Counts come from `SEASON_DAYS`, never from `steps_for_years`/`season_steps()`, which
+    carry four steps a day inside them.
+  * **B**, `run_split`: probe each step's withdrawals, and take a tight step as two halves,
+    recursively, to 1/256 day. It refuses rather than rations at the limit. A half-step sees the
+    right time of day because the state's counter is renumbered onto the finer grid (the
+    schedules read `t = n·dt`), and set back afterwards.
+  * **C**, `ImplicitUptake`: the crop's frozen flows read against an end-of-step pool solved by
+    bisection. Two scopes: **crop only** (`X = C₀ − U(X)`, backward Euler on the uptake) and
+    **with returns** (the crop's whole carbon budget against `X = C₀ + I + N(X)`, `I` what every
+    other flow returns over the same step). The second was added after the first run, to test a
+    cause.
+* `rust/crates/domains/examples/step_options.rs`: the scorecard. It panics on any failed control.
+* `rust/crates/domains/tests/step_options.rs`: 6 tests, the controls that arithmetic fixes in
+  advance, on one season. Two deliberate breaks (the counter renumbering; C ignoring its end
+  pool) each turned one of them red.
+
+## Controls
+
+B never splitting is the frozen run, bit for bit. B always splitting is Euler ⅛ (and, two deep,
+1/16) bit for bit at every quarter-day, across four re-sows. C leaves the open field
+bit-identical. C and Euler approach one limit (34 → 2.7 ppm apart from ¼ to 1/64). C's solve
+satisfies its equation to 2e-12 mol on every step. The explicit processes never read the end
+pool on the frozen jar. **On the leaf-form jar the leaf-area aux process does** (270–342 steps),
+so C as built does not reach it. The fine-step answer (1/256 day) converges, but not cleanly at
+first order at coarse steps. Its own error, estimated as the last halving, is 0.6–2.7 ppm and
+0.05 % yield.
+
+## Findings
+
+**1. The shipped quarter-day step costs the sealed jar 15 % of its yield** (−15.1 %; the lab leaf
+form −16.1 %), and CO₂ errors of up to 241 ppm. The open field loses only 2.1 % of its yield. The
+step sweep had measured the jar's harvest at −0.7 % at `dt = 1`, **before** the within-day light
+path. The light-path record then found the open field's canopy step-sensitive (15 %), and the
+user's call there was to finish at the shipped step. It measured the jar's day-night swing, not
+its yield. So the jar's yield went from 0.7 % step-sensitive to 15 % across the science added
+since, unmeasured until now.
+
+**2. It is not the crop's uptake outrunning the air inside a step.** C removes exactly that
+error, and the yield moves 0.2 points (−15.3 %). C with same-step returns also lets the crop spend
+what the chamber gives back during the step, and it moves 0.1 (−15.2 %). Both candidate causes are
+refuted by the experiment that removes them. The loss lives in the steps where the crop draws
+hard: refining only those (B at θ = 0.1) recovers most of it. But that refines every process and
+the light at once. **Cause not identified.** The named candidate, the light path's curved-response
+bias, is unmeasured for the jar, and its sign does not follow simply.
+
+**3. A is the only option that moves the error**: −3.9 % at ⅛ (2× the evaluations), −2.2 % at 1/16
+(4×), −0.2 % at 1/64 (16×). It is also the only one that fixes the leaf-form jar's peak leaf area
+(−4.2 % → −0.2 %). Its price is a step unfreeze of every biosphere golden, plus the station's plant
+step, which is unmeasured.
+
+**4. B, built without touching `simcore`, is dominated by A.** Its probe cannot share the step's
+evaluation. To match A's accuracy it needs θ = 0.1 at 3.9× Euler's cost, twice A's. At θ = 0.5 it
+moves only the jar's golden and buys nothing there. Watching every store, it bottoms out on cold
+nights, where the condenser takes the whole humidity excess at any step size, and it moves every
+chamber golden.
+
+**5. C is a safety property, not an accuracy fix.** It can never overdraw, so the backstop never
+fires on the crop's CO₂. On accuracy it matches the shipped step. It would move every sealed
+golden and not the open field. For the user's standing wish (*"make plants take less as the CO₂
+runs low"*): C buys no rationing, and no better yield.
+
+**6. Predictions: 9 graded.** Three held (P6, P7, and P9 for the pre-registered controls). Four
+half held (P1, P4, P8). Three refuted: P2 is the finding; P3 refuted in the good direction; P5
+refuted. The sign in P4 was wrong: C does not sit on the other side of the answer from Euler.
+Both leave more CO₂ in the air and grow less.
+
+## Open
+
+* **The decision (Step 2, slice 4) is the user's.** The options on the table: A at ⅛ or 1/16 (a
+  step unfreeze); C for safety, alone or with A; nothing.
+* **The 15 %'s cause.** A mechanism experiment is owed before any claim about it: for example, the
+  jar at ¼ day with the light forcing taken from a finer window.
+* **The station**: none of the three options was run through the two-rate driver.

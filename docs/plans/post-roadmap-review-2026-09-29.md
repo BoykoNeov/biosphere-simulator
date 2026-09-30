@@ -148,6 +148,13 @@ store's worst draw is set by a cold night, not by the step, and the 7-day statio
 seedlings, so the station crop's pull on the cabin air (0.078) is visible only on the 4-year
 sealed station. Slices 2–4 are not started.
 
+**Slices 2 and 3 TAKEN 2026-09-30, lab only** → `docs/plans/post-roadmap-step-options.md`,
+record `docs/log/step-options.md`. All three options were built and scored against a 1/256-day
+answer. ⚠ **The shipped step costs the sealed jar 15 % of its yield** (the open field 2 %). Only A
+moves that (⅛ day −3.9 %, 1/16 −2.2 %). C, in both scopes, prevents overdrawing but leaves the
+yield where it was: the error is not the crop's in-step draw. B needs twice A's cost to match
+it. Cause of the 15 % not identified. **Slice 4, the decision, is the user's.**
+
 ### The problem, measured
 
 - The reference sealed jar's tightest step withdraws **0.757** of the CO₂ it starts with
