@@ -326,7 +326,11 @@ docs (one also still called `n` a day count — a leftover of the one-day step),
 `palette.rs`, the bridge's `time_control.rs`, `godot/greenhouse_smoke.gd`, `ulp_probe.rs`, the
 native-port doc and `tiers.json`'s sealed-station evidence ("once-daily biosphere lumps": they
 are quarter-day lumps with the regulators between each now, which only strengthens that
-argument), and `docs/station-reference.md`'s numerics paragraph.
+argument), and `docs/station-reference.md`'s numerics paragraph. ⚠ *Corrected after the
+closing review:* an eleventh, `docs/plans/phase-6-station-integration.md`'s "the driver is
+slow-first … the snapshot is the intra-day minimum `storage_c`", was in the first search's
+output and missed; it and the station contract's "a within-day shape is not expressible" on
+the fast side (now true only below a quarter-day) carry dated notes.
 
 ### 8.4 The long runs — measured 2026-09-30
 

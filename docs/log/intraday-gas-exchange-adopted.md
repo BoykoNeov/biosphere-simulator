@@ -41,9 +41,13 @@ previous item, `log/intraday-gas-exchange.md`. Plan, predictions (committed befo
 
 ## Findings
 
-**1. Prose had named the old order in ten places, and nothing would have caught any of
-them.** They were the driver, the session, the greenhouse, the palette, the bridge's time
-control, a Godot smoke script, the ULP probe, the native-port doc, the tier evidence and the
+**1. Prose had named the old order in eleven places, and nothing would have caught any of
+them.** (First recorded as ten; the eleventh — the Phase-6 plan's *"the driver is slow-first
+… so the day-boundary snapshot is the intra-day minimum"* — was in the first search's output
+and was missed until the closing review. It now carries a dated note, as does a twelfth claim
+the order made partly false: the station contract's *"a within-day shape is not expressible"*
+on the fast side, which is now true only below a quarter-day.) The ten corrected were the
+driver, the session, the greenhouse, the palette, the bridge's time control, a Godot smoke script, the ULP probe, the native-port doc, the tier evidence and the
 station contract. The Tier-2 argument ("the regulators hold the pools at setpoint between the
 **once-daily** biosphere lumps") had been stale since the quarter-day step made the lumps four
 back-to-back steps. It is now literally true for the first time: the lumps are quarter-day ones

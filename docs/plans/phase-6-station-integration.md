@@ -424,7 +424,13 @@ twentieth). The **exact-identity properties were verified before building** (adv
 (2) ``CrewRespiration`` is forced (independent of ``food_store``) → the regenerated store doesn't
 perturb the cabin gas; (3) ``Harvest`` touches neither ``CARBON_POOL`` nor a photosynthesis
 input. The driver is **slow-first** (biosphere refills grain, then 1440 cabin sub-steps drain it),
-so the day-boundary snapshot is the intra-day *minimum* ``storage_c``. **Seam 2 (the
+so the day-boundary snapshot is the intra-day *minimum* ``storage_c``.
+⚠ *2026-09-30: no longer true.* The master day is now **interleaved** (each plant quarter-day,
+then its 360 cabin minutes; `docs/plans/post-roadmap-intraday-gas-exchange.md` §8), so the
+snapshot follows only the last quarter's drain and is not the day's minimum. The sentence above
+described a consequence of the order, not a reason for it; under the new order the `harvest`
+golden still asserts 0 rationing and 0 events, and its grain store rose 37.5 % because the
+crop is no longer starved of CO₂ by the old schedule. **Seam 2 (the
 ``fecal_waste → litter_carbon`` re-pointing) is the next increment** — the design below is its
 spec.
 

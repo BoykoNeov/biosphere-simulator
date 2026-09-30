@@ -530,7 +530,11 @@ gate), so the discipline is enforced, not merely requested.
   number; what changes is that the lamp's dark hours are now hours the crop respires
   through. ⚠ The lamp's **ENERGY** half is deliberately unchanged: the Power domain is the
   *fast* operator and `substep` freezes `n`, so a within-day shape is not expressible there
-  and the flow keeps drawing the daily average. The two halves of one lamp differ on
+  and the flow keeps drawing the daily average. ⚠ *Partly outdated 2026-09-30:* since the
+  master day was interleaved, the fast operator sees `n` take four values a day, so a
+  **quarter-day** step shape is now expressible there (a minute-resolution one still is not).
+  Nothing uses that: the lamp's energy half still draws the daily average, and the `lighting`
+  golden was measured byte-identical across the change. The two halves of one lamp differ on
   purpose, and that asymmetry is now stated in `lighting.py` rather than implied.
 
   **What moved.** `greenhouse`, `harvest`, `lighting`, `sealed_station` (+ its energy-drift
