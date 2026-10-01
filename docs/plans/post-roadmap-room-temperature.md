@@ -30,8 +30,8 @@ chosen so Euler stays stable). The radiator rejects `εσA(T⁴ − T_space⁴)`
 the node settles where the radiator balances it.
 
 * **Heat into the sealed station's node:** charge loss 15.9 W + the load 302.4 W + lamp waste heat
-  61.0 W = **379.2 W** (`sealed::sealed_node_heat`).
-* **Where that puts it:** 167.5 K by the closed form. **Measured** in the frozen
+  60.4 W = **378.7 W** (`sealed::sealed_node_heat`; lamp η = 2.5 / `PAR_UMOL_PER_J` 4.57 = 0.547).
+* **Where that puts it:** 167.424 K by the closed form. **Measured** in the frozen
   `rust/data/golden/sealed_station_state.json` end state: `thermal.node` = 1.6472e9 J, so
   **T = 167.42 K = −105.73 °C.**
 * ⚠ `docs/station-reference.md`'s *"T_eq ≈ 160 K"* is the **heat-closure** scenario (no lamp, no
@@ -99,8 +99,12 @@ mover** of anything here, and it is a choice: re-sow on maturity, or keep the ca
 **A — a held room, constant.** In the sealed station, `TEMP_VAR` becomes a constant setpoint
 (the `habitat_temp_c` precedent, added to `sealed_bio_resolver`). The heat model and the energy
 books are untouched, and the plants never feel a heat fault.
-*Moves:* the `sealed_station` golden, the Godot sealed session, and the lab runs built on the
-sealed station. *Does not move:* any biosphere golden, heat closure,
+*Moves* (grepped for `sealed_bio_resolver`, `src/`, `examples/`, `tests/`, `godot_bridge`): the
+`sealed_station` golden (`goldens.rs`), the Godot sealed session (`palette.rs`, `godot_bridge`),
+the lab lamp shed (`examples/lamp_shed.rs`, `tests/lamp_shed.rs`), the `draw_census` and
+`intraday_exchange` examples, and the sealed cases in `tests/{day_order, perturbations,
+session_parity, session_save_load}.rs`. *Does not move:* the perturbed brown-out golden
+(`emit_perturbed_brownout` builds the heat-closure `build_station`, which has no plants), any biosphere golden, heat closure,
 `sealed_energy_drift_summary`, or the node gate. Both of the last two read the heat-closure run
 (`science_gates::runs::node_peak_temps` builds `HEAT_CLOSURE_SCENARIO`), not the sealed station.
 
@@ -129,7 +133,7 @@ two causes in one golden diff. Candidate as its own item (a "3d"), the user's ca
 
 | Build | Heat model? | In 3c? | Why |
 |---|---|---|---|
-| `sealed_station` (golden; Godot sealed session; lab `lamp_shed`, perturbed brown-out) | yes | **in** | the only build with plants *and* a station heat model |
+| `sealed_station` (golden; Godot sealed session; lab `lamp_shed`; the §5 A list, grepped) | yes | **in** | the only build with plants *and* a station heat model |
 | `greenhouse`, `harvest` | no node | out | cabin-coupled; no station heat model to hold a room. A setpoint there is a separate choice |
 | `lighting` (golden, `habitat_temp_c: None`) | waste heat to a boundary | out | frozen 7-day lamp check; already has the override hook |
 | biosphere `sealed_chamber`, `perennial_chamber`, `perennial_long_horizon`, `consumer_chamber`, `consumer_long_horizon` | none | out | the biosphere's own jars, with no station around them |
@@ -144,9 +148,11 @@ carrying both explains neither. Proposed order, each slice measured on its own:
 1. **Temperature alone, winter wheat kept (a check, lab only):** at 22 °C the crop never reaches
    flowering. No chill-days ever accrue, so the factor is 0 from sowing, development never
    starts (thermal time stays 0), and grain is 0. This is the §4 claim tested by running it.
-2. **Crop alone (day-neutral, weather temperature kept):** development is no longer gated by cold
-   or daylength. Predicted: earlier maturity than today's crop in the same Dutch season. The size
-   of the change is to be measured, not guessed.
+2. **Crop alone (day-neutral, weather temperature kept):** under the 16 h lamp the daylength
+   factor is already exactly 1 (16 h ≥ `cpp` 16 h), so in this station the swap removes **only**
+   the cold requirement. Control: vernalization off with photoperiod left on must be bit-identical
+   to the day-neutral build here. Predicted: earlier maturity than today's crop in the same Dutch
+   season. The size of the change is to be measured, not guessed.
 3. **Room setpoint (form A) on the day-neutral crop, calendar kept:** maturity ≈ 84 days after
    sowing, then standing until day 305.
    * Water: at 22 °C saturation pressure is 2.64 kPa against the season mean 1.35, so the chamber's
