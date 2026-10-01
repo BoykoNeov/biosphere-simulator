@@ -4,8 +4,9 @@
 for Step 3 (3a and 3b as builds, 3c as a design note first). 3a is taken first, as ordered.
 Review plan: `docs/plans/post-roadmap-review-2026-09-29.md`, Step 3.
 
-**STOPPED BEFORE CODE on a finding, and waiting on the user's decision (§3).** Nothing is built;
-nothing frozen has moved.
+**B CHOSEN 2026-10-01** (the user: *"Dimming rule"*), source search done (§5): the form has an
+engineering precedent, the threshold has no source, so B is **lab-only, WHAT-IF**. One question
+remains open with the user (§6): switch-off or gradual. Nothing is built; nothing frozen has moved.
 
 ## 1. What 3a asked for
 
@@ -95,6 +96,73 @@ which is also why it is the tempting one.
   nothing). Under B it does not: B dims for low battery, not for a failed lamp, so the hand-cut
   stays load-bearing — stated, not hidden.
 
-## 5. Results
+## 5. The source search (2026-10-01, for B)
+
+Searched: our shelf (`docs/bvad-reference.md`, every doc and param file: no shedding, priority or
+dimming rule) and the web. What was read and what each supports:
+
+* **Chung & Mazzocco, US patent 4,575,679 (General Electric, filed 1983), "Automatic load shed
+  control for spacecraft power system"** — description, read through a fetch asked for verbatim
+  text (⚠ a summariser sat between us and the page; re-read the page before binding a quote):
+  *"it has become conventional to divide the spacecraft electrical load into an interruptible
+  load and an uninterruptible load"*; *"Ideally, the interruptible load is shed when the battery
+  system contains an amount of charge remaining that is sufficient to enable the spacecraft
+  system to survive until a positive battery charging condition is achieved."* The relay
+  *"interrupts the power … to thereby place spacecraft 10 in survival mode … until a positive
+  charging condition can again be achieved."* **Supports the FORM**: the lamp is an
+  interruptible load, life support (`LoadDraw`) is not; shedding is a **switch-off**, not a
+  dimming; the threshold is a reserve, *the charge the essential load needs until charging
+  resumes*. ⚠ It does **not** state a restore rule; "back on when charging is positive" is our
+  reading of "survival mode … until". It gives **no number** for any other system.
+* **Dalton & Cohen 2002, NASA/TM-2002-211721, "International Space Station Nickel-Hydrogen
+  Battery On-Orbit Performance"** — pages 1–2 read as images. *"The batteries are designed to
+  operate at a 35% depth of discharge (DOD) maximum during normal operation"* (abstract);
+  requirement *"Contingency orbit capability consisting of one additional orbit at reduced power
+  after a 35% DOD without recharge"* (p. 2). **Rejected as our threshold**: it is a battery-life
+  limit for Ni-H₂ cells cycling every orbit, not the point loads are shed, and it is a fraction
+  of a capacity this model does not have (`power.battery` is an unclamped pool; its "size" is
+  only `battery0`). A checked lead, not a bind.
+* **"ISS sheds loads at 82 V"** — appeared only in a search engine's summary, never on a page we
+  read. Not citable; not used.
+* **Crop lighting under a power shortage** — searched; nothing found on how a plant chamber's
+  lamps are treated in a shortage.
+
+**Net:** the threshold is WHAT-IF. B is built lab-only, tagged under
+`docs/param-file-conventions.md` (WHAT-IF), and cannot enter the reference until a threshold is
+sourced. No frozen byte moves (the frozen builds do not carry the rule), so this is not yet a
+station unfreeze; §2.4's flow-set movement applies on promotion.
+
+## 6. The sealed station cannot afford its lamp — measured, and a separate finding
+
+`sealed_station`'s battery falls by **exactly** the lamp's energy: 2.0e10 − 5.9456e9 =
+1.40544e10 J, and the lamp's daily average × 1220 days (4 × 305) = 1.40544e10 J, difference
+**0.0**. `balanced_load_w` sizes the life-support load to the stored solar with `load_fraction
+= 1.0` (`BOUNDED_SOC_SCENARIO`), so solar pays for life support and **nothing pays for the
+lamp**: the frozen station runs its lamp off its starting charge and would empty around day
+1736 (2.0e10 / 1.152e7 J/day). `lighting` has no charger at all; same shape. **Not fixed
+here** — it is the frozen station's power budget, and changing it is its own decision.
+
+What it means for B: with the lamp shed, net charging is exactly 0, so the patent's *"until a
+positive charging condition"* is **never** met — a shed lamp stays off for good. That is the
+honest answer for this station; it is also why the restore rule matters.
+
+**Carrier, revised for a switch.** §3 B's "the crop reads g(battery) at its own step" works only
+for a smooth `g`. A latched switch can flip inside the 90 cabin minutes after the crop's one
+sample, and the latch is state the crop cannot see. So B uses A's carrier: a lab driver keeps
+the latch in `State.aux` (fast sub-steps do not advance aux — `simcore` `substep` — so the lab
+driver sets it between sub-steps), the lab lamp draws only while latched on, and after each
+group the driver writes the **count** of sub-steps the lamp was on over the group's count into
+`State.aux` — 90/90 is exactly 1.0 with nothing shed. The crop's wrapper multiplies `par` by it.
+This also restores the lighting-failure check of §4.
+
+**Predictions, revised (lab-only):** no golden, no manifest row. Control: the lab build with the
+rule off reproduces the plain run bit for bit. Red first: a deep brownout on the lab sealed
+station leaves the crop below its un-shed run, where the plain build is bit-identical to
+baseline.
+
+**Open with the user:** switch-off with a latch (the form has a precedent; only the threshold
+is invented) or gradual dimming (shape and threshold both invented). Recommendation: switch-off.
+
+## 7. Results
 
 None yet.

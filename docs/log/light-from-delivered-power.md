@@ -12,5 +12,9 @@ and predictions: `docs/plans/post-roadmap-light-from-delivered-power.md`.
   run (not balanced; not investigated). No brownout has ever run against a lit crop.
 * A station-side wrapper can dim `par` with no `simcore` or biosphere edit; it moves the
   station flow-set rows, so any form of 3a is a station unfreeze. The lag is 1/16 day.
-* Waiting on the user: A (the guard dims the lamp), B (a lamp dimming rule; no source on our
-  shelf, so WHAT-IF unless one is found), or skip to 3b. Nothing frozen moved.
+* The user chose B (a lamp rule). Searched: a 1983 GE patent gives the FORM (switch the lamp,
+  an interruptible load, off at a reserve); nothing gives a number, so B is lab-only, WHAT-IF.
+  The ISS 35 % depth of discharge was read and rejected (a battery-life limit, needs a capacity).
+* `sealed_station`'s battery drain is EXACTLY the lamp's energy (difference 0.0): the solar pays
+  life support only. A shed lamp there never comes back on. Separate finding; not fixed here.
+* Open with the user: switch-off with a latch, or gradual dimming. Nothing frozen moved.
