@@ -201,15 +201,20 @@ sowing; a cold cabin; drop the cold (day-neutral). **The user chose the plant ch
 
 * **"The room" in B is a dedicated plant growth chamber** with its own held temperature. It shares
   the gas pools with the crew cabin (ducted air), as today.
-* This is cheap here, measured not assumed: the crew reads **no** temperature (its rates are fixed),
-  and the plants' vapour store is **already** separate from the crew's (`eclss.cabin_h2o` takes
-  the crew's water; the 3b vapour store is the biosphere's). The cabin's own temperature stays
+* This is cheap here, checked against the code: the crew reads **no** temperature (`crew.rs` has
+  no temperature input; its rates are fixed), and the plants' vapour store is **already** separate
+  from the crew's. The station never names `biosphere.water_vapor` anywhere in `station/src`; the
+  crew's `WaterBalance` and the ECLSS `Condenser` touch only `eclss.cabin_h2o`, and the sealed
+  build's biosphere registry is `build_season` verbatim. The cabin's own temperature stays
   unmodelled, as today.
 * So crew body heat does **not** enter the chamber's heat books. It stays out of the books, the gap
   §2 already lists.
 
-**The cold period's source — searched 2026-10-01, NOT yet bound.** Controlled-environment practice
-found by search: 2–6 °C for 6–10 weeks (most often 4 °C), plants in a refrigerated cabinet under
+**The cold period's source — searched 2026-10-01, NOT yet bound.** ⚠ The figures below are **per a
+search engine's summary; the pages were NOT opened**, and the summary mixed several results, so
+which paper says which figure is unverified (the "4 °C, 16 h, 100–150 µmol" sentence may be the
+PMC high-throughput protocol's, PMC12690896, not the preprint's). Opening and pinning each to its
+page **blocks slice 3**. Controlled-environment practice as summarized: 2–6 °C for 6–10 weeks (most often 4 °C), plants in a refrigerated cabinet under
 16 h light at 100–150 µmol m⁻² s⁻¹ (the speed-vernalisation preprint, bioRxiv
 10.1101/2021.12.01.470717, quoting the "normal" treatment); an alternative of 10 °C for 6 weeks
 (Zheng et al. 2023, *Plant Breeding*, doi 10.1111/pbr.13074). Rules for binding it:
@@ -229,8 +234,16 @@ current `State`, so it can fire on a state condition (development complete) inst
 
 ### The slices — one cause per golden diff, predictions committed before each one's code
 
-1. **Lab check, no golden.** Winter wheat in a chamber held at 22 °C from sowing. Predicted: no
-   chill-day ever accrues, the vernalization factor is 0 throughout, thermal time stays 0, grain 0.
+1. **Lab check, no golden.** Winter wheat in the sealed station with `TEMP_VAR` held at 22 °C from
+   sowing, the rest of the sealed build unchanged. Predicted:
+   * no chill-day ever accrues (`vernalization_days` stays exactly 0), the factor is exactly 0, so
+     `thermal_time` stays exactly 0 and DVS stays 0;
+   * so grain stays exactly 0 (the partition table's storage column is 0 before anthesis, and the
+     scenario sows with `storage_c0` = 0), while leaf, stem and root **keep growing** — a crop of
+     vegetative biomass with no seed;
+   * so the first re-sow, at day 305, **hard-fails** with *"seed bank too small to re-sow"*
+     (`reset_crop`: grain 0 < seedling 0.16). The check runs one season and asserts that failure
+     at the boundary, rather than reading it as a bug.
    This is the control for slice 3 (it shows the cold period, not the warm room, is what lets the
    crop develop).
 2. **The chamber heat store (B), the plants NOT yet reading it.** A station unfreeze with the full
