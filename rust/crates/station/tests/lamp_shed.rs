@@ -159,6 +159,50 @@ fn small_lab_baseline() -> &'static Run {
     })
 }
 
+#[test]
+fn a_run_resumed_from_a_saved_day_is_the_continuous_run_bit_for_bit() {
+    // The share lives in `State` so that a saved day carries it. Split an 8-day run whose
+    // lamp is cut over days 2–5 at day 5 — the last group of day 5 is the first lit one
+    // after the cut, so a day-end state that held a stale share would resume dark.
+    let scn = scenario(sealed_station_scenario().battery0);
+    let (bio, _) = resolvers(&scn, false);
+    let cut = || {
+        with_lamp_power_cut(
+            sealed_fast_resolver(&domains::params::charge(), &scn).unwrap(),
+            BLACKOUT.0,
+            BLACKOUT.1,
+        )
+        .unwrap()
+    };
+    let whole = lab(&scn, &cut(), &bio, reserve(&scn));
+    // ⚠ Comparing the resumed crop alone cannot see a stale share: a day starts at midnight,
+    // inside the lamp's dark hours, so the first plant step multiplies zero light. So each
+    // saved day must carry the share of its own last group.
+    let groups = whole.log.delivery.len() / DAYS;
+    for day in 1..=DAYS {
+        assert_eq!(
+            whole.states[day].aux[LAMP_DELIVERY_AUX],
+            whole.log.delivery[day * groups - 1],
+            "the day-{day} state carries a stale share"
+        );
+    }
+    let (_, bio_reg, fast_reg) = build(&scn);
+    let saved = whole.states[5].clone();
+    let (state, bio_reg, fast_reg) =
+        rewire_for_shedding(saved, bio_reg, fast_reg, reserve(&scn)).unwrap();
+    let (resumed, _, _, _) = run_shedding(
+        &EulerIntegrator::new(bio_reg),
+        &EulerIntegrator::new(fast_reg),
+        state,
+        &bio,
+        &cut(),
+        &scn,
+        DAYS - 5,
+    )
+    .unwrap();
+    assert_eq!(resumed.last().unwrap(), whole.states.last().unwrap());
+}
+
 fn small_lab_blackout() -> &'static Run {
     static RUN: OnceLock<Run> = OnceLock::new();
     RUN.get_or_init(|| {

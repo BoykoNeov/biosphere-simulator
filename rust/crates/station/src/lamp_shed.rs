@@ -228,8 +228,9 @@ impl AuxProcess for LampLitAux {
 
 /// Re-wire a built sealed station for the lab: the fast registry's `Lamp` becomes a
 /// [`SheddingLamp`] at `reserve_j`, every slow flow and aux process becomes lamp-lit, and the
-/// state carries [`LAMP_DELIVERY_AUX`] = 1.0. Takes the pieces `build_sealed_station` returns,
-/// so a perturbation can be composed before or after.
+/// state carries [`LAMP_DELIVERY_AUX`] — 1.0 unless it already carries one, as a state saved
+/// by [`run_shedding`] does. Takes the pieces `build_sealed_station` returns, so a
+/// perturbation can be composed before or after.
 pub fn rewire_for_shedding(
     state: State,
     bio_reg: Registry,
@@ -267,7 +268,11 @@ pub fn rewire_for_shedding(
         )));
     }
     let mut state = state;
-    state.aux.insert(LAMP_DELIVERY_AUX.to_string(), 1.0);
+    // A fresh build starts lit; a resumed one keeps the share its saved day carried.
+    state
+        .aux
+        .entry(LAMP_DELIVERY_AUX.to_string())
+        .or_insert(1.0);
     let bio = Registry::new(lit_flows, &state.stocks, lit_aux)?;
     let fast = Registry::new(shed_flows, &state.stocks, fast_aux)?;
     Ok((state, bio, fast))
@@ -285,11 +290,12 @@ pub struct ShedLog {
 /// the lamp-delivery bookkeeping between the two operators. No re-sow hook: a lab run stays
 /// inside one season (the caller's horizon must be shorter than `season_days`).
 ///
-/// Per group: write the last delivered share into the state, run the group's slow steps,
-/// then its fast sub-steps — asserting conservation after each, as the reference driver does
+/// Per group: run the group's slow steps (reading the share the state carries), then its
+/// fast sub-steps — asserting conservation after each, as the reference driver does
 /// — while summing the lamp power drawn against the nominal draw. A sub-step counts as lit
 /// when the lamp's light actually arrived (`boundary.light_used` rose), and then adds the
-/// `lamp_power` forcing it was asked for; the new share is the ratio. So the crop follows
+/// `lamp_power` forcing it was asked for; the new share is the ratio, written into the state
+/// at once. So the crop follows
 /// what the lamp **did**, not what the rule predicts — a failed lamp darkens it too, and a
 /// lamp the rule should have shed but did not leaves it lit.
 #[allow(clippy::too_many_arguments)]
@@ -332,10 +338,9 @@ pub fn run_shedding(
     let mut rationed = 0u64;
     let mut events: Vec<Event> = Vec::new();
     let mut log = ShedLog::default();
-    let mut delivered = delivery(&state)?;
+    delivery(&state)?;
     for _day in 0..days {
         for _ in 0..groups.count {
-            state.aux.insert(LAMP_DELIVERY_AUX.to_string(), delivered);
             for _ in 0..groups.slow {
                 let report = bio_integrator.step_report(&state, bio_resolver, slow_dt)?;
                 state = report.state;
@@ -355,7 +360,10 @@ pub fn run_shedding(
                 rationed += report.rationed;
                 events.extend(report.events);
             }
-            delivered = drawn / nominal;
+            // Written the moment it is known, so a day-end state carries its own last
+            // group's share and a run resumed from it continues bit for bit (tested).
+            let delivered = drawn / nominal;
+            state.aux.insert(LAMP_DELIVERY_AUX.to_string(), delivered);
             log.delivery.push(delivered);
         }
         states.push(state.clone());

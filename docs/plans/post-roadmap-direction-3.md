@@ -468,10 +468,15 @@ cannot fire on the crop's CO₂ at all, so a controller priced on the jar now pr
 crop that self-limits within the step; the jar's tightest step is 0.165 of the pool (2.64 per
 day).
 ⚠ *Re-read 2026-10-01* (`log/light-from-delivered-power.md`, BUILT LAB-ONLY the same day): the
-review proposal's Step 3, slice 3a. It discharges nothing here and touches no §2 or §3 item. It bears
-on **§2.2** only at a distance: a crop dimmed by a power shortage draws less CO₂, so a CO₂
-controller priced on a lamp-lit station would see the crop's draw follow the battery once 3a
-lands, which no frozen run exercises today (no frozen run shorts the lamp).
+review proposal's Step 3, slice 3a, a WHAT-IF lamp shed. It discharges nothing here. It bears
+on **§2.2** at a distance: a crop dimmed by a power shortage draws less CO₂, so a CO₂ controller
+priced on a lamp-lit station would see the crop's draw follow the battery if the rule were ever
+promoted; no frozen run sheds. ⚠ **It names something new, not on this list:** the frozen sealed
+station's power budget pays for life support only. Its battery falls by exactly the lamp's
+energy (1.40544e10 J over 1220 days, difference 0.0), because `balanced_load_w` sizes the load
+to the stored solar; the lamp runs on the starting charge and the station would go dark near
+day 1736, past the frozen horizon. Recorded as an open decision for the user (leave it, or
+resize the budget — a station unfreeze that moves the sealed goldens), not taken here.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

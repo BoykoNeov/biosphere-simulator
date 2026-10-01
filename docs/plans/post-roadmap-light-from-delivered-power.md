@@ -102,12 +102,15 @@ Searched: our shelf (`docs/bvad-reference.md`, every doc and param file: no shed
 dimming rule) and the web. What was read and what each supports:
 
 * **Chung & Mazzocco, US patent 4,575,679 (General Electric, filed 1983), "Automatic load shed
-  control for spacecraft power system"** — description, read through a fetch asked for verbatim
-  text (⚠ a summariser sat between us and the page; re-read the page before binding a quote):
+  control for spacecraft power system"** — description. **Quotes verified 2026-10-01 against the
+  raw page HTML** (`patents.google.com/patent/US4575679A/en`, fetched with `curl`, not through a
+  summariser):
   *"it has become conventional to divide the spacecraft electrical load into an interruptible
   load and an uninterruptible load"*; *"Ideally, the interruptible load is shed when the battery
   system contains an amount of charge remaining that is sufficient to enable the spacecraft
-  system to survive until a positive battery charging condition is achieved."* The relay
+  system to survive until a positive battery charging condition is achieved. That is, load
+  shedding should be performed when the battery system has reached a predetermined state of
+  charge."* The relay
   *"interrupts the power … to thereby place spacecraft 10 in survival mode … until a positive
   charging condition can again be achieved."* **Supports the FORM**: the lamp is an
   interruptible load, life support (`LoadDraw`) is not; shedding is a **switch-off**, not a
@@ -206,7 +209,29 @@ one. So promoting this would move no golden on today's scenarios, as §4 predict
   the crop; in the plain build the same cut leaves the crop bit-identical.
 
 **Deliberate breakages** (each run, then reverted): the crop ignoring the share; the share never
-written; the lamp never shed. Each turns 2 of the 7 tests red.
+written; the lamp never shed. Each turned 2 of the then 7 tests red (8 tests now, with the resume
+test below).
+
+**Saved and resumed runs (fixed after the first commit, `d82253c`).** The first driver wrote
+the share into the state at the *start* of each group, so every day-end state carried the
+second-to-last group's share. A continuous run never noticed (no number above moved), but a run
+resumed from a saved day would have read a stale one. ⚠ A test comparing the resumed crop alone
+stayed green: a day starts at midnight, inside the lamp's dark hours, so the first plant step
+multiplies zero light. The test now also asserts each saved day carries its own last group's
+share; it went red (day 2 held 1.0 where the lamp had delivered 0.0), the share is now written
+the moment it is known, and a run split at day 5 and resumed is the 8-day run bit for bit.
+`rewire_for_shedding` keeps a share a saved state already carries.
+
+**Scope — what follows the lamp and what does not** (checked by listing every `env.get` in the
+biosphere, not by the variable's name):
+* **Follows it:** `par`, at its one read site (`CarbonContext::budget`) — through growth,
+  growth and maintenance respiration, the lab leaf form, and option C's end-of-step solve (which
+  wraps the environment it is handed, so it sees the dimmed light too).
+* **Does not:** `net_radiation`, the energy term of transpiration, which comes from the weather
+  file — in the frozen lamp-lit station as well, so the crop's water loss under a lamp has never
+  followed the lamp. `daylength_s` stays the lamp's timetable, so a shed lamp still counts as
+  day for development. Both bear on 3b (transpiration).
+* **Wired:** the sealed station only. The `lighting` scenario's lamp seam (`lighting.rs`) is not.
 
 **What this does not claim.** Nothing about real stations or crops: the reserve is invented,
 and the 31.6 % is a property of that reserve, this battery and this blackout. A crop reading

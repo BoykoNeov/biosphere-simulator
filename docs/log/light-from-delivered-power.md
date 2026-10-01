@@ -26,3 +26,7 @@
   lab crop -31.6 % with 0. The shed lamp never comes back (solar pays life support only).
 * A first version counted what the rule predicted, not what arrived; a broken lamp still
   darkened the crop. Fixed. Nothing frozen moved; no golden, no manifest row.
+* After the first commit: day-end states carried a one-group-stale share, invisible to a
+  resumed crop (a day starts in the lamp's dark hours). Asserted directly, red, fixed.
+* Patent quotes verified against the raw page. Only `par` follows the lamp: transpiration's
+  net radiation is the weather file's, even in the frozen lamp-lit station (bears on 3b).
