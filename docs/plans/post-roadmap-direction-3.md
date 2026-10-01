@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `chamber-dryness.md`
+**Re-read against the record's last row:** `room-temperature.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -483,6 +483,10 @@ only. It is the successor named in §6's vapour item below (*"the plants
 read the WEATHER's VPD, not the chamber's humidity"*) — taken now, so that item's *"Still the
 user's call; unblocked, not scheduled"* is superseded by the user's *"work on step 3"*. It
 touches no §2 or §3 item.
+⚠ *Re-read 2026-10-01* (`log/room-temperature.md`, OPENED as a design note, no code): the
+review proposal's Step 3, slice 3c. Grepped this plan for the heat store, room temperature,
+vernalization, the day-neutral crop and the re-sow calendar: none appears, so it discharges
+nothing here and adds nothing to §2 or §3. Its four decisions live in the note.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the

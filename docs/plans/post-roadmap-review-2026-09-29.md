@@ -293,6 +293,11 @@ transpiration, no crop reaches water stress, the 9 sealed goldens moved (water s
 
 ### Slice 3c — temperature from the station's heat model
 
+**DESIGN NOTE WRITTEN 2026-10-01** → `docs/plans/post-roadmap-room-temperature.md`, no code. The
+heat store sits at −106 °C (measured), so it is not a room. A room held at BVAD's 22 °C is cheap,
+but it arrests the frozen winter wheat and leaves a day-neutral crop standing ≈ 220 days a year
+on the 305-day re-sow calendar. Four decisions are the user's.
+
 - The largest of the three, and the least ready. The heat model is one lump with a heat
   capacity, referenced to deep space. Plants need *air* temperature in a *room*.
 - **First a design note, not a build:** what stock carries the greenhouse air's heat, what
