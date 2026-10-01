@@ -63,7 +63,7 @@ fn mean_solar_power(scenario: &SealedStationScenario) -> f64 {
 }
 
 /// The constant daily-average lamp draw (W): `lamp_power_w · photoperiod / 24`.
-fn lighting_average_power(scenario: &SealedStationScenario) -> f64 {
+pub(crate) fn lighting_average_power(scenario: &SealedStationScenario) -> f64 {
     scenario.lamp_power_w * scenario.photoperiod_hours as f64 / 24.0
 }
 

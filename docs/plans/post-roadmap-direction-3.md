@@ -467,8 +467,8 @@ gate the shading loss on a pushed run (leaves 10 % thinner). **§2.2:** under C 
 cannot fire on the crop's CO₂ at all, so a controller priced on the jar now prices against a
 crop that self-limits within the step; the jar's tightest step is 0.165 of the pool (2.64 per
 day).
-⚠ *Re-read 2026-10-01* (`log/light-from-delivered-power.md`, STOPPED BEFORE CODE): the review
-proposal's Step 3, slice 3a. It discharges nothing here and touches no §2 or §3 item. It bears
+⚠ *Re-read 2026-10-01* (`log/light-from-delivered-power.md`, BUILT LAB-ONLY the same day): the
+review proposal's Step 3, slice 3a. It discharges nothing here and touches no §2 or §3 item. It bears
 on **§2.2** only at a distance: a crop dimmed by a power shortage draws less CO₂, so a CO₂
 controller priced on a lamp-lit station would see the crop's draw follow the battery once 3a
 lands, which no frozen run exercises today (no frozen run shorts the lamp).

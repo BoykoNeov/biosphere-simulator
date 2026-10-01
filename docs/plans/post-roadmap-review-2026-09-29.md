@@ -268,11 +268,14 @@ still come from outside it:
   nameplate and **no golden moves**. The perturbed brown-out run is where it shows.
 - **Risk:** a one-quarter-day lag between lamp and leaf. State it in the record.
 
-**3a OPENED 2026-10-01 and STOPPED BEFORE CODE** (`docs/plans/post-roadmap-light-from-delivered-power.md`):
-today the lamp can get less than nameplate only through the arbitration backstop, which cuts
-life support and the lamp alike; "delivered" needs a lamp policy first. The lag is 1/16 day,
-not a quarter-day. Decision with the user: A (the backstop dims), B (a dimming rule, needs a
-source), or skip to 3b.
+**3a BUILT LAB-ONLY 2026-10-01** (`docs/plans/post-roadmap-light-from-delivered-power.md`): today
+the lamp can get less than nameplate only through the arbitration backstop, which cuts life
+support and the lamp alike, so the user chose a lamp rule: switch the lamp off at a reserve
+(form from a 1983 spacecraft patent; the 24 h reserve is WHAT-IF, unsourced). The crop reads the
+share of lamp power that actually arrived; lag 1/16 day. If-then result: a 3-day blackout
+leaves the plain crop untouched and the lab crop 31.6 % lighter, with no life-support
+rationing. Not in the reference until the reserve has a source. Found on the way: the sealed
+station's solar pays for life support only, never the lamp.
 
 ### Slice 3b — air dryness from the chamber's own humidity
 

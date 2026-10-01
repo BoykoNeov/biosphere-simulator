@@ -24,6 +24,7 @@ pub mod goldens;
 pub mod greenhouse;
 pub mod harvest;
 pub mod inspection;
+pub mod lamp_shed;
 pub mod lighting;
 pub mod objectives;
 pub mod palette;

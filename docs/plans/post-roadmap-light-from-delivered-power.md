@@ -4,9 +4,9 @@
 for Step 3 (3a and 3b as builds, 3c as a design note first). 3a is taken first, as ordered.
 Review plan: `docs/plans/post-roadmap-review-2026-09-29.md`, Step 3.
 
-**B CHOSEN 2026-10-01** (the user: *"Dimming rule"*), source search done (§5): the form has an
-engineering precedent, the threshold has no source, so B is **lab-only, WHAT-IF**. One question
-remains open with the user (§6): switch-off or gradual. Nothing is built; nothing frozen has moved.
+**B CHOSEN 2026-10-01** (the user: *"Dimming rule"*), then **switch-off** (the user: *"Switch off"*,
+§6). Source search (§5): the form has an engineering precedent, the threshold has no source, so
+it is **BUILT LAB-ONLY, WHAT-IF** (§7). Nothing frozen moved; no golden, no manifest row.
 
 ## 1. What 3a asked for
 
@@ -163,6 +163,55 @@ baseline.
 **Open with the user:** switch-off with a latch (the form has a precedent; only the threshold
 is invented) or gradual dimming (shape and threshold both invented). Recommendation: switch-off.
 
-## 7. Results
+## 7. Results — BUILT lab-only, 2026-10-01
 
-None yet.
+**What was built** (`station::lamp_shed`, `tests/lamp_shed.rs` — 7 tests, example `lamp_shed`):
+
+* `SheddingLamp` — the frozen `Lamp` with every leg times 1.0 or 0.0: on exactly when the battery
+  holds at least the reserve. Stateless: below the reserve it is off, and only charging can lift
+  the battery back over it, so no latch is stored (the restore reading is ours; §5).
+* `WHAT_IF_RESERVE_HOURS = 24` h of the life-support load (`balanced_load_w`) — 2.61e7 J on the
+  sealed station. Chosen, not sourced.
+* `run_shedding` — the reference's interleaved day, plus bookkeeping: over each power group it
+  sums the `lamp_power` asked for at the sub-steps where light **actually arrived** in
+  `boundary.light_used`, divides by the nominal draw, and writes the share into `State.aux`
+  before the next plant step. `LampLitFlow` / `LampLitAux` wrap every slow flow and aux process
+  and hand them a `par` times that share. ⚠ The first version counted the sub-steps where the
+  **rule** said the lamp was on; a deliberately broken lamp that never shed then still darkened
+  the crop, and only one test noticed. Counting what arrived fixed that (below).
+
+**Controls (bit for bit, 8 days, the sealed station):** the lab wiring with the rule off is the
+plain run, every day's state, rationing and events; with the rule on and the frozen 2.0e10 J
+battery nothing sheds, the share is the literal 1.0 in every group, and the run is again the plain
+one. So promoting this would move no golden on today's scenarios, as §4 predicted.
+
+**The answer** (battery 1.5e8 J, solar cut to zero over days 2–5, horizon 8 days —
+`cargo run --release -q -p station --example lamp_shed`). WHAT-IF: *if* the lamp were shed at
+24 h of life support, then:
+
+| run | crop (mol C) | vs calm | battery at day 8 (J) | rationed | lamp light (J) |
+|---|---|---|---|---|---|
+| plain, calm | 0.323944 | — | 5.78e7 | 0 | 5.04e7 |
+| plain, blackout | 0.323944 | **+0.000 %** | 1.8e4 | **5140** | 4.70e7 |
+| lab, calm | 0.323944 | — | 5.78e7 | 0 | 5.04e7 |
+| lab, blackout | 0.221738 | **−31.6 %** | 1.82e7 | **0** | 2.92e7 |
+
+* **Plain:** the blackout empties the battery; the backstop then rations 5140 times, cutting life
+  support and lamp alike, and the crop is bit-identical to the calm run — it never learns.
+* **Lab:** the lamp is shed at day 4.625 (the group it switches off in delivers 1/6 of its
+  nominal power), life support is never short, and the crop ends 31.6 % lighter.
+* **It never comes back on** (tested): after the blackout, the solar pays life support exactly
+  (§6), the battery sits at 1.82e7 J below the 2.61e7 J reserve, and every later group is dark.
+* **The lamp's power alone darkens the lab crop** (tested): cutting only `lamp_power` lowers
+  the crop; in the plain build the same cut leaves the crop bit-identical.
+
+**Deliberate breakages** (each run, then reverted): the crop ignoring the share; the share never
+written; the lamp never shed. Each turns 2 of the 7 tests red.
+
+**What this does not claim.** Nothing about real stations or crops: the reserve is invented,
+and the 31.6 % is a property of that reserve, this battery and this blackout. A crop reading
+light from what the lamp did — the carrier — is the reusable part; the rule needs a source to
+enter the reference, and promoting either is a station unfreeze (§2.4).
+
+**Next, per the review plan:** 3b (the crop feels the chamber's own humidity). Open and not
+taken here: §6, the sealed station's power budget pays for life support only.
