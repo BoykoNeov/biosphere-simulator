@@ -477,8 +477,9 @@ energy (1.40544e10 J over 1220 days, difference 0.0), because `balanced_load_w` 
 to the stored solar; the lamp runs on the starting charge and the station would go dark near
 day 1736, past the frozen horizon. Recorded as an open decision for the user (leave it, or
 resize the budget — a station unfreeze that moves the sealed goldens), not taken here.
-⚠ *Re-read 2026-10-01* (`log/chamber-dryness.md`, OPENED, predictions only): the review
-proposal's Step 3, slice 3b. It is the successor named in §6's vapour item below (*"the plants
+⚠ *Re-read 2026-10-01* (`log/chamber-dryness.md`, BUILT AND MEASURED, NOT FROZEN): the review
+proposal's Step 3, slice 3b. Under the chamber reading the 9 sealed goldens move, water only;
+freezing waits on the user. It is the successor named in §6's vapour item below (*"the plants
 read the WEATHER's VPD, not the chamber's humidity"*) — taken now, so that item's *"Still the
 user's call; unblocked, not scheduled"* is superseded by the user's *"work on step 3"*. It
 touches no §2 or §3 item.
@@ -548,7 +549,9 @@ chose the follow-on explicitly: **"ok A now, but immediately after that (next se
   potential transpiration **+21 %**, so coupled plants would transpire *more* than today, and
   "would not notice" was measured at today's rates, not at +21 % (first recorded as ≈2.5×, a
   mean of per-step ratios; corrected the same day). BVAD's crop model (§4.14, Eqn 4-23) reads the chamber's RH, a precedent for the form.
-  Still the user's call; unblocked, not scheduled.
+  ~~Still the user's call; unblocked, not scheduled.~~ **TAKEN 2026-10-01** as the review
+  proposal's Step 3b: built behind a switch and measured (+20.55 %, no stress, water only);
+  freezing waits on the user. `log/chamber-dryness.md`.
 * **The `o2_setpoint` mole-fraction conversion (B's slice 4), now BLOCKED behind an authoring
   decision.** It is bit-neutral (`0.21 × 9500.0 == 1995.0` exactly, verified both directions)
   but cannot ship as designed: the frozen params reach every authored `eclss.o2_makeup`, so

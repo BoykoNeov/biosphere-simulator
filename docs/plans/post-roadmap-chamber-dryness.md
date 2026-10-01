@@ -145,14 +145,15 @@ starts at RH 0: the chambers are sown with empty air (`water_vapor0 = 0`).
 | # | prediction | measured | verdict |
 |---|---|---|---|
 | 1 | exactly the 9 sealed goldens move | the 9, and only them | **held** |
-| 1b | `drift_summary` moves | **identical** | **missed** — its folds did not move; why is not read here |
+| 1b | `drift_summary` moves | **identical** | **missed**, and explained: it folds **carbon only** (each year's peak leaf carbon in the perennial and consumer chambers, and the consumer's year-end carbon), not the per-quantity mass drift the prediction assumed. No carbon moved, so it could not — a 15-year confirmation of row 3 |
 | 2 | potential transpiration about +21 % | +20.55 % in all three chambers | **held** |
-| 3 | no water stress; no carbon, N, O₂ or energy value moves | stress factor exactly 1 at every step; only water stocks moved | **held** |
+| 3 | no water stress; no carbon, N, O₂ or energy value moves | **measured directly in the 3 biosphere chambers**: stress factor exactly 1 at every step. **In the 4 station runs it is inferred**, from no carbon value moving — `sealed_station` is the run whose subsoil water moved most (−7 %), and its stress factor was not probed | **held** (station: inferred) |
 | 4 | `water_vapor` barely moves | unchanged at the end of every run | **held** |
 | 5 | 9 `golden_sha256` rows move; tiers untouched | not run yet (nothing written) | open |
 | 6 | the condenser's below-target draw: few steps, small share | 3.2 % of steps, 5.6 % of the extra, lowest RH 0.54 after day 1 | **held** |
 | 7 | crew and ECLSS stores unmoved | unmoved | **held** |
 | 8 | the sealed flow tests pinned to the forcing need re-posing | the two were re-posed before the run (pinned to `Weather`) | held |
+| 8b | (checked after the advisor asked) a test or perturbation made hollow | no test, perturbation, precision probe or science gate names the dryness input (`VPD_VAR`, `"vpd"`, `vap_hpa`), so none is silently emptied | none found |
 | — | **not predicted** | `the_resow_makes_a_cycle_and_not_a_ratchet_over_five_years` goes red under `Chamber` | **missed** |
 
 **The miss that needs a decision.** That test checks the perennial chamber's yearly re-sow: one
@@ -173,3 +174,23 @@ user's call, never the agent's.
    reference docs' amendment blocks.
 4. The re-sow test's transient bound — the user's decision (§4.4).
 5. Run the tier checks after the write (prediction 5).
+
+### 4.6 The freeze — taken by the user 2026-10-01; its predictions, written before `--write`
+
+The user's *"freeze it"*, and for the re-sow bound *"Raise to 0.004"* (about 3× the measured
+transient, the rule that set 1e-3). Predictions for the write, corrected by §4.4's 1b:
+
+1. `regen_goldens` (report mode, loader at `Chamber`) reports **exactly the 9** sealed goldens
+   changed; the other 11 identical.
+2. Each written golden is **byte-identical** to its copy measured in `W:\temp\claude\cd\golden`
+   (§4.2): same build, deterministic, so the frozen bytes are the bytes §4.2 describes.
+3. Manifests: **exactly 9 `golden_sha256` rows** move — biosphere 5 (`sealed_chamber`,
+   `perennial_chamber`, `perennial_long_horizon`, `consumer_chamber`, `consumer_long_horizon`),
+   station 4 (`greenhouse`, `harvest`, `lighting`, `sealed_station`). **Not** `drift_summary`
+   (§4.4 1b: it folds carbon only) and not `sealed_energy_drift_summary`. No `param_files`,
+   `flow_set` or `aux_set` entry; no authoring manifest byte.
+4. `rust/data/tiers.json` untouched; no tier-2 band crossed. `git diff rust/crates/simcore/` empty.
+5. **Reach:** the authoring platform cannot build a `Transpiration` (no authored scenario or
+   flow type names it, grepped), so authored habitats do not move. The Godot palette's
+   `greenhouse` and `sealed` sessions are built by the reference loader and **do** read the
+   chamber's air from the freeze on.
