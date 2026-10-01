@@ -255,7 +255,7 @@ pub fn chamber_vapour_pressure_pa(vapour_kg: f64, air_capacity_mol: f64) -> f64 
 /// `max(0, e_s(T) − e_a)`, with `e_a` from [`chamber_vapour_pressure_pa`].
 ///
 /// What sealed transpiration reads under [`VpdRead::Chamber`] (the 2026-09-29 review's Step 3,
-/// slice 3b, `docs/plans/post-roadmap-chamber-dryness.md`; not yet the loader's value). At the humidity target it is
+/// slice 3b, `docs/plans/post-roadmap-chamber-dryness.md`; the loader's value since 2026-10-01). At the humidity target it is
 /// `(1 − setpoint)·e_s(T)`; at or above saturation it is 0. BVAD Rev 2 §4.14 (Eqn 4-23, Monje
 /// 1998) takes a chamber crop's deficit from the chamber's relative humidity — the precedent for
 /// the form; the numbers are the FAO-56 curve and the room identity already in the model.
@@ -267,16 +267,18 @@ pub fn chamber_vpd_pa(temp_c: f64, vapour_kg: f64, air_capacity_mol: f64) -> f64
 /// **Where sealed transpiration reads how dry the air is**: the weather file's outdoor deficit,
 /// or the chamber's own air ([`chamber_vpd_pa`]).
 ///
-/// Not a fitted coefficient and never loaded from a param file. ⚠ The loader still sets
-/// [`VpdRead::Weather`]; [`VpdRead::Chamber`] is built and measured (2026-10-01,
-/// `docs/plans/post-roadmap-chamber-dryness.md`) and becomes the loader's value only on the
-/// user's freeze decision. `domains::lab` selects either. Deliberately **no `Default`**, for [`Co2Read`]'s reason. Only sealed
+/// Not a fitted coefficient and never loaded from a param file. The loader sets
+/// [`VpdRead::Chamber`] since the user's Step 3b freeze (2026-10-01,
+/// `docs/plans/post-roadmap-chamber-dryness.md`); [`VpdRead::Weather`] is the retired reading,
+/// kept so its records can be re-run. `domains::lab` selects either. Deliberately **no `Default`**, for [`Co2Read`]'s reason. Only sealed
 /// transpiration acts on it; the open field has no chamber air and reads the weather either way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VpdRead {
-    /// The weather file's outdoor deficit (`vpd` forcing). The loader's value today.
+    /// The weather file's outdoor deficit (`vpd` forcing). The retired reading (the loader's
+    /// value until 2026-10-01); lab-only.
     Weather,
-    /// The chamber's own air, from its `water_vapor` at the start of the step.
+    /// The chamber's own air, from its `water_vapor` at the start of the step. The loader's
+    /// value since 2026-10-01.
     Chamber,
 }
 

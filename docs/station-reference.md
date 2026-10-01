@@ -320,6 +320,17 @@ gate), so the discipline is enforced, not merely requested.
 
 ### Unfreeze log
 
+- **2026-10-01 — the biosphere's crop transpires against the chamber's own air; 4 station
+  goldens move (water stocks only) and 4 `golden_sha256` rows follow. No station flow, param,
+  seam or claim changed.** Delegated: `docs/biosphere-reference.md`'s 2026-10-01 entry is the
+  record. `greenhouse`, `harvest` and `lighting` (7 days) moved `condensate` +26 % to +32 % and
+  `soil_water` −0.6 % to −3.5 %; `sealed_station` moved `condensate` −2.26 %, `soil_water`
+  +1.22 %, `subsoil_water` −6.99 %. No carbon, O₂, N, crew or ECLSS value moved;
+  `sealed_energy_drift_summary.json` unchanged. ⚠ In `sealed_station` the water-stress factor
+  was not probed directly; that it stays 1 is inferred from no carbon value moving. The Godot
+  palette's `greenhouse` and `sealed` sessions read the new form. Every station golden keeps 0
+  rationing and 0 events; no tier-2 band was crossed.
+
 - **2026-09-30 — option C reaches the station: the crop's growth reads the cabin CO₂ the plant
   step leaves. 4 station goldens (`greenhouse`, `harvest`, `lighting`, `sealed_station`) and
   their `golden_sha256` rows; no station flow, param, seam or `simcore` byte changed.** The

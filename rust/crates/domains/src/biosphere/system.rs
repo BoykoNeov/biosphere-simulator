@@ -3062,7 +3062,13 @@ mod tests {
         // The transient is ONE cycle wide, small, and in one direction — not the first two
         // steps of a slow ratchet that happen to look flat at this tolerance.
         assert_ne!(at_cycle_start[0], settled[0]);
-        assert!((at_cycle_start[0] - settled[0]).abs() / settled[0] < 1e-3);
+        // ⚠ 4e-3 since 2026-10-01 (was 1e-3), the USER's call at the Step 3b freeze
+        // (`docs/plans/post-roadmap-chamber-dryness.md` §4.4, §4.6). Reading the chamber's own
+        // air raised potential transpiration +20.55 %, which leaves year 1's root zone further
+        // from the settled cycle: the transient went 3.39e-4 -> 1.203e-3 while the convergence
+        // above still holds to 1e-12. The bound is ~3x the measured transient, the same rule
+        // that set 1e-3; it was never tied to a physical limit.
+        assert!((at_cycle_start[0] - settled[0]).abs() / settled[0] < 4e-3);
         assert!(at_cycle_start[0] > settled[0]);
         // The two soil stores TOGETHER are conserved across every cycle boundary, which is
         // what says the convergence is a REDISTRIBUTION and not a leak.

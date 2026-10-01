@@ -388,9 +388,9 @@ pub struct WaterCycleParams {
     /// Fraction of saturation, `(0, 1]` — BVAD's "about 75%" (2026-09-29).
     pub humidity_setpoint: f64,
     /// Where sealed transpiration reads the air's dryness ([`VpdRead`]). Never loaded from the
-    /// file. ⚠ The loader still sets [`VpdRead::Weather`]: [`VpdRead::Chamber`] is built and
-    /// measured (2026-10-01) and waits on the user's freeze decision
-    /// (`docs/plans/post-roadmap-chamber-dryness.md`); `domains::lab` selects either.
+    /// file. The loader sets [`VpdRead::Chamber`] since the user's Step 3b freeze (2026-10-01,
+    /// `docs/plans/post-roadmap-chamber-dryness.md`); [`VpdRead::Weather`] is the retired
+    /// reading, kept runnable through `domains::lab`.
     pub vpd_read: VpdRead,
 }
 
@@ -1166,9 +1166,9 @@ pub fn water_cycle_from_bounded(
         condensation_rate: v["condensation_rate"],
         recycling_rate: v["recycling_rate"],
         humidity_setpoint: v["humidity_setpoint"],
-        // ⚠ WEATHER until the user's freeze decision on Step 3b; the flip is this line plus
-        // the 9 goldens' regeneration (docs/plans/post-roadmap-chamber-dryness.md §4).
-        vpd_read: VpdRead::Weather,
+        // CHAMBER since the Step 3b freeze (2026-10-01): this line moved 9 goldens, water
+        // stocks only (docs/plans/post-roadmap-chamber-dryness.md §4.6).
+        vpd_read: VpdRead::Chamber,
     }
 }
 

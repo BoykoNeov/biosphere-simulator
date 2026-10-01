@@ -902,6 +902,30 @@ runs where water limits", a golden count of 25 — describes the tree **as it wa
 entry's date**. Rewriting them would falsify the measurement; only the *scope* statements at
 the top of this doc, which are live claims, are kept current.
 
+- **2026-10-01 — in a sealed build the crop transpires against the CHAMBER's air, not the
+  weather's: 5 goldens here (4 on the station), their `golden_sha256` rows. Only water stocks
+  moved. No flow set, aux, param file, `dt_days` or `simcore` byte changed; the open field is
+  byte-identical by construction.** The user's *"freeze it"* on the review's Step 3, slice 3b.
+  Plan, predictions (committed before the code, and again before the write) and grading:
+  `docs/plans/post-roadmap-chamber-dryness.md`; record `docs/log/chamber-dryness.md`.
+  **The form.** `WaterCycleParams` gained `vpd_read` (`VpdRead::Chamber`, set by the loader,
+  never by a file; the lab can select `Weather`, the reading every record before this one
+  measured). Sealed `Transpiration` takes its vapour-pressure deficit from the chamber's own
+  vapour store by the room-gas identity (`science::chamber_vpd_pa`): `e_a = v·P_std/(n_ref·M)`,
+  deficit `max(0, e_s(T) − e_a)`. No new number. Precedent: BVAD Rev 2 §4.14, Eqn 4-23.
+  **What moved.** Potential transpiration +20.55 % in every sealed chamber; the water-stress
+  factor stays exactly 1 at every step (measured directly in the three chambers), so no carbon,
+  N, O₂ or energy value moved and `drift_summary` (a carbon fold) is unchanged. `condensate`,
+  `soil_water` and `subsoil_water` moved (subsoil −4.9 % in the year-long chambers);
+  `water_vapor` ends every run unchanged. The 9 written goldens are byte-identical to the
+  measurement run's. **The one bound moved, on the user's call:** the perennial re-sow's
+  first-year transient rose 3.39e-4 → 1.203e-3, over the 1e-3 its test allowed, while the cycle
+  still settles to 1e-12; the bound is now 4e-3 (~3× the transient, the rule that set 1e-3).
+  ⚠ **Scope.** The condenser's below-setting draw (2026-09-29 entry) is now load-bearing on
+  3.2 % of steps (5.6 % of the extra transpiration, lowest RH 0.54 after day 1). Net radiation
+  is still the weather file's in the lamp-lit builds. Advisor-reviewed before the write.
+  `git diff rust/crates/simcore/` empty.
+
 - **2026-09-30 — OPTION C: in a sealed build the crop's growth reads the chamber CO₂ the step
   LEAVES, not the CO₂ it starts with. 6 goldens here (4 on the station), their `golden_sha256`
   rows; no flow set, aux, param file, `dt_days` or `simcore` byte changed; the open field is

@@ -183,10 +183,10 @@ pub fn biosphere_with_co2_read(
 
 /// The frozen params with sealed transpiration reading the air's dryness from `form`.
 ///
-/// [`VpdRead::Weather`] is the loader's value and every sealed record's reading so far;
-/// [`VpdRead::Chamber`] is Step 3b's form (`docs/plans/post-roadmap-chamber-dryness.md`), built
-/// and measured 2026-10-01 — 9 goldens move, water stocks only — and waiting on the user's
-/// freeze decision. The open field reads the weather either way, by construction.
+/// [`VpdRead::Chamber`] is the loader's value since the user's Step 3b freeze (2026-10-01,
+/// `docs/plans/post-roadmap-chamber-dryness.md`; 9 goldens moved, water stocks only);
+/// [`VpdRead::Weather`] is the retired reading, which every sealed record before that date
+/// measured. The open field reads the weather either way, by construction.
 ///
 /// # ⚠ This endorses no form
 ///

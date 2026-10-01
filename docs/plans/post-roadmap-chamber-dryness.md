@@ -4,12 +4,13 @@
 (`docs/plans/post-roadmap-light-from-delivered-power.md`). Review plan:
 `docs/plans/post-roadmap-review-2026-09-29.md`, Step 3, slice 3b.
 
-**BUILT AND MEASURED 2026-10-01, NOT FROZEN** (§4). The chamber reading is in the code behind
-`science::VpdRead`; the loader still sets `Weather`, so every committed golden still holds and the
-suite is green. **Freezing it is the user's decision**: one loader line, the 9 goldens'
-regeneration, the manifests, and one test's bound (§4.4). This is a
-biosphere unfreeze (`docs/biosphere-reference.md`, "The unfreeze discipline"): the frozen
-transpiration flow's dryness input changes in every sealed build.
+**FROZEN 2026-10-01** on the user's *"freeze it"* (§4.6, §4.7). The loader sets
+`science::VpdRead::Chamber`; the 9 sealed goldens and their 9 `golden_sha256` rows were
+regenerated; the re-sow test's transient bound went 1e-3 → 4e-3 on the user's choice. This is a
+biosphere unfreeze (`docs/biosphere-reference.md`, "The unfreeze discipline", log entry
+2026-10-01): the frozen transpiration flow's dryness input changed in every sealed build.
+*Before the freeze (kept for the record):* built and measured behind the switch with the loader at
+`Weather` (§4.1–§4.5).
 
 ## 1. The problem
 
@@ -149,7 +150,7 @@ starts at RH 0: the chambers are sown with empty air (`water_vapor0 = 0`).
 | 2 | potential transpiration about +21 % | +20.55 % in all three chambers | **held** |
 | 3 | no water stress; no carbon, N, O₂ or energy value moves | **measured directly in the 3 biosphere chambers**: stress factor exactly 1 at every step. **In the 4 station runs it is inferred**, from no carbon value moving — `sealed_station` is the run whose subsoil water moved most (−7 %), and its stress factor was not probed | **held** (station: inferred) |
 | 4 | `water_vapor` barely moves | unchanged at the end of every run | **held** |
-| 5 | 9 `golden_sha256` rows move; tiers untouched | not run yet (nothing written) | open |
+| 5 | 9 `golden_sha256` rows move; tiers untouched | at the freeze: the 9 rows and only them; `tiers.json` untouched (§4.7) | **held** |
 | 6 | the condenser's below-target draw: few steps, small share | 3.2 % of steps, 5.6 % of the extra, lowest RH 0.54 after day 1 | **held** |
 | 7 | crew and ECLSS stores unmoved | unmoved | **held** |
 | 8 | the sealed flow tests pinned to the forcing need re-posing | the two were re-posed before the run (pinned to `Weather`) | held |
@@ -194,3 +195,20 @@ transient, the rule that set 1e-3). Predictions for the write, corrected by §4.
    flow type names it, grepped), so authored habitats do not move. The Godot palette's
    `greenhouse` and `sealed` sessions are built by the reference loader and **do** read the
    chamber's air from the freeze on.
+
+### 4.7 The freeze — graded
+
+| # | prediction (§4.6) | measured | verdict |
+|---|---|---|---|
+| 1 | report mode: exactly the 9 change | 9 of 20 would change, the 9 named | **held** |
+| 2 | written bytes = the measured copies | all 21 files in `W:\temp\claude\cd\golden` byte-identical to the tree after `--write` | **held** |
+| 3 | 9 `golden_sha256` rows, nothing else | biosphere 5, station 4, the 9 named; `drift_summary`, `sealed_energy_drift_summary`, params, flow and aux sets and the authoring manifest unmoved | **held** |
+| 4 | tiers untouched; `simcore` empty | `tiers.json` and `rust/crates/simcore/` diffs empty; `every_expensive_station_golden_is_inside_its_measured_band` green | **held** |
+| 5 | authoring cannot reach it | no authored scenario or flow type names transpiration | **held** (by grep) |
+
+Gates: `cargo test --workspace --no-fail-fast` **1249 passed, 0 failed**, with the re-sow bound at
+4e-3; the 4 `--ignored` horizon tests (the sealed-station golden, its band, the two-rate session
+and the season-boundary resume) **4 passed**; `cargo clippy --all-targets -- -D warnings` clean.
+Science gates and liveness floors read no plant water quantity and no carbon value moved, so
+their readings are unchanged. Stale "the loader still sets `Weather`" comments in `params.rs`,
+`science.rs` and `lab/mod.rs` were rewritten (the advisor's check: no test sees them).

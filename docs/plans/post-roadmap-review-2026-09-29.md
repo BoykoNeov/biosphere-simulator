@@ -279,6 +279,9 @@ station's solar pays for life support only, never the lamp.
 
 ### Slice 3b — air dryness from the chamber's own humidity
 
+**FROZEN 2026-10-01** → `docs/plans/post-roadmap-chamber-dryness.md`: +20.55 % potential
+transpiration, no crop reaches water stress, the 9 sealed goldens moved (water stocks only).
+
 - Already priced in the third direction plan (the successor named by the vapour items): the
   chamber's own dryness summed over a run is **1.5×** the weather's, potential water use
   **+21 %**. BVAD's crop model reads chamber humidity, a precedent for the form.
