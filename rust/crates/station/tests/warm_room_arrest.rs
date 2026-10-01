@@ -3,7 +3,8 @@
 //!
 //! Plan: `docs/plans/post-roadmap-room-temperature.md` §10, slice 1, whose predictions were
 //! committed before this file. The sealed station is run with the plants' temperature held at
-//! the chosen 22 °C setpoint (BVAD Table 4-73 cabin nominal) and everything else unchanged.
+//! the chosen 22 °C setpoint and everything else unchanged. (22 °C is BVAD Table 4-73's crew
+//! *cabin* nominal; the plants now sit in their own chamber, so it applies by analogy only.)
 //! The cited vernalization window ends at 12 °C, so no chill-day ever accrues, the
 //! vernalization factor stays exactly 0, and development never starts.
 //!
@@ -90,8 +91,9 @@ fn control_the_plain_season_develops_and_fills_grain() {
 
 /// Prediction 1: no chill-day, so no thermal time, at any day of the warm season.
 ///
-/// The sown state (day 0) carries no `vernalization_days` entry at all — the accumulator is
-/// written from the first step on — so an absent entry there reads as 0, and only there.
+/// The sown state (day 0) carries no `vernalization_days` entry: `build_sealed_station`
+/// seeds only `thermal_time` and `rooted_depth`. The development flow reads a missing entry
+/// as 0, so an absent entry here reads as 0 too — on day 0 only.
 #[test]
 fn warm_room_accrues_no_chill_day_and_no_development() {
     for (day, s) in season().1.iter().enumerate() {

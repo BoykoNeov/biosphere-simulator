@@ -190,7 +190,7 @@ and §8's day-neutral slices are **superseded**.
 | 1 | Form | **B** — a held room that can fail (a heat store, a capacity-limited exchanger to the node) |
 | 2 | Crop | **winter wheat kept**, with a **cold period** in the room's schedule; needs its own source |
 | 3 | Calendar | **re-sow on maturity** (the 305-day calendar goes) |
-| 4 | Setpoint | **22 °C** (BVAD Table 4-73 cabin nominal) |
+| 4 | Setpoint | **22 °C** (BVAD Table 4-73 cabin nominal) — ⚠ see the note below the conflict |
 
 **A conflict found after the answers, and its resolution (asked, answered 2026-10-01).** The
 crew and the plants share one atmosphere (`sealed.rs`: crew respiration draws `O2_POOL` and emits
@@ -209,6 +209,11 @@ sowing; a cold cabin; drop the cold (day-neutral). **The user chose the plant ch
   unmodelled, as today.
 * So crew body heat does **not** enter the chamber's heat books. It stays out of the books, the gap
   §2 already lists.
+* ⚠ **The 22 °C citation weakened with this choice.** §9 recommended 22 °C as BVAD's *cabin*
+  nominal, "a direct citation for a room". The room is now a plant chamber, not the crew cabin, so
+  Table 4-73 applies to it **by analogy only** — the same standing (a class citation) as Table
+  4-111's 23 °C crop-room figure. The value stays 22 °C (the user's choice); the citation's kind is
+  what changed.
 
 **The cold period's source — searched 2026-10-01, NOT yet bound.** ⚠ The figures below are **per a
 search engine's summary; the pages were NOT opened**, and the summary mixed several results, so
@@ -258,8 +263,15 @@ current `State`, so it can fire on a state condition (development complete) inst
      0.0"*.
    * Control: the plain season vernalizes, develops and fills grain (so the zeros are not a reading
      that is always zero). Liveness: with the room at 8 °C instead, all three warm tests go red.
-   * Missed detail, not a prediction: the sown state (day 0) carries no `vernalization_days` entry
-     at all; it is written from the first step on. The test reads an absent entry as 0 on day 0 only.
+   * Finding, not a prediction: the sown state (day 0) carries no `vernalization_days` entry at
+     all. Cause, read in the code: `build_sealed_station` assembles its own starting entries
+     (`thermal_time`, `rooted_depth`) and omits it, while `build_season` and the re-sow both seed
+     it to 0. The thermal-time flow reads a missing entry as 0 (`flows.rs`, `unwrap_or(0.0)`), so
+     no value moves today. It is the same class of omission as the `rooted_depth` one fixed
+     2026-08-12 (the comment at that site), so the original sowing and a re-sowing start with
+     different entry sets — relevant to slice 4. Not fixed here: seeding it could change exported
+     bytes, which is a golden question, not a lab one. The test reads an absent entry as 0 on day
+     0 only.
 2. **The chamber heat store (B), the plants NOT yet reading it.** A station unfreeze with the full
    ceremony. Into the chamber: the lamp's waste heat **and** its light leg (re-pointed from
    `boundary.light_used`; only the sugar-fixed part should leave as chemical energy — to be
