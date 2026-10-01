@@ -40,6 +40,9 @@ dropped here too (stated in `saturation_vapour_kg`). At the humidity target the 
 found in 3a, recorded, not changed here (it is its own question: a lamp's radiation is not the
 sun's).
 
+**One helper, not a second copy:** `science::chamber_vapour_pressure_pa(v, n_ref)` beside
+`saturation_vapour_kg`, so the two halves of the identity live together.
+
 **Plumbing, by precedent** (`science::Co2Read`, Step 2): a field never loaded from the file,
 set by the loader to the new reference value, which `domains::lab` can flip back — so the
 retired reading stays runnable and the control "flipped back = today's goldens, bit for bit" is
@@ -61,12 +64,37 @@ a test, not a claim.
    threshold, or if a sealed build's water source runs short. If the prediction holds, the stress
    factor stays **exactly 1** and **no carbon, nitrogen, O₂ or energy value moves in any
    golden** — only water stocks (`soil_water`, `subsoil_water`, `water_vapor`, `condensate` and
-   the water stores that feed irrigation). If carbon moves anywhere, stress happened there, and
-   that is the finding to show the user before anything is frozen.
+   the water stores that feed irrigation). **Checked before code, by reading:** the stress factor
+   is a hard threshold, exactly 1.0 at `FTSW ≥ wssg` (`science::water_stress_factor`); the drought
+   factor is `(1 − wsfg)·wssd + 1`, exactly 1 at `wsfg = 1`; root extension reads the same stress
+   factor plus a "subsoil empty" stop. So carbon can move only if the stress factor falls below 1
+   at some step or the subsoil reaches zero where it did not before. **Both are measured
+   directly** (lowest stress factor, lowest drought factor, steps below 1, subsoil minimum, per
+   scenario) — not inferred from carbon moving.
 4. **`water_vapor` barely moves**: on steps the crop can fill, the air ends at the target either
    way; the extra transpiration goes to `condensate`.
-5. **Manifests:** the 9 `golden_sha256` rows move (biosphere 5, station 4). The flow set and
-   param hashes do not (no file text changes; the new field is never loaded).
+5. **Manifests:** the 9 `golden_sha256` rows move (biosphere 5, station 4), plus
+   `drift_summary`'s (it folds the sealed 15-year perennial and consumer runs, so any change to
+   those trajectories moves its drift figures). The flow set and param hashes do not (no file
+   text changes; the new field is never loaded). `rust/data/tiers.json` is untouched unless the
+   tier checks go red (a crossed band is re-measured under the native-port contract, not
+   re-tuned) — predicted not to.
+6. **The condenser's shortcut becomes load-bearing.** The condenser keeps a first-order draw
+   *below* the 75 % setting (`science::condensed_vapour_kg`), recorded as harmless because "it
+   only matters on steps the plants cannot fill" (`log/vapour-step-artefact.md`). Reading the
+   chamber's air, the crop now transpires harder on exactly those steps. Measured: how many steps
+   start below the target, the lowest relative humidity at a step start, and the share of the
+   extra transpiration that falls on those steps. Predicted: few such steps (night and seedling
+   steps), lowest RH well under 75 %, a small share of the extra.
+7. **The station's crew water loop does not move.** The station wires neither the chamber's
+   `water_vapor` nor its `condensate` into the cabin (the crew condenser works on `cabin_h2o`),
+   so crew and ECLSS stores are bit-identical in the 4 station goldens.
+8. **Tests:** flow tests that build a *sealed* `Transpiration` and pin its flux from a `vpd`
+   forcing go red (the sealed flow no longer reads that forcing) and are re-posed by hand against
+   the chamber's air; the open-field transpiration tests and the per-step humidity bounds in
+   `tests/atmosphere.rs` stay green. New: the identity helper's tests (at the target the deficit
+   is `0.25·e_s(T)`; above saturation it is 0), and the control — the weather reading flipped
+   back reproduces today's goldens bit for bit.
 
 ## 4. Results
 
