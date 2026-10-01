@@ -535,6 +535,14 @@ crate that compiles it in; a pure rename, and the manifest records its **basenam
 value moved.
 Tiling it `Y×` gives the multi-year horizons. Recorded in the manifest under `forcing`.
 
+#### ⚠ UNFROZEN 2026-10-01: a sealed crop no longer reads the fixture's air dryness
+
+The fixture's vapour pressure (`vap_hpa`, through the `vpd` forcing) now drives transpiration
+in the **open field only**. A sealed build's crop takes its deficit from the chamber's own
+vapour store (`science::VpdRead::Chamber`; unfreeze log, 2026-10-01). The fixture and its hash
+are unchanged; temperature and radiation still reach sealed builds from it, including the
+energy term of transpiration.
+
 #### ⚠ UNFROZEN 2026-08-14: PAR varies **within** the day — the light path
 
 The fixture is unchanged and its hash has not moved, but **the shape of the day has**. Until
