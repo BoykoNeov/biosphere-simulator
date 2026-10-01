@@ -27,3 +27,10 @@ atmosphere and a cold period sits far below the crew's cited 18 °C floor, the u
 reads no temperature, and the plants' vapour store is already separate from the crew's. The cold
 period's length and temperature must come from a source, not from the model's own saturation
 point; candidates were found by search but none is bound yet. Four slices, none built.
+
+**Slice 1 BUILT 2026-10-01 (lab only, no golden).** With the plants held at 22 °C, the frozen
+winter wheat never accrues a chill-day, so it never develops and never sets grain. It grows
+29.91 of leaf, stem and root instead, and the first re-sow refuses with "seed bank too small".
+All three predictions were committed before the code and all held. The control (the plain
+season develops) and a liveness check (all three go red at 8 °C) both pass. Check:
+`rust/crates/station/tests/warm_room_arrest.rs`. Slice 2 is a station unfreeze and was not started.

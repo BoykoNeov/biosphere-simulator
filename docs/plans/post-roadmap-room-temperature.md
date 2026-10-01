@@ -244,8 +244,22 @@ current `State`, so it can fire on a state condition (development complete) inst
    * so the first re-sow, at day 305, **hard-fails** with *"seed bank too small to re-sow"*
      (`reset_crop`: grain 0 < seedling 0.16). The check runs one season and asserts that failure
      at the boundary, rather than reading it as a bug.
+
    This is the control for slice 3 (it shows the cold period, not the warm room, is what lets the
    crop develop).
+
+   **RESULT 2026-10-01 — all three predictions held.** Lab check
+   `rust/crates/station/tests/warm_room_arrest.rs` (4 tests, ≈ 40 s; no golden, no `src/` change):
+   * chill-days and thermal time are exactly 0 on every day of the warm season;
+   * grain is exactly 0 on every day; the vegetative crop reaches **29.91** (leaf + stem + root)
+     against the seedling's 0.16 — more than the plain season's 18.64 vegetative, which also filled
+     40.05 of grain;
+   * a two-season warm run fails at the boundary with *"seed bank too small to re-sow — storage_c
+     0.0"*.
+   * Control: the plain season vernalizes, develops and fills grain (so the zeros are not a reading
+     that is always zero). Liveness: with the room at 8 °C instead, all three warm tests go red.
+   * Missed detail, not a prediction: the sown state (day 0) carries no `vernalization_days` entry
+     at all; it is written from the first step on. The test reads an absent entry as 0 on day 0 only.
 2. **The chamber heat store (B), the plants NOT yet reading it.** A station unfreeze with the full
    ceremony. Into the chamber: the lamp's waste heat **and** its light leg (re-pointed from
    `boundary.light_used`; only the sugar-fixed part should leave as chemical energy — to be
