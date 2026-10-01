@@ -240,6 +240,46 @@ pub fn saturation_vapour_kg(temp_c: f64, air_capacity_mol: f64) -> f64 {
         * H2O_MOLAR_MASS_KG_PER_MOL
 }
 
+/// The partial pressure (**Pa**) of `vapour_kg` of water vapour in a sealed chamber whose
+/// reference fill is `air_capacity_mol` — the inverse of [`saturation_vapour_kg`]'s identity:
+/// `e_a = n_v / n_ref · P_std`, with `n_v = vapour_kg / M_H2O`.
+///
+/// The same `p_i/P_ref = n_i/n_ref` rule the leaf's CO₂ and O₂ partial pressures use, with the
+/// same dropped `T/T_ref` factor (see [`saturation_vapour_kg`]). One identity, both directions,
+/// in one place: [`chamber_vpd_pa`] reads it so the deficit and the ceiling cannot disagree.
+pub fn chamber_vapour_pressure_pa(vapour_kg: f64, air_capacity_mol: f64) -> f64 {
+    vapour_kg / H2O_MOLAR_MASS_KG_PER_MOL / air_capacity_mol * STANDARD_ATMOSPHERE_PA
+}
+
+/// The vapour-pressure deficit (**Pa**) of a sealed chamber's own air:
+/// `max(0, e_s(T) − e_a)`, with `e_a` from [`chamber_vapour_pressure_pa`].
+///
+/// What sealed transpiration reads under [`VpdRead::Chamber`] (the 2026-09-29 review's Step 3,
+/// slice 3b, `docs/plans/post-roadmap-chamber-dryness.md`; not yet the loader's value). At the humidity target it is
+/// `(1 − setpoint)·e_s(T)`; at or above saturation it is 0. BVAD Rev 2 §4.14 (Eqn 4-23, Monje
+/// 1998) takes a chamber crop's deficit from the chamber's relative humidity — the precedent for
+/// the form; the numbers are the FAO-56 curve and the room identity already in the model.
+pub fn chamber_vpd_pa(temp_c: f64, vapour_kg: f64, air_capacity_mol: f64) -> f64 {
+    (saturation_vapor_pressure(temp_c) - chamber_vapour_pressure_pa(vapour_kg, air_capacity_mol))
+        .max(0.0)
+}
+
+/// **Where sealed transpiration reads how dry the air is**: the weather file's outdoor deficit,
+/// or the chamber's own air ([`chamber_vpd_pa`]).
+///
+/// Not a fitted coefficient and never loaded from a param file. ⚠ The loader still sets
+/// [`VpdRead::Weather`]; [`VpdRead::Chamber`] is built and measured (2026-10-01,
+/// `docs/plans/post-roadmap-chamber-dryness.md`) and becomes the loader's value only on the
+/// user's freeze decision. `domains::lab` selects either. Deliberately **no `Default`**, for [`Co2Read`]'s reason. Only sealed
+/// transpiration acts on it; the open field has no chamber air and reads the weather either way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VpdRead {
+    /// The weather file's outdoor deficit (`vpd` forcing). The loader's value today.
+    Weather,
+    /// The chamber's own air, from its `water_vapor` at the start of the step.
+    Chamber,
+}
+
 /// The water vapour (**kg**) a sealed chamber's condenser holds the air at: the humidity
 /// setting times saturation, `setpoint · e_s(T)/P_std · n_ref`.
 ///
@@ -1906,6 +1946,28 @@ mod tests {
     // strangers — dropping the water-stress factor from transpiration outright moved one
     // test, and that one is about drought-accelerated phenology.
     // Record: `docs/plans/post-roadmap-reference-flip.md` §5ag.
+
+    /// The chamber's vapour pressure is the saturation identity run backwards: saturation's
+    /// vapour reads back as `e_s(T)`, the humidity target as `0.75·e_s(T)`, and the deficit is
+    /// `e_s − e_a`, clamped at 0 above saturation (Step 3b,
+    /// `docs/plans/post-roadmap-chamber-dryness.md`).
+    #[test]
+    fn the_chambers_vapour_pressure_inverts_the_saturation_identity() {
+        for temp in [5.0, 20.0, 31.5] {
+            for room in [250.0, 1000.0, 9500.0] {
+                let e_s = saturation_vapor_pressure(temp);
+                let cap = saturation_vapour_kg(temp, room);
+                let close = |a: f64, b: f64| (a - b).abs() <= 1e-12 * e_s;
+                assert!(close(chamber_vapour_pressure_pa(cap, room), e_s));
+                assert!(close(
+                    chamber_vpd_pa(temp, humidity_target_kg(temp, room, 0.75), room),
+                    0.25 * e_s
+                ));
+                assert_eq!(chamber_vpd_pa(temp, 0.0, room), e_s);
+                assert_eq!(chamber_vpd_pa(temp, 1.5 * cap, room), 0.0);
+            }
+        }
+    }
 
     /// `e_s(T)` against FAO-56's own table, and `Δ` alongside it.
     ///

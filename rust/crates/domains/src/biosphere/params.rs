@@ -36,7 +36,7 @@
 //! provenance unfreeze **no test can see**; see the ceremony record in
 //! `docs/biosphere-reference.md`.
 
-use super::science::{Co2Read, KineticsForm, LeafAreaForm, O2Form};
+use super::science::{Co2Read, KineticsForm, LeafAreaForm, O2Form, VpdRead};
 use config::{
     require_closed, require_half_open, require_non_negative, require_positive, ConfigError,
     ParamFile, YamlValue,
@@ -387,6 +387,11 @@ pub struct WaterCycleParams {
     pub recycling_rate: f64,
     /// Fraction of saturation, `(0, 1]` — BVAD's "about 75%" (2026-09-29).
     pub humidity_setpoint: f64,
+    /// Where sealed transpiration reads the air's dryness ([`VpdRead`]). Never loaded from the
+    /// file. ⚠ The loader still sets [`VpdRead::Weather`]: [`VpdRead::Chamber`] is built and
+    /// measured (2026-10-01) and waits on the user's freeze decision
+    /// (`docs/plans/post-roadmap-chamber-dryness.md`); `domains::lab` selects either.
+    pub vpd_read: VpdRead,
 }
 
 /// Minimal-consumer params (grazing + respiration + mortality + f_O2 Monod).
@@ -1161,6 +1166,9 @@ pub fn water_cycle_from_bounded(
         condensation_rate: v["condensation_rate"],
         recycling_rate: v["recycling_rate"],
         humidity_setpoint: v["humidity_setpoint"],
+        // ⚠ WEATHER until the user's freeze decision on Step 3b; the flip is this line plus
+        // the 9 goldens' regeneration (docs/plans/post-roadmap-chamber-dryness.md §4).
+        vpd_read: VpdRead::Weather,
     }
 }
 

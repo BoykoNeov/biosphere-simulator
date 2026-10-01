@@ -768,6 +768,7 @@ fn build_plants(
                 air_capacity_mol: scenario.chamber_air_capacity_mol,
                 condensation_rate: p.water.condensation_rate,
                 humidity_setpoint: p.water.humidity_setpoint,
+                vpd_read: p.water.vpd_read,
             }),
         }),
         Box::new(NitrogenUptake {

@@ -577,3 +577,5 @@ A	flows.rs	the_end_of_step_solve_is_free_and_exact_when_the_crop_takes_nothing	n
 A	flows.rs	the_end_of_step_solve_is_backward_euler_and_never_overdraws	no-ancestor-named	-
 A	flows.rs	the_end_of_step_solve_refuses_a_draw_that_rises_as_the_air_thins	no-ancestor-named	-
 A	flows.rs	the_reference_reads_the_crops_co2_at_the_end_of_the_step	no-ancestor-named	-
+A	flows.rs	sealed_transpiration_reads_the_chambers_own_dryness	no-ancestor-named	-
+A	science.rs	the_chambers_vapour_pressure_inverts_the_saturation_identity	no-ancestor-named	-

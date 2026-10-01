@@ -722,6 +722,10 @@ pub struct VapourSaturation {
     /// The humidity the condenser holds (fraction of saturation) — the SAME
     /// `water.humidity_setpoint` `Condensation` is built from.
     pub humidity_setpoint: f64,
+    /// Where the crop reads the air's dryness: the weather's deficit, or this chamber's own
+    /// air ([`science::chamber_vpd_pa`]) — built 2026-10-01, the loader's value only after the
+    /// user's freeze decision.
+    pub vpd_read: science::VpdRead,
 }
 
 /// WATER `soil_water -> vapor_sink` (Penman–Monteith · f_water).
@@ -759,8 +763,17 @@ impl Flow for Transpiration {
         dt: f64,
     ) -> Result<FlowResult, SimError> {
         let net_radiation = env.get(&self.rn_var)?;
-        let vpd = env.get(&self.vpd_var)?;
         let temp_c = env.get(&self.temp_var)?;
+        // Under `VpdRead::Chamber` a sealed crop transpires into the chamber's own air (Step 3b);
+        // the open field, and the sealed `Weather` reading, take the weather file's deficit.
+        let vpd = match &self.saturation {
+            Some(sat) if sat.vpd_read == science::VpdRead::Chamber => science::chamber_vpd_pa(
+                temp_c,
+                amt(snapshot, &sat.water_vapor),
+                sat.air_capacity_mol,
+            ),
+            _ => env.get(&self.vpd_var)?,
+        };
         let soil_water = amt(snapshot, &self.soil_water);
         let potential = science::penman_monteith_transpiration(
             net_radiation,
@@ -3248,6 +3261,10 @@ mod tests {
                 air_capacity_mol: ROOM_MOL,
                 condensation_rate: 0.5,
                 humidity_setpoint: 0.75,
+                // The subject is the SPLIT of one flux, taken from the open flow below; reading
+                // the weather's deficit keeps the sealed flux equal to it. The chamber reading
+                // has its own test (`sealed_transpiration_reads_the_chambers_own_dryness`).
+                vpd_read: science::VpdRead::Weather,
             }),
             ..transpiration_flow(2.0)
         };
@@ -3322,6 +3339,63 @@ mod tests {
         }
     }
 
+    /// **A sealed crop transpires against the chamber's own dryness** (Step 3b, 2026-10-01,
+    /// `docs/plans/post-roadmap-chamber-dryness.md`), not the weather's `vpd` forcing.
+    ///
+    /// Through the real flow, against Penman–Monteith evaluated by hand at the chamber's own
+    /// deficit: at the humidity target the deficit is a quarter of `e_s(20 °C)`, and air at
+    /// saturation leaves only the radiation term. The weather reading at the same state is the
+    /// control that the forcing (1000 Pa here) is what the chamber reading replaces.
+    #[test]
+    fn sealed_transpiration_reads_the_chambers_own_dryness() {
+        const ROOM_MOL: f64 = 1000.0;
+        let cap = science::saturation_vapour_kg(20.0, ROOM_MOL);
+        let sealed = |read| Transpiration {
+            vapor_sink: WATER_VAPOR.to_string(),
+            saturation: Some(VapourSaturation {
+                water_vapor: WATER_VAPOR.to_string(),
+                condensate: CONDENSATE.to_string(),
+                air_capacity_mol: ROOM_MOL,
+                condensation_rate: 0.5,
+                humidity_setpoint: 0.75,
+                vpd_read: read,
+            }),
+            ..transpiration_flow(2.0)
+        };
+        let p = params::transpiration();
+        let full = science::transpirable_capacity(TEST_DEPTH, EXTR, 2.0);
+        let by_hand = |vpd: f64| {
+            science::penman_monteith_transpiration(
+                200.0,
+                vpd,
+                20.0,
+                p.aerodynamic_resistance,
+                p.surface_resistance,
+            ) * 2.0
+        };
+        for (vapour, vpd) in [
+            (0.75 * cap, science::chamber_vpd_pa(20.0, 0.75 * cap, ROOM_MOL)),
+            (cap, 0.0),
+            (1.5 * cap, 0.0),
+        ] {
+            let state = water_only_state(full, TEST_DEPTH, vapour, 0.0);
+            let chamber = -water_legs(&sealed(science::VpdRead::Chamber), &state, 200.0, 0.0, 1.0)
+                [SOIL_WATER];
+            let weather = -water_legs(&sealed(science::VpdRead::Weather), &state, 200.0, 0.0, 1.0)
+                [SOIL_WATER];
+            let want = by_hand(vpd);
+            assert!(
+                (chamber - want).abs() <= 1e-12 * want,
+                "vapour {vapour}: chamber {chamber} vs by hand {want}"
+            );
+            assert_eq!(weather, by_hand(1000.0), "the weather reading takes the forcing");
+            assert!(chamber < weather, "the chamber's air is the damper one here");
+        }
+        let quarter = 0.25 * science::chamber_vpd_pa(20.0, 0.0, ROOM_MOL); // dry air: e_s
+        let at_target = science::chamber_vpd_pa(20.0, 0.75 * cap, ROOM_MOL);
+        assert!((at_target - quarter).abs() <= 1e-9 * quarter, "{at_target} vs {quarter}");
+    }
+
     /// **The air ends a filling step AT the humidity target, at any step size.**
     ///
     /// Both water flows read the vapour at the start of the step. Before 2026-09-29 the
@@ -3350,6 +3424,10 @@ mod tests {
                 air_capacity_mol: ROOM_MOL,
                 condensation_rate: RATE,
                 humidity_setpoint: SETPOINT,
+                // The subject is where a filling step ENDS; the weather's deficit keeps the
+                // flux the fixture's, whatever the vapour (the chamber reading would shrink it
+                // as the air fills, and above the target it reads no deficit at all).
+                vpd_read: science::VpdRead::Weather,
             }),
             ..transpiration_flow(2.0)
         };

@@ -40,7 +40,7 @@
 //! (`docs/log/canopy-provenance.md`) is still open and still the user's.
 
 use crate::biosphere::params::{self, BiosphereParams, Bounds};
-use crate::biosphere::science::{Co2Read, KineticsForm, LeafAreaForm, O2Form};
+use crate::biosphere::science::{Co2Read, KineticsForm, LeafAreaForm, O2Form, VpdRead};
 use config::{with_override, ConfigError, ParamFile};
 
 /// The comparison report — §6 of the plan, every requirement earned by a wrong read.
@@ -178,6 +178,25 @@ pub fn biosphere_with_co2_read(
 ) -> Result<BiosphereParams, ConfigError> {
     let mut p = biosphere_with(subs)?;
     p.photo.co2_read = form;
+    Ok(p)
+}
+
+/// The frozen params with sealed transpiration reading the air's dryness from `form`.
+///
+/// [`VpdRead::Weather`] is the loader's value and every sealed record's reading so far;
+/// [`VpdRead::Chamber`] is Step 3b's form (`docs/plans/post-roadmap-chamber-dryness.md`), built
+/// and measured 2026-10-01 — 9 goldens move, water stocks only — and waiting on the user's
+/// freeze decision. The open field reads the weather either way, by construction.
+///
+/// # ⚠ This endorses no form
+///
+/// Which one is the reference is the loader's line, not this function's.
+pub fn biosphere_with_vpd_read(
+    subs: &[Substitution],
+    form: VpdRead,
+) -> Result<BiosphereParams, ConfigError> {
+    let mut p = biosphere_with(subs)?;
+    p.water.vpd_read = form;
     Ok(p)
 }
 

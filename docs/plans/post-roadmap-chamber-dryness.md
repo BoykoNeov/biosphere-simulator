@@ -4,8 +4,10 @@
 (`docs/plans/post-roadmap-light-from-delivered-power.md`). Review plan:
 `docs/plans/post-roadmap-review-2026-09-29.md`, Step 3, slice 3b.
 
-**Predictions are written here before any code.** The build is then measured into a temp copy
-of the goldens; **nothing frozen is written until the user has seen the measurement.** This is a
+**BUILT AND MEASURED 2026-10-01, NOT FROZEN** (§4). The chamber reading is in the code behind
+`science::VpdRead`; the loader still sets `Weather`, so every committed golden still holds and the
+suite is green. **Freezing it is the user's decision**: one loader line, the 9 goldens'
+regeneration, the manifests, and one test's bound (§4.4). This is a
 biosphere unfreeze (`docs/biosphere-reference.md`, "The unfreeze discipline"): the frozen
 transpiration flow's dryness input changes in every sealed build.
 
@@ -96,6 +98,78 @@ a test, not a claim.
    is `0.25·e_s(T)`; above saturation it is 0), and the control — the weather reading flipped
    back reproduces today's goldens bit for bit.
 
-## 4. Results
+## 4. Results — measured 2026-10-01, nothing frozen
 
-None yet.
+**Built:** `science::chamber_vapour_pressure_pa` and `science::chamber_vpd_pa` (the identity's two
+directions, one place), `science::VpdRead { Weather, Chamber }` on `WaterCycleParams` (never
+loaded; the loader sets `Weather` until the freeze), sealed `Transpiration` reading the chamber
+under `Chamber`, `lab::biosphere_with_vpd_read`, the measurement example `chamber_dryness`.
+Tests: the identity inverts saturation at three temperatures and three room sizes; the sealed
+flow at the target, at and above saturation matches Penman–Monteith by hand at the chamber's
+deficit. The two older split tests are pinned to `Weather` with the reason written beside them.
+
+### 4.1 The control — HELD
+
+Loader set to `Weather`, `regen_goldens` in report mode: **20 of 20 goldens identical.**
+
+### 4.2 The goldens under `Chamber` — regenerated into `W:\temp\claude\cd\golden`, never the tree
+
+| golden | `condensate` | `soil_water` | `subsoil_water` |
+|---|---|---|---|
+| `sealed_chamber` | −2.24 % | +0.12 % | — |
+| `perennial_chamber`, `perennial_long_horizon` | −2.24 % | +0.90 % | −4.93 % |
+| `consumer_chamber`, `consumer_long_horizon` | −2.24 % | +0.90 % | −4.97 % |
+| `sealed_station` | −2.26 % | +1.22 % | −6.99 % |
+| `greenhouse` (7 days) | +31.98 % | −3.48 % | — |
+| `harvest` (7 days) | +31.98 % | −0.63 % | — |
+| `lighting` (7 days) | +26.43 % | −2.81 % | — |
+
+**Nothing else moved in any golden**: no carbon, nitrogen, O₂, energy, crew or ECLSS value, and
+not `water_vapor` (the air ends a filled step at the target either way). The end-of-run water
+stores are snapshots of a cycling ring, so their signs are not the transpiration's: the 7-day
+seedling runs end with more condensed, the year-long runs at a different point of the cycle.
+
+### 4.3 The measurement (`cargo run --release -q -p domains --example chamber_dryness`)
+
+| chamber | potential transpiration, chamber ÷ weather | lowest stress factor (both) | steps starting below 75 % | lowest RH after day 1 | extra transpiration on those steps |
+|---|---|---|---|---|---|
+| `sealed_chamber` (3 yr) | **1.2055** | **1.000000**, 0 steps below 1 | 466 of 14 641 | 0.538 | 5.6 % |
+| `perennial_chamber` (5 yr) | **1.2055** | **1.000000**, 0 | 776 of 24 401 | 0.538 | 5.6 % |
+| `consumer_chamber` (5 yr) | **1.2055** | **1.000000**, 0 | 777 of 24 401 | 0.538 | 5.6 % |
+
+The lowest subsoil water is 25.966 kg under both readings (never near empty). The very first step
+starts at RH 0: the chambers are sown with empty air (`water_vapor0 = 0`).
+
+### 4.4 Predictions, graded
+
+| # | prediction | measured | verdict |
+|---|---|---|---|
+| 1 | exactly the 9 sealed goldens move | the 9, and only them | **held** |
+| 1b | `drift_summary` moves | **identical** | **missed** — its folds did not move; why is not read here |
+| 2 | potential transpiration about +21 % | +20.55 % in all three chambers | **held** |
+| 3 | no water stress; no carbon, N, O₂ or energy value moves | stress factor exactly 1 at every step; only water stocks moved | **held** |
+| 4 | `water_vapor` barely moves | unchanged at the end of every run | **held** |
+| 5 | 9 `golden_sha256` rows move; tiers untouched | not run yet (nothing written) | open |
+| 6 | the condenser's below-target draw: few steps, small share | 3.2 % of steps, 5.6 % of the extra, lowest RH 0.54 after day 1 | **held** |
+| 7 | crew and ECLSS stores unmoved | unmoved | **held** |
+| 8 | the sealed flow tests pinned to the forcing need re-posing | the two were re-posed before the run (pinned to `Weather`) | held |
+| — | **not predicted** | `the_resow_makes_a_cycle_and_not_a_ratchet_over_five_years` goes red under `Chamber` | **missed** |
+
+**The miss that needs a decision.** That test checks the perennial chamber's yearly re-sow: one
+transient year, then the same subsoil water every year (to 1e-12), the transient pointing
+upward, and the transient **smaller than 1e-3**. Under `Chamber` everything holds except the
+last: the transient is **1.203e-3** (it was 3.39e-4 under `Weather`), because the extra
+transpiration leaves the first year's root zone further from its steady state (160.67 kg against a
+settled 162.41, where `Weather` had 160.49 against 160.98). The cycle still settles: 167.71978719215,
+…213, …213. The 1e-3 was set at about 3× the old transient; nothing in its doc ties it to a
+physical limit. Raising it is a bound moved to fit a change, which this repository treats as the
+user's call, never the agent's.
+
+### 4.5 What freezing it would take
+
+1. The loader line `vpd_read: VpdRead::Weather` → `Chamber`.
+2. `regen_goldens -- --write`: the 9 goldens above.
+3. The biosphere and station manifests' 9 `golden_sha256` rows (`manifest_writer`), and the
+   reference docs' amendment blocks.
+4. The re-sow test's transient bound — the user's decision (§4.4).
+5. Run the tier checks after the write (prediction 5).
