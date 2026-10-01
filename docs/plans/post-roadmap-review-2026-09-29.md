@@ -268,6 +268,12 @@ still come from outside it:
   nameplate and **no golden moves**. The perturbed brown-out run is where it shows.
 - **Risk:** a one-quarter-day lag between lamp and leaf. State it in the record.
 
+**3a OPENED 2026-10-01 and STOPPED BEFORE CODE** (`docs/plans/post-roadmap-light-from-delivered-power.md`):
+today the lamp can get less than nameplate only through the arbitration backstop, which cuts
+life support and the lamp alike; "delivered" needs a lamp policy first. The lag is 1/16 day,
+not a quarter-day. Decision with the user: A (the backstop dims), B (a dimming rule, needs a
+source), or skip to 3b.
+
 ### Slice 3b — air dryness from the chamber's own humidity
 
 - Already priced in the third direction plan (the successor named by the vapour items): the

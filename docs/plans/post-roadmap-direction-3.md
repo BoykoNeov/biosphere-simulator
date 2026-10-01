@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `step-sixteenth.md`
+**Re-read against the record's last row:** `light-from-delivered-power.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -467,6 +467,11 @@ gate the shading loss on a pushed run (leaves 10 % thinner). **§2.2:** under C 
 cannot fire on the crop's CO₂ at all, so a controller priced on the jar now prices against a
 crop that self-limits within the step; the jar's tightest step is 0.165 of the pool (2.64 per
 day).
+⚠ *Re-read 2026-10-01* (`log/light-from-delivered-power.md`, STOPPED BEFORE CODE): the review
+proposal's Step 3, slice 3a. It discharges nothing here and touches no §2 or §3 item. It bears
+on **§2.2** only at a distance: a crop dimmed by a power shortage draws less CO₂, so a CO₂
+controller priced on a lamp-lit station would see the crop's draw follow the battery once 3a
+lands, which no frozen run exercises today (no frozen run shorts the lamp).
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
