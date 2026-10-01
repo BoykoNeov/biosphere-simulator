@@ -9,7 +9,7 @@ the right move. ⚠ It also carries **61 `~~` markers — an odd number**, so on
 opened and never closed. That is a small thing and it is the argument in miniature: a
 document edited five times by striking cannot be checked by reading it.
 
-**Re-read against the record's last row:** `light-from-delivered-power.md`
+**Re-read against the record's last row:** `chamber-dryness.md`
 
 ⚠ **That line is a gate, not a note.** `repo_gates` asserts it names the record table's
 *last* row. Landing a new item appends a row, so this doc goes red until someone re-reads it
@@ -477,6 +477,11 @@ energy (1.40544e10 J over 1220 days, difference 0.0), because `balanced_load_w` 
 to the stored solar; the lamp runs on the starting charge and the station would go dark near
 day 1736, past the frozen horizon. Recorded as an open decision for the user (leave it, or
 resize the budget — a station unfreeze that moves the sealed goldens), not taken here.
+⚠ *Re-read 2026-10-01* (`log/chamber-dryness.md`, OPENED, predictions only): the review
+proposal's Step 3, slice 3b. It is the successor named in §6's vapour item below (*"the plants
+read the WEATHER's VPD, not the chamber's humidity"*) — taken now, so that item's *"Still the
+user's call; unblocked, not scheduled"* is superseded by the user's *"work on step 3"*. It
+touches no §2 or §3 item.
 
 **The three decisions (§2.1–2.3) are independent** — none blocks another and none blocks any
 work — so they can be taken in one sitting or left indefinitely. ~~Recommended: refuse the
