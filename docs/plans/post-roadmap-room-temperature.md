@@ -5,6 +5,9 @@ next"*. Review plan: `docs/plans/post-roadmap-review-2026-09-29.md`, Step 3, sli
 *"first a design note, not a build … decided again once the note exists."* **This file is that
 note. Nothing in `rust/` changed.** The decisions in §9 are the user's.
 
+**DECIDED 2026-10-01 (§10):** form B in a dedicated plant chamber (shared air, its own
+temperature), the winter wheat with a cited cold period, re-sow on maturity, 22 °C.
+
 ## 1. What the sealed station's plants read today
 
 | Input | Source today | Value |
@@ -164,7 +167,7 @@ carrying both explains neither. Proposed order, each slice measured on its own:
 4. **The calendar (if chosen):** re-sow on maturity. Over the 4 × 305 = 1220-day horizon, ≈ 14
    crops instead of 4.
 
-## 9. Decisions — the user's
+## 9. Decisions — the user's (ANSWERED 2026-10-01 — see §10)
 
 1. **The temperature form.** A (held constant) now, B (can fail) later on top, C refused.
    *Recommended: A.*
@@ -175,3 +178,82 @@ carrying both explains neither. Proposed order, each slice measured on its own:
    3 shows how the standing crop behaves.*
 4. **The setpoint value.** 22 °C (BVAD cabin nominal, a direct citation for a room) or 23 °C (BVAD's
    crop table, another model's wheat). *Recommended: 22 °C, with 23 °C recorded as contrast.*
+
+## 10. DECIDED 2026-10-01 — the user's answers, and the build they set
+
+The user answered §9 on 2026-10-01: *"1. B 2. add a cold period 3. re sow as soon as the crop
+matures 4. 22"*. Every recommendation in §9 except the setpoint was declined, so §5's "A first"
+and §8's day-neutral slices are **superseded**.
+
+| # | Decision | Taken |
+|---|---|---|
+| 1 | Form | **B** — a held room that can fail (a heat store, a capacity-limited exchanger to the node) |
+| 2 | Crop | **winter wheat kept**, with a **cold period** in the room's schedule; needs its own source |
+| 3 | Calendar | **re-sow on maturity** (the 305-day calendar goes) |
+| 4 | Setpoint | **22 °C** (BVAD Table 4-73 cabin nominal) |
+
+**A conflict found after the answers, and its resolution (asked, answered 2026-10-01).** The
+crew and the plants share one atmosphere (`sealed.rs`: crew respiration draws `O2_POOL` and emits
+into `CARBON_POOL`). The cited vernalization window ends at 12 °C (optimum 0–8 °C), and BVAD's
+cabin *lower* limit is 18 °C (Table 4-73). A cold period in "the room" would therefore hold the
+crew below their cited range for weeks per crop. Options put: a plant chamber; chill seed before
+sowing; a cold cabin; drop the cold (day-neutral). **The user chose the plant chamber.** So:
+
+* **"The room" in B is a dedicated plant growth chamber** with its own held temperature. It shares
+  the gas pools with the crew cabin (ducted air), as today.
+* This is cheap here, measured not assumed: the crew reads **no** temperature (its rates are fixed),
+  and the plants' vapour store is **already** separate from the crew's (`eclss.cabin_h2o` takes
+  the crew's water; the 3b vapour store is the biosphere's). The cabin's own temperature stays
+  unmodelled, as today.
+* So crew body heat does **not** enter the chamber's heat books. It stays out of the books, the gap
+  §2 already lists.
+
+**The cold period's source — searched 2026-10-01, NOT yet bound.** Controlled-environment practice
+found by search: 2–6 °C for 6–10 weeks (most often 4 °C), plants in a refrigerated cabinet under
+16 h light at 100–150 µmol m⁻² s⁻¹ (the speed-vernalisation preprint, bioRxiv
+10.1101/2021.12.01.470717, quoting the "normal" treatment); an alternative of 10 °C for 6 weeks
+(Zheng et al. 2023, *Plant Breeding*, doi 10.1111/pbr.13074). Rules for binding it:
+* **The duration and temperature come from the source, never from the model.** The model's own
+  numbers (VDSAT 50 chill-days at 1 per day in 0–8 °C) say 50 days at 4 °C saturates. Choosing 50
+  days *because* the model saturates there is calibration in disguise. Model readings at 4 °C, as
+  **predictions only**: 6 weeks → 42 chill-days → factor 0.736; 8 weeks → factor 1; 10 weeks → 1.
+* ⚠ A recorded mismatch, not a tuning target: at 10 °C the model credits 0.5 chill-day per day, so
+  Zheng's 6 weeks at 10 °C gives 21 → factor ≈ 0.04. The model and that paper disagree.
+* Locus check owed on the page itself (the preprint is a secondary statement of "normal" practice).
+  If no sound source binds, the cold period is **WHAT-IF, lab-only** (`docs/param-file-conventions.md`)
+  and the reference build stops at slice 2. The user is told before slice 3 is built either way.
+
+**Re-sow on maturity is a hook change, not a driver change.** `sealed_reset_hook` is handed the
+current `State`, so it can fire on a state condition (development complete) instead of
+`n % season_steps`.
+
+### The slices — one cause per golden diff, predictions committed before each one's code
+
+1. **Lab check, no golden.** Winter wheat in a chamber held at 22 °C from sowing. Predicted: no
+   chill-day ever accrues, the vernalization factor is 0 throughout, thermal time stays 0, grain 0.
+   This is the control for slice 3 (it shows the cold period, not the warm room, is what lets the
+   crop develop).
+2. **The chamber heat store (B), the plants NOT yet reading it.** A station unfreeze with the full
+   ceremony. Into the chamber: the lamp's waste heat **and** its light leg (re-pointed from
+   `boundary.light_used`; only the sugar-fixed part should leave as chemical energy — to be
+   priced). Out: a controlled exchanger to `thermal.node`, up to a capacity. New numbers are
+   labelled DESIGN, not tuned. Predicted: every biosphere stock bit-identical; the node runs warmer
+   (more heat reaches it: the light leg, ≈ 73 W averaged) by a closed-form amount computed before
+   code; nominal chamber = setpoint. A perturbation (exchanger or radiator fault) shows the chamber
+   drifting — the reason B was chosen over A.
+3. **The plants read the chamber, with the cited cold period.** `TEMP_VAR` in `sealed_bio_resolver`
+   becomes the chamber's temperature; the setpoint schedule is cold (source's value) for the
+   source's duration after each sowing, then 22 °C. One science change: reading the room cannot be
+   split from the cold period without arresting the crop (slice 1 is that split, as a lab check).
+   The 305-day calendar is **kept** in this slice. Predictions owed, not guessed: condensation —
+   saturation at 4 °C is ≈ 0.81 kPa against ≈ 2.64 at 22, so the plants' vapour store condenses on
+   entering the cold phase; transpiration — §8 item 3's ×1.96 drier air at 22 °C; carbon — sign not
+   predicted; time to maturity ≈ cold period + (1850 − thermal time accrued while cold)/22 days.
+4. **Re-sow on maturity.** The hook fires on development complete; each new crop gets its own cold
+   period. Rough count: a cycle of ≈ 120–150 days gives ≈ 8–10 crops over the 1220-day horizon
+   (measured, not this estimate, is what gets recorded). ⚠ **Risk to measure:** `annual_reset_with`
+   hard-errors when the grain is smaller than the next seedling (`system.rs`, "seed bank too small
+   to re-sow"). Over ~9 crops in a row, one poor crop ends the run. Whether it does is a prediction
+   recorded before the run.
+
+Out of scope still: net radiation (§6, a possible "3d"); crew body heat; the cabin's temperature.

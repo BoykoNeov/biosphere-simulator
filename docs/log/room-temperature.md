@@ -19,3 +19,11 @@ next"*. No code. Note, sources and predictions: `docs/plans/post-roadmap-room-te
   books; C, a free-floating room, recommended against. Net radiation is out of scope by name.
 * Four decisions are the user's (form, crop, calendar, setpoint value). Nothing in `rust/`
   changed.
+
+**DECIDED 2026-10-01** (note §10). The user chose form **B**, the winter wheat with a **cold
+period**, **re-sow on maturity**, and **22 °C**. Asked next, because crew and plants share one
+atmosphere and a cold period sits far below the crew's cited 18 °C floor, the user chose a
+**dedicated plant chamber** with its own temperature and shared air. That is cheap here: the crew
+reads no temperature, and the plants' vapour store is already separate from the crew's. The cold
+period's length and temperature must come from a source, not from the model's own saturation
+point; candidates were found by search but none is bound yet. Four slices, none built.
