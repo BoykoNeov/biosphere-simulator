@@ -1124,3 +1124,13 @@ minute step is the next decision, and the user's.
   recorded numbers date from plant-step builds (`intraday_exchange` is now pinned to them).
 * `docs/station-reference.md`'s "the `aux_set` is empty — the station carries no non-conserved
   accumulator" was false after §17 (it carries `PlantWindowRecorder`); reworded to the real reason.
+
+## 19. Two decisions TAKEN (user, 2026-10-03)
+
+1. **Shared air's two moisture stocks: KEEP two, record the flaw.** The crew's `cabin_h2o` (held
+   at 40 %) and the plants' `water_vapor` (held at 75 %) stay separate stocks in the one shared
+   room; counted together they read above saturation (§15a). Nothing reads the sum; it stays a
+   documented flaw of shared air, not fixed.
+2. **Leaf water loss (transpiration) on the minute step: LAB FIRST, then decide.** Build it on the
+   separate-air lab build, measure, and bring the main-build decision back to the user — the path
+   the gas exchange took (§16 → §17).
