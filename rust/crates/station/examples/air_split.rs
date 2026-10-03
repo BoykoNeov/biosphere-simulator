@@ -37,6 +37,7 @@ use station::air_split::{
     CABIN_AIR_MOL, CABIN_INERT,
 };
 use station::driver::{DayOrder, Side, TwoRate};
+use station::gas_exchange::{gas_exchange_on_fast_step, GasExchangeStep, CARBON_BUDGET_FLOWS};
 use station::params as station_params;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{
@@ -199,6 +200,21 @@ fn season(
             r.cabin_co2_min = r.cabin_co2_min.min(c);
             r.cabin_co2_max = r.cabin_co2_max.max(c);
             let bound = fast_r.bind(before, scenario.cabin_dt);
+            // §16: with the gas exchange on the minute step, the crop's CO₂ draw is a FAST leg.
+            let budget: Vec<FlowResult> = fast
+                .registry()
+                .flows()
+                .iter()
+                .filter(|f| CARBON_BUDGET_FLOWS.contains(&f.id()))
+                .map(|f| {
+                    f.evaluate(before, &bound, scenario.cabin_dt)
+                        .expect("budget")
+                })
+                .collect();
+            if !budget.is_empty() {
+                let demand = withdrawal_demand(&budget, &before.stocks);
+                r.co2_gross += demand.get(CARBON_POOL).copied().unwrap_or(0.0);
+            }
             for f in fast.registry().flows() {
                 if f.id() == AIR_EXCHANGE {
                     let res = f.evaluate(before, &bound, scenario.cabin_dt).expect("fan");
@@ -226,7 +242,7 @@ fn season(
     r
 }
 
-fn shared(scenario: &SealedStationScenario, days: usize) -> Reading {
+fn shared(scenario: &SealedStationScenario, days: usize, gas: GasExchangeStep) -> Reading {
     let (state, bio, fast) = build_sealed_station(
         &params::charge(),
         &params::thermal(),
@@ -240,6 +256,15 @@ fn shared(scenario: &SealedStationScenario, days: usize) -> Reading {
         false,
     )
     .expect("build_sealed_station");
+    let (bio, fast) = match gas {
+        GasExchangeStep::PlantStep => (bio, fast),
+        GasExchangeStep::Minute => {
+            gas_exchange_on_fast_step(&state.stocks, bio, fast, scenario.bio_dt, || {
+                sealed_bio_resolver(&station_params::lamp(), scenario)
+            })
+            .expect("gas exchange on the minute step")
+        }
+    };
     season(
         scenario,
         state,
@@ -314,7 +339,7 @@ fn main() {
          16 °C {:.6} kg",
         humidity_target_kg(16.0, BVAD_CHAMBER_AIR_MOL, setpoint)
     );
-    let base = shared(&scenario, days);
+    let base = shared(&scenario, days, GasExchangeStep::PlantStep);
     print("shared", &base, &base);
     println!(
         "shared room, crew + plant vapour over saturation at the plants' temperature: max {:.4},          above 1 on {} of {} slow steps (before the fix: max {:.4}, above 1 on {})",
@@ -324,23 +349,79 @@ fn main() {
         base.room_rh_max_before,
         base.room_over_saturation_before
     );
+    let minute = shared(&scenario, days, GasExchangeStep::Minute);
+    print("shared, minute gas", &minute, &base);
+    let (plant, min) = (GasExchangeStep::PlantStep, GasExchangeStep::Minute);
     let cases = [
-        ("split Q0.2 vapour-off", BVAD_CHAMBER_AIR_MOL, 0.2, false),
-        ("split Q0.1 vapour-off", BVAD_CHAMBER_AIR_MOL, 0.1, false),
-        ("split Q0.4 vapour-off", BVAD_CHAMBER_AIR_MOL, 0.4, false),
-        ("split Q0.2 vapour-on", BVAD_CHAMBER_AIR_MOL, 0.2, true),
-        ("big 9500 Q10 vap-off", 9500.0, 10.0, false),
+        (
+            "split Q0.2 vapour-off",
+            BVAD_CHAMBER_AIR_MOL,
+            0.2,
+            false,
+            plant,
+        ),
+        (
+            "split Q0.1 vapour-off",
+            BVAD_CHAMBER_AIR_MOL,
+            0.1,
+            false,
+            plant,
+        ),
+        (
+            "split Q0.4 vapour-off",
+            BVAD_CHAMBER_AIR_MOL,
+            0.4,
+            false,
+            plant,
+        ),
+        (
+            "split Q0.2 vapour-on",
+            BVAD_CHAMBER_AIR_MOL,
+            0.2,
+            true,
+            plant,
+        ),
+        ("big 9500 Q10 vap-off", 9500.0, 10.0, false, plant),
+        (
+            "min split Q0.2 v-off",
+            BVAD_CHAMBER_AIR_MOL,
+            0.2,
+            false,
+            min,
+        ),
+        (
+            "min split Q0.1 v-off",
+            BVAD_CHAMBER_AIR_MOL,
+            0.1,
+            false,
+            min,
+        ),
+        (
+            "min split Q0.4 v-off",
+            BVAD_CHAMBER_AIR_MOL,
+            0.4,
+            false,
+            min,
+        ),
+        ("min split Q0.2 v-on", BVAD_CHAMBER_AIR_MOL, 0.2, true, min),
+        ("min big 9500 Q10", 9500.0, 10.0, false, min),
     ];
-    for (name, cap, q, vapour) in cases {
+    for (name, cap, q, vapour, gas) in cases {
+        let t0 = std::time::Instant::now();
         let r = split(
             &scenario,
             AirSplit {
                 chamber_air_mol: cap,
                 fan_mol_per_s: q,
                 vapour_crosses: vapour,
+                gas_exchange: gas,
             },
             days,
         );
         print(name, &r, &base);
+        println!(
+            "    ({name}: {:.1} s with the observer)",
+            t0.elapsed().as_secs_f64()
+        );
     }
 }

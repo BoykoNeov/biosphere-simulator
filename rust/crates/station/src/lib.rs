@@ -21,6 +21,7 @@ pub mod display;
 pub mod driver;
 pub mod flows;
 pub mod freeze_manifest;
+pub mod gas_exchange;
 pub mod goldens;
 pub mod greenhouse;
 pub mod harvest;

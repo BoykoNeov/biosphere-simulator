@@ -40,8 +40,11 @@ use simcore::registry::Registry;
 use simcore::state::State;
 
 use crate::flows::{HarvestParams, LampParams, WaterRecoveryParams};
+use crate::gas_exchange::{
+    gas_exchange_on_fast_step, require_one_plant_step_per_group, GasExchangeStep,
+};
 use crate::scenario::SealedStationScenario;
-use crate::sealed::{build_sealed_station, sealed_fast_flows, CabinAir};
+use crate::sealed::{build_sealed_station, sealed_bio_resolver, sealed_fast_flows, CabinAir};
 use crate::stocks::{co2_composition, gas_pool, o2_composition, simple_pool};
 
 /// The cabin's reference air (mol) — the frozen sealed station's `chamber_air_capacity_mol`,
@@ -68,6 +71,9 @@ pub struct AirSplit {
     pub fan_mol_per_s: f64,
     /// Whether water vapour crosses with the air (§13a's W4 control turns it off).
     pub vapour_crosses: bool,
+    /// Which step the crop's gas exchange is taken on (§16): the plant step starves a small
+    /// chamber by construction, the minute step lets the fan refill it as the crop draws.
+    pub gas_exchange: GasExchangeStep,
 }
 
 /// The fan: every species crosses by its concentration difference ([module docs](self)).
@@ -219,7 +225,20 @@ pub fn build_split_station(
         fan_mol_per_s: split.fan_mol_per_s,
     }));
     let fast_reg = Registry::flows_only(fast_flows, &state.stocks)?;
-    Ok((state, bio_reg, fast_reg))
+    match split.gas_exchange {
+        GasExchangeStep::PlantStep => Ok((state, bio_reg, fast_reg)),
+        GasExchangeStep::Minute => {
+            require_one_plant_step_per_group(resized.steps_per_day, resized.bio_steps_per_day)?;
+            let (bio_reg, fast_reg) = gas_exchange_on_fast_step(
+                &state.stocks,
+                bio_reg,
+                fast_reg,
+                resized.bio_dt,
+                || sealed_bio_resolver(lamp, &resized),
+            )?;
+            Ok((state, bio_reg, fast_reg))
+        }
+    }
 }
 
 /// The cabin's gas books, for readers: `(co2 mol, o2 mol, inert kg)`.

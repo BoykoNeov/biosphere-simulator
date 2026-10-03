@@ -14,6 +14,7 @@ use simcore::integrator::EulerIntegrator;
 use simcore::state::State;
 use station::air_split::{build_split_station, split_scenario, AirSplit, BVAD_CHAMBER_AIR_MOL};
 use station::driver::run_master_day;
+use station::gas_exchange::GasExchangeStep;
 use station::params as station_params;
 use station::scenario::{sealed_station_scenario, SealedStationScenario};
 use station::sealed::{
@@ -95,11 +96,26 @@ fn shared() -> State {
 }
 
 fn split(chamber_air_mol: f64, fan_mol_per_s: f64, vapour_crosses: bool) -> State {
+    split_with(
+        chamber_air_mol,
+        fan_mol_per_s,
+        vapour_crosses,
+        GasExchangeStep::PlantStep,
+    )
+}
+
+fn split_with(
+    chamber_air_mol: f64,
+    fan_mol_per_s: f64,
+    vapour_crosses: bool,
+    gas_exchange: GasExchangeStep,
+) -> State {
     let scenario = sealed_station_scenario();
     let s = AirSplit {
         chamber_air_mol,
         fan_mol_per_s,
         vapour_crosses,
+        gas_exchange,
     };
     let built = build_split_station(
         &params::charge(),
@@ -205,6 +221,7 @@ fn each_room_is_charged_at_its_own_size() {
         chamber_air_mol: BVAD_CHAMBER_AIR_MOL,
         fan_mol_per_s: 0.2,
         vapour_crosses: false,
+        gas_exchange: GasExchangeStep::PlantStep,
     };
     let (state, _, _) = build_split_station(
         &params::charge(),
@@ -236,5 +253,39 @@ fn each_room_is_charged_at_its_own_size() {
         (state.stocks[CARBON_POOL].amount / BVAD_CHAMBER_AIR_MOL / (co2 / CABIN_AIR_MOL) - 1.0)
             .abs()
             < 1e-12
+    );
+}
+
+/// §16 G2 + G3 — with the crop's gas exchange on the MINUTE step, the BVAD chamber no longer
+/// starves, and the fan rate now matters. Measured at 90 days (2026-10-03): Q 0.1 / 0.2 / 0.4 →
+/// 0.892 / 0.939 / 0.963 of shared air's plant carbon, against 0.144 at any rate on the plant
+/// step (`the_starvation_does_not_depend_on_the_fan_rate`). Equal draws at different fan rates
+/// would mean the plant step is still the limit — the failure this pin exists to catch.
+#[test]
+fn on_the_minute_step_the_chamber_is_fed_and_the_fan_rate_matters() {
+    let base = plant_c(&shared());
+    let m = GasExchangeStep::Minute;
+    let [slow, mid, fast] =
+        [0.1, 0.2, 0.4].map(|q| plant_c(&split_with(BVAD_CHAMBER_AIR_MOL, q, false, m)));
+    assert!(mid / base > 0.8, "fan 0.2: {mid} vs shared {base}");
+    assert!(
+        slow < mid && mid < fast,
+        "fan 0.1 / 0.2 / 0.4 → {slow} / {mid} / {fast}"
+    );
+    assert!(
+        slow / fast < 0.97,
+        "fan 0.1 → {slow}, fan 0.4 → {fast}: the fan should matter"
+    );
+}
+
+/// §16 G4 — the control on the minute step: a cabin-sized chamber with a fast fan grows within
+/// 5 % of shared air (measured 1.008 at 90 days).
+#[test]
+fn on_the_minute_step_a_cabin_sized_chamber_recovers_shared_air() {
+    let base = plant_c(&shared());
+    let big = plant_c(&split_with(9500.0, 10.0, false, GasExchangeStep::Minute));
+    assert!(
+        (big / base - 1.0).abs() < 0.05,
+        "big chamber {big} vs shared {base}"
     );
 }

@@ -865,3 +865,38 @@ Cost measured before adopting.
 
 **Scope, stated:** transpiration stays on the plant step. Moving it too would send most of the
 crop's 700–1700 kg of water a season through the fan — the next question, not this one.
+
+### 16a. Gas exchange on the minute step BUILT (lab option) — the predictions graded (2026-10-03)
+
+**What landed.** `rust/crates/station/src/gas_exchange.rs` (`OnFastStep`, `PlantWindow`,
+`split_carbon_budget`, `gas_exchange_on_fast_step`, `require_one_plant_step_per_group`);
+`AirSplit.gas_exchange` selects the step on the separate-air build; the season instrument
+`examples/air_split.rs` counts the crop's CO₂ draw on whichever side it is taken (output
+`W:\temp\claude\air_split_run5.txt`); pins in `tests/gas_exchange.rs` (the three traps) and
+`tests/air_split.rs` (90-day season claims). Nothing in the reference calls it yet.
+
+**One season (305 days), "of shared" = the frozen plant-step shared run:**
+
+| Case | Crop gross CO₂ | Plant C at end | cabin CO₂ range |
+|---|---|---|---|
+| shared, plant step (frozen) | 129.556 (1.000) | 58.689 (1.000) | 3.731–3.833 |
+| shared, minute | 130.456 (**1.007**) | 59.114 (**1.007**) | 3.782–3.813 |
+| split 27.66 mol, Q 0.1, minute | 111.861 (0.863) | 49.484 (0.843) | — |
+| split 27.66 mol, Q 0.2, minute | 119.238 (**0.920**) | 53.263 (**0.908**) | — |
+| split 27.66 mol, Q 0.4, minute | 122.964 (0.949) | 55.184 (0.940) | — |
+| split Q 0.2, minute, vapour on | 119.238 (0.920) | 53.263 (0.908) | — |
+| big 9500 mol, Q 10, minute | 130.325 (1.006) | 59.047 (1.006) | — |
+| (split Q 0.2, plant step, for contrast) | 22.519 (0.174) | 8.429 (0.144) | — |
+
+| # | Prediction | Result |
+|---|---|---|
+| G1 | shared air within ±1 % | **HELD** — +0.7 % draw and plant carbon (up, the direction a finer step on growth gives). The shared pool's minute-to-minute swing narrows to a third (3.731–3.833 → 3.782–3.813): the crop's draw is now spread through the 90 minutes instead of landing at once |
+| G2 | split draw 0.75–0.98 of shared | **HELD** — 0.920 (plant carbon 0.908) |
+| G3 | fan rate matters; Q0.1/Q0.4 ≤ 0.97 | **HELD** — 0.863 < 0.920 < 0.949; ratio **0.910** (plant carbon 0.843 / 0.940 = 0.897) |
+| G4 | big chamber within ±5 %; vapour on/off leaves plant C unchanged | **HELD** — 0.999 of minute-shared; 53.263 on and off |
+| G5 | conservation, 0 / 0 rationing, no events | **HELD** for conservation and rationing on every season run; events are asserted empty by the 90-day pins (the season instrument does not count them) |
+| G6 | the window pin | **HELD** — `the_fast_step_reads_the_light_of_the_plant_window_it_lies_in`, plus the flow-level pin. Mutations, `--no-fail-fast`, each restored and `cmp`-checked: reading window `n` → 2 red; `dt` left in seconds → 1 red; the three left on the plant step too → 1 red |
+| G7 | cost | a season with the observer (which re-evaluates the three each minute): **≈ 26 s vs ≈ 18 s** on the plant step. The reference's own cost is measured at adoption (§17) |
+
+**Tally: 7 held.** At 90 days (the pins): Q 0.1 / 0.2 / 0.4 → 0.892 / 0.939 / 0.963 of shared air's
+plant carbon; the 9500-mol chamber 1.008.
