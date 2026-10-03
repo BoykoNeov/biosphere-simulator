@@ -58,6 +58,8 @@ struct Reading {
     watered: f64,
     exported: f64,
     stress_min: f64,
+    /// The root zone's lowest fill, `ATSW / TTSW` (FTSW), at plant-step starts.
+    ftsw_min: f64,
     stressed_steps: u64,
     rationed: (u64, u64),
     events: usize,
@@ -108,6 +110,7 @@ fn season(warm: bool, watering: bool) -> (State, State, Reading) {
     };
     let mut r = Reading {
         stress_min: 1.0,
+        ftsw_min: f64::INFINITY,
         ..Reading::default()
     };
     let b = scenario.bio;
@@ -121,6 +124,12 @@ fn season(warm: bool, watering: bool) -> (State, State, Reading) {
                 b.ground_area,
                 b.wssg,
             );
+            let ttsw = domains::biosphere::science::transpirable_capacity(
+                before.aux.get(ROOTED_DEPTH).copied().unwrap_or(0.0),
+                b.soil_extractable_water,
+                b.ground_area,
+            );
+            r.ftsw_min = r.ftsw_min.min(before.stocks[SOIL_WATER].amount / ttsw);
             r.stress_min = r.stress_min.min(f);
             r.stressed_steps += u64::from(f < 1.0);
             let env = bio_r.bind(before, scenario.bio_dt);
@@ -178,7 +187,7 @@ fn main() {
         println!(
             "{name:<30} | watered {:8.3} kg | fan export {:8.3} kg | plant water {:8.3} → {:8.3} \
              (soil {:7.3}→{:7.3}, subsoil {:7.3}→{:7.3}) | crew store {:+9.3} kg, brine {:+7.3} kg \
-             | stress min {:.4} on {} steps | plant C {:7.3} | rationed {:?}, events {}",
+             | FTSW min {:.4} | stress min {:.4} on {} steps | plant C {:7.3} | rationed {:?}, events {}",
             r.watered,
             r.exported,
             plant_water(&s0),
@@ -189,6 +198,7 @@ fn main() {
             end.stocks[SUBSOIL_WATER].amount,
             end.stocks[WATER_STORE].amount - s0.stocks[WATER_STORE].amount,
             end.stocks[BRINE].amount - s0.stocks[BRINE].amount,
+            r.ftsw_min,
             r.stress_min,
             r.stressed_steps,
             plant_c(&end),

@@ -1054,3 +1054,34 @@ not water: no run reached water stress.
 own condensate already waters the crop: it fills ahead of the loop and inflates it. (2) The drain the
 watering was asked to answer is itself bounded by the plant step's transpiration-into-air rule — the
 next question §16 named (transpiration on the minute step).
+
+### 18b. Watering REDESIGNED: on a depletion trigger (advisor, 2026-10-03; predictions before code)
+
+**The source of WHEN.** FAO-56 (Allen et al. 1998, *Crop evapotranspiration*, FAO Irrigation and
+Drainage Paper 56), **Table 22**, "Ranges of maximum effective rooting depth (Zr), and soil water
+depletion fraction for no stress (p), for common crops" (fetched from fao.org, chapter 8,
+2026-10-03): spring wheat **p = 0.55**, winter wheat **p = 0.55**; *"The fraction of TAW that a
+crop can extract from the root zone without suffering water stress is the readily available soil
+water: RAW = p TAW."* Taken as the irrigation trigger: water when depletion reaches RAW, i.e.
+when the root zone's fill `FTSW = ATSW / TTSW` falls below **1 − p = 0.45**. ⚠ Locus: TAW is
+FAO's field-capacity-to-wilting-point store and `TTSW` is [F]'s transpirable store — the same
+quantity by definition, read here as a class citation. The check the advisor set: 0.45 sits
+**above** the model crop's own stress onset (`wssg` 0.30), so it waters before the crop suffers.
+**HOW MUCH** stays [F] Eqn 14.8's refill (`min(capacity · A · dt, TTSW − ATSW)`). Without a latch,
+a refill capped at 0.5 kg per plant step stops as soon as FTSW is back over 0.45, so the zone is
+HELD at the trigger rather than refilled to the top — stated, not hidden.
+
+**Measured before predicting** (`W:\temp\claude\watering_run2.txt`, the §18a runs with the root
+zone's lowest fill added): without watering the zone never falls below **0.8184** (weather chamber)
+or **0.6623** (22 °C).
+
+**Predictions:**
+
+* **T1 — no season run needs it:** in all four runs watering delivers **exactly 0 kg**, and each
+  watering-on run's end state is **byte-identical** to its watering-off run.
+* **T2 — it fires when the zone IS low** (pin a): a root zone started below the trigger is watered
+  from `crew.water_store` (the store falls by exactly what the soil gains), the step after the zone
+  is back over 0.45 it stops.
+* **T3 — above the trigger it gives exactly 0** (pin b).
+* **T4 — liveness:** the always-refill rule (§18a's) turns pin b red; an inverted comparison turns
+  pin a red.
