@@ -1024,3 +1024,33 @@ subsoil's, as in the field.
   store through the condenser and the recovery processor (`recovery_efficiency` 0.9), so with
   watering the crew's store falls by ≈ **10 % of the water cycled**, not by all of it.
 * **R5 — books:** conservation every step, 0 / 0 rationing, no events.
+
+### 18a. Watering BUILT as predicted — the predictions graded, and mostly FAILED (2026-10-03)
+
+`AirSplit.watering` adds the field's `Irrigation` (source `crew.water_store`, 8 mm/day cap) to
+the plant step; instrument `rust/crates/station/examples/watering.rs`, output
+`W:\temp\claude\watering_run1.txt`. One season, separate air, Q 0.2, vapour crossing, minute
+gas exchange:
+
+| Chamber | Watering | Watered (kg) | Fan export (kg) | Plants' water 195.000 → | soil / subsoil at end | Crew store Δ | Brine Δ | Water stress | Plant C |
+|---|---|---|---|---|---|---|---|---|---|
+| weather | off | 0 | −2.083 | 197.083 | 159.2 / 28.3 | −133.74 | +131.54 | never | 53.263 |
+| weather | on | **43.256** | −2.083 | **240.339** | 169.0 / 61.8 | −177.00 | +131.54 | never | 53.263 |
+| 22 °C | off | 0 | **21.248** | 173.752 | 133.3 / 25.9 | −112.74 | +133.87 | never | 28.314 |
+| 22 °C | on | **51.178** | 21.248 | **224.930** | 169.1 / 41.2 | −163.92 | +133.87 | never | 28.314 |
+
+| # | Prediction | Result |
+|---|---|---|
+| R1 | weather chamber: watering delivers 0 | ✗ **FAILED** — 43.3 kg. The field rule refills the root zone to capacity every plant step its own transpiration dips it, AHEAD of the chamber's recycled condensate; the condensate then arrives on a full zone and drains below it. So watering pre-empts the plants' own loop and adds the crew's water to it: the plants' water ends **+45 kg** |
+| R2 | 22 °C, no watering: drain ≥ 50 kg and water stress | ✗ **FAILED** — 21.2 kg and no stress. The drain is capped by the PLANT STEP again: transpiration (still on it) puts at most the chamber's headroom into the air each 90 minutes and condenses the rest inside, and with the fan holding the chamber near the cabin's level that headroom is ≈ (3.5e-4 − 1.95e-4) kg/mol × 27.66 mol ≈ 0.0043 kg a step × 16 × 305 ≈ 21 kg. The same step artefact as the CO₂ starvation, on the water side |
+| R3 | 22 °C + watering: delivered ±10 % of export, plants' water ±2 % | ✗ **FAILED** — delivered 51.2 vs 21.2 exported; the plants' water ends **+15 %** (R1's mechanism) |
+| R4 | crew store falls ≈ 10 % of cycled water | ✗ **FAILED** — the crew paid all 51.2 kg; brine is identical with and without watering, because the extra water stayed in the plants' loop and never cycled back |
+| R5 | books | **HELD** — 0 / 0 rationing, no events, every run |
+
+**Tally: 1 held, 4 failed.** The 22 °C crop's lower carbon is the warm room's arrest (§9, slice 1),
+not water: no run reached water stress.
+
+**What the failures say.** (1) A field's top-up rule is the wrong controller for a closed room whose
+own condensate already waters the crop: it fills ahead of the loop and inflates it. (2) The drain the
+watering was asked to answer is itself bounded by the plant step's transpiration-into-air rule — the
+next question §16 named (transpiration on the minute step).

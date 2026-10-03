@@ -394,6 +394,7 @@ fn every_crop_build_steps_the_carbon_budget_exactly_once() {
             fan_mol_per_s: 0.2,
             vapour_crosses: true,
             gas_exchange: gas,
+            watering: false,
         };
         let (_, bio, fast) = build_split_station(
             &params::charge(),

@@ -417,6 +417,7 @@ fn main() {
                 fan_mol_per_s: q,
                 vapour_crosses: vapour,
                 gas_exchange: gas,
+                watering: false,
             },
             days,
         );

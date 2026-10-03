@@ -26,10 +26,13 @@
 //! "Ventilation" row is an air speed. The plant chamber's size is BVAD Table 4-88's 0.67 m³
 //! of shoot zone per m² of crop (page image owed), an upper bound on free air.
 
+use domains::biosphere::flows::Irrigation;
 use domains::biosphere::science::N2_MOLAR_MASS_KG_PER_MOL;
-use domains::biosphere::stocks::{CARBON_POOL, CHAMBER_INERT, O2_POOL, WATER_VAPOR};
+use domains::biosphere::stocks::{
+    CARBON_POOL, CHAMBER_INERT, IRRIGATION_VAR, O2_POOL, ROOTED_DEPTH, SOIL_WATER, WATER_VAPOR,
+};
 use domains::biosphere::system::weather_shared;
-use domains::crew::{CrewParams, FECAL_WASTE};
+use domains::crew::{CrewParams, FECAL_WASTE, WATER_STORE};
 use domains::eclss::{EclssParams, CABIN_CO2, CABIN_H2O, CABIN_O2, ECLSS_DOMAIN};
 use domains::power::ChargeParams;
 use domains::thermal::ThermalParams;
@@ -75,7 +78,13 @@ pub struct AirSplit {
     /// Which step the crop's gas exchange is taken on (§16): the plant step starves a small
     /// chamber by construction, the minute step lets the fan refill it as the crop draws.
     pub gas_exchange: GasExchangeStep,
+    /// Whether the plants are watered from the crew's store (§18): the open field's own
+    /// demand-driven `Irrigation` ([F] Eqn 14.8), its source re-pointed at `crew.water_store`.
+    pub watering: bool,
 }
+
+/// The watering flow's id (§18).
+pub const WATERING: &str = "station.watering";
 
 /// The fan: every species crosses by its concentration difference ([module docs](self)).
 pub struct AirExchange {
@@ -198,6 +207,24 @@ pub fn build_split_station(
         }
     }
     let state = State::new(state.n, stocks, state.rng_seed, state.aux)?;
+
+    // §18: watered from the crew's supply — the field's top-up, on the plant step (its rate is
+    // per day, and it reads the rooted depth the plant step advances).
+    let bio_reg = if split.watering {
+        let (mut flows, aux) = bio_reg.into_parts();
+        flows.push(Box::new(Irrigation {
+            id: WATERING.to_string(),
+            water_source: WATER_STORE.to_string(),
+            soil_water: SOIL_WATER.to_string(),
+            irrigation_var: IRRIGATION_VAR.to_string(),
+            ground_area: resized.bio.ground_area,
+            rooted_depth_aux: ROOTED_DEPTH.to_string(),
+            soil_extractable_water: resized.bio.soil_extractable_water,
+        }));
+        Registry::new(flows, &state.stocks, aux)?
+    } else {
+        bio_reg
+    };
 
     let mut pairs = vec![
         (CABIN_CO2.to_string(), CARBON_POOL.to_string()),

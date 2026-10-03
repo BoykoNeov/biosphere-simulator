@@ -116,6 +116,7 @@ fn split_with(
         fan_mol_per_s,
         vapour_crosses,
         gas_exchange,
+        watering: false,
     };
     let built = build_split_station(
         &params::charge(),
@@ -223,6 +224,7 @@ fn each_room_is_charged_at_its_own_size() {
         fan_mol_per_s: 0.2,
         vapour_crosses: false,
         gas_exchange: GasExchangeStep::PlantStep,
+        watering: false,
     };
     let (state, _, _) = build_split_station(
         &params::charge(),
