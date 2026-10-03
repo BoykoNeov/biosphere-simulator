@@ -640,16 +640,19 @@ runs of the same claims). Fan `Q` = 0.2 mol/s (DESIGN, inside the window).
 | # | Prediction | Result |
 |---|---|---|
 | 1 | default build untouched | **HELD** — `regen_goldens`: 20 of 20 identical; `cargo test --no-fail-fast` 1252 passed, 1 red that was **not** this build (my own MEMORY.md hook past the 240 B per-line gate — shortened, gate green); `clippy --all-targets -D warnings` clean |
-| 2 | conservation every step | **HELD** — the driver asserts it per sub-step; every run completed |
+| 2a | conservation every step | **HELD** — the driver asserts it per sub-step; every run completed |
+| 2b | each room's total moves only by the fan's net, zero at reference pressure | ✗ **FALSIFIED as stated** (graded after the advisor's review, `examples/air_split.rs` run 2, `W:	emp\claudeir_split_run2.txt`): the rooms do not sit at reference — the chamber's total gas reaches **+1.96 %** over its reference air (the vapour, which the dry inert charge leaves out; the **shared** room reads the same 1.96e-2, so this predates the split), the cabin drifts **≤ 2.5e-4** (scrubber, makeup, crew). The fan carried **0 mol** of inert gas all season: both rooms start at the same inert concentration and nothing else moves inert, so the fan has nothing to even out. It evens out a pressure difference only once one room's inert changes (a breach) |
 | 3 | crop starves by the step, well under half | **HELD** — 0.174 of shared CO₂ (0.074 mol/day, under the ≈ 0.118 ceiling); plant carbon 0.144 |
 | 4 | a fan window exists; starvation is the step's | **HELD** via the fan-rate control |
 | fan-rate | Q 0.1 vs 0.4 within 5 % | **HELD** — equal to 5 figures (22.5186 / 22.5187) |
 | 5 | big chamber within ±5 % of shared | **HELD** — 0.999 |
 | 6 | cabin CO₂ within ±0.01 % of 3.796 | ✗ **FALSIFIED** — 3.7907–3.8012 (±0.14 %). The bound came from the shared pool read at **slow-step** starts (3.79575–3.79617); read at every fast step the shared pool itself swings 3.731–3.833 (±1.7 %). The split cabin is **steadier** than the shared pool, not as steady as claimed |
-| W1 | vapour off: same humidity, same transpiration | **HELD** — RH 0.7502 vs 0.7481; transpiration 0.996; `to_air` 0.83 vs 284.7 kg |
+| W1 | vapour off: same humidity, same transpiration | **HELD** — RH 0.7502 vs 0.7481; transpiration 0.996; `to_air` 0.83 vs 284.7 kg. ⚠ The promised per-step water-stress record was **not built** (the instrument records where the source bound binds, not the stress factor); W4's identical plant carbon is the stronger evidence and stands in for it |
 | W2 | one way only, chamber → cabin, every season | ✗ **FALSIFIED in the absolute** — chamber → cabin on all but **78** of 439 200 fan steps; the seasonal direction held |
 | W3 | export ≈ 10–50 kg/season, ≈ 0.04–0.16 kg/day; transpiration up ≈ 3–4× | export **HELD** (23.30 kg, 0.076 kg/day); transpiration ✗ **MISSED LOW** — **2.40×** |
 | W4 | vapour on/off attributes the effects | **HELD** — plant carbon identical (8.429) on and off: within a season the drain does not touch the crop, so prediction 3 is CO₂ alone |
+
+**Tally: 9 held, 4 failed** (2b, 6, W2 in the absolute, W3's transpiration).
 
 **Liveness of the lab pins (mutations, `--no-fail-fast`, each restored and `cmp`-checked):**
 vapour never crossing → the drain pin goes red; the crew breathing the chamber's pools (no
@@ -669,8 +672,13 @@ pin was added, `each_room_is_charged_at_its_own_size`, which that mutation turns
 
 **Decisions owed to the user (not taken):**
 
-1. **How the plants' gas exchange meets the fan** — the starvation is the slow step's: crop gas
-   exchange on the fast step; the fan's resupply inside the slow step; or a larger chamber (DESIGN).
+1. **How the plants' gas exchange meets the fan** — the starvation is the slow step's. A chamber
+   stops starving only above ≈ **184 mol ≈ 4.5 m³ per m² of crop** (the worst step's 0.0736 mol at
+   the cabin's CO₂ concentration) — 6.7× BVAD's 0.67 m³, so the unread page image cannot overturn
+   this. Each remedy's price: crop gas exchange on the fast step changes the **frozen biosphere
+   step**; folding the fan's resupply into the crop's end-of-step CO₂ solve couples a biosphere
+   flow to a station flow; a larger chamber is a DESIGN size picked so the crop behaves —
+   calibration, unless a source sets it.
 2. **A water return path** — with vapour crossing, the plants' water ends up in the crew's store
    and nothing brings it back (a real station would irrigate from it).
 3. **The cabin's humidity** — `eclss.yaml`'s DESIGN condenser rate holds the cabin at ≈ 1.5 % RH,

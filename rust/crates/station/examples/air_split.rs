@@ -17,13 +17,15 @@
 
 use domains::biosphere::params as bio_params;
 use domains::biosphere::readouts::withdrawal_demand;
-use domains::biosphere::science::{humidity_target_kg, saturation_vapour_kg};
+use domains::biosphere::science::{
+    humidity_target_kg, saturation_vapour_kg, H2O_MOLAR_MASS_KG_PER_MOL, N2_MOLAR_MASS_KG_PER_MOL,
+};
 use domains::biosphere::stocks::{
-    CARBON_POOL, CONDENSATE, LEAF_C, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C, SUBSOIL_WATER,
-    TEMP_VAR, WATER_SOURCE, WATER_VAPOR,
+    CARBON_POOL, CHAMBER_INERT, CONDENSATE, LEAF_C, O2_POOL, ROOT_C, SOIL_WATER, STEM_C, STORAGE_C,
+    SUBSOIL_WATER, TEMP_VAR, WATER_SOURCE, WATER_VAPOR,
 };
 use domains::crew::WATER_STORE;
-use domains::eclss::{CABIN_CO2, CABIN_H2O};
+use domains::eclss::{CABIN_CO2, CABIN_H2O, CABIN_O2};
 use domains::params;
 use simcore::environment::Environment;
 use simcore::flow::FlowResult;
@@ -32,6 +34,7 @@ use simcore::registry::Registry;
 use simcore::state::State;
 use station::air_split::{
     build_split_station, split_scenario, AirSplit, AIR_EXCHANGE, BVAD_CHAMBER_AIR_MOL,
+    CABIN_AIR_MOL, CABIN_INERT,
 };
 use station::driver::{DayOrder, Side, TwoRate};
 use station::params as station_params;
@@ -63,6 +66,12 @@ struct Reading {
     cabin_co2_max: f64,
     rationed: (u64, u64),
     end: Option<State>,
+    /// The largest |total gas / reference air − 1| at fast-step starts, per room (the cabin's
+    /// only when it has its own air), and the season's net inert fill the fan carried into the
+    /// chamber (mol).
+    chamber_dev: f64,
+    cabin_dev: f64,
+    inert_in: f64,
 }
 
 fn plant_c(s: &State) -> f64 {
@@ -152,6 +161,18 @@ fn season(
             }
         }
         Side::Fast => {
+            let total = |co2: &str, o2: &str, inert: &str, vapour: &str| {
+                before.stocks[co2].amount
+                    + before.stocks[o2].amount
+                    + before.stocks[inert].amount / N2_MOLAR_MASS_KG_PER_MOL
+                    + before.stocks[vapour].amount / H2O_MOLAR_MASS_KG_PER_MOL
+            };
+            let chamber = total(CARBON_POOL, O2_POOL, CHAMBER_INERT, WATER_VAPOR);
+            r.chamber_dev = r.chamber_dev.max((chamber / chamber_air_mol - 1.0).abs());
+            if before.stocks.contains_key(CABIN_INERT) {
+                let cabin = total(CABIN_CO2, CABIN_O2, CABIN_INERT, CABIN_H2O);
+                r.cabin_dev = r.cabin_dev.max((cabin / CABIN_AIR_MOL - 1.0).abs());
+            }
             let c = before.stocks[cabin_co2_id].amount;
             r.cabin_co2_min = r.cabin_co2_min.min(c);
             r.cabin_co2_max = r.cabin_co2_max.max(c);
@@ -160,6 +181,9 @@ fn season(
                 if f.id() == AIR_EXCHANGE {
                     let res = f.evaluate(before, &bound, scenario.cabin_dt).expect("fan");
                     for leg in &res.legs {
+                        if leg.stock == CHAMBER_INERT {
+                            r.inert_in += leg.amount / N2_MOLAR_MASS_KG_PER_MOL;
+                        }
                         if leg.stock == CABIN_H2O {
                             if leg.amount > 0.0 {
                                 r.exported += leg.amount;
@@ -236,7 +260,7 @@ fn print(name: &str, r: &Reading, base: &Reading) {
     println!(
         "{name:<22} co2 {:8.4} mol ({:6.3} of shared) | plant C {:7.3} ({:6.3}) | RH {:.4} | \
          transp {:8.3} kg ({:5.3}) to_air {:7.3} bound {:5} | export {:7.3} kg (back {}) | \
-         plant water {:8.3} crew water {:9.3} | cabin CO2 {:.6}–{:.6} | rationed {:?}",
+         plant water {:8.3} crew water {:9.3} | cabin CO2 {:.6}–{:.6} | rationed {:?} |          total/ref − 1: chamber {:.3e} cabin {:.3e}, inert into chamber {:.4} mol",
         r.co2_gross,
         r.co2_gross / base.co2_gross,
         plant_c(end),
@@ -253,6 +277,9 @@ fn print(name: &str, r: &Reading, base: &Reading) {
         r.cabin_co2_min,
         r.cabin_co2_max,
         r.rationed,
+        r.chamber_dev,
+        r.cabin_dev,
+        r.inert_in,
     );
 }
 
