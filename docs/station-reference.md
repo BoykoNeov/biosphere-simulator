@@ -132,9 +132,10 @@ no biosphere flow stepped on the plant step (`MicrobialRespiration` / …) appea
 `MaintenanceRespiration` are stepped on the sealed station's fast registry (the exception
 above). The plant-step `PlantWindowRecorder` that feeds them is in the excluded slow registry,
 so no freeze record lists it. The `aux_set`
-is empty — the siblings + station carry no non-conserved accumulator (the biosphere's
-`ThermalTimeAccumulation` lives in the delegated slow registry) — but the *set* is frozen
-so a future aux is caught.
+is empty because every aux process lives in the excluded slow registry — the biosphere's
+`ThermalTimeAccumulation` and, since 2026-10-03, the station's own `PlantWindowRecorder` —
+not because the station carries none (it carries that one). The *set* is frozen so a future
+aux on a fast registry is caught.
 
 ### The eight param files
 

@@ -1105,3 +1105,22 @@ stands it never has to: the most the season drains is 21 kg, against a root zone
 below 66 % full. **That 21 kg is the plant step's**, not the room's (§18a, R2): transpiration
 still puts at most the chamber's headroom into its air each 90 minutes. Moving transpiration to the
 minute step is the next decision, and the user's.
+
+### 17b. Follow-up checks after adoption (advisor, 2026-10-03)
+
+* **Lamp shedding reaches photosynthesis — by a run, not only by reading.** `tests/lamp_shed.rs`
+  builds with `build_sealed_station` (minute step since §17) and stayed green:
+  `a_blackout_sheds_the_lamp_and_the_crop_feels_it` and
+  `cutting_only_the_lamps_power_darkens_the_lab_crop` both assert the crop grows LESS. On the
+  minute build the recorded window PAR is the only light the carbon budget reads, so those pins
+  now cover the recorder's lamp-lit path.
+* **`examples/draw_census.rs` re-run after adoption** (`W:\temp\claude\draw_census_after_adoption.txt`):
+  control 1 byte-exact on all 18 goldens it runs, the three adopted ones included. ⚠ Its control 4
+  reports FAILED — *"lab_leaf_jar: control 4 case does not ration — it proves nothing"* — and so
+  does the pre-session commit `5661ded` (`W:\temp\claude\draw_census_pre_session.txt`): the lab
+  leaf jar stopped rationing at the 1/16 step (2026-09-30), so the control's chosen case went
+  stale then. Not caused here; recorded, not fixed.
+* **Recompiled, NOT re-run:** `examples/intraday_exchange.rs` and `examples/lamp_shed.rs`. Their
+  recorded numbers date from plant-step builds (`intraday_exchange` is now pinned to them).
+* `docs/station-reference.md`'s "the `aux_set` is empty — the station carries no non-conserved
+  accumulator" was false after §17 (it carries `PlantWindowRecorder`); reworded to the real reason.
